@@ -5230,6 +5230,98 @@ def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Op
     return r
 
 
+def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
+    """COST-OF-SERVICE economics for a no-market-revenue infrastructure / utility plant (water /
+    treatment / fertigation): the HONEST, COMPLETE economic model is capex + annual opex + the
+    LEVELISED COST per output unit (£/m³ of delivered water), NOT a revenue/EBITDA/NPV/IRR model —
+    there is no product sale. Computed DETERMINISTICALLY from the engine's costStack + the opex
+    drivers on the Inputs tab; records state['_costOfService'] so the scorer treats this as the
+    class-appropriate model (a real cost-recovery tariff, not a fake-8 over an 'UNVERIFIED revenue'
+    banner). Returns the next row, or None (caller renders the revenue model) when no capex/output
+    is derivable. UNIVERSAL — keyed on the no-verified-price + infrastructure signal, no class table."""
+    cs = state.get("costStack") or {}
+    capex = num(cs.get("all_in_capex_gbp")) or num(cs.get("installed_asp_gbp"))
+    if not capex or capex <= 0:
+        return None
+    out_qty, out_unit, _pu, out_noun = _econ_output_metric(state)
+    if not out_qty or out_qty <= 0:
+        return None
+    d = _ECON_DEFAULTS
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+
+    def _qv(*keys: str) -> float:
+        for k in keys:
+            v = q.get(k)
+            if isinstance(v, dict) and isinstance(v.get("value"), (int, float)):
+                return float(v["value"])
+        return 0.0
+
+    # A levelised £/unit is only meaningful over an ANNUAL THROUGHPUT (£/m³·yr). The generic output
+    # metric can resolve to a non-time COUNT (e.g. an emitter count) — useless for a cost-of-service
+    # tariff. When it is NOT per-year, derive the plant's annual delivered VOLUME from its largest
+    # process flow (m³/h × operating hours), so the levelised cost reads £/m³. UNIVERSAL.
+    if not _output_is_per_year(out_unit):
+        flow_m3h = 0.0
+        for _nm, _qv2 in q.items():
+            if not isinstance(_qv2, dict):
+                continue
+            _u = str(_qv2.get("unit") or "").replace("³", "3").lower()
+            _fam = str(_qv2.get("family") or "").lower()
+            if ("m3/h" in _u or "m3/hr" in _u) and _fam in ("flow_rate", "throughput"):
+                _vv = num(_qv2.get("value"))
+                if _vv and _vv > flow_m3h:
+                    flow_m3h = float(_vv)
+        if flow_m3h > 0:
+            out_qty = flow_m3h * d["hours"] * d["load_factor"]
+            out_unit, out_noun = "m³/yr", "treated water"
+
+    conn_kw = _qv("connected_electrical_load_kw", "total_electrical_demand_kw",
+                  "total_connected_load_kw", "connected_load_kw")
+    energy = conn_kw * d["hours"] * d["load_factor"] * d["energy_price"]
+    maint = capex * d["maint_pct"] / 100.0
+    opex = energy + d["labour"] + maint + d["other_opex"]
+    i = d["discount_rate"] / 100.0
+    n = float(d["project_life"])
+    crf = (i * (1 + i) ** n) / (((1 + i) ** n) - 1) if i > 0 and n > 0 else (1.0 / n if n else 0.0)
+    ann_capex = capex * crf
+    levelised = (ann_capex + opex) / out_qty
+    unit_base = out_unit.split("/")[0] if "/" in out_unit else out_unit
+    state["_costOfService"] = {
+        "capex_gbp": round(capex), "annual_opex_gbp": round(opex),
+        "annualised_capex_gbp": round(ann_capex), "levelised_cost_per_unit": round(levelised, 4),
+        "output_qty": out_qty, "output_unit": out_unit, "unit_base": unit_base, "crf": round(crf, 4),
+    }
+    sub_banner(ws, r, "COST-OF-SERVICE MODEL — infrastructure / utility plant, NO market revenue", 8)
+    r += 1
+    note = ws.cell(r, 1, f"A cost-recovery utility — its economics are the LEVELISED COST of delivered "
+                         f"{out_noun}, not revenue/NPV/IRR (there is no product sale). Levelised = "
+                         f"(capex annualised at CRF {crf:.3f} over {n:.0f} yr + annual opex) ÷ "
+                         f"{out_qty:,.0f} {out_unit}.")
+    note.font = Font(italic=True, size=9, color="555555")
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    r += 2
+    header(ws, r, ["Item", "Value (£)", "", "Basis"])
+    r += 1
+    rows = [
+        ("All-in capex", round(capex), FMT_INT, "engine costStack (all-in / installed ASP)"),
+        ("Annualised capex / yr", round(ann_capex), FMT_INT, f"capex × CRF (i={d['discount_rate']:.0f}%, n={n:.0f} yr)"),
+        ("Energy / yr", round(energy), FMT_INT, f"{conn_kw:,.0f} kW × {d['hours']:.0f} h × {d['load_factor']:.0%} × £{d['energy_price']:.2f}/kWh"),
+        ("Maintenance / yr", round(maint), FMT_INT, f"{d['maint_pct']:.0f}% of capex"),
+        ("Labour + other opex / yr", round(d["labour"] + d["other_opex"]), FMT_INT, "operations crew + consumables"),
+        ("TOTAL annual opex / yr", round(opex), FMT_INT, "energy + maintenance + labour + other"),
+        (f"LEVELISED COST (£/{unit_base})", round(levelised, 2), '£#,##0.00', f"(annualised capex + opex) ÷ {out_qty:,.0f} {out_unit}"),
+    ]
+    for label, val, fmt, basis in rows:
+        bold = label.startswith(("TOTAL", "LEVELISED"))
+        ws.cell(r, 1, label).font = Font(bold=bold)
+        c = ws.cell(r, 2, val); c.number_format = fmt
+        if bold:
+            c.font = Font(bold=True)
+        bc = ws.cell(r, 4, basis); bc.font = Font(size=9, color="555555")
+        r += 1
+    return r
+
+
 def tab_financial_model(wb: Workbook, state: dict) -> bool:
     """A + B (consolidation 2026-06-24) — "Financial model": Economics (base case +
     its opex pie / revenue-vs-EBITDA bar) on top, then the Scenarios scale sweep +
@@ -5268,6 +5360,17 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
         ws.row_dimensions[r].height = 24
         r += 2
+
+    # ── COST-OF-SERVICE (infrastructure / no market revenue) — the HONEST model for a utility ──
+    # A water / treatment / fertigation plant has NO product sale, so a revenue/NPV/IRR model is
+    # UNVERIFIABLE by construction (the prior fake-8 / capped-6). Its real economics are capex +
+    # opex + the levelised cost of delivered water. Render that FIRST when no per-unit market price
+    # is verified; it sets state['_costOfService'] so the scorer credits the cost-of-service model.
+    cos_next = None
+    if _econ_sale_unverified():
+        cos_next = _render_cost_of_service_section(ws, state, r)
+        if cos_next is not None:
+            r = cos_next + 2
 
     # ── Economics ──
     _section("Economics — base case (revenue / opex / EBITDA / NPV / IRR)")
@@ -7304,10 +7407,16 @@ def build(run_dir: str, out_path: str) -> dict:
     # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
     # '⚠ UNVERIFIED ECONOMICS' banner. _econ_sale_unverified() is the engine's real sale-price-verified
     # signal (a 'revenue' WORD in state is not enough — the PRICE must be derivable). When unverified,
-    # cap the Financial-model score at a FAIL so the banner and the score agree.
+    # cap the Financial-model score at a FAIL so the banner and the score agree — UNLESS the tab now
+    # presents a COST-OF-SERVICE model (state['_costOfService'], a capex/opex/levelised-£-per-unit
+    # frame): for an infrastructure / utility plant THAT is the honest, complete, class-appropriate
+    # economics (a cost-recovery tariff, not a fake revenue stub), so the absence of a MARKET price
+    # is expected, not a defect — do not cap it. (This is the 'OR a capex/opex/payback model for this
+    # class' branch the prior message itself asked for.)
     try:
         _fm = _TAB_SCORES.get("Financial model")
-        if _econ_sale_unverified() and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
+        _has_cos = isinstance(state.get("_costOfService"), dict) and (state["_costOfService"].get("capex_gbp") or 0) > 0
+        if _econ_sale_unverified() and not _has_cos and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
             _fm["score"] = 6
             _fm["status"] = "FAIL"
             _fm["issues"] = (["the economics are UNVERIFIED — no per-unit market sale price is derivable, "

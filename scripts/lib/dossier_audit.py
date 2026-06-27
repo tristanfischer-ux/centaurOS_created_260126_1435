@@ -779,7 +779,14 @@ def check_economics(state, rows, run_dir) -> list:
     # known, recoverable model → MED); any other class with no derivable sale price is an unverified
     # model that needs a real price OR a class-appropriate capex/opex/payback frame (→ HIGH).
     cls = _product_class(state)
-    if not _state_has_revenue_signal(state):
+    # A COST-OF-SERVICE frame (capex/opex/levelised-£-per-unit) IS the honest, class-appropriate
+    # economic model for an infrastructure / utility plant with no product sale — it is exactly the
+    # "capex/opex/payback model for this class" this check asks for. When present, the absence of a
+    # MARKET sale price is expected, not a defect, so do not flag the no-revenue HIGH. (build-excel's
+    # _render_cost_of_service_section records state['_costOfService'] for a no-verified-price plant.)
+    _cos = state.get("_costOfService")
+    _has_cost_of_service = isinstance(_cos, dict) and (_num(_cos.get("capex_gbp")) or 0) > 0
+    if not _state_has_revenue_signal(state) and not _has_cost_of_service:
         if _NO_OUTPUT_SALE_RX.search(cls):
             out.append(Finding(
                 tab=tab, check="no_revenue_line", severity="MED",
