@@ -2745,10 +2745,32 @@ export function reassertPopulationCounts(modules: ModuleLike[], contract: Contra
 // UNIVERSAL — a real part ends in a DEVICE noun (the `\s*$` anchor spares "Pressure Vessel" /
 // "Control Valve"); sub-components are spared (their parent owns the attribute). Mutates in place.
 const ATTRIBUTE_NAME_RE = /\b(area|diameter|radius|circumference|volume|height|length|width|depth|thickness|capacity|throughput|flow ?rate|velocity|head|footprint|pressure|temperature|count|spacing|pitch|ratio|density|mass|weight|power|voltage|current|frequency)\s*$/i
+// Parse a word's population count from its quantity modifier ('×200' → 200; '1' → 1; absent → 1).
+function _wordPopCount(w: WordLike): number {
+  for (const mc of (w as { modifier_characters?: Array<{ kind?: string; value?: unknown }> }).modifier_characters ?? []) {
+    if (mc.kind === 'quantity') {
+      const n = parseInt(String(mc.value ?? '').replace(/[^0-9]/g, ''), 10)
+      if (Number.isFinite(n) && n > 0) return n
+    }
+  }
+  return 1
+}
+// Singularise each token (strip a word-final 's') so 'Pneumatic Actuated Valves' === 'Pneumatic
+// Actuated Valve' for de-duplication. Lower-cased + whitespace-collapsed.
+function _singularisePhrase(s: string): string {
+  return (s || '').toLowerCase().replace(/s\b/g, '').replace(/\s+/g, ' ').trim()
+}
+
 export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhantom: number; droppedDuplicate: number } {
   let droppedPhantom = 0
   let droppedDuplicate = 0
   const seenIds = new Set<string>()
+  // POPULATION duplicate guard (Tristan 2026-06-27): a high-count population emitted under both a
+  // SINGULAR and a PLURAL name ('Pneumatic Actuated Valve ×200' + 'Pneumatic Actuated Valves ×200') is
+  // the SAME 200 valves counted twice — the physics critic's "multiple redundant groups of 200" HIGH.
+  // De-dup across the WHOLE design by (singularised-name, count) for population words (count ≥ POP_MIN),
+  // keeping the first. Safe: two genuinely-distinct parts won't share an identical name AND count.
+  const seenPopKey = new Set<string>()
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       if (!Array.isArray(sm.words)) continue
@@ -2760,6 +2782,14 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
         if (id) {
           if (seenIds.has(id)) { droppedDuplicate += 1; return false }
           seenIds.add(id)
+        }
+        if (!isSub) {
+          const count = _wordPopCount(w)
+          if (count >= POP_MIN) {
+            const key = `${_singularisePhrase(name)}|${count}`
+            if (seenPopKey.has(key)) { droppedDuplicate += 1; return false }
+            seenPopKey.add(key)
+          }
         }
         return true
       })

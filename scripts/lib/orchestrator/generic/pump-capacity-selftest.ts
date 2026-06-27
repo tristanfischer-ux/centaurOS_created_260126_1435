@@ -7,7 +7,7 @@
 // whose capacity is < 50% of the gap word's computed duty (keeping the honest generic spec). This
 // guard fails the build if the capacity parser or the duty reader regress.
 
-import { partFlowCapacityM3h, wordFlowDutyM3h, isCommodityProcessValve } from '../../../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { partFlowCapacityM3h, wordFlowDutyM3h, isCommodityProcessValve, isElectronicsIcMispin } from '../../../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 function pumpWord(name: string, m3h: number) {
   const slug = name.toLowerCase().replace(/\W+/g, '_')
@@ -44,8 +44,15 @@ function run() {
     if (isCommodityProcessValve(v)) throw new Error(`pump-capacity: "${v}" must NOT be treated as a commodity valve (it carries a real MPN / is not a valve)`)
   }
 
+  // a process field instrument/switch must reject an electronics-IC vendor pin (keep generic)
+  if (!isElectronicsIcMispin('Low Pressure Switch', 'Analog Devices Inc./Maxim Integrated')) throw new Error('pump-capacity: a Maxim IC on a Low Pressure Switch must be flagged as an electronics-IC mis-pin')
+  if (!isElectronicsIcMispin('Level Transmitter', 'Texas Instruments')) throw new Error('pump-capacity: a TI IC on a Level Transmitter must be flagged')
+  // a legitimate industrial instrument vendor must NOT be flagged; a non-instrument must NOT be flagged
+  if (isElectronicsIcMispin('Pressure Transmitter', 'Endress+Hauser')) throw new Error('pump-capacity: a real industrial instrument vendor must NOT be flagged')
+  if (isElectronicsIcMispin('Centrifugal Pump', 'Maxim Integrated')) throw new Error('pump-capacity: a pump is not a field instrument — must NOT be flagged')
+
   // eslint-disable-next-line no-console
-  console.log('pump-capacity --selftest OK (CM3-3 3 m³/h rejected for a 90 m³/h duty; a 120 m³/h pump accepted; commodity valves kept generic, actuated/control valves pinnable)')
+  console.log('pump-capacity --selftest OK (CM3-3 3 m³/h rejected for a 90 m³/h duty; a 120 m³/h pump accepted; commodity valves kept generic, actuated/control valves pinnable; electronics-IC vendor rejected on a field instrument)')
 }
 
 run()

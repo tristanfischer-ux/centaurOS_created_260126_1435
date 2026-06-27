@@ -296,6 +296,29 @@ export function partFlowCapacityM3h(p: { part_name?: string | null; raw_excerpt?
   return m ? parseFloat(m[1]) : null
 }
 
+// Electronics-COMPONENT vendors — they make ICs / chips / boards, NOT industrial FIELD instruments.
+// A process field switch / transmitter / gauge pinned to one of these (e.g. a Maxim MAX31827A temp-
+// sensor IC on a 'Low Pressure Switch') is a wrong-domain mis-pin: the DB is electronics-heavy and a
+// loose token match ('switch') lands an IC on a field device. A real field instrument is Endress+
+// Hauser / WIKA / Hach / Siemens / Danfoss, etc. Reject the IC-vendor pin → keep the generic spec.
+const ELECTRONICS_IC_VENDORS = new Set<string>([
+  'analog devices', 'analog devices inc.', 'analog devices inc./maxim integrated', 'maxim integrated',
+  'maxim', 'texas instruments', 'ti', 'stmicroelectronics', 'st microelectronics', 'nxp',
+  'nxp semiconductors', 'microchip', 'microchip technology', 'infineon', 'on semiconductor',
+  'onsemi', 'renesas', 'diodes incorporated', 'vishay', 'rohm', 'nordic semiconductor', 'espressif',
+])
+const _PROCESS_FIELD_INSTRUMENT_RE =
+  /\b(pressure|level|flow|temperature|conductivity|turbidity|\bph\b|\borp\b|chlorine)\b.*\b(switch|transmitter|gauge|indicator|sensor|probe|element|meter|analy[sz]er)\b|\b(switch|transmitter|gauge)\b/i
+
+// A PROCESS FIELD INSTRUMENT / SWITCH whose ONLY DB candidate is from an electronics-component vendor
+// is a wrong-domain mis-pin — keep it generic (specified by range / output / connection at detailed
+// design), not by an IC part number. UNIVERSAL — keyed on the field-instrument vocabulary + the
+// IC-vendor list, no class table.
+export function isElectronicsIcMispin(name: string, manufacturer: string): boolean {
+  if (!_PROCESS_FIELD_INSTRUMENT_RE.test(name || '')) return false
+  return ELECTRONICS_IC_VENDORS.has((manufacturer || '').trim().toLowerCase())
+}
+
 // A SIMPLE COMMODITY process valve (check / non-return / swing / ball / gate / globe / needle), which
 // is specified GENERICALLY at design stage (size + rating + material), NOT by a single MPN — so a
 // fill-blank name-token match must not pin an unreliable specific part on it. An ACTUATED / control /
@@ -1065,6 +1088,14 @@ export async function fillBlankWordMpns(
         // MPN — e.g. the brief's Keystone Composeal). UNIVERSAL — keyed on the commodity-valve vocabulary.
         if (isCommodityProcessValve(cand.name)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
+          continue
+        }
+        // ELECTRONICS-IC MIS-PIN (Tristan 2026-06-27): a process FIELD instrument / switch must not be
+        // pinned to an electronics-component vendor's IC (a Maxim MAX31827A temp-sensor IC landed on a
+        // 'Low Pressure Switch' via the loose 'switch' token). The DB is electronics-heavy; a field
+        // device needs an industrial instrument (E+H / WIKA / Hach), not a chip. Keep generic. UNIVERSAL.
+        if (isElectronicsIcMispin(cand.name, dbHit.manufacturer)) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): electronics-IC vendor ${dbHit.manufacturer} on a process field instrument — generic spec, not a chip MPN (was ${dbHit.part_number})`)
           continue
         }
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
