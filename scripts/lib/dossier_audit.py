@@ -2015,10 +2015,64 @@ def check_glossary(state, rows, run_dir) -> list:
     return out
 
 
+_POP_MIN_DUP = 12  # a "population" count; 1–2 duplicate valves are legit, a 200-population emitted twice is not
+
+
+def _word_qty(w: dict) -> int:
+    for mc in (w.get("modifier_characters") or []):
+        if isinstance(mc, dict) and mc.get("kind") == "quantity":
+            n = _num(re.sub(r"[^0-9.]", "", str(mc.get("value", ""))))
+            if n and n > 0:
+                return int(n)
+    return 1
+
+
+def _singularise_phrase(s) -> str:
+    return " ".join(_singularise(t) for t in re.findall(r"[a-z]+", str(s).lower()))
+
+
+def check_population_duplication(state, rows, run_dir) -> list:
+    """A brief POPULATION (e.g. '200 actuated valves') emitted under TWO words — a singular + a plural,
+    or two synonym names with the SAME count — DOUBLE-COUNTS it: 'Pneumatic Actuated Valve ×200' +
+    'Pneumatic Actuated Valves ×200' = 400 valves on a 200-valve bill. Deterministic + universal:
+    group every principal word by (singularised-name, count) for population counts (≥12); ≥2 words in a
+    group is a duplicated population. Runs on the FINAL state, so a synthesis path that re-mints the
+    duplicate is still caught (the 'two synthesis paths' gotcha). Council C5 (2026-06-27)."""
+    tab = "Bill of Materials (Ledger)"
+    out: list = []
+    groups: dict = {}
+    for m in (state.get("moduleDecomposition") or {}).get("modules", []) or []:
+        for sm in m.get("sub_modules", []) or []:
+            for w in sm.get("words", []) or []:
+                if not isinstance(w, dict) or w.get("_subcomponent"):
+                    continue
+                nm = w.get("name_human") or (w.get("content_character") or {}).get("name_human") or ""
+                if not nm:
+                    continue
+                q = _word_qty(w)
+                if q < _POP_MIN_DUP:
+                    continue
+                groups.setdefault((_singularise_phrase(nm), q), []).append(nm)
+    for (sing, q), names in groups.items():
+        if len(names) >= 2:
+            out.append(Finding(
+                tab=tab, check="population_duplication", severity="HIGH",
+                message=(f"the {q}-unit population '{names[0]}' is emitted {len(names)}× under the same "
+                         f"name (e.g. {', '.join(sorted(set(names))[:3])}) — the bill DOUBLE-COUNTS it "
+                         f"({len(names)}×{q}={len(names) * q}, not {q})"),
+                actual=f"{len(names)} words × {q}", expected=f"ONE consolidated word × {q}",
+                source_rule=("consolidate a population to ONE word at synthesis "
+                             "(dropAttributePhantomWords singular/plural dedup) — this check asserts it on "
+                             "the FINAL state so a re-minting reconcile path cannot bypass it"),
+            ))
+    return out
+
+
 _CHECKS = [
     check_bom,
     check_capex_by_category,
     check_brief_compliance_unverified,
+    check_population_duplication,
     check_cross_tab,
     check_part_names,
     check_line_velocity,
@@ -2569,6 +2623,23 @@ def _selftest() -> int:
     expect(abs((_convert_value(4500, "kWh", "MWh") or 0) - 4.5) < 1e-9,
            "convert 4500 kWh -> 4.5 MWh")
     expect(_convert_value(100, "kg", "MWh") is None, "convert refuses cross-family")
+
+    # proveCatch population-duplication (Tristan 2026-06-27 council C5): a 200-population emitted as
+    # BOTH a singular and a plural word DOUBLE-COUNTS it; ONE population word is clean; small duplicate
+    # qtys (×1) are not flagged.
+    _dupst = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Pneumatic Actuated Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Pneumatic Actuated Valves", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Manual Ball Valve", "modifier_characters": [{"kind": "quantity", "value": "×1"}]},
+        {"name_human": "Manual Ball Valves", "modifier_characters": [{"kind": "quantity", "value": "×1"}]},
+    ]}]}]}}
+    _dup = check_population_duplication(_dupst, [], "")
+    expect(len(_dup) == 1 and "200" in _dup[0].message,
+           f"C5: a 200-population emitted as singular+plural must be ONE HIGH (got {len(_dup)})")
+    _clean = check_population_duplication({"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Pneumatic Actuated Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+    ]}]}]}}, [], "")
+    expect(len(_clean) == 0, "C5: a single 200-population word must NOT be flagged")
 
     if failures:
         print("SELFTEST FAILED:")
