@@ -63,6 +63,11 @@ TYPE_EXPECTED = {
     "other":      {"blender", "general-arrangement"},
 }
 TYPE_RULES = [
+    # TELEMETRY / SCADA / cloud gateways are CONTROL systems (single-line / panel), NOT field
+    # instruments — checked FIRST so "Remote Monitoring Gateway" / "Aquavista" don't fall to the
+    # instrument rule's bare "monitor" token and get falsely counted as P&ID-expected field tags.
+    ("control",    r"\bSCADA\b|telemetry|remote\s*monitor|cloud|aquavista|grundfos\s*remote|"
+                   r"data\s*logger|\bIoT\b|edge\s*gateway|\bgateway\b"),
     ("instrument", r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|level switch|"
                    r"flow meter|flowmeter|\bmeter\b|densit|turbidit|viscosit|coriolis|"
                    r"mass flow|detector|monitor"),
@@ -96,13 +101,20 @@ MECH_KIND = {"fluid_loop": "pipe", "fluid": "pipe", "process": "pipe", "thermal"
 _ISA_FUNC = [
     # valves FIRST (a "flow control valve" is a valve, not a flow transmitter — match before \bflow\b)
     (re.compile(r"relief|\bpsv\b|safety.?valve|pressure.?relief", re.I), ("PSV",)),
-    (re.compile(r"solenoid|\besd\b|shut.?off|emergency.*valve|on.?off.?valve", re.I), ("XV",)),
+    (re.compile(r"check.?valve|non.?return|\bnrv\b|one.?way.?valve|foot.?valve", re.I), ("NV", "XV")),
+    (re.compile(r"solenoid|\besd\b|shut.?off|emergency.*valve|on.?off.?valve|"
+                r"actuat|pneumatic|motor(?:is|iz)ed.?valve|composeal", re.I), ("XV",)),
     (re.compile(r"flow.?control.?valve|\bfcv\b|control.?valve|dosing.?valve|modulat", re.I), ("FCV", "PCV")),
+    # manual hand valves (ball / butterfly / gate / isolation) — drawn as a plain hand-valve symbol
+    (re.compile(r"manual.?(?:ball|valve)|\bball.?valve\b|butterfly|gate.?valve|isolation.?valve|hand.?valve", re.I), ("HV", "XV")),
     # instruments
     (re.compile(r"dissolved.?oxygen|_do_|\bdo\b|do[_ ]?anal", re.I), ("AT",)),
     (re.compile(r"\bph\b|_ph_|ph[_ ]?anal", re.I), ("AT",)),
-    (re.compile(r"conductiv|salin", re.I), ("AT",)),
-    (re.compile(r"ammonia|nitrate|nitrite|\btan\b|analy[sz]", re.I), ("AT",)),
+    (re.compile(r"conductiv|salin|\btds\b|total.?dissolved|\bec\b", re.I), ("AT",)),
+    # water-quality analysers: ORP/redox, free-chlorine, turbidity, silica, hardness, ammonia/nitrate,
+    # leak / moisture — all measure a stream property → ISA Analyser bubble (AT). UNIVERSAL.
+    (re.compile(r"ammonia|nitrate|nitrite|\btan\b|analy[sz]|\borp\b|redox|chlorin|turbidit|"
+                r"\bsilica\b|hardness|residual|\bleak\b|moisture|gas.?detect", re.I), ("AT",)),
     (re.compile(r"\blevel\b|_level_|level.?transmit|level.?switch", re.I), ("LT", "LSL")),
     (re.compile(r"temperatur|_temp_|\btemp\b", re.I), ("TT",)),
     (re.compile(r"\bflow\b|_flow_|flow.?transmit|flow.?meter", re.I), ("FT",)),
@@ -997,12 +1009,31 @@ def _selftest() -> int:
         ("Butterfly Valve", "valve"),
         ("Fresh Water Tank", "vessel"),
     ]
+    cases += [
+        ("Aquavista Remote Monitoring", "control"),   # telemetry, not a field instrument
+        ("Remote Monitoring Gateway", "control"),
+    ]
     for name, want in cases:
         got = _classify(name, "")
         if got != want:
             print(f"  FAIL _classify('{name}') = {got!r}, want {want!r}")
             bad += 1
-    print("parts_ledger _classify selftest:", "OK" if bad == 0 else f"{bad} FAIL")
+    # _isa_letters: a water-quality analyser maps to AT; a valve to its valve symbol. The P&ID
+    # coverage matcher credits the part when ITS function symbol is present in the drawing — so an
+    # ORP/chlorine/TDS/leak sensor (an analyser) must map to AT, not to nothing (the gap that left
+    # them P&ID-uncredited even though an AT bubble was drawn).
+    isa_cases = [
+        ("Orp Sensor", "AT"), ("Chlorine Sensor", "AT"), ("Tds Sensor", "AT"),
+        ("Leak Detection Sensor", "AT"), ("Conductivity Sensor", "AT"),
+        ("Solenoid Valves", "XV"), ("Check Valve", "NV"), ("Manual Ball Valve", "HV"),
+        ("Pneumatic Actuated Valve", "XV"), ("Level Transmitter", "LT"), ("Pressure Transducer", "PT"),
+    ]
+    for name, want_first in isa_cases:
+        letters = _isa_letters("", name)
+        if not letters or letters[0] != want_first:
+            print(f"  FAIL _isa_letters('{name}') = {letters!r}, want first {want_first!r}")
+            bad += 1
+    print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
 
