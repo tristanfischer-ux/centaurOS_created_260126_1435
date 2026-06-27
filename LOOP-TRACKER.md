@@ -210,6 +210,23 @@ bespoke -9shot template). They now score 9 on the DETERMINISTIC proxy (coverage)
 NEXT: v17 (fresh chain, motor fix in BoM/Risk) → re-score. Then P&ID/BFD/Single-line coverage
 (draw_*.py tag enrichment) + Financial capex frame.
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 v17 — CLEAN FULL-CHAIN CONFIRMS all 5 fixes; 25/34; motor landed)
+═══════════════════════════════════════════════════════════════════════════════
+v17 = fresh chain (exit 0) with all committed fixes. CONFIRMS end-to-end: 25/34 sheets ≥8;
+irrigation pump Drive Motor = 10 kW in the BoM (was 2 kW — motor fix landed). Scorecard
+identical to v16 re-score → the 5 fixes are stable + deterministic. HEAD 4c3c145dc.
+Remaining 9 <8 unchanged: Single-line 4, P&ID 6, BFD 6 (COVERAGE — draw_*.py tag enrichment);
+BoM 6, Financial 6 (#57 capex), Risk 6; ⚠Audit 4 + ⚠Checks 6 (DERIVED); HVAC unscored.
+
+NEXT CONCRETE LAYER = P&ID/BFD/Single-line COVERAGE (the 3-sheet cluster). The derived topology
+spine carries the PRINCIPAL equipment; the P&ID must ALSO tag valves/instruments (P&ID present
+27/44=61%, BFD 11/20=55%, single-line 7/19=37%). Fix in draw_pid.py / draw_single_line: emit a
+tag for every expected part (valves/instruments belong on the P&ID, unlike the GA). Verify by
+re-running the draw_*.py + parts_ledger on a finished state (or a fresh chain). THEN Financial
+capex/payback frame (#57), Risk physics-critic remaining HIGHs. ⚠Audit/⚠Checks rise as rest clear.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
