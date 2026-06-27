@@ -1,5 +1,17 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶ 2026-06-27 LATEST (HEAD 0208efbe4): 13 universal fixes this session. Beyond the 9 earlier
+> (2 physics HIGHs, P&ID/BFD topology, single-line REPS, matcher, count-match, pump): +4 attacking
+> the v19 dominant blocker (LLM valve over-decomp + phantoms): (10) reassertPopulationCounts —
+> re-asserts deterministic per-word count over the LLM ×200 valve smear (v19: 3,028→441 valves);
+> (11) dropAttributePhantomWords + skeleton PROPERTY_COMPONENT_RE — drops "RO Membrane Area"/"GAC
+> Vessel Diameter" phantoms + dedups same-id words (fixes X-108/V-102 dup-tag BoM HIGH); (12) water
+> cost-sanity band £/(m³·yr) (kills the 786× CO₂-band false alarm). All guarded (verify-engine-guards
+> green). v20 measurement run in flight. REMAINING (tasks #105 consolidation residual/#107 Gac box/
+> #108 Financial capex frame/#109 determinism/#110 final run). See RESUME block below + handover
+> 2026-06-27T-codema-PHYSICS-FIRST-7fixes-a8b675734.md.
+
+
 > Tristan 2026-06-26: ONE tracker. No duplicates. This is it. All others are archived (`docs/archive/trackers/`)
 > or are reference-only: `OPERATING-FRAME-2026-06.md` (why + self-prompt + SIGHT), `REVIEW-PUNCHLIST-2026-06-27.md`
 > (verbatim tab review). Work the MASTER CHECKLIST top-down; update status in place; the RESUME blocks below
