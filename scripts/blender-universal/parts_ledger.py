@@ -67,11 +67,14 @@ TYPE_RULES = [
                    r"flow meter|flowmeter|\bmeter\b|densit|turbidit|viscosit|coriolis|"
                    r"mass flow|detector|monitor"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
-    ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b"),
+    ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
+                   r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)"),
     ("electrical", r"transformer|switchgear|\bMCC\b|\bpanel\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge"),
     ("rotating",   r"\bpump\b|blower|\bfan\b|compressor|skimmer|aerat"),
     ("exchanger",  r"heat exchanger|heat pump|\bHEX\b|chiller|\bUV\b|ozone|steril|oxygenat|degas|makeup hex"),
-    ("separator",  r"drum filter|screen|filter|clarifi|settl|cyclone|membrane|biofilter|\bMBBR\b"),
+    # `\bscreen\b` (not bare `screen`) so a filtration screen / drum screen matches but an HMI
+    # "touchscreen" does NOT fall to separator (the HMI is caught by the control rule above anyway).
+    ("separator",  r"drum filter|\bscreen\b|filter|clarifi|settl|cyclone|membrane|biofilter|\bMBBR\b"),
     ("vessel",     r"\btank\b|vessel|reservoir|\bsump\b|\bcone\b|column|reactor|silo|hopper|\bLOX\b|storage"),
 ]
 TRANSFORM = {"vessel": "holds / contains working fluid", "rotating": "adds head / moves fluid",
@@ -976,5 +979,34 @@ def main() -> int:
     return 0
 
 
+def _selftest() -> int:
+    """proveCatch for _classify type assignment (Tristan 2026-06-27, P&ID-coverage work).
+    An HMI 'Touchscreen' used to fall to `separator` because the bare `screen` token matched
+    'touchSCREEN' — inflating the separator-expected drawing coverage with a control device.
+    Now `\\bscreen\\b` matches a filtration screen but not a touchscreen, and the control rule
+    recognises HMI / touchscreen / DCS / operator panel positively."""
+    bad = 0
+    cases = [
+        ("HMI Touchscreen", "control"),
+        ("Operator Interface Panel", "control"),
+        ("PLC Controller", "control"),
+        ("Drum Screen", "separator"),
+        ("Microscreen Filter", "separator"),
+        ("UF Membrane Bank", "separator"),
+        ("Pressure Transmitter", "instrument"),
+        ("Butterfly Valve", "valve"),
+        ("Fresh Water Tank", "vessel"),
+    ]
+    for name, want in cases:
+        got = _classify(name, "")
+        if got != want:
+            print(f"  FAIL _classify('{name}') = {got!r}, want {want!r}")
+            bad += 1
+    print("parts_ledger _classify selftest:", "OK" if bad == 0 else f"{bad} FAIL")
+    return bad
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        raise SystemExit(_selftest())
     raise SystemExit(main())

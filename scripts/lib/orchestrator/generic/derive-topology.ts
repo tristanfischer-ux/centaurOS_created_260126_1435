@@ -27,6 +27,8 @@ type AnyWord = {
   name_human?: string
   content_character?: { name_human?: string }
   _synthesized?: boolean
+  _subcomponent?: boolean
+  id?: string
 }
 type AnyModule = { sub_modules?: Array<{ words?: AnyWord[] }> }
 
@@ -34,6 +36,15 @@ type AnyModule = { sub_modules?: Array<{ words?: AnyWord[] }> }
 // TAG — NOT a node on the fluid process spine. Excluded from the derived topology.
 const NON_PROCESS_RE =
   /\b(generator|ups\b|scada|switchboard|switchgear|incomer|transformer|\bmcc\b|motor[ _-]?control|distribution[ _-]?board|\bpanel\b|\bplc\b|\bhmi\b|circuit[ _-]?breaker|busbar|cabling|earthing|\bvalve\b|transmitter|transducer|\bsensor\b|analy[sz]er|\bgauge\b|\bprobe\b|flow[ _-]?meter|\bdetector\b|\bindicator\b|controller|interface|gateway|monitoring)\b/i
+
+// A PRINCIPAL process-equipment device noun. A grounded (non-`_synthesized`) emitter word
+// that names one of these IS a real node on the fluid spine and must appear on the P&ID/BFD
+// even though it carries no `_synthesized` flag (the brief's Cip Tank, Cleaning Tank, UF
+// Membrane Bank were skipped because the deriver only walked synthesised words). Keyed on the
+// device noun → UNIVERSAL, any archetype. Sub-components (Tank Wall, Impeller) are excluded by
+// the `_subcomponent` flag, not by this list, so a 'tank' here never pulls in a tank wall.
+const PRINCIPAL_PROCESS_RE =
+  /\b(tank|vessel|reservoir|\bsump\b|silo|column|tower|reactor|skid|membrane|\bro\b|\buf\b|filter|softener|clarifier|separator|degass|stripper|scrubber|exchanger|\bhex\b|chiller|boiler|pump|blower|compressor|mixer|cyclone|hopper|contactor)\b/i
 
 // feed(0) → product(9) spine, ported from draw_bfd.py::_ROLE_PATTERNS + general
 // process-equipment synonyms. Checked IN ORDER — earliest match wins — so a "feed pump"
@@ -76,9 +87,13 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   for (const m of modules || []) {
     for (const sm of m.sub_modules || []) {
       for (const w of sm.words || []) {
-        if (!w?._synthesized) continue
+        if (!w) continue
+        if (w._subcomponent) continue // a sub-assembly part (Tank Wall, Impeller) is not a spine node
         const name = w.name_human || w.content_character?.name_human || ''
         if (!name) continue
+        // Include a word if it is physics-SYNTHESISED OR it NAMES a principal process device
+        // (a grounded Cip/Cleaning tank, UF membrane bank the synthesised-only walk missed).
+        if (!w._synthesized && !PRINCIPAL_PROCESS_RE.test(name)) continue
         if (NON_PROCESS_RE.test(name)) continue // electrical / instrument / valve → not the fluid spine
         const slug = slugify(name)
         if (!slug || seen.has(slug)) continue
@@ -119,10 +134,17 @@ function _selftest() {
         mk('Gac Filter'), mk('Softener Vessel'), mk('Cloth Filter'),
         mk('Fresh Water Tank'), mk('Total Water Storage'), mk('Drain Collection Sump'),
         mk('Irrigation Pump'), mk('Fertigation Dosing Pump'),
+        // GROUNDED principal vessels (NOT _synthesized) — must now appear on the spine
+        // (the P&ID-coverage gap: these were skipped by the synthesised-only walk):
+        { name_human: 'Cip Tank', _synthesized: false },
+        { name_human: 'Cleaning Tank', _synthesized: false },
+        { name_human: 'Uf Membrane Bank', _synthesized: false },
+        // a grounded SUB-COMPONENT must NOT appear (it is part of a parent vessel):
+        { name_human: 'Tank Wall (laminate)', _synthesized: false, _subcomponent: true },
         // these MUST be excluded from the process spine:
         mk('Standby Diesel Generator'), mk('Main Switchboard'), mk('SCADA / Plant Control System'),
         mk('Inlet Flow Control Valve'), mk('Level Transmitter'), mk('pH Analyser'),
-        { name_human: 'Skeleton Filler', _synthesized: false }, // non-synth → ignored
+        { name_human: 'Skeleton Filler', _synthesized: false }, // non-synth, non-process → ignored
       ],
     }],
   }]
@@ -134,10 +156,12 @@ function _selftest() {
   for (const bad of ['standby_diesel_generator', 'main_switchboard', 'inlet_flow_control_valve', 'level_transmitter', 'ph_analyser', 'scada_plant_control_system']) {
     if (endpoints.has(bad)) throw new Error(`derive-topology leaked a non-process node onto the fluid spine: ${bad}`)
   }
-  // the principal process equipment MUST be present
-  for (const need of ['reverse_osmosis_skid', 'gac_filter', 'fresh_water_tank', 'irrigation_pump']) {
+  // the principal process equipment MUST be present — incl. the GROUNDED (non-synth) vessels
+  for (const need of ['reverse_osmosis_skid', 'gac_filter', 'fresh_water_tank', 'irrigation_pump', 'cip_tank', 'cleaning_tank', 'uf_membrane_bank']) {
     if (!endpoints.has(need)) throw new Error(`derive-topology missing principal equipment node: ${need}`)
   }
+  // a grounded SUB-COMPONENT must NOT be promoted to a spine node
+  if (endpoints.has('tank_wall_laminate')) throw new Error('derive-topology leaked a sub-component (Tank Wall) onto the spine')
   // feed must come before product on the spine (RO/membrane/filter < storage/pump rank)
   const ranks = topo.map(e => e.from_part)
   if (!ranks.includes('gac_filter')) throw new Error('derive-topology: separation stage absent from spine')
