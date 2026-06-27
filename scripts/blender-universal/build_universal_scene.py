@@ -14440,7 +14440,16 @@ def main():
     # not a false "broken reference". (Tristan 2026-06-27 — the orphan-instrument signal-topology fix:
     # without this, wiring the instruments to clear the instrument-association invariant only trades it
     # for a referential-integrity FAIL on the same edges.)
+    # A topology edge endpoint may be either the placed-part NAME or the SLUG (snake_case) of an
+    # authored word. A non-massed authored part (an RO membrane / GRP housing dropped from the 3-D
+    # scene by ga_massing) is referenced by its SLUG ('grp_membrane_housings') which never resolves to
+    # a placed part — so the referential set must include BOTH the authored name AND its slug, else a
+    # legitimate fluid edge to a non-massed part reads as a broken reference (4 such on v30). VERIFIED:
+    # names-only → 4 violations, names+slugs → 0 ("graph fully traceable"). (Tristan 2026-06-27.)
+    def _ri_slug(_x):
+        return re.sub(r"[^a-z0-9]+", "_", str(_x).lower()).strip("_")
     _ri_names = {p.name for p in parts}
+    _ri_names |= {_ri_slug(p.name) for p in parts}
     try:
         for _m in (state.get("moduleDecomposition", {}) or {}).get("modules", []) or []:
             for _sm in _m.get("sub_modules", []) or []:
@@ -14448,6 +14457,7 @@ def main():
                     _nm = (_w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or "")
                     if _nm:
                         _ri_names.add(_nm)
+                        _ri_names.add(_ri_slug(_nm))
     except Exception:  # noqa: BLE001 — never break the ledger on an unexpected state shape
         pass
     _ledger_integrity = cl.audit_referential_integrity(
