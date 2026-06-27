@@ -142,6 +142,11 @@ const CONTROL_HUB_RE = /\b(scada|plant control|control system|\bdcs\b|\bplc\b|co
  * control-hub vocabulary, no class table.
  */
 export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
+  // Endpoints are the part's HUMAN NAME (name_human), NOT the slug. The connection-ledger's
+  // referential-integrity check resolves an edge endpoint against the AUTHORED part names; the
+  // slug→placed-part resolution that fluid edges rely on never fires for an instrument (it is not in
+  // the 3-D scene), so a slug endpoint reads as "not an authored part" (broken reference). Using the
+  // authored name resolves cleanly without needing the instrument to be placed.
   const instruments: string[] = []
   const hubs: string[] = []
   const seenI = new Set<string>()
@@ -153,11 +158,9 @@ export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
         const name = w.name_human || w.content_character?.name_human || ''
         if (!name) continue
         if (CONTROL_HUB_RE.test(name)) {
-          const s = slugify(name)
-          if (s && !seenH.has(s)) { seenH.add(s); hubs.push(s) }
+          if (!seenH.has(name)) { seenH.add(name); hubs.push(name) }
         } else if (INSTRUMENT_RE.test(name)) {
-          const s = slugify(name)
-          if (s && !seenI.has(s)) { seenI.add(s); instruments.push(s) }
+          if (!seenI.has(name)) { seenI.add(name); instruments.push(name) }
         }
       }
     }
@@ -234,7 +237,9 @@ function _selftest() {
   if (sig.length < 3) throw new Error(`derive-topology SIGNAL: the 3 instruments must each get a signal edge to the hub (got ${sig.length})`)
   for (const e of sig) {
     if (e.mechanism !== 'signal') throw new Error('derive-topology SIGNAL: edges must carry mechanism "signal"')
-    if (e.from_part === 'reverse_osmosis_skid') throw new Error('derive-topology SIGNAL: a process vessel must NOT get a signal edge')
+    // endpoints must be the AUTHORED human name (so the ledger referential-integrity check resolves them), NOT a slug
+    if (/_/.test(String(e.from_part))) throw new Error(`derive-topology SIGNAL: endpoint must be the authored human name, not a slug (got "${e.from_part}")`)
+    if (e.from_part === 'Reverse Osmosis Skid') throw new Error('derive-topology SIGNAL: a process vessel must NOT get a signal edge')
   }
   const sigHubs = new Set(sig.map(e => e.to_part))
   if (sigHubs.size !== 1) throw new Error(`derive-topology SIGNAL: all instruments must wire to ONE control hub (got ${[...sigHubs].join(',')})`)

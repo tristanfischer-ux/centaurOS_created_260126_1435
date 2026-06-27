@@ -14410,8 +14410,25 @@ def main():
     # Per-part adjacency (the traceable "which part connects to what") + referential
     # integrity (every reference names a real part on both ends) — Tristan 2026-06-20.
     _ledger_adj = cl.build_adjacency(topology)
+    # Referential integrity resolves an edge endpoint against REAL parts. A real part is any AUTHORED
+    # design word (placed OR logical) — an instrument/controller wired by a signal edge is legitimate
+    # even though ga_massing keeps it OUT of the 3-D scene (so it is absent from `parts`). Union the
+    # placed-part names with every authored word name, so a signal tie to a non-massed instrument is
+    # not a false "broken reference". (Tristan 2026-06-27 — the orphan-instrument signal-topology fix:
+    # without this, wiring the instruments to clear the instrument-association invariant only trades it
+    # for a referential-integrity FAIL on the same edges.)
+    _ri_names = {p.name for p in parts}
+    try:
+        for _m in (state.get("moduleDecomposition", {}) or {}).get("modules", []) or []:
+            for _sm in _m.get("sub_modules", []) or []:
+                for _w in _sm.get("words", []) or []:
+                    _nm = (_w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or "")
+                    if _nm:
+                        _ri_names.add(_nm)
+    except Exception:  # noqa: BLE001 — never break the ledger on an unexpected state shape
+        pass
     _ledger_integrity = cl.audit_referential_integrity(
-        topology, {p.name for p in parts}, log=lambda m: print(m))
+        topology, _ri_names, log=lambda m: print(m))
     try:
         _ledger_path = os.path.join(out_dir, "connection-ledger.json")
         with open(_ledger_path, "w") as _lf:
