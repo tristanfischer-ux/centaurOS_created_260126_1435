@@ -250,6 +250,37 @@ Same pattern for BFD (11/20=55%) + Single-line (7/19=37%, electrical — draw_si
 
 
 ═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 — v19 LANDED: 2 physics HIGHs CLEARED; DOMINANT BLOCKER now = LLM valve over-decomp + non-determinism)
+═══════════════════════════════════════════════════════════════════════════════
+v19 (exit 0, all 9 fixes 1-9 EXCEPT the 9th [single-line REPS] is parts_ledger-side so applies on
+re-score). Authoritative offline re-score: **23/34 ≥8** — DOWN from v18's 27/34, but NOT a fix
+regression: it is LLM NON-DETERMINISM (#86). This fresh run's LLM Phase-2 over-decomposed the valves
+HARD (385 BoM lines vs v18's ~fewer; 29 valve lines; ~15 valve words EACH ×200; dup tags X-108×2 /
+V-102×2), which DILUTES every coverage-% score (P&ID 78.8→70.6, BFD 85→72.7) + tanks BoM (2: "8
+drawings partially covered" + "2 tags reused") + Overview 6 ("Instruments associated" invariant) +
+Connection-trace 6 ("Ledger completeness"). My 9 fixes are CORRECT + verified: the 2 physics HIGHs
+(instrument-2kW, total-water-storage) are CLEARED (confirmed in v18 critique + v19 state); P&ID/BFD
+topology + single-line REPS (32→58%) work. The score is now governed by run-to-run LLM variance, NOT
+the source rules.
+**THE TWO DOMINANT BLOCKERS (both deep, both must be tackled for all-tabs-8 — Tristan decision):**
+  A. **VALVE OVER-DECOMPOSITION (LLM Phase 2)** — the contract has ONE actuated_distribution_valve_count
+     =200; the LLM mints ~15 synonym valve words EACH ×200 (Solenoid/Pneumatic-Actuated/Manual-Ball/
+     Automated-Ball/Pneumatic-Control… all in actuation_kinematics = the SAME population). My
+     contractCountFor fix (a8b675734) fixed the SKELETON path (verified: Solenoid Valves→1) but the LLM
+     path dominates. NEEDS a post-Phase-2 CONSOLIDATION pass: collapse synonym valve-type words to the
+     real distinct types, cap Σ valve qty to the contract population (collapseRoleSynonyms exists for
+     PRINCIPAL equipment — extend to valves). Drawer forgeos_gotchas_78a8e79e5571ba7c (two-paths trap).
+  B. **NON-DETERMINISM (#86)** — same brief → different scorecard each run (v18 27/34 vs v19 23/34). The
+     LLM Phase-2 decomposition varies. Until the design is deterministic (or the valve/instrument
+     decomposition is engine-controlled not LLM), "all tabs ≥8" is unstable run-to-run.
+  Plus concrete: dup-tag uniqueness (X-108×2/V-102×2 — tag assignment must guarantee uniqueness);
+  Gac-softener box (vessel got throughput-box, name/group-priority); Financial capex frame (#57);
+  cost-sanity mis-keys water→CO₂ band. HVAC unscored.
+NEXT (highest leverage): the post-Phase-2 valve/instrument CONSOLIDATION pass (fixes A, lifts BoM +
+coverage + Risk + dup-tags at once). Then determinism. Handover:
+~/Downloads/handovers/2026-06-27T-codema-PHYSICS-FIRST-7fixes-a8b675734.md. HEAD 8e6df4278.
+
+═══════════════════════════════════════════════════════════════════════════════
 ## ▶▶▶ RESUME (2026-06-27 POST-COMPACT — PHYSICS FIRST done + P&ID coverage; v18→v19 confirming)
 ═══════════════════════════════════════════════════════════════════════════════
 SIX universal+guarded fixes this session (all proveCatch in verify-engine-guards.sh; all green):
