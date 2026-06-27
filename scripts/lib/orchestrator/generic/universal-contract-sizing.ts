@@ -544,7 +544,7 @@ function isPlaceholder(w: WordLike): boolean {
 // of a pump is identical in any plant — so no per-class table. The component prices SUM
 // to the equipment cost; the contract's installed-cost anchor becomes a cross-check, not
 // the source. Nothing is allocated; every line traces to the parent's computed physics.
-interface ParentPhysics { kw: number; m3: number; m3h: number; diaM: number; htM: number; qty: number }
+interface ParentPhysics { kw: number; m3: number; m3h: number; diaM: number; htM: number; qty: number; motorKwOverride?: number }
 interface SubSpec { name: string; derive: (p: ParentPhysics) => { size?: string; rating?: { v: number; u: string }; gbp: number } }
 
 function parentQty(w: WordLike): number {
@@ -570,7 +570,36 @@ function readParentPhysics(w: WordLike): ParentPhysics {
 }
 
 const R2 = (n: number) => Math.round(n)
-const motorKw = (p: ParentPhysics) => Math.max(1.5, (p.kw || (p.m3h ? p.m3h / 120 : 30)) / 0.88)
+// Motor/VSD electrical power for a pump/blower/fan. PREFER the hydraulic motor power the
+// sizing tool already computed into the contract (motorKwOverride — P=ρgQH/η, the RIGHT
+// physics that knows the head); only when absent fall back to the crude flow heuristic.
+// Without this, a FLOW-rated pump (p.kw=0) collapsed to the 1.5 kW floor because the
+// heuristic ignores head entirely (e.g. 90 m³/h @ 3.5 bar → true ≈ 9.7 kW, was floored to
+// ~2 kW). The motor is the most-flagged pump physics error; this makes it scale with duty.
+const motorKw = (p: ParentPhysics) =>
+  (p.motorKwOverride && p.motorKwOverride > 0)
+    ? p.motorKwOverride
+    : Math.max(1.5, (p.kw || (p.m3h ? p.m3h / 120 : 30)) / 0.88)
+
+// Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
+// quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The
+// hydraulic sizing tool (process:/irrigation:pump-sizing) emits *_motor_kw / *_power_kw for
+// pumps across EVERY process archetype, so this is universal — no per-class table.
+function motorKwFromContract(w: WordLike, quantities: Record<string, number>): number {
+  const stems = wordStems(w).filter((s) => !['synth', 'word', 'system', 'unit', 'assembly'].includes(s))
+  if (stems.length < 2) return 0 // need ≥2 distinctive stems (e.g. irrigation+pump) to bind unambiguously
+  let best = 0, bestScore = 1
+  for (const [k, v] of Object.entries(quantities)) {
+    if (!(v > 0)) continue
+    if (!/_(motor_kw|motor_power_kw|power_kw|drive_kw)$/.test(k)) continue
+    // stem the key tokens the SAME way wordStems does (5-char truncation) so
+    // 'irrigation' (key) ≡ 'irrig' (word stem) — otherwise nothing ever binds.
+    const ktoks = new Set(k.toLowerCase().split(/[^a-z0-9]+/).map(stem))
+    const overlap = stems.reduce((n, s) => n + (ktoks.has(s) ? 1 : 0), 0)
+    if (overlap >= 2 && overlap > bestScore) { bestScore = overlap; best = v }
+  }
+  return best
+}
 const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 || 50) * 4) / Math.PI); const h = p.htM || d; return { shell: Math.PI * d * h, head: (Math.PI * d * d) / 4, d, h } }
 
 // Each entry: parts SIZED + PRICED from the parent's physics. Cost factors are
@@ -709,7 +738,7 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 /** Append each principal equipment's PHYSICS-SIZED sub-components (qty inherited), each
  *  priced bottom-up from the parent's computed physics. Mutates modules in place; returns
  *  the number of sub-component lines added. Universal by equipment type. */
-export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 3): number {
+export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3): number {
   // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
   // part already carrying children is skipped (so re-running never duplicates — the
   // bug that gave a pump 39 children); a sub-component that itself matches a rule (a
@@ -744,6 +773,12 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], maxDepth = 
         const rule = SUB_ASSEMBLY.find((r) => r.re.test(nm))
         if (!rule) continue
         const physics = readParentPhysics(w)
+        // CONSUME-THE-CONTRACT: a flow-rated pump has p.kw=0, so the Drive Motor + VSD would
+        // collapse to the 1.5 kW floor. Bind the hydraulic motor power the sizing tool already
+        // computed (e.g. irrigation_pump_motor_kw=9.653) so the motor reflects the real duty +
+        // the casing/impeller/baseplate scale off the true power. Universal across all pumps.
+        const cmk = motorKwFromContract(w, quantities)
+        if (cmk > 0) { physics.motorKwOverride = cmk; if (physics.kw === 0) physics.kw = cmk }
         for (const spec of rule.parts) {
           out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics))
           added += 1
@@ -3070,7 +3105,7 @@ export function applyUniversalContractSizing(
   const mainIncomer = (opts.instrument ?? true) ? sizeMainIncomer(modules, quantities, contract) : 0
 
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
-  const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules) : 0
+  const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules, quantities) : 0
 
   // ── E. TYPED SERVICE (Phase 0 root fix): stamp every characterisable word with a
   // `service{fabrication_family,…}` descriptor DERIVED FROM ITS DRIVER QUANTITY (a
