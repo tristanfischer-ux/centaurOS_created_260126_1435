@@ -248,6 +248,26 @@ So this is OFFLINE-ITERABLE (seconds, no Blender/chain). The 17 missing P&ID par
       a control panel, not a separator) → wrongly inflates P&ID-expected. Fix _classify.
 Same pattern for BFD (11/20=55%) + Single-line (7/19=37%, electrical — draw_single_line feeders).
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ POST-COMPACT PRIORITIES (Tristan 2026-06-27): ALL tabs ≥8; PHYSICS FIRST; UNIVERSAL Blender
+═══════════════════════════════════════════════════════════════════════════════
+Full execution plan: handover `~/Downloads/handovers/2026-06-27T-codema-UNIVERSAL-blender-db-PLAN-5a9c2cf5d.md`.
+1. ⭐⭐ PHYSICS FIRST (Tristan: "physics is the most deterministic of all things... so much depends on the physics
+   being right"). Risk/physics tab = 6, held by 2 HIGH physics-critic findings (out/<run>/7-5-physics-critique.json):
+   (a) brief needs 3 SEPARATE 40 m³ tanks (1 fresh + 2 drain, no mixing) but design aggregated to one 262 m³ "Total
+   Water Storage" → emit 3 distinct tanks at synthesis (universal: never merge brief-separated stores). (b) pressure
+   transducers rated "2 kW" — instruments draw mW not kW; same default-kW bug as the pump motor, mis-applied to
+   instruments → instruments must NOT get a kW power default (keyed on the ga_massing instrument vocab). Re-run Stage
+   7.5 critic to confirm closure. A LOW physics number means the physics is ACTUALLY WRONG — drive it HIGH.
+2. ALL OTHER TABS ≥8: P&ID/BFD/Single-line coverage (draw_pid.py bpy-free, offline-iterable — 3 causes diagnosed
+   above), Financial capex frame (#57), BoM, ⚠Audit/⚠Checks (derived). HVAC unscored.
+3. ⭐ UNIVERSAL BLENDER FROM FIRST PRINCIPLES + GROWING 3D-PART-SHAPE DB (drawer forgeos_decisions_7a394c568b9018b9):
+   NO bespoke templates. build_universal_scene must generate correct geometry for ANY archetype via DB-first lookup →
+   web-search real 3D model on miss → download/validate/cache/writeback → use; first-principles parametric recipes
+   (real engineered shapes, not blobs) as fallback. DB table blender_part_shapes in ~/.forge-truth/forge-truth.db.
+   Keyed on equipment archetype (universal). See handover for the 4-phase plan + recipe list.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
