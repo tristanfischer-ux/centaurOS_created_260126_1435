@@ -59,7 +59,12 @@ TYPE_EXPECTED = {
     "instrument": {"pid", "process-schedules"},
     "valve":      {"pid", "process-schedules"},
     "electrical": {"single-line-diagram", "panel-schedule"},
-    "control":    {"single-line-diagram", "panel-schedule"},
+    # A CONTROL device (PLC / HMI / SCADA / gateway / power-supply / surge) is CABINET CONTENTS,
+    # shown on the PANEL SCHEDULE — NOT a power feeder on the single-line one-line (which shows the
+    # incomer → main breaker → motor/sub-panel feeders). The control PANEL/enclosure itself is typed
+    # `electrical` and stays single-line-expected; its internal cards do not. (A single-line conventionally
+    # carries power-path equipment only — same correctness principle as GA-non-massing for the 3-D scene.)
+    "control":    {"panel-schedule"},
     "other":      {"blender", "general-arrangement"},
 }
 TYPE_RULES = [
@@ -1033,6 +1038,13 @@ def _selftest() -> int:
         if not letters or letters[0] != want_first:
             print(f"  FAIL _isa_letters('{name}') = {letters!r}, want first {want_first!r}")
             bad += 1
+    # TYPE_EXPECTED: a control device is panel-schedule contents, NOT a single-line power feeder.
+    if "single-line-diagram" in TYPE_EXPECTED.get("control", set()):
+        print("  FAIL: control type must NOT expect single-line (it is panel-schedule cabinet contents)")
+        bad += 1
+    if "panel-schedule" not in TYPE_EXPECTED.get("control", set()):
+        print("  FAIL: control type must expect the panel-schedule")
+        bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
