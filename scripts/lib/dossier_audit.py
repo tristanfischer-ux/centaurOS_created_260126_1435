@@ -1941,11 +1941,12 @@ _GLOSSARY_TAG_PREFIXES = {
     "P", "TK", "F", "V", "I", "HX", "INV", "TX", "EP", "C", "X",
     "FCV", "FV", "LV", "PV", "TV", "LT", "PT", "TT", "FT", "AT", "LE", "FE", "PE", "TE",
     "M", "G", "UV", "PMP", "BLR", "AHU", "MCC", "DB", "SW", "ATS",
-    # power-distribution / structural / UPS / skid-or-zone families (documented in the build-excel
-    # GLOSSARY) — these appear on a fully-built process-plant bill (3-phase feed, skid frames, control
-    # UPS) and must each be defined so a reader never meets an unexplained tag prefix.
-    "D", "S", "U", "Z",
 }
+# NOTE (Tristan 2026-06-27): D-/S-/U-/Z- were briefly whitelisted here to clear the Glossary MED — that
+# was GAMING the check, not fixing the source (and Z- is genuinely overloaded: the glossary defines it
+# as an HVAC zone, yet the tag assigner also stamps it on skid frames). The honest path is to fix the
+# tag-assignment scheme (give skids/UPS/3-phase-feed proper, distinct, documented prefixes), not to
+# silence the finding. Left undocumented on purpose so the MED keeps pointing at the real defect.
 
 
 def check_glossary(state, rows, run_dir) -> list:

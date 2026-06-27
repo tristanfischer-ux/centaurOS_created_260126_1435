@@ -243,14 +243,21 @@ def _aux_tab_score(title: str, run_dir: str):
         if not isinstance(pct, (int, float)):
             return None
         sc = max(0, min(10, round(pct / 10)))
-        st = "PASS" if sc >= 8 else "FAIL"
         iss = []
         if advisory:
             iss.append(advisory)
+            # HONEST CAP (Tristan 2026-06-27): an ADVISORY = a dimension the engine did NOT verify
+            # (here, object-level VISUAL quality — coverage being 100% says the tags are present, NOT
+            # that the picture is right). An unverified dimension means the sheet is NOT verified-perfect
+            # and CANNOT score 10; nor can it be a confident ≥8 PASS until something actually LOOKS at it
+            # (the SIGHT vision-critic). Cap at 7 (FAIL) so an unverified render never reads as shippable.
+            # Earning ≥8 requires a real visual check that clears, which removes the advisory.
+            sc = min(sc, 7)
+        st = "PASS" if sc >= 8 else "FAIL"
         iss.append(f"{label} part coverage {c.get('present')}/{c.get('expected')} ({pct:.0f}%)"
-                   + ("" if sc >= 8 else " — under-covered: the drawing must render its parts so their tags match the BoM"))
+                   + ("" if pct >= 80 else " — under-covered: the drawing must render its parts so their tags match the BoM"))
         return {"score": sc, "target": 8, "status": st, "issues": iss,
-                "fix": "drawing generator must emit every principal part's tag so parts_ledger coverage ≥ 80%"}
+                "fix": "object-level visual quality is UNVERIFIED — run the vision critic on the render so a 5-second human-glance defect is caught before ship (then this advisory clears); also keep coverage ≥ 80%"}
 
     if "p&id" in t or t == "pid":
         return _cov("pid", "P&ID")
@@ -352,7 +359,10 @@ def _aux_tab_score(title: str, run_dir: str):
                 "issues": ["the design carries an HVAC duty but the HVAC drawing has no scored coverage — "
                            "the drawing must represent the ventilation / cooling equipment"],
                 "fix": "the HVAC drawing generator must emit the ventilation/cooling equipment tags"}
-        return {"score": 10, "target": 8, "status": "PASS",
+        # HONEST score (Tristan 2026-06-27): an OUT-OF-SCOPE disclosure is class-correct and ships, but
+        # it is NOT a verified-perfect 10 — there is no HVAC engineering ON the sheet to make it a "wow".
+        # Cap at 8 (a clean PASS for a correctly-scoped sheet) — never inflate a disclosure to 10.
+        return {"score": 8, "target": 8, "status": "PASS",
                 "issues": ["HVAC is OUT OF SCOPE for this process / fluid plant — its climate hardware "
                            "(heating / ventilation / cooling) is supplied by others (per the brief); the "
                            "sheet honestly documents building-ventilation only, with no HVAC equipment to "
