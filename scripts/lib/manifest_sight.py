@@ -84,6 +84,15 @@ def manifest_divergence(run_dir: str) -> dict:
     that GA + render + parts_ledger all consume (no re-place after the render)."""
     import glob
     paths = sorted(glob.glob(os.path.join(run_dir, "**", "parts-manifest.json"), recursive=True))
+    # EXCLUDE internal isolated-pass sub-dirs (a '_'-prefixed dir by convention, e.g. the early
+    # settle loop's outDir/_loop/parts-manifest.json). That manifest is written at an EARLIER,
+    # pre-final-layout state and NO delivered drawing reads it — GA, the render AND parts_ledger
+    # all consume the ROOT canonical parts-manifest (generate_drawing_set snapshots/restores it).
+    # Comparing the delivered manifest against this throwaway is a FALSE divergence. The detector's
+    # intent is "do the DELIVERED drawings disagree?" — so only compare manifests a delivered
+    # drawing actually consumes (root + any non-'_' sub-dir).
+    paths = [p for p in paths
+             if not any(seg.startswith("_") for seg in os.path.relpath(p, run_dir).split(os.sep)[:-1])]
     if len(paths) < 2:
         return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
     layouts = []
@@ -155,8 +164,28 @@ def _selftest() -> int:
     if r["litter_parts"] != 0:
         print(f"  FAIL legit-repeat: 4 same-size valves must not be flagged (got {r['litter_parts']})")
         bad += 1
-    # proveCatch: two manifests in a run that disagree on positions → diverged/FAIL (GA2).
+    # proveCatch: two DELIVERED manifests in a run that disagree on positions → diverged/FAIL (GA2).
+    # Use a NON-'_' sub-dir ('views') — a delivered placement a drawing would actually read.
     import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        os.makedirs(os.path.join(_td, "views"), exist_ok=True)
+        _a = {"parts": [{"tag": f"t{i}", "pos_mm": [i * 100, 0, 0], "dims_mm": {"w": 50, "d": 50, "h": 50}} for i in range(10)]}
+        _b = {"parts": [{"tag": f"t{i}", "pos_mm": [i * 100 + 9000, 5000, 0], "dims_mm": {"w": 50, "d": 50, "h": 50}} for i in range(10)]}
+        with open(os.path.join(_td, "parts-manifest.json"), "w") as fh:
+            json.dump(_a, fh)
+        with open(os.path.join(_td, "views", "parts-manifest.json"), "w") as fh:
+            json.dump(_b, fh)
+        r = manifest_divergence(_td)
+        if not r["diverged"] or r["status"] != "FAIL":
+            print(f"  FAIL divergence proveCatch: two disagreeing DELIVERED manifests must be FAIL (got {r})"); bad += 1
+        # counter-case: identical second manifest → no divergence, PASS.
+        with open(os.path.join(_td, "views", "parts-manifest.json"), "w") as fh:
+            json.dump(_a, fh)
+        r = manifest_divergence(_td)
+        if r["diverged"]:
+            print(f"  FAIL divergence counter-case: identical manifests must PASS (got {r})"); bad += 1
+    # counter-case (the 2026-06-27 false-positive fix): a DIVERGING manifest in an INTERNAL '_loop'
+    # isolated-pass sub-dir must be IGNORED (no delivered drawing reads it) → PASS, not FAIL.
     with _tf.TemporaryDirectory() as _td:
         os.makedirs(os.path.join(_td, "_loop"), exist_ok=True)
         _a = {"parts": [{"tag": f"t{i}", "pos_mm": [i * 100, 0, 0], "dims_mm": {"w": 50, "d": 50, "h": 50}} for i in range(10)]}
@@ -166,14 +195,8 @@ def _selftest() -> int:
         with open(os.path.join(_td, "_loop", "parts-manifest.json"), "w") as fh:
             json.dump(_b, fh)
         r = manifest_divergence(_td)
-        if not r["diverged"] or r["status"] != "FAIL":
-            print(f"  FAIL divergence proveCatch: two disagreeing manifests must be FAIL (got {r})"); bad += 1
-        # counter-case: identical second manifest → no divergence, PASS.
-        with open(os.path.join(_td, "_loop", "parts-manifest.json"), "w") as fh:
-            json.dump(_a, fh)
-        r = manifest_divergence(_td)
         if r["diverged"]:
-            print(f"  FAIL divergence counter-case: identical manifests must PASS (got {r})"); bad += 1
+            print(f"  FAIL _loop-exclusion: an internal _loop manifest must NOT count as divergence (got {r})"); bad += 1
     print("manifest_sight selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
