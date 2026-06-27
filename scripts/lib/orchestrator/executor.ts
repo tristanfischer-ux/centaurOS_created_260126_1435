@@ -25,6 +25,19 @@ import type {
 import { getTool } from './registry'
 import { loadToolInputKeys } from './attribution'
 
+// A brief that EXPLICITLY DIMENSIONS a storage vessel (the Codema drain tanks: "40 m³ each", with a
+// stated 3.64 m ⌀ × 3.88 m) gives a PHYSICAL tank size, not a soft target — a generic buffer-sizing
+// tool (a CONSUMPTIVE model, wrong on a RECIRCULATING ebb/flow plant) must not refine it AT ALL.
+// The >3× gross-override guard misses a 1.62× drift (drain 40→64.8), so the brief's exact tank is
+// lost and the physics critic flags "brief 120 m³ total vs the design". For a brief-pinned
+// STORAGE/TANK/BUFFER/RESERVOIR volume|capacity, hold the brief value EXACTLY on ANY divergence.
+// UNIVERSAL — keyed on the storage-vessel key + a volume/capacity family (brief provenance checked
+// by the caller). Exported for the regression guard.
+const _HOLD_EXACT_STORAGE_RE = /(tank|storage|buffer|reservoir|cistern|silo)\w*_(volume|capacity)|_(storage|tank)_(volume|capacity)/i
+export function briefStorageHoldExact(key: string, family: string): boolean {
+  return (family === 'volume' || family === 'capacity') && _HOLD_EXACT_STORAGE_RE.test(key)
+}
+
 export interface ExecutorOutcome {
   contract: ContractInProgress
   tool_results: Map<string, ToolResult<unknown>>
@@ -200,6 +213,14 @@ async function runStep(
   // NOT applied to lower-is-better families (mass / cost / area / loss) where smaller is better.
   const MUST_MEET = new Set(['power', 'current', 'flow_rate', 'throughput', 'capacity',
                              'pressure', 'voltage', 'energy', 'duty', 'head'])
+  // HOLD-EXACT: a brief that EXPLICITLY DIMENSIONS a storage vessel (the Codema drain tanks:
+  // "40 m³ each", with a stated 3.64 m ⌀ × 3.88 m) gives a physical tank size, NOT a soft target —
+  // a generic buffer-sizing tool (which uses a CONSUMPTIVE model, wrong on a RECIRCULATING ebb/flow
+  // plant) must not refine it AT ALL. The >3× gross-override guard misses a 1.62× drift (drain 40→
+  // 64.8), so the brief's exact tank is lost and the physics critic flags "brief 120 m³ total vs the
+  // design's tanks". For a brief-pinned STORAGE/TANK/BUFFER/RESERVOIR volume|capacity, hold the brief
+  // value EXACTLY on ANY divergence. Universal — keyed on the storage-vessel key + brief provenance.
+  // (the predicate is exported as briefStorageHoldExact for the guard)
   const briefPinned: Record<string, { value: number; family: string }> = {}
   for (const [k, v] of Object.entries(contract.quantities)) {
     const qq = v as unknown as { value?: number; source?: string; family?: string } | undefined
@@ -221,11 +242,14 @@ async function runStep(
     const ratio = Math.abs(newVal / briefVal)
     const grossOverride = ratio > 3 || ratio < 1 / 3
     const underRatedSpec = newVal < briefVal && MUST_MEET.has(pin.family)
-    if (grossOverride || underRatedSpec) {
+    const holdExactStorage = briefStorageHoldExact(k, pin.family)
+    if (grossOverride || underRatedSpec || holdExactStorage) {
       // the brief wins; record the tool's (rejected) figure for transparency
       const why = grossOverride
         ? `a ${ratio.toFixed(0)}× divergence, rejected as a gross override of an explicit brief spec`
-        : `${Number(newVal.toFixed(3))} < the brief ${briefVal} ${pin.family} rating — a tool must not under-size a must-meet brief spec`
+        : holdExactStorage
+          ? `an explicitly-dimensioned brief storage vessel is held EXACTLY (${step.tool_id}'s ${Number(newVal.toFixed(3))} is a generic buffer-model refinement, rejected)`
+          : `${Number(newVal.toFixed(3))} < the brief ${briefVal} ${pin.family} rating — a tool must not under-size a must-meet brief spec`
       qq.value = briefVal
       qq.source = 'brief'
       qq.source_detail = `brief-pinned ${briefVal} (held — ${step.tool_id} suggested ${Number(newVal.toFixed(3))}: ${why})`
