@@ -8,7 +8,7 @@
 // three false-positive guards (≥POP_MIN, value==a contract count, head-noun shared). This guard
 // fails the build if the smear is no longer corrected OR a legitimate count is wrongly reset.
 
-import { reassertPopulationCounts } from './universal-contract-sizing'
+import { reassertPopulationCounts, dropAttributePhantomWords } from './universal-contract-sizing'
 
 const C = (q: Record<string, number>) => ({
   quantities: Object.fromEntries(Object.entries(q).map(([k, v]) => [k, { value: v }])),
@@ -54,8 +54,29 @@ function run() {
   if (qtyOf(modules, 'Drip Emitter') !== 200) throw new Error('population-count: a ×200 word whose head noun matches NO same-valued count key must be untouched (false-positive guard)')
   if (fixed !== 4) throw new Error(`population-count: expected exactly 4 smear corrections, got ${fixed}`)
 
+  // ── dropAttributePhantomWords: a dimension/property name is not a part; same-id words dedup ──
+  const pm: any = [{
+    module: 'mass_fluid', sub_modules: [{ sub_module: 's', words: [
+      { ...word('RO Membrane Area', 1), id: 'ro_membrane_area_word' },     // phantom (ends "Area")
+      { ...word('GAC Vessel Diameter', 1), id: 'gac_vessel_diameter_word' }, // phantom (ends "Diameter")
+      { ...word('Reverse Osmosis Skid', 1), id: 'ro_skid_word' },          // real part — kept
+      { ...word('Pressure Vessel', 1), id: 'pv_word' },                    // ends in DEVICE noun — kept
+      { ...word('Control Valve', 1), id: 'cv_word' },                      // ends in DEVICE noun — kept
+      { ...word('Duplicate Pump', 1), id: 'dup_word' },
+      { ...word('Duplicate Pump Two', 1), id: 'dup_word' },                // same id → deduped
+    ] }],
+  }]
+  const dr = dropAttributePhantomWords(pm)
+  const remain = pm[0].sub_modules[0].words.map((w: any) => w.name_human)
+  if (remain.some((n: string) => /membrane area|vessel diameter/i.test(n))) throw new Error(`phantom-drop: a dimension/property phantom survived (${JSON.stringify(remain)})`)
+  for (const keep of ['Reverse Osmosis Skid', 'Pressure Vessel', 'Control Valve']) {
+    if (!remain.includes(keep)) throw new Error(`phantom-drop: dropped a REAL part "${keep}" (ends in a device noun, must be kept)`)
+  }
+  if (dr.droppedDuplicate !== 1) throw new Error(`phantom-drop: expected 1 exact-id duplicate dropped, got ${dr.droppedDuplicate}`)
+
   // eslint-disable-next-line no-console
-  console.log('population-count --selftest OK (4 valve smears → ×1; genuine actuated stays ×200; small + non-matching counts untouched)')
+  console.log('population-count --selftest OK (4 valve smears → ×1; genuine actuated stays ×200; ' +
+    `attribute phantoms dropped [${dr.droppedPhantom}], same-id dedup [${dr.droppedDuplicate}], real parts kept)`)
 }
 
 run()

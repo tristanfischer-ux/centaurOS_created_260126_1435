@@ -2695,6 +2695,39 @@ export function reassertPopulationCounts(modules: ModuleLike[], contract: Contra
   return fixed
 }
 
+// ── ATTRIBUTE-PHANTOM DROP + EXACT-ID DEDUP (post-Phase-2 cleanup) ─────────────────────────
+// Two defects, both fixed here (runs BEFORE routing + BoM, so no manifest pruning is needed):
+//  (1) A standalone word whose name ENDS in a DIMENSION/PROPERTY noun ("RO Membrane Area", "GAC
+//      Vessel Diameter") is a PHANTOM — an attribute of its parent device, never a discrete part.
+//      It mints a bogus BoM line + a duplicate tag + an absurd "Skid → its own Area" connection.
+//  (2) Two words with the SAME id (an LLM/skeleton duplication) collide on ONE tag (the v19
+//      X-108 "RO Membrane Area"×2 BoM "tags must be unique" HIGH).
+// UNIVERSAL — a real part ends in a DEVICE noun (the `\s*$` anchor spares "Pressure Vessel" /
+// "Control Valve"); sub-components are spared (their parent owns the attribute). Mutates in place.
+const ATTRIBUTE_NAME_RE = /\b(area|diameter|radius|circumference|volume|height|length|width|depth|thickness|capacity|throughput|flow ?rate|velocity|head|footprint|pressure|temperature|count|spacing|pitch|ratio|density|mass|weight|power|voltage|current|frequency)\s*$/i
+export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhantom: number; droppedDuplicate: number } {
+  let droppedPhantom = 0
+  let droppedDuplicate = 0
+  const seenIds = new Set<string>()
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      if (!Array.isArray(sm.words)) continue
+      sm.words = sm.words.filter((w) => {
+        const isSub = (w as { _subcomponent?: boolean })._subcomponent === true
+        const name = w.name_human ?? w.content_character?.name_human ?? ''
+        if (!isSub && ATTRIBUTE_NAME_RE.test(name)) { droppedPhantom += 1; return false }
+        const id = String((w as { id?: unknown }).id ?? '')
+        if (id) {
+          if (seenIds.has(id)) { droppedDuplicate += 1; return false }
+          seenIds.add(id)
+        }
+        return true
+      })
+    }
+  }
+  return { droppedPhantom, droppedDuplicate }
+}
+
 export function reconcilePrincipalEquipment(
   modules: ModuleLike[],
   contract: ContractInProgress,

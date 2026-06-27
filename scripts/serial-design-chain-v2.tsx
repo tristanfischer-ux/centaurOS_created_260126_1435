@@ -6601,7 +6601,7 @@ async function main() {
   try {
     const isGeneric = /Generic emitter/i.test(String((state.moduleDecomposition as any)?.rationale_excluded ?? ''))
     if (isGeneric && engineeringContract) {
-      const { reconcilePrincipalEquipment, reassertPopulationCounts } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+      const { reconcilePrincipalEquipment, reassertPopulationCounts, dropAttributePhantomWords } = await import('./lib/orchestrator/generic/universal-contract-sizing')
       // Pass the contract the RENDERER + GA read (state.orchestratorContract) so the building
       // take-off's re-derived footprint write-back (synthesizeBuildingStructure, run inside the
       // reconcile against the FINAL equipment set) persists where it is consumed; fall back to
@@ -6621,6 +6621,18 @@ async function main() {
         }
       } catch (err) {
         console.error(`[chain] population-count re-assert failed (non-fatal): ${(err as Error).message}`)
+      }
+      // Drop standalone DIMENSION/PROPERTY phantoms ("RO Membrane Area", "GAC Vessel Diameter" —
+      // an attribute is not a part: bogus BoM line + duplicate tag + absurd self-connection) and
+      // exact-id duplicate words (two same-id words collide on one tag). Runs BEFORE routing + BoM.
+      try {
+        const ph = dropAttributePhantomWords((state.moduleDecomposition?.modules ?? []) as any)
+        if (ph.droppedPhantom || ph.droppedDuplicate) {
+          console.error(`[chain] attribute-phantom cleanup: dropped ${ph.droppedPhantom} dimension/property phantom word(s) + ${ph.droppedDuplicate} exact-id duplicate(s) (fixes phantom BoM lines + duplicate tags)`)
+          logAction({ step: 'attribute_phantom_drop', dropped_phantom: ph.droppedPhantom, dropped_duplicate: ph.droppedDuplicate })
+        }
+      } catch (err) {
+        console.error(`[chain] attribute-phantom cleanup failed (non-fatal): ${(err as Error).message}`)
       }
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,

@@ -239,6 +239,17 @@ export function contractCountFor(component: string, contract: ContractInProgress
 // thermal set of a heating-only plant (the RAS chiller-in-a-heating-plant residual).
 const COOLING_COMPONENT_RE = /chill|cooling|\bcooler\b|refriger|condenser|air[_\s-]?damper|cold[_\s-]?plate|cooling[_\s-]?fan/i
 
+// A component name that is actually a DIMENSION / PROPERTY of a device (it ENDS in a measurement
+// noun — area, diameter, volume, height, length, width, capacity, throughput, …) is NEVER a
+// discrete part. The corpus/LLM sometimes lists a quantity name ("RO Membrane Area", "GAC Vessel
+// Diameter") as a component; emitting a BoM word for it mints a PHANTOM part + a duplicate tag
+// (two same-named property-words collide on one tag — the v19 X-108/V-102 BoM HIGH) + an absurd
+// "Skid → its own Area" routed connection. The attribute belongs to its PARENT device's word, so
+// drop the standalone. UNIVERSAL — a real part name ends in a DEVICE noun (pump/tank/valve/skid…),
+// never a dimension. The `\s*$` anchor (ENDS-with) avoids false hits on "Pressure Vessel" /
+// "Control Valve" / "Pressure Transmitter" (those end in a device noun).
+const PROPERTY_COMPONENT_RE = /\b(area|diameter|radius|circumference|volume|height|length|width|depth|thickness|capacity|throughput|flow ?rate|velocity|head|footprint|pressure|temperature|count|spacing|pitch|ratio|density|mass|weight|power|voltage|current|frequency)\s*$/i
+
 /** Build the 5-7 component name list for a module: corpus union first, floor to top up.
  *  For `environmental_interface` the floor + a cooling-component filter are driven by the
  *  contract's thermal DUTY SIGN, so a heating-only plant never ships a chiller. */
@@ -256,6 +267,8 @@ function componentsForModule(
   const push = (c: string) => {
     // Heating-only plant: never admit a cooling component (from corpus OR floor).
     if (isThermal && thermalMode === 'heating' && COOLING_COMPONENT_RE.test(c)) return
+    // Never admit a DIMENSION/PROPERTY name as a part (it is an attribute of its parent device).
+    if (PROPERTY_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
     if (id && !seen.has(id)) {
       seen.add(id)
