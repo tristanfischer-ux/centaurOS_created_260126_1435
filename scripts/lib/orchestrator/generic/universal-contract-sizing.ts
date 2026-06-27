@@ -589,10 +589,20 @@ const R2 = (n: number) => Math.round(n)
 // Without this, a FLOW-rated pump (p.kw=0) collapsed to the 1.5 kW floor because the
 // heuristic ignores head entirely (e.g. 90 m³/h @ 3.5 bar → true ≈ 9.7 kW, was floored to
 // ~2 kW). The motor is the most-flagged pump physics error; this makes it scale with duty.
+// Flow-only fallback (no contract motor_kw, no device kW): estimate shaft power from the
+// hydraulic relation P[kW] = Q[m³/h]·ΔP[bar] / (36·η) at a SENSIBLE DEFAULT head. The old
+// `m3h/120` implied ΔP ≈ 0.18 bar — physically absurd for any pumped duty (a 25 m³/h hand-
+// watering pump came out ~0.2 kW → floored to 1.5, the physics-critic "2 kW undersized for
+// 25 m³/h @ 3 bar" HIGH). A real process-water pump runs ~2–4 bar; assume ΔP=2.5 bar, η=0.62
+// when the contract gives no head → 25 m³/h → ~2.8 kW (vs the brief's 3 bar → ~3.5 kW: honest,
+// no over-claim without the real head, but no longer absurdly low). Override path (the sizing
+// tool's true P=ρgQH/η) is UNCHANGED — this only governs a pump the contract never head-sized.
+const FLOW_PUMP_DEFAULT_BAR = 2.5
+const FLOW_PUMP_EFF = 0.62
 const motorKw = (p: ParentPhysics) =>
   (p.motorKwOverride && p.motorKwOverride > 0)
     ? p.motorKwOverride
-    : Math.max(1.5, (p.kw || (p.m3h ? p.m3h / 120 : 30)) / 0.88)
+    : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88))
 
 // Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
 // quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The

@@ -60,9 +60,11 @@ function run() {
   if (irr < 8) throw new Error(`pump-motor: irrigation pump motor ${irr} kW did not bind the contract 9.653 kW (regressed to the flow floor)`)
   // Drain pump binds its own (smaller) contract value — proves per-pump stem binding, not a global.
   if (drn < 1.5 || drn > 3) throw new Error(`pump-motor: drain pump motor ${drn} kW did not bind its contract 1.923 kW`)
-  // Hand-watering has no contract value → heuristic fallback (small), proving we don't mis-bind
-  // the fertigation decoy (7.5) to it.
+  // Hand-watering has no contract motor_kw → heuristic fallback. It must (a) NOT bind the
+  // fertigation decoy (7.5) and (b) be a REALISTIC flow-only estimate (25 m³/h @ ~2.5 bar default
+  // ≈ 2.8 kW), NOT the old absurd m3h/120 → 1.5 floor (the physics-critic "2 kW undersized" HIGH).
   if (hand > 4) throw new Error(`pump-motor: hand-watering pump motor ${hand} kW wrongly bound a foreign contract value (decoy leak)`)
+  if (hand < 2.5) throw new Error(`pump-motor: hand-watering pump motor ${hand} kW is the old absurd flow heuristic (m3h/120) — a 25 m³/h pump needs ~2.8 kW, not the 1.5 floor`)
 
   // eslint-disable-next-line no-console
   console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak)`)
