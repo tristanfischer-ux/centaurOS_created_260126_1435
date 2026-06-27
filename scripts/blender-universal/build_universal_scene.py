@@ -138,6 +138,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import connection_sizing as cs
 import connection_ledger as cl   # the LEDGER authority — validates + owns the connection graph
 import layout_optimiser as lo    # deterministic CRAFT plant-layout optimiser (opt-in)
+import ga_massing                # GA non-massing classifier (accessory/instrument/valve drop)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -846,6 +847,18 @@ def extract_parts(state):
                 if re.search(r"\bfastener set\b|\bgasket seal\b|\bmounting (bracket|hardware)\b|"
                              r"\bwiring harness\b|\blabelling set\b|\blifting (point|lug)\b|"
                              r"\bnameplate\b|\bearthing boss\b", name, re.I):
+                    dropped.append(name)
+                    continue
+                # GA NON-MASSING parts — accessories, field instruments, switchgear /
+                # control-panel internals and inline valves are NOT principal 3D equipment.
+                # A General Arrangement (and the 3D render that mirrors it) shows the MAJOR
+                # equipment; valves + instruments are P&ID TAGS and glands / unions /
+                # panel-cards are accessories that live ON or INSIDE a parent. Placing each
+                # as its own box buries the plant in identical default-size boxes (the
+                # manifest-sight LITTER signal). They REMAIN in the BoM + connection ledger
+                # and appear on the P&ID. The classifier + its proveCatch live in ga_massing
+                # (bpy-free, --selftest in verify-engine-guards.sh) so the rule is one source.
+                if ga_massing.is_ga_non_massing(name):
                     dropped.append(name)
                     continue
                 # Filter on the NAME only (form prose names catalysts/resins on

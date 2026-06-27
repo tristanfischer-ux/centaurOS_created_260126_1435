@@ -48,6 +48,7 @@ run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.p
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
+run "ga_massing.py --selftest"                "$PY" scripts/blender-universal/ga_massing.py --selftest
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
 run "design-to-target.ts --selftest"          npx tsx scripts/lib/design-to-target.ts --selftest
