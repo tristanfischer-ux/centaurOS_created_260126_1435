@@ -582,6 +582,41 @@ def _would_show_unverified(state, m) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+# Check 3.5 — Brief-compliance UNVERIFIED lines drop the Executive Summary
+# --------------------------------------------------------------------------- #
+
+def check_brief_compliance_unverified(state, rows, run_dir) -> list:
+    """Every brief metric the compliance matrix renders UNVERIFIED (NO contract quantity fulfils it)
+    is a requirement the engine CANNOT confirm the design meets — an honest GAP, not a free note. It
+    must DROP the Executive Summary score (the cover that prints the matrix); a sheet with an
+    unverified line cannot read a green 10 (Tristan 2026-06-27 caught exactly this: max_irrigation_
+    demand showed UNVERIFIED while the Exec Summary scored 10/10). A HARD sizing/scale/safety metric
+    is HIGH; a soft metric is MED. The fix is to SIZE the missing quantity (so it verifies) or admit a
+    genuine miss as a FAIL — never a silent UNVERIFIED on the cover."""
+    tab = "Executive Summary"
+    out: list = []
+    hard_rx = re.compile(r"capacit|throughput|flow|demand|power|voltage|count|\brate\b|pressure|"
+                         r"recovery|storage|head|duty|temperature|mass|energy|load", re.I)
+    for m in _brief_metrics(state):
+        if not _would_show_unverified(state, m):
+            continue
+        name = _metric_name(m) or "(unnamed metric)"
+        hard = bool(hard_rx.search(name))
+        out.append(Finding(
+            tab=tab, check="brief_compliance_unverified",
+            severity="HIGH" if hard else "MED",
+            message=(f"brief requirement '{name}' is UNVERIFIED on the compliance matrix — no contract "
+                     f"quantity fulfils it, so the design cannot be confirmed to meet it"),
+            actual="UNVERIFIED",
+            expected="every brief requirement matched to a DELIVERED quantity with a PASS/FAIL",
+            source_rule=("size the missing quantity in the engineering contract so the requirement "
+                         "verifies (or surface a genuine miss as a FAIL) — never a silent UNVERIFIED "
+                         "on the cover; the Exec Summary cannot be ≥8 over an unverified requirement"),
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Check 4 — Cross-tab consistency (Exec Summary vs Overview)
 # --------------------------------------------------------------------------- #
 
@@ -1983,6 +2018,7 @@ def check_glossary(state, rows, run_dir) -> list:
 _CHECKS = [
     check_bom,
     check_capex_by_category,
+    check_brief_compliance_unverified,
     check_cross_tab,
     check_part_names,
     check_line_velocity,
@@ -2122,6 +2158,21 @@ def tab_scores(state: dict, rows: list, run_dir: str) -> dict:
             "issues": [f"[{f.severity}] {f.message[:110]}" for f in fs[:6]],
             "fix": next((f.source_rule for f in fs if f.source_rule), ""),
         }
+    # The Executive Summary is the COVER that CLAIMS the whole dossier is buildable + ready. It cannot
+    # honestly score higher than the WEAKEST sheet it summarises — a 10/10 cover over a 6/10 Risk tab
+    # and "4 open issues" is the lie Tristan caught (2026-06-27). Cap it at the floor of the other
+    # scored tabs so the headline can never overstate the dossier's true readiness.
+    es = out.get("Executive Summary")
+    if isinstance(es, dict) and isinstance(es.get("score"), (int, float)):
+        others = [v["score"] for k, v in out.items()
+                  if k != "Executive Summary" and isinstance(v.get("score"), (int, float))]
+        floor = min(others) if others else es["score"]
+        if floor < es["score"]:
+            es["issues"] = ([f"capped at the dossier FLOOR ({floor}/10): the cover cannot claim a higher "
+                             f"score than its weakest sheet — fix that sheet to raise this one"]
+                            + (es.get("issues") or []))[:6]
+            es["score"] = floor
+            es["status"] = "PASS" if floor >= 8 else "FAIL"
     return out
 
 

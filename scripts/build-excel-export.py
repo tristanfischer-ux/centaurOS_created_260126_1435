@@ -3218,7 +3218,21 @@ def _unit_family(unit: str) -> Tuple[str, float]:
 _ECHO_SUFFIXES = ("_requested", "_request", "_target", "_demand", "_brief", "_spec")
 _QTY_UNIT_SUFFIX = re.compile(
     r"_(kwh|mwh|gwh|wh|kw|mw|gw|w|kva|mva|kv|mv|v|ka|ma|a|percent|pct|cycles?|kg|t|m2|m3|c)$")
-_QTY_STOP_TOKENS = {"the", "of", "per", "system", "total", "design", "rated", "nominal"}
+_QTY_STOP_TOKENS = {
+    "the", "of", "per", "system", "total", "design", "rated", "nominal",
+    # UNIT tokens — the unit family is ALREADY gated by `_fam_ok`, so a unit token must NEVER count
+    # toward IDENTITY overlap. Without this, `hand_watering_capacity_m3_per_hr` matched
+    # `fertigation_dosing_capacity_m3_per_hr` purely on {capacity, m3, hr} — a wrong-subsystem FALSE
+    # PASS (a 25 m³/h hand-watering target "met" by a 90 m³/h fertigation pump). `_norm_qty_name`
+    # only strips a trailing unit (…_m3), not a RATE unit (…_m3_per_hr), so m3/hr leaked through here.
+    "m3", "m2", "m", "l", "hr", "h", "hour", "hrs", "min", "mins", "sec", "s", "day", "yr", "year",
+    "kw", "mw", "gw", "w", "kwh", "mwh", "gwh", "wh", "kg", "kt", "t", "g", "v", "kv", "a", "ka", "ma",
+    "bar", "pa", "kpa", "mpa", "psi", "c", "k", "pct", "percent", "mm", "cm", "km", "nm", "ppm",
+    # GENERIC measure-nouns — a metric's IDENTITY is its SUBSYSTEM (hand/watering, fertigation/dosing,
+    # ro/permeate), NOT the generic quantity word. These alone must not bridge two subsystems (the
+    # memory rule: gac_softener_throughput must NOT match cloth_filter_throughput on "throughput").
+    "capacity", "throughput", "flow", "rate", "demand", "output", "volume", "duty", "load",
+}
 
 
 def _norm_qty_name(s: str) -> str:
