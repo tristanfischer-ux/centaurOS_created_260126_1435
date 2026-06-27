@@ -280,6 +280,35 @@ export interface DbPart {
   // pins the catalogue price (via a list_price_gbp modifier) instead of falling
   // back to the component-class anchor. Null when the ingested row had no price.
   unit_price_gbp: number | null
+  // The ingested spec text (JSON desc with flow/capacity/head). Carried so a
+  // CAPACITY-aware pin can reject a grossly-undersized flow-machine match (a
+  // Grundfos CM3-3 @ 3 m³/h pinned for a 90 m³/h pump — the DB has no capacity
+  // column, but the desc string holds "3 m3/h @ 35m head"). Null when absent.
+  raw_excerpt?: string | null
+}
+
+// Parse a flow capacity (m³/h) from a DB part's ingested spec text + name. The pretraining rows
+// have no capacity COLUMN, but raw_excerpt.desc carries it ("3 m3/h @ 35m head"). Returns null
+// when no flow figure is present. UNIVERSAL (any pump/blower spec string).
+export function partFlowCapacityM3h(p: { part_name?: string | null; raw_excerpt?: string | null }): number | null {
+  const hay = `${p.part_name ?? ''} ${p.raw_excerpt ?? ''}`
+  const m = hay.match(/(\d+(?:\.\d+)?)\s*m\s*[³3]\s*\/\s*h/i)
+  return m ? parseFloat(m[1]) : null
+}
+
+// A gap word's flow DUTY (m³/h) when it is a flow machine (pump/blower/compressor/fan/filter), read
+// from its rating_primary. Returns null for a non-flow word or no m³/h rating, so capacity-gating
+// only ever touches a flow machine with a known duty. UNIVERSAL.
+export function wordFlowDutyM3h(w: WordLike): number | null {
+  const nm = w.name_human ?? w.content_character?.name_human ?? w.content_character?.character_id ?? ''
+  if (!/pump|blower|compressor|\bfan\b|filter|screen|skimmer/i.test(nm)) return null
+  for (const mc of w.modifier_characters ?? []) {
+    if (mc.kind !== 'rating_primary') continue
+    if (!/m\s*[³3]\s*\/\s*h/i.test(String(mc.unit ?? '') + ' ' + String(mc.value ?? ''))) continue
+    const v = parseFloat(String(mc.value).replace(/[^0-9.]/g, ''))
+    if (Number.isFinite(v) && v > 0) return v
+  }
+  return null
 }
 
 function openLibraryDb(dbPath: string): Database.Database | null {
@@ -363,7 +392,7 @@ export function dbFirstLookup(
   let stmt: Database.Statement
   try {
     stmt = db.prepare(`
-      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp
+      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp, raw_excerpt
       FROM pretraining_extracted_parts
       WHERE manufacturer IS NOT NULL AND manufacturer != ''
         AND part_number IS NOT NULL AND length(part_number) >= 4
@@ -1002,6 +1031,19 @@ export async function fillBlankWordMpns(
       //    a part within the sub_module.
       const dbHit = dbFirstLookup(db, tokenList, headNoun)
       if (dbHit) {
+        // CAPACITY VALIDATION (Tristan 2026-06-27): a flow-machine pin must not be grossly
+        // undersized vs the engine's own computed duty. A 'Grundfos CM3-3' (3 m³/h) pinned for a
+        // 90 m³/h pump is a ~30× mis-pin (the DB name-match ignores capacity). When the gap word is
+        // a flow machine with a known m³/h duty AND the candidate's parsed flow capacity is < 50% of
+        // it, SKIP the pin entirely — keep the engine's honest generic spec ("90 m³/h @ 3.5 bar
+        // end-suction, exact MPN at detailed design") rather than ship a known-undersized part. The
+        // generate path is NOT used either (it could hallucinate another wrong pump). UNIVERSAL.
+        const duty = wordFlowDutyM3h(cand.word)
+        const cap = duty ? partFlowCapacityM3h(dbHit) : null
+        if (duty && cap !== null && cap < duty * 0.5) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): DB ${dbHit.manufacturer} ${dbHit.part_number} ~${cap} m³/h << duty ${duty} m³/h — keeping generic spec`)
+          continue
+        }
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
         const key = `${dbHit.manufacturer}|${dbHit.part_number}`.toLowerCase()
         let used = usedInSub.get(cand.subId)

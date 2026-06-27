@@ -57,6 +57,7 @@ run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/g
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
 run "population-count --selftest"             npx tsx scripts/lib/orchestrator/generic/population-count-selftest.ts
 run "subassembly-class --selftest"           npx tsx scripts/lib/orchestrator/generic/subassembly-class-selftest.ts
+run "pump-capacity --selftest"               npx tsx scripts/lib/orchestrator/generic/pump-capacity-selftest.ts
 run "brief-storage-hold --selftest"           npx tsx scripts/lib/orchestrator/brief-storage-hold-selftest.ts
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
