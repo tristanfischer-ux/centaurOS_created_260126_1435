@@ -120,6 +120,43 @@ meets the brief). What remains is 3 generation build-outs, each needing a fresh 
   2. P&ID/BFD emitters emit part tags (BoM).
   3. physics-critic HIGH closure + re-run (Risk).
 
+
+═══════════════════════════════════════════════════════════════════════════════
+## ▶▶▶ RESUME (2026-06-27 v15/v16 — RENDER LITTER + P&ID/BFD TOPOLOGY fixed UNIVERSALLY)
+═══════════════════════════════════════════════════════════════════════════════
+TWO universal fixes committed + verified this session (HEAD c20ab489a):
+1. RENDER/GA LITTER (commit 61ccae24b) — extract_parts now drops GA non-massing parts
+   (accessories/instruments/switchgear+panel internals/inline valves) from the 3D scene;
+   they were all falling to one shared default box (manifest_sight LITTER). Single-sourced
+   in scripts/blender-universal/ga_massing.py (is_ga_non_massing + --selftest proveCatch).
+   VERIFIED IN REAL CHAIN: v15 parts-manifest 128→54 parts, 0 litter clusters, ratio 0.0.
+   → the 8 render sheets + GA should leave 0 (were 0 from litter).
+2. P&ID/BFD EMPTY (commit c20ab489a) — water_treatment (+ any unseen generic-path class)
+   emitted NO contract.topology, so P&ID/BFD drew "nothing to draw" = 0. New
+   deriveProcessTopology (scripts/lib/orchestrator/generic/derive-topology.ts) derives a
+   feed→product spine from the synthesised principal equipment (role-rank ported from
+   draw_bfd _ROLE_PATTERNS), wired in the chain after principal-equipment reconcile, FIRES
+   ONLY when no hand-authored topology exists. Verified on v14 state: 15 nodes → 14 edges.
+v16 = the clean run with BOTH fixes (in progress; out/fischer-codema-v16).
+
+NEXT INCREMENT (Risk/physics-critic, #79/#99/#82) — PUMP MOTOR UNDERSIZED (skeleton critic
+flagged on v15): Irrigation Pump 90 m³/h @ 3.5 bar is given only a ~2 kW drive motor + VSD.
+ROOT (precise): scripts/lib/orchestrator/generic/universal-contract-sizing.ts `motorKw` (line
+573) = max(1.5, (p.kw || p.m3h/120)/0.88). A FLOW-rated pump has p.kw=0 → collapses to the
+floor 1.5 kW, IGNORING head entirely. The CORRECT value ALREADY EXISTS in the contract:
+orchestratorContract.quantities.irrigation_pump_motor_kw = 9.653 kW (from tool:irrigation:
+pump-sizing; siblings fertigation 7.5, drain 1.923 also present). UNIVERSAL FIX = consume the
+contract: thread quantities into explodeEquipmentSubAssemblies (line 712; call site sets
+readParentPhysics at 746) and, for a pump parent, inject its stem-matched `*_motor_kw`/
+`*_power_kw` into ParentPhysics.kw so the Drive Motor + VSD derive (lines 627-628) read the
+real hydraulic figure. Reusable formula if needed: process_pump_sizing.py (P=ρgQH/η). ALL
+pumps on ALL archetypes flow through motorKw → one fix covers everything. Guard: extend
+test-universal-sizing or add a selftest asserting a 90 m³/h pump → motor ≈ contract value.
+ALSO (#13-class part mis-pin): the irrigation pump is pinned "Grundfos CM3-3" (~3 m³/h unit)
+for a 90 m³/h duty — absurdly undersized part SELECTION (separate from the motor kW); a
+90 m³/h @ 3.5 bar duty wants a big end-suction/multistage pump, not a CM-series. Route to the
+pump part-selection rule.
+
 ═══════════════════════════════════════════════════════════════════════════════
 ## ★ MASTER CHECKLIST — every must-do for a genuine ≥8-on-EVERY-tab dossier
 ═══════════════════════════════════════════════════════════════════════════════
