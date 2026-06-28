@@ -189,6 +189,23 @@ def _ledger_coverage(run_dir: str) -> dict:
 
 _LITTER_CACHE: dict = {}
 _SHAPE_MM_CACHE: dict = {}
+_VISION_CACHE: dict = {}
+
+
+def _render_vision_verdict(run_dir: str):
+    """SIGHT: read the vision critic's verdict on the render (render-vision-critique.json), if a vision
+    model has looked. {ok, broken, defects, model} or None. Deterministic READ of the delivered verdict
+    — the non-deterministic vision CALL happens once upstream (the chain / render_vision_critic.py)."""
+    if run_dir in _VISION_CACHE:
+        return _VISION_CACHE[run_dir]
+    res = None
+    try:
+        with open(os.path.join(run_dir, "render-vision-critique.json"), "r", encoding="utf-8") as _fh:
+            res = json.load(_fh)
+    except Exception:  # noqa: BLE001
+        res = None
+    _VISION_CACHE[run_dir] = res
+    return res
 
 
 def _manifest_litter(run_dir: str):
@@ -332,8 +349,27 @@ def _aux_tab_score(title: str, run_dir: str):
     if "isometric" in t:
         return _cov("isometric-index", "Isometric")
     if "render" in t or "interior layout" in t or "building exterior" in t:
+        # VISION VERDICT (Tristan 2026-06-28): if a vision critic has actually LOOKED at the render
+        # (render-vision-critique.json), its verdict replaces the blanket 'visual quality unverified'
+        # advisory. broken → FAIL with the named defect (flag-only: it can only CAP, never lift).
+        # clean → the visual dimension is VERIFIED, so NO advisory and the render can earn ≥8 on its
+        # deterministic checks (coverage/litter/shape). absent → keep the advisory (honest-cap → 7).
+        _vv = _render_vision_verdict(run_dir)
+        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is True:
+            base = _cap_litter(_cov("blender", "Render"))
+            if isinstance(base, dict):
+                _df = "; ".join(str(d) for d in (_vv.get("defects") or [])[:3]) or "a visible defect"
+                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                base["status"] = "FAIL"
+                base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — the render is not "
+                                   f"clean (model: {_vv.get('model', '?')})"] + (base.get("issues") or []))[:6]
+                base["fix"] = "fix the geometry/routing that produces the flagged defect, then the vision critic clears"
+            return base
+        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is False:
+            # visual quality VERIFIED clean by the vision critic → drop the 'unverified' advisory
+            return _cap_litter(_cov("blender", "Render"))
         return _cap_litter(_cov("blender", "Render",
-                    advisory="ADVISORY: object-level visual quality (scatter / GA-vs-render consistency) is a partial check"))
+                    advisory="ADVISORY: object-level visual quality is UNVERIFIED — no vision critic has looked at this render (run render_vision_critic)"))
     if "checks" in t:  # ⚠ Checks — deterministic-invariant pass rate
         try:
             import deterministic_checks_lib as _dcl
