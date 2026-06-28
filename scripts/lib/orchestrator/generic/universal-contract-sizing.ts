@@ -117,6 +117,11 @@ const SUFFIX_RULES: { re: RegExp; measure: Measure; unit: string; each?: boolean
   { re: /_electrical_kw$/, measure: 'power', unit: 'kW' },
   { re: /_power_kw$/, measure: 'power', unit: 'kW' },
   { re: /_rating_kva$/, measure: 'power', unit: 'kVA' },
+  // a bare `<stem>_kva` (e.g. transformer_kva=100) must size its principal too — without this the
+  // Distribution Transformer never reads its 100 kVA and falls to the 2 kW default box (the physics
+  // critic's "2 kW transformer for a 48 kW load"). The aggregate total_supply_demand_kva is dropped by
+  // isPureAggregatePhrase, so only a real per-unit rating (transformer_kva) binds. (Tristan 2026-06-28.)
+  { re: /_kva$/, measure: 'power', unit: 'kVA' },
   { re: /_supply_kg_h$/, measure: 'rate', unit: 'kg/h' },
   { re: /_kg_h$/, measure: 'rate', unit: 'kg/h' },
   { re: /_area_m2$/, measure: 'area', unit: 'm²' },
