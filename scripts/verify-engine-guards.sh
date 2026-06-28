@@ -46,6 +46,7 @@ run "dossier_audit.py --selftest"            "$PY" scripts/lib/dossier_audit.py 
 run "dossier_repair.py --selftest"            "$PY" scripts/lib/dossier_repair.py --selftest
 run "manifest_sight.py --selftest"            "$PY" scripts/lib/manifest_sight.py --selftest
 run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_rot_test.py
+run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest

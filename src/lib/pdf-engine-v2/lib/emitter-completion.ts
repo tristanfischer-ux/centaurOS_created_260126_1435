@@ -306,17 +306,32 @@ const ELECTRONICS_IC_VENDORS = new Set<string>([
   'maxim', 'texas instruments', 'ti', 'stmicroelectronics', 'st microelectronics', 'nxp',
   'nxp semiconductors', 'microchip', 'microchip technology', 'infineon', 'on semiconductor',
   'onsemi', 'renesas', 'diodes incorporated', 'vishay', 'rohm', 'nordic semiconductor', 'espressif',
+  'intersil',  // Renesas/Intersil ISL-series ICs — an ISL1571IRZ (DSL line-driver IC) was mis-pinned as
+               // a 'PLC Controller'; the compound vendor string "Renesas / Intersil" is split + matched below.
 ])
 const _PROCESS_FIELD_INSTRUMENT_RE =
   /\b(pressure|level|flow|temperature|conductivity|turbidity|\bph\b|\borp\b|chlorine)\b.*\b(switch|transmitter|gauge|indicator|sensor|probe|element|meter|analy[sz]er)\b|\b(switch|transmitter|gauge)\b/i
 
-// A PROCESS FIELD INSTRUMENT / SWITCH whose ONLY DB candidate is from an electronics-component vendor
-// is a wrong-domain mis-pin — keep it generic (specified by range / output / connection at detailed
-// design), not by an IC part number. UNIVERSAL — keyed on the field-instrument vocabulary + the
-// IC-vendor list, no class table.
+// CONTROL / DISTRIBUTION / CABLING equipment — a PHYSICAL industrial item (a PLC unit, a cable tray, a
+// busbar, a switchboard), NEVER a single chip. An IC-vendor pin here is the same wrong-domain mis-pin as
+// on a field instrument (a Renesas/Intersil DSL-driver IC landed on a 'PLC Controller' via the loose name
+// match). Deliberately EXCLUDES generic 'panel/cabinet/enclosure' (a populated enclosure can legitimately
+// carry a board) — only the items that are unambiguously NOT a board-level component.
+const _CONTROL_DISTRIBUTION_EQUIP_RE =
+  /\b(plc|hmi|scada|rtu|programmable logic|cable tray|cable ladder|ladder rack|cable basket|busbar|bus bar|switchboard|switchgear|distribution board|panelboard|consumer unit|din rail|wireway|trunking)\b/i
+
+// A PROCESS FIELD INSTRUMENT / SWITCH or a CONTROL/DISTRIBUTION item whose ONLY DB candidate is from an
+// electronics-component vendor is a wrong-domain mis-pin — keep it generic (specified by range / output /
+// connection / size at detailed design), not by an IC part number. UNIVERSAL — keyed on the wrong-domain
+// slot vocabulary + the IC-vendor list, no class table. The vendor string is split on '/' so a compound
+// "Renesas / Intersil" matches when either house is an IC vendor (substring matching is avoided — it would
+// false-match a 2-letter house like 'ti' inside an unrelated name).
 export function isElectronicsIcMispin(name: string, manufacturer: string): boolean {
-  if (!_PROCESS_FIELD_INSTRUMENT_RE.test(name || '')) return false
-  return ELECTRONICS_IC_VENDORS.has((manufacturer || '').trim().toLowerCase())
+  const n = name || ''
+  if (!_PROCESS_FIELD_INSTRUMENT_RE.test(n) && !_CONTROL_DISTRIBUTION_EQUIP_RE.test(n)) return false
+  const mfr = (manufacturer || '').trim().toLowerCase()
+  if (ELECTRONICS_IC_VENDORS.has(mfr)) return true
+  return mfr.split(/\s*[/&,]\s*/).some((house) => ELECTRONICS_IC_VENDORS.has(house.trim()))
 }
 
 // A SIMPLE COMMODITY process valve (check / non-return / swing / ball / gate / globe / needle), which
