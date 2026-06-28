@@ -87,13 +87,24 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
         txt = data["choices"][0]["message"]["content"]
     except Exception as exc:  # noqa: BLE001
         return {"broken": None, "defects": [], "model": model, "ok": False, "error": str(exc)[:160]}
-    m = re.search(r"\{.*\}", txt, re.S)
-    if not m:
-        return {"broken": None, "defects": [], "model": model, "ok": False, "error": f"no JSON: {txt[:120]}"}
-    try:
-        out = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return {"broken": None, "defects": [], "model": model, "ok": False, "error": f"bad JSON: {m.group(0)[:120]}"}
+    # Robust parse: the model may wrap the JSON in a ```json fence and/or TRUNCATE it mid-string. Strip
+    # fences, try full JSON, else fall back to extracting the broken flag + any quoted defect strings
+    # (a truncated '{"broken": true, "defects": ["red pipe …' still yields the verdict).
+    txt2 = re.sub(r"```(?:json)?", "", txt)
+    out = None
+    mm = re.search(r"\{.*\}", txt2, re.S)
+    if mm:
+        try:
+            out = json.loads(mm.group(0))
+        except json.JSONDecodeError:
+            out = None
+    if out is None:
+        bm = re.search(r'"broken"\s*:\s*(true|false)', txt2, re.I)
+        if not bm:
+            return {"broken": None, "defects": [], "model": model, "ok": False, "error": f"no verdict: {txt[:120]}"}
+        tail = txt2.split('"defects"', 1)[-1] if '"defects"' in txt2 else ""
+        out = {"broken": bm.group(1).lower() == "true",
+               "defects": re.findall(r'"([^"]{3,90})"', tail)}
     return {"broken": bool(out.get("broken")), "defects": out.get("defects") or [], "model": model, "ok": True}
 
 
