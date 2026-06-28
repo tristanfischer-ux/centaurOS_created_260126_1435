@@ -1469,8 +1469,22 @@ def flow_order_regions(parts, topology):
     for e in topology:
         if e.get("mechanism") not in _FLOW_MECHANISMS:
             continue
-        ra = region_of_partname(e.get("from_part", ""))
-        rb = region_of_partname(e.get("to_part", ""))
+        _fp, _tp = e.get("from_part", ""), e.get("to_part", "")
+        ra = region_of_partname(_fp)
+        rb = region_of_partname(_tp)
+        # SERVICE COHERENCE (LAYOUT-FIX-PLAN P2, council 2026-06-28): a process-FLUID edge that lands on
+        # a pure ELECTRICAL part (incomer / switchboard / transformer / "3 Phase Power Input") is a
+        # PHANTOM — the same incoherence P1 deletes at draw time, but get_flow_plan runs during PLACEMENT
+        # (before route-reconcile) so it still sees it. If counted, it marks the ELECTRICAL region as a
+        # FLOW region → the electrical gear (generator/transformer/incomer) is laid into the process
+        # TRAIN, metres from the switchboard/MCC in the back-row periphery → the long distribution-spine
+        # "beam". Drop the electrical endpoint's flow-touch so the electrical region stays PERIPHERY and
+        # clusters with power_distribution (short, local spine). A genuine fluid endpoint (a tank/pump,
+        # or a liquid-cooled battery in a BESS — NOT matched by _endpoint_is_electrical) is unaffected.
+        if ra and _endpoint_is_electrical(_fp):
+            ra = None
+        if rb and _endpoint_is_electrical(_tp):
+            rb = None
         if ra:
             flow_touched.add(ra)
         if rb:
