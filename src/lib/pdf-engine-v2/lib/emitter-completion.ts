@@ -334,6 +334,19 @@ export function isElectronicsIcMispin(name: string, manufacturer: string): boole
   return mfr.split(/\s*[/&,]\s*/).some((house) => ELECTRONICS_IC_VENDORS.has(house.trim()))
 }
 
+// A PANEL INDICATOR / PILOT LIGHT (an LED signal lamp — Banner EZ-LIGHT, a beacon, a stack/tower light)
+// pinned to a slot that is NOT itself a light/indicator is a wrong-domain mis-pin: a Banner K30LMBXXP
+// ("LED Panel Mount Indicators … EZ-LIGHT", DB component_class 'optical') landed on a 'Cable Trays' slot
+// via the loose name match. Keyed on the INDICATOR/PILOT-LIGHT vocabulary in the candidate's name/excerpt
+// (NOT bare component_class 'optical' — that also covers legitimate optical SENSORS) AND the absence of
+// light/indicator words in the slot. UNIVERSAL — no class table.
+const _INDICATOR_LIGHT_RE = /\b(indicator|pilot (?:light|lamp)|signal (?:light|lamp)|ez-?light|beacon|stack light|tower light|pilot light|panel mount light|warning light)\b/i
+export function isIndicatorLightMispin(slotName: string, p: { part_name?: string | null; raw_excerpt?: string | null }): boolean {
+  const cand = `${p.part_name ?? ''} ${p.raw_excerpt ?? ''}`
+  if (!_INDICATOR_LIGHT_RE.test(cand)) return false       // candidate is NOT an indicator/pilot light
+  return !_INDICATOR_LIGHT_RE.test(slotName || '')        // …but the slot is not a light/indicator → mis-pin
+}
+
 // A SIMPLE COMMODITY process valve (check / non-return / swing / ball / gate / globe / needle), which
 // is specified GENERICALLY at design stage (size + rating + material), NOT by a single MPN — so a
 // fill-blank name-token match must not pin an unreliable specific part on it. An ACTUATED / control /
@@ -1111,6 +1124,12 @@ export async function fillBlankWordMpns(
         // device needs an industrial instrument (E+H / WIKA / Hach), not a chip. Keep generic. UNIVERSAL.
         if (isElectronicsIcMispin(cand.name, dbHit.manufacturer)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): electronics-IC vendor ${dbHit.manufacturer} on a process field instrument — generic spec, not a chip MPN (was ${dbHit.part_number})`)
+          continue
+        }
+        // INDICATOR-LIGHT MIS-PIN (Tristan 2026-06-28): a panel pilot light / LED indicator (Banner
+        // K30LMBXXP EZ-LIGHT) must not pin a non-light slot ('Cable Trays'). Keep the generic spec.
+        if (isIndicatorLightMispin(cand.name, dbHit)) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): indicator/pilot-light part ${dbHit.manufacturer} ${dbHit.part_number} on a non-light slot — generic spec`)
           continue
         }
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)

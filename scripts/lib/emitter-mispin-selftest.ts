@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -26,6 +26,16 @@ expect(isElectronicsIcMispin('Control Cabinet', 'Rittal') === false,
   "a populated enclosure (excluded slot) + non-IC vendor must NOT be flagged")
 expect(isElectronicsIcMispin('Irrigation Pump', 'Grundfos') === false,
   "a pump (not a wrong-domain slot) from a pump vendor must NOT be flagged")
+
+// ── isIndicatorLightMispin — a panel pilot light / LED indicator must not pin a non-light slot
+expect(isIndicatorLightMispin('Cable Trays', { part_name: 'LED Panel Mount Indicators K30LM Series EZ-LIGHT: 1-Color Hazardous Area Indicator', raw_excerpt: 'Banner EZ-LIGHT' }) === true,
+  "K30LMBXXP (LED EZ-LIGHT indicator) pinned as 'Cable Trays' MUST be flagged")
+expect(isIndicatorLightMispin('Pilot Indicator Light', { part_name: 'LED Panel Mount Indicators K30LM' }) === false,
+  "the SAME indicator pinned to an actual indicator-light slot must NOT be flagged")
+expect(isIndicatorLightMispin('Cable Trays', { part_name: 'Steel Cable Tray 300mm', raw_excerpt: 'hot-dip galvanised' }) === false,
+  "a real cable tray on the cable-tray slot must NOT be flagged")
+expect(isIndicatorLightMispin('Level Sensor', { part_name: 'Photoelectric Sensor', raw_excerpt: 'optical retroreflective sensor' }) === false,
+  "an optical SENSOR (not an indicator light) must NOT be flagged — no over-reach on component_class 'optical'")
 
 // ── isCommodityProcessValve — a simple mechanical valve is generic-spec; an actuated/dosing one is not
 expect(isCommodityProcessValve('Non-Return Valve') === true, "a non-return valve is commodity → generic spec")
