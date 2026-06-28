@@ -4559,11 +4559,15 @@ def reconcile_route_specs(parts):
         if _mech_is_fluid(s.get("mechanism")):
             pa = resolve_endpoint(str(s.get("from_part") or ''), parts)
             pb = resolve_endpoint(str(s.get("to_part") or ''), parts)
-            from_instr = _endpoint_is_pure_instrument(
-                pa.name if pa is not None else s.get("from_part"))
-            to_instr = _endpoint_is_pure_instrument(
-                pb.name if pb is not None else s.get("to_part"))
-            if from_instr or to_instr:
+            _fa = pa.name if pa is not None else s.get("from_part")
+            _tb = pb.name if pb is not None else s.get("to_part")
+            from_instr = _endpoint_is_pure_instrument(_fa)
+            to_instr = _endpoint_is_pure_instrument(_tb)
+            # SERVICE COHERENCE: a process-FLUID line must not terminate on a pure ELECTRICAL/CONTROL
+            # device (the "Fresh Water Tank → Mains Incomer" phantom) — drop it + its geometry too.
+            from_elec = _endpoint_is_electrical(_fa)
+            to_elec = _endpoint_is_electrical(_tb)
+            if from_instr or to_instr or from_elec or to_elec:
                 dropped_instr.append((s.get("from_part"), s.get("to_part"),
                                       s.get("size_label"), float(s.get("length_m") or 0.0)))
                 if s.get("run_name"):
@@ -6676,6 +6680,27 @@ def _endpoint_is_pure_instrument(name):
         'tank', 'vessel', 'filter', 'mbbr', 'degas', 'skim', 'clarifier', 'reactor',
         'column', 'tower', 'cone', 'exchanger', 'separator', 'contactor', 'sump', 'reservoir', 'drum'))
     return _is_sensor and not _is_inline
+
+
+# A pure ELECTRICAL / CONTROL device carries POWER or SIGNAL, NEVER process fluid — a process-water
+# line that terminates on a Mains Incomer / switchboard / MCC / transformer / PLC is a SERVICE-INCOHERENT
+# phantom (the v33 "+aug fluid: Fresh Water Tank → Mains Incomer" stray: the cross-module augmenter's
+# fluid_only repr-part picker landed the water leg on an electrical part). Symmetric with
+# _endpoint_is_pure_instrument — used at the route-reconcile DEFECT-1 drop so the fluid edge AND its drawn
+# geometry are deleted. Keyed on electrical-distribution vocabulary, no class table; a 'control VALVE' /
+# pumping skid is excluded so a real fluid part is never dropped. UNIVERSAL.
+_ELECTRICAL_PART_RE = re.compile(
+    r"\b(incomer|switchboard|switch ?gear|motor control cent\w*|motor control panel|\bmcc\b|busbar|bus bar|"
+    r"distribution board|panelboard|consumer unit|\bplc\b|\bhmi\b|scada|transformer|"
+    r"(?:circuit )?breaker|contactor|\bvfd\b|variable.speed drive|rectifier|"
+    r"\bups\b|main switch|mains\b|power supply|surge protection|switch ?board)\b", re.I)
+
+
+def _endpoint_is_electrical(name):
+    t = str(name or '').lower()
+    if 'valve' in t or 'pump' in t:
+        return False   # a control valve / pump skid is a fluid part that merely carries a control word
+    return bool(_ELECTRICAL_PART_RE.search(t))
 
 
 # ── ELECTRICAL DISTRIBUTION HIERARCHY (universal, role-keyed — no class table) ────
@@ -8797,6 +8822,19 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                       f"(trunk {trunk_len_m * fl.MM:.1f} m + {len(grp)} spurs)")
             if not grp_fallback:
                 continue
+        # ── EDGE-TYPING (council 2026-06-28, LAYOUT-FIX-PLAN P1): a POWER / SIGNAL / CONTROL cable
+        #    that did NOT bundle into a shared TRAY is a LOGICAL connection — it lives on the
+        #    single-line diagram + P&ID + the connection schedule, NEVER as a rigid point-to-point
+        #    3-D beam across the plant. The v33 24 m red "beam" was exactly this: a lone
+        #    Fresh-Water-Tank → Mains-Incomer power run. Only FLUID draws per-edge (a process pipe
+        #    must physically land on its nozzle); cable TRAYS (≥3, drawn above) and busbars stay.
+        #    UNIVERSAL — keyed on the cable service, no class table. (Mirrors the route_topology
+        #    side per the dual-router skip-symmetry rule.)
+        if _is_cable(service):
+            for r in grp:
+                skipped.append({"edge": r["edge_lbl"],
+                                "reason": "logical cable (no shared tray) → single-line/P&ID, not a 3-D route"})
+            continue
         # ── per-edge port-to-port path (small group OR a tray that failed to build).
         for r in grp:
             _run_i = _svc_run_count.get(service, 0)
