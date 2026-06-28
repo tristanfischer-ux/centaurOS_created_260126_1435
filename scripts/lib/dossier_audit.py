@@ -277,7 +277,20 @@ def _metric_name(m) -> str:
     return m.get("key_metric") or m.get("metric") or m.get("name") or ""
 
 
-def _physics_issues(state) -> list:
+def _physics_issues(state, run_dir=None) -> list:
+    """SIGHT: grade the DELIVERED critique. The freshen-scorer re-runs the physics critic on the FINAL
+    design and writes 7-5-physics-critique.json; the copy embedded in state.json is from an earlier
+    stage and can be STALE (different — sometimes contradictory — findings). Prefer the on-disk fresh
+    file when present, fall back to the state-embedded critique (Tristan 2026-06-28)."""
+    if run_dir:
+        try:
+            with open(os.path.join(run_dir, "7-5-physics-critique.json"), "r", encoding="utf-8") as _fh:
+                fresh = json.load(_fh)
+            iss = fresh.get("issues") if isinstance(fresh, dict) else None
+            if isinstance(iss, list):
+                return iss
+        except Exception:  # noqa: BLE001
+            pass
     for key in ("physicsCritique", "physicsCritic", "physics_critique", "physics_critic"):
         pc = state.get(key)
         if isinstance(pc, dict):
@@ -285,6 +298,26 @@ def _physics_issues(state) -> list:
             if isinstance(iss, list):
                 return iss
     return []
+
+
+_PHYS_EMPTY_CLAIM_RX = re.compile(r"\bempty\b|no words|words['\"]?\s*[:=]?\s*\[\s*\]|\bhas no (?:words|equipment|parts)\b", re.I)
+
+
+def _physics_claim_falsified(state, issue: dict) -> bool:
+    """Deterministically FALSE physics-critic claims must not gate (a false FAIL is as dishonest as a
+    false PASS — Tristan 2026-06-28). CONSERVATIVE: only the unambiguous 'module X is empty / has no
+    words' shape — when the named module deterministically HAS words, the claim is a hallucination.
+    Anything fuzzier is left to gate (never drop a claim we cannot definitively disprove)."""
+    txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}".lower()
+    if not _PHYS_EMPTY_CLAIM_RX.search(txt):
+        return False
+    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        mid = str(m.get("module") or "")
+        if mid and mid.lower() in txt:
+            wc = sum(len(sm.get("words") or []) for sm in (m.get("sub_modules") or []))
+            if wc > 0:
+                return True  # "empty" claim against a module that has words → falsified
+    return False
 
 
 def _product_class(state) -> str:
@@ -778,12 +811,14 @@ _PHYS_FP_VAGUE = re.compile(
     r"structural)\s+analysis)\b", re.I)
 
 
-def _physics_high_is_design_defect(issue: dict) -> bool:
+def _physics_high_is_design_defect(issue: dict, state=None) -> bool:
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
     if _PHYS_FP_PAYLOAD.search(txt):
         return False  # the critic's INPUT was truncated — an engine I/O artifact, not a design defect
     if _PHYS_FP_VAGUE.search(txt) and not re.search(r"/words?[\[/]|\bsub_modules?\b", txt):
         return False  # a holistic advisory with no NAMED part — gate-33 false-positive discipline
+    if state is not None and _physics_claim_falsified(state, issue):
+        return False  # the critic's claim is deterministically FALSE (e.g. "module empty" but it has words)
     return True
 
 
@@ -791,9 +826,9 @@ def check_physics_critic(state, rows, run_dir) -> list:
     tab = "Risk & Regulatory"
     out: list = []
     highs = [
-        i for i in _physics_issues(state)
+        i for i in _physics_issues(state, run_dir)
         if isinstance(i, dict) and str(i.get("severity", "")).lower() == "high"
-        and _physics_high_is_design_defect(i)
+        and _physics_high_is_design_defect(i, state)
     ]
     if highs:
         titles = []
@@ -2640,6 +2675,22 @@ def _selftest() -> int:
         {"name_human": "Pneumatic Actuated Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
     ]}]}]}}, [], "")
     expect(len(_clean) == 0, "C5: a single 200-population word must NOT be flagged")
+
+    # ── proveCatch: physics-critic claim FALSIFICATION (a deterministically-false claim must not gate)
+    _pop_state = {"moduleDecomposition": {"modules": [
+        {"module": "fertigation_dosing_system", "sub_modules": [
+            {"words": [{"name_human": "Water-Powered Dosing Pump"}]}]},
+        {"module": "truly_empty_module", "sub_modules": [{"words": []}]},
+    ]}}
+    expect(_physics_claim_falsified(_pop_state, {"severity": "high",
+           "issue": "the fertigation_dosing_system module is completely empty ('words': [])"}) is True,
+           "PHYS: 'empty' claim against a POPULATED module must be falsified (hallucination)")
+    expect(_physics_claim_falsified(_pop_state, {"severity": "high",
+           "issue": "the truly_empty_module is completely empty"}) is False,
+           "PHYS: 'empty' claim against a GENUINELY empty module must NOT be falsified (real)")
+    expect(_physics_claim_falsified(_pop_state, {"severity": "high",
+           "issue": "the Dosatron D8RE5 is forced to 45 m3/h above its 8 m3/h max"}) is False,
+           "PHYS: a real capacity defect must NOT be falsified")
 
     if failures:
         print("SELFTEST FAILED:")
