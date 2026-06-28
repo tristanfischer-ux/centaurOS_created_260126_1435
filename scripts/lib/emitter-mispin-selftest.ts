@@ -14,6 +14,8 @@ const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; consol
 // ── isElectronicsIcMispin — an IC-vendor chip on a field-instrument OR control/distribution slot is wrong
 expect(isElectronicsIcMispin('PLC Controller', 'Renesas / Intersil') === true,
   "ISL1571IRZ (Renesas/Intersil DSL-driver IC) pinned as a 'PLC Controller' MUST be flagged (compound vendor split)")
+expect(isElectronicsIcMispin('Dc3 Power Controller', 'Renesas / Intersil') === true,
+  "the SAME IC on the RENAMED slot 'Dc3 Power Controller' MUST still be flagged (name-variance robustness)")
 expect(isElectronicsIcMispin('Low Pressure Switch', 'Maxim Integrated') === true,
   "a Maxim IC on a 'Low Pressure Switch' MUST stay flagged (field-instrument case preserved)")
 expect(isElectronicsIcMispin('Cable Tray', 'Texas Instruments') === true,

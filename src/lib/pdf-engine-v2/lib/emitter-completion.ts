@@ -317,8 +317,12 @@ const _PROCESS_FIELD_INSTRUMENT_RE =
 // on a field instrument (a Renesas/Intersil DSL-driver IC landed on a 'PLC Controller' via the loose name
 // match). Deliberately EXCLUDES generic 'panel/cabinet/enclosure' (a populated enclosure can legitimately
 // carry a board) — only the items that are unambiguously NOT a board-level component.
+// NB 'controller' is included GENERALLY (not just 'plc controller') — the LLM names this slot variably
+// ('PLC Controller' on one run, 'Dc3 Power Controller' the next), and in a PLANT BoM a *controller* is
+// always a physical industrial control UNIT, never a bare chip — so an IC-vendor pin on any '… controller'
+// is wrong-domain. (Keying on the exact name 'plc' missed the rename; the general term is robust.)
 const _CONTROL_DISTRIBUTION_EQUIP_RE =
-  /\b(plc|hmi|scada|rtu|programmable logic|cable tray|cable ladder|ladder rack|cable basket|busbar|bus bar|switchboard|switchgear|distribution board|panelboard|consumer unit|din rail|wireway|trunking)\b/i
+  /\b(plc|hmi|scada|rtu|controller|programmable logic|cable tray|cable ladder|ladder rack|cable basket|busbar|bus bar|switchboard|switchgear|distribution board|panelboard|consumer unit|din rail|wireway|trunking)\b/i
 
 // A PROCESS FIELD INSTRUMENT / SWITCH or a CONTROL/DISTRIBUTION item whose ONLY DB candidate is from an
 // electronics-component vendor is a wrong-domain mis-pin — keep it generic (specified by range / output /
