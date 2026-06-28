@@ -190,6 +190,24 @@ SHAPE_RULES = [
     (r"oxygenat|oxygen.?cone|speece", "vertical_vessel"),
     (r"clarifier|settler|lamella|sediment", "tank"),
     (r"\buv\b|steriliz|disinfect|ozone", "vertical_vessel"),
+    # membrane SKIDS / packages (UF / RO / NF / MF / EDI) — the skid PACKAGE is the
+    # massed object; its spiral-wound elements / FRP pressure tubes are ga_massing
+    # INTERNALS (already dropped). Without a rule a "UF Module Bank" /
+    # "Ultrafiltration Module" matched nothing and fell to the DEFAULT box (the
+    # manifest-sight LITTER signal: 6 distinct parts sharing one box). Placed BEFORE
+    # the generic \bfilter\b vessel rule so a membrane skid reads as a package, not a
+    # pressure vessel. UNIVERSAL water-treatment, keyed on membrane vocab.
+    # NB classify_shape matches against a LOWERCASED head, so tokens are lower-case
+    # (an upper-case \bUF\b would never fire — same latent quirk the existing
+    # \bMCC\b/\bUV\b rules rely on their spelled-out synonyms for). The bare 2-letter
+    # abbreviations fire ONLY when paired with a skid/package noun, so a genuine vessel
+    # ("RO Reject Tank") is NOT hijacked to a skid — it falls through to the tank rule.
+    (r"ultrafiltrat|microfiltrat|nanofiltrat|reverse.?osmos|electrodialys|\bmembrane\b|"
+     r"\b(?:ro|uf|nf|mf|edi)\s+(?:skid|module|bank|package|unit|train|system|rack|plant|array)\b",
+     "skid_box"),
+    # a SUMP / wet well is an open/covered pit — tank-like (sized from its own dim
+    # when present, else the tank default). "Drain Collection Sump" fell to a box.
+    (r"\bsumps?\b|wet well", "tank"),
     # a CRYSTALLISER is a vertical body with a CONICAL bottom (forced-circulation /
     # draft-tube / Oslo) — give it the cone-bottom primitive, not a flat box (Tristan
     # 2026-06-24: "crystallisers the correct shape"). Before column/reactor so it wins.
@@ -234,7 +252,7 @@ SHAPE_RULES = [
     # and fell to a flat BOX. A closed process vessel is a vertical cylinder with dished
     # ends — give it that shape. Placed AFTER every specific reactor/column/separator/
     # tank/electrical rule so those still win, and before the instrument/box fallbacks.)
-    (r"\bvessel\b|\bpot\b|reservoir|accumulator|maturation|\bdigest", "vertical_vessel"),
+    (r"\bvessels?\b|\bpot\b|reservoir|accumulator|maturation|\bdigest", "vertical_vessel"),
     (r"valve|transmitter|thermowell|detector|analy[sz]er|metering|"
      r"instrument|sensor|relief|gauge|probe", "instrument"),
 ]
@@ -905,6 +923,16 @@ def extract_parts(state):
                         qty = parse_quantity(mc.get("value"))
                         break
                 shape = classify_shape(name, form, module_id)
+                # UNIVERSAL backstop: a part carrying an explicit CYLINDER dim
+                # ("2.1 m dia x 1.4 m") IS a cylindrical vessel — but a `box` shape
+                # drops dia/len (footprint_mm reads w/d/h) and the part collapses to
+                # the DEFAULT box (the manifest-sight LITTER signal: Drain Collection
+                # Sump + Pressure Vessels both fell to one shared box despite carrying
+                # real cylinder dims). Coerce an unclassified box to a vertical vessel
+                # so the explicit dims are honoured. Keyed on the dim KIND, not the
+                # name, so it catches any future name a shape rule doesn't recognise.
+                if dim and dim.get("kind") == "cyl" and shape == DEFAULT_SHAPE:
+                    shape = "vertical_vessel"
                 parts.append(Part(name, module_id, region_key, rank, shape, dim, qty, form))
     # A qty-N big VESSEL/TANK is replicated DOWNSTREAM in build_part (one Part, N
     # instances drawn as a compact grid, each with a unique object base-name) so the

@@ -36,7 +36,20 @@ GA_NON_MASSING_RE = re.compile(
     r"\blev(?:el)?ling feet\b|\bleveling feet\b|\bdistribution plate(?:s)?\b|"
     r"\bcip (?:system )?connection(?:s)?\b|\bquick coupling\b|"
     r"\bsupport (?:system|frame|structure|stand)\b|"
+    # a SKID / BASE / EQUIPMENT FRAME is the structural steel base of a process skid —
+    # the SKID itself (RO/UF/dosing skid) is the massed GA object; its bare frame is not
+    # drawn separately. Three material-named "Skid Frame" rows (carbon steel/steel/SST304)
+    # shared the skid_box default and littered. "Reverse Osmosis Skid" has no "frame" → kept.
+    r"\b(?:skid|base|equipment|mounting|baseplate|sub|structural) frame\b|\bframe assembly\b|"
     r"\bpneumatic actuator(?:s)?\b|\belectric actuator(?:s)?\b|"
+    # a bare PIPE RUN / spool ("DN110 PVC Pipe", "DN50 PVC Pipe", "HDPE Pipework") is
+    # routed pipework on the P&ID / connection ledger, NOT a massed equipment box — it
+    # fell to the default box (LITTER). "pipe" is anchored TERMINAL (the head noun is
+    # pipe), with a DN/material context, so a STRUCTURE ("DN150 Pipe Rack/Bridge") or a
+    # small vessel ("Pipe Manifold/Header") — where pipe is NOT the head — is NOT dropped.
+    r"(?:\bdn\s?\d{2,4}\b|\b(?:pvc|upvc|cpvc|hdpe|abs|grp|frp|stainless|carbon[- ]?steel|"
+    r"mild[- ]?steel|galvanis\w+|copper)\b)[^.]*\bpipe(?:s|work)?\s*\d*\s*$|"
+    r"\bpipework\s*\d*\s*$|\bpipe spools?\s*\d*\s*$|\bprocess tubing\s*\d*\s*$|"
     # cabling / wiring / distribution accessories
     r"\bcabling\b|\bcable tray(?:s)?\b|\bcable gland(?:s)?\b|"
     r"\bterminal block(?:s)?\b|\b(?:power )?distribution block(?:s)?\b|"
@@ -89,6 +102,12 @@ def _selftest():
         "Veolia Ro40 Controller", "Aquavista Remote Monitoring",
         "Low Pressure Switch", "High Pressure Switch", "Overcurrent Protection",
         "Surge Protection Device", "Compartment Spacers", "Flow Distribution Plates",
+        # bare pipe RUNS — routed pipework, never a massed box (the v33 litter pair)
+        "DN110 PVC Pipe", "DN50 PVC Pipe", "DN200 Stainless Pipe", "HDPE Pipework",
+        "Pipe Spool 4", "DN80 PVC Pipe 2",
+        # bare structural skid FRAMES — the skid they support is the massed object
+        "Painted Carbon Steel Skid Frame", "Painted Steel Skid Frame", "Sst304 Skid Frame",
+        "Equipment Frame", "Base Frame Assembly",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -101,6 +120,9 @@ def _selftest():
         "Drum Filter", "Biofilter", "Oxygenation Cone", "MBBR Reactor",
         "Aeration Blower", "Battery Rack", "Power Conversion System", "Step-up Transformer",
         "Absorber Column", "CSTR Reactor", "Heat Exchanger", "Buffer Tank",
+        # pipe-ADJACENT names where pipe is NOT the head noun — these are structures /
+        # vessels and MUST stay massed (proves the terminal-anchored pipe rule is tight)
+        "DN150 Pipe Rack", "Pipe Bridge Support", "Filtrate Pipe Manifold", "Pipe Header Vessel",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

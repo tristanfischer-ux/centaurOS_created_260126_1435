@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -49,5 +49,15 @@ expect(partFlowCapacityM3h({ part_name: 'Dosatron D8RE5', raw_excerpt: 'water-po
        partFlowCapacityM3h({ part_name: 'Dosatron D8RE5', raw_excerpt: '8 m3/h max flow' }) === 8,
   "the Dosatron D8RE5 capacity (8 m³/h) must parse from raw_excerpt so the capacity gate can fire vs a 45 m³/h duty")
 
+// ── isMotorDriveSlot — a VFD / drive / soft-starter is generic-spec (frame sized to its motor), not a
+//    name-matched DB MPN (the ABB ACS580-01-12A6-4 ≈ 5.5 kW pinned on a 15 kW pump's drive = physics HIGH)
+expect(isMotorDriveSlot('Vfd Controller') === true, "a VFD controller is a motor drive → generic spec")
+expect(isMotorDriveSlot('Vfd Drive') === true, "a VFD drive is a motor drive → generic spec")
+expect(isMotorDriveSlot('Soft Starter') === true, "a soft-starter is a motor drive → generic spec")
+expect(isMotorDriveSlot('Variable Speed Drive') === true, "a variable-speed drive is a motor drive")
+expect(isMotorDriveSlot('Irrigation Pump') === false, "a pump is not a drive (it carries its own duty)")
+expect(isMotorDriveSlot('Direct Drive Generator') === false, "a direct-drive generator is not a motor controller")
+expect(isMotorDriveSlot('Hard Disk Drive') === false, "a disk drive is not a motor controller")
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity guards proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards proven)')

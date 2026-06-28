@@ -362,6 +362,20 @@ export function isCommodityProcessValve(name: string): boolean {
   return /\b(check|non.?return|swing|ball|gate|globe|needle|wafer|lift|foot|isolation|isolat)\b/.test(n)
 }
 
+// A MOTOR DRIVE slot — VFD / variable-speed/-frequency drive / soft-starter / inverter drive / motor
+// starter — is power electronics SIZED TO A SPECIFIC MOTOR (the frame is chosen from the driven motor's
+// kW / full-load current), so it must NOT be pinned by a loose name-token DB match: that match has no
+// knowledge of the motor it serves and WILL mis-size. A DB 'ABB ACS580-01-12A6-4' (12.6 A ≈ 5.5 kW) was
+// pinned onto a 'Vfd Controller' whose plant runs a 15 kW irrigation pump + 8 kW dosing pumps — the
+// physics-critic HIGH ("severely undersized, will trip under load"). Keep the engine's honest generic
+// spec ("VFD — frame sized to the driven motor at detailed design") instead of a known-undersized MPN.
+// EXCLUDES non-motor "drive" senses (disk / belt / chain / gear / direct-drive). UNIVERSAL — no table.
+export function isMotorDriveSlot(name: string): boolean {
+  const n = (name || '').toLowerCase()
+  if (/\b(disk|hard|thumb|belt|chain|gear|direct[- ]?)\s*drive\b/.test(n)) return false
+  return /\bvfd\b|\bvsd\b|variable[- ]?(?:speed|frequency)[- ]?(?:drive|controller)|soft[- ]?start\w*|motor starter|frequency converter|inverter drive/.test(n)
+}
+
 // A gap word's flow DUTY (m³/h) when it is a flow machine (pump/blower/compressor/fan/filter), read
 // from its rating_primary. Returns null for a non-flow word or no m³/h rating, so capacity-gating
 // only ever touches a flow machine with a known duty. UNIVERSAL.
@@ -1134,6 +1148,14 @@ export async function fillBlankWordMpns(
         // K30LMBXXP EZ-LIGHT) must not pin a non-light slot ('Cable Trays'). Keep the generic spec.
         if (isIndicatorLightMispin(cand.name, dbHit)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): indicator/pilot-light part ${dbHit.manufacturer} ${dbHit.part_number} on a non-light slot — generic spec`)
+          continue
+        }
+        // MOTOR-DRIVE MIS-SIZE (Tristan 2026-06-28): a VFD / soft-starter / inverter is sized to its
+        // driven MOTOR's kW — a name-token DB match knows nothing of that motor and mis-sizes (an ABB
+        // ACS580-01-12A6-4 ≈ 5.5 kW pinned on a 'Vfd Controller' for a 15 kW pump = the physics-critic
+        // HIGH). Keep the generic spec (frame sized to the motor at detailed design). UNIVERSAL.
+        if (isMotorDriveSlot(cand.name)) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): motor drive — frame sized to the driven motor at detailed design, not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
           continue
         }
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
