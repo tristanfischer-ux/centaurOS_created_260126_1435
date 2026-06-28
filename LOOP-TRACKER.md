@@ -1,5 +1,36 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-28 CLOSE-5 (HEAD 9e3ce061e, 15 fix-commits; guards GREEN). **THE PRIOR "33/34 ≥8" WAS
+> INFLATED — corrected.** Tristan caught the engine (and me) giving full marks to tabs carrying
+> unverified/fake data. This session made the engine MEASURE ITSELF HONESTLY, then fixed what honesty
+> surfaced. Honest floor on a fresh run ≈ **21-22 of 31 tabs ≥8** (NOT 33/34). The arc, all UNIVERSAL +
+> proveCatch-guarded in verify-engine-guards.sh:
+>  HONEST MEASUREMENT (the core shift): (a) VISION CRITIC `scripts/lib/render_vision_critic.py` — sends a
+>   render PNG to Gemini-3.1-Pro via OpenRouter, FLAG-ONLY (can only CAP a render, never lift); auto-runs
+>   in blender-bg-runner (`--write`→render-vision-critique.json); build-excel reads the verdict; rot-guard
+>   `render_vision_rot_test.py` + frozen fixture. (b) universal HONEST-CAP (no false 10s). (c) GRADE THE
+>   FRESH critique: dossier_audit `_physics_issues` reads on-disk 7-5-physics-critique.json not stale state
+>   + `_physics_claim_falsified` drops deterministically-FALSE "empty module" claims (a false FAIL is as
+>   dishonest as a false PASS).
+>  RISK 5→1 physics defects: transformer 2kW→100kVA (`_kva` contract map) · 3 DB mis-pins in
+>   emitter-completion.ts (IC-vendor→control-slot incl. general 'controller'; indicator-light→non-light;
+>   compound-vendor split). Remaining 1 = Dosatron D8RE5 = DB-row has no parseable flow → deterministic
+>   dead-end, advisory only.
+>  ISOMETRICS REMOVED (Tristan's call): generation + Excel tabs + parts_ledger scoring (34→31 tabs).
+>  LAYOUT P1+P2 (service-coherence, `build_universal_scene.py`): `_endpoint_is_electrical` drops fluid
+>   edges onto electrical parts at draw-time (route-reconcile DEFECT-1, killed the blue Tank→Mains-Incomer
+>   stray) AND at flow-classification (get_flow_plan — electrical no longer exiled into the process train).
+>   3-archetype regression gate (Codema fix / RAS+BESS no-regression) PASSED.
+>  REVERTED (verify-driven, NOT committed): a back-row 'centre the electrical region' reorder — the gate
+>   caught it worsening fluid runs + not killing the beam.
+> BLOCKER to ≥8-everywhere = the RENDER LAYOUT (8 render sheets + derived ⚠Audit). The "beam" is a
+> multi-cause HYDRA (each fix reveals the next: lone-cable→fluid-phantom→split-electrical→now MCC→load
+> power SPUR drawn as a diagonal not an orthogonal tray + a floating-cube containment miss). Confirms the
+> council verdict: needs the TYPED-ROUTING + SPATIAL-CONTAINMENT REBUILD, taken FRESH (Tristan's call).
+> Plan+council verdict: `LAYOUT-FIX-PLAN.md`. Baselines: `out/{codema,ras,bess}-base/`. Re-render =
+> `python3 scripts/render-blender-scene.py --state <run>/state.json --out-dir <run>` (python wrapper, NOT
+> `blender --python`). Handover: ~/Downloads/handovers/2026-06-28T15-56-9e3ce061e.md. Latest run out/fischer-codema-v33.
+
 > ▶▶▶ 2026-06-27 CLOSE-4 (HEAD aeab856f7, 29 fix-commits; v26 = all-fixes run). v25 verified the
 > SIGNAL-topology fired (10 instrument→hub edges) + CLEARED the instrument-association invariant — but
 > it TRADED for a 'ledger referential integrity' FAIL: (a) the edges named SLUGS while the ledger
