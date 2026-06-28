@@ -82,6 +82,21 @@ function main(): number {
     console.error(`[bg-runner] render failed (${err?.status ?? 'err'}); hero stage will fall back`)
   }
 
+  // VISION CRITIC (Tristan 2026-06-28): now the render exists, have a vision model LOOK at it and
+  // write render-vision-critique.json. Flag-only — the dossier scorer reads the verdict and can only
+  // CAP the render (broken → FAIL; clean → drops the 'unverified' advisory; absent → stays capped at
+  // 7). Non-fatal + best-effort (a missing key / API error just leaves the render UNVERIFIED).
+  try {
+    execFileSync(
+      'python3',
+      [resolve(__dirname, 'lib', 'render_vision_critic.py'), '--write', outDir],
+      { stdio: 'inherit', timeout: 120_000 },
+    )
+    console.log('[bg-runner] vision critic wrote render-vision-critique.json')
+  } catch (err: any) {
+    console.error(`[bg-runner] vision critic skipped (${err?.status ?? 'err'}); render stays UNVERIFIED`)
+  }
+
   writeFileSync(done, `pid=${process.pid}\nfinished=${new Date().toISOString()}\ngen_ok=${genOk}\n`)
   try { unlinkSync(running) } catch {}
   console.log(`[bg-runner] DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s; sentinel ${done}`)

@@ -97,11 +97,36 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
     return {"broken": bool(out.get("broken")), "defects": out.get("defects") or [], "model": model, "ok": True}
 
 
+_HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
+
+
+def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
+    """Find the run's hero render, critique it, and WRITE render-vision-critique.json into run_dir.
+    Non-fatal: returns {ok: False} if no render or no key (the dossier scorer then keeps the render's
+    'visual quality UNVERIFIED' advisory → capped at 7, honest). Called from the Blender bg-runner."""
+    hero = next((os.path.join(run_dir, f) for f in _HERO_CANDIDATES
+                 if os.path.exists(os.path.join(run_dir, f))), None)
+    if not hero:
+        res = {"broken": None, "defects": [], "model": model, "ok": False, "error": "no hero render"}
+    else:
+        res = critique_render(hero, model)
+        res["image"] = os.path.basename(hero)
+    try:
+        with open(os.path.join(run_dir, "render-vision-critique.json"), "w", encoding="utf-8") as fh:
+            json.dump(res, fh, indent=2)
+    except OSError:
+        pass
+    return res
+
+
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
     mdl = next((sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--model"), DEFAULT_MODEL)
+    if "--write" in sys.argv:
+        rd = sys.argv[sys.argv.index("--write") + 1]
+        print(json.dumps(critique_run(rd, mdl), indent=2))
+        raise SystemExit(0)
+    args = [a for a in sys.argv[1:] if not a.startswith("--") and a != mdl]
     if not args:
-        print("usage: render_vision_critic.py <image.png> [--model M]", file=sys.stderr)
+        print("usage: render_vision_critic.py <image.png> | --write <run_dir> [--model M]", file=sys.stderr)
         raise SystemExit(2)
-    res = critique_render(args[0], mdl)
-    print(json.dumps(res, indent=2))
+    print(json.dumps(critique_render(args[0], mdl), indent=2))
