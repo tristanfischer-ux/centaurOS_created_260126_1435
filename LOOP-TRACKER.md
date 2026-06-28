@@ -1,5 +1,66 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-28 SESSION-2 IN-PROGRESS (base HEAD 2156beea6, guards GREEN; v34 full run running).
+> MEASURED the honest scorecard FIRST (re-scored v33 tab-scorecard.json) instead of trusting the CLOSE-5
+> estimate — and it OVERTURNED the plan. **The whole 12-tab shortfall = TWO source fixes, NOT the
+> layout/typed-routing rebuild.** v33 = 19/31 ≥8; the 12 failing tabs are: 9 @ **7** (GA + 8 render
+> sheets) + 3 @ **6** (Exec Summary, Risk, ⚠Audit). Crucially the render sheets sit at 7 (a deterministic
+> LITTER cap), NOT ≤4 (a vision broken-flag) — so the scary "beam HYDRA" is a real visual blemish the
+> scorecard does NOT gate on; chasing the rebuild now would polish something unrewarded. The two real
+> roots:
+>  FIX 1 — DEFAULT-BOX LITTER (clears the 9 render+GA tabs). 6 parts shared the fallback box: 2 pipes
+>   (DN110/DN50 PVC — non-massing now), 2 vessels carrying real cyl dims that a `box` shape silently
+>   dropped (Drain Collection Sump + Pressure Vessels — the plural `\bvessels?\b` miss + a universal
+>   "explicit cyl dim ⇒ round shape" backstop), 2 UF membrane skids (new skid_box rule), + 3 structural
+>   "Skid Frame" rows that then formed a NEW skid_box cluster (non-massing — the skid represents its
+>   frame). All in build_universal_scene.py SHAPE_RULES/extract_parts + ga_massing.py; proveCatch in
+>   ga_massing --selftest (51 drop / 31 keep). VERIFIED on the REAL re-rendered manifest: the v33 6-part
+>   box cluster is gone; the offline sim is a SUPERSET predictor (confirmed manifolds get varied widths
+>   1515/2030/1000 so never cluster ≥5).
+>  FIX 2 — UNDERSIZED VFD (clears Risk 6→8; Risk is the floor → Exec Summary + ⚠Audit follow). The 1
+>   remaining physics-critic HIGH: ABB ACS580-01-12A6-4 (12.6 A ≈ 5.5 kW) pinned on a 'Vfd Controller'
+>   driving a 15 kW pump + 8 kW dosers — a blind DB name-match that can't know the motor. New
+>   `isMotorDriveSlot` gate in emitter-completion.ts keeps the generic spec (frame sized to the motor at
+>   detailed design) — same pattern as the pump-duty/commodity-valve/IC-mispin gates; proveCatch in
+>   emitter-mispin --selftest. Removing the wrong MPN removes the basis for the HIGH.
+> v34 RESULT (committed d636e2d55, both fixes verified end-to-end) — and it CORRECTED my "beam not
+> score-blocking" claim: GA 7→**10** ✓ (litter fix fully landed) and the VFD HIGH is GONE ✓. BUT the 8
+> render tabs went 7→**4**: clearing the litter REMOVED the cap that was masking the vision-critic, which
+> now (correctly) flags the render broken=True. v33's broken=False was a FALSE-NEGATIVE (the beam was
+> there too). I VIEWED the v34 hero myself: a prominent RED BEAM (27.2 m) + a blue wireframe stray.
+> EXACT beam = route `u_wire_trunk_motor_control_center_power` [Motor Control Center→3 Phase Power Input],
+> mech=electrical_bus, "LV power feeder 400/415V 3ph" — the power-distribution shared-tray TRUNK, 27.2 m
+> because the MCC and its loads/3-phase-input are placed FAR apart (the split-electrical-region root the
+> CLOSE-5 IMPLEMENTATION LOG already diagnosed). NOT a lone cable to suppress (it's legitimate tray
+> infra per council Blocker 1) → the real fix is the CO-LOCATION PARTITIONER (council Blocker 3), i.e.
+> the deferred layout rebuild. v34 honest floor = **20/31 ≥8**. Remaining <8: 8 renders @4 (the beam),
+> Risk @6 (5 FRESH physics HIGHs — Legionella omission / single-Dosatron-vs-two-A&B-dosers / 80 m³
+> unrequested CIP storage / valve text-vs-BoM qty / level-tx 0-1.4 m on a 1.6 m tank), Exec @2 (brief
+> compliance: fertigation 3.5 bar vs 2 bar achieved), ⚠Audit @2 (floor-mirror). Chain also exited
+> gate-12 numeric-drift (the valve-qty HIGH). NEXT = a DECISION put to Tristan: how to attack the render
+> beam (co-location rebuild vs orthogonal-trunk routing vs defer-and-do-physics-first).
+> → TRISTAN CHOSE: physics + compliance FIRST (render beam / co-location rebuild deferred again).
+>
+> PHYSICS BATCH PLAN (all 5 HIGHs verified REAL + brief-grounded; each is SYNTHESIS-level → needs a full
+> chain run to validate the critic; do as ONE batch + one validation run, NOT one-run-per-fix):
+>  1. DOSING (HIGH + clears Exec @2 compliance — highest leverage, 2 tabs). fertigation_dosing_system has
+>     ONE word "Water-Powered Dosing Pump" (Dosatron D8RE5, 8 m³/h) — grossly under-synthesised. Brief C
+>     specifies TWO A/B units, each a Lowara e-SHE 50-160/75, 7.5 kW, 45 m³/h @ 3.5 bar + venturi
+>     injectors + A/B dosing pumps. FIX: fertigation synthesis must emit the circulation pump sized to
+>     45 m³/h @ 3.5 bar (clears the Exec fertigation-pressure miss too). Dosatron is the known DB dead-end
+>     (no parseable flow → capacity gate can't fire) — fix = SYNTHESISE the right pump, not gate Dosatron.
+>  2. CIP SCOPE (HIGH). maintenance_serviceability has cip_tank_word + cleaning_tank_word (80 m³) the brief
+>     never asked for (brief = 3×40 m³ only: 1 fresh + 2 drain). LLM-synthesis over-reach (NOT the
+>     derive-topology selftest, which only references them as fixtures). FIX = scope-fidelity removal (#85).
+>  3. LEGIONELLA (HIGH). Brief Safety explicitly mandates "Legionella / water-hygiene control"; design has
+>     none. FIX = synthesise a hygiene subsystem (UV steriliser) when the brief mandates it (#84).
+>  4. VALVE QTY (HIGH + the gate-12 numeric-drift FATAL exit). actuation_kinematics is a consolidation MESS:
+>     correct "Pneumatic Actuated Valves ×200" coexists with ~8 duplicative ×1 representative valve words.
+>     FIX = valve/population consolidation pass (#105).
+>  5. LEVEL-TX RANGE (HIGH). A guided-radar level tx rated 0–1.4 m consolidated onto a 1.6 m nutrient tank.
+>     FIX = a consolidated instrument's range must cover the tallest member it serves.
+> Then ONE full run → re-read tab-scorecard.json (expect Risk 6→8, Exec 2→8, ⚠Audit follows).
+
 > ▶▶▶ 2026-06-28 CLOSE-5 (HEAD 9e3ce061e, 15 fix-commits; guards GREEN). **THE PRIOR "33/34 ≥8" WAS
 > INFLATED — corrected.** Tristan caught the engine (and me) giving full marks to tabs carrying
 > unverified/fake data. This session made the engine MEASURE ITSELF HONESTLY, then fixed what honesty
