@@ -163,7 +163,7 @@ def run_gates(out_dir: str) -> list:
             if m:
                 mats.add(re.split(r"\s*\(", str(m))[0].strip().lower())
     if route:
-        gates.append(Gate("material_diversity", ["isometric-set", "process-schedules"],
+        gates.append(Gate("material_diversity", ["line-velocity-schedule", "process-schedules"],
                           "med", len(mats) >= 2,
                           f"{len(mats)} distinct pipe material(s): {sorted(mats)[:4]}"))
 

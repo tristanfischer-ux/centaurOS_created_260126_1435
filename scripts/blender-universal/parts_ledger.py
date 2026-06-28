@@ -45,17 +45,20 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling modules
 import ga_massing  # GA non-massing classifier — keep render/GA EXPECTED consistent with the scene
 
+# Isometric drawings REMOVED from the dossier (Tristan 2026-06-28). 'isometric-index' is dropped from
+# the tracked drawing reps + every type's expected-set, so no part is isometric-expected and no
+# isometric coverage gap or tab is produced. The P&ID + BFD + line schedule carry the piping detail.
 REPS = ["blender", "general-arrangement", "pid", "single-line-diagram", "panel-schedule",
-        "block-flow-diagram", "process-schedules", "isometric-index"]
+        "block-flow-diagram", "process-schedules"]
 SHORT = {"blender": "BLE", "general-arrangement": "GA", "pid": "P&ID",
          "single-line-diagram": "SLD", "panel-schedule": "PNL", "block-flow-diagram": "BFD",
-         "process-schedules": "SCH", "isometric-index": "ISO"}
+         "process-schedules": "SCH"}
 
 TYPE_EXPECTED = {
-    "vessel":     {"blender", "general-arrangement", "pid", "block-flow-diagram", "isometric-index"},
+    "vessel":     {"blender", "general-arrangement", "pid", "block-flow-diagram"},
     "rotating":   {"blender", "general-arrangement", "pid", "single-line-diagram", "panel-schedule", "block-flow-diagram"},
     "exchanger":  {"blender", "general-arrangement", "pid", "block-flow-diagram"},
-    "separator":  {"blender", "general-arrangement", "pid", "block-flow-diagram", "isometric-index"},
+    "separator":  {"blender", "general-arrangement", "pid", "block-flow-diagram"},
     "instrument": {"pid", "process-schedules"},
     "valve":      {"pid", "process-schedules"},
     "electrical": {"single-line-diagram", "panel-schedule"},

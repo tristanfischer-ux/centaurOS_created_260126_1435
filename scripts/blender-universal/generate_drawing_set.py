@@ -65,8 +65,8 @@ SCHEDULE_DRAWINGS = [
     ("panel-schedule", "draw_panel_schedule.py", "panel-schedule.png",
      "Panel / Load Schedule"),
     ("hvac", "draw_hvac.py", "hvac-layout.png", "HVAC Duct Layout"),
-    ("isometric", "draw_isometric.py", "isometric-index.png",
-     "Piping Isometrics"),
+    # Isometric drawings REMOVED from the dossier (Tristan 2026-06-28: "get rid of the isometric
+    # drawings — I never understood or trusted them"). draw_isometric.py is no longer invoked.
 ]
 
 

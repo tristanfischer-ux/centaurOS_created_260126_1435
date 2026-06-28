@@ -6866,14 +6866,11 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
         if path:
             specs.append((path, ttl, cap))
 
-    # representative isometrics (first up to 3) so the iso family is shown without
-    # exploding the file size with all ~60.
-    isos = sorted(fn for fn in os.listdir(draw)
-                  if fn.startswith("isometric-") and fn.endswith(".png")) if os.path.isdir(draw) else []
-    for fn in isos[:3]:
-        tag = fn[len("isometric-"):-len(".png")]
-        specs.append((os.path.join(draw, fn), f"Isometric — {tag}",
-                      f"Representative pipe isometric ({tag})."))
+    # Isometric drawings REMOVED from the dossier (Tristan 2026-06-28: "get rid of the isometric
+    # drawings — I never understood or trusted them"). The per-line spool isometrics are no longer
+    # rendered as workbook sheets; the P&ID + BFD + line-&-velocity schedule carry the piping
+    # information a reader needs. (Generation is also disabled in generate_drawing_set.py and the
+    # 'isometric-index' coverage is dropped from parts_ledger so no isometric tab/score remains.)
 
     return specs
 
