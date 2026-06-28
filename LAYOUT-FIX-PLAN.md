@@ -110,3 +110,25 @@ the deterministic fixes actually cleared the eye-level defect.
 5. **Vision = beam-gone confirmation only**; compactness is the deterministic metric. (P4 scoped.)
 6. **Separate task: hunt the stray wireframe** (mesh/zero-dim/cull).
 7. RAS/BESS render regression must hold for 1–4.
+
+---
+
+# IMPLEMENTATION LOG
+**P1 (edge-typing / service-coherence) — DONE + VERIFIED, commit ac7be90d1.** Re-render dropped the 2
+phantom fluid-to-electrical edges (Tank/Vessels → Mains Incomer); blue stray gone from the hero.
+
+**P2 (co-location) — first attempt FAILED + REVERTED (verify-driven, not committed).** Tried the
+tractable version: reorder the back-row periphery lane so `power_distribution` sits at the CENTRE
+(`_centre_electrical_in_lane`). 3-archetype render gate (Codema + RAS + BESS) showed it did NOT work:
+the key power run `Motor Control Center → 3 Phase Power Input` STAYED at 24.35 m, and Codema's longest
+runs got WORSE (33 m tank-to-tank fluid — the back-row reorder rippled the shared centreline). REVERTED.
+**ROOT (now verified):** the electrical gear is SPLIT ACROSS TWO LANES — `energy_storage_source` is a
+FLOW-train region (it holds the generator / transformer / "3 Phase Power Input") while
+`power_distribution` is a back-row periphery region (switchboard / MCC). The distribution SPINE
+(Generator→Transformer→Switchboard→MCC) therefore runs BETWEEN the train lane and the back row = the
+long red beam. Centring one region cannot shorten a run whose two ends live in different lanes.
+**REAL P2:** CO-LOCATE both electrical regions in ONE lane — i.e. classify `energy_storage_source` as
+periphery/electrical (it carries no process fluid) so it clusters with `power_distribution` and the
+spine is short + local. That is a flow-plan PARTITION change (`get_flow_plan` / the flow-vs-periphery
+split, ~line 1431), with the same 3-archetype regression gate. Do it fresh with baselines captured
+FIRST (render RAS/BESS on the committed P1 build before any P2 edit, so regression is measurable).
