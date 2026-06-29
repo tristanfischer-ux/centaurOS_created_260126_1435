@@ -23,7 +23,7 @@
 > | I | Dossier self-audit FAIL (3 HIGH/3 MED) not fixed | #66 #79 | — | it's the honest REPORT; underlying defects (E/F/G + pump-pressure brief-miss + calc-coverage + glossary) aren't repaired | ☐ rolls up E/F/G + below |
 > | I.1 | brief_metric_fail: fertigation pump 2 vs 3.5 bar; hand-water 1 vs 3 bar | #90 | design | design under-delivers a brief metric; pump head not sized to the brief pressure | ☐ chain fix |
 > | I.2 | calc_coverage: 4 of 35 numbers show no calc | #89 | theme | those 4 quantities have no worked-calc capture | ☐ |
-> | I.3 | glossary_undocumented_prefix (D/S/U/Z) | #80 | easy | glossary doesn't enumerate every tag prefix used in the bill | ☐ easy fix |
+> | I.3 | glossary_undocumented_prefix (D/S/U/Z) | #80 | **NOT cosmetic** | INVESTIGATED: the deterministic allocator (`dossier_repair._TAG_PREFIX_RULES`) only emits HX/INV/TX/P/TK/F/V/I/EP/X. D-101/Z-/S-/U- are LLM-supplied tags BYPASSING it (Z- also collides w/ HVAC-zone). `dossier_audit.py:2015` note: whitelisting these was tried 2026-06-27 + REJECTED as gaming. FIX = route every principal tag through the documented scheme (re-tag off-scheme prefixes), NOT add to glossary | ☐ tag-scheme fix |
 > | J | Connection trace: cabinets unconnected (1/6; SCADA devices 0-in/0-out) | #80 #96 | **YES** | synthesis doesn't wire cabinet housed-devices into topology edges | ☐ chain fix |
 > | K | "you stopped using LOOP-TRACKER.md" | process | — | I drifted to ad-hoc handovers | ✅ resumed (this section) |
 >
