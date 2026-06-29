@@ -3507,6 +3507,19 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
     b_key = (metric.get("key_metric") or metric.get("metric") or metric.get("name") or "").lower().strip()
     b_norm = _norm_qty_name(b_key)
     b_tokens = set(t for t in re.findall(r"[a-z]+", b_norm) if t not in _QTY_STOP_TOKENS)
+    # COUNT-TYPED metric whose UNIT is a count-NOUN ('containers' / 'valves' / 'vials' / 'units')
+    # rather than the token 'count' lands in the '?'+noun family — so _fam_ok's count branch never
+    # fires and it never matches the unitless …_count contract quantity (Tristan 2026-06-29:
+    # cultivation_containers_count + actuated_valves_count went UNVERIFIED although
+    # cultivation_container_count=6000 and actuated_distribution_valve_count=200 exist). Promote such
+    # a metric to the 'count' family — keyed on the metric KEY ending in a count suffix OR a count-noun
+    # unit. UNIVERSAL; only fires on an UNKNOWN ('?') family so real physical units (bar/psi/rpm) are
+    # untouched (their key isn't *_count and their unit isn't a count-noun).
+    if b_fam.startswith("?") and (
+        re.search(r"(?:_|^)(?:count|qty|number|nr)$", b_key)
+        or re.fullmatch(r"valves?|containers?|vials?|units?|drums?|modules?|racks?|cells?|tanks?|pumps?|bags?|cartridges?|elements?|skids?|trains?", (metric.get("unit") or "").strip().lower())
+    ):
+        b_fam = "count"
 
     def _fam_ok(a_fam: str, qname: str) -> bool:
         """Same unit family, OR a COUNT metric vs a count-named unitless quantity
@@ -7892,6 +7905,20 @@ def _selftest() -> int:
     gm = _match_quantity({"key_metric": "hand_watering_capacity_m3_per_hr", "value": 25, "unit": "m3/h"}, good_qs)
     if not gm or gm[0] != "hand_watering_pump_throughput_m3_h":
         print(f"  FAIL fake-match: hand-watering must match its OWN pump (got {gm})"); bad += 1
+    # (1c) COUNT-NOUN UNIT (Tristan 2026-06-29): a count metric whose UNIT is a count-NOUN
+    # ('containers'/'valves') must match the unitless …_count contract quantity — it was going
+    # UNVERIFIED because '?containers'/'?valves' ≠ the 'count' family. A real physical unit ('bar')
+    # must NOT be promoted (no false match).
+    count_qs = {"cultivation_container_count": {"value": 6000, "unit": ""},
+                "actuated_distribution_valve_count": {"value": 200, "unit": ""}}
+    cm = _match_quantity({"key_metric": "cultivation_containers_count", "value": 6000, "unit": "containers"}, count_qs)
+    if not cm or cm[0] != "cultivation_container_count":
+        print(f"  FAIL count-noun: cultivation_containers_count (unit 'containers') must match cultivation_container_count (got {cm})"); bad += 1
+    vm = _match_quantity({"key_metric": "actuated_valves_count", "value": 200, "unit": "valves"}, count_qs)
+    if not vm or vm[0] != "actuated_distribution_valve_count":
+        print(f"  FAIL count-noun: actuated_valves_count (unit 'valves') must match actuated_distribution_valve_count (got {vm})"); bad += 1
+    if _match_quantity({"key_metric": "design_pressure_bar", "value": 6, "unit": "bar"}, count_qs) is not None:
+        print("  FAIL count-noun: a real physical unit ('bar') must NOT be promoted to count + falsely matched"); bad += 1
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
