@@ -167,24 +167,38 @@ function findMatchingBomWord(claim: NumericClaim, bom: BomWordQty[]): BomWordQty
     }
     return false
   }
-  const scoreOf = (w: BomWordQty): number => {
-    const idTokens = tokeniseId(w.word_id)
-    const nameTokens = tokeniseName(w.word_name_human)
-    for (const term of claim.noun_search_terms) {
-      const t = term.toLowerCase().trim()
-      if (!t) continue
-      if (includesAsWhole(idTokens, t) || includesAsWhole(nameTokens, t)) {
-        // Prefer the longest matching term — more specific.
-        return t.length
-      }
+  // Singular/plural-insensitive token (Tristan 2026-06-29): "valves" must match the contract's
+  // "valve" — otherwise "Pneumatic Actuated Valves" (the real ×200 word) scores 0 and the 200 count
+  // mis-binds to a SINGULAR "Suction Isolation Valve" (×2) → a false 100× drift FATAL (gate 12).
+  const sing = (t: string): string => (t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t)
+  // GENERIC component-head nouns: a token that many DISTINCT words carry, so sharing ONLY it is
+  // ambiguous (every valve/pump/tank matches "valve"/"pump"/"tank"). A confident match needs a
+  // DISTINGUISHING (qualifier) token too — "actuated_distribution_valve_count" must land on the
+  // word sharing "actuated", not just any "valve".
+  const GENERIC_HEADS = new Set(['valve', 'valves', 'pump', 'tank', 'filter', 'vessel', 'sensor', 'transmitter', 'motor', 'fan', 'blower', 'cable', 'pipe', 'unit', 'module', 'board', 'switch', 'meter'])
+  // The claim's BASE tokens = the longest (most-specific) search term, singularised.
+  const baseTerm = claim.noun_search_terms.reduce((a, b) => (b.split(/[\s_]+/).length > a.split(/[\s_]+/).length ? b : a), '')
+  const baseToks = baseTerm.split(/[\s_]+/).map(sing).filter(Boolean)
+  // Count how many DISTINCT base tokens a word carries (plural-insensitive). The winner shares the
+  // MOST → the more-qualified word beats a generic-head-only collision.
+  const scoreOf = (w: BomWordQty): { score: number; sharedNonGeneric: number } => {
+    const toks = new Set([...tokeniseId(w.word_id), ...tokeniseName(w.word_name_human)].map(sing))
+    let score = 0
+    let nonGeneric = 0
+    for (const bt of new Set(baseToks)) {
+      if (toks.has(bt)) { score += 1; if (!GENERIC_HEADS.has(bt)) nonGeneric += 1 }
     }
-    return 0
+    return { score, sharedNonGeneric: nonGeneric }
   }
-  let best: { w: BomWordQty; score: number } | null = null
+  let best: { w: BomWordQty; score: number; sharedNonGeneric: number } | null = null
   for (const w of bom) {
-    const s = scoreOf(w)
-    if (s > 0 && (!best || s > best.score)) best = { w, score: s }
+    const r = scoreOf(w)
+    if (r.score > 0 && (!best || r.score > best.score)) best = { w, ...r }
   }
+  // AMBIGUITY GUARD: a multi-token claim whose best match shares ONLY a generic head noun (e.g. just
+  // "valve") is NOT a confident match — skip it (advisory unmatched), never a HIGH drift. A single-
+  // token claim, or a match sharing a distinguishing qualifier, is kept.
+  if (best && baseToks.length >= 2 && best.sharedNonGeneric === 0) return null
   return best?.w ?? null
 }
 
