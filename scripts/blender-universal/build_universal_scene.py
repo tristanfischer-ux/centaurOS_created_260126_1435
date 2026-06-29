@@ -3288,7 +3288,10 @@ def place_all(parts, regions, MAT, MO):
     # measure each bank's ACTUAL placed Y-extent and re-stack the lanes so
     # successive banks are separated by just BANK_COMPACT_GAP_MM. Purely a Y shift
     # per bank — X (process-flow order) is untouched. Universal + deterministic.
-    _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks)
+    # Rewrite B: when deterministic placement is active the det packer ALREADY arranged the parts;
+    # the bank Y-compaction would re-shift them off their authored coords, so skip it.
+    if not _DET_LAYOUT_POS:
+        _compact_banks_in_y(parts, bank_of_region, region_centres, n_banks)
 
     # actual bbox from placed-equipment EXTENTS (half-footprints, not just centres)
     # so the frame/bbox hug the TRUE equipment outline per-axis (Fix 2): the frame
@@ -9782,7 +9785,10 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     # The optimiser re-flows parts to be "more square" (its own note) — exactly what a
     # containerised flat-pack must NOT do (it would undo the long-thin row that fits the
     # container). Skip it when the container layout is active.
-    if (not _CONTAINER_LAYOUT
+    # Rewrite B: when deterministic placement is active, the det packer IS the authoritative layout
+    # (sequenced + cabinet-consolidated by construction); the CRAFT optimiser would re-flow it away,
+    # so skip it. (Without det, the optimiser stays default-on as before.)
+    if (not _CONTAINER_LAYOUT and not _DET_LAYOUT_POS
             and os.environ.get("LAYOUT_OPTIMISE", "1").strip().lower() not in ("0", "false", "no", "off")):
         try:
             bbox = _apply_layout_optimiser(parts, topology, bbox)

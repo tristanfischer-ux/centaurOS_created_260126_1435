@@ -111,28 +111,36 @@ def layout(items: list[dict], n_banks: int = 2) -> dict:
             nodes.extend({"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM))} for it in small)
         region_nodes[rk] = nodes
 
-    # 4) bank the regions in PROCESS ORDER across `n_banks` serpentine lanes (squareness), each
-    #    region shelf-packed; bank cursor + lane Y are integer-accumulated (deterministic).
-    per_bank = max(1, (len(region_order) + n_banks - 1) // n_banks)
+    # 4) shelf-pack each region into a compact BAY (square-ish), then lay the bays in PROCESS ORDER
+    #    left→right, WRAPPING to a new bank when the running width exceeds a square-target width. The
+    #    target = sqrt(total bay area)·aspect, so the whole plant folds into a roughly SQUARE block
+    #    instead of one long ribbon (the fixed-2-bank version produced a 4:1 strip). All integer-grid,
+    #    process order preserved, deterministic. `n_banks` is now only an UPPER cap on the fold.
+    region_bay: dict[str, tuple] = {}
+    for rk in region_order:
+        nodes = region_nodes[rk]
+        bay_area = sum(nd["w"] * nd["d"] for nd in nodes) or (GRID_MM * GRID_MM)
+        bay_target_w = max(GRID_MM, int((bay_area ** 0.5) * 1.4))
+        rpos, used_w, used_d = _shelf_pack(nodes, 0, 0, bay_target_w)
+        region_bay[rk] = (used_w, used_d, rpos)
+    total_area = sum(w * d for w, d, _ in region_bay.values()) or (GRID_MM * GRID_MM)
+    # square-ish overall: target width ≈ sqrt(total area)·1.4; never narrower than the widest bay.
+    widest_bay = max((w for w, _, _ in region_bay.values()), default=GRID_MM)
+    target_w = max(widest_bay, int((total_area ** 0.5) * 1.4))
+    min_banks = max(1, (len(region_order) + max(1, n_banks * 4) - 1) // max(1, n_banks * 4))  # cap fold
     out: dict[str, tuple[int, int]] = {}
-    bank_y = 0
-    for b in range(n_banks):
-        banks_regions = region_order[b * per_bank:(b + 1) * per_bank]
-        if not banks_regions:
-            continue
-        if b % 2 == 1:                    # serpentine: odd banks flow right→left (reverse order)
-            banks_regions = list(reversed(banks_regions))
-        x_cursor, bank_d = 0, 0
-        for rk in banks_regions:
-            # a region's bay width ≈ sqrt(area)·~1.4, but a simple sum-of-widths cap keeps it tight;
-            # use a fixed target so packing is deterministic + regions read as columns.
-            tot_w = sum(nd["w"] for nd in region_nodes[rk]) or GRID_MM
-            target_w = max(GRID_MM, int((tot_w ** 0.5) * 1200))
-            rpos, used_w, used_d = _shelf_pack(region_nodes[rk], x_cursor, bank_y, target_w)
-            out.update(rpos)
-            x_cursor += used_w + REGION_GAP_MM
-            bank_d = max(bank_d, used_d)
-        bank_y += bank_d + BANK_GAP_MM
+    x_cursor, bank_y, bank_d, n_banks_used = 0, 0, 0, 1
+    for rk in region_order:
+        used_w, used_d, rpos = region_bay[rk]
+        if x_cursor > 0 and x_cursor + used_w > target_w:   # wrap to a new bank
+            bank_y += bank_d + BANK_GAP_MM
+            x_cursor, bank_d = 0, 0
+            n_banks_used += 1
+        for pid, (lx, ly) in rpos.items():
+            out[pid] = (_snap(x_cursor + lx), _snap(bank_y + ly))
+        x_cursor += used_w + REGION_GAP_MM
+        bank_d = max(bank_d, used_d)
+    _ = min_banks  # (reserved: a future fold cap; width-budget wrap governs squareness today)
     # map each small item to its cabinet position so the caller can resolve it.
     for rk, members in cabinet_members.items():
         cpos = out.get(f"cabinet::{rk}")
