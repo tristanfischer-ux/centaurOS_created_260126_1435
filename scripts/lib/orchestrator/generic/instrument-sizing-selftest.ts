@@ -13,7 +13,7 @@
 //
 // Standalone (not a --selftest block inside the big module). Wired into verify-engine-guards.sh.
 
-import { applyUniversalContractSizing } from './universal-contract-sizing'
+import { applyUniversalContractSizing, synthesizeInstrumentation } from './universal-contract-sizing'
 
 function modsOf(modules: any, name: string): any[] {
   for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words) {
@@ -69,8 +69,25 @@ function run() {
   const pump = modsOf(modules, 'Transfer Pump')
   if (!hasKwRating(pump)) throw new Error('instrument-sizing: the real Transfer Pump lost its contract kW rating — the instrument skip over-reached')
 
+  // CONSOLIDATED LEVEL RANGE must span the TALLEST served vessel (Tristan 2026-06-29 physics HIGH:
+  // a 0–1.4 m guided-radar consolidated onto a 1.6 m nutrient tank = unmonitored dead zone). The
+  // host is the largest by CAPACITY (the wide shallow sump, 1.4 m) but the range must cover the
+  // taller nutrient tank (1.6 m).
+  const lvlModules: any = [{
+    module: 'mass_fluid_transport_process', sub_modules: [{
+      sub_module: 's', words: [
+        { id: 'sump_word', name_human: 'Drain Collection Sump', content_character: { character_id: 'sump', name_human: 'Drain Collection Sump' }, modifier_characters: [{ kind: 'dimension', value: '2.1 m dia x 1.4 m' }, { kind: 'quantity', value: '×1' }], _synthesized: true },
+        { id: 'nutrient_tank_word', name_human: 'Nutrient Tank', content_character: { character_id: 'nutrient_tank', name_human: 'Nutrient Tank' }, modifier_characters: [{ kind: 'dimension', value: '1.0 m dia x 1.6 m' }, { kind: 'quantity', value: '×8' }], _synthesized: true },
+      ],
+    }],
+  }]
+  synthesizeInstrumentation(lvlModules as never[], {})
+  const lvl = modsOf(lvlModules, 'Level Transmitter')
+  const lvlRange = String(lvl.find((x) => x.kind === 'rating_primary')?.value ?? '')
+  if (!/1\.6\s*m/.test(lvlRange)) throw new Error(`instrument-sizing: consolidated LEVEL range "${lvlRange}" must span the TALLEST served vessel (1.6 m), not the largest-capacity host (1.4 m sump)`)
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range spans the tallest served vessel)')
 }
 
 run()

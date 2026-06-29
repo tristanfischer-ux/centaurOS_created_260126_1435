@@ -1198,13 +1198,23 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
     // ≥2 vessel types → one consolidated line. Host it on the largest served vessel (the primary
     // when it is served), sum the counts, build the location + combined-requirement strings.
     const hostV = served.includes(primary) ? primary : served.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
+    // A consolidated LEVEL instrument's RANGE must span the TALLEST served vessel — its range IS the
+    // vessel height, and the host is the largest by CAPACITY (a wide, shallow sump) which can be
+    // SHORTER than a narrow, tall vessel it also serves. A 0–1.4 m range hosted on the sump cannot
+    // read a 1.6 m nutrient tank → "unmonitored dead zone / overflow risk" (physics-critic HIGH).
+    // Pick the max-HEIGHT served vessel for the consolidated RANGE only (host/name/form stay the
+    // largest). Keyed on the height-ranged 'level' family; temp/pressure/pH ranges are NOT vessel-
+    // height-derived so they keep the host range. UNIVERSAL — no class table.
+    const rangeV = spec.scope === 'level'
+      ? served.slice().sort((a, b) => (b.p.htM || 0) - (a.p.htM || 0))[0]
+      : hostV
     const totalQty = served.reduce((s, v) => s + Math.max(1, Math.round(v.count)), 0)
     const perVessel = served.map((v) => ({ name: v.w.name_human ?? 'vessel', qty: Math.max(1, Math.round(v.count)), range: spec.range(quantities, v.p) }))
     const vesselLocation = perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')
     // The combined requirement: the family's own form on the host, then the per-vessel breakdown so
     // every served vessel's range is explicit on the single line.
     const combinedForm = `${spec.form(hostV.w.name_human ?? 'the served vessels')} Consolidated across ${perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')} — one schedule line for the ${spec.label.toLowerCase()} on every served vessel.`
-    toAdd.push(instrumentWord(spec, hostV.w, totalQty, spec.range(quantities, hostV.p), { vesselLocation, combinedForm }))
+    toAdd.push(instrumentWord(spec, hostV.w, totalQty, spec.range(quantities, rangeV.p), { vesselLocation, combinedForm }))
   }
   ;((target.words ??= []) as WordLike[]).push(...toAdd)
   return toAdd.length
