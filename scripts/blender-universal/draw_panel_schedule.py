@@ -1446,6 +1446,39 @@ def _describe_load(base: str, state: dict) -> str:
     return human or base
 
 
+def _panel_pump_kw_by_name(name: str, state: dict) -> Optional[float]:
+    """A PUMP circuit's OWN electrical kW from a NAME-MATCHED contract quantity — e.g.
+    'Fertigation Dosing Pump' → fertigation_dosing_pump_power_kw, 'Drain Transfer Pump' →
+    drain_transfer_pump_power_kw, 'Irrigation Pump' → irrigation_pump_motor_kw. Replaces the old
+    blanket rule that returned the single irrigation_pump_motor_kw for EVERY pump (Tristan
+    2026-06-29: that inflated the Codema panel 48→63 kW — drain 1.9 kW + fertigation 7.5 kW were
+    both shown at 9.65 — and tripped the load_reconcile drawing-gate). Best token-overlap wins; the
+    generic 'pump'/'motor'/'power' tokens are dropped so the DISTINGUISHING noun decides. Returns
+    None when no pump-specific quantity matches by name (caller falls through to ledger/duty)."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    _GEN = {"pump", "motor", "power", "kw", "dosing", "transfer", ""}
+    t_toks = set(_norm_load_name(name).split()) - _GEN
+    if not t_toks:                                   # name was only generic words
+        t_toks = set(_norm_load_name(name).split()) - {"pump", "motor", ""}
+    if not t_toks:
+        return None
+    best = None
+    for k, vv in q.items():
+        kl = k.lower()
+        if not kl.endswith("_kw") or ("pump" not in kl and "motor" not in kl):
+            continue
+        val = vv.get("value") if isinstance(vv, dict) else vv
+        if not isinstance(val, (int, float)) or val <= 0:
+            continue
+        k_toks = set(re.split(r"[_\s]+", kl)) - _GEN
+        overlap = len(t_toks & k_toks)
+        if overlap == 0:
+            continue
+        if best is None or overlap > best[0]:
+            best = (overlap, float(val))
+    return best[1] if best else None
+
+
 def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
                       ways: int = 1) -> Optional[float]:
     """The connected load (kW) for ONE circuit.  Prefer a KNOWN per-load figure from the
@@ -1513,7 +1546,12 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
             if v:
                 return v
     if "pump" in b or "nutrient" in b or "irrigation" in b:
-        v = _q(state, "irrigation_pump_motor_kw")
+        # EACH pump circuit takes ITS OWN power — a NAME-MATCHED pump *_kw quantity — NEVER one
+        # blanket value for every pump. The old rule returned irrigation_pump_motor_kw (9.65 kW)
+        # for the fertigation (7.5) + drain (1.9) + hand-watering pumps too, inflating the Codema
+        # panel total 48→63 kW and tripping the load_reconcile drawing-gate (Tristan 2026-06-29).
+        # Fall through to the per-load ledger '· N kW' resolution when nothing matches by name.
+        v = _panel_pump_kw_by_name(base, state)
         if v:
             return v
     if "pcs" in b or "inverter" in b or "transformer" in b:
@@ -2346,6 +2384,22 @@ def _selftest() -> int:
     chk("I8.noncoincident_reported", abs(rec["noncoincident_kw"] - 863.0) < 0.01)
     # standby current stays in Σ-current (100 + 1451), the duplicate's 100 is dropped.
     chk("I8.amps_keep_standby_drop_dup", abs(rec["sum_a"] - 1551.0) < 0.01)
+
+    # I-pump — EACH pump circuit resolves to ITS OWN name-matched contract kW, NEVER one blanket
+    # value for every pump (Tristan 2026-06-29: drain 1.9 kW + fertigation 7.5 kW were both shown at
+    # the irrigation pump's 9.65 kW, inflating the Codema panel total 48→63 kW and tripping the
+    # load_reconcile drawing-gate). The distinguishing noun must decide each pump's power.
+    st_p = {"orchestratorContract": {"quantities": {
+        "fertigation_dosing_pump_power_kw": {"value": 7.5},
+        "drain_transfer_pump_power_kw": {"value": 1.92},
+        "irrigation_pump_motor_kw": {"value": 9.65}}}}
+    kf = _connected_kw_for("Fertigation Dosing Pump", 20.0, _P(), st_p, 1)
+    kd = _connected_kw_for("Drain Transfer Pump", 8.0, _P(), st_p, 1)
+    ki = _connected_kw_for("Irrigation Pump", 20.0, _P(), st_p, 1)
+    chk("Ipump.fertigation_own_kw", kf == 7.5)
+    chk("Ipump.drain_own_kw", kd == 1.92)
+    chk("Ipump.irrigation_own_kw", ki == 9.65)
+    chk("Ipump.not_blanket_all_equal", not (kf == kd == ki))   # the exact regression we fixed
 
     # I9 — a THERMAL-RECOVERY quantity (*_recovery_kw / heat-recovery duty) is NOT read as the
     # item's electrical draw (the HRV 941 kW thermal-recovery duty landing in the panel as a
