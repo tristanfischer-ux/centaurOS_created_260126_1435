@@ -35,22 +35,32 @@ export const LLM_CONFIG = {
   /** Stage 1 brief parser — strict structured extraction, must be deterministic. */
   brief_parser: { temperature: 0, seed: 42 } as StageConfig,
 
-  /** Brief-rewrite when revision loop iterates — small variation acceptable. */
-  brief_rewriter: { temperature: 0.1, seed: null } as StageConfig,
+  /** Brief-rewrite when revision loop iterates — small variation, but SEEDED so the same
+   *  brief rewrites the same way run-to-run (determinism #86; Tristan 2026-06-29). */
+  brief_rewriter: { temperature: 0.1, seed: 42 } as StageConfig,
 
-  /** R1/R4 reviewers + plausibility critics — low variation, no fixed seed
-   *  (we want different reviewers' independent looks, not identical replays). */
-  reviewer: { temperature: 0.1, seed: null } as StageConfig,
+  /** R1/R4 reviewers + plausibility critics — low variation, now SEEDED (determinism #86).
+   *  A fixed seed does NOT collapse R1≡R4: each reviewer has a DIFFERENT prompt, so they
+   *  still give independent looks — the seed only makes EACH reviewer reproducible across
+   *  runs (same prompt + same seed → same look), which is what same-brief→same-scorecard needs. */
+  reviewer: { temperature: 0.1, seed: 42 } as StageConfig,
 
   /** Physics critic — must be reproducible per design state to function as a
    *  stable gate signal. Greedy + fixed seed. */
   physics_critic: { temperature: 0, seed: 42 } as StageConfig,
 
-  /** Generator — moderate variation for design synthesis. */
-  generator: { temperature: 0.2, seed: null } as StageConfig,
+  /** Generator — moderate variation for design synthesis, now SEEDED (determinism #86;
+   *  Tristan 2026-06-29). This is the biggest cross-run variance source — an unseeded
+   *  temp-0.2 generator produced DIFFERENT equipment sets run-to-run (v36 vs v37: v37 grew a
+   *  Cip Tank + Cleaning Tank v36 lacked). The fixed seed keeps the moderate-temp exploration
+   *  but makes it the SAME exploration each run, so the same brief yields the same design. */
+  generator: { temperature: 0.2, seed: 42 } as StageConfig,
 
-  /** Generator alt-candidate diversity scan — higher temperature to explore
-   *  meaningfully different topologies, not just rephrasings. */
+  /** Generator alt-candidate diversity scan — higher temperature to explore meaningfully
+   *  different topologies. DELIBERATELY UNSEEDED: this stage is called N× IN ONE RUN to build a
+   *  diverse candidate ENSEMBLE; a single fixed seed would collapse all N candidates to one
+   *  identical output, killing the ensemble. (Per-member seeding seed=42+i would give in-run
+   *  diversity AND cross-run reproducibility — a future refinement if the caller threads an index.) */
   generator_diversity: { temperature: 0.4, seed: null } as StageConfig,
 
   /** Scorer (best-of-N rank, council vote) — must be deterministic for the
@@ -61,9 +71,9 @@ export const LLM_CONFIG = {
    *  validate) — low variation for consistent edits across runs. */
   specialist: { temperature: 0, seed: 42 } as StageConfig,
 
-  /** Brief targets reconciliation — small variation tolerable as the LLM
-   *  emits a structured JSON edit; greedy would be fine too. */
-  brief_reconciliation: { temperature: 0.1, seed: null } as StageConfig,
+  /** Brief targets reconciliation — emits a structured JSON edit; SEEDED so the same brief
+   *  reconciles the same way each run (determinism #86; Tristan 2026-06-29). */
+  brief_reconciliation: { temperature: 0.1, seed: 42 } as StageConfig,
 } as const
 
 export type StageName = keyof typeof LLM_CONFIG
