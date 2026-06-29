@@ -47,6 +47,13 @@
 >
 > **REMAINING (deep render/layout increments — each its own verified step, NOT rushed):** BFD 7.2:1 + P&ID 4.6:1 legibility (serpentine multi-row FOLD — re-routes streams, regression risk); H render-camera (bring 3D render onto manifest coords — the GA is faithful); scope #85 (drop brief-absent CIP/Cleaning tanks — risky, needs brief-scope authority). Plus: paired-run determinism verification; final clean ship-gate-ON run (#110).
 >
+> **▶ v38 CONSOLIDATION (2026-06-29) — all 4 batch fixes VERIFIED end-to-end:**
+> - **gate-21 per-line-price: PASS** (was 1 HIGH FATAL in v37) — board-sensor mis-pin fix CLEARED the FATAL; chain progressed past it for the first time this session.
+> - **duplicate principal tags: NONE** (TK-108 dedup held) · BoM F–N visible · count-noun metrics (cultivation_containers_count 6000 + actuated_valves_count 200) now MATCH (verified in rebuilt v38 workbook).
+> - REMAINING tabs <8 (11): 8× RENDER @4 + Exec/⚠Audit @2 (floor-capped) + Risk @6.
+> - **Render @4 ROOT** = vision critic "stray red pipe extending off platform to a floating box" — the CO-LOCATION problem: parts span x[0.7,30.3]×y[-6.9,20.5] (30×27 m), so long pipes route to off-platform parts (TK-115 @27.4, X-101 @-6.1). This is #67/#100/H — the layout-engine rebuild (LAYOUT-FIX-PLAN). DEEP + the render score has the non-deterministic vision-critic treadmill (B3). Biggest lever (8 tabs) but NOT a quick edit.
+> - **Risk @6 = scope #85**: physics critic "design includes a Cleaning Tank + CIP Tank". CONFIRMED brief-absent (brief 'cip'=false-match on 'prinCIPle'; 'clean'=only 'cleanable particle filter'; contract has NO cip/cleaning qty; words are _synthesized=None LLM inventions that evade reconcile's invented-drop which only touches _synthesized). FIX = scope-fidelity gate dropping a contract-unbacked principal whose distinctive noun is brief-absent — but RISKY (a slightly-off brief-token check drops legit equipment across archetypes; 'principle'→'cip' proves the hazard). Needs robust brief-scope signal + multi-archetype verify. NOT rushed.
+>
 > **KEY STRUCTURAL FINDING:** the WORST defects (missing tank, empty module) evade EVERY enforcing gate — flipping the flags on would NOT catch them. "Fix the gates" here means ADD the deterministic gates that bite (#84 + module-non-empty), then the design fix + the gate land together. The panel per-pump fix (9b61929a4) cleared 2 of the 3 drawing-gate failures AND confirmed item G is a critic false-positive (48 kW / 100 A incomer correct).
 >
 > ---
