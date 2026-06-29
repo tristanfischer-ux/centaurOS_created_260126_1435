@@ -1,5 +1,36 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-29 **VISUAL AUDIT (Tristan, back after ~2 days away)** — every item in his note, tracked.
+>
+> **THE HONEST "why are these STILL not fixed" answer (he asked this directly):** every item below was
+> ALREADY a tracked task (#58–#110). I spent the last sessions tuning DETECTORS + SCORERS (making the
+> engine report its faults more honestly) instead of burning down this DEFECT backlog — the engine got
+> better at *telling* you it's broken; I didn't make it *not* broken. Second, structural reason for the
+> Risk/Audit/Connection items: every run used the enforcing flags OFF (`*_ENFORCING=0`), so the engine
+> FLAGS the defect (missing tank, empty module, underrated incomer) and SHIPS anyway — nothing blocks,
+> nothing repairs. The shift this session: stop tuning the report, FIX the design + presentation at source.
+>
+> | # | His words | Task | Recurring? | WHY it survived | Status |
+> |---|---|---|---|---|---|
+> | A | Calc tool-data-flow values not traceable; C16 (0.74) not linked to B60 (same number) | #59 #89 #98 | theme | the data-flow table + the worked-calc transcript are two separate sections with NO cross-cell link; linking needs a pre-pass mapping tool-output→result-row | ☐ NEXT |
+> | B | BoM ledger "compacted"; F–N hidden | #61 #102 | **YES, asked ≥2×** | collapse-by-default was a deliberate "clean buy-list" choice that overrode the instruction; NO guard asserted visibility so it stuck | ✅ **FIXED 548215d5a** (F–N visible, verified in xlsx, guard added) |
+> | C | BoM "where do these numbers come from" | #102 | theme | provenance lived in the HIDDEN cols F–J → un-hiding (B) surfaces them; col **G key-inputs still blank** for class_reference/parametric lines | ◑ partly (un-hidden); G-populate = NEXT |
+> | D | Cost-waterfall raw-materials = hard-coded, no source | #88 #59 | **YES, "we've talked about this"** | `raw_materials_bom_gbp` shown as a static scalar with no link (it actually == BoM Σ to within £41) | ✅ **FIXED 548215d5a** (now LIVE link to Ledger Σ, verified, guard added) |
+> | E | Risk: missing 1 of 3 required 40 m³ tanks (mislabeled "Cleaning Tank") | #79 #84 #99 | design family | flagged by physics critic; gates OFF + no auto-repair; storage-count synth makes 2 + invents CIP/cleaning tanks (scope over-reach #85) | ☐ chain fix |
+> | F | Risk: `fertigation_dosing_system` empty words[] array | #79 | design family | components scattered into `mass_fluid_transport_process`; NO gate asserts every module has ≥1 word | ☐ chain fix |
+> | G | Risk: mains incomer + switchboard rated 100 A "doesn't work" | #81 | sizing family | internal incoherence (calc says 48 kW→96 A→100 A OK; critic says ~60 kW). NEEDS INVESTIGATION — may be a critic FALSE-positive OR a real load-reconcile gap | ☐ investigate first |
+> | H | Blender render ≠ GA; dozens of floating minor components | #100 #67 #69 | **YES** | TWO engines: `build_universal_scene.py` (shows every part incl. valves/instruments) vs `ga_massing.py` (drops P&ID detail + co-locates). They diverge by construction | ☐ chain fix (align filters) |
+> | I | Dossier self-audit FAIL (3 HIGH/3 MED) not fixed | #66 #79 | — | it's the honest REPORT; underlying defects (E/F/G + pump-pressure brief-miss + calc-coverage + glossary) aren't repaired | ☐ rolls up E/F/G + below |
+> | I.1 | brief_metric_fail: fertigation pump 2 vs 3.5 bar; hand-water 1 vs 3 bar | #90 | design | design under-delivers a brief metric; pump head not sized to the brief pressure | ☐ chain fix |
+> | I.2 | calc_coverage: 4 of 35 numbers show no calc | #89 | theme | those 4 quantities have no worked-calc capture | ☐ |
+> | I.3 | glossary_undocumented_prefix (D/S/U/Z) | #80 | easy | glossary doesn't enumerate every tag prefix used in the bill | ☐ easy fix |
+> | J | Connection trace: cabinets unconnected (1/6; SCADA devices 0-in/0-out) | #80 #96 | **YES** | synthesis doesn't wire cabinet housed-devices into topology edges | ☐ chain fix |
+> | K | "you stopped using LOOP-TRACKER.md" | process | — | I drifted to ad-hoc handovers | ✅ resumed (this section) |
+>
+> **Ordered plan (cheap+certain first, then chain-dependent design fixes):** B✅ D✅ → C(G-populate) → A(calc link) → I.3(glossary) → then the chain batch E/F/H/J/G/I.1 (each: fix DESIGN at source + a gate that BLOCKS it shipping, not just flags) → determinism #86 so the fixes provably stick → clean re-run, confirm tabs ≥8.
+>
+> ---
+
 > ▶▶▶ 2026-06-29 PHYSICS BATCH — 5 verified fixes landed; v36 validating. Session arc (all UNIVERSAL,
 > source-level, proveCatch-guarded, guards GREEN):
 >  1. LITTER → GA 7→10 (commit d636e2d55). 2. VFD mis-pin gate (d636e2d55; HIGH gone in v34).
