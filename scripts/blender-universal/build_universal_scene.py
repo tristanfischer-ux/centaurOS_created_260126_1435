@@ -9264,7 +9264,7 @@ def _apply_layout_optimiser(parts, topology, bbox):
     # (incident, name) its duplicate-name handling is order-sensitive — so a varying node order gave a
     # different optimised layout. Sort by name + the (already-deterministic, pre-optimiser) base placed
     # coords as a total tiebreak. Pairs with the ledger tie-break fix that made the EDGES deterministic.
-    equip.sort(key=lambda p: (str(p.name), tuple(round(v, 1) for v in (p.placed_xyz_mm or ()))))
+    equip.sort(key=lambda p: (str(p.name), int(getattr(p, "_seq", 0))))   # _seq = pure-int extraction index (NO float-coord tiebreak, which carried sub-mm jitter that occasionally re-ordered)
     nodes = [{"name": p.name,
               "dims_mm": list(footprint_mm(resolved_dims_mm(p))[:2])} for p in equip]
     nameset = {p.name for p in equip}
