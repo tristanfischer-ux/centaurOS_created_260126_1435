@@ -155,7 +155,10 @@ def _det_layout_key(p):
 def _populate_det_layout(parts):
     """Fill _DET_LAYOUT_POS from the deterministic sequence-packer. Gated by DETERMINISTIC_PLACEMENT."""
     _DET_LAYOUT_POS.clear()
-    if os.environ.get("DETERMINISTIC_PLACEMENT", "").strip().lower() not in ("1", "true", "yes", "on"):
+    # DEFAULT-ON 2026-06-29 (Tristan): the deterministic sequence-packer IS the layout now. Same state
+    # → same plant, every run; the GA + all 2-D drawings read the one stable manifest. DETERMINISTIC_
+    # PLACEMENT=0 reverts to the legacy place_all banking + CRAFT optimiser.
+    if os.environ.get("DETERMINISTIC_PLACEMENT", "1").strip().lower() in ("0", "false", "no", "off"):
         return
     items = []
     for p in parts:
