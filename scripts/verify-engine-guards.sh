@@ -52,6 +52,7 @@ run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --s
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
 run "ga_massing.py --selftest"                "$PY" scripts/blender-universal/ga_massing.py --selftest
+run "deterministic_layout --selftest"         "$PY" scripts/blender-universal/deterministic_layout.py --selftest
 run "parts_ledger.py --selftest"              "$PY" scripts/blender-universal/parts_ledger.py --selftest
 run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/generic/derive-topology.ts --selftest
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts
