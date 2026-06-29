@@ -1288,6 +1288,41 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
     return out
 
 
+def _checks_module_integrity(state: dict, run_dir: str) -> List[Check]:
+    """A sub-module that DESCRIBES components (a real English sentence) but carries an EMPTY words[]
+    is a HOLLOW module — it claims content it does not contain. Tristan 2026-06-29: the Codema
+    'fertigation_dosing_system' had prose ("two identical A/B nutrient-dosing units…") but zero
+    component words (the dosing pumps had been scattered into another module). The LLM physics critic
+    flags this only intermittently; this DETERMINISTIC check fires every time. Universal — every
+    described sub-module must back its prose with ≥1 component word; a genuinely contentless structural
+    slot (no descriptive sentence) is NOT a defect, so it is not flagged."""
+    md = state.get("moduleDecomposition") or {}
+    modules = md.get("modules") or []
+    if not modules:
+        return []
+    hollow: List[str] = []
+    for m in modules:
+        for sm in (m.get("sub_modules") or []):
+            words = sm.get("words") or []
+            sent = str(sm.get("english_sentence") or sm.get("sentence_en")
+                       or sm.get("paragraph_en") or "").strip()
+            if len(words) == 0 and len(sent.split()) >= 5:
+                hollow.append(str(sm.get("id") or sm.get("sub_module") or "?"))
+    n = len(hollow)
+    return [Check(
+        name="modules: every described sub-module carries components (no hollow module)",
+        category="CONSISTENCY", relation="le",
+        status=(PASS if n == 0 else FAIL),
+        actual=float(n), expected=0.0, tol=0.0, unit="hollow modules",
+        producer="module:hollow_count",
+        detail=("every sub-module that describes components backs its prose with ≥1 component word"
+                if n == 0 else
+                f"{n} hollow sub-module(s) describe components but carry an EMPTY words[]: "
+                f"{', '.join(hollow[:6])} — their components were dropped or scattered to another "
+                f"module. Every described sub-module must carry ≥1 component word."),
+    )]
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1304,6 +1339,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_connectivity(state, run_dir))
     checks.extend(_checks_brief_compliance(state, run_dir))
     checks.extend(_checks_tool_provenance(state, run_dir))
+    checks.extend(_checks_module_integrity(state, run_dir))
     return checks
 
 
@@ -1412,6 +1448,28 @@ def _selftest() -> int:
               "CLEAN process-coverage should PASS (20/20)")
         check(_has(checks, "Instruments associated", PASS),
               "CLEAN instrument-coverage should PASS (16/16)")
+
+    # ---- HOLLOW-MODULE check (Tristan 2026-06-29): a sub-module with descriptive prose but an EMPTY
+    #      words[] FAILs; an all-populated decomposition PASSES; a contentless slot with NO prose is
+    #      NOT a defect (must not be flagged). proveCatch for _checks_module_integrity. ----
+    hollow_state = {"moduleDecomposition": {"modules": [{"module": "m1", "sub_modules": [
+        {"id": "fertigation_dosing_system",
+         "english_sentence": "The fertigation dosing system comprises two identical A/B nutrient-dosing units.",
+         "words": []},                                                   # prose + empty -> the defect
+        {"id": "filtration", "english_sentence": "The filtration train removes particulates.",
+         "words": [{"name_human": "Cloth Filter"}]},                     # populated -> fine
+        {"id": "spare_slot", "english_sentence": "", "words": []},       # no prose -> NOT a defect
+    ]}]}}
+    hcs = _checks_module_integrity(hollow_state, "")
+    check(len(hcs) == 1 and hcs[0].status == FAIL and hcs[0].actual == 1.0,
+          f"HOLLOW-MODULE: prose + empty words[] must FAIL with count 1 (spare slot excluded); "
+          f"got {[(c.status, c.actual) for c in hcs]}")
+    populated_state = {"moduleDecomposition": {"modules": [{"module": "m1", "sub_modules": [
+        {"id": "filtration", "english_sentence": "The filtration train removes particulates.",
+         "words": [{"name_human": "Cloth Filter"}]}]}]}}
+    pcs = _checks_module_integrity(populated_state, "")
+    check(len(pcs) == 1 and pcs[0].status == PASS,
+          f"HOLLOW-MODULE: an all-populated decomposition must PASS; got {[c.status for c in pcs]}")
 
     # ---- DEFECTIVE run: each family must trip exactly its own FAIL ----
     bad_state = {
