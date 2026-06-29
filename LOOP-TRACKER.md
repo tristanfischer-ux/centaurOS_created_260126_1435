@@ -12,9 +12,9 @@
 >
 > | # | His words | Task | Recurring? | WHY it survived | Status |
 > |---|---|---|---|---|---|
-> | A | Calc tool-data-flow values not traceable; C16 (0.74) not linked to B60 (same number) | #59 #89 #98 | theme | the data-flow table + the worked-calc transcript are two separate sections with NO cross-cell link; linking needs a pre-pass mapping tool-output→result-row | ☐ NEXT |
+> | A | Calc tool-data-flow values not traceable; C16 (0.74) not linked to B60 (same number) | #59 #89 #98 | theme | the data-flow table + the worked-calc transcript were two disconnected sections | ✅ **FIXED 01895d355** (each data-flow Value → live `=B<row>` link to its worked result; C16→B60, 10 linked; verified, guard _selftest(8)) |
 > | B | BoM ledger "compacted"; F–N hidden | #61 #102 | **YES, asked ≥2×** | collapse-by-default was a deliberate "clean buy-list" choice that overrode the instruction; NO guard asserted visibility so it stuck | ✅ **FIXED 548215d5a** (F–N visible, verified in xlsx, guard added) |
-> | C | BoM "where do these numbers come from" | #102 | theme | provenance lived in the HIDDEN cols F–J → un-hiding (B) surfaces them; col **G key-inputs still blank** for class_reference/parametric lines | ◑ partly (un-hidden); G-populate = NEXT |
+> | C | BoM "where do these numbers come from" | #102 | theme | provenance lived in HIDDEN cols F–J; un-hiding exposed col G blank for class_reference/parametric lines | ✅ **FIXED 2aed8a72e** (corpus median extracted + honest estimate-kind disclosure; 143 principals, 0 blank G; verified, guard _selftest(9)) |
 > | D | Cost-waterfall raw-materials = hard-coded, no source | #88 #59 | **YES, "we've talked about this"** | `raw_materials_bom_gbp` shown as a static scalar with no link (it actually == BoM Σ to within £41) | ✅ **FIXED 548215d5a** (now LIVE link to Ledger Σ, verified, guard added) |
 > | E | Risk: missing 1 of 3 required 40 m³ tanks (mislabeled "Cleaning Tank") | #79 #84 #99 | design family | flagged by physics critic; gates OFF + no auto-repair; storage-count synth makes 2 + invents CIP/cleaning tanks (scope over-reach #85) | ☐ chain fix |
 > | F | Risk: `fertigation_dosing_system` empty words[] array | #79 | design family | components scattered into `mass_fluid_transport_process`; NO gate asserts every module has ≥1 word | ☐ chain fix |
