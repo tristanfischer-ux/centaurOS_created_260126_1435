@@ -563,7 +563,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Connection trace": "Which part connects to what — live input/output cell-references with completeness & integrity counts.",
     "Quantities": "Every sized contract quantity with family, basis & source.",
     "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
-    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with two collapsible column-groups: 'Cost basis' (how each £ was derived) and 'Engineering spec' (why each principal is this size).",
+    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with ALL columns visible (nothing hidden): 'Cost basis' (cols F–J, how each £ was derived) and 'Engineering spec' (cols K–N, why each principal is this size).",
     "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
     "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
     "Financial model": "The whole commercial model on one sheet: base-case Economics (revenue / opex / EBITDA / NPV / IRR + charts), the scale sweep + Low/Central/High price sensitivity, and the Investment-analysis sweet-spot finder — all live off the Inputs tab.",
@@ -2994,6 +2994,12 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
 
 _LEDGER_SHEET = "Bill of Materials (Ledger)"
 
+# The LIVE address of the BoM Ledger's Σ-total cell, captured when the ledger is built
+# so the Cost waterfall's "Raw materials" row can LINK to the bill (traceability — Tristan:
+# "the raw-materials number can't be a hard-coded figure with no source") instead of
+# repeating a static costStack scalar. None until tab_bom() runs (which precedes the waterfall).
+_LEDGER_TOTAL_CELL: Optional[str] = None
+
 
 # Parse a BoM `basis` STRING into (key inputs, factors) for the Ledger G/H columns when the
 # structured cost-basis carries none (Tristan 2026-06-27: G & H were blank for every line — the
@@ -3104,12 +3110,12 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                     "F": 18, "G": 30, "H": 22, "I": 10, "J": 12,          # Cost-basis group
                     "K": 30, "L": 18, "M": 50, "N": 30})                  # Engineering-spec group
     title_row(ws, "Bill of Materials (Ledger)", 14,
-              "THE BILL + its provenance + its engineering, on one sheet. ALWAYS shown: tag · "
-              "item · qty · unit £ · LIVE line £ (the buy-list). Two COLLAPSIBLE column-groups "
-              "(click the [+] above cols F and K to expand): 'Cost basis' = HOW each £ was "
-              "derived (method / inputs / factors / estimate class / confidence); 'Engineering "
-              "spec' = WHY each principal is this size (duty / material / sizing calc / MPN). "
-              "Σ line £ is live at the foot; commodity lines leave the spec columns blank.")
+              "THE BILL + its provenance + its engineering, on one sheet — ALL COLUMNS VISIBLE "
+              "(nothing hidden/collapsed). Buy-list: tag · item · qty · unit £ · LIVE line £. "
+              "'Cost basis' (cols F–J) = HOW each £ was derived (method / inputs / factors / "
+              "estimate class / confidence); 'Engineering spec' (cols K–N) = WHY each principal "
+              "is this size (duty / material / sizing calc / MPN). Σ line £ is live at the foot; "
+              "commodity lines leave the spec columns blank (correct — they need no sizing basis).")
     header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
                    "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
                    "Duty / rating", "Material", "Sizing calc (basis)", "MPN / datasheet"])
@@ -3223,6 +3229,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     tot.font = Font(bold=True)
     tot.fill = FILL_RESULT
     sum_row = r
+    # capture this Σ cell so the Cost waterfall can LINK its "Raw materials" step to the
+    # actual bill (live traceability) rather than show a sourceless costStack scalar.
+    global _LEDGER_TOTAL_CELL
+    _LEDGER_TOTAL_CELL = f"'{_LEDGER_SHEET}'!$E${sum_row}"
     r += 2
 
     # BUILDING & CIVILS — listed in the BoM/equipment list (Tristan 2026-06-22: "additional items
@@ -3282,21 +3292,18 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     ws.auto_filter.ref = f"A4:N{last_line_row}"
     ws.freeze_panes = "A5"
 
-    # ── COLLAPSIBLE column-groups (collapsed by default). The two detail blocks fold
-    #    behind a [+] so the default view is the clean buy-list (A–E); a click expands
-    #    'Cost basis' (F–J) or 'Engineering spec' (K–N). DO NOT delete the data — it is
-    #    present, just hidden. Set the outline level + hidden flag on EVERY column in the
-    #    range (openpyxl's range-group() only stamps the endpoints, leaving the middle
-    #    columns ungrouped + visible), then collapse the group at its right edge. ──
-    for _grp in ("FGHIJ", "KLMN"):
-        for _cl in _grp:
-            cd = ws.column_dimensions[_cl]
-            cd.outline_level = 1
-            cd.hidden = True
-        # the collapse control sits on the column just RIGHT of the group
-        right = get_column_letter(column_index_from_string(_grp[-1]) + 1)
-        ws.column_dimensions[right].collapsed = True
-    ws.sheet_properties.outlinePr.summaryRight = True
+    # ── DETAIL COLUMNS ALWAYS VISIBLE (Tristan, asked ≥2×: "stop having it compacted …
+    #    after column E you hide F to N. I want them not hidden so you can see what's going
+    #    on"). The 'Cost basis' (F–J) + 'Engineering spec' (K–N) blocks ARE the provenance a
+    #    reader needs ("where do these numbers come from") — hiding them defeats the purpose.
+    #    So they render EXPANDED: NO column carries hidden=True, NO group is collapsed. A flat
+    #    sheet — every cost-method / key-input / factor / sizing-basis is on screen by default.
+    #    proveCatch: _ledger_columns_never_hidden() in _selftest blocks a regression to collapse. ──
+    for _cl in "FGHIJKLMN":
+        cd = ws.column_dimensions[_cl]
+        cd.outline_level = 0
+        cd.hidden = False
+        cd.collapsed = False
 
     back_link(ws, 14)
 
@@ -3619,8 +3626,14 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
 
     # Build the additive ladder. Each entry: (label, step_amount, anchor_value_or_None, note)
     steps: List[Tuple[str, Optional[float], Optional[float], str]] = []
-    steps.append(("Raw materials (BoM)", raw, raw,
-                  "raw_materials_bom_gbp — start of the build-up"))
+    # SOURCE the raw-materials figure to the bill: a LIVE link to the Ledger Σ cell so a
+    # reader can trace it (Tristan: "there should be a source where the number comes from").
+    # Falls back to the costStack scalar only if the ledger total wasn't captured. The
+    # costStack value stays as the engine ANCHOR (col D note) so any divergence is visible.
+    _raw_step = (f"={_LEDGER_TOTAL_CELL}" if _LEDGER_TOTAL_CELL else raw)
+    steps.append(("Raw materials (BoM)", _raw_step, raw,
+                  "= Σ Bill of Materials (Ledger) line £ — LIVE link to the bill; edit the "
+                  "bill and this recomputes"))
     asm = num(cs.get("assembly_labour_gbp")) or 0.0
     steps.append(("+ Assembly / erection labour", asm, None, "assembly_labour_gbp"))
     ovh = num(cs.get("factory_overhead_gbp")) or 0.0
@@ -7833,6 +7846,32 @@ def _selftest() -> int:
         print(f"  FAIL banner-reflects-score: a 9/PASS tab must banner '9/10 … PASS' (got {_bn})"); bad += 1
     _TAB_SCORES.clear()
     _TAB_SCORES.update(_saved)
+    # (6) BoM LEDGER COLUMNS NEVER HIDDEN (Tristan, asked ≥2×: "stop having it compacted … I want
+    #     F–N not hidden"). Build the REAL ledger tab from a minimal state and assert no detail column
+    #     (F–N) is hidden/collapsed — a regression to the old collapse-by-default behaviour fails here.
+    with _tf.TemporaryDirectory() as _td2:
+        _wb = Workbook(); _wb.remove(_wb.active)
+        _mini = {"requirementsBom": [
+            {"tag": "P-101", "requirement": "Backwash Pump · 7.5 kW", "qty": 1,
+             "unit_gbp": 4200, "line_gbp": 4200, "material": "316 SS",
+             "basis": "rating-based: 7.5 kW × £560/kW (UK-2026 installed mid)"}],
+            "costStack": {"raw_materials_bom_gbp": 4200, "factory_cogs_gbp": 5000,
+                          "oem_transfer_price_gbp": 5000, "installation_cost_gbp": 1000,
+                          "installed_asp_gbp": 6000}}
+        tab_bom(_wb, _mini, _td2)
+        _lws = _wb[_LEDGER_SHEET]
+        _hidden_cols = [c for c in "FGHIJKLMN" if _lws.column_dimensions[c].hidden]
+        if _hidden_cols:
+            print(f"  FAIL ledger-columns-visible: F–N must NEVER be hidden, got hidden={_hidden_cols}"); bad += 1
+        # (7) COST WATERFALL RAW-MATERIALS = LIVE LINK TO THE BILL (Tristan: "there must be a source
+        #     where the number comes from"). The Raw-materials step £ cell must be a formula pointing at
+        #     the Ledger Σ — NOT a sourceless static scalar. Regression to a bare number fails here.
+        tab_cost_waterfall(_wb, _mini)
+        _cws = _wb["Cost waterfall"]
+        _raw_cell = next((_cws.cell(rr, 2).value for rr in range(5, 14)
+                          if str(_cws.cell(rr, 1).value or "").startswith("Raw materials")), None)
+        if not (isinstance(_raw_cell, str) and _raw_cell.startswith("=") and _LEDGER_SHEET in _raw_cell):
+            print(f"  FAIL waterfall-raw-source: Raw materials must LINK to the BoM Ledger Σ, got {_raw_cell!r}"); bad += 1
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
