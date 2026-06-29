@@ -138,6 +138,44 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import connection_sizing as cs
 import connection_ledger as cl   # the LEDGER authority — validates + owns the connection graph
 import layout_optimiser as lo    # deterministic CRAFT plant-layout optimiser (opt-in)
+import deterministic_layout as dl  # rewrite "B" — the deterministic sequence-packer (opt-in via DETERMINISTIC_PLACEMENT)
+
+# Rewrite B (#86): when DETERMINISTIC_PLACEMENT is on, part positions come from dl.layout() (computed
+# by construction, order-invariant, integer-grid) instead of the accreted, intermittently non-
+# deterministic place_all banking/shelf-pack. _DET_LAYOUT_POS maps a STABLE part key → absolute (x,y)
+# mm; _shelf_pack consumes it. Default OFF until proven on every archetype.
+_DET_LAYOUT_POS = {}
+
+
+def _det_layout_key(p):
+    """Stable per-part key (name + deterministic extraction index) — matches dl.layout()'s item id."""
+    return f"{getattr(p, 'name', '')}\x1f{int(getattr(p, '_seq', 0))}"
+
+
+def _populate_det_layout(parts):
+    """Fill _DET_LAYOUT_POS from the deterministic sequence-packer. Gated by DETERMINISTIC_PLACEMENT."""
+    _DET_LAYOUT_POS.clear()
+    if os.environ.get("DETERMINISTIC_PLACEMENT", "").strip().lower() not in ("1", "true", "yes", "on"):
+        return
+    items = []
+    for p in parts:
+        try:
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        except Exception:
+            fx = fy = float(dl.GRID_MM)
+        items.append({"id": _det_layout_key(p), "region": str(getattr(p, "region_key", "")),
+                      "rank": int(getattr(p, "region_rank", 10_000)), "seq": int(getattr(p, "_seq", 0)),
+                      "w": int(fx), "d": int(fy), "area": float(fx * fy)})
+    try:
+        pos = dl.layout(items)
+    except Exception as e:
+        print(f"[univ][det-layout] skipped (error): {e}")
+        return
+    for p in parts:
+        c = pos.get(_det_layout_key(p))
+        if c:
+            _DET_LAYOUT_POS[_det_layout_key(p)] = (float(c[0]), float(c[1]))
+    print(f"[univ][det-layout] DETERMINISTIC placement ON — {len(_DET_LAYOUT_POS)} parts positioned by construction")
 import ga_massing                # GA non-massing classifier (accessory/instrument/valve drop)
 
 
@@ -2807,7 +2845,9 @@ def _shelf_pack(plist, x_left, y_front, target_width, base_z_mm, gap, MAT, MO,
             x = x_left
             row_depth = 0.0
         x += fx / 2
-        asm, anchors = build_part(p, x, row_y, base_z_mm, MAT, MO)
+        _dpos = _DET_LAYOUT_POS.get(_det_layout_key(p))   # rewrite B: deterministic absolute coord wins
+        _bx, _by = _dpos if _dpos else (x, row_y)
+        asm, anchors = build_part(p, _bx, _by, base_z_mm, MAT, MO)
         p.obj_anchor, p.anchors = asm, anchors
         p.placed_xyz_mm = anchors["centre"]
         x += fx / 2 + gap
@@ -3060,6 +3100,8 @@ def place_all(parts, regions, MAT, MO):
     (plant_bbox_mm, region_centres)."""
     region_list = [rk for rk in regions if any(p.region_key == rk for p in parts)]
     n_banks = max(1, min(N_BANKS, len(region_list)))
+
+    _populate_det_layout(parts)   # rewrite B: deterministic positions (opt-in) consumed by _shelf_pack
 
     # Pre-estimate each region's width (needed by every banking path below).
     region_parts = {rk: [p for p in parts if p.region_key == rk]
