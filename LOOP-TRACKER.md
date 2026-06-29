@@ -1,5 +1,36 @@
 # LOOP-TRACKER — THE ONE master tracker for ForgeOS dossier-≥8 work
 
+> ▶▶▶ 2026-06-29 PHYSICS BATCH — 5 verified fixes landed; v36 validating. Session arc (all UNIVERSAL,
+> source-level, proveCatch-guarded, guards GREEN):
+>  1. LITTER → GA 7→10 (commit d636e2d55). 2. VFD mis-pin gate (d636e2d55; HIGH gone in v34).
+>  3. DOSING motorless-duplicate drop (07f397f4c) — fertigation pump IS correctly synthesised; dropped
+>     the LLM Dosatron duplicate via a new pass in reconcilePrincipalEquipment (motorless word vs a
+>     powered canon). v35 CONFIRMED: the dosing HIGH is GONE + Exec Summary 2→6 (the 3.5-bar compliance
+>     followed). 4. LEVEL-TX range spans the TALLEST served vessel (18ccf7367; 0-1.4→0-1.6 m).
+>  5. GATE-12 drift-matcher precision (9d1de834e) — the FATAL exit(12) was a detector FALSE-POSITIVE:
+>     it bound actuated_distribution_valve_count=200 to a SINGULAR "Suction Isolation Valve" ×2 (plural
+>     "Valves" didn't match + generic-head "valve" matched any). Fixed: plural-insensitive + shared-
+>     base-token-count score + reject generic-head-only matches. v35 state → 1 HIGH→0.
+> KEY STRATEGIC INSIGHT (surfaced to Tristan): the physics critic is NON-DETERMINISTIC — it surfaces a
+> DIFFERENT 4-5 HIGHs each run, several of which are FALSE POSITIVES (the "200× Pressure Relief Valve"
+> HIGH is actually ×1 in state; gate-12 was a wrong-bind). Risk-tab gated by raw LLM-HIGH-count may NEVER
+> deterministically reach ≥8 by chasing findings = a TREADMILL. Durable wins = (a) DETERMINISTIC scorer/
+> detector-bug fixes (gate-12) and (b) recurring DESIGN families. Connects to the B3 "deterministic floor,
+> LLM advisory" work [[forgeos_deterministic_verification_b3_2026_06_19]].
+> REMAINING families (deep, careful work — NOT rushed):
+>  • SCOPE OVER-REACH (the recurring real family: UF module + UF membrane bank + CIP system + CIP/cleaning
+>    tanks). DIAGNOSED: these are NON-_synthesized LLM-skeleton inventions with NO backing contract
+>    quantity (contract has only ro_membrane_area_m2=363.6, the legit RO; brief lists NO ultrafiltration,
+>    NO CIP — see brief "Sub-modules expected" + "Explicitly EXCLUDED"). They evade reconcile's invented-
+>    principal drop (which only touches _synthesized words). FIX = a scope-fidelity gate (#85): drop a
+>    principal whose function is NOT in the brief's expected-sub-modules AND has NO contract backing.
+>    RISKY (could drop legit equipment the contract didn't quantify) → needs the brief's explicit scope as
+>    authority + a tight guard + selftest. THE NEXT BIG PIECE.
+>  • PART MIS-PINS (coaxial L-Com cable on "Cable Glands"; a pressure-transducer MPN on a DP switch) —
+>    emitter-completion mis-pins, somewhat run-dependent.
+>  • RENDER BEAM (8 tabs @4) — co-location rebuild, still deferred.
+> v36 confirms gate-12 no longer fatal-exits + re-baselines. Run incantation unchanged.
+
 > ▶▶▶ 2026-06-28 SESSION-2 IN-PROGRESS (base HEAD 2156beea6, guards GREEN; v34 full run running).
 > MEASURED the honest scorecard FIRST (re-scored v33 tab-scorecard.json) instead of trusting the CLOSE-5
 > estimate — and it OVERTURNED the plan. **The whole 12-tab shortfall = TWO source fixes, NOT the
