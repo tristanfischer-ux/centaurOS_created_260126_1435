@@ -3054,6 +3054,10 @@ _BASIS_INPUT_RE = re.compile(
 _BASIS_FACTOR_WORDS = ("floored", "lifted", "corpus", "install", "margin", "FOAK", "EPC",
                        "contingency", "take-off", "class budget", "catalogue", "rating-based",
                        "parametric")
+# corpus median reference ("median £183, n=5") = the KEY INPUT a corpus-priced line is set from.
+_BASIS_CORPUS_RE = re.compile(r"median\s*£[\d,]+(?:\.\d+)?(?:\s*,?\s*n\s*=\s*\d+)?", re.I)
+# price-repair delta ("£25→£183", with either arrow glyph) = a FACTOR (the engine moved the £).
+_BASIS_DELTA_RE = re.compile(r"£[\d,]+(?:\.\d+)?\s*(?:→|->)\s*£[\d,]+(?:\.\d+)?")
 
 
 def _basis_split(basis_str):
@@ -3063,6 +3067,18 @@ def _basis_split(basis_str):
         return ("", "")
     inputs = list(dict.fromkeys(m.group(0).strip() for m in _BASIS_INPUT_RE.finditer(s)))
     factors = list(dict.fromkeys(m.group(0).strip() for m in _BASIS_FACTOR_RE.finditer(s)))
+    # CORPUS reference is a real KEY INPUT a parametric/corpus-lifted line is priced off
+    # ("median £183, n=5") — it was being dropped (the input regex only matched physical
+    # quantities). Capture it so a corpus-priced line shows what drove its £, not a blank.
+    for m in _BASIS_CORPUS_RE.finditer(s):
+        cm = m.group(0).strip()
+        if cm not in inputs:
+            inputs.append(cm)
+    # the lift/repair DELTA ("£25→£183") is a real FACTOR (the engine moved the price).
+    for m in _BASIS_DELTA_RE.finditer(s):
+        dm = m.group(0).strip()
+        if dm not in factors:
+            factors.append(dm)
     sl = s.lower()
     for w in _BASIS_FACTOR_WORDS:
         if w.lower() in sl and w not in factors:
@@ -3081,6 +3097,28 @@ def _basis_method(basis_str) -> str:
         if kw in s.lower():
             return kw
     return s.split("·")[0].split(":")[0].strip()[:24]
+
+
+def _key_input_disclosure(method: str) -> str:
+    """When a PRINCIPAL line carries no decomposable key-input (a direct parametric / class /
+    catalogue estimate), state honestly WHAT KIND of estimate it is, rather than leaving the
+    'Key inputs' cell mystery-blank (Tristan 2026-06-29: "not clear where these numbers come
+    from"). A rating-based line returns '' on purpose — that one SHOULD have parsed an input, so a
+    blank there flags a real gap, not an estimate. proveCatch in _selftest."""
+    m = (method or "").lower()
+    if "rating" in m:
+        return ""
+    if "catalogue" in m:
+        return "catalogue-class budget (no itemised inputs)"
+    if "corpus" in m:
+        return "corpus reference price (no itemised inputs)"
+    if "class" in m:
+        return "class-reference price (no itemised inputs)"
+    if "parametric" in m or "bottom-up" in m:
+        return "parametric estimate (no itemised inputs)"
+    if "llm" in m or "model" in m:
+        return "model estimate (no itemised inputs)"
+    return "engineering estimate (no itemised inputs)"
 
 
 def _fmt_cost_items(items) -> str:
@@ -3211,8 +3249,13 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         _cbasis = (_cl.get("basis") or {}) if _cl else {}
         _g = _fmt_cost_items(_cbasis.get("inputs"))
         _h = _fmt_cost_items(_cbasis.get("factors"))
-        if not _g and not _h:
-            _g, _h = _basis_split(row.get("basis"))
+        # fill EITHER empty side from the row's own basis string (corpus median, rating, take-off,
+        # lift delta) — not only when BOTH are empty (Tristan 2026-06-29: col G was still blank for
+        # class_reference/parametric lines once the columns were un-hidden).
+        if not _g or not _h:
+            _bg, _bh = _basis_split(row.get("basis"))
+            _g = _g or _bg
+            _h = _h or _bh
         _method = _cbasis.get("method") or _basis_method(row.get("basis"))
         _eclass = _cbasis.get("estimate_class", "")
         _conf = _cbasis.get("confidence", "")
@@ -3222,6 +3265,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             _conf = _conf or "incl. in parent"
             if not _g and not _h:
                 _g = "incl. in parent line"
+        elif not _g and _line_num:
+            # a PRINCIPAL with no decomposable input is a direct ESTIMATE — DISCLOSE that honestly
+            # (method in F + factor in H carry the rest) rather than leave a mystery-blank cell.
+            _g = _key_input_disclosure(_method)
         if _method or _g or _h or _eclass or _conf:
             ws.cell(r, 6, clean_cell(_method)).border = BORDER
             ic = ws.cell(r, 7, clean_cell(_g))
@@ -7942,6 +7989,18 @@ def _selftest() -> int:
         print(f"  FAIL calc-link: an AMBIGUOUS value (two equal results) must NOT link, got {_lk.get('C40')!r}"); bad += 1
     if "C41" in _lk:
         print(f"  FAIL calc-link: a value with NO matching result must NOT link, got {_lk.get('C41')!r}"); bad += 1
+    # (9) BoM KEY-INPUTS never mystery-blank for a principal (Tristan 2026-06-29). The corpus median +
+    #     lift-delta in a parametric basis ARE key provenance and must be extracted; an indecomposable
+    #     estimate must be DISCLOSED by kind, not left blank; rating-based discloses '' (real-gap signal).
+    _bi, _bf = _basis_split("bottom-up parametric · lifted £25→£183 to the engine corpus 0.6×median (median £183, n=5)")
+    if "median £183" not in _bi:
+        print(f"  FAIL basis-split: corpus median must be a key input, got inputs={_bi!r}"); bad += 1
+    if "£25→£183" not in _bf and "£25->£183" not in _bf:
+        print(f"  FAIL basis-split: the lift delta must be a factor, got factors={_bf!r}"); bad += 1
+    if "no itemised inputs" not in _key_input_disclosure("class_reference"):
+        print(f"  FAIL key-disclosure: class_reference must disclose an estimate kind (got {_key_input_disclosure('class_reference')!r})"); bad += 1
+    if _key_input_disclosure("rating-based") != "":
+        print(f"  FAIL key-disclosure: rating-based must stay blank (a real-gap signal), got {_key_input_disclosure('rating-based')!r}"); bad += 1
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
