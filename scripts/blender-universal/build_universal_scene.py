@@ -9259,6 +9259,12 @@ def _apply_layout_optimiser(parts, topology, bbox):
              and not _layout_is_envelope(p)]
     if len(equip) < 3:
         return bbox
+    # DETERMINISM (#86, Tristan 2026-06-29): feed the optimiser a CANONICAL node order. `parts` order
+    # can vary run-to-run (Blender forces hash randomisation), and although lo.optimise re-sorts by
+    # (incident, name) its duplicate-name handling is order-sensitive — so a varying node order gave a
+    # different optimised layout. Sort by name + the (already-deterministic, pre-optimiser) base placed
+    # coords as a total tiebreak. Pairs with the ledger tie-break fix that made the EDGES deterministic.
+    equip.sort(key=lambda p: (str(p.name), tuple(round(v, 1) for v in (p.placed_xyz_mm or ()))))
     nodes = [{"name": p.name,
               "dims_mm": list(footprint_mm(resolved_dims_mm(p))[:2])} for p in equip]
     nameset = {p.name for p in equip}
@@ -9269,7 +9275,14 @@ def _apply_layout_optimiser(parts, topology, bbox):
             return s
         st = set(re.split(r"[^a-z0-9]+", s.lower()))
         best, bov = None, 0
-        for nm in nameset:
+        # DETERMINISM (#86, Tristan 2026-06-29): iterate the names in SORTED order, not raw set order.
+        # Blender's bundled Python forces hash randomisation ON (ignores PYTHONHASHSEED), so `for nm in
+        # nameset` visited names in a different order each run; with the strict `ov > bov` first-wins
+        # tie-break, two names tying on token overlap resolved to DIFFERENT nodes per run → different
+        # adjacency weights → the CRAFT optimiser produced a DIFFERENT layout every render (the whole #86
+        # layout non-determinism + render-treadmill traced to HERE — confirmed: LAYOUT_OPTIMISE=0 was
+        # deterministic). Sorted iteration makes the tie resolve to the alphabetically-first name, stably.
+        for nm in sorted(nameset):
             ov = len(st & set(re.split(r"[^a-z0-9]+", nm.lower())))
             if ov > bov:
                 best, bov = nm, ov
@@ -9285,8 +9298,11 @@ def _apply_layout_optimiser(parts, topology, bbox):
     cyo = sum(opt[p.name][1] for p in common) / len(common)
     cxc = sum(p.placed_xyz_mm[0] for p in common) / len(common)
     cyc = sum(p.placed_xyz_mm[1] for p in common) / len(common)
-    # LONGEST prefix first → collision-safe with the shared moved-set (see _shift_part_xy).
-    common.sort(key=lambda q: len(_part_prefix(q.name)), reverse=True)
+    # LONGEST prefix first → collision-safe with the shared moved-set (see _shift_part_xy). TOTAL
+    # order (prefix-length, then prefix, then name) so equal-length prefixes don't tie + resolve by
+    # the non-deterministic `parts` order — that tie decided which part claimed a shared object first,
+    # giving a different layout each run (#86, Tristan 2026-06-29; Blender forces hash randomisation).
+    common.sort(key=lambda q: (-len(_part_prefix(q.name)), _part_prefix(q.name), str(q.name)))
     moved, n_moved = set(), 0
     for p in common:
         nx = opt[p.name][0] - cxo + cxc

@@ -136,6 +136,15 @@ def optimise(nodes, edges, name_resolve=None, log=print):
     names = [n["name"] for n in nodes if n.get("name")]
     nameset = set(names)
     fp = {n["name"]: _footprint_mm(n) for n in nodes if n.get("name")}
+    # DETERMINISM (#86, Tristan 2026-06-29): canonicalise the edge order BEFORE accumulating incident
+    # weights. The caller's `edges` arrive in a non-deterministic order (Blender forces hash
+    # randomisation; upstream topology iterates sets), and `incident[a] += w` float-accumulates in that
+    # order — floating-point addition is NOT associative, so the low bits of incident differed per run,
+    # flipping the `-incident` tie-break in the placement `order` below → a DIFFERENT optimised layout
+    # every render. A fixed accumulation order makes incident bit-identical. Universal; pure sort.
+    edges = sorted(edges or [], key=lambda e: (
+        str(e.get("from_part") or ""), str(e.get("to_part") or ""),
+        str(e.get("mechanism") or ""), str(e.get("size") or e.get("size_label") or "")))
 
     # adjacency weight between placed real parts (sum the edge weights per unordered pair).
     wpair = {}
@@ -159,7 +168,7 @@ def optimise(nodes, edges, name_resolve=None, log=print):
 
     # DETERMINISTIC order: anchor = the most-connected part; then descending incident weight,
     # ties by name. The anchor (the tank farm / hub) sits at the origin.
-    order = sorted(names, key=lambda n: (-incident[n], n))
+    order = sorted(names, key=lambda n: (-round(incident[n], 3), n))   # round → float-noise-proof tie-break (#86)
     pos = {}
 
     def _free(nm, cx, cy):

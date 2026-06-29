@@ -382,7 +382,7 @@ def close_flow_directions(parts, topology, log=print):
         r, m = _rank(nm), _mod(nm)
         cands = [s for s in sources if s != nm and _rank(s) < r and (nm, s) not in fwd_pairs]
         same = [s for s in cands if _mod(s) == m]
-        pick = (max(same, key=_rank) if same else (max(cands, key=_rank) if cands else None))
+        pick = (max(same, key=lambda c: (_rank(c), c)) if same else (max(cands, key=lambda c: (_rank(c), c)) if cands else None))   # det tie-break (#86)
         if pick is None or (pick, nm) in seen:
             continue  # no genuine upstream → leave it for the gate (never guess)
         seen.add((pick, nm))
@@ -396,7 +396,7 @@ def close_flow_directions(parts, topology, log=print):
     # but feeds nothing; connect it to its nearest DOWNSTREAM consumer (a part with an
     # input, higher region_rank). Closes storage/recycle/intermediate units. A sink
     # legitimately has no output and is skipped; never reverse an existing edge.
-    consumers = sorted(has_in, key=_rank)
+    consumers = sorted(has_in, key=lambda c: (_rank(c), c))   # (rank, name) total order → deterministic (#86)
     for p in parts:
         nm = getattr(p, "name", None)
         if not nm or nm in has_out or nm not in has_in:
@@ -409,7 +409,7 @@ def close_flow_directions(parts, topology, log=print):
         r, m = _rank(nm), _mod(nm)
         cands = [c for c in consumers if c != nm and _rank(c) > r and (c, nm) not in fwd_pairs]
         same = [c for c in cands if _mod(c) == m]
-        pick = (min(same, key=_rank) if same else (min(cands, key=_rank) if cands else None))
+        pick = (min(same, key=lambda c: (_rank(c), c)) if same else (min(cands, key=lambda c: (_rank(c), c)) if cands else None))   # det tie-break (#86)
         if pick is None or (nm, pick) in seen:
             continue
         seen.add((nm, pick))
@@ -460,7 +460,7 @@ def close_air_directions(parts, topology, log=print):
         r, m = _rank(nm), _mod(nm)
         cands = [c for c in consumers if c != nm]
         pool = [c for c in cands if _mod(c) == m] or cands
-        pick = min(pool, key=lambda c: abs(_rank(c) - r)) if pool else None
+        pick = min(pool, key=lambda c: (abs(_rank(c) - r), c)) if pool else None
         if pick is None or (nm, pick) in seen:
             continue
         seen.add((nm, pick))
@@ -523,7 +523,7 @@ def close_oxygen_directions(parts, topology, log=print):
         r, m = _rank(nm), _mod(nm)
         cands = [s for s in sources if s != nm]
         pool = [s for s in cands if _mod(s) == m] or cands   # same module preferred
-        pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else None
+        pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else None
         if pick is None or (pick, nm) in seen:
             continue
         seen.add((pick, nm))
@@ -697,7 +697,7 @@ def close_boundaries(parts, topology, log=print):
         if nm not in has_in and (is_sink or nm in has_out):
             cands = [s for s in sources if s != nm and (nm, s) not in fwd]
             pool = [s for s in cands if _mod(s) == m] or cands
-            pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_FEED
+            pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else _BL_FEED
             _add(pick, nm, "process input (boundary closer: nearest producer)"
                  if pick != _BL_FEED else "plant feed (battery limit)")
             has_in.add(nm)
@@ -794,14 +794,14 @@ def close_residual_completeness(parts, topology, required_services, log=print):
             if miss == "fluid-input":
                 cands = [s for s in sources if s != nm and (nm, s) not in fwd_fluid]
                 pool = [s for s in cands if _mod(s) == m] or cands
-                pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_FEED
+                pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else _BL_FEED
                 _add(pick, nm, "water",
                      "process input (residual closer: nearest producer)" if pick != _BL_FEED
                      else "plant feed (battery limit)")
             elif miss in ("fluid-output", "fluid-connection"):
                 cands = [s for s in consumers if s != nm and (s, nm) not in fwd_fluid]
                 pool = [s for s in cands if _mod(s) == m] or cands
-                pick = min(pool, key=lambda s: abs(_rank(s) - r)) if pool else _BL_EXPORT
+                pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else _BL_EXPORT
                 _add(nm, pick, "water",
                      "process output (residual closer: nearest consumer)" if pick != _BL_EXPORT
                      else "product / recycle export (battery limit)")
