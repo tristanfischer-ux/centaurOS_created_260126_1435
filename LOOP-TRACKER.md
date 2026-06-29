@@ -38,6 +38,8 @@
 > | Compliance (—) | WARN | no | mandatory standards 0/0 detected for a water plant (a gap) |
 > | Physics-Ledger / Cost-Sanity / Tool-Archetype | PASS | no | — |
 >
+> **▶ v37 CONSOLIDATION RUN (2026-06-29, exit-21 on per-line-price but state+workbook built):** ALL 6 source fixes verified END-TO-END in the fresh dossier — BoM F–N visible · waterfall raw-materials=live link ($E$416) · calc C16→B60 (10 links) · key-inputs 161/161 populated · panel load_reconcile NONE (per-pump fix held) · hollow-module gate PASS. **NO regression from my work.** NEW defects v37 surfaced (run-to-run, not mine): (a) duplicate tag TK-108 — TWO "Nutrient Tank" principals (one "0.9m dia x1.6m", one "1000 L" = same ~1018 L tank listed twice) → BoM Ledger 8→4, floor-caps Exec Summary→4. Fix = dedupe the double-listed tank at SOURCE (dim vs volume representation), not band-aid the tag. (b) v37 tank set ≠ v36 (v37 has Cip Tank + Cleaning Tank) = non-determinism #86 + scope over-reach #85. (c) F (hollow fertigation module) did NOT reproduce in v37 — non-deterministic; the gate stands guard. (d) gate-21 per-line-price FATAL = the part-mis-pin family (Honeywell sensor on DP switch, handover §2).
+>
 > **KEY STRUCTURAL FINDING:** the WORST defects (missing tank, empty module) evade EVERY enforcing gate — flipping the flags on would NOT catch them. "Fix the gates" here means ADD the deterministic gates that bite (#84 + module-non-empty), then the design fix + the gate land together. The panel per-pump fix (9b61929a4) cleared 2 of the 3 drawing-gate failures AND confirmed item G is a critic false-positive (48 kW / 100 A incomer correct).
 >
 > ---
