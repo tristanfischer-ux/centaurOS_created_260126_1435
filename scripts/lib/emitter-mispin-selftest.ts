@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -28,6 +28,20 @@ expect(isElectronicsIcMispin('Control Cabinet', 'Rittal') === false,
   "a populated enclosure (excluded slot) + non-IC vendor must NOT be flagged")
 expect(isElectronicsIcMispin('Irrigation Pump', 'Grundfos') === false,
   "a pump (not a wrong-domain slot) from a pump vendor must NOT be flagged")
+
+// ── isBoardMountSensorMispin — a PCB board-mount sensor chip must not pin a process field-device slot
+expect(isBoardMountSensorMispin('Differential-Pressure Switch', 'HSCDLNN100MDSA5') === true,
+  "the EXACT v37 gate-21 case: Honeywell HSCDLNN100MDSA5 (board sensor) on a 'Differential-Pressure Switch' MUST be flagged")
+expect(isBoardMountSensorMispin('Pressure Transmitter', 'SSCDANN150PG2A3') === true,
+  "a Honeywell SSC-series board sensor on a 'Pressure Transmitter' MUST be flagged")
+expect(isBoardMountSensorMispin('Level Switch', 'ABPDANT001PG2A3') === true,
+  "a Honeywell ABP-series board sensor on a field 'Level Switch' MUST be flagged")
+expect(isBoardMountSensorMispin('Differential-Pressure Switch', 'DPS-400-2-N4') === false,
+  "a REAL field DP-switch MPN (not a board-sensor family) must NOT be flagged")
+expect(isBoardMountSensorMispin('Reverse Osmosis Skid', 'HSCDLNN100MDSA5') === false,
+  "even a board-sensor MPN on a NON-field-instrument slot (a skid) must NOT be flagged (slot guard)")
+expect(isBoardMountSensorMispin('Conductivity Sensor', 'CLS21D-A1A') === false,
+  "a real E+H field-sensor MPN must NOT be flagged")
 
 // ── isIndicatorLightMispin — a panel pilot light / LED indicator must not pin a non-light slot
 expect(isIndicatorLightMispin('Cable Trays', { part_name: 'LED Panel Mount Indicators K30LM Series EZ-LIGHT: 1-Color Hazardous Area Indicator', raw_excerpt: 'Banner EZ-LIGHT' }) === true,

@@ -376,6 +376,22 @@ export function isMotorDriveSlot(name: string): boolean {
   return /\bvfd\b|\bvsd\b|variable[- ]?(?:speed|frequency)[- ]?(?:drive|controller)|soft[- ]?start\w*|motor starter|frequency converter|inverter drive/.test(n)
 }
 
+// A BOARD-MOUNT / PCB SENSOR — a surface-mount component (Honeywell HSC/SSC/ABP/MPR/TBP/NBP/RSC/DLC/DLV
+// TruStability series, TE MS5xxx, Amphenol ELVH, Bosch BMP/BMA, ST LPS) costing ~£10-50 — pinned to a
+// PROCESS FIELD instrument / switch / transmitter / gauge slot (a panel/field device costing ~£200-600)
+// is a wrong-FORM mis-pin: a loose token match ('pressure'/'sensor'/'switch') lands a bare PCB chip on a
+// field device. The MANUFACTURER alone cannot catch it — Honeywell makes BOTH the chip AND legitimate
+// field DP switches — so this keys on the board-mount-sensor MPN PATTERN. A Honeywell HSCDLNN100MDSA5
+// (£39 board sensor) was pinned on a 'Differential-Pressure Switch' and rendered at £420 → gate-21 fired
+// (10.7× over the chip's real price). Reject the pin → keep the generic field-device spec. UNIVERSAL —
+// keyed on the field-instrument slot vocabulary + the board-sensor MPN family, no class table.
+const _BOARD_MOUNT_SENSOR_MPN_RE =
+  /^(?:HSC|SSC|ABP|MPR|TBP|NBP|RSC|DLC|DLV|DLLR)[A-Z]|^MS5\d{3}\b|^ELVH[-A-Z]|^BM[AP]\d|^LPS\d/i
+export function isBoardMountSensorMispin(name: string, partNumber: string): boolean {
+  if (!_PROCESS_FIELD_INSTRUMENT_RE.test(name || '')) return false
+  return _BOARD_MOUNT_SENSOR_MPN_RE.test((partNumber || '').trim())
+}
+
 // A gap word's flow DUTY (m³/h) when it is a flow machine (pump/blower/compressor/fan/filter), read
 // from its rating_primary. Returns null for a non-flow word or no m³/h rating, so capacity-gating
 // only ever touches a flow machine with a known duty. UNIVERSAL.
@@ -1142,6 +1158,14 @@ export async function fillBlankWordMpns(
         // device needs an industrial instrument (E+H / WIKA / Hach), not a chip. Keep generic. UNIVERSAL.
         if (isElectronicsIcMispin(cand.name, dbHit.manufacturer)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): electronics-IC vendor ${dbHit.manufacturer} on a process field instrument — generic spec, not a chip MPN (was ${dbHit.part_number})`)
+          continue
+        }
+        // BOARD-MOUNT-SENSOR MIS-PIN (Tristan 2026-06-29): a process field switch/transmitter must not be
+        // pinned to a PCB board-mount sensor CHIP. A Honeywell HSCDLNN100MDSA5 (£39 board sensor) landed
+        // on a 'Differential-Pressure Switch' and rendered £420 → gate-21 10.7× FATAL. The manufacturer is
+        // legit (Honeywell makes both chip + field DP switch), so this keys on the board-sensor MPN pattern.
+        if (isBoardMountSensorMispin(cand.name, dbHit.part_number)) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): board-mount PCB sensor ${dbHit.manufacturer} ${dbHit.part_number} on a process field-instrument slot — generic field-device spec, not a chip MPN`)
           continue
         }
         // INDICATOR-LIGHT MIS-PIN (Tristan 2026-06-28): a panel pilot light / LED indicator (Banner
