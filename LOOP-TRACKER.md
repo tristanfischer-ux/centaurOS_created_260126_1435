@@ -18,7 +18,7 @@
 > | D | Cost-waterfall raw-materials = hard-coded, no source | #88 #59 | **YES, "we've talked about this"** | `raw_materials_bom_gbp` shown as a static scalar with no link (it actually == BoM Σ to within £41) | ✅ **FIXED 548215d5a** (now LIVE link to Ledger Σ, verified, guard added) |
 > | E | Risk: missing 1 of 3 required 40 m³ tanks (mislabeled "Cleaning Tank") | #79 #84 #99 | design family | flagged by physics critic; gates OFF + no auto-repair; storage-count synth makes 2 + invents CIP/cleaning tanks (scope over-reach #85) | ☐ chain fix |
 > | F | Risk: `fertigation_dosing_system` empty words[] array | #79 | design family | components scattered into `mass_fluid_transport_process`; NO gate asserts every module has ≥1 word | ☐ chain fix |
-> | G | Risk: mains incomer + switchboard rated 100 A "doesn't work" | #81 #79 | **critic FALSE-POSITIVE** | INVESTIGATED (offline, v36 state): engine sizes pumps at 7.5/9.65/1.92 kW; critic asserted 15/15/11 (re-estimated, didn't read the design). Real connected load = 48 kW → 77 A ×1.25 = 96 A → 100 A frame CORRECT. The critic's "60 kW" is built on hallucinated pump powers. NOT a design bug — resizing would be the error. FIX = ground the critic in the engine's sized quantities / make a deterministic electrical-adequacy check authoritative so this LLM FP can't present as an unresolved HIGH (B3 deterministic-floor direction) | ◑ diagnosed; durable fix = B3 (chain-side) |
+> | G | Risk: mains incomer + switchboard rated 100 A "doesn't work" | #81 #79 #76 | **critic FALSE-POSITIVE + a real PANEL bug** | RESOLVED 9b61929a4. The critic's "incomer undersized" is a FALSE-POSITIVE (real load 48 kW → 96 A → 100 A frame CORRECT). BUT the deterministic load_reconcile gate caught a REAL bug it pointed at: the panel schedule gave EVERY pump the irrigation pump's 9.65 kW (blanket rule), inflating the panel total 48→63 kW. Fixed: each pump its OWN name-matched kW (fertigation 7.5, drain 1.9); panel 63.2→41.3 kW; gate 1.32→0.86 PASS. (My first offline G call "clean FP, nothing to fix" was PREMATURE — the gate found the panel bug I'd dismissed.) | ✅ **panel FIXED**; critic-FP grounding = B3 (remaining) |
 > | H | Blender render ≠ GA; dozens of floating minor components | #100 #67 #69 | **YES** | TWO engines: `build_universal_scene.py` (shows every part incl. valves/instruments) vs `ga_massing.py` (drops P&ID detail + co-locates). They diverge by construction | ☐ chain fix (align filters) |
 > | I | Dossier self-audit FAIL (3 HIGH/3 MED) not fixed | #66 #79 | — | it's the honest REPORT; underlying defects (E/F/G + pump-pressure brief-miss + calc-coverage + glossary) aren't repaired | ☐ rolls up E/F/G + below |
 > | I.1 | brief_metric_fail: fertigation pump 2 vs 3.5 bar; hand-water 1 vs 3 bar | #90 | design | design under-delivers a brief metric; pump head not sized to the brief pressure | ☐ chain fix |
@@ -27,7 +27,18 @@
 > | J | Connection trace: cabinets unconnected (1/6; SCADA devices 0-in/0-out) | #80 #96 | **YES** | synthesis doesn't wire cabinet housed-devices into topology edges | ☐ chain fix |
 > | K | "you stopped using LOOP-TRACKER.md" | process | — | I drifted to ad-hoc handovers | ✅ resumed (this section) |
 >
-> **Ordered plan (cheap+certain first, then chain-dependent design fixes):** B✅ D✅ → C(G-populate) → A(calc link) → I.3(glossary) → then the chain batch E/F/H/J/G/I.1 (each: fix DESIGN at source + a gate that BLOCKS it shipping, not just flags) → determinism #86 so the fixes provably stick → clean re-run, confirm tabs ≥8.
+> **Ordered plan:** B✅ D✅ A✅ C✅ (offline-Excel sweep DONE) → ENFORCEMENT-GATE AUDIT (Tristan: "look at where the gates are failing and fix them, don't let them slide") → chain batch.
+>
+> **▶ ENFORCEMENT-GATE AUDIT (v36 shadow verdicts — what each gate WOULD block):**
+> | Gate | Verdict | Blocks if enforced? | Defect / action |
+> |---|---|---|---|
+> | Physics Critic (33) | 2 HIGH 2 MED 1 LOW | **NO** (shouldExit=False) | gate 33 only blocks NAMED-PART-failures; the missing-tank (E) + empty-module (F) HIGHs are "fidelity" → **slip past every gate**. FIX = add deterministic gates that catch them (#84 requirement-closure for the tank; module-non-empty for F) |
+> | Self-Audit (31) | min 3 mean 7 | NO (no deception signal) | physics_fidelity=3, brief_compliance=5 — low but not "deception". Rolls up E/F |
+> | **Drawing Gates (35)** | **3/10 FAIL** | **YES** under DRAWING_GATES_ENFORCING | ✅ load_reconcile (panel+single-line) FIXED 9b61929a4 (per-pump kW); ☐ BFD 7.2:1 + P&ID 4.6:1 legibility (multi-sheet wrap) |
+> | Compliance (—) | WARN | no | mandatory standards 0/0 detected for a water plant (a gap) |
+> | Physics-Ledger / Cost-Sanity / Tool-Archetype | PASS | no | — |
+>
+> **KEY STRUCTURAL FINDING:** the WORST defects (missing tank, empty module) evade EVERY enforcing gate — flipping the flags on would NOT catch them. "Fix the gates" here means ADD the deterministic gates that bite (#84 + module-non-empty), then the design fix + the gate land together. The panel per-pump fix (9b61929a4) cleared 2 of the 3 drawing-gate failures AND confirmed item G is a critic false-positive (48 kW / 100 A incomer correct).
 >
 > ---
 
