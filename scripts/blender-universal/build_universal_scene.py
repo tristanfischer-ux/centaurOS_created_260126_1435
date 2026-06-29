@@ -171,10 +171,17 @@ def _populate_det_layout(parts):
     except Exception as e:
         print(f"[univ][det-layout] skipped (error): {e}")
         return
+    # dl.layout() grows from the origin (+x,+y quadrant); the building shell + camera centre on the
+    # plant CENTROID, so store coords CENTRED on the layout's bbox-centre → the envelope encloses the
+    # parts symmetrically instead of leaving one half of the slab empty (det render was right-shifted).
+    xs = [c[0] for c in pos.values()]
+    ys = [c[1] for c in pos.values()]
+    cx = (min(xs) + max(xs)) / 2.0 if xs else 0.0
+    cy = (min(ys) + max(ys)) / 2.0 if ys else 0.0
     for p in parts:
         c = pos.get(_det_layout_key(p))
         if c:
-            _DET_LAYOUT_POS[_det_layout_key(p)] = (float(c[0]), float(c[1]))
+            _DET_LAYOUT_POS[_det_layout_key(p)] = (float(c[0] - cx), float(c[1] - cy))
     print(f"[univ][det-layout] DETERMINISTIC placement ON — {len(_DET_LAYOUT_POS)} parts positioned by construction")
 import ga_massing                # GA non-massing classifier (accessory/instrument/valve drop)
 
