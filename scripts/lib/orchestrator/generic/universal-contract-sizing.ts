@@ -3203,6 +3203,18 @@ export function reconcilePrincipalEquipment(
   // typed service on every characterisable word of the final design. Universal.
   annotateServiceFamilies(modules, quantities)
 
+  // FINAL same-name principal de-dup (Tristan 2026-06-29, the v37 TK-108 duplicate). reconcile is
+  // the LAST synthesis pass: it can re-synthesise a `*_synth_word` TWIN of an equipment the LLM
+  // decomposition already named (e.g. a second "Nutrient Tank" when the original word was not
+  // recognised as owning the contract canon). That twin escapes applyUniversalContractSizing's
+  // EARLIER dedupePrincipalWords, and the original — being non-`_synthesized` — also escapes the
+  // invented-principal drop above. Both then get tagged → a DUPLICATE TAG (TK-108×2) that collapses
+  // the BoM Ledger score. dedupePrincipalWords collapses principals sharing a normalised name_human
+  // (keeping the better-specified survivor: more modifiers, real over synth), so running it HERE —
+  // after ALL synthesis — guarantees ONE word per named principal regardless of which path minted it.
+  // Universal + deterministic; a strict no-op when there are no same-name twins.
+  res.removedDuplicates += dedupePrincipalWords(modules)
+
   return res
 }
 
