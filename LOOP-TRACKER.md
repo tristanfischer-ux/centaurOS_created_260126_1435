@@ -72,6 +72,16 @@
 > - **NOT YET DONE (guard still FAILs — honest):** TWO residuals. (a) CRAFT optimiser flips between TWO stable layouts (104/104 parts differ, systematic) — its INPUT is the RAW `topology` arg (pre-ledger), still non-deterministic; needs the finalized/deterministic edge set passed in (or optimiser made input-robust). (b) BASE placement (LAYOUT_OPTIMISE=0) has sub-cm FLOAT-accumulation jitter (66-86 parts differ <10mm) — needs position QUANTISATION to a grid. (Earlier "optimiser-off is deterministic" was a LUCKY pair — the guard's independent pairs reveal the truth.)
 > - **FINISH OPTIONS:** (A) quantise final positions to a grid (kills base jitter) + pass deterministic edges to the optimiser (kills the flip) — focused continuation; OR (B) the deterministic SEQUENCE-PACKER rewrite (Tristan's spec) that computes positions by construction → no float/set residue at all. The guard makes either provable.
 >
+> **▶ DECISION: deterministic-placer REWRITE (B) — Tristan chose it 2026-06-29; CONFIRMED necessary.**
+> DECISIVE PROOF patching won't work: with the CRAFT optimiser OFF *and* instrument-colocate OFF *and* cabinet-consolidate OFF, the BASE `place_all` is STILL intermittently non-deterministic (guard: run1 identical, run2 differs 84 parts). So there is no single line to fix — the accreted placer has subtle float/order non-determinism across many paths. Edges ARE deterministic now (ledger fix held); the placement compute is the problem.
+> **B DESIGN (the build spec):**
+>  1. NEW deterministic placer: sort parts by total key (region_rank, region_key, _seq); place region-by-region in process order (serpentine banks for squareness), shelf-pack within a region — all on an INTEGER GRID (no float-sum-order dependence).
+>  2. The COMPUTED coords are the AUTHORITATIVE position — parts-manifest/GA/all drawings read THEM, NOT a Blender-object bbox read-back (`_world_bbox_mm_by_prefix` read-back is itself non-deterministic; Tristan: "Blender placement is the source of truth; drawings take cues from it, don't make anything up"). Blender renders AT these coords.
+>  3. CABINET-CONSOLIDATE small standard items by construction (10-30 small parts → one cabinet box; extend `_consolidate_control_cabinet` universally, sizing-aware) — not scattered across the floor.
+>  4. DROP the CRAFT optimiser + the non-deterministic post-placement re-flow; co-location is achieved by the deterministic sequence packing itself.
+>  5. VERIFY every increment with `determinism_check.py` (render twice → bit-identical) + visual check vs out/{water,bess,ras,co2} baselines (no regression).
+> Status: design locked; build is the next focused increment(s). Guard (determinism_check.py) + edge-determinism already committed (82a5a6af5, d3399290d).
+>
 > **KEY STRUCTURAL FINDING:** the WORST defects (missing tank, empty module) evade EVERY enforcing gate — flipping the flags on would NOT catch them. "Fix the gates" here means ADD the deterministic gates that bite (#84 + module-non-empty), then the design fix + the gate land together. The panel per-pump fix (9b61929a4) cleared 2 of the 3 drawing-gate failures AND confirmed item G is a critic false-positive (48 kW / 100 A incomer correct).
 >
 > ---
