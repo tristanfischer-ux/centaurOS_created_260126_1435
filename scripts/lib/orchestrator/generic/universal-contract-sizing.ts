@@ -2568,6 +2568,56 @@ function collapseRoleSynonyms(modules: ModuleLike[], canons: CanonEquip[] = []):
   return out
 }
 
+// MOTORLESS-DUPLICATE DROP (Tristan 2026-06-29). A PASSIVE / MOTORLESS machine word — a
+// "Water-Powered Dosing Pump" (a Dosatron injector: no motor, ~8 m³/h) — cannot be the
+// design's POWERED principal, yet it survives EVERY other dedup: it is not `_synthesized`
+// (the principal reconcile skips it), it carries an MPN (the section-C cleanup protects it
+// as a "real grounded part"), its name differs (the exact-name dedup misses it), and its
+// distinguishing residual differs from the canon's (collapseRoleSynonyms correctly refuses
+// to merge it). The result was TWO fertigation pumps — the correct synthesised "Fertigation
+// Dosing Pump ×2, 7.5 kW" AND the LLM-invented motorless Dosatron the physics critic flags.
+// RULE: when the contract sizes a POWERED canon (a `*_power_kw` group → power>0) of a powered
+// device KIND (pump/blower/fan/compressor/mixer) and a NON-synth word of that SAME kind names
+// a MOTORLESS drive AND shares ≥1 of that canon's distinguishing stems, the word is an
+// LLM mis-conception duplicate of that powered principal → drop it; the synthesised powered
+// principal stands. NARROW + SAFE: the MOTORLESS vocabulary is water-powered/-driven/-operated
+// only (the injector category), so a real ELECTRIC dosing pump (the brief's Iwaki units) is
+// NEVER matched; the powered-canon + shared-stem requirement ties the drop to a specific
+// principal so an unrelated motorless device is left alone. UNIVERSAL — no class table.
+const MOTORLESS_RE = /\bwater[-\s]?(?:powered|driven|operated|motor)\b|\bhydraulically[-\s]powered\b/i
+const POWERED_DEVICE_KINDS = new Set(['pump', 'blower', 'fan', 'compressor', 'mixer'])
+function dropMotorlessPoweredDuplicates(
+  modules: ModuleLike[], canons: CanonEquip[],
+): { removed: number; details: string[] } {
+  const out = { removed: 0, details: [] as string[] }
+  const poweredCanons = canons.filter((c) => (c.group.power ?? 0) > 0)
+  if (poweredCanons.length === 0) return out
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      if (!Array.isArray(sm.words)) continue
+      sm.words = sm.words.filter((w) => {
+        if (isSynth(w) || isSubcomponent(w)) return true
+        if (!MOTORLESS_RE.test(String(w.name_human ?? ''))) return true
+        const { kind } = roleParts(w)
+        if (!kind || !POWERED_DEVICE_KINDS.has(kind)) return true
+        const wStems = new Set(wordStems(w))
+        const hit = poweredCanons.find(
+          (c) => c.group.stems.includes(kind)
+            && c.group.stems.some((s) => s !== kind && wStems.has(s)),
+        )
+        if (!hit) return true
+        out.removed += 1
+        out.details.push(
+          `dropped motorless duplicate '${w.name_human}' — a powered ${kind} principal `
+          + `(${hit.group.phrase}, ${hit.group.power} kW) is the contract's equipment`,
+        )
+        return false
+      })
+    }
+  }
+  return out
+}
+
 // Deterministic modifier set for a canonical equipment word, identical to synthWord's
 // (count + dimension + rating), but used to OVERWRITE a survivor's locked spec mods so
 // the count/size the contract computed always wins over an LLM edit.
@@ -2854,6 +2904,16 @@ export function reconcilePrincipalEquipment(
     res.removedSynonymDuplicates += syn.removed
     res.removedOrphanChildren += syn.removedOrphanChildren
     res.details.push(...syn.details)
+  }
+
+  // Drop a MOTORLESS word duplicating a POWERED contract principal (the fertigation
+  // "Water-Powered Dosing Pump"/Dosatron beside the synthesised 7.5 kW pump). Runs AFTER
+  // the synonym collapse (so a survivor is already chosen) and BEFORE the canon-claim (so
+  // the motorless impostor never claims the canon). Counts as a removed duplicate.
+  {
+    const ml = dropMotorlessPoweredDuplicates(modules, canons)
+    res.removedDuplicates += ml.removed
+    res.details.push(...ml.details)
   }
 
   // Assign every surviving top-level _synthesized word to its owning canon. The
