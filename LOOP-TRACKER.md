@@ -60,6 +60,24 @@
 >  5. LEVEL-TX RANGE (HIGH). A guided-radar level tx rated 0–1.4 m consolidated onto a 1.6 m nutrient tank.
 >     FIX = a consolidated instrument's range must cover the tallest member it serves.
 > Then ONE full run → re-read tab-scorecard.json (expect Risk 6→8, Exec 2→8, ⚠Audit follows).
+>
+> ▶▶▶ DOSING FIX — DIAGNOSIS CORRECTS THE PLAN (2026-06-29). It is NOT under-synthesis: the fertigation
+> pump IS correctly synthesised — "Fertigation Dosing Pump ×2, ~7.5 kW" (_synth=true) in
+> mass_fluid_transport_process (contract keys fertigation_dosing_pump_{throughput_m3_h=45, power_kw=7.5,
+> count=2} all present + consumed). The bug is a SURVIVING CROSS-MODULE DUPLICATE: an LLM-invented
+> "Water-Powered Dosing Pump" slot (→ Dosatron D8RE5, 8 m³/h) in the fertigation_dosing_system module —
+> THAT is what the physics critic reads + flags. It evades EVERY existing dedup: (a) reconcilePrincipal-
+> Equipment touches only _synthesized words (Dosatron isn't one); (b) applyUniversalContractSizing
+> section-C cleanup protects it because it has an MPN ("real grounded part"); (c) dedupePrincipalWords
+> collapses only EXACT id or EXACT name ("Water-Powered Dosing Pump" ≠ "Fertigation Dosing Pump"); (d)
+> reconcile's stem-subset claim needs canon stems ⊆ word stems but the Dosatron word lacks the "fertig"
+> stem. pickModule also mis-routed the synth pump to mass_fluid_transport_process not the fertigation
+> module. FIX (needs care + selftest + a validation run — brief has 5+ legit distinct pumps so a loose
+> rule WILL drop real pumps): drop a non-_synthesized word that DUPLICATES an already-_synthesized
+> contract principal (same role/head-noun + pinned part mis-fits the canon rating: Dosatron 8 m³/h vs
+> 45 m³/h@3.5bar/7.5kW) EVEN WITH an MPN. Likely home: extend reconcile's collapseRoleSynonyms to
+> non-synth role-duplicates. NOT an emitter-completion gate (the slot is literally NAMED "Water-Powered
+> Dosing Pump" so the Dosatron pin is "correct" for that bad slot — the LLM SLOT is the error).
 
 > ▶▶▶ 2026-06-28 CLOSE-5 (HEAD 9e3ce061e, 15 fix-commits; guards GREEN). **THE PRIOR "33/34 ≥8" WAS
 > INFLATED — corrected.** Tristan caught the engine (and me) giving full marks to tabs carrying
