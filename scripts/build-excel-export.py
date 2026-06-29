@@ -2209,6 +2209,23 @@ def _infer_inputs_from_formula(formula, substitution):
     return list(inputs.values()) or None
 
 
+def _link_dataflow_to_calc(io_value_cells: List[Tuple[str, float, str]],
+                           calc_results: Dict[str, List[Tuple[Optional[float], str]]]) -> Dict[str, str]:
+    """PURE: decide which data-flow Value cells link to a worked-calc result cell.
+
+    For each (tool_id_norm, value, coord) data-flow cell, return {coord: '=B<row>'} when EXACTLY
+    ONE worked result IN THAT TOOL carries that value (unambiguous). A value matched by 0 or ≥2
+    worked results is left unlinked — a missed link keeps the static value (safe); a wrong link can
+    never form. This is the C16→B60 traceability Tristan asked for; proveCatch in _selftest."""
+    out: Dict[str, str] = {}
+    for tidn, val, coord in io_value_cells:
+        cands = sorted({c for (rv, c) in calc_results.get(tidn, [])
+                        if rv is not None and abs(rv - val) <= max(abs(val) * 1e-4, 1e-9)})
+        if len(cands) == 1:
+            out[coord] = f"={cands[0]}"
+    return out
+
+
 def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]:
     """
     Returns (live_calc_count, static_calc_count).
@@ -2283,7 +2300,9 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         "ORPHANED = it appears nowhere downstream; STALE = the downstream value disagrees.",
     ).font = FONT_NOTE
     r += 2
-    io_next = _render_tool_io_section(ws, state, run_dir, r)
+    # capture each data-flow Value cell so we can LINK it to the worked-calc result below
+    _io_value_cells: List[Tuple[str, float, str]] = []
+    io_next = _render_tool_io_section(ws, state, run_dir, r, value_cells_out=_io_value_cells)
     if io_next is None:
         ws.cell(r, 1, "— no orchestrator tool log for this run —").font = FONT_NOTE
         r += 2
@@ -2316,6 +2335,9 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     qindex = index_design_quantities(state)   # authoritative design quantities to cross-check against
     live_count = 0
     static_count = 0
+    # worked-calc result cells, keyed by tool_id → [(result_value, "B<row>"), …], so the
+    # data-flow Value cells above can be linked to the result that produced them.
+    calc_results: Dict[str, List[Tuple[Optional[float], str]]] = {}
 
     for tool in tools:
         worked = tool.get("worked") or []
@@ -2323,6 +2345,7 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             continue
         tname = tool.get("tool_name") or tool.get("tool_id") or "tool"
         tid = tool.get("tool_id", "")
+        _tid_norm = str(tid).strip().lower()
         sub_banner(ws, r, f"{tname}   ·   {tid}", 8)
         r += 1
         header(ws, r, ["Calc / input", "Value (live)", "Unit",
@@ -2389,6 +2412,9 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     lc = ws.cell(r, 2, _bval)             # STATIC computed result — never a live worked-calc formula (Excel-safe)
                     lc.fill = FILL_RESULT
                     lc.number_format = "#,##0.0000"
+                    _rv = res_val if isinstance(res_val, (int, float)) else _bval
+                    if isinstance(_rv, (int, float)):
+                        calc_results.setdefault(_tid_norm, []).append((float(_rv), f"B{r}"))
                     ws.cell(r, 5, res_val)                # engine value
                     ws.cell(r, 6, f"=B{r}-E{r}").number_format = "#,##0.0000"
                     ws.cell(r, 7, res_unit)
@@ -2474,6 +2500,9 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 live_cell.value = _bval
                 live_cell.fill = FILL_RESULT
                 produced_ok = True
+                _rv = res_val if isinstance(res_val, (int, float)) else _bval
+                if isinstance(_rv, (int, float)):
+                    calc_results.setdefault(_tid_norm, []).append((float(_rv), f"B{r}"))
                 if isinstance(ev_s, (int, float)) and isinstance(res_val, (int, float)) and res_val:
                     drift_s = abs(ev_s - res_val) / abs(res_val)
                     if drift_s <= 0.02:
@@ -2507,6 +2536,18 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             r += 2  # spacer between calcs
 
         r += 1  # spacer between tools
+
+    # ── LINK the data-flow Value cells (above) to the worked-calc result that produced them
+    #    (Tristan 2026-06-29: "why is the value in C16 not connected to the result in B60?").
+    #    Match by (same tool_id, same value); link ONLY when the match is UNAMBIGUOUS — a single
+    #    worked result in that tool carries that value. A missed match leaves the static value
+    #    (safe); a wrong link can never form. The Value cell becomes '=B<row>' so the data-flow
+    #    table and the worked transcript can no longer disagree, and a reader can trace it. ──
+    _links = _link_dataflow_to_calc(_io_value_cells, calc_results)
+    for _coord, _formula in _links.items():
+        ws[_coord].value = _formula                 # forward same-sheet ref; style/format preserved
+    if _links:
+        print(f"  · Calculations: linked {len(_links)} data-flow value(s) to their worked-calc result cell")
 
     # number formats (#37): value (B) + engine-value (E) + Δ (F) columns. These
     # carry per-calc results in mixed units, so a thousands-separated 2-dp mask
@@ -6994,12 +7035,18 @@ def _render_cabinet_section(ws: Worksheet, run_dir: str, start_row: int) -> Opti
     return r
 
 
-def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row: int) -> Optional[int]:
+def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row: int,
+                            value_cells_out: Optional[list] = None) -> Optional[int]:
     """Render the Tool-provenance table onto `ws` starting at `start_row` (header row).
     Returns the next free row, or None when no tools ran. (Was tab_tool_io; refactored
     into a section folded under "⚠ Checks", 2026-06-24.) Every engineering tool that ran,
     with where each output's INPUT came from and where its OUTPUT goes, plus a
-    USED/STALE/ORPHANED/TRACED verdict — the 'computed by verified tools' proof."""
+    USED/STALE/ORPHANED/TRACED verdict — the 'computed by verified tools' proof.
+
+    When `value_cells_out` is a list, each rendered Value cell is recorded as
+    (tool_id_norm, value, cell_coordinate) so the CALLER can LINK that Value cell to the
+    worked-calc result cell that produced it (traceability; Tristan: "C16 isn't connected
+    to B60"). Other callers (the ⚠ Checks tab) pass nothing — behaviour unchanged."""
     import re as _re
     tu = load_json(os.path.join(run_dir, "4-orchestrator-tools-used.json"))
     if not isinstance(tu, dict) or not tu.get("tools"):
@@ -7071,7 +7118,10 @@ def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row:
                 status, cons = "ORPHANED", "appears nowhere downstream"
             ws.cell(r, 1, tid).border = BORDER
             ws.cell(r, 2, clean_cell(c.get("output_field") or field)).border = BORDER
-            ws.cell(r, 3, val).border = BORDER
+            _vcell = ws.cell(r, 3, val)
+            _vcell.border = BORDER
+            if value_cells_out is not None and val is not None:
+                value_cells_out.append((tid.strip().lower(), val, _vcell.coordinate))
             ws.cell(r, 4, clean_cell(c.get("unit", ""))).border = BORDER
             e = ws.cell(r, 5, clean_cell(c.get("input_summary", "")))
             e.alignment = WRAP_TOP
@@ -7872,6 +7922,26 @@ def _selftest() -> int:
                           if str(_cws.cell(rr, 1).value or "").startswith("Raw materials")), None)
         if not (isinstance(_raw_cell, str) and _raw_cell.startswith("=") and _LEDGER_SHEET in _raw_cell):
             print(f"  FAIL waterfall-raw-source: Raw materials must LINK to the BoM Ledger Σ, got {_raw_cell!r}"); bad += 1
+    # (8) CALC TRACEABILITY LINK (Tristan 2026-06-29: "why is the value in C16 not connected to the
+    #     result in B60?"). A data-flow Value must link to the worked-calc result of the SAME tool +
+    #     value, UNAMBIGUOUSLY — and must NOT link on an ambiguous (≥2) or mismatched value.
+    _io = [("arc-flash:ieee-1584", 0.741378, "C16"),    # unique value in its tool → links to B60
+           ("electrical:cable-sizing", 50.0, "C18"),    # unique → links
+           ("amb:two-equal", 4920.0, "C40"),            # AMBIGUOUS (two B-cells = 4920) → must NOT link
+           ("amb:no-match", 99.0, "C41")]               # no worked result = 99 → must NOT link
+    _cr = {"arc-flash:ieee-1584": [(0.741378, "B60")],
+           "electrical:cable-sizing": [(50.0, "B74"), (1.4615, "B86")],
+           "amb:two-equal": [(4920.0, "B10"), (4920.0, "B20")],
+           "amb:no-match": [(7.0, "B30")]}
+    _lk = _link_dataflow_to_calc(_io, _cr)
+    if _lk.get("C16") != "=B60":
+        print(f"  FAIL calc-link: C16 must link to =B60 (arc-flash 0.74), got {_lk.get('C16')!r}"); bad += 1
+    if _lk.get("C18") != "=B74":
+        print(f"  FAIL calc-link: C18 must link to =B74, got {_lk.get('C18')!r}"); bad += 1
+    if "C40" in _lk:
+        print(f"  FAIL calc-link: an AMBIGUOUS value (two equal results) must NOT link, got {_lk.get('C40')!r}"); bad += 1
+    if "C41" in _lk:
+        print(f"  FAIL calc-link: a value with NO matching result must NOT link, got {_lk.get('C41')!r}"); bad += 1
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
