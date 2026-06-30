@@ -6555,7 +6555,12 @@ def _draw_cable_tray(nm, waypoints_mm, MAT, MO, dia_mm=None):
         tray_w = max(40.0, dia_mm * 1.4)
     else:
         tray_w = max(220.0, PIPE_DIA_MM * 1.3)   # tray slightly wider than a pipe
-    tray_h = tray_w * 0.55                    # shallow rectangular section
+    # FLAT ladder tray, not a chunky beam (Tristan 2026-06-30): a real cable tray is WIDE + SHALLOW —
+    # its depth is ~75-110 mm regardless of how wide the bundle is. The old tray_h = tray_w*0.55 turned
+    # a wide bus into a deep square box that, run 40 m overhead, reads as a solid "red pipe shooting off
+    # the platform" (the vision-critic defect that capped every render at 4/8). Capping depth to a flat
+    # band makes even a fat bus read as a TRAY (the open ladder rungs below complete the look). Universal.
+    tray_h = min(max(60.0, tray_w * 0.20), 110.0)   # flat: 60-110 mm deep regardless of width
     legs = 0
     for a, b in zip(waypoints_mm[:-1], waypoints_mm[1:]):
         ax, ay, az = (float(c) for c in a)
