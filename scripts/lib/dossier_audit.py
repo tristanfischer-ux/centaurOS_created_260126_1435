@@ -301,6 +301,24 @@ def _physics_issues(state, run_dir=None) -> list:
 
 
 _PHYS_EMPTY_CLAIM_RX = re.compile(r"\bempty\b|no words|words['\"]?\s*[:=]?\s*\[\s*\]|\bhas no (?:words|equipment|parts)\b", re.I)
+# A "quantity N× smeared/duplicated across many parts" claim — verifiable against the actual part counts.
+_PHYS_DUP_CLAIM_RX = re.compile(r"duplicat|smear|copied .*count|across every|thousands of|on every .*(valve|part|word)", re.I)
+
+
+def _count_words_with_qty(state, qty: int) -> int:
+    """How many DISTINCT design part-words carry the exact quantity `qty` (×N modifier). Used to verify a
+    critic 'N× duplicated everywhere' claim against the real state — a true smear stamps N on MANY words."""
+    n = 0
+    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                for mc in (w.get("modifier_characters") or []):
+                    if mc.get("kind") == "quantity":
+                        mm = re.search(r"(\d[\d,]*)", str(mc.get("value") or ""))
+                        if mm and int(mm.group(1).replace(",", "")) == qty:
+                            n += 1
+                        break
+    return n
 
 
 def _physics_claim_falsified(state, issue: dict) -> bool:
@@ -309,14 +327,27 @@ def _physics_claim_falsified(state, issue: dict) -> bool:
     words' shape — when the named module deterministically HAS words, the claim is a hallucination.
     Anything fuzzier is left to gate (never drop a claim we cannot definitively disprove)."""
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}".lower()
-    if not _PHYS_EMPTY_CLAIM_RX.search(txt):
-        return False
-    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
-        mid = str(m.get("module") or "")
-        if mid and mid.lower() in txt:
-            wc = sum(len(sm.get("words") or []) for sm in (m.get("sub_modules") or []))
-            if wc > 0:
-                return True  # "empty" claim against a module that has words → falsified
+    # (a) "module X is empty" shape — falsified if the named module actually has words.
+    if _PHYS_EMPTY_CLAIM_RX.search(txt):
+        for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+            mid = str(m.get("module") or "")
+            if mid and mid.lower() in txt:
+                wc = sum(len(sm.get("words") or []) for sm in (m.get("sub_modules") or []))
+                if wc > 0:
+                    return True  # "empty" claim against a module that has words → falsified
+    # (b) "quantity N× smeared/duplicated across many parts" shape — a REAL smear stamps the same big
+    # count onto MANY distinct words. Verify: extract the large claimed count(s) and check how many words
+    # actually carry each. If the worst-case count appears on ≤1 word, there is NO smear — the (LLM) critic
+    # hallucinated it (the Codema run: it claimed '200× across 15 valve types' when only Pneumatic Actuated
+    # Valves = ×200 and every other valve = ×1). A false FAIL is as dishonest as a false PASS (2026-06-28).
+    if _PHYS_DUP_CLAIM_RX.search(txt):
+        cands = {int(x.replace(",", "")) for x in re.findall(r"\b(\d[\d,]{1,6})\b", txt)}
+        cands = {c for c in cands if c >= 50}  # a "smear" is a LARGE repeated count, not 1–2 isolators
+        # A REAL smear stamps the big count onto 3+ distinct words. ≤2 is a legitimate DRIVEN PAIR (e.g.
+        # 200 actuated valves + their 200 actuators, 1:1) — not the "thousands across 15 types" the critic
+        # claimed. Falsify only when the actual spread is ≤2 (the engine is correct, the LLM hallucinated).
+        if cands and max(_count_words_with_qty(state, c) for c in cands) <= 2:
+            return True  # the claimed massive duplication does not exist in the state → hallucinated smear
     return False
 
 
@@ -2291,6 +2322,23 @@ def _selftest() -> int:
     def expect(cond, msg):
         if not cond:
             failures.append(msg)
+
+    # ---- physics duplication-claim verifier (Tristan 2026-06-30) ------------
+    # An LLM critic that claims "N× smeared across many parts" must be checked against the real counts:
+    # a hallucinated smear (≤2 words actually at N — e.g. 200 valves + their 200 actuators, a legit 1:1
+    # pair) is DROPPED; a real smear (3+ unrelated words at N) still GATES (a false FAIL == a false PASS).
+    def _mk(name, qty):
+        return {"name_human": name, "modifier_characters": [{"kind": "quantity", "value": f"×{qty}"}]}
+    halluc = {"moduleDecomposition": {"modules": [{"module": "act", "sub_modules": [{"words": [
+        _mk("Pneumatic Actuated Valves", 200), _mk("Pneumatic Actuators", 200), _mk("Solenoid Valve", 1)]}]}]}}
+    dup_issue = {"severity": "high", "issue": "Massive duplication of the '200x' valve quantity across every "
+                 "valve representation — thousands of valves instead of the 200 requested."}
+    expect(_physics_claim_falsified(halluc, dup_issue),
+           "hallucinated 200× smear (only valves+actuators at 200) must be FALSIFIED")
+    real_smear = {"moduleDecomposition": {"modules": [{"module": "x", "sub_modules": [{"words": [
+        _mk("Power Distribution Block", 200), _mk("Flow Plates", 200), _mk("Gasket Set", 200), _mk("Bracket", 200)]}]}]}}
+    expect(not _physics_claim_falsified(real_smear, dup_issue),
+           "a REAL 4-part 200× smear must STILL gate (not be dropped)")
 
     # ---- Fixture A: dirty — should trip many HIGH/MED findings -------------
     dirty_state = {
