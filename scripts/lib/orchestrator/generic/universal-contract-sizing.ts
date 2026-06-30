@@ -2224,6 +2224,18 @@ function deriveService(w: WordLike, quantities: Record<string, number>): Service
     return { fluid: 'none', phase: 'solid', pressure_bar: 0, fabrication_family: 'structural', criticality: 'standard' }
   }
 
+  // 1b) PACKAGED ASSEMBLY / structural frame (skid, frame, rack, cabinet, enclosure, gantry, package) —
+  //     FABRICATED as a steel structure carrying components, NOT a fluid containment vessel; its m³ is the
+  //     ENVELOPE, not a holdup. Without this a "RO skid (10 m³ envelope)" fell through to the capM3≥1 fluid
+  //     branch below and was classed + priced as a 10 m³ fluid vessel (physics-critic HIGH: "a skid frame
+  //     is a structural support, not a fluid containment vessel"). Universal — keyed on the assembly noun;
+  //     a genuine vessel noun (tank/drum/column/…) in the name excludes it so a "tank skid" stays a vessel.
+  const nmS = w.name_human ?? ''
+  if (/\bskids?\b|\bframes?\b|\bracks?\b|\bcabinets?\b|\benclosure\b|\bgantry\b|\bpackage\b|\bpallet\b/i.test(nmS)
+      && !/tank|vessel|drum|column|tower|reactor|separator|clarifier|basin|sump|scrubber|absorber|degasser/i.test(nmS)) {
+    return { fluid: 'none', phase: 'solid', pressure_bar: 0, fabrication_family: 'structural', criticality: 'standard' }
+  }
+
   // 2) FLUID driver — a real m³ capacity OR a 3-D vessel geometry on a vessel-noun
   //    holdup (reuse the existing physics-based isFluidVessel detector). Its pressure
   //    comes from the CONTRACT; an atmospheric tank reads 0 bar (an OPEN tank).
@@ -3008,7 +3020,19 @@ export function reconcilePrincipalEquipment(
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
-        if (!isSynth(w) || isSubcomponent(w)) continue
+        // A LARGE LLM-AUTHORED FLUID VESSEL (a principal tank/vessel ≥10 m³ the LLM invented, not the
+        // sizer) must ALSO face the grounding test — a legit one matches a contract canon (kept below),
+        // a PHANTOM matches none → dropped. This catches the LLM-invented "Cleaning Tank / CIP Tank"
+        // (2× 40 m³) the brief never asked for (physics-critic HIGH, scope-fidelity). NARROW: only fluid
+        // vessels ≥10 m³ — instruments / genset / building / small pots are NOT vessels, so the prior
+        // false-drop family (RAS genset/LOX/building) is untouched. Universal — no class table.
+        const _capMod = (w.modifier_characters ?? []).find((m) => m.kind === 'capacity')
+        const _capM3 = _capMod && /m³|m3/.test(`${_capMod.unit ?? ''} ${_capMod.value ?? ''}`) ? (parseFloat(String(_capMod.value)) || 0) : 0
+        // detect the vessel by NOUN+capacity (isFluidVessel returns false for any non-synth word, so it
+        // can't be used here). A large LLM-authored tank/vessel is a candidate phantom.
+        const _isVesselNoun = /\btanks?\b|\bvessels?\b|\bdrums?\b|\bsilos?\b|\breservoirs?\b|\bcisterns?\b|\bbasins?\b/i.test(w.name_human ?? '')
+        const isLargeAuthoredVessel = !isSynth(w) && _isVesselNoun && _capM3 >= 10
+        if ((!isSynth(w) && !isLargeAuthoredVessel) || isSubcomponent(w)) continue
         // PRINCIPAL-ONLY: instruments / actuators / utility-safety / process-support
         // words are ALSO deterministically synthesised from the contract (they carry
         // `_synthesized` so geometry/cost treat them as engine-derived), but they are
@@ -3026,7 +3050,9 @@ export function reconcilePrincipalEquipment(
         // The main-incomer breaker is contract-SIZED (sizeMainIncomer) but is NOT a synthesisable
         // principal GROUP — it claims no canon, so the principal-set logic would drop it as
         // "invented". Skip it exactly like the instrument / utility families it sits beside.
-        if (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w) || isMainIncomerWord(w)) continue
+        // The instrument/utility/process-system/building guard protects SYNTH non-principals from a false
+        // drop; a large AUTHORED vessel must still be grounding-tested, so it bypasses the guard.
+        if (!isLargeAuthoredVessel && (isInstrument(w) || isActuator(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w) || isMainIncomerWord(w))) continue
         const pick = canonClaimedBy(w)
         if (pick) byCanon.get(pick.id)!.push({ word: w, sm })
         else unclaimed.push({ word: w, sm })

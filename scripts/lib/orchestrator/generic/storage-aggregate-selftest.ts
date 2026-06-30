@@ -79,6 +79,22 @@ function run() {
   if (n3.some((x) => /total|overall|combined/i.test(x))) throw new Error(`storage-aggregate: reconcilePrincipalEquipment did NOT remove the phantom "Total Water Storage" mega-tank (got ${JSON.stringify(n3)})`)
   if (!n3.some((x) => /fresh water tank/i.test(x)) || !n3.some((x) => /drain water tank/i.test(x))) throw new Error(`storage-aggregate: reconcile dropped a real separate tank (got ${JSON.stringify(n3)})`)
 
+  // PHANTOM LLM-AUTHORED VESSEL (physics-critic HIGH 2026-06-30): a large fluid vessel the LLM invented
+  // (NOT _synthesized) with NO backing contract group is a scope-fidelity phantom → dropped; a grounded
+  // tank survives. The Codema run shipped a 40 m³ "Cip Tank"/"Cleaning Tank" the brief never asked for.
+  const m4: any = [{ module: 'maintenance', sub_modules: [{ sub_module: 's', words: [
+    { id: 'fresh_water_tank_synth_word', name_human: 'Fresh Water Tank', _synthesized: true,
+      content_character: { character_id: 'fresh_water_tank_synth', name_human: 'Fresh Water Tank' },
+      modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '40', unit: 'm³' }] },
+    { id: 'cip_tank_word', name_human: 'Cip Tank',  // LLM-authored, NOT _synthesized, no contract key
+      content_character: { character_id: 'cip_tank', name_human: 'Cip Tank' },
+      modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'capacity', value: '40', unit: 'm³' }] },
+  ] }] }]
+  reconcilePrincipalEquipment(m4 as never[], contractOf({ fresh_water_tank_volume_each_m3: 40, fresh_water_tank_count: 1 }) as never)
+  const n4 = names(m4)
+  if (n4.some((x) => /cip|cleaning/i.test(x))) throw new Error(`storage-aggregate: ungrounded LLM "Cip Tank" phantom must be DROPPED (got ${JSON.stringify(n4)})`)
+  if (!n4.some((x) => /fresh water tank/i.test(x))) throw new Error(`storage-aggregate: the grounded Fresh Water Tank must SURVIVE (got ${JSON.stringify(n4)})`)
+
   // TANK ASPECT (physics-critic HIGH 2026-06-30): a CLOSED vertical STORAGE tank must be TALL (h≈d, the
   // real Enduramaxx 3.64×3.88 — not a 5.8⌀×1.5 paddling pool); an OPEN process basin (rearing/aeration/
   // clarifier) stays wide+shallow. A 40 m³ storage tank → ~3.7×3.7; a 40 m³ rearing tank → ~5.8×1.5.
