@@ -65,6 +65,7 @@ run "subassembly-class --selftest"           npx tsx scripts/lib/orchestrator/ge
 run "pump-capacity --selftest"               npx tsx scripts/lib/orchestrator/generic/pump-capacity-selftest.ts
 run "motorless-duplicate --selftest"         npx tsx scripts/lib/orchestrator/generic/motorless-duplicate-selftest.ts
 run "principal-dedup --selftest"             npx tsx scripts/lib/orchestrator/generic/principal-dedup-selftest.ts
+run "provenance-trace --selftest"            npx tsx scripts/lib/orchestrator/generic/provenance-trace.ts --selftest
 run "brief-storage-hold --selftest"           npx tsx scripts/lib/orchestrator/brief-storage-hold-selftest.ts
 run "benchmark-expectation.ts --selftest"     npx tsx scripts/lib/benchmark-expectation.ts --selftest
 run "sweet-spot.ts --selftest"                npx tsx scripts/lib/sweet-spot.ts --selftest
