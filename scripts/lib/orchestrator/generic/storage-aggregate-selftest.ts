@@ -13,7 +13,7 @@
 //
 // Standalone (not a --selftest block inside the big module). Wired into verify-engine-guards.sh.
 
-import { applyUniversalContractSizing, reconcilePrincipalEquipment } from './universal-contract-sizing'
+import { applyUniversalContractSizing, reconcilePrincipalEquipment, cylinderFromVolumeM3 } from './universal-contract-sizing'
 
 function names(modules: any): string[] {
   const out: string[] = []
@@ -79,8 +79,17 @@ function run() {
   if (n3.some((x) => /total|overall|combined/i.test(x))) throw new Error(`storage-aggregate: reconcilePrincipalEquipment did NOT remove the phantom "Total Water Storage" mega-tank (got ${JSON.stringify(n3)})`)
   if (!n3.some((x) => /fresh water tank/i.test(x)) || !n3.some((x) => /drain water tank/i.test(x))) throw new Error(`storage-aggregate: reconcile dropped a real separate tank (got ${JSON.stringify(n3)})`)
 
+  // TANK ASPECT (physics-critic HIGH 2026-06-30): a CLOSED vertical STORAGE tank must be TALL (h≈d, the
+  // real Enduramaxx 3.64×3.88 — not a 5.8⌀×1.5 paddling pool); an OPEN process basin (rearing/aeration/
+  // clarifier) stays wide+shallow. A 40 m³ storage tank → ~3.7×3.7; a 40 m³ rearing tank → ~5.8×1.5.
+  const tankDim = cylinderFromVolumeM3(40, 'Fresh Water Tank')
+  const tankM = /([0-9.]+) m dia x ([0-9.]+) m/.exec(tankDim)
+  if (!tankM || Number(tankM[2]) / Number(tankM[1]) < 0.7) throw new Error(`storage-aggregate: a 40 m³ STORAGE tank must be TALL (h/d≥0.7), got ${tankDim}`)
+  const basinDim = cylinderFromVolumeM3(40, 'Rearing Tank')
+  const basinM = /([0-9.]+) m dia x ([0-9.]+) m/.exec(basinDim)
+  if (!basinM || Number(basinM[2]) / Number(basinM[1]) > 0.5) throw new Error(`storage-aggregate: an OPEN rearing tank must stay wide+shallow (h/d≤0.5), got ${basinDim}`)
   // eslint-disable-next-line no-console
-  console.log('storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed at synthesis AND removed by the principal reconcile; lone total still synthesised)')
+  console.log(`storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed + reconciled; storage tank TALL ${tankDim}, basin SHALLOW ${basinDim})`)
 }
 
 run()

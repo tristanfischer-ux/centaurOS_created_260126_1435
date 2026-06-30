@@ -407,7 +407,12 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
  *  canonical triple. Universal — the aspect is chosen by the device noun, not the class. */
 function cylinderDimsForVolume(v: number, phrase = ''): { dia: number; ht: number } {
   const p = phrase.toLowerCase()
-  const isOpenTank = /tank|basin|sump|pond|reservoir|clarifier|settl|lagoon|\bpit\b|\bcell\b|raceway|trough/.test(p)
+  // OPEN process BASINS are wide + shallow; a CLOSED VERTICAL STORAGE tank (water/buffer/day tank — a
+  // galvanised or rotomoulded cylinder) is TALL (h≈d). The old test matched bare "tank", so a 40 m³
+  // "Fresh Water Tank" came out 5.8 ⌀ × 1.5 m (a paddling pool) instead of the real Enduramaxx 3.64×3.88
+  // (physics-critic HIGH: conflicting tank dims). Match only genuine OPEN-basin nouns; a plain storage
+  // "tank" falls through to the neutral h≈d aspect. Universal — keyed on the device noun, no class table.
+  const isOpenTank = /basin|sump|\bpond\b|reservoir|clarifier|settl|lagoon|\bpit\b|raceway|trough|rearing|\bculture\b|grow[_ -]?out|fish[_ ]?tank|aeration|equali[sz]|balancing|stilling|wet[_ ]?well|open[_ -]?tank/.test(p)
   const isTower = /column|tower|stripper|scrubber|absorber|contactor|degasser/.test(p)
   // Target diameter for the chosen aspect (before printing-rounding).
   let dTarget: number
@@ -429,7 +434,7 @@ function cylinderDimsForVolume(v: number, phrase = ''): { dia: number; ht: numbe
     Math.abs((Math.PI / 4) * dia * dia * h - v) < Math.abs((Math.PI / 4) * dia * dia * best - v) ? h : best)
   return { dia, ht }
 }
-function cylinderFromVolumeM3(v: number, phrase = ''): string {
+export function cylinderFromVolumeM3(v: number, phrase = ''): string {
   const { dia, ht } = cylinderDimsForVolume(v, phrase)
   return `${dia.toFixed(1)} m dia x ${ht.toFixed(1)} m`
 }
