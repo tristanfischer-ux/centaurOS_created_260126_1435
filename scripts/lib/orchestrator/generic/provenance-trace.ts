@@ -24,7 +24,19 @@ export interface QtyTrace { key: string; value: number; source: SourceKind; deta
 // small count (1 RO skid, 2 softeners) is not worth blocking the dossier over.
 export const UNSOURCED_MIN = 10
 
-interface QtyLike { value?: unknown; basis?: string; provenance?: unknown }
+// A contract Quantity carries provenance in TWO shapes: tool-derived values record a nested
+// `provenance: {tool_id,…}`; calculator/brief/physics values record the FLAT `source`
+// ('brief'|'calculator'|'physics_constant'|'override'|'inherited') + a `source_detail` string (the
+// actual derivation, e.g. "I = P·1000/(√3·400·0.9)·1.25 = 96 A"). BOTH are real provenance — the
+// classifier must read both, or it false-flags fully-derived values as "magic".
+interface QtyLike {
+  value?: unknown
+  basis?: string
+  provenance?: unknown
+  source?: string
+  source_detail?: string
+  lineage?: { from?: string[]; via?: string }
+}
 
 function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : NaN
@@ -68,16 +80,29 @@ export function traceContractProvenance(
   for (const [key, q] of entries) {
     const value = num(q?.value)
     const prov = q?.provenance as { tool_id?: string; source?: string } | null | undefined
+    const flatSource = (q?.source ?? '').trim().toLowerCase()
+    const flatDetail = (q?.source_detail ?? '').trim()
     let source: SourceKind = 'unsourced'
     let detail = ''
     if (prov && (prov.tool_id || prov.source)) {
       source = 'tool'
       detail = String(prov.tool_id ?? prov.source ?? '')
+    } else if (flatSource === 'brief') {
+      // the contract builder marked this value as taken from the brief …
+      source = 'brief'
+      detail = flatDetail || (Number.isFinite(value) ? `brief states ${briefStatesNumber(briefText, value) ?? value}` : 'brief')
+    } else if (flatSource) {
+      // ANY recorded non-brief source is a real derivation (calculator / physics_constant / override /
+      // inherited / convergence-report / …). The derivation lives in source_detail; a `lineage` records
+      // the explicit input keys it was computed FROM. Do NOT enumerate source kinds — any recorded source
+      // is provenance (a future source kind must not silently fall through to "magic").
+      source = 'derived'
+      const lin = q?.lineage?.from?.length ? ` ⟵ ${q.lineage.from.join(', ')}` : ''
+      detail = (flatDetail || flatSource) + lin
     } else if (Number.isFinite(value) && briefStatesNumber(briefText, value)) {
       source = 'brief'
       detail = `brief states ${briefStatesNumber(briefText, value)}`
     } else if (basisIsDescriptive(q?.basis)) {
-      // a recorded derivation / measurement / correlation lives in the basis string.
       source = 'derived'
       detail = String(q?.basis)
     }
@@ -101,8 +126,9 @@ function _selftest(): number {
     irrigation_demand_m3_h: { value: 90, basis: 'rated' }, // brief states 90 → brief
     water_storage_capacity_m3: { value: 120, basis: 'rated' }, // brief states 120 → brief
     container_count: { value: 6000, basis: 'rated' }, // brief states 6,000 → brief
+    breaker_a: { value: 96, basis: 'rated', source: 'calculator', source_detail: 'I = P·1000/(√3·400·0.9)·1.25 = 96 A' }, // recorded calc → derived
     pipe_length_m: { value: 914, basis: 'measured routed pipe length' }, // descriptive basis → derived
-    invented_capacity_m3: { value: 250, basis: 'rated' }, // NOT in brief, bare rated → unsourced + gate-worthy
+    invented_capacity_m3: { value: 250, basis: 'rated' }, // NO source, NO detail, not in brief → unsourced + gate-worthy
     softener_count: { value: 2, basis: 'rated' }, // small unsourced count → NOT gate-worthy
   }
   const { traces, unsourced } = traceContractProvenance(q, brief)
@@ -111,8 +137,9 @@ function _selftest(): number {
   expect('pump_kw', 'tool')
   expect('irrigation_demand_m3_h', 'brief')
   expect('container_count', 'brief')           // brief-stated 6000 (NOT magic) — the engine just never recorded it
+  expect('breaker_a', 'derived')               // source:calculator + a recorded formula is real provenance
   expect('pipe_length_m', 'derived')           // a recorded (measured) basis is real provenance
-  expect('invented_capacity_m3', 'unsourced')  // bare "rated", not in brief → magic
+  expect('invented_capacity_m3', 'unsourced')  // no source, no detail, not in brief → magic
   if (!unsourced.some((u) => u.key === 'invented_capacity_m3')) { console.log('  FAIL: the magic 250 must be gate-worthy'); bad++ }
   if (unsourced.some((u) => u.key === 'softener_count')) { console.log('  FAIL: small unsourced count must NOT be gate-worthy'); bad++ }
   console.log('provenance-trace selftest:', bad === 0 ? 'OK' : `${bad} FAIL`)
