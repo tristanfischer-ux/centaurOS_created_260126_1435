@@ -1648,9 +1648,14 @@ function sizeMainIncomer(
     const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
     const basis = `main incomer sized from the connected electrical load ${Math.round(connectedKw)} kW: I = P·1000/(√3·${vLine}·${PF})·${MARGIN} = ${Math.round(iReq)} A → next standard ${frameA} A ACB frame`
     // lineage.from = the load quantity it was sized from, so the breaker rating traces back to the brief.
-    const incomerLineage = { from: ['connected_electrical_load_kw'], via: 'calculator' }
-    cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: incomerLineage }
-    cq['main_incomer_breaker_frame_a'] = { value: frameA, unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: incomerLineage }
+    // breaker_a is a CLEAN function of the connected load → carry an Excel formula (the constants vLine/PF/
+    // margin are embedded as used) so the Excel renders it as a LIVE, provable cell, not a bare number.
+    const breakerLineage = { from: ['connected_electrical_load_kw'], via: 'calculator',
+      formula: `ROUND(connected_electrical_load_kw*1000/(SQRT(3)*${vLine}*${PF})*${MARGIN},0)` }
+    // frame_a is the next STANDARD ACB frame (a discrete lookup, not a clean formula) → lineage only.
+    const frameLineage = { from: ['main_incomer_breaker_a'], via: 'calculator' }
+    cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: breakerLineage }
+    cq['main_incomer_breaker_frame_a'] = { value: frameA, unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: frameLineage }
   }
   return stamped
 }

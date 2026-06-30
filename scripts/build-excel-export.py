@@ -1940,7 +1940,8 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         if src == "brief":
             return "← brief (stated requirement)"
         if lin:
-            return "← " + ", ".join(lin)
+            live = " ✓ LIVE formula (Value is computed in-cell)" if (v.get("lineage") or {}).get("formula") else ""
+            return "← " + ", ".join(lin) + live
         basis = (v.get("basis") or "").strip()
         if basis and basis.lower() not in ("rated", "assumed", "estimate", "estimated", "default", ""):
             return f"← measured: {basis}"
@@ -1963,6 +1964,26 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         sub += f"  —  {rooting.get('rooted', '?')}/{rooting.get('total', '?')} inputs ({pct}%) trace to the brief."
     title_row(ws, "Contract inputs — traceability (where-from / where-to)", 8, sub)
     header(ws, 4, ["Input", "Value", "Unit", "Family", "Source", "Where-from (source / inputs)", "Source detail", "Used by (where-to)"])
+    # Map each quantity → its Excel row, so a recorded `lineage.formula` can be rendered as a LIVE
+    # Excel formula referencing the input ROWS (the value PROVES itself rather than being asserted).
+    key_row = {name: 5 + i for i, name in enumerate(quantities)}
+
+    def _live_formula(v):
+        """Return an Excel formula string (with B<row> cell refs) for a value whose lineage records a
+        clean `formula` over its input keys — or None when it can't be fully resolved to cells."""
+        if not isinstance(v, dict):
+            return None
+        lin = v.get("lineage") or {}
+        expr, froms = lin.get("formula"), lin.get("from") or []
+        if not expr or not froms or not all(k in key_row for k in froms):
+            return None
+        out = expr
+        for k in sorted(set(froms), key=len, reverse=True):
+            out = out.replace(k, f"B{key_row[k]}")
+        # accept only if EVERY quantity identifier got substituted (Excel funcs SQRT/ROUND/… are fine).
+        residual = re.sub(r"\b(SQRT|ROUND|SUM|MIN|MAX|ABS|PI|INT|CEILING|FLOOR)\b", "", out)
+        return "=" + out if not re.search(r"[A-Za-z_]{3,}", residual) else None
+
     r = 5
     for name in quantities:
         v = quantities[name]
@@ -1973,7 +1994,8 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         else:
             value, unit, family, source, detail = v, "", "", "", ""
         ws.cell(r, 1, clean_cell(name)).border = BORDER
-        ws.cell(r, 2, value).border = BORDER
+        live = _live_formula(v)
+        ws.cell(r, 2, live if live else value).border = BORDER
         ws.cell(r, 3, clean_cell(unit)).border = BORDER
         ws.cell(r, 4, clean_cell(family)).border = BORDER
         ws.cell(r, 5, clean_cell(source)).border = BORDER

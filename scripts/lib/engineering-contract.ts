@@ -13099,8 +13099,13 @@ registerArchetype('water_treatment', (brief: any) => {
   // `from` = the OTHER contract-quantity keys this value is computed FROM (the machine lineage that lets
   // every input trace transitively back to the brief — Tristan 2026-06-30). A brief/measured value passes
   // none; a calculator value MUST pass its inputs so it is not "rootless".
-  const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string, from?: string[]): Quantity =>
-    ({ value: v, unit, family, basis, scope, source, source_detail, ...(from && from.length ? { lineage: { from, via: source } } : {}) } as unknown as Quantity)
+  // `formula` = the value's computation as an EXCEL EXPRESSION over the `from` quantity KEYS (e.g.
+  // "fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)"). The Excel
+  // substitutes key→cell and writes a LIVE formula so the number is PROVEN, not asserted (Tristan
+  // 2026-06-30: "it's just a number — I'd expect a link"). Only for values that are a clean function of
+  // recorded inputs; tool/irreducible values omit it.
+  const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string, from?: string[], formula?: string): Quantity =>
+    ({ value: v, unit, family, basis, scope, source, source_detail, ...(from && from.length ? { lineage: { from, via: source, ...(formula ? { formula } : {}) } } : {}) } as unknown as Quantity)
 
   const quantities: Record<string, Quantity> = {
     // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
@@ -13111,7 +13116,7 @@ registerArchetype('water_treatment', (brief: any) => {
     // 2 drain, ~40 m³ each = 120 m³) — emit it under the brief's own metric name so the compliance check
     // compares TOTAL-vs-TOTAL, not the per-tank 40 against the 120 target (v10 Exec Summary miss: a brief
     // total must be matched by an aggregate, never one unit's capacity).
-    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³', ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count']),
+    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³', ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'], 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
@@ -13132,7 +13137,7 @@ registerArchetype('water_treatment', (brief: any) => {
     fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
     // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL = both A/B dosing units (2 × 45 = 90 m³/h),
     // not one unit's 45 — emit the aggregate under the brief metric name so compliance compares total-vs-total.
-    fertigation_dosing_capacity_m3_per_hr: q(dosingFlowM3H * departmentCount, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `total fertigation dosing capacity = ${departmentCount} units × ${dosingFlowM3H} m³/h = ${dosingFlowM3H * departmentCount} m³/h`),
+    fertigation_dosing_capacity_m3_per_hr: q(dosingFlowM3H * departmentCount, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `total fertigation dosing capacity = ${departmentCount} units × ${dosingFlowM3H} m³/h = ${dosingFlowM3H * departmentCount} m³/h`, ['fertigation_dosing_pump_throughput_m3_h', 'fertigation_dosing_pump_count'], 'fertigation_dosing_pump_throughput_m3_h*fertigation_dosing_pump_count'),
     nutrient_tank_volume_each_m3: q(1.0, 'm³', 'volume', 'rated', 'module', 'brief', 'nutrient stock tank (1,000 L polyester, 4 × A + 4 × B)'),
     nutrient_tank_count: q(nutrientTankCount, '', 'dimensionless', 'rated', 'system', 'brief', 'eight 1,000 L nutrient stock tanks'),
     hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3 bar)'),
