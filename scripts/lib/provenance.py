@@ -198,6 +198,13 @@ _GENERIC_ROLE = {
     "area", "cost", "price", "mass", "load", "power", "capacity", "rate", "size",
     "volume", "length", "width", "height", "weight", "value", "flow", "duty",
     "demand_kw",  # never a token, but guard
+    # device-type + flow-descriptor nouns — shared across UNRELATED equipment, so they don't
+    # discriminate ROLE either. A metering pump and a circulation pump are both "dosing pumps" but
+    # legitimately differ ~1000× in flow; without this the check paired the 0.04 m³/h acid metering
+    # pump with the 45 m³/h circulation pump and false-flagged the real difference (Tristan 2026-06-30).
+    "pump", "valve", "tank", "vessel", "skid", "unit", "motor", "filter", "blower", "fan",
+    "mixer", "agitator", "sensor", "transmitter", "exchanger", "column", "tower", "compressor",
+    "dosing", "metering", "throughput", "transfer", "circulation", "recirc", "feed", "pressure",
 }
 
 
@@ -281,6 +288,18 @@ def _selftest() -> int:
            "total_supply_demand_kw must be flagged sourceless")
     expect(sc["roots"] == 2 and sc["structured"] == 1,
            f"expected 2 roots (brief + physics_constant) + 1 structured, got roots={sc['roots']} structured={sc['structured']}")
+
+    # DEVICE-ROLE guard (Tristan 2026-06-30): two DIFFERENT devices that merely share a generic device/
+    # flow noun (a 0.04 m³/h acid METERING pump vs a 45 m³/h CIRCULATION pump — both "dosing pumps") must
+    # NOT be flagged as a divergent same-role pair; only a SPECIFIC shared role (acid↔acid) discriminates.
+    pumps = {"orchestratorContract": {"quantities": {
+        "acid_dosing_pump_throughput_m3_h":        {"value": 0.04, "unit": "m³/h", "source": "brief"},
+        "chemical_dosing_pump_throughput_m3_h":    {"value": 0.04, "unit": "m³/h", "source": "brief"},
+        "fertigation_dosing_pump_throughput_m3_h": {"value": 45.0, "unit": "m³/h", "source": "brief"},
+        "drain_transfer_pump_throughput_m3_h":     {"value": 45.0, "unit": "m³/h", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(pumps).findings),
+           "a metering pump and a circulation pump (different devices) must NOT be flagged divergent")
 
     # clean: every number is a root, prose-traced, or structured
     clean = {"orchestratorContract": {"quantities": {
