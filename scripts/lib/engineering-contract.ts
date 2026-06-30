@@ -13125,6 +13125,13 @@ registerArchetype('water_treatment', (brief: any) => {
     // an 8 m³/h throughput is below the synth threshold so the envelope volume mints the one skid.
     reverse_osmosis_skid_volume_m3: q(10, 'm³', 'volume', 'rated', 'module', 'brief', 'reverse-osmosis packaged skid envelope (3.8 m × 1.4 m × 2.0 m, Codema HORTI PURE RO7-3LP2P, 8 m³/h @ 75% recovery)'),
     reverse_osmosis_skid_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one RO purification skid'),
+    // RO high-pressure pump — the brief's frequency-controlled HP pump that drives the membranes to the
+    // 10.6 bar working pressure (feed ≈ 10.7 m³/h). Itemised so the pump schedule + BoM show it (physics-
+    // critic HIGH 2026-06-30: "the 5.5 kW RO high-pressure pump is completely missing from the BoM"). Its
+    // electrical load is ALREADY in connected_electrical_load_kw (the +5.5 RO term), so no double-count.
+    ro_high_pressure_pump_throughput_m3_h: q(11, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'RO frequency-controlled high-pressure pump (10.6 bar working pressure, ~10.7 m³/h feed)'),
+    ro_high_pressure_pump_power_kw: q(4.2, 'kW', 'power', 'rated', 'module', 'brief', 'RO high-pressure pump motor (frequency-controlled; 4.2 kW consumption within the RO skid 5.5 kW installed)'),
+    ro_high_pressure_pump_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one frequency-controlled RO high-pressure pump'),
     gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)', ['gac_softener_throughput_m3_h']),
     softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
     softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
@@ -13138,6 +13145,17 @@ registerArchetype('water_treatment', (brief: any) => {
     // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL = both A/B dosing units (2 × 45 = 90 m³/h),
     // not one unit's 45 — emit the aggregate under the brief metric name so compliance compares total-vs-total.
     fertigation_dosing_capacity_m3_per_hr: q(dosingFlowM3H * departmentCount, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `total fertigation dosing capacity = ${departmentCount} units × ${dosingFlowM3H} m³/h = ${dosingFlowM3H * departmentCount} m³/h`, ['fertigation_dosing_pump_throughput_m3_h', 'fertigation_dosing_pump_count'], 'fertigation_dosing_pump_throughput_m3_h*fertigation_dosing_pump_count'),
+    // A/B fertigation METERING pumps — distinct from the 7.5 kW CIRCULATION pumps above. The brief
+    // specifies, per dosing unit, one acid dosing pump (Iwaki EWN-C21VCER) + one chemical dosing pump
+    // (Iwaki EWN-C21VHERA), each with a 100 L barrel; ${departmentCount} units → ${departmentCount * 2}
+    // metering pumps (physics-critic HIGH 2026-06-30: design had a single generic dosing pump). Small
+    // metering duty (~40 L/h) — explicit motor kW so the synth doesn't bump them to the 1.5 kW floor.
+    acid_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'acid metering pump (Iwaki EWN-C21VCER, 100 L barrel, ~40 L/h)'),
+    acid_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'acid metering pump motor (frequency-controlled)'),
+    acid_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} acid dosing pumps (one per A/B fertigation unit)`),
+    chemical_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'chemical/nutrient metering pump (Iwaki EWN-C21VHERA, 100 L barrel, ~40 L/h)'),
+    chemical_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'chemical metering pump motor (frequency-controlled)'),
+    chemical_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} chemical/nutrient dosing pumps (one per A/B fertigation unit)`),
     nutrient_tank_volume_each_m3: q(1.0, 'm³', 'volume', 'rated', 'module', 'brief', 'nutrient stock tank (1,000 L polyester, 4 × A + 4 × B)'),
     nutrient_tank_count: q(nutrientTankCount, '', 'dimensionless', 'rated', 'system', 'brief', 'eight 1,000 L nutrient stock tanks'),
     hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3 bar)'),
