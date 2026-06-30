@@ -117,6 +117,56 @@ export function traceContractProvenance(
   return { traces, unsourced }
 }
 
+// ── TRANSITIVE ROOT-TO-BRIEF (Tristan 2026-06-30: "apart from the brief, nothing should magically appear;
+//    everything should be sourced back to the briefing document"). A quantity is BRIEF-ROOTED iff it is a
+//    brief number, OR a tool output, OR a derivation whose `lineage.from` inputs are ALL (recursively)
+//    brief-rooted. A 'derived/calculator' value with NO structured lineage.from is PROSE-ONLY: the
+//    derivation is human-readable but NOT machine-linkable to the brief → it is "rootless" (the real gap).
+export interface RootResult { key: string; rooted: boolean; via: SourceKind; chain: string[] }
+
+export function resolveRootToBrief(
+  quantities: Record<string, QtyLike> | undefined,
+  briefText: string,
+): { results: RootResult[]; rootless: RootResult[] } {
+  const q = quantities ?? {}
+  const memo = new Map<string, RootResult>()
+  const visiting = new Set<string>()
+  const classify = (key: string): RootResult => {
+    if (memo.has(key)) return memo.get(key)!
+    if (visiting.has(key)) return { key, rooted: false, via: 'derived', chain: ['…cycle'] } // guard cycles
+    visiting.add(key)
+    const v = q[key]
+    const value = num(v?.value)
+    const prov = v?.provenance as { tool_id?: string } | null | undefined
+    const flatSource = (v?.source ?? '').trim().toLowerCase()
+    let res: RootResult
+    if (flatSource === 'brief' || (Number.isFinite(value) && briefStatesNumber(briefText, value))) {
+      res = { key, rooted: true, via: 'brief', chain: ['brief'] }
+    } else if (prov?.tool_id) {
+      res = { key, rooted: true, via: 'tool', chain: [`tool:${prov.tool_id}`] }
+    } else {
+      const from = v?.lineage?.from?.filter((f) => f in q) ?? []
+      if (from.length) {
+        const sub = from.map(classify)
+        res = {
+          key,
+          rooted: sub.every((s) => s.rooted),
+          via: 'derived',
+          chain: [...new Set(sub.flatMap((s) => s.chain))],
+        }
+      } else {
+        // a recorded but PROSE-ONLY derivation (no machine lineage) cannot be proven brief-rooted.
+        res = { key, rooted: false, via: flatSource ? 'derived' : 'unsourced', chain: [] }
+      }
+    }
+    visiting.delete(key)
+    memo.set(key, res)
+    return res
+  }
+  const results = Object.keys(q).map(classify)
+  return { results, rootless: results.filter((r) => !r.rooted) }
+}
+
 // ── selftest (proveCatch) ──────────────────────────────────────────────────────────────────────────
 function _selftest(): number {
   let bad = 0
@@ -142,6 +192,21 @@ function _selftest(): number {
   expect('invented_capacity_m3', 'unsourced')  // no source, no detail, not in brief → magic
   if (!unsourced.some((u) => u.key === 'invented_capacity_m3')) { console.log('  FAIL: the magic 250 must be gate-worthy'); bad++ }
   if (unsourced.some((u) => u.key === 'softener_count')) { console.log('  FAIL: small unsourced count must NOT be gate-worthy'); bad++ }
+  // ROOT-TO-BRIEF: a brief number + a tool output + a lineage'd derivation are rooted; a prose-only
+  // 'calculator' with NO lineage.from is ROOTLESS; and rootlessness is TRANSITIVE (a derivation whose
+  // input is rootless is itself rootless).
+  const rq: Record<string, QtyLike> = {
+    demand_m3_h: { value: 90, source: 'brief' },                                           // rooted (brief)
+    pump_kw: { value: 7.5, provenance: { tool_id: 'process:pump-sizing' } },               // rooted (tool)
+    breaker_a: { value: 96, source: 'calculator', source_detail: 'I=…', lineage: { from: ['demand_m3_h'] } }, // rooted via lineage→brief
+    prose_calc: { value: 250, source: 'calculator', source_detail: 'sum of stuff' },        // ROOTLESS (prose-only)
+    downstream: { value: 9, source: 'calculator', lineage: { from: ['prose_calc'] } },      // ROOTLESS (transitive)
+  }
+  const { rootless } = resolveRootToBrief(rq, 'plant treats 90 m³/h')
+  const rk = new Set(rootless.map((r) => r.key))
+  if (rk.has('demand_m3_h') || rk.has('pump_kw') || rk.has('breaker_a')) { console.log('  FAIL: a brief/tool/lineage-rooted value flagged rootless'); bad++ }
+  if (!rk.has('prose_calc')) { console.log('  FAIL: a prose-only calc must be rootless'); bad++ }
+  if (!rk.has('downstream')) { console.log('  FAIL: rootlessness must be TRANSITIVE'); bad++ }
   console.log('provenance-trace selftest:', bad === 0 ? 'OK' : `${bad} FAIL`)
   return bad
 }
