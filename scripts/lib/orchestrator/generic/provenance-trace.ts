@@ -144,6 +144,10 @@ export function resolveRootToBrief(
       res = { key, rooted: true, via: 'brief', chain: ['brief'] }
     } else if (prov?.tool_id) {
       res = { key, rooted: true, via: 'tool', chain: [`tool:${prov.tool_id}`] }
+    } else if (basisIsDescriptive(v?.basis)) {
+      // a MEASURED / correlated value (basis describes how it was obtained, e.g. "measured routed pipe
+      // length") is a legitimate engine transform of the deterministic layout — rooted leaf, like a tool.
+      res = { key, rooted: true, via: 'derived', chain: [`measured:${String(v?.basis).slice(0, 32)}`] }
     } else {
       const from = v?.lineage?.from?.filter((f) => f in q) ?? []
       if (from.length) {
@@ -165,6 +169,47 @@ export function resolveRootToBrief(
   }
   const results = Object.keys(q).map(classify)
   return { results, rootless: results.filter((r) => !r.rooted) }
+}
+
+// ── THE GATE (universal): every contract input must root to the brief ───────────────────────────────
+// Shadow by default; enforce with PROVENANCE_ROOTING_ENFORCING. A rootless input is a number that does
+// not descend from the briefing document — it must not ship. The fix is always at SOURCE: add the
+// `lineage.from` (the input quantity keys) where the value is computed, so the chain closes to the brief.
+export interface RootingGate {
+  total: number
+  rooted: number
+  rootless: RootResult[]
+  pct: number
+  block: boolean
+  punchlist: string
+}
+
+export function rootingEnforceFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = (env.PROVENANCE_ROOTING_ENFORCING ?? '').trim().toLowerCase()
+  return v.length > 0 && v !== '0' && v !== 'false' && v !== 'no' && v !== 'shadow' && v !== 'off'
+}
+
+export function evaluateRootingGate(
+  quantities: Record<string, QtyLike> | undefined,
+  briefText: string,
+  enforcing: boolean,
+): RootingGate {
+  const { results, rootless } = resolveRootToBrief(quantities, briefText)
+  const total = results.length
+  const rooted = total - rootless.length
+  const lines = rootless.map(
+    (r) => `- **${r.key}** — rootless (${r.via}): no machine lineage to the brief. FIX: add lineage.from (the input quantity keys it is computed from) at its contract setter.`,
+  )
+  return {
+    total,
+    rooted,
+    rootless,
+    pct: total ? Math.round((rooted / total) * 100) : 100,
+    block: enforcing && rootless.length > 0,
+    punchlist: rootless.length
+      ? `# Provenance rooting — ${rooted}/${total} inputs trace to the brief (${rootless.length} ROOTLESS)\n\n${lines.join('\n')}\n`
+      : '',
+  }
 }
 
 // ── selftest (proveCatch) ──────────────────────────────────────────────────────────────────────────
@@ -207,6 +252,11 @@ function _selftest(): number {
   if (rk.has('demand_m3_h') || rk.has('pump_kw') || rk.has('breaker_a')) { console.log('  FAIL: a brief/tool/lineage-rooted value flagged rootless'); bad++ }
   if (!rk.has('prose_calc')) { console.log('  FAIL: a prose-only calc must be rootless'); bad++ }
   if (!rk.has('downstream')) { console.log('  FAIL: rootlessness must be TRANSITIVE'); bad++ }
+  // the GATE: blocks on a rootless input WHEN enforcing, shadows otherwise.
+  if (!evaluateRootingGate(rq, 'plant treats 90 m³/h', true).block) { console.log('  FAIL: gate must BLOCK on rootless + enforcing'); bad++ }
+  if (evaluateRootingGate(rq, 'plant treats 90 m³/h', false).block) { console.log('  FAIL: gate must NOT block in shadow'); bad++ }
+  const cleanGate = evaluateRootingGate({ a: { value: 90, source: 'brief' } }, 'treats 90 m³/h', true)
+  if (cleanGate.block || cleanGate.rootless.length) { console.log('  FAIL: an all-rooted contract must pass the gate'); bad++ }
   console.log('provenance-trace selftest:', bad === 0 ? 'OK' : `${bad} FAIL`)
   return bad
 }

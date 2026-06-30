@@ -1642,8 +1642,10 @@ function sizeMainIncomer(
   if (contract) {
     const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
     const basis = `main incomer sized from the connected electrical load ${Math.round(connectedKw)} kW: I = P·1000/(√3·${vLine}·${PF})·${MARGIN} = ${Math.round(iReq)} A → next standard ${frameA} A ACB frame`
-    cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis }
-    cq['main_incomer_breaker_frame_a'] = { value: frameA, unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis }
+    // lineage.from = the load quantity it was sized from, so the breaker rating traces back to the brief.
+    const incomerLineage = { from: ['connected_electrical_load_kw'], via: 'calculator' }
+    cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: incomerLineage }
+    cq['main_incomer_breaker_frame_a'] = { value: frameA, unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: incomerLineage }
   }
   return stamped
 }

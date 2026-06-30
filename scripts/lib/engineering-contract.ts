@@ -13096,8 +13096,11 @@ registerArchetype('water_treatment', (brief: any) => {
     + 5,                                     // instrumentation, dosing pumps, controls
   )
 
-  const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string): Quantity =>
-    ({ value: v, unit, family, basis, scope, source, source_detail } as unknown as Quantity)
+  // `from` = the OTHER contract-quantity keys this value is computed FROM (the machine lineage that lets
+  // every input trace transitively back to the brief — Tristan 2026-06-30). A brief/measured value passes
+  // none; a calculator value MUST pass its inputs so it is not "rootless".
+  const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string, from?: string[]): Quantity =>
+    ({ value: v, unit, family, basis, scope, source, source_detail, ...(from && from.length ? { lineage: { from, via: source } } : {}) } as unknown as Quantity)
 
   const quantities: Record<string, Quantity> = {
     // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
@@ -13108,7 +13111,7 @@ registerArchetype('water_treatment', (brief: any) => {
     // 2 drain, ~40 m³ each = 120 m³) — emit it under the brief's own metric name so the compliance check
     // compares TOTAL-vs-TOTAL, not the per-tank 40 against the 120 target (v10 Exec Summary miss: a brief
     // total must be matched by an aggregate, never one unit's capacity).
-    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³'),
+    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³', ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count']),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
@@ -13117,7 +13120,7 @@ registerArchetype('water_treatment', (brief: any) => {
     // an 8 m³/h throughput is below the synth threshold so the envelope volume mints the one skid.
     reverse_osmosis_skid_volume_m3: q(10, 'm³', 'volume', 'rated', 'module', 'brief', 'reverse-osmosis packaged skid envelope (3.8 m × 1.4 m × 2.0 m, Codema HORTI PURE RO7-3LP2P, 8 m³/h @ 75% recovery)'),
     reverse_osmosis_skid_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one RO purification skid'),
-    gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)'),
+    gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)', ['gac_softener_throughput_m3_h']),
     softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
     softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
     fresh_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'fresh-water galvanised storage tank (3.64 m dia × 3.88 m, 40 m³)'),
@@ -13150,13 +13153,13 @@ registerArchetype('water_treatment', (brief: any) => {
     // metric gac_softener_throughput matches its DELIVERED capacity — the design treats at
     // 14.5 m³/h ≥ the 14.5 m³/h demand (a genuine PASS, not a matcher work-around).
     gac_softener_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
-    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`),
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`, ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'hand_watering_pump_count', 'drain_transfer_pump_count']),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
     // 1 = the building / civils / rack framework are supplied by others → synthesizeBuildingStructure
     // returns 0 (no £1.1M phantom hall). 'build'/'scope' stems are STOP_STEMS so this never synthesises.
     building_out_of_scope: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'the building, civils and cultivation rack framework are supplied by others — OUT of scope (no hall is synthesised around the water plant)'),
-    total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'total connected electrical demand of the water plant'),
+    total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'total connected electrical demand of the water plant', ['connected_electrical_load_kw']),
   }
 
   const closures: any[] = [{
