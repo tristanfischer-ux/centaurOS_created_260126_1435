@@ -1924,6 +1924,77 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
             for src in lin:
                 used_by.setdefault(src, []).append(nm)
 
+    # WHERE-TO also includes the BoM PARTS each input feeds — Tristan: "masses of these have no used-by;
+    # if it's not used by anything, what's the point?" A self-describing quantity key (<noun>_<attribute>,
+    # e.g. fresh_water_tank_volume_each_m3 / softener_vessel_count) SIZES the part whose name carries that
+    # noun. Strip the attribute suffix → the noun token-set, and match it (subset) against the design's
+    # part names. Universal — keyed on the noun, no class table.
+    _part_names = []
+    for _m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+        for _sm in (_m.get("sub_modules") or []):
+            for _w in (_sm.get("words") or []):
+                _pn = _w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or ""
+                if _pn:
+                    _part_names.append(_pn)
+    def _sing(t):
+        return t[:-1] if len(t) > 3 and t.endswith("s") else t
+    _part_tok = [(pn, set(_sing(t) for t in re.split(r"[^a-z0-9]+", pn.lower()) if t)) for pn in dict.fromkeys(_part_names)]
+    _ATTR_SUFFIX = re.compile(
+        r"_(volume_each_m3|volume_m3|capacity_m3_per_hr|capacity_m3|throughput_m3_h|power_kw|"
+        r"each_m3|diameter_m|secondary_current_a|current_a|breaker_frame_a|breaker_a|frame_a|"
+        r"salt_consumption_max_kg_per_reg|cal_cm2|voltdrop_pct|csa_mm2|kva|kwh|kw|percent|"
+        r"m3_h|m3|m2|kg|mm2|count|\ba\b)$", re.I)
+
+    def _noun_stem(key: str):
+        s = key
+        while True:
+            s2 = _ATTR_SUFFIX.sub("", s)
+            if s2 == s:
+                break
+            s = s2
+        toks = set(t for t in s.split("_") if t and t not in ("each", "total", "main", "of"))
+        return toks
+
+    _GENERIC = {"tank", "pump", "valve", "vessel", "skid", "filter", "panel", "system", "unit", "water"}
+
+    def _part_consumers(key: str):
+        stem = set(_sing(t) for t in _noun_stem(key))
+        if not stem or (len(stem) == 1 and next(iter(stem)) in _GENERIC):
+            return []
+        head = _sing(next(iter(_noun_stem(key) or {""})))  # last token of the key noun (the device)
+        out = []
+        for pn, toks in _part_tok:
+            if stem <= toks:                                   # exact noun match
+                out.append(pn)
+            elif head and head not in _GENERIC and head in toks and len(stem & toks) >= 2:
+                out.append(pn)                                  # head noun + ≥1 qualifier overlap (plurals/extra words)
+        return sorted(set(out))
+
+    # A value can also INFORM a calculation / closure / design-rule without a quantity-or-part link (e.g.
+    # ro_recovery_percent feeds the RO mass-balance closure; cultivation_container_count drives the valve
+    # count; building_out_of_scope is a synthesis flag). Build a corpus of all calc/closure text and treat
+    # a value whose NOUN appears there as USED — so only a GENUINELY unreferenced input is flagged orphan.
+    _orch = state.get("orchestratorContract") or {}
+    _corpus = " ".join(
+        [(qq.get("source_detail") or "") for qq in quantities.values() if isinstance(qq, dict)]
+        + [f"{c.get('required', '')} {c.get('reason', '')} {c.get('measured', '')}" for c in (_orch.get("closures") or [])],
+    ).lower()
+    _corpus_toks = set(t for t in re.split(r"[^a-z0-9]+", _corpus) if t)
+
+    def _informs_calc(key: str) -> bool:
+        stem = _noun_stem(key)
+        # ANY noun token appearing in the calc/closure corpus → this value informs a calculation.
+        return bool(stem) and bool(stem & _corpus_toks)
+
+    # An OUTPUT-type value (a cost £, a mass, a length, an area, a current/voltage, an NPV/capex) is not
+    # consumed by another INPUT — it feeds a deliverable subsystem (cost / financial model / drawings).
+    # Recognise it by its unit suffix so it is NOT mislabelled "orphan".
+    _OUTPUT_SUFFIX = re.compile(r"_(gbp|kg|m2|mm2|cal_cm2|csa_mm2|npv|capex|opex|cost|mass|length_m|"
+                                r"area_m2|m_h|ml_min|kva|kvar|hz|pct|percent)$|_m$", re.I)
+
+    def _is_output(key: str) -> bool:
+        return bool(_OUTPUT_SUFFIX.search(key))
+
     rooting = state.get("provenanceRooting") or {}
     pct = rooting.get("pct")
     rootless_set = set(rooting.get("rootless") or [])
@@ -2010,10 +2081,28 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         cd.alignment = WRAP_TOP
         cd.font = FONT_NOTE
         cd.border = BORDER
-        ct = ws.cell(r, 8, clean_cell(", ".join(used_by.get(name, [])) or "—"))
+        q_consumers = used_by.get(name, [])
+        p_consumers = _part_consumers(name)
+        parts_txt = (["→ part: " + ", ".join(p_consumers[:4]) + (f" (+{len(p_consumers) - 4})" if len(p_consumers) > 4 else "")]
+                     if p_consumers else [])
+        whereto = ", ".join(q_consumers) if q_consumers else ""
+        if parts_txt:
+            whereto = (whereto + "  " if whereto else "") + parts_txt[0]
+        orphan = False
+        if not whereto:
+            if _is_output(name):
+                whereto = "→ design output (feeds cost / financial / drawings)"
+            elif _informs_calc(name):
+                whereto = "→ informs calculations / design rules (see Source detail)"
+            else:
+                whereto = "⚠ no consumer found — verify it is needed"
+                orphan = True
+        ct = ws.cell(r, 8, clean_cell(whereto))
         ct.alignment = WRAP_TOP
         ct.font = FONT_NOTE
         ct.border = BORDER
+        if orphan:
+            ct.fill = FILL_FAIL if "FILL_FAIL" in globals() else ct.fill
         r += 1
     apply_col_formats(ws, 5, {2: FMT_NUM}, r - 1)
     ws.auto_filter.ref = f"A4:H{r - 1}"
