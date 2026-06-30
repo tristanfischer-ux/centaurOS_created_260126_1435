@@ -1944,14 +1944,18 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         basis = (v.get("basis") or "").strip()
         if basis and basis.lower() not in ("rated", "assumed", "estimate", "estimated", "default", ""):
             return f"← measured: {basis}"
-        # No explicit source/lineage. Defer to the GATE (the authority): if it rooted this value, it is
-        # a brief-stated number that the builder just labelled 'calculator'; only flag ⚠ when the gate ran
-        # AND named it rootless.
-        if gate_ran and name not in rootless_set:
-            return "← brief (stated value)"
+        # Source-CONSISTENT fallback (no tool/brief/lineage/measured link). A calculator/derived value
+        # must NEVER be labelled "← brief" just because its output number happens to appear in the brief
+        # text (that was the irrigation_demand "source=calculator but where-from=brief" contradiction).
+        # Show its KIND, matching the Source column, and flag that it is not yet MACHINE-LINKED (no
+        # lineage.from → the Value is a bare number, not a live formula — the next-step fix).
+        if src in ("calculator", "physics_constant", "override", "inherited", "convergence-report"):
+            return "← calculated (inputs in Source detail — not yet machine-linked)"
         if not gate_ran:
             return "(source not recorded — re-run to trace)"
-        return "⚠ ROOTLESS — no link to the brief"
+        if gate_ran and name in rootless_set:
+            return "⚠ ROOTLESS — no link to the brief"
+        return "← brief (value stated in brief)"
 
     sub = ("Where each INPUT came FROM (its source / the quantities it was computed from) and what it "
            "FEEDS into downstream. Apart from the brief, every value traces back to the briefing document.")
