@@ -2773,6 +2773,26 @@ export function reassertPopulationCounts(modules: ModuleLike[], contract: Contra
     if (!popHeadsByValue.has(val)) popHeadsByValue.set(val, new Set())
     popHeadsByValue.get(val)!.add(head)
   }
+  // QUALIFIER-GRAB SMEAR: a contract count (e.g. actuated_distribution_VALVE_count = 200) is grabbed by a
+  // word that shares one of the count key's QUALIFIER tokens but NOT its HEAD noun — so the word does not
+  // OWN that count (a "Power Distribution Block" / "Flow Distribution Plates" inherits 200 via the shared
+  // "distribution" qualifier; it is electrical/internal infrastructure, not 200 units). The head-only
+  // matcher (b) below misses these because the head differs. Detect them by: value IS a contract count,
+  // the word shares a NON-HEAD token with a same-valued key, and the word does NOT carry that key's head.
+  // Reset to the word's own qualifier-strict contractCountFor. A word that owns the count (shares the head
+  // noun — the real "Pneumatic Actuated Valve") is untouched, as is one that shares NOTHING with the key
+  // (e.g. "Pneumatic Actuators", whose count stays coherent with the valves). UNIVERSAL — token-keyed.
+  const popKeysByValue = new Map<number, Array<{ head: string; toks: Set<string> }>>()
+  for (const [k, v] of Object.entries(quantities)) {
+    const m = k.match(/^(.+?)_(count|qty|quantity|number)$/i)
+    if (!m || v < POP_MIN) continue
+    const parts = m[1].split('_').filter(Boolean).map(singulariseTok)
+    const head = parts[parts.length - 1] ?? ''
+    if (!head) continue
+    const val = Math.round(v)
+    if (!popKeysByValue.has(val)) popKeysByValue.set(val, [])
+    popKeysByValue.get(val)!.push({ head, toks: new Set(parts) })
+  }
   if (popHeadsByValue.size === 0) return 0
   let fixed = 0
   for (const mdl of modules ?? []) {
@@ -2782,12 +2802,16 @@ export function reassertPopulationCounts(modules: ModuleLike[], contract: Contra
         if (!qmod) continue
         const cur = Math.round(parseFloat(String(qmod.value).replace(/[^0-9.]/g, '')) || 0)
         if (cur < POP_MIN) continue
-        const heads = popHeadsByValue.get(cur)
-        if (!heads) continue
         const name = w.name_human ?? w.content_character?.name_human ?? ''
         const toks = new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(singulariseTok))
-        // (b) the word must share a HEAD NOUN with a same-valued population count (smear signature)
-        if (![...heads].some((h) => toks.has(h))) continue
+        // (b) HEAD-noun smear: the word shares a HEAD NOUN with a same-valued contract count …
+        const heads = popHeadsByValue.get(cur)
+        const headSmear = !!heads && [...heads].some((h) => toks.has(h))
+        // … OR QUALIFIER-GRAB: shares a NON-HEAD token with a same-valued count key it does NOT head-own.
+        const qualGrab = (popKeysByValue.get(cur) ?? []).some(
+          (key) => !toks.has(key.head) && [...key.toks].some((t) => t !== key.head && toks.has(t)),
+        )
+        if (!headSmear && !qualGrab) continue
         // (c) the qualifier-strict deterministic count must DISAGREE with the stamped population
         const cc = contractCountFor(name, contract)
         if (cc !== cur && cc >= 1) {
