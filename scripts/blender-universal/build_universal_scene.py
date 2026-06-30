@@ -8727,10 +8727,25 @@ def _tray_paths(src_xyz, dests_xyz, service, overhead_base_z=None, tier_idx=0):
             trunk.append((spine_other, sy, z_spine))   # square up to the spine's X lane
         trunk.append(near)
     trunk.append(far)                                  # run the full spine span
+    # END THE TRUNK ON THE OUTERMOST LOAD (Tristan 2026-06-30): the spine's free `far` end sits at the
+    # off-axis CENTROID (spine_other), but the dest at that along-extreme is usually OFFSET in the
+    # off-axis — so the bare spine end FLOATS above empty floor, which the vision critic flags as a
+    # "stray pipe shooting off the platform to a floating box" (the v30 proveCatch defect class). Extend
+    # the trunk straight from `far` to sit DIRECTLY ABOVE that real outermost dest, so the trunk
+    # TERMINATES on a part; its spur is then a clean vertical drop (no L to empty space). Universal,
+    # pure geometry — deterministic (min over dests with an explicit tiebreak).
+    far_along = far[0] if axis == "x" else far[1]
+    far_dest = min(dests, key=lambda d: (abs((d[0] if axis == "x" else d[1]) - far_along),
+                                         d[0], d[1]))
+    far_tip = (far_along, far_dest[1], z_spine) if axis == "x" else (far_dest[0], far_along, z_spine)
+    if abs(far_tip[0] - far[0]) > 1.0 or abs(far_tip[1] - far[1]) > 1.0:
+        trunk.append(far_tip)                          # run from the spine end onto the real load
     # SPUR: the spine point directly above each dest → drop onto the dest port.
     spurs = []
     for d in dests:
-        if axis == "x":
+        if d is far_dest:
+            tap = far_tip                              # the trunk already reaches above this load
+        elif axis == "x":
             tap = (d[0], spine_other, z_spine)
         else:
             tap = (spine_other, d[1], z_spine)
