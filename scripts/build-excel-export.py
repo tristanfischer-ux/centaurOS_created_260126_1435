@@ -355,18 +355,37 @@ def _aux_tab_score(title: str, run_dir: str):
         # clean → the visual dimension is VERIFIED, so NO advisory and the render can earn ≥8 on its
         # deterministic checks (coverage/litter/shape). absent → keep the advisory (honest-cap → 7).
         _vv = _render_vision_verdict(run_dir)
-        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is True:
+        _vv_defects = (_vv.get("defects") or []) if isinstance(_vv, dict) else []
+        # DETERMINISTIC backstop FIRST: a real electrical-part-drawn-as-a-vessel (the stray-beam defect)
+        # caps the render to 4 regardless of the vision critic — so relaxing an UNSUBSTANTIATED vision
+        # verdict below can never let a genuine structural defect pass.
+        _stm = _manifest_shape_mismatch(run_dir)
+        if isinstance(_stm, dict) and _stm.get("count"):
             base = _cap_litter(_cov("blender", "Render"))
             if isinstance(base, dict):
-                _df = "; ".join(str(d) for d in (_vv.get("defects") or [])[:3]) or "a visible defect"
+                _ex = ", ".join(f"{p['name']}→{p['shape']}" for p in _stm.get("parts", [])[:3])
+                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                base["status"] = "FAIL"
+                base["issues"] = ([f"WRONG SHAPE: {_stm['count']} electrical part(s) rendered as a process vessel (the stray-beam defect): {_ex}"] + (base.get("issues") or []))[:6]
+                base["fix"] = "classify_shape must map an electrical/power-connection part to a cabinet/box, not a vessel"
+            return base
+        # VISION VERDICT: a 'broken' flag only HARD-CAPS when it NAMES a concrete defect. An LLM
+        # 'broken=True' with EMPTY defects is unsubstantiated — a false FAIL is as dishonest as a false
+        # PASS (Tristan 2026-06-30); the deterministic shape/litter/coverage checks are the real gate.
+        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is True and _vv_defects:
+            base = _cap_litter(_cov("blender", "Render"))
+            if isinstance(base, dict):
+                _df = "; ".join(str(d) for d in _vv_defects[:3])
                 base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
                 base["status"] = "FAIL"
                 base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — the render is not "
                                    f"clean (model: {_vv.get('model', '?')})"] + (base.get("issues") or []))[:6]
                 base["fix"] = "fix the geometry/routing that produces the flagged defect, then the vision critic clears"
             return base
-        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is False:
-            # visual quality VERIFIED clean by the vision critic → drop the 'unverified' advisory
+        if isinstance(_vv, dict) and _vv.get("ok") and (_vv.get("broken") is False or not _vv_defects):
+            # VERIFIED clean, OR broken-but-unsubstantiated (no named defect) → score on the DETERMINISTIC
+            # checks (coverage/litter/shape) only; the vision critic cannot drag a deterministically-clean
+            # render to a FAIL on a verdict it could not substantiate.
             return _cap_litter(_cov("blender", "Render"))
         return _cap_litter(_cov("blender", "Render",
                     advisory="ADVISORY: object-level visual quality is UNVERIFIED — no vision critic has looked at this render (run render_vision_critic)"))
