@@ -524,7 +524,14 @@ function isSynthesisable(g: EquipGroup): boolean {
   // A sub-aspect of a larger principal (degasser_column ⊂ a degasser) is not a second machine.
   if (g.subAspect) return false
   if (g.volume !== undefined && g.volume >= 1) return true
-  if (g.area !== undefined && g.area >= 2) return true
+  if (g.area !== undefined && g.area >= 2) {
+    // a MEMBRANE / transfer SURFACE area (RO/UF/NF) is a process SPEC, not a plan footprint — the
+    // membranes live INSIDE the RO/UF skid principal, so minting a standalone "364 m² membrane slab"
+    // is wrong (the recurring £61M membrane-area bug + the physics-critic HIGH "364 m² for an 8040
+    // element"). Universal — keyed on the membrane/RO noun, no class table.
+    if (/membrane|reverse.?osmos|\bro\b|\buf\b|\bnf\b|ultrafiltrat|nanofiltrat/i.test(g.phrase)) return false
+    return true
+  }
   if ((g.throughput !== undefined && g.throughput >= 10) || (g.power !== undefined && g.power >= 15)) {
     return phraseLooksLikeDevice(g.phrase)
   }
