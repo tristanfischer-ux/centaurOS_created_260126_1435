@@ -1910,37 +1910,89 @@ def tab_audit(wb: Workbook, report, state: Optional[dict] = None) -> None:
 # ============================================================================
 def tab_quantities(wb: Workbook, state: dict) -> None:
     ws = wb.create_sheet("Quantities")
-    set_widths(ws, {"A": 34, "B": 16, "C": 12, "D": 16, "E": 12, "F": 12, "G": 62})
-    title_row(ws, "Contract quantities", 7,
-              "Every sized contract quantity with its family, basis and source.")
-    header(ws, 4, ["Name", "Value", "Unit", "Family", "Basis", "Source", "Source detail"])
+    set_widths(ws, {"A": 34, "B": 14, "C": 10, "D": 14, "E": 12, "F": 50, "G": 34, "H": 34})
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+
+    # WHERE-FROM / WHERE-TO traceability (Tristan 2026-06-30: "show where the source info came from and
+    # what happens to it; apart from the brief, nothing should appear from nowhere"). where-FROM = each
+    # value's source (brief / tool / a measured basis / the input quantities in its lineage). where-TO =
+    # the REVERSE edges — which OTHER inputs consume this one (so the reader sees the value flow forward).
+    used_by: dict = {}
+    for nm, v in quantities.items():
+        if isinstance(v, dict):
+            lin = (v.get("lineage") or {}).get("from") or []
+            for src in lin:
+                used_by.setdefault(src, []).append(nm)
+
+    rooting = state.get("provenanceRooting") or {}
+    pct = rooting.get("pct")
+    rootless_set = set(rooting.get("rootless") or [])
+    gate_ran = bool(rooting)
+
+    def _where_from(name, v) -> str:
+        if not isinstance(v, dict):
+            return ""
+        src = (v.get("source") or "").lower()
+        prov = v.get("provenance")
+        lin = (v.get("lineage") or {}).get("from") or []
+        if isinstance(prov, dict) and prov.get("tool_id"):
+            return f"← tool: {prov['tool_id']}"
+        if src == "brief":
+            return "← brief (stated requirement)"
+        if lin:
+            return "← " + ", ".join(lin)
+        basis = (v.get("basis") or "").strip()
+        if basis and basis.lower() not in ("rated", "assumed", "estimate", "estimated", "default", ""):
+            return f"← measured: {basis}"
+        # No explicit source/lineage. Defer to the GATE (the authority): if it rooted this value, it is
+        # a brief-stated number that the builder just labelled 'calculator'; only flag ⚠ when the gate ran
+        # AND named it rootless.
+        if gate_ran and name not in rootless_set:
+            return "← brief (stated value)"
+        if not gate_ran:
+            return "(source not recorded — re-run to trace)"
+        return "⚠ ROOTLESS — no link to the brief"
+
+    sub = ("Where each INPUT came FROM (its source / the quantities it was computed from) and what it "
+           "FEEDS into downstream. Apart from the brief, every value traces back to the briefing document.")
+    if pct is not None:
+        sub += f"  —  {rooting.get('rooted', '?')}/{rooting.get('total', '?')} inputs ({pct}%) trace to the brief."
+    title_row(ws, "Contract inputs — traceability (where-from / where-to)", 8, sub)
+    header(ws, 4, ["Input", "Value", "Unit", "Family", "Source", "Where-from (source / inputs)", "Source detail", "Used by (where-to)"])
     r = 5
     for name in quantities:
         v = quantities[name]
         if isinstance(v, dict):
             value, unit = v.get("value"), v.get("unit", "")
-            family, basis = v.get("family", ""), v.get("basis", "")
+            family = v.get("family", "")
             source, detail = v.get("source", ""), v.get("source_detail", "")
         else:
-            value, unit, family, basis, source, detail = v, "", "", "", "", ""
+            value, unit, family, source, detail = v, "", "", "", ""
         ws.cell(r, 1, clean_cell(name)).border = BORDER
         ws.cell(r, 2, value).border = BORDER
         ws.cell(r, 3, clean_cell(unit)).border = BORDER
         ws.cell(r, 4, clean_cell(family)).border = BORDER
-        ws.cell(r, 5, clean_cell(basis)).border = BORDER
-        ws.cell(r, 6, clean_cell(source)).border = BORDER
+        ws.cell(r, 5, clean_cell(source)).border = BORDER
+        wf = _where_from(name, v)
+        cf = ws.cell(r, 6, clean_cell(wf))
+        cf.alignment = WRAP_TOP
+        cf.font = FONT_NOTE
+        cf.border = BORDER
+        if wf.startswith("⚠"):
+            cf.fill = FILL_FAIL if "FILL_FAIL" in globals() else cf.fill
         cd = ws.cell(r, 7, clean_cell(detail))
         cd.alignment = WRAP_TOP
         cd.font = FONT_NOTE
         cd.border = BORDER
+        ct = ws.cell(r, 8, clean_cell(", ".join(used_by.get(name, [])) or "—"))
+        ct.alignment = WRAP_TOP
+        ct.font = FONT_NOTE
+        ct.border = BORDER
         r += 1
-    # number formats (#37) on the Value column — FMT_NUM drops trailing .00 so an
-    # integer-valued metric reads "62" not "62.00", while 2.58 still shows "2.58".
     apply_col_formats(ws, 5, {2: FMT_NUM}, r - 1)
-    ws.auto_filter.ref = f"A4:G{r - 1}"
+    ws.auto_filter.ref = f"A4:H{r - 1}"
     ws.freeze_panes = "A5"
-    back_link(ws, 7)
+    back_link(ws, 8)
 
 
 # ============================================================================
