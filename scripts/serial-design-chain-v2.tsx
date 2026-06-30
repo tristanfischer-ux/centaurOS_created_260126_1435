@@ -6704,6 +6704,27 @@ async function main() {
     logAction({ step: 'derive_process_topology', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── PROVENANCE ROOTING GATE (Tristan 2026-06-30): every contract INPUT must trace back to the brief.
+  // "Apart from the brief, nothing should appear from nowhere" — a rootless value (no machine lineage to
+  // the briefing document) must not ship. Shadow by default; PROVENANCE_ROOTING_ENFORCING blocks (exit 37).
+  // Records state.provenanceRooting (the Excel where-from/where-to tab reads it) + a routed punch-list.
+  try {
+    const { evaluateRootingGate, rootingEnforceFromEnv } = await import('./lib/orchestrator/generic/provenance-trace')
+    const rootQ = ((state.orchestratorContract as any)?.quantities) ?? ((engineeringContract as any)?.quantities) ?? {}
+    const enforcing = rootingEnforceFromEnv(process.env)
+    const rg = evaluateRootingGate(rootQ, currentBriefText, enforcing)
+    ;(state as any).provenanceRooting = { total: rg.total, rooted: rg.rooted, pct: rg.pct, rootless: rg.rootless.map((r) => r.key) }
+    console.error(`[chain] provenance rooting: ${rg.rooted}/${rg.total} inputs trace to the brief (${rg.pct}%)${rg.rootless.length ? ` — ${rg.rootless.length} ROOTLESS: ${rg.rootless.map((r) => r.key).join(', ')}` : ''}`)
+    if (rg.punchlist) writeFileSync(resolve(outDir, 'provenance-rooting-punchlist.md'), rg.punchlist)
+    logAction({ step: 'provenance_rooting_gate', rooted: rg.rooted, total: rg.total, rootless: rg.rootless.length, enforcing, block: rg.block })
+    if (rg.block) {
+      console.error(`[chain] PROVENANCE-ROOTING gate BLOCKED — ${rg.rootless.length} input(s) do not trace to the brief; fix at source (add lineage.from). See provenance-rooting-punchlist.md`)
+      process.exit(37)
+    }
+  } catch (err) {
+    console.error(`[chain] provenance rooting gate skipped (non-fatal): ${(err as Error).message}`)
+  }
+
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
