@@ -871,6 +871,15 @@ def build_schedules(schedule: dict, state: dict,
     # LEDGER equipment quantities (parts-manifest) — so a circuit to an N-off load enumerates
     # N feeders (8 recirc pumps), not one. Empty when no out_dir / manifest (prior behaviour).
     equip_qty = _load_equipment_qty(out_dir)
+    # Stash the qty-expanded parts-manifest on state so the MAIN board can synthesise ONE outgoing
+    # circuit PER driven equipment item (the real panel schedule) instead of per-module — mirrors the
+    # single-line. Without this the schedule shows module circuits and under-covers the principal
+    # parts (Codema: panel-schedule part-coverage 64%). Best-effort; falls back when absent. 2026-07-01.
+    if out_dir and not (state.get("_parts_manifest") or {}).get("parts"):
+        try:
+            state["_parts_manifest"] = json.loads((Path(out_dir) / "parts-manifest.json").read_text())
+        except Exception:  # noqa: BLE001
+            pass
     voltage_v, is_dc, phases, system = _board_voltage(state)
     # UNIVERSAL LV fallback: when the board voltage cannot be read or inferred (an AC
     # process plant whose state carries no explicit board voltage and no TP&N/1-ph cue in
@@ -1000,10 +1009,26 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
         return None
 
     md = state.get("moduleDecomposition") or {}
-    feeders = edm.synthesise_module_feeders(
-        plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
-        total_load_kw=plan.connected_load_kw,
-        per_module_load_kw=_known_module_loads(state))
+    # PREFER one outgoing circuit PER driven equipment item (pump/blower/panel) from the qty-expanded
+    # parts-manifest — the real panel schedule a plant has — mirroring the single-line. Falls back to
+    # the per-module split when the manifest is absent or yields nothing. 2026-07-01 (panel-coverage fix).
+    parts = ((state.get("_parts_manifest") or {}).get("parts")) or []
+    quantities = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict) and q:
+            quantities = q
+            break
+    feeders = []
+    if parts:
+        feeders = edm.synthesise_equipment_feeders(
+            plan.board_current_a, plan.board_voltage_v, parts,
+            total_load_kw=plan.connected_load_kw, quantities=quantities)
+    if not feeders:
+        feeders = edm.synthesise_module_feeders(
+            plan.board_current_a, plan.board_voltage_v, md.get("modules") or [],
+            total_load_kw=plan.connected_load_kw,
+            per_module_load_kw=_known_module_loads(state))
     if not feeders:
         return None
 
