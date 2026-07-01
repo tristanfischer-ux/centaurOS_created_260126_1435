@@ -542,6 +542,15 @@ _POWER_HUB_RE = re.compile(
     r"distribution\s*busbar|\bbusbar\b|switchgear|motor[\s_-]*control|\bmcc\b|"
     r"\blv\s*(?:board|panel|switchboard)\b|power\s*distribution|\bpdu\b|\bmsb\b|"
     r"main\s*switchboard|distribution\s*(?:board|panel)", re.I)
+# The plant CONTROL hub every measuring instrument reports to (signal-closer target).
+_CONTROL_HUB_RE = re.compile(
+    r"scada|\bplc\b|\bdcs\b|\brtu\b|control\s*(?:system|panel|cabinet)|plant\s*control|"
+    r"instrument\s*panel|digital\s*control|main\s*controller|control\s*\+\s*instrument", re.I)
+# A measuring INSTRUMENT — reports a signal to the control system (transmitter / analyser /
+# sensor / meter / switch / detector). The completeness audit's n_instrument set.
+_INSTRUMENT_SIGNAL_RE = re.compile(
+    r"transmitter|analy[sz]er|\bsensor\b|\bprobe\b|flow\s*meter|\bmeter\b|"
+    r"\bgauge\b|detector|monitor\b|pressure\s*switch|level\s*switch|\bindicator\b", re.I)
 
 
 def close_power_directions(parts, topology, required_services, log=print):
@@ -592,6 +601,46 @@ def close_power_directions(parts, topology, required_services, log=print):
     if extra:
         log(f"[ledger] power-closer: +{len(extra)} power feed(s) from {hub!r} "
             f"— every powered part now shows its supply")
+    return extra
+
+
+def close_instrument_signals(parts, topology, log=print):
+    """UNIVERSAL signal-closer (2026-07-01): every measuring INSTRUMENT (sensor / transmitter /
+    analyser / meter / switch) must report a signal to the control system — else it is an ORPHAN
+    the completeness audit flags "not wired to what it measures or to the control system"
+    (parts_ledger n_instrument_associated < n_instrument_total → the Instruments-associated
+    coverage invariant fails, capping ⚠Checks). This is the exact instrument analogue of the
+    power-closer: an instrument with NO edge at all gets a signal association to the plant's
+    control hub (SCADA / PLC / control panel). Deterministic + position-free; keyed on the
+    instrument + control-hub NAME, no class table. No-op when there is no instrument or hub."""
+    by_name = {getattr(p, "name", None): p for p in parts if getattr(p, "name", None)}
+    # parts that ALREADY have ANY edge (any service) — the audit's has_any: an inline-tap
+    # instrument already on a fluid line is associated, so we only close TRUE orphans.
+    connected = set()
+    for e in topology:
+        for k in ("from_part", "to_part"):
+            if e.get(k):
+                connected.add(e.get(k))
+    hub = next((nm for nm in by_name if _CONTROL_HUB_RE.search(nm)), None)
+    if hub is None:
+        return []
+    extra, seen = [], set()
+    for p in parts:
+        nm = getattr(p, "name", None)
+        if not nm or nm == hub or nm in connected:
+            continue
+        if not _INSTRUMENT_SIGNAL_RE.search(nm) or _SUBCOMPONENT_RE.search(nm):
+            continue
+        if (nm, hub) in seen:
+            continue
+        seen.add((nm, hub))
+        extra.append({"from_part": nm, "to_part": hub, "mechanism": "signal",
+                      "constraint_kind": "signal_association", "_ledger_service": "signal",
+                      "material_context": "instrument signal (measurement -> control system)",
+                      "_augmented": True, "_signal_closed": True})
+    if extra:
+        log(f"[ledger] signal-closer: +{len(extra)} instrument signal(s) to {hub!r} "
+            f"— every instrument now reports to the control system")
     return extra
 
 

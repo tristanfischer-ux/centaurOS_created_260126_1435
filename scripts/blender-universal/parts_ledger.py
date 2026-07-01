@@ -756,6 +756,11 @@ def main() -> int:
         if e["outputs"]:
             agg["has_out"] = True
 
+    # A control system is present when ANY equipment is control-typed (SCADA / PLC / DCS /
+    # control panel) — every field instrument reports its measurement to it (see the instrument
+    # branch below; its signal wiring is on the P&ID, decluttered from the 3-D model).
+    _control_present = any((str(e.get("type") or "")) in CONTROL_TYPES for e in equipment)
+
     seen_idents: set = set()
     for e in equipment:
         ident = (str(e["tag"] or "—"), _norm(e["name"]))
@@ -828,14 +833,23 @@ def main() -> int:
 
         elif etype in INSTRUMENT_TYPES:
             n_instrument_total += 1
-            if not has_any:
+            # A field instrument reports its measurement to the control system BY DEFINITION;
+            # that signal wiring lives on the P&ID / loop diagram and is deliberately
+            # DECLUTTERED from the 3-D model + connection schedule (0 signal rows drawn), so a
+            # ×N field transmitter often carries no discrete DRAWN edge even though it is wired.
+            # Requiring a drawn edge is then a FALSE ORPHAN (2026-07-01): if the plant HAS a
+            # control system, every instrument associates to it. A run-to-run flapper too — the
+            # LLM authors a signal grammar-link for some transmitters and not others. Credit the
+            # instrument when a control system exists; only a genuinely CONTROL-LESS plant leaves
+            # an instrument orphan. Deterministic — keyed on the presence of a control-typed part.
+            if has_any or _control_present:
+                n_instrument_associated += 1
+            else:
                 connectivity_concerns.append({
                     "tag": tag, "name": e["name"], "type": etype,
                     "issue": "orphan_instrument",
-                    "detail": "Sensor/analyser with no connection — not wired to "
-                              "what it measures or to the control system."})
-            else:
-                n_instrument_associated += 1
+                    "detail": "Sensor/analyser with no connection AND no control system in the "
+                              "plant — nothing for it to report its measurement to."})
 
         elif etype in ELECTRICAL_TYPES:
             n_electrical_total += 1

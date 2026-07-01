@@ -14669,6 +14669,9 @@ def main():
     # the gaps the audit flags.
     _candidate = _candidate + cl.close_power_directions(parts, _candidate, _required_services_wet,
                                                         log=lambda m: print(m))
+    # signal-closer: every measuring instrument reports to the control system (the instrument
+    # analogue of the power-closer — closes the parts_ledger n_instrument_associated orphan gap).
+    _candidate = _candidate + cl.close_instrument_signals(parts, _candidate, log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
     # final boundary connector: sinks fed from their producer + discharged to disposal;
     # feed-stage/product units with no in-plant neighbour tied to the battery limit.
