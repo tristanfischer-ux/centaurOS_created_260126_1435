@@ -183,7 +183,42 @@ def run_gates(out_dir: str) -> list:
                           "high" if got < n * 0.5 else "med", got >= max(2, int(n * 0.8)),
                           f"{noun}: contract qty {n}, parts-manifest has {got} instance(s) (need ≥{max(2, int(n*0.8))})"))
 
+    # ── G6 NO STRAY BEAM — no CABLE run spans the plant as an overhead beam ──────────
+    #    The v44 render shipped a 'stray red pipe extending off the platform to a floating
+    #    box': an MCC->plant-wide-loads cable tray whose spine ran 33 m. A physical overhead
+    #    cable tray does NOT span the whole plant to a lone load — that power/signal
+    #    distribution belongs on the single-line/P&ID (build_universal_scene demotes it).
+    #    SCOPE: cables ONLY (power/signal/electric/data/control/bus). A FLUID pipe MUST
+    #    physically connect its two parts, so a long routed process pipe is legitimate (it
+    #    hugs equipment via Manhattan waypoints — a large bbox is not a straight beam); only
+    #    cable distribution is demotable. Universal — service-keyed, no class table.
+    worst = None
+    for r in route:
+        if not isinstance(r, dict):
+            continue
+        svc = str(r.get("service") or r.get("mechanism") or "").lower()
+        if not any(t in svc for t in ("power", "signal", "electric", "data", "control", "bus")):
+            continue
+        wps = r.get("waypoints_mm") or r.get("waypoints") or []
+        xs = [w[0] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 2]
+        ys = [w[1] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 2]
+        if not xs or not ys:
+            continue
+        span = max(max(xs) - min(xs), max(ys) - min(ys))
+        if worst is None or span > worst[1]:
+            worst = (str(r.get("run_name") or r.get("name") or "?"), span)
+    if worst is not None:
+        gates.append(Gate("no_stray_beam", ["general-arrangement", "pid", "single-line-diagram"],
+                          "high", worst[1] <= STRAY_BEAM_MAX_SPAN_MM,
+                          f"longest CABLE run {worst[0]} spans {worst[1]/1000:.1f} m "
+                          f"(limit {STRAY_BEAM_MAX_SPAN_MM/1000:.0f} m — a plant-crossing beam)"))
+
     return gates
+
+
+# A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam
+# (mirrors build_universal_scene.WIRE_TRAY_MAX_SPAN_MM); such distribution goes on the P&ID.
+STRAY_BEAM_MAX_SPAN_MM = 16000.0
 
 
 # Map a gate to the engine STAGE that fixes it — the loop routes a failing gate back here.
@@ -193,6 +228,7 @@ GATE_STAGE = {
     "part_coverage": "topology / orphan-connector (per-equipment electrical feeders)",
     "material_diversity": "connection_sizing (per-service material)",
     "qty_coverage": "contract qty-N replication + parts-manifest expansion",
+    "no_stray_beam": "wire_ports tray demotion + draw_boundary_services (plant-crossing run → single-line/P&ID)",
 }
 
 
@@ -254,6 +290,13 @@ def _selftest() -> int:
     # material diversity
     chk("mat_ok", len({"hdpe/pe100", "duplex 2205"}) >= 2)
     chk("mat_uniform", not (len({"316l stainless"}) >= 2))
+    # no stray beam: a compact 8 m run passes; the v44 33 m MCC spine fails (proveCatch)
+    def _span(wps):
+        xs = [w[0] for w in wps]; ys = [w[1] for w in wps]
+        return max(max(xs) - min(xs), max(ys) - min(ys))
+    chk("beam_ok", _span([[0, 0, 6000], [8000, 0, 6000], [8000, 2000, 500]]) <= STRAY_BEAM_MAX_SPAN_MM)
+    chk("beam_stray", not (_span([[440, 12940, 6270], [440, -16910, 6270], [-5980, -16910, 6270]])
+                           <= STRAY_BEAM_MAX_SPAN_MM))   # the 33 m MCC beam is caught
     # scorecard aggregation
     gs = [Gate("legibility", ["single-line-diagram"], "high", False, "x"),
           Gate("qty_coverage", ["pid"], "high", True, "y")]
@@ -266,7 +309,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print(f"[drawing-gates] selftest OK ({12} deterministic-gate invariants)")
+    print(f"[drawing-gates] selftest OK ({14} deterministic-gate invariants)")
     return 0
 
 
