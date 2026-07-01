@@ -891,6 +891,26 @@ function applyReviewerPatches(
             skipped++; reasons.push(`REJECT [identity-locked A2] +word ${p.module}.${p.sub_module_id}.${p.word?.id}: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)`)
             continue
           }
+          // A4 PRINCIPAL-EMITTER-AUTHORITY lock (2026-07-01, determinism #86): the deterministic
+          // emitter + contract are the SOLE authority for which PRINCIPAL equipment exists — the
+          // pumps / tanks / transformers / skids / filters the drawings + coverage checks COUNT. A2
+          // blocks a NEW word that carries an identity modifier AT ADD-TIME, but a reviewer can still
+          // add a PROSE-ONLY principal noun (e.g. "CIP Pump") that a downstream branding / RAG-fill
+          // stage later pins an MPN onto — turning it into a principal. Those late-born principals are
+          // the ENTIRE residual run-to-run scorecard variance (measured on Codema: the contract's 69
+          // quantity keys are byte-identical across runs, but "CIP Pump" + "Distribution Transformer"
+          // appeared in some runs and not others → the coverage denominator, hollow-module and tag
+          // checks flapped). A genuinely-needed principal belongs in the CONTRACT (deterministic,
+          // present EVERY run — the CORE FIX PRINCIPLE convergence loop: a critic flags the gap →
+          // add it to the contract → the emitter seeds it deterministically), never a per-run LLM add.
+          // Reject a NEW word whose name is a principal-equipment noun; prose + sub-component
+          // densification words (valves, fittings, glands, brackets) still pass. Universal — noun-keyed.
+          const A4_PRINCIPAL_EQUIP_RE = /\b(pumps?|blowers?|compressors?|fans?|tanks?|vessels?|transformers?|skids?|filters?|softeners?|membranes?|reactors?|exchangers?|chillers?|generators?|switchboards?|switchgear|motors?|mixers?|agitators?|clarifiers?|degassers?|columns?|dryers?|centrifuges?|separators?|boilers?|condensers?|evaporators?|scrubbers?|silos?|hoppers?|conveyors?|ups|inverters?|rectifiers?|mcc)\b/i
+          const a4Name = String(p.word?.name_human ?? '')
+          if (A4_PRINCIPAL_EQUIP_RE.test(a4Name)) {
+            skipped++; reasons.push(`REJECT [principal-emitter-authority A4] +word ${p.module}.${p.sub_module_id}.${p.word?.id} "${a4Name}": reviewers may not add NEW principal equipment — the deterministic emitter/contract owns the principal list (determinism #86). A genuinely-needed principal belongs in the contract.`)
+            continue
+          }
           sm.words.push(p.word)
           applied++; reasons.push(`+word ${p.module}.${p.sub_module_id}.${p.word?.id} (prose-only)`)
         }
