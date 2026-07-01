@@ -8727,6 +8727,23 @@ async function main() {
     logAction({ step: 'reconcile_hollow', ok: false, error: String(herr).slice(0, 160) })
   }
 
+  // ── DETERMINISTIC FINALIZE on the FINAL state.json (2026-07-01, determinism #86). The scorer +
+  //    contract are deterministic; the residual run-to-run scorecard variance is LLM-generated CONTENT
+  //    the deterministic GRAMMAR gates read — prose that drops words, overviews naming hallucinated
+  //    model numbers, words with two conflicting values for one modifier kind. This pass makes the
+  //    artefact satisfy those gates BY CONSTRUCTION (one modifier value per kind, prose names every
+  //    word, overview names only real components), so the same brief → the same scorecard regardless
+  //    of LLM wording. Runs LAST (after reconcile_hollow), on the settled state.json (SIGHT: fix the
+  //    DELIVERED artefact — the offending content is authored/mutated late). Idempotent.
+  try {
+    execFileSync('python3', [resolve(__dirname, 'lib', 'deterministic_finalize.py'), outDir],
+      { stdio: 'inherit', timeout: 60_000 })
+    logAction({ step: 'deterministic_finalize', ok: true })
+  } catch (ferr) {
+    console.error(`[chain] deterministic-finalize failed (non-fatal): ${(ferr as Error).message.slice(0, 140)}`)
+    logAction({ step: 'deterministic_finalize', ok: false, error: String(ferr).slice(0, 160) })
+  }
+
   // ── TRACEABILITY SPINE (Tristan 2026-06-25: "every number should come from some original
   //    source — the brief → tools → contract → …; nothing should appear from nowhere"). Shadow
   //    gate: report how many quantities have NO recorded origin + any same-physical-role value

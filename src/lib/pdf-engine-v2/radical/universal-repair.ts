@@ -38,28 +38,35 @@ import { allowlistContainsMpn, renderAllowlistForPrompt } from './allowlist-buil
 export function dedupWordModifiers(word: any): { collapsed: number } {
   const mods = Array.isArray(word?.modifier_characters) ? word.modifier_characters : null
   if (!mods) return { collapsed: 0 }
-  // Keep first-seen (kind,normValue); when a later one has a SHORTER raw value, swap in
-  const seen = new Map<string, number>()  // key → index in survivors
+  // Keep ONE modifier per normalised KIND (2026-07-01, determinism #86 + modifier_consistency
+  // gate): the gate requires at most one value per kind so the BoM can pick a canonical value.
+  // Two DIFFERENT values for the same kind (the LLM/Phase-2 adds a conflicting rating/dimension
+  // next to the emitter's — Codema RO membrane got dimension "364 m² area" AND "8 inch × 40 inch")
+  // is a genuine conflict AND a run-to-run flapper. Keep the FIRST value seen (emitter modifiers
+  // come first → emitter-authoritative), dropping any later CONFLICTING value; for an EXACT dupe
+  // keep the shorter raw form (canonical). Deterministic — first-wins, order-stable.
+  const seenKind = new Map<string, number>()  // normalised kind → index in survivors
   const survivors: any[] = []
   let collapsed = 0
   for (const mc of mods) {
     const k = normaliseKind(String(mc?.kind ?? ''))
     if (!k) { survivors.push(mc); continue }
-    const norm = normaliseModifierValue(String(mc?.value ?? ''))
-    const key = `${k}::${norm}`
-    const existingIdx = seen.get(key)
+    const existingIdx = seenKind.get(k)
     if (existingIdx == null) {
-      seen.set(key, survivors.length)
+      seenKind.set(k, survivors.length)
       survivors.push(mc)
     } else {
       collapsed++
       const existing = survivors[existingIdx]
-      const rawNew = String(mc?.value ?? '')
-      const rawOld = String(existing?.value ?? '')
-      // Prefer the shorter raw form (more canonical)
-      if (rawNew.length > 0 && rawNew.length < rawOld.length) {
-        survivors[existingIdx] = mc
+      const normNew = normaliseModifierValue(String(mc?.value ?? ''))
+      const normOld = normaliseModifierValue(String(existing?.value ?? ''))
+      if (normNew === normOld) {
+        // EXACT dupe → prefer the shorter raw form (more canonical)
+        const rawNew = String(mc?.value ?? '')
+        const rawOld = String(existing?.value ?? '')
+        if (rawNew.length > 0 && rawNew.length < rawOld.length) survivors[existingIdx] = mc
       }
+      // CONFLICTING value (same kind, different value) → keep the FIRST (emitter); drop this one.
     }
   }
   if (collapsed > 0) word.modifier_characters = survivors
