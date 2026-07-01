@@ -5185,6 +5185,57 @@ async function main() {
   }
   logAction({ step: 'post_phase2_normalise', sub_modules_rewritten: postProse.sub_modules_rewritten, modifiers_collapsed: postDedup.modifiers_collapsed })
 
+  // ── HOLLOW-MODULE RECONCILE (2026-07-01): a sub-module that DESCRIBES components (prose ≥5 words)
+  // but carries ZERO words is a HOLLOW shell — its parts were scattered into another module. Codema:
+  // `fertigation_dosing_system__primary_assembly` describes the A/B nutrient-dosing units but the
+  // dosing pump landed in `mass_fluid_transport_process`, leaving a described-but-empty section that
+  // the deterministic hollow-module check flags EVERY run + the physics critic flags intermittently
+  // (both a false-FAIL-inducing DESIGN defect). Deterministic fix: MOVE the best-matching scattered
+  // word back into the described sub-module (un-scatter); if nothing matches, DEMOTE the orphan prose
+  // (a genuinely contentless slot is NOT a defect). Universal — token-keyed, no class table. The
+  // move never empties its source (only populated sub-modules are scanned + a 1-word source is skipped).
+  {
+    const modules = design.modules ?? []
+    const tok = (s: string) => new Set(String(s || '').toLowerCase().match(/[a-z0-9]{3,}/g) ?? [])
+    const STOP = new Set(['the', 'and', 'system', 'unit', 'units', 'assembly', 'primary', 'module',
+      'design', 'with', 'that', 'this', 'each', 'water', 'plant', 'section', 'component', 'components'])
+    let moved = 0, demoted = 0
+    for (const m of modules) {
+      for (const sm of ((m as any).sub_modules ?? [])) {
+        const words = (sm as any).words ?? []
+        const sent = String((sm as any).english_sentence ?? (sm as any).sentence_en ?? (sm as any).paragraph_en ?? '').trim()
+        if (words.length > 0 || sent.split(/\s+/).filter(Boolean).length < 5) continue
+        // hollow: key tokens = the sub-module id + its module id + its own prose (minus stopwords)
+        const key = new Set([...tok(`${(sm as any).id ?? (sm as any).sub_module ?? ''} ${(m as any).module ?? ''} ${sent}`)].filter(t => !STOP.has(t)))
+        let best: any = null, bestScore = 0, bestSrc: any = null
+        for (const m2 of modules) {
+          if (m2 === m) continue
+          for (const s2 of ((m2 as any).sub_modules ?? [])) {
+            const w2 = (s2 as any).words ?? []
+            if (w2.length <= 1) continue                    // never empty a source that has ≤1 word
+            for (const w of w2) {
+              const score = [...tok((w as any).name_human ?? '')].filter(t => key.has(t) && !STOP.has(t)).length
+              if (score > bestScore) { bestScore = score; best = w; bestSrc = s2 }
+            }
+          }
+        }
+        if (best && bestScore >= 2) {
+          const arr = (bestSrc as any).words as any[]
+          arr.splice(arr.indexOf(best), 1)                  // remove from the scattered source
+          ;(sm as any).words = [best]                       // place into the described sub-module
+          moved++
+        } else {
+          ;(sm as any).english_sentence = ''; (sm as any).sentence_en = ''; (sm as any).paragraph_en = ''
+          demoted++                                         // no match → demote to a contentless slot
+        }
+      }
+    }
+    if (moved || demoted) {
+      console.error(`[chain] post-Phase-2 hollow-module reconcile: moved ${moved} scattered word(s) back into their described sub-module, demoted ${demoted} orphan prose slot(s)`)
+    }
+    logAction({ step: 'hollow_module_reconcile', moved, demoted })
+  }
+
   // ── A1 absorption layer re-assert (2026-05-28, deterministic-generation, anchor A1):
   // ALL LLM mutation (reviewers + physics-repair + Phase-2) is now complete.
   // Restore every emitter-pinned word's LOCKED identity/spec modifiers +
