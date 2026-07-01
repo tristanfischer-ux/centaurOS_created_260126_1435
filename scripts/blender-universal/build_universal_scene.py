@@ -532,6 +532,15 @@ WIRE_SERVICE_TIER_MM = 130.0
 # detour Tristan flagged: a busbar→fuse-holder 1.5 m apart routed up-and-over the whole
 # plant). ONLY genuinely long cross-plant runs use the high rack to clear the tank farm.
 WIRE_LOCAL_DIRECT_MAX_MM = 9000.0
+# A CABLE fan-out whose DESTINATION plan-span EXCEEDS this is NOT one physical overhead
+# tray — its loads are scattered plant-wide, so the power distribution belongs on the
+# SINGLE-LINE / P&ID, not a 3-D channel (a lone spine would run the plant length as a fat
+# overhead beam to the outermost load: the v44 MCC → 11-loads 42 m trunk, spine spanning
+# 33 m, that rendered as the red "stray beam to a floating box"). COMPACT fan-outs (a real
+# marshalled rack) stay as 3-D trays. Demotion never loses the connection — it still lives
+# on the ledger / single-line / connection-schedule, exactly like the electrical_bus +
+# sub-threshold-cable logical edges. Universal — geometry-keyed, no class table (2026-07-01).
+WIRE_TRAY_MAX_SPAN_MM = 16000.0
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
@@ -8918,6 +8927,28 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     for (frm, service), grp in groups.items():
         _thr = 3 if _is_cable(service) else WIRE_FANOUT_MIN
         if len(grp) >= _thr:
+            # ── PLANT-SPANNING CABLE FAN-OUT (2026-07-01): a cable tray is a PHYSICAL overhead
+            #    channel with a realistic reach. When one source fans out to loads scattered
+            #    across the WHOLE plant (dest plan-span > WIRE_TRAY_MAX_SPAN_MM), a single spine
+            #    runs the plant length as a fat overhead beam to the outermost load — the v44 red
+            #    "stray beam to a floating box" (MCC → 11 loads, spine spanning 33 m, 42 m trunk).
+            #    That is NOT a real tray: plant-wide power distribution belongs on the SINGLE-LINE /
+            #    P&ID (mirrors the electrical_bus + sub-threshold-cable logical rule below). Demote
+            #    the whole fan-out to logical; COMPACT fan-outs (a real marshalled rack) stay 3-D.
+            #    The connection is NOT lost — it stays on the ledger / schedule / single-line.
+            if _is_cable(service):
+                _dxs = [r["dst_xyz"][0] for r in grp]
+                _dys = [r["dst_xyz"][1] for r in grp]
+                _tray_span = max(max(_dxs) - min(_dxs), max(_dys) - min(_dys))
+                if _tray_span > WIRE_TRAY_MAX_SPAN_MM:
+                    for r in grp:
+                        skipped.append({"edge": r["edge_lbl"],
+                                        "reason": "plant-spanning cable fan-out → single-line/P&ID, "
+                                                  "not a 3-D tray"})
+                    print(f"[univ][wire]   PLANT-SPANNING {frm} → {len(grp)}× {service}: dest span "
+                          f"{_tray_span * fl.MM:.1f} m > {WIRE_TRAY_MAX_SPAN_MM * fl.MM:.0f} m "
+                          f"→ single-line/P&ID (no 3-D tray beam)")
+                    continue
             # ── SHARED TRAY: one trunk from the (single) source port → spurs to each dest.
             src_xyz = grp[0]["src_xyz"]      # same source port for the whole group
             dests = [r["dst_xyz"] for r in grp]
@@ -9609,7 +9640,14 @@ def draw_boundary_services(parts, MAT, MO):
     ext = _plant_extent_mm(parts)
     if ext is None:
         return 0
-    MM, OUT = fl.MM, 7000.0
+    # OUT (was 7000): the external supply marker sits JUST beyond the boundary, not 7 m out
+    # on empty ground. The v44 power feed read as a "stray red beam to a floating box" (the
+    # vision-critic defect) because the stub ran from a source part 2 m INSIDE the deck,
+    # across the edge, 7 m out to a fat red cube floating above grade. Fix (2026-07-01): the
+    # supply line spans ONLY from the plant EDGE outward to the marker (never a beam crossing
+    # the deck), at the process-pipe gauge (not a fat red bar), and the marker is a slim
+    # utility pillar RESTING ON GRADE (base z=0, not floating). Universal — all three services.
+    MM, OUT = fl.MM, 3500.0
     x0, x1, y0, y1, _top = ext
     placed = [p for p in parts if getattr(p, "placed_xyz_mm", None)
               and not getattr(p, "_consolidated", False)]
@@ -9627,22 +9665,27 @@ def draw_boundary_services(parts, MAT, MO):
             return
         px, py, _pz = part.placed_xyz_mm
         m = _mech_pipe_mat(mech, MAT)
-        z = 800.0
+        z = 500.0                    # low supply line — reads as entering at grade, not overhead
+        RAD = 0.11                   # process-pipe gauge (was 0.22 — a fat red beam)
+        MKW, MKH = 700.0, 1400.0     # slim utility pillar (was a 1.0×1.0×1.6 m cube)
         if edge in ("x0", "x1"):
-            ex = (x0 - OUT) if edge == "x0" else (x1 + OUT)
-            fl.add_cyl(f"u_boundary_{label}", ((ex + px) / 2 * MM, py * MM, z * MM),
-                       0.22, abs(px - ex) * MM, m, module=None, module_objects=MO,
+            xe = x0 if edge == "x0" else x1                    # the plant EDGE the supply crosses
+            xm = (x0 - OUT) if edge == "x0" else (x1 + OUT)    # marker, just beyond the edge
+            fl.add_cyl(f"u_boundary_{label}", ((xe + xm) / 2 * MM, py * MM, z * MM),
+                       RAD, abs(xm - xe) * MM, m, module=None, module_objects=MO,
                        rotation=(0, math.radians(90), 0))
-            mkx, mky = ex, py
+            mkx, mky = xm, py
         else:
-            ey = (y0 - OUT) if edge == "y0" else (y1 + OUT)
-            fl.add_cyl(f"u_boundary_{label}", (px * MM, (ey + py) / 2 * MM, z * MM),
-                       0.22, abs(py - ey) * MM, m, module=None, module_objects=MO,
+            ye = y0 if edge == "y0" else y1
+            ym = (y0 - OUT) if edge == "y0" else (y1 + OUT)
+            fl.add_cyl(f"u_boundary_{label}", (px * MM, (ye + ym) / 2 * MM, z * MM),
+                       RAD, abs(ym - ye) * MM, m, module=None, module_objects=MO,
                        rotation=(math.radians(90), 0, 0))
-            mkx, mky = px, ey
-        mk = fl.add_box(f"u_boundary_{label}_marker", (mkx * MM, mky * MM, (z + 300) * MM),
-                        (1000.0 * MM, 1000.0 * MM, 1600.0 * MM), m, module=None, module_objects=MO)
-        mk.dimensions = (1000.0 * MM, 1000.0 * MM, 1600.0 * MM)
+            mkx, mky = px, ym
+        # marker RESTS ON GRADE: centre at MKH/2 so the base sits at z=0 (was z+300 → floating)
+        mk = fl.add_box(f"u_boundary_{label}_marker", (mkx * MM, mky * MM, (MKH / 2) * MM),
+                        (MKW * MM, MKW * MM, MKH * MM), m, module=None, module_objects=MO)
+        mk.dimensions = (MKW * MM, MKW * MM, MKH * MM)
         n += 1
 
     _stub(_find(("intake", "make-up", "makeup", "make up")), "fluid_supply", "water_in", "x0")
