@@ -303,6 +303,24 @@ def _physics_issues(state, run_dir=None) -> list:
 _PHYS_EMPTY_CLAIM_RX = re.compile(r"\bempty\b|no words|words['\"]?\s*[:=]?\s*\[\s*\]|\bhas no (?:words|equipment|parts)\b", re.I)
 # A "quantity N× smeared/duplicated across many parts" claim — verifiable against the actual part counts.
 _PHYS_DUP_CLAIM_RX = re.compile(r"duplicat|smear|copied .*count|across every|thousands of|on every .*(valve|part|word)", re.I)
+# A "passive fluid device is (wrongly) rated in kW/power" claim — verifiable: does the NAMED device
+# actually carry a power modifier in the shipped design? (Codema: the critic's stale '4 kW' on the
+# Pressure Relief Valve / pressure switches — no such modifier exists in the delivered parts.)
+_PHYS_PASSIVE_DEVICE_RX = re.compile(
+    r"pressure relief valve|relief valve|pressure switch|check valve|non-return valve|isolation valve|"
+    r"ball valve|sight glass|pressure gauge|level gauge|strainer|rupture disc|flow indicator", re.I)
+# A claim that reasons about NAMED components the shipped design supposedly HAS ("the design
+# includes/provides 'X'", "'X' is oversized", "labeled as 'Cip Tank'") — verifiable: do those named
+# components still EXIST in the shipped design? (Codema: the critic's stale 'Cip Tank (40 m³)' /
+# 'Cleaning Tank (40 m³)' — both a "40 m³ CIP tank is absurd" HIGH and a "water-storage deficit, the
+# design only provides these two tanks" HIGH, BOTH predicated on tanks reconcilePrincipalEquipment
+# already DROPPED downstream. When the critic's cited parts are gone, its reasoning is stale.)
+_PHYS_OVERSIZED_RX = re.compile(r"oversiz|implausibl|absurd|physically implausible|too large|does not (?:exist|belong)", re.I)
+_PHYS_DESIGN_HAS_RX = re.compile(
+    r"design (?:only )?(?:includes|provides|contains|has|specifies|features)|labell?ed as|"
+    r"the design's? '", re.I)
+# A "a SINGLE / only one <part>" undercount claim — verifiable against the contract's part count.
+_PHYS_SINGULAR_RX = re.compile(r"\b(?:a single|only one|only a single|just one|a lone)\b", re.I)
 
 
 def _count_words_with_qty(state, qty: int) -> int:
@@ -321,12 +339,51 @@ def _count_words_with_qty(state, qty: int) -> int:
     return n
 
 
+def _iter_design_words(state):
+    """Yield every (word_dict, name_lower) in the shipped design."""
+    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                yield w, str(w.get("name_human") or "").lower()
+
+
+def _word_has_power_rating(w) -> bool:
+    """True if the word carries a real electrical POWER rating (kind=power, or a '<n> kW/W' modifier)."""
+    for mc in (w.get("modifier_characters") or []):
+        if mc.get("kind") == "power":
+            return True
+        if re.search(r"\d\s*(?:k?w|kilowatt)\b", str(mc.get("value") or ""), re.I):
+            return True
+    return False
+
+
+def _contract_count_ge2_for(state, tokens: set) -> bool:
+    """True if a contract quantity whose key carries all `tokens` + 'count' has value ≥ 2 — i.e. the design
+    demonstrably has MULTIPLE of that part (falsifies a critic 'a single <part>' undercount)."""
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if not isinstance(qs, dict):
+            continue
+        for k, v in qs.items():
+            kt = set(re.findall(r"[a-z0-9]+", k.lower()))
+            if "count" in kt and tokens <= kt:
+                val = (v or {}).get("value") if isinstance(v, dict) else v
+                try:
+                    if float(str(val)) >= 2:
+                        return True
+                except (TypeError, ValueError):
+                    pass
+    return False
+
+
 def _physics_claim_falsified(state, issue: dict) -> bool:
     """Deterministically FALSE physics-critic claims must not gate (a false FAIL is as dishonest as a
-    false PASS — Tristan 2026-06-28). CONSERVATIVE: only the unambiguous 'module X is empty / has no
-    words' shape — when the named module deterministically HAS words, the claim is a hallucination.
-    Anything fuzzier is left to gate (never drop a claim we cannot definitively disprove)."""
+    false PASS — Tristan 2026-06-28). The physics critic runs at Stage 7.5, BEFORE the downstream fixes
+    (phantom-vessel drop, valve consolidation, contract sizing) settle — so its snapshot is frequently
+    STALE against the shipped design. Each shape below falsifies ONLY when the delivered state
+    definitively LACKS the claimed defect; anything we cannot disprove is left to gate."""
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}".lower()
+    raw = f"{issue.get('issue') or ''} {issue.get('title') or ''}"  # case-preserved for quoted names
     # (a) "module X is empty" shape — falsified if the named module actually has words.
     if _PHYS_EMPTY_CLAIM_RX.search(txt):
         for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
@@ -337,17 +394,53 @@ def _physics_claim_falsified(state, issue: dict) -> bool:
                     return True  # "empty" claim against a module that has words → falsified
     # (b) "quantity N× smeared/duplicated across many parts" shape — a REAL smear stamps the same big
     # count onto MANY distinct words. Verify: extract the large claimed count(s) and check how many words
-    # actually carry each. If the worst-case count appears on ≤1 word, there is NO smear — the (LLM) critic
+    # actually carry each. If the worst-case count appears on ≤2 words, there is NO smear — the (LLM) critic
     # hallucinated it (the Codema run: it claimed '200× across 15 valve types' when only Pneumatic Actuated
-    # Valves = ×200 and every other valve = ×1). A false FAIL is as dishonest as a false PASS (2026-06-28).
+    # Valves = ×200 + their 200 actuators = a 1:1 driven PAIR). A false FAIL is as dishonest as a false PASS.
+    # NB the count regex must not require a trailing \b — the critic writes "200x" (digit+letter, no boundary).
     if _PHYS_DUP_CLAIM_RX.search(txt):
-        cands = {int(x.replace(",", "")) for x in re.findall(r"\b(\d[\d,]{1,6})\b", txt)}
+        cands = {int(x.replace(",", "")) for x in re.findall(r"\b(\d[\d,]{1,6})(?![\d,])", txt)}
         cands = {c for c in cands if c >= 50}  # a "smear" is a LARGE repeated count, not 1–2 isolators
-        # A REAL smear stamps the big count onto 3+ distinct words. ≤2 is a legitimate DRIVEN PAIR (e.g.
-        # 200 actuated valves + their 200 actuators, 1:1) — not the "thousands across 15 types" the critic
-        # claimed. Falsify only when the actual spread is ≤2 (the engine is correct, the LLM hallucinated).
         if cands and max(_count_words_with_qty(state, c) for c in cands) <= 2:
             return True  # the claimed massive duplication does not exist in the state → hallucinated smear
+    # (c) "passive fluid device wrongly rated in kW" shape — falsified if the NAMED passive device(s) carry
+    # NO power modifier in the delivered design (the wrong rating the critic complains about isn't there).
+    if re.search(r"\bk?w\b|kilowatt|electrical.{0,10}power", txt) and _PHYS_PASSIVE_DEVICE_RX.search(txt):
+        named = {d.lower() for d in _PHYS_PASSIVE_DEVICE_RX.findall(raw)}
+        any_powered = any(
+            any(dev in nm for dev in named) and _word_has_power_rating(w)
+            for w, nm in _iter_design_words(state))
+        if not any_powered:
+            return True  # no named passive device is actually power-rated → stale 'N kW' claim
+    # (d) "the design includes/provides 'X'" or "'X' is oversized/implausible" shape — the critic reasons
+    # about specific NAMED components it asserts the design HAS. Falsified if NONE of the quoted component
+    # name(s) still exist as a design word (the offending vessel was dropped downstream — so the critic's
+    # whole line of reasoning, oversize OR capacity-deficit, rests on parts that are no longer shipped).
+    # SAFE: fires only on a POSITIVE-assertion framing (design HAS X) — never on "the design LACKS X"
+    # (a genuine missing-component finding must still gate).
+    if _PHYS_OVERSIZED_RX.search(txt) or _PHYS_DESIGN_HAS_RX.search(txt):
+        quoted = [q.strip() for q in re.findall(r"'([^']{3,40})'", raw) + re.findall(r"\"([^\"]{3,40})\"", raw)]
+        # keep only quoted tokens that look like a component (contain a noun), not bare numbers/units
+        quoted = [q for q in quoted if re.search(r"[a-z]{3}", q, re.I) and not re.fullmatch(r"[\d.,\s]*m[³3l]?", q, re.I)]
+        if quoted:
+            present = any(q.lower() in nm for q in quoted for _w, nm in _iter_design_words(state))
+            if not present:
+                return True  # none of the named components the critic cites exist in the shipped design → stale
+    # (e) "a SINGLE / only one <part>" undercount shape — falsified if the contract shows that part's
+    # count ≥ 2 (the design demonstrably has the required multiple units; the critic under-counted).
+    if _PHYS_SINGULAR_RX.search(txt):
+        # the part noun tokens: the significant words right after the singular phrase / in the 'where' path
+        toks = set(re.findall(r"[a-z]{4,}", txt))
+        toks -= {"single", "only", "lone", "just", "design", "specifies", "rated", "brief", "requires",
+                 "explicitly", "with", "that", "this", "each", "unit", "units", "system", "which", "using",
+                 "water", "powered", "nutrient"}
+        for noun in ("pump", "tank", "vessel", "blower", "compressor", "filter", "skid", "exchanger"):
+            if noun in toks:
+                # a couple of qualifier tokens + the noun (e.g. {dosing, pump}) must match a *_count ≥ 2
+                quals = [t for t in toks if t not in (noun,)][:3]
+                for qtok in quals:
+                    if _contract_count_ge2_for(state, {qtok, noun}):
+                        return True  # the design has ≥2 of this part → 'a single <part>' is false
     return False
 
 
@@ -2739,6 +2832,67 @@ def _selftest() -> int:
     expect(_physics_claim_falsified(_pop_state, {"severity": "high",
            "issue": "the Dosatron D8RE5 is forced to 45 m3/h above its 8 m3/h max"}) is False,
            "PHYS: a real capacity defect must NOT be falsified")
+
+    # ── proveCatch: STALE Stage-7.5 shapes (the critic runs before downstream fixes settle). Each must
+    #    falsify when the shipped design LACKS the defect, and NOT falsify when the defect is real.
+    # (b) "200x" smear number-extraction (the digit+letter, no-\b case that used to slip through)
+    _smear2 = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Pneumatic Actuated Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Pneumatic Actuator", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+    ]}]}]}}
+    expect(_physics_claim_falsified(_smear2, {"severity": "high",
+           "issue": "massive duplication of the 200x valve count across sub-modules (200x solenoid valves, 200x ...)"}) is True,
+           "PHYS(b): '200x' smear over a 1:1 driven pair (2 words) must falsify (regex handles digit+letter)")
+    _smear5 = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": f"Valve{k}", "modifier_characters": [{"kind": "quantity", "value": "×200"}]} for k in range(5)]}]}]}}
+    expect(_physics_claim_falsified(_smear5, {"severity": "high",
+           "issue": "massive duplication of the 200x valve count across sub-modules"}) is False,
+           "PHYS(b): a REAL 200x smear over 5 words must NOT falsify")
+    # (c) passive device wrongly rated in kW — falsify when no named device carries a power modifier
+    _passive_ok = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Pressure Relief Valve", "modifier_characters": [{"kind": "rating_primary", "value": "16 bar"}]}]}]}]}}
+    expect(_physics_claim_falsified(_passive_ok, {"severity": "high",
+           "issue": "The Pressure Relief Valve and Low Pressure Switch are all rated '4 kW'"}) is True,
+           "PHYS(c): '4 kW' on a passive device with NO power modifier must falsify")
+    _passive_bad = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Pressure Relief Valve", "modifier_characters": [{"kind": "power", "value": "4 kW"}]}]}]}]}}
+    expect(_physics_claim_falsified(_passive_bad, {"severity": "high",
+           "issue": "The Pressure Relief Valve is rated '4 kW'"}) is False,
+           "PHYS(c): a passive device that IS actually power-rated must NOT falsify (real defect)")
+    # (d) phantom oversized vessel — falsify when the named vessel is absent from the shipped design
+    _no_cip = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Cip System Connections"}]}]}]}}
+    expect(_physics_claim_falsified(_no_cip, {"severity": "high",
+           "issue": "The design includes a 'Cip Tank' (40 m³) which is absurdly oversized and implausible"}) is True,
+           "PHYS(d): an oversized 'Cip Tank' that no longer EXISTS in the design must falsify")
+    _has_cip = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Cip Tank", "modifier_characters": [{"kind": "capacity", "value": "40 m³"}]}]}]}]}}
+    expect(_physics_claim_falsified(_has_cip, {"severity": "high",
+           "issue": "The design includes a 'Cip Tank' (40 m³) which is absurdly oversized"}) is False,
+           "PHYS(d): an oversized vessel that IS present must NOT falsify (real defect)")
+    # (e) 'a single <part>' undercount — falsify when the contract shows count ≥ 2
+    _two_pumps = {"orchestratorContract": {"quantities": {"fertigation_dosing_pump_count": {"value": 2}}}}
+    expect(_physics_claim_falsified(_two_pumps, {"severity": "high",
+           "issue": "The design specifies a single water-powered dosing pump rated at 10 L/h"}) is True,
+           "PHYS(e): 'a single dosing pump' when the contract count is 2 must falsify")
+    _one_pump = {"orchestratorContract": {"quantities": {"fertigation_dosing_pump_count": {"value": 1}}}}
+    expect(_physics_claim_falsified(_one_pump, {"severity": "high",
+           "issue": "The design specifies a single dosing pump"}) is False,
+           "PHYS(e): 'a single dosing pump' when the count really IS 1 must NOT falsify")
+    # (d-broadened) "the design provides 'X'" where X was DROPPED downstream — stale reasoning (Codema
+    # water-storage 'deficit' predicated on the dropped 'Cleaning Tank'/'Cip Tank'). Must falsify when the
+    # cited parts are absent; must NOT falsify when they exist, nor a genuine "design LACKS X" gap.
+    _no_tanks = {"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Fresh Water Tank"}, {"name_human": "Drain Water Tank"}]}]}]}}
+    expect(_physics_claim_falsified(_no_tanks, {"severity": "high",
+           "issue": "The design only provides 2x 40 m³ tanks (labeled as 'Cleaning Tank' and 'Cip Tank'), a 40 m³ deficit"}) is True,
+           "PHYS(d): a 'design provides X' claim citing DROPPED tanks must falsify")
+    expect(_physics_claim_falsified(_no_tanks, {"severity": "high",
+           "issue": "the design provides a 'Fresh Water Tank' that is oversized"}) is False,
+           "PHYS(d): a 'design provides X' claim where X EXISTS must NOT falsify")
+    expect(_physics_claim_falsified({"moduleDecomposition": {"modules": []}}, {"severity": "high",
+           "issue": "the design lacks a 'Backup Pump' required by the brief"}) is False,
+           "PHYS(d): a genuine 'design LACKS X' missing-component finding must NOT falsify")
 
     if failures:
         print("SELFTEST FAILED:")
