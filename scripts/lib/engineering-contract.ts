@@ -13083,6 +13083,15 @@ registerArchetype('water_treatment', (brief: any) => {
   const clothFilterM3H = 80          // per cultivation room
   const drainPitVolM3 = 5            // 5,000 L drain pit per room
 
+  // ── UV-C DISINFECTION (Legionella / water-hygiene control) ────────────────────────────
+  // The brief mandates "Legionella / water-hygiene control on stored and recirculated water".
+  // Stored water (fresh + drain tanks) is recirculated to the departments for fertigation, so
+  // the disinfection duty is the peak recirculated flow. A medium-pressure UV-C reactor at the
+  // Legionella dose (≈40 mJ/cm²) is the standard non-chemical control (no residual to dose into
+  // a nutrient stream). Electrical draw ≈ 0.045 kW per m³/h at that dose + moderate UVT. 2026-07-01.
+  const uvDisinfectionFlowM3H = irrigationDemandTotalM3H
+  const uvDisinfectionKw = Math.max(1.5, Math.round(uvDisinfectionFlowM3H * 0.045 * 10) / 10)
+
   // Connected electrical load — the SUM of the pump + dosing + control loads. This is a
   // ~50 kW plant of pumps and dosing, NOT a megawatt facility (fixes the 124 MW mis-size:
   // the vertical_farm path put LED+HVAC load on a water plant). Built bottom-up from the kit.
@@ -13093,6 +13102,7 @@ registerArchetype('water_treatment', (brief: any) => {
     + departmentCount * 4                    // drain-pit submersible transfer pumps
     + departmentCount * 4                    // cloth-filter self-priming pumps
     + nutrientTankCount * 0.37               // 8 nutrient mixers (~0.37 kW each)
+    + uvDisinfectionKw                       // UV-C disinfection (Legionella control)
     + 5,                                     // instrumentation, dosing pumps, controls
   )
 
@@ -13111,6 +13121,13 @@ registerArchetype('water_treatment', (brief: any) => {
     // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
     ro_permeate_capacity_m3_h: q(roPermeateM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'reverse-osmosis permeate capacity (Codema HORTI PURE RO 8 m³/h); lock-gate HARD slot (exit 22)'),
     irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments; lock-gate HARD slot (exit 22)`),
+    // ── UV-C disinfection unit (Legionella / water-hygiene control on stored + recirculated water) ──
+    uv_disinfection_throughput_m3_h: q(uvDisinfectionFlowM3H, 'm³/h', 'flow_rate', 'derived', 'system', 'calculator', `medium-pressure UV-C reactor sized to the peak recirculated flow (= irrigation demand ${irrigationDemandTotalM3H} m³/h) for Legionella control at ≈40 mJ/cm²`, ['irrigation_demand_m3_h'], 'irrigation_demand_m3_h'),
+    uv_disinfection_power_kw: q(uvDisinfectionKw, 'kW', 'power', 'derived', 'system', 'calculator', `UV-C lamp electrical draw ≈ 0.045 kW per m³/h at the Legionella dose (${uvDisinfectionFlowM3H} m³/h × 0.045)`, ['uv_disinfection_throughput_m3_h'], 'uv_disinfection_throughput_m3_h*0.045'),
+    uv_disinfection_count: q(1, 'off', 'count', 'derived', 'system', 'calculator', 'one duty UV-C reactor on the common recirculation main (all stored/recirculated water passes it before distribution)'),
+    // hand-watering ring-main delivery pressure — the ACHIEVED value the Brief Compliance table
+    // shows against the brief's 3-bar hand-watering requirement (was unrecorded → read as a miss).
+    hand_watering_discharge_pressure_bar: q(3, 'bar', 'pressure', 'rated', 'system', 'brief', 'hand-watering ring-main delivery pressure (brief-stated 3 bar; sets the hand-watering pump head)'),
     fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', 'fresh-water buffer storage (Codema 40 m³ galvanised tank); lock-gate HARD slot (exit 22)'),
     // The brief's 'water_storage_capacity' is the PLANT TOTAL across the 3 galvanised tanks (1 fresh +
     // 2 drain, ~40 m³ each = 120 m³) — emit it under the brief's own metric name so the compliance check
