@@ -1797,8 +1797,13 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
 
     # --- Replace the lumped feeder(s) with per-EQUIPMENT feeders (preferred) or, if no
     #     parts-manifest is available, per-MODULE feeders. --------------------------------
-    if not lumped:
-        return
+    # NB do NOT early-return when `lumped` is empty (2026-07-01): a process plant whose board
+    # was built with NO lumped process feeder (a sparse connection-schedule electrical model)
+    # STILL has real driven loads (pumps/blowers) in the parts-manifest that must appear as
+    # outgoing feeders. `keep = [br not in lumped]` degrades correctly to "keep all + append"
+    # when lumped is empty, so we proceed to synthesise the per-equipment feeders regardless.
+    # (Codema: the single-line drew only 2 loads because it returned here before adding the 6
+    # pump feeders → part-coverage 7/14.) The module-split FALLBACK still needs a load basis.
     md = state.get("moduleDecomposition") or {}
     # PREFER one way per electrically-driven equipment item (pump / blower / O2 / heat-pump
     # / control panel) from the qty-expanded parts-manifest — the real single-line a plant
