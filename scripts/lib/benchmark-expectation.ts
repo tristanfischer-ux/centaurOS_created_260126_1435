@@ -217,6 +217,39 @@ export function canonicalMeasure(value: number, unit: string): { v: number; fami
   return { v, family: u }   // unknown unit — only compares against the SAME raw unit
 }
 
+// ── BRIEF-PINNED VOLUMES (2026-07-02, the v56 40 m³ tank false-fault) ──────────
+// A quantity/dimension the BRIEF itself mandates (e.g. "one 40 m³ fresh-water tank plus two
+// 40 m³ drain tanks" → total_water_storage_volume_m3 = 120) is NOT an engine sizing fault —
+// the engine is DELIVERING the brief. The net must diff the engine against the benchmark on
+// the RESIDUAL (non-pinned) volume, and a per-line fault that targets a pinned item must
+// downgrade to an informational note ("brief-mandated; benchmark envelope assumes X").
+// Detection is deterministic: walk parsedBrief.constraints (derived_requirements +
+// target_performance.metrics) for VOLUME-family entries (unit m³ — a rate like m³/h never
+// canonicalises to 'volume') whose key/label reads as a storage/tank/volume metric, and
+// parse the per-item volumes from the entry's basis ("(40 m3)" / "(40 m3 each)").
+export interface BriefPinnedVolume { key: string; label: string; m3: number; item_m3: number[]; basis: string }
+export function briefPinnedVolumesM3(state: any): { total_m3: number; pins: BriefPinnedVolume[] } {
+  const c = state?.parsedBrief?.constraints || {}
+  const entries: any[] = [
+    ...(Array.isArray(c.derived_requirements) ? c.derived_requirements : []),
+    ...(Array.isArray(c.target_performance?.metrics) ? c.target_performance.metrics : []),
+  ]
+  const pins: BriefPinnedVolume[] = []
+  for (const e of entries) {
+    if (!e || typeof e !== 'object') continue
+    const cm = canonicalMeasure(Number(e.value), String(e.unit || ''))
+    if (!cm || cm.family !== 'volume' || !(cm.v > 0)) continue     // 'm3/h' is NOT volume family
+    const name = `${e.key || e.key_metric || ''} ${e.label || ''}`
+    if (!/storage|tank|volume|vessel|buffer|capacity/i.test(name)) continue
+    const basis = String(e.basis || '')
+    const item_m3: number[] = []
+    for (const m of basis.matchAll(/(\d+(?:\.\d+)?)\s*m(?:³|3)(?!\s*\/)(?!\d)/g)) item_m3.push(parseFloat(m[1]))
+    pins.push({ key: String(e.key || e.key_metric || ''), label: String(e.label || ''),
+                m3: cm.v, item_m3: item_m3.length ? item_m3 : [cm.v], basis })
+  }
+  return { total_m3: pins.reduce((a, p) => a + p.m3, 0), pins }
+}
+
 // Find the engine's actual value for a predicted output metric. (1) exact orchestrator-contract
 // quantity key; else (2) same-unit-FAMILY + best name-token overlap (so 'rated_power_kw' finds
 // 'continuous_power_kw'), de-prioritising peak/max; else (3) keyMetrics.headline_output when its
@@ -352,33 +385,56 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     // component volumes parsed from BoM requirement strings ("· 350 m³") + any contract volume keys
     const vols: Array<{ name: string; m3: number }> = []
     for (const b of rb) {
-      // tolerate "350 m³" (unicode) and "350 m3" (ascii); no \b after ³ (it is a non-word char)
-      const m = String(b?.requirement || '').match(/·\s*([\d,]+(?:\.\d+)?)\s*m(?:³|3)(?!\d)/)
+      // tolerate "350 m³" (unicode) and "350 m3" (ascii); no \b after ³ (it is a non-word char).
+      // RATE-UNIT GUARD (2026-07-02, the v56 2,031 m³ phantom): "45 m³/h" is a FLOW RATE, not a
+      // volume — the old regex counted 59 pipe/pump duty ratings (2,031 "m³") as equipment volume
+      // when the run's TRUE volume lines summed to zero. `(?!\s*\/)` rejects any m³/h·d·s rate.
+      const m = String(b?.requirement || '').match(/·\s*([\d,]+(?:\.\d+)?)\s*m(?:³|3)(?!\d)(?!\s*\/)/)
       if (m) vols.push({ name: String(b.requirement).split('·')[0].trim(), m3: parseFloat(m[1].replace(/,/g, '')) })
     }
+    // BRIEF-PINNED exemption (2026-07-02): a volume the brief itself mandates (the 3× 40 m³
+    // tanks) is the engine DELIVERING the brief, not a sizing fault. Diff on the RESIDUAL.
+    const pinned = briefPinnedVolumesM3(state)
+    const maxPinnedItem = pinned.pins.reduce((a, p) => Math.max(a, ...p.item_m3), 0)
+    const pinNote = pinned.total_m3 > 0
+      ? `brief-mandated: ${Math.round(pinned.total_m3)} m³ pinned by the brief (${pinned.pins.map(p => p.label || p.key).join(', ')})`
+      : ''
     const biggest = vols.slice().sort((a, c) => c.m3 - a.m3)[0]
     if (biggest && biggest.m3 > env) {
-      // a single component bigger than the stated enclosure is an unambiguous sizing error
+      // a single component bigger than the stated enclosure is an unambiguous sizing error —
+      // UNLESS it is a brief-pinned item (then the benchmark envelope, not the engine, is short).
+      const isPinnedItem = maxPinnedItem > 0 && biggest.m3 <= maxPinnedItem * 1.25
       findings.push({
         dimension: 'sizing — single component vs enclosure',
         expected: `≤ the ${exp.expected_sizing.envelope || 'enclosure'} (~${Math.round(env)} m³ total)`,
         deterministic: `"${biggest.name.slice(0, 32)}" alone is ${biggest.m3.toLocaleString()} m³`,
         ratio: Number((biggest.m3 / env).toFixed(2)),
-        verdict: 'radical',
-        note: 'a single component is larger than the entire stated enclosure — a volume/units bug (this also breaks the GA layout)',
+        verdict: isPinnedItem ? 'ok' : 'radical',
+        note: isPinnedItem
+          ? `${pinNote}; benchmark envelope assumes ~${Math.round(env)} m³ — informational, not an engine fault`
+          : 'a single component is larger than the entire stated enclosure — a volume/units bug (this also breaks the GA layout)',
       })
     }
     const sumV = vols.reduce((a, v) => a + v.m3, 0)
     if (sumV > 0) {
       const ratio = sumV / env
       if (ratio >= WARN_FACTOR) {
+        // recompute on the residual EXCLUDING the brief-pinned volumes; a divergence the pins
+        // explain downgrades to an informational note; still RADICAL on the residual → still blocks.
+        const residual = Math.max(0, sumV - Math.min(pinned.total_m3, sumV))
+        const resRatio = residual / env
+        const verdict: Verdict = pinned.total_m3 > 0 ? classify(Math.max(resRatio, 1)) : classify(ratio)
         findings.push({
           dimension: 'sizing — total equipment volume',
           expected: `fits ${exp.expected_sizing.envelope || 'the enclosure'} (~${Math.round(env)} m³)`,
-          deterministic: `equipment sums to ~${Math.round(sumV).toLocaleString()} m³`,
-          ratio: Number(ratio.toFixed(2)),
-          verdict: classify(ratio),
-          note: 'the equipment does not fit the stated enclosure — the GA drawing will sprawl beyond the container',
+          deterministic: `equipment sums to ~${Math.round(sumV).toLocaleString()} m³`
+            + (pinned.total_m3 > 0 ? ` (~${Math.round(residual).toLocaleString()} m³ excluding brief-pinned)` : ''),
+          ratio: Number((pinned.total_m3 > 0 ? resRatio : ratio).toFixed(2)),
+          verdict,
+          note: verdict === 'ok'
+            ? `${pinNote}; the residual ~${Math.round(residual)} m³ fits the benchmark envelope — informational, not an engine fault`
+            : 'the equipment does not fit the stated enclosure — the GA drawing will sprawl beyond the container'
+              + (pinNote ? ` (${pinNote}; residual still diverges)` : ''),
         })
       }
     }
@@ -513,10 +569,19 @@ export function sourceRuleForBasis(basis: string): SourceRule | null {
   return null
 }
 
-/** Attach the source rule to each fault by matching it back to its BoM line's basis. Pure. */
-export function routeFaults(faults: Fault[], state: any): Array<Fault & { source: SourceRule | null; basis: string }> {
+/** Attach the source rule to each fault by matching it back to its BoM line's basis. Pure.
+ *  BRIEF-PIN DOWNGRADE (2026-07-02): a SIZING fault that targets a brief-pinned volume (the
+ *  v56 "TK-108 3.7 m dia ≈40 m³ grossly oversized" faults — the brief mandates 3× 40 m³
+ *  tanks) is the engine DELIVERING the brief, not a wrong rule. Such a fault is downgraded
+ *  to dimension 'note' with brief_pinned=true so the punch-list renders it as informational
+ *  ("brief-mandated; benchmark envelope assumes X") — the source rule stays attached as
+ *  provenance, but the issue text says plainly that no fix is required. */
+export function routeFaults(faults: Fault[], state: any): Array<Fault & { source: SourceRule | null; basis: string; brief_pinned?: boolean }> {
   const rb: any[] = Array.isArray(state?.requirementsBom) ? state.requirementsBom : []
   const norm = (s: any) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const pinned = briefPinnedVolumesM3(state)
+  const pinItems = pinned.pins.flatMap(p => p.item_m3)
+  const pinLabel = pinned.pins.map(p => p.label || p.key).join(', ')
   return (faults || []).map(f => {
     const key = norm(f.line)
     // match the fault's line to a BoM row by tag, then by requirement-name containment
@@ -524,7 +589,28 @@ export function routeFaults(faults: Fault[], state: any): Array<Fault & { source
       || rb.find(r => key && (norm(r.requirement).includes(key) || key.includes(norm(r.requirement).split(' ').slice(0, 3).join(' '))))
       || rb.find(r => key && norm(r.requirement).startsWith(key.split(' ').slice(0, 2).join(' ')))
     const basis = line ? String(line.basis || '') : ''
-    return { ...f, basis, source: basis ? sourceRuleForBasis(basis) : null }
+    const routed: Fault & { source: SourceRule | null; basis: string; brief_pinned?: boolean } =
+      { ...f, basis, source: basis ? sourceRuleForBasis(basis) : null }
+    // brief-pin check: a sizing fault whose implied volume matches a pinned item (±25%) —
+    // read the volume from the fault's own text AND from the matched line's shell spec.
+    if (pinItems.length && /sizing/i.test(String(f.dimension || ''))) {
+      const cand: number[] = []
+      // number pattern tolerates thousand separators ("2 031 m³", "2,031 m³", narrow NBSP) so a
+      // separated thousands group is never misread as a small pinned-size match ("031" ≠ 31 m³)
+      for (const m of `${f.issue || ''} ${f.magnitude || ''}`.matchAll(/(\d{1,3}(?:[,\s  ]\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*m(?:³|3)(?!\s*\/)(?!\d)/g)) {
+        cand.push(parseFloat(m[1].replace(/[,\s  ]/g, '')))
+      }
+      const dia = Number(line?.diameter_m), ht = Number(line?.height_m)
+      if (dia > 0 && ht > 0) cand.push(Math.PI * (dia / 2) ** 2 * ht)
+      const isPinned = cand.some(v => pinItems.some(p => v >= p * 0.75 && v <= p * 1.25))
+      if (isPinned) {
+        routed.brief_pinned = true
+        routed.dimension = 'note'
+        routed.issue = `brief-mandated size — ${pinLabel} pins this volume; the benchmark envelope simply assumes `
+          + `smaller storage. Not an engine fault. (was: ${f.issue})`
+      }
+    }
+    return routed
   })
 }
 
@@ -634,6 +720,110 @@ function _selftest() {
     { requirementsBom: [{ tag: 'P-1', requirement: 'cooling pump · 150 L/min', basis: 'rating-based: 150 kW × £700/kW', line_gbp: 210000 }] })
   if (routed[0]?.source?.rule !== 'rating-based-pricing' || routed[0]?.source?.file !== 'scripts/requirements_bom.py') {
     console.log(`FAIL: routeFaults did not route the pump to rating-based-pricing (got ${JSON.stringify(routed[0]?.source)})`); bad++
+  }
+  // ── VOLUME PARSER RATE-UNIT GUARD + BRIEF-PIN EXEMPTION (2026-07-02, v56) ── proveCatch
+  // both directions for each rule.
+  // (v1) a FLOW RATE ("· 90 m³/h") must NEVER count as equipment volume — v56 summed 59 pipe
+  // duty ratings to a phantom 2,031 m³ (4.23× the envelope) when the true volume sum was 0.
+  {
+    const r = compareToBenchmark(exp, {
+      costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {},
+      requirementsBom: [
+        { requirement: 'water connection: Sump → Pump · 90 m3/h', line_gbp: 500 },
+        { requirement: 'Irrigation Pump · 90 m³/h · 1379x766x1073 mm', line_gbp: 900 },
+        { requirement: 'Cloth Filter · 80 m³/h · 3 m² area', line_gbp: 900 },
+      ],
+    })
+    if (r.findings.some(f => f.dimension.startsWith('sizing'))) {
+      console.log('FAIL: m³/h flow rates were counted as equipment volume (the v56 2,031 m³ phantom)'); bad++
+    }
+  }
+  // (v2) a TRUE volume line still fires (the guard must not kill the real check) — covered by
+  // the 350 m³ case above (r4), which must remain RADICAL.
+  // (v3) briefPinnedVolumesM3 reads the v56-shaped brief pin; a m³/h rate metric is NOT a pin.
+  const pinnedBrief = {
+    parsedBrief: { constraints: { derived_requirements: [
+      { key: 'total_water_storage_volume_m3', label: 'Total Water Storage Volume', value: 120, unit: 'm3',
+        basis: 'One fresh-water tank (40 m3) plus two drain-water tanks (40 m3 each).' },
+      { key: 'total_irrigation_flow_capacity_m3_per_hr', label: 'Total Irrigation Flow Capacity', value: 90, unit: 'm3/h',
+        basis: 'Two dosing units, each 45 m3/h.' },
+    ] } },
+  }
+  {
+    const p = briefPinnedVolumesM3(pinnedBrief)
+    if (p.total_m3 !== 120 || !p.pins[0]?.item_m3.includes(40) || p.pins.length !== 1) {
+      console.log(`FAIL: briefPinnedVolumesM3 (want 120 m³ with 40 m³ items, 1 pin; got ${JSON.stringify(p)})`); bad++
+    }
+  }
+  // (v4) total-volume divergence EXPLAINED by the pins → downgraded to an informational note
+  // (verdict ok, brief-mandated in the note); the same volumes WITHOUT the pin still flag.
+  {
+    const bom = [{ requirement: 'Fresh Water Tank · 40 m³', line_gbp: 30000 },
+                 { requirement: 'Drain Water Tank · 40 m³', line_gbp: 30000 },
+                 { requirement: 'Drain Water Tank 2 · 40 m³', line_gbp: 30000 }]
+    const rPin = compareToBenchmark(exp, { ...pinnedBrief, costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {}, requirementsBom: bom })
+    const fPin = rPin.findings.find(f => f.dimension === 'sizing — total equipment volume')
+    if (!fPin || fPin.verdict !== 'ok' || !/brief-mandated/.test(fPin.note)) {
+      console.log(`FAIL: 120 m³ of brief-pinned tanks vs an 86 m³ envelope must downgrade to a note (got ${JSON.stringify(fPin)})`); bad++
+    }
+    const rNoPin = compareToBenchmark(exp, { costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {}, requirementsBom: bom })
+    const fNoPin = rNoPin.findings.find(f => f.dimension === 'sizing — total equipment volume')
+    if (!fNoPin || fNoPin.verdict === 'ok') {
+      console.log('FAIL: the same 120 m³ WITHOUT a brief pin must still flag (the exemption must not blind the net)'); bad++
+    }
+  }
+  // (v5) residual still RADICAL → still blocks: pins explain only 40 of 300 m³ in an 86 m³
+  // envelope (residual 260 m³ ≈ 3× the envelope) — a genuinely oversized non-pinned skid fires.
+  {
+    const st = {
+      parsedBrief: { constraints: { derived_requirements: [
+        { key: 'buffer_tank_volume_m3', label: 'Buffer Tank Volume', value: 40, unit: 'm3', basis: 'One 40 m3 buffer tank.' },
+      ] } },
+      costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {},
+      requirementsBom: [{ requirement: 'Buffer Tank · 40 m³', line_gbp: 30000 },
+                        { requirement: 'Oversized RO Skid · 260 m³', line_gbp: 90000 }],
+    }
+    const r = compareToBenchmark(exp, st)
+    if (r.worst !== 'radical' || !r.needs_full_check) {
+      console.log(`FAIL: a 260 m³ non-pinned residual vs 86 m³ must stay RADICAL and block (got ${r.worst})`); bad++
+    }
+  }
+  // (v6) single-component-vs-enclosure: a brief-pinned 40 m³ tank in a 30 m³ envelope is a
+  // note (the benchmark envelope is simply smaller than the mandated storage); a non-pinned
+  // 350 m³ skid still fires RADICAL (covered by r4 above).
+  {
+    const smallEnv: BenchmarkExpectation = { ...exp, expected_sizing: { footprint_m2: 12, volume_m3: 30, envelope: 'small plant room', basis: 't' } }
+    const r = compareToBenchmark(smallEnv, { ...pinnedBrief, costStack: { oem_transfer_price_gbp: 1_000_000 }, keyMetrics: {}, requirementsBom: [{ requirement: 'Fresh Water Tank · 40 m³', line_gbp: 30000 }] })
+    const f = r.findings.find(x => x.dimension.startsWith('sizing — single'))
+    if (!f || f.verdict !== 'ok' || !/brief-mandated/.test(f.note)) {
+      console.log(`FAIL: a brief-pinned 40 m³ tank vs a 30 m³ envelope must be a note, not RADICAL (got ${JSON.stringify(f)})`); bad++
+    }
+  }
+  // (v7) routeFaults BRIEF-PIN DOWNGRADE: a per-line sizing fault on the pinned 40 m³ tank
+  // (the v56 TK-106/TK-108 punch-list faults) → dimension 'note' + brief_pinned; a sizing
+  // fault on a non-pinned skid is untouched (both directions).
+  {
+    const st = { ...pinnedBrief, requirementsBom: [
+      { tag: 'TK-108', requirement: 'Fresh Water Tank · open FRP', basis: 'tapered wall 6 mm = P·r/(σ·E)+c · ⌀3.7×3.7 m', line_gbp: 30000, diameter_m: 3.7, height_m: 3.7 },
+      { tag: 'Z-101', requirement: 'Reverse Osmosis Skid', basis: 'bottom-up parametric', line_gbp: 20000 },
+    ] }
+    const routed = routeFaults([
+      { line: 'TK-108 (Fresh Water Tank)', dimension: 'sizing', issue: 'tank grossly oversized for plant room', magnitude: '3.7 m dia (≈40 m³)', suggested: '2.0–2.5 m dia', likely_cause: 'wrong size' },
+      { line: 'Z-101 (Reverse Osmosis Skid)', dimension: 'sizing', issue: 'skid oversized', magnitude: '≈300 m³', suggested: 'shrink', likely_cause: 'wrong dims' },
+    ] as any, st)
+    if (!(routed[0]?.brief_pinned === true && routed[0]?.dimension === 'note' && /brief-mandated/.test(routed[0]?.issue || ''))) {
+      console.log(`FAIL: pinned-tank sizing fault not downgraded to a note (got ${JSON.stringify(routed[0])})`); bad++
+    }
+    if (routed[1]?.brief_pinned || routed[1]?.dimension !== 'sizing') {
+      console.log(`FAIL: non-pinned skid sizing fault wrongly downgraded (got ${JSON.stringify(routed[1])})`); bad++
+    }
+    // thousand-separator guard: "2 031 m³" must parse as 2031 (never "031" ≈ a 40 m³ pin)
+    const sep = routeFaults([
+      { line: 'all large tanks', dimension: 'sizing', issue: 'cumulative equipment volume 2 031 m³ vs benchmark ~480 m³', magnitude: '~4× over', suggested: 'shrink', likely_cause: 'volume bug' },
+    ] as any, st)
+    if (sep[0]?.brief_pinned) {
+      console.log('FAIL: "2 031 m³" (narrow-space thousands) wrongly pinned to the 40 m³ brief item'); bad++
+    }
   }
   console.log(bad === 0 ? 'benchmark-expectation selftest: OK' : `benchmark-expectation selftest: ${bad} FAIL`)
   if (bad) process.exit(1)

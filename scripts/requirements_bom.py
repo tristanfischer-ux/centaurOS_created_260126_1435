@@ -1088,6 +1088,131 @@ def _control_element_budget(name: str):
     return CONTROL_ELEMENT_CLASS_BUDGETS.get(kind)
 
 
+# ── ACTUATED-VALVE ASSEMBLY FAMILY (benchmark net v56, 2026-07-02) ──
+# An ACTUATED valve (a pneumatic/electric actuator MOUNTED ON a valve body — one
+# procurable assembly) must price from the ACTUATED-VALVE family, never the bare-valve
+# commodity band: the v56 water-treatment run shipped 200× "Pneumatic Actuated Valves"
+# at £25 each (a bare PVC ball-valve token price) when a real 2½ in pneumatically
+# actuated valve is £150–250 — the heart of the client's £895k ebb/flow section being
+# ~70% under-modelled. Basis (UK 2026 trade supply, PVC-U/ball class assembly):
+#   assembly £ = £80 base (actuator + mounting kit + solenoid pilot) + £1.85 × DN(mm)
+#   → DN50 ≈ £173 · DN65 (2½ in, the class default) ≈ £200 · DN100 ≈ £265.
+# LIFT-ONLY (never lowers a real catalogue price); a line with a live distributor
+# price is untouched. Universal: keyed off the ACTUATION qualifier on the valve NOUN
+# (pneumatic/electric/motorised/actuated/automated), no per-archetype table. A manual /
+# check / solenoid / relief valve carries no actuation qualifier and never matches.
+_ACTUATED_VALVE_RE = re.compile(
+    r"(?:pneumatic(?:ally)?|electric(?:ally)?|motoris\w*|air)[\s_-]+(?:actuated|operated)"
+    r"[\s_-]+(?:\w+[\s_-]+)?valves?\b"                                  # 'pneumatic actuated valve'
+    r"|\bactuated[\s_-]+(?:\w+[\s_-]+)?valves?\b"                        # 'actuated ball valve'
+    r"|\bautomated[\s_-]+(?:\w+[\s_-]+)?valves?\b"                       # 'automated ball valve'
+    r"|\bmotoris\w*[\s_-]+valves?\b"                                     # 'motorised valve'
+    r"|\bpneumatic[\s_-]+(?:ball|butterfly|diaphragm|control)[\s_-]+valves?\b",
+    re.I)
+_ACTUATED_VALVE_BASE_GBP = 80.0      # actuator + mounting kit + solenoid pilot
+_ACTUATED_VALVE_PER_DN_GBP = 1.85    # valve-body cost scales with DN
+_ACTUATED_VALVE_DEFAULT_DN = 65.0    # 2½ in — the ebb/flow distribution class
+
+
+def _valve_dn_mm(text: str):
+    """DN (mm) parsed from a name/requirement — 'DN80', '2.5 in', '2½"' — else None."""
+    t = text or ""
+    m = re.search(r"\bDN\s*(\d{2,4})\b", t, re.I)
+    if m:
+        return float(m.group(1))
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:\"|\bin(?:ch)?\b)", t)
+    if m:
+        return float(m.group(1)) * 25.0   # nominal inch → DN mm (2 in → DN50)
+    return None
+
+
+def _actuated_valve_assembly_price(name: str, requirement: str = ""):
+    """(gbp, basis) for an actuated-valve ASSEMBLY (actuator + valve body priced as
+    ONE unit), else None when the noun carries no actuation qualifier. Deterministic,
+    universal, explicit basis: £80 base + £1.85/DN·mm (DN65 assumed when unstated)."""
+    if not _ACTUATED_VALVE_RE.search(name or ""):
+        return None
+    dn = _valve_dn_mm(f"{name} {requirement}")
+    dn_note = f"DN{dn:g}" if dn else f"DN{_ACTUATED_VALVE_DEFAULT_DN:g} assumed (2½ in class)"
+    dn_val = dn or _ACTUATED_VALVE_DEFAULT_DN
+    gbp = _ACTUATED_VALVE_BASE_GBP + _ACTUATED_VALVE_PER_DN_GBP * dn_val
+    basis = (f"actuated-valve assembly (actuator + valve body as ONE unit): "
+             f"£{_ACTUATED_VALVE_BASE_GBP:.0f} base + £{_ACTUATED_VALVE_PER_DN_GBP:.2f}/DN·mm × {dn_note} "
+             f"= £{gbp:,.0f} (UK-2026 trade supply, never the bare-valve band)")
+    return gbp, basis
+
+
+# ── BARE PNEUMATIC-ACTUATOR COMPONENT BAND (benchmark net v56, 2026-07-02) ──
+# A bare PNEUMATIC (air) actuator priced SEPARATELY from its valve is a small
+# rack-and-pinion / diaphragm component — £30–40 each at trade volume, NOT the £329
+# the corpus lift produced (the "actuator" corpus median £548 is dominated by large
+# MOTORISED/electric actuators — a class-mismatch). A motorised/electric actuator is
+# a different family (CONTROL_ELEMENT_CLASS_BUDGETS £2,500) and never matches here.
+# NOTE the double-representation trap this band pairs with: when the SAME N units also
+# appear as an actuated-valve ASSEMBLY line (which already includes its actuators),
+# the bare-actuator line is folded to £0 by _dedupe_actuator_assembly_rows.
+_BARE_PNEUMATIC_ACTUATOR_RE = re.compile(
+    r"(?:pneumatic|air)[\s_-]+(?:valve[\s_-]+)?actuators?\b", re.I)
+_PNEUMATIC_ACTUATOR_FLOOR_GBP, _PNEUMATIC_ACTUATOR_CEILING_GBP = 30.0, 40.0
+
+
+def _pneumatic_actuator_band(name: str, gbp: float):
+    """Clamp a bare pneumatic-actuator COMPONENT price into its £30–40 band; returns
+    (gbp, basis_suffix) when clamped, else None (non-matching noun / already in band).
+    A pneumatic ACTUATED VALVE (the assembly) is priced by its own family, not here."""
+    if not _BARE_PNEUMATIC_ACTUATOR_RE.search(name or ""):
+        return None
+    if _ACTUATED_VALVE_RE.search(name or ""):
+        return None                       # the assembly family owns that line
+    if gbp > _PNEUMATIC_ACTUATOR_CEILING_GBP:
+        return (_PNEUMATIC_ACTUATOR_CEILING_GBP,
+                f" · capped to pneumatic-actuator component band "
+                f"£{_PNEUMATIC_ACTUATOR_FLOOR_GBP:.0f}–{_PNEUMATIC_ACTUATOR_CEILING_GBP:.0f} "
+                f"(bare rack-and-pinion/diaphragm air actuator, not a motorised drive)")
+    if 0 <= gbp < _PNEUMATIC_ACTUATOR_FLOOR_GBP:
+        return (_PNEUMATIC_ACTUATOR_FLOOR_GBP,
+                f" · floored to pneumatic-actuator component band "
+                f"£{_PNEUMATIC_ACTUATOR_FLOOR_GBP:.0f}–{_PNEUMATIC_ACTUATOR_CEILING_GBP:.0f}")
+    return None
+
+
+def _dedupe_actuator_assembly_rows(rows):
+    """DOUBLE-REPRESENTATION de-dup (benchmark net v56, 2026-07-02): when the bill
+    carries BOTH an actuated-valve ASSEMBLY line (N units, actuator included in the
+    assembly price) AND a separate bare-actuator line for the same population (qty ≤
+    the assemblies' qty), the bare-actuator line double-bills the actuators already
+    priced inside the assemblies. Fold it: line_gbp → 0, status IN ASSEMBLY, honest
+    basis note. Mutates `rows` in place; returns the number of folded lines. Pure
+    noun/qty logic — a bare-actuator line with NO matching assembly line (or a larger
+    population than the assemblies can absorb) is left untouched (it genuinely stands
+    alone). Universal, no per-class table."""
+    assemblies = [r for r in rows
+                  if float(r.get("line_gbp") or 0) > 0
+                  and _ACTUATED_VALVE_RE.search(str(r.get("requirement", "")).split("·")[0])]
+    if not assemblies:
+        return 0
+    folded = 0
+    for r in rows:
+        if float(r.get("line_gbp") or 0) <= 0:
+            continue
+        lead = str(r.get("requirement", "")).split("·")[0]
+        if not _BARE_PNEUMATIC_ACTUATOR_RE.search(lead) or _ACTUATED_VALVE_RE.search(lead):
+            continue
+        qy = int(r.get("qty") or 1)
+        host = next((a for a in assemblies if int(a.get("qty") or 1) >= qy), None)
+        if host is None:
+            continue                      # more actuators than assemblies — stands alone
+        r["line_gbp"] = 0
+        r["status"] = "IN ASSEMBLY"
+        r["basis"] = (str(r.get("basis", ""))
+                      + f" · de-duplicated: these {qy}× actuators are the actuators ON the "
+                      f"{int(host.get('qty') or 1)}× actuated-valve assemblies "
+                      f"('{str(host.get('requirement','')).split('·')[0].strip()[:40]}') — "
+                      f"the assembly line already prices actuator + valve as one unit")
+        folded += 1
+    return folded
+
+
 # ── DUTY-SCALED CLASS-REFERENCE BUDGET (council 2026-06-19) ──
 # A large mechanical-equipment price should be EXPLICIT and auditable, not an
 # unexplained outlier. A heat pump / compressor / chiller / blower scales its cost
@@ -2539,6 +2664,63 @@ def _selftest() -> int:
     if not (_g2 == 60.0 and "commodity-floor" in _b2):
         print(f"  FAIL £0 line filter not floored to £60 (got £{_g2})"); bad += 1
 
+    # ── (i) ACTUATED-VALVE ASSEMBLY FAMILY + BARE-ACTUATOR BAND + DE-DUP (benchmark net
+    # v56, 2026-07-02) — proveCatch both directions for each of the three rules.
+    # (i1) an ACTUATED valve prices from the assembly family, never the bare-valve band:
+    _av = _actuated_valve_assembly_price("Pneumatic Actuated Valves")
+    if not (_av and abs(_av[0] - (80.0 + 1.85 * 65.0)) < 0.01 and "actuated-valve assembly" in _av[1]):
+        print(f"  FAIL actuated-valve DN65 default not ~£200 with assembly basis (got {_av})"); bad += 1
+    _av100 = _actuated_valve_assembly_price("Actuated Butterfly Valve DN100")
+    if not (_av100 and abs(_av100[0] - (80.0 + 1.85 * 100.0)) < 0.01 and "DN100" in _av100[1]):
+        print(f"  FAIL actuated-valve DN100 scaling (want £265, got {_av100})"); bad += 1
+    _av25in = _actuated_valve_assembly_price("Electrically Operated Ball Valve", '2.5" ebb/flow')
+    if not (_av25in and abs(_av25in[0] - (80.0 + 1.85 * 62.5)) < 0.01):
+        print(f"  FAIL actuated-valve 2.5-inch → DN62.5 scaling (got {_av25in})"); bad += 1
+    if _actuated_valve_assembly_price("Automated Ball Valves") is None:
+        print("  FAIL 'Automated Ball Valves' should match the assembly family"); bad += 1
+    for _nm in ("Manual Isolation Valves", "Check Valve", "Solenoid Valve",
+                "Pressure Relief Valve", "Flow Control Valves", "Backwash / Service Valve Nest"):
+        if _actuated_valve_assembly_price(_nm) is not None:
+            print(f"  FAIL non-actuated valve {_nm!r} wrongly matched the assembly family"); bad += 1
+    # (i2) a bare pneumatic actuator clamps into the £30–40 COMPONENT band (the £329
+    # corpus-lift over-bill), and the corpus lift never fires on it; a motorised/electric
+    # actuator is a different family and is untouched by the band:
+    _pa_hi = _pneumatic_actuator_band("Pneumatic Actuators", 329.0)
+    if not (_pa_hi and _pa_hi[0] == 40.0 and "component band" in _pa_hi[1]):
+        print(f"  FAIL pneumatic actuator £329 not capped to £40 (got {_pa_hi})"); bad += 1
+    _pa_lo = _pneumatic_actuator_band("Pneumatic Valve Actuator", 25.0)
+    if not (_pa_lo and _pa_lo[0] == 30.0):
+        print(f"  FAIL pneumatic actuator £25 not floored to £30 (got {_pa_lo})"); bad += 1
+    if _pneumatic_actuator_band("Pneumatic Actuators", 35.0) is not None:
+        print("  FAIL in-band pneumatic actuator wrongly clamped"); bad += 1
+    if _pneumatic_actuator_band("Motorised Actuator", 2500.0) is not None:
+        print("  FAIL motorised actuator wrongly clamped to the pneumatic band"); bad += 1
+    if _pneumatic_actuator_band("Pneumatic Actuated Valves", 25.0) is not None:
+        print("  FAIL actuated-valve ASSEMBLY wrongly clamped to the bare-actuator band"); bad += 1
+    if _BARE_PNEUMATIC_ACTUATOR_RE.search("Pneumatic Actuators") is None:
+        print("  FAIL corpus-lift skip regex misses 'Pneumatic Actuators'"); bad += 1
+    # (i3) DOUBLE-REPRESENTATION de-dup: 200 assemblies + 200 bare actuators → the
+    # actuator line folds to £0 IN ASSEMBLY; a bare-actuator line with NO assembly (or a
+    # larger population than the assemblies) stands alone (proveCatch both directions).
+    _rows_fold = [
+        {"requirement": "Pneumatic Actuated Valves", "qty": 200, "unit_gbp": 200, "line_gbp": 40000, "basis": "b", "status": "NOT FOUND"},
+        {"requirement": "Pneumatic Actuators", "qty": 200, "unit_gbp": 35, "line_gbp": 7000, "basis": "b", "status": "NOT FOUND"},
+    ]
+    if not (_dedupe_actuator_assembly_rows(_rows_fold) == 1
+            and _rows_fold[1]["line_gbp"] == 0 and _rows_fold[1]["status"] == "IN ASSEMBLY"
+            and "de-duplicated" in _rows_fold[1]["basis"]
+            and _rows_fold[0]["line_gbp"] == 40000):
+        print(f"  FAIL actuator de-dup did not fold the duplicate line (got {_rows_fold})"); bad += 1
+    _rows_alone = [{"requirement": "Pneumatic Actuators", "qty": 200, "unit_gbp": 35, "line_gbp": 7000, "basis": "b", "status": "NOT FOUND"}]
+    if not (_dedupe_actuator_assembly_rows(_rows_alone) == 0 and _rows_alone[0]["line_gbp"] == 7000):
+        print("  FAIL standalone actuator line wrongly folded (no assembly present)"); bad += 1
+    _rows_more = [
+        {"requirement": "Actuated Ball Valves", "qty": 50, "unit_gbp": 200, "line_gbp": 10000, "basis": "b", "status": "NOT FOUND"},
+        {"requirement": "Pneumatic Actuators", "qty": 200, "unit_gbp": 35, "line_gbp": 7000, "basis": "b", "status": "NOT FOUND"},
+    ]
+    if not (_dedupe_actuator_assembly_rows(_rows_more) == 0 and _rows_more[1]["line_gbp"] == 7000):
+        print("  FAIL 200 actuators folded into only 50 assemblies (population mismatch)"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -3589,6 +3771,28 @@ def assemble(out_dir: str):
                         status, part = "NOT FOUND", "requirement stated"
                     basis = (basis + " · floored to min credible price"
                              if "floored" not in basis else basis)
+                # ── ACTUATED-VALVE ASSEMBLY FAMILY (benchmark net v56, 2026-07-02): a valve
+                # noun carrying an ACTUATION qualifier (pneumatic/electric/motorised/actuated/
+                # automated) is an actuator+valve ASSEMBLY — price it from the actuated-valve
+                # family (£80 base + £1.85/DN·mm, DN65 assumed), NEVER the bare-valve band
+                # (the 200× "Pneumatic Actuated Valves" @ £25 bug — a £5k line for £40k of
+                # kit). LIFT-only with a re-based explicit basis; a line with a real
+                # distributor price is never overridden.
+                av = _actuated_valve_assembly_price(name, requirement)
+                if av and wid not in dist_price and gbp < av[0]:
+                    gbp, basis = av[0], av[1]
+                    if status == "BESPOKE":
+                        status, part = "NOT FOUND", "requirement stated"
+                # ── BARE PNEUMATIC-ACTUATOR COMPONENT BAND (benchmark net v56, 2026-07-02):
+                # a pneumatic (air) actuator priced SEPARATELY from its valve is a £30–40
+                # component — clamp any stray estimate into the band (the standalone leg of
+                # the £329 over-bill; the corpus-lift leg is guarded at the lift site, and a
+                # line that duplicates an actuated-valve assembly population is folded to £0
+                # by _dedupe_actuator_assembly_rows).
+                pab = _pneumatic_actuator_band(name, gbp)
+                if pab and wid not in dist_price:
+                    gbp = pab[0]
+                    basis = basis + pab[1]
                 # PACK-INTERNAL MICRO-COMMODITY CEILING (2026-06-24): a cell tap/sense wire or
                 # insulation pad priced from a catalogue REEL/SHEET (£59 reel, £40 sheet) and
                 # applied per-cell ×3,750 is a pack-size error. Cap the per-unit at the material
@@ -3860,6 +4064,16 @@ def assemble(out_dir: str):
     for kr in rows:
         if kr.get("status") == "SUB-COMPONENT" and kr.get("sub_of"):
             kids_by_tag.setdefault(kr["sub_of"], []).append(kr)
+    # ── ACTUATED-VALVE / BARE-ACTUATOR DOUBLE-REPRESENTATION DE-DUP (2026-07-02):
+    # when the bill carries BOTH "N× actuated valves" (assembly-priced, actuator
+    # included) AND "N× pneumatic actuators" for the same population, the actuator
+    # line double-bills what the assemblies already contain — fold it to £0 with an
+    # honest IN ASSEMBLY note. Runs BEFORE the corpus lift so a folded line is never
+    # lifted. (stderr only — stdout must stay pure JSON for the chain.)
+    _folded = _dedupe_actuator_assembly_rows(rows)
+    if _folded:
+        print(f"  [actuator-dedup] folded {_folded} bare-actuator line(s) into their "
+              f"actuated-valve assemblies (double-representation removed)", file=sys.stderr)
     _lift_n, _lift_gbp = 0, 0.0
     for row in rows:
         if row.get("line_gbp", 0) <= 0 or row.get("status") == "SUB-COMPONENT":
@@ -3895,6 +4109,15 @@ def assemble(out_dir: str):
         # grounded truth; never corpus-lift a membrane/media line. (corpus-mismatch family)
         if _MEMBRANE_MEDIA_RE.search(req_lead):
             continue
+        # ACTUATED-VALVE / BARE-ACTUATOR FAMILIES (benchmark net v56, 2026-07-02,
+        # corpus-mismatch family): the "actuator"/"actuated valve" corpus medians (£548 /
+        # £2,400, n=5) are dominated by large MOTORISED/electric industrial drives and
+        # valve packages, so a lift over-bills the £30–40 air actuator ~10× (£25→£329
+        # across 200 units = £65.8k phantom) and re-inflates the family-grounded £200
+        # assembly to £2,400 (12×). The DN-scaled family band at the pricing site is the
+        # grounded truth for BOTH; never corpus-lift either family.
+        if _BARE_PNEUMATIC_ACTUATOR_RE.search(req_lead) or _ACTUATED_VALVE_RE.search(req_lead):
+            continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
         res = _corpus_median_lift(u, pv) if pv else None
@@ -3908,7 +4131,13 @@ def assemble(out_dir: str):
             # swarm-caught Degasser £115k parent / £9,693 children mismatch, 2026-06-20).
             # The children are an apportionment of the parent, not independent prices, so a
             # proportional scale by the SAME factor the parent moved keeps the split honest.
-            kids = kids_by_tag.get(row.get("tag"))
+            # PLACEHOLDER-TAG COLLISION GUARD (2026-07-02): "—" is the no-tag placeholder
+            # shared by MANY unrelated rows, so kids_by_tag["—"] holds OTHER parents'
+            # children — rescaling them by THIS row's lift factor silently inflated the
+            # membrane sub-components ~13× in v56 (the £116.5M "Backwash / Service Valve
+            # Nest" breakdown). Only a row with a REAL canonical tag owns its children.
+            _rtag = row.get("tag")
+            kids = kids_by_tag.get(_rtag) if _rtag not in (None, "", "—") else None
             if kids and u > 0:
                 k_factor = new_u / u
                 for kr in kids:
