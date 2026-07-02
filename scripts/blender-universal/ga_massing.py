@@ -72,6 +72,18 @@ GA_NON_MASSING_RE = re.compile(
     r"thermal|fault) protection\b|"
     r"\b(?:low|high|pressure|level|float|limit|flow|proximity|"
     r"temperature) switch(?:es)?\b|"
+    # pipework-attached fittings that live ON/IN a parent (Codema litter clusters
+    # 2026-07-02): a CIP SPRAY BALL sits INSIDE the tank; a SAMPLING POINT is a
+    # port+valve (P&ID tag, same object as the 'Sample Valve' already dropped); a
+    # HOSE ASSEMBLY is routed flexible pipework, never a massed crate.
+    # NOTE deliberately NOT dropped: manifolds/headers (massed as inline_spool —
+    # the 2026-06-27 must_keep decision); "Manifold Support Bracket"; and bare
+    # terminal "<stream> Inlet/Outlet" stubs — a first attempt dropped those and
+    # the router LOST the real 'Permeate Outlet → Cloth Filter' process edge +
+    # re-homed 6 fluid_loop rows (connection endpoints beat GA tidiness; a
+    # name-only classifier cannot know which stubs the topology references).
+    r"\bspray balls?\b|\bsampl(?:e|ing) points?\b|"
+    r"\b(?:hose|flexible hose) assembl(?:y|ies)\b|\bflexible hoses?\b|"
     # inline valves -> P&ID symbols (specific types, never a 'valve skid')
     r"\b(?:isolation|sample|ball|check|relief|gate|globe|butterfly|"
     r"control|solenoid|needle|diaphragm|non-return|nrv|pressure relief|"
@@ -108,6 +120,10 @@ def _selftest():
         # bare structural skid FRAMES — the skid they support is the massed object
         "Painted Carbon Steel Skid Frame", "Painted Steel Skid Frame", "Sst304 Skid Frame",
         "Equipment Frame", "Base Frame Assembly",
+        # pipework-attached fittings (Codema litter clusters 2026-07-02: 5 names
+        # sharing 1000×1010×1100)
+        "CIP Spray Ball", "Permeate Sampling Point", "Sample Point 2",
+        "CIP Hose Assembly", "Flexible Hose",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -123,6 +139,12 @@ def _selftest():
         # pipe-ADJACENT names where pipe is NOT the head noun — these are structures /
         # vessels and MUST stay massed (proves the terminal-anchored pipe rule is tight)
         "DN150 Pipe Rack", "Pipe Bridge Support", "Filtrate Pipe Manifold", "Pipe Header Vessel",
+        # manifolds stay MASSED (rendered as inline_spool headers, 2026-07-02)
+        "Inlet Manifold", "Outlet Manifold", "Piping Manifold", "Permeate Manifold",
+        "Outlet Damper Assembly", "Inlet Air Filter", "Cip System",
+        # connection-schedule fluid ENDPOINTS — dropping either dangles/re-homes real
+        # process edges (the 'Permeate Outlet → Cloth Filter' loss, 2026-07-02)
+        "Manifold Support Bracket", "Permeate Outlet", "Concentrate Outlet",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

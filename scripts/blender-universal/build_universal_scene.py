@@ -301,6 +301,17 @@ SHAPE_RULES = [
     # ends — give it that shape. Placed AFTER every specific reactor/column/separator/
     # tank/electrical rule so those still win, and before the instrument/box fallbacks.)
     (r"\bvessels?\b|\bpot\b|reservoir|accumulator|maturation|\bdigest", "vertical_vessel"),
+    # A pipe MANIFOLD / distribution HEADER is a slim horizontal pipe assembly, NOT a
+    # crate — left on the DEFAULT box, four manifolds shared one 1515×900×1100 box and
+    # tripped the manifest-sight LITTER signal (Codema 2026-07-02). inline_spool already
+    # renders a horizontal cylinder (dia 350 × len 900) — the honest header silhouette.
+    # AFTER the vessel rule so a "Header Vessel"/"Header Tank" keeps its vessel shape;
+    # manifolds stay MASSED (ga_massing must_keep "Filtrate Pipe Manifold", 2026-06-27).
+    # TERMINAL-anchored: manifold/header must be the HEAD noun — "Manifold Pressure
+    # Relief" (an instrument) and "Manifold Support Bracket" (support steel) are NOT
+    # manifolds and must keep their own shapes (first attempt hijacked both and
+    # re-formed a 6-name spool cluster).
+    (r"\bmanifolds?\s*\d*\s*$|\bheaders?\s*\d*\s*$", "inline_spool"),
     (r"valve|transmitter|thermowell|detector|analy[sz]er|metering|"
      r"instrument|sensor|relief|gauge|probe", "instrument"),
 ]
