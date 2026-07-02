@@ -88,6 +88,10 @@ class GAPart:
     y0: float; y1: float     # plan vertical / side horizontal (plant width)
     z0: float; z1: float     # elevation (plant height)
     cx: float; cy: float     # plan centre (for the tag + leader)
+    # process-flow rank from the manifest (region_rank) — the equipment schedule
+    # reads in PROCESS ORDER, not tag-letter-alphabetical (Tristan 2026-07-02:
+    # "manifolds scattered around the page — why are they where they are").
+    rank: int = 10**9
 
 
 def _round_extent(centre, half):
@@ -134,7 +138,8 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
             shape=r.get("shape") or "",
             qty=int(r.get("qty") or 1),
             is_round=is_round,
-            x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1, cx=x, cy=y))
+            x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1, cx=x, cy=y,
+            rank=int(r.get("region_rank") or 10**9)))
 
     bbox = man.get("bbox_mm") or {}
     if not bbox and parts:
@@ -728,7 +733,11 @@ def _collapse_schedule(parts):
     AND the SAME name collapse to one range row (e.g. 15 battery racks → 'BR-101…
     BR-115  Battery / equipment rack  ×15'), so the schedule is concise. Returns a
     list of (tag_label, name) in equipment-tag order."""
-    items = sorted(parts, key=lambda p: (p.tag.split("-")[0],
+    # PROCESS ORDER first (manifest region_rank — feed → treatment → product →
+    # utilities), then tag family/number so range-collapsing still finds its
+    # consecutive runs within a region. Was tag-letter-alphabetical, which
+    # scattered the schedule's reading order across the process.
+    items = sorted(parts, key=lambda p: (p.rank, p.tag.split("-")[0],
                                          _tag_num(p.tag), p.tag))
     rows = []
     i = 0

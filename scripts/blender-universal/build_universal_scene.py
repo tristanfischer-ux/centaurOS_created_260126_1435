@@ -156,6 +156,93 @@ def _det_layout_key(p):
 # a walkable maintenance gap that still reads as ONE plant, not a detached island.
 PERIPHERY_HUG_GAP_MM = 2500
 
+# The connection-ledger topology, published by place_process_plant for the det-layout
+# manifold hug (an inline manifold/header places BESIDE the run it serves, not wherever
+# its region bay landed). None (every other caller/family) → the hug is a strict no-op.
+_DET_LAYOUT_TOPOLOGY = None
+# An inline spool (manifold/header/static mixer) sits this close beside its ledger-tied
+# host — a service stub off the run, tighter than the packer's 2 m walk aisle (nothing
+# walks between a manifold and the equipment it feeds).
+MANIFOLD_HUG_GAP_MM = 800.0
+
+
+def _hug_manifolds_to_hosts(items, pos, parts):
+    """Move each INLINE-SPOOL part (pipe manifold / header — classify_shape 'inline_spool')
+    NEXT TO the placed part the connection ledger ties it to, instead of wherever its
+    region bay put it (Tristan 2026-07-02, codema v52: manifolds scattered mid-deck with
+    no evident rationale — a manifold belongs beside the run it distributes).
+
+    Deterministic: manifolds processed in sorted key order; the host is the NEAREST tied
+    non-spool placed part (Manhattan distance, tie-break by key); candidate seats are the
+    host's E/W/N/S faces at MANIFOLD_HUG_GAP_MM, first non-overlapping wins; snapped to
+    the integer grid. A manifold with no resolvable placed tie keeps its packed position.
+    Mutates `pos` in place; returns the number moved."""
+    topo = _DET_LAYOUT_TOPOLOGY or []
+    if not topo or not pos:
+        return 0
+    fp = {it["id"]: (float(it["w"]), float(it["d"])) for it in items}
+    by_name = {}
+    for p in parts:
+        by_name.setdefault(str(getattr(p, "name", "")).strip().lower(), p)
+    ties = {}
+    for e in topo:
+        if not isinstance(e, dict):
+            continue
+        a = str(e.get("from_part") or e.get("from") or "").strip().lower()
+        b = str(e.get("to_part") or e.get("to") or "").strip().lower()
+        if a and b and a != b:
+            ties.setdefault(a, []).append(b)
+            ties.setdefault(b, []).append(a)
+
+    def _rect(iid, cx, cy):
+        w, d = fp.get(iid, (float(dl.GRID_MM), float(dl.GRID_MM)))
+        return (cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2)
+
+    manifolds = sorted((p for p in parts
+                        if getattr(p, "shape", "") == "inline_spool"
+                        and _det_layout_key(p) in pos and _det_layout_key(p) in fp),
+                       key=_det_layout_key)
+    CLEAR = 200.0        # placement clearance either side of the hug seat
+    moved = 0
+    for p in manifolds:
+        mk = _det_layout_key(p)
+        hosts = []
+        for tn in ties.get(str(p.name).strip().lower(), ()):
+            hp = by_name.get(tn)
+            if hp is None or hp is p or getattr(hp, "shape", "") == "inline_spool":
+                continue
+            hk = _det_layout_key(hp)
+            if hk != mk and hk in pos and hk in fp:
+                hosts.append(hp)
+        if not hosts:
+            continue
+        mx, my = pos[mk]
+        host = min(hosts, key=lambda h: (abs(pos[_det_layout_key(h)][0] - mx)
+                                         + abs(pos[_det_layout_key(h)][1] - my),
+                                         _det_layout_key(h)))
+        hk = _det_layout_key(host)
+        hx, hy = pos[hk]
+        hw, hd = fp[hk]
+        mw, md = fp[mk]
+        cands = ((hx + hw / 2 + MANIFOLD_HUG_GAP_MM + mw / 2, hy),
+                 (hx - hw / 2 - MANIFOLD_HUG_GAP_MM - mw / 2, hy),
+                 (hx, hy + hd / 2 + MANIFOLD_HUG_GAP_MM + md / 2),
+                 (hx, hy - hd / 2 - MANIFOLD_HUG_GAP_MM - md / 2))
+        others = [(k, xy) for k, xy in sorted(pos.items()) if k != mk and k in fp]
+        for cx, cy in cands:
+            r = _rect(mk, cx, cy)
+            r = (r[0] - CLEAR, r[1] - CLEAR, r[2] + CLEAR, r[3] + CLEAR)
+            if any(r[0] < o[2] and r[2] > o[0] and r[1] < o[3] and r[3] > o[1]
+                   for o in (_rect(k, ox, oy) for k, (ox, oy) in others)):
+                continue
+            pos[mk] = (dl._snap(cx), dl._snap(cy))
+            moved += 1
+            break
+    if moved:
+        print(f"[univ][det-layout] manifold hug: {moved} inline manifold/header part(s) "
+              f"seated beside their ledger-tied host run (+{MANIFOLD_HUG_GAP_MM:.0f} mm)")
+    return moved
+
 
 def _det_layout_with_periphery_hug(items):
     """dl.layout() with the NON-FLOW periphery pulled in tight against the process train.
@@ -232,7 +319,10 @@ def _det_layout_with_periphery_hug(items):
     row_x, row_y, row_d = tx0, ty1 + PERIPHERY_HUG_GAP_MM, 0.0
     for rk in peri_regions:
         ritems = [it for it in peri_items if it["region"] == rk]
-        rpos = dl.layout(ritems)
+        # bay_row_w: pack the back-row bay as a SHALLOW ROW spanning up to the train width —
+        # the square-ish default stacked 2-3 cabinets into a one-part-per-row column 5-11 m
+        # deep (codema v52: the periphery read as scattered boxes down the deck, not a row).
+        rpos = dl.layout(ritems, bay_row_w=int(train_w))
         rx0, ry0, rx1, ry1 = _bbox(rpos)
         if rx0 > rx1:      # defensive: a bay with no measurable part
             continue
@@ -269,11 +359,31 @@ def _populate_det_layout(parts):
         items.append({"id": _det_layout_key(p), "region": str(getattr(p, "region_key", "")),
                       "rank": int(getattr(p, "region_rank", 10_000)), "seq": int(getattr(p, "_seq", 0)),
                       "w": int(fx), "d": int(fy), "area": float(fx * fy)})
+    # OPT-IN diagnostics (DET_LAYOUT_DUMP=1): serialise the packer's INPUT items + flow plan
+    # so the pure dl.layout() can be iterated OFFLINE (no Blender session). Never in production.
+    if os.environ.get("DET_LAYOUT_DUMP", "").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            _dump_path = os.path.join(os.environ.get("BLENDER_OUT_DIR", "."),
+                                      "det-layout-items.json")
+            with open(_dump_path, "w") as _df:
+                json.dump({"items": items,
+                           "flow_plan": list(_PLANT_FLOW_PLAN) if _PLANT_FLOW_PLAN else None,
+                           "shapes": {_det_layout_key(p): getattr(p, "shape", "")
+                                      for p in parts}}, _df, indent=1)
+            print(f"[univ][det-layout] DET_LAYOUT_DUMP=1 → {_dump_path}")
+        except Exception as _de:
+            print(f"[univ][det-layout] dump failed: {_de}")
     try:
         pos = _det_layout_with_periphery_hug(items)
     except Exception as e:
         print(f"[univ][det-layout] skipped (error): {e}")
         return
+    # Manifold hug — inline spools seat beside the run the ledger ties them to (no-op
+    # when no topology was published, e.g. a non-process family or the legacy path).
+    try:
+        _hug_manifolds_to_hosts(items, pos, parts)
+    except Exception as e:
+        print(f"[univ][det-layout] manifold hug skipped (error): {e}")
     # dl.layout() grows from the origin (+x,+y quadrant); the building shell + camera centre on the
     # plant CENTROID, so store coords CENTRED on the layout's bbox-centre → the envelope encloses the
     # parts symmetrically instead of leaving one half of the slab empty (det render was right-shifted).
@@ -555,7 +665,10 @@ SKID_POST_MM             = 180    # box-section size of frame posts/rails (subst
 # free-space families (aircraft/satellite have their own faint ground plane; a wind
 # turbine has its own foundation pad).
 GROUND_SLAB_THICK_MM   = 400.0    # reinforced slab depth (top at DECK_Z_MM, extends down)
-GROUND_SLAB_MARGIN_MM  = 4000.0   # (was 2500) wider apron so the floor clearly reads in the hero
+GROUND_SLAB_MARGIN_MM  = 3000.0   # (was 4000) a stated 3 m PERIMETER ACCESS AISLE round the
+#                                   occupied hull — the deck must fit the plant, not the reverse
+#                                   (Tristan 2026-07-02: v52's plant sat in a corner of an
+#                                   oversized deck; the slab spans drawn-mesh bbox + this apron)
 # Concrete-grey — darker than before (was 0.62) against the 0.85 INSPECT world so the
 # deck reads UNMISTAKABLY as the plant floor in the hero/iso view (Tristan 2026-06-22:
 # "no floor"), while staying subordinate to the equipment.
@@ -5415,6 +5528,9 @@ def build_parts_manifest(parts):
             "module": p.module_id,
             "shape": p.shape,
             "qty": int(p.qty) if p.qty else 1,
+            # process-sequence rank (REGION_PRIORITY) — carried so the GA equipment
+            # schedule + any manifest consumer can list parts in PROCESS ORDER.
+            "region_rank": int(getattr(p, "region_rank", REGION_PRIORITY_DEFAULT)),
             "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
             "dims_mm": dims,
         })
@@ -5469,6 +5585,60 @@ def _remap_manifest_to_canonical_tags(rows, state):
     return n_remapped
 
 
+# ── SITE UTILISATION (Tristan 2026-07-02, issues 13+14) ─────────────────────────────
+# plant hull area ÷ deck area — the deterministic "is the deck mostly empty?" signal the
+# v52 top view failed by eye (plant in a corner/L of a much larger deck, ratio 0.33).
+# HULL   = union of every placed part's plan footprint, each inflated by
+#          SITE_HULL_AISLE_MM (the 1 m access strip a part owns — half the packer's 2 m
+#          walk aisle, so two adjacent parts' strips meet without double-counting).
+# DECK   = the drawn u_ground_slab plan rectangle (drawn-mesh bbox + the 3 m apron).
+# Rasterised on a fixed integer grid (SITE_UTIL_CELL_MM) → deterministic, no float-order
+# dependence. Written into parts-manifest.json as `site`; drawing_gates.py G7 scores it.
+SITE_UTIL_CELL_MM   = 500.0
+SITE_HULL_AISLE_MM  = 1000.0
+
+
+def _compute_site_utilisation(parts):
+    """{deck_m2, hull_m2, utilisation, …} for the drawn deck, or None when no slab exists
+    (free-space families / BLENDER_GROUND_SLAB=0) — the G7 gate then skips."""
+    slab = bpy.data.objects.get("u_ground_slab")
+    if slab is None:
+        return None
+    sx, sy = slab.location.x * 1000.0, slab.location.y * 1000.0
+    sw, sd = slab.dimensions.x * 1000.0, slab.dimensions.y * 1000.0
+    if sw <= 0 or sd <= 0:
+        return None
+    x0, y0 = sx - sw / 2.0, sy - sd / 2.0
+    C = SITE_UTIL_CELL_MM
+    nx, ny = max(1, int(sw // C) + 1), max(1, int(sd // C) + 1)
+    filled = set()
+    for p in parts:
+        if not getattr(p, "placed_xyz_mm", None):
+            continue
+        cx, cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
+        try:
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        except Exception:
+            continue
+        a = SITE_HULL_AISLE_MM
+        i0 = max(0, int((cx - fx / 2 - a - x0) // C))
+        i1 = min(nx - 1, int((cx + fx / 2 + a - x0) // C))
+        j0 = max(0, int((cy - fy / 2 - a - y0) // C))
+        j1 = min(ny - 1, int((cy + fy / 2 + a - y0) // C))
+        for i in range(i0, i1 + 1):
+            for j in range(j0, j1 + 1):
+                filled.add((i, j))
+    deck_m2 = sw * sd / 1e6
+    hull_m2 = len(filled) * C * C / 1e6
+    return {"deck_m2": round(deck_m2, 1), "hull_m2": round(hull_m2, 1),
+            "utilisation": round(hull_m2 / deck_m2, 3) if deck_m2 else None,
+            "deck_rect_mm": [round(x0, 1), round(y0, 1),
+                             round(x0 + sw, 1), round(y0 + sd, 1)],
+            "hull_aisle_mm": SITE_HULL_AISLE_MM, "cell_mm": SITE_UTIL_CELL_MM,
+            "basis": "hull = union of placed part footprints each inflated 1 m (its access "
+                     "strip); deck = drawn u_ground_slab plan rect (mesh bbox + 3 m apron)"}
+
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -5491,6 +5661,16 @@ def write_parts_manifest(out_dir, parts, state=None):
     # Unify auxiliary tags with the canonical BoM/index namespace (kill: CANON_TAGS=0).
     if os.environ.get("CANON_TAGS", "").strip() not in ("0", "false", "no"):
         _remap_manifest_to_canonical_tags(rows, state)
+    # PROCESS-ORDER rows (Tristan 2026-07-02: "the GA equipment schedule lists parts in no
+    # meaningful order"): region rank (the process sequence), then the FINAL equipment tag
+    # (letter, numeric), then name — so every manifest consumer that keeps row order (the
+    # GA schedule included) reads feed→product. Deterministic; tags were already assigned.
+    def _row_order(r):
+        m = re.match(r"([A-Z]+)-(\d+)", str(r.get("equipment_tag") or ""))
+        return (int(r.get("region_rank", REGION_PRIORITY_DEFAULT)),
+                m.group(1) if m else "ZZZ", int(m.group(2)) if m else 10**9,
+                str(r.get("name") or "").lower())
+    rows.sort(key=_row_order)
     # overall placed-equipment bounding box (mm) — the GA's plant L×W×H source.
     if rows:
         xs, ys, zs_lo, zs_hi = [], [], [], []
@@ -5516,8 +5696,17 @@ def write_parts_manifest(out_dir, parts, state=None):
         bbox["height_mm"] = round(bbox["z_max_mm"] - max(0.0, bbox["z_min_mm"]), 1)
     else:
         bbox = {}
+    # SITE UTILISATION — hull ÷ deck, the deterministic "empty deck" signal (G7 reads it).
+    site = None
+    try:
+        site = _compute_site_utilisation(parts)
+    except Exception as _se:   # pure diagnostics — never fail the export
+        print(f"[parts-manifest] site-utilisation skipped: {_se}")
+    if site:
+        print(f"[parts-manifest] site utilisation: hull {site['hull_m2']} m² / "
+              f"deck {site['deck_m2']} m² = {site['utilisation']}")
     manifest = {"schema": "parts-manifest/1", "count": len(rows),
-                "bbox_mm": bbox, "parts": rows}
+                "bbox_mm": bbox, "site": site, "parts": rows}
     with open(os.path.join(out_dir, "parts-manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
     print(f"[parts-manifest] wrote {len(rows)} placed parts → "
@@ -10116,15 +10305,17 @@ def place_process_plant(parts, regions, topology, MAT, MO):
     #    flow order + periphery from the connectivity graph, hand it to place_all,
     #    and always reset the global so no other family/call sees it. Empty flow
     #    train (a design with no usable flow edge) → place_all's rank fallback.
-    global _PLANT_FLOW_PLAN
+    global _PLANT_FLOW_PLAN, _DET_LAYOUT_TOPOLOGY
     flow_regions, periphery = flow_order_regions(parts, topology)
     print(f"[univ][flow] flow order (feed→product): {flow_regions}")
     print(f"[univ][flow] periphery (non-flow → back row): {periphery}")
     _PLANT_FLOW_PLAN = (flow_regions, periphery) if flow_regions else None
+    _DET_LAYOUT_TOPOLOGY = topology   # det-layout manifold hug reads the ledger ties
     try:
         bbox, region_centres = place_all(parts, regions, MAT, MO)
     finally:
         _PLANT_FLOW_PLAN = None
+        _DET_LAYOUT_TOPOLOGY = None
     print(f"[univ] plant bbox (mm): {bbox}")
 
     # 4b. UNIVERSAL LAYOUT OPTIMISER (DEFAULT-ON 2026-06-22, Tristan's call; LAYOUT_OPTIMISE=0

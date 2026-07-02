@@ -6,13 +6,22 @@ multimodal council is expensive and judgment-based; most recurring drawing defec
 DETERMINISTIC and checkable from the data the drawings are generated from (state.json +
 connection-schedule.json + route-manifest.json + parts-manifest.json + the rendered PNG dims):
 
-  G1 LEGIBILITY        every 2D drawing PNG aspect ratio ≤ 4:1 (a 9:1 single-line strip is unreadable)
+  G1 LEGIBILITY        (a) every 2D drawing PNG aspect ratio ≤ 4:1 (a 9:1 strip is unreadable);
+                       (b) MIN TEXT HEIGHT AT A1 PRINT SCALE: the drawing's smallest lettering,
+                       printed at its A1 print scale (svg font-size × mm-per-px of its A1 sheet
+                       set), must be ≥ 2.5 mm (ISO 3098 minimum lettering). A failing drawing
+                       must PAGINATE onto more A1 sheets (bigger scale — a1_print.py), never
+                       shrink content. Aspect stays as the secondary check (a 10:1 strip still
+                       fails even with big text).
   G2 LOAD RECONCILE    the panel-schedule running total ≈ the contract connected_electrical_load_kw (±15%)
   G3 PART COVERAGE     every PRINCIPAL powered part (pump/blower/heat-pump/compressor/UV with a real kW)
                        in the BoM has its own 'supply → <part>' electrical edge in the connection schedule
   G4 MATERIAL DIVERSITY a multi-service plant uses ≥2 distinct pipe materials (not a uniform default)
   G5 QTY-N COVERAGE    each principal qty-N node (degasser/drum-filter/pump/tank count from the contract)
                        is represented by ~N instances in the parts manifest (not collapsed to 1)
+  G6 NO STRAY BEAM     no routed CABLE run spans the plant as one overhead beam (≤16 m plan span)
+  G7 SITE UTILISATION  plant hull ÷ deck area ≥ 0.45 (parts-manifest `site` block) — the deck
+                       must hug the plant, not strand it in a corner (v52 measured 0.33)
 
 Each gate maps to the drawing(s) it scores. The scorecard is per-drawing (the worst failing gate sets
 the drawing's verdict) + an overall ALL-PASS gate. Universal — keyed on the contract + manifests, never
@@ -68,6 +77,59 @@ _NON_POWERED_RE = re.compile(
     r"enclosure|busbar|fuse|surge|cable|connection|\bmedia\b", re.I)
 
 
+# ── G1b — min text height at A1 print scale (ISO 3098: ≥2.5 mm lettering) ─────────
+# Drawings with an A1 print pipeline (a1_print.py, hooked in their generators):
+# gate name → the print set's file base (<base>-A1.pdf / <base>-A1.json).
+_A1_PRINT_BASES = {"pid": "pid", "block-flow-diagram": "bfd",
+                   "single-line-diagram": "single-line"}
+A1_MIN_TEXT_MM = 2.5
+
+
+def _a1_mod():
+    """Lazy sibling import of a1_print (pure planning maths — stdlib only)."""
+    try:
+        import a1_print
+        return a1_print
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import a1_print
+            return a1_print
+        except ImportError:
+            return None
+
+
+def _min_text_on_a1(dd: str, nm: str, base: str):
+    """(min_text_mm, source) for drawing <nm> at its A1 print scale, or None when the
+    drawing was not produced / carries no text. Prefers the DELIVERED A1 print set's
+    manifest (<base>-A1.json with real PDFs); falls back to the one-A1-sheet fit scale
+    computed from the SVG, so a missing/failed pagination is scored, not skipped."""
+    man_path = os.path.join(dd, f"{base}-A1.json")
+    if os.path.exists(man_path):
+        try:
+            man = json.load(open(man_path))
+            mm = man.get("min_text_mm")
+            if man.get("pdf_ok") and man.get("pdfs") and isinstance(mm, (int, float)):
+                return float(mm), (f"{man['sheets']} A1 sheet(s) "
+                                   f"[{man['grid'][0]}x{man['grid'][1]}], "
+                                   f"1 px = {man['mm_per_px']:.4f} mm")
+        except Exception:
+            pass
+    svg_path = os.path.join(dd, nm + ".svg")
+    a1 = _a1_mod()
+    if a1 is None or not os.path.exists(svg_path):
+        return None
+    try:
+        svg = open(svg_path).read()
+    except OSError:
+        return None
+    dims, font = a1.svg_px_dims(svg), a1.min_font_px(svg)
+    if not dims or not font:
+        return None
+    return font * a1.sheet_scale_mm_per_px(dims[0], dims[1], 1, 1), \
+        "one-A1-sheet fit (NO delivered A1 print set — paginate via a1_print)"
+
+
 def _rows(d):
     if isinstance(d, list):
         return d
@@ -107,6 +169,23 @@ def run_gates(out_dir: str) -> list:
         aspect = max(w, h) / max(1, min(w, h))
         gates.append(Gate("legibility", [nm], "high" if aspect > 6 else "med",
                           aspect <= 4.0, f"{nm} {w}x{h} aspect {aspect:.1f}:1 (limit 4:1)"))
+
+    # ── G1b LEGIBILITY (min text height at A1 print scale) — the aspect check fixes
+    #    SHAPE, not READABILITY: a 2:1 drawing can still print 1.4 mm lettering. The
+    #    smallest lettering AT THE DRAWING'S A1 PRINT SCALE must be ≥ 2.5 mm (ISO 3098).
+    #    The scale comes from the drawing's own A1 print set (<base>-A1.json, written by
+    #    a1_print.py via the generator — paginated onto N sheets when one is not enough);
+    #    with no delivered A1 set the drawing is scored at ONE-A1-sheet fit scale, so a
+    #    generator that skips pagination fails honestly. Fix = MORE SHEETS, never smaller.
+    for nm, base in _A1_PRINT_BASES.items():
+        verdict = _min_text_on_a1(dd, nm, base)
+        if verdict is None:
+            continue
+        mm, src = verdict
+        gates.append(Gate("legibility", [nm], "high" if mm < 1.8 else "med",
+                          mm >= A1_MIN_TEXT_MM,
+                          f"{nm} min text {mm:.2f} mm at A1 print scale "
+                          f"(≥{A1_MIN_TEXT_MM:g} mm ISO 3098) — {src}"))
 
     # ── G2 LOAD RECONCILE — panel total ≈ contract connected load ────────────────
     cload = _q(state, "connected_electrical_load_kw")
@@ -213,6 +292,33 @@ def run_gates(out_dir: str) -> list:
                           f"longest CABLE run {worst[0]} spans {worst[1]/1000:.1f} m "
                           f"(limit {STRAY_BEAM_MAX_SPAN_MM/1000:.0f} m — a plant-crossing beam)"))
 
+    # ── G7 SITE UTILISATION — the deck must hug the plant, not dwarf it ──────────────
+    #    v52's top view shipped the plant as a corner/L of a much larger deck (the packer's
+    #    square-width fold): hull/deck measured 0.33. build_universal_scene writes `site`
+    #    into parts-manifest.json (hull = union of placed part footprints each inflated
+    #    1 m — its access strip; deck = the drawn slab plan rect = mesh bbox + 3 m apron).
+    #    THRESHOLD BASIS (SITE_UTILISATION_MIN = 0.45): with every part carrying its 1 m
+    #    access strip and the deck a 3 m perimeter aisle, a compact single-block rectangular
+    #    layout measures ~0.5–0.7 on this metric (plant-layout practice for a developed
+    #    plot); below 0.45 the empty deck area exceeds the plant's own hull even after the
+    #    aisles — the top view visibly reads as a plant stranded on an oversized deck.
+    #    Skips (like every gate) when the `site` block is absent — free-space families
+    #    (aircraft / wind turbine) lay no deck and are never scored.
+    pm_doc = _load("parts-manifest.json")
+    site = pm_doc.get("site") if isinstance(pm_doc, dict) else None
+    if isinstance(site, dict) and site.get("utilisation") is not None:
+        try:
+            _ratio = float(site["utilisation"])
+        except (TypeError, ValueError):
+            _ratio = None
+        if _ratio is not None:
+            gates.append(Gate("site_utilisation", ["general-arrangement"],
+                              "high" if _ratio < 0.30 else "med",
+                              _ratio >= SITE_UTILISATION_MIN,
+                              f"plant hull {site.get('hull_m2')} m² / deck {site.get('deck_m2')} m² "
+                              f"= {_ratio:.2f} (floor {SITE_UTILISATION_MIN} — below it the plant "
+                              f"sits in a corner of an empty deck)"))
+
     return gates
 
 
@@ -220,15 +326,21 @@ def run_gates(out_dir: str) -> list:
 # (mirrors build_universal_scene.WIRE_TRAY_MAX_SPAN_MM); such distribution goes on the P&ID.
 STRAY_BEAM_MAX_SPAN_MM = 16000.0
 
+# G7 floor: plant hull ÷ deck must be ≥ this (basis in the G7 block above — a compact
+# single-block layout with 1 m part strips + a 3 m deck apron measures ~0.5–0.7; v52's
+# stranded-corner defect measured 0.33).
+SITE_UTILISATION_MIN = 0.45
+
 
 # Map a gate to the engine STAGE that fixes it — the loop routes a failing gate back here.
 GATE_STAGE = {
-    "legibility": "draw-script (layout / multi-sheet wrap)",
+    "legibility": "draw-script (layout / multi-sheet wrap — A1 pagination via a1_print)",
     "load_reconcile": "contract (connected_electrical_load_kw) + panel kW resolution",
     "part_coverage": "topology / orphan-connector (per-equipment electrical feeders)",
     "material_diversity": "connection_sizing (per-service material)",
     "qty_coverage": "contract qty-N replication + parts-manifest expansion",
     "no_stray_beam": "wire_ports tray demotion + draw_boundary_services (plant-crossing run → single-line/P&ID)",
+    "site_utilisation": "deterministic_layout min-area fold + periphery row + ground-slab 3 m apron (the deck must hug the plant hull)",
 }
 
 
@@ -277,6 +389,27 @@ def _selftest() -> int:
     # legibility: a 9:1 strip fails, a 1.3:1 sheet passes (pure aspect logic)
     chk("legible_pass", (lambda a: a <= 4.0)(2160 / 1716))
     chk("legible_fail", not (lambda a: a <= 4.0)(17858 / 1960))
+    # G1b min-text-at-A1-print-scale proveCatch: a 12000-px-wide SVG with 10 px text
+    # squeezed onto ONE A1 sheet prints ~0.67 mm lettering → the gate FIRES; the SAME
+    # drawing paginated (a1_print planner → 4×1 A1 sheets; 3 sheets is still <2.5 mm)
+    # prints ≥2.5 mm → PASS. Adversarial input drives the decision both directions.
+    a1 = _a1_mod()
+    chk("a1_mod_present", a1 is not None)
+    if a1 is not None:
+        bad_svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="12000" height="2000">'
+                   '<text x="10" y="30" font-size="10">microscopic label</text></svg>')
+        dims, font = a1.svg_px_dims(bad_svg), a1.min_font_px(bad_svg)
+        one_sheet_mm = font * a1.sheet_scale_mm_per_px(dims[0], dims[1], 1, 1)
+        chk("min_text_fires_on_strip", not (one_sheet_mm >= A1_MIN_TEXT_MM))
+        plan = a1.plan_sheets(dims[0], dims[1], font)
+        chk("min_text_pass_when_paginated",
+            plan["meets_bar"] and plan["min_text_mm"] >= A1_MIN_TEXT_MM)
+        chk("three_sheets_not_enough",
+            font * a1.sheet_scale_mm_per_px(dims[0], dims[1], 3, 1) < A1_MIN_TEXT_MM)
+        chk("planner_picked_smallest_grid", plan["sheets"] == 4)
+        # severity mapping: sub-1.8 mm lettering is a HIGH, 1.8-2.5 mm a MED
+        chk("min_text_severity_high", ("high" if one_sheet_mm < 1.8 else "med") == "high")
+        chk("min_text_severity_med", ("high" if 2.1 < 1.8 else "med") == "med")
     # load reconcile ratio band
     chk("load_ok", 0.85 <= (1417 / 1417) <= 1.15)
     chk("load_under", not (0.85 <= (1050 / 1417) <= 1.15))   # the pre-fix undercount fails
@@ -297,6 +430,14 @@ def _selftest() -> int:
     chk("beam_ok", _span([[0, 0, 6000], [8000, 0, 6000], [8000, 2000, 500]]) <= STRAY_BEAM_MAX_SPAN_MM)
     chk("beam_stray", not (_span([[440, 12940, 6270], [440, -16910, 6270], [-5980, -16910, 6270]])
                            <= STRAY_BEAM_MAX_SPAN_MM))   # the 33 m MCC beam is caught
+    # G7 site utilisation proveCatch: the v52 stranded-corner deck (hull 476 / deck 1466
+    # = 0.33, measured) FIRES; a compacted plant (hull 476 / deck 900 = 0.53) passes; the
+    # severity mapping marks a sub-0.30 ratio HIGH (the deck is 3×+ the plant).
+    chk("site_util_fires_on_v52", not (476 / 1466 >= SITE_UTILISATION_MIN))
+    chk("site_util_pass_compacted", (476 / 900) >= SITE_UTILISATION_MIN)
+    # severity: v52's 0.33 is a MED (fails, deck ~3× hull); a 0.20 (deck 5× hull) is a HIGH
+    chk("site_util_severity_med", ("high" if 476 / 1466 < 0.30 else "med") == "med")
+    chk("site_util_severity_high", ("high" if 300 / 1500 < 0.30 else "med") == "high")
     # scorecard aggregation
     gs = [Gate("legibility", ["single-line-diagram"], "high", False, "x"),
           Gate("qty_coverage", ["pid"], "high", True, "y")]
@@ -309,7 +450,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print(f"[drawing-gates] selftest OK ({14} deterministic-gate invariants)")
+    print(f"[drawing-gates] selftest OK ({26} deterministic-gate invariants)")
     return 0
 
 
