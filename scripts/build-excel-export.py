@@ -455,7 +455,7 @@ def _aux_tab_score(title: str, run_dir: str):
             _ok = _worst >= 8
             return {"score": 8 if _ok else max(2, _worst), "target": 8, "status": "PASS" if _ok else "FAIL",
                     "issues": [] if _ok else [f"the dossier does NOT ship — the weakest tab scores {_worst}/10; every tab must reach ≥8"],
-                    "fix": "resolve the failing tabs (see the per-tab punch-list / ⚠ Audit findings)"}
+                    "fix": "resolve the failing tabs (see the per-tab punch-list / Quality & Audit findings)"}
         return None
     if "hvac" in t:
         # Deterministic HVAC check (Tristan 2026-06-27 — close the last UNSCORED tab). The score
@@ -525,9 +525,9 @@ def _tab_quality_banner(title: str):
 
 # Tabs that CARRY the row-2 '⬤ TAB QUALITY' banner (presentation audit 2026-07-02, fix 2):
 # self-grading banners on every client-facing tab read as noise and contradict each other —
-# the per-tab scores stay in tab-scorecard.json + the ⭐ Scorecard tab; only the meta /
+# the per-tab scores stay in tab-scorecard.json + the Quality & Audit tab; only the meta /
 # audit surfaces keep the on-tab banner.
-_BANNER_TABS = {"⚠ Checks", "⚠ Audit", "⭐ Scorecard"}
+_BANNER_TABS = {"⚠ Checks", "Quality & Audit"}
 
 
 def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
@@ -540,8 +540,8 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
     c.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.row_dimensions[1].height = 26
     nxt = 2
-    # Quality banner — META tabs only (⚠ Checks / ⚠ Audit / ⭐ Scorecard). Every tab's score
-    # still lands in tab-scorecard.json + the ⭐ Scorecard per-tab table.
+    # Quality banner — META tabs only (⚠ Checks / Quality & Audit). Every tab's score
+    # still lands in tab-scorecard.json + the Quality & Audit per-tab table.
     qb = _tab_quality_banner(ws.title) if ws.title in _BANNER_TABS else None
     if qb is not None:
         ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
@@ -631,9 +631,9 @@ FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bo
 _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Executive Summary": "The cover — what it is, cost, verdict and next steps.",
     "Overview": "Run provenance, quality scorecard and headline metrics.",
-    "⭐ Scorecard": "Every section and tab scored against the ≥8 ship floor.",
+    "Renders": "Photoreal render gallery — interior hero, plan and exterior views.",
+    "Quality & Audit": "Sections, per-tab scores and audit findings — one verdict.",
     "Sense-check": "Independent market benchmark versus the engine's numbers.",
-    "⚠ Audit": "Deterministic self-audit findings and the ship verdict.",
     "Brief": "Original client brief and the engine's structured interpretation.",
     "⚠ Checks": "Live arithmetic invariants — red rows show numbers that don't reconcile.",
     "Part names": "Master parts list; every other tab references these cells.",
@@ -644,9 +644,9 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Cost waterfall": "Bill of materials to installed price, with live running totals.",
     "Inputs & Assumptions": "Editable yellow drivers feeding the economics model.",
     "Financial model": "Economics, scenarios and investment analysis, live off the Inputs tab.",
-    "Panel schedule": "Electrical panel and load schedule as a sortable table.",
-    "Process schedules": "Line, valve and instrument schedules, cross-referenced to the P&ID.",
-    "Line & velocity": "Every sized run with velocity or volt-drop versus its limit.",
+    "Electrical": "Single-line diagram with the panel/load schedule — one dataset.",
+    "Process schedules": "Valve and instrument schedules; the line list is Line & velocity.",
+    "Line & velocity": "THE line list — every sized run versus its limit.",
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
     "Risk & Regulatory": "Hazard and risk register, compliance verdict and statutory duties.",
     "Holds & exclusions": "Numbered open holds derived live from failing checks; scope exclusions.",
@@ -1195,7 +1195,7 @@ def _exec_synopsis(state: dict) -> str:
         _fl_txt = f"{_fl:g}/10" if isinstance(_fl, (int, float)) else "—"
         parts.append(f"This is a DRAFT: {_open} open issue{'s' if _open != 1 else ''} — "
                      f"sections or tabs below the ≥8 ship floor (lowest {_fl_txt}); see the "
-                     f"⚠ Audit tab. It is not yet engineering-validated.")
+                     f"Quality & Audit tab. It is not yet engineering-validated.")
     else:
         _, vsent = _exec_validation_verdict(state)
         if vsent:
@@ -1292,7 +1292,7 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
     _vrow = row + 1              # card() writes label at `row`, value at `row + 1`
     card("Status", verdict_text("card"),
          "One verdict for the whole dossier — the floor is the minimum score of every "
-         "section and tab; it ships when all are ≥8. Detail: ⚠ Audit tab.")
+         "section and tab; it ships when all are ≥8. Detail: Quality & Audit tab.")
     _register_verdict_cell(ws, _vrow, 1, style="card")
 
     # clear the hero image before full-width sections
@@ -1947,6 +1947,29 @@ def tab_brief(wb: Workbook, state: dict, run_dir: str) -> None:
 # ============================================================================
 # TAB 2 — "⚠ Checks"  (THE ERROR-SURFACING TAB — the point of the exercise)
 # ============================================================================
+# CHECKS DIET (Bundle B fix 6, two-reviewer audit): the per-line BoM tautologies
+# (unit £ × qty == line £ on every line; Σ sub-components == line) buried the REAL
+# checks under ~190 identical green rows. They collapse into TWO aggregate LIVE
+# invariants (a SUM over a per-line DATA block in cols P–T — edit a line's data and
+# the aggregate recomputes) + an exceptions list: any line that MISMATCHES renders
+# individually, exactly as before. The CLI fail-count semantics are untouched.
+_PERLINE_UNITQTY_RX = re.compile(r"^BoM .+: unit_gbp x qty == line_gbp$")
+_PERLINE_SIGMASUB_RX = re.compile(r"^BoM .+: Sigma sub-component_gbp == line_gbp$")
+
+
+def _perline_agg_key(c) -> Optional[str]:
+    """Which aggregate family (if any) a lib Check belongs to — 'unitqty' / 'sigmasub' /
+    None. Pure; only CONSISTENCY per-line BoM tautologies aggregate."""
+    if getattr(c, "category", None) != "CONSISTENCY":
+        return None
+    name = str(getattr(c, "name", ""))
+    if _PERLINE_UNITQTY_RX.match(name):
+        return "unitqty"
+    if _PERLINE_SIGMASUB_RX.match(name):
+        return "sigmasub"
+    return None
+
+
 def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
                        data_r: int, data_col_a: str,
                        fail_labels: List[str]) -> Tuple[int, int, int]:
@@ -1967,6 +1990,10 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
           eq    -> =IF(ABS(D)<E,"PASS","FAIL")      (equality within tolerance)
     A COST check with relation "eq" and tol 0 IS a ratio-band check (the lib's COST1
     `unit price within xN of <ref>`); every other eq check carries a non-zero tol.
+
+    CHECKS DIET (Bundle B fix 6): the per-line BoM tautologies (unit×qty==line;
+    Σsub==line) render as TWO aggregate live invariants over a per-line DATA block
+    (cols P–T) + individually-rendered exceptions — never ~190 identical rows.
     """
     checks = dcl.run_all_checks(run_dir, state)
     fail_count = 0
@@ -1983,97 +2010,179 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         "PROVENANCE": "E7 · PROVENANCE — every engineering-tool output is actually USED by the "
                       "design (no stale/orphaned tool computations)",
     }
+
+    # ---- the per-line DATA block for the two aggregate invariants (cols P–T) ----
+    AGG_HDR = 4
+    ws.cell(AGG_HDR, 16, "AGGREGATE DATA — one row per collapsed per-line invariant "
+                         "(P=line · Q=per-unit/actual £ · R=expected £ · S=qty · "
+                         "T=live mismatch flag). Edit Q/R/S and the aggregate row recomputes.")
+    ws.cell(AGG_HDR, 16).font = FONT_SUB
+    agg_r = AGG_HDR   # advances per collapsed line
+
+    def _emit_agg_data(c) -> int:
+        """One DATA-block row for a collapsed per-line check; returns its row index.
+        The mismatch flag (col T) MIRRORS the lib's eq decision: |actual−expected| < tol."""
+        nonlocal agg_r
+        agg_r += 1
+        tol = float(c.tol or 0)
+        ws.cell(agg_r, 16, c.name)
+        if c.a_factors is not None:
+            per_unit, count = c.a_factors
+            ws.cell(agg_r, 17, per_unit).fill = FILL_INPUT     # Q = per-unit £
+            ws.cell(agg_r, 19, count).fill = FILL_INPUT        # S = qty
+            flag = f'=IF(ABS($Q${agg_r}*$S${agg_r}-$R${agg_r})<{tol!r},0,1)'
+        else:
+            ws.cell(agg_r, 17, c.actual).fill = FILL_INPUT     # Q = actual (Σ sub)
+            flag = f'=IF(ABS($Q${agg_r}-$R${agg_r})<{tol!r},0,1)'
+        ws.cell(agg_r, 18, c.expected).fill = FILL_INPUT       # R = expected £
+        ws.cell(agg_r, 20, flag)                               # T = live 0/1 mismatch
+        return agg_r
+
+    def _render_one(c, fam: str) -> None:
+        """The standard per-check row (live where numeric, static red where the ENGINE
+        itself flagged a no-formula FAIL) — unchanged semantics."""
+        nonlocal r, data_r, fail_count
+        if c.actual is None or c.expected is None:
+            if c.status == dcl.FAIL:
+                ws.cell(r, 1, clean_cell(c.name)).border = BORDER
+                ws.cell(r, 1).alignment = WRAP_TOP
+                ws.cell(r, 2, num(c.actual) if c.actual is not None else "—").border = BORDER
+                ws.cell(r, 3, "(engine verdict)").border = BORDER
+                ws.cell(r, 4, "—").border = BORDER
+                ws.cell(r, 5, "—").border = BORDER
+                cs = ws.cell(r, 6, "FAIL")
+                cs.border = BORDER
+                cs.font = Font(bold=True)
+                cdet = ws.cell(r, 7, clean_cell(c.detail))
+                cdet.alignment = WRAP_TOP
+                cdet.font = FONT_NOTE
+                cdet.border = BORDER
+                fail_count += 1
+                fail_labels.append(f"[{fam}] {c.name}")
+                for col in range(1, 8):
+                    ws.cell(r, col).fill = FILL_FAIL
+                r += 1
+            return  # N/A, or static-fail already rendered — nothing live
+        data_r += 1   # retained for the return signature only; inputs now live on row r
+        # --- editable data cells, ON THE SAME VISIBLE ROW as the check (CH2, Tristan 2026-06-27:
+        #     the right-hand live-input column must LINE UP with its check row — it used to sit on a
+        #     separate `data_r` block that advances only on live rows, so it drifted UP past every
+        #     family banner / spacer / static-fail row and no longer matched the rows below it). ---
+        ws.cell(r, 10, c.name)
+        if c.a_factors is not None:
+            per_unit, count = c.a_factors
+            ws.cell(r, 11, per_unit).fill = FILL_INPUT      # K = per-unit
+            ws.cell(r, 13, count).fill = FILL_INPUT         # M = count
+            actual_formula = f"=${data_col_a}${r}*$M${r}"
+        else:
+            ws.cell(r, 11, c.actual).fill = FILL_INPUT      # K = actual
+            actual_formula = f"=${data_col_a}${r}"
+        ws.cell(r, 12, c.expected).fill = FILL_INPUT        # L = expected
+
+        # A COST check tagged relation="eq" with tol==0 is decided by the lib as a
+        # RATIO BAND (unit price within xN of its reference), NOT an equality —
+        # render it as a live band test so the recompute matches the CLI exactly.
+        is_band = (c.category == "COST" and c.relation == "eq" and not c.tol)
+        tol_cell_val = dcl.COST_BAND_FACTOR if is_band else c.tol
+
+        # --- visible live row ---
+        ws.cell(r, 1, c.name).border = BORDER
+        ws.cell(r, 1).alignment = WRAP_TOP
+        ws.cell(r, 2, actual_formula).border = BORDER
+        ws.cell(r, 3, f"=$L${r}").border = BORDER
+        ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
+        ws.cell(r, 5, tol_cell_val).border = BORDER
+        # STATUS formula chosen to MIRROR the lib's own decision (see docstring)
+        if is_band:                     # COST ratio band: flag >xN or <1/N of ref
+            status_f = (f'=IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
+                        f'B{r}/C{r}>=1/E{r})),"PASS","FAIL")')
+        elif c.relation == "ge":        # actual must be >= expected
+            status_f = f'=IF(B{r}>=C{r}-E{r},"PASS","FAIL")'
+        elif c.relation == "le":        # actual must be <= expected
+            status_f = f'=IF(B{r}<=C{r}+E{r},"PASS","FAIL")'
+        elif c.relation == "tally":     # actual count must be 0
+            status_f = f'=IF(B{r}<=C{r},"PASS","FAIL")'
+        else:                            # equality within tolerance
+            status_f = f'=IF(ABS(D{r})<E{r},"PASS","FAIL")'
+        cs = ws.cell(r, 6, status_f)
+        cs.border = BORDER
+        cs.font = Font(bold=True)
+        cdet = ws.cell(r, 7, c.detail)
+        cdet.alignment = WRAP_TOP
+        cdet.font = FONT_NOTE
+        cdet.border = BORDER
+
+        # pre-evaluate now so we can colour + count FAILs (and so the CLI and
+        # the tab agree before Excel recomputes on open)
+        if c.status == dcl.FAIL:
+            fail_count += 1
+            fail_labels.append(f"[{fam}] {c.name}")
+            for col in range(1, 8):
+                cc = ws.cell(r, col)
+                cc.fill = FILL_FAIL
+        r += 1
+
+    _AGG_TITLES = {
+        "unitqty": "unit £ × qty == line £",
+        "sigmasub": "Σ sub-component £ == line £",
+    }
     for fam in ("CONSISTENCY", "ADEQUACY", "BALANCE", "COST", "CONNECTIVITY", "BRIEF", "PROVENANCE"):
         fam_checks = [c for c in checks if c.category == fam]
         if not fam_checks:
             continue
         sub_banner(ws, r, fam_titles[fam], 7)
         r += 1
+        # ---- CHECKS DIET: aggregate the per-line tautologies of THIS family ----
+        agg_groups: Dict[str, list] = {}
+        rest = []
         for c in fam_checks:
-            if c.actual is None or c.expected is None:
-                # No numeric target → no LIVE formula possible. But a check the ENGINE
-                # itself flagged FAIL (e.g. a closure with status=warn/fail such as
-                # capex_within_ceiling: £8.15 M design vs the £5.0 M brief ceiling) must
-                # still surface — otherwise the tab silently disagrees with the CLI and
-                # hides a real breach. Render it as a STATIC red row (no recompute).
-                if c.status == dcl.FAIL:
-                    ws.cell(r, 1, clean_cell(c.name)).border = BORDER
-                    ws.cell(r, 1).alignment = WRAP_TOP
-                    ws.cell(r, 2, num(c.actual) if c.actual is not None else "—").border = BORDER
-                    ws.cell(r, 3, "(engine verdict)").border = BORDER
-                    ws.cell(r, 4, "—").border = BORDER
-                    ws.cell(r, 5, "—").border = BORDER
-                    cs = ws.cell(r, 6, "FAIL")
-                    cs.border = BORDER
-                    cs.font = Font(bold=True)
-                    cdet = ws.cell(r, 7, clean_cell(c.detail))
-                    cdet.alignment = WRAP_TOP
-                    cdet.font = FONT_NOTE
-                    cdet.border = BORDER
-                    fail_count += 1
-                    fail_labels.append(f"[{fam}] {c.name}")
-                    for col in range(1, 8):
-                        ws.cell(r, col).fill = FILL_FAIL
-                    r += 1
-                continue  # N/A, or static-fail already rendered — nothing live
-            data_r += 1   # retained for the return signature only; inputs now live on row r
-            # --- editable data cells, ON THE SAME VISIBLE ROW as the check (CH2, Tristan 2026-06-27:
-            #     the right-hand live-input column must LINE UP with its check row — it used to sit on a
-            #     separate `data_r` block that advances only on live rows, so it drifted UP past every
-            #     family banner / spacer / static-fail row and no longer matched the rows below it). ---
-            ws.cell(r, 10, c.name)
-            if c.a_factors is not None:
-                per_unit, count = c.a_factors
-                ws.cell(r, 11, per_unit).fill = FILL_INPUT      # K = per-unit
-                ws.cell(r, 13, count).fill = FILL_INPUT         # M = count
-                actual_formula = f"=${data_col_a}${r}*$M${r}"
+            k = _perline_agg_key(c)
+            if k is not None:
+                agg_groups.setdefault(k, []).append(c)
             else:
-                ws.cell(r, 11, c.actual).fill = FILL_INPUT      # K = actual
-                actual_formula = f"=${data_col_a}${r}"
-            ws.cell(r, 12, c.expected).fill = FILL_INPUT        # L = expected
-
-            # A COST check tagged relation="eq" with tol==0 is decided by the lib as a
-            # RATIO BAND (unit price within xN of its reference), NOT an equality —
-            # render it as a live band test so the recompute matches the CLI exactly.
-            is_band = (c.category == "COST" and c.relation == "eq" and not c.tol)
-            tol_cell_val = dcl.COST_BAND_FACTOR if is_band else c.tol
-
-            # --- visible live row ---
-            ws.cell(r, 1, c.name).border = BORDER
-            ws.cell(r, 1).alignment = WRAP_TOP
-            ws.cell(r, 2, actual_formula).border = BORDER
-            ws.cell(r, 3, f"=$L${r}").border = BORDER
-            ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
-            ws.cell(r, 5, tol_cell_val).border = BORDER
-            # STATUS formula chosen to MIRROR the lib's own decision (see docstring)
-            if is_band:                     # COST ratio band: flag >xN or <1/N of ref
-                status_f = (f'=IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
-                            f'B{r}/C{r}>=1/E{r})),"PASS","FAIL")')
-            elif c.relation == "ge":        # actual must be >= expected
-                status_f = f'=IF(B{r}>=C{r}-E{r},"PASS","FAIL")'
-            elif c.relation == "le":        # actual must be <= expected
-                status_f = f'=IF(B{r}<=C{r}+E{r},"PASS","FAIL")'
-            elif c.relation == "tally":     # actual count must be 0
-                status_f = f'=IF(B{r}<=C{r},"PASS","FAIL")'
-            else:                            # equality within tolerance
-                status_f = f'=IF(ABS(D{r})<E{r},"PASS","FAIL")'
-            cs = ws.cell(r, 6, status_f)
-            cs.border = BORDER
-            cs.font = Font(bold=True)
-            cdet = ws.cell(r, 7, c.detail)
-            cdet.alignment = WRAP_TOP
-            cdet.font = FONT_NOTE
-            cdet.border = BORDER
-
-            # pre-evaluate now so we can colour + count FAILs (and so the CLI and
-            # the tab agree before Excel recomputes on open)
-            if c.status == dcl.FAIL:
-                fail_count += 1
-                fail_labels.append(f"[{fam}] {c.name}")
-                for col in range(1, 8):
-                    cc = ws.cell(r, col)
-                    cc.fill = FILL_FAIL
-            r += 1
+                rest.append(c)
+        for k in ("unitqty", "sigmasub"):
+            grp = agg_groups.get(k) or []
+            if not grp:
+                continue
+            # a per-line check that FAILS (or carries no numbers) is an EXCEPTION —
+            # it renders individually, exactly as before; the rest collapse.
+            exceptions = [c for c in grp
+                          if c.status == dcl.FAIL or c.actual is None or c.expected is None]
+            collapsed = [c for c in grp if c not in exceptions]
+            first_d = last_d = None
+            for c in collapsed:
+                d = _emit_agg_data(c)
+                first_d = first_d if first_d is not None else d
+                last_d = d
+            if collapsed:
+                # the ONE aggregate live invariant row: ACTUAL = Σ mismatch flags (live)
+                name_txt = (f"All {len(collapsed)} BoM lines: {_AGG_TITLES[k]} "
+                            f"(aggregate — mismatching lines list individually)")
+                ws.cell(r, 1, name_txt).border = BORDER
+                ws.cell(r, 1).alignment = WRAP_TOP
+                ws.cell(r, 2, f"=SUM($T${first_d}:$T${last_d})").border = BORDER
+                ws.cell(r, 12, 0).fill = FILL_INPUT            # L = expected mismatches (0)
+                ws.cell(r, 10, name_txt)
+                ws.cell(r, 3, f"=$L${r}").border = BORDER
+                ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
+                ws.cell(r, 5, 0).border = BORDER
+                cs = ws.cell(r, 6, f'=IF(B{r}<=C{r},"PASS","FAIL")')
+                cs.border = BORDER
+                cs.font = Font(bold=True)
+                cdet = ws.cell(r, 7, f"{len(collapsed)} per-line invariants collapsed — each "
+                                     f"line lives in the DATA block (cols P–T, rows "
+                                     f"{first_d}–{last_d}) with a LIVE mismatch flag at its "
+                                     f"own tolerance; ACTUAL = the number of mismatching "
+                                     f"lines. {len(exceptions)} exception(s) below.")
+                cdet.alignment = WRAP_TOP
+                cdet.font = FONT_NOTE
+                cdet.border = BORDER
+                r += 1
+            for c in exceptions:
+                _render_one(c, fam)
+        for c in rest:
+            _render_one(c, fam)
         r += 1  # spacer between families
     return r, data_r, fail_count
 
@@ -2198,42 +2307,33 @@ def tab_checks(wb: Workbook, state: dict, run_dir: str) -> int:
 
 
 # ============================================================================
-# TAB — "⚠ Audit"  (THE DETERMINISTIC SHIP GATE — per-tab self-audit findings)
+# SECTION — deterministic ship-gate audit findings (rendered on 'Quality & Audit')
 # ============================================================================
-def tab_audit(wb: Workbook, report, state: Optional[dict] = None) -> None:
-    """Render the deterministic per-tab self-audit (scripts/lib/dossier_audit.py) as a worksheet.
-    A scorecard header line + every Finding grouped by its target tab. HIGH = red, MED = amber,
-    LOW = grey — the SHIP GATE made visible: a FAIL verdict means the dossier is NOT validated."""
-    ws = wb.create_sheet("⚠ Audit")
-    set_widths(ws, {"A": 10, "B": 30, "C": 60, "D": 22, "E": 22})
+def _render_audit_findings(ws: Worksheet, report, state: Optional[dict], r: int) -> int:
+    """Render the deterministic per-tab self-audit (scripts/lib/dossier_audit.py) onto `ws`
+    from row `r`: a finding-count line + every Finding grouped by its target tab, then the
+    benchmark-net compare. HIGH = red, MED = amber, LOW = grey. NO verdict line here — the
+    ONE verdict renders exactly once, at the top of the merged 'Quality & Audit' tab
+    (Bundle B fix 2). Returns the next free row."""
     sc = report.scorecard()
-    title_row(
-        ws, "⚠ Dossier self-audit — the deterministic ship gate", 5,
-        "Every per-tab check (scripts/lib/dossier_audit.py) — pass/fail FLAGS, no LLM. A FAIL "
-        "verdict (any HIGH finding) means the dossier is NOT validated. HIGH = red, MED = amber, "
-        "LOW = grey.",
-    )
-    r = 4
-    # ---- header line = the ONE VERDICT (fix 2, 2026-07-02) + this audit's finding counts.
-    # The old line rendered its OWN verdict/ship_ok, which could contradict the Exec /
-    # Overview / Scorecard surfaces; every surface now shows compute_verdict()'s answer. ----
-    _suffix = (f"  ·  findings: {sc.get('high', 0)} HIGH · {sc.get('med', 0)} MED · "
-               f"{sc.get('low', 0)} LOW · {sc.get('total', 0)} total")
-    hc = ws.cell(r, 1, verdict_text("line") + _suffix)
-    hc.font = FONT_TITLE
-    hc.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
-    hc.alignment = Alignment(vertical="center", horizontal="left", indent=1)
+    band = ws.cell(r, 1, "⚠ Deterministic ship-gate audit — every per-tab check (no LLM)")
+    band.font = FONT_TITLE
+    band.fill = FILL_TITLE
+    band.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     ws.row_dimensions[r].height = 22
-    _register_verdict_cell(ws, r, 1, style="title-line", suffix=_suffix)
+    r += 1
+    cnt = ws.cell(r, 1, f"Findings: {sc.get('high', 0)} HIGH · {sc.get('med', 0)} MED · "
+                        f"{sc.get('low', 0)} LOW · {sc.get('total', 0)} total — a HIGH finding "
+                        f"means the dossier is NOT validated.")
+    cnt.font = FONT_SUB
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     r += 2
 
     by_tab = report.by_tab()
     if not by_tab:
         ws.cell(r, 1, "No findings — every deterministic check passed.").font = FONT_PASS
-        back_link(ws, 5)
-        ws.freeze_panes = "A5"
-        return
+        return r + 2
 
     _SEV_STYLE = {
         "HIGH": (FILL_FAIL, FONT_FAIL),
@@ -2321,9 +2421,7 @@ def tab_audit(wb: Workbook, report, state: Optional[dict] = None) -> None:
             _c5.fill = _fill; _c5.font = _font; _c5.border = BORDER
             r += 1
         r += 1
-
-    back_link(ws, 5)
-    ws.freeze_panes = "A5"
+    return r
 
 
 # ============================================================================
@@ -3505,6 +3603,9 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
 # than repeated again and again"). Tags that do not resolve fall back to the literal,
 # so a tab never breaks. Cleared at the start of each build so a re-run is never stale.
 _BOM_REGISTRY: Dict[str, Dict[str, str]] = {}
+# Parent rows of the BoM ↳ groups (Bundle B fix 5) — the deterministic finalise pass
+# re-stamps collapsed="1" on these after the LibreOffice recalc strips it.
+_BOM_COLLAPSED_PARENTS: List[int] = []
 
 
 def _norm_tag(tag) -> str:
@@ -4017,7 +4118,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         "'Cost basis' (cols F–J) = HOW each £ was derived (method / inputs / factors / "
         "estimate class / confidence); 'Engineering spec' (cols K–N) = WHY each principal "
         "is this size (duty / material / sizing calc / MPN). Σ line £ is live at the foot; "
-        "commodity lines leave the spec columns blank (correct — they need no sizing basis).")
+        "commodity lines leave the spec columns blank (correct — they need no sizing basis). "
+        "↳ SUB-COMPONENT ROWS are grouped under their parent principal and open COLLAPSED — "
+        "the sheet reads as the buy list; expand a parent's + on the left margin to see its "
+        "children (their £ is apportioned into the parent line).")
     if cres:
         subtitle += (f" MPN TBD COUNT: {cres.get('tbd_count', 0)}/{cres.get('tbd_required', 0)} "
                      f"bought-out lines await detailed design (score penalised by the TBD "
@@ -4032,6 +4136,11 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     mpn_by_word = _build_mpn_by_word(state)
     r = 5
     first_line_row = r
+    # ↳ ROW-OUTLINE bookkeeping (Bundle B fix 5): sub-component rows group under their
+    # parent principal at outlineLevel 1, hidden (collapsed) by default.
+    _last_parent_row: Optional[int] = None
+    _parents_with_children: set = set()
+    _BOM_COLLAPSED_PARENTS.clear()
     for _ri, row in enumerate(bom):
         _cr = crows.get(_ri) or {}
         # Tag column REFERENCES the master "Part names" tag where this is a principal (one
@@ -4168,8 +4277,29 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                 "unit": f"'{_LEDGER_SHEET}'!$D${r}",
                 "line": f"'{_LEDGER_SHEET}'!$E${r}",
             })
+        # ↳ ROW OUTLINE (Bundle B fix 5): a sub-component row nests under its parent
+        # principal (outlineLevel 1, hidden) so the sheet OPENS as the readable buy list
+        # (~principals + connections) and expands on demand. ROWS only — the detail
+        # COLUMNS stay fully visible (the standing 'never hide the columns' rule holds).
+        if _is_subcomp:
+            _rd = ws.row_dimensions[r]
+            _rd.outline_level = 1
+            _rd.hidden = True
+            if _last_parent_row is not None:
+                _parents_with_children.add(_last_parent_row)
+        else:
+            _last_parent_row = r
         r += 1
     last_line_row = r - 1
+    if _parents_with_children:
+        # the +/- toggle sits ON the parent row (which is ABOVE its group)
+        ws.sheet_properties.outlinePr.summaryBelow = False
+        for _pr in _parents_with_children:
+            ws.row_dimensions[_pr].collapsed = True
+        # remembered so the deterministic finalise pass can RE-STAMP collapsed="1"
+        # (the LibreOffice recalc round-trip strips the attribute; the rows stay
+        # hidden+grouped, but Excel's +/- glyph needs it on the parent row)
+        _BOM_COLLAPSED_PARENTS.extend(sorted(_parents_with_children))
 
     # LIVE Σ of line £ (col E)
     ws.cell(r, 1, "Σ TOTAL").font = FONT_SUB
@@ -7829,39 +7959,25 @@ def tab_assembly_sequence(wb: Workbook, state: dict) -> bool:
     return True
 
 
-def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
-    """#20 — Panel / load schedule as a real table (from panel-schedule.md)."""
+def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional[int]:
+    """Render the panel / load schedule tables (drawings/panel-schedule.md) onto `ws`
+    starting at row `r` — the roll-up, every board's field table + circuit table with the
+    LIVE In-spec formulas and the contract Row-check column. Returns the next free row,
+    or None when the run has no parseable panel schedule."""
     path = os.path.join(run_dir, "drawings", "panel-schedule.md")
     if not os.path.exists(path):
-        return False
+        return None
     try:
         text = open(path, "r").read()
     except Exception:  # noqa: BLE001
-        return False
+        return None
     tables = parse_md_tables(text)
     if not tables:
-        return False
+        return None
     # The COLUMN CONTRACT for this tab (evaluated once in build(), before any tab renders):
     # a dash in a contracted column (Length, ΔU) FAILS its row — a dash is never in-spec.
     cres = _CONTRACT_RESULTS.get("Panel schedule") or {}
     crows = cres.get("rows") or {}
-
-    ws = wb.create_sheet("Panel schedule")
-    set_widths(ws, {"A": 14, "B": 40, "C": 8, "D": 18, "E": 12, "F": 22,
-                    "G": 22, "H": 12, "I": 10, "J": 8, "K": 52})
-    subtitle = (
-        "Real sortable rows (circuit · load · device · cable · volt-drop). The "
-        "engine computes Design I = P·1000 / (√3·V·pf·η) — pf 0.85 / η 0.90 for "
-        "motor circuits, pf 1.0 / η 1.0 for resistive loads — from each circuit's "
-        "INSTALLED motor frame (so the amps can exceed the duty-kW shown). ΔU % is "
-        "the cable volt-drop over its length / CSA at Design I. 'In spec' is a LIVE "
-        "formula = (ΔU ≤ 5 %) — a missing/dash ΔU renders ✗, never a pass. "
-        "Auto-generated; not for construction."
-    )
-    if cres:
-        subtitle += " " + _contract_note(cres)
-    title_row(ws, "Electrical panel / load schedule", 11, subtitle)
-    r = 4
     # ROOT-CAUSE ROLL-UP (fix 3): failing rows grouped to their cause(s), above the table.
     r = _render_rollup(ws, r, cres, 11)
     last_circuit_first = None
@@ -7941,9 +8057,92 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     if last_circuit_first:
         bf, bl, nc = last_circuit_first
         ws.auto_filter.ref = f"A{bf - 1}:{get_column_letter(nc)}{bl}"
-    ws.freeze_panes = "A5"
+    return r
+
+
+def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]]:
+    """ONE 'Electrical' tab (Bundle B fix 4): the single-line diagram preview ON TOP and
+    the panel / load schedule BELOW it — one electrical surface, one dataset. The two
+    used to be separate tabs whose numbers could contradict (400 vs 415 V labels, per-
+    unit vs per-circuit amps); the SCHEDULE's own values are now the single source for
+    every rendered number, with the drawing's labelling convention footnoted. Returns
+    [("Electrical", <single-line source path>)] so the Drawings register preview link
+    resolves (empty list when only the schedule exists), or None when the run has
+    neither drawing nor schedule."""
+    from openpyxl.drawing.image import Image as XLImage
+    draw = os.path.join(run_dir, "drawings")
+    sld_src = os.path.join(draw, "single-line-diagram.png")
+    if not os.path.exists(sld_src):
+        sld_src = os.path.join(draw, "single-line-diagram.svg")
+    sld_png = ensure_png(sld_src, run_dir) if os.path.exists(sld_src) else None
+    has_sched = os.path.exists(os.path.join(draw, "panel-schedule.md"))
+    if not sld_png and not has_sched:
+        return None
+
+    cres = _CONTRACT_RESULTS.get("Panel schedule") or {}
+    ws = wb.create_sheet("Electrical")
+    set_widths(ws, {"A": 14, "B": 40, "C": 8, "D": 18, "E": 12, "F": 22,
+                    "G": 22, "H": 12, "I": 10, "J": 8, "K": 52})
+    subtitle = (
+        "The electrical design on ONE tab: single-line diagram (preview) above, the "
+        "panel / load schedule below. Every number on this tab renders from ONE dataset "
+        "— the schedule (the converged connection schedule): Design I = P·1000 / "
+        "(√3·V·pf·η) — pf 0.85 / η 0.90 for motor circuits, pf 1.0 / η 1.0 for resistive "
+        "loads — from each circuit's INSTALLED motor frame. ΔU % is the cable volt-drop "
+        "over its length / CSA at Design I. 'In spec' is a LIVE formula = (ΔU ≤ 5 %) — a "
+        "missing/dash ΔU renders ✗, never a pass. Auto-generated; not for construction."
+    )
+    if cres:
+        subtitle += " " + _contract_note(cres)
+    r = title_row(ws, "Electrical — single-line diagram + panel / load schedule", 11, subtitle)
     back_link(ws, 11)
-    return True
+    embedded: List[Tuple[str, str]] = []
+    if sld_png:
+        note = _drawing_tab_note(run_dir, "Single-line")
+        if note:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=11)
+            nc = ws.cell(r, 1, note)
+            nc.font = FONT_SUB
+            nc.fill = FILL_SUB
+            nc.alignment = WRAP_TOP
+            ws.row_dimensions[r].height = 30
+            r += 1
+        try:
+            ds = downscale_png(sld_png, run_dir)
+            img = XLImage(ds)
+            max_w = 1500
+            if img.width and img.width > max_w:
+                ratio = max_w / float(img.width)
+                img.width = int(img.width * ratio)
+                img.height = int(img.height * ratio)
+            ws.add_image(img, f"A{r}")
+            r += int(-(-(img.height or 600) // 20)) + 2   # reserve rows under the image
+            embedded.append(("Electrical", sld_src))
+        except Exception as exc:  # noqa: BLE001
+            print(f"    ! could not embed single-line diagram: {exc}")
+            r += 1
+    # ONE-DATASET RECONCILIATION FOOTNOTE (fix 4): the convention note that kills the
+    # old two-surface contradictions (a 415 V label vs the 400 V system; a per-unit amp
+    # label vs the per-circuit Design I) — stated once, above the schedule.
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=11)
+    fn = ws.cell(r, 1, clean_cell(
+        "Convention: the schedule below is the single source for the electrical numbers on "
+        "this tab. On the drawing, a ×N grouped circuit is labelled with its PER-UNIT "
+        "current (the schedule's Design I is the whole circuit), and the LV system is "
+        "stated at its 400 V nominal (a legacy '415 V' label names the same UK LV system). "
+        "Where a drawing label and the schedule differ, the schedule governs."))
+    fn.font = FONT_NOTE
+    fn.alignment = WRAP_TOP
+    ws.row_dimensions[r].height = 42
+    r += 2
+    nxt = _render_panel_schedule_body(ws, run_dir, r)
+    if nxt is None and not embedded:
+        # neither surface rendered anything usable — drop the empty sheet
+        wb.remove(ws)
+        return None
+    if nxt is None:
+        ws.cell(r, 1, "— no panel / load schedule was generated for this run —").font = FONT_NOTE
+    return embedded
 
 
 # ── INSTRUMENT-INDEX COLLAPSE (reviewers 2026-07-02, Bundle C fix 5) ─────────────────
@@ -8049,16 +8248,21 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
 
     # a friendly section title per source heading
     name_for = {
-        "line": "Process line list",
         "valve": "Process valve list",
         "instrument": "Process instruments",
     }
-    # pre-filter to non-empty tables + widest column count across them all (so the
-    # title band + back-link span the whole sheet)
-    secs = [(h, hd, rw) for (h, hd, rw) in tables if rw]
-    if not secs:
+    # ONE LINE LIST (Bundle B fix 3): the source md carries the SAME physical lines twice
+    # (an un-DN'd `201-PR…` block and an as-routed `201-PR-DN…` block — two tag dialects),
+    # and 'Line & velocity' carries them a THIRD time with the sizing contract + computed
+    # velocities. Line & velocity is THE line list; here the line-list section(s) are
+    # replaced by a short pointer. This also retires the source block's artefact rows
+    # (a from==to self-loop; instrument signal cables misfiled as pipe lines — signals
+    # are not pipes and belong on the instrument index / the P&ID, not a pipe list).
+    line_secs = [(h, hd, rw) for (h, hd, rw) in tables if rw and "line" in h.lower()]
+    secs = [(h, hd, rw) for (h, hd, rw) in tables if rw and "line" not in h.lower()]
+    if not secs and not line_secs:
         return 0
-    span = 2
+    span = 4
     for _h, hd, rw in secs:
         span = max(span, len(hd), max((len(r) for r in rw), default=0))
 
@@ -8066,11 +8270,32 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
     widths = {get_column_letter(i): (14 if i > 1 else 16) for i in range(1, span + 1)}
     set_widths(ws, widths)
     title_row(ws, "Process schedules", span,
-              "Process line list, valve list and instrument index — each a sortable "
-              "section parsed from process-schedules.md and cross-referenced to the P&ID.")
+              "Valve list and instrument index — sortable sections parsed from "
+              "process-schedules.md and cross-referenced to the P&ID. The LINE LIST "
+              "lives once, on the 'Line & velocity' tab.")
     made = 0
     r = 4
     used = set()
+    if line_secs:
+        n_lines = sum(len(rw) for _h, _hd, rw in line_secs)
+        sub_banner(ws, r, "Process line list — see the 'Line & velocity' tab", span)
+        r += 1
+        lk = ws.cell(r, 1, "→ Line & velocity")
+        lk.hyperlink = "#'Line & velocity'!A1"
+        lk.font = FONT_LINK
+        ptr = ws.cell(r, 2, clean_cell(
+            f"THE line list: every routed line ONCE (as-routed tags, e.g. 201-PR-DN65) with "
+            f"its size, computed flow/velocity vs the erosion band, length, £ and per-row "
+            f"contract check. The {n_lines}-row block previously duplicated here carried the "
+            f"same physical lines in two tag dialects, plus artefact rows (a from==to "
+            f"self-loop; 4-20 mA instrument signal cables misfiled as pipes) — signals are "
+            f"on the instrument index below, never the pipe list."))
+        ptr.font = FONT_NOTE
+        ptr.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=span)
+        ws.row_dimensions[r].height = 58
+        r += 2
+        made += 1
     for heading, hdr, rows in secs:
         hl = heading.lower()
         sect = next((v for k, v in name_for.items() if k in hl), None)
@@ -9313,6 +9538,11 @@ def tab_contents(wb: Workbook, descriptions: Dict[str, str]) -> None:
         r += 1
         n += 1
     ws.freeze_panes = "A5"
+    # group colour (Contents is built AFTER _reorder_tabs stamped every other sheet)
+    try:
+        ws.sheet_properties.tabColor = _TAB_GROUP_COLOUR[_tab_group(CONTENTS_SHEET)]
+    except Exception:  # noqa: BLE001
+        pass
     # move to the very front
     idx = wb.sheetnames.index(CONTENTS_SHEET)
     if idx != 0:
@@ -9481,14 +9711,116 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
         return None
 
 
+def _manifest_render_map(run_dir: str) -> Dict[str, Tuple[str, str]]:
+    """RENDER NAMES/CAPTIONS from the drawing-manifest `renders` array (generator-purge
+    2026-07-02): each render carries a canonical ≤31-char `sheet_name` + a `caption`
+    (bearing + envelope dims + tag callouts). {normalised path: (name, caption)}."""
+    _man = load_json(os.path.join(run_dir, "drawing-manifest.json")) or {}
+    _rmap: Dict[str, Tuple[str, str]] = {}
+    for _r in (_man.get("renders") or []):
+        if isinstance(_r, dict) and _r.get("file"):
+            _rmap[os.path.normpath(os.path.join(run_dir, str(_r["file"])))] = (
+                str(_r.get("sheet_name") or "").strip()[:31],
+                str(_r.get("caption") or "").strip())
+    return _rmap
+
+
+# The GALLERY view set (Bundle B fix 1, reviewers 2026-07-02): 8 per-render tabs were
+# 7 too many — near-duplicate corner views + an exterior-top nobody reads. ONE 'Renders'
+# gallery keeps the informative views, each with its manifest caption; the other render
+# FILES stay on disk (drawing-manifest renders[] still lists all of them) — they just
+# don't get tabs. Selection is by view KIND from the canonical filenames (universal):
+#   interior 00-hero  → the hero isometric        interior 01-top → the annotated plan
+#   exterior 00-hero  → building exterior iso     exterior 02-corner-FR → 2nd exterior angle
+_GALLERY_VIEWS = (
+    ("00-hero.png", "Interior — hero isometric",
+     "Blender 3D render — interior plant layout (no walls/roof), three-quarter hero view."),
+    ("01-top.png", "Interior — annotated plan",
+     "Interior plant layout — top-down plan view (matches the GA orientation)."),
+    (os.path.join("exterior", "00-hero.png"), "Exterior — building isometric",
+     "Architectural exterior of the building/enclosure, three-quarter view."),
+    (os.path.join("exterior", "02-corner-FR.png"), "Exterior — front-corner",
+     "Architectural exterior — front-corner angle."),
+)
+
+
+def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
+    """The gallery's (file_path, view_name, caption) picks — hero iso + annotated interior
+    plan + up to 2 exterior views. Captions/names come from the drawing-manifest renders[]
+    where present (fallbacks otherwise). Near-duplicate corners + the exterior-top are
+    deliberately NOT selected. Missing files are skipped (universal)."""
+    _rmap = _manifest_render_map(run_dir)
+    specs: List[Tuple[str, str, str]] = []
+    for rel, fb_title, fb_cap in _GALLERY_VIEWS:
+        p = os.path.join(run_dir, rel)
+        if rel == "00-hero.png" and not os.path.exists(p):
+            # the interior hero's legacy alias
+            alt = os.path.join(run_dir, "blender-cover.png")
+            p = alt if os.path.exists(alt) else p
+        if not os.path.exists(p):
+            continue
+        sn, cap = _rmap.get(os.path.normpath(p), ("", ""))
+        specs.append((p, sn or fb_title, cap or fb_cap))
+    return specs
+
+
+def tab_renders(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]]:
+    """ONE 'Renders' gallery tab (Bundle B fix 1) — the 8 per-render tabs collapse to a
+    single sheet: hero isometric + annotated interior plan + 1-2 exterior views, each
+    with its manifest caption. Returns [(sheet_title, source_path), …] for the embedded
+    views (so the Drawings register preview links resolve), or None when the run has no
+    renders at all."""
+    from openpyxl.drawing.image import Image as XLImage
+    specs = _gallery_render_specs(run_dir)
+    if not specs:
+        return None
+    ws = wb.create_sheet("Renders")
+    r = title_row(
+        ws, "Renders — photoreal views of the plant", 6,
+        "The informative views from the Blender scene build: interior hero isometric, "
+        "annotated interior plan, and the building exterior. Every rendered view file "
+        "(including the additional corner angles) is listed with its caption on the "
+        "Drawings register tab; the full-resolution files live in the run folder.")
+    back_link(ws, 6)
+    embedded: List[Tuple[str, str]] = []
+    for path, name, caption in specs:
+        png = ensure_png(path, run_dir)
+        if not png:
+            continue
+        sub_banner(ws, r, name, 6)
+        r += 1
+        cap = ws.cell(r, 1, clean_cell(caption))
+        cap.font = FONT_NOTE
+        cap.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        ws.row_dimensions[r].height = 30
+        r += 1
+        try:
+            ds = downscale_png(png, run_dir)
+            img = XLImage(ds)
+            max_w = 1500                      # gallery views a notch smaller than a solo tab
+            if img.width and img.width > max_w:
+                ratio = max_w / float(img.width)
+                img.width = int(img.width * ratio)
+                img.height = int(img.height * ratio)
+            ws.add_image(img, f"A{r}")
+            # reserve rows under the anchor so the next section never overlaps the image
+            # (default Excel row ≈ 20 px)
+            r += int(-(-(img.height or 600) // 20)) + 2
+            embedded.append(("Renders", path))
+        except Exception as exc:  # noqa: BLE001
+            print(f"    ! could not embed gallery render {path}: {exc}")
+            r += 1
+    return embedded or None
+
+
 def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
     """
-    Return ordered list of (file_path, tab_title, caption). UNIVERSAL discovery:
-      1. Blender hero (00-hero.png or blender-cover.png)
-      2. each module-*.png at the run root (NOT the *-top-front variants)
-      3. the 8 named engineering drawings (PNG, or SVG->PNG) from drawings/
-         + a few representative isometrics if present
-    Missing files are simply skipped.
+    Return ordered list of (file_path, tab_title, caption) for the ENGINEERING-DRAWING
+    preview tabs (PNG, or SVG->PNG) from drawings/. Missing files are simply skipped.
+    Photoreal renders are NOT tabbed per-view any more — they live on the ONE 'Renders'
+    gallery tab (tab_renders, Bundle B fix 1); the files stay on disk. The single-line
+    diagram is embedded on the merged 'Electrical' tab (tab_electrical, Bundle B fix 4).
     """
     specs: List[Tuple[str, str, str]] = []
     draw = os.path.join(run_dir, "drawings")
@@ -9499,72 +9831,20 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
                 return c
         return None
 
-    # RENDER NAMES/CAPTIONS from the drawing-manifest `renders` array (generator-purge
-    # 2026-07-02): each render carries a canonical ≤31-char `sheet_name` (kills the
-    # 'Render — Interior layout (vie-2' truncations) + a `caption` (bearing + envelope
-    # dims + tag callouts). Filename-minted fallbacks remain for runs without it.
-    _man = load_json(os.path.join(run_dir, "drawing-manifest.json")) or {}
-    _rmap: Dict[str, Tuple[str, str]] = {}
-    for _r in (_man.get("renders") or []):
-        if isinstance(_r, dict) and _r.get("file"):
-            _rmap[os.path.normpath(os.path.join(run_dir, str(_r["file"])))] = (
-                str(_r.get("sheet_name") or "").strip()[:31],
-                str(_r.get("caption") or "").strip())
-
-    def _render_spec(path: str, fb_title: str, fb_cap: str) -> Tuple[str, str, str]:
-        sn, cap = _rmap.get(os.path.normpath(path), ("", ""))
-        return (path, sn or fb_title, cap or fb_cap)
-
-    # 1. hero (interior layout — the materialed render's 00-hero)
-    hero = first_existing(os.path.join(run_dir, "00-hero.png"),
-                          os.path.join(run_dir, "blender-cover.png"))
-    if hero:
-        specs.append(_render_spec(
-            hero, "Render — Interior layout",
-            "Blender 3D render — interior plant layout (no walls/roof), view 1."))
-    # 1b. SECOND interior angle + the EXTERIOR building views (Tristan 2026-06-22: the Excel was
-    #     missing the updated renders + the external building). The exterior set is rendered to
-    #     <run>/exterior/ from the SAME scene build (BLENDER_PLANT_SHELL=1).
-    _ext = os.path.join(run_dir, "exterior")
-    # The full set for BOTH surfaces (Tristan 2026-06-25): hero + front-corner + top-down + back-
-    # corner, interior then exterior. Each is guarded by os.path.exists, so a class that renders
-    # fewer views simply gets fewer tabs (universal — no per-class assumption).
-    for _p, _ttl, _cap in (
-        (os.path.join(run_dir, "02-corner-FR.png"), "Render — Interior layout (view 2)",
-         "Interior plant layout — front-corner angle."),
-        (os.path.join(run_dir, "01-top.png"), "Render — Interior layout (top)",
-         "Interior plant layout — top-down plan view."),
-        (os.path.join(run_dir, "03-corner-BL.png"), "Render — Interior layout (view 3)",
-         "Interior plant layout — back-corner angle."),
-        (os.path.join(_ext, "00-hero.png"), "Render — Building exterior",
-         "Architectural exterior of the container enclosure, view 1."),
-        (os.path.join(_ext, "02-corner-FR.png"), "Render — Building exterior (view 2)",
-         "Architectural exterior — front-corner angle."),
-        (os.path.join(_ext, "01-top.png"), "Render — Building exterior (top)",
-         "Architectural exterior — top-down view."),
-        (os.path.join(_ext, "03-corner-BL.png"), "Render — Building exterior (view 3)",
-         "Architectural exterior — back-corner angle."),
-    ):
-        if os.path.exists(_p):
-            specs.append(_render_spec(_p, _ttl, _cap))
-
-    # 2. module renders — REMOVED (Tristan 2026-06-20): the per-module Blender
-    # highlight renders (module-*.png) read as poor quality and their provenance was
-    # unclear, so they no longer get their own tabs. Universal across all classes.
-
-    # 3. the 8 engineering drawings (canonical names + aliases)
+    # the engineering drawings (canonical names + aliases)
     eng = [
         ("general-arrangement", "GA — General Arrangement",
          "General arrangement / plant layout."),
         ("pid", "P&ID", "Piping & instrumentation diagram."),
         ("block-flow-diagram", "BFD — Block Flow",
          "Block flow diagram of the process."),
-        ("single-line-diagram", "Single-line",
-         "Electrical single-line diagram."),
+        # NOTE: single-line-diagram is deliberately NOT a standalone tab — it is embedded
+        # at the top of the merged 'Electrical' tab (drawing + circuit schedule, ONE
+        # electrical source; Bundle B fix 4).
         ("hvac-layout", "HVAC", "HVAC / ventilation layout."),
         # NOTE: panel-schedule + process-schedules are deliberately NOT embedded
         # as PDF-page images — they are rendered as NATIVE, sortable Excel rows by
-        # tab_panel_schedule + tab_process_schedules (Tristan 2026-06-20: "panel /
+        # tab_electrical + tab_process_schedules (Tristan 2026-06-20: "panel /
         # process schedule should be in excel, not a pdf"). Universal for any class
         # that emits those schedules.
     ]
@@ -9606,7 +9886,7 @@ _DRAWING_REGISTER = [
     ("bfd", "block-flow-diagram.svg", "FF-BFD-001", "Block Flow Diagram",
      "BFD — Block Flow"),
     ("single-line", "single-line-diagram.svg", "FF-SLD-001",
-     "Single-Line Electrical Diagram", "Single-line"),
+     "Single-Line Electrical Diagram", "Electrical"),   # embedded on the merged Electrical tab
     ("hvac", "hvac-layout.svg", "FF-HVAC-001", "HVAC / Ventilation Layout", "HVAC"),
 ]
 
@@ -10028,55 +10308,92 @@ def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row:
     return r
 
 
+# The MERGED TAB STRIP (Bundle B fix 7, two-reviewer audit 2026-07-02): Exec → Contents →
+# Renders → Cost waterfall → Financial model → BoM → Brief → Drawings register → the
+# drawings (BFD → P&ID → Process schedules → GA → HVAC → Electrical → Line & velocity) →
+# Assembly → Risk → Holds → Quality & Audit → ⚠ Checks → Connection trace → Quantities →
+# Calculations → Inputs → Part names → Glossary. Overview (kept — run provenance) sits
+# between Contents and Renders; Sense-check (when present) joins the verification block.
+_TAB_RANK = {
+    "Executive Summary": -1, "Contents": 0, "Overview": 0.5, "Renders": 1,
+    "Cost waterfall": 2, "Financial model": 3, "Bill of Materials (Ledger)": 4,
+    "Brief": 5,
+    "Drawings": 6,                                      # the drawing REGISTER opens the drawings block
+    # drawings in reading order: BFD 7 → P&ID 8 → Process schedules 9 → GA 10 → HVAC 11 →
+    # Electrical 12 → Line & velocity 13 (prefix ranks in _tab_rank fill the gaps)
+    "Process schedules": 9, "Electrical": 12, "Line & velocity": 13,
+    "Assembly sequence": 14, "Risk & Regulatory": 15, "Holds & exclusions": 16,
+    "Quality & Audit": 17, "Sense-check": 17.5, "⚠ Checks": 18,
+    "Connection trace": 19, "Quantities": 20, "Calculations": 21,
+    "Inputs & Assumptions": 22, "Part names": 23, "Glossary": 24,
+}
+
+# Tab-strip COLOUR GROUPS (Bundle B fix 7): commercial / drawings / verification /
+# reference — one colour per group so the strip reads as four blocks.
+_TAB_GROUP_COLOUR = {
+    "commercial": "2F5597",    # blue — the story + money tabs
+    "drawings": "548235",      # green — register + every drawing surface
+    "verification": "C55A11",  # orange — risk / holds / quality / checks
+    "reference": "7F7F7F",     # grey — the plumbing a reader dips into
+}
+_TAB_GROUPS = {
+    "commercial": {"Executive Summary", "Contents", "Overview", "Renders", "Cost waterfall",
+                   "Financial model", "Bill of Materials (Ledger)", "Brief"},
+    "drawings": {"Drawings", "Process schedules", "Electrical", "Line & velocity",
+                 "Assembly sequence"},
+    "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
+                     "Sense-check", "⚠ Checks"},
+    "reference": {"Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
+                  "Part names", "Glossary"},
+}
+
+
+def _tab_rank(title: str) -> float:
+    """The merged-sequence rank for a sheet title. Drawing prefixes rank into the drawings
+    block (BFD 7 → P&ID 8 → [Process schedules 9] → GA 10 → HVAC 11); unknown tabs land at
+    the end of the drawings block so nothing ever disappears off the strip."""
+    if title in _TAB_RANK:
+        return _TAB_RANK[title]
+    t = title.lower()
+    for rank, prefixes in ((7, ("bfd", "block flow")), (8, ("p&id", "pid")),
+                           (10, ("ga", "general arrangement")), (11, ("hvac",))):
+        if any(t.startswith(p) for p in prefixes):
+            return rank
+    if t.startswith("render"):
+        return 1.5                                     # stray per-render tab → beside the gallery
+    if t.startswith("isometric") or t.startswith("module") or t.startswith("single"):
+        return 12.5                                    # legacy drawing surfaces → drawings block
+    return 14.5                                        # unknown data tab: end of the drawings block
+
+
+def _tab_group(title: str) -> str:
+    """Which colour group a sheet belongs to — explicit membership first, then by its rank
+    position in the merged sequence (so unknown / prefix tabs colour with their block)."""
+    for g, names in _TAB_GROUPS.items():
+        if title in names:
+            return g
+    rk = _tab_rank(title)
+    if rk <= 5:
+        return "commercial"
+    if rk <= 14.5:
+        return "drawings"
+    if rk <= 18:
+        return "verification"
+    return "reference"
+
+
 def _reorder_tabs(wb: Workbook) -> None:
-    """Reorder sheets into a READER-NARRATIVE sequence (Tristan 2026-06-23): Story (hero render
-    early) → Commercial (economics early) → Engineering → Drawings → Reference/Audit (the plumbing
-    last). PURE presentation — Excel formula references are by sheet NAME, so tab order never breaks
-    a formula. Universal — keys on tab name/prefix, no archetype logic; unknown tabs take a sensible
-    middle rank."""
-    _RANK = {
-        "Executive Summary": -1, "Contents": 0, "⭐ Scorecard": 0.5, "Overview": 1,
-        "Render — Interior layout": 2,                 # HERO render — early (exact name)
-        "Brief": 3,
-        # The LOGICAL READING ORDER (Tristan 2026-06-27, said several times): the BRIEF states the
-        # need → INPUTS & ASSUMPTIONS are the drivers taken from it → QUANTITIES + CALCULATIONS derive
-        # the design from those → the BILL OF MATERIALS lists what to buy → the COST WATERFALL sums the
-        # BoM up the cost stack → the FINANCIAL MODEL runs the economics off the cost. So:
-        # Brief → Inputs & Assumptions → Quantities → Calculations → BoM → Cost waterfall → Financial.
-        "Inputs & Assumptions": 4,                      # drivers from the brief — near the FRONT
-        "Quantities": 5, "Calculations": 6,
-        "Bill of Materials (Ledger)": 12,               # the bill — BEFORE the cost waterfall it feeds
-        "Cost waterfall": 14,                           # sums the BoM up the cost stack (AFTER the BoM)
-        "Financial model": 16,                          # economics off the cost (AFTER the cost waterfall)
-        "Sense-check": 18,
-        "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
-        "Assembly sequence": 29,
-        "Risk & Regulatory": 30,
-        "Holds & exclusions": 31,               # the open-items register follows the risks
-        "Drawings": 49,                                 # the drawing REGISTER opens the drawings section
-
-        "⚠ Checks": 90, "⚠ Audit": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
-    }
-
-    def _rank(title: str) -> int:
-        if title in _RANK:
-            return _RANK[title]
-        t = title.lower()
-        if t.startswith("render 1"):
-            return 2                                    # manifest-named HERO render — early
-        if t.startswith("render"):
-            return 50                                   # non-hero renders → Drawings
-        for i, p in enumerate(("ga", "p&id", "bfd", "single", "hvac")):
-            if t.startswith(p):
-                return 55 + i
-        if t.startswith("isometric"):
-            return 70
-        if t.startswith("module"):
-            return 72
-        return 40                                       # unknown data tab: end of engineering
-
+    """Reorder sheets into the MERGED reader sequence (Bundle B fix 7) and colour the tab
+    strip by group (commercial / drawings / verification / reference). PURE presentation —
+    Excel formula references are by sheet NAME, so tab order never breaks a formula.
+    Universal — keys on tab name/prefix, no archetype logic."""
     orig = {id(ws): i for i, ws in enumerate(wb._sheets)}
-    wb._sheets.sort(key=lambda ws: (_rank(ws.title), orig[id(ws)]))
+    wb._sheets.sort(key=lambda ws: (_tab_rank(ws.title), orig[id(ws)]))
+    for ws in wb._sheets:
+        try:
+            ws.sheet_properties.tabColor = _TAB_GROUP_COLOUR[_tab_group(ws.title)]
+        except Exception:  # noqa: BLE001 — a colour must never kill the build
+            pass
 
 
 def tab_benchmark(wb: Workbook, state: dict) -> None:
@@ -10202,44 +10519,47 @@ def tab_benchmark(wb: Workbook, state: dict) -> None:
             pass
 
 
-def tab_scorecard(wb: Workbook, state: dict) -> None:
-    """The ≥8-every-section self-audit, surfaced for the reader (Tristan 2026-06-25: the dossier
-    must SHOW its own quality, not bury it). Renders state.selfAudit — the MIN section score vs the
-    ≥8 floor, the mean, and every section's score + its top defect — so the reader sees exactly
-    where the design is solid and where it isn't. This is the headline quality measure."""
+def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
+    """ONE 'Quality & Audit' tab (Bundle B fix 2) — the former ⭐ Scorecard + ⚠ Audit tabs
+    merged: the ONE verdict (rendered exactly once, at the top), the ≥8-every-section
+    self-audit table, the engine quality metrics, the per-tab deterministic scorecard,
+    and the ship-gate audit findings + benchmark net. ⚠ Checks stays its own tab (the
+    live-invariant surface)."""
     sa = state.get("selfAudit") or {}
     secs = sa.get("sections") or []
-    if not isinstance(secs, list) or not secs:
-        return
-    ws = wb.create_sheet("⭐ Scorecard")
-    set_widths(ws, {"A": 28, "B": 9, "C": 16, "D": 82})
-    title_row(ws, "Quality scorecard — every section against the ≥8 floor", 4,
-              "The engine's own self-audit. The AIM is ≥8 on EVERY section — the floor, not the "
-              "average. A section below 8 is flagged; a BLOCKING defect means the dossier is not "
-              "yet shippable. This is the headline quality measure for the whole dossier.")
+    if not isinstance(secs, list):
+        secs = []
+    ws = wb.create_sheet("Quality & Audit")
+    set_widths(ws, {"A": 28, "B": 30, "C": 60, "D": 82, "E": 24})
+    title_row(ws, "Quality & Audit — every section and tab against the ≥8 floor + the ship gate", 5,
+              "The engine's own quality surface, on one tab: the dossier verdict (stated ONCE, "
+              "here), every self-audit section and every tab scored against the ≥8 floor, and "
+              "the deterministic ship-gate audit findings. The AIM is ≥8 EVERYWHERE — the floor, "
+              "not the average. See ⚠ Checks for the live arithmetic invariants.")
     r = 4
-    # ---- the ONE VERDICT first (fix 2, 2026-07-02) — identical on every verdict surface;
-    # the MIN below is LABELLED as this tab's own source (the LLM self-audit sections). ----
+    # ---- THE ONE VERDICT — this tab's single verdict surface (fix 2, 2026-07-02);
+    # identical on the Exec / Overview surfaces via _register_verdict_cell. ----
     _ver = ws.cell(r, 1, verdict_text("line"))
     _ver.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
     _ver.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
     _ver.alignment = LEFT_TOP
-    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     _register_verdict_cell(ws, r, 1, style="line")
     r += 2
     mn = sa.get("min_score")
     mean = sa.get("mean_score")
     n_ok = sum(1 for s in secs if isinstance(s.get("score"), (int, float)) and s.get("score") >= 8)
-    min_fill = FILL_PASS if (isinstance(mn, (int, float)) and mn >= 8) else FILL_FAIL
-    mc = ws.cell(r, 1, f"MIN section score (LLM self-audit)  {mn}/10")
-    mc.font = FONT_TITLE
-    mc.fill = min_fill
-    ws.cell(r, 2).fill = min_fill
-    ws.cell(r, 3, f"{n_ok}/{len(secs)} sections ≥8").font = FONT_SUB
-    ws.cell(r, 4, f"mean {mean}/10   ·   AIM: every section ≥8").font = FONT_NOTE
-    r += 2
-    header(ws, r, ["Section", "Score", "vs ≥8 floor", "Top defect (why it's below 8)"])
-    r += 1
+    if secs:
+        min_fill = FILL_PASS if (isinstance(mn, (int, float)) and mn >= 8) else FILL_FAIL
+        mc = ws.cell(r, 1, f"MIN section score (LLM self-audit)  {mn}/10")
+        mc.font = FONT_TITLE
+        mc.fill = min_fill
+        ws.cell(r, 2).fill = min_fill
+        ws.cell(r, 3, f"{n_ok}/{len(secs)} sections ≥8").font = FONT_SUB
+        ws.cell(r, 4, f"mean {mean}/10   ·   AIM: every section ≥8").font = FONT_NOTE
+        r += 2
+        header(ws, r, ["Section", "Score", "vs ≥8 floor", "Top defect (why it's below 8)"])
+        r += 1
     for s in secs:
         if not isinstance(s, dict):
             continue
@@ -10324,6 +10644,13 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
             _icell.font = FONT_NOTE
             r += 1
 
+    # ---- the deterministic ship-gate AUDIT findings + benchmark net (the former ⚠ Audit
+    # tab's content) — merged below the scorecard tables (Bundle B fix 2). ----
+    r += 1
+    _render_audit_findings(ws, report, state, r)
+    back_link(ws, 5)
+    ws.freeze_panes = "A5"
+
 
 # ============================================================================
 # RECALC-AND-CACHE (presentation audit 2026-07-02, fix 1). openpyxl writes live
@@ -10349,6 +10676,97 @@ _LO_RECALC_XCU = """<?xml version="1.0" encoding="UTF-8"?>
 # blank-preview gap, so it must NOT count as a cached value).
 _XLSX_F_RX = re.compile(r"<f[ >/]")
 _XLSX_FV_RX = re.compile(r"(?:</f>|<f[^>]*/>)\s*<v[^/>]*>[^<]")
+
+
+# ── DETERMINISTIC FINALISE (Bundle B): two builds of the same run must be SHA-identical,
+# so a diff/regression check is a straight shasum. Three volatile leftovers are pinned
+# AFTER save+recalc: (1) docProps dcterms:modified (openpyxl stamps save-time); (2) the
+# chart axId/crossAx pairs (LibreOffice's recalc round-trip regenerates them RANDOMLY
+# each run — renumbered deterministically per chart, pairing preserved); (3) every zip
+# member's mtime (stamped with wall-clock time by both writers). Content otherwise
+# byte-preserved; formulas/cached values untouched. ──
+_CHART_AXID_RX = re.compile(rb'<c:axId val="(\d+)"/>')
+_CHART_CROSSAX_RX = re.compile(rb'<c:crossAx val="(\d+)"/>')
+_DOCPROPS_MODIFIED_RX = re.compile(rb"<dcterms:modified[^>]*>[^<]*</dcterms:modified>")
+
+
+def _sheet_file_for_name(z, sheet_name: str) -> Optional[str]:
+    """Resolve a sheet NAME to its xl/worksheets/sheetN.xml member via workbook.xml + rels."""
+    try:
+        wbxml = z.read("xl/workbook.xml").decode("utf-8", "replace")
+        rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "replace")
+    except KeyError:
+        return None
+    rid = None
+    for m in re.finditer(r"<sheet\b[^>]*>", wbxml):
+        tag = m.group(0)
+        nm = re.search(r'name="([^"]*)"', tag)
+        ri = re.search(r'r:id="(rId\d+)"', tag)
+        if nm and ri and _xml_unescape(nm.group(1)) == sheet_name:
+            rid = ri.group(1)
+            break
+    if not rid:
+        return None
+    tm = re.search(r'Id="' + rid + r'"[^>]*Target="([^"]*)"', rels) or \
+        re.search(r'Target="([^"]*)"[^>]*Id="' + rid + r'"', rels)
+    if not tm:
+        return None
+    tgt = tm.group(1).lstrip("/")
+    return tgt if tgt.startswith("xl/") else "xl/" + tgt
+
+
+def _xml_unescape(s: str) -> str:
+    from html import unescape
+    return unescape(s)
+
+
+def _finalise_deterministic_zip(out_path: str) -> None:
+    """Rewrite the finished xlsx with pinned timestamps + deterministic chart axIds,
+    and re-stamp collapsed="1" on the BoM ↳ parent rows (LibreOffice strips it)."""
+    import zipfile
+    with zipfile.ZipFile(out_path) as zin:
+        bom_sheet = (_sheet_file_for_name(zin, _LEDGER_SHEET)
+                     if _BOM_COLLAPSED_PARENTS else None)
+        items = []
+        for n in zin.namelist():
+            data = zin.read(n)
+            if bom_sheet and n == bom_sheet:
+                def _stamp_collapsed(m, _pr):
+                    attrs = m.group(1)
+                    if b"collapsed" in attrs:   # LibreOffice writes collapsed="false" explicitly
+                        attrs = re.sub(rb'collapsed="[^"]*"', b'collapsed="true"', attrs)
+                    else:
+                        attrs += b' collapsed="1"'
+                    return (b'<row r="%d"' % _pr) + attrs + m.group(2) + b">"
+                for _pr in _BOM_COLLAPSED_PARENTS:
+                    data = re.sub(
+                        (r'<row r="%d"([^>]*?)(/?)>' % _pr).encode(),
+                        lambda m, _pr=_pr: _stamp_collapsed(m, _pr),
+                        data, count=1)
+            if n == "docProps/core.xml":
+                data = _DOCPROPS_MODIFIED_RX.sub(
+                    b'<dcterms:modified xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00Z'
+                    b"</dcterms:modified>", data)
+            elif n.startswith("xl/charts/chart") and n.endswith(".xml"):
+                # renumber this chart's axis ids in first-appearance order; crossAx
+                # references use the SAME map so every axis pair stays consistent.
+                idmap: Dict[bytes, bytes] = {}
+                for m in _CHART_AXID_RX.finditer(data):
+                    if m.group(1) not in idmap:
+                        idmap[m.group(1)] = str(70000001 + len(idmap)).encode()
+                data = _CHART_AXID_RX.sub(
+                    lambda m: b'<c:axId val="' + idmap.get(m.group(1), m.group(1)) + b'"/>', data)
+                data = _CHART_CROSSAX_RX.sub(
+                    lambda m: b'<c:crossAx val="' + idmap.get(m.group(1), m.group(1)) + b'"/>', data)
+            items.append((n, data))
+    tmp = out_path + ".det-tmp"
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n, data in items:
+            zi = zipfile.ZipInfo(n, date_time=(2026, 1, 1, 0, 0, 0))
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o600 << 16
+            zout.writestr(zi, data)
+    os.replace(tmp, out_path)
 
 
 def _find_soffice() -> Optional[str]:
@@ -10445,6 +10863,12 @@ def build(run_dir: str, out_path: str) -> dict:
 
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
+    # DETERMINISTIC OUTPUT (Bundle B): pin the docProps timestamps (openpyxl stamps
+    # datetime.now() at Workbook() creation) so two builds of the same run to the same
+    # path are byte-comparable — the determinism proof is a straight shasum.
+    from datetime import datetime as _dtm
+    wb.properties.created = _dtm(2026, 1, 1)
+    wb.properties.modified = _dtm(2026, 1, 1)
 
     # ---- DETERMINISTIC SHIP-GATE AUDIT — run FIRST so the Exec Summary validation card can read
     # the verdict (state["_dossierAudit"]) and the "⚠ Audit" tab can render the findings. `rows` are
@@ -10494,6 +10918,21 @@ def build(run_dir: str, out_path: str) -> dict:
                   f"→ {_cres['score']}/10" +
                   (f" ({_cres['source_fabricated']} fabricated source tick(s) neutralised)"
                    if _cres.get("source_fabricated") else ""))
+    # ── ELECTRICAL MERGE (Bundle B fix 4): the 'Panel schedule' + 'Single-line' tabs are
+    #    now ONE 'Electrical' sheet, so its score is keyed by the sheet that actually exists.
+    #    The score itself is UNCHANGED (the panel column contract), tightened by the single-
+    #    line drawing's own coverage check when that is lower — the merged sheet cannot
+    #    outscore its weaker half. (No external consumer reads the old key — grepped.) ──
+    if "Panel schedule" in _TAB_SCORES:
+        _elec_sc = _TAB_SCORES.pop("Panel schedule")
+        _sl_sc = _aux_tab_score("Single-line", run_dir)
+        if (isinstance(_sl_sc, dict) and isinstance(_sl_sc.get("score"), (int, float))
+                and isinstance(_elec_sc.get("score"), (int, float))
+                and _sl_sc["score"] < _elec_sc["score"]):
+            _elec_sc["score"] = _sl_sc["score"]
+            _elec_sc["status"] = _sl_sc.get("status", _elec_sc.get("status"))
+            _elec_sc["issues"] = ((_sl_sc.get("issues") or []) + (_elec_sc.get("issues") or []))[:6]
+        _TAB_SCORES["Electrical"] = _elec_sc
     state["tabScorecard"] = _TAB_SCORES
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)
     state["tabScorecardSummary"] = _ts_summary
@@ -10568,8 +11007,8 @@ def build(run_dir: str, out_path: str) -> dict:
     tab_executive_summary(wb, state, run_dir, sha)
     print("  · Overview")
     tab_overview(wb, state, run_dir, sha)
-    print("  · ⭐ Scorecard")
-    tab_scorecard(wb, state)
+    print("  · Quality & Audit")
+    tab_quality_audit(wb, state, run_dir, report)
     print("  · Sense-check")
     tab_benchmark(wb, state)
     print("  · Brief")
@@ -10586,8 +11025,6 @@ def build(run_dir: str, out_path: str) -> dict:
     fail_count = tab_checks(wb, state, run_dir)
     checks_ws = wb["⚠ Checks"]
     fail_labels = getattr(checks_ws, "_forge_fail_labels", [])
-    print("  · ⚠ Audit")
-    tab_audit(wb, report, state)
     print("  · Part names")
     tab_parts_master(wb, state, run_dir)
     print("  · Quantities")
@@ -10627,7 +11064,8 @@ def build(run_dir: str, out_path: str) -> dict:
     # references it. Each self-guards (skips cleanly with no usable output metric).
     add_tab(INPUTS_SHEET, lambda: tab_inputs_assumptions(wb, state))
     add_tab("Financial model", lambda: tab_financial_model(wb, state))
-    add_tab("Panel schedule", lambda: tab_panel_schedule(wb, run_dir))
+    # 'Electrical' (single-line drawing + panel schedule, ONE tab — Bundle B fix 4) is
+    # built with the image tabs below, so its embedded drawing registers a preview link.
     # process schedules creates 0..3 sheets; treat >0 as success
     add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
@@ -10641,6 +11079,24 @@ def build(run_dir: str, out_path: str) -> dict:
     specs = collect_image_specs(run_dir)
     img_ok = 0
     embedded: List[Tuple[str, str]] = []   # (actual sheet title, source image path)
+    # ONE 'Renders' gallery tab (Bundle B fix 1) — hero iso + annotated interior plan +
+    # exterior views, each with its manifest caption; the other render files stay on disk.
+    _gal = tab_renders(wb, run_dir)
+    if _gal:
+        embedded.extend(_gal)
+        img_ok += 1
+        used_titles.add("renders")
+        print(f"      + Renders (gallery — {len(_gal)} views on one tab)")
+    # ONE 'Electrical' tab (Bundle B fix 4) — single-line drawing on top, panel/load
+    # schedule below; the schedule's own values are the single dataset.
+    _elec = tab_electrical(wb, run_dir)
+    if _elec is None:
+        print("  · Electrical — skipped (no single-line drawing or panel schedule)")
+        skipped.append("Electrical (no source data)")
+    else:
+        embedded.extend(_elec)
+        used_titles.add("electrical")
+        print("  · Electrical (single-line + panel schedule)")
     for path, ttl, cap in specs:
         png = ensure_png(path, run_dir)
         sheet = add_image_tab(wb, run_dir, png, ttl, cap, used_titles) if png else None
@@ -10741,7 +11197,7 @@ def build(run_dir: str, out_path: str) -> dict:
     #    tabs. Now that all sheets exist, merge each drawing/render/meta sheet's aux-score into the
     #    per-tab scorecard, so an EMPTY P&ID / BFD actually FAILS the dossier (not just a red banner).
     #    Pure-navigation tabs (Contents / ⭐ Scorecard) carry no content to score → skipped. ──
-    _NAV_TABS = {"Contents", "⭐ Scorecard"}
+    _NAV_TABS = {"Contents"}   # ⭐ Scorecard + ⚠ Audit merged into 'Quality & Audit' (scored via the audit branch)
     for _wsx in wb.worksheets:
         _nm = _wsx.title
         if _nm in _TAB_SCORES or _nm in _NAV_TABS:
@@ -10836,6 +11292,14 @@ def build(run_dir: str, out_path: str) -> dict:
     recalc_cached = False
     if os.environ.get("FORGE_SKIP_RECALC", "").lower() not in ("1", "true", "yes"):
         recalc_cached = recalc_and_cache(out_path)
+
+    # ── DETERMINISTIC FINALISE (Bundle B): pin the volatile leftovers (docProps
+    #    modified-time, LibreOffice-random chart axIds, zip mtimes) so a rebuild of the
+    #    same run to the same path is byte-identical — provable with a straight shasum. ──
+    try:
+        _finalise_deterministic_zip(out_path)
+    except Exception as _dex:  # noqa: BLE001 — determinism polish must never kill the build
+        print(f"  ! deterministic finalise failed (file left as-written): {_dex}")
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
     return {
@@ -11485,7 +11949,7 @@ def _selftest() -> int:
               f"(got {_cm2})"); bad += 1
     # ═══ (15) CONTENTS descriptions: the meta tabs are described (never the drawing
     # fallback) and EVERY description is ≤12 words (fix 4) ═══
-    for _k in ("Executive Summary", "⭐ Scorecard", "⚠ Audit", "Overview"):
+    for _k in ("Executive Summary", "Quality & Audit", "Renders", "Electrical", "Overview"):
         if _k not in _TAB_DESCRIPTIONS or _TAB_DESCRIPTIONS[_k] == _default_desc(_k):
             print(f"  FAIL contents: {_k!r} needs its own description (not the drawing "
                   f"fallback {_default_desc(_k)!r})"); bad += 1
@@ -11510,9 +11974,13 @@ def _selftest() -> int:
                 "| | **TOTALS** | | **10.0 kW** | **15 A** | | | | | |\n")
         _wbp = Workbook(); _wbp.remove(_wbp.active)
         _CONTRACT_RESULTS["Panel schedule"] = _eval_panel_schedule_contract(_td4, {}) or {}
-        tab_panel_schedule(_wbp, _td4)
+        # the schedule renders on the merged 'Electrical' tab (Bundle B fix 4)
+        _elt = tab_electrical(_wbp, _td4)
         _CONTRACT_RESULTS.pop("Panel schedule", None)
-        _pws = _wbp["Panel schedule"]
+        if _elt is None or "Electrical" not in _wbp.sheetnames:
+            print("  FAIL electrical: the merged Electrical tab must build from the panel "
+                  "schedule alone (no single-line drawing needed)"); bad += 1
+        _pws = _wbp["Electrical"]
         _stars = [c.coordinate for row_ in _pws.iter_rows() for c in row_
                   if isinstance(c.value, str) and "**" in c.value]
         if _stars:
@@ -11540,32 +12008,65 @@ def _selftest() -> int:
     if _rv3 != 998.0 or "seawater" in _rn3:
         print(f"  FAIL rho: a fresh/potable plant must derive 998, never seawater "
               f"(got {_rv3}, {_rn3!r})"); bad += 1
-    # ═══ (18) RENDER tab names/captions come from the drawing-manifest `renders` array;
-    # hero embedding prefers the web-weight hero-embed.png (generator-purge 2026-07-02) ═══
+    # ═══ (18) RENDERS GALLERY (Bundle B fix 1): the gallery picks hero iso + interior
+    # plan + exterior views (manifest names/captions), KILLS the exterior-top + the
+    # near-duplicate corners, and collect_image_specs no longer mints per-render tabs;
+    # hero embedding still prefers the web-weight hero-embed.png ═══
     with _tf.TemporaryDirectory() as _td5:
-        for _fn in ("00-hero.png", "hero-embed.png"):
-            with open(os.path.join(_td5, _fn), "wb") as _fh:
-                _fh.write(b"\x89PNG\r\n\x1a\n")
+        os.makedirs(os.path.join(_td5, "exterior"), exist_ok=True)
+        from PIL import Image as _PILImg
+        for _fn in ("00-hero.png", "hero-embed.png", "01-top.png", "02-corner-FR.png",
+                    "03-corner-BL.png", os.path.join("exterior", "00-hero.png"),
+                    os.path.join("exterior", "01-top.png"),
+                    os.path.join("exterior", "02-corner-FR.png")):
+            _PILImg.new("RGB", (8, 6), (200, 20, 20)).save(os.path.join(_td5, _fn))
         with open(os.path.join(_td5, "drawing-manifest.json"), "w") as _fh:
             json.dump({"hero_embed": os.path.join(_td5, "hero-embed.png"),
                        "renders": [{"file": "00-hero.png",
                                     "sheet_name": "Render 1 — Interior iso",
                                     "caption": "Interior render — hero · envelope 23.6 × 39.2 m"}]}, _fh)
-        _sp = collect_image_specs(_td5)
-        _hs = next((s for s in _sp if os.path.basename(s[0]) == "00-hero.png"), None)
+        _gv = _gallery_render_specs(_td5)
+        _gnames = [os.path.relpath(p, _td5) for p, _n, _c in _gv]
+        if _gnames != ["00-hero.png", "01-top.png",
+                       os.path.join("exterior", "00-hero.png"),
+                       os.path.join("exterior", "02-corner-FR.png")]:
+            print(f"  FAIL gallery: must pick hero iso + interior plan + 2 exterior views, "
+                  f"in that order (got {_gnames})"); bad += 1
+        if any("corner-BL" in n or n == os.path.join("exterior", "01-top.png") for n in _gnames):
+            print("  FAIL gallery: the exterior-top + near-duplicate corner views must be "
+                  "KILLED (files stay on disk, no tab)"); bad += 1
+        _hs = next((s for s in _gv if os.path.basename(s[0]) == "00-hero.png"), None)
         if not _hs or _hs[1] != "Render 1 — Interior iso" or "envelope" not in _hs[2]:
-            print(f"  FAIL render-names: the manifest sheet_name/caption must name the render tab "
-                  f"(got {_hs})"); bad += 1
+            print(f"  FAIL gallery-names: the manifest sheet_name/caption must name the gallery "
+                  f"view (got {_hs})"); bad += 1
+        if any("render" in s[1].lower() or os.path.basename(s[0]).startswith("00-hero")
+               for s in collect_image_specs(_td5)):
+            print("  FAIL gallery: collect_image_specs must NOT mint per-render tabs any more "
+                  "(the gallery owns the renders)"); bad += 1
+        # the rendered gallery sheet: ONE 'Renders' tab, every picked view captioned
+        _wbg = Workbook(); _wbg.remove(_wbg.active)
+        _emb = tab_renders(_wbg, _td5)
+        if not _emb or [s for s, _p in _emb] != ["Renders"] * len(_gv):
+            print(f"  FAIL gallery: tab_renders must embed every picked view on the ONE "
+                  f"'Renders' sheet (got {_emb})"); bad += 1
+        elif "Renders" not in _wbg.sheetnames or len(_wbg["Renders"]._images) != len(_gv):
+            print(f"  FAIL gallery: expected {len(_gv)} images on the Renders sheet "
+                  f"(got {len(_wbg['Renders']._images) if 'Renders' in _wbg.sheetnames else 'no sheet'})"); bad += 1
+        else:
+            _gtxt = " ".join(str(c.value) for row_ in _wbg["Renders"].iter_rows()
+                             for c in row_ if isinstance(c.value, str))
+            if "envelope 23.6" not in _gtxt:
+                print("  FAIL gallery: each view's manifest caption must render on the sheet"); bad += 1
         if os.path.basename(_hero_embed_png(_td5) or "") != "hero-embed.png":
             print(f"  FAIL hero-embed: hero-embed.png must be preferred for embedding "
                   f"(got {_hero_embed_png(_td5)})"); bad += 1
         os.remove(os.path.join(_td5, "drawing-manifest.json"))
         os.remove(os.path.join(_td5, "hero-embed.png"))
-        _sp2 = collect_image_specs(_td5)
-        _hs2 = next((s for s in _sp2 if os.path.basename(s[0]) == "00-hero.png"), None)
-        if not _hs2 or _hs2[1] != "Render — Interior layout":
-            print(f"  FAIL render-names: a run WITHOUT manifest renders must keep the fallback "
-                  f"title (got {_hs2})"); bad += 1
+        _gv2 = _gallery_render_specs(_td5)
+        _hs2 = next((s for s in _gv2 if os.path.basename(s[0]) == "00-hero.png"), None)
+        if not _hs2 or _hs2[1] != "Interior — hero isometric":
+            print(f"  FAIL gallery-names: a run WITHOUT manifest renders must keep the fallback "
+                  f"view name (got {_hs2})"); bad += 1
         if os.path.basename(_hero_embed_png(_td5) or "") != "00-hero.png":
             print("  FAIL hero-embed: without hero-embed.png the full hero must be the fallback"); bad += 1
     # ═══ (19) DRAWINGS REGISTER + A1 cross-refs (reviewers 2026-07-02). Claims:
@@ -11941,6 +12442,224 @@ def _selftest() -> int:
         _CONTRACT_RESULTS.clear()
         _CONTRACT_RESULTS.update(_save_cr)
 
+    # ═══ (B) BUNDLE B — structural consolidation proofs (2026-07-02) ═══
+    import tempfile as _tfB
+    # (B1) TAB STRIP: the merged sequence + the four group colours (fix 7)
+    _wbo = Workbook(); _wbo.remove(_wbo.active)
+    for _nm in ("Glossary", "⚠ Checks", "Quality & Audit", "P&ID", "GA — General Arrangement",
+                "BFD — Block Flow", "HVAC", "Electrical", "Line & velocity", "Process schedules",
+                "Renders", "Contents", "Executive Summary", "Overview", "Cost waterfall",
+                "Financial model", "Bill of Materials (Ledger)", "Brief", "Drawings",
+                "Assembly sequence", "Risk & Regulatory", "Holds & exclusions",
+                "Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
+                "Part names"):
+        _wbo.create_sheet(_nm)
+    _reorder_tabs(_wbo)
+    _want_order = ["Executive Summary", "Contents", "Overview", "Renders", "Cost waterfall",
+                   "Financial model", "Bill of Materials (Ledger)", "Brief", "Drawings",
+                   "BFD — Block Flow", "P&ID", "Process schedules", "GA — General Arrangement",
+                   "HVAC", "Electrical", "Line & velocity", "Assembly sequence",
+                   "Risk & Regulatory", "Holds & exclusions", "Quality & Audit", "⚠ Checks",
+                   "Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
+                   "Part names", "Glossary"]
+    if _wbo.sheetnames != _want_order:
+        print(f"  FAIL strip: merged tab order wrong\n    got  {_wbo.sheetnames}\n"
+              f"    want {_want_order}"); bad += 1
+    for _nm, _grp in (("Executive Summary", "commercial"), ("Brief", "commercial"),
+                      ("Renders", "commercial"), ("Drawings", "drawings"),
+                      ("P&ID", "drawings"), ("Electrical", "drawings"),
+                      ("Quality & Audit", "verification"), ("⚠ Checks", "verification"),
+                      ("Risk & Regulatory", "verification"), ("Glossary", "reference"),
+                      ("Quantities", "reference")):
+        _tc = _wbo[_nm].sheet_properties.tabColor
+        _rgb = str(getattr(_tc, "rgb", "") or "")
+        if not _rgb.endswith(_TAB_GROUP_COLOUR[_grp]):
+            print(f"  FAIL strip-colour: {_nm!r} must carry the {_grp} group colour "
+                  f"{_TAB_GROUP_COLOUR[_grp]} (got {_rgb!r})"); bad += 1
+    # (B2) QUALITY & AUDIT: ONE merged tab, the verdict rendered exactly ONCE (fix 2)
+    _save_vc = list(_VERDICT_CELLS); _save_v = dict(_VERDICT)
+    try:
+        class _StubFinding:
+            severity, check, message, actual, expected = "HIGH", "c1", "broken thing", "1", "2"
+        class _StubReport:
+            def scorecard(self):
+                return {"high": 1, "med": 0, "low": 0, "total": 1, "verdict": "FAIL", "ship_ok": False}
+            def by_tab(self):
+                return {"Cost waterfall": [_StubFinding()]}
+        _qstate = {"selfAudit": {"min_score": 6, "mean_score": 7.5, "sections": [
+                       {"name": "bom", "score": 6, "blocking": True, "defects": ["under-priced"]},
+                       {"name": "drawings", "score": 9, "defects": []}]},
+                   "tabScorecard": {"Brief": {"score": 9, "status": "PASS", "issues": []}},
+                   "tabScorecardSummary": {"min_tab": "Brief", "min_score": 9,
+                                           "fail_tabs": [], "unscored_tabs": []}}
+        _VERDICT_CELLS.clear(); _VERDICT.clear()
+        _VERDICT.update(compute_verdict(_qstate, _qstate["tabScorecard"]))
+        _wbq = Workbook(); _wbq.remove(_wbq.active)
+        tab_quality_audit(_wbq, _qstate, "", _StubReport())
+        if "Quality & Audit" not in _wbq.sheetnames or "⭐ Scorecard" in _wbq.sheetnames \
+                or "⚠ Audit" in _wbq.sheetnames:
+            print("  FAIL quality-merge: ONE 'Quality & Audit' sheet must replace the two old tabs"); bad += 1
+        else:
+            _wsq = _wbq["Quality & Audit"]
+            _txts = [str(c.value) for row_ in _wsq.iter_rows() for c in row_
+                     if isinstance(c.value, str)]
+            _nverd = sum(1 for v in _txts if v.startswith("VERDICT:"))
+            if _nverd != 1:
+                print(f"  FAIL quality-merge: the ONE verdict must render exactly ONCE on the "
+                      f"merged tab (got {_nverd})"); bad += 1
+            for _need in ("MIN section score", "Per-tab quality", "Deterministic ship-gate audit",
+                          "broken thing", "BENCHMARK NET"):
+                if not any(_need in v for v in _txts):
+                    print(f"  FAIL quality-merge: merged tab must carry {_need!r}"); bad += 1
+            if sum(1 for (_t, _r, _c, _s, _sf) in _VERDICT_CELLS if _t == "Quality & Audit") != 1:
+                print("  FAIL quality-merge: exactly ONE verdict cell registered for re-stamping"); bad += 1
+    finally:
+        _VERDICT_CELLS.clear(); _VERDICT_CELLS.extend(_save_vc)
+        _VERDICT.clear(); _VERDICT.update(_save_v)
+    # (B3) PROCESS SCHEDULES: the duplicated line blocks are GONE (self-loop + misfiled
+    # signal-cable rows with them), replaced by a pointer to Line & velocity; the valve
+    # list + instrument index still render (fix 3)
+    with _tfB.TemporaryDirectory() as _tdp:
+        os.makedirs(os.path.join(_tdp, "drawings"))
+        with open(os.path.join(_tdp, "drawings", "process-schedules.md"), "w") as _fh:
+            _fh.write(
+                "# PROCESS SCHEDULES\n\n## 1 · LINE LIST\n\n"
+                "| Line no. | From | To | Service | Fluid |\n|---|---|---|---|---|\n"
+                "| `201-PR` | P-106 | P-106 | PR | Process fluid |\n"
+                "| `202-PR` | P-106 | V-104 | PR | Process fluid |\n"
+                "| `224-PR` | X-901 | X-904 | Instrument signal cable 4-20mA | Process fluid |\n\n"
+                "## 2 · VALVE LIST\n\n| Tag | Type | Size |\n|---|---|---|\n"
+                "| XV-201 | Ball | DN65 |\n\n"
+                "## 3 · INSTRUMENT INDEX\n\n| Tag | Type | Range |\n|---|---|---|\n"
+                "| LT-201 | Level | 0-5 m |\n")
+        _wbps = Workbook(); _wbps.remove(_wbps.active)
+        _made = tab_process_schedules(_wbps, _tdp)
+        _wsps = _wbps["Process schedules"]
+        _pcells = [str(c.value) for row_ in _wsps.iter_rows() for c in row_ if c.value]
+        if _made < 3:
+            print(f"  FAIL proc-sched: pointer + valve + instrument sections expected (made={_made})"); bad += 1
+        if any("P-106" in v for v in _pcells) or any("4-20mA" in v for v in _pcells):
+            print("  FAIL proc-sched: the duplicated line rows (incl. the P-106 self-loop + the "
+                  "misfiled 4-20mA signal rows) must NOT render"); bad += 1
+        if not any("see the 'Line & velocity' tab" in v for v in _pcells):
+            print("  FAIL proc-sched: the 3-line pointer to Line & velocity must render"); bad += 1
+        _lkc = next((c for row_ in _wsps.iter_rows() for c in row_
+                     if str(c.value) == "→ Line & velocity"), None)
+        if _lkc is None or not _lkc.hyperlink or "Line & velocity" not in str(_lkc.hyperlink.target):
+            print("  FAIL proc-sched: the pointer must HYPERLINK to the Line & velocity tab"); bad += 1
+        if not any("XV-201" in v for v in _pcells) or not any("LT-201" in v for v in _pcells):
+            print("  FAIL proc-sched: the valve list + instrument index must still render"); bad += 1
+    # (B4) ELECTRICAL: drawing on top + schedule below on ONE sheet, with the one-dataset
+    # convention footnote (fix 4)
+    with _tfB.TemporaryDirectory() as _tde:
+        os.makedirs(os.path.join(_tde, "drawings"))
+        from PIL import Image as _PILImgE
+        _PILImgE.new("RGB", (10, 6), (10, 10, 200)).save(
+            os.path.join(_tde, "drawings", "single-line-diagram.png"))
+        with open(os.path.join(_tde, "drawings", "panel-schedule.md"), "w") as _fh:
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE\n\n## MAIN BOARD\n\n"
+                "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | "
+                "Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "| W1 | Pump A | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n")
+        _wbe = Workbook(); _wbe.remove(_wbe.active)
+        _emb_e = tab_electrical(_wbe, _tde)
+        if not _emb_e or _emb_e[0][0] != "Electrical" \
+                or "single-line-diagram" not in os.path.basename(_emb_e[0][1]):
+            print(f"  FAIL electrical: the embedded single-line source must register for the "
+                  f"Drawings-register preview link (got {_emb_e})"); bad += 1
+        _wse = _wbe["Electrical"]
+        if len(_wse._images) != 1:
+            print(f"  FAIL electrical: the single-line drawing must embed ON the merged tab "
+                  f"(got {len(_wse._images)} images)"); bad += 1
+        _ecells = [str(c.value) for row_ in _wse.iter_rows() for c in row_ if c.value]
+        if not any("the schedule governs" in v for v in _ecells):
+            print("  FAIL electrical: the one-dataset convention footnote must render"); bad += 1
+        _w1r = next((c.row for row_ in _wse.iter_rows() for c in row_ if c.value == "W1"), None)
+        _anch = _wse._images[0].anchor if _wse._images else "A0"
+        _imgr = (int(re.sub(r"[A-Z]+", "", _anch)) if isinstance(_anch, str)
+                 else int(_anch._from.row) + 1)
+        if _w1r is None or _w1r <= _imgr:
+            print(f"  FAIL electrical: the schedule (W1 @ row {_w1r}) must render BELOW the "
+                  f"drawing (anchored @ row {_imgr})"); bad += 1
+    # (B5) BoM OUTLINE: ↳ children grouped under their parent at outlineLevel 1, collapsed;
+    # principals + the columns stay visible (fix 5)
+    with _tfB.TemporaryDirectory() as _tdb:
+        _bstate = {"requirementsBom": [
+            {"tag": "P-1", "requirement": "Transfer Pump · 4 kW", "qty": 1,
+             "unit_gbp": 1000, "line_gbp": 1000, "basis": "rating-based", "material": "316L"},
+            {"tag": "P-1.1", "requirement": "↳ drive motor · 4 kW", "qty": 1,
+             "unit_gbp": 0, "line_gbp": 0},
+            {"tag": "P-1.2", "requirement": "↳ baseplate", "qty": 1, "unit_gbp": 0, "line_gbp": 0},
+            {"tag": "TK-1", "requirement": "Water Tank · 2 m", "qty": 1,
+             "unit_gbp": 500, "line_gbp": 500, "basis": "take-off", "material": "HDPE"},
+        ]}
+        _wbb = Workbook(); _wbb.remove(_wbb.active)
+        tab_bom(_wbb, _bstate, _tdb)
+        _wsb = _wbb[_LEDGER_SHEET]
+        _ch1, _ch2 = _wsb.row_dimensions[6], _wsb.row_dimensions[7]
+        if _ch1.outline_level != 1 or not _ch1.hidden or _ch2.outline_level != 1 or not _ch2.hidden:
+            print("  FAIL bom-outline: ↳ child rows must sit at outlineLevel 1, hidden "
+                  f"(got lvl {_ch1.outline_level}/{_ch2.outline_level}, "
+                  f"hidden {_ch1.hidden}/{_ch2.hidden})"); bad += 1
+        if not _wsb.row_dimensions[5].collapsed:
+            print("  FAIL bom-outline: the parent principal row must carry the collapsed toggle"); bad += 1
+        if _wsb.sheet_properties.outlinePr.summaryBelow is not False:
+            print("  FAIL bom-outline: summaryBelow must be False (the parent sits ABOVE its group)"); bad += 1
+        _tk = _wsb.row_dimensions[8]
+        if _tk.outline_level or _tk.hidden:
+            print("  FAIL bom-outline: a principal row must stay visible at level 0"); bad += 1
+        for _clx in "FGHIJKLMNO":
+            _cdx = _wsb.column_dimensions[_clx]
+            if _cdx.hidden or _cdx.outline_level:
+                print(f"  FAIL bom-outline: column {_clx} must stay VISIBLE (rows group, "
+                      f"columns never hide — the standing rule)"); bad += 1
+    # (B6) CHECKS DIET: the per-line tautologies collapse into 2 aggregate LIVE invariants
+    # + an exceptions list; a mismatching line still renders individually and counts (fix 6)
+    with _tfB.TemporaryDirectory() as _tdc:
+        _ckstate = {"requirementsBom": [
+            {"tag": "A-1", "requirement": "Pump", "qty": 2, "unit_gbp": 100, "line_gbp": 200},
+            {"tag": "A-2", "requirement": "Tank", "qty": 1, "unit_gbp": 300, "line_gbp": 300},
+            {"tag": "A-3", "requirement": "Filter", "qty": 3, "unit_gbp": 50, "line_gbp": 150},
+            {"tag": "A-BAD", "requirement": "Mixer", "qty": 2, "unit_gbp": 100, "line_gbp": 900},
+        ]}
+        with open(os.path.join(_tdc, "parts-ledger.json"), "w") as _fh:
+            json.dump({"equipment": [{"tag": "A-1", "line_gbp": 200, "subcomponents": 2,
+                                      "subcomponent_gbp": 200}]}, _fh)
+        _wbc = Workbook(); _wbc.remove(_wbc.active)
+        _fc = tab_checks(_wbc, _ckstate, _tdc)
+        _wsc = _wbc["⚠ Checks"]
+        _ccells = {(c.row, c.column): str(c.value) for row_ in _wsc.iter_rows()
+                   for c in row_ if c.value is not None}
+        _colA = [v for (rr, cc), v in _ccells.items() if cc == 1]
+        _n_perline = sum(1 for v in _colA if _PERLINE_UNITQTY_RX.match(v))
+        if _n_perline != 1 or not any(v.startswith("BoM A-BAD:") for v in _colA):
+            print(f"  FAIL checks-diet: ONLY the mismatching line renders individually "
+                  f"(got {_n_perline} per-line row(s): "
+                  f"{[v for v in _colA if v.startswith('BoM ')]})"); bad += 1
+        _aggq = next((v for v in _colA if v.startswith("All 3 BoM lines: unit £ × qty")), None)
+        _aggs = next((v for v in _colA if v.startswith("All 1 BoM lines: Σ sub-component")), None)
+        if not _aggq or not _aggs:
+            print(f"  FAIL checks-diet: the TWO aggregate invariants must render "
+                  f"(unit×qty: {_aggq!r}; Σsub: {_aggs!r})"); bad += 1
+        else:
+            _aggr = next(rr for (rr, cc), v in _ccells.items() if cc == 1 and v == _aggq)
+            _bf = _ccells.get((_aggr, 2), "")
+            _sf = _ccells.get((_aggr, 6), "")
+            if not (_bf.startswith("=SUM($T$") and _sf.startswith("=IF(B")):
+                print(f"  FAIL checks-diet: the aggregate must be LIVE (ACTUAL {_bf!r}, "
+                      f"STATUS {_sf!r})"); bad += 1
+            _flags = [v for (rr, cc), v in _ccells.items() if cc == 20 and v.startswith("=IF(ABS(")]
+            if len(_flags) != 4:   # 3 unit×qty lines + 1 Σsub line collapse into the DATA block
+                print(f"  FAIL checks-diet: expected 4 live per-line flags in the DATA block "
+                      f"cols P–T (got {len(_flags)})"); bad += 1
+        # the CLI fail-count is untouched by the diet: A-BAD is the one CONSISTENCY fail here
+        _cli_fails = [c for c in dcl.run_all_checks(_tdc, _ckstate) if c.status == dcl.FAIL]
+        if _fc != len(_cli_fails):
+            print(f"  FAIL checks-diet: tab fail-count {_fc} must equal the CLI's "
+                  f"{len(_cli_fails)}"); bad += 1
+
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
@@ -11988,4 +12707,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # DETERMINISM (Bundle B): pin the interpreter hash seed BEFORE any work, so set/dict
+    # iteration order in the repair/audit path cannot flap the scorecard between two
+    # builds of the same run (the #86 treadmill's exporter-side symptom: the physics-HIGH
+    # count flip-flopped 4↔5 run-to-run purely on the process hash seed). PYTHONHASHSEED
+    # only takes effect at interpreter start, hence the one-shot re-exec.
+    if os.environ.get("PYTHONHASHSEED") is None:
+        os.environ["PYTHONHASHSEED"] = "0"
+        os.execv(sys.executable, [sys.executable] + sys.argv)
     main()
