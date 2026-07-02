@@ -42,6 +42,121 @@ _DRY_ANCILLARY_RE = re.compile(
 _TANK_RE = re.compile(
     r"rearing[_ ]?tank|grow[_ ]?out|fish[_ ]?tank|culture[_ ]?tank|nursery[_ ]?tank", re.I)
 
+# ── SERVICE-DOMAIN COMPATIBILITY (2026-07-02, the v55 "Fresh Water Tank → Mains Incomer
+# [water]" fix) ─────────────────────────────────────────────────────────────────────────
+# SWITCHING / PROTECTION / CONTROL gear NEVER carries process fluid: an incomer,
+# switchboard, busbar, MCC, distribution board, breaker, control panel, PLC/SCADA. A fluid
+# (water/thermal/air/oxygen) edge terminating on one is a corrupt tie — v55's cross-module
+# augmenter picked 'Mains Incomer' as a module representative and routed the 90 m³/h recirc
+# main INTO the electrical incomer (shipped on the Connection trace as 'Mains Incomer |
+# Inputs ← Fresh Water Tank | Services: power, water'). DELIBERATELY EXCLUDED from this
+# classifier: power-CONVERSION gear that legitimately takes liquid cooling (transformer /
+# inverter / rectifier / PCS / UPS / generator — a BESS coolant loop to a PCS is real).
+# Universal — electrical-gear vocabulary, no class table. The new connection-sanity gate
+# (drawing_gates) uses this SAME classifier, so authoring rule and gate stay in lock-step.
+SWITCH_CONTROL_GEAR_RE = re.compile(
+    r"incomer|switchboard|switchgear|busbar|\bmcc\b|motor[ _-]?control[ _-]?cent|"
+    r"distribution[ _-]?(?:board|panel)|circuit[ _-]?breaker|"
+    r"control[ _-]?(?:panel|cabinet|room)|\bplc\b|scada|\bdcs\b|\brtu\b|\bhmi\b|"
+    r"protection[ _-]?relay|metering[ _-]?(?:panel|cubicle)|electrical[ _-]?(?:panel|cabinet)", re.I)
+
+# A pure STORAGE vessel takes NO power feed (its heater / agitator / dosing skid is a
+# separate powered part). Used by the gate's reverse check (power edge into a tank). A
+# storage name carrying a powered-internals qualifier is exempt.
+PURE_STORAGE_RE = re.compile(r"\b(?:tank|reservoir|storage|silo|cistern)\b", re.I)
+POWERED_INTERNALS_RE = re.compile(
+    r"heat|agitat|mix|stir|immersion|trace|chill|refriger|aerat|dosing|pump", re.I)
+
+_FLUID_SERVICES = ("water", "thermal", "air", "oxygen")
+
+
+def _norm_name(s):
+    """Case/punctuation-insensitive part-name key (self-loop + merged-tag comparison)."""
+    return re.sub(r"[^a-z0-9]+", "", str(s or "").lower())
+
+
+# ── FLOW-UNIT CANONICALISATION (2026-07-02, the v55 phantom 300,000 m³/h fix) ──────────
+# The cross-module / service-tie augmenters scrape `loop_flow` from the authored fluid
+# edges (which carry m³/h since the daed1aeab/9f07f8a71 flow joins) but stamp the minted
+# edge `required_unit = 'm³/s'` — so a 90 m³/h loop flow ships as 90 m³/s = 324,000 m³/h
+# (v55: 6 parallel DN300 runs @ 205.6 m/s @ 9,477 bar, £152k phantom pipe, 132.6 GW
+# parasitic pump power). finalize_ledger is the choke point every candidate edge flows
+# through, so the ledger AUTHORITY canonicalises here: an edge whose stated flow exceeds
+# the plant's own demand ceiling (max contract flow qty × FLOW_CEILING_FACTOR) while the
+# BARE magnitude fits the m³/h demand family is a mis-stamped unit → re-stamp m3/h with
+# provenance. A flow implausible under EITHER reading is never rescaled (no fabrication) —
+# it is marked `_flow_implausible` for the connection-sanity gate to FAIL.
+_VOL_FLOW_TO_M3H = {
+    "m3/h": 1.0, "m³/h": 1.0, "m3h": 1.0, "m^3/h": 1.0, "m3/hr": 1.0, "m³/hr": 1.0,
+    "m3/s": 3600.0, "m³/s": 3600.0, "m3s": 3600.0, "m^3/s": 3600.0,
+    "l/s": 3.6, "lps": 3.6, "l/min": 0.06, "lpm": 0.06, "l/h": 0.001, "lph": 0.001,
+}
+FLOW_CEILING_FACTOR = 5.0   # a single line may carry a combined header, never 5× the
+                            # largest demand the contract states anywhere on the plant
+
+
+def plant_flow_ceiling_m3h(quantities):
+    """The plant's own demand-family ceiling: max over the contract's flow-suffixed
+    quantities (m³/h), or None when the contract states no flow anywhere."""
+    if not quantities:
+        return None
+    best = None
+    for k in quantities:
+        if any(k.endswith(suf) for suf in _FLOW_QTY_SUFFIXES):
+            v = _qty_num(quantities.get(k))
+            if v is not None and v > 0 and (best is None or v > best):
+                best = v
+    return best
+
+
+def canonicalise_flow_units(edges, quantities, log=print):
+    """In-place unit sanity for FLUID edges (see block comment above). Returns
+    (n_corrected, n_implausible). No-op without a stated plant flow ceiling."""
+    ceiling = plant_flow_ceiling_m3h(quantities)
+    if ceiling is None:
+        return (0, 0)
+    limit = ceiling * FLOW_CEILING_FACTOR
+    n_fix = n_bad = 0
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        svc = e.get("_ledger_service") or _service_of(e.get("mechanism"))
+        if svc not in ("water", "thermal"):
+            continue
+        v = _qty_num(e.get("required_value"))
+        if v is None or v <= 0:
+            continue
+        unit = str(e.get("required_unit") or "").strip().lower()
+        factor = _VOL_FLOW_TO_M3H.get(unit)
+        if factor is None:
+            continue    # not a volumetric flow rating (or no unit) — not ours to judge
+        flow_m3h = v * factor
+        if flow_m3h <= limit:
+            continue    # plausible as stated
+        if factor != 1.0 and v <= limit:
+            # the BARE magnitude fits the plant's m³/h demand family — the unit stamp is
+            # the corruption (an augmenter copied an m³/h loop flow and wrote m³/s).
+            e["required_unit"] = "m3/h"
+            e["_unit_corrected_basis"] = (
+                f"unit re-stamped {unit}→m3/h: {v:g} {unit} = {flow_m3h:g} m³/h exceeds "
+                f"the plant demand ceiling {ceiling:g} m³/h × {FLOW_CEILING_FACTOR:g}, while "
+                f"{v:g} m³/h fits the contract's own demand family")
+            n_fix += 1
+        else:
+            e["_flow_implausible"] = (
+                f"{v:g} {unit or '?'} = {flow_m3h:g} m³/h exceeds the plant demand ceiling "
+                f"{ceiling:g} m³/h × {FLOW_CEILING_FACTOR:g} under every unit reading")
+            n_bad += 1
+    if n_fix:
+        log(f"[ledger] flow-unit canonicalisation: {n_fix} fluid edge(s) re-stamped to m3/h "
+            f"(magnitude matched the plant demand family; the stated unit exceeded the "
+            f"ceiling {ceiling:g} m³/h × {FLOW_CEILING_FACTOR:g})")
+    if n_bad:
+        log(f"[ledger] flow-unit canonicalisation: ✗ {n_bad} fluid edge(s) carry an "
+            f"IMPLAUSIBLE flow under every unit reading — marked _flow_implausible "
+            f"(the connection-sanity gate fails on these)")
+    return (n_fix, n_bad)
+
 
 def _service_of(mech):
     """Map an edge mechanism → the SERVICE it carries (power / signal / water / thermal
@@ -225,8 +340,22 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
         # canonical endpoint names: a resolved part's name, else the (abstract) tag text.
         a_name = pa.name if pa is not None else frm
         b_name = pb.name if pb is not None else to
-        if a_name == b_name:
+        # SELF-LOOP — compared on the NORMALISED name (case/punctuation-insensitive), so a
+        # 'Cip Tank' → 'cip_tank' slug/alias pair is caught, not only the exact-string match
+        # (v55 shipped a 'Cip Tank → Cip Tank' row on the Connection trace).
+        if _norm_name(a_name) == _norm_name(b_name):
             dropped.append((a_name, b_name, mech, "self-loop"))
+            continue
+
+        # SERVICE-DOMAIN COMPATIBILITY — a fluid edge may not terminate on switching /
+        # protection / control gear (and the gate checks the reverse: power into a pure
+        # storage vessel). v55: 'Fresh Water Tank → Mains Incomer [water]'. Power-conversion
+        # gear that takes liquid cooling (transformer/inverter/PCS/UPS/generator) is NOT in
+        # the classifier, so a BESS coolant loop is untouched.
+        if svc in _FLUID_SERVICES and (
+                SWITCH_CONTROL_GEAR_RE.search(a_name) or SWITCH_CONTROL_GEAR_RE.search(b_name)):
+            dropped.append((a_name, b_name, mech,
+                            "service-domain mismatch (fluid line on electrical/control gear)"))
             continue
 
         # 2) NO SPURIOUS WATER/THERMAL TIE for parts that don't carry process water.
@@ -272,6 +401,11 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
     # per-part contract quantities), covering contract + every closer-minted fluid edge.
     if quantities:
         join_flow_demands(final, quantities, log=log)
+        # FLOW-UNIT CANONICALISATION — an authored/augmented rating whose stated unit puts
+        # it orders of magnitude over the plant's own demand ceiling is a mis-stamped unit
+        # (the v55 90 m³/h → '90 m³/s' → 324,000 m³/h phantom); re-stamp when the bare
+        # magnitude fits the demand family, else mark _flow_implausible for the gate.
+        canonicalise_flow_units(final, quantities, log=log)
 
     if dropped:
         from collections import Counter
@@ -280,7 +414,9 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
             f"{len(dropped)} candidate(s) dropped ("
             + ", ".join(f"{n} {r}" for r, n in reasons.most_common()) + ")")
         for d in dropped:
-            if d[3] in ("both-endpoints-unresolved", "dry-ancillary water/thermal tie to tank"):
+            if d[3] in ("both-endpoints-unresolved", "dry-ancillary water/thermal tie to tank",
+                        "service-domain mismatch (fluid line on electrical/control gear)",
+                        "self-loop"):
                 log(f"[ledger]   dropped {d[0]} -> {d[1]} [{d[2]}]: {d[3]}")
     return final, dropped
 
@@ -1070,6 +1206,12 @@ def ledger_rows(final_topology):
             "material_context": e.get("material_context"),
             "source": "contract" if not e.get("_augmented") else "completion",
         })
+        # unit-canonicalisation provenance — only present when the ledger acted, so the
+        # row shape (and every prior run's artifact) is otherwise byte-identical.
+        if e.get("_unit_corrected_basis"):
+            rows[-1]["unit_corrected"] = e.get("_unit_corrected_basis")
+        if e.get("_flow_implausible"):
+            rows[-1]["flow_implausible"] = e.get("_flow_implausible")
     return rows
 
 
@@ -1254,6 +1396,79 @@ def _selftest():
     rws = ledger_rows(fj)
     assert rws[0]["required_value"] == 120 and "rotary_drum_filter_throughput_m3_h" in rws[0]["required_basis"], \
         f"ledger_rows must carry required_value + required_basis; got {rws[0]}"
+
+    # ── SERVICE-DOMAIN COMPATIBILITY + SELF-LOOP + FLOW-UNIT CANONICALISATION ──────────
+    # (2026-07-02, the v55 scrambled-graph proveCatch — each case reproduces a SHIPPED v55
+    #  defect and must be caught; the clean counter-cases must pass untouched.)
+    dparts = [_P("Fresh Water Tank"), _P("Mains Incomer"), _P("Cip Tank"),
+              _P("PCS Inverter Module"), _P("Gac Softener")]
+
+    def dresolve(name, parts):
+        for p in parts:
+            if p.name.lower() == str(name or "").lower():
+                return p
+        return None
+
+    dtopo = [
+        # v55 shipped: WATER routed INTO the electrical incomer → must DROP
+        {"from_part": "Fresh Water Tank", "to_part": "Mains Incomer", "mechanism": "fluid_loop"},
+        # carve-out: liquid COOLING of power-CONVERSION gear is real (BESS PCS loop) → KEPT
+        {"from_part": "Fresh Water Tank", "to_part": "PCS Inverter Module", "mechanism": "fluid_coolant"},
+        # v55 shipped: 'Cip Tank → Cip Tank' — normalised self-loop (slug alias) → must DROP
+        {"from_part": "Cip Tank", "to_part": "cip_tank", "mechanism": "fluid_loop"},
+        # clean process edge → KEPT
+        {"from_part": "Fresh Water Tank", "to_part": "Gac Softener", "mechanism": "fluid_loop"},
+    ]
+    dfinal, ddropped = finalize_ledger(dtopo, dparts, dresolve, log=lambda *a: None)
+    dpairs = {(e["from_part"], e["to_part"]) for e in dfinal}
+    dreasons = {(d[0], d[1]): d[3] for d in ddropped}
+    assert dreasons.get(("Fresh Water Tank", "Mains Incomer")) == \
+        "service-domain mismatch (fluid line on electrical/control gear)", \
+        f"water into the electrical incomer must be dropped; got {ddropped}"
+    assert ("Fresh Water Tank", "PCS Inverter Module") in dpairs, \
+        "coolant to power-CONVERSION gear (PCS) must be KEPT (the BESS carve-out)"
+    assert dreasons.get(("Cip Tank", "cip_tank")) == "self-loop", \
+        f"a normalised self-loop (name vs slug alias) must be dropped; got {ddropped}"
+    assert ("Fresh Water Tank", "Gac Softener") in dpairs, "the clean process edge survives"
+
+    # canonicalise_flow_units — the 90 m³/h → '90 m³/s' phantom (324,000 m³/h) is re-stamped;
+    # a flow implausible under EVERY reading is marked (never rescaled); sane edges untouched.
+    cq = {"irrigation_pump_flow_m3_h": 90}     # plant ceiling 90 m³/h → limit 450
+    cedges = [
+        {"from_part": "A", "to_part": "B", "mechanism": "fluid_loop",
+         "required_value": 90, "required_unit": "m³/s"},        # v55 main-loop mis-stamp
+        {"from_part": "C", "to_part": "D", "mechanism": "fluid_loop",
+         "required_value": 1.35, "required_unit": "m³/s"},      # v55 service-tie mis-stamp
+        {"from_part": "E", "to_part": "F", "mechanism": "fluid_loop",
+         "required_value": 90000, "required_unit": "m3/h"},     # implausible under any reading
+        {"from_part": "G", "to_part": "H", "mechanism": "fluid_loop",
+         "required_value": 14.5, "required_unit": "m3/h"},      # sane — untouched
+        {"from_part": "I", "to_part": "J", "mechanism": "electrical_bus",
+         "required_value": 4000, "required_unit": "A"},         # non-fluid — untouched
+    ]
+    nfix, nbad = canonicalise_flow_units(cedges, cq, log=lambda *a: None)
+    assert (nfix, nbad) == (2, 1), f"expected 2 corrected + 1 implausible, got {(nfix, nbad)}"
+    assert cedges[0]["required_unit"] == "m3/h" and "re-stamped" in cedges[0]["_unit_corrected_basis"], \
+        f"90 m³/s must be re-stamped to 90 m3/h with provenance; got {cedges[0]}"
+    assert cedges[1]["required_unit"] == "m3/h", "the 1.35 m³/s service tie is re-stamped too"
+    assert "_flow_implausible" in cedges[2] and cedges[2]["required_value"] == 90000, \
+        "an implausible flow is MARKED, never rescaled (no fabrication)"
+    assert cedges[3]["required_unit"] == "m3/h" and "_unit_corrected_basis" not in cedges[3], \
+        "a sane in-ceiling flow is untouched"
+    assert cedges[4]["required_unit"] == "A", "a non-fluid rating is untouched"
+    # no flow quantity anywhere (a BESS-like contract) → strict no-op
+    assert canonicalise_flow_units([dict(cedges[0])], {"battery_capacity_kwh": 5000},
+                                   log=lambda *a: None) == (0, 0), \
+        "with no stated plant flow the canonicaliser must be a no-op (BESS byte-identity)"
+    # finalize integration: the mis-stamped unit is corrected AT THE CHOKE POINT and the
+    # ledger row discloses the correction.
+    itopo = [{"from_part": "Fresh Water Tank", "to_part": "Gac Softener",
+              "mechanism": "fluid_loop", "constraint_kind": "flow_capacity",
+              "required_value": 90, "required_unit": "m³/s"}]
+    ifinal, _ = finalize_ledger(itopo, dparts, dresolve, log=lambda *a: None, quantities=cq)
+    irow = ledger_rows(ifinal)[0]
+    assert irow["required_unit"] == "m3/h" and "re-stamped" in (irow.get("unit_corrected") or ""), \
+        f"finalize_ledger must canonicalise the unit and disclose it on the row; got {irow}"
 
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "

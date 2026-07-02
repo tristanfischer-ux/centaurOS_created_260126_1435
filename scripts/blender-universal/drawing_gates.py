@@ -22,6 +22,15 @@ connection-schedule.json + route-manifest.json + parts-manifest.json + the rende
   G6 NO STRAY BEAM     no routed CABLE run spans the plant as one overhead beam (≤16 m plan span)
   G7 SITE UTILISATION  plant hull ÷ deck area ≥ 0.45 (parts-manifest `site` block) — the deck
                        must hug the plant, not strand it in a corner (v52 measured 0.33)
+  G8 CONNECTION SANITY (v55 scrambled-graph net, 2026-07-02) the connection graph must be
+                       PHYSICALLY coherent, not merely referentially intact: (a) a fluid edge
+                       may not terminate on switching/protection/control gear and a power feed
+                       may not terminate on a pure storage vessel (service-domain, keyed on the
+                       ledger's OWN classifier); (b) no self-loops (normalised names); (c) no
+                       edge may carry a flow above the plant's own demand ceiling (max contract
+                       flow qty × 5 — a 90 m³/h plant cannot carry a 300,000 m³/h line); (d) an
+                       aggregate supply-demand quantity must reconcile against the connected
+                       electrical load within ×10 (v55 shipped 132,599,650 kW on a 53 kW plant)
 
 Each gate maps to the drawing(s) it scores. The scorecard is per-drawing (the worst failing gate sets
 the drawing's verdict) + an overall ALL-PASS gate. Universal — keyed on the contract + manifests, never
@@ -138,6 +147,130 @@ def _rows(d):
             if isinstance(d.get(k), list):
                 return d[k]
     return []
+
+
+# ── G8 CONNECTION SANITY (2026-07-02, the v55 scrambled-graph deterministic net) ─────────
+# v55 shipped 86 connections all reading 'OK' because the existing trace gates check
+# referential integrity, never PHYSICAL coherence: water was routed INTO the Mains Incomer,
+# the Connection trace carried a 'Cip Tank → Cip Tank' self-loop, and a 90 m³/h plant carried
+# six parallel DN300 runs rated '90 m³/s' (= 324,000 m³/h) @ 205.6 m/s — cascading into
+# total_supply_demand_kw = 132,599,650 kW on a 53 kW plant (the 132.6 GW cover + 201 MA
+# busbar). The checks are keyed on connection_ledger's OWN classifiers so the authoring rule
+# and this gate can never drift apart.
+
+def _cl_mod():
+    """Lazy sibling import of connection_ledger (pure, stdlib-only — the classifiers)."""
+    try:
+        import connection_ledger
+        return connection_ledger
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import connection_ledger
+            return connection_ledger
+        except ImportError:
+            return None
+
+
+# an aggregate supply demand (plant load + distribution parasitic) can sit above the
+# connected load, but never an order of magnitude above it — beyond this it is a phantom
+# artefact (v55: ×2,501,880), not a design output.
+AGG_SUPPLY_DEMAND_FACTOR = 10.0
+
+_RATING_FLOW_RE = re.compile(
+    r"([\d,]+(?:\.\d+)?)\s*(m³/s|m3/s|m\^3/s|m³/h|m3/h|m\^3/h|l/s|l/min|l/h)", re.I)
+
+
+def connection_sanity_findings(ledger_rows, schedule_rows, quantities):
+    """PURE check — list of finding strings (empty = sane). See the G8 doc block above."""
+    cl = _cl_mod()
+    if cl is None:
+        return []
+    findings = []
+
+    def _svc(r):
+        return str(r.get("service") or r.get("_ledger_service") or "").lower()
+
+    def _ends(r):
+        return (str(r.get("from_part") or r.get("from") or ""),
+                str(r.get("to_part") or r.get("to") or ""))
+
+    # (a) SERVICE-DOMAIN — fluid on switch/control gear; power into a pure storage vessel
+    for r in ledger_rows or []:
+        if not isinstance(r, dict):
+            continue
+        a, b = _ends(r)
+        svc = _svc(r)
+        if svc in cl._FLUID_SERVICES:
+            for nm in (a, b):
+                if nm and cl.SWITCH_CONTROL_GEAR_RE.search(nm):
+                    findings.append(f"fluid[{svc}] edge on electrical/control gear: {a} → {b}")
+                    break
+        elif svc == "power":
+            if (b and cl.PURE_STORAGE_RE.search(b)
+                    and not cl.POWERED_INTERNALS_RE.search(b)):
+                findings.append(f"power feed into a pure storage vessel: {a} → {b}")
+
+    # (b) SELF-LOOPS — normalised names, on the ledger AND the sized schedule
+    for src, rows in (("ledger", ledger_rows), ("schedule", schedule_rows)):
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            a, b = _ends(r)
+            if a and b and cl._norm_name(a) == cl._norm_name(b):
+                findings.append(f"self-loop ({src}): {a} → {b}")
+
+    # (c) PER-EDGE FLOW CEILING — the plant's own demand family bounds every line
+    ceiling = cl.plant_flow_ceiling_m3h(quantities or {})
+    if ceiling:
+        limit = ceiling * cl.FLOW_CEILING_FACTOR
+        for r in ledger_rows or []:
+            if not isinstance(r, dict):
+                continue
+            if r.get("flow_implausible"):
+                a, b = _ends(r)
+                findings.append(f"implausible flow (ledger-marked): {a} → {b} — {r['flow_implausible']}")
+                continue
+            v = r.get("required_value")
+            unit = str(r.get("required_unit") or "").strip().lower()
+            factor = cl._VOL_FLOW_TO_M3H.get(unit)
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                continue
+            if factor and v * factor > limit:
+                a, b = _ends(r)
+                findings.append(f"flow over plant ceiling: {a} → {b} carries {v:g} {unit} = "
+                                f"{v * factor:g} m³/h > {ceiling:g} × {cl.FLOW_CEILING_FACTOR:g}")
+        for r in schedule_rows or []:
+            if not isinstance(r, dict):
+                continue
+            m = _RATING_FLOW_RE.search(str(r.get("rating") or ""))
+            if not m:
+                continue
+            v = float(m.group(1).replace(",", ""))
+            factor = cl._VOL_FLOW_TO_M3H.get(m.group(2).lower())
+            if factor and v * factor > limit:
+                a, b = _ends(r)
+                findings.append(f"sized run over plant ceiling: {a} → {b} rated "
+                                f"{m.group(0)} = {v * factor:g} m³/h > {ceiling:g} × "
+                                f"{cl.FLOW_CEILING_FACTOR:g}")
+
+    # (d) AGGREGATE SUPPLY-DEMAND RECONCILE — total_supply_demand_kw vs the connected load
+    def _qv(key):
+        v = (quantities or {}).get(key)
+        v = v.get("value") if isinstance(v, dict) else v
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+    supply = _qv("total_supply_demand_kw")
+    base = _qv("connected_electrical_load_kw") or _qv("total_electrical_demand_kw")
+    if supply and base and supply > base * AGG_SUPPLY_DEMAND_FACTOR:
+        findings.append(f"aggregate supply demand {supply:g} kW is ×{supply / base:,.0f} the "
+                        f"connected load {base:g} kW (limit ×{AGG_SUPPLY_DEMAND_FACTOR:g}) — "
+                        f"a phantom artefact, not a design output")
+    return findings
 
 
 def run_gates(out_dir: str) -> list:
@@ -319,6 +452,23 @@ def run_gates(out_dir: str) -> list:
                               f"= {_ratio:.2f} (floor {SITE_UTILISATION_MIN} — below it the plant "
                               f"sits in a corner of an empty deck)"))
 
+    # ── G8 CONNECTION SANITY — service-domain + self-loop + flow-ceiling + aggregate ──
+    ledg = _rows(_load("connection-ledger.json"))
+    if ledg:
+        qs = {}
+        for ck in ("orchestratorContract", "engineeringContract"):
+            _cand = (state.get(ck) or {}).get("quantities")
+            if isinstance(_cand, dict):
+                qs = _cand
+                break
+        f8 = connection_sanity_findings(ledg, conn, qs)
+        gates.append(Gate("connection_sanity",
+                          ["pid", "single-line-diagram", "process-schedules"],
+                          "high", len(f8) == 0,
+                          "connection graph physically coherent (domain + direction + magnitude)"
+                          if not f8 else
+                          f"{len(f8)} incoherent connection(s): " + " | ".join(f8[:4])))
+
     return gates
 
 
@@ -341,6 +491,7 @@ GATE_STAGE = {
     "qty_coverage": "contract qty-N replication + parts-manifest expansion",
     "no_stray_beam": "wire_ports tray demotion + draw_boundary_services (plant-crossing run → single-line/P&ID)",
     "site_utilisation": "deterministic_layout min-area fold + periphery row + ground-slab 3 m apron (the deck must hug the plant hull)",
+    "connection_sanity": "derive-topology role ranks (spine direction) + connection_ledger finalize (service-domain drop + flow-unit canonicalisation) + design-loop writeback reconcile bound",
 }
 
 
@@ -438,6 +589,57 @@ def _selftest() -> int:
     # severity: v52's 0.33 is a MED (fails, deck ~3× hull); a 0.20 (deck 5× hull) is a HIGH
     chk("site_util_severity_med", ("high" if 476 / 1466 < 0.30 else "med") == "med")
     chk("site_util_severity_high", ("high" if 300 / 1500 < 0.30 else "med") == "high")
+    # ── G8 connection sanity proveCatch — v55's REAL shipped rows must FIRE every check;
+    #    the corrected set must pass clean. (2026-07-02 scrambled-graph net.)
+    _v55_q = {"irrigation_pump_flow_m3_h": {"value": 90},
+              "connected_electrical_load_kw": {"value": 53},
+              "total_supply_demand_kw": {"value": 132599650.69}}   # the shipped 132.6 GW
+    _v55_ledger = [
+        # v55 row: WATER routed INTO the electrical incomer (service-domain)
+        {"from_part": "Fresh Water Tank", "to_part": "Mains Incomer", "service": "water",
+         "required_value": 90, "required_unit": "m3/h"},
+        # v55 Connection-trace self-loop
+        {"from_part": "Cip Tank", "to_part": "Cip Tank", "service": "water"},
+        # sane row — must not be flagged
+        {"from_part": "Ro High Pressure Pump", "to_part": "Ro Membrane Elements",
+         "service": "water", "required_value": 11, "required_unit": "m3/h"},
+    ]
+    _v55_sched = [
+        # v55 sized run: '90 m³/s' on a 90 m³/h plant (the 6×DN300 @ 205.6 m/s phantom)
+        {"from": "Fresh Water Tank", "to": "Permeate Outlet", "rating": "90 m³/s",
+         "size": "6×DN300", "drop": "205.576 m/s"},
+    ]
+    _f = connection_sanity_findings(_v55_ledger, _v55_sched, _v55_q)
+    chk("g8_fires_on_v55", len(_f) >= 4)   # domain + self-loop + flow + aggregate all fire
+    chk("g8_domain_fires", any("electrical/control gear" in x and "Mains Incomer" in x for x in _f))
+    chk("g8_selfloop_fires", any("self-loop" in x and "Cip Tank" in x for x in _f))
+    chk("g8_flow_ceiling_fires", any("over plant ceiling" in x and "m³/s" in x for x in _f))
+    chk("g8_aggregate_fires", any("phantom artefact" in x for x in _f))
+    chk("g8_sane_edge_not_flagged", not any("Ro Membrane Elements" in x for x in _f))
+    # the CORRECTED graph passes clean: pump feeds its membranes, sane units, reconciled load
+    _fix_q = {"irrigation_pump_flow_m3_h": {"value": 90},
+              "connected_electrical_load_kw": {"value": 53},
+              "total_supply_demand_kw": {"value": 55.1}}
+    _fix_ledger = [
+        {"from_part": "Uf Module Bank", "to_part": "Ro High Pressure Pump",
+         "service": "water", "required_value": 11, "required_unit": "m3/h"},
+        {"from_part": "Ro High Pressure Pump", "to_part": "Ro Membrane Elements",
+         "service": "water", "required_value": 11, "required_unit": "m3/h"},
+        {"from_part": "Main Switchboard", "to_part": "Irrigation Pump", "service": "power"},
+    ]
+    _fix_sched = [{"from": "Fresh Water Tank", "to": "Irrigation Pump", "rating": "90 m³/h",
+                   "size": "DN125"}]
+    chk("g8_pass_on_corrected", connection_sanity_findings(_fix_ledger, _fix_sched, _fix_q) == [])
+    # power feed into a HEATED tank is legitimate (powered-internals carve-out); into a pure
+    # storage tank it fires
+    chk("g8_power_to_pure_tank_fires", any("pure storage" in x for x in connection_sanity_findings(
+        [{"from_part": "Main Switchboard", "to_part": "Fresh Water Tank", "service": "power"}], [], {})))
+    chk("g8_power_to_heated_tank_ok", connection_sanity_findings(
+        [{"from_part": "Main Switchboard", "to_part": "Heated Cip Tank", "service": "power"}], [], {}) == [])
+    # coolant to power-CONVERSION gear is legitimate (the BESS PCS carve-out)
+    chk("g8_pcs_coolant_ok", connection_sanity_findings(
+        [{"from_part": "Coolant Manifold", "to_part": "PCS Inverter Module", "service": "water"}], [], {}) == [])
+
     # scorecard aggregation
     gs = [Gate("legibility", ["single-line-diagram"], "high", False, "x"),
           Gate("qty_coverage", ["pid"], "high", True, "y")]
@@ -450,7 +652,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print(f"[drawing-gates] selftest OK ({26} deterministic-gate invariants)")
+    print("[drawing-gates] selftest OK (38 deterministic-gate invariants incl. G8 connection-sanity proveCatch on v55)")
     return 0
 
 

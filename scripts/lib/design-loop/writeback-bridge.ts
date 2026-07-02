@@ -25,7 +25,18 @@ export interface QuantityUpdate {
   rel_change: number     // |to-from| / max(|from|, eps); 1 when `from` was null
   from_keys?: string[]   // TRACEABILITY SPINE: the upstream quantity keys this value was
                          // computed from (lineage.from), so the number is not born sourceless
+  unverified_artefact?: boolean // RECONCILE BOUND (2026-07-02): the converged aggregate does
+                         // NOT reconcile against the plant's connected load — it is recorded
+                         // in the loop ledger as an UNVERIFIED-ARTEFACT but NEVER written as
+                         // a design quantity (applyUpdates skips it; isSettled ignores it).
 }
+
+// An as-routed supply demand = plant load + distribution parasitic (pump friction + cable
+// I²R). Distribution losses are a FRACTION of the plant load — a converged total more than
+// this factor above the connected load is a phantom (v55: 132,599,650 kW on a 53 kW plant,
+// ×2.5 million, from a corrupted 90 m³/s edge flow), never a design output that may feed
+// cost / financial / drawings.
+export const SUPPLY_RECONCILE_FACTOR = 3
 
 export interface ConvergenceReport {
   base_demand_kw?: number
@@ -84,25 +95,46 @@ export function computeQuantityUpdates(
   //    avoids (a) overwriting the brief metric (connected_electrical_load_kw, which the prose +
   //    compliance cap reference) and (b) a false cap breach — so the writeback is purely additive
   //    and safe to apply without reordering the narrative.
+  // RECONCILE BOUND (2026-07-02, the v55 total_supply_demand_kw = 1.326e8 fix): the
+  // converged aggregate must reconcile against the plant's own connected electrical load
+  // within SUPPLY_RECONCILE_FACTOR. v55's scrambled connection graph carried a 90 m³/s
+  // phantom flow → 132.4 GW of "pump friction" → the writeback minted it as a quantity the
+  // single-line / panel-schedule / Excel PREFER — shipping a 132.6 GW cover + a 201,464,029 A
+  // busbar on a 53 kW plant. Beyond the bound the value is recorded in the loop ledger as
+  // UNVERIFIED-ARTEFACT (durable, diagnosable) but never becomes a design quantity.
+  const baseLoad = curValue(q, 'connected_electrical_load_kw')
+    ?? curValue(q, 'total_electrical_demand_kw')
+    ?? (Number(conv?.base_demand_kw) > 0 ? Number(conv!.base_demand_kw) : null)
+  const reconciles = (v: number) => baseLoad == null || v <= baseLoad * SUPPLY_RECONCILE_FACTOR
+
   const converged = Number(last.total_demand_kw)
   if (Number.isFinite(converged) && converged > 0) {
     const from = curValue(q, 'total_supply_demand_kw')
+    const ok = reconciles(converged)
     updates.push({
       key: 'total_supply_demand_kw', from, to: converged, unit: 'kW',
       source: 'convergence-report',
-      basis: 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric',
+      basis: ok
+        ? 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric'
+        : `UNVERIFIED-ARTEFACT: converged ${converged} kW does not reconcile against the connected load ${baseLoad} kW (limit ×${SUPPLY_RECONCILE_FACTOR}) — a corrupted-flow phantom, NOT written as a design quantity`,
       rel_change: rel(from, converged),
       from_keys: ['connected_electrical_load_kw', 'total_electrical_demand_kw'],
+      ...(ok ? {} : { unverified_artefact: true }),
     })
   }
-  // 2. cooling load (converged) — only if the engine already carries the quantity
+  // 2. cooling load (converged) — only if the engine already carries the quantity; the same
+  //    reconcile bound applies (v55's phantom minted 161,131 kW of "cooling" from cable I²R)
   const cool = Number(last.cooling_load_kw)
   if (Number.isFinite(cool) && cool > 0 && q.system_cooling_load_kw != null) {
     const from = curValue(q, 'system_cooling_load_kw')
+    const ok = reconciles(cool)
     updates.push({
       key: 'system_cooling_load_kw', from, to: cool, unit: 'kW',
-      source: 'convergence-report', basis: 'converged cooling load (cable I²R + process heat)',
+      source: 'convergence-report',
+      basis: ok ? 'converged cooling load (cable I²R + process heat)'
+        : `UNVERIFIED-ARTEFACT: converged cooling ${cool} kW does not reconcile against the connected load ${baseLoad} kW (limit ×${SUPPLY_RECONCILE_FACTOR}) — NOT written as a design quantity`,
       rel_change: rel(from, cool),
+      ...(ok ? {} : { unverified_artefact: true }),
     })
   }
   // 3. interconnect lengths (measured) — universal; feed the bill of materials + Stage F
@@ -127,15 +159,20 @@ export function computeQuantityUpdates(
   return updates
 }
 
-/** Settled when every update's relative change is below tolerance. No updates ⇒ settled. */
+/** Settled when every APPLIED update's relative change is below tolerance. No updates ⇒ settled.
+ *  An UNVERIFIED-ARTEFACT entry is never applied, so it cannot hold the loop open — it is a
+ *  recorded diagnosis, not a moving quantity. */
 export function isSettled(updates: QuantityUpdate[], tol = 0.005): boolean {
-  return updates.every(u => u.rel_change <= tol)
+  return updates.filter(u => !u.unverified_artefact).every(u => u.rel_change <= tol)
 }
 
-/** Apply updates to a quantities object PURELY (returns a new object; preserves the {value,…} shape). */
+/** Apply updates to a quantities object PURELY (returns a new object; preserves the {value,…} shape).
+ *  An UNVERIFIED-ARTEFACT entry is SKIPPED — it lives in the loop ledger only, never as a
+ *  design quantity that feeds cost / financial / drawings. */
 export function applyUpdates(quantities: Record<string, any>, updates: QuantityUpdate[]): Record<string, any> {
   const next: Record<string, any> = { ...(quantities || {}) }
   for (const u of updates) {
+    if (u.unverified_artefact) continue // recorded in the ledger, never written as a quantity
     const prev = next[u.key]
     // TRACEABILITY SPINE: carry the update's REAL source + reason + upstream inputs onto the
     // written quantity (previously hardcoded source:'design-loop' with no detail/lineage, so

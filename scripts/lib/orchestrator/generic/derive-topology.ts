@@ -46,26 +46,63 @@ const NON_PROCESS_RE =
 const PRINCIPAL_PROCESS_RE =
   /\b(tank|vessel|reservoir|\bsump\b|silo|column|tower|reactor|skid|membrane|\bro\b|\buf\b|filter|softener|clarifier|separator|degass|stripper|scrubber|exchanger|\bhex\b|chiller|boiler|pump|blower|compressor|mixer|cyclone|hopper|contactor)\b/i
 
+// STRUCTURAL parts — a frame / plinth / support / walkway is STRUCTURE, never a node on the
+// fluid spine. v55 root-cause: 'Painted Carbon Steel Skid Frame' / 'Painted Steel Skid Frame' /
+// 'SST304 Skid Frame' matched \bskid\b in PRINCIPAL_PROCESS_RE and were serially threaded INTO
+// the process chain (gac_filter → skid_frame → skid_frame → skid_frame → drain_sump), scrambling
+// the whole downstream graph. Keyed on the structural noun — a genuine 'Reverse Osmosis Skid'
+// (no 'frame') stays a process node. UNIVERSAL, no class table.
+const STRUCTURAL_RE =
+  /\b(frame|framework|plinth|baseplate|base[ _-]?plate|foundation|footing|support(?:s|ing)?[ _-]?(?:steel|structure)?$|racking|walkway|access[ _-]?platform|ladder|handrail|grating|bund|kerb|curb)\b/i
+
 // feed(0) → product(9) spine, ported from draw_bfd.py::_ROLE_PATTERNS + general
 // process-equipment synonyms. Checked IN ORDER — earliest match wins — so a "feed pump"
 // lands at feed(0) before the generic pump→distribution(9) rule.
+//
+// v55 SCRAMBLE FIXES (2026-07-02, the "connection graph is scrambled" root cause):
+//  1. DELIVERY-APPLICATION OVERRIDE (first entry): a part named for the DELIVERY system it
+//     serves (fertigation / irrigation / watering) belongs at the delivery END of the spine —
+//     the served-system noun governs over the generic mechanism noun. v55: 'Fertigation
+//     Dosing Pump' matched 'dosing'(1) first and became the spine HEAD, feeding the softener.
+//  2. MEMBRANE-FINENESS SUB-RANKS: in any multi-membrane train the coarser separation feeds
+//     the finer (pore-size physics, universal): microfiltration < ultrafiltration <
+//     nanofiltration < reverse osmosis. v55 lumped UF + RO at one rank and alphabetical
+//     tie-break sent the RO high-pressure pump discharging BACKWARDS into the UF bank.
 const ROLE_PATTERNS: Array<[RegExp, number]> = [
+  [/fertigation|irrigation|hand.?watering|\bwatering\b|sprinkler/i, 9], // delivery-application override (see 1)
   [/feed|inlet|supply|make.?up|charge|intake|receiv|raw[ _-]?water/i, 0],
   [/pre.?heat|preheater|guard.?bed|drier|dryer|conditioning|blend|mixer|saturat|soften|dechlor|antiscal|dosing/i, 1],
-  [/reactor|synthesis|absorber|contactor|carbonat|crystallis|crystalliz|converter|reformer|electrolys|reverse.?osmosis|\bro\b|membrane|\buf\b|ultrafiltrat|nanofiltrat|\bedi\b|deioni/i, 2],
+  [/micro.?filtrat|\bmf\b/i, 2.1],                                      // membrane fineness (see 2)
+  [/ultra.?filtrat|\buf\b/i, 2.2],
+  [/nano.?filtrat/i, 2.3],
+  [/reverse.?osmosis|\bro\b|\bedi\b|deioni/i, 2.4],
+  [/reactor|synthesis|absorber|contactor|carbonat|crystallis|crystalliz|converter|reformer|electrolys|membrane/i, 2],
   [/steam.?generator|waste.?heat|boiler|economiser|economizer|reboiler|quench/i, 3],
   [/separator|flash|knock.?out|ko.?drum|\bdrum\b|decanter|coalesc|demister|filter|stripper|clarifier|\bgac\b|carbon|degass|sediment|cartridge/i, 4],
   [/recycle|\breturn\b|tail.?gas|\bloop\b|recompress|recirc/i, 5],
   [/oxidis|oxidiz|flare|incinerat|\bvent\b|purge|abatement|effluent|disposal|\bwaste\b|\bdrain\b|\bsump\b|reject|concentrate|\bbrine\b|blowdown|backwash/i, 6],
   [/fractionat|distillat|hydrocrack|hydrotreat|isomeris|isomeriz|refin|upgrad|rectif|\bcolumn\b/i, 7],
   [/condenser|cooler|chiller|cold.?box|cryo/i, 8],
-  [/storage|\btank\b|\bproduct\b|export|loading|gantry|dispatch|reservoir|bottling|\bpump\b|distribution|irrigation|fertigation|watering|delivery/i, 9],
+  [/storage|\btank\b|\bproduct\b|export|loading|gantry|dispatch|reservoir|bottling|\bpump\b|distribution|delivery/i, 9],
 ]
 
 function roleRank(name: string): number {
   const blob = name || ''
   for (const [rx, rank] of ROLE_PATTERNS) if (rx.test(blob)) return rank
   return 5 // neutral mid-spine when no role keyword is present
+}
+
+// Within one spine rank, direction is ROLE-BASED, never alphabetical (v55 fix 3): a stage's
+// STORAGE feeds its MOVER, and a MOVER (pump / compressor / blower) discharges INTO the stage
+// units it drives — a membrane HP pump feeds its membrane bank, a storage tank feeds its
+// distribution pump. Sub-order: storage(0) → mover(1) → process unit(2); name is only the
+// deterministic FINAL tie-break between two parts of the same sub-role.
+const SUBROLE_STORAGE_RE = /\b(tank|storage|reservoir|silo|sump|cistern|basin)\b/i
+const SUBROLE_MOVER_RE = /\b(pump|compressor|blower|fan)\b/i
+function subRole(name: string): number {
+  if (SUBROLE_STORAGE_RE.test(name || '')) return 0
+  if (SUBROLE_MOVER_RE.test(name || '')) return 1
+  return 2
 }
 
 export function slugify(name: string): string {
@@ -83,7 +120,7 @@ export function slugify(name: string): string {
 export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
   const seen = new Set<string>()
-  const items: Array<{ name: string; slug: string; rank: number }> = []
+  const items: Array<{ name: string; slug: string; rank: number; sub: number }> = []
   for (const m of modules || []) {
     for (const sm of m.sub_modules || []) {
       for (const w of sm.words || []) {
@@ -95,21 +132,25 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
         // (a grounded Cip/Cleaning tank, UF membrane bank the synthesised-only walk missed).
         if (!w._synthesized && !PRINCIPAL_PROCESS_RE.test(name)) continue
         if (NON_PROCESS_RE.test(name)) continue // electrical / instrument / valve → not the fluid spine
+        if (STRUCTURAL_RE.test(name)) continue // a frame / plinth / walkway is structure, not process
         const slug = slugify(name)
         if (!slug || seen.has(slug)) continue
         seen.add(slug)
-        items.push({ name, slug, rank: roleRank(name) })
+        items.push({ name, slug, rank: roleRank(name), sub: subRole(name) })
       }
     }
   }
   if (items.length < 2) return [] // need ≥2 nodes to draw an edge
 
-  // Order along the spine (rank, then name for a stable deterministic tie-break)
-  items.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+  // Order along the spine: rank, then ROLE-BASED sub-order within the rank (storage feeds its
+  // mover, the mover discharges into the stage's process units — see subRole), then name as
+  // the deterministic final tie-break. Alphabetical-within-rank was the v55 direction scramble.
+  items.sort((a, b) => a.rank - b.rank || a.sub - b.sub || a.name.localeCompare(b.name))
 
   const edges: TopologyEdge[] = []
   for (let i = 0; i < items.length - 1; i++) {
     const a = items[i], b = items[i + 1]
+    if (a.slug === b.slug) continue // a self-loop is never authored (belt + braces on the dedupe)
     // thermal mechanism for heat-recovery(3)/cooling(8) endpoints, else fluid.
     const thermal = a.rank === 3 || a.rank === 8 || b.rank === 8
     edges.push({
@@ -126,9 +167,22 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
 // flow / pressure / temperature element) — needs a SIGNAL tie to the control system.
 const INSTRUMENT_RE =
   /\b(transmitter|transducer|sensor|analy[sz]er|gauge|probe|detector|\borp\b|\bph\b|conductivity|turbidity|silica|chlorine|level|flow ?meter|flowmeter)\b/i
-// The CONTROL HUB nouns — the PLC / SCADA / control-system the instruments report to + the
-// controllers that command actuators. Ranked: a plant control SYSTEM / SCADA / DCS first, then a PLC.
-const CONTROL_HUB_RE = /\b(scada|plant control|control system|\bdcs\b|\bplc\b|control panel|controller)\b/i
+// The CONTROL HUB nouns — the PLC / SCADA / control-system the instruments report to.
+// TIERED (v55 fix): the bare noun 'controller' also matches POWER-ELECTRONIC device controllers
+// ('Dc3 Power Controller', a motor/drive/dosing controller) — v55 wired every instrument's
+// 4-20 mA signal to the DC POWER controller instead of the plant control panel. A device
+// controller is NEVER the plant control hub; a generic 'controller' is only a LAST-resort hub.
+const NON_HUB_CONTROLLER_RE =
+  /\b(power|motor|speed|drive|dosing|pump|temperature|lighting|charge|battery|inverter)\s+controller\b/i
+function hubTier(name: string): number {
+  const n = name || ''
+  if (/\b(scada|plant control|control system|dcs)\b/i.test(n)) return 0
+  if (/\bplc\b/i.test(n)) return 1
+  if (/\bcontrol (?:panel|cabinet)\b/i.test(n)) return 2
+  if (/\bcontroller\b/i.test(n) && !NON_HUB_CONTROLLER_RE.test(n)) return 3
+  return -1 // not a control hub (incl. any device-level power/motor/drive controller)
+}
+const CONTROL_HUB_RE = { test: (n: string) => hubTier(n) >= 0 } // same call-shape as a RegExp
 
 /**
  * Derive SIGNAL topology — every field INSTRUMENT wires to the control hub (a PLC / SCADA / control
@@ -166,8 +220,10 @@ export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
     }
   }
   if (hubs.length === 0 || instruments.length === 0) return []
-  // Prefer a SCADA / plant-control-system hub if present (it sorts first by name), else the first PLC.
-  const hub = hubs.sort()[0]
+  // Prefer the highest hub TIER (SCADA/plant-control(0) > PLC(1) > control panel(2) > generic
+  // controller(3)); name is only the deterministic tie-break WITHIN a tier. v55's alphabetical
+  // pick chose 'Dc3 Power Controller' over the plant control panel.
+  const hub = hubs.sort((a, b) => hubTier(a) - hubTier(b) || a.localeCompare(b))[0]
   const edges: TopologyEdge[] = []
   for (const inst of instruments) {
     if (inst === hub) continue
@@ -300,6 +356,12 @@ function _selftest() {
         { name_human: 'Cip Tank', _synthesized: false },
         { name_human: 'Cleaning Tank', _synthesized: false },
         { name_human: 'Uf Membrane Bank', _synthesized: false },
+        // v55 SCRAMBLE adversarial set (2026-07-02): the HP pump + module bank whose
+        // alphabetical tie-break produced 'RO HP pump discharges into the UF bank', and
+        // the three structural skid FRAMES that were threaded INTO the process chain.
+        mk('Ro High Pressure Pump'), mk('Uf Module Bank'),
+        mk('Painted Carbon Steel Skid Frame'), mk('Painted Steel Skid Frame'),
+        mk('Sst304 Skid Frame'),
         // a grounded SUB-COMPONENT must NOT appear (it is part of a parent vessel):
         { name_human: 'Tank Wall (laminate)', _synthesized: false, _subcomponent: true },
         // these MUST be excluded from the process spine:
@@ -326,6 +388,41 @@ function _selftest() {
   // feed must come before product on the spine (RO/membrane/filter < storage/pump rank)
   const ranks = topo.map(e => e.from_part)
   if (!ranks.includes('gac_filter')) throw new Error('derive-topology: separation stage absent from spine')
+
+  // ── v55 SCRAMBLE proveCatch (2026-07-02) — each check FIRES on the pre-fix behaviour ──
+  // The spine is a serial chain, so spine position = index in the from→to sequence.
+  const order: string[] = [topo[0].from_part, ...topo.map(e => e.to_part)]
+  const idx = (slug: string) => {
+    const i = order.indexOf(slug)
+    if (i < 0) throw new Error(`derive-topology proveCatch: expected spine node missing: ${slug}`)
+    return i
+  }
+  // (1) structural skid FRAMES must NOT be process nodes (pre-fix: 3 frames serially threaded)
+  for (const bad of ['painted_carbon_steel_skid_frame', 'painted_steel_skid_frame', 'sst304_skid_frame']) {
+    if (endpoints.has(bad)) throw new Error(`derive-topology leaked a STRUCTURAL frame onto the fluid spine: ${bad}`)
+  }
+  // (2) membrane fineness: UF (coarser) feeds the RO train, never the reverse (pre-fix:
+  //     RO HP pump discharged backwards into the UF bank via the alphabetical tie-break)
+  if (!(idx('uf_membrane_bank') < idx('ro_high_pressure_pump')) || !(idx('uf_module_bank') < idx('ro_high_pressure_pump'))) {
+    throw new Error(`derive-topology: UF must be UPSTREAM of the RO HP pump (got order ${order.join(' → ')})`)
+  }
+  // (3) a stage's MOVER discharges INTO the stage units it drives: the RO HP pump feeds the
+  //     RO membranes (role-based sub-order, not alphabetical)
+  if (!(idx('ro_high_pressure_pump') < idx('ro_membrane'))) {
+    throw new Error('derive-topology: the RO HP pump must FEED the RO membranes (mover before unit within the rank)')
+  }
+  // (4) delivery-application override: the fertigation dosing pump sits at the DELIVERY end,
+  //     never at the spine head feeding the softener (pre-fix: 'dosing' rank-1 match)
+  if (!(idx('softener_vessel') < idx('fertigation_dosing_pump'))) {
+    throw new Error('derive-topology: fertigation dosing pump must be DOWNSTREAM of pretreatment (delivery-application override)')
+  }
+  if (order[0] === 'fertigation_dosing_pump') throw new Error('derive-topology: fertigation dosing pump must not head the spine')
+  // (5) storage feeds its distribution mover (tank → pump, not pump → tank)
+  if (!(idx('fresh_water_tank') < idx('irrigation_pump'))) {
+    throw new Error('derive-topology: storage must feed its distribution pump (fresh_water_tank before irrigation_pump)')
+  }
+  // (6) no self-loop is ever authored
+  for (const e of topo) if (e.from_part === e.to_part) throw new Error(`derive-topology authored a self-loop: ${e.from_part}`)
   // empty / single-node inputs return []
   if (deriveProcessTopology([]).length !== 0) throw new Error('derive-topology: empty modules must yield []')
   if (deriveProcessTopology([{ sub_modules: [{ words: [mk('Lone Tank')] }] }]).length !== 0) throw new Error('derive-topology: single node must yield [] (no edge)')
@@ -349,6 +446,20 @@ function _selftest() {
   if (sigHubs.size !== 1) throw new Error(`derive-topology SIGNAL: all instruments must wire to ONE control hub (got ${[...sigHubs].join(',')})`)
   // no control hub OR no instrument → []
   if (deriveSignalTopology([{ sub_modules: [{ words: [mk('Fresh Water Tank'), mk('Irrigation Pump')] }] }]).length !== 0) throw new Error('derive-topology SIGNAL: no instrument/hub must yield []')
+  // v55 proveCatch: a device-level POWER controller is NEVER the plant control hub — with a
+  // 'Dc3 Power Controller' AND an 'Electrical Control Panel' present, the instruments wire to
+  // the CONTROL PANEL (pre-fix: alphabetical pick sent every 4-20 mA signal to the DC power
+  // controller); with ONLY the power controller present, NO signal hub exists (no edges).
+  const sigV55 = deriveSignalTopology([{ sub_modules: [{ words: [
+    mk('Level Transmitter'), mk('pH Analyser'),
+    mk('Dc3 Power Controller'), mk('Electrical Control Panel'),
+  ] }] }])
+  if (sigV55.length !== 2 || sigV55.some(e => e.to_part !== 'Electrical Control Panel')) {
+    throw new Error(`derive-topology SIGNAL: instruments must wire to the control PANEL, never a device power controller (got ${JSON.stringify(sigV55.map(e => e.to_part))})`)
+  }
+  if (deriveSignalTopology([{ sub_modules: [{ words: [mk('Level Transmitter'), mk('Dc3 Power Controller')] }] }]).length !== 0) {
+    throw new Error('derive-topology SIGNAL: a lone device power controller must not become the signal hub')
+  }
 
   // ── FLOW-DEMAND JOIN (the v52 required_value=null fix) ──────────────────────
   const q = {
