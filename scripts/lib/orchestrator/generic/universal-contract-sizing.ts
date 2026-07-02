@@ -464,6 +464,46 @@ function boxFromThroughputM3h(q: number): string {
   return `${mm}x${Math.round(mm * 0.85)}x${Math.round(mm * 1.1)} mm`
 }
 
+// ── TYPE-DERIVED dims for flow-rated devices (default-size LITTER fix, codema v53) ──
+// boxFromThroughputM3h clamps its side at 0.7 m, so EVERY small flow-rated principal —
+// a 25 m³/h hand-watering pump, a 45 m³/h drain pump, a 90 m³/h irrigation pump, a
+// 14.5 m³/h GAC softener — collapsed to ONE identical 700x595x770 mm box: 5 distinct
+// parts sharing one dims signature = the manifest-sight default-size LITTER cluster
+// that capped the render/GA tabs. Fix at source: derive per-TYPE dims from the physics
+// the group already carries (mirroring how grounded words get real dims), keyed on the
+// device NOUN in the group phrase — no class table, universal.
+//   · PUMP / BLOWER / FAN → scale the canonical pump-set envelope (900×500×700 mm at
+//     25 m³/h — the same envelope build_universal_scene's TYPE_DEFAULTS uses) by the
+//     CUBE ROOT of the flow ratio. Continuous in Q, no floor clamp → two different
+//     flows can never share a dims signature.
+//   · MEDIA-BED VESSEL (filter / softener / adsorber / GAC / polisher) → a vertical
+//     cylinder sized at a standard 25 m/h superficial velocity: bed area = Q/25 m²,
+//     ⌀ from the area, height ≈ 2⌀ (bed + freeboard) — the honest silhouette of a
+//     packaged media vessel, printed in the same "⌀ m dia x H m" grammar every
+//     downstream parser (Blender, GA, BoM) already reads.
+//   · anything else keeps the legacy throughput box (unchanged behaviour).
+const PUMP_SET_REF_FLOW_M3H = 25
+const PUMP_SET_REF_MM = { w: 900, d: 500, h: 700 } // = build_universal_scene TYPE_DEFAULTS "pump"
+function pumpSetDimsFromFlowM3h(q: number): string {
+  const s = Math.cbrt(Math.max(2, q) / PUMP_SET_REF_FLOW_M3H)
+  return `${Math.round(PUMP_SET_REF_MM.w * s)}x${Math.round(PUMP_SET_REF_MM.d * s)}x${Math.round(PUMP_SET_REF_MM.h * s)} mm`
+}
+const MEDIA_BED_SUPERFICIAL_M_H = 25
+function mediaVesselDimsFromFlowM3h(q: number): string {
+  const areaM2 = Math.max(0.05, q / MEDIA_BED_SUPERFICIAL_M_H)
+  const dia = Math.max(0.4, Math.round(Math.sqrt((4 * areaM2) / Math.PI) * 10) / 10)
+  const ht = Math.max(1.2, Math.round(2.0 * dia * 10) / 10)
+  return `${dia.toFixed(1)} m dia x ${ht.toFixed(1)} m`
+}
+const PUMPLIKE_NOUN_RE = /\b(pumps?|blowers?|fans?)\b/
+const MEDIA_VESSEL_NOUN_RE = /\b(filters?|softeners?|adsorbers?|polishers?|strainers?|deionisers?|demineralisers?|gac)\b|activated carbon/
+function dimsForThroughputDevice(q: number, phrase: string): string {
+  const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
+  if (PUMPLIKE_NOUN_RE.test(p)) return pumpSetDimsFromFlowM3h(q)
+  if (MEDIA_VESSEL_NOUN_RE.test(p)) return mediaVesselDimsFromFlowM3h(q)
+  return boxFromThroughputM3h(q)
+}
+
 // Display a working volume so the printed CAPACITY stays consistent with the printed ⌀×H even
 // at small scale: integer truncation of a 1.3 m³ vessel to "1" would read 24 % off its own
 // ⌀1.2×1.1 ≈ 1.2 m³ dimension. Keep 1 dp below 100 m³ (where the rounding granularity bites),
@@ -490,7 +530,9 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   } else if (g.power !== undefined) {
     add.push(mod('dimension', boxFromRatingKw(g.power)))
   } else if (g.throughput !== undefined) {
-    add.push(mod('dimension', boxFromThroughputM3h(g.throughput)))
+    // per-TYPE flow-derived dims (pump-set envelope / media-bed cylinder / legacy box) —
+    // see dimsForThroughputDevice: fixes the shared 700x595x770 default-size litter.
+    add.push(mod('dimension', dimsForThroughputDevice(g.throughput, g.phrase)))
   }
   if (g.power !== undefined) add.push(mod('rating_primary', `${Math.round(g.power)}`, 'kW'))
   else if (g.throughput !== undefined) add.push(mod('rating_primary', `${Math.round(g.throughput)}`, 'm³/h'))
@@ -1108,7 +1150,12 @@ function completeness(g: EquipGroup): number {
 // Ordered: treatment terms before tank (a "biofilter tank" is treatment, not bare
 // containment); each maps an equipment keyword family → the universal module id.
 const PLACEMENT: { re: RegExp; module: RegExp }[] = [
-  { re: /filter|biofil|degas|skim|clarif|\buv\b|ozone|treat|media|membran|aerat|settl|disinfe|steril/i, module: /water_treatment|treatment|process/i },
+  // soften/osmosis/deionis/demineral/desalin added 2026-07-02 (codema v53): "gac_softener" +
+  // "reverse_osmosis_skid" matched NO placement rule and fell to the structure/containment
+  // FALLBACK — the scene then placed them in the far structure region, metres from the fluid
+  // train they pipe into (the vision critic's "floating disconnected objects"). A water-
+  // treatment noun belongs with the treatment/process module, like every other filter.
+  { re: /filter|biofil|degas|skim|clarif|\buv\b|ozone|treat|media|membran|aerat|settl|disinfe|steril|soften|osmosis|deionis|demineral|desalin/i, module: /water_treatment|treatment|process/i },
   { re: /pump|blower|compress|\bfan\b|manifold|\bpipe|flow|valve|duct/i, module: /mass_fluid|fluid|transport|process/i },
   { re: /heat|chill|boiler|thermal|hvac|cool|refrig|exchang|\bhex\b|\bhx\b|condenser|evaporator|dehumid|latent/i, module: /environment|thermal|interface/i },
   { re: /tank|vessel|reservoir|sump|basin|silo|hopper|column|tower|cone|enclos|frame|contain/i, module: /structure|contain|process/i },
@@ -1202,6 +1249,28 @@ function isFieldInstrumentByName(w: WordLike): boolean {
 // transducer rated 2 kW — off by four orders of magnitude").
 function isInstrument(w: WordLike): boolean {
   return (w as { _instrument?: boolean })._instrument === true || isFieldInstrumentByName(w)
+}
+// An ELECTRICAL POWER-DISTRIBUTION device word (transformer / switchgear / switchboard /
+// MCC / UPS / busbar / incomer / distribution board / genset / VFD). Codema v53: the
+// 5-char stem 'trans' is shared by "Distribution TRANSformer" and the drain_TRANSfer_pump
+// contract group, so the fuzzy sizing match stamped the transformer with the pump group's
+// 700x595x770 mm flow box + a bogus "45 m³/h" rating + a phantom ×2 count — an electrical
+// machine rated in water flow, and the 5th member of the default-size litter cluster. An
+// electrical-distribution device may only ever be sized from an ELECTRICAL group (kW /
+// kVA / A) — never a fluid volume / flow / mass-rate group. Deliberately NARROW nouns:
+// a bare "generator" is NOT here (a steam/oxygen/nitrogen generator is process
+// equipment) — only the explicitly electrical genset forms. UNIVERSAL, no class table.
+const ELECTRICAL_DISTRIBUTION_DEVICE_RE =
+  /\b(transformers?|switchgear|switchboards?|substations?|rectifiers?|inverters?|ups|busbars?|mcc|motor control cent(?:re|er)s?|distribution (?:boards?|panels?)|panel ?boards?|gensets?|(?:diesel|standby|backup|emergency) generators?|incomers?|vfds?|variable[- ]frequency drives?)\b/i
+function isElectricalDistributionWord(w: WordLike): boolean {
+  const name = `${w.name_human ?? ''} ${w.content_character?.name_human ?? ''} ${w.content_character?.character_id ?? ''} ${w.id ?? ''}`
+    .replace(/_+/g, ' ')
+  return ELECTRICAL_DISTRIBUTION_DEVICE_RE.test(name)
+}
+// A contract group whose driving physics is FLUID / MASS-RATE — the measures an
+// electrical-distribution device must never adopt a size or rating from.
+function groupIsFluidSized(g: EquipGroup): boolean {
+  return g.volume !== undefined || g.throughput !== undefined || g.perUnitFlow !== undefined || g.rate !== undefined
 }
 function anyKey(q: Record<string, number>, re: RegExp): boolean {
   return Object.keys(q).some((k) => re.test(k))
@@ -3667,10 +3736,17 @@ export function applyUniversalContractSizing(
         // tank's synthesis until the late reconcile — which left it un-instrumented. Keyed on
         // the role NOUN, universal, no class table.
         const wIsCleaningRole = isCleaningRolePhrase(wordRoleText(w))
+        // ELECTRICAL-ROLE COHERENCE (codema v53 litter member #5): an electrical power-
+        // distribution device (transformer / switchboard / MCC / UPS / genset …) must never
+        // adopt a FLUID group's size or rating — the shared 'trans' stem let the drain-
+        // TRANSfer-pump group stamp "Distribution TRANSformer" with a 700x595x770 mm flow
+        // box + "45 m³/h" + ×2. Electrical groups (kW / kVA / A) still match normally.
+        const wIsElectricalDevice = isElectricalDistributionWord(w)
         let best: EquipGroup | null = null
         let bestScore = 0
         for (const g of groups) {
           if (wIsCleaningRole !== isCleaningRolePhrase(g.phrase)) continue
+          if (wIsElectricalDevice && groupIsFluidSized(g)) continue
           const sc = scoreMatch(wStems, g)
           if (sc < minScore) continue
           if (sc > bestScore || (sc === bestScore && best && completeness(g) > completeness(best))) {

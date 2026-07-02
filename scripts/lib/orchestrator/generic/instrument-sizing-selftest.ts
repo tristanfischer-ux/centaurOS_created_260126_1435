@@ -221,8 +221,80 @@ function run() {
   const dcDrain = qVal(dcC4, 'drain_transfer_pump_motor_kw')
   if (!(typeof dcDrain === 'number' && dcDrain > 1 && dcDrain < 15)) throw new Error(`demand-coverage: a pump-named flow family with no motor twin must get the deterministic hydraulic floor as <fam>_motor_kw (45 m³/h ≈ 5 kW), got ${dcDrain} — the v51 drain_transfer_pump_power_kw loss regressed`)
 
+  // ── TYPE-DERIVED SYNTH DIMS — default-size LITTER proveCatch (codema v53, 2026-07-02) ──
+  // boxFromThroughputM3h clamps at a 0.7 m side, so EVERY small flow-rated synthesised
+  // principal (25 / 45 / 90 m³/h pumps + a 14.5 m³/h GAC softener) collapsed to ONE
+  // identical 700x595x770 mm box, and the shared 'trans' stem let the drain_TRANSfer_pump
+  // group stamp the same box + a bogus "45 m³/h" onto "Distribution TRANSformer" — 5
+  // distinct parts, one dims signature = manifest-sight LITTER that capped the render/GA
+  // tabs. The fix derives per-TYPE dims from the group's own physics; this guard fails the
+  // build if any two of those five ever share a dims signature again.
+  const litterModules: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+    { module: 'structure_containment', sub_modules: [{ id: 'sc', words: [] }] },
+    { module: 'energy_storage_source', sub_modules: [{ id: 'es', words: [
+      { id: 'distribution_transformer_word', name_human: 'Distribution Transformer', content_character: { character_id: 'distribution_transformer', name_human: 'Distribution Transformer' }, modifier_characters: [{ kind: 'form', value: 'representative energy storage source component' }] },
+    ] }] },
+  ]
+  const litterContract: any = { quantities: {
+    hand_watering_pump_throughput_m3_h: { value: 25 }, hand_watering_pump_count: { value: 1 },
+    drain_transfer_pump_throughput_m3_h: { value: 45 }, drain_transfer_pump_count: { value: 2 },
+    irrigation_pump_flow_m3_h: { value: 90 },
+    gac_softener_throughput_m3_h: { value: 14.5 },
+    reverse_osmosis_skid_volume_m3: { value: 10 }, reverse_osmosis_skid_count: { value: 1 },
+  } }
+  applyUniversalContractSizing(litterModules as never[], litterContract, { dedupeAndStrip: false, explode: false, instrument: false })
+  const dimOf = (name: string): string => String(modsOf(litterModules, name).find((x) => x.kind === 'dimension' || x.kind === 'dimensions')?.value ?? '')
+  const litterNames = ['Hand Watering Pump', 'Drain Transfer Pump', 'Irrigation Pump', 'Gac Softener']
+  const dimSigs = new Set<string>()
+  for (const nm of litterNames) {
+    const d = dimOf(nm)
+    if (!d) throw new Error(`synth-dims: "${nm}" was synthesised with NO dimension — a flow-rated principal must carry type-derived dims`)
+    dimSigs.add(d)
+  }
+  if (dimSigs.size !== litterNames.length) throw new Error(`synth-dims: ${litterNames.length} flow-rated synthesised principals share only ${dimSigs.size} dims signature(s) [${[...dimSigs].join(' | ')}] — the 700x595x770 default-size LITTER cluster regressed`)
+  for (const nm of ['Hand Watering Pump', 'Drain Transfer Pump', 'Irrigation Pump']) {
+    if (!/^\d+x\d+x\d+ mm$/.test(dimOf(nm))) throw new Error(`synth-dims: pump "${nm}" dims "${dimOf(nm)}" must be a WxDxH pump-set box scaled from its flow`)
+  }
+  const wOf = (nm: string): number => parseInt(dimOf(nm).split('x')[0], 10)
+  if (!(wOf('Hand Watering Pump') < wOf('Drain Transfer Pump') && wOf('Drain Transfer Pump') < wOf('Irrigation Pump')))
+    throw new Error(`synth-dims: pump-set envelopes must GROW with flow (25→${wOf('Hand Watering Pump')}, 45→${wOf('Drain Transfer Pump')}, 90→${wOf('Irrigation Pump')} mm) — the flow-derived scaling broke`)
+  if (!/m dia x .* m$/.test(dimOf('Gac Softener'))) throw new Error(`synth-dims: "Gac Softener" dims "${dimOf('Gac Softener')}" must be a media-bed CYLINDER (⌀ from superficial velocity), not a box`)
+  // the ELECTRICAL word must have adopted NOTHING from the fluid pump group.
+  const txMods = modsOf(litterModules, 'Distribution Transformer')
+  if (txMods.some((x) => (x.kind === 'dimension' || x.kind === 'dimensions'))) throw new Error('synth-dims: "Distribution Transformer" was stamped a dimension from a FLUID group — the electrical-role coherence guard regressed (it must stay un-dimensioned → scene TYPE_DEFAULT transformer_box)')
+  if (txMods.some((x) => /^rating/.test(String(x.kind)) && /m³\/h|m3\/h/.test(String(x.unit ?? '')))) throw new Error('synth-dims: "Distribution Transformer" carries an m³/h rating — an electrical-distribution device must never adopt a fluid group (the 45 m³/h transformer regressed)')
+  if (txMods.some((x) => x.kind === 'quantity' && String(x.value) === '×2')) throw new Error('synth-dims: "Distribution Transformer" was stamped the pump group\'s ×2 count — the electrical-role coherence guard regressed')
+
+  // ── SYNTH MODULE HOME (codema v53 "floating disconnected objects") ──────────────────
+  // A water-treatment synth principal (softener / reverse-osmosis skid) must land in the
+  // TREATMENT/PROCESS module — not the structure/containment FALLBACK that strands it in
+  // the far structure region of the 3-D scene, metres from the fluid train it pipes into.
+  const homeModules: any = [
+    { module: 'structure_containment', sub_modules: [{ id: 'sc', words: [] }] },
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+  ]
+  reconcilePrincipalEquipment(homeModules as never[], litterContract)
+  const moduleOf = (name: string): string => {
+    for (const m of homeModules) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (String(w.name_human ?? '') === name) return String(m.module)
+    }
+    return '(not synthesised)'
+  }
+  for (const nm of ['Gac Softener', 'Reverse Osmosis Skid']) {
+    if (moduleOf(nm) !== 'mass_fluid_transport_process') throw new Error(`synth-module-home: "${nm}" landed in "${moduleOf(nm)}" — a treatment-family synth principal must home with the process module, not the structure fallback (the v53 floating far-corner regressed)`)
+  }
+
+  // ── LEGACY FALLBACK PRESERVED (byte-identity mechanism for unaffected families) ─────
+  // A throughput group naming NO pump/media noun must keep the legacy throughput box
+  // exactly — proving the type-derived dims dispatch cannot touch any other family.
+  const legacyModules: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(legacyModules as never[], { quantities: { degasser_unit_throughput_m3_h: { value: 40 } } } as any, { dedupeAndStrip: false, explode: false, instrument: false })
+  const legacyDim = String((() => { for (const m of legacyModules) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) { const d = (w.modifier_characters ?? []).find((x: any) => x.kind === 'dimension'); if (d) return d.value } return '' })())
+  if (legacyDim !== '700x595x770 mm') throw new Error(`synth-dims: a non-pump/media throughput device must keep the LEGACY throughput box (700x595x770 mm at 40 m³/h), got "${legacyDim}" — the dispatch over-reached beyond pump/media families`)
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically)')
 }
 
 run()

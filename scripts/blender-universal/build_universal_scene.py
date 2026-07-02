@@ -152,6 +152,106 @@ def _det_layout_key(p):
     return f"{getattr(p, 'name', '')}\x1f{int(getattr(p, '_seq', 0))}"
 
 
+# Clear aisle [mm] between the process-train block and the hugged periphery row —
+# a walkable maintenance gap that still reads as ONE plant, not a detached island.
+PERIPHERY_HUG_GAP_MM = 2500
+
+
+def _det_layout_with_periphery_hug(items):
+    """dl.layout() with the NON-FLOW periphery pulled in tight against the process train.
+
+    THE DEFECT (codema v53, vision critic: "floating disconnected objects on right side"):
+    dl.layout() packs ALL regions into one rank-ordered serpentine, so the PERIPHERY
+    regions (electrical / control / safety cabinets — parts whose only ties are LOGICAL
+    electrical_bus / signal edges the 3-D deliberately does NOT draw; they live on the
+    single-line / P&ID) land in far sparse bays metres beyond the fluid train: unconnected
+    grey boxes in empty space that read as floating litter, while the pipes all stay on
+    the train. FIX at the layout source: pack the FLOW-train regions on their own
+    (unchanged relative placement), pack the periphery regions as their OWN compact
+    dl.layout() block (same deterministic packer, cabinet consolidation intact), and
+    TRANSLATE that block to hug the train's top edge at a fixed aisle — so the electrical
+    module sits BESIDE the plant it feeds, the way a real MCC room does. Deterministic:
+    same integer-grid packer, one integer translation; and a strict NO-OP (byte-identical
+    positions) when there is no flow plan (non-process families) or no periphery."""
+    plan = _PLANT_FLOW_PLAN
+    if not plan or not plan[0] or not plan[1]:
+        return dl.layout(items)
+    flow_regions, periphery = set(plan[0]), set(plan[1])
+    # a TINY train region (total plan area < 2 m² — a lone spool / manifold / small pot
+    # the LLM homed in its own module) must not claim its own train BAY: a 0.5 m² part
+    # alone in a 25 m-deep bank column is the stranded far-corner box (codema v53's
+    # "Permeate Manifold" alone in structure_containment). Pull it into the compact
+    # periphery block instead — its pipe still routes port-to-port, so it stays
+    # CONNECTED, just grouped. Deterministic: a pure area sum per region.
+    _region_area = {}
+    for it in items:
+        _region_area[it["region"]] = _region_area.get(it["region"], 0.0) + float(it.get("area", 0.0))
+    TINY_TRAIN_REGION_AREA_MM2 = 2e6
+    for rk in sorted(_region_area):
+        if rk in flow_regions and _region_area[rk] < TINY_TRAIN_REGION_AREA_MM2:
+            flow_regions.discard(rk)
+            periphery.add(rk)
+            print(f"[univ][det-layout] tiny train region '{rk}' "
+                  f"({_region_area[rk] / 1e6:.2f} m² total) → periphery block (no solo corner bay)")
+    train_items = [it for it in items if it["region"] in flow_regions]
+    peri_items = [it for it in items if it["region"] in periphery]
+    # a region in NEITHER list (should not happen — the plan covers every region) stays
+    # with the train so no part is ever dropped from the layout.
+    other = [it for it in items if it["region"] not in flow_regions and it["region"] not in periphery]
+    train_items += other
+    if not train_items or not peri_items:
+        return dl.layout(items)
+    tpos = dl.layout(train_items)
+    # train bbox (part extents, not just centres) in the train layout's own coords
+    by_id_w = {it["id"]: (int(it["w"]), int(it["d"])) for it in items}
+    def _bbox(posmap):
+        """Part-extent bbox over the REAL part ids (synthetic cabinet:: ids are skipped —
+        their members map to the same coordinates and carry the true footprints)."""
+        x0 = y0 = 1e12
+        x1 = y1 = -1e12
+        for pid, (cx, cy) in posmap.items():
+            if pid not in by_id_w:
+                continue
+            w, d = by_id_w[pid]
+            x0 = min(x0, cx - w / 2.0); x1 = max(x1, cx + w / 2.0)
+            y0 = min(y0, cy - d / 2.0); y1 = max(y1, cy + d / 2.0)
+        return x0, y0, x1, y1
+    tx0, ty0, tx1, ty1 = _bbox(tpos)
+    # ── pack the periphery as a horizontal BACK ROW of per-region bays hugging the
+    # train's top edge (one dl.layout() bay per region, so the packer's cabinet
+    # consolidation still applies within a region), wrapping to a second row only when
+    # the row would overshoot the train width. ONE block dl.layout() over all periphery
+    # regions is NOT this: its square-ish width budget stacks the region bays into a
+    # deep narrow column — a 20 m tail of cabinets running away from the plant (worse
+    # than the defect). Region order + all arithmetic deterministic (rank, then name).
+    def _region_rank(rk):
+        return min(int(it.get("rank", 10_000)) for it in peri_items if it["region"] == rk)
+    peri_regions = sorted({it["region"] for it in peri_items}, key=lambda rk: (_region_rank(rk), rk))
+    out = dict(tpos)
+    train_w = max(tx1 - tx0, dl.GRID_MM)
+    row_x, row_y, row_d = tx0, ty1 + PERIPHERY_HUG_GAP_MM, 0.0
+    for rk in peri_regions:
+        ritems = [it for it in peri_items if it["region"] == rk]
+        rpos = dl.layout(ritems)
+        rx0, ry0, rx1, ry1 = _bbox(rpos)
+        if rx0 > rx1:      # defensive: a bay with no measurable part
+            continue
+        w, d = rx1 - rx0, ry1 - ry0
+        if row_x > tx0 and (row_x + w) > tx0 + max(train_w, w):
+            row_y += row_d + PERIPHERY_HUG_GAP_MM
+            row_x, row_d = tx0, 0.0
+        dx = dl._snap(row_x - rx0)
+        dy = dl._snap(row_y - ry0)
+        for pid, (cx, cy) in rpos.items():
+            out[pid] = (cx + dx, cy + dy)
+        row_x += w + PERIPHERY_HUG_GAP_MM
+        row_d = max(row_d, d)
+    print(f"[univ][det-layout] periphery hug: {len(peri_items)} part(s) in {len(peri_regions)} "
+          f"non-flow region bay(s) packed as a back row on the train top edge "
+          f"(+{PERIPHERY_HUG_GAP_MM} mm aisle)")
+    return out
+
+
 def _populate_det_layout(parts):
     """Fill _DET_LAYOUT_POS from the deterministic sequence-packer. Gated by DETERMINISTIC_PLACEMENT."""
     _DET_LAYOUT_POS.clear()
@@ -170,7 +270,7 @@ def _populate_det_layout(parts):
                       "rank": int(getattr(p, "region_rank", 10_000)), "seq": int(getattr(p, "_seq", 0)),
                       "w": int(fx), "d": int(fy), "area": float(fx * fy)})
     try:
-        pos = dl.layout(items)
+        pos = _det_layout_with_periphery_hug(items)
     except Exception as e:
         print(f"[univ][det-layout] skipped (error): {e}")
         return
@@ -185,6 +285,30 @@ def _populate_det_layout(parts):
         c = pos.get(_det_layout_key(p))
         if c:
             _DET_LAYOUT_POS[_det_layout_key(p)] = (float(c[0] - cx), float(c[1] - cy))
+    # DE-OVERLAP consolidated cabinet members: dl.layout() maps every small item of a
+    # region onto its ONE cabinet::<region> coordinate. Now that ALL placement paths
+    # honour the det coords (incl. the instrument grid), two co-consolidated parts would
+    # draw exactly on top of each other — spread each identical-coordinate group into a
+    # tight row (max-member-width pitch, centred on the cabinet point, key-sorted so the
+    # spread is deterministic). Reads as the marshalled panel row the consolidation means.
+    _by_xy = {}
+    for k, xy in _DET_LAYOUT_POS.items():
+        _by_xy.setdefault(xy, []).append(k)
+    _fp_of = {}
+    for p in parts:
+        try:
+            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
+        except Exception:
+            fx = fy = float(dl.GRID_MM)
+        _fp_of[_det_layout_key(p)] = (fx, fy)
+    for xy, keys in sorted(_by_xy.items()):
+        if len(keys) < 2:
+            continue
+        keys.sort()
+        pitch = max(_fp_of.get(k, (dl.GRID_MM, dl.GRID_MM))[0] for k in keys) + 200.0
+        x0 = xy[0] - pitch * (len(keys) - 1) / 2.0
+        for i, k in enumerate(keys):
+            _DET_LAYOUT_POS[k] = (x0 + pitch * i, xy[1])
     print(f"[univ][det-layout] DETERMINISTIC placement ON — {len(_DET_LAYOUT_POS)} parts positioned by construction")
 import ga_massing                # GA non-massing classifier (accessory/instrument/valve drop)
 
@@ -2843,7 +2967,15 @@ def _place_grid(plist, x0, x_window, y_front, base_z_mm, MAT, MO):
         r, c = divmod(i, cols)
         x = x0 + pitch_x * (c + 0.5)
         y = y_front + pitch_y * r          # step toward +Y (away from walkway)
-        asm, anchors = build_part(p, x, y, base_z_mm, MAT, MO)
+        # rewrite B: the deterministic absolute coord wins HERE TOO. The instrument grid
+        # was the ONE placement path that ignored _DET_LAYOUT_POS, so every small
+        # front-row part (instrument / cabinet_small — SCADA, UPS, control panels) fell
+        # back to the LEGACY bank coords: with the rest of the plant on det coords they
+        # landed metres out on the empty deck — the codema v53 "floating disconnected
+        # objects on right side" trio. Same one-line override idiom as _shelf_pack.
+        _dpos = _DET_LAYOUT_POS.get(_det_layout_key(p))
+        _bx, _by = _dpos if _dpos else (x, y)
+        asm, anchors = build_part(p, _bx, _by, base_z_mm, MAT, MO)
         p.obj_anchor, p.anchors = asm, anchors
         p.placed_xyz_mm = anchors["centre"]
     used_cols = min(cols, len(plist))
