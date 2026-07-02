@@ -589,8 +589,8 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Connection trace": "Which part connects to what — live input/output cell-references with completeness & integrity counts.",
     "Quantities": "Every sized contract quantity with family, basis & source.",
     "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
-    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with ALL columns visible (nothing hidden): 'Cost basis' (cols F–J, how each £ was derived) and 'Engineering spec' (cols K–N, why each principal is this size).",
-    "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals).",
+    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with ALL columns visible (nothing hidden): 'Cost basis' (cols F–J, how each £ was derived), 'Engineering spec' (cols K–N, why each principal is this size) and the per-row column-contract 'Row check' (col O; MPN TBD count surfaced in the header).",
+    "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals; the assembly/install bars are BoM-derived class-factor estimates with their derivation table).",
     "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
     "Financial model": "The whole commercial model on one sheet: base-case Economics (revenue / opex / EBITDA / NPV / IRR + charts), the scale sweep + Low/Central/High price sensitivity, and the Investment-analysis sweet-spot finder — all live off the Inputs tab.",
     "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
@@ -1971,15 +1971,21 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         r"salt_consumption_max_kg_per_reg|cal_cm2|voltdrop_pct|csa_mm2|kva|kwh|kw|percent|"
         r"m3_h|m3|m2|kg|mm2|count|\ba\b)$", re.I)
 
-    def _noun_stem(key: str):
+    def _noun_stem_toks(key: str):
+        """ORDERED noun tokens of a quantity key with its attribute suffix stripped.
+        Ordered (not a set) so the HEAD noun below is deterministic — `next(iter(set))`
+        was hash-seed-dependent and made the Quantities where-to column differ between
+        two builds of the SAME run (determinism bug, fixed 2026-07-02)."""
         s = key
         while True:
             s2 = _ATTR_SUFFIX.sub("", s)
             if s2 == s:
                 break
             s = s2
-        toks = set(t for t in s.split("_") if t and t not in ("each", "total", "main", "of"))
-        return toks
+        return [t for t in s.split("_") if t and t not in ("each", "total", "main", "of")]
+
+    def _noun_stem(key: str):
+        return set(_noun_stem_toks(key))
 
     _GENERIC = {"tank", "pump", "valve", "vessel", "skid", "filter", "panel", "system", "unit", "water"}
 
@@ -1987,7 +1993,8 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         stem = set(_sing(t) for t in _noun_stem(key))
         if not stem or (len(stem) == 1 and next(iter(stem)) in _GENERIC):
             return []
-        head = _sing(next(iter(_noun_stem(key) or {""})))  # last token of the key noun (the device)
+        _ord = _noun_stem_toks(key)
+        head = _sing(_ord[-1]) if _ord else ""  # last token of the key noun (the device)
         out = []
         for pn, toks in _part_tok:
             if stem <= toks:                                   # exact noun match
@@ -3380,23 +3387,38 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     ws = wb.create_sheet(_LEDGER_SHEET)
     set_widths(ws, {"A": 12, "B": 46, "C": 8, "D": 12, "E": 12,           # always-visible
                     "F": 18, "G": 30, "H": 22, "I": 10, "J": 12,          # Cost-basis group
-                    "K": 30, "L": 18, "M": 50, "N": 30})                  # Engineering-spec group
-    title_row(ws, "Bill of Materials (Ledger)", 14,
-              "THE BILL + its provenance + its engineering, on one sheet — ALL COLUMNS VISIBLE "
-              "(nothing hidden/collapsed). Buy-list: tag · item · qty · unit £ · LIVE line £. "
-              "'Cost basis' (cols F–J) = HOW each £ was derived (method / inputs / factors / "
-              "estimate class / confidence); 'Engineering spec' (cols K–N) = WHY each principal "
-              "is this size (duty / material / sizing calc / MPN). Σ line £ is live at the foot; "
-              "commodity lines leave the spec columns blank (correct — they need no sizing basis).")
+                    "K": 30, "L": 22, "M": 50, "N": 30,                   # Engineering-spec group
+                    "O": 34})                                             # Row check (contract)
+    # The COLUMN CONTRACT for this tab (evaluated once in build(), before any tab renders):
+    # material required on FABRICATED parts / na_with_reason on assemblies; MPN real /
+    # DB-sourced / explicit TBD (count surfaced + proportional score penalty); qty × unit £
+    # = line £ per row. The per-row verdicts render in the rightmost 'Row check' column
+    # from the SAME evaluation — never a fresh, divergent judgement.
+    cres = _CONTRACT_RESULTS.get(_LEDGER_SHEET) or {}
+    crows = cres.get("rows") or {}
+    subtitle = (
+        "THE BILL + its provenance + its engineering, on one sheet — ALL COLUMNS VISIBLE "
+        "(nothing hidden/collapsed). Buy-list: tag · item · qty · unit £ · LIVE line £. "
+        "'Cost basis' (cols F–J) = HOW each £ was derived (method / inputs / factors / "
+        "estimate class / confidence); 'Engineering spec' (cols K–N) = WHY each principal "
+        "is this size (duty / material / sizing calc / MPN). Σ line £ is live at the foot; "
+        "commodity lines leave the spec columns blank (correct — they need no sizing basis).")
+    if cres:
+        subtitle += (f" MPN TBD COUNT: {cres.get('tbd_count', 0)}/{cres.get('tbd_required', 0)} "
+                     f"bought-out lines await detailed design (score penalised by the TBD "
+                     f"fraction — a fully-TBD bill cannot reach 8). " + _contract_note(cres))
+    title_row(ws, "Bill of Materials (Ledger)", 15, subtitle)
     header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
                    "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
-                   "Duty / rating", "Material", "Sizing calc (basis)", "MPN / datasheet"])
+                   "Duty / rating", "Material", "Sizing calc (basis)", "MPN / datasheet",
+                   "Row check"])
     bom = state.get("requirementsBom") or []
     cost_by_name = _build_costbasis_by_name(state)
     mpn_by_word = _build_mpn_by_word(state)
     r = 5
     first_line_row = r
-    for row in bom:
+    for _ri, row in enumerate(bom):
+        _cr = crows.get(_ri) or {}
         # Tag column REFERENCES the master "Part names" tag where this is a principal (one
         # identity; the master is the single source of the tag too). Sub-components (P-101.1)
         # and connection lines keep their literal tag (not master principals).
@@ -3477,17 +3499,47 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         if _is_principal:
             # duty / rating = the requirement text (carries the sizing, '132 kW motor …')
             dc = ws.cell(r, 11, _req_raw); dc.alignment = WRAP_TOP; dc.font = FONT_NOTE; dc.border = BORDER
-            ws.cell(r, 12, clean_cell(row.get("material", ""))).border = BORDER
+            # MATERIAL — the contract's resolved value: the row's own material / MoC token,
+            # or the explicit 'N/A — proprietary assembly …' disclosure for a bought-out
+            # package (issue 7: an assembly's blank material is a stated reason, never a gap).
+            _mat = _cr.get("material") if _cr else clean_cell(row.get("material", ""))
+            mcell = ws.cell(r, 12, clean_cell(_mat))
+            mcell.alignment = WRAP_TOP
+            mcell.border = BORDER
+            if str(_mat or "").startswith("N/A"):
+                mcell.font = FONT_NOTE
             sc = ws.cell(r, 13, clean_cell(row.get("basis", "")))
             sc.alignment = WRAP_TOP; sc.font = FONT_NOTE; sc.border = BORDER
-            # MPN / datasheet: partVerifications by tag, then by the requirement head noun;
-            # fall back to the BoM `part` text.
-            _mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
-            if not _mpn and _req_raw:
-                _head = re.split(r"[·\-(]", _req_raw)[0].strip().lower()
-                _mpn = mpn_by_word.get(_head, "")
-            pc = ws.cell(r, 14, clean_cell(_mpn) or clean_cell(row.get("part", "")) or "—")
+            # MPN / datasheet — the contract's resolved reference (partVerifications by
+            # tag → head noun → the row's own non-placeholder `part`); a bought-out row
+            # with NO reference renders the EXPLICIT flagged 'TBD (detailed design)'
+            # (amber), never a silent dash or the 'requirement stated' placeholder.
+            if _cr:
+                _mpn = _cr.get("mpn") or "—"
+            else:
+                _mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
+                if not _mpn and _req_raw:
+                    _head = re.split(r"[·\-(]", _req_raw)[0].strip().lower()
+                    _mpn = mpn_by_word.get(_head, "")
+                _mpn = clean_cell(_mpn) or clean_cell(row.get("part", "")) or "—"
+            pc = ws.cell(r, 14, clean_cell(_mpn))
             pc.alignment = WRAP_TOP; pc.border = BORDER
+            if _cr.get("tbd"):
+                pc.fill = FILL_ADVISORY
+                pc.font = FONT_ADVISORY
+
+        # ── ROW CHECK (col O) — the published column contract's per-row verdict, from the
+        #    SAME evaluation that set the tab's arithmetic score (never a fresh judgement). ──
+        if _cr:
+            _rok = _cr.get("verdict") == "PASS"
+            rcell = ws.cell(r, 15, "PASS" if _rok else "FAIL — " + "; ".join(_cr.get("reasons") or []))
+            rcell.alignment = WRAP_TOP
+            rcell.border = BORDER
+            rcell.font = FONT_PASS if _rok else FONT_FAIL
+            rcell.fill = FILL_PASS if _rok else FILL_FAIL
+            if not _rok:
+                for col in range(1, 15):
+                    ws.cell(r, col).fill = FILL_FAIL
 
         # Register this part's canonical cells so other tabs reference (not repeat) it.
         # Sheet name = the merged ledger (was 'BoM') so every bom_ref() still resolves.
@@ -3570,7 +3622,7 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     # number formats (#37): Qty (#,##0) + Unit/Line £ (£#,##0) + the cost-basis Est class
     apply_col_formats(ws, first_line_row, {3: FMT_INT}, last_line_row)
     apply_col_formats(ws, first_line_row, {4: FMT_GBP, 5: FMT_GBP}, sum_row)
-    ws.auto_filter.ref = f"A4:N{last_line_row}"
+    ws.auto_filter.ref = f"A4:O{last_line_row}"
     ws.freeze_panes = "A5"
 
     # ── DETAIL COLUMNS ALWAYS VISIBLE (Tristan, asked ≥2×: "stop having it compacted …
@@ -3580,13 +3632,13 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     #    So they render EXPANDED: NO column carries hidden=True, NO group is collapsed. A flat
     #    sheet — every cost-method / key-input / factor / sizing-basis is on screen by default.
     #    proveCatch: _ledger_columns_never_hidden() in _selftest blocks a regression to collapse. ──
-    for _cl in "FGHIJKLMN":
+    for _cl in "FGHIJKLMNO":
         cd = ws.column_dimensions[_cl]
         cd.outline_level = 0
         cd.hidden = False
         cd.collapsed = False
 
-    back_link(ws, 14)
+    back_link(ws, 15)
 
 
 # ============================================================================
@@ -3891,6 +3943,103 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
 # state.costStack, as LIVE running formulas (each running total references the
 # prior running total + the step delta, so editing any step recomputes the ASP).
 # ----------------------------------------------------------------------------
+
+# ── INSTALL-FACTOR DERIVATION (Tristan 2026-07-02, issue 8) ──────────────────────────────
+# The assembly-&-integration (B6) and installation-&-field-erection (B9) bars were bare
+# costStack scalars (a blanket class factor × raw). They are now ENGINEERING ESTIMATES
+# derived from the BoM's OWN class subtotals × Lang/Hand-style per-equipment-class
+# factors. Classification uses ONLY signals the rows already carry (requirement nouns,
+# routed-connection fields, vessel-geometry fields) — never an archetype table.
+#
+# Factor sources (per class, stated again in the rendered table):
+#   · Lang, H.J. (1948) "Simplified approach to preliminary cost estimates", Chem. Eng. 55.
+#   · Hand, W.E. (1958) "From flow sheet to cost estimate", Petroleum Refiner 37(9) —
+#     per-equipment-class installed-cost factor families.
+#   · Peters, Timmerhaus & West, "Plant Design & Economics for Chemical Engineers" 5th ed.,
+#     Table 6-5: equipment installation 25–55% of purchased cost, class-dependent.
+#   · Towler & Sinnott, "Chemical Engineering Design": typical installed-cost factors —
+#     equipment erection ~0.3, piping labour-dominant, electrical ~0.2–0.35,
+#     instrumentation ~0.3–0.4 of purchased cost.
+# Assembly factor = the shop/skid assembly-&-integration share of purchased cost;
+# install factor = field erection / installation labour share. Both AACE Class 4 style.
+_INSTALL_CLASSES = [
+    ("Vessels & tanks",
+     re.compile(r"\b(tank|vessel|sump|column|reactor|drum|silo|hopper|clarifier|softener)\b", re.I),
+     0.10, 0.45,
+     "vessel/tank setting + field erection ≈ 40–50% of purchased (P,T&W 5e Tbl 6-5 install 25–55%; Hand 1958 vessel family)"),
+    ("Piping & fittings",
+     re.compile(r"\b(pipe|piping|manifold|duct|spool|fitting|hose|tubing|connection)\b", re.I),
+     0.08, 0.60,
+     "pipework erection is the labour-dominant field trade ≈ 50–70% of material (Towler & Sinnott piping factor; P,T&W 5e)"),
+    ("Rotating machinery",
+     re.compile(r"\b(pump|blower|compressor|fan|mixer|agitator|centrifuge|drive|motor)\b", re.I),
+     0.15, 0.30,
+     "machine setting, alignment + commissioning ≈ 25–60% of purchased, mid 30% (P,T&W 5e Tbl 6-5; Hand 1958 pump family)"),
+    ("Electrical & power",
+     re.compile(r"\b(panel|breaker|starter|mcc|switchboard|switchgear|transformer|vfd|inverter|ups|cabl\w*|busbar|electrical|distribution|power)\b", re.I),
+     0.20, 0.35,
+     "panel wiring/integration ~20%; field electrical (containment, pulling, termination, test) ≈ 15–40% (P,T&W 5e; Towler & Sinnott f_el)"),
+    ("Instruments, valves & controls",
+     re.compile(r"\b(sensor|transmitter|instrument|meter|analy[sz]er|probe|plc|scada|hmi|controller|solenoid|actuat\w*|valve|switch)\b", re.I),
+     0.10, 0.40,
+     "instrument mounting, hook-up, loop check + calibration ≈ 30–50% (Towler & Sinnott f_i; ISA installation norms)"),
+    ("Structural & civil",
+     re.compile(r"\b(skid|frame|structure|structural|platform|support|grating|ladder|walkway|foundation|slab|steelwork)\b", re.I),
+     0.05, 0.50,
+     "steelwork trial-fit ~5%; site erection ≈ 50% of fabricated-steel cost (UK structural-erection norms; P,T&W civil factors)"),
+]
+_INSTALL_DEFAULT = ("Other equipment", None, 0.10, 0.30,
+                    "ASSUMPTION — no class signal on these lines; generic process-equipment "
+                    "install 30% (P,T&W 5e 25–55% band, low end) + 10% assembly")
+
+
+def _bom_install_derivation(state: dict) -> List[dict]:
+    """Per-equipment-class BoM subtotals + assembly/install factors for the waterfall's
+    B6/B9 derivation. One entry per class PRESENT in the bill: {label, subtotal, count,
+    mass_kg, asm_f, inst_f, source}. Principal lines only (a '↳' sub-component is an
+    apportionment of its parent; a £0 line contributes nothing)."""
+    bom = state.get("requirementsBom") or []
+    order = [c[0] for c in _INSTALL_CLASSES] + [_INSTALL_DEFAULT[0]]
+    spec = {c[0]: c for c in _INSTALL_CLASSES}
+    spec[_INSTALL_DEFAULT[0]] = _INSTALL_DEFAULT
+    agg: Dict[str, dict] = {}
+    for row in bom:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "").strip()
+        if req.startswith("↳") or row.get("sub_of"):
+            continue
+        line = num(row.get("line_gbp")) or 0.0
+        if line <= 0:
+            continue
+        cls = None
+        # a routed connection row is a piping (or cable) take-off regardless of its noun
+        if row.get("connection") or row.get("service"):
+            svc = str(row.get("service") or "").lower()
+            cls = ("Electrical & power" if ("electr" in svc or "signal" in svc or "cable" in svc)
+                   else "Piping & fittings")
+        if cls is None:
+            for label, rx, _a, _i, _src in _INSTALL_CLASSES:
+                if rx.search(req):
+                    cls = label
+                    break
+        if cls is None:
+            cls = _INSTALL_DEFAULT[0]
+        a = agg.setdefault(cls, {"subtotal": 0.0, "count": 0, "mass_kg": 0.0})
+        a["subtotal"] += line
+        a["count"] += 1
+        a["mass_kg"] += (num(row.get("mass_kg")) or 0.0) * max(1.0, num(row.get("qty")) or 1.0)
+    out: List[dict] = []
+    for label in order:
+        if label not in agg:
+            continue
+        _lbl, _rx, asm_f, inst_f, src = spec[label]
+        out.append({"label": label, "subtotal": round(agg[label]["subtotal"], 2),
+                    "count": agg[label]["count"], "mass_kg": round(agg[label]["mass_kg"], 1),
+                    "asm_f": asm_f, "inst_f": inst_f, "source": src})
+    return out
+
+
 def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
     cs = state.get("costStack")
     if not cs or not isinstance(cs, dict):
@@ -3906,20 +4055,31 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
         return False
 
     ws = wb.create_sheet("Cost waterfall")
-    set_widths(ws, {"A": 38, "B": 18, "C": 18, "D": 56})
+    set_widths(ws, {"A": 38, "B": 18, "C": 18, "D": 62,
+                    "E": 13, "F": 14, "G": 13, "H": 14})
     title_row(
-        ws, "Cost waterfall — BoM → installed ASP", 4,
-        "Running build-up from state.costStack. Yellow = editable step £; the "
-        "Running total column is LIVE (each = previous running + this step), so "
-        "editing any step recomputes the installed price. 'costStack anchor' shows "
-        "the engine's stored figure at that milestone for cross-check.",
+        ws, "Cost waterfall — BoM → installed ASP", 8,
+        "Running build-up. Yellow = editable step £; the Running total column is LIVE "
+        "(each = previous running + this step), so Σ bars = total by construction and "
+        "editing any step recomputes the installed price. The assembly (B6) and "
+        "installation (B9) bars are ENGINEERING ESTIMATES derived from the bill's own "
+        "class subtotals × Lang/Hand-style install factors (derivation table below, "
+        "sources per line) — never bare numbers. 'costStack anchor' shows the engine's "
+        "stored figure at each milestone so any divergence is visible.",
     )
     header(ws, 4, ["Step", "Step £ (editable)", "Running total £ (live)",
-                   "costStack anchor / note"])
+                   "Basis / derivation (costStack anchor for cross-check)"])
     r = 5
 
+    # ── The BoM-derived assembly / install estimates (issue 8) ──
+    deriv = _bom_install_derivation(state)
+    ra = cs.get("ratios_applied") or {}
+
+    def _ra(key) -> Optional[float]:
+        return num(ra.get(key))
+
     # Build the additive ladder. Each entry: (label, step_amount, anchor_value_or_None, note)
-    steps: List[Tuple[str, Optional[float], Optional[float], str]] = []
+    steps: List[Tuple[str, Any, Optional[float], str]] = []
     # SOURCE the raw-materials figure to the bill: a LIVE link to the Ledger Σ cell so a
     # reader can trace it (Tristan: "there should be a source where the number comes from").
     # Falls back to the costStack scalar only if the ledger total wasn't captured. The
@@ -3929,28 +4089,69 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
                   "= Σ Bill of Materials (Ledger) line £ — LIVE link to the bill; edit the "
                   "bill and this recomputes"))
     asm = num(cs.get("assembly_labour_gbp")) or 0.0
-    steps.append(("+ Assembly / erection labour", asm, None, "assembly_labour_gbp"))
+    # B6 basis string — names the derivation (class → factor), never a bare scalar.
+    if deriv:
+        _asm_note = ("ESTIMATE — Σ BoM class subtotals × assembly-&-integration factor: "
+                     + " · ".join(f"{d['label']} {d['asm_f']:.2f}" for d in deriv)
+                     + " (LIVE from the derivation table below; Lang/Hand-style factors, "
+                       "sources per line). Engine assembly_labour_gbp kept as anchor")
+    else:
+        _f = _ra("assembly_labour_factor") or _ra("install_factor")
+        _asm_note = ("ESTIMATE — no BoM class subtotals derivable, so this bar falls back to "
+                     f"the engine's blanket class factor ({_f if _f is not None else '?'} × raw "
+                     "materials, costStack.assembly_labour_gbp) — ASSUMPTION stated, not a "
+                     "derived figure")
+    steps.append(("+ Assembly / erection labour", "ASM_DERIVED" if deriv else asm,
+                  asm, _asm_note))
     ovh = num(cs.get("factory_overhead_gbp")) or 0.0
     if ovh:
-        steps.append(("+ Factory overhead", ovh, None, "factory_overhead_gbp"))
+        _ovf = _ra("factory_overhead_factor")
+        steps.append(("+ Factory overhead", ovh, None,
+                      f"factory_overhead_gbp = (raw + assembly) × factor {_ovf:g} "
+                      f"(class cost structure '{cs.get('class_key', '?')}')"
+                      if _ovf else "factory_overhead_gbp (engine class cost structure)"))
     steps.append(("= Factory COGS", None,
                   num(cs.get("factory_cogs_gbp")),
                   "factory_cogs_gbp (anchor — compare running total)"))
     margin = num(cs.get("manufacturer_margin_gbp")) or 0.0
     if margin:
-        steps.append(("+ Manufacturer margin", margin, None, "manufacturer_margin_gbp"))
+        _mgf = _ra("manufacturer_margin_factor")
+        steps.append(("+ Manufacturer margin", margin, None,
+                      f"manufacturer_margin_gbp = factory COGS × factor {_mgf:g} "
+                      f"(class cost structure '{cs.get('class_key', '?')}')"
+                      if _mgf else "manufacturer_margin_gbp (engine class cost structure)"))
     steps.append(("= OEM transfer price", None,
                   num(cs.get("oem_transfer_price_gbp")),
                   "oem_transfer_price_gbp (anchor)"))
     chan = num(cs.get("channel_markup_gbp")) or 0.0
     if chan:
-        steps.append(("+ Channel markup", chan, None, "channel_markup_gbp"))
+        _chf = _ra("channel_markup_factor")
+        steps.append(("+ Channel markup", chan, None,
+                      f"channel_markup_gbp = OEM transfer × factor {_chf:g} (class cost structure)"
+                      if _chf else "channel_markup_gbp (engine class cost structure)"))
         steps.append(("= Channel list price", None,
                       num(cs.get("channel_list_price_gbp")),
                       "channel_list_price_gbp (anchor)"))
     install = num(cs.get("installation_cost_gbp")) or 0.0
-    steps.append(("+ Installation / field erection", install, None,
-                  "installation_cost_gbp"))
+    if deriv:
+        _inst_note = ("ESTIMATE — Σ BoM class subtotals × install factor: "
+                      + " · ".join(f"{d['label']} {d['inst_f']:.2f}" for d in deriv)
+                      + " (LIVE from the derivation table below; Lang/Hand-style factors, "
+                        "sources per line). Engine installation_cost_gbp kept as anchor")
+    else:
+        _foak = _ra("foak_contingency_factor")
+        _epc = _ra("epc_engineering_factor")
+        _inf = _ra("installation_cost_factor") or _ra("install_factor")
+        _parts = [p for p in (
+            f"install {_inf:g}" if _inf else "",
+            f"FOAK contingency {_foak:g}" if _foak else "",
+            f"EPC/engineering {_epc:g}" if _epc else "") if p]
+        _inst_note = ("ESTIMATE — no BoM class subtotals derivable, so this bar falls back to "
+                      "the engine's blanket factors × raw materials ("
+                      + (" + ".join(_parts) if _parts else "costStack.installation_cost_gbp")
+                      + ") — ASSUMPTION stated, not a derived figure")
+    steps.append(("+ Installation / field erection", "INST_DERIVED" if deriv else install,
+                  install, _inst_note))
     steps.append(("= Installed ASP (process equipment)", None,
                   num(cs.get("installed_asp_gbp")),
                   "installed_asp_gbp (anchor — process plant installed price)"))
@@ -3959,10 +4160,26 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
     bld = num(cs.get("building_civils_gbp")) or 0.0
     if bld:
         steps.append(("+ Building & Civils (installed)", bld, None,
-                      "building_civils_gbp — insulated industrial building, floor slab, drainage, "
-                      "doors (civils — separate from the equipment OEM stack)"))
+                      f"building_civils_gbp — insulated industrial building, "
+                      f"{int(num(cs.get('building_footprint_m2')) or 0):,} m² footprint × UK-2026 "
+                      "rates: clad walls, insulated roof, floor slab, drainage, doors (civils — "
+                      "separate from the equipment OEM stack)"))
         steps.append(("= ALL-IN PROJECT CAPEX", None, num(cs.get("all_in_capex_gbp")),
                       "all_in_capex_gbp (anchor — equipment + building, total project capex)"))
+
+    # Pre-compute the DERIVATION TABLE layout (below the ladder) so the B6/B9 step cells
+    # can be LIVE =SUM() formulas over it: Σ bars = total stays true by construction and
+    # the reader can edit a factor and watch the ladder recompute.
+    d_banner = 5 + len(steps) + 1
+    d_header = d_banner + 1
+    d_first = d_header + 1
+    d_last = d_first + max(len(deriv), 1) - 1
+    d_total = d_last + 1
+    for i, (label, amt, anchor, note) in enumerate(steps):
+        if amt == "ASM_DERIVED":
+            steps[i] = (label, f"=SUM(F{d_first}:F{d_last})", anchor, note)
+        elif amt == "INST_DERIVED":
+            steps[i] = (label, f"=SUM(H{d_first}:H{d_last})", anchor, note)
 
     first = r
     running_row: Optional[int] = None  # row holding the last LIVE running total
@@ -4003,8 +4220,78 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
         r += 1
 
     apply_col_formats(ws, first, {2: FMT_GBP, 3: FMT_GBP}, r - 1)
+
+    # ── DERIVATION TABLE — the B6/B9 engineering estimate, in the open (issue 8). One row
+    # per equipment class PRESENT in the bill: its BoM subtotal (+ line count / mass where
+    # the rows carry it) × an assembly factor and an install factor (Lang/Hand-style, the
+    # source named per line). The £ columns are LIVE (=subtotal × factor); the ladder's B6
+    # = ΣF and B9 = ΣH, so the bars, this table and the running total can never diverge. ──
+    sub_banner(ws, d_banner,
+               "B6 / B9 derivation — BoM class subtotals × Lang/Hand-style factors "
+               "(Lang 1948 · Hand 1958 · Peters/Timmerhaus/West 5e Tbl 6-5 · Towler & Sinnott)", 8)
+    header(ws, d_header, ["Equipment class", "BoM subtotal £", "Lines / mass",
+                          "Factor source (assembly + install)", "Assembly f",
+                          "Assembly £ (live)", "Install f", "Install £ (live)"])
+    if deriv:
+        for i, d in enumerate(deriv):
+            rr = d_first + i
+            ws.cell(rr, 1, d["label"]).border = BORDER
+            bc = ws.cell(rr, 2, d["subtotal"])
+            bc.number_format = FMT_GBP
+            bc.border = BORDER
+            _ctx = f"{d['count']} line(s)" + (f" · {d['mass_kg']:,.0f} kg" if d["mass_kg"] else "")
+            ws.cell(rr, 3, _ctx).border = BORDER
+            sc2 = ws.cell(rr, 4, clean_cell(d["source"]))
+            sc2.alignment = WRAP_TOP
+            sc2.font = FONT_NOTE
+            sc2.border = BORDER
+            af = ws.cell(rr, 5, d["asm_f"])
+            af.fill = FILL_INPUT
+            af.number_format = FMT_DEC2
+            af.border = BORDER
+            ac = ws.cell(rr, 6, f"=B{rr}*E{rr}")
+            ac.number_format = FMT_GBP
+            ac.fill = FILL_RESULT
+            ac.border = BORDER
+            inf = ws.cell(rr, 7, d["inst_f"])
+            inf.fill = FILL_INPUT
+            inf.number_format = FMT_DEC2
+            inf.border = BORDER
+            ic2 = ws.cell(rr, 8, f"=B{rr}*G{rr}")
+            ic2.number_format = FMT_GBP
+            ic2.fill = FILL_RESULT
+            ic2.border = BORDER
+        ws.cell(d_total, 1, "Σ — feeds the ladder: B6 = ΣF, B9 = ΣH (live)").font = FONT_SUB
+        tb = ws.cell(d_total, 2, f"=SUM(B{d_first}:B{d_last})")
+        tb.number_format = FMT_GBP
+        ta = ws.cell(d_total, 6, f"=SUM(F{d_first}:F{d_last})")
+        ta.number_format = FMT_GBP
+        ta.font = Font(bold=True)
+        ta.fill = FILL_RESULT
+        ti = ws.cell(d_total, 8, f"=SUM(H{d_first}:H{d_last})")
+        ti.number_format = FMT_GBP
+        ti.font = Font(bold=True)
+        ti.fill = FILL_RESULT
+        rec = ws.cell(d_total + 2, 1,
+                      "Reconciliation: Σ bars = the ladder's running total by construction "
+                      "(col C is live off col B; B6/B9 are live off this table). The engine's "
+                      f"costStack anchors (assembly £{asm:,.0f} · install £{install:,.0f} — "
+                      "blanket class factors) are shown per bar for cross-check; a divergence "
+                      "between the class-derived estimate and the blanket anchor is DISCLOSED, "
+                      "never hidden.")
+        rec.font = FONT_NOTE
+        rec.alignment = WRAP_TOP
+        ws.merge_cells(start_row=d_total + 2, start_column=1, end_row=d_total + 2, end_column=8)
+    else:
+        nc = ws.cell(d_first, 1,
+                     "No principal BoM lines were classifiable — the assembly / installation "
+                     "bars above fall back to the engine's blanket class factors and are "
+                     "labelled ESTIMATE with that assumption stated.")
+        nc.font = FONT_NOTE
+        ws.merge_cells(start_row=d_first, start_column=1, end_row=d_first, end_column=8)
+
     ws.freeze_panes = "A5"
-    back_link(ws, 4)
+    back_link(ws, 8)
     return True
 
 
@@ -4342,6 +4629,39 @@ def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
     }
 
 
+# ── CONSUMABLES the plant ACTUALLY uses (Tristan 2026-07-02, issue 9) ────────────────────
+# The 'feedstock cost' template wording is wrong for a plant that consumes chemicals /
+# media / nutrients rather than a converted feedstock. These classes are derived from the
+# run's OWN process/media BoM lines + contract quantity names — keyed on the consumable
+# signals actually present, never a per-archetype table. A class with no signal is absent.
+_CONSUMABLE_CLASSES = [
+    ("dosing chemicals",
+     re.compile(r"acid[_ ]dos|chemical[_ ]dos|antiscalant|coagulant|polymer[_ ]dos|chlorin|"
+                r"hypochlorite|caustic|biocide|reagent", re.I)),
+    ("nutrient / fertiliser stock",
+     re.compile(r"nutrient|fertigat|fertili[sz]", re.I)),
+    ("filter media & membranes",
+     re.compile(r"membrane|filter[_ ]media|\bmedia\b|\bresin\b|cartridge|\bgac\b|activated[_ ]?carbon",
+                re.I)),
+    ("softener salt / brine", re.compile(r"\bbrine\b|\bsalt\b", re.I)),
+    ("process gases", re.compile(r"\boxygen\b|\bnitrogen\b|\blox\b|co2[_ ]supply", re.I)),
+    ("feedstock", re.compile(r"feedstock", re.I)),
+]
+
+
+def _consumable_classes(state: dict) -> List[str]:
+    """The consumable classes THIS plant actually uses (ordered, de-duplicated), derived
+    from the process/media BoM requirement texts + the contract quantity names."""
+    texts: List[str] = []
+    for row in state.get("requirementsBom") or []:
+        if isinstance(row, dict):
+            texts.append(str(row.get("requirement") or ""))
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    texts.extend(str(k) for k in q.keys())
+    blob = "\n".join(texts)
+    return [label for label, rx in _CONSUMABLE_CLASSES if rx.search(blob)]
+
+
 # Resolved non-RAS drivers for the current run, published by tab_inputs_assumptions
 # so the Python sweep mirror (_econ_at) reproduces what the live cells show. None on
 # the RAS path (the RAS _ECON_DEFAULTS values are used unchanged). Also carries the
@@ -4468,10 +4788,27 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
             rows.append(("fcr", "Feedstock conversion ratio", round(gen.get("fcr", 0.0), 3),
                          "ratio", gen.get("fcr_basis", "feed-to-output ratio"), FMT_DEC2))
         else:
-            rows.append(("feed_price", "Feedstock price", 0.0, f"£/{out_unit}",
-                         "N/A — this product/plant has NO feedstock (not a feed-driven process)", FMT_GBP2))
-            rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
-                         "N/A — no feedstock for this class (feed term disabled)", FMT_DEC2))
+            # NOT feed-driven — but the plant may still CONSUME chemicals / media /
+            # nutrients (issue 9): name what it actually uses (derived from its own
+            # process/media BoM + contract lines), never the 'feedstock' template word.
+            _cons_i = _consumable_classes(state)
+            if _cons_i:
+                rows.append(("feed_price",
+                             f"Consumables price ({' · '.join(_cons_i[:3])})", 0.0,
+                             f"£/{out_unit}",
+                             "consumable classes derived from the plant's own process/media "
+                             "BoM + contract lines — what it ACTUALLY consumes (not a "
+                             "'feedstock'); enter a real £ per output unit to price them "
+                             "(0 until priced — meanwhile carried inside 'Other opex')",
+                             FMT_GBP2))
+                rows.append(("fcr", "Consumable intensity ratio", 0.0, "ratio",
+                             "consumable units per output unit (multiplies the consumables "
+                             "price above); 0 until priced", FMT_DEC2))
+            else:
+                rows.append(("feed_price", "Feedstock price", 0.0, f"£/{out_unit}",
+                             "N/A — this product/plant has NO feedstock (not a feed-driven process)", FMT_GBP2))
+                rows.append(("fcr", "Feedstock conversion ratio", 0.0, "ratio",
+                             "N/A — no feedstock for this class (feed term disabled)", FMT_DEC2))
     # Energy price / load factor / hours / labour / other opex: RAS keeps its grounded
     # values + basis EXACTLY; the non-RAS path uses signal-derived values with honest,
     # RAS-free basis strings (no LOX / juveniles / micro-grid / 'continuous RAS duty').
@@ -4630,10 +4967,20 @@ def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     line("revenue", "Annual revenue",
          f"={R('out_qty')}{sale_mult}*{R('sale_price')}",
          f"output × {'1000 ×' if is_ras else ''} sale price ({price_unit})")
-    # feed cost = output × FCR × feed price (RAS: ×1000 kg)
-    line("feed", "Feed / feedstock cost",
-         f"={R('out_qty')}{sale_mult}*{R('fcr')}*{R('feed_price')}",
-         "output × FCR × feed price")
+    # feed cost = output × FCR × feed price (RAS: ×1000 kg). Issue 9: on a NON-feed plant
+    # the line is named for what the plant ACTUALLY consumes (chemicals / media /
+    # nutrients — derived from its own process/media BoM lines), never 'feedstock'.
+    _cons_ec = [] if is_ras else _consumable_classes(state)
+    if is_ras or not _cons_ec:
+        line("feed", "Feed / feedstock cost",
+             f"={R('out_qty')}{sale_mult}*{R('fcr')}*{R('feed_price')}",
+             "output × FCR × feed price")
+    else:
+        line("feed", f"Consumables — {' · '.join(_cons_ec[:3])}",
+             f"={R('out_qty')}{sale_mult}*{R('fcr')}*{R('feed_price')}",
+             "output × consumable-intensity ratio × consumables price — the classes are "
+             "the plant's own (from its process/media BoM + contract lines); price them "
+             "on the Inputs tab")
     # energy = connected load × hours × load factor × energy price
     line("energy", "Energy cost",
          f"={R('load_kw')}*{R('hours')}*{R('load_factor')}*{R('energy_price')}",
@@ -4744,7 +5091,9 @@ def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     header(ws, r, ["Driver", "£ / yr (live)", "% of opex (live)", ""])
     r += 1
     brk_first = r
-    for key, lbl in [("feed", "Feed / feedstock"), ("energy", "Energy"),
+    _feed_brk = ("Feed / feedstock" if (is_ras or not _cons_ec)
+                 else "Consumables — " + " · ".join(_cons_ec[:2]))
+    for key, lbl in [("feed", _feed_brk), ("energy", "Energy"),
                      ("labour", "Labour"), ("maint", "Maintenance"),
                      ("other", "Other")]:
         ws.cell(r, 1, clean_cell(lbl)).border = BORDER
@@ -5881,6 +6230,28 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
         ws.row_dimensions[r].height = 24
         r += 2
 
+    # ── FRAMING HEADER (Tristan 2026-07-02, issue 9): when no market sale price is
+    # derivable this plant is a COST SUBSYSTEM of a larger operation — say so EXPLICITLY
+    # before any P&L-shaped section, so the absent revenue reads as the correct frame,
+    # not a gap. Signal-keyed (the engine's own sale-price-verified flag), no class table. ──
+    if _econ_sale_unverified():
+        _cons_hdr = _consumable_classes(state)
+        fr = ws.cell(r, 1,
+                     "COST SUBSYSTEM of a larger operation — no revenue attribution; the "
+                     "figures on this tab are lifecycle COSTS (capex + annual opex + the "
+                     "levelised £/unit of service). This plant serves a wider operation and "
+                     "earns no market revenue of its own"
+                     + (f"; what it consumes: {' · '.join(_cons_hdr[:4])}, power and water"
+                        if _cons_hdr else "")
+                     + ". Revenue/EBITDA/IRR rows further down are template placeholders "
+                       "awaiting a real sale price — they are NOT claims.")
+        fr.font = Font(bold=True, color="1F3A5F")
+        fr.fill = FILL_SUB
+        fr.alignment = Alignment(wrap_text=True, vertical="center")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = 42
+        r += 2
+
     # ── COST-OF-SERVICE (infrastructure / no market revenue) — the HONEST model for a utility ──
     # A water / treatment / fertigation plant has NO product sale, so a revenue/NPV/IRR model is
     # UNVERIFIABLE by construction (the prior fake-8 / capped-6). Its real economics are capex +
@@ -6700,7 +7071,9 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
             hc.border = BORDER
             for rr in range(body_first, body_last + 1):
                 ckt = str(ws.cell(rr, 1).value or "").strip()
-                cr = crows.get(ckt)
+                # contract rows are keyed (board · circuit ref) so duplicate refs across
+                # boards never collide; bare-ref fallback keeps older single-board runs.
+                cr = crows.get(f"{str(heading or '').strip()} · {ckt}") or crows.get(ckt)
                 if not cr:
                     continue
                 ok = cr.get("verdict") == "PASS"
@@ -7137,6 +7510,7 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     for _heading, hdr, trows in tables:
         if len(hdr) < 6:
             continue          # board key-value header tables are not circuit tables
+        _board = str(_heading or "").strip()
         c_ckt, c_kw = 0, _col(hdr, "load (kw)", "conn. load", "kw")
         c_i = _col(hdr, "design i", "current (a)")
         c_dev = _col(hdr, "device")
@@ -7182,7 +7556,16 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                 n_pass += 1
             if verdict == "FAIL" and "✓" in cell(c_sp):
                 source_fabricated += 1
-            per_row[ckt] = {"verdict": verdict, "reasons": reasons, "du": du, "length_m": ln}
+            # KEY = (board, circuit ref) — a multi-board schedule reuses circuit refs
+            # ("W1" on the MDB *and* on an MCC sub-board); keying by the bare ref
+            # collided the rows and mis-counted the arithmetic (v52: true 16/17 read
+            # 16/16). A residual collision (same board, same ref) falls back to a
+            # positional suffix so NO row is ever silently dropped from the count.
+            _key = f"{_board} · {ckt}" if _board else ckt
+            if _key in per_row:
+                _key = f"{_key} #{len(per_row)}"
+            per_row[_key] = {"verdict": verdict, "reasons": reasons, "du": du,
+                             "length_m": ln, "board": _board, "ckt": ckt}
 
     if not per_row:
         return None
@@ -7206,12 +7589,218 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                     "= f(length, CSA, Design I) in draw_panel_schedule at source")}
 
 
+# ── BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ─────────────────────────────
+# Material lexicon — a material the row ALREADY carries: its `material` field, an 'MoC:'
+# clause, or a material token inside its basis / requirement string (a pipe line's
+# "(HDPE/PVC-U)", a "Painted Carbon Steel Skid Frame"). UNIVERSAL — a lexicon of
+# engineering materials, never a per-class part table.
+_MATERIAL_TOKEN_RE = re.compile(
+    r"MoC:\s*[^·;|]+|\b(?:316L?|304L?|904L|duplex|super[- ]?duplex|stainless(?:\s+steel)?|"
+    r"carbon\s+steel|mild\s+steel|galvani[sz]ed(?:\s+steel)?|weathering\s+steel|"
+    r"aluminium|aluminum|copper|brass|bronze|cast\s+iron|ductile\s+iron|titanium|hastelloy|"
+    r"HDPE|MDPE|LDPE|PVC(?:-[UC])?|uPVC|CPVC|PP[RH]?\b|PTFE|PVDF|PFA|ABS|PMMA|POM|"
+    r"FRP|GRP|EPDM|NBR|nitrile|viton|silicone|polycarbonate|polyethylene|polypropylene|"
+    r"polyurethane|rubber|ceramic|concrete)\b", re.I)
+
+
+def _bom_row_material(row: dict) -> str:
+    """The material the row itself discloses: the `material` field first, else the
+    MoC / material token in its basis or requirement text. '' = none stated."""
+    m = str(row.get("material") or "").strip()
+    if m:
+        return m
+    for src in (row.get("basis"), row.get("requirement")):
+        hit = _MATERIAL_TOKEN_RE.search(str(src or ""))
+        if hit:
+            return re.sub(r"^MoC:\s*", "", hit.group(0).strip()).strip()
+    return ""
+
+
+# Fabrication signals — data the row already carries that says "this is a PHYSICAL part
+# fabricated / sized to a geometry" (a vessel shell, a routed pipe run, a structural
+# frame): physics-sized dimension / mass fields, a take-off or made-to-spec basis, a
+# routed connection. Everything else is a bought-out ASSEMBLY / PACKAGE priced as a unit.
+_FAB_FIELDS = ("wall_mm", "mass_kg", "diameter_m", "height_m", "footprint_m2", "length_m")
+_FAB_BASIS_RE = re.compile(
+    r"take-?off|made-to-spec|tapered wall|structural|steelwork|fabricat|"
+    r"\bpipe £|\bduct £|\bcable £|/m @", re.I)
+
+
+def _bom_row_kind(row: dict) -> str:
+    """'fabricated' (physical part sized to a geometry — material REQUIRED) or
+    'assembly' (bought-out unit/package — material n/a WITH reason). Derived ONLY from
+    data the row already carries (shape fields / basis / connection), never a class table."""
+    if any((num(row.get(f)) or 0) > 0 for f in _FAB_FIELDS):
+        return "fabricated"
+    if _FAB_BASIS_RE.search(str(row.get("basis") or "")):
+        return "fabricated"
+    if row.get("connection") or row.get("service"):
+        return "fabricated"          # a routed line — a pipe/duct/cable take-off
+    return "assembly"
+
+
+# `part` strings that are template placeholders, NOT a real part / datasheet reference.
+_MPN_PLACEHOLDER = {"", "—", "-", "n/a", "na", "tbd", "requirement stated", "assembly detail"}
+
+
+def _bom_row_mpn(row: dict, mpn_by_word: Dict[str, str]) -> str:
+    """The row's real / DB-sourced part reference: partVerifications by tag, then by the
+    requirement head noun (the SAME join tab_bom renders), then the row's own `part`
+    text when it is not a placeholder. '' = none. A partVerifications entry whose
+    part_number is ITSELF a 'TBD …' marker (the engine emits 'TBD (detailed design)'
+    for unresolved parts — 316/326 on codema v52) is NOT a resolved reference: it must
+    fall through to '' so the contract counts it as a TBD, never a fake real MPN."""
+    mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
+    req = str(row.get("requirement") or "").strip()
+    if not mpn and req:
+        head = re.split(r"[·\-(]", req)[0].strip().lower()
+        mpn = mpn_by_word.get(head, "")
+    if not mpn:
+        part = str(row.get("part") or "").strip()
+        if part.lower() not in _MPN_PLACEHOLDER:
+            mpn = part
+    if re.match(r"^\s*TBD\b", mpn, re.I):
+        return ""
+    return mpn
+
+
+_TBD_MPN_TEXT = "TBD (detailed design)"
+
+
+def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
+    """Column-contract evaluation of EVERY Bill-of-Materials (Ledger) row (pure — reads
+    state.requirementsBom + partVerifications; renders nothing).
+
+    MATERIAL — required for a PHYSICAL fabricated part (a row carrying its own geometry /
+    mass / take-off / routed-connection signals); a bought-out ASSEMBLY / PACKAGE discloses
+    'N/A — proprietary assembly' (na_with_reason). The distinction derives from data the
+    rows already carry — never a per-class table.
+    MPN / DATASHEET — a real or DB-sourced part reference for a bought-out row, else an
+    EXPLICIT flagged 'TBD (detailed design)'. A TBD row passes its ROW check (the gap is
+    disclosed) but the TAB score is penalised in PROPORTION to the TBD fraction — a
+    fully-TBD bill can never reach 8. The count is surfaced in the tab header.
+    NUMBERS — qty > 0 · unit £ > 0 · line £ = qty × unit £ (per-row arithmetic) · a
+    non-empty pricing basis. A '↳' sub-component is an apportionment of its parent
+    (unit/line waived WITH that stated reason, exactly as the ledger renders it)."""
+    bom = state.get("requirementsBom") or []
+    if not isinstance(bom, list) or not bom:
+        return None
+    mpn_by_word = _build_mpn_by_word(state)
+
+    contract = [
+        ("Tag/Item", "required_nonempty", "identity of the line"),
+        ("Qty", "required_nonempty", "quantity > 0"),
+        ("Unit £ / Line £", "computed",
+         "unit £ > 0 and line £ = qty × unit £ per row ('↳' sub-components are apportioned into their parent)"),
+        ("Basis", "required_nonempty", "the pricing derivation (method / take-off / rating / corpus reference)"),
+        ("Material", "computed",
+         "required for a PHYSICAL fabricated part; a bought-out assembly/package discloses "
+         "'N/A — proprietary assembly' (derived from the row's own shape/basis data, no class table)"),
+        ("MPN / datasheet", "computed",
+         "real or DB-sourced part reference for a bought-out row, else an explicit 'TBD (detailed design)' "
+         "— the TBD count is surfaced and penalises the tab score by its fraction"),
+    ]
+
+    per_row: Dict[int, dict] = {}
+    n_pass = 0
+    tbd_count = 0
+    mpn_required = 0
+    for idx, row in enumerate(bom):
+        if not isinstance(row, dict):
+            continue
+        reasons: List[str] = []
+        req = str(row.get("requirement") or "").strip()
+        is_sub = req.startswith("↳") or bool(row.get("sub_of"))
+        kind = "sub-component" if is_sub else _bom_row_kind(row)
+
+        if not (str(row.get("tag") or "").strip() and req):
+            reasons.append("tag / item identity missing")
+        qty = num(row.get("qty"))
+        if qty is None or qty <= 0:
+            reasons.append("qty missing")
+        unit = num(row.get("unit_gbp"))
+        line = num(row.get("line_gbp"))
+        material_txt = _bom_row_material(row)
+        mpn_txt = _bom_row_mpn(row, mpn_by_word)
+        tbd = False
+
+        if is_sub and not (line or 0):
+            # apportioned child — unit/line/material/MPN live on the PARENT line; the
+            # ledger renders 'incl. in parent', and that disclosure IS the reason.
+            material_txt = material_txt or "incl. in parent"
+            mpn_txt = mpn_txt or "incl. in parent"
+        else:
+            if unit is None or unit <= 0:
+                reasons.append("unit £ missing/zero")
+            if line is None or line <= 0:
+                reasons.append("line £ missing/zero")
+            if qty and unit is not None and line is not None and \
+                    abs(qty * unit - line) > max(1.0, 0.005 * abs(line)):
+                reasons.append(f"line £{line:,.0f} ≠ qty {qty:g} × unit £{unit:,.2f} "
+                               f"(= £{qty * unit:,.0f}) — per-row arithmetic broken")
+            if kind == "fabricated":
+                if not material_txt:
+                    reasons.append("material missing on a PHYSICAL fabricated part "
+                                   "(the row carries geometry/take-off data but states no material)")
+            elif not material_txt:
+                material_txt = "N/A — proprietary assembly / bought-out package, see datasheet"
+            if kind == "assembly":
+                mpn_required += 1
+                if not mpn_txt:
+                    mpn_txt = _TBD_MPN_TEXT
+                    tbd = True
+                    tbd_count += 1
+            elif kind == "fabricated" and not mpn_txt:
+                mpn_txt = "bespoke fabrication to drawing — see sizing basis"
+        if not str(row.get("basis") or "").strip():
+            reasons.append("pricing basis missing")
+
+        verdict = "PASS" if not reasons else "FAIL"
+        if verdict == "PASS":
+            n_pass += 1
+        per_row[idx] = {"verdict": verdict, "reasons": reasons, "kind": kind,
+                        "material": material_txt, "mpn": mpn_txt, "tbd": tbd}
+
+    if not per_row:
+        return None
+    n_total = len(per_row)
+    base = _contract_score(n_pass, n_total)
+    # TBD penalty — PROPORTIONAL to the fraction of bought-out rows still 'TBD (detailed
+    # design)': score = arithmetic − 4 × TBD-fraction, so a fully-TBD bill caps at 6 (<8)
+    # even when every row check passes. The gap is honest but it is still a gap.
+    tbd_frac = (tbd_count / mpn_required) if mpn_required else 0.0
+    score = base
+    if base is not None and tbd_frac > 0:
+        score = max(0.0, round(base - 4.0 * tbd_frac, 1))
+    n_fail = n_total - n_pass
+    issues: List[str] = []
+    if n_fail:
+        ex = [f"row {i + 1} ({str((bom[i] or {}).get('requirement', ''))[:40]}): {r['reasons'][0]}"
+              for i, r in list(per_row.items()) if r["verdict"] == "FAIL"][:3]
+        issues.append(f"{n_fail}/{n_total} ledger rows FAIL the column contract (arithmetic "
+                      f"10 × {n_pass}/{n_total} = {base}) — e.g. " + " · ".join(ex))
+    if tbd_count:
+        issues.append(f"{tbd_count}/{mpn_required} bought-out lines carry MPN 'TBD (detailed "
+                      f"design)' — an ESTIMATE-stage gap; score penalised −{4.0 * tbd_frac:.1f} "
+                      f"(proportional to the TBD fraction)")
+    return {"tab": _LEDGER_SHEET, "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "source_fabricated": 0,
+            "tbd_count": tbd_count, "tbd_required": mpn_required,
+            "tbd_fraction": round(tbd_frac, 3),
+            "fix": ("price the £0 lines at source (requirements_bom.py emitter), state the "
+                    "material on fabricated parts in the sizing pass, and close MPN TBDs by "
+                    "growing the parts DB (Stage 17.6 ingest) so partVerifications resolves them")}
+
+
 # The registry: tab name → its contract evaluator. build() runs each BEFORE the tabs render,
 # overrides the tab's quality score with the ARITHMETIC result, and the tab functions read
 # _CONTRACT_RESULTS to render the per-row "Row check" verdicts from the SAME evaluation.
 _CONTRACT_TABS = {
     "Line & velocity": _eval_line_velocity_contract,
     "Panel schedule": _eval_panel_schedule_contract,
+    _LEDGER_SHEET: _eval_bom_ledger_contract,
 }
 
 
@@ -8576,26 +9165,121 @@ def _selftest() -> int:
         if not _lv2 or _lv2["rows"][0]["verdict"] != "FAIL":
             print("  FAIL contract-lv: an n/a WITHOUT a stated reason must FAIL its row"); bad += 1
         # (b) PANEL: a dash-ΔU circuit FAILS (and its source ✓ counts as fabricated); a
-        # computed in-band circuit PASSES; the tab score is arithmetic 10 × 1/2 = 5.0.
+        # computed in-band circuit PASSES; the tab score is arithmetic. A SECOND BOARD
+        # reusing the same circuit ref ("W1" on the sub-board — the multi-board panel
+        # data landed 2026-07-02) must NOT collide with the main board's "W1": every
+        # row is keyed (board · ref) and counts. The sub-board's W1 is genuinely
+        # out-of-spec (ΔU 5.7% > 5%) — an HONEST ✗, so it is a failing row, never a
+        # fabricated tick. True arithmetic: 1 PASS / 3 rows.
         os.makedirs(os.path.join(_td, "drawings"), exist_ok=True)
         with open(os.path.join(_td, "drawings", "panel-schedule.md"), "w") as _fh:
-            _fh.write(
-                "# PANEL / LOAD SCHEDULE\n\n## MAIN LV BOARD (TP&N)\n\n"
+            _hdr_ln = (
                 "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | "
                 "Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
-                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n")
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE\n\n## MAIN LV BOARD (TP&N)\n\n" + _hdr_ln +
                 "| W1 | Pump A | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | — | — | ✓ |\n"
-                "| W2 | Pump B | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n")
+                "| W2 | Pump B | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n"
+                "\n## MCC SUB-BOARD\n\n" + _hdr_ln +
+                "| W1 | Dosing Pump | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 57.8 | 5.7 | ✗ |\n")
         _ps = _eval_panel_schedule_contract(_td, {})
-        if not _ps or _ps["n_total"] != 2:
-            print(f"  FAIL contract-panel: expected 2 circuit rows (got {_ps and _ps['n_total']})"); bad += 1
+        _k_main_w1 = "MAIN LV BOARD (TP&N) · W1"
+        _k_main_w2 = "MAIN LV BOARD (TP&N) · W2"
+        _k_sub_w1 = "MCC SUB-BOARD · W1"
+        if not _ps or _ps["n_total"] != 3:
+            print(f"  FAIL contract-panel: duplicate circuit refs across boards must NOT collide — "
+                  f"expected 3 keyed rows (got {_ps and _ps['n_total']})"); bad += 1
         else:
-            if _ps["rows"]["W1"]["verdict"] != "FAIL" or not any("ΔU" in x for x in _ps["rows"]["W1"]["reasons"]):
-                print(f"  FAIL contract-panel: a dash-ΔU row must FAIL naming the missing ΔU (got {_ps['rows']['W1']})"); bad += 1
-            if _ps["rows"]["W2"]["verdict"] != "PASS":
-                print(f"  FAIL contract-panel: a routed, in-band circuit must PASS (got {_ps['rows']['W2']})"); bad += 1
-            if _ps["score"] != 5.0 or _ps["source_fabricated"] != 1:
-                print(f"  FAIL contract-panel: score must be 5.0 with 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
+            if _ps["rows"][_k_main_w1]["verdict"] != "FAIL" or not any("ΔU" in x for x in _ps["rows"][_k_main_w1]["reasons"]):
+                print(f"  FAIL contract-panel: a dash-ΔU row must FAIL naming the missing ΔU (got {_ps['rows'][_k_main_w1]})"); bad += 1
+            if _ps["rows"][_k_main_w2]["verdict"] != "PASS":
+                print(f"  FAIL contract-panel: a routed, in-band circuit must PASS (got {_ps['rows'][_k_main_w2]})"); bad += 1
+            if _ps["rows"][_k_sub_w1]["verdict"] != "FAIL" or not any("exceeds" in x for x in _ps["rows"][_k_sub_w1]["reasons"]):
+                print(f"  FAIL contract-panel: the sub-board's out-of-band ΔU 5.7% must FAIL the ≤5% band (got {_ps['rows'][_k_sub_w1]})"); bad += 1
+            # score is ARITHMETIC over ALL boards' rows: 10 × 1/3 = 3.3; only the dash-ΔU
+            # main-board W1 rendered a fabricated ✓ (the honest ✗ on the sub-board is NOT one).
+            if _ps["score"] != 3.3 or _ps["source_fabricated"] != 1:
+                print(f"  FAIL contract-panel: score must be 10×1/3=3.3 with exactly 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
+    # ═══ proveCatch the BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ═══
+    # Claims: (a) a bought-out ASSEMBLY without a material PASSES with the stated
+    # 'N/A — proprietary assembly' reason + its missing MPN becomes an EXPLICIT flagged
+    # TBD; (b) a PHYSICAL fabricated part without a material FAILS; (c) line £ ≠ qty ×
+    # unit £ FAILS the row arithmetic; (d) the TBD fraction PENALISES the tab score
+    # (fully-TBD < 8); (e) a real DB-sourced MPN resolves and is NOT a TBD.
+    _bom_state = {"requirementsBom": [
+        {"tag": "X-105", "requirement": "Electrical Control Panel", "qty": 1,
+         "unit_gbp": 800, "line_gbp": 800, "part": "requirement stated",
+         "basis": "bottom-up parametric · floored to min credible price"},
+        {"tag": "TK-1", "requirement": "Water Tank · 2 m dia x 2 m", "qty": 1,
+         "unit_gbp": 5000, "line_gbp": 5000, "diameter_m": 2.0, "height_m": 2.0,
+         "basis": "tapered wall 6 mm = P·r/(σ·E)+c · ⌀2×2 m take-off"},
+        {"tag": "P-1", "requirement": "Transfer Pump · 4 kW", "qty": 2,
+         "unit_gbp": 1000, "line_gbp": 1500, "part": "requirement stated",
+         "basis": "rating-based: 4 kW × £250/kW", "material": "316L stainless"},
+        {"tag": "P-2", "requirement": "Dosing Pump · 0.04 kW", "qty": 1,
+         "unit_gbp": 900, "line_gbp": 900, "part": "requirement stated",
+         "basis": "catalogue-class budget", "material": "PVDF"},
+        # partVerifications carries its OWN 'TBD (detailed design)' marker for this one —
+        # a TBD marker is NOT a resolved MPN and must be counted as a TBD (v52: 316/326
+        # partVerifications are TBD markers; treating them as real MPNs hid the gap).
+        {"tag": "X-9", "requirement": "Control Panel Unit", "qty": 1,
+         "unit_gbp": 500, "line_gbp": 500, "part": "requirement stated",
+         "basis": "bottom-up parametric"},
+    ], "partVerifications": [
+        {"word_name": "Dosing Pump", "manufacturer": "Grundfos", "part_number": "97722438"},
+        {"word_name": "Control Panel Unit", "manufacturer": None,
+         "part_number": "TBD (detailed design)"},
+    ]}
+    _bl = _eval_bom_ledger_contract(".", _bom_state)
+    if not _bl or _bl["n_total"] != 5:
+        print(f"  FAIL contract-bom: expected 5 evaluated rows (got {_bl and _bl['n_total']})"); bad += 1
+    else:
+        _b0, _b1, _b2, _b3, _b4 = (_bl["rows"][i] for i in range(5))
+        if not _b4["tbd"] or _b4["mpn"] != _TBD_MPN_TEXT:
+            print(f"  FAIL contract-bom: a partVerifications 'TBD (detailed design)' marker must "
+                  f"COUNT as a TBD, never read as a resolved MPN (got {_b4})"); bad += 1
+        if _b0["verdict"] != "PASS" or not str(_b0["material"]).startswith("N/A — proprietary assembly"):
+            print(f"  FAIL contract-bom: an assembly without a material must PASS with the "
+                  f"stated N/A reason (got {_b0})"); bad += 1
+        if _b0["mpn"] != _TBD_MPN_TEXT or not _b0["tbd"]:
+            print(f"  FAIL contract-bom: an assembly with no MPN must carry the EXPLICIT "
+                  f"flagged TBD (got {_b0['mpn']!r})"); bad += 1
+        if _b1["verdict"] != "FAIL" or not any("material missing" in x for x in _b1["reasons"]):
+            print(f"  FAIL contract-bom: a fabricated part without a material must FAIL "
+                  f"naming the gap (got {_b1})"); bad += 1
+        if _b2["verdict"] != "FAIL" or not any("≠ qty" in x for x in _b2["reasons"]):
+            print(f"  FAIL contract-bom: line £1,500 ≠ 2 × £1,000 must FAIL the per-row "
+                  f"arithmetic (got {_b2})"); bad += 1
+        if _b3["verdict"] != "PASS" or _b3["tbd"] or "Grundfos" not in str(_b3["mpn"]):
+            print(f"  FAIL contract-bom: a DB-sourced MPN must resolve (never TBD) — got {_b3}"); bad += 1
+        # (d) TBD penalty is PROPORTIONAL: tbd 3 of 4 bought-out rows here → score = base − 4×¾
+        _base = _contract_score(_bl["n_pass"], _bl["n_total"])
+        if not (_bl["score"] < _base and abs(_bl["score"] - max(0.0, round(_base - 4.0 * (3 / 4), 1))) < 0.05):
+            print(f"  FAIL contract-bom: TBD fraction must penalise proportionally "
+                  f"(base {_base}, got {_bl['score']})"); bad += 1
+        if _bl["tbd_count"] != 3 or _bl["tbd_required"] != 4:
+            print(f"  FAIL contract-bom: TBD count must be surfaced (got "
+                  f"{_bl['tbd_count']}/{_bl['tbd_required']}, want 3/4)"); bad += 1
+    # a fully-TBD bill can NEVER reach 8, even when every row check passes
+    _all_tbd = _eval_bom_ledger_contract(".", {"requirementsBom": [
+        {"tag": f"X-{i}", "requirement": f"Package Unit {i}", "qty": 1, "unit_gbp": 100,
+         "line_gbp": 100, "part": "requirement stated", "basis": "bottom-up parametric"}
+        for i in range(1, 6)]})
+    if not _all_tbd or _all_tbd["n_pass"] != 5 or _all_tbd["score"] >= 8:
+        print(f"  FAIL contract-bom: a fully-TBD bill must score <8 even with every row "
+              f"passing (got {_all_tbd and _all_tbd['score']})"); bad += 1
+    # ═══ proveCatch the CONSUMABLES label derivation (issue 9): classes come from the
+    # plant's OWN BoM/contract signals; a plant with none gets NO consumable label. ═══
+    _cs_hit = _consumable_classes({"requirementsBom": [
+        {"requirement": "Ro Membrane Elements"}, {"requirement": "Nutrient Tank"}],
+        "orchestratorContract": {"quantities": {"acid_dosing_pump_throughput_m3_h": 1}}})
+    if not all(x in _cs_hit for x in ("dosing chemicals", "nutrient / fertiliser stock",
+                                      "filter media & membranes")):
+        print(f"  FAIL consumables: expected the 3 present classes to be detected (got {_cs_hit})"); bad += 1
+    if _consumable_classes({"requirementsBom": [{"requirement": "Battery Rack"}]}):
+        print("  FAIL consumables: a plant with no consumable signal must yield NO classes"); bad += 1
+
     # (d2) the score arithmetic itself + the fabricated-tick hard floor
     if _contract_score(1, 2) != 5.0 or _contract_score(45, 45) != 10.0 or _contract_score(0, 45) != 0.0:
         print("  FAIL contract-score: 10 × pass-fraction arithmetic broken"); bad += 1
@@ -8735,11 +9419,18 @@ def _selftest() -> int:
             "costStack": {"raw_materials_bom_gbp": 4200, "factory_cogs_gbp": 5000,
                           "oem_transfer_price_gbp": 5000, "installation_cost_gbp": 1000,
                           "installed_asp_gbp": 6000}}
+        _CONTRACT_RESULTS[_LEDGER_SHEET] = _eval_bom_ledger_contract(_td2, _mini)
         tab_bom(_wb, _mini, _td2)
         _lws = _wb[_LEDGER_SHEET]
         _hidden_cols = [c for c in "FGHIJKLMN" if _lws.column_dimensions[c].hidden]
         if _hidden_cols:
             print(f"  FAIL ledger-columns-visible: F–N must NEVER be hidden, got hidden={_hidden_cols}"); bad += 1
+        # (6b) LEDGER ROW CHECK (issue 7): the rightmost column renders the contract's
+        # per-row verdict from the SAME evaluation that scored the tab.
+        if _lws.cell(4, 15).value != "Row check" or _lws.cell(5, 15).value != "PASS":
+            print(f"  FAIL ledger-row-check: col O must carry the contract verdict "
+                  f"(got header {_lws.cell(4, 15).value!r}, row {_lws.cell(5, 15).value!r})"); bad += 1
+        _CONTRACT_RESULTS.pop(_LEDGER_SHEET, None)
         # (7) COST WATERFALL RAW-MATERIALS = LIVE LINK TO THE BILL (Tristan: "there must be a source
         #     where the number comes from"). The Raw-materials step £ cell must be a formula pointing at
         #     the Ledger Σ — NOT a sourceless static scalar. Regression to a bare number fails here.
@@ -8749,6 +9440,46 @@ def _selftest() -> int:
                           if str(_cws.cell(rr, 1).value or "").startswith("Raw materials")), None)
         if not (isinstance(_raw_cell, str) and _raw_cell.startswith("=") and _LEDGER_SHEET in _raw_cell):
             print(f"  FAIL waterfall-raw-source: Raw materials must LINK to the BoM Ledger Σ, got {_raw_cell!r}"); bad += 1
+        # (7b) WATERFALL BAR DERIVATION (issue 8): the assembly + installation bars must be
+        # LIVE =SUM() formulas over the class-factor derivation table, with a basis string
+        # naming the derivation — NEVER a bare scalar with a bare costStack key.
+        _asm_row = next((rr for rr in range(5, 16)
+                         if "Assembly" in str(_cws.cell(rr, 1).value or "")), None)
+        _ins_row = next((rr for rr in range(5, 16)
+                         if "Installation" in str(_cws.cell(rr, 1).value or "")), None)
+        if _asm_row is None or _ins_row is None:
+            print("  FAIL waterfall-derived: assembly/installation bars missing from the ladder"); bad += 1
+        else:
+            for _br, _tag in ((_asm_row, "assembly"), (_ins_row, "install")):
+                _v = _cws.cell(_br, 2).value
+                _n = str(_cws.cell(_br, 4).value or "")
+                if not (isinstance(_v, str) and _v.startswith("=SUM(")):
+                    print(f"  FAIL waterfall-derived: the {_tag} bar must be a LIVE Σ over the "
+                          f"derivation table, got {_v!r}"); bad += 1
+                if "Σ BoM class subtotals" not in _n or "ESTIMATE" not in _n:
+                    print(f"  FAIL waterfall-derived: the {_tag} bar must carry its derivation "
+                          f"basis string, got {_n!r}"); bad += 1
+            # the pump row must classify as Rotating machinery with its stated factors
+            _dt = next((rr for rr in range(5, 40)
+                        if str(_cws.cell(rr, 1).value or "").startswith("Rotating machinery")), None)
+            if _dt is None or _cws.cell(_dt, 5).value != 0.15 or _cws.cell(_dt, 7).value != 0.30:
+                print("  FAIL waterfall-derived: the pump line must land in 'Rotating machinery' "
+                      "with assembly 0.15 / install 0.30 factors"); bad += 1
+        # (7c) a bar with NO derivable basis (no classifiable BoM) renders honestly as an
+        # ESTIMATE with its ASSUMPTION stated — never a bare number with a bare key name.
+        _wb2 = Workbook(); _wb2.remove(_wb2.active)
+        tab_cost_waterfall(_wb2, {"requirementsBom": [],
+                                  "costStack": {"raw_materials_bom_gbp": 1000,
+                                                "assembly_labour_gbp": 400,
+                                                "installation_cost_gbp": 300,
+                                                "installed_asp_gbp": 1700,
+                                                "ratios_applied": {"install_factor": 0.4}}})
+        _cws2 = _wb2["Cost waterfall"]
+        _n2 = next((str(_cws2.cell(rr, 4).value or "") for rr in range(5, 16)
+                    if "Assembly" in str(_cws2.cell(rr, 1).value or "")), "")
+        if "ESTIMATE" not in _n2 or "ASSUMPTION" not in _n2:
+            print(f"  FAIL waterfall-honest-fallback: a bar with no derivable basis must state "
+                  f"ESTIMATE + its ASSUMPTION, got {_n2!r}"); bad += 1
     # (8) CALC TRACEABILITY LINK (Tristan 2026-06-29: "why is the value in C16 not connected to the
     #     result in B60?"). A data-flow Value must link to the worked-calc result of the SAME tool +
     #     value, UNAMBIGUOUSLY — and must NOT link on an ambiguous (≥2) or mismatched value.
