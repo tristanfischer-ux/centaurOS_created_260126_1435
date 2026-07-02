@@ -649,6 +649,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Line & velocity": "Every sized run with velocity or volt-drop versus its limit.",
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
     "Risk & Regulatory": "Hazard and risk register, compliance verdict and statutory duties.",
+    "Holds & exclusions": "Numbered open holds derived live from failing checks; scope exclusions.",
     "Assembly sequence": "Order of works from civils through to commissioning.",
     "Drawings": "Drawing register — number, revision, scale, sheets and full-size A1 files.",
 }
@@ -1625,11 +1626,207 @@ def _brief_paragraphs(md: str) -> List[str]:
     return [p for p in out if p]
 
 
-def tab_brief(wb: Workbook, run_dir: str) -> None:
+# ── CLIENT-OFFER RECONCILIATION (reviewers 2026-07-02, Bundle C fix 1) ────────────────
+# When the brief carries the client's own per-section ground-truth costs ("A. Water
+# purification: approximately £85,000 …"), the Brief tab must SHOW the reconciliation:
+# client section £ vs this design's BoM £, mapped by subsystem keyword family, with an
+# honest delta — and an explicit OUT-OF-SCOPE statement where the engine has no scope
+# (never a forced match). Signal-keyed: renders ONLY when ≥2 section-cost lines parse.
+_CLIENT_SECTION_RE = re.compile(
+    r"^[\s​]*[-•*]?\s*([A-Z])\.\s*([^:\n]{3,90}?)\s*:\s*approximately\s*£([\d,]+)",
+    re.M)
+_CLIENT_TOTAL_RE = re.compile(
+    r"^[\s​]*[-•*]?\s*Total\s*:\s*approximately\s*£([\d,]+)", re.M | re.I)
+
+# Subsystem keyword families: each client section label picks the FIRST family whose
+# label-pattern matches it; each BoM line is then classed to the FIRST section (in the
+# client's own A→F order) whose stems match the line's requirement text. Generic process
+# vocabulary, keyed off the section's OWN title words — no archetype table.
+_SECTION_FAMILY_STEMS: List[Tuple["re.Pattern", "re.Pattern"]] = [
+    (re.compile(r"purificat|treatment|filtrat", re.I),
+     re.compile(r"reverse osmosis|\bro\b|permeate|concentrate|membrane|ultrafiltra|\buf\b|"
+                r"softener|brine|carbon|\bgac\b|filter|blend|backflow|intake", re.I)),
+    (re.compile(r"storage", re.I),
+     re.compile(r"storage tank|water tank|level (?:transmitter|processor|sensor|monitor)|"
+                r"suction line", re.I)),
+    (re.compile(r"fertilis|fertiliz|fertigation|nutrient", re.I),
+     re.compile(r"fertigation|fertilis|fertiliz|nutrient|dosing|venturi|mixer|"
+                r"ph analy|\bph\b|conductivity|acid", re.I)),
+    (re.compile(r"irrigation|ebb|flood|distribution|drain", re.I),
+     re.compile(r"irrigation|ebb|flood|riser|distribution|actuated|actuator|drain|sump|"
+                r"cloth filter|container", re.I)),
+    (re.compile(r"hand.?water", re.I),
+     re.compile(r"hand.?water|ring main", re.I)),
+    (re.compile(r"control|computer|automation", re.I),
+     re.compile(r"\bplc\b|scada|process[- ]?control|control (?:panel|cabinet|computer|"
+                r"system)|\bhmi\b|modbus|ethernet|\bups\b|monitor|instrument|transmitter|"
+                r"sensor|switchboard|motor control|\bmcc\b|\bvfd\b|transformer|incomer|"
+                r"power|electrical|cabling|circuit breaker|terminal|relay|signal", re.I)),
+]
+
+
+def _parse_client_offer_sections(orig: str) -> Optional[dict]:
+    """Parse the client's per-section ground-truth costs out of the original brief.
+    Returns {sections: [{key,label,client_gbp}], client_total_gbp} or None when the
+    brief carries no such calibration block (<2 section-cost lines)."""
+    secs = [{"key": m.group(1), "label": m.group(2).strip(),
+             "client_gbp": float(m.group(3).replace(",", ""))}
+            for m in _CLIENT_SECTION_RE.finditer(orig or "")]
+    if len(secs) < 2:
+        return None
+    tm = _CLIENT_TOTAL_RE.search(orig or "")
+    return {"sections": secs,
+            "client_total_gbp": float(tm.group(1).replace(",", "")) if tm else None}
+
+
+def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
+    """Client offer vs this design, by subsystem — the deterministic reconciliation the
+    Brief tab renders + the holds register reads. Each BoM line (principal rows only) is
+    classed to the FIRST client section whose keyword family matches its requirement
+    text; unmapped lines stay unmapped (NEVER forced into a match). Engine installed-
+    equivalent = section BoM materials × the run's installed÷materials ratio (client
+    section prices are INSTALLED). Returns None when the brief has no section costs."""
+    parsed = _parse_client_offer_sections(orig)
+    if not parsed:
+        return None
+    bom = [r for r in (state.get("requirementsBom") or [])
+           if isinstance(r, dict) and not r.get("sub_of")]
+    if not bom:
+        return None
+    cs = state.get("costStack") or {}
+    raw_total = num(cs.get("raw_materials_bom_gbp")) \
+        or sum(num(r.get("line_gbp")) or 0 for r in bom)
+    installed = num(cs.get("installed_asp_gbp")) or num(cs.get("all_in_capex_gbp"))
+    ratio = (installed / raw_total) if (installed and raw_total) else 1.0
+
+    # attach a stems regex to each parsed section via its OWN title words
+    stems: List[Optional["re.Pattern"]] = []
+    for sec in parsed["sections"]:
+        rx = next((s for lbl_rx, s in _SECTION_FAMILY_STEMS
+                   if lbl_rx.search(sec["label"])), None)
+        stems.append(rx)
+
+    totals = [0.0] * len(parsed["sections"])
+    unmapped = 0.0
+    for row in bom:
+        req = str(row.get("requirement") or "")
+        line = num(row.get("line_gbp")) or 0.0
+        for si, rx in enumerate(stems):
+            if rx is not None and rx.search(req):
+                totals[si] += line
+                break
+        else:
+            unmapped += line
+
+    out_secs = []
+    for sec, eng in zip(parsed["sections"], totals):
+        client = sec["client_gbp"]
+        inst_eq = eng * ratio
+        if eng <= 0:
+            status, delta = "out_of_scope", None
+            note = "OUT OF SCOPE of this BoM — see the holds register"
+        else:
+            delta = inst_eq - client
+            if client > 0 and inst_eq < 0.4 * client:
+                status = "partial"
+                note = (f"PARTIAL SCOPE — the engine models £{eng:,.0f} of materials "
+                        f"(installed-equiv £{inst_eq:,.0f}); the balance of this client "
+                        f"section is outside this BoM — see the holds register")
+            elif client > 0 and inst_eq > 1.4 * client:
+                status = "above"
+                note = (f"engine prices this section {inst_eq / client:.1f}× the client "
+                        f"offer — engine scope/pricing above the offer, review the section")
+            else:
+                status = "consistent"
+                note = (f"engine installed-equivalent within "
+                        f"{abs(delta) / client:.0%} of the client section"
+                        if client > 0 else "no client £ to compare")
+        out_secs.append({**sec, "engine_bom_gbp": round(eng),
+                         "engine_installed_gbp": round(inst_eq),
+                         "delta_gbp": (round(delta) if delta is not None else None),
+                         "status": status, "note": note})
+    return {"sections": out_secs, "client_total_gbp": parsed["client_total_gbp"],
+            "engine_bom_total_gbp": round(raw_total),
+            "engine_installed_total_gbp": round(installed or raw_total * ratio),
+            "unmapped_bom_gbp": round(unmapped), "install_ratio": round(ratio, 3)}
+
+
+def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
+    """Render the 'Client offer vs this design, by subsystem' table on the Brief tab.
+    Returns the next free row."""
+    set_widths(ws, {"D": 16, "E": 17, "F": 14, "G": 62})
+    sub_banner(ws, r, "Client offer vs this design, by subsystem", 7)
+    r += 1
+    note = ws.cell(
+        r, 1,
+        f"Mapping: each BoM line is classed to the FIRST client section whose subsystem "
+        f"keyword family matches its requirement text (the client's own A→F order); "
+        f"unmapped lines are shown separately, NEVER forced into a match. The client's "
+        f"section prices are INSTALLED, so the comparison column is the engine "
+        f"installed-equivalent = section BoM materials × {recon['install_ratio']:g} "
+        f"(this run's installed ÷ materials ratio from the cost stack).")
+    note.font = Font(italic=True, size=9, color="555555")
+    note.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.row_dimensions[r].height = 42
+    r += 1
+    header(ws, r, ["Client section", "", "Client offer £ (installed)",
+                   "This design £ (BoM materials)", "Installed-equivalent £",
+                   "Δ vs offer £", "Honest note"])
+    r += 1
+    for sec in recon["sections"]:
+        ws.cell(r, 1, clean_cell(f"{sec['key']}. {sec['label']}")).font = FONT_SUB
+        c = ws.cell(r, 3, sec["client_gbp"]); c.number_format = FMT_GBP
+        if sec["status"] == "out_of_scope":
+            ws.cell(r, 4, "—").alignment = Alignment(horizontal="right")
+            ws.cell(r, 5, "—").alignment = Alignment(horizontal="right")
+            ws.cell(r, 6, "—").alignment = Alignment(horizontal="right")
+        else:
+            ws.cell(r, 4, sec["engine_bom_gbp"]).number_format = FMT_GBP
+            ws.cell(r, 5, sec["engine_installed_gbp"]).number_format = FMT_GBP
+            dc = ws.cell(r, 6, sec["delta_gbp"]); dc.number_format = FMT_GBP
+        nc = ws.cell(r, 7, clean_cell(sec["note"]))
+        nc.font = FONT_NOTE
+        nc.alignment = WRAP_TOP
+        if sec["status"] in ("out_of_scope", "partial"):
+            nc.font = Font(size=9, bold=True, color="9C2B2E")
+        ws.row_dimensions[r].height = 14.5 * min(4, max(1, -(-len(sec["note"]) // 58)))
+        r += 1
+    # unmapped engine lines — honesty row so the section columns reconcile to the bill
+    if recon.get("unmapped_bom_gbp"):
+        ws.cell(r, 1, "(engine lines not mapped to any client section)").font = FONT_NOTE
+        ws.cell(r, 4, recon["unmapped_bom_gbp"]).number_format = FMT_GBP
+        un = ws.cell(r, 7, "engine-added scope with no client section counterpart "
+                           "(e.g. standby power, skid frames, CIP) — kept unmapped, "
+                           "not forced into a section")
+        un.font = FONT_NOTE
+        un.alignment = WRAP_TOP
+        ws.row_dimensions[r].height = 29
+        r += 1
+    # totals row
+    ws.cell(r, 1, "TOTAL").font = Font(bold=True)
+    if recon.get("client_total_gbp"):
+        tc = ws.cell(r, 3, recon["client_total_gbp"])
+        tc.number_format = FMT_GBP; tc.font = Font(bold=True)
+    tb = ws.cell(r, 4, recon["engine_bom_total_gbp"])
+    tb.number_format = FMT_GBP; tb.font = Font(bold=True)
+    ti = ws.cell(r, 5, recon["engine_installed_total_gbp"])
+    ti.number_format = FMT_GBP; ti.font = Font(bold=True)
+    if recon.get("client_total_gbp"):
+        td = ws.cell(r, 6, recon["engine_installed_total_gbp"] - recon["client_total_gbp"])
+        td.number_format = FMT_GBP; td.font = Font(bold=True)
+    tn = ws.cell(r, 7, "engine installed capex (cost stack) vs the client's total offer")
+    tn.font = FONT_NOTE
+    return r + 1
+
+
+def tab_brief(wb: Workbook, state: dict, run_dir: str) -> None:
     """The ORIGINAL client brief (left) vs the engine's ENHANCED, structured brief
     (right). Original = 0-original-brief.md (prose, one paragraph per row, wrapped);
     enhanced = 1-brief-expanded.json (labelled sections; lists one item per row).
-    Falls back gracefully when a file is missing. Universal."""
+    When the brief carries the client's per-section ground-truth costs, a 'Client
+    offer vs this design, by subsystem' reconciliation table renders below (fix 1,
+    reviewers 2026-07-02). Falls back gracefully when a file is missing. Universal."""
     ws = wb.create_sheet("Brief")
     set_widths(ws, {"A": 80, "B": 4, "C": 46})
     title_row(
@@ -1736,6 +1933,12 @@ def tab_brief(wb: Workbook, run_dir: str) -> None:
         if notes:
             _label("Notes")
             _value(str(notes))
+
+    # ── Client offer vs this design, by subsystem (fix 1, reviewers 2026-07-02) ──
+    recon = _client_offer_reconciliation(state, orig)
+    if recon:
+        state["_clientOfferRecon"] = recon      # the holds register reads this
+        _render_client_offer_recon(ws, recon, max(left_r, right_r) + 2)
 
     ws.freeze_panes = "A4"
     back_link(ws, 3)
@@ -3397,12 +3600,173 @@ def tag_ref(tag, field: str = "tag") -> Optional[str]:
     return "=" + rec[field]
 
 
+# ── PART-NAME DEDUPE (reviewers 2026-07-02, Bundle C fix 4) ─────────────────────────
+# The master list carried singular/plural twins ("Circuit Breaker" + "Circuit Breakers")
+# and obvious synonyms ("Emergency Stop" / "Emergency Stop Switch"; "Cip Tank" +
+# "Cleaning Tank" at identical dims) as separate identities. Render-time merge, since
+# the tab is exporter-built from state: (a) rows whose normalised names are EQUAL after
+# plural-strip merge unconditionally; (b) curated synonym GROUPS merge ONLY when the
+# rows' dims / unit price / qty are compatible. A merged row shows the combined qty +
+# every source name (with its tag) in the requirement cell, and _NAME_REG/_TAG_REG are
+# registered under EVERY source key so downstream live references still resolve.
+_MERGE_PARENS_RX = re.compile(r"[()\[\]]")
+
+
+def _singular_token(t: str) -> str:
+    """'breakers'→'breaker', 'switches'→'switch', 'valves'→'valve'; leaves 'ss'/'us'/'is'
+    endings ('process', 'radius', 'chassis') alone."""
+    if len(t) > 4 and t.endswith(("ches", "shes", "sses", "xes", "zes")):
+        return t[:-2]
+    if len(t) > 3 and t.endswith("s") and not t.endswith(("ss", "us", "is")):
+        return t[:-1]
+    return t
+
+
+def _merge_key(name) -> str:
+    """The plural- and punctuation-insensitive identity key: 'Circuit Breakers' and
+    'Circuit Breaker' → 'circuit breaker'; 'Modbus (Tcp) Interface' and 'Modbus Tcp
+    Interface' → 'modbus tcp interface'."""
+    t = _MERGE_PARENS_RX.sub(" ", _norm_name(name))
+    return " ".join(_singular_token(tok) for tok in t.split())
+
+
+# Synonym groups over MERGE KEYS — generic electrical/control/process vocabulary (the
+# same nouns recur on every archetype), matched by pattern, never a per-class table.
+_SYNONYM_GROUP_RES: List[Tuple[str, "re.Pattern"]] = [
+    ("emergency-stop", re.compile(r"^emergency stop(?: button| switch)?$")),
+    ("cip-cleaning-tank", re.compile(r"^(?:cip|cleaning) tank$")),
+    ("plc-controller", re.compile(r"^(?:plc(?: controller)?|(?:[\w.\- ]+ )?plc)$")),
+    ("modbus-interface", re.compile(r"^modbus(?: tcp)? interface$")),
+]
+
+
+def _synonym_group_id(key: str) -> Optional[str]:
+    for gid, rx in _SYNONYM_GROUP_RES:
+        if rx.match(key):
+            return gid
+    return None
+
+
+def _principal_rows_compatible(a: dict, b: dict) -> bool:
+    """Are two principal rows the SAME part wearing two names? Stated dims must match
+    (within 2% where both carry the field), unit prices must be within 3× of each other
+    (when both are real), and quantities must be the same order of magnitude. A synonym
+    pair failing any of these stays as two honest rows."""
+    ra, rb = a.get("row") or {}, b.get("row") or {}
+    for f in ("diameter_m", "height_m", "footprint_m2"):
+        va, vb = num(ra.get(f)), num(rb.get(f))
+        if va and vb and abs(va - vb) > 0.02 * max(va, vb):
+            return False
+    pa, pb = num(ra.get("unit_gbp")) or 0.0, num(rb.get("unit_gbp")) or 0.0
+    if pa > 0 and pb > 0 and max(pa, pb) / min(pa, pb) > 3.0:
+        return False
+    qa, qb = num(a.get("qty")) or 1.0, num(b.get("qty")) or 1.0
+    if qa > 0 and qb > 0 and max(qa, qb) / min(qa, qb) > 10.0:
+        return False
+    return True
+
+
+def _merge_members(members: List[dict], why: str) -> dict:
+    """ONE merged principal from ≥2 members: shortest name is canonical; tags joined;
+    qty summed; the requirement cell lists EVERY source name + tag."""
+    prim = min(members, key=lambda m: (len(m["name"]), m["name"].lower()))
+    tags = [m["tag"] for m in members if m["tag"] and m["tag"] != "—"]
+    qty = sum(num(m.get("qty")) or 0 for m in members) or None
+    src = " + ".join(f"'{m['name']}' ({m['tag']})" for m in members)
+    req = f"{prim['req']}  ·  MERGED ROWS ({why}): {src}"
+    keys: List[str] = []
+    for m in members:
+        keys.extend(m.get("src_keys") or [_norm_name(m["req"]), _merge_key(m["req"])])
+    return {"tag": " / ".join(dict.fromkeys(tags)) or "—", "name": prim["name"],
+            "qty": qty, "req": req, "row": prim.get("row") or {},
+            "src_keys": list(dict.fromkeys(k for k in keys if k)),
+            "src_tags": list(dict.fromkeys(tags)),
+            "merged_from": [m["name"] for m in members]}
+
+
+def _cluster_compatible(members: List[dict]) -> List[List[dict]]:
+    """Greedy compatibility clustering: each member joins the first cluster it is
+    pairwise-compatible with (dims/price/qty), else starts its own."""
+    clusters: List[List[dict]] = []
+    for p in members:
+        home = next((c for c in clusters
+                     if all(_principal_rows_compatible(p, q) for q in c)), None)
+        (home.append(p) if home is not None else clusters.append([p]))
+    return clusters
+
+
+def _merge_principals(principals: List[dict]) -> Tuple[List[dict], int]:
+    """Apply the two deterministic merge passes: (1) plural/punctuation-normalised name
+    equality; (2) curated synonym groups. BOTH respect the dims/price/qty compatibility
+    guard (a 'Buffer Tank ⌀1 m' and a 'Buffer Tanks ⌀3 m' share a stem but are two real
+    parts — never merged). Returns (merged list, n rows merged away)."""
+    for p in principals:
+        p.setdefault("src_keys", [_norm_name(p["req"]), _merge_key(p["req"])])
+        p.setdefault("src_tags", [p["tag"]] if p["tag"] and p["tag"] != "—" else [])
+    merges = 0
+    # pass 1 — plural/punctuation-normalised equality
+    by_key: Dict[str, List[dict]] = {}
+    order: List[str] = []
+    for p in principals:
+        k = _merge_key(p["req"])
+        if k not in by_key:
+            by_key[k] = []
+            order.append(k)
+        by_key[k].append(p)
+    stage1: List[dict] = []
+    for k in order:
+        for c in _cluster_compatible(by_key[k]):
+            if len(c) == 1:
+                stage1.append(c[0])
+            else:
+                stage1.append(_merge_members(c, "singular/plural"))
+                merges += len(c) - 1
+    # pass 2 — synonym groups, ONLY when dims/price/qty are compatible
+    out: List[dict] = []
+    by_group: Dict[str, List[dict]] = {}
+    g_order: List[str] = []
+    for p in stage1:
+        gid = _synonym_group_id(_merge_key(p["name"]))
+        if gid is None:
+            out.append(p)
+            continue
+        if gid not in by_group:
+            by_group[gid] = []
+            g_order.append(gid)
+        by_group[gid].append(p)
+    for gid in g_order:
+        for c in _cluster_compatible(by_group[gid]):
+            if len(c) == 1:
+                out.append(c[0])
+            else:
+                out.append(_merge_members(c, "synonym"))
+                merges += len(c) - 1
+    return out, merges
+
+
+def _manifest_tag_by_name(run_dir: str) -> Dict[str, str]:
+    """Normalised part name → equipment tag from parts-manifest.json — used to resolve
+    the '—' untagged principals where the manifest knows the part."""
+    m = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+    out: Dict[str, str] = {}
+    for p in (m.get("parts") or []):
+        if not isinstance(p, dict):
+            continue
+        nm = _norm_name(p.get("name"))
+        tg = p.get("equipment_tag") or p.get("tag")
+        if nm and tg:
+            out.setdefault(nm, str(tg))
+    return out
+
+
 def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
     """THE master list of part NAMES (Tristan 2026-06-21). One row per distinct principal
     part: its canonical Tag + Name typed ONCE here. Populates _NAME_REG so every other
     tab references these cells instead of repeating the string. Built FIRST so all
     consumers can resolve. Principals only (a tag with no '.' suffix whose requirement is
-    not a ↳ sub-component)."""
+    not a ↳ sub-component). Singular/plural + compatible-synonym twins are MERGED into
+    one row (fix 4, reviewers 2026-07-02) with every source name registered, so
+    downstream live references never break."""
     _NAME_REG.clear()
     _TAG_REG.clear()
     ws = wb.create_sheet("Part names")
@@ -3436,7 +3800,22 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
         if not nm or not key or key in seen:
             continue
         seen.add(key)
-        principals.append({"tag": tag, "name": nm, "qty": row.get("qty"), "req": req})
+        principals.append({"tag": tag, "name": nm, "qty": row.get("qty"), "req": req,
+                           "row": row})
+    # resolve '—' untagged principals from the parts-manifest where it knows the part
+    man_tags = _manifest_tag_by_name(run_dir)
+    tagged_from_manifest = 0
+    for p in principals:
+        if (not p["tag"]) or p["tag"] == "—":
+            mt = man_tags.get(_norm_name(p["name"]))
+            if mt:
+                p["tag"] = mt
+                tagged_from_manifest += 1
+    # merge singular/plural + compatible-synonym twins (fix 4)
+    principals, n_merged = _merge_principals(principals)
+    if n_merged or tagged_from_manifest:
+        print(f"      Part names: merged {n_merged} duplicate/synonym row(s); "
+              f"tagged {tagged_from_manifest} untagged principal(s) from the manifest")
     # stable, readable order: by name (the thing the reader scans)
     principals.sort(key=lambda p: p["name"].lower())
     r = 5
@@ -3455,9 +3834,13 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
             "name": f"'Part names'!$B${r}",
             "row":  str(r),
         }
+        # register EVERY source identity (merged twins included) → the SAME master row,
+        # so a consumer holding either original name/tag still resolves live.
+        for k in (p.get("src_keys") or [_norm_name(p["req"]), _merge_key(p["req"])]):
+            _NAME_REG.setdefault(k, _rec)
         _NAME_REG[_norm_name(p["req"])] = _rec
-        if p["tag"] and p["tag"] != "—":
-            _TAG_REG.setdefault(_norm_tag(p["tag"]), _rec)
+        for t in (p.get("src_tags") or ([p["tag"]] if p["tag"] and p["tag"] != "—" else [])):
+            _TAG_REG.setdefault(_norm_tag(t), _rec)
         r += 1
     apply_col_formats(ws, 5, {3: FMT_INT}, r - 1)
     ws.auto_filter.ref = f"A4:D{r - 1}"
@@ -4901,6 +5284,49 @@ def _consumable_classes(state: dict) -> List[str]:
     return [label for label, rx in _CONSUMABLE_CLASSES if rx.search(blob)]
 
 
+# ── WATER / THROUGHPUT UTILISATION (Tristan 2026-07-02, reviewers' levelised-cost fix) ──
+# The v54 levelised £/m³ divided annual cost by design flow × 8760 × the ELECTRICAL load
+# factor (0.65) — an electrical average/peak ratio misapplied to WATER throughput. The
+# correct divisor is annual DELIVERED volume = design flow × 8760 h × a WATER utilisation
+# factor (its own Inputs driver, editable, with a stated basis). Universal — keyed on the
+# presence of a process-flow quantity, never on the archetype name.
+def _max_process_flow_m3h(state: dict) -> float:
+    """The plant's largest process flow (m³/h) from the contract quantities — the DESIGN
+    flow the cost-of-service divisor is built from. 0.0 when no flow quantity exists."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    flow = 0.0
+    for _nm, v in q.items():
+        if not isinstance(v, dict):
+            continue
+        u = str(v.get("unit") or "").replace("³", "3").lower()
+        fam = str(v.get("family") or "").lower()
+        if ("m3/h" in u or "m3/hr" in u) and fam in ("flow_rate", "throughput"):
+            vv = num(v.get("value"))
+            if vv and vv > flow:
+                flow = float(vv)
+    return flow
+
+
+def _water_util_default(state: dict) -> Tuple[float, str]:
+    """(value, basis) for the WATER/throughput utilisation factor: annual delivered volume
+    ÷ (design peak flow × 8760 h). From an engine utilisation/duty signal when present,
+    else an assumed default with its basis stated. This is NOT the electrical load factor —
+    that sizes the ENERGY cost line only; it never divides water throughput."""
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    for k in ("water_utilisation", "throughput_utilisation", "utilisation_factor",
+              "demand_factor", "annual_utilisation"):
+        v = qval(q, k)
+        if v and 0 < v <= 1.0:
+            return float(v), f"from engine · {k}"
+    return 0.25, (
+        "assumed — the design flow is the PEAK simultaneous demand, so annual delivered "
+        "volume = design flow × 8760 h × this factor. 0.25 models an intermittent, "
+        "demand-driven duty (sequenced valve sections / batch draw-off deliver ≈25% of "
+        "the peak run continuously); set ≈0.9 for a continuous process duty, or edit to "
+        "metered annual demand ÷ (design flow × 8760). Drives the levelised £/m³ on the "
+        "Financial model — the electrical load factor above sizes the ENERGY line only.")
+
+
 # Resolved non-RAS drivers for the current run, published by tab_inputs_assumptions
 # so the Python sweep mirror (_econ_at) reproduces what the live cells show. None on
 # the RAS path (the RAS _ECON_DEFAULTS values are used unchanged). Also carries the
@@ -5077,6 +5503,16 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
                      gen["load_factor_basis"], FMT_DEC2))
         rows.append(("hours", "Operating hours", round(gen["hours"], 0), "h/yr",
                      gen["hours_basis"], FMT_INT))
+        # WATER / THROUGHPUT UTILISATION (reviewers 2026-07-02): the cost-of-service
+        # levelised £/m³ divisor. Only emitted when the plant carries a real process
+        # flow (m³/h) — a flow-less product has no delivered-volume divisor to drive.
+        _flow_m3h = _max_process_flow_m3h(state)
+        if _flow_m3h > 0:
+            _wu, _wu_basis = _water_util_default(state)
+            rows.append(("water_util",
+                         "Water utilisation (delivered ÷ design flow)",
+                         round(_wu, 3), "fraction",
+                         f"design flow {_flow_m3h:g} m³/h · {_wu_basis}", FMT_DEC2))
         rows.append(("labour", "Labour", gen["labour"], "£/yr",
                      gen["labour_basis"], FMT_GBP))
         rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
@@ -6364,30 +6800,41 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
                 return float(v["value"])
         return 0.0
 
+    # The REAL drivers for this run: the Inputs-tab values (signal-derived, non-RAS)
+    # when published, else the static defaults. The rendered cells are LIVE formulas
+    # over the Inputs tab (fix 3, reviewers 2026-07-02 — B14 hardcoded £420k 'Labour +
+    # other opex' contradicting the Inputs' £25k+£23k UNMANNED-skid figures); this
+    # Python mirror only records state['_costOfService'] for the scorer.
+    gen = _ECON_GENERIC or {}
+    labour = float(gen.get("labour", d["labour"]))
+    other_opex = float(gen.get("other_opex", d["other_opex"]))
+    hours = float(gen.get("hours", d["hours"]))
+    lf = float(gen.get("load_factor", d["load_factor"]))
+    eprice = float(gen.get("energy_price", d["energy_price"]))
+
     # A levelised £/unit is only meaningful over an ANNUAL THROUGHPUT (£/m³·yr). The generic output
-    # metric can resolve to a non-time COUNT (e.g. an emitter count) — useless for a cost-of-service
-    # tariff. When it is NOT per-year, derive the plant's annual delivered VOLUME from its largest
-    # process flow (m³/h × operating hours), so the levelised cost reads £/m³. UNIVERSAL.
+    # metric can resolve to a non-time COUNT (e.g. a tray count) — useless for a cost-of-service
+    # tariff. When it is NOT per-year, derive the plant's annual DELIVERED volume from its largest
+    # process flow: design flow (m³/h) × 8760 h × the WATER utilisation factor on the Inputs tab —
+    # NEVER the electrical load factor (that is an ENERGY average/peak ratio; misapplying it to
+    # water throughput was the v54 512,460 m³ divisor bug). UNIVERSAL — flow-signal keyed.
+    flow_m3h = 0.0
+    water_util = None
+    divisor_basis = f"engine primary output metric ({out_qty:,.0f} {out_unit})"
     if not _output_is_per_year(out_unit):
-        flow_m3h = 0.0
-        for _nm, _qv2 in q.items():
-            if not isinstance(_qv2, dict):
-                continue
-            _u = str(_qv2.get("unit") or "").replace("³", "3").lower()
-            _fam = str(_qv2.get("family") or "").lower()
-            if ("m3/h" in _u or "m3/hr" in _u) and _fam in ("flow_rate", "throughput"):
-                _vv = num(_qv2.get("value"))
-                if _vv and _vv > flow_m3h:
-                    flow_m3h = float(_vv)
+        flow_m3h = _max_process_flow_m3h(state)
         if flow_m3h > 0:
-            out_qty = flow_m3h * d["hours"] * d["load_factor"]
+            water_util, _ = _water_util_default(state)
+            out_qty = flow_m3h * 8760.0 * water_util
             out_unit, out_noun = "m³/yr", "treated water"
+            divisor_basis = (f"design flow {flow_m3h:g} m³/h × 8760 h × water utilisation "
+                             f"{water_util:g} (Inputs & Assumptions)")
 
     conn_kw = _qv("connected_electrical_load_kw", "total_electrical_demand_kw",
                   "total_connected_load_kw", "connected_load_kw")
-    energy = conn_kw * d["hours"] * d["load_factor"] * d["energy_price"]
+    energy = conn_kw * hours * lf * eprice
     maint = capex * d["maint_pct"] / 100.0
-    opex = energy + d["labour"] + maint + d["other_opex"]
+    opex = energy + labour + maint + other_opex
     i = d["discount_rate"] / 100.0
     n = float(d["project_life"])
     crf = (i * (1 + i) ** n) / (((1 + i) ** n) - 1) if i > 0 and n > 0 else (1.0 / n if n else 0.0)
@@ -6398,31 +6845,65 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
         "capex_gbp": round(capex), "annual_opex_gbp": round(opex),
         "annualised_capex_gbp": round(ann_capex), "levelised_cost_per_unit": round(levelised, 4),
         "output_qty": out_qty, "output_unit": out_unit, "unit_base": unit_base, "crf": round(crf, 4),
+        "water_util": water_util, "design_flow_m3h": flow_m3h or None,
+        "divisor_basis": divisor_basis,
+        "labour_other_opex_gbp": round(labour + other_opex),
     }
     sub_banner(ws, r, "COST-OF-SERVICE MODEL — infrastructure / utility plant, NO market revenue", 8)
     r += 1
     note = ws.cell(r, 1, f"A cost-recovery utility — its economics are the LEVELISED COST of delivered "
                          f"{out_noun}, not revenue/NPV/IRR (there is no product sale). Levelised = "
-                         f"(capex annualised at CRF {crf:.3f} over {n:.0f} yr + annual opex) ÷ "
-                         f"{out_qty:,.0f} {out_unit}.")
+                         f"(capex annualised at CRF {crf:.3f} over {n:.0f} yr + annual opex) ÷ annual "
+                         f"delivered volume ({divisor_basis}). Every value cell is a LIVE formula over "
+                         f"the yellow Inputs & Assumptions drivers — edit an input and this recomputes.")
     note.font = Font(italic=True, size=9, color="555555")
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
     r += 2
     header(ws, r, ["Item", "Value (£)", "", "Basis"])
     r += 1
+
+    # Live cross-sheet references to the registered Inputs cells (None → static fallback).
+    _A = _ECON_INPUT_ADDR.get
+    CAPX, DR, PL = _A("capex"), _A("discount_rate"), _A("project_life")
+    LKW, HRS, LFR, EPR = _A("load_kw"), _A("hours"), _A("load_factor"), _A("energy_price")
+    LAB, OTH, MPC, WUT = _A("labour"), _A("other_opex"), _A("maint_pct"), _A("water_util")
+    _crf_f = (f"(({DR}/100)*(1+{DR}/100)^{PL})/((1+{DR}/100)^{PL}-1)"
+              if (DR and PL) else None)
+    r_cap, r_ann, r_en, r_mnt, r_lab, r_opx, r_vol = r, r + 1, r + 2, r + 3, r + 4, r + 5, r + 6
+    # per-row: (label, live_formula_or_None, static_value, fmt, basis)
     rows = [
-        ("All-in capex", round(capex), FMT_INT, "engine costStack (all-in / installed ASP)"),
-        ("Annualised capex / yr", round(ann_capex), FMT_INT, f"capex × CRF (i={d['discount_rate']:.0f}%, n={n:.0f} yr)"),
-        ("Energy / yr", round(energy), FMT_INT, f"{conn_kw:,.0f} kW × {d['hours']:.0f} h × {d['load_factor']:.0%} × £{d['energy_price']:.2f}/kWh"),
-        ("Maintenance / yr", round(maint), FMT_INT, f"{d['maint_pct']:.0f}% of capex"),
-        ("Labour + other opex / yr", round(d["labour"] + d["other_opex"]), FMT_INT, "operations crew + consumables"),
-        ("TOTAL annual opex / yr", round(opex), FMT_INT, "energy + maintenance + labour + other"),
-        (f"LEVELISED COST (£/{unit_base})", round(levelised, 2), '£#,##0.00', f"(annualised capex + opex) ÷ {out_qty:,.0f} {out_unit}"),
+        ("All-in capex", (f"={CAPX}" if CAPX else None), round(capex), FMT_INT,
+         "live from Inputs — installed capex (engine costStack all-in / installed ASP)"),
+        ("Annualised capex / yr", (f"=B{r_cap}*{_crf_f}" if _crf_f else None), round(ann_capex), FMT_INT,
+         f"capex × CRF (live off the Inputs discount rate + project life; as-built i={d['discount_rate']:.0f}%, n={n:.0f} yr)"),
+        ("Energy / yr", (f"={LKW}*{HRS}*{LFR}*{EPR}" if all((LKW, HRS, LFR, EPR)) else None),
+         round(energy), FMT_INT,
+         f"live from Inputs — connected load × hours × ELECTRICAL load factor × £/kWh "
+         f"(as-built {conn_kw:,.0f} kW × {hours:,.0f} h × {lf:.0%} × £{eprice:.2f}/kWh)"),
+        ("Maintenance / yr", (f"=B{r_cap}*{MPC}/100" if MPC else None), round(maint), FMT_INT,
+         f"live from Inputs — {d['maint_pct']:.0f}% of capex/yr"),
+        ("Labour + other opex / yr", (f"={LAB}+{OTH}" if (LAB and OTH) else None),
+         round(labour + other_opex), FMT_INT,
+         f"live from Inputs — labour £{labour:,.0f} + other opex £{other_opex:,.0f} "
+         f"(the Inputs basis: unmanned/skid plant unless a headcount signal exists)"),
+        ("TOTAL annual opex / yr", f"=B{r_en}+B{r_mnt}+B{r_lab}", round(opex), FMT_INT,
+         "energy + maintenance + labour + other (sum of the live rows above)"),
+        (f"Annual delivered volume ({out_unit})",
+         (f"={flow_m3h:g}*8760*{WUT}" if (flow_m3h > 0 and WUT) else None),
+         round(out_qty), FMT_INT,
+         (f"live — {divisor_basis}; the WATER utilisation is its own Inputs driver "
+          f"(the electrical load factor sizes the energy line above, never this divisor)"
+          if flow_m3h > 0 else divisor_basis)),
+        (f"LEVELISED COST (£/{unit_base})", f"=(B{r_ann}+B{r_opx})/B{r_vol}",
+         round(levelised, 2), '£#,##0.00',
+         f"(annualised capex + total opex) ÷ annual delivered volume — live; as-built "
+         f"£{levelised:,.2f}/{unit_base} over {out_qty:,.0f} {out_unit}"),
     ]
-    for label, val, fmt, basis in rows:
+    for label, formula, val, fmt, basis in rows:
         bold = label.startswith(("TOTAL", "LEVELISED"))
         ws.cell(r, 1, label).font = Font(bold=bold)
-        c = ws.cell(r, 2, val); c.number_format = fmt
+        c = ws.cell(r, 2, formula if formula else val)
+        c.number_format = fmt
         if bold:
             c.font = Font(bold=True)
         bc = ws.cell(r, 4, basis); bc.font = Font(size=9, color="555555")
@@ -7465,6 +7946,89 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     return True
 
 
+# ── INSTRUMENT-INDEX COLLAPSE (reviewers 2026-07-02, Bundle C fix 5) ─────────────────
+# The generated instrument index expands a qty-N instrument into N copy-paste rows
+# ('LT-201 … vessels (e.g. V-104) (#1 of 17)' × 17). Collapse identical-but-for-the-
+# index rows into ONE typed group row: tag 'LT-201…217', the count stated ('17 off'),
+# plus host tags where the manifest knows them (exact-count match only — never guessed).
+_INST_COUNT_RX = re.compile(r"\s*\(#\d+ of \d+\)")
+_TAG_NUM_RX = re.compile(r"^(.*?)(\d+)\s*$")
+
+
+def _range_tag(first: str, last: str) -> str:
+    """'LT-201' + 'LT-217' → 'LT-201…217' (falls back to 'first…last' when the tags
+    don't share an alpha prefix + numeric tail)."""
+    a, b = _TAG_NUM_RX.match(first or ""), _TAG_NUM_RX.match(last or "")
+    if a and b and a.group(1) == b.group(1):
+        return f"{first}…{b.group(2)}"
+    return f"{first}…{last}"
+
+
+def _manifest_host_tags(run_dir: str, count: int) -> List[str]:
+    """The vessel/tank equipment tags from parts-manifest.json, ONLY when their number
+    exactly matches the instrument count (an honest host list, never an approximation)."""
+    m = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+    tags = [str(p.get("equipment_tag") or p.get("tag") or "")
+            for p in (m.get("parts") or []) if isinstance(p, dict)
+            and str(p.get("shape") or "") in ("tank", "vessel", "vertical_vessel")]
+    tags = [t for t in tags if t]
+    return tags if len(tags) == count else []
+
+
+def _collapse_instrument_rows(hdr: List[str], rows: List[List[str]],
+                              run_dir: str = "") -> Tuple[List[List[str]], int]:
+    """Collapse per-index copy-paste instrument rows into typed group rows. Rows are
+    grouped when every cell is identical once the tag and the '(#N of M)' marker are
+    stripped; a group of ≥2 renders once with the tag range + '(M off)'. Rows without
+    the marker pass through untouched. Returns (new_rows, n_rows_collapsed_away)."""
+    try:
+        tag_i = [str(h).strip().lower() for h in hdr].index("tag")
+    except ValueError:
+        tag_i = 0
+    groups: Dict[tuple, List[List[str]]] = {}
+    emit: List[Tuple[str, Any]] = []
+    for rw in rows:
+        if any(_INST_COUNT_RX.search(str(c)) for c in rw):
+            key = tuple("" if i == tag_i else _INST_COUNT_RX.sub("", str(c))
+                        for i, c in enumerate(rw))
+            if key not in groups:
+                groups[key] = []
+                emit.append(("grp", key))
+            groups[key].append(rw)
+        else:
+            emit.append(("lit", rw))
+    out: List[List[str]] = []
+    collapsed = 0
+    for kind, item in emit:
+        if kind == "lit":
+            out.append(item)
+            continue
+        mem = groups[item]
+        if len(mem) == 1:
+            out.append([_INST_COUNT_RX.sub("", str(c)) for c in mem[0]])
+            continue
+        first = str(mem[0][tag_i]).strip("` ")
+        last = str(mem[-1][tag_i]).strip("` ")
+        n = len(mem)
+        hosts = ""
+        if run_dir and any(re.search(r"\bvessels?\b", str(c), re.I) for c in mem[0]):
+            ht = _manifest_host_tags(run_dir, n)
+            if ht:
+                hosts = " — hosts: " + ", ".join(ht)
+        grp: List[str] = []
+        for i, c in enumerate(mem[0]):
+            if i == tag_i:
+                grp.append(_range_tag(first, last))
+                continue
+            s = str(c)
+            if _INST_COUNT_RX.search(s):
+                s = _INST_COUNT_RX.sub(f" ({n} off)", s) + hosts
+            grp.append(s)
+        out.append(grp)
+        collapsed += n - 1
+    return out, collapsed
+
+
 def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
     """#21 — Process line list / valve list / instrument index as ONE sheet
     "Process schedules" with three section bands (Tristan 2026-06-24 consolidation:
@@ -7519,6 +8083,14 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
             n += 1
             sect = f"{base} ({n})"
         used.add(sect)
+        # instrument index: collapse the per-index copy-paste rows into typed group
+        # rows (fix 5, reviewers 2026-07-02) — 'LT-201…217 … (17 off)' instead of 17
+        # identical lines; host tags appended only where the manifest knows them.
+        if "instrument" in hl:
+            rows, _n_coll = _collapse_instrument_rows(hdr, rows, run_dir)
+            if _n_coll:
+                print(f"      Process schedules: collapsed {_n_coll} copy-paste "
+                      f"instrument row(s) into typed group rows")
         # widen any 'service'/'description'-like column for THIS section
         for idx, h in enumerate(hdr, start=1):
             if h.lower() in ("service", "description", "measured", "notes", "remarks"):
@@ -8334,6 +8906,187 @@ _CONTRACT_TABS = {
     _LEDGER_SHEET: _eval_bom_ledger_contract,
     "Risk & Regulatory": _eval_risk_register_contract,
 }
+
+
+# ═══ HOLDS & EXCLUSIONS REGISTER (reviewers 2026-07-02, Bundle C fix 6) ══════════════
+# How a consultancy ships incomplete work without it reading as broken: the honest open
+# items become NUMBERED HOLDS, each DERIVED LIVE from a failing check / column contract
+# (never hand-typed), so the register stays current — clear the defect at source and the
+# hold disappears on rebuild. Exclusions restate the brief's own out-of-scope list + any
+# client-offer section this BoM has no scope for.
+def _derive_holds(state: dict, contract_results: Optional[dict] = None) -> List[dict]:
+    """The numbered holds, derived from the LIVE evaluation results. Pure — reads the
+    contract results (default: the module-level _CONTRACT_RESULTS populated in build())
+    plus state['_clientOfferRecon'] / state['_dossierRepair']. Returns [] when nothing
+    is open (a clean dossier carries no fabricated holds)."""
+    cr = _CONTRACT_RESULTS if contract_results is None else contract_results
+    holds: List[dict] = []
+
+    def _add(item: str, scope: str, source: str, clears: str) -> None:
+        holds.append({"id": f"HOLD-{len(holds) + 1:03d}", "item": item, "scope": scope,
+                      "source": source, "clears": clears})
+
+    # 1 — line sizing pending flow allocation (Line & velocity column contract)
+    lv = cr.get("Line & velocity")
+    if isinstance(lv, dict):
+        rows = list((lv.get("rows") or {}).values())
+        unver = sum(1 for x in rows if x.get("verdict") == "FAIL"
+                    and any("underivable" in str(t) for t in x.get("reasons") or []))
+        band = sum(1 for x in rows if x.get("verdict") == "FAIL"
+                   and any("exceeds" in str(t) for t in x.get("reasons") or []))
+        if unver or band:
+            _add("Line sizing pending flow allocation",
+                 (f"{unver} line(s) with no derivable flow (velocity unverifiable)"
+                  + (f" + {band} line(s) outside the velocity band (sized without their "
+                     f"real flow demand)" if band else "")),
+                 "Line & velocity column contract (live per-row evaluation)",
+                 "author the real flow demand on every fluid topology edge at source — "
+                 "the contract then re-passes and this hold clears")
+    # 2 — bought-out MPNs pending detailed design (BoM ledger contract)
+    bl = cr.get(_LEDGER_SHEET)
+    if isinstance(bl, dict) and (bl.get("tbd_count") or 0) > 0:
+        _add("Bought-out manufacturer part numbers pending detailed design",
+             f"{bl['tbd_count']}/{bl.get('tbd_required', '?')} bought-out lines carry an "
+             f"explicit 'TBD (detailed design)' part number",
+             "Bill of Materials ledger column contract (live TBD count)",
+             "resolve real MPNs at detailed design (Stage 17.6 library / supplier RFQs) — "
+             "the TBD count then falls and this hold clears")
+    # 3 — client-offer sections this BoM has no / partial scope for (Brief reconciliation)
+    recon = state.get("_clientOfferRecon") or {}
+    for sec in recon.get("sections") or []:
+        if sec.get("status") in ("out_of_scope", "partial"):
+            _add(f"Client section {sec['key']} ({sec['label']}) "
+                 + ("out of BoM scope" if sec["status"] == "out_of_scope"
+                    else "only partially in BoM scope"),
+                 f"client section £{sec['client_gbp']:,.0f}"
+                 + (f"; engine models £{sec['engine_bom_gbp']:,.0f} of materials"
+                    if sec.get("engine_bom_gbp") else "; no engine BoM lines map to it"),
+                 "Brief tab — 'Client offer vs this design' reconciliation (live mapping)",
+                 "scope + price the section (or agree the exclusion with the client) — "
+                 "the reconciliation row then reads consistent and this hold clears")
+    # 4 — open engine-fixable design defects (Risk register triage)
+    rr = cr.get("Risk & Regulatory")
+    if isinstance(rr, dict) and (rr.get("fixable_count") or 0) > 0:
+        _add("Engine-fixable design defects open in the risk register",
+             f"{rr['fixable_count']} OPEN DEFECT row(s) — each names its routed fix stage",
+             "Risk register column contract (live triage: engine-fixable ≠ 'tolerable')",
+             "fix each defect at its routed source stage — the mirrored finding clears "
+             "and the row disappears")
+    # 5 — panel circuits failing their column contract
+    ps = cr.get("Panel schedule")
+    if isinstance(ps, dict) and (ps.get("n_total") or 0) > (ps.get("n_pass") or 0):
+        _add("Panel circuits failing the schedule column contract",
+             f"{ps['n_total'] - ps['n_pass']}/{ps['n_total']} circuit row(s) FAIL "
+             f"(missing ΔU / out-of-band volt-drop)",
+             "Panel schedule column contract (live per-circuit evaluation)",
+             "route + size the failing circuits so ΔU computes in-band")
+    # 6 — gaps the self-repair loop could not fix without human input
+    for f in ((state.get("_dossierRepair") or {}).get("needs_input") or []):
+        if isinstance(f, dict) and f.get("message"):
+            _add(f"Needs input — {f.get('check', 'open gap')}",
+                 str(f.get("message"))[:180],
+                 f"self-repair loop (severity {f.get('severity', '?')}, tab {f.get('tab', '?')})",
+                 str(f.get("why") or "supply the missing input and re-run")[:180])
+    return holds
+
+
+def _brief_exclusions(orig: str) -> List[str]:
+    """The brief's OWN explicit out-of-scope bullets (the lines under an 'Explicitly
+    EXCLUDED' heading) — restated on the register so scope is unambiguous."""
+    out: List[str] = []
+    in_block = False
+    for line in (orig or "").splitlines():
+        s = line.strip()
+        if re.match(r"^Explicitly EXCLUDED", s, re.I):
+            in_block = True
+            continue
+        if in_block:
+            if s.startswith("-") or s.startswith("•"):
+                out.append(s.lstrip("-• ").strip())
+            elif s:
+                break
+    return out
+
+
+def tab_holds_register(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Fix 6 (reviewers 2026-07-02) — the HOLDS & EXCLUSIONS register: numbered holds
+    derived LIVE from the failing checks/column contracts + the brief's own exclusions.
+    Skips cleanly when there is nothing to register (no holds AND no exclusions)."""
+    holds = _derive_holds(state)
+    orig = ""
+    op = os.path.join(run_dir, "0-original-brief.md")
+    if os.path.exists(op):
+        try:
+            orig = open(op, "r").read()
+        except Exception:  # noqa: BLE001
+            orig = ""
+    excl = _brief_exclusions(orig)
+    recon_excl = [s for s in ((state.get("_clientOfferRecon") or {}).get("sections") or [])
+                  if s.get("status") == "out_of_scope"]
+    if not holds and not excl and not recon_excl:
+        return False
+    ws = wb.create_sheet("Holds & exclusions")
+    set_widths(ws, {"A": 11, "B": 46, "C": 44, "D": 40, "E": 52})
+    title_row(
+        ws, "Holds & exclusions — the honest open-items register", 5,
+        "Every hold is DERIVED LIVE from a failing check or column contract at build "
+        "time — never hand-typed — so this register is always current: fix the item at "
+        "source, rebuild, and its hold disappears. The dossier ships as a draft WITH "
+        "these holds against it; the exclusions restate what was never in scope.")
+    r = 4
+    if holds:
+        sub_banner(ws, r, f"HOLDS — {len(holds)} open item(s), numbered", 5)
+        r += 1
+        header(ws, r, ["Hold", "Item", "Scope (live count)", "Derived from", "Clears when"])
+        r += 1
+        for h in holds:
+            ws.cell(r, 1, h["id"]).font = Font(bold=True, color="9C2B2E")
+            for ci, k in ((2, "item"), (3, "scope"), (4, "source"), (5, "clears")):
+                c = ws.cell(r, ci, clean_cell(h[k]))
+                c.alignment = WRAP_TOP
+                c.font = FONT_NOTE if ci > 2 else Font(size=10, bold=(ci == 2))
+                c.border = BORDER
+            ws.cell(r, 1).border = BORDER
+            longest = max(len(str(h[k])) for k in ("item", "scope", "source", "clears"))
+            ws.row_dimensions[r].height = 14.5 * min(5, max(2, -(-longest // 48)))
+            r += 1
+        r += 1
+    if excl or recon_excl:
+        sub_banner(ws, r, "EXCLUSIONS — never in this plant's scope", 5)
+        r += 1
+        for s in recon_excl:
+            c = ws.cell(r, 2, clean_cell(
+                f"Client offer section {s['key']} ({s['label']}) — £{s['client_gbp']:,.0f} "
+                f"in the client's offer; no line of this BoM prices it (see the matching hold)"))
+            c.alignment = WRAP_TOP
+            c.font = Font(size=10, bold=True)
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+            ws.row_dimensions[r].height = 29
+            r += 1
+        for s in excl:
+            c = ws.cell(r, 2, clean_cell("• " + s))
+            c.alignment = WRAP_TOP
+            c.font = FONT_NOTE
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+            r += 1
+    ws.freeze_panes = "A5"
+    back_link(ws, 5)
+    # deterministic register score: every hold row must carry all four derived fields.
+    complete = sum(1 for h in holds
+                   if all(str(h.get(k) or "").strip()
+                          for k in ("item", "scope", "source", "clears")))
+    n = len(holds)
+    sc = 8 if (n == 0 or complete == n) else max(0, round(10 * complete / n, 1))
+    _TAB_SCORES["Holds & exclusions"] = {
+        "score": sc, "target": 8, "status": "PASS" if sc >= 8 else "FAIL",
+        "issues": [f"{n} open hold(s) + {len(excl) + len(recon_excl)} exclusion(s) — "
+                   f"every hold derived live from a failing check/contract (TBD / "
+                   f"out-of-scope items disclosed, not hidden); capped at 8 while any "
+                   f"hold is open"],
+        "fix": "clear each hold at its source (the named check re-passes) — the row "
+               "then disappears on rebuild",
+    }
+    return True
 
 
 def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
@@ -9299,6 +10052,7 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,
+        "Holds & exclusions": 31,               # the open-items register follows the risks
         "Drawings": 49,                                 # the drawing REGISTER opens the drawings section
 
         "⚠ Checks": 90, "⚠ Audit": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
@@ -9819,7 +10573,7 @@ def build(run_dir: str, out_path: str) -> dict:
     print("  · Sense-check")
     tab_benchmark(wb, state)
     print("  · Brief")
-    tab_brief(wb, run_dir)
+    tab_brief(wb, state, run_dir)
     # Place Brief immediately AFTER Overview, BEFORE ⚠ Checks (created next).
     # openpyxl appends at the end, so move it up to index 1.
     try:
@@ -9878,6 +10632,7 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Process schedules", lambda: tab_process_schedules(wb, run_dir) > 0)
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
     add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
+    add_tab("Holds & exclusions", lambda: tab_holds_register(wb, state, run_dir))
     add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
 
@@ -10919,6 +11674,273 @@ def _selftest() -> int:
         if _pv != "Render 5 — Exterior iso":
             print(f"  FAIL drg-render-link: the exterior render must link to the EXTERIOR tab, "
                   f"never its interior basename twin (got {_pv!r})"); bad += 1
+    # ═══ Bundle C (reviewers 2026-07-02) — proveCatch the six remainder fixes ═══════════
+    # (1) CLIENT-OFFER RECONCILIATION: section costs parse from the brief; a section the
+    # engine has NO scope for reads OUT OF SCOPE (never a forced match); a covered section
+    # reconciles with an installed-equivalent delta; no cost block → no fabricated table.
+    _brief_c1 = ("Cost and calibration context:\n"
+                 "- A. Water purification: approximately £85,000 (€94,735)\n"
+                 "- D. Ebb/flow irrigation installation: approximately £895,000 (€993,750)\n"
+                 "- Total: approximately £1,250,000 (€1,395,019)\n")
+    _rec_state = {"requirementsBom": [
+        {"tag": "Z-1", "requirement": "Reverse Osmosis Skid", "qty": 1, "unit_gbp": 50000,
+         "line_gbp": 50000},
+        {"tag": "V-1", "requirement": "Softener Vessel", "qty": 2, "unit_gbp": 5000,
+         "line_gbp": 10000},
+        {"tag": "X-1", "requirement": "Widget Bracket", "qty": 1, "unit_gbp": 100,
+         "line_gbp": 100},
+    ], "costStack": {"raw_materials_bom_gbp": 60100, "installed_asp_gbp": 102170}}
+    _rec = _client_offer_reconciliation(_rec_state, _brief_c1)
+    if not _rec or len(_rec["sections"]) != 2 or _rec["client_total_gbp"] != 1250000:
+        print(f"  FAIL client-recon: 2 sections + the client total must parse (got {_rec})"); bad += 1
+    else:
+        _sa = next(s for s in _rec["sections"] if s["key"] == "A")
+        _sd = next(s for s in _rec["sections"] if s["key"] == "D")
+        if _sa["engine_bom_gbp"] != 60000 or _sa["status"] != "consistent":
+            print(f"  FAIL client-recon: RO skid + softener must map to section A and "
+                  f"reconcile (got {_sa})"); bad += 1
+        if _sd["status"] != "out_of_scope" or "OUT OF SCOPE of this BoM" not in _sd["note"] \
+                or _sd["delta_gbp"] is not None:
+            print(f"  FAIL client-recon: a section with NO engine scope must say OUT OF "
+                  f"SCOPE, never force a match (got {_sd})"); bad += 1
+        if _rec["unmapped_bom_gbp"] != 100:
+            print(f"  FAIL client-recon: the unmapped bracket must stay unmapped "
+                  f"(got {_rec['unmapped_bom_gbp']})"); bad += 1
+    if _client_offer_reconciliation(_rec_state, "no cost lines here") is not None:
+        print("  FAIL client-recon: a brief with no section costs must render NO table"); bad += 1
+
+    # (2+3) COST-OF-SERVICE: the levelised divisor is design flow × 8760 × the WATER
+    # utilisation Inputs driver (never the ELECTRICAL load factor — the 512,460 m³ bug),
+    # and every cost row is a LIVE formula over the Inputs cells (the £420k B14 hardcode).
+    _save_addr = dict(_ECON_INPUT_ADDR)
+    _save_gen = _ECON_GENERIC
+    try:
+        _cos_state = {
+            "costStack": {"all_in_capex_gbp": 1148141},
+            "orchestratorContract": {"quantities": {
+                "peak_irrigation_flow_m3_h": {"value": 90, "unit": "m³/h",
+                                              "family": "flow_rate"},
+                "connected_electrical_load_kw": {"value": 53, "unit": "kW",
+                                                 "family": "power"}}},
+            "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+                {"value": 6000, "unit": "trays"}]}}}}
+        _ECON_INPUT_ADDR.clear()
+        _wbi = Workbook(); _wbi.remove(_wbi.active)
+        if not tab_inputs_assumptions(_wbi, _cos_state) or "water_util" not in _ECON_INPUT_ADDR:
+            print("  FAIL cos: the Inputs tab must emit the water_util driver row for a "
+                  "plant with a process flow"); bad += 1
+        _wsc = _wbi.create_sheet("FM fixture")
+        _nx = _render_cost_of_service_section(_wsc, _cos_state, 4)
+        _cosr = _cos_state.get("_costOfService") or {}
+        if _nx is None or round(_cosr.get("output_qty") or 0) != round(90 * 8760 * 0.25):
+            print(f"  FAIL cos: the divisor must be flow × 8760 × water utilisation "
+                  f"(197,100 m³/yr), NOT flow × 8760 × electrical load factor "
+                  f"(got {_cosr.get('output_qty')})"); bad += 1
+        _i3, _n3 = 0.10, 20.0
+        _crf3 = (_i3 * (1 + _i3) ** _n3) / (((1 + _i3) ** _n3) - 1)
+        _exp_lev = (1148141 * _crf3 + 53 * 8000 * 0.65 * 0.15 + 25000
+                    + 1148141 * 0.03 + round(1148141 * 0.02)) / (90 * 8760 * 0.25)
+        if abs((_cosr.get("levelised_cost_per_unit") or 0) - _exp_lev) > 0.001:
+            print(f"  FAIL cos: levelised £/m³ must recompute over the Inputs drivers "
+                  f"(want {_exp_lev:.4f}, got {_cosr.get('levelised_cost_per_unit')})"); bad += 1
+        _rows_c = {str(_wsc.cell(rr, 1).value): _wsc.cell(rr, 2).value
+                   for rr in range(4, (_nx or 4) + 1)}
+        _vol_f = next((v for k, v in _rows_c.items()
+                       if str(k).startswith("Annual delivered volume")), None)
+        _lab_f = next((v for k, v in _rows_c.items()
+                       if str(k).startswith("Labour + other opex")), None)
+        _lev_f = next((v for k, v in _rows_c.items() if str(k).startswith("LEVELISED")), None)
+        _wu_ad = _ECON_INPUT_ADDR.get("water_util", "@@")
+        _lf_ad = _ECON_INPUT_ADDR.get("load_factor", "@@")
+        if not (isinstance(_vol_f, str) and _wu_ad in _vol_f and "8760" in _vol_f
+                and _lf_ad not in _vol_f):
+            print(f"  FAIL cos: the delivered-volume cell must be LIVE over the water_util "
+                  f"Inputs cell and never the load-factor cell (got {_vol_f!r})"); bad += 1
+        if not (isinstance(_lab_f, str) and _lab_f.startswith("=")
+                and _ECON_INPUT_ADDR.get("labour", "@@") in _lab_f
+                and _ECON_INPUT_ADDR.get("other_opex", "@@") in _lab_f):
+            print(f"  FAIL cos: 'Labour + other opex' must be a LIVE formula over the "
+                  f"Inputs labour+other cells, never a £420k hardcode (got {_lab_f!r})"); bad += 1
+        if not (isinstance(_lev_f, str) and _lev_f.startswith("=(")):
+            print(f"  FAIL cos: the levelised cost must be a live ratio formula "
+                  f"(got {_lev_f!r})"); bad += 1
+    finally:
+        _ECON_INPUT_ADDR.clear()
+        _ECON_INPUT_ADDR.update(_save_addr)
+        globals()["_ECON_GENERIC"] = _save_gen
+
+    # (4) PART-NAME DEDUPE: plural + compatible-synonym twins merge into ONE row with
+    # the combined qty + every source name/tag; INCOMPATIBLE twins (price 5×, different
+    # dims) stay separate; every source key still resolves to the merged master row.
+    import tempfile as _tf9
+    with _tf9.TemporaryDirectory() as _td9:
+        with open(os.path.join(_td9, "parts-manifest.json"), "w") as _fh:
+            json.dump({"parts": [{"tag": "u_tb", "equipment_tag": "X-999",
+                                  "name": "Terminal Block", "shape": "box", "qty": 1}]}, _fh)
+        _pn_state = {"requirementsBom": [
+            {"tag": "X-111", "requirement": "Circuit Breaker", "qty": 1, "unit_gbp": 45, "line_gbp": 45},
+            {"tag": "X-107", "requirement": "Circuit Breakers", "qty": 1, "unit_gbp": 45, "line_gbp": 45},
+            {"tag": "TK-101", "requirement": "Cip Tank · 1.4 m dia x 1.3 m", "qty": 1,
+             "unit_gbp": 4000, "line_gbp": 4000, "diameter_m": 1.4, "height_m": 1.3},
+            {"tag": "TK-102", "requirement": "Cleaning Tank · 1.4 m dia x 1.3 m", "qty": 1,
+             "unit_gbp": 4000, "line_gbp": 4000, "diameter_m": 1.4, "height_m": 1.3},
+            {"tag": "X-143", "requirement": "Emergency Stop", "qty": 1, "unit_gbp": 40, "line_gbp": 40},
+            {"tag": "I-106", "requirement": "Emergency Stop Switch", "qty": 1, "unit_gbp": 40, "line_gbp": 40},
+            {"tag": "X-140", "requirement": "Emergency Stop Button", "qty": 1, "unit_gbp": 218, "line_gbp": 218},
+            {"tag": "X-115", "requirement": "PLC Controller", "qty": 1, "unit_gbp": 400, "line_gbp": 400},
+            {"tag": "X-122", "requirement": "Siemens S7 1200 PLC", "qty": 1, "unit_gbp": 400, "line_gbp": 400},
+            {"tag": "X-117", "requirement": "Modbus Interface", "qty": 1, "unit_gbp": 12, "line_gbp": 12},
+            {"tag": "X-123", "requirement": "Modbus (Tcp) Interface", "qty": 1, "unit_gbp": 12, "line_gbp": 12},
+            {"tag": "—", "requirement": "Terminal Block", "qty": 1, "unit_gbp": 0, "line_gbp": 0},
+            {"tag": "—", "requirement": "Terminal Blocks", "qty": 1, "unit_gbp": 0, "line_gbp": 0},
+            {"tag": "TK-201", "requirement": "Buffer Tank · 1 m dia x 1 m", "qty": 1,
+             "unit_gbp": 900, "line_gbp": 900, "diameter_m": 1.0, "height_m": 1.0},
+            {"tag": "TK-202", "requirement": "Buffer Tanks · 3 m dia x 4 m", "qty": 1,
+             "unit_gbp": 9000, "line_gbp": 9000, "diameter_m": 3.0, "height_m": 4.0},
+        ]}
+        _wbp = Workbook(); _wbp.remove(_wbp.active)
+        tab_parts_master(_wbp, _pn_state, _td9)
+        _wsp = _wbp["Part names"]
+        _names_col = {str(_wsp.cell(rr, 2).value): rr for rr in range(5, _wsp.max_row + 1)
+                      if _wsp.cell(rr, 2).value}
+        # expected: 15 source rows − 6 merges = 9 master rows
+        if len(_names_col) != 9:
+            print(f"  FAIL partnames: 15 rows must merge to 9 masters "
+                  f"(got {len(_names_col)}: {sorted(_names_col)})"); bad += 1
+        _cbr = _names_col.get("Circuit Breaker")
+        if not _cbr or _wsp.cell(_cbr, 3).value != 2 \
+                or "Circuit Breakers" not in str(_wsp.cell(_cbr, 4).value) \
+                or str(_wsp.cell(_cbr, 1).value) != "X-111 / X-107":
+            print(f"  FAIL partnames: the merged Circuit Breaker row must show qty 2, both "
+                  f"tags and both source names (row {_cbr})"); bad += 1
+        _r1 = _NAME_REG.get("circuit breaker")
+        _r2 = _NAME_REG.get("circuit breakers")
+        if not _r1 or not _r2 or _r1["row"] != _r2["row"]:
+            print("  FAIL partnames: BOTH source name keys must resolve to the SAME merged "
+                  "master row (live references must not break)"); bad += 1
+        _ref_f = name_ref("Circuit Breakers")
+        if not _ref_f or not str(_wsp[_ref_f.split("!")[1].replace("$", "")].value) == "Circuit Breaker":
+            print(f"  FAIL partnames: a consumer holding the OLD plural name must still "
+                  f"resolve to the merged master cell (got {_ref_f!r})"); bad += 1
+        if "Emergency Stop Button" not in _names_col:
+            print("  FAIL partnames: the price-incompatible (5.45×) Emergency Stop Button "
+                  "must NOT merge into the E-stop pair"); bad += 1
+        if "Emergency Stop" not in _names_col or "Emergency Stop Switch" in _names_col:
+            print("  FAIL partnames: Emergency Stop + Switch (same £) must merge"); bad += 1
+        if "Cleaning Tank" in _names_col or "Cip Tank" not in _names_col:
+            print("  FAIL partnames: identical-dims Cip Tank + Cleaning Tank must merge"); bad += 1
+        if "Buffer Tank" not in _names_col or "Buffer Tanks" not in _names_col:
+            print("  FAIL partnames: plural twins with DIFFERENT dims/price are two real "
+                  "parts — they must NOT merge"); bad += 1
+        _tbr = _names_col.get("Terminal Block")
+        if not _tbr or "X-999" not in str(_wsp.cell(_tbr, 1).value):
+            print(f"  FAIL partnames: the untagged Terminal Block must take its manifest "
+                  f"tag X-999 (got {_tbr and _wsp.cell(_tbr, 1).value!r})"); bad += 1
+        if _TAG_REG.get("tk-102", {}).get("row") != _NAME_REG.get("cip tank", {}).get("row"):
+            print("  FAIL partnames: the merged twin's TAG must resolve to the merged row"); bad += 1
+
+    # (5) INSTRUMENT-INDEX COLLAPSE: N copy-paste '(#i of N)' rows → ONE typed group row
+    # ('LT-201…203', '(3 off)'); a row with a DIFFERENT range stays its own row; host
+    # tags appended only on an exact manifest count match.
+    _hdr5 = ["Tag", "ISA", "Service", "Measured", "Type", "Location", "Range", "Signal", "Loop"]
+    _rows5 = [[f"`LT-20{i}`", "LT", "Level Transmitter — TBD", "Level", "Guided-radar",
+               f"vessels (e.g. V-105) (#{i} of 3)", "0–4 m", "4–20 mA", "FF-PID-001"]
+              for i in (1, 2, 3)]
+    _rows5.append(["`AT-201`", "AT (pH)", "pH Analyser", "pH", "ISE", "TK-114",
+                   "0–14 pH", "4–20 mA", "FF-PID-001"])
+    _c5, _n5 = _collapse_instrument_rows(_hdr5, _rows5)
+    if len(_c5) != 2 or _n5 != 2:
+        print(f"  FAIL inst-collapse: 3 uniform rows + 1 distinct must collapse to 2 "
+              f"(got {len(_c5)} rows, {_n5} collapsed)"); bad += 1
+    else:
+        if "LT-201…203" not in _c5[0][0].replace("`", ""):
+            print(f"  FAIL inst-collapse: the group tag must read the range 'LT-201…203' "
+                  f"(got {_c5[0][0]!r})"); bad += 1
+        if "(3 off)" not in _c5[0][5] or "(#1 of 3)" in _c5[0][5]:
+            print(f"  FAIL inst-collapse: the location must state '(3 off)', never the "
+                  f"per-index marker (got {_c5[0][5]!r})"); bad += 1
+        if _c5[1][0] != "`AT-201`":
+            print("  FAIL inst-collapse: an unmarked row must pass through untouched"); bad += 1
+    # a differing Range splits the group (never collapse rows that are not identical)
+    _rows5b = [list(_r) for _r in _rows5[:3]]
+    _rows5b[2][6] = "0–10 m"
+    _c5b, _ = _collapse_instrument_rows(_hdr5, _rows5b)
+    if len(_c5b) != 2:
+        print(f"  FAIL inst-collapse: a row with a different Range must stay separate "
+              f"(got {len(_c5b)} rows)"); bad += 1
+    with _tf9.TemporaryDirectory() as _td5:
+        with open(os.path.join(_td5, "parts-manifest.json"), "w") as _fh:
+            json.dump({"parts": [{"equipment_tag": f"TK-10{i}", "name": f"Tank {i}",
+                                  "shape": "tank"} for i in (1, 2, 3)]}, _fh)
+        _c5h, _ = _collapse_instrument_rows(_hdr5, _rows5[:3], _td5)
+        if "hosts: TK-101, TK-102, TK-103" not in _c5h[0][5]:
+            print(f"  FAIL inst-collapse: an exact-count manifest vessel list must append "
+                  f"the host tags (got {_c5h[0][5]!r})"); bad += 1
+        with open(os.path.join(_td5, "parts-manifest.json"), "w") as _fh:
+            json.dump({"parts": [{"equipment_tag": f"TK-10{i}", "name": f"Tank {i}",
+                                  "shape": "tank"} for i in (1, 2, 3, 4)]}, _fh)
+        _c5n, _ = _collapse_instrument_rows(_hdr5, _rows5[:3], _td5)
+        if "hosts:" in _c5n[0][5]:
+            print("  FAIL inst-collapse: a count MISMATCH (4 vessels, 3 instruments) must "
+                  "never guess host tags"); bad += 1
+
+    # (6) HOLDS REGISTER: derived LIVE from the failing contracts (never hand-typed) —
+    # 3 unverified lines + 84/90 TBD MPNs + an out-of-scope client section → 3 numbered
+    # holds with those exact live counts; clean inputs → NO fabricated holds.
+    _save_cr = dict(_CONTRACT_RESULTS)
+    try:
+        _CONTRACT_RESULTS.clear()
+        _CONTRACT_RESULTS["Line & velocity"] = {"rows": {
+            0: {"verdict": "FAIL", "reasons": ["velocity underivable — no flow demand on the edge"]},
+            1: {"verdict": "FAIL", "reasons": ["velocity underivable — no contract flow matches"]},
+            2: {"verdict": "FAIL", "reasons": ["velocity underivable — unknown pipe size"]},
+            3: {"verdict": "PASS", "reasons": []}}}
+        _CONTRACT_RESULTS[_LEDGER_SHEET] = {"tbd_count": 84, "tbd_required": 90}
+        _h_state = {"_clientOfferRecon": {"sections": [
+            {"key": "D", "label": "Ebb/flow irrigation installation", "client_gbp": 895000.0,
+             "status": "out_of_scope", "engine_bom_gbp": 0}]}}
+        _holds = _derive_holds(_h_state)
+        if [h["id"] for h in _holds] != ["HOLD-001", "HOLD-002", "HOLD-003"]:
+            print(f"  FAIL holds: exactly 3 numbered holds must derive "
+                  f"(got {[h['id'] for h in _holds]})"); bad += 1
+        else:
+            if "3 line(s) with no derivable flow" not in _holds[0]["scope"]:
+                print(f"  FAIL holds: HOLD-001 must carry the LIVE unverified-line count "
+                      f"(got {_holds[0]['scope']!r})"); bad += 1
+            if "84/90" not in _holds[1]["scope"]:
+                print(f"  FAIL holds: HOLD-002 must carry the LIVE 84/90 TBD count "
+                      f"(got {_holds[1]['scope']!r})"); bad += 1
+            if "£895,000" not in _holds[2]["scope"] or "out of BoM scope" not in _holds[2]["item"]:
+                print(f"  FAIL holds: HOLD-003 must state the out-of-scope client section "
+                      f"+ its £ (got {_holds[2]})"); bad += 1
+        _CONTRACT_RESULTS.clear()
+        if _derive_holds({}) != []:
+            print("  FAIL holds: clean inputs must yield NO fabricated holds"); bad += 1
+        # the rendered register: holds + the brief's own exclusions, and a tab score entry
+        _CONTRACT_RESULTS[_LEDGER_SHEET] = {"tbd_count": 84, "tbd_required": 90}
+        with _tf9.TemporaryDirectory() as _td6:
+            with open(os.path.join(_td6, "0-original-brief.md"), "w") as _fh:
+                _fh.write("Explicitly EXCLUDED (out of scope):\n- the grow-lighting\n"
+                          "- the building, civil works\n\nNext heading\n")
+            _wbh = Workbook(); _wbh.remove(_wbh.active)
+            if not tab_holds_register(_wbh, {}, _td6):
+                print("  FAIL holds: the register tab must build when a hold exists"); bad += 1
+            else:
+                _wsh = _wbh["Holds & exclusions"]
+                _hcells = [str(c.value) for row_ in _wsh.iter_rows() for c in row_ if c.value]
+                if not any(v == "HOLD-001" for v in _hcells) \
+                        or not any("84/90" in v for v in _hcells) \
+                        or not any("grow-lighting" in v for v in _hcells):
+                    print("  FAIL holds: the rendered register must show the numbered hold, "
+                          "its live count and the brief's exclusions"); bad += 1
+                _hsc = _TAB_SCORES.pop("Holds & exclusions", None)
+                if not _hsc or _hsc.get("score") != 8:
+                    print(f"  FAIL holds: the register scores an honest 8 (disclosure tab, "
+                          f"capped while holds are open) — got {_hsc}"); bad += 1
+    finally:
+        _CONTRACT_RESULTS.clear()
+        _CONTRACT_RESULTS.update(_save_cr)
+
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
