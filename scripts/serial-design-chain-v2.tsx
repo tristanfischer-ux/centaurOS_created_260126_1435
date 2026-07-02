@@ -51,7 +51,12 @@ import { runSemanticSelfAudit, evaluateSelfAuditEnforcement, selfAuditEnforceMod
 import { computeCostSanity, evaluateCostSanityEnforcement, costSanityEnforceModeFromEnv, readHeadlineCostGbp, deriveOutputDenominator } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { generateBenchmarkExpectation, compareToBenchmark, diagnoseFaults, routeFaults, briefDescriptionFromState, type BenchmarkExpectation, type DivergenceReport, type Fault } from './lib/benchmark-expectation'
 import { reconcile as reconcileSweetSpot, type PrimaryObjective } from './lib/sweet-spot'
-import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
+import {
+  computeScorecardFloor,
+  buildBriefComplianceSection,
+  buildUnresolvedCriticHighsSection,
+  type ComplianceRowInput,
+} from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
@@ -2377,6 +2382,70 @@ interface FixDirective {
   fixStage: string
 }
 
+// ── Deterministic-sections python probe (Tristan 2026-07-02) ─────────────────────
+// Agreement-by-construction: instead of re-implementing the workbook's compliance
+// matcher and the Risk & Regulatory tab's falsify-stale HIGH filter in TS (semantic
+// drift guaranteed), this probe IMPORTS the exact python functions those surfaces run:
+//   • build-excel-export.py::_match_quantity      — the ⚠ Checks compliance matrix
+//   • dossier_audit.py::_physics_issues +
+//     _physics_high_is_design_defect              — the Risk tab's surviving-HIGH set
+// State is passed on stdin; output is one JSON object. Any partial failure is reported
+// in `errors` and the corresponding section is simply not built (loud, never silent).
+const DETERMINISTIC_SECTIONS_PROBE_PY = `
+import sys, os, json, importlib.util
+scripts_dir = sys.argv[1]
+run_dir = sys.argv[2] if len(sys.argv) > 2 else ''
+sys.path.insert(0, os.path.join(scripts_dir, 'lib'))
+state = json.load(sys.stdin)
+out = {'compliance_rows': None, 'surviving_highs': None, 'errors': []}
+try:
+    spec = importlib.util.spec_from_file_location('bxe', os.path.join(scripts_dir, 'build-excel-export.py'))
+    bxe = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bxe)
+    pb = state.get('parsedBrief') or {}
+    tp = (pb.get('constraints') or {}).get('target_performance') or {}
+    metrics = tp.get('metrics') or []
+    if not metrics and tp.get('value') is not None:
+        metrics = [tp]
+    quantities = (state.get('orchestratorContract') or {}).get('quantities') or {}
+    rows = []
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        key = (m.get('key_metric') or m.get('metric') or m.get('name') or '').strip()
+        matched = bxe._match_quantity(m, quantities)
+        rows.append({
+            'key': key,
+            'unit': m.get('unit', '') or '',
+            'category': (m.get('category') or ''),
+            'target': bxe.num(m.get('value')),
+            'matched': (matched[0] if matched else None),
+            'achieved': (matched[1] if matched else None),
+        })
+    out['compliance_rows'] = rows
+except Exception as e:
+    out['errors'].append('brief_compliance: %s' % e)
+try:
+    import dossier_audit as da
+    has_critique = bool(run_dir and os.path.exists(os.path.join(run_dir, '7-5-physics-critique.json')))
+    if not has_critique:
+        for key in ('physicsCritique', 'physicsCritic', 'physics_critique', 'physics_critic'):
+            pc = state.get(key)
+            if isinstance(pc, dict) and isinstance(pc.get('issues'), list):
+                has_critique = True
+                break
+    if has_critique:
+        highs = [i for i in da._physics_issues(state, run_dir or None)
+                 if isinstance(i, dict) and str(i.get('severity', '')).lower() == 'high'
+                 and da._physics_high_is_design_defect(i, state)]
+        out['surviving_highs'] = [
+            {'issue': str(i.get('issue') or i.get('title') or '(untitled)'),
+             'where': str(i.get('where') or '')} for i in highs]
+except Exception as e:
+    out['errors'].append('unresolved_critic_highs: %s' % e)
+print(json.dumps(out))
+`
+
 function computeQualityScorecard(state: any): QualityScorecard {
   const sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }> = []
 
@@ -2526,6 +2595,41 @@ function computeQualityScorecard(state: any): QualityScorecard {
       }
     }
   } catch { /* best-effort */ }
+
+  // ── Deterministic brief_compliance + unresolved_critic_highs (Tristan 2026-07-02) ──
+  // Tristan caught the workbook's Scorecard sheet showing brief_compliance 5/10
+  // ("8 of 15 constraints unverified") + physics_fidelity 7 while THIS scorecard said
+  // floor=8/allPass=true. B3 correctly cages the LLM's SCORES, but it also excluded
+  // FACTS that are deterministically computable. These two sections restore the facts
+  // to the floor WITHOUT re-admitting LLM opinion: the probe imports the SAME python
+  // functions the workbook renders with (see DETERMINISTIC_SECTIONS_PROBE_PY above),
+  // and the pure, harness-tested builders in scorecard-floor.ts apply the scoring
+  // rules (brief_compliance: hard FAIL→4 / hard UNVERIFIED→5 / soft-only→7 / clean→10;
+  // unresolved_critic_highs: 0→10 / 1→6 / ≥2→4). On probe failure the sections are
+  // NOT pushed and the failure is logged loudly — never a silent green.
+  try {
+    const probeRaw = execFileSync(
+      'python3',
+      ['-c', DETERMINISTIC_SECTIONS_PROBE_PY, __dirname, process.env.QUALITY_LOOP_OUT_DIR || ''],
+      { input: JSON.stringify(state), encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 },
+    )
+    const probe = JSON.parse(probeRaw)
+    for (const e of probe.errors || []) {
+      console.error(`[chain] ⚠ deterministic-section probe error: ${e}`)
+    }
+    if (Array.isArray(probe.compliance_rows) && probe.compliance_rows.length > 0) {
+      const bc = buildBriefComplianceSection(probe.compliance_rows as ComplianceRowInput[])
+      sections.push({ name: bc.name, score: bc.score, defects: bc.defects ?? [] })
+    }
+    if (Array.isArray(probe.surviving_highs)) {
+      const uh = buildUnresolvedCriticHighsSection(probe.surviving_highs)
+      sections.push({ name: uh.name, score: uh.score, defects: uh.defects ?? [] })
+    }
+  } catch (err) {
+    console.error(
+      `[chain] ⚠ deterministic brief_compliance/unresolved_critic_highs sections UNAVAILABLE (python probe failed): ${(err as Error).message}`,
+    )
+  }
 
   // B3: floor + mean from the DETERMINISTIC (non-advisory) sections only — the
   // deterministic checks ARE the quality bar; advisory LLM sections stay visible in

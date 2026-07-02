@@ -50,7 +50,12 @@ import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-su
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
-import { computeScorecardFloor } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
+import {
+  computeScorecardFloor,
+  buildBriefComplianceSection,
+  buildUnresolvedCriticHighsSection,
+  complianceRowStatus,
+} from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
 import { co2MineralisationEmitter } from './lib/orchestrator/emitters/co2-mineralisation'
 import { E_FUEL_SYNTHESIS_PLAN } from './lib/orchestrator/class-plans/e-fuel-synthesis'
@@ -11265,6 +11270,107 @@ function checkQualityLoopInvariants(): Assertion[] {
       description: 'B3: a class with ONLY advisory sections falls back to all (floor 6, never blank)',
       passed: onlyAdvisory.floor === 6,
       detail: onlyAdvisory.floor !== 6 ? `got floor ${onlyAdvisory.floor}` : undefined,
+    })
+  }
+
+  // QL7 (Tristan 2026-07-02): deterministic brief_compliance + unresolved_critic_highs
+  // sections — the FACT sections that closed the "workbook Scorecard shows 5/10 while
+  // the chain says floor=8/allPass=true" lie (v52). A deterministic brief_compliance
+  // <8 MUST drag the floor; advisory LLM sections still cannot (B3 stands).
+  {
+    // a) the v52 lie, reproduced: 2 UNVERIFIED hard (scale) constraints → section 5,
+    //    and 5 DRAGS the floor below 8 even though every other deterministic gate is ≥8.
+    const v52Rows = [
+      { key: 'total_cultivation_containers', unit: 'trays', category: 'scale', target: 6000, matched: null, achieved: null },
+      { key: 'max_irrigation_demand_per_department', unit: 'm3/hr', category: 'scale', target: 45, matched: null, achieved: null },
+      { key: 'ro_permeate_capacity', unit: 'm3/hr', category: 'scale', target: 8, matched: 'ro_permeate_capacity_m3_h', achieved: 8 },
+      { key: 'water_storage_capacity', unit: 'm3', category: 'scale', target: 120, matched: 'water_storage_capacity_m3', achieved: 120 },
+    ]
+    const bcV52 = buildBriefComplianceSection(v52Rows)
+    const v52Floor = computeScorecardFloor([
+      { name: 'physics_fidelity', score: 7, advisory: true },   // LLM — stays caged
+      { name: 'drawing_gates', score: 10 },
+      { name: 'cost_sanity', score: 10 },
+      { name: 'connectivity', score: 10 },
+      bcV52,
+    ])
+    out.push({
+      id: 'QL7.deterministic_brief_compliance_drags_floor',
+      description: 'unverified HARD constraints score the deterministic brief_compliance 5 and DRAG the floor (the v52 lie is caught)',
+      passed: bcV52.score === 5 && v52Floor.floor === 5 && (bcV52.defects || []).length === 2,
+      detail: `section=${bcV52.score} floor=${v52Floor.floor} defects=${(bcV52.defects || []).length}`,
+    })
+    // b) counter-case: a fully-verified brief → 10; the new section leaves the floor alone.
+    const bcClean = buildBriefComplianceSection([
+      { key: 'ro_permeate_capacity', unit: 'm3/hr', category: 'scale', target: 8, matched: 'ro_permeate_capacity_m3_h', achieved: 8 },
+      { key: 'actuated_valves_count', unit: 'count', category: 'scale', target: 200, matched: 'actuated_distribution_valve_count', achieved: 200 },
+    ])
+    const cleanFloor = computeScorecardFloor([
+      { name: 'drawing_gates', score: 8 },
+      bcClean,
+      buildUnresolvedCriticHighsSection([]),
+    ])
+    out.push({
+      id: 'QL7.fully_verified_brief_scores_10',
+      description: 'a fully-verified brief scores brief_compliance 10 and the new sections do not move the floor',
+      passed: bcClean.score === 10 && cleanFloor.floor === 8,
+      detail: `section=${bcClean.score} floor=${cleanFloor.floor}`,
+    })
+    // c) a FAILED hard constraint outranks unverified: score 4; a soft-only gap: 7.
+    const bcHardFail = buildBriefComplianceSection([
+      { key: 'water_storage_capacity', unit: 'm3', category: 'scale', target: 120, matched: 'water_storage_capacity_m3', achieved: 60 },
+    ])
+    const bcSoftOnly = buildBriefComplianceSection([
+      { key: 'ro_recovery_factor', unit: '%', category: 'efficiency', target: 75, matched: null, achieved: null },
+    ])
+    out.push({
+      id: 'QL7.hard_fail_4_soft_only_7',
+      description: 'scoring rule: hard FAIL → 4; soft-only gap → 7',
+      passed: bcHardFail.score === 4 && bcSoftOnly.score === 7,
+      detail: `hardFail=${bcHardFail.score} softOnly=${bcSoftOnly.score}`,
+    })
+    // d) direction mirror: lower-better metrics (FCR/duration/LCOE) pass under target,
+    //    higher-better metrics fail under target (±2% tolerance, as the workbook renders).
+    out.push({
+      id: 'QL7.direction_mirrors_workbook_matrix',
+      description: 'complianceRowStatus mirrors the workbook direction + ±2% tolerance logic',
+      passed:
+        complianceRowStatus({ key: 'fcr_feed_conversion', category: 'performance', target: 1.4, matched: 'fcr', achieved: 1.3 }) === 'PASS' &&
+        complianceRowStatus({ key: 'rated_power_kw', category: 'performance', target: 100, matched: 'rated_power_kw', achieved: 90 }) === 'FAIL' &&
+        complianceRowStatus({ key: 'rated_power_kw', category: 'performance', target: 100, matched: 'rated_power_kw', achieved: 98.5 }) === 'PASS',
+    })
+    // e) advisory sections STILL cannot drag the floor with the new sections present (B3 stands).
+    const advisoryStillCaged = computeScorecardFloor([
+      { name: 'brief_compliance', score: 5, advisory: true },   // the LLM's own opinion
+      bcClean,                                                   // deterministic 10
+      { name: 'drawing_gates', score: 9 },
+    ])
+    out.push({
+      id: 'QL7.advisory_still_cannot_drag_floor',
+      description: 'B3 stands: an advisory LLM brief_compliance 5 cannot drag the floor when the deterministic section is clean',
+      passed: advisoryStillCaged.floor === 9,
+      detail: `floor=${advisoryStillCaged.floor}`,
+    })
+  }
+
+  // QL8 (Tristan 2026-07-02): unresolved_critic_highs — the COUNT of falsify-stale-
+  // surviving physics-critic HIGHs gates deterministically: 0→10, 1→6, ≥2→4.
+  {
+    const zero = buildUnresolvedCriticHighsSection([])
+    const one = buildUnresolvedCriticHighsSection([{ issue: 'MDPE buffer tank spec\'d for a 120 °C stripper loop', where: 'm/sub_modules[0]/words[3]' }])
+    const two = buildUnresolvedCriticHighsSection([
+      { issue: 'MDPE buffer tank spec\'d for a 120 °C stripper loop' },
+      { issue: 'feeder rated 106 kg/h against a 200 kg/h demand' },
+    ])
+    const oneDrags = computeScorecardFloor([{ name: 'drawing_gates', score: 10 }, one])
+    out.push({
+      id: 'QL8.unresolved_critic_highs_counts_gate',
+      description: 'unresolved_critic_highs: 0 HIGHs→10, 1→6 (drags the floor), ≥2→4; defects carry the finding texts',
+      passed:
+        zero.score === 10 && one.score === 6 && two.score === 4 &&
+        oneDrags.floor === 6 && (two.defects || []).length === 2 &&
+        String((one.defects || [])[0] || '').includes('MDPE'),
+      detail: `zero=${zero.score} one=${one.score} two=${two.score} floor=${oneDrags.floor}`,
     })
   }
 
