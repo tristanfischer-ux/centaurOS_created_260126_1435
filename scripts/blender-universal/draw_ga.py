@@ -402,9 +402,11 @@ def scale_bar(svg: SVG, x, y, scale_S, px_per_mm, total_mm):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _draw_equipment_rect(svg, px, py, pw, ph, round_plan, tag, show_tag=True,
-                         tiny_fill=EQ_FILL):
+                         tiny_fill=EQ_FILL, placer=None):
     """Draw one equipment outline at paper (px,py) size (pw,ph). round_plan=True
-    draws a circle (a vessel/tank footprint in PLAN) inscribed in the box."""
+    draws a circle (a vessel/tank footprint in PLAN) inscribed in the box. When a
+    `placer` (_TagPlacer) is given the tag is REGISTERED for the view's de-overlap
+    pass instead of being stamped immediately."""
     if round_plan and pw > 4 and ph > 4:
         # plan footprint of a cylinder = a circle (diameter = the box) + a centre dot
         r = min(pw, ph) / 2.0
@@ -416,10 +418,81 @@ def _draw_equipment_rect(svg, px, py, pw, ph, round_plan, tag, show_tag=True,
         svg.rect(px, py, max(pw, 1.5), max(ph, 1.5), stroke=EQ_INK, width=1.4,
                  fill=tiny_fill)
     if show_tag and pw >= 16 and ph >= 11:
-        svg.text(px + pw / 2.0, py + ph / 2.0 + 3.2, tag, size=min(10.0, ph * 0.6),
-                 anchor="middle", weight="bold", fill=EQ_INK)
+        _cx, _cy = px + pw / 2.0, py + ph / 2.0
+        _sz = min(10.0, ph * 0.6)
+        if placer is not None:
+            placer.add(_cx, _cy + 3.2, tag, _sz, anchor_pt=(_cx, _cy))
+        else:
+            svg.text(_cx, _cy + 3.2, tag, size=_sz,
+                     anchor="middle", weight="bold", fill=EQ_INK)
         return True
     return False   # too small to label in place → caller adds a leader/keynote
+
+
+class _TagPlacer:
+    """Deterministic tag-label DE-OVERLAP for one GA view (reviewers 2026-07-02: the
+    small-tank nest rendered collided, garbled tags — 'TK-TK-113' / 'TK-1TK-11K-105' —
+    on the plan and both elevations, because every in-place tag was stamped at its part
+    centre regardless of neighbours). Tags are REGISTERED while the view's equipment is
+    drawn, then resolved in ONE pass: a label keeps its in-place position unless its
+    text bbox intersects an already-placed label, in which case it walks a fixed
+    offset LADDER (up, down, further up, further down …) to the first clear slot and
+    draws a leader line back to its part centre so the tag stays unambiguous.
+    Registration order is the existing draw order (largest part first — a stable,
+    deterministic sort), so the resolved layout is byte-identical run to run."""
+
+    CHAR_W = 0.62          # ≈ em-fraction per character of the sheet's bold Helvetica
+
+    def __init__(self, svg):
+        self.svg = svg
+        self._pending = []
+        self._placed = []          # bboxes of resolved labels in THIS view
+
+    def _bbox(self, x, y, text, size):
+        w = self.CHAR_W * size * max(len(str(text)), 1)
+        # y is the text BASELINE (svg.text convention): ascender ≈ 0.78·size above.
+        return (x - w / 2.0, y - size * 0.78, x + w / 2.0, y + size * 0.22)
+
+    @staticmethod
+    def _hits(a, b):
+        return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+    def add(self, x, y, text, size, anchor_pt=None):
+        """Register a middle-anchored bold tag at its desired baseline (x, y);
+        anchor_pt = the part centre a displaced label leads back to."""
+        self._pending.append((float(x), float(y), str(text), float(size), anchor_pt))
+
+    def block(self, x0, y0, x1, y1):
+        """Reserve a rectangle no tag may land on (a dimension band / annotation
+        the view draws OUTSIDE this placer), so a ladder-displaced tag can never
+        overprint it."""
+        self._placed.append((float(x0), float(y0), float(x1), float(y1)))
+
+    def flush(self):
+        """Resolve + draw every registered tag. Ladder: in place, then ±1, ±2 … rows
+        of (size + 3 px); a label that had to move gets a leader to its part."""
+        for x, y, text, size, anchor_pt in self._pending:
+            step = size + 3.0
+            chosen = None
+            for k in (0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6):
+                cy = y + k * step
+                bb = self._bbox(x, cy, text, size)
+                if not any(self._hits(bb, pb) for pb in self._placed):
+                    chosen = (cy, bb, k)
+                    break
+            if chosen is None:      # extreme pile-up — place at the far ladder end
+                cy = y - 7 * step
+                chosen = (cy, self._bbox(x, cy, text, size), -7)
+            cy, bb, k = chosen
+            self._placed.append(bb)
+            if k and anchor_pt is not None:
+                ax, ay = anchor_pt
+                # leader from the label's near edge back to the part centre
+                ey = bb[3] if cy < ay else bb[1]
+                self.svg.line(x, ey, ax, ay, stroke=DATUM_INK, width=0.7)
+            self.svg.text(x, cy, text, size=size, anchor="middle", weight="bold",
+                          fill=EQ_INK)
+        self._pending = []
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -527,14 +600,22 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # small numbered balloons keyed to the EQUIPMENT SCHEDULE (the standard GA way
     # to keep a dense plan legible without tag pile-ups).
     keynotes = []   # (part, cx, cy) for items too small to label in place
+    plan_tags = _TagPlacer(svg)      # de-overlap pass (GA fix 7, reviewers 2026-07-02)
+    # reserve the plan's annotation bands so a ladder-displaced tag can never
+    # overprint the dimensions / grid balloons / north arrow drawn around the plan.
+    plan_tags.block(plan_x - 40, plan_y - 26, plan_x + plan_w + 40, plan_y - 2)
+    plan_tags.block(plan_x - 28, plan_y - 2, plan_x - 2, plan_y + plan_h + 2)
+    plan_tags.block(plan_x + plan_w - 40, plan_y + 2, plan_x + plan_w + 8, plan_y + 46)
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1))):
         pw = (p.x1 - p.x0) * ppm
         ph = (p.y1 - p.y0) * ppm
         px = plan_x + mx(p.x0)
         py = plan_y + my(p.y1)        # my inverts → top edge is the larger y
-        labelled = _draw_equipment_rect(svg, px, py, pw, ph, p.is_round, p.tag)
+        labelled = _draw_equipment_rect(svg, px, py, pw, ph, p.is_round, p.tag,
+                                        placer=plan_tags)
         if not labelled:
             keynotes.append((p, px + pw / 2.0, py + ph / 2.0))
+    plan_tags.flush()
     # numbered balloons for unlabelled small items — but SKIP any balloon that would
     # land on top of one already drawn (within ~11 px), so the plan never becomes a
     # mass of overlapping circles; those items are still in the schedule.
@@ -552,12 +633,21 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     svg.text(front_x + 118, front_y - 14, "(looking north)", size=9.5, fill=MUTED)
     _draw_elev_frame(svg, front_x, front_y, plan_w, front_h, L, H, ppm,
                      z_min, z_max, mz_base=front_y)
+    front_tags = _TagPlacer(svg)
+    # reserve the ground/FFL row, the left height dimension and the schedule-panel
+    # top edge so displaced tags never overprint them.
+    _gy_f = front_y + (z_max - max(0.0, z_min)) * ppm
+    front_tags.block(front_x - 30, _gy_f + 0.5, front_x + plan_w + 95, _gy_f + 13)
+    front_tags.block(front_x - 30, front_y - 2, front_x - 2, _gy_f)
+    front_tags.block(margin, sched_top - 2, width - margin, sched_top + 20)
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
         pw = (p.x1 - p.x0) * ppm
         ph = (p.z1 - p.z0) * ppm
         px = front_x + mx(p.x0)
         py = front_y + (z_max - p.z1) * ppm
-        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="x")
+        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="x",
+                             placer=front_tags)
+    front_tags.flush()
     # ground / datum line + overall height dimension on the front elevation
     ground_y = front_y + (z_max - max(0.0, z_min)) * ppm
     svg.line(front_x - 8, ground_y, front_x + plan_w + 8, ground_y,
@@ -576,13 +666,20 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # rows); vertical axis = plant HEIGHT (z). Width on paper = plan_h.
     _draw_elev_frame(svg, side_x, side_y, plan_h, front_h, W, H, ppm,
                      z_min, z_max, mz_base=side_y, horiz_label="WIDTH")
+    side_tags = _TagPlacer(svg)
+    # reserve the ground row + the width dimension band ('33.12 m' / PLANT WIDTH):
+    # the v55 regen showed a displaced tag overprinting the dim label without this.
+    _gy_s = side_y + (z_max - max(0.0, z_min)) * ppm
+    side_tags.block(side_x - 30, _gy_s + 0.5, side_x + plan_h + 40, _gy_s + 58)
     for p in sorted(parts, key=lambda q: -(max(q.y1 - q.y0, 1) * max(q.z1 - q.z0, 1))):
         pw = (p.y1 - p.y0) * ppm
         ph = (p.z1 - p.z0) * ppm
         # plan rows run north(top)→south; keep the same handedness as the plan.
         px = side_x + (y_max - p.y1) * ppm
         py = side_y + (z_max - p.z1) * ppm
-        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="y")
+        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="y",
+                             placer=side_tags)
+    side_tags.flush()
     ground_ys = side_y + (z_max - max(0.0, z_min)) * ppm
     svg.line(side_x - 8, ground_ys, side_x + plan_h + 8, ground_ys,
              stroke=INK, width=1.4)
@@ -668,10 +765,12 @@ def _draw_elev_frame(svg, ox, oy, pw, ph, horiz_mm, H_mm, ppm, z_min, z_max,
         lvl += pitch
 
 
-def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x"):
+def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x",
+                         placer=None):
     """One equipment outline in an elevation. Cylinders (vessels/columns/tanks/
     stacks) draw as a capsule (rounded top) so they read as vessels, not boxes;
-    everything else a rect. Tag if it fits."""
+    everything else a rect. Tag if it fits (registered with the view's _TagPlacer
+    when given, so colliding tags de-overlap deterministically)."""
     pw = max(pw, 1.5)
     ph = max(ph, 1.5)
     if p.is_round and p.shape == "tank" and ph > 8 and pw > 5:
@@ -697,9 +796,13 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x"):
     else:
         svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
     if pw >= 16 and ph >= 12:
-        svg.text(px + pw / 2.0, py + ph / 2.0 + 3.2, p.tag,
-                 size=min(9.5, ph * 0.5), anchor="middle", weight="bold",
-                 fill=EQ_INK)
+        _cx, _cy = px + pw / 2.0, py + ph / 2.0
+        _sz = min(9.5, ph * 0.5)
+        if placer is not None:
+            placer.add(_cx, _cy + 3.2, p.tag, _sz, anchor_pt=(_cx, _cy))
+        else:
+            svg.text(_cx, _cy + 3.2, p.tag, size=_sz, anchor="middle",
+                     weight="bold", fill=EQ_INK)
 
 
 def _hatch_ground(svg, x0, x1, y):
@@ -1023,10 +1126,62 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     return summary, parts, svg_text
 
 
+def _selftest() -> int:
+    """proveCatch the tag de-overlap (GA fix 7, reviewers 2026-07-02 — the v55
+    'TK-TK-113' / 'TK-1TK-11K-105' garbled small-tank nest): (1) tags registered at
+    colliding positions resolve to DISJOINT bboxes with leader lines; (2) a tag with
+    clear air stays EXACTLY in place (no false displacement); (3) the pass is
+    deterministic (same input → byte-identical SVG)."""
+    bad = 0
+
+    def _render(tags):
+        svg = SVG(400, 200)
+        pl = _TagPlacer(svg)
+        for x, y, t in tags:
+            pl.add(x, y, t, 9.0, anchor_pt=(x, y - 3.2))
+        pl.flush()
+        return svg.render(), pl
+
+    # 1 — the v55 nest: three tags stamped ~8 px apart (text ~34 px wide) must
+    #     resolve to pairwise-disjoint bboxes and draw leaders for the moved ones.
+    nest = [(100.0, 60.0, "TK-113"), (108.0, 60.0, "TK-111"), (116.0, 60.0, "TK-105")]
+    txt1, pl1 = _render(nest)
+    for i in range(len(pl1._placed)):
+        for j in range(i + 1, len(pl1._placed)):
+            if _TagPlacer._hits(pl1._placed[i], pl1._placed[j]):
+                print("  FAIL ga-tags: resolved labels still overlap "
+                      f"({pl1._placed[i]} vs {pl1._placed[j]})")
+                bad += 1
+    if txt1.count("<line") < 2:
+        print(f"  FAIL ga-tags: the two displaced labels must each draw a leader "
+              f"line (got {txt1.count('<line')})")
+        bad += 1
+    if "TK-113" not in txt1 or "TK-111" not in txt1 or "TK-105" not in txt1:
+        print("  FAIL ga-tags: every registered tag must still render")
+        bad += 1
+    # 2 — the OTHER direction: a lone tag must stay exactly in place, no leader.
+    txt2, pl2 = _render([(100.0, 60.0, "TK-101")])
+    if '<line' in txt2:
+        print("  FAIL ga-tags: an uncontested tag must NOT grow a leader")
+        bad += 1
+    if 'y="60.0"' not in txt2 and 'y="60"' not in txt2:
+        print("  FAIL ga-tags: an uncontested tag must stay at its in-place baseline")
+        bad += 1
+    # 3 — determinism: the same registration sequence renders byte-identically.
+    txt1b, _ = _render(nest)
+    if txt1 != txt1b:
+        print("  FAIL ga-tags: de-overlap pass must be deterministic")
+        bad += 1
+    print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
+    return 1 if bad else 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] in ("--selftest", "selftest"):
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:

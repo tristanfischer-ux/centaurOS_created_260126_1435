@@ -449,11 +449,15 @@ def _aux_tab_score(title: str, run_dir: str):
             pass
         return None
     if "audit" in t:  # ⚠ Audit — the dossier ship verdict = does every scored tab reach ≥8?
+        # ONE FLOOR (fix 3, reviewers 2026-07-02): this fallback score IS the weakest
+        # tab score — never a derived max(2, …) number no other surface quotes. (The
+        # canonical 'Quality & Audit' entry is set in build() from compute_verdict; this
+        # branch only serves a direct _aux_tab_score call before that entry exists.)
         _scored = [v.get("score") for v in _TAB_SCORES.values() if isinstance(v.get("score"), (int, float))]
         if _scored:
             _worst = min(_scored)
             _ok = _worst >= 8
-            return {"score": 8 if _ok else max(2, _worst), "target": 8, "status": "PASS" if _ok else "FAIL",
+            return {"score": 8 if _ok else _worst, "target": 8, "status": "PASS" if _ok else "FAIL",
                     "issues": [] if _ok else [f"the dossier does NOT ship — the weakest tab scores {_worst}/10; every tab must reach ≥8"],
                     "fix": "resolve the failing tabs (see the per-tab punch-list / Quality & Audit findings)"}
         return None
@@ -3721,9 +3725,20 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         # registered principal (one identity across the workbook); literal fallback for
         # boundary / aggregate endpoints the master doesn't carry.
         _pn = name_ref(name)
-        ws.cell(r, 1, _pn if _pn else clean_cell(name)).border = BORDER
-        _pt = name_ref(name, "tag")
-        ws.cell(r, 2, _pt if _pt else clean_cell(_tag_for(name))).border = BORDER
+        # DISTINCT identities for MERGED twins (fix 1): when this endpoint is one
+        # source identity of a merged master row (TK-101 'Cip Tank' + TK-102 'Cleaning
+        # Tank' → one master 'Cip Tank'), append its OWN tag so the trace never reads
+        # 'Cip Tank → Cip Tank' — the endpoints stay two distinguishable physical parts.
+        _own_tag = _MERGE_SRC_TAG.get(_norm_name(name))
+        if _pn and _own_tag:
+            ws.cell(r, 1, _pn + '&" (' + _own_tag.replace('"', "'") + ')"').border = BORDER
+        else:
+            ws.cell(r, 1, _pn if _pn else clean_cell(name)).border = BORDER
+        if _own_tag:
+            ws.cell(r, 2, clean_cell(_own_tag)).border = BORDER
+        else:
+            _pt = name_ref(name, "tag")
+            ws.cell(r, 2, _pt if _pt else clean_cell(_tag_for(name))).border = BORDER
         sc = ws.cell(r, 3, clean_cell(status))
         sc.border = BORDER
         if miss:
@@ -3811,6 +3826,12 @@ _NAME_REG: Dict[str, Dict[str, str]] = {}
 # Line & velocity From/To endpoints, a schedule's served-equipment column) can also
 # reference the master row. Populated alongside _NAME_REG in tab_parts_master.
 _TAG_REG: Dict[str, Dict[str, str]] = {}
+# SOURCE-identity tags of MERGED master rows (fix 1 completion): normalised source
+# name → its OWN tag (e.g. 'cleaning tank' → 'TK-102', 'cip tank' → 'TK-101' when the
+# two merged into one master row). A name-referencing surface that must keep DISTINCT
+# physical identities (the connection trace endpoints) appends this tag so two merged
+# twins never render as the same string. Populated alongside _NAME_REG.
+_MERGE_SRC_TAG: Dict[str, str] = {}
 
 
 def _norm_name(s) -> str:
@@ -3934,19 +3955,28 @@ def _principal_rows_compatible(a: dict, b: dict) -> bool:
 
 def _merge_members(members: List[dict], why: str) -> dict:
     """ONE merged principal from ≥2 members: shortest name is canonical; tags joined;
-    qty summed; the requirement cell lists EVERY source name + tag."""
+    qty summed; the requirement cell lists EVERY source name + tag. Carries every
+    member's bom-row index (src_idx) + (name, tag) identity (src_identities) so the
+    LEDGER fold + the connection-trace disambiguation (fix 1 completion, reviewers
+    2026-07-02) work from the SAME merge decision."""
     prim = min(members, key=lambda m: (len(m["name"]), m["name"].lower()))
     tags = [m["tag"] for m in members if m["tag"] and m["tag"] != "—"]
     qty = sum(num(m.get("qty")) or 0 for m in members) or None
     src = " + ".join(f"'{m['name']}' ({m['tag']})" for m in members)
     req = f"{prim['req']}  ·  MERGED ROWS ({why}): {src}"
     keys: List[str] = []
+    idxs: List[int] = []
+    idents: List[tuple] = []
     for m in members:
         keys.extend(m.get("src_keys") or [_norm_name(m["req"]), _merge_key(m["req"])])
+        idxs.extend(m.get("src_idx") or [])
+        idents.extend(m.get("src_identities") or [(m["name"], m["tag"])])
     return {"tag": " / ".join(dict.fromkeys(tags)) or "—", "name": prim["name"],
             "qty": qty, "req": req, "row": prim.get("row") or {},
             "src_keys": list(dict.fromkeys(k for k in keys if k)),
             "src_tags": list(dict.fromkeys(tags)),
+            "src_idx": sorted(dict.fromkeys(idxs)),
+            "src_identities": list(dict.fromkeys(idents)),
             "merged_from": [m["name"] for m in members]}
 
 
@@ -4025,31 +4055,14 @@ def _manifest_tag_by_name(run_dir: str) -> Dict[str, str]:
     return out
 
 
-def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
-    """THE master list of part NAMES (Tristan 2026-06-21). One row per distinct principal
-    part: its canonical Tag + Name typed ONCE here. Populates _NAME_REG so every other
-    tab references these cells instead of repeating the string. Built FIRST so all
-    consumers can resolve. Principals only (a tag with no '.' suffix whose requirement is
-    not a ↳ sub-component). Singular/plural + compatible-synonym twins are MERGED into
-    one row (fix 4, reviewers 2026-07-02) with every source name registered, so
-    downstream live references never break."""
-    _NAME_REG.clear()
-    _TAG_REG.clear()
-    ws = wb.create_sheet("Part names")
-    set_widths(ws, {"A": 14, "B": 46, "C": 8, "D": 64})
-    title_row(ws, "Part names — the master list", 4,
-              "THE single source of every part's name. Each name is typed ONCE here; every "
-              "other tab (BoM, Cost, Spec sheets, Connection trace, schedules) REFERENCES these "
-              "cells, never repeats the string — edit a name here and it updates across the whole "
-              "workbook. Select a Name cell and use Formulas ▸ Trace Dependents to see everywhere "
-              "it is used. One row per principal part; sub-components are listed under their parent "
-              "on the BoM.")
-    header(ws, 4, ["Tag", "Name", "Qty", "Requirement (as stated)"])
-    bom = state.get("requirementsBom") or []
-    # collect principals in document order, dedup by normalised name (first wins)
+def _collect_principals(bom: list, run_dir: str) -> Tuple[List[dict], int]:
+    """The Part-names master principals (document order, deduped by normalised name),
+    each carrying its bom-row index (src_idx). Factored out of tab_parts_master so the
+    LEDGER fold (_ledger_fold_layout, fix 1 completion) derives from the SAME
+    collection + merge pass and the two surfaces can never disagree."""
     seen: set = set()
     principals: List[dict] = []
-    for row in bom:
+    for _i, row in enumerate(bom):
         if not isinstance(row, dict):
             continue
         tag = str(row.get("tag", "") or "").strip()
@@ -4067,7 +4080,7 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
             continue
         seen.add(key)
         principals.append({"tag": tag, "name": nm, "qty": row.get("qty"), "req": req,
-                           "row": row})
+                           "row": row, "src_idx": [_i]})
     # resolve '—' untagged principals from the parts-manifest where it knows the part
     man_tags = _manifest_tag_by_name(run_dir)
     tagged_from_manifest = 0
@@ -4077,6 +4090,134 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
             if mt:
                 p["tag"] = mt
                 tagged_from_manifest += 1
+    return principals, tagged_from_manifest
+
+
+def _ledger_fold_layout(bom: list, run_dir: str) -> Tuple[List[dict], Dict[int, int]]:
+    """LEDGER DEDUP COMPLETION (fix 1, reviewers 2026-07-02): the Part names master
+    merged synonym/plural twins but the Ledger still rendered BOTH physical rows, each
+    wearing the combined tag ('X-107 / X-111 · Circuit Breaker · £45' twice — a
+    possible double-count). This computes the LEDGER-side fold from the SAME merge
+    pass: every group of bom rows the master merged becomes ONE ledger row
+    (qty summed, line £ summed, unit £ = line ÷ qty; both source tags shown via the
+    master reference), and each folded parent's ↳ children merge into the leader's
+    children by name (tags joined). Pure + deterministic.
+
+    Returns (entries, sheet_row_by_idx):
+      entries          — ordered render list: {"src_idx": [bom idxs], "row": display
+                         row dict (COPY — state is never mutated), "src_tags": [...]}
+      sheet_row_by_idx — EVERY original bom index → the sheet row it renders on
+                         (data starts at row 5), so audit findings can reference the
+                         REAL sheet row, not the data index (fix 3)."""
+    principals, _ = _collect_principals(bom, run_dir)
+    merged, _n = _merge_principals(list(principals))
+    # leader bom idx -> all member idxs, member idx -> leader idx (merged groups only)
+    leader_of: Dict[int, int] = {}
+    members_of: Dict[int, List[int]] = {}
+    for p in merged:
+        idxs = p.get("src_idx") or []
+        if len(idxs) > 1:
+            lead = idxs[0]
+            members_of[lead] = idxs
+            for i in idxs[1:]:
+                leader_of[i] = lead
+    # group bom rows into blocks: a non-↳ row + its trailing ↳ children
+    blocks: List[dict] = []      # {"idx": pidx, "children": [cidx, ...]}
+    for _i, row in enumerate(bom):
+        req = str((row or {}).get("requirement", "") or "").strip() if isinstance(row, dict) else ""
+        if req.startswith("↳") and blocks:
+            blocks[-1]["children"].append(_i)
+        else:
+            blocks.append({"idx": _i, "children": []})
+    # fold non-leader blocks into their leader block
+    by_leader: Dict[int, dict] = {}
+    entries: List[dict] = []
+    for blk in blocks:
+        pidx = blk["idx"]
+        prow = bom[pidx] if isinstance(bom[pidx], dict) else {}
+        lead = leader_of.get(pidx)
+        if lead is not None and lead in by_leader:
+            tgt = by_leader[lead]
+            trow = tgt["row"]
+            # qty + line £ summed; unit £ re-derived so qty × unit = line holds per row
+            _q = (num(trow.get("qty")) or 0) + (num(prow.get("qty")) or 0)
+            _l = (num(trow.get("line_gbp")) or 0) + (num(prow.get("line_gbp")) or 0)
+            trow["qty"] = _q or trow.get("qty")
+            trow["line_gbp"] = _l or trow.get("line_gbp")
+            if _q and _l:
+                trow["unit_gbp"] = round(_l / _q, 2)
+            tgt["src_idx"].append(pidx)
+            _t = str(prow.get("tag", "") or "").strip()
+            if _t:
+                tgt["src_tags"].append(_t)
+            # children merge by NAME into the leader's children (tags joined) —
+            # identical tanks carry the same template children, one row each
+            _kids_by_name = {_norm_name((c["row"].get("requirement"))): c
+                             for c in tgt["children"]}
+            for cidx in blk["children"]:
+                crow = bom[cidx] if isinstance(bom[cidx], dict) else {}
+                mate = _kids_by_name.get(_norm_name(crow.get("requirement")))
+                if mate is not None:
+                    _ct = str(crow.get("tag", "") or "").strip()
+                    _mt = str(mate["row"].get("tag", "") or "").strip()
+                    if _ct and _ct not in _mt:
+                        mate["row"]["tag"] = f"{_mt} / {_ct}" if _mt else _ct
+                    mate["src_idx"].append(cidx)
+                else:
+                    tgt["children"].append({"src_idx": [cidx], "row": dict(crow)})
+            continue
+        entry = {"src_idx": [pidx], "row": dict(prow),
+                 "src_tags": ([str(prow.get("tag", "") or "").strip()]
+                              if str(prow.get("tag", "") or "").strip() else []),
+                 "children": [{"src_idx": [ci], "row": dict(bom[ci])}
+                              for ci in blk["children"] if isinstance(bom[ci], dict)]}
+        entries.append(entry)
+        if pidx in members_of:
+            by_leader[pidx] = entry
+    # flatten + assign sheet rows (data starts at row 5)
+    flat: List[dict] = []
+    sheet_row_by_idx: Dict[int, int] = {}
+    rr = 5
+    for e in entries:
+        for i in e["src_idx"]:
+            sheet_row_by_idx[i] = rr
+        flat.append({"src_idx": e["src_idx"], "row": e["row"],
+                     "src_tags": e["src_tags"]})
+        rr += 1
+        for c in e["children"]:
+            for i in c["src_idx"]:
+                sheet_row_by_idx[i] = rr
+            flat.append({"src_idx": c["src_idx"], "row": c["row"],
+                         "src_tags": [str(c["row"].get("tag", "") or "").strip()]})
+            rr += 1
+    return flat, sheet_row_by_idx
+
+
+def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
+    """THE master list of part NAMES (Tristan 2026-06-21). One row per distinct principal
+    part: its canonical Tag + Name typed ONCE here. Populates _NAME_REG so every other
+    tab references these cells instead of repeating the string. Built FIRST so all
+    consumers can resolve. Principals only (a tag with no '.' suffix whose requirement is
+    not a ↳ sub-component). Singular/plural + compatible-synonym twins are MERGED into
+    one row (fix 4, reviewers 2026-07-02) with every source name registered, so
+    downstream live references never break."""
+    _NAME_REG.clear()
+    _TAG_REG.clear()
+    _MERGE_SRC_TAG.clear()
+    ws = wb.create_sheet("Part names")
+    set_widths(ws, {"A": 14, "B": 46, "C": 8, "D": 64})
+    title_row(ws, "Part names — the master list", 4,
+              "THE single source of every part's name. Each name is typed ONCE here; every "
+              "other tab (BoM, Cost, Spec sheets, Connection trace, schedules) REFERENCES these "
+              "cells, never repeats the string — edit a name here and it updates across the whole "
+              "workbook. Select a Name cell and use Formulas ▸ Trace Dependents to see everywhere "
+              "it is used. One row per principal part; sub-components are listed under their parent "
+              "on the BoM.")
+    header(ws, 4, ["Tag", "Name", "Qty", "Requirement (as stated)"])
+    bom = state.get("requirementsBom") or []
+    # collect principals in document order, dedup by normalised name (first wins) —
+    # shared with the ledger fold (_ledger_fold_layout) so both surfaces agree.
+    principals, tagged_from_manifest = _collect_principals(bom, run_dir)
     # merge singular/plural + compatible-synonym twins (fix 4)
     principals, n_merged = _merge_principals(principals)
     if n_merged or tagged_from_manifest:
@@ -4107,6 +4248,13 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
         _NAME_REG[_norm_name(p["req"])] = _rec
         for t in (p.get("src_tags") or ([p["tag"]] if p["tag"] and p["tag"] != "—" else [])):
             _TAG_REG.setdefault(_norm_tag(t), _rec)
+        # a MERGED master row keeps each source identity's OWN tag, so a surface that
+        # must render DISTINCT identities (the connection trace: TK-101 vs TK-102, both
+        # 'Cip Tank') can disambiguate rather than show 'Cip Tank → Cip Tank' (fix 1).
+        if len(p.get("merged_from") or []) > 1:
+            for _snm, _stg in (p.get("src_identities") or []):
+                if _snm and _stg and _stg != "—":
+                    _MERGE_SRC_TAG.setdefault(_norm_name(_snm), _stg)
         r += 1
     apply_col_formats(ws, 5, {3: FMT_INT}, r - 1)
     ws.auto_filter.ref = f"A4:D{r - 1}"
@@ -4255,6 +4403,27 @@ def _build_mpn_by_word(state: dict) -> Dict[str, str]:
     return out
 
 
+def _combine_contract_rows(crows: Dict[int, dict], idxs: List[int]) -> dict:
+    """The Row-check verdict for a FOLDED ledger row = the combination of its source
+    rows' contract results (fix 1): PASS only when EVERY source row passed; reasons
+    are the de-duplicated union; a TBD on any source keeps the amber TBD flag."""
+    crs = [crows.get(i) for i in idxs if crows.get(i)]
+    if not crs:
+        return {}
+    if len(crs) == 1:
+        return crs[0]
+    reasons: List[str] = []
+    for c in crs:
+        for x in (c.get("reasons") or []):
+            if x not in reasons:
+                reasons.append(x)
+    lead = dict(crs[0])
+    lead["verdict"] = "PASS" if all(c.get("verdict") == "PASS" for c in crs) else "FAIL"
+    lead["reasons"] = reasons
+    lead["tbd"] = any(c.get("tbd") for c in crs)
+    return lead
+
+
 def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     """STAGE 4 consolidation (2026-06-24) — the headline merge: BoM + Cost + Spec sheets
     on ONE sheet "Bill of Materials (Ledger)" with two collapsible Excel column-GROUPS.
@@ -4306,8 +4475,18 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     _last_parent_row: Optional[int] = None
     _parents_with_children: set = set()
     _BOM_COLLAPSED_PARENTS.clear()
-    for _ri, row in enumerate(bom):
-        _cr = crows.get(_ri) or {}
+    # ── LEDGER FOLD (fix 1 completion, reviewers 2026-07-02): the Part names master
+    #    merged synonym/plural twins; the ledger folds the SAME groups so it renders
+    #    ONE physical row per physical thing (qty-combined, line £ summed, both source
+    #    tags shown via the master reference) — never two rows wearing one identity. ──
+    _folded, _sheet_rows = _ledger_fold_layout(bom, run_dir)
+    _n_folded = len([x for x in bom if isinstance(x, dict)]) - len(_folded)
+    if _n_folded > 0:
+        print(f"      Ledger: folded {_n_folded} master-merged twin row(s) into "
+              f"single qty-combined rows (one physical row per physical thing)")
+    for _ent in _folded:
+        row = _ent["row"]
+        _cr = _combine_contract_rows(crows, _ent["src_idx"])
         # Tag column REFERENCES the master "Part names" tag where this is a principal (one
         # identity; the master is the single source of the tag too). Sub-components (P-101.1)
         # and connection lines keep their literal tag (not master principals).
@@ -4432,8 +4611,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
 
         # Register this part's canonical cells so other tabs reference (not repeat) it.
         # Sheet name = the merged ledger (was 'BoM') so every bom_ref() still resolves.
-        _rtag = str(row.get("tag", "") or "").strip()
-        if _rtag:
+        # A FOLDED row registers under EVERY source tag (X-107 AND X-111 → the one row).
+        for _rtag in (_ent["src_tags"] or [str(row.get("tag", "") or "").strip()]):
+            if not _rtag:
+                continue
             _BOM_REGISTRY.setdefault(_norm_tag(_rtag), {
                 "tag":  f"'{_LEDGER_SHEET}'!$A${r}",
                 "name": f"'{_LEDGER_SHEET}'!$B${r}",
@@ -5384,6 +5565,63 @@ def _sweet_spot(state: dict) -> Optional[Dict[str, Any]]:
     }
 
 
+def _feed_sensitivity_drivers(state: dict) -> List[Tuple[str, str]]:
+    """The feed-term rows of the What-if sensitivity table, LABELLED from the same
+    resolution the Inputs tab renders (fix 6, reviewers 2026-07-02: the table said
+    'Feed price' / 'Feed-conversion ratio (FCR)' on a water-treatment plant):
+      • RAS path (grounded £/kg feed model)      → the classic Feed price / FCR rows;
+      • engine feed signal on a non-RAS class    → Feedstock price / conversion ratio;
+      • consumables present (dosing chems, media)→ the consumables-labelled rows;
+      • no feed basis at all                     → NO rows (a template word with no
+        basis is never a sensitivity driver)."""
+    gen = _ECON_GENERIC
+    if gen is None:      # RAS path — the grounded feed model stands
+        return [("Feed price", "feed"), ("Feed-conversion ratio (FCR)", "fcr")]
+    if gen.get("feed_price") or gen.get("fcr"):
+        return [("Feedstock price", "feed"), ("Feedstock conversion ratio", "fcr")]
+    _cons = _consumable_classes(state)
+    if _cons:
+        return [(f"Consumables price ({' · '.join(_cons[:3])})", "feed"),
+                ("Consumable intensity ratio", "fcr")]
+    return []
+
+
+_BREAK_EVEN_NONE_TEXT = "none in range (all EBITDA < 0)"
+
+
+def _break_even_out_formula(out_rng: str, ebi_rng: str) -> str:
+    """The LIVE 'Break-even scale' cell formula (fix 2, reviewers 2026-07-02). The old
+    =IFERROR(INDEX(OUT,MATCH(0,EBI,1)+1), INDEX(OUT,1)) collapsed BOTH edge cases into
+    'the first sweep row': correct when every row is already profitable, but WRONG when
+    NO row qualifies (all EBITDA < 0 → MATCH finds the last row → +1 → #REF → IFERROR →
+    first row — v55 printed 'Break-even scale = 1200' over an all-negative sweep). The
+    three cases are now explicit:
+      • MAX(EBITDA) < 0      → 'none in range (all EBITDA < 0)';
+      • first EBITDA ≥ 0     → the smallest sweep output (break-even at/below range);
+      • else                 → INDEX(MATCH(0,…,1)+1) — the first row crossing ≥ 0.
+    Pure string builder; proveCatch (both directions) in _selftest via the
+    _break_even_display mirror + the D1 no-revenue fixture."""
+    return (f'=IF(MAX({ebi_rng})<0,"{_BREAK_EVEN_NONE_TEXT}",'
+            f'IF(INDEX({ebi_rng},1)>=0,INDEX({out_rng},1),'
+            f'INDEX({out_rng},MATCH(0,{ebi_rng},1)+1)))')
+
+
+def _break_even_display(ebitdas: List[float], outs: List[float]):
+    """The Python mirror of _break_even_out_formula's decision (EBITDA ascending with
+    scale): the smallest output with EBITDA ≥ 0, or the 'none in range' text when no
+    sweep row qualifies. Used by the selftest to prove the formula's case-split."""
+    if not ebitdas or not outs:
+        return None
+    if max(ebitdas) < 0:
+        return _BREAK_EVEN_NONE_TEXT
+    if ebitdas[0] >= 0:
+        return outs[0]
+    for e, o in zip(ebitdas, outs):
+        if e >= 0:
+            return o
+    return _BREAK_EVEN_NONE_TEXT
+
+
 def _econ_output_metric(state: dict) -> Tuple[float, str, str, str]:
     """Resolve the headline OUTPUT the economics model sells, universally.
 
@@ -5799,13 +6037,22 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
         # WATER / THROUGHPUT UTILISATION (reviewers 2026-07-02): the cost-of-service
         # levelised £/m³ divisor. Only emitted when the plant carries a real process
         # flow (m³/h) — a flow-less product has no delivered-volume divisor to drive.
+        # The DESIGN FLOW is its own driver cell (fix 5, reviewers 2026-07-02: the
+        # Financial model's annual-delivered-volume cell hardcoded '=90*8760*…' — a
+        # different plant must flow through LIVE, so the divisor references THIS cell).
         _flow_m3h = _max_process_flow_m3h(state)
         if _flow_m3h > 0:
+            rows.append(("flow_m3h", "Design process flow (peak)",
+                         round(_flow_m3h, 3), "m³/h",
+                         "from engine · largest process-flow quantity (the PEAK "
+                         "simultaneous demand); the Financial model's annual-delivered-"
+                         "volume divisor references this cell LIVE — edit it and the "
+                         "levelised £/m³ recomputes", FMT_DEC1))
             _wu, _wu_basis = _water_util_default(state)
             rows.append(("water_util",
                          "Water utilisation (delivered ÷ design flow)",
                          round(_wu, 3), "fraction",
-                         f"design flow {_flow_m3h:g} m³/h · {_wu_basis}", FMT_DEC2))
+                         f"multiplies the design flow above · {_wu_basis}", FMT_DEC2))
         rows.append(("labour", "Labour", gen["labour"], "£/yr",
                      gen["labour_basis"], FMT_GBP))
         rows.append(("maint_pct", "Maintenance", 3.0, "% capex/yr",
@@ -5814,15 +6061,17 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
                      gen["other_opex_basis"], FMT_GBP))
     rows.append(("capex", "Installed capex", round(capex, 0), "£", capex_basis,
                  FMT_GBP))
+    # Basis rewritten from the ACTUAL scaling basis (fix 6, reviewers 2026-07-02: the
+    # old text still cited the dead '£5M anchor', 'per tonne' and 'RAS data' — legacy
+    # residue from the original aquaculture brief on every class).
     rows.append(("scale_exp", "Scaling exponent n  (capex ∝ output^n)",
                  SCALE_EXPONENT, "n",
                  "1.0 = LINEAR — a MODULAR plant scaled by replicating identical units "
-                 "(more tanks/pumps/skids); capex per tonne is constant, de-risked + "
-                 "testable at small scale (the ForgeOS default; the empirical RAS data "
-                 "scales ~linearly). 0.6 = the six-tenths law for MONOLITHIC equipment "
-                 "that scales by getting bigger. Edit to model either regime — every "
-                 "capex/economics cell on the sweep, solver and £5M anchor is live off "
-                 "this.", FMT_DEC2))
+                 "(more tanks/pumps/skids); capex per output unit is constant, "
+                 "de-risked + testable at small scale (the ForgeOS default for modular "
+                 "plant). 0.6 = the six-tenths law for MONOLITHIC equipment that scales "
+                 "by getting bigger. Edit to model either regime — every capex/economics "
+                 "cell on the sweep + solver recomputes live off this.", FMT_DEC2))
     rows.append(("discount_rate", "Discount rate", 10.0, "%",
                  "real WACC for a small infrastructure project", FMT_DEC1))
     rows.append(("hurdle_rate", "Investor hurdle rate (IRR)", 15.0, "%",
@@ -6362,11 +6611,14 @@ def _render_scenarios_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     header(ws, r, ["Driver (±20%)", "EBITDA @ −20%", "EBITDA @ base",
                    "EBITDA @ +20%", "Swing £ (|+20 − −20|)", "", "", ""])
     r += 1
-    DRIVERS = [
-        ("Sale price", "sale"), ("Feed price", "feed"), ("Energy price", "energy"),
-        ("Feed-conversion ratio (FCR)", "fcr"), ("Capex (→ maintenance)", "capex"),
-        ("Labour", "labour"),
-    ]
+    # FEED-DRIVER ROWS mirror the resolved Inputs labels (fix 6, reviewers 2026-07-02:
+    # 'Feed price' / 'Feed-conversion ratio (FCR)' rendered on a WATER plant). The
+    # labels derive from what the plant ACTUALLY consumes; rows with no feed basis at
+    # all are DROPPED — a template word is never a driver.
+    DRIVERS = ([("Sale price", "sale")]
+               + _feed_sensitivity_drivers(state)
+               + [("Energy price", "energy"), ("Capex (→ maintenance)", "capex"),
+                  ("Labour", "labour")])
     for label, key in DRIVERS:
         ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
         ws.cell(r, 2, _ebitda(**{key: "*0.8"})).number_format = FMT_GBP
@@ -6685,11 +6937,14 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
             oc.fill = FILL_CONST
         r += 1
 
-    # break-even scale: smallest output where EBITDA ≥ 0 (EBITDA ascending)
-    be_out = (f"=IFERROR(INDEX({OUT},MATCH(0,{EBI},1)+1),"
-              f"INDEX({OUT},1))")
+    # break-even scale: smallest output where EBITDA ≥ 0 (EBITDA ascending). The
+    # NO-QUALIFYING-ROW case renders 'none in range …' — never the first sweep row
+    # (fix 2, reviewers 2026-07-02: v55 printed 'Break-even scale = 1200' while the
+    # same sweep's E131 was −£67,275 and another cell said 'negative at every scale').
+    be_out = _break_even_out_formula(OUT, EBI)
     thr_row("Break-even scale (EBITDA ≥ 0)", be_out,
-            "first sweep row with EBITDA ≥ 0 (EBITDA rises with scale)",
+            "first sweep row with EBITDA ≥ 0 (EBITDA rises with scale); "
+            "'none in range' when every sweep row is loss-making",
             ss["break_even"] if ss else None)
     # viability: smallest output where IRR ≥ discount rate
     via_out = (f"=IFERROR(INDEX({OUT},MATCH({DISC}/100,{IRRr},1)+1),\"> range\")")
@@ -7046,13 +7301,14 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
         "divisor_basis": divisor_basis, "output_noun": out_noun,
         "labour_other_opex_gbp": round(labour + other_opex),
     }
-    sub_banner(ws, r, "COST-OF-SERVICE MODEL — infrastructure / utility plant, NO market revenue", 8)
+    # (Section banner + note carry NO restatement of the no-revenue caveat — fix 5:
+    #  the tab subtitle states it once; the appendix banner is the only other mention.)
+    sub_banner(ws, r, "COST-OF-SERVICE MODEL — the lifecycle cost of the delivered service", 8)
     r += 1
-    note = ws.cell(r, 1, f"A cost-recovery utility — its economics are the LEVELISED COST of delivered "
-                         f"{out_noun}, not revenue/NPV/IRR (there is no product sale). Levelised = "
-                         f"(capex annualised at CRF {crf:.3f} over {n:.0f} yr + annual opex) ÷ annual "
-                         f"delivered volume ({divisor_basis}). Every value cell is a LIVE formula over "
-                         f"the yellow Inputs & Assumptions drivers — edit an input and this recomputes.")
+    note = ws.cell(r, 1, f"Levelised cost of delivered {out_noun} = (capex annualised at CRF {crf:.3f} "
+                         f"over {n:.0f} yr + annual opex) ÷ annual delivered volume ({divisor_basis}). "
+                         f"Every value cell is a LIVE formula over the yellow Inputs & Assumptions "
+                         f"drivers — edit an input and this recomputes.")
     note.font = Font(italic=True, size=9, color="555555")
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
     r += 2
@@ -7064,6 +7320,7 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     CAPX, DR, PL = _A("capex"), _A("discount_rate"), _A("project_life")
     LKW, HRS, LFR, EPR = _A("load_kw"), _A("hours"), _A("load_factor"), _A("energy_price")
     LAB, OTH, MPC, WUT = _A("labour"), _A("other_opex"), _A("maint_pct"), _A("water_util")
+    FLW = _A("flow_m3h")     # the Inputs design-flow driver cell (fix 5)
     _crf_f = (f"(({DR}/100)*(1+{DR}/100)^{PL})/((1+{DR}/100)^{PL}-1)"
               if (DR and PL) else None)
     r_cap, r_ann, r_en, r_mnt, r_lab, r_opx, r_vol = r, r + 1, r + 2, r + 3, r + 4, r + 5, r + 6
@@ -7086,10 +7343,15 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
         ("TOTAL annual opex / yr", f"=B{r_en}+B{r_mnt}+B{r_lab}", round(opex), FMT_INT,
          "energy + maintenance + labour + other (sum of the live rows above)"),
         (f"Annual delivered volume ({out_unit})",
-         (f"={flow_m3h:g}*8760*{WUT}" if (flow_m3h > 0 and WUT) else None),
+         # LIVE off the Inputs DESIGN-FLOW cell — never a hardcoded flow literal
+         # (fix 5, reviewers 2026-07-02: B16 baked '=90*8760*…' into the formula, so
+         # a different plant's flow would not have flowed through).
+         (f"={FLW}*8760*{WUT}" if (flow_m3h > 0 and FLW and WUT) else
+          (f"={flow_m3h:g}*8760*{WUT}" if (flow_m3h > 0 and WUT) else None)),
          round(out_qty), FMT_INT,
-         (f"live — {divisor_basis}; the WATER utilisation is its own Inputs driver "
-          f"(the electrical load factor sizes the energy line above, never this divisor)"
+         (f"live — design flow (Inputs driver) × 8760 h × water utilisation (Inputs "
+          f"driver); as-built {divisor_basis}. The electrical load factor sizes the "
+          f"energy line above, never this divisor"
           if flow_m3h > 0 else divisor_basis)),
         (f"LEVELISED COST (£/{unit_base})", f"=(B{r_ann}+B{r_opx})/B{r_vol}",
          round(levelised, 2), '£#,##0.00',
@@ -7158,27 +7420,10 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
         ws.row_dimensions[r].height = 24
         r += 2
 
-    # ── FRAMING HEADER (Tristan 2026-07-02, issue 9): when no market sale price is
-    # derivable this plant is a COST SUBSYSTEM of a larger operation — say so EXPLICITLY
-    # before any P&L-shaped section, so the absent revenue reads as the correct frame,
-    # not a gap. Signal-keyed (the engine's own sale-price-verified flag), no class table. ──
-    if unverified:
-        _cons_hdr = _consumable_classes(state)
-        fr = ws.cell(r, 1,
-                     "COST SUBSYSTEM of a larger operation — no revenue attribution; the "
-                     "figures on this tab are lifecycle COSTS (capex + annual opex + the "
-                     "levelised £/unit of service). This plant serves a wider operation and "
-                     "earns no market revenue of its own"
-                     + (f"; what it consumes: {' · '.join(_cons_hdr[:4])}, power and water"
-                        if _cons_hdr else "")
-                     + ". A speculative 'if the output were sold' model sits in the "
-                       "APPENDIX at the bottom of this sheet.")
-        fr.font = Font(bold=True, color="1F3A5F")
-        fr.fill = FILL_SUB
-        fr.alignment = Alignment(wrap_text=True, vertical="center")
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-        ws.row_dimensions[r].height = 42
-        r += 2
+    # (The old 'COST SUBSYSTEM — no revenue attribution' FRAMING HEADER is GONE — fix 5,
+    #  reviewers 2026-07-02: the no-revenue caveat rendered FOUR times on this tab
+    #  (A2/A4/A6-7/A69). It now renders exactly TWICE: the tab subtitle (the header)
+    #  and the ⚠ SPECULATIVE APPENDIX banner. proveCatch in _selftest counts them.)
 
     # ── COST-OF-SERVICE (infrastructure / no market revenue) — the HONEST model for a utility ──
     # A water / treatment / fertigation plant has NO product sale, so a revenue/NPV/IRR model is
@@ -8573,6 +8818,36 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
         if len(hdr) >= 6:
             last_circuit_first = (body_first, r - 1, len(hdr))
         r += 1
+    # ── BOARD & DRAWING RECONCILIATION — contract checks (fix 4, reviewers
+    #    2026-07-02): the per-board Σ-current-vs-busbar reconciliation (the drawing
+    #    printed 'ratio 21.52 REVIEW' while this tab scored 10.0) + the single-line ↔
+    #    schedule consistency rows (voltage / board hierarchy / transformer kVA vs the
+    #    contract quantity), from the SAME evaluation that scores the tab. ──
+    _recon = cres.get("recon_rows") or []
+    if _recon:
+        sub_banner(ws, r, "Board & drawing reconciliation — contract checks "
+                          "(scored with the circuit rows above)", 11)
+        r += 1
+        header(ws, r, ["Check", "Measured / compared", "Row check"])
+        r += 1
+        for _rr in _recon:
+            ws.cell(r, 1, clean_cell(_rr.get("check", ""))).border = BORDER
+            _dc = ws.cell(r, 2, clean_cell(_rr.get("detail", "")))
+            _dc.alignment = WRAP_TOP
+            _dc.border = BORDER
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=9)
+            _ok = _rr.get("verdict") == "PASS"
+            _vc = ws.cell(r, 10, "PASS" if _ok else
+                          "FAIL — " + "; ".join(_rr.get("reasons") or []))
+            _vc.alignment = WRAP_TOP
+            _vc.border = BORDER
+            _vc.font = FONT_PASS if _ok else FONT_FAIL
+            _vc.fill = FILL_PASS if _ok else FILL_FAIL
+            ws.merge_cells(start_row=r, start_column=10, end_row=r, end_column=11)
+            if not _ok:
+                ws.row_dimensions[r].height = 30
+            r += 1
+        r += 1
     if last_circuit_first:
         bf, bl, nc = last_circuit_first
         ws.auto_filter.ref = f"A{bf - 1}:{get_column_letter(nc)}{bl}"
@@ -8907,10 +9182,21 @@ _CONTRACT_RESULTS: dict = {}     # tab name -> evaluation result (set in build()
 
 
 def _contract_note(res: dict) -> str:
-    """One-line publication of a tab's column contract for the tab's header note."""
+    """One-line publication of a tab's column contract for the tab's header note. The
+    printed formula MUST match the actual score arithmetic (fix 6, reviewers
+    2026-07-02: the ledger header said 'score = 10 × pass ÷ rows' while the real score
+    also subtracted the TBD penalty — the label now prints every term)."""
     cols = " · ".join(f"{c}={r}" for c, r, _b in res.get("contract", []))
-    return (f"ROW CHECK CONTRACT (score = 10 × rows-passing ÷ rows = "
-            f"10 × {res.get('n_pass', 0)}/{res.get('n_total', 0)} = {res.get('score')}): {cols}. "
+    _np, _nt = res.get("n_pass", 0), res.get("n_total", 0)
+    _tbd_frac = res.get("tbd_fraction") or 0
+    if _tbd_frac:
+        _base = round(10.0 * _np / _nt, 1) if _nt else 0.0
+        formula = (f"score = 10 × rows-passing ÷ rows − 4 × TBD-fraction = "
+                   f"10 × {_np}/{_nt} − 4 × {_tbd_frac:g} = {res.get('score')}")
+    else:
+        formula = (f"score = 10 × rows-passing ÷ rows = "
+                   f"10 × {_np}/{_nt} = {res.get('score')}")
+    return (f"ROW CHECK CONTRACT ({formula}): {cols}. "
             "A dash / empty / unverifiable contracted cell FAILS its row — honest red beats fake green.")
 
 
@@ -9219,7 +9505,10 @@ def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
     n_fail = n_total - n_pass
     issues: List[str] = []
     if n_fail:
-        ex = [f"row {i + 1} ({rows[i].get('from')}→{rows[i].get('to')}): {r['reasons'][0]}"
+        # reference failing rows by their IDENTITY (from→to, the rendered Tag/From/To
+        # columns), never a data-row ordinal that does not match the sheet (fix 3 —
+        # the audit's 'row N' refs were off vs the sectioned sheet layout).
+        ex = [f"{rows[i].get('from')}→{rows[i].get('to')}: {r['reasons'][0]}"
               for i, r in list(per_row.items()) if r["verdict"] == "FAIL"][:3]
         issues = [f"{n_fail}/{n_total} rows FAIL the column contract (arithmetic score "
                   f"10 × {n_pass}/{n_total} = {score}) — e.g. " + " · ".join(ex)]
@@ -9236,14 +9525,36 @@ def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
                     "and the band check passes on the re-sized lines")}
 
 
+# ── Method-C ampacity mirror (fix 4, reviewers 2026-07-02) ──────────────────────────
+# MINIMAL values MIRRORED from the electrical model's table — SOURCE:
+# scripts/blender-universal/electrical_distribution_model.py :: _CSA_AMPACITY_A
+# (single-core Cu, BS 7671 Method C ballpark, conservative). Keep in sync with that
+# table; used here for the per-row In ≤ Iz check (protective device ≤ cable ampacity).
+_METHOD_C_AMPACITY_A: Dict[float, float] = {
+    1.5: 20, 2.5: 27, 4: 37, 6: 47, 10: 64, 16: 85, 25: 112, 35: 138, 50: 168,
+    70: 213, 95: 258, 120: 299, 150: 344, 185: 392, 240: 461, 300: 530, 400: 643,
+}
+
+# The schedule's own reconciliation band: Σ circuit design current vs board busbar
+# demand. Outside this band (or an explicit REVIEW verdict, or a dash) = row FAIL.
+_BOARD_RECON_BAND = (0.8, 1.25)
+
+
 def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     """Column-contract evaluation of EVERY Panel schedule circuit row (pure — reads
-    drawings/panel-schedule.md; renders nothing).
+    drawings/panel-schedule.md + drawings/single-line-diagram.svg; renders nothing).
 
     Per circuit: connected kW > 0; Design I consistent with P = √3·V·I·pf·η at the board
     voltage (implied pf·η must land in the physical 0.60–1.05 band); protective device
-    ≥ Design I; cable CSA stated; routed length PRESENT and > 0; ΔU% PRESENT and ≤ 5 %.
-    A dash in a contracted column FAILS the row — a dash is never in-spec."""
+    ≥ Design I; cable Method-C ampacity ≥ protective-device rating (BS 7671 Ib ≤ In ≤ Iz);
+    cable CSA stated; routed length PRESENT and > 0; ΔU% PRESENT and ≤ 5 %.
+    Per BOARD (fix 4, reviewers 2026-07-02 — the tab scored 10.0 while its own drawing
+    printed 'ratio 21.52 REVIEW'): the board's OWN reconciliation line (Σ circuit design
+    current vs busbar demand) must reconcile within band, and its busbar rating must be
+    stated. Per DRAWING: the single-line's voltage / transformer kVA / board hierarchy
+    strings must match the schedule + the contract quantity (both read from the same
+    dataset — a divergence means the two surfaces were generated from different data).
+    A dash / mismatch in a contracted cell FAILS its row — never in-spec."""
     path = os.path.join(run_dir, "drawings", "panel-schedule.md")
     if not os.path.exists(path):
         return None
@@ -9262,10 +9573,16 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
         ("Conn. load (kW)", "required_nonempty", "connected load > 0"),
         ("Design I (A)", "computed", f"I consistent with P = √3·{board_v:g}·I·pf·η (implied pf·η ∈ 0.60–1.05)"),
         ("Protective device", "computed", "device rating ≥ Design I"),
-        ("Cable", "required_nonempty", "CSA · cores stated"),
+        ("Cable", "computed", "CSA · cores stated AND Method-C ampacity ≥ device rating (BS 7671 Ib ≤ In ≤ Iz)"),
         ("Length (m)", "required_nonempty", "routed cable length > 0 (dash = FAIL)"),
         ("ΔU (%)", "computed", "volt-drop over the routed length at Design I, ≤ 5 % (dash = FAIL)"),
         ("In spec", "computed", "= (ΔU ≤ 5 %) of a PRESENT ΔU — a dash is never in-spec"),
+        ("Board reconciliation", "computed",
+         "Σ circuit design current ≈ board busbar demand (ratio within 0.8–1.25, the "
+         "schedule's own OK band) + busbar rating stated — a REVIEW/dash row FAILS"),
+        ("Drawing ↔ schedule", "computed",
+         "single-line voltage + board hierarchy strings + transformer kVA must match "
+         "the schedule and the contract quantity (one dataset, two projections)"),
     ]
 
     def _col(hdr: List[str], *keys: str) -> Optional[int]:
@@ -9311,8 +9628,19 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                 reasons.append("protective device rating missing")
             elif amps and dev_a < amps:
                 reasons.append(f"protective device {dev_a:g} A below Design I {amps:g} A")
-            if "mm²" not in cell(c_cab) and "mm2" not in cell(c_cab):
+            _cab_txt = cell(c_cab)
+            if "mm²" not in _cab_txt and "mm2" not in _cab_txt:
                 reasons.append("cable CSA missing")
+            else:
+                # CABLE AMPACITY ≥ DEVICE RATING (fix 4): BS 7671 Ib ≤ In ≤ Iz — the
+                # protective device must not out-rate the cable it protects.
+                _csa_m = re.search(r"(\d+(?:\.\d+)?)\s*mm[²2]", _cab_txt)
+                if _csa_m and dev_a is not None:
+                    _iz = _METHOD_C_AMPACITY_A.get(float(_csa_m.group(1)))
+                    if _iz is not None and dev_a > _iz:
+                        reasons.append(f"protective device {dev_a:g} A exceeds the "
+                                       f"{_csa_m.group(1)} mm² cable's Method-C ampacity "
+                                       f"{_iz:g} A (BS 7671 In ≤ Iz)")
             ln = num(cell(c_len))
             if ln is None or ln <= 0:
                 reasons.append("routed cable length missing (dash is not data — the run's electrical "
@@ -9340,14 +9668,143 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
 
     if not per_row:
         return None
+
+    # ── BOARD RECONCILIATION rows (fix 4): the schedule prints its OWN per-board
+    #    'Reconciliation: Σ circuit design current = X A vs board busbar demand = Y A
+    #    (ratio Z) → REVIEW/OK' line + a 'Busbar rating' field. A REVIEW verdict, a
+    #    ratio outside the band, or a dash busbar rating = a FAILING contract row —
+    #    the tab can no longer score 10.0 over its own printed REVIEW. ──
+    recon_rows: List[dict] = []
+    _board_meta: Dict[str, dict] = {}
+    for _heading, hdr, trows in tables:
+        if len(hdr) >= 6 or len(hdr) < 2:
+            continue
+        if hdr[0].strip().lower() == "field":
+            _bm: Dict[str, str] = {}
+            for tr in trows:
+                if len(tr) >= 2:
+                    _bm[re.sub(r"\*+", "", tr[0]).strip().lower()] = re.sub(r"\*+", "", tr[1]).strip()
+            _board_meta[str(_heading or "").strip()] = _bm
+    _recon_rx = re.compile(
+        r"Reconciliation:\*{0,2}\s*Σ circuit design current = ([\d.,]+)\s*A vs board "
+        r"busbar demand = ([\d.,]+)\s*A \(ratio ([\d.,]+)\) → \*{0,2}(\w+)")
+    _chunks = re.split(r"^##\s+", text, flags=re.M)[1:]
+    for _ch in _chunks:
+        _bname = _ch.splitlines()[0].strip() if _ch.splitlines() else ""
+        if not _bname:
+            continue
+        _meta = _board_meta.get(_bname, {})
+        _rs: List[str] = []
+        _detail = ""
+        _mrec = _recon_rx.search(_ch)
+        if _mrec:
+            _sig, _dem, _ratio, _verd = (_mrec.group(1), _mrec.group(2),
+                                         num(_mrec.group(3)) or 0.0,
+                                         _mrec.group(4).upper())
+            _detail = (f"Σ circuit design current {_sig} A vs busbar demand {_dem} A "
+                       f"(ratio {_ratio:g}); busbar rating: {_meta.get('busbar rating', '—')}")
+            if _verd != "OK":
+                _rs.append(f"the schedule's own reconciliation says {_verd} "
+                           f"(ratio {_ratio:g})")
+            elif not (_BOARD_RECON_BAND[0] <= _ratio <= _BOARD_RECON_BAND[1]):
+                _rs.append(f"ratio {_ratio:g} outside the "
+                           f"{_BOARD_RECON_BAND[0]:g}–{_BOARD_RECON_BAND[1]:g} band")
+        else:
+            _rs.append("no reconciliation line printed for this board")
+            _detail = f"busbar rating: {_meta.get('busbar rating', '—')}"
+        _bb = _meta.get("busbar rating", "")
+        if not _bb or _bb in ("—", "-", ""):
+            _rs.append("busbar rating missing (dash) — the board's Σ current has no "
+                       "stated capacity to reconcile against")
+        _key = f"{_bname} · [board reconciliation]"
+        _v = "PASS" if not _rs else "FAIL"
+        if _v == "PASS":
+            n_pass += 1
+        per_row[_key] = {"verdict": _v, "reasons": _rs, "board": _bname,
+                         "ckt": "[board reconciliation]"}
+        recon_rows.append({"check": _key, "detail": _detail, "verdict": _v,
+                           "reasons": _rs})
+
+    # ── DRAWING ↔ SCHEDULE consistency rows (fix 4): the single-line diagram and the
+    #    schedule must project the SAME dataset — voltage, board hierarchy strings and
+    #    transformer kVA (also checked against the CONTRACT quantity). ──
+    _svg_path = os.path.join(run_dir, "drawings", "single-line-diagram.svg")
+    _svg_texts: List[str] = []
+    if os.path.exists(_svg_path):
+        try:
+            _svg_texts = [t.strip() for t in
+                          re.findall(r">([^<>]{1,120})<", open(_svg_path).read())
+                          if t.strip()]
+        except Exception:  # noqa: BLE001
+            _svg_texts = []
+    if _svg_texts:
+        _svg_join = " | ".join(_svg_texts)
+
+        def _consistency_row(key: str, ok: bool, detail: str, reason: str) -> None:
+            nonlocal n_pass
+            _v = "PASS" if ok else "FAIL"
+            if ok:
+                n_pass += 1
+            per_row[key] = {"verdict": _v, "reasons": ([] if ok else [reason]),
+                            "board": "single-line ↔ schedule", "ckt": key}
+            recon_rows.append({"check": key, "detail": detail, "verdict": _v,
+                               "reasons": [] if ok else [reason]})
+
+        # 1 — system voltage: the schedule's LV system voltage must appear on the drawing
+        _v_ok = f"{board_v:g}" in " ".join(re.findall(r"(\d{3,5})\s*V", _svg_join))
+        _consistency_row(
+            "single-line ↔ schedule · system voltage", _v_ok,
+            f"schedule system {board_v:g} V 3-phase; drawing voltages: "
+            + (", ".join(sorted(set(re.findall(r"\d{3,5}(?:/\d{3,5})?\s*V", _svg_join)))[:4]) or "none"),
+            f"the drawing never states the schedule's {board_v:g} V system voltage")
+        # 2 — board hierarchy strings: every schedule board reference must appear on
+        #     the drawing (same dataset → same names; 'MAIN LV BOARD' vs 'Motor
+        #     Control Center' means the two were generated from different data).
+        _missing_boards = [b for b in _board_meta
+                           if b and b.lower() not in _svg_join.lower()]
+        _consistency_row(
+            "single-line ↔ schedule · board hierarchy", not _missing_boards,
+            f"schedule boards: {', '.join(_board_meta) or '—'}",
+            "board reference(s) absent from the single-line drawing: "
+            + ", ".join(_missing_boards[:3]))
+        # 3 — transformer kVA: the drawing's transformer rating vs the CONTRACT quantity
+        _q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+        _kva_contract = None
+        for _k in ("transformer_kva", "main_transformer_kva"):
+            _kv = _q.get(_k)
+            if isinstance(_kv, dict) and isinstance(_kv.get("value"), (int, float)):
+                _kva_contract = float(_kv["value"])
+                break
+        _kva_drawing = None
+        for _ti, _t in enumerate(_svg_texts):
+            if re.match(r"^TX\d*\b", _t) or re.search(r"\btransformer\b", _t, re.I):
+                for _t2 in _svg_texts[_ti:_ti + 3]:
+                    _km = re.search(r"([\d.,]+)\s*kVA", _t2)
+                    if _km:
+                        _kva_drawing = num(_km.group(1))
+                        break
+                if _kva_drawing is not None:
+                    break
+        if _kva_contract is not None or _kva_drawing is not None:
+            _kva_ok = (_kva_contract is not None and _kva_drawing is not None
+                       and abs(_kva_drawing - _kva_contract) <= 0.10 * _kva_contract)
+            _consistency_row(
+                "single-line ↔ schedule · transformer kVA", _kva_ok,
+                f"drawing transformer {_kva_drawing if _kva_drawing is not None else '—'} kVA "
+                f"vs contract quantity {_kva_contract if _kva_contract is not None else '—'} kVA",
+                f"transformer kVA mismatch: drawing "
+                f"{_kva_drawing if _kva_drawing is not None else 'missing'} vs contract "
+                f"{_kva_contract if _kva_contract is not None else 'missing'} "
+                f"(must match within 10% — one dataset)")
+
     n_total = len(per_row)
     score = _contract_score(n_pass, n_total)
     n_fail = n_total - n_pass
     issues: List[str] = []
     if n_fail:
         ex = [f"{k}: {v['reasons'][0]}" for k, v in per_row.items() if v["verdict"] == "FAIL"][:3]
-        issues = [f"{n_fail}/{n_total} circuit rows FAIL the column contract (arithmetic score "
-                  f"10 × {n_pass}/{n_total} = {score}) — e.g. " + " · ".join(ex)]
+        issues = [f"{n_fail}/{n_total} circuit/board/drawing rows FAIL the column contract "
+                  f"(arithmetic score 10 × {n_pass}/{n_total} = {score}) — e.g. " + " · ".join(ex)]
         if source_fabricated:
             issues.append(f"{source_fabricated} source row(s) rendered ✓ over a dash/failing contracted "
                           "column — fabricated ticks, now rendered ✗")
@@ -9355,9 +9812,12 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             "n_pass": n_pass, "n_total": n_total, "score": score,
             "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
             "source_fabricated": source_fabricated,
+            "recon_rows": recon_rows,
             "fix": ("route the electrical circuits in the scene (wire the electrical_bus edges) so "
-                    "route-manifest / connection-schedule carry real cable lengths, then compute ΔU% "
-                    "= f(length, CSA, Design I) in draw_panel_schedule at source")}
+                    "route-manifest / connection-schedule carry real cable lengths, compute ΔU% "
+                    "= f(length, CSA, Design I) in draw_panel_schedule at source, and generate the "
+                    "single-line + schedule from the ONE distribution dataset so kVA / voltage / "
+                    "board names cannot diverge")}
 
 
 # ── BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ─────────────────────────────
@@ -9437,6 +9897,38 @@ def _bom_row_mpn(row: dict, mpn_by_word: Dict[str, str]) -> str:
 
 _TBD_MPN_TEXT = "TBD (detailed design)"
 
+# ── CLASS-ALIEN PART MARKERS (fix 6, reviewers 2026-07-02 — 'Aquavista Remote
+# Monitoring', an aquaculture SCADA product, shipped on a water_treatment plant). The
+# BoM data is NEVER renamed here (it comes from state); the ROW CHECK flags the line
+# as class-alien so the fix routes UPSTREAM to the parts/BoM source. Same
+# suppress-on-the-legitimate-class pattern as gate 34's marker families: a marker
+# fires only when the product class is NOT the marker's home domain.
+_CLASS_ALIEN_MARKERS: List[Tuple[str, "re.Pattern", "re.Pattern"]] = [
+    ("aquaculture monitoring/SCADA",
+     re.compile(r"\baquavista\b|\bfishtalk\b|\bakva\s?connect\b|\bfeed\s?barge\b|"
+                r"\bbiomass\s+(?:camera|estimat)", re.I),
+     re.compile(r"aquaculture|\bras\b|fish|hatchery", re.I)),
+    ("hydroponic / grow-room",
+     re.compile(r"\bnutrient\s+film\s+technique\b|\bebb\s*&?\s*flow\s+tray\b|"
+                r"\bgrow\s?light\b", re.I),
+     re.compile(r"vertical_farm|hydroponic|greenhouse|grow", re.I)),
+    ("marine / subsea",
+     re.compile(r"\bsacrificial\s+anode\b|\bhull\s+penetrator\b|\bbilge\s+pump\b", re.I),
+     re.compile(r"\bauv\b|\brov\b|marine|subsea|submersible|naval|ship|boat", re.I)),
+]
+
+
+def _class_alien_reason(row_text: str, product_class: str) -> Optional[str]:
+    """A row-check FAIL reason when the row names a product from a DIFFERENT domain
+    than the plant's class (None when clean or when the class IS the home domain)."""
+    for dom, marker, legit in _CLASS_ALIEN_MARKERS:
+        hit = marker.search(str(row_text or ""))
+        if hit and not legit.search(str(product_class or "")):
+            return (f"class-alien part ('{hit.group(0)}' is a {dom} product on a "
+                    f"'{product_class or 'unknown'}' plant) — fix upstream at the "
+                    f"parts/BoM source; the data is not renamed here")
+    return None
+
 
 def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     """Column-contract evaluation of EVERY Bill-of-Materials (Ledger) row (pure — reads
@@ -9457,9 +9949,15 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     if not isinstance(bom, list) or not bom:
         return None
     mpn_by_word = _build_mpn_by_word(state)
+    _pclass = str(((state.get("orchestratorContract") or {}).get("product_class"))
+                  or ((state.get("parsedBrief") or {}).get("product_class")) or "")
 
     contract = [
         ("Tag/Item", "required_nonempty", "identity of the line"),
+        ("Class fit", "computed",
+         "the part belongs to THIS plant's domain — a marker-flagged foreign-domain "
+         "product (e.g. aquaculture SCADA on a water plant) FAILS its row and routes "
+         "the fix upstream to the parts source"),
         ("Qty", "required_nonempty", "quantity > 0"),
         ("Unit £ / Line £", "computed",
          "unit £ > 0 and line £ = qty × unit £ per row ('↳' sub-components are apportioned into their parent)"),
@@ -9525,6 +10023,10 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                 mpn_txt = "bespoke fabrication to drawing — see sizing basis"
         if not str(row.get("basis") or "").strip():
             reasons.append("pricing basis missing")
+        # CLASS FIT (fix 6): a foreign-domain product fails its row — routed upstream.
+        _alien = _class_alien_reason(f"{req} {row.get('part') or ''}", _pclass)
+        if _alien:
+            reasons.append(_alien)
 
         verdict = "PASS" if not reasons else "FAIL"
         if verdict == "PASS":
@@ -9546,14 +10048,19 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     n_fail = n_total - n_pass
     issues: List[str] = []
     if n_fail:
-        ex = [f"row {i + 1} ({str((bom[i] or {}).get('requirement', ''))[:40]}): {r['reasons'][0]}"
+        # reference the REAL sheet row each failing bom line renders on (fix 3 — the
+        # audit's 'row 4' refs were data-row ordinals, off-by-4 vs the sheet whose data
+        # starts at row 5; the fold layout is the single source of the row mapping).
+        _, _sheet_by_idx = _ledger_fold_layout(bom, run_dir)
+        ex = [f"sheet row {_sheet_by_idx.get(i, i + 5)} "
+              f"({str((bom[i] or {}).get('requirement', ''))[:40]}): {r['reasons'][0]}"
               for i, r in list(per_row.items()) if r["verdict"] == "FAIL"][:3]
         issues.append(f"{n_fail}/{n_total} ledger rows FAIL the column contract (arithmetic "
                       f"10 × {n_pass}/{n_total} = {base}) — e.g. " + " · ".join(ex))
     if tbd_count:
         issues.append(f"{tbd_count}/{mpn_required} bought-out lines carry MPN 'TBD (detailed "
-                      f"design)' — an ESTIMATE-stage gap; score penalised −{4.0 * tbd_frac:.1f} "
-                      f"(proportional to the TBD fraction)")
+                      f"design)' — an ESTIMATE-stage gap; score = arithmetic − 4 × TBD-fraction "
+                      f"= {base} − {4.0 * tbd_frac:.1f}")
     return {"tab": _LEDGER_SHEET, "contract": contract, "rows": per_row,
             "n_pass": n_pass, "n_total": n_total, "score": score,
             "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
@@ -9616,7 +10123,9 @@ def _eval_risk_rows(rows: List[dict]) -> Optional[dict]:
         score = min(score, 7.9)   # hard cap <8 while any open engine-fixable defect ships
     issues: List[str] = []
     if fixable_n:
-        ex = [f"row {i + 1} ({str(rows[i].get('hazard', ''))[:50]})"
+        # 'register # N' = the register's own visible '#' column (never a sheet-row
+        # ordinal — fix 3: the audit's bare 'row N' refs did not match the sheet).
+        ex = [f"register # {i + 1} ({str(rows[i].get('hazard', ''))[:50]})"
               for i, r in per_row.items() if r["cls"] == CLS_ENGINE_FIXABLE][:3]
         issues.append(f"{fixable_n}/{n_total} risk rows are ENGINE-FIXABLE open defects shipped "
                       f"in the register (arithmetic 10 × {n_pass}/{n_total}, capped <8 while any "
@@ -11537,8 +12046,10 @@ def build(run_dir: str, out_path: str) -> dict:
     tab_executive_summary(wb, state, run_dir, sha)
     print("  · Overview")
     tab_overview(wb, state, run_dir, sha)
-    print("  · Quality & Audit")
-    tab_quality_audit(wb, state, run_dir, report)
+    # ('Quality & Audit' renders LAST, after the X1 gate-feed has merged EVERY sheet's
+    #  aux score — fix 3, reviewers 2026-07-02: its per-tab table must include every
+    #  scored surface and quote THE one floor, so it cannot render before the scores
+    #  are final.)
     print("  · Sense-check")
     tab_benchmark(wb, state)
     print("  · Brief")
@@ -11644,6 +12155,60 @@ def build(run_dir: str, out_path: str) -> dict:
     # just before the first drawing tab. ----
     add_tab("Drawings (register)", lambda: tab_drawings_register(wb, run_dir, embedded))
 
+    # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
+    #    tabs. Now that all content sheets exist, merge each drawing/render/meta sheet's aux-score into
+    #    the per-tab scorecard, so an EMPTY P&ID / BFD actually FAILS the dossier (not just a red banner).
+    #    MOVED BEFORE the 'Quality & Audit' render (fix 3, reviewers 2026-07-02): the aux scores used to
+    #    merge in AFTER that tab had rendered its per-tab table, so the table omitted the ⚠ Checks tab
+    #    (floor 2/10 came from nowhere the reader could see) and its 'worst' disagreed with the verdict.
+    #    Pure-navigation tabs (Contents) carry no content to score → skipped. ──
+    _NAV_TABS = {"Contents"}   # ⭐ Scorecard + ⚠ Audit merged into 'Quality & Audit' (scored via the ONE floor below)
+    for _wsx in wb.worksheets:
+        _nm = _wsx.title
+        if _nm in _TAB_SCORES or _nm in _NAV_TABS:
+            continue
+        _auxv = _aux_tab_score(_nm, run_dir)
+        if isinstance(_auxv, dict):
+            _TAB_SCORES[_nm] = _auxv
+    # ── UNIVERSAL HONEST CAP (Tristan 2026-06-27 — "no whack-a-mole"). ONE rule over EVERY tab from
+    #    EVERY source: a tab's score is capped by the CAVEATS IT ITSELF DECLARES in its issues. ──
+    _apply_universal_honest_cap(_TAB_SCORES)
+    # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
+    # '⚠ UNVERIFIED ECONOMICS' banner — unless it presents the class-appropriate COST-OF-SERVICE model.
+    try:
+        _fm = _TAB_SCORES.get("Financial model")
+        _has_cos = isinstance(state.get("_costOfService"), dict) and (state["_costOfService"].get("capex_gbp") or 0) > 0
+        if _econ_sale_unverified() and not _has_cos and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
+            _fm["score"] = 6
+            _fm["status"] = "FAIL"
+            _fm["issues"] = (["the economics are UNVERIFIED — no per-unit market sale price is derivable, "
+                              "so revenue / EBITDA / NPV are not real; give it a verified price OR a "
+                              "capex/opex/payback model for this class"] + (_fm.get("issues") or []))[:6]
+    except Exception:  # noqa: BLE001
+        pass
+    # ── ONE FLOOR (fix 3): the 'Quality & Audit' tab's own score IS the dossier floor —
+    #    the same computation the verdict quotes (min of every section & tab) — so its
+    #    banner (A2) can never disagree with the verdict line (A4). The per-tab table it
+    #    renders below now includes EVERY scored surface (⚠ Checks + drawings included).
+    _VERDICT.clear()
+    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir))
+    _q_fl = _VERDICT.get("floor")
+    _TAB_SCORES["Quality & Audit"] = {
+        "score": _q_fl, "target": 8,
+        "status": "PASS" if _VERDICT.get("ships") else "FAIL",
+        "issues": ([] if _VERDICT.get("ships") else
+                   [f"the dossier does NOT ship — floor "
+                    f"{_q_fl:g}/10 (min of every section & tab, the SAME number the "
+                    f"verdict quotes); every surface must reach ≥8" if isinstance(_q_fl, (int, float)) else
+                    "the dossier does NOT ship — no scored surface exists"]),
+        "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
+        "basis": "THE dossier floor — min score of every section & tab (identical to the verdict computation)",
+    }
+    state["tabScorecard"] = _TAB_SCORES
+    state["tabScorecardSummary"] = tab_scorecard_summary(_TAB_SCORES)
+    print("  · Quality & Audit")
+    tab_quality_audit(wb, state, run_dir, report)
+
     # ---- reorder into the reader-narrative sequence BEFORE Contents is built, so the Contents
     # index lists the tabs in the new order (Story → Commercial → Engineering → Drawings → Audit) ----
     _reorder_tabs(wb)
@@ -11726,47 +12291,8 @@ def build(run_dir: str, out_path: str) -> dict:
         print(f"  · Drawing cross-refs: {_annotated} cell(s) annotated with the A1 sheet range "
               f"(e.g. FF-PID-001 S1-S{_a1_counts.get('PID', '?')})")
 
-    # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
-    #    tabs. Now that all sheets exist, merge each drawing/render/meta sheet's aux-score into the
-    #    per-tab scorecard, so an EMPTY P&ID / BFD actually FAILS the dossier (not just a red banner).
-    #    Pure-navigation tabs (Contents / ⭐ Scorecard) carry no content to score → skipped. ──
-    _NAV_TABS = {"Contents"}   # ⭐ Scorecard + ⚠ Audit merged into 'Quality & Audit' (scored via the audit branch)
-    for _wsx in wb.worksheets:
-        _nm = _wsx.title
-        if _nm in _TAB_SCORES or _nm in _NAV_TABS:
-            continue
-        _auxv = _aux_tab_score(_nm, run_dir)
-        if isinstance(_auxv, dict):
-            _TAB_SCORES[_nm] = _auxv
-    # ── UNIVERSAL HONEST CAP (Tristan 2026-06-27 — "no whack-a-mole"). ONE rule over EVERY tab from
-    #    EVERY source, replacing the per-sheet render/HVAC/Financial patches: a tab's score is capped by
-    #    the CAVEATS IT ITSELF DECLARES in its issues. A VERIFICATION GAP (unverified / advisory /
-    #    partial-check / cannot-confirm / nothing-derivable) caps at 7 (FAIL — the engine does NOT know
-    #    it is right). A SOFTER caveat (assumption / estimate / out-of-scope / TBD / provisional) caps at
-    #    8 (class-correct, but never a verified-perfect 10). A NEW archetype's gaps therefore cap
-    #    THEMSELVES — the dishonest 10-over-an-unverified-line cannot recur on any class without new
-    #    code. proveCatch in _selftest. ─────────────────────────────────────────────────────────────
-    _apply_universal_honest_cap(_TAB_SCORES)
-    # X2 (Tristan 2026-06-27): the Financial model tab must NOT be a green 10 while it renders its own
-    # '⚠ UNVERIFIED ECONOMICS' banner. _econ_sale_unverified() is the engine's real sale-price-verified
-    # signal (a 'revenue' WORD in state is not enough — the PRICE must be derivable). When unverified,
-    # cap the Financial-model score at a FAIL so the banner and the score agree — UNLESS the tab now
-    # presents a COST-OF-SERVICE model (state['_costOfService'], a capex/opex/levelised-£-per-unit
-    # frame): for an infrastructure / utility plant THAT is the honest, complete, class-appropriate
-    # economics (a cost-recovery tariff, not a fake revenue stub), so the absence of a MARKET price
-    # is expected, not a defect — do not cap it. (This is the 'OR a capex/opex/payback model for this
-    # class' branch the prior message itself asked for.)
-    try:
-        _fm = _TAB_SCORES.get("Financial model")
-        _has_cos = isinstance(state.get("_costOfService"), dict) and (state["_costOfService"].get("capex_gbp") or 0) > 0
-        if _econ_sale_unverified() and not _has_cos and isinstance(_fm, dict) and isinstance(_fm.get("score"), (int, float)) and _fm["score"] > 6:
-            _fm["score"] = 6
-            _fm["status"] = "FAIL"
-            _fm["issues"] = (["the economics are UNVERIFIED — no per-unit market sale price is derivable, "
-                              "so revenue / EBITDA / NPV are not real; give it a verified price OR a "
-                              "capex/opex/payback model for this class"] + (_fm.get("issues") or []))[:6]
-    except Exception:  # noqa: BLE001
-        pass
+    # (X1 gate-feed + universal honest cap + X2 Financial cap now run EARLIER — before
+    #  the 'Quality & Audit' render — see the ONE-FLOOR block above; fix 3 2026-07-02.)
     # F1/X2 — RE-STAMP every sheet's quality banner from the FINAL _TAB_SCORES. Banners are written at
     # tab-BUILD time (title_row, row 2) from the scores as they were THEN; any score adjusted later in
     # this gate-feed (the economics-unverified Financial penalty, any merged drawing score) would leave
@@ -11970,9 +12496,12 @@ def _selftest() -> int:
         _k_main_w1 = "MAIN LV BOARD (TP&N) · W1"
         _k_main_w2 = "MAIN LV BOARD (TP&N) · W2"
         _k_sub_w1 = "MCC SUB-BOARD · W1"
-        if not _ps or _ps["n_total"] != 3:
-            print(f"  FAIL contract-panel: duplicate circuit refs across boards must NOT collide — "
-                  f"expected 3 keyed rows (got {_ps and _ps['n_total']})"); bad += 1
+        # fix 4 (2026-07-02): each board ALSO contributes a [board reconciliation]
+        # contract row — this fixture prints NO reconciliation line + NO busbar rating,
+        # so both board rows FAIL (a board with no reconciliation can never be in-spec).
+        if not _ps or _ps["n_total"] != 5:
+            print(f"  FAIL contract-panel: expected 3 circuit + 2 board-reconciliation "
+                  f"keyed rows (got {_ps and _ps['n_total']})"); bad += 1
         else:
             if _ps["rows"][_k_main_w1]["verdict"] != "FAIL" or not any("ΔU" in x for x in _ps["rows"][_k_main_w1]["reasons"]):
                 print(f"  FAIL contract-panel: a dash-ΔU row must FAIL naming the missing ΔU (got {_ps['rows'][_k_main_w1]})"); bad += 1
@@ -11980,10 +12509,15 @@ def _selftest() -> int:
                 print(f"  FAIL contract-panel: a routed, in-band circuit must PASS (got {_ps['rows'][_k_main_w2]})"); bad += 1
             if _ps["rows"][_k_sub_w1]["verdict"] != "FAIL" or not any("exceeds" in x for x in _ps["rows"][_k_sub_w1]["reasons"]):
                 print(f"  FAIL contract-panel: the sub-board's out-of-band ΔU 5.7% must FAIL the ≤5% band (got {_ps['rows'][_k_sub_w1]})"); bad += 1
-            # score is ARITHMETIC over ALL boards' rows: 10 × 1/3 = 3.3; only the dash-ΔU
-            # main-board W1 rendered a fabricated ✓ (the honest ✗ on the sub-board is NOT one).
-            if _ps["score"] != 3.3 or _ps["source_fabricated"] != 1:
-                print(f"  FAIL contract-panel: score must be 10×1/3=3.3 with exactly 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
+            _k_recon = "MAIN LV BOARD (TP&N) · [board reconciliation]"
+            if (_k_recon not in _ps["rows"] or _ps["rows"][_k_recon]["verdict"] != "FAIL"
+                    or not any("no reconciliation" in x for x in _ps["rows"][_k_recon]["reasons"])):
+                print(f"  FAIL contract-panel: a board with NO reconciliation line must FAIL its "
+                      f"board row (got {_ps['rows'].get(_k_recon)})"); bad += 1
+            # score is ARITHMETIC over ALL rows (3 circuits + 2 board recons): 10 × 1/5 = 2.0;
+            # only the dash-ΔU main-board W1 rendered a fabricated ✓.
+            if _ps["score"] != 2.0 or _ps["source_fabricated"] != 1:
+                print(f"  FAIL contract-panel: score must be 10×1/5=2.0 with exactly 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
     # ═══ proveCatch the BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ═══
     # Claims: (a) a bought-out ASSEMBLY without a material PASSES with the stated
     # 'N/A — proprietary assembly' reason + its missing MPN becomes an EXPLICIT flagged
@@ -13308,6 +13842,35 @@ def _selftest() -> int:
             if not (_irr_f and "no revenue basis" in _irr_f):
                 print(f"  FAIL fm-restructure: the IRR cell must degrade to the honest "
                       f"'n/a — no revenue basis' text, never #N/A (got {_irr_f!r})"); bad += 1
+            # fix 2 (v55 reviews): the Break-even cell must carry the explicit
+            # 'none in range' guard (this fixture's sweep is all-negative).
+            _be_f = next((str(c.value) for row in _wsf.iter_rows() for c in row
+                          if isinstance(c.value, str) and c.value.startswith("=IF(MAX(")
+                          and _BREAK_EVEN_NONE_TEXT in c.value), None)
+            if not _be_f:
+                print("  FAIL fm-restructure: the Break-even cell must guard the "
+                      "all-negative sweep with the 'none in range' branch"); bad += 1
+            # fix 5 (v55 reviews): the levelised divisor references the Inputs
+            # design-flow CELL — never a hardcoded flow literal ('=90*8760*…').
+            _vol_f = next((str(c.value) for row in _wsf.iter_rows() for c in row
+                           if isinstance(c.value, str) and c.value.startswith("=")
+                           and "*8760*" in c.value), None)
+            if not _vol_f or "'Inputs & Assumptions'!" not in _vol_f.split("*8760*")[0]:
+                print(f"  FAIL fm-restructure: the annual-delivered-volume divisor must "
+                      f"reference the Inputs design-flow cell (got {_vol_f!r})"); bad += 1
+            # fix 5 (caveat collapse): the no-revenue frame renders exactly TWICE as
+            # prose — the tab subtitle (header) + the appendix banner. The old A4
+            # 'no revenue attribution' framing header and the cost-of-service
+            # 'no market revenue / no product sale' restatements are DEAD.
+            _n_cav = len([v for _, v in _cells if not v.startswith("=")
+                          and re.search(r"(?i)SPECULATIVE APPENDIX|cost subsystem", v)])
+            if _n_cav != 2:
+                print(f"  FAIL fm-restructure: the no-revenue frame must render exactly "
+                      f"twice (subtitle + appendix banner) — got {_n_cav}"); bad += 1
+            if any(re.search(r"(?i)revenue attribution|no market revenue|there is no product sale", v)
+                   for _, v in _cells if not v.startswith("=")):
+                print("  FAIL fm-restructure: a third restatement of the no-revenue "
+                      "caveat has crept back in (A4/A6-7 class)"); bad += 1
     finally:
         _ECON_INPUT_ADDR.clear()
         _ECON_INPUT_ADDR.update(_save_addr_d)
@@ -13451,6 +14014,187 @@ def _selftest() -> int:
                       f"drop BELOW 8 (template plan) — got {_asc2.get('score')}"); bad += 1
     finally:
         _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d3)
+
+    # ═══ SEVEN WORKBOOK-SIDE FIXES (v55 adversarial reviews, 2026-07-02) ══════════════
+    import tempfile as _tf7
+
+    # (F1) LEDGER FOLD — one physical row per physical thing. The Part-names-merged
+    # twins fold into ONE qty-combined ledger row (children merged by name, tags
+    # joined); an INCOMPATIBLE same-stem pair is NEVER folded (both directions).
+    _fold_bom = [
+        {"tag": "X-107", "requirement": "Circuit Breakers", "qty": 1, "unit_gbp": 45, "line_gbp": 45, "basis": "b"},
+        {"tag": "TK-102", "requirement": "Cleaning Tank · 1.4 m dia x 1.3 m", "qty": 1, "unit_gbp": 4000,
+         "line_gbp": 4000, "basis": "b", "diameter_m": 1.4, "height_m": 1.3},
+        {"tag": "TK-102.1", "requirement": "↳ Tank Wall (laminate)", "qty": 1},
+        {"tag": "X-111", "requirement": "Circuit Breaker", "qty": 1, "unit_gbp": 45, "line_gbp": 45, "basis": "b"},
+        {"tag": "TK-101", "requirement": "Cip Tank · 1.4 m dia x 1.3 m", "qty": 1, "unit_gbp": 4000,
+         "line_gbp": 4000, "basis": "b", "diameter_m": 1.4, "height_m": 1.3},
+        {"tag": "TK-101.1", "requirement": "↳ Tank Wall (laminate)", "qty": 1},
+        {"tag": "TK-201", "requirement": "Buffer Tank · 1.0 m dia", "qty": 1, "unit_gbp": 1000,
+         "line_gbp": 1000, "basis": "b", "diameter_m": 1.0},
+        {"tag": "TK-202", "requirement": "Buffer Tanks · 3.0 m dia", "qty": 1, "unit_gbp": 9000,
+         "line_gbp": 9000, "basis": "b", "diameter_m": 3.0},
+    ]
+    with _tf7.TemporaryDirectory() as _td7:
+        _flat7, _srows7 = _ledger_fold_layout(_fold_bom, _td7)
+        _cb = next((e for e in _flat7 if 0 in e["src_idx"]), None)
+        if not _cb or _cb["src_idx"] != [0, 3] or _cb["row"].get("qty") != 2 \
+                or _cb["row"].get("line_gbp") != 90 or _cb["row"].get("unit_gbp") != 45:
+            print(f"  FAIL ledger-fold: the Circuit Breaker twins must fold to ONE row "
+                  f"qty 2 · line £90 · unit £45 (got {_cb})"); bad += 1
+        _tk = next((e for e in _flat7 if 1 in e["src_idx"]), None)
+        if not _tk or _tk["src_idx"] != [1, 4] or _tk["row"].get("qty") != 2 \
+                or _tk["row"].get("line_gbp") != 8000:
+            print(f"  FAIL ledger-fold: the Cip/Cleaning Tank synonyms must fold to ONE "
+                  f"row qty 2 · line £8,000 (got {_tk})"); bad += 1
+        _kid = next((e for e in _flat7 if 2 in e["src_idx"]), None)
+        if not _kid or 5 not in _kid["src_idx"] or "TK-102.1 / TK-101.1" != _kid["row"].get("tag"):
+            print(f"  FAIL ledger-fold: the twin parents' ↳ children must merge by name "
+                  f"with tags joined (got {_kid})"); bad += 1
+        if _srows7.get(0) != _srows7.get(3) or _srows7.get(1) != _srows7.get(4):
+            print("  FAIL ledger-fold: both source indices of a folded pair must map to "
+                  "the SAME sheet row"); bad += 1
+        # OTHER direction: incompatible dims (⌀1 m vs ⌀3 m) share a stem but are two
+        # real parts — never folded.
+        _b1 = next((e for e in _flat7 if 6 in e["src_idx"]), None)
+        _b2 = next((e for e in _flat7 if 7 in e["src_idx"]), None)
+        if not (_b1 and _b2 and _b1 is not _b2 and len(_b1["src_idx"]) == 1):
+            print("  FAIL ledger-fold: incompatible same-stem Buffer Tanks must stay "
+                  "TWO honest rows"); bad += 1
+        # (F1b) MERGED-TWIN SOURCE TAGS — tab_parts_master must register each source
+        # identity's OWN tag so the connection trace renders distinct endpoints.
+        _wb7 = Workbook(); _wb7.remove(_wb7.active)
+        tab_parts_master(_wb7, {"requirementsBom": _fold_bom}, _td7)
+        if _MERGE_SRC_TAG.get(_norm_name("Cleaning Tank")) != "TK-102" \
+                or _MERGE_SRC_TAG.get(_norm_name("Cip Tank")) != "TK-101":
+            print(f"  FAIL merge-src-tag: each merged twin must keep its OWN tag for "
+                  f"endpoint disambiguation (got {_MERGE_SRC_TAG})"); bad += 1
+        # (F3b) LEDGER AUDIT REFS — a failing bom line must be referenced by its REAL
+        # sheet row (data starts at row 5), never the data-row ordinal.
+        _bad_bom = [dict(_fold_bom[0])]
+        _bad_bom[0].pop("unit_gbp"); _bad_bom[0].pop("line_gbp")
+        _lc7 = _eval_bom_ledger_contract(_td7, {"requirementsBom": _bad_bom})
+        if not _lc7 or "sheet row 5 " not in (_lc7.get("issues") or [""])[0]:
+            print(f"  FAIL ledger-refs: the audit example must cite 'sheet row 5' for "
+                  f"bom index 0 (got {_lc7 and _lc7.get('issues')})"); bad += 1
+
+    # (F2) BREAK-EVEN — both directions of the case-split.
+    if _break_even_display([-5.0, -3.0, -1.0], [10, 20, 30]) != _BREAK_EVEN_NONE_TEXT:
+        print("  FAIL break-even: an all-negative sweep must render 'none in range', "
+              "never the first row"); bad += 1
+    if _break_even_display([-5.0, 1.0, 3.0], [10, 20, 30]) != 20 \
+            or _break_even_display([1.0, 2.0, 3.0], [10, 20, 30]) != 10:
+        print("  FAIL break-even: a crossing sweep must return the first ≥0 row"); bad += 1
+    _bef = _break_even_out_formula("OUTRNG", "EBIRNG")
+    if "MAX(EBIRNG)<0" not in _bef or _BREAK_EVEN_NONE_TEXT not in _bef:
+        print(f"  FAIL break-even: the live formula must guard the no-qualifying-row "
+              f"case explicitly (got {_bef})"); bad += 1
+
+    # (F3) ONE FLOOR — the audit fallback score IS the weakest tab, never max(2, …).
+    _save_ts7 = dict(_TAB_SCORES)
+    try:
+        _TAB_SCORES.clear()
+        _TAB_SCORES["X"] = {"score": 0, "status": "FAIL"}
+        _aud7 = _aux_tab_score("Quality & Audit", "")
+        if not _aud7 or _aud7.get("score") != 0:
+            print(f"  FAIL one-floor: the audit tab's fallback score must equal the "
+                  f"weakest tab (0), not a derived max(2, …) (got {_aud7})"); bad += 1
+    finally:
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_save_ts7)
+    # (F6d) the printed score formula must carry the TBD penalty term when it applies.
+    _note7 = _contract_note({"contract": [], "n_pass": 9, "n_total": 10, "score": 5.4,
+                             "tbd_fraction": 0.9})
+    if "− 4 × 0.9" not in _note7 or "= 5.4" not in _note7:
+        print(f"  FAIL formula-label: the header must print the TBD penalty term "
+              f"(got {_note7[:120]})"); bad += 1
+    _note7b = _contract_note({"contract": [], "n_pass": 9, "n_total": 10, "score": 9.0})
+    if "TBD-fraction" in _note7b:
+        print("  FAIL formula-label: no penalty term when no TBD fraction applies"); bad += 1
+
+    # (F4) ELECTRICAL CONTRACT — board reconciliation + Method-C ampacity + drawing
+    # consistency, both directions.
+    _hdr7 = ("| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | "
+             "Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+             "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n")
+    _meta7 = ("| Field | Value |\n|---|---|\n| **Board reference** | MDB |\n"
+              "| **System** | 400 V 3-phase + N (TP&N) |\n| **Busbar rating** | {bb} |\n\n")
+    _kva_state7 = {"orchestratorContract": {"quantities": {
+        "transformer_kva": {"value": 100, "unit": "kVA"}}}}
+    with _tf7.TemporaryDirectory() as _td7e:
+        os.makedirs(os.path.join(_td7e, "drawings"), exist_ok=True)
+        with open(os.path.join(_td7e, "drawings", "panel-schedule.md"), "w") as _fh7:
+            _fh7.write("# PANEL\n\n## MDB\n\n" + _meta7.format(bb="—") + _hdr7 +
+                       "| W1 | Big Pump | 1 | 10.0 | 15.2 | 25 A MCB | 1.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n\n"
+                       "**Reconciliation:** Σ circuit design current = 90 A vs board busbar "
+                       "demand = 4 A (ratio 21.52) → **REVIEW**. Σ connected load ≈ 46.8 kW.\n")
+        with open(os.path.join(_td7e, "drawings", "single-line-diagram.svg"), "w") as _fh7:
+            _fh7.write('<svg><text>TX1</text><text>66 kVA</text><text>11000/400 V</text>'
+                       '<text>SOME OTHER BOARD</text></svg>')
+        _pe7 = _eval_panel_schedule_contract(_td7e, _kva_state7) or {}
+        _rows7 = _pe7.get("rows") or {}
+        _br7 = _rows7.get("MDB · [board reconciliation]") or {}
+        if _br7.get("verdict") != "FAIL" or not any("REVIEW" in x for x in _br7.get("reasons", [])) \
+                or not any("busbar rating missing" in x for x in _br7.get("reasons", [])):
+            print(f"  FAIL elec-contract: a REVIEW reconciliation + dash busbar must FAIL "
+                  f"the board row (got {_br7})"); bad += 1
+        _w17 = _rows7.get("MDB · W1") or {}
+        if _w17.get("verdict") != "FAIL" or not any("Method-C ampacity" in x for x in _w17.get("reasons", [])):
+            print(f"  FAIL elec-contract: a 25 A device on a 1.5 mm² (Iz 20 A) cable must "
+                  f"FAIL In ≤ Iz (got {_w17})"); bad += 1
+        _kv7 = _rows7.get("single-line ↔ schedule · transformer kVA") or {}
+        if _kv7.get("verdict") != "FAIL":
+            print(f"  FAIL elec-contract: drawing 66 kVA vs contract 100 kVA must FAIL "
+                  f"(got {_kv7})"); bad += 1
+        _bh7 = _rows7.get("single-line ↔ schedule · board hierarchy") or {}
+        if _bh7.get("verdict") != "FAIL":
+            print(f"  FAIL elec-contract: a board name absent from the drawing must FAIL "
+                  f"(got {_bh7})"); bad += 1
+        _vv7 = _rows7.get("single-line ↔ schedule · system voltage") or {}
+        if _vv7.get("verdict") != "PASS":
+            print(f"  FAIL elec-contract: 400 V on both surfaces must PASS (got {_vv7})"); bad += 1
+        # OTHER direction — a coherent schedule + drawing scores clean.
+        with open(os.path.join(_td7e, "drawings", "panel-schedule.md"), "w") as _fh7:
+            _fh7.write("# PANEL\n\n## MDB\n\n" + _meta7.format(bb="100 A") + _hdr7 +
+                       "| W1 | Big Pump | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n\n"
+                       "**Reconciliation:** Σ circuit design current = 15 A vs board busbar "
+                       "demand = 15 A (ratio 1.00) → **OK**. Σ connected load ≈ 10 kW.\n")
+        with open(os.path.join(_td7e, "drawings", "single-line-diagram.svg"), "w") as _fh7:
+            _fh7.write('<svg><text>TX1</text><text>100 kVA</text><text>11000/400 V</text>'
+                       '<text>MDB</text></svg>')
+        _pe7b = _eval_panel_schedule_contract(_td7e, _kva_state7) or {}
+        if _pe7b.get("score") != 10.0:
+            _f7 = [(k, v["reasons"]) for k, v in (_pe7b.get("rows") or {}).items()
+                   if v.get("verdict") != "PASS"]
+            print(f"  FAIL elec-contract: a coherent schedule + drawing must score 10 "
+                  f"(got {_pe7b.get('score')}: {_f7})"); bad += 1
+
+    # (F6a) FEED-DRIVER SENSITIVITY LABELS — RAS keeps the grounded rows; an engine
+    # feed signal renames them; NO basis at all drops them.
+    _save_gen7 = _ECON_GENERIC
+    try:
+        globals()["_ECON_GENERIC"] = None
+        if _feed_sensitivity_drivers({}) != [("Feed price", "feed"),
+                                             ("Feed-conversion ratio (FCR)", "fcr")]:
+            print("  FAIL feed-drivers: the RAS path must keep the grounded Feed/FCR rows"); bad += 1
+        globals()["_ECON_GENERIC"] = {"feed_price": 0.4, "fcr": 1.2}
+        if _feed_sensitivity_drivers({})[0][0] != "Feedstock price":
+            print("  FAIL feed-drivers: a real engine feed signal must label the rows "
+                  "Feedstock, not Feed/FCR"); bad += 1
+        globals()["_ECON_GENERIC"] = {}
+        if _feed_sensitivity_drivers({}) != []:
+            print("  FAIL feed-drivers: rows with NO feed basis must be DROPPED "
+                  "(the v55 water plant rendered 'Feed price'/'FCR')"); bad += 1
+    finally:
+        globals()["_ECON_GENERIC"] = _save_gen7
+
+    # (F6c) CLASS-ALIEN row check — flags the foreign-domain part, never the home class.
+    if not _class_alien_reason("Aquavista Remote Monitoring", "water_treatment"):
+        print("  FAIL class-alien: aquaculture SCADA on a water_treatment plant must "
+              "flag the row"); bad += 1
+    if _class_alien_reason("Aquavista Remote Monitoring", "aquaculture_ras"):
+        print("  FAIL class-alien: the marker must be SUPPRESSED on its home class"); bad += 1
+    if _class_alien_reason("UV Disinfection Unit", "water_treatment"):
+        print("  FAIL class-alien: a class-appropriate part must never flag"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
