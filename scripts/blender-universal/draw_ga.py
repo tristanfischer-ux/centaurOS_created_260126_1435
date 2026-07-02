@@ -446,8 +446,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # ----- pick ONE scale shared across all views so they read together. The
     #       binding span is whichever of (L, W) and (L) , (H) dominates the sheet.
     #       Target a ~A3-landscape working area; choose scale from the widest view.
-    PLAN_MAX_W = 760.0     # px budget for the plan width (x)
-    PLAN_MAX_H = 360.0     # px budget for the plan depth (y)
+    # Larger plan budgets (2026-07-02): the in-drawing schedule now shows only the top
+    # principals (full list → Part names tab), freeing sheet area — spend it on a bigger,
+    # more legible plan (typically one standard scale finer).
+    PLAN_MAX_W = 1000.0    # px budget for the plan width (x)
+    PLAN_MAX_H = 600.0     # px budget for the plan depth (y)
     sx, ppm_x = choose_scale(L, PLAN_MAX_W)
     sy, ppm_y = choose_scale(W, PLAN_MAX_H)
     sz, ppm_z = choose_scale(H, 300.0)
@@ -495,13 +498,14 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # height covers the taller of (a) the front elevation below the plan and (b) the
     # equipment-schedule panel in the right gutter below the side elevation, so the
     # schedule never gets clipped or driven into the title block.
-    n_sched_rows = max(8, min(len(parts), 16))
     # the schedule sits BELOW the front elevation (which is below the plan) — NOT just below
     # the plan TOP, or it covers the plan + front elevation (Tristan 2026-06-22: "the equipment
-    # schedule is hiding most of the plans and elevations").
+    # schedule is hiding most of the plans and elevations"). Its height is the EXACT panel
+    # height _draw_key will draw (shared helper), plus a hard clearance band so the scale
+    # bar + 'SCALE 1:N' text can never overprint the schedule (v54, 2026-07-02).
     sched_top = front_y + front_h + 56
-    sched_bottom = sched_top + (20 + n_sched_rows * 13 + 8)
-    height = max(front_y + front_h + 64, sched_bottom + 24) + title_h
+    sched_bottom = sched_top + _key_panel_height(parts)
+    height = max(front_y + front_h + 64, sched_bottom + 60) + title_h
     width = int(math.ceil(width))
     height = int(math.ceil(height))
 
@@ -763,50 +767,61 @@ def _tag_num(tag):
     return int(m.group(1)) if m else 0
 
 
+# The in-drawing schedule shows only the PRINCIPAL equipment (largest plan footprints) —
+# a 39-row full schedule shrank to an unreadable 8 px row height and overran into the
+# scale bar (v54, 2026-07-02). The FULL list lives in the dossier's Part names tab; the
+# panel says so explicitly. Universal: selection is by footprint geometry, never a class.
+_GA_SCHED_MAX_ROWS = 10
+
+
+def _principal_schedule_rows(parts):
+    """(rows, total_rows, total_items): the collapsed schedule rows for the largest-
+    footprint principals (≤ _GA_SCHED_MAX_ROWS rows), plus the FULL collapsed-row and
+    item counts for the pointer note. Deterministic (area then tag)."""
+    all_rows = _collapse_schedule(parts)
+    by_area = sorted(parts, key=lambda p: (-(max(p.x1 - p.x0, 1.0)
+                                             * max(p.y1 - p.y0, 1.0)), p.tag))
+    sel = by_area[: _GA_SCHED_MAX_ROWS + 6]       # headroom — ranges collapse rows away
+    rows = _collapse_schedule(sel)[:_GA_SCHED_MAX_ROWS]
+    return rows, len(all_rows), len(parts)
+
+
+def _key_panel_height(parts) -> float:
+    """The EXACT height _draw_key will draw — shared with the sheet-size computation so
+    the scale bar / title block can never collide with the panel (v54: 'SCALE 1:500'
+    overprinted the schedule rows)."""
+    rows, total_rows, _ = _principal_schedule_rows(parts)
+    note_h = 16 if total_rows > len(rows) else 0
+    return 20 + len(rows) * 13.0 + note_h + 8
+
+
 def _draw_key(svg, parts, keynotes, x, y, x_right, h_max):
-    """Equipment SCHEDULE: a bounded, boxed tag→name table. Repeated identical
-    items collapse to a range row. Lays out in as many columns as needed to fit the
-    available height h_max; overflow is summarised as '+N more items'. Boxed so it
-    reads as a drawing panel, never colliding with the title block."""
+    """PRINCIPAL-EQUIPMENT schedule: a bounded, boxed tag→name table of the largest
+    items only, with a pointer to the dossier's Part names tab for the full list.
+    Fixed 13 px rows — always legible, never shrunk to fit an unbounded list."""
     bw = max(x_right - x, 260)
-    rows = _collapse_schedule(parts)
+    rows, total_rows, total_items = _principal_schedule_rows(parts)
     header_h = 20
     rh = 13.0
+    fs = 8.2
     pad = 8
-    # rows per column from the height budget
-    body_h = max(h_max - header_h - pad, 13.0)
-    # SHOW EVERY item (Tristan 2026-06-13: "show ALL of the equipment in the schedule,
-    # not just a select few"). Never truncate: fit ALL rows by taking as many columns as
-    # the panel width allows, then shrinking the row height to a legibility floor. The
-    # panel grows within the right gutter if still needed.
-    total = len(rows)
-    # Column count is HEIGHT-driven: pick enough columns to keep each one a readable
-    # length (~24 rows) at a legible row height, bounded by the panel width and a
-    # 4-column cap; force ≥2 columns once the list is long (Tristan's explicit ask).
-    max_cols_by_width = max(1, int(bw // 200))    # ≥200 px per column (tag + full name)
-    target_cols = max(1, math.ceil(total / 24))
-    ncol = max(1, min(max_cols_by_width, 4, target_cols))
-    if total > 16:
-        ncol = max(ncol, 2)
-    rows_per_col = max(1, math.ceil(total / ncol))
-    rh = max(8.0, min(13.0, body_h / rows_per_col))
-    fs = max(5.6, min(8.2, rh * 0.62))            # font scales with row height
-    shown = rows                                  # no cap, no overflow note
-    panel_h = header_h + rows_per_col * rh + pad
+    note_h = 16 if total_rows > len(rows) else 0
+    panel_h = header_h + len(rows) * rh + note_h + pad
     svg.rect(x, y, bw, panel_h, stroke=GRID_FAINT, width=1.1, fill=FILL_BG)
     svg.rect(x, y, bw, header_h, stroke=GRID_FAINT, width=1.1, fill=PANEL_BG)
-    svg.text(x + 8, y + 14, f"EQUIPMENT SCHEDULE  ({total} items)", size=9.5, weight="bold", fill=MUTED)
-    yy0 = y + header_h + 11
-    actual_col_w = bw / ncol
-    for idx, (tag, name) in enumerate(shown):
-        col = idx // rows_per_col
-        row = idx % rows_per_col
-        cx = x + 8 + col * actual_col_w
-        cy = yy0 + row * rh
-        svg.text(cx, cy, tag, size=fs + 0.2, weight="bold", fill=EQ_INK)
-        avail_chars = max(6, int((actual_col_w - 62) / (fs * 0.58)))
-        nm = name if len(name) <= avail_chars else name[:max(avail_chars - 1, 4)] + "…"
-        svg.text(cx + 56, cy, nm, size=fs, fill=MUTED)
+    title = (f"PRINCIPAL EQUIPMENT  (top {len(rows)} of {total_items} items by footprint)"
+             if note_h else f"EQUIPMENT SCHEDULE  ({total_items} items)")
+    svg.text(x + 8, y + 14, title, size=9.5, weight="bold", fill=MUTED)
+    yy = y + header_h + 11
+    for tag, name in rows:
+        svg.text(x + 8, yy, tag, size=fs + 0.2, weight="bold", fill=EQ_INK)
+        svg.text(x + 150, yy, name, size=fs, fill=MUTED)
+        yy += rh
+    if note_h:
+        svg.text(x + 8, yy + 3,
+                 f"Equipment schedule: see the Part names tab of the dossier for the "
+                 f"full {total_items}-item list (tag · name · duty).",
+                 size=8.2, fill=EQ_INK, weight="bold")
 
 
 def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H):
@@ -896,7 +911,7 @@ def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
                  f"--window-size={w},{h}",
                  f"--force-device-scale-factor={scale}",
                  "--default-background-color=FFFFFFFF",
-                 "--hide-scrollbars", f"file://{svg_path}"],
+                 "--hide-scrollbars", f"file://{Path(svg_path).resolve()}"],
                 check=True, capture_output=True, timeout=90)
             if png_path.is_file() and png_path.stat().st_size > 1000:
                 return True

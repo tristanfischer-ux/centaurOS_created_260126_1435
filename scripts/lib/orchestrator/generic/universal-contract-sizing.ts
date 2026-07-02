@@ -2172,10 +2172,39 @@ interface UtilitySpec {
   // utilities / other synthesised systems are NEVER matched (flag-guarded below).
   supersedes?: RegExp
 }
+// The load families the standby genset actually protects, derived from the contract's OWN
+// quantity keys (a physical signal, never a product class): a recirculation duty implies
+// pump loads, an oxygen duty implies oxygenation, a ventilation duty implies air handling,
+// etc. "controls" always applies (the genset always rides the plant controls through an
+// outage). Deterministic order; used by the standby_generator `form` rationale.
+export function standbyLoadFamilies(q?: Record<string, number>): string {
+  const keys = Object.keys(q ?? {}).join(' ').toLowerCase()
+  const fams: string[] = []
+  for (const [re, label] of [
+    [/recirc|circulation|circulat/, 'recirculation'],
+    [/oxygen|aerat|\bdo_|dissolved_o/, 'oxygenation'],
+    [/pump/, 'process pumping'],
+    [/dosing|dose_|chemical/, 'dosing'],
+    [/uv_|disinfect|steril/, 'disinfection'],
+    [/ventilation|hvac|air_change|airflow/, 'ventilation'],
+    [/heating|heat_pump|makeup_heat/, 'heating'],
+    [/cooling|chiller|refriger|thermal_dissipation/, 'cooling'],
+  ] as [RegExp, string][]) {
+    if (re.test(keys) && !fams.includes(label)) fams.push(label)
+  }
+  const top = fams.slice(0, 3)
+  top.push('controls')
+  return top.join(' + ')
+}
+
 const UTILITY_SYSTEMS: UtilitySpec[] = [
   { key: 'standby_generator', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Standby Diesel Generator', module: /power|electric|distribution/,
     size: (load) => { const crit = load * 0.7; return { dim: boxFromRatingKw(crit), rating: [String(stdGenset(crit / 0.8)), 'kVA'], gbp: Math.round(crit * 400 + 30000) } },
-    form: (load) => `Containerised standby diesel genset + automatic transfer switch + day tank; covers the ~${Math.round(load * 0.7)} kW life-safety load (recirculation + oxygenation + controls) on a mains failure — a RAS loses its stock within minutes without it` },
+    // The covered-load description is DERIVED from the load families the contract actually
+    // declares — never a class narrative (the old fixed "(recirculation + oxygenation +
+    // controls) … a RAS loses its stock" string shipped verbatim on a potable-water plant,
+    // v54 2026-07-02). Universal: keyed on quantity-key signals; "controls" always applies.
+    form: (load, q) => `Containerised standby diesel genset + automatic transfer switch + day tank; covers the ~${Math.round(load * 0.7)} kW life-safety / essential load (${standbyLoadFamilies(q)}) on a mains failure` },
   { key: 'makeup_water', driver: (q) => pickQ(q, /makeup_water_m3_h|make_up_water_m3_h/), label: 'Make-up Water System', module: /mass_fluid|fluid|process|water|circulation/,
     size: (mu) => { const buf = Math.max(5, mu * 0.5); return { dim: cylinderFromVolumeM3(buf, 'make-up tank'), rating: [String(Math.round(mu)), 'm³/h'], gbp: Math.round(25000 + mu * 200) } },
     form: (mu) => `Make-up water skid: ~${Math.round(Math.max(5, mu * 0.5))} m³ break tank + level control + ${Math.round(mu)} m³/h control valve + meter; replaces evaporation + bleed losses` },

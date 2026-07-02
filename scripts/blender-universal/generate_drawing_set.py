@@ -188,6 +188,155 @@ def _run_exterior_pass(out_dir: Path, state_path: Path,
     return ok
 
 
+# ── RENDER CAPTIONS + CANONICAL SHEET NAMES (Tristan audit 2026-07-02, item 5) ──────────
+# The exporter's render-tab names were minted from filenames and hit Excel's 31-char limit
+# mid-word ("Render — Interior layout (vie-2"), and the captions said nothing. The render
+# pipeline owns the render CONTEXT (camera bearing, envelope, principal equipment) — so the
+# drawing manifest now carries, per render: a ≤31-char canonical sheet name + an informative
+# caption (bearing + envelope dims + principal-equipment callouts from the parts manifest).
+# Both render engines (bespoke template + universal) emit this fixed view vocabulary.
+_RENDER_VIEWS = [
+    ("00-hero.png",      "three-quarter hero perspective", "iso"),
+    ("01-top.png",       "plan view, looking down",        "plan"),
+    ("02-corner-FR.png", "front-right corner perspective", "FR iso"),
+    ("03-corner-BL.png", "back-left corner perspective",   "BL iso"),
+]
+_SHEET_NAME_MAX = 31          # Excel hard limit — names are asserted under it here
+
+
+def _manifest_envelope_dims(out_dir: Path) -> str:
+    """'L × W × H m' from parts-manifest.json bbox, or ''."""
+    try:
+        man = json.loads((out_dir / "parts-manifest.json").read_text())
+        bb = man.get("bbox_mm") or {}
+        L = (bb.get("x_max_mm", 0) - bb.get("x_min_mm", 0)) / 1000.0
+        W = (bb.get("y_max_mm", 0) - bb.get("y_min_mm", 0)) / 1000.0
+        H = (bb.get("z_max_mm", 0) - bb.get("z_min_mm", 0)) / 1000.0
+        if L > 0 and W > 0:
+            return f"{L:.1f} × {W:.1f} × {H:.1f} m"
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def _principal_callouts(out_dir: Path, n: int = 5) -> str:
+    """'TAG Name · TAG Name …' for the n largest-footprint parts in the manifest."""
+    try:
+        man = json.loads((out_dir / "parts-manifest.json").read_text())
+        parts = man.get("parts") or []
+    except Exception:  # noqa: BLE001
+        return ""
+    def _area(r):
+        d = r.get("dims_mm") or {}
+        if "dia" in d:
+            dia = float(d.get("dia") or 0.0)
+            return dia * dia
+        return float(d.get("w") or 0.0) * float(d.get("d") or 0.0)
+    seen: set = set()
+    call = []
+    for r in sorted(parts, key=lambda r: (-_area(r), str(r.get("equipment_tag") or ""))):
+        tag = str(r.get("equipment_tag") or "").strip()
+        name = str(r.get("name") or "").strip()
+        if not tag or (tag, name) in seen:
+            continue
+        seen.add((tag, name))
+        call.append(f"{tag} {name}" if name else tag)
+        if len(call) >= n:
+            break
+    return " · ".join(call)
+
+
+def build_render_manifest(out_dir: Path) -> list[dict]:
+    """One entry per render PNG present (interior + exterior), each with a ≤31-char
+    canonical sheet name + an informative caption. Deterministic; empty when no renders."""
+    env_dims = _manifest_envelope_dims(out_dir)
+    callouts = _principal_callouts(out_dir)
+    entries: list[dict] = []
+    idx = 0
+    for area, base in (("Interior", out_dir), ("Exterior", out_dir / "exterior")):
+        for fname, bearing, short in _RENDER_VIEWS:
+            p = base / fname
+            if not (p.exists() and p.stat().st_size > 1000):
+                continue
+            idx += 1
+            sheet = f"Render {idx} — {area} {short}"
+            assert len(sheet) <= _SHEET_NAME_MAX, sheet
+            cap_bits = [f"{area} render — {bearing}"]
+            if env_dims:
+                cap_bits.append(f"plant envelope {env_dims}")
+            if callouts and area == "Interior":
+                cap_bits.append(f"principal equipment: {callouts}")
+            elif area == "Exterior":
+                cap_bits.append("building shell + site apron (equipment enclosed)")
+            entries.append({
+                "file": str(p.relative_to(out_dir)),
+                "file_abs": str(p),
+                "area": area.lower(),
+                "bearing": bearing,
+                "sheet_name": sheet,
+                "caption": " · ".join(cap_bits),
+            })
+    return entries
+
+
+# ── WEB-WEIGHT HERO (Tristan audit 2026-07-02, item 6) ──────────────────────────────────
+# The full-res interior hero is ~3-6 MB and the exporter embeds it multiple times. Emit an
+# additional web-weight hero-embed.png (≤ ~800 KB: resized to ≤1600 px + palette-quantised
+# when needed) for the exporter to PREFER when embedding; the full-res file stays untouched.
+_HERO_EMBED_MAX_BYTES = 800_000
+_HERO_EMBED_MAX_PX = 1600
+
+
+def write_hero_embed(out_dir: Path, log: list[str]) -> str | None:
+    """Write <out_dir>/hero-embed.png from 00-hero.png. Returns the path or None."""
+    src = out_dir / "00-hero.png"
+    dst = out_dir / "hero-embed.png"
+    if not (src.exists() and src.stat().st_size > 1000):
+        log.append("hero-embed: no 00-hero.png — skipped")
+        return None
+    if (dst.exists() and dst.stat().st_size <= _HERO_EMBED_MAX_BYTES
+            and dst.stat().st_mtime >= src.stat().st_mtime):
+        log.append("hero-embed: up to date — reused")
+        return str(dst)
+    try:
+        from PIL import Image  # noqa: PLC0415
+    except Exception:  # PIL not in THIS interpreter → delegate to the repo venv
+        try:
+            r = subprocess.run([_venv_python(), str(Path(__file__).resolve()),
+                                "--hero-embed", str(out_dir)],
+                               capture_output=True, text=True, timeout=120)
+            if dst.exists() and dst.stat().st_size > 1000:
+                log.append("hero-embed: written via venv python")
+                return str(dst)
+            log.append(f"hero-embed: venv fallback failed …{(r.stderr or '')[-120:]}")
+        except Exception as exc:  # noqa: BLE001
+            log.append(f"hero-embed: FAILED (no PIL): {exc}")
+        return None
+    try:
+        im = Image.open(src).convert("RGB")
+        scale = min(1.0, _HERO_EMBED_MAX_PX / max(im.width, im.height))
+        if scale < 1.0:
+            im = im.resize((max(1, round(im.width * scale)),
+                            max(1, round(im.height * scale))), Image.LANCZOS)
+        im.save(dst, "PNG", optimize=True)
+        if dst.stat().st_size > _HERO_EMBED_MAX_BYTES:
+            # palette-quantise (256 colours) — renders compress dramatically; visually
+            # indistinguishable at embed size.
+            im.quantize(colors=256, method=Image.Quantize.MEDIANCUT).save(
+                dst, "PNG", optimize=True)
+        if dst.stat().st_size > _HERO_EMBED_MAX_BYTES:
+            im2 = im.resize((max(1, round(im.width * 0.75)),
+                             max(1, round(im.height * 0.75))), Image.LANCZOS)
+            im2.quantize(colors=256, method=Image.Quantize.MEDIANCUT).save(
+                dst, "PNG", optimize=True)
+        kb = dst.stat().st_size // 1024
+        log.append(f"hero-embed: hero-embed.png written ({kb} KB)")
+        return str(dst)
+    except Exception as exc:  # noqa: BLE001
+        log.append(f"hero-embed: FAILED: {exc}")
+        return None
+
+
 def _a1_print_entry(out_dir: Path, base: str) -> dict | None:
     """The drawing's DELIVERED A1 print set (written by a1_print.py inside the P&ID /
     BFD / single-line generators): sheet PDFs + print-legibility numbers, from the
@@ -447,6 +596,14 @@ def generate_drawing_set(state_path: str | Path,
             log.append(f"self-exam {_mod}: FAILED: {_e}")
             self_exam[_art] = None
 
+    # web-weight hero for embedding (item 6) + per-render captions/sheet names (item 5) —
+    # computed AFTER the canonical-manifest restore so captions read the SAME placement
+    # the GA was drawn from.
+    hero_embed = write_hero_embed(out_dir, log)
+    renders = build_render_manifest(out_dir)
+    if renders:
+        log.append(f"renders: {len(renders)} captioned (canonical ≤31-char sheet names)")
+
     manifest = {
         "schema": "drawing-set/v1",
         "placement": "lead-and-weave",
@@ -459,6 +616,12 @@ def generate_drawing_set(state_path: str | Path,
         "schedule_drawings": schedules,
         # the universal-CAD hero render → state.cad_hero_image_path (cover + module fallback).
         "hero": hero_abs,
+        # web-weight hero (≤ ~800 KB) — the exporter should PREFER this when EMBEDDING;
+        # the full-res 00-hero.png remains the print/cover master.
+        "hero_embed": hero_embed,
+        # per-render caption metadata + canonical ≤31-char sheet names (Excel limit) —
+        # the exporter renders THESE instead of minting names from filenames.
+        "renders": renders,
         # the Part-1 process-flow Block-Flow Diagram (D1 fix) → EngineeringBasisPage.
         "block_flow_diagram": bfd_path,
         # print-ready ISO A1 vector PDF sets (Tristan issues 15-17: on-screen PNGs are
@@ -499,6 +662,11 @@ def main(argv: list[str]) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] == "--hero-embed":          # internal: venv-python delegation target
+        _log: list[str] = []
+        p = write_hero_embed(Path(argv[1]).resolve(), _log)
+        print("\n".join(_log))
+        return 0 if p else 1
     state_path = argv[0]
     out_dir = argv[1] if len(argv) > 1 else None
     m = generate_drawing_set(state_path, out_dir)

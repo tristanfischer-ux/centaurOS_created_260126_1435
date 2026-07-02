@@ -118,6 +118,19 @@ _NAME_UNIT_SUFFIXES = [
 ]
 
 
+def _clip(s, n: int) -> str:
+    """Clip a user-facing string at a WORD boundary with an ellipsis — never mid-word
+    (v54 shipped scorecard defect texts like 'A number you canno' cut at a raw [:110]).
+    Text at/under the limit is returned untouched."""
+    s = str(s or "")
+    if len(s) <= n:
+        return s
+    cut = s[: max(n - 1, 1)]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0].rstrip(" ,;:·—-")
+    return cut + "…"
+
+
 def _norm_unit(u) -> str:
     if u is None:
         return ""
@@ -624,7 +637,7 @@ def check_bom(state, rows, run_dir) -> list:
     untagged = [r for r in principal if _tag_missing(r.get("tag"))]
     if untagged:
         ex = "; ".join(
-            str(r.get("part") or r.get("requirement") or "?")[:40] for r in untagged[:3]
+            _clip(str(r.get("part") or r.get("requirement") or "?"), 40) for r in untagged[:3]
         )
         out.append(Finding(
             tab=tab, check="tag_coverage", severity="HIGH",
@@ -651,7 +664,7 @@ def check_bom(state, rows, run_dir) -> list:
             out.append(Finding(
                 tab=tab, check="line_math", severity="HIGH",
                 message=(f"line math wrong for "
-                         f"'{str(r.get('part') or r.get('tag') or '?')[:40]}': "
+                         f"'{_clip(str(r.get('part') or r.get('tag') or '?'), 40)}': "
                          f"{qty} × £{unit:,.0f} = £{qty*unit:,.0f} but line shows £{line:,.0f}"),
                 actual=f"line_gbp=£{line:,.0f}", expected=f"£{round(qty*unit):,.0f}",
                 source_rule="line_gbp must equal qty × unit_gbp",
@@ -663,7 +676,7 @@ def check_bom(state, rows, run_dir) -> list:
             out.append(Finding(
                 tab=tab, check="zero_principal", severity="MED",
                 message=(f"principal line "
-                         f"'{str(r.get('part') or r.get('tag') or '?')[:40]}' "
+                         f"'{_clip(str(r.get('part') or r.get('tag') or '?'), 40)}' "
                          f"({_status(r)}) is priced at £0"),
                 actual="£0", expected=">£0 for a principal line",
                 source_rule="a principal (IDENTIFIED/BESPOKE/SYSTEM/UTILITY) line must be priced",
@@ -957,7 +970,7 @@ def check_physics_critic(state, rows, run_dir) -> list:
     if highs:
         titles = []
         for i in highs[:3]:
-            titles.append(str(i.get("title") or i.get("issue") or "(untitled)")[:80])
+            titles.append(_clip(str(i.get("title") or i.get("issue") or "(untitled)"), 80))
         out.append(Finding(
             tab=tab, check="unresolved_high_physics", severity="HIGH",
             message=(f"{len(highs)} HIGH physics-critic findings are unresolved in the "
@@ -1543,7 +1556,7 @@ def check_traceability_basis(state, rows, run_dir) -> list:
     if not blank:
         return out
     sev = "HIGH" if len(blank) >= max(3, 0.1 * len(principals)) else "MED"
-    ex = "; ".join(_row_name(r)[:40] or "?" for r in blank[:3])
+    ex = "; ".join(_clip(_row_name(r), 40) or "?" for r in blank[:3])
     out.append(Finding(
         tab=tab, check="traceability_basis", severity=sev,
         message=(f"{len(blank)} of {len(principals)} principal lines have no provenance "
@@ -1789,7 +1802,7 @@ def check_dominant_bom_line(state, rows, run_dir) -> list:
             name = str(r.get("requirement") or r.get("part") or "?")
             out.append(Finding(
                 tab="Bill of Materials", check="dominant_bom_line", severity="HIGH",
-                message=(f"a single line '{name[:48]}' is £{round(lg):,} = {round(lg/total*100)}% "
+                message=(f"a single line '{_clip(name, 48)}' is £{round(lg):,} = {round(lg/total*100)}% "
                          f"of the £{round(total):,} bill — almost certainly a mis-price (check the "
                          f"unit price against the part's spec)"),
                 actual=f"unit £{r.get('unit_gbp')} × qty {r.get('qty')}",
@@ -1841,7 +1854,7 @@ def check_scope_fidelity(state, rows, run_dir) -> list:
             out.append(Finding(
                 tab="Exec Summary", check="scope_fidelity", severity="HIGH",
                 message=(f"the brief EXCLUDES {label}, but the design builds it: {len(hits)} part(s), "
-                         f"£{round(cost):,} (e.g. '{hits[0][0][:40]}'). Build only what the brief asks for."),
+                         f"£{round(cost):,} (e.g. '{_clip(hits[0][0], 40)}'). Build only what the brief asks for."),
                 actual=f"£{round(cost):,} of out-of-scope {label}",
                 expected=f"no {label} parts — the brief excludes them",
                 source_rule="scope-fidelity: drop subsystems the brief excludes; route a process/water-system brief to the process path, not a full-product emitter",
@@ -1936,7 +1949,7 @@ def check_overview_invariants(state, rows, run_dir) -> list:
     fails = [c for c in checks if str(getattr(c, "status", "")).upper() == "FAIL"]
     if not fails:
         return out
-    names = "; ".join(str(getattr(c, "name", ""))[:46] for c in fails[:4])
+    names = "; ".join(_clip(str(getattr(c, "name", "")), 46) for c in fails[:4])
     # The Overview DISPLAYS the summary count → its score reflects the TOTAL fails.
     out.append(Finding(
         tab=tab, check="overview_invariant_fail",
@@ -1962,7 +1975,7 @@ def check_overview_invariants(state, rows, run_dir) -> list:
             continue  # the Overview summary already covers the generic ones
         out.append(Finding(
             tab=dest, check="invariant_fail_on_tab", severity="HIGH",
-            message=(f"a deterministic invariant this tab is responsible for FAILS: {nm[:80]}"),
+            message=(f"a deterministic invariant this tab is responsible for FAILS: {_clip(nm, 120)}"),
             actual="invariant FAIL", expected="the invariant passes",
             source_rule="fix the invariant at source (deterministic_checks_lib) — this tab cannot pass while it fails",
         ))
@@ -2368,7 +2381,7 @@ def tab_scores(state: dict, rows: list, run_dir: str) -> dict:
         out[tab] = {
             "score": score, "target": 8,
             "status": "PASS" if score >= 8 else "FAIL",
-            "issues": [f"[{f.severity}] {f.message[:110]}" for f in fs[:6]],
+            "issues": [f"[{f.severity}] {_clip(f.message, 220)}" for f in fs[:6]],
             "fix": next((f.source_rule for f in fs if f.source_rule), ""),
         }
     # The Executive Summary is the COVER that CLAIMS the whole dossier is buildable + ready. It cannot

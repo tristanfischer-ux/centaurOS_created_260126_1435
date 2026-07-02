@@ -2326,7 +2326,7 @@ def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
                  f"--screenshot={png_path}", f"--window-size={w},{h}",
                  f"--force-device-scale-factor={scale}",
                  "--default-background-color=FFFFFFFF", "--hide-scrollbars",
-                 f"file://{svg_path}"],
+                 f"file://{Path(svg_path).resolve()}"],
                 check=True, capture_output=True, timeout=120)
             if png_path.is_file() and png_path.stat().st_size > 1000:
                 return True

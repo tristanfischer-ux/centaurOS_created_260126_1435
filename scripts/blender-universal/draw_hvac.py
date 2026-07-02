@@ -480,6 +480,7 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
 
     # ---- served zones: placed racks, else DERIVE from the contract --------------
     zones_derived = False
+    zd_note = ""
     if not zones:
         zones, zd_note = _derive_zones(state, bbox, arch)
         zones_derived = True
@@ -497,6 +498,11 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     if _building_under_served(zones, bbox):
         zones = _hall_zone_grid(bbox, _read_zone_count(state))
         zones_derived = True
+        # ONE source of truth for the zone story: the earlier derive-zones note quoted a
+        # zone count this re-zoning just changed (v54: note said "4 representative zones"
+        # while the plan + title read 6) — the superseded note must not ship.
+        if zd_note and zd_note in notes:
+            notes.remove(zd_note)
         L_m = (bbox.get("x_max_mm", 0.0) - bbox.get("x_min_mm", 0.0)) / 1000.0
         W_m = (bbox.get("y_max_mm", 0.0) - bbox.get("y_min_mm", 0.0)) / 1000.0
         notes.append(
@@ -517,8 +523,12 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     if medium == "liquid":
         _build_liquid_loop(main_hub, zones, schedule, ducts, diffusers, notes)
     else:
-        _build_air_ducts(main_hub, zones, airflow_cms, cooling_kw, schedule,
-                         ducts, diffusers, notes, medium == "mixed", state)
+        # ONE source of truth: the ducts and the title-block headline must quote the SAME
+        # airflow. _build_air_ducts derives a fallback airflow when none is published
+        # (v54: ducts said 3.0 m³/s while the title read "0.00 m³/s (0 cfm)") — keep the
+        # EFFECTIVE value it actually sized the ducts from.
+        airflow_cms = _build_air_ducts(main_hub, zones, airflow_cms, cooling_kw, schedule,
+                                       ducts, diffusers, notes, medium == "mixed", state)
 
     # ---- DEHUMIDIFICATION (the latent side of the air system the ledger carries) ----
     # The sensible heating/cooling drawing alone under-renders the air-side duty: a humid
@@ -822,10 +832,12 @@ def _synth_hub(arch: str, bbox: dict, medium: str) -> Equip:
 
 def _build_air_ducts(hub: Equip, zones: list[Equip], airflow_cms: float,
                      cooling_kw: float, schedule: dict, ducts: list,
-                     diffusers: list, notes: list, mixed: bool, state: dict):
+                     diffusers: list, notes: list, mixed: bool, state: dict) -> float:
     """SUPPLY ducts hub→each zone, sized from the per-zone airflow share; a RETURN duct
     from each zone back to the hub; a diffuser at each zone (supply) + a return grille.
-    The MAIN supply trunk + branch sizing mirrors connection_sizing's duct ladder."""
+    The MAIN supply trunk + branch sizing mirrors connection_sizing's duct ladder.
+    Returns the EFFECTIVE airflow (m³/s) the ducts were sized from — the caller stores it
+    so the headline and the duct schedule quote one number."""
     n = max(len(zones), 1)
     if airflow_cms <= 0:
         # no published airflow: back it out of the cooling duty so ducts are still sized.
@@ -868,6 +880,7 @@ def _build_air_ducts(hub: Equip, zones: list[Equip], airflow_cms: float,
         notes.append(f"Supply airflow {airflow_cms:.2f} m³/s ({_cfm(airflow_cms):,} cfm) "
                      f"split across {n} zone(s); ducts sized at "
                      f"≤{DUCT_VELOCITY_MAX_MS:g} m/s.")
+    return airflow_cms
 
 
 # ── liquid coolant loop (honest: NOT air) -------------------------------------
@@ -1270,7 +1283,9 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
 
     # ----- sheet geometry -----
     margin = 46
-    title_h = 156
+    # title-block height grows with the WRAPPED note lines (notes are word-wrapped, never
+    # clipped mid-word — v54 shipped "from the desig…" / "verify aga…").
+    title_h = 156 + max(0, len(_note_lines(sysm)) - 2) * 12
     plan_x = margin + 44
     plan_y = margin + 56
     sect_x = plan_x
@@ -1751,7 +1766,9 @@ def _draw_schedule(svg, sysm, x, y, w, h_max):
     yy = y + header_h + 11
     for tag, note in rows:
         svg.text(x + 8, yy, tag, size=8.0, weight="bold", fill=EQ_INK)
-        note = note if len(note) <= 30 else note[:29] + "…"
+        # fit by dropping whole trailing tokens — never a mid-word clip.
+        while len(note) > 30 and "  " in note:
+            note = note.rsplit("  ", 1)[0]
         svg.text(x + 108, yy, note, size=7.6, fill=MUTED, mono=True)
         yy += rh
 
@@ -1759,6 +1776,33 @@ def _draw_schedule(svg, sysm, x, y, w, h_max):
 # ═══════════════════════════════════════════════════════════════════════════
 # TITLE BLOCK
 # ═══════════════════════════════════════════════════════════════════════════
+
+def _wrap_words(text: str, limit: int) -> list:
+    """Word-boundary wrap: never cuts mid-word, never drops text (the fix for the
+    clipped 'from the desig…' / 'verify aga…' title-block notes, v54 2026-07-02)."""
+    words = str(text or "").split()
+    lines, cur = [], ""
+    for w in words:
+        cand = f"{cur} {w}".strip()
+        if len(cand) <= limit or not cur:
+            cur = cand
+        else:
+            lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _note_lines(sysm) -> list:
+    """Every note, word-wrapped to the title-block width. Returns a list of
+    (text, is_first_line_of_note) so the renderer bullets only the first line."""
+    out = []
+    for note in (sysm.notes or []):
+        for i, ln in enumerate(_wrap_words(note, 96)):
+            out.append((ln, i == 0))
+    return out
+
 
 def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
     y0 = height - title_h + 24
@@ -1804,17 +1848,21 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
                 lat_bits.append(f"{dh.moisture_load_kg_h:.0f} kg/h")
             latent = (f" · dehumidification {' / '.join(lat_bits)}"
                       if lat_bits else " · dehumidification")
+        # the headline quotes the SAME effective airflow the ducts were sized from (one
+        # source of truth); a zero/unpublished duty is OMITTED, never printed as "0 kW".
+        duty = (f" · {sysm.duty_word} {sysm.cooling_kw:.0f} kW"
+                if sysm.cooling_kw > 0 else "")
         head = (f"Supply airflow {sysm.airflow_cms:.2f} m³/s "
-                f"({_cfm(sysm.airflow_cms):,} cfm) · {sysm.duty_word} "
-                f"{sysm.cooling_kw:.0f} kW{latent} · {len(sysm.zones)} served zone(s).")
+                f"({_cfm(sysm.airflow_cms):,} cfm){duty}{latent} · "
+                f"{len(sysm.zones)} served zone(s).")
     svg.text(x0, y0 + 61, head, size=9.5, fill=MUTED)
     svg.text(x0, y0 + 78,
              "Plan + section · ducts sized from airflow ÷ velocity (≤9 m/s) · "
              "supply / return shown distinctly · datum ± 0.000 = FFL.",
              size=9.0, fill=MUTED)
     ny = y0 + 95
-    for note in (sysm.notes or [])[:2]:
-        svg.text(x0, ny, "• " + (note if len(note) <= 96 else note[:95] + "…"),
+    for ln, is_first in _note_lines(sysm):
+        svg.text(x0 + (0 if is_first else 10), ny, ("• " if is_first else "") + ln,
                  size=8.5, fill=MUTED)
         ny += 12
     svg.text(x0, ny + 2,
@@ -1865,7 +1913,7 @@ def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
                  f"--window-size={w},{h}",
                  f"--force-device-scale-factor={scale}",
                  "--default-background-color=FFFFFFFF",
-                 "--hide-scrollbars", f"file://{svg_path}"],
+                 "--hide-scrollbars", f"file://{Path(svg_path).resolve()}"],
                 check=True, capture_output=True, timeout=90)
             if png_path.is_file() and png_path.stat().st_size > 1000:
                 return True

@@ -92,24 +92,53 @@ def _box_from_dim(dim):
 # ── WETTED-PARTS CORROSION (Tristan 2026-06-23) ─────────────────────────────────────────
 # A plant handling a CORROSIVE fluid (seawater / brackish / saline / chlorinated / ozonated)
 # must specify corrosion-resistant wetted materials — carbon steel / cast iron corrode fast in
-# marine service. Detect the plant fluid corrosivity ONCE (from the whole state blob — brief,
-# contract, services), then (a) _material upgrades a wetted steel shell to 316L, and (b) every
-# wetted catalogue part carries an explicit material of construction. Universal — keyed on the
-# FLUID, never a product class. Freshwater / non-corrosive plants are untouched.
+# marine service. Detect the plant fluid corrosivity ONCE from the plant's PROCESS-FLUID DUTY
+# context (brief + contract duty fields — see _fluid_context_blob), then (a) _material upgrades
+# a wetted steel shell to 316L, and (b) every wetted catalogue part carries an explicit material
+# of construction. Universal — keyed on the FLUID, never a product class. Freshwater /
+# non-corrosive plants are untouched; a POTABLE-water plant gets a WRAS-appropriate MoC
+# (not a corrosion upgrade).
 _PLANT_CORROSIVE = False
 _PLANT_MOC = ""
 _PLANT_CORROSION = ""
 
 
+def _fluid_context_blob(state) -> str:
+    """The plant's PROCESS-FLUID duty context — the brief + the engineering contract's DUTY
+    fields ONLY, never the whole state blob. The whole-blob scan mis-classified a PVC potable
+    plant as marine (v54, 2026-07-02): 'seawater' matched a tool registry URL
+    ('github.com/python-seawater'), a catalogue part's CAPABILITY list
+    (product_ontology.key_specs.feed_water_type: '… seawater …'), and 'marine' matched the
+    audit boolean NAME 'is_marine_class': false — none of which says anything about THIS
+    plant's fluid. It is also self-reinforcing: the cached requirementsBom carries the previous
+    run's 'MoC: … (seawater)' strings, so a single false positive re-matches forever. The duty
+    statement lives in the brief + the contract's brief_summary/quantities — scan those only."""
+    ec = state.get("engineeringContract") if isinstance(state, dict) else None
+    ec = ec if isinstance(ec, dict) else {}
+    parts = [state.get("brief") if isinstance(state, dict) else None,
+             state.get("parsedBrief") if isinstance(state, dict) else None,
+             state.get("briefOverviewProse") if isinstance(state, dict) else None,
+             ec.get("brief_summary"), ec.get("quantities")]
+    try:
+        return json.dumps(parts, default=str).lower()
+    except Exception:
+        return str(parts).lower()
+
+
 def _set_plant_corrosivity(state):
     global _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION
-    blob = json.dumps(state).lower()
-    if re.search(r"seawater|sea water|\bmarine\b|brackish|saline|salinity|maricultur", blob):
+    blob = _fluid_context_blob(state)
+    if re.search(r"seawater|sea water|\bmarine\b|brackish|\bsaline\b|salinity|maricultur", blob):
         _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
             True, "316L stainless / bronze (seawater)", "seawater/marine chloride service")
     elif re.search(r"chlorinat|hypochlor|ozonat|\bozone\b|peracetic|caustic|acidic|low\s*ph", blob):
         _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
             True, "316L stainless / PVC-U (chemical)", "chlorinated/chemical service")
+    elif re.search(r"potable|drinking\s*water|\bwras\b", blob):
+        # POTABLE service: not a corrosion problem (no 316L shell upgrade) but wetted parts
+        # still carry the right MoC — WRAS-appropriate polymer / stainless contact materials.
+        _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
+            False, "PVC-U / 304 stainless (WRAS)", "potable-water service (WRAS-approved wetted materials)")
     else:
         _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (False, "", "")
 
@@ -124,15 +153,45 @@ _NONWETTED_NOUN = re.compile(
     r"platform|walkway|sign|sensor|monitor|alarm|button|interlock|relay|probe", re.I)
 
 
+# A part whose NAME/requirement already DECLARES its material of construction keeps it —
+# the plant-level MoC default must never override a part's own stated material (a 'DN50 PVC
+# Pipe' is PVC, full stop — v54 stamped it '316L stainless / bronze (seawater)'). Ordered:
+# first match wins; patterns are word-bounded so tag fragments never false-match.
+_OWN_MATERIAL_PATTERNS = [
+    (re.compile(r"\bu?pvc\b|pvc-?[uc]\b|\bcpvc\b", re.I), "PVC-U"),
+    (re.compile(r"\bhdpe\b|\bmdpe\b|polyethylene|\bpe100\b|\bpe80\b", re.I), "HDPE"),
+    (re.compile(r"\bpp\b(?!-)|polypropylen", re.I), "polypropylene"),
+    (re.compile(r"\babs\b", re.I), "ABS"),
+    (re.compile(r"\bfrp\b|\bgrp\b|fibreglass|fiberglass", re.I), "FRP/GRP"),
+    (re.compile(r"\b316l?\b", re.I), "316L stainless"),
+    (re.compile(r"\b304l?\b", re.I), "304 stainless"),
+    (re.compile(r"duplex", re.I), "duplex stainless"),
+    (re.compile(r"titanium", re.I), "titanium"),
+    (re.compile(r"\bbronze\b|\bbrass\b|cupro[- ]?nickel", re.I), "bronze/copper alloy"),
+]
+
+
+def _own_material(blob: str) -> str:
+    """The material the part's own name/requirement declares, else ''."""
+    for pat, label in _OWN_MATERIAL_PATTERNS:
+        if pat.search(blob):
+            return label
+    return ""
+
+
 def _wetted_moc(name, requirement):
-    """The corrosion-resistant material-of-construction for a WETTED part in a corrosive plant,
-    else '' (non-corrosive plant, or a clearly non-wetted part)."""
-    if not _PLANT_CORROSIVE:
+    """The material-of-construction for a WETTED part, derived from the part's OWN
+    service/material context first, then the plant fluid service — else '' (no plant MoC
+    context, or a clearly non-wetted part). The part's declared material always wins over
+    the plant default (universal: keyed on the part text + the FLUID, never a class)."""
+    if not _PLANT_MOC:
         return ""
     blob = (str(name or "") + " " + str(requirement or "")).lower()
     if _NONWETTED_NOUN.search(blob):
         return ""
-    return _PLANT_MOC if _WETTED_NOUN.search(blob) else ""
+    if not _WETTED_NOUN.search(blob):
+        return ""
+    return _own_material(blob) or _PLANT_MOC
 
 
 def _material(name, mods):
@@ -1651,6 +1710,43 @@ def _selftest() -> int:
             print(f"  FAIL open-tank cost £{oc:.0f} vs closed £{cc:.0f} (want open < 0.75×closed, £20–150k)"); bad += 1
     else:
         print("  FAIL open-tank cost — no geometry parsed"); bad += 1
+
+    # ── WETTED-MoC PROVENANCE (v54 seawater-leak, 2026-07-02): the plant fluid service is
+    # read from the DUTY context (brief + contract duty fields) ONLY — a tool registry URL
+    # ('python-seawater'), a catalogue part's capability list (feed_water_type '… seawater …'),
+    # an audit boolean name (is_marine_class) and the cached previous BoM's own MoC strings
+    # must NOT flip a potable plant to marine. And a part's OWN declared material always
+    # beats the plant default (a 'DN50 PVC Pipe' is PVC, never 316L/bronze).
+    _poison = {  # every known false-positive source, NONE of them a duty statement
+        "toolsUsedPage": [{"source_url": "github.com/python-seawater"}],
+        "toolArchetypeCoherence": {"is_marine_class": False},
+        "partRecommendations": [{"key_specs": {"feed_water_type":
+                                 "surface water, groundwater, seawater, wastewater"}}],
+        "requirementsBom": [{"basis": "moc: 316l stainless / bronze (seawater) for "
+                                      "seawater/marine chloride service"}],
+    }
+    _moc_cases = [
+        # (state, corrosive?, wetted-MoC for a plain pump, MoC for a PVC pipe)
+        (dict(_poison, brief="A potable drinking-water treatment plant, 500 m³/day."),
+         False, "PVC-U / 304 stainless (WRAS)", "PVC-U"),
+        (dict(_poison, brief="A land-based marine RAS on a seawater intake."),
+         True, "316L stainless / bronze (seawater)", "PVC-U"),
+        (dict(_poison, brief="A 20 ft containerised battery energy storage system."),
+         False, "", ""),
+        ({"brief": "An effluent plant with sodium hypochlorite dosing."},
+         True, "316L stainless / PVC-U (chemical)", "PVC-U"),
+    ]
+    for _st, _want_corr, _want_pump, _want_pipe in _moc_cases:
+        _set_plant_corrosivity(_st)
+        if _PLANT_CORROSIVE != _want_corr:
+            print(f"  FAIL corrosivity on {_st.get('brief','')!r} → {_PLANT_CORROSIVE} (want {_want_corr})"); bad += 1
+        got_pump = _wetted_moc("Transfer Pump", "duty pump")
+        got_pipe = _wetted_moc("DN50 PVC Pipe", "distribution pipework")
+        if got_pump != _want_pump:
+            print(f"  FAIL pump MoC on {_st.get('brief','')!r} → {got_pump!r} (want {_want_pump!r})"); bad += 1
+        if got_pipe != _want_pipe:
+            print(f"  FAIL PVC-pipe MoC on {_st.get('brief','')!r} → {got_pipe!r} (want {_want_pipe!r})"); bad += 1
+    _set_plant_corrosivity({})  # reset the globals for anything after this block
 
     # ── CORPUS-MEDIAN LIFT (#172, 2026-06-20): a principal the engine's own forge-truth
     # corpus flagged 'under' (price ≪ a TRUSTED median) is lifted to the conservative
@@ -3387,7 +3483,13 @@ def assemble(out_dir: str):
                     _moc = _wetted_moc(name, requirement)
                     if _moc:
                         row["material"] = _moc
-                        row["basis"] = f"{row.get('basis','')} · MoC: {_moc} for {_PLANT_CORROSION}"
+                        # honest provenance: a part-declared material is "as specified";
+                        # only a plant-default MoC cites the plant fluid service.
+                        if _moc != _PLANT_MOC:
+                            row["basis"] = (f"{row.get('basis','')} · MoC: {_moc} "
+                                            f"(part-specified material; {_PLANT_CORROSION})")
+                        else:
+                            row["basis"] = f"{row.get('basis','')} · MoC: {_moc} for {_PLANT_CORROSION}"
                 rows.append(row)
                 # ── itemise the ASSEMBLY BREAKDOWN beneath the parent: one row per
                 # physics-sized sub-component, scaled to SUM to the parent's line cost.

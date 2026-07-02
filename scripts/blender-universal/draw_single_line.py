@@ -588,17 +588,65 @@ def _find_standby_generator(state: dict) -> Optional[StandbySource]:
                     kva = f"{float(m.group(1).replace(',', '')):,.0f} kVA"
                 except ValueError:
                     kva = ""
-        # a short detail: prefer the covered-load clause from the form text.
+        # a short detail: prefer the covered-load clause from the form text. STOP the
+        # capture at a parenthetical or an em-dash rationale tail — the form text may
+        # carry a synthesis-time narrative after the load clause (v54's baked genset
+        # form ran "…load (recirculation + oxygenation + controls) … — a RAS loses its
+        # stock…" straight onto a potable-water drawing). The load FAMILIES drawn next
+        # to the genset come from the board's ACTUAL feeders (_standby_load_families),
+        # never from the minted prose.
         detail = ""
-        cov = re.search(r"covers?\s+the\s+([^;.]+?(?:load)[^;.]*)", form, re.I)
+        cov = re.search(r"covers?\s+the\s+([^;.(—]+?(?:load)[^;.(—]*)", form, re.I)
         if cov:
             detail = cov.group(1).strip()
         elif form:
-            detail = form.split(";")[0].strip()[:64]
+            detail = re.split(r"[;—]", form)[0].strip()[:64]
         ats = "ATS" if _ATS_RE.search(form) else "ATS"   # always an ATS for a genset
         return StandbySource(tag=(name or "STANDBY GENERATOR").upper(),
                              kva=kva, detail=detail, ats_tag=ats)
     return None
+
+
+# Load-FAMILY classifier for the standby-source annotation: the families are derived from
+# the load names ACTUALLY on the board (universal — a fish farm surfaces recirculation +
+# oxygenation because those feeders exist; a potable plant surfaces pumping + dosing + UV),
+# never from a minted class narrative. Deterministic order; 'controls' appended when any
+# control/instrument way exists.
+_LOAD_FAMILY_PATTERNS = [
+    (re.compile(r"recirc|circulat", re.I), "recirculation"),
+    (re.compile(r"oxygenat|dissolved.?o|aeration|\bo2\b", re.I), "oxygenation"),
+    (re.compile(r"pump", re.I), "pumping"),
+    (re.compile(r"dos(?:e|ing)|chemical", re.I), "dosing"),
+    (re.compile(r"\buv\b|steril|disinfect|ozone", re.I), "disinfection"),
+    (re.compile(r"filter|membrane|\bro\b|treatment", re.I), "treatment"),
+    (re.compile(r"chill|refriger|cool", re.I), "cooling"),
+    (re.compile(r"heat", re.I), "heating"),
+    (re.compile(r"hvac|ventilat|\bahu\b|\bfan\b|blower", re.I), "ventilation"),
+]
+
+
+def _standby_load_families(tree: "Tree") -> str:
+    """A short 'what the genset actually holds' family list read from the board's OWN
+    feeders (labels of the consuming branches, including sub-board contents), e.g.
+    'pumping, dosing, disinfection + controls'. '' when nothing classifies."""
+    names = []
+    def _collect(bus):
+        for br in bus.branches:
+            names.append(f"{br.label} {br.to_node}")
+            if br.sub_bus is not None:
+                _collect(br.sub_bus)
+    _collect(tree.main_bus)
+    fams = []
+    blob = " · ".join(names)
+    for pat, label in _LOAD_FAMILY_PATTERNS:
+        if label not in fams and pat.search(blob):
+            fams.append(label)
+    fams = fams[:4]
+    has_controls = any(_is_control_load(br) for br in tree.main_bus.branches) or \
+        any(_CONTROL_LOAD_RE.search(n) for n in names)
+    if not fams:
+        return "controls" if has_controls else ""
+    return ", ".join(fams) + (" + controls" if has_controls else "")
 
 
 # A small control / SCADA / instrumentation / networking load — UPS-backed, grouped off
@@ -1585,6 +1633,13 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # load feeder. Strip those before grouping so the main breaker stays the incomer
     # device, the SPD a bus shunt, and the busbar the bus (not a 54 A load tap).
     _strip_board_element_feeders(tree)
+    # The standby annotation names the load FAMILIES actually on the board (post-strip,
+    # so only real consuming loads classify) — never the genset word's minted narrative.
+    if tree.standby_source is not None:
+        fams = _standby_load_families(tree)
+        if fams:
+            base = tree.standby_source.detail or "the essential load"
+            tree.standby_source.detail = f"{base} — holds {fams} through an outage"
     # UNIVERSAL: a powered process LOAD must never render 0.0 A nor sit at the wholesale
     # schedule default — size each consuming feeder from its OWN derived electrical kW
     # (requirementsBom → contract quantity → duty-type estimate); drop a genuinely
@@ -2859,7 +2914,7 @@ def rasterise(svg_path: Path, png_path: Path, scale: int = 2) -> bool:
                  f"--window-size={w},{h}",
                  f"--force-device-scale-factor={scale}",
                  "--default-background-color=FFFFFFFF",
-                 "--hide-scrollbars", f"file://{svg_path}"],
+                 "--hide-scrollbars", f"file://{Path(svg_path).resolve()}"],
                 check=True, capture_output=True, timeout=90)
             if png_path.is_file() and png_path.stat().st_size > 1000:
                 return True
