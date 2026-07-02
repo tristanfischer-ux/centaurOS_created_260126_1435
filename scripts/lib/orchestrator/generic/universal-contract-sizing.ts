@@ -738,6 +738,145 @@ function motorKwFromContract(w: WordLike, quantities: Record<string, number>): n
   }
   return best
 }
+
+// ── DEMAND-COVERAGE COMPLETENESS (the omission-side counterpart of principal-emitter
+// authority — codema v51, Tristan 2026-07-02) ────────────────────────────────────────────
+// THE BUG: the generator's word-set varies run-to-run. On v51 the LLM emitted NO irrigation-
+// pump word (v49 + v50 both had one — pure word-set variance), so the hydraulic pump-sizing
+// tool never ran for irrigation and the contract carried ONLY the requirement ECHO
+// (irrigation_demand_m3_h = 90, the lock-gate HARD slot) with no DELIVERED quantity. The
+// compliance matcher deliberately refuses to match an echo key (…_demand — dossier_audit.py
+// _ECHO_NAME_TOKENS; the honest-scoring principle, NOT to be relaxed), so the brief metric
+// max_irrigation_demand_per_department (45 m³/h × 2 departments) went UNVERIFIED → 2 HIGH
+// findings → Executive Summary + Audit capped at 2 — and the design GENUINELY lacked the
+// irrigation train. The same run-to-run tool luck lost drain_transfer_pump_power_kw on v51
+// (the pump word + its *_throughput_m3_h / *_count survived; the motor quantity vanished).
+// THE RULE (universal — keyed on quantity-key SEMANTICS + stems, never a class table):
+//   1. every FLUID-DELIVERY DEMAND quantity — an echo-token key (demand / required /
+//      requested / target / setpoint: exactly the token family the compliance matcher
+//      refuses to verify) anchored on a volumetric-flow unit — with value > 0 yields a
+//      DELIVERED supply-pump pair for its stem family: <stem>_pump_flow_m3_h = the demand,
+//      <stem>_pump_motor_kw from the flow-only hydraulic idiom (P = Q·ΔP/(36·η) at
+//      ΔP = FLOW_PUMP_DEFAULT_BAR, η = FLOW_PUMP_EFF — the same relation the sub-assembly
+//      Drive Motor falls back to). Minted ONLY when the family carries no delivered pump
+//      flow/power already: a sizing-tool value ALWAYS wins — this is a deterministic floor,
+//      never an override. (Survey 2026-07-02: the only fluid demand key any archetype
+//      builder emits is irrigation_demand_m3_h; every other _demand_/_supply_ key is
+//      electrical kW/kVA or a gas kg/h rate — excluded by the m3_h unit anchor.)
+//   2. every PUMP-named flow family (<fam>_throughput/flow_m3_h where <fam> carries a
+//      'pump' token) with no *_power_kw / *_motor_kw family twin gets <fam>_power_kw
+//      minted from the same hydraulics. A fan / blower / compressor is NOT covered — a
+//      gas-mover's head physics differ from the liquid ΔP default.
+// The minted keys are written into the LOCAL quantities map BEFORE buildGroups — the ONE
+// choke point BOTH synthesis paths read (applyUniversalContractSizing part A/B AND
+// reconcilePrincipalEquipment's canons) — so the EXISTING matched/suppression logic applies
+// unchanged: a design that already HAS the pump word (v50) gets NO synthetic principal,
+// only the delivered quantities; one without it (v51) synthesises the principal via the
+// normal synthWord path. When the contract is supplied, each minted quantity persists to
+// contract.quantities with provenance source='demand-coverage' (CORE FIX PRINCIPLE — route
+// by provenance) so the compliance matrix verifies the brief metric on EVERY run. STRICT
+// NO-OP — byte-identical output — for a class with no fluid-delivery demand key and no
+// motorless pump-flow family (BESS / smallsat / edge-ai).
+const FLUID_DEMAND_ECHO_RE = /_(demand|required|requested|target|setpoint)_(m3_h|m3_hr|m3_per_hr)$/
+const DELIVERED_PUMP_FLOW_RE = /_(flow|throughput)_(m3_h|m3_hr|m3_per_hr)$/
+const PUMP_POWER_KEY_RE = /_(motor_kw|motor_power_kw|power_kw|drive_kw|electrical_kw)$/
+function demandKeyTokens(k: string): Set<string> {
+  return new Set(String(k ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+}
+/** Flow-only hydraulic motor estimate (kW) at the sensible default head — the SAME idiom the
+ *  sub-assembly Drive Motor uses for a pump with no contract motor power (see motorKw). */
+function hydraulicMotorKwForFlow(m3h: number): number {
+  return Math.round(((m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF)) * 1000) / 1000
+}
+
+export interface DemandCoverageMint { key: string; value: number; unit: string; from: string }
+
+/** Mint the DELIVERED supply-pump quantities every fluid-delivery demand implies (rule 1)
+ *  and the motor floor every pump-named flow family implies (rule 2) — see the block
+ *  comment above. Mutates `quantities` in place (feeding buildGroups) and, when `contract`
+ *  is given, persists each mint to `contract.quantities` with 'demand-coverage' provenance.
+ *  NEVER overwrites an existing quantity. Returns the mints (empty = byte-identical no-op). */
+export function mintDemandCoverage(
+  quantities: Record<string, number>,
+  contract?: ContractInProgress,
+): DemandCoverageMint[] {
+  const minted: DemandCoverageMint[] = []
+  // LIVE existence check over the current map (a rule-1 mint is visible to rule 2 — the
+  // irrigation family never double-mints a _power_kw beside its fresh _motor_kw).
+  const familyKeyExists = (famTokens: string[], suffixRe: RegExp, requirePumpToken: boolean): boolean => {
+    for (const k of Object.keys(quantities)) {
+      if (!suffixRe.test(k)) continue
+      const kt = demandKeyTokens(k)
+      if (requirePumpToken && !kt.has('pump')) continue
+      if (famTokens.every((t) => kt.has(t))) return true
+    }
+    return false
+  }
+  const mint = (key: string, value: number, unit: string, family: string, from: string, detail: string): void => {
+    if (Object.prototype.hasOwnProperty.call(quantities, key)) return // NEVER overwrite an existing quantity
+    quantities[key] = value
+    minted.push({ key, value, unit, from })
+    if (contract) {
+      const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
+      if (cq[key] === undefined) {
+        cq[key] = {
+          value,
+          unit,
+          family,
+          basis: 'rated',
+          scope: 'system',
+          source: 'demand-coverage',
+          lineage: { from: [from], via: 'demand-coverage' },
+          source_detail: detail,
+        }
+      }
+    }
+  }
+  // ── rule 1: fluid-delivery demand echo → delivered supply-pump pair ──────────────────
+  for (const k of Object.keys(quantities)) {
+    const v = quantities[k]
+    if (!Number.isFinite(v) || v <= 0) continue
+    const m = FLUID_DEMAND_ECHO_RE.exec(k)
+    if (!m) continue
+    if (/(^|_)(calc|computed)_/i.test(k)) continue // collision-shadow — never a mint source
+    const stemPhrase = k.slice(0, m.index)
+    if (!stemPhrase) continue
+    if (isPureAggregatePhrase(stemPhrase)) continue // a total/overall roll-up is not one pumped train
+    if (significantStems(stemPhrase).length === 0) continue // no engineering identity → no group could anchor
+    const famTokens = [...demandKeyTokens(stemPhrase)]
+    const pumpBase = /(^|_)pump$/.test(stemPhrase) ? stemPhrase : `${stemPhrase}_pump`
+    if (!familyKeyExists(famTokens, DELIVERED_PUMP_FLOW_RE, true)) {
+      mint(`${pumpBase}_flow_m3_h`, v, 'm3/h', 'flow_rate', k,
+        `demand-coverage: delivered supply-pump flow = the ${k} demand (${v} m³/h) — no pump-sizing tool covered this demand family this run`)
+    }
+    if (!familyKeyExists(famTokens, PUMP_POWER_KEY_RE, true)) {
+      mint(`${pumpBase}_motor_kw`, hydraulicMotorKwForFlow(v), 'kW', 'power', k,
+        `demand-coverage: hydraulic motor floor P = Q·ΔP/(36·η) @ ΔP = ${FLOW_PUMP_DEFAULT_BAR} bar, η = ${FLOW_PUMP_EFF}, from ${k} = ${v} m³/h (a sizing-tool value always wins when present)`)
+    }
+  }
+  // ── rule 2: a pump-named flow family with no motor/power twin → deterministic floor ──
+  // Minted as `<fam>_motor_kw` (NOT `_power_kw`): a `_motor_kw` key binds the Drive Motor /
+  // VSD sub-assembly (motorKwFromContract) + the electrical feeder match, but forms NO
+  // equipment group of its own (no SUFFIX_RULES entry) — so the pump word's PRIMARY rating
+  // stays its grounded per-unit FLOW (the per-unit-duty convention the regression harness
+  // pins: UNIVERSAL.principal_per_unit_duty_equals_total_over_count). A tool-emitted
+  // `_power_kw` keeps its authority (and its kW-primary rendering) untouched.
+  for (const k of Object.keys(quantities)) {
+    const v = quantities[k]
+    if (!Number.isFinite(v) || v <= 0) continue
+    const m = DELIVERED_PUMP_FLOW_RE.exec(k)
+    if (!m) continue
+    if (/(^|_)(calc|computed)_/i.test(k)) continue
+    const fam = k.slice(0, m.index)
+    if (!fam || isPureAggregatePhrase(fam)) continue
+    const famTokens = [...demandKeyTokens(fam)]
+    if (!famTokens.includes('pump')) continue // liquid pump only — see the block comment
+    if (familyKeyExists(famTokens, PUMP_POWER_KEY_RE, false)) continue
+    mint(`${fam}_motor_kw`, hydraulicMotorKwForFlow(v), 'kW', 'power', k,
+      `demand-coverage: hydraulic motor floor P = Q·ΔP/(36·η) @ ΔP = ${FLOW_PUMP_DEFAULT_BAR} bar, η = ${FLOW_PUMP_EFF}, from ${k} = ${v} m³/h (a sizing-tool value always wins when present)`)
+  }
+  return minted
+}
 const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 || 50) * 4) / Math.PI); const h = p.htM || d; return { shell: Math.PI * d * h, head: (Math.PI * d * d) / 4, d, h } }
 
 // Each entry: parts SIZED + PRICED from the parent's physics. Cost factors are
@@ -3031,6 +3170,14 @@ export function reconcilePrincipalEquipment(
     const val = v?.value
     if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
   }
+  // DEMAND-COVERAGE (choke-point feed — codema v51): mint the delivered supply-pump
+  // quantities for any uncovered fluid-delivery demand + the motor floor for any motorless
+  // pump-flow family BEFORE buildGroups, so the reconcile's canons carry the pump group on
+  // every run regardless of the generator's word-set luck (see mintDemandCoverage). A mint
+  // persists to contract.quantities ('demand-coverage' provenance) so the compliance matrix
+  // verifies the brief demand metric. Strict no-op (byte-identical) when nothing is missing.
+  mintDemandCoverage(quantities, contract)
+
   // A `total_*`/overall/combined volume is a reporting SUM, not a vessel — exclude it from the
   // principal-equipment set when its constituent vessels are present (≥2 other non-aggregate
   // volume groups). SAME rule as the generic-emitter synthesis path; applying it HERE is what
@@ -3485,6 +3632,15 @@ export function applyUniversalContractSizing(
     const val = v?.value
     if (typeof val === 'number' && Number.isFinite(val)) quantities[k] = val
   }
+
+  // DEMAND-COVERAGE (choke-point feed — codema v51): mint the delivered supply-pump
+  // quantities for any uncovered fluid-delivery demand + the motor floor for any motorless
+  // pump-flow family BEFORE buildGroups, so the pump group exists on every run regardless
+  // of the generator's word-set luck (see mintDemandCoverage). The normal match/suppress
+  // logic below then applies: an existing pump word adopts the group (no synthetic twin);
+  // a missing one is synthesised in part B. Mints persist to contract.quantities with
+  // 'demand-coverage' provenance. Strict no-op (byte-identical) when nothing is missing.
+  mintDemandCoverage(quantities, contract)
 
   const groups = buildGroups(quantities)
   const matched = new Set<string>() // group phrase → matched an existing word

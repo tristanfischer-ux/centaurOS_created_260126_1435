@@ -147,8 +147,82 @@ function run() {
   const recRange = String(recLvl.find((x) => x.kind === 'rating_primary')?.value ?? '')
   if (!/0–4\s*m/.test(recRange)) throw new Error(`instrument-sizing: reconcile-path LT range "${recRange}" must cover the 3.7 m host vessel (next standard range 0–4 m)`)
 
+  // ── DEMAND-COVERAGE COMPLETENESS (codema v51, 2026-07-02) ───────────────────────────
+  // A fluid-delivery DEMAND quantity (…_demand_m3_h — a requirement ECHO the compliance
+  // matcher refuses to verify) must always yield DELIVERED supply-pump quantities
+  // (<stem>_pump_flow_m3_h + <stem>_pump_motor_kw), and a principal pump word when none
+  // exists — in BOTH synthesis paths. A sizing-tool value is never overwritten; a contract
+  // with no fluid demand is a byte-identical no-op.
+  const mkDemandContract = (extra: Record<string, any> = {}): any => ({ quantities: {
+    irrigation_demand_m3_h: { value: 90, unit: 'm³/h' },
+    ...extra,
+  } })
+  const findWord = (ms: any[], re: RegExp): any => {
+    for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (String(w.id ?? '').includes('__')) continue
+      if (re.test(String(w.name_human ?? ''))) return w
+    }
+    return undefined
+  }
+  const qVal = (c: any, k: string): number | undefined => c?.quantities?.[k]?.value
+
+  // (1) demand with NO word → PATH-1 synthesises the principal + mints the delivered pair.
+  const dcMods1: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  const dcC1 = mkDemandContract()
+  applyUniversalContractSizing(dcMods1 as never[], dcC1, { dedupeAndStrip: false, explode: false, instrument: false })
+  if (!findWord(dcMods1, /^irrigation pump$/i)) throw new Error('demand-coverage: an uncovered irrigation_demand_m3_h must synthesise an Irrigation Pump principal in PATH-1 (the codema v51 omission regressed)')
+  if (qVal(dcC1, 'irrigation_pump_flow_m3_h') !== 90) throw new Error(`demand-coverage: irrigation_pump_flow_m3_h must be minted = the demand (90), got ${qVal(dcC1, 'irrigation_pump_flow_m3_h')} — the compliance matrix cannot verify the brief metric without a DELIVERED quantity`)
+  const dcMotor = qVal(dcC1, 'irrigation_pump_motor_kw')
+  if (!(typeof dcMotor === 'number' && dcMotor > 5 && dcMotor < 20)) throw new Error(`demand-coverage: irrigation_pump_motor_kw must be minted from the flow-only hydraulics (90 m³/h @ 2.5 bar ≈ 10 kW), got ${dcMotor}`)
+  if (String(dcC1.quantities.irrigation_pump_flow_m3_h.source) !== 'demand-coverage') throw new Error('demand-coverage: a minted quantity must carry source="demand-coverage" provenance (CORE FIX PRINCIPLE — route by provenance)')
+  // PATH-2 (reconcile ALONE) must give the same coverage.
+  const dcMods1b: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  const dcC1b = mkDemandContract()
+  const dcRec = reconcilePrincipalEquipment(dcMods1b as never[], dcC1b)
+  if (dcRec.synthesizedMissing < 1 || !findWord(dcMods1b, /^irrigation pump$/i)) throw new Error('demand-coverage: the RECONCILE path alone must also synthesise the Irrigation Pump principal (two-paths choke point)')
+  if (qVal(dcC1b, 'irrigation_pump_flow_m3_h') !== 90) throw new Error('demand-coverage: the RECONCILE path alone must also mint the delivered irrigation_pump_flow_m3_h')
+
+  // (2) demand with an EXISTING pump word → NO synthetic twin; delivered pair still minted.
+  const dcMods2: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [
+    { id: 'irrigation_pump_word', name_human: 'Irrigation Pump', content_character: { character_id: 'irrigation_pump', name_human: 'Irrigation Pump' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+  ] }] }]
+  const dcC2 = mkDemandContract()
+  const dcR2 = applyUniversalContractSizing(dcMods2 as never[], dcC2, { dedupeAndStrip: false, explode: false, instrument: false })
+  if (dcR2.synthesizedPhrases.includes('irrigation_pump')) throw new Error('demand-coverage: a design that already HAS the pump word must get NO synthetic principal twin (matched/suppression logic must apply to the minted group)')
+  let dcCount = 0
+  for (const m of dcMods2) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) { if (/^irrigation pump$/i.test(String(w.name_human ?? '')) && !String(w.id ?? '').includes('__')) dcCount += 1 }
+  if (dcCount !== 1) throw new Error(`demand-coverage: exactly ONE Irrigation Pump word must survive when the word pre-exists, got ${dcCount}`)
+  if (qVal(dcC2, 'irrigation_pump_flow_m3_h') !== 90) throw new Error('demand-coverage: the delivered quantities must be minted EITHER WAY (word present or not) so the compliance matrix verifies on every run')
+
+  // (3) a contract with NO fluid-delivery demand and no motorless pump family → BYTE-IDENTICAL no-op.
+  const bessLikeC: any = { quantities: {
+    nameplate_capacity_kwh: { value: 3500, unit: 'kWh' },
+    continuous_power_kw: { value: 1000, unit: 'kW' },
+    battery_night_demand_kw: { value: 120, unit: 'kW' }, // an ELECTRICAL demand — excluded by the m3_h unit anchor
+    coolant_flow_m3_h: { value: 12, unit: 'm³/h' },      // a flow with no pump token — not a pump family
+  } }
+  const bessBefore = JSON.stringify(bessLikeC)
+  const bessMods: any = [{ module: 'energy_conversion_transduction', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(bessMods as never[], bessLikeC, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+  if (JSON.stringify(bessLikeC) !== bessBefore) throw new Error('demand-coverage: a class with no fluid-delivery demand must be a BYTE-IDENTICAL no-op on the contract (BESS/smallsat/edge-ai guarantee broken)')
+
+  // (4) an existing tool-emitted motor kW is NEVER overwritten; a motorless pump-flow family
+  //     gets the deterministic hydraulic floor (the v51 drain_transfer_pump_power_kw loss).
+  const dcC4 = mkDemandContract({
+    irrigation_pump_flow_m3_h: { value: 90, unit: 'm3/h', source: 'tool:irrigation:pump-sizing' },
+    irrigation_pump_motor_kw: { value: 9.653, unit: 'kW', source: 'tool:irrigation:pump-sizing' },
+    drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h' },
+    drain_transfer_pump_count: { value: 2, unit: '' },
+  })
+  const dcMods4: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(dcMods4 as never[], dcC4, { dedupeAndStrip: false, explode: false, instrument: false })
+  if (qVal(dcC4, 'irrigation_pump_motor_kw') !== 9.653) throw new Error(`demand-coverage: a tool-emitted motor kW must NEVER be overwritten (9.653 → ${qVal(dcC4, 'irrigation_pump_motor_kw')})`)
+  if (String(dcC4.quantities.irrigation_pump_motor_kw.source) !== 'tool:irrigation:pump-sizing') throw new Error('demand-coverage: the tool provenance on an existing motor quantity must survive untouched')
+  const dcDrain = qVal(dcC4, 'drain_transfer_pump_motor_kw')
+  if (!(typeof dcDrain === 'number' && dcDrain > 1 && dcDrain < 15)) throw new Error(`demand-coverage: a pump-named flow family with no motor twin must get the deterministic hydraulic floor as <fam>_motor_kw (45 m³/h ≈ 5 kW), got ${dcDrain} — the v51 drain_transfer_pump_power_kw loss regressed`)
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical)')
 }
 
 run()

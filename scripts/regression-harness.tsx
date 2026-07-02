@@ -895,6 +895,92 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── A3c. DEMAND-COVERAGE COMPLETENESS in BOTH synthesis paths (codema v51, 2026-07-02 —
+  // the omission-side counterpart of A4 principal-emitter authority). THE BUG: on v51 the
+  // LLM generator emitted NO "Irrigation Pump" word (v49+v50 both had it — pure run-to-run
+  // word-set variance), so the hydraulic pump-sizing never ran, no delivered quantity was
+  // minted, and the brief metric max_irrigation_demand_per_department went UNVERIFIED on
+  // the compliance matrix (the matcher deliberately refuses a requirement ECHO …_demand) →
+  // 2 HIGHs → Exec Summary + Audit capped at 2; the design GENUINELY lacked the irrigation
+  // train. drain_transfer_pump_power_kw was lost the same way (word survived, the *_power_kw
+  // quantity vanished). THE RULE (universal — quantity-key semantics + stems, no class
+  // table, fed to buildGroups = the choke point BOTH paths read): every fluid-delivery
+  // demand (…_demand_m3_h et al., value > 0) yields a supply-pump group + DELIVERED
+  // quantities (<stem>_pump_flow_m3_h = the demand; <stem>_pump_motor_kw from the flow-only
+  // hydraulics), minted with 'demand-coverage' provenance ONLY when the family has none —
+  // a sizing-tool value always wins; an existing pump word suppresses the synthetic twin
+  // but the delivered quantities are minted either way; a pump-named flow family with no
+  // motor twin gets the deterministic hydraulic floor; a no-demand class is byte-identical.
+  const dcContract = (): any => ({ quantities: {
+    irrigation_demand_m3_h: { value: 90, unit: 'm³/h', source: 'calculator' },
+    drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+    drain_transfer_pump_count: { value: 2, unit: '', source: 'brief' },
+  } })
+  const dcWordCount = (ms: any[], re: RegExp): number => {
+    let n = 0
+    for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (!String(w.id ?? '').includes('__') && re.test(String(w.name_human ?? ''))) n += 1
+    }
+    return n
+  }
+  const mkDcMods = (withPumpWord: boolean): any[] => ([
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: withPumpWord ? [
+      { id: 'irrigation_pump_word', name_human: 'Irrigation Pump', content_character: { character_id: 'irrigation_pump', name_human: 'Irrigation Pump' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+    ] : [] }] },
+  ])
+  // PATH-1, no word (the v51 shape) → principal synthesised + delivered quantities minted.
+  const dcMods1 = mkDcMods(false)
+  const dcC1 = dcContract()
+  applyUniversalContractSizing(dcMods1, dcC1, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false })
+  // PATH-2 ALONE, no word → same coverage via the reconcile's canons.
+  const dcMods2 = mkDcMods(false)
+  const dcC2 = dcContract()
+  const dcRec = reconcilePrincipalEquipment(dcMods2, dcC2)
+  // PATH-1, word EXISTS (the v50 shape) → no synthetic twin, quantities still minted.
+  const dcMods3 = mkDcMods(true)
+  const dcC3 = dcContract()
+  applyUniversalContractSizing(dcMods3, dcC3, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false })
+  // no-demand contract (BESS-like) → byte-identical no-op.
+  const dcBess: any = { quantities: { nameplate_capacity_kwh: { value: 3500, unit: 'kWh' }, battery_night_demand_kw: { value: 120, unit: 'kW' } } }
+  const dcBessBefore = JSON.stringify(dcBess)
+  applyUniversalContractSizing([{ module: 'energy_conversion_transduction', sub_modules: [{ id: 'sm', words: [] }] }] as any, dcBess, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+  // tool-emitted motor kW never overwritten.
+  const dcC5: any = dcContract()
+  dcC5.quantities.irrigation_pump_flow_m3_h = { value: 90, unit: 'm3/h', source: 'tool:irrigation:pump-sizing' }
+  dcC5.quantities.irrigation_pump_motor_kw = { value: 9.653, unit: 'kW', source: 'tool:irrigation:pump-sizing' }
+  dcC5.quantities.drain_transfer_pump_power_kw = { value: 1.923, unit: 'kW', source: 'tool:process:pump-sizing' }
+  applyUniversalContractSizing(mkDcMods(true), dcC5, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false })
+  const dcQ = (c: any, k: string) => c?.quantities?.[k]?.value
+  out.push(assertEq(
+    'UNIVERSAL.demand_coverage_supply_pump_and_delivered_quantities_both_paths',
+    'every *_demand_m3_h contract quantity has a matching DELIVERED supply quantity (<stem>_pump_flow_m3_h = the demand + a hydraulic <stem>_pump_motor_kw, provenance demand-coverage) + a principal pump in BOTH synthesis paths; an existing pump word suppresses the synthetic twin but still gets the quantities; a pump flow family with no motor twin gets the hydraulic floor; a tool-emitted value is never overwritten; a no-demand (BESS-like) contract is byte-identical',
+    JSON.stringify({
+      p1Words: dcWordCount(dcMods1, /^irrigation pump$/i),
+      p1Flow: dcQ(dcC1, 'irrigation_pump_flow_m3_h'),
+      p1Motor: dcQ(dcC1, 'irrigation_pump_motor_kw'),
+      p1Src: dcC1?.quantities?.irrigation_pump_flow_m3_h?.source,
+      p1Drain: dcQ(dcC1, 'drain_transfer_pump_motor_kw'),
+      p2Words: dcWordCount(dcMods2, /^irrigation pump$/i),
+      p2Synth: dcRec.synthesizedMissing,
+      p2Flow: dcQ(dcC2, 'irrigation_pump_flow_m3_h'),
+      p3Words: dcWordCount(dcMods3, /^irrigation pump$/i),
+      p3Flow: dcQ(dcC3, 'irrigation_pump_flow_m3_h'),
+      bessUntouched: JSON.stringify(dcBess) === dcBessBefore,
+      toolMotorKept: dcQ(dcC5, 'irrigation_pump_motor_kw'),
+      toolDrainKept: dcQ(dcC5, 'drain_transfer_pump_power_kw'),
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.p1Words === 1 && o.p1Flow === 90 && o.p1Motor > 5 && o.p1Motor < 20 &&
+        o.p1Src === 'demand-coverage' && o.p1Drain > 1 && o.p1Drain < 15 &&
+        o.p2Words === 1 && o.p2Synth >= 1 && o.p2Flow === 90 &&
+        o.p3Words === 1 && o.p3Flow === 90 &&
+        o.bessUntouched === true &&
+        o.toolMotorKept === 9.653 && o.toolDrainKept === 1.923
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
   // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
   // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a
