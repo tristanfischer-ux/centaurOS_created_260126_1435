@@ -74,7 +74,21 @@ def _num(s):
 
 
 def _mods(w):
-    return {m.get("kind"): m.get("value") for m in (w.get("modifier_characters") or [])}
+    """Flatten modifier_characters to {kind: value} — PLUS `<kind>_unit` keys when the
+    modifier carries a separate `unit` field (2026-07-02, the flow-read-as-kW source fix):
+    the emitter authors e.g. {kind: rating_primary, value: "90", unit: "m³/h"} and the old
+    flat map DROPPED the unit, so `_rating_kw` saw a bare "90" and priced the 90 m³/h
+    Irrigation Pump as 90 kW × £700/kW = £63k (its real motor is 15 kW). Additive — the
+    value strings are unchanged, so every existing consumer (incl. BESS byte-identity)
+    reads exactly what it read before; unit-aware consumers now ALSO see the unit."""
+    out = {}
+    for m in (w.get("modifier_characters") or []):
+        kind = m.get("kind")
+        out[kind] = m.get("value")
+        u = m.get("unit")
+        if kind and u not in (None, ""):
+            out[f"{kind}_unit"] = u
+    return out
 
 
 def _cyl_from_dim(dim):
@@ -304,6 +318,48 @@ def _read_service(md: dict):
 _STRUCTURAL_GBP_PER_M2 = 90.0
 
 
+# ── MEMBRANE / FILTRATION-MEDIA family (2026-07-02, the membrane-as-steel fix) ──
+# A membrane element / membrane bank / membrane housing / filter-media line is a
+# PROCESS CONSUMABLE-or-PACKAGE priced from its MEMBRANE AREA — never a structural-
+# steel or hoop-stress shell take-off. v55 priced 'Ro Membrane Elements · 364 m²'
+# as "structural steelwork take-off: 364 m² plan × £90/m²" = £40,760 (×3 lines with
+# the UF bank + GRP housings = £122k, 16 % of the bill) — the m² is MEMBRANE area,
+# not a steel plan footprint. Universal: keyed on the membrane/media noun family.
+_MEMBRANE_MEDIA_RE = re.compile(
+    r"\bmembranes?\b|"
+    r"\b(?:ro|uf|nf|mf|edi)\s+(?:membrane|element|module|bank|housing)s?\b|"
+    r"\bfilter\s+media\b|\bmedia\s+(?:bed|fill|charge)\b|"
+    r"\bspiral[- ]wound\b|\bhollow[- ]fib(?:re|er)\b",
+    re.I)
+_MEMBRANE_GBP_PER_M2 = 25.0        # spiral-wound RO / UF module supply ≈ £15-30/m² (UK 2026)
+_HOUSING_M2_PER_UNIT = 37.0        # one 8040 element ≈ 37 m² membrane area
+_HOUSING_GBP_PER_UNIT = 1100.0     # 8-in GRP pressure housing, 300 psi class, supplied
+
+
+def _membrane_area_price(name, md):
+    """(gbp, basis) for a membrane/media line from its MEMBRANE AREA (m²), read from
+    the dimension / rating_primary modifiers; None when no area driver exists (the
+    caller then labels it an honest vendor-TBD with the membrane CLASS as the basis
+    — never a steel take-off). Housings price per element-slot; elements/banks/media
+    price per m² of membrane area. Universal — noun family + area only."""
+    blob = f"{md.get('dimension') or md.get('dimensions') or ''} " \
+           f"{md.get('rating_primary') or ''} {md.get('rating_primary_unit') or ''} " \
+           f"{md.get('capacity') or ''} {md.get('capacity_unit') or ''}"
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", blob, re.I)
+    area_m2 = float(m.group(1).replace(",", "")) if m else None
+    if not area_m2 or area_m2 <= 0:
+        return None
+    if re.search(r"housings?\b", name or "", re.I):
+        n = max(1, math.ceil(area_m2 / _HOUSING_M2_PER_UNIT))
+        gbp = n * _HOUSING_GBP_PER_UNIT
+        return gbp, (f"membrane-housing parametric: {area_m2:,.0f} m² membrane area ÷ "
+                     f"{_HOUSING_M2_PER_UNIT:.0f} m²/element → {n} × 8-in GRP pressure housing "
+                     f"@ £{_HOUSING_GBP_PER_UNIT:,.0f} (UK-2026 supply; NOT a steel take-off)")
+    gbp = max(1500.0, area_m2 * _MEMBRANE_GBP_PER_M2)
+    return gbp, (f"membrane-area parametric: {area_m2:,.0f} m² × £{_MEMBRANE_GBP_PER_M2:.0f}/m² "
+                 f"(spiral-wound/UF module supply, UK-2026; NOT a steel take-off)")
+
+
 def _structural_takeoff(name, md, geom=None):
     """Cost a STRUCTURAL part (a frame / space-frame / support structure / enclosure
     skeleton) from its PLAN FOOTPRINT at the structural-steel £/m² rate — the SAME basis
@@ -315,6 +371,10 @@ def _structural_takeoff(name, md, geom=None):
     a box) — a FLOOR AREA, never wrapped into a pressure shell. Returns (gbp, basis,
     spec) or None when no footprint can be read. Universal, deterministic, no per-class
     table."""
+    # a MEMBRANE/media line's m² is MEMBRANE area, not a steel plan footprint —
+    # it may never take a structural take-off (2026-07-02 membrane-as-steel fix).
+    if _MEMBRANE_MEDIA_RE.search(name or ""):
+        return None
     area_m2 = None
     dim = str(md.get("dimension") or md.get("dimensions") or "")
     m = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", dim, re.I)
@@ -379,6 +439,14 @@ def _materials_takeoff(name, mods, geom=None, service=None):
 
     Returns (gbp, basis_str, spec_dict) or None if no geometry is available.
     """
+    # a MEMBRANE/media line is a process consumable/package priced from membrane
+    # area — never a shell/steel take-off (2026-07-02 membrane-as-steel fix).
+    if _MEMBRANE_MEDIA_RE.search(name or ""):
+        mem = _membrane_area_price(name, mods if isinstance(mods, dict) else {})
+        if mem:
+            g_m, b_m = mem
+            return g_m, b_m, {"material": "membrane/filtration media"}
+        return None
     if geom:
         # AS-BUILT geometry (the Blender parts-manifest ⌀,H in m) — the SAME source the
         # drawings + the dashboard read, so the BoM costs the vessel that is actually
@@ -1346,14 +1414,41 @@ def _unit_operation_price(name: str, md: dict, q):
                 return float(v)
         return default
 
-    # UV / ozone disinfection — £/kW of installed lamp power (medium-pressure UV
-    # skids ~ £900-1,400/kW installed incl. reactor, ballasts, quartz, controls).
+    # UV / ozone disinfection — £/kW of installed LAMP power. The lamp power is
+    # NEVER a flow read as kW (v55: '90 m³/h' flowed into `rating` and priced a
+    # £90k '60 kW' UV on a plant whose real UV draw is ~2-4 kW). Resolution order:
+    #   1. an explicit contract LAMP/POWER quantity (uv_*_power_kw family);
+    #   2. the line's own rating ONLY when it is a POWER (unit-checked);
+    #   3. the UV DOSE RULE from the FLOW quantity: P[kW] = Q[m³/h] × dose[mJ/cm²]
+    #      ÷ UVT-factor — dose 40 mJ/cm² (potable, DVGW/USEPA validated point),
+    #      UVT-factor 1800 ≈ 22 Wh/m³ delivered electrical at UVT ~85% with
+    #      low-pressure lamp + ballast efficiency (a 90 m³/h potable duty → 2.0 kW).
     if re.search(r"\buv\b|ultraviolet|ozone|disinfect|steril", nm):
-        kw = _qv("uv_lamp_power_kw", "uv_installed_power_kw", default=rating)
+        _UV_DOSE_MJ_CM2 = 40.0     # potable-water validated dose
+        _UV_UVT_FACTOR = 1800.0    # (m³/h·mJ/cm²) per kW — UVT ~85 %, LP lamp+ballast
+        _rp_unit = str(md.get("rating_primary_unit") or "")
+        _rp_blob = f"{md.get('rating_primary') or ''} {_rp_unit}"
+        _rp_is_power = bool(re.search(r"\b\d[\d.]*\s*(?:k|m)?w\b|^\s*k?w\s*$",
+                                      _rp_blob, re.I)) or re.fullmatch(r"k?w", _rp_unit.strip(), re.I)
+        _rp_is_flow = bool(re.search(r"m\s*[³^]?\s*3?\s*/?\s*h|l\s*/?\s*(?:min|s|h)|gpm",
+                                     _rp_blob, re.I))
+        kw = _qv("uv_lamp_power_kw", "uv_installed_power_kw", "uv_disinfection_power_kw",
+                 "uv_power_kw", "disinfection_power_kw",
+                 default=(rating if _rp_is_power else None))
+        _kw_basis = "contract lamp-power quantity" if not (_rp_is_power and kw == rating) \
+            else "the line's own kW rating"
+        if not (kw and kw > 0):
+            flow = _qv("uv_disinfection_throughput_m3_h", "uv_flow_m3_h",
+                       "disinfection_flow_m3_h", "uv_throughput_m3_h",
+                       default=(rating if _rp_is_flow else None))
+            if flow and flow > 0:
+                kw = flow * _UV_DOSE_MJ_CM2 / _UV_UVT_FACTOR
+                _kw_basis = (f"dose rule: {flow:.0f} m³/h × {_UV_DOSE_MJ_CM2:.0f} mJ/cm² "
+                             f"(potable) ÷ {_UV_UVT_FACTOR:.0f} UVT-factor (UVT ~85 %, LP lamp)")
         if kw and kw > 0:
-            kw = min(kw, 60.0)   # sanity clamp until the upstream UV-power fix lands
-            gbp = 18000.0 + kw * 1200.0
-            return gbp, f"UV/ozone parametric: {kw:.0f} kW lamp power × £1,200/kW + £18k reactor/controls"
+            gbp = 4000.0 + kw * 2200.0
+            return gbp, (f"UV/ozone parametric: {kw:.1f} kW lamp power ({_kw_basis}) "
+                         f"× £2,200/kW + £4k reactor/controls (LP-UV skid, UK-2026)")
         return 35000.0, "UV/ozone budget: mid-size disinfection skid (duty unstated)"
 
     # Oxygenation — LOX skid + oxygen-transfer cones, £/kg·h of oxygen supply.
@@ -1455,7 +1550,10 @@ def _rating_kw(md: dict, name: str = "", requirement: str = ""):
         # and the cooling pump priced 150 kW × £700/kW = £105k (×2 = £210k). Only accept a
         # bare number or an explicit kW/kVA/MW/MVA. Universal — same unit-honouring fix as
         # the capacity→m³ size bug.
-        rp_str = str(rp)
+        # the modifier's own `unit` field (preserved by _mods as rating_primary_unit)
+        # is part of the rating — "value: 90, unit: m³/h" must read as a FLOW, never
+        # 90 kW (the v55 Irrigation Pump £63k bug: the flat map dropped the unit).
+        rp_str = f"{rp} {md.get('rating_primary_unit') or ''}".strip()
         _has_power = bool(re.search(r"\b\d[\d.]*\s*(?:k|m)?(?:w|va)\b", rp_str, re.I))
         _has_nonpower = bool(re.search(
             r"l\s*/?\s*min|l\s*/?\s*s|m\s*3\s*/?\s*h|m³|\bgpm\b|\bm\b\s*head|\bhead\b|"
@@ -1575,6 +1673,58 @@ def _motor_nameplate_kw(name: str, shaft_kw, q):
     return (None, None)
 
 
+# Tokens that carry no identity for the motor-kW matcher — every pump/motor shares
+# them, so they must never DECIDE a match on their own (the f9dfc2918 blanket-match
+# family: the generic token 'pump' handed irrigation_pump_motor_kw to EVERY pump).
+_GENERIC_EQUIP_TOKENS = {"pump", "motor", "power", "drive", "kw", "unit", "system",
+                         "electrical", "elec"}
+# contract kW keys that are AGGREGATES or thermal duties — never a per-item motor.
+_NON_MOTOR_KW_KEY_RE = re.compile(
+    r"total|connected|aggregate|overall|demand|supply|thermal|duty|capacity|"
+    r"heating|cooling|chiller|loss|load_kw$", re.I)
+
+
+def _contract_motor_kw(name: str, q):
+    """Per-item MOTOR/electrical kW for a motor-driven line from the contract
+    quantities, matched on the line's DISTINGUISHING name tokens (the f9dfc2918
+    matcher discipline: exact token or ≥4-char prefix stem, generic tokens never
+    decide, ambiguous top-ties return None). Used when the line's own rating is a
+    FLOW (m³/h) — the v55 Irrigation Pump (90 m³/h) must price from its 15 kW
+    motor, never from '90 kW'. Returns (kw, key) or (None, None)."""
+    if not isinstance(q, dict) or not _MOTOR_DRIVEN_NOUN_RE.search(name or ""):
+        return (None, None)
+    toks = {t for t in re.split(r"[^a-z0-9]+", (name or "").lower()) if len(t) >= 2}
+    dist = toks - _GENERIC_EQUIP_TOKENS
+    if not dist:
+        return (None, None)
+
+    def _hit(t, k):
+        return t == k or (min(len(t), len(k)) >= 4 and (t.startswith(k) or k.startswith(t)))
+
+    candidates = []   # (overlap, motor_pref, key, kw)
+    for k in q:
+        kl = str(k).lower()
+        if not (kl.endswith("_motor_kw") or kl.endswith("_power_kw")):
+            continue
+        if _NON_MOTOR_KW_KEY_RE.search(kl):
+            continue
+        ktoks = set(re.split(r"[^a-z0-9]+", kl))
+        overlap = sum(1 for t in dist if any(_hit(t, kt) for kt in ktoks))
+        if overlap == 0:
+            continue
+        val = _qnum(q, k)
+        if val is None or val <= 0:
+            continue
+        candidates.append((overlap, 1 if kl.endswith("_motor_kw") else 0, kl, float(val)))
+    if not candidates:
+        return (None, None)
+    candidates.sort(key=lambda c: (-c[0], -c[1], c[2]))   # total order (key name last)
+    top = [c for c in candidates if c[0] == candidates[0][0] and c[1] == candidates[0][1]]
+    if len({c[3] for c in top}) > 1:
+        return (None, None)                                # genuine ambiguity — never guess
+    return (candidates[0][3], candidates[0][2])
+
+
 def _rated_equipment_cost(name: str, kw: float, is_kva: bool):
     """Installed cost (£) for a power-rated equipment line from a UNIVERSAL £/kW
     (or £/kVA) market curve keyed off the equipment NOUN, plus the plausibility
@@ -1597,7 +1747,7 @@ def _rated_equipment_cost(name: str, kw: float, is_kva: bool):
 
 
 def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
-                           requirement: str = ""):
+                           requirement: str = "", q=None):
     """Universal price-reality reconciliation for a power-rated line. If the line
     carries a real rating AND a rating-model exists for its noun, ANY existing
     price that is absent / ≤0 / outside the model's plausibility band is REPLACED
@@ -1609,8 +1759,29 @@ def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
     is KEPT (we only correct values that are clearly wrong), but tight enough that
     a 5-30× error (either way) is pulled to the mid. Returns (gbp, basis)."""
     kw, is_kva = _rating_kw(md, name, requirement)
+    _motor_note = ""
     if kw is None:
-        return (gbp, basis)
+        # FLOW-RATED PUMP (2026-07-02, unit-confusion family): the line's own rating
+        # is EXPLICITLY a volumetric flow (the v55 'Irrigation Pump · 90 m³/h' that
+        # priced as '90 kW × £700/kW' = £63k), so its PRICE driver is its MOTOR —
+        # resolve the per-item motor kW from the contract by distinguishing-token
+        # match (a pump with flow 90 m³/h + motor 15 kW prices from 15 kW, never
+        # from '90 kW'). SCOPE (no-regression, SAF/CO₂ byte-identity): fires ONLY
+        # when (a) the line's rating_primary IS a flow — a line with NO rating at
+        # all (a catalogue-identified Grundfos) keeps its price untouched, the old
+        # behaviour — AND (b) the noun is a PUMP (an engineered kg/h compressor
+        # package is not £/kW commodity kit and must not be re-banded).
+        _rp_blob = (f"{md.get('rating_primary') or ''} {md.get('rating_primary_unit') or ''}"
+                    if isinstance(md, dict) else "")
+        _rating_is_flow = bool(re.search(
+            r"m\s*[³^]?\s*3?\s*/?\s*h|l\s*/?\s*(?:min|s|h)\b|\bgpm\b", _rp_blob, re.I))
+        if not (_rating_is_flow and re.search(r"\bpump\b", name or "", re.I)):
+            return (gbp, basis)
+        kw, _mkey = _contract_motor_kw(name, q)
+        if kw is None:
+            return (gbp, basis)
+        is_kva = False
+        _motor_note = f" · motor kW from contract {_mkey} (the line's own rating is a flow, not a power)"
     # DB-FIRST (growing-DB loop, Tristan 2026-06-25): a REAL spec-matched part in forge-truth.db
     # beats the rating-model estimate — this is how an ingested principal (e.g. the 86 kW chiller
     # the ingest job wrote) flows back into pricing on the next run, closing the loop. The known
@@ -1618,7 +1789,8 @@ def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
     _dbp = _db_spec_price(f"{name} {kw:.0f} {'kva' if is_kva else 'kw'}", md)
     if _dbp and _dbp[0] > 0:
         return (round(_dbp[0], 2),
-                f"real DB median of {_dbp[1]} comparable {_dbp[3]} '{_dbp[2]}' parts (forge-truth.db)")
+                f"real DB median of {_dbp[1]} comparable {_dbp[3]} '{_dbp[2]}' parts (forge-truth.db)"
+                + _motor_note)
     model = _rated_equipment_cost(name, kw, is_kva)
     if not model:
         return (gbp, basis)
@@ -1632,7 +1804,7 @@ def _reconcile_rated_price(name: str, md: dict, gbp: float, basis: str,
         why = ("no price" if (gbp is None or gbp <= 0)
                else f"£{gbp:,.0f} below band" if gbp < window_lo
                else f"£{gbp:,.0f} above band")
-        return (float(mid_gbp), f"{model_basis} [{why} → grounded to market]")
+        return (float(mid_gbp), f"{model_basis} [{why} → grounded to market]{_motor_note}")
     return (gbp, basis)
 
 
@@ -1895,6 +2067,58 @@ def _selftest() -> int:
         print("  FAIL rating_kw dropped a bare kW number"); bad += 1
     if _rating_kw({"rating_primary": "132 kW"}, "Circulation Pump")[0] != 132:
         print("  FAIL rating_kw dropped an explicit kW rating"); bad += 1
+
+    # ── FLOW-AS-KW PRICING proveCatch (2026-07-02, the v55 Irrigation Pump £63k =
+    # '90 kW × £700/kW' where 90 was its FLOW in m³/h): (a) _mods preserves the
+    # modifier's separate `unit` field; (b) _rating_kw refuses a flow-united rating;
+    # (c) a flow-rated pump prices from its CONTRACT MOTOR kW (distinguishing-token
+    # match, f9dfc2918 family) — a pump with flow 90 m³/h + motor 15 kW prices from
+    # 15 kW; (d) an ambiguous motor-key tie returns None (never guesses).
+    _w_irr = {"modifier_characters": [{"kind": "rating_primary", "value": "90", "unit": "m³/h"}]}
+    _md_irr = _mods(_w_irr)
+    if _md_irr.get("rating_primary_unit") != "m³/h":
+        print("  FAIL _mods dropped the modifier's separate unit field"); bad += 1
+    if _rating_kw(_md_irr, "Irrigation Pump")[0] is not None:
+        print("  FAIL rating_kw read a value-90/unit-m³/h rating as 90 kW (v55 flow-as-kW)"); bad += 1
+    _q_irr = {"irrigation_pump_motor_kw": {"value": 15}, "irrigation_pump_flow_m3_h": {"value": 90}}
+    _kwm, _keym = _contract_motor_kw("Irrigation Pump", _q_irr)
+    if not (_kwm == 15 and _keym == "irrigation_pump_motor_kw"):
+        print(f"  FAIL contract motor kW not resolved: {_kwm} {_keym}"); bad += 1
+    g, b = _reconcile_rated_price("Irrigation Pump", _md_irr, 0.0, "x", q=_q_irr)
+    if not (g >= 2500 and g <= 20000 and "motor kW from contract irrigation_pump_motor_kw" in b):
+        print(f"  FAIL flow-rated pump not priced from its 15 kW motor: £{g:.0f} ({b[:90]})"); bad += 1
+    _kwm, _ = _contract_motor_kw("Dosing Pump", {"acid_dosing_pump_power_kw": {"value": 0.04},
+                                                 "chemical_dosing_pump_power_kw": {"value": 0.07}})
+    if _kwm is not None:
+        print("  FAIL ambiguous motor-kW tie guessed instead of returning None"); bad += 1
+
+    # ── UV LAMP-POWER RULE proveCatch (2026-07-02, the v55 £90k '60 kW' UV on a
+    # 90 m³/h duty — a 90 m³/h potable UV is ~2-4 kW / £8-15k): the lamp power is
+    # never a flow read as kW; it comes from a contract power key, or the dose rule
+    # P = flow × dose ÷ UVT-factor (40 mJ/cm² potable), and prices in the LP band.
+    _md_uv = _mods({"modifier_characters": [{"kind": "rating_primary", "value": "90", "unit": "m³/h"}]})
+    g, b = _unit_operation_price("UV Disinfection Unit", _md_uv,
+                                 {"uv_disinfection_throughput_m3_h": {"value": 90}})
+    if not (abs(g - 8400.0) < 1 and "dose rule" in b and "2.0 kW" in b):
+        print(f"  FAIL UV dose rule (want 2.0 kW → £8,400): £{g} ({str(b)[:90]})"); bad += 1
+    g, b = _unit_operation_price("UV Disinfection Unit", _md_uv,
+                                 {"uv_disinfection_power_kw": {"value": 4.1}})
+    if not (abs(g - (4000.0 + 4.1 * 2200.0)) < 1 and "4.1 kW" in b):
+        print(f"  FAIL UV contract lamp-power key not used: £{g} ({str(b)[:90]})"); bad += 1
+
+    # ── MEMBRANE-AS-STEEL proveCatch (2026-07-02, v55: 'Ro Membrane Elements · 364 m²'
+    # = £40,760 'structural steelwork take-off', ×3 lines = £122k / 16% of the bill):
+    # a membrane/element/media line NEVER takes a structural or shell take-off — it
+    # prices from MEMBRANE AREA (elements £/m²; housings per element slot).
+    _md_mem = {"rating_primary": "364", "rating_primary_unit": "m2", "dimension": ""}
+    if _structural_takeoff("Ro Membrane Elements", _md_mem) is not None:
+        print("  FAIL membrane line took a structural steelwork take-off"); bad += 1
+    mt = _materials_takeoff("Ro Membrane Elements", _md_mem)
+    if not (mt and abs(mt[0] - 9100.0) < 1 and "membrane-area parametric" in mt[1]):
+        print(f"  FAIL membrane elements not priced from membrane area: {mt}"); bad += 1
+    mt = _materials_takeoff("Grp Membrane Housings", _md_mem)
+    if not (mt and abs(mt[0] - 11000.0) < 1 and "membrane-housing parametric" in mt[1]):
+        print(f"  FAIL membrane housings not priced per element slot: {mt}"); bad += 1
 
     # ── UNIVERSAL RATING-BASED COST MODEL (council 2026-06-16/17) ──
     # invariant: power-rated kit is priced from the £/kW(/kVA) market curve in BOTH
@@ -3259,7 +3483,24 @@ def assemble(out_dir: str):
                 # every _materials_takeoff() call so its plausibility invariant always fires.
                 svc = _read_service(md)
                 svc_fam = svc.get("fabrication_family") if svc else None
-                if svc_fam in _STRUCTURAL_FAMILIES:
+                # ── MEMBRANE/MEDIA FAMILY FIRST (2026-07-02): a membrane element /
+                # bank / housing / filter-media line prices from its MEMBRANE AREA
+                # (or an honest class-basis TBD) — NEVER the structural-steel or
+                # shell take-off the typed service / noun would otherwise route it
+                # to (the v55 £122k membrane-as-steel bill, 16% of the total). ──
+                if _MEMBRANE_MEDIA_RE.search(name):
+                    mem = _membrane_area_price(name, md)
+                    if mem:
+                        status, part = "NOT FOUND", "requirement stated — membrane-area parametric"
+                        gbp, basis = mem
+                        mt_spec = {"material": "membrane/filtration media"}
+                    else:
+                        pv = price.get(wid, 0.0)
+                        status, part = "NOT FOUND", "requirement stated"
+                        gbp = pv if pv > 0 else 0.0
+                        basis = ("membrane/filtration-media class — vendor quote TBD "
+                                 "(no membrane-area driver; excluded from steel take-off)")
+                elif svc_fam in _STRUCTURAL_FAMILIES:
                     # structural / building frame — price on footprint, not a pressure shell.
                     pv = price.get(wid, 0.0)
                     st = _structural_takeoff(name, md, g_lookup)
@@ -3426,7 +3667,8 @@ def assemble(out_dir: str):
                     # named for a 97 kW / 1,670 m³/h recirculation pump → its £2,024
                     # estimate vs the £67,900 rating-based price = 33.5×).
                     pre_gbp, pre_status = gbp, status
-                    gbp, basis = _reconcile_rated_price(name, md, gbp, basis, requirement)
+                    gbp, basis = _reconcile_rated_price(name, md, gbp, basis, requirement,
+                                                        q=qcontract)
                     # AUDITABLE CLASS-REFERENCE BUDGET (RAS audit 2026-06-19): for a
                     # mechanical-equipment line (heat pump / compressor / chiller /
                     # blower), make a large price EXPLICIT — scaled from a class-
@@ -3644,6 +3886,14 @@ def assemble(out_dir: str):
         if (re.search(r"\bheater\b", req_lead, re.I)
                 and not re.search(r"immersion|backup|process|duct|inline|booster|jacket|reboil", req_lead, re.I)
                 and re.search(r"\b\d[\d,]*\s*w\b", str(row.get("requirement") or ""), re.I)):
+            continue
+        # MEMBRANE/MEDIA family: the line is AREA-GROUNDED (membrane-area/housing
+        # parametric, 2026-07-02) — the corpus median for a 'membrane bank/skid' noun is
+        # dominated by COMPLETE skid packages (pumps + frames + controls), so a lift
+        # re-inflates the consumable back toward the steel-take-off error the membrane
+        # fix just removed (Uf Membrane Bank £9,100→£47,855). The area rate is the
+        # grounded truth; never corpus-lift a membrane/media line. (corpus-mismatch family)
+        if _MEMBRANE_MEDIA_RE.search(req_lead):
             continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)

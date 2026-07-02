@@ -1470,6 +1470,22 @@ def _selftest():
     assert irow["required_unit"] == "m3/h" and "re-stamped" in (irow.get("unit_corrected") or ""), \
         f"finalize_ledger must canonicalise the unit and disclose it on the row; got {irow}"
 
+    # ── SOURCE KILL GUARD (2026-07-02): the scene augmenters may never again STAMP a
+    # hardcoded flow unit onto an edge (the v55 phantom: an m³/h magnitude shipped as
+    # 'm³/s' = ×3600). The choke-point canonicaliser above is the NET; this proves the
+    # SOURCE stays fixed: no `required_unit = 'm³/s'`-style literal assignment exists in
+    # build_universal_scene.py (inherited-unit assignments read a variable, not a literal).
+    import os as _os
+    _scene_src = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                               "build_universal_scene.py")
+    with open(_scene_src, "r", encoding="utf-8") as _sf:
+        _src_txt = _sf.read()
+    _stamps = re.findall(r"required_unit.{0,4}=\s*['\"]m[³^]?3?/s['\"]", _src_txt) \
+        + re.findall(r"required_unit.{0,4}=\s*['\"]m³/s['\"]", _src_txt)
+    assert not _stamps, (
+        f"build_universal_scene.py stamps a hardcoded m³/s required_unit again — "
+        f"the v55 ×3600 phantom source: {_stamps}")
+
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
           f"completeness flags {len(concerns)} incomplete part(s) incl. pump-missing-input)")

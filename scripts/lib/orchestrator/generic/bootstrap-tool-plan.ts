@@ -1320,6 +1320,50 @@ function _normalisePumpSizingInput(
   return payload
 }
 
+// ── ECONOMICS REVENUE-BASIS VETO (2026-07-02, the v55 £580M phantom NPV) ─────
+// The yield-economics NPV tool minted plant_npv_gbp = £580M on a WATER plant from
+// FABRICATED revenue inputs: annual_yield_kg = 100,000 @ market_price = £1,000/kg —
+// neither exists anywhere in the brief or the contract (the plant makes no saleable
+// product mass; no sale price was ever stated). The tool must mint NOTHING when the
+// brief/contract carries no product-mass + sale-price basis: honest ABSENT, never
+// invented inputs. Detection is UNIVERSAL, keyed on the step's own input params
+// (a mass-per-year YIELD param + a per-mass PRICE param = a revenue-economics step),
+// no tool-id table. Grounded = wired `from_contract_key` to a key that EXISTS on the
+// live contract with a finite positive value; a literal `constant` or a wire to an
+// absent key (which would silently take the LLM's numeric `fallback`) is fabricated.
+const ECON_YIELD_PARAM_RE = /(?:^|_)(?:annual_)?(?:yield|production|product|output)(?:_[a-z0-9]+)*?_(?:kg|t|tonnes?)(?:_?(?:yr|year|pa))?$/i
+const ECON_PRICE_PARAM_RE = /price|revenue_(?:gbp|usd|eur)|_(?:gbp|usd|eur)_(?:per_)?(?:kg|t|tonne)/i
+
+export function economicsRevenueBasisMissing(
+  step: ToolPlanStepSpec,
+  c: ContractInProgress,
+): string | null {
+  const yieldInp = step.inputs.find(i => ECON_YIELD_PARAM_RE.test(i.param))
+  const priceInp = step.inputs.find(i => i !== yieldInp && ECON_PRICE_PARAM_RE.test(i.param))
+  if (!yieldInp || !priceInp) return null   // not a revenue-economics step — no veto
+  const missing: string[] = []
+  for (const inp of [yieldInp, priceInp]) {
+    const key = inp.from_contract_key
+    const qv = key ? (c.quantities as Record<string, any>)?.[key] : undefined
+    const raw = qv && typeof qv === 'object' ? qv.value : qv
+    const grounded = !!key && Number.isFinite(Number(raw)) && Number(raw) > 0
+    if (!grounded) {
+      missing.push(
+        `${inp.param} ${key
+          ? `(wired to contract key '${key}' which is ABSENT/non-numeric — the numeric fallback would fabricate it)`
+          : '(a literal constant — a fabricated revenue input, not a brief/contract value)'}`,
+      )
+    }
+  }
+  if (!missing.length) return null
+  return (
+    `ECONOMICS BASIS VETO: ${step.tool_id} is a revenue-economics step but the ` +
+    `brief/contract carries no product-mass + sale-price basis — refusing to mint ` +
+    `NPV/revenue from invented inputs: ${missing.join('; ')}. ` +
+    `(Honest ABSENT beats a fabricated £-figure; wire both from real contract keys to enable.)`
+  )
+}
+
 /** Build the input payload for a step from its inputs[] spec. from_contract_key
  *  → q(c, key, fallback); else the literal constant. A pump-sizing step is then
  *  normalised onto the PER-PUMP basis (parallel_pumps + authoritative TDH). */
@@ -1529,7 +1573,15 @@ export function materialisePlan(slug: string, spec: ToolPlanSpec, orderedToolIds
       tool_id: step.tool_id,
       required: false, // SAFETY: a bootstrapped tool can never halt the plan
       feeds_into: [...downstream],
-      input_from_contract: (c: ContractInProgress) => buildStepInput(step, c),
+      input_from_contract: (c: ContractInProgress) => {
+        // ECONOMICS BASIS VETO — a revenue-economics step with no grounded
+        // product-mass + sale-price inputs must not INVOKE at all (throwing here
+        // fails the step honestly in runStep; required:false keeps the plan going;
+        // nothing is minted into quantities/worked-calcs). v55: £580M phantom NPV.
+        const noBasis = economicsRevenueBasisMissing(step, c)
+        if (noBasis) throw new Error(noBasis)
+        return buildStepInput(step, c)
+      },
       contract_update: (c: ContractInProgress, output: unknown) => {
         // DETERMINISTIC STEP PRUNE (fix C-full): evaluated against the LIVE
         // contract that already carries the source:'calculator' seeds. Skip the

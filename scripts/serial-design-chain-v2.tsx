@@ -8945,9 +8945,14 @@ async function main() {
     logAction({ step: 'freshen_scorer_inputs', ok: false, error: String(frErr).slice(0, 160) })
   }
   // RE-RUN the physics critic on the FINAL cleaned design so the Risk tab is HONEST (reflects the
-  // shipped state, not the Stage-7.5 pre-cleanup critique). Overwrites 7-5-physics-critique.json
-  // (what dossier_audit reads for the Risk tab). The mid-chain gate-33 / autocorrect already ran on
-  // the original critique — this only refreshes the END scorecard. Non-fatal; skipped without a key.
+  // shipped state, not the Stage-7.5 pre-cleanup critique). ONE CRITIQUE PER RUN (2026-07-02, the
+  // v55 stale-critique fix): the fresh critique is written ONCE to BOTH surfaces — the file
+  // (7-5-physics-critique.json, what dossier_audit reads) AND state.physicsCritique in state.json
+  // (what the Excel Risk register + floor read) — as the SAME object, so the two can never diverge
+  // again (v55: state carried a stale 'tanks omitted' HIGH that was FALSE against the delivered
+  // BoM while the fresh file findings were absent from the register). The mid-chain gate-33 /
+  // autocorrect already ran on the original critique — this refreshes the SHIPPED sample.
+  // Non-fatal; skipped without a key.
   try {
     if (apiKey) {
       const _fs = JSON.parse(readFileSync(statePath, 'utf8'))
@@ -8962,10 +8967,18 @@ async function main() {
           contractTradeOffs: buildContractTradeOffs(engineeringContract),
         })
         if (_fresh) {
+          // the ONE shipped critique object — file + state field written together
           writeFileSync(resolve(outDir, '7-5-physics-critique.json'), JSON.stringify(_fresh, null, 2))
+          _fs.physicsCritique = _fresh
+          _fs.physicsCritiqueProvenance = {
+            sample: 'final-design-rerun', written_once: true,
+            note: 'state.physicsCritique === 7-5-physics-critique.json (one critique sample per run; the Stage-7.5 pre-cleanup critique fed gate 33 only)',
+            savedAt: new Date().toISOString(),
+          }
+          writeFileSync(statePath, JSON.stringify(_fs, null, 2))
           const _high = _fresh.issues.filter(i => i.severity === 'high').length
-          console.error(`[chain] physics-critic RE-RUN on the final cleaned design → ${_high} HIGH (Risk now reflects the shipped state)`)
-          logAction({ step: 'physics_critic_rerun', ok: true, high: _high })
+          console.error(`[chain] physics-critic RE-RUN on the final cleaned design → ${_high} HIGH (file + state.physicsCritique now the SAME object)`)
+          logAction({ step: 'physics_critic_rerun', ok: true, high: _high, state_updated: true })
         }
       }
     }

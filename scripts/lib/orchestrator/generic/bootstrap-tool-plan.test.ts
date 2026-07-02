@@ -39,6 +39,7 @@ import {
   orderSpec,
   materialisePlan,
   bootstrapToolPlan,
+  economicsRevenueBasisMissing,
   type ToolPlanSpec,
   type ToolPlanStepSpec,
 } from './bootstrap-tool-plan'
@@ -206,6 +207,50 @@ function pureTests(): void {
   const plan = materialisePlan('aquaculture_ras', goodSpec(), order)
   check('materialisePlan → runnable ClassToolPlan, all steps required:false',
     plan.tools.length === 3 && plan.tools.every(t => t.required === false))
+
+  // ── ECONOMICS REVENUE-BASIS VETO (proveCatch, 2026-07-02): the v55 £580M phantom
+  //    NPV was minted from FABRICATED inputs (annual_yield_kg=100,000 @ £1,000/kg on
+  //    a water plant with NO product mass and NO sale price). A revenue-economics
+  //    step whose yield+price inputs are not GROUNDED contract keys must refuse to
+  //    build its input (throw), so the tool never invokes and nothing is minted.
+  const npvStepFabricated: ToolPlanStepSpec = {
+    tool_id: 'yield-economics:npv',
+    inputs: [
+      { param: 'annual_yield_kg', constant: 100000 },                   // fabricated literal
+      { param: 'market_price_gbp_kg', from_contract_key: 'product_sale_price_gbp_kg', fallback: 1000 }, // absent key → fallback fabrication
+      { param: 'capex_gbp', from_contract_key: 'bom_total_gbp', fallback: 1000000 },
+    ],
+    outputs: [{ contract_key: 'plant_npv_gbp', tool_output_field: 'npv_gbp', unit: 'GBP', family: 'currency' }],
+  }
+  const missing = economicsRevenueBasisMissing(npvStepFabricated, baseContract)
+  check('VETO fires: fabricated yield+price inputs on an ungrounded contract',
+    typeof missing === 'string' && /ECONOMICS BASIS VETO/.test(missing ?? '') &&
+    /annual_yield_kg/.test(missing ?? '') && /market_price_gbp_kg/.test(missing ?? ''),
+    String(missing).slice(0, 160))
+  const vetoPlan = materialisePlan('water_treatment', { display_name: 'x', steps: [npvStepFabricated] }, ['yield-economics:npv'])
+  let vetoThrew = false
+  try { vetoPlan.tools[0].input_from_contract(baseContract, {} as ParsedConstraints) } catch { vetoThrew = true }
+  check('materialised step REFUSES to build input (throw → runStep fails honestly, nothing minted)', vetoThrew)
+  // grounded case: both revenue inputs wired to REAL contract keys → no veto
+  const groundedContract: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      annual_product_yield_kg: { value: 250000, unit: 'kg/yr', family: 'yield' } as any,
+      product_sale_price_gbp_kg: { value: 6.2, unit: 'GBP/kg', family: 'currency' } as any,
+    },
+  }
+  const npvStepGrounded: ToolPlanStepSpec = {
+    ...npvStepFabricated,
+    inputs: [
+      { param: 'annual_yield_kg', from_contract_key: 'annual_product_yield_kg' },
+      { param: 'market_price_gbp_kg', from_contract_key: 'product_sale_price_gbp_kg' },
+    ],
+  }
+  check('VETO stays silent when yield+price are grounded contract keys',
+    economicsRevenueBasisMissing(npvStepGrounded, groundedContract) === null)
+  // non-economics steps are untouched (a pump-sizing step never trips the veto)
+  check('VETO never fires on a non-economics step',
+    economicsRevenueBasisMissing(goodSpec().steps[0], baseContract) === null)
 }
 
 // ── SMOKE block — ONE real Gemini call on the RAS brief ─────────────────────

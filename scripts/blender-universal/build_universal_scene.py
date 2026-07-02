@@ -3753,11 +3753,30 @@ GROUP_BRANCH_TOP_N = 3
 # (so 'electrical_supply' never accidentally resolves onto a stray 'supply' word).
 
 
+def _plural_fold(tok):
+    """A conservative singular fold for the HEAD-noun check only: 'tanks'→'tank',
+    'housings'→'housing'. Never folds a short token ('gas' stays 'gas')."""
+    t = str(tok)
+    if len(t) >= 5 and t.endswith("s") and not t.endswith("ss"):
+        return t[:-1]
+    return t
+
+
 def resolve_endpoint(edge_part_name, parts):
     """Best parts-list match for a topology endpoint name by token overlap with
     the discriminator guard. Returns the Part or None. Abstract/aggregate
     endpoints (a bus, a supply, an 'X_and_Y' group) deliberately return None so
-    the router skips them rather than drawing a misleading pipe to a stray part."""
+    the router skips them rather than drawing a misleading pipe to a stray part.
+
+    HEAD-NOUN DISCIPLINE (2026-07-02, the f9dfc2918 distinguishing-token matcher
+    family applied here): a candidate may only win if it echoes the endpoint's
+    HEAD noun — the last discriminating token, the part's IDENTITY ('Pressure
+    Transmitter' IS a transmitter; 'pressure' is a shared qualifier). Without it,
+    'Pressure Transmitter' snapped onto 'Ro High Pressure Pump' via the generic
+    shared token 'pressure' (v55: a signal cable wore the pump's name + a water
+    pipe tag). A qualifier token can SUPPORT a match but never DECIDE one; an
+    endpoint whose head noun no placed part echoes resolves to None (the router
+    skips it — honest drop, never a stray snap). Universal — pure morphology."""
     if ABSTRACT_ENDPOINTS_RE.search(edge_part_name):
         return None
     toks = tokenise(edge_part_name)
@@ -3773,10 +3792,18 @@ def resolve_endpoint(edge_part_name, parts):
     }
     if edge_part_name in SYN:
         toks = tokenise(SYN[edge_part_name])
+    head = toks[-1] if toks else None
     best = None
     for p in parts:
         score = token_overlap(toks, p.match_tokens)
         if score <= 0:
+            continue
+        # the endpoint's head noun must be echoed by the candidate (exact, the
+        # conservative _token_match stem, or a plural fold — 'tanks'≡'tank') — a
+        # match carried only by qualifier tokens is a name-collision, not an identity.
+        if head is not None and not any(
+                _token_match(head, y) or _plural_fold(head) == _plural_fold(y)
+                for y in p.match_tokens):
             continue
         if best is None or score > best[0]:
             best = (score, p)
@@ -7302,14 +7329,25 @@ def augment_topology_connect_orphans(state, topology, parts):
         pwr_hub = dist_load_hub or _module_repr_part_name('power_distribution', parts)
         dist_spine, dist_protects = [], []
 
-    # the water tie carries the loop flow (largest flow_capacity already on the topology)
+    # the water tie carries the loop flow (largest flow_capacity already on the topology).
+    # UNIT INHERITED FROM THE SOURCE EDGE (2026-07-02 m³/s source kill): the augmenter used
+    # to copy the VALUE and stamp a hardcoded 'm³/s' — but the primary topology authors
+    # these flows in m³/h, so a 90 m³/h loop shipped as 90 m³/s = 324,000 m³/h (the v55
+    # phantom: 6×DN300 @ 205.6 m/s → £152k phantom pipe → 132.6 GW cover). The new edge
+    # carries EXACTLY the unit of the edge it inherited its magnitude from; no unit on the
+    # source → no value/unit stamped (an unsized service tie takes the sizer's default
+    # branch — honest, never a fabricated unit).
     loop_flow = 0.0
+    loop_flow_unit = None
     for e in topology:
         if str(e.get('constraint_kind')) == 'flow_capacity':
             try:
-                loop_flow = max(loop_flow, float(e.get('required_value') or 0.0))
+                _v = float(e.get('required_value') or 0.0)
             except (TypeError, ValueError):
-                pass
+                continue
+            if _v > loop_flow:
+                loop_flow = _v
+                loop_flow_unit = e.get('required_unit') or None
 
     # SERVICES each part already HAS — resolve BOTH endpoints to a real part so a
     # process-ID endpoint credits its equipment-name part (the identity bridge). Also
@@ -7388,9 +7426,9 @@ def augment_topology_connect_orphans(state, topology, parts):
                 'constraint_kind': 'flow_capacity',
                 'material_context': 'process-water service tie-in (make-up / fill / drain)',
                 '_augmented': True, '_service_tie': True}
-        if loop_flow > 0:
+        if loop_flow > 0 and loop_flow_unit:
             edge['required_value'] = loop_flow * 0.015  # service branch (~DN65-80), NOT the main loop
-            edge['required_unit'] = 'm³/s'
+            edge['required_unit'] = loop_flow_unit      # SOURCE unit — never a hardcoded m³/s
         extra.append(edge)
         return 1
 
@@ -7474,14 +7512,22 @@ def augment_topology_cross_module(state, topology, parts):
 
     # The recirc/service leg carries the LOOP's flow — inherit the largest
     # flow_capacity already on the fluid topology so the return is sized like the
-    # forward process line (a DN300 forward must NOT get a DN15 return). m³/s.
+    # forward process line (a DN300 forward must NOT get a DN15 return).
+    # UNIT INHERITED FROM THE SOURCE EDGE (2026-07-02 m³/s source kill — see the
+    # twin comment in augment_topology_orphans): the value AND its unit travel
+    # together; a hardcoded 'm³/s' on an m³/h magnitude was the v55 324,000 m³/h
+    # phantom. No unit on the source edge → no value/unit stamped.
     loop_flow = 0.0
+    loop_flow_unit = None
     for e in topology:
         if str(e.get("constraint_kind")) == "flow_capacity":
             try:
-                loop_flow = max(loop_flow, float(e.get("required_value") or 0.0))
+                _v = float(e.get("required_value") or 0.0)
             except (TypeError, ValueError):
-                pass
+                continue
+            if _v > loop_flow:
+                loop_flow = _v
+                loop_flow_unit = e.get("required_unit") or None
 
     # (1) module-pairs the PRIMARY topology already connects — so we never duplicate a
     #     drawn line. DIRECTED ((from_module, to_module)) — a forward supply leg
@@ -7530,9 +7576,9 @@ def augment_topology_cross_module(state, topology, parts):
             "material_context": "process water (inter-module recirculation/service)",
             "_augmented": True,
         }
-        if loop_flow > 0:                          # size the leg like the loop it closes
+        if loop_flow > 0 and loop_flow_unit:       # size the leg like the loop it closes
             edge["required_value"] = loop_flow
-            edge["required_unit"] = "m³/s"
+            edge["required_unit"] = loop_flow_unit  # SOURCE unit — never a hardcoded m³/s
         extra.append(edge)
     if extra:
         print(f"[univ] cross-module augmentation: +{len(extra)} FLUID process line(s) "
@@ -15232,6 +15278,10 @@ def render_inspection(out_dir, bbox):
     for cam in cams:
         fl.clear_cameras()
         c = fl.setup_camera(cam["loc"], cam["target"], cam["ortho_scale"], focal=50)
+        # PER-CAMERA BILLBOARDS (2026-07-02): the equipment-tag chips face THIS
+        # view's camera, text upright — never the old fixed hero-bisector tilt
+        # (which read as 45°-rotated labels on the plan + mirrored from behind).
+        fl.orient_billboards_to_camera(cam["loc"], cam["target"])
         # Generous clip range so a big plant is never near/far-plane clipped.
         c.data.clip_start = max(0.01, radius * 0.001)
         c.data.clip_end = radius * 8.0

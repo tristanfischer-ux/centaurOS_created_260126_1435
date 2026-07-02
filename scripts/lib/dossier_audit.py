@@ -334,6 +334,46 @@ _PHYS_DESIGN_HAS_RX = re.compile(
     r"the design's? '", re.I)
 # A "a SINGLE / only one <part>" undercount claim — verifiable against the contract's part count.
 _PHYS_SINGULAR_RX = re.compile(r"\b(?:a single|only one|only a single|just one|a lone)\b", re.I)
+# A "design OMITS / lacks / is missing X" claim — verifiable by EXISTENCE: does X actually
+# appear in the DELIVERED BoM / design words? (v55: the stale critique's top HIGH said the
+# design "completely omits the three 40 m³ storage tanks (one fresh-water, two drain-water)"
+# while the delivered BoM carried Fresh Water Tank TK-108 + Drain Water Tanks — the claim
+# was FALSE against what shipped.)
+_PHYS_OMITS_RX = re.compile(
+    r"\bomits?\b|\bomitted\b|\bmissing\b|\blacks?\b|\babsent\b|"
+    r"does not (?:include|provide|contain|specify)|"
+    r"(?:is|are) not (?:included|present|provided|specified)|"
+    r"\bno (?:provision|allowance) for\b|fail(?:s|ed)? to (?:include|provide|specify)", re.I)
+# Tokens that carry no identity for the existence match — every plant shares them, so they
+# must never DECIDE a match on their own (the f9dfc2918 distinguishing-token discipline).
+_EXIST_GENERIC_TOKENS = {
+    "tank", "tanks", "pump", "pumps", "valve", "valves", "vessel", "vessels", "unit",
+    "units", "system", "systems", "skid", "assembly", "module", "storage", "water",
+    "sensor", "sensors", "filter", "filters", "plant", "design", "process", "supply"}
+
+
+def _exist_tok_hit(a: str, b: str) -> bool:
+    """Exact token equality or a bounded ≥4-char PREFIX stem (never substring
+    containment) — the f9dfc2918 matcher rule ('tanks'≡'tank', 'recirculation'≡'recirc')."""
+    return a == b or (min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a)))
+
+
+def _delivered_row_names(state):
+    """Every DELIVERED component name the dossier ships: requirementsBom principal rows
+    (the requirement text before the '·' spec suffix) + every design word name."""
+    names = []
+    for row in state.get("requirementsBom") or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("status") or "") == "SUB-COMPONENT":
+            continue
+        req = str(row.get("requirement") or "").split("·")[0].strip()
+        if req:
+            names.append(req)
+    for _w, nm in _iter_design_words(state):
+        if nm:
+            names.append(nm)
+    return names
 
 
 def _count_words_with_qty(state, qty: int) -> int:
@@ -439,6 +479,31 @@ def _physics_claim_falsified(state, issue: dict) -> bool:
             present = any(q.lower() in nm for q in quoted for _w, nm in _iter_design_words(state))
             if not present:
                 return True  # none of the named components the critic cites exist in the shipped design → stale
+    # (f) EXISTENCE check — "the design OMITS / lacks / is missing X" is auto-falsified when X
+    # matches a DELIVERED BoM/manifest row (token match, the f9dfc2918 distinguishing-token
+    # discipline). For each delivered row: ALL of its tokens must appear in the claim text
+    # (exact or ≥4-char prefix stem) AND at least one matched token must be NON-generic (the
+    # generic noun 'tank' alone never decides — 'fresh'/'drain' does). v55: the stale "design
+    # completely omits the three 40 m³ storage tanks (one fresh-water, two drain-water)" HIGH
+    # dies against the delivered 'Fresh Water Tank' + 'Drain Water Tank' rows; a claim naming
+    # a component NO row matches (a genuine omission) still gates.
+    # REDUNDANCY carve-out: "omits a BACKUP/standby/spare X" is a redundancy finding — the
+    # base X shipping does not falsify it; only a plain existence claim is checked.
+    if _PHYS_OMITS_RX.search(txt) and not re.search(
+            r"backup|standby|redundan|spare|additional|\bsecond\b|duplicate", txt):
+        claim_toks = set(re.findall(r"[a-z0-9]{2,}", txt))
+        for row_name in _delivered_row_names(state):
+            row_toks = [t for t in re.findall(r"[a-z0-9]{2,}", str(row_name).lower())
+                        if not t.isdigit()]
+            if not row_toks or len(row_toks) > 6:
+                continue   # a whole-sentence 'name' is not a component identity
+            dist = [t for t in row_toks if t not in _EXIST_GENERIC_TOKENS]
+            if not dist:
+                continue   # all-generic row ('Tank') can never falsify an omission claim
+            all_present = all(any(_exist_tok_hit(t, c) for c in claim_toks) for t in row_toks)
+            dist_present = any(any(_exist_tok_hit(t, c) for c in claim_toks) for t in dist)
+            if all_present and dist_present:
+                return True  # the 'omitted' component demonstrably SHIPS → stale claim
     # (e) "a SINGLE / only one <part>" undercount shape — falsified if the contract shows that part's
     # count ≥ 2 (the design demonstrably has the required multiple units; the critic under-counted).
     if _PHYS_SINGULAR_RX.search(txt):
@@ -2906,6 +2971,31 @@ def _selftest() -> int:
     expect(_physics_claim_falsified({"moduleDecomposition": {"modules": []}}, {"severity": "high",
            "issue": "the design lacks a 'Backup Pump' required by the brief"}) is False,
            "PHYS(d): a genuine 'design LACKS X' missing-component finding must NOT falsify")
+
+    # ── proveCatch (f): EXISTENCE falsification of 'design OMITS X' claims (2026-07-02, the v55
+    #    stale top HIGH: "completely omits the three 40 m³ storage tanks (one fresh-water, two
+    #    drain-water)" while TK-108 Fresh Water Tank + the Drain Water Tanks were IN the delivered
+    #    BoM). Token match per the f9dfc2918 distinguishing-token discipline: all row tokens in
+    #    the claim, at least one NON-generic ('fresh'/'drain' decides; bare 'tank' never does).
+    _v55_bom = {"requirementsBom": [
+        {"status": "BESPOKE", "requirement": "Fresh Water Tank · 3.7 m dia x 3.7 m"},
+        {"status": "BESPOKE", "requirement": "Drain Water Tank · 3.6 m dia x 3.9 m"},
+        {"status": "SUB-COMPONENT", "requirement": "↳ Nameplate"},
+    ], "moduleDecomposition": {"modules": []}}
+    expect(_physics_claim_falsified(_v55_bom, {"severity": "high",
+           "issue": "The design completely omits the three 40 m³ storage tanks (one fresh-water, "
+                    "two drain-water) required to meet the brief's 120 m³ buffer"}) is True,
+           "PHYS(f): 'omits the fresh-water/drain-water tanks' must falsify — both tanks SHIP in the BoM")
+    expect(_physics_claim_falsified(_v55_bom, {"severity": "high",
+           "issue": "The design omits the inductive EC sensors the brief explicitly requires"}) is False,
+           "PHYS(f): a GENUINE omission (no EC sensor row exists) must NOT falsify")
+    expect(_physics_claim_falsified(_v55_bom, {"severity": "high",
+           "issue": "The design lacks a backup fresh water tank for N+1 redundancy"}) is False,
+           "PHYS(f): a missing-REDUNDANCY claim must NOT be falsified by the base tank shipping")
+    expect(_physics_claim_falsified({"requirementsBom": [
+        {"status": "BESPOKE", "requirement": "Tank"}], "moduleDecomposition": {"modules": []}},
+        {"severity": "high", "issue": "The design omits the chemical dosing tank"}) is False,
+        "PHYS(f): an ALL-GENERIC row ('Tank') can never decide an existence falsification")
 
     if failures:
         print("SELFTEST FAILED:")

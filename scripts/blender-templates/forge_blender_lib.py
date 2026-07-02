@@ -989,6 +989,52 @@ def restore_materials_from_snap(snap):
 # ─── Full render pipeline (spatial + hero + per-module) ──────────────────
 
 
+def orient_billboards_to_camera(loc, target):
+    """PER-CAMERA BILLBOARD ORIENTATION (2026-07-02) — face every `u_tagcallout_*`
+    tag chip (+ its text) at the camera about to render, text upright. The chips
+    used to carry ONE fixed compromise tilt (hero/top bisector), which read as
+    ~45°-rotated labels on the PLAN view and mirrored/edge-on chips from the
+    corner/exterior cameras. Each render pass now re-orients the chips to ITS
+    camera: normal along the (ortho) view axis, local +Y (text up) resolved
+    toward world-up via the same 'Y' up-hint the camera itself uses, so the text
+    is upright and never mirrored in EVERY view. The paired text object is
+    re-lifted along the new face normal. Deterministic (pure camera-spec maths);
+    a scene with no tag chips (all bespoke templates) is a strict no-op.
+    Returns the number of chips oriented."""
+    chips = [o for o in bpy.data.objects if o.name.startswith("u_tagcallout_chip_")]
+    if not chips:
+        return 0
+    view = mathutils.Vector((loc[0] - target[0], loc[1] - target[1], loc[2] - target[2]))
+    if view.length == 0:
+        return 0
+    vn = view.normalized()
+    if abs(vn.z) > 0.999:
+        # STRAIGHT-DOWN (plan) camera — the 'Y' up-hint is DEGENERATE for a vertical
+        # track axis and Blender resolves it with local +Y → −Y world, which rendered
+        # the plan labels UPSIDE-DOWN. The plan camera's screen-up is world +Y
+        # (setup_camera's own degenerate resolution), so the chip must lie flat with
+        # local +Y = +Y world: identity for a top view (normal +Z), X-flip for a
+        # bottom view.
+        q = mathutils.Euler((0.0 if vn.z > 0 else math.pi, 0.0, 0.0)).to_quaternion()
+    else:
+        q = vn.to_track_quat("Z", "Y")              # chip face normal → toward camera
+    eul = q.to_euler()
+    n = q @ mathutils.Vector((0.0, 0.0, 1.0))       # world-space face normal
+    for chip in chips:
+        chip.rotation_mode = "XYZ"
+        chip.rotation_euler = eul
+        txt = bpy.data.objects.get(chip.name.replace("_chip_", "_txt_", 1))
+        if txt is not None:
+            # re-lift the text off the (re-oriented) chip face so it never z-fights
+            lift = chip.dimensions.z / 2.0 + chip.dimensions.y * 0.02
+            txt.rotation_mode = "XYZ"
+            txt.rotation_euler = eul
+            txt.location = (chip.location.x + n.x * lift,
+                            chip.location.y + n.y * lift,
+                            chip.location.z + n.z * lift)
+    return len(chips)
+
+
 def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_containment",
                         flat_form_factor=False, hero_camera_override=None,
                         hero_cycles=False, hero_open_frame=False):
@@ -1027,6 +1073,7 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     for cam_spec in cams:
         clear_cameras()
         setup_camera(loc=cam_spec["loc"], target=cam_spec["target"], ortho_scale=cam_spec["ortho_scale"])
+        orient_billboards_to_camera(cam_spec["loc"], cam_spec["target"])   # tag chips face THIS view
         scene.render.filepath = str(out_dir / f"{cam_spec['name']}.png")
         bpy.ops.render.render(write_still=True)
         print(f"[forge] {cam_spec['name']}.png")
@@ -1049,19 +1096,23 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     clear_cameras()
     if hero_camera_override:
         setup_camera(**hero_camera_override)
+        _hero_loc, _hero_target = hero_camera_override["loc"], hero_camera_override["target"]
     else:
         (xmin, xmax), (ymin, ymax), (zmin, zmax) = compute_scene_bbox()
         cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
         if flat_form_factor:
             horizontal_max = max(xmax-xmin, ymax-ymin)
             hero_diag = horizontal_max * 1.6 / math.sqrt(2)
-            setup_camera(loc=(cx + hero_diag, cy - hero_diag, cz + horizontal_max * 0.20),
-                         target=(cx, cy, cz), ortho_scale=horizontal_max * 1.10)
+            _hero_loc = (cx + hero_diag, cy - hero_diag, cz + horizontal_max * 0.20)
+            _hero_target = (cx, cy, cz)
+            setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=horizontal_max * 1.10)
         else:
             max_dim = max(xmax-xmin, ymax-ymin, zmax-zmin)
             hero_diag = max_dim * 2.0 / math.sqrt(2)
-            setup_camera(loc=(cx + hero_diag, cy - hero_diag, cz + max_dim * 0.45),
-                         target=(cx, cy, cz), ortho_scale=max_dim * 1.20)
+            _hero_loc = (cx + hero_diag, cy - hero_diag, cz + max_dim * 0.45)
+            _hero_target = (cx, cy, cz)
+            setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=max_dim * 1.20)
+    orient_billboards_to_camera(_hero_loc, _hero_target)   # tag chips face the hero camera
     disable_freestyle()
     # Phase B item 8 (2026-05-24): opt-in Cycles ray-trace for hero only.
     # Enable via run_render_pipeline(..., hero_cycles=True) or env
@@ -1205,6 +1256,7 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
         for cam_idx, cam_spec in enumerate(cam_pair):
             clear_cameras()
             setup_camera(loc=cam_spec["loc"], target=cam_spec["target"], ortho_scale=cam_spec["ortho_scale"])
+            orient_billboards_to_camera(cam_spec["loc"], cam_spec["target"])   # tag chips face THIS view
             suffix = "" if cam_idx == 0 else "-" + cam_spec["name"]
             scene.render.filepath = str(out_dir / f"module-{module_id}{suffix}.png")
             bpy.ops.render.render(write_still=True)

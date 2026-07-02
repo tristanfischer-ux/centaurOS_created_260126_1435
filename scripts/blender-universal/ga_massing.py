@@ -88,7 +88,16 @@ GA_NON_MASSING_RE = re.compile(
     r"\b(?:isolation|sample|ball|check|relief|gate|globe|butterfly|"
     r"control|solenoid|needle|diaphragm|non-return|nrv|pressure relief|"
     r"pressure reducing|safety|actuated|automated|pneumatic|electric|"
-    r"motoris(?:ed|er)|motoriz(?:ed|er)|modulating) valve(?:s)?\b",
+    r"motoris(?:ed|er)|motoriz(?:ed|er)|modulating) valve(?:s)?\b|"
+    # a DESIGN-METADATA head noun is never a physical part (v55 name-collision:
+    # 'Modular Stack Design' matched the \bstack\b shape rule and rendered a 9.6 m
+    # CHIMNEY — the tallest object on a water plant — with its own S-101 tag chip).
+    # The HEAD noun (terminal, optional trailing index) is the identity: a name
+    # ending in design/concept/philosophy/strategy/approach/methodology/scheme/
+    # basis is documentation, not equipment. A real 'Vent Stack' / 'Membrane
+    # Stack' / 'Design Pressure Vessel' has a different head noun and is kept.
+    r"\b(?:design|concept|philosophy|strategy|approach|methodology|scheme|basis)"
+    r"s?\s*\d*\s*$",
     re.I)
 
 
@@ -124,6 +133,10 @@ def _selftest():
         # sharing 1000×1010×1100)
         "CIP Spray Ball", "Permeate Sampling Point", "Sample Point 2",
         "CIP Hose Assembly", "Flexible Hose",
+        # DESIGN-METADATA head nouns — never physical parts (v55: 'Modular Stack
+        # Design' rendered as a 9.6 m chimney, the tallest object on a water plant)
+        "Modular Stack Design", "Redundancy Concept", "Control Philosophy",
+        "Maintenance Strategy", "Sizing Basis", "Expansion Concept 2",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -145,6 +158,10 @@ def _selftest():
         # connection-schedule fluid ENDPOINTS — dropping either dangles/re-homes real
         # process edges (the 'Permeate Outlet → Cloth Filter' loss, 2026-07-02)
         "Manifold Support Bracket", "Permeate Outlet", "Concentrate Outlet",
+        # REAL stacks — the design-metadata rule is HEAD-anchored, so these keep
+        # their massing (proves the rule is tight). NB 'Membrane Stack' is already
+        # dropped by the membrane-INTERNALS rule above — deliberately not listed.
+        "Vent Stack", "Flare Stack", "Exhaust Stack 2",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]
