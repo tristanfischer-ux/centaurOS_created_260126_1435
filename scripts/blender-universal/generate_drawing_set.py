@@ -339,8 +339,8 @@ def write_hero_embed(out_dir: Path, log: list[str]) -> str | None:
 
 def _a1_print_entry(out_dir: Path, base: str) -> dict | None:
     """The drawing's DELIVERED A1 print set (written by a1_print.py inside the P&ID /
-    BFD / single-line generators): sheet PDFs + print-legibility numbers, from the
-    <base>-A1.json manifest. None when no A1 set was produced."""
+    BFD / single-line / GA generators): sheet PDFs + print-legibility numbers, from
+    the <base>-A1.json manifest. None when no A1 set was produced."""
     man_path = out_dir / "drawings" / f"{base}-A1.json"
     if not man_path.exists():
         return None
@@ -629,7 +629,7 @@ def generate_drawing_set(state_path: str | Path,
         # ≥2.5 mm lettering (ISO 3098); sits next to the PNGs for the exporter to link.
         "a1_print": {key: _a1_print_entry(out_dir, base)
                      for key, base in (("pid", "pid"), ("single-line", "single-line"),
-                                       ("bfd", "bfd"))},
+                                       ("bfd", "bfd"), ("ga", "ga"))},
         # deterministic self-examination — the loop's drawing feedback signal.
         "parts_ledger": self_exam.get("parts-ledger.json"),
         "drawings_inspection": self_exam.get("drawings-inspection.json"),

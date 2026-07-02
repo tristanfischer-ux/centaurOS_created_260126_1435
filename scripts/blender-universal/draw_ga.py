@@ -992,10 +992,23 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     svg_path.write_text(svg_text)
     png_ok = rasterise(svg_path, png_path) if rasterise_png else False
 
+    # print-ready ISO A1 PDF set — the SAME additive, non-fatal contract as the P&ID /
+    # BFD / single-line generators (reviewers 2026-07-02: the GA was the only system
+    # drawing without one, so the workbook's drawing register had nothing to point at).
+    # The SVG master above is untouched; a1_print paginates onto multiple A1 sheets when
+    # one sheet would print the smallest lettering below 2.5 mm (ISO 3098).
+    a1 = None
+    try:
+        import a1_print
+        a1 = a1_print.export_a1(svg_path, base="ga", title="General Arrangement")
+    except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
+        print(f"[ga] A1 PDF export skipped: {type(ex).__name__}: {ex}")
+
     summary = {
         "archetype": archetype,
         "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
+        "a1": a1,
         "equipment": len(parts),
         "plant_L_m": round((bbox.get("length_mm")
                             or (bbox.get("x_max_mm", 0) - bbox.get("x_min_mm", 0)))

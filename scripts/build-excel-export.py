@@ -302,6 +302,41 @@ def _aux_tab_score(title: str, run_dir: str):
         return {"score": sc, "target": 8, "status": st, "issues": iss,
                 "fix": "object-level visual quality is UNVERIFIED — run the vision critic on the render so a 5-second human-glance defect is caught before ship (then this advisory clears); also keep coverage ≥ 80%"}
 
+    if t == "drawings" or "drawing register" in t:
+        # DRAWING REGISTER (reviewers 2026-07-02) — deterministic integrity check of the
+        # register itself: every A1 sheet PDF it lists must EXIST on disk at build time,
+        # and every print set must meet the 2.5 mm ISO 3098 lettering bar. A registered
+        # file missing from disk is a broken deliverable → FAIL, honestly flagged.
+        regs = _drawing_register_rows(run_dir or "")
+        if not regs:
+            return None
+        listed = [f for rr in regs for f in rr["files"]]
+        missing = [f for rr in regs for f in rr["missing"]]
+        with_a1 = [rr for rr in regs if rr["files"]]
+        if not with_a1:
+            return {"score": 2, "target": 8, "status": "FAIL",
+                    "issues": ["no print-ready A1 PDF set exists for ANY drawing — the register has nothing to point at"],
+                    "fix": "run the drawing generators (a1_print.export_a1 in draw_pid / draw_bfd / draw_single_line / draw_ga)"}
+        if missing:
+            sc = min(6, max(0, round(10 * (len(listed) - len(missing)) / max(1, len(listed)))))
+            return {"score": sc, "target": 8, "status": "FAIL",
+                    "issues": [f"{len(missing)} of {len(listed)} registered A1 sheet PDF(s) MISSING on disk: "
+                               + ", ".join(missing[:4])],
+                    "fix": "re-run the drawing generators so every registered sheet PDF exists next to its SVG"}
+        below = [rr["no"] for rr in with_a1 if rr.get("meets_bar") is False]
+        if below:
+            return {"score": 7, "target": 8, "status": "FAIL",
+                    "issues": ["print legibility below the 2.5 mm ISO 3098 bar on: " + ", ".join(below)],
+                    "fix": "a1_print pagination must split those drawings onto more A1 sheets"}
+        no_a1 = [rr["no"] for rr in regs if not rr["files"]]
+        iss = [f"{len(with_a1)} drawing(s) registered with {len(listed)} print-ready A1 sheet PDF(s), "
+               f"all present on disk, lettering ≥2.5 mm"]
+        sc = 10
+        if no_a1:
+            sc = 8
+            iss.append("no A1 print set yet for: " + ", ".join(no_a1) + " (PNG/SVG master only)")
+        return {"score": sc, "target": 8, "status": "PASS", "issues": iss,
+                "fix": "" if sc == 10 else "wire a1_print.export_a1 into the remaining generator(s)"}
     if "p&id" in t or t == "pid":
         return _cov("pid", "P&ID")
     if "block flow" in t or "bfd" in t:
@@ -615,6 +650,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
     "Risk & Regulatory": "Hazard and risk register, compliance verdict and statutory duties.",
     "Assembly sequence": "Order of works from civils through to commissioning.",
+    "Drawings": "Drawing register — number, revision, scale, sheets and full-size A1 files.",
 }
 
 # ============================================================================
@@ -8651,7 +8687,9 @@ def safe_sheet_title(name: str, used: set) -> str:
 
 
 def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
-                  caption: str, used_titles: set) -> bool:
+                  caption: str, used_titles: set) -> Optional[str]:
+    """Embed one image as its own sheet. Returns the ACTUAL sheet title (so the
+    Drawings register can link to it), or None on failure."""
     from openpyxl.drawing.image import Image as XLImage
     ds = downscale_png(png_path, run_dir)
     try:
@@ -8661,6 +8699,19 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
         # of a bare bold cell. title_row returns the next free row; the image goes below it.
         img_row = title_row(ws, title, 6, caption)
         back_link(ws, 6)
+        # DRAWING CAPTION ROW (reviewers 2026-07-02): on each engineering-drawing tab,
+        # say where the full-size A1 vector sheets live + one sentence of reading
+        # guidance — the embedded PNG is a preview, the A1 PDF set is the print master.
+        note = _drawing_tab_note(run_dir, title)
+        if note:
+            ws.merge_cells(start_row=img_row, start_column=1,
+                           end_row=img_row, end_column=6)
+            nc = ws.cell(img_row, 1, note)
+            nc.font = FONT_SUB
+            nc.fill = FILL_SUB
+            nc.alignment = WRAP_TOP
+            ws.row_dimensions[img_row].height = 30
+            img_row += 1
         img = XLImage(ds)
         # cap on-sheet display size (keep aspect) so the tab is readable. Raised
         # 1100→1700 to match the higher-res embed: the underlying PNG is up to
@@ -8671,10 +8722,10 @@ def add_image_tab(wb: Workbook, run_dir: str, png_path: str, title: str,
             img.width = int(img.width * ratio)
             img.height = int(img.height * ratio)
         ws.add_image(img, f"A{img_row}")
-        return True
+        return sheet_title
     except Exception as exc:  # noqa: BLE001
         print(f"    ! could not embed {png_path}: {exc}")
-        return False
+        return None
 
 
 def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
@@ -8782,6 +8833,270 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
     # 'isometric-index' coverage is dropped from parts_ledger so no isometric tab/score remains.)
 
     return specs
+
+
+# ============================================================================
+# TAB — DRAWINGS REGISTER (reviewers' unanimous #1, 2026-07-02)
+# The seven print-ready ISO A1 vector PDFs (a1_print.py, commit 761ff4608) existed in
+# every run's drawings/ dir and were referenced NOWHERE in the workbook. This register
+# is the consultancy-standard artefact: one row per engineering drawing — Drawing No. ·
+# Title · Rev · Scale · Sheets · Min lettering · A1 PDF file(s) · preview-tab link —
+# plus a second section listing the photoreal renders from the drawing-manifest.
+# ============================================================================
+
+# The canonical drawing set: (A1 base, SVG master, default drawing no., register title,
+# embedded-preview tab fallback title). Register order mirrors the workbook tab order.
+_DRAWING_REGISTER = [
+    ("ga", "general-arrangement.svg", "FF-GA-001", "General Arrangement",
+     "GA — General Arrangement"),
+    ("pid", "pid.svg", "FF-PID-001", "Piping & Instrumentation Diagram", "P&ID"),
+    ("bfd", "block-flow-diagram.svg", "FF-BFD-001", "Block Flow Diagram",
+     "BFD — Block Flow"),
+    ("single-line", "single-line-diagram.svg", "FF-SLD-001",
+     "Single-Line Electrical Diagram", "Single-line"),
+    ("hvac", "hvac-layout.svg", "FF-HVAC-001", "HVAC / Ventilation Layout", "HVAC"),
+]
+
+# Drawing cross-reference → A1 base, for appending the sheet range so a bare
+# "FF-PID-001" resolves to the actual print set ("FF-PID-001 S1-S4").
+_A1_BASE_BY_REF = {"PID": "pid", "BFD": "bfd", "SLD": "single-line",
+                   "GA": "ga", "HVAC": "hvac"}
+_DRG_REF_RX = re.compile(r"\b(FF-(PID|BFD|SLD|GA|HVAC)-\d{3})\b(?!\s*S\d)")
+
+
+def _a1_manifest(run_dir: str, base: str) -> Optional[dict]:
+    """The <base>-A1.json print manifest a1_print.py writes next to the drawing SVG.
+    None when no A1 set was produced (or the PDF export failed — honest miss)."""
+    m = load_json(os.path.join(run_dir, "drawings", f"{base}-A1.json"))
+    if isinstance(m, dict) and m.get("pdf_ok") and m.get("pdfs"):
+        return m
+    return None
+
+
+def _a1_sheet_range(sheets) -> str:
+    """'S1' for a single-sheet set, 'S1-S4' for a 4-sheet set. '' when unknown."""
+    try:
+        n = int(sheets)
+    except (TypeError, ValueError):
+        return ""
+    return "S1" if n <= 1 else f"S1-S{n}"
+
+
+def _annotate_drawing_refs(text: str, sheet_counts: Dict[str, int]) -> str:
+    """Append the A1 sheet range to every drawing cross-reference in `text` so it
+    resolves to the print set: 'FF-PID-001' → 'FF-PID-001 S1-S4'. Idempotent (an
+    already-annotated ref never gains a second range); a ref whose drawing has no A1
+    print set is left untouched. Pure — proveCatch in _selftest."""
+    def _sub(m: "re.Match") -> str:
+        rng = _a1_sheet_range(sheet_counts.get(m.group(2)))
+        return f"{m.group(1)} {rng}" if rng else m.group(1)
+    return _DRG_REF_RX.sub(_sub, text)
+
+
+def _svg_titleblock(run_dir: str, svg_name: str) -> Dict[str, str]:
+    """Parse DRAWING No. / REV / SCALE out of the DELIVERED drawing SVG's title block
+    (the generators draw each row as a key <text> immediately followed by its value
+    <text>). SIGHT principle: read the artefact, not what the code intended."""
+    out: Dict[str, str] = {}
+    try:
+        with open(os.path.join(run_dir, "drawings", svg_name), encoding="utf-8") as fh:
+            svg = fh.read()
+    except OSError:
+        return out
+    from html import unescape as _unesc
+    for key, label in (("no", r"DRAWING No\."), ("rev", "REV"), ("scale", "SCALE")):
+        m = re.search(r">" + label + r"</text>\s*<text[^>]*>([^<]+)</text>", svg)
+        if m:
+            out[key] = _unesc(m.group(1)).strip()
+    return out
+
+
+def _drawing_register_rows(run_dir: str) -> List[dict]:
+    """One register row per drawing whose SVG master exists in <run>/drawings/: title-
+    block fields (from the SVG), A1 print-set numbers (from <base>-A1.json) and an
+    on-disk existence check of every listed sheet PDF. Deterministic; universal."""
+    rows: List[dict] = []
+    for base, svg_name, no_default, title, tab in _DRAWING_REGISTER:
+        if not os.path.exists(os.path.join(run_dir, "drawings", svg_name)):
+            continue                    # a class that never drew this sheet — no row
+        tb = _svg_titleblock(run_dir, svg_name)
+        man = _a1_manifest(run_dir, base) or {}
+        pdfs = [f"drawings/{p}" for p in (man.get("pdfs") or [])]
+        rows.append({
+            "base": base,
+            "svg": svg_name,
+            "no": tb.get("no") or no_default,
+            "title": title,
+            "rev": tb.get("rev") or "—",
+            "scale": tb.get("scale") or "—",
+            "sheets": man.get("sheets"),
+            "min_text_mm": man.get("min_text_mm"),
+            "meets_bar": man.get("meets_bar"),
+            "files": pdfs,
+            "missing": [p for p in pdfs
+                        if not os.path.exists(os.path.join(run_dir, p))],
+            "tab": tab,
+        })
+    return rows
+
+
+def _drawing_base_for_title(title: str) -> Optional[str]:
+    """Map an embedded drawing TAB title to its A1 base ('P&ID' → 'pid'). None for a
+    non-drawing tab (renders, modules, data tabs)."""
+    low = (title or "").lower()
+    if "p&id" in low or low == "pid":
+        return "pid"
+    if low.startswith("bfd") or "block flow" in low:
+        return "bfd"
+    if "single-line" in low or "single line" in low:
+        return "single-line"
+    if low.startswith("ga ") or low == "ga" or "general arrangement" in low:
+        return "ga"
+    if "hvac" in low:
+        return "hvac"
+    return None
+
+
+# One-sentence reading guidance per drawing type — what to look at, drawn from the
+# drawing's own structure, with the cross-tab whose rows carry the same tags.
+_DRAWING_TAB_GUIDANCE = {
+    "pid": "top band = the process train in flow order (follow the numbered lines left to "
+           "right), lower band = utility / dosing tie-ins; line numbers match the Process "
+           "schedules tab.",
+    "bfd": "each block is one major process step — follow the stream arrows left to right; "
+           "block names match the Quantities and BoM module groupings.",
+    "single-line": "read top-down from the utility incomer through the main board to each "
+                   "feeder; feeder tags and loads match the Panel schedule tab.",
+    "ga": "plan view with elevations — equipment outlines carry the same tags as the Part "
+          "names tab; dimensions in mm, datum ±0.000 = finished floor level.",
+    "hvac": "duct runs overlay the GA footprint with supply vs extract airflow arrows; "
+            "equipment tags match the Part names tab.",
+}
+
+
+def _drawing_tab_note(run_dir: str, title: str) -> Optional[str]:
+    """The caption row for an embedded drawing tab: where the full-size A1 vector sheets
+    live + one sentence of reading guidance. None for a non-drawing tab."""
+    base = _drawing_base_for_title(title)
+    if base is None:
+        return None
+    man = _a1_manifest(run_dir, base)
+    if man:
+        n = man.get("sheets") or len(man["pdfs"])
+        sheets_txt = "sheet 1 of 1" if (isinstance(n, (int, float)) and n <= 1) else f"sheets 1-{int(n)}"
+        lead = (f"Full-size vector sheets: drawings/{man['pdfs'][0]} ({sheets_txt}, ISO A1, "
+                f"lettering ≥{man.get('min_text_bar_mm', 2.5):g} mm) — see the Drawings register tab.")
+    else:
+        lead = ("Full-size vector sheets: none for this drawing (PNG/SVG master only) — "
+                "see the Drawings register tab.")
+    return f"{lead} Reading guide: {_DRAWING_TAB_GUIDANCE[base]}"
+
+
+def tab_drawings_register(wb: Workbook, run_dir: str,
+                          embedded: Optional[List[Tuple[str, str]]] = None) -> bool:
+    """The 'Drawings' register tab: section 1 = the engineering drawings (Drawing No. ·
+    Title · Rev · Scale · Sheets · Min lettering · A1 PDF file(s) · preview link · an
+    honest on-disk file check); section 2 = the photoreal renders from the manifest's
+    renders[]. `embedded` maps source image paths → the actual workbook tab titles so
+    the preview links always resolve. Returns False when there is nothing to register."""
+    regs = _drawing_register_rows(run_dir)
+    man = load_json(os.path.join(run_dir, "drawing-manifest.json")) or {}
+    renders = [r for r in (man.get("renders") or []) if isinstance(r, dict) and r.get("file")]
+    if not regs and not renders:
+        return False
+    embedded = embedded or []
+
+    def _tab_for_path(path: str, by: str = "path") -> Optional[str]:
+        """Embedded sheet for a source image. by='path' → exact normalised-path match
+        (renders: exterior/00-hero.png shares its BASENAME with the interior 00-hero.png,
+        so a stem match would link the exterior rows to the interior tabs); by='stem' →
+        filename-stem match (drawings: the register knows 'pid.svg', the embed may be
+        drawings/pid.png or an .excel-tmp SVG→PNG conversion)."""
+        tgt = os.path.normpath(path).lower()
+        want = os.path.splitext(os.path.basename(path))[0].lower()
+        for sheet, src in embedded:
+            if by == "path":
+                if os.path.normpath(src).lower() == tgt:
+                    return sheet
+            elif os.path.splitext(os.path.basename(src))[0].lower() == want:
+                return sheet
+        return None
+
+    ws = wb.create_sheet("Drawings")
+    set_widths(ws, {"A": 13, "B": 34, "C": 5, "D": 15, "E": 7, "F": 13, "G": 40,
+                    "H": 26, "I": 30})
+    title_row(
+        ws, "Drawing register", 9,
+        "Every engineering drawing and render in this dossier. The File column names the "
+        "print-ready ISO A1 vector PDF set in the run's drawings/ folder (841 × 594 mm, "
+        "smallest lettering ≥ 2.5 mm on paper per ISO 3098; multi-sheet drawings carry "
+        "match lines). The workbook tabs embed reduced PNG previews — print from the A1 "
+        "PDFs, never from the previews.")
+    back_link(ws, 9)
+    header(ws, 4, ["Drawing No.", "Title", "Rev", "Scale", "Sheets",
+                   "Min lettering", "File (A1 print set)", "Preview tab", "File check"])
+    r = 5
+    for rr in regs:
+        ws.cell(r, 1, rr["no"]).border = BORDER
+        tc = ws.cell(r, 2, rr["title"]); tc.alignment = WRAP_TOP; tc.border = BORDER
+        ws.cell(r, 3, rr["rev"]).border = BORDER
+        ws.cell(r, 4, rr["scale"]).border = BORDER
+        sc = ws.cell(r, 5, rr["sheets"] if rr["sheets"] else "—")
+        sc.alignment = Alignment(horizontal="center"); sc.border = BORDER
+        mt = rr.get("min_text_mm")
+        ws.cell(r, 6, f"{mt:g} mm" if isinstance(mt, (int, float)) else "—").border = BORDER
+        fc = ws.cell(r, 7, "\n".join(rr["files"]) if rr["files"]
+                     else "— no A1 print set (PNG/SVG embedded only)")
+        fc.alignment = WRAP_TOP; fc.border = BORDER; fc.font = FONT_NOTE
+        tab = (_tab_for_path(rr["svg"], by="stem")
+               or (rr["tab"] if rr["tab"] in wb.sheetnames else None))
+        pv = ws.cell(r, 8, tab or "—")
+        pv.border = BORDER
+        if tab:
+            pv.hyperlink = f"#'{tab}'!A1"
+            pv.font = FONT_LINK
+        # honest on-disk check of every listed sheet PDF, at build time
+        if rr["missing"]:
+            ck = ws.cell(r, 9, "✗ MISSING on disk: " + ", ".join(rr["missing"]))
+            ck.font = FONT_FAIL; ck.fill = FILL_FAIL
+        elif rr["files"]:
+            ck = ws.cell(r, 9, f"✓ {len(rr['files'])} sheet PDF(s) on disk")
+            ck.font = FONT_PASS; ck.fill = FILL_PASS
+        else:
+            ck = ws.cell(r, 9, "—")
+        ck.alignment = WRAP_TOP; ck.border = BORDER
+        if len(rr["files"]) > 1:
+            ws.row_dimensions[r].height = 14.5 * len(rr["files"])
+        r += 1
+
+    if renders:
+        r += 1
+        sub_banner(ws, r, f"Photoreal renders — {len(renders)} view(s) from the Blender "
+                          f"scene build (drawing-manifest renders[])", 9)
+        r += 1
+        header(ws, r, ["#", "Render", "File", "Caption", "", "", "", "Preview tab", ""])
+        r += 1
+        for i, rd in enumerate(renders, 1):
+            ws.cell(r, 1, i).border = BORDER
+            nm = ws.cell(r, 2, clean_cell(str(rd.get("sheet_name") or
+                                              os.path.basename(str(rd["file"])))))
+            nm.alignment = WRAP_TOP; nm.border = BORDER
+            fl = ws.cell(r, 3, str(rd["file"])); fl.font = FONT_NOTE; fl.border = BORDER
+            ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=7)
+            cp = ws.cell(r, 4, clean_cell(str(rd.get("caption") or "—")))
+            cp.alignment = WRAP_TOP; cp.font = FONT_NOTE
+            tab = _tab_for_path(os.path.join(run_dir, str(rd["file"])))
+            pv = ws.cell(r, 8, tab or "—")
+            pv.border = BORDER
+            if tab:
+                pv.hyperlink = f"#'{tab}'!A1"
+                pv.font = FONT_LINK
+            if len(str(rd.get("caption") or "")) > 100:
+                ws.row_dimensions[r].height = 29
+            r += 1
+
+    ws.freeze_panes = "A5"
+    return True
 
 
 # ============================================================================
@@ -8984,6 +9299,8 @@ def _reorder_tabs(wb: Workbook) -> None:
         "Line & velocity": 24, "Panel schedule": 25, "Process schedules": 26,
         "Assembly sequence": 29,
         "Risk & Regulatory": 30,
+        "Drawings": 49,                                 # the drawing REGISTER opens the drawings section
+
         "⚠ Checks": 90, "⚠ Audit": 91, "Connection trace": 92, "Part names": 93, "Glossary": 94,
     }
 
@@ -9568,11 +9885,20 @@ def build(run_dir: str, out_path: str) -> dict:
     used_titles = {t.lower() for t in wb.sheetnames}
     specs = collect_image_specs(run_dir)
     img_ok = 0
+    embedded: List[Tuple[str, str]] = []   # (actual sheet title, source image path)
     for path, ttl, cap in specs:
         png = ensure_png(path, run_dir)
-        if png and add_image_tab(wb, run_dir, png, ttl, cap, used_titles):
+        sheet = add_image_tab(wb, run_dir, png, ttl, cap, used_titles) if png else None
+        if sheet:
             img_ok += 1
+            embedded.append((sheet, path))
             print(f"      + {ttl}")
+
+    # ---- DRAWINGS REGISTER (reviewers 2026-07-02): the print-ready A1 vector PDF sets
+    # existed in drawings/ and were referenced NOWHERE in the workbook. Built AFTER the
+    # image tabs so every preview link resolves to a real sheet; _reorder_tabs places it
+    # just before the first drawing tab. ----
+    add_tab("Drawings (register)", lambda: tab_drawings_register(wb, run_dir, embedded))
 
     # ---- reorder into the reader-narrative sequence BEFORE Contents is built, so the Contents
     # index lists the tabs in the new order (Story → Commercial → Engineering → Drawings → Audit) ----
@@ -9622,11 +9948,26 @@ def build(run_dir: str, out_path: str) -> dict:
     def _expand_sci(_m: "re.Match") -> str:
         _val = float(_m.group(1))
         return str(int(_val)) if _val == int(_val) else repr(_val)
-    _defanged = _normalised = 0
+    # A1 sheet counts per drawing-ref prefix, for resolving cross-references
+    # ('FF-PID-001' → 'FF-PID-001 S1-S4') in the same sweep. The Drawings register
+    # sheet is skipped — it already carries an explicit Sheets column.
+    _a1_counts: Dict[str, int] = {}
+    for _ref, _b in _A1_BASE_BY_REF.items():
+        _mn = _a1_manifest(run_dir, _b)
+        if _mn and isinstance(_mn.get("sheets"), (int, float)):
+            _a1_counts[_ref] = int(_mn["sheets"])
+    _defanged = _normalised = _annotated = 0
     for _ws in wb.worksheets:
         for _row in _ws.iter_rows():
             for _c in _row:
                 _v = _c.value
+                if (_a1_counts and isinstance(_v, str) and "FF-" in _v
+                        and not _v.startswith("=") and _ws.title != "Drawings"):
+                    _nv = _annotate_drawing_refs(_v, _a1_counts)
+                    if _nv != _v:
+                        _c.value = _nv
+                        _annotated += 1
+                    continue
                 if not (isinstance(_v, str) and _v.startswith("=")):
                     continue
                 if _is_invalid_formula(_v):
@@ -9637,6 +9978,9 @@ def build(run_dir: str, out_path: str) -> dict:
                     _normalised += 1
     if _defanged or _normalised:
         print(f"  · Excel-corruption guard: defanged {_defanged} prose-as-formula + normalised {_normalised} sci-notation formula(s)")
+    if _annotated:
+        print(f"  · Drawing cross-refs: {_annotated} cell(s) annotated with the A1 sheet range "
+              f"(e.g. FF-PID-001 S1-S{_a1_counts.get('PID', '?')})")
 
     # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
     #    tabs. Now that all sheets exist, merge each drawing/render/meta sheet's aux-score into the
@@ -10469,6 +10813,112 @@ def _selftest() -> int:
                   f"title (got {_hs2})"); bad += 1
         if os.path.basename(_hero_embed_png(_td5) or "") != "00-hero.png":
             print("  FAIL hero-embed: without hero-embed.png the full hero must be the fallback"); bad += 1
+    # ═══ (19) DRAWINGS REGISTER + A1 cross-refs (reviewers 2026-07-02). Claims:
+    # (a) the register reads Drawing No./Rev/Scale from the DELIVERED SVG title block;
+    # (b) a registered A1 sheet PDF MISSING from disk is flagged on the row AND fails
+    #     the tab's deterministic score (proveCatch — never a silent green register);
+    # (c) with every listed file on disk the register scores a PASS;
+    # (d) 'FF-PID-001' cross-refs gain the sheet range ('S1-S4'), idempotently, and a
+    #     ref with no A1 set stays untouched;
+    # (e) the rendered Drawings sheet lists the drawing + its file + a preview link,
+    #     and the drawing-tab caption note names the A1 file + the register. ═══
+    with _tf.TemporaryDirectory() as _td7:
+        _dd = os.path.join(_td7, "drawings")
+        os.makedirs(_dd)
+        _tb_svg = (  # the generators' title-block idiom: key <text> then value <text>
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700">'
+            '<text x="8" y="10" font-size="9">DRAWING No.</text>'
+            '<text x="120" y="10" font-size="9.5">{no}</text>'
+            '<text x="8" y="30" font-size="9">REV</text>'
+            '<text x="120" y="30" font-size="9.5">P1</text>'
+            '<text x="8" y="50" font-size="9">SCALE</text>'
+            '<text x="120" y="50" font-size="9.5">{scale}</text></svg>')
+        with open(os.path.join(_dd, "general-arrangement.svg"), "w") as _fh:
+            _fh.write(_tb_svg.format(no="FF-GA-001", scale="1:100  (@ A1)"))
+        with open(os.path.join(_dd, "pid.svg"), "w") as _fh:
+            _fh.write(_tb_svg.format(no="FF-PID-001", scale="NTS"))
+        with open(os.path.join(_dd, "ga-A1.json"), "w") as _fh:
+            json.dump({"pdf_ok": True, "pdfs": ["ga-A1.pdf"], "sheets": 1,
+                       "min_text_mm": 2.76, "meets_bar": True}, _fh)
+        with open(os.path.join(_dd, "pid-A1.json"), "w") as _fh:
+            json.dump({"pdf_ok": True, "sheets": 4, "min_text_mm": 2.85, "meets_bar": True,
+                       "pdfs": ["pid-A1.pdf", "pid-A1-sheet2.pdf",
+                                "pid-A1-sheet3.pdf", "pid-A1-sheet4.pdf"]}, _fh)
+        for _pn in ("ga-A1.pdf", "pid-A1.pdf", "pid-A1-sheet2.pdf", "pid-A1-sheet3.pdf"):
+            with open(os.path.join(_dd, _pn), "wb") as _fh:
+                _fh.write(b"%PDF-1.4 fixture")
+        # (a) title-block fields come from the artefact; (b) sheet4 is listed but absent
+        _rr = _drawing_register_rows(_td7)
+        _ga = next((x for x in _rr if x["no"] == "FF-GA-001"), None)
+        _pid = next((x for x in _rr if x["no"] == "FF-PID-001"), None)
+        if not _ga or _ga["scale"] != "1:100  (@ A1)" or _ga["rev"] != "P1" or _ga["missing"]:
+            print(f"  FAIL drg-register: GA row must carry the SVG title-block fields with no "
+                  f"missing file (got {_ga})"); bad += 1
+        if not _pid or _pid["missing"] != ["drawings/pid-A1-sheet4.pdf"]:
+            print(f"  FAIL drg-register: the absent pid sheet-4 PDF must be flagged MISSING "
+                  f"(got {_pid and _pid['missing']})"); bad += 1
+        _aux = _aux_tab_score("Drawings", _td7)
+        if not _aux or _aux["status"] != "FAIL" or "MISSING" not in " ".join(_aux["issues"]):
+            print(f"  FAIL drg-register: a registered file NOT on disk must FAIL the tab score "
+                  f"(got {_aux})"); bad += 1
+        # (c) once the file exists the register scores an honest PASS
+        with open(os.path.join(_dd, "pid-A1-sheet4.pdf"), "wb") as _fh:
+            _fh.write(b"%PDF-1.4 fixture")
+        _aux2 = _aux_tab_score("Drawings", _td7)
+        if not _aux2 or _aux2["status"] != "PASS":
+            print(f"  FAIL drg-register: all-files-on-disk must PASS (got {_aux2})"); bad += 1
+        # (d) cross-ref annotation resolves, idempotently; no-A1 refs untouched
+        _cnt = {"PID": 4, "GA": 1}
+        _an = _annotate_drawing_refs("cross-referenced to the P&ID (FF-PID-001).", _cnt)
+        if "FF-PID-001 S1-S4" not in _an:
+            print(f"  FAIL drg-refs: FF-PID-001 must gain S1-S4 (got {_an!r})"); bad += 1
+        if _annotate_drawing_refs(_an, _cnt) != _an:
+            print(f"  FAIL drg-refs: annotation must be idempotent (got "
+                  f"{_annotate_drawing_refs(_an, _cnt)!r})"); bad += 1
+        if _annotate_drawing_refs("see FF-HVAC-001", _cnt) != "see FF-HVAC-001":
+            print("  FAIL drg-refs: a ref with no A1 set must stay untouched"); bad += 1
+        if "FF-GA-001 S1" not in _annotate_drawing_refs("FF-GA-001", _cnt):
+            print("  FAIL drg-refs: a single-sheet set must resolve to 'S1'"); bad += 1
+        # (e) the rendered register sheet + the drawing-tab caption note
+        _wbd = Workbook(); _wbd.remove(_wbd.active)
+        if not tab_drawings_register(_wbd, _td7, [("P&ID", os.path.join(_dd, "pid.png"))]):
+            print("  FAIL drg-register: tab must build from the fixture run"); bad += 1
+        else:
+            _dws = _wbd["Drawings"]
+            _cells = [str(c.value) for row_ in _dws.iter_rows() for c in row_ if c.value]
+            if not any("FF-GA-001" in v for v in _cells) \
+                    or not any("drawings/pid-A1-sheet4.pdf" in v for v in _cells) \
+                    or not any("✓" in v and "on disk" in v for v in _cells):
+                print("  FAIL drg-register: rendered sheet must list the drawing no., the A1 "
+                      "files and the on-disk check"); bad += 1
+        _note = _drawing_tab_note(_td7, "P&ID")
+        if not _note or "drawings/pid-A1.pdf" not in _note or "sheets 1-4" not in _note \
+                or "Drawings register" not in _note or "Process schedules" not in _note:
+            print(f"  FAIL drg-note: the P&ID caption must name the A1 file, the sheet range, "
+                  f"the register and its reading guide (got {_note!r})"); bad += 1
+        if _drawing_tab_note(_td7, "Render — Interior layout") is not None:
+            print("  FAIL drg-note: a render tab must get NO drawing caption"); bad += 1
+        # (f) BASENAME-TWIN preview links: exterior/00-hero.png shares its basename with
+        # the interior 00-hero.png — the exterior render row must link to the EXTERIOR
+        # tab (path-exact match), never the interior twin (the 2026-06-22 collision class).
+        with open(os.path.join(_td7, "drawing-manifest.json"), "w") as _fh:
+            json.dump({"renders": [
+                {"file": "00-hero.png", "sheet_name": "Render 1 — Interior iso",
+                 "caption": "interior"},
+                {"file": "exterior/00-hero.png", "sheet_name": "Render 5 — Exterior iso",
+                 "caption": "exterior"}]}, _fh)
+        _wbe = Workbook(); _wbe.remove(_wbe.active)
+        tab_drawings_register(_wbe, _td7, [
+            ("Render 1 — Interior iso", os.path.join(_td7, "00-hero.png")),
+            ("Render 5 — Exterior iso", os.path.join(_td7, "exterior", "00-hero.png"))])
+        _ews = _wbe["Drawings"]
+        _pv = None
+        for _rw in _ews.iter_rows():
+            if any(isinstance(c.value, str) and c.value == "exterior/00-hero.png" for c in _rw):
+                _pv = _rw[7].value
+        if _pv != "Render 5 — Exterior iso":
+            print(f"  FAIL drg-render-link: the exterior render must link to the EXTERIOR tab, "
+                  f"never its interior basename twin (got {_pv!r})"); bad += 1
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
