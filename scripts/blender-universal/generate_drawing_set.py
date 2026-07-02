@@ -188,6 +188,24 @@ def _run_exterior_pass(out_dir: Path, state_path: Path,
     return ok
 
 
+def _a1_print_entry(out_dir: Path, base: str) -> dict | None:
+    """The drawing's DELIVERED A1 print set (written by a1_print.py inside the P&ID /
+    BFD / single-line generators): sheet PDFs + print-legibility numbers, from the
+    <base>-A1.json manifest. None when no A1 set was produced."""
+    man_path = out_dir / "drawings" / f"{base}-A1.json"
+    if not man_path.exists():
+        return None
+    try:
+        man = json.loads(man_path.read_text())
+    except Exception:  # noqa: BLE001
+        return None
+    if not (man.get("pdf_ok") and man.get("pdfs")):
+        return None
+    return {"pdfs": [f"drawings/{p}" for p in man["pdfs"]],
+            "sheets": man.get("sheets"), "grid": man.get("grid"),
+            "mm_per_px": man.get("mm_per_px"), "min_text_mm": man.get("min_text_mm")}
+
+
 def _run_generator(script: str, out_dir: Path, state_path: Path,
                    png_name: str, log: list[str]) -> bool:
     """Run one draw_*.py as an isolated subprocess; return whether its PNG landed."""
@@ -443,6 +461,12 @@ def generate_drawing_set(state_path: str | Path,
         "hero": hero_abs,
         # the Part-1 process-flow Block-Flow Diagram (D1 fix) → EngineeringBasisPage.
         "block_flow_diagram": bfd_path,
+        # print-ready ISO A1 vector PDF sets (Tristan issues 15-17: on-screen PNGs are
+        # "too tiny to see"). Written by a1_print.py inside the generators, paginated to
+        # ≥2.5 mm lettering (ISO 3098); sits next to the PNGs for the exporter to link.
+        "a1_print": {key: _a1_print_entry(out_dir, base)
+                     for key, base in (("pid", "pid"), ("single-line", "single-line"),
+                                       ("bfd", "bfd"))},
         # deterministic self-examination — the loop's drawing feedback signal.
         "parts_ledger": self_exam.get("parts-ledger.json"),
         "drawings_inspection": self_exam.get("drawings-inspection.json"),

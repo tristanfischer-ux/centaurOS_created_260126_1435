@@ -2909,10 +2909,23 @@ def generate_sld(out_dir: str, state_path: Optional[str] = None,
     if rasterise_png:
         png_ok = rasterise(svg_path, png_path)
 
+    # print-ready ISO A1 PDF set (Tristan issues 15-17: the embedded PNG is "too tiny to
+    # see"). Additive: the SVG master above is untouched; the exporter paginates onto
+    # multiple A1 sheets when one sheet would print the smallest lettering below 2.5 mm
+    # (ISO 3098). Non-fatal by contract.
+    a1 = None
+    try:
+        import a1_print
+        a1 = a1_print.export_a1(svg_path, base="single-line",
+                                title="Single-Line Electrical Diagram")
+    except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
+        print(f"[sld] A1 PDF export skipped: {type(ex).__name__}: {ex}")
+
     summary = {
         "archetype": tree.archetype,
         "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
+        "a1": a1,
         "source": tree.source.tag,
         "main_bus": tree.main_bus.tag,
         "main_branches": len(tree.main_bus.branches),
@@ -2945,10 +2958,53 @@ def _count_loads(tree: Tree):
     return n
 
 
+def _selftest() -> int:
+    """Layout + A1-print invariants (regression guard for the G1 legibility gate): a
+    synthetic board renders within the ≤4:1 aspect gate, and the A1 pagination plan
+    always reaches ≥ 2.5 mm lettering (ISO 3098) — more sheets, never smaller text.
+    Pure — no external files, no rasteriser. Returns 0 on pass."""
+    import a1_print
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    def _mk_tree(n_branches):
+        """A synthetic LV board: utility incomer → main bus → n plain load branches."""
+        bus = Bus(tag="MDB-01", voltage="400 V AC", rating="1250 A",
+                  branches=[Branch(from_node="MDB-01", to_node=f"L{i}",
+                                   label=f"Load {i}", rating="63 A", cable="16 mm²",
+                                   devices=[Device(kind="breaker", tag="CB")])
+                            for i in range(n_branches)])
+        return Tree(archetype="selftest", source=Source(),
+                    incomer_devices=[Device(kind="breaker", tag="ACB")],
+                    incomer_transformer=None, main_bus=bus)
+
+    # S1 — a small board and a WIDE board both clear the ≤4:1 G1 aspect gate.
+    for name, n in (("small", 4), ("wide", 28)):
+        svg = build_sld_svg(_mk_tree(n))
+        w, h = a1_print.svg_px_dims(svg)
+        chk(f"S1.aspect_{name}", max(w, h) / min(w, h) <= 4.0)
+        # S2 — every load label is present (no lost content).
+        chk(f"S2.loads_kept_{name}", all(f"Load {i}" in svg for i in range(n)))
+        # S3 — the A1 pagination plan reaches the ISO 3098 bar for the real output.
+        p = a1_print.plan_sheets(w, h, a1_print.min_font_px(svg))
+        chk(f"S3.a1_plan_meets_bar_{name}", p["meets_bar"] and p["min_text_mm"] >= 2.5)
+
+    for f in fails:
+        print(f"[sld][selftest] FAIL {f}")
+    print(f"[sld][selftest] {'PASS' if not fails else 'FAIL'} "
+          f"({len(fails)} failure(s))")
+    return 1 if fails else 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] == "--selftest":
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:
@@ -2969,6 +3025,10 @@ def main(argv):
         print(f"[sld] PNG → {summary['png']}")
     else:
         print("[sld] PNG not written (no rasteriser available — SVG is the master)")
+    a1 = summary.get("a1")
+    if a1 and a1.get("pdf_ok"):
+        print(f"[sld] A1  → {a1['pdfs'][0]}  ({a1['sheets']} sheet(s), "
+              f"min text {a1['min_text_mm']} mm on A1)")
     return 0
 
 

@@ -3176,10 +3176,23 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
 
     png_ok = rasterise(svg_path, png_path) if rasterise_png else False
 
+    # print-ready ISO A1 PDF set (Tristan issues 15-17: the embedded PNG is "too tiny to
+    # see — should be an A1 page PDF"). Additive: the SVG master above is untouched; the
+    # exporter paginates onto multiple A1 sheets when one sheet would print the smallest
+    # lettering below 2.5 mm (ISO 3098). Non-fatal by contract.
+    a1 = None
+    try:
+        import a1_print
+        a1 = a1_print.export_a1(svg_path, base="pid",
+                                title="Piping & Instrumentation Diagram")
+    except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
+        print(f"[pid] A1 PDF export skipped: {type(ex).__name__}: {ex}")
+
     summary = {
         "archetype": proc.archetype,
         "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
+        "a1": a1,
         "equipment": len(proc.nodes),
         "lines": len(proc.lines),
         "instruments": sum(len(n.instruments) for n in proc.nodes)
@@ -3268,6 +3281,12 @@ def _selftest() -> int:
     chk("F4.order_preserved", [c for r in rows for c in r] == list(range(25)))
     chk("F4.row_count", 1 <= len(rows) <= 3 and all(rows))
     chk("F4.single_row_noop", _balance_rows_pid(list(range(7)), 1) == [list(range(7))])
+    # F5 — A1 PRINT LEGIBILITY: the A1 pagination plan for the generator's own output
+    #      always reaches ≥ 2.5 mm lettering (ISO 3098) — more sheets, never smaller text.
+    import a1_print
+    for name, svg in (("46col", svg46), ("5col", svg5)):
+        p = a1_print.plan_sheets(*_dims(svg), a1_print.min_font_px(svg))
+        chk(f"F5.a1_plan_meets_bar_{name}", p["meets_bar"] and p["min_text_mm"] >= 2.5)
 
     for f in fails:
         print(f"[pid][selftest] FAIL {f}")
@@ -3300,6 +3319,10 @@ def main(argv):
         print(f"[pid] PNG → {summary['png']}")
     else:
         print("[pid] PNG not written (no rasteriser available — SVG is the master)")
+    a1 = summary.get("a1")
+    if a1 and a1.get("pdf_ok"):
+        print(f"[pid] A1  → {a1['pdfs'][0]}  ({a1['sheets']} sheet(s), "
+              f"min text {a1['min_text_mm']} mm on A1)")
     return 0
 
 
