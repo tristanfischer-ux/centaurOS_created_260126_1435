@@ -7561,6 +7561,24 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
     # The edge must carry a rating to be sized. If it has neither an explicit
     # required_value nor an override carried_value, fall back to a small default.
     has_rating = (carried_value is not None) or (e.get("required_value") is not None)
+    # HONEST-UNKNOWN, electrical (2026-07-02 — the "0 A → 10×0 mm Cu bar, within ✓"
+    # fabrication): an ELECTRICAL edge whose design current resolves to ZERO/absent
+    # cannot be sized — feeding 0 A to the sizer mints a 0 mm² busbar marked in-spec
+    # at the leaked 1500 V default. Mirror connection_sizing's fluid no-demand rule at
+    # this chokepoint: UNVERIFIED (within_spec=None), never a fabricated ✓. Universal —
+    # keyed on the mechanism + the missing demand, no class table.
+    _is_electrical_edge = (e.get("constraint_kind") == "current_rating"
+                           or (e.get("mechanism") or mech) == "electrical_bus")
+    _design_val = carried_value if carried_value is not None else e.get("required_value")
+    try:
+        _design_pos = float(_design_val) > 0
+    except (TypeError, ValueError):
+        _design_pos = False
+    if _is_electrical_edge and not _design_pos:
+        has_rating = False           # a zero current is NOT a rating
+        e.pop("required_value", None)
+        carried_value = None
+        e["_electrical_no_demand"] = True   # cache-sig distinct from a plain no-rating edge
 
     # Memo key: the rating-determining inputs + a 0.5 m length bucket (length only
     # shifts volt-drop %, not the chosen size, so coarse bucketing is safe). Identical
@@ -7573,6 +7591,27 @@ def _sized_dia_mm(nm, mech, waypoints, edge, carried_value=None, role=None):
     if cached is not None:
         spec = copy.deepcopy(cached)
         spec["length_m"] = round(length_m, 2)   # keep THIS run's exact length
+    elif e.get("_electrical_no_demand"):
+        # Electrical edge with NO design current (absent/zero) — UNVERIFIED, not sized
+        # (see the HONEST-UNKNOWN block above; the fluid twin lives in size_connection).
+        spec = cs._spec(
+            kind="cable", mechanism=e.get("mechanism") or mech,
+            size_label="(unsized — no design current)",
+            outer_dia_mm=CONN_FALLBACK_DIA_MM,
+            drop_pct_or_velocity=None, within_spec=None,
+            spec_limit="≤5% volt-drop (UNVERIFIED — no design current)",
+            material_qty_desc=f"power feeder, {length_m:.1f} m (design current unknown)",
+            tool_used="(no design current — NOT sized)",
+            assumptions=["electrical edge carries no required_value design current "
+                         "(absent or zero); the conductor cannot be sized and "
+                         "volt-drop / within-spec are UNVERIFIED (fix at source: "
+                         "author the current demand on the topology edge)"],
+            notes="no design current on this electrical edge — volt-drop UNVERIFIED",
+        )
+        spec["from_part"] = e.get("from_part")
+        spec["to_part"] = e.get("to_part")
+        spec["length_m"] = round(length_m, 2)
+        _SIZING_CACHE[sig] = copy.deepcopy(spec)
     elif not has_rating and not e.get("constraint_kind"):
         # No rating + no constraint_kind ⇒ nothing to size from. Small fallback dia.
         spec = cs._spec(
@@ -8962,6 +9001,13 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     #    part of a shared tray). Edges that resolve to no port are skipped here exactly as
     #    before (abstract boundary / assembly / unported endpoint) — never drawn.
     resolved = []        # [{idx,e,frm,to,mech,service,src_part,dst_part,src_xyz,...}]
+    # DEMOTED ≠ DELETED (2026-07-02): a cable edge the hero declutters out of the 3-D
+    # scene still physically EXISTS — the panel schedule's volt-drop needs its ROUTED
+    # length. Such edges are still RESOLVED to their ports and LENGTH-ROUTED through the
+    # same orthogonal router (deterministic Manhattan rise→across→drop), but registered
+    # WITHOUT a mesh (_record_logical): sized into _CONN_SPECS (→ connection-schedule.json
+    # → panel ΔU%) + wired-lengths.json, zero geometry (declutter intent preserved).
+    logical_pool = []    # declutter-demoted cable edges → length-only routing (no draw)
     for idx, e in enumerate(ledger_topology or []):
         frm = e.get("from_part")
         to = e.get("to_part")
@@ -8986,6 +9032,11 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         # HERO-ONLY (not _INSPECT_MODE): only the materialed hero declutters the I&C wiring; the
         # INSPECT=1 technical render KEEPS it so the parts-ledger + P&ID + the connectivity audit
         # see the instrument↔measured associations (Tristan 2026-06-22 — hiding broke coverage).
+        # 2026-07-02: a declutter hit no longer DROPS the edge — it is tagged and diverted to
+        # logical_pool below (length-only routing, no mesh) so its routed length still reaches
+        # the connection schedule + panel volt-drop. Grouping/drawing sees resolved[] only, so
+        # the hero geometry is unchanged by this.
+        _declutter = False
         if (not _INSPECT_MODE) and os.environ.get("BLENDER_WIRE_INSTRUMENTS", "").strip().lower() \
                 not in ("1", "true", "yes", "on"):
             _fp, _tp = by_name.get(frm), by_name.get(to)
@@ -8996,8 +9047,7 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             if (_fp is not None and _is_subcomponent_part(_fp)) \
                     or (_tp is not None and _is_subcomponent_part(_tp)) \
                     or str(mech).lower() in ("signal", "control", "data"):
-                skipped.append({"edge": edge_lbl, "reason": "hero-declutter: I&C/sub-component spur"})
-                continue
+                _declutter = True
         src_part = by_name.get(frm)
         dst_part = by_name.get(to)
         # An endpoint with no placed-and-ported part is an abstract battery-limit
@@ -9019,12 +9069,13 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             print(f"[univ][wire]   port FALLBACK {edge_lbl}: "
                   f"src={src_key}({src_how}) dst={dst_key}({dst_how}) "
                   f"— wanted {service}_out / {service}_in")
-        resolved.append({
+        _rec = {
             "idx": idx, "e": e, "frm": frm, "to": to, "mech": mech, "service": service,
             "edge_lbl": edge_lbl, "src_part": src_part, "dst_part": dst_part,
             "src_xyz": src_xyz, "dst_xyz": dst_xyz, "src_key": src_key, "dst_key": dst_key,
             "src_how": src_how, "dst_how": dst_how,
-        })
+        }
+        (logical_pool if _declutter else resolved).append(_rec)
 
     # ── group the resolved edges by (from_part, service). A group with ≥WIRE_FANOUT_MIN
     #    destinations is a FAN-OUT → one SHARED TRAY (trunk + drop spurs). Smaller groups
@@ -9055,6 +9106,49 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             "waypoints_mm": [[round(c, 1) for c in w] for w in waypoints],
         })
 
+    n_logical = 0        # cable edges LENGTH-ROUTED without a mesh (demoted from 3-D)
+
+    def _record_logical(r, reason):
+        """OPTION B — register a DEMOTED cable edge's ROUTED length WITHOUT meshing it.
+        The 3-D demotion (hero declutter / plant-spanning fan-out / lone logical cable)
+        is a VISUAL decision — the cable still physically exists, and the panel
+        schedule's ΔU% is uncomputable without its length. Route it through the SAME
+        deterministic orthogonal router a drawn run uses (_wire_path: rise → across on
+        the overhead deck → drop, Manhattan between the two placed ports), size it
+        through _sized_dia_mm (→ _CONN_SPECS → connection-schedule.json, where
+        draw_panel_schedule reads length + volt-drop) and record it in wired-lengths —
+        but draw NOTHING and log NO route (render, route-audit and G6 no_stray_beam are
+        untouched: the declutter intent survives). Universal — reached only via the
+        cable-service demotion paths, keyed on service/mechanism, never a class."""
+        nonlocal n_logical
+        # run_idx=0: the per-run Z micro-stagger exists to untangle DRAWN geometry;
+        # an unmeshed run has nothing to tangle, and a fixed index keeps the length
+        # independent of registration order (determinism).
+        waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], r["service"], run_idx=0,
+                               overhead_base_z=overhead_base_z)
+        length_m = _polyline_len_m(waypoints)
+        nm = f"u_route_{r['idx']:03d}_{_part_prefix(str(r['to']))}_{r['service']}_logical"
+        render_mech = _WIRE_SERVICE_MECH.get(r["service"], "fluid_loop")
+        edge_for_size = dict(r["e"])
+        edge_for_size.setdefault("from_part", r["frm"])
+        edge_for_size.setdefault("to_part", r["to"])
+        try:
+            _sized_dia_mm(nm, render_mech, waypoints, edge_for_size)
+        except Exception as ex:  # noqa: BLE001 — never let sizing kill the wiring pass
+            print(f"[univ][wire]   WARN logical-run sizing failed for {r['edge_lbl']}: {ex}")
+        wired.append({
+            "run_name": nm, "from_part": r["frm"], "to_part": r["to"],
+            "mechanism": r["mech"], "service": r["service"],
+            "src_port": r["src_key"], "dst_port": r["dst_key"],
+            "port_match": "exact" if (r["src_how"] == "exact" and r["dst_how"] == "exact") else "fallback",
+            "route_mode": "logical",
+            "drawn": False,
+            "demoted": reason,
+            "length_m": round(length_m, 3),
+            "waypoints_mm": [[round(c, 1) for c in w] for w in waypoints],
+        })
+        n_logical += 1
+
     n_trayed = 0
     # Tray threshold is SERVICE-AWARE (Tristan 2026-06-22): FLUID stays DIRECT port-to-port so
     # every pipe visibly lands on its part (WIRE_FANOUT_MIN=999), but SIGNAL / ELECTRICAL fan-outs
@@ -9084,13 +9178,16 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                 _dys = [r["dst_xyz"][1] for r in grp]
                 _tray_span = max(max(_dxs) - min(_dxs), max(_dys) - min(_dys))
                 if _tray_span > WIRE_TRAY_MAX_SPAN_MM:
+                    # Demoted from 3-D (the v44 stray fat beam) but NOT from the maths:
+                    # each circuit still gets its own full board→load routed length so
+                    # the panel schedule's ΔU% computes (a cable in a tray runs the
+                    # whole way from the board — no trunk/N cost-share here).
                     for r in grp:
-                        skipped.append({"edge": r["edge_lbl"],
-                                        "reason": "plant-spanning cable fan-out → single-line/P&ID, "
-                                                  "not a 3-D tray"})
+                        _record_logical(r, "plant-spanning cable fan-out → single-line/"
+                                           "P&ID, not a 3-D tray (length still routed)")
                     print(f"[univ][wire]   PLANT-SPANNING {frm} → {len(grp)}× {service}: dest span "
                           f"{_tray_span * fl.MM:.1f} m > {WIRE_TRAY_MAX_SPAN_MM * fl.MM:.0f} m "
-                          f"→ single-line/P&ID (no 3-D tray beam)")
+                          f"→ single-line/P&ID (no 3-D tray beam; lengths routed logically)")
                     continue
             # ── SHARED TRAY: one trunk from the (single) source port → spurs to each dest.
             src_xyz = grp[0]["src_xyz"]      # same source port for the whole group
@@ -9144,8 +9241,8 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         #    side per the dual-router skip-symmetry rule.)
         if _is_cable(service):
             for r in grp:
-                skipped.append({"edge": r["edge_lbl"],
-                                "reason": "logical cable (no shared tray) → single-line/P&ID, not a 3-D route"})
+                _record_logical(r, "logical cable (no shared tray) → single-line/P&ID, "
+                                   "not a 3-D route (length still routed)")
             continue
         # ── per-edge port-to-port path (small group OR a tray that failed to build).
         for r in grp:
@@ -9160,15 +9257,22 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                 print(f"[univ][wire]   WARN draw failed for {r['edge_lbl']}: {ex}")
                 skipped.append({"edge": r["edge_lbl"], "reason": f"draw error: {ex}"})
                 continue
+    # Hero-decluttered I&C / sub-component spurs: 3-D demoted, lengths still routed
+    # (the panel volt-drop + connection schedule need them; the hero stays clean).
+    for r in logical_pool:
+        _record_logical(r, "hero-declutter: I&C/sub-component spur (length still routed)")
     total_m = round(sum(w["length_m"] for w in wired), 2)
     by_service = {}
     for w in wired:
         by_service.setdefault(w["service"], 0.0)
         by_service[w["service"]] += w["length_m"]
     by_service = {k: round(v, 2) for k, v in sorted(by_service.items())}
-    summary = {"schema": "wired-lengths/2",
+    n_drawn = sum(1 for w in wired if w.get("drawn", True))
+    summary = {"schema": "wired-lengths/3",
                "edges_total": n_edges,
                "edges_wired": len(wired),
+               "edges_drawn": n_drawn,             # meshed in the 3-D scene
+               "edges_routed_logical": n_logical,  # length-routed only (demoted cable runs)
                "edges_skipped": len(skipped),
                "edges_drawn_by_spine": already,   # Stage 4: abstract-boundary edges the spine router drew
                "port_fallbacks": fallbacks,
@@ -9179,7 +9283,8 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                "skipped": skipped,
                "runs": wired}
     print(f"[univ][wire] STAGE 3/4 port-to-port wiring — {len(wired)}/{n_edges} ledger "
-          f"edges WIRED port-to-port ({fallbacks} via a port fallback), "
+          f"edges ROUTED ({n_drawn} drawn port-to-port, {n_logical} length-only logical "
+          f"cable runs, {fallbacks} via a port fallback), "
           f"{already} already drawn by the spine router (abstract boundary), "
           f"{len(skipped)} left unwired (abstract boundary / assembly); "
           f"{n_trayed} fan-out(s) routed as a SHARED TRAY; "
@@ -14825,8 +14930,12 @@ def main():
     # same audit it satisfies (Tristan 2026-06-24: "all connector points are connected").
     _candidate = _candidate + cl.close_residual_completeness(parts, _candidate,
                                                              _required_services_wet, log=lambda m: print(m))
+    # quantities= joins each fluid edge's contract flow demand (required_value m3/h) at the
+    # ledger choke point (cl.join_flow_demands — the v52 required_value=null fix), so the
+    # sizer sizes pipes from TRUE flows instead of DN15-at-zero-flow.
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
-                                                   log=lambda m: print(m))
+                                                   log=lambda m: print(m),
+                                                   quantities=quantities)
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan
     # 2026-06-20). A concern = a part not fully connected; it is written to the ledger
     # artifact so the deterministic suite can FAIL on it (no 80%-coverage absorption).

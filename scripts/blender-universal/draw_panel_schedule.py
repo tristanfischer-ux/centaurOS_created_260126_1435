@@ -366,6 +366,39 @@ def size_circuit_from_kw(kw, voltage_v, is_dc=False, phases=3, resistive=False):
     return round(flc, 1), csa, label, frame
 
 
+_RHO_CU_OP = 0.0225      # Ω·mm²/m — copper at ~70 °C conductor operating temperature
+#                          (the BS 7671 mV/A/m tabulated basis, not the 20 °C 0.0172)
+_VD_LIMIT_PCT = 5.0      # BS 7671 Appendix 4 volt-drop band for power circuits
+
+
+def voltdrop_pct_from_run(length_m, cable_label, design_a, voltage_v,
+                          is_dc=False, phases=3):
+    """ΔU% over the ROUTED cable length at the circuit's Design I on its FINAL cable —
+    the at-source volt-drop the schedule prints (and the workbook column contract
+    re-verifies as f(length, CSA, Design I)).
+
+      3-phase AC : ΔU = √3 · I · ρ · L / CSA   (line-to-line drop)
+      1-ph / DC  : ΔU = 2 · I · ρ · L / CSA   (go-and-return)
+
+    A parallel group ('3×400 mm²') divides the loop resistance by n. Returns None when
+    any input is missing — the schedule then shows a dash, which the column contract
+    honestly FAILS (a dash is never in-spec). Universal — pure arithmetic on the
+    routed length, no product class."""
+    if not length_m or not design_a or not voltage_v:
+        return None
+    m = re.search(r"(?:(\d+)\s*[×x]\s*)?([\d.]+)\s*mm²", str(cable_label or ""))
+    if not m:
+        return None
+    n_par = int(m.group(1) or 1)
+    csa = float(m.group(2))
+    if csa <= 0 or n_par <= 0:
+        return None
+    r_path = _RHO_CU_OP * float(length_m) / (csa * n_par)   # Ω per conductor path
+    k = 2.0 if (is_dc or phases < 3) else math.sqrt(3.0)
+    vd_v = k * float(design_a) * r_path
+    return round(100.0 * vd_v / float(voltage_v), 3)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA MODEL — the reconstructed panel / load schedule
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1383,6 +1416,23 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
 
         dev, dev_a = _device_for(base, design_a, devices, panel,
                                  frame_override=frame_override)
+
+        # ΔU AT SOURCE (2026-07-02): the connection-schedule row's Vd was computed on the
+        # ROW's cable at the ROW's (often wholesale-default) current; this panel re-derives
+        # Design I from the circuit's own kW and re-sizes the cable — so recompute
+        # ΔU% = f(routed length, FINAL cable CSA, Design I) here, the same formula the
+        # workbook column contract verifies. The schedule-row Vd stays the fallback for a
+        # circuit with no kW-derived sizing. In-spec is then a COMPUTED comparison
+        # (ΔU ≤ 5 %), never a default — a dash stays a FAIL downstream.
+        vd_calc = voltdrop_pct_from_run(length_m, cable, design_a, panel.voltage_v,
+                                        is_dc=panel.is_dc, phases=panel.phases)
+        if vd_calc is not None:
+            # Recomputed on THIS circuit's Design I + final cable — supersedes the row's
+            # verdict (which judged the row cable at the schedule's default current).
+            vd = vd_calc
+            within = vd_calc <= _VD_LIMIT_PCT
+        elif vd is not None:
+            within = within and (vd <= _VD_LIMIT_PCT)
 
         # COINCIDENCE: a STANDBY / BACKUP / EMERGENCY load (a backup immersion heater, a standby
         # pump) is NOT part of the running plant — it energises only on a fault / cold-start — so
