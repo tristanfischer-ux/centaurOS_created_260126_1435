@@ -2155,6 +2155,33 @@ def _short_anc_name(name: str, maxlen: int = 26) -> str:
     return n if len(n) <= maxlen else n[:maxlen - 1] + "…"
 
 
+def _balance_rows_pid(cols, n_rows):
+    """Greedily split the ORDERED flow-column list into ≤ n_rows reading-order rows
+    (row 1 left→right, then row 2 left→right — LEFT-ALIGNED, never snake), mirroring the
+    proven draw_single_line._balance_rows / draw_bfd._balance_rows_bfd idiom. Every P&ID
+    column spans one col_pitch, so the spans are all equal. Never splits a column's
+    vertical stack across rows; preserves process order. Deterministic + universal (pure
+    geometry, no class knowledge)."""
+    total = len(cols) or 1
+    target = total / max(1, n_rows)
+    rows, cur = [], []
+    for c in cols:
+        if cur and len(cur) + 1 > target * 1.15 and len(rows) < n_rows - 1:
+            rows.append(cur)
+            cur = []
+        cur.append(c)
+    if cur:
+        rows.append(cur)
+    return rows or [[]]
+
+
+def _fold_lane_off(i, n, span):
+    """Stagger offset for the i-th of n parallel fold connectors (mirrors the BFD)."""
+    if n <= 1:
+        return 0.0
+    return (i - (n - 1) / 2) * (span / max(1, n))
+
+
 def build_pid_svg(proc: Process) -> str:
     """Render the reconstructed process as a standard P&ID."""
     nodes = proc.nodes
@@ -2194,17 +2221,48 @@ def build_pid_svg(proc: Process) -> str:
     title_h = 150
     legend_w = 250
 
-    diagram_w = margin_l * 2 + (ncol - 1) * col_pitch + EQ_W
-    width = max(diagram_w + legend_w, 1180)
-    body_h = margin_top + (max_stack - 1) * row_pitch + (340 if has_array else 220)
     # the ancillary / field-device register sits in a full-width band below the equipment,
     # above the title block; size it to the page width (3 columns on a standard sheet).
     reg_cols = 3
     reg_h = _ancillary_register_height(proc, reg_cols)
     reg_gap = 24 if reg_h else 0
-    height = body_h + reg_h + reg_gap + title_h
-    width = int(math.ceil(width))
-    height = int(math.ceil(height))
+
+    # inter-row corridor when the train FOLDS into reading-order rows (the fold is a
+    # strict no-op at n_rows == 1). Sized so the corridor clears the UPPER row's captions
+    # + tie-in fans (below its symbols) AND the LOWER row's instrument-bubble fans (above
+    # its symbols), with air for the fold connectors + any cross-row return band.
+    # Universal — pure geometry, mirrors the proven draw_bfd/draw_single_line fold.
+    FOLD_ROW_GAP = 380 if has_array else 270
+    if has_return:
+        FOLD_ROW_GAP += 40          # returns route in the corridor band (+ banner air)
+    FOLD_MAX_ASPECT = 3.5           # fold until the page clears the ≤4:1 G1 gate w/ margin
+
+    def _dims_for(n_rows):
+        """Page dimensions for a candidate fold of the process train into n_rows
+        reading-order rows. n_rows == 1 reproduces the classic single-row formulas
+        EXACTLY (the fold is a byte-identical no-op for already-legible diagrams)."""
+        rcols = _balance_rows_pid(cols, n_rows)
+        max_len = max(len(r) for r in rcols)
+        diagram_w = margin_l * 2 + (max_len - 1) * col_pitch + EQ_W
+        w = max(diagram_w + legend_w, 1180)
+        rows_h = sum((max(len(by_col[c]) for c in r) - 1) * row_pitch for r in rcols)
+        body_h = margin_top + rows_h + (len(rcols) - 1) * FOLD_ROW_GAP \
+            + (340 if has_array else 220)
+        h = body_h + reg_h + reg_gap + title_h
+        return int(math.ceil(w)), int(math.ceil(h)), rcols
+
+    # ----- FOLD the process train into R reading-order rows so the page clears the
+    #       ≤4:1 G1 legibility gate with margin (a wide train renders as an unreadable
+    #       horizontal strip; folding collapses the width and grows the height).
+    #       Smallest R with aspect ≤ 3.5 wins. Universal + deterministic — keyed ONLY
+    #       on geometry (column count / resulting aspect), never on product class.
+    width = height = 0
+    row_cols: list = [list(cols)]
+    for _cand in range(1, max(1, ncol) + 1):
+        width, height, row_cols = _dims_for(_cand)
+        if width / max(1.0, height) <= FOLD_MAX_ASPECT:
+            break
+    n_rows = len(row_cols)
 
     svg = SVG(width, height)
     svg.rect(18, 18, width - 36, height - 36, stroke=GRID_FAINT, width=1.2)
@@ -2218,19 +2276,31 @@ def build_pid_svg(proc: Process) -> str:
              size=10, fill=MUTED)
     svg.line(40, 108, width - 40, 108, stroke=GRID_FAINT, width=1.2)
 
-    # ----- compute each node's centre -----
+    # ----- compute each node's centre (row-major reading order: row 1 left→right, then
+    #       row 2 left→right — LEFT-ALIGNED rows so pipes always flow left→right; the
+    #       single-row case evaluates the exact classic formulas, a byte-identical no-op) --
     centre: dict[str, tuple] = {}
     ports: dict[str, dict] = {}
-    base_y = margin_top + 30
-    for ci, c in enumerate(cols):
-        stack = by_col[c]
-        cx = margin_l + ci * col_pitch + EQ_W / 2
-        # vertically centre the stack around the band middle
-        total_h = (len(stack) - 1) * row_pitch
-        y0 = base_y + ((max_stack - 1) * row_pitch - total_h) / 2
-        for si, nd in enumerate(stack):
-            cy = y0 + si * row_pitch
-            centre[nd.key] = (cx, cy)
+    row_of_col: dict[int, int] = {}
+    row_base_y: list[float] = []
+    row_band_h: list[float] = []
+    yy = margin_top + 30
+    for ri, rcols in enumerate(row_cols):
+        rstack = max(len(by_col[c]) for c in rcols)
+        bh_r = (rstack - 1) * row_pitch
+        row_base_y.append(yy)
+        row_band_h.append(bh_r)
+        for ci, c in enumerate(rcols):
+            row_of_col[c] = ri
+            stack = by_col[c]
+            cx = margin_l + ci * col_pitch + EQ_W / 2
+            # vertically centre the stack around the row's band middle
+            total_h = (len(stack) - 1) * row_pitch
+            y0 = yy + (bh_r - total_h) / 2
+            for si, nd in enumerate(stack):
+                cy = y0 + si * row_pitch
+                centre[nd.key] = (cx, cy)
+        yy += bh_r + FOLD_ROW_GAP
 
     # ----- draw process LINES first (so symbols sit on top of pipe ends) -----
     # we must draw symbols to know exact ports; do a scratch pass for ports.
@@ -2240,10 +2310,16 @@ def build_pid_svg(proc: Process) -> str:
         ports[nd.key] = _SYM_DRAW.get(nd.sym, _sym_generic)(scratch, cx, cy)
 
     # which lines are FORWARD vs return (decide once, so we can spread converging inlets).
+    # PROCESS-ORDER forwardness is keyed on the flow COLUMN, not the pixel x: when the
+    # train folds, a forward line crossing a fold lands at a SMALLER x in the next row —
+    # the column order is the invariant. On a single-row page the column order IS the x
+    # order, so this is exactly the old centre-x comparison (byte-identical no-op).
+    col_of_key = {nd.key: nd.column for nd in nodes}
+
     def _is_forward(ln):
         if ln.from_key not in centre or ln.to_key not in centre:
             return None
-        return (centre[ln.to_key][0] >= centre[ln.from_key][0] - 1) and not ln.is_return
+        return (col_of_key[ln.to_key] >= col_of_key[ln.from_key]) and not ln.is_return
 
     # distribute multiple FORWARD inlets on a shared target across its left face, and
     # multiple FORWARD outlets from a shared source across its right face, so converging /
@@ -2269,6 +2345,18 @@ def build_pid_svg(proc: Process) -> str:
             return 0.0
         return (i - (n - 1) / 2) * (span / max(1, n))
 
+    # lines crossing a FOLD boundary become explicit routed connectors; count the
+    # parallel runs per (row_from, row_to) pair so they stagger into lanes. Empty maps
+    # on a single-row page (no cross-row line can exist), so the fold is a no-op.
+    row_of = {nd.key: row_of_col[nd.column] for nd in nodes}
+    fold_count: dict = defaultdict(int)
+    for ln in proc.lines:
+        if ln.from_key in centre and ln.to_key in centre:
+            rf, rt = row_of[ln.from_key], row_of[ln.to_key]
+            if rf != rt:
+                fold_count[(rf, rt)] += 1
+    fold_seen: dict = defaultdict(int)
+
     for ln in proc.lines:
         fwd = _is_forward(ln)
         if fwd is None:
@@ -2287,6 +2375,19 @@ def build_pid_svg(proc: Process) -> str:
         # when the source fans out (>1 outlet) the tags share an x; keep them terse
         # (line number only) so they don't collide with each other's service hints.
         terse = out_count.get(ln.from_key, 1) > 1
+        r_f, r_t = row_of[ln.from_key], row_of[ln.to_key]
+        if r_f != r_t:
+            # the line crosses a FOLD boundary → an explicit routed connector so the
+            # folded train still reads as ONE process line (line number, service hint,
+            # in-line valves + instruments + RECIRC banner all preserved).
+            pair = (r_f, r_t)
+            dest_head = col_of_key[ln.to_key] == row_cols[r_t][0]
+            _draw_fold_connector_pid(svg, ln, pf, pt, r_f, r_t, row_base_y, width,
+                                     margin_l, legend_w, fold_seen[pair],
+                                     fold_count[pair], dest_head, stroke, dash,
+                                     marker, lw, terse)
+            fold_seen[pair] += 1
+            continue
         _draw_pipe(svg, pf, pt, fx, fy, tx, ty, fwd, stroke, lw, dash, marker, ln,
                    in_off=in_off, out_off=out_off, terse=terse)
 
@@ -2725,6 +2826,81 @@ def _draw_recirc_banner(svg, cx, cy, ln: "Line"):
             svg.text(cx, cy + pill_h + 4, svc, size=7.0, anchor="middle", fill=MUTED)
 
 
+def _draw_fold_connector_pid(svg, ln, pf, pt, r_f, r_t, row_base_y, width, margin_l,
+                             legend_w, lane_i, lane_n, dest_is_row_head, stroke, dash,
+                             marker, lw, terse):
+    """A process / thermal / utility line crossing a FOLD boundary (source row ≠
+    destination row) is drawn as an explicit routed connector so the folded train still
+    reads as ONE process line — mirroring draw_bfd._draw_fold_connector:
+
+      • FORWARD (into a LOWER row — the reading-order continuation): out of the source's
+        RIGHT face, elbow DOWN the right-hand corridor (kept LEFT of the legend panel),
+        across the inter-row corridor just above the destination row, then down + in
+        through the destination's LEFT face (the arrow still flows left→right into the
+        symbol). A destination that is NOT the head of its row gets its riser in the
+        inter-column gap just left of its own left face, so the run never crosses the
+        earlier symbols of that row (and never ploughs through an instrument fan the way
+        a top-face entry would).
+      • BACKWARD (a recycle / return to an EARLIER row): out of the source's TOP face
+        (off-centre, clear of the instrument fan), up into its own row's upper corridor,
+        climb the LEFT margin, across the band just above the destination row, then DOWN
+        into the destination's TOP face — exactly how an in-row return routes over the
+        top, so it reads unmistakably as a closing loop.
+
+    The line NUMBER + service hint (via _line_tag), the RECIRC RETURN banner, and any
+    in-line valves / field instruments (via _decorate_line) are all rendered on the
+    corridor run — NO text content is lost relative to the unfolded drawing. Parallel
+    connectors between the same row pair stagger into lanes. Universal + deterministic —
+    pure geometry, styled by the line kind."""
+    off = _fold_lane_off(lane_i, lane_n, 44)
+    if r_t > r_f:
+        # corridor just above the destination row's band: below the upper row's caption /
+        # tie-in extent, above the destination row's instrument-bubble fans.
+        corridor_y = row_base_y[r_t] - 130 + off * 0.5
+        x0, y0 = pf["right"]
+        y0 += off * 0.3                       # spread multiple exits off one face
+        rx = width - legend_w - 30 + off      # right-hand drop corridor (left of legend)
+        x1, y1 = pt["left"]
+        y1 += off * 0.3
+        if dest_is_row_head:
+            riser_x = margin_l - 30 + off * 0.4      # left-margin approach corridor
+        else:
+            riser_x = x1 - 26 - abs(off) * 0.4       # riser in the gap left of the dest
+        pts = [(x0, y0), (rx, y0), (rx, corridor_y), (riser_x, corridor_y),
+               (riser_x, y1), (x1, y1)]
+        _polyline(svg, pts, stroke, lw, dash, marker)
+        label_x = (rx + riser_x) / 2
+        _line_tag(svg, ln, label_x, corridor_y, stroke, terse=terse)
+        if ln.detail == "RECIRC RETURN":
+            _draw_recirc_banner(svg, label_x, corridor_y - 22, ln)
+        _decorate_line(svg, ln, riser_x, corridor_y, rx, corridor_y, stroke)
+    else:
+        # BACKWARD return to an earlier row.
+        x0, y0 = pf["top"]
+        x0 -= 20 + off * 0.5                  # off-centre, clear of the instrument fan
+        src_up = row_base_y[r_f] - 150 + off * 0.5
+        # row 1's upper band also hosts the page header — clamp the corridor (and the
+        # RECIRC banner above it) BELOW the header rule (y=108), still above the
+        # instrument-bubble fans; lower rows keep the full inter-row corridor level.
+        dst_up = row_base_y[r_t] - 150
+        if r_t == 0:
+            dst_up = max(dst_up, 140)
+        dst_up += off * 0.5
+        lx = 28 + abs(off) * 0.4              # left-margin climb corridor
+        x1, y1 = pt["top"]
+        # enter LEFT of the top-centre: the PSV nozzle + an array's common-supply header
+        # both live to the RIGHT of the top port, so the drop never clips them.
+        x1 -= 20 - off * 0.5
+        pts = [(x0, y0), (x0, src_up), (lx, src_up), (lx, dst_up), (x1, dst_up),
+               (x1, y1)]
+        _polyline(svg, pts, stroke, lw, dash, marker)
+        mid_x = (lx + x1) / 2
+        _line_tag(svg, ln, mid_x, dst_up, stroke, above=True)
+        if ln.detail == "RECIRC RETURN":
+            _draw_recirc_banner(svg, mid_x, dst_up - 22, ln)
+        _decorate_line(svg, ln, lx, dst_up, x1, dst_up, stroke)
+
+
 def _draw_node_instruments(svg, nd, cx, cy, port):
     """Draw the equipment instrument bubbles in a small fan above the symbol.  Returns the
     x of the RIGHTMOST bubble (so a PSV nozzle can be placed clear to its right), or cx
@@ -3022,10 +3198,90 @@ def _symbol_breakdown(proc: Process):
     return dict(c)
 
 
+def _selftest() -> int:
+    """FOLD-layout invariants (regression guard for the G1 legibility gate: a wide
+    process train must fold into reading-order rows with page aspect ≤ 4:1 and NO lost
+    content, while a short train stays a SINGLE unfolded row — the fold is a strict
+    no-op for already-legible diagrams). Mirrors draw_bfd._selftest F1-F4. Pure — no
+    external files, no rasteriser. Returns 0 on pass."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    def _mk_proc(ncols, with_recycle=False):
+        """A synthetic linear train: ncols single-node columns chained left→right by
+        numbered process lines; optionally with a cross-row RECIRC RETURN (last unit
+        back to the second) to exercise the backward fold-connector branch."""
+        nodes = [Node(key=f"u{i}", tag=f"U-{i:03d}", label=f"Unit {i}",
+                      sym=SYM_VESSEL, column=i) for i in range(ncols)]
+        lines = [Line(from_key=f"u{i}", to_key=f"u{i + 1}",
+                      number=f"{201 + i}-PR-DN50", dn="DN50",
+                      service="process water") for i in range(ncols - 1)]
+        if with_recycle:
+            lines.append(Line(from_key=f"u{ncols - 1}", to_key="u1",
+                              number="990-RC-RETURN", dn="",
+                              service="Recirculation return",
+                              detail="RECIRC RETURN", is_return=True))
+        return Process(archetype="selftest", nodes=nodes, lines=lines)
+
+    def _dims(svg_text):
+        m = re.search(r'width="(\d+)" height="(\d+)"', svg_text)
+        return int(m.group(1)), int(m.group(2))
+
+    def _tag_rows(svg_text):
+        """Distinct y positions of the equipment TAG texts (== row count for a
+        single-stack synthetic train)."""
+        return set(re.findall(r'<text x="[-\d.]+" y="([-\d.]+)"[^>]*>U-\d{3}</text>',
+                              svg_text))
+
+    # F1 — a ~46-column train FOLDS: the page clears the ≤4:1 G1 gate with margin.
+    svg46 = build_pid_svg(_mk_proc(46))
+    w46, h46 = _dims(svg46)
+    chk("F1.fold_clears_g1_gate", max(w46, h46) / min(w46, h46) <= 4.0)
+    chk("F1.fold_clears_with_margin", w46 / h46 <= 3.5)
+    chk("F1.folded_multiple_rows", len(_tag_rows(svg46)) >= 2)
+    # F2 — NO LOST CONTENT: every line NUMBER renders (fold connectors included) …
+    chk("F2.line_numbers_preserved",
+        all(f">{201 + i}-PR-DN50<" in svg46 for i in range(45)))
+    # … every equipment tag is present, and every chain arrow renders.
+    chk("F2.tags_preserved", all(f">U-{i:03d}<" in svg46 for i in range(46)))
+    chk("F2.arrows_preserved", svg46.count('marker-end="url(#flow)"') >= 45)
+    # F3 — a SHORT train stays ONE row (the fold logic no-ops when n_rows == 1).
+    svg5 = build_pid_svg(_mk_proc(5))
+    w5, h5 = _dims(svg5)
+    chk("F3.small_single_row", len(_tag_rows(svg5)) == 1)
+    chk("F3.small_passes_gate", max(w5, h5) / min(w5, h5) <= 4.0)
+    # F3b — a folded train with a CROSS-ROW RECYCLE still renders every line: the
+    #        backward fold connector carries the return's number + RECIRC banner, and
+    #        no forward line number is lost.
+    svgr = build_pid_svg(_mk_proc(46, with_recycle=True))
+    chk("F3b.backward_return_number", ">990-RC-RETURN<" in svgr)
+    chk("F3b.backward_return_banner", ">RECIRC RETURN<" in svgr)
+    chk("F3b.forward_lines_kept",
+        all(f">{201 + i}-PR-DN50<" in svgr for i in range(45)))
+    chk("F3b.still_clears_gate",
+        max(_dims(svgr)) / min(_dims(svgr)) <= 4.0)
+    # F4 — the row split preserves reading order, never drops a column.
+    rows = _balance_rows_pid(list(range(25)), 3)
+    chk("F4.order_preserved", [c for r in rows for c in r] == list(range(25)))
+    chk("F4.row_count", 1 <= len(rows) <= 3 and all(rows))
+    chk("F4.single_row_noop", _balance_rows_pid(list(range(7)), 1) == [list(range(7))])
+
+    for f in fails:
+        print(f"[pid][selftest] FAIL {f}")
+    print(f"[pid][selftest] {'PASS' if not fails else 'FAIL'} "
+          f"({len(fails)} failure(s))")
+    return 1 if fails else 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] == "--selftest":
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:
