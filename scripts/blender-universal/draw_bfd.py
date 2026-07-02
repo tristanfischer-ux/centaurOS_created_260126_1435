@@ -859,6 +859,25 @@ def _wrap(label: str, maxlen=20, maxlines=3):
     return lines[:maxlines]
 
 
+def _balance_rows_bfd(cols, n_rows):
+    """Greedily split the ORDERED process-column list into ≤ n_rows reading-order rows
+    (row 1 left→right, then row 2 left→right — LEFT-ALIGNED, never snake), mirroring the
+    proven draw_single_line._balance_rows idiom. Every BFD column spans one col_pitch, so
+    the spans are all equal. Never splits a column's vertical stack across rows; preserves
+    process order. Deterministic + universal (pure geometry, no class knowledge)."""
+    total = len(cols) or 1
+    target = total / max(1, n_rows)
+    rows, cur = [], []
+    for c in cols:
+        if cur and len(cur) + 1 > target * 1.15 and len(rows) < n_rows - 1:
+            rows.append(cur)
+            cur = []
+        cur.append(c)
+    if cur:
+        rows.append(cur)
+    return rows or [[]]
+
+
 def build_bfd_svg(bf: BlockFlow) -> str:
     """Render the BlockFlow as a clean executive Block-Flow Diagram."""
     blocks = bf.blocks
@@ -889,6 +908,8 @@ def build_bfd_svg(bf: BlockFlow) -> str:
     margin_r = 215           # room for the product arrow + label on the right
     header_h = 124
     title_h = 150
+    FOLD_ROW_GAP = 150        # inter-row corridor (fold connectors + bus links + labels)
+    FOLD_MAX_ASPECT = 3.5     # fold until the page clears the ≤4:1 G1 gate with margin
 
     # reserve extra vertical room when any product / waste sink exits DOWNWARD (a sink in
     # an earlier column) so its arrow + label clear the band before the legend.
@@ -897,19 +918,46 @@ def build_bfd_svg(bf: BlockFlow) -> str:
         for b in bf.boundaries)
     bottom_pad = 210 if has_down_product else 130
 
-    diagram_w = margin_l + margin_r + (ncol - 1) * col_pitch + BLOCK_W
-    width = int(math.ceil(max(diagram_w, 1180)))
-
     # supporting-equipment band geometry: a grid of smaller blocks below the main train.
     # 5 per row, BLOCK_W spacing; reserves vertical room only when supporting blocks exist.
     support_cell_w = BLOCK_W + 24
     support_cell_h = BLOCK_H + 28
-    support_per_row = max(1, int((width - margin_l - margin_r + 24) // support_cell_w)) if support_blocks else 0
-    support_rows = math.ceil(len(support_blocks) / support_per_row) if support_blocks else 0
-    support_band_h = (support_rows * support_cell_h + 48) if support_blocks else 0
 
-    body_h = header_h + (max_stack - 1) * row_pitch + BLOCK_H + bottom_pad + support_band_h
-    height = int(math.ceil(body_h + title_h))
+    def _support_band_for(w):
+        """(support_per_row, support_band_h) for a candidate page width."""
+        if not support_blocks:
+            return 0, 0
+        per_row = max(1, int((w - margin_l - margin_r + 24) // support_cell_w))
+        rows_n = math.ceil(len(support_blocks) / per_row)
+        return per_row, rows_n * support_cell_h + 48
+
+    def _dims_for(n_rows):
+        """Page dimensions for a candidate fold of the process train into n_rows
+        reading-order rows. n_rows == 1 reproduces the classic single-row formulas
+        EXACTLY (the fold is a byte-identical no-op for already-legible diagrams)."""
+        rcols = _balance_rows_bfd(cols, n_rows)
+        max_len = max(len(r) for r in rcols)
+        dw = margin_l + margin_r + (max_len - 1) * col_pitch + BLOCK_W
+        w = int(math.ceil(max(dw, 1180)))
+        spr, sbh = _support_band_for(w)
+        rows_h = sum((max(len(by_col[c]) for c in r) - 1) * row_pitch + BLOCK_H
+                     for r in rcols)
+        bh = header_h + rows_h + (len(rcols) - 1) * FOLD_ROW_GAP + bottom_pad + sbh
+        return w, int(math.ceil(bh + title_h)), rcols, spr
+
+    # ----- FOLD the process train into R reading-order rows so the page clears the
+    #       ≤4:1 G1 legibility gate with margin (a 46-column single row renders as an
+    #       unreadable ~5:1 strip; folding collapses the width and grows the height).
+    #       Mirrors the proven single-line fold. Universal + deterministic — keyed ONLY
+    #       on geometry (column count / resulting aspect), never on product class.
+    width = height = 0
+    row_cols: list = [list(cols)]
+    support_per_row = 0
+    for _cand in range(1, max(1, ncol) + 1):   # smallest R giving aspect ≤ 3.5
+        width, height, row_cols, support_per_row = _dims_for(_cand)
+        if width / max(1.0, height) <= FOLD_MAX_ASPECT:
+            break
+    n_rows = len(row_cols)
 
     svg = SVG(width, height)
     svg.rect(18, 18, width - 36, height - 36, stroke=GRID_FAINT, width=1.2)
@@ -924,17 +972,27 @@ def build_bfd_svg(bf: BlockFlow) -> str:
              size=10, fill=MUTED)
     svg.line(40, 108, width - 40, 108, stroke=GRID_FAINT, width=1.2)
 
-    # ----- compute each block centre -----
+    # ----- compute each block centre (row-major reading order: row 1 left→right, then
+    #       row 2 left→right — LEFT-ALIGNED rows so arrows always flow left→right) -----
     centre: dict[str, tuple] = {}
-    base_y = header_h + 40
-    band_h = (max_stack - 1) * row_pitch
-    for ci, c in enumerate(cols):
-        stack = by_col[c]
-        cx = margin_l + ci * col_pitch + BLOCK_W / 2
-        total_h = (len(stack) - 1) * row_pitch
-        y0 = base_y + (band_h - total_h) / 2
-        for si, b in enumerate(stack):
-            centre[b.key] = (cx, y0 + si * row_pitch)
+    row_of_col: dict[int, int] = {}
+    row_base_y: list[float] = []
+    row_band_h: list[float] = []
+    yy = header_h + 40
+    for ri, rcols in enumerate(row_cols):
+        rstack = max(len(by_col[c]) for c in rcols)
+        bh_r = (rstack - 1) * row_pitch
+        row_base_y.append(yy)
+        row_band_h.append(bh_r)
+        for ci, c in enumerate(rcols):
+            row_of_col[c] = ri
+            stack = by_col[c]
+            cx = margin_l + ci * col_pitch + BLOCK_W / 2
+            total_h = (len(stack) - 1) * row_pitch
+            y0 = yy + (bh_r - total_h) / 2
+            for si, b in enumerate(stack):
+                centre[b.key] = (cx, y0 + si * row_pitch)
+        yy += bh_r + BLOCK_H + FOLD_ROW_GAP
 
     ports = {b.key: _block_ports(*centre[b.key]) for b in topo_blocks}
 
@@ -956,23 +1014,45 @@ def build_bfd_svg(bf: BlockFlow) -> str:
             in_seen[s.to_key] += 1
 
     block_col = {b.key: b.col for b in topo_blocks}
-    band_bottom = base_y + band_h + BLOCK_H / 2
+    block_row = {b.key: row_of_col[b.col] for b in topo_blocks}
+    row_bottom = [row_base_y[ri] + row_band_h[ri] + BLOCK_H / 2 for ri in range(n_rows)]
+    band_bottom = row_bottom[-1]
     # a lower bus level for long cross-component bridges (inferred links / any forward
     # stream that skips ≥2 columns) so they route UNDER the intervening blocks instead of
-    # jogging up into one of them.
-    bus_y = band_bottom + 24
+    # jogging up into one of them.  Per ROW when folded (== band_bottom + 24 unfolded).
+    row_bus_y = [rb + 24 for rb in row_bottom]
 
     def _spans_far(s):
         return abs(block_col.get(s.to_key, 0) - block_col.get(s.from_key, 0)) >= 2
 
+    # streams crossing a fold boundary become explicit routed connectors; count the
+    # parallel runs per (row_from, row_to) pair so they stagger into lanes.
+    fold_count: dict = defaultdict(int)
+    for s in bf.streams:
+        if s.from_key in centre and s.to_key in centre:
+            rf, rt = block_row[s.from_key], block_row[s.to_key]
+            if rf != rt:
+                fold_count[(rf, rt)] += 1
+    fold_seen: dict = defaultdict(int)
+
     for s in bf.streams:
         if s.from_key not in centre or s.to_key not in centre:
             continue
-        if s.style == STREAM_RECYCLE:
+        r_f = block_row[s.from_key]
+        r_t = block_row[s.to_key]
+        if r_f != r_t:
+            pair = (r_f, r_t)
+            dest_is_row_head = block_col[s.to_key] == row_cols[r_t][0]
+            _draw_fold_connector(svg, ports[s.from_key], ports[s.to_key], s,
+                                 r_f, r_t, row_base_y, row_bottom, width, margin_l,
+                                 margin_r, dest_is_row_head, fold_seen[pair],
+                                 fold_count[pair])
+            fold_seen[pair] += 1
+        elif s.style == STREAM_RECYCLE:
             _draw_recycle(svg, ports[s.from_key], ports[s.to_key],
                           centre[s.from_key], centre[s.to_key], s)
         elif s.style == STREAM_INFERRED or _spans_far(s):
-            _draw_bus_link(svg, ports[s.from_key], ports[s.to_key], s, bus_y)
+            _draw_bus_link(svg, ports[s.from_key], ports[s.to_key], s, row_bus_y[r_f])
         else:
             _draw_stream(svg, ports[s.from_key], ports[s.to_key],
                          centre[s.from_key], centre[s.to_key], s,
@@ -981,8 +1061,10 @@ def build_bfd_svg(bf: BlockFlow) -> str:
     # ----- draw BOUNDARY feeds (left) + products (right) -----
     min_col = min(block_col.values())
     max_col = max(block_col.values())
+    # a down-exiting side product drops into ITS row's corridor (== band_bottom unfolded).
+    bottom_of = {b.key: row_bottom[block_row[b.key]] for b in topo_blocks}
     _draw_boundaries(svg, bf, centre, ports, col_pitch, block_col, min_col, max_col,
-                     band_bottom=band_bottom)
+                     bottom_of=bottom_of)
 
     # ----- draw the BLOCKS on top -----
     for b in topo_blocks:
@@ -1164,6 +1246,81 @@ def _draw_bus_link(svg, pf, pt, s, bus_y):
     _stream_label(svg, s, (x0 + x1) / 2, bus_y, stroke)
 
 
+def _draw_fold_connector(svg, pf, pt, s, r_f, r_t, row_base_y, row_bottom, width,
+                         margin_l, margin_r, dest_is_row_head, lane_i, lane_n):
+    """A stream crossing a FOLD boundary (source row ≠ destination row) is drawn as an
+    explicit routed connector so the folded train still reads as ONE process line:
+
+      • FORWARD (into a LOWER row — the reading-order continuation): out of the source's
+        RIGHT face, elbow DOWN the right margin, across the inter-row corridor above the
+        destination row, then in from the LEFT margin into the destination's LEFT face
+        (arrow still flows left→right into the block).  When the destination is NOT the
+        head of its row (a long stream that skips the fold), it drops into the
+        destination's TOP face instead, so the run never crosses earlier blocks.
+      • BACKWARD (a recycle / return to an EARLIER row): out of the source's TOP face,
+        across the inter-row corridor just BELOW the destination row (there is no
+        corridor above row 1 — the page header lives there), then UP into the
+        destination's BOTTOM face — visually distinct (dashed) like any recycle.
+        When more than one row separates the two, it climbs the LEFT margin.
+
+    Parallel connectors between the same row pair are staggered into lanes so they never
+    overdraw.  Universal + deterministic — pure geometry, styled by the stream kind."""
+    stroke = {STREAM_PROCESS: PROC_INK, STREAM_THERMAL: THERMAL_INK,
+              STREAM_RECYCLE: RECYCLE_INK, STREAM_INFERRED: INFER_INK}.get(s.style, PROC_INK)
+    dash = {STREAM_THERMAL: "8,4", STREAM_RECYCLE: "6,4",
+            STREAM_INFERRED: "2,4"}.get(s.style)
+    marker = {STREAM_PROCESS: "bf_proc", STREAM_THERMAL: "bf_therm",
+              STREAM_RECYCLE: "bf_recyc", STREAM_INFERRED: "bf_infer"}.get(s.style, "bf_proc")
+    lw = {STREAM_PROCESS: 2.4, STREAM_THERMAL: 2.1, STREAM_RECYCLE: 2.1,
+          STREAM_INFERRED: 1.6}.get(s.style, 2.4)
+    off = _lane_off(lane_i, lane_n, 56)          # stagger parallel fold runs
+    forward = pt["cy"] > pf["cy"]
+
+    if forward:
+        # corridor just above the destination row's blocks (inside the inter-row gap).
+        corridor_y = row_base_y[r_t] - BLOCK_H / 2 - 56 + off * 0.5
+        x0, y0 = pf["right"]
+        y0 += off * 0.3                          # spread multiple exits off one face
+        rx = width - margin_r + 66 + off         # right-margin drop corridor
+        pts = [(x0, y0), (rx, y0), (rx, corridor_y)]
+        if dest_is_row_head:
+            x1, y1 = pt["left"]
+            y1 += off * 0.3
+            lx = margin_l - 58 + off * 0.4       # left-margin approach corridor
+            pts += [(lx, corridor_y), (lx, y1), (x1, y1)]
+            label_x = (rx + lx) / 2
+        else:
+            xt, yt = pt["top"]
+            xt += off * 0.5
+            pts += [(xt, corridor_y), (xt, yt)]
+            label_x = (rx + xt) / 2
+        _polyline(svg, pts, stroke, lw, dash, marker)
+        _stream_label(svg, s, label_x, corridor_y, stroke)
+    else:
+        # BACKWARD: out of the source's TOP face (left-of-centre band — the centre is
+        # where in-row recycle loops land), up into the inter-row corridor BELOW the
+        # destination row, across to the destination column, then UP into its BOTTOM
+        # face.  When more than one row separates the two, climb the LEFT margin between
+        # the corridors.  Never crosses a block: corridors sit in the row gaps.
+        x0, y0 = pf["top"]
+        x0 -= BLOCK_W * 0.25 + off * 0.5
+        dest_corr_y = row_bottom[r_t] + 46 + off * 0.5
+        xb, yb = pt["bottom"]
+        xb += off * 0.5
+        if r_t == r_f - 1:
+            pts = [(x0, y0), (x0, dest_corr_y), (xb, dest_corr_y), (xb, yb)]
+        else:
+            src_corr_y = row_bottom[r_f - 1] + 46 + off * 0.5
+            lx = margin_l - 88 + off * 0.4
+            pts = [(x0, y0), (x0, src_corr_y), (lx, src_corr_y),
+                   (lx, dest_corr_y), (xb, dest_corr_y), (xb, yb)]
+        _polyline(svg, pts, stroke, lw, dash, marker)
+        # label anchored at the DESTINATION riser (unique per dest, so a crowd of
+        # parallel returns never piles its labels in one spot); alternate lanes label
+        # above/below the corridor so two returns into the SAME unit stay legible.
+        _stream_label(svg, s, xb + 52, dest_corr_y, stroke, below=(lane_i % 2 == 1))
+
+
 def _polyline(svg, pts, stroke, lw, dash, marker):
     d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in pts)
     svg.path(d, stroke=stroke, width=lw, dash=dash, marker=marker)
@@ -1210,7 +1367,7 @@ def _lane_off(i, n, span):
 
 
 def _draw_boundaries(svg, bf, centre, ports, col_pitch, block_col, min_col, max_col,
-                     band_bottom):
+                     bottom_of):
     """Draw the boundary feeds + products as arrows crossing the battery limit, styled
     distinctly (green feed, amber product) with a small battery-limit marker + the honest
     flow label.
@@ -1278,7 +1435,8 @@ def _draw_boundaries(svg, bf, centre, ports, col_pitch, block_col, min_col, max_
             bx, by = ports[key]["bottom"]
             for i, bnd in enumerate(items):
                 xx = bx + _lane_off(i, n, BLOCK_W * 0.5)
-                ey = band_bottom + 46
+                # drop into THIS block's row corridor (never plough through a lower row).
+                ey = bottom_of.get(key, max(bottom_of.values())) + 46
                 _polyline(svg, [(xx, by), (xx, ey)], PRODUCT_INK, 2.4, None, "bf_prod")
                 _battery_chip(svg, xx, ey + 10, PRODUCT_INK, PRODUCT_FILL)
                 svg.text(xx + 11, ey + 8, bnd.label, size=9.5, anchor="start",
@@ -1450,10 +1608,86 @@ def _order_str(bf: BlockFlow) -> str:
     return "  →  ".join(f"[{b.col}] {b.tag} {b.label}" for b in seq)
 
 
+def _selftest() -> int:
+    """FOLD-layout invariants (regression guard for the G1 legibility gate: a ~46-column
+    process train must fold into rows with page aspect ≤ 4:1, while a short train stays a
+    SINGLE unfolded row — the fold is a no-op for already-legible diagrams).  Pure — no
+    external files, no rasteriser.  Returns 0 on pass."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    def _mk_bf(ncols, with_recycle=False):
+        """A synthetic linear train: ncols single-block columns chained left→right;
+        optionally with a cross-row RECYCLE (last unit back to the second) to exercise
+        the backward fold-connector branch."""
+        blocks = [Block(key=f"u{i}", tag=f"U-{i:03d}", label=f"Unit {i}",
+                        sym=PID.SYM_VESSEL, col=i) for i in range(ncols)]
+        streams = [Stream(from_key=f"u{i}", to_key=f"u{i + 1}", service="process water",
+                          qty="water") for i in range(ncols - 1)]
+        if with_recycle:
+            streams.append(Stream(from_key=f"u{ncols - 1}", to_key="u1",
+                                  service="return", qty="recycle",
+                                  style=STREAM_RECYCLE))
+        bnds = [Boundary(kind=BND_FEED, block_key="u0", label="Feed"),
+                Boundary(kind=BND_PRODUCT, block_key=f"u{ncols - 1}", label="Product")]
+        return BlockFlow(archetype="selftest", blocks=blocks, streams=streams,
+                         boundaries=bnds, has_recycle=with_recycle)
+
+    def _dims(svg_text):
+        m = re.search(r'width="(\d+)" height="(\d+)"', svg_text)
+        return int(m.group(1)), int(m.group(2))
+
+    def _block_rows(svg_text):
+        """Distinct y positions of the main process blocks (== row count for stack-1)."""
+        return set(re.findall(
+            r'<rect x="[-\d.]+" y="([-\d.]+)" width="138\.0" height="84\.0" '
+            r'rx="7" fill="' + EQ_FILL + '"', svg_text))
+
+    # F1 — a ~46-column train FOLDS: the page clears the ≤4:1 G1 gate with margin.
+    svg46 = build_bfd_svg(_mk_bf(46))
+    w46, h46 = _dims(svg46)
+    chk("F1.fold_clears_g1_gate", w46 / h46 <= 4.0)
+    chk("F1.fold_clears_with_margin", w46 / h46 <= 3.5)
+    chk("F1.folded_multiple_rows", len(_block_rows(svg46)) >= 2)
+    # F2 — NO LOST CONTENT: all 45 chain arrows render (fold connectors included) …
+    chk("F2.stream_count_preserved",
+        svg46.count('marker-end="url(#bf_proc)"') >= 45)
+    # … and every block label is present.
+    chk("F2.blocks_preserved", all(f">U-{i:03d}<" in svg46 for i in range(46)))
+    # F3 — a SHORT train stays ONE row (the fold logic no-ops when n_rows == 1).
+    svg5 = build_bfd_svg(_mk_bf(5))
+    w5, h5 = _dims(svg5)
+    chk("F3.small_single_row", len(_block_rows(svg5)) == 1)
+    chk("F3.small_passes_gate", max(w5, h5) / min(w5, h5) <= 4.0)
+    # F3b — a folded train with a CROSS-ROW RECYCLE still renders every stream (the
+    #        backward fold connector: last row back up to row 1, drawn dashed).
+    svgr = build_bfd_svg(_mk_bf(46, with_recycle=True))
+    chk("F3b.backward_recycle_rendered",
+        svgr.count('marker-end="url(#bf_recyc)"') >= 1)
+    chk("F3b.forward_streams_kept",
+        svgr.count('marker-end="url(#bf_proc)"') >= 45)
+    # F4 — the row split preserves reading order, never drops a column.
+    rows = _balance_rows_bfd(list(range(25)), 3)
+    chk("F4.order_preserved", [c for r in rows for c in r] == list(range(25)))
+    chk("F4.row_count", 1 <= len(rows) <= 3 and all(rows))
+    chk("F4.single_row_noop", _balance_rows_bfd(list(range(7)), 1) == [list(range(7))])
+
+    for f in fails:
+        print(f"[bfd][selftest] FAIL {f}")
+    print(f"[bfd][selftest] {'PASS' if not fails else 'FAIL'} "
+          f"({len(fails)} failure(s))")
+    return 1 if fails else 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] == "--selftest":
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:
