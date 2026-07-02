@@ -72,7 +72,8 @@ import deterministic_checks_lib as dcl  # noqa: E402
 # SHIP GATE: the dossier is not "validated" unless its scorecard is clean. Imported by absolute
 # path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
-from dossier_audit import audit_dossier, tab_scores, tab_scorecard_summary  # noqa: E402
+from dossier_audit import (audit_dossier, tab_scores, tab_scorecard_summary,  # noqa: E402
+                           _physics_high_is_design_defect)
 from dossier_repair import repair_dossier  # noqa: E402
 
 # The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
@@ -597,7 +598,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Process schedules": "Process line list, valve list & instrument index — three sortable sections cross-referenced to the P&ID.",
     "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
     "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
-    "Risk & Regulatory": "Live hazard & risk register (physics critic, gate flags, cost, equipment) + the compliance-gate verdict and statutory duties, on one sheet.",
+    "Risk & Regulatory": "Live hazard & risk register (physics critic, gate flags, cost, equipment), TRIAGED per row — an ENGINE-FIXABLE design defect renders as an OPEN DEFECT with its routed fix stage (never 'tolerable with mitigation'); only genuinely EXTERNAL risks carry mitigations — + the compliance-gate verdict and statutory duties, on one sheet.",
     "Assembly sequence": "Order-of-works: civils → tankage → mechanical → pipework → electrical → I&C → commissioning.",
 }
 
@@ -6662,24 +6663,82 @@ def _detect_jurisdiction(state: dict) -> str:
     return "UK"
 
 
-def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
-    """Render the Risk register TABLE onto `ws` starting at `start_row` (header row).
-    Returns the next free row, or None when there are no rows to show. The header is
-    written by the caller as a section banner. (Was tab_risk_register; refactored into
-    a section for the "Risk & Regulatory" merge, 2026-06-24.)"""
-    rows = []   # (category, hazard/finding, cause, sev, lik, mitigation, source)
+# ── RISK TRIAGE (Tristan 2026-07-02, issue 12: "if you have identified these problems why
+# are they still here? … the risk actually should be fixed as part of the loop") ─────────
+# Every risk-register row is TRIAGED, deterministically from the row's OWN content:
+#   ENGINE-FIXABLE — the risk describes a property of the DESIGN the engine controls (a
+#     sizing / spec / selection / coverage / consistency defect: an undersized part, a TBD
+#     placeholder in a critical slot, an unresolved physics-critic finding, a gate flag, a
+#     capex out of band). Such a row may NOT ship as "Tolerable (with mitigation)" — it
+#     renders as an OPEN DEFECT naming its routed fix stage, FAILS its row check, and caps
+#     the tab below 8 until the defect is fixed at source (at which point the finding it
+#     mirrors is gone and the row disappears).
+#   EXTERNAL — genuinely outside the engine: inherent process hazards of the equipment
+#     class (stored pressure, chemicals, work at height), site / utility / supply-chain /
+#     regulatory / operator factors. These legitimately carry mitigations and can pass.
+# Signals (universal, never a per-class table): the row's PROVENANCE (a live engine finding
+# — physics critic / gate flag / cost sanity — is the engine's own audit vocabulary) plus a
+# defect-vocabulary net over the row's text (sizing / rating / coverage / consistency nouns).
+_RISK_DEFECT_VOCAB_RE = re.compile(
+    r"(undersiz|oversiz|under-?rated|mis-?siz|unsized|not\s+sized|"
+    r"\btbd\b|placeholder|unverified|unresolved|uncosted|fabricated\s+tick|"
+    r"missing\s+(?:instrument|material|mpn|part|datasheet|basis|tag)|"
+    r"zero\s+flow|0\.0\s*m/s|never\s+routed|not\s+routed|unrouted|"
+    r"mismatch|inconsisten|contradict|"
+    r"exceeds?\s+the\s+\S{0,24}\s*(?:band|limit|rating)|outside\s+the\s+\S{0,24}\s*band|"
+    r"out\s+of\s+band|£0\b|volt-?drop\s+unverifi)", re.I)
 
-    # 1) LIVE engineering findings — the physics critic's issues
+# The live-finding sources — rows minted from the engine's OWN audit machinery.
+_RISK_ENGINE_SOURCES = ("state.physicsCritique.issues", "state.residualIssues", "state.costSanity")
+
+CLS_ENGINE_FIXABLE = "ENGINE-FIXABLE"
+CLS_EXTERNAL = "EXTERNAL"
+
+
+def _classify_risk_row(source: str, text: str) -> str:
+    """Deterministic triage of ONE risk row from its own provenance + text (never a class
+    table). A live engine finding OR defect vocabulary → ENGINE-FIXABLE; else EXTERNAL."""
+    if source in _RISK_ENGINE_SOURCES:
+        return CLS_ENGINE_FIXABLE
+    if _RISK_DEFECT_VOCAB_RE.search(text or ""):
+        return CLS_ENGINE_FIXABLE
+    return CLS_EXTERNAL
+
+
+def _build_risk_rows(state: dict) -> List[dict]:
+    """The ONE row-builder for the Risk register — shared by the column-contract evaluator
+    AND the renderer (one classifier, no divergence). Each row: cat / hazard / cause / sev /
+    lik / mit / source / cls (triage verdict) / fix (routed source stage, engine-fixable)."""
+    rows: List[dict] = []
+
+    def _add(cat, hz, cause, sev, lik, mit, src, fix="", force_external_reason=""):
+        cls = CLS_EXTERNAL if force_external_reason else _classify_risk_row(src, f"{hz} {cause}")
+        rows.append(dict(cat=cat, hazard=hz, cause=cause, sev=sev, lik=lik,
+                         mit=(force_external_reason or mit), source=src, cls=cls,
+                         fix=(fix if cls == CLS_ENGINE_FIXABLE else "")))
+
+    # 1) LIVE engineering findings — the physics critic's issues. A finding that is the
+    # critic's OWN I/O artifact (truncated payload / vague hedge with no named part — the
+    # gate-33 false-positive discipline, same filter as dossier_audit Check 6) is NOT a
+    # design property: it renders with an explicit re-run note instead of failing the tab
+    # (the critic is an LLM; a flaky artifact must not flip a deterministic score).
     pc = state.get("physicsCritique") or {}
     for iss in (pc.get("issues") or []):
         if not isinstance(iss, dict):
             continue
         sevtxt = str(iss.get("severity", "")).lower()
         sev = 5 if sevtxt == "high" else 3 if sevtxt in ("medium", "med") else 2
-        rows.append(("Engineering — design", iss.get("issue", "").strip() or "Design concern",
-                     f"Physics critic ({iss.get('dimension', 'engineering')}), at {iss.get('where', 'design')}.",
-                     sev, 3, "Resolve / re-spec before procurement; re-run the physics check to confirm closure.",
-                     "state.physicsCritique.issues"))
+        artifact = not _physics_high_is_design_defect(iss, state)
+        _add("Engineering — design", iss.get("issue", "").strip() or "Design concern",
+             f"Physics critic ({iss.get('dimension', 'engineering')}), at {iss.get('where', 'design')}.",
+             sev, 3, "Resolve / re-spec before procurement; re-run the physics check to confirm closure.",
+             "state.physicsCritique.issues",
+             fix=(f"Stage 7.5 physics-critic finding ({iss.get('dimension', 'engineering')}) — fix the "
+                  "source rule that spec'd the flagged part (universal-contract-sizing / requirements_bom "
+                  "emitter), add its regression guard, re-run; the finding clears and this row disappears"),
+             force_external_reason=("Physics-critic I/O artifact — not a design property "
+                                    "(gate-33 false-positive discipline); re-run Stage 7.5 to clear."
+                                    if artifact else ""))
 
     # 2) LIVE residual gate flags (QA / commercial)
     for ri in (state.get("residualIssues") or []):
@@ -6690,10 +6749,12 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
                "Procurement — part data" if "pn" in gate or "fictional" in gate else
                "Documentation — drawing/layout" if "layout" in gate or "overlap" in gate else
                "Quality assurance")
-        rows.append((cat, ri.get("summary", "").strip() or ri.get("gate", "Gate flag"),
-                     f"Deterministic {ri.get('gate', 'gate')} raised a flag.",
-                     3, 2, "Review the named audit, correct the source line, and re-run the gate.",
-                     "state.residualIssues"))
+        _add(cat, ri.get("summary", "").strip() or ri.get("gate", "Gate flag"),
+             f"Deterministic {ri.get('gate', 'gate')} raised a flag.",
+             3, 2, "Review the named audit, correct the source line, and re-run the gate.",
+             "state.residualIssues",
+             fix=(f"deterministic gate '{ri.get('gate', 'gate')}' flag — correct the flagged source "
+                  "line at its producing rule, re-run the gate; the flag clears and this row disappears"))
 
     # 3) LIVE cost-sanity (commercial) when outside / borderline the industry band
     cstat = state.get("costSanity") or {}
@@ -6701,46 +6762,97 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
         ratio = num(cstat.get("ratio_to_nearest_edge")) or 1.0
         if ratio and ratio > 1.05:
             sev = 4 if ratio > 2 else 3 if ratio > 1.5 else 2
-            rows.append(("Commercial — capex", "Capex per output unit outside the typical industry band",
-                         clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.",
-                         sev, 3, "Value-engineer the high-cost items or confirm the premium is justified.",
-                         "state.costSanity"))
+            _add("Commercial — capex", "Capex per output unit outside the typical industry band",
+                 clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.",
+                 sev, 3, "Value-engineer the high-cost items or confirm the premium is justified.",
+                 "state.costSanity",
+                 fix=("cost model at source — requirements_bom.py pricing rules (corpus lift / "
+                      "principal pricing) or value-engineer the high-cost items; re-run cost sanity"))
 
-    # 4) PROCESS-HAZARD rows from the equipment present (universal hazard library)
+    # 4) PROCESS-HAZARD rows from the equipment present (universal hazard library) —
+    # inherent hazards of the equipment class, mitigated by design practice + statutory
+    # regime, not design DEFECTS: EXTERNAL (unless their text carries defect vocabulary).
     for hz in _derive_hazards(state):
-        rows.append(("Process safety / HSE", hz["name"], hz["cause"],
-                     hz["sev"], hz["lik"], hz["mit"], "Equipment present in the bill of materials"))
+        _add("Process safety / HSE", hz["name"], hz["cause"],
+             hz["sev"], hz["lik"], hz["mit"], "Equipment present in the bill of materials",
+             fix="fix the source rule that produced this finding, add its regression guard, re-run")
 
+    return rows
+
+
+def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
+    """Render the Risk register TABLE onto `ws` starting at `start_row` (header row).
+    Returns the next free row, or None when there are no rows to show. The header is
+    written by the caller as a section banner. (Was tab_risk_register; refactored into
+    a section for the "Risk & Regulatory" merge, 2026-06-24; TRIAGE columns 2026-07-02.)
+
+    Every row renders its TRIAGE class + the column-contract row check (issue 12): an
+    ENGINE-FIXABLE row is an OPEN DEFECT in red naming its routed fix stage — never
+    "Tolerable (with mitigation)"; only a genuinely EXTERNAL risk carries a mitigation."""
+    rows = _build_risk_rows(state)
     if not rows:
         return None
+    # per-row verdicts from the SAME evaluation build() scored the tab with (fallback:
+    # evaluate locally over the same rows — one row-builder, so verdicts cannot diverge)
+    cres = _CONTRACT_RESULTS.get("Risk & Regulatory") or _eval_risk_rows(rows) or {}
+    crows = cres.get("rows") or {}
 
     header(ws, start_row, ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score",
-                           "Rating", "Mitigation", "Residual", "Source"])
+                           "Rating", "Class", "Mitigation / fix route", "Residual", "Source",
+                           "Row check"])
     r = start_row + 1
-    body_first = r
-    for i, (cat, hz, cause, sev, lik, mit, src) in enumerate(rows, start=1):
-        score = sev * lik
+    for i, row in enumerate(rows):
+        cr = crows.get(i) or {}
+        fixable = row["cls"] == CLS_ENGINE_FIXABLE
+        row_ok = cr.get("verdict") == "PASS"
+        score = row["sev"] * row["lik"]
         rating, fill = _rag(score)
-        ws.cell(r, 1, i).border = BORDER
-        ws.cell(r, 2, clean_cell(cat)).border = BORDER
-        c3 = ws.cell(r, 3, clean_cell(hz)); c3.alignment = WRAP_TOP; c3.border = BORDER
-        c4 = ws.cell(r, 4, clean_cell(cause)); c4.alignment = WRAP_TOP; c4.border = BORDER
-        ws.cell(r, 5, sev).border = BORDER
-        ws.cell(r, 6, lik).border = BORDER
+        ws.cell(r, 1, i + 1).border = BORDER
+        ws.cell(r, 2, clean_cell(row["cat"])).border = BORDER
+        c3 = ws.cell(r, 3, clean_cell(row["hazard"])); c3.alignment = WRAP_TOP; c3.border = BORDER
+        c4 = ws.cell(r, 4, clean_cell(row["cause"])); c4.alignment = WRAP_TOP; c4.border = BORDER
+        ws.cell(r, 5, row["sev"]).border = BORDER
+        ws.cell(r, 6, row["lik"]).border = BORDER
         sc = ws.cell(r, 7, score); sc.border = BORDER
         # live recompute so an edited S or L re-scores: =E*F
         sc.value = f"=E{r}*F{r}"
         rc = ws.cell(r, 8, rating); rc.border = BORDER; rc.fill = fill
         rc.alignment = Alignment(horizontal="center")
-        c9 = ws.cell(r, 9, clean_cell(mit)); c9.alignment = WRAP_TOP; c9.border = BORDER
-        ws.cell(r, 10, "Tolerable (with mitigation)").border = BORDER
-        c11 = ws.cell(r, 11, clean_cell(src)); c11.alignment = WRAP_TOP; c11.border = BORDER
+        # Class — the triage verdict, red when the engine owns the fix
+        cc = ws.cell(r, 9, row["cls"]); cc.border = BORDER
+        cc.alignment = Alignment(horizontal="center")
+        if fixable:
+            cc.font = FONT_FAIL
+            cc.fill = _FILL_RISK_HI
+        # Mitigation / fix route — an engine-fixable defect shows its ROUTED FIX, never a
+        # soothing mitigation; an external risk shows its real mitigation.
+        mit_txt = (f"FIX AT SOURCE: {row['fix']}" if fixable else clean_cell(row["mit"]))
+        c10 = ws.cell(r, 10, mit_txt); c10.alignment = WRAP_TOP; c10.border = BORDER
+        # Residual — "Tolerable (with mitigation)" is EARNED by the external class only
+        res_txt = ("OPEN DEFECT — may not ship as 'tolerable'" if fixable
+                   else "Tolerable (with mitigation)")
+        c11 = ws.cell(r, 11, res_txt); c11.border = BORDER
+        if fixable:
+            c11.font = FONT_FAIL
+            c11.fill = FILL_FAIL
+        c12 = ws.cell(r, 12, clean_cell(row["source"])); c12.alignment = WRAP_TOP; c12.border = BORDER
+        # Row check — the per-row verdict of the published column contract.
+        c13 = ws.cell(r, 13, "PASS" if row_ok else
+                      "FAIL — " + "; ".join(cr.get("reasons") or ["no contract evaluation for this row"]))
+        c13.alignment = WRAP_TOP
+        c13.border = BORDER
+        c13.font = FONT_PASS if row_ok else FONT_FAIL
+        c13.fill = FILL_PASS if row_ok else FILL_FAIL
+        if not row_ok:
+            for col in (1, 2, 3, 4, 5, 6, 7, 12):   # 8-11+13 carry their own verdict fills
+                ws.cell(r, col).fill = FILL_FAIL
         # grow row for the longest wrapped cell
-        longest = max(len(str(hz)), len(str(cause)), len(str(mit)))
+        longest = max(len(str(row["hazard"])), len(str(row["cause"])), len(mit_txt),
+                      len(str(c13.value)))
         if longest > 40:
-            ws.row_dimensions[r].height = min(-(-longest // 40), 5) * 14.5
+            ws.row_dimensions[r].height = min(-(-longest // 40), 6) * 14.5
         r += 1
-    ws.auto_filter.ref = f"A{start_row}:K{r - 1}"
+    ws.auto_filter.ref = f"A{start_row}:M{r - 1}"
     return r
 
 
@@ -6750,18 +6862,26 @@ def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
     the SAME universal hazard library, so they belong together). Each section keeps its
     full table. Universal; skips only if NEITHER section has content."""
     ws = wb.create_sheet("Risk & Regulatory")
-    set_widths(ws, {"A": 6, "B": 22, "C": 40, "D": 40, "E": 6, "F": 6, "G": 7,
-                    "H": 10, "I": 46, "J": 16, "K": 26})
-    title_row(
-        ws, "Risk & Regulatory", 11,
+    set_widths(ws, {"A": 6, "B": 22, "C": 38, "D": 36, "E": 6, "F": 6, "G": 7,
+                    "H": 10, "I": 16, "J": 46, "K": 24, "L": 24, "M": 36})
+    subtitle = (
         "Preliminary hazard & risk register PLUS the regulatory / compliance duties, on "
         "one sheet (both derive from the same universal hazard library). Risk rows come "
         "LIVE from the physics critic, the deterministic gate flags, the cost-sanity check "
         "and the equipment present; the regulatory section adds the engine's compliance-gate "
         "verdict and the jurisdiction × hazard → regulation matrix. Score = S × L (≤7 Low / "
-        "8–14 Medium / ≥15 High). Universal — not plant-specific. Preliminary; a site-specific "
-        "HAZID / HAZOP and a regulatory review are required before construction / sale.",
+        "8–14 Medium / ≥15 High). Every row is TRIAGED from its own provenance + content: "
+        "an ENGINE-FIXABLE row (a design defect the engine controls — sizing / spec / "
+        "coverage / consistency) is an OPEN DEFECT that names its routed fix stage and can "
+        "never ship as 'tolerable with mitigation'; only a genuinely EXTERNAL risk (inherent "
+        "process hazard, site / utility / supply-chain / regulatory factor) carries a "
+        "mitigation. Universal — not plant-specific. Preliminary; a site-specific HAZID / "
+        "HAZOP and a regulatory review are required before construction / sale."
     )
+    _cres = _CONTRACT_RESULTS.get("Risk & Regulatory")
+    if _cres:
+        subtitle += " " + _contract_note(_cres)
+    title_row(ws, "Risk & Regulatory", 13, subtitle)
     r = 4
     # ── Risk register section ──
     sub_banner(ws, r, "Risk register", 11)
@@ -6777,7 +6897,7 @@ def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
     r += 1
     r = _render_regulatory_section(ws, state, r)
     ws.freeze_panes = "A5"
-    back_link(ws, 11)
+    back_link(ws, 13)
     return True
 
 
@@ -7794,6 +7914,82 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
                     "growing the parts DB (Stage 17.6 ingest) so partVerifications resolves them")}
 
 
+# ── RISK REGISTER column contract (Tristan 2026-07-02, issue 12) ────────────────────────
+def _eval_risk_rows(rows: List[dict]) -> Optional[dict]:
+    """Column-contract evaluation of EVERY Risk-register row (pure — takes the rows
+    `_build_risk_rows` produced; renders nothing).
+
+    TRIAGE RULE: an ENGINE-FIXABLE row (a design defect the engine controls) FAILS its row
+    check with its routed fix stage — "tolerable with mitigation" over an identified defect
+    is a fabricated tolerance, exactly a fabricated tick. An EXTERNAL row passes ONLY with a
+    non-empty mitigation. The tab score is arithmetic (10 × rows-passing ÷ rows) and HARD
+    CAPPED below 8 while ANY open engine-fixable defect ships — the ≥8 floor can never be
+    reached over a known defect; fixing it at source clears the mirrored finding and the
+    row disappears."""
+    if not rows:
+        return None
+    contract = [
+        ("Class", "computed",
+         "ENGINE-FIXABLE vs EXTERNAL — deterministic triage from the row's own provenance "
+         "(live engine finding = the engine's audit vocabulary) + defect-vocabulary net"),
+        ("Mitigation / fix route", "required_nonempty",
+         "EXTERNAL: a real mitigation; ENGINE-FIXABLE: the routed source-stage fix"),
+        ("Residual", "computed",
+         "EXTERNAL + mitigated → 'Tolerable (with mitigation)'; ENGINE-FIXABLE → OPEN DEFECT "
+         "(row FAILS until the defect is fixed at source and the finding it mirrors is gone)"),
+    ]
+    per_row: Dict[int, dict] = {}
+    n_pass = 0
+    fixable_n = 0
+    unmitigated_n = 0
+    for idx, row in enumerate(rows):
+        reasons: List[str] = []
+        if row.get("cls") == CLS_ENGINE_FIXABLE:
+            fixable_n += 1
+            reasons.append(
+                "identified ENGINE-FIXABLE defect shipped in the register — a design property "
+                "the engine controls can never be 'tolerable with mitigation'; fix at source: "
+                + (row.get("fix") or "the source rule that produced this finding"))
+        elif not str(row.get("mit") or "").strip():
+            unmitigated_n += 1
+            reasons.append("EXTERNAL risk with no mitigation stated — an unmitigated external "
+                           "risk is not tolerable")
+        verdict = "PASS" if not reasons else "FAIL"
+        if verdict == "PASS":
+            n_pass += 1
+        per_row[idx] = {"verdict": verdict, "reasons": reasons, "cls": row.get("cls"),
+                        "fix": row.get("fix", "")}
+    n_total = len(per_row)
+    score = _contract_score(n_pass, n_total)
+    if score is not None and fixable_n:
+        score = min(score, 7.9)   # hard cap <8 while any open engine-fixable defect ships
+    issues: List[str] = []
+    if fixable_n:
+        ex = [f"row {i + 1} ({str(rows[i].get('hazard', ''))[:50]})"
+              for i, r in per_row.items() if r["cls"] == CLS_ENGINE_FIXABLE][:3]
+        issues.append(f"{fixable_n}/{n_total} risk rows are ENGINE-FIXABLE open defects shipped "
+                      f"in the register (arithmetic 10 × {n_pass}/{n_total}, capped <8 while any "
+                      "remain) — e.g. " + " · ".join(ex))
+    if unmitigated_n:
+        issues.append(f"{unmitigated_n} EXTERNAL risk row(s) carry no mitigation")
+    return {"tab": "Risk & Regulatory", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            # every engine-fixable row previously rendered 'Tolerable (with mitigation)' —
+            # a fabricated tolerance tick, now neutralised by the OPEN-DEFECT rendering
+            "source_fabricated": fixable_n,
+            "fixable_count": fixable_n,
+            "fix": ("fix each OPEN-DEFECT row at its ROUTED source stage (each row names it: the "
+                    "physics-critic finding's producing rule / the flagged gate's source line / the "
+                    "cost model) — the mirrored finding then clears and the row disappears; external "
+                    "risks keep their mitigations")}
+
+
+def _eval_risk_register_contract(_run_dir: str, state: dict) -> Optional[dict]:
+    """Registry adapter: build the risk rows from state and evaluate their contract."""
+    return _eval_risk_rows(_build_risk_rows(state))
+
+
 # The registry: tab name → its contract evaluator. build() runs each BEFORE the tabs render,
 # overrides the tab's quality score with the ARITHMETIC result, and the tab functions read
 # _CONTRACT_RESULTS to render the per-row "Row check" verdicts from the SAME evaluation.
@@ -7801,6 +7997,7 @@ _CONTRACT_TABS = {
     "Line & velocity": _eval_line_velocity_contract,
     "Panel schedule": _eval_panel_schedule_contract,
     _LEDGER_SHEET: _eval_bom_ledger_contract,
+    "Risk & Regulatory": _eval_risk_register_contract,
 }
 
 
@@ -9269,6 +9466,108 @@ def _selftest() -> int:
     if not _all_tbd or _all_tbd["n_pass"] != 5 or _all_tbd["score"] >= 8:
         print(f"  FAIL contract-bom: a fully-TBD bill must score <8 even with every row "
               f"passing (got {_all_tbd and _all_tbd['score']})"); bad += 1
+    # ═══ proveCatch the RISK-REGISTER TRIAGE contract (Tristan 2026-07-02, issue 12 —
+    # "if you have identified these problems why are they still here?"). Claims:
+    # (a) ENGINE-FIXABLE-as-tolerable IMPOSSIBLE: a live engine finding (physics critic /
+    #     gate flag / cost sanity) FAILS its row naming the routed fix stage, and the tab
+    #     is capped <8 while ANY such open defect ships — even at a high pass-fraction;
+    # (b) an EXTERNAL risk WITHOUT a mitigation FAILS;
+    # (c) a register of ONLY external risks with mitigations scores 10 PASS;
+    # (d) the defect-vocabulary net classifies a non-live-source row by its own text;
+    # (e) a physics-critic I/O ARTIFACT (truncated payload) is NOT an engine-fixable
+    #     design defect — a flaky LLM artifact must never flip the deterministic score. ═══
+    _risk_state = {
+        "physicsCritique": {"issues": [
+            {"severity": "high", "dimension": "engineering_plausibility",
+             "issue": "The transfer pump is rated for only 4 kW against an 11 kW duty",
+             "where": "mass_fluid_transport/sub_modules[0]/words[3]"},
+            {"severity": "high", "dimension": "part_realism",
+             "issue": "The design JSON payload is truncated mid-array; the module list is incomplete",
+             "where": "design"},
+        ]},
+        "residualIssues": [{"gate": "price_floor", "summary": "3 lines priced under the class floor"}],
+        "costSanity": {"ratio_to_nearest_edge": 2.4, "message": "capex 2.4x above the band edge"},
+        "requirementsBom": [
+            {"requirement": "Pressure Vessel · 2 bar", "part": "", "status": "", "tag": "PV-1"},
+            {"requirement": "Chemical Dosing Skid", "part": "", "status": "", "tag": "CD-1"},
+        ],
+    }
+    _rr = _build_risk_rows(_risk_state)
+    _rv = _eval_risk_rows(_rr)
+    # rows: physics-defect + physics-artifact + gate flag + cost sanity + hazards
+    # (pressure vessel → stored pressure + tank/vessel + chemical dosing hits)
+    if not _rv or _rv["n_total"] != len(_rr) or _rv["n_total"] < 6:
+        print(f"  FAIL contract-risk: expected ≥6 evaluated rows (got {_rv and _rv['n_total']})"); bad += 1
+    else:
+        # (a) the NAMED physics finding, the gate flag and the cost-sanity row are all
+        # ENGINE-FIXABLE and FAIL with a routed fix — 'tolerable with mitigation' impossible
+        _fx = [i for i, r in enumerate(_rr) if r["cls"] == CLS_ENGINE_FIXABLE]
+        if len(_fx) != 3:
+            print(f"  FAIL contract-risk: exactly the 3 live findings must triage ENGINE-FIXABLE "
+                  f"(got {len(_fx)}: {[_rr[i]['source'] for i in _fx]})"); bad += 1
+        for _i in _fx:
+            _vr = _rv["rows"][_i]
+            if _vr["verdict"] != "PASS" and any("fix at source" in x for x in _vr["reasons"]):
+                continue
+            print(f"  FAIL contract-risk: an ENGINE-FIXABLE row must FAIL naming its routed "
+                  f"fix stage (row {_i}: {_vr})"); bad += 1
+        if not any("Stage 7.5" in _rr[i]["fix"] for i in _fx):
+            print("  FAIL contract-risk: the physics-critic row must route to Stage 7.5"); bad += 1
+        if not any("gate 'price_floor'" in _rr[i]["fix"] for i in _fx):
+            print("  FAIL contract-risk: the gate-flag row must route to its named gate"); bad += 1
+        # (e) the truncated-payload artifact is NOT a design defect → EXTERNAL with the
+        # explicit artifact note, and it PASSES (never flips the deterministic score)
+        _art = [i for i, r in enumerate(_rr) if "artifact" in str(r["mit"]).lower()]
+        if not _art or _rr[_art[0]]["cls"] != CLS_EXTERNAL or _rv["rows"][_art[0]]["verdict"] != "PASS":
+            print(f"  FAIL contract-risk: a physics-critic I/O artifact must triage EXTERNAL "
+                  f"with the re-run note, never fail the tab (got {_art and _rr[_art[0]]})"); bad += 1
+        # hazard-library rows are EXTERNAL with mitigations → PASS
+        _hz = [i for i, r in enumerate(_rr) if r["source"].startswith("Equipment present")]
+        if not _hz or any(_rv["rows"][i]["verdict"] != "PASS" for i in _hz):
+            print("  FAIL contract-risk: mitigated inherent process hazards must PASS"); bad += 1
+        # tab honestly FAILS with the fabricated-tolerance count surfaced
+        if _rv["status"] != "FAIL" or (_rv["score"] or 0) >= 8 or _rv["source_fabricated"] != 3:
+            print(f"  FAIL contract-risk: 3 open defects must FAIL the tab <8 with 3 fabricated "
+                  f"tolerances counted (got {_rv['score']}, {_rv['source_fabricated']})"); bad += 1
+    # (a cont.) the <8 cap holds even when engine-fixables are a small fraction: 1 defect
+    # over 19 mitigated externals is arithmetically 9.5 — it must still cap below 8
+    _many = ([{"cat": "Engineering — design", "hazard": "Undersized pump", "cause": "x", "sev": 3,
+               "lik": 3, "mit": "", "source": "state.physicsCritique.issues",
+               "cls": CLS_ENGINE_FIXABLE, "fix": "Stage 7.5"}] +
+             [{"cat": "Process safety / HSE", "hazard": f"Hazard {i}", "cause": "x", "sev": 3,
+               "lik": 2, "mit": "guarding + permit-to-work", "source": "Equipment present in the bill of materials",
+               "cls": CLS_EXTERNAL, "fix": ""} for i in range(19)])
+    _mv = _eval_risk_rows(_many)
+    if not _mv or (_mv["score"] or 0) >= 8 or _mv["status"] != "FAIL":
+        print(f"  FAIL contract-risk: ONE open engine-fixable defect must cap the tab <8 even "
+              f"at a 19/20 pass-fraction (got {_mv and _mv['score']})"); bad += 1
+    # (b) an external risk WITHOUT a mitigation fails its row
+    _nomit = _eval_risk_rows([{"cat": "Process safety / HSE", "hazard": "Site flooding",
+                               "cause": "low-lying site", "sev": 3, "lik": 2, "mit": "",
+                               "source": "Equipment present in the bill of materials",
+                               "cls": CLS_EXTERNAL, "fix": ""}])
+    if not _nomit or _nomit["rows"][0]["verdict"] != "FAIL" or \
+            not any("no mitigation" in x for x in _nomit["rows"][0]["reasons"]):
+        print(f"  FAIL contract-risk: an EXTERNAL risk without a mitigation must FAIL "
+              f"(got {_nomit and _nomit['rows'][0]})"); bad += 1
+    # (c) counter-case: ONLY external risks, all mitigated → an honest 10 PASS
+    _ext_state = {"requirementsBom": [
+        {"requirement": "Storage Tank", "part": "", "status": "", "tag": "TK-1"},
+        {"requirement": "Transfer Pump", "part": "", "status": "", "tag": "P-1"},
+    ]}
+    _ev = _eval_risk_rows(_build_risk_rows(_ext_state))
+    if not _ev or _ev["score"] != 10.0 or _ev["status"] != "PASS" or _ev["source_fabricated"] != 0:
+        print(f"  FAIL contract-risk: an all-external, all-mitigated register must score 10 PASS "
+              f"(got {_ev and _ev['score']}, {_ev and _ev['status']})"); bad += 1
+    # (d) the defect-vocabulary net: a row that is NOT a live finding but whose own text
+    # says 'undersized' is a design defect → ENGINE-FIXABLE
+    if _classify_risk_row("Equipment present in the bill of materials",
+                          "Undersized relief valve on the receiver") != CLS_ENGINE_FIXABLE:
+        print("  FAIL contract-risk: defect vocabulary in a row's own text must classify "
+              "ENGINE-FIXABLE"); bad += 1
+    if _classify_risk_row("Equipment present in the bill of materials",
+                          "Stored pressure energy — vessels can fail explosively") != CLS_EXTERNAL:
+        print("  FAIL contract-risk: an inherent process hazard must classify EXTERNAL"); bad += 1
     # ═══ proveCatch the CONSUMABLES label derivation (issue 9): classes come from the
     # plant's OWN BoM/contract signals; a plant with none gets NO consumable label. ═══
     _cs_hit = _consumable_classes({"requirementsBom": [
