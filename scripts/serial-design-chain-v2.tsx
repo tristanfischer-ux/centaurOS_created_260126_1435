@@ -3938,6 +3938,29 @@ async function main() {
         null, 2,
       ))
       writeFileSync(resolve(outDir, '4-orchestrator-tools-used.json'), JSON.stringify(orchResult.tools_used_page, null, 2))
+      // ── GATE 37: TOOL-BRIDGE LIVENESS + WORKED-CALC FLOOR (Tristan 2026-07-02) ──
+      // v51-v53 shipped dossiers whose Calculations sheet held ZERO worked
+      // calculations: the repo .venv had been replaced by a dead self-symlink, so
+      // EVERY Python-bridge tool died "Python exit null" and the chain sailed on
+      // with 1/24 tools, silently losing all first-principles engineering. A chain
+      // whose physics tools are dead must HALT with a routed fix, never render.
+      // Deterministic, universal: keyed on the executed plan's own results.
+      {
+        const trs = Array.from(orchResult.tool_results.entries())
+        const attempted = trs.length
+        const pyDead = trs.filter(([, r]) => !r.ok && /Python exit (null|-?\d+)/.test(String(r.error ?? ''))).length
+        const workedTotal = (orchResult.tools_used_page?.tools ?? [])
+          .reduce((n: number, t: { worked?: unknown[] }) => n + (t.worked?.length ?? 0), 0)
+        const bridgeDead = attempted >= 3 && pyDead / attempted > 0.5
+        const calcsEmpty = attempted >= 3 && workedTotal === 0
+        if (bridgeDead || calcsEmpty) {
+          console.error(`\n[chain] === FATAL GATE 37 tool-bridge/worked-calcs (exit 37) — WRONGNESS, fix the environment/source ===`)
+          console.error(`[gate-37] attempted=${attempted} python_dead=${pyDead} worked_calcs_total=${workedTotal}`)
+          console.error(`[gate-37] ${bridgeDead ? 'PYTHON BRIDGE DEAD: check .venv/bin/python3 exists and imports numpy (rebuild: /opt/homebrew/bin/python3.12 -m venv .venv && .venv/bin/pip install numpy scipy pandas fluids thermo chemicals ht CoolProp psychrolib control pvlib windpowerlib pybamm pandapower).' : ''}${calcsEmpty ? ' ZERO WORKED CALCULATIONS across an executed tool plan: the Calculations sheet would render EMPTY — every invoked physics tool must emit >=1 worked calc.' : ''}`)
+          logAction({ step: 'gate-37-tool-bridge', ok: false, attempted, python_dead: pyDead, worked_total: workedTotal })
+          process.exit(37)
+        }
+      }
       // Build #19e (2026-05-22): capture the tools-used page + the finalised
       // engineering contract so they can be attached to chain state below.
       // The renderer reads state.toolsUsedPage (Build #19e end-page) and
