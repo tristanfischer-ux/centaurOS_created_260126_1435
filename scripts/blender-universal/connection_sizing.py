@@ -1466,7 +1466,33 @@ def size_connection(edge: dict, length_m: float,
         spec = size_thermal(edge, length_m, value)
 
     elif ck == "flow_capacity":
-        spec = size_fluid(edge, length_m, value, unit)
+        if value > 0:
+            spec = size_fluid(edge, length_m, value, unit)
+        else:
+            # HONEST-UNKNOWN (Tristan 2026-07-02 — the v52 "velocity 0.0 m/s, in spec ✓"
+            # fabrication): a fluid edge that carries NO flow demand (required_value
+            # absent / zero and no carried_value override) CANNOT be sized. The old rule
+            # fed flow=0 into size_fluid, which returned velocity 0.0 with
+            # within_spec=True (0 ≤ 3 m/s) — a fabricated verdict over an unknown.
+            # SOURCE RULE: an unknown flow is UNVERIFIED, never in-spec. within_spec=None
+            # is the established "—/unverified" value every consumer already handles
+            # (build_universal_scene counts `is False`; draw_panel_schedule renders None
+            # as "—"; size_connection_to_spec returns immediately on not-False).
+            # A nominal DN25 keeps CAD continuity (same idiom as material_compatibility).
+            spec = _spec(
+                kind="pipe", mechanism=mechanism or "fluid_loop",
+                carried_rating=None, carried_unit=None,
+                size_label="DN25 (nominal — flow unknown)",
+                outer_dia_mm=PIPE_DN_OD["DN25"],
+                drop_pct_or_velocity=None, within_spec=None,
+                spec_limit=f"≤{LIQUID_VELOCITY_LIMIT_MS:g} m/s velocity (UNVERIFIED — no flow demand)",
+                material_qty_desc=f"DN25 nominal pipe, {length_m:.1f} m (flow unknown)",
+                tool_used="(no flow demand — NOT sized)",
+                assumptions=["fluid edge carries no required_value flow demand; the pipe "
+                             "cannot be sized and velocity / within-spec are UNVERIFIED "
+                             "(fix at source: author the flow demand on the topology edge)"],
+                notes="no flow demand on this edge — velocity UNVERIFIED; nominal DN25 for CAD continuity",
+            )
 
     elif ck in ("voltage_rating",):
         # A voltage-only edge: render as a thin signal/HV-sense lead — no

@@ -686,6 +686,34 @@ def main() -> int:
     check("explicit 316L preserved (non-oxidiser)",
           "stainless" in _mat("316L stainless process line"))
 
+    # ---- HONEST-UNKNOWN flow (2026-07-02 — the v52 "velocity 0.0 m/s, in spec ✓"
+    # fabrication): a fluid edge with NO flow demand must NOT come back sized with
+    # velocity 0.0 and within_spec=True. It must be UNVERIFIED (within_spec=None,
+    # no velocity, no carried rating) — an unknown is never a passing verdict. ----
+    print("\nHONEST-UNKNOWN fluid edge (no flow demand):")
+    _nf = cs.size_connection(
+        {"mechanism": "fluid_loop", "constraint_kind": "flow_capacity",
+         "from_part": "Pump", "to_part": "Vessel"}, 10.0)
+    check("no-flow fluid edge → within_spec is None (UNVERIFIED, never a ✓)",
+          _nf.get("within_spec") is None)
+    check("no-flow fluid edge → drop_pct_or_velocity is None (no fabricated 0.0 m/s)",
+          _nf.get("drop_pct_or_velocity") is None)
+    check("no-flow fluid edge → carried_rating is None (no fabricated '0 m³/s')",
+          _nf.get("carried_rating") is None)
+    check("no-flow fluid edge → spec_limit flags UNVERIFIED",
+          "UNVERIFIED" in str(_nf.get("spec_limit")))
+    # explicit zero demand is the same unknown
+    _zf = cs.size_connection(
+        {"mechanism": "fluid_loop", "constraint_kind": "flow_capacity",
+         "required_value": 0, "required_unit": "m³/s"}, 10.0)
+    check("zero-flow fluid edge → within_spec is None", _zf.get("within_spec") is None)
+    # and a REAL flow still sizes exactly as before (no-op guard)
+    _rf = cs.size_connection(
+        {"mechanism": "fluid_loop", "constraint_kind": "flow_capacity",
+         "required_value": 0.0125, "required_unit": "m³/s"}, 10.0)
+    check("real-flow fluid edge still sizes (within_spec bool, velocity > 0)",
+          isinstance(_rf.get("within_spec"), bool) and (_rf.get("drop_pct_or_velocity") or 0) > 0)
+
     # ---- Verdict ----
     print()
     if failures:

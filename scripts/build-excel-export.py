@@ -49,6 +49,7 @@ FORMULA -> EXCEL TRANSLATION (verified with the `formulas` lib in the POC)
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -73,6 +74,12 @@ import deterministic_checks_lib as dcl  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 from dossier_audit import audit_dossier, tab_scores, tab_scorecard_summary  # noqa: E402
 from dossier_repair import repair_dossier  # noqa: E402
+
+# The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
+# ONE-SOURCE pipe DN ladder + velocity limits + flow-unit conversion, so the Line & velocity column
+# contract computes velocity over the SAME bores the sizer used (never a duplicated table).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender-universal"))
+import connection_sizing as conn_sizing  # noqa: E402
 
 # ----------------------------------------------------------------------------
 # STYLES — light theme only (Tristan: light mode, never dark)
@@ -6624,19 +6631,26 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
     tables = parse_md_tables(text)
     if not tables:
         return False
+    # The COLUMN CONTRACT for this tab (evaluated once in build(), before any tab renders):
+    # a dash in a contracted column (Length, ΔU) FAILS its row — a dash is never in-spec.
+    cres = _CONTRACT_RESULTS.get("Panel schedule") or {}
+    crows = cres.get("rows") or {}
+
     ws = wb.create_sheet("Panel schedule")
     set_widths(ws, {"A": 14, "B": 40, "C": 8, "D": 18, "E": 12, "F": 22,
-                    "G": 22, "H": 12, "I": 10, "J": 8})
-    title_row(
-        ws, "Electrical panel / load schedule", 10,
+                    "G": 22, "H": 12, "I": 10, "J": 8, "K": 52})
+    subtitle = (
         "Real sortable rows (circuit · load · device · cable · volt-drop). The "
         "engine computes Design I = P·1000 / (√3·V·pf·η) — pf 0.85 / η 0.90 for "
         "motor circuits, pf 1.0 / η 1.0 for resistive loads — from each circuit's "
         "INSTALLED motor frame (so the amps can exceed the duty-kW shown). ΔU % is "
         "the cable volt-drop over its length / CSA at Design I. 'In spec' is a LIVE "
-        "formula = (ΔU ≤ 5 %): edit a ΔU cell and the verdict + red flag recompute. "
-        "Auto-generated; not for construction.",
+        "formula = (ΔU ≤ 5 %) — a missing/dash ΔU renders ✗, never a pass. "
+        "Auto-generated; not for construction."
     )
+    if cres:
+        subtitle += " " + _contract_note(cres)
+    title_row(ws, "Electrical panel / load schedule", 11, subtitle)
     r = 4
     last_circuit_first = None
     for heading, hdr, rows in tables:
@@ -6662,9 +6676,11 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
                 cell = ws.cell(rr, spec_col)
                 # ELSE branch must be a STATIC value — referencing the spec cell itself
                 # ({sp_L}{rr}) is a CIRCULAR reference (the cell is THIS formula). When
-                # ΔU is non-numeric there is no volt-drop to check, so show "—".
+                # ΔU is non-numeric there is NO computed volt-drop, so the verdict is ✗
+                # (Tristan 2026-07-02: a dash is never in-spec — the old "—" let a
+                # length-less circuit read as passing and the tab score a fake 10).
                 cell.value = (f'=IF(ISNUMBER({du_L}{rr}),'
-                              f'IF({du_L}{rr}<=5,"✓","✗"),"—")')
+                              f'IF({du_L}{rr}<=5,"✓","✗"),"✗")')
             from openpyxl.formatting.rule import CellIsRule
             ws.conditional_formatting.add(
                 f"{sp_L}{body_first}:{sp_L}{body_last}",
@@ -6674,6 +6690,32 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
                 f"{sp_L}{body_first}:{sp_L}{body_last}",
                 CellIsRule(operator="equal", formula=['"✓"'],
                            fill=FILL_PASS, font=FONT_PASS))
+        # Row check — the per-row verdict of the published column contract, appended as
+        # the rightmost column of each circuit table (keyed by the Ckt id in column A).
+        if len(hdr) >= 6 and body_last >= body_first and crows:
+            ncol_t = max(len(hdr), max((len(rw) for rw in rows), default=0))
+            hc = ws.cell(body_first - 1, ncol_t + 1, "Row check")
+            hc.font = FONT_HEADER
+            hc.fill = FILL_HEADER
+            hc.border = BORDER
+            for rr in range(body_first, body_last + 1):
+                ckt = str(ws.cell(rr, 1).value or "").strip()
+                cr = crows.get(ckt)
+                if not cr:
+                    continue
+                ok = cr.get("verdict") == "PASS"
+                rc = ws.cell(rr, ncol_t + 1,
+                             "PASS" if ok else "FAIL — " + "; ".join(cr.get("reasons") or []))
+                rc.alignment = WRAP_TOP
+                rc.border = BORDER
+                rc.font = FONT_PASS if ok else FONT_FAIL
+                rc.fill = FILL_PASS if ok else FILL_FAIL
+                if not ok:
+                    _rt = len(str(rc.value))
+                    if _rt > 52:
+                        ws.row_dimensions[rr].height = max(
+                            ws.row_dimensions[rr].height or 14.5,
+                            min(-(-_rt // 52), 5) * 14.5)
         # autofilter + format the wide circuit table (the one with many columns)
         if len(hdr) >= 6:
             last_circuit_first = (body_first, r - 1, len(hdr))
@@ -6682,7 +6724,7 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
         bf, bl, nc = last_circuit_first
         ws.auto_filter.ref = f"A{bf - 1}:{get_column_letter(nc)}{bl}"
     ws.freeze_panes = "A5"
-    back_link(ws, 10)
+    back_link(ws, 11)
     return True
 
 
@@ -6790,6 +6832,389 @@ def _line_basis(row: dict) -> str:
     return " · ".join(bits)
 
 
+# ============================================================================
+# COLUMN-CONTRACT REGISTRY (Tristan 2026-07-02 — "every single line needs a check,
+# every column needs a check on every single piece of information"; a tick must be a
+# COMPUTED comparison, never a default. The v52 catch: 45/45 Line & velocity rows
+# showed "in spec ✓" over velocity 0.0 m/s, and the Panel schedule's dash ΔU passed.)
+#
+# Per tab, each contracted column declares ONE rule:
+#   computed(<derivation>)  — the cell must be DERIVED by the stated arithmetic and pass its band
+#   required_nonempty       — the cell must carry real data (dash / empty / TBD = ROW FAIL)
+#   na_with_reason          — the cell may be n/a ONLY with an explicit stated reason
+# Every row gets a rightmost "Row check" verdict: PASS only when EVERY contracted column
+# passes. The tab's quality score is ARITHMETIC — 10 × (rows passing ÷ rows) — hard-floored
+# to 0 if any fabricated tick (a rendered ✓ the contract judges FAIL) survives on the sheet.
+# The contract itself is published in the tab's header note so a reader sees the basis.
+# proveCatch in _selftest (0-velocity+tick impossible · dash-ΔU fails · na_with_reason
+# passes · score arithmetic).
+# ============================================================================
+
+_CONTRACT_RESULTS: dict = {}     # tab name -> evaluation result (set in build(), read by the tab fns)
+
+
+def _contract_note(res: dict) -> str:
+    """One-line publication of a tab's column contract for the tab's header note."""
+    cols = " · ".join(f"{c}={r}" for c, r, _b in res.get("contract", []))
+    return (f"ROW CHECK CONTRACT (score = 10 × rows-passing ÷ rows = "
+            f"10 × {res.get('n_pass', 0)}/{res.get('n_total', 0)} = {res.get('score')}): {cols}. "
+            "A dash / empty / unverifiable contracted cell FAILS its row — honest red beats fake green.")
+
+
+def _contract_score(n_pass: int, n_total: int, rendered_fabricated: int = 0) -> Optional[float]:
+    """The ARITHMETIC tab score: 10 × pass-fraction, hard-floored to 0 while any
+    fabricated tick (a rendered ✓ over a contract-FAIL row) exists on the sheet."""
+    if n_total <= 0:
+        return None
+    if rendered_fabricated > 0:
+        return 0.0
+    return round(10.0 * n_pass / n_total, 1)
+
+
+# Flow-quantity join: the contract's flow demands live as per-part quantities
+# (<part>_throughput_m3_h / _flow_m3_h / _demand_m3_h …) even when the topology edge
+# carries no required_value (the v52 break: the sizer received flow=0 and emitted
+# velocity 0.0 "in spec"). Matching an endpoint NAME to its own quantity is a pure,
+# universal join — snake(name) + a flow-family suffix, no per-class table.
+_FLOW_QTY_SUFFIXES = ("_throughput_m3_h", "_flow_m3_h", "_demand_m3_h", "_capacity_m3_h",
+                      "_throughput_m3_per_hr", "_flow_m3_per_hr", "_demand_m3_per_hr")
+
+
+def _snake_part(name: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(name or "").lower()).strip("_")
+
+
+def _flow_qty_for_part(part: Any, quantities: Dict[str, Any]) -> Optional[Tuple[str, float]]:
+    """(quantity_key, flow_m3h) for a part name, or None. Exact snake-name + flow-suffix
+    first; a UNIQUE prefixed candidate second (never a guess between two)."""
+    s = _snake_part(part)
+    if not s:
+        return None
+    for suf in _FLOW_QTY_SUFFIXES:
+        v = qval(quantities, s + suf)
+        if v is not None and v > 0:
+            return (s + suf, float(v))
+    cands = [(k, qval(quantities, k)) for k in quantities
+             if k.startswith(s + "_") and any(k.endswith(x) for x in _FLOW_QTY_SUFFIXES)]
+    cands = [(k, v) for k, v in cands if v is not None and v > 0]
+    if len(cands) == 1:
+        return (cands[0][0], float(cands[0][1]))
+    return None
+
+
+def _derive_line_flow_m3h(row: dict, quantities: Dict[str, Any]) -> Optional[Tuple[float, str]]:
+    """(flow_m3h, basis) for a schedule line from the contract quantities. When BOTH
+    endpoints carry a flow quantity the SMALLER governs (a DN15 tap to a 14.5 m³/h
+    softener carries the softener's demand, not the 90 m³/h loop)."""
+    hits = [h for h in (_flow_qty_for_part(row.get("from"), quantities),
+                        _flow_qty_for_part(row.get("to"), quantities)) if h]
+    if not hits:
+        return None
+    key, flow = min(hits, key=lambda h: h[1])
+    return (flow, f"contract qty {key} = {flow:g} m³/h")
+
+
+_PIPE_DN_BORE = {label: bore for label, bore in conn_sizing.PIPE_DN_LADDER}
+
+
+def _pipe_velocity_ms(flow_m3h: float, size_label: str, n_parallel: Optional[float]) -> Optional[float]:
+    """v = Q / A over the DN bore (the sizer's own ladder), across n parallel runs."""
+    bore_mm = _PIPE_DN_BORE.get(str(size_label or "").split(" ")[0])
+    if not bore_mm:
+        return None
+    area = math.pi * (bore_mm / 2000.0) ** 2
+    n = max(1.0, num(n_parallel) or 1.0)
+    return (flow_m3h / 3600.0) / (area * n)
+
+
+def _parse_spec_limit(spec_limit: Any, default: float) -> float:
+    m = re.search(r"≤\s*(\d+(?:\.\d+)?)", str(spec_limit or ""))
+    return float(m.group(1)) if m else default
+
+
+def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
+    """Column-contract evaluation of EVERY Line & velocity row (pure — reads
+    connection-schedule.json + the contract quantities; renders nothing).
+
+    PIPE rows: velocity MUST be computed >0 (the sizer's as-sized value when it carried a
+    real flow, else v = Q/A from the endpoint-matched contract flow quantity over the
+    sizer's own DN bore) and inside the velocity band (spec_limit, from connection_sizing's
+    erosion limits). ELECTRICAL rows: ΔU% present + inside the volt-drop band at a real
+    current. OTHER rows: n/a allowed ONLY with the sizer's stated reason. ALL rows: size /
+    spec-limit / length populated; Line £ > 0 with its cost model + basis disclosed."""
+    cs = load_json(os.path.join(run_dir, "connection-schedule.json"))
+    if not cs or not isinstance(cs, dict) or not isinstance(cs.get("rows"), list) or not cs["rows"]:
+        return None
+    rows = cs["rows"]
+    specs = cs.get("specs") or []
+    quantities = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    vd_limit = num(cs.get("voltdrop_limit_pct")) or 5.0
+
+    contract = [
+        ("Tag/From/To/Size", "required_nonempty", "identity of the run"),
+        ("Rating", "computed", "carried flow / current — from the sizer, else the endpoint-matched contract flow quantity"),
+        ("Velocity / ΔU", "computed", "pipe: v = Q ÷ A over the sizer's DN bore, must be > 0; cable: ΔU% at the carried current; other: na_with_reason"),
+        ("Spec limit", "required_nonempty", "the band source (connection_sizing erosion / volt-drop limits)"),
+        ("In spec", "computed", "band comparison of the COMPUTED value — never a default tick"),
+        ("Length (m)", "required_nonempty", "routed length > 0"),
+        ("Line £ + Basis", "required_nonempty", "cost > 0 with its model (cost_source) + take-off basis disclosed"),
+    ]
+
+    per_row: Dict[int, dict] = {}
+    n_pass = 0
+    source_fabricated = 0
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        spec = specs[idx] if idx < len(specs) and isinstance(specs[idx], dict) else {}
+        section = _line_section(row, spec)
+        reasons: List[str] = []
+        velocity: Optional[float] = None
+        vel_basis = ""
+        flow_display = ""
+        in_spec: Optional[bool] = None
+
+        # identity columns
+        if not (row.get("from") and row.get("to")):
+            reasons.append("endpoint missing")
+        if not row.get("size"):
+            reasons.append("size missing")
+
+        if section == "pipe":
+            v_lim = _parse_spec_limit(spec.get("spec_limit"), conn_sizing.LIQUID_VELOCITY_LIMIT_MS)
+            carried = num(spec.get("carried_rating"))
+            spec_v = num(spec.get("drop_pct_or_velocity"))
+            if carried is not None and carried > 0 and spec_v is not None and spec_v > 0:
+                velocity = spec_v
+                unit = spec.get("carried_unit") or "m³/s"
+                flow_display = f"{carried:g} {unit}"
+                vel_basis = f"as-sized by connection_sizing (post-upsize) from {flow_display}"
+            else:
+                derived = _derive_line_flow_m3h(row, quantities)
+                if derived:
+                    flow_m3h, fbasis = derived
+                    velocity = _pipe_velocity_ms(flow_m3h, spec.get("size_label") or row.get("size"),
+                                                 spec.get("n_parallel"))
+                    flow_display = f"{flow_m3h:g} m³/h"
+                    vel_basis = (f"v = Q ÷ A: {fbasis} over {row.get('size')} bore "
+                                 f"{_PIPE_DN_BORE.get(str(row.get('size') or '').split(' ')[0], '?')} mm "
+                                 "(edge carried NO flow demand — sizer received 0)")
+                    if velocity is None:
+                        reasons.append(f"velocity underivable — unknown pipe size {row.get('size')!r}")
+                else:
+                    reasons.append("velocity underivable — no flow demand on the edge and no contract "
+                                   "flow/throughput quantity matches either endpoint")
+            if velocity is not None:
+                if velocity <= 0:
+                    reasons.append("velocity 0.0 m/s over a fluid line — a zero flow is not a sized pipe")
+                    in_spec = False
+                elif velocity > v_lim:
+                    reasons.append(f"velocity {velocity:.1f} m/s exceeds the ≤{v_lim:g} m/s band "
+                                   "(line sized without its real flow demand)")
+                    in_spec = False
+                else:
+                    in_spec = True
+            if not spec.get("spec_limit"):
+                reasons.append("spec-limit missing")
+        elif section == "electrical":
+            du_lim = _parse_spec_limit(spec.get("spec_limit"), vd_limit)
+            current = num(spec.get("carried_rating"))
+            du = num(spec.get("drop_pct_or_velocity"))
+            if current is not None and current > 0:
+                flow_display = f"{current:g} {spec.get('carried_unit') or 'A'}"
+            else:
+                reasons.append("no carried current on the run")
+            if du is None:
+                reasons.append("ΔU% missing — volt-drop unverifiable (dash is never in-spec)")
+            else:
+                velocity = du
+                vel_basis = f"volt-drop at {flow_display or 'unknown current'} over {row.get('length_m')} m"
+                if du > du_lim:
+                    reasons.append(f"ΔU {du:g}% exceeds the ≤{du_lim:g}% band")
+                    in_spec = False
+                elif du <= 0 and (current or 0) > 0 and (num(row.get("length_m")) or 0) >= 1:
+                    reasons.append("ΔU 0% at a real current over a real length — not a computed drop")
+                    in_spec = False
+                else:
+                    in_spec = True
+            if not spec.get("spec_limit"):
+                reasons.append("spec-limit missing")
+        else:
+            # OTHER services — n/a allowed ONLY with the sizer's stated reason
+            why = ""
+            for src in ([spec.get("notes")] + list(spec.get("assumptions") or [])):
+                if src:
+                    why = str(src)
+                    break
+            if why:
+                vel_basis = f"n/a — {why}"
+                in_spec = None
+            else:
+                reasons.append("no velocity/ΔU and no stated n/a reason")
+
+        lm = num(row.get("length_m"))
+        if lm is None or lm <= 0:
+            reasons.append("routed length missing")
+        cost = num(row.get("line_total_gbp"))
+        if cost is None or cost <= 0:
+            reasons.append("line £ missing")
+        if not (row.get("cost_source") and row.get("cost_basis")):
+            reasons.append("line £ has no disclosed basis (cost model / take-off)")
+
+        verdict = "PASS" if not reasons else "FAIL"
+        if verdict == "PASS":
+            n_pass += 1
+        if verdict == "FAIL" and row.get("within_spec") is not False:
+            source_fabricated += 1     # the schedule would have rendered a ✓ over this row
+        per_row[idx] = {"verdict": verdict, "reasons": reasons, "section": section,
+                        "velocity": velocity, "vel_basis": vel_basis,
+                        "flow_display": flow_display, "in_spec": in_spec}
+
+    n_total = len(per_row)
+    score = _contract_score(n_pass, n_total)
+    n_fail = n_total - n_pass
+    issues: List[str] = []
+    if n_fail:
+        ex = [f"row {i + 1} ({rows[i].get('from')}→{rows[i].get('to')}): {r['reasons'][0]}"
+              for i, r in list(per_row.items()) if r["verdict"] == "FAIL"][:3]
+        issues = [f"{n_fail}/{n_total} rows FAIL the column contract (arithmetic score "
+                  f"10 × {n_pass}/{n_total} = {score}) — e.g. " + " · ".join(ex)]
+        if source_fabricated:
+            issues.append(f"{source_fabricated} source row(s) claimed within_spec=✓ over data the "
+                          "contract judges unverifiable/failing — fabricated ticks, now rendered ✗")
+    return {"tab": "Line & velocity", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "source_fabricated": source_fabricated,
+            "fix": ("author the real flow demand (required_value) on every fluid topology edge at "
+                    "source (universal-contract-sizing → connection ledger) so connection_sizing "
+                    "sizes bores from true flows; the schedule then carries computed velocities "
+                    "and the band check passes on the re-sized lines")}
+
+
+def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
+    """Column-contract evaluation of EVERY Panel schedule circuit row (pure — reads
+    drawings/panel-schedule.md; renders nothing).
+
+    Per circuit: connected kW > 0; Design I consistent with P = √3·V·I·pf·η at the board
+    voltage (implied pf·η must land in the physical 0.60–1.05 band); protective device
+    ≥ Design I; cable CSA stated; routed length PRESENT and > 0; ΔU% PRESENT and ≤ 5 %.
+    A dash in a contracted column FAILS the row — a dash is never in-spec."""
+    path = os.path.join(run_dir, "drawings", "panel-schedule.md")
+    if not os.path.exists(path):
+        return None
+    try:
+        text = open(path, "r").read()
+    except Exception:  # noqa: BLE001
+        return None
+    tables = parse_md_tables(text)
+    if not tables:
+        return None
+    mv = re.search(r"(\d{3,4})\s*V\s*3-phase", text)
+    board_v = float(mv.group(1)) if mv else 400.0
+
+    contract = [
+        ("Ckt/Description", "required_nonempty", "circuit identity"),
+        ("Conn. load (kW)", "required_nonempty", "connected load > 0"),
+        ("Design I (A)", "computed", f"I consistent with P = √3·{board_v:g}·I·pf·η (implied pf·η ∈ 0.60–1.05)"),
+        ("Protective device", "computed", "device rating ≥ Design I"),
+        ("Cable", "required_nonempty", "CSA · cores stated"),
+        ("Length (m)", "required_nonempty", "routed cable length > 0 (dash = FAIL)"),
+        ("ΔU (%)", "computed", "volt-drop over the routed length at Design I, ≤ 5 % (dash = FAIL)"),
+        ("In spec", "computed", "= (ΔU ≤ 5 %) of a PRESENT ΔU — a dash is never in-spec"),
+    ]
+
+    def _col(hdr: List[str], *keys: str) -> Optional[int]:
+        for i, h in enumerate(hdr):
+            hl = h.lower()
+            if any(k in hl for k in keys):
+                return i
+        return None
+
+    per_row: Dict[str, dict] = {}
+    n_pass = 0
+    source_fabricated = 0
+    for _heading, hdr, trows in tables:
+        if len(hdr) < 6:
+            continue          # board key-value header tables are not circuit tables
+        c_ckt, c_kw = 0, _col(hdr, "load (kw)", "conn. load", "kw")
+        c_i = _col(hdr, "design i", "current (a)")
+        c_dev = _col(hdr, "device")
+        c_cab = _col(hdr, "cable")
+        c_len = _col(hdr, "length")
+        c_du = _col(hdr, "δu", "volt", "drop")
+        c_sp = _col(hdr, "spec")
+        for trow in trows:
+            ckt = (trow[c_ckt] if c_ckt < len(trow) else "").strip()
+            if not ckt or "TOTALS" in " ".join(trow).upper():
+                continue
+            cell = lambda ci: (trow[ci].strip() if ci is not None and ci < len(trow) else "")  # noqa: E731
+            reasons: List[str] = []
+            kw = num(cell(c_kw))
+            if kw is None or kw <= 0:
+                reasons.append("connected load (kW) missing")
+            amps = num(cell(c_i))
+            if amps is None or amps <= 0:
+                reasons.append("Design I missing")
+            elif kw:
+                pf_eta = (kw * 1000.0) / (math.sqrt(3.0) * board_v * amps)
+                if not (0.60 <= pf_eta <= 1.05):
+                    reasons.append(f"Design I {amps:g} A inconsistent with {kw:g} kW at {board_v:g} V "
+                                   f"(implied pf·η {pf_eta:.2f} outside 0.60–1.05)")
+            dev_a = num(cell(c_dev))
+            if dev_a is None:
+                reasons.append("protective device rating missing")
+            elif amps and dev_a < amps:
+                reasons.append(f"protective device {dev_a:g} A below Design I {amps:g} A")
+            if "mm²" not in cell(c_cab) and "mm2" not in cell(c_cab):
+                reasons.append("cable CSA missing")
+            ln = num(cell(c_len))
+            if ln is None or ln <= 0:
+                reasons.append("routed cable length missing (dash is not data — the run's electrical "
+                               "circuits were never routed, so no length exists to verify ΔU against)")
+            du = num(cell(c_du))
+            if du is None:
+                reasons.append("ΔU% missing — volt-drop unverifiable (a dash is never in-spec)")
+            elif du > 5.0:
+                reasons.append(f"ΔU {du:g}% exceeds the ≤5% band")
+            verdict = "PASS" if not reasons else "FAIL"
+            if verdict == "PASS":
+                n_pass += 1
+            if verdict == "FAIL" and "✓" in cell(c_sp):
+                source_fabricated += 1
+            per_row[ckt] = {"verdict": verdict, "reasons": reasons, "du": du, "length_m": ln}
+
+    if not per_row:
+        return None
+    n_total = len(per_row)
+    score = _contract_score(n_pass, n_total)
+    n_fail = n_total - n_pass
+    issues: List[str] = []
+    if n_fail:
+        ex = [f"{k}: {v['reasons'][0]}" for k, v in per_row.items() if v["verdict"] == "FAIL"][:3]
+        issues = [f"{n_fail}/{n_total} circuit rows FAIL the column contract (arithmetic score "
+                  f"10 × {n_pass}/{n_total} = {score}) — e.g. " + " · ".join(ex)]
+        if source_fabricated:
+            issues.append(f"{source_fabricated} source row(s) rendered ✓ over a dash/failing contracted "
+                          "column — fabricated ticks, now rendered ✗")
+    return {"tab": "Panel schedule", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "source_fabricated": source_fabricated,
+            "fix": ("route the electrical circuits in the scene (wire the electrical_bus edges) so "
+                    "route-manifest / connection-schedule carry real cable lengths, then compute ΔU% "
+                    "= f(length, CSA, Design I) in draw_panel_schedule at source")}
+
+
+# The registry: tab name → its contract evaluator. build() runs each BEFORE the tabs render,
+# overrides the tab's quality score with the ARITHMETIC result, and the tab functions read
+# _CONTRACT_RESULTS to render the per-row "Row check" verdicts from the SAME evaluation.
+_CONTRACT_TABS = {
+    "Line & velocity": _eval_line_velocity_contract,
+    "Panel schedule": _eval_panel_schedule_contract,
+}
+
+
 def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
     """#22 — Line & velocity schedule from connection-schedule.json, SPLIT into
     process-pipe lines (velocity vs ≤3 m/s) and electrical/signal cables (volt-drop
@@ -6822,16 +7247,26 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             return str(_rlines[idx].get("line_number") or (idx + 1))
         return str(idx + 1)
 
+    # The COLUMN CONTRACT for this tab (evaluated once in build(), before any tab renders).
+    # Every row's tick below is the CONTRACT's computed comparison — never row['within_spec']
+    # (the v52 fabrication: 45/45 rows ticked ✓ over velocity 0.0 m/s from a zero flow).
+    cres = _CONTRACT_RESULTS.get("Line & velocity") or {}
+    crows = cres.get("rows") or {}
+
     ws = wb.create_sheet("Line & velocity")
     set_widths(ws, {"A": 15, "B": 22, "C": 22, "D": 16, "E": 16, "F": 14,
-                    "G": 16, "H": 10, "I": 9, "J": 13, "K": 62})
-    title_row(
-        ws, "Line & velocity schedule", 11,
-        "Every sized run, SPLIT so units never mix: process-pipe lines (flow m³/s, "
-        "velocity vs ≤ 3 m/s) · electrical & signal cables (current A, volt-drop vs "
-        "≤ 5 %) · other services. Velocity / ΔU is the AS-SIZED value (post-upsizing); "
-        "'In spec' ✗ = RED. Basis shows how each Line £ is built (take-off × £/m + install).",
+                    "G": 16, "H": 10, "I": 9, "J": 13, "K": 62, "L": 52})
+    subtitle = (
+        "Every sized run, SPLIT so units never mix: process-pipe lines (flow, "
+        "velocity vs the erosion band) · electrical & signal cables (current A, volt-drop "
+        "band) · other services. Velocity is COMPUTED (the sizer's as-sized value when it "
+        "carried a real flow, else v = Q ÷ A from the endpoint-matched contract flow over "
+        "the sizer's DN bore); 'In spec' is the computed band comparison — never a default "
+        "tick. Basis shows the flow/velocity derivation + how each Line £ is built."
     )
+    if cres:
+        subtitle += " " + _contract_note(cres)
+    title_row(ws, "Line & velocity schedule", 12, subtitle)
 
     # bucket rows by section, preserving the original index for the '#'
     groups: Dict[str, list] = {"pipe": [], "electrical": [], "other": []}
@@ -6847,7 +7282,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         ("other", "Other services (air / misc)"),
     ]
     HDR = ["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
-           "Length (m)", "In spec", "Line £", "Basis"]
+           "Length (m)", "In spec", "Line £", "Basis", "Row check"]
     r = 4
     grand_fail = 0
     spec_cells = []   # In-spec column cells for the conditional-format range
@@ -6855,13 +7290,17 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         g = groups[key]
         if not g:
             continue
-        sub_banner(ws, r, label, 11)
+        sub_banner(ws, r, label, 12)
         r += 1
         header(ws, r, HDR)
         r += 1
         sec_first = r
         for idx, row, spec in g:
-            in_spec = row.get("within_spec")
+            cr = crows.get(idx) or {}
+            # the COMPUTED verdict — a row with no contract evaluation is UNVERIFIED = FAIL
+            # (never inherit the source's within_spec tick).
+            in_spec = cr.get("in_spec") if cr else False
+            row_ok = cr.get("verdict") == "PASS"
             ws.cell(r, 1, _line_tag(row, idx)).border = BORDER
             # From / To endpoints REFERENCE the master "Part names" row where the endpoint
             # is a registered principal (one identity; click through to the part). The
@@ -6873,41 +7312,57 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             _to = name_ref(row.get("to", "")) or tag_ref(row.get("to", ""))
             ws.cell(r, 3, _to if _to else clean_cell(row.get("to", ""))).border = BORDER
             ws.cell(r, 4, clean_cell(row.get("size", ""))).border = BORDER
-            ws.cell(r, 5, clean_cell(row.get("rating", ""))).border = BORDER
-            # AS-SIZED velocity / volt-drop (post-upsizing) from specs — never the
-            # stale pre-upsize row['drop'].
-            velnum = num(spec.get("drop_pct_or_velocity"))
+            # Rating = the COMPUTED carried flow / current (the contract's derivation, incl.
+            # the endpoint-matched contract quantity when the edge carried no demand) —
+            # never the source's fabricated "0 m³/s".
+            ws.cell(r, 5, cr.get("flow_display") or clean_cell(row.get("rating", ""))).border = BORDER
+            # Velocity / ΔU = the CONTRACT's computed value (as-sized when the sizer carried a
+            # real flow; else v = Q ÷ A from the contract quantity; UNVERIFIED when underivable).
+            velnum = cr.get("velocity")
             if velnum is not None:
-                vc = ws.cell(r, 6, velnum)
+                vc = ws.cell(r, 6, round(float(velnum), 3))
                 vc.number_format = FMT_DEC2
+            elif str(cr.get("vel_basis") or "").startswith("n/a — "):
+                vc = ws.cell(r, 6, "n/a")
             else:
-                vc = ws.cell(r, 6, clean_cell(row.get("drop", "")))
+                vc = ws.cell(r, 6, "UNVERIFIED")
             vc.border = BORDER
             ws.cell(r, 7, clean_cell(spec.get("spec_limit", ""))).border = BORDER
             lc = ws.cell(r, 8, num(row.get("length_m")))
             lc.number_format = FMT_DEC1
             lc.border = BORDER
-            sc = ws.cell(r, 9, "✓" if in_spec is not False else "✗")
+            # In spec = the COMPUTED band comparison (True/False), 'n/a' only for a
+            # non-pipe/non-cable service carrying its stated reason. NEVER row['within_spec'].
+            sc = ws.cell(r, 9, "✓" if in_spec is True else ("n/a" if in_spec is None and row_ok else "✗"))
             sc.border = BORDER
             sc.alignment = Alignment(horizontal="center")
             spec_cells.append(sc.coordinate)
-            if in_spec is False:
+            if not row_ok:
                 sc.font = FONT_FAIL
                 grand_fail += 1
-                for col in range(1, 12):
+                for col in range(1, 13):
                     ws.cell(r, col).fill = FILL_FAIL
-            else:
+            elif in_spec is True:
                 sc.fill = FILL_PASS
                 sc.font = FONT_PASS
             lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
             lt.number_format = FMT_GBP
             lt.border = BORDER
-            basis = _line_basis(row)
+            basis_bits = [b for b in (_line_basis(row), cr.get("vel_basis"),
+                                      (f"cost model: {row.get('cost_source')}" if row.get("cost_source") else "")) if b]
+            basis = " · ".join(basis_bits)
             bc = ws.cell(r, 11, basis)
             bc.alignment = WRAP_TOP
             bc.border = BORDER
-            if len(basis) > 60:
-                ws.row_dimensions[r].height = min(-(-len(basis) // 60), 4) * 14.5
+            # Row check — the per-row verdict of the published column contract.
+            rc = ws.cell(r, 12, "PASS" if row_ok else "FAIL — " + "; ".join(cr.get("reasons") or ["no contract evaluation for this row"]))
+            rc.alignment = WRAP_TOP
+            rc.border = BORDER
+            rc.font = FONT_PASS if row_ok else FONT_FAIL
+            rc.fill = FILL_PASS if row_ok else FILL_FAIL
+            _wrap_len = max(len(basis), len(str(rc.value)))
+            if _wrap_len > 52:
+                ws.row_dimensions[r].height = min(-(-_wrap_len // 52), 5) * 14.5
             r += 1
         # per-section Σ line £
         ws.cell(r, 2, f"Σ {label.split('—')[0].strip()}").font = FONT_SUB
@@ -6917,8 +7372,8 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         st.number_format = FMT_GBP
         r += 2
 
-    # grand foot: out-of-spec tally across all sections
-    ws.cell(r, 2, "Runs out-of-spec (all sections, as-sized)").font = FONT_SUB
+    # grand foot: rows failing the published column contract (computed, not inherited)
+    ws.cell(r, 2, "Rows FAILING the column contract (all sections, computed)").font = FONT_SUB
     tc = ws.cell(r, 9, grand_fail)
     tc.font = FONT_FAIL if grand_fail else FONT_PASS
     tc.fill = FILL_FAIL if grand_fail else FILL_PASS
@@ -6931,7 +7386,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             f"I5:I{r}",
             CellIsRule(operator="equal", formula=['"✗"'], fill=FILL_FAIL, font=FONT_FAIL))
     ws.freeze_panes = "A5"
-    back_link(ws, 11)
+    back_link(ws, 12)
     return True
 
 
@@ -7703,6 +8158,30 @@ def build(run_dir: str, out_path: str) -> dict:
     # chain can gate + route the loop (a tab <8 → its source_rule fix → re-run → tab ≥8).
     global _TAB_SCORES
     _TAB_SCORES = tab_scores(state, rows, run_dir)
+    # ── COLUMN-CONTRACT ARITHMETIC SCORES (Tristan 2026-07-02): for every registered tab,
+    #    evaluate its published per-row column contract and OVERRIDE the tab's quality score
+    #    with the arithmetic result (10 × rows-passing ÷ rows). This replaces the source-data
+    #    trust score for these tabs — the v52 catch was both scoring 10/10 while every row
+    #    carried a fabricated tick (velocity 0.0 "in spec ✓"; dash-ΔU passing). Runs BEFORE
+    #    the summary/banners/punch-list so the ship gate + ⭐ Scorecard reflect it. ──
+    _CONTRACT_RESULTS.clear()
+    for _cname, _cfn in _CONTRACT_TABS.items():
+        try:
+            _cres = _cfn(run_dir, state)
+        except Exception as _cex:  # noqa: BLE001 — a contract eval must never kill the build
+            print(f"  ! column-contract eval failed for {_cname}: {_cex}")
+            _cres = None
+        if _cres:
+            _CONTRACT_RESULTS[_cname] = _cres
+            _TAB_SCORES[_cname] = {
+                "score": _cres["score"], "target": 8, "status": _cres["status"],
+                "issues": _cres["issues"], "fix": _cres["fix"],
+                "basis": f"column-contract arithmetic: 10 × {_cres['n_pass']}/{_cres['n_total']} rows passing",
+            }
+            print(f"  · column contract [{_cname}]: {_cres['n_pass']}/{_cres['n_total']} rows PASS "
+                  f"→ {_cres['score']}/10" +
+                  (f" ({_cres['source_fabricated']} fabricated source tick(s) neutralised)"
+                   if _cres.get("source_fabricated") else ""))
     state["tabScorecard"] = _TAB_SCORES
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)
     state["tabScorecardSummary"] = _ts_summary
@@ -8034,6 +8513,94 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch the COLUMN-CONTRACT REGISTRY (Tristan 2026-07-02 — the v52 fabricated
+    # ticks: velocity 0.0 "in spec ✓" × 45; dash-ΔU panel rows scoring 10/10). Four claims:
+    # (a) a 0-velocity fluid row can NEVER evaluate in-spec (tick impossible); (b) a dash-ΔU
+    # panel row FAILS; (c) an n/a-with-reason row PASSES; (d) the tab score is ARITHMETIC. ═══
+    import tempfile as _tf2
+    with _tf2.TemporaryDirectory() as _td:
+        _mk = lambda frm, to, ws_=True: {  # noqa: E731 — schedule row template
+            "mechanism": "fluid_loop", "from": frm, "to": to, "rating": "0 m³/s",
+            "length_m": 8.0, "size": "DN15", "drop": "0 m/s", "within_spec": ws_,
+            "qty": "DN15 pipe, 8.0 m", "line_total_gbp": 171.6, "unit_cost_gbp": 18.0,
+            "install_gbp": 143.6, "cost_source": "model:uk-2026-supply+install",
+            "cost_basis": "pipe £18/m @ DN15"}
+        _sp = lambda: {"kind": "pipe", "mechanism": "fluid_loop", "carried_rating": 0.0,  # noqa: E731
+                       "carried_unit": "m³/s", "size_label": "DN15", "drop_pct_or_velocity": 0.0,
+                       "within_spec": True, "spec_limit": "≤3 m/s velocity"}
+        _duct_row = dict(_mk("AHU", "Grow Room"), mechanism="air", size="600×600")
+        _duct_spec = dict(_sp(), kind="duct", mechanism="air", size_label="600×600",
+                          drop_pct_or_velocity=None, carried_rating=None,
+                          spec_limit="≤6 m/s duct velocity")
+        _duct_spec["notes"] = "air duct sized from cooling duty -> airflow -> area"
+        with open(os.path.join(_td, "connection-schedule.json"), "w") as _fh:
+            json.dump({"voltdrop_limit_pct": 5, "rows": [
+                _mk("Acid Dosing Pump", "Mix Tank"),        # tiny real flow → in band → PASS
+                _mk("Big Pump", "Tank B"),                  # 45 m³/h through DN15 → 63.7 m/s → FAIL
+                _mk("Mystery A", "Mystery B"),              # no flow derivable → FAIL (UNVERIFIED)
+                _duct_row,                                  # other service, n/a WITH reason → PASS
+            ], "specs": [_sp(), _sp(), _sp(), _duct_spec]}, _fh)
+        _cstate = {"orchestratorContract": {"quantities": {
+            "acid_dosing_pump_throughput_m3_h": {"value": 0.04, "unit": "m³/h"},
+            "big_pump_throughput_m3_h": 45}}}
+        _lv = _eval_line_velocity_contract(_td, _cstate)
+        if not _lv or _lv["n_total"] != 4:
+            print(f"  FAIL contract-lv: expected 4 evaluated rows (got {_lv and _lv['n_total']})"); bad += 1
+        else:
+            _r0, _r1, _r2, _r3 = (_lv["rows"][i] for i in range(4))
+            # (a) 0-velocity + tick IMPOSSIBLE: rows 1+2 carried within_spec=True over a 0.0
+            # velocity — the contract must judge them FAIL / not-in-spec and count the fabrication.
+            if _r1["verdict"] != "FAIL" or _r1["in_spec"] is True:
+                print(f"  FAIL contract-lv: 45 m³/h through DN15 must FAIL the ≤3 m/s band (got {_r1})"); bad += 1
+            if _r2["verdict"] != "FAIL" or _r2["in_spec"] is True:
+                print(f"  FAIL contract-lv: an underivable velocity must FAIL, never tick (got {_r2})"); bad += 1
+            if _lv["source_fabricated"] < 2:
+                print(f"  FAIL contract-lv: the 2 fabricated source ticks must be counted (got {_lv['source_fabricated']})"); bad += 1
+            # a GENUINE in-band computed velocity must PASS (the check can pass honestly)
+            if _r0["verdict"] != "PASS" or not (0 < (_r0["velocity"] or 0) <= 3):
+                print(f"  FAIL contract-lv: 0.04 m³/h through DN15 (v≈0.06 m/s) must PASS (got {_r0})"); bad += 1
+            if "acid_dosing_pump_throughput_m3_h" not in _r0["vel_basis"]:
+                print(f"  FAIL contract-lv: the velocity basis must name its source quantity (got {_r0['vel_basis']!r})"); bad += 1
+            # (c) n/a WITH the sizer's stated reason passes; the same row WITHOUT a reason fails
+            if _r3["verdict"] != "PASS":
+                print(f"  FAIL contract-lv: an n/a-with-reason service row must PASS (got {_r3})"); bad += 1
+            # (d) score is ARITHMETIC: 10 × 2/4 = 5.0
+            if _lv["score"] != 5.0:
+                print(f"  FAIL contract-lv: score must be 10×2/4=5.0 (got {_lv['score']})"); bad += 1
+        # no-reason n/a must FAIL (dash/empty without an explicit reason token = ROW FAIL)
+        _duct_spec2 = dict(_duct_spec)
+        _duct_spec2.pop("notes")
+        with open(os.path.join(_td, "connection-schedule.json"), "w") as _fh:
+            json.dump({"rows": [_duct_row], "specs": [_duct_spec2]}, _fh)
+        _lv2 = _eval_line_velocity_contract(_td, _cstate)
+        if not _lv2 or _lv2["rows"][0]["verdict"] != "FAIL":
+            print("  FAIL contract-lv: an n/a WITHOUT a stated reason must FAIL its row"); bad += 1
+        # (b) PANEL: a dash-ΔU circuit FAILS (and its source ✓ counts as fabricated); a
+        # computed in-band circuit PASSES; the tab score is arithmetic 10 × 1/2 = 5.0.
+        os.makedirs(os.path.join(_td, "drawings"), exist_ok=True)
+        with open(os.path.join(_td, "drawings", "panel-schedule.md"), "w") as _fh:
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE\n\n## MAIN LV BOARD (TP&N)\n\n"
+                "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | "
+                "Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "| W1 | Pump A | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | — | — | ✓ |\n"
+                "| W2 | Pump B | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n")
+        _ps = _eval_panel_schedule_contract(_td, {})
+        if not _ps or _ps["n_total"] != 2:
+            print(f"  FAIL contract-panel: expected 2 circuit rows (got {_ps and _ps['n_total']})"); bad += 1
+        else:
+            if _ps["rows"]["W1"]["verdict"] != "FAIL" or not any("ΔU" in x for x in _ps["rows"]["W1"]["reasons"]):
+                print(f"  FAIL contract-panel: a dash-ΔU row must FAIL naming the missing ΔU (got {_ps['rows']['W1']})"); bad += 1
+            if _ps["rows"]["W2"]["verdict"] != "PASS":
+                print(f"  FAIL contract-panel: a routed, in-band circuit must PASS (got {_ps['rows']['W2']})"); bad += 1
+            if _ps["score"] != 5.0 or _ps["source_fabricated"] != 1:
+                print(f"  FAIL contract-panel: score must be 5.0 with 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
+    # (d2) the score arithmetic itself + the fabricated-tick hard floor
+    if _contract_score(1, 2) != 5.0 or _contract_score(45, 45) != 10.0 or _contract_score(0, 45) != 0.0:
+        print("  FAIL contract-score: 10 × pass-fraction arithmetic broken"); bad += 1
+    if _contract_score(45, 45, rendered_fabricated=1) != 0.0:
+        print("  FAIL contract-score: a surviving rendered fabricated tick must hard-floor the tab to 0"); bad += 1
     # proveCatch the UNIVERSAL honest cap (Tristan 2026-06-27 'no whack-a-mole'): an unverified line
     # caps ANY tab at ≤7, a soft caveat at ≤8, a clean tab is untouched — on ANY archetype, no new code.
     _hc = _apply_universal_honest_cap({
