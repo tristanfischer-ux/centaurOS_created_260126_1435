@@ -85,6 +85,13 @@ NA = "N/A"
 # chain gate-21 ">5x = HIGH" rule so the two layers agree.
 COST_BAND_FACTOR = 5.0
 
+# Magnitude sanity ceiling for the "rating >= duty x margin" ADEQUACY family
+# (2026-07-02, v55): a rating more than 100x its duty is not an adequate device,
+# it is a corrupt quantity being waved through (incomer 184,166,200 kVA on a 53 kW
+# load "PASSed" the >= 66.25 kVA floor). Generous by design — real engineering
+# margins sit at 1.25-3x, so x100 can never false-positive a legitimate design.
+MAGNITUDE_CEILING_FACTOR = 100.0
+
 
 # ============================================================================
 # Check record — the unit shared by the CLI and the Excel exporter
@@ -113,6 +120,22 @@ class Check:
     relation: str = "eq"
     # identity of the value this check's ACTUAL is produced from (chain key):
     producer: str = ""
+    # The CONTRACT QUANTITY this check blesses/measures (orchestratorContract.quantities
+    # key) + the quantity keys it consumed as inputs. These drive the CROSS-CHECK JOIN
+    # (2026-07-02, the v55 184 GVA lesson): a FAILing check flags its quantity_key, and no
+    # OTHER check may then PASS ("bless") a flagged quantity — nor may any headline surface
+    # display it. Empty for checks not tied to a named quantity (per-line BoM, cables, …).
+    quantity_key: str = ""
+    input_keys: Tuple[str, ...] = ()
+    # MAGNITUDE SANITY CEILING for "ge" (rating >= duty) checks: a rating more than
+    # ~100x its duty is not adequacy, it is a corrupt number being waved through
+    # (v55: incomer 184,166,200 kVA "PASSed" >= 66.25 kVA). When set, status is
+    # FAIL above the ceiling and the Excel live formula includes the bound.
+    ceiling: Optional[float] = None
+    # Set when the CROSS-CHECK JOIN demoted this check: its own arithmetic passed but
+    # it blesses a quantity another check flagged. The exporter renders a STATIC FAIL
+    # (no live formula — the live arithmetic would dishonestly show PASS).
+    cross_flagged: bool = False
 
     @property
     def delta(self) -> Optional[float]:
@@ -171,6 +194,16 @@ def _first_qval(quantities: Dict[str, Any], keys: List[str]) -> Optional[float]:
         if v is not None:
             return v
     return None
+
+
+def _first_q(quantities: Dict[str, Any], keys: List[str]) -> Tuple[str, Optional[float]]:
+    """Like _first_qval but ALSO returns the key that matched — the quantity identity
+    the cross-check join needs (a check must record WHICH quantity it read)."""
+    for k in keys:
+        v = qval(quantities, k)
+        if v is not None:
+            return k, v
+    return "", None
 
 
 def _rendered_unit_price(pv: dict) -> Optional[float]:
@@ -410,20 +443,24 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     cs = _load_json(os.path.join(run_dir, "connection-schedule.json")) or {}
 
     # --- A1. pump motor kW >= hydraulic power / efficiency ---
-    hyd_w = _first_qval(q, ["recirc_pump_hydraulic_power_w", "pump_hydraulic_power_w"])
-    motor_kw = _first_qval(q, ["recirc_pump_motor_kw", "pump_motor_kw"])
+    hyd_key, hyd_w = _first_q(q, ["recirc_pump_hydraulic_power_w", "pump_hydraulic_power_w"])
+    motor_key, motor_kw = _first_q(q, ["recirc_pump_motor_kw", "pump_motor_kw"])
     eta = _first_qval(q, ["pump_efficiency", "recirc_pump_efficiency",
                           "pump_overall_efficiency"]) or 0.65
     if hyd_w is not None and motor_kw is not None and eta and 0 < eta <= 1:
         duty_kw = (hyd_w / 1000.0) / eta
+        ceil_kw = duty_kw * MAGNITUDE_CEILING_FACTOR
         out.append(Check(
             name="Pump motor kW >= hydraulic / efficiency",
             category="ADEQUACY", relation="ge",
-            status=_ge_status(motor_kw, duty_kw),
+            status=_ge_ceiling_status(motor_kw, duty_kw, ceil_kw),
             actual=motor_kw, expected=duty_kw, tol=0.0, unit="kW",
             producer="recirc_pump_motor_kw",
+            quantity_key=motor_key, input_keys=(hyd_key,) if hyd_key else (),
+            ceiling=ceil_kw,
             detail=(f"Motor {motor_kw:g} kW must cover hydraulic {hyd_w/1000:g} kW "
-                    f"/ eta {eta:g} = {duty_kw:.3g} kW shaft duty."),
+                    f"/ eta {eta:g} = {duty_kw:.3g} kW shaft duty"
+                    + _ceiling_clause(motor_kw, ceil_kw, "duty")),
         ))
 
     # --- A2. main incomer rating >= connected load x 1.25 ---
@@ -434,8 +471,8 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     #       the transformer on, so no power-factor guess is needed).
     #   (b) FALLBACK: incomer CURRENT (A) >= load-derived current at the contract's
     #       stated voltage + power factor (only when an explicit PF is present).
-    conn_kw = _first_qval(q, ["connected_electrical_load_kw", "connected_load_kw",
-                              "total_connected_load_kw", "installed_electrical_load_kw"])
+    conn_key, conn_kw = _first_q(q, ["connected_electrical_load_kw", "connected_load_kw",
+                                     "total_connected_load_kw", "installed_electrical_load_kw"])
     incomer_kva, kva_key = None, ""
     for k in ("main_transformer_kva", "main_incomer_kva", "supply_transformer_kva",
               "total_supply_demand_kva", "main_supply_kva"):
@@ -445,15 +482,24 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
             break
     if conn_kw is not None and incomer_kva is not None:
         required_kva = conn_kw * 1.25  # kVA must be >= kW; 1.25 design margin
+        # MAGNITUDE SANITY CEILING (2026-07-02, v55 proveCatch): "bigger is adequate" has
+        # NO upper bound, so a corrupt 184,166,200 kVA incomer PASSed >= 66.25 kVA. A real
+        # incomer is never > load x 100 (a generous bound: real designs sit at 1.25-3x);
+        # above it the number is an artefact, not an adequate rating -> FAIL.
+        ceiling_kva = conn_kw * MAGNITUDE_CEILING_FACTOR
         out.append(Check(
             name="Main incomer kVA >= connected load x 1.25",
             category="ADEQUACY", relation="ge",
-            status=_ge_status(incomer_kva, required_kva),
+            status=_ge_ceiling_status(incomer_kva, required_kva, ceiling_kva),
             actual=incomer_kva, expected=required_kva, tol=0.0, unit="kVA",
             producer=kva_key,
+            quantity_key=kva_key, input_keys=(conn_key,) if conn_key else (),
+            ceiling=ceiling_kva,
             detail=(f"Incomer {incomer_kva:g} kVA ({kva_key}) must be >= "
                     f"{conn_kw:g} kW x 1.25 = {required_kva:.4g} kVA "
-                    f"(kVA >= kW for any power factor)."),
+                    f"(kVA >= kW for any power factor)"
+                    + _ceiling_clause(incomer_kva, ceiling_kva,
+                                      f"connected load {conn_kw:g} kW")),
         ))
     else:
         # (b) current form — only with an explicit PF (else we won't guess one)
@@ -471,16 +517,22 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
         pf = _first_qval(q, ["power_factor", "system_power_factor"])
         if (conn_kw is not None and breaker_a is not None and voltage > 0
                 and pf is not None and 0 < pf <= 1):
-            required_a = (conn_kw * 1000.0) / (math.sqrt(3) * voltage * pf) * 1.25
+            load_a = (conn_kw * 1000.0) / (math.sqrt(3) * voltage * pf)
+            required_a = load_a * 1.25
+            ceiling_a = load_a * MAGNITUDE_CEILING_FACTOR
             out.append(Check(
                 name="Main incomer A >= connected load x 1.25",
                 category="ADEQUACY", relation="ge",
-                status=_ge_status(breaker_a, required_a),
+                status=_ge_ceiling_status(breaker_a, required_a, ceiling_a),
                 actual=breaker_a, expected=required_a, tol=0.0, unit="A",
                 producer=breaker_key,
+                quantity_key=breaker_key, input_keys=(conn_key,) if conn_key else (),
+                ceiling=ceiling_a,
                 detail=(f"Incomer {breaker_a:g} A ({breaker_key}) must be >= "
                         f"{conn_kw:g} kW x 1000 / (sqrt3 x {voltage:.0f} V x {pf:g}) "
-                        f"x 1.25 = {required_a:.4g} A."),
+                        f"x 1.25 = {required_a:.4g} A"
+                        + _ceiling_clause(breaker_a, ceiling_a,
+                                          f"load current {load_a:.4g} A")),
             ))
 
     # --- A3. cable CSA >= current (per electrical connection row) ---
@@ -492,9 +544,9 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     out.extend(_checks_cable_csa(cs))
 
     # --- A4. vessel/tank volume > media (MBBR) fill volume ---
-    tank_v = _first_qval(q, ["biofilter_tank_volume_m3", "mbbr_tank_volume_m3"])
-    media_v = _first_qval(q, ["biofilter_media_volume_m3", "mbbr_media_volume_m3",
-                              "media_volume_m3"])
+    tank_key, tank_v = _first_q(q, ["biofilter_tank_volume_m3", "mbbr_tank_volume_m3"])
+    media_key, media_v = _first_q(q, ["biofilter_media_volume_m3", "mbbr_media_volume_m3",
+                                      "media_volume_m3"])
     if tank_v is not None and media_v is not None and media_v > 0:
         out.append(Check(
             name="Biofilter tank volume > media fill volume",
@@ -502,24 +554,29 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
             status=_ge_status(tank_v, media_v),
             actual=tank_v, expected=media_v, tol=0.0, unit="m3",
             producer="biofilter_tank_volume_m3",
+            quantity_key=tank_key, input_keys=(media_key,) if media_key else (),
             detail=(f"Tank {tank_v:g} m3 must exceed the {media_v:g} m3 MBBR media "
                     f"fill (carriers cannot exceed the vessel they sit in)."),
         ))
 
     # --- A5. chiller / heat-pump capacity >= duty ---
-    cap = _first_qval(q, ["chiller_capacity_kw", "heat_pump_capacity_kw",
-                          "installed_cooling_capacity_kw", "heat_pump_heating_capacity_kw"])
-    duty = _first_qval(q, ["cooling_duty_kw", "heating_duty_kw", "thermal_duty_kw",
-                           "system_thermal_dissipation_kw"])
+    cap_key, cap = _first_q(q, ["chiller_capacity_kw", "heat_pump_capacity_kw",
+                                "installed_cooling_capacity_kw", "heat_pump_heating_capacity_kw"])
+    duty_key, duty = _first_q(q, ["cooling_duty_kw", "heating_duty_kw", "thermal_duty_kw",
+                                  "system_thermal_dissipation_kw"])
     if cap is not None and duty is not None and duty > 0:
+        ceil_th = duty * MAGNITUDE_CEILING_FACTOR
         out.append(Check(
             name="Chiller / heat-pump capacity >= thermal duty",
             category="ADEQUACY", relation="ge",
-            status=_ge_status(cap, duty),
+            status=_ge_ceiling_status(cap, duty, ceil_th),
             actual=cap, expected=duty, tol=0.0, unit="kW",
             producer="thermal_capacity_kw",
+            quantity_key=cap_key, input_keys=(duty_key,) if duty_key else (),
+            ceiling=ceil_th,
             detail=(f"Installed thermal capacity {cap:g} kW must cover the "
-                    f"{duty:g} kW design duty."),
+                    f"{duty:g} kW design duty"
+                    + _ceiling_clause(cap, ceil_th, "duty")),
         ))
 
     return out
@@ -1029,6 +1086,31 @@ def _ge_status(actual: float, expected: float) -> str:
     return PASS if actual >= expected - 1e-9 - abs(expected) * 1e-9 else FAIL
 
 
+def _ge_ceiling_status(actual: float, expected: float, ceiling: Optional[float]) -> str:
+    """rating >= duty AND rating <= magnitude ceiling. The v55 lesson (2026-07-02):
+    an adequacy check with no upper bound "blessed" a 184,166,200 kVA incomer against a
+    53 kW load. Adequacy means 'in the right band', not 'as big as any corrupt number'."""
+    if _ge_status(actual, expected) == FAIL:
+        return FAIL
+    if ceiling is not None and actual > ceiling * (1 + 1e-9):
+        return FAIL
+    return PASS
+
+
+def _ceiling_clause(actual: float, ceiling: Optional[float], base_label: str) -> str:
+    """The stated-basis sentence for the magnitude ceiling — always states the basis;
+    turns into an explicit breach callout when the ceiling is broken."""
+    if ceiling is None:
+        return "."
+    if actual > ceiling * (1 + 1e-9):
+        return (f". MAGNITUDE CEILING BREACHED: {actual:g} > {ceiling:.4g} "
+                f"(= {base_label} x {MAGNITUDE_CEILING_FACTOR:g} sanity ceiling) — a rating "
+                f"~{actual / (ceiling / MAGNITUDE_CEILING_FACTOR):,.0f}x its duty is a corrupt "
+                f"quantity, not an adequate device. FAIL.")
+    return (f"; magnitude sanity ceiling <= {base_label} x {MAGNITUDE_CEILING_FACTOR:g} "
+            f"= {ceiling:.4g} (an absurdly-large rating must FAIL, not pass as 'adequate').")
+
+
 # ============================================================================
 # Parsing helpers
 # ============================================================================
@@ -1264,11 +1346,15 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                 qv = num(qval[qk])
                 ok = qv is not None and abs(val - qv) <= max(abs(qv) * 0.02, 0.01)
                 _tol = round(max(abs(qv) * 0.02, 0.01), 3) if qv is not None else 0.01
+                # find the ORIGINAL-CASE contract key (qval dict is lower-cased) so the
+                # cross-check join + headline surfaces can join on the real quantity key.
+                qk_orig = next((k for k in q if k.lower() == qk), qk)
                 out.append(Check(
                     name=f"Tool output used: {field}", category="PROVENANCE", relation="eq",
                     status=PASS if ok else FAIL, actual=round(val, 3),
                     expected=(round(qv, 3) if qv is not None else val), tol=_tol, unit="",
                     producer=f"tool:{tid}",
+                    quantity_key=qk_orig,
                     detail=(f"{tid} {field}={val:g} matches contract {qk}." if ok else
                             f"STALE: {tid} computed {field}={val:g} but the design uses {qk}="
                             f"{qv:g} — the tool output is NOT the number shown (tool ran at a "
@@ -1323,6 +1409,64 @@ def _checks_module_integrity(state: dict, run_dir: str) -> List[Check]:
     )]
 
 
+def flagged_quantity_reasons(checks: List[Check], state: Optional[dict] = None) -> Dict[str, str]:
+    """THE FLAGGED-QUANTITY SET (2026-07-02, v55): every contract quantity that FAILED a
+    check on this run, mapped to the failing check's name — PLUS the lineage-forward
+    closure (a quantity DERIVED from a flagged quantity is itself flagged: v55's
+    total_supply_demand_kva=184,166,200 has lineage.from=[total_supply_demand_kw], the
+    directly-STALE-flagged 132 GW artefact). This is the JOIN every headline/summary
+    surface must apply: a flagged quantity may render ONLY as a flagged FAIL row —
+    never as an Exec OUTPUT, an Overview headline metric, or a 'design output' role."""
+    reasons: Dict[str, str] = {}
+    for c in checks:
+        if c.status == FAIL and c.quantity_key:
+            reasons.setdefault(c.quantity_key, c.name)
+    if not reasons:
+        return reasons
+    q = ((state or {}).get("orchestratorContract") or {}).get("quantities") or {}
+    changed = True
+    while changed:                      # lineage-forward transitive closure
+        changed = False
+        for k, v in q.items():
+            if k in reasons or not isinstance(v, dict):
+                continue
+            lin = (v.get("lineage") or {}).get("from") or []
+            hit = next((s for s in lin if s in reasons), None)
+            if hit:
+                reasons[k] = f"derived (lineage) from flagged '{hit}' ({reasons[hit]})"
+                changed = True
+    return reasons
+
+
+def _apply_cross_check_join(checks: List[Check], state: Optional[dict]) -> None:
+    """CROSS-CHECK JOIN (2026-07-02, v55): a check must not BLESS a quantity another
+    check flagged. v55's 'tool matches contract' provenance rows PASSed on quantities
+    downstream of the STALE 132 GW artefact, and the adequacy check PASSed the derived
+    184 GVA — each check was locally true while the quantity was known-bad on the SAME
+    run. Demote every PASSing PROVENANCE/ADEQUACY check whose quantity_key (or any
+    input_key) is in the flagged set, to a fixpoint (a demotion can flag new keys)."""
+    for _ in range(len(checks) + 1):
+        flagged = flagged_quantity_reasons(checks, state)
+        if not flagged:
+            return
+        changed = False
+        for c in checks:
+            if c.status != PASS or c.category not in ("PROVENANCE", "ADEQUACY"):
+                continue
+            keys = [c.quantity_key, *c.input_keys]
+            hit = next((k for k in keys if k and k in flagged), None)
+            if hit:
+                c.status = FAIL
+                c.cross_flagged = True
+                c.detail = (c.detail.rstrip() +
+                            f" CROSS-CHECK FAIL: '{hit}' is flagged by another failed check "
+                            f"on this run ({flagged[hit]}) — a check must not bless a "
+                            f"quantity a sibling check has already flagged.")
+                changed = True
+        if not changed:
+            return
+
+
 def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     """Run EVERY deterministic check against a run directory and return the list
     of Check records (PASS / FAIL / N/A). Pure: reads only the run's JSON, makes
@@ -1340,6 +1484,7 @@ def run_all_checks(run_dir: str, state: Optional[dict] = None) -> List[Check]:
     checks.extend(_checks_brief_compliance(state, run_dir))
     checks.extend(_checks_tool_provenance(state, run_dir))
     checks.extend(_checks_module_integrity(state, run_dir))
+    _apply_cross_check_join(checks, state)     # no PASS may bless a flagged quantity
     return checks
 
 
@@ -1365,7 +1510,8 @@ def _selftest() -> int:
                 return c.status == want_status
         return False
 
-    def _write_run(tmp: str, state: dict, ledger: dict, conns: dict) -> str:
+    def _write_run(tmp: str, state: dict, ledger: dict, conns: dict,
+                   tools: Optional[dict] = None) -> str:
         d = os.path.join(tmp, "run")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "state.json"), "w") as f:
@@ -1374,6 +1520,9 @@ def _selftest() -> int:
             json.dump(ledger, f)
         with open(os.path.join(d, "connection-schedule.json"), "w") as f:
             json.dump(conns, f)
+        if tools is not None:
+            with open(os.path.join(d, "4-orchestrator-tools-used.json"), "w") as f:
+                json.dump(tools, f)
         return d
 
     failures: List[str] = []
@@ -1575,6 +1724,61 @@ def _selftest() -> int:
               "WARN closure (capex over ceiling) must surface as a deterministic FAIL")
         check(not any("ceiling_satisfied_elsewhere" in c.name for c in checks),
               "PASS inequality closure must stay silent (never fabricate a FAIL)")
+
+    # ---- MAGNITUDE CEILING + CROSS-CHECK JOIN proveCatch (2026-07-02, the v55 shape):
+    #      an ABSURD incomer (184,166,200 kVA on a 53 kW load) must FAIL the adequacy
+    #      check (was: PASSed — ">= load x 1.25" had no upper bound); the STALE tool
+    #      claim flags total_supply_demand_kw; the lineage closure flags the derived
+    #      _kva; and a 'tool matches contract' PASS on the flagged _kva is DEMOTED. ----
+    v55_state = {
+        "orchestratorContract": {
+            "product_class": "synthetic_v55",
+            "quantities": {
+                "connected_electrical_load_kw": {"value": 53, "unit": "kW"},
+                "total_supply_demand_kw": {"value": 132599650.69, "unit": "kW",
+                                           "lineage": {"from": ["connected_electrical_load_kw"]}},
+                "total_supply_demand_kva": {"value": 184166200, "unit": "kVA",
+                                            "lineage": {"from": ["total_supply_demand_kw"]}},
+            },
+            "closures": [],
+        },
+        "requirementsBom": [], "partVerifications": [],
+    }
+    v55_tools = {"tools": [{
+        "tool_id": "first-principles:process",
+        "claims": [
+            # the tool computed 53 but the design holds 1.326e8 -> STALE FAIL (flags the key)
+            {"field": "total_supply_demand_kw", "value": 53},
+            # the tool "matches" the corrupt derived kVA -> locally-true PASS that MUST be demoted
+            {"field": "total_supply_demand_kva", "value": 184166200},
+        ]}]}
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, v55_state, {}, {}, tools=v55_tools)
+        checks = run_all_checks(d)
+        check(_has(checks, "incomer kVA", FAIL),
+              "V55 CEILING: incomer 184,166,200 kVA on a 53 kW load must FAIL "
+              "(magnitude ceiling <= load x 100), never PASS as 'adequate'")
+        _kva_ck = next((c for c in checks if "incomer kVA" in c.name), None)
+        check(_kva_ck is not None and _kva_ck.ceiling == 5300.0,
+              f"V55 CEILING: the adequacy check must carry ceiling = 53 x 100 = 5300 "
+              f"(got {_kva_ck and _kva_ck.ceiling})")
+        check(_has(checks, "Tool output used: total_supply_demand_kw", FAIL),
+              "V55: the STALE tool claim (53 vs 1.326e8) must FAIL")
+        _kva_prov = next((c for c in checks
+                          if c.name == "Tool output used: total_supply_demand_kva"), None)
+        check(_kva_prov is not None and _kva_prov.status == FAIL and _kva_prov.cross_flagged,
+              f"V55 CROSS-CHECK: a 'tool matches contract' PASS on the flagged derived kVA "
+              f"must be DEMOTED to FAIL (got {_kva_prov and (_kva_prov.status, _kva_prov.cross_flagged)})")
+        flagged = flagged_quantity_reasons(checks, v55_state)
+        check("total_supply_demand_kw" in flagged,
+              "V55 FLAG SET: the STALE-failed quantity must be in the flagged set")
+        check("total_supply_demand_kva" in flagged,
+              "V55 FLAG SET: lineage closure must flag the kVA DERIVED from the flagged kW")
+        check("connected_electrical_load_kw" not in flagged,
+              "V55 FLAG SET: lineage flows FORWARD only — the sane 53 kW load "
+              "(an INPUT to the flagged aggregate) must NOT be flagged")
+    # a LEGITIMATE margin (1250 kVA on 800 kW = 1.56x) must still PASS under the ceiling —
+    # already asserted by the CLEAN run above ("CLEAN incomer kVA should PASS").
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----

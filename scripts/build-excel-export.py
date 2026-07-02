@@ -1121,6 +1121,85 @@ _INTERNAL_FLOW_RE = re.compile(
 _FLOW_UNIT_RE = re.compile(r"/\s*h(r)?\b|/\s*day|/\s*yr|/\s*year|per[_ ]?h|m3[_ ]?h\b|m³/h|\bkw\b|\bmw\b|kwh|mwh|gwh|kg\s*/|t\s*/|tonne\s*/", re.I)
 
 
+# ============================================================================
+# HEADLINE INTEGRITY RULE (Tristan 2026-07-02, the v55 '132,599,650.7 kW OUTPUT' lesson):
+# any surface that SELECTS a quantity for headline/summary display must EXCLUDE
+# quantities that FAILED their provenance/staleness/adequacy check on THIS run — the
+# check results are computed in the SAME build, so the join is wired here — and must
+# prefer the BRIEF's primary output family (a water plant's OUTPUT is delivered water,
+# never electrical demand). When nothing qualifies: honest fallback text, NEVER a
+# flagged number.
+# ============================================================================
+def _flagged_quantities(state: dict, run_dir: Optional[str] = None) -> Dict[str, str]:
+    """{quantity_key: failing-check reason} for THIS run — dcl.run_all_checks (the SAME
+    suite the ⚠ Checks tab renders) + the lineage-forward closure. Cached on the state
+    dict so every headline surface (Exec OUTPUT, Overview metrics, Quantities roles)
+    reads ONE consistent set; build() seeds the cache before any tab renders."""
+    cached = state.get("_flaggedQuantities")
+    if isinstance(cached, dict):
+        return cached
+    rd = run_dir or globals().get("_RUN_DIR")
+    out: Dict[str, str] = {}
+    if rd:
+        try:
+            out = dcl.flagged_quantity_reasons(dcl.run_all_checks(rd, state), state)
+        except Exception:  # noqa: BLE001 — the join must never break a build
+            out = {}
+    state["_flaggedQuantities"] = out
+    return out
+
+
+# Unit → canonical OUTPUT FAMILY (universal, string-normalised — no class table). Used to
+# prefer the brief's primary output family when deriving the headline deliverable.
+def _unit_canon_family(unit: Any) -> Optional[str]:
+    u = str(unit or "").strip().lower().replace("³", "3").replace(" ", "")
+    if not u:
+        return None
+    if re.search(r"m3/(h|hr|d|day|yr|year)|m3per|l/(s|min|h|hr)|l(pm|ph)\b", u):
+        return "volume_flow"
+    if re.search(r"(kg|t|tonne)/(s|h|hr|d|day|yr|year)", u):
+        return "mass_flow"
+    if re.search(r"^(k|m|g)?wh(/|$)", u):
+        return "energy"
+    if re.search(r"^(k|m|g)?w$|^(k|m|g)?va$", u):
+        return "power"
+    if u in ("m3", "l", "litre", "litres"):
+        return "volume"
+    if u in ("count", "each", "units", "unit", "nr", "no"):
+        return "count"
+    return None
+
+
+def _brief_output_families(state: dict) -> List[str]:
+    """The brief's primary output families, in brief order: every target_performance
+    metric whose unit is a genuine RATE/product family (flow, mass-flow, power, energy).
+    A count / percent / static volume never defines the output family."""
+    tp = ((state.get("parsedBrief") or {}).get("constraints") or {}).get("target_performance") or {}
+    metrics = list(tp.get("metrics") or [])
+    if tp.get("key_metric") and not any(m.get("key_metric") == tp.get("key_metric") for m in metrics):
+        metrics.insert(0, tp)
+    fams: List[str] = []
+    for m in metrics:
+        if not isinstance(m, dict):
+            continue
+        fam = _unit_canon_family(m.get("unit"))
+        if fam in ("volume_flow", "mass_flow", "power", "energy") and fam not in fams:
+            fams.append(fam)
+    return fams
+
+
+def _headline_fallback(state: dict, ho: dict, why: str) -> dict:
+    """The HONEST no-number headline: rendered when every candidate output quantity is
+    flagged / disqualified. NEVER a flagged number (Tristan 2026-07-02)."""
+    return {
+        "id": "output_unverified", "label": "Output", "value": None, "unit": "",
+        "fallback_text": (f"Not shown — {why} See the ⚠ Checks tab for the flagged rows."),
+        "notes": f"honest fallback: {why}",
+        "_served_context": (f"{ho.get('value')} {ho.get('label')}"
+                            if ho.get("value") not in (None, "") else None),
+    }
+
+
 def _honest_headline_output(state: dict) -> dict:
     """Deterministic, UNIVERSAL: return the plant's HONEST headline output. If the engine's headline is
     a FOREIGN served-asset COUNT (e.g. '6,000 cultivation containers' for a WATER plant — the plant
@@ -1128,16 +1207,46 @@ def _honest_headline_output(state: dict) -> dict:
     (the largest output-named process flow, internal/utility streams excluded), and demote the count to
     served-context. Council rule (2026-06-27): the deliverable is the boundary-crossing OUTPUT, never a
     served-asset count, never the largest INTERNAL throughput. Leaves a real product-unit headline
-    (MWh, kg/yr, m³/h) untouched. proveCatch in _selftest."""
+    (MWh, kg/yr, m³/h) untouched.
+
+    HEADLINE INTEGRITY RULE (Tristan 2026-07-02, the v55 132 GW lesson) — two hard filters:
+      1. a quantity that FAILED its provenance/staleness/adequacy check on THIS run
+         (_flagged_quantities — the same-build checks join) is EXCLUDED, always;
+      2. when the brief states a rate-family target (target_performance), the derived
+         deliverable must belong to a BRIEF output family — a water plant's OUTPUT is
+         delivered water (m³/h), never its electrical demand (kW).
+    When nothing qualifies the headline is the HONEST FALLBACK text, never a flagged
+    number. proveCatch in _selftest."""
     km = state.get("keyMetrics") or {}
     ho = dict(km.get("headline_output") or {})
+    flagged = _flagged_quantities(state)
     unit = str(ho.get("unit", "")).strip().lower()
     label = str(ho.get("label") or ho.get("id") or "")
     is_foreign_count = unit in ("count", "each", "units", "unit", "nr", "no", "") and bool(_SERVED_ASSET_RE.search(label))
-    if not is_foreign_count:
-        return ho  # already a genuine product unit — untouched (BESS MWh, VF kg/yr, …)
+
+    def _ho_is_flagged() -> Optional[str]:
+        """Is the engine-seeded headline itself a flagged quantity? Join by value (the
+        seeded metric rarely carries the contract key) with a tight tolerance."""
+        try:
+            hv = float(str(ho.get("value")).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+        q0 = (state.get("orchestratorContract") or {}).get("quantities") or {}
+        for fk in flagged:
+            fv = q0.get(fk)
+            fval = fv.get("value") if isinstance(fv, dict) else fv
+            if isinstance(fval, (int, float)) and fval and abs(hv - fval) <= abs(fval) * 0.005:
+                return fk
+        return None
+
+    _ho_flag = _ho_is_flagged()
+    if not is_foreign_count and not _ho_flag:
+        return ho  # already a genuine, unflagged product unit — untouched (BESS MWh, VF kg/yr, …)
+
     q = (state.get("orchestratorContract") or {}).get("quantities") or {}
-    best = None
+    brief_fams = _brief_output_families(state)
+    best = None          # best candidate IN a brief output family
+    best_any = None      # best candidate regardless of family (used only when the brief states none)
     for k, v in q.items():
         if not isinstance(v, dict):
             continue
@@ -1147,14 +1256,32 @@ def _honest_headline_output(state: dict) -> dict:
             continue
         if not _FLOW_UNIT_RE.search(un):
             continue
+        if k in flagged:
+            continue      # HEADLINE INTEGRITY: a check-flagged quantity NEVER headlines
         k_words = k.replace("_", " ")
         if _INTERNAL_FLOW_RE.search(k_words) or not _DELIVERABLE_NAME_RE.search(k_words):
             continue
-        if best is None or val > best[1]:
+        fam = _unit_canon_family(un)
+        if fam in brief_fams and (best is None or val > best[1]):
             best = (k, float(val), un)
-    if best is None:
+        if best_any is None or val > best_any[1]:
+            best_any = (k, float(val), un)
+    if brief_fams:
+        chosen = best     # the brief names the output family — never headline outside it
+    else:
+        chosen = best_any
+    if chosen is None:
+        if _ho_flag:
+            return _headline_fallback(
+                state, ho, f"the engine's output quantity ('{_ho_flag}') failed its "
+                           f"provenance check on this run and no unflagged deliverable "
+                           f"in the brief's output family qualifies.")
+        if is_foreign_count and flagged:
+            return _headline_fallback(
+                state, ho, "no contract quantity in the brief's output family survives "
+                           "this run's deterministic checks.")
         return ho  # cannot derive the deliverable honestly — leave the count; the foreign-unit check flags it
-    k, val, un = best
+    k, val, un = chosen
     nm = re.sub(r"_(m3|m³|per_hr|per_h|m3_h|kw|kwh|mwh).*$", "", k).replace("_", " ").strip().title()
     return {
         "id": "derived_deliverable", "label": f"{nm} delivered",
@@ -1182,6 +1309,10 @@ def _exec_synopsis(state: dict) -> str:
         parts.append(f"This dossier specifies a {proj} — {out}"
                      + (f" ({lbl.lower()})" if lbl else "")
                      + (f", serving {str(_served).lower()}" if _served else "") + ".")
+    elif ho.get("fallback_text"):
+        # HEADLINE INTEGRITY (2026-07-02): the honest no-number sentence — never a flagged value.
+        parts.append(f"This dossier specifies a {proj}. Its headline output figure is withheld: "
+                     f"{ho['fallback_text']}")
     else:
         parts.append(f"This dossier specifies a {proj}.")
     clabel, cgbp = _headline_build_cost(state)
@@ -1284,6 +1415,10 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         if ho.get("_served_context"):
             _sub = (_sub + f" · serves {ho['_served_context']}").strip(" ·")
         card("Output", f"{ho.get('value')} {ho.get('unit', '')}".strip(), _sub)
+    elif ho.get("fallback_text"):
+        # HEADLINE INTEGRITY (2026-07-02): a check-flagged output NEVER headlines — the
+        # card renders the honest fallback, and the number stays a FAIL row on ⚠ Checks.
+        card("Output", "—", str(ho["fallback_text"]))
     clabel, cgbp = _headline_build_cost(state)
     if cgbp:
         card(clabel, f"£{round(cgbp):,}")
@@ -1553,8 +1688,17 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
         row += 1
 
     if isinstance(km, dict):
+        # HEADLINE INTEGRITY (2026-07-02): the Overview headline is the SAME honest
+        # selection as the Exec cover — never the raw seeded metric, which can be a
+        # check-flagged quantity (v55: 132,599,650.7 kW total_supply_demand_kw whose
+        # own provenance row read STALE on the same build).
         if km.get("headline_output"):
-            metric_row(km["headline_output"])
+            _oho = _honest_headline_output(state)
+            if _oho.get("value") not in (None, ""):
+                metric_row(_oho)
+            elif _oho.get("fallback_text"):
+                metric_row({"label": "Output", "value": "—", "unit": "",
+                            "notes": _oho["fallback_text"]})
         if km.get("headline_constraint"):
             metric_row(km["headline_constraint"])
         for m in (km.get("supporting_metrics") or [])[:12]:
@@ -2094,9 +2238,18 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         ws.cell(r, 4, f"=B{r}-C{r}").border = BORDER
         ws.cell(r, 5, tol_cell_val).border = BORDER
         # STATUS formula chosen to MIRROR the lib's own decision (see docstring)
-        if is_band:                     # COST ratio band: flag >xN or <1/N of ref
+        _ceiling = getattr(c, "ceiling", None)
+        if getattr(c, "cross_flagged", False):
+            # CROSS-CHECK demotion (2026-07-02): the local arithmetic passes but the
+            # quantity is flagged by ANOTHER failed check — a live formula would
+            # dishonestly recompute to PASS, so the verdict renders STATIC.
+            status_f = "FAIL"
+        elif is_band:                   # COST ratio band: flag >xN or <1/N of ref
             status_f = (f'=IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
                         f'B{r}/C{r}>=1/E{r})),"PASS","FAIL")')
+        elif c.relation == "ge" and _ceiling is not None:
+            # rating >= duty AND <= the magnitude sanity ceiling (the 184 GVA lesson)
+            status_f = f'=IF(AND(B{r}>=C{r}-E{r},B{r}<={_ceiling!r}),"PASS","FAIL")'
         elif c.relation == "ge":        # actual must be >= expected
             status_f = f'=IF(B{r}>=C{r}-E{r},"PASS","FAIL")'
         elif c.relation == "le":        # actual must be <= expected
@@ -2432,6 +2585,8 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
     ws = wb.create_sheet("Quantities")
     set_widths(ws, {"A": 34, "B": 14, "C": 10, "D": 14, "E": 12, "F": 50, "G": 34, "H": 34})
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    # the same-build checks join: quantities that FAILED a check must not carry a role label
+    _q_flagged = _flagged_quantities(state)
 
     # WHERE-FROM / WHERE-TO traceability (Tristan 2026-06-30: "show where the source info came from and
     # what happens to it; apart from the brief, nothing should appear from nowhere"). where-FROM = each
@@ -2616,7 +2771,16 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         if parts_txt:
             whereto = (whereto + "  " if whereto else "") + parts_txt[0]
         orphan = False
-        if not whereto:
+        # HEADLINE INTEGRITY (2026-07-02): a quantity that FAILED a deterministic check on
+        # THIS run must NEVER carry the "design output (feeds cost / financial / drawings)"
+        # role — that label blessed v55's 184,166,200 kVA artefact as a design basis. It
+        # renders as a flagged defect instead, joined to the failing check.
+        if name in _q_flagged:
+            whereto = (f"⚠ FAILED a deterministic check this run ({_q_flagged[name]}) — "
+                       f"excluded from headline/output surfaces; see ⚠ Checks"
+                       + (f".  Downstream: {whereto}" if whereto else ""))
+            orphan = True                       # red fill: a flagged value, not a design basis
+        elif not whereto:
             if _is_output(name):
                 whereto = "→ design output (feeds cost / financial / drawings)"
             elif _informs_calc(name):
@@ -11242,6 +11406,16 @@ def build(run_dir: str, out_path: str) -> dict:
     _repair = repair_dossier(state, rows, run_dir)
     state, rows = _repair.state, _repair.rows
     state["requirementsBom"] = rows                       # downstream tabs read the repaired bill
+    # ── HEADLINE INTEGRITY JOIN (Tristan 2026-07-02): compute the flagged-quantity set
+    #    (deterministic checks + lineage closure) ONCE, before ANY tab renders, so every
+    #    headline surface (Exec OUTPUT, Overview metrics, Quantities roles) excludes a
+    #    quantity whose own check FAILED on this very build — the v55 cover printed
+    #    132,599,650.7 kW while its provenance row read STALE three tabs later. ──
+    _flg = _flagged_quantities(state, run_dir)
+    if _flg:
+        print(f"  · headline integrity: {len(_flg)} check-flagged quantit"
+              f"{'ies' if len(_flg) != 1 else 'y'} excluded from headline surfaces: "
+              + ", ".join(sorted(_flg)[:6]))
     report = audit_dossier(state, rows, run_dir)          # audit of the REPAIRED dossier
     state["_dossierAudit"] = report.scorecard()
     # DETERMINISTIC PER-TAB SCORECARD (Tristan 2026-06-26): score EVERY tab against the ≥8 floor and
@@ -12014,6 +12188,7 @@ def _selftest() -> int:
     # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an
     # internal stage, NOT the largest throughput. A real product-unit headline (MWh) is untouched.
     _wp = {"keyMetrics": {"headline_output": {"label": "Cultivation Containers", "value": 6000, "unit": "count"}},
+           "_flaggedQuantities": {},                                             # no flags this run
            "orchestratorContract": {"quantities": {
                "irrigation_demand_m3_h": {"value": 90, "unit": "m³/h"},          # the deliverable (90)
                "cloth_filter_throughput_m3_h": {"value": 80, "unit": "m³/h"},    # internal stage — must NOT win
@@ -12025,9 +12200,69 @@ def _selftest() -> int:
         print(f"  FAIL honest-headline: water plant must show the 90 m³/h deliverable, not 6000 count / 80 internal / 120 volume (got {_hh})"); bad += 1
     if not _hh.get("_served_context"):
         print("  FAIL honest-headline: the served-asset count must be retained as context"); bad += 1
-    _bess = _honest_headline_output({"keyMetrics": {"headline_output": {"label": "Energy delivered", "value": 3.5, "unit": "MWh"}}})
+    _bess = _honest_headline_output({"keyMetrics": {"headline_output": {"label": "Energy delivered", "value": 3.5, "unit": "MWh"}},
+                                     "_flaggedQuantities": {}})
     if _bess.get("unit") != "MWh" or _bess.get("value") != 3.5:
         print(f"  FAIL honest-headline: a real product-unit headline (MWh) must be UNTOUCHED (got {_bess})"); bad += 1
+    # proveCatch HEADLINE INTEGRITY (Tristan 2026-07-02, the v55 '132,599,650.7 kW OUTPUT' cover):
+    # (a) a quantity that FAILED its provenance/staleness check on THIS run must NEVER headline;
+    # (b) the picker must prefer the BRIEF's output family (water: m³/h — never electrical kW);
+    # (c) when no unflagged in-family candidate exists the headline is the HONEST FALLBACK text;
+    # (d) an engine-seeded headline whose VALUE is a flagged quantity is itself rejected.
+    _v55_q = {
+        "irrigation_demand_m3_h": {"value": 90, "unit": "m³/h"},
+        "total_supply_demand_kw": {"value": 132599650.69, "unit": "kW"},   # the flagged artefact
+    }
+    _v55_brief = {"constraints": {"target_performance": {
+        "key_metric": "cultivation_containers", "value": 6000, "unit": "count",
+        "metrics": [{"key_metric": "irrigation_demand_m3_per_hr", "value": 90, "unit": "m3/hr"}]}}}
+    _v55_flags = {"total_supply_demand_kw": "Tool output used: total_supply_demand_kw (STALE: tool 53 vs design 1.326e8)"}
+    _v55 = {"keyMetrics": {"headline_output": {"label": "Cultivation Containers", "value": "6,000", "unit": "count"}},
+            "parsedBrief": _v55_brief, "orchestratorContract": {"quantities": dict(_v55_q)},
+            "_flaggedQuantities": dict(_v55_flags)}
+    _hv = _honest_headline_output(_v55)
+    if float(_hv.get("value") or 0) != 90 or "m3" not in str(_hv.get("unit", "")).replace("³", "3").lower():
+        print(f"  FAIL headline-integrity (a/b): must pick the unflagged 90 m³/h brief-family deliverable, "
+              f"never the flagged 132,599,650 kW artefact (got {_hv})"); bad += 1
+    # (b) even UNFLAGGED, a foreign-family aggregate must not displace the brief's water family
+    _v55_nf = {"keyMetrics": {"headline_output": {"label": "Cultivation Containers", "value": 6000, "unit": "count"}},
+               "parsedBrief": _v55_brief, "orchestratorContract": {"quantities": dict(_v55_q)},
+               "_flaggedQuantities": {}}
+    _hnf = _honest_headline_output(_v55_nf)
+    if float(_hnf.get("value") or 0) != 90:
+        print(f"  FAIL headline-integrity (b): the brief's output family (m³/h) must beat a larger "
+              f"out-of-family kW aggregate even when unflagged (got {_hnf})"); bad += 1
+    # (c) nothing qualifies (the only rate quantity is flagged) → HONEST FALLBACK, never the number
+    _v55_only = {"keyMetrics": {"headline_output": {"label": "Cultivation Containers", "value": 6000, "unit": "count"}},
+                 "parsedBrief": _v55_brief,
+                 "orchestratorContract": {"quantities": {
+                     "total_supply_demand_kw": {"value": 132599650.69, "unit": "kW"}}},
+                 "_flaggedQuantities": dict(_v55_flags)}
+    _hof = _honest_headline_output(_v55_only)
+    if _hof.get("value") is not None or not _hof.get("fallback_text"):
+        print(f"  FAIL headline-integrity (c): with every candidate flagged the headline must be the "
+              f"honest fallback text with NO number (got {_hof})"); bad += 1
+    if "132599650" in (str(_hof.get("value")) + str(_hof.get("fallback_text", ""))).replace(",", ""):
+        print(f"  FAIL headline-integrity (c): the fallback must not smuggle the flagged number (got {_hof})"); bad += 1
+    # (d) an engine-seeded 'genuine-unit' headline that IS the flagged quantity must be rejected
+    _v55_direct = {"keyMetrics": {"headline_output": {"label": "Total Supply Demand delivered",
+                                                      "value": 132599650.7, "unit": "kW"}},
+                   "parsedBrief": _v55_brief, "orchestratorContract": {"quantities": dict(_v55_q)},
+                   "_flaggedQuantities": dict(_v55_flags)}
+    _hd = _honest_headline_output(_v55_direct)
+    if abs(float(_hd.get("value") or 0) - 132599650.7) < 1e6:
+        print(f"  FAIL headline-integrity (d): a seeded headline whose value IS the flagged quantity "
+              f"must never render (got {_hd})"); bad += 1
+    if float(_hd.get("value") or 0) != 90:
+        print(f"  FAIL headline-integrity (d): the rejected seeded headline must fall through to the "
+              f"honest 90 m³/h deliverable (got {_hd})"); bad += 1
+    # the Exec card path renders the fallback SUB-TEXT, never a flagged value (proveCatch on the
+    # deterministic synopsis, which shares the same picker):
+    _syn = _exec_synopsis(_v55_only)
+    if "132599650" in _syn.replace(",", "") or "132,599,650" in _syn:
+        print(f"  FAIL headline-integrity: the Exec synopsis must never quote the flagged number (got {_syn[:160]})"); bad += 1
+    if "withheld" not in _syn and "Not shown" not in _syn:
+        print(f"  FAIL headline-integrity: the Exec synopsis must carry the honest-fallback sentence (got {_syn[:160]})"); bad += 1
     # (1) _match_quantity must match the ACHIEVED quantity by NAME, NOT the target-closest ECHO.
     qs = {
         "nameplate_capacity_kwh": {"value": 2912, "unit": "kWh"},
