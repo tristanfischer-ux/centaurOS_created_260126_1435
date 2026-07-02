@@ -70,11 +70,131 @@ def _service_of(mech):
     return "water"
 
 
-def finalize_ledger(topology, parts, resolve_endpoint, log=print):
+# ── FLOW-DEMAND JOIN (2026-07-02, the v52 "every fluid edge required_value=null" fix) ──
+# The contract's flow demands live as PER-PART quantities (fertigation_dosing_pump_
+# throughput_m3_h = 45, gac_softener_throughput_m3_h = 14.5, …) but were never joined
+# onto the edges — connection_sizing received flow=0 for every fluid line, sized
+# everything at the DN15 minimum, and (since commit 1303f8535) the Line & velocity tab
+# honestly reads UNVERIFIED/FAIL. finalize_ledger is the CHOKE POINT every edge flows
+# through (the contract's authored topology AND every closer-minted _augmented edge), so
+# the join here covers all Python authoring paths in one place.
+#
+# MATCH SEMANTICS mirror the landed Excel join (build-excel-export.py::_flow_qty_for_part,
+# commit 1303f8535) + the distinguishing-token discipline of edm._equip_kw_from_quantities
+# (commit f9dfc2918 — the blanket-match family has bitten 3×): (1) exact snake(endpoint) +
+# flow-suffix key; (2) else a UNIQUE snake(endpoint)-prefixed flow-suffix candidate —
+# never a guess between two, and a name made ONLY of generic tokens (pump/tank/filter/…)
+# may never ride the prefix path (generic tokens never decide); NO bare-substring
+# containment anywhere. Ambiguity → None.
+#
+# PRECEDENCE RULE (the governing endpoint): the DESTINATION's demand governs — a line is
+# sized for what the consumer it feeds must receive (a DN-tap to a 14.5 m³/h softener
+# carries the softener's demand, not the 90 m³/h loop). When the destination carries no
+# flow quantity, the SOURCE's delivery rating governs (a pump's rated delivery IS the
+# design flow of the line it drives — which is also how a recycle/return edge takes its
+# loop's flow: the return pump that drives the loop names it). NEVER fabricate: no
+# matching quantity on either endpoint → required_value stays None and the honest-
+# UNVERIFIED path from 1303f8535 reports it.
+_FLOW_QTY_SUFFIXES = ("_throughput_m3_h", "_flow_m3_h", "_demand_m3_h", "_capacity_m3_h",
+                      "_throughput_m3_per_hr", "_flow_m3_per_hr", "_demand_m3_per_hr")
+
+# Tokens that carry no identity — every pump/tank/filter shares them; a name made ONLY
+# of these must never decide a prefix match (same discipline as _GENERIC_EQUIP_TOKENS in
+# electrical_distribution_model.py).
+_GENERIC_FLOW_TOKENS = {"pump", "tank", "vessel", "filter", "water", "system", "unit",
+                        "skid", "motor", "line", "pipe", "main", "process", "supply"}
+
+
+def _qty_num(v):
+    """Numeric value of a contract quantity ({value:..} dict or bare scalar), else None."""
+    if isinstance(v, dict):
+        v = v.get("value")
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f
+
+
+def _snake_name(name):
+    return re.sub(r"[^a-z0-9]+", "_", str(name or "").lower()).strip("_")
+
+
+def _flow_qty_for_part(name, quantities):
+    """(quantity_key, flow_m3h) for an endpoint name, or None — see MATCH SEMANTICS above."""
+    s = _snake_name(name)
+    if not s or not quantities:
+        return None
+    # (1) exact snake-name + flow-suffix
+    for suf in _FLOW_QTY_SUFFIXES:
+        v = _qty_num(quantities.get(s + suf))
+        if v is not None and v > 0:
+            return (s + suf, v)
+    # (2) a UNIQUE prefixed candidate — generic-only names are barred from this path
+    toks = [t for t in s.split("_") if t]
+    if toks and all(t in _GENERIC_FLOW_TOKENS for t in toks):
+        return None
+    cands = []
+    for k in quantities:
+        if not k.startswith(s + "_") or not any(k.endswith(x) for x in _FLOW_QTY_SUFFIXES):
+            continue
+        v = _qty_num(quantities.get(k))
+        if v is not None and v > 0:
+            cands.append((k, v))
+    if len(cands) == 1:
+        return cands[0]
+    return None
+
+
+def join_flow_demands(edges, quantities, log=print):
+    """Join the contract's per-part flow demands onto the FLUID edges in place
+    (required_value + required_unit + a _flow_join_basis provenance note). Only a fluid
+    (water-service) edge with NO existing required_value and a flow_capacity (or absent)
+    constraint_kind is touched — a hand-authored rating is never overwritten, and no edge
+    is ever given a fabricated value. Returns the number of edges joined."""
+    if not edges or not quantities:
+        return 0
+    joined = 0
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        mech = str(e.get("mechanism") or "").lower()
+        if not ("fluid" in mech or mech == "water"):
+            continue    # fluid lines only (never an air/O₂/thermal/power/signal tie)
+        ck = e.get("constraint_kind")
+        if ck not in (None, "flow_capacity"):
+            continue    # don't re-type an authored constraint
+        if e.get("required_value") is not None:
+            continue    # never overwrite an authored rating
+        # destination's demand governs; else the source's delivery (see PRECEDENCE RULE)
+        dst = _flow_qty_for_part(e.get("to_part"), quantities)
+        hit, which = (dst, "destination demand") if dst else \
+                     (_flow_qty_for_part(e.get("from_part"), quantities), "source delivery")
+        if not hit:
+            continue    # honest None — the UNVERIFIED path reports it
+        key, flow = hit
+        e["required_value"] = flow
+        e["required_unit"] = "m3/h"
+        if ck is None:
+            e["constraint_kind"] = "flow_capacity"
+        e["_flow_join_basis"] = f"contract qty {key} = {flow:g} m3/h ({which})"
+        joined += 1
+    if joined:
+        log(f"[ledger] flow-demand join: {joined} fluid edge(s) now carry their contract "
+            f"flow demand (required_value m3/h) — pipes size from true flows")
+    return joined
+
+
+def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=None):
     """Return (final_topology, dropped). `final_topology` is the AUTHORITATIVE connection
     list — every edge endpoint-resolved to a real placed part, spurious ties removed,
     de-duplicated per (from, to, service). `dropped` is a list of
     (from, to, mechanism, reason) for transparency.
+
+    When `quantities` (the contract quantities map) is given, every authored FLUID edge
+    that carries no required_value gets the endpoint-matched contract flow demand joined
+    on (join_flow_demands — the v52 required_value=null fix); with quantities=None the
+    ledger is byte-identical to the pre-join behaviour.
 
     The three authority rules (universal, in priority order):
       1. ENDPOINT VALIDITY — an edge whose BOTH endpoints fail to resolve to a real part
@@ -147,6 +267,11 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print):
         e2["to_part"] = b_name
         e2["_ledger_service"] = svc
         final.append(e2)
+
+    # FLOW-DEMAND JOIN — after endpoint resolution (canonical part names match their
+    # per-part contract quantities), covering contract + every closer-minted fluid edge.
+    if quantities:
+        join_flow_demands(final, quantities, log=log)
 
     if dropped:
         from collections import Counter
@@ -939,6 +1064,9 @@ def ledger_rows(final_topology):
             "constraint_kind": e.get("constraint_kind"),
             "required_value": e.get("required_value"),
             "required_unit": e.get("required_unit"),
+            # provenance of a JOINED flow demand (join_flow_demands) — None for an
+            # authored rating, so the row discloses where its number came from.
+            "required_basis": e.get("_flow_join_basis"),
             "material_context": e.get("material_context"),
             "source": "contract" if not e.get("_augmented") else "completion",
         })
@@ -1065,7 +1193,69 @@ def _selftest():
     assert any(e["from_part"] == "Motor Control Centre" and e["mechanism"] == "signal" for e in sres), \
         "a signal tie parallels an existing power edge between the same pair (service-aware dedup)"
 
-    print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual)")
+    # ── FLOW-DEMAND JOIN (the v52 required_value=null fix) ──────────────────────
+    q = {"fertigation_dosing_pump_throughput_m3_h": {"value": 45},
+         "gac_softener_throughput_m3_h": 14.5,
+         "drain_transfer_pump_throughput_m3_h": 45,
+         # TWO keys share the 'storage_tank' prefix → ambiguous, must never decide:
+         "storage_tank_a_flow_m3_h": 10, "storage_tank_b_flow_m3_h": 20}
+    jt = [
+        # destination demand governs (dest 14.5 beats source 45):
+        {"from_part": "Fertigation Dosing Pump", "to_part": "Gac Softener",
+         "mechanism": "fluid_loop", "constraint_kind": "flow_capacity"},
+        # destination has no qty → source delivery governs (the recycle/return case):
+        {"from_part": "Drain Transfer Pump", "to_part": "Fresh Water Tank",
+         "mechanism": "fluid_loop", "constraint_kind": "flow_capacity"},
+        # NO-FABRICATION counter-case: neither endpoint has a flow qty → stays None:
+        {"from_part": "Grp Membrane Housings", "to_part": "Uf Module Bank",
+         "mechanism": "fluid_loop", "constraint_kind": "flow_capacity"},
+        # an authored rating is NEVER overwritten:
+        {"from_part": "Irrigation Pump", "to_part": "Gac Softener",
+         "mechanism": "fluid_loop", "constraint_kind": "flow_capacity",
+         "required_value": 7.7, "required_unit": "m3/h"},
+        # a NON-fluid edge is untouched even when its endpoints carry flow quantities:
+        {"from_part": "Fertigation Dosing Pump", "to_part": "Main Switchboard",
+         "mechanism": "electrical_bus", "constraint_kind": "current_rating"},
+        # ambiguity between two prefixed candidates → None (never a guess):
+        {"from_part": "Clean Water Pump", "to_part": "Storage Tank",
+         "mechanism": "fluid_loop", "constraint_kind": "flow_capacity"},
+    ]
+    nj = join_flow_demands(jt, q, log=lambda *a: None)
+    assert nj == 2, f"flow-join: expected exactly 2 edges joined, got {nj}"
+    assert jt[0]["required_value"] == 14.5 and "destination demand" in jt[0]["_flow_join_basis"], \
+        f"flow-join: destination demand must govern; got {jt[0]}"
+    assert jt[1]["required_value"] == 45 and "source delivery" in jt[1]["_flow_join_basis"], \
+        f"flow-join: source delivery must govern when destination has no qty; got {jt[1]}"
+    assert jt[2].get("required_value") is None, \
+        "flow-join: NO-FABRICATION violated — an edge with no matching quantity must stay None"
+    assert jt[3]["required_value"] == 7.7, "flow-join: an authored rating must never be overwritten"
+    assert jt[4].get("required_value") is None, "flow-join: a non-fluid edge must be untouched"
+    assert jt[5].get("required_value") is None, \
+        "flow-join: two prefixed candidates are ambiguous — must stay None"
+    # generic-only name must not ride the unique-prefix path even when unambiguous:
+    assert _flow_qty_for_part("tank", {"tank_farm_flow_m3_h": 33}) is None, \
+        "flow-join: a generic-only name must never decide a prefix match"
+    # …but its EXACT key still matches (the full name IS the identity):
+    assert _flow_qty_for_part("tank", {"tank_flow_m3_h": 33}) == ("tank_flow_m3_h", 33.0), \
+        "flow-join: exact snake-name + suffix must match even for a generic name"
+    # finalize_ledger applies the join when quantities are passed (the choke point) and is
+    # a no-op join with quantities=None (byte-identical pre-join behaviour).
+    ftopo = [{"from_part": "Rearing Tank", "to_part": "Rotary Drum Filter", "mechanism": "fluid_loop"}]
+    fq = {"rotary_drum_filter_throughput_m3_h": 120}
+    fj, _ = finalize_ledger(list(ftopo), parts, resolve, log=lambda *a: None, quantities=fq)
+    assert fj[0]["required_value"] == 120 and fj[0]["required_unit"] == "m3/h", \
+        f"finalize_ledger must join flow demands when quantities given; got {fj[0]}"
+    assert fj[0]["constraint_kind"] == "flow_capacity", \
+        "finalize_ledger join must default constraint_kind=flow_capacity on a bare fluid edge"
+    fn, _ = finalize_ledger(list(ftopo), parts, resolve, log=lambda *a: None)
+    assert fn[0].get("required_value") is None, \
+        "finalize_ledger without quantities must leave edges un-joined (backward compatible)"
+    # ledger_rows discloses the join provenance:
+    rws = ledger_rows(fj)
+    assert rws[0]["required_value"] == 120 and "rotary_drum_filter_throughput_m3_h" in rws[0]["required_basis"], \
+        f"ledger_rows must carry required_value + required_basis; got {rws[0]}"
+
+    print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
           f"completeness flags {len(concerns)} incomplete part(s) incl. pump-missing-input)")
 

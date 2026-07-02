@@ -6849,6 +6849,22 @@ async function main() {
         logAction({ step: 'derive_signal_topology', edges: sigEdges.length })
       }
     }
+    // FLOW-DEMAND JOIN (2026-07-02, commit 1303f8535's routed defect #1): the contract's
+    // flow demands live as per-part quantities but were never joined onto the fluid edges —
+    // connection_sizing received flow=0, sized every line at the DN15 minimum, and the Line
+    // & velocity tab honestly reads UNVERIFIED/FAIL. THIS is the choke point where ALL
+    // topology has landed on state.orchestratorContract.topology (hand-authored builder
+    // arrays via initialOrchContract AND the derived spine above), so one join here covers
+    // every authoring path without editing ~40 builders. Destination demand governs, else
+    // source delivery; no match → honestly null (see derive-topology.ts PRECEDENCE RULE).
+    if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
+      const { joinFlowDemandsOntoTopology } = await import('./lib/orchestrator/generic/derive-topology')
+      const nJoined = joinFlowDemandsOntoTopology(orch.topology, (orch.quantities ?? {}) as Record<string, unknown>)
+      if (nJoined > 0) {
+        console.error(`[chain] flow-demand join: ${nJoined} fluid edge(s) now carry their contract flow demand (required_value m3/h) → pipes size from true flows`)
+        logAction({ step: 'join_flow_demands_onto_topology', edges_joined: nJoined })
+      }
+    }
   } catch (err) {
     console.error(`[chain] topology derivation failed (non-fatal): ${(err as Error).message}`)
     logAction({ step: 'derive_process_topology', ok: false, error: String(err).slice(0, 200) })

@@ -179,6 +179,110 @@ export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
   return edges
 }
 
+// ── FLOW-DEMAND JOIN (2026-07-02, the v52 "every fluid edge required_value=null" fix) ──
+// The contract's flow demands live as PER-PART quantities (fertigation_dosing_pump_
+// throughput_m3_h = 45, gac_softener_throughput_m3_h = 14.5, …) but were never joined
+// onto the topology edges — so connection_sizing received flow=0 for every fluid line,
+// sized everything at the DN15 minimum, and (since commit 1303f8535) the Line & velocity
+// tab honestly reads UNVERIFIED/FAIL. This join moves the landed Excel-render fallback
+// (build-excel-export.py::_flow_qty_for_part, commit 1303f8535) UPSTREAM so the edges
+// CARRY the demand and the pipes SIZE from it.
+//
+// MATCH SEMANTICS (mirrors the Excel join + the distinguishing-token discipline of
+// edm._equip_kw_from_quantities, commit f9dfc2918 — the blanket-match family has bitten
+// 3×): (1) exact snake(endpoint) + flow-suffix key; (2) else a UNIQUE snake(endpoint)-
+// prefixed flow-suffix candidate — never a guess between two, and a name made ONLY of
+// generic tokens (pump/tank/filter/…) may never ride the prefix path (generic tokens
+// never decide); NO bare-substring containment anywhere. Ambiguity → null.
+//
+// PRECEDENCE RULE (the governing endpoint): the DESTINATION's demand governs — a line is
+// sized for what the consumer it feeds must receive (a DN-tap to a 14.5 m³/h softener
+// carries the softener's demand, not the 90 m³/h loop). When the destination carries no
+// flow quantity, the SOURCE's delivery rating governs (a pump's rated delivery IS the
+// design flow of the line it drives — which is also how a recycle/return edge takes its
+// loop's flow: the return pump that drives the loop names it). NEVER fabricate: no
+// matching quantity on either endpoint → required_value stays null and the honest-
+// UNVERIFIED path from 1303f8535 reports it.
+
+const FLOW_QTY_SUFFIXES = [
+  '_throughput_m3_h', '_flow_m3_h', '_demand_m3_h', '_capacity_m3_h',
+  '_throughput_m3_per_hr', '_flow_m3_per_hr', '_demand_m3_per_hr',
+] as const
+
+// Tokens that carry no identity — every pump/tank/filter shares them; a name made ONLY
+// of these must never decide a prefix match (same discipline as _GENERIC_EQUIP_TOKENS).
+const GENERIC_FLOW_TOKENS = new Set([
+  'pump', 'tank', 'vessel', 'filter', 'water', 'system', 'unit', 'skid', 'motor',
+  'line', 'pipe', 'main', 'process', 'supply',
+])
+
+function qtyNum(v: unknown): number | null {
+  const raw = v !== null && typeof v === 'object' ? (v as { value?: unknown }).value : v
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/** (quantity key, flow m³/h) for an endpoint name, or null — see MATCH SEMANTICS above. */
+export function flowQtyForPart(
+  name: unknown,
+  quantities: Record<string, unknown>,
+): { key: string; flowM3h: number } | null {
+  const s = slugify(String(name ?? ''))
+  if (!s) return null
+  // (1) exact snake-name + flow-suffix
+  for (const suf of FLOW_QTY_SUFFIXES) {
+    const v = qtyNum(quantities[s + suf])
+    if (v !== null && v > 0) return { key: s + suf, flowM3h: v }
+  }
+  // (2) a UNIQUE prefixed candidate — generic-only names are barred from this path
+  const toks = s.split('_').filter(Boolean)
+  if (toks.length > 0 && toks.every((t) => GENERIC_FLOW_TOKENS.has(t))) return null
+  const cands: Array<{ key: string; flowM3h: number }> = []
+  for (const k of Object.keys(quantities)) {
+    if (!k.startsWith(s + '_')) continue
+    if (!FLOW_QTY_SUFFIXES.some((suf) => k.endsWith(suf))) continue
+    const v = qtyNum(quantities[k])
+    if (v !== null && v > 0) cands.push({ key: k, flowM3h: v })
+  }
+  return cands.length === 1 ? cands[0] : null
+}
+
+/**
+ * Join the contract's per-part flow demands onto the FLUID topology edges in place
+ * (required_value + required_unit + a _flow_join_basis provenance note). Only a fluid
+ * edge (mechanism contains 'fluid', or 'water') with NO existing required_value and a
+ * flow_capacity (or absent) constraint_kind is touched — a hand-authored rating is
+ * never overwritten, and no edge is ever given a fabricated value. Returns the number
+ * of edges joined.
+ */
+export function joinFlowDemandsOntoTopology(
+  topology: Array<Record<string, unknown>>,
+  quantities: Record<string, unknown>,
+): number {
+  if (!Array.isArray(topology) || topology.length === 0) return 0
+  if (!quantities || typeof quantities !== 'object') return 0
+  let joined = 0
+  for (const e of topology) {
+    if (!e || typeof e !== 'object') continue
+    const mech = String(e.mechanism ?? '').toLowerCase()
+    if (!(mech.includes('fluid') || mech === 'water')) continue // fluid lines only
+    const ck = e.constraint_kind
+    if (ck != null && ck !== 'flow_capacity') continue // don't re-type an authored constraint
+    if (e.required_value != null) continue // never overwrite an authored rating
+    // destination's demand governs; else the source's delivery (see PRECEDENCE RULE)
+    const dst = flowQtyForPart(e.to_part, quantities)
+    const src = dst ? null : flowQtyForPart(e.from_part, quantities)
+    const hit = dst ?? src
+    if (!hit) continue // honest null — the UNVERIFIED path reports it
+    e.required_value = hit.flowM3h
+    e.required_unit = 'm3/h'
+    if (ck == null) e.constraint_kind = 'flow_capacity'
+    e._flow_join_basis = `contract qty ${hit.key} = ${hit.flowM3h} m3/h (${dst ? 'destination demand' : 'source delivery'})`
+    joined++
+  }
+  return joined
+}
+
 // ── proveCatch selftest ──────────────────────────────────────────────────────
 function _selftest() {
   const mk = (name: string): AnyWord => ({ name_human: name, _synthesized: true })
@@ -245,8 +349,46 @@ function _selftest() {
   if (sigHubs.size !== 1) throw new Error(`derive-topology SIGNAL: all instruments must wire to ONE control hub (got ${[...sigHubs].join(',')})`)
   // no control hub OR no instrument → []
   if (deriveSignalTopology([{ sub_modules: [{ words: [mk('Fresh Water Tank'), mk('Irrigation Pump')] }] }]).length !== 0) throw new Error('derive-topology SIGNAL: no instrument/hub must yield []')
+
+  // ── FLOW-DEMAND JOIN (the v52 required_value=null fix) ──────────────────────
+  const q = {
+    fertigation_dosing_pump_throughput_m3_h: { value: 45 },
+    gac_softener_throughput_m3_h: 14.5,
+    irrigation_pump_flow_m3_h: 90,
+    drain_transfer_pump_throughput_m3_h: 45,
+    // TWO tank-farm keys share the 'storage_tank' prefix → ambiguous, must never decide:
+    storage_tank_a_flow_m3_h: 10, storage_tank_b_flow_m3_h: 20,
+  } as Record<string, unknown>
+  const jt: Array<Record<string, unknown>> = [
+    // destination demand governs (dest 14.5 beats source 45):
+    { from_part: 'fertigation_dosing_pump', to_part: 'gac_softener', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    // destination has no qty → source delivery governs (the recycle/return case):
+    { from_part: 'drain_transfer_pump', to_part: 'fresh_water_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    // NO-FABRICATION counter-case: neither endpoint has a flow qty → stays null:
+    { from_part: 'grp_membrane_housings', to_part: 'uf_module_bank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    // an authored rating is NEVER overwritten:
+    { from_part: 'irrigation_pump', to_part: 'gac_softener', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 7.7, required_unit: 'm3/h' },
+    // a NON-fluid edge is untouched even when its endpoints carry flow quantities:
+    { from_part: 'irrigation_pump', to_part: 'main_switchboard', mechanism: 'electrical_bus', constraint_kind: 'current_rating' },
+    // ambiguity between two prefixed candidates → null (never a guess):
+    { from_part: 'clean_water_pump', to_part: 'storage_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const nJoined = joinFlowDemandsOntoTopology(jt, q)
+  if (nJoined !== 2) throw new Error(`flow-join: expected exactly 2 edges joined, got ${nJoined}`)
+  if (jt[0].required_value !== 14.5 || !String(jt[0]._flow_join_basis).includes('destination demand')) throw new Error(`flow-join: destination demand must govern (got ${jt[0].required_value})`)
+  if (jt[1].required_value !== 45 || !String(jt[1]._flow_join_basis).includes('source delivery')) throw new Error(`flow-join: source delivery must govern when the destination has no qty (got ${jt[1].required_value})`)
+  if (jt[2].required_value != null) throw new Error('flow-join: NO-FABRICATION violated — an edge with no matching quantity must stay null')
+  if (jt[3].required_value !== 7.7) throw new Error('flow-join: an authored rating must never be overwritten')
+  if (jt[4].required_value != null) throw new Error('flow-join: a non-fluid edge must be untouched')
+  if (jt[5].required_value != null) throw new Error('flow-join: two prefixed candidates are ambiguous — must stay null')
+  // generic-only name must not ride the unique-prefix path even when unambiguous:
+  if (flowQtyForPart('tank', { tank_farm_flow_m3_h: 33 }) !== null) throw new Error('flow-join: a generic-only name must never decide a prefix match')
+  // …but its EXACT key still matches (the full name IS the identity):
+  const g = flowQtyForPart('tank', { tank_flow_m3_h: 33 })
+  if (!g || g.flowM3h !== 33) throw new Error('flow-join: exact snake-name + suffix must match even for a generic name')
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
