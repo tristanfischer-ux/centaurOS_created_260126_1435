@@ -1213,6 +1213,99 @@ def _dedupe_actuator_assembly_rows(rows):
     return folded
 
 
+# ── MEMBRANE-FAMILY SYNONYM DE-DUP (benchmark net v56b, 2026-07-03) ──
+# THE BUG: the generator emitted the SAME UF stage under three synonym words —
+# 'Ultrafiltration Module' (£14,505), 'Uf Module Bank' (£14,505) and 'Uf Membrane Bank'
+# (£9,100, area parametric) — and each became its own priced line (£38k for one bank;
+# the gate-36 diagnose: "Duplicate UF module + bank lines … double-counted").
+# THE RULE (universal — distinguishing-token discipline, no class table): within the
+# membrane/filtration family, two lines whose DISTINGUISHING tokens are IDENTICAL after
+# dropping the family-generic nouns (membrane/module/bank/element/media …) and
+# normalising the stage synonyms (ultrafiltration→uf, reverse osmosis→ro, nano→nf,
+# micro→mf) name the SAME physical stage → ONE line survives (the one with a stated
+# quantitative driver — the area parametric — else the cheapest), the rest fold to £0
+# with an honest MERGED·SYNONYM note. Different STAGE tokens (uf vs ro) or different
+# HARDWARE tokens (elements vs housings vs skid) NEVER merge — UF and RO are different
+# physical stages; housings are not membranes.
+_MEMBRANE_DEDUP_FAMILY_RE = re.compile(
+    r"\bmembranes?\b|\bultrafiltrat\w*|\bnanofiltrat\w*|\bmicrofiltrat\w*|"
+    r"\breverse\s+osmosis\b|\b(?:ro|uf|nf|mf|edi)\s+(?:membrane|element|module|bank|cartridge)s?\b",
+    re.I)
+_MEMBRANE_GENERIC_TOKENS = {
+    "membrane", "module", "bank", "element", "media", "cartridge", "filtration", "filter",
+}
+
+
+def _membrane_distinguishing_tokens(name):
+    """The DISTINGUISHING token set of a membrane-family line name: stage synonyms
+    normalised, family-generic nouns dropped, plurals folded. 'Ultrafiltration Module' /
+    'Uf Module Bank' / 'Uf Membrane Bank' → {'uf'}; 'Ro Membrane Elements' → {'ro'};
+    'Grp Membrane Housings' → {'grp','housing'} (housing is HARDWARE, it distinguishes)."""
+    joined = "_".join(re.findall(r"[a-z0-9]+", str(name or "").lower()))
+    joined = (joined.replace("reverse_osmosis", "ro").replace("ultrafiltration", "uf")
+              .replace("nanofiltration", "nf").replace("microfiltration", "mf")
+              .replace("electrodeionization", "edi").replace("electrodeionisation", "edi"))
+    out = set()
+    for t in joined.split("_"):
+        if not t:
+            continue
+        t = t[:-1] if (t.endswith("s") and len(t) > 3) else t
+        if t in _MEMBRANE_GENERIC_TOKENS:
+            continue
+        out.add(t)
+    return frozenset(out)
+
+
+def _dedupe_membrane_synonym_rows(rows):
+    """Fold membrane-family SYNONYM lines (identical distinguishing tokens) onto one
+    survivor: survivor keeps its price (area-parametric driver preferred, else cheapest),
+    qty = max across the group, basis lists the merged source names; folded lines →
+    line_gbp 0 + MERGED·SYNONYM + honest note. Mutates `rows`; returns folded count.
+    UF vs RO / elements vs housings vs skid are different token sets → never merged."""
+    groups = {}
+    for r in rows:
+        if r.get("connection") or float(r.get("line_gbp") or 0) <= 0:
+            continue
+        if str(r.get("status")) == "SUB-COMPONENT":
+            continue
+        lead = str(r.get("requirement", "")).split("·")[0].strip()
+        if lead.startswith("↳") or not _MEMBRANE_DEDUP_FAMILY_RE.search(lead):
+            continue
+        key = _membrane_distinguishing_tokens(lead)
+        if not key:
+            continue
+        groups.setdefault(key, []).append(r)
+    folded = 0
+    for key, grp in groups.items():
+        if len(grp) < 2:
+            continue
+
+        def _rank(r):
+            b = str(r.get("basis", ""))
+            has_driver = ("membrane-area parametric" in b or "membrane-housing parametric" in b)
+            return (0 if has_driver else 1, float(r.get("line_gbp") or 0))
+
+        grp.sort(key=_rank)
+        survivor = grp[0]
+        merged_names = []
+        for r in grp[1:]:
+            merged_names.append(f"'{str(r.get('requirement', '')).split('·')[0].strip()}' "
+                                f"(was £{round(float(r.get('line_gbp') or 0)):,})")
+            r["line_gbp"] = 0
+            r["status"] = "MERGED·SYNONYM"
+            r["basis"] = (str(r.get("basis", ""))
+                          + f" · de-duplicated: names the SAME {'/'.join(sorted(key)).upper()} stage as "
+                          f"'{str(survivor.get('requirement', '')).split('·')[0].strip()}' — synonym line "
+                          f"folded into it (one physical bank, one price)")
+            folded += 1
+        survivor["qty"] = max(int(g.get("qty") or 1) for g in grp)
+        survivor["line_gbp"] = round(float(survivor.get("unit_gbp") or 0) * int(survivor.get("qty") or 1)) \
+            if float(survivor.get("unit_gbp") or 0) > 0 else survivor.get("line_gbp")
+        survivor["basis"] = (str(survivor.get("basis", ""))
+                             + f" · merged synonym line(s): {', '.join(merged_names)}")
+    return folded
+
+
 # ── DUTY-SCALED CLASS-REFERENCE BUDGET (council 2026-06-19) ──
 # A large mechanical-equipment price should be EXPLICIT and auditable, not an
 # unexplained outlier. A heat pump / compressor / chiller / blower scales its cost
@@ -2721,6 +2814,40 @@ def _selftest() -> int:
     if not (_dedupe_actuator_assembly_rows(_rows_more) == 0 and _rows_more[1]["line_gbp"] == 7000):
         print("  FAIL 200 actuators folded into only 50 assemblies (population mismatch)"); bad += 1
 
+    # ── MEMBRANE-FAMILY SYNONYM DE-DUP proveCatch (gate-36 round 2, 2026-07-03, v56b:
+    # 'Ultrafiltration Module' £14,505 + 'Uf Module Bank' £14,505 + 'Uf Membrane Bank'
+    # £9,100 = three lines for ONE UF stage). Both directions: the UF synonym triplet
+    # folds to the area-parametric survivor; UF vs RO (different stage tokens) and
+    # elements vs housings (different hardware tokens) NEVER merge.
+    if _membrane_distinguishing_tokens("Ultrafiltration Module") != frozenset({"uf"}):
+        print("  FAIL 'Ultrafiltration Module' distinguishing tokens ≠ {'uf'}"); bad += 1
+    if _membrane_distinguishing_tokens("Uf Membrane Bank") != frozenset({"uf"}):
+        print("  FAIL 'Uf Membrane Bank' distinguishing tokens ≠ {'uf'}"); bad += 1
+    if _membrane_distinguishing_tokens("Ro Membrane Elements") == _membrane_distinguishing_tokens("Uf Membrane Bank"):
+        print("  FAIL RO vs UF must have DIFFERENT distinguishing tokens (never merge stages)"); bad += 1
+    if _membrane_distinguishing_tokens("Grp Membrane Housings") == _membrane_distinguishing_tokens("Ro Membrane Elements"):
+        print("  FAIL housings vs elements must have DIFFERENT distinguishing tokens"); bad += 1
+    _mem_rows = [
+        {"tag": "Z-103", "requirement": "Ultrafiltration Module", "qty": 1, "unit_gbp": 14505, "line_gbp": 14505, "basis": "bottom-up parametric", "status": "NOT FOUND"},
+        {"tag": "Z-102", "requirement": "Uf Module Bank", "qty": 1, "unit_gbp": 14505, "line_gbp": 14505, "basis": "membrane/filtration-media class — vendor quote TBD", "status": "NOT FOUND"},
+        {"tag": "—", "requirement": "Uf Membrane Bank · 364 m² area", "qty": 1, "unit_gbp": 9100, "line_gbp": 9100, "basis": "membrane-area parametric: 364 m² × £25/m²", "status": "NOT FOUND"},
+        {"tag": "—", "requirement": "Ro Membrane Elements · 364 m² area", "qty": 1, "unit_gbp": 9100, "line_gbp": 9100, "basis": "membrane-area parametric: 364 m² × £25/m²", "status": "NOT FOUND"},
+        {"tag": "—", "requirement": "Grp Membrane Housings · 364 m² area", "qty": 1, "unit_gbp": 11000, "line_gbp": 11000, "basis": "membrane-housing parametric: 364 m² ÷ 37 m²/element", "status": "NOT FOUND"},
+    ]
+    _mem_folded = _dedupe_membrane_synonym_rows(_mem_rows)
+    _uf_live = [r for r in _mem_rows if "uf" in str(r["requirement"]).lower()[:3] or "ultraf" in str(r["requirement"]).lower()]
+    if not (_mem_folded == 2
+            and _mem_rows[0]["line_gbp"] == 0 and _mem_rows[0]["status"] == "MERGED·SYNONYM"
+            and _mem_rows[1]["line_gbp"] == 0 and _mem_rows[1]["status"] == "MERGED·SYNONYM"
+            and _mem_rows[2]["line_gbp"] == 9100 and "merged synonym" in _mem_rows[2]["basis"]
+            and _mem_rows[3]["line_gbp"] == 9100 and _mem_rows[3]["status"] == "NOT FOUND"
+            and _mem_rows[4]["line_gbp"] == 11000 and _mem_rows[4]["status"] == "NOT FOUND"):
+        print(f"  FAIL membrane synonym de-dup (folded={_mem_folded}; rows={[(r['requirement'][:24], r['line_gbp'], r['status']) for r in _mem_rows]})"); bad += 1
+    # a single membrane line (no synonym) is byte-untouched
+    _mem_alone = [{"tag": "—", "requirement": "Ro Membrane Elements · 364 m² area", "qty": 1, "unit_gbp": 9100, "line_gbp": 9100, "basis": "membrane-area parametric", "status": "NOT FOUND"}]
+    if not (_dedupe_membrane_synonym_rows(_mem_alone) == 0 and _mem_alone[0]["line_gbp"] == 9100 and "merged" not in _mem_alone[0]["basis"]):
+        print("  FAIL standalone membrane line wrongly folded"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -3193,6 +3320,17 @@ def _connection_rows(out_dir: str, q=None):
                          f"2 ends · sized {flow_m3h:,.0f} m³/h @ {v_ms:.1f} m/s · {duty_basis}")
 
         req = f"{service} connection: {frm} → {to}" + (f" · {rating}" if rating else "")
+        # ── INSTALLED-SCOPE STATEMENT (gate-36 round 2, 2026-07-03): every routed run is
+        # priced on the uk-2026 SUPPLY+INSTALL model (£/m rate incl. pipe/cable supply +
+        # fittings/supports/jointing + installation labour; ends = jointed/flanged/lugged
+        # terminations) — NOT a bare-fittings price. The benchmark diagnose compared £900-
+        # £2,400 installed water runs to £50-£150 FITTINGS and £100-£130 installed cable
+        # runs to £15-£40 TERMINATIONS: two different scopes. State the scope ON the line
+        # so no reader can mistake the installed run for a component price (the fault
+        # router downgrades an installed-vs-component complaint to a note on this basis).
+        if "install" not in basis.lower():
+            basis += (" · installed cost — supply + installation labour + terminations "
+                      "included (uk-2026 supply+install model; not a bare-fittings/component price)")
         # human part description incl. length + as-sized DN/CSA
         if service == "water":
             part = f"{size} {matlabel} {kind}, {float(length or 0):.1f} m"
@@ -3538,10 +3676,25 @@ def assemble(out_dir: str):
                             else "PT" if "pressure" in nlow else "FT" if "flow" in nlow
                             else "AT")   # ISA-5.1 instrument tag (analysers → AT)
                     itag = _canon_tag(w, itag)   # numbered canonical tag — same as the drawings
+                    ibasis = "installed instrument — catalogue-class budget"
+                    # STATED QTY BASIS (gate-36 round 2, 2026-07-03): the per-vessel count is
+                    # deliberate engineering (synthesizeInstrumentation: a contract-declared
+                    # control variable is measured on EVERY vessel that holds it — a tank's
+                    # level/pressure cannot be inferred from a neighbour's), not over-provision.
+                    # State the rule + the vessel roster ON the line so a reader (the benchmark
+                    # net's "17 transmitters for ~15 tanks — reduce to 8-10" included) sees the
+                    # one-per-vessel basis instead of an unexplained count.
+                    if qy > 1:
+                        vloc = str(md.get("vessel_location") or "").strip()
+                        ibasis += (f" · qty {qy} = one per monitored vessel (a contract-declared "
+                                   f"control variable is measured on EVERY vessel that holds it — "
+                                   f"stated engineering rule)")
+                        if vloc:
+                            ibasis += f"; locations: {vloc[:180]}"
                     rows.append({"tag": itag, "requirement": requirement, "status": "INSTRUMENT",
                                  "part": "field instrument (catalogue class)", "qty": qy,
                                  "unit_gbp": round(igbp), "line_gbp": round(igbp * qy),
-                                 "basis": "installed instrument — catalogue-class budget"})
+                                 "basis": ibasis})
                     continue
                 # ── FINAL CONTROL ELEMENT (synthesizeActuation #141): a flow control valve
                 # or aeration blower sized from the contract. Catalogue-class budget. ──
@@ -3600,7 +3753,20 @@ def assemble(out_dir: str):
                 # LOX, sludge handling, SCADA, grading. Priced whole from its contract duty. ──
                 if w.get("_process"):
                     pgbp = _child_price(w)
-                    pbasis = "installed process system — catalogue-class budget"
+                    # STATED PRICE BASIS (gate-36 round 2): a process-support system whose
+                    # synthesis stamped a `price_basis` modifier (e.g. SCADA: £60k base +
+                    # £50/kW, supply+install scope) carries THAT auditable derivation as
+                    # the line basis. A word from an earlier state (no price_basis yet)
+                    # states its scope from its own `form` modifier instead — the £ is a
+                    # WHOLE-SYSTEM supply+install budget and the line must say what that
+                    # covers (the SCADA £62,650 read as an unexplained outlier).
+                    pbasis = str(md.get("price_basis") or "").strip()
+                    if not pbasis:
+                        pbasis = "installed process system — catalogue-class budget"
+                        _pform = str(md.get("form") or "").strip()
+                        if _pform:
+                            pbasis += (" (whole-system supply+install scope: "
+                                       f"{_pform[:150]}{'…' if len(_pform) > 150 else ''})")
                     # a process-support skid with a kW/kVA rating (e.g. a pumped LOX
                     # vaporiser, a chilled-water skid) → ground to the market curve.
                     # No-op for an unrated dosing/feed/SCADA system.
@@ -4074,6 +4240,15 @@ def assemble(out_dir: str):
     if _folded:
         print(f"  [actuator-dedup] folded {_folded} bare-actuator line(s) into their "
               f"actuated-valve assemblies (double-representation removed)", file=sys.stderr)
+    # ── MEMBRANE-FAMILY SYNONYM DE-DUP (gate-36 round 2, 2026-07-03): the same UF stage
+    # emitted under synonym names ('Ultrafiltration Module' + 'Uf Module Bank' + 'Uf
+    # Membrane Bank') folds to ONE priced line. Runs BEFORE the corpus lift so a folded
+    # synonym is never lifted. (stderr only — stdout must stay pure JSON for the chain.)
+    _mfolded = _dedupe_membrane_synonym_rows(rows)
+    if _mfolded:
+        print(f"  [membrane-dedup] folded {_mfolded} membrane-family synonym line(s) onto "
+              f"their surviving stage line (same distinguishing tokens — one physical bank)",
+              file=sys.stderr)
     _lift_n, _lift_gbp = 0, 0.0
     for row in rows:
         if row.get("line_gbp", 0) <= 0 or row.get("status") == "SUB-COMPONENT":

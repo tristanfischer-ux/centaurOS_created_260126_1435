@@ -1069,6 +1069,118 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── A3e. DEMAND-COVERAGE rules 5+6+7: DISINFECTION GUARANTEE + STORAGE DELIVERY +
+  // PER-UNIT×COUNT TOTAL (gate-36 round 2, codema v56b, 2026-07-03). THREE v56b defects:
+  // (1) UV COIN-FLIP — uv_disinfection_{throughput,power,count} sat in the contract on
+  // v54–v56b but the principal only existed when the generator emitted the word
+  // ('uv_disinfection' fails phraseLooksLikeDevice → isSynthesisable refused it);
+  // (2) STORAGE — the brief pins water_storage_capacity_m3=120 (3× 40 m³ tanks) but nothing
+  // GUARANTEED the delivered tanks sum to it, and no DELIVERED-total key existed (the
+  // benchmark read fresh_water_storage_capacity_m3=40 → 0.33× false-RADICAL);
+  // (3) FERTIGATION — pump 45 m³/h PER UNIT ×2 delivers 90, but no key said so explicitly.
+  // proveCatch BOTH directions per rule; BESS/SAF-like contracts byte-identical.
+  {
+    const uvContract = (): any => ({ quantities: {
+      irrigation_demand_m3_h: { value: 90, unit: 'm³/h', source: 'calculator' },
+      fertigation_dosing_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+      fertigation_dosing_pump_count: { value: 2, unit: '', source: 'brief' },
+      fertigation_dosing_capacity_m3_per_hr: { value: 90, unit: 'm³/h', source: 'calculator' },
+    } })
+    const tankWord = (name: string, capM3: number, qty: number): any => ({
+      id: `${name.toLowerCase().replace(/\W+/g, '_')}_word`, name_human: name,
+      content_character: { character_id: name.toLowerCase().replace(/\W+/g, '_'), name_human: name },
+      modifier_characters: [
+        { kind: 'quantity', value: `×${qty}` },
+        { kind: 'capacity', value: String(capM3), unit: 'm³' },
+        { kind: 'dimension', value: '3.7 m dia x 3.7 m' },
+      ],
+    })
+    const uvWord = (): any => ({
+      id: 'uv_disinfection_unit_word', name_human: 'UV Disinfection Unit',
+      content_character: { character_id: 'uv_disinfection_unit', name_human: 'UV Disinfection Unit' },
+      modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '90', unit: 'm³/h' }],
+    })
+    const mkMods = (words: any[]): any[] => ([
+      { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words }] },
+    ])
+    const storageMetric = [{ key_metric: 'water_storage_capacity_m3', value: 120, unit: 'm3', category: 'scale' }]
+    const wordCount = (ms: any[], re: RegExp): number => {
+      let n = 0
+      for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+        if (!String(w.id ?? '').includes('__') && re.test(String(w.name_human ?? ''))) n += 1
+      }
+      return n
+    }
+    const qv = (c: any, k: string) => c?.quantities?.[k]?.value
+    // (a) PATH-1, v56b shape: tanks deliver 120 (no shortfall), NO UV word → the UV principal
+    // is synthesised from the hygiene signal + delivered flow; delivered-storage total minted;
+    // fertigation explicit total minted; NO reserve tank.
+    const aMods = mkMods([tankWord('Fresh Water Tank', 40, 1), tankWord('Drain Water Tank', 40, 2)])
+    const aC = uvContract()
+    applyUniversalContractSizing(aMods, aC, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: storageMetric })
+    // (b) PATH-2 ALONE, same shape → same coverage via the reconcile's canons.
+    const bMods = mkMods([tankWord('Fresh Water Tank', 40, 1), tankWord('Drain Water Tank', 40, 2)])
+    const bC = uvContract()
+    reconcilePrincipalEquipment(bMods, bC, { briefMetrics: storageMetric })
+    // (c) grounded UV word PRESENT + the uv_disinfection_* quantity family present (the
+    // real v55 shape — the group is synthesisable) → NO synthetic twin in EITHER path.
+    const cMods = mkMods([tankWord('Fresh Water Tank', 40, 1), tankWord('Drain Water Tank', 40, 2), uvWord()])
+    const cC = uvContract()
+    cC.quantities.uv_disinfection_throughput_m3_h = { value: 90, unit: 'm³/h', source: 'calculator' }
+    cC.quantities.uv_disinfection_power_kw = { value: 4.1, unit: 'kW', source: 'calculator' }
+    cC.quantities.uv_disinfection_count = { value: 1, unit: 'off', source: 'calculator' }
+    applyUniversalContractSizing(cMods, cC, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: storageMetric })
+    reconcilePrincipalEquipment(cMods, cC, { briefMetrics: storageMetric })
+    // (d) STORAGE SHORTFALL: words deliver only 40 vs the 120 pin → reserve tanks synthesised
+    // summing the shortfall (80 m³), delivered total = 120.
+    const dMods = mkMods([tankWord('Fresh Water Tank', 40, 1)])
+    const dC = uvContract()
+    applyUniversalContractSizing(dMods, dC, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: storageMetric })
+    // (e) BESS-like contract (no hygiene noun, energy-family metric) → byte-identical.
+    const eBess: any = { quantities: { nameplate_capacity_kwh: { value: 3500, unit: 'kWh' }, rack_count: { value: 15, unit: '' } } }
+    const eBefore = JSON.stringify(eBess)
+    applyUniversalContractSizing(mkMods([]), eBess, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: [{ key_metric: 'nameplate_capacity_kwh', value: 3500, unit: 'kWh', category: 'scale' }] })
+    // (f) duty/standby NON-corroborated pair → NO fertigation-style total restated.
+    const fC: any = { quantities: {
+      irrigation_demand_m3_h: { value: 90, unit: 'm³/h', source: 'calculator' },
+      drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+      drain_transfer_pump_count: { value: 2, unit: '', source: 'brief' },
+    } }
+    applyUniversalContractSizing(mkMods([]), fC, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+    out.push(assertEq(
+      'UNIVERSAL.demand_coverage_disinfection_storage_and_per_unit_total_both_paths',
+      'a hygiene-critical loop (potable/irrigation/fertigation/recirculating nouns) with NO disinfection word/quantity gets a UV principal sized by the validated-dose rule (flow × 40 mJ/cm² ⇒ ~0.046 kWe per m³/h) in BOTH synthesis paths; a grounded disinfection word suppresses the twin; a brief STORAGE pin (volume-family metric) is DELIVERED — tank principals summing to the pin are synthesised on shortfall, and the `_delivered_m3` total is minted either way; a per-unit rate × count mints its explicit corroborated `_total_m3_h` twin; BESS-like contracts and non-corroborated duty/standby pairs are untouched',
+      JSON.stringify({
+        aUvWords: wordCount(aMods, /^uv disinfection$/i),
+        aUvFlow: qv(aC, 'uv_disinfection_throughput_m3_h'),
+        aUvKw: qv(aC, 'uv_disinfection_power_kw'),
+        aDelivered: qv(aC, 'water_storage_delivered_m3'),
+        aNoReserve: qv(aC, 'water_storage_reserve_tank_count') === undefined,
+        aFertTotal: qv(aC, 'fertigation_dosing_total_m3_h'),
+        bUvWords: wordCount(bMods, /^uv disinfection$/i),
+        bDelivered: qv(bC, 'water_storage_delivered_m3'),
+        cUvTotal: wordCount(cMods, /uv disinfection/i),
+        cGroundedKept: wordCount(cMods, /^uv disinfection unit$/i),
+        dReserveWords: wordCount(dMods, /water storage reserve tank/i),
+        dReserveEach: qv(dC, 'water_storage_reserve_tank_volume_each_m3'),
+        dReserveCnt: qv(dC, 'water_storage_reserve_tank_count'),
+        dDelivered: qv(dC, 'water_storage_delivered_m3'),
+        eBessUntouched: JSON.stringify(eBess) === eBefore,
+        fNoTotal: Object.keys(fC.quantities).every((k: string) => !/_total_m3_h$/.test(k)),
+      }),
+      (v) => {
+        const o = JSON.parse(v as unknown as string)
+        return o.aUvWords === 1 && o.aUvFlow === 90 && o.aUvKw > 3.5 && o.aUvKw < 5 &&
+          o.aDelivered === 120 && o.aNoReserve === true && o.aFertTotal === 90 &&
+          o.bUvWords === 1 && o.bDelivered === 120 &&
+          o.cUvTotal === 1 && o.cGroundedKept === 1 &&
+          o.dReserveWords === 1 && o.dReserveEach === 40 && o.dReserveCnt === 2 && o.dDelivered === 120 &&
+          o.eBessUntouched === true && o.fNoTotal === true
+      },
+      (v) => `result=${v}`,
+    ))
+  }
+
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
   // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
   // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a

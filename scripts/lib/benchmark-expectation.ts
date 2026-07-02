@@ -192,7 +192,10 @@ const worstOf = (vs: Verdict[]): Verdict =>
 export function canonicalMeasure(value: number, unit: string): { v: number; family: string } | null {
   const v = Number(value)
   if (!Number.isFinite(v)) return null
-  const u = String(unit || '').toLowerCase().replace(/\s/g, '')
+  // superscript normalisation (gate-36 round 2): 'm³/h' ≡ 'm3/h' — unknown units compare by
+  // their RAW string as the family, so the unicode/ascii split silently excluded a matching
+  // quantity (the demand-coverage delivered totals are minted ascii; the LLM predicts unicode).
+  const u = String(unit || '').toLowerCase().replace(/\s/g, '').replace(/³/g, '3').replace(/²/g, '2')
   if (/^wh$/.test(u)) return { v: v / 1000, family: 'energy' }
   if (/^kwh$/.test(u)) return { v, family: 'energy' }
   if (/^mwh$/.test(u)) return { v: v * 1000, family: 'energy' }
@@ -281,7 +284,22 @@ export function engineValueForMetric(
       let overlap = 0
       for (const t of wantToks) if (kt.has(t)) overlap++
       if (overlap === 0) continue
-      const score = overlap - (/peak|max|surge|inrush/.test(norm(key)) ? 0.5 : 0)
+      // SCOPE PREFERENCE (gate-36 round 2 — the v56b storage 40-vs-120 false-RADICAL): when
+      // several keys tie on token overlap, the diff must read the DELIVERED SYSTEM TOTAL,
+      // never a per-scope/per-unit sibling. The tie used to fall to Object insertion order,
+      // so the benchmark's 'storage' = 120 m³ matched fresh_water_storage_capacity_m3 = 40
+      // (fresh-only) while water_storage_capacity_m3 = 120 + the delivered tank total sat
+      // beside it; and 'fertigation_dosing_capacity' = 90 matched the PER-UNIT pump 45 (×2).
+      // Honest-scoring doctrine: match the DELIVERED quantity. A `delivered` key (the
+      // demand-coverage delivered-total convention) outranks a `total/overall` roll-up,
+      // which outranks everything else; a per-share/per-unit key (`_per_…` / `_each_…`)
+      // never takes the delivered bonus and is slightly de-prioritised, like peak/max.
+      const nk = norm(key)
+      const isPerShare = /(^|_)(per|each)(_|$)/.test(nk)
+      const scopeBonus = isPerShare ? -0.25
+        : /(^|_)delivered(_|$)/.test(nk) ? 0.5
+        : /(^|_)(total|overall|aggregate|combined)(_|$)/.test(nk) ? 0.25 : 0
+      const score = overlap + scopeBonus - (/peak|max|surge|inrush/.test(nk) ? 0.5 : 0)
       if (!best || score > best.score) best = { key, q, score }
     }
   }
@@ -588,6 +606,18 @@ export function routeFaults(faults: Fault[], state: any): Array<Fault & { source
     let line = rb.find(r => key && norm(r.tag) === key)
       || rb.find(r => key && (norm(r.requirement).includes(key) || key.includes(norm(r.requirement).split(' ').slice(0, 3).join(' '))))
       || rb.find(r => key && norm(r.requirement).startsWith(key.split(' ').slice(0, 2).join(' ')))
+    // MULTI-TAG FAULT LINES (gate-36 round 2): the diagnose LLM often names a FAMILY of
+    // lines in one fault ("C59, C05, C23, C29, C07 … (all ~60 water-connection lines)" /
+    // "C51–C73 (electrical connections)") — the whole string matches no row, so the fault
+    // used to land UNROUTED with basis '—' and no source rule. Route it by its FIRST tag
+    // token (the family shares one pricing rule, so any member's basis is the provenance).
+    if (!line && key) {
+      const firstTok = norm(String(f.line).split(/[,;(]|\s+and\s+|…|–|–/)[0])
+      if (firstTok && firstTok !== key) {
+        line = rb.find(r => norm(r.tag) === firstTok)
+          || rb.find(r => norm(r.requirement).includes(firstTok))
+      }
+    }
     const basis = line ? String(line.basis || '') : ''
     const routed: Fault & { source: SourceRule | null; basis: string; brief_pinned?: boolean } =
       { ...f, basis, source: basis ? sourceRuleForBasis(basis) : null }
@@ -609,6 +639,24 @@ export function routeFaults(faults: Fault[], state: any): Array<Fault & { source
         routed.issue = `brief-mandated size — ${pinLabel} pins this volume; the benchmark envelope simply assumes `
           + `smaller storage. Not an engine fault. (was: ${f.issue})`
       }
+    }
+    // INSTALLED-vs-COMPONENT downgrade (gate-36 round 2): a COST fault on a routed
+    // connection run whose basis STATES the installed scope (supply + install: pipe/cable +
+    // fittings/supports/jointing + labour + terminations) but whose complaint compares it to
+    // bare-component prices (fittings £50-150, terminations £15-40) is comparing two
+    // different scopes — the benchmark priced the FITTING, the engine priced the INSTALLED
+    // RUN. Downgrade to an informational note (the basis is defensible engineering, stated
+    // on the line); a cost fault on a connection whose basis does NOT state installed scope
+    // still routes as a real fault.
+    if (!routed.brief_pinned && /cost/i.test(String(f.dimension || ''))
+      && routed.source?.rule === 'connection-sizing'
+      && /supply\s*\+\s*install|installed/i.test(basis)
+      && /fitting|termination|bare|per\s+(cable|connection|valve)|absorb/i.test(`${f.issue || ''} ${f.suggested || ''}`)) {
+      ;(routed as any).installed_basis = true
+      routed.dimension = 'note'
+      routed.issue = `installed-cost basis stated — the line price is the INSTALLED run (supply + installation `
+        + `labour + fittings/supports + terminations, per the line's basis), while the benchmark compared `
+        + `bare-component prices. Not an engine fault. (was: ${f.issue})`
     }
     return routed
   })
@@ -823,6 +871,71 @@ function _selftest() {
     ] as any, st)
     if (sep[0]?.brief_pinned) {
       console.log('FAIL: "2 031 m³" (narrow-space thousands) wrongly pinned to the 40 m³ brief item'); bad++
+    }
+  }
+  // ── GATE-36 ROUND 2 (2026-07-03, v56b) — proveCatch both directions per rule ──
+  // (v8) DELIVERED-TOTAL SCOPE PREFERENCE: on a token-overlap tie the diff reads the
+  // DELIVERED system total, never a per-scope/per-unit sibling. The v56b shape: 'storage'
+  // = 120 m³ matched the FIRST-inserted fresh_water_storage_capacity_m3 = 40 (fresh-only)
+  // → a 0.33× false-RADICAL while the delivered 120 m³ sat beside it.
+  {
+    const qs: any = {
+      fresh_water_storage_capacity_m3: { value: 40, unit: 'm3' },
+      water_storage_capacity_m3: { value: 120, unit: 'm³' },
+      total_water_storage_volume_m3: { value: 261.6, unit: 'm3' },
+      water_storage_delivered_m3: { value: 120, unit: 'm3' },
+    }
+    const got = engineValueForMetric('storage', 'm³', qs, {})
+    if (!got || got.v !== 120 || got.source !== 'contract.water_storage_delivered_m3') {
+      console.log(`FAIL: 'storage' must match the DELIVERED total (120, water_storage_delivered_m3; got ${JSON.stringify(got)})`); bad++
+    }
+    // without a delivered key the total/overall roll-up outranks the per-scope sibling
+    const qs2: any = { fresh_water_storage_capacity_m3: qs.fresh_water_storage_capacity_m3, total_water_storage_volume_m3: { value: 120, unit: 'm3' } }
+    const got2 = engineValueForMetric('storage', 'm³', qs2, {})
+    if (!got2 || got2.v !== 120) { console.log(`FAIL: total_* roll-up must outrank the per-scope key (got ${JSON.stringify(got2)})`); bad++ }
+    // the fertigation per-unit misread: capacity 90 total, pump 45 per-unit ×2, explicit total 90
+    const qs3: any = {
+      fertigation_dosing_pump_throughput_m3_h: { value: 45, unit: 'm³/h' },
+      fertigation_dosing_pump_count: { value: 2, unit: '' },
+      fertigation_dosing_capacity_m3_per_hr: { value: 90, unit: 'm³/h' },
+      fertigation_dosing_total_m3_h: { value: 90, unit: 'm3/h' },
+    }
+    const got3 = engineValueForMetric('fertigation_dosing_capacity', 'm³/h', qs3, {})
+    if (!got3 || got3.v !== 90 || got3.source !== 'contract.fertigation_dosing_total_m3_h') {
+      console.log(`FAIL: fertigation must match the explicit delivered total 90, never the per-unit 45 (got ${JSON.stringify(got3)})`); bad++
+    }
+    // counter-direction: a per-share `_per_…_delivered_` key must NOT outrank the system value
+    const qs4: any = {
+      irrigation_demand_m3_h: { value: 90, unit: 'm³/h' },
+      irrigation_per_department_delivered_m3_h: { value: 45, unit: 'm3/h' },
+    }
+    const got4 = engineValueForMetric('irrigation_capacity', 'm³/h', qs4, {})
+    if (!got4 || got4.v !== 90) { console.log(`FAIL: a per-share delivered key must not beat the system value (got ${JSON.stringify(got4)})`); bad++ }
+  }
+  // (v9) INSTALLED-vs-COMPONENT DOWNGRADE + MULTI-TAG ROUTING: a cost fault comparing an
+  // installed connection run to bare-fitting prices downgrades to a note when the basis
+  // STATES the installed scope; the same complaint without the stated scope stays a fault;
+  // a multi-tag family line ("C59, C05, …") routes by its first tag instead of UNROUTED.
+  {
+    const st = { requirementsBom: [
+      { tag: 'C59', requirement: 'water connection: Uf Module Bank → Fresh Water Tank · 5 m3/h',
+        basis: 'pipe £36/m @ DN32 (HDPE/PVC-U) × 22.1 m + 2 ends · installed cost — supply + installation labour + terminations included', line_gbp: 975 },
+      { tag: 'C60', requirement: 'water connection: Pump → Tank · 5 m3/h',
+        basis: 'pipe £36/m @ DN32 (HDPE/PVC-U) × 10 m + 2 ends', line_gbp: 500 },
+    ] }
+    const routed = routeFaults([
+      { line: 'C59, C05, C23 … (all ~60 water-connection lines)', dimension: 'cost',
+        issue: 'Individual pipe runs priced £900–£2400 each; realistic small-bore irrigation fittings are £50–£150',
+        magnitude: '~10-20× too high per line', suggested: '£80–£150 per connection', likely_cause: 'overpriced fittings' },
+      { line: 'C60', dimension: 'cost',
+        issue: 'pipe run priced £500; realistic fittings are £50–£150', magnitude: '~4×', suggested: '£100', likely_cause: 'overpriced' },
+    ] as any, st)
+    if (!((routed[0] as any)?.installed_basis === true && routed[0]?.dimension === 'note'
+      && /installed-cost basis stated/.test(routed[0]?.issue || '') && routed[0]?.source?.rule === 'connection-sizing')) {
+      console.log(`FAIL: installed-scope connection cost fault not downgraded (got ${JSON.stringify(routed[0])})`); bad++
+    }
+    if ((routed[1] as any)?.installed_basis || routed[1]?.dimension !== 'cost') {
+      console.log(`FAIL: a connection WITHOUT stated installed scope must stay a real cost fault (got ${JSON.stringify(routed[1])})`); bad++
     }
   }
   console.log(bad === 0 ? 'benchmark-expectation selftest: OK' : `benchmark-expectation selftest: ${bad} FAIL`)

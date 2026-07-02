@@ -597,7 +597,12 @@ function isSynthesisable(g: EquipGroup): boolean {
     return true
   }
   if ((g.throughput !== undefined && g.throughput >= 10) || (g.power !== undefined && g.power >= 15)) {
-    return phraseLooksLikeDevice(g.phrase)
+    // a DISINFECTION STAGE (uv / disinfect / steril / ozone / chlorinat) is a real process
+    // unit even though its noun is a "-tion" process word — 'uv_disinfection' failed
+    // phraseLooksLikeDevice, so the calculator-sized UV existed as quantities on v54–v56b
+    // yet only rendered when the generator happened to emit the word (the UV coin-flip).
+    // Keyed on the stage noun family, universal, no class table (gate-36 round 2).
+    return phraseLooksLikeDevice(g.phrase) || isDisinfectionPhrase(g.phrase)
   }
   return false
 }
@@ -678,6 +683,63 @@ function sizeCleaningServiceVessels(modules: ModuleLike[], quantities: Record<st
   }
   return sized
 }
+
+// ── DISINFECTION-STAGE + STORAGE-DELIVERY machinery (gate-36 round 2, 2026-07-03) ─────────
+// THE BUGS (fischer-codema v54→v56b): (1) UV COIN-FLIP — the contract carried
+// uv_disinfection_{throughput,power,count} on all four runs, but the principal only existed
+// when the GENERATOR happened to emit a UV word (v54/v55 yes, v56/v56b no): the group phrase
+// 'uv_disinfection' fails phraseLooksLikeDevice ('disinfection' is a "-tion" process noun),
+// so isSynthesisable refused it and neither synthesis path ever minted the unit. A hygiene-
+// critical water loop lost its disinfection stage on generator whim. (2) STORAGE PIN — the
+// brief pins a total storage volume (water_storage_capacity_m3 = 120, "three 40 m³ tanks");
+// nothing GUARANTEED the delivered tank principals sum to it, and no DELIVERED-total quantity
+// existed for a compliance/benchmark reader (the per-scope fresh_water_storage_capacity_m3 =
+// 40 read as "the storage" → the gate-36 0.33× false-RADICAL).
+// THE RULES (universal — nouns + quantity-key semantics, no class table):
+//   · a disinfection-stage phrase (uv / disinfect / steril / ozone / chlorinat) IS a device
+//     for synthesisability, and rule 5 mints its quantities from the validated-dose rule
+//     when a hygiene-critical loop has NO disinfection at all;
+//   · an existing disinfection WORD suppresses the synthetic principal in BOTH paths
+//     (grounded delivery always wins — no twin);
+//   · rule 6 sums the DELIVERED storage-vessel principals against every brief storage pin,
+//     synthesises the shortfall as real tank principals, and mints the `_delivered_m3`
+//     total either way so every reader diffs the DELIVERED quantity, never a per-scope key.
+const DISINFECTION_STAGE_WORD_RE = /(^|\s)uv(\s|$)|disinfect|steril|ozon|chlorinat/i
+function isDisinfectionPhrase(s: string): boolean {
+  return DISINFECTION_STAGE_WORD_RE.test(String(s ?? '').replace(/[_-]/g, ' '))
+}
+// hygiene-critical loop signal (potable / drinking / irrigation / fertigation / hygiene /
+// recirculating water) — the brief/contract noun families whose water demands a disinfection
+// stage. BESS / SAF / CO₂ carry none of these → strict no-op.
+const HYGIENE_CRITICAL_RE = /potable|drinking|irrigat|fertigat|hygien|recircul/i
+// UV electrical demand per delivered flow: the P1 validated-dose rule — 40 mJ/cm² validated
+// dose (potable/reuse practice, DVGW/USEPA) at typical UVT ⇒ ≈ 0.046 kWe per m³/h delivered
+// (matches the water-treatment calculator: 90 m³/h → 4.1 kW).
+const UV_DOSE_MJ_CM2 = 40
+const UV_KW_PER_M3H = 0.046
+/** True when the design already carries a disinfection-stage WORD (any UV / ozone /
+ *  steriliser / chlorination unit). Instruments (a UV-intensity sensor) and sub-components
+ *  never count — they monitor the stage, they are not the stage. `groundedOnly` restricts
+ *  to non-synthesised words (the reconcile's suppression test: a grounded unit owns the
+ *  function; a synth twin from a prior pass is reconciled via its canon instead). */
+function modulesHaveDisinfectionWord(mods: ModuleLike[], groundedOnly = false): boolean {
+  for (const m of mods ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (isSubcomponent(w) || isInstrument(w) || isFieldInstrumentByName(w)) continue
+    if (groundedOnly && isSynth(w)) continue
+    if (isDisinfectionPhrase(wordRoleText(w))) return true
+  }
+  return false
+}
+// storage-pin metric noun test (mirrors benchmark-expectation briefPinnedVolumesM3) + the
+// vessel nouns whose capacity counts as DELIVERED storage.
+const STORAGE_METRIC_NOUN_RE = /storage|store|tank|buffer|reservoir/i
+const STORAGE_VESSEL_NOUN_RE = /\btanks?\b|\bvessels?\b|\bsilos?\b|\breservoirs?\b|\bcisterns?\b|\bbasins?\b|\bdrums?\b/i
+// a rule-6 SHORTFALL-coverage group ('<core>_reserve_tank') exists precisely BECAUSE the
+// existing vessel words do NOT cover the pin — a loose stem overlap ('water'+'tank') must
+// never let an existing tank ADOPT it (that both suppresses the reserve synthesis AND
+// stamps the reserve count onto the grounded tank). Only a word that FULLY contains the
+// group's stems (its own synth word on a re-run) may match it.
+const RESERVE_COVERAGE_PHRASE_RE = /(^|_)reserve_tank$/i
 
 // ── cleanup (Round 3): physics-first BoM — drop the skeleton's leftover junk ──
 // Small generic detailed-design filler that is never PRINCIPAL equipment (keeps it
@@ -1270,6 +1332,160 @@ export function mintDemandCoverage(
             `demand-coverage: delivered flow for brief metric ${bKey} = ${flowCands[0].key} (${flowCands[0].value} m³/h)${sharesBasis} — derives from the design's delivered quantity, never the target (a genuine shortfall stays a FAIL)`)
         }
       }
+    }
+  }
+  // ── rule 5: DISINFECTION-STAGE COVERAGE (gate-36 round 2 — the v54/v55-present,
+  // v56/v56b-absent UV coin-flip; see the DISINFECTION-STAGE block comment). A POTABLE /
+  // IRRIGATION / HYGIENE-critical water loop requires a disinfection stage. When (a) a
+  // hygiene-critical signal exists in the contract keys or brief metrics, (b) NO
+  // disinfection quantity family exists, and (c) NO disinfection word exists in the design,
+  // mint the uv_disinfection_* quantities sized by the validated-dose rule (40 mJ/cm² at
+  // the delivered hygiene flow ⇒ ~0.046 kWe/(m³/h)); buildGroups + the disinfection-stage
+  // synthesisable rule then mint the principal in BOTH paths. An existing disinfection
+  // WORD (v55's grounded UV unit) or quantity family (the calculator ran) suppresses the
+  // mint entirely — grounded delivery always wins. No hygiene noun (BESS / SAF / CO₂) or
+  // no delivered hygiene flow → strict byte-identical no-op (never fabricate).
+  if (mods.length > 0) {
+    const hygieneSignal =
+      Object.keys(quantities).some((k) => HYGIENE_CRITICAL_RE.test(k)) ||
+      briefMetrics.some((met) => HYGIENE_CRITICAL_RE.test(String(met?.key_metric ?? met?.metric ?? met?.name ?? '')))
+    const disinfectionQtyExists = Object.keys(quantities).some((k) => isDisinfectionPhrase(k))
+    if (hygieneSignal && !disinfectionQtyExists && !modulesHaveDisinfectionWord(mods)) {
+      let flow = 0
+      let flowKey = ''
+      for (const [k, v] of Object.entries(quantities)) {
+        if (!Number.isFinite(v) || v <= 0) continue
+        if (!/_m3_h$|_m3_hr$|_m3_per_hr$/.test(k)) continue
+        if (FLOW_ECHO_TOKEN_RE.test(k) || SERVICE_LINE_FLOW_KEY_RE.test(k) || /(^|_)(calc|computed)_/i.test(k)) continue
+        if (!HYGIENE_CRITICAL_RE.test(k)) continue // size at the hygiene-critical delivery, not a stray duty
+        if (v > flow) { flow = v; flowKey = k }
+      }
+      if (flow > 0) {
+        const uvKw = Math.round(flow * UV_KW_PER_M3H * 10) / 10
+        const doseDetail =
+          `demand-coverage: disinfection-stage coverage — a hygiene-critical loop (${flowKey}) requires a ` +
+          `disinfection stage; sized by the validated-dose rule (${UV_DOSE_MJ_CM2} mJ/cm² at the delivered ` +
+          `${flow} m³/h ⇒ ~${UV_KW_PER_M3H} kWe per m³/h). Suppressed whenever a disinfection word or quantity already exists.`
+        mint('uv_disinfection_throughput_m3_h', flow, 'm3/h', 'flow_rate', flowKey, doseDetail)
+        mint('uv_disinfection_power_kw', uvKw, 'kW', 'power', flowKey, doseDetail)
+        mint('uv_disinfection_count', 1, '', 'count', flowKey, doseDetail)
+      }
+    }
+  }
+  // ── rule 6: STORAGE DELIVERY COVERAGE (gate-36 round 2 — the v56b storage 40-vs-120
+  // false-RADICAL; see the STORAGE-DELIVERY block comment). Every brief STORAGE pin
+  // (volume-family target metric whose name reads storage/tank/buffer) must be DELIVERED:
+  // sum the design's storage-vessel principals in the pin's token family (capacity × qty;
+  // cleaning/CIP vessels excluded — a cleaning charge is not brief storage); synthesise the
+  // shortfall as real tank principals (`<core>_reserve_tank_volume_each_m3` + `_count` →
+  // buildGroups mints the words in BOTH paths); and mint `<core>_delivered_m3` either way so
+  // compliance + the benchmark diff the DELIVERED total, never a per-scope sibling. The
+  // delivered value derives from the words (+ the synthesised principals that WILL be
+  // delivered) — never a bare echo of the target. No storage pin (BESS/SAF/CO₂) → no-op.
+  if (mods.length > 0 && briefMetrics.length > 0) {
+    for (const met of briefMetrics) {
+      const bKey = String(met?.key_metric ?? met?.metric ?? met?.name ?? '').toLowerCase().trim()
+      const target = Number(met?.value)
+      if (!bKey || !Number.isFinite(target) || target <= 0) continue
+      if (matcherUnitFamily(met?.unit ?? '') !== 'volume_m3') continue
+      if (!STORAGE_METRIC_NOUN_RE.test(bKey.replace(/_/g, ' '))) continue
+      const idTokens = [...matcherIdentityTokens(matcherNormName(bKey))]
+        .filter((t) => !METRIC_QUALIFIER_TOKENS.has(t)).map(depluralToken)
+      if (idTokens.length === 0) continue
+      const core = idTokens.join('_')
+      if (Object.prototype.hasOwnProperty.call(quantities, `${core}_delivered_m3`)) continue // idempotent (path 2 re-run)
+      const items: string[] = []
+      let delivered = 0
+      let refEach = 0
+      for (const m of mods) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+        if (isInstrument(w) || isSubcomponent(w)) continue
+        const name = String(w.name_human ?? '')
+        if (!STORAGE_VESSEL_NOUN_RE.test(name)) continue
+        if (isCleaningRolePhrase(wordRoleText(w))) continue
+        const wToks = new Set((name.toLowerCase().match(/[a-z]+/g) ?? []).map(depluralToken))
+        if (!idTokens.some((t) => wToks.has(t))) continue
+        const wm = w.modifier_characters ?? []
+        const capMod = wm.find((mc) => mc.kind === 'capacity' && /m³|m3/.test(`${mc.unit ?? ''} ${mc.value ?? ''}`))
+        const each = capMod ? (parseFloat(String(capMod.value)) || 0) : 0
+        if (!(each > 0)) continue
+        const qtyMod = wm.find((mc) => mc.kind === 'quantity')
+        const qn = qtyMod ? (parseInt(String(qtyMod.value).replace(/[^\d]/g, ''), 10) || 1) : 1
+        delivered += each * qn
+        refEach = Math.max(refEach, each)
+        items.push(`${name} ${qn}× ${each} m³`)
+      }
+      const shortfall = target - delivered
+      let mintedReserveM3 = 0
+      if (shortfall >= Math.max(1, target * 0.02)) {
+        // shortfall tanks at the family's grounded unit size (else one tank) — real principals,
+        // synthesised by the normal buildGroups path, so the pin is DELIVERED, not asserted.
+        const eachRef = refEach > 0 ? Math.min(refEach, shortfall) : shortfall
+        const cnt = Math.max(1, Math.ceil(shortfall / eachRef - 1e-9))
+        const each = Math.round((shortfall / cnt) * 100) / 100
+        const reserveDetail =
+          `demand-coverage: storage shortfall coverage for brief metric ${bKey} = ${target} m³ pinned − ` +
+          `${Math.round(delivered * 100) / 100} m³ delivered by the design's storage vessels (${items.join(' + ') || 'none'}) → ` +
+          `${cnt}× ${each} m³ reserve tank(s) synthesised so the pinned volume is DELIVERED (suppressed when the grounded words already deliver it)`
+        mint(`${core}_reserve_tank_volume_each_m3`, each, 'm³', 'volume', bKey, reserveDetail)
+        mint(`${core}_reserve_tank_count`, cnt, '', 'count', bKey, reserveDetail)
+        mintedReserveM3 = each * cnt
+        items.push(`${titleCase(`${core}_reserve_tank`)} ${cnt}× ${each} m³ (synthesised shortfall coverage)`)
+      }
+      const deliveredTotal = Math.round((delivered + mintedReserveM3) * 100) / 100
+      if (deliveredTotal > 0) {
+        mint(`${core}_delivered_m3`, deliveredTotal, 'm3', 'volume_m3', bKey,
+          `demand-coverage: DELIVERED storage total for brief metric ${bKey} = ${items.join(' + ')} — ` +
+          `sums the design's storage-vessel principals (capacity × qty), never the target echo, so a genuine shortfall stays visible`)
+      }
+    }
+  }
+  // ── rule 7: PER-UNIT × COUNT DELIVERED-TOTAL TWIN (gate-36 round 2 — the v56b
+  // fertigation 45-vs-90 misread: fertigation_dosing_pump_throughput_m3_h = 45 PER UNIT with
+  // fertigation_dosing_pump_count = 2 delivers 90 m³/h, but no key SAID so explicitly and a
+  // reader (the benchmark net included) took the per-unit 45 as the system delivery). For a
+  // per-unit rate key with a counted sibling (≥2), mint the explicit `<family>_total_m3_h`
+  // twin with per-unit × count lineage — ONLY when the design already corroborates that
+  // total in the same distinctive-token family (±2%): a duty/standby pair whose combined
+  // flow is NOT the system delivery must never be restated as one (no new arithmetic claim,
+  // only explicit lineage). No counted rate / no corroboration → no mint. ──
+  {
+    const r7Keys = Object.keys(quantities)
+    for (const k of r7Keys) {
+      const v = quantities[k]
+      if (!Number.isFinite(v) || v <= 0) continue
+      const m = /^(.+)_(throughput|flow|capacity|delivery)_(m3_h|m3_hr|m3_per_hr)$/.exec(k)
+      if (!m) continue
+      if (FLOW_ECHO_TOKEN_RE.test(k) || SERVICE_LINE_FLOW_KEY_RE.test(k) || /(^|_)(calc|computed)_/i.test(k)) continue
+      const stem = m[1]
+      if (isPureAggregatePhrase(stem) || /(^|_)(total|delivered)(_|$)/.test(stem)) continue
+      const cnt = quantities[`${stem}_count`]
+      if (!Number.isFinite(cnt) || cnt < 2 || Math.abs(cnt - Math.round(cnt)) > 1e-9) continue
+      const total = Math.round(v * cnt * 1000) / 1000
+      const distinctive = stem.split('_')
+        .filter((t) => t.length >= 2 && !GENERIC_ENDPOINT_TOKENS.has(t)).map(depluralToken)
+      if (distinctive.length === 0) continue
+      const inFamily = (k2: string): boolean => {
+        const kt = new Set(k2.split('_').map(depluralToken))
+        return distinctive.some((t) => kt.has(t))
+      }
+      // family already states an explicit total/delivered flow → nothing to restate
+      if (r7Keys.some((k3) => k3 !== k && /(^|_)(total|delivered)(_|$)/.test(k3) &&
+        /_m3_h$|_m3_hr$|_m3_per_hr$/.test(k3) && inFamily(k3))) continue
+      let corrKey = ''
+      let corrVal = 0
+      for (const k2 of r7Keys) {
+        if (k2 === k || k2 === `${stem}_count`) continue
+        const v2 = quantities[k2]
+        if (!Number.isFinite(v2) || v2 <= 0) continue
+        if (!/_m3_h$|_m3_hr$|_m3_per_hr$/.test(k2) || SERVICE_LINE_FLOW_KEY_RE.test(k2)) continue
+        if (!inFamily(k2)) continue
+        if (Math.abs(v2 - total) / total <= 0.02) { corrKey = k2; corrVal = v2; break }
+      }
+      if (!corrKey) continue
+      const famBase = stem.replace(/_(pumps?|blowers?|compressors?|fans?)$/i, '') || stem
+      mint(`${famBase}_total_m3_h`, total, 'm3/h', 'flow_rate', k,
+        `demand-coverage: DELIVERED total = ${v} m³/h per unit × ${Math.round(cnt)} units (${k} × ${stem}_count), ` +
+        `corroborated by ${corrKey} = ${corrVal} m³/h — the explicit system total, so no reader mistakes the per-unit figure for the delivery`)
     }
   }
   return minted
@@ -2160,6 +2376,11 @@ interface UtilitySpec {
   labelOf?: (q: Record<string, number>) => string
   module: RegExp
   size: (d: number) => { dim: string; rating: [string, string]; gbp: number }
+  // OPTIONAL basis: the STATED derivation of the £ estimate (what the price includes + the
+  // class formula), stamped as a `price_basis` modifier so the BoM row carries an auditable
+  // basis string instead of a bare "catalogue-class budget" (gate-36 round 2 — the SCADA
+  // £62,650 read as an unexplained outlier because nothing STATED £60k base + £50/kW).
+  basis?: (d: number) => string
   // `form` may read the full contract quantities (2nd arg) to make its rationale conditional
   // on a PHYSICAL signal (e.g. a nitrification / bio-process key) rather than asserting a
   // fixed archetype rationale. Specs that don't need it keep the single-arg `(d) => …` form.
@@ -2238,6 +2459,7 @@ function utilityWord(spec: UtilitySpec, d: number, category: 'utility' | 'proces
   if (s.dim) mods.push(mod('dimension', s.dim))
   mods.push(mod('rating_primary', s.rating[0], s.rating[1]))
   mods.push(mod('price_estimate_gbp', String(Math.max(1, Math.round(s.gbp)))))
+  if (spec.basis) mods.push(mod('price_basis', spec.basis(d)))
   mods.push(mod('form', spec.form(d, quantities)))
   mods.push(mod('part_number', 'TBD (catalogue class)'))
   mods.push(mod('lifecycle', `Concept design — ${category === 'process' ? 'process-support' : 'balance-of-plant'} system sized from the contract duty; exact MPN at detailed design`))
@@ -2406,6 +2628,9 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
     form: (kgd) => `Gravity thickener + rotary-screen / belt dewatering + skip; concentrates ~${Math.round(kgd)} kg/day captured solids to a haulable cake for off-site disposal` },
   { key: 'scada', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'SCADA / Plant Control System', module: /control|compute|scada|sensing|instrument/,
     size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW plant'], gbp: Math.round(60000 + kw * 50) }),
+    // stated basis (gate-36 round 2): the £ is a whole-system supply+install budget, not a
+    // panel price — state WHAT it includes + the class formula so a reader can audit it.
+    basis: (kw) => `installed process system — catalogue-class budget: £60k base (redundant PLC racks + SCADA servers + operator HMIs + I/O + plant network + software licences + panel build + commissioning; supply + install) + £50/kW × ~${Math.round(kw)} kW connected plant load`,
     // The closed-loop list is DERIVED from the measurement quantities the contract actually
     // carries (level / temperature / DO / pH / flow / pressure / conductivity), never a fixed
     // RAS string — a CO₂/SAF plant lists the loops IT measures, not "DO / pH". Generic fallback
@@ -3639,7 +3864,13 @@ export function reconcilePrincipalEquipment(
   // reconcile re-mints principals from the contract LATER in the chain, and because the aggregate
   // is dropped from `canons`, the reconcile's invented-removal also deletes any pre-existing copy.
   const allSynth = buildGroups(quantities).filter(isSynthesisable)
+  // a GROUNDED disinfection word (v55's generator-emitted UV unit — non-synth, so it can
+  // never claim a canon below) owns the disinfection function: drop the disinfection canon
+  // so the reconcile never mints a synth twin beside it. A prior pass's SYNTH UV word keeps
+  // its canon and is reconciled through the normal exact-id claim (gate-36 round 2).
+  const groundedDisinfectionWordExists = modulesHaveDisinfectionWord(modules ?? [], true)
   const principalGroups = allSynth.filter((g) => {
+    if (isDisinfectionPhrase(g.phrase) && groundedDisinfectionWordExists) return false
     if (isPureAggregatePhrase(g.phrase) && g.volume !== undefined) {
       const constituents = allSynth.filter(
         (o) => o !== g && o.volume !== undefined && o.volume >= 1 && !isPureAggregatePhrase(o.phrase),
@@ -4132,6 +4363,8 @@ export function applyUniversalContractSizing(
         for (const g of groups) {
           if (wIsCleaningRole !== isCleaningRolePhrase(g.phrase)) continue
           if (wIsElectricalDevice && groupIsFluidSized(g)) continue
+          // rule-6 shortfall group: full-stem containment only (see RESERVE_COVERAGE_PHRASE_RE)
+          if (RESERVE_COVERAGE_PHRASE_RE.test(g.phrase) && !g.stems.every((s) => wStems.includes(s))) continue
           const sc = scoreMatch(wStems, g)
           if (sc < minScore) continue
           if (sc > bestScore || (sc === bestScore && best && completeness(g) > completeness(best))) {
@@ -4166,10 +4399,15 @@ export function applyUniversalContractSizing(
 
   // ── B. synthesise principal equipment no word matched ─────────────────────
   const synthesizedPhrases: string[] = []
+  // an existing disinfection word (grounded OR a prior pass's synth) owns the disinfection
+  // function — never mint a twin beside it (gate-36 round 2; e.g. an "Ozone Generator" whose
+  // stems don't fuzzy-match the uv_disinfection group would otherwise gain a UV sibling).
+  const disinfectionWordExists = modulesHaveDisinfectionWord(modules ?? [])
   if (synthesizeMissing) {
     for (const g of groups) {
       if (matched.has(g.phrase)) continue
       if (!isSynthesisable(g)) continue
+      if (isDisinfectionPhrase(g.phrase) && disinfectionWordExists) continue
       // A `total_*` / overall / combined volume is a REPORTING SUM of the real vessels, not a
       // physical tank. Synthesising it mints a phantom mega-vessel that double-counts the
       // constituents and reads as one contaminating store. Suppress it ONLY when the
