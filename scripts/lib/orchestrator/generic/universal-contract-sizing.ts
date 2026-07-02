@@ -66,7 +66,7 @@ interface EquipGroup {
   // Provenance note when `volume` was OVERRIDDEN from the plant aggregate ÷ count (a stale
   // per-each value reconciled to the authoritative aggregate) — see the per-unit↔aggregate
   // reconcile in buildGroups. Undefined when the contract's per-each value was taken verbatim.
-  volumeProvenance?: 'per-unit-derived-from-aggregate'
+  volumeProvenance?: 'per-unit-derived-from-aggregate' | 'cleaning-service-one-charge-clamp'
   // PHYSICAL-VESSEL precedence when one device declares MULTIPLE volume keys (universal,
   // Tristan 2026-06-19): the SYNTHESISED vessel must be sized to its CONTAINMENT — the
   // tank / shell / vessel volume — NOT to the internal FILL (MBBR media, packing, resin,
@@ -382,6 +382,21 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
       }
     }
   }
+  // ── CLEANING-ROLE GROUP CLAMP (one-charge rule — see CLEANING_ROLE_RE) ────────────
+  // A contract group whose OWN phrase names a cleaning role (`cip_tank_volume_m3` …) is a
+  // service-charge vessel, not plant storage: whatever upstream rule computed its volume,
+  // the synthesised/reconciled word must never exceed one cleaning-solution recirculation
+  // charge. buildGroups is the ONE choke point BOTH synthesis paths read (part A/B of
+  // applyUniversalContractSizing AND reconcilePrincipalEquipment's canons), so clamping
+  // here covers every mint. A cleaning group already at/below one charge is untouched.
+  for (const g of all) {
+    if (g.volume === undefined || !isCleaningRolePhrase(g.phrase)) continue
+    const charge = cleaningChargeM3(quantities)
+    if (g.volume > charge) {
+      g.volume = charge
+      g.volumeProvenance = 'cleaning-service-one-charge-clamp'
+    }
+  }
   return all
 }
 
@@ -549,6 +564,70 @@ function isPureAggregatePhrase(phrase: string): boolean {
   // Normalise `_` → space first: `\b` does NOT break between word-chars `l` and `_`, so a raw
   // `total_water_storage` phrase would evade `\btotal\b` without this.
   return AGGREGATE_MARKER_RE.test(String(phrase ?? '').replace(/_/g, ' '))
+}
+
+// ── CLEANING-SERVICE (CIP / flush / rinse / washdown) vessels — one-charge rule ──────────
+// THE BUG (codema v50 physics-critic HIGH): the contract-quantity fuzzy match scored the
+// 40 m³ `fresh_water_tank` STORAGE group onto the grounded "Cleaning Tank" / "Cip Tank"
+// words via the single shared generic stem 'tank' (scoreMatch=1 ≥ minScore=1) — two absurd
+// 3.7 m ⌀ × 3.7 m CIP vessels, each the size of the plant's entire fresh-water store, AND
+// the REAL storage tanks were suppressed at generator time (matched.add) so they were only
+// re-minted later by the reconcile, with no instrumentation.
+// THE RULE (universal, keyed on the role NOUN, no class table): a vessel whose ROLE noun is
+// cleaning / CIP / flush / rinse sizes from the process it SERVES, never from a plant-storage
+// default. ENGINEERING BASIS: a CIP tank holds ONE cleaning-solution recirculation charge —
+// the hold-up of the circuit it flushes (membrane vessels + interconnecting pipework), in
+// practice ~10–20 % of the plant's hourly design flow volume; for package plants that lands
+// in the 0.5–2 m³ band. Charge = max(0.5 m³, min(2 m³, 0.15 × hourly design flow m³/h)).
+// Deliberately does NOT match a bare "clean" adjective ("Clean Water Tank" is storage FOR
+// clean water, not a vessel that DOES cleaning).
+const CLEANING_ROLE_RE = /\b(cip|clean[\s_-]?in[\s_-]?place|cleaning|flush(?:ing)?|rins(?:e|ing)|wash(?:ing|down))\b/i
+function isCleaningRolePhrase(s: string): boolean {
+  return CLEANING_ROLE_RE.test(String(s ?? '').replace(/_/g, ' '))
+}
+function wordRoleText(w: WordLike): string {
+  return `${w.name_human ?? ''} ${w.id ?? ''} ${w.content_character?.character_id ?? ''}`
+}
+// The vessel nouns the one-charge rule applies to (mirrors the reconcile's authored-vessel
+// noun test; a cleaning-role PUMP or hose station is not a vessel and is never touched).
+const CLEANING_VESSEL_NOUN_RE = /\btanks?\b|\bvessels?\b|\bdrums?\b|\bsilos?\b|\breservoirs?\b|\bcisterns?\b|\bbasins?\b/i
+/** One cleaning-solution recirculation charge (m³) for the plant the contract describes:
+ *  ~15 % of the largest hourly design flow, bounded [0.5, 2] m³ (see basis above). */
+function cleaningChargeM3(quantities: Record<string, number>): number {
+  let flow = 0
+  for (const [k, v] of Object.entries(quantities)) {
+    if (!Number.isFinite(v) || v <= 0) continue
+    if (/_m3_h$|_m3_per_hr$/.test(k)) flow = Math.max(flow, v)
+  }
+  return Math.max(0.5, Math.min(2, 0.15 * flow))
+}
+
+/** Apply the one-charge rule to every cleaning-role VESSEL word: an unsized CIP/flush/rinse
+ *  tank gets one charge; an oversized one (however it was minted — fuzzy match, LLM author,
+ *  prior state) is clamped to one charge. A cleaning vessel already at/below one charge is
+ *  byte-untouched. Runs in BOTH synthesis paths (applyUniversalContractSizing AND
+ *  reconcilePrincipalEquipment) so a re-mint can never resurrect the storage-sized CIP tank.
+ *  Universal — keyed on the role noun + vessel noun, no class table. Returns words sized. */
+function sizeCleaningServiceVessels(modules: ModuleLike[], quantities: Record<string, number>): number {
+  const charge = cleaningChargeM3(quantities)
+  let sized = 0
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    if (isInstrument(w) || isSubcomponent(w)) continue
+    const txt = wordRoleText(w)
+    if (!isCleaningRolePhrase(txt) || !CLEANING_VESSEL_NOUN_RE.test(txt)) continue
+    const mods = w.modifier_characters ?? []
+    const cap = mods.find((mc) => mc.kind === 'capacity' && /m³|m3/.test(`${mc.unit ?? ''} ${mc.value ?? ''}`))
+    const capM3 = cap ? parseFloat(String(cap.value)) || 0 : 0
+    const hasDim = mods.some((mc) => mc.kind === 'dimension' || mc.kind === 'dimensions')
+    if (capM3 > 0 && capM3 <= charge + 1e-9 && hasDim) continue // already correctly sized
+    mergeMods(w, [
+      mod('dimension', cylinderFromVolumeM3(charge, 'cip tank')),
+      mod('capacity', formatCapacityM3(charge), 'm³'),
+      mod('sizing_basis', `CIP/cleaning-service vessel — one cleaning-solution recirculation charge (~15 % of the plant hourly design flow, bounded 0.5–2 m³); never the plant-storage default`),
+    ])
+    sized += 1
+  }
+  return sized
 }
 
 // ── cleanup (Round 3): physics-first BoM — drop the skeleton's leftover junk ──
@@ -1044,9 +1123,28 @@ interface InstrumentSpec {
   form: (host: string) => string
 }
 
+// A LEVEL transmitter is a CATALOGUE instrument with STANDARD measuring ranges — you order
+// the next standard range at/above the span you must read, you cannot order a "3.7 m"
+// custom span at concept design. An LT's range therefore derives from its HOST vessel's
+// height: nextStdLevelRange(host height). THE BUG this encodes against (codema v50
+// physics-critic HIGH): the emitted range was the RAW host height (0–1.4 m from the sump)
+// while the plant's tallest liquid vessels (3.7 m storage tanks) both exceeded the range
+// AND — being minted by the later reconcile path — carried no level instrument at all.
+// UNIVERSAL — keyed on host geometry only, no class table.
+const STD_LEVEL_RANGES_M = [1.4, 2, 3, 4, 6, 8, 10, 15, 20, 30]
+function stdLevelRangeM(htM: number): number {
+  return STD_LEVEL_RANGES_M.find((r) => r >= htM - 1e-9) ?? Math.ceil(htM)
+}
+function fmtLevelRange(htM: number): string {
+  const r = stdLevelRangeM(htM)
+  return `0–${Number.isInteger(r) ? String(r) : r.toFixed(1)} m`
+}
+
 const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
   { key: 'level', scope: 'level', principle: 'guided-radar', present: () => true, label: 'Level Transmitter', gbp: 900,
-    range: (_q, p) => (p.htM > 0 ? `0–${p.htM.toFixed(1)} m` : '0–100 %'),
+    // next STANDARD range ≥ the host vessel's height (never the raw height, never a shorter
+    // sibling's range) — see STD_LEVEL_RANGES_M above.
+    range: (_q, p) => (p.htM > 0 ? fmtLevelRange(p.htM) : '0–100 %'),
     form: (h) => `Guided-radar level transmitter, ${h}-mounted; 4–20 mA to PLC with high / low-level alarm` },
   { key: 'temperature', scope: 'vessel-temp', principle: 'Pt100', present: (q) => anyKey(q, /setpoint_temp|temp_c$|_temp_/), label: 'Temperature Transmitter', gbp: 350,
     range: (q) => { const t = pickQ(q, /water.*temp|setpoint_temp|temp_c$/); return t !== undefined ? `0–40 °C (control ${t.toFixed(1)} °C)` : '0–40 °C' },
@@ -2750,6 +2848,7 @@ export interface PrincipalReconcileResult {
   removedOrphanChildren: number // sub-components of removed duplicates/inventions dropped
   synthesizedMissing: number // principal groups with NO surviving synth word, re-created
   buildingResynthesised: number // building take-off lines re-derived against the FINAL equipment set
+  instrumentsResynthesised: number // instruments re-derived against the FINAL vessel set (two-paths coverage)
   rehostedDependents: number // instruments/actuators whose dropped "computed_*" host was re-pointed to the real host
   removedDuplicateDependents: number // those that then collided with an identical sibling on the real host → dropped
   details: string[]
@@ -2923,7 +3022,7 @@ export function reconcilePrincipalEquipment(
   contract: ContractInProgress,
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
-    groups: 0, repaired: 0, removedDuplicates: 0, removedSynonymDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
+    groups: 0, repaired: 0, removedDuplicates: 0, removedSynonymDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, instrumentsResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
   }
 
   const quantities: Record<string, number> = {}
@@ -3012,9 +3111,14 @@ export function reconcilePrincipalEquipment(
     // Full-subset: the canon's group stems must ALL be present in the word — so the word
     // genuinely names that equipment. Prefer the canon with the most stems (the most
     // specific) to avoid a 1-stem group stealing a more-specific word.
+    // ROLE COHERENCE (one-charge rule, match-side — mirrors applyUniversalContractSizing):
+    // a cleaning/CIP/flush/rinse-role word must never claim a non-cleaning canon (nor the
+    // reverse), so a re-minted STORAGE principal can never be adopted by a CIP vessel here.
+    const wIsCleaningRole = isCleaningRolePhrase(wordRoleText(w))
     let best: CanonEquip | undefined
     let bestStems = 0
     for (const c of canons) {
+      if (wIsCleaningRole !== isCleaningRolePhrase(c.group.phrase)) continue
       const gs = c.group.stems
       if (gs.length > 0 && gs.every((s) => wStems.includes(s)) && gs.length > bestStems) {
         best = c
@@ -3242,6 +3346,25 @@ export function reconcilePrincipalEquipment(
     }
   }
 
+  // CLEANING-SERVICE VESSEL CLAMP on the FINAL tree (the one-charge rule's second mint
+  // path — "synthesis runs in TWO paths"): an oversized CIP/flush/rinse vessel that reached
+  // this reconcile (LLM-authored in Phase 2, or surviving prior state) is clamped to one
+  // cleaning-solution recirculation charge, exactly as the generator-time pass does. Runs
+  // BEFORE the instrumentation re-derive so any level range reads the post-clamp geometry.
+  sizeCleaningServiceVessels(modules, quantities)
+
+  // SECOND-PATH INSTRUMENT COVERAGE (the "synthesis runs in TWO paths" trap — codema v50):
+  // this reconcile can RE-MINT a principal fluid vessel the sizing-time instrumentation pass
+  // (applyUniversalContractSizing C3) never saw — v50's 40 m³ Fresh/Drain Water Tanks were
+  // re-created HERE, so the plant's TALLEST liquid vessels (3.7 m) shipped with NO level
+  // instrument while the consolidated LT (softener/nutrient/sump only) read 0–1.4 m.
+  // synthesizeInstrumentation is idempotent (drops every instrument word, re-derives from
+  // the CURRENT vessel set), so re-running it against the FINAL principal set guarantees
+  // every principal liquid vessel carries level coverage, ranged off ITS OWN height (next
+  // standard range ≥ height). STRICT NO-OP for a class with no fluid vessels (it returns
+  // before its idempotent drop), so BESS / SAF / CO₂ state is byte-identical.
+  res.instrumentsResynthesised = synthesizeInstrumentation(modules, quantities)
+
   // RE-DERIVE THE BUILDING against the FINAL principal-equipment set. The building take-off
   // is first emitted at generator time (in applyUniversalContractSizing), but the SET it
   // measured can change here — a duplicate principal dropped, a deleted one re-created — so
@@ -3380,9 +3503,18 @@ export function applyUniversalContractSizing(
         if (isInstrument(w)) continue
         const wStems = wordStems(w)
         if (wStems.length === 0) continue
+        // ROLE COHERENCE (the one-charge rule's match-side half — codema v50 physics-critic
+        // HIGH): a CLEANING/CIP/flush/rinse-role word must never adopt a non-cleaning group's
+        // size, and vice versa. Without this the single shared generic stem 'tank' scored the
+        // 40 m³ fresh_water_tank STORAGE group onto "Cleaning Tank"/"Cip Tank" (two plant-
+        // storage-sized CIP vessels) AND `matched.add()` then suppressed the REAL storage
+        // tank's synthesis until the late reconcile — which left it un-instrumented. Keyed on
+        // the role NOUN, universal, no class table.
+        const wIsCleaningRole = isCleaningRolePhrase(wordRoleText(w))
         let best: EquipGroup | null = null
         let bestScore = 0
         for (const g of groups) {
+          if (wIsCleaningRole !== isCleaningRolePhrase(g.phrase)) continue
           const sc = scoreMatch(wStems, g)
           if (sc < minScore) continue
           if (sc > bestScore || (sc === bestScore && best && completeness(g) > completeness(best))) {
@@ -3408,6 +3540,12 @@ export function applyUniversalContractSizing(
       }
     }
   }
+
+  // ── A2. CLEANING-SERVICE VESSELS: one-charge rule (see sizeCleaningServiceVessels) ──
+  // Runs after the contract match (so the role-coherence gate above has already kept the
+  // storage groups off these words) and before synthesis: a grounded CIP/flush/rinse tank
+  // is sized to one cleaning-solution recirculation charge from the plant's design flow.
+  sized += sizeCleaningServiceVessels(modules, quantities)
 
   // ── B. synthesise principal equipment no word matched ─────────────────────
   const synthesizedPhrases: string[] = []

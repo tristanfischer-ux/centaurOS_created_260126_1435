@@ -834,6 +834,67 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} levelLines=${countI(/level transmitter/i)} levelQty=${qtyOfW(levelW)} n1=${instr1.length} n2=${instr2n}`,
   ))
 
+  // ── A3b. CLEANING-SERVICE VESSEL one-charge rule + LT standard-range/coverage in BOTH
+  // synthesis paths (codema v50 physics-critic HIGHs, 2026-07-02). Path-1 bug: the fuzzy
+  // contract match stamped the 40 m³ fresh_water_tank STORAGE group onto the grounded
+  // "Cip Tank" word via the single shared generic stem 'tank' (two 3.7 m ⌀ × 3.7 m CIP
+  // vessels) AND `matched.add()` then suppressed the REAL storage tank's synthesis.
+  // Path-2 bug: a principal vessel minted only by reconcilePrincipalEquipment carried NO
+  // level instrument, and LT ranges were raw host heights (a 0–1.4 m consolidated range on
+  // a plant whose tallest liquid vessel is 3.7 m). THE RULES (universal, role-noun / host-
+  // geometry keyed): (1) a cleaning/CIP/flush/rinse-role vessel sizes to ONE cleaning-
+  // solution recirculation charge (≈15 % of the hourly design flow, bounded 0.5–2 m³),
+  // never a plant-storage default — while a plain storage tank is NOT clamped; (2) an LT's
+  // range is the next STANDARD range ≥ its host vessel's height (1.4/2/3/4/6 m…), and every
+  // principal liquid vessel gets level coverage in BOTH paths (the reconcile re-derives
+  // instrumentation against the FINAL vessel set).
+  const cipContract: any = { quantities: {
+    fresh_water_tank_volume_each_m3: { value: 40 }, fresh_water_tank_count: { value: 1 },
+    ro_permeate_flow_m3_h: { value: 8 }, // hourly design flow → one charge = 1.2 m³
+  } }
+  const mkCipMods = (withCipWord: boolean): any[] => ([
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+    { module: 'sensing_instrumentation', sub_modules: [{ id: 'sensing_instrumentation__x', words: [] }] },
+    { module: 'maintenance_serviceability', sub_modules: [{ id: 'maint', words: withCipWord ? [
+      { id: 'cip_tank_word', name_human: 'Cip Tank', content_character: { character_id: 'cip_tank', name_human: 'Cip Tank' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+    ] : [] }] },
+  ])
+  const capOfW = (ms: any[], re: RegExp): number => {
+    for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (!re.test(String(w.name_human ?? ''))) continue
+      return parseFloat(String((w.modifier_characters ?? []).find((mc: any) => mc.kind === 'capacity')?.value ?? '0')) || 0
+    }
+    return 0
+  }
+  const ltRangeOf = (ms: any[]): string => {
+    for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (!/level transmitter/i.test(String(w.name_human ?? ''))) continue
+      return String((w.modifier_characters ?? []).find((mc: any) => mc.kind === 'rating_primary')?.value ?? '')
+    }
+    return ''
+  }
+  const cipMods1 = mkCipMods(true)
+  applyUniversalContractSizing(cipMods1, cipContract, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: true })
+  const cipMods2 = mkCipMods(false)
+  const cipRec = reconcilePrincipalEquipment(cipMods2, cipContract)
+  out.push(assertEq(
+    'UNIVERSAL.cleaning_vessel_one_charge_and_level_range_std_both_paths',
+    'a CIP/cleaning-role vessel sizes to one cleaning charge (≤2 m³ on an 8 m³/h plant), never the 40 m³ storage default; the REAL storage tank is still synthesised at 40 m³ (not clamped, not suppressed by the false match); the LT range is the next STANDARD range ≥ the 3.7 m host (0–4 m) in the generator path; and a vessel minted only by the RECONCILE path still gets its LT at 0–4 m (two-paths coverage)',
+    JSON.stringify({
+      cipCap: capOfW(cipMods1, /^cip tank$/i),
+      freshCap: capOfW(cipMods1, /^fresh water tank$/i),
+      lt1: ltRangeOf(cipMods1),
+      lt2: ltRangeOf(cipMods2),
+      recInstr: cipRec.instrumentsResynthesised,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.cipCap > 0 && o.cipCap <= 2 && Math.abs(o.freshCap - 40) < 0.01 &&
+        /0–4\s*m/.test(o.lt1) && /0–4\s*m/.test(o.lt2) && o.recInstr >= 1
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
   // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
   // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a
