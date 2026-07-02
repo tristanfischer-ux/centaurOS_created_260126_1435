@@ -488,8 +488,16 @@ def _tab_quality_banner(title: str):
     }
 
 
+# Tabs that CARRY the row-2 '⬤ TAB QUALITY' banner (presentation audit 2026-07-02, fix 2):
+# self-grading banners on every client-facing tab read as noise and contradict each other —
+# the per-tab scores stay in tab-scorecard.json + the ⭐ Scorecard tab; only the meta /
+# audit surfaces keep the on-tab banner.
+_BANNER_TABS = {"⚠ Checks", "⚠ Audit", "⭐ Scorecard"}
+
+
 def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
-    """Write a full-width title band (+ a deterministic per-tab quality banner); return next free row."""
+    """Write a full-width title band (+ a deterministic per-tab quality banner on the
+    meta tabs only — client-facing tabs carry no self-grade banner); return next free row."""
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=span)
     c = ws.cell(1, 1, text)
     c.font = FONT_TITLE
@@ -497,8 +505,9 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
     c.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.row_dimensions[1].height = 26
     nxt = 2
-    # Quality banner — every scored tab shows its deterministic score vs the ≥8 floor, ON the tab.
-    qb = _tab_quality_banner(ws.title)
+    # Quality banner — META tabs only (⚠ Checks / ⚠ Audit / ⭐ Scorecard). Every tab's score
+    # still lands in tab-scorecard.json + the ⭐ Scorecard per-tab table.
+    qb = _tab_quality_banner(ws.title) if ws.title in _BANNER_TABS else None
     if qb is not None:
         ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
         bc = ws.cell(nxt, 1, qb["text"])
@@ -581,26 +590,107 @@ CONTENTS_SHEET = "Contents"
 FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bold=True)
 
 # One-line descriptions for the Contents index (#26). Image/module tabs fall
-# back to _default_desc(); these cover the data tabs by their exact sheet name.
+# back to _default_desc(); these cover the data + meta tabs by exact sheet name.
+# CONTRACT (presentation audit 2026-07-02, fix 4): every description ≤ 12 words —
+# the Contents column is a glance index, not documentation (guarded in _selftest).
 _TAB_DESCRIPTIONS: Dict[str, str] = {
-    "Overview": "Quality scorecard, headline metrics & run provenance.",
-    "Brief": "The original client brief and the engine's enhanced, structured interpretation that drives the design.",
-    "⚠ Checks": "Live arithmetic invariants (== the CLI verifier; RED = numbers don't reconcile), then Brief-compliance (target vs achieved) and Tool-provenance (USED/STALE/ORPHANED) sections.",
-    "Part names": "The master parts list — every part named once; every other tab references these cells.",
-    "Connection trace": "Which part connects to what — live input/output cell-references with completeness & integrity counts.",
-    "Quantities": "Every sized contract quantity with family, basis & source.",
-    "Calculations": "Worked calcs grouped by tool — live Excel formulas where structured.",
-    "Bill of Materials (Ledger)": "THE BILL — what to buy (tag · item · qty · unit £ · live Σ line £), with ALL columns visible (nothing hidden): 'Cost basis' (cols F–J, how each £ was derived), 'Engineering spec' (cols K–N, why each principal is this size) and the per-row column-contract 'Row check' (col O; MPN TBD count surfaced in the header).",
-    "Cost waterfall": "BoM → assembly → factory COGS → install → installed ASP (live running totals; the assembly/install bars are BoM-derived class-factor estimates with their derivation table).",
-    "Inputs & Assumptions": "Editable yellow drivers (price/feed/energy/labour/capex) — the economics model inputs.",
-    "Financial model": "The whole commercial model on one sheet: base-case Economics (revenue / opex / EBITDA / NPV / IRR + charts), the scale sweep + Low/Central/High price sensitivity, and the Investment-analysis sweet-spot finder — all live off the Inputs tab.",
-    "Panel schedule": "Electrical panel / load schedule as a real sortable table.",
-    "Process schedules": "Process line list, valve list & instrument index — three sortable sections cross-referenced to the P&ID.",
-    "Line & velocity": "Every sized run with velocity / volt-drop & within-spec flagging.",
-    "Glossary": "Plain-English meaning of every abbreviation (DN, ISA tags, FC/FO, status codes, units).",
-    "Risk & Regulatory": "Live hazard & risk register (physics critic, gate flags, cost, equipment), TRIAGED per row — an ENGINE-FIXABLE design defect renders as an OPEN DEFECT with its routed fix stage (never 'tolerable with mitigation'); only genuinely EXTERNAL risks carry mitigations — + the compliance-gate verdict and statutory duties, on one sheet.",
-    "Assembly sequence": "Order-of-works: civils → tankage → mechanical → pipework → electrical → I&C → commissioning.",
+    "Executive Summary": "The cover — what it is, cost, verdict and next steps.",
+    "Overview": "Run provenance, quality scorecard and headline metrics.",
+    "⭐ Scorecard": "Every section and tab scored against the ≥8 ship floor.",
+    "Sense-check": "Independent market benchmark versus the engine's numbers.",
+    "⚠ Audit": "Deterministic self-audit findings and the ship verdict.",
+    "Brief": "Original client brief and the engine's structured interpretation.",
+    "⚠ Checks": "Live arithmetic invariants — red rows show numbers that don't reconcile.",
+    "Part names": "Master parts list; every other tab references these cells.",
+    "Connection trace": "Which part connects to what, with live cell references.",
+    "Quantities": "Every sized contract quantity with family, basis and source.",
+    "Calculations": "Worked calculations by tool — live Excel formulas where structured.",
+    "Bill of Materials (Ledger)": "The bill — tag, item, qty, unit £, cost basis, spec.",
+    "Cost waterfall": "Bill of materials to installed price, with live running totals.",
+    "Inputs & Assumptions": "Editable yellow drivers feeding the economics model.",
+    "Financial model": "Economics, scenarios and investment analysis, live off the Inputs tab.",
+    "Panel schedule": "Electrical panel and load schedule as a sortable table.",
+    "Process schedules": "Line, valve and instrument schedules, cross-referenced to the P&ID.",
+    "Line & velocity": "Every sized run with velocity or volt-drop versus its limit.",
+    "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
+    "Risk & Regulatory": "Hazard and risk register, compliance verdict and statutory duties.",
+    "Assembly sequence": "Order of works from civils through to commissioning.",
 }
+
+# ============================================================================
+# ONE VERDICT — the single self-grade (presentation audit 2026-07-02, fix 2).
+# The workbook used to self-grade in FOUR places with contradictory answers (Exec
+# 'DRAFT'+ship-gate-FAILED, Overview 'allPass PASS', Scorecard 'MIN 5/10', Audit
+# 'FAIL…ship_ok=True'). There is now ONE verdict, computed ONCE:
+#   floor   = min score of EVERY section (deterministic gates + LLM self-audit,
+#             deduped by name) and EVERY tab;
+#   verdict = SHIPS when everything is ≥8 · else DRAFT — n open issues
+#             (n = sections + tabs below 8 or UNSCORED).
+# Every surface that shows a verdict renders THIS one, via verdict_text(). Cells are
+# registered in _VERDICT_CELLS and re-stamped at the end of build() from the FINAL
+# tab scores, so no surface can disagree with another. proveCatch in _selftest.
+# ============================================================================
+_VERDICT: dict = {}
+_VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
+
+
+def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
+    """The ONE dossier verdict. Pure — reads the quality scorecard + LLM self-audit
+    sections and the per-tab scores; returns {floor, open_issues, ships, …}."""
+    secs: Dict[str, Optional[float]] = {}
+
+    def _add_sections(sections) -> None:
+        for s in sections or []:
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            nm = str(s["name"])
+            v = s.get("score")
+            v = float(v) if isinstance(v, (int, float)) else None
+            if nm in secs:   # same section from two sources → the MIN (worst) wins
+                prev = secs[nm]
+                secs[nm] = v if (prev is None or (v is not None and v < prev)) else prev
+            else:
+                secs[nm] = v
+
+    qsc = (state or {}).get("qualityScorecard") or (
+        load_json(os.path.join(run_dir, "quality-scorecard.json")) if run_dir else None) or {}
+    _add_sections(qsc.get("sections"))
+    _add_sections(((state or {}).get("selfAudit") or {}).get("sections"))
+    tabs: Dict[str, Optional[float]] = {}
+    for t, v in (tab_scores or {}).items():
+        if isinstance(v, dict):
+            sv = v.get("score")
+            tabs[str(t)] = float(sv) if isinstance(sv, (int, float)) else None  # UNSCORED → None
+    all_vals = list(secs.values()) + list(tabs.values())
+    scored = [v for v in all_vals if v is not None]
+    floor = min(scored) if scored else None
+    open_n = sum(1 for v in all_vals if v is None or v < 8)
+    return {"floor": floor, "open_issues": open_n,
+            "ships": bool(scored) and open_n == 0,
+            "n_sections": len(secs), "n_tabs": len(tabs)}
+
+
+def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
+    """The ONE verdict, rendered. style='card' → the short Exec-card form
+    ('SHIPS' / 'DRAFT — n open issues'); style='line' → the full banner form."""
+    v = v if v is not None else _VERDICT
+    if not v:
+        return ""
+    n = int(v.get("open_issues") or 0)
+    short = "SHIPS" if v.get("ships") else f"DRAFT — {n} open issue{'s' if n != 1 else ''}"
+    if style == "card":
+        return short
+    fl = v.get("floor")
+    fl_txt = (f"{fl:g}/10" if isinstance(fl, (int, float)) else "—")
+    return (f"VERDICT: {short} · floor {fl_txt} "
+            f"(min of every section & tab; ships at ≥8 everywhere)")
+
+
+def _register_verdict_cell(ws: Worksheet, row: int, col: int,
+                           style: str = "line", suffix: str = "") -> None:
+    """Record a rendered-verdict cell so build() can RE-STAMP it from the FINAL scores."""
+    _VERDICT_CELLS.append((ws.title, row, col, style, suffix))
+
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
 # md tables occasionally carry stray control bytes; strip them so .save never throws.
@@ -616,17 +706,63 @@ _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _FORMULA_TRIGGERS = ("=", "+", "-", "@")
 
 
+# Markdown EMPHASIS markers leaking into cells as literal text (presentation audit
+# 2026-07-02: the Panel-schedule metadata block rendered '**Board reference**' and the
+# TOTALS row '**42.7 kW**'). Excel is not a markdown surface — strip paired asterisks.
+# Bold first, then a conservative italic pair (never a bare '*' used as multiplication:
+# the open '*' must not follow a word char, the close '*' must not precede one).
+_MD_BOLD = re.compile(r"\*\*([^*]+)\*\*")
+_MD_ITAL = re.compile(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])")
+
+
+def _strip_md_emphasis(s: str) -> str:
+    s = _MD_BOLD.sub(r"\1", s)
+    s = _MD_ITAL.sub(r"\1", s)
+    return s
+
+
 def clean_cell(v: Any) -> Any:
     """Make any value safe + tidy for a worksheet DISPLAY cell. Strings get control
-    chars stripped, are trimmed, and any leading formula-trigger is defanged with a
-    zero-width space (CWE-1236). Non-strings pass through untouched (numbers stay
-    numbers). NEVER call this on a deliberate "=..." live-formula string."""
+    chars stripped, are trimmed, markdown emphasis (**bold** / *italic*) de-marked,
+    and any leading formula-trigger is defanged with a zero-width space (CWE-1236).
+    Non-strings pass through untouched (numbers stay numbers). NEVER call this on a
+    deliberate "=..." live-formula string."""
     if isinstance(v, str):
         s = _CTRL.sub("", v).strip().replace("`", "")   # strip markdown code-ticks (Tristan: `201-PR` → 201-PR)
+        s = _strip_md_emphasis(s).strip()
         if s and s[0] in _FORMULA_TRIGGERS:
             s = "​" + s
         return s
     return v
+
+
+# ── DISPLAY-NAME HUMANISER (presentation audit 2026-07-02, fix 4) ───────────────────
+# snake_case metric keys ('total_cultivation_containers') read as machine debris in a
+# client-facing table. Humanise for DISPLAY only — the raw key stays in a secondary
+# cell (the compliance Note column / tab-scorecard.json) wherever traceability needs it.
+_UNIT_SUFFIX_DISPLAY = [
+    ("_m3_per_hr", " (m³/h)"), ("_m3_h", " (m³/h)"), ("_m3_s", " (m³/s)"),
+    ("_kwh", " (kWh)"), ("_kw", " (kW)"), ("_gbp", " (£)"), ("_pct", " (%)"),
+    ("_percent", " (%)"), ("_t_yr", " (t/yr)"), ("_kg", " (kg)"), ("_mm", " (mm)"),
+    ("_lpm", " (L/min)"), ("_bar", " (bar)"),
+]
+
+
+def _display_name(s: Any) -> str:
+    """'total_cultivation_containers' → 'Total cultivation containers';
+    'ro_permeate_capacity_m3_h' → 'Ro permeate capacity (m³/h)'. A string that is not
+    pure lowercase snake_case (already human) passes through unchanged."""
+    t = str(s or "").strip()
+    if not t or not re.fullmatch(r"[a-z0-9_]+", t):
+        return t
+    suffix = ""
+    for suf, disp in _UNIT_SUFFIX_DISPLAY:
+        if t.endswith(suf):
+            t = t[: -len(suf)]
+            suffix = disp
+            break
+    words = t.replace("_", " ").strip()
+    return (words[:1].upper() + words[1:] + suffix) if words else suffix.strip()
 
 
 def back_link(ws: Worksheet, span: int) -> None:
@@ -1013,15 +1149,16 @@ def _exec_synopsis(state: dict) -> str:
     clabel, cgbp = _headline_build_cost(state)
     if cgbp:
         parts.append(f"The engine values the build at £{round(cgbp):,} ({clabel.lower()}).")
-    # The deterministic ship gate has the last word: when it FAILS, the synopsis must NOT claim the
-    # dossier is validated (2026-06-25). It carries the honest DRAFT clause instead of the benchmark
-    # "agrees on every dimension" sentence.
-    _aud = state.get("_dossierAudit") or {}
-    if _aud and _aud.get("ship_ok") is False:
-        _open = int(_aud.get("total") or 0)
-        parts.append(f"This is a DRAFT: the deterministic self-audit flags {_open} open "
-                     f"issue{'s' if _open != 1 else ''} ({_aud.get('high', 0)} high-severity) — "
-                     f"see the ⚠ Audit tab. It is not yet engineering-validated.")
+    # The ONE VERDICT has the last word (2026-07-02, fix 2): when the dossier is a DRAFT the
+    # synopsis must NOT claim it is validated — and its open-issue count is the SAME number
+    # every other verdict surface shows (compute_verdict), never a divergent local tally.
+    if _VERDICT and not _VERDICT.get("ships"):
+        _open = int(_VERDICT.get("open_issues") or 0)
+        _fl = _VERDICT.get("floor")
+        _fl_txt = f"{_fl:g}/10" if isinstance(_fl, (int, float)) else "—"
+        parts.append(f"This is a DRAFT: {_open} open issue{'s' if _open != 1 else ''} — "
+                     f"sections or tabs below the ≥8 ship floor (lowest {_fl_txt}); see the "
+                     f"⚠ Audit tab. It is not yet engineering-validated.")
     else:
         _, vsent = _exec_validation_verdict(state)
         if vsent:
@@ -1030,6 +1167,21 @@ def _exec_synopsis(state: dict) -> str:
                  "specifications below — is derived deterministically from the engineering "
                  "contract, computed rather than estimated by hand.")
     return " ".join(parts)
+
+
+def _hero_embed_png(run_dir: str) -> Optional[str]:
+    """The hero image for IN-SHEET embedding (Exec cover / Overview thumbnail): the
+    scene's web-weight hero-embed.png (manifest key `hero_embed`, ≈600 KB) when present,
+    else the full 00-hero / blender-cover. The full-resolution hero keeps its own
+    dedicated render tab — so the heavy file is embedded ONCE, not three times."""
+    _man = load_json(os.path.join(run_dir, "drawing-manifest.json")) or {}
+    _he = _man.get("hero_embed")
+    cands = ([str(_he)] if _he else []) + [
+        os.path.join(run_dir, "hero-embed.png"),
+        os.path.join(run_dir, "00-hero.png"),
+        os.path.join(run_dir, "blender-cover.png"),
+    ]
+    return next((p for p in cands if p and os.path.exists(p)), None)
 
 
 def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
@@ -1048,12 +1200,12 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         "the summary.",
     )
 
-    # ---- hero render (right side) ----
+    # ---- hero render (right side) — the WEB-WEIGHT hero-embed.png when the scene
+    # emitted one (≈600 KB vs the 3–6 MB full render; generator-purge 2026-07-02).
+    # The full-resolution hero remains its own dedicated render tab. ----
     try:
         from openpyxl.drawing.image import Image as XLImage
-        hero = next((p for p in (os.path.join(run_dir, "00-hero.png"),
-                                 os.path.join(run_dir, "blender-cover.png"))
-                     if os.path.exists(p)), None)
+        hero = _hero_embed_png(run_dir)
         if hero:
             ds = downscale_png(hero, run_dir, max_px=900)
             im = XLImage(ds)
@@ -1097,28 +1249,20 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
     clabel, cgbp = _headline_build_cost(state)
     if cgbp:
         card(clabel, f"£{round(cgbp):,}")
-    sc_obj = state.get("qualityScorecard") or load_json(os.path.join(run_dir, "quality-scorecard.json")) or {}
-    floor = sc_obj.get("floor")
-    vstatus, _vsent = _exec_validation_verdict(state)
-    # ---- the deterministic SHIP GATE overrides every other status (2026-06-25). When the per-tab
-    # self-audit (scripts/lib/dossier_audit.py) says ship_ok=False, the dossier is a DRAFT — it may
-    # NOT claim "Engineering-validated" no matter what the quality floor or benchmark say. ----
-    _aud = state.get("_dossierAudit") or {}
-    _open = int(_aud.get("total") or 0)
-    if _aud and _aud.get("ship_ok") is False:
-        card("Status", f"DRAFT — {_open} open issue{'s' if _open != 1 else ''}",
-             "Deterministic self-audit ship gate FAILED — see the ⚠ Audit tab.")
-    elif isinstance(floor, (int, float)):
-        card("Status",
-             "Engineering-validated" if floor >= 8 else f"Quality floor {floor}/10",
-             "Scored against deterministic engineering gates." if floor >= 8 else "")
-    elif vstatus:
-        card("Validation", vstatus, "Independent top-down market benchmark vs the engine.")
+    # ---- STATUS = the ONE VERDICT (2026-07-02, fix 2): the same verdict every other surface
+    # renders (compute_verdict) — never a locally-derived status that can contradict them.
+    # The value cell is registered so build() re-stamps it from the FINAL scores. ----
+    _vrow = row + 1              # card() writes label at `row`, value at `row + 1`
+    card("Status", verdict_text("card"),
+         "One verdict for the whole dossier — the floor is the minimum score of every "
+         "section and tab; it ships when all are ≥8. Detail: ⚠ Audit tab.")
+    _register_verdict_cell(ws, _vrow, 1, style="card")
 
     # clear the hero image before full-width sections
     row = max(row, nxt + 16) + 1
 
-    # ---- deterministic synopsis (every clause is a state value — prose cannot drift) ----
+    # ---- deterministic synopsis (every clause is a state value — prose cannot drift).
+    # Registered so build() re-renders it from the FINAL verdict (fix 2). ----
     syn = _exec_synopsis(state)
     if syn:
         sc = ws.cell(row, 1, syn)
@@ -1126,6 +1270,7 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
         sc.alignment = Alignment(wrap_text=True, vertical="top")
         ws.merge_cells(start_row=row, start_column=1, end_row=row + 2, end_column=7)
         ws.row_dimensions[row].height = 56
+        _register_verdict_cell(ws, row, 1, style="synopsis")
         row += 4
 
     # ---- key specifications & brief compliance (deterministic, brief-driven spec sheet) ----
@@ -1211,12 +1356,11 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     )
 
     # ---- hero render thumbnail (top-right) — the cover answers "what does it look like?" without
-    # a click; the full-resolution hero is its own tab. Floats over the empty cols right of D. ----
+    # a click; the full-resolution hero is its own tab. Floats over the empty cols right of D.
+    # Uses the web-weight hero-embed.png when present (generator-purge 2026-07-02). ----
     try:
         from openpyxl.drawing.image import Image as XLImage
-        _hero = next((p for p in (os.path.join(run_dir, "00-hero.png"),
-                                  os.path.join(run_dir, "blender-cover.png"))
-                      if os.path.exists(p)), None)
+        _hero = _hero_embed_png(run_dir)
         if _hero:
             _hds = downscale_png(_hero, run_dir, max_px=900)
             _himg = XLImage(_hds)
@@ -1251,28 +1395,38 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     )
     sub_banner(ws, row, "Quality scorecard", 4)
     row += 1
+    # ---- the ONE VERDICT first (fix 2, 2026-07-02): identical on every verdict surface;
+    # the per-source stats below are LABELLED for what they are, never an unqualified
+    # 'allPass PASS' beside a failing section. Registered for the final re-stamp. ----
+    _ver = ws.cell(row, 1, verdict_text("line"))
+    _ver.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
+    _ver.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
+    _ver.alignment = LEFT_TOP
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+    _register_verdict_cell(ws, row, 1, style="line")
+    row += 1
     if sc:
         floor = sc.get("floor")
         mean = sc.get("mean")
-        all_pass = sc.get("allPass")
-        # allPass may be absent -> derive from floor >= 8 (the ≥8-everywhere rule)
-        if all_pass is None and floor is not None:
-            all_pass = floor >= 8
+        _secs = [s for s in (sc.get("sections") or []) if isinstance(s, dict)]
+        _det = [s for s in _secs if not s.get("advisory")]
+        _det_ok = sum(1 for s in _det
+                      if isinstance(s.get("score"), (int, float)) and s["score"] >= 8)
         for label, val in [
-            ("Floor (min section)", floor),
-            ("Mean", mean),
-            ("All sections ≥ 8 (allPass)", all_pass),
+            ("Deterministic gate floor (min gate section)", floor),
+            ("Mean (all sections)", mean),
+            ("Deterministic gates ≥8", f"{_det_ok}/{len(_det)}" if _det else "—"),
             ("Iteration", sc.get("iteration")),
         ]:
             ws.cell(row, 1, label).font = FONT_SUB
             c = ws.cell(row, 2, val if val is not None else "—")
-            if label.startswith("Floor") and isinstance(floor, (int, float)):
+            if label.startswith("Deterministic gate floor") and isinstance(floor, (int, float)):
                 c.fill = FILL_PASS if floor >= 8 else FILL_FAIL
                 c.font = FONT_PASS if floor >= 8 else FONT_FAIL
-            if label.startswith("All sections") and isinstance(all_pass, bool):
-                c.value = "PASS" if all_pass else "FAIL"
-                c.fill = FILL_PASS if all_pass else FILL_FAIL
-                c.font = FONT_PASS if all_pass else FONT_FAIL
+            if label.startswith("Deterministic gates ≥8") and _det:
+                _all_det = _det_ok == len(_det)
+                c.fill = FILL_PASS if _all_det else FILL_FAIL
+                c.font = FONT_PASS if _all_det else FONT_FAIL
             row += 1
         row += 1
 
@@ -1293,7 +1447,7 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             score = sec.get("score")
             advisory = bool(sec.get("advisory"))
             defects = sec.get("defects") or []
-            ws.cell(row, 1, name + ("  (advisory)" if advisory else "")).border = BORDER
+            ws.cell(row, 1, _display_name(name) + ("  (advisory)" if advisory else "")).border = BORDER
             cs = ws.cell(row, 2, score)
             cs.border = BORDER
             ok = isinstance(score, (int, float)) and score >= 8
@@ -1821,17 +1975,18 @@ def tab_audit(wb: Workbook, report, state: Optional[dict] = None) -> None:
         "LOW = grey.",
     )
     r = 4
-    # ---- scorecard header line ----
-    verdict = sc.get("verdict", "?")
-    sline = (f"VERDICT: {verdict}  ·  {sc.get('high', 0)} HIGH  ·  {sc.get('med', 0)} MED  ·  "
-             f"{sc.get('low', 0)} LOW  ·  {sc.get('total', 0)} total"
-             f"  ·  ship_ok={sc.get('ship_ok')}")
-    hc = ws.cell(r, 1, sline)
+    # ---- header line = the ONE VERDICT (fix 2, 2026-07-02) + this audit's finding counts.
+    # The old line rendered its OWN verdict/ship_ok, which could contradict the Exec /
+    # Overview / Scorecard surfaces; every surface now shows compute_verdict()'s answer. ----
+    _suffix = (f"  ·  findings: {sc.get('high', 0)} HIGH · {sc.get('med', 0)} MED · "
+               f"{sc.get('low', 0)} LOW · {sc.get('total', 0)} total")
+    hc = ws.cell(r, 1, verdict_text("line") + _suffix)
     hc.font = FONT_TITLE
-    hc.fill = FILL_FAIL if verdict == "FAIL" else (FILL_ADVISORY if verdict == "REVIEW" else FILL_PASS)
+    hc.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
     hc.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     ws.row_dimensions[r].height = 22
+    _register_verdict_cell(ws, r, 1, style="title-line", suffix=_suffix)
     r += 2
 
     by_tab = report.by_tab()
@@ -2427,6 +2582,45 @@ def _link_dataflow_to_calc(io_value_cells: List[Tuple[str, float, str]],
     return out
 
 
+# ── PROCESS-FLUID DENSITY (generator-purge workstream, 2026-07-02): the shared 'rho'
+# constant was HARDCODED to 1025 kg/m³ 'seawater density' — marine physics leaking into
+# every non-marine dossier (a fresh-water plant's constants block claimed seawater).
+# Fluid-following, universal (no class table):
+#   1. the engine's OWN worked-calc rho inputs are ground truth → their median;
+#   2. else a marine/seawater/brine signal in the brief/contract → 1025;
+#   3. else fresh/potable water → 998. proveCatch in _selftest.
+_MARINE_FLUID_RX = re.compile(
+    r"seawater|sea[- ]water|marine|offshore|brine|salt[- ]?water|subsea|\bauv\b|\brov\b|desalinat",
+    re.I)
+
+
+def _process_fluid_density(state: dict) -> Tuple[float, str]:
+    """(rho_kg_m3, note) for the shared constants block — derived from state, never hardcoded."""
+    vals: List[float] = []
+    for tool in (((state or {}).get("toolsUsedPage") or {}).get("tools") or []):
+        for c in ((tool or {}).get("worked") or []):
+            for inp in ((c or {}).get("inputs") or []):
+                sym = str((inp or {}).get("symbol") or "").lower()
+                v = (inp or {}).get("value")
+                if sym in ("rho", "rho_water", "rho_fluid", "rho_liquid", "density") \
+                        and isinstance(v, (int, float)) and 300 <= float(v) <= 2000:
+                    vals.append(float(v))
+    if vals:
+        vals.sort()
+        med = vals[len(vals) // 2]
+        return med, f"process-fluid density (median of {len(vals)} engine worked-calc input(s))"
+    blob = " ".join(str(x) for x in (
+        ((state or {}).get("orchestratorContract") or {}).get("product_class"),
+        ((state or {}).get("parsedBrief") or {}).get("product_class"),
+        ((state or {}).get("parsedBrief") or {}).get("summary"),
+        json.dumps(((state or {}).get("parsedBrief") or {}).get("constraints") or {},
+                   default=str)[:4000],
+    ))
+    if _MARINE_FLUID_RX.search(blob):
+        return 1025.0, "seawater density (marine process context in the brief/contract)"
+    return 998.0, "fresh/potable water density (no marine signal in the brief/contract)"
+
+
 def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]:
     """
     Returns (live_calc_count, static_calc_count).
@@ -2453,9 +2647,10 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     )
     r = 4
 
-    # ---- shared constants block ----
+    # ---- shared constants block (rho is FLUID-FOLLOWING — see _process_fluid_density) ----
+    _rho_val, _rho_note = _process_fluid_density(state)
     CONSTANTS = {
-        "rho": (1025.0, "kg/m³", "seawater density"),
+        "rho": (_rho_val, "kg/m³", _rho_note),
         "rho_air": (1.2, "kg/m³", "air density"),
         "g": (9.8066, "m/s²", "gravity"),
         "pi": (3.141592653589793, "-", "pi (use PI() in formulas)"),
@@ -3851,7 +4046,9 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         category = (m.get("category") or "").lower()
         matched = _match_quantity(m, quantities)
 
-        ws.cell(r, 1, clean_cell(key) or "(unnamed metric)").border = BORDER
+        # Display names are HUMANISED (fix 4, 2026-07-02) — the raw snake_case keys stay
+        # in the Note column so the metric remains traceable to the brief/contract.
+        ws.cell(r, 1, _display_name(clean_cell(key)) or "(unnamed metric)").border = BORDER
         tc = ws.cell(r, 2, tgt)
         tc.fill = FILL_INPUT
         tc.border = BORDER
@@ -3867,7 +4064,7 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
             sc.font = Font(bold=True, color="7F5B00")
             sc.border = BORDER
             nt = ws.cell(r, 8, "No contract quantity in the same unit family within "
-                              "±50% of target — cannot auto-verify.")
+                              f"±50% of target — cannot auto-verify. (brief key: {key})")
             nt.alignment = WRAP_TOP
             nt.font = FONT_NOTE
             nt.border = BORDER
@@ -3875,7 +4072,7 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
             continue
 
         qname, ach, qunit_s = matched
-        ws.cell(r, 4, clean_cell(qname)).border = BORDER
+        ws.cell(r, 4, _display_name(clean_cell(qname))).border = BORDER
         ac = ws.cell(r, 5, ach)
         ac.fill = FILL_RESULT
         ac.border = BORDER
@@ -3917,7 +4114,12 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
                     pass
             sc.fill = sc_fill
             sc.font = FONT_PASS if passed else FONT_FAIL
-        nt = ws.cell(r, 8, f"family={_unit_family(unit)[0]}")
+        # Note = TRACEABILITY (the raw brief key → the matched contract quantity) + the
+        # unit family where KNOWN. The old cell rendered the matcher's internal fallback
+        # token bare ('family=?trays' / 'family=?%') — machine debris, not a note (fix 4).
+        _fam = _unit_family(unit)[0]
+        _fam_txt = "" if str(_fam).startswith("?") else f" · unit family: {_fam}"
+        nt = ws.cell(r, 8, f"brief key: {key} → contract: {qname}{_fam_txt}")
         nt.alignment = WRAP_TOP
         nt.font = FONT_NOTE
         nt.border = BORDER
@@ -7143,6 +7345,8 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
         subtitle += " " + _contract_note(cres)
     title_row(ws, "Electrical panel / load schedule", 11, subtitle)
     r = 4
+    # ROOT-CAUSE ROLL-UP (fix 3): failing rows grouped to their cause(s), above the table.
+    r = _render_rollup(ws, r, cres, 11)
     last_circuit_first = None
     for heading, hdr, rows in tables:
         # locate the 'in spec' + 'ΔU' columns for live verdicts + conditional colour
@@ -7164,6 +7368,10 @@ def tab_panel_schedule(wb: Workbook, run_dir: str) -> bool:
             du_L = get_column_letter(du_col)
             sp_L = get_column_letter(spec_col)
             for rr in range(body_first, body_last + 1):
+                # A TOTALS footer row carries no circuit — no In-spec verdict belongs on
+                # it (fix 4, 2026-07-02: the ✗ formula on the TOTALS row read as a fail).
+                if _is_totals_label(ws.cell(rr, 1).value, ws.cell(rr, 2).value):
+                    continue
                 cell = ws.cell(rr, spec_col)
                 # ELSE branch must be a STATIC value — referencing the spec cell itself
                 # ({sp_L}{rr}) is a CIRCULAR reference (the cell is THIS formula). When
@@ -7352,6 +7560,97 @@ def _contract_note(res: dict) -> str:
     return (f"ROW CHECK CONTRACT (score = 10 × rows-passing ÷ rows = "
             f"10 × {res.get('n_pass', 0)}/{res.get('n_total', 0)} = {res.get('score')}): {cols}. "
             "A dash / empty / unverifiable contracted cell FAILS its row — honest red beats fake green.")
+
+
+# ── ROOT-CAUSE ROLL-UP (presentation audit 2026-07-02, fix 3) ────────────────────────
+# A red schedule tab used to bury ONE cause under N identical per-row sentences. The
+# roll-up GROUPS the row-check failure reasons (numbers normalised so '3.1 m/s' and
+# '205.6 m/s' are one cause) and renders 1–3 lines above the table: the count, the
+# cause(s), and the contract's fix route. proveCatch in _selftest.
+_NUM_RX = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _rollup_failures(cres: dict, max_causes: int = 3) -> List[str]:
+    """1–3 summary lines for a contract evaluation's failing rows, [] when none fail."""
+    rows = (cres or {}).get("rows") or {}
+    fails: List[str] = []
+    for v in rows.values():
+        if isinstance(v, dict) and v.get("verdict") != "PASS":
+            fails.append("; ".join(str(x) for x in (v.get("reasons") or ["no contract evaluation"])))
+    if not fails:
+        return []
+    n_total = int(cres.get("n_total") or len(rows))
+    groups: Dict[str, List[str]] = {}
+    for reason in fails:
+        key = _NUM_RX.sub("N", reason).strip().lower()
+        groups.setdefault(key, []).append(reason)
+    ordered = sorted(groups.values(), key=len, reverse=True)
+    head = (f"All {n_total} rows FAIL" if len(fails) == n_total
+            else f"{len(fails)} of {n_total} rows FAIL")
+    fix = str(cres.get("fix") or "").strip()
+    lines: List[str] = []
+    if len(ordered) == 1:
+        lines.append(f"⛔ {head} — single cause: {ordered[0][0]}")
+    else:
+        tops = "; ".join(f"{len(g)}× {g[0]}" for g in ordered[:max_causes])
+        more = f" (+{len(ordered) - max_causes} further cause(s))" if len(ordered) > max_causes else ""
+        lines.append(f"⛔ {head} — top causes: {tops}{more}")
+    if fix:
+        lines.append(f"Fix route: {fix}")
+    return lines[:3]
+
+
+def _render_rollup(ws: Worksheet, row: int, cres: dict, span: int) -> int:
+    """Render the roll-up (if any rows fail) as red banner lines; return the next free row."""
+    lines = _rollup_failures(cres)
+    for ln in lines:
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=span)
+        c = ws.cell(row, 1, clean_cell(ln))
+        c.fill = FILL_FAIL
+        c.font = FONT_FAIL
+        c.alignment = WRAP_TOP
+        ws.row_dimensions[row].height = max(28, 14.5 * min(-(-len(ln) // 110), 4))
+        row += 1
+    if lines:
+        row += 1   # spacer under the roll-up
+    return row
+
+
+def _is_totals_label(first: Any, second: Any) -> bool:
+    """A schedule TOTALS row (no circuit/line id in col 1, a 'TOTALS' label in col 2).
+    Such a row is an arithmetic footer — it carries NO In-spec verdict, so the live
+    ✓/✗ formula must never be written on it (fix 4, 2026-07-02). Robust to both the
+    de-marked ('TOTALS') and raw-markdown ('**TOTALS**') forms."""
+    if _strip_md_emphasis(str(first or "")).strip():
+        return False
+    return bool(re.match(r"^\s*totals?\b", _strip_md_emphasis(str(second or "")), re.I))
+
+
+# ── BASIS BOILERPLATE FACTORING (presentation audit 2026-07-02, fix 3) ───────────────
+def _hoist_common_tail(bases: List[str], threshold: float = 0.8,
+                       sep: str = " · ") -> Tuple[List[str], List[str]]:
+    """Move IDENTICAL trailing `sep`-segments shared by > threshold of a column's cells
+    into a single header note, keeping the per-row numbers in place. Returns
+    (common_segments_in_display_order, trimmed_bases). proveCatch in _selftest."""
+    if not bases:
+        return [], list(bases)
+    trimmed = [str(b or "") for b in bases]
+    common: List[str] = []
+    n = len(trimmed)
+    while True:
+        last: Dict[str, int] = {}
+        for b in trimmed:
+            segs = [s for s in b.split(sep) if s]
+            if segs:
+                last[segs[-1]] = last.get(segs[-1], 0) + 1
+        cand = next((seg for seg, cnt in last.items() if cnt > threshold * n), None)
+        if cand is None:
+            break
+        common.insert(0, cand)   # stripped end-first → display in original order
+        trimmed = [sep.join([s for s in b.split(sep) if s][:-1])
+                   if ([s for s in b.split(sep) if s] or [""])[-1] == cand else b
+                   for b in trimmed]
+    return common, trimmed
 
 
 def _contract_score(n_pass: int, n_total: int, rendered_fabricated: int = 0) -> Optional[float]:
@@ -8070,6 +8369,8 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
     HDR = ["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
            "Length (m)", "In spec", "Line £", "Basis", "Row check"]
     r = 4
+    # ROOT-CAUSE ROLL-UP (fix 3): failing rows grouped to their cause(s), above the table.
+    r = _render_rollup(ws, r, cres, 12)
     grand_fail = 0
     spec_cells = []   # In-spec column cells for the conditional-format range
     for key, label in SECTIONS:
@@ -8078,10 +8379,26 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             continue
         sub_banner(ws, r, label, 12)
         r += 1
+        # BASIS BOILERPLATE FACTORING (fix 3): identical trailing sentences shared by >80%
+        # of this section's Basis cells move to ONE header note; per-row numbers stay.
+        _sec_bases = []
+        for idx, row, spec in g:
+            cr = crows.get(idx) or {}
+            _bits = [b for b in (_line_basis(row), cr.get("vel_basis"),
+                                 (f"cost model: {row.get('cost_source')}" if row.get("cost_source") else "")) if b]
+            _sec_bases.append(" · ".join(_bits))
+        _common, _sec_bases = _hoist_common_tail(_sec_bases)
+        if _common:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=12)
+            _bn = ws.cell(r, 1, clean_cell("Basis note — common to the rows below (factored out "
+                                           "of the per-row cells): " + " · ".join(_common)))
+            _bn.font = FONT_NOTE
+            _bn.alignment = WRAP_TOP
+            r += 1
         header(ws, r, HDR)
         r += 1
         sec_first = r
-        for idx, row, spec in g:
+        for _gi, (idx, row, spec) in enumerate(g):
             cr = crows.get(idx) or {}
             # the COMPUTED verdict — a row with no contract evaluation is UNVERIFIED = FAIL
             # (never inherit the source's within_spec tick).
@@ -8134,9 +8451,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
             lt.number_format = FMT_GBP
             lt.border = BORDER
-            basis_bits = [b for b in (_line_basis(row), cr.get("vel_basis"),
-                                      (f"cost model: {row.get('cost_source')}" if row.get("cost_source") else "")) if b]
-            basis = " · ".join(basis_bits)
+            basis = _sec_bases[_gi]   # boilerplate tail already factored to the header note
             bc = ws.cell(r, 11, basis)
             bc.alignment = WRAP_TOP
             bc.border = BORDER
@@ -8380,12 +8695,29 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
                 return c
         return None
 
+    # RENDER NAMES/CAPTIONS from the drawing-manifest `renders` array (generator-purge
+    # 2026-07-02): each render carries a canonical ≤31-char `sheet_name` (kills the
+    # 'Render — Interior layout (vie-2' truncations) + a `caption` (bearing + envelope
+    # dims + tag callouts). Filename-minted fallbacks remain for runs without it.
+    _man = load_json(os.path.join(run_dir, "drawing-manifest.json")) or {}
+    _rmap: Dict[str, Tuple[str, str]] = {}
+    for _r in (_man.get("renders") or []):
+        if isinstance(_r, dict) and _r.get("file"):
+            _rmap[os.path.normpath(os.path.join(run_dir, str(_r["file"])))] = (
+                str(_r.get("sheet_name") or "").strip()[:31],
+                str(_r.get("caption") or "").strip())
+
+    def _render_spec(path: str, fb_title: str, fb_cap: str) -> Tuple[str, str, str]:
+        sn, cap = _rmap.get(os.path.normpath(path), ("", ""))
+        return (path, sn or fb_title, cap or fb_cap)
+
     # 1. hero (interior layout — the materialed render's 00-hero)
     hero = first_existing(os.path.join(run_dir, "00-hero.png"),
                           os.path.join(run_dir, "blender-cover.png"))
     if hero:
-        specs.append((hero, "Render — Interior layout",
-                      "Blender 3D render — interior plant layout (no walls/roof), view 1."))
+        specs.append(_render_spec(
+            hero, "Render — Interior layout",
+            "Blender 3D render — interior plant layout (no walls/roof), view 1."))
     # 1b. SECOND interior angle + the EXTERIOR building views (Tristan 2026-06-22: the Excel was
     #     missing the updated renders + the external building). The exterior set is rendered to
     #     <run>/exterior/ from the SAME scene build (BLENDER_PLANT_SHELL=1).
@@ -8410,7 +8742,7 @@ def collect_image_specs(run_dir: str) -> List[Tuple[str, str, str]]:
          "Architectural exterior — back-corner angle."),
     ):
         if os.path.exists(_p):
-            specs.append((_p, _ttl, _cap))
+            specs.append(_render_spec(_p, _ttl, _cap))
 
     # 2. module renders — REMOVED (Tristan 2026-06-20): the per-module Blender
     # highlight renders (module-*.png) read as poor quality and their provenance was
@@ -8659,6 +8991,8 @@ def _reorder_tabs(wb: Workbook) -> None:
         if title in _RANK:
             return _RANK[title]
         t = title.lower()
+        if t.startswith("render 1"):
+            return 2                                    # manifest-named HERO render — early
         if t.startswith("render"):
             return 50                                   # non-hero renders → Drawings
         for i, p in enumerate(("ga", "p&id", "bfd", "single", "hvac")):
@@ -8695,7 +9029,9 @@ def tab_benchmark(wb: Workbook, state: dict) -> None:
     r = 4
     worst = str(bd.get("worst", "?")).upper()
     wfill = FILL_FAIL if worst in ("RADICAL", "FAIL") else (FILL_ADVISORY if worst in ("WARN", "REVIEW") else FILL_PASS)
-    vc = ws.cell(r, 1, f"VERDICT: {worst}")
+    # LABELLED as this tab's OWN benchmark verdict — never confusable with the dossier's
+    # ONE verdict (fix 2, 2026-07-02).
+    vc = ws.cell(r, 1, f"SENSE-CHECK VERDICT: {worst}")
     vc.font = FONT_TITLE
     vc.fill = wfill
     ws.cell(r, 2).fill = wfill
@@ -8811,11 +9147,20 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
               "average. A section below 8 is flagged; a BLOCKING defect means the dossier is not "
               "yet shippable. This is the headline quality measure for the whole dossier.")
     r = 4
+    # ---- the ONE VERDICT first (fix 2, 2026-07-02) — identical on every verdict surface;
+    # the MIN below is LABELLED as this tab's own source (the LLM self-audit sections). ----
+    _ver = ws.cell(r, 1, verdict_text("line"))
+    _ver.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
+    _ver.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
+    _ver.alignment = LEFT_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+    _register_verdict_cell(ws, r, 1, style="line")
+    r += 2
     mn = sa.get("min_score")
     mean = sa.get("mean_score")
     n_ok = sum(1 for s in secs if isinstance(s.get("score"), (int, float)) and s.get("score") >= 8)
     min_fill = FILL_PASS if (isinstance(mn, (int, float)) and mn >= 8) else FILL_FAIL
-    mc = ws.cell(r, 1, f"MIN section score  {mn}/10")
+    mc = ws.cell(r, 1, f"MIN section score (LLM self-audit)  {mn}/10")
     mc.font = FONT_TITLE
     mc.fill = min_fill
     ws.cell(r, 2).fill = min_fill
@@ -8829,7 +9174,7 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
             continue
         score = s.get("score")
         ok = isinstance(score, (int, float)) and score >= 8
-        ws.cell(r, 1, clean_cell(s.get("name", ""))).font = FONT_SUB
+        ws.cell(r, 1, _display_name(clean_cell(s.get("name", "")))).font = FONT_SUB
         scell = ws.cell(r, 2, score)
         scell.fill = FILL_PASS if ok else (FILL_FAIL if s.get("blocking") else FILL_ADVISORY)
         ws.cell(r, 3, "PASS ✓" if ok else ("⛔ BLOCKING" if s.get("blocking") else "below 8"))
@@ -8872,7 +9217,7 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
     _cov = round(_shown / _tot * 100) if _tot else 100
     for _label, _val, _aim in [
         ("Sections at ≥8 (AIM: all)", f"{n_ok} / {len(secs)}", n_ok == len(secs)),
-        ("Min section score", f"{mn}/10", isinstance(mn, (int, float)) and mn >= 8),
+        ("Min section score (LLM self-audit)", f"{mn}/10", isinstance(mn, (int, float)) and mn >= 8),
         ("Traceability — every number → the brief", f"{_trace}%" if _trace is not None else "—", (_trace or 0) >= 100),
         ("Calc-coverage — every number shows its formula", f"{_cov}%", _cov >= 100),
     ]:
@@ -8907,6 +9252,116 @@ def tab_scorecard(wb: Workbook, state: dict) -> None:
             _icell.alignment = WRAP_TOP
             _icell.font = FONT_NOTE
             r += 1
+
+
+# ============================================================================
+# RECALC-AND-CACHE (presentation audit 2026-07-02, fix 1). openpyxl writes live
+# formulas WITHOUT cached <v> values, so every LIVE cell renders BLANK on any
+# surface that doesn't recalculate (Quick Look, Gmail/Drive preview, mobile Excel
+# viewers). Post-write, the workbook is round-tripped through LibreOffice headless
+# with a one-shot profile forcing OOXMLRecalcMode=0 (recalculate on load), which
+# stores a cached value beside EVERY formula while the formulas themselves REMAIN
+# live. Verified by re-unzipping the shipped file: formula (<f>) count must hold
+# and formula-with-cached-value pairs must appear. Kill: FORGE_SKIP_RECALC=1.
+# ============================================================================
+_LO_RECALC_XCU = """<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+ <item oor:path="/org.openoffice.Office.Calc/Formula/Load">
+  <prop oor:name="OOXMLRecalcMode" oor:op="fuse"><value>0</value></prop>
+  <prop oor:name="ODFRecalcMode" oor:op="fuse"><value>0</value></prop>
+ </item>
+</oor:items>
+"""
+
+# Formula node (<f>…</f> or <f …/>) and a formula IMMEDIATELY carrying a NON-EMPTY
+# cached <v> (openpyxl writes an EMPTY '<v />' beside formulas — that is exactly the
+# blank-preview gap, so it must NOT count as a cached value).
+_XLSX_F_RX = re.compile(r"<f[ >/]")
+_XLSX_FV_RX = re.compile(r"(?:</f>|<f[^>]*/>)\s*<v[^/>]*>[^<]")
+
+
+def _find_soffice() -> Optional[str]:
+    """LibreOffice headless binary, or None (PATH first, then the macOS app bundle)."""
+    import shutil as _shutil
+    for cand in (_shutil.which("soffice"),
+                 "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+                 "/usr/bin/soffice"):
+        if cand and os.path.exists(cand):
+            return cand
+    return None
+
+
+def _count_formulas_and_cached(xlsx_path: str) -> Tuple[int, int]:
+    """(formula_cells, formula_cells_with_cached_value) by scanning the sheet XML."""
+    import zipfile
+    n_f = n_fv = 0
+    with zipfile.ZipFile(xlsx_path) as z:
+        for nm in z.namelist():
+            if nm.startswith("xl/worksheets/") and nm.endswith(".xml"):
+                xml = z.read(nm).decode("utf-8", "ignore")
+                n_f += len(_XLSX_F_RX.findall(xml))
+                n_fv += len(_XLSX_FV_RX.findall(xml))
+    return n_f, n_fv
+
+
+def recalc_and_cache(out_path: str, soffice_path: Optional[str] = "auto") -> bool:
+    """Recalculate + CACHE every formula value in the written workbook (LibreOffice
+    headless round-trip). Returns True only when the shipped file provably carries
+    cached values AND its formulas survived. On any failure the original file is
+    left untouched and a LOUD warning states the preview consequence."""
+    soffice = _find_soffice() if soffice_path == "auto" else soffice_path
+    if not soffice:
+        print("  !! RECALC-AND-CACHE SKIPPED — LibreOffice (soffice) not found. The workbook "
+              "ships with NO cached formula values: every live cell renders BLANK in Quick "
+              "Look / Gmail / Drive previews. Install LibreOffice (brew install --cask "
+              "libreoffice) or open + save the file in Excel before sending it.")
+        return False
+    import tempfile
+    import shutil as _shutil
+    try:
+        n_f0, n_fv0 = _count_formulas_and_cached(out_path)
+    except Exception as _ex:  # noqa: BLE001
+        print(f"  !! RECALC-AND-CACHE SKIPPED — could not scan {out_path}: {_ex}")
+        return False
+    with tempfile.TemporaryDirectory(prefix="forge-recalc-") as td:
+        profile = os.path.join(td, "profile", "user")
+        os.makedirs(profile, exist_ok=True)
+        with open(os.path.join(profile, "registrymodifications.xcu"), "w", encoding="utf-8") as fh:
+            fh.write(_LO_RECALC_XCU)
+        outdir = os.path.join(td, "out")
+        os.makedirs(outdir, exist_ok=True)
+        cmd = [soffice, "--headless", "--norestore", "--nolockcheck",
+               f"-env:UserInstallation=file://{os.path.dirname(profile)}",
+               "--convert-to", "xlsx:Calc MS Excel 2007 XML", "--outdir", outdir,
+               os.path.abspath(out_path)]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        except Exception as _ex:  # noqa: BLE001
+            print(f"  !! RECALC-AND-CACHE FAILED — soffice did not run ({_ex}). The workbook "
+                  "ships WITHOUT cached values (blank live cells in previews).")
+            return False
+        conv = os.path.join(outdir, os.path.splitext(os.path.basename(out_path))[0] + ".xlsx")
+        if res.returncode != 0 or not os.path.exists(conv) or os.path.getsize(conv) < 4096:
+            print(f"  !! RECALC-AND-CACHE FAILED — soffice exit {res.returncode}: "
+                  f"{(res.stderr or res.stdout or '').strip()[:300]}. The workbook ships "
+                  "WITHOUT cached values (blank live cells in previews).")
+            return False
+        try:
+            n_f1, n_fv1 = _count_formulas_and_cached(conv)
+        except Exception as _ex:  # noqa: BLE001
+            print(f"  !! RECALC-AND-CACHE FAILED — converted file unreadable: {_ex}")
+            return False
+        # Formulas must REMAIN (cached values + formulas, never values-only) and cached
+        # values must actually be present now.
+        if n_f1 <= 0 or n_fv1 <= 0 or n_f1 < 0.8 * n_f0:
+            print(f"  !! RECALC-AND-CACHE REJECTED — round-trip formulas {n_f0}→{n_f1}, "
+                  f"cached {n_fv0}→{n_fv1}; keeping the openpyxl original (blank live "
+                  "cells in previews).")
+            return False
+        _shutil.move(conv, out_path)
+        print(f"  · recalc-and-cache: {n_fv1}/{n_f1} formula cells now carry a cached value "
+              f"(was {n_fv0}/{n_f0}); formulas remain live (LibreOffice round-trip)")
+        return True
 
 
 def build(run_dir: str, out_path: str) -> dict:
@@ -9030,6 +9485,13 @@ def build(run_dir: str, out_path: str) -> dict:
     if _repair.fixes_applied:
         print(f"  · self-repair: {len(_repair.fixes_applied)} fix(es) applied over "
               f"{_repair.iterations} pass(es); {len(_repair.remaining())} gap(s) need input")
+
+    # ── ONE VERDICT (fix 2, 2026-07-02): computed ONCE, rendered identically on every
+    #    verdict surface. Initialised here (pre-render) and RE-STAMPED from the FINAL
+    #    scores just before save, so no surface can contradict another. ──
+    _VERDICT_CELLS.clear()
+    _VERDICT.clear()
+    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir))
 
     print("  · Executive Summary")
     tab_executive_summary(wb, state, run_dir, sha)
@@ -9248,7 +9710,33 @@ def build(run_dir: str, out_path: str) -> dict:
     except Exception:  # noqa: BLE001
         pass
 
+    # ── ONE VERDICT — final RE-STAMP (fix 2): recompute over the FULL workbook's final
+    #    scores and rewrite every registered verdict cell, so the Exec card, Overview,
+    #    ⭐ Scorecard and ⚠ Audit all state the SAME answer. ──
+    _VERDICT.clear()
+    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir))
+    state["_verdict"] = dict(_VERDICT)
+    for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
+        if _vt not in wb.sheetnames:
+            continue
+        _cell = wb[_vt].cell(_vr, _vc)
+        if _vstyle == "synopsis":
+            _cell.value = _exec_synopsis(state)
+            continue
+        _cell.value = verdict_text("card" if _vstyle == "card" else "line") + (_vsuf or "")
+        if _vstyle in ("line", "title-line"):
+            _cell.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
+            if _vstyle == "line":
+                _cell.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
+    print(f"  · ONE VERDICT: {verdict_text('line')} ({len(_VERDICT_CELLS)} surfaces)")
+
     wb.save(out_path)
+
+    # ── RECALC-AND-CACHE (fix 1): ship cached values beside every live formula so
+    #    preview surfaces (Quick Look / Gmail / Drive) never show blank cells. ──
+    recalc_cached = False
+    if os.environ.get("FORGE_SKIP_RECALC", "").lower() not in ("1", "true", "yes"):
+        recalc_cached = recalc_and_cache(out_path)
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
     return {
@@ -9265,6 +9753,8 @@ def build(run_dir: str, out_path: str) -> dict:
         # The floor-aware audit (ship_ok already folds in the per-tab ≥8 gate above).
         "audit": state.get("_dossierAudit") or report.scorecard(),
         "tab_floor": _ts_summary,
+        "verdict": dict(_VERDICT),
+        "recalc_cached": recalc_cached,
         "sha": sha,
     }
 
@@ -9811,6 +10301,174 @@ def _selftest() -> int:
         print(f"  FAIL key-disclosure: class_reference must disclose an estimate kind (got {_key_input_disclosure('class_reference')!r})"); bad += 1
     if _key_input_disclosure("rating-based") != "":
         print(f"  FAIL key-disclosure: rating-based must stay blank (a real-gap signal), got {_key_input_disclosure('rating-based')!r}"); bad += 1
+    # ═══ (10) ONE VERDICT — single source (presentation audit 2026-07-02, fix 2).
+    # proveCatch the four-contradictory-verdicts bug: the verdict is computed ONCE
+    # (floor = min of every section + tab; DRAFT counts sections/tabs <8 or UNSCORED)
+    # and every rendering style states the SAME answer. ═══
+    _vstate = {"qualityScorecard": {"sections": [
+                   {"name": "gates", "score": 9},
+                   {"name": "brief_compliance", "score": 5, "advisory": True}]},
+               "selfAudit": {"sections": [
+                   {"name": "brief_compliance", "score": 5},      # duplicate name → deduped
+                   {"name": "narrative", "score": 10}]}}
+    _vtabs = {"Overview": {"score": 10, "status": "PASS"},
+              "P&ID": {"score": None, "status": "UNSCORED"}}
+    _vv = compute_verdict(_vstate, _vtabs)
+    if _vv["floor"] != 5 or _vv["open_issues"] != 2 or _vv["ships"]:
+        print(f"  FAIL one-verdict: floor must be 5 with 2 open issues (the 5-section + the "
+              f"UNSCORED tab), never SHIPS (got {_vv})"); bad += 1
+    _vcard, _vline = verdict_text("card", _vv), verdict_text("line", _vv)
+    if _vcard != "DRAFT — 2 open issues" or _vcard not in _vline or "floor 5/10" not in _vline:
+        print(f"  FAIL one-verdict: card and line forms must state the SAME verdict "
+              f"(got {_vcard!r} / {_vline!r})"); bad += 1
+    _vok = compute_verdict({"qualityScorecard": {"sections": [{"name": "a", "score": 9}]}},
+                           {"T": {"score": 8, "status": "PASS"}})
+    if not _vok["ships"] or verdict_text("card", _vok) != "SHIPS":
+        print(f"  FAIL one-verdict: an all-≥8 dossier must SHIP (got {_vok})"); bad += 1
+    # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
+    if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
+        print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "
+              f"{clean_cell('**TOTALS**')!r})"); bad += 1
+    if "*" in str(clean_cell("Digital Control Panel  *(control / aux feeder)*")):
+        print("  FAIL md-emphasis: italic '*(...)*' must be de-marked"); bad += 1
+    if clean_cell("area 2*3 m and a*b") != "area 2*3 m and a*b":
+        print(f"  FAIL md-emphasis: multiplication asterisks must be UNTOUCHED (got "
+              f"{clean_cell('area 2*3 m and a*b')!r})"); bad += 1
+    # ═══ (12) ROOT-CAUSE ROLL-UP grouping (fix 3) ═══
+    _fk = {"n_total": 5, "n_pass": 2, "fix": "size the line from its real flow",
+           "rows": {0: {"verdict": "FAIL", "reasons": ["velocity 5.0 m/s exceeds the ≤3 m/s band"]},
+                    1: {"verdict": "FAIL", "reasons": ["velocity 6.1 m/s exceeds the ≤3 m/s band"]},
+                    2: {"verdict": "FAIL", "reasons": ["velocity 7.2 m/s exceeds the ≤3 m/s band"]},
+                    3: {"verdict": "PASS"}, 4: {"verdict": "PASS"}}}
+    _rl = _rollup_failures(_fk)
+    if not _rl or "3 of 5 rows FAIL" not in _rl[0] or "single cause" not in _rl[0] \
+            or not any("Fix route" in x for x in _rl):
+        print(f"  FAIL rollup: 3 same-cause rows must group to ONE cause + a fix route "
+              f"(got {_rl})"); bad += 1
+    _fk2 = {"n_total": 3, "fix": "f", "rows": {
+        0: {"verdict": "FAIL", "reasons": ["velocity 9 m/s exceeds the band"]},
+        1: {"verdict": "FAIL", "reasons": ["ΔU% missing — volt-drop unverifiable"]},
+        2: {"verdict": "FAIL", "reasons": ["no carried current on the run"]}}}
+    _rl2 = _rollup_failures(_fk2)
+    if not _rl2 or "All 3 rows FAIL" not in _rl2[0] or "top causes" not in _rl2[0] or len(_rl2) > 3:
+        print(f"  FAIL rollup: 3 distinct causes must render 'All 3 rows FAIL — top causes' "
+              f"in ≤3 lines (got {_rl2})"); bad += 1
+    if _rollup_failures({"n_total": 2, "rows": {0: {"verdict": "PASS"}, 1: {"verdict": "PASS"}}}):
+        print("  FAIL rollup: an all-PASS contract must render NO roll-up"); bad += 1
+    # ═══ (13) RECALC-AND-CACHE presence (fix 1) — pure parts: the LO profile forces
+    # recalculate-on-load; a missing soffice degrades LOUDLY (False), never crashes;
+    # the cached-value scanner counts <f>+<v> pairs on a real openpyxl file (0 cached —
+    # exactly the gap the round-trip closes). ═══
+    if "OOXMLRecalcMode" not in _LO_RECALC_XCU:
+        print("  FAIL recalc: the LO profile must force OOXMLRecalcMode"); bad += 1
+    if recalc_and_cache("/nonexistent/never.xlsx", soffice_path=None) is not False:
+        print("  FAIL recalc: a missing soffice must return False (loud skip)"); bad += 1
+    with _tf.TemporaryDirectory() as _td3:
+        _wbf = Workbook()
+        _wsf = _wbf.active
+        _wsf["A1"] = 2
+        _wsf["A2"] = "=A1*3"
+        _fp = os.path.join(_td3, "f.xlsx")
+        _wbf.save(_fp)
+        _nf, _nfv = _count_formulas_and_cached(_fp)
+        if _nf != 1 or _nfv != 0:
+            print(f"  FAIL recalc-scan: a fresh openpyxl file must show 1 formula / 0 cached "
+                  f"(got {_nf}/{_nfv}) — the scanner is the shipped-file proof"); bad += 1
+    # ═══ (14) BASIS BOILERPLATE FACTORING (fix 3) ═══
+    _bases = [f"DN{n} pipe · £{n}/m · cost model: uk-2026" for n in (15, 25, 50, 80, 100)]
+    _cm, _tr = _hoist_common_tail(_bases)
+    if _cm != ["cost model: uk-2026"] or any("cost model" in b for b in _tr) or "£15/m" not in _tr[0]:
+        print(f"  FAIL hoist: a 100%-shared trailing segment must move to the header note, "
+              f"keeping per-row numbers (got common={_cm}, rows={_tr[:2]})"); bad += 1
+    _cm2, _tr2 = _hoist_common_tail(["a · x", "b · x", "c · y", "d · z", "e · w"])
+    if _cm2:
+        print(f"  FAIL hoist: a 40%-shared tail is below the >80% bar — must NOT hoist "
+              f"(got {_cm2})"); bad += 1
+    # ═══ (15) CONTENTS descriptions: the meta tabs are described (never the drawing
+    # fallback) and EVERY description is ≤12 words (fix 4) ═══
+    for _k in ("Executive Summary", "⭐ Scorecard", "⚠ Audit", "Overview"):
+        if _k not in _TAB_DESCRIPTIONS or _TAB_DESCRIPTIONS[_k] == _default_desc(_k):
+            print(f"  FAIL contents: {_k!r} needs its own description (not the drawing "
+                  f"fallback {_default_desc(_k)!r})"); bad += 1
+    for _k, _d in _TAB_DESCRIPTIONS.items():
+        if len(str(_d).split()) > 12:
+            print(f"  FAIL contents: description for {_k!r} exceeds 12 words: {_d!r}"); bad += 1
+    # ═══ (16) TOTALS rows: no In-spec formula, no literal ** — proven on the RENDERED
+    # panel sheet (fixes 3+4) ═══
+    if not _is_totals_label("", "TOTALS") or not _is_totals_label("", "**TOTALS**") \
+            or _is_totals_label("W1", "Pump A"):
+        print("  FAIL totals-label: TOTALS detection broken"); bad += 1
+    with _tf.TemporaryDirectory() as _td4:
+        os.makedirs(os.path.join(_td4, "drawings"), exist_ok=True)
+        with open(os.path.join(_td4, "drawings", "panel-schedule.md"), "w") as _fh:
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE\n\n## MAIN BOARD\n\n"
+                "| Field | Value |\n|---|---|\n| **Board reference** | Main Board |\n\n"
+                "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | "
+                "Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "| W1 | Pump A | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n"
+                "| | **TOTALS** | | **10.0 kW** | **15 A** | | | | | |\n")
+        _wbp = Workbook(); _wbp.remove(_wbp.active)
+        _CONTRACT_RESULTS["Panel schedule"] = _eval_panel_schedule_contract(_td4, {}) or {}
+        tab_panel_schedule(_wbp, _td4)
+        _CONTRACT_RESULTS.pop("Panel schedule", None)
+        _pws = _wbp["Panel schedule"]
+        _stars = [c.coordinate for row_ in _pws.iter_rows() for c in row_
+                  if isinstance(c.value, str) and "**" in c.value]
+        if _stars:
+            print(f"  FAIL totals-render: literal '**' markdown survives in cells {_stars}"); bad += 1
+        _trow = next((rr for rr in range(1, _pws.max_row + 1)
+                      if str(_pws.cell(rr, 2).value or "").strip() == "TOTALS"), None)
+        if _trow is None:
+            print("  FAIL totals-render: TOTALS row not found (de-marked) on the rendered sheet"); bad += 1
+        else:
+            _tspec = _pws.cell(_trow, 10).value
+            if isinstance(_tspec, str) and _tspec.startswith("="):
+                print(f"  FAIL totals-render: the TOTALS row must carry NO In-spec formula "
+                      f"(got {_tspec!r})"); bad += 1
+    # ═══ (17) FLUID-FOLLOWING rho (generator-purge 2026-07-02): the constants block
+    # must NEVER hardcode marine physics into a non-marine dossier. ═══
+    _rv1, _rn1 = _process_fluid_density({"toolsUsedPage": {"tools": [
+        {"worked": [{"inputs": [{"symbol": "rho", "value": 1000.0, "unit": "kg/m³"}]}]}]}})
+    if _rv1 != 1000.0 or "worked-calc" not in _rn1:
+        print(f"  FAIL rho: the engine's own worked-calc rho must win (got {_rv1}, {_rn1!r})"); bad += 1
+    _rv2, _rn2 = _process_fluid_density({"parsedBrief": {"summary": "an offshore seawater intake AUV"}})
+    if _rv2 != 1025.0 or "seawater" not in _rn2:
+        print(f"  FAIL rho: a marine brief must derive 1025 (got {_rv2}, {_rn2!r})"); bad += 1
+    _rv3, _rn3 = _process_fluid_density({"orchestratorContract": {"product_class": "water_treatment"},
+                                         "parsedBrief": {"summary": "potable water plant for a farm"}})
+    if _rv3 != 998.0 or "seawater" in _rn3:
+        print(f"  FAIL rho: a fresh/potable plant must derive 998, never seawater "
+              f"(got {_rv3}, {_rn3!r})"); bad += 1
+    # ═══ (18) RENDER tab names/captions come from the drawing-manifest `renders` array;
+    # hero embedding prefers the web-weight hero-embed.png (generator-purge 2026-07-02) ═══
+    with _tf.TemporaryDirectory() as _td5:
+        for _fn in ("00-hero.png", "hero-embed.png"):
+            with open(os.path.join(_td5, _fn), "wb") as _fh:
+                _fh.write(b"\x89PNG\r\n\x1a\n")
+        with open(os.path.join(_td5, "drawing-manifest.json"), "w") as _fh:
+            json.dump({"hero_embed": os.path.join(_td5, "hero-embed.png"),
+                       "renders": [{"file": "00-hero.png",
+                                    "sheet_name": "Render 1 — Interior iso",
+                                    "caption": "Interior render — hero · envelope 23.6 × 39.2 m"}]}, _fh)
+        _sp = collect_image_specs(_td5)
+        _hs = next((s for s in _sp if os.path.basename(s[0]) == "00-hero.png"), None)
+        if not _hs or _hs[1] != "Render 1 — Interior iso" or "envelope" not in _hs[2]:
+            print(f"  FAIL render-names: the manifest sheet_name/caption must name the render tab "
+                  f"(got {_hs})"); bad += 1
+        if os.path.basename(_hero_embed_png(_td5) or "") != "hero-embed.png":
+            print(f"  FAIL hero-embed: hero-embed.png must be preferred for embedding "
+                  f"(got {_hero_embed_png(_td5)})"); bad += 1
+        os.remove(os.path.join(_td5, "drawing-manifest.json"))
+        os.remove(os.path.join(_td5, "hero-embed.png"))
+        _sp2 = collect_image_specs(_td5)
+        _hs2 = next((s for s in _sp2 if os.path.basename(s[0]) == "00-hero.png"), None)
+        if not _hs2 or _hs2[1] != "Render — Interior layout":
+            print(f"  FAIL render-names: a run WITHOUT manifest renders must keep the fallback "
+                  f"title (got {_hs2})"); bad += 1
+        if os.path.basename(_hero_embed_png(_td5) or "") != "00-hero.png":
+            print("  FAIL hero-embed: without hero-embed.png the full hero must be the fallback"); bad += 1
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
@@ -9832,6 +10490,9 @@ def main() -> None:
     print(f"  live calcs  : {res['live_calcs']}")
     print(f"  static calcs: {res['static_calcs']}")
     print(f"  image tabs  : {res['image_tabs']}")
+    print(f"  recalc cache: {'cached values shipped (previews render)' if res.get('recalc_cached') else 'NOT CACHED — live cells blank in previews'}")
+    if res.get("verdict"):
+        print(f"  VERDICT     : {verdict_text('line', res['verdict'])}")
     if res.get("skipped_tabs"):
         print(f"  skipped     : {res['skipped_tabs']}")
     print(f"  CHECKS FAIL : {res['fail_count']}")
