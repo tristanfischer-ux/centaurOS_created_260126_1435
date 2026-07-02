@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -421,23 +422,57 @@ _THERMAL_KW_RE = re.compile(
     r"makeup_heating|process_loss|sensible|load_kw", re.I)
 
 
-def _equip_kw_from_quantities(name: str, quantities: dict) -> Optional[float]:
+# Tokens that carry no identity — EVERY pump/motor shares them, so they must never decide a
+# match on their own (the 120×-recurring load_reconcile blanket bug 2026-07-02: the generic
+# token 'pump' substring-matched every *_pump_*_kw key and the 'motor' preference then handed
+# irrigation_pump_motor_kw (9.65 kW) to EVERY pump in the plant — fertigation 7.5, RO 4.2 and
+# drain 1.9 all rendered 9.65, panel 67.7 kW vs contract 53). The DISTINGUISHING noun decides.
+_GENERIC_EQUIP_TOKENS = {"pump", "motor", "power", "drive", "kw", "unit", "system",
+                         "electrical", "elec"}
+_GENERIC_EQUIP_TOKENS_MIN = {"pump", "motor", "kw"}   # fallback for all-generic names
+
+
+def _tok_hits(dist: set, ktoks: set) -> int:
+    """Distinguishing-token overlap between a part name and a quantity key — exact token
+    equality, plus a bounded PREFIX stem (≥4 chars) so 'recirculation' still finds 'recirc'
+    while 'ran' can never ride inside 'drain' (substring containment is banned here: it is
+    the root of the blanket-match bug)."""
+    n = 0
+    for t in dist:
+        for k in ktoks:
+            if t == k or (min(len(t), len(k)) >= 4 and (t.startswith(k) or k.startswith(t))):
+                n += 1
+                break
+    return n
+
+
+def _equip_kw_from_quantities(name: str, quantities: dict,
+                              require_key_re: Optional[re.Pattern] = None) -> Optional[float]:
     """A known per-item ELECTRICAL motor/drive kW for this equipment from the contract
-    quantities, matched on the item NAME tokens (universal — no per-class table). E.g. a
-    'Circulation Pump' matches `recirc_pump_motor_kw`. CRITICALLY excludes thermal DUTY /
+    quantities, matched on the item's DISTINGUISHING name tokens (universal — no per-class
+    table). E.g. 'Fertigation Dosing Pump' matches `fertigation_dosing_pump_power_kw`, never
+    the generic-sibling `irrigation_pump_motor_kw`. CRITICALLY excludes thermal DUTY /
     capacity quantities (a 'Cooling Fan' must not read the 1617 kW cooling DUTY as its motor
-    feeder). Returns the electrical kW, or None when only a thermal figure matches."""
+    feeder). `require_key_re` optionally restricts candidate keys (the panel's pump/motor
+    scope). Deterministic: ties on (overlap, motor-preference) with DIFFERENT values return
+    None (ambiguous → caller's honest even-split) instead of dict-order roulette.
+    Returns the per-item electrical kW, or None when nothing matches by identity."""
     if not quantities:
         return None
-    toks = {t for t in re.split(r"[^a-z0-9]+", (name or "").lower()) if len(t) > 2}
+    toks = {t for t in re.split(r"[^a-z0-9]+", (name or "").lower()) if len(t) >= 2}
     if not toks:
         return None
-    best = None
+    dist = toks - _GENERIC_EQUIP_TOKENS
+    if not dist:                                    # name was ONLY generic words
+        dist = toks - _GENERIC_EQUIP_TOKENS_MIN
+    if not dist:
+        return None
+    candidates: list[tuple[int, int, str, float]] = []
     for k, v in quantities.items():
         kl = k.lower()
         if not kl.endswith("_kw"):
             continue
-        if not any(t in kl for t in toks):
+        if require_key_re is not None and not require_key_re.search(kl):
             continue
         # a thermal DUTY / capacity figure is NOT an electrical feeder — skip it.
         if _THERMAL_KW_RE.search(kl) and not _ELEC_KW_RE.search(kl):
@@ -445,15 +480,27 @@ def _equip_kw_from_quantities(name: str, quantities: dict) -> Optional[float]:
         # only accept a key that reads as an ELECTRICAL motor/drive/power load.
         if not _ELEC_KW_RE.search(kl):
             continue
+        ktoks = set(re.split(r"[^a-z0-9]+", kl))
+        overlap = _tok_hits(dist, ktoks)
+        if overlap == 0:
+            continue
         val = v.get("value") if isinstance(v, dict) else v
         try:
             val = float(val)
         except (TypeError, ValueError):
             continue
-        score = (2 if ("motor" in kl or "drive" in kl) else 1)  # prefer a motor figure
-        if best is None or score > best[0]:
-            best = (score, val)
-    return best[1] if best else None
+        if val <= 0:
+            continue
+        motor_pref = 1 if ("motor" in ktoks or "drive" in ktoks) else 0
+        candidates.append((overlap, motor_pref, kl, val))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: (-c[0], -c[1], c[2]))   # total order (key name last)
+    top_overlap, top_pref = candidates[0][0], candidates[0][1]
+    top_vals = {c[3] for c in candidates if c[0] == top_overlap and c[1] == top_pref}
+    if len(top_vals) > 1:
+        return None                                  # genuine ambiguity — never guess
+    return candidates[0][3]
 
 
 def synthesise_equipment_feeders(total_current_a: float,
@@ -534,3 +581,55 @@ def synthesise_equipment_feeders(total_current_a: float,
                               voltage_v=voltage_v, is_busbar=isb,
                               note="control/instrument distribution"))
     return feeders
+
+
+# ── selftest — regression guard for the load_reconcile blanket-match family ──────────────
+def _selftest() -> int:
+    """Proves the per-equipment kW matcher resolves each item to ITS OWN quantity (the
+    120×-recurring load_reconcile root cause 2026-07-02). Run: python3 <me> --selftest"""
+    q = {
+        "fertigation_dosing_pump_power_kw": {"value": 7.5},
+        "ro_high_pressure_pump_power_kw": {"value": 4.2},
+        "drain_transfer_pump_power_kw": {"value": 1.923},
+        "irrigation_pump_motor_kw": {"value": 9.653},
+        "acid_dosing_pump_power_kw": {"value": 0.04},
+        "chemical_dosing_pump_power_kw": {"value": 0.04},
+        "connected_electrical_load_kw": {"value": 53},
+        "hvac_chiller_capacity_kw": {"value": 1617},   # thermal — must never feed a motor
+    }
+    fails = 0
+
+    def chk(name, cond):
+        nonlocal fails
+        if not cond:
+            fails += 1
+            print(f"  ✗ {name}")
+        else:
+            print(f"  ✓ {name}")
+
+    f = _equip_kw_from_quantities
+    chk("E1.fertigation_own_kw_not_blanket", f("Fertigation Dosing Pump", q) == 7.5)
+    chk("E2.ro_own_kw", f("Ro High Pressure Pump", q) == 4.2)
+    chk("E3.drain_own_kw", f("Drain Transfer Pump", q) == 1.923)
+    chk("E4.irrigation_own_kw", f("Irrigation Pump", q) == 9.653)
+    chk("E5.unmatched_returns_none", f("Hand Watering Pump", q) is None)
+    chk("E6.no_substring_ride", f("Membrane Crane Hoist", q) is None)     # 'ran'∉'drain'
+    chk("E7.stem_prefix_matches", f("Recirculation Pump",
+        {"recirc_pump_motor_kw": {"value": 4.0}}) == 4.0)
+    chk("E8.thermal_never_a_feeder", f("Chiller Skid",
+        {"hvac_chiller_capacity_kw": {"value": 1617}}) is None)
+    chk("E9.ambiguous_tie_returns_none", f("Dosing Pump", q) is None)     # acid vs chemical vs fertigation tie
+    chk("E10.require_re_scopes_keys", f("Fertigation Dosing Pump", q,
+        require_key_re=re.compile(r"pump|motor")) == 7.5)
+    # determinism: identical result under reversed insertion order
+    q_rev = dict(reversed(list(q.items())))
+    chk("E11.insertion_order_invariant",
+        all(f(n, q) == f(n, q_rev) for n in
+            ("Fertigation Dosing Pump", "Ro High Pressure Pump", "Drain Transfer Pump",
+             "Irrigation Pump", "Hand Watering Pump", "Dosing Pump")))
+    print(f"[edm-selftest] {'PASS' if fails == 0 else f'FAIL ({fails})'}")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__" and "--selftest" in sys.argv:
+    raise SystemExit(_selftest())

@@ -1,8 +1,8 @@
-// AUTO-DRAFTED regression-harness invariant stub — 2026-06-26T09:33:29.846Z
+// AUTO-DRAFTED regression-harness invariant stub — 2026-07-01T19:34:23.461Z
 // Origin: gate 'drawing:load_reconcile' FAILED on class 'water_treatment', routed to fix-stage: contract (connected_electrical_load_kw) + panel kW resolution.
-// Loss recurrence in the ledger: 16  ⚠ RECURRING — escalate to a coding-council, do not just stub.
-// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v9  @ 1073daf8b
-// Detail: single-line-diagram: panel total 133 kW vs contract 48 kW (ratio 2.77, ±15%)
+// Loss recurrence in the ledger: 120  ⚠ RECURRING — escalate to a coding-council, do not just stub.
+// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/fischer-codema-v49  @ 30a11c255
+// Detail: single-line-diagram: panel total 68 kW vs contract 53 kW (ratio 1.28, ±15%)
 //
 // TODO(human/council): implement the DETERMINISTIC assertion that would have CAUGHT this
 // at fix-stage 'contract (connected_electrical_load_kw) + panel kW resolution', then MOVE it into scripts/regression-harness.tsx

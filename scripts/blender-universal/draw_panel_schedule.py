@@ -1480,28 +1480,18 @@ def _panel_pump_kw_by_name(name: str, state: dict) -> Optional[float]:
     both shown at 9.65 — and tripped the load_reconcile drawing-gate). Best token-overlap wins; the
     generic 'pump'/'motor'/'power' tokens are dropped so the DISTINGUISHING noun decides. Returns
     None when no pump-specific quantity matches by name (caller falls through to ledger/duty)."""
-    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
-    _GEN = {"pump", "motor", "power", "kw", "dosing", "transfer", ""}
-    t_toks = set(_norm_load_name(name).split()) - _GEN
-    if not t_toks:                                   # name was only generic words
-        t_toks = set(_norm_load_name(name).split()) - {"pump", "motor", ""}
-    if not t_toks:
-        return None
-    best = None
-    for k, vv in q.items():
-        kl = k.lower()
-        if not kl.endswith("_kw") or ("pump" not in kl and "motor" not in kl):
-            continue
-        val = vv.get("value") if isinstance(vv, dict) else vv
-        if not isinstance(val, (int, float)) or val <= 0:
-            continue
-        k_toks = set(re.split(r"[_\s]+", kl)) - _GEN
-        overlap = len(t_toks & k_toks)
-        if overlap == 0:
-            continue
-        if best is None or overlap > best[0]:
-            best = (overlap, float(val))
-    return best[1] if best else None
+    # ONE shared matcher — edm._equip_kw_from_quantities (the 2026-07-02 half-fix lesson:
+    # this distinguishing-token logic lived TWICE; only this copy got the 06-29 fix while
+    # synthesise_equipment_feeders kept the blanket match and re-broke load_reconcile for
+    # 120 runs). The panel scopes candidates to pump/motor keys via require_key_re.
+    q = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qq = (state.get(ck) or {}).get("quantities")
+        if isinstance(qq, dict) and qq:
+            q = qq
+            break
+    return edm._equip_kw_from_quantities(name, q,
+                                         require_key_re=re.compile(r"pump|motor"))
 
 
 def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
