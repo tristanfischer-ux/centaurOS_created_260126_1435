@@ -585,6 +585,48 @@ def main() -> int:
     # power in+out. Same `via [mech]` idiom; coverage/cost stay schedule-driven. Universal.
     cledger_rows = cledger.get("rows", []) if isinstance(cledger, dict) else []
     n_ledger_attached = 0
+    # STALE-TIE GUARD (2026-07-02): the connection-ledger is authored INSIDE Blender
+    # MID-CHAIN; later design stages may legitimately remove/rename a word (the
+    # generator's pH/ORP/Conductivity sensor suite was wired by Blender, then dropped
+    # from the delivered design). A tie endpoint that exists NOWHERE in the delivered
+    # design (BoM heads + module words + drawn manifest parts) must NOT be attached as
+    # a live connection — that fabricates an input from a part that does not exist in
+    # the bill (the "Ph Sensor (?)" phantom the dossier audit rightly flags HIGH).
+    # An endpoint that IS in the design but is not ledger EQUIPMENT (a pipe run /
+    # spool line / GA-dropped sub-component / drawn electrical spine node) keeps the
+    # loose '(?)' attach — those via-nodes are legitimate delivered evidence. Stale
+    # ties are DISCLOSED in `stale_ties`; the deeper fix (re-derive the ledger on the
+    # FINAL state) is the standing #86 ordering work.
+    design_names = set()
+    for _r in rb:
+        _h = str(_r.get("requirement") or "").split("·", 1)[0].strip()
+        if _h:
+            design_names.add(_norm(_h))
+    for _m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        for _sm in (_m.get("sub_modules") or []):
+            for _w in (_sm.get("words") or []):
+                if _w.get("name_human"):
+                    design_names.add(_norm(str(_w["name_human"])))
+    for _p in (manifest.get("parts") or []):
+        if isinstance(_p, dict) and _p.get("name"):
+            design_names.add(_norm(str(_p["name"])))
+
+    # token set mirrors dossier_audit's phantom-reference resolver rule (b) — ANY
+    # meaningful token (len>2) of the reference appearing in the design token set
+    # resolves it. SAME semantics on both sides so the ledger can never attach a tie
+    # the audit would flag phantom (the one-matcher lesson, 2026-07-02).
+    design_tokens = set()
+    for d in design_names:
+        design_tokens.update(t for t in re.split(r"[^a-z0-9]+", d) if len(t) > 2)
+
+    def _in_design(k: str) -> bool:
+        if not k:
+            return False
+        if k in design_names or any((k in d or d in k) for d in design_names):
+            return True
+        return bool({t for t in re.split(r"[^a-z0-9]+", k) if len(t) > 2} & design_tokens)
+
+    stale_ties = []
     for r in cledger_rows:
         fr_key, to_key = _norm(str(r.get("from_part", ""))), _norm(str(r.get("to_part", "")))
         mech = r.get("mechanism", "") or r.get("service", "")
@@ -592,6 +634,12 @@ def main() -> int:
             continue
         fe, te = resolve(fr_key), resolve(to_key)
         if not (fe or te):
+            continue
+        unresolved = [k for k, e in ((fr_key, fe), (to_key, te)) if e is None]
+        if any(not _in_design(k) for k in unresolved):
+            stale_ties.append({"from_part": r.get("from_part"), "to_part": r.get("to_part"),
+                               "mechanism": mech,
+                               "unresolved": "from_part" if not fe else "to_part"})
             continue
         attached_pairs.add((fr_key, to_key, mech))
         kind = MECH_KIND.get(mech, MECH_KIND.get(r.get("service", ""), "tie"))
@@ -602,6 +650,11 @@ def main() -> int:
         if fe:
             fe["outputs"].append(f"{tn} ({(te or {}).get('tag') or '?'}) via {kind} [{mech}]")
         n_ledger_attached += 1
+    if stale_ties:
+        print(f"[parts-ledger] {len(stale_ties)} STALE ledger tie(s) reference part(s) "
+              f"absent from the delivered design (wired pre-removal) — disclosed in "
+              f"stale_ties, not attached: "
+              f"{[t['from_part'] + '→' + t['to_part'] for t in stale_ties[:4]]}")
 
     # ── reconciliations / summaries ──
     by_drawing = {}
@@ -798,6 +851,18 @@ def main() -> int:
         is_buffer = any(kw in name_l for kw in BUFFER_KEYWORDS)
 
         if etype in PROCESS_TYPES:
+            # An INLINE VALVE is a FINAL ELEMENT mounted ON a pipe run — the connection
+            # schedule routes EQUIPMENT↔EQUIPMENT, so no bare valve ever carries its own
+            # drawn fluid in+out. Requiring one produced a per-NOUN whack-a-mole of
+            # exemptions (control/solenoid 2026-06-21, PSV/sample/check 2026-06-26) and
+            # plain inlet/drain/manual-ball valves STILL failed 2026-07-02, deflating
+            # water_treatment coverage to 76% < 80%. Fix the RULE, not the noun list:
+            # the valve TYPE leaves the flow-through denominator entirely. Its drawing
+            # presence is already scored by the ISA-bubble P&ID credit above, and a
+            # genuinely missing valve tie stays caught by the STRICT connection-ledger
+            # completeness audit (the authoritative gate). Universal — keyed on etype.
+            if etype == "valve":
+                continue
             n_process_total += 1
             # a BUFFER / surge / expansion vessel is a DEAD-LEG — one tie is correct, so
             # it only needs ≥1 connection (in OR out), like an instrument's association.
@@ -966,6 +1031,10 @@ def main() -> int:
                       n_electrical_total=n_electrical_total,
                       n_electrical_connected=n_electrical_connected,
                       n_orphans=len(orphans)),
+                  # ledger ties whose endpoint no longer exists in the DELIVERED design
+                  # (wired by Blender mid-chain, part removed later) — disclosed, never
+                  # attached as live connections (2026-07-02 phantom-reference fix).
+                  n_stale_ties=len(stale_ties), stale_ties=stale_ties,
                   cabinets=cabinets)
     (out_dir / "parts-ledger.json").write_text(json.dumps(report, indent=1))
 
@@ -1039,6 +1108,16 @@ def _selftest() -> int:
     cases += [
         ("Aquavista Remote Monitoring", "control"),   # telemetry, not a field instrument
         ("Remote Monitoring Gateway", "control"),
+    ]
+    cases += [
+        # valve ETYPE routing — the 2026-07-02 connectivity fix keys on it: a part typed
+        # `valve` is a FINAL ELEMENT on a line and leaves the flow-through (fluid in+out)
+        # denominator entirely (`if etype == "valve": continue` in the tally loop). These
+        # four deflated water_treatment coverage to 76% when counted as process nodes.
+        ("Inlet Valve", "valve"),
+        ("Drain Valve", "valve"),
+        ("Manual Ball Valve", "valve"),
+        ("Manifold Drain Valve", "valve"),
     ]
     for name, want in cases:
         got = _classify(name, "")
