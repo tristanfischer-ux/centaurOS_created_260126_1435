@@ -173,9 +173,20 @@ export async function emitGenericDesign(
   // the design + the Blender faithfully reflect the physics the contract computed.
   let physicsEquipment = { sized: 0, synthesized: 0 }
   try {
+    // Brief target metrics (demand-coverage rule 4): the orchestrator's flattened
+    // ParsedConstraints carries the parsed brief's target_performance object verbatim —
+    // metrics[] when the brief lists several, else the headline {value,unit} as one row
+    // (the same fallback the workbook's compliance matrix + the chain's floor probe use).
+    const tp = brief?.target_performance as
+      | { value?: unknown; unit?: string; metrics?: Array<Record<string, unknown>> }
+      | undefined
+    const briefMetrics = (Array.isArray(tp?.metrics) && tp.metrics.length > 0
+      ? tp.metrics
+      : tp && Number.isFinite(Number(tp.value)) ? [tp] : []) as never[]
     const r = applyUniversalContractSizing(modules as never[], contract, {
       onlyUnsized: true,
       synthesizeMissing: true,
+      briefMetrics,
     })
     physicsEquipment = { sized: r.sized, synthesized: r.synthesized }
     if (r.sized || r.synthesized) {

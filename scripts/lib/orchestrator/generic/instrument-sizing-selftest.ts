@@ -293,8 +293,120 @@ function run() {
   const legacyDim = String((() => { for (const m of legacyModules) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) { const d = (w.modifier_characters ?? []).find((x: any) => x.kind === 'dimension'); if (d) return d.value } return '' })())
   if (legacyDim !== '700x595x770 mm') throw new Error(`synth-dims: a non-pump/media throughput device must keep the LEGACY throughput box (700x595x770 mm at 40 m³/h), got "${legacyDim}" — the dispatch over-reached beyond pump/media families`)
 
+  // ── DEMAND-COVERAGE rules 3+4: loop flows + brief-metric delivery (codema v52, 2026-07-02) ──
+  // rule 4a: a COUNT-family brief metric with a count-noun unit the matcher can't promote
+  // ('trays') must yield a delivered served-count in the metric's unit, derived from the
+  // design's structural count — in BOTH paths; a metric with NO structural basis stays
+  // un-minted (honest UNVERIFIED); an already-verifiable metric mints nothing.
+  const v52Metrics: any[] = [
+    { key_metric: 'total_cultivation_containers', value: 6000, unit: 'trays', category: 'scale' },
+    { key_metric: 'max_irrigation_demand_per_department', value: 45, unit: 'm3/hr', category: 'scale' },
+    { key_metric: 'ro_permeate_capacity', value: 8, unit: 'm3/hr', category: 'scale' },   // already verifiable
+    { key_metric: 'orphan_widget_total', value: 12, unit: 'widgets', category: 'scale' }, // NO structural basis
+  ]
+  const mkV52Contract = (): any => ({ quantities: {
+    cultivation_container_count: { value: 6000, unit: '', source: 'brief', source_detail: '2 dept × 10 tunnels × 5 layers × 4 rows × 15' },
+    irrigation_demand_m3_h: { value: 90, unit: 'm³/h', source: 'calculator' },
+    ro_permeate_capacity_m3_h: { value: 8, unit: 'm³/h', source: 'brief' },
+    drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+    gac_softener_throughput_m3_h: { value: 14.5, unit: 'm³/h', source: 'brief' },
+    acid_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+    chemical_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+  } })
+  const mkLoopMods = (): any => ([
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [
+      { id: 'drain_collection_sump_word', name_human: 'Drain Collection Sump', content_character: { character_id: 'drain_collection_sump', name_human: 'Drain Collection Sump' }, modifier_characters: [{ kind: 'quantity', value: '×2' }] },
+      { id: 'softener_vessel_word', name_human: 'Softener Vessel', content_character: { character_id: 'softener_vessel', name_human: 'Softener Vessel' }, modifier_characters: [{ kind: 'quantity', value: '×2' }] },
+      { id: 'permeate_outlet_word', name_human: 'Permeate Outlet', content_character: { character_id: 'permeate_outlet', name_human: 'Permeate Outlet' }, modifier_characters: [] },
+      // AMBIGUITY counter-case: 'Nutrient Dosing Tank' shares 'dosing' with TWO dosing-pump
+      // flow families → must NOT be given a line duty (never a guess).
+      { id: 'nutrient_dosing_tank_word', name_human: 'Nutrient Dosing Tank', content_character: { character_id: 'nutrient_dosing_tank', name_human: 'Nutrient Dosing Tank' }, modifier_characters: [] },
+      // NO-BASIS counter-case: no flow family shares a distinctive token → honest null.
+      { id: 'fresh_water_tank_word', name_human: 'Fresh Water Tank', content_character: { character_id: 'fresh_water_tank', name_human: 'Fresh Water Tank' }, modifier_characters: [] },
+      // INLINE-DEVICE counter-case: a valve sits ON a line — never a stream endpoint.
+      { id: 'inlet_flow_control_valve_word', name_human: 'Inlet Flow Control Valve', content_character: { character_id: 'inlet_flow_control_valve', name_human: 'Inlet Flow Control Valve' }, modifier_characters: [] },
+    ] }] },
+    { module: 'maintenance_serviceability', sub_modules: [{ id: 'maint', words: [
+      { id: 'cip_tank_word2', name_human: 'Cip Tank', content_character: { character_id: 'cip_tank', name_human: 'Cip Tank' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+    ] }] },
+  ])
+  const dcv1: any = mkV52Contract()
+  const dcvMods1 = mkLoopMods()
+  applyUniversalContractSizing(dcvMods1 as never[], dcv1, { dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: v52Metrics })
+  const dcv2: any = mkV52Contract()
+  const dcvMods2 = mkLoopMods()
+  reconcilePrincipalEquipment(dcvMods2 as never[], dcv2, { briefMetrics: v52Metrics })
+  for (const [label, c] of [['PATH-1', dcv1], ['PATH-2', dcv2]] as const) {
+    const served = c.quantities.cultivation_container_served_trays
+    if (served?.value !== 6000 || String(served?.unit) !== 'trays' || String(served?.source) !== 'demand-coverage')
+      throw new Error(`${label} brief-metric coverage: cultivation_container_served_trays must be minted (6000, unit 'trays', source demand-coverage) from the design's cultivation_container_count so the 'trays'-unit metric verifies — got ${JSON.stringify(served)}`)
+    const perDept = c.quantities.irrigation_per_department_delivered_m3_h
+    if (perDept?.value !== 45)
+      throw new Error(`${label} brief-metric coverage: irrigation_per_department_delivered_m3_h must be minted = delivered 90 ÷ 2 departments = 45 (shares from the system demand echo), got ${JSON.stringify(perDept)}`)
+    for (const k of Object.keys(c.quantities)) {
+      if (/widget/.test(k)) throw new Error(`${label} brief-metric coverage: a metric with NO structural basis must stay UNVERIFIED (honest red) — found fabricated ${k}`)
+      if (/ro_permeate.*(delivered|served)/.test(k)) throw new Error(`${label} brief-metric coverage: an already-verifiable metric must mint NOTHING — found redundant ${k}`)
+    }
+    // rule 3a: CIP recirc duty = one charge (0.15×90 clamped to 2 m³) turned over in 30 min → 4 m³/h
+    if (c.quantities.cip_tank_line_flow_m3_h?.value !== 4)
+      throw new Error(`${label} loop-flow: cip_tank_line_flow_m3_h must be one cleaning charge (2 m³) × 2/h = 4 m³/h, got ${JSON.stringify(c.quantities.cip_tank_line_flow_m3_h)}`)
+    // rule 3b: unique distinctive-token family → service duty; ambiguity/no-basis/valve → nothing
+    if (c.quantities.drain_collection_sump_line_flow_m3_h?.value !== 45)
+      throw new Error(`${label} loop-flow: the drain sump must take its drain-TRANSFER pump duty (45 m³/h) as its service-line flow`)
+    if (c.quantities.softener_vessel_line_flow_m3_h?.value !== 14.5)
+      throw new Error(`${label} loop-flow: the softener vessel must take the softener-train throughput (14.5 m³/h)`)
+    if (c.quantities.permeate_outlet_line_flow_m3_h?.value !== 8)
+      throw new Error(`${label} loop-flow: the permeate outlet must take the RO permeate capacity (8 m³/h)`)
+    if (c.quantities.nutrient_dosing_tank_line_flow_m3_h !== undefined)
+      throw new Error(`${label} loop-flow: TWO dosing families share 'dosing' — an ambiguous endpoint must get NO line duty (never a guess)`)
+    if (c.quantities.fresh_water_tank_line_flow_m3_h !== undefined)
+      throw new Error(`${label} loop-flow: an endpoint with NO distinctive-token flow family must stay null (honest UNVERIFIED), not be fabricated`)
+    if (c.quantities.inlet_flow_control_valve_line_flow_m3_h !== undefined)
+      throw new Error(`${label} loop-flow: a VALVE is an inline device, never a stream endpoint — it must get no line duty`)
+  }
+  // a `_line_flow_m3_h` key must NEVER mint an equipment group / phantom word (buildGroups skip)
+  const wordNames = (ms: any[]): string[] => {
+    const out: string[] = []
+    for (const m of ms) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) out.push(String(w.name_human ?? ''))
+    return out
+  }
+  const phantomMods: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(phantomMods as never[], { quantities: { cip_tank_line_flow_m3_h: { value: 40 } } } as any, { dedupeAndStrip: false, explode: false, instrument: false })
+  if (wordNames(phantomMods).length !== 0)
+    throw new Error(`loop-flow: a <endpoint>_line_flow_m3_h quantity is a CONNECTION duty and must NOT synthesise equipment — got phantom word(s) ${JSON.stringify(wordNames(phantomMods))}`)
+  // IDEMPOTENCY: a SECOND pass over the already-minted contract must change NOTHING — in
+  // particular pass 2 must not chain new endpoints off pass 1's _line_flow mints (the
+  // 'Piping Manifold' ← permeate_manifold_line_flow 'manifold'-token chaining bug).
+  const dcv1Before = JSON.stringify(dcv1.quantities)
+  applyUniversalContractSizing(mkLoopMods() as never[], dcv1, { dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: v52Metrics })
+  if (JSON.stringify(dcv1.quantities) !== dcv1Before)
+    throw new Error('demand-coverage rules 3+4 are NOT idempotent — a second synthesis pass changed the contract (rule-3 mints must never be flow SOURCES for later passes)')
+  // no-overwrite: an endpoint that already carries a join-visible flow key gets NO line duty
+  const dcv3: any = mkV52Contract()
+  dcv3.quantities.cip_tank_flow_m3_h = { value: 6.5, unit: 'm³/h', source: 'tool:process:cip-sizing' }
+  applyUniversalContractSizing(mkLoopMods() as never[], dcv3, { dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: v52Metrics })
+  if (dcv3.quantities.cip_tank_line_flow_m3_h !== undefined || dcv3.quantities.cip_tank_flow_m3_h?.value !== 6.5)
+    throw new Error('loop-flow: a tool-emitted endpoint flow always wins — a second (line) key would also make the ledger-join prefix AMBIGUOUS')
+  // BESS-like byte-identity holds WITH briefMetrics + modules supplied (all metrics either
+  // verify already or have no count/flow basis → zero mints)
+  const bessMetrics: any[] = [
+    { key_metric: 'nameplate_capacity_kwh', value: 3500, unit: 'kWh', category: 'scale' },
+    { key_metric: 'round_trip_efficiency_percent', value: 88, unit: '%', category: 'efficiency' },
+  ]
+  const bessC2: any = { quantities: {
+    nameplate_capacity_kwh: { value: 3500, unit: 'kWh' },
+    battery_night_demand_kw: { value: 120, unit: 'kW' },
+    rack_count: { value: 15, unit: '' },
+  } }
+  const bessBefore2 = JSON.stringify(bessC2)
+  applyUniversalContractSizing([{ module: 'energy_storage_source', sub_modules: [{ id: 'sm', words: [
+    { id: 'expansion_tank_word', name_human: 'Expansion Tank', content_character: { character_id: 'expansion_tank', name_human: 'Expansion Tank' }, modifier_characters: [] },
+  ] }] }] as any, bessC2, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: bessMetrics })
+  if (JSON.stringify(bessC2) !== bessBefore2)
+    throw new Error('demand-coverage rules 3+4: a BESS-like contract (no m³/h flows, metrics already-verifiable or basis-less) must stay BYTE-IDENTICAL with briefMetrics + modules supplied')
+
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied)')
 }
 
 run()

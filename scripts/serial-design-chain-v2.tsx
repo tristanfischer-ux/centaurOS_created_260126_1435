@@ -6784,9 +6784,19 @@ async function main() {
       } catch (err) {
         console.error(`[chain] attribute-phantom cleanup failed (non-fatal): ${(err as Error).message}`)
       }
+      // Brief target metrics (demand-coverage rule 4 — Tristan issue 4, codema v52): the
+      // reconcile's mintDemandCoverage needs the parsed brief's target_performance metrics
+      // so EVERY brief metric ends with a DELIVERED contract quantity the workbook matcher
+      // (and the deterministic brief_compliance floor probe) can verify — or stays honestly
+      // UNVERIFIED. Same metrics[]-else-headline fallback as the floor probe.
+      const _tpForCoverage: any = (state as any).parsedBrief?.constraints?.target_performance
+      const briefMetricsForCoverage: any[] = Array.isArray(_tpForCoverage?.metrics) && _tpForCoverage.metrics.length > 0
+        ? _tpForCoverage.metrics
+        : (_tpForCoverage && Number.isFinite(Number(_tpForCoverage.value)) ? [_tpForCoverage] : [])
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,
         reconcileContract,
+        { briefMetrics: briefMetricsForCoverage },
       )
       console.error(
         `[chain] principal-equipment reconcile (deterministic, contract-keyed): ` +

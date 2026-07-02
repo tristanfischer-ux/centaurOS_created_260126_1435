@@ -208,6 +208,13 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
     // no archetype carries a legitimate `calc_*` quantity (BESS/CO2/e-fuel = 0). Same family as the
     // computed_* twin reconciliation — see reconcileComputedTwins + stripComputedToken.
     if (/(^|_)calc_/i.test(key)) continue
+    // A `<endpoint>_line_flow_m3_h` quantity is a SERVICE-LINE duty published for the
+    // topology flow-demand join (mintDemandCoverage rule 3: CIP recirculation / drain
+    // transfer / train service flows, keyed on the endpoint slug so derive-topology's
+    // joinFlowDemandsOntoTopology + connection_ledger.join_flow_demands pick them up).
+    // It describes a CONNECTION (a pipe), never equipment — it must not mint or resize
+    // an equipment group (same family as the calc_*/building_* skips above).
+    if (SERVICE_LINE_FLOW_KEY_RE.test(key)) continue
     let matched: { phrase: string; measure: Measure; perEach: boolean; volRole?: number } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {
@@ -831,16 +838,177 @@ function hydraulicMotorKwForFlow(m3h: number): number {
   return Math.round(((m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF)) * 1000) / 1000
 }
 
+// ── rule-3 (service-loop flow publication) machinery — routed follow-up of the daed1aeab
+// flow-demand join (Tristan 2026-07-02). The join sizes a fluid line from a quantity keyed
+// on an ENDPOINT slug; these constants mirror its match surface. ──────────────────────────
+// suffixes the ledger/topology join reads (derive-topology FLOW_QTY_SUFFIXES ∪
+// connection_ledger._FLOW_QTY_SUFFIXES): any such key on an endpoint-slug prefix makes the
+// endpoint join-visible — a second one would make the prefix AMBIGUOUS and null the join,
+// so rule 3 mints ONLY for an endpoint with none.
+const JOIN_VISIBLE_FLOW_RE = /_(throughput|flow|demand|capacity)_(m3_h|m3_per_hr)$/
+// rule-3 mint suffix: join-visible (ends `_flow_m3_h`) but SKIPPED by buildGroups — a
+// service-LINE duty describes a connection (a pipe), never an equipment group.
+const SERVICE_LINE_FLOW_KEY_RE = /_line_flow_(m3_h|m3_hr|m3_per_hr)$/
+// rule-3b delivered-flow SOURCE keys. An echo (…_demand_…) is never a source — rule 1
+// already turns a demand into a delivered pump flow.
+const DELIVERED_FLOW_SOURCE_RE = /_(flow|throughput|capacity|delivery)_(m3_h|m3_hr|m3_per_hr)$/
+const FLOW_ECHO_TOKEN_RE = /(^|_)(demand|required|requested|target|setpoint)(_|$)/
+// name tokens that carry no endpoint identity (derive-topology GENERIC_FLOW_TOKENS + the
+// module/bank/plant fillers): a rule-3b mint must be decided by a DISTINCTIVE token only
+// (f9dfc2918 discipline — generic tokens never decide).
+const GENERIC_ENDPOINT_TOKENS = new Set([
+  'pump', 'tank', 'vessel', 'filter', 'water', 'system', 'unit', 'skid', 'motor',
+  'line', 'pipe', 'main', 'process', 'supply', 'module', 'bank', 'plant',
+  // measure words — every flow-source key carries one; they must never decide a match
+  'flow', 'throughput', 'capacity', 'delivery', 'control',
+  // structural stream nouns — a manifold/outlet/inlet is WHAT the part is, not WHOSE
+  // stream it carries; only the stream identity token (permeate/drain/…) may decide
+  'manifold', 'outlet', 'inlet', 'header', 'nozzle',
+])
+// PROCESS vessel / boundary nouns eligible for a rule-3b service-line duty. A pump /
+// blower / compressor / fan is a fluid MOVER — its delivery is rules 1–2, never 3b; a
+// VALVE is an INLINE device (it sits ON a line, it is not a stream endpoint).
+const PROCESS_STREAM_NOUN_RE =
+  /\b(tanks?|vessels?|sumps?|basins?|silos?|reservoirs?|cisterns?|clarifiers?|filters?|softeners?|skids?|columns?|towers?|membranes?|outlets?|inlets?|manifolds?|separators?|drums?)\b/i
+const FLUID_MOVER_NOUN_RE = /\b(pumps?|blowers?|compressors?|fans?|valves?)\b/i
+// CIP recirculation turnover: one cleaning-solution charge (the one-charge rule, 27888aeff)
+// turned over in 20–30 min industry practice; 30 min = the conservative low end.
+const CIP_RECIRC_TURNOVER_MIN = 30
+const slugifyEndpointName = (name: unknown): string =>
+  String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+const depluralToken = (t: string): string => (t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t)
+
+// ═══ WORKBOOK COMPLIANCE-MATCHER MIRROR (rule-4 mint-GATING only) ═══════════════════════
+// A faithful TS mirror of build-excel-export.py::_match_quantity (+ _unit_family /
+// _norm_qty_name / _ECHO_SUFFIXES / _QTY_STOP_TOKENS) used ONLY to decide whether a brief
+// target metric ALREADY has a verifiable DELIVERED contract quantity — when it does, rule 4
+// mints nothing. It never scores compliance: the deterministic floor + the workbook still
+// import the real python matcher (agreement-by-construction, a503acdde). Mirror drift is
+// SAFE in both directions: a false-"matched" skips a mint (the row stays honest
+// UNVERIFIED); a false-"unmatched" mints a redundant delivered quantity (still honest —
+// its value derives from the design, never from the target).
+export interface BriefTargetMetric {
+  key_metric?: string
+  metric?: string
+  name?: string
+  value?: unknown
+  unit?: string
+  category?: string
+}
+const MATCHER_ECHO_SUBSTRINGS = ['_requested', '_request', '_target', '_demand', '_brief', '_spec'] as const
+const MATCHER_NAME_UNIT_SUFFIX_RE =
+  /_(kwh|mwh|gwh|wh|kw|mw|gw|w|kva|mva|kv|mv|v|ka|ma|a|percent|pct|cycles?|kg|t|m2|m3|c)$/
+const MATCHER_STOP_TOKENS = new Set([
+  'the', 'of', 'per', 'system', 'total', 'design', 'rated', 'nominal',
+  'm3', 'm2', 'm', 'l', 'hr', 'h', 'hour', 'hrs', 'min', 'mins', 'sec', 's', 'day', 'yr', 'year',
+  'kw', 'mw', 'gw', 'w', 'kwh', 'mwh', 'gwh', 'wh', 'kg', 'kt', 't', 'g', 'v', 'kv', 'a', 'ka', 'ma',
+  'bar', 'pa', 'kpa', 'mpa', 'psi', 'c', 'k', 'pct', 'percent', 'mm', 'cm', 'km', 'nm', 'ppm',
+  'capacity', 'throughput', 'flow', 'rate', 'demand', 'output', 'volume', 'duty', 'load',
+])
+const MATCHER_UNIT_FAMILY: Record<string, string> = {
+  tpy: 't_per_yr', 't/yr': 't_per_yr', 't/y': 't_per_yr', 'tonnes/yr': 't_per_yr',
+  'tonne/yr': 't_per_yr', 'te/yr': 't_per_yr', 'kg/yr': 't_per_yr',
+  m3: 'volume_m3', litre: 'volume_m3', l: 'volume_m3', litres: 'volume_m3',
+  'm3/h': 'flow_m3h', 'm3/hr': 'flow_m3h', m3perhr: 'flow_m3h', 'm3/hour': 'flow_m3h',
+  m3ph: 'flow_m3h', 'l/h': 'flow_m3h', lph: 'flow_m3h', 'l/s': 'flow_m3h', lps: 'flow_m3h',
+  count: 'count', nr: 'count', no: 'count', qty: 'count', ea: 'count', off: 'count',
+  pcs: 'count', pieces: 'count', '#': 'count',
+  'kg/m3': 'density', 'g/l': 'density',
+  days: 'time_days', day: 'time_days', d: 'time_days', hr: 'time_days', hours: 'time_days', h: 'time_days',
+  kg: 'mass_kg', g: 'mass_kg', t: 'mass_kg', tonne: 'mass_kg', tonnes: 'mass_kg',
+  wh: 'energy_kwh', kwh: 'energy_kwh', mwh: 'energy_kwh', gwh: 'energy_kwh',
+  w: 'power_kw', kw: 'power_kw', mw: 'power_kw', gw: 'power_kw',
+  v: 'voltage_v', kv: 'voltage_v', mv: 'voltage_v',
+  a: 'current_a', ka: 'current_a', ma: 'current_a',
+  c: 'temp_c', degc: 'temp_c', celsius: 'temp_c',
+  ratio: 'ratio', '': 'ratio', '-': 'ratio',
+}
+function matcherUnitFamily(unit: unknown): string {
+  const u = String(unit ?? '').trim().toLowerCase().replace(/ /g, '')
+    .replace(/³/g, '3').replace(/²/g, '2').replace(/\^/g, '').replace(/·/g, '.')
+    .replace(/μ/g, 'u').replace(/°/g, '')
+  return MATCHER_UNIT_FAMILY[u] ?? '?' + u
+}
+function matcherNormName(s: unknown): string {
+  return String(s ?? '').toLowerCase().replace(MATCHER_NAME_UNIT_SUFFIX_RE, '')
+}
+/** letters-only identity tokens of a NORMED name, minus the matcher's stop tokens. */
+function matcherIdentityTokens(normed: string): Set<string> {
+  return new Set((normed.match(/[a-z]+/g) ?? []).filter((t) => !MATCHER_STOP_TOKENS.has(t)))
+}
+const MATCHER_COUNT_KEY_RE = /(?:_|^)(?:count|qty|number|nr)$/
+const MATCHER_COUNT_NOUN_RE =
+  /^(?:valves?|containers?|vials?|units?|drums?|modules?|racks?|cells?|tanks?|pumps?|bags?|cartridges?|elements?|skids?|trains?)$/
+/** the metric's unit family AFTER the matcher's count-noun promotion. */
+function matcherMetricFamily(metric: BriefTargetMetric, bKey: string): string {
+  let bFam = matcherUnitFamily(metric.unit ?? '')
+  const unitRaw = String(metric.unit ?? '').trim().toLowerCase()
+  if (bFam.startsWith('?') && (MATCHER_COUNT_KEY_RE.test(bKey) || MATCHER_COUNT_NOUN_RE.test(unitRaw))) bFam = 'count'
+  return bFam
+}
+/** true ⇢ _match_quantity would return a match for this metric over these contract
+ *  quantities (name+unit-family arithmetic — no values compared, no scoring). */
+function matcherWouldVerify(
+  metric: BriefTargetMetric,
+  contractQuantities: Record<string, unknown>,
+): boolean {
+  const bKey = String(metric.key_metric ?? metric.metric ?? metric.name ?? '').toLowerCase().trim()
+  if (!bKey) return true // unnamed metric — nothing a mint could ever verify
+  const bFam = matcherMetricFamily(metric, bKey)
+  const bNorm = matcherNormName(bKey)
+  const bTokens = matcherIdentityTokens(bNorm)
+  const famOk = (aFam: string, qname: string): boolean => {
+    if (aFam === bFam) return true
+    if (bFam === 'count') {
+      return (aFam === 'count' || aFam === 'ratio' || aFam.startsWith('?')) &&
+        /(count|qty|number|_nr|valves?|containers?|units?)$/.test(qname.toLowerCase())
+    }
+    return false
+  }
+  const need = Math.max(1, Math.floor((bTokens.size + 1) / 2))
+  for (const [qname, qv] of Object.entries(contractQuantities)) {
+    if (!qv || typeof qv !== 'object') continue
+    const ql = qname.toLowerCase()
+    if (MATCHER_ECHO_SUBSTRINGS.some((e) => ql.includes(e))) continue
+    const aVal = Number((qv as { value?: unknown }).value)
+    if (!Number.isFinite(aVal)) continue
+    if (!famOk(matcherUnitFamily((qv as { unit?: unknown }).unit), qname)) continue
+    if (ql === bKey || matcherNormName(qname) === bNorm) return true // (1) exact name
+    let overlap = 0
+    for (const t of matcherIdentityTokens(matcherNormName(ql))) if (bTokens.has(t)) overlap += 1
+    if (overlap >= need) return true // (2) token-overlap path
+  }
+  return false
+}
+// brief-metric qualifier tokens (peak/max framing) — excluded from a rule-4 mint's
+// identity core; echo words are excluded too so the minted NAME can never read as an echo.
+const METRIC_QUALIFIER_TOKENS = new Set([
+  'max', 'maximum', 'peak', 'min', 'minimum', 'mean', 'average', 'avg',
+  'demand', 'required', 'requested', 'target', 'setpoint', 'request', 'brief', 'spec',
+])
+
 export interface DemandCoverageMint { key: string; value: number; unit: string; from: string }
 
-/** Mint the DELIVERED supply-pump quantities every fluid-delivery demand implies (rule 1)
- *  and the motor floor every pump-named flow family implies (rule 2) — see the block
- *  comment above. Mutates `quantities` in place (feeding buildGroups) and, when `contract`
- *  is given, persists each mint to `contract.quantities` with 'demand-coverage' provenance.
- *  NEVER overwrites an existing quantity. Returns the mints (empty = byte-identical no-op). */
+export interface DemandCoverageOpts {
+  /** design words — enables rule 3 (service-loop flow publication keyed on endpoint slugs) */
+  modules?: ModuleLike[]
+  /** parsed-brief target_performance.metrics — enables rule 4 (brief-metric delivery coverage) */
+  briefMetrics?: BriefTargetMetric[]
+}
+
+/** Mint the DELIVERED supply-pump quantities every fluid-delivery demand implies (rule 1),
+ *  the motor floor every pump-named flow family implies (rule 2), the SERVICE-LOOP line
+ *  flows the topology join needs (rule 3 — when `opts.modules` is given), and the delivered
+ *  quantity every brief target metric needs to verify (rule 4 — when `opts.briefMetrics` is
+ *  given) — see the block comments. Mutates `quantities` in place (feeding buildGroups)
+ *  and, when `contract` is given, persists each mint to `contract.quantities` with
+ *  'demand-coverage' provenance. NEVER overwrites an existing quantity; NEVER fabricates
+ *  where no engineering basis exists (the honest-UNVERIFIED path stays red). Returns the
+ *  mints (empty = byte-identical no-op). */
 export function mintDemandCoverage(
   quantities: Record<string, number>,
   contract?: ContractInProgress,
+  opts?: DemandCoverageOpts,
 ): DemandCoverageMint[] {
   const minted: DemandCoverageMint[] = []
   // LIVE existence check over the current map (a rule-1 mint is visible to rule 2 — the
@@ -916,6 +1084,193 @@ export function mintDemandCoverage(
     if (familyKeyExists(famTokens, PUMP_POWER_KEY_RE, false)) continue
     mint(`${fam}_motor_kw`, hydraulicMotorKwForFlow(v), 'kW', 'power', k,
       `demand-coverage: hydraulic motor floor P = Q·ΔP/(36·η) @ ΔP = ${FLOW_PUMP_DEFAULT_BAR} bar, η = ${FLOW_PUMP_EFF}, from ${k} = ${v} m³/h (a sizing-tool value always wins when present)`)
+  }
+  // ── rule 3: SERVICE-LOOP FLOW PUBLICATION (the daed1aeab routed follow-up — Tristan
+  // 2026-07-02). The flow-demand join sizes a fluid line from a quantity keyed on an
+  // ENDPOINT slug; on v52, 23/45 Line & Velocity rows had NO derivable flow on either
+  // endpoint because the CIP / cleaning / drain / service-train loops never publish one.
+  // Publish them HERE (the same choke point, both synthesis paths) where a stated
+  // engineering basis exists — NEVER fabricate:
+  //   3a. a CLEANING-ROLE vessel word (Cip/Cleaning Tank — the one-charge rule's noun
+  //       tests, 27888aeff) recirculates ONE cleaning charge per CIP_RECIRC_TURNOVER_MIN
+  //       → <slug>_line_flow_m3_h = charge × 60/turnover. Gated on the plant having a
+  //       nonzero hourly design flow (no flow → no CIP duty to state).
+  //   3b. a PROCESS vessel / boundary word (tank / sump / filter / softener / outlet /
+  //       manifold …, never a pump/blower — those are rules 1–2) with NO join-visible
+  //       flow key takes the delivered flow of EXACTLY ONE pre-existing quantity sharing
+  //       a DISTINCTIVE name token (f9dfc2918: generic tokens never decide; ≥2 candidate
+  //       keys → NO mint, the honest-UNVERIFIED path reports the line): a drain sump/tank
+  //       takes its drain-TRANSFER pump's duty (the flow that fills/empties it), the
+  //       softener vessel + GAC filter take the softener-train throughput, the permeate
+  //       outlet takes the RO permeate capacity.
+  // The `_line_flow_m3_h` suffix is deliberate: join-visible (ends `_flow_m3_h`) but
+  // SKIPPED by buildGroups — a line duty describes a CONNECTION, never equipment, so it
+  // can neither mint a phantom principal nor resize the vessel it names. A manifold with
+  // no basis of its own stays null — its edges join via the partner endpoint's quantity.
+  const mods = opts?.modules ?? []
+  if (mods.length > 0) {
+    // sources + the plant design flow come from the PRE-rule-3 key set: rule-3 mints must
+    // never chain off each other (a second pass sees its own mints only as existing keys).
+    const preKeys = Object.keys(quantities)
+    const flowSourceKeys = preKeys.filter((k) => {
+      const v = quantities[k]
+      // a prior-pass `_line_flow` mint is a PIPE duty, never a train delivery — excluding
+      // it keeps rule 3 idempotent (pass 2 must not chain new endpoints off pass 1's mints)
+      return Number.isFinite(v) && v > 0 && DELIVERED_FLOW_SOURCE_RE.test(k) &&
+        !FLOW_ECHO_TOKEN_RE.test(k) && !SERVICE_LINE_FLOW_KEY_RE.test(k)
+    })
+    let maxHourlyFlow = 0
+    for (const k of preKeys) {
+      const v = quantities[k]
+      if (Number.isFinite(v) && v > 0 && /_m3_h$|_m3_per_hr$/.test(k)) maxHourlyFlow = Math.max(maxHourlyFlow, v)
+    }
+    const joinVisibleFlowExists = (slug: string): boolean =>
+      Object.keys(quantities).some((k) => k.startsWith(slug + '_') && JOIN_VISIBLE_FLOW_RE.test(k))
+    const seenSlugs = new Set<string>()
+    for (const m of mods) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+      if (isInstrument(w) || isSubcomponent(w)) continue
+      const name = w.name_human ?? w.content_character?.name_human ?? ''
+      const slug = slugifyEndpointName(name)
+      if (!slug || seenSlugs.has(slug)) continue
+      seenSlugs.add(slug)
+      const roleTxt = wordRoleText(w)
+      // 3a — CIP / cleaning recirculation duty (charge basis, not token-share)
+      if (isCleaningRolePhrase(roleTxt) && CLEANING_VESSEL_NOUN_RE.test(roleTxt)) {
+        if (maxHourlyFlow <= 0 || joinVisibleFlowExists(slug)) continue
+        const charge = cleaningChargeM3(quantities)
+        const recirc = Math.round(charge * (60 / CIP_RECIRC_TURNOVER_MIN) * 100) / 100
+        mint(`${slug}_line_flow_m3_h`, recirc, 'm3/h', 'flow_rate', '(cip one-charge rule)',
+          `demand-coverage: CIP recirculation duty — one cleaning-solution charge (${charge} m³, the one-charge rule: ~15% of the plant hourly design flow bounded 0.5–2 m³) turned over in ${CIP_RECIRC_TURNOVER_MIN} min → ${recirc} m³/h service-line flow for ${name}`)
+        continue
+      }
+      // 3b — vessel / boundary service duty from the unique distinctive-token family
+      if (!PROCESS_STREAM_NOUN_RE.test(name) || FLUID_MOVER_NOUN_RE.test(name)) continue
+      if (joinVisibleFlowExists(slug)) continue
+      const distinctive = slug.split('_')
+        .filter((t) => t.length >= 2 && !GENERIC_ENDPOINT_TOKENS.has(t))
+        .map(depluralToken)
+      if (distinctive.length === 0) continue // a generic-only name never decides (f9dfc2918)
+      const cands: Array<{ key: string; value: number }> = []
+      for (const k of flowSourceKeys) {
+        // tokenise the key's BASE (suffix stripped): flow/throughput/m3/h suffix tokens
+        // appear on every source key and must never decide a match.
+        const ktoks = new Set(k.replace(DELIVERED_FLOW_SOURCE_RE, '').split('_').map(depluralToken))
+        if (distinctive.some((t) => ktoks.has(t))) cands.push({ key: k, value: quantities[k] })
+      }
+      if (cands.length !== 1) continue // 0 = no basis (honest null); ≥2 = ambiguous → never a guess
+      mint(`${slug}_line_flow_m3_h`, cands[0].value, 'm3/h', 'flow_rate', cands[0].key,
+        `demand-coverage: service-line duty for ${name} = ${cands[0].key} (${cands[0].value} m³/h) — the one delivered flow in this endpoint's distinctive-token family (the duty that serves/fills/drains it)`)
+    }
+  }
+  // ── rule 4: BRIEF-METRIC DELIVERY COVERAGE (Tristan issue 4 — codema v52 floor=5). Every
+  // brief target_performance metric must end with a DELIVERED contract quantity the workbook
+  // matcher verifies, or stay honestly UNVERIFIED. v52: `total_cultivation_containers`
+  // (6,000 trays — the unit-noun 'trays' is outside the matcher's count-noun promotion, so
+  // the design's cultivation_container_count could never verify it) and
+  // `max_irrigation_demand_per_department` (45 m³/h — the delivered irrigation_pump_flow
+  // shares only ONE identity token with the metric, below the matcher's ≥half threshold)
+  // both sat UNVERIFIED → deterministic brief_compliance floor 5. The mints derive from the
+  // DESIGN's own quantities — never a bare echo of the target — so a genuine shortfall
+  // still reads FAIL (honest-scoring principle):
+  //   4a COUNT family (an unknown-unit count noun, e.g. 'trays'): the design's ONE
+  //      count-suffixed quantity in the metric's token family (cultivation_container_count,
+  //      itself carried with its structural factorisation) is re-published in the metric's
+  //      unit so the matcher's unit-family gate can see it.
+  //   4b FLOW family (m³/h): the ONE delivered flow in the metric's identity-token family,
+  //      divided by the per-share count when the metric is a `…_per_<noun>` target (shares
+  //      = system demand echo ÷ per-share target, accepted only when near-integer).
+  // No candidate / ambiguous candidates / any other unit family → NO mint (honest red).
+  const briefMetrics = opts?.briefMetrics ?? []
+  const cq = (contract as { quantities?: Record<string, unknown> } | undefined)?.quantities
+  if (briefMetrics.length > 0 && cq) {
+    for (const met of briefMetrics) {
+      const bKey = String(met?.key_metric ?? met?.metric ?? met?.name ?? '').toLowerCase().trim()
+      const target = Number(met?.value)
+      if (!bKey || !Number.isFinite(target) || target <= 0) continue
+      if (matcherWouldVerify(met, cq)) continue // already ends in a verifiable delivered quantity
+      const bFam = matcherMetricFamily(met, bKey)
+      const bTokens = matcherIdentityTokens(matcherNormName(bKey))
+      if (bTokens.size === 0) continue
+      const need = Math.max(1, Math.floor((bTokens.size + 1) / 2))
+      const bTokensDepl = new Set([...bTokens].map(depluralToken))
+      const overlapDepl = (k: string): number => {
+        let n = 0
+        for (const t of new Set((k.toLowerCase().match(/[a-z]+/g) ?? []).map(depluralToken))) {
+          if (bTokensDepl.has(t)) n += 1
+        }
+        return n
+      }
+      const unitNoun = bFam.startsWith('?') ? bFam.slice(1) : ''
+      if (bFam !== 'count' && unitNoun && /^[a-z]{2,}$/.test(unitNoun)) {
+        // ── 4a: count-noun family ('trays' / any noun the matcher can't promote) ────────
+        const cands: Array<{ key: string; value: number }> = []
+        for (const [k, qv] of Object.entries(cq)) {
+          if (!qv || typeof qv !== 'object') continue
+          if (!/_(count|qty|number|nr)$/.test(k)) continue
+          const kl = k.toLowerCase()
+          if (MATCHER_ECHO_SUBSTRINGS.some((e) => kl.includes(e))) continue
+          const v = Number((qv as { value?: unknown }).value)
+          if (!Number.isFinite(v) || v <= 0) continue
+          if (overlapDepl(k) >= need) cands.push({ key: k, value: v })
+        }
+        if (cands.length !== 1) continue // no structural basis, or two families → honest red
+        const base = cands[0].key.replace(/_(count|qty|number|nr)$/, '')
+        const srcDetail = String((cq[cands[0].key] as { source_detail?: unknown })?.source_detail ?? '')
+        mint(`${base}_served_${unitNoun}`, cands[0].value, String(met.unit ?? unitNoun), 'count', cands[0].key,
+          `demand-coverage: delivered served-position count for brief metric ${bKey} = the design's ${cands[0].key} (${cands[0].value}), expressed in the metric's unit '${unitNoun}' so the compliance matrix can verify it${srcDetail ? ` — structural basis: ${srcDetail}` : ''}`)
+      } else if (bFam === 'flow_m3h') {
+        // ── 4b: flow family, incl. per-share (…_per_<noun>) targets ─────────────────────
+        const perIdx = bKey.indexOf('_per_')
+        const headKey = perIdx >= 0 ? bKey.slice(0, perIdx) : bKey
+        const perNoun = perIdx >= 0 ? bKey.slice(perIdx + 5).replace(/[^a-z0-9_]/g, '') : ''
+        const core = [...matcherIdentityTokens(matcherNormName(headKey))]
+          .filter((t) => !METRIC_QUALIFIER_TOKENS.has(t))
+        if (core.length === 0) continue
+        const coreDepl = new Set(core.map(depluralToken))
+        const shares1 = (k: string): boolean => {
+          for (const t of new Set((k.toLowerCase().match(/[a-z]+/g) ?? []).map(depluralToken))) {
+            if (coreDepl.has(t)) return true
+          }
+          return false
+        }
+        const flowCands: Array<{ key: string; value: number }> = []
+        const echoCands: Array<{ key: string; value: number }> = []
+        for (const [k, qv] of Object.entries(cq)) {
+          if (!qv || typeof qv !== 'object') continue
+          const v = Number((qv as { value?: unknown }).value)
+          if (!Number.isFinite(v) || v <= 0) continue
+          const isFlow = matcherUnitFamily((qv as { unit?: unknown }).unit) === 'flow_m3h' ||
+            /_(m3_h|m3_hr|m3_per_hr)$/.test(k)
+          if (!isFlow || !shares1(k)) continue
+          const kl = k.toLowerCase()
+          if (MATCHER_ECHO_SUBSTRINGS.some((e) => kl.includes(e)) || FLOW_ECHO_TOKEN_RE.test(kl)) {
+            echoCands.push({ key: k, value: v })
+          } else if (!SERVICE_LINE_FLOW_KEY_RE.test(k)) {
+            flowCands.push({ key: k, value: v }) // a DELIVERED flow (a rule-3 line duty is a pipe, not the train delivery)
+          }
+        }
+        if (flowCands.length !== 1) continue // no delivered basis, or ambiguous → honest red
+        let shares = 1
+        let sharesBasis = ''
+        if (perNoun) {
+          if (echoCands.length !== 1) continue // per-share split needs the ONE system demand echo
+          const raw = echoCands[0].value / target
+          shares = Math.round(raw)
+          if (!(shares >= 1 && Math.abs(raw - shares) <= 0.05)) continue // not a clean share split
+          sharesBasis = ` ÷ ${shares} ${perNoun}s (system ${echoCands[0].key} = ${echoCands[0].value} m³/h = ${shares} × the ${target} m³/h per-${perNoun} target)`
+        }
+        const val = Math.round((flowCands[0].value / shares) * 1000) / 1000
+        const mintKey = perNoun
+          ? `${core.join('_')}_per_${perNoun}_delivered_m3_h`
+          : `${core.join('_')}_delivered_m3_h`
+        // the minted NAME must itself clear the matcher's overlap threshold, or it can
+        // never verify the metric — then minting it would be pointless clutter.
+        if (matcherIdentityTokens(matcherNormName(mintKey)).size > 0 && overlapDepl(mintKey) >= need) {
+          mint(mintKey, val, 'm3/h', 'flow_rate', flowCands[0].key,
+            `demand-coverage: delivered flow for brief metric ${bKey} = ${flowCands[0].key} (${flowCands[0].value} m³/h)${sharesBasis} — derives from the design's delivered quantity, never the target (a genuine shortfall stays a FAIL)`)
+        }
+      }
+    }
   }
   return minted
 }
@@ -3228,6 +3583,7 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
 export function reconcilePrincipalEquipment(
   modules: ModuleLike[],
   contract: ContractInProgress,
+  reconcileOpts: { briefMetrics?: BriefTargetMetric[] } = {},
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
     groups: 0, repaired: 0, removedDuplicates: 0, removedSynonymDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, instrumentsResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
@@ -3245,7 +3601,7 @@ export function reconcilePrincipalEquipment(
   // every run regardless of the generator's word-set luck (see mintDemandCoverage). A mint
   // persists to contract.quantities ('demand-coverage' provenance) so the compliance matrix
   // verifies the brief demand metric. Strict no-op (byte-identical) when nothing is missing.
-  mintDemandCoverage(quantities, contract)
+  mintDemandCoverage(quantities, contract, { modules, briefMetrics: reconcileOpts.briefMetrics })
 
   // A `total_*`/overall/combined volume is a reporting SUM, not a vessel — exclude it from the
   // principal-equipment set when its constituent vessels are present (≥2 other non-aggregate
@@ -3688,7 +4044,7 @@ export function dedupePrincipalWords(modules: ModuleLike[]): number {
 export function applyUniversalContractSizing(
   modules: ModuleLike[],
   contract: ContractInProgress,
-  opts: { onlyUnsized?: boolean; synthesizeMissing?: boolean; dedupeAndStrip?: boolean; explode?: boolean; instrument?: boolean; minScore?: number } = {},
+  opts: { onlyUnsized?: boolean; synthesizeMissing?: boolean; dedupeAndStrip?: boolean; explode?: boolean; instrument?: boolean; minScore?: number; briefMetrics?: BriefTargetMetric[] } = {},
 ): UniversalSizingResult {
   const onlyUnsized = opts.onlyUnsized ?? true
   const synthesizeMissing = opts.synthesizeMissing ?? true
@@ -3709,7 +4065,7 @@ export function applyUniversalContractSizing(
   // logic below then applies: an existing pump word adopts the group (no synthetic twin);
   // a missing one is synthesised in part B. Mints persist to contract.quantities with
   // 'demand-coverage' provenance. Strict no-op (byte-identical) when nothing is missing.
-  mintDemandCoverage(quantities, contract)
+  mintDemandCoverage(quantities, contract, { modules, briefMetrics: opts.briefMetrics })
 
   const groups = buildGroups(quantities)
   const matched = new Set<string>() // group phrase → matched an existing word

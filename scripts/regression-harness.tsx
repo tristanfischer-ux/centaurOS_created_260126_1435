@@ -986,6 +986,89 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── A3d. DEMAND-COVERAGE rules 3+4: SERVICE-LOOP FLOWS + BRIEF-METRIC DELIVERY (codema
+  // v52, 2026-07-02 — extensions of A3c at the same choke point). TWO v52 defects:
+  // (1) brief metrics `total_cultivation_containers` (6,000 trays — a count-noun unit the
+  // workbook matcher can't promote) + `max_irrigation_demand_per_department` (45 m³/h —
+  // the delivered irrigation_pump_flow shares only ONE identity token, below the matcher's
+  // ≥half threshold) sat UNVERIFIED → the deterministic brief_compliance floor read 5;
+  // (2) 23/45 Line & Velocity rows had NO derivable flow on either endpoint (CIP/cleaning/
+  // drain/service loops publish no *_flow quantity) → pipes DN15-at-'0', honest-UNVERIFIED.
+  // THE RULES (universal, both synthesis paths): rule 4 re-publishes the design's OWN
+  // delivered/structural quantity so the matcher can verify each brief metric (count →
+  // served-count in the metric's unit; per-share flow → delivered ÷ shares from the system
+  // demand echo) — never a bare echo, so a genuine shortfall stays FAIL; rule 3 publishes
+  // endpoint-slug `_line_flow_m3_h` duties (CIP one-charge × 60/30-min turnover; the ONE
+  // delivered flow sharing a distinctive token) that the daed1aeab topology/ledger joins
+  // pick up — buildGroups SKIPS the suffix so a line duty can never mint a phantom
+  // principal. No basis / ambiguity (two dosing families) / valve endpoints mint NOTHING.
+  const dcvMetrics: any[] = [
+    { key_metric: 'total_cultivation_containers', value: 6000, unit: 'trays', category: 'scale' },
+    { key_metric: 'max_irrigation_demand_per_department', value: 45, unit: 'm3/hr', category: 'scale' },
+    { key_metric: 'orphan_widget_total', value: 12, unit: 'widgets', category: 'scale' }, // no structural basis → honest red
+  ]
+  const dcvContract = (): any => ({ quantities: {
+    cultivation_container_count: { value: 6000, unit: '', source: 'brief' },
+    irrigation_demand_m3_h: { value: 90, unit: 'm³/h', source: 'calculator' },
+    ro_permeate_capacity_m3_h: { value: 8, unit: 'm³/h', source: 'brief' },
+    drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+    gac_softener_throughput_m3_h: { value: 14.5, unit: 'm³/h', source: 'brief' },
+    acid_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+    chemical_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+  } })
+  const dcvWord = (name: string): any => ({ id: `${name.toLowerCase().replace(/\W+/g, '_')}_word`, name_human: name, content_character: { character_id: name.toLowerCase().replace(/\W+/g, '_'), name_human: name }, modifier_characters: [] })
+  const dcvMods = (): any[] => ([
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [
+      dcvWord('Drain Collection Sump'), dcvWord('Softener Vessel'), dcvWord('Permeate Outlet'),
+      dcvWord('Nutrient Dosing Tank'), dcvWord('Fresh Water Tank'), dcvWord('Inlet Flow Control Valve'),
+    ] }] },
+    { module: 'maintenance_serviceability', sub_modules: [{ id: 'maint', words: [dcvWord('Cip Tank')] }] },
+  ])
+  const dcvC1: any = dcvContract()
+  applyUniversalContractSizing(dcvMods(), dcvC1, { dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: dcvMetrics })
+  const dcvC2: any = dcvContract()
+  reconcilePrincipalEquipment(dcvMods(), dcvC2, { briefMetrics: dcvMetrics })
+  // a _line_flow key must never synthesise a phantom principal (buildGroups skip)
+  const dcvPhantomMods: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  applyUniversalContractSizing(dcvPhantomMods, { quantities: { cip_tank_line_flow_m3_h: { value: 40 } } } as any, { dedupeAndStrip: false, explode: false, instrument: false })
+  // BESS-like contract stays byte-identical WITH metrics + modules supplied
+  const dcvBess: any = { quantities: { nameplate_capacity_kwh: { value: 3500, unit: 'kWh' }, rack_count: { value: 15, unit: '' } } }
+  const dcvBessBefore = JSON.stringify(dcvBess)
+  applyUniversalContractSizing([{ module: 'energy_storage_source', sub_modules: [{ id: 'sm', words: [dcvWord('Expansion Tank')] }] }] as any, dcvBess,
+    { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: [{ key_metric: 'nameplate_capacity_kwh', value: 3500, unit: 'kWh', category: 'scale' }] })
+  out.push(assertEq(
+    'UNIVERSAL.demand_coverage_loop_flows_and_brief_metric_delivery_both_paths',
+    'every brief target metric ends with a DELIVERED quantity the workbook matcher verifies (count-noun metric → <base>_served_<unit> from the design structural count; per-share flow metric → delivered ÷ shares from the system demand echo) or stays honestly UNVERIFIED (no basis → no mint); service loops publish endpoint-slug _line_flow_m3_h duties (CIP one-charge recirc; unique distinctive-token vessel/boundary duty) for the topology/ledger flow join, with ambiguity/valve/no-basis counter-cases minting NOTHING, no phantom principal from a _line_flow key, and a BESS-like contract byte-identical — in BOTH synthesis paths',
+    JSON.stringify({
+      p1Served: dcvC1?.quantities?.cultivation_container_served_trays?.value,
+      p1ServedUnit: dcvC1?.quantities?.cultivation_container_served_trays?.unit,
+      p1PerDept: dcvC1?.quantities?.irrigation_per_department_delivered_m3_h?.value,
+      p1Cip: dcvC1?.quantities?.cip_tank_line_flow_m3_h?.value,
+      p1Sump: dcvC1?.quantities?.drain_collection_sump_line_flow_m3_h?.value,
+      p1Softener: dcvC1?.quantities?.softener_vessel_line_flow_m3_h?.value,
+      p1Permeate: dcvC1?.quantities?.permeate_outlet_line_flow_m3_h?.value,
+      p2Served: dcvC2?.quantities?.cultivation_container_served_trays?.value,
+      p2PerDept: dcvC2?.quantities?.irrigation_per_department_delivered_m3_h?.value,
+      p2Cip: dcvC2?.quantities?.cip_tank_line_flow_m3_h?.value,
+      p2Src: dcvC2?.quantities?.cip_tank_line_flow_m3_h?.source,
+      noWidget: Object.keys(dcvC1?.quantities ?? {}).every((k: string) => !/widget/.test(k)),
+      noAmbiguous: dcvC1?.quantities?.nutrient_dosing_tank_line_flow_m3_h === undefined,
+      noBasisNull: dcvC1?.quantities?.fresh_water_tank_line_flow_m3_h === undefined,
+      noValveDuty: dcvC1?.quantities?.inlet_flow_control_valve_line_flow_m3_h === undefined,
+      noPhantom: dcvPhantomMods.every((m: any) => (m.sub_modules ?? []).every((sm: any) => (sm.words ?? []).length === 0)),
+      bessUntouched: JSON.stringify(dcvBess) === dcvBessBefore,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.p1Served === 6000 && o.p1ServedUnit === 'trays' && o.p1PerDept === 45 &&
+        o.p1Cip === 4 && o.p1Sump === 45 && o.p1Softener === 14.5 && o.p1Permeate === 8 &&
+        o.p2Served === 6000 && o.p2PerDept === 45 && o.p2Cip === 4 && o.p2Src === 'demand-coverage' &&
+        o.noWidget === true && o.noAmbiguous === true && o.noBasisNull === true &&
+        o.noValveDuty === true && o.noPhantom === true && o.bessUntouched === true
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
   // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
   // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a
