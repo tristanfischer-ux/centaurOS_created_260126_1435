@@ -635,6 +635,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Quality & Audit": "Sections, per-tab scores and audit findings — one verdict.",
     "Sense-check": "Independent market benchmark versus the engine's numbers.",
     "Brief": "Original client brief and the engine's structured interpretation.",
+    "Design basis": "Codes, design duties, fluid and utilisation basis — with sources.",
     "⚠ Checks": "Live arithmetic invariants — red rows show numbers that don't reconcile.",
     "Part names": "Master parts list; every other tab references these cells.",
     "Connection trace": "Which part connects to what, with live cell references.",
@@ -5207,17 +5208,15 @@ def _sweet_spot(state: dict) -> Optional[Dict[str, Any]]:
     # is NPV monotone increasing to the top of the range? (RAS: usually yes)
     npv_monotonic = npv_max["out"] >= rows[-1]["out"] - 1e-6
 
-    # the £5M-affordable output and its economics
-    five_out = out_qty * (5_000_000.0 / base_capex) ** (1.0 / SCALE_EXPONENT)
-    five = _econ_at(five_out, out_qty, base_capex, is_ras)
-
-    # recommended deployment = the investable scale if it exists, else NPV-max
+    # recommended deployment = the investable scale if it exists, else NPV-max.
+    # (The legacy £5M anchor is GONE — it was the OLD RAS brief's capex ceiling
+    # hardcoded into every dossier; a brief's real ceiling lives in the brief.)
     recommend = investable or npv_max
     return {
         "is_ras": is_ras, "base_q": out_qty, "base_capex": base_capex,
         "rows": rows, "break_even": break_even, "viability": viability,
         "investable": investable, "npv_max": npv_max, "npv_monotonic": npv_monotonic,
-        "five": five, "recommend": recommend,
+        "recommend": recommend,
     }
 
 
@@ -5726,23 +5725,9 @@ def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Opt
 
     R = _ref  # local alias
     r = start_row
-    # Flag the tab UNVERIFIED when no real per-unit sale price exists (the revenue/
-    # EBITDA/IRR below are then NOT a valid investor model); and reframe when the
-    # output is a per-UNIT product rather than annual throughput.
-    if _econ_sale_unverified():
-        r = unverified_banner(
-            ws, r, 4,
-            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
-            "derived for this product class. Revenue, EBITDA, payback and IRR below "
-            "are NOT a valid investor model until you enter a real sale price on the "
-            "'Inputs & Assumptions' tab.")
-    if not _output_is_per_year(out_unit):
-        r = unverified_banner(
-            ws, r, 4,
-            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
-            "manufactured-product spec, not annual throughput. A £/yr revenue / "
-            "EBITDA / IRR frame does not apply; read this tab as per-unit cost, not "
-            "an annual P&L.")
+    # NOTE (Bundle D fix 1): the UNVERIFIED-ECONOMICS / PER-UNIT caveat is rendered
+    # ONCE by tab_financial_model (the APPENDIX banner) — this section repeats none
+    # of it (the caveat used to render up to 6 times across the three sections).
 
     # ---- revenue + opex stack ----------------------------------------------
     sub_banner(ws, r, "Annual profit & loss", 4)
@@ -5819,7 +5804,10 @@ def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     r += 1
     margin_row = r
     ws.cell(r, 1, "EBITDA margin").font = FONT_SUB
-    mc = ws.cell(r, 2, f"=B{rows_addr['ebitda']}/B{rows_addr['revenue']}")
+    # guard zero-revenue (a cost subsystem with no sale price) — never a #DIV/0! cell
+    mc = ws.cell(r, 2, f'=IF(B{rows_addr["revenue"]}<>0,'
+                       f'B{rows_addr["ebitda"]}/B{rows_addr["revenue"]},'
+                       f'"n/a — no revenue basis")')
     mc.fill = FILL_RESULT
     mc.border = BORDER
     mc.number_format = "0.0%"
@@ -5883,11 +5871,15 @@ def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     npv_row = r
     r += 1
     ws.cell(r, 1, "IRR").font = FONT_SUB
-    irr_c = ws.cell(r, 3, f"=IRR(B{cf_first}:B{cf_last})")
+    # IRR() returns #NUM!/#N/A on an all-negative cashflow (no revenue) — render the
+    # honest text instead of an error cell (Bundle D fix 1: no empty NPV/IRR cells).
+    irr_c = ws.cell(r, 3, f'=IFERROR(IRR(B{cf_first}:B{cf_last}),'
+                          f'"n/a — no revenue basis")')
     irr_c.fill = FILL_RESULT
     irr_c.border = BORDER
     irr_c.number_format = "0.0%"
-    ws.cell(r, 4, clean_cell("live =IRR over the year-0..N cashflow row")).font = FONT_NOTE
+    ws.cell(r, 4, clean_cell("live =IRR over the year-0..N cashflow row "
+                             "(text n/a when the cashflow never turns positive)")).font = FONT_NOTE
     r += 2
 
     # ---- opex breakdown sub-table (feeds the pie chart) ---------------------
@@ -5982,19 +5974,7 @@ def _render_scenarios_section(ws: Worksheet, state: dict, start_row: int) -> Opt
     R = _ref
 
     r = start_row
-    if _econ_sale_unverified():
-        r = unverified_banner(
-            ws, r, 8,
-            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
-            "derived for this product class. The whole revenue/EBITDA/IRR sweep "
-            "below is NOT a valid investor model until you enter a real sale price "
-            "on the 'Inputs & Assumptions' tab.")
-    if not _output_is_per_year(out_unit):
-        r = unverified_banner(
-            ws, r, 8,
-            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
-            "manufactured-product spec, not annual throughput; an annual £/yr "
-            "scale-economics sweep does not apply. Read as a per-unit cost curve.")
+    # (Bundle D fix 1: the caveat renders ONCE — tab_financial_model's APPENDIX banner.)
 
     # ---- FINE scale sweep ---------------------------------------------------
     base_q = round(out_qty, 6) or 204.0
@@ -6354,20 +6334,7 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
     PAY = f"{sh}!${sw['col_payback']}${f}:${sw['col_payback']}${l}"
 
     r = start_row
-    if _econ_sale_unverified():
-        r = unverified_banner(
-            ws, r, 6,
-            "⚠ UNVERIFIED ECONOMICS — no per-unit market sale price could be "
-            "derived for this product class, so the sweet-spot / investability "
-            "verdict below is NOT a valid investor model. Enter a real sale price "
-            "on the 'Inputs & Assumptions' tab first.")
-    if not _output_is_per_year(out_unit):
-        r = unverified_banner(
-            ws, r, 6,
-            "⚠ PER-UNIT PRODUCT — this output (" + clean_cell(out_unit) + ") is a "
-            "manufactured-product spec, not annual throughput. 'IRR / payback / "
-            "investable scale' is the wrong frame for a per-unit product; treat the "
-            "figures below as indicative only.")
+    # (Bundle D fix 1: the caveat renders ONCE — tab_financial_model's APPENDIX banner.)
 
     # ── ★ CAPEX → MAX OUTPUT SOLVER (Tristan 2026-06-20: "how do you get as much fish
     #    production out for a specific amount of capex?"). The six-tenths cost-capacity
@@ -6444,10 +6411,15 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
 
     rec = ss["recommend"] if ss else None
     inv = ss["investable"] if ss else None
-    five = ss["five"] if ss else None
-    npvmax = ss["npv_max"] if ss else None
+    # ── DEPLOY SUPPRESSION (Bundle D fix 1, reviewers 2026-07-02): NEVER render a
+    # "DEPLOY £X" recommendation whose own EBITDA is ≤ 0 — recommending capital
+    # into a loss-making point is wrong at any scale. When no sweep point earns a
+    # positive EBITDA, say exactly that instead. (The legacy £5.0M-anchor block is
+    # DELETED outright — it was the OLD RAS brief's ceiling hardcoded universally;
+    # this brief's ceiling is its own, on the Brief tab.) ──
+    rec_positive = bool(rec and (rec.get("ebitda") or 0) > 0)
     callout_lines: List[str] = []
-    if ss and rec:
+    if ss and rec and rec_positive:
         if inv:
             callout_lines.append(
                 f"DEPLOY {_fmt_gbp(rec['capex'])} for {_fmt_q(rec['out'])} "
@@ -6460,24 +6432,7 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
                 f"→ IRR {_fmt_pct(rec['irr'])}, payback "
                 f"{_fmt_yr(rec['payback'])} — the best NPV in range. The "
                 f"{_ECON_DEFAULTS['hurdle_rate']:.0f}% investor hurdle is not reached "
-                f"anywhere in the 0.2x-5x sweep at the current inputs"
-                + (" (economics are UNVERIFIED — no per-unit sale price is "
-                   "derivable for this class; set a real sale price on the Inputs "
-                   "tab to get a meaningful model)." if _econ_sale_unverified()
-                   else ".") )
-        # £5M ceiling line
-        if five:
-            if five["irr"] is None or five["irr"] <= 0.005:
-                callout_lines.append(
-                    f"At the £5.0M capex ceiling the plant makes only "
-                    f"{_fmt_q(five['out'])} and is ~break-even (IRR ≈ 0) — economics "
-                    f"turn investable only at larger scale.")
-            else:
-                callout_lines.append(
-                    f"At the £5.0M capex ceiling the plant makes {_fmt_q(five['out'])} "
-                    f"at IRR {_fmt_pct(five['irr'])} — "
-                    + (f"already above the hurdle." if five['irr'] >= _ECON_DEFAULTS['hurdle_rate']/100
-                       else f"below the {_ECON_DEFAULTS['hurdle_rate']:.0f}% hurdle."))
+                f"anywhere in the 0.2x-5x sweep at the current inputs.")
         if inv:
             callout_lines.append(
                 f"Economics turn investable above {_fmt_gbp(inv['capex'])} / "
@@ -6487,21 +6442,29 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
                 "NOTE: NPV improves monotonically with scale to the top of the "
                 "range — the binding constraint here is capital/site, not economics. "
                 "Build as large as the site and balance sheet allow.")
+    elif ss and rec:
+        callout_lines.append(
+            "NO DEPLOYMENT RECOMMENDED — EBITDA is negative at every scale in the "
+            "0.2x–5x sweep at the current inputs (no revenue basis), so there is no "
+            "point worth deploying capital into. The valid economics for this plant "
+            "are the cost-of-service model at the top of this tab.")
     else:
         callout_lines.append("No usable output metric to analyse — sweet-spot "
                              "finder unavailable for this run.")
 
-    # render the callout band
+    # render the callout band (header says which case it is — never a DEPLOY
+    # banner over a negative-EBITDA recommendation)
     callout_text = "  ".join(callout_lines)
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=6)
-    cc = ws.cell(r, 1, clean_cell("★ RECOMMENDED DEPLOYMENT"))
+    cc = ws.cell(r, 1, clean_cell("★ RECOMMENDED DEPLOYMENT" if rec_positive
+                                  else "DEPLOYMENT VERDICT"))
     cc.font = Font(name="Calibri", size=13, bold=True, color="FFFFFF")
     cc.fill = FILL_TITLE
     cc.alignment = Alignment(vertical="top", wrap_text=True, indent=1)
     r += 3
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 3, end_column=6)
     bc = ws.cell(r, 1, clean_cell(callout_text))
-    bc.fill = FILL_RESULT
+    bc.fill = FILL_RESULT if rec_positive else FILL_CONST
     bc.alignment = Alignment(vertical="top", wrap_text=True, indent=1)
     bc.font = Font(name="Calibri", size=11, bold=True, color="1F3A5F")
     for rr in range(r, r + 4):
@@ -6581,70 +6544,10 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
             "range when economics improve with scale)", ss["npv_max"] if ss else None)
     r += 1
 
-    # ----------------------------------------------------------------------
-    # THE £5M ANCHOR — output affordable at £5M (inverse six-tenths) + its metrics.
-    # out_5M = out_ref × (5e6 / capex_ref)^(1/0.6). Live off the Inputs capex cell.
-    # ----------------------------------------------------------------------
-    sub_banner(ws, r, "The £5M capex anchor — what £5.0M buys & how far below "
-                      "investable it sits", 6)
-    r += 1
-    header(ws, r, ["Metric", "Value", "", "", "", ""])
-    r += 1
-    five_out_row = r
-    # output at £5M (live, inverse scaling off the as-built capex+output; exponent is
-    # the tunable scale_exp cell — at n=1.0 this is simply out_ref × 5M / capex_ref)
-    ws.cell(r, 1, clean_cell(f"Output affordable at £5.0M ({out_unit})")).font = FONT_SUB
-    fo = ws.cell(r, 2, f"={R('out_qty')}*(5000000/{R('capex')})^(1/{R('scale_exp')})")
-    fo.fill = FILL_RESULT
-    fo.border = BORDER
-    fo.number_format = FMT_DEC1
-    ws.cell(r, 1).border = BORDER
-    r += 1
-    # the £5M EBITDA / IRR / payback — computed directly (not via the sweep, since
-    # the £5M output isn't one of the sweep grid points). All live off Inputs.
-    five_q = f"B{five_out_row}"
-    qref = R("out_qty")
-    sale_mult = "*1000" if is_ras else ""
-    feed5 = f"{five_q}{sale_mult}*{R('fcr')}*{R('feed_price')}"
-    energy5 = f"{R('load_kw')}*({five_q}/{qref})*{R('hours')}*{R('load_factor')}*{R('energy_price')}"
-    maint5 = f"5000000*{R('maint_pct')}/100"
-    rev5 = f"{five_q}{sale_mult}*{R('sale_price')}"
-    eb5 = f"({rev5})-({feed5}+{energy5}+{R('labour')}+{maint5}+{R('other_opex')})"
-    eb5_row = r
-    ws.cell(r, 1, clean_cell("EBITDA at £5.0M")).font = FONT_SUB
-    ec5 = ws.cell(r, 2, f"={eb5}")
-    ec5.fill = FILL_RESULT
-    ec5.border = BORDER
-    ec5.number_format = FMT_GBP
-    ws.cell(r, 1).border = BORDER
-    r += 1
-    ws.cell(r, 1, clean_cell("IRR at £5.0M")).font = FONT_SUB
-    irr5 = ws.cell(r, 2,
-                   f'=IF(B{eb5_row}>0,IFERROR(MAX(-0.99,RATE({R("project_life")},'
-                   f'B{eb5_row},-5000000,0,0,B{eb5_row}/5000000)),-1),"n/a")')
-    irr5.fill = FILL_RESULT
-    irr5.border = BORDER
-    irr5.number_format = "0.0%"
-    ws.cell(r, 1).border = BORDER
-    r += 1
-    ws.cell(r, 1, clean_cell("Payback at £5.0M")).font = FONT_SUB
-    pay5 = ws.cell(r, 2, f'=IF(B{eb5_row}>0,5000000/B{eb5_row},"n/a (EBITDA≤0)")')
-    pay5.fill = FILL_RESULT
-    pay5.border = BORDER
-    pay5.number_format = FMT_DEC1
-    ws.cell(r, 1).border = BORDER
-    r += 1
-    # gap below investable scale (live: investable output − £5M output)
-    ws.cell(r, 1, clean_cell(f"Shortfall vs investable scale ({out_unit})")).font = FONT_SUB
-    gap = ws.cell(r, 2,
-                  f'=IFERROR(INDEX({OUT},MATCH({HURDLE}/100,{IRRr},1)+1)-B{five_out_row},"—")')
-    gap.fill = FILL_CONST
-    gap.border = BORDER
-    gap.number_format = FMT_DEC1
-    ws.cell(r, 3, clean_cell("how far the £5M plant sits below the investable size")
-            ).font = FONT_NOTE
-    ws.cell(r, 1).border = BORDER
-    r += 2
+    # (Bundle D fix 1: the legacy "£5M capex anchor" block is DELETED — a hardcoded
+    # £5,000,000 from the original RAS brief that rendered into EVERY dossier. The
+    # CAPEX → MAX OUTPUT solver above answers the same question at ANY budget, and
+    # the brief's own cost ceiling lives on the Brief tab.)
 
     # ----------------------------------------------------------------------
     # "What moves the sweet spot" note — the 2-3 most sensitive inputs.
@@ -6976,7 +6879,7 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
         "annualised_capex_gbp": round(ann_capex), "levelised_cost_per_unit": round(levelised, 4),
         "output_qty": out_qty, "output_unit": out_unit, "unit_base": unit_base, "crf": round(crf, 4),
         "water_util": water_util, "design_flow_m3h": flow_m3h or None,
-        "divisor_basis": divisor_basis,
+        "divisor_basis": divisor_basis, "output_noun": out_noun,
         "labour_other_opex_gbp": round(labour + other_opex),
     }
     sub_banner(ws, r, "COST-OF-SERVICE MODEL — infrastructure / utility plant, NO market revenue", 8)
@@ -7057,17 +6960,28 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     if not _ECON_INPUT_ADDR:
         return False  # Inputs tab didn't build -> no economic model
 
+    unverified = _econ_sale_unverified()
+    out_qty, out_unit, _pu, out_noun = _econ_output_metric(state)
+
     ws = wb.create_sheet("Financial model")
     # widest of the three sections (Scenarios uses A..M = 13 cols) sets the widths.
     set_widths(ws, {"A": 30, "B": 18, "C": 16, "D": 16, "E": 16, "F": 12,
                     "G": 14, "H": 16, "I": 16, "J": 16, "K": 16, "L": 16, "M": 16})
     title_row(
-        ws, "Financial model — economics · scenarios · investment analysis", 8,
-        "The whole commercial model on one sheet, every cell a LIVE formula over the "
-        "yellow 'Inputs & Assumptions' tab: (1) the base-case Economics (revenue / opex / "
-        "EBITDA / NPV / IRR + charts); (2) a fine scale-sweep + Low/Central/High price "
-        "sensitivity; (3) the Investment-analysis sweet-spot finder. Edit any input and "
-        "everything here recomputes. Money £#,##0; margins 0.0%; years 0.0.",
+        ws, "Financial model — cost of service first · speculative model in the appendix"
+        if unverified else
+        "Financial model — economics · scenarios · investment analysis", 8,
+        ("THE VALID FRAME LEADS: this plant is a cost subsystem, so the tab opens with "
+         "its lifecycle cost-of-service model (capex + opex + levelised £/unit), every "
+         "cell live over the yellow 'Inputs & Assumptions' tab. The revenue/EBITDA/NPV/"
+         "IRR machinery survives only as a clearly-labelled APPENDIX at the bottom — "
+         "one caveat, stated once. Money £#,##0; margins 0.0%; years 0.0."
+         if unverified else
+         "The whole commercial model on one sheet, every cell a LIVE formula over the "
+         "yellow 'Inputs & Assumptions' tab: (1) the base-case Economics (revenue / opex / "
+         "EBITDA / NPV / IRR + charts); (2) a fine scale-sweep + Low/Central/High price "
+         "sensitivity; (3) the Investment-analysis sweet-spot finder. Edit any input and "
+         "everything here recomputes. Money £#,##0; margins 0.0%; years 0.0."),
     )
     r = 4
 
@@ -7084,7 +6998,7 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     # derivable this plant is a COST SUBSYSTEM of a larger operation — say so EXPLICITLY
     # before any P&L-shaped section, so the absent revenue reads as the correct frame,
     # not a gap. Signal-keyed (the engine's own sale-price-verified flag), no class table. ──
-    if _econ_sale_unverified():
+    if unverified:
         _cons_hdr = _consumable_classes(state)
         fr = ws.cell(r, 1,
                      "COST SUBSYSTEM of a larger operation — no revenue attribution; the "
@@ -7093,8 +7007,8 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
                      "earns no market revenue of its own"
                      + (f"; what it consumes: {' · '.join(_cons_hdr[:4])}, power and water"
                         if _cons_hdr else "")
-                     + ". Revenue/EBITDA/IRR rows further down are template placeholders "
-                       "awaiting a real sale price — they are NOT claims.")
+                     + ". A speculative 'if the output were sold' model sits in the "
+                       "APPENDIX at the bottom of this sheet.")
         fr.font = Font(bold=True, color="1F3A5F")
         fr.fill = FILL_SUB
         fr.alignment = Alignment(wrap_text=True, vertical="center")
@@ -7107,11 +7021,40 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     # UNVERIFIABLE by construction (the prior fake-8 / capped-6). Its real economics are capex +
     # opex + the levelised cost of delivered water. Render that FIRST when no per-unit market price
     # is verified; it sets state['_costOfService'] so the scorer credits the cost-of-service model.
-    cos_next = None
-    if _econ_sale_unverified():
+    if unverified:
         cos_next = _render_cost_of_service_section(ws, state, r)
         if cos_next is not None:
             r = cos_next + 2
+
+    # ── Sweet spot & brief reconciliation (Phase 1d, 2026-06-24) — a COST/OUTPUT
+    # reconciliation (part of the valid frame), so on a cost subsystem it renders
+    # BEFORE the speculative appendix. Skips cleanly when absent (older dossiers).
+    def _sweet_spot_recon() -> None:
+        nonlocal r
+        if state.get("sweetSpot"):
+            _section("Sweet spot & brief reconciliation")
+            nxt = _render_sweet_spot_section(ws, state, r)
+            r = (nxt if nxt is not None else r) + 1
+
+    if unverified:
+        _sweet_spot_recon()
+        # ── APPENDIX — the speculative revenue machinery, demoted to the bottom
+        # with ONE caveat banner (Bundle D fix 1: it used to repeat ~6 times). ──
+        # Name the appendix for the SERVICE output when the cost-of-service model
+        # derived one (e.g. "if the treated water were sold"), else the metric noun.
+        _cos_noun = (state.get("_costOfService") or {}).get("output_noun")
+        _section("APPENDIX — if the " + str(_cos_noun or out_noun or "output")
+                 + " were sold (speculative — not the valid frame for this plant)")
+        _caveat = ("⚠ SPECULATIVE APPENDIX — no per-unit market sale price is derivable "
+                   "for this product class, so every revenue / EBITDA / NPV / IRR figure "
+                   "below is NOT a valid investor model until a real sale price is "
+                   "entered on the 'Inputs & Assumptions' tab. This caveat is stated "
+                   "ONCE and covers the whole appendix.")
+        if not _output_is_per_year(out_unit):
+            _caveat += (" Note the output (" + str(clean_cell(out_unit)) + ") is a "
+                        "per-unit product spec, not annual throughput — a £/yr P&L "
+                        "frame does not apply.")
+        r = unverified_banner(ws, r, 8, _caveat) + 1
 
     # ── Economics ──
     _section("Economics — base case (revenue / opex / EBITDA / NPV / IRR)")
@@ -7126,16 +7069,223 @@ def tab_financial_model(wb: Workbook, state: dict) -> bool:
     nxt = _render_investment_section(ws, state, r)
     r = (nxt if nxt is not None else r) + 1
 
-    # ── Sweet spot & brief reconciliation (Phase 1d, 2026-06-24) ──
-    # Reads state['sweetSpot'] (the TS reconcile output). Skips cleanly (renders
-    # nothing) when absent — older dossiers have no reconciliation recorded.
-    if state.get("sweetSpot"):
-        _section("Sweet spot & brief reconciliation")
-        nxt = _render_sweet_spot_section(ws, state, r)
-        r = (nxt if nxt is not None else r) + 1
+    if not unverified:
+        _sweet_spot_recon()
 
     ws.freeze_panes = "A5"
     back_link(ws, 8)
+    return True
+
+
+# ============================================================================
+# TAB — DESIGN-BASIS STATEMENT (Bundle D item 2, reviewers 2026-07-02)
+# One page stating the codes, sizing rules, design duties, fluid basis and
+# utilisation drivers this design was ACTUALLY sized to — every line DERIVED
+# LIVE from the module that owns the rule (connection_sizing's own constants,
+# the electrical model's BS 7671 ladder, a1_print's ISO 3098 bar, the duct
+# sizer's velocity band, the contract quantities, the Inputs drivers). Never
+# hand-typed: change a module constant and this tab follows on rebuild.
+# ============================================================================
+DESIGN_BASIS_MAX_ROWS = 40      # the one-page contract — enforced + selftested
+
+
+def _design_basis_rows(state: dict) -> List[dict]:
+    """The derived design-basis lines: [{disc, item, value, unit, source}] with
+    `value` either a number/string or a live '=…' formula (utilisation drivers
+    reference the Inputs cells). Pure derivation — no rendering."""
+    rows: List[dict] = []
+
+    def add(disc, item, value, unit, source):
+        rows.append(dict(disc=disc, item=item, value=value, unit=unit, source=source))
+
+    # ── Process & piping — connection_sizing's OWN constants (the module that
+    # sized every line on the Line & velocity tab) ──
+    cs = conn_sizing
+    add("Process & piping", "Pipe sizing basis — target velocity, liquid lines",
+        cs.DEFAULT_LIQUID_VELOCITY_MS, "m/s",
+        "connection_sizing.DEFAULT_LIQUID_VELOCITY_MS — D = √(4Q/πv), next standard DN up")
+    add("Process & piping", "Target velocity, gas / vapour lines",
+        cs.DEFAULT_GAS_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_GAS_VELOCITY_MS")
+    add("Process & piping", "Target velocity, steam lines",
+        cs.DEFAULT_STEAM_VELOCITY_MS, "m/s", "connection_sizing.DEFAULT_STEAM_VELOCITY_MS")
+    add("Process & piping", "Velocity limit, liquid lines (line-list spec)",
+        cs.LIQUID_VELOCITY_LIMIT_MS, "m/s",
+        "connection_sizing.LIQUID_VELOCITY_LIMIT_MS — the ≤ limit every line is checked against")
+    add("Process & piping", "Velocity limit, gas lines (erosion)",
+        cs.GAS_VELOCITY_LIMIT_MS, "m/s",
+        "connection_sizing.GAS_VELOCITY_LIMIT_MS (API RP 14E erosion ballpark)")
+    add("Process & piping", "Velocity limit, steam lines (erosion)",
+        cs.STEAM_VELOCITY_LIMIT_MS, "m/s", "connection_sizing.STEAM_VELOCITY_LIMIT_MS")
+    add("Process & piping", "Standard pipe size ladder",
+        f"{cs.PIPE_DN_LADDER[0][0]}–{cs.PIPE_DN_LADDER[-1][0]} "
+        f"({len(cs.PIPE_DN_LADDER)} standard bores)", "DN",
+        "connection_sizing.PIPE_DN_LADDER — the ONE ladder the sizer, line list and BoM share")
+
+    # ── HVAC — the duct sizer's design conditions ──
+    try:
+        import draw_hvac as _dh
+        add("HVAC", "Duct sizing basis — target air velocity",
+            _dh.DEFAULT_DUCT_VELOCITY_MS, "m/s",
+            "draw_hvac.DEFAULT_DUCT_VELOCITY_MS — duct area = airflow ÷ target velocity")
+        add("HVAC", "Duct velocity ceiling (flagged above)",
+            _dh.DUCT_VELOCITY_MAX_MS, "m/s", "draw_hvac.DUCT_VELOCITY_MAX_MS")
+    except Exception:  # noqa: BLE001 — the HVAC module is optional for a non-ducted class
+        pass
+
+    # ── Electrical — the distribution model's BS 7671 constants + THIS design's
+    # chosen board voltage (magnitude-keyed off the connected load) ──
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    conn_kw = qval(q, "connected_electrical_load_kw") or qval(q, "total_electrical_demand_kw") \
+        or qval(q, "total_connected_load_kw") or qval(q, "connected_load_kw")
+    try:
+        import electrical_distribution_model as edm
+        if conn_kw:
+            vp = edm.select_distribution_voltage(conn_kw)
+            if vp is not None:
+                add("Electrical", "Distribution voltage (this design)",
+                    f"{vp.board_voltage_v:g} V" + (" (MV)" if vp.is_mv else " 3-ph LV"),
+                    "", f"electrical_distribution_model.select_distribution_voltage"
+                        f"({conn_kw:g} kW) — {vp.rationale}")
+        add("Electrical", "Cable conductor sizes — preferred ladder",
+            f"{edm.CABLE_CSA_LADDER[0]:g}–{edm.CABLE_CSA_LADDER[-1]:g} "
+            f"({len(edm.CABLE_CSA_LADDER)} sizes)", "mm²",
+            "electrical_distribution_model.CABLE_CSA_LADDER — BS 7671 / IEC 60228 preferred sizes")
+        add("Electrical", "Cable ampacity basis",
+            "BS 7671 Method C (conservative single-core copper)", "",
+            "electrical_distribution_model._CSA_AMPACITY_A")
+        add("Electrical", "Assumed displacement power factor",
+            edm.POWER_FACTOR, "", "electrical_distribution_model.POWER_FACTOR (stated, kW↔A)")
+        add("Electrical", "Practical LV main-board current ceiling",
+            edm.PRACTICAL_LV_BOARD_CURRENT_A, "A",
+            "electrical_distribution_model.PRACTICAL_LV_BOARD_CURRENT_A — past this the model steps up")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── Drawings — a1_print's ISO 3098 legibility bar ──
+    try:
+        import a1_print as _a1
+        add("Drawings", "Minimum lettering on printed A1 sheets",
+            _a1.MIN_TEXT_MM, "mm",
+            "a1_print.MIN_TEXT_MM — ISO 3098 minimum lettering height; pagination splits "
+            "a drawing onto more A1 sheets until met")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── Design flows / duties — the contract quantities the tools sized to ──
+    _FLOW_KEY_RX = re.compile(r"flow|throughput|demand|duty|airflow", re.I)
+    # electrical duties: the CONNECTED/installed/rated figures only — a raw
+    # tool-output aggregate (the total_supply_demand_kw 132 GW artefact) is a
+    # flagged provenance defect, not a design basis, and must never lead this tab.
+    _ELEC_DUTY_RX = re.compile(r"connected|installed_|rated_|transformer", re.I)
+    flows, powers = [], []
+    for key, v in q.items():
+        if not isinstance(v, dict) or not isinstance(v.get("value"), (int, float)):
+            continue
+        fam = str(v.get("family") or "")
+        unit = str(v.get("unit") or "")
+        if fam == "power" and _ELEC_DUTY_RX.search(str(key)):
+            powers.append((key, v))
+        elif (fam == "flow_rate" or _FLOW_KEY_RX.search(str(key))) and "/" in unit:
+            flows.append((key, v))          # a DUTY is per-time; volumes are not flows
+    # the HEADLINE duties lead: biggest flows + biggest electrical duties (value
+    # sort, key tie-break) — never an alphabetical grab of the dosing trickles.
+    flows.sort(key=lambda kv: (-float(kv[1]["value"]), str(kv[0])))
+    powers.sort(key=lambda kv: (-float(kv[1]["value"]), str(kv[0])))
+    for key, v in flows[:5] + powers[:3]:
+        src = str(v.get("source") or v.get("basis") or "contract").strip()
+        add("Design flows & duties", str(key).replace("_", " "),
+            v["value"], str(v.get("unit") or ""),
+            f"orchestratorContract.quantities.{key}" + (f" ({src})" if src else ""))
+
+    # ── Process fluid basis ──
+    rho, rho_note = _process_fluid_density(state)
+    add("Process fluid", "Design fluid density", rho, "kg/m³",
+        f"{rho_note} — resolved by _process_fluid_density from the engine's own worked-calc inputs")
+
+    # ── Utilisation drivers — LIVE off the Inputs tab where built ──
+    _A = _ECON_INPUT_ADDR.get
+    gen = _ECON_GENERIC or {}
+    d = _ECON_DEFAULTS
+    for key, label, why in (
+            ("water_util", "Water / service utilisation (levelised-cost divisor)",
+             "annual delivered volume = design flow × 8760 × THIS driver"),
+            ("load_factor", "Electrical load factor (energy line only)",
+             "average÷peak electrical ratio — sizes the energy cost, never the water divisor"),
+            ("hours", "Operating hours basis", "hours per year the plant runs")):
+        addr = _A(key)
+        val = (f"={addr}" if addr else gen.get(key, d.get(key)))
+        if val is None:
+            continue
+        add("Utilisation drivers", label, val, "h/yr" if key == "hours" else "",
+            (f"LIVE ← 'Inputs & Assumptions'!{addr.split('!')[-1]} — {why}" if addr
+             else f"Inputs driver default — {why}"))
+    return rows[:DESIGN_BASIS_MAX_ROWS]
+
+
+def tab_design_basis(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Bundle D item 2 — the DESIGN-BASIS STATEMENT: one page, ≤40 rows, every
+    line derived from the module that owns the rule (source stated per line).
+    Placed after Brief in the tab strip. Self-scores by arithmetic over row
+    completeness, capped at 8 (a derived statement of basis, not an
+    independently verified document)."""
+    rows = _design_basis_rows(state)
+    if not rows:
+        return False
+    ws = wb.create_sheet("Design basis")
+    set_widths(ws, {"A": 24, "B": 52, "C": 22, "D": 10, "E": 66})
+    title_row(
+        ws, "Design-basis statement — codes, duties, fluid & utilisation basis", 5,
+        "The rules this design was ACTUALLY sized to, one page. Every line is DERIVED "
+        "LIVE from the module that owns it (pipe/duct sizing constants, the electrical "
+        "model's BS 7671 ladder, ISO 3098 print legibility, the contract quantities, "
+        "the Inputs utilisation drivers) with its source stated — never hand-typed. "
+        "Change the rule at source and this statement follows on rebuild.")
+    r = 4
+    header(ws, r, ["Discipline", "Item", "Value", "Unit",
+                   "Source (module constant / contract quantity — never hand-typed)"])
+    r += 1
+    last_disc = None
+    complete = 0
+    for row in rows:
+        if row["disc"] != last_disc:
+            sub_banner(ws, r, row["disc"], 5)
+            r += 1
+            last_disc = row["disc"]
+        ws.cell(r, 1, clean_cell(row["disc"])).font = FONT_NOTE
+        c2 = ws.cell(r, 2, clean_cell(row["item"])); c2.alignment = WRAP_TOP; c2.border = BORDER
+        v = row["value"]
+        c3 = ws.cell(r, 3, v if (isinstance(v, str) and v.startswith("=")) else clean_cell(v))
+        c3.border = BORDER
+        if isinstance(v, str) and v.startswith("="):
+            c3.fill = FILL_RESULT               # live over the Inputs tab
+        elif isinstance(v, (int, float)):
+            c3.number_format = FMT_NUM
+        ws.cell(r, 4, clean_cell(row["unit"])).border = BORDER
+        c5 = ws.cell(r, 5, clean_cell(row["source"])); c5.font = FONT_NOTE
+        c5.alignment = WRAP_TOP; c5.border = BORDER
+        if row["value"] not in (None, "") and str(row["source"]).strip():
+            complete += 1
+        if len(str(row["source"])) > 66 or len(str(row["item"])) > 52:
+            ws.row_dimensions[r].height = 27
+        r += 1
+    ws.freeze_panes = "A5"
+    back_link(ws, 5)
+    # HONEST SELF-SCORE: arithmetic over row completeness (value + stated source),
+    # capped at 8 — a derived basis STATEMENT, not an independently verified doc.
+    n = len(rows)
+    sc = min(8, round(10.0 * complete / max(1, n), 1))
+    sc = int(sc) if sc == int(sc) else sc
+    _TAB_SCORES["Design basis"] = {
+        "score": sc, "target": 8,
+        "status": "PASS" if sc >= 8 else "FAIL",
+        "issues": [f"{complete}/{n} basis lines carry a value + a named source "
+                   f"(module constant / contract quantity / live Inputs cell); "
+                   f"capped at 8 — a derived statement of basis, not an "
+                   f"independently verified document"],
+        "fix": "any line without a derivable value/source must gain one at its "
+               "owning module (never hand-type a basis line)",
+        "basis": f"arithmetic: min(8, 10 × {complete}/{n} complete rows)",
+    }
     return True
 
 
@@ -7834,128 +7984,333 @@ def _render_regulatory_section(ws: Worksheet, state: dict, start_row: int) -> in
     return r
 
 
-# Universal construction / erection sequence — the standard order of works for a
-# process plant. Each phase keys off equipment tokens in the bill of materials, so
-# the equipment list populates from whatever the engine built (no per-class table).
-#   (phase, token_regex_or_None, predecessor, plant/lifting, hold/witness point)
-_ERECTION_PHASES = [
-    ("Site establishment & civils",
-     r"foundation|slab|\bbund\b|civil|groundwork|plinth|concrete|earthwork|drainage channel",
-     "Site handover & set-out", "Excavator, concrete pump",
-     "Foundation survey + concrete cube tests signed off"),
-    ("Tankage & major static equipment erection",
-     r"\btank\b|\bvessel\b|\bcolumn\b|biofilter|degas|\bsilo\b|\bbasin\b|\bsump\b|reactor|skimmer|clarifier|\bmbbr\b|media",
-     "Civils complete & cured", "Mobile crane",
-     "Tank / vessel hydrostatic (leak) test witnessed"),
-    ("Mechanical equipment installation",
-     r"\bpump\b|blower|\bfilter\b|heat pump|compressor|screen|mixer|\bfan\b|dehumidif|\buv\b|chiller|\bhrv\b|skid|aerat|exchanger",
-     "Tankage set & grouted", "Forklift / overhead crane",
-     "Alignment + rotation (bump) test recorded"),
-    ("Pipework & ductwork",
-     r"\bpipe\b|\bvalve\b|\bline\b|\bduct\b|manifold|header|\bspool\b|fitting|flange|\bdn\d",
-     "Equipment installed", "Pipe trolleys, chain hoists",
-     "Pressure / leak test certificate per line"),
-    ("Electrical installation",
-     r"switchgear|transformer|\bmcc\b|\bpanel\b|\bcable\b|\bups\b|generator|genset|distribution|busbar|\bats\b|feeder|breaker|\bmccb\b|\bmcb\b",
-     "Equipment set, cable routes ready", "Cable drum jacks",
-     "Insulation-resistance + earth-continuity tests"),
-    ("Instrumentation, controls & SCADA",
-     r"transmitter|\bsensor\b|\bprobe\b|analys|instrument|controller|\bscada\b|\bplc\b|flow meter|\bgauge\b|\bhmi\b|level switch",
-     "Electrical energised (LV)", "Hand tools",
-     "Loop checks + calibration certificates"),
-    ("Pre-commissioning & commissioning",
-     None, "All systems installed & tested", "—",
-     "Water-on, functional + performance test; client witness"),
+# ── DESIGN-SPECIFIC ASSEMBLY SEQUENCE (Bundle D item 4, reviewers 2026-07-02) ──
+# The steps are derived from THE DESIGN: civils sized from the placed-plant footprint,
+# erection steps in the manifest's process-region order with per-module equipment
+# GROUPS (tag ranges), the largest lift from the BoM's heaviest vessel mass → a stated
+# crane class, and durations from group counts × the stated unit norms below.
+# The norms are labelled ESTIMATE (industry-plausible defaults) — which is exactly why
+# the tab self-scores ≤8 until they are design-derived.
+_ASSEMBLY_NORMS = {
+    # key: (norm, unit, basis-text). All ESTIMATE — industry-plausible defaults.
+    "civils": (40.0, "m² slab per crew-day",
+               "ground-bearing slab + plinths/bunds, incl. set-out & cure wait overlap"),
+    "vessel": (3.0, "vessel lifts per crane-day",
+               "set, level, grout & hold — light vessels (<5 t) on a mobile crane"),
+    "machine": (4.0, "items per crew-day",
+                "skid/machine set + alignment on prepared plinths"),
+    "pipe": (25.0, "m installed & tested per crew-day",
+             "carbon/PE process pipe incl. supports, per 2-fitter crew"),
+    "cable": (60.0, "m pulled & terminated per crew-day",
+              "LV power/control cable on tray, per 2-electrician crew"),
+    "loop": (8.0, "instrument loops per crew-day",
+             "mount, hook-up, loop-check & calibration certificate"),
+    "commission": (10.0, "principal items per day + 5 days flat",
+                   "flush/fill/leak-check, energise, wet-commission, performance test"),
+}
+
+# Crane class from the heaviest single lift (kg). Stated rule (ESTIMATE): crane
+# rated ≥5× the load at a ~10 m working radius — normal contract-lift margin.
+_CRANE_CLASSES = [
+    (1_000.0, "20 t mobile crane (or lorry-mounted HIAB)"),
+    (5_000.0, "35 t mobile crane"),
+    (20_000.0, "100 t mobile crane"),
+    (60_000.0, "250 t mobile crane"),
+    (float("inf"), "heavy-lift crane — dedicated rigging study required"),
 ]
 
+_VESSEL_SHAPE_RX = re.compile(
+    r"tank|vessel|column|silo|sump|basin|stack|reactor|clarifier|tall_", re.I)
+_INSTRUMENT_ROW_RX = re.compile(
+    r"transmitter|\bsensor\b|\bprobe\b|analys|instrument|flow meter|\bgauge\b|"
+    r"level switch|\bplc\b|\bhmi\b|\bscada\b", re.I)
 
-def tab_assembly_sequence(wb: Workbook, state: dict) -> bool:
-    """Z — native Assembly & Erection Sequence (Tristan 2026-06-21: bring the PDF's
-    assembly/erection sequence into the Excel). Universal: a standard order-of-works
-    whose per-phase equipment list is derived from the bill of materials by discipline
-    keyword (no per-class table). Each phase carries its predecessor, lifting plant and
-    a hold / witness point."""
+
+def _crane_class(mass_kg: float) -> str:
+    for cap, label in _CRANE_CLASSES:
+        if mass_kg <= cap:
+            return label
+    return _CRANE_CLASSES[-1][1]
+
+
+def _fmt_days(days: float) -> str:
+    d = max(0.5, math.ceil(days * 2.0) / 2.0)
+    return f"~{d:g} crew-day{'s' if d != 1 else ''} (ESTIMATE)"
+
+
+def _tag_range(tags: List[str]) -> str:
+    """Compress ['TK-104','TK-105',…,'TK-111'] → 'TK-104…TK-111'; mixed/gappy tags
+    render as a short list. Deterministic."""
+    real = [t for t in tags if t and t != "—"]
+    if not real:
+        return ""
+    if len(real) == 1:
+        return real[0]
+    ms = [re.match(r"([A-Z]+)-(\d+)$", t) for t in sorted(set(real))]
+    if all(ms) and len({m.group(1) for m in ms}) == 1:
+        nums = sorted(int(m.group(2)) for m in ms)
+        if nums[-1] - nums[0] == len(nums) - 1 and len(nums) >= 3:
+            return f"{ms[0].group(1)}-{nums[0]}…{ms[0].group(1)}-{nums[-1]}"
+    shown = sorted(set(real))
+    return ", ".join(shown[:4]) + (f" (+{len(shown) - 4} more)" if len(shown) > 4 else "")
+
+
+def _assembly_groups(rows: List[dict]) -> List[str]:
+    """Group manifest rows by part NAME → ['7× Nutrient Tank TK-109…TK-115', …],
+    biggest group first (then name). Max 10 visible; tail summarised."""
+    by_name: Dict[str, List[str]] = {}
+    for r in rows:
+        nm = str(r.get("name") or "").split("·")[0].strip() or "(unnamed)"
+        by_name.setdefault(nm, []).append(str(r.get("equipment_tag") or ""))
+    groups = sorted(by_name.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    out = []
+    for nm, tags in groups[:10]:
+        rng = _tag_range(tags)
+        out.append((f"{len(tags)}× {nm}" if len(tags) > 1 else nm)
+                   + (f" {rng}" if rng else "") + (" — see GA" if len(tags) > 2 else ""))
+    if len(groups) > 10:
+        hidden = sum(len(t) for _, t in groups[10:])
+        out.append(f"(+{len(groups) - 10} more groups, {hidden} items — see GA)")
+    return out
+
+
+def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
+    """Z — DESIGN-SPECIFIC assembly & erection sequence (Bundle D item 4). Steps come
+    from the design itself: (1) civils/set-out FIRST, sized from the placed-plant
+    footprint; (2) one erection step per process REGION (manifest region_rank order)
+    with the equipment GROUPED by module (tag ranges, max ~10 visible); (3) pipework /
+    electrical / instrumentation steps quantified from the connection schedule + BoM;
+    (4) commissioning. The largest lift is called out with a stated crane class from
+    the BoM's heaviest vessel mass. Durations = group counts × the stated unit norms
+    (footnoted, labelled ESTIMATE). Self-scores honestly: ≤8 while the norms are
+    industry defaults, scaled by how many steps carry design-derived content."""
     bom = state.get("requirementsBom") or []
-    principals = [b for b in bom if isinstance(b, dict) and not b.get("sub_of") and num(b.get("line_gbp"))]
-    if not principals:
-        principals = [b for b in bom if isinstance(b, dict) and b.get("requirement")]
-    if not principals:
+    principals = [b for b in bom if isinstance(b, dict) and not b.get("sub_of")
+                  and b.get("requirement")]
+    manifest = load_json(os.path.join(run_dir, "parts-manifest.json")) if run_dir else None
+    man_rows = [r for r in ((manifest or {}).get("parts") or [])
+                if isinstance(r, dict) and r.get("equipment_tag")]
+    if not principals and not man_rows:
         return False
 
-    # assign each principal to the FIRST matching phase (commissioning takes none)
-    buckets = {ph[0]: [] for ph in _ERECTION_PHASES}
-    for b in principals:
-        blob = f"{b.get('requirement', '')} {b.get('part', '')} {b.get('tag', '')}".lower()
-        placed = False
-        for ph, rx, *_ in _ERECTION_PHASES:
-            if rx and re.search(rx, blob):
-                tag = clean_cell(b.get("tag", ""))
-                nm = clean_cell(b.get("requirement", "")).lstrip("↳ ").split("·")[0].strip()
-                buckets[ph].append((nm, tag))      # (name, tag) — referenced at render
-                placed = True
-                break
-        if not placed:
-            buckets["Mechanical equipment installation"].append(
-                (clean_cell(b.get("requirement", "")).split("·")[0].strip(), ""))
+    # ---- the design numbers every step derives from --------------------------
+    bb = (manifest or {}).get("bbox_mm") or {}
+    slab_m2 = None
+    if bb.get("length_mm") and bb.get("width_mm"):
+        slab_m2 = round((bb["length_mm"] / 1000.0) * (bb["width_mm"] / 1000.0), 1)
+    sched = load_json(os.path.join(run_dir, "connection-schedule.json")) if run_dir else None
+    tot = (sched or {}).get("totals") or {}
+    pipe_m = round(sum(v for v in (tot.get("pipe_m_by_dn") or {}).values()
+                       if isinstance(v, (int, float))), 1)
+    cable_m = round(sum(v for v in (tot.get("cable_m_by_csa") or {}).values()
+                        if isinstance(v, (int, float))), 1)
+    n_runs = tot.get("runs_sized")
+    # instruments: BoM principal rows that read as instruments/loops
+    n_loops = sum(int(num(b.get("qty")) or 1) for b in principals
+                  if _INSTRUMENT_ROW_RX.search(str(b.get("requirement") or "")))
+    # heaviest single lift from the BoM (mass_kg rows are per-unit vessel masses)
+    heaviest = None
+    for b in bom:
+        if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float)) and b["mass_kg"] > 0:
+            if heaviest is None or b["mass_kg"] > heaviest["mass_kg"]:
+                heaviest = b
+    # mass by tag for the per-step lifting-plant pick
+    mass_by_tag = {str(b.get("tag")): float(b["mass_kg"]) for b in bom
+                   if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float))
+                   and b.get("tag")}
 
+    # ---- build the STEP list --------------------------------------------------
+    # each step: dict(phase, scope, pred, plant, duration, hold, design(bool))
+    steps: List[dict] = []
+    nm_civ = _ASSEMBLY_NORMS["civils"]
+    if slab_m2:
+        steps.append(dict(
+            phase="Site set-out & civils",
+            scope=(f"Ground-bearing slab {bb['length_mm']/1000:.1f} × "
+                   f"{bb['width_mm']/1000:.1f} m ({slab_m2:g} m², from the placed-plant "
+                   f"footprint) + plinths, bunds & drainage falls"),
+            pred="Site handover", plant="Excavator, concrete pump",
+            duration=_fmt_days(slab_m2 / nm_civ[0]),
+            hold="Set-out survey + concrete cube tests signed off", design=True))
+    else:
+        steps.append(dict(
+            phase="Site set-out & civils",
+            scope="Ground slab + plinths & bunds (no placed-plant footprint derived "
+                  "for this run — size on the GA)",
+            pred="Site handover", plant="Excavator, concrete pump",
+            duration="— (no footprint derived)",
+            hold="Set-out survey + concrete cube tests signed off", design=False))
+
+    # per-REGION erection steps in process order (manifest region_rank, then module)
+    if man_rows:
+        region_mods: Dict[Tuple[int, str], List[dict]] = {}
+        for r in man_rows:
+            key = (int(r.get("region_rank", 999)), str(r.get("module") or ""))
+            region_mods.setdefault(key, []).append(r)
+        nm_v, nm_m = _ASSEMBLY_NORMS["vessel"], _ASSEMBLY_NORMS["machine"]
+        for (rank, mod), rows in sorted(region_mods.items()):
+            vessels = [r for r in rows if _VESSEL_SHAPE_RX.search(str(r.get("shape") or "")
+                                                                  + " " + str(r.get("name") or ""))]
+            machines = [r for r in rows if r not in vessels]
+            dur_days = len(vessels) / nm_v[0] + len(machines) / nm_m[0]
+            step_mass = max((mass_by_tag.get(str(r.get("equipment_tag")), 0.0) for r in rows),
+                            default=0.0)
+            plant = (_crane_class(step_mass) if step_mass > 0
+                     else ("Mobile crane" if vessels else "Forklift / pallet truck"))
+            hold = ("Vessel hydrostatic (leak) test witnessed; machines: alignment + "
+                    "rotation (bump) test" if vessels
+                    else "Alignment + rotation (bump) test recorded")
+            steps.append(dict(
+                phase=f"Erect & set — {_humanize_class(mod)}",
+                scope="; ".join(_assembly_groups(rows)),
+                pred="Civils complete & cured" if len(steps) == 1
+                     else steps[-1]["phase"] + " set",
+                plant=plant, duration=_fmt_days(dur_days), hold=hold, design=True))
+
+    # pipework — quantified from the connection schedule the sizer wrote
+    nm_p = _ASSEMBLY_NORMS["pipe"]
+    if pipe_m > 0:
+        dn_bits = ", ".join(f"{k} {v:g} m" for k, v in sorted(
+            (tot.get("pipe_m_by_dn") or {}).items())[:6])
+        steps.append(dict(
+            phase="Pipework & interconnections",
+            scope=(f"{pipe_m:g} m of sized pipe across {n_runs or '—'} runs "
+                   f"({dn_bits}) — per the connection schedule / Line & velocity tab"),
+            pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
+            duration=_fmt_days(pipe_m / nm_p[0]),
+            hold="Pressure / leak test certificate per line", design=True))
+    else:
+        steps.append(dict(
+            phase="Pipework & interconnections",
+            scope="Process pipework per the P&ID (no sized connection schedule "
+                  "for this run)",
+            pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
+            duration="— (no schedule derived)",
+            hold="Pressure / leak test certificate per line", design=False))
+
+    nm_c = _ASSEMBLY_NORMS["cable"]
+    if cable_m > 0:
+        steps.append(dict(
+            phase="Electrical installation",
+            scope=(f"{cable_m:g} m of LV cable per the connection schedule; boards & "
+                   f"distribution per the Electrical tab (single-line + panel schedule)"),
+            pred="Cable routes / trays installed", plant="Cable drum jacks",
+            duration=_fmt_days(cable_m / nm_c[0]),
+            hold="Insulation-resistance + earth-continuity tests", design=True))
+    else:
+        steps.append(dict(
+            phase="Electrical installation",
+            scope="LV distribution per the Electrical tab (no sized cable schedule "
+                  "for this run)",
+            pred="Cable routes / trays installed", plant="Cable drum jacks",
+            duration="— (no schedule derived)",
+            hold="Insulation-resistance + earth-continuity tests", design=False))
+
+    nm_l = _ASSEMBLY_NORMS["loop"]
+    steps.append(dict(
+        phase="Instrumentation, controls & SCADA",
+        scope=(f"{n_loops} instrument loop(s) from the bill of materials — mount, "
+               f"hook-up, loop-check" if n_loops else
+               "Instrument loops per the process schedules"),
+        pred="Electrical energised (LV)", plant="Hand tools",
+        duration=_fmt_days(n_loops / nm_l[0]) if n_loops else "— (no loop count derived)",
+        hold="Loop checks + calibration certificates", design=bool(n_loops)))
+
+    nm_x = _ASSEMBLY_NORMS["commission"]
+    n_prin = len(man_rows) or len(principals)
+    steps.append(dict(
+        phase="Pre-commissioning & commissioning",
+        scope=(f"Whole plant — flush, fill, leak-check, energise, wet-commission, "
+               f"performance test ({n_prin} principal items)"),
+        pred="All systems installed & tested", plant="—",
+        duration=_fmt_days(5.0 + n_prin / nm_x[0]) if n_prin else "—",
+        hold="Water-on, functional + performance test; client witness",
+        design=bool(n_prin)))
+
+    # ---- render ----------------------------------------------------------------
     ws = wb.create_sheet("Assembly sequence")
-    set_widths(ws, {"A": 6, "B": 34, "C": 60, "D": 26, "E": 22, "F": 40})
+    set_widths(ws, {"A": 6, "B": 32, "C": 58, "D": 24, "E": 26, "F": 20, "G": 36})
     title_row(
-        ws, "Assembly & erection sequence", 6,
-        "Standard order of works for the plant, derived from the bill of materials by "
-        "discipline. Each step lists the principal equipment installed in it (with tags), "
-        "its predecessor, the lifting plant, and the hold / witness point that gates the "
-        "next step. Universal sequence — not specific to this plant type. Indicative; a "
-        "site-specific construction phase plan (CDM) is required before works begin.",
-    )
-    header(ws, 4, ["Step", "Phase / activity", "Principal equipment installed (tag)",
-                   "Predecessor", "Lifting plant", "Hold / witness point"])
-    r = 5
-    step = 1
-    for ph, rx, pred, plant, hold in _ERECTION_PHASES:
-        items = list(dict.fromkeys(buckets.get(ph, [])))
-        if ph.startswith("Pre-commissioning"):
-            equip = "Whole plant — flush, fill, leak-check, energise, wet-commission, performance test."
-        elif items:
-            shown = items[:14]
-            tail = len(items) - 14
-            # Build a concat formula REFERENCING the master "Part names" for each principal's
-            # name + tag (one identity; click a precedent). Literal fallback per item; if no
-            # item resolves, emit the plain string (no pointless all-literal formula).
-            exprs, any_ref = [], False
-            for nm, tag in shown:
-                nref = name_ref(nm)
-                tref = tag_ref(tag) if tag else None
-                any_ref = any_ref or bool(nref) or bool(tref)
-                nexpr = nref[1:] if nref else '"' + str(nm).replace('"', '""') + '"'
-                if tag:
-                    texpr = tref[1:] if tref else '"' + str(tag).replace('"', '""') + '"'
-                    exprs.append(f'{nexpr} & " [" & {texpr} & "]"')
-                else:
-                    exprs.append(nexpr)
-            if any_ref:
-                joined = ' & "; " & '.join(exprs)
-                if tail > 0:
-                    joined += f' & "  (+{tail} more)"'
-                equip = "=" + joined
-            else:
-                equip = "; ".join(f"{nm}{(' [' + tag + ']') if tag else ''}" for nm, tag in shown) \
-                    + (f"  (+{tail} more)" if tail > 0 else "")
-        else:
-            continue  # skip a phase with no equipment (other than commissioning)
-        ws.cell(r, 1, step).border = BORDER
-        ws.cell(r, 2, clean_cell(ph)).border = BORDER
-        c3 = ws.cell(r, 3, equip); c3.alignment = WRAP_TOP; c3.border = BORDER
-        ws.cell(r, 4, clean_cell(pred if step > 1 else "Site handover & set-out")).border = BORDER
-        ws.cell(r, 5, clean_cell(plant)).border = BORDER
-        c6 = ws.cell(r, 6, clean_cell(hold)); c6.alignment = WRAP_TOP; c6.border = BORDER
-        lines = max(1, -(-len(equip) // 58))
+        ws, "Assembly & erection sequence — derived from this design", 7,
+        "Order of works DERIVED FROM THE DESIGN: civils sized from the placed-plant "
+        "footprint, one erection step per process region (GA order) with equipment "
+        "grouped by module, pipework/electrical quantified from the connection "
+        "schedule, and durations from the group counts × the unit norms footnoted "
+        "below (ESTIMATE). Hold / witness points gate each step. A site-specific "
+        "construction phase plan (CDM) is still required before works begin.")
+    r = 4
+    # ── LARGEST LIFT callout — from the BoM's heaviest vessel mass ──
+    if heaviest is not None:
+        _hname = str(heaviest.get("requirement") or "").split("·")[0].strip()
+        lift = ws.cell(r, 1, clean_cell(
+            f"LARGEST LIFT: {_hname} [{heaviest.get('tag')}] at {heaviest['mass_kg']:,.0f} kg "
+            f"(heaviest vessel mass in the bill of materials) → {_crane_class(float(heaviest['mass_kg']))}. "
+            f"Rule (ESTIMATE): crane rated ≥5× the load at a ~10 m working radius."))
+        lift.font = Font(bold=True, color="1F3A5F"); lift.fill = FILL_SUB
+        lift.alignment = Alignment(wrap_text=True, vertical="center")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+        ws.row_dimensions[r].height = 30
+        r += 2
+    else:
+        lift = ws.cell(r, 1, clean_cell(
+            "LARGEST LIFT: not derivable — no vessel masses in this bill of materials; "
+            "crane class to be confirmed at detailed design."))
+        lift.font = FONT_NOTE
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+        r += 2
+
+    header(ws, r, ["Step", "Phase / activity", "Scope — equipment groups (tags)",
+                   "Predecessor", "Lifting plant", "Duration", "Hold / witness point"])
+    r += 1
+    for i, s in enumerate(steps, start=1):
+        ws.cell(r, 1, i).border = BORDER
+        ws.cell(r, 2, clean_cell(s["phase"])).border = BORDER
+        c3 = ws.cell(r, 3, clean_cell(s["scope"])); c3.alignment = WRAP_TOP; c3.border = BORDER
+        ws.cell(r, 4, clean_cell(s["pred"])).border = BORDER
+        c5 = ws.cell(r, 5, clean_cell(s["plant"])); c5.alignment = WRAP_TOP; c5.border = BORDER
+        ws.cell(r, 6, clean_cell(s["duration"])).border = BORDER
+        c7 = ws.cell(r, 7, clean_cell(s["hold"])); c7.alignment = WRAP_TOP; c7.border = BORDER
+        lines = max(1, -(-len(s["scope"]) // 56))
         if lines > 1:
             ws.row_dimensions[r].height = min(lines, 6) * 14.5
         r += 1
-        step += 1
+    r += 1
+    # ── NORMS FOOTNOTE — the stated unit norms + their basis, all ESTIMATE ──
+    sub_banner(ws, r, "Duration norms used above — stated, industry-plausible "
+                      "defaults (ESTIMATE, not design-derived)", 7)
+    r += 1
+    for key, (norm, unit, basis) in _ASSEMBLY_NORMS.items():
+        ws.cell(r, 2, clean_cell(f"{key}: {norm:g} {unit}")).font = FONT_SUB
+        bcell = ws.cell(r, 3, clean_cell(f"ESTIMATE — {basis}"))
+        bcell.font = FONT_NOTE
+        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=7)
+        r += 1
     ws.freeze_panes = "A5"
-    back_link(ws, 6)
+    back_link(ws, 7)
+
+    # ── HONEST SELF-SCORE (Bundle D item 4): arithmetic over how many steps carry
+    # DESIGN-DERIVED content (equipment groups from the manifest/BoM, quantities from
+    # the schedule, lift from the BoM mass), CAPPED at 8 while the duration norms are
+    # stated industry defaults rather than design-derived rates. A run with no
+    # manifest/schedule scores lower — its steps are template text.
+    n_design = sum(1 for s in steps if s["design"])
+    frac_sc = round(10.0 * n_design / max(1, len(steps)), 1)
+    sc = min(8.0, frac_sc)
+    sc = round(sc, 1)
+    if sc == int(sc):
+        sc = int(sc)
+    _TAB_SCORES["Assembly sequence"] = {
+        "score": sc, "target": 8,
+        "status": "PASS" if sc >= 8 else "FAIL",
+        "issues": [f"{n_design}/{len(steps)} steps carry design-derived content "
+                   f"(footprint / region groups / schedule quantities / BoM lift mass); "
+                   f"duration norms are stated ESTIMATE defaults — capped at 8 until "
+                   f"the norms themselves are design-derived"],
+        "fix": "derive the unit norms from the design (crew model / lift study) to "
+               "lift the cap; give every step a design-derived quantity to raise the "
+               "fraction",
+        "basis": f"arithmetic: min(8, 10 × {n_design}/{len(steps)} design-derived steps)",
+    }
     return True
 
 
@@ -10318,6 +10673,7 @@ _TAB_RANK = {
     "Executive Summary": -1, "Contents": 0, "Overview": 0.5, "Renders": 1,
     "Cost waterfall": 2, "Financial model": 3, "Bill of Materials (Ledger)": 4,
     "Brief": 5,
+    "Design basis": 5.5,                                # the basis statement follows the Brief
     "Drawings": 6,                                      # the drawing REGISTER opens the drawings block
     # drawings in reading order: BFD 7 → P&ID 8 → Process schedules 9 → GA 10 → HVAC 11 →
     # Electrical 12 → Line & velocity 13 (prefix ranks in _tab_rank fill the gaps)
@@ -10338,7 +10694,7 @@ _TAB_GROUP_COLOUR = {
 }
 _TAB_GROUPS = {
     "commercial": {"Executive Summary", "Contents", "Overview", "Renders", "Cost waterfall",
-                   "Financial model", "Bill of Materials (Ledger)", "Brief"},
+                   "Financial model", "Bill of Materials (Ledger)", "Brief", "Design basis"},
     "drawings": {"Drawings", "Process schedules", "Electrical", "Line & velocity",
                  "Assembly sequence"},
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
@@ -11064,6 +11420,9 @@ def build(run_dir: str, out_path: str) -> dict:
     # references it. Each self-guards (skips cleanly with no usable output metric).
     add_tab(INPUTS_SHEET, lambda: tab_inputs_assumptions(wb, state))
     add_tab("Financial model", lambda: tab_financial_model(wb, state))
+    # Design basis is BUILT after Inputs (its utilisation drivers reference the live
+    # Inputs cells) but PLACED after Brief in the strip (_TAB_RANK 5.5).
+    add_tab("Design basis", lambda: tab_design_basis(wb, state, run_dir))
     # 'Electrical' (single-line drawing + panel schedule, ONE tab — Bundle B fix 4) is
     # built with the image tabs below, so its embedded drawing registers a preview link.
     # process schedules creates 0..3 sheets; treat >0 as success
@@ -11071,7 +11430,7 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
     add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
     add_tab("Holds & exclusions", lambda: tab_holds_register(wb, state, run_dir))
-    add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state))
+    add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state, run_dir))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
 
     print("  · Image tabs")
@@ -12659,6 +13018,204 @@ def _selftest() -> int:
         if _fc != len(_cli_fails):
             print(f"  FAIL checks-diet: tab fail-count {_fc} must equal the CLI's "
                   f"{len(_cli_fails)}"); bad += 1
+
+    # ── BUNDLE D (two-reviewer audit, 2026-07-02) ────────────────────────────────
+    # (D1) FINANCIAL MODEL RESTRUCTURE: cost-of-service LEADS; the speculative
+    # revenue machinery is ONE clearly-labelled appendix with ONE caveat banner;
+    # the £5M anchor is dead; a negative-EBITDA "DEPLOY" recommendation never
+    # renders; the IRR cell degrades to honest text (never #N/A).
+    _save_addr_d = dict(_ECON_INPUT_ADDR)
+    _save_gen_d = _ECON_GENERIC
+    _save_scores_d = dict(_TAB_SCORES)
+    try:
+        _fm_state = {
+            "costStack": {"all_in_capex_gbp": 1_148_141, "installed_asp_gbp": 951_000},
+            "orchestratorContract": {"quantities": {
+                "peak_irrigation_flow_m3_h": {"value": 90, "unit": "m³/h",
+                                              "family": "flow_rate"},
+                "connected_electrical_load_kw": {"value": 53, "unit": "kW",
+                                                 "family": "power"}}},
+            "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+                {"value": 6000, "unit": "trays"}]}}}}
+        _ECON_INPUT_ADDR.clear()
+        _wbf = Workbook(); _wbf.remove(_wbf.active)
+        if not tab_inputs_assumptions(_wbf, _fm_state) or not tab_financial_model(_wbf, _fm_state):
+            print("  FAIL fm-restructure: Inputs + Financial model must build on the fixture"); bad += 1
+        else:
+            _wsf = _wbf["Financial model"]
+            _cells = [(c.row, str(c.value)) for row in _wsf.iter_rows() for c in row
+                      if isinstance(c.value, str)]
+            _cavs = [rw for rw, v in _cells
+                     if "UNVERIFIED" in v or "SPECULATIVE APPENDIX" in v or "PER-UNIT PRODUCT" in v]
+            if len(_cavs) != 1:
+                print(f"  FAIL fm-restructure: the caveat must render exactly ONCE "
+                      f"(the appendix banner) — got {len(_cavs)} caveat cell(s)"); bad += 1
+            _cos_row = next((rw for rw, v in _cells if v.startswith("COST-OF-SERVICE MODEL")), None)
+            _apx_row = next((rw for rw, v in _cells if v.startswith("APPENDIX — if the")), None)
+            _eco_row = next((rw for rw, v in _cells if v.startswith("Economics — base case")), None)
+            if not (_cos_row and _apx_row and _eco_row and _cos_row < _apx_row < _eco_row):
+                print(f"  FAIL fm-restructure: order must be cost-of-service ({_cos_row}) → "
+                      f"APPENDIX band ({_apx_row}) → Economics ({_eco_row})"); bad += 1
+            if any("£5M capex anchor" in v or "at £5.0M" in v for _, v in _cells) \
+                    or any(isinstance(c.value, str) and c.value.startswith("=")
+                           and "5000000" in c.value
+                           for row in _wsf.iter_rows() for c in row):
+                print("  FAIL fm-restructure: the hardcoded £5M anchor block must be DEAD"); bad += 1
+            # the fixture has no real sale price → EBITDA ≤ 0 → NEVER a DEPLOY banner
+            if any(v.lstrip("★ ").startswith("DEPLOY £") or "DEPLOY £" in v for _, v in _cells):
+                print("  FAIL fm-restructure: a DEPLOY recommendation must be SUPPRESSED "
+                      "when EBITDA ≤ 0"); bad += 1
+            if not any("NO DEPLOYMENT RECOMMENDED" in v for _, v in _cells):
+                print("  FAIL fm-restructure: the honest no-deployment verdict must render "
+                      "instead of the suppressed DEPLOY"); bad += 1
+            _irr_f = next((str(c.value) for row in _wsf.iter_rows() for c in row
+                           if isinstance(c.value, str) and c.value.startswith("=IFERROR(IRR(")), None)
+            if not (_irr_f and "no revenue basis" in _irr_f):
+                print(f"  FAIL fm-restructure: the IRR cell must degrade to the honest "
+                      f"'n/a — no revenue basis' text, never #N/A (got {_irr_f!r})"); bad += 1
+    finally:
+        _ECON_INPUT_ADDR.clear()
+        _ECON_INPUT_ADDR.update(_save_addr_d)
+        globals()["_ECON_GENERIC"] = _save_gen_d
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d)
+
+    # (D2) DESIGN-BASIS STATEMENT: ≤40 rows, every line value+source, and the values
+    # are DERIVED from the owning module's constants (never hand-typed — proven by
+    # flipping a source constant and watching the row follow), headline duties lead.
+    _save_scores_d2 = dict(_TAB_SCORES)
+    try:
+        _db_state = {
+            "orchestratorContract": {"quantities": {
+                "peak_irrigation_flow_m3_h": {"value": 90, "unit": "m³/h",
+                                              "family": "flow_rate", "source": "contract"},
+                "acid_dosing_pump_throughput_m3_h": {"value": 0.04, "unit": "m³/h",
+                                                     "family": "flow_rate"},
+                "connected_electrical_load_kw": {"value": 53, "unit": "kW",
+                                                 "family": "power"},
+                # a flagged tool-output artefact (the 132 GW total_supply_demand_kw)
+                # must NEVER surface as a design-basis duty
+                "total_supply_demand_kw": {"value": 132_599_334.756, "unit": "kW",
+                                           "family": "power"},
+                # a storage VOLUME is not a per-time duty — excluded from the block
+                "total_water_storage_volume_m3": {"value": 261.6, "unit": "m3",
+                                                  "family": "volume"}}}}
+        _rows_db = _design_basis_rows(_db_state)
+        if not _rows_db or len(_rows_db) > DESIGN_BASIS_MAX_ROWS:
+            print(f"  FAIL design-basis: must render 1..{DESIGN_BASIS_MAX_ROWS} rows "
+                  f"(got {len(_rows_db)})"); bad += 1
+        _incomplete = [r for r in _rows_db
+                       if r["value"] in (None, "") or not str(r["source"]).strip()]
+        if _incomplete:
+            print(f"  FAIL design-basis: every line must carry a value + a named source "
+                  f"(missing: {[r['item'] for r in _incomplete][:3]})"); bad += 1
+        # proveCatch: the pipe-spec line FOLLOWS the module constant (never hand-typed)
+        _orig_lim = conn_sizing.LIQUID_VELOCITY_LIMIT_MS
+        try:
+            conn_sizing.LIQUID_VELOCITY_LIMIT_MS = 9.9
+            _rows_db2 = _design_basis_rows(_db_state)
+            _lim_row = next((r for r in _rows_db2 if "Velocity limit, liquid" in r["item"]), None)
+            if not _lim_row or _lim_row["value"] != 9.9:
+                print(f"  FAIL design-basis: the liquid-velocity-limit line must FOLLOW "
+                      f"connection_sizing.LIQUID_VELOCITY_LIMIT_MS (flipped to 9.9, "
+                      f"got {_lim_row and _lim_row['value']})"); bad += 1
+        finally:
+            conn_sizing.LIQUID_VELOCITY_LIMIT_MS = _orig_lim
+        # headline duty leads; the dosing trickle must NOT displace it
+        _duty_rows = [r for r in _rows_db if r["disc"] == "Design flows & duties"]
+        if not _duty_rows or "peak irrigation flow" not in _duty_rows[0]["item"]:
+            print(f"  FAIL design-basis: the LARGEST flow must lead the duties block "
+                  f"(got {_duty_rows and _duty_rows[0]['item']!r})"); bad += 1
+        if not any("connected electrical load" in r["item"] for r in _duty_rows):
+            print("  FAIL design-basis: the electrical duty must appear in the duties block"); bad += 1
+        if any("total supply demand" in r["item"] or "storage volume" in r["item"]
+               for r in _duty_rows):
+            print("  FAIL design-basis: a flagged tool aggregate / storage volume must "
+                  "NOT surface as a design duty"); bad += 1
+        # rendered tab: builds + self-scores by arithmetic, capped 8
+        _wbd = Workbook(); _wbd.remove(_wbd.active)
+        if not tab_design_basis(_wbd, _db_state, "/nonexistent"):
+            print("  FAIL design-basis: the tab must build from state alone"); bad += 1
+        _dbs = _TAB_SCORES.get("Design basis") or {}
+        if _dbs.get("score") != 8 or "arithmetic" not in str(_dbs.get("basis", "")):
+            print(f"  FAIL design-basis: complete rows must self-score exactly 8 by "
+                  f"arithmetic (got {_dbs.get('score')} basis={_dbs.get('basis')!r})"); bad += 1
+    finally:
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d2)
+
+    # (D3) DESIGN-SPECIFIC ASSEMBLY SEQUENCE: civils first (footprint-sized), region
+    # steps with tag-range GROUPS, the largest lift → stated crane class, durations
+    # from counts × the footnoted norms, and an HONEST arithmetic self-score that
+    # drops when the design data is absent (proveCatch of the ≤8 cap both ways).
+    import tempfile as _tfD
+    _save_scores_d3 = dict(_TAB_SCORES)
+    try:
+        if _crane_class(656) != "20 t mobile crane (or lorry-mounted HIAB)" \
+                or _crane_class(12_000) != "100 t mobile crane":
+            print("  FAIL assembly: crane class must follow the mass bands"); bad += 1
+        if _tag_range(["TK-104", "TK-105", "TK-106", "TK-107"]) != "TK-104…TK-107":
+            print(f"  FAIL assembly: consecutive tags must compress to a range "
+                  f"(got {_tag_range(['TK-104', 'TK-105', 'TK-106', 'TK-107'])!r})"); bad += 1
+        _asm_state = {"requirementsBom": [
+            {"tag": "TK-108", "requirement": "Fresh Water Tank · 3.7 m dia", "qty": 1,
+             "line_gbp": 20000, "mass_kg": 656},
+            {"tag": "P-101", "requirement": "Transfer Pump", "qty": 2, "line_gbp": 4000},
+            {"tag": "LT-201", "requirement": "Level Transmitter", "qty": 4, "line_gbp": 1200},
+        ]}
+        with _tfD.TemporaryDirectory() as _tdD:
+            _parts = ([{"tag": f"u_nt_inst{i}", "equipment_tag": f"TK-{104 + i}",
+                        "name": "Nutrient Tank", "module": "mass_fluid_transport_process",
+                        "shape": "tank", "qty": 1, "region_rank": 45,
+                        "pos_mm": [i * 4000, 0, 1850], "dims_mm": {"dia": 3700, "len": 3700}}
+                       for i in range(8)]
+                      + [{"tag": "u_pump", "equipment_tag": "P-101", "name": "Transfer Pump",
+                          "module": "mass_fluid_transport_process", "shape": "box", "qty": 1,
+                          "region_rank": 45, "pos_mm": [0, 5000, 400],
+                          "dims_mm": {"w": 800, "d": 500, "h": 800}}])
+            with open(os.path.join(_tdD, "parts-manifest.json"), "w") as _fh:
+                json.dump({"parts": _parts,
+                           "bbox_mm": {"length_mm": 23600, "width_mm": 39200}}, _fh)
+            with open(os.path.join(_tdD, "connection-schedule.json"), "w") as _fh:
+                json.dump({"totals": {"pipe_m_by_dn": {"DN125": 462.1, "DN50": 74.0},
+                                      "cable_m_by_csa": {"1.5 mm²": 541.3},
+                                      "runs_sized": 76}}, _fh)
+            _wba = Workbook(); _wba.remove(_wba.active)
+            if not tab_assembly_sequence(_wba, _asm_state, _tdD):
+                print("  FAIL assembly: the tab must build on the fixture"); bad += 1
+            _wsa = _wba["Assembly sequence"]
+            _txt = [str(c.value) for row in _wsa.iter_rows() for c in row
+                    if c.value not in (None, "")]
+            _blob = "\n".join(_txt)
+            _first_step = next((v for v in _txt if v == "Site set-out & civils"), None)
+            if not _first_step or "23.6 × 39.2 m" not in _blob:
+                print("  FAIL assembly: civils must be step 1, sized from the "
+                      "placed-plant footprint"); bad += 1
+            if "8× Nutrient Tank TK-104…TK-111 — see GA" not in _blob:
+                print("  FAIL assembly: the 8 tanks must GROUP to one tag-ranged line "
+                      "('8× Nutrient Tank TK-104…TK-111 — see GA')"); bad += 1
+            if "LARGEST LIFT: Fresh Water Tank [TK-108] at 656 kg" not in _blob \
+                    or "20 t mobile crane" not in _blob:
+                print("  FAIL assembly: the largest lift must name the heaviest BoM "
+                      "vessel + its crane class"); bad += 1
+            if "536.1 m of sized pipe" not in _blob or "(ESTIMATE)" not in _blob \
+                    or "40 m² slab per crew-day" not in _blob:
+                print("  FAIL assembly: pipework must be quantified from the schedule "
+                      "and the norms footnoted as ESTIMATE"); bad += 1
+            _asc = _TAB_SCORES.get("Assembly sequence") or {}
+            if _asc.get("score") != 8 or "min(8," not in str(_asc.get("basis", "")):
+                print(f"  FAIL assembly: a fully design-derived plan must self-score "
+                      f"exactly 8 (capped — norms are estimates); got {_asc.get('score')}"); bad += 1
+        # proveCatch the OTHER direction: with NO manifest/schedule the plan is
+        # template text → the arithmetic score must FALL below 8, never stamp an 8.
+        _wbb = Workbook(); _wbb.remove(_wbb.active)
+        with _tfD.TemporaryDirectory() as _tdE:
+            if not tab_assembly_sequence(_wbb, _asm_state, _tdE):
+                print("  FAIL assembly: the tab must still build without design files"); bad += 1
+            _asc2 = _TAB_SCORES.get("Assembly sequence") or {}
+            if not (isinstance(_asc2.get("score"), (int, float)) and _asc2["score"] < 8):
+                print(f"  FAIL assembly: with no manifest/schedule the self-score must "
+                      f"drop BELOW 8 (template plan) — got {_asc2.get('score')}"); bad += 1
+    finally:
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_save_scores_d3)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

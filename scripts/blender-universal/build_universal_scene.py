@@ -14534,6 +14534,11 @@ def apply_inspection_materials(parts):
         if obj.type != "MESH" or obj.data is None:
             continue
         nm = obj.name
+        # ── Tag-callout chips/stems keep their own bright billboard materials —
+        #    the whole point is that the tag stays legible in the INSPECT set too
+        #    (the text FONT objects are non-MESH, so the loop never touches them). ──
+        if nm.startswith("u_tagcallout_"):
+            continue
         # ── Pipe-rack structure → solid light structural grey (Fix 2) ──
         if nm.startswith("u_rack_"):
             obj.data.materials.clear()
@@ -14820,6 +14825,268 @@ def _scene_bbox_excluding(prefixes):
     zmn, zmx = min(zs), max(zs)
     return ((xmn + xmx) / 2, (ymn + ymx) / 2, (zmn + zmx) / 2,
             xmx - xmn, ymx - ymn, zmx - zmn)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RENDER TAG CALLOUTS (Bundle D item 3, 2026-07-02) — billboard equipment-tag
+# chips baked into the hero + plan renders at the principal equipment, so a
+# reader can put a tag to a shape without the GA open beside the render.
+#   • Data: the SAME parts-manifest rows the GA / BoM / Excel read (canonical
+#     equipment_tag + placed pos/dims), so the chip tag ALWAYS matches the
+#     paperwork. Top TAG_CALLOUT_COUNT principals by plan footprint.
+#   • Geometry: a small white chip (thin box) + dark tag text + a thin grey
+#     stem down to the part's top. The chip is tilted so its normal BISECTS
+#     the top-view (+Z) and hero-view directions — legible in BOTH the plan
+#     (01-top / inspect-top) and the 3/4 hero (00-hero / inspect-hero).
+#   • Deterministic: rows come pre-sorted from the manifest; ties break on the
+#     tag string; the anti-overlap stagger is a fixed greedy pass. Pure ADDED
+#     presentation geometry — parts-manifest / ledger / schedule / gates are
+#     all written BEFORE this runs, and the A1 2-D drawing pipelines read the
+#     manifest (never the scene), so none of them see the chips.
+#   • Kill switch: BLENDER_TAG_CALLOUTS=0.
+# ═══════════════════════════════════════════════════════════════════════════
+TAG_CALLOUT_COUNT = 12          # top principals by plan footprint that get a chip
+TAG_CALLOUT_TEXT_FRAC = 0.016   # text height as a fraction of the plant's long span
+TAG_CALLOUT_TEXT_MIN_MM = 260.0
+TAG_CALLOUT_TEXT_MAX_MM = 850.0
+TAG_CALLOUT_CLEAR_MM = 550.0    # air gap between the part's top and the chip
+
+
+def _tag_callout_row_area(row):
+    """Plan-footprint area (mm²) of a manifest row — the principal-picking key."""
+    d = row.get("dims_mm") or {}
+    if "dia" in d:
+        dia = float(d.get("dia") or 0.0)
+        return dia * dia
+    return float(d.get("w") or 0.0) * float(d.get("d") or 0.0)
+
+
+def _tag_callout_top_z_mm(row):
+    """The part's top elevation (mm) from its manifest row: centre z + half its
+    VERTICAL extent. Round rows: `len` is the standing height for a vertical
+    vessel but the AXIAL length for a horizontal one (shape disambiguates)."""
+    z = float((row.get("pos_mm") or [0, 0, 0])[2])
+    d = row.get("dims_mm") or {}
+    shape = str(row.get("shape") or "")
+    if "dia" in d:
+        vert = float(d.get("dia") or 0.0) if shape in ("horizontal_vessel", "inline_spool") \
+            else float(d.get("len") or 0.0)
+    else:
+        vert = float(d.get("h") or 0.0)
+    return z + vert / 2.0
+
+
+def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
+    """Add the billboard tag chips for the top `limit` principals by footprint.
+    Reads the written parts-manifest dict (canonical tags); returns the number
+    of chips added. Additive-only; BLENDER_TAG_CALLOUTS=0 suppresses."""
+    if os.environ.get("BLENDER_TAG_CALLOUTS", "1").strip().lower() in (
+            "0", "false", "no", "off"):
+        print("[univ][callouts] BLENDER_TAG_CALLOUTS=0 — tag chips suppressed")
+        return 0
+    rows = (manifest or {}).get("parts") or []
+    cands = [r for r in rows
+             if str(r.get("equipment_tag") or "").strip()
+             and isinstance(r.get("pos_mm"), list) and len(r["pos_mm"]) == 3
+             and isinstance(r.get("dims_mm"), dict)
+             and _tag_callout_row_area(r) > 0]
+    if not cands:
+        return 0
+    # deterministic pick: biggest plan footprint first, tag string breaks ties;
+    # one chip per equipment_tag (instance rows TK-104…TK-111 each carry their own).
+    cands.sort(key=lambda r: (-_tag_callout_row_area(r), str(r["equipment_tag"])))
+    seen, picked = set(), []
+    for r in cands:
+        tag = str(r["equipment_tag"]).strip()
+        if tag in seen:
+            continue
+        seen.add(tag)
+        picked.append(r)
+        if len(picked) >= limit:
+            break
+
+    bb = manifest.get("bbox_mm") or {}
+    span_mm = max(float(bb.get("length_mm") or 0.0),
+                  float(bb.get("width_mm") or 0.0), 1000.0)
+    text_mm = max(TAG_CALLOUT_TEXT_MIN_MM,
+                  min(TAG_CALLOUT_TEXT_MAX_MM, span_mm * TAG_CALLOUT_TEXT_FRAC))
+    chip_h_mm = text_mm * 1.7
+    chip_t_mm = max(28.0, text_mm * 0.08)          # chip thickness (thin slab)
+
+    # TWO hero cameras consume this scene (both az 45°, different elevations —
+    # MEASURED from their own camera formulas, run-E finding: modelling only the
+    # 33° inspect-hero mis-ordered chips in the 12.7° embed hero):
+    #   • 00-hero embed (forge_blender_lib.run_render_pipeline): loc offset
+    #     (+2/√2, −2/√2, +0.45)·max_dim → elevation atan2(0.45, 2.0) ≈ 12.7°
+    #   • inspect-hero (render_inspection): loc offset (0.60, −0.60, 0.55)·radius
+    #     → elevation atan2(0.55, 0.849) ≈ 32.9°
+    _el_embed = math.atan2(0.45, 2.0)
+    _el_inspect = math.atan2(0.55, math.hypot(0.60, 0.60))
+    _ELS = (_el_embed, _el_inspect)
+
+    def _hero_dir(el):
+        return (math.cos(el) / math.sqrt(2.0), -math.cos(el) / math.sqrt(2.0),
+                math.sin(el))
+
+    # Chip orientation: normal = bisector of the top view (+Z) and the MID hero
+    # elevation, so the tag reads in the plan AND both heroes. Euler XYZ (tilt
+    # about X, then 45° about Z) — local +X (the text baseline) lands on the
+    # heroes' shared screen-right (1,1,0)/√2.
+    _el_mid = (_el_embed + _el_inspect) / 2.0
+    _hm = _hero_dir(_el_mid)
+    _b = (_hm[0], _hm[1], _hm[2] + 1.0)                      # + top view (0,0,1)
+    _bl = math.sqrt(_b[0] ** 2 + _b[1] ** 2 + _b[2] ** 2)
+    _tilt = math.acos(max(-1.0, min(1.0, _b[2] / _bl)))      # back-tilt from vertical
+    chip_rot = (_tilt, 0.0, math.radians(45.0))
+    # unit normal of the tilted chip (for the small text lift off its face)
+    _n = (math.sin(_tilt) * math.sin(math.radians(45.0)),
+          -math.sin(_tilt) * math.cos(math.radians(45.0)), math.cos(_tilt))
+
+    chip_mat = fl.make_mat("m_tagcallout_chip", fl._to_linear((0.97, 0.97, 0.96)),
+                           metallic=0.0, roughness=0.55, emission_strength=0.12)
+    text_mat = fl.make_mat("m_tagcallout_text", fl._to_linear((0.09, 0.11, 0.15)),
+                           metallic=0.0, roughness=0.5)
+    stem_mat = fl.make_mat("m_tagcallout_stem", fl._to_linear((0.42, 0.44, 0.48)),
+                           metallic=0.0, roughness=0.7)
+
+    # Lift every chip CLEAR of the overhead pipe corridor: a chip at part-top
+    # height sits INSIDE the pipe rack that runs above the tanks and is occluded
+    # in both the hero and the plan (run-A finding, 2026-07-02). The corridor top
+    # is the highest routed pipe/tray/rack member actually in the scene.
+    corridor_top_mm = 0.0
+    _PIPE_PREF = ("u_route_", "u_pipe_", "u_trunk_", "u_tap_", "u_wire_", "u_rack_")
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH" or obj.data is None \
+                or not obj.name.startswith(_PIPE_PREF):
+            continue
+        for c in obj.bound_box:
+            w = obj.matrix_world @ mathutils_vec(c)
+            corridor_top_mm = max(corridor_top_mm, w.z / fl.MM)
+
+    # ── PLACEMENT (all computed BEFORE any chip geometry exists, so the occlusion
+    # rays below only ever test PLANT geometry, never another chip) ──
+    M = fl.MM
+    # occlusion probe: a chip must have a clear sight-line to BOTH embed cameras
+    # (the 3/4 hero and the straight-down plan). A tall foreground pipe arch can
+    # occlude a chip that is already above the corridor (ortho projection — run-B
+    # finding); ray-cast from the chip's centre + both ends toward each camera and
+    # lift until clear. Deterministic: the scene is deterministic, fixed step/order.
+    try:
+        bpy.context.view_layer.update()
+        _dg = bpy.context.evaluated_depsgraph_get()
+    except Exception:  # noqa: BLE001
+        _dg = None
+    _scene = bpy.context.scene
+    _V = mathutils_vec
+    _probe_dirs = [_V(_hero_dir(el)) for el in _ELS] + [_V((0.0, 0.0, 1.0))]
+    _ux = _uy = 1.0 / math.sqrt(2.0)                         # chip long axis (screen-right)
+
+    def _sightline_clear(x_mm, y_mm, z_mm, half_w_mm):
+        if _dg is None:
+            return True
+        for off in (-half_w_mm, 0.0, half_w_mm):
+            origin = _V(((x_mm + off * _ux) * M, (y_mm + off * _uy) * M, z_mm * M))
+            for d in _probe_dirs:                            # both heroes + the plan
+                try:
+                    if _scene.ray_cast(_dg, origin, d)[0]:
+                        return False
+                except TypeError:                            # older ray_cast signature
+                    if _scene.ray_cast(bpy.context.view_layer, origin, d)[0]:
+                        return False
+        return True
+
+    # greedy anti-overlap stagger in TRUE screen coordinates, tested under BOTH
+    # hero elevations: screen-x u=(x+y)/√2 (shared) and screen-y per elevation
+    # v(el)=((y−x)/√2)·sin(el)+z·cos(el) — the run-C/run-E V-vs-Z pairs proved a
+    # single-elevation (or z-only) test misses chips whose DEPTH difference lines
+    # them up on screen in the OTHER hero. Combined with the sight-line probe in
+    # ONE monotone upward loop, so a lifted chip is re-checked against the plant.
+    def _screen_v(x_mm, y_mm, z_mm, el):
+        return ((y_mm - x_mm) / math.sqrt(2.0)) * math.sin(el) + z_mm * math.cos(el)
+
+    placed = []          # (u_mm, x_mm, y_mm, z_mm, chip_w_mm)
+    placements = []      # (row, tag, x_mm, y_mm, top_mm, chip_w_mm, chip_z_mm)
+    for r in picked:
+        tag = str(r["equipment_tag"]).strip()
+        x_mm, y_mm = float(r["pos_mm"][0]), float(r["pos_mm"][1])
+        top_mm = _tag_callout_top_z_mm(r)
+        chip_w_mm = text_mm * (0.62 * len(tag) + 1.0)
+        chip_z_mm = (max(top_mm, corridor_top_mm)
+                     + TAG_CALLOUT_CLEAR_MM + chip_h_mm / 2.0)
+        u_mm = (x_mm + y_mm) / math.sqrt(2.0)
+        for _ in range(14):                                  # bounded, monotone up
+            if not _sightline_clear(x_mm, y_mm, chip_z_mm, chip_w_mm / 2.0):
+                chip_z_mm += 1.5 * chip_h_mm
+                continue
+            # a clash under EITHER hero elevation must clear (threshold 1.35 <
+            # lift step 1.6, so every lift makes strict progress — converges)
+            need_z = None
+            for el in _ELS:
+                v_mm = _screen_v(x_mm, y_mm, chip_z_mm, el)
+                for p in placed:
+                    if abs(p[0] - u_mm) >= 0.60 * (p[4] + chip_w_mm):
+                        continue
+                    pv = _screen_v(p[1], p[2], p[3], el)
+                    if abs(pv - v_mm) < 1.35 * chip_h_mm:
+                        zz = ((pv + 1.6 * chip_h_mm
+                               - ((y_mm - x_mm) / math.sqrt(2.0)) * math.sin(el))
+                              / math.cos(el))
+                        need_z = max(need_z or 0.0, zz, chip_z_mm + 0.25 * chip_h_mm)
+            if need_z is None:
+                break
+            chip_z_mm = need_z
+        placed.append((u_mm, x_mm, y_mm, chip_z_mm, chip_w_mm))
+        placements.append((r, tag, x_mm, y_mm, top_mm, chip_w_mm, chip_z_mm))
+        print(f"[univ][callouts] place {tag}: u={u_mm:.0f} z={chip_z_mm:.0f} "
+              f"w={chip_w_mm:.0f} (part top {top_mm:.0f}; "
+              f"v12={_screen_v(x_mm, y_mm, chip_z_mm, _ELS[0]):.0f} "
+              f"v33={_screen_v(x_mm, y_mm, chip_z_mm, _ELS[1]):.0f})")
+
+    n_added = 0
+    for i, (r, tag, x_mm, y_mm, top_mm, chip_w_mm, chip_z_mm) in enumerate(placements):
+        loc = (x_mm * M, y_mm * M, chip_z_mm * M)
+        # chip slab
+        bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+        chip = bpy.context.active_object
+        chip.name = f"u_tagcallout_chip_{i:02d}_{tag}"
+        chip.dimensions = (chip_w_mm * M, chip_h_mm * M, chip_t_mm * M)
+        chip.rotation_mode = "XYZ"
+        # local Z is the slab's THIN axis after the (w, h, t) sizing above, so the
+        # face normal follows chip_rot exactly like the text plane does.
+        chip.rotation_euler = chip_rot
+        chip.data.materials.clear()
+        chip.data.materials.append(chip_mat)
+        # tag text — a FONT object lying on the chip face (2% of a chip height
+        # proud of it along the face normal so it never z-fights).
+        cu = bpy.data.curves.new(f"u_tagcallout_txt_{i:02d}_{tag}", type="FONT")
+        cu.body = tag
+        cu.size = text_mm * M
+        cu.align_x = "CENTER"
+        cu.align_y = "CENTER"
+        cu.materials.append(text_mat)
+        lift = (chip_t_mm / 2.0 + chip_h_mm * 0.02) * M
+        txt = bpy.data.objects.new(f"u_tagcallout_txt_{i:02d}_{tag}", cu)
+        txt.location = (loc[0] + _n[0] * lift, loc[1] + _n[1] * lift,
+                        loc[2] + _n[2] * lift)
+        txt.rotation_mode = "XYZ"
+        txt.rotation_euler = chip_rot
+        bpy.context.collection.objects.link(txt)
+        # stem from the part's top to the chip underside
+        stem_len_mm = max(1.0, (chip_z_mm - chip_h_mm / 2.0) - top_mm)
+        bpy.ops.mesh.primitive_cylinder_add(
+            radius=max(12.0, text_mm * 0.045) * M, depth=stem_len_mm * M,
+            location=(x_mm * M, y_mm * M, (top_mm + stem_len_mm / 2.0) * M),
+            vertices=12)
+        stem = bpy.context.active_object
+        stem.name = f"u_tagcallout_stem_{i:02d}_{tag}"
+        stem.data.materials.clear()
+        stem.data.materials.append(stem_mat)
+        n_added += 1
+
+    print(f"[univ][callouts] baked {n_added} equipment-tag chip(s) "
+          f"(text {text_mm:.0f} mm, top-{limit} principals by footprint): "
+          + ", ".join(str(r["equipment_tag"]) for r in picked))
+    return n_added
 
 
 def render_inspection(out_dir, bbox):
@@ -15394,6 +15661,17 @@ def main():
     # with vs without proves the renders / route-audit / schedule are unchanged.
     route_manifest = write_route_manifest(out_dir)
 
+    # ── RENDER TAG CALLOUTS (Bundle D item 3) — billboard equipment-tag chips at the
+    # principal equipment, baked into the hero + plan renders. Runs AFTER every data
+    # artefact (ledger / schedule / manifests) is written, so the chips are pure
+    # presentation geometry — no manifest/gate consumer ever sees them. Uses the
+    # WRITTEN manifest rows so the chip tags match the GA/BoM canonically.
+    n_tag_callouts = 0
+    try:
+        n_tag_callouts = add_tag_callouts(parts_manifest, MAT)
+    except Exception as _tce:   # additive — never fail the whole render
+        print(f"[univ][callouts] WARN add_tag_callouts skipped: {_tce}")
+
     # ── INSPECT MODE (default ON) — the FAST visual-judge surface ──
     # When INSPECT=1 (the loop's default), render the CLEAN CAD-inspection set
     # (bright light deck, flat-matte by part type, de-emphasised frame, four
@@ -15528,6 +15806,7 @@ def main():
               "connection_schedule_totals": conn_schedule.get("totals"),
               "parts_manifest_count": parts_manifest.get("count"),
               "route_manifest_count": route_manifest.get("count"),
+              "tag_callouts": n_tag_callouts,
               "inspect": _inspect_summary,
           }))
 
