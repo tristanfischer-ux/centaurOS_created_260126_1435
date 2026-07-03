@@ -31,6 +31,14 @@ connection-schedule.json + route-manifest.json + parts-manifest.json + the rende
                        flow qty × 5 — a 90 m³/h plant cannot carry a 300,000 m³/h line); (d) an
                        aggregate supply-demand quantity must reconcile against the connected
                        electrical load within ×10 (v55 shipped 132,599,650 kW on a 53 kW plant)
+  G9 TAG LEGIBILITY    (v59 GA net, 2026-07-03) every equipment TAG on a drawing must be
+                       READABLE: (i) no two tag bboxes may overlap >20% (v59 B–B shipped a
+                       ~6-tag vertical pile-up over the tank nest; the plan/A–A titles were
+                       overprinted); (ii) no tag bbox may extend past its view's border box
+                       (v59 B–B clipped 'X-1…'/'TK-10…' mid-word off the sheet edge). Views
+                       come from the generator's own `data-viewbox` markers (ONE shared rule
+                       with draw_ga._TagPlacer bounds); a legacy SVG with no markers is
+                       scored against the page rectangle, so the shipped v59 defect FIRES.
 
 Each gate maps to the drawing(s) it scores. The scorecard is per-drawing (the worst failing gate sets
 the drawing's verdict) + an overall ALL-PASS gate. Universal — keyed on the contract + manifests, never
@@ -338,6 +346,107 @@ def connection_sanity_findings(ledger_rows, schedule_rows, quantities):
     return findings
 
 
+# ── G9 TAG LEGIBILITY (2026-07-03, the v59 GA-elevation pile-up + clip net) ─────────
+# v59's scores could not see that BOTH GA elevations failed a 5-second glance: B–B had a
+# vertical pile of ~6 colliding tags over the tank nest, tags overprinted the view titles,
+# and the B–B right edge clipped tags mid-word. Deterministic: parse the SVG's own <text>
+# elements, keep only equipment-tag-shaped labels ('TK-104', ranges 'TK-106…TK-113'),
+# rebuild each bbox with the SAME char-width model the generator's _TagPlacer used, and
+# score (i) pairwise overlap and (ii) containment in the view's `data-viewbox` border box.
+
+TAG_OVERLAP_MAX = 0.20          # >20% bbox intersection (over the smaller bbox) = a pile-up
+_TAG_LABEL_RE = re.compile(
+    r"^[A-Z]{1,4}-\d+[A-Za-z]?(?:…[A-Z]{1,4}-\d+[A-Za-z]?)?$")
+_VIEWBOX_RE = re.compile(
+    r'<rect x="(-?[\d.]+)" y="(-?[\d.]+)" width="([\d.]+)" height="([\d.]+)"'
+    r'[^>]*data-viewbox="([^"]+)"')
+_TEXT_EL_RE = re.compile(r"<text\s([^>]*)>([^<]*)</text>")
+_ATTR_RE = re.compile(r'([a-zA-Z-]+)="([^"]*)"')
+
+
+def _tag_char_w():
+    """The generator's OWN char-width model (draw_ga._TagPlacer.CHAR_W) — one shared
+    rule, so the gate's bboxes are the placer's bboxes. Mirror constant on import miss."""
+    try:
+        import draw_ga
+        return float(draw_ga._TagPlacer.CHAR_W)
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import draw_ga
+            return float(draw_ga._TagPlacer.CHAR_W)
+        except ImportError:
+            return 0.62   # MIRROR of draw_ga._TagPlacer.CHAR_W (keep in sync)
+
+
+def tag_legibility_findings(svg_text: str) -> list:
+    """PURE G9 check — list of finding strings (empty = every tag legible).
+    (i) two tag bboxes in the SAME view overlapping >TAG_OVERLAP_MAX of the smaller;
+    (ii) a tag bbox extending past its view's `data-viewbox` border (fallback: the
+    page rect when a legacy SVG carries no markers — the shipped-v59 case)."""
+    boxes = {}
+    for m in _VIEWBOX_RE.finditer(svg_text):
+        x, y, w, h = (float(m.group(i)) for i in range(1, 5))
+        boxes[m.group(5)] = (x, y, x + w, y + h)
+    msvg = re.search(r'<svg[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"', svg_text)
+    sheet = (0.0, 0.0, float(msvg.group(1)), float(msvg.group(2))) if msvg else None
+    cw = _tag_char_w()
+
+    tags = []   # (view_name_or_None, label, bbox)
+    for m in _TEXT_EL_RE.finditer(svg_text):
+        attrs = dict(_ATTR_RE.findall(m.group(1)))
+        label = m.group(2).strip()
+        if not _TAG_LABEL_RE.match(label):
+            continue                       # titles, dims, notes — never scored
+        if "transform" in attrs:
+            continue                       # rotated dimension text is not a tag
+        try:
+            x = float(attrs["x"])
+            y = float(attrs["y"])
+            size = float(attrs.get("font-size", 10))
+        except (KeyError, ValueError):
+            continue
+        w = cw * size * len(label)
+        x0 = x - w / 2.0 if attrs.get("text-anchor") == "middle" else x
+        bb = (x0, y - 0.78 * size, x0 + w, y + 0.22 * size)
+        cx, cy = (bb[0] + bb[2]) / 2.0, (bb[1] + bb[3]) / 2.0
+        view = None
+        for nm in sorted(boxes):
+            b = boxes[nm]
+            if b[0] <= cx <= b[2] and b[1] <= cy <= b[3]:
+                view = nm
+                break
+        tags.append((view, label, bb))
+
+    findings = []
+    # (i) pairwise pile-up within one view (or the un-marked sheet)
+    for i in range(len(tags)):
+        for j in range(i + 1, len(tags)):
+            va, ta, a = tags[i]
+            vb, tb, b = tags[j]
+            if va != vb:
+                continue
+            ix = min(a[2], b[2]) - max(a[0], b[0])
+            iy = min(a[3], b[3]) - max(a[1], b[1])
+            if ix <= 0 or iy <= 0:
+                continue
+            amin = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+            if amin > 0 and (ix * iy) / amin > TAG_OVERLAP_MAX:
+                findings.append(f"tag pile-up in {va or 'sheet'}: '{ta}' ∩ '{tb}' = "
+                                f"{(ix * iy) / amin:.0%} of the smaller bbox (max "
+                                f"{TAG_OVERLAP_MAX:.0%})")
+    # (ii) a tag past its view border box is CLIPPED (mid-word at the sheet edge)
+    for view, label, bb in tags:
+        box = boxes.get(view) or sheet
+        if box is None:
+            continue
+        if (bb[0] < box[0] - 0.5 or bb[2] > box[2] + 0.5
+                or bb[1] < box[1] - 0.5 or bb[3] > box[3] + 0.5):
+            findings.append(f"tag '{label}' extends past its view border "
+                            f"({view or 'sheet'}) — clipped text")
+    return findings
+
+
 def run_gates(out_dir: str) -> list:
     """Run every deterministic drawing gate on <out_dir>. Returns list[Gate]."""
     def _load(name):
@@ -517,6 +626,21 @@ def run_gates(out_dir: str) -> list:
                           if not f8 else
                           f"{len(f8)} incoherent connection(s): " + " | ".join(f8[:4])))
 
+    # ── G9 TAG LEGIBILITY — no tag pile-ups, no tag clipped at a view border ─────────
+    ga_svg = os.path.join(dd, "general-arrangement.svg")
+    if os.path.exists(ga_svg):
+        try:
+            _ga_txt = open(ga_svg).read()
+        except OSError:
+            _ga_txt = ""
+        if _ga_txt:
+            f9 = tag_legibility_findings(_ga_txt)
+            gates.append(Gate("tag_legibility", ["general-arrangement"],
+                              "high", len(f9) == 0,
+                              "every tag distinct (≤20% bbox overlap) + inside its view border"
+                              if not f9 else
+                              f"{len(f9)} illegible tag(s): " + " | ".join(f9[:4])))
+
     return gates
 
 
@@ -540,6 +664,7 @@ GATE_STAGE = {
     "no_stray_beam": "wire_ports tray demotion + draw_boundary_services (plant-crossing run → single-line/P&ID)",
     "site_utilisation": "deterministic_layout min-area fold + periphery row + ground-slab 3 m apron (the deck must hug the plant hull)",
     "connection_sanity": "derive-topology role ranks (spine direction) + connection_ledger finalize (service-domain drop + flow-unit canonicalisation) + design-loop writeback reconcile bound",
+    "tag_legibility": "draw_ga _TagPlacer (view-bounds clip guard + title/dim obstacles + elevation same-name range-collapse)",
 }
 
 
@@ -710,6 +835,64 @@ def _selftest() -> int:
     chk("g8_pcs_coolant_ok", connection_sanity_findings(
         [{"from_part": "Coolant Manifold", "to_part": "PCS Inverter Module", "service": "water"}], [], {}) == [])
 
+    # ── G9 tag-legibility proveCatch — the v59 GA B–B defects, both directions. ──────
+    # (a) the PILE-UP: v59 B–B stamped ~6 TK tags in one column a few px apart over the
+    #     tank nest ('TK-110/TK-109/TK-105/TK-107/TK-106/TK-108') → the overlap check
+    #     must FIRE on exactly that shape.
+    _pile = ('<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1400">'
+             + "".join(f'<text x="1600" y="{200 + i * 4}" font-family="Helvetica" '
+                       f'font-size="9.5" text-anchor="middle" fill="#10243e" '
+                       f'font-weight="bold">TK-1{k:02d}</text>'
+                       for i, k in enumerate((10, 9, 5, 7, 6, 8)))
+             + '</svg>')
+    _f9a = tag_legibility_findings(_pile)
+    chk("g9_fires_on_v59_pileup", any("pile-up" in x for x in _f9a))
+    # (b) the CLIP: a legacy SVG (no data-viewbox markers — the shipped v59) with a tag
+    #     whose bbox runs past the PAGE edge must FIRE the border check.
+    _clip = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+             '<text x="996" y="300" font-size="9.5" text-anchor="middle" '
+             'font-weight="bold">TK-104</text></svg>')
+    chk("g9_fires_on_clipped_edge",
+        any("extends past" in x for x in tag_legibility_findings(_clip)))
+    # (c) a tag past its own VIEW's data-viewbox border fires even when on-page
+    _past = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+             '<rect x="100" y="100" width="500" height="300" fill="none" stroke="none" '
+             'data-viewbox="elevation-bb"/>'
+             '<text x="596" y="200" font-size="9.5" text-anchor="middle" '
+             'font-weight="bold">TK-106…TK-113</text></svg>')
+    chk("g9_fires_past_view_border",
+        any("elevation-bb" in x and "extends past" in x
+            for x in tag_legibility_findings(_past)))
+    # (d) the FIXED layout passes clean: a laddered stack (rows ≥ size+2.5 apart) +
+    #     a range tag, all inside their view box
+    _clean = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+              '<rect x="100" y="100" width="500" height="300" fill="none" stroke="none" '
+              'data-viewbox="elevation-bb"/>'
+              '<text x="200" y="150" font-size="9.5" text-anchor="middle" '
+              'font-weight="bold">TK-106…TK-113</text>'
+              '<text x="200" y="164" font-size="9.5" text-anchor="middle" '
+              'font-weight="bold">V-102</text>'
+              '<text x="350" y="150" font-size="9.5" text-anchor="middle" '
+              'font-weight="bold">Z-101</text></svg>')
+    chk("g9_pass_on_deoverlapped", tag_legibility_findings(_clean) == [])
+    # (e) non-tag lettering (view titles / dims / the drawing number) is NEVER scored —
+    #     two overprinting titles + a rotated dim must yield zero findings
+    _titles = ('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+               '<text x="10" y="20" font-size="13" font-weight="bold">ELEVATION B–B</text>'
+               '<text x="12" y="22" font-size="13" font-weight="bold">ELEVATION A–A</text>'
+               '<text x="790" y="300" font-size="10" transform="rotate(-90 790 300)">'
+               'TK-101</text>'
+               '<text x="700" y="590" font-size="9.5">FF-GA-001</text></svg>')
+    chk("g9_ignores_titles_and_dims", tag_legibility_findings(_titles) == [])
+    # (f) two tags merely CLOSE (rows a full ladder step apart) do not fire — the
+    #     threshold is >20% of the smaller bbox, not any touch
+    _close = ('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">'
+              '<text x="200" y="150" font-size="9.5" text-anchor="middle" '
+              'font-weight="bold">TK-114</text>'
+              '<text x="200" y="162" font-size="9.5" text-anchor="middle" '
+              'font-weight="bold">TK-115</text></svg>')
+    chk("g9_no_false_positive_on_ladder_rows", tag_legibility_findings(_close) == [])
+
     # scorecard aggregation
     gs = [Gate("legibility", ["single-line-diagram"], "high", False, "x"),
           Gate("qty_coverage", ["pid"], "high", True, "y")]
@@ -722,7 +905,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55)")
+    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55 + G9 tag-legibility proveCatch on the v59 GA elevation pile-up/clip)")
     return 0
 
 

@@ -439,12 +439,20 @@ class _TagPlacer:
     offset LADDER (up, down, further up, further down …) to the first clear slot and
     draws a leader line back to its part centre so the tag stays unambiguous.
     Registration order is the existing draw order (largest part first — a stable,
-    deterministic sort), so the resolved layout is byte-identical run to run."""
+    deterministic sort), so the resolved layout is byte-identical run to run.
+
+    v59 hardening (2026-07-03 — both ELEVATIONS failed a 5-second glance): the
+    ladder is now 2-D (vertical rows first, then deterministic horizontal dodges),
+    and every view passes its BOUNDS box: a tag whose bbox would leave the view is
+    CLAMPED back inside (leader-flipped to its part) — never clipped mid-word the
+    way v59 B–B lost 'X-1…'/'TK-10…' off the sheet edge. View titles + dimension
+    bands are registered as obstacles via block()."""
 
     CHAR_W = 0.62          # ≈ em-fraction per character of the sheet's bold Helvetica
 
-    def __init__(self, svg):
+    def __init__(self, svg, bounds=None):
         self.svg = svg
+        self.bounds = bounds       # (x0, y0, x1, y1) every tag bbox must stay inside
         self._pending = []
         self._placed = []          # bboxes of resolved labels in THIS view
 
@@ -468,31 +476,161 @@ class _TagPlacer:
         overprint it."""
         self._placed.append((float(x0), float(y0), float(x1), float(y1)))
 
+    def _inside(self, bb):
+        """The clip-guard predicate: a candidate bbox must sit fully inside the
+        view's bounds box (no bounds → everywhere is fair)."""
+        if self.bounds is None:
+            return True
+        bx0, by0, bx1, by1 = self.bounds
+        return bb[0] >= bx0 and bb[2] <= bx1 and bb[1] >= by0 and bb[3] <= by1
+
     def flush(self):
-        """Resolve + draw every registered tag. Ladder: in place, then ±1, ±2 … rows
-        of (size + 3 px); a label that had to move gets a leader to its part."""
+        """Resolve + draw every registered tag. 2-D ladder: in place, then ±1, ±2 …
+        rows of (size + 2.5 px) — first straight above/below, then with a
+        deterministic horizontal dodge; every candidate must clear the placed
+        labels AND the view bounds. A label that moved (or was pulled inside the
+        bounds) gets a leader back to its part."""
         for x, y, text, size, anchor_pt in self._pending:
-            step = size + 3.0
+            w = self.CHAR_W * size * max(len(str(text)), 1)
+            # hard clip-guard: pull the anchor x inside the view bounds up front,
+            # so even the fallback position can never run past the view border.
+            x_in, clamped = x, False
+            if self.bounds is not None:
+                lo = self.bounds[0] + w / 2.0 + 1.0
+                hi = self.bounds[2] - w / 2.0 - 1.0
+                if lo <= hi:
+                    nx = min(max(x, lo), hi)
+                    if nx != x:
+                        x_in, clamped = nx, True
+            step = size + 2.5
             chosen = None
-            for k in (0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6):
-                cy = y + k * step
-                bb = self._bbox(x, cy, text, size)
-                if not any(self._hits(bb, pb) for pb in self._placed):
-                    chosen = (cy, bb, k)
+            for dx in (0.0, -0.75 * w, 0.75 * w, -1.5 * w, 1.5 * w):
+                for k in (0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8):
+                    cx = x_in + dx
+                    cy = y + k * step
+                    bb = self._bbox(cx, cy, text, size)
+                    if not self._inside(bb):
+                        continue
+                    if not any(self._hits(bb, pb) for pb in self._placed):
+                        chosen = (cx, cy, bb, bool(k) or bool(dx) or clamped)
+                        break
+                if chosen is not None:
                     break
-            if chosen is None:      # extreme pile-up — place at the far ladder end
-                cy = y - 7 * step
-                chosen = (cy, self._bbox(x, cy, text, size), -7)
-            cy, bb, k = chosen
+            if chosen is None:      # extreme pile-up — far ladder end, clamped inside
+                cy = y - 9 * step
+                if self.bounds is not None:
+                    cy = min(max(cy, self.bounds[1] + size * 0.78 + 1.0),
+                             self.bounds[3] - size * 0.22 - 1.0)
+                chosen = (x_in, cy, self._bbox(x_in, cy, text, size), True)
+            cx, cy, bb, moved = chosen
             self._placed.append(bb)
-            if k and anchor_pt is not None:
+            if moved and anchor_pt is not None:
                 ax, ay = anchor_pt
                 # leader from the label's near edge back to the part centre
                 ey = bb[3] if cy < ay else bb[1]
-                self.svg.line(x, ey, ax, ay, stroke=DATUM_INK, width=0.7)
-            self.svg.text(x, cy, text, size=size, anchor="middle", weight="bold",
+                self.svg.line(cx, ey, ax, ay, stroke=DATUM_INK, width=0.7)
+            self.svg.text(cx, cy, text, size=size, anchor="middle", weight="bold",
                           fill=EQ_INK)
         self._pending = []
+
+
+def _view_box(svg: SVG, name: str, x0, y0, x1, y1):
+    """Emit an invisible per-view BOUNDS marker (`data-viewbox`) and return the
+    bounds tuple. ONE shared rule: the _TagPlacer keeps every tag inside this box
+    and drawing_gates G9 (tag_legibility) re-reads the SAME box from the SVG to
+    verify no tag was clipped — generator and gate can never drift apart."""
+    svg.add(f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" '
+            f'height="{y1 - y0:.1f}" fill="none" stroke="none" '
+            f'data-viewbox="{_esc(name)}"/>')
+    return (float(x0), float(y0), float(x1), float(y1))
+
+
+def _elevation_tag_groups(items):
+    """Collapse an elevation's stacked same-family tags into RANGE tags (v59 B–B:
+    six colliding TK labels over the tank nest projected edge-on). `items` =
+    [(part, px, py, pw, ph)] as DRAWN in one elevation. Same-FAMILY parts whose
+    projected outlines overlap (3 px pad) cluster (union-find); inside a cluster
+    of ≥3, a run of the SAME NAME with CONSECUTIVE numbers gets ONE range tag
+    'TK-109…TK-113' with a single leader to the run — the EXACT rule the
+    equipment schedule already ranges by (family + name), plus numeric
+    contiguity so a range never claims a tag that isn't in it: a real elevation
+    names a rack once, not 8 overlapping labels. Returns (singles, ranges):
+      singles = [(tag, cx, baseline_y, size, anchor)]  (draw-order preserved)
+      ranges  = [(label, cx, baseline_y, size, anchor)] (sorted by label)
+    Deterministic — pure geometry + stable sorts."""
+    PAD = 3.0
+    ents = []
+    for p, px, py, pw, ph in items:
+        ents.append((p, float(px), float(py), max(float(pw), 1.5),
+                     max(float(ph), 1.5), p.tag.split("-")[0]))
+    n = len(ents)
+    parent = list(range(n))
+
+    def _find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if ents[i][5] != ents[j][5]:
+                continue
+            ax0, ay0 = ents[i][1] - PAD, ents[i][2] - PAD
+            ax1, ay1 = ents[i][1] + ents[i][3] + PAD, ents[i][2] + ents[i][4] + PAD
+            bx0, by0 = ents[j][1], ents[j][2]
+            bx1, by1 = ents[j][1] + ents[j][3], ents[j][2] + ents[j][4]
+            if not (ax1 <= bx0 or bx1 <= ax0 or ay1 <= by0 or by1 <= ay0):
+                ri, rj = _find(i), _find(j)
+                if ri != rj:
+                    parent[max(ri, rj)] = min(ri, rj)
+
+    groups: dict = {}
+    for i in range(n):
+        groups.setdefault(_find(i), []).append(i)
+
+    singles, ranges = [], []
+    in_range = set()
+    for root, idxs in groups.items():
+        if len(idxs) < 3:
+            continue
+        # same-NAME + numerically-CONSECUTIVE runs inside the stacked cluster —
+        # the schedule's own collapse rule ('Drain Water Tank ×2 → TK-106…TK-107'),
+        # so a range tag never claims a tag that is a DIFFERENT piece of equipment.
+        by_name: dict = {}
+        for i in idxs:
+            by_name.setdefault(ents[i][0].name, []).append(i)
+        for name in sorted(by_name):
+            run: list = []
+
+            def _emit(run):
+                if len(run) < 2:
+                    return
+                members = [ents[i] for i in run]
+                in_range.update(run)
+                x0 = min(e[1] for e in members)
+                y0 = min(e[2] for e in members)
+                x1 = max(e[1] + e[3] for e in members)
+                y1 = max(e[2] + e[4] for e in members)
+                label = f"{members[0][0].tag}…{members[-1][0].tag}"
+                cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+                ranges.append((label, cx, cy + 3.2, 9.0, (cx, cy)))
+
+            for i in sorted(by_name[name],
+                            key=lambda k: (_tag_num(ents[k][0].tag), ents[k][0].tag)):
+                if run and _tag_num(ents[i][0].tag) != _tag_num(ents[run[-1]][0].tag) + 1:
+                    _emit(run)
+                    run = []
+                run.append(i)
+            _emit(run)
+    for i, (p, px, py, pw, ph, _fam) in enumerate(ents):
+        if i in in_range:
+            continue
+        if pw >= 16 and ph >= 12:
+            cx, cy = px + pw / 2.0, py + ph / 2.0
+            singles.append((p.tag, cx, cy + 3.2, min(9.5, ph * 0.5), (cx, cy)))
+    ranges.sort(key=lambda r: r[0])
+    return singles, ranges
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -559,7 +697,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # SIDE elevation sits to the RIGHT of the plan, sharing the Y axis (plant width).
     side_x = plan_x + plan_w + gap
     side_y = plan_y
-    side_w = elev_h          # side elevation width = plant HEIGHT (z), drawn L→R as z
+    # the side elevation's PAPER width = the plant WIDTH (y), the axis it is drawn
+    # along — v59 sized the sheet from elev_h (plant HEIGHT, tiny for a low plant)
+    # so the B–B view ran PAST the sheet edge and its right-edge tags rasterised
+    # clipped mid-word ('X-1…' / 'TK-10…'). Source fix: the sheet budget uses the
+    # drawn width, and the +46 keeps the level labels ('+4m') on-sheet.
+    side_w = plan_h + 46
 
     # FRONT elevation sits BELOW the plan, sharing the X axis (plant length).
     front_x = plan_x
@@ -600,7 +743,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # small numbered balloons keyed to the EQUIPMENT SCHEDULE (the standard GA way
     # to keep a dense plan legible without tag pile-ups).
     keynotes = []   # (part, cx, cy) for items too small to label in place
-    plan_tags = _TagPlacer(svg)      # de-overlap pass (GA fix 7, reviewers 2026-07-02)
+    # de-overlap pass (GA fix 7, reviewers 2026-07-02) + view BOUNDS (v59: the
+    # ladder walked plan tags up ONTO the 'PLAN' title — the bounds stop above
+    # the top dimension band, so no tag can ever reach the heading again).
+    plan_tags = _TagPlacer(svg, bounds=_view_box(
+        svg, "plan", plan_x - 2, plan_y - 2, plan_x + plan_w + 40,
+        plan_y + plan_h + 34))
     # reserve the plan's annotation bands so a ladder-displaced tag can never
     # overprint the dimensions / grid balloons / north arrow drawn around the plan.
     plan_tags.block(plan_x - 40, plan_y - 26, plan_x + plan_w + 40, plan_y - 2)
@@ -637,20 +785,32 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     svg.text(front_x + 118, front_y - 14, "(looking north)", size=9.5, fill=MUTED)
     _draw_elev_frame(svg, front_x, front_y, plan_w, front_h, L, H, ppm,
                      z_min, z_max, mz_base=front_y)
-    front_tags = _TagPlacer(svg)
+    # SAME _TagPlacer discipline as the plan, with the view's own BOUNDS box (the
+    # clip-guard) — v59's A–A ladder walked tags up over the 'ELEVATION A–A' title.
+    _gy_f = front_y + (z_max - max(0.0, z_min)) * ppm
+    front_tags = _TagPlacer(svg, bounds=_view_box(
+        svg, "elevation-aa", front_x - 2, front_y - 40, front_x + plan_w + 2,
+        _gy_f + 0.5))
+    # the view TITLE + subtitle are OBSTACLES (they sit inside the bounds headroom)
+    front_tags.block(front_x - 4, front_y - 26, front_x + 212, front_y - 4)
     # reserve the ground/FFL row, the left height dimension and the schedule-panel
     # top edge so displaced tags never overprint them.
-    _gy_f = front_y + (z_max - max(0.0, z_min)) * ppm
     front_tags.block(front_x - 30, _gy_f + 0.5, front_x + plan_w + 95, _gy_f + 13)
     front_tags.block(front_x - 30, front_y - 2, front_x - 2, _gy_f)
     front_tags.block(margin, sched_top - 2, width - margin, sched_top + 20)
+    front_items = []
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
         pw = (p.x1 - p.x0) * ppm
         ph = (p.z1 - p.z0) * ppm
         px = front_x + mx(p.x0)
         py = front_y + (z_max - p.z1) * ppm
-        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="x",
-                             placer=front_tags)
+        _draw_elevation_item(svg, px, py, pw, ph, p)
+        front_items.append((p, px, py, pw, ph))
+    # stacked same-family tags (the tank nest seen edge-on) collapse to ONE range
+    # tag with a single leader — like the schedule's 'TK-106…TK-113' rows.
+    _singles_f, _ranges_f = _elevation_tag_groups(front_items)
+    for label, cx, cy, size, anchor in _ranges_f + _singles_f:
+        front_tags.add(cx, cy, label, size, anchor_pt=anchor)
     front_tags.flush()
     # ground / datum line + overall height dimension on the front elevation
     ground_y = front_y + (z_max - max(0.0, z_min)) * ppm
@@ -670,19 +830,29 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # rows); vertical axis = plant HEIGHT (z). Width on paper = plan_h.
     _draw_elev_frame(svg, side_x, side_y, plan_h, front_h, W, H, ppm,
                      z_min, z_max, mz_base=side_y, horiz_label="WIDTH")
-    side_tags = _TagPlacer(svg)
+    # SAME _TagPlacer discipline + BOUNDS (v59 B–B: a ~6-tag pile-up over the tank
+    # nest, X-106/EP-104 colliding, and right-edge tags clipped mid-word).
+    _gy_s = side_y + (z_max - max(0.0, z_min)) * ppm
+    side_tags = _TagPlacer(svg, bounds=_view_box(
+        svg, "elevation-bb", side_x - 2, side_y - 44, side_x + plan_h + 2,
+        _gy_s + 0.5))
+    # the view TITLE + subtitle are OBSTACLES inside the bounds headroom
+    side_tags.block(side_x - 4, side_y - 42, side_x + 212, side_y - 20)
     # reserve the ground row + the width dimension band ('33.12 m' / PLANT WIDTH):
     # the v55 regen showed a displaced tag overprinting the dim label without this.
-    _gy_s = side_y + (z_max - max(0.0, z_min)) * ppm
     side_tags.block(side_x - 30, _gy_s + 0.5, side_x + plan_h + 40, _gy_s + 58)
+    side_items = []
     for p in sorted(parts, key=lambda q: -(max(q.y1 - q.y0, 1) * max(q.z1 - q.z0, 1))):
         pw = (p.y1 - p.y0) * ppm
         ph = (p.z1 - p.z0) * ppm
         # plan rows run north(top)→south; keep the same handedness as the plan.
         px = side_x + (y_max - p.y1) * ppm
         py = side_y + (z_max - p.z1) * ppm
-        _draw_elevation_item(svg, px, py, pw, ph, p, tag_axis="y",
-                             placer=side_tags)
+        _draw_elevation_item(svg, px, py, pw, ph, p)
+        side_items.append((p, px, py, pw, ph))
+    _singles_s, _ranges_s = _elevation_tag_groups(side_items)
+    for label, cx, cy, size, anchor in _ranges_s + _singles_s:
+        side_tags.add(cx, cy, label, size, anchor_pt=anchor)
     side_tags.flush()
     ground_ys = side_y + (z_max - max(0.0, z_min)) * ppm
     svg.line(side_x - 8, ground_ys, side_x + plan_h + 8, ground_ys,
@@ -769,12 +939,12 @@ def _draw_elev_frame(svg, ox, oy, pw, ph, horiz_mm, H_mm, ppm, z_min, z_max,
         lvl += pitch
 
 
-def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x",
-                         placer=None):
-    """One equipment outline in an elevation. Cylinders (vessels/columns/tanks/
+def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart):
+    """One equipment OUTLINE in an elevation. Cylinders (vessels/columns/tanks/
     stacks) draw as a capsule (rounded top) so they read as vessels, not boxes;
-    everything else a rect. Tag if it fits (registered with the view's _TagPlacer
-    when given, so colliding tags de-overlap deterministically)."""
+    everything else a rect. Tagging is NOT done here — the view collects its
+    items and tags them in one pass via _elevation_tag_groups + _TagPlacer
+    (range-collapse for stacked same-family nests, then the de-overlap ladder)."""
     pw = max(pw, 1.5)
     ph = max(ph, 1.5)
     if p.is_round and p.shape == "tank" and ph > 8 and pw > 5:
@@ -799,14 +969,6 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart, tag_axis="x",
                 svg.line(px + 2, ty, px + pw - 2, ty, stroke=DATUM_INK, width=0.6)
     else:
         svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
-    if pw >= 16 and ph >= 12:
-        _cx, _cy = px + pw / 2.0, py + ph / 2.0
-        _sz = min(9.5, ph * 0.5)
-        if placer is not None:
-            placer.add(_cx, _cy + 3.2, p.tag, _sz, anchor_pt=(_cx, _cy))
-        else:
-            svg.text(_cx, _cy + 3.2, p.tag, size=_sz, anchor="middle",
-                     weight="bold", fill=EQ_INK)
 
 
 def _hatch_ground(svg, x0, x1, y):
@@ -1180,6 +1342,50 @@ def _selftest() -> int:
     if build_ga_svg([big, small], bbox, "water_treatment", {"count": 2}) != svg_txt:
         print("  FAIL ga-small-tag: the GA render must stay deterministic")
         bad += 1
+    # 5 — ELEVATION proveCatch (the v59 GA: BOTH elevations failed a 5-second glance —
+    #     a ~6-tag pile-up over the tank nest projected edge-on, tags over the view
+    #     titles, and the B–B right edge clipping tags mid-word). Adversarial input:
+    #     a 2×4 nest of SAME-NAME tanks (projects to ONE stacked column in each
+    #     elevation) + a long-tagged part hard against the plant's far edge. Must
+    #     yield: (a) a same-name consecutive RANGE tag (the schedule's own collapse
+    #     rule) instead of 8 stacked labels; (b) `data-viewbox` bounds markers for
+    #     all three views; (c) a CLEAN drawing_gates G9 verdict — no two tag bboxes
+    #     >20% overlapped, nothing outside its view border box.
+    nest = []
+    for i in range(8):
+        col, row = i % 2, i // 2
+        x0 = 20000 + col * 1300
+        y0 = 6000 + row * 1300
+        nest.append(GAPart(tag=f"TK-1{i+3:02d}", obj_tag=f"tk1{i+3:02d}",
+                           name="Nutrient Tank", module="m", shape="tank", qty=1,
+                           is_round=True, x0=x0, x1=x0 + 1200, y0=y0, y1=y0 + 1200,
+                           z0=0, z1=2000, cx=x0 + 600, cy=y0 + 600))
+    edge = GAPart(tag="TX-101", obj_tag="tx101", name="Transformer", module="m",
+                  shape="box", qty=1, is_round=False,
+                  x0=28000, x1=29900, y0=18000, y1=19900, z0=0, z1=2200,
+                  cx=28950, cy=18950)
+    bbox2 = {"x_min_mm": 0, "x_max_mm": 30000, "y_min_mm": 0, "y_max_mm": 20000,
+             "z_min_mm": 0, "z_max_mm": 4000}
+    svg_nest = build_ga_svg([big] + nest + [edge], bbox2, "water_treatment",
+                            {"count": 10})
+    if ">TK-103…TK-110<" not in svg_nest:
+        print("  FAIL ga-elev-range: an edge-on same-name tank nest must collapse to "
+              "ONE range tag (TK-103…TK-110) in the elevations — the v59 B–B pile-up")
+        bad += 1
+    for vb in ("plan", "elevation-aa", "elevation-bb"):
+        if f'data-viewbox="{vb}"' not in svg_nest:
+            print(f"  FAIL ga-viewbox: the {vb} bounds marker must be emitted (the "
+                  "one-shared-rule box drawing_gates G9 re-checks)")
+            bad += 1
+    try:
+        import drawing_gates as _dg
+        _f9 = _dg.tag_legibility_findings(svg_nest)
+        if _f9:
+            print(f"  FAIL ga-elev-legible: G9 must pass the generated GA clean, got "
+                  f"{len(_f9)}: {_f9[:3]}")
+            bad += 1
+    except ImportError:
+        pass
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
 
