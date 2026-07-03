@@ -20,13 +20,64 @@ Returns {broken: bool, defects: [...], model, ok}. broken=True ⇒ the render ha
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
 import sys
 import urllib.request
+from typing import Optional
 
 DEFAULT_MODEL = "google/gemini-3.1-pro-preview"  # multimodal; strongest reasoner seat
+
+# CORROBORATION DOCTRINE — geometry-hash cache (Tristan re-roll defect, 2026-07-03; same shape as
+# the physics critic 247494a32 and gate 36 284c69c09). The vision CALL is non-deterministic on two
+# axes: (1) EEVEE TAA sampling noise changes the rendered PNG bytes run-to-run by <=8/255 on <6% of
+# pixels even for byte-identical geometry (established 906ea3f39), so a pixel-keyed cache misses
+# every run; (2) the LLM itself can give a different verdict on visually-near-identical images. The
+# fix keys the cache on the GEOMETRY MANIFEST (parts-manifest.json + route-manifest.json) — the true
+# design identity, byte-identical across two runs of the same design — so identical geometry reuses
+# the stored critique verbatim and never re-rolls the LLM.
+_CACHE_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".cache", "vision-critic")
+
+
+def geometry_hash(run_dir: str) -> Optional[str]:
+    """The design-identity hash for a run: parts-manifest.json + route-manifest.json content,
+    canonicalised (sorted keys, no whitespace) so key-order/formatting drift never misses a real
+    cache hit. Returns None when neither manifest is present/parseable — caller then skips the
+    cache (nothing stable to key on) rather than risk a false hit."""
+    parts = []
+    for name in ("parts-manifest.json", "route-manifest.json"):
+        p = os.path.join(run_dir, name)
+        try:
+            with open(p, "r", encoding="utf-8") as fh:
+                parts.append(json.dumps(json.load(fh), sort_keys=True, separators=(",", ":")))
+        except (OSError, json.JSONDecodeError):
+            continue
+    if not parts:
+        return None
+    return hashlib.sha256("||".join(parts).encode("utf-8")).hexdigest()
+
+
+def _cache_path(geo_hash: str) -> str:
+    return os.path.join(_CACHE_ROOT, f"{geo_hash}.json")
+
+
+def cache_read(geo_hash: str) -> Optional[dict]:
+    try:
+        with open(_cache_path(geo_hash), "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def cache_write(geo_hash: str, res: dict) -> None:
+    try:
+        os.makedirs(_CACHE_ROOT, exist_ok=True)
+        with open(_cache_path(geo_hash), "w", encoding="utf-8") as fh:
+            json.dump(res, fh, indent=2)
+    except OSError:
+        pass
 
 _PROMPT = (
     "You are an adversarial chartered engineer inspecting a 3-D render of a process/utility PLANT laid "
@@ -114,14 +165,40 @@ _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-he
 def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     """Find the run's hero render, critique it, and WRITE render-vision-critique.json into run_dir.
     Non-fatal: returns {ok: False} if no render or no key (the dossier scorer then keeps the render's
-    'visual quality UNVERIFIED' advisory → capped at 7, honest). Called from the Blender bg-runner."""
+    'visual quality UNVERIFIED' advisory → capped at 7, honest). Called from the Blender bg-runner.
+
+    CACHED on the geometry-manifest hash (geometry_hash(run_dir)): a run whose parts-manifest +
+    route-manifest are byte-identical to a PRIOR critiqued run reuses that prior verdict verbatim —
+    no LLM call, no re-roll. Only an 'ok' prior verdict from the SAME model is reused (a failed/no-key
+    prior attempt is not cached as a verdict). Absence of either manifest (geo_hash is None) disables
+    caching for that run — correctness over speed when there is nothing stable to key on."""
     hero = next((os.path.join(run_dir, f) for f in _HERO_CANDIDATES
                  if os.path.exists(os.path.join(run_dir, f))), None)
+    geo_hash = geometry_hash(run_dir)
+    if geo_hash:
+        cached = cache_read(geo_hash)
+        if isinstance(cached, dict) and cached.get("ok") and cached.get("model") == model:
+            res = dict(cached)
+            res["cache_hit"] = True
+            res["geometry_hash"] = geo_hash
+            if hero:
+                res["image"] = os.path.basename(hero)
+            try:
+                with open(os.path.join(run_dir, "render-vision-critique.json"), "w", encoding="utf-8") as fh:
+                    json.dump(res, fh, indent=2)
+            except OSError:
+                pass
+            return res
     if not hero:
         res = {"broken": None, "defects": [], "model": model, "ok": False, "error": "no hero render"}
     else:
         res = critique_render(hero, model)
         res["image"] = os.path.basename(hero)
+    if geo_hash:
+        res["geometry_hash"] = geo_hash
+        res["cache_hit"] = False
+        if res.get("ok"):
+            cache_write(geo_hash, res)
     try:
         with open(os.path.join(run_dir, "render-vision-critique.json"), "w", encoding="utf-8") as fh:
             json.dump(res, fh, indent=2)

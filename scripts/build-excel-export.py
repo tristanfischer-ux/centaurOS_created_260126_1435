@@ -270,6 +270,43 @@ def _manifest_div(run_dir: str):
     return res
 
 
+_DG_CACHE: dict = {}
+
+
+def _drawing_gates_verdict(run_dir: str):
+    """SIGHT: read the deterministic drawing_gates.json verdict (G1-G9 legibility/load-reconcile/
+    part-coverage/material-diversity/qty-coverage gates), if the chain wrote one. {all_pass,
+    drawings:{key:{pass, failing_gates}}} or None. Cached."""
+    if run_dir in _DG_CACHE:
+        return _DG_CACHE[run_dir]
+    res = None
+    try:
+        with open(os.path.join(run_dir, "drawing-gates.json"), "r", encoding="utf-8") as _fh:
+            res = json.load(_fh)
+    except Exception:  # noqa: BLE001
+        res = None
+    _DG_CACHE[run_dir] = res
+    return res
+
+
+def _drawing_gate_failing(run_dir: str, *keys: str) -> Optional[bool]:
+    """True iff drawing_gates.json records a FAILING gate for any of the given drawing keys (e.g.
+    'blender' / 'general-arrangement'). False when a verdict exists and none of the keys fail. None
+    when no drawing_gates.json exists — absence is not evidence of failure, so it never corroborates."""
+    dg = _drawing_gates_verdict(run_dir)
+    if not isinstance(dg, dict):
+        return None
+    drawings = dg.get("drawings") or {}
+    seen = False
+    for k in keys:
+        d = drawings.get(k)
+        if isinstance(d, dict):
+            seen = True
+            if d.get("pass") is False:
+                return True
+    return False if seen else None
+
+
 def _aux_tab_score(title: str, run_dir: str):
     """A deterministic quality score for a DRAWING / RENDER / META sheet that the per-tab scorecard
     (the 16 data tabs) doesn't cover — so EVERY sheet shows a quality number (Tristan 2026-06-27).
@@ -398,11 +435,20 @@ def _aux_tab_score(title: str, run_dir: str):
     if "isometric" in t:
         return _cov("isometric-index", "Isometric")
     if "render" in t or "interior layout" in t or "building exterior" in t:
-        # VISION VERDICT (Tristan 2026-06-28): if a vision critic has actually LOOKED at the render
-        # (render-vision-critique.json), its verdict replaces the blanket 'visual quality unverified'
-        # advisory. broken → FAIL with the named defect (flag-only: it can only CAP, never lift).
-        # clean → the visual dimension is VERIFIED, so NO advisory and the render can earn ≥8 on its
-        # deterministic checks (coverage/litter/shape). absent → keep the advisory (honest-cap → 7).
+        # VISION VERDICT — CORROBORATION DOCTRINE (Tristan 2026-06-28, hardened 2026-07-03; same
+        # shape as the physics critic 247494a32 and benchmark-net gate 36 284c69c09). The vision CALL
+        # is non-deterministic on two axes: EEVEE TAA sampling noise changes the rendered PNG bytes
+        # run-to-run by <=8/255 on <6% of pixels even for byte-identical geometry (established
+        # 906ea3f39), and the LLM itself can re-roll its verdict on visually-near-identical images —
+        # observed as GA/Renders/P&ID/BFD/Overview score DRIFT across two otherwise-matched runs
+        # (GA 9.7 vs 9, Renders 9.7 vs 9). The call is now CACHED upstream on the geometry-manifest
+        # hash (render_vision_critic.critique_run), so identical geometry reuses ONE stored verdict —
+        # but even a genuine, freshly-computed LLM finding must never move a NUMBER by itself: a
+        # vision finding SCORES only when a DETERMINISTIC artefact check corroborates it (drawing_gates
+        # G1-G9 / manifest litter / manifest shape-mismatch); UNCORROBORATED findings render as an
+        # advisory note — visible, never scoring. clean → the visual dimension is VERIFIED, so no
+        # advisory and the render earns on its deterministic checks. absent → keep the 'unverified'
+        # advisory (honest-cap → 7).
         _vv = _render_vision_verdict(run_dir)
         _vv_defects = (_vv.get("defects") or []) if isinstance(_vv, dict) else []
         # DETERMINISTIC backstop FIRST: a real electrical-part-drawn-as-a-vessel (the stray-beam defect)
@@ -418,18 +464,44 @@ def _aux_tab_score(title: str, run_dir: str):
                 base["issues"] = ([f"WRONG SHAPE: {_stm['count']} electrical part(s) rendered as a process vessel (the stray-beam defect): {_ex}"] + (base.get("issues") or []))[:6]
                 base["fix"] = "classify_shape must map an electrical/power-connection part to a cabinet/box, not a vessel"
             return base
-        # VISION VERDICT: a 'broken' flag only HARD-CAPS when it NAMES a concrete defect. An LLM
-        # 'broken=True' with EMPTY defects is unsubstantiated — a false FAIL is as dishonest as a false
-        # PASS (Tristan 2026-06-30); the deterministic shape/litter/coverage checks are the real gate.
+        # VISION VERDICT: a 'broken' flag only ever ENTERS this branch when it NAMES a concrete
+        # defect. An LLM 'broken=True' with EMPTY defects is unsubstantiated — a false FAIL is as
+        # dishonest as a false PASS (Tristan 2026-06-30) — and falls straight to the deterministic-only
+        # branch below, same as a clean verdict.
         if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is True and _vv_defects:
             base = _cap_litter(_cov("blender", "Render"))
             if isinstance(base, dict):
                 _df = "; ".join(str(d) for d in _vv_defects[:3])
-                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
-                base["status"] = "FAIL"
-                base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — the render is not "
-                                   f"clean (model: {_vv.get('model', '?')})"] + (base.get("issues") or []))[:6]
-                base["fix"] = "fix the geometry/routing that produces the flagged defect, then the vision critic clears"
+                # CORROBORATION CHECK: does an INDEPENDENT deterministic artefact check agree
+                # something is visibly wrong with this drawing? Shape-mismatch is already the
+                # dedicated backstop above; here litter (default-size/degraded geometry) and a
+                # failing drawing_gates G1-G9 verdict for this drawing are the corroborating SIGHT
+                # mechanisms. Coverage/legibility corroboration is handled separately by _cov's own
+                # advisory-cap path (applied regardless of the vision verdict, on the 'absent' branch).
+                _lit = _manifest_litter(run_dir)
+                _lit_corroborates = (isinstance(_lit, dict)
+                                      and isinstance(_lit.get("score"), (int, float))
+                                      and _lit["score"] < 8)
+                _gate_corroborates = _drawing_gate_failing(run_dir, "blender", "general-arrangement") is True
+                if _lit_corroborates or _gate_corroborates:
+                    # CORROBORATED: an independent deterministic check agrees — the vision finding
+                    # SCORES (a deduction), quoted for human colour, but the deduction is driven by
+                    # the deterministic corroborator, never the LLM's own opinion number alone.
+                    _corr = "default-size litter" if _lit_corroborates else "a failing drawing_gates verdict"
+                    base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                    base["status"] = "FAIL"
+                    base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — CORROBORATED by "
+                                       f"{_corr} (model: {_vv.get('model', '?')})"] + (base.get("issues") or []))[:6]
+                    base["fix"] = "fix the geometry/routing that produces the flagged (and corroborated) defect"
+                else:
+                    # UNCORROBORATED: no deterministic check agrees. A single non-deterministic LLM
+                    # opinion must never move a number on its own (the re-roll defect this doctrine
+                    # closes) — render as an advisory note only; the score stays on its deterministic
+                    # basis (coverage/litter/shape).
+                    base["issues"] = ([f"ADVISORY: vision critic flagged a possible defect: {_df} — "
+                                       f"UNCORROBORATED by any deterministic check (litter/shape/drawing-"
+                                       f"gates); informational only, does not score (model: {_vv.get('model', '?')})"]
+                                       + (base.get("issues") or []))[:6]
             return base
         if isinstance(_vv, dict) and _vv.get("ok") and (_vv.get("broken") is False or not _vv_defects):
             # VERIFIED clean, OR broken-but-unsubstantiated (no named defect) → score on the DETERMINISTIC
@@ -16833,6 +16905,87 @@ def _selftest() -> int:
         if not _rn or _rn.get("score", 10) > 7 or _rn.get("status") != "FAIL":
             print(f"  FAIL render-cap: a 100%-coverage render with an UNVERIFIED-visual advisory must be ≤7/FAIL, not a fake 10 (got {_rn})"); bad += 1
         _COV_CACHE.clear()
+    # (4b) CORROBORATION DOCTRINE (Tristan 2026-07-03 — the re-roll defect: GA 9.7 vs 9, Renders
+    # 9.7 vs 9 across two otherwise-matched runs because an uncached, non-deterministic vision
+    # verdict directly capped the score). proveCatch BOTH directions on the render/GA scorer: an
+    # UNCORROBORATED vision 'broken' finding must render advisory-only and NEVER move the score; a
+    # CORROBORATED one (an independent deterministic check agrees) must still deduct.
+    with _tf.TemporaryDirectory() as _td_corr:
+        with open(os.path.join(_td_corr, "parts-ledger.json"), "w") as _fh:
+            json.dump({"coverage_by_drawing": {"blender": {"present": 40, "expected": 40, "pct": 100.0}}}, _fh)
+        with open(os.path.join(_td_corr, "render-vision-critique.json"), "w") as _fh:
+            json.dump({"ok": True, "broken": True, "defects": ["odd shadow in the corner"],
+                       "model": "test-model"}, _fh)
+        _COV_CACHE.clear(); _VISION_CACHE.clear(); _LITTER_CACHE.clear()
+        _SHAPE_MM_CACHE.clear(); _DG_CACHE.clear()
+        # (4b-i) UNCORROBORATED: no drawing-gates.json, no litter degrade, no shape mismatch — the
+        # vision finding must NOT drag a 100%-coverage render below its deterministic PASS.
+        _rn_unc = _aux_tab_score("Render — Interior layout", _td_corr)
+        if not _rn_unc or _rn_unc.get("status") != "PASS" or (_rn_unc.get("score") or 0) < 8:
+            print(f"  FAIL corroboration-doctrine: an UNCORROBORATED vision finding must not cap a "
+                  f"clean-deterministic render below PASS (got {_rn_unc})"); bad += 1
+        if not any("UNCORROBORATED" in str(i) for i in (_rn_unc or {}).get("issues", [])):
+            print(f"  FAIL corroboration-doctrine: the uncorroborated vision finding must still render "
+                  f"as a visible ADVISORY note (got issues={(_rn_unc or {}).get('issues')})"); bad += 1
+        # (4b-ii) CORROBORATED via a failing drawing_gates verdict on the SAME drawing → the finding
+        # must now deduct (score capped, FAIL).
+        with open(os.path.join(_td_corr, "drawing-gates.json"), "w") as _fh:
+            json.dump({"all_pass": False, "drawings": {
+                "blender": {"pass": False, "failing_gates": ["G6_no_stray_beam"]}}}, _fh)
+        _COV_CACHE.clear(); _VISION_CACHE.clear(); _LITTER_CACHE.clear()
+        _SHAPE_MM_CACHE.clear(); _DG_CACHE.clear()
+        _rn_corr = _aux_tab_score("Render — Interior layout", _td_corr)
+        if not _rn_corr or _rn_corr.get("status") != "FAIL" or (_rn_corr.get("score") or 10) > 4:
+            print(f"  FAIL corroboration-doctrine: a vision finding CORROBORATED by a failing "
+                  f"drawing_gates verdict must deduct (≤4/FAIL), got {_rn_corr}"); bad += 1
+        if not any("CORROBORATED" in str(i) for i in (_rn_corr or {}).get("issues", [])):
+            print(f"  FAIL corroboration-doctrine: a corroborated finding's issue text must say so "
+                  f"(got issues={(_rn_corr or {}).get('issues')})"); bad += 1
+        _COV_CACHE.clear(); _VISION_CACHE.clear(); _LITTER_CACHE.clear()
+        _SHAPE_MM_CACHE.clear(); _DG_CACHE.clear()
+    # (4c) GEOMETRY-HASH CACHE (render_vision_critic.py): identical geometry (byte-identical
+    # parts-manifest + route-manifest) must reuse a prior 'ok' critique VERBATIM — no re-call. A
+    # geometry change must NOT reuse a stale critique (no false cache hit across designs).
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib"))
+        import render_vision_critic as _rvc
+        with _tf.TemporaryDirectory() as _tdA, _tf.TemporaryDirectory() as _tdB, \
+             _tf.TemporaryDirectory() as _tdC:
+            _geo = {"parts": [{"tag": "P-1", "dims": {"w": 1, "d": 1, "h": 1}}]}
+            _route = {"routes": [{"from": "A", "to": "B"}]}
+            for _td_g in (_tdA, _tdB):
+                with open(os.path.join(_td_g, "parts-manifest.json"), "w") as _fh:
+                    json.dump(_geo, _fh)
+                with open(os.path.join(_td_g, "route-manifest.json"), "w") as _fh:
+                    json.dump(_route, _fh)
+            with open(os.path.join(_tdC, "parts-manifest.json"), "w") as _fh:
+                json.dump({"parts": [{"tag": "P-2", "dims": {"w": 9, "d": 9, "h": 9}}]}, _fh)
+            with open(os.path.join(_tdC, "route-manifest.json"), "w") as _fh:
+                json.dump(_route, _fh)
+            _hA = _rvc.geometry_hash(_tdA)
+            _hB = _rvc.geometry_hash(_tdB)
+            _hC = _rvc.geometry_hash(_tdC)
+            if not _hA or _hA != _hB:
+                print(f"  FAIL vision-cache: byte-identical geometry must hash IDENTICALLY (got {_hA} vs {_hB})"); bad += 1
+            if _hA == _hC:
+                print("  FAIL vision-cache: DIFFERENT geometry must hash differently (false cache-hit risk)"); bad += 1
+            _rvc.cache_write(_hA, {"ok": True, "broken": True, "defects": ["stray beam"],
+                                    "model": "test-model", "geometry_hash": _hA})
+            _calls = {"n": 0}
+            def _boom(*_a, **_kw):  # noqa: ANN001 — a re-call means the cache MISSED; fail loudly
+                _calls["n"] += 1
+                raise AssertionError("critique_render called despite an identical-geometry cache hit")
+            _orig = _rvc.critique_render
+            _rvc.critique_render = _boom
+            try:
+                _res = _rvc.critique_run(_tdB, "test-model")
+            finally:
+                _rvc.critique_render = _orig
+            if _calls["n"] or not _res.get("cache_hit") or _res.get("defects") != ["stray beam"]:
+                print(f"  FAIL vision-cache: identical-geometry run B must reuse run A's critique "
+                      f"VERBATIM with zero LLM calls (got calls={_calls['n']}, res={_res})"); bad += 1
+    except ImportError as _exc:
+        print(f"  FAIL vision-cache: could not import render_vision_critic ({_exc})"); bad += 1
     # (5) F1/X2: the on-tab banner must REFLECT the _TAB_SCORES score — it can never read higher than
     # the gate verdict (the Financial fake-8: banner 10 while the gate FAILs at 6). The re-stamp pass
     # relies on _tab_quality_banner reading the FINAL score; prove it does.

@@ -97,6 +97,9 @@ data/extra-step-staging/
 
 # Build cache
 tsconfig.tsbuildinfo
+
+# Vision-critic geometry-hash cache (render_vision_critic.py) — regenerable, not source
+.cache/vision-critic/
 .aider*
 .env.prod
 .env.vercel
