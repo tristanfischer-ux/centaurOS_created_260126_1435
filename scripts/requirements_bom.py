@@ -457,6 +457,16 @@ def _materials_takeoff(name, mods, geom=None, service=None):
     else:
         dim = mods.get("dimension") or ""
         cyl = _cyl_from_dim(dim); box = _box_from_dim(dim); cap = _num(mods.get("capacity"))
+        # UNIT-FAMILY GUARD (2026-07-03, the same capacity->m3 confusion the
+        # 'flow read as kW' fix closed for rating_primary): `capacity` is stated in
+        # WHATEVER unit the modifier carries (a Reflex expansion vessel is '50 L',
+        # not '50 m3') — deriving a cylinder from the bare number as if it were
+        # already m3 inflates a 50 L tank into a 50 m3 shell (dia 3.66 m). Convert
+        # to m3 first; unknown/absent unit defaults to m3 (byte-identical for every
+        # existing m3-stated capacity — the dominant case).
+        cap_u = str(mods.get("capacity_unit") or "").strip().lower()
+        if cap is not None and re.fullmatch(r"l|litre|litres|liter|liters", cap_u):
+            cap = cap / 1000.0
         if not cyl and not box and cap:                       # derive a cylinder from V
             d = (4 * cap / (1.3 * math.pi)) ** (1 / 3.0); cyl = (d, 1.3 * d)
         if cyl:
@@ -2106,6 +2116,73 @@ def _vessel_cost_ceiling(vol_m3: float) -> float:
     return per_m3 * v + 20000.0   # + fixed allowance so a sub-1 m³ vessel isn't over-tight
 
 
+_BESPOKE_SHELL_HEAD_NOUN_RE = re.compile(
+    r"^(?:tanks?|vessels?|reservoirs?|basins?|sumps?|biofilters?|degassers?|"
+    r"clarifiers?|hoppers?|silos?)$", re.I)
+
+
+def _is_bespoke_shell_head_noun(name: str) -> bool:
+    """TRUE only when the word's HEAD NOUN (last token, whole-word) is unambiguously
+    a large fabricated pressure/process shell — tank/vessel/reservoir/basin/sump/
+    biofilter/degasser/clarifier/hopper/silo. Deliberately NARROWER than
+    `_BESPOKE_RE` (which loose-substring-matches the WHOLE name, including
+    'enclosure'/'frame'/'structure'/'duct' — real hits for THEIR own purpose, but
+    'duct' also matches inside unrelated words like 'inductor', and a small
+    catalogue-scale isolator 'enclosure' is not a fabricated vessel shell). Used
+    ONLY to decide whether a catalogue-pinned price should be refused for type-
+    coherence (see the curve_only gate below); does not change `_bespoke_class`'s
+    own broader SIMPLE/STRONG classification used elsewhere."""
+    toks = (name or "").strip().split()
+    if not toks:
+        return False
+    head = re.sub(r"[^a-z0-9]+$", "", toks[-1].lower())
+    return bool(_BESPOKE_SHELL_HEAD_NOUN_RE.match(head))
+
+
+# Below this implied volume, a tank/vessel-headed word is a MASS-MANUFACTURED
+# shelf product (compressed-air receiver, expansion vessel, small buffer tank —
+# the exact scale `_install_factor`'s own smallest bracket, '<5 m3 — small
+# skid-mounted vessel, workshop-tested, fork-lift in', still assumes a REAL
+# fabrication job, not a catalogue item), not a field-fabricated shell — a
+# materials take-off (steel/FRP mass x £/kg + erection + fittings) systematically
+# OVER-prices it (a real 50 L Reflex expansion vessel priced as bespoke fabrication
+# came out £1,941 vs a genuine ~£100-300 retail item). So the catalogue-pin refusal
+# below applies ONLY at genuine field-fabrication scale.
+_MIN_BESPOKE_SHELL_VOL_M3 = 0.5
+
+
+def _implied_vessel_vol_m3(mods: dict) -> Optional[float]:
+    """Best-effort implied volume (m3), unit-aware, from a word's OWN dimension/
+    capacity modifiers — mirrors `_materials_takeoff`'s geometry derivation without
+    needing AS-BUILT (Blender) geometry. Returns None when neither is present."""
+    dim = mods.get("dimension") or ""
+    cyl = _cyl_from_dim(dim)
+    if cyl:
+        d, h = cyl
+        return math.pi * (d / 2.0) ** 2 * h
+    box = _box_from_dim(dim)
+    if box:
+        w, dp, h = box
+        return w * dp * h
+    cap = _num(mods.get("capacity"))
+    if cap is None:
+        return None
+    cap_u = str(mods.get("capacity_unit") or "").strip().lower()
+    if re.fullmatch(r"l|litre|litres|liter|liters", cap_u):
+        cap = cap / 1000.0
+    return cap
+
+
+def _bespoke_shell_vol_m3(geom, mods: dict) -> Optional[float]:
+    """Implied volume (m3) for the field-fabrication-scale gate: prefer the
+    AS-BUILT (Blender) geometry `_materials_takeoff` itself prefers, else the
+    word's own dimension/capacity modifiers."""
+    if geom:
+        d_v, h_v = geom
+        return math.pi * (d_v / 2.0) ** 2 * h_v
+    return _implied_vessel_vol_m3(mods)
+
+
 def _bespoke_class(name: str) -> str:
     """'strong' | 'simple' | 'none'. STRONG = complex fabricated process vessel
     (reactor/column/absorber/...) decided by the HEAD noun (last word) so a qualifier
@@ -3127,6 +3204,32 @@ def _selftest() -> int:
     if _catalogue_pinned_child({"price_basis": "distributor catalogue (db:mouser £45.68)"}, 0) is not None:
         print("  FAIL a £0 child never pins (catalogue price must be plausible)"); bad += 1
 
+    # (n) TYPE-COHERENT CATALOGUE-PIN REFUSAL (codema v65 I-106, 2026-07-03): a
+    # tank/vessel-headed word priced ONLY by Engine B's small-parts commodity
+    # curve (no ComponentClass exists for a bespoke fabricated shell) must be
+    # refused at FIELD-FABRICATION scale (proveCatch — the v65 shape: a 1.2x1.3 m
+    # Softener Vessel hallucinated-pinned to a £66 'structural_polymer' curve
+    # guess) — AND a genuine SMALL vessel (mass-manufactured catalogue scale, e.g.
+    # a 50 L Reflex expansion tank) must KEEP its real catalogue price unrefused
+    # (a cheap vessel accessory never gets bulldozed into a bespoke-fabrication
+    # over-price). Both directions on the SAME head-noun family + curve-only
+    # provenance signal — only the implied volume differs.
+    if not _is_bespoke_shell_head_noun("Softener Vessel"):
+        print("  FAIL head-noun gate must accept 'Softener Vessel'"); bad += 1
+    if _is_bespoke_shell_head_noun("Rack DC Isolator Enclosure"):
+        print("  FAIL head-noun gate must reject 'Enclosure' (small-parts scale, "
+              "loose substring landmine — 'duct' inside 'inductor' etc.)"); bad += 1
+    if _is_bespoke_shell_head_noun("PCS LCL Output Filter Inductor"):
+        print("  FAIL head-noun gate must not fire on 'inductor' ('duct' substring)"); bad += 1
+    _v_big = _bespoke_shell_vol_m3((1.2, 1.3), {})       # codema V-106 AS-BUILT geometry
+    if not (_v_big and _v_big >= _MIN_BESPOKE_SHELL_VOL_M3):
+        print(f"  FAIL field-fabrication-scale vessel must clear the volume floor, got {_v_big!r}"); bad += 1
+    _v_small = _bespoke_shell_vol_m3(None, {"capacity": "50", "capacity_unit": "L"})  # BESS expansion tank
+    if not (_v_small is not None and _v_small < _MIN_BESPOKE_SHELL_VOL_M3):
+        print(f"  FAIL a 50 L catalogue-scale vessel must stay BELOW the volume floor, got {_v_small!r}"); bad += 1
+    if abs((_v_small or 0) - 0.05) > 1e-9:
+        print(f"  FAIL 50 L must convert to 0.05 m3 (unit-family guard), got {_v_small!r}"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -4102,6 +4205,18 @@ def assemble(out_dir: str):
     price = {}
     dist_price = {}
     pv_pn = {}        # the partVerification's OWN MPN (may differ from the word modifier)
+    # CURVE-ONLY PROVENANCE (2026-07-03, codema v65 I-106): a word's price is
+    # "curve_only" when Engine B's OWN small-parts commodity-class curve is the
+    # sole basis (engine_b_estimate_source in {curve, flash_lite_unknown_class})
+    # — i.e. NOT grounded in a real distributor hit, DB spec match, or corpus
+    # price. Engine B's ComponentClass taxonomy (component-classes.ts) has no
+    # class for a bespoke fabricated vessel/tank shell — every one of its ~24
+    # classes is explicitly small-parts scale (electronics, fasteners, moulded
+    # housings, …) — so a curve_only price is a FAMILY MISMATCH by construction
+    # whenever it lands on a `_bespoke_class() != 'none'` word. Used below to
+    # refuse the catalogue-pin branch for a bespoke fabricated shell, the same
+    # type-coherence discipline dbHitAcceptableForWord applies to a DB MPN pin.
+    curve_only = {}
     for v in (st.get("partVerifications") or []):
         wid = str(v.get("word_id") or "")
         if not wid:
@@ -4109,6 +4224,9 @@ def assemble(out_dir: str):
         dp = v.get("distributor_price_gbp")
         if isinstance(dp, (int, float)) and dp > 0:
             dist_price[wid] = float(dp)
+        if str(v.get("engine_b_estimate_source") or "").strip().lower() in (
+                "curve", "flash_lite_unknown_class"):
+            curve_only[wid] = True
         vpn = str(v.get("part_number") or "").strip()
         if vpn:
             pv_pn[wid] = vpn
@@ -4423,7 +4541,10 @@ def assemble(out_dir: str):
                         mt = _materials_takeoff(name, md, g_lookup, svc)
                         gbp, basis = (mt[0], mt[1]) if mt else (0.0, "bottom-up parametric")
                         mt_spec = mt[2] if mt and len(mt) > 2 else None
-                elif pn and not _TBD_RE.search(pn):
+                elif pn and not _TBD_RE.search(pn) and not (
+                        bc == "simple" and curve_only.get(wid)
+                        and _is_bespoke_shell_head_noun(name)
+                        and (_bespoke_shell_vol_m3(g_lookup, md) or 0.0) >= _MIN_BESPOKE_SHELL_VOL_M3):
                     status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
                     gbp, basis = price.get(wid, 0.0), "catalogue"
                     # BATTERY CELL — the DOMINANT BESS cost. ALWAYS price from its ENERGY (the
@@ -4455,6 +4576,20 @@ def assemble(out_dir: str):
                     status, part = "BESPOKE", "made to spec"
                     gbp, basis = (mt[0], mt[1]) if mt else (price.get(wid, 0.0), "bottom-up parametric")
                     mt_spec = mt[2] if mt and len(mt) > 2 else None
+                    # TYPE-COHERENCE (2026-07-03, codema v65 I-106): a pinned MPN was
+                    # REJECTED above because it was priced ONLY by Engine B's small-parts
+                    # commodity curve (no ComponentClass exists for a bespoke fabricated
+                    # shell — the head-noun family of the price SOURCE never matched the
+                    # word, same discipline as dbHitAcceptableForWord for a DB MPN pin).
+                    # Say so on the line rather than silently dropping the pin.
+                    if (pn and not _TBD_RE.search(pn) and curve_only.get(wid)
+                            and _is_bespoke_shell_head_noun(name)
+                            and (_bespoke_shell_vol_m3(g_lookup, md) or 0.0) >= _MIN_BESPOKE_SHELL_VOL_M3
+                            and mt):
+                        basis = (basis + f" · named part {mfr!s} {pn!r} rejected: Engine "
+                                 f"B priced it £{price.get(wid, 0.0):,.0f} via its small-parts "
+                                 f"commodity curve — no catalogue class exists for a bespoke "
+                                 f"fabricated tank/vessel shell; a materials take-off is used instead")
                 else:
                     # NOT FOUND — no pinned catalogue part. Before falling back to a
                     # flat verification-stub, try a per-UNIT-OPERATION parametric keyed
