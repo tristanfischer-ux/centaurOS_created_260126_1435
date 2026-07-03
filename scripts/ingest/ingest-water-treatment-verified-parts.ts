@@ -52,6 +52,13 @@ interface VerifiedPart {
   desc: string               // duty + spec, honest datasheet numbers (m3/h kept parseable)
   src: string                // the page actually fetched + verified 2026-07-03
   unit_price_gbp: number | null // GBP-quoted list prices only; NULL when page quoted USD/EUR
+  /** Per-row component_class override. Default CLASS_TAG ('water_treatment').
+   *  Needed for MOTION-typed slots: dbHitAcceptableForWord (emitter-completion.ts)
+   *  REJECTS a motor/drive-token word unless the candidate's component_class
+   *  matches /motor_actuator|mechanical_assembly/ — so a drive motor / motor-
+   *  overload row tagged 'water_treatment' would be type-rejected for the very
+   *  slot it exists to serve. */
+  component_class?: string
 }
 
 const PARTS: VerifiedPart[] = [
@@ -228,6 +235,105 @@ const PARTS: VerifiedPart[] = [
     src: 'https://www.legrand.co.uk/en/catalog/products/swifts-heavy-duty-hot-dip-galvanised-steel-cable-tray-100mm-x-50mm-x-3m-length-srfl100g',
     unit_price_gbp: null,
   },
+
+  // ═══ ROUND 2 (2026-07-03, v59 engineered-TBD sweep) — every page below was
+  //     actually fetched on 2026-07-03. Families: VFDs at the driven-motor kW,
+  //     motor starter/overload, MCC/switchboard/panel ENCLOSURES (the internals
+  //     stay engineered), dosing pump, GAC/softener composite vessels, mains-
+  //     incomer MCCB, SPD, Modbus-TCP/EtherNet-IP gateway, pump drive motor. ═══
+  // ── Drives + motor control ───────────────────────────────────────────────────
+  {
+    part_name: 'VFD drive — variable frequency drive 15 kW, 3x380-480 V, IP20, 31 A (VLT Micro Drive FC-51)',
+    manufacturer: 'Danfoss', part_number: '132F0059',
+    desc: 'Danfoss VLT Micro Drive FC-51 15 kW / 20 HP frequency converter (FC-051P15KT4E20H3BXCXXXSXXX), 3x380-480 V AC, IP20, max output 31 A. Sized to the plant 15 kW irrigation-pump motor. GBP 1,926.85 ex VAT (Drives Online).',
+    src: 'https://www.drives-online.com/shop/vlt-fc51-132f0059/',
+    unit_price_gbp: 1926.85,
+  },
+  {
+    part_name: 'VFD drive — variable frequency drive 4 kW, 3x380-480 V, IP20, 8.8 A (ACS355 machinery drive)',
+    manufacturer: 'ABB', part_number: 'ACS355-03E-08A8-4',
+    desc: 'ABB ACS355 machinery drive, 4 kW, 3-phase 380-480 V AC, output 8.8 A, IP20, vector control + STO. Sized to the plant 4 kW RO high-pressure pump motor. (Newark stock ref 97Y9133.)',
+    src: 'https://www.newark.com/abb/acs355-03e-08a8-4/inverter-drive-machinery-3-ph/dp/97Y9133',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'Motor starter / motor circuit breaker — TeSys GV2, 20-25 A, 11 kW @ 400 V, 15 kA (DOL starter protection)',
+    manufacturer: 'Schneider Electric', part_number: 'GV2ME22',
+    desc: 'Schneider TeSys GV2ME22 3-pole thermal-magnetic motor circuit breaker, adjustable 20-25 A, Icu 15 kA @ 400 V, 11 kW motor @ 400/415 V, pushbutton control, DIN rail, IP20. Indicative DOL motor-starter protection. USD 95 (IQ Electro). NOTE: an id-42316 row for this MPN already exists — the ingest skips; this entry documents the verified page.',
+    src: 'https://iqelectro.com/products/gv2me22-schneider-electric-motor-circuit-breaker',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'Motor overload protection relay — SIRIUS thermal overload relay, 20-25 A, Class 10, size S0',
+    manufacturer: 'Siemens', part_number: '3RU2126-4DB0',
+    desc: 'Siemens SIRIUS 3RU2126-4DB0 thermal overload relay, 20-25 A setting range, trip Class 10, size S0, mounts on 3RT202x contactors, phase-loss protection, manual/auto reset. Indicative pump-motor overload protection. USD 55.46 (Kent Store).',
+    src: 'https://kentstore.com/3ru2126-4db0/',
+    unit_price_gbp: null,
+    // MOTION-typed slot ('Motor Overload Protection'): dbHitAcceptableForWord
+    // requires a motor_actuator/mechanical_assembly class for motor-token words.
+    component_class: 'motor_actuator',
+  },
+  {
+    part_name: 'Drive motor for process pump — W22 IE3 cast iron three-phase motor, 4 kW, 400/690 V, IEC 112M',
+    manufacturer: 'WEG', part_number: 'M4-02FL112C3BIE3',
+    desc: 'WEG W22 IE3 cast iron 3-phase induction motor, 4 kW, 3000 rpm (2-pole), 400/690 V 50 Hz, IEC 112M frame, B5 flange, TEFC (ERIKS UK catalogue ref M4-02FL112C3BIE3). Indicative 4 kW pump drive motor (RO high-pressure CRN duty runs 2900 rpm).',
+    src: 'https://shop.eriks.co.uk/en/gearboxes-motors-and-drives-electric-motors-three-phase-ac-motors/3-phase-motor-4kw-3000rpm-2p-b5t-ie3-400-690v-50hz-w22-iec-112m-cast-iron-m4-02fl112c3bie3-weg/',
+    unit_price_gbp: null,
+    component_class: 'motor_actuator', // MOTION-typed slot ('Drive Motor') — see 3RU2126 note
+  },
+  // ── Dosing + vessels ─────────────────────────────────────────────────────────
+  {
+    part_name: 'pH / EC dosing pump — SMART Digital diaphragm dosing pump, 7.5 l/h @ 16 bar, 1:3000 turndown',
+    manufacturer: 'Grundfos', part_number: 'DDA 7.5-16 AR',
+    desc: 'Grundfos DDA 7.5-16 AR digital diaphragm dosing pump (variant fetched: DDA 7.5-16 AR-PV/T/C-F-31U2U2IG, code GRU-97722794), max 7.5 l/h @ 16 bar, stepper-motor drive, PVDF head, full-PTFE diaphragm, 230 V AC. Indicative pH/EC correction dosing duty. AUD 3,311 ex GST.',
+    src: 'https://pwnps.com/products/grundfos-dda-digital-dosing-pump-7-5-16-ar-l-h-max-flow-rate-at-16-bar-max-pressure',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'GAC filter / softener composite pressure vessel — 36 x 72 in (0.91 m dia x 1.83 m), 999 L, 150 psi, NSF 61',
+    manufacturer: 'Pentair Structural', part_number: '36X72 COMP 6"TF 6"BF',
+    desc: 'Pentair Structural composite pressure vessel 36X72 COMP 6"TF 6"BF: 36 in (914 mm) diameter x 72 in, 264 US gal (999 L), fibreglass-wound PE liner, 150 psi max, 6 in top+bottom flanges, tripod base, NSF/ANSI 61. Indicative GAC filter / softener vessel at the 0.9 m dia x 1.8 m duty.',
+    src: 'https://hillwater.com/wp-content/uploads/2024/11/structural-composite-tank-specs.pdf',
+    unit_price_gbp: null,
+  },
+  // ── Enclosures (the ENCLOSURE is the real part; internals stay engineered) ────
+  {
+    part_name: 'Main switchboard / motor control centre enclosure — VX25 baying enclosure, 800x2000x600 mm, IP55',
+    manufacturer: 'Rittal', part_number: '8806.000',
+    desc: 'Rittal VX25 baying enclosure system 8806.000, WHD 800x2000x600 mm, single door, sheet steel with 3 mm zinc-plated mounting plate, IP55 (IEC 60529), IK10. Indicative main switchboard / MCC / plant control-panel enclosure carcass. GBP 742.15 (Parmley Graham).',
+    src: 'https://www.parmley-graham.co.uk/enclosures-amp-climate-control/rittal/enclosure-systems/baying-enclosure-system-vx25/8806000',
+    unit_price_gbp: 742.15,
+  },
+  {
+    part_name: 'Electrical control panel enclosure — AX compact wall enclosure, 800x1000x300 mm, IP66',
+    manufacturer: 'Rittal', part_number: '1180.000',
+    desc: 'Rittal AX compact enclosure 1180.000, WHD 800x1000x300 mm, 1.5 mm sheet steel, single door, zinc-plated mounting plate, IP66 / NEMA 4, RAL 7035. Indicative digital/electrical control panel enclosure. GBP 285.53 (Parmley Graham).',
+    src: 'https://www.parmley-graham.co.uk/enclosures-amp-climate-control/rittal/compact-enclosures/compact-enclosure-ax/1180000',
+    unit_price_gbp: 285.53,
+  },
+  // ── LV distribution + protection ─────────────────────────────────────────────
+  {
+    part_name: 'Mains incomer circuit breaker — Tmax XT1N 160 MCCB, TMD 125 A, 36 kA @ 415 V, 3P',
+    manufacturer: 'ABB', part_number: '1SDA067417R1',
+    desc: 'ABB Tmax XT1N 160 moulded-case circuit breaker, thermomagnetic TMD release 125 A (magnetic 1250 A), Icu 36 kA @ 415 V AC, 3-pole, fixed, front terminals. Indicative 125 A LV mains-incomer breaker (v59 duty: 125 A ACB frame on 53 kW connected load). USD 123.90 (Gabby Electric).',
+    src: 'https://gabbyelectric.com/en-us/products/1sda067417r1-xt1n-160-tmd-125-1250-3p-f-f',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'Surge protection device — Type 2 SPD, 3+1 circuit, 230/400 V, In 20 kA / Imax 40 kA, DIN rail',
+    manufacturer: 'Phoenix Contact', part_number: '2838199',
+    desc: 'Phoenix Contact VAL-MS 230/3+1-FM Type 2 (IEC class II / EN T2) surge arrester, 230/400 V AC, nominal discharge 20 kA (8/20), max 40 kA, Up ≤ 1.35 kV L-N, remote indicator contact, NS 35/7.5 DIN rail. Indicative LV panel surge protection device.',
+    src: 'https://media.digikey.com/pdf/Data%20Sheets/Phoenix%20Contact%20PDFs/2838199.pdf',
+    unit_price_gbp: null,
+  },
+  // ── Communications ───────────────────────────────────────────────────────────
+  {
+    part_name: 'Modbus TCP / EtherNet-IP interface module — Anybus Communicator serial gateway, 2-port, 24 V DC',
+    manufacturer: 'HMS Networks', part_number: 'AB7072-B',
+    desc: 'HMS Anybus Communicator AB7072-B, serial RS-232/485 to EtherNet/IP + Modbus-TCP 2-port gateway, 24 V DC, DIN rail, IP20 (509 bytes in / 505 out). Indicative Modbus-TCP / EtherNet-IP interface. NOTE: superseded by ABC3007-A — state at procurement.',
+    src: 'https://www.parmley-graham.co.uk/AB7072-B',
+    unit_price_gbp: null,
+  },
 ]
 
 // ── Embedding (canonical recipe: text-embedding-3-small, 1536-d Float32LE) ─────
@@ -305,7 +411,7 @@ async function main(): Promise<void> {
     const r = insertStmt!.run(
       docId, p.part_name.slice(0, 256), p.manufacturer, p.part_number,
       excerpt, 0.9 /* web-verified on a fetched page */, p.unit_price_gbp,
-      CLASS_TAG, embedding, embedding ? embedHashOf(embedSource) : null,
+      p.component_class ?? CLASS_TAG, embedding, embedding ? embedHashOf(embedSource) : null,
       p.src, new Date().toISOString(), DISCOVERY_SOURCE,
     )
     inserted++
