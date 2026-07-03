@@ -1864,6 +1864,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
     out.append(f"# PANEL / LOAD SCHEDULE — {_humanise(archetype)}\n")
     out.append("> Fractional Forge · ForgeOS — projected from the converged connection "
                "schedule. Auto-generated; not for construction.\n")
+    out.append(f"> {_tb.TOLERANCE_NOTE}\n")
     cost = (schedule.get("totals") or {}).get("grand_total_gbp")
     src = (schedule.get("totals") or {}).get("cost_source")
     if cost:
@@ -2079,7 +2080,7 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict, state: 
         rh = 30                                              # reconciliation line
         block_heights.append((hh, th, rh))
         y += hh + th + rh + 26
-    height = y + aux_h + 80                       # + aux device schedule + title block
+    height = y + aux_h + 108                      # + aux device schedule + title block (+28: tolerance note)
     width = _TABLE_W + 2 * _MARGIN
 
     svg = SVG(width, height)
@@ -2262,7 +2263,7 @@ def _shorten(s, n):
 
 
 def _draw_title_block(svg: SVG, archetype, width, height):
-    y0 = height - 64
+    y0 = height - 92          # -92 (was -64): +28 for the shared general-tolerance note line
     svg.line(30, y0, width - 30, y0, stroke=INK, width=1.4)
     bw = 290
     bx0 = width - 30 - bw
@@ -2285,6 +2286,9 @@ def _draw_title_block(svg: SVG, archetype, width, height):
     svg.text(30, y0 + 46,
              "Scope: outgoing-circuit schedule per distribution board, projected from "
              "the connection schedule. Not for construction.", size=8.2, fill=MUTED)
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py) — drawn
+    # BELOW the metadata box's bottom row so the long line never strikes through it.
+    svg.text(30, y0 + 72, _tb.TOLERANCE_NOTE, size=8.2, fill=MUTED)
 
 
 # ---- rasterise (SVG → PNG): cairosvg → rsvg-convert → headless Chrome ---------

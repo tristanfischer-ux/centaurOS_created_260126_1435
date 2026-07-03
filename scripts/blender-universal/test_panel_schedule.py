@@ -304,6 +304,9 @@ def test_render_smoke():
               and "| Ckt |" in md, f"[{name}] markdown has banner + table + reconcile")
         check(svg.startswith("<svg") and "TOTALS" in svg and len(svg) > 2000,
               f"[{name}] SVG renders the table")
+        # shared general-tolerance note (drawing_titleblock.TOLERANCE_NOTE) on BOTH surfaces
+        check("ISO 2768-mK" in md and "ISO 2768-mK" in svg,
+              f"[{name}] general-tolerance note (ISO 2768-mK) missing from md/SVG")
 
 
 def test_real_dirs():

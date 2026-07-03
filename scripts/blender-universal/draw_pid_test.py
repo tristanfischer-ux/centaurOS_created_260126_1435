@@ -172,6 +172,8 @@ def _run_case(label, state_path, sched_candidates):
            f"{label}: title block heading missing")
     _check("not for construction" in svg.lower(),
            f"{label}: scope note 'not for construction' missing")
+    _check("ISO 2768-mK" in svg,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing")
     _check("DRAWING No." in svg or "DRAWING No" in svg,
            f"{label}: drawing-number field missing from title block")
     # the flow-direction arrow marker must be defined + used (a P&ID shows flow).

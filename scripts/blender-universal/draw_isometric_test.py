@@ -275,6 +275,8 @@ def _run_case(label, state_path, manifest_candidates):
     _check("PIPING ISOMETRIC" in svg, f"{label}: title block heading missing")
     _check("not for construction" in svg.lower(),
            f"{label}: 'not for construction' scope note missing")
+    _check("ISO 2768-mK" in svg,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing")
     _check("DRAWING No." in svg, f"{label}: drawing-number field missing")
 
     # ---- (4) index sheet present with a line register --------------------------

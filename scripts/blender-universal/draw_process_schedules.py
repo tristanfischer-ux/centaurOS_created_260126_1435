@@ -1237,6 +1237,7 @@ def render_markdown(sc: Schedules) -> str:
     out.append("> Fractional Forge · ForgeOS — line list · valve list · instrument index. "
                "Auto-generated; cross-referenced line-for-line to the P&ID "
                f"(`{sc.pid_sheet}`). Not for construction · as-modelled.\n")
+    out.append(f"> {_tb.TOLERANCE_NOTE}\n")
     if not sc.schedule_present:
         out.append("> Line sizes inferred from process duties (connection schedule not "
                    "supplied); DN shown is indicative.\n")
@@ -1419,7 +1420,7 @@ def build_table_svg(sc: Schedules) -> str:
               + block_h(len(sc.lines))
               + block_h(len(sc.valves))
               + block_h(len(sc.instruments))
-              + 84)
+              + 98)          # +14: shared general-tolerance note line in the title block
 
     svg = SVG(width, int(math.ceil(height)))
     svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
@@ -1469,7 +1470,7 @@ def build_table_svg(sc: Schedules) -> str:
 
 
 def _draw_title_block(svg, archetype, width, height, sc: Schedules):
-    y0 = height - 66
+    y0 = height - 80          # -80 (was -66): +14 for the shared general-tolerance note line
     svg.line(30, y0, width - 30, y0, stroke=INK, width=1.4)
     bw = 300
     bx0 = width - 30 - bw
@@ -1493,6 +1494,8 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules):
              "Scope: line list · valve list · instrument index, projected from the process "
              "topology + connection schedule. Cross-referenced to the P&ID. "
              "Not for construction · as-modelled.", size=8.2, fill=MUTED)
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
+    svg.text(30, y0 + 60, _tb.TOLERANCE_NOTE, size=8.2, fill=MUTED)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

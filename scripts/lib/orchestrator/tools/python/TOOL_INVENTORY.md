@@ -641,7 +641,7 @@ This is the FINAL round of tool building for the universal engineering orchestra
 
 | Tool | Purpose |
 |---|---|
-| airframe_fea_landing | Landing impact loads + material yield check |
+| airframe_fea_landing | Landing impact loads + material yield check — closed-form energy method (FEA-ready seam; no finite-element model) |
 | gimbal_balance_cog | Camera CoG + gimbal motor torque |
 | gust_response_drone | Small UAV gust load factor + recovery |
 | obstacle_avoidance_sensor | Lidar/radar/stereo braking envelope + blind spots |

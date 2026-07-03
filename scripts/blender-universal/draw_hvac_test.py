@@ -173,6 +173,8 @@ def _run_case(label, manifest_dir, state_path, expect_medium):
     _check("HVAC" in svg.upper(), f"{label}: no HVAC title")
     _check("not for construction" in svg.lower(),
            f"{label}: scope note 'not for construction' missing")
+    _check("ISO 2768-mK" in svg,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing")
     _check("FF-HVAC-001" in svg, f"{label}: no HVAC drawing number in the title block")
     _check(re.search(r"SCALE\s*1:\d+", svg), f"{label}: no stated scale (1:N)")
     _check(re.search(r'>N<', svg), f"{label}: no north arrow on the plan")

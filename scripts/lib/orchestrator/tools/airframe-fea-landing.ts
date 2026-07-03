@@ -19,8 +19,13 @@ const PYTHON_SCRIPT = resolve(__dirname, 'python', 'airframe_fea_landing.py')
 const VENV_PYTHON = resolve(__dirname, '..', '..', '..', '..', '.venv', 'bin', 'python3')
 
 export const airframeFeaLandingTool: Tool<any, any> = {
+  // id kept verbatim for registry compatibility (planners/manifests reference it);
+  // it is an identifier, not a method claim. The NAME states the real method:
+  // this tool computes a CLOSED-FORM ENERGY METHOD, not finite-element analysis
+  // (scikit-fem is not installed; no mesh is ever built). Honest-naming WAVE 1,
+  // 2026-07-03 — no dossier surface may present a closed-form result as "FEA".
   id: 'airframe-fea:landing',
-  name: 'Airframe Landing FEA',
+  name: 'Landing-Load Closed-Form Energy Method (FEA-ready seam)',
   version: '1.0.0',
   license: 'free-proprietary',
   source_url: 'internal://forgeos/aero',

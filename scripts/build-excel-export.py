@@ -862,6 +862,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
     "Risk & Regulatory": "Hazard and risk register, compliance verdict and statutory duties.",
     "Holds & exclusions": "Numbered open holds derived live from failing checks; scope exclusions.",
+    "Questions for the customer": "Numbered confirm-or-correct questions — assumptions, gaps and offer divergences.",
     "Assembly sequence": "Order of works from civils through to commissioning.",
     "Drawings": "Drawing register — number, revision, scale, sheets and full-size A1 files.",
     "Audit data": "Embedded operands every live verdict formula references, with provenance.",
@@ -3492,6 +3493,245 @@ def style_chart(ch, *, legend="auto", data_labels=False, gridlines=False):
     return ch
 
 
+# ============================================================================
+# ENGINEERING CURVES (engineering-credibility WAVE 1, 2026-07-03) — plot EXISTING
+# curve DATA with the proven chart machinery (style_chart). Two sources, both real:
+#   (a) the parts-spec registry's cooling/derating curves (KNOWN_PART_AUTHORITATIVE in
+#       scripts/lib/parts-spec-validator.ts — manufacturer-datasheet anchors, the same
+#       data gates 13/16 validate against) for any part THIS run actually pins;
+#   (b) any tool result exposing curve-shaped data (a claims[].value that is a series
+#       of ≥3 points, e.g. a polarisation curve) on state.toolsUsedPage.
+# A family with no data is SKIPPED — a curve is never fabricated (proveCatch in
+# _selftest: a part with a cooling_curve gets a chart; absent data → no chart).
+# ============================================================================
+
+def _load_partspec_cooling_curves() -> List[dict]:
+    """Parse the cooling/derating curves out of the parts-spec registry source
+    (scripts/lib/parts-spec-validator.ts). Deterministic line-scan: each entry's
+    part_number_pattern (a JS /…/i literal, compiled to Python) + its cooling_curve
+    anchor points + manufacturer + notes. Returns [] when the file is unreadable —
+    silently no charts, never an error."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "lib", "parts-spec-validator.ts")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        return []
+    out: List[dict] = []
+    cur: Dict[str, Any] = {}
+
+    def _flush() -> None:
+        if cur.get("rx") is not None and len(cur.get("points") or []) >= 2:
+            out.append({"manufacturer": cur.get("manufacturer", ""),
+                        "rx": cur["rx"], "points": cur["points"],
+                        "notes": cur.get("notes", "")})
+
+    pt_rx = re.compile(r"ambient_c:\s*(-?[\d.]+)\s*,\s*capacity_kw:\s*(-?[\d.]+)")
+    in_curve = False
+    for line in src.splitlines():
+        s = line.strip()
+        m = re.match(r"manufacturer:\s*'([^']*)'", s)
+        if m:
+            _flush()
+            cur = {"manufacturer": m.group(1), "rx": None, "points": [], "notes": ""}
+            in_curve = False
+            continue
+        m = re.match(r"part_number_pattern:\s*/((?:[^/\\]|\\.)+)/(\w*)", s)
+        if m:
+            try:
+                cur["rx"] = re.compile(m.group(1),
+                                       re.I if "i" in m.group(2) else 0)
+            except re.error:
+                cur["rx"] = None
+            continue
+        if s.startswith("cooling_curve:"):
+            in_curve = True
+        if in_curve:
+            for pm in pt_rx.finditer(s):
+                cur.setdefault("points", []).append(
+                    (float(pm.group(1)), float(pm.group(2))))
+            if s.endswith("],") or s.endswith("]"):
+                in_curve = False
+            continue
+        m = re.match(r"notes:\s*'(.*)'\s*,?\s*$", s)
+        if m:
+            cur["notes"] = m.group(1)
+    _flush()
+    return out
+
+
+def _run_part_candidates(state: dict) -> List[Tuple[str, str]]:
+    """(manufacturer, part_number) pairs this run actually pins — from
+    partVerifications (the per-part provenance record every pinned part carries)."""
+    seen = set()
+    out: List[Tuple[str, str]] = []
+    for pv in (state.get("partVerifications") or []):
+        if not isinstance(pv, dict):
+            continue
+        pn = str(pv.get("part_number") or "").strip()
+        mfr = str(pv.get("manufacturer") or "").strip()
+        if not pn or pn.upper().startswith(("TBD", "N/A")) or len(pn) < 3:
+            continue
+        key = (mfr.lower(), pn.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((mfr, pn))
+    return out
+
+
+def _tool_claim_curve(val) -> Optional[Tuple[List[Tuple[float, float]], str, str]]:
+    """Detect curve-shaped tool output: a list of ≥3 dicts sharing ≥2 numeric keys
+    (points; the first two keys in emission order are x, y — e.g. a polarisation
+    curve's current_density/voltage), or a list of ≥3 [x, y] pairs. Returns
+    (points, x_key, y_key) or None. Deterministic — no unit guessing."""
+    if not isinstance(val, list) or len(val) < 3:
+        return None
+    if all(isinstance(p, (list, tuple)) and len(p) == 2
+           and all(isinstance(x, (int, float)) for x in p) for p in val):
+        return ([(float(p[0]), float(p[1])) for p in val], "x", "y")
+    if not all(isinstance(p, dict) for p in val):
+        return None
+    first = val[0]
+    num_keys = [k for k, v in first.items() if isinstance(v, (int, float))]
+    if len(num_keys) < 2:
+        return None
+    xk, yk = num_keys[0], num_keys[1]
+    pts: List[Tuple[float, float]] = []
+    for p in val:
+        if not (isinstance(p.get(xk), (int, float)) and isinstance(p.get(yk), (int, float))):
+            return None
+        pts.append((float(p[xk]), float(p[yk])))
+    return (pts, str(xk), str(yk))
+
+
+def _collect_engineering_curves(state: dict, run_dir: str,
+                                partspec_curves: Optional[List[dict]] = None
+                                ) -> List[dict]:
+    """All REAL curve data for this run: matched parts-spec derating curves + tool
+    results exposing curve-shaped series. Each: {title, x_label, y_label, points,
+    source}. Empty when the run carries no curve data (no chart is ever fabricated)."""
+    curves: List[dict] = []
+    specs = (_load_partspec_cooling_curves() if partspec_curves is None
+             else partspec_curves)
+    if specs:
+        seen_specs = set()
+        for mfr, pn in _run_part_candidates(state):
+            for spec in specs:
+                try:
+                    if not spec["rx"].match(pn):
+                        continue
+                except Exception:  # noqa: BLE001 — a bad pattern never kills the build
+                    continue
+                # manufacturer must not CONTRADICT (either side may be blank)
+                sm = str(spec.get("manufacturer") or "").lower()
+                if mfr and sm and sm not in mfr.lower() and mfr.lower() not in sm:
+                    continue
+                key = (sm, spec["rx"].pattern)
+                if key in seen_specs:
+                    break                       # one chart per catalogue model
+                seen_specs.add(key)
+                curves.append({
+                    # labels stay parenthesis-free: they render inside the header's
+                    # own "X (…)" wrapper, and _norm_col strips only one paren level
+                    "title": f"{spec['manufacturer']} {pn} — cooling capacity vs "
+                             f"ambient (derating)",
+                    "x_label": "ambient °C", "y_label": "cooling capacity kW",
+                    "points": sorted(spec["points"]),
+                    "source": ("manufacturer-datasheet anchors from the parts-spec "
+                               "registry (KNOWN_PART_AUTHORITATIVE, gates 13/16)"
+                               + (f" — {spec['notes']}" if spec.get("notes") else "")),
+                })
+                break
+    for tool in ((state.get("toolsUsedPage") or {}).get("tools") or []):
+        if not isinstance(tool, dict):
+            continue
+        for claim in (tool.get("claims") or []):
+            if not isinstance(claim, dict):
+                continue
+            got = _tool_claim_curve(claim.get("value"))
+            if not got:
+                continue
+            pts, xk, yk = got
+            unit = str(claim.get("unit") or "").strip()
+            curves.append({
+                "title": f"{tool.get('tool_name') or tool.get('tool_id') or 'tool'} — "
+                         f"{claim.get('field') or 'series'}",
+                "x_label": xk.replace("_", " "),
+                "y_label": (yk.replace("_", " ") + (f" · {unit}" if unit else "")),
+                "points": sorted(pts),
+                "source": f"tool result — {tool.get('tool_id') or '?'} "
+                          f"(field {claim.get('field') or '?'}, live invocation)",
+            })
+    return curves
+
+
+def _render_engineering_curves(ws: Worksheet, state: dict, run_dir: str, r: int,
+                               curves: Optional[List[dict]] = None) -> Tuple[int, int]:
+    """Render the curves section on the Calculations tab: per curve a small sourced
+    data table (registered → per-cell contract + live row checks apply) + a styled
+    line chart anchored to its right. Returns (next_row, charts_added). Renders
+    NOTHING when there is no curve data."""
+    if curves is None:
+        curves = _collect_engineering_curves(state, run_dir)
+    if not curves:
+        return r, 0
+    from openpyxl.chart import LineChart, Reference
+    sub_banner(ws, r, f"Engineering curves — sourced data ({min(len(curves), 6)})", 8)
+    r += 1
+    note = ws.cell(r, 1, clean_cell(
+        "Every curve below plots EXISTING data — manufacturer-datasheet derating "
+        "anchors (the same data the parts-spec gates validate against) or a tool "
+        "result's own series. No curve is fabricated: a part or tool with no curve "
+        "data renders no chart. Each table states its source; the chart title carries "
+        "the axes (y vs x)."))
+    note.font = Font(italic=True, size=9, color="555555")
+    note.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 40
+    r += 2
+    added = 0
+    for curve in curves[:6]:
+        block_top = r
+        sub_banner(ws, r, curve["title"], 4)
+        r += 1
+        header(ws, r, ["#", f"X ({curve['x_label']})", f"Y ({curve['y_label']})"])
+        hdr_row = r
+        r += 1
+        first = r
+        for i, (x, y) in enumerate(curve["points"]):
+            ws.cell(r, 1, i + 1)
+            ws.cell(r, 2, x)
+            ws.cell(r, 3, y)
+            r += 1
+        last = r - 1
+        src = ws.cell(r, 1, clean_cell(f"Source: {curve['source']}"))
+        src.font = FONT_NOTE
+        src.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = 28
+        r += 1
+        ch = LineChart()
+        # the chart title carries the axes (style_chart drops axis titles — they overlap
+        # tick labels); skip the "y vs x" suffix when the curve's own title already says it
+        _axes = f"{curve['y_label']} vs {curve['x_label']}"
+        _y_head = str(curve["y_label"]).split()[0].lower() if str(curve["y_label"]) else ""
+        ch.title = (curve["title"] if _y_head and _y_head in str(curve["title"]).lower()
+                    else f"{curve['title']} — {_axes}")
+        ch.height, ch.width = 7, 13
+        d = Reference(ws, min_col=3, min_row=first, max_row=last)
+        cats = Reference(ws, min_col=2, min_row=first, max_row=last)
+        ch.add_data(d, titles_from_data=False)
+        ch.set_categories(cats)
+        style_chart(ch, legend=None)
+        ws.add_chart(ch, f"E{hdr_row}")
+        added += 1
+        # keep blocks clear of the ~14-row chart anchored beside each table
+        r = max(r, block_top + 16)
+    return r + 1, added
+
+
 # --- worked-calc verification: turn "static" legacy calcs into LIVE, checked ---
 _ARITH_OPS = {_ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
               _ast.Div: _op.truediv, _ast.Pow: _op.pow, _ast.Mod: _op.mod,
@@ -4053,6 +4293,14 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         ws[_coord].value = _formula                 # forward same-sheet ref; style/format preserved
     if _links:
         print(f"  · Calculations: linked {len(_links)} data-flow value(s) to their worked-calc result cell")
+
+    # ── ENGINEERING CURVES (WAVE 1, 2026-07-03): plot the run's REAL curve data —
+    #    parts-spec derating anchors for pinned parts + curve-shaped tool series —
+    #    with the proven chart machinery. Skips silently when the run has none. ──
+    r, _n_curves = _render_engineering_curves(ws, state, run_dir, r + 1)
+    if _n_curves:
+        print(f"  · Calculations: {_n_curves} engineering curve chart(s) plotted from "
+              f"sourced data (parts-spec derating / tool series)")
 
     # number formats (#37): value (B) + engine-value (E) + Δ (F) columns. These
     # carry per-calc results in mixed units, so a thousands-separated 2-dp mask
@@ -11513,6 +11761,248 @@ def tab_holds_register(wb: Workbook, state: dict, run_dir: str) -> bool:
     return True
 
 
+# ============================================================================
+# TAB — QUESTIONS FOR THE CUSTOMER (engineering-credibility WAVE 1, 2026-07-03)
+# "Customers don't know what they want" — this register is the OUTPUT ARTEFACT
+# that turns every gap the engine papered over into an explicit confirm-or-correct
+# question: brief fields still missing / filled by class defaults (BriefAugment),
+# plausibility-critic contradictions, unresolved design decisions, and client-offer
+# reconciliation divergences NOT covered by a recorded decision. Every row is
+# DERIVED LIVE from a named engine artefact — never hand-typed — so answering a
+# question (in the brief or the decisions register) makes its row disappear on the
+# next build. proveCatch (in _selftest, both directions): a state with still_missing
+# fields renders questions; a fully-specified state renders 'No open questions'
+# honestly.
+# ============================================================================
+QUESTIONS_SHEET = "Questions for the customer"
+
+# still_missing fields → what concretely changes if the customer supplies a value
+# (universal field semantics, not per-class).
+_MISSING_FIELD_WHY = {
+    "max_mass_kg": ("a stated mass cap becomes a hard constraint on the skid/structure "
+                    "and the transport & lifting plan; today nothing bounds the plant's "
+                    "shipped mass"),
+    "operating_environment": ("the ambient min/max drive thermal sizing (heater/chiller "
+                              "duty, derating), material selection and IP ratings; today "
+                              "no ambient-envelope check can run"),
+    "max_dimensions_mm": ("a stated envelope becomes a hard fit constraint on the layout "
+                          "and the general arrangement; today the footprint is unbounded"),
+    "unit_cost_ceiling": ("a stated budget gates the design-to-cost loop; today no cost "
+                          "ceiling constrains part selection"),
+    "design_life": ("design life drives material corrosion allowances, duty classes and "
+                    "the economics horizon"),
+    "batch_size": ("annual volume moves the make-vs-buy and tooling amortisation in the "
+                   "cost model"),
+}
+
+
+def _derive_customer_questions(state: dict, run_dir: str,
+                               augment: Optional[dict] = None,
+                               plausibility: Optional[dict] = None) -> List[dict]:
+    """Derive the numbered customer questions from the run's own artefacts. Pure given
+    its inputs; `augment` / `plausibility` default to the run-dir JSON artefacts
+    (1-parsed-brief-augmented.json / 2-brief-plausibility-iter0.json) so the register is
+    always the LIVE re-derivation, and the selftest can inject fixtures directly."""
+    if augment is None:
+        augment = load_json(os.path.join(run_dir, "1-parsed-brief-augmented.json")) or {}
+    if plausibility is None:
+        plausibility = load_json(
+            os.path.join(run_dir, "2-brief-plausibility-iter0.json")) or {}
+    qs: List[dict] = []
+
+    def _add(question: str, why: str, assumption: str, provenance: str) -> None:
+        qs.append({"id": f"Q-{len(qs) + 1:03d}", "question": question, "why": why,
+                   "assumption": assumption, "provenance": provenance})
+
+    # 1 — brief fields the augmentation could not fill (still missing after class defaults)
+    for field in (augment.get("still_missing") or []):
+        f = str(field)
+        _add(f"What is the required {f.replace('_', ' ')}? The brief does not state it "
+             f"and no class default exists.",
+             _MISSING_FIELD_WHY.get(f, "a stated value becomes a hard design constraint "
+                                       "and can resize the subsystems derived from it"),
+             "none in force — the field is empty in the design basis; the design "
+             "proceeds unconstrained on it",
+             "brief augmentation (still_missing) — 1-parsed-brief-augmented.json")
+    # 2 — brief fields FILLED with class-default/inferred values ("we assumed X — confirm
+    #     or correct")
+    for a in (augment.get("augmentations") or []):
+        if not (isinstance(a, dict) and a.get("was_filled")):
+            continue
+        val = a.get("new_value")
+        val_s = (json.dumps(val, default=str) if isinstance(val, (dict, list))
+                 else str(val))
+        _add(f"We assumed {str(a.get('field', '')).replace('_', ' ')} = "
+             f"{_xq(val_s, 120)} — confirm or correct.",
+             "every quantity derived from this field moves if the real value differs "
+             "(it entered the design as if the brief had stated it)",
+             f"inferred: {_xq(val_s, 100)} — {_xq(str(a.get('rationale') or ''), 140)}",
+             "brief augmentation (was_filled) — 1-parsed-brief-augmented.json")
+    # 3 — plausibility-critic contradictions (brief value vs physical floor)
+    for c in (plausibility.get("contradictions") or []):
+        if not isinstance(c, dict):
+            continue
+        _add(f"The brief's {c.get('constraint', 'constraint')} "
+             f"({_xq(str(c.get('brief_value') or ''), 60)}) conflicts with the physical "
+             f"floor {_xq(str(c.get('physical_floor') or ''), 60)} "
+             f"({_xq(str(c.get('ratio') or ''), 30)}) — which should govern?",
+             _xq(str(c.get("reasoning") or "the design cannot honour both; the engine "
+                                           "proceeded on a revised constraint"), 220),
+             "the chain applied its refinement-loop revision (see the brief's "
+             "'alternatives considered')",
+             "brief plausibility critic — 2-brief-plausibility-iter0.json")
+    # 4 — unresolved design decisions (the register the structural-gate router keeps:
+    #     'without human review you can't tell which')
+    for d in (state.get("designDecisions") or []):
+        if not isinstance(d, dict):
+            continue
+        rec = str(d.get("recommendation") or "").strip()
+        if not rec:
+            continue
+        _add(f"Please review: {_xq(rec, 260)}",
+             _xq(str(d.get("why_it_matters") or d.get("explanation") or ""), 240)
+             or "the engine could not resolve this without review",
+             _xq(str((d.get("conflicting_values") or ["the engine's current value "
+                                                      "stands"])[0]), 200),
+             f"design-decisions register — {d.get('id', '?')} "
+             f"({d.get('kind', '?')}, module {d.get('module', '?')})")
+    # 5 — client-offer reconciliation divergences NOT covered by a recorded decision
+    #     (a covered section reads consistent_with_decision and asks nothing)
+    for sec in ((state.get("_clientOfferRecon") or {}).get("sections") or []):
+        st = sec.get("status")
+        if st not in ("above", "partial", "out_of_scope"):
+            continue
+        key = f"{sec.get('key', '?')}. {sec.get('label', '')}"
+        client = num(sec.get("client_gbp")) or 0.0
+        if st == "above":
+            q = (f"Client section {key}: this design prices "
+                 f"£{num(sec.get('engine_installed_gbp')) or 0:,.0f} installed-equivalent "
+                 f"against your £{client:,.0f} offer — do you want the fuller design, or "
+                 f"should we match the offer's scope?")
+        elif st == "partial":
+            q = (f"Client section {key}: this bill models only part of your "
+                 f"£{client:,.0f} section — should the balance be scoped in, or is it "
+                 f"supplied by others?")
+        else:
+            q = (f"Client section {key} (£{client:,.0f} in your offer) has no line in "
+                 f"this bill — confirm it is out of scope, or ask us to scope it.")
+        _add(q,
+             "the commercial reconciliation stays inconsistent until answered — the "
+             "totals cannot be compared like-for-like and the delta is unexplained",
+             _xq(str(sec.get("note") or "the engine's current scope stands"), 200),
+             "Brief tab — client-offer reconciliation (no recorded decision covers "
+             "this section; a decision in briefs-loop/<brief>.decisions.json clears it)")
+    return qs
+
+
+def tab_questions(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """The QUESTIONS FOR THE CUSTOMER register. ALWAYS renders (never skipped): open
+    questions are the deliverable when present, and 'No open questions' is stated
+    HONESTLY (with what was consulted) when the brief is fully specified."""
+    qs = _derive_customer_questions(state, run_dir)
+    ws = wb.create_sheet(QUESTIONS_SHEET)
+    set_widths(ws, {"A": 8, "B": 58, "C": 50, "D": 44, "E": 44})
+    title_row(
+        ws, "Questions for the customer — confirm or correct", 5,
+        "Customers don't know what they want — so every value the engine had to assume, "
+        "every brief field still missing, every physics contradiction and every "
+        "unexplained divergence from your offer is a NUMBERED QUESTION here. Each row is "
+        "derived live from a named engine artefact at build time (never hand-typed): "
+        "answer it in the brief or record a scope decision, rebuild, and the row "
+        "disappears. What changes if your answer differs is stated per row.")
+    r = 4
+    if qs:
+        sub_banner(ws, r, f"OPEN QUESTIONS — {len(qs)}, numbered (each names the "
+                          f"artefact that raised it)", 5)
+        r += 1
+        header(ws, r, ["Q#", "Question for the customer",
+                       "Why it matters — what changes if the answer differs",
+                       "Assumption in force (until answered)",
+                       "Provenance (engine artefact that raised it)"])
+        r += 1
+        for q in qs:
+            ws.cell(r, 1, q["id"]).font = Font(bold=True, color="1F4E79")
+            ws.cell(r, 1).border = BORDER
+            for ci, k in ((2, "question"), (3, "why"), (4, "assumption"), (5, "provenance")):
+                c = ws.cell(r, ci, clean_cell(q[k]))
+                c.alignment = WRAP_TOP
+                c.font = Font(size=10, bold=True) if ci == 2 else FONT_NOTE
+                c.border = BORDER
+            longest = max(len(str(q[k])) for k in ("question", "why", "assumption",
+                                                   "provenance"))
+            ws.row_dimensions[r].height = 14.5 * min(7, max(2, -(-longest // 46)))
+            r += 1
+    else:
+        c = ws.cell(r, 1, clean_cell(
+            "No open questions — the brief augmentation reports no missing or inferred "
+            "hard fields, the plausibility critic found no contradictions, the design-"
+            "decisions register is empty, and every client-offer section reconciles (or "
+            "is covered by a recorded decision). All four artefacts were consulted live "
+            "at build time."))
+        c.font = Font(size=10, bold=True, color="375623")
+        c.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+        ws.row_dimensions[r].height = 44
+        r += 1
+    ws.freeze_panes = "A5"
+    back_link(ws, 5)
+    n = len(qs)
+    complete = sum(1 for q in qs
+                   if all(str(q.get(k) or "").strip()
+                          for k in ("id", "question", "why", "assumption", "provenance")))
+    sc = 10.0 if (n == 0 or complete == n) else max(0.0, round(10 * complete / n, 1))
+    _TAB_SCORES[QUESTIONS_SHEET] = {
+        "score": sc, "target": 8, "status": "PASS" if sc >= 8 else "FAIL",
+        "issues": [f"{n} open question(s) for the customer — every row derived live "
+                   f"from a named engine artefact (brief augmentation / plausibility "
+                   f"critic / decisions register / client-offer reconciliation); an "
+                   f"answered question disappears on rebuild"],
+        "fix": "answer each question in the brief (or record a scope decision in "
+               "briefs-loop/<brief>.decisions.json) and re-run",
+    }
+    return True
+
+
+def _sc_questions(wb, ws, state, run_dir):
+    """Content scorer: the RENDERED questions must match the LIVE re-derivation (a stale
+    question or a silently-dropped one both fail), mirroring _sc_holds."""
+    comps = []
+    iss = []
+    live = _derive_customer_questions(state, run_dir)
+    rows = _fam_rows(wb, ws.title, "questions")
+    live_ids = [q["id"] for q in live]
+    rend = [(_cell_txt(d.get("q#")), _cell_txt(d.get("question for the customer")))
+            for _r, d in rows]
+    matched = 0
+    for i, (rid, rq) in enumerate(rend):
+        if i < len(live_ids) and rid == live_ids[i] \
+                and rq.startswith(str(live[i]["question"])[:40]):
+            matched += 1
+    total = max(len(live_ids), len(rend)) if (live_ids or rend) else 0
+    if total:
+        comps.append(("rendered questions match the LIVE re-derivation "
+                      "(stale/dropped question = fail)", matched, total))
+        if matched < total:
+            iss.append(f"{total - matched} question(s) diverge from the live "
+                       f"re-derivation — an answered question may still render, or a "
+                       f"new gap is missing from the register")
+    else:
+        # the honest empty register: the sheet must SAY so, and the re-derivation agree
+        blob = " ".join(str(c.value) for row in ws.iter_rows() for c in row
+                        if isinstance(c.value, str))
+        stated = "no open questions" in blob.lower()
+        comps.append(("live re-derivation agrees no questions are open AND the sheet "
+                      "states it honestly", 1 if stated else 0, 1))
+        if not stated:
+            iss.append("no questions derived, but the sheet does not state 'No open "
+                       "questions' — the empty register must be explicit")
+    return {"components": comps, "issues": iss,
+            "mech": "live-derivation check (each question re-derived from the run's own "
+                    "artefacts: brief augmentation, plausibility critic, decisions "
+                    "register, client-offer reconciliation)",
+            "fix": "rebuild — the register renders only what the live derivation yields"}
+
+
 def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
     """#22 — Line & velocity schedule from connection-schedule.json, SPLIT into
     process-pipe lines (velocity vs ≤3 m/s) and electrical/signal cables (volt-drop
@@ -12583,6 +13073,7 @@ _TAB_RANK = {
     # Electrical 12 → Line & velocity 13 (prefix ranks in _tab_rank fill the gaps)
     "Process schedules": 9, "Electrical": 12, "Line & velocity": 13,
     "Assembly sequence": 14, "Risk & Regulatory": 15, "Holds & exclusions": 16,
+    "Questions for the customer": 16.5,
     "Quality & Audit": 17, "Sense-check": 17.5, "⚠ Checks": 18,
     "Connection trace": 19, "Quantities": 20, "Calculations": 21,
     "Inputs & Assumptions": 22, "Part names": 23, "Glossary": 24,
@@ -12603,7 +13094,7 @@ _TAB_GROUPS = {
     "drawings": {"Drawings", "Process schedules", "Electrical", "Line & velocity",
                  "Assembly sequence"},
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
-                     "Sense-check", "⚠ Checks"},
+                     "Questions for the customer", "Sense-check", "⚠ Checks"},
     "reference": {"Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
                   "Part names", "Glossary", "Audit data"},
 }
@@ -13330,6 +13821,10 @@ _dt(["Input", "Value", "Unit", "Family", "Source", "Where-from (source / inputs)
      "Source detail", "Used by (where-to)"], "quantities",
     ["Input", "Value", "Source"], unit=["Unit"])
 _dt(["Constant", "Value", "Unit", "Note"], "constants", ["Constant", "Value"], unit=["Unit"])
+# Engineering-curve point tables (WAVE 1): headers are "X (<axis label>)" / "Y (<axis
+# label>)" — _norm_col strips the parenthesised axis label, so ONE contract covers every
+# curve family (derating, polarisation, …) with both point columns required + numeric.
+_dt(["#", "X", "Y"], "curve-points", ["#", "X", "Y"], numeric=["#", "X", "Y"])
 _dt(["Calc / input", "Value (live)", "Unit", "Formula (text)", "Engine value", "Δ", "Unit",
      "Assumptions"], "worked-calc", ["Calc / input"])
 _dt(["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs", "Factors",
@@ -13399,6 +13894,13 @@ _dt(["#", "Regulation / standard", "Triggered by (hazard present)", "Status"],
     "reg-triggered", ["#", "Regulation / standard", "Triggered by", "Status"])
 _dt(["Hold", "Item", "Scope (live count)", "Derived from", "Clears when"], "holds",
     ["Hold", "Item", "Scope", "Derived from", "Clears when"])
+_dt(["Q#", "Question for the customer",
+     "Why it matters — what changes if the answer differs",
+     "Assumption in force (until answered)",
+     "Provenance (engine artefact that raised it)"], "questions",
+    ["Q#", "Question for the customer",
+     "Why it matters — what changes if the answer differs",
+     "Assumption in force", "Provenance"])
 _dt(["Step", "Phase / activity", "Scope — equipment groups (tags)", "Predecessor",
      "Lifting plant", "Duration", "Hold / witness point"], "assembly",
     ["Step", "Phase / activity", "Scope — equipment groups", "Duration"])
@@ -14358,6 +14860,7 @@ _TAB_SCORERS = [
     ("Part names", _sc_partnames),
     ("Glossary", _sc_glossary),
     ("Holds & exclusions", _sc_holds),
+    (QUESTIONS_SHEET, _sc_questions),
     ("Sense-check", _sc_benchmark),
     ("⚠ Checks", _sc_checks),
     ("Quality & Audit", _sc_quality_audit),
@@ -15064,6 +15567,9 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Line & velocity", lambda: tab_line_velocity(wb, run_dir))
     add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
     add_tab("Holds & exclusions", lambda: tab_holds_register(wb, state, run_dir))
+    # Questions for the customer builds AFTER Brief (its recon-divergence source is
+    # state._clientOfferRecon, set by tab_brief) — always renders, honestly empty or not.
+    add_tab(QUESTIONS_SHEET, lambda: tab_questions(wb, state, run_dir))
     add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state, run_dir))
     # (Glossary builds AFTER the image/drawing tabs — its orphan filter scans the full
     #  workbook text; _reorder_tabs still places it at its canonical position.)
@@ -17891,6 +18397,189 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables2)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done2)
+
+    # ═══ QUESTIONS-FOR-THE-CUSTOMER proveCatch (WAVE 1, 2026-07-03, both directions):
+    # a state with still_missing / inferred fields / contradictions / uncovered recon
+    # divergences RENDERS numbered questions; a fully-specified state renders 'No open
+    # questions' HONESTLY; a recon section covered by a recorded decision asks NOTHING;
+    # the scorer flags a stale register. ═══
+    _sv_tables3 = list(_RENDERED_TABLES); _sv_done3 = set(_CELLCON_DONE)
+    _sv_scores3 = dict(_TAB_SCORES); _sv_chips3 = dict(_CHIP_SPANS)
+    try:
+        from openpyxl import Workbook as _WbQ
+        _q_aug = {"still_missing": ["max_mass_kg", "operating_environment"],
+                  "augmentations": [
+                      {"field": "target_process", "was_filled": True,
+                       "new_value": "continuous chemical process",
+                       "rationale": "inferred from mission"},
+                      {"field": "design_life", "was_filled": False,
+                       "new_value": "20 years", "rationale": "RETAINED"}]}
+        _q_pl = {"contradictions": [
+            {"constraint": "unit_cost_ceiling", "brief_value": "£10,000",
+             "physical_floor": "£120,000 (materials alone)", "ratio": "12×",
+             "reasoning": "the stated budget is below the raw-materials floor"}]}
+        _q_state = {
+            "designDecisions": [
+                {"id": "gate-unrepaired::x", "kind": "unrepaired_gate", "module": "m1",
+                 "recommendation": "confirm whether the thin sub-module should be split",
+                 "why_it_matters": "a thin sub-module may hide missed components",
+                 "conflicting_values": ["grammar: 1 sub-module under-dense"]}],
+            "_clientOfferRecon": {"sections": [
+                {"key": "A", "label": "Water treatment", "status": "above",
+                 "client_gbp": 85000, "engine_installed_gbp": 130550,
+                 "note": "engine prices this section 1.5× the client offer"},
+                {"key": "B", "label": "Fertigation", "status": "consistent_with_decision",
+                 "client_gbp": 31000, "engine_installed_gbp": 78490,
+                 "note": "CONSISTENT WITH RECORDED DECISION — fuller design agreed"},
+                {"key": "C", "label": "Irrigation", "status": "consistent",
+                 "client_gbp": 50000, "engine_installed_gbp": 51000,
+                 "note": "within 2%"}]}}
+        _qs = _derive_customer_questions(_q_state, ".", augment=_q_aug,
+                                         plausibility=_q_pl)
+        # 2 still_missing + 1 was_filled + 1 contradiction + 1 decision + 1 uncovered
+        # divergence = 6; the decision-covered section B and consistent C ask NOTHING.
+        if len(_qs) != 6:
+            print(f"  FAIL questions: expected 6 derived questions (got {len(_qs)}: "
+                  f"{[q['id'] for q in _qs]})"); bad += 1
+        if any("Fertigation" in q["question"] or "Irrigation" in q["question"]
+               for q in _qs):
+            print("  FAIL questions: a decision-covered / consistent recon section must "
+                  "ask NOTHING"); bad += 1
+        if not any("We assumed target process" in q["question"] and
+                   "confirm or correct" in q["question"] for q in _qs):
+            print("  FAIL questions: a was_filled field must render as 'we assumed X — "
+                  "confirm or correct'"); bad += 1
+        if not all(str(q.get(k) or "").strip() for q in _qs
+                   for k in ("id", "question", "why", "assumption", "provenance")):
+            print("  FAIL questions: every question must carry question/why/assumption/"
+                  "provenance"); bad += 1
+        _ret_fields = [str(a.get("field")) for a in _q_aug["augmentations"]
+                       if not a.get("was_filled")]
+        if any("design life" in q["question"] for q in _qs) or "design_life" not in \
+                str(_ret_fields):
+            print("  FAIL questions: a RETAINED (user-stated) field must never become a "
+                  "question"); bad += 1
+        # render direction 1: the tab renders the numbered rows + registers its table
+        import tempfile as _tfq
+        with _tfq.TemporaryDirectory() as _tdq:
+            with open(os.path.join(_tdq, "1-parsed-brief-augmented.json"), "w") as _fh:
+                json.dump(_q_aug, _fh)
+            with open(os.path.join(_tdq, "2-brief-plausibility-iter0.json"), "w") as _fh:
+                json.dump(_q_pl, _fh)
+            _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+            _wbq = _WbQ(); _wbq.remove(_wbq.active)
+            if not tab_questions(_wbq, _q_state, _tdq):
+                print("  FAIL questions: tab_questions must ALWAYS render"); bad += 1
+            _wsq = _wbq[QUESTIONS_SHEET]
+            _blobq = " ".join(str(c.value) for row in _wsq.iter_rows() for c in row
+                              if isinstance(c.value, str))
+            if "Q-001" not in _blobq or "Q-006" not in _blobq:
+                print("  FAIL questions: rendered register must number Q-001..Q-006"); bad += 1
+            if not any(t["sheet"] == QUESTIONS_SHEET and
+                       _TABLE_CONTRACTS.get(_table_sig(t["cols"]))
+                       for t in _RENDERED_TABLES):
+                print("  FAIL questions: the rendered table must carry a declared "
+                      "contract (registry compliance)"); bad += 1
+            _scq = _sc_questions(_wbq, _wsq, _q_state, _tdq)
+            if not _scq["components"] or _scq["components"][0][1] != _scq["components"][0][2]:
+                print(f"  FAIL questions: scorer must match rendered vs live re-derivation "
+                      f"(got {_scq['components']})"); bad += 1
+            # scorer catches a STALE register: drop a live source → rendered ≠ derived
+            _scq2 = _sc_questions(_wbq, _wsq, {"designDecisions": [],
+                                               "_clientOfferRecon": {}}, _tdq)
+            if not _scq2["issues"]:
+                print("  FAIL questions: scorer must flag a stale register (rendered "
+                      "questions diverge from the live re-derivation)"); bad += 1
+        # render direction 2: fully-specified state → HONEST 'No open questions'
+        with _tfq.TemporaryDirectory() as _tdq2:
+            _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+            _wbq2 = _WbQ(); _wbq2.remove(_wbq2.active)
+            tab_questions(_wbq2, {}, _tdq2)
+            _wsq2 = _wbq2[QUESTIONS_SHEET]
+            _blobq2 = " ".join(str(c.value) for row in _wsq2.iter_rows() for c in row
+                               if isinstance(c.value, str))
+            if "no open questions" not in _blobq2.lower():
+                print("  FAIL questions: a fully-specified state must render 'No open "
+                      "questions' honestly"); bad += 1
+            if "Q-0" in _blobq2:
+                print("  FAIL questions: an empty register must render NO numbered "
+                      "questions"); bad += 1
+            _scq3 = _sc_questions(_wbq2, _wsq2, {}, _tdq2)
+            if not _scq3["components"] or _scq3["components"][0][1:] != (1, 1):
+                print(f"  FAIL questions: empty register must score its honest statement "
+                      f"1/1 (got {_scq3['components']})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables3)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done3)
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_sv_scores3)
+        _CHIP_SPANS.clear(); _CHIP_SPANS.update(_sv_chips3)
+
+    # ═══ ENGINEERING-CURVES proveCatch (WAVE 1, 2026-07-03, both directions): a part
+    # matching a parts-spec cooling_curve gets a REAL chart from the datasheet anchors;
+    # a run with no curve data renders NO chart (never fabricated); a curve-shaped tool
+    # series is detected, a scalar/short series is not. ═══
+    _sv_tables4 = list(_RENDERED_TABLES); _sv_done4 = set(_CELLCON_DONE)
+    try:
+        from openpyxl import Workbook as _WbC
+        _specs = _load_partspec_cooling_curves()
+        if len(_specs) < 5 or not all(len(s["points"]) >= 2 for s in _specs):
+            print(f"  FAIL curves: parts-spec registry parse must yield the derating "
+                  f"curve library (got {len(_specs)} entries)"); bad += 1
+        _cstate1 = {"partVerifications": [
+            {"manufacturer": "Pfannenberg", "part_number": "EB XT 500 WT"},
+            {"manufacturer": "Generic", "part_number": "M6-BOLT-XX"}]}
+        _cv1 = _collect_engineering_curves(_cstate1, ".", partspec_curves=_specs)
+        if len(_cv1) != 1 or "EB XT 500" not in _cv1[0]["title"] \
+                or len(_cv1[0]["points"]) < 2:
+            print(f"  FAIL curves: a pinned EB XT 500 WT must yield exactly its derating "
+                  f"curve (got {[c['title'] for c in _cv1]})"); bad += 1
+        elif not (47.0 in [p[1] for p in _cv1[0]["points"]]
+                  and 28.2 in [p[1] for p in _cv1[0]["points"]]):
+            print(f"  FAIL curves: EB XT 500 WT must plot ITS datasheet anchors "
+                  f"(47 kW @ 35°C, 28.2 kW @ 50°C) — got {_cv1[0]['points']}"); bad += 1
+        # tool-series detection: a polarisation-like series is a curve; scalars are not
+        _cstate2 = {"toolsUsedPage": {"tools": [
+            {"tool_id": "electrolyser:polarisation", "tool_name": "Polarisation",
+             "claims": [{"field": "polarisation_curve", "unit": "V",
+                         "value": [{"current_density_a_cm2": 0.2, "cell_voltage_v": 1.55},
+                                   {"current_density_a_cm2": 0.6, "cell_voltage_v": 1.72},
+                                   {"current_density_a_cm2": 1.0, "cell_voltage_v": 1.86},
+                                   {"current_density_a_cm2": 1.4, "cell_voltage_v": 2.01}]},
+                        {"field": "stack_power_kw", "value": 125.0, "unit": "kW"},
+                        {"field": "two_points_only", "unit": "V",
+                         "value": [{"x": 1, "y": 2}, {"x": 2, "y": 3}]}]}]}}
+        _cv2 = _collect_engineering_curves(_cstate2, ".", partspec_curves=[])
+        if len(_cv2) != 1 or "polarisation_curve" not in _cv2[0]["title"] \
+                or len(_cv2[0]["points"]) != 4:
+            print(f"  FAIL curves: the 4-point polarisation series (and ONLY it) must be "
+                  f"detected (got {[c['title'] for c in _cv2]})"); bad += 1
+        # render direction 1: the chart lands on the sheet, data rows numeric
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbc = _WbC(); _wsc = _wbc.active; _wsc.title = "Calculations"
+        _r2, _nch = _render_engineering_curves(_wsc, _cstate1, ".", 4, curves=_cv1)
+        if _nch != 1 or len(getattr(_wsc, "_charts", [])) != 1:
+            print(f"  FAIL curves: exactly one chart must render for the one matched "
+                  f"part (got {_nch})"); bad += 1
+        if not any(t["sheet"] == "Calculations" and
+                   _TABLE_CONTRACTS.get(_table_sig(t["cols"]))
+                   for t in _RENDERED_TABLES):
+            print("  FAIL curves: the curve point table must carry a declared contract "
+                  "(registry compliance)"); bad += 1
+        # render direction 2 (the catch): NO curve data → NO chart, NOTHING rendered
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbc2 = _WbC(); _wsc2 = _wbc2.active; _wsc2.title = "Calculations"
+        _r3, _nch2 = _render_engineering_curves(_wsc2, {}, ".", 4,
+                                                curves=[])
+        if _nch2 != 0 or len(getattr(_wsc2, "_charts", [])) != 0 or _r3 != 4:
+            print(f"  FAIL curves: absent data must render NO chart and write NOTHING "
+                  f"(got charts={_nch2}, next_row={_r3})"); bad += 1
+        _cv3 = _collect_engineering_curves({}, ".", partspec_curves=_specs)
+        if _cv3:
+            print(f"  FAIL curves: a run pinning no curve-bearing part must collect NO "
+                  f"curves (got {[c['title'] for c in _cv3]})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables4)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done4)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

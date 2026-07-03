@@ -907,7 +907,7 @@ def build_bfd_svg(bf: BlockFlow) -> str:
     margin_l = 160            # room for the feed arrow + label on the left
     margin_r = 215           # room for the product arrow + label on the right
     header_h = 124
-    title_h = 150
+    title_h = 164            # +14 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     FOLD_ROW_GAP = 150        # inter-row corridor (fold connectors + bus links + labels)
     FOLD_MAX_ASPECT = 3.5     # fold until the page clears the ≤4:1 G1 gate with margin
 
@@ -1549,8 +1549,10 @@ def _draw_title_block(svg, bf, width, height, title_h):
              "Scope: as-modelled major unit operations in process order — "
              "an executive process overview · not for construction.",
              size=9.5, fill=MUTED)
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
+    svg.text(x0, y0 + 77, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
     avail_w = (bx0 - 20) - x0
-    ny = y0 + 79
+    ny = y0 + 93
     for note in (bf.notes or [])[:2]:
         for j, wl in enumerate(_wrap_text("• " + note, avail_w, 9.0)):
             svg.text(x0 if j == 0 else x0 + 9, ny, wl, size=9.0, fill=MUTED)

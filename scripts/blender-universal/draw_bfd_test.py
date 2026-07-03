@@ -211,6 +211,8 @@ def _run_case(label, state_path, artifact_dir, opts):
     _check("BLOCK-FLOW DIAGRAM" in svg, f"{label}: title-block heading missing")
     _check("not for construction" in svg.lower(),
            f"{label}: scope note 'not for construction' missing")
+    _check("ISO 2768-mK" in svg,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing")
     _check("DRAWING No." in svg or "DRAWING No" in svg,
            f"{label}: drawing-number field missing from title block")
     _check("Process stream" in svg, f"{label}: legend missing the process-stream key")

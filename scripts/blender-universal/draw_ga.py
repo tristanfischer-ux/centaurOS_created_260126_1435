@@ -685,7 +685,7 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
 
     # ----- sheet geometry -----
     margin = 46
-    title_h = 150
+    title_h = 166            # +16 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     gap = 96                 # gap between plan and the side elevation / dim gutters
     v_gap = 92               # gap between plan and front elevation (dim band)
     label_gutter = 30        # left gutter for the vertical (plant-width) dimension
@@ -1114,6 +1114,8 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
              "NOT FOR CONSTRUCTION — preliminary auto-generated arrangement; "
              "verify against the P&ID + single-line before issue.",
              size=9.0, fill="#a4332a", weight="bold")
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
+    svg.text(x0, y0 + 130, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -158,6 +158,8 @@ def _run_case(label, manifest_dir, state_path):
     _check("GENERAL ARRANGEMENT" in svg, f"{label}: no 'General Arrangement' title")
     _check("NOT FOR CONSTRUCTION" in svg.upper(),
            f"{label}: missing 'not for construction' note")
+    _check("ISO 2768-mK" in svg,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing")
 
     print(f"  ✓ manifest complete ({len(raw_parts)} parts, tags {letters})")
     print(f"  ✓ GA dimensioned: {svg.count('url(#dim)')} dim lines, scale "

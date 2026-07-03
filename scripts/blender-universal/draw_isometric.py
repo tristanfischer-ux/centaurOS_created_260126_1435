@@ -726,7 +726,9 @@ def _draw_bom_table(svg: SVG, ln: IsoLine, x, y, w):
 def build_single_line_sheet(ln: IsoLine, archetype: str, idx: int, total: int) -> str:
     width = 1180
     height = 860
-    title_h = 132
+    # 166 (was 132): the NFC line at y0+113 used to land BELOW the sheet edge (clipped);
+    # +the shared general-tolerance note line (_tb.TOLERANCE_NOTE) at y0+130.
+    title_h = 166
     svg = SVG(width, height)
     svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
 
@@ -800,7 +802,9 @@ def build_index_sheet(lines: list[IsoLine], archetype: str) -> str:
     cell_w = 360
     cell_h = 230
     margin = 40
-    title_h = 132
+    # 166 (was 132): the NFC line at y0+113 used to land BELOW the sheet edge (clipped);
+    # +the shared general-tolerance note line (_tb.TOLERANCE_NOTE) at y0+130.
+    title_h = 166
     reg_h = 28 + min(n, 16) * 16 + 16
     width = margin * 2 + cols * cell_w
     height = (116 + rows_g * cell_h + 24) + reg_h + title_h
@@ -930,6 +934,8 @@ def _draw_title_block(svg, archetype, width, height, title_h, line: Optional[Iso
              "NOT FOR CONSTRUCTION — preliminary auto-generated isometric; verify "
              "against the P&ID + GA + line list before issue.",
              size=9.0, fill="#a4332a", weight="bold")
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
+    svg.text(x0, y0 + 130, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

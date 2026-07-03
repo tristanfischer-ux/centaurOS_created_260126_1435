@@ -2218,7 +2218,7 @@ def build_pid_svg(proc: Process) -> str:
         margin_top += 70
     if has_return:
         margin_top = max(margin_top, 230)   # return loop needs clearance above equipment
-    title_h = 150
+    title_h = 164            # +14 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     legend_w = 250
 
     # the ancillary / field-device register sits in a full-width band below the equipment,
@@ -3075,7 +3075,9 @@ def _draw_title_block(svg, proc, width, height, title_h):
              "Scope: as-modelled major process lines + instruments "
              "(projected from the process topology) · not for construction.",
              size=9.5, fill=MUTED)
-    ny = y0 + 79
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
+    svg.text(x0, y0 + 77, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
+    ny = y0 + 93
     for note in (proc.notes or [])[:2]:
         svg.text(x0, ny, "• " + note, size=9.0, fill=MUTED)
         ny += 13

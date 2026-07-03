@@ -2,10 +2,16 @@
 """
 scripts/lib/orchestrator/tools/python/airframe_fea_landing.py
 
-Drone airframe FEA for landing impact loads.
+Drone airframe LANDING-LOAD analysis — CLOSED-FORM ENERGY METHOD (FEA-ready seam).
 
-Uses scikit-fem (reused for FEA work in other parts of orchestrator) but
-falls back to closed-form energy-method analysis if not available.
+HONEST NAMING (engineering-credibility WAVE 1, 2026-07-03): this tool computes a
+closed-form energy-method analysis (KE balance → peak force → axial stress → yield
+check → idealised cantilever deflection). It performs NO finite-element analysis —
+scikit-fem is not installed and no mesh is ever built. The historical name claimed
+"FEA"; every surface string now states the real method. The FILE NAME + tool id
+(`airframe-fea:landing`) are kept for registry compatibility only — they are
+identifiers, not method claims; the "FEA-ready seam" phrasing marks where a real
+finite-element implementation would slot in (non-axial loading, detailed deflection).
 
 Landing impact analysis:
 1. Kinetic energy at touchdown: KE = 0.5 × m × v²
@@ -46,7 +52,8 @@ from _worked import worked_calc  # noqa: E402
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
 PROVENANCE = {
-    "tool_name": 'airframe_fea_landing (custom)',
+    # Honest method naming: closed-form energy method, NOT finite-element analysis.
+    "tool_name": 'landing-load closed-form energy method (FEA-ready seam)',
     "tool_version": '1.0.0',
     "tool_license": 'proprietary',
     "tool_source_url": '(in-tree)',
@@ -151,7 +158,12 @@ def compute(payload: dict) -> dict:
                 "v": (v_descent, "m/s"),
             },
             result=ke_r, result_unit="J",
-            assumptions=["all kinetic energy must be absorbed by landing gear stroke"],
+            assumptions=[
+                "all kinetic energy must be absorbed by landing gear stroke",
+                "method: closed-form energy balance (hand-calculation), not a "
+                "finite-element analysis — a mesh-based check is the seam for "
+                "detailed design",
+            ],
         ),
         worked_calc(
             label="Peak impact force",
@@ -209,10 +221,12 @@ def compute(payload: dict) -> dict:
         "elastic_modulus_gpa": mat["E_gpa"],
         "frame_mass_per_m_kg": round(mat["density_kg_m3"] * csa_m2, 4),
         "notes": (
-            "Energy-method landing impact analysis. Peak g = KE / (stroke × mg). "
+            "Closed-form energy-method landing impact analysis (no finite-element "
+            "model is built). Peak g = KE / (stroke × mg). "
             "Per FAR 23.473 / 25.473: ultimate load = 1.5 × limit. "
             "Add ground reaction multiplier × 1.5 for hard surface. "
-            "Use scikit-fem wrapper (when available) for non-axial loading or detailed deflection."
+            "FEA-ready seam: a mesh-based solver (e.g. scikit-fem) would slot in here "
+            "for non-axial loading or detailed deflection at detailed design."
         ),
         "worked": worked,
     }

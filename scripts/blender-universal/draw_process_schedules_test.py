@@ -274,6 +274,8 @@ def _run_case(label, state_path, sched_candidates):
            f"{label}: SVG title block missing")
     _check("not for construction" in svg.lower(),
            f"{label}: SVG scope note missing")
+    _check("ISO 2768-mK" in svg and "ISO 2768-mK" in md,
+           f"{label}: shared general-tolerance note (ISO 2768-mK) missing from SVG/md")
     _check(svg.count("<text") >= 40, f"{label}: implausibly few SVG cells")
 
     print(f"  PASS  (lines match P&ID exactly; valves {len(sc.valves)}={len(exp_valves)} "

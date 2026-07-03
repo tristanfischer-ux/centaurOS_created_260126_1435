@@ -525,6 +525,15 @@ def t_landing():
         "frame_csa_mm2": 50,
     })
     assert r["peak_g"] > 0
+    # HONEST-NAMING proveCatch (WAVE 1, 2026-07-03): the tool computes a CLOSED-FORM
+    # energy method — no rendered surface (notes / provenance / worked calcs) may claim
+    # bare "FEA" for its result. The only permitted occurrence is the "FEA-ready seam"
+    # phrasing (a statement about what it is NOT, marking the future mesh-based slot).
+    import re as _re
+    _surface = json.dumps(r)
+    _bare_fea = [m.group(0) for m in _re.finditer(r"FEA(?!-ready)", _surface)]
+    assert not _bare_fea, f"closed-form result rendered as 'FEA': {_bare_fea}"
+    assert "closed-form" in _surface.lower(), "method statement missing from surfaces"
     return f"peak {r['peak_g']}g, σ={r['peak_stress_mpa']}MPa, δ={r['max_deflection_mm']}mm"
 
 

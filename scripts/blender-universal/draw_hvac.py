@@ -1285,7 +1285,9 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
     margin = 46
     # title-block height grows with the WRAPPED note lines (notes are word-wrapped, never
     # clipped mid-word — v54 shipped "from the desig…" / "verify aga…").
-    title_h = 156 + max(0, len(_note_lines(sysm)) - 2) * 12
+    # +28 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE), drawn BELOW the
+    # NFC line so it clears the drawing-metadata box on the right.
+    title_h = 184 + max(0, len(_note_lines(sysm)) - 2) * 12
     plan_x = margin + 44
     plan_y = margin + 56
     sect_x = plan_x
@@ -1869,6 +1871,9 @@ def _draw_title_block(svg, sysm, meta, scale_S, width, height, title_h):
              "NOT FOR CONSTRUCTION — preliminary auto-generated mechanical-services "
              "layout; verify against the P&ID + room layout before issue.",
              size=9.0, fill="#a4332a", weight="bold")
+    # shared general-tolerance note (ONE source of truth: drawing_titleblock.py) — drawn
+    # BELOW the NFC line, full width, clear of the metadata box.
+    svg.text(x0, ny + 18, _tb.TOLERANCE_NOTE, size=8.5, fill=MUTED)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

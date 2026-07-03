@@ -33,6 +33,19 @@ from pathlib import Path
 # (not a live clock); a single constant so every drawing's title block agrees.
 REV = "P1"
 
+# GENERAL-TOLERANCE NOTE (engineering-credibility WAVE 1, 2026-07-03).  ONE shared
+# line every drawing's title block renders, so the whole set states the same
+# tolerancing basis.  ISO 2768-mK stated properly: "m" is the ISO 2768-1 general
+# tolerance class for linear + angular dimensions (medium); "K" is the ISO 2768-2
+# class for geometrical tolerances.  The corrosion-allowance + dimensions clauses
+# make the drawing's default assumptions explicit instead of implied.  This line is
+# ADDITIVE — every generator KEEPS its existing "not for construction" scope note.
+TOLERANCE_NOTE = (
+    "GENERAL TOLERANCES: ISO 2768-mK unless noted (linear & angular class m — medium, "
+    "ISO 2768-1; geometrical class K, ISO 2768-2) · corrosion allowance per material "
+    "schedule · dimensions in mm · not for construction"
+)
+
 
 def issue_date(out_dir) -> str:
     """A DETERMINISTIC issue date (YYYY-MM-DD) for the title block, derived from the run's

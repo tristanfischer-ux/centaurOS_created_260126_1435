@@ -2497,7 +2497,7 @@ def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
     col_w = 210
     margin_l = 60
     margin_r = 60
-    title_h = 138
+    title_h = 152          # +14 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     legend_gutter = 220   # dedicated right-hand column for the symbol legend
     # sub-distribution branches need extra vertical space below their parent slot.
     has_sub = any(br.sub_bus for br in main_branches)
@@ -2826,6 +2826,7 @@ def _draw_title_block(svg: SVG, tree: Tree, width, height, title_h):
     svg.text(x0, ny + 2,
              "Auto-generated · drawn ForgeOS auto-projection · not for construction.",
              size=8.6, fill=MUTED)
+    svg.text(x0, ny + 16, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
 
 
 def _draw_legend(svg: SVG, x_right, y_top):
