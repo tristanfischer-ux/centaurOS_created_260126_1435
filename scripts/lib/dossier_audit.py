@@ -290,7 +290,7 @@ def _metric_name(m) -> str:
     return m.get("key_metric") or m.get("metric") or m.get("name") or ""
 
 
-def _physics_issues(state, run_dir=None) -> list:
+def _physics_issues_raw(state, run_dir=None) -> list:
     """SIGHT: grade the DELIVERED critique. The freshen-scorer re-runs the physics critic on the FINAL
     design and writes 7-5-physics-critique.json; the copy embedded in state.json is from an earlier
     stage and can be STALE (different — sometimes contradictory — findings). Prefer the on-disk fresh
@@ -311,6 +311,17 @@ def _physics_issues(state, run_dir=None) -> list:
             if isinstance(iss, list):
                 return iss
     return []
+
+
+def _physics_issues(state, run_dir=None) -> list:
+    """The CANONICAL scoring view of the physics critique (B3 extension, Tristan 2026-07-03):
+    corroborated findings are replaced by their deterministic, state-derived evidence rows
+    (identical designs → identical rows, however the LLM re-rolled its phrasing); anything the
+    deterministic matchers cannot corroborate carries corroboration='uncorroborated' and is an
+    ADVISORY note — visible, honest, NEVER scores. Idempotent: a critique the chain already
+    canonicalised (every issue carries a 'corroboration' marker) is returned as-is."""
+    raw = _physics_issues_raw(state, run_dir)
+    return _canonicalise_issues(state, raw)
 
 
 _PHYS_EMPTY_CLAIM_RX = re.compile(r"\bempty\b|no words|words['\"]?\s*[:=]?\s*\[\s*\]|\bhas no (?:words|equipment|parts)\b", re.I)
@@ -520,6 +531,329 @@ def _physics_claim_falsified(state, issue: dict) -> bool:
                     if _contract_count_ge2_for(state, {qtok, noun}):
                         return True  # the design has ≥2 of this part → 'a single <part>' is false
     return False
+
+
+# --------------------------------------------------------------------------- #
+# DETERMINISTIC CORROBORATION LAYER (Tristan 2026-07-03 — B3 extended to the
+# critic's FINDING SET)
+# --------------------------------------------------------------------------- #
+# v56c vs v56d (identical code, identical delivered design words, fresh runs): the
+# LLM physics critic re-rolled 3→5 'engine-fixable' findings, and those findings
+# leaked straight into scores (Risk tab 7.0→5.8, physics_fidelity 6, floor mirrors).
+# B3 caged the critic's SCORES; this layer cages its FINDING SET:
+#
+#   A critic finding may SCORE (Risk-register ENGINE-FIXABLE row, physics_fidelity
+#   deduction, unresolved_critic_highs) ONLY when a DETERMINISTIC check over the
+#   DELIVERED artefacts corroborates it. An uncorroborated finding renders as an
+#   ADVISORY note — visible, honest, NEVER scores.
+#
+# Corroborable claim shapes (each with its own matcher, the f9dfc2918
+# distinguishing-token discipline):
+#   (a) rating_pair       — "X rated A kW but its motor/drive is B kW": both values
+#                           must live on the delivered BoM rows and genuinely diverge
+#                           beyond the 1.25× motor-service tolerance. A corroborated
+#                           rating_pair claim scores through the CANONICAL SWEEP of
+#                           every delivered machine↔drive pair (state-derived, deduped,
+#                           sorted) — so identical designs yield IDENTICAL scoring rows
+#                           however many of the pairs the critic happened to mention.
+#   (b) brief_vs_delivered — the claim pins a brief value: corroborated iff that value
+#                           exists in parsedBrief AND the named delivered row carries a
+#                           same-family value diverging >2%.
+#   (c) existence          — "the design omits X": already falsifiable (shape f of
+#                           _physics_claim_falsified); corroborated iff the named
+#                           component genuinely matches NO delivered row.
+#   (d) count              — "only one X": corroborated iff the contract counts confirm
+#                           exactly the claimed deficiency (a *_count == 1).
+# Everything else (material-suitability opinion, external-catalogue part-identity
+# claims, freeboard/oversize judgement calls) is UNCORROBORATED → advisory.
+
+_CORR_KW_RX = re.compile(r"(\d+(?:\.\d+)?)\s*k(?:w\b|ilowatts?)", re.I)
+_CORR_DRIVE_CHILD_RX = re.compile(r"\b(?:drive\s+)?(?:gear)?motor\b|\bvsd\b|variable[- ]speed\s+drive", re.I)
+_CORR_DRIVEN_PARENT_RX = re.compile(
+    r"\b(pump|blower|compressor|fan|agitator|mixer|conveyor|feeder|centrifuge)s?\b", re.I)
+_CORR_BRIEF_CITE_RX = re.compile(r"\bbrief\b|\bspecification\b|specif(?:y|ies|ied)|requirement\b", re.I)
+# a motor/VSD up to 25% above its driven machine is standard service-margin selection;
+# beyond that the delivered rows genuinely disagree with each other.
+_RATING_PAIR_SERVICE_TOL = 1.25
+_CORR_EQUIP_NOUNS = ("pump", "tank", "vessel", "blower", "compressor", "filter",
+                     "skid", "exchanger", "sensor", "valve", "motor", "drive")
+
+
+def _word_kw(w):
+    """The word's electrical POWER rating in kW, or None. Only a kW-family modifier
+    counts — a '90 m³/h' rating_primary must never read as 90 kW (unit-family bug)."""
+    for mc in (w.get("modifier_characters") or []):
+        if mc.get("kind") in ("power", "rating_primary", "rating"):
+            txt = f"{mc.get('value') or ''} {mc.get('unit') or ''}"
+            if re.search(r"m³|m3|/h|/s|bar|°c|\bv\b|litre|liter", txt, re.I):
+                continue  # flow / pressure / voltage family — not power
+            m = _CORR_KW_RX.search(txt)
+            if m:
+                try:
+                    return float(m.group(1))
+                except ValueError:
+                    pass
+    return None
+
+
+def _iter_words_with_module(state):
+    """Yield (module_id, word) for every word in the shipped design."""
+    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        mid = str(m.get("module") or "")
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                yield mid, w
+
+
+def _rating_pair_sweep(state) -> list:
+    """CANONICAL sweep of every delivered machine ↔ motor/drive rating pair.
+
+    Pairing is by character-id lineage (`<parent>_word__<child>` — the synthesis pass
+    stamps a sub-component's parent into its character_id), so it is exact, not fuzzy.
+    A pair rows-in only when BOTH sides carry a kW rating and the ratio exceeds the
+    1.25× motor-service tolerance. One row per parent machine (motor + VSD echo the
+    same source defect); severity from the EVIDENCE (ratio ≥2× → high, else med) so a
+    critic re-roll can never move it. Output sorted by parent id → deterministic."""
+    by_cid: dict = {}
+    entries = []
+    for mid, w in _iter_words_with_module(state):
+        cid = str(((w.get("content_character") or {}).get("character_id")) or "")
+        nm = str(w.get("name_human") or "")
+        entries.append((mid, w, cid, nm))
+        if cid and cid not in by_cid:
+            by_cid[cid] = (mid, w, nm)
+    grouped: dict = {}
+    for mid, w, cid, nm in entries:
+        m2 = re.match(r"^(?P<parent>.+?)_word__(?P<child>.+)$", cid)
+        if not m2:
+            continue
+        if not re.search(r"motor|drive|vsd", m2.group("child")):
+            continue
+        pent = by_cid.get(m2.group("parent"))
+        if not pent:
+            continue
+        pmid, pw, pnm = pent
+        pkw, ckw = _word_kw(pw), _word_kw(w)
+        if not pkw or not ckw or pkw <= 0 or ckw <= 0:
+            continue
+        ratio = max(pkw, ckw) / min(pkw, ckw)
+        if ratio <= _RATING_PAIR_SERVICE_TOL + 1e-9:
+            continue
+        g = grouped.setdefault(m2.group("parent"),
+                               {"parent_name": pnm, "parent_kw": pkw, "module": pmid, "children": set()})
+        g["children"].add((nm, ckw))
+    out = []
+    for key in sorted(grouped):
+        g = grouped[key]
+        worst = max(kw for _n, kw in g["children"])
+        ratio = max(worst, g["parent_kw"]) / min(worst, g["parent_kw"])
+        sev = "high" if ratio >= 2.0 else "med"
+        kids = " + ".join(f"{n} {kw:g} kW" for n, kw in sorted(g["children"]))
+        out.append({
+            "dimension": "engineering_plausibility",
+            "severity": sev,
+            "confidence": "high",
+            "where": f"{g['module']}/{g['parent_name']}",
+            "issue": (f"{g['parent_name']} is rated {g['parent_kw']:g} kW but its drive train "
+                      f"({kids}) diverges beyond the 1.25x motor-service tolerance "
+                      f"(ratio {ratio:.2f}) — both values are on the delivered BoM rows "
+                      f"(deterministic rating-pair corroboration)"),
+            "suggested_check": ("align the drive motor / VSD rating with the driven machine at its "
+                                "SOURCE rule (the synthesis pass that mints drive-train ratings), "
+                                "add its regression guard, re-run"),
+            "corroboration": "corroborated",
+            "shape": "rating_pair",
+            "parent_name": g["parent_name"],
+        })
+    return out
+
+
+def _claim_tokens(issue) -> set:
+    txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}".lower()
+    return {t for t in re.findall(r"[a-z]{4,}", txt)}
+
+
+def _brief_numbers(state) -> set:
+    """Every numeric value pinned anywhere in the parsedBrief (deep scan, incl. numbers
+    embedded in strings) — the deterministic 'does the brief actually say N?' oracle."""
+    out: set = set()
+
+    def _walk(x):
+        if isinstance(x, dict):
+            for v in x.values():
+                _walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                _walk(v)
+        elif isinstance(x, (int, float)) and not isinstance(x, bool):
+            out.add(round(float(x), 6))
+        elif isinstance(x, str):
+            for m in re.findall(r"\d+(?:\.\d+)?", x):
+                try:
+                    out.add(round(float(m), 6))
+                except ValueError:
+                    pass
+    _walk(state.get("parsedBrief") or {})
+    return out
+
+
+def _finding_shape(issue) -> str:
+    """Classify a critic finding into its corroborable claim shape (most specific first)."""
+    txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
+    kws = _CORR_KW_RX.findall(txt)
+    if len(kws) >= 2 and _CORR_DRIVE_CHILD_RX.search(txt) and _CORR_DRIVEN_PARENT_RX.search(txt):
+        return "rating_pair"
+    if kws and _CORR_BRIEF_CITE_RX.search(txt):
+        return "brief_vs_delivered"
+    if _PHYS_OMITS_RX.search(txt):
+        return "existence"
+    if _PHYS_SINGULAR_RX.search(txt):
+        return "count"
+    return "other"
+
+
+def _corroborate_finding(state, issue):
+    """→ (verdict, shape, detail). verdict ∈ 'corroborated' | 'uncorroborated' | 'falsified'.
+    A finding corroborates ONLY when a deterministic check over the DELIVERED artefacts
+    confirms its claim; a deterministically FALSE claim is 'falsified'; anything the
+    matchers cannot decide is 'uncorroborated' (advisory — never scores)."""
+    shape = _finding_shape(issue)
+    if _physics_claim_falsified(state, issue):
+        return ("falsified", shape, "the claim is deterministically FALSE against the delivered state")
+    toks = _claim_tokens(issue)
+    if shape == "rating_pair":
+        for row in _rating_pair_sweep(state):
+            row_toks = {t for t in re.findall(r"[a-z]{4,}", str(row["parent_name"]).lower())}
+            dist = row_toks - set(_CORR_EQUIP_NOUNS)
+            if row_toks and row_toks <= toks and (not dist or (dist & toks)):
+                return ("corroborated", shape,
+                        f"delivered rows confirm the rating divergence on {row['parent_name']}")
+        return ("uncorroborated", shape,
+                "the claimed rating pair does not diverge beyond tolerance on any delivered row pair")
+    if shape == "brief_vs_delivered":
+        txt = f"{issue.get('issue') or ''} {issue.get('title') or ''}"
+        cited = {round(float(v), 6) for v in _CORR_KW_RX.findall(txt)}
+        brief_vals = cited & _brief_numbers(state)
+        if brief_vals:
+            for _mid, w in _iter_words_with_module(state):
+                nm = str(w.get("name_human") or "").lower()
+                nm_toks = {t for t in re.findall(r"[a-z]{4,}", nm)}
+                if not nm_toks or not (nm_toks <= toks):
+                    continue
+                kw = _word_kw(w)
+                if kw is None:
+                    continue
+                for bv in brief_vals:
+                    if bv > 0 and abs(kw - bv) / bv > 0.02:
+                        return ("corroborated", shape,
+                                f"brief pins {bv:g} kW; delivered row '{w.get('name_human')}' carries {kw:g} kW")
+        return ("uncorroborated", shape,
+                "the cited brief value / delivered divergence could not be confirmed on the rows")
+    if shape == "existence":
+        # not falsified (checked above) → verify the claim names something concrete that
+        # genuinely matches NO delivered row (the inverse of falsifier shape f).
+        raw = f"{issue.get('issue') or ''} {issue.get('title') or ''}"
+        quoted = [q for q in re.findall(r"'([^']{3,40})'", raw) + re.findall(r'"([^"]{3,40})"', raw)
+                  if re.search(r"[a-z]{3}", q, re.I)]
+        candidates = quoted or [raw]
+        for cand in candidates:
+            c_toks = [t for t in re.findall(r"[a-z]{4,}", cand.lower())]
+            nouns = [t for t in c_toks if _singularise(t) in
+                     {_singularise(n) for n in _CORR_EQUIP_NOUNS}]
+            quals = [t for t in c_toks if t not in _EXIST_GENERIC_TOKENS and t not in nouns]
+            if not nouns or not quals:
+                continue
+            hit = any(
+                any(_exist_tok_hit(n, rt) for rt in re.findall(r"[a-z0-9]{2,}", str(rn).lower()))
+                and any(any(_exist_tok_hit(q, rt) for rt in re.findall(r"[a-z0-9]{2,}", str(rn).lower()))
+                        for q in quals)
+                for n in nouns for rn in _delivered_row_names(state))
+            if not hit:
+                return ("corroborated", shape,
+                        f"no delivered row matches the claimed component ('{cand[:60]}') — genuine omission")
+        return ("uncorroborated", shape,
+                "the omission claim names no component the existence scan can decide")
+    if shape == "count":
+        # not falsified → the contract does NOT show ≥2; corroborated iff a matching
+        # *_count quantity exists and equals exactly 1 (the claimed deficiency).
+        nouns = [n for n in ("pump", "tank", "vessel", "blower", "compressor", "filter",
+                             "skid", "exchanger") if n in toks]
+        for noun in nouns:
+            quals = [t for t in toks if t != noun][:6]
+            for ck in ("orchestratorContract", "engineeringContract"):
+                qs = (state.get(ck) or {}).get("quantities")
+                if not isinstance(qs, dict):
+                    continue
+                for k, v in qs.items():
+                    kt = set(re.findall(r"[a-z0-9]+", k.lower()))
+                    if "count" in kt and noun in kt and any(q in kt for q in quals):
+                        val = (v or {}).get("value") if isinstance(v, dict) else v
+                        try:
+                            if float(str(val)) == 1:
+                                return ("corroborated", shape,
+                                        f"contract confirms {k} = 1 (the claimed single unit)")
+                        except (TypeError, ValueError):
+                            pass
+        return ("uncorroborated", shape, "no contract count confirms the claimed deficiency")
+    return ("uncorroborated", shape,
+            "no deterministic matcher corroborates this claim shape — advisory only")
+
+
+def _canonicalise_issues(state, issues) -> list:
+    """The scoring view: corroborated findings → their canonical, state-derived evidence
+    rows (rating_pair claims score through the FULL deterministic sweep — the CORE FIX
+    PRINCIPLE: one wrong rule is wrong for the whole class, and identical states must
+    yield identical rows); uncorroborated/falsified findings → ADVISORY notes (visible,
+    labelled, never score). Idempotent via the 'corroboration' marker."""
+    issues = [i for i in (issues or []) if isinstance(i, dict)]
+    if any(i.get("corroboration") for i in issues):
+        return issues  # already canonicalised (the chain wrote this critique)
+    scoring: list = []
+    advisory: list = []
+    swept_rating_pairs = False
+    for i in issues:
+        verdict, shape, detail = _corroborate_finding(state, i)
+        if verdict == "corroborated" and shape == "rating_pair":
+            swept_rating_pairs = True  # scored via the canonical sweep below (deduped)
+            continue
+        if verdict == "corroborated":
+            canon = dict(i)
+            canon["corroboration"] = "corroborated"
+            canon["shape"] = shape
+            canon["issue"] = f"{str(i.get('issue') or '')} [corroborated: {detail}]"
+            scoring.append(canon)
+            continue
+        adv = dict(i)
+        adv["corroboration"] = verdict
+        adv["shape"] = shape
+        adv["advisory"] = True
+        adv["issue"] = (f"ADVISORY ({verdict} by deterministic check — visible, never scores): "
+                        f"{str(i.get('issue') or '')}")
+        advisory.append(adv)
+    if swept_rating_pairs:
+        scoring = _rating_pair_sweep(state) + scoring
+    return scoring + advisory
+
+
+def canonicalise_physics_critique(state, critique) -> dict:
+    """PUBLIC: return a NEW critique object whose issues are the canonical scoring view
+    (see _canonicalise_issues) + a per-finding corroboration report. The chain calls this
+    on the final shipped critique so the file, state.physicsCritique, the Excel Risk
+    register and the floor all read the SAME deterministic set."""
+    critique = dict(critique) if isinstance(critique, dict) else {}
+    raw = [i for i in (critique.get("issues") or []) if isinstance(i, dict)]
+    report = []
+    for i in raw:
+        if i.get("corroboration"):
+            report = critique.get("corroboration_report") or []
+            break
+        verdict, shape, detail = _corroborate_finding(state, i)
+        report.append({"issue": str(i.get("issue") or "")[:200], "shape": shape,
+                       "verdict": verdict, "detail": detail})
+    critique["issues"] = _canonicalise_issues(state, raw)
+    critique["corroboration_report"] = report
+    critique["raw_issue_count"] = len(raw)
+    return critique
 
 
 def _product_class(state) -> str:
@@ -1014,6 +1348,15 @@ _PHYS_FP_VAGUE = re.compile(
 
 
 def _physics_high_is_design_defect(issue: dict, state=None) -> bool:
+    # CORROBORATION GATE (Tristan 2026-07-03, B3 extended to the finding set): a finding
+    # may SCORE only when a deterministic check over the delivered artefacts corroborates
+    # it. A canonicalised issue carries the verdict directly; a raw issue is corroborated
+    # on the fly when state is available. Uncorroborated → advisory, NEVER scores.
+    corr = issue.get("corroboration") if isinstance(issue, dict) else None
+    if corr == "corroborated":
+        return True
+    if corr in ("uncorroborated", "falsified"):
+        return False
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
     if _PHYS_FP_PAYLOAD.search(txt):
         return False  # the critic's INPUT was truncated — an engine I/O artifact, not a design defect
@@ -1021,14 +1364,18 @@ def _physics_high_is_design_defect(issue: dict, state=None) -> bool:
         return False  # a holistic advisory with no NAMED part — gate-33 false-positive discipline
     if state is not None and _physics_claim_falsified(state, issue):
         return False  # the critic's claim is deterministically FALSE (e.g. "module empty" but it has words)
+    if state is not None:
+        verdict, _shape, _detail = _corroborate_finding(state, issue)
+        return verdict == "corroborated"
     return True
 
 
 def check_physics_critic(state, rows, run_dir) -> list:
     tab = "Risk & Regulatory"
     out: list = []
+    issues = _physics_issues(state, run_dir)   # the CANONICAL corroborated scoring view
     highs = [
-        i for i in _physics_issues(state, run_dir)
+        i for i in issues
         if isinstance(i, dict) and str(i.get("severity", "")).lower() == "high"
         and _physics_high_is_design_defect(i, state)
     ]
@@ -1043,6 +1390,24 @@ def check_physics_critic(state, rows, run_dir) -> list:
             actual=f"{len(highs)} HIGH findings",
             expected="0 unresolved HIGH physics findings",
             source_rule="no HIGH-severity physics-critic finding may remain unresolved at ship",
+        ))
+    # UNCORROBORATED critic notes stay VISIBLE (honest) but NEVER score: severity INFO
+    # carries a 0 penalty in the per-tab scorecard (Tristan 2026-07-03 corroboration layer).
+    advisory = [i for i in issues if isinstance(i, dict)
+                and i.get("corroboration") in ("uncorroborated", "falsified")]
+    if advisory:
+        heads = [_clip(str(i.get("issue") or "(untitled)").replace(
+            "ADVISORY (uncorroborated by deterministic check — visible, never scores): ", ""), 70)
+            for i in advisory[:2]]
+        out.append(Finding(
+            tab=tab, check="advisory_critic_notes", severity="INFO",
+            message=(f"{len(advisory)} critic note(s) are UNCORROBORATED by any deterministic "
+                     f"check over the delivered artefacts — rendered as advisory, never scored: "
+                     + " | ".join(heads)),
+            actual=f"{len(advisory)} advisory notes",
+            expected="advisory notes are visible but carry no score penalty",
+            source_rule=("a critic finding may score only when corroborated by a deterministic "
+                         "check over delivered artefacts (B3 finding-set extension)"),
         ))
     return out
 
@@ -2391,7 +2756,10 @@ COVERED_TABS = {
     "Part names", "Line & velocity", "Panel schedule", "Glossary",
 }
 
-_SEVERITY_PENALTY = {"HIGH": 4, "MED": 2, "LOW": 1}
+_SEVERITY_PENALTY = {"HIGH": 4, "MED": 2, "LOW": 1,
+                     # INFO = an advisory note (e.g. an uncorroborated critic opinion):
+                     # VISIBLE on the tab, but it may never move a deterministic score.
+                     "INFO": 0}
 
 # Route an audit Finding.tab (audit-domain names) → its canonical Excel tab. First substring wins.
 _TAB_ROUTE = [
@@ -2545,8 +2913,13 @@ def _selftest() -> int:
             "installed_asp_gbp": 0,            # -> HIGH installed capex £0; bess -> MED no-revenue
             "raw_materials_bom_gbp": 1000,     # -> HIGH capex_reconciliation (1000 << bill 50009)
         },
+        # CORROBORATION LAYER (2026-07-03): a HIGH scores only when a deterministic
+        # check corroborates it. The first issue is a genuine-omission existence claim
+        # (no transformer skid ships anywhere in this fixture → corroborates); the
+        # second is an uncorroborable judgement → an ADVISORY note (never scores).
         "physicsCritique": {"issues": [
-            {"severity": "high", "title": "Transformer undersized 2x"},
+            {"severity": "high", "title": "Transformer undersized 2x",
+             "issue": "The design omits the step-up transformer skid the brief requires"},
             {"severity": "high", "issue": "Racks do not fit the container"},
             {"severity": "medium", "title": "minor"},
         ]},
@@ -2708,9 +3081,10 @@ def _selftest() -> int:
     scb = repb.scorecard()
 
     # The only legitimate finding in the clean fixture is the missing parts-ledger (MED).
-    # Remove that one and the rest must be empty -> verdict REVIEW (no HIGH).
-    expect(checksb == {"ledger_present"} or checksb <= {"ledger_present"},
-           f"B: only ledger_present allowed, got {checksb}")
+    # advisory_critic_notes is INFO (zero penalty): the fixture's 'cosmetic' low critic
+    # note is uncorroborated → an honest, visible, never-scoring advisory (2026-07-03).
+    expect(checksb <= {"ledger_present", "advisory_critic_notes"},
+           f"B: only ledger_present (+INFO advisory_critic_notes) allowed, got {checksb}")
     expect(scb["high"] == 0, f"B: expected 0 HIGH, got {scb}")
     expect(scb["verdict"] in ("REVIEW", "PASS"), f"B: expected REVIEW/PASS, got {scb}")
     expect(scb["ship_ok"] is True, f"B: expected ship_ok True, got {scb}")
@@ -2996,6 +3370,80 @@ def _selftest() -> int:
         {"status": "BESPOKE", "requirement": "Tank"}], "moduleDecomposition": {"modules": []}},
         {"severity": "high", "issue": "The design omits the chemical dosing tank"}) is False,
         "PHYS(f): an ALL-GENERIC row ('Tank') can never decide an existence falsification")
+
+    # ── proveCatch: DETERMINISTIC CORROBORATION LAYER (Tristan 2026-07-03) ───────
+    # B3 extended to the critic's FINDING SET: a finding SCORES only when a
+    # deterministic check over the delivered artefacts corroborates it; an
+    # uncorroborated finding is an advisory note that NEVER scores — both directions.
+    def _corr_word(cid, name, kw=None):
+        mods = [{"kind": "quantity", "value": "×1"}]
+        if kw is not None:
+            mods.append({"kind": "rating_primary", "value": f"{kw}kW"})
+        return {"name_human": name,
+                "content_character": {"character_id": cid, "name_human": name},
+                "modifier_characters": mods}
+
+    corr_state = {"moduleDecomposition": {"modules": [{"module": "mass_fluid", "sub_modules": [{"words": [
+        _corr_word("fert_pump_synth", "Fertigation Dosing Pump", 8),
+        _corr_word("fert_pump_synth_word__drive_motor", "Drive Motor", 11),
+        _corr_word("ro_hp_pump_synth", "Ro High Pressure Pump", 4),
+        _corr_word("ro_hp_pump_synth_word__drive_motor", "Drive Motor", 6),
+        _corr_word("softener_vessel_synth", "Softener Vessel"),
+    ]}]}]}}
+    claim_fert = {"severity": "high", "confidence": "high",
+                  "issue": "The Drive Motor for the Fertigation Dosing Pump is rated at 11 kW, "
+                           "but the parent pump is rated at 8 kW."}
+    claim_judgement = {"severity": "high", "confidence": "high",
+                       "issue": "The Softener Vessel is oversized for 350 litres of resin; "
+                                "typically a 700-800 litre vessel is sufficient."}
+    # (1) corroborated rating-pair FIRES (scores)
+    v1 = _corroborate_finding(corr_state, claim_fert)
+    expect(v1[0] == "corroborated" and v1[1] == "rating_pair",
+           f"CORR(1): the fertigation 8 kW-pump / 11 kW-motor claim must CORROBORATE (got {v1[:2]})")
+    expect(_physics_high_is_design_defect(claim_fert, corr_state) is True,
+           "CORR(1): a corroborated rating-pair HIGH must SCORE")
+    # (2) uncorroborated judgement NEVER scores (advisory) — the other direction
+    v2 = _corroborate_finding(corr_state, claim_judgement)
+    expect(v2[0] == "uncorroborated",
+           f"CORR(2): an oversize judgement call with no deterministic matcher must be UNCORROBORATED (got {v2[0]})")
+    expect(_physics_high_is_design_defect(claim_judgement, corr_state) is False,
+           "CORR(2): an uncorroborated finding must NEVER score, even at severity=high")
+    # (3) REPRODUCTION PROOF: two different LLM re-rolls over the SAME delivered state
+    #     canonicalise to IDENTICAL scoring rows (the v56c/v56d determinism fix).
+    reroll_a = [claim_fert, claim_judgement]                       # v56c-style: 1 pair + 1 judgement
+    reroll_b = [{"severity": "med", "confidence": "high",
+                 "issue": "The Drive Motor for the Ro High Pressure Pump is rated at 6 kW, "
+                          "but the parent pump is rated at 4 kW."}]  # v56d-style: different pair named
+    rows_a = [(r["severity"], r["issue"]) for r in _canonicalise_issues(corr_state, reroll_a)
+              if r.get("corroboration") == "corroborated"]
+    rows_b = [(r["severity"], r["issue"]) for r in _canonicalise_issues(corr_state, reroll_b)
+              if r.get("corroboration") == "corroborated"]
+    expect(rows_a == rows_b and len(rows_a) == 2,
+           f"CORR(3): different critic re-rolls over the SAME state must yield IDENTICAL canonical "
+           f"scoring rows via the full sweep (a={len(rows_a)}, b={len(rows_b)}, equal={rows_a == rows_b})")
+    # (4) a HEALTHY pair (within the 1.25× service tolerance) never fires the sweep,
+    #     and a rating-pair claim against it stays advisory (no manufactured defect).
+    healthy = {"moduleDecomposition": {"modules": [{"module": "m", "sub_modules": [{"words": [
+        _corr_word("p_synth", "Recirculation Pump", 10),
+        _corr_word("p_synth_word__drive_motor", "Drive Motor", 11),
+    ]}]}]}}
+    expect(_rating_pair_sweep(healthy) == [],
+           "CORR(4): a 10 kW pump with an 11 kW motor (ratio 1.10) is healthy — the sweep must be EMPTY")
+    claim_healthy = {"severity": "high", "issue": "The Drive Motor for the Recirculation Pump is "
+                     "rated at 11 kW but the pump is rated at 10 kW."}
+    expect(_corroborate_finding(healthy, claim_healthy)[0] == "uncorroborated",
+           "CORR(4): a rating-pair claim within the service tolerance must NOT corroborate")
+    # (5) existence claims: a GENUINE omission corroborates; INFO advisory carries no penalty
+    omit_claim = {"severity": "high", "issue": "The design omits the drain transfer pump required by the brief"}
+    v5 = _corroborate_finding(_v55_bom, omit_claim)
+    expect(v5[0] == "corroborated" and v5[1] == "existence",
+           f"CORR(5): a genuine omission (no pump row ships) must CORROBORATE via the existence scan (got {v5[:2]})")
+    expect(_SEVERITY_PENALTY.get("INFO") == 0,
+           "CORR(5): INFO (advisory) findings must carry a ZERO tab-score penalty")
+    # (6) idempotency: canonicalising an already-canonical set is a no-op
+    once = _canonicalise_issues(corr_state, reroll_a)
+    expect(_canonicalise_issues(corr_state, once) == once,
+           "CORR(6): canonicalisation must be idempotent (marker-guarded)")
 
     if failures:
         print("SELFTEST FAILED:")

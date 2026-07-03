@@ -54,6 +54,7 @@ import {
   computeScorecardFloor,
   buildBriefComplianceSection,
   buildUnresolvedCriticHighsSection,
+  buildPhysicsFidelitySection,
   complianceRowStatus,
 } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { CO2_MINERALISATION_PLAN } from './lib/orchestrator/class-plans/co2-mineralisation'
@@ -11634,6 +11635,80 @@ function checkQualityLoopInvariants(): Assertion[] {
         String((one.defects || [])[0] || '').includes('MDPE'),
       detail: `zero=${zero.score} one=${one.score} two=${two.score} floor=${oneDrags.floor}`,
     })
+  }
+
+  // QL9 (Tristan 2026-07-03): CRITIC DETERMINISM — B3 extended to the FINDING SET.
+  // physics_fidelity becomes a deterministic FACT section: it scores ONLY the
+  // CORROBORATED finding set (0 → 10; each HIGH −3, each MED −1; floor 2); the LLM's
+  // own opinion + uncorroborated notes are advisory annotations that never score.
+  {
+    const clean = buildPhysicsFidelitySection([], 6, 2)
+    const threeMed = buildPhysicsFidelitySection([
+      { severity: 'med', issue: 'Fertigation Dosing Pump 8 kW vs Drive Motor 11 kW' },
+      { severity: 'med', issue: 'Ro High Pressure Pump 4 kW vs Drive Motor 6 kW' },
+      { severity: 'med', issue: 'Drain Transfer Pump 2 kW vs Drive Motor 3 kW' },
+    ])
+    const oneHigh = buildPhysicsFidelitySection([{ severity: 'high', issue: 'MDPE tank on a 120 °C loop' }])
+    const floored = buildPhysicsFidelitySection([
+      { severity: 'high', issue: 'a' }, { severity: 'high', issue: 'b' }, { severity: 'high', issue: 'c' },
+    ])
+    const threeDrags = computeScorecardFloor([{ name: 'drawing_gates', score: 10 }, threeMed])
+    out.push({
+      id: 'QL9.physics_fidelity_scores_corroborated_only',
+      description: 'physics_fidelity: 0 corroborated→10 (LLM opinion is an annotation); 3 MED→7 (drags floor); 1 HIGH→7; 3 HIGH→floor 2',
+      passed:
+        clean.score === 10 &&
+        (clean.defects || []).some((d) => d.includes('6/10') && d.includes('never scores')) &&
+        (clean.defects || []).some((d) => d.includes('2 uncorroborated')) &&
+        threeMed.score === 7 && oneHigh.score === 7 && floored.score === 2 &&
+        threeDrags.floor === 7 &&
+        (threeMed.defects || []).every((d, i2) => i2 >= 3 || d.startsWith('CORROBORATED')),
+      detail: `clean=${clean.score} threeMed=${threeMed.score} oneHigh=${oneHigh.score} floored=${floored.score} floor=${threeDrags.floor}`,
+    })
+    // QL9b — REPRODUCTION PROOF (the v56c/v56d re-roll): two DIFFERENT critic finding
+    // sets over the SAME delivered state must canonicalise to IDENTICAL scoring rows,
+    // and an uncorroborated judgement must NEVER score. Bridges to the real python
+    // corroboration layer (dossier_audit.py) — the exact code the probe + workbook run.
+    try {
+      const probe = `
+import sys, os, json
+sys.path.insert(0, os.path.join('scripts', 'lib'))
+import dossier_audit as da
+def w(cid, name, kw=None):
+    mods = [{"kind": "quantity", "value": "x1"}]
+    if kw is not None:
+        mods.append({"kind": "rating_primary", "value": "%gkW" % kw})
+    return {"name_human": name, "content_character": {"character_id": cid}, "modifier_characters": mods}
+state = {"moduleDecomposition": {"modules": [{"module": "m", "sub_modules": [{"words": [
+    w("fert_pump_synth", "Fertigation Dosing Pump", 8),
+    w("fert_pump_synth_word__drive_motor", "Drive Motor", 11),
+    w("ro_pump_synth", "Ro High Pressure Pump", 4),
+    w("ro_pump_synth_word__drive_motor", "Drive Motor", 6),
+]}]}]}}
+reroll_a = [{"severity": "med", "issue": "The Drive Motor for the Fertigation Dosing Pump is rated at 11 kW, but the parent pump is rated at 8 kW."}]
+reroll_b = [{"severity": "med", "issue": "The Drive Motor for the Ro High Pressure Pump is rated at 6 kW, but the parent pump is rated at 4 kW."},
+            {"severity": "high", "issue": "The Softener Vessel is oversized for the resin volume."}]
+rows_a = [(r["severity"], r["issue"]) for r in da._canonicalise_issues(state, reroll_a) if r.get("corroboration") == "corroborated"]
+rows_b = [(r["severity"], r["issue"]) for r in da._canonicalise_issues(state, reroll_b) if r.get("corroboration") == "corroborated"]
+judgement_scores = da._physics_high_is_design_defect(reroll_b[1], state)
+print(json.dumps({"identical": rows_a == rows_b, "n": len(rows_a), "uncorroborated_scores": judgement_scores}))
+`
+      const o = execFileSync('python3', ['-c', probe], { encoding: 'utf8', cwd: resolve(__dirname, '..'), timeout: 30000 })
+      const r = JSON.parse(o.trim().split('\n').pop() || '{}')
+      out.push({
+        id: 'QL9b.reroll_canonicalises_identically',
+        description: 'two different critic re-rolls over the SAME state yield IDENTICAL canonical scoring rows; an uncorroborated HIGH never scores (python corroboration layer)',
+        passed: r.identical === true && r.n === 2 && r.uncorroborated_scores === false,
+        detail: `identical=${r.identical} rows=${r.n} uncorroborated_scores=${r.uncorroborated_scores}`,
+      })
+    } catch (err) {
+      out.push({
+        id: 'QL9b.reroll_canonicalises_identically',
+        description: 'two different critic re-rolls over the SAME state yield IDENTICAL canonical scoring rows (python corroboration layer)',
+        passed: false,
+        detail: `probe failed: ${(err as Error).message.slice(0, 160)}`,
+      })
+    }
   }
 
   return out

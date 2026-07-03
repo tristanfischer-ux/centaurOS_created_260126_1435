@@ -178,6 +178,46 @@ export function buildBriefComplianceSection(rows: ComplianceRowInput[]): Scoreca
 }
 
 /**
+ * Deterministic `physics_fidelity` section (advisory:false — it GATES).
+ *
+ * B3 EXTENDED TO THE FINDING SET (Tristan 2026-07-03): v56c vs v56d (identical code,
+ * identical delivered design, fresh runs) showed the LLM critic re-rolling 3→5
+ * findings and those findings leaking into scores (Risk 7.0→5.8, physics_fidelity 6,
+ * floor mirrors). The fix: a critic finding may SCORE only when CORROBORATED by a
+ * deterministic check over the delivered artefacts (dossier_audit.py corroboration
+ * layer — rating-pair sweep / brief-vs-delivered / existence / count matchers).
+ * This section scores the CORROBORATED set only:
+ *
+ * SCORING RULE: 0 corroborated findings → 10; each corroborated HIGH −3, each
+ * corroborated MED/LOW −1; floor 2. The LLM's own 1-10 opinion (and any
+ * uncorroborated notes) become ADVISORY ANNOTATIONS in defects[] — visible,
+ * honest, never scored.
+ */
+export function buildPhysicsFidelitySection(
+  corroborated: Array<{ severity: string; issue: string; where?: string }>,
+  llmOpinion?: number | null,
+  advisoryNoteCount?: number,
+): ScorecardSection {
+  const nHigh = corroborated.filter((f) => String(f.severity || '').toLowerCase() === 'high').length
+  const nOther = corroborated.length - nHigh
+  const score = corroborated.length === 0 ? 10 : Math.max(2, 10 - 3 * nHigh - 1 * nOther)
+  const defects = corroborated.map((f) =>
+    `CORROBORATED (${String(f.severity || 'med').toLowerCase()}): ${f.issue}${f.where ? ` — at ${f.where}` : ''}`.slice(0, 200),
+  )
+  if (typeof llmOpinion === 'number' && Number.isFinite(llmOpinion)) {
+    defects.push(
+      `advisory: the LLM critic's own physics opinion is ${llmOpinion}/10 — an annotation only, it never scores (B3)`.slice(0, 200),
+    )
+  }
+  if (advisoryNoteCount && advisoryNoteCount > 0) {
+    defects.push(
+      `advisory: ${advisoryNoteCount} uncorroborated critic note(s) render as advisory notes — visible, never scored`.slice(0, 200),
+    )
+  }
+  return { name: 'physics_fidelity', score, defects }
+}
+
+/**
  * Deterministic `unresolved_critic_highs` section (advisory:false — it GATES).
  *
  * Input: the physics-critic HIGH findings that SURVIVED the falsify-stale pass —

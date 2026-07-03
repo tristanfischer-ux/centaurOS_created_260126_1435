@@ -12596,15 +12596,30 @@ def _selftest() -> int:
     # (d) the defect-vocabulary net classifies a non-live-source row by its own text;
     # (e) a physics-critic I/O ARTIFACT (truncated payload) is NOT an engine-fixable
     #     design defect — a flaky LLM artifact must never flip the deterministic score. ═══
+    # CORROBORATION LAYER (2026-07-03, dossier_audit.py): a critic finding triages
+    # ENGINE-FIXABLE only when a deterministic check over the delivered artefacts
+    # corroborates it. The fixture's physics HIGH is therefore a rating-pair claim whose
+    # BOTH values live on the delivered words below (pump 4 kW ↔ drive motor 11 kW,
+    # paired by character-id lineage) — the exact corroborable shape.
     _risk_state = {
         "physicsCritique": {"issues": [
             {"severity": "high", "dimension": "engineering_plausibility",
-             "issue": "The transfer pump is rated for only 4 kW against an 11 kW duty",
+             "issue": "The Transfer Pump is rated 4 kW but its drive motor is rated 11 kW",
              "where": "mass_fluid_transport/sub_modules[0]/words[3]"},
             {"severity": "high", "dimension": "part_realism",
              "issue": "The design JSON payload is truncated mid-array; the module list is incomplete",
              "where": "design"},
         ]},
+        "moduleDecomposition": {"modules": [{"module": "mass_fluid_transport", "sub_modules": [{"words": [
+            {"name_human": "Transfer Pump",
+             "content_character": {"character_id": "transfer_pump_synth"},
+             "modifier_characters": [{"kind": "quantity", "value": "×1"},
+                                     {"kind": "rating_primary", "value": "4kW"}]},
+            {"name_human": "Drive Motor",
+             "content_character": {"character_id": "transfer_pump_synth_word__drive_motor"},
+             "modifier_characters": [{"kind": "quantity", "value": "×1"},
+                                     {"kind": "rating_primary", "value": "11kW"}]},
+        ]}]}]},
         "residualIssues": [{"gate": "price_floor", "summary": "3 lines priced under the class floor"}],
         "costSanity": {"ratio_to_nearest_edge": 2.4, "message": "capex 2.4x above the band edge"},
         "requirementsBom": [

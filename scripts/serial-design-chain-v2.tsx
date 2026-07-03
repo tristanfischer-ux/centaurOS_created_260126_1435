@@ -55,8 +55,10 @@ import {
   computeScorecardFloor,
   buildBriefComplianceSection,
   buildUnresolvedCriticHighsSection,
+  buildPhysicsFidelitySection,
   type ComplianceRowInput,
 } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
+import { createHash } from 'crypto'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
@@ -2435,16 +2437,133 @@ try:
                 has_critique = True
                 break
     if has_critique:
-        highs = [i for i in da._physics_issues(state, run_dir or None)
-                 if isinstance(i, dict) and str(i.get('severity', '')).lower() == 'high'
+        # da._physics_issues returns the CANONICAL corroborated scoring view (Tristan
+        # 2026-07-03): corroborated findings are deterministic, state-derived evidence
+        # rows; uncorroborated findings carry corroboration='uncorroborated' and NEVER
+        # score. Identical delivered designs -> identical rows, however the LLM re-rolled.
+        issues = [i for i in da._physics_issues(state, run_dir or None) if isinstance(i, dict)]
+        highs = [i for i in issues
+                 if str(i.get('severity', '')).lower() == 'high'
                  and da._physics_high_is_design_defect(i, state)]
         out['surviving_highs'] = [
             {'issue': str(i.get('issue') or i.get('title') or '(untitled)'),
              'where': str(i.get('where') or '')} for i in highs]
+        out['corroborated_findings'] = [
+            {'severity': str(i.get('severity') or 'med'),
+             'issue': str(i.get('issue') or '(untitled)'),
+             'where': str(i.get('where') or '')}
+            for i in issues if i.get('corroboration') == 'corroborated']
+        out['advisory_note_count'] = sum(
+            1 for i in issues if i.get('corroboration') in ('uncorroborated', 'falsified'))
+        # the LLM's own physics opinion — an ANNOTATION on the deterministic section, never a score
+        llm_opinion = None
+        try:
+            if run_dir and os.path.exists(os.path.join(run_dir, '7-5-physics-critique.json')):
+                with open(os.path.join(run_dir, '7-5-physics-critique.json'), 'r', encoding='utf-8') as _fh:
+                    _crit = json.load(_fh)
+            else:
+                _crit = state.get('physicsCritique') or {}
+            _sc = (_crit.get('scores') or {}).get('engineering_plausibility')
+            if isinstance(_sc, (int, float)):
+                llm_opinion = _sc
+        except Exception:
+            pass
+        out['critic_llm_opinion'] = llm_opinion
 except Exception as e:
     out['errors'].append('unresolved_critic_highs: %s' % e)
 print(json.dumps(out))
 `
+
+// ── Physics-critique canonicaliser probe (Tristan 2026-07-03) ─────────────────────
+// Runs dossier_audit.canonicalise_physics_critique on the FINAL shipped critique so
+// the file, state.physicsCritique, the Excel Risk register and the floor all read the
+// SAME deterministic finding set: corroborated findings become canonical, state-derived
+// evidence rows; uncorroborated findings become labelled ADVISORY notes (visible, never
+// score). Input on stdin: {"state": ..., "critique": ...}; output: the canonical critique.
+const CANONICALISE_CRITIQUE_PROBE_PY = `
+import sys, os, json
+scripts_dir = sys.argv[1]
+sys.path.insert(0, os.path.join(scripts_dir, 'lib'))
+import dossier_audit as da
+payload = json.load(sys.stdin)
+print(json.dumps(da.canonicalise_physics_critique(payload.get('state') or {}, payload.get('critique') or {})))
+`
+
+/** Canonicalise a physics critique against the delivered state via the python
+ *  corroboration layer. Returns the canonical critique, or null on failure (loud —
+ *  the caller then ships the raw critique rather than silently losing it). */
+function canonicalisePhysicsCritique(critique: any, state: any): any | null {
+  try {
+    const raw = execFileSync('python3', ['-c', CANONICALISE_CRITIQUE_PROBE_PY, __dirname], {
+      input: JSON.stringify({ state, critique }),
+      encoding: 'utf-8',
+      maxBuffer: 256 * 1024 * 1024,
+    })
+    return JSON.parse(raw)
+  } catch (err) {
+    console.error(`[chain] ⚠ physics-critique canonicalisation FAILED (shipping the raw critique): ${(err as Error).message.slice(0, 160)}`)
+    return null
+  }
+}
+
+// ── CRITIQUE STABILITY CACHE (Tristan 2026-07-03) ─────────────────────────────────
+// The physics critic is the last non-deterministic input to the scorecard: identical
+// designs got different finding sets on fresh runs (v56c 3 findings / v56d 5). Cache
+// the critique per DESIGN-HASH — the sha256 of the critic's exact input payload
+// (modules + brief + keyMetrics + productClass + contractTradeOffs + model; the prompt
+// is a pure function of these). Identical payload → the stored critique is reused
+// VERBATIM (no LLM call); the LLM only runs on a genuinely new design. Stored in the
+// run dir (7-5-physics-critique.hash) + a cross-run cache (out/.critique-cache/).
+function stableStringify(x: any): string {
+  if (x === null || typeof x !== 'object') return JSON.stringify(x)
+  if (Array.isArray(x)) return `[${x.map(stableStringify).join(',')}]`
+  const keys = Object.keys(x).sort()
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(x[k])}`).join(',')}}`
+}
+
+function critiquePayloadHash(opts: {
+  modules: any[]; brief: any; keyMetrics?: any; productClass: string
+  contractTradeOffs?: any; model?: string
+}): string {
+  return createHash('sha256').update(stableStringify({
+    modules: opts.modules ?? [],
+    brief: opts.brief ?? null,
+    keyMetrics: opts.keyMetrics ?? null,
+    productClass: opts.productClass ?? '',
+    contractTradeOffs: opts.contractTradeOffs ?? null,
+    model: opts.model ?? null,
+  })).digest('hex')
+}
+
+const CRITIQUE_CACHE_DIR = resolve(__dirname, '..', 'out', '.critique-cache')
+
+async function runPhysicsCriticCached(
+  opts: Parameters<typeof runPhysicsCritic>[0],
+  label: string,
+  runDirForHash?: string,
+): Promise<CritiqueReport | null> {
+  const hash = critiquePayloadHash(opts)
+  const cachePath = resolve(CRITIQUE_CACHE_DIR, `${hash}.json`)
+  try {
+    if (existsSync(cachePath)) {
+      const cached = JSON.parse(readFileSync(cachePath, 'utf-8'))
+      console.error(`[chain] physics-critic CACHE HIT (${label}): design-hash ${hash.slice(0, 12)}… — reusing the stored critique verbatim (no LLM call)`)
+      logAction({ step: 'physics_critic_cache', label, hit: true, hash })
+      if (runDirForHash) { try { writeFileSync(resolve(runDirForHash, '7-5-physics-critique.hash'), hash + '\n') } catch { /* best-effort */ } }
+      return cached
+    }
+  } catch { /* unreadable cache entry → fall through to a fresh critique */ }
+  const fresh = await runPhysicsCritic(opts)
+  if (fresh) {
+    try {
+      mkdirSync(CRITIQUE_CACHE_DIR, { recursive: true })
+      writeFileSync(cachePath, JSON.stringify(fresh, null, 2))
+    } catch { /* cache write is best-effort */ }
+    if (runDirForHash) { try { writeFileSync(resolve(runDirForHash, '7-5-physics-critique.hash'), hash + '\n') } catch { /* best-effort */ } }
+    logAction({ step: 'physics_critic_cache', label, hit: false, hash })
+  }
+  return fresh
+}
 
 function computeQualityScorecard(state: any): QualityScorecard {
   const sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }> = []
@@ -2624,6 +2743,19 @@ function computeQualityScorecard(state: any): QualityScorecard {
     if (Array.isArray(probe.surviving_highs)) {
       const uh = buildUnresolvedCriticHighsSection(probe.surviving_highs)
       sections.push({ name: uh.name, score: uh.score, defects: uh.defects ?? [] })
+    }
+    // Deterministic physics_fidelity (Tristan 2026-07-03, B3 extended to the finding
+    // set): scores ONLY the CORROBORATED finding set (deterministic evidence rows —
+    // identical designs → identical rows → identical score); the LLM's own opinion +
+    // uncorroborated notes are advisory annotations. The self-audit's LLM
+    // physics_fidelity section above stays advisory (B3) — this is the FACT section.
+    if (Array.isArray(probe.corroborated_findings)) {
+      const pf = buildPhysicsFidelitySection(
+        probe.corroborated_findings,
+        typeof probe.critic_llm_opinion === 'number' ? probe.critic_llm_opinion : null,
+        Number(probe.advisory_note_count ?? 0),
+      )
+      sections.push({ name: pf.name, score: pf.score, defects: pf.defects ?? [] })
     }
   } catch (err) {
     console.error(
@@ -4441,14 +4573,14 @@ async function main() {
   let skeletonCritique: CritiqueReport | null = null
   let skeletonFailFastTriggered = false
   try {
-    skeletonCritique = await runPhysicsCritic({
+    skeletonCritique = await runPhysicsCriticCached({
       modules: design.modules ?? [],
       brief: parsedResult.data,
       keyMetrics,
       productClass,
       apiKey,
       contractTradeOffs: buildContractTradeOffs(engineeringContract),
-    })
+    }, 'skeleton')
     if (skeletonCritique) {
       const s = skeletonCritique.scores
       console.error(`[chain] PHASE 4 skeleton critic: brief=${s.brief_to_design_fidelity}/10 plaus=${s.engineering_plausibility}/10 coh=${s.internal_coherence}/10 part=${s.part_realism}/10 hon=${s.honesty_signal}/10 (${skeletonCritique.latency_ms}ms)`)
@@ -4520,14 +4652,14 @@ async function main() {
   // Phase-2 auto-correct record (gate 33 self-correcting loop). SHADOW by default.
   let physicsCriticAutocorrect: PhysicsCriticAutocorrectResult | null = null
   try {
-    critique = await runPhysicsCritic({
+    critique = await runPhysicsCriticCached({
       modules: design.modules ?? [],
       brief: parsedResult.data,
       keyMetrics,
       productClass,
       apiKey,
       contractTradeOffs: buildContractTradeOffs(engineeringContract),
-    })
+    }, 'stage-7.5', outDir)
     if (critique) {
       console.error(`[chain] critic scored: brief=${critique.scores.brief_to_design_fidelity}/10 phys=${critique.scores.engineering_plausibility}/10 coh=${critique.scores.internal_coherence}/10 part=${critique.scores.part_realism}/10 hon=${critique.scores.honesty_signal}/10 (${critique.latency_ms}ms)`)
       console.error(`[chain] critic headline: ${critique.headline}`)
@@ -4597,14 +4729,16 @@ async function main() {
           try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_3) }
         },
         // Re-critique callback: re-run the Physics Critic on the (working) modules.
-        reCritique: async (mods: any[]) => runPhysicsCritic({
+        // Cached too — a mutated design hashes differently, so a genuine re-check
+        // still calls the LLM; only a byte-identical design reuses its critique.
+        reCritique: async (mods: any[]) => runPhysicsCriticCached({
           modules: mods,
           brief: parsedResult.data,
           keyMetrics,
           productClass,
           apiKey,
           contractTradeOffs: buildContractTradeOffs(engineeringContract),
-        }),
+        }, 'autocorrect-recheck'),
       })
       const r = physicsCriticAutocorrect
       console.error(`[chain] physics auto-correct (${r.mode}): selected ${r.selected} blocking finding(s) → corrected ${r.corrected}, declined ${r.declined}, unlocatable ${r.unlocatable}, still-uncorrectable ${r.uncorrectable_after_passes} after ${r.passes_run} pass(es)`)
@@ -8958,27 +9092,38 @@ async function main() {
       const _fs = JSON.parse(readFileSync(statePath, 'utf8'))
       const _mods = _fs?.moduleDecomposition?.modules ?? []
       if (Array.isArray(_mods) && _mods.length > 0) {
-        const _fresh = await runPhysicsCritic({
+        // CACHED per design-hash (Tristan 2026-07-03): an identical final design reuses
+        // its stored critique verbatim — the LLM's re-roll can no longer vary the
+        // shipped finding set between identical runs.
+        const _fresh = await runPhysicsCriticCached({
           modules: _mods,
           brief: parsedResult.data,
           keyMetrics,
           productClass,
           apiKey,
           contractTradeOffs: buildContractTradeOffs(engineeringContract),
-        })
+        }, 'final-rerun', outDir)
         if (_fresh) {
+          // CANONICALISE (corroboration layer, Tristan 2026-07-03): corroborated
+          // findings become deterministic state-derived evidence rows; uncorroborated
+          // ones become labelled ADVISORY notes (visible, never score). The Excel Risk
+          // register, dossier_audit and the floor all read THIS canonical set.
+          const _canon = canonicalisePhysicsCritique(_fresh, _fs) ?? _fresh
           // the ONE shipped critique object — file + state field written together
-          writeFileSync(resolve(outDir, '7-5-physics-critique.json'), JSON.stringify(_fresh, null, 2))
-          _fs.physicsCritique = _fresh
+          writeFileSync(resolve(outDir, '7-5-physics-critique.json'), JSON.stringify(_canon, null, 2))
+          _fs.physicsCritique = _canon
           _fs.physicsCritiqueProvenance = {
-            sample: 'final-design-rerun', written_once: true,
-            note: 'state.physicsCritique === 7-5-physics-critique.json (one critique sample per run; the Stage-7.5 pre-cleanup critique fed gate 33 only)',
+            sample: 'final-design-rerun', written_once: true, canonicalised: _canon !== _fresh,
+            note: 'state.physicsCritique === 7-5-physics-critique.json (one critique sample per run, corroboration-canonicalised; the Stage-7.5 pre-cleanup critique fed gate 33 only)',
             savedAt: new Date().toISOString(),
           }
           writeFileSync(statePath, JSON.stringify(_fs, null, 2))
-          const _high = _fresh.issues.filter(i => i.severity === 'high').length
-          console.error(`[chain] physics-critic RE-RUN on the final cleaned design → ${_high} HIGH (file + state.physicsCritique now the SAME object)`)
-          logAction({ step: 'physics_critic_rerun', ok: true, high: _high, state_updated: true })
+          const _issues: any[] = Array.isArray(_canon.issues) ? _canon.issues : []
+          const _high = _issues.filter((i: any) => i.severity === 'high' && i.corroboration !== 'uncorroborated' && i.corroboration !== 'falsified').length
+          const _nCorr = _issues.filter((i: any) => i.corroboration === 'corroborated').length
+          const _nAdv = _issues.filter((i: any) => i.corroboration === 'uncorroborated' || i.corroboration === 'falsified').length
+          console.error(`[chain] physics-critic RE-RUN on the final cleaned design → ${_high} HIGH · ${_nCorr} corroborated (score) · ${_nAdv} advisory (never score) — file + state.physicsCritique are the SAME canonical object`)
+          logAction({ step: 'physics_critic_rerun', ok: true, high: _high, corroborated: _nCorr, advisory: _nAdv, state_updated: true })
         }
       }
     }
