@@ -2131,12 +2131,28 @@ function synthWord(g: EquipGroup): WordLike & { _synthesized?: boolean } {
 // is a P&ID TAG, never a kW machine. The vocabulary mirrors ga_massing.py's instrument set
 // (the same list that drops these from the 3-D GA scene), so SIGHT (render-side) and SIZING
 // (contract-side) agree on what an instrument is. UNIVERSAL — keyed purely on the instrument
-// noun, no archetype table. (Deliberately excludes 'switch'/'indicator' to avoid catching
-// switchgear / indicator lights, which DO carry a real electrical rating.)
+// noun, no archetype table. (Deliberately excludes BARE 'switch'/'indicator' to avoid catching
+// switchgear / transfer·disconnect·changeover switches / indicator lights, which DO carry a
+// real electrical rating — the qualifier-gated PROCESS_SWITCH_INSTRUMENT_RE below covers the
+// instrument half of those nouns.)
 const FIELD_INSTRUMENT_RE =
   /\b(transmitters?|transducers?|sensors?|analy[sz]ers?|flow\s?meters?|gauges?|probes?|detectors?|thermocouples?|thermowells?|pyrometers?|manometers?|piezometers?|hygrometers?)\b/i
+// A PROCESS-VARIABLE SWITCH / INDICATOR (codema v60, BoM line I-104): a pressure / level /
+// temperature / flow / limit / float / proximity / vacuum / differential … SWITCH or
+// INDICATOR is a field instrument — a P&ID tag wired to the PLC, never a kW machine. The
+// bare nouns were DELIBERATELY excluded above (switchgear / disconnect·transfer·changeover
+// switches / indicator lights carry real ratings), which left a coverage gap the fuzzy
+// contract match fell through: the skeleton 'Low Pressure Switch' shared the 'pressure' stem
+// with the ro_high_pressure_pump contract group and was stamped its 4 kW rating + the
+// boxFromRatingKw floor box (600×510×660 mm) — the SAME instrument-never-kW physics family
+// as the 2026-06-27 "2 kW pressure transducer", reached through the excluded noun. Gated on
+// a MEASURED-VARIABLE qualifier immediately before the noun so every electrical exclusion
+// above still holds ('disconnect switch' / 'switchgear' / 'emergency stop switch' never match).
+const PROCESS_SWITCH_INSTRUMENT_RE =
+  /\b(pressure|vacuum|level|temperature|thermal|flow|limit|float|proximity|position|differential|speed|vibration)[\s-]*(switch(?:es)?|indicators?)\b/i
 function isFieldInstrumentByName(w: WordLike): boolean {
-  return FIELD_INSTRUMENT_RE.test(String(w.name_human ?? ''))
+  const nm = String(w.name_human ?? '')
+  return FIELD_INSTRUMENT_RE.test(nm) || PROCESS_SWITCH_INSTRUMENT_RE.test(nm)
 }
 // True for a word that is a field instrument by EITHER the synthesised `_instrument` flag
 // (synthesizeInstrumentation) OR its NAME (a skeleton / padding instrument word the flag
@@ -2146,6 +2162,50 @@ function isFieldInstrumentByName(w: WordLike): boolean {
 // transducer rated 2 kW — off by four orders of magnitude").
 function isInstrument(w: WordLike): boolean {
   return (w as { _instrument?: boolean })._instrument === true || isFieldInstrumentByName(w)
+}
+// ── INSTRUMENT MACHINE-ATTRIBUTE STRIP (codema v60 I-104 — the skip's other half) ──────────
+// The isInstrument skip below prevents a NEW fuzzy machine stamp, but a word that ALREADY
+// carries one (minted before the noun joined the family, or authored upstream) sailed
+// through untouched: v60's 'Low Pressure Switch' reached the BoM reading
+// '4 kW · 600x510x660 mm' with a rotating_electrical service — an instrument wearing a
+// machine's clothes (£76 Danfoss KPI35 catalogue pin vs a machine-priced £420 estimate).
+// Strip, at the SAME choke point as the skip, any machine kW/kVA rating, any machine-scale
+// 3-axis box (longest side > the instrument envelope — a real switch/transmitter body is
+// ≲0.3 m), and any stale rotating_electrical service from an instrument-family word,
+// recording provenance on source_detail. A rating with NO kW/kVA unit (an instrument's
+// measuring RANGE from instrumentWord()) and honest small library dims are untouched; a
+// real machine never enters (isInstrument gates the call). UNIVERSAL — no class table.
+const INSTRUMENT_MAX_ENVELOPE_MM = 400
+const MACHINE_BOX_DIM_RE = /^(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s*mm$/i
+function stripMachineAttrsFromInstrument(w: WordLike): number {
+  const mods = w.modifier_characters ?? []
+  const stripped: string[] = []
+  const keep = mods.filter((mc) => {
+    if (mc.kind === 'rating_primary' || mc.kind === 'rating_secondary') {
+      if (/k(?:w|va)\b/i.test(String(mc.unit ?? ''))) {
+        stripped.push(`${mc.value} ${mc.unit} rating`)
+        return false
+      }
+    }
+    if (mc.kind === 'dimension' || mc.kind === 'dimensions') {
+      const m = MACHINE_BOX_DIM_RE.exec(String(mc.value ?? '').trim())
+      if (m && Math.max(Number(m[1]), Number(m[2]), Number(m[3])) > INSTRUMENT_MAX_ENVELOPE_MM) {
+        stripped.push(`${String(mc.value).trim()} machine box`)
+        return false
+      }
+    }
+    if (mc.kind === 'service' && /"fabrication_family"\s*:\s*"rotating_electrical"/.test(String(mc.value ?? ''))) {
+      stripped.push('rotating_electrical service')
+      return false
+    }
+    return true
+  })
+  if (stripped.length === 0) return 0
+  w.modifier_characters = keep
+  const prior = String((w as { source_detail?: unknown }).source_detail ?? '').trim()
+  ;(w as { source_detail?: string }).source_detail =
+    `${prior ? prior + ' · ' : ''}instrument-guard: stripped machine attrs (${stripped.join('; ')}) — a field instrument is a P&ID tag, never a kW machine`
+  return stripped.length
 }
 // An ELECTRICAL POWER-DISTRIBUTION device word (transformer / switchgear / switchboard /
 // MCC / UPS / busbar / incomer / distribution board / genset / VFD). Codema v53: the
@@ -2372,9 +2432,13 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
   if (vessels.length === 0) return 0
   const primary = vessels.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
 
-  // idempotency: drop any instruments a prior pass added (re-derive cleanly)
+  // idempotency: drop any instruments a prior pass ADDED (re-derive cleanly). Keyed on
+  // the `_instrument` SYNTHESIS flag only — never the name-based family: a GROUNDED /
+  // library-matched instrument word (codema v60's 'Low Pressure Switch', a £76 Danfoss
+  // KPI35 catalogue pin) is authored equipment this pass never minted and must survive
+  // the re-derive (dropping it by name deletes its BoM line entirely).
   for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) {
-    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isInstrument(w))
+    if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => (w as { _instrument?: boolean })._instrument !== true)
   }
 
   const toAdd: WordLike[] = []
@@ -4680,7 +4744,12 @@ export function applyUniversalContractSizing(
         // four orders of magnitude", and the SAME default box that littered the GA). An
         // instrument is a 4-20 mA loop tag, not a machine; leave it un-sized here (it is a
         // P&ID tag downstream). UNIVERSAL — keyed on the instrument noun, any archetype.
-        if (isInstrument(w)) continue
+        // AND strip any machine attrs it ALREADY carries (stamped before the noun joined
+        // the family / authored upstream) — codema v60 I-104, see stripMachineAttrsFromInstrument.
+        if (isInstrument(w)) {
+          stripMachineAttrsFromInstrument(w)
+          continue
+        }
         const wStems = wordStems(w)
         if (wStems.length === 0) continue
         // ROLE COHERENCE (the one-charge rule's match-side half — codema v50 physics-critic

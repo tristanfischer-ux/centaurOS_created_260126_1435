@@ -708,6 +708,38 @@ _DELIBERATE_PRICE_CORRECTION_RE = re.compile(
     r"commodity-floor|micro-commodity ceiling|gate-21\s*>?\s*\d*×?\s*correction",
     re.I)
 
+# Basis vocabulary that states the line's rendered price IS a catalogue / distributor /
+# library quote ('catalogue', 'distributor catalogue (db:…)', 'library match') — anchored
+# at the START of the basis so 'catalogue-class budget' (a class-anchor ESTIMATE, not a
+# quote) never matches. Such a row must band against ITS OWN quote, never a parametric
+# estimate another pass rejected/overwrote (see the exemption note in _checks_cost).
+_CATALOGUE_PIN_BASIS_RE = re.compile(
+    r"^\s*(?:(?:distributor\s+)?catalogue(?![\w-])|library\s+match\b)", re.I)
+# The quote a 'distributor catalogue (db:mouser £45.68)' basis embeds — parse ONLY the
+# (db:…£N) form, never the '£X→£Y' lift figures a correction suffix may carry.
+_DB_PIN_QUOTE_RE = re.compile(r"\(db:[^)]*?£\s*([\d,]+(?:\.\d+)?)", re.I)
+
+
+def _own_catalogue_quote(pv: dict, basis: str) -> Tuple[Optional[float], str]:
+    """The catalogue-pinned row's OWN quote to band against (codema v60 I-104):
+    (1) a £ figure the basis itself embeds ('distributor catalogue (db:mouser £45.68)');
+    (2) else the pv's engine-B corpus quote (engine_b_reference_unit_cost_gbp) — but ONLY
+        when engine_b_estimate_source == 'corpus_price' (a REAL corpus/catalogue match,
+        untouched by a later cost-repair overwrite of price_estimate_gbp). A 'curve' /
+        rule-based parametric is NOT a quote — a catalogue-claiming row with no quote
+        behind it must stay flagged (BESS I-17: £140 'catalogue' vs a £6.5 curve estimate).
+    Returns (quote, source_label) or (None, '')."""
+    m = _DB_PIN_QUOTE_RE.search(basis)
+    if m:
+        v = num(m.group(1).replace(",", ""))
+        if v is not None and v > 0:
+            return v, "own distributor-catalogue quote (basis db pin)"
+    if str(pv.get("engine_b_estimate_source") or "").strip().lower() == "corpus_price":
+        v = num(pv.get("engine_b_reference_unit_cost_gbp"))
+        if v is not None and v > 0:
+            return v, "own catalogue quote (engine-B corpus)"
+    return None, ""
+
 
 def _checks_cost(state: dict, run_dir: str) -> List[Check]:
     out: List[Check] = []
@@ -761,6 +793,28 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
         # an in-band corrected row keeps the plain band-comparison detail (a passing
         # row's rendered text is byte-identical to the pre-exemption behaviour).
         exempt = grounded or (corrected and out_of_band and ref_src == "price_estimate_gbp")
+        # CATALOGUE-PIN re-band (codema v60 I-104, same self-contradiction family): a row
+        # whose basis states the price IS a catalogue quote ('catalogue' / 'distributor
+        # catalogue (db:…)' / 'library match') was banded against price_estimate_gbp — but
+        # when TWO partVerifications share one MPN the first-indexed pv wins the join, and
+        # a cost-repair pass may have OVERWRITTEN that pv's estimate with a parametric-
+        # physics figure the pricing pass never used (I-104: £76 KPI35 catalogue pin banded
+        # vs the DP-switch sub-component's £420 parametric-physics overwrite = x0.2 false
+        # FAIL). Re-band against the row's OWN quote instead — the basis-embedded (db:…£N)
+        # figure, else the pv's engine-B corpus quote. BOTH directions: a catalogue-basis
+        # row whose rendered price still diverges from its own quote FAILs (dishonest
+        # 'catalogue' label), and a catalogue claim with NO recoverable quote behind it
+        # keeps the plain parametric band-FAIL (BESS I-17 stays caught). Engages only where
+        # the band would otherwise FIRE and only on the weak parametric reference — a LIVE
+        # distributor reference is independent market evidence and is never displaced.
+        if (not exempt) and out_of_band and ref_src == "price_estimate_gbp" \
+                and _CATALOGUE_PIN_BASIS_RE.match(basis):
+            own, own_src = _own_catalogue_quote(pv, basis)
+            if own is not None:
+                ref, ref_src = own, own_src
+                ratio = unit_p / ref
+                out_of_band = (ratio > COST_BAND_FACTOR
+                               or ratio < (1.0 / COST_BAND_FACTOR))
         bad = (not exempt) and out_of_band
         out.append(Check(
             name=f"BoM {tag}: unit price within x{COST_BAND_FACTOR:g} of {ref_src}",
@@ -1866,9 +1920,28 @@ def _selftest() -> int:
              "line_gbp": 181, "requirement": "PCS skid",
              "basis": "catalogue · lifted £28→£181 to the engine corpus p25"},
             # UNCORRECTED out-of-band vs the estimate → still FAILS (the exemption never
-            # blesses a plain-catalogue absurd price)
+            # blesses a plain-catalogue absurd price; the pv carries no recoverable quote —
+            # engine_b_estimate_source is absent — so the catalogue-pin re-band stays out)
             {"tag": "I-1", "part": "Crowcon TXgard-IS+", "qty": 1, "unit_gbp": 900,
              "line_gbp": 900, "requirement": "Gas detector", "basis": "catalogue"},
+            # CATALOGUE-PIN + own corpus quote (codema v60 I-104): the joined pv's
+            # price_estimate_gbp was OVERWRITTEN to a parametric-physics £420 by a
+            # cost-repair pass on a same-MPN sibling, but the row's £76 IS the engine-B
+            # corpus quote (£75.75) → re-band against the OWN quote → PASS
+            {"tag": "I-2", "part": "Danfoss KPI-TEST-35", "qty": 1, "unit_gbp": 76,
+             "line_gbp": 76, "requirement": "Low pressure switch", "basis": "catalogue"},
+            # SAME pv shape but the rendered price diverges from its own quote too
+            # (£2500 vs the £75.75 quote = x33) → the catalogue label is dishonest →
+            # the re-band must NOT bless it → still FAILS
+            {"tag": "I-3", "part": "Danfoss KPI-TEST-36", "qty": 1, "unit_gbp": 2500,
+             "line_gbp": 2500, "requirement": "High pressure switch", "basis": "catalogue"},
+            # DISTRIBUTOR-CATALOGUE db pin: the basis EMBEDS its own quote (£45.68); the
+            # pv estimate says £420 (x0.11 → would false-FAIL) → re-band vs the embedded
+            # figure → PASS
+            {"tag": "V-1", "part": "Wago 221-TEST-415", "qty": 1, "unit_gbp": 46,
+             "line_gbp": 46, "requirement": "Lever connector",
+             "basis": "distributor catalogue (db:mouser £45.68) — supersedes parametric "
+                      "estimate £420.00"},
         ],
         "partVerifications": [
             {"word_id": "a", "word_name": "DC switch disconnector", "manufacturer": "ABB",
@@ -1878,6 +1951,16 @@ def _selftest() -> int:
              "price_estimate_gbp": 75000},
             {"word_id": "c", "word_name": "Gas detector", "manufacturer": "Crowcon",
              "part_number": "TXgard-IS+", "price_estimate_gbp": 150},
+            {"word_id": "d", "word_name": "Low pressure switch", "manufacturer": "Danfoss",
+             "part_number": "KPI-TEST-35", "price_estimate_gbp": 420,
+             "engine_b_estimate_source": "corpus_price",
+             "engine_b_reference_unit_cost_gbp": 75.75},
+            {"word_id": "e", "word_name": "High pressure switch", "manufacturer": "Danfoss",
+             "part_number": "KPI-TEST-36", "price_estimate_gbp": 420,
+             "engine_b_estimate_source": "corpus_price",
+             "engine_b_reference_unit_cost_gbp": 75.75},
+            {"word_id": "f", "word_name": "Lever connector", "manufacturer": "Wago",
+             "part_number": "221-TEST-415", "price_estimate_gbp": 420},
         ],
     }
     # tool claims: the WRONG declared output_field must not trump an exact same-name
@@ -1892,7 +1975,7 @@ def _selftest() -> int:
              "output_field": "system_thermal_dissipation_kw"},
         ]}]}
     xv_ledger = {
-        "grand_total_gbp": 1511,
+        "grand_total_gbp": 4133,  # Σ line_gbp: 430+181+900+76+2500+46
         "connectivity": {"n_process_total": 2, "n_process_connected": 2,
                          "n_instrument_total": 1, "n_instrument_associated": 1,
                          "n_concerns": 0},
@@ -1919,6 +2002,16 @@ def _selftest() -> int:
               "price must FAIL (the correction is not market evidence)")
         check(_has(checks, "BoM I-1: unit price", FAIL),
               "XVAL COST: an uncorrected out-of-band price must still FAIL")
+        # catalogue-pin re-band proveCatch (codema v60 I-104), BOTH directions:
+        check(_has(checks, "BoM I-2: unit price", PASS),
+              "CATALOGUE-PIN: a catalogue-basis row banded against a cost-repair-"
+              "overwritten estimate must re-band vs its OWN engine-B corpus quote (PASS)")
+        check(_has(checks, "BoM I-3: unit price", FAIL),
+              "CATALOGUE-PIN: a catalogue-basis row whose rendered price diverges from "
+              "its OWN quote must still FAIL (dishonest 'catalogue' label)")
+        check(_has(checks, "BoM V-1: unit price", PASS),
+              "CATALOGUE-PIN: a 'distributor catalogue (db:…£N)' basis must band against "
+              "the quote it EMBEDS, not the superseded parametric estimate (PASS)")
         check(_has(checks, "Tool output used: cell_heat_generation_kw", PASS),
               "XVAL PROVENANCE: an exact same-name contract match (45.1==45.1) must PASS even "
               "when the claim's declared output_field points at a different quantity")

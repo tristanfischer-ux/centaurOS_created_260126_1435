@@ -69,6 +69,76 @@ function run() {
   const pump = modsOf(modules, 'Transfer Pump')
   if (!hasKwRating(pump)) throw new Error('instrument-sizing: the real Transfer Pump lost its contract kW rating — the instrument skip over-reached')
 
+  // ── PROCESS-VARIABLE SWITCH family + machine-attr STRIP (codema v60 I-104) ──────────────
+  // THE BUG: FIELD_INSTRUMENT_RE deliberately excludes the bare 'switch' noun (switchgear /
+  // transfer switches carry real ratings), so the skeleton 'Low Pressure Switch' fell through
+  // the instrument skip, shared the 'pressure' stem with the ro_high_pressure_pump contract
+  // group, and was stamped its 4 kW rating + the 600×510×660 mm boxFromRatingKw floor box +
+  // a rotating_electrical service — an instrument rendered as a machine in the BoM
+  // ('Low Pressure Switch · 4 kW · 600x510x660 mm'). The fix: (1) qualifier-gated
+  // PROCESS_SWITCH_INSTRUMENT_RE joins pressure/level/temperature/…-switches to the
+  // instrument family; (2) stripMachineAttrsFromInstrument removes machine attrs an
+  // instrument-family word ALREADY carries, at the same choke point, with provenance.
+  const svcRot = JSON.stringify({ fluid: 'none', phase: 'none', pressure_bar: 0, fabrication_family: 'rotating_electrical', criticality: 'standard' })
+  const swModules: any = [{
+    module: 'safety_protection', sub_modules: [{
+      sub_module: 's', words: [
+        // pre-polluted instrument (the exact v60 state): the pass must STRIP all three attrs
+        { id: 'low_pressure_switch_word', name_human: 'Low Pressure Switch',
+          content_character: { character_id: 'low_pressure_switch', name_human: 'Low Pressure Switch' },
+          modifier_characters: [
+            { kind: 'quantity', value: '×1' },
+            { kind: 'dimension', value: '600x510x660 mm' },
+            { kind: 'rating_primary', value: '4', unit: 'kW' },
+            { kind: 'service', value: svcRot },
+          ] },
+        // clean instrument: the pass must not stamp it (the family skip)
+        { id: 'high_pressure_switch_word', name_human: 'High Pressure Switch',
+          content_character: { character_id: 'high_pressure_switch', name_human: 'High Pressure Switch' },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+        // the REAL machine that owns the 4.2 kW group: must KEEP/GET its rating (direction 2)
+        { id: 'ro_high_pressure_pump_word', name_human: 'Ro High Pressure Pump',
+          content_character: { character_id: 'ro_high_pressure_pump', name_human: 'Ro High Pressure Pump' },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+        // an ELECTRICAL switch (no process-variable qualifier): stays OUT of the family —
+        // its real kVA rating + cabinet box must survive untouched (direction 2b)
+        { id: 'changeover_switch_word', name_human: 'Changeover Switch',
+          content_character: { character_id: 'changeover_switch', name_human: 'Changeover Switch' },
+          modifier_characters: [
+            { kind: 'quantity', value: '×1' },
+            { kind: 'dimension', value: '2000x1700x2200 mm' },
+            { kind: 'rating_primary', value: '45', unit: 'kVA' },
+          ] },
+      ],
+    }],
+  }]
+  const swContract: any = { quantities: {
+    ro_high_pressure_pump_power_kw: { value: 4.2, unit: 'kW' },
+    ro_high_pressure_pump_throughput_m3_h: { value: 11, unit: 'm³/h' },
+    ro_high_pressure_pump_count: { value: 1, unit: '' },
+  } }
+  applyUniversalContractSizing(swModules as never[], swContract, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+  const hasRotSvc = (m: any[]) => m.some((x) => x.kind === 'service' && /rotating_electrical/.test(String(x.value ?? '')))
+  for (const sw of ['Low Pressure Switch', 'High Pressure Switch']) {
+    const m = modsOf(swModules, sw)
+    if (hasKwRating(m)) throw new Error(`instrument-sizing: "${sw}" carries a kW rating — a process-variable switch is a field instrument, never a kW machine (codema v60 I-104 regressed)`)
+    if (hasBoxDim(m)) throw new Error(`instrument-sizing: "${sw}" carries a WxDxH machine box — the boxFromRatingKw floor box must be stripped/never stamped on a process switch`)
+    if (hasRotSvc(m)) throw new Error(`instrument-sizing: "${sw}" carries a rotating_electrical service — the phantom machine service must be stripped from an instrument`)
+  }
+  const lpsWord = swModules[0].sub_modules[0].words.find((w: any) => w.id === 'low_pressure_switch_word')
+  if (!/instrument-guard: stripped machine attrs/.test(String(lpsWord?.source_detail ?? ''))) {
+    throw new Error('instrument-sizing: the strip must record provenance on source_detail (instrument-guard note missing)')
+  }
+  const roPump = modsOf(swModules, 'Ro High Pressure Pump')
+  if (!hasKwRating(roPump)) throw new Error('instrument-sizing: the real Ro High Pressure Pump lost its 4 kW contract rating — the switch-family fix over-reached (a real 4 kW pump must keep its rating)')
+  const co = modsOf(swModules, 'Changeover Switch')
+  if (!co.some((x) => x.kind === 'rating_primary' && /kva/i.test(String(x.unit ?? '')))) {
+    throw new Error('instrument-sizing: the electrical Changeover Switch lost its kVA rating — the process-switch qualifier gate leaked onto an electrical switch')
+  }
+  if (!co.some((x) => x.kind === 'dimension' && String(x.value) === '2000x1700x2200 mm')) {
+    throw new Error('instrument-sizing: the electrical Changeover Switch lost its cabinet dims — the machine-box strip leaked onto an electrical switch')
+  }
+
   // CONSOLIDATED LEVEL RANGE must span the TALLEST served vessel (Tristan 2026-06-29 physics HIGH:
   // a 0–1.4 m guided-radar consolidated onto a 1.6 m nutrient tank = unmonitored dead zone). The
   // host is the largest by CAPACITY (the wide shallow sump, 1.4 m) but the range must cover the
