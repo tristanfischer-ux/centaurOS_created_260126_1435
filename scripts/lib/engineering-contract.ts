@@ -13083,6 +13083,29 @@ registerArchetype('water_treatment', (brief: any) => {
   const clothFilterM3H = 80          // per cultivation room
   const drainPitVolM3 = 5            // 5,000 L drain pit per room
 
+  // ── ZONED-DISTRIBUTION GEOMETRY (the brief's OWN section-D layout, 2026-07-03) ──────────
+  // The brief states the ebb/flow zoning geometry explicitly: "2 departments, 10 cultivation
+  // tunnels per department, 5 layers per tunnel, 4 rows per layer, 15 containers per row …
+  // each 2,760 by 1,290 millimetres … 30 containers per valve, 200 electrically-actuated
+  // valves … two DN125 risers per cultivation room, each riser fitted with five 2.5-inch
+  // electric valves". These parsed values feed the UNIVERSAL zoned-delivery network rule
+  // (universal-contract-sizing.ts, mintDemandCoverage rule 8), which derives the parametric
+  // distribution allowance — mains / risers / zone laterals / drain-mirror lengths by DN —
+  // that the client's £895k ebb/flow irrigation section (D) is made of (HOLD-003 scope-in).
+  // Defaults = the Codema reference layout, so a missed regex still yields the right design.
+  const tunnelsPerDept = Math.max(1, Math.round(pick(/(\d{1,2})\s*(?:cultivation\s+)?tunnels?\s+per\s+department/i, 10)))
+  const layersPerTunnel = Math.max(1, Math.round(pick(/(\d{1,2})\s*layers?\s+per\s+tunnel/i, 5)))
+  const containersPerValve = Math.max(1, Math.round(pick(/(\d{1,3})\s*containers?\s+per\s+valve/i, 30)))
+  const containerLenMm = pick(/(\d[,.]?\d{3})\s*(?:by|×|x)\s*\d[,.]?\d{3}\s*millimetres/i, 2760)
+  const containerWidMm = pick(/\d[,.]?\d{3}\s*(?:by|×|x)\s*(\d[,.]?\d{3})\s*millimetres/i, 1290)
+  const zoneValveInches = pick(/(\d(?:\.\d)?)[\s-]?inch\s+(?:electric\s+)?valves?/i, 2.5)
+  // nominal-bore inches → DN (mm), standard pipe series
+  const zoneValveDnMm = (() => {
+    const map: Array<[number, number]> = [[1, 25], [1.25, 32], [1.5, 40], [2, 50], [2.5, 65], [3, 80], [4, 100]]
+    const hit = map.find(([inch]) => Math.abs(inch - zoneValveInches) < 0.13)
+    return hit ? hit[1] : Math.round(zoneValveInches * 25)
+  })()
+
   // ── UV-C DISINFECTION (Legionella / water-hygiene control) ────────────────────────────
   // The brief mandates "Legionella / water-hygiene control on stored and recirculated water".
   // Stored water (fresh + drain tanks) is recirculated to the departments for fertigation, so
@@ -13188,6 +13211,18 @@ registerArchetype('water_treatment', (brief: any) => {
     //    distributed-network costing follow-on — see closures note) ──
     cultivation_container_count: q(containerCount, '', 'dimensionless', 'rated', 'system', 'brief', '6,000 ebb/flow cultivation containers (2 dept × 10 tunnels × 5 layers × 4 rows × 15) — the irrigation network sizing driver'),
     actuated_distribution_valve_count: q(valveCount, '', 'dimensionless', 'rated', 'system', 'brief', '200 electrically-actuated 2.5-inch ebb/flow distribution valves (30 containers each)'),
+    // ── zoned-distribution geometry (brief-stated — consumed by the universal zoned-delivery
+    //    network rule to derive the parametric mains/riser/lateral/drain lengths by DN; key
+    //    names deliberately avoid the sizer's SUFFIX_RULES so none mints a phantom group) ──
+    distribution_delivery_groups: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} delivery departments — each A/B fertigation unit feeds its own department main (DN125 mainline per department)`),
+    distribution_branch_runs: q(departmentCount * tunnelsPerDept, '', 'dimensionless', 'rated', 'system', 'brief', `${tunnelsPerDept} cultivation tunnels per department × ${departmentCount} departments = ${departmentCount * tunnelsPerDept} branch (tunnel) runs`, ['distribution_delivery_groups'], `distribution_delivery_groups*${tunnelsPerDept}`),
+    distribution_levels_per_branch: q(layersPerTunnel, '', 'dimensionless', 'rated', 'system', 'brief', `${layersPerTunnel} cultivation layers per tunnel — one zone valve per layer per riser`),
+    distribution_risers_per_branch: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two DN125 riser connections per cultivation tunnel (brief: "two riser connections per tunnel")'),
+    distribution_positions_per_zone: q(containersPerValve, '', 'dimensionless', 'rated', 'system', 'brief', `${containersPerValve} containers per actuated valve section (the flood-fill zone)`),
+    distribution_zone_rows: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'each valve section feeds two rows of containers ("30 containers (two rows of 15) via a DN75 distribution line")'),
+    distribution_position_pitch_mm: q(containerLenMm, 'mm', 'length', 'rated', 'system', 'brief', `cultivation container length ${containerLenMm} mm (container ${containerLenMm} × ${containerWidMm} mm) — the along-row position pitch`),
+    distribution_position_width_mm: q(containerWidMm, 'mm', 'length', 'rated', 'system', 'brief', `cultivation container width ${containerWidMm} mm — sets the branch (tunnel) pitch across the rows`),
+    distribution_zone_valve_dn_mm: q(zoneValveDnMm, 'mm', 'dimension', 'rated', 'system', 'brief', `${zoneValveInches}-inch electric zone valves → DN${zoneValveDnMm} (the brief's stated valve bore)`),
     ro_recovery_percent: q(roRecoveryPct, '%', 'dimensionless', 'rated', 'system', 'brief', 'RO recovery factor (75%)'),
     // Named with the brief's own GAC/softener terminology (not "granular_carbon") so the brief
     // metric gac_softener_throughput matches its DELIVERED capacity — the design treats at

@@ -1733,6 +1733,21 @@ def _unit_operation_price(name: str, md: dict, q):
             return gbp, f"heat-exchanger parametric: {kw:.0f} kW duty × £220/kW + £4k frame/connections"
         return 14000.0, "heat-exchanger budget: process plate exchanger (duty unstated)"
 
+    # Distribution manifold station — the zoned-delivery per-group header (rule-8 principal:
+    # delivery header + isolation/non-return valves + gauge tappings + supports, fabricated
+    # thermoplastic/stainless). Priced from its delivery FLOW duty; supply-only materials
+    # (this bill is raw materials; the cost stack adds field labour). Without this family the
+    # word fell to the £3 'manifold' commodity floor (2026-07-03 — a £6 line for the plant's
+    # per-department distribution header).
+    if re.search(r"(distribution|delivery|zone)[_ ]?manifold|manifold[_ ]?(station|set|assembly|skid)", nm):
+        flow = _qv("distribution_manifold_throughput_m3_h", default=rating)
+        if flow and flow > 0:
+            gbp = 600.0 + flow * 25.0
+            return gbp, (f"distribution-manifold parametric: {flow:.0f} m³/h delivery duty × £25/(m³·h) "
+                         f"+ £600 base — fabricated header + isolation/non-return valves + gauge tappings "
+                         f"+ supports (supply-only materials; field labour in the cost stack)")
+        return 1500.0, "distribution-manifold budget: per-group delivery header station (duty unstated)"
+
     return None
 
 
@@ -2938,6 +2953,48 @@ def _selftest() -> int:
         if _structural_material_from_name(_nm) != _want:
             print(f"  FAIL structural material {_nm!r}: got {_structural_material_from_name(_nm)!r} want {_want!r}"); bad += 1
 
+    # (k) ZONED-DELIVERY PARAMETRIC NETWORK (client section D, 2026-07-03): the sizer's
+    # 'parametric — not routed' distribution quantities price as supply-only £/m lines;
+    # absent quantities → [] (every non-zoned archetype's bill byte-identical).
+    _dq = {
+        "distribution_network_length_km": {"value": 14.844, "source": "demand-coverage",
+                                           "source_detail": "parametric — not routed: total"},
+        "distribution_zone_lateral_length_m": {"value": 8280, "source": "demand-coverage",
+                                               "source_detail": "parametric — not routed: 200 zones × 41.4 m"},
+        "distribution_zone_lateral_dn_mm": {"value": 75},
+        "distribution_drain_riser_length_m": {"value": 4200},
+        "distribution_drain_riser_dn_mm": {"value": 110},
+        "distribution_position_connections": {"value": 6000, "source_detail": "parametric — one inlet per position"},
+        "distribution_zone_kits": {"value": 200},
+    }
+    _drows = _distribution_network_rows(_dq)
+    if len(_drows) != 4:
+        print(f"  FAIL distribution rows: want 4 (2 segments + inlets + zone kits), got {len(_drows)}"); bad += 1
+    else:
+        _lat = next((r for r in _drows if "zone laterals" in r["requirement"]), None)
+        _want_lat = round(8280 * _pvc_supply_rate_per_m(75))
+        if not _lat or _lat["line_gbp"] != _want_lat:
+            print(f"  FAIL lateral line £{_lat and _lat['line_gbp']} want £{_want_lat} "
+                  f"(8,280 m × £{_pvc_supply_rate_per_m(75)}/m supply share)"); bad += 1
+        if _lat and "parametric" not in _lat["basis"]:
+            print("  FAIL lateral basis must state the parametric provenance"); bad += 1
+        if _lat and "supply" not in _lat["basis"].lower():
+            print("  FAIL lateral basis must state the supply-only share (no install double-count)"); bad += 1
+        _ink = next((r for r in _drows if "inlet stubs" in r["requirement"]), None)
+        if not _ink or _ink["line_gbp"] != 6000 * round(_DIST_INLET_STUB_GBP):
+            print(f"  FAIL inlet-stub allowance £{_ink and _ink['line_gbp']} want £{6000 * round(_DIST_INLET_STUB_GBP)}"); bad += 1
+        if any(r["status"] != "PARAMETRIC" for r in _drows):
+            print("  FAIL every distribution row must carry the PARAMETRIC status (not ROUTED — it is NOT per-pipe routed)"); bad += 1
+        if any("TBD" in str(r.get("part", "")) for r in _drows):
+            print("  FAIL distribution rows must not add TBD parts (HOLD-002 must not inflate)"); bad += 1
+        if any(r.get("tag") != "—" for r in _drows):
+            print("  FAIL distribution rows must stay untagged ('—') — a new PD- prefix family "
+                  "would be an undocumented Glossary abbreviation"); bad += 1
+    if _distribution_network_rows({}) != []:
+        print("  FAIL distribution rows must be [] with no zoned-delivery quantities (BESS/SAF/CO2/RAS byte-identity)"); bad += 1
+    if _distribution_network_rows({"connected_electrical_load_kw": {"value": 53}}) != []:
+        print("  FAIL distribution rows must ignore unrelated quantities"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -2977,6 +3034,147 @@ def _stainless_rate_per_m(dn_mm: float) -> float:
     """Installed £/m for a 316L stainless line (aggressive service) at the given DN."""
     # roughly 4× the HDPE rate (the schedule's own £340/m at DN300 sits here)
     return round(_hdpe_rate_per_m(dn_mm) * 3.8 + 30, 0)
+
+
+# ── ZONED-DELIVERY DISTRIBUTION NETWORK (parametric — 2026-07-03, client section D) ────────
+# A zoned-delivery plant (ebb/flow irrigation, bench fertigation, any valve-sectioned
+# delivery grid) carries most of its cost in a repetitive FIELD distribution network the
+# Blender never routes (it routes plant-room equipment ties, not a 15,000 m rack grid).
+# The universal contract sizer (universal-contract-sizing.ts, mintDemandCoverage rule 8)
+# derives the network PARAMETRICALLY — segment lengths by DN family + connection counts,
+# each quantity carrying its derivation formula and 'parametric — not routed' provenance —
+# and THIS pass prices those quantities as their own BoM lines.
+#
+# PRICE BASIS — supply-only share of the EXISTING installed £/m model: this bill is the
+# RAW-MATERIALS bill (costStack.raw_materials_bom_gbp); the cost stack then adds field
+# assembly labour + installation + EPC on top of every line. Pricing the network at the
+# full supply+install £/m would double-count its installation. Thermoplastic distribution
+# pipework is installation-dominated: pipe + fittings + hangers SUPPLY is ~20 % of the
+# uk-2026 supply+install rate (DN75 PVC-U ≈ £13/m of the £66/m installed; DN110 ≈ £21 of
+# £104), so the supply share is stated per line and the stack carries the labour.
+_PVC_SUPPLY_SHARE = 0.20
+
+
+def _pvc_supply_rate_per_m(dn_mm: float) -> float:
+    """Supply-only £/m (pipe + fittings + hangers, ex-works) for PVC-U/HDPE distribution
+    pipework at the given DN = the supply share of the uk-2026 supply+install model."""
+    return round(_hdpe_rate_per_m(dn_mm) * _PVC_SUPPLY_SHARE, 1)
+
+
+# The parametric network segments, in fixed render order (deterministic bill).
+_DISTRIBUTION_SEGMENTS = [
+    ("distribution_main", "Zoned distribution — department delivery mains"),
+    ("distribution_riser", "Zoned distribution — delivery risers"),
+    ("distribution_zone_lateral", "Zoned distribution — zone laterals (flood-fill lines)"),
+    ("distribution_drain_riser", "Zoned distribution — drain/return risers (gravity)"),
+    ("distribution_drain_collection", "Zoned distribution — drain collection lines"),
+    ("distribution_drain_main", "Zoned distribution — main drain headers"),
+]
+
+# Per-connection supply allowances (£, ex-works fittings/stub materials — stated basis):
+#   inlet stub: a small-bore tee + stub + inlet fitting per served position (~£6)
+#   drain outlet: a gravity tee/branch fitting per 2 positions (~£9)
+#   zone kit: valve stub-in unions + supports per sectioning valve (~£40)
+_DIST_INLET_STUB_GBP = 6.0
+_DIST_DRAIN_OUTLET_GBP = 9.0
+_DIST_ZONE_KIT_GBP = 40.0
+
+
+def _distribution_network_rows(q):
+    """The parametric zoned-distribution network as BoM lines — one line per DN segment
+    family plus the per-connection allowances. Reads ONLY the `distribution_*` quantities
+    the universal sizer minted with 'parametric — not routed' provenance (absent on every
+    non-zoned archetype → returns [] and the bill is byte-identical). Lengths price at the
+    supply share of the existing installed £/m model (see _PVC_SUPPLY_SHARE)."""
+    q = q or {}
+
+    def _qv(key):
+        v = q.get(key)
+        if isinstance(v, dict):
+            v = v.get("value")
+        return float(v) if isinstance(v, (int, float)) and v > 0 else None
+
+    def _detail(key):
+        v = q.get(key)
+        return str(v.get("source_detail") or "") if isinstance(v, dict) else ""
+
+    if not _qv("distribution_network_length_km"):
+        return []
+    rows, i = [], 0
+
+    def _row(requirement, part, qty, unit_gbp, basis, extra=None):
+        nonlocal i
+        i += 1
+        r = {
+            # untagged ("—") like other non-canonical rows: inventing a new tag-prefix family
+            # (PD-) would add an undocumented abbreviation the Glossary audit rightly flags.
+            "tag": "—",
+            "requirement": requirement,
+            "status": "PARAMETRIC",
+            "part": part,
+            "qty": qty,
+            "unit_gbp": round(unit_gbp),
+            "line_gbp": round(unit_gbp) * int(qty),
+            "basis": basis,
+            "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
+        }
+        if extra:
+            r.update(extra)
+        rows.append(r)
+
+    for base, label in _DISTRIBUTION_SEGMENTS:
+        length_m = _qv(f"{base}_length_m")
+        dn = _qv(f"{base}_dn_mm")
+        if not length_m or not dn:
+            continue
+        rate = _pvc_supply_rate_per_m(dn)
+        installed_rate = _hdpe_rate_per_m(dn)
+        derivation = _detail(f"{base}_length_m")
+        _row(
+            f"{label} · DN{int(dn)} PVC-U · {length_m:,.0f} m",
+            f"DN{int(dn)} PVC-U pressure pipe + fittings + hangers, {length_m:,.0f} m (supply)",
+            1, length_m * rate,
+            f"parametric estimate — zoned-delivery distribution network (engineered allowance, "
+            f"NOT per-pipe routed; client distribution-section scope): {length_m:,.0f} m × "
+            f"£{rate:g}/m supply-only materials ({_PVC_SUPPLY_SHARE:.0%} of the uk-2026 "
+            f"supply+install £{installed_rate:.0f}/m @ DN{int(dn)}; installation labour is "
+            f"carried by the cost-stack field-install factors — no double count)"
+            + (f" · derivation: {derivation}" if derivation else ""),
+            extra={"length_m": round(length_m, 1), "size": f"DN{int(dn)}"},
+        )
+    inlets = _qv("distribution_position_connections")
+    if inlets:
+        _row(
+            f"Zoned distribution — delivery inlet stubs, one per served position · {inlets:,.0f} off",
+            "Small-bore PVC-U tee + stub + inlet fitting (supply)",
+            int(inlets), _DIST_INLET_STUB_GBP,
+            f"parametric estimate — zoned-delivery distribution network: {inlets:,.0f} served "
+            f"positions × £{_DIST_INLET_STUB_GBP:g} inlet-stub materials allowance (tee + stub "
+            f"+ inlet fitting, ex-works) · {_detail('distribution_position_connections')}",
+        )
+    drains = _qv("distribution_drain_outlet_connections")
+    if drains:
+        _row(
+            f"Zoned distribution — drain outlet connections (one per 2 positions) · {drains:,.0f} off",
+            "PVC-U gravity tee/branch outlet fitting (supply)",
+            int(drains), _DIST_DRAIN_OUTLET_GBP,
+            f"parametric estimate — zoned-delivery distribution network: {drains:,.0f} drain "
+            f"outlets × £{_DIST_DRAIN_OUTLET_GBP:g} gravity tee/branch materials allowance "
+            f"(ex-works) · {_detail('distribution_drain_outlet_connections')}",
+        )
+    kits = _qv("distribution_zone_kits")
+    if kits:
+        _row(
+            f"Zoned distribution — zone valve connection kits · {kits:,.0f} off",
+            "Zone valve stub-in: unions, supports, riser tie-in (supply; valve body + actuator priced on the actuated-valve assembly line)",
+            int(kits), _DIST_ZONE_KIT_GBP,
+            f"parametric estimate — zoned-delivery distribution network: {kits:,.0f} valve "
+            f"zones × £{_DIST_ZONE_KIT_GBP:g} connection-kit materials allowance; the "
+            f"actuated valve assemblies themselves are priced on their own BoM line "
+            f"(assembly family £/DN) — this kit is the pipework tie-in only, no double count "
+            f"· {_detail('distribution_zone_kits')}",
+        )
+    return rows
 
 
 # Endpoint NOUNS that make up the main high-flow recirculation LOOP (full recirc
@@ -4459,6 +4657,10 @@ def assemble(out_dir: str):
               f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})", file=sys.stderr)
 
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
+    # the PARAMETRIC zoned-delivery distribution network (mains/risers/laterals/drain mirror
+    # + connection allowances) — priced from the sizer's 'parametric — not routed' quantities;
+    # [] on every archetype without zoned-delivery signals (bill byte-identical).
+    rows += _distribution_network_rows(qcontract)
 
     # ── DISPLAY-ARITHMETIC CONSISTENCY (swarm-flagged £1 nits, 2026-06-20). A line built
     # as unit_gbp=round(x), line_gbp=round(x·qty) can show unit×qty ≠ line by up to £1

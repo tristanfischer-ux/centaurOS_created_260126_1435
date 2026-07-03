@@ -65,6 +65,7 @@ run "numeric-drift-matcher --selftest"       npx tsx scripts/lib/numeric-drift-m
 run "population-count --selftest"             npx tsx scripts/lib/orchestrator/generic/population-count-selftest.ts
 run "subassembly-class --selftest"           npx tsx scripts/lib/orchestrator/generic/subassembly-class-selftest.ts
 run "pump-capacity --selftest"               npx tsx scripts/lib/orchestrator/generic/pump-capacity-selftest.ts
+run "zoned-distribution --selftest"          npx tsx scripts/lib/orchestrator/generic/zoned-distribution-selftest.ts
 run "motorless-duplicate --selftest"         npx tsx scripts/lib/orchestrator/generic/motorless-duplicate-selftest.ts
 run "principal-dedup --selftest"             npx tsx scripts/lib/orchestrator/generic/principal-dedup-selftest.ts
 run "provenance-trace --selftest"            npx tsx scripts/lib/orchestrator/generic/provenance-trace.ts --selftest

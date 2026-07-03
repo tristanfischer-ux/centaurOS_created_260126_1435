@@ -565,6 +565,12 @@ const DEVICE_NOUNS = new Set([
   'chiller', 'boiler', 'degasser', 'filter', 'blower', 'compressor', 'reactor',
   'clarifier', 'separator', 'stripper', 'mixer', 'press', 'membrane', 'sump',
   'basin', 'cone', 'scrubber', 'cyclone', 'centrifuge', 'hopper', 'silo', 'drum',
+  // 'manifold' — a distribution manifold station is real process equipment (headers +
+  // isolation/non-return valves); needed so the zoned-delivery rule-8 principal
+  // (distribution_manifold_count + _throughput_m3_h) is synthesisable. The only pre-existing
+  // `*manifold*` quantity keys are `_line_flow_m3_h` service duties, which buildGroups skips,
+  // so no other archetype gains or loses a group from this noun. (2026-07-03)
+  'manifold',
 ])
 // The same device nouns reduced to the 5-char STEM form (matching significantStems), used as the
 // universal join key for the per-unit↔aggregate volume reconcile in buildGroups: a `_each_m3`
@@ -740,6 +746,11 @@ const STORAGE_VESSEL_NOUN_RE = /\btanks?\b|\bvessels?\b|\bsilos?\b|\breservoirs?
 // stamps the reserve count onto the grounded tank). Only a word that FULLY contains the
 // group's stems (its own synth word on a re-run) may match it.
 const RESERVE_COVERAGE_PHRASE_RE = /(^|_)reserve_tank$/i
+// rule-8 zoned-network principal (the per-group distribution manifold) — like the rule-6
+// reserve tank, its group must only ever be adopted by a word that FULLY names it: a 1-stem
+// 'distr' overlap ("Flow Distribution Plates", "Power Distribution Block") must neither
+// inherit its ×N count + flow box nor suppress its synthesis via matched.add().
+const ZONED_NETWORK_PRINCIPAL_RE = /(^|_)distribution_manifold$/i
 
 // ── cleanup (Round 3): physics-first BoM — drop the skeleton's leftover junk ──
 // Small generic detailed-design filler that is never PRINCIPAL equipment (keeps it
@@ -765,7 +776,7 @@ function isPlaceholder(w: WordLike): boolean {
 // of a pump is identical in any plant — so no per-class table. The component prices SUM
 // to the equipment cost; the contract's installed-cost anchor becomes a cross-check, not
 // the source. Nothing is allocated; every line traces to the parent's computed physics.
-interface ParentPhysics { kw: number; m3: number; m3h: number; diaM: number; htM: number; qty: number; motorKwOverride?: number }
+interface ParentPhysics { kw: number; m3: number; m3h: number; diaM: number; htM: number; qty: number; motorKwOverride?: number; motorKwPinned?: boolean }
 interface SubSpec { name: string; derive: (p: ParentPhysics) => { size?: string; rating?: { v: number; u: string }; gbp: number } }
 
 function parentQty(w: WordLike): number {
@@ -808,36 +819,42 @@ const R2 = (n: number) => Math.round(n)
 const FLOW_PUMP_DEFAULT_BAR = 2.5
 const FLOW_PUMP_EFF = 0.62
 // Standard IEC three-phase motor frames (kW). You cannot buy a "9.653 kW" motor — a real motor is
-// SELECTED at the next standard frame ABOVE the required power with a service margin. Rounding the
-// derived shaft power up to the next frame (×1.15 service factor) gives the honest NAMEPLATE rating
-// the physics critic checks against (90 m³/h @ 3.5 bar → ~8.75 kW hydraulic / ~12 kW shaft @ η0.72 →
-// 15 kW frame) instead of a bare hydraulic number that reads as undersized. UNIVERSAL — any motor.
+// SELECTED at the next standard frame at or above the required power. SINGLE ROUNDING ONLY
+// (Tristan 2026-07-03): the old rule stacked a ×1.15 service factor ON TOP of the frame
+// rounding (a double margin) — the tool's 9.653 kW motor became 11.1 → a 15 kW frame, and a
+// brief-pinned 7.5 kW Lowara e-SHE became 8.6 → an 11 kW frame — tripping the deterministic
+// rating-pair corroboration (>1.25× motor-service tolerance) on v56c/v56d (fertigation
+// 11-vs-8, RO 5.5-vs-4.2, drain 3-vs-2 → Risk 7.5 / physics_fidelity 7 / floor 7). The frame
+// step IS the service margin: a computed requirement already carries the tool's own
+// efficiency terms, and a brief-pinned rating is a NAMEPLATE (honoured exactly — see
+// motorKwPinned; the brief-pinned protection family: never exceed a pin by stacked margins).
 const IEC_MOTOR_FRAMES_KW = [
   0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200,
   250, 315, 355, 400, 450, 500, 560, 630, 710, 800, 900, 1000,
 ]
-const MOTOR_SERVICE_FACTOR = 1.15
 function nextMotorFrameKw(kw: number): number {
   if (!(kw > 0)) return kw
-  const need = kw * MOTOR_SERVICE_FACTOR
-  for (const f of IEC_MOTOR_FRAMES_KW) if (f >= need - 1e-9) return f
-  return Math.ceil(need)
+  for (const f of IEC_MOTOR_FRAMES_KW) if (f >= kw - 1e-9) return f
+  return Math.ceil(kw)
 }
 const motorKw = (p: ParentPhysics) =>
-  nextMotorFrameKw(
-    (p.motorKwOverride && p.motorKwOverride > 0)
-      ? p.motorKwOverride
-      : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88)),
-  )
+  (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned)
+    ? p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
+    : nextMotorFrameKw(
+      (p.motorKwOverride && p.motorKwOverride > 0)
+        ? p.motorKwOverride
+        : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88)),
+    )
 
 // Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
 // quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The
 // hydraulic sizing tool (process:/irrigation:pump-sizing) emits *_motor_kw / *_power_kw for
-// pumps across EVERY process archetype, so this is universal — no per-class table.
-function motorKwFromContract(w: WordLike, quantities: Record<string, number>): number {
+// pumps across EVERY process archetype, so this is universal — no per-class table. Returns
+// the matched KEY too so the caller can test brief-pinned provenance (motorKwPinned).
+function motorKwFromContract(w: WordLike, quantities: Record<string, number>): { kw: number; key: string } {
   const stems = wordStems(w).filter((s) => !['synth', 'word', 'system', 'unit', 'assembly'].includes(s))
-  if (stems.length < 2) return 0 // need ≥2 distinctive stems (e.g. irrigation+pump) to bind unambiguously
-  let best = 0, bestScore = 1
+  if (stems.length < 2) return { kw: 0, key: '' } // need ≥2 distinctive stems (e.g. irrigation+pump) to bind unambiguously
+  let best = 0, bestKey = '', bestScore = 1
   for (const [k, v] of Object.entries(quantities)) {
     if (!(v > 0)) continue
     if (!/_(motor_kw|motor_power_kw|power_kw|drive_kw)$/.test(k)) continue
@@ -845,9 +862,21 @@ function motorKwFromContract(w: WordLike, quantities: Record<string, number>): n
     // 'irrigation' (key) ≡ 'irrig' (word stem) — otherwise nothing ever binds.
     const ktoks = new Set(k.toLowerCase().split(/[^a-z0-9]+/).map(stem))
     const overlap = stems.reduce((n, s) => n + (ktoks.has(s) ? 1 : 0), 0)
-    if (overlap >= 2 && overlap > bestScore) { bestScore = overlap; best = v }
+    if (overlap >= 2 && overlap > bestScore) { bestScore = overlap; best = v; bestKey = k }
   }
-  return best
+  return { kw: best, key: bestKey }
+}
+
+/** The contract-quantity keys whose value the BRIEF pinned (source === 'brief') — a pinned
+ *  machine rating is a NAMEPLATE the design must honour exactly (brief-pinned protection:
+ *  change the part to meet the demand, never exceed a pin by stacked margins). */
+export function briefPinnedQuantityKeys(contract?: ContractInProgress): Set<string> {
+  const out = new Set<string>()
+  const q = (contract as { quantities?: Record<string, unknown> } | undefined)?.quantities ?? {}
+  for (const [k, v] of Object.entries(q)) {
+    if (v && typeof v === 'object' && String((v as { source?: unknown }).source ?? '') === 'brief') out.add(k)
+  }
+  return out
 }
 
 // ── DEMAND-COVERAGE COMPLETENESS (the omission-side counterpart of principal-emitter
@@ -1519,6 +1548,195 @@ export function mintDemandCoverage(
         `corroborated by ${corrKey} = ${corrVal} m³/h — the explicit system total, so no reader mistakes the per-unit figure for the delivery`)
     }
   }
+  // ── rule 8: ZONED-DELIVERY DISTRIBUTION NETWORK (parametric — Tristan 2026-07-03, the
+  // fischer-codema client section D £895k vs ~£158k modelled HOLD-003). A plant that delivers
+  // to N VALVE-SECTIONED ZONES (an ebb/flow irrigation grid, a fertigation bench network, any
+  // zoned sprinkler/delivery loop) carries most of its cost in the DISTRIBUTION network —
+  // mains, risers, zone laterals, drain/return mirror — which is never per-pipe ROUTED by the
+  // Blender (it routes plant-room equipment ties, not a 15,000 m field grid). This rule mints
+  // the network as a PARAMETRICALLY-DERIVED engineered allowance: lengths by DN family +
+  // connection counts, every value carrying its derivation formula in source_detail and
+  // 'parametric — not routed' provenance, plus the per-department distribution-manifold
+  // principal via the normal buildGroups path (so drawings/schedules pick it up naturally).
+  // KEYED ON ZONED-DELIVERY SIGNALS ONLY (never a class table):
+  //   (a) a zone-valve population — a `*valve*_count` quantity carrying a zoning qualifier
+  //       token (actuated / zone / distribution / section), ≥ 8 zones;
+  //   (b) a delivery-flow basis — the brief's `…_per_<group>` flow metric resolved against
+  //       the design's ONE delivered flow in that family (the rule-4b derivation: the split
+  //       count D = system ÷ per-group only when it divides cleanly), or an explicit
+  //       `distribution_delivery_groups` quantity + the largest delivered flow.
+  //   No zone valves (BESS / SAF / CO₂ / RAS) or no delivered-flow basis → strict
+  //   byte-identical no-op (never fabricate — the honest-out-of-scope hold stays).
+  // GEOMETRY: brief-stated zoning quantities when the contract carries them
+  // (distribution_positions_per_zone / _zone_rows / _position_pitch_mm / _levels_per_branch /
+  // _branch_runs / _risers_per_branch — generic distribution vocabulary, emitted by any
+  // builder that parses them from its brief), with stated standard-layout fallbacks.
+  // HYDRAULICS: DN per segment from the flow-split duties at standard service velocities
+  // (delivery mains/risers ≤1.3 m/s surge-limited on cycling valve networks; zone laterals
+  // ≤3.0 m/s short-duration flood-fill; gravity drains ≤1.4 m/s; main drain headers ≤0.8 m/s
+  // part-full equivalent), d = √(4Q/πv), snapped to the PVC-U metric ladder. Idempotent —
+  // the `distribution_network_length_m` sentinel + mint()'s never-overwrite guarantee.
+  {
+    const r8Keys = Object.keys(quantities)
+    const qpos = (k: string): number => (Number.isFinite(quantities[k]) && quantities[k] > 0 ? quantities[k] : 0)
+    // (a) the zone-valve population
+    let zoneValveKey = ''
+    let zoneCount = 0
+    for (const k of r8Keys) {
+      if (!/valve\w*_count$/.test(k)) continue
+      if (!/(actuat|zone|distribut|section)/.test(k)) continue
+      const v = quantities[k]
+      if (Number.isFinite(v) && v >= 8 && v > zoneCount) { zoneCount = Math.round(v); zoneValveKey = k }
+    }
+    if (zoneCount >= 8 && !Object.prototype.hasOwnProperty.call(quantities, 'distribution_network_length_km')) {
+      // (b) delivery-flow basis: per-group brief metric → the ONE delivered flow in its family
+      let sysFlow = 0
+      let groups = 0
+      let flowBasis = ''
+      for (const met of briefMetrics) {
+        const bKey = String(met?.key_metric ?? met?.metric ?? met?.name ?? '').toLowerCase().trim()
+        const perIdx = bKey.indexOf('_per_')
+        if (perIdx < 0) continue
+        if (matcherMetricFamily(met, bKey) !== 'flow_m3h') continue
+        const target = Number(met?.value)
+        if (!Number.isFinite(target) || target <= 0) continue
+        const core = [...matcherIdentityTokens(matcherNormName(bKey.slice(0, perIdx)))]
+          .filter((t) => !METRIC_QUALIFIER_TOKENS.has(t)).map(depluralToken)
+        if (core.length === 0) continue
+        const coreSet = new Set(core)
+        const cands: Array<{ key: string; value: number }> = []
+        for (const k of r8Keys) {
+          const v = quantities[k]
+          if (!Number.isFinite(v) || v <= 0) continue
+          if (!/_(m3_h|m3_hr|m3_per_hr)$/.test(k) || SERVICE_LINE_FLOW_KEY_RE.test(k)) continue
+          if (FLOW_ECHO_TOKEN_RE.test(k) || /(^|_)(calc|computed)_/i.test(k)) continue
+          // a rule-4/rule-7 RE-PUBLICATION (`…_delivered_m3_h`, `…_per_<noun>_delivered_…`,
+          // `…_total_m3_h`) restates a flow that already exists under its source key — counting
+          // it would make the ONE-delivered-flow test ambiguous against its own derivation.
+          if (/_delivered_(m3_h|m3_hr|m3_per_hr)$/.test(k) || /_per_[a-z0-9]+_delivered_/.test(k)
+            || /_total_(m3_h|m3_hr|m3_per_hr)$/.test(k)) continue
+          const kt = new Set((k.toLowerCase().match(/[a-z]+/g) ?? []).map(depluralToken))
+          if ([...coreSet].some((t) => kt.has(t))) cands.push({ key: k, value: v })
+        }
+        if (cands.length !== 1) continue // ambiguous / no delivered basis → never a guess
+        const raw = cands[0].value / target
+        const sh = Math.round(raw)
+        if (!(sh >= 1 && Math.abs(raw - sh) <= 0.05)) continue // not a clean per-group split
+        sysFlow = cands[0].value
+        groups = sh
+        flowBasis = `${cands[0].key} = ${cands[0].value} m³/h delivered ÷ ${sh} groups (the ${bKey} = ${target} m³/h per-group brief metric)`
+        break
+      }
+      if (sysFlow <= 0 && qpos('distribution_delivery_groups') >= 1) {
+        // explicit builder opt-in: the delivery-group count is a stated quantity
+        groups = Math.round(qpos('distribution_delivery_groups'))
+        for (const k of r8Keys) {
+          const v = quantities[k]
+          if (!Number.isFinite(v) || v <= 0) continue
+          if (!/_(m3_h|m3_hr|m3_per_hr)$/.test(k) || SERVICE_LINE_FLOW_KEY_RE.test(k)) continue
+          if (FLOW_ECHO_TOKEN_RE.test(k) || /(^|_)(calc|computed)_/i.test(k)) continue
+          if (v > sysFlow) { sysFlow = v; flowBasis = `${k} = ${v} m³/h delivered (largest delivered flow; distribution_delivery_groups = ${groups})` }
+        }
+      }
+      if (sysFlow > 0 && groups >= 1) {
+        const groupFlow = Math.round((sysFlow / groups) * 100) / 100 // the open-zone fill duty (one zone open per group)
+        // geometry — brief-stated quantities first, stated standard-layout fallbacks second
+        let servedPositions = 0
+        for (const k of r8Keys) {
+          if (!/(container|tray|bench|position|pot|plot)s?_count$/.test(k)) continue
+          const v = quantities[k]
+          if (Number.isFinite(v) && v >= 2 * zoneCount && v > servedPositions) servedPositions = Math.round(v)
+        }
+        const posPerZone = qpos('distribution_positions_per_zone')
+          || (servedPositions > 0 ? servedPositions / zoneCount : 24)
+        const zoneRows = qpos('distribution_zone_rows') || 2
+        const pitchM = (qpos('distribution_position_pitch_mm') || 2500) / 1000
+        const widthM = (qpos('distribution_position_width_mm') || 1200) / 1000
+        const levels = Math.max(1, Math.round(qpos('distribution_levels_per_branch') || 1))
+        const risersPerBranch = Math.max(1, Math.round(qpos('distribution_risers_per_branch') || 2))
+        const branches = Math.max(groups, Math.round(qpos('distribution_branch_runs')
+          || (levels > 1 ? zoneCount / levels / risersPerBranch : Math.sqrt(zoneCount))))
+        const hasDrainReturn = r8Keys.some((k) => /(^|_)(drain|return|reclaim)/.test(k))
+        // hydraulics — DN per segment from the flow-split duty at its service velocity
+        const PVC_DN_LADDER = [50, 63, 75, 90, 110, 125, 160, 200, 250, 315, 400]
+        const dnFor = (m3h: number, vMs: number): number => {
+          const dMm = Math.sqrt((4 * (m3h / 3600)) / (Math.PI * vMs)) * 1000
+          return PVC_DN_LADDER.find((d) => d >= dMm) ?? PVC_DN_LADDER[PVC_DN_LADDER.length - 1]
+        }
+        const R1 = (x: number): number => Math.round(x * 10) / 10
+        // segment lengths (standard layout arithmetic — every formula stated)
+        const lateralEach = R1((posPerZone / zoneRows) * pitchM)
+        const lateralTotal = Math.round(zoneCount * lateralEach)
+        const riserRuns = levels > 1 ? Math.round(zoneCount / levels) : 0
+        const riserHeight = levels > 1 ? R1(levels * 1.3 + 0.5) : 0 // 1.3 m standard multi-level rack tier pitch + connection
+        const riserTotal = Math.round(riserRuns * riserHeight)
+        const zonesPerLevelPerBranch = zoneCount / branches / Math.max(1, levels)
+        const branchPitchM = R1(zonesPerLevelPerBranch * zoneRows * widthM * 1.5) // rows served + 50 % aisle allowance
+        const spineM = R1((branches / groups) * branchPitchM + 30) // + 30 m plant-room stand-off per group
+        const mainTotal = Math.round(groups * spineM)
+        const drainRiserRuns = hasDrainReturn && levels > 1
+          ? Math.round(servedPositions > 0 ? servedPositions / (2 * levels) : zoneCount)
+          : 0 // one gravity drop per outlet column (an outlet per 2 positions per level)
+        const drainRiserTotal = Math.round(drainRiserRuns * riserHeight)
+        const drainCollectTotal = hasDrainReturn ? Math.round(2 * lateralEach * branches) : 0 // a floor line per branch side
+        const drainMainTotal = hasDrainReturn ? mainTotal : 0
+        const mainDn = dnFor(groupFlow, 1.3)
+        const lateralDn = dnFor(groupFlow, 3.0)
+        const drainDn = dnFor(groupFlow, 1.4)
+        const drainMainDn = dnFor(groupFlow, 0.8)
+        const valveDn = qpos('distribution_zone_valve_dn_mm')
+          || (PREFERRED_DN.find((d) => d >= Math.sqrt((4 * (groupFlow / 3600)) / (Math.PI * 3.8)) * 1000) ?? 65)
+        const prov = 'parametric — not routed (zoned-delivery distribution network, engineered allowance)'
+        const geomBasis = `${zoneCount} zones (${zoneValveKey}) × ${posPerZone} positions/zone` +
+          (servedPositions > 0 ? ` (${servedPositions} served positions)` : '') +
+          `; ${groups} delivery group(s); ${branches} branch runs × ${levels} level(s); fill duty ${groupFlow} m³/h/group from ${flowBasis}`
+        const mintLen = (key: string, lenM: number, dn: number, formula: string): void => {
+          if (lenM <= 0) return
+          mint(`${key}_length_m`, lenM, 'm', 'length', zoneValveKey, `${prov}: ${formula} · ${geomBasis}`)
+          mint(`${key}_dn_mm`, dn, 'mm', 'dimension', zoneValveKey,
+            `${prov}: DN${dn} from d = √(4·Q/π·v) at the segment service velocity — see ${key}_length_m for the run derivation`)
+        }
+        mintLen('distribution_main', mainTotal, mainDn,
+          `delivery mains (department spines) = ${groups} group(s) × (${branches / groups} branches × ${branchPitchM} m branch pitch + 30 m plant-room stand-off) = ${mainTotal} m; DN${mainDn} at ${groupFlow} m³/h ≤ 1.3 m/s (surge-limited delivery main on a cycling valve network)`)
+        mintLen('distribution_riser', riserTotal, mainDn,
+          `delivery risers = ${riserRuns} risers (${zoneCount} zones ÷ ${levels} levels) × ${riserHeight} m (${levels} levels × 1.3 m tier pitch + 0.5 m) = ${riserTotal} m; DN${mainDn} at ${groupFlow} m³/h ≤ 1.3 m/s`)
+        mintLen('distribution_zone_lateral', lateralTotal, lateralDn,
+          `zone laterals = ${zoneCount} zones × (${posPerZone} positions/zone ÷ ${zoneRows} rows × ${pitchM} m position pitch) = ${zoneCount} × ${lateralEach} m = ${lateralTotal} m; DN${lateralDn} at the ${groupFlow} m³/h open-zone flood-fill duty ≤ 3.0 m/s (short-duration fill)`)
+        mintLen('distribution_drain_riser', drainRiserTotal, drainDn,
+          `drain/return risers (mirror of the delivery grid) = ${drainRiserRuns} gravity drops (an outlet per 2 positions per level) × ${riserHeight} m = ${drainRiserTotal} m; DN${drainDn} gravity at ${groupFlow} m³/h ≤ 1.4 m/s`)
+        mintLen('distribution_drain_collection', drainCollectTotal, drainDn,
+          `drain collection lines = 2 floor lines/branch × ${lateralEach} m × ${branches} branches = ${drainCollectTotal} m; DN${drainDn} gravity ≤ 1.4 m/s`)
+        mintLen('distribution_drain_main', drainMainTotal, drainMainDn,
+          `main drain headers = the delivery-spine mirror (${mainTotal} m); DN${drainMainDn} at ${groupFlow} m³/h ≤ 0.8 m/s part-full gravity equivalent`)
+        const networkTotal = mainTotal + riserTotal + lateralTotal + drainRiserTotal + drainCollectTotal + drainMainTotal
+        // the headline roll-up is minted in km (its natural scale for a ~15,000 m network) —
+        // deliberately a DIFFERENT unit family from the per-segment `_length_m` runs, so the
+        // provenance divergence net (same-unit, shared-role, >50× → HIGH) never false-fires
+        // on an explicit total-vs-segment pair (both values are correct by construction).
+        mint('distribution_network_length_km', Math.round(networkTotal) / 1000, 'km', 'length', zoneValveKey,
+          `${prov}: total zoned-distribution pipework = mains ${mainTotal} + risers ${riserTotal} + zone laterals ${lateralTotal} + drain risers ${drainRiserTotal} + drain collection ${drainCollectTotal} + drain mains ${drainMainTotal} = ${networkTotal} m = ${Math.round(networkTotal) / 1000} km · ${geomBasis}`)
+        mint('distribution_zone_valve_dn_mm', valveDn, 'mm', 'dimension', zoneValveKey,
+          `${prov}: zone valve DN${valveDn} — the ${zoneCount} sectioning valves each pass the ${groupFlow} m³/h open-zone fill duty at ≤ 3.8 m/s valve velocity`)
+        mint('distribution_zone_kits', zoneCount, '', 'count', zoneValveKey,
+          `${prov}: one zone connection kit (valve stub-in, unions, supports) per sectioning valve = ${zoneCount}`)
+        if (servedPositions > 0) {
+          mint('distribution_position_connections', servedPositions, '', 'count', zoneValveKey,
+            `${prov}: one delivery inlet stub + fitting per served position = ${servedPositions}`)
+          if (hasDrainReturn) {
+            mint('distribution_drain_outlet_connections', Math.round(servedPositions / 2), '', 'count', zoneValveKey,
+              `${prov}: one gravity drain outlet per 2 served positions = ${Math.round(servedPositions / 2)}`)
+          }
+        }
+        // the per-group distribution-manifold principal — minted through the NORMAL buildGroups
+        // path (throughput device + count) so BoM, drawings, schedules and the panel see it as
+        // real equipment, not a note. 'manifold' is a device noun (see DEVICE_NOUNS).
+        mint('distribution_manifold_count', groups, '', 'count', zoneValveKey,
+          `${prov}: one distribution manifold station (delivery header, isolation + non-return valves, drain tie-in) per delivery group = ${groups}`)
+        mint('distribution_manifold_throughput_m3_h', groupFlow, 'm3/h', 'flow_rate', zoneValveKey,
+          `${prov}: each distribution manifold passes its group's ${groupFlow} m³/h delivery duty (${flowBasis})`)
+      }
+    }
+  }
   return minted
 }
 const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 || 50) * 4) / Math.PI); const h = p.htM || d; return { shell: Math.PI * d * h, head: (Math.PI * d * d) / 4, d, h } }
@@ -1681,7 +1899,7 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 /** Append each principal equipment's PHYSICS-SIZED sub-components (qty inherited), each
  *  priced bottom-up from the parent's computed physics. Mutates modules in place; returns
  *  the number of sub-component lines added. Universal by equipment type. */
-export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3): number {
+export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3, briefPinnedKeys?: Set<string>): number {
   // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
   // part already carrying children is skipped (so re-running never duplicates — the
   // bug that gave a pump 39 children); a sub-component that itself matches a rule (a
@@ -1721,7 +1939,13 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // computed (e.g. irrigation_pump_motor_kw=9.653) so the motor reflects the real duty +
         // the casing/impeller/baseplate scale off the true power. Universal across all pumps.
         const cmk = motorKwFromContract(w, quantities)
-        if (cmk > 0) { physics.motorKwOverride = cmk; if (physics.kw === 0) physics.kw = cmk }
+        if (cmk.kw > 0) {
+          physics.motorKwOverride = cmk.kw
+          // a brief-pinned machine rating (7.5 kW Lowara e-SHE) is a NAMEPLATE — the drive
+          // honours it exactly (no frame re-rounding, no stacked margin — see motorKw)
+          physics.motorKwPinned = briefPinnedKeys?.has(cmk.key) ?? false
+          if (physics.kw === 0) physics.kw = cmk.kw
+        }
         for (const spec of rule.parts) {
           out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics))
           added += 1
@@ -1731,6 +1955,77 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
     }
   }
   return added
+}
+
+// ── DRIVE-TRAIN RATING RECONCILE (Tristan 2026-07-03 — the v56c/v56d rating-pair fix) ──────
+// The deterministic rating-pair corroboration (dossier_audit._rating_pair_sweep) proved 3
+// REAL drive-train mint defects: the old motor rule stacked a ×1.15 service factor on top of
+// IEC-frame rounding AND ignored brief-pinned machine ratings (fertigation pump 8 kW with an
+// 11 kW motor vs the brief's stated 7.5 kW Lowara; RO 5.5-vs-4.2; drain 3-vs-2 — each pair
+// beyond the 1.25× motor-service tolerance → Risk 7.5 / physics_fidelity 7 / floor 7). The
+// SOURCE rule (motorKw/nextMotorFrameKw) is fixed above; THIS pass re-asserts the fixed rule
+// onto drive-train children that already exist in the state (a prior run's mints — the
+// explode is not re-run for surviving principals), so BOTH synthesis paths converge on the
+// corrected ratings. Pairing is by character-id lineage (`<parent>_word__<child>`, the same
+// exact join the audit sweep uses); only a DRIVEN-machine parent (pump/blower/compressor/…)
+// is touched, and only when the target genuinely differs. Universal, deterministic, idempotent.
+const DRIVEN_PARENT_NOUN_RE = /\b(pump|blower|compressor|fan|agitator|mixer|conveyor|feeder|centrifuge)s?\b/i
+const DRIVE_CHILD_ID_RE = /motor|drive|vsd/i
+function wordPowerKw(w: WordLike): number {
+  for (const mc of w.modifier_characters ?? []) {
+    if (mc.kind !== 'rating_primary' && mc.kind !== 'power' && mc.kind !== 'rating') continue
+    const blob = `${mc.value ?? ''} ${mc.unit ?? ''}`
+    if (/m³|m3|\/h|\/s|bar|°c|litre|\bv\b/i.test(blob)) continue // flow/pressure/voltage — not power
+    if (!/kw/i.test(blob)) continue
+    const v = parseFloat(String(mc.value))
+    if (Number.isFinite(v) && v > 0) return v
+  }
+  return 0
+}
+export function reconcileDriveTrainRatings(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  briefPinnedKeys?: Set<string>,
+): number {
+  const byCid = new Map<string, WordLike>()
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    const cid = String(w.content_character?.character_id ?? '')
+    if (cid && !byCid.has(cid)) byCid.set(cid, w)
+  }
+  let repaired = 0
+  for (const m of modules ?? []) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    const cid = String(w.content_character?.character_id ?? '')
+    const m2 = /^(.+?)_word__(.+)$/.exec(cid)
+    if (!m2 || !DRIVE_CHILD_ID_RE.test(m2[2])) continue
+    const parent = byCid.get(m2[1])
+    if (!parent || !DRIVEN_PARENT_NOUN_RE.test(String(parent.name_human ?? ''))) continue
+    const cmk = motorKwFromContract(parent, quantities)
+    let target = 0
+    let basisNote = ''
+    if (cmk.kw > 0) {
+      const pinned = briefPinnedKeys?.has(cmk.key) ?? false
+      target = pinned ? cmk.kw : nextMotorFrameKw(cmk.kw)
+      basisNote = pinned
+        ? `brief-pinned machine rating ${cmk.kw} kW (${cmk.key}) honoured exactly — a pin is a nameplate, never re-margined`
+        : `contract motor requirement ${cmk.kw} kW (${cmk.key}) → next IEC frame ${target} kW (single rounding, no stacked service factor)`
+    } else {
+      const parentKw = wordPowerKw(parent)
+      if (parentKw > 0) {
+        target = nextMotorFrameKw(Math.max(1.5, parentKw / 0.88))
+        basisNote = `driven machine ${parentKw} kW ÷ 0.88 motor efficiency → next IEC frame ${target} kW (single rounding)`
+      }
+    }
+    if (!(target > 0)) continue
+    const rp = (w.modifier_characters ?? []).find((mc) => mc.kind === 'rating_primary')
+    if (!rp) continue
+    if (rp.unit && !/kw/i.test(String(rp.unit))) continue // never rewrite a non-kW rating
+    const cur = parseFloat(String(rp.value))
+    if (!Number.isFinite(cur) || Math.abs(cur - target) <= 1e-9) continue
+    rp.value = String(Math.round(target * 100) / 100)
+    mergeMods(w, [mod('sizing_basis', `drive-train rating reconciled to the driven machine: ${basisNote}`)])
+    repaired += 1
+  }
+  return repaired
 }
 
 // ── matching ────────────────────────────────────────────────────────────────
@@ -4134,6 +4429,19 @@ export function reconcilePrincipalEquipment(
     }
   }
 
+  // DRIVE-TRAIN RATING RECONCILE (both-paths coverage — see reconcileDriveTrainRatings):
+  // re-assert the fixed motor rule (brief-pin honoured exactly; otherwise a SINGLE IEC-frame
+  // rounding, no stacked ×1.15) onto every machine↔motor/VSD pair in the tree, including
+  // survivors from a prior run whose children were minted under the old double-margin rule
+  // (the v56c/v56d fertigation 11-vs-8 / RO 5.5-vs-4.2 / drain 3-vs-2 corroborated defects).
+  {
+    const dtr = reconcileDriveTrainRatings(modules, quantities, briefPinnedQuantityKeys(contract))
+    if (dtr > 0) {
+      res.repaired += dtr
+      res.details.push(`drive-train reconcile: ${dtr} motor/VSD rating(s) re-asserted (pin-honour / single IEC rounding)`)
+    }
+  }
+
   // RE-HOST + DE-DUP DEPENDENTS OF A COLLAPSED "computed_*" TWIN. The instrument / actuator
   // passes synthesise their words ONTO a host vessel (`_instrument_of` / `_actuator_of` + an
   // `…_on_<hostId>` id). On already-emitted state where the OLD sizing minted both a real and
@@ -4396,6 +4704,8 @@ export function applyUniversalContractSizing(
           if (wIsElectricalDevice && groupIsFluidSized(g)) continue
           // rule-6 shortfall group: full-stem containment only (see RESERVE_COVERAGE_PHRASE_RE)
           if (RESERVE_COVERAGE_PHRASE_RE.test(g.phrase) && !g.stems.every((s) => wStems.includes(s))) continue
+          // rule-8 zoned-network principal: full-stem containment only (see ZONED_NETWORK_PRINCIPAL_RE)
+          if (ZONED_NETWORK_PRINCIPAL_RE.test(g.phrase) && !g.stems.every((s) => wStems.includes(s))) continue
           const sc = scoreMatch(wStems, g)
           if (sc < minScore) continue
           if (sc > bestScore || (sc === bestScore && best && completeness(g) > completeness(best))) {
@@ -4531,7 +4841,15 @@ export function applyUniversalContractSizing(
   const mainIncomer = (opts.instrument ?? true) ? sizeMainIncomer(modules, quantities, contract) : 0
 
   // ── D. sub-assembly explosion: BoM DEPTH (each equipment → its real components) ──
-  const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules, quantities) : 0
+  const pinnedKeys = briefPinnedQuantityKeys(contract)
+  const exploded = (opts.explode ?? true) ? explodeEquipmentSubAssemblies(modules, quantities, 3, pinnedKeys) : 0
+  // Re-assert the fixed drive-train rule onto ANY machine↔motor/VSD pair already in the
+  // tree (a prior run's stacked-margin mints) — see reconcileDriveTrainRatings.
+  const driveTrainRepaired = (opts.explode ?? true) ? reconcileDriveTrainRatings(modules, quantities, pinnedKeys) : 0
+  if (driveTrainRepaired > 0) {
+    // eslint-disable-next-line no-console
+    console.error(`[universal-sizing] drive-train reconcile: ${driveTrainRepaired} motor/VSD rating(s) re-asserted (pin-honour / single IEC rounding)`)
+  }
 
   // ── E. TYPED SERVICE (Phase 0 root fix): stamp every characterisable word with a
   // `service{fabrication_family,…}` descriptor DERIVED FROM ITS DRIVER QUANTITY (a
