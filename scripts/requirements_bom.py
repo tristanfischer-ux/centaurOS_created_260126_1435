@@ -2976,6 +2976,17 @@ def _selftest() -> int:
         if not _lat or _lat["line_gbp"] != _want_lat:
             print(f"  FAIL lateral line £{_lat and _lat['line_gbp']} want £{_want_lat} "
                   f"(8,280 m × £{_pvc_supply_rate_per_m(75)}/m supply share)"); bad += 1
+        # LENGTH-PRICED shape (gate-36 round 3): qty = run length in metres, unit = the £/m
+        # rate, uom = 'm' — never qty 1 × the whole run's cost (the "single DN75 assembly
+        # ~200× too high" misread). The line total must be UNCHANGED by the reshape.
+        if _lat and (_lat["qty"] != 8280 or _lat["unit_gbp"] != _pvc_supply_rate_per_m(75)
+                     or _lat.get("uom") != "m"):
+            print(f"  FAIL lateral row must be length-priced (qty 8280 m × £{_pvc_supply_rate_per_m(75)}/m, "
+                  f"uom 'm'); got qty {_lat['qty']} × £{_lat['unit_gbp']}, uom {_lat.get('uom')!r}"); bad += 1
+        if _lat and abs(_lat["unit_gbp"] * _lat["qty"] - _lat["line_gbp"]) > max(1.0, 0.005 * _lat["line_gbp"]):
+            print("  FAIL lateral unit × qty must equal the line total within the C2 tolerance"); bad += 1
+        if _lat and "length-priced" not in _lat["basis"]:
+            print("  FAIL lateral basis must state the length-priced scope (qty = metres)"); bad += 1
         if _lat and "parametric" not in _lat["basis"]:
             print("  FAIL lateral basis must state the parametric provenance"); bad += 1
         if _lat and "supply" not in _lat["basis"].lower():
@@ -2994,6 +3005,36 @@ def _selftest() -> int:
         print("  FAIL distribution rows must be [] with no zoned-delivery quantities (BESS/SAF/CO2/RAS byte-identity)"); bad += 1
     if _distribution_network_rows({"connected_electrical_load_kw": {"value": 53}}) != []:
         print("  FAIL distribution rows must ignore unrelated quantities"); bad += 1
+
+    # (l) DEMAND-SIZED DUTY PROVENANCE (gate-36 round 3, 2026-07-03): a row whose m³/h duty
+    # equals a contract *_demand_* flow gets the demand derivation stamped on its basis (so
+    # the benchmark fault-router can defend "90 m³/h pump on 45 m³/h design flow"); a
+    # per-share row (45), a non-flow row (kW), and a demand key without a derivation never
+    # stamp — and a second pass is idempotent. BESS/SAF byte-identity rides on the miss cases.
+    _dsr = [
+        {"status": "PRINCIPAL", "requirement": "Irrigation Pump · 90 m³/h · 1379x766x1073 mm", "basis": "catalogue"},
+        {"status": "PRINCIPAL", "requirement": "Fertigation Dosing Pump · 45 m³/h", "basis": "catalogue"},
+        {"status": "PRINCIPAL", "requirement": "Battery Rack · 250 kWh", "basis": "catalogue"},
+        {"status": "SUB-COMPONENT", "requirement": "Impeller · 90 m³/h", "basis": "catalogue"},
+    ]
+    _dsq = {
+        "irrigation_demand_m3_h": {"value": 90, "unit": "m³/h",
+                                   "source_detail": "peak irrigation demand = 45 m³/h per department × 2 departments; lock-gate HARD slot (exit 22)"},
+        "power_demand_kw": {"value": 53, "unit": "kW", "source_detail": "26.5 kW × 2 boards"},
+        "bare_demand_m3_h": {"value": 45, "unit": "m3/h", "source_detail": ""},
+    }
+    _n1 = _apply_demand_sized_basis(_dsr, _dsq)
+    if _n1 != 1 or "demand-sized: peak irrigation demand = 45 m³/h per department × 2 departments" not in _dsr[0]["basis"]:
+        print(f"  FAIL demand-sized stamp: want exactly the 90 m³/h principal stamped with the ';'-clean "
+              f"derivation, got n={_n1}, basis={_dsr[0]['basis']!r}"); bad += 1
+    if "lock-gate" in _dsr[0]["basis"]:
+        print("  FAIL demand-sized stamp must strip the '; lock-gate …' tail"); bad += 1
+    if any("demand-sized" in r["basis"] for r in _dsr[1:]):
+        print("  FAIL demand-sized must not stamp per-share (45), non-flow (kW) or SUB-COMPONENT rows"); bad += 1
+    if _apply_demand_sized_basis(_dsr, _dsq) != 0:
+        print("  FAIL demand-sized stamp must be idempotent"); bad += 1
+    if _apply_demand_sized_basis([dict(_dsr[0], basis="catalogue")], {"nameplate_capacity_kwh": {"value": 2912, "unit": "kWh", "source_detail": "16 racks × 182 kWh"}}) != 0:
+        print("  FAIL demand-sized must ignore non-demand and non-flow quantities (BESS byte-identity)"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -3102,22 +3143,45 @@ def _distribution_network_rows(q):
         return []
     rows, i = [], 0
 
-    def _row(requirement, part, qty, unit_gbp, basis, extra=None):
+    def _row(requirement, part, qty, unit_gbp, basis, extra=None, per_m=False):
         nonlocal i
         i += 1
-        r = {
-            # untagged ("—") like other non-canonical rows: inventing a new tag-prefix family
-            # (PD-) would add an undocumented abbreviation the Glossary audit rightly flags.
-            "tag": "—",
-            "requirement": requirement,
-            "status": "PARAMETRIC",
-            "part": part,
-            "qty": qty,
-            "unit_gbp": round(unit_gbp),
-            "line_gbp": round(unit_gbp) * int(qty),
-            "basis": basis,
-            "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
-        }
+        if per_m:
+            # LENGTH-PRICED presentation (gate-36 round 3, 2026-07-03): a network segment used
+            # to render qty 1 × the whole run's cost — the benchmark (and any reviewer) read
+            # "Zone laterals … £109,296" as ONE DN75 assembly (~200× too high). The row now
+            # carries qty = the run length in METRES and unit = the stated £/m supply rate, so
+            # the unit price reads sane; the LINE TOTAL IS UNCHANGED (round(length × rate) is
+            # exactly what the old qty-1 line charged). The £/m rate stays fractional BY DESIGN
+            # — rounding £13.2/m to £13 would move an 8,280 m line by £1,656; deterministic
+            # check C2 (unit × qty == line) carries ±max(0.5%, £1) tolerance, satisfied here.
+            # `uom: "m"` exempts the row from the integer display-rounding pass in assemble().
+            r = {
+                "tag": "—",
+                "requirement": requirement,
+                "status": "PARAMETRIC",
+                "part": part,
+                "qty": int(round(qty)),
+                "unit_gbp": round(unit_gbp, 2),
+                "line_gbp": round(qty * unit_gbp),
+                "uom": "m",
+                "basis": basis,
+                "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
+            }
+        else:
+            r = {
+                # untagged ("—") like other non-canonical rows: inventing a new tag-prefix family
+                # (PD-) would add an undocumented abbreviation the Glossary audit rightly flags.
+                "tag": "—",
+                "requirement": requirement,
+                "status": "PARAMETRIC",
+                "part": part,
+                "qty": qty,
+                "unit_gbp": round(unit_gbp),
+                "line_gbp": round(unit_gbp) * int(qty),
+                "basis": basis,
+                "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
+            }
         if extra:
             r.update(extra)
         rows.append(r)
@@ -3133,14 +3197,16 @@ def _distribution_network_rows(q):
         _row(
             f"{label} · DN{int(dn)} PVC-U · {length_m:,.0f} m",
             f"DN{int(dn)} PVC-U pressure pipe + fittings + hangers, {length_m:,.0f} m (supply)",
-            1, length_m * rate,
+            length_m, rate,
             f"parametric estimate — zoned-delivery distribution network (engineered allowance, "
             f"NOT per-pipe routed; client distribution-section scope): {length_m:,.0f} m × "
             f"£{rate:g}/m supply-only materials ({_PVC_SUPPLY_SHARE:.0%} of the uk-2026 "
             f"supply+install £{installed_rate:.0f}/m @ DN{int(dn)}; installation labour is "
-            f"carried by the cost-stack field-install factors — no double count)"
+            f"carried by the cost-stack field-install factors — no double count) · "
+            f"length-priced: qty = the run length in metres, unit = £/m"
             + (f" · derivation: {derivation}" if derivation else ""),
             extra={"length_m": round(length_m, 1), "size": f"DN{int(dn)}"},
+            per_m=True,
         )
     inlets = _qv("distribution_position_connections")
     if inlets:
@@ -3175,6 +3241,53 @@ def _distribution_network_rows(q):
             f"· {_detail('distribution_zone_kits')}",
         )
     return rows
+
+
+def _apply_demand_sized_basis(rows, q):
+    """DEMAND-SIZED DUTY PROVENANCE (gate-36 round 3, 2026-07-03). A principal whose rendered
+    duty EQUALS a contract ``*_demand_*`` flow quantity (the v57 irrigation pump: 90 m³/h =
+    45 m³/h per department × 2 departments concurrent, brief line 49) reads as "~2× oversized"
+    to a reviewer holding only the per-share figure. Stamp the demand derivation ON the row
+    ('demand-sized: …') so the benchmark fault-router (routeFaults in
+    scripts/lib/benchmark-expectation.ts) sees the stated basis and downgrades an oversize
+    opinion that contradicts it. Fires ONLY for a flow duty (N m³/h in the row's requirement)
+    equal (±1%) to a ``_demand_`` quantity carrying a stated multiplicative derivation — no
+    BESS/SAF/CO2 row matches (their demand keys are not m³/h duties), so those bills stay
+    byte-identical (verified in the selftest + the assemble diff). Returns the stamped count.
+    Idempotent: a row already carrying 'demand-sized:' is never re-stamped."""
+    demands = []
+    for k, v in (q or {}).items():
+        if not re.search(r"(^|_)demand(_|$)", str(k)):
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        unit = str(v.get("unit") or "") if isinstance(v, dict) else ""
+        detail = str(v.get("source_detail") or "") if isinstance(v, dict) else ""
+        u = unit.replace("³", "3").replace(" ", "").lower()
+        if not (isinstance(val, (int, float)) and val > 0 and u in ("m3/h", "m3/hr") and detail):
+            continue
+        # only a derivation worth stating (a share multiplication: '×'/'x N'/'per') defends a row
+        if not re.search(r"[×]|\bx\s*\d|\bper\b", detail):
+            continue
+        demands.append((float(val), detail.split(";")[0].strip()))
+    if not demands:
+        return 0
+    n = 0
+    for row in rows:
+        if row.get("status") == "SUB-COMPONENT":
+            continue
+        basis = str(row.get("basis") or "")
+        if "demand-sized:" in basis:
+            continue
+        m = re.search(r"·\s*([\d,]+(?:\.\d+)?)\s*m(?:³|3)/hr?\b", str(row.get("requirement") or ""))
+        if not m:
+            continue
+        duty = float(m.group(1).replace(",", ""))
+        for val, detail in demands:
+            if abs(duty - val) <= 0.01 * val:
+                row["basis"] = basis + f" · demand-sized: {detail}"
+                n += 1
+                break
+    return n
 
 
 # Endpoint NOUNS that make up the main high-flow recirculation LOOP (full recirc
@@ -4661,6 +4774,9 @@ def assemble(out_dir: str):
     # + connection allowances) — priced from the sizer's 'parametric — not routed' quantities;
     # [] on every archetype without zoned-delivery signals (bill byte-identical).
     rows += _distribution_network_rows(qcontract)
+    # demand-sized duty provenance — stamp AFTER every row exists so a principal, connection or
+    # network line whose duty IS a contract *_demand_* flow states its derivation (see helper).
+    _apply_demand_sized_basis(rows, qcontract)
 
     # ── DISPLAY-ARITHMETIC CONSISTENCY (swarm-flagged £1 nits, 2026-06-20). A line built
     # as unit_gbp=round(x), line_gbp=round(x·qty) can show unit×qty ≠ line by up to £1
@@ -4671,6 +4787,13 @@ def assemble(out_dir: str):
     # effect on the total; makes every BoM row self-consistent + passes the C2 gate exactly.
     for row in rows:
         if row.get("status") == "SUB-COMPONENT":
+            continue
+        if row.get("uom") == "m":
+            # LENGTH-PRICED parametric row (gate-36 round 3): qty is metres and unit is the
+            # fractional £/m rate — integer-rounding £13.2/m to £13 would move an 8,280 m line
+            # by £1,656 (and re-mint the qty-1 "single assembly" misread this shape fixes).
+            # The row is already self-consistent: line = round(qty × rate), within the C2
+            # check's ±max(0.5%, £1) tolerance.
             continue
         u = row.get("unit_gbp")
         qy = row.get("qty")
