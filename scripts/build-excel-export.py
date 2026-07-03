@@ -60,6 +60,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.worksheet.hyperlink import Hyperlink
 
 # The SHARED deterministic-check library — the SAME pure-arithmetic checks the
 # standalone CLI (scripts/deterministic-checks.py) runs, so the workbook's Checks
@@ -1177,14 +1178,36 @@ def _display_name(s: Any) -> str:
     return (words[:1].upper() + words[1:] + suffix) if words else suffix.strip()
 
 
+def _set_internal_hyperlink(cell, sheet_name: str, cell_ref: str = "A1") -> None:
+    """Point `cell` at another sheet in THIS workbook via a genuine internal hyperlink
+    (OOXML `location=`, no relationship). SOFFICE RECALC BYTE NON-DETERMINISM fix
+    (2026-07-03): `cell.hyperlink = "#'Sheet'!A1"` (a plain string) always goes through
+    openpyxl's `Hyperlink(ref="", target=val)` path (cell.py — the setter has no
+    special-case for a leading '#'), which ALWAYS creates an EXTERNAL relationship
+    (worksheet/_writer.py::write_hyperlinks: `if link.target: Relationship(...
+    TargetMode="External", Target=link.target)`). A LibreOffice headless round-trip
+    (recalc-and-cache) then RESOLVES that '#Sheet!A1' external target against the
+    file's OWN path and rewrites xl/worksheets/_rels/sheetN.xml.rels with a relative
+    path back to the workbook's own absolute filesystem location — losing the '#Sheet
+    !A1' fragment entirely (so the link stops navigating internally) AND making two
+    recalculated builds of identical content byte-diverge whenever they're written to
+    two different paths (proven: same out_path -> byte-identical; different out_path
+    -> every 'back to X' link's .rels Target differs). Constructing a Hyperlink with
+    `location=` and `target=None` writes `<hyperlink ref="A1" location="Sheet!A1"/>`
+    directly on the sheet with NO relationship at all (_writer.py only emits a
+    Relationship `if link.target`) — nothing for LibreOffice's recalc round-trip to
+    perturb, and the navigation actually works post-recalc."""
+    cell.hyperlink = Hyperlink(ref=cell.coordinate,
+                               location=f"'{sheet_name}'!{cell_ref}", target=None)
+
+
 def back_link(ws: Worksheet, span: int) -> None:
     """Write a '↑ Contents' internal hyperlink at the top-right of a data tab —
     column ``span+1`` (immediately right of the merged title band, so it never
     collides with the title merge). UNIVERSAL: called on every non-image tab."""
     col = span + 1
     c = ws.cell(1, col, "↑ Contents")
-    # quote the sheet name so spaces/symbols in CONTENTS_SHEET are always valid
-    c.hyperlink = f"#'{CONTENTS_SHEET}'!A1"
+    _set_internal_hyperlink(c, CONTENTS_SHEET)
     c.font = FONT_LINK
     c.alignment = Alignment(horizontal="right", vertical="center")
     ws.column_dimensions[get_column_letter(col)].width = 13
@@ -10113,8 +10136,12 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                 _dvr = audit_operand("Electrical · reconciliation",
                                      "voltage tokens — DRAWING", _rr.get("draw_v"),
                                      "every 'N V' token on the single-line drawing")
+                # Delimiter padding added HERE, at formula-eval time, on BOTH operands —
+                # never relies on the stored cell value carrying literal leading/trailing
+                # whitespace (clean_cell() strips it on write; baking padding into the
+                # stored value alone breaks the moment anything re-cleans it).
                 _fx = fx_verdict(
-                    _base_terms + [f'ISNUMBER(SEARCH(" "&{_svr}&" ",{_dvr}))'],
+                    _base_terms + [f'ISNUMBER(SEARCH(" "&{_svr}&" "," "&{_dvr}&" "))'],
                     f'"the drawing never states the schedule\'s "&{_svr}&" V system voltage"')
             elif _op == "board-recon":
                 _rref = audit_operand("Electrical · reconciliation",
@@ -10386,7 +10413,7 @@ def tab_process_schedules(wb: Workbook, run_dir: str) -> int:
         sub_banner(ws, r, "Process line list — see the 'Line & velocity' tab", span)
         r += 1
         lk = ws.cell(r, 1, "→ Line & velocity")
-        lk.hyperlink = "#'Line & velocity'!A1"
+        _set_internal_hyperlink(lk, "Line & velocity")
         lk.font = FONT_LINK
         ptr = ws.cell(r, 2, clean_cell(
             f"THE line list: every routed line ONCE (as-routed tags, e.g. 201-PR-DN65) with "
@@ -11113,15 +11140,27 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                                "reasons": [] if ok else [reason], **(op or {})})
 
         # 1 — system voltage: the schedule's LV system voltage must appear on the drawing
+        # as its OWN token (exact-token SET membership — NOT a substring test: "400" is a
+        # substring of "14000"/"1400", so a naive `in " ".join(tokens)` can false-PASS on
+        # an unrelated larger number that happens to contain the same digits). The live
+        # formula mirrors this with SEARCH(" "&needle&" "," "&haystack&" ") — the padding
+        # spaces are added AT FORMULA-EVAL TIME on BOTH operands (never stored baked into
+        # the cell's VALUE): clean_cell() strips leading/trailing whitespace off every
+        # 'Audit data' operand on write (control-char/markdown hygiene), which silently
+        # ate a pre-padded stored value and broke the delimiter search (ONE-TRUTH
+        # divergence 2026-07-03: python said PASS, the recalculated formula said FAIL for
+        # the identical single-token case — a rendering-plumbing bug, not a real check
+        # disagreement). Padding the operands in the FORMULA text is immune to any future
+        # trim/clean pass over the stored cell value.
         _draw_v_tokens = sorted(set(re.findall(r"(\d{3,5})\s*V", _svg_join)))
-        _v_ok = f"{board_v:g}" in " ".join(_draw_v_tokens)
+        _v_ok = f"{board_v:g}" in _draw_v_tokens
         _consistency_row(
             "single-line ↔ schedule · system voltage", _v_ok,
             f"schedule system {board_v:g} V 3-phase; drawing voltages: "
             + (", ".join(sorted(set(re.findall(r"\d{3,5}(?:/\d{3,5})?\s*V", _svg_join)))[:4]) or "none"),
             f"the drawing never states the schedule's {board_v:g} V system voltage",
             op={"op": "voltage", "sched_v": f"{board_v:g}",
-                "draw_v": " " + " ".join(_draw_v_tokens) + " "})
+                "draw_v": " ".join(_draw_v_tokens)})
         # 2 — board hierarchy strings: every schedule board reference must appear on
         #     the drawing (same dataset → same names; 'MAIN LV BOARD' vs 'Motor
         #     Control Center' means the two were generated from different data).
@@ -12327,7 +12366,7 @@ def tab_contents(wb: Workbook, descriptions: Dict[str, str]) -> None:
             continue
         ws.cell(r, 1, n).border = BORDER
         c = ws.cell(r, 2, name)
-        c.hyperlink = f"#'{name}'!A1"
+        _set_internal_hyperlink(c, name)
         c.font = FONT_LINK
         c.border = BORDER
         d = ws.cell(r, 3, descriptions.get(name, _default_desc(name)))
@@ -12888,7 +12927,7 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
         pv = ws.cell(r, 8, tab or "—")
         pv.border = BORDER
         if tab:
-            pv.hyperlink = f"#'{tab}'!A1"
+            _set_internal_hyperlink(pv, tab)
             pv.font = FONT_LINK
         # honest on-disk check of every listed sheet PDF — the counts + missing list are
         # EMBEDDED (muted cols J/K, computed by os.path.exists at build) and the File
@@ -12936,7 +12975,7 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
             pv = ws.cell(r, 8, tab or "—")
             pv.border = BORDER
             if tab:
-                pv.hyperlink = f"#'{tab}'!A1"
+                _set_internal_hyperlink(pv, tab)
                 pv.font = FONT_LINK
             if len(str(rd.get("caption") or "")) > 100:
                 ws.row_dimensions[r].height = 29
@@ -16186,6 +16225,89 @@ def _selftest() -> int:
                     or not any("inconsistent" in x for x in _pdc["rows"][_k_dc_w2]["reasons"])):
                 print(f"  FAIL contract-panel-dc: 100 A for 12.6 kW at 1500 V DC (implied 0.08) must "
                       f"still FAIL the consistency band (got {_pdc['rows'][_k_dc_w2]})"); bad += 1
+        # ═══ proveCatch ONE-TRUTH voltage-token divergence (fixed 2026-07-03 — codema
+        #     v65: python said 'Electrical: 9.6', the recalculated workbook said '9.2'.
+        #     Root cause: (1) the python check `board_v_str in " ".join(tokens)` is a
+        #     SUBSTRING test — "400" is a substring of "14000"/"1400", a false-PASS risk;
+        #     (2) the render side embedded a hand-padded " 400 " VALUE on the 'Audit
+        #     data' sheet so the live SEARCH formula could exact-token-match, but
+        #     clean_cell() strips leading/trailing whitespace on every operand write —
+        #     silently eating the padding and making the live formula FAIL a genuine
+        #     single-token match. Fix: python does exact SET membership (no substring
+        #     risk); the live formula pads BOTH operands AT FORMULA-EVAL TIME
+        #     (" "&ref&" ") so a stripped stored value can never break it again. Both
+        #     directions proven here WITHOUT needing a LibreOffice round-trip: (a) the
+        #     genuine single-token case must PASS on both python AND the padding-at-
+        #     eval-time formula simulation; (b) a same-digits-different-number drawing
+        #     ("14000 V") must FAIL both — the old substring test would have wrongly
+        #     PASSED it. ═══
+        with open(os.path.join(_td, "drawings", "panel-schedule.md"), "w") as _fh:
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE — 400 V 3-phase\n\n## MAIN LV BOARD (TP&N)\n\n" +
+                _hdr_ln +
+                "| W1 | Pump A | 1 | 10.0 | 15.2 | 16 A MCB | 2.5 mm² · 3c+E | 12.0 | 0.8 | ✓ |\n" +
+                "\n**Reconciliation:** Σ circuit design current = 15.2 A vs board busbar "
+                "demand = 15.2 A (ratio 1.00) → **OK**.\n**Busbar rating:** 100 A\n")
+
+        def _svg_of(*texts: str) -> str:
+            return "<svg>" + "".join(f"<text>{t}</text>" for t in texts) + "</svg>"
+
+        def _sim_search(sched_v: str, draw_v: str) -> bool:
+            """The live formula, simulated EXACTLY as it now reads (padding added at
+            eval time on both operands): ISNUMBER(SEARCH(' '&sched&' ',' '&draw&' '))."""
+            return f" {sched_v} " in f" {draw_v} "
+
+        with open(os.path.join(_td, "drawings", "single-line-diagram.svg"), "w") as _fh:
+            _fh.write(_svg_of("400 V", "TX1 75 kVA"))
+        _vok_true = _eval_panel_schedule_contract(_td, {})
+        _vrow_t = next((r for r in (_vok_true.get("recon_rows") or []) if r.get("op") == "voltage"), None)
+        if not _vrow_t or _vrow_t["verdict"] != "PASS":
+            print(f"  FAIL onetruth-voltage: a genuine single-token 400 V match must PASS "
+                  f"(got {_vrow_t})"); bad += 1
+        elif not _sim_search(_vrow_t["sched_v"], _vrow_t["draw_v"]):
+            print(f"  FAIL onetruth-voltage: python PASS but the padding-at-eval-time live "
+                  f"formula simulation disagrees (sched={_vrow_t['sched_v']!r} draw="
+                  f"{_vrow_t['draw_v']!r}) — the ONE-TRUTH divergence would reproduce"); bad += 1
+        elif clean_cell(_vrow_t["draw_v"]) != _vrow_t["draw_v"]:
+            print(f"  FAIL onetruth-voltage: the stored draw_v operand must survive "
+                  f"clean_cell() unchanged (got {_vrow_t['draw_v']!r} -> "
+                  f"{clean_cell(_vrow_t['draw_v'])!r}) — padding must live in the FORMULA, "
+                  f"never in the stored cell value"); bad += 1
+        with open(os.path.join(_td, "drawings", "single-line-diagram.svg"), "w") as _fh:
+            _fh.write(_svg_of("14000 V", "TX1 75 kVA"))   # "400" is a SUBSTRING of "14000"
+        _vok_false = _eval_panel_schedule_contract(_td, {})
+        _vrow_f = next((r for r in (_vok_false.get("recon_rows") or []) if r.get("op") == "voltage"), None)
+        if not _vrow_f or _vrow_f["verdict"] != "FAIL":
+            print(f"  FAIL onetruth-voltage: '400' is a SUBSTRING of the unrelated token "
+                  f"'14000' — a naive substring test false-PASSES this; must FAIL "
+                  f"(got {_vrow_f})"); bad += 1
+        elif _sim_search(_vrow_f["sched_v"], _vrow_f["draw_v"]):
+            print(f"  FAIL onetruth-voltage: the live formula simulation must ALSO reject "
+                  f"the substring trap (sched={_vrow_f['sched_v']!r} draw="
+                  f"{_vrow_f['draw_v']!r})"); bad += 1
+        # ═══ proveCatch SOFFICE RECALC BYTE NON-DETERMINISM at its source (fixed
+        #     2026-07-03): every internal navigation hyperlink MUST go through
+        #     _set_internal_hyperlink (location=, target=None) — a plain-string
+        #     `cell.hyperlink = "#'Sheet'!A1"` ALWAYS creates an EXTERNAL relationship
+        #     (openpyxl cell.py: `Hyperlink(ref="", target=val)`, no '#'-prefix special
+        #     case), which a LibreOffice recalc round-trip rewrites into a relative
+        #     path back to the workbook's OWN absolute filesystem location — proven
+        #     byte-divergent across two builds of identical content to two different
+        #     output paths. `_set_internal_hyperlink` writes location= only, so
+        #     openpyxl's writer (`if link.target: …Relationship…`) never emits a
+        #     relationship at all — nothing for a recalc round-trip to perturb. ═══
+        from openpyxl import Workbook as _WbT
+        _wbt = _WbT()
+        _wst = _wbt.active
+        _cht = _wst.cell(1, 1, "link")
+        _set_internal_hyperlink(_cht, "Some Sheet")
+        if _cht.hyperlink is None or _cht.hyperlink.target:
+            print(f"  FAIL hyperlink-determinism: _set_internal_hyperlink must set "
+                  f"target=None (no relationship, no .rels entry) — got target="
+                  f"{_cht.hyperlink and _cht.hyperlink.target!r}"); bad += 1
+        elif _cht.hyperlink.location != "'Some Sheet'!A1":
+            print(f"  FAIL hyperlink-determinism: expected location \"'Some Sheet'!A1\", "
+                  f"got {_cht.hyperlink.location!r}"); bad += 1
     # ═══ proveCatch the HVAC DIRECT drawing coverage (BESS cross-val 2026-07-03) ═══
     # Both directions: a design with an HVAC duty whose drawing OMITS half its
     # HVAC/cooling parts scores the honest fraction + NAMES the missing kit; a
@@ -17755,8 +17877,13 @@ def _selftest() -> int:
             print("  FAIL proc-sched: the 3-line pointer to Line & velocity must render"); bad += 1
         _lkc = next((c for row_ in _wsps.iter_rows() for c in row_
                      if str(c.value) == "→ Line & velocity"), None)
-        if _lkc is None or not _lkc.hyperlink or "Line & velocity" not in str(_lkc.hyperlink.target):
-            print("  FAIL proc-sched: the pointer must HYPERLINK to the Line & velocity tab"); bad += 1
+        # internal hyperlink (2026-07-03, SOFFICE RECALC BYTE NON-DETERMINISM fix): the
+        # pointer now uses _set_internal_hyperlink (location=, target=None — no
+        # relationship), never a plain-string target.
+        if (_lkc is None or not _lkc.hyperlink or _lkc.hyperlink.target
+                or "Line & velocity" not in str(_lkc.hyperlink.location)):
+            print("  FAIL proc-sched: the pointer must HYPERLINK (internal, location=, "
+                  "no target) to the Line & velocity tab"); bad += 1
         if not any("XV-201" in v for v in _pcells) or not any("LT-201" in v for v in _pcells):
             print("  FAIL proc-sched: the valve list + instrument index must still render"); bad += 1
     # (B4) ELECTRICAL: drawing on top + schedule below on ONE sheet, with the one-dataset
