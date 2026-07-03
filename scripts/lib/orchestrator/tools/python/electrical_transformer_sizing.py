@@ -168,7 +168,14 @@ def compute(payload: dict) -> dict:
             _parsed.append(float(_x))
         except (TypeError, ValueError):
             pass
-    ladder = _parsed or [float(x) for x in STANDARD_KVA_LADDER]
+    # ONE-MINT HARDENING (2026-07-03, Codema v62 three-way kVA divergence): a caller-
+    # supplied ladder is UNIONed with the standard ladder, never a REPLACEMENT. The v62
+    # bootstrap tool-plan passed a ladder MISSING the 75 kVA trade step, so 53 kW jumped
+    # a whole size class to 100 kVA while the design-loop E pass (same rule, full ladder)
+    # minted 75 — the exact divergence the one-mint rule exists to kill. A caller may ADD
+    # finer trade steps; it may never REMOVE a standard preferred rating.
+    ladder = sorted(set(_parsed) | {float(x) for x in STANDARD_KVA_LADDER}) \
+        if _parsed else [float(x) for x in STANDARD_KVA_LADDER]
 
     # ---- ONE-MINT INCOMER RULE (mirrors settle-loop.ts resizeFromConvergedDemand,
     # commit e74d4502e): required kVA = load kW x (1 + headroom), default margin
@@ -176,8 +183,13 @@ def compute(payload: dict) -> dict:
     # yields an informational apparent-power line only; it must NOT change the
     # mint (dividing by an assumed pf is how this tool minted 100 kVA while the
     # settle-loop minted 75 kVA for the same 53 kW load).
+    # ONE-MINT HARDENING (2026-07-03): the margin is FLOORED at INCOMER_KVA_MARGIN — a
+    # caller may specify MORE spare capacity, never less than the assumption-free adequacy
+    # basis (kVA >= load x 1.25) the deterministic check verifies. The v62 bootstrap passed
+    # headroom_fraction=0.2, minting below the rule every other surface enforces.
     s_load_kva = p_kw / pf                       # informational: apparent demand at stated pf
-    margin = 1.0 + headroom
+    margin = max(1.0 + headroom, INCOMER_KVA_MARGIN)
+    headroom_eff = round(margin - 1.0, 6)        # the headroom the mint actually used
     s_req_kva = p_kw * margin
     s_rated_kva, off_ladder = _next_standard_kva(s_req_kva, ladder)
 
@@ -211,11 +223,14 @@ def compute(payload: dict) -> dict:
         worked_calc(
             label="Required rating (one-mint incomer rule)",
             formula="S_req = P x (1 + headroom)",
-            values={"P": (round(p_kw, 2), "kW"), "headroom": (headroom, "")},
+            values={"P": (round(p_kw, 2), "kW"), "headroom": (headroom_eff, "")},
             result=s_req_r, result_unit="kVA",
             assumptions=[
                 f"kVA >= load x {round(margin, 4)} — assumption-free adequacy (kVA >= kW at any power factor)",
                 "same rule as the settle-loop incomer mint + the deterministic adequacy check (commit e74d4502e)",
+                *([f"requested headroom {headroom:g} floored at {INCOMER_KVA_MARGIN - 1.0:g} — "
+                   "the one-mint adequacy margin is not caller-reducible"]
+                  if headroom < INCOMER_KVA_MARGIN - 1.0 else []),
             ],
         ),
         worked_calc(
@@ -249,7 +264,8 @@ def compute(payload: dict) -> dict:
         "phases": phases,
         "plant_load_kw": round(p_kw, 2),
         "power_factor": pf,
-        "headroom_fraction": headroom,
+        "headroom_fraction": headroom_eff,       # the effective (floored) headroom the mint used
+        "headroom_fraction_requested": headroom,
         "primary_voltage_v": round(v_pri, 1),
         "secondary_voltage_v": round(v_sec, 1),
         "apparent_power_demand_kva": round(s_load_kva, 2),
@@ -295,10 +311,33 @@ def _selftest() -> int:
     # worked[] present + the nameplate line references the standard-ladder rule
     chk("worked_present", len(out.get("worked") or []) == 5)
 
+    # ── ONE-MINT HARDENING proveCatch (2026-07-03, the v62 three-way divergence) ──
+    # ADVERSARIAL INPUT = the literal v62 bootstrap payload: 53 kW, pf 0.85,
+    # headroom 0.2, caller ladder MISSING the 75 kVA trade step. It minted 100 kVA
+    # (53 x 1.2 = 63.6 -> next step on the 75-less ladder) while the design-loop E
+    # pass minted 75 for the same plant. The mint MUST now be 75 on the one rule.
+    v62 = compute({
+        "plant_load_kw": 53, "power_factor": 0.85, "headroom_fraction": 0.2,
+        "standard_ratings_kva": [25, 50, 100, 160, 200, 250, 315, 400, 500, 630, 800, 1000],
+    })
+    chk("v62_bootstrap_payload_mints_75_not_100", v62["transformer_kva"] == 75.0)
+    chk("v62_margin_floored_to_1_25", abs(v62["required_with_headroom_kva"] - 66.25) < 1e-6)
+    chk("v62_effective_headroom_disclosed",
+        v62["headroom_fraction"] == 0.25 and v62["headroom_fraction_requested"] == 0.2)
+    # margin floor alone: headroom 0 must still mint on load x 1.25
+    chk("margin_floor_headroom_zero", compute({"plant_load_kw": 53, "headroom_fraction": 0.0})["transformer_kva"] == 75.0)
+    # DIRECTION 2a — a HIGHER headroom is honoured (more spare is a legitimate design input):
+    # 53 x 1.5 = 79.5 -> 100 kVA
+    chk("higher_headroom_honoured", compute({"plant_load_kw": 53, "headroom_fraction": 0.5})["transformer_kva"] == 100.0)
+    # DIRECTION 2b — a caller trade step FINER than the standard series is honoured:
+    # 100 kW x 1.25 = 125 -> caller's 130 step beats the standard 160 (union, not veto)
+    chk("caller_extra_step_honoured", compute({"plant_load_kw": 100, "standard_ratings_kva": [130]})["transformer_kva"] == 130.0)
+
     if fails:
         print(f"[electrical_transformer_sizing] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
         return 1
-    print("[electrical_transformer_sizing] selftest OK (one-mint kVA rule: 53 kW -> 75 kVA, pf-free, ladder incl. 75)")
+    print("[electrical_transformer_sizing] selftest OK (one-mint kVA rule: 53 kW -> 75 kVA, "
+          "pf-free, ladder incl. 75; hardened: margin floored at 1.25, caller ladder UNIONed)")
     return 0
 
 

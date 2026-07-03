@@ -393,6 +393,54 @@ function checkDesignLoopClosesEarly(): Assertion[] {
     () => `resized=${JSON.stringify(resized)} expectKva=${expectKva} kva53=${kva53} kva60=${kva60}`,
   ))
 
+  // ── INCOMER-kVA ALIAS RECONCILE proveCatch (2026-07-03, the Codema v62 three-way kVA
+  //    divergence: bootstrap tool minted transformer_kva=100 BEFORE the load converged,
+  //    the E pass minted total_supply_demand_kva=75, the SLD derived a third 66 — the
+  //    Electrical 'single-line ↔ schedule · transformer kVA' audit FAILed).
+  //    ONE MINT, ONE OWNER: the E pass reconciles the stale alias to its mint. ──
+  // DIRECTION 1 (the catch): a stale alias within the ladder-step tolerance ADOPTS the
+  // design-loop value (100 → 75, one step apart), keeps the as-computed figure in the
+  // basis, and re-bases the tool's paired secondary current (144.34 → 108.26, linear in S).
+  const staleAliasQ: Record<string, any> = {
+    total_supply_demand_kw: { value: 53, unit: 'kW' },
+    transformer_kva: { value: 100, unit: 'kVA', source: 'tool:electrical:transformer-sizing' },
+    transformer_secondary_current_a: { value: 144.34, unit: 'A', source: 'tool:electrical:transformer-sizing' },
+    // BESS-style grid-tie STEP-UP/export rating — deliberately NOT in the alias family
+    // (a supply-demand reconcile must never rewrite the export transformer).
+    transformer_rating_kva: { value: 3150, unit: 'kVA' },
+  }
+  const staleAlias = resizeFromConvergedDemand(staleAliasQ)
+  // DIRECTION 2 (the non-catch): a rating genuinely DIFFERENT from the mint (≥3 ladder
+  // steps off — a dedicated/step-up unit, not a stale re-mint of the same incomer) STANDS.
+  const differentRating = resizeFromConvergedDemand({
+    total_supply_demand_kw: { value: 53, unit: 'kW' },
+    main_transformer_kva: { value: 630, unit: 'kVA' },
+  })
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_incomer_kva_alias_reconcile',
+    'E pass reconciles a stale incomer-kVA alias to the ONE design-loop mint (v62 proveCatch: transformer_kva 100 → 75 with as-computed kept in basis + paired current re-based 144.34 → 108.26), while a genuinely different rating (630 vs 75) and the step-up transformer_rating_kva STAND untouched',
+    JSON.stringify({
+      aliasKva: staleAlias?.quantities.transformer_kva?.value,
+      aliasBasisKeepsAsComputed: /as-computed 100/.test(String(staleAlias?.quantities.transformer_kva?.basis || '')),
+      currentRebased: staleAlias?.quantities.transformer_secondary_current_a?.value,
+      stepUpUntouched: staleAlias?.quantities.transformer_rating_kva?.value,
+      reconciledKeys: (staleAlias?.reconciled || []).map(r => r.key),
+      differentStands: differentRating?.quantities.main_transformer_kva?.value,
+      differentNotReconciled: (differentRating?.reconciled || []).length === 0,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.aliasKva === 75 && o.aliasBasisKeepsAsComputed === true
+        && Math.abs(o.currentRebased - 108.26) < 0.02
+        && o.stepUpUntouched === 3150
+        && o.reconciledKeys.includes('transformer_kva')
+        && o.differentStands === 630 && o.differentNotReconciled === true
+    },
+    () => `staleAlias=${JSON.stringify(staleAlias?.reconciled)} tx=${staleAlias?.quantities.transformer_kva?.value} ` +
+          `iSec=${staleAlias?.quantities.transformer_secondary_current_a?.value} ` +
+          `stepUp=${staleAlias?.quantities.transformer_rating_kva?.value} different=${differentRating?.quantities.main_transformer_kva?.value}`,
+  ))
+
   // Honesty backstop: with NO converged demand (loop never ran), the resize is a safe no-op (null)
   // and the rendered load falls back to the brief metric — the loop is OPEN but nothing is corrupted.
   const noLoop: Record<string, any> = { connected_electrical_load_kw: { value: 87.25 } }

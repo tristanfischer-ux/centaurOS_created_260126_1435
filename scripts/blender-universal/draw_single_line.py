@@ -2004,8 +2004,25 @@ def _build_source(state, schedule, devices, main_bus, arch):
                               "transformer")
         # Design-loop closure: prefer the converged as-routed supply demand (see above).
         load_kw = _q(state, "total_supply_demand_kw") or _q(state, "connected_electrical_load_kw")
+        # ONE MINT, ONE OWNER (supply-demand-alias doctrine, commit e74d4502e): the TX1
+        # rating READS the contract's kVA — total_supply_demand_kva (the design-loop
+        # E-pass mint) preferred, transformer_kva (the tool mint the E pass reconciles)
+        # as fallback. The drawing NEVER derives its own rating while a contract value
+        # exists: the old `load_kw / 0.8` pf-divide minted a THIRD independent number
+        # (Codema v62: drawing 66 kVA vs contract 75/100 → the Electrical 'single-line ↔
+        # schedule · transformer kVA' check FAILed). Only when NO contract kVA exists may
+        # the drawing derive one — via the SAME one-mint rule (edm.incomer_kva_for_load =
+        # next standard rating ≥ load × 1.25), and then it says so on the sheet.
+        kva_contract = _q(state, "total_supply_demand_kva") or _q(state, "transformer_kva")
+        if kva_contract:
+            kva_label = f"{kva_contract:,.0f} kVA"
+        elif load_kw:
+            kva_label = (f"{edm.incomer_kva_for_load(load_kw):,.0f} kVA "
+                         f"(derived — no contract rating)")
+        else:
+            kva_label = ""
         inc_xfmr = Transformer(
-            tag="TX1", kva=(f"{load_kw/0.8:,.0f} kVA (≈)" if load_kw else ""),
+            tag="TX1", kva=kva_label,
             ratio="11000/400 V",
             detail=(xfmr_d["detail"] or xfmr_d["name"]) if xfmr_d else "")
         main_bus.tag = "MAIN LV BOARD"

@@ -16,7 +16,7 @@
  * for free; the loop's numeric value scales with topology density (the long pole), but the
  * mechanism runs >=4 and records the settle ledger regardless. UNIVERSAL — no class logic.
  */
-import { execFileSync } from 'child_process'
+import { execFileSync, spawnSync } from 'child_process'
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'fs'
 import { join, resolve } from 'path'
 import { runWritebackPass } from './writeback-bridge'
@@ -125,6 +125,43 @@ export function nextStandardKva(sReqKva: number): number {
 // so the mint and the check can never disagree on the rule.
 export const INCOMER_KVA_MARGIN = 1.25
 
+// ── ONE MINT, ONE OWNER: the incomer-kVA ALIAS FAMILY (2026-07-03, Codema v62) ──────────
+// The plant supply/incomer/distribution-transformer nameplate has ONE owner — the design
+// loop's total_supply_demand_kva mint (this file, resizeFromConvergedDemand). Any contract
+// quantity that is an ALIAS of that rating (minted earlier, e.g. by the bootstrap
+// tool:electrical:transformer-sizing running BEFORE the load converged) must RECONCILE to
+// the design-loop value, or the dossier carries the same transformer at two ratings (v62:
+// contract transformer_kva=100 from the bootstrap vs design-loop total_supply_demand_kva=75
+// vs a third pf-divided 66 on the single-line → Electrical 'single-line ↔ schedule ·
+// transformer kVA' FAIL). The alias keys mirror the deterministic adequacy check's incomer
+// preference list (deterministic_checks_lib._checks A2) minus total_supply_demand_kva itself.
+// `transformer_rating_kva` is EXCLUDED deliberately: it is the grid-tie STEP-UP/export
+// transformer's rating (BESS carries 3150 kVA against a 1600 kVA supply-demand mint,
+// legitimately) — not a supply-demand alias.
+export const INCOMER_KVA_ALIAS_KEYS = [
+  'transformer_kva', 'main_transformer_kva', 'main_incomer_kva',
+  'supply_transformer_kva', 'main_supply_kva',
+] as const
+
+// A stale alias diverges from the re-mint by the CONVERGENCE delta on the same load —
+// bounded by a couple of preferred-rating steps. A rating ≥ 3 ladder steps away is a
+// genuinely DIFFERENT transformer (a dedicated process/step-up unit): it STANDS, and the
+// adequacy/benchmark checks judge it — the reconcile never silently rewrites it.
+export const KVA_ALIAS_MAX_LADDER_STEPS = 2
+
+/** Rank of a kVA value on the preferred-rating ladder: the number of standard steps ≤ it
+ *  (off-ladder values rank between their neighbours; above the ladder top, bespoke 100 kVA
+ *  steps extend the rank — mirroring nextStandardKva's never-under-size rule). */
+export function kvaLadderRank(v: number): number {
+  let r = 0
+  for (const s of IEC_KVA_LADDER) if (s <= v + 1e-9) r++
+  const top = IEC_KVA_LADDER[IEC_KVA_LADDER.length - 1]
+  if (v > top) r += Math.ceil((v - top) / 100)
+  return r
+}
+
+export interface ReconciledAlias { key: string; from: number; to: number; steps: number }
+
 /**
  * E PASS (pure): size the incomer/transformer kVA from the reconciled supply demand.
  * THE RULE (v56c convergence round): incomer kVA = next STANDARD rating ≥ load × 1.25
@@ -138,7 +175,7 @@ export const INCOMER_KVA_MARGIN = 1.25
 export function resizeFromConvergedDemand(
   quantities: Record<string, any>,
   opts: { margin?: number } = {},
-): { quantities: Record<string, any>; kva: number; kw: number } | null {
+): { quantities: Record<string, any>; kva: number; kw: number; reconciled: ReconciledAlias[] } | null {
   const q = quantities || {}
   const sup = q.total_supply_demand_kw
   const kw = (sup && typeof sup === 'object') ? Number(sup.value) : Number(sup)
@@ -169,7 +206,64 @@ export function resizeFromConvergedDemand(
     basis: `incomer sized from the supply demand ${kw} kW: next standard rating ≥ ${kw} × ${margin} = ${sReq} kVA → ${kva} kVA; converged-loop E pass`,
     ...meta,
   }
-  return { quantities: next, kva, kw }
+
+  // ── ALIAS RECONCILE (2026-07-03, the v62 three-way kVA divergence) ────────────────────
+  // ONE MINT, ONE OWNER: any incomer-kVA alias minted BEFORE the design loop converged
+  // (bootstrap tool:electrical:transformer-sizing ran at its own earlier input → v62
+  // carried transformer_kva=100 against this pass's 75) is RECONCILED to the design-loop
+  // mint — the reconciliation lives HERE, at the mint, because the tool runs first (the
+  // same choke-point pattern as the total_supply_demand_kw alias reconcile in
+  // writeback-bridge: adopt the anchor, keep the superseded figure in the basis, never
+  // patch downstream consumers). Within the ladder-step tolerance the stale value is an
+  // ALIAS (same rating family, pre-convergence input) and adopts the mint; beyond it the
+  // rating is a genuinely different transformer and STANDS (the adequacy/benchmark checks
+  // judge it — silent rewrites of a real divergence would hide a fault, not fix one).
+  const reconciled: ReconciledAlias[] = []
+  for (const key of INCOMER_KVA_ALIAS_KEYS) {
+    const cur = next[key]
+    if (cur == null) continue
+    const val = (typeof cur === 'object') ? Number(cur.value) : Number(cur)
+    if (!Number.isFinite(val) || val <= 0 || val === kva) continue
+    const steps = Math.abs(kvaLadderRank(val) - kvaLadderRank(kva))
+    if (steps > KVA_ALIAS_MAX_LADDER_STEPS) continue           // genuinely different rating — stands
+    const recBasis =
+      `reconciled to the design-loop incomer mint (one mint, one owner): total_supply_demand_kva = ` +
+      `${kva} kVA from the converged supply demand ${kw} kW × ${margin}; as-computed ${val} kVA ` +
+      `(pre-convergence input, ${steps} ladder step${steps === 1 ? '' : 's'} off) superseded — kept here for the ledger`
+    const recMeta = {
+      source: 'design-loop',
+      source_detail: recBasis,
+      as_computed_kva: val,
+      lineage: { from: ['total_supply_demand_kva'], via: 'design-loop:incomer-alias-reconcile',
+                 formula: 'ADOPT(total_supply_demand_kva)' },
+    }
+    next[key] = (typeof cur === 'object')
+      ? { ...cur, value: kva, basis: recBasis, ...recMeta }
+      : { value: kva, unit: 'kVA', family: 'power', basis: recBasis, ...recMeta }
+    reconciled.push({ key, from: val, to: kva, steps })
+
+    // The tool's PAIRED line currents are functions of the nameplate at fixed voltage
+    // (I = S·1000 / (√3·U)) — scale them with the reconciled rating so the contract stays
+    // internally coherent. (When the E pass re-runs the tool, the exact re-computed values
+    // overwrite these scaled ones — see applyEPassResize.)
+    if (key === 'transformer_kva') {
+      for (const ck of ['transformer_primary_current_a', 'transformer_secondary_current_a']) {
+        const cq = next[ck]
+        if (cq == null) continue
+        const cv = (typeof cq === 'object') ? Number(cq.value) : Number(cq)
+        if (!Number.isFinite(cv) || cv <= 0) continue
+        const scaled = Math.round(cv * (kva / val) * 100) / 100
+        const cBasis = `re-based on the reconciled nameplate ${kva} kVA (linear in S at fixed voltage: ` +
+          `${cv} A × ${kva}/${val}); as-computed ${cv} A superseded`
+        next[ck] = (typeof cq === 'object')
+          ? { ...cq, value: scaled, basis: cBasis, source: 'design-loop', source_detail: cBasis,
+              lineage: { from: ['transformer_kva'], via: 'design-loop:incomer-alias-reconcile' } }
+          : { value: scaled, unit: 'A', family: 'current', basis: cBasis, source: 'design-loop' }
+        reconciled.push({ key: ck, from: cv, to: scaled, steps })
+      }
+    }
+  }
+  return { quantities: next, kva, kw, reconciled }
 }
 
 export interface EarlyLoopResult extends SettleResult {
@@ -177,6 +271,145 @@ export interface EarlyLoopResult extends SettleResult {
   converged: number | null
   parasiticKw: number | null
   resizedTransformerKva: number | null
+}
+
+// ── E-PASS TOOL RE-MINT (2026-07-03): keep the tool PROVENANCE true after the reconcile ──
+// Reconciling contract transformer_kva to the design-loop mint would leave the bootstrap
+// tool's CLAIM (4-orchestrator-tools-used.json + state.toolsUsedPage + the contract's
+// worked_calculations) at the superseded value — the deterministic 'Tool output used:
+// transformer_kva' provenance check would then honestly FAIL as STALE. The tool is a pure,
+// deterministic, stdlib-only script implementing the SAME one-mint rule, so the E pass
+// RE-RUNS it at the converged supply demand (recovering pf + voltages from the recorded
+// worked inputs) and updates the claims + worked[] with the GENUINE re-computation —
+// provenance stays true because the tool really did compute the reconciled numbers.
+const TRANSFORMER_TOOL_ID = 'electrical:transformer-sizing'
+const TRANSFORMER_TOOL_SCRIPT = resolve(
+  __dirname, '..', 'orchestrator', 'tools', 'python', 'electrical_transformer_sizing.py')
+
+/** Pull a numeric input (by worked-calc label + symbol) out of a tools-used entry's worked[]. */
+function workedInput(worked: any[], labelRe: RegExp, symbol: string): number | null {
+  for (const w of Array.isArray(worked) ? worked : []) {
+    if (!labelRe.test(String(w?.label || ''))) continue
+    const inp = (Array.isArray(w?.inputs) ? w.inputs : []).find((i: any) => String(i?.symbol) === symbol)
+    const n = Number(inp?.value)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return null
+}
+
+/** Apply the fresh tool output onto ONE tools-used entry (claims values + worked[]), in place. */
+function applyFreshToolOutputToEntry(entry: any, fresh: Record<string, any>, kw: number): void {
+  for (const c of Array.isArray(entry?.claims) ? entry.claims : []) {
+    const fv = fresh[String(c?.field)]
+    if (typeof fv !== 'number' || !Number.isFinite(fv) || fv === c.value) continue
+    const old = c.value
+    c.value = fv
+    c.input_summary =
+      `re-minted by the design-loop E pass at the converged supply demand ${kw} kW ` +
+      `(one-mint rule; superseded pre-convergence value: ${old}${c.unit ? ' ' + c.unit : ''})`
+  }
+  if (Array.isArray(fresh.worked) && fresh.worked.length) entry.worked = fresh.worked
+  entry.re_minted = { by: 'design-loop-e-pass', converged_supply_demand_kw: kw }
+}
+
+/**
+ * Re-run the deterministic transformer-sizing tool at the converged load and propagate the
+ * genuine re-computation to every surface that carries the tool's numbers:
+ *   4-orchestrator-tools-used.json (deterministic provenance checks read the FILE),
+ *   state.toolsUsedPage (Excel reads the STATE copy),
+ *   orchestratorContract.worked_calculations[tool] (the Calculations sheet),
+ *   the contract's transformer_* current quantities (exact values over the scaled fallback).
+ * Returns true only when the re-run agreed with the design-loop mint and was applied.
+ * NEVER throws — on any miss the pure reconcile stands and the provenance check will
+ * honestly report the claim as STALE (true: the tool ran at a pre-convergence input).
+ */
+export function reMintTransformerToolClaims(
+  state: any, runDir: string, pyBin: string,
+  resized: { kva: number; kw: number },
+): boolean {
+  try {
+    const toolsUsedPath = join(runDir, '4-orchestrator-tools-used.json')
+    if (!existsSync(toolsUsedPath) || !existsSync(TRANSFORMER_TOOL_SCRIPT)) return false
+    const doc = JSON.parse(readFileSync(toolsUsedPath, 'utf-8'))
+    const entry = (Array.isArray(doc?.tools) ? doc.tools : []).find(
+      (t: any) => String(t?.tool_id) === TRANSFORMER_TOOL_ID)
+    if (!entry) return false
+
+    // Recover the run's electrical basis from the recorded worked inputs (fall back to the
+    // tool defaults). pf cannot change the mint (pf-free rule) — it only re-labels the
+    // informational apparent-power line; the voltages set the line currents.
+    const pf = workedInput(entry.worked, /apparent power/i, 'pf') ?? 0.9
+    const vPri = workedInput(entry.worked, /primary line current/i, 'U_LL')
+      ?? workedInput(entry.worked, /primary line current/i, 'U') ?? 11000
+    const vSec = workedInput(entry.worked, /secondary line current/i, 'U_LL')
+      ?? workedInput(entry.worked, /secondary line current/i, 'U') ?? 400
+    const proc = spawnSync(pyBin, [TRANSFORMER_TOOL_SCRIPT], {
+      input: JSON.stringify({
+        plant_load_kw: resized.kw, power_factor: pf,
+        primary_voltage_v: vPri, secondary_voltage_v: vSec,
+      }),
+      encoding: 'utf-8', timeout: 30_000,
+    })
+    if (proc.status !== 0 || !proc.stdout) return false
+    const fresh = JSON.parse(proc.stdout)
+    // The tool and the E pass implement ONE rule — a disagreement means the re-run inputs
+    // are not this plant's (recovery failed): keep the reconcile, do NOT rewrite claims.
+    if (fresh?.error || Number(fresh?.transformer_kva) !== resized.kva) return false
+
+    applyFreshToolOutputToEntry(entry, fresh, resized.kw)
+    writeFileSync(toolsUsedPath, JSON.stringify(doc, null, 2))
+
+    const stateEntry = (state?.toolsUsedPage?.tools || []).find(
+      (t: any) => String(t?.tool_id) === TRANSFORMER_TOOL_ID)
+    if (stateEntry) applyFreshToolOutputToEntry(stateEntry, fresh, resized.kw)
+
+    const oc = state.orchestratorContract || {}
+    if (oc.worked_calculations && oc.worked_calculations[TRANSFORMER_TOOL_ID]
+        && Array.isArray(fresh.worked) && fresh.worked.length) {
+      oc.worked_calculations[TRANSFORMER_TOOL_ID] = fresh.worked
+    }
+    // Exact re-computed currents over the linear-scaled fallback (same numbers modulo the
+    // tool's own rounding; the claims and the contract must be identical for provenance).
+    const q = oc.quantities || {}
+    for (const fld of ['transformer_primary_current_a', 'transformer_secondary_current_a']) {
+      const fv = fresh[fld]
+      const cur = q[fld]
+      if (typeof fv !== 'number' || !Number.isFinite(fv) || cur == null) continue
+      const basis = `re-computed by ${TRANSFORMER_TOOL_ID} re-run at the converged supply demand ` +
+        `${resized.kw} kW (design-loop E pass; I = S·1000/(√3·U) at the reconciled nameplate ${resized.kva} kVA)`
+      q[fld] = (typeof cur === 'object')
+        ? { ...cur, value: fv, basis, source: `tool:${TRANSFORMER_TOOL_ID}`, source_detail: basis,
+            lineage: { from: ['transformer_kva'], via: 'design-loop:e-pass-tool-re-run' } }
+        : { value: fv, unit: 'A', family: 'current', basis, source: `tool:${TRANSFORMER_TOOL_ID}` }
+    }
+    return true
+  } catch { return false }
+}
+
+/**
+ * The E PASS as one callable unit (extracted so it can be run/verified standalone, without
+ * Blender): read the state, re-size the incomer from the converged demand, reconcile the
+ * stale incomer-kVA aliases, re-mint the transformer tool's claims (when runDir given), and
+ * write the state back. Returns null when there is no converged demand to size from.
+ */
+export function applyEPassResize(
+  statePath: string,
+  opts: { runDir?: string; pyBin?: string } = {},
+): { kva: number; kw: number; reconciled: ReconciledAlias[]; reMinted: boolean } | null {
+  if (!existsSync(statePath)) return null
+  const state = JSON.parse(readFileSync(statePath, 'utf-8'))
+  const oc = state.orchestratorContract || {}
+  const resized = resizeFromConvergedDemand(oc.quantities || {})
+  if (!resized) return null
+  oc.quantities = resized.quantities
+  state.orchestratorContract = oc
+  let reMinted = false
+  const txReconciled = resized.reconciled.some(r => r.key === 'transformer_kva')
+  if (txReconciled && opts.runDir) {
+    reMinted = reMintTransformerToolClaims(state, opts.runDir, opts.pyBin || 'python3', resized)
+  }
+  writeFileSync(statePath, JSON.stringify(state))
+  return { kva: resized.kva, kw: resized.kw, reconciled: resized.reconciled, reMinted }
 }
 
 /**
@@ -227,18 +460,20 @@ export function runEarlyDesignLoop(
     }
   } catch { /* honest null on any miss */ }
 
-  // E PASS: re-size the incomer from the converged supply demand the writeback wrote into state.
+  // E PASS: re-size the incomer from the converged supply demand the writeback wrote into
+  // state — and reconcile the stale incomer-kVA aliases + re-mint the transformer tool's
+  // claims at the same choke point (applyEPassResize; runDir = the run dir carrying
+  // 4-orchestrator-tools-used.json, handed in as resizeOutDir).
   let resizedTransformerKva: number | null = null
   try {
-    if (existsSync(statePath)) {
-      const state = JSON.parse(readFileSync(statePath, 'utf-8'))
-      const oc = state.orchestratorContract || {}
-      const resized = resizeFromConvergedDemand(oc.quantities || {})
-      if (resized) {
-        oc.quantities = resized.quantities
-        state.orchestratorContract = oc
-        writeFileSync(statePath, JSON.stringify(state))
-        resizedTransformerKva = resized.kva
+    const eRes = applyEPassResize(statePath, { runDir: opts.resizeOutDir, pyBin: opts.pyBin })
+    if (eRes) {
+      resizedTransformerKva = eRes.kva
+      if (eRes.reconciled.length) {
+        console.error(
+          `[design-loop] E pass alias reconcile: ` +
+          eRes.reconciled.map(r => `${r.key} ${r.from} → ${r.to}`).join(', ') +
+          `${eRes.reMinted ? ' (tool claims re-minted at the converged load)' : ''}`)
       }
     }
   } catch { /* non-fatal: E pass is additive */ }
