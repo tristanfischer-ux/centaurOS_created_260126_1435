@@ -1146,6 +1146,39 @@ def _selftest() -> int:
     if "panel-schedule" not in TYPE_EXPECTED.get("control", set()):
         print("  FAIL: control type must expect the panel-schedule")
         bad += 1
+    # GA-EXPECTATION ↔ SCENE one-rule proveCatch (v58b GA coverage 24/37): a routed
+    # distribution-network line item ('Zoned distribution — …' pipework take-off,
+    # qty in the hundreds/thousands of metres) is dropped from the 3-D scene by the
+    # SHARED ga_massing rule — so the ledger must NOT expect it on the render or the
+    # GA either (the guaranteed absence of a part the scene correctly omits was
+    # deflating GA coverage). A real massed principal in a distribution CONTEXT
+    # ('Distribution Manifold') keeps both expectations — the rule is head-anchored.
+    _zoned = [
+        "Zoned distribution — department delivery mains",
+        "Zoned distribution — delivery risers",
+        "Zoned distribution — zone laterals (flood-fill lines)",
+        "Zoned distribution — drain/return risers (gravity)",
+        "Zoned distribution — drain collection lines",
+        "Zoned distribution — main drain headers",
+        "Zoned distribution — delivery inlet stubs, one per served position",
+        "Zoned distribution — drain outlet connections (one per 2 positions)",
+    ]
+    for _zn in _zoned:
+        _exp = TYPE_EXPECTED.get(_classify(_zn, ""), set())
+        if ga_massing.is_ga_non_massing(_zn):
+            _exp = _exp - {"blender", "general-arrangement"}
+        if "general-arrangement" in _exp or "blender" in _exp:
+            print(f"  FAIL ga-expectation: '{_zn}' is scene-dropped pipework take-off "
+                  f"and must NOT be GA/render-expected (got {sorted(_exp)})")
+            bad += 1
+    for _kn in ("Distribution Manifold", "Drain Collection Sump", "Drain Transfer Pump"):
+        _exp = TYPE_EXPECTED.get(_classify(_kn, ""), set())
+        if ga_massing.is_ga_non_massing(_kn):
+            _exp = _exp - {"blender", "general-arrangement"}
+        if "general-arrangement" not in _exp:
+            print(f"  FAIL ga-expectation: '{_kn}' is a massed principal and MUST stay "
+                  f"GA-expected (got {sorted(_exp)})")
+            bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

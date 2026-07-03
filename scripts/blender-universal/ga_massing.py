@@ -50,6 +50,19 @@ GA_NON_MASSING_RE = re.compile(
     r"(?:\bdn\s?\d{2,4}\b|\b(?:pvc|upvc|cpvc|hdpe|abs|grp|frp|stainless|carbon[- ]?steel|"
     r"mild[- ]?steel|galvanis\w+|copper)\b)[^.]*\bpipe(?:s|work)?\s*\d*\s*$|"
     r"\bpipework\s*\d*\s*$|\bpipe spools?\s*\d*\s*$|\bprocess tubing\s*\d*\s*$|"
+    # routed DISTRIBUTION-NETWORK take-off quantities (v58b GA coverage: the 8
+    # 'Zoned distribution — …' rows X-150..X-157, qty 214-8,280 = metres of delivery/
+    # drain mains, risers, zone laterals, collection lines, per-position inlet stubs /
+    # outlet connections + valve kits) are PIPEWORK LINE ITEMS, never massed GA boxes —
+    # exactly the bare-pipe-run principle above, extended to the network nouns. HEAD-
+    # anchored: a distribution-context word (zoned/distribution/delivery/drain/return)
+    # followed by a network head noun (mains/risers/laterals/headers/lines/stubs/
+    # connections/kits) that ENDS the name (or is followed only by a count/parenthetical
+    # tail) — so 'Distribution Transformer', 'Main Switchboard', 'Drain Transfer Pump',
+    # 'Drain Collection Sump' and 'Distribution Manifold' (head noun ≠ network noun)
+    # all stay massed. proveCatch in _selftest.
+    r"\b(?:zoned?|distribution|delivery|drain|return)\b[^.]*?"
+    r"\b(?:mains?|risers?|laterals?|headers?|lines?|stubs?|connections?|kits?)\s*(?:\(|,|·|\d|$)|"
     # cabling / wiring / distribution accessories
     r"\bcabling\b|\bcable tray(?:s)?\b|\bcable gland(?:s)?\b|"
     r"\bterminal block(?:s)?\b|\b(?:power )?distribution block(?:s)?\b|"
@@ -137,6 +150,19 @@ def _selftest():
         # Design' rendered as a 9.6 m chimney, the tallest object on a water plant)
         "Modular Stack Design", "Redundancy Concept", "Control Philosophy",
         "Maintenance Strategy", "Sizing Basis", "Expansion Concept 2",
+        # routed DISTRIBUTION-NETWORK take-off quantities (the v58b GA-coverage 8:
+        # X-150..X-157) — pipework line items, never massed GA boxes; a part this rule
+        # drops from the scene must not be GA-expected either (parts_ledger reads the
+        # SAME rule, so expectation and scene can never disagree)
+        "Zoned distribution — department delivery mains",
+        "Zoned distribution — delivery risers",
+        "Zoned distribution — zone laterals (flood-fill lines)",
+        "Zoned distribution — drain/return risers (gravity)",
+        "Zoned distribution — drain collection lines",
+        "Zoned distribution — main drain headers",
+        "Zoned distribution — delivery inlet stubs, one per served position",
+        "Zoned distribution — drain outlet connections (one per 2 positions)",
+        "Zoned distribution — zone valve connection kits",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -162,6 +188,10 @@ def _selftest():
         # their massing (proves the rule is tight). NB 'Membrane Stack' is already
         # dropped by the membrane-INTERNALS rule above — deliberately not listed.
         "Vent Stack", "Flare Stack", "Exhaust Stack 2",
+        # distribution-CONTEXT names whose HEAD is real equipment — the network rule
+        # is head-anchored, so none of these may drop (proves the rule is tight)
+        "Distribution Transformer", "Drain Collection Sump", "Drain Transfer Pump",
+        "Drain Line Filter", "Delivery Pump Skid", "Return Sludge Pump",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

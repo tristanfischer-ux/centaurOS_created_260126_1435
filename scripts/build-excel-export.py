@@ -675,10 +675,27 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
 _VERDICT: dict = {}
 _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
 
+# ── FLOOR MIRRORS (floor-fixpoint fix, 2026-07-03). The Exec cover is CAPPED AT the
+# dossier floor and 'Quality & Audit''s score IS the floor — both tabs RENDER the
+# floor, they do not measure anything of their own. Including them in the min that
+# COMPUTES the floor made a 0 self-sustaining: on codema v58b the dossier_audit Exec
+# cap captured the PRE-column-contract BoM 0 (three £0 line-math HIGHs + the drawing-
+# coverage HIGH → penalty 16 → score 0), the column-contract override then lifted BoM
+# to 7.0, but nobody re-derived the Exec cap — the stale 0 stayed in compute_verdict's
+# min → floor 0 → 'Quality & Audit' stamped 0 → the two mirrors sustained each other
+# at 0 for ever while the min REAL surface was GA 6. The floor now ranges over
+# NON-MIRROR surfaces only; the mirrors then RENDER that floor (_stamp_floor_mirrors).
+# proveCatch in _selftest: min real tab 6 + two stale-0 mirrors → floor 6 on both
+# mirrors; a REAL 0 tab still pins the floor at 0. ──
+_MIRROR_TABS = ("Executive Summary", "Quality & Audit")
+
 
 def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
     """The ONE dossier verdict. Pure — reads the quality scorecard + LLM self-audit
-    sections and the per-tab scores; returns {floor, open_issues, ships, …}."""
+    sections and the per-tab scores; returns {floor, open_issues, ships, …}.
+    The two FLOOR-MIRROR tabs (_MIRROR_TABS) are EXCLUDED from the computation —
+    they render this floor, so counting them in the min is a fixpoint (a stale 0
+    self-sustains)."""
     secs: Dict[str, Optional[float]] = {}
 
     def _add_sections(sections) -> None:
@@ -700,6 +717,8 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
     _add_sections(((state or {}).get("selfAudit") or {}).get("sections"))
     tabs: Dict[str, Optional[float]] = {}
     for t, v in (tab_scores or {}).items():
+        if str(t) in _MIRROR_TABS:
+            continue      # a mirror RENDERS the floor — it never computes it (fixpoint fix)
         if isinstance(v, dict):
             sv = v.get("score")
             tabs[str(t)] = float(sv) if isinstance(sv, (int, float)) else None  # UNSCORED → None
@@ -725,13 +744,74 @@ def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
     fl = v.get("floor")
     fl_txt = (f"{fl:g}/10" if isinstance(fl, (int, float)) else "—")
     return (f"VERDICT: {short} · floor {fl_txt} "
-            f"(min of every section & tab; ships at ≥8 everywhere)")
+            f"(min of every non-mirror section & tab; ships at ≥8 everywhere)")
 
 
 def _register_verdict_cell(ws: Worksheet, row: int, col: int,
                            style: str = "line", suffix: str = "") -> None:
     """Record a rendered-verdict cell so build() can RE-STAMP it from the FINAL scores."""
     _VERDICT_CELLS.append((ws.title, row, col, style, suffix))
+
+
+_SEV_ISSUE_RX = re.compile(r"^\[(HIGH|MED|LOW|INFO)\]")
+
+
+def _exec_own_score(entry: Optional[dict]) -> Optional[float]:
+    """The Executive Summary tab's OWN deterministic score — 10 − Σ severity penalties
+    of the findings actually ROUTED to it ('[SEV] …' issue lines) — re-derived from the
+    entry itself so a stale earlier mirror-cap (dossier_audit caps the cover at the
+    floor of the PRE-override scores) can be recomputed at any point in the build.
+    A mirror-cap line carries no '[SEV]' prefix, so it never counts as an own finding."""
+    if not isinstance(entry, dict):
+        return None
+    pen = {"HIGH": 4, "MED": 2, "LOW": 1, "INFO": 0}
+    tot = 0
+    for iss in entry.get("issues") or []:
+        m = _SEV_ISSUE_RX.match(str(iss))
+        if m:
+            tot += pen[m.group(1)]
+    return float(max(0, 10 - tot))
+
+
+def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
+    """Compute THE verdict (floor over NON-MIRROR surfaces — compute_verdict) and stamp
+    it onto the two mirror tabs, so they RENDER the floor instead of computing it:
+
+      • 'Executive Summary' — the cover shows min(floor, its OWN routed-finding score):
+        it can never claim more than the weakest real sheet, and its own findings still
+        cap it when they are worse than the floor. Any stale earlier cap line is replaced.
+      • 'Quality & Audit'  — its score IS the floor (identical to the verdict quote).
+
+    Returns the verdict dict (callers feed it into _VERDICT). proveCatch in _selftest:
+    a stale mirror 0 over a min-real-6 workbook re-stamps to 6; a real 0 tab stays 0."""
+    v = compute_verdict(state, scores, run_dir)
+    fl = v.get("floor")
+    es = scores.get("Executive Summary")
+    if isinstance(es, dict) and isinstance(fl, (int, float)):
+        own = _exec_own_score(es)
+        sc = min(fl, own) if isinstance(own, (int, float)) else fl
+        own_issues = [i for i in (es.get("issues") or []) if _SEV_ISSUE_RX.match(str(i))]
+        iss = list(own_issues)
+        if fl < (own if isinstance(own, (int, float)) else 10):
+            iss = [f"capped at the dossier FLOOR ({sc:g}/10): the cover cannot claim a higher "
+                   f"score than its weakest sheet — fix that sheet to raise this one"] + iss
+        es["score"] = sc
+        es["status"] = "PASS" if sc >= 8 else "FAIL"
+        es["issues"] = iss[:6]
+        es["basis"] = ("MIRROR of the dossier floor (min of every non-mirror section & tab) — "
+                       "re-stamped from the CURRENT scores, never a stale earlier cap")
+    scores["Quality & Audit"] = {
+        "score": fl, "target": 8,
+        "status": "PASS" if v.get("ships") else "FAIL",
+        "issues": ([] if v.get("ships") else
+                   [f"the dossier does NOT ship — floor "
+                    f"{fl:g}/10 (min of every non-mirror section & tab, the SAME number the "
+                    f"verdict quotes); every surface must reach ≥8" if isinstance(fl, (int, float)) else
+                    "the dossier does NOT ship — no scored surface exists"]),
+        "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
+        "basis": "THE dossier floor — min score of every non-mirror section & tab (identical to the verdict computation)",
+    }
+    return v
 
 
 # A whitelist of CONTROL-CHARS Excel rejects inside a worksheet cell string —
@@ -9903,19 +9983,12 @@ _TBD_MPN_TEXT = "TBD (detailed design)"
 # as class-alien so the fix routes UPSTREAM to the parts/BoM source. Same
 # suppress-on-the-legitimate-class pattern as gate 34's marker families: a marker
 # fires only when the product class is NOT the marker's home domain.
-_CLASS_ALIEN_MARKERS: List[Tuple[str, "re.Pattern", "re.Pattern"]] = [
-    ("aquaculture monitoring/SCADA",
-     re.compile(r"\baquavista\b|\bfishtalk\b|\bakva\s?connect\b|\bfeed\s?barge\b|"
-                r"\bbiomass\s+(?:camera|estimat)", re.I),
-     re.compile(r"aquaculture|\bras\b|fish|hatchery", re.I)),
-    ("hydroponic / grow-room",
-     re.compile(r"\bnutrient\s+film\s+technique\b|\bebb\s*&?\s*flow\s+tray\b|"
-                r"\bgrow\s?light\b", re.I),
-     re.compile(r"vertical_farm|hydroponic|greenhouse|grow", re.I)),
-    ("marine / subsea",
-     re.compile(r"\bsacrificial\s+anode\b|\bhull\s+penetrator\b|\bbilge\s+pump\b", re.I),
-     re.compile(r"\bauv\b|\brov\b|marine|subsea|submersible|naval|ship|boat", re.I)),
-]
+# ONE SOURCE (2026-07-03): the vocabulary now lives in scripts/lib/
+# deterministic_finalize.py (CLASS_ALIEN_MARKERS) — the SAME table drives that
+# pass's class_alien_control_rename (which renames an alien telemetry/SCADA word
+# to the brief's NAMED control system), so the flagger and the fixer can never
+# disagree on what "class-alien" means.
+from deterministic_finalize import CLASS_ALIEN_MARKERS as _CLASS_ALIEN_MARKERS  # noqa: E402
 
 
 def _class_alien_reason(row_text: str, product_class: str) -> Optional[str]:
@@ -11972,6 +12045,13 @@ def build(run_dir: str, out_path: str) -> dict:
             _elec_sc["status"] = _sl_sc.get("status", _elec_sc.get("status"))
             _elec_sc["issues"] = ((_sl_sc.get("issues") or []) + (_elec_sc.get("issues") or []))[:6]
         _TAB_SCORES["Electrical"] = _elec_sc
+    # ── FLOOR MIRRORS re-stamped from the CURRENT (post-column-contract) scores
+    #    (floor-fixpoint fix, 2026-07-03): dossier_audit capped the Exec cover at the
+    #    floor of the PRE-override scores (v58b: BoM raw 0 → Exec 0, then the contract
+    #    lifted BoM to 7.0 and the stale Exec 0 self-sustained the verdict floor at 0).
+    #    The mirrors now always RENDER the floor computed over non-mirror surfaces. ──
+    _VERDICT.clear()
+    _VERDICT.update(_stamp_floor_mirrors(_TAB_SCORES, state, run_dir))
     state["tabScorecard"] = _TAB_SCORES
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)
     state["tabScorecardSummary"] = _ts_summary
@@ -12187,23 +12267,13 @@ def build(run_dir: str, out_path: str) -> dict:
     except Exception:  # noqa: BLE001
         pass
     # ── ONE FLOOR (fix 3): the 'Quality & Audit' tab's own score IS the dossier floor —
-    #    the same computation the verdict quotes (min of every section & tab) — so its
-    #    banner (A2) can never disagree with the verdict line (A4). The per-tab table it
-    #    renders below now includes EVERY scored surface (⚠ Checks + drawings included).
+    #    the same computation the verdict quotes (min of every NON-MIRROR section & tab,
+    #    floor-fixpoint fix 2026-07-03) — so its banner (A2) can never disagree with the
+    #    verdict line (A4). Both mirror tabs are re-stamped here from the FINAL scores
+    #    (the X1 gate-feed + honest cap + X2 have all merged), so a stale earlier cap
+    #    can never survive into the shipped scorecard.
     _VERDICT.clear()
-    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir))
-    _q_fl = _VERDICT.get("floor")
-    _TAB_SCORES["Quality & Audit"] = {
-        "score": _q_fl, "target": 8,
-        "status": "PASS" if _VERDICT.get("ships") else "FAIL",
-        "issues": ([] if _VERDICT.get("ships") else
-                   [f"the dossier does NOT ship — floor "
-                    f"{_q_fl:g}/10 (min of every section & tab, the SAME number the "
-                    f"verdict quotes); every surface must reach ≥8" if isinstance(_q_fl, (int, float)) else
-                    "the dossier does NOT ship — no scored surface exists"]),
-        "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
-        "basis": "THE dossier floor — min score of every section & tab (identical to the verdict computation)",
-    }
+    _VERDICT.update(_stamp_floor_mirrors(_TAB_SCORES, state, run_dir))
     state["tabScorecard"] = _TAB_SCORES
     state["tabScorecardSummary"] = tab_scorecard_summary(_TAB_SCORES)
     print("  · Quality & Audit")
@@ -14210,6 +14280,57 @@ def _selftest() -> int:
         print("  FAIL class-alien: the marker must be SUPPRESSED on its home class"); bad += 1
     if _class_alien_reason("UV Disinfection Unit", "water_treatment"):
         print("  FAIL class-alien: a class-appropriate part must never flag"); bad += 1
+
+    # ═══ (F7) FLOOR FIXPOINT proveCatch (2026-07-03 — codema v58b: Exec 0 + Q&A 0 held
+    # the verdict floor at 0 while the min REAL surface was GA 6, because both mirrors
+    # were counted in the min that computes the floor they render). Three claims:
+    # (a) a STALE mirror 0 must NOT pin the floor — a min-real-6 workbook re-stamps
+    #     floor 6 onto BOTH mirrors;
+    # (b) a REAL 0 tab still pins the floor at 0 (the fix relaxes nothing);
+    # (c) the Exec cover's OWN routed findings still cap it below a higher floor. ═══
+    _fx_state = {"qualityScorecard": {"sections": [{"name": "s1", "score": 10}]}}
+    _fx = {
+        "Executive Summary": {"score": 0, "target": 8, "status": "FAIL",
+                              "issues": ["capped at the dossier FLOOR (0/10): the cover cannot claim "
+                                         "a higher score than its weakest sheet — stale from a "
+                                         "pre-override BoM 0"]},
+        "Overview": {"score": 10, "target": 8, "status": "PASS", "issues": []},
+        "GA — General Arrangement": {"score": 6, "target": 8, "status": "FAIL", "issues": []},
+        "Quality & Audit": {"score": 0, "target": 8, "status": "FAIL", "issues": []},
+    }
+    _fxv = _stamp_floor_mirrors(_fx, _fx_state, "")
+    if _fxv.get("floor") != 6:
+        print(f"  FAIL floor-fixpoint: a stale mirror 0 must not pin the floor — min real "
+              f"tab is 6 (got floor {_fxv.get('floor')})"); bad += 1
+    if _fx["Executive Summary"]["score"] != 6 or _fx["Quality & Audit"]["score"] != 6:
+        print(f"  FAIL floor-fixpoint: BOTH mirrors must render the recomputed floor 6 "
+              f"(got Exec {_fx['Executive Summary']['score']}, "
+              f"Q&A {_fx['Quality & Audit']['score']})"); bad += 1
+    if _stamp_floor_mirrors(_fx, _fx_state, "").get("floor") != 6:
+        print("  FAIL floor-fixpoint: re-stamping must be idempotent (floor stays 6)"); bad += 1
+    _fx0 = {
+        "Executive Summary": {"score": 0, "target": 8, "status": "FAIL", "issues": []},
+        "Overview": {"score": 0, "target": 8, "status": "FAIL", "issues": []},   # a REAL 0 tab
+        "Quality & Audit": {"score": 0, "target": 8, "status": "FAIL", "issues": []},
+    }
+    _fxv0 = _stamp_floor_mirrors(_fx0, _fx_state, "")
+    if _fxv0.get("floor") != 0 or _fx0["Quality & Audit"]["score"] != 0:
+        print(f"  FAIL floor-fixpoint: a REAL 0 tab must still pin the floor at 0 "
+              f"(got {_fxv0.get('floor')})"); bad += 1
+    _fxo = {
+        "Executive Summary": {"score": 9, "target": 8, "status": "PASS",
+                              "issues": ["[HIGH] the cover headline quotes a flagged quantity",
+                                         "[HIGH] the OUTPUT card is blank"]},
+        "Overview": {"score": 9, "target": 8, "status": "PASS", "issues": []},
+        "Quality & Audit": {"score": 9, "target": 8, "status": "PASS", "issues": []},
+    }
+    _stamp_floor_mirrors(_fxo, _fx_state, "")
+    if _fxo["Executive Summary"]["score"] != 2:
+        print(f"  FAIL floor-fixpoint: the Exec cover's OWN [HIGH]×2 findings must cap it at "
+              f"10−8=2 below a floor of 9 (got {_fxo['Executive Summary']['score']})"); bad += 1
+    if _fxo["Quality & Audit"]["score"] != 9:
+        print(f"  FAIL floor-fixpoint: Q&A mirrors the non-mirror floor 9 "
+              f"(got {_fxo['Quality & Audit']['score']})"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

@@ -615,11 +615,15 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                                         placer=plan_tags)
         if not labelled:
             keynotes.append((p, px + pw / 2.0, py + ph / 2.0))
+    # items too small for an IN-PLACE tag get their FULL equipment tag through the same
+    # de-overlap ladder (a leader line back to the part when displaced). The old numeric-
+    # suffix balloon ('6' for P-106) keyed to a schedule that now shows only the top-10
+    # principals left every small part UNIDENTIFIABLE on the sheet — v58b GA coverage
+    # 24/37: P-101 / P-104 / P-106 / M-101 / I-102 were DRAWN but untagged. A GA must
+    # honestly NAME every part it draws. proveCatch in _selftest.
+    for p, kx, ky in keynotes:
+        plan_tags.add(kx, ky + 2.7, p.tag, 7.5, anchor_pt=(kx, ky))
     plan_tags.flush()
-    # numbered balloons for unlabelled small items — but SKIP any balloon that would
-    # land on top of one already drawn (within ~11 px), so the plan never becomes a
-    # mass of overlapping circles; those items are still in the schedule.
-    _draw_plan_keynotes(svg, keynotes, plan_x, plan_y, plan_w, plan_h)
     # north arrow (top-right corner of the plan)
     north_arrow(svg, plan_x + plan_w - 16, plan_y + 22)
 
@@ -811,28 +815,6 @@ def _hatch_ground(svg, x0, x1, y):
     for i in range(max(n, 0) + 1):
         hx = x0 + i * 12
         svg.line(hx, y, hx - 6, y + 6, stroke=MUTED, width=0.7)
-
-
-def _draw_plan_keynotes(svg, keynotes, ox, oy, pw, ph):
-    """Stamp the small unlabelled plan items with their equipment-tag NUMBER in a
-    tiny balloon at the item centre. De-cluttered: a balloon that would overlap one
-    already drawn (within ~12 px) is skipped (the item stays in the EQUIPMENT
-    SCHEDULE + reads on the elevations), so a dense plan never piles balloons. The
-    balloon shows the tag's numeric suffix only (e.g. '7' for V-107) to stay small;
-    the schedule resolves it. Returns the count actually drawn."""
-    placed = []
-    drawn = 0
-    for (p, cx, cy) in keynotes:
-        if any((cx - ux) ** 2 + (cy - uy) ** 2 < 12.0 ** 2 for ux, uy in placed):
-            continue
-        m = re.search(r"-(\d+)$", p.tag)
-        num = m.group(1) if m else "•"
-        svg.circle(cx, cy, 6.2, stroke=EQ_INK, width=1.0, fill=FILL_BG)
-        svg.text(cx, cy + 2.7, num, size=7.2, anchor="middle", weight="bold",
-                 fill=EQ_INK)
-        placed.append((cx, cy))
-        drawn += 1
-    return drawn
 
 
 def _collapse_schedule(parts):
@@ -1171,6 +1153,32 @@ def _selftest() -> int:
     txt1b, _ = _render(nest)
     if txt1 != txt1b:
         print("  FAIL ga-tags: de-overlap pass must be deterministic")
+        bad += 1
+    # 4 — SMALL-PART FULL-TAG proveCatch (v58b GA coverage 24/37): a part whose
+    #     footprint is too small for an in-place tag (<16×11 px at the chosen scale)
+    #     must STILL emit its FULL equipment tag into the SVG text — the old numeric-
+    #     suffix balloon left P-101/P-104/P-106/M-101/I-102 drawn but unidentifiable.
+    #     A 600×510 mm pump inside a 30×20 m plant forces the small-part path.
+    small = GAPart(tag="P-106", obj_tag="p106", name="Fertigation Dosing Pump",
+                   module="m", shape="box", qty=1, is_round=False,
+                   x0=5000, x1=5600, y0=5000, y1=5510, z0=0, z1=660,
+                   cx=5300, cy=5255)
+    big = GAPart(tag="T-101", obj_tag="t101", name="Fresh Water Storage Tank",
+                 module="m", shape="tank", qty=1, is_round=True,
+                 x0=10000, x1=16000, y0=8000, y1=14000, z0=0, z1=4000,
+                 cx=13000, cy=11000)
+    bbox = {"x_min_mm": 0, "x_max_mm": 30000, "y_min_mm": 0, "y_max_mm": 20000,
+            "z_min_mm": 0, "z_max_mm": 5000}
+    svg_txt = build_ga_svg([big, small], bbox, "water_treatment", {"count": 2})
+    if ">P-106<" not in svg_txt:
+        print("  FAIL ga-small-tag: a drawn-but-tiny part must carry its FULL tag "
+              "in the GA text (P-106 absent — the v58b untagged-pump defect)")
+        bad += 1
+    if ">T-101<" not in svg_txt:
+        print("  FAIL ga-small-tag: the large part's in-place tag must still render")
+        bad += 1
+    if build_ga_svg([big, small], bbox, "water_treatment", {"count": 2}) != svg_txt:
+        print("  FAIL ga-small-tag: the GA render must stay deterministic")
         bad += 1
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0

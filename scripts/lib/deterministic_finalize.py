@@ -14,6 +14,14 @@ the offending content is authored/mutated LATE (Phase-2 reviewers + downstream b
 mirrors a universal-grammar-gate one-for-one and is verified against a Python replica of that gate.
 
 Fixes (all deterministic, order-stable, idempotent):
+ -1. class_alien_control_rename — a telemetry/SCADA-family word whose NAME is class-alien
+     (the gate-34-style suppress-on-home-class CLASS_ALIEN_MARKERS vocabulary, shared with
+     the exporter's row check) on a plant whose BRIEF names its control system is RENAMED
+     to the brief's named system (ids + modifier structure preserved; rename provenance
+     recorded; the DB fill then serves the named system's MPN). NEVER fires without a
+     brief-named replacement — an alien name with no brief-named system stays, honestly
+     flagged by the exporter's class-alien row check. Runs FIRST so every later prose fix
+     sees the corrected name.
   0. sub_module_word_density — MERGE each thin (<5-word, non-exempt) sub-module into its DENSEST
      eligible sibling in the SAME module (words moved verbatim; grammar_links rewritten; emptied
      shell deleted). Mirrors the gate's own exemptions (faithful split partition, single-thin-4-word)
@@ -55,6 +63,187 @@ def _words(sm):
 def _name(w):
     cc = w.get("content_character") or {}
     return cc.get("name_human") or w.get("name_human") or ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# -1. class_alien_control_rename — the brief-named control system replaces a
+#     class-alien telemetry/SCADA brand (codema v58b: the generator kept
+#     re-emitting 'Aquavista Remote Monitoring' — an AQUACULTURE SCADA product —
+#     on a water plant whose brief NAMES its control system:
+#       "F. PROCESS-CONTROL COMPUTER — a horticultural irrigation/fertigation
+#        process computer (Hoogendoorn iSii class) managing the irrigation
+#        scheduling, …"
+#     The rename is deterministic + universal: it fires ONLY when (a) the word is
+#     telemetry/SCADA-family, (b) its name trips a CLASS_ALIEN_MARKERS marker whose
+#     home class is NOT this plant's class (gate-34 suppress-on-home-class), and
+#     (c) the brief STATES a named control system to rename TO. Ids and modifier
+#     structure are preserved; every human-name echo of the alien name (BoM
+#     requirement, cost label, part-verification word_name, prose) is renamed so
+#     the artefact is consistent and the DB fill serves the named system's MPN.
+#     Without a brief-named replacement NOTHING is renamed — the exporter's
+#     class-alien row check keeps flagging it (honest).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ONE-SOURCE vocabulary — the exporter's ledger row check (_class_alien_reason in
+# scripts/build-excel-export.py) imports THIS table, so the flagger and the fixer
+# can never disagree on what "class-alien" means. Each entry: (domain label,
+# marker regex, home-class regex — the marker is LEGITIMATE on its home class).
+CLASS_ALIEN_MARKERS = [
+    ("aquaculture monitoring/SCADA",
+     re.compile(r"\baquavista\b|\bfishtalk\b|\bakva\s?connect\b|\bfeed\s?barge\b|"
+                r"\bbiomass\s+(?:camera|estimat)", re.I),
+     re.compile(r"aquaculture|\bras\b|fish|hatchery", re.I)),
+    ("hydroponic / grow-room",
+     re.compile(r"\bnutrient\s+film\s+technique\b|\bebb\s*&?\s*flow\s+tray\b|"
+                r"\bgrow\s?light\b", re.I),
+     re.compile(r"vertical_farm|hydroponic|greenhouse|grow", re.I)),
+    ("marine / subsea",
+     re.compile(r"\bsacrificial\s+anode\b|\bhull\s+penetrator\b|\bbilge\s+pump\b", re.I),
+     re.compile(r"\bauv\b|\brov\b|marine|subsea|submersible|naval|ship|boat", re.I)),
+]
+
+# telemetry / SCADA family — mirrors the parts-ledger control-type vocabulary (a
+# remote-monitoring gateway / SCADA head / data logger is a CONTROL system).
+_TELEMETRY_RE = re.compile(
+    r"\bSCADA\b|telemetry|remote\s*monitor|data\s*logg(?:er|ing)|edge\s*gateway|"
+    r"cloud\s*(?:monitor|link|gateway|platform)|\bIoT\b", re.I)
+
+# a brief-NAMED control system: a Brand + Model token pair stated in a control-
+# system context ("… process computer (Hoogendoorn iSii class) …", "… a Siemens
+# S7-1500 PLC …"). The CONTEXT word must appear within the same sentence.
+_CTRL_CONTEXT_RE = re.compile(
+    r"process[- ]computer|control(?:\s+system|ler)?\b|\bSCADA\b|\bPLC\b|\bDCS\b|"
+    r"automation\s+system|process\s+controller", re.I)
+_BRAND_MODEL_RE = re.compile(
+    # Brand (capitalised word ≥3 chars) + Model (token with a letter, may carry
+    # digits/dots/dashes), optionally suffixed '-class'/' class' — the brief idiom
+    # for "this named system or equivalent".
+    r"\b([A-Z][a-zA-Z]{2,})\s+([A-Za-z][\w.\-]*\w)(?:[- ]?class\b)?")
+
+
+def _product_class(state) -> str:
+    for ck in ("orchestratorContract", "parsedBrief", "engineeringContract"):
+        pc = (state.get(ck) or {}).get("product_class")
+        if pc:
+            return str(pc)
+    return ""
+
+
+def _brief_text(state) -> str:
+    pb = state.get("parsedBrief") or {}
+    br = state.get("brief") or {}
+    for cand in (pb.get("original_text"), br.get("original_text"),
+                 (br.get("parsed_original") or {}).get("original_text") if isinstance(br.get("parsed_original"), dict) else None):
+        if isinstance(cand, str) and cand.strip():
+            return cand
+    return ""
+
+
+def brief_named_control_system(state) -> str | None:
+    """The control system the BRIEF names ('Hoogendoorn iSii'), or None. Deterministic:
+    the FIRST Brand+Model pair found in a sentence that also carries control-system
+    vocabulary. A generic phrase without a branded name returns None."""
+    text = _brief_text(state)
+    if not text:
+        return None
+    for sentence in re.split(r"(?<=[.;])\s+|\n", text):
+        if not _CTRL_CONTEXT_RE.search(sentence):
+            continue
+        for m in _BRAND_MODEL_RE.finditer(sentence):
+            brand, model = m.group(1), m.group(2)
+            # the pair must not be the context noun itself ("Process Computer") or a
+            # sentence-initial article pair; the MODEL must carry a digit OR mixed case
+            # (iSii / S7-1500 / EWN-C21) so plain prose bigrams never match.
+            if _CTRL_CONTEXT_RE.fullmatch(f"{brand} {model}"):
+                continue
+            if not (re.search(r"\d", model) or re.search(r"[a-z][A-Z]|^[a-z].*[A-Z]", model)):
+                continue
+            return f"{brand} {model}"
+    return None
+
+
+def _alien_hit(name: str, product_class: str):
+    """The (match, domain) of a class-alien marker in `name`, or None — suppressed on
+    the marker's home class (gate-34 pattern)."""
+    for dom, marker, legit in CLASS_ALIEN_MARKERS:
+        hit = marker.search(str(name or ""))
+        if hit and not legit.search(str(product_class or "")):
+            return hit, dom
+    return None
+
+
+def _replace_everywhere(node, patterns):
+    """Recursively apply [(compiled_rx, replacement)] to every STRING VALUE in the state
+    (never dict keys). Snake_case identifiers survive because every pattern is bounded
+    by (?<!\\w)…(?!\\w) — an id token like 'aquavista_remote_monitoring_word' has \\w on
+    both sides of the brand token, so ids are structurally untouchable."""
+    n = 0
+    if isinstance(node, dict):
+        for k, v in list(node.items()):
+            if isinstance(v, str):
+                new = v
+                for rx, rep in patterns:
+                    new = rx.sub(rep, new)
+                if new != v:
+                    node[k] = new
+                    n += 1
+            else:
+                n += _replace_everywhere(v, patterns)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            if isinstance(v, str):
+                new = v
+                for rx, rep in patterns:
+                    new = rx.sub(rep, new)
+                if new != v:
+                    node[i] = new
+                    n += 1
+            else:
+                n += _replace_everywhere(v, patterns)
+    return n
+
+
+def rename_class_alien_control(state) -> int:
+    """Fix -1 — rename each class-alien telemetry/SCADA word to the brief's named
+    control system. Returns the number of WORDS renamed (0 when the brief names no
+    system — the alien name then stays, honestly flagged downstream)."""
+    pclass = _product_class(state)
+    patterns = []          # collected, then applied state-wide in ONE deterministic pass
+    provenance = []        # (word, note) — stamped AFTER the sweep so the note keeps the OLD name
+    for m in _modules(state):
+        for sm in (m.get("sub_modules") or []):
+            for w in _words(sm):
+                name = _name(w)
+                if not name or not _TELEMETRY_RE.search(name):
+                    continue
+                hit_dom = _alien_hit(name, pclass)
+                if not hit_dom:
+                    continue
+                target = brief_named_control_system(state)
+                if not target:
+                    continue        # no brief-named replacement → stays flagged (honest)
+                hit, dom = hit_dom
+                alien_token = hit.group(0)
+                if target.lower() in name.lower():
+                    continue        # already renamed (idempotent)
+                new_name = (name[:hit.start()] + target + name[hit.end():]).strip()
+                # the exact full-name echo first (BoM requirement / cost label / prose),
+                # then any leftover standalone brand token ('the Aquavista gateway').
+                # (?<!\w)/(?!\w) boundaries keep snake_case ids + character_ids intact.
+                patterns.append((re.compile(r"(?<!\w)" + re.escape(name) + r"(?!\w)", re.I),
+                                 new_name))
+                patterns.append((re.compile(r"(?<!\w)" + re.escape(alien_token) + r"(?!\w)", re.I),
+                                 target))
+                provenance.append((w, (
+                    f"deterministic_finalize class_alien_control_rename: '{name}' is a "
+                    f"{dom} name on a '{pclass or 'unknown'}' plant; the brief names the "
+                    f"control system '{target}', so the word is renamed to '{new_name}' "
+                    f"(id + modifier structure preserved)")))
+    if patterns:
+        _replace_everywhere(state, patterns)
+    for w, note in provenance:      # after the sweep — the note must keep the OLD name verbatim
+        w["rename_provenance"] = note
+    return len(provenance)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -450,7 +639,10 @@ def count_violations(state):
 
 def finalize(state) -> dict:
     r = {
-        # density merge FIRST so prose coverage (fix 2) names the transplanted words
+        # class-alien rename VERY FIRST so every later fix (density merge / prose
+        # coverage / overview scrub) sees the corrected, brief-named system name
+        "class_alien_renamed": rename_class_alien_control(state),
+        # density merge next so prose coverage (fix 2) names the transplanted words
         "thin_sub_modules_merged": merge_thin_sub_modules(state),
         "modifier_conflicts_fixed": fix_modifier_conflicts(state),
         "prose_covered": fix_prose_coverage(state),
@@ -555,12 +747,81 @@ def _selftest() -> int:
         and not any(w.get("id") == "wdc" and s["id"] == "m1__ac_switchgear"
                     for s in d_subs for w in s.get("words") or [])              # …dc one stays put
 
-    if ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok and domain_ok:
-        print("deterministic_finalize selftest OK (density-merge / modifier / prose / overview / idempotent)")
+    # ── fix -1: class_alien_control_rename — proveCatch BOTH directions ────────
+    def _alien_state(brief_text, pclass="water_treatment", name="Aquavista Remote Monitoring"):
+        return {
+            "orchestratorContract": {"product_class": pclass},
+            "parsedBrief": {"original_text": brief_text},
+            "moduleDecomposition": {"modules": [{
+                "module": "control_compute_communication",
+                "overview_paragraph_en": f"Plant telemetry is provided by the {name} gateway. " * 3,
+                "sub_modules": [{
+                    "id": "ccc__plc", "english_sentence": f"The group integrates a {name} unit.",
+                    "words": [{
+                        "id": "aquavista_remote_monitoring_word",
+                        "name_human": name,
+                        "content_character": {"character_id": "aquavista_remote_monitoring",
+                                              "name_human": name},
+                        "modifier_characters": [
+                            {"kind": "quantity", "value": "×1"},
+                            {"kind": "form", "value": f"{name} — representative control component"},
+                            {"kind": "part_number", "value": "TBD (detailed design)"}],
+                    }] + [_w(i) for i in range(4)]}]}]},
+            "requirementsBom": [{"tag": "X-119", "requirement": name, "part": "requirement stated"}],
+            "costBasis": {"lines": [{"word_id": "aquavista_remote_monitoring_word", "label": name}]},
+        }
+
+    _brief_named = ("The plant control uses a horticultural irrigation/fertigation process "
+                    "computer (Hoogendoorn iSii class) managing the irrigation scheduling.")
+    # (a) FIRES: alien telemetry name + brief-named system → renamed EVERYWHERE the
+    #     name is echoed; ids + modifier structure preserved; provenance recorded.
+    st_a = _alien_state(_brief_named)
+    n_a = rename_class_alien_control(st_a)
+    w_a = st_a["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"][0]
+    rename_ok = (
+        n_a == 1
+        and w_a["name_human"] == "Hoogendoorn iSii Remote Monitoring"
+        and w_a["content_character"]["name_human"] == "Hoogendoorn iSii Remote Monitoring"
+        and w_a["id"] == "aquavista_remote_monitoring_word"                        # id PRESERVED
+        and w_a["content_character"]["character_id"] == "aquavista_remote_monitoring"
+        and len(w_a["modifier_characters"]) == 3                                   # structure PRESERVED
+        and w_a["modifier_characters"][1]["value"].startswith("Hoogendoorn iSii Remote Monitoring")
+        and st_a["requirementsBom"][0]["requirement"] == "Hoogendoorn iSii Remote Monitoring"
+        and st_a["costBasis"]["lines"][0]["label"] == "Hoogendoorn iSii Remote Monitoring"
+        and "Hoogendoorn iSii" in st_a["moduleDecomposition"]["modules"][0]["overview_paragraph_en"]
+        and "Aquavista" not in json.dumps(st_a["requirementsBom"])
+        and "'Aquavista Remote Monitoring'" in w_a.get("rename_provenance", "")
+        and "Hoogendoorn iSii class" in st_a["parsedBrief"]["original_text"]       # brief text untouched
+        and rename_class_alien_control(st_a) == 0)                                 # idempotent
+    # (b) NEVER fires without a brief-named replacement — alien stays, honestly flagged.
+    st_b = _alien_state("The plant needs a modern control system with remote monitoring.")
+    rename_none_ok = (rename_class_alien_control(st_b) == 0
+                      and st_b["moduleDecomposition"]["modules"][0]["sub_modules"][0]
+                              ["words"][0]["name_human"] == "Aquavista Remote Monitoring")
+    # (c) suppressed on the marker's HOME class (Aquavista on an aquaculture plant is legitimate).
+    st_c = _alien_state(_brief_named, pclass="aquaculture_ras")
+    home_ok = rename_class_alien_control(st_c) == 0
+    # (d) a NON-telemetry word never renames under this rule (it is not a control-system swap).
+    st_d = _alien_state(_brief_named, name="Feed Barge Chute")
+    non_telemetry_ok = rename_class_alien_control(st_d) == 0
+    # (e) the brief extractor: named system found; generic prose → None.
+    extract_ok = (brief_named_control_system({"parsedBrief": {"original_text": _brief_named}})
+                  == "Hoogendoorn iSii"
+                  and brief_named_control_system({"parsedBrief": {"original_text":
+                      "A robust control system shall manage the plant."}}) is None)
+
+    if (ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok
+            and domain_ok and rename_ok and rename_none_ok and home_ok and non_telemetry_ok
+            and extract_ok):
+        print("deterministic_finalize selftest OK (class-alien-rename / density-merge / "
+              "modifier / prose / overview / idempotent)")
         return 0
     print(f"SELFTEST FAIL: ok={ok} idem={idem} named={named} one_dim={one_dim} "
           f"merge_ok={merge_ok} loop_ok={loop_ok} exempt_ok={exempt_ok} "
-          f"partition_ok={partition_ok} domain_ok={domain_ok} before={before} after={after}")
+          f"partition_ok={partition_ok} domain_ok={domain_ok} rename_ok={rename_ok} "
+          f"rename_none_ok={rename_none_ok} home_ok={home_ok} "
+          f"non_telemetry_ok={non_telemetry_ok} extract_ok={extract_ok} "
+          f"before={before} after={after}")
     return 1
 
 
@@ -577,12 +838,13 @@ def main(argv) -> int:
     with open(sp, "r", encoding="utf-8") as fh:
         state = json.load(fh)
     r = finalize(state)
-    if (r["thin_sub_modules_merged"] or r["modifier_conflicts_fixed"]
+    if (r["class_alien_renamed"] or r["thin_sub_modules_merged"] or r["modifier_conflicts_fixed"]
             or r["prose_covered"] or r["overview_scrubbed"]):
         with open(sp, "w", encoding="utf-8") as fh:
             json.dump(state, fh)
     rv = r["residual_violations"]
-    print(f"[deterministic-finalize] density-merged={r['thin_sub_modules_merged']} "
+    print(f"[deterministic-finalize] class-alien-renamed={r['class_alien_renamed']} "
+          f"density-merged={r['thin_sub_modules_merged']} "
           f"modifiers={r['modifier_conflicts_fixed']} prose={r['prose_covered']} "
           f"overview={r['overview_scrubbed']} · residual violations {rv}")
     return 0
