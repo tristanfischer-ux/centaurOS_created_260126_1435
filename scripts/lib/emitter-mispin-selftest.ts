@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -73,5 +73,61 @@ expect(isMotorDriveSlot('Irrigation Pump') === false, "a pump is not a drive (it
 expect(isMotorDriveSlot('Direct Drive Generator') === false, "a direct-drive generator is not a motor controller")
 expect(isMotorDriveSlot('Hard Disk Drive') === false, "a disk drive is not a motor controller")
 
+// ── BAR A (2026-07-03): plural-folded candidacy lexicon — an industrial catalogue family must be a
+//    fill-blank candidate (the singular-only \bvalve\b + missing nouns kept 52 engineered lines TBD
+//    while their verified parts sat in forge-truth.db), and scope/structural items must stay refused.
+expect(foldPluralToken('valves') === 'valve' && foldPluralToken('switches') === 'switch' &&
+       foldPluralToken('batteries') === 'battery' && foldPluralToken('ups') === 'ups',
+  'plural fold: valves→valve, switches→switch, batteries→battery; UPS never folds')
+for (const nm of ['Manual Isolation Valves', 'Pressure Transmitters', 'Control + Instrument UPS',
+                  'Standby Diesel Generator', 'SCADA / Plant Control System', 'pH Analyser',
+                  'UV Disinfection', 'Electrical Control Panel', 'Main Switchboard',
+                  'Emergency Stop Button', 'Variable-Speed Drive', 'Surge Protection Device']) {
+  expect(isCatalogueComponent(nm) === true, `Bar A candidacy: '${nm}' is a purchased catalogue family`)
+}
+for (const nm of ['Piping Network', 'Stack Design', 'battery_pack_enclosure', 'Access Panel',
+                  'wing_spar', 'motor_pylon_mount']) {
+  expect(isCatalogueComponent(nm) === false, `Bar A candidacy: '${nm}' stays structural/scope (never MPN-pinned)`)
+}
+
+// ── TYPE-COHERENCE (gate-15 spirit): the head noun must hit the candidate's LEADING family phrase.
+//    The Hoogendoorn iSii (a process COMPUTER whose text mentions 'fertigation') must never pin the
+//    'Fertigation Dosing Pump' word; the type-correct Grundfos dosing pump must.
+const _iSii: DbPart = { part_name: 'SCADA / plant control system — horticultural irrigation and fertigation process computer', manufacturer: 'Hoogendoorn', part_number: 'iSii', component_class: 'water_treatment', unit_price_gbp: null }
+const _grundfos: DbPart = { part_name: 'Fertigation dosing / injection pump — vertical multistage, 30 m3/h @ 53.1 m, 7.5 kW', manufacturer: 'Grundfos', part_number: '96122012', component_class: 'water_treatment', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_iSii, 'Fertigation Dosing Pump') === false,
+  "the iSii process computer MUST be refused on a dosing PUMP word (the lm-only-rubber-stamped mis-pin family)")
+expect(dbHitAcceptableForWord(_grundfos, 'Fertigation Dosing Pump') === true,
+  'the type-correct Grundfos fertigation dosing pump MUST be accepted')
+expect(dbHitAcceptableForWord(_iSii, 'SCADA / Plant Control System') === true,
+  'the iSii MUST still pin its OWN family (a SCADA/plant-control word)')
+const _panelPc: DbPart = { part_name: 'HMI Displays & Panel PCs 12.1" XGA fanless touch panel computer with Intel Celeron processor N3060, 5-wire resistive touch screen and 24 VDC power input (terminal block connector)', manufacturer: 'Axiomtek', part_number: 'GOT5120T-845', component_class: 'oem_subsystem', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_panelPc, 'Terminal Blocks') === false,
+  "a panel PC whose spec TAIL says '(terminal block connector)' must never pin 'Terminal Blocks' (lead-segment discipline)")
+const _wika: DbPart = { part_name: 'Pressure transmitter — 0-7 bar (0-100 psi), 4-20 mA, G1/4', manufacturer: 'WIKA', part_number: '50372475', component_class: 'water_treatment', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_wika, 'Low Pressure Switch') === false,
+  'a pressure TRANSMITTER must never pin a pressure SWITCH word (head-noun families never cross)')
+const _eatonEstop: DbPart = { part_name: 'Emergency stop switch station — safety mushroom pushbutton 38 mm, pull-to-release, 1NC+1NO (ISO 13850)', manufacturer: 'Eaton', part_number: '216516', component_class: 'water_treatment', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_eatonEstop, 'Emergency Stop Button') === true,
+  "the Eaton e-stop SWITCH station must pin the 'Emergency Stop Button' word (same-family head synonym)")
+expect(isAccessoryRow('Circuit Breaker Accessories 508, DM, 40A Entrance Supply module REX12-T') === true &&
+       isAccessoryRow('Mains incomer circuit breaker — Tmax XT1N 160 MCCB') === false,
+  'an ACCESSORY row is recognised by its lead family phrase; a primary breaker is not')
+expect(headNounHit(partNameLeadSegment('Board Mount Pressure Sensors Harsh Media 100PSI Absolute Pressure Element, Sawn Wafer on Tape'), 'element') === false,
+  "a tail 'Element' mention on a board-mount sensor never counts as the family (lead segment cuts it)")
+
+// ── BAR B: DUTY-AWARE motor-drive pin — in-band pins allowed, undersize stays refused, no-duty stays TBD.
+expect(motorDriveRatingAcceptable(15, 5.5) === false,
+  'the ACS580 5.5 kW frame on a 15 kW pump duty (the original physics HIGH) must stay refused')
+expect(motorDriveRatingAcceptable(4.2, 4) === true && motorDriveRatingAcceptable(7.5, 15) === true,
+  'frame-rounding (4 kW on 4.2 kW nameplate) and next-frame-up (15 kW on 7.5 kW) are in band')
+expect(motorDriveRatingAcceptable(4.2, null) === false, 'a candidate with NO parseable kW never pins')
+expect(partPowerRatingKw({ part_name: 'VFD drive — variable frequency drive 15 kW, 3x380-480 V, IP20, 31 A (VLT Micro Drive FC-51)' }) === 15,
+  "the drive kW parses from the row's family text")
+expect(wordMotorDriveDutyKw({ modifier_characters: [{ kind: 'rating_primary', value: '7.5', unit: 'kW' }] } as any) === 7.5,
+  "the driven-motor duty reads from the word's own rating_primary kW")
+expect(wordMotorDriveDutyKw({ modifier_characters: [{ kind: 'quantity', value: '×1' }] } as any) === null,
+  'a duty-less drive word resolves NO duty (stays the honest generic TBD)')
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band proven)')

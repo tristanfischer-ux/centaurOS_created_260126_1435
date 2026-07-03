@@ -201,10 +201,65 @@ function honestDescriptorMpn(): string {
 // an integrated-assembly COST signal, not a structure signal, and misfires
 // (passes `motor_pylon_mount` via "motor"; skips `flight computer`/`connector`).
 // This dedicated classifier scored 8/8 on the council's test-names.
-const STRUCTURAL_TOKENS =
-  /\b(spar|laminate|skin|panel|rib|bulkhead|frame|strut|mount|pylon|boom|keel|mast|shell|fairing|cowl|shroud|enclosure|chassis|housing|bracket|casing|ballast|foundation|tower|nacelle|hull|fuselage|airframe|structure|structural|monocoque|honeycomb|prepreg|layup|weldment)\b/i
-const CATALOGUE_TOKENS =
-  /\b(sensor|driver|controller|computer|processor|board|ic|chip|connector|cable|harness|antenna|transceiver|receiver|radio|motor|servo|actuator|esc|regulator|converter|inverter|relay|switch|fuse|capacitor|resistor|inductor|diode|transistor|mosfet|battery|cell|pump|valve|fan|gps|imu|gyro|accelerometer|magnetometer|altimeter|camera|lidar|sonar|encoder|amplifier|oscillator|led|display|gimbal|bearing|gearbox|coupling|compressor|chiller|heater|thermocouple|solenoid)\b/i
+const STRUCTURAL_TOKEN_SET = new Set<string>([
+  'spar', 'laminate', 'skin', 'panel', 'rib', 'bulkhead', 'frame', 'strut', 'mount',
+  'pylon', 'boom', 'keel', 'mast', 'shell', 'fairing', 'cowl', 'shroud', 'enclosure',
+  'chassis', 'housing', 'bracket', 'casing', 'ballast', 'foundation', 'tower',
+  'nacelle', 'hull', 'fuselage', 'airframe', 'structure', 'structural', 'monocoque',
+  'honeycomb', 'prepreg', 'layup', 'weldment',
+])
+const CATALOGUE_TOKEN_SET = new Set<string>([
+  'sensor', 'driver', 'controller', 'computer', 'processor', 'board', 'ic', 'chip',
+  'connector', 'cable', 'harness', 'antenna', 'transceiver', 'receiver', 'radio',
+  'motor', 'servo', 'actuator', 'esc', 'regulator', 'converter', 'inverter', 'relay',
+  'switch', 'fuse', 'capacitor', 'resistor', 'inductor', 'diode', 'transistor',
+  'mosfet', 'battery', 'cell', 'pump', 'valve', 'fan', 'gps', 'imu', 'gyro',
+  'accelerometer', 'magnetometer', 'altimeter', 'camera', 'lidar', 'sonar', 'encoder',
+  'amplifier', 'oscillator', 'led', 'display', 'gimbal', 'bearing', 'gearbox',
+  'coupling', 'compressor', 'chiller', 'heater', 'thermocouple', 'solenoid',
+  // ── BAR-A LEXICON EXTENSION (2026-07-03). 52 engineered TBD lines on codema
+  // v59 while their verified parts sat embedded in forge-truth.db — the candidacy
+  // gate refused whole industrial-catalogue families. These are ALL purchased
+  // catalogue items (a Rosemount transmitter, an Eaton 9SX UPS, an ABB MCCB, a
+  // WEDECO UV unit are bought by MPN, not fabricated). UNIVERSAL nouns — no class
+  // table. 'panel'/'enclosure'/'cabinet' stay structural UNLESS qualified as a
+  // control/electrical housing (head-noun discipline, see the qualified-housing
+  // override below).
+  'transmitter', 'transducer', 'analyser', 'analyzer', 'generator', 'genset', 'ups',
+  'breaker', 'mccb', 'switchboard', 'transformer', 'softener', 'filter',
+  'disinfection', 'plc', 'hmi', 'touchscreen', 'gateway', 'interface', 'scada',
+  'dosing', 'doser', 'spd', 'surge', 'button', 'pushbutton',
+  // Motor-drive nouns admitted so the DUTY-AWARE drive pin (Bar B, below) can
+  // reach a 'Variable-Speed Drive' word at all — the guard isMotorDriveSlot still
+  // routes them to the sized-to-motor path, never a loose name match.
+  'drive', 'vfd', 'vsd', 'starter',
+])
+
+// English plural→singular fold for TOKEN classification + matching (the f9dfc2918
+// stem discipline applied to plurals): 'valves'→'valve', 'switches'→'switch',
+// 'batteries'→'battery'. Conservative — never folds short tokens, -ss/-us/-is
+// endings (chassis, modbus, stainless) or known non-plurals (UPS, lens, bellows),
+// so an acronym/mass noun is never mangled into a false match.
+const NEVER_FOLD = new Set<string>(['ups', 'lens', 'bellows', 'scada'])
+export function foldPluralToken(t: string): string {
+  const s = String(t ?? '').toLowerCase()
+  if (s.length < 4 || NEVER_FOLD.has(s)) return s
+  if (/[^aeiou]ies$/.test(s)) return s.slice(0, -3) + 'y'
+  if (/(ches|shes|sses|xes|zes)$/.test(s)) return s.slice(0, -2)
+  if (/s$/.test(s) && !/(ss|us|is)$/.test(s)) return s.slice(0, -1)
+  return s
+}
+
+// 'panel' / 'enclosure' / 'cabinet' are structural (a fabricated skin/housing) —
+// UNLESS the name qualifies them as a CONTROL/ELECTRICAL housing (an 'Electrical
+// Control Panel', a Rittal 'control panel enclosure', an 'MCC cabinet'), which is
+// a purchased catalogue product. Head-noun discipline: the qualifier admits the
+// housing head; a bare 'battery_pack_enclosure' / 'access panel' stays structural.
+const HOUSING_HEADS = new Set<string>(['panel', 'enclosure', 'cabinet'])
+const HOUSING_QUALIFIERS = new Set<string>([
+  'control', 'electrical', 'electric', 'instrument', 'instrumentation',
+  'distribution', 'junction', 'mcc', 'switchboard', 'switchgear',
+])
 
 /**
  * True when a word is a purchased catalogue component worth attaching a part
@@ -212,17 +267,28 @@ const CATALOGUE_TOKENS =
  * with no clear signal (conservative — never pin an MPN on something uncertain).
  * Ambiguous compounds (catalogue + structural tokens both present, e.g.
  * `motor_pylon_mount`, `battery_pack_enclosure`) are decided by the HEAD noun
- * (last token): a structural head ⇒ structure.
+ * (last token): a structural head ⇒ structure. Tokens are PLURAL-FOLDED first
+ * (2026-07-03) so 'Manual Isolation Valves' / 'Pressure Transmitters' classify
+ * exactly like their singulars — the singular-only \bvalve\b miss was Bar A of
+ * the 52-TBD engineered backlog.
  */
 export function isCatalogueComponent(name: string): boolean {
-  const hay = String(name ?? '').toLowerCase()
-  const structural = STRUCTURAL_TOKENS.test(hay)
-  const catalogue = CATALOGUE_TOKENS.test(hay)
+  const toks = String(name ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map(foldPluralToken)
+  if (toks.length === 0) return false
+  const structural = toks.some((t) => STRUCTURAL_TOKEN_SET.has(t))
+  const qualifiedHousing =
+    toks.some((t) => HOUSING_HEADS.has(t)) && toks.some((t) => HOUSING_QUALIFIERS.has(t))
+  const catalogue = toks.some((t) => CATALOGUE_TOKEN_SET.has(t)) || qualifiedHousing
   if (catalogue && !structural) return true
   if (structural && !catalogue) return false
   if (catalogue && structural) {
-    const lastTok = hay.trim().split(/[^a-z0-9]+/).filter(Boolean).pop() ?? ''
-    return !STRUCTURAL_TOKENS.test(lastTok)
+    const lastTok = toks[toks.length - 1] ?? ''
+    if (HOUSING_HEADS.has(lastTok) && qualifiedHousing) return true
+    return !STRUCTURAL_TOKEN_SET.has(lastTok)
   }
   return false
 }
@@ -240,6 +306,9 @@ export function isBlankOrPlaceholderMpn(pn: string | undefined | null): boolean 
 }
 
 // Strip a trailing "_word" / "_assembly" and split a snake/camel id into tokens.
+// Tokens are PLURAL-FOLDED (2026-07-03, Bar A) so 'Manual Isolation Valves'
+// tokenises to the same distinguishing nouns as 'manual isolation valve' — the
+// DB query + whole-word matching then see ONE stem for both surfaces.
 export function tokenize(s: string | undefined | null): string[] {
   if (!s) return []
   return String(s)
@@ -247,8 +316,15 @@ export function tokenize(s: string | undefined | null): string[] {
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .split(/[^a-z0-9]+/i)
-    .filter((t) => t.length >= 3 && !STOP_TOKENS.has(t))
+    .map(foldPluralToken)
+    .filter((t) => (t.length >= 3 || SHORT_DOMAIN_TOKENS.has(t)) && !STOP_TOKENS.has(t))
 }
+
+// 2-char tokens that ARE distinguishing engineering nouns ('UV Disinfection',
+// 'RO Membrane', 'pH Analyser') — the blanket ≥3-char filter silently dropped
+// them, so a 'Uv Disinfection' word could never reach the WEDECO UV row on the
+// 2-hit acceptance bar.
+const SHORT_DOMAIN_TOKENS = new Set<string>(['uv', 'ro', 'ph'])
 
 // Generic/structural tokens that carry no component-type signal — excluded so a
 // DB match is driven by the DISTINGUISHING noun (blade, gearbox, stator, seal),
@@ -275,6 +351,12 @@ export interface DbPart {
   manufacturer: string
   part_number: string
   component_class: string | null
+  // Ranking provenance (2026-07-03 saturation fix): a CLASS-TAGGED verified row
+  // (confidence ≥ 0.9, discovery_source 'web_verified_ingest' — the deliberate
+  // per-class harvest) outranks a same-strength distributor-sweep row on tie, so
+  // the 36k-row generic sweep can never drown the 33 rows ingested FOR this class.
+  confidence?: number | null
+  discovery_source?: string | null
   // Self-learning price (2026-06-01): pretraining_extracted_parts already carries
   // a real unit_price_gbp on ~83% of MPN-bearing rows. Pull it so a DB-first hit
   // pins the catalogue price (via a list_price_gbp modifier) instead of falling
@@ -344,9 +426,12 @@ export function isElectronicsIcMispin(name: string, manufacturer: string): boole
 // via the loose name match. Keyed on the INDICATOR/PILOT-LIGHT vocabulary in the candidate's name/excerpt
 // (NOT bare component_class 'optical' — that also covers legitimate optical SENSORS) AND the absence of
 // light/indicator words in the slot. UNIVERSAL — no class table.
-const _INDICATOR_LIGHT_RE = /\b(indicator|pilot (?:light|lamp)|signal (?:light|lamp)|ez-?light|beacon|stack light|tower light|pilot light|panel mount light|warning light)\b/i
+const _INDICATOR_LIGHT_RE = /\b(indicators?|pilot (?:lights?|lamps?)|signal (?:lights?|lamps?)|ez[-\s]?light|beacons?|stack lights?|tower lights?|panel mount lights?|warning lights?)\b/i
 export function isIndicatorLightMispin(slotName: string, p: { part_name?: string | null; raw_excerpt?: string | null }): boolean {
-  const cand = `${p.part_name ?? ''} ${p.raw_excerpt ?? ''}`
+  // Judge the candidate by its LEADING family phrase (2026-07-03): a real SPD /
+  // relay whose spec TAIL mentions a 'status indicator' is not an indicator
+  // light — the Phoenix Contact Type-2 SPD was falsely skipped on that tail.
+  const cand = partNameLeadSegment(p.part_name, 8)
   if (!_INDICATOR_LIGHT_RE.test(cand)) return false       // candidate is NOT an indicator/pilot light
   return !_INDICATOR_LIGHT_RE.test(slotName || '')        // …but the slot is not a light/indicator → mis-pin
 }
@@ -374,6 +459,118 @@ export function isMotorDriveSlot(name: string): boolean {
   const n = (name || '').toLowerCase()
   if (/\b(disk|hard|thumb|belt|chain|gear|direct[- ]?)\s*drive\b/.test(n)) return false
   return /\bvfd\b|\bvsd\b|variable[- ]?(?:speed|frequency)[- ]?(?:drive|controller)|soft[- ]?start\w*|motor starter|frequency converter|inverter drive/.test(n)
+}
+
+// ── DUTY-AWARE motor-drive pin (Bar B, 2026-07-03) ───────────────────────────
+// The blanket isMotorDriveSlot refusal contradicted the engine's own data: the
+// contract DOES carry the driven motor's kW on the drive word itself
+// (rating_primary, lineage from the pump words — 'drive-train rating reconciled
+// to the driven machine'). When that duty is resolvable we CAN size the drive:
+// query the DB for a VFD/starter in the duty's kW band and pin it with the basis
+// 'sized to driven motor N kW'. Only when NO duty is resolvable does the slot
+// stay an honest generic TBD. The original mis-size family (ABB ACS580 5.5 kW on
+// a 15 kW pump) stays refused — an out-of-band rating never pins.
+
+/** The drive word's own driven-motor duty in kW (rating_primary), else null. */
+export function wordMotorDriveDutyKw(w: WordLike): number | null {
+  for (const mc of w.modifier_characters ?? []) {
+    if (mc.kind !== 'rating_primary') continue
+    if (!/\bkw\b/i.test(`${String(mc.value ?? '')} ${String(mc.unit ?? '')}`)) continue
+    const v = parseFloat(String(mc.value).replace(/[^0-9.]/g, ''))
+    if (Number.isFinite(v) && v > 0) return v
+  }
+  return null
+}
+
+/** A DB part's power rating (kW) parsed from its name/spec text, else null. */
+export function partPowerRatingKw(p: { part_name?: string | null; raw_excerpt?: string | null }): number | null {
+  const hay = `${p.part_name ?? ''} ${p.raw_excerpt ?? ''}`
+  const m = hay.match(/(\d+(?:\.\d+)?)\s*kW\b/i)
+  return m ? parseFloat(m[1]) : null
+}
+
+/**
+ * Is a candidate drive's rating acceptable for a driven-motor duty? In-band =
+ * [0.85×, 3×] the duty: ≥0.85× tolerates IEC-frame rounding (a 4 kW drive on a
+ * 4.2 kW nameplate the contract itself rounded), ≤3× refuses a grossly-oversized
+ * frame. An undersized drive (the ACS580 5.5 kW on 15 kW — trips under load)
+ * NEVER passes. Pure — proveCatch in emitter-mispin-selftest both directions.
+ */
+export function motorDriveRatingAcceptable(dutyKw: number, ratingKw: number | null): boolean {
+  if (ratingKw === null || !Number.isFinite(dutyKw) || dutyKw <= 0) return false
+  return ratingKw >= dutyKw * 0.85 && ratingKw <= dutyKw * 3
+}
+
+const _DRIVE_FAMILY_SQL_LIKES = [
+  '%vfd%', '%variable frequency%', '%variable-frequency%',
+  '%variable speed%', '%variable-speed%', '%soft start%', '%soft-start%',
+  '%motor starter%', '%frequency converter%', '%inverter drive%',
+]
+
+/**
+ * DB-first lookup DEDICATED to motor drives: candidates must advertise a drive
+ * family in their name AND carry a parseable kW rating INSIDE the duty band.
+ * Among in-band rows, the smallest rating ≥ duty wins (the next frame up — real
+ * drive selection); rows below duty (≥0.85×, frame-rounding) only win when no
+ * row clears the duty. Verified class ingest rows are served first by the same
+ * ORDER BY as dbFirstLookup. Returns null when nothing is in band — the slot
+ * stays an honest generic TBD (never a mis-size).
+ */
+// Drive SUBFAMILY coherence: a 'Variable-Speed Drive' word wants a VFD/VSD row,
+// never a (thermal-magnetic) motor starter/circuit breaker — the GV2ME22 (a
+// TeSys motor circuit breaker whose text carries '11 kW @ 400 V') otherwise
+// wins an 11 kW VSD slot on exact-kW proximity. A 'Motor Starter' / 'Soft
+// Starter' word conversely wants a starter row, not a VFD.
+const _VFD_ROW_RE = /\bvfd\b|\bvsd\b|variable[- ]?(?:speed|frequency)|frequency converter|inverter drive|sinamics|micro ?drive|machinery drive/i
+const _STARTER_ROW_RE = /\bstarter\b|soft[- ]?start/i
+
+export function dbFirstMotorDriveLookup(
+  db: Database.Database | null,
+  dutyKw: number,
+  wordName = '',
+): DbPart | null {
+  if (!db || !Number.isFinite(dutyKw) || dutyKw <= 0) return null
+  const n = (wordName || '').toLowerCase()
+  const wantsVfd = /\bvfd\b|\bvsd\b|variable|frequency|inverter/.test(n)
+  const wantsStarter = !wantsVfd && /soft[- ]?start|starter/.test(n)
+  let rows: DbPart[]
+  try {
+    const stmt = db.prepare(`
+      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp,
+             raw_excerpt, confidence, discovery_source
+      FROM pretraining_extracted_parts
+      WHERE manufacturer IS NOT NULL AND manufacturer != ''
+        AND part_number IS NOT NULL AND length(part_number) >= 4
+        AND (${_DRIVE_FAMILY_SQL_LIKES.map(() => 'LOWER(part_name) LIKE ?').join(' OR ')})
+      ORDER BY (CASE WHEN discovery_source = 'web_verified_ingest'
+                      AND IFNULL(confidence, 0) >= 0.9 THEN 1 ELSE 0 END) DESC,
+               IFNULL(confidence, 0) DESC, id DESC
+      LIMIT 200
+    `)
+    rows = stmt.all(..._DRIVE_FAMILY_SQL_LIKES) as DbPart[]
+  } catch {
+    return null
+  }
+  let best: { row: DbPart; rating: number } | null = null
+  for (const r of rows) {
+    // Subfamily coherence (see _VFD_ROW_RE above): judged on the LEAD family
+    // phrase of the part name, same discipline as dbHitAcceptableForWord.
+    const lead = partNameLeadSegment(r.part_name, 10)
+    if (wantsVfd && !_VFD_ROW_RE.test(lead)) continue
+    if (wantsStarter && !_STARTER_ROW_RE.test(lead)) continue
+    // A soft-starter/overload row rated in A only (no kW) never pins here —
+    // amps-to-kW needs a voltage assumption this function refuses to make.
+    const rating = partPowerRatingKw(r)
+    if (!motorDriveRatingAcceptable(dutyKw, rating)) continue
+    if (!best) { best = { row: r, rating: rating! }; continue }
+    const bestClears = best.rating >= dutyKw
+    const candClears = rating! >= dutyKw
+    if (candClears && !bestClears) best = { row: r, rating: rating! }
+    else if (candClears === bestClears && Math.abs(rating! - dutyKw) < Math.abs(best.rating - dutyKw)) {
+      best = { row: r, rating: rating! }
+    }
+  }
+  return best?.row ?? null
 }
 
 // A BOARD-MOUNT / PCB SENSOR — a surface-mount component (Honeywell HSC/SSC/ABP/MPR/TBP/NBP/RSC/DLC/DLV
@@ -482,10 +679,84 @@ function openLibraryDb(dbPath: string): Database.Database | null {
 // it is a genuine word. Word-boundary matching kills the substring false-
 // positives that the first cut produced.
 function hasWholeWord(hay: string, token: string): boolean {
-  if (token.length < 3) return false
+  // 2-char engineering nouns (UV / RO / pH) are real distinguishing tokens —
+  // everything else under 3 chars stays banned (substring-noise discipline).
+  if (token.length < 3 && !SHORT_DOMAIN_TOKENS.has(token.toLowerCase())) return false
   // Escape regex metachars in token (tokens are alnum so this is belt+braces).
   const esc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`(?:^|[^a-z0-9])${esc}(?:[^a-z0-9]|$)`, 'i').test(hay)
+}
+
+/** Plural-tolerant whole-word membership: 'valve' matches 'Valves', 'switch'
+ *  matches 'switches' — BOTH sides folded (the Bar-A stem discipline). */
+export function hasWholeWordFolded(hay: string, token: string): boolean {
+  if (hasWholeWord(hay, token)) return true
+  const folded = foldPluralToken(token)
+  if (folded !== token && hasWholeWord(hay, folded)) return true
+  // Fold the HAY side too: split, fold each token, retest.
+  const foldedHay = String(hay ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map(foldPluralToken)
+    .join(' ')
+  return hasWholeWord(foldedHay, folded)
+}
+
+/** True for a CLASS-TAGGED verified-ingest DB row (the deliberate per-class
+ *  harvest — rounds 1+2). Used as the tie-break signal in candidate ranking. */
+export function isVerifiedIngestRow(p: Pick<DbPart, 'confidence' | 'discovery_source'>): boolean {
+  return (p.discovery_source ?? '') === 'web_verified_ingest' && (p.confidence ?? 0) >= 0.9
+}
+
+// HEAD-NOUN synonym families for type-coherence: a word's component family may
+// be written differently in the catalogue row ('Emergency Stop Button' ↔ Eaton's
+// 'safety mushroom PUSHBUTTON ... switch station'). DELIBERATELY tiny — only
+// true same-family synonyms; 'transmitter' is NEVER a synonym of 'switch'
+// (proveCatch: a pressure transmitter must not join a pressure switch).
+const HEAD_NOUN_SYNONYMS: Record<string, string[]> = {
+  button: ['switch', 'pushbutton'],
+  pushbutton: ['button', 'switch'],
+  analyser: ['analyzer'],
+  analyzer: ['analyser'],
+  vsd: ['vfd', 'drive'],
+  vfd: ['vsd', 'drive'],
+  genset: ['generator'],
+  touchscreen: ['hmi'],   // an industrial 'HMI Touchscreen' word ↔ an 'HMI Displays & Panel PCs …' catalogue family
+  hmi: ['touchscreen'],
+}
+
+/** Does the candidate hay contain the word's HEAD NOUN (fold- and
+ *  synonym-tolerant)? The type-coherence primitive (gate-15 spirit). */
+export function headNounHit(hay: string, headNoun: string): boolean {
+  const head = foldPluralToken(headNoun)
+  if (hasWholeWordFolded(hay, head)) return true
+  return (HEAD_NOUN_SYNONYMS[head] ?? []).some((syn) => hasWholeWordFolded(hay, syn))
+}
+
+/**
+ * The LEADING FAMILY SEGMENT of a catalogue part name — its first few tokens.
+ * Distributor + ingest rows both LEAD with the component family ('Board Mount
+ * Pressure Sensors …', 'Variable Frequency Drives - VFDs …', 'Pressure
+ * transmitter — 0-7 bar …'); incidental mentions of OTHER families live in the
+ * spec tail ('…24 VDC power input (terminal block connector)' on a panel PC,
+ * '…exchangeable connectors' on a flow sensor, '…remote monitoring and control'
+ * on a smart-home valve — each a REAL v59 dry-run mis-pin). Type coherence is
+ * therefore judged against the lead segment, never the tail.
+ */
+export function partNameLeadSegment(partName: string | null | undefined, nTokens = 6): string {
+  return String(partName ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .slice(0, nTokens)
+    .join(' ')
+}
+
+/** An ACCESSORY catalogue row ('Circuit Breaker Accessories …', '… Accessory,
+ *  REX12 …') must never pin a PRIMARY-equipment word that did not ask for an
+ *  accessory. */
+export function isAccessoryRow(partName: string | null | undefined): boolean {
+  return /\baccessor(?:y|ies)\b/i.test(partNameLeadSegment(partName, 8))
 }
 
 // Hobby / maker-electronics + small-board vendors. Their catalogue rows are
@@ -536,6 +807,7 @@ export function dbFirstLookup(
   db: Database.Database | null,
   tokens: string[],
   headNoun: string | null,
+  opts: { excludeMakerVendors?: boolean } = {},
 ): DbPart | null {
   if (!db || tokens.length === 0) return null
 
@@ -554,14 +826,22 @@ export function dbFirstLookup(
     // then NEWEST id, so fresh verified ingest displaces stale low-confidence
     // rows inside the window. IFNULL(confidence,0): a NULL-confidence legacy row
     // ranks below any scored row but stays reachable on sparse tokens.
+    // SATURATION FIX (2026-07-03): the 60-row per-token window ordered by bare
+    // confidence let the 36k-row distributor sweep (conf 0.9-1.0) saturate a
+    // common token and lock out the 33 CLASS-TAGGED verified-ingest rows (conf
+    // 0.9) harvested FOR this plant — verified-ingest rows now enter the window
+    // FIRST, then confidence, then newest.
     stmt = db.prepare(`
-      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp, raw_excerpt
+      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp,
+             raw_excerpt, confidence, discovery_source
       FROM pretraining_extracted_parts
       WHERE manufacturer IS NOT NULL AND manufacturer != ''
         AND part_number IS NOT NULL AND length(part_number) >= 4
         AND (LOWER(part_name) LIKE '%' || ? || '%'
              OR LOWER(IFNULL(component_class,'')) LIKE '%' || ? || '%')
-      ORDER BY IFNULL(confidence, 0) DESC, id DESC
+      ORDER BY (CASE WHEN discovery_source = 'web_verified_ingest'
+                      AND IFNULL(confidence, 0) >= 0.9 THEN 1 ELSE 0 END) DESC,
+               IFNULL(confidence, 0) DESC, id DESC
       LIMIT 60
     `)
   } catch {
@@ -576,11 +856,21 @@ export function dbFirstLookup(
       continue
     }
     for (const r of rows) {
-      // Whole-word hits across BOTH part_name and component_class.
+      // PER-WORD path (2026-07-03): a maker/hobby vendor can NEVER pass the
+      // per-word acceptance (dbHitAcceptableForWord refuses them outright), so
+      // letting one win the single-winner rank is a guaranteed silent miss —
+      // a Kratos e-stop shaded the verified Eaton safety station on a
+      // component_class 4th hit. Exclude them from ranking for that caller.
+      if (opts.excludeMakerVendors && MAKER_VENDORS.has((r.manufacturer ?? '').trim().toLowerCase())) continue
+      // Whole-word hits across BOTH part_name and component_class (fold-tolerant,
+      // so the folded token 'valve' still hits a catalogue 'Valves' row).
       const hay = `${(r.part_name ?? '')} ${(r.component_class ?? '')}`.toLowerCase()
       const nameHits = new Set<string>()
-      for (const t of specificTokens) if (hasWholeWord(hay, t)) nameHits.add(t)
-      const headHit = headNoun ? hasWholeWord(hay, headNoun) : false
+      for (const t of specificTokens) if (hasWholeWordFolded(hay, t)) nameHits.add(t)
+      // HEAD HIT = the head noun in the LEADING FAMILY SEGMENT of the part name
+      // (type coherence, 2026-07-03) — an incidental tail mention ('…terminal
+      // block connector' on a panel PC) is NOT a family match.
+      const headHit = headNoun ? headNounHit(partNameLeadSegment(r.part_name), headNoun) : false
       const key = `${r.manufacturer}|${r.part_number}`
       const prev = seen.get(key)
       if (!prev || nameHits.size > prev.nameHits.size) {
@@ -591,12 +881,30 @@ export function dbFirstLookup(
 
   if (seen.size === 0) return null
 
-  // Rank: head-noun hits first, then total distinct hits.
+  // Rank: head-noun (family) hits first, then non-accessory over accessory, then
+  // total distinct hits; on a FULL tie a class-tagged verified-ingest row
+  // outranks a distributor-sweep row (the saturation fix's in-memory leg — same
+  // signal as the SQL window ordering).
+  const rankOf = (v: { row: DbPart; nameHits: Set<string>; headHit: boolean }): number[] => [
+    v.headHit ? 1 : 0,
+    isAccessoryRow(v.row.part_name) ? 0 : 1,
+    v.nameHits.size,
+    // Below equal hits: a non-maker vendor outranks a maker/hobby vendor (a
+    // Kratos e-stop must not shade the Eaton safety station on a tie — the
+    // per-word acceptance refuses maker vendors outright, so letting one win
+    // the rank is a guaranteed silent miss), then verified class ingest.
+    MAKER_VENDORS.has(v.row.manufacturer.trim().toLowerCase()) ? 0 : 1,
+    isVerifiedIngestRow(v.row) ? 1 : 0,
+  ]
   let best: { row: DbPart; nameHits: Set<string>; headHit: boolean } | null = null
   for (const v of seen.values()) {
     if (!best) { best = v; continue }
-    if (v.headHit && !best.headHit) best = v
-    else if (v.headHit === best.headHit && v.nameHits.size > best.nameHits.size) best = v
+    const a = rankOf(v)
+    const b = rankOf(best)
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] > b[i]) { best = v; break }
+      if (a[i] < b[i]) break
+    }
   }
   if (!best) return null
 
@@ -631,9 +939,43 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   const SENSE = new Set(['sensor', 'imu', 'gyro', 'gyroscope', 'accelerometer', 'magnetometer', 'thermocouple', 'altimeter', 'encoder', 'pitot'])
   if (toks.some((t) => MOTION.has(t)) && cls && !/motor_actuator|mechanical_assembly/.test(cls)) return false
   if (toks.some((t) => SENSE.has(t)) && cls && !/sensor|optical/.test(cls)) return false
-  const hay = `${dbHit.part_name ?? ''} ${cls}`
-  const headTokens = toks.slice(-3)
-  return headTokens.length === 0 || headTokens.some((t) => hasWholeWord(hay, t))
+  // TYPE-COHERENCE (2026-07-03, gate-15 spirit): the word's HEAD NOUN — its
+  // component FAMILY, the LAST distinguishing token — must appear in the
+  // candidate's LEADING FAMILY SEGMENT (fold/synonym-tolerant). The previous
+  // any-of-last-3-anywhere rule let a QUALIFIER carry the match: 'Fertigation
+  // Dosing Pump' accepted the Hoogendoorn iSii process COMPUTER on the token
+  // 'fertigation' (an lm-only verifier then rubber-stamped it — the part exists,
+  // just not as a pump); a panel PC whose spec tail says '(terminal block
+  // connector)' matched 'Terminal Blocks'. A candidate whose FAMILY mismatches
+  // the head noun is refused; the honest generic spec (or the type-correct row,
+  // e.g. the Grundfos fertigation dosing PUMP) wins. An ACCESSORY row never pins
+  // a word that did not ask for an accessory.
+  if (isAccessoryRow(dbHit.part_name) && !/\baccessor/i.test(name || '')) return false
+  const lead = partNameLeadSegment(dbHit.part_name, 6)
+  const headTok = toks[toks.length - 1]
+  if (headTok && !headNounHit(lead, headTok)) return false
+  // QUALIFIER COHERENCE (2026-07-03): a multi-token word must ALSO share ≥1
+  // NON-HEAD qualifier with the candidate's family phrase — a generic head noun
+  // alone ('element', 'block', 'connector') cross-pins domains (a pneumatic
+  // logic ELEMENT on 'Filter Media / Membrane Elements'; an electrical circular
+  // CONNECTOR on 'Hydraulic Connectors'; a fuse BLOCK on 'Terminal Blocks' — all
+  // real v59 dry-run mis-pins). A single-token word ('sensor', 'connector')
+  // passes on its head alone (nothing more to require).
+  if (toks.length >= 2) {
+    const quals = toks.slice(0, -1)
+    const qualHit = quals.some((t) =>
+      hasWholeWordFolded(lead, t) ||
+      // A word token naming the candidate's MANUFACTURER is a strong coherence
+      // signal ('Siemens S7 1200 PLC' ↔ manufacturer Siemens) …
+      hasWholeWordFolded(dbHit.manufacturer ?? '', t) ||
+      // … and a MODEL-designator token (carries a digit: 's7', '1200') may hit
+      // the FULL part name — model numbers legitimately live in the spec tail
+      // ('SIMATIC S7-1200 CPU 1212C'), unlike generic family nouns whose tail
+      // mentions are exactly the mis-pin vector this guard exists to refuse.
+      (/\d/.test(t) && hasWholeWordFolded(dbHit.part_name ?? '', t)))
+    if (!qualHit) return false
+  }
+  return true
 }
 
 // ── LLM generate fallback ────────────────────────────────────────────────────
@@ -1181,10 +1523,44 @@ export async function fillBlankWordMpns(
 
   try {
     for (const cand of candidates) {
-      const tokens = new Set<string>([...tokenize(cand.subId), ...tokenize(cand.name)])
-      for (const t of tokenize(cand.word.content_character?.character_id)) tokens.add(t)
+      // TOKEN PRIORITY (2026-07-03, Bar A): the WORD'S OWN tokens lead the query
+      // list — dbFirstLookup slices the first 8, and with subId first a long
+      // module path ('mass_fluid_transport_process__ro_membrane_elements')
+      // crowded the word's actual component nouns ('pump') out of the window.
+      const tokens = new Set<string>([
+        ...tokenize(cand.name),
+        ...tokenize(cand.word.content_character?.character_id),
+        ...tokenize(cand.subId),
+      ])
       const tokenList = [...tokens]
-      const headNoun = tokenize(cand.name)[0] ?? tokenize(cand.subId)[0] ?? null
+      // Head noun = the component FAMILY = the LAST distinguishing token of the
+      // natural-language name ('Fertigation Dosing Pump' → 'pump'), matching the
+      // dbHitAcceptableForWord type-coherence bar. The old FIRST-token head
+      // ('fertigation') let a qualifier outrank the family (the iSii mis-pin).
+      const nameToks = tokenize(cand.name)
+      const subToks = tokenize(cand.subId)
+      const headNoun = nameToks[nameToks.length - 1] ?? subToks[subToks.length - 1] ?? null
+
+      // MOTOR-DRIVE, DUTY-AWARE (2026-07-03, Bar B): a VFD/starter is sized to
+      // its driven motor. When the word CARRIES that duty (rating_primary kW —
+      // lineage from the pump words), pin a DB drive in the kW band with the
+      // basis stated; only a duty-less drive slot stays the honest generic TBD.
+      // A loose name-token pin is never used here (it mis-sizes — the ACS580 HIGH).
+      if (isMotorDriveSlot(cand.name)) {
+        const dutyKw = wordMotorDriveDutyKw(cand.word)
+        const driveHit = dutyKw ? dbFirstMotorDriveLookup(db, dutyKw, cand.name) : null
+        if (dutyKw && driveHit) {
+          setWordMpn(cand.word, driveHit.manufacturer, driveHit.part_number, 'db')
+          cand.word.source_detail =
+            `Discover-on-miss: DB-first library match — sized to driven motor ${dutyKw} kW`
+          mutated = true
+          filled.push({ module_id: cand.moduleId, sub_module_id: cand.subId, source: 'db', manufacturer: driveHit.manufacturer, part_number: driveHit.part_number, name: cand.name })
+          log(`[fill-blank-mpn]   ✓ DB   ${cand.moduleId}::${cand.subId} (${cand.name}) → ${driveHit.manufacturer} ${driveHit.part_number} [sized to driven motor ${dutyKw} kW]`)
+        } else {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): motor drive — ${dutyKw ? `no DB drive in the ${dutyKw} kW band` : 'no driven-motor duty resolvable'} — frame sized to the driven motor at detailed design`)
+        }
+        continue
+      }
 
       // 1. DB-FIRST — cache-real structured MPN (gate-20-safe). Per-word matching
       //    needs a TIGHTER precision bar than sub_module-gap matching (council
@@ -1193,7 +1569,7 @@ export async function fillBlankWordMpns(
       //    natural-language name is the LAST token (busbar/sensor/controller), not
       //    the first — to appear as a whole word in the candidate, AND never reuse
       //    a part within the sub_module.
-      const dbHit = dbFirstLookup(db, tokenList, headNoun)
+      const dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true })
       if (dbHit) {
         // CAPACITY VALIDATION (Tristan 2026-06-27): a flow-machine pin must not be grossly
         // undersized vs the engine's own computed duty. A 'Grundfos CM3-3' (3 m³/h) pinned for a
@@ -1242,14 +1618,9 @@ export async function fillBlankWordMpns(
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): indicator/pilot-light part ${dbHit.manufacturer} ${dbHit.part_number} on a non-light slot — generic spec`)
           continue
         }
-        // MOTOR-DRIVE MIS-SIZE (Tristan 2026-06-28): a VFD / soft-starter / inverter is sized to its
-        // driven MOTOR's kW — a name-token DB match knows nothing of that motor and mis-sizes (an ABB
-        // ACS580-01-12A6-4 ≈ 5.5 kW pinned on a 'Vfd Controller' for a 15 kW pump = the physics-critic
-        // HIGH). Keep the generic spec (frame sized to the motor at detailed design). UNIVERSAL.
-        if (isMotorDriveSlot(cand.name)) {
-          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): motor drive — frame sized to the driven motor at detailed design, not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
-          continue
-        }
+        // (Motor-drive slots never reach here — the DUTY-AWARE block above owns
+        // them entirely: in-band DB pin when the duty is known, honest TBD when
+        // not. A loose name-token pin on a drive is still impossible.)
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
         const key = `${dbHit.manufacturer}|${dbHit.part_number}`.toLowerCase()
         let used = usedInSub.get(cand.subId)
@@ -1262,7 +1633,10 @@ export async function fillBlankWordMpns(
           log(`[fill-blank-mpn]   ✓ DB   ${cand.moduleId}::${cand.subId} (${cand.name}) → ${dbHit.manufacturer} ${dbHit.part_number}`)
           continue
         }
-        // type mismatch or duplicate → treat as a MISS (fall through to generate).
+        // type mismatch or duplicate → treat as a MISS (fall through to
+        // generate) — LOGGED (2026-07-03): the silent fall-through hid why a
+        // word stayed TBD (the Kratos-shades-Eaton diagnosis took a debugger).
+        log(`[fill-blank-mpn]   ⊘ miss ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} ${typeOk ? 'already used in this sub_module' : 'fails type-coherence'} — ${opts.skipGenerate ? 'staying generic' : 'falling through to generate'}`)
       }
 
       // 2. ON MISS → generate (real OEM + honest deferred MPN) + write-back to
