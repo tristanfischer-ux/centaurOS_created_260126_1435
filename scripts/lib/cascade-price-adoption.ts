@@ -54,6 +54,7 @@ import { lookupCached } from '../../src/lib/pdf-engine-v2/lib/distributors/db-on
 import {
   COMMODITY_SKIP_REGEX,
   SHORT_ALPHANUMERIC_REGEX,
+  reconcileUnitBasis,
 } from './per-line-price-plausibility-audit'
 
 // ── Types (structural — no dependency on the live-adapter DistributorResult) ──
@@ -98,6 +99,11 @@ export interface AdoptionSummary {
   skipped_no_cache_price: number
   skipped_implausible: number
   skipped_zero_qty: number
+  /** Piece-of-stock lines (pad/gasket/label/per-metre) whose per-piece price
+   *  reconciles to the cascade STOCK-unit price via an integer die-cut yield —
+   *  adopting the per-sheet/per-reel price onto the per-piece line would
+   *  over-bill by the yield factor (gate-21 unit-basis rule, 2026-07-03). */
+  skipped_unit_basis_mismatch: number
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -214,6 +220,7 @@ export function adoptCascadePrices(
     skipped_placeholder_mpn: 0, skipped_commodity_or_short: 0,
     skipped_explicit_distributor: 0, skipped_no_cache_price: 0,
     skipped_implausible: 0, skipped_zero_qty: 0,
+    skipped_unit_basis_mismatch: 0,
   }
   const pvs: any[] = Array.isArray(state?.partVerifications) ? state.partVerifications : []
   const wordsById = indexWords(state)
@@ -251,6 +258,20 @@ export function adoptCascadePrices(
 
     const adopted = round2(brk.unitPriceGbp)
     const previous = effectiveRenderedPrice(v)
+
+    // 5. UNIT-BASIS guard (gate-21 rule, 2026-07-03 Bergquist GP3000S30): the
+    // cascade sells the STOCK unit (a Gap Pad SHEET, a cable REEL) while a
+    // piece-of-stock BoM line prices ONE piece die-cut / cut-to-length from it.
+    // When the current per-piece price reconciles to the cascade stock price via
+    // an integer yield in [2, 500], BOTH numbers are right on different bases —
+    // adopting the per-sheet price onto the per-piece line would over-bill by
+    // the yield factor. Skip; gate 21 reports it as a reconciled MEDIUM note.
+    if (previous !== null) {
+      const wordName = String(v?.word_name ?? ref?.word?.name_human ?? '')
+      if (reconcileUnitBasis(wordName, previous, adopted).applied) {
+        summary.skipped_unit_basis_mismatch++; continue
+      }
+    }
     if (previous !== null && Math.abs(previous - adopted) < 0.005) continue // already at catalogue truth — untouched (byte-identity)
 
     const dbSource = String(res.result.source ?? 'cache')
@@ -450,6 +471,31 @@ export function selftestCascadePriceAdoption(): { ok: boolean; failures: string[
     }
   }
 
+  // 8. UNIT-BASIS guard (the Bergquist GP3000S30 shape): a piece-of-stock line
+  // whose per-piece price reconciles to the cascade STOCK-unit price never
+  // adopts (adopting per-sheet onto per-piece would over-bill ~23×); a
+  // NON-stock line with the same ratio still adopts.
+  {
+    const pad: any = {
+      word_id: 'w_pad', part_number: 'GP3000S30', manufacturer: 'Bergquist',
+      word_name: 'cell insulation pad', price_estimate_gbp: 2.5,
+      cost_provenance: 'parametric-physics',
+    }
+    const sheetPrice: CascadePriceBreak[] = [{ qty: 1, unitPriceGbp: 56.48 }]
+    const s = adoptCascadePrices(mkState([pad]), { lookup: cacheHit(sheetPrice, 'GP3000S30') })
+    check(s.adoptions.length === 0 && s.skipped_unit_basis_mismatch === 1
+      && pad.price_estimate_gbp === 2.5,
+      'case8: piece-of-stock per-piece price never adopts the per-sheet cascade price')
+    const nonStock: any = {
+      word_id: 'w_ns', part_number: 'REAL-1234-X',
+      word_name: 'auxiliary relay', price_estimate_gbp: 2.5,
+      cost_provenance: 'parametric-physics',
+    }
+    const s2 = adoptCascadePrices(mkState([nonStock]), { lookup: cacheHit(sheetPrice) })
+    check(s2.adoptions.length === 1 && nonStock.price_estimate_gbp === 56.48,
+      'case8: non-stock noun with the same ratio still adopts')
+  }
+
   return { ok: failures.length === 0, failures }
 }
 
@@ -466,7 +512,7 @@ if (isMain) {
       console.error(`[cascade-price-adoption] SELFTEST FAIL:\n  - ${failures.join('\n  - ')}`)
       process.exit(1)
     }
-    console.log('[cascade-price-adoption] selftest PASS (adopts real-MPN cached price; TBD never adopts; explicit distributor price never overridden; sanity band; qty-break; parent re-base; idempotent)')
+    console.log('[cascade-price-adoption] selftest PASS (adopts real-MPN cached price; TBD never adopts; explicit distributor price never overridden; sanity band; qty-break; parent re-base; idempotent; piece-of-stock unit-basis mismatch never adopts)')
     process.exit(0)
   }
   const statePath = args.find((a) => !a.startsWith('--'))
@@ -485,7 +531,7 @@ if (isMain) {
   if (asJson) {
     console.log(JSON.stringify(summary, null, 2))
   } else {
-    console.log(`[cascade-price-adoption] ${summary.adoptions.length} adoption(s), ${summary.parent_rebases.length} parent re-base(s) — scanned ${summary.scanned} line(s); skipped: ${summary.skipped_placeholder_mpn} placeholder-MPN, ${summary.skipped_commodity_or_short} commodity/short, ${summary.skipped_explicit_distributor} explicit-distributor, ${summary.skipped_no_cache_price} no-cache-price, ${summary.skipped_implausible} implausible, ${summary.skipped_zero_qty} zero-qty`)
+    console.log(`[cascade-price-adoption] ${summary.adoptions.length} adoption(s), ${summary.parent_rebases.length} parent re-base(s) — scanned ${summary.scanned} line(s); skipped: ${summary.skipped_placeholder_mpn} placeholder-MPN, ${summary.skipped_commodity_or_short} commodity/short, ${summary.skipped_explicit_distributor} explicit-distributor, ${summary.skipped_no_cache_price} no-cache-price, ${summary.skipped_implausible} implausible, ${summary.skipped_zero_qty} zero-qty, ${summary.skipped_unit_basis_mismatch} unit-basis-mismatch`)
     for (const a of summary.adoptions) {
       console.log(`  ↳ ${a.word_id} (${a.manufacturer ?? '?'} ${a.part_number}) ×${a.quantity}: £${a.previous_price_gbp?.toFixed(2) ?? '—'} → £${a.adopted_price_gbp.toFixed(2)} — ${a.basis}`)
     }

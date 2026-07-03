@@ -33,7 +33,7 @@ import { auditBriefConstraintCompleteness } from './brief-constraint-completenes
 import { extractOccurrences, cluster, buildFindings } from './cross-page-numeric-consistency-audit'
 import { auditJurisdictionalStandards } from './jurisdictional-standards-audit'
 import { STRUCTURED_PN_REGEX } from './fictional-pn-audit'
-import { classifySeverity } from './per-line-price-plausibility-audit'
+import { classifySeverity, classifyLineSeverity, selftestPerLinePriceAudit } from './per-line-price-plausibility-audit'
 import { selftestCascadePriceAdoption } from './cascade-price-adoption'
 import { missingHardSlots } from '../../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runPayloadRatingAudit } from '../../src/lib/pdf-engine-v2/lib/payload-rating-audit'
@@ -175,12 +175,22 @@ export const GATES: GateProof[] = [
   },
   {
     code: 21, name: 'per-line-price-plausibility', intent: 'a line priced >5× (or <0.2×) the catalogue price (a £18 part billed £180)',
-    // Two proofs: (a) the gate's severity decision FIRES on a 10×/0.01× line; (b) the gate's
+    // Three proofs: (a) the gate's severity decision FIRES on a 10×/0.01× line; (b) the gate's
     // FIX-SIDE rule — cascade-price adoption (2026-07-03, codema v58: real pinned MPN whose
     // price exists in the DB cascade ADOPTS it; a TBD MPN never adopts; an explicit
     // distributor-sourced price is never overridden) — proves its catch on in-memory fixtures
-    // with an injected lookup (no DB dependency).
+    // with an injected lookup (no DB dependency); (c) UNIT-BASIS RECONCILIATION (2026-07-03,
+    // bess-crossval-v1 Bergquist GP3000S30 false HIGH: per-piece £2.50 vs per-SHEET £56.48,
+    // both right — the sheet die-cuts into ~23 pads) — a yield-consistent piece-of-stock
+    // under-bill downgrades HIGH → MEDIUM with the reconciliation stated, while BOTH
+    // over-billing directions still FIRE: the v58-shaped £420-over-catalogue DP switch stays
+    // HIGH, and a piece-of-stock line >5× the FULL stock price stays HIGH (you cannot pay
+    // more per piece than per sheet). selftestPerLinePriceAudit() proves both directions.
     proveCatch: () => classifySeverity(180 / 18) === 'HIGH' && classifySeverity(30 / 3000) === 'HIGH' && classifySeverity(100 / 90) === 'PASS'
+      && classifyLineSeverity('cell insulation pad', 2.5, 56.48).severity === 'MEDIUM'          // false HIGH reconciled
+      && classifyLineSeverity('differential pressure switch', 420, 45.68).severity === 'HIGH'   // v58 over-bill still fires
+      && classifyLineSeverity('cell insulation pad', 420, 56.48).severity === 'HIGH'            // piece >5× FULL stock still fires
+      && selftestPerLinePriceAudit().ok
       && selftestCascadePriceAdoption().ok,
     enforcedByDefault: gateBlockEnforced,
   },

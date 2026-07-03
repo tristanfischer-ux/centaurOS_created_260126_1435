@@ -82,6 +82,120 @@ export const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generi
 // unreliable as a benchmark.
 export const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
 
+// ── UNIT-BASIS RECONCILIATION (2026-07-03, Bergquist GP3000S30 false HIGH) ───
+//
+// THE DEFECT (universal, not per-part): out/bess-crossval-v1 blocked exit 21 on
+// "cell insulation pad" (Bergquist GP3000S30) — BoM £2.50/cell vs db:farnell
+// £56.48, ratio 0.04×. BOTH numbers are right: the distributor unit is a STOCK
+// SHEET (Gap Pad 3000S30, ~8×16 in) that die-cuts into many per-cell pads; the
+// BoM unit is ONE die-cut pad. Comparing per-piece to per-sheet is a unit-basis
+// mismatch, and it recurs on every gasket / label / tape / wire-per-metre style
+// line across all archetypes (the distributor sells the STOCK; the BoM prices
+// the PIECE cut from it).
+//
+// THE RULE (universal, no per-part whitelist): before flagging, attempt
+// unit-basis reconciliation —
+//   (a) detect the stock-vs-piece SHAPE: the BoM word is a piece-of-stock
+//       family (pad / gasket / shim / label / seal / die-cut nouns, or a
+//       cut-from-reel family like cable / wire / tubing / sleeving priced per
+//       metre vs per reel) AND the ratio direction is piece << stock;
+//   (b) reconcile: if piece_price × yield lands within the plausibility band
+//       [0.5×, 2×] of the stock price for ANY integer yield in [2, 500], the
+//       divergence is yield-consistent — downgrade HIGH → MEDIUM with the
+//       reconciliation stated (e.g. "per-piece £2.50 vs stock unit £56.48 —
+//       implied yield ~23, unit-basis differs; verify die-cut yield"). (When
+//       part + sheet dimensions are available a geometric yield could be
+//       computed; the DB-only cascade carries no dimensions, so the integer
+//       yield-consistency test is the deterministic substrate.)
+//   (c) the OPPOSITE direction (BoM price ABOVE the distributor unit — the
+//       v58 £420 DP-switch over-billing) is NEVER excused by this rule;
+//   (d) a piece-of-stock line > 5× the FULL stock price also stays HIGH —
+//       you cannot pay more per piece than per sheet.
+// Both directions are proven in selftestPerLinePriceAudit() + the gate-21
+// registry proveCatch.
+
+/** Piece-of-stock noun families: parts die-cut / cut-to-length from a stock
+ *  sheet or reel the distributor sells whole. Matched against the BoM word
+ *  NAME (not the MPN). */
+export const PIECE_OF_STOCK_REGEX =
+  /\b(pads?|gaskets?|shims?|labels?|seals?|die[- ]?cut|decals?|stickers?|tapes?|foils?|films?|liners?|membranes?|wires?|cables?|tub(?:e|es|ing)|hoses?|sleev(?:e|es|ing)|heat[- ]?shrink|braid(?:ed|ing)?|cords?|lacing|webbing|per[- ]?met(?:re|er))\b/i
+
+/** Plausible die-cut / cut-length yields from one stock unit. Below 2 the
+ *  bands already overlap; above 500 pieces-per-sheet the divergence is no
+ *  longer credibly a unit-basis artefact. */
+export const UNIT_BASIS_YIELD_MIN = 2
+export const UNIT_BASIS_YIELD_MAX = 500
+
+export interface UnitBasisReconciliation {
+  applied: boolean
+  implied_yield: number | null
+  note: string | null
+}
+
+const NO_RECONCILIATION: UnitBasisReconciliation = { applied: false, implied_yield: null, note: null }
+
+/** Attempt unit-basis reconciliation for one line. Pure + deterministic.
+ *  Returns applied=true ONLY when (a) the word is a piece-of-stock family,
+ *  (b) the BoM price is BELOW the distributor stock price (rule c: the over
+ *  direction is never excused), and (c) some integer yield in [2, 500] lands
+ *  piece_price × yield within [0.5×, 2×] of the stock price. */
+export function reconcileUnitBasis(
+  wordName: string,
+  bomUnitPriceGbp: number,
+  distributorBestGbp: number,
+): UnitBasisReconciliation {
+  if (!(bomUnitPriceGbp > 0) || !(distributorBestGbp > 0)) return NO_RECONCILIATION
+  // (c) NEVER excuse the over direction — a BoM price at/above the stock price
+  // is over-billing territory regardless of noun family.
+  if (bomUnitPriceGbp >= distributorBestGbp) return NO_RECONCILIATION
+  // (a) shape: piece-of-stock noun family only.
+  if (!PIECE_OF_STOCK_REGEX.test(String(wordName ?? ''))) return NO_RECONCILIATION
+  // (b) yield-consistency: ∃ integer yield y ∈ [2, 500] with
+  //     (piece × y) / stock ∈ [0.5, 2].
+  const impliedYield = distributorBestGbp / bomUnitPriceGbp
+  const yLo = Math.max(UNIT_BASIS_YIELD_MIN, Math.ceil(0.5 * impliedYield))
+  const yHi = Math.min(UNIT_BASIS_YIELD_MAX, Math.floor(2 * impliedYield))
+  if (yLo > yHi) return NO_RECONCILIATION
+  const rounded = Math.round(impliedYield)
+  return {
+    applied: true,
+    implied_yield: rounded,
+    note:
+      `unit-basis reconciliation: per-piece £${bomUnitPriceGbp.toFixed(2)} vs stock unit ` +
+      `£${distributorBestGbp.toFixed(2)} — implied yield ~${rounded}, unit-basis differs; ` +
+      `verify die-cut/cut-length yield`,
+  }
+}
+
+export interface LineSeverityDecision {
+  ratio: number
+  severity: PricePlausibilitySeverity
+  reconciliation: UnitBasisReconciliation | null
+}
+
+/** THE per-line severity decision gate 21 uses (and the registry proveCatch
+ *  drives): ratio ladder via classifySeverity(), then unit-basis reconciliation
+ *  for under-billed piece-of-stock lines — a reconcilable false HIGH downgrades
+ *  to MEDIUM (non-blocking, note stated); a reconcilable MEDIUM keeps its
+ *  severity but carries the note. The over direction never reconciles. */
+export function classifyLineSeverity(
+  wordName: string,
+  bomUnitPriceGbp: number,
+  distributorBestGbp: number,
+): LineSeverityDecision {
+  const ratio = bomUnitPriceGbp / distributorBestGbp
+  let severity = classifySeverity(ratio)
+  let reconciliation: UnitBasisReconciliation | null = null
+  if ((severity === 'HIGH' || severity === 'MEDIUM') && ratio < 0.5) {
+    const rec = reconcileUnitBasis(wordName, bomUnitPriceGbp, distributorBestGbp)
+    if (rec.applied) {
+      reconciliation = rec
+      if (severity === 'HIGH') severity = 'MEDIUM'
+    }
+  }
+  return { ratio, severity, reconciliation }
+}
+
 // ── PRICE LOOKUP (DB-ONLY) ────────────────────────────────────────────────────
 //
 // CHAIN-AS-DB-CONSUMER: reads only from forge-truth.db via lookupCached().
@@ -289,6 +403,9 @@ export interface PricePlausibilityFinding {
   top_source: string
   all_sources: Array<{ source: string; unitPriceGbp: number }>
   nexar_tried: boolean
+  /** Set when the under-billed piece-of-stock divergence reconciled to an
+   *  integer die-cut/cut-length yield (severity downgraded HIGH → MEDIUM). */
+  unit_basis_reconciliation: UnitBasisReconciliation | null
   explanation: string
 }
 
@@ -382,17 +499,20 @@ export async function auditPerLinePricePlausibility(
       lookup.pricesGbp[0],
     )
 
-    const ratio = unit_price_gbp / distributorBest
-    const severity = classifySeverity(ratio)
+    const { ratio, severity, reconciliation } = classifyLineSeverity(
+      word_name, unit_price_gbp, distributorBest,
+    )
 
     if (severity === 'PASS') {
       linesPass += 1
       return
     }
 
-    const directionNote = ratio > 1
-      ? `BoM price is ${ratio.toFixed(1)}× MORE EXPENSIVE than the cheapest distributor source — suggests over-billing, wrong quantity break, or stale catalogue data.`
-      : `BoM price is ${(1 / ratio).toFixed(1)}× CHEAPER than the cheapest distributor source — suggests currency confusion (USD quoted as GBP?), incorrect unit basis (per-lot vs per-unit?), or stale pre-negotiated quote.`
+    const directionNote = reconciliation?.applied
+      ? `${reconciliation.note}. The distributor sells the STOCK unit (sheet/reel); the BoM prices ONE piece cut from it — both numbers can be right. Downgraded from HIGH: not chain-blocking, but confirm the die-cut/cut-length yield covers the design quantity.`
+      : ratio > 1
+        ? `BoM price is ${ratio.toFixed(1)}× MORE EXPENSIVE than the cheapest distributor source — suggests over-billing, wrong quantity break, or stale catalogue data.`
+        : `BoM price is ${(1 / ratio).toFixed(1)}× CHEAPER than the cheapest distributor source — suggests currency confusion (USD quoted as GBP?), incorrect unit basis (per-lot vs per-unit?), or stale pre-negotiated quote.`
 
     findings.push({
       id: `${word_id}:${part_number}`,
@@ -410,6 +530,7 @@ export async function auditPerLinePricePlausibility(
       top_source: `${cheapestSource.source} £${cheapestSource.unitPriceGbp.toFixed(2)}`,
       all_sources: lookup.pricesGbp,
       nexar_tried: false,
+      unit_basis_reconciliation: reconciliation,
       explanation:
         `Gate 21 per-line plausibility (DB-only): BoM renders "${word_name}" (MPN: ${part_number}` +
         `${manufacturer ? `, manufacturer: ${manufacturer}` : ''}) at £${unit_price_gbp.toFixed(2)} per unit. ` +
@@ -531,6 +652,9 @@ function renderMarkdown(result: PricePlausibilityAuditResult, statePath: string)
       lines.push(`- **Cheapest distributor:** ${f.top_source}`)
       lines.push(`- **Distributor median:** £${f.distributor_median_gbp.toFixed(2)}`)
       lines.push(`- **Ratio:** ${f.ratio.toFixed(2)}× (threshold: outside [0.33, 3])`)
+      if (f.unit_basis_reconciliation?.applied) {
+        lines.push(`- **Unit-basis reconciliation (downgraded from HIGH):** ${f.unit_basis_reconciliation.note}`)
+      }
       lines.push(`- **Fix:** ${f.explanation}`)
       lines.push('')
     }
@@ -566,8 +690,87 @@ function renderMarkdown(result: PricePlausibilityAuditResult, statePath: string)
   return lines.join('\n')
 }
 
+// ── SELF-TEST (proveCatch substrate — pure, no DB, both directions) ──────────
+
+export function selftestPerLinePriceAudit(): { ok: boolean; failures: string[] } {
+  const failures: string[] = []
+  const check = (cond: boolean, label: string) => { if (!cond) failures.push(label) }
+
+  // Ratio ladder unchanged (the original gate-21 proofs).
+  check(classifySeverity(180 / 18) === 'HIGH', 'ladder: 10× over-bill → HIGH')
+  check(classifySeverity(30 / 3000) === 'HIGH', 'ladder: 0.01× under-bill → HIGH')
+  check(classifySeverity(100 / 90) === 'PASS', 'ladder: 1.1× → PASS')
+
+  // (a)+(b) THE Bergquist case: piece-of-stock under-bill reconciles → MEDIUM
+  // with the reconciliation stated (implied yield ~23).
+  {
+    const d = classifyLineSeverity('cell insulation pad', 2.5, 56.48)
+    check(d.severity === 'MEDIUM', 'bergquist: per-piece £2.50 vs stock £56.48 downgrades HIGH → MEDIUM')
+    check(d.reconciliation?.applied === true && d.reconciliation.implied_yield === 23,
+      'bergquist: reconciliation applied with implied yield ~23')
+    check(String(d.reconciliation?.note ?? '').includes('implied yield ~23')
+      && String(d.reconciliation?.note ?? '').includes('unit-basis differs'),
+      'bergquist: note states the reconciliation')
+  }
+
+  // (c) The v58-shaped £420 over-billing (DP switch, BoM ABOVE the distributor
+  // unit) is NEVER excused — stays HIGH, no reconciliation.
+  {
+    const d = classifyLineSeverity('differential pressure switch', 420, 45.68)
+    check(d.severity === 'HIGH' && d.reconciliation === null,
+      'v58 over-bill: £420 vs £45.68 stays HIGH (over direction never reconciles)')
+  }
+
+  // (c)+(d) Even a piece-of-stock NOUN in the over direction stays HIGH — you
+  // cannot pay more per piece than per sheet.
+  {
+    const d = classifyLineSeverity('cell insulation pad', 420, 56.48)
+    check(d.severity === 'HIGH' && d.reconciliation === null,
+      'piece-of-stock over-bill: pad at 7.4× the FULL stock price stays HIGH')
+    check(reconcileUnitBasis('cell insulation pad', 420, 56.48).applied === false,
+      'reconcileUnitBasis never applies in the over direction')
+  }
+
+  // Non-stock noun under-bill stays HIGH (no whitelist leak to arbitrary parts).
+  {
+    const d = classifyLineSeverity('string inverter', 30, 3000)
+    check(d.severity === 'HIGH' && d.reconciliation === null,
+      'non-stock noun: £30 inverter vs £3000 stays HIGH')
+  }
+
+  // Yield beyond [2, 500] is NOT credibly a unit-basis artefact — stays HIGH.
+  {
+    const d = classifyLineSeverity('adhesive label', 0.01, 56.48)
+    check(d.severity === 'HIGH' && d.reconciliation === null,
+      'implied yield ~5648 (> 500): stays HIGH')
+  }
+
+  // Cut-from-reel family (wire per metre vs per reel) reconciles too.
+  {
+    const d = classifyLineSeverity('control wire (per metre)', 3, 60)
+    check(d.severity === 'MEDIUM' && d.reconciliation?.applied === true,
+      'per-metre wire vs per-reel price reconciles → MEDIUM')
+  }
+
+  // A MEDIUM-band piece-of-stock under-bill keeps MEDIUM but carries the note.
+  {
+    const d = classifyLineSeverity('door gasket', 14, 56)
+    check(d.severity === 'MEDIUM' && d.reconciliation?.applied === true,
+      'MEDIUM-band gasket under-bill stays MEDIUM with reconciliation note')
+  }
+
+  // PASS band untouched by the rule.
+  {
+    const d = classifyLineSeverity('cell insulation pad', 40, 56.48)
+    check(d.severity === 'PASS' && d.reconciliation === null, 'PASS band untouched')
+  }
+
+  return { ok: failures.length === 0, failures }
+}
+
 // ── CLI ENTRYPOINT ────────────────────────────────────────────────────────────
 // Usage: npx tsx scripts/lib/per-line-price-plausibility-audit.ts <statePath> [outMdPath]
+//        npx tsx scripts/lib/per-line-price-plausibility-audit.ts --selftest
 // Exit code 21 on any HIGH-severity finding (chain fails fast).
 // Exit code 0 on PASS (no HIGH findings; MEDs/LOWs are informational only).
 // Exit code 1 on IO or runtime error.
@@ -576,10 +779,19 @@ const argv1 = process.argv[1] ?? ''
 const isMain = /per-line-price-plausibility-audit\.(?:ts|js|mjs|cjs)$/.test(argv1)
 
 if (isMain) {
+  if (process.argv.includes('--selftest')) {
+    const { ok, failures } = selftestPerLinePriceAudit()
+    if (!ok) {
+      console.error(`[per-line-price-audit] SELFTEST FAIL:\n  - ${failures.join('\n  - ')}`)
+      process.exit(1)
+    }
+    console.log('[per-line-price-audit] selftest PASS (ratio ladder; unit-basis reconciliation downgrades a yield-consistent piece-of-stock under-bill to MEDIUM; over-billing NEVER excused; yield band [2,500]; non-stock nouns unaffected)')
+    process.exit(0)
+  }
   const statePath = process.argv[2]
   const outMdPath = process.argv[3]
   if (!statePath) {
-    console.error('Usage: per-line-price-plausibility-audit <statePath> [outMdPath]')
+    console.error('Usage: per-line-price-plausibility-audit <statePath> [outMdPath] | --selftest')
     process.exit(1)
   }
   let state: any
