@@ -500,10 +500,18 @@ _INLINE_TAP_RE = re.compile(
 # ABSTRACT BATTERY-LIMIT boundary nodes — the grid connection, the atmosphere, the sea/
 # sewer. Intentional system edges with no physical part; a legitimate trace terminus, so
 # they are NOT 'broken references' in the referential-integrity check.
+# EXTENDED 2026-07-03 (BESS cross-val): the electrical-storage-era SERVICE termini a
+# contract edge legitimately ends on — the dc/ac service bus ('dc_bus') and the thermal
+# sink ('heat_rejection') — are the same kind of abstract system edge as 'atmosphere'
+# (which already passed). Keyed on the service-family NAME (snake_case contract node
+# ids); a real part name ('DC busbar 1500 V') or a misspelled part never matches.
+# Keep in sync with deterministic_checks_lib._SERVICE_BOUNDARY_ENDPOINT_RE.
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
-    r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site", re.I)
+    r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
+    r"\b(?:dc|ac|hv|lv|mv)_bus\b|\bheat[_ -]?reject(?:ion)?\b|"
+    r"\b(?:heat|thermal|cold)[_ -]?sink\b", re.I)
 
 
 def audit_completeness(parts, final_topology, required_services, log=print):
@@ -1485,6 +1493,22 @@ def _selftest():
     assert not _stamps, (
         f"build_universal_scene.py stamps a hardcoded m³/s required_unit again — "
         f"the v55 ×3600 phantom source: {_stamps}")
+
+    # ── SERVICE-BOUNDARY termini proveCatch (BESS cross-val 2026-07-03, both directions):
+    # a contract edge ending on the dc service bus / thermal sink is a legitimate abstract
+    # terminus (like 'atmosphere'), NOT a broken reference; a misspelled real-part
+    # endpoint must STILL be flagged.
+    _sb_topo = [
+        {"from_part": "rack string fuse", "to_part": "dc_bus", "mechanism": "electrical_bus"},
+        {"from_part": "PCS inverter", "to_part": "heat_rejection", "mechanism": "thermal"},
+        {"from_part": "pump", "to_part": "Bufer Tank", "mechanism": "fluid_loop"},
+    ]
+    _sb_v = audit_referential_integrity(
+        _sb_topo, ["rack string fuse", "PCS inverter", "pump", "Buffer Tank"],
+        log=lambda *a: None)
+    assert len(_sb_v) == 1 and _sb_v[0]["name"] == "Bufer Tank", (
+        f"referential integrity must exempt service-boundary termini (dc_bus / "
+        f"heat_rejection) while still flagging the misspelled part; got {_sb_v}")
 
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "

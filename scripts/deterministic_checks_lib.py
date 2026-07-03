@@ -699,6 +699,16 @@ def _checks_balance(state: dict, run_dir: str) -> List[Check]:
 # ============================================================================
 # COST
 # ============================================================================
+# Basis vocabulary the pricing pass writes when it DELIBERATELY corrects a line's price
+# away from its raw parametric estimate (corpus lift / credible-price floor / commodity
+# floor / micro-commodity cap / gate-21 distributor correction). Keyed on the correction
+# STATEMENT, never on part class — universal. See the exemption note in _checks_cost.
+_DELIBERATE_PRICE_CORRECTION_RE = re.compile(
+    r"lifted\s*£?[\d,.]+\s*→|to the engine corpus|floored to min credible price|"
+    r"commodity-floor|micro-commodity ceiling|gate-21\s*>?\s*\d*×?\s*correction",
+    re.I)
+
+
 def _checks_cost(state: dict, run_dir: str) -> List[Check]:
     out: List[Check] = []
     rb = _requirements_bom(state)
@@ -731,21 +741,43 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
         # IS the sanity correction). Pass it with a note. Universal — any £/kW(/kVA)-grounded line.
         # (Tristan 2026-06-22: E-101 PHE £88k = 400kW×£220/kW grounded UP from a £2,740 below-band
         # LLM estimate; the £88k is correct, the £2,740 was the bad number.)
-        grounded = "grounded to market" in str(row.get("basis") or "")
+        basis = str(row.get("basis") or "")
+        grounded = "grounded to market" in basis
+        # SAME self-contradiction, other vocabularies (BESS cross-val 2026-07-03): the pricing
+        # pass writes its deliberate corrections as "lifted £X→£Y to the engine corpus p25/
+        # 0.6×median", "floored to min credible price", "commodity-floor (…)", "capped to pack
+        # micro-commodity ceiling", "gate-21 >5× correction". Each states the raw estimate was
+        # REJECTED as out-of-band — so banding the corrected price against that SAME rejected
+        # PARAMETRIC ESTIMATE re-litigates a decision already taken (22 false FAILs on the first
+        # BESS run under this check). The exemption is deliberately NARROW: it applies ONLY when
+        # the reference is the weak parametric estimate. A LIVE DISTRIBUTOR price is independent
+        # market evidence the correction never saw — a corrected line that still diverges from a
+        # real catalogue price stays FLAGGED (e.g. the 1 MW PCS 'lifted' to £181 vs its £75,000
+        # distributor price — a genuine corpus-comparable mis-class, not a check artefact).
+        corrected = bool(_DELIBERATE_PRICE_CORRECTION_RE.search(basis))
         ratio = unit_p / ref
-        bad = (not grounded) and (ratio > COST_BAND_FACTOR or ratio < (1.0 / COST_BAND_FACTOR))
+        out_of_band = (ratio > COST_BAND_FACTOR or ratio < (1.0 / COST_BAND_FACTOR))
+        # the correction exemption ENGAGES only where the band would otherwise FIRE —
+        # an in-band corrected row keeps the plain band-comparison detail (a passing
+        # row's rendered text is byte-identical to the pre-exemption behaviour).
+        exempt = grounded or (corrected and out_of_band and ref_src == "price_estimate_gbp")
+        bad = (not exempt) and out_of_band
         out.append(Check(
             name=f"BoM {tag}: unit price within x{COST_BAND_FACTOR:g} of {ref_src}",
             category="COST", relation="eq",
             status=FAIL if bad else PASS,
-            actual=unit_p, expected=(unit_p if grounded else ref), tol=0.0, unit="GBP",
+            actual=unit_p, expected=(unit_p if exempt else ref), tol=0.0, unit="GBP",
             producer=f"cost:{tag}:ref",
             detail=(f"{tag} ({pv.get('manufacturer','?')} {pv.get('part_number','?')}): "
                     + (f"price GROUNDED to the market band (£{unit_p:,.0f}); the pre-grounding "
                        f"{ref_src} £{ref:,.0f} was rejected as out-of-band — banding against it is "
                        f"not meaningful." if grounded
-                       else f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} = x{ratio:.1f}. "
-                       f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}.")),
+                       else (f"price DELIBERATELY CORRECTED by the pricing pass (£{unit_p:,.0f}; "
+                             f"basis: {basis[:80]}); the parametric {ref_src} £{ref:,.0f} was "
+                             f"rejected/superseded by that correction — banding against it is "
+                             f"self-contradictory." if exempt
+                             else f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} = x{ratio:.1f}. "
+                             f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}."))),
         ))
 
     # --- COST2. Sigma BoM line_gbp == cover / grand total ---
@@ -773,6 +805,20 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
 # ============================================================================
 # CONNECTIVITY / SPEC
 # ============================================================================
+# Abstract SERVICE-BOUNDARY termini — an edge may legitimately end on a system boundary
+# that is not a physical part. Mirrors connection_ledger._ABSTRACT_BOUNDARY_RE (the fluid
+# battery-limit families) + the electrical/thermal SERVICE termini an electrical-storage
+# archetype's contract edges end on (dc/ac/hv/lv/mv service bus, heat rejection/sink).
+# Keyed on the service-family NAME (snake_case contract node ids), never a class table —
+# a real part name ('DC busbar 1500 V') or a misspelled part never matches.
+_SERVICE_BOUNDARY_ENDPOINT_RE = re.compile(
+    r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
+    r"power[_ -]?supply\b|incoming[_ -]?supply|"
+    r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
+    r"\b(?:dc|ac|hv|lv|mv)_bus\b|\bheat[_ -]?reject(?:ion)?\b|"
+    r"\b(?:heat|thermal|cold)[_ -]?sink\b", re.I)
+
+
 def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
     out: List[Check] = []
 
@@ -876,8 +922,18 @@ def _checks_connectivity(state: dict, run_dir: str) -> List[Check]:
         # systems this way"). A broken reference = a connection the trace cannot follow.
         ri = cledger.get("referential_integrity") or {}
         if isinstance(ri, dict):
-            nv = int(ri.get("n_violations") or len(ri.get("violations") or []))
-            vs = ri.get("violations") or []
+            # SERVICE-BOUNDARY endpoints are NOT broken references (BESS cross-val fix
+            # 2026-07-03): the ledger authoring recognised the fluid-era battery-limit
+            # termini (grid / atmosphere / sewer / battery limit) but not the electrical-
+            # storage-era SERVICE termini a contract edge legitimately ends on — the
+            # dc/ac service bus ('dc_bus') and the thermal sink ('heat_rejection'). Both
+            # are abstract system edges keyed on their SERVICE family, exactly like
+            # 'enclosure_atmosphere' (which already passed via 'atmosphere'). Filter them
+            # here so the check keys on service family, both directions: a misspelled
+            # real-part endpoint still has no service-family name and still FAILS.
+            vs = [v for v in (ri.get("violations") or [])
+                  if not _SERVICE_BOUNDARY_ENDPOINT_RE.search(str(v.get("name") or ""))]
+            nv = len(vs)
             vsample = "; ".join(f"{v.get('edge')} [{v.get('end')}={v.get('name')!r}]"
                                 for v in vs[:4])
             out.append(Check(
@@ -1338,9 +1394,15 @@ def _checks_tool_provenance(state: dict, run_dir: str) -> List[Check]:
                 continue
             of = str(c.get("output_field", "")).lower()
             f = re.sub(r"^calc_", "", field).lower()
-            # prefer the claim's DECLARED output_field (the engine's own claim→quantity mapping),
-            # else the calc_-stripped field name.
-            qk = (of if of in qval else f if f in qval else
+            # JOIN PRIORITY (BESS cross-val fix 2026-07-03): when the claim's OWN field name is
+            # itself a contract quantity, THAT is the canonical comparison — tool.X vs contract.X.
+            # The claim's declared output_field only routes a claim whose field name is NOT a
+            # quantity (calc_* / renamed outputs). Before this, a claim with a WRONG declared
+            # mapping (pybamm cell_heat_generation_kw=45.1 declared output_field=
+            # system_thermal_dissipation_kw) was compared against a DIFFERENT quantity (95.1)
+            # and flagged STALE while contract.cell_heat_generation_kw matched it exactly —
+            # apples-to-oranges. A tool field that IS a contract key and DISAGREES still FAILs.
+            qk = (f if f in qval else of if of in qval else
                   next((k for k in qval if k == f or (len(f) >= 6 and (f in k or k in f))), None))
             if qk is not None:
                 qv = num(qval[qk])
@@ -1779,6 +1841,104 @@ def _selftest() -> int:
               "(an INPUT to the flagged aggregate) must NOT be flagged")
     # a LEGITIMATE margin (1250 kVA on 800 kW = 1.56x) must still PASS under the ceiling —
     # already asserted by the CLEAN run above ("CLEAN incomer kVA should PASS").
+
+    # ---- BESS CROSS-VAL proveCatches (2026-07-03) — the three checks re-keyed for the
+    #      electrical-storage archetype must each still CATCH their adversarial input
+    #      (both directions). ----
+    xv_state = {
+        "orchestratorContract": {
+            "product_class": "synthetic_xval",
+            "quantities": {
+                "cell_heat_generation_kw": {"value": 45.1, "unit": "kW"},
+                "system_thermal_dissipation_kw": {"value": 95.1, "unit": "kW"},
+            },
+            "closures": [],
+        },
+        "requirementsBom": [
+            # corrected-basis + ESTIMATE ref → exempt (the estimate was rejected by the
+            # pricing pass; re-banding against it is self-contradictory) → PASS
+            {"tag": "EP-1", "part": "ABB OTDC200E02P", "qty": 1, "unit_gbp": 430,
+             "line_gbp": 430, "requirement": "DC switch disconnector",
+             "basis": "catalogue · lifted £95→£430 to the engine corpus 0.6×median"},
+            # corrected-basis + LIVE DISTRIBUTOR ref → NOT exempt → the £181-for-a-£75k-PCS
+            # under-bill still FAILS (the corpus lift never saw the market evidence)
+            {"tag": "INV-1", "part": "Sungrow SC1000UD-MV", "qty": 1, "unit_gbp": 181,
+             "line_gbp": 181, "requirement": "PCS skid",
+             "basis": "catalogue · lifted £28→£181 to the engine corpus p25"},
+            # UNCORRECTED out-of-band vs the estimate → still FAILS (the exemption never
+            # blesses a plain-catalogue absurd price)
+            {"tag": "I-1", "part": "Crowcon TXgard-IS+", "qty": 1, "unit_gbp": 900,
+             "line_gbp": 900, "requirement": "Gas detector", "basis": "catalogue"},
+        ],
+        "partVerifications": [
+            {"word_id": "a", "word_name": "DC switch disconnector", "manufacturer": "ABB",
+             "part_number": "OTDC200E02P", "price_estimate_gbp": 6.5},
+            {"word_id": "b", "word_name": "PCS skid", "manufacturer": "Sungrow",
+             "part_number": "SC1000UD-MV", "distributor_price_gbp": 75000,
+             "price_estimate_gbp": 75000},
+            {"word_id": "c", "word_name": "Gas detector", "manufacturer": "Crowcon",
+             "part_number": "TXgard-IS+", "price_estimate_gbp": 150},
+        ],
+    }
+    # tool claims: the WRONG declared output_field must not trump an exact same-name
+    # contract match (cell_heat 45.1 == contract 45.1 → PASS even though its declared
+    # output_field points at the 95.1 system quantity)…
+    xv_tools = {"tools": [{
+        "tool_id": "pybamm:cell-sizing",
+        "claims": [
+            {"field": "cell_heat_generation_kw", "value": 45.1,
+             "output_field": "system_thermal_dissipation_kw"},
+            {"field": "system_thermal_dissipation_kw", "value": 95.1,
+             "output_field": "system_thermal_dissipation_kw"},
+        ]}]}
+    xv_ledger = {
+        "grand_total_gbp": 1511,
+        "connectivity": {"n_process_total": 2, "n_process_connected": 2,
+                         "n_instrument_total": 1, "n_instrument_associated": 1,
+                         "n_concerns": 0},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, xv_state, xv_ledger, {}, tools=xv_tools)
+        # connection-ledger with SERVICE-BOUNDARY endpoints (legit) + a MISSPELLED part (broken)
+        with open(os.path.join(d, "connection-ledger.json"), "w") as f:
+            json.dump({"completeness": {"n_concerns": 0, "concerns": []},
+                       "referential_integrity": {"n_violations": 3, "violations": [
+                           {"edge": "rack string fuse→dc_bus", "end": "to_part",
+                            "name": "dc_bus", "reason": "endpoint name is not an authored part"},
+                           {"edge": "PCS inverter→heat_rejection", "end": "to_part",
+                            "name": "heat_rejection", "reason": "endpoint name is not an authored part"},
+                           {"edge": "pump→Bufer Tank", "end": "to_part",
+                            "name": "Bufer Tank", "reason": "endpoint name is not an authored part"},
+                       ]}}, f)
+        checks = run_all_checks(d)
+        check(_has(checks, "BoM EP-1: unit price", PASS),
+              "XVAL COST: a corpus-corrected price banded against its own REJECTED estimate "
+              "must be exempt (PASS)")
+        check(_has(checks, "BoM INV-1: unit price", FAIL),
+              "XVAL COST: a corrected price that still diverges from a LIVE distributor "
+              "price must FAIL (the correction is not market evidence)")
+        check(_has(checks, "BoM I-1: unit price", FAIL),
+              "XVAL COST: an uncorrected out-of-band price must still FAIL")
+        check(_has(checks, "Tool output used: cell_heat_generation_kw", PASS),
+              "XVAL PROVENANCE: an exact same-name contract match (45.1==45.1) must PASS even "
+              "when the claim's declared output_field points at a different quantity")
+        check(_has(checks, "Tool output used: system_thermal_dissipation_kw", PASS),
+              "XVAL PROVENANCE: the true system claim must PASS (95.1==95.1)")
+        _ri = next((c for c in checks if "referential integrity" in c.name), None)
+        check(_ri is not None and _ri.status == FAIL and _ri.actual == 1.0
+              and "Bufer Tank" in _ri.detail,
+              f"XVAL LEDGER: service-boundary endpoints (dc_bus/heat_rejection) must be "
+              f"filtered while the MISSPELLED part endpoint still FAILS "
+              f"(got {_ri and (_ri.status, _ri.actual)})")
+    # …and a same-name claim whose VALUE disagrees must still FAIL (stale stays caught).
+    xv_stale = json.loads(json.dumps(xv_state))
+    xv_stale["orchestratorContract"]["quantities"]["cell_heat_generation_kw"]["value"] = 22.0
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, xv_stale, xv_ledger, {}, tools=xv_tools)
+        checks = run_all_checks(d)
+        check(_has(checks, "Tool output used: cell_heat_generation_kw", FAIL),
+              "XVAL PROVENANCE: a same-name claim whose value disagrees with the contract "
+              "(45.1 vs 22.0) must still FAIL (stale tool output stays caught)")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----

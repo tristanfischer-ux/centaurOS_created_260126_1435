@@ -4357,9 +4357,14 @@ function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
     // (a) dc_bus_voltage_v follows the brief's stated value
     if (dflt.dc !== 800) failures.push(`brief-silent dc_bus_voltage_v=${dflt.dc}, expected default 800`)
     if (stated.dc !== 1500) failures.push(`brief-states-1500 dc_bus_voltage_v=${stated.dc}, expected 1500 (still hardcoded?)`)
-    // (b) series cells re-derive from the stated voltage
-    const expSeries = Math.round(1500 / CELL_V)  // 469
-    if (stated.series !== expSeries) failures.push(`series_cells_per_string=${stated.series}, expected round(1500/3.2)=${expSeries}`)
+    // (b) series cells re-derive from the stated voltage — FLOOR, never round
+    // (2026-07-03): the string must stay WITHIN the voltage class (469S = 1500.8 V
+    // breached the 1500 V boundary; 468S = 1497.6 V is the honest optimum).
+    const expSeries = Math.floor(1500 / CELL_V)  // 468
+    if (stated.series !== expSeries) failures.push(`series_cells_per_string=${stated.series}, expected floor(1500/3.2)=${expSeries}`)
+    // (b2) VOLTAGE-CLASS GUARD: string nominal must never exceed the DC bus class
+    if (stated.series * CELL_V > stated.dc + 0.01) failures.push(
+      `string nominal ${(stated.series * CELL_V).toFixed(1)} V EXCEEDS the ${stated.dc} V class boundary`)
     // (c) string/rack count is a positive integer (the string topology must stay coherent)
     for (const [k, v] of [['strings', stated.strings], ['racks', stated.racks]] as const) {
       if (!(v > 0) || !Number.isInteger(v)) failures.push(`${k}=${v} is not a positive integer at 1500 V`)
@@ -4378,7 +4383,7 @@ function checkBessDcBusFollowsBriefInvariant(): Assertion[] {
   }
   out.push(assertEq(
     'BESS.dc_bus_follows_brief',
-    'BESS dc_bus_voltage_v is READ FROM THE BRIEF (not hardcoded 800): a brief stating 1500 V gets 1500 V with series cells = round(1500/3.2)=469, an integer string/rack count, the bus current falling to ~1667 A, and the nameplate energy PRESERVED within 2% across the voltage change',
+    'BESS dc_bus_voltage_v is READ FROM THE BRIEF (not hardcoded 800): a brief stating 1500 V gets 1500 V with series cells = floor(1500/3.2)=468 (string nominal must stay WITHIN the voltage class — never exceed it), an integer string/rack count, the bus current falling to ~1667 A, and the nameplate energy PRESERVED within 2% across the voltage change',
     failures.length, (n) => n === 0,
     () => `BESS dc-bus-follows-brief wrong: ${failures.join(' ; ')}. Check the dcBusVoltage reader in registerArchetype('bess', …) in scripts/lib/engineering-contract.ts (read target_performance.metrics / desc, default 800 only when silent; the rack/string cascade must preserve nameplate).`,
   ))

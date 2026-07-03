@@ -41,15 +41,50 @@ def _required_services(name, module, function, wet_plant=True):
     power / signal only. Default True preserves every caller that does not yet pass
     the signal (a RAS / wet plant keeps its water services unchanged)."""
     t = _norm(f"{name} {module} {function}"); m = _norm(module); req = set()
+    # WORD tokens of the RAW name+function (NOT _norm'd — _norm glues words, so 'relief
+    # and' reads as 'fan', 'louvre' as 'uv', and the MODULE name 'transduction' as
+    # 'duct'; the BESS cross-val 2026-07-03 catch). SHORT/ambiguous tokens match on
+    # these word boundaries; the ≥4-char tokens keep the glued substring behaviour
+    # (a 'Centre Standpipe' must keep matching 'pipe' mid-word).
+    _words = set(_re.findall(r'[a-z0-9]+', f"{name} {function}".lower()))
+    tn = _norm(f"{name} {function}")   # name+function ONLY — the module's service is rule (3)
     # ── (1) NAME-keyword roles (cross-module: a pump / sensor / valve anywhere) ──
-    if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
+    if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
+            or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
         req.add('power')
     # PROCESS-FLUID role — ONLY on a WET plant. The bare tokens below describe parts
     # that sit in a fluid flow; on a DRY archetype (no fluid edges, not a process
     # plant) they must NOT pull a spurious process-water pipe. The RAS-only tokens
     # ('rear', 'cone') are a CONDITIONAL extension folded in here, never universal.
-    if wet_plant and any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
+    # SCANNED OVER THE NAME+FUNCTION, never the module (BESS cross-val 2026-07-03:
+    # 'duct' inside the MODULE name 'energy_conversion_transDUCTion' handed every PCS
+    # capacitor/arrester/transformer a process-water pipe); the short tokens
+    # 'uv'/'fan' match whole words only ('loUVre' and 'relieF ANd' are not fluid kit).
+    if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress'))
+                      or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
         req.add('water')
+    # ── (1a) SERVICE-FAMILY EXCLUSION (BESS cross-val 2026-07-03, the fluid-plant rule
+    # mis-firing on an electrical-storage archetype): ELECTRICAL gear (a capacitor bank /
+    # surge arrester / transformer / busbar / breaker / fuse), DOCUMENTATION (a label /
+    # torque card / tape) and pure FASTENING structure (a compression plate / tie rod)
+    # never sit in a process-WATER flow — their families are power/signal/none. Two
+    # exceptions keep it honest both directions: an explicitly LIQUID-COOLED part (a
+    # 'PCS liquid cooling interface', a water-jacketed anything) keeps water, and a part
+    # whose NAME is fluid kit (pipework / manifold / tank / valve …) keeps water even
+    # when it also carries a structural word ('Skid Frame & Pipework'). Universal
+    # vocabulary, no class table; mirrors the (1b) field-instrument rule below.
+    if 'water' in req and not _re.search(
+            r'cool|chill|water[ -]?jacket|cold[ -]?plate|'
+            r'tank|vessel|pipe|manifold|header|valve|sump|reservoir|drain|hose|spool',
+            f"{name} {function}", _re.I):
+        if _re.search(
+                r'capacitor|inductor|arrester|\btransformer\b|busbar|breaker|\brelay\b|'
+                r'\bfuse\b|inverter|rectifier|\bpcs\b|surge|grounding|earthing|'
+                r'sealing[ -]?end|switchgear|isolator|varistor|bushing|'
+                r'\blabel\b|\bcard\b|\btape\b|placard|nameplate|decal|'
+                r'tie[ -]?rod|compression[ -]?plate|end[ -]?plate|\bbracket\b',
+                f"{name} {function}", _re.I):
+            req.discard('water')
     if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
         req.add('signal')
     if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
@@ -463,3 +498,56 @@ def build_connectivity(run, req_bom, tools):
                           'priced': priced.get(_norm(part['name']), False)}
     return parts, edges
 
+
+
+def _selftest():
+    """proveCatch for the required-services classifier (BESS cross-val 2026-07-03) —
+    both directions: the fluid-plant water rule must NOT fire on electrical-storage
+    gear, and must STILL fire on genuine fluid kit. Run:
+        python3 scripts/component_engineering.py --selftest"""
+    fails = []
+
+    def expect(cond, msg):
+        if not cond:
+            fails.append(msg)
+
+    # (a) electrical gear in a module whose NAME glues to a fluid token
+    # ('transDUCTion' ≠ 'duct') gets NO process-water service
+    for nm in ("PCS DC-link capacitor bank", "PCS DC surge arrester", "step-up transformer",
+               "transformer neutral grounding", "transformer cable sealing end"):
+        expect('water' not in _required_services(nm, "energy_conversion_transduction", "", True),
+               f"{nm!r} must not require process water (electrical gear; module-name 'duct' trap)")
+    # (b) short-token word boundaries: 'loUVre' is not UV kit; 'relieF ANd' is not a fan
+    expect('water' not in _required_services("louvre vent panel", "environmental_interface", "", True),
+           "'louvre' must not match the 'uv' token")
+    expect('power' not in _required_services("pressure relief and sight glass",
+                                             "mass_fluid_transport_process", "", True),
+           "'relief and' must not match the 'fan' token (no spurious power)")
+    # (c) fastening structure / documentation: no water
+    expect('water' not in _required_services("compression tie rod set", "energy_storage_source", "", True),
+           "a tie rod set must not require process water")
+    # (d) STILL FIRES on genuine fluid kit (the other direction)
+    expect('water' in _required_services("Skid Frame & Pipework", "mass_fluid_transport_process", "", True),
+           "'Skid Frame & Pipework' is fluid kit and must keep water")
+    expect('water' in _required_services("Dual Drain / Centre Standpipe", "mass_fluid_transport_process", "", True),
+           "'Centre Standpipe' must keep water (mid-word 'pipe' match)")
+    expect('water' in _required_services("UV Sterilizer Chamber", "water_treatment", "", True),
+           "a real UV steriliser keeps water ('uv' as a whole word)")
+    expect('water' in _required_services("coolant supply pipe", "mass_fluid_transport_process", "", True),
+           "a coolant pipe keeps water")
+    # (e) dry plant: no water anywhere
+    expect('water' not in _required_services("Buffer Tank", "structure", "", False),
+           "a DRY archetype never gets process water")
+    if fails:
+        print("component_engineering selftest FAILED:")
+        for m in fails:
+            print("  -", m)
+        return 1
+    print("component_engineering selftest: OK (required-services keys on service family)")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    if "--selftest" in _sys.argv:
+        _sys.exit(_selftest())

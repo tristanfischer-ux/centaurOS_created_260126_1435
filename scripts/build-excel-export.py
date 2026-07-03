@@ -486,7 +486,59 @@ def _aux_tab_score(title: str, run_dir: str):
         except Exception:  # noqa: BLE001
             pass
         if has_hvac_duty:
-            return _cov("hvac", "HVAC") or {
+            _hc = _cov("hvac", "HVAC")
+            if _hc is not None:
+                return _hc
+            # DIRECT deterministic coverage (BESS cross-val 2026-07-03): the parts-ledger
+            # computes no 'hvac' rep yet, but the drawing IS delivered — score the tab on
+            # what it shows instead of a flat unscored-6. Coverage = fraction of the
+            # design's HVAC/cooling-duty BoM parts named on drawings/hvac-layout.svg
+            # (plural-insensitive token overlap, same spirit as parts_ledger.covered).
+            # Universal: keyed on the HVAC/cooling service family, no class table; a
+            # class with no such parts or no drawing falls through to the honest FAIL.
+            _svgp = os.path.join(run_dir or "", "drawings", "hvac-layout.svg")
+            _hvac_fam = re.compile(
+                r"hvac|chiller|\bcool|coolant|cold[ -]?plate|air[ -]?handl|\bahu\b|"
+                r"air[ -]?condition|\bac unit\b|ventilat|vent[ -]?fan|extract|supply[ -]?air|"
+                r"\bduct\b|damper|louvre|condensate|fan[ -]?coil|radiator|glycol|expansion tank",
+                re.I)
+            try:
+                with open(st_path, "r", encoding="utf-8") as _fh:
+                    _st2 = json.load(_fh)
+                _hvac_parts = sorted({str(r.get("requirement") or r.get("part") or "").split("·")[0].strip()
+                                      for r in (_st2.get("requirementsBom") or [])
+                                      if isinstance(r, dict)
+                                      and _hvac_fam.search(str(r.get("requirement") or r.get("part") or ""))})
+                _hvac_parts = [p for p in _hvac_parts if p]
+            except Exception:  # noqa: BLE001
+                _hvac_parts = []
+            _svg_txt = ""
+            try:
+                _svg_txt = " ".join(re.findall(r">([^<>]+)<", open(_svgp).read())).lower()
+            except Exception:  # noqa: BLE001
+                _svg_txt = ""
+            if _hvac_parts and _svg_txt:
+                _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
+                _svg_sing = _sing(_svg_txt)
+                _generic = {"unit", "system", "main", "panel", "skid", "rack", "plant"}
+                def _on_drawing(pn: str) -> bool:
+                    toks = [w for w in re.findall(r"[a-z]{4,}", pn.lower()) if w not in _generic]
+                    hits = sum(1 for w in toks if _sing(w) in _svg_sing)
+                    return bool(toks) and hits >= max(1, (len(toks) + 1) // 2)
+                _shown = [p for p in _hvac_parts if _on_drawing(p)]
+                _missing = [p for p in _hvac_parts if p not in _shown]
+                _pct = 100.0 * len(_shown) / len(_hvac_parts)
+                _sc = max(0, min(10, round(_pct / 10)))
+                return {"score": _sc, "target": 8,
+                        "status": "PASS" if _sc >= 8 else "FAIL",
+                        "issues": [f"HVAC drawing coverage {len(_shown)}/{len(_hvac_parts)} "
+                                   f"({_pct:.0f}%) of the design's HVAC/cooling-duty parts"
+                                   + (f" — MISSING from the drawing: {', '.join(_missing[:5])}"
+                                      if _missing else "")],
+                        "fix": ("the HVAC drawing generator must draw the design's full HVAC scope "
+                                "(air-side AC / ventilation / ducting as well as the coolant loop)"
+                                if _missing else "")}
+            return {
                 "score": 6, "target": 8, "status": "FAIL",
                 "issues": ["the design carries an HVAC duty but the HVAC drawing has no scored coverage — "
                            "the drawing must represent the ventilation / cooling equipment"],
@@ -4508,9 +4560,56 @@ def _build_costbasis_by_name(state: dict) -> Dict[str, dict]:
     return out
 
 
+# ── MPN JOIN (Bar C, 2026-07-03): singular/plural + head-noun-stem tolerant ─────
+# The join was literal lowercase equality, so a VERIFIED part sitting in
+# partVerifications under 'Pneumatic Actuated Valve' (Bürkert Type 2000) never
+# surfaced on the ledger row 'Pneumatic Actuated Valves' (qty 200), and 'Emergency
+# Stop Switch' (Eaton 216516) never joined 'emergency stop button'. The join key
+# now folds plurals per-token (the f9dfc2918 stem discipline) and canonicalises
+# the HEAD noun through a tiny same-family synonym map. NEVER cross-joins
+# different head nouns — 'pressure transmitter' can never join 'pressure switch'
+# (proveCatch in _selftest).
+_JOIN_NEVER_FOLD = {"ups", "lens", "bellows", "scada", "gas"}
+_HEAD_NOUN_SYNONYM = {"button": "switch", "pushbutton": "switch"}
+
+
+def _fold_plural_token(t: str) -> str:
+    """'valves'→'valve', 'switches'→'switch', 'batteries'→'battery'; conservative —
+    short tokens, -ss/-us/-is endings and known non-plurals (UPS) never fold."""
+    s = str(t or "").lower()
+    if len(s) < 4 or s in _JOIN_NEVER_FOLD:
+        return s
+    if re.search(r"[^aeiou]ies$", s):
+        return s[:-3] + "y"
+    if re.search(r"(ches|shes|sses|xes|zes)$", s):
+        return s[:-2]
+    if s.endswith("s") and not re.search(r"(ss|us|is)$", s):
+        return s[:-1]
+    return s
+
+
+def _mpn_join_key(name: str) -> str:
+    """Fold-tolerant join key: plural-folded tokens, head noun canonicalised via
+    the same-family synonym map. '' when the name has no tokens."""
+    toks = [_fold_plural_token(t) for t in re.split(r"[^a-z0-9]+", str(name or "").lower()) if t]
+    if not toks:
+        return ""
+    toks[-1] = _HEAD_NOUN_SYNONYM.get(toks[-1], toks[-1])
+    return " ".join(toks)
+
+
 def _build_mpn_by_word(state: dict) -> Dict[str, str]:
-    """tag/word(lower) -> 'Manufacturer MPN' from partVerifications (Spec-sheet MPN col)."""
+    """tag/word(lower) -> 'Manufacturer MPN' from partVerifications (Spec-sheet MPN col).
+    Registers BOTH the literal lowercase key (back-compat) and the fold-tolerant
+    join key. TWO PASSES (Bar C, 2026-07-03): RESOLVED references claim keys FIRST,
+    then 'TBD …' deferral entries fill the remainder. A TBD entry thus can never
+    SHADOW a verified sibling pin (the 'Pneumatic Actuated Valves' TBD twin used to
+    block the singular Bürkert pin) — but it still claims otherwise-unclaimed keys
+    as an explicit BLOCKER: _bom_row_mpn maps it to '' (honest TBD), which stops a
+    generic `row.part` class-description ('field instrument (catalogue class)')
+    from leaking through the fallback as a fake part reference."""
     out: Dict[str, str] = {}
+    entries: List[tuple] = []
     for pv in (state.get("partVerifications") or []):
         if not isinstance(pv, dict):
             continue
@@ -4519,9 +4618,22 @@ def _build_mpn_by_word(state: dict) -> Dict[str, str]:
         if not mpn:
             continue
         label = f"{mfr} {mpn}".strip()
-        for k in (pv.get("word_name"), pv.get("word_id")):
-            if k:
-                out.setdefault(str(k).strip().lower(), label)
+        entries.append((bool(re.match(r"^\s*TBD\b", mpn, re.I)), pv, label))
+    # Key-claim priority: (1) resolved literal, (2) resolved folded alias,
+    # (3) TBD literal, (4) TBD folded. A folded ALIAS must never shadow another
+    # word's LITERAL identity ('Solenoid Valves'→Crouzet must not hijack the
+    # distinct 'Solenoid Valve' word whose own pin is the Sensata SOL7A4).
+    for pass_tbd in (False, True):
+        for folded_pass in (False, True):
+            for is_tbd, pv, label in entries:
+                if is_tbd != pass_tbd:
+                    continue
+                for k in (pv.get("word_name"), pv.get("word_id")):
+                    if not k:
+                        continue
+                    key = _mpn_join_key(str(k)) if folded_pass else str(k).strip().lower()
+                    if key:
+                        out.setdefault(key, label)
     return out
 
 
@@ -4719,7 +4831,8 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                 _mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
                 if not _mpn and _req_raw:
                     _head = re.split(r"[·\-(]", _req_raw)[0].strip().lower()
-                    _mpn = mpn_by_word.get(_head, "")
+                    _mpn = (mpn_by_word.get(_head, "")
+                            or mpn_by_word.get(_mpn_join_key(re.split(r"[·(]", _req_raw)[0]), ""))
                 _mpn = clean_cell(_mpn) or clean_cell(row.get("part", "")) or "—"
             pc = ws.cell(r, 14, clean_cell(_mpn))
             pc.alignment = WRAP_TOP; pc.border = BORDER
@@ -9710,10 +9823,45 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     mv = re.search(r"(\d{3,4})\s*V\s*3-phase", text)
     board_v = float(mv.group(1)) if mv else 400.0
 
+    # ── BOARD META first (moved up 2026-07-03): each board's Field/Value table states its
+    #    OWN electrical system ('| **System** | 1,500 V DC bus |' vs '400 V 3-phase'). The
+    #    Design-I consistency check must use THAT system — P = V·I on a DC bus, √3·V·I·pf·η
+    #    on a 3-phase board. Before this the 400 V √3 AC formula was applied to 1500 V DC
+    #    circuits (implied pf·η 2.17 'outside 0.60–1.05' on rows that are EXACTLY P = V·I:
+    #    8.4 A × 1500 V = 12.6 kW — the BESS cross-val Electrical 1.1). Keyed on the
+    #    schedule's own System field, no class table; an AC board reads exactly as before. ──
+    _board_meta: Dict[str, dict] = {}
+    for _heading, hdr, trows in tables:
+        if len(hdr) >= 6 or len(hdr) < 2:
+            continue
+        if hdr[0].strip().lower() == "field":
+            _bm: Dict[str, str] = {}
+            for tr in trows:
+                if len(tr) >= 2:
+                    _bm[re.sub(r"\*+", "", tr[0]).strip().lower()] = re.sub(r"\*+", "", tr[1]).strip()
+            _board_meta[str(_heading or "").strip()] = _bm
+
+    def _board_system(bname: str) -> Tuple[float, str]:
+        """(volts, kind) from the board's own System field; kind ∈ {'dc','1ph','3ph'}.
+        Falls back to the file-level 3-phase voltage (the pre-fix behaviour)."""
+        sysv = str((_board_meta.get(bname) or {}).get("system", ""))
+        mvv = re.search(r"([\d,.]+)\s*(k?)V\b", sysv)
+        if not mvv:
+            return board_v, "3ph"
+        v = num(mvv.group(1).replace(",", "")) or board_v
+        if mvv.group(2).lower() == "k":
+            v *= 1000.0
+        if re.search(r"\bdc\b", sysv, re.I):
+            return v, "dc"
+        if re.search(r"\b(?:1|single)[\s-]?phase\b", sysv, re.I):
+            return v, "1ph"
+        return v, "3ph"
+
     contract = [
         ("Ckt/Description", "required_nonempty", "circuit identity"),
         ("Conn. load (kW)", "required_nonempty", "connected load > 0"),
-        ("Design I (A)", "computed", f"I consistent with P = √3·{board_v:g}·I·pf·η (implied pf·η ∈ 0.60–1.05)"),
+        ("Design I (A)", "computed", "I consistent with the board's OWN system — P = V·I (DC) "
+         f"or P = √3·V·I·pf·η (AC 3-phase, default {board_v:g} V); implied pf·η ∈ 0.60–1.05"),
         ("Protective device", "computed", "device rating ≥ Design I"),
         ("Cable", "computed", "CSA · cores stated AND Method-C ampacity ≥ device rating (BS 7671 Ib ≤ In ≤ Iz)"),
         ("Length (m)", "required_nonempty", "routed cable length > 0 (dash = FAIL)"),
@@ -9761,9 +9909,18 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             if amps is None or amps <= 0:
                 reasons.append("Design I missing")
             elif kw:
-                pf_eta = (kw * 1000.0) / (math.sqrt(3.0) * board_v * amps)
+                _bv, _bkind = _board_system(_board)
+                if _bkind == "dc":
+                    pf_eta = (kw * 1000.0) / (_bv * amps)              # P = V·I (no √3, no pf)
+                    _sys_lbl = f"{_bv:g} V DC"
+                elif _bkind == "1ph":
+                    pf_eta = (kw * 1000.0) / (_bv * amps)              # P = V·I·pf
+                    _sys_lbl = f"{_bv:g} V 1-phase"
+                else:
+                    pf_eta = (kw * 1000.0) / (math.sqrt(3.0) * _bv * amps)
+                    _sys_lbl = f"{_bv:g} V 3-phase"
                 if not (0.60 <= pf_eta <= 1.05):
-                    reasons.append(f"Design I {amps:g} A inconsistent with {kw:g} kW at {board_v:g} V "
+                    reasons.append(f"Design I {amps:g} A inconsistent with {kw:g} kW at {_sys_lbl} "
                                    f"(implied pf·η {pf_eta:.2f} outside 0.60–1.05)")
             dev_a = num(cell(c_dev))
             if dev_a is None:
@@ -9817,16 +9974,7 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     #    ratio outside the band, or a dash busbar rating = a FAILING contract row —
     #    the tab can no longer score 10.0 over its own printed REVIEW. ──
     recon_rows: List[dict] = []
-    _board_meta: Dict[str, dict] = {}
-    for _heading, hdr, trows in tables:
-        if len(hdr) >= 6 or len(hdr) < 2:
-            continue
-        if hdr[0].strip().lower() == "field":
-            _bm: Dict[str, str] = {}
-            for tr in trows:
-                if len(tr) >= 2:
-                    _bm[re.sub(r"\*+", "", tr[0]).strip().lower()] = re.sub(r"\*+", "", tr[1]).strip()
-            _board_meta[str(_heading or "").strip()] = _bm
+    # (_board_meta is parsed ONCE above, before the circuit loop — 2026-07-03.)
     _recon_rx = re.compile(
         r"Reconciliation:\*{0,2}\s*Σ circuit design current = ([\d.,]+)\s*A vs board "
         r"busbar demand = ([\d.,]+)\s*A \(ratio ([\d.,]+)\) → \*{0,2}(\w+)")
@@ -9912,7 +10060,9 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
         # 3 — transformer kVA: the drawing's transformer rating vs the CONTRACT quantity
         _q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
         _kva_contract = None
-        for _k in ("transformer_kva", "main_transformer_kva"):
+        # ('transformer_rating_kva' added 2026-07-03: the BESS contract emits the rating
+        #  under that key — the join must not report 'contract missing' over a present one.)
+        for _k in ("transformer_kva", "main_transformer_kva", "transformer_rating_kva"):
             _kv = _q.get(_k)
             if isinstance(_kv, dict) and isinstance(_kv.get("value"), (int, float)):
                 _kva_contract = float(_kv["value"])
@@ -10018,21 +10168,33 @@ _MPN_PLACEHOLDER = {"", "—", "-", "n/a", "na", "tbd", "requirement stated", "a
 
 def _bom_row_mpn(row: dict, mpn_by_word: Dict[str, str]) -> str:
     """The row's real / DB-sourced part reference: partVerifications by tag, then by the
-    requirement head noun (the SAME join tab_bom renders), then the row's own `part`
-    text when it is not a placeholder. '' = none. A partVerifications entry whose
-    part_number is ITSELF a 'TBD …' marker (the engine emits 'TBD (detailed design)'
-    for unresolved parts — 316/326 on codema v52) is NOT a resolved reference: it must
-    fall through to '' so the contract counts it as a TBD, never a fake real MPN."""
+    requirement head noun (the SAME join tab_bom renders) — literal first, then the
+    FOLD-TOLERANT join key (Bar C 2026-07-03: 'Pneumatic Actuated Valves' joins the
+    verified singular 'Pneumatic Actuated Valve'; 'emergency stop button' joins
+    'Emergency Stop Switch'; head-noun families never cross) — then the row's own
+    `part` text when it is not a placeholder. '' = none. A partVerifications entry
+    whose part_number is ITSELF a 'TBD …' marker (the engine emits 'TBD (detailed
+    design)' for unresolved parts — 316/326 on codema v52) is NOT a resolved
+    reference: it maps to '' here so the contract counts it as a TBD, never a fake
+    real MPN — and as a BLOCKER it stops the `row.part` fallback (a generic class
+    description must not masquerade as a reference for a word the engine explicitly
+    deferred)."""
+    _tbd = lambda s: bool(re.match(r"^\s*TBD\b", s, re.I))  # noqa: E731
     mpn = mpn_by_word.get(str(row.get("tag", "")).strip().lower()) or ""
     req = str(row.get("requirement") or "").strip()
-    if not mpn and req:
+    if (not mpn or _tbd(mpn)) and req:
         head = re.split(r"[·\-(]", req)[0].strip().lower()
-        mpn = mpn_by_word.get(head, "")
+        # Fold-tolerant join key: full head phrase (split only on '·'/'(' so a
+        # hyphenated noun like 'Non-Return Valve' keeps its tokens).
+        fk = _mpn_join_key(re.split(r"[·(]", req)[0])
+        cands = [mpn_by_word.get(head, ""), mpn_by_word.get(fk, "") if fk else ""]
+        resolved = next((c for c in cands if c and not _tbd(c)), "")
+        mpn = resolved or mpn or cands[0] or cands[1]
     if not mpn:
         part = str(row.get("part") or "").strip()
         if part.lower() not in _MPN_PLACEHOLDER:
             mpn = part
-    if re.match(r"^\s*TBD\b", mpn, re.I):
+    if _tbd(mpn):
         return ""
     return mpn
 
@@ -10071,16 +10233,45 @@ _COMMODITY_NOUN_RX = re.compile(
     r"\bfittings?\b", re.I)
 
 
+# ── COMMODITY PROCESS VALVE (Bar B, 2026-07-03): the ENGINE refuses MPNs on a
+# simple mechanical process valve by design (emitter-completion
+# isCommodityProcessValve — a DN50 ball valve is bought BY SPEC: size + rating +
+# material, never by a single name-matched MPN), so the SCORER must agree: a
+# generic-spec process valve WITHOUT actuation is 'commodity — MPN at
+# procurement', not an engineered TBD. Mirrors the engine's vocabulary exactly
+# (+ manual/sample). An ACTUATED / control / solenoid / dosing / relief valve
+# stays ENGINEERED (it has a real pin path — e.g. Bürkert Type 2000 — or a set
+# pressure to certify) and keeps the full TBD penalty. The price + basis legs of
+# the triple guard still apply in _commodity_bought_out (proveCatch both
+# directions in _selftest).
+_VALVE_ACTUATION_RX = re.compile(
+    r"actuat|automat|solenoid|motoris|motoriz|\bcontrol\b|dosing|metering|modulat|"
+    r"throttl|pneumatic|electric|relief|safety", re.I)
+_COMMODITY_VALVE_NOUN_RX = re.compile(
+    r"\b(check|non.?return|swing|ball|gate|globe|needle|wafer|lift|foot|"
+    r"isolation|isolat\w*|manual|sample)\b", re.I)
+
+
+def _commodity_process_valve(text: str) -> bool:
+    n = str(text or "")
+    if not re.search(r"\bvalves?\b|\bnon.?return\b", n, re.I):
+        return False
+    if _VALVE_ACTUATION_RX.search(n):
+        return False
+    return bool(_COMMODITY_VALVE_NOUN_RX.search(n))
+
+
 def _commodity_bought_out(row: dict, unit: Optional[float]) -> bool:
-    """True only when BOTH commodity signals hold: the commodity noun family AND a
-    stated class-basis unit price under the threshold. An engineered pump can never
-    be reclassified by price alone; a £5k 'gland' package never by noun alone."""
+    """True only when BOTH commodity signals hold: the commodity noun family (small
+    parts OR a generic-spec unactuated process valve) AND a stated class-basis unit
+    price under the threshold. An engineered pump can never be reclassified by price
+    alone; a £5k 'gland' package never by noun alone; an ACTUATED valve never at all."""
     if unit is None or unit <= 0 or unit > _COMMODITY_UNIT_GBP_MAX:
         return False
     if not str(row.get("basis") or "").strip():
         return False        # class-basis priced small parts only — never an unpriced mystery
-    return bool(_COMMODITY_NOUN_RX.search(
-        f"{row.get('requirement') or ''} {row.get('part') or ''}"))
+    text = f"{row.get('requirement') or ''} {row.get('part') or ''}"
+    return bool(_COMMODITY_NOUN_RX.search(text)) or _commodity_process_valve(text)
 
 
 # ── CLASS-ALIEN PART MARKERS (fix 6, reviewers 2026-07-02 — 'Aquavista Remote
@@ -12777,6 +12968,64 @@ def _selftest() -> int:
             # only the dash-ΔU main-board W1 rendered a fabricated ✓.
             if _ps["score"] != 2.0 or _ps["source_fabricated"] != 1:
                 print(f"  FAIL contract-panel: score must be 10×1/5=2.0 with exactly 1 fabricated tick (got {_ps['score']}, {_ps['source_fabricated']})"); bad += 1
+        # ── DC-BOARD SYSTEM proveCatch (BESS cross-val 2026-07-03, both directions):
+        #    a board whose OWN System field says '1,500 V DC bus' must be judged by
+        #    P = V·I — 8.4 A × 1500 V = 12.6 kW is CONSISTENT (the 400 V √3 formula
+        #    read it as pf·η 2.17 and failed a correct row); a genuinely inconsistent
+        #    DC current (100 A for 12.6 kW at 1500 V → implied 0.08) must STILL FAIL. ──
+        with open(os.path.join(_td, "drawings", "panel-schedule.md"), "w") as _fh:
+            _fh.write(
+                "# PANEL / LOAD SCHEDULE\n\n## DC MAIN BOARD\n\n"
+                "| Field | Value |\n|---|---|\n"
+                "| **Board reference** | DC busbar 1500 V |\n"
+                "| **System** | 1,500 V DC bus |\n"
+                "| **Busbar rating** | 1,667 A |\n\n" + _hdr_ln +
+                "| W1 | BMS master | 1 | 12.60 | 8.4 | 10 A MCB | 1.5 mm² · 2c | 8.1 | 0.136 | ✓ |\n"
+                "| W2 | Aux feeder | 1 | 12.60 | 100.0 | 125 A MCB | 35 mm² · 2c | 8.1 | 0.1 | ✓ |\n"
+                "\n**Reconciliation:** Σ circuit design current = 108 A vs board busbar "
+                "demand = 108 A (ratio 1.00) → **OK**.\n")
+        _pdc = _eval_panel_schedule_contract(_td, {})
+        _k_dc_w1 = "DC MAIN BOARD · W1"
+        _k_dc_w2 = "DC MAIN BOARD · W2"
+        if not _pdc or _k_dc_w1 not in _pdc["rows"]:
+            print(f"  FAIL contract-panel-dc: DC fixture rows missing (got {_pdc and list(_pdc['rows'])})"); bad += 1
+        else:
+            if _pdc["rows"][_k_dc_w1]["verdict"] != "PASS":
+                print(f"  FAIL contract-panel-dc: 8.4 A × 1500 V DC = 12.6 kW is CONSISTENT and must "
+                      f"PASS (got {_pdc['rows'][_k_dc_w1]})"); bad += 1
+            if (_pdc["rows"][_k_dc_w2]["verdict"] != "FAIL"
+                    or not any("inconsistent" in x for x in _pdc["rows"][_k_dc_w2]["reasons"])):
+                print(f"  FAIL contract-panel-dc: 100 A for 12.6 kW at 1500 V DC (implied 0.08) must "
+                      f"still FAIL the consistency band (got {_pdc['rows'][_k_dc_w2]})"); bad += 1
+    # ═══ proveCatch the HVAC DIRECT drawing coverage (BESS cross-val 2026-07-03) ═══
+    # Both directions: a design with an HVAC duty whose drawing OMITS half its
+    # HVAC/cooling parts scores the honest fraction + NAMES the missing kit; a
+    # drawing showing everything PASSES ≥8.
+    import tempfile as _tfh
+    with _tfh.TemporaryDirectory() as _tdh:
+        os.makedirs(os.path.join(_tdh, "drawings"), exist_ok=True)
+        with open(os.path.join(_tdh, "state.json"), "w") as _fh:
+            json.dump({"orchestratorContract": {"quantities": {
+                           "hvac_cooling_load_kw": {"value": 30, "unit": "kW"}}},
+                       "requirementsBom": [
+                           {"tag": "CH-1", "requirement": "liquid cooling chiller"},
+                           {"tag": "AC-1", "requirement": "container AC unit"},
+                       ]}, _fh)
+        with open(os.path.join(_tdh, "drawings", "hvac-layout.svg"), "w") as _fh:
+            _fh.write("<svg><text>Liquid chiller / cooling skid</text></svg>")
+        _hv = _aux_tab_score("HVAC", _tdh)
+        if (not _hv or _hv.get("score") != 5 or _hv.get("status") != "FAIL"
+                or "container AC unit" not in (_hv.get("issues") or [""])[0]):
+            print(f"  FAIL hvac-coverage: half-covered drawing must score 5 FAIL naming the "
+                  f"missing 'container AC unit' (got {_hv})"); bad += 1
+        with open(os.path.join(_tdh, "drawings", "hvac-layout.svg"), "w") as _fh:
+            _fh.write("<svg><text>Liquid chiller / cooling skid</text>"
+                      "<text>Container AC unit</text></svg>")
+        _COV_CACHE.pop(_tdh, None)
+        _hv2 = _aux_tab_score("HVAC", _tdh)
+        if not _hv2 or _hv2.get("score") != 10 or _hv2.get("status") != "PASS":
+            print(f"  FAIL hvac-coverage: a fully-covered drawing must PASS 10 (got {_hv2})"); bad += 1
+
     # ═══ proveCatch the BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ═══
     # Claims: (a) a bought-out ASSEMBLY without a material PASSES with the stated
     # 'N/A — proprietary assembly' reason + its missing MPN becomes an EXPLICIT flagged
@@ -12891,6 +13140,72 @@ def _selftest() -> int:
         if "engineered TBD 2/2" not in _tn or "commodity 'MPN at procurement' 1/1" not in _tn:
             print(f"  FAIL tbd-taxonomy: the header formula must print BOTH tallies "
                   f"(got {_tn[:220]})"); bad += 1
+    # ═══ proveCatch the COMMODITY PROCESS VALVE taxonomy (Bar B, 2026-07-03). Claims:
+    # (a) a generic-spec unactuated process valve (manual/ball/check/isolation/sample)
+    #     with class-basis price ≤ threshold is 'commodity — MPN at procurement';
+    # (b) an ACTUATED valve NEVER reclassifies (real pin path — engineered TBD),
+    #     even under the price threshold;
+    # (c) the price + basis legs of the triple guard still bind (a £500 ball valve /
+    #     a basis-less £9 valve both stay engineered). ═══
+    if not _commodity_process_valve("Manual Ball Valve") or \
+       not _commodity_process_valve("Suction Isolation Valves") or \
+       not _commodity_process_valve("Sample Valves") or \
+       not _commodity_process_valve("Non-Return Valve"):
+        print("  FAIL valve-taxonomy: manual/isolation/sample/non-return valves must "
+              "classify as generic-spec commodity process valves"); bad += 1
+    for _av in ("Pneumatic Actuated Valves", "Solenoid Valve", "Automated Ball Valves",
+                "Flow Control Valve", "Pressure Relief Valve", "Chemical Dosing Pump"):
+        if _commodity_process_valve(_av):
+            print(f"  FAIL valve-taxonomy: {_av!r} must stay ENGINEERED (actuation / "
+                  f"control / relief / non-valve never reclassifies)"); bad += 1
+    _vrow = {"requirement": "Manual Ball Valve", "part": "requirement stated",
+             "basis": "bottom-up parametric · MoC: PVC-U"}
+    if not _commodity_bought_out(_vrow, 9.0):
+        print("  FAIL valve-taxonomy: a £9 basis-backed manual ball valve must be "
+              "commodity"); bad += 1
+    if _commodity_bought_out(_vrow, 500.0):
+        print("  FAIL valve-taxonomy: a £500 ball valve must stay engineered (price "
+              "leg binds)"); bad += 1
+    if _commodity_bought_out({"requirement": "Manual Ball Valve", "basis": ""}, 9.0):
+        print("  FAIL valve-taxonomy: a basis-less valve must stay engineered (basis "
+              "leg binds)"); bad += 1
+    if _commodity_bought_out({"requirement": "Pneumatic Actuated Valves",
+                              "basis": "actuated-valve assembly"}, 90.0):
+        print("  FAIL valve-taxonomy: an actuated valve under the threshold must stay "
+              "engineered"); bad += 1
+    # ═══ proveCatch the FOLD-TOLERANT MPN JOIN (Bar C, 2026-07-03). Claims:
+    # (a) a verified singular pin joins the plural ledger row ('Pneumatic Actuated
+    #     Valve' → 'Pneumatic Actuated Valves');
+    # (b) same-family head synonyms join ('Emergency Stop Switch' → 'emergency stop
+    #     button');
+    # (c) DIFFERENT head nouns NEVER cross-join ('pressure transmitter' never joins
+    #     'Pressure Switch');
+    # (d) a TBD partVerifications entry can neither surface NOR shadow a verified
+    #     sibling pin. ═══
+    _jmap = _build_mpn_by_word({"partVerifications": [
+        {"word_name": "Pneumatic Actuated Valves", "manufacturer": None,
+         "part_number": "TBD (detailed design)"},          # TBD twin FIRST — must not shadow
+        {"word_name": "Pneumatic Actuated Valve", "manufacturer": "Bürkert",
+         "part_number": "Type 2000"},
+        {"word_name": "Emergency Stop Switch", "manufacturer": "Eaton",
+         "part_number": "216516"},
+        {"word_name": "Pressure Transmitter", "manufacturer": "WIKA",
+         "part_number": "50372475"},
+    ]})
+    if _bom_row_mpn({"tag": "X-127", "requirement": "Pneumatic Actuated Valves",
+                     "part": "requirement stated"}, _jmap) != "Bürkert Type 2000":
+        print("  FAIL mpn-join: plural row must join the verified singular pin "
+              "(Bürkert Type 2000), never the TBD twin"); bad += 1
+    if _bom_row_mpn({"tag": "X-141", "requirement": "emergency stop button",
+                     "part": "requirement stated"}, _jmap) != "Eaton 216516":
+        print("  FAIL mpn-join: 'emergency stop button' must join the verified "
+              "'Emergency Stop Switch' (same-family head synonym)"); bad += 1
+    if _bom_row_mpn({"tag": "I-9", "requirement": "Pressure Switch",
+                     "part": "requirement stated"}, _jmap) != "":
+        print("  FAIL mpn-join: 'Pressure Switch' must NEVER join the pressure "
+              "TRANSMITTER (head-noun families never cross)"); bad += 1
+    if _mpn_join_key("Pressure Transmitters") == _mpn_join_key("Pressure Switch"):
+        print("  FAIL mpn-join: transmitter and switch join keys must differ"); bad += 1
     # ═══ proveCatch the RISK-REGISTER TRIAGE contract (Tristan 2026-07-02, issue 12 —
     # "if you have identified these problems why are they still here?"). Claims:
     # (a) ENGINE-FIXABLE-as-tolerable IMPOSSIBLE: a live engine finding (physics critic /

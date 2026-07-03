@@ -1899,6 +1899,23 @@ _REF_STOP_RX = re.compile(
     r"\b(the|a|an|of|for|with|and|to|from|via|x|series|model|unit|assembly|"
     r"module|kit|set|mk|rev|mw|kw|kv|v|a|mm|m|dn|sch|nominal|bidirectional)\b", re.I)
 
+# ABSTRACT TERMINI a connection legitimately ends on WITHOUT a BoM part behind them
+# (BESS cross-val 2026-07-03): the battery-limit boundaries (grid / atmosphere / sewer),
+# the service sinks (heat rejection / thermal sink), and the ELECTRICAL-DISTRIBUTION
+# pseudo-nodes the electrical model authors as routing structure (a busway, a
+# distribution BOARD id like 'bms_ctrl' rendered 'Bm Ctrl', the dc/ac service bus).
+# These are system edges, not phantom parts — the rendered Connection trace resolves
+# or drops them (_resolve_trace_endpoints); the audit keys on the same service
+# families so it applies only where its physics applies. A genuinely phantom PART
+# ('cabinets', a misspelled vessel) matches none of these and still flags.
+# Keep in sync with deterministic_checks_lib._SERVICE_BOUNDARY_ENDPOINT_RE.
+_ABSTRACT_TERMINUS_RX = re.compile(
+    r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|atmosphere|ambient|"
+    r"to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
+    r"\bheat[_ -]?reject(?:ion)?\b|\b(?:heat|thermal|cold)[_ -]?sink\b|"
+    r"bus[_ -]?way|\b(?:dc|ac|hv|lv|mv)[_ -]?bus\b|\bctrl\b|"
+    r"\bboard\b", re.I)
+
 
 def _ref_noun(name) -> str:
     """Reduce a connection-trace endpoint label to a comparable noun bag: strip array
@@ -1936,6 +1953,8 @@ def check_phantom_reference(state, rows, run_dir) -> list:
 
     seen = set()
     for _ctx, name in refs:
+        if _ABSTRACT_TERMINUS_RX.search(str(name or "")):
+            continue   # a service-boundary / distribution pseudo-node, not a phantom part
         nn = _ref_noun(name)
         flat = _flat(re.sub(r"\[\d+\]", "", str(name)))
         if not nn and not flat:
@@ -2422,7 +2441,10 @@ def check_provenance(state, rows, run_dir) -> list:
     except Exception:  # noqa: BLE001
         return out
     try:
-        rep = audit_provenance(state)
+        # run_dir lets the audit read the run's RECORDED tool invocations
+        # (4-orchestrator-tools-used.json) — a quantity matching a recorded tool
+        # claim by its own name has an origin (the tool run), not 'from nowhere'.
+        rep = audit_provenance(state, run_dir=run_dir)
     except Exception:  # noqa: BLE001
         return out
     sc = rep.scorecard()
@@ -3149,6 +3171,28 @@ def _selftest() -> int:
                "F: expected phantom_reference HIGH for 'cabinets'")
         expect(not any("Motor" in f.message for f in phantoms),
                "F: must NOT flag the resolvable 'Motor B' reference")
+
+    # ---- Fixture F2 (BESS cross-val 2026-07-03): ABSTRACT TERMINI are not phantoms —
+    # a thermal service sink ('Heat Rejection'), a distribution board id ('Bm Ctrl'),
+    # and a busway are system routing nodes, never BoM parts; a genuinely phantom part
+    # ('cabinets') in the SAME ledger must STILL flag (both directions).
+    with tempfile.TemporaryDirectory() as tf:
+        with open(os.path.join(tf, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 11000,
+                       "coverage_by_drawing": {"ga": {"expected": 3, "present": 3}},
+                       "connections": [
+                           {"from_part": "Motor B", "to_part": "Heat Rejection"},
+                           {"from_part": "Bm Ctrl", "to_part": "Motor B"},
+                           {"from_part": "Motor B", "to_part": "(Busway)"},
+                           {"from_part": "Frame A", "to_part": "cabinets"},
+                       ]}, fh)
+        repf2 = audit_dossier(clean_state, clean_rows, run_dir=tf)
+        phantoms2 = [f for f in repf2.findings if f.check == "phantom_reference"]
+        for _term in ("Heat Rejection", "Bm Ctrl", "Busway"):
+            expect(not any(_term in f.message for f in phantoms2),
+                   f"F2: abstract terminus '{_term}' must NOT be flagged as a phantom part")
+        expect(any("cabinets" in f.message for f in phantoms2),
+               "F2: a genuine phantom part must STILL flag next to the exempt termini")
 
     # ---- Fixture H: cross-tab — UNVERIFIED on compliance but computed in headline --
     # A metric with NO fulfilling contract quantity (so the compliance table shows

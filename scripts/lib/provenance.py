@@ -135,7 +135,34 @@ def _quantities(state: dict) -> Dict[str, dict]:
     return q if isinstance(q, dict) else {}
 
 
-def audit_provenance(state: dict) -> ProvenanceReport:
+def _tool_claim_index(run_dir: Optional[str]) -> Dict[str, List[float]]:
+    """{quantity_key_lower: [claimed values]} from the run's RECORDED tool invocations
+    (4-orchestrator-tools-used.json — the engine's own 'this verified tool computed this
+    number' record). A quantity whose value matches a recorded claim by ITS OWN name has
+    a recorded origin: the tool run. The audit under-read the run's provenance surfaces
+    before this (BESS cross-val 2026-07-03: all 22 'sourceless' quantities were exact
+    pybamm/pandapower/ngspice/coolprop claims on disk) — a false-UNVERIFIED is as
+    dishonest as a false-PASS. Value must MATCH (2%): a stale claim is NOT a lineage."""
+    idx: Dict[str, List[float]] = {}
+    if not run_dir:
+        return idx
+    try:
+        with open(os.path.join(run_dir, "4-orchestrator-tools-used.json")) as fh:
+            tu = json.load(fh)
+    except Exception:  # noqa: BLE001
+        return idx
+    for t in (tu.get("tools") or []) if isinstance(tu, dict) else []:
+        for c in (t.get("claims") or []):
+            v = c.get("value")
+            if not isinstance(v, (int, float)):
+                continue
+            for k in (c.get("field"), c.get("output_field")):
+                if k:
+                    idx.setdefault(str(k).strip().lower(), []).append(float(v))
+    return idx
+
+
+def audit_provenance(state: dict, run_dir: Optional[str] = None) -> ProvenanceReport:
     rep = ProvenanceReport()
     q = _quantities(state)
     rep.total = len(q)
@@ -143,6 +170,7 @@ def audit_provenance(state: dict) -> ProvenanceReport:
         return rep
 
     keyset = set(q.keys())
+    claims = _tool_claim_index(run_dir)
 
     # ---- 1. sourceless / lineage check -------------------------------------
     for key, qty in q.items():
@@ -168,6 +196,17 @@ def audit_provenance(state: dict) -> ProvenanceReport:
             continue
         if _has_detail(qty):
             rep.traced += 1   # prose lineage — traceable but not yet structured
+            continue
+        # TOOL-CLAIM ORIGIN: the run's recorded tool invocations claim this exact key
+        # with a MATCHING value (2%) → the origin IS recorded (the tool run), just not
+        # restated on the quantity. Traced. A claim whose value DISAGREES does not
+        # credit — a stale tool output is deterministic_checks_lib's STALE catch, not
+        # a lineage.
+        v = qty.get("value")
+        if isinstance(v, (int, float)) and any(
+                abs(float(v) - cv) <= max(abs(cv) * 0.02, 0.01)
+                for cv in claims.get(key.strip().lower(), [])):
+            rep.traced += 1
             continue
         # No root source, no source_detail, no lineage.from → appears from nowhere.
         rep.sourceless += 1
@@ -205,7 +244,24 @@ _GENERIC_ROLE = {
     "pump", "valve", "tank", "vessel", "skid", "unit", "motor", "filter", "blower", "fan",
     "mixer", "agitator", "sensor", "transmitter", "exchanger", "column", "tower", "compressor",
     "dosing", "metering", "throughput", "transfer", "circulation", "recirc", "feed", "pressure",
+    # electrical measurement-type nouns (BESS cross-val 2026-07-03): every *_voltage_* /
+    # *_current_* quantity of the unit shares these, so they don't discriminate ROLE —
+    # a 3.2 V CELL and a 1500 V DC BUS are different roles BY DESIGN (469 in series),
+    # exactly as 'power'/'mass' above; only the genuine domain token (cell/bus/string)
+    # discriminates.
+    "voltage", "volt", "current", "amperage", "frequency",
 }
+
+# Aggregate qualifiers: a key carrying one of these is a SYSTEM ROLL-UP of a same-role
+# per-unit quantity (total_cell_mass_kg = cell_mass_kg × cell_count). A roll-up and its
+# per-unit basis legitimately differ by the unit COUNT — that is a consistent design,
+# not a contradiction. Two AGGREGATES that disagree (total_supply_demand 124,478 vs
+# total_electrical_demand 41.3 — the original catch) still flag: both carry the qualifier.
+_AGGREGATE_QUALIFIERS = {"total", "overall", "gross", "system", "aggregate", "sum", "combined"}
+
+
+def _is_aggregate(key: str) -> bool:
+    return bool(_AGGREGATE_QUALIFIERS & set(_NUM_RE.findall(str(key).lower())))
 
 
 def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
@@ -239,6 +295,11 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
             for j in range(i + 1, n):
                 kj, vj, rj = items[j]
                 if not (ri & rj):           # must DIRECTLY share a domain role token
+                    continue
+                if _is_aggregate(ki) != _is_aggregate(kj):
+                    # a TOTAL vs its PER-UNIT basis (total_cell_mass vs cell_mass) is a
+                    # roll-up relation, not a same-role contradiction — skip. Two
+                    # aggregates (or two per-unit values) that disagree still flag.
                     continue
                 hi, lo = (vi, vj) if vi >= vj else (vj, vi)
                 hk, lk = (ki, kj) if vi >= vj else (kj, ki)
@@ -301,6 +362,51 @@ def _selftest() -> int:
     expect(not any(f.kind == "divergence" for f in audit_provenance(pumps).findings),
            "a metering pump and a circulation pump (different devices) must NOT be flagged divergent")
 
+    # ELECTRICAL-ARCHETYPE role guards (BESS cross-val 2026-07-03, both directions):
+    # a 3.2 V cell vs its 1500 V series bus, and a per-cell mass vs its ×6097 system
+    # total, are DESIGN relations — never divergences. Two same-role AGGREGATES that
+    # contradict must STILL flag (the original 124,478-vs-41.3 catch, asserted above).
+    bess = {"orchestratorContract": {"quantities": {
+        "cell_voltage_v":         {"value": 3.2, "unit": "V", "source": "datasheet"},
+        "dc_bus_voltage_v":       {"value": 1500, "unit": "V", "source": "brief"},
+        "string_voltage_nominal_v": {"value": 1500.8, "unit": "V", "source": "brief"},
+        "cell_mass_kg":           {"value": 5.3, "unit": "kg", "source": "datasheet"},
+        "total_cell_mass_kg":     {"value": 32314.1, "unit": "kg", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(bess).findings),
+           "cell-vs-bus voltage and per-cell-vs-total mass are design roll-ups, not divergences")
+    twin_totals = {"orchestratorContract": {"quantities": {
+        "total_supply_demand_kw":     {"value": 124478.0, "unit": "kW", "source": "brief"},
+        "total_electrical_demand_kw": {"value": 41.3, "unit": "kW", "source": "brief"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(twin_totals).findings),
+           "two contradicting same-role AGGREGATES must still flag (the original catch)")
+
+    # TOOL-CLAIM ORIGIN (both directions): a quantity matching the run's recorded tool
+    # claim is TRACED (the tool run IS its recorded origin); a claim whose value
+    # DISAGREES does not credit (stale ≠ lineage → still sourceless).
+    import tempfile
+    tool_state = {"orchestratorContract": {"quantities": {
+        "cell_count":   {"value": 6097, "unit": ""},                # claim matches → traced
+        "rack_count":   {"value": 14, "unit": ""},                  # claim says 13 → sourceless
+    }}}
+    with tempfile.TemporaryDirectory() as td:
+        with open(os.path.join(td, "4-orchestrator-tools-used.json"), "w") as fh:
+            json.dump({"tools": [{"tool_id": "pybamm:cell-sizing", "claims": [
+                {"field": "cell_count", "value": 6097, "output_field": "cell_count"},
+                {"field": "rack_count", "value": 13, "output_field": "rack_count"},
+            ]}]}, fh)
+        rep_t = audit_provenance(tool_state, run_dir=td)
+        keys_sourceless = {f.key for f in rep_t.findings if f.kind == "sourceless"}
+        expect("cell_count" not in keys_sourceless,
+               "a quantity matching a recorded tool claim has an origin (the tool run) — traced")
+        expect("rack_count" in keys_sourceless,
+               "a quantity DISAGREEING with its tool claim must stay sourceless (stale ≠ lineage)")
+    # without a run_dir nothing is credited (pure-state behaviour unchanged)
+    expect({f.key for f in audit_provenance(tool_state).findings if f.kind == "sourceless"}
+           == {"cell_count", "rack_count"},
+           "no run_dir → no tool-claim crediting (behaviour unchanged)")
+
     # clean: every number is a root, prose-traced, or structured
     clean = {"orchestratorContract": {"quantities": {
         "brief_power_kw": {"value": 41.3, "unit": "kW", "source": "brief"},
@@ -338,7 +444,7 @@ def _cli(run_dir: str, enforce: bool) -> int:
     except Exception as e:  # noqa: BLE001
         print(f"provenance: cannot read {sp}: {e}", file=sys.stderr)
         return 2
-    rep = audit_provenance(state)
+    rep = audit_provenance(state, run_dir=run_dir)
     sc = rep.scorecard()
     print(f"provenance: {sc['total']} quantities · roots {sc['roots']} · traced {sc['traced']} "
           f"· structured {sc['structured']} · SOURCELESS {sc['sourceless']} "

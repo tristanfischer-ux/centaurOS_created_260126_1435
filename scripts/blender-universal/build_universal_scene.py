@@ -7091,13 +7091,36 @@ def _load_required_services():
         def _rs(name, module, function, wet_plant=True):   # replica of component_engineering._required_services
             t = re.sub(r'[^a-z0-9]', '', f"{name} {module} {function}".lower())
             m = re.sub(r'[^a-z0-9]', '', str(module or '').lower()); req = set()
-            if any(k in t for k in ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'fan', 'lamp', 'mixer', 'agitat')):
+            # word tokens of the RAW name+function + name-only glued scan (BESS cross-val
+            # 2026-07-03 — keep in sync with component_engineering._required_services):
+            # the module name must never grant a fluid token ('transDUCTion' ≠ 'duct'),
+            # and the short tokens 'uv'/'fan' match whole words only.
+            _words = set(re.findall(r'[a-z0-9]+', f"{name} {function}".lower()))
+            tn = re.sub(r'[^a-z0-9]', '', f"{name} {function}".lower())
+            if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
+                    or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
                 req.add('power')
             # PROCESS-FLUID role gated on the WET-plant signal (M1, 2026-06-23 — keep in
             # sync with component_engineering._required_services). RAS-only tokens
             # ('rear','cone') are a conditional extension folded in here, never universal.
-            if wet_plant and any(k in t for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'uv', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'fan', 'compress')):
+            if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress'))
+                              or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
                 req.add('water')
+            # SERVICE-FAMILY EXCLUSION (2026-07-03): electrical gear / documentation /
+            # fastening structure never carries process water — unless explicitly
+            # liquid-cooled or itself fluid kit (see component_engineering).
+            if 'water' in req and not re.search(
+                    r'cool|chill|water[ -]?jacket|cold[ -]?plate|'
+                    r'tank|vessel|pipe|manifold|header|valve|sump|reservoir|drain|hose|spool',
+                    f"{name} {function}", re.I):
+                if re.search(
+                        r'capacitor|inductor|arrester|\btransformer\b|busbar|breaker|\brelay\b|'
+                        r'\bfuse\b|inverter|rectifier|\bpcs\b|surge|grounding|earthing|'
+                        r'sealing[ -]?end|switchgear|isolator|varistor|bushing|'
+                        r'\blabel\b|\bcard\b|\btape\b|placard|nameplate|decal|'
+                        r'tie[ -]?rod|compression[ -]?plate|end[ -]?plate|\bbracket\b',
+                        f"{name} {function}", re.I):
+                    req.discard('water')
             if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
                 req.add('signal')
             if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):

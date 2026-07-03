@@ -704,7 +704,13 @@ registerArchetype('bess', (brief: any) => {
     // THIRD: class default — integer-clean 1P × 250S at exactly 800 V.
     return 800
   })()
-  const seriesCellsPerString = Math.round(dcBusVoltage / cellVoltageV)  // e.g. 800/3.2 = 250 ; 1500/3.2 ≈ 469
+  // FLOOR, never round (BESS cross-val 2026-07-03): the string nominal voltage must
+  // never EXCEED the DC-bus voltage class — round(1500/3.2)=469S gave 1500.8 V, a
+  // breach of the 1500 V IEC 61140 class boundary the engine's own voltage_closure
+  // then recorded as FAIL. floor() yields the largest integer string WITHIN the
+  // class: 468S × 3.2 = 1497.6 V ≤ 1500 V. An exact multiple (800/3.2 = 250S) is
+  // unchanged, so the 800 V default topology is byte-identical.
+  const seriesCellsPerString = Math.floor(dcBusVoltage / cellVoltageV)  // e.g. 800/3.2 = 250 ; 1500/3.2 → 468
   // BESS L3 physics-critic fix (2026-05-24, issues #1 + #2): the brief's
   // 3.5 MWh usable + 800 V + 28 t + single-container envelope is genuinely
   // over-constrained at 5.3 kg/cell LFP. Solve the integer-feasible config:
@@ -1120,12 +1126,19 @@ registerArchetype('bess', (brief: any) => {
   // equal the DC bus nominal exactly (integer cell count × cell V). The
   // previous design emitted 5,010 cells / 15 racks = 334 cells/rack → no
   // integer config gives 800 V. Now enforced: 250S × 3.2V = 800 V exactly.
+  // PASS RULE (2026-07-03): the physically-honest closure is (a) the string nominal
+  // never EXCEEDS the DC-bus voltage class, and (b) it sits within ONE cell voltage
+  // of it (the largest integer string). Demanding exact equality was only satisfiable
+  // when the bus voltage is an integer multiple of the cell voltage (800 = 250 × 3.2);
+  // a 1500 V bus with 3.2 V cells has NO exact config — the honest optimum 468S =
+  // 1497.6 V must PASS, while a class breach (469S = 1500.8 V) must still FAIL.
   closures.push({
     invariant_id: 'voltage_closure',
-    status: Math.abs(stringVoltageNominalV - dcBusVoltage) < 0.01 ? 'pass' : 'fail',
+    status: (stringVoltageNominalV <= dcBusVoltage + 0.01
+             && dcBusVoltage - stringVoltageNominalV < cellVoltageV) ? 'pass' : 'fail',
     measured: { value: stringVoltageNominalV, unit: 'V', basis: 'rated', source_detail: 'series_cells_per_string × cell_voltage_v' } as any,
     required: { value: dcBusVoltage, unit: 'V', basis: 'rated', source_detail: 'dc_bus_voltage_v' } as any,
-    reason: `String voltage ${stringVoltageNominalV} V = ${seriesCellsPerString}S × ${cellVoltageV} V; DC bus ${dcBusVoltage} V (IEC 61140 voltage-class boundary).`,
+    reason: `String voltage ${stringVoltageNominalV} V = ${seriesCellsPerString}S × ${cellVoltageV} V; DC bus ${dcBusVoltage} V (IEC 61140 voltage-class boundary; string ≤ class and within one cell voltage of it).`,
   })
   // BESS L3 (2026-05-24, issue #1): brief_target_feasibility — explicit
   // pass/warn closure surfaces the achieved-vs-requested shortfall so the
