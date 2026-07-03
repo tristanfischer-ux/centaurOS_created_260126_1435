@@ -1054,6 +1054,9 @@ def _convert_value(value, from_unit, to_unit):
 # --------------------------------------------------------------------------- #
 
 _PRINCIPAL_STATUSES = {"IDENTIFIED", "BESPOKE", "SYSTEM", "UTILITY"}
+# Deliberate dedupe-fold statuses: the row stays visible at line £0; its value lives on
+# the parent line named in `sub_of` (ledger fold, bar-C dedupe work, 2026-07-02).
+_FOLD_STATUSES = {"MERGED·SYNONYM", "IN ASSEMBLY"}
 
 
 def check_bom(state, rows, run_dir) -> list:
@@ -1085,6 +1088,31 @@ def check_bom(state, rows, run_dir) -> list:
     # an indicative breakdown, not counted in the bill total), so qty×unit≠0 on a £0 sub-row is correct,
     # not a fault. Counting it flagged 202 false HIGHs on the water dossier → BoM forced to 0/10. The
     # line-math invariant applies to PRINCIPAL (counted) lines only.
+    #
+    # FOLD SEMANTICS (Tristan catch routed 2026-07-03): the dedupe pass deliberately keeps a
+    # folded row VISIBLE at line £0 with a fold status ('MERGED·SYNONYM' — a synonym line
+    # naming the same physical thing; 'IN ASSEMBLY' — a component already priced inside its
+    # assembly line) and `sub_of` naming the PARENT that carries the price. Such a row's £0
+    # is CORRECT — the check verifies the PARENT exists (its own qty×unit=line is checked by
+    # this same loop). A £0 fold row whose named parent does NOT exist is a genuine defect
+    # and still flags. proveCatch both directions in _selftest.
+    def _base_name(x) -> str:
+        # ledger names carry a ' · spec' suffix ('Uf Membrane Bank · 364 m² area');
+        # sub_of names the BASE — compare on the base.
+        return str(x or "").split("·")[0].strip().lower()
+
+    def _fold_parent_exists(r) -> bool:
+        target = _base_name(r.get("sub_of"))
+        if not target or target in ("—", "-"):
+            return False
+        for p in rows:
+            if p is r or not isinstance(p, dict):
+                continue
+            name = _base_name(p.get("requirement") or p.get("part"))
+            if name == target and _status(p) not in _FOLD_STATUSES:
+                return True
+        return False
+
     for r in rows:
         if _status(r) == "SUB-COMPONENT":
             continue
@@ -1092,6 +1120,19 @@ def check_bom(state, rows, run_dir) -> list:
         unit = _num(r.get("unit_gbp"))
         line = _num(r.get("line_gbp"))
         if qty is None or unit is None or line is None:
+            continue
+        if _status(r) in _FOLD_STATUSES and round(line) == 0:
+            if _fold_parent_exists(r):
+                continue      # deliberate fold — the priced parent carries the arithmetic
+            out.append(Finding(
+                tab=tab, check="line_math", severity="HIGH",
+                message=(f"£0 fold row "
+                         f"'{_clip(str(r.get('requirement') or r.get('part') or '?'), 40)}' "
+                         f"({_status(r)}) names parent '{_clip(str(r.get('sub_of') or '—'), 40)}' "
+                         "but no priced line with that name exists — a fold must point at a real parent"),
+                actual="fold parent missing", expected="sub_of names a priced BoM line",
+                source_rule="a MERGED·SYNONYM / IN ASSEMBLY fold row must reference its priced parent line",
+            ))
             continue
         if abs(round(qty * unit) - round(line)) > 1:
             out.append(Finding(
@@ -3046,6 +3087,30 @@ def _selftest() -> int:
 
     expect("tag_coverage" in checks, "A: expected tag_coverage HIGH")
     expect("line_math" in checks, "A: expected line_math HIGH")
+
+    # ---- FOLD SEMANTICS proveCatch (both directions, 2026-07-03): a deliberate dedupe
+    # fold (£0 + fold status + sub_of naming a priced parent) passes; a £0 fold whose
+    # parent does NOT exist still fails; a genuine £0-with-price line still fails.
+    fold_rows = [
+        {"tag": "Z-1", "requirement": "Uf Membrane Bank · 364 m² area", "status": "IDENTIFIED",
+         "part": "UF bank", "qty": 1, "unit_gbp": 14825, "line_gbp": 14825, "basis": "x"},
+        {"tag": "Z-2", "requirement": "Ultrafiltration Module", "status": "MERGED·SYNONYM",
+         "part": "UF synonym", "qty": 1, "unit_gbp": 14825, "line_gbp": 0,
+         "sub_of": "Uf Membrane Bank", "basis": "folded"},
+        {"tag": "—", "requirement": "Pneumatic Actuators", "status": "IN ASSEMBLY",
+         "part": "actuators", "qty": 200, "unit_gbp": 30, "line_gbp": 0,
+         "sub_of": "Uf Membrane Bank", "basis": "priced in assembly"},
+    ]
+    fold_f = [f for f in check_bom({}, fold_rows, "") if f.check == "line_math"]
+    expect(not fold_f, f"FOLD: a legit £0 fold row must NOT flag line_math (got {[f.message[:60] for f in fold_f]})")
+    orphan_fold = [dict(fold_rows[1], sub_of="No Such Parent")]
+    orphan_f = [f for f in check_bom({}, orphan_fold, "") if f.check == "line_math"]
+    expect(len(orphan_f) == 1 and "no priced line" in orphan_f[0].message,
+           "FOLD: a £0 fold row pointing at a MISSING parent must still flag")
+    broken_line = [{"tag": "X-9", "requirement": "Pump", "status": "IDENTIFIED",
+                    "part": "pump", "qty": 2, "unit_gbp": 100, "line_gbp": 0, "basis": "x"}]
+    broken_f = [f for f in check_bom({}, broken_line, "") if f.check == "line_math"]
+    expect(len(broken_f) == 1, "FOLD: a genuinely broken £0 line (no fold status) must still flag")
     expect("zero_principal" in checks, "A: expected zero_principal MED")
     expect("capex_category_coverage" in checks, "A: expected capex_category_coverage HIGH (conn £500 << grand)")
     # compliance_matcher_gap RETIRED — the renderer + score now share ONE matcher

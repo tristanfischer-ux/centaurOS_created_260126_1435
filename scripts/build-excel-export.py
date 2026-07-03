@@ -556,7 +556,10 @@ def _aux_tab_score(title: str, run_dir: str):
 
 
 def _tab_quality_banner(title: str):
-    """The quality-banner spec ({text, fill, height}) for a sheet, or None if the tab isn't scored."""
+    """The score-CHIP spec ({text, fill, height}) for a sheet — score + the scoring
+    formula with LIVE COUNTS (the tab's own basis) + a pointer to Quality & Audit.
+    None only when the tab has no score entry at all (the no-silent-default assertion
+    turns that into a build error before any chip is stamped)."""
     v = _TAB_SCORES.get(title)
     if not isinstance(v, dict):
         v = _aux_tab_score(title, _RUN_DIR)   # drawing / render / meta sheets → on-the-fly score
@@ -570,25 +573,41 @@ def _tab_quality_banner(title: str):
             "fill": FILL_ADVISORY, "height": 30,
         }
     sc = v.get("score")
+    sc_txt = f"{sc:g}" if isinstance(sc, (int, float)) else str(sc)
+    basis = str(v.get("basis") or "").strip()
+    basis_short = (basis[:170] + "…") if len(basis) > 171 else basis
     issues = v.get("issues") or []
     tail = (f"  →  {issues[0]}" if (status == "FAIL" and issues) else "")
     return {
-        "text": f"⬤ TAB QUALITY: {sc}/10   ·   target ≥{tgt}   ·   {status}{tail}",
+        "text": (f"⬤ TAB QUALITY {sc_txt}/10 · {status} (target ≥{tgt})"
+                 + (f" · {basis_short}" if basis_short else "")
+                 + " · full audit: 'Quality & Audit' tab" + tail),
         "fill": FILL_PASS if status == "PASS" else FILL_FAIL,
-        "height": 30 if tail else 18,
+        "height": 30 if (tail or len(basis_short) > 90) else 18,
     }
 
 
-# Tabs that CARRY the row-2 '⬤ TAB QUALITY' banner (presentation audit 2026-07-02, fix 2):
-# self-grading banners on every client-facing tab read as noise and contradict each other —
-# the per-tab scores stay in tab-scorecard.json + the Quality & Audit tab; only the meta /
-# audit surfaces keep the on-tab banner.
-_BANNER_TABS = {"⚠ Checks", "Quality & Audit"}
+# ON-TAB SCORE CHIP (Tristan 2026-07-03: "if they don't have a score how can you score
+# it?"). EVERY tab reserves row 2 as its score chip at build time and registers itself in
+# _CHIP_SPANS; the chip is RE-STAMPED at the very end of build() from the FINAL
+# _TAB_SCORES (score + the formula with live counts + a pointer to Quality & Audit) —
+# never at tab-build time, so the banner-timing staleness gap cannot recur. This
+# supersedes the 2026-07-02 meta-tabs-only banner rule: an on-tab score is required
+# precisely because a score nobody can see on the tab is indistinguishable from no score.
+_CHIP_SPANS: Dict[str, int] = {}   # sheet title -> merged span of its reserved chip row
+_CHIP_PLACEHOLDER = "⬤ TAB QUALITY — computed from this tab's rendered content at end of build"
+
+# PER-CELL COMPLETENESS CONTRACT registry of every rendered table (populated by header()).
+# Each entry: {sheet, row, cols}. The generic walker (_run_cell_contracts) verifies every
+# data row × required column of every registered table and refuses a table whose column
+# signature has no declared contract (_TABLE_CONTRACTS) — adding an uncontracted table is
+# impossible.
+_RENDERED_TABLES: List[dict] = []
 
 
 def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
-    """Write a full-width title band (+ a deterministic per-tab quality banner on the
-    meta tabs only — client-facing tabs carry no self-grade banner); return next free row."""
+    """Write a full-width title band + reserve the row-2 score chip (re-stamped from the
+    FINAL scores at end of build — every tab carries its visible score); return next free row."""
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=span)
     c = ws.cell(1, 1, text)
     c.font = FONT_TITLE
@@ -596,17 +615,14 @@ def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
     c.alignment = Alignment(vertical="center", horizontal="left", indent=1)
     ws.row_dimensions[1].height = 26
     nxt = 2
-    # Quality banner — META tabs only (⚠ Checks / Quality & Audit). Every tab's score
-    # still lands in tab-scorecard.json + the Quality & Audit per-tab table.
-    qb = _tab_quality_banner(ws.title) if ws.title in _BANNER_TABS else None
-    if qb is not None:
-        ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
-        bc = ws.cell(nxt, 1, qb["text"])
-        bc.fill = qb["fill"]
-        bc.font = FONT_SUB
-        bc.alignment = LEFT_TOP
-        ws.row_dimensions[nxt].height = qb["height"]
-        nxt += 1
+    # Score chip — EVERY tab. Reserved (placeholder) now, stamped from FINAL scores later.
+    ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
+    bc = ws.cell(nxt, 1, _CHIP_PLACEHOLDER)
+    bc.font = FONT_NOTE
+    bc.alignment = LEFT_TOP
+    ws.row_dimensions[nxt].height = 16
+    _CHIP_SPANS[ws.title] = span
+    nxt += 1
     if subtitle:
         ws.merge_cells(start_row=nxt, start_column=1, end_row=nxt, end_column=span)
         s = ws.cell(nxt, 1, subtitle)
@@ -636,6 +652,12 @@ def _col_width(ws: Worksheet, col_idx: int) -> float:
 
 
 def header(ws: Worksheet, row: int, cols: List[str]) -> None:
+    # PER-CELL COMPLETENESS CONTRACT (Tristan 2026-07-03): EVERY rendered table is
+    # REGISTERED here, so the generic cell-contract walker can verify every row ×
+    # required column after the build — and a table with no declared contract entry
+    # is IMPOSSIBLE to ship (the walker refuses, naming the sheet + columns).
+    _RENDERED_TABLES.append({"sheet": ws.title, "row": row,
+                             "cols": [str(c) if c is not None else "" for c in cols]})
     for i, name in enumerate(cols, start=1):
         c = ws.cell(row, i, name)
         c.font = FONT_HEADER
@@ -796,7 +818,8 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
     return facts, advisory
 
 
-def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
+def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
+                    rendered_sheets: Optional[List[str]] = None) -> dict:
     """The ONE dossier verdict. Pure — the floor ranges over the DETERMINISTIC
     (FACT) scorecard sections + the per-tab scores ONLY; returns {floor,
     open_issues, ships, …}. The LLM self-audit (and any section flagged
@@ -805,7 +828,26 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
     corroboration-based sections exist precisely to replace it).
     The two FLOOR-MIRROR tabs (_MIRROR_TABS) are EXCLUDED from the computation —
     they render this floor, so counting them in the min is a fixpoint (a stale 0
-    self-sustains)."""
+    self-sustains).
+
+    NO SILENT DEFAULT (Tristan 2026-07-03: "if they don't have a score how can you
+    score it?"): when `rendered_sheets` is given (the workbook's real sheet list),
+    EVERY rendered tab must carry a score entry WITH a non-empty `basis` (the stated
+    content-derived mechanism + live counts). A tab whose entry is missing or whose
+    basis is empty is a DEFAULT dressed as a score — the verdict REFUSES with a build
+    error naming the tab, so adding a new tab without a registered scorer is
+    impossible. proveCatch in _selftest (both directions)."""
+    if rendered_sheets is not None:
+        _unscored = [str(t) for t in rendered_sheets
+                     if not (isinstance((tab_scores or {}).get(t), dict)
+                             and str((tab_scores or {}).get(t, {}).get("basis") or "").strip())]
+        if _unscored:
+            raise SystemExit(
+                "NO-SILENT-DEFAULT: rendered tab(s) carry no registered content-derived "
+                "scoring mechanism (missing entry or empty basis): "
+                + ", ".join(sorted(_unscored))
+                + " — register a scorer in _TAB_SCORERS / _content_score_tab so the tab's "
+                  "score is arithmetic over its own rendered content, never a default.")
     facts, _ = _verdict_sections(state, run_dir)
     secs: Dict[str, Optional[float]] = {nm: d.get("score") for nm, d in facts.items()}
     tabs: Dict[str, Optional[float]] = {}
@@ -883,7 +925,15 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
     es = scores.get("Executive Summary")
     if isinstance(es, dict) and isinstance(fl, (int, float)):
         own = _exec_own_score(es)
-        sc = min(fl, own) if isinstance(own, (int, float)) else fl
+        # The cover can never exceed the floor, its own routed findings, OR its own
+        # content-derived arithmetic (the brief-compliance rows rendered on it —
+        # content_score is stamped by the content scorer pass, 2026-07-03).
+        cand = [fl]
+        if isinstance(own, (int, float)):
+            cand.append(own)
+        if isinstance(es.get("content_score"), (int, float)):
+            cand.append(es["content_score"])
+        sc = min(cand)
         own_issues = [i for i in (es.get("issues") or []) if _SEV_ISSUE_RX.match(str(i))]
         iss = list(own_issues)
         if fl < (own if isinstance(own, (int, float)) else 10):
@@ -893,9 +943,14 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
         es["status"] = "PASS" if sc >= 8 else "FAIL"
         es["issues"] = iss[:6]
         es["basis"] = ("MIRROR of the dossier floor (min of every deterministic section & "
-                       "non-mirror tab) — re-stamped from the CURRENT scores, never a stale earlier cap")
+                       "non-mirror tab) — re-stamped from the CURRENT scores, never a stale earlier cap"
+                       + (f"; own content check: {es.get('content_basis')}" if es.get("content_basis") else ""))
+    _qa_prev = scores.get("Quality & Audit") if isinstance(scores.get("Quality & Audit"), dict) else {}
+    _qa_sc = fl
+    if isinstance(_qa_prev.get("content_score"), (int, float)) and isinstance(fl, (int, float)):
+        _qa_sc = min(fl, _qa_prev["content_score"])
     scores["Quality & Audit"] = {
-        "score": fl, "target": 8,
+        "score": _qa_sc, "target": 8,
         "status": "PASS" if v.get("ships") else "FAIL",
         "issues": ([] if v.get("ships") else
                    [f"the dossier does NOT ship — floor "
@@ -903,7 +958,13 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
                     f"number the verdict quotes); every surface must reach ≥8" if isinstance(fl, (int, float)) else
                     "the dossier does NOT ship — no scored surface exists"]),
         "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
-        "basis": "THE dossier floor — min score of every deterministic section & non-mirror tab (identical to the verdict computation)",
+        "basis": ("THE dossier floor — min score of every deterministic section & non-mirror tab "
+                  "(identical to the verdict computation)"
+                  + (f"; own content check: {_qa_prev.get('content_basis')}" if _qa_prev.get("content_basis") else "")),
+        # carry the content-derived counts forward (the mirror renders the floor, but its
+        # own rendered tables are still cell-checked — checked/passed must survive the stamp)
+        **{k: _qa_prev[k] for k in ("checked", "passed", "content_score", "content_basis", "components")
+           if k in _qa_prev},
     }
     return v
 
@@ -4348,10 +4409,11 @@ def _ledger_fold_layout(bom: list, run_dir: str) -> Tuple[List[dict], Dict[int, 
         entries.append(entry)
         if pidx in members_of:
             by_leader[pidx] = entry
-    # flatten + assign sheet rows (data starts at row 5)
+    # flatten + assign sheet rows (data starts at _LEDGER_DATA_START — the chip row
+    # added 2026-07-03 moved the ledger header to row 5, data to row 6)
     flat: List[dict] = []
     sheet_row_by_idx: Dict[int, int] = {}
-    rr = 5
+    rr = _LEDGER_DATA_START
     for e in entries:
         for i in e["src_idx"]:
             sheet_row_by_idx[i] = rr
@@ -4437,6 +4499,11 @@ def tab_parts_master(wb: Workbook, state: dict, run_dir: str) -> None:
 
 
 _LEDGER_SHEET = "Bill of Materials (Ledger)"
+# First DATA row of the ledger sheet: title(1) + score chip(2) + subtitle(3) + column
+# header(4) -> data starts at 5 (the chip row consumed the old spacer; tab_bom hardcodes
+# its header at row 4). ONE constant shared by the fold layout, the column-contract row
+# references and the selftest.
+_LEDGER_DATA_START = 5
 
 # The LIVE address of the BoM Ledger's Σ-total cell, captured when the ledger is built
 # so the Cost waterfall's "Raw materials" row can LINK to the bill (traceability — Tristan:
@@ -8000,6 +8067,7 @@ def _render_md_table(ws: Worksheet, start_row: int, heading: str,
         sub_banner(ws, start_row, heading, max(ncol, 2))
         start_row += 1
     header(ws, start_row, hdr + [""] * (ncol - len(hdr)))
+    _RENDERED_TABLES[-1]["md_table"] = True   # class-dependent md columns -> generic contract
     r = start_row + 1
     body_first = r
     for rw in rows:
@@ -8130,6 +8198,36 @@ _GLOSSARY: List[tuple] = [
 ]
 
 
+def _workbook_text_blob(wb: Workbook, exclude: str = "") -> str:
+    """Lower-cased concatenation of every string cell on every sheet except `exclude` —
+    the usage corpus for the glossary term matcher."""
+    parts: List[str] = []
+    for other in wb.worksheets:
+        if other.title == exclude:
+            continue
+        for row in other.iter_rows(values_only=True):
+            for v in row:
+                if isinstance(v, str):
+                    parts.append(v.lower())
+    return "\n".join(parts)
+
+
+def _term_used_in(term: str, blob: str) -> bool:
+    """ONE matcher for 'is this glossary term used anywhere?' — shared by the renderer
+    (which drops orphan terms at source) and the Glossary scorer (which verifies none
+    remain), so the two can never disagree (honest-scoring rule). Slash/comma variants
+    each count; alpha terms tolerate an adjacent digit ('50NB', 'DN50'); numeric terms
+    keep the strict boundary so '304' never matches inside a number."""
+    for v in (x.strip().lower() for x in re.split(r"[/,]", str(term).split("(")[0]) if x.strip()):
+        if re.search(r"\d", v):
+            pat = r"(?<![a-z0-9])" + re.escape(v) + r"(?![a-z0-9])"
+        else:
+            pat = r"(?<![a-z])" + re.escape(v) + r"(?![a-z])"
+        if re.search(pat, blob):
+            return True
+    return False
+
+
 def tab_glossary(wb: Workbook, state: dict) -> bool:
     """Reference glossary of every abbreviation used across the dossier tabs and
     drawings. Universal (standard engineering nomenclature, identical for any
@@ -8141,8 +8239,17 @@ def tab_glossary(wb: Workbook, state: dict) -> bool:
               "Plain-English meaning of every abbreviation used on the schedule, "
               "drawing, bill-of-materials and cost tabs. Standard engineering "
               "nomenclature (British spelling); the same reference applies to any plant.")
+    # ORPHAN FILTER (Tristan 2026-07-03 glossary contract: every rendered term defined +
+    # NO orphan terms): only render terms actually USED somewhere in the workbook — the
+    # SAME matcher the Glossary scorer verifies with, so renderer and score cannot
+    # disagree. (Glossary is built after the drawing/schedule tabs, so the corpus is the
+    # full deliverable text.)
+    _blob = _workbook_text_blob(wb, exclude="Glossary")
+    _gloss = [(cat, [(t, m) for (t, m) in entries if _term_used_in(t, _blob)])
+              for cat, entries in _GLOSSARY]
+    _gloss = [(cat, entries) for cat, entries in _gloss if entries]
     r = 4
-    for category, entries in _GLOSSARY:
+    for category, entries in _gloss:
         sub_banner(ws, r, category, 2)
         r += 1
         for term, meaning in entries:
@@ -10447,7 +10554,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         # audit's 'row 4' refs were data-row ordinals, off-by-4 vs the sheet whose data
         # starts at row 5; the fold layout is the single source of the row mapping).
         _, _sheet_by_idx = _ledger_fold_layout(bom, run_dir)
-        ex = [f"sheet row {_sheet_by_idx.get(i, i + 5)} "
+        ex = [f"sheet row {_sheet_by_idx.get(i, i + _LEDGER_DATA_START)} "
               f"({str((bom[i] or {}).get('requirement', ''))[:40]}): {r['reasons'][0]}"
               for i, r in list(per_row.items()) if r["verdict"] == "FAIL"][:3]
         issues.append(f"{n_fail}/{n_total} ledger rows FAIL the column contract (arithmetic "
@@ -12226,8 +12333,14 @@ def _finalise_deterministic_zip(out_path: str) -> None:
                         lambda m, _pr=_pr: _stamp_collapsed(m, _pr),
                         data, count=1)
             if n == "docProps/core.xml":
+                # carry the namespace declarations ON the element: openpyxl's raw core.xml
+                # declares dcterms/xsi per-element, so a replacement without its own
+                # xmlns:* left UNBOUND prefixes -> strict XML parsers reject the file
+                # (masked when a LibreOffice round-trip re-declared them at the root).
                 data = _DOCPROPS_MODIFIED_RX.sub(
-                    b'<dcterms:modified xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00Z'
+                    b'<dcterms:modified xmlns:dcterms="http://purl.org/dc/terms/" '
+                    b'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+                    b'xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00Z'
                     b"</dcterms:modified>", data)
             elif n.startswith("xl/charts/chart") and n.endswith(".xml"):
                 # renumber this chart's axis ids in first-appearance order; crossAx
@@ -12335,6 +12448,1207 @@ def recalc_and_cache(out_path: str, soffice_path: Optional[str] = "auto") -> boo
         return True
 
 
+# ════════════════════════════════════════════════════════════════════════════════════════
+# EVERY-TAB CONTENT SCORING + PER-CELL COMPLETENESS CONTRACT (Tristan 2026-07-03)
+#
+# "All of the tabs don't have a scoring mechanism on them — if they don't have a score how
+# can you score it?"  +  "every line and every row should have some kind of deterministic
+# scoring mechanism on it… if every cell needed to have something in it and it didn't, it
+# would flag it as a problem."
+#
+# Three layers, all deterministic, all computed from the RENDERED workbook (never intent):
+#   1. PER-CELL COMPLETENESS CONTRACT — every table rendered through header() is registered
+#      (_RENDERED_TABLES) and must match a DECLARED contract (_TABLE_CONTRACTS: required
+#      columns + type rules per table family). The generic walker (_run_cell_contracts)
+#      verifies every data row × required column (non-empty, non-placeholder — a bare
+#      'TBD'/'—' fails, an honest 'TBD (stated basis)' passes — and type-valid), FLAGS a
+#      failing row ON the row (a '⚠ …' cell right of the table) and feeds the counts into
+#      the tab score. A table whose signature has no declared contract REFUSES the build.
+#   2. PER-TAB CONTENT SCORERS (_content_score_tab) — every tab's score is arithmetic over
+#      checks of ITS OWN rendered content, min-combined with any pre-existing mechanism
+#      (column contracts / drawing coverage / routed findings). The basis states the
+#      formula WITH live counts. Scores are never a constant.
+#   3. NO SILENT DEFAULT — compute_verdict(rendered_sheets=…) refuses any rendered tab
+#      whose entry lacks a stated basis; _stamp_chips then renders the row-2 score chip on
+#      every tab from the FINAL scores. proveCatch for all three in _selftest.
+# ════════════════════════════════════════════════════════════════════════════════════════
+
+_CELL_STATS: Dict[str, dict] = {}   # sheet -> {"checked","passed","fails","tables","rows"}
+_CELLCON_DONE: set = set()          # (sheet, header_row, cols) already walked
+
+
+def _norm_col(name) -> str:
+    """Normalise a column label for contract matching: lowercase, parenthesised segments
+    stripped (class-dependent units live there), '£/<unit>' collapsed (class-dependent
+    denominators), whitespace collapsed."""
+    s = re.sub(r"\([^)]*\)", "", str(name or ""))
+    s = s.replace("​", "").lower()
+    s = re.sub(r"£\s*/\s*[^\s,;]+", "£/unit", s)
+    s = re.sub(r"\s+", " ", s).strip().strip(".:").strip()
+    return s
+
+
+def _table_sig(cols) -> tuple:
+    return tuple(c for c in (_norm_col(x) for x in cols) if c)
+
+
+_TABLE_CONTRACTS: Dict[tuple, dict] = {}
+
+
+def _dt(cols, family, required, numeric=(), unit=(), row_rules=()) -> None:
+    """Declare one table family's per-cell contract (required / numeric / unit columns).
+    row_rules: [{'col','rx','exempt'}] — a row whose `col` matches `rx` is EXEMPT from the
+    `exempt` columns (deliberate semantics, e.g. a ledger ↳ fold row priced on its parent)."""
+    _TABLE_CONTRACTS[_table_sig(cols)] = {
+        "family": family,
+        "required": [_norm_col(c) for c in required],
+        "numeric": [_norm_col(c) for c in numeric],
+        "unit": [_norm_col(c) for c in unit],
+        "row_rules": [{"col": _norm_col(rr["col"]), "rx": re.compile(rr["rx"]),
+                       "exempt": [_norm_col(c) for c in rr["exempt"]]} for rr in row_rules],
+    }
+
+
+# ── Declared contracts for EVERY rendered table family (from the live signature sweep).
+#    Adding a new table without declaring its contract fails the build + selftest. ──
+_dt(["Brief metric", "Target", "Unit", "Matched contract quantity", "Achieved", "Direction",
+     "STATUS", "Note"], "compliance", ["Brief metric", "Target", "STATUS"], unit=["Unit"])
+_dt(["Section", "Score", "≥8?", "Defects"], "overview-sections",
+    ["Section", "Score", "≥8?"], numeric=["Score"])
+_dt(["Metric", "Value", "Unit", "Notes / source"], "overview-metrics",
+    ["Metric", "Value", "Notes / source"])
+_dt(["Category", "Cost (£)", "% of capex", "Share"], "overview-cost",
+    ["Category", "Cost (£)", "% of capex"], numeric=["Cost (£)"])
+_dt(["", "LLM expected (top-down)", "Engine (bottom-up)", "Ratio", "Basis"],
+    "benchmark-headline", ["Basis"])
+_dt(["Dimension", "LLM expected", "Engine (deterministic)", "Ratio", "Verdict"],
+    "benchmark-dims", ["Dimension", "Verdict"])
+_dt(["Dimension", "LLM expected (top-down)", "Engine (bottom-up)", "Ratio", "Verdict / note"],
+    "benchmark-dims", ["Dimension", "Verdict / note"])
+_dt(["Bill line", "What's wrong", "Magnitude", "LLM-suggested", "Likely cause"],
+    "benchmark-faults", ["Bill line", "What's wrong"])
+_dt(["Expected line / category", "% of cost", "Note", "", ""], "benchmark-expected",
+    ["Expected line / category", "% of cost"])
+_dt(["Client section", "", "Client offer £ (installed)", "This design £ (BoM materials)",
+     "Installed-equivalent £", "Δ vs offer £", "Honest note"], "recon",
+    ["Client section", "Client offer £", "Honest note"],
+    row_rules=[{"col": "Client section", "rx": r"^\(", "exempt": ["Client offer £"]}])
+_dt(["Check", "ACTUAL", "EXPECTED", "Δ (actual-exp)", "Tol", "STATUS", "Detail / why"],
+    "checks", ["Check", "ACTUAL", "EXPECTED", "STATUS"])
+_dt(["Tool", "Output field", "Value", "Unit", "Input — from", "→ Consumed by", "Status"],
+    "tool-flow", ["Tool", "Output field", "Value", "Status"], unit=["Unit"])
+_dt(["Tag", "Name", "Qty", "Requirement (as stated)"], "part-names",
+    ["Tag", "Name", "Qty", "Requirement (as stated)"], numeric=["Qty"])
+_dt(["Input", "Value", "Unit", "Family", "Source", "Where-from (source / inputs)",
+     "Source detail", "Used by (where-to)"], "quantities",
+    ["Input", "Value", "Source"], unit=["Unit"])
+_dt(["Constant", "Value", "Unit", "Note"], "constants", ["Constant", "Value"], unit=["Unit"])
+_dt(["Calc / input", "Value (live)", "Unit", "Formula (text)", "Engine value", "Δ", "Unit",
+     "Assumptions"], "worked-calc", ["Calc / input"])
+_dt(["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs", "Factors",
+     "Est class", "Confidence", "Duty / rating", "Material", "Sizing calc (basis)",
+     "MPN / datasheet", "Row check"], "bom-ledger",
+    ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Est class", "Confidence",
+     "Row check"], numeric=["Qty", "Unit £", "Line £"],
+    row_rules=[{"col": "Item", "rx": r"^\s*↳", "exempt": ["Unit £", "Line £", "Tag"]}])
+_dt(["Drawing", "Expected", "Present", "% present", "", "", "", "", "", "", "", "", "", ""],
+    "drawing-coverage", ["Drawing", "Expected", "Present", "% present"],
+    numeric=["Expected", "Present"])
+_dt(["Part", "Tag", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"],
+    "connection", ["Part", "Status"])
+_dt(["Housed device", "Tag", "Function", "Inputs ← (from)", "Outputs → (to)", "Connectors"],
+    "connection-housed", ["Housed device", "Function"])
+_dt(["Step", "Step £ (editable)", "Running total £ (live)",
+     "Basis / derivation (costStack anchor for cross-check)"], "waterfall",
+    ["Step", "Running total £", "Basis / derivation"],
+    numeric=["Running total £"])
+_dt(["Equipment class", "BoM subtotal £", "Lines / mass", "Factor source (assembly + install)",
+     "Assembly f", "Assembly £ (live)", "Install f", "Install £ (live)"], "class-factors",
+    ["Equipment class", "BoM subtotal £", "Factor source", "Assembly f", "Assembly £",
+     "Install f", "Install £"], numeric=["BoM subtotal £", "Assembly f", "Install f"])
+_dt(["Driver", "Value", "Unit", "Basis / source"], "drivers",
+    ["Driver", "Value", "Basis / source"], unit=["Unit"])
+_dt(["Item", "Value (£)", "", "Basis"], "fin-item", ["Item", "Value (£)", "Basis"],
+    numeric=["Value (£)"])
+_dt(["Recommended operating point", "Value", "", "", "", "", "", ""], "fin-oppoint",
+    ["Recommended operating point", "Value"])
+_dt(["Output (m³/yr)", "Capex (£)", "£/m³/yr", "", "", "", "", ""], "fin-curve",
+    ["Output", "Capex"], numeric=["Output", "Capex"])
+_dt(["Line", "£ / yr (live)", "Unit", "Formula"], "fin-lines",
+    ["Line", "£ / yr", "Formula"], unit=["Unit"])
+_dt(["Year", "Cashflow £ (live)", "Discounted £ (live)", "Note"], "fin-cashflow",
+    ["Year", "Cashflow £", "Discounted £"],
+    row_rules=[{"col": "Year", "rx": r"^(?i:npv|irr)\b", "exempt": ["Cashflow £"]}])
+_dt(["Driver", "£ / yr (live)", "% of opex (live)", ""], "fin-opex",
+    ["Driver", "£ / yr"])
+_dt(["Output (count)", "Capex £ (live)", "Revenue £ (live)", "Total opex £ (live)",
+     "EBITDA £ (live)", "Payback yr", "NPV £ (live)", "IRR (live)"], "fin-scenarios",
+    ["Output", "Capex £", "Revenue £", "Total opex £", "EBITDA £", "Payback yr", "NPV £",
+     "IRR"])
+_dt(["Output (count)", "Payback yr (chart)", "", "", "", "", "", ""], "fin-chart",
+    ["Output", "Payback yr"])
+_dt(["Driver / metric", "Low", "Central", "High", "", "", "", ""], "fin-range",
+    ["Driver / metric", "Low", "Central", "High"])
+_dt(["Driver (±20%)", "EBITDA @ −20%", "EBITDA @ base", "EBITDA @ +20%",
+     "Swing £ (|+20 − −20|)", "", "", ""], "fin-tornado",
+    ["Driver", "EBITDA @ −20%", "EBITDA @ base", "EBITDA @ +20%", "Swing £"])
+_dt(["What", "Output (count)", "Capex £", "IRR", "Payback yr", "How it's found"],
+    "fin-recommend", ["What", "Output", "Capex £", "IRR", "Payback yr", "How it's found"])
+_dt(["Discipline", "Item", "Value", "Unit",
+     "Source (module constant / contract quantity — never hand-typed)"], "design-basis",
+    ["Discipline", "Item", "Value", "Source"], unit=["Unit"])
+_dt(["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit", "Length (m)",
+     "In spec", "Line £", "Basis", "Row check"], "line-velocity",
+    ["Tag", "From", "To", "Size", "In spec", "Basis", "Row check"])
+_dt(["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", "Class",
+     "Mitigation / fix route", "Residual", "Source", "Row check"], "risk-register",
+    ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", "Class",
+     "Mitigation / fix route", "Residual", "Row check"], numeric=["S", "L"])
+_dt(["#", "Regulation / standard", "Applies because", "Status"], "reg-register",
+    ["#", "Regulation / standard", "Applies because", "Status"])
+_dt(["#", "Regulation / standard", "Triggered by (hazard present)", "Status"],
+    "reg-triggered", ["#", "Regulation / standard", "Triggered by", "Status"])
+_dt(["Hold", "Item", "Scope (live count)", "Derived from", "Clears when"], "holds",
+    ["Hold", "Item", "Scope", "Derived from", "Clears when"])
+_dt(["Step", "Phase / activity", "Scope — equipment groups (tags)", "Predecessor",
+     "Lifting plant", "Duration", "Hold / witness point"], "assembly",
+    ["Step", "Phase / activity", "Scope — equipment groups", "Duration"])
+_dt(["Field", "Value"], "kv", ["Field", "Value"])
+_dt(["Ckt", "Description", "Ways", "Conn. load (kW)", "Design I (A)", "Protective device",
+     "Cable (CSA · cores)", "Length (m)", "ΔU (%)", "In spec"], "panel-schedule",
+    ["Ckt", "Description", "Conn. load", "Design I", "Protective device", "Cable", "ΔU",
+     "In spec"], numeric=["Conn. load", "Design I"])
+_dt(["Check", "Measured / compared", "Row check"], "elec-check",
+    ["Check", "Measured / compared", "Row check"])
+_dt(["Drawing No.", "Title", "Rev", "Scale", "Sheets", "Min lettering",
+     "File (A1 print set)", "Preview tab", "File check"], "drawing-register",
+    ["Drawing No.", "Title", "Rev", "File", "File check"])
+_dt(["#", "Render", "File", "Caption", "", "", "", "Preview tab", ""], "render-register",
+    ["#", "Render", "File"])
+_dt(["Section", "Score (deterministic)", "vs ≥8 floor",
+     "Self-audit opinion (advisory — never floors)", "Top defect (why it's below 8)"],
+    "qa-sections", ["Section", "Score", "vs ≥8 floor"])
+_dt(["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)"], "qa-tabs",
+    ["Tab", "Score", "vs ≥8 floor"])
+_dt(["Severity", "Check", "Message", "Actual", "Expected"], "qa-findings",
+    ["Severity", "Check", "Message"])
+_dt(["#", "Tab", "What's on it"], "contents", ["#", "Tab", "What's on it"])
+
+# Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
+# drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
+# EVERY named column is required per row (exactly Tristan's per-cell rule; the md source
+# writes '—' only where it has nothing, which is precisely what must flag).
+_MD_TABLE_CONTRACT = {"family": "md-schedule", "required": None, "numeric": [], "unit": []}
+
+_PLACEHOLDER_RX = re.compile(r"^(?:—|–|-|\?+|\.{2,}|n/?a\.?|none|null|todo|tbd|tbc)$", re.I)
+_TBD_PREFIX_RX = re.compile(r"^(?:tbd|tbc|n/?a)\b", re.I)
+
+
+def _cell_txt(v) -> str:
+    return str(v).replace("​", "").strip() if v is not None else ""
+
+
+def _cell_missing(v) -> Optional[str]:
+    """None when the cell is honestly populated; else a short reason. A bare placeholder
+    ('', '—', 'TBD', 'n/a') is MISSING; a placeholder WITH a stated basis
+    ('TBD (detailed design)', 'n/a — gravity drain') is an honest disclosure and passes."""
+    if v is None:
+        return "empty"
+    if isinstance(v, (int, float)):
+        return None
+    s = _cell_txt(v)
+    if not s:
+        return "empty"
+    if _PLACEHOLDER_RX.match(s):
+        return f"placeholder '{s}'"
+    if _TBD_PREFIX_RX.match(s) and len(s) < 10:
+        return f"bare '{s}' (no stated basis)"
+    return None
+
+
+def _cell_num_ok(v) -> bool:
+    """Numeric-typed cell: a number, a live formula, or a parseable money/qty string."""
+    if isinstance(v, (int, float)):
+        return True
+    s = _cell_txt(v)
+    if s.startswith("="):
+        return True
+    s = re.sub(r"\([^)]*\)", "", s)          # '7.50 (×2=15.0)' → '7.50'
+    s = re.sub(r"[£$€,%×x\s≈~]", "", s)
+    if not s:
+        return False
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
+def _cell_unit_ok(v) -> bool:
+    """A unit cell must read as a unit token, not prose (missing is checked separately)."""
+    s = _cell_txt(v)
+    return len(s) <= 24 and s.count(" ") <= 2
+
+
+_TOTAL_ROW_RX = re.compile(r"^(?:sub)?totals?\b|^grand total|^Σ|^sum\b|^headroom\b|^margin\b|"
+                           r"^break[- ]even\b", re.I)
+
+
+def _merged_spans(ws) -> Dict[int, int]:
+    """row -> widest single-row merged span starting at column 1 (section banners/notes)."""
+    out: Dict[int, int] = {}
+    try:
+        for rng in ws.merged_cells.ranges:
+            if rng.min_col == 1 and rng.min_row == rng.max_row:
+                w = rng.max_col - rng.min_col + 1
+                if w > out.get(rng.min_row, 0):
+                    out[rng.min_row] = w
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _walk_rows(ws, hdr_row: int, ncols: int, header_rows: set,
+               merged: Optional[Dict[int, int]] = None) -> List[Tuple[int, list]]:
+    """The DATA rows of a rendered table: rows below its header until the first fully-empty
+    row / the next table's header. Section banners (single-row merges), TOTAL rows and
+    italic note rows are skipped — they are not data and carry no per-cell obligation."""
+    merged = _merged_spans(ws) if merged is None else merged
+    out: List[Tuple[int, list]] = []
+    r = hdr_row + 1
+    while r <= ws.max_row:
+        if r in header_rows:
+            break
+        vals = [ws.cell(r, c).value for c in range(1, ncols + 1)]
+        idx = [i for i, v in enumerate(vals) if v not in (None, "")]
+        if not idx:
+            break
+        if merged.get(r, 0) >= max(2, min(3, ncols)):
+            r += 1
+            continue                          # section banner / merged note row
+        first_cell = ws.cell(r, 1 + idx[0])
+        first_txt = _cell_txt(vals[idx[0]])
+        if _TOTAL_ROW_RX.match(first_txt):
+            r += 1
+            continue                          # a totals row is arithmetic, not a data row
+        if len(idx) == 1 and (getattr(first_cell.font, "italic", False) or len(first_txt) > 70):
+            r += 1
+            continue                          # a one-cell prose/note row
+        out.append((r, vals))
+        r += 1
+    return out
+
+
+_CHECK_FLAG_FONT = Font(name="Calibri", size=9, color="9C0006")
+
+
+def _run_cell_contracts(wb, sheets=None) -> Dict[str, dict]:
+    """The generic per-cell walker: verify every registered table's data rows against its
+    declared contract, write a '⚠' flag cell ON each failing row (right of the table) and
+    accumulate per-sheet counts into _CELL_STATS. Refuses (build error) any table whose
+    signature carries no declared contract — an uncontracted table cannot ship."""
+    header_rows_by_sheet: Dict[str, set] = {}
+    for t in _RENDERED_TABLES:
+        header_rows_by_sheet.setdefault(t["sheet"], set()).add(t["row"])
+    for t in _RENDERED_TABLES:
+        key = (t["sheet"], t["row"], tuple(t["cols"]))
+        if key in _CELLCON_DONE:
+            continue
+        if sheets is not None and t["sheet"] not in sheets:
+            continue
+        if t["sheet"] not in wb.sheetnames:
+            continue
+        sig = _table_sig(t["cols"])
+        spec = _TABLE_CONTRACTS.get(sig)
+        if spec is None and t.get("md_table"):
+            spec = _MD_TABLE_CONTRACT
+        if spec is None:
+            raise SystemExit(
+                f"PER-CELL CONTRACT: rendered table on '{t['sheet']}' (header row {t['row']}) "
+                f"has NO declared required-columns contract — columns {t['cols']!r} "
+                f"(signature {sig!r}). Declare it in _TABLE_CONTRACTS; an uncontracted "
+                "table cannot ship.")
+        _CELLCON_DONE.add(key)
+        ws = wb[t["sheet"]]
+        ncols = len(t["cols"])
+        norm = [_norm_col(c) for c in t["cols"]]
+        req_names = spec["required"] if spec["required"] is not None else [c for c in norm if c]
+        req_idx = [i for i, c in enumerate(norm) if c and c in req_names]
+        num_idx = [i for i, c in enumerate(norm) if c in (spec["numeric"] or [])]
+        unit_idx = [i for i, c in enumerate(norm) if c in (spec["unit"] or [])]
+        row_rules = [(next((i for i, c in enumerate(norm) if c == rr["col"]), None),
+                      rr["rx"], {c for c in rr["exempt"]})
+                     for rr in (spec.get("row_rules") or [])]
+        st = _CELL_STATS.setdefault(t["sheet"], {"checked": 0, "passed": 0, "fails": [],
+                                                 "tables": 0, "rows": 0})
+        st["tables"] += 1
+        merged = _merged_spans(ws)
+        rows = _walk_rows(ws, t["row"], ncols, header_rows_by_sheet.get(t["sheet"], set()),
+                          merged)
+        wrote_hdr = False
+        for r, vals in rows:
+            st["rows"] += 1
+            exempt_cols = set()
+            for rc, rrx, rex in row_rules:
+                if rc is not None and rrx.search(_cell_txt(vals[rc])):
+                    exempt_cols |= rex
+            reasons = []
+            for i in req_idx:
+                if norm[i] in exempt_cols:
+                    continue      # declared row-level semantics (fold/summary row)
+                st["checked"] += 1
+                why = _cell_missing(vals[i])
+                if why is None and i in num_idx and norm[i] not in exempt_cols \
+                        and not _cell_num_ok(vals[i]):
+                    why = "not numeric"
+                if why is None and i in unit_idx and not _cell_unit_ok(vals[i]):
+                    why = "not a unit token"
+                if why is None:
+                    st["passed"] += 1
+                else:
+                    reasons.append(f"'{t['cols'][i] or f'col {i + 1}'}' {why}")
+            if reasons:
+                if len(st["fails"]) < 80:
+                    st["fails"].append({"row": r, "why": "; ".join(reasons[:3]),
+                                        "table_row": t["row"]})
+                # FLAG ON THE ROW — the reader sees the defect next to the row itself.
+                flag_col = ncols + 1
+                fc = ws.cell(r, flag_col)
+                if type(fc).__name__ == "MergedCell":
+                    continue      # row merge extends over the flag column — counts still tally
+                if fc.value in (None, ""):
+                    fc.value = "⚠ " + "; ".join(reasons[:2]) + (
+                        f" +{len(reasons) - 2} more" if len(reasons) > 2 else "")
+                    fc.font = _CHECK_FLAG_FONT
+                    fc.alignment = LEFT_TOP
+                    if not wrote_hdr:
+                        hc = ws.cell(t["row"], flag_col)
+                        if type(hc).__name__ != "MergedCell" and hc.value in (None, ""):
+                            hc.value = "Cell check"
+                            hc.font = FONT_NOTE
+                        wrote_hdr = True
+    return _CELL_STATS
+
+
+# ── Rendered-table readers for the per-tab scorers ───────────────────────────────────────
+def _tables_of(wb, sheet_title: str, family=None) -> List[dict]:
+    out = []
+    for t in _RENDERED_TABLES:
+        if t["sheet"] != sheet_title:
+            continue
+        spec = _TABLE_CONTRACTS.get(_table_sig(t["cols"]))
+        if spec is None and t.get("md_table"):
+            spec = _MD_TABLE_CONTRACT
+        if spec is None:
+            continue
+        if family is None or spec["family"] == family:
+            out.append({**t, "spec": spec})
+    return out
+
+
+def _read_rows(wb, tbl: dict) -> List[Tuple[int, Dict[str, Any]]]:
+    """Data rows of a registered table as (sheet_row, {normalised col name: value})."""
+    ws = wb[tbl["sheet"]]
+    header_rows = {t["row"] for t in _RENDERED_TABLES if t["sheet"] == tbl["sheet"]}
+    norm = [_norm_col(c) for c in tbl["cols"]]
+    rows = _walk_rows(ws, tbl["row"], len(tbl["cols"]), header_rows)
+    out = []
+    for r, vals in rows:
+        d: Dict[str, Any] = {}
+        for i, cname in enumerate(norm):
+            if cname and cname not in d:
+                d[cname] = vals[i]
+        out.append((r, d))
+    return out
+
+
+def _fam_rows(wb, sheet: str, family: str) -> List[Tuple[int, Dict[str, Any]]]:
+    out: List[Tuple[int, Dict[str, Any]]] = []
+    for t in _tables_of(wb, sheet, family):
+        out.extend(_read_rows(wb, t))
+    return out
+
+
+_TAG_TOKEN_RX = re.compile(r"\b[A-Z]{1,5}-\d{1,4}[A-Za-z]?\b")
+_TAG_RANGE_RX = re.compile(r"\b([A-Z]{1,5})-(\d{1,4})\s*[–—-]\s*(?:\1-)?(\d{1,4})\b")
+
+
+def _expand_tags(text: str) -> set:
+    """Tag tokens in a cell, with 'X-152–X-154' / 'X-152–154' RANGES expanded so a
+    master row that names a range covers every instance tag the ledger replicates."""
+    out = set(_TAG_TOKEN_RX.findall(text))
+    for m in _TAG_RANGE_RX.finditer(text):
+        pre, lo, hi = m.group(1), int(m.group(2)), int(m.group(3))
+        if hi >= lo and hi - lo <= 500:
+            out.update(f"{pre}-{n}" for n in range(lo, hi + 1))
+    return out
+
+
+def _num_of(v):
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = re.sub(r"[£$€,%×x\s≈~]", "", _cell_txt(v))
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _state_number_index(state: dict) -> List[float]:
+    """Every number the engine states in its headline sources — the Overview dashboard's
+    quoted values must each trace to one of these (dashboard integrity)."""
+    out: List[float] = []
+
+    def _walk_idx(o, depth=0):
+        if depth > 6 or len(out) > 4000:
+            return
+        if isinstance(o, dict):
+            for v in o.values():
+                _walk_idx(v, depth + 1)
+        elif isinstance(o, list):
+            for v in o[:400]:
+                _walk_idx(v, depth + 1)
+        elif isinstance(o, bool):
+            return
+        elif isinstance(o, (int, float)):
+            out.append(float(o))
+        elif isinstance(o, str):
+            n = _num_of(o)
+            if n is not None:
+                out.append(n)
+    for key in ("keyMetrics", "costStack", "bomTotals", "costBasis", "_costOfService",
+                "headlineDerived", "tabScorecardSummary"):
+        _walk_idx((state or {}).get(key))
+    _walk_idx(((state or {}).get("orchestratorContract") or {}).get("quantities"))
+    _walk_idx(((state or {}).get("engineeringContract") or {}).get("quantities"))
+    return out
+
+
+def _traces_to_state(val: float, index: List[float]) -> bool:
+    tol = max(abs(val) * 0.005, 0.51)   # 0.5% or rounding distance
+    return any(abs(val - x) <= tol for x in index)
+
+
+# ── Per-tab content scorers. Each returns {"components": [(label, passed, checked)],
+#    "issues": [...], "fix": str, "mech": str, "score_cap": Optional[float]} — the merge
+#    turns components into arithmetic (min over checks of 10 × passed/checked). ──────────
+def _compliance_row_pass(d) -> Optional[bool]:
+    """Recompute a rendered compliance row's verdict from its OWN cells. The STATUS cell
+    is a live =IF formula (unreadable pre-recalc), so the check re-evaluates the same
+    comparison: achieved vs target in the stated direction, 2% tolerance (the formulas
+    bake the same allowance). None = unverifiable (missing numbers) — counts as FAIL."""
+    t = _num_of(d.get("target"))
+    a = _num_of(d.get("achieved"))
+    if t is None or a is None:
+        st = _cell_txt(d.get("status")).upper()
+        if st.startswith("PASS"):
+            return True       # a static PASS status over non-numeric cells
+        return None
+    dirn = _cell_txt(d.get("direction")).lower()
+    if "≥" in dirn or ">=" in dirn or "meet/exceed" in dirn or "at least" in dirn:
+        return a >= t * 0.98
+    if "≤" in dirn or "<=" in dirn or "at most" in dirn or "ceiling" in dirn:
+        return a <= t * 1.02
+    return abs(a - t) <= 0.02 * max(abs(t), 1e-9)
+
+
+def _sc_exec(wb, ws, state, run_dir):
+    rows = _fam_rows(wb, ws.title, "compliance")
+    verdicts = [_compliance_row_pass(d) for _r, d in rows]
+    p = sum(1 for v in verdicts if v is True)
+    unv = sum(1 for v in verdicts if v is None)
+    iss = []
+    if unv:
+        iss.append(f"{unv} brief-compliance row(s) UNVERIFIABLE on the cover (no numeric "
+                   "target/achieved pair)")
+    return {"components": [("brief-compliance rows recompute to PASS", p, len(rows))],
+            "issues": iss,
+            "mech": "cover compliance arithmetic (achieved vs target re-evaluated per row)",
+            "fix": ""}
+
+
+def _sec_label_norm(x) -> str:
+    return re.sub(r"\s*\(advisory\)\s*", "", str(x or "")).strip().lower().replace("_", " ")
+
+
+def _sc_overview(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    sec_rows = _fam_rows(wb, ws.title, "overview-sections")
+    facts, advisory = _verdict_sections(state, run_dir)   # THE same source the verdict uses
+    fact_by = {_sec_label_norm(k): (v or {}).get("score") for k, v in facts.items()}
+    adv_by = {_sec_label_norm(k): (v or {}).get("score") for k, v in advisory.items()}
+    ok = 0
+    mism = []
+    for _r, d in sec_rows:
+        label = _cell_txt(d.get("section"))
+        want = (adv_by if "(advisory)" in label.lower() else fact_by).get(_sec_label_norm(label))
+        got = _num_of(d.get("score"))
+        if got is not None and isinstance(want, (int, float)) and abs(got - want) <= 0.05:
+            ok += 1
+        elif len(mism) < 3:
+            mism.append(f"'{label[:30]}' shows {got} vs engine {want}")
+    if sec_rows:
+        comps.append(("section scores match the engine scorecard", ok, len(sec_rows)))
+        if ok < len(sec_rows):
+            iss.append(f"{len(sec_rows) - ok} Overview section score(s) diverge from the "
+                       f"engine scorecard — e.g. {'; '.join(mism)}")
+    idx = _state_number_index(state)
+    # (Cost-waterfall class-split numbers are checked by their OWN tab's arithmetic
+    #  ties; the capex table below carries its own per-row % arithmetic.)
+    cost_rows = _fam_rows(wb, ws.title, "overview-cost")
+    pairs = [(_num_of(d.get("cost")), _num_of(d.get("% of capex"))) for _r, d in cost_rows]
+    pairs = [(c, pct) for c, pct in pairs if c is not None]
+    if pairs:
+        total = sum(c for c, _p in pairs)
+        ok = sum(1 for c, pct in pairs
+                 if pct is not None and total > 0 and abs(pct - 100.0 * c / total) <= 0.3)
+        comps.append(("capex category % = 100 × £ / Σ (per-row arithmetic)", ok, len(pairs)))
+        anchor = None
+        for k in ("raw_materials_bom_gbp", "bom_total_gbp"):
+            av = (state.get("costStack") or {}).get(k)
+            if isinstance(av, (int, float)) and av:
+                anchor = float(av)
+                break
+        if anchor:
+            tie = 1 if abs(total - anchor) <= max(1.0, anchor * 0.02) else 0
+            comps.append(("Σ capex categories ≈ the BoM materials total", tie, 1))
+            if not tie:
+                iss.append(f"Overview capex categories sum £{total:,.0f} ≠ BoM materials "
+                           f"total £{anchor:,.0f}")
+    return {"components": comps, "issues": iss,
+            "mech": "dashboard integrity (every quoted number vs its engine source)", "fix": ""}
+
+
+def _sc_brief(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    secs = ((state.get("_clientOfferRecon") or {}).get("sections") or [])
+    rows = _fam_rows(wb, ws.title, "recon")
+    if secs or rows:
+        cons = sum(1 for s in secs if s.get("status") == "consistent")
+        comps.append(("client-offer reconciliation sections consistent", cons, len(secs)))
+        keys = {str(s.get("key") or "").strip().upper() for s in secs}
+        sec_rows = [1 for _r, d in rows
+                    if _cell_txt(d.get("client section")).split(".")[0].strip().upper() in keys]
+        comps.append(("every live section rendered as a reconciliation row",
+                      1 if len(sec_rows) == len(secs) else 0, 1))
+        if cons < len(secs):
+            others = sorted({str(s.get("status")) for s in secs if s.get("status") != "consistent"})
+            iss.append(f"{len(secs) - cons} client-offer section(s) not consistent "
+                       f"({', '.join(others)}) — mirrored as HOLDS")
+    return {"components": comps, "issues": iss,
+            "mech": "client-offer reconciliation (live section mapping)", "fix": ""}
+
+
+def _sc_quantities(wb, ws, state, run_dir):
+    rows = _fam_rows(wb, ws.title, "quantities")
+    prov = sum(1 for _r, d in rows
+               if not _cell_missing(d.get("source"))
+               and not _cell_missing(d.get("where-from"))
+               and not _cell_missing(d.get("used by")))
+    iss = []
+    if rows and prov < len(rows):
+        bad = [str(r) for r, d in rows
+               if _cell_missing(d.get("where-from")) or _cell_missing(d.get("used by"))][:3]
+        iss.append(f"{len(rows) - prov} quantity row(s) missing full provenance "
+                   f"(where-from / used-by), e.g. rows {', '.join(bad)}")
+    return {"components": [("provenance-verified quantity rows", prov, len(rows))],
+            "issues": iss, "mech": "quantity provenance (source + where-from + used-by per row)",
+            "fix": "author the missing where-from/used-by provenance at the quantity emitter"}
+
+
+def _sc_calculations(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    wc_rows = _fam_rows(wb, ws.title, "worked-calc")
+    # BLOCK SEMANTICS: a DEFINITION row (unindented label + formula text, value empty) is
+    # resolved by its trailing '= result' row carrying the computed value; INPUT rows are
+    # the indented rows and must carry their value. A definition with no valued result row
+    # is an unresolved worked calc — the fault Tristan's coverage fraction measures.
+    n_def = n_def_ok = n_in = n_in_ok = 0
+    pending_def = None
+    unresolved = []
+    for _r, d in wc_rows:
+        raw = d.get("calc / input")
+        label = _cell_txt(raw)
+        indented = isinstance(raw, str) and raw.startswith("  ")
+        has_val = not _cell_missing(d.get("value"))
+        if not indented and not _cell_missing(d.get("formula")):
+            if pending_def is not None:
+                unresolved.append(pending_def)
+            n_def += 1
+            if has_val:            # single-row calc: value on the definition row
+                n_def_ok += 1
+                pending_def = None
+            else:
+                pending_def = label
+            continue
+        if indented and label.startswith("="):
+            if pending_def is not None:
+                n_def_ok += 1 if has_val else 0
+                if not has_val:
+                    unresolved.append(pending_def)
+                pending_def = None
+            continue
+        if indented:
+            n_in += 1
+            if has_val:
+                n_in_ok += 1
+    if pending_def is not None:
+        unresolved.append(pending_def)
+    if n_def:
+        comps.append(("worked-calc definitions resolve to a computed result", n_def_ok, n_def))
+        if n_def_ok < n_def:
+            iss.append(f"{n_def - n_def_ok} worked calc(s) never resolve to a result value — "
+                       f"e.g. {', '.join(u[:40] for u in unresolved[:3])}")
+    if n_in:
+        comps.append(("calc input rows carry their value", n_in_ok, n_in))
+    tf_rows = _fam_rows(wb, ws.title, "tool-flow")
+    if tf_rows:
+        ok = sum(1 for _r, d in tf_rows if "⚠" not in _cell_txt(d.get("status")))
+        comps.append(("tool outputs consumed downstream", ok, len(tf_rows)))
+    return {"components": comps, "issues": iss,
+            "mech": "worked-calc coverage (every definition resolves to a computed result; "
+                    "inputs populated) + tool-flow consumption",
+            "fix": "emit the missing result/substitution rows at the calc renderer source"}
+
+
+def _sc_waterfall(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    cs = state.get("costStack") or {}
+    rows = _fam_rows(wb, ws.title, "waterfall")
+    tied = 0
+    for _r, d in rows:
+        basis = _cell_txt(d.get("basis / derivation"))
+        anchors = re.findall(r"[a-z][a-z0-9_]*_gbp", basis)
+        step = d.get("step £")
+        run = d.get("running total £")
+        val = _num_of(step)
+        got = None
+        for a in anchors:
+            av = cs.get(a)
+            if isinstance(av, (int, float)):
+                got = float(av)
+                break
+        if isinstance(step, str) and _cell_txt(step).startswith("="):
+            tied += 1        # a live link/sum to its source cells IS the tie
+        elif step in (None, "") and isinstance(run, str) and _cell_txt(run).startswith("="):
+            tied += 1        # MILESTONE row ('= Factory COGS'): running total live-chains
+        elif got is not None and val is not None and abs(val - got) <= max(1.0, abs(got) * 0.02):
+            tied += 1
+        elif got is not None and val is not None:
+            iss.append(f"waterfall row {_r}: step £{val:,.0f} ≠ its costStack anchor £{got:,.0f}")
+    if rows:
+        comps.append(("waterfall rows tie live to their stated costStack anchor", tied, len(rows)))
+    cf_rows = _fam_rows(wb, ws.title, "class-factors")
+    if cf_rows:
+        live = sum(1 for _r, d in cf_rows
+                   if isinstance(d.get("assembly £"), str)
+                   and _cell_txt(d.get("assembly £")).startswith("=")
+                   and isinstance(d.get("install £"), str)
+                   and _cell_txt(d.get("install £")).startswith("="))
+        comps.append(("assembly/install rows computed live from their factors", live, len(cf_rows)))
+        subs = [v for v in (_num_of(d.get("bom subtotal £")) for _r, d in cf_rows) if v is not None]
+        anchor = None
+        for k in ("raw_materials_bom_gbp", "bom_total_gbp"):
+            if isinstance(cs.get(k), (int, float)) and cs.get(k):
+                anchor = float(cs[k])
+                break
+        if anchor and subs:
+            ok = 1 if abs(sum(subs) - anchor) <= max(1.0, anchor * 0.02) else 0
+            comps.append(("Σ class subtotals ≈ the BoM materials total", ok, 1))
+            if not ok:
+                iss.append(f"Σ class subtotals £{sum(subs):,.0f} ≠ BoM materials total £{anchor:,.0f}")
+    return {"components": comps, "issues": iss,
+            "mech": "cost-waterfall arithmetic ties (each step vs its named costStack anchor; sums close)",
+            "fix": "fix the mismatching step at the cost-stack source it names"}
+
+
+def _is_input_fill(cell) -> bool:
+    try:
+        rgb = getattr(cell.fill.start_color, "rgb", None) or ""
+        return str(rgb)[-6:] in ("FFF2CC", "FCE4D6")   # editable input / shared constant
+    except Exception:  # noqa: BLE001
+        return False
+
+
+_FIN_FAMILIES = ("fin-item", "fin-lines", "fin-cashflow", "fin-opex", "fin-scenarios",
+                 "fin-curve", "fin-chart", "fin-range", "fin-tornado", "fin-recommend",
+                 "fin-oppoint")
+
+
+def _sc_financial(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    checked = passed = 0
+    orphan_rows = []
+    hdr_rows = {tt["row"] for tt in _RENDERED_TABLES if tt["sheet"] == ws.title}
+    for fam in _FIN_FAMILIES:
+        for t in _tables_of(wb, ws.title, fam):
+            norm = [_norm_col(c) for c in t["cols"]]
+            money_idx = [i for i, c in enumerate(norm)
+                         if re.search(r"£|capex|revenue|opex|ebitda|npv|cashflow|value|swing|"
+                                      r"low|central|high", c)]
+            for r, vals in _walk_rows(ws, t["row"], len(t["cols"]), hdr_rows):
+                for i in money_idx:
+                    v = vals[i]
+                    if v in (None, ""):
+                        continue
+                    if isinstance(v, str) and not v.startswith("=") and _num_of(v) is None:
+                        continue   # text notes are the cell-contract's business
+                    checked += 1
+                    if isinstance(v, str) and v.startswith("="):
+                        passed += 1
+                    elif _is_input_fill(ws.cell(r, i + 1)):
+                        passed += 1
+                    else:
+                        if len(orphan_rows) < 4:
+                            orphan_rows.append(f"row {r} col {i + 1}")
+    if checked:
+        comps.append(("model value cells are live formulas or declared (yellow) inputs",
+                      passed, checked))
+        if passed < checked:
+            iss.append(f"{checked - passed} orphan numeric literal(s) in the financial model "
+                       f"(e.g. {', '.join(orphan_rows)}) — a model number must be driven, not typed")
+    return {"components": comps, "issues": iss,
+            "mech": "formula integrity (cells reference drivers; no orphan literals) + scenario arithmetic (live)",
+            "fix": "drive the orphan literals from the Inputs & Assumptions drivers"}
+
+
+def _sc_connection(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    tags = set()
+    for sheet, fam, col in ((_LEDGER_SHEET, "bom-ledger", "tag"),
+                            ("Part names", "part-names", "tag")):
+        if sheet in wb.sheetnames:
+            for _r, d in _fam_rows(wb, sheet, fam):
+                for tok in _TAG_TOKEN_RX.findall(_cell_txt(d.get(col))):
+                    tags.add(tok)
+    n_ep = n_ok = 0
+    rows = _fam_rows(wb, ws.title, "connection") + _fam_rows(wb, ws.title, "connection-housed")
+    for _r, d in rows:
+        for key in ("inputs ←", "outputs →"):
+            for tok in _TAG_TOKEN_RX.findall(_cell_txt(d.get(key))):
+                n_ep += 1
+                if tok in tags:
+                    n_ok += 1
+    if n_ep:
+        comps.append(("endpoint tags resolve to a real BoM/part tag", n_ok, n_ep))
+        if n_ok < n_ep:
+            iss.append(f"{n_ep - n_ok} connection endpoint(s) reference a tag no BoM/part row carries")
+    st_rows = [d for _r, d in rows if "status" in d]
+    if st_rows:
+        ok = sum(1 for d in st_rows if not _cell_missing(d.get("status"))
+                 and "⚠" not in _cell_txt(d.get("status")))
+        comps.append(("connection rows carry a computed OK status", ok, len(st_rows)))
+    return {"components": comps, "issues": iss,
+            "mech": "resolved-endpoint fraction (every ← / → tag must exist) + per-row status",
+            "fix": "fix the topology edge that names a non-existent tag at the connection emitter"}
+
+
+def _sc_partnames(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    rows = _fam_rows(wb, ws.title, "part-names")
+    tag_lists = [_TAG_TOKEN_RX.findall(_cell_txt(d.get("tag"))) for _r, d in rows]
+    all_tags = [t for lst in tag_lists for t in lst]
+    dupes = sorted({t for t in all_tags if all_tags.count(t) > 1})
+    comps.append(("part tags unique (each physical thing named once)",
+                  len(all_tags) - sum(all_tags.count(t) - 1 for t in dupes), len(all_tags)))
+    if dupes:
+        iss.append(f"duplicate tag(s) on the master: {', '.join(dupes[:4])}")
+    master_tags = set()
+    for _r, d in rows:
+        master_tags |= _expand_tags(_cell_txt(d.get("tag")))
+    ledger_tags = set()
+    if _LEDGER_SHEET in wb.sheetnames:
+        for _r, d in _fam_rows(wb, _LEDGER_SHEET, "bom-ledger"):
+            if _cell_txt(d.get("item")).startswith("↳"):
+                continue      # ↳ children are components of a principal — the master is principals-only
+            if _cell_txt(d.get("item")).startswith("='Part names'"):
+                continue      # the Item cell live-references its master row — traced by construction
+            ledger_tags |= _expand_tags(_cell_txt(d.get("tag")))
+    if ledger_tags:
+        have = master_tags
+        present = sum(1 for t in sorted(ledger_tags) if t in have)
+        comps.append(("every BoM-ledger tag present on the master", present, len(ledger_tags)))
+        if present < len(ledger_tags):
+            missing = sorted(ledger_tags - have)[:4]
+            iss.append(f"{len(ledger_tags) - present} ledger tag(s) missing from the master: "
+                       + ", ".join(missing))
+    return {"components": comps, "issues": iss,
+            "mech": "dedupe + completeness (every BoM tag present exactly once)",
+            "fix": "fix the master merge / tag registry at tab_parts_master source"}
+
+
+def _sc_glossary(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    merged = _merged_spans(ws)
+    terms = []
+    for r in range(4, ws.max_row + 1):
+        if merged.get(r, 0) >= 2:
+            continue
+        term = _cell_txt(ws.cell(r, 1).value)
+        if not term:
+            continue
+        terms.append((r, term, _cell_txt(ws.cell(r, 2).value)))
+    defined = sum(1 for _r, _t, m in terms if m)
+    comps.append(("every rendered term carries a definition", defined, len(terms)))
+    if defined < len(terms):
+        iss.append("undefined term(s): "
+                   + ", ".join(t for _r, t, m in terms if not m)[:120])
+    # orphan terms: defined here but appearing nowhere else in the workbook
+    blob = _workbook_text_blob(wb, exclude=ws.title)
+    used = 0
+    orphans = []
+    for _r, t, _m in terms:
+        if _term_used_in(t, blob):
+            used += 1
+        else:
+            orphans.append(t)
+    comps.append(("terms actually used somewhere in the workbook", used, len(terms)))
+    if orphans:
+        iss.append(f"{len(orphans)} glossary term(s) never used on any tab (orphans): "
+                   + ", ".join(orphans[:5]))
+    return {"components": comps, "issues": iss,
+            "mech": "glossary contract (every term defined + no orphan terms)",
+            "fix": "drop orphan terms / define the missing ones in _GLOSSARY"}
+
+
+def _sc_holds(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    live = _derive_holds(state)
+    rows = _fam_rows(wb, ws.title, "holds")
+    live_ids = [h["id"] for h in live]
+    rend = [(_cell_txt(d.get("hold")), _cell_txt(d.get("item"))) for _r, d in rows]
+    matched = 0
+    for i, (rid, ritem) in enumerate(rend):
+        if i < len(live_ids) and rid == live_ids[i] \
+                and ritem.startswith(str(live[i]["item"])[:40]):
+            matched += 1
+    total = max(len(live_ids), len(rend)) if (live_ids or rend) else 0
+    if total:
+        comps.append(("rendered holds match the LIVE re-derivation (stale hold = fail)",
+                      matched, total))
+        if matched < total:
+            iss.append(f"{total - matched} hold(s) diverge from the live re-derivation — "
+                       "a cleared condition may not still hold / a new condition must appear")
+    else:
+        comps.append(("live re-derivation agrees no holds are open (0 = 0)", 1, 1))
+    return {"components": comps, "issues": iss,
+            "mech": "live-derivation check (each hold re-derived from the current contract results)",
+            "fix": "rebuild — the register renders only what the live evaluation derives"}
+
+
+def _sc_inputs(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    rows = _fam_rows(wb, ws.title, "drivers")
+    refd_rows = set()
+    rx = re.compile(r"'" + re.escape(INPUTS_SHEET) + r"'!\$?B\$?(\d+)")
+    for other in wb.worksheets:
+        for row in other.iter_rows(values_only=True):
+            for v in row:
+                if isinstance(v, str) and v.startswith("="):
+                    for m in rx.finditer(v):
+                        refd_rows.add(int(m.group(1)))
+    refd = sum(1 for r, _d in rows if r in refd_rows)
+    if rows:
+        comps.append(("drivers referenced by a live formula somewhere", refd, len(rows)))
+        if refd < len(rows):
+            unrefd = [_cell_txt(d.get("driver")) for r, d in rows if r not in refd_rows][:4]
+            iss.append(f"{len(rows) - refd} driver(s) never referenced by any live formula "
+                       f"(orphan inputs): {', '.join(unrefd)}")
+    return {"components": comps, "issues": iss,
+            "mech": "driver integrity (every input driver consumed by a live formula)",
+            "fix": "wire the orphan driver into the model or remove it"}
+
+
+def _sc_benchmark(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    rows = _fam_rows(wb, ws.title, "benchmark-dims")
+    if rows:
+        ok = sum(1 for _r, d in rows
+                 if not re.search(r"radical|⚠", _cell_txt(d.get("verdict")), re.I))
+        comps.append(("benchmark dimensions within the expectation envelope", ok, len(rows)))
+        if ok < len(rows):
+            iss.append(f"{len(rows) - ok} dimension(s) flagged vs the independent top-down "
+                       "expectation (gate 36)")
+    bd = state.get("benchmarkDivergence") or {}
+    if bd:
+        comps.append(("gate-36 verdict is not RADICAL",
+                      0 if bd.get("needs_full_check") else 1, 1))
+    return {"components": comps, "issues": iss,
+            "mech": "generative benchmark sanity net (gate 36): independent top-down LLM "
+                    "expectation diffed against the bottom-up engine, per-dimension",
+            "fix": "route each flagged dimension to its source rule via benchmark-punchlist.md"}
+
+
+def _sc_checks(wb, ws, state, run_dir):
+    rows = _fam_rows(wb, ws.title, "checks")
+    fails = sum(1 for _r, d in rows if _cell_txt(d.get("status")).upper().startswith("FAIL"))
+    cap = 10.0 if fails == 0 else float(max(0, 8 - 2 * fails))
+    iss = ([f"{fails} of {len(rows)} deterministic invariants FAIL — "
+            f"score = max(0, 8 − 2 × {fails})"] if fails else [])
+    return {"components": [("deterministic invariants pass", len(rows) - fails, len(rows))],
+            "issues": iss, "score_cap": cap,
+            "mech": "fail-count formula: 10 if 0 FAIL else max(0, 8 − 2 × fails)",
+            "fix": "fix each failing invariant at its named source"}
+
+
+def _sc_contents(wb, ws, state, run_dir):
+    rows = _fam_rows(wb, ws.title, "contents")
+    names = set(wb.sheetnames) - {ws.title}
+    ok = sum(1 for _r, d in rows if _cell_txt(d.get("tab")) in names)
+    listed = {_cell_txt(d.get("tab")) for _r, d in rows}
+    covered = sum(1 for n in sorted(names) if n in listed)
+    iss = []
+    if covered < len(names):
+        iss.append("sheet(s) missing from the index: "
+                   + ", ".join(sorted(names - listed)[:4]))
+    return {"components": [("index rows point at an existing tab", ok, len(rows)),
+                           ("every sheet listed in the index", covered, len(names))],
+            "issues": iss, "mech": "index integrity (both directions)", "fix": ""}
+
+
+def _sc_quality_audit(wb, ws, state, run_dir):
+    comps = []
+    rows = _fam_rows(wb, ws.title, "qa-tabs")
+    if rows:
+        ok = sum(1 for _r, d in rows if _cell_txt(d.get("tab")) in _TAB_SCORES)
+        comps.append(("per-tab table rows name real scored tabs", ok, len(rows)))
+    f_rows = _fam_rows(wb, ws.title, "qa-findings")
+    if f_rows:
+        named = sum(1 for _r, d in f_rows if not _cell_missing(d.get("check")))
+        comps.append(("findings carry their producing check", named, len(f_rows)))
+    return {"components": comps, "issues": [],
+            "mech": "floor mirror + audit-surface integrity (rows tie to the live scorecard)",
+            "fix": ""}
+
+
+# Drawing / render sheets: the EXISTING upstream mechanism (parts-ledger coverage, litter,
+# typed-shape, vision critic, drawing gates) IS the score — the scorer states it in the
+# basis with the live counts rather than re-inventing it.
+_DRAW_KEYS = [
+    (re.compile(r"p&id|^pid$", re.I), "pid",
+     "P&ID part-coverage arithmetic (parts_ledger ✓/✗ vs the BoM)"),
+    (re.compile(r"block flow|bfd", re.I), "block-flow-diagram",
+     "block-flow part-coverage arithmetic (parts_ledger)"),
+    (re.compile(r"general arrangement|^ga\b", re.I), "general-arrangement",
+     "GA mechanism: parts-ledger coverage × default-size litter × layout-divergence × "
+     "typed-shape checks"),
+    (re.compile(r"single.line", re.I), "single-line-diagram",
+     "single-line part-coverage arithmetic (parts_ledger)"),
+    (re.compile(r"isometric", re.I), "isometric-index",
+     "isometric part-coverage arithmetic (parts_ledger)"),
+    (re.compile(r"render|interior layout|building exterior|^module —", re.I), "blender",
+     "render mechanism: parts-ledger coverage × default-size litter × typed-shape × "
+     "vision-critic verdict (render-vision-critique.json)"),
+    (re.compile(r"hvac", re.I), "hvac",
+     "HVAC duty-scoped check: contract duty signal → drawing coverage; no duty → honest "
+     "out-of-scope disclosure (capped 8)"),
+]
+
+
+def _sc_drawing(wb, ws, state, run_dir):
+    comps = []
+    iss = []
+    mech = None
+    cov = _ledger_coverage(run_dir) if run_dir else {}
+    for rx, key, mtext in _DRAW_KEYS:
+        if rx.search(ws.title):
+            mech = mtext
+            c = cov.get(key)
+            if isinstance(c, dict) and isinstance(c.get("expected"), (int, float)) \
+                    and c.get("expected"):
+                comps.append((f"drawing part coverage ({key})",
+                              int(c.get("present") or 0), int(c.get("expected") or 0)))
+            break
+    if ws.title == "Drawings":
+        mech = ("drawing-register integrity: every registered A1 print PDF exists on disk + "
+                "ISO 3098 2.5 mm lettering bar")
+        reg_rows = _fam_rows(wb, ws.title, "drawing-register")
+        if reg_rows:
+            ok = sum(1 for _r, d in reg_rows
+                     if not _cell_missing(d.get("file check"))
+                     and not _cell_txt(d.get("file check")).startswith(("⚠", "✗")))
+            comps.append(("registered drawings with their print set present", ok, len(reg_rows)))
+        rnd_rows = _fam_rows(wb, ws.title, "render-register")
+        if rnd_rows:
+            ok = sum(1 for _r, d in rnd_rows if not _cell_missing(d.get("file")))
+            comps.append(("registered render views with a file", ok, len(rnd_rows)))
+    if mech is None:
+        # An image sheet with no coverage mechanism: content check = the view is embedded;
+        # the honest-cap advisory keeps it below a verified ≥8 until a mechanism covers it.
+        has_img = bool(getattr(ws, "_images", None))
+        comps.append(("embedded view present on the sheet", 1 if has_img else 0, 1))
+        iss.append("ADVISORY: no deterministic coverage mechanism examines this view yet")
+        mech = "embedded-view presence (advisory-capped until a coverage mechanism examines it)"
+    return {"components": comps, "issues": iss, "mech": mech,
+            "fix": "raise the drawing's part coverage at its generator (parts-ledger names "
+                   "the misses)"}
+
+
+def _sc_schedules(wb, ws, state, run_dir):
+    return {"components": [], "issues": [],
+            "mech": "schedule column contract (per-cell completeness + type over every "
+                    "schedule row, from the drawings/*.md source)",
+            "fix": "populate the missing schedule cells at the drawing-generator source"}
+
+
+_TAB_SCORERS = [
+    ("Executive Summary", _sc_exec),
+    ("Contents", _sc_contents),
+    ("Overview", _sc_overview),
+    ("Brief", _sc_brief),
+    ("Quantities", _sc_quantities),
+    ("Calculations", _sc_calculations),
+    ("Cost waterfall", _sc_waterfall),
+    (INPUTS_SHEET, _sc_inputs),
+    ("Financial model", _sc_financial),
+    ("Connection trace", _sc_connection),
+    ("Part names", _sc_partnames),
+    ("Glossary", _sc_glossary),
+    ("Holds & exclusions", _sc_holds),
+    ("Sense-check", _sc_benchmark),
+    ("⚠ Checks", _sc_checks),
+    ("Quality & Audit", _sc_quality_audit),
+    (re.compile(r"schedule", re.I), _sc_schedules),
+    (re.compile(r"p&id|^pid$|block flow|bfd|general arrangement|^ga\b|single.line|isometric|"
+                r"render|interior layout|building exterior|^module —|hvac|^drawings$", re.I),
+     _sc_drawing),
+]
+
+# Tabs whose content is fully covered by an EXISTING registered mechanism (column
+# contract / aux drawing score / mirror) — they take the generic cell-contract component
+# only, keeping their stated mechanism as the basis head.
+_MECH_ONLY_TABS = {
+    _LEDGER_SHEET: "BoM ledger column contract (per-row Row check)",
+    "Risk & Regulatory": "risk-register column contract (per-row triage)",
+    "Line & velocity": "line & velocity column contract (per-row Row check)",
+    "Electrical": "panel-schedule column contract + single-line drawing coverage",
+    "Design basis": "design-basis completeness arithmetic",
+    "Assembly sequence": "design-derived step arithmetic",
+}
+
+
+def _content_score_tab(wb, ws, state, run_dir):
+    for key, fn in _TAB_SCORERS:
+        if isinstance(key, str):
+            if ws.title == key:
+                return fn(wb, ws, state, run_dir)
+        elif key.search(ws.title):
+            return fn(wb, ws, state, run_dir)
+    if ws.title in _MECH_ONLY_TABS:
+        return {"components": [], "issues": [], "mech": _MECH_ONLY_TABS[ws.title], "fix": ""}
+    return None
+
+
+def _merge_content(entry, res, cellstat, title: str) -> dict:
+    """Fold a tab's content-derived checks into its score entry: score = min(existing
+    mechanism, min over content checks of 10 × passed/checked, any stated cap); the basis
+    states every check WITH its live counts. Never lifts an existing score."""
+    entry = dict(entry) if isinstance(entry, dict) else {"target": 8, "issues": [], "fix": ""}
+    components = list((res or {}).get("components") or [])
+    if cellstat and cellstat.get("checked"):
+        components.append(("cell completeness+type contract",
+                           cellstat["passed"], cellstat["checked"]))
+    comp_scores = [10.0 * p / c for (_l, p, c) in components if c]
+    cap = (res or {}).get("score_cap")
+    if isinstance(cap, (int, float)):
+        comp_scores.append(float(cap))
+    content_score = round(min(comp_scores), 1) if comp_scores else None
+    mech = ((res or {}).get("mech") or "").strip()
+    bits = [f"{l} {p}/{c}" for (l, p, c) in components if c]
+    content_basis = ""
+    if bits:
+        content_basis = ((mech + " — ") if mech else "") + "; ".join(bits) + \
+            " · score = min over checks of 10 × passed/checked"
+    elif mech:
+        content_basis = mech
+    prior = entry.get("score")
+    cand = [v for v in (prior if isinstance(prior, (int, float)) else None, content_score)
+            if isinstance(v, (int, float))]
+    if cand:
+        entry["score"] = round(min(cand), 1)
+        entry["status"] = "PASS" if entry["score"] >= 8 else "FAIL"
+    entry.setdefault("target", 8)
+    prior_basis = str(entry.get("basis") or "").strip()
+    if prior_basis and content_basis:
+        entry["basis"] = f"{prior_basis}; content checks: {content_basis}"
+    else:
+        entry["basis"] = prior_basis or content_basis
+    entry["content_score"] = content_score
+    entry["content_basis"] = content_basis
+    entry["checked"] = sum(c for (_l, _p, c) in components)
+    entry["passed"] = sum(p for (_l, p, _c) in components)
+    entry["components"] = [{"check": l, "passed": p, "checked": c} for (l, p, c) in components]
+    iss = list(entry.get("issues") or [])
+    for i in (res or {}).get("issues") or []:
+        if i not in iss:
+            iss.append(i)
+    if cellstat and cellstat.get("fails"):
+        n = len(cellstat["fails"])
+        ex = cellstat["fails"][0]
+        extra = (f"cell contract: {cellstat['checked'] - cellstat['passed']} of "
+                 f"{cellstat['checked']} required cells empty/invalid across {n} row(s) — "
+                 f"e.g. row {ex['row']}: {ex['why']}")
+        if extra not in iss:
+            iss.append(extra)
+    entry["issues"] = iss[:6]
+    if not entry.get("fix"):
+        entry["fix"] = (res or {}).get("fix") or ""
+    return entry
+
+
+def _finalise_tab_scores(wb, state, run_dir, sheets=None) -> None:
+    """Run the per-cell contract walker + every tab's content scorer and fold the results
+    into _TAB_SCORES (min-combine; basis with live counts). `sheets` restricts the pass
+    (build phase 2 covers the late-built Quality & Audit / Contents sheets)."""
+    _run_cell_contracts(wb, sheets)
+    for ws in wb.worksheets:
+        if sheets is not None and ws.title not in sheets:
+            continue
+        res = _content_score_tab(wb, ws, state, run_dir)
+        _TAB_SCORES[ws.title] = _merge_content(_TAB_SCORES.get(ws.title), res,
+                                               _CELL_STATS.get(ws.title), ws.title)
+    _apply_universal_honest_cap(_TAB_SCORES)
+
+
+def _stamp_chips(wb) -> int:
+    """Write the row-2 score chip on EVERY sheet from the FINAL _TAB_SCORES (score +
+    formula with live counts + Quality & Audit pointer). Runs after all scoring so a chip
+    can never show a stale number."""
+    stamped = 0
+    for ws in wb.worksheets:
+        qb = _tab_quality_banner(ws.title)
+        if qb is None:
+            continue          # unreachable post-refusal; placeholder would stay visible
+        span = _CHIP_SPANS.get(ws.title)
+        if span is None:      # sheet built without title_row — claim row 2 if free
+            if ws.cell(2, 1).value not in (None, ""):
+                continue
+            span = 8
+            try:
+                ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=span)
+            except Exception:  # noqa: BLE001
+                pass
+        cell = ws.cell(2, 1)
+        cell.value = qb["text"]
+        cell.fill = qb["fill"]
+        cell.font = FONT_SUB
+        cell.alignment = LEFT_TOP
+        ws.row_dimensions[2].height = qb["height"]
+        stamped += 1
+    return stamped
+
+
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
@@ -12342,6 +13656,11 @@ def build(run_dir: str, out_path: str) -> dict:
     sha = git_short_sha()
     global _RUN_DIR
     _RUN_DIR = run_dir            # so _tab_quality_banner can score drawing/render/meta sheets
+    # EVERY-TAB CONTENT SCORING (2026-07-03): reset the per-build registries.
+    _RENDERED_TABLES.clear()
+    _CHIP_SPANS.clear()
+    _CELL_STATS.clear()
+    _CELLCON_DONE.clear()
 
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
@@ -12576,7 +13895,8 @@ def build(run_dir: str, out_path: str) -> dict:
     add_tab("Risk & Regulatory", lambda: tab_risk_regulatory(wb, state))
     add_tab("Holds & exclusions", lambda: tab_holds_register(wb, state, run_dir))
     add_tab("Assembly sequence", lambda: tab_assembly_sequence(wb, state, run_dir))
-    add_tab("Glossary", lambda: tab_glossary(wb, state))
+    # (Glossary builds AFTER the image/drawing tabs — its orphan filter scans the full
+    #  workbook text; _reorder_tabs still places it at its canonical position.)
 
     print("  · Image tabs")
     used_titles = {t.lower() for t in wb.sheetnames}
@@ -12614,6 +13934,7 @@ def build(run_dir: str, out_path: str) -> dict:
     # image tabs so every preview link resolves to a real sheet; _reorder_tabs places it
     # just before the first drawing tab. ----
     add_tab("Drawings (register)", lambda: tab_drawings_register(wb, run_dir, embedded))
+    add_tab("Glossary", lambda: tab_glossary(wb, state))
 
     # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
     #    tabs. Now that all content sheets exist, merge each drawing/render/meta sheet's aux-score into
@@ -12646,12 +13967,22 @@ def build(run_dir: str, out_path: str) -> dict:
                               "capex/opex/payback model for this class"] + (_fm.get("issues") or []))[:6]
     except Exception:  # noqa: BLE001
         pass
+    # ── EVERY-TAB CONTENT SCORING, PASS 1 (Tristan 2026-07-03): run the per-cell
+    #    completeness contract + every tab's content scorer over the RENDERED sheets, so
+    #    each tab's score is arithmetic over its own rows/cells (basis with live counts) —
+    #    never a default. Refuses any uncontracted table. Pass 2 (below) covers the
+    #    late-built Quality & Audit + Contents sheets. ──
+    _finalise_tab_scores(wb, state, run_dir)
+    print(f"  · content scoring pass 1: {len(_CELL_STATS)} sheet(s) cell-checked — "
+          + ", ".join(f"{t}:{st['passed']}/{st['checked']}"
+                      for t, st in sorted(_CELL_STATS.items())
+                      if st['checked'] and st['passed'] < st['checked']))
     # ── ONE FLOOR (fix 3): the 'Quality & Audit' tab's own score IS the dossier floor —
     #    the same computation the verdict quotes (min of every NON-MIRROR section & tab,
     #    floor-fixpoint fix 2026-07-03) — so its banner (A2) can never disagree with the
     #    verdict line (A4). Both mirror tabs are re-stamped here from the FINAL scores
-    #    (the X1 gate-feed + honest cap + X2 have all merged), so a stale earlier cap
-    #    can never survive into the shipped scorecard.
+    #    (the X1 gate-feed + honest cap + X2 + content scorers have all merged), so a
+    #    stale earlier cap can never survive into the shipped scorecard.
     _VERDICT.clear()
     _VERDICT.update(_stamp_floor_mirrors(_TAB_SCORES, state, run_dir))
     state["tabScorecard"] = _TAB_SCORES
@@ -12741,22 +14072,13 @@ def build(run_dir: str, out_path: str) -> dict:
         print(f"  · Drawing cross-refs: {_annotated} cell(s) annotated with the A1 sheet range "
               f"(e.g. FF-PID-001 S1-S{_a1_counts.get('PID', '?')})")
 
-    # (X1 gate-feed + universal honest cap + X2 Financial cap now run EARLIER — before
-    #  the 'Quality & Audit' render — see the ONE-FLOOR block above; fix 3 2026-07-02.)
-    # F1/X2 — RE-STAMP every sheet's quality banner from the FINAL _TAB_SCORES. Banners are written at
-    # tab-BUILD time (title_row, row 2) from the scores as they were THEN; any score adjusted later in
-    # this gate-feed (the economics-unverified Financial penalty, any merged drawing score) would leave
-    # the VISIBLE banner reading higher than the gate verdict — a residual fake-8. Re-stamping closes
-    # it: no banner can now exceed the score the gate uses. (Only touches rows that ALREADY hold a
-    # banner, so a subtitle/other row 2 is never clobbered.)
-    for _wsb in wb.worksheets:
-        _bcell = _wsb.cell(2, 1)
-        if isinstance(_bcell.value, str) and _bcell.value.startswith("⬤ TAB QUALITY"):
-            _qb = _tab_quality_banner(_wsb.title)
-            if _qb is not None:
-                _bcell.value = _qb["text"]
-                _bcell.fill = _qb["fill"]
-                _wsb.row_dimensions[2].height = _qb["height"]
+    # ── EVERY-TAB CONTENT SCORING, PASS 2 (2026-07-03): the Quality & Audit + Contents
+    #    sheets render AFTER pass 1 — cell-check + content-score them now, then re-stamp
+    #    the floor mirrors so the mirrors reflect the final full-workbook scores. ──
+    _finalise_tab_scores(wb, state, run_dir,
+                         sheets={"Quality & Audit", CONTENTS_SHEET} & set(wb.sheetnames))
+    _VERDICT.clear()
+    _VERDICT.update(_stamp_floor_mirrors(_TAB_SCORES, state, run_dir))
 
     _ts_summary = tab_scorecard_summary(_TAB_SCORES)         # re-derive over the FULL workbook
     state["tabScorecard"] = _TAB_SCORES
@@ -12778,7 +14100,10 @@ def build(run_dir: str, out_path: str) -> dict:
     #    scores and rewrite every registered verdict cell, so the Exec card, Overview,
     #    ⭐ Scorecard and ⚠ Audit all state the SAME answer. ──
     _VERDICT.clear()
-    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir))
+    # NO SILENT DEFAULT: pass the workbook's REAL sheet list — a rendered tab whose entry
+    # is missing or carries no stated basis REFUSES the build, naming the tab.
+    _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir,
+                                    rendered_sheets=list(wb.sheetnames)))
     state["_verdict"] = dict(_VERDICT)
     for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
         if _vt not in wb.sheetnames:
@@ -12793,6 +14118,12 @@ def build(run_dir: str, out_path: str) -> dict:
             if _vstyle == "line":
                 _cell.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
     print(f"  · ONE VERDICT: {verdict_text('line')} ({len(_VERDICT_CELLS)} surfaces)")
+
+    # ── ON-TAB SCORE CHIPS: stamp row 2 of EVERY sheet from the FINAL scores (score +
+    #    formula with live counts + Quality & Audit pointer). Last write before save so a
+    #    chip can never be stale. ──
+    _n_chips = _stamp_chips(wb)
+    print(f"  · score chips: {_n_chips}/{len(wb.sheetnames)} tabs stamped from the final scorecard")
 
     wb.save(out_path)
 
@@ -14736,8 +16067,8 @@ def _selftest() -> int:
         _bad_bom = [dict(_fold_bom[0])]
         _bad_bom[0].pop("unit_gbp"); _bad_bom[0].pop("line_gbp")
         _lc7 = _eval_bom_ledger_contract(_td7, {"requirementsBom": _bad_bom})
-        if not _lc7 or "sheet row 5 " not in (_lc7.get("issues") or [""])[0]:
-            print(f"  FAIL ledger-refs: the audit example must cite 'sheet row 5' for "
+        if not _lc7 or f"sheet row {_LEDGER_DATA_START} " not in (_lc7.get("issues") or [""])[0]:
+            print(f"  FAIL ledger-refs: the audit example must cite 'sheet row {_LEDGER_DATA_START}' for "
                   f"bom index 0 (got {_lc7 and _lc7.get('issues')})"); bad += 1
 
     # (F2) BREAK-EVEN — both directions of the case-split.
@@ -14908,6 +16239,109 @@ def _selftest() -> int:
     if _fxo["Quality & Audit"]["score"] != 9:
         print(f"  FAIL floor-fixpoint: Q&A mirrors the non-mirror floor 9 "
               f"(got {_fxo['Quality & Audit']['score']})"); bad += 1
+
+    # ═══ EVERY-TAB SCORING + PER-CELL CONTRACT proveCatches (Tristan 2026-07-03) ═══
+    # (V1) NO SILENT DEFAULT — a rendered tab with no scorer entry / empty basis REFUSES.
+    try:
+        compute_verdict({}, {"Ghost Tab": {"score": 10, "target": 8}},
+                        rendered_sheets=["Ghost Tab"])
+        print("  FAIL no-silent-default: a rendered tab without a stated basis must refuse"); bad += 1
+    except SystemExit as _nsd:
+        if "Ghost Tab" not in str(_nsd):
+            print(f"  FAIL no-silent-default: refusal must NAME the tab (got {_nsd})"); bad += 1
+    try:
+        compute_verdict({"qualityScorecard": {"sections": []}},
+                        {"Ok Tab": {"score": 9, "target": 8,
+                                    "basis": "row contract 9/9 rows passing"}},
+                        rendered_sheets=["Ok Tab"])
+    except SystemExit:
+        print("  FAIL no-silent-default: a tab WITH a stated basis must not refuse"); bad += 1
+
+    # (V2/V3) PER-CELL CONTRACT — refusal on an uncontracted table; a bare-TBD required
+    # cell FLAGS ON ITS ROW and drops the fraction; an honest 'TBD (basis)' passes; a
+    # fully-populated table stays clean. Module registries saved/restored.
+    _sv_tables = list(_RENDERED_TABLES); _sv_done = set(_CELLCON_DONE); _sv_stats = dict(_CELL_STATS)
+    try:
+        from openpyxl import Workbook as _WbFix
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear(); _CELL_STATS.clear()
+        _wbx = _WbFix()
+        _wsx = _wbx.active
+        _wsx.title = "Fixture"
+        header(_wsx, 1, ["Alpha", "Beta", "Gamma-Uncontracted"])
+        try:
+            _run_cell_contracts(_wbx)
+            print("  FAIL cell-contract: an UNCONTRACTED table must refuse the build"); bad += 1
+        except SystemExit as _uce:
+            if "Fixture" not in str(_uce):
+                print(f"  FAIL cell-contract: refusal must name the sheet (got {_uce})"); bad += 1
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear(); _CELL_STATS.clear()
+        _wb2 = _WbFix()
+        _ws2 = _wb2.active
+        _ws2.title = "Holds Fixture"
+        header(_ws2, 1, ["Hold", "Item", "Scope (live count)", "Derived from", "Clears when"])
+        _ws2.append(["HOLD-001", "clean row", "3 lines", "live contract", "fix at source"])
+        _ws2.append(["HOLD-002", "TBD", "2 lines", "live contract", "fix at source"])
+        _ws2.append(["HOLD-003", "TBD (class basis: DN80 HDPE take-off)", "1 line",
+                     "live contract", "fix at source"])
+        _st2 = _run_cell_contracts(_wb2)["Holds Fixture"]
+        if _st2["checked"] != 15 or _st2["passed"] != 14:
+            print(f"  FAIL cell-contract counts: bare TBD must fail (1 of 15), honest "
+                  f"TBD-with-basis must pass (got {_st2['passed']}/{_st2['checked']})"); bad += 1
+        if not (_st2["fails"] and _st2["fails"][0]["row"] == 3 and "Item" in _st2["fails"][0]["why"]):
+            print(f"  FAIL cell-contract flag routing: the defect must cite ROW 3 col Item "
+                  f"(got {_st2['fails']})"); bad += 1
+        _flag = _ws2.cell(3, 6).value
+        if not (isinstance(_flag, str) and _flag.startswith("⚠") and "Item" in _flag):
+            print(f"  FAIL on-row flag: row 3 must carry a '⚠ Item…' cell right of the table "
+                  f"(got {_flag!r})"); bad += 1
+        if _ws2.cell(2, 6).value not in (None, "") or _ws2.cell(4, 6).value not in (None, ""):
+            print("  FAIL on-row flag: clean rows (2, 4) must carry NO flag"); bad += 1
+        _mg = _merge_content(None, None, _st2, "Holds Fixture")
+        if not (isinstance(_mg.get("score"), (int, float)) and abs(_mg["score"] - 9.3) < 0.11):
+            print(f"  FAIL score arithmetic: 10 × 14/15 ≈ 9.3 (got {_mg.get('score')})"); bad += 1
+        if "14/15" not in str(_mg.get("basis")):
+            print(f"  FAIL basis live counts: basis must quote 14/15 (got {_mg.get('basis')!r})"); bad += 1
+        # score can only fall when a check fails harder — never a constant: a fully-clean
+        # fixture scores 10 with the same mechanism stated.
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear(); _CELL_STATS.clear()
+        _wb3 = _WbFix()
+        _ws3 = _wb3.active
+        _ws3.title = "Holds Fixture"
+        header(_ws3, 1, ["Hold", "Item", "Scope (live count)", "Derived from", "Clears when"])
+        _ws3.append(["HOLD-001", "clean row", "3 lines", "live contract", "fix at source"])
+        _st3 = _run_cell_contracts(_wb3)["Holds Fixture"]
+        _mg3 = _merge_content(None, None, _st3, "Holds Fixture")
+        if _mg3.get("score") != 10 or _st3["passed"] != _st3["checked"]:
+            print(f"  FAIL clean fixture: fully-populated table must score 10 "
+                  f"(got {_mg3.get('score')}, {_st3['passed']}/{_st3['checked']})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done)
+        _CELL_STATS.clear(); _CELL_STATS.update(_sv_stats)
+
+    # (V4) CHIP — the row-2 chip is stamped from the FINAL score entry with its live-count
+    # basis; a reserved placeholder is replaced.
+    _sv_scores = dict(_TAB_SCORES); _sv_spans = dict(_CHIP_SPANS)
+    try:
+        from openpyxl import Workbook as _WbFix2
+        _wbc = _WbFix2()
+        _wsc = _wbc.active
+        _wsc.title = "Chip Tab"
+        title_row(_wsc, "Chip Tab", 4, "subtitle")
+        if _wsc.cell(2, 1).value != _CHIP_PLACEHOLDER:
+            print("  FAIL chip: title_row must reserve the row-2 placeholder"); bad += 1
+        _TAB_SCORES.clear()
+        _TAB_SCORES["Chip Tab"] = {"score": 9.6, "target": 8, "status": "PASS", "issues": [],
+                                   "fix": "", "basis": "71/74 rows pass the column contract"}
+        _stamp_chips(_wbc)
+        _chip = _wsc.cell(2, 1).value
+        if not (isinstance(_chip, str) and "9.6/10" in _chip and "71/74" in _chip
+                and "Quality & Audit" in _chip):
+            print(f"  FAIL chip: final chip must quote score + live counts + the Quality & "
+                  f"Audit pointer (got {_chip!r})"); bad += 1
+    finally:
+        _TAB_SCORES.clear(); _TAB_SCORES.update(_sv_scores)
+        _CHIP_SPANS.clear(); _CHIP_SPANS.update(_sv_spans)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
