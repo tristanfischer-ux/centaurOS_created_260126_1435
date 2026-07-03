@@ -11240,13 +11240,24 @@ _TBD_MPN_TEXT = "TBD (detailed design)"
 _COMMODITY_MPN_TEXT = "commodity — MPN at procurement"
 _COMMODITY_UNIT_GBP_MAX = 100.0
 _COMMODITY_NOUN_RX = re.compile(
-    r"\b(?:cable\s+)?glands?\b|\bunions?\b|\bdin\s+rail\b|"
+    r"\b(?:cable\s+)?glands?\b|\bunions?\b|\bcouplings?\b|\bdin\s+rail\b|"
     r"\bterminal\s+(?:block|strip)s?\b|"
     r"\b(?:fastener|bolt|nut|washer|screw|stud|anchor|rivet)s?\b|"
     r"\b(?:gasket|o-?ring|ferrule|lug|crimp)s?\b|"
     r"\b(?:cable\s+tie|tie-?wrap|label|marker)s?\b|"
     r"\b(?:spacer|standoff|shim)s?\b|\blevell?ing\s+(?:feet|foot|pads?)\b|"
     r"\bconnectors?\b|\b(?:cabling|wiring|conduit|trunking|cable\s+tray)\b|"
+    # pipe-joint CLOSURE hardware + bare pipe-stub CONNECTION POINTS (Codema v63
+    # residual, 2026-07-03): a FLANGE + its GASKET are the bolted joint on a pipe
+    # run; an END CAP / blanking cap is the closure fitting on a spool/manifold
+    # end; a bare HOSE (no 'assembly'/'flexible' qualifier — e.g. 'CIP Hose') is
+    # routed flexible pipework, the same commodity class as a hose assembly; a
+    # bare stream OUTLET/inlet ('Permeate Outlet') is a pipe-stub connection
+    # point, priced as a nominal fitting allowance, never a catalogue-pinned part.
+    # Every one still needs BOTH legs of the triple guard (noun AND unit £ ≤
+    # threshold AND a stated basis) — a real engineered item wearing one of
+    # these words at a real price never reclassifies (proveCatch in _selftest).
+    r"\bflanges?\b|\bend\s+caps?\b|\bhoses?\b|\boutlets?\b|"
     r"\bfittings?\b", re.I)
 
 
@@ -16209,6 +16220,21 @@ def _selftest() -> int:
         if "engineered TBD 2/2" not in _tn or "commodity 'MPN at procurement' 1/1" not in _tn:
             print(f"  FAIL tbd-taxonomy: the header formula must print BOTH tallies "
                   f"(got {_tn[:220]})"); bad += 1
+    # ═══ proveCatch the PIPE-FITTING / HOSE / OUTLET commodity extension (Codema
+    # v63 residual, 2026-07-03). Claims: (a) a low-£ basis-backed flange/end-cap/
+    # bare-hose/bare-outlet reclassifies to commodity; (b) the SAME noun at a real
+    # engineered price stays penalised TBD — the noun alone can never reclassify
+    # (price leg binds), mirroring the £5,000 'gland' proveCatch above. ═══
+    for _noun, _lo, _hi in (("Flange", 40, 5000), ("End Cap", 25, 5000),
+                             ("CIP Hose", 9, 5000), ("Permeate Outlet", 9, 5000)):
+        _lo_row = {"requirement": _noun, "part": "requirement stated",
+                   "basis": "bottom-up parametric"}
+        if not _commodity_bought_out(_lo_row, float(_lo)):
+            print(f"  FAIL fitting-taxonomy: a £{_lo} basis-backed {_noun!r} must be "
+                  f"commodity"); bad += 1
+        if _commodity_bought_out(_lo_row, float(_hi)):
+            print(f"  FAIL fitting-taxonomy: a £{_hi} {_noun!r} must stay engineered "
+                  f"(price leg binds)"); bad += 1
     # ═══ proveCatch the COMMODITY PROCESS VALVE taxonomy (Bar B, 2026-07-03). Claims:
     # (a) a generic-spec unactuated process valve (manual/ball/check/isolation/sample)
     #     with class-basis price ≤ threshold is 'commodity — MPN at procurement';

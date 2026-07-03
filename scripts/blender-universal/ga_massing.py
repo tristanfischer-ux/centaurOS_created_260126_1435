@@ -33,6 +33,20 @@ GA_NON_MASSING_RE = re.compile(
     # pipe / mechanical fittings + connectors + supports (accessories)
     r"\b(?:union|glands?|couplings?|adapters?|adaptors?|ferrules?|olives?|"
     r"nipples?|connectors?|flexmount|spacers?|baffles?)\b|"
+    # closure / joint fittings on a pipe run (Codema litter clusters 2026-07-03: a
+    # FLANGE and its GASKET are the bolted joint hardware on a pipe stub — same
+    # "small parts that live ON a run, never their own GA box" family as the
+    # union/gland/coupling line above; an END CAP is the closure fitting on the
+    # end of a manifold/spool. 'blanking plate/cap' is the synonym for the same
+    # closure part on a larger-bore line.
+    r"\bflanges?\b|\bgaskets?\b|\bend caps?\b|\bblanking (?:plates?|caps?)\b|"
+    # FASTENERS — bolts/nuts/washers/screws/studs/rivets are never their own GA
+    # box (mirrors the Excel commodity-noun family in build-excel-export.py's
+    # _COMMODITY_NOUN_RX, applied here to the 3D-massing decision). 'anchor bolt'
+    # is the compound skid-fixing fastener; bare 'anchor' is DELIBERATELY excluded
+    # from this line so a real 'Anchor Tank' / 'Anchor Handling Winch' is never
+    # caught by the fastener family (proveCatch counter-case in _selftest).
+    r"\banchor\s+bolts?\b|\b(?:bolts?|nuts?|washers?|screws?|studs?|rivets?)\b|"
     r"\blev(?:el)?ling feet\b|\bleveling feet\b|\bdistribution plate(?:s)?\b|"
     r"\bcip (?:system )?connection(?:s)?\b|\bquick coupling\b|"
     r"\bsupport (?:system|frame|structure|stand)\b|"
@@ -97,6 +111,13 @@ GA_NON_MASSING_RE = re.compile(
     # name-only classifier cannot know which stubs the topology references).
     r"\bspray balls?\b|\bsampl(?:e|ing) points?\b|"
     r"\b(?:hose|flexible hose) assembl(?:y|ies)\b|\bflexible hoses?\b|"
+    # a BARE "<service/DN context> Hose" (e.g. 'CIP Hose', 'DN50 Hose') is routed
+    # flexible pipework — the same 'hose assembly' principle, extended to the
+    # bare noun. TERMINAL-anchored (head noun = hose, optional trailing index) so
+    # a real packaged item whose head noun is something else — 'Hose Station'
+    # (a mounted reel/cabinet), 'Hose Reel Cabinet' — is NOT dropped (proveCatch
+    # counter-case in _selftest).
+    r"\bhoses?\s*\d*\s*$|"
     # inline valves -> P&ID symbols (specific types, never a 'valve skid')
     r"\b(?:isolation|sample|ball|check|relief|gate|globe|butterfly|"
     r"control|solenoid|needle|diaphragm|non-return|nrv|pressure relief|"
@@ -163,6 +184,16 @@ def _selftest():
         "Zoned distribution — delivery inlet stubs, one per served position",
         "Zoned distribution — drain outlet connections (one per 2 positions)",
         "Zoned distribution — zone valve connection kits",
+        # Codema v63 residual (2026-07-03): 5 of the 8 default-box litter names are
+        # real bought-out FASTENERS / FITTINGS with genuine manufacturer+DN specs
+        # (Hilti M20 anchor bolts, Georg Fischer PVC-U flange/end cap, Klinger
+        # gasket, Trelleborg EPDM hose) — every one lives ON a parent connection
+        # (a skid frame, a pipe joint, a manifold end), never its own GA box.
+        "Anchor Bolt", "M20 Anchor Bolts", "Hex Bolt",
+        "CIP Hose", "DN50 Hose", "Hose 2",
+        "End Cap", "Outlet Manifold End Cap",
+        "Flange", "Permeate Outlet Flange",
+        "Gasket", "Permeate Outlet Gasket",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -171,6 +202,11 @@ def _selftest():
         "Gac Filter", "Softener Vessel", "Irrigation Pump", "Fertigation Dosing Pump",
         "Drain Collection Sump", "Cip Tank", "Main Switchboard", "Cloth Filter",
         "Electrical Control Cabinet",   # the enclosure itself is real massing
+        # fastener/fitting counter-cases (Codema v63 residual, 2026-07-03): bare
+        # 'anchor' and bare terminal-noun heads OTHER than the fitting/fastener
+        # word itself must never be swept up by the new fastener/hose/fitting
+        # families above (proves those rules are tight, not "contains anchor").
+        "Anchor Tank", "Anchor Handling Winch", "Hose Station", "Hose Reel Cabinet",
         # other-archetype principals (no-regression): RAS + BESS + process
         "Drum Filter", "Biofilter", "Oxygenation Cone", "MBBR Reactor",
         "Aeration Blower", "Battery Rack", "Power Conversion System", "Step-up Transformer",
