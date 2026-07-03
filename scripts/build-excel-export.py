@@ -664,13 +664,22 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
 # The workbook used to self-grade in FOUR places with contradictory answers (Exec
 # 'DRAFT'+ship-gate-FAILED, Overview 'allPass PASS', Scorecard 'MIN 5/10', Audit
 # 'FAIL…ship_ok=True'). There is now ONE verdict, computed ONCE:
-#   floor   = min score of EVERY section (deterministic gates + LLM self-audit,
-#             deduped by name) and EVERY tab;
+#   floor   = min score of every DETERMINISTIC (FACT) scorecard section and EVERY
+#             non-mirror tab (B3 — scorecard-floor.ts: "the floor is set by the
+#             DETERMINISTIC sections only"; the LLM self-audit is an OPINION that
+#             renders as an advisory annotation and NEVER enters the floor — the
+#             corroboration-based deterministic sections exist precisely to
+#             replace it. B3-floor fix 2026-07-03: the verdict was the doctrine's
+#             LAST hold-out — codema v59 floored at 5 on the self-audit's
+#             physics_fidelity opinion while the deterministic physics_fidelity
+#             section scored 10);
 #   verdict = SHIPS when everything is ≥8 · else DRAFT — n open issues
-#             (n = sections + tabs below 8 or UNSCORED).
+#             (n = FACT sections + tabs below 8 or UNSCORED).
 # Every surface that shows a verdict renders THIS one, via verdict_text(). Cells are
 # registered in _VERDICT_CELLS and re-stamped at the end of build() from the FINAL
-# tab scores, so no surface can disagree with another. proveCatch in _selftest.
+# tab scores, so no surface can disagree with another. proveCatch in _selftest
+# (a deterministic 10 + self-audit 5 floors on the tabs' min, never 5; a
+# deterministic 4 still pins 4).
 # ============================================================================
 _VERDICT: dict = {}
 _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
@@ -690,31 +699,63 @@ _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
 _MIRROR_TABS = ("Executive Summary", "Quality & Audit")
 
 
-def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
-    """The ONE dossier verdict. Pure — reads the quality scorecard + LLM self-audit
-    sections and the per-tab scores; returns {floor, open_issues, ships, …}.
-    The two FLOOR-MIRROR tabs (_MIRROR_TABS) are EXCLUDED from the computation —
-    they render this floor, so counting them in the min is a fixpoint (a stale 0
-    self-sustains)."""
-    secs: Dict[str, Optional[float]] = {}
+def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], Dict[str, dict]]:
+    """Split the quality sections into FACT vs OPINION (the B3 doctrine,
+    scorecard-floor.ts — "a number is trustworthy only when you can WATCH it be
+    computed"). Returns (facts, advisory), each name -> {score, defects}:
 
-    def _add_sections(sections) -> None:
-        for s in sections or []:
-            if not isinstance(s, dict) or not s.get("name"):
-                continue
-            nm = str(s["name"])
-            v = s.get("score")
-            v = float(v) if isinstance(v, (int, float)) else None
-            if nm in secs:   # same section from two sources → the MIN (worst) wins
-                prev = secs[nm]
-                secs[nm] = v if (prev is None or (v is not None and v < prev)) else prev
-            else:
-                secs[nm] = v
+      FACTS    — the DETERMINISTIC quality-scorecard sections (no `advisory` flag);
+                 corroboration-computed from state/artefacts. These (and ONLY these)
+                 may enter the verdict floor. Duplicate names → the MIN (worst) wins.
+      ADVISORY — the LLM self-audit's sections + any scorecard section flagged
+                 `advisory`: the critic's OPINION. Rendered as annotations
+                 ('self-audit opinion: N — advisory, uncorroborated'); NEVER floors.
+                 The selfAudit entry wins a name collision (it is the source opinion
+                 the scorecard's advisory copy was taken from)."""
+    facts: Dict[str, dict] = {}
+    advisory: Dict[str, dict] = {}
+
+    def _score(s: dict) -> Optional[float]:
+        v = s.get("score")
+        return float(v) if isinstance(v, (int, float)) else None
 
     qsc = (state or {}).get("qualityScorecard") or (
         load_json(os.path.join(run_dir, "quality-scorecard.json")) if run_dir else None) or {}
-    _add_sections(qsc.get("sections"))
-    _add_sections(((state or {}).get("selfAudit") or {}).get("sections"))
+    for s in (qsc.get("sections") or []):
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        nm, v = str(s["name"]), _score(s)
+        ent = {"score": v, "defects": list(s.get("defects") or [])}
+        if s.get("advisory"):
+            advisory.setdefault(nm, ent)
+            continue
+        if nm in facts:   # same FACT section twice → the MIN (worst) wins
+            prev = facts[nm]["score"]
+            if prev is None or (v is not None and v < prev):
+                facts[nm] = ent
+        else:
+            facts[nm] = ent
+    for s in (((state or {}).get("selfAudit") or {}).get("sections") or []):
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        advisory[str(s["name"])] = {"score": _score(s),
+                                    "defects": list(s.get("defects") or []),
+                                    "blocking": bool(s.get("blocking"))}
+    return facts, advisory
+
+
+def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "") -> dict:
+    """The ONE dossier verdict. Pure — the floor ranges over the DETERMINISTIC
+    (FACT) scorecard sections + the per-tab scores ONLY; returns {floor,
+    open_issues, ships, …}. The LLM self-audit (and any section flagged
+    `advisory`) NEVER enters the floor — it is an OPINION, rendered as an
+    advisory annotation (B3, scorecard-floor.ts; the deterministic
+    corroboration-based sections exist precisely to replace it).
+    The two FLOOR-MIRROR tabs (_MIRROR_TABS) are EXCLUDED from the computation —
+    they render this floor, so counting them in the min is a fixpoint (a stale 0
+    self-sustains)."""
+    facts, _ = _verdict_sections(state, run_dir)
+    secs: Dict[str, Optional[float]] = {nm: d.get("score") for nm, d in facts.items()}
     tabs: Dict[str, Optional[float]] = {}
     for t, v in (tab_scores or {}).items():
         if str(t) in _MIRROR_TABS:
@@ -744,7 +785,8 @@ def verdict_text(style: str = "line", v: Optional[dict] = None) -> str:
     fl = v.get("floor")
     fl_txt = (f"{fl:g}/10" if isinstance(fl, (int, float)) else "—")
     return (f"VERDICT: {short} · floor {fl_txt} "
-            f"(min of every non-mirror section & tab; ships at ≥8 everywhere)")
+            f"(min of every DETERMINISTIC section & non-mirror tab; the LLM self-audit "
+            f"is advisory and never floors; ships at ≥8 everywhere)")
 
 
 def _register_verdict_cell(ws: Worksheet, row: int, col: int,
@@ -798,18 +840,18 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
         es["score"] = sc
         es["status"] = "PASS" if sc >= 8 else "FAIL"
         es["issues"] = iss[:6]
-        es["basis"] = ("MIRROR of the dossier floor (min of every non-mirror section & tab) — "
-                       "re-stamped from the CURRENT scores, never a stale earlier cap")
+        es["basis"] = ("MIRROR of the dossier floor (min of every deterministic section & "
+                       "non-mirror tab) — re-stamped from the CURRENT scores, never a stale earlier cap")
     scores["Quality & Audit"] = {
         "score": fl, "target": 8,
         "status": "PASS" if v.get("ships") else "FAIL",
         "issues": ([] if v.get("ships") else
                    [f"the dossier does NOT ship — floor "
-                    f"{fl:g}/10 (min of every non-mirror section & tab, the SAME number the "
-                    f"verdict quotes); every surface must reach ≥8" if isinstance(fl, (int, float)) else
+                    f"{fl:g}/10 (min of every deterministic section & non-mirror tab, the SAME "
+                    f"number the verdict quotes); every surface must reach ≥8" if isinstance(fl, (int, float)) else
                     "the dossier does NOT ship — no scored surface exists"]),
         "fix": "resolve the failing tabs/sections (the per-tab table on this tab lists every scored surface)",
-        "basis": "THE dossier floor — min score of every non-mirror section & tab (identical to the verdict computation)",
+        "basis": "THE dossier floor — min score of every deterministic section & non-mirror tab (identical to the verdict computation)",
     }
     return v
 
@@ -4501,6 +4543,7 @@ def _combine_contract_rows(crows: Dict[int, dict], idxs: List[int]) -> dict:
     lead["verdict"] = "PASS" if all(c.get("verdict") == "PASS" for c in crs) else "FAIL"
     lead["reasons"] = reasons
     lead["tbd"] = any(c.get("tbd") for c in crs)
+    lead["commodity"] = any(c.get("commodity") for c in crs)
     return lead
 
 
@@ -4537,9 +4580,15 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         "the sheet reads as the buy list; expand a parent's + on the left margin to see its "
         "children (their £ is apportioned into the parent line).")
     if cres:
-        subtitle += (f" MPN TBD COUNT: {cres.get('tbd_count', 0)}/{cres.get('tbd_required', 0)} "
-                     f"bought-out lines await detailed design (score penalised by the TBD "
-                     f"fraction — a fully-TBD bill cannot reach 8). " + _contract_note(cres))
+        subtitle += (f" MPN STATUS: engineered TBD {cres.get('tbd_count', 0)}"
+                     f"/{cres.get('tbd_required', 0)} bought-out lines await detailed design "
+                     f"(score penalised by the engineered-TBD fraction — a fully-TBD bill "
+                     f"cannot reach 8) · commodity {cres.get('tbd_commodity_count', 0)}"
+                     f"/{cres.get('commodity_count', 0)} small parts carry 'commodity — MPN at "
+                     f"procurement' (commodity noun family + unit £ ≤ "
+                     f"£{_COMMODITY_UNIT_GBP_MAX:g}, both required — unpenalised, tallied "
+                     f"separately; real practice carries no MPN on class-basis commodity parts "
+                     f"at concept stage). " + _contract_note(cres))
     title_row(ws, "Bill of Materials (Ledger)", 15, subtitle)
     header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
                    "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
@@ -4659,9 +4708,11 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             sc = ws.cell(r, 13, clean_cell(row.get("basis", "")))
             sc.alignment = WRAP_TOP; sc.font = FONT_NOTE; sc.border = BORDER
             # MPN / datasheet — the contract's resolved reference (partVerifications by
-            # tag → head noun → the row's own non-placeholder `part`); a bought-out row
-            # with NO reference renders the EXPLICIT flagged 'TBD (detailed design)'
-            # (amber), never a silent dash or the 'requirement stated' placeholder.
+            # tag → head noun → the row's own non-placeholder `part`); an ENGINEERED
+            # bought-out row with NO reference renders the EXPLICIT flagged 'TBD
+            # (detailed design)' (amber); a COMMODITY row renders 'commodity — MPN at
+            # procurement' (honest taxonomy 2026-07-03 — no MPN is owed at concept
+            # stage), never a silent dash or the 'requirement stated' placeholder.
             if _cr:
                 _mpn = _cr.get("mpn") or "—"
             else:
@@ -4675,6 +4726,8 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             if _cr.get("tbd"):
                 pc.fill = FILL_ADVISORY
                 pc.font = FONT_ADVISORY
+            elif _cr.get("commodity") and str(_mpn).startswith("commodity"):
+                pc.font = FONT_NOTE
 
         # ── ROW CHECK (col O) — the published column contract's per-row verdict, from the
         #    SAME evaluation that set the tab's arithmetic score (never a fresh judgement). ──
@@ -9270,13 +9323,22 @@ def _contract_note(res: dict) -> str:
     _np, _nt = res.get("n_pass", 0), res.get("n_total", 0)
     _tbd_frac = res.get("tbd_fraction") or 0
     if _tbd_frac:
-        _base = round(10.0 * _np / _nt, 1) if _nt else 0.0
-        formula = (f"score = 10 × rows-passing ÷ rows − 4 × TBD-fraction = "
+        formula = (f"score = 10 × rows-passing ÷ rows − 4 × engineered-TBD-fraction = "
                    f"10 × {_np}/{_nt} − 4 × {_tbd_frac:g} = {res.get('score')}")
     else:
         formula = (f"score = 10 × rows-passing ÷ rows = "
                    f"10 × {_np}/{_nt} = {res.get('score')}")
-    return (f"ROW CHECK CONTRACT ({formula}): {cols}. "
+    # HONEST TBD TAXONOMY (2026-07-03): when the tab tracks MPN tallies, the formula
+    # line prints BOTH — the penalised engineered-TBD count and the unpenalised (but
+    # visible) commodity 'MPN at procurement' count.
+    tallies = ""
+    if ("tbd_required" in res) or res.get("commodity_count"):
+        tallies = (f" MPN TALLIES: engineered TBD {res.get('tbd_count', 0)}"
+                   f"/{res.get('tbd_required', 0)} (penalised) · commodity 'MPN at "
+                   f"procurement' {res.get('tbd_commodity_count', 0)}"
+                   f"/{res.get('commodity_count', 0)} (unpenalised, visible; commodity = "
+                   f"noun family + unit £ ≤ £{_COMMODITY_UNIT_GBP_MAX:g}, both required).")
+    return (f"ROW CHECK CONTRACT ({formula}):{tallies} {cols}. "
             "A dash / empty / unverifiable contracted cell FAILS its row — honest red beats fake green.")
 
 
@@ -9977,6 +10039,50 @@ def _bom_row_mpn(row: dict, mpn_by_word: Dict[str, str]) -> str:
 
 _TBD_MPN_TEXT = "TBD (detailed design)"
 
+# ── HONEST TBD TAXONOMY (2026-07-03). Real concept-stage EPC practice: COMMODITY
+# small parts (glands, unions, DIN rail, terminal blocks, fasteners — class-basis
+# priced) do NOT carry MPNs at concept stage; nobody expects a manufacturer part
+# number on a £2 terminal block until procurement. The credibility gap the TBD
+# penalty exists for is unidentified ENGINEERED equipment — a pump, analyser or
+# VFD with no part number. The taxonomy therefore splits the bought-out lines:
+#   • COMMODITY — requires BOTH signals (proveCatch: neither alone can reclassify):
+#       (a) a commodity NOUN family match (_COMMODITY_NOUN_RX — a universal
+#           small-parts lexicon, never a per-class table), AND
+#       (b) a class-basis unit price under the STATED threshold
+#           (_COMMODITY_UNIT_GBP_MAX, printed in the tab header), with a stated
+#           pricing basis on the row.
+#     Renders 'commodity — MPN at procurement'; tallied SEPARATELY (visible in the
+#     header + results), NEVER penalised.
+#   • ENGINEERED — every other bought-out line; a missing MPN stays the explicit
+#     'TBD (detailed design)' and keeps the FULL proportional score penalty.
+# proveCatch in _selftest: an engineered pump with TBD still penalises (noun family
+# fails even under the price threshold); a £5k 'gland plate' package still
+# penalises (price threshold fails even with the noun). ──
+_COMMODITY_MPN_TEXT = "commodity — MPN at procurement"
+_COMMODITY_UNIT_GBP_MAX = 100.0
+_COMMODITY_NOUN_RX = re.compile(
+    r"\b(?:cable\s+)?glands?\b|\bunions?\b|\bdin\s+rail\b|"
+    r"\bterminal\s+(?:block|strip)s?\b|"
+    r"\b(?:fastener|bolt|nut|washer|screw|stud|anchor|rivet)s?\b|"
+    r"\b(?:gasket|o-?ring|ferrule|lug|crimp)s?\b|"
+    r"\b(?:cable\s+tie|tie-?wrap|label|marker)s?\b|"
+    r"\b(?:spacer|standoff|shim)s?\b|\blevell?ing\s+(?:feet|foot|pads?)\b|"
+    r"\bconnectors?\b|\b(?:cabling|wiring|conduit|trunking|cable\s+tray)\b|"
+    r"\bfittings?\b", re.I)
+
+
+def _commodity_bought_out(row: dict, unit: Optional[float]) -> bool:
+    """True only when BOTH commodity signals hold: the commodity noun family AND a
+    stated class-basis unit price under the threshold. An engineered pump can never
+    be reclassified by price alone; a £5k 'gland' package never by noun alone."""
+    if unit is None or unit <= 0 or unit > _COMMODITY_UNIT_GBP_MAX:
+        return False
+    if not str(row.get("basis") or "").strip():
+        return False        # class-basis priced small parts only — never an unpriced mystery
+    return bool(_COMMODITY_NOUN_RX.search(
+        f"{row.get('requirement') or ''} {row.get('part') or ''}"))
+
+
 # ── CLASS-ALIEN PART MARKERS (fix 6, reviewers 2026-07-02 — 'Aquavista Remote
 # Monitoring', an aquaculture SCADA product, shipped on a water_treatment plant). The
 # BoM data is NEVER renamed here (it comes from state); the ROW CHECK flags the line
@@ -10012,9 +10118,13 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     'N/A — proprietary assembly' (na_with_reason). The distinction derives from data the
     rows already carry — never a per-class table.
     MPN / DATASHEET — a real or DB-sourced part reference for a bought-out row, else an
-    EXPLICIT flagged 'TBD (detailed design)'. A TBD row passes its ROW check (the gap is
-    disclosed) but the TAB score is penalised in PROPORTION to the TBD fraction — a
-    fully-TBD bill can never reach 8. The count is surfaced in the tab header.
+    EXPLICIT disclosure. HONEST TBD TAXONOMY (2026-07-03): a COMMODITY line (commodity
+    noun family AND unit £ under the stated threshold — both required) renders
+    'commodity — MPN at procurement' and lands in a SEPARATE, unpenalised-but-visible
+    tally; every other (ENGINEERED) bought-out line without a reference stays the
+    flagged 'TBD (detailed design)' and the TAB score is penalised in PROPORTION to
+    the ENGINEERED-TBD fraction — a fully-TBD bill can never reach 8. BOTH tallies are
+    surfaced in the tab header.
     NUMBERS — qty > 0 · unit £ > 0 · line £ = qty × unit £ (per-row arithmetic) · a
     non-empty pricing basis. A '↳' sub-component is an apportionment of its parent
     (unit/line waived WITH that stated reason, exactly as the ledger renders it)."""
@@ -10039,14 +10149,19 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
          "required for a PHYSICAL fabricated part; a bought-out assembly/package discloses "
          "'N/A — proprietary assembly' (derived from the row's own shape/basis data, no class table)"),
         ("MPN / datasheet", "computed",
-         "real or DB-sourced part reference for a bought-out row, else an explicit 'TBD (detailed design)' "
-         "— the TBD count is surfaced and penalises the tab score by its fraction"),
+         "real or DB-sourced part reference for a bought-out row, else an explicit disclosure: "
+         "ENGINEERED lines carry 'TBD (detailed design)' (counted + penalising the tab score by "
+         "their fraction); COMMODITY lines (commodity noun family AND unit £ ≤ the stated "
+         "threshold, both required) carry 'commodity — MPN at procurement' (tallied separately, "
+         "unpenalised)"),
     ]
 
     per_row: Dict[int, dict] = {}
     n_pass = 0
-    tbd_count = 0
-    mpn_required = 0
+    tbd_count = 0          # ENGINEERED bought-out lines with no reference (penalised)
+    mpn_required = 0       # ENGINEERED bought-out lines (the penalty denominator)
+    commodity_tbd = 0      # COMMODITY bought-out lines with no reference (visible, unpenalised)
+    commodity_total = 0    # COMMODITY bought-out lines
     for idx, row in enumerate(bom):
         if not isinstance(row, dict):
             continue
@@ -10065,6 +10180,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         material_txt = _bom_row_material(row)
         mpn_txt = _bom_row_mpn(row, mpn_by_word)
         tbd = False
+        commodity = False
 
         if is_sub and not (line or 0):
             # apportioned child — unit/line/material/MPN live on the PARENT line; the
@@ -10087,11 +10203,22 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
             elif not material_txt:
                 material_txt = "N/A — proprietary assembly / bought-out package, see datasheet"
             if kind == "assembly":
-                mpn_required += 1
-                if not mpn_txt:
-                    mpn_txt = _TBD_MPN_TEXT
-                    tbd = True
-                    tbd_count += 1
+                # HONEST TBD TAXONOMY: commodity small parts (noun family + price
+                # threshold, BOTH required) do not owe an MPN at concept stage —
+                # separate visible tally, no penalty. Engineered lines keep the
+                # full TBD penalty.
+                commodity = _commodity_bought_out(row, unit)
+                if commodity:
+                    commodity_total += 1
+                    if not mpn_txt:
+                        mpn_txt = _COMMODITY_MPN_TEXT
+                        commodity_tbd += 1
+                else:
+                    mpn_required += 1
+                    if not mpn_txt:
+                        mpn_txt = _TBD_MPN_TEXT
+                        tbd = True
+                        tbd_count += 1
             elif kind == "fabricated" and not mpn_txt:
                 mpn_txt = "bespoke fabrication to drawing — see sizing basis"
         if not str(row.get("basis") or "").strip():
@@ -10105,15 +10232,19 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         if verdict == "PASS":
             n_pass += 1
         per_row[idx] = {"verdict": verdict, "reasons": reasons, "kind": kind,
-                        "material": material_txt, "mpn": mpn_txt, "tbd": tbd}
+                        "material": material_txt, "mpn": mpn_txt, "tbd": tbd,
+                        "commodity": commodity}
 
     if not per_row:
         return None
     n_total = len(per_row)
     base = _contract_score(n_pass, n_total)
-    # TBD penalty — PROPORTIONAL to the fraction of bought-out rows still 'TBD (detailed
-    # design)': score = arithmetic − 4 × TBD-fraction, so a fully-TBD bill caps at 6 (<8)
-    # even when every row check passes. The gap is honest but it is still a gap.
+    # TBD penalty — PROPORTIONAL to the fraction of ENGINEERED bought-out rows still
+    # 'TBD (detailed design)': score = arithmetic − 4 × engineered-TBD-fraction, so a
+    # fully-TBD bill caps at 6 (<8) even when every row check passes. The gap is honest
+    # but it is still a gap. Commodity lines ('MPN at procurement') are OUTSIDE both the
+    # numerator and the denominator — they owe no MPN at concept stage (honest TBD
+    # taxonomy 2026-07-03), but their tally stays visible.
     tbd_frac = (tbd_count / mpn_required) if mpn_required else 0.0
     score = base
     if base is not None and tbd_frac > 0:
@@ -10131,18 +10262,22 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         issues.append(f"{n_fail}/{n_total} ledger rows FAIL the column contract (arithmetic "
                       f"10 × {n_pass}/{n_total} = {base}) — e.g. " + " · ".join(ex))
     if tbd_count:
-        issues.append(f"{tbd_count}/{mpn_required} bought-out lines carry MPN 'TBD (detailed "
-                      f"design)' — an ESTIMATE-stage gap; score = arithmetic − 4 × TBD-fraction "
-                      f"= {base} − {4.0 * tbd_frac:.1f}")
+        issues.append(f"{tbd_count}/{mpn_required} ENGINEERED bought-out lines carry MPN 'TBD "
+                      f"(detailed design)' — an ESTIMATE-stage gap; score = arithmetic − 4 × "
+                      f"engineered-TBD-fraction = {base} − {4.0 * tbd_frac:.1f}"
+                      + (f" ({commodity_tbd} commodity line(s) 'MPN at procurement' tallied "
+                         f"separately, unpenalised)" if commodity_tbd else ""))
     return {"tab": _LEDGER_SHEET, "contract": contract, "rows": per_row,
             "n_pass": n_pass, "n_total": n_total, "score": score,
             "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
             "source_fabricated": 0,
             "tbd_count": tbd_count, "tbd_required": mpn_required,
             "tbd_fraction": round(tbd_frac, 3),
+            "tbd_commodity_count": commodity_tbd, "commodity_count": commodity_total,
             "fix": ("price the £0 lines at source (requirements_bom.py emitter), state the "
-                    "material on fabricated parts in the sizing pass, and close MPN TBDs by "
-                    "growing the parts DB (Stage 17.6 ingest) so partVerifications resolves them")}
+                    "material on fabricated parts in the sizing pass, and close ENGINEERED MPN "
+                    "TBDs by growing the parts DB (Stage 17.6 ingest) so partVerifications "
+                    "resolves them (commodity lines resolve at procurement — no hold)")}
 
 
 # ── RISK REGISTER column contract (Tristan 2026-07-02, issue 12) ────────────────────────
@@ -10272,8 +10407,11 @@ def _derive_holds(state: dict, contract_results: Optional[dict] = None) -> List[
     bl = cr.get(_LEDGER_SHEET)
     if isinstance(bl, dict) and (bl.get("tbd_count") or 0) > 0:
         _add("Bought-out manufacturer part numbers pending detailed design",
-             f"{bl['tbd_count']}/{bl.get('tbd_required', '?')} bought-out lines carry an "
-             f"explicit 'TBD (detailed design)' part number",
+             f"{bl['tbd_count']}/{bl.get('tbd_required', '?')} engineered bought-out lines "
+             f"carry an explicit 'TBD (detailed design)' part number"
+             + (f" (commodity lines 'MPN at procurement' are tallied separately and "
+                f"carry no hold: {bl.get('tbd_commodity_count', 0)})"
+                if bl.get("tbd_commodity_count") else ""),
              "Bill of Materials ledger column contract (live TBD count)",
              "resolve real MPNs at detailed design (Stage 17.6 library / supplier RFQs) — "
              "the TBD count then falls and this hold clears")
@@ -11624,20 +11762,21 @@ def tab_benchmark(wb: Workbook, state: dict) -> None:
 def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     """ONE 'Quality & Audit' tab (Bundle B fix 2) — the former ⭐ Scorecard + ⚠ Audit tabs
     merged: the ONE verdict (rendered exactly once, at the top), the ≥8-every-section
-    self-audit table, the engine quality metrics, the per-tab deterministic scorecard,
-    and the ship-gate audit findings + benchmark net. ⚠ Checks stays its own tab (the
-    live-invariant surface)."""
+    table (DETERMINISTIC sections score; the LLM self-audit renders as an ADVISORY
+    annotation on the same rows — B3-floor fix 2026-07-03, it never floors), the engine
+    quality metrics, the per-tab deterministic scorecard, and the ship-gate audit
+    findings + benchmark net. ⚠ Checks stays its own tab (the live-invariant surface)."""
     sa = state.get("selfAudit") or {}
-    secs = sa.get("sections") or []
-    if not isinstance(secs, list):
-        secs = []
+    facts, advisory = _verdict_sections(state, run_dir)
     ws = wb.create_sheet("Quality & Audit")
     set_widths(ws, {"A": 28, "B": 30, "C": 60, "D": 82, "E": 24})
     title_row(ws, "Quality & Audit — every section and tab against the ≥8 floor + the ship gate", 5,
               "The engine's own quality surface, on one tab: the dossier verdict (stated ONCE, "
-              "here), every self-audit section and every tab scored against the ≥8 floor, and "
-              "the deterministic ship-gate audit findings. The AIM is ≥8 EVERYWHERE — the floor, "
-              "not the average. See ⚠ Checks for the live arithmetic invariants.")
+              "here), every DETERMINISTIC section and every tab scored against the ≥8 floor "
+              "(the LLM self-audit's opinions render as advisory annotations — visible, never "
+              "scoring; B3), and the deterministic ship-gate audit findings. The AIM is ≥8 "
+              "EVERYWHERE — the floor, not the average. See ⚠ Checks for the live arithmetic "
+              "invariants.")
     r = 4
     # ---- THE ONE VERDICT — this tab's single verdict surface (fix 2, 2026-07-02);
     # identical on the Exec / Overview surfaces via _register_verdict_cell. ----
@@ -11648,31 +11787,75 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
     _register_verdict_cell(ws, r, 1, style="line")
     r += 2
+    # ---- SECTION TABLE (B3-floor fix 2026-07-03): the scored rows are the DETERMINISTIC
+    # (FACT) scorecard sections — the corroboration-computed numbers the verdict floor
+    # actually ranges over. The LLM self-audit's numbers annotate the same rows as
+    # 'self-audit opinion: N — advisory, uncorroborated' and NEVER enter the floor;
+    # a self-audit section with no deterministic counterpart renders as an
+    # advisory-only row (amber, non-gating — its deliverable is scored on the per-tab
+    # table below). ----
     mn = sa.get("min_score")
-    mean = sa.get("mean_score")
-    n_ok = sum(1 for s in secs if isinstance(s.get("score"), (int, float)) and s.get("score") >= 8)
-    if secs:
-        min_fill = FILL_PASS if (isinstance(mn, (int, float)) and mn >= 8) else FILL_FAIL
-        mc = ws.cell(r, 1, f"MIN section score (LLM self-audit)  {mn}/10")
+    _det_scores = [d.get("score") for d in facts.values()
+                   if isinstance(d.get("score"), (int, float))]
+    det_min = min(_det_scores) if _det_scores else None
+    n_ok = sum(1 for v in _det_scores if v >= 8)
+    if facts or advisory:
+        min_fill = (FILL_PASS if (isinstance(det_min, (int, float)) and det_min >= 8)
+                    else FILL_FAIL) if _det_scores else FILL_ADVISORY
+        mc = ws.cell(r, 1, f"MIN deterministic section score  "
+                           f"{det_min if det_min is not None else '—'}/10")
         mc.font = FONT_TITLE
         mc.fill = min_fill
         ws.cell(r, 2).fill = min_fill
-        ws.cell(r, 3, f"{n_ok}/{len(secs)} sections ≥8").font = FONT_SUB
-        ws.cell(r, 4, f"mean {mean}/10   ·   AIM: every section ≥8").font = FONT_NOTE
+        ws.cell(r, 3, f"{n_ok}/{len(_det_scores)} deterministic sections ≥8").font = FONT_SUB
+        ws.cell(r, 4, f"LLM self-audit min {mn if mn is not None else '—'}/10 — ADVISORY, "
+                      f"uncorroborated; annotates, never floors (B3)   ·   "
+                      f"AIM: every section ≥8").font = FONT_NOTE
         r += 2
-        header(ws, r, ["Section", "Score", "vs ≥8 floor", "Top defect (why it's below 8)"])
+        header(ws, r, ["Section", "Score (deterministic)", "vs ≥8 floor",
+                       "Self-audit opinion (advisory — never floors)",
+                       "Top defect (why it's below 8)"])
         r += 1
-    for s in secs:
-        if not isinstance(s, dict):
-            continue
-        score = s.get("score")
+
+    def _opinion_text(nm: str) -> str:
+        adv = advisory.get(nm)
+        if not adv:
+            return "—"
+        osc = adv.get("score")
+        return (f"self-audit opinion: {osc:g} — advisory, uncorroborated"
+                if isinstance(osc, (int, float)) else "self-audit opinion: — (unscored)")
+
+    for nm, d in facts.items():
+        score = d.get("score")
         ok = isinstance(score, (int, float)) and score >= 8
-        ws.cell(r, 1, _display_name(clean_cell(s.get("name", "")))).font = FONT_SUB
+        ws.cell(r, 1, _display_name(clean_cell(nm))).font = FONT_SUB
         scell = ws.cell(r, 2, score)
-        scell.fill = FILL_PASS if ok else (FILL_FAIL if s.get("blocking") else FILL_ADVISORY)
-        ws.cell(r, 3, "PASS ✓" if ok else ("⛔ BLOCKING" if s.get("blocking") else "below 8"))
-        defect = s.get("defects") or [""]
-        dcell = ws.cell(r, 4, clean_cell(defect[0] if defect else ""))
+        scell.fill = FILL_PASS if ok else FILL_FAIL
+        ws.cell(r, 3, "PASS ✓" if ok else "⛔ below 8")
+        ocell = ws.cell(r, 4, _opinion_text(nm))
+        ocell.font = FONT_ADVISORY if nm in advisory else FONT_NOTE
+        ocell.alignment = WRAP_TOP
+        defect = d.get("defects") or [""]
+        dcell = ws.cell(r, 5, clean_cell(defect[0] if defect else ""))
+        dcell.alignment = WRAP_TOP
+        dcell.font = FONT_NOTE
+        r += 1
+    for nm, adv in advisory.items():
+        if nm in facts:
+            continue     # already annotated on its deterministic row
+        ws.cell(r, 1, _display_name(clean_cell(nm)) + "  (advisory)").font = FONT_SUB
+        scell = ws.cell(r, 2, "— (no deterministic section — the deliverable is scored "
+                              "on the per-tab table below)")
+        scell.font = FONT_NOTE
+        scell.alignment = WRAP_TOP
+        vcell = ws.cell(r, 3, "ADVISORY — non-gating")
+        vcell.fill = FILL_ADVISORY
+        vcell.font = FONT_ADVISORY
+        ocell = ws.cell(r, 4, _opinion_text(nm))
+        ocell.font = FONT_ADVISORY
+        ocell.alignment = WRAP_TOP
+        defect = adv.get("defects") or [""]
+        dcell = ws.cell(r, 5, clean_cell(defect[0] if defect else ""))
         dcell.alignment = WRAP_TOP
         dcell.font = FONT_NOTE
         r += 1
@@ -11709,8 +11892,14 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             _shown += 1
     _cov = round(_shown / _tot * 100) if _tot else 100
     for _label, _val, _aim in [
-        ("Sections at ≥8 (AIM: all)", f"{n_ok} / {len(secs)}", n_ok == len(secs)),
-        ("Min section score (LLM self-audit)", f"{mn}/10", isinstance(mn, (int, float)) and mn >= 8),
+        ("Deterministic sections at ≥8 (AIM: all)", f"{n_ok} / {len(_det_scores)}",
+         bool(_det_scores) and n_ok == len(_det_scores)),
+        ("Min deterministic section score (floors)",
+         f"{det_min if det_min is not None else '—'}/10",
+         isinstance(det_min, (int, float)) and det_min >= 8),
+        ("Min self-audit opinion (advisory — never floors)",
+         f"{mn if mn is not None else '—'}/10",
+         isinstance(mn, (int, float)) and mn >= 8),
         ("Traceability — every number → the brief", f"{_trace}%" if _trace is not None else "—", (_trace or 0) >= 100),
         ("Calc-coverage — every number shows its formula", f"{_cov}%", _cov >= 100),
     ]:
@@ -12656,6 +12845,52 @@ def _selftest() -> int:
     if not _all_tbd or _all_tbd["n_pass"] != 5 or _all_tbd["score"] >= 8:
         print(f"  FAIL contract-bom: a fully-TBD bill must score <8 even with every row "
               f"passing (got {_all_tbd and _all_tbd['score']})"); bad += 1
+    # ═══ proveCatch the HONEST TBD TAXONOMY (2026-07-03). Claims:
+    # (a) a COMMODITY line (noun family + unit £ ≤ threshold, BOTH) renders
+    #     'commodity — MPN at procurement', lands in the SEPARATE tally, and does
+    #     NOT penalise the score;
+    # (b) an ENGINEERED pump with TBD still penalises — a sub-threshold price alone
+    #     can NEVER reclassify it (noun family required);
+    # (c) a £5k package wearing a commodity noun still penalises — the noun alone
+    #     can NEVER reclassify it (price threshold required);
+    # (d) the header note prints BOTH tallies. ═══
+    _tax = _eval_bom_ledger_contract(".", {"requirementsBom": [
+        {"tag": "X-1", "requirement": "Terminal Blocks", "qty": 40, "unit_gbp": 2,
+         "line_gbp": 80, "part": "requirement stated",
+         "basis": "bottom-up parametric · commodity-floor"},
+        {"tag": "P-9", "requirement": "Chemical Dosing Pump · 1 kW", "qty": 1,
+         "unit_gbp": 90, "line_gbp": 90, "part": "requirement stated",
+         "basis": "bottom-up parametric"},
+        {"tag": "X-2", "requirement": "Cable Gland Plate Package", "qty": 1,
+         "unit_gbp": 5000, "line_gbp": 5000, "part": "requirement stated",
+         "basis": "bottom-up parametric"},
+    ]})
+    if not _tax:
+        print("  FAIL tbd-taxonomy: taxonomy fixture must evaluate"); bad += 1
+    else:
+        _t0, _t1, _t2 = (_tax["rows"][i] for i in range(3))
+        if _t0["mpn"] != _COMMODITY_MPN_TEXT or _t0["tbd"] or not _t0["commodity"]:
+            print(f"  FAIL tbd-taxonomy: a £2 terminal block must render "
+                  f"'{_COMMODITY_MPN_TEXT}' and never count as a TBD (got {_t0})"); bad += 1
+        if _t1["mpn"] != _TBD_MPN_TEXT or not _t1["tbd"] or _t1["commodity"]:
+            print(f"  FAIL tbd-taxonomy: a £90 ENGINEERED pump with no MPN must stay a "
+                  f"penalised TBD — price alone can never reclassify (got {_t1})"); bad += 1
+        if _t2["mpn"] != _TBD_MPN_TEXT or not _t2["tbd"] or _t2["commodity"]:
+            print(f"  FAIL tbd-taxonomy: a £5,000 'gland' package must stay a penalised "
+                  f"TBD — the noun alone can never reclassify (got {_t2})"); bad += 1
+        if _tax["tbd_count"] != 2 or _tax["tbd_required"] != 2 \
+                or _tax["tbd_commodity_count"] != 1 or _tax["commodity_count"] != 1:
+            print(f"  FAIL tbd-taxonomy: tallies must read engineered 2/2 + commodity 1/1 "
+                  f"(got {_tax['tbd_count']}/{_tax['tbd_required']} + "
+                  f"{_tax['tbd_commodity_count']}/{_tax['commodity_count']})"); bad += 1
+        # score = 10 − 4 × (2/2) = 6.0: the commodity line is OUTSIDE the penalty
+        if _tax["score"] != 6.0:
+            print(f"  FAIL tbd-taxonomy: score must be 10 − 4×(2/2) = 6.0 — the commodity "
+                  f"line must not penalise (got {_tax['score']})"); bad += 1
+        _tn = _contract_note(_tax)
+        if "engineered TBD 2/2" not in _tn or "commodity 'MPN at procurement' 1/1" not in _tn:
+            print(f"  FAIL tbd-taxonomy: the header formula must print BOTH tallies "
+                  f"(got {_tn[:220]})"); bad += 1
     # ═══ proveCatch the RISK-REGISTER TRIAGE contract (Tristan 2026-07-02, issue 12 —
     # "if you have identified these problems why are they still here?"). Claims:
     # (a) ENGINE-FIXABLE-as-tolerable IMPOSSIBLE: a live engine finding (physics critic /
@@ -13077,30 +13312,54 @@ def _selftest() -> int:
         print(f"  FAIL key-disclosure: class_reference must disclose an estimate kind (got {_key_input_disclosure('class_reference')!r})"); bad += 1
     if _key_input_disclosure("rating-based") != "":
         print(f"  FAIL key-disclosure: rating-based must stay blank (a real-gap signal), got {_key_input_disclosure('rating-based')!r}"); bad += 1
-    # ═══ (10) ONE VERDICT — single source (presentation audit 2026-07-02, fix 2).
-    # proveCatch the four-contradictory-verdicts bug: the verdict is computed ONCE
-    # (floor = min of every section + tab; DRAFT counts sections/tabs <8 or UNSCORED)
-    # and every rendering style states the SAME answer. ═══
+    # ═══ (10) ONE VERDICT — single source (presentation audit 2026-07-02, fix 2;
+    # B3-floor fix 2026-07-03). proveCatch the four-contradictory-verdicts bug AND
+    # the B3 doctrine: the verdict is computed ONCE (floor = min of every
+    # DETERMINISTIC section + non-mirror tab; the LLM self-audit / any `advisory`
+    # section NEVER enters the floor; DRAFT counts FACT sections/tabs <8 or
+    # UNSCORED) and every rendering style states the SAME answer. ═══
     _vstate = {"qualityScorecard": {"sections": [
                    {"name": "gates", "score": 9},
                    {"name": "brief_compliance", "score": 5, "advisory": True}]},
                "selfAudit": {"sections": [
-                   {"name": "brief_compliance", "score": 5},      # duplicate name → deduped
+                   {"name": "brief_compliance", "score": 5},      # opinion — never floors
                    {"name": "narrative", "score": 10}]}}
     _vtabs = {"Overview": {"score": 10, "status": "PASS"},
               "P&ID": {"score": None, "status": "UNSCORED"}}
     _vv = compute_verdict(_vstate, _vtabs)
-    if _vv["floor"] != 5 or _vv["open_issues"] != 2 or _vv["ships"]:
-        print(f"  FAIL one-verdict: floor must be 5 with 2 open issues (the 5-section + the "
-              f"UNSCORED tab), never SHIPS (got {_vv})"); bad += 1
+    if _vv["floor"] != 9 or _vv["open_issues"] != 1 or _vv["ships"]:
+        print(f"  FAIL one-verdict: the advisory/self-audit 5 must NOT floor — floor 9 "
+              f"(FACT 'gates') with 1 open issue (the UNSCORED tab), never SHIPS "
+              f"(got {_vv})"); bad += 1
     _vcard, _vline = verdict_text("card", _vv), verdict_text("line", _vv)
-    if _vcard != "DRAFT — 2 open issues" or _vcard not in _vline or "floor 5/10" not in _vline:
+    if _vcard != "DRAFT — 1 open issue" or _vcard not in _vline or "floor 9/10" not in _vline:
         print(f"  FAIL one-verdict: card and line forms must state the SAME verdict "
               f"(got {_vcard!r} / {_vline!r})"); bad += 1
     _vok = compute_verdict({"qualityScorecard": {"sections": [{"name": "a", "score": 9}]}},
                            {"T": {"score": 8, "status": "PASS"}})
     if not _vok["ships"] or verdict_text("card", _vok) != "SHIPS":
         print(f"  FAIL one-verdict: an all-≥8 dossier must SHIP (got {_vok})"); bad += 1
+    # ═══ (10b) B3 FLOOR proveCatch (2026-07-03 — codema v59: the workbook verdict
+    # floored at 5 on the self-audit's physics_fidelity OPINION while the
+    # DETERMINISTIC corroboration section scored 10). Claims:
+    # (a) deterministic section 10 + self-audit 5 → the floor is the TABS' min, not 5;
+    # (b) a DETERMINISTIC section at 4 still pins the floor at 4 (nothing is relaxed). ═══
+    _b3 = compute_verdict(
+        {"qualityScorecard": {"sections": [
+             {"name": "physics_fidelity", "score": 10},
+             {"name": "physics_fidelity", "score": 5, "advisory": True}]},
+         "selfAudit": {"sections": [{"name": "physics_fidelity", "score": 5}]}},
+        {"Bill of Materials (Ledger)": {"score": 7, "status": "FAIL"}})
+    if _b3["floor"] != 7:
+        print(f"  FAIL b3-floor: deterministic 10 + self-audit opinion 5 must floor on "
+              f"the tabs' min 7, never the opinion 5 (got {_b3['floor']})"); bad += 1
+    _b3b = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "connectivity", "score": 4}]},
+         "selfAudit": {"sections": [{"name": "connectivity", "score": 9}]}},
+        {"T": {"score": 10, "status": "PASS"}})
+    if _b3b["floor"] != 4:
+        print(f"  FAIL b3-floor: a DETERMINISTIC section at 4 must still pin the floor "
+              f"at 4 — the fix relaxes nothing (got {_b3b['floor']})"); bad += 1
     # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
     if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
         print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "
@@ -13720,8 +13979,11 @@ def _selftest() -> int:
             if _nverd != 1:
                 print(f"  FAIL quality-merge: the ONE verdict must render exactly ONCE on the "
                       f"merged tab (got {_nverd})"); bad += 1
-            for _need in ("MIN section score", "Per-tab quality", "Deterministic ship-gate audit",
-                          "broken thing", "BENCHMARK NET"):
+            for _need in ("MIN deterministic section score", "Per-tab quality",
+                          "Deterministic ship-gate audit", "broken thing", "BENCHMARK NET",
+                          # B3-floor fix: the self-audit renders as an ADVISORY annotation
+                          "self-audit opinion: 6 — advisory, uncorroborated",
+                          "ADVISORY — non-gating"):
                 if not any(_need in v for v in _txts):
                     print(f"  FAIL quality-merge: merged tab must carry {_need!r}"); bad += 1
             if sum(1 for (_t, _r, _c, _s, _sf) in _VERDICT_CELLS if _t == "Quality & Audit") != 1:
