@@ -1611,6 +1611,18 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # case), re-base the board onto the load-appropriate voltage (MV above ~1.5 MW)
     # and split the aggregate into a feeder per module. Keyed on load magnitude.
     _apply_distribution_voltage_model(tree, schedule, state)
+    # CANONICAL BOARD NAMING (J101, 2026-07-03): a GENERIC placeholder tag — the two
+    # non-descriptive names main_bus can still carry at this point ('MAIN SWITCHBOARD', the
+    # un-rewritten default, or 'MAIN LV BOARD', the _build_source / voltage-model generic
+    # rewrite) — never read the REAL board_id, so the same board the schedule correctly named
+    # from its own board_id (e.g. 'MAIN DISTRIBUTION BOARD (TP&N)' for 'motor_control_center')
+    # rendered as the meaningless 'MAIN LV BOARD' here. Pass the real board_id (main_hub, the
+    # SAME node-identity signal draw_panel_schedule uses for its own main board) through
+    # edm.canonical_board_name — the ONE MINT shared with the schedule — so the two projections
+    # can never disagree. A DC or MV main board already got its OWN descriptive name above
+    # ('MAIN DC BUS' / 'MAIN MV SWITCHBOARD', not in this placeholder set) and is left alone.
+    if main_bus.tag in ("MAIN SWITCHBOARD", "MAIN LV BOARD") and main_hub:
+        main_bus.tag = edm.canonical_board_name(main_hub, "main", humanise=_humanise)
     # UNIVERSAL de-duplication: a load can reach the board both as a kW-derived
     # synthesised feeder AND as a per-word skeleton edge — collapse those to one way
     # each (keeps the kW-derived feeder). Done AFTER the voltage model so synthesised

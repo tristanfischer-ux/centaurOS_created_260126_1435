@@ -11890,6 +11890,96 @@ print(json.dumps({"identical": rows_a == rows_b, "n": len(rows_a), "uncorroborat
     }
   }
 
+  // QL10 — BOARD-HEADING-IN-SVG (J101, 2026-07-03): the panel/load schedule and the
+  // single-line diagram are two PROJECTIONS of the SAME converged electrical model — every
+  // board heading the schedule renders (`## <name>`) must appear VERBATIM in the SLD's
+  // rendered SVG text. Before the 2026-07-03 fix, draw_single_line hardcoded a GENERIC
+  // main-bus tag ('MAIN SWITCHBOARD' -> rewritten to 'MAIN LV BOARD') that never read the
+  // real board_id, so a board the schedule correctly named from its board_id (e.g. 'MAIN
+  // DISTRIBUTION BOARD (TP&N)') rendered as the meaningless 'MAIN LV BOARD' in the SLD; a DC
+  // main board diverged the OTHER way (SLD said 'MAIN DC BUS', the schedule echoed the raw,
+  // often-arbitrary node id verbatim, e.g. 'MAIN BOARD — DC busbar 1500 V'). Both drawers now
+  // route through edm.canonical_board_name (the ONE MINT) — this probe drives BOTH the
+  // generic-LV-named-board path and the DC grid-tie path through the REAL production
+  // generate_panel_schedule / generate_sld entry points on a minimal self-contained fixture
+  // (no dependency on any out/ artifact — those are gitignored, not available in CI) and
+  // proves the catch: a reintroduced hardcoded SLD tag would make the schedule's `## `
+  // heading (XML-escaped, e.g. 'TP&N' -> 'TP&amp;N') NOT appear in the SVG text, failing here.
+  try {
+    const probe = `
+import sys, os, json, tempfile
+sys.path.insert(0, os.path.join('scripts', 'blender-universal'))
+import draw_panel_schedule as dps
+import draw_single_line as dsl
+
+def xml_escape(s):
+    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+def check(rows, state):
+    d = tempfile.mkdtemp()
+    with open(os.path.join(d, 'connection-schedule.json'), 'w') as fh:
+        json.dump({'rows': rows}, fh)
+    with open(os.path.join(d, 'state.json'), 'w') as fh:
+        json.dump(state, fh)
+    _sp, _panels, md = dps.generate_panel_schedule(d, rasterise_png=False)
+    _ss, tree, svg = dsl.generate_sld(d, rasterise_png=False)
+    headings = [ln[3:].strip() for ln in md.splitlines() if ln.startswith('## ')]
+    ok = len(headings) >= 1 and all(xml_escape(h) in svg for h in headings)
+    return {"headings": headings, "ok": ok, "main_bus_tag": tree.main_bus.tag}
+
+# named-board LV path: board_id 'control' (matches the ^control$ named-board rule, the
+# same class of match as the real Codema 'motor_control_center') with a real connected
+# load so _apply_distribution_voltage_model's generic 'MAIN LV BOARD' rewrite fires.
+lv_rows = [
+    {"from": "utility", "to": "control", "mechanism": "electrical", "role": "trunk",
+     "rating": "50 A", "size": "16 mm2", "length_m": 10},
+    {"from": "control", "to": "Pump A", "mechanism": "electrical", "role": "branch",
+     "rating": "20 A", "size": "4 mm2", "length_m": 5},
+    {"from": "control", "to": "Pump B", "mechanism": "electrical", "role": "branch",
+     "rating": "20 A", "size": "4 mm2", "length_m": 5},
+]
+lv_state = {"orchestratorContract": {"quantities":
+    {"connected_electrical_load_kw": {"value": 15.0}}}}
+r_lv = check(lv_rows, lv_state)
+
+# DC grid-tie path: board_id 'dc_busbar_1500v' (an arbitrary node id, NOT a named board —
+# same shape as the real BESS 'DC busbar 1500 V' node) with dc_bus_voltage_v so is_dc=True
+# on the schedule side and ac_output_voltage_v so _build_source takes the grid-tie branch.
+dc_rows = [
+    {"from": "grid", "to": "dc_busbar_1500v", "mechanism": "electrical", "role": "trunk",
+     "rating": "100 A", "size": "95 mm2", "length_m": 8},
+    {"from": "dc_busbar_1500v", "to": "Rack A", "mechanism": "electrical", "role": "branch",
+     "rating": "30 A", "size": "10 mm2"},
+    {"from": "dc_busbar_1500v", "to": "Rack B", "mechanism": "electrical", "role": "branch",
+     "rating": "30 A", "size": "10 mm2"},
+]
+dc_state = {"orchestratorContract": {"quantities": {
+    "dc_bus_voltage_v": {"value": 1500.0},
+    "ac_output_voltage_v": {"value": 400.0},
+    "continuous_power_kw": {"value": 500.0}}}}
+r_dc = check(dc_rows, dc_state)
+
+print(json.dumps({"lv": r_lv, "dc": r_dc}))
+`
+    const o = execFileSync('python3', ['-c', probe], { encoding: 'utf8', cwd: resolve(__dirname, '..'), timeout: 30000 })
+    const r = JSON.parse(o.trim().split('\n').pop() || '{}')
+    out.push({
+      id: 'QL10.board_heading_appears_in_sld_svg',
+      description: "every panel-schedule board heading appears verbatim in the single-line SVG (J101 canonical naming, LV named-board + DC grid-tie paths)",
+      passed: r?.lv?.ok === true && r?.dc?.ok === true
+        && r?.lv?.main_bus_tag === 'MAIN DISTRIBUTION BOARD (TP&N)'
+        && r?.dc?.main_bus_tag === 'MAIN DC BUS',
+      detail: `lv=${JSON.stringify(r?.lv)} dc=${JSON.stringify(r?.dc)}`,
+    })
+  } catch (err) {
+    out.push({
+      id: 'QL10.board_heading_appears_in_sld_svg',
+      description: 'every panel-schedule board heading appears verbatim in the single-line SVG (J101 canonical naming)',
+      passed: false,
+      detail: `probe failed: ${(err as Error).message.slice(0, 160)}`,
+    })
+  }
+
   return out
 }
 

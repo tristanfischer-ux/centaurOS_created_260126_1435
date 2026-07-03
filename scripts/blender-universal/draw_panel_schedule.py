@@ -435,7 +435,12 @@ class Panel:
     kind: str = "main"      # 'main' | 'sub'
     supply: str = ""        # supply source description
     system: str = ""        # system voltage / phases, e.g. '400 V 3-phase + N' / '800 V DC'
-    busbar_a: Optional[float] = None        # busbar continuous rating, A
+    busbar_a: Optional[float] = None        # busbar continuous CURRENT (measured/derived), A
+    busbar_rating_a: Optional[float] = None # busbar RATING — next BS-EN-60947 frame ≥ demand,
+    #                                          A. Distinct from busbar_a: a RATING is the
+    #                                          equipment the board is BUILT to (e.g. a 100 A
+    #                                          frame), never a bare echo of the DEMAND current
+    #                                          (e.g. 87 A) — see _set_busbar_rating().
     incoming: str = ""      # incoming feeder description (size · length · Vd)
     incoming_a: Optional[float] = None      # incoming feeder current (THIS board's domain)
     phases: int = 3          # 3 (TP&N / 3-ph) | 1 (single-phase) — drives kW↔A
@@ -1223,25 +1228,18 @@ def _is_named_board(node: str) -> bool:
 
 
 def _new_panel(board_id, kind, state, voltage_v, is_dc, phases, system) -> Panel:
-    name = _board_name(board_id, kind)
+    name = _board_name(board_id, kind, is_dc=is_dc)
     return Panel(board_id=board_id, name=name, kind=kind, system=system,
                  voltage_v=voltage_v, is_dc=is_dc, phases=phases)
 
 
-def _board_name(board_id: str, kind: str) -> str:
-    bid = (board_id or "").lower()
-    if board_id.endswith("_subdist"):
-        base = _humanise(board_id[:-len("_subdist")])
-        return f"SUB-DISTRIBUTION BOARD — {base}"
-    if kind == "main":
-        if "switchgear" in bid or "switchboard" in bid:
-            return "MAIN SWITCHBOARD (MSB)"
-        if "control" in bid:
-            return "MAIN DISTRIBUTION BOARD (TP&N)"
-        if "board" in bid or "panel" in bid:
-            return _humanise(board_id)
-        return f"MAIN BOARD — {_humanise(board_id)}"
-    return _humanise(board_id)
+def _board_name(board_id: str, kind: str, is_mv: bool = False, is_dc: bool = False) -> str:
+    """Delegates to edm.canonical_board_name — the ONE MINT shared with draw_single_line's
+    main-bus tagging (J101, 2026-07-03) so the schedule heading and the SLD tag can never
+    diverge for the same board. `_humanise` is passed through as the caller-local
+    tag→title-case function (edm stays pure logic, no drawer-specific string convention)."""
+    return edm.canonical_board_name(board_id, kind, is_mv=is_mv, is_dc=is_dc,
+                                    humanise=_humanise)
 
 
 def _subdist_secondary_v(rows, state) -> Optional[float]:
@@ -1281,6 +1279,25 @@ def _transformer_for(board_id: str, rows):
 
 # --- circuit grouping --------------------------------------------------------
 
+def _dominant_default_amps(amps: list) -> Optional[float]:
+    """A WHOLESALE FALLBACK current is the SAME value inherited by MANY un-sized rows (e.g.
+    27.4 A on every outgoing circuit, or 4.2 A repeated verbatim across trunk + branch rows
+    of the connection schedule) — detected by its DOMINANCE (≥3 occurrences AND >30% share of
+    the readings), never by a fixed magnitude cap (a genuine large current recurring on
+    identical parallel feeders — e.g. 1953 A battery-rack busbars collapsed to one row ×N —
+    is NOT repeated across many distinct rows, so it never trips this). Shared by
+    `_fill_circuits` (per-board outgoing-circuit sizing, the original 2026-07-02 use) and
+    `_set_incoming` (the schedule-wide guard on a MAIN board's incoming-feeder reading,
+    2026-07-03) so both sides of the amps-from-kW fix read the SAME dominance signal."""
+    if not amps:
+        return None
+    from collections import Counter
+    val, n = Counter(amps).most_common(1)[0]
+    if n >= 3 and n / len(amps) > 0.30:
+        return val
+    return None
+
+
 def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
                    equip_qty: Optional[dict] = None):
     """Build the outgoing-circuit rows for a board: every row whose `from` is this board
@@ -1319,20 +1336,7 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
     # from its OWN derived connected kW. Universal — keyed on the value frequency, not a class.
     grp_amps = [round(a, 1) for grp in groups.values()
                 for a in [_row_amps(grp[0])] if a and a > 0]
-    default_a = None
-    if grp_amps:
-        from collections import Counter
-        val, n = Counter(grp_amps).most_common(1)[0]
-        # A wholesale FALLBACK current is the SAME value inherited by MANY un-sized taps
-        # (e.g. 27.4 A on every circuit, or 75.4 A on every RAS circuit) — detected by its
-        # DOMINANCE (≥3 circuits AND >30% share AND it is shared by loads of OBVIOUSLY
-        # different size, so it cannot be a real engineered current). A large shared current
-        # that genuinely recurs on identical parallel feeders (e.g. 1953 A battery-rack
-        # busbars, where the GROUP collapses to ONE row ×N so it is NOT repeated across many
-        # distinct rows) is left alone. The previous `val < 60` cap silently missed the RAS
-        # 75.4 A default; dominance + a distinct-load check is the universal signal.
-        if n >= 3 and n / len(grp_amps) > 0.30:
-            default_a = val
+    default_a = _dominant_default_amps(grp_amps)
 
     # Identical-equipment de-duplication set: a signature per circuit (ledger spec tail +
     # per-way kW + ways) so the SAME physical equipment emitted under two names is counted once.
@@ -1736,10 +1740,39 @@ def _incoming_descr(row: dict) -> str:
     return " · ".join(bits)
 
 
+def _circuit_current_sum(panel: Panel) -> float:
+    """Σ design current across the board's OWN circuits (non-duplicate, ways-weighted) — the
+    board's real downstream demand signal, computed from panel.circuits (already filled by
+    `_fill_circuits` before either incoming-setter runs). Same formula `reconcile()` uses for
+    its headline `sum_a`, exposed early so `_set_incoming` can derive/guard the incoming
+    demand BEFORE the full reconciliation runs. Not a duplicate mint — `reconcile()` calls
+    this helper too."""
+    return sum(((c.design_a or 0) * c.ways) for c in panel.circuits if not c.duplicate)
+
+
+def _set_busbar_rating(panel: Panel) -> None:
+    """Busbar RATING is the standard BS-EN-60947 breaker/busbar FRAME the board is BUILT to
+    (the next _BREAKER_FRAMES rung ≥ the board's own demand current) — never a bare echo of
+    the DEMAND current itself (an 87 A demand sits on a 100 A busbar, not an '87 A busbar').
+    Same ladder + `_next_frame()` the outgoing-circuit devices use. Called from both incoming-
+    setters once the board's demand (incoming_a, else busbar_a) is settled."""
+    demand_a = panel.incoming_a or panel.busbar_a
+    if demand_a:
+        panel.busbar_rating_a = _next_frame(demand_a)
+
+
 def _set_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict):
     """Incoming feeder + busbar for the MAIN board.  Its busbar = the bus trunk row it
     carries ('(busway)'); the incoming = the conversion-chain trunk feed (or that same
-    busbar when no upstream chain row exists)."""
+    busbar when no upstream chain row exists).
+
+    The connection schedule frequently leaves the incoming-feeder row at the SAME wholesale
+    default current it puts on many unrelated trunk/branch rows (e.g. 4.2 A repeated across
+    4 trunk stages + 11 branches) — trusting that raw reading made a MAIN board's demand read
+    orders of magnitude below its own Σ circuit current (ratio ~20). Guard it: when the raw
+    incoming reading (a) doesn't exist, or (b) IS the schedule-wide dominant default AND sits
+    implausibly below the board's own downstream circuit sum, derive the demand from that sum
+    instead — the board's own circuits are real (kW-derived, 2026-07-02), never a stale row."""
     bus = _lv_busbar_row(board_id, rows)
     if bus is not None:
         panel.busbar_a = _row_amps(bus) or panel.busbar_a
@@ -1751,9 +1784,29 @@ def _set_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict
                     and r.get("from") != board_id), None)
     if inc is None:
         inc = bus
+
+    downstream_a = _circuit_current_sum(panel)
+    raw_a = _row_amps(inc) if inc is not None else None
+    schedule_default_a = _dominant_default_amps(
+        [a for a in (_row_amps(r) for r in rows) if a and a > 0])
+    stale_default = (raw_a is not None and downstream_a > 0
+                      and schedule_default_a is not None
+                      and round(raw_a, 1) == schedule_default_a
+                      and raw_a < downstream_a * 0.5)
+
     if inc is not None:
-        panel.incoming = _incoming_descr(inc)
-        panel.incoming_a = _row_amps(inc)
+        panel.incoming = _incoming_descr(inc)          # cable/length/ΔU stay useful either way
+    if inc is None and downstream_a > 0:
+        panel.incoming_a = downstream_a                 # (a) no incoming row — use own circuits
+        if bus is None and not panel.busbar_a:
+            panel.busbar_a = downstream_a
+    elif stale_default:
+        panel.incoming_a = downstream_a                 # (b) stale wholesale default — use own
+    elif inc is not None:                                #     circuits' derived sum instead
+        panel.incoming_a = raw_a
+
+    # (c) the busbar RATING is a separate figure from the demand current — never a bare echo.
+    _set_busbar_rating(panel)
 
 
 def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict):
@@ -1793,6 +1846,10 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
     else:
         panel.incoming = mv_descr
 
+    # busbar RATING (the frame the board is built to) — split from the demand current, same
+    # as the MAIN board (see _set_busbar_rating).
+    _set_busbar_rating(panel)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # RECONCILIATION
@@ -1813,7 +1870,7 @@ def reconcile(panel: Panel) -> dict:
                            for c in panel.circuits if not c.coincident)
     # Σ-current keeps every INSTALLED circuit (standby included — the bus carries it on a fault)
     # but drops a DUPLICATE (the same equipment's current is already counted under its first name).
-    sum_a = sum(((c.design_a or 0) * c.ways) for c in panel.circuits if not c.duplicate)
+    sum_a = _circuit_current_sum(panel)
     # board demand current = the incoming feeder (single transformer/bus run carrying all)
     demand_a = panel.incoming_a or panel.busbar_a
     # demand kW from the board's own continuous rating (incoming current × V)
@@ -1881,7 +1938,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
              else "Sub-distribution board"),
             ("Supply source", p.supply or "—"),
             ("System", p.system or "—"),
-            ("Busbar rating", _fmt(p.busbar_a, " A", fmt="{:,.0f}")),
+            ("Busbar rating", _fmt(p.busbar_rating_a or p.busbar_a, " A", fmt="{:,.0f}")),
             ("Incoming feeder", p.incoming or "—"),
         ]
         if p.transformer:
@@ -2107,11 +2164,10 @@ def build_table_svg(archetype: str, panels: list[Panel], schedule: dict, state: 
             ("Type", "Main board" if p.kind == "main" else "Sub-distribution board"),
             ("Supply", _shorten(p.supply or "—", 56)),
             ("System", p.system or "—"),
-            # "Bus rating" (not "Busbar") — the board's BUS continuous current rating, a
-            # header field, NOT a load circuit. Naming it "Bus rating" keeps the standard
-            # engineering meaning while making clear (to reader + the deterministic drawing
-            # auditor) that it is the board's bus rating, not a feeder to a busbar.
-            ("Bus rating", _fmt(p.busbar_a, " A", fmt="{:,.0f}")),
+            # "Bus rating" (not "Busbar") — the board's BUS RATING (the breaker/busbar frame
+            # it's built to — see _set_busbar_rating), a header field, NOT a load circuit and
+            # NOT a bare echo of the demand current.
+            ("Bus rating", _fmt(p.busbar_rating_a or p.busbar_a, " A", fmt="{:,.0f}")),
             ("Incoming feeder", _shorten(p.incoming or "—", 56)),
         ]
         if p.transformer:

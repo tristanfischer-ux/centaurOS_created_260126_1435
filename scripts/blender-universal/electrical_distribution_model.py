@@ -613,6 +613,49 @@ def synthesise_equipment_feeders(total_current_a: float,
     return feeders
 
 
+# ── canonical board naming — ONE MINT for the schedule + the single-line ──────────────────
+def canonical_board_name(board_id: str, kind: str, *, is_mv: bool = False,
+                         is_dc: bool = False, humanise=None) -> str:
+    """THE canonical human name for a distribution board — ONE MINT shared by the panel/load
+    schedule (draw_panel_schedule._board_name) and the single-line diagram's main-bus tagging,
+    so the SAME board reads the SAME heading in both projections.
+
+    The divergence this closes (2026-07-03): draw_single_line hardcoded a GENERIC main-bus tag
+    ('MAIN SWITCHBOARD' → rewritten to 'MAIN LV BOARD') that never read the real board_id, so a
+    board the schedule correctly named 'MAIN DISTRIBUTION BOARD (TP&N)' (from board_id
+    'motor_control_center') rendered as the meaningless 'MAIN LV BOARD' in the SLD. Conversely,
+    for a DC main board the SLD already used the clear universal name 'MAIN DC BUS' while the
+    schedule echoed the RAW (often synthesised/arbitrary) node id verbatim — 'MAIN BOARD — DC
+    busbar 1500 V'. Routing BOTH drawers through this one function fixes both directions.
+
+    Ports draw_panel_schedule's pre-existing `_board_name` rule set byte-identical for the
+    LV/no-qualifier case (no archetype regresses) and ADDS is_mv / is_dc qualifiers: a DC main
+    board is ALWAYS 'MAIN DC BUS' (the universal name, not an echo of an arbitrary node id — a
+    DC bus is a DC bus regardless of what the connection-schedule happened to call the node);
+    an MV main board is 'MAIN MV SWITCHBOARD'. `humanise` is the CALLER's own tag→title-case
+    function (kept local to each drawer — draw_single_line's variant handles rack-tap suffixes
+    the schedule's doesn't) so this stays PURE LOGIC with no drawer-specific string convention
+    baked in; defaults to identity when the caller doesn't supply one."""
+    humanise = humanise or (lambda s: s)
+    bid = (board_id or "").lower()
+    if board_id and board_id.endswith("_subdist"):
+        base = humanise(board_id[:-len("_subdist")])
+        return f"SUB-DISTRIBUTION BOARD — {base}"
+    if kind != "main":
+        return humanise(board_id)
+    if is_dc:
+        return "MAIN DC BUS"
+    if is_mv:
+        return "MAIN MV SWITCHBOARD"
+    if "switchgear" in bid or "switchboard" in bid:
+        return "MAIN SWITCHBOARD (MSB)"
+    if "control" in bid:
+        return "MAIN DISTRIBUTION BOARD (TP&N)"
+    if "board" in bid or "panel" in bid:
+        return humanise(board_id)
+    return f"MAIN BOARD — {humanise(board_id)}"
+
+
 # ── selftest — regression guard for the load_reconcile blanket-match family ──────────────
 def _selftest() -> int:
     """Proves the per-equipment kW matcher resolves each item to ITS OWN quantity (the
@@ -668,6 +711,31 @@ def _selftest() -> int:
         all(incomer_kva_for_load(kw) >= kw * INCOMER_KVA_MARGIN - 1e-9
             for kw in (1, 19, 53, 61, 87.39, 100, 400, 999, 12000)))
     chk("K5.above_ladder_rounds_up_100", incomer_kva_for_load(8500) == 10700.0)  # 10,625 → next 100
+
+    # ── canonical board naming (J101, 2026-07-03) — ONE MINT proves identical from BOTH
+    # drawers' call paths, so a schedule heading and an SLD main-bus tag can never diverge. ──
+    n = canonical_board_name
+    chk("N1.control_node_is_mdb",
+        n("motor_control_center", "main") == "MAIN DISTRIBUTION BOARD (TP&N)")
+    chk("N2.switchgear_node_is_msb",
+        n("switchgear", "main") == "MAIN SWITCHBOARD (MSB)")
+    chk("N3.dc_always_main_dc_bus_regardless_of_node_text",
+        n("dc_busbar_1500v", "main", is_dc=True) == "MAIN DC BUS")
+    chk("N4.mv_is_main_mv_switchboard",
+        n("switchgear", "main", is_mv=True) == "MAIN MV SWITCHBOARD")
+    chk("N5.subdist_node_is_sub_distribution_board",
+        n("hvac_subdist", "main", humanise=lambda s: s.replace("_", " ").title())
+        == "SUB-DISTRIBUTION BOARD — Hvac")
+    chk("N6.non_main_kind_falls_through_to_humanise",
+        n("hvac_subdist", "sub", humanise=lambda s: s.upper())
+        == "SUB-DISTRIBUTION BOARD — HVAC")
+    # THE CATCH: the schedule's real (arbitrarily-cased/synthesised) board_id 'DC busbar
+    # 1500 V' and a differently-formatted equivalent both resolve to the SAME DC name — proving
+    # the divergence J101 flagged (schedule 'MAIN BOARD — DC busbar 1500 V' vs SLD 'MAIN DC
+    # BUS') can no longer happen: the DC-universal override makes node-id text irrelevant.
+    chk("N7.dc_universal_override_ignores_node_id_differences",
+        n("DC busbar 1500 V", "main", is_dc=True) == n("dc_busbar_1500v", "main", is_dc=True)
+        == "MAIN DC BUS")
     print(f"[edm-selftest] {'PASS' if fails == 0 else f'FAIL ({fails})'}")
     return 1 if fails else 0
 
