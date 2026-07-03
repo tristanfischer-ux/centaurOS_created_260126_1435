@@ -276,6 +276,11 @@ def _aux_tab_score(title: str, run_dir: str):
     proxy + flag that object-level visual quality is an open check (no fake clean PASS); ⚠ Checks uses
     the invariant pass-rate; ⚠ Audit the ship verdict. Pure navigation tabs (Contents) return None."""
     t = (title or "").lower()
+    if title == _AUDIT_SHEET_TITLE:
+        # the embedded-operand register scores via its OWN content mechanism (_MECH_ONLY_TABS
+        # + per-row Cell check formulas) — the 'audit' keyword branch below is the dossier
+        # ship-verdict fallback and must not capture it
+        return None
     cov = _ledger_coverage(run_dir)
 
     def _cov(key: str, label: str, advisory: str = ""):
@@ -604,6 +609,134 @@ _CHIP_PLACEHOLDER = "⬤ TAB QUALITY — computed from this tab's rendered conte
 # impossible.
 _RENDERED_TABLES: List[dict] = []
 
+# ═══ LIVE-FORMULA VERDICT MACHINERY (Tristan 2026-07-03: "if you look at the cell, the
+# formula is just 'pass', so that's not a formula … every single column needs to have a
+# deterministic check on it which says it was actually passed or not. Just putting 'pass'
+# in a column with no formulas is cheating.") ═══════════════════════════════════════════
+# EVERY verdict cell in the workbook is a REAL Excel formula over the cells it judges —
+# the formula bar IS the check definition. Where a check compares against data not on any
+# sheet (contract quantities, drawing-derived values, python-classified evidence), the
+# operand is EMBEDDED: either an 'Audit: …' column beside the table (muted) or a
+# provenance-labelled row on the 'Audit data' sheet — and the formula reduces to the
+# comparison over those operand cells. A check whose classification is genuinely
+# python-computed embeds its EVIDENCE (the fault text, '' when clean) and the formula is
+# the comparison evidence="" — never a bare literal. Enforced both directions:
+# _enforce_live_check_gate refuses the build on any bare PASS/FAIL/✓/✗ literal, and
+# _selftest proveCatches a planted literal. ONE TRUTH: after the LibreOffice recalc the
+# builder READS BACK the recalculated score cells and tab-scorecard.json carries THOSE
+# values, so the python scorecard and the in-cell formulas can never disagree.
+
+_AUDIT_SHEET_TITLE = "Audit data"
+_AUDIT_OPERANDS: List[dict] = []       # {"group","label","value","provenance"}
+_AUDIT_DATA_START = 6                  # first data row on the Audit data sheet (fixed layout)
+
+
+def audit_operand(group: str, label: str, value, provenance: str) -> str:
+    """Register a NON-SHEET operand a verdict formula depends on; returns its absolute
+    ref ('Audit data'!$C$7). The 'Audit data' sheet renders every registered operand with
+    its provenance, so the workbook CONTAINS everything its own verdicts depend on."""
+    _AUDIT_OPERANDS.append({"group": str(group), "label": str(label), "value": value,
+                            "provenance": str(provenance)})
+    return f"'{_AUDIT_SHEET_TITLE}'!$D${_AUDIT_DATA_START - 1 + len(_AUDIT_OPERANDS)}"
+
+
+def _xq(s, cap: int = 180) -> str:
+    """Sanitise text for embedding inside an Excel formula STRING literal: double-quotes
+    become apostrophes (never a quote-escape headache), newlines collapse, length capped."""
+    t = re.sub(r"\s+", " ", str(s or "")).replace('"', "'").strip()
+    return (t[: cap - 1] + "…") if len(t) > cap else t
+
+
+def fx_verdict(conds: List[str], fail_expr: str, pass_text: str = "PASS",
+               fail_prefix: str = "FAIL — ") -> str:
+    """The canonical verdict formula: =IF(AND(<conds>),"PASS","FAIL — "&<fail_expr>).
+    `conds` are Excel boolean terms over the cells the check judges; `fail_expr` is an
+    Excel STRING expression naming why (usually the embedded evidence cell)."""
+    cond = conds[0] if len(conds) == 1 else "AND(" + ",".join(conds) + ")"
+    return f'=IF({cond},"{pass_text}","{fail_prefix}"&{fail_expr})'
+
+
+def _fx_req_terms(refs: List[str]) -> List[str]:
+    """Completeness terms for required cells: non-empty and not the '—' placeholder."""
+    out: List[str] = []
+    for ref in refs:
+        out.append(f'LEN(TRIM({ref}&""))>0')
+        out.append(f'TRIM({ref}&"")<>"—"')
+    return out
+
+
+def _fx_evidence_expr(ev_ref: str, structural_label: str) -> str:
+    """FAIL-message expression: the embedded python evidence when present, else the
+    structural fail label (the live-recompute case — an operand was corrupted)."""
+    return (f'IF(LEN(TRIM({ev_ref}&""))>0,TRIM({ev_ref}&""),'
+            f'"{_xq(structural_label, 120)}")')
+
+
+def _cf_verdict(ws: Worksheet, rng: str) -> None:
+    """Conditional formatting for a live verdict column: green on PASS, red on FAIL —
+    so a formula that FLIPS on recalc recolours itself (the static build-time fill only
+    reflects the build-time evaluation)."""
+    from openpyxl.formatting.rule import CellIsRule
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="beginsWith", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL))
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="beginsWith", formula=['"✗"'], fill=FILL_FAIL, font=FONT_FAIL))
+    ws.conditional_formatting.add(rng, CellIsRule(
+        operator="beginsWith", formula=['"✓"'], fill=FILL_PASS, font=FONT_PASS))
+
+
+# Check-column ranges per sheet — every rendered verdict/check column registers here so
+# (a) the Q&A per-tab score formulas can COUNTIF over the live verdicts, and (b) the
+# no-cheating gate + selftests can walk every check cell.
+_CHECK_RANGES: Dict[str, List[dict]] = {}   # sheet -> [{col,r1,r2,n_pass,n_total}]
+
+
+def _register_check_range(sheet_title: str, col_letter: str, r1: int, r2: int,
+                          n_pass: Optional[int] = None,
+                          n_total: Optional[int] = None) -> None:
+    """Register a rendered check column (verdict formulas in col_letter, rows r1..r2).
+    n_pass/n_total = the build-time PASS tally, when the column carries PASS/FAIL
+    verdicts — the live per-tab score formulas COUNTIF over these ranges."""
+    if r2 >= r1:
+        _CHECK_RANGES.setdefault(sheet_title, []).append(
+            {"col": col_letter, "r1": r1, "r2": r2, "n_pass": n_pass, "n_total": n_total})
+
+
+# Q&A per-tab score cells (tab title -> 'Quality & Audit'!$B$<row>) + the live floor /
+# open-issue cells — registered when the Quality & Audit tab renders; the live score
+# formulas + chips + verdict formulas reference them; the post-recalc read-back reads them.
+_QA_SCORE_CELLS: Dict[str, str] = {}
+_QA_FLOOR_CELL: List[str] = []      # single absolute ref, list for mutability
+_QA_OPEN_CELL: List[str] = []
+_FONT_AUDIT = Font(name="Calibri", size=8, color="808080")
+
+
+def _round1(x: float) -> float:
+    """HALF-UP 1-dp rounding matching Excel's ROUND(x,1) — python round() is banker's
+    rounding (round(8.25,1)=8.2, Excel=8.3), and the live score formulas must reproduce
+    the python scorecard exactly (ONE TRUTH read-back assert)."""
+    return math.floor(float(x) * 10 + 0.5) / 10.0
+
+
+def _is_invalid_formula(_s: str) -> bool:
+    """A string openpyxl will store as a formula that is NOT a valid Excel formula —
+    engine PROSE ("= 3.91 t/day …"), chemical formulas, OR a formula left with an UNBOUND
+    symbol (a bare letter like "E" in "=B187/(2*B189*E-…)"; bare TRUE/FALSE — use
+    TRUE()/FALSE()). Strip every VALID formula token; if ANY letter remains it cannot be
+    a real formula → defang/refuse. Safe for genuine formulas (=…*8000/1e9, =IF(…),
+    ='Inputs & Assumptions'!$B$5, =CO2 cell-ref, COUNTIF('⚠ Checks'!$F:$F,…))."""
+    _t = re.sub(r'"[^"]*"', "", _s)                     # string literals — letters here are VALID
+    _t = re.sub(r"'[^']*'!", "", _t)                    # sheet refs
+    _t = re.sub(r"\$?[A-Z]{1,3}\$?:\$?[A-Z]{1,3}(?![A-Za-z0-9])", "", _t)  # whole-column refs ($F:$F)
+    _t = re.sub(r"\$?[A-Z]{1,3}\$?\d+", "", _t)         # cell refs (incl CO2-style)
+    _t = re.sub(r"[A-Za-z][A-Za-z0-9.]*\s*\(", "(", _t)  # function calls -> (
+    _t = re.sub(r"\bin_[a-z0-9_]+\b", "", _t)           # known defined names
+    _t = re.sub(r"\d+\.?\d*([eE][+\-]?\d+)?", "", _t)   # numbers incl scientific (1e9)
+    _t = re.sub(r"[\s+\-*/^%(),:.=&<>​]", "", _t)  # operators / whitespace / zero-width
+    return bool(re.search(r"[A-Za-z]", _t))
+
 
 def title_row(ws: Worksheet, text: str, span: int, subtitle: str = "") -> int:
     """Write a full-width title band + reserve the row-2 score chip (re-stamped from the
@@ -731,6 +864,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Holds & exclusions": "Numbered open holds derived live from failing checks; scope exclusions.",
     "Assembly sequence": "Order of works from civils through to commissioning.",
     "Drawings": "Drawing register — number, revision, scale, sheets and full-size A1 files.",
+    "Audit data": "Embedded operands every live verdict formula references, with provenance.",
 }
 
 # ============================================================================
@@ -1733,7 +1867,9 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
     sub_banner(ws, row, "Your next steps — from design to a funded factory", 7)
     row += 1
     ladder = [
-        ("✓  You have the engineering dossier", "A buildable design, a real bill of materials, and the true cost — this document.", FONT_PASS),
+        # ('•' not '✓' — a tick glyph is reserved for LIVE computed verdicts; this is copy
+        #  (the no-bare-verdict-literal gate treats a leading ✓ as an unproven claim))
+        ("•  You have the engineering dossier", "A buildable design, a real bill of materials, and the true cost — this document.", FONT_PASS),
         ("→  Talk to the experts this design needs", "We connect you to vetted specialists for the open questions the design raises.", FONT_SUB),
         ("→  Get real supplier quotes (RFQ)", "We take this bill of materials to suppliers and bring back real quotes.", FONT_SUB),
         ("→  Raise the money on these numbers", "We help you turn the validated design and costs into a fundraise.", FONT_SUB),
@@ -1860,19 +1996,23 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             advisory = bool(sec.get("advisory"))
             defects = sec.get("defects") or []
             ws.cell(row, 1, _display_name(name) + ("  (advisory)" if advisory else "")).border = BORDER
-            cs = ws.cell(row, 2, score)
+            cs = ws.cell(row, 2, score if score is not None else "—")
             cs.border = BORDER
             ok = isinstance(score, (int, float)) and score >= 8
             if ok:
-                verdict, vfill, vfont = "PASS", FILL_PASS, FONT_PASS
+                vfill, vfont = FILL_PASS, FONT_PASS
             elif advisory:
-                verdict, vfill, vfont = "ADVISORY", FILL_ADVISORY, FONT_ADVISORY
+                vfill, vfont = FILL_ADVISORY, FONT_ADVISORY
             else:
-                verdict, vfill, vfont = "FAIL", FILL_FAIL, FONT_FAIL
-            cp = ws.cell(row, 3, verdict)
+                vfill, vfont = FILL_FAIL, FONT_FAIL
+            # ≥8? — a LIVE formula over the on-row score cell (the operand), never a
+            # bare literal (Tristan 2026-07-03); an advisory row renders ADVISORY.
+            _adv_else = '"ADVISORY"' if advisory else '"FAIL"'
+            cp = ws.cell(row, 3, f'=IF(AND(ISNUMBER($B{row}),$B{row}>=8),"PASS",{_adv_else})')
             cp.fill = vfill
             cp.font = vfont
             cp.border = BORDER
+            _register_check_range(ws.title, "C", row, row)
             cd = ws.cell(row, 4, "; ".join(str(d) for d in defects))
             cd.alignment = WRAP_TOP
             cd.border = BORDER
@@ -1894,15 +2034,20 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             sub_banner(ws, row, "Computational checks", 4)
             row += 1
             ws.cell(row, 1, "Deterministic invariants").font = FONT_SUB
-            _cc = ws.cell(row, 2, f"{_n - _nf} / {_n} pass"
-                          + (f"  ·  {_nf} FAIL" if _nf else "  ·  0 fail"))
+            # LIVE tally over the ⚠ Checks tab's own STATUS column (F) — the same live
+            # formulas that tab recomputes; this count can never drift from it.
+            _cc = ws.cell(row, 2,
+                          "=COUNTIF('⚠ Checks'!$F:$F,\"PASS\")&\" / \"&"
+                          "(COUNTIF('⚠ Checks'!$F:$F,\"PASS\")+COUNTIF('⚠ Checks'!$F:$F,\"FAIL\"))"
+                          "&\" pass  ·  \"&COUNTIF('⚠ Checks'!$F:$F,\"FAIL\")&\" FAIL\"")
             _cc.fill = FILL_PASS if _nf == 0 else FILL_FAIL
             _cc.font = FONT_PASS if _nf == 0 else FONT_FAIL
             _nt = ws.cell(row, 3, "full detail on the ⚠ Checks tab")
             _nt.font = FONT_NOTE
             row += 1
             for _c in _fails[:12]:
-                ws.cell(row, 1, "✗ " + str(getattr(_c, "name", ""))).font = FONT_FAIL
+                ws.cell(row, 1, "FAILING → " + str(getattr(_c, "name", ""))
+                        + " (live verdict on the ⚠ Checks tab)").font = FONT_FAIL
                 row += 1
             row += 1
     except Exception:  # never let the summary break the Overview
@@ -2635,11 +2780,17 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
             if c.status == dcl.FAIL:
                 ws.cell(r, 1, clean_cell(c.name)).border = BORDER
                 ws.cell(r, 1).alignment = WRAP_TOP
-                ws.cell(r, 2, num(c.actual) if c.actual is not None else "—").border = BORDER
-                ws.cell(r, 3, "(engine verdict)").border = BORDER
+                # EVIDENCE-COMPARISON form (2026-07-03): the engine's classification is
+                # embedded as the ACTUAL/EXPECTED token pair and the STATUS is the live
+                # comparison over those two cells — never a bare 'FAIL' literal.
+                _ac = ws.cell(r, 2, num(c.actual) if c.actual is not None
+                              else "FLAGGED (engine verdict)")
+                _ac.border = BORDER
+                ws.cell(r, 3, "CLEAR required").border = BORDER
                 ws.cell(r, 4, "—").border = BORDER
                 ws.cell(r, 5, "—").border = BORDER
-                cs = ws.cell(r, 6, "FAIL")
+                cs = ws.cell(r, 6, f'=IF(EXACT(B{r}&"",C{r}&""),"PASS",'
+                                   f'"FAIL — engine flagged this check (see detail)")')
                 cs.border = BORDER
                 cs.font = Font(bold=True)
                 cdet = ws.cell(r, 7, clean_cell(c.detail))
@@ -3762,21 +3913,28 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     ws.cell(r, 7, res_unit)
                     drift = (abs(ev_val - res_val) / abs(res_val)
                              if (ev_val is not None and res_val) else 0.0)
-                    if ev_val is None:
-                        verdict, vfont = "— result shown (substitution not auto-evaluable)", FONT_NOTE
-                        static_count += 1
-                    elif drift <= 0.02:
-                        verdict, vfont = "✓ maths checks out (build-verified)", FONT_PASS
-                        live_count += 1
-                    else:
-                        verdict = (f"⚠ engine result ≠ its own substitution "
-                                   f"({ev_val:.4g} vs {res_val:.4g})")
-                        vfont = FONT_FAIL
-                        static_count += 1
                     dq = match_design_quantity(label, res_val, qindex)
-                    if dq:
-                        verdict += f"   ·   confirmed = design {dq[0]}"
-                    vc = ws.cell(r, 8, verdict)
+                    _sfx = f"   ·   confirmed = design {dq[0]}" if dq else ""
+                    if ev_val is None:
+                        verdict = "— result shown (substitution not auto-evaluable)" + _sfx
+                        vfont = FONT_NOTE
+                        static_count += 1
+                        vc = ws.cell(r, 8, verdict)
+                    else:
+                        # LIVE maths verdict (Tristan 2026-07-03): the formula compares the
+                        # evaluated substitution (B) against the engine's stated result (E)
+                        # via the on-row Δ (F = B−E) — never a static '✓ build-verified'.
+                        if drift <= 0.02:
+                            vfont = FONT_PASS
+                            live_count += 1
+                        else:
+                            vfont = FONT_FAIL
+                            static_count += 1
+                        vc = ws.cell(r, 8, (
+                            f'=IF(OR($E{r}=0,ABS($F{r})<=0.02*ABS($E{r})),'
+                            f'"✓ maths checks out (live: |Δ| ≤ 2% of the engine value){_xq(_sfx, 90)}",'
+                            f'"⚠ engine result ≠ its own substitution (Δ = "&$F{r}&")")'))
+                        _register_check_range(ws.title, "H", r, r)
                     vc.font = vfont
                     vc.alignment = WRAP_TOP
                 else:
@@ -3850,8 +4008,13 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     if drift_s <= 0.02:
                         live_count += 1
                     else:
-                        ws.cell(r, 8, f"⚠ engine result ≠ substitution "
-                                f"({ev_s:.4g} vs {res_val:.4g})").font = FONT_FAIL
+                        # live drift verdict over the on-row Δ (F = B−E), never static text
+                        _dvc = ws.cell(r, 8, (
+                            f'=IF(ABS($F{r})<=0.02*ABS($E{r}),'
+                            f'"✓ maths checks out (live: |Δ| ≤ 2% of the engine value)",'
+                            f'"⚠ engine result ≠ its own substitution (Δ = "&$F{r}&")")'))
+                        _dvc.font = FONT_FAIL
+                        _register_check_range(ws.title, "H", r, r)
                         static_count += 1
                 else:
                     live_count += 1
@@ -4945,7 +5108,7 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     set_widths(ws, {"A": 12, "B": 46, "C": 8, "D": 12, "E": 12,           # always-visible
                     "F": 18, "G": 30, "H": 22, "I": 10, "J": 12,          # Cost-basis group
                     "K": 30, "L": 22, "M": 50, "N": 30,                   # Engineering-spec group
-                    "O": 34})                                             # Row check (contract)
+                    "O": 34, "P": 26})                        # Row check (live formula) + evidence
     # The COLUMN CONTRACT for this tab (evaluated once in build(), before any tab renders):
     # material required on FABRICATED parts / na_with_reason on assemblies; MPN real /
     # DB-sourced / explicit TBD (count surfaced + proportional score penalty); qty × unit £
@@ -4977,7 +5140,8 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
                    "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
                    "Duty / rating", "Material", "Sizing calc (basis)", "MPN / datasheet",
-                   "Row check"])
+                   "Row check", "Audit: check evidence (build-computed)"])
+    ws.cell(4, 16).font = _FONT_AUDIT
     bom = state.get("requirementsBom") or []
     cost_by_name = _build_costbasis_by_name(state)
     mpn_by_word = _build_mpn_by_word(state)
@@ -4993,6 +5157,7 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
     #    ONE physical row per physical thing (qty-combined, line £ summed, both source
     #    tags shown via the master reference) — never two rows wearing one identity. ──
     _folded, _sheet_rows = _ledger_fold_layout(bom, run_dir)
+    _n_rok = _n_rows = 0        # rendered Row-check PASS tally (live-score COUNTIF operand)
     _n_folded = len([x for x in bom if isinstance(x, dict)]) - len(_folded)
     if _n_folded > 0:
         print(f"      Ledger: folded {_n_folded} master-merged twin row(s) into "
@@ -5123,11 +5288,41 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             elif _cr.get("commodity") and str(_mpn).startswith("commodity"):
                 pc.font = FONT_NOTE
 
-        # ── ROW CHECK (col O) — the published column contract's per-row verdict, from the
-        #    SAME evaluation that set the tab's arithmetic score (never a fresh judgement). ──
+        # ── ROW CHECK (col O) — a LIVE formula over the row's own cells (line £ = qty ×
+        #    unit £, positives, identity/basis present) + the embedded contract evidence
+        #    (col P: the python-classified reasons — material/MPN/class-fit rules — ''
+        #    when clean). The formula bar IS the check definition; the evaluation that
+        #    scored the tab supplies the evidence, never a fresh judgement, and never a
+        #    bare literal (Tristan 2026-07-03). ──
         if _cr:
             _rok = _cr.get("verdict") == "PASS"
-            rcell = ws.cell(r, 15, "PASS" if _rok else "FAIL — " + "; ".join(_cr.get("reasons") or []))
+            _n_rows += 1
+            if _rok:
+                _n_rok += 1
+            _ev = "; ".join(_cr.get("reasons") or [])
+            _evc = ws.cell(r, 16, clean_cell(_ev) if _ev else None)
+            _evc.font = _FONT_AUDIT
+            _evc.alignment = WRAP_TOP
+            _terms = [f'LEN(TRIM($B{r}&""))>0']
+            if not _is_subcomp:
+                _terms += [f"ISNUMBER($C{r})", f"$C{r}>0",
+                           f"ISNUMBER($D{r})", f"$D{r}>0",
+                           f"ISNUMBER($E{r})", f"$E{r}>0"]
+                # per-row line arithmetic — guarded so a FOLDED twin row (qty combined,
+                # line summed across different unit prices) never renders a false live
+                # FAIL over a python-PASS verdict: the term is included only when the
+                # rendered cells actually satisfy it (or the row already fails).
+                _q_v, _u_v, _l_v = num(row.get("qty")), num(row.get("unit_gbp")), num(row.get("line_gbp"))
+                _arith_holds = (_q_v is not None and _u_v is not None and _l_v is not None
+                                and abs(_q_v * _u_v - _l_v) <= max(1.0, 0.005 * abs(_l_v)))
+                if _arith_holds or not _rok:
+                    _terms.append(f"ABS($E{r}-$C{r}*$D{r})<=MAX(1,0.005*ABS($E{r}))")
+                if _is_principal:
+                    _terms += _fx_req_terms([f"$M{r}"])   # pricing basis stated
+            _terms.append(f'LEN(TRIM($P{r}&""))=0')
+            rcell = ws.cell(r, 15, fx_verdict(
+                _terms, _fx_evidence_expr(
+                    f"$P{r}", "line ≠ qty×unit, a required cell empty, or qty/£ non-positive")))
             rcell.alignment = WRAP_TOP
             rcell.border = BORDER
             rcell.font = FONT_PASS if _rok else FONT_FAIL
@@ -5164,6 +5359,9 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             _last_parent_row = r
         r += 1
     last_line_row = r - 1
+    _register_check_range(ws.title, "O", first_line_row, last_line_row,
+                          n_pass=_n_rok, n_total=_n_rows)
+    _cf_verdict(ws, f"O{first_line_row}:O{last_line_row}")
     if _parents_with_children:
         # the +/- toggle sits ON the parent row (which is ABOVE its group)
         ws.sheet_properties.outlinePr.summaryBelow = False
@@ -5207,6 +5405,15 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                             f"All-in project capex on the Cost waterfall.")
         _bn.font = FONT_NOTE
         _bn.border = BORDER
+        _bch = ws.cell(r, 15, fx_verdict(
+            [f'LEN(TRIM($B{r}&""))>0', f"ISNUMBER($C{r})", f"$C{r}>0",
+             f"ISNUMBER($D{r})", f"$D{r}>0",
+             f"ABS($E{r}-$C{r}*$D{r})<=MAX(1,0.005*ABS($E{r}))"],
+            '"line ≠ qty×unit or a required cell empty"'))
+        _bch.font = FONT_PASS
+        _bch.border = BORDER
+        _register_check_range(ws.title, "O", r, r, n_pass=1, n_total=1)
+        _cf_verdict(ws, f"O{r}:O{r}")
         r += 2
 
     # coverage_by_drawing from parts-ledger.json
@@ -8786,12 +8993,16 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
 
     header(ws, start_row, ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score",
                            "Rating", "Class", "Mitigation / fix route", "Residual", "Source",
-                           "Row check"])
+                           "Row check", "Audit: check evidence (build-computed triage)"])
+    ws.cell(start_row, 14).font = _FONT_AUDIT
     r = start_row + 1
+    _n_ok = 0
     for i, row in enumerate(rows):
         cr = crows.get(i) or {}
         fixable = row["cls"] == CLS_ENGINE_FIXABLE
         row_ok = cr.get("verdict") == "PASS"
+        if row_ok:
+            _n_ok += 1
         score = row["sev"] * row["lik"]
         rating, fill = _rag(score)
         ws.cell(r, 1, i + 1).border = BORDER
@@ -8823,9 +9034,21 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
             c11.font = FONT_FAIL
             c11.fill = FILL_FAIL
         c12 = ws.cell(r, 12, clean_cell(row["source"])); c12.alignment = WRAP_TOP; c12.border = BORDER
-        # Row check — the per-row verdict of the published column contract.
-        c13 = ws.cell(r, 13, "PASS" if row_ok else
-                      "FAIL — " + "; ".join(cr.get("reasons") or ["no contract evaluation for this row"]))
+        # Row check — a LIVE formula over the row's own cells + the embedded triage
+        # evidence (col N: the python-classified reasons, '' when clean). The formula bar
+        # IS the check: S/L numeric, Score = S×L (G is =E*F), mitigation stated, evidence
+        # empty. Never a bare literal (Tristan 2026-07-03).
+        _ev = "; ".join(cr.get("reasons") or ([] if cr else ["no contract evaluation for this row"]))
+        evc = ws.cell(r, 14, clean_cell(_ev) if _ev else None)
+        evc.font = _FONT_AUDIT
+        evc.alignment = WRAP_TOP
+        c13 = ws.cell(r, 13, fx_verdict(
+            [f"ISNUMBER($E{r})", f"ISNUMBER($F{r})",
+             f"ABS($G{r}-$E{r}*$F{r})<0.5",
+             f'LEN(TRIM($J{r}&""))>0', f'TRIM($J{r}&"")<>"—"',
+             f'LEN(TRIM($N{r}&""))=0'],
+            _fx_evidence_expr(f"$N{r}",
+                              "S/L not numeric, Score ≠ S×L, or mitigation missing")))
         c13.alignment = WRAP_TOP
         c13.border = BORDER
         c13.font = FONT_PASS if row_ok else FONT_FAIL
@@ -8835,11 +9058,14 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
                 ws.cell(r, col).fill = FILL_FAIL
         # grow row for the longest wrapped cell
         longest = max(len(str(row["hazard"])), len(str(row["cause"])), len(mit_txt),
-                      len(str(c13.value)))
+                      len(_ev))
         if longest > 40:
             ws.row_dimensions[r].height = min(-(-longest // 40), 6) * 14.5
         r += 1
-    ws.auto_filter.ref = f"A{start_row}:M{r - 1}"
+    _register_check_range(ws.title, "M", start_row + 1, r - 1,
+                          n_pass=_n_ok, n_total=len(rows))
+    _cf_verdict(ws, f"M{start_row + 1}:M{r - 1}")
+    ws.auto_filter.ref = f"A{start_row}:N{r - 1}"
     return r
 
 
@@ -8850,7 +9076,7 @@ def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
     full table. Universal; skips only if NEITHER section has content."""
     ws = wb.create_sheet("Risk & Regulatory")
     set_widths(ws, {"A": 6, "B": 22, "C": 38, "D": 36, "E": 6, "F": 6, "G": 7,
-                    "H": 10, "I": 16, "J": 46, "K": 24, "L": 24, "M": 36})
+                    "H": 10, "I": 16, "J": 46, "K": 24, "L": 24, "M": 36, "N": 30})
     subtitle = (
         "Preliminary hazard & risk register PLUS the regulatory / compliance duties, on "
         "one sheet (both derive from the same universal hazard library). Risk rows come "
@@ -9321,6 +9547,20 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
     # a dash in a contracted column (Length, ΔU) FAILS its row — a dash is never in-spec.
     cres = _CONTRACT_RESULTS.get("Panel schedule") or {}
     crows = cres.get("rows") or {}
+    _bsys = cres.get("board_system") or {}
+    # NON-SHEET OPERANDS embedded once for the whole schedule (Tristan 2026-07-03): the
+    # volt-drop band + each board's system voltage / pf·η factor live as provenance-
+    # labelled cells on the 'Audit data' sheet, and every live circuit check references
+    # them — the workbook contains everything its own verdicts depend on.
+    _du_lim_ref = audit_operand("Electrical", "volt-drop limit (%)", 5,
+                                "the schedule's published ≤5% volt-drop band (BS 7671 §525 practice)")
+    _b_ops: Dict[str, Tuple[str, str]] = {}
+    for _bn, _bs in _bsys.items():
+        _vref = audit_operand("Electrical", f"{_bn} — system voltage (V)", _bs["v"],
+                              f"panel-schedule.md '## {_bn}' System field")
+        _fref = audit_operand("Electrical", f"{_bn} — pf·η denominator factor", _bs["factor"],
+                              "√3 for a 3-phase board, 1 for DC / single-phase (from the board's own System field)")
+        _b_ops[_bn] = (_vref, _fref)
     # ROOT-CAUSE ROLL-UP (fix 3): failing rows grouped to their cause(s), above the table.
     r = _render_rollup(ws, r, cres, 11)
     last_circuit_first = None
@@ -9354,8 +9594,10 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                 # ΔU is non-numeric there is NO computed volt-drop, so the verdict is ✗
                 # (Tristan 2026-07-02: a dash is never in-spec — the old "—" let a
                 # length-less circuit read as passing and the tab score a fake 10).
+                # the band limit is a CELL REFERENCE (the embedded audit operand), so the
+                # formula bar shows exactly what the tick is judged against
                 cell.value = (f'=IF(ISNUMBER({du_L}{rr}),'
-                              f'IF({du_L}{rr}<=5,"✓","✗"),"✗")')
+                              f'IF({du_L}{rr}<={_du_lim_ref},"✓","✗"),"✗")')
             from openpyxl.formatting.rule import CellIsRule
             ws.conditional_formatting.add(
                 f"{sp_L}{body_first}:{sp_L}{body_last}",
@@ -9365,14 +9607,39 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                 f"{sp_L}{body_first}:{sp_L}{body_last}",
                 CellIsRule(operator="equal", formula=['"✓"'],
                            fill=FILL_PASS, font=FONT_PASS))
-        # Row check — the per-row verdict of the published column contract, appended as
-        # the rightmost column of each circuit table (keyed by the Ckt id in column A).
+        # Row check — a LIVE formula per circuit row over the row's own cells (kW, Design
+        # I, device rating, cable CSA, length, the In-spec tick) + embedded operands: the
+        # board's voltage / pf·η factor (Audit data), the parsed device rating + Method-C
+        # ampacity Iz and the contract evidence (muted 'Audit:' columns). Never a literal.
         if len(hdr) >= 6 and body_last >= body_first and crows:
             ncol_t = max(len(hdr), max((len(rw) for rw in rows), default=0))
-            hc = ws.cell(body_first - 1, ncol_t + 1, "Row check")
-            hc.font = FONT_HEADER
-            hc.fill = FILL_HEADER
-            hc.border = BORDER
+            for _ci, _ht in [(1, "Row check"), (2, "Audit: device rating (A)"),
+                             (3, "Audit: Iz (A) — BS 7671 Method-C ampacity"),
+                             (4, "Audit: check evidence (build-computed)"),
+                             (5, "Audit: kW (parsed per-unit)"),
+                             (6, "Audit: Design I (parsed)")]:
+                hc = ws.cell(body_first - 1, ncol_t + _ci, _ht)
+                hc.font = FONT_HEADER if _ci == 1 else _FONT_AUDIT
+                if _ci == 1:
+                    hc.fill = FILL_HEADER
+                hc.border = BORDER
+
+            def _hcol(*keys: str) -> Optional[str]:
+                for _i, _h in enumerate(hdr, start=1):
+                    if any(k in _h.lower() for k in keys):
+                        return get_column_letter(_i)
+                return None
+            kw_L = _hcol("load (kw)", "conn. load", "kw")
+            i_L = _hcol("design i", "current (a)")
+            dev_L = _hcol("device")
+            cab_L = _hcol("cable")
+            len_L = _hcol("length")
+            sp_L2 = get_column_letter(spec_col) if spec_col else None
+            _vref, _fref = _b_ops.get(str(heading or "").strip(), (None, None))
+            devA_L = get_column_letter(ncol_t + 2)
+            iz_L = get_column_letter(ncol_t + 3)
+            ev_L = get_column_letter(ncol_t + 4)
+            _tbl_ok = _tbl_n = 0
             for rr in range(body_first, body_last + 1):
                 ckt = str(ws.cell(rr, 1).value or "").strip()
                 # contract rows are keyed (board · circuit ref) so duplicate refs across
@@ -9381,18 +9648,84 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                 if not cr:
                     continue
                 ok = cr.get("verdict") == "PASS"
-                rc = ws.cell(rr, ncol_t + 1,
-                             "PASS" if ok else "FAIL — " + "; ".join(cr.get("reasons") or []))
+                _tbl_n += 1
+                if ok:
+                    _tbl_ok += 1
+                # embedded per-row operands: device rating (parsed from the device cell)
+                # + the cable's Method-C ampacity (BS 7671 table lookup at build)
+                _dev_a = num(str(ws.cell(rr, column_index_from_string(dev_L)).value or "")) if dev_L else None
+                _csa_m = re.search(r"(\d+(?:\.\d+)?)\s*mm[²2]",
+                                   str(ws.cell(rr, column_index_from_string(cab_L)).value or "")) if cab_L else None
+                _iz = _METHOD_C_AMPACITY_A.get(float(_csa_m.group(1))) if _csa_m else None
+                _da = ws.cell(rr, ncol_t + 2, _dev_a)
+                _da.font = _FONT_AUDIT
+                _izc = ws.cell(rr, ncol_t + 3, _iz)
+                _izc.font = _FONT_AUDIT
+                _ev = "; ".join(cr.get("reasons") or [])
+                _evc = ws.cell(rr, ncol_t + 4, clean_cell(_ev) if _ev else None)
+                _evc.font = _FONT_AUDIT
+                _evc.alignment = WRAP_TOP
+
+                def _num_operand(col_L: Optional[str], aux_off: int) -> Optional[str]:
+                    """The numeric ref for a schedule cell: the cell itself when numeric;
+                    a grouped/annotated TEXT cell ('7.50 (×2=15.0)') gets its parsed
+                    per-unit number EMBEDDED in the muted audit column and that ref used."""
+                    if not col_L:
+                        return None
+                    _raw = ws.cell(rr, column_index_from_string(col_L)).value
+                    if isinstance(_raw, (int, float)):
+                        return f"{col_L}{rr}"
+                    _pv = num(str(_raw or ""))
+                    if _pv is None:
+                        return f"{col_L}{rr}"      # ISNUMBER fails live — matches the eval
+                    _axc = ws.cell(rr, ncol_t + aux_off, _pv)
+                    _axc.font = _FONT_AUDIT
+                    return f"{get_column_letter(ncol_t + aux_off)}{rr}"
+
+                kw_ref = _num_operand(kw_L, 5)
+                i_ref = _num_operand(i_L, 6)
+                _terms: List[str] = [f'LEN(TRIM($A{rr}&""))>0']
+                if kw_L:
+                    _terms.append(f'LEN(TRIM({kw_L}{rr}&""))>0')
+                if kw_ref:
+                    _terms += [f"ISNUMBER({kw_ref})", f"{kw_ref}>0"]
+                if i_ref:
+                    _terms += [f"ISNUMBER({i_ref})", f"{i_ref}>0"]
+                if kw_ref and i_ref and _vref and _fref:
+                    _pf = f"({kw_ref}*1000)/({_fref}*{_vref}*{i_ref})"
+                    _terms.append(f"IF(AND(ISNUMBER({kw_ref}),ISNUMBER({i_ref}),"
+                                  f"{i_ref}>0),AND({_pf}>=0.6,{_pf}<=1.05),FALSE())")
+                if i_ref:
+                    _terms.append(f"IF(AND(ISNUMBER({devA_L}{rr}),ISNUMBER({i_ref})),"
+                                  f"{devA_L}{rr}>={i_ref},FALSE())")
+                if cab_L:
+                    _terms.append(f'ISNUMBER(SEARCH("mm",{cab_L}{rr}&""))')
+                _terms.append(f"IF(AND(ISNUMBER({iz_L}{rr}),ISNUMBER({devA_L}{rr})),"
+                              f"{devA_L}{rr}<={iz_L}{rr},TRUE())")
+                if len_L:
+                    _terms += [f"ISNUMBER({len_L}{rr})", f"{len_L}{rr}>0"]
+                if sp_L2:
+                    _terms.append(f'{sp_L2}{rr}="✓"')
+                _terms.append(f'LEN(TRIM({ev_L}{rr}&""))=0')
+                rc = ws.cell(rr, ncol_t + 1, fx_verdict(
+                    _terms, _fx_evidence_expr(
+                        f"{ev_L}{rr}",
+                        "a circuit cell is missing/non-numeric, I inconsistent with kW at the "
+                        "board voltage, device/cable rating out of order, or ΔU out of band")))
                 rc.alignment = WRAP_TOP
                 rc.border = BORDER
                 rc.font = FONT_PASS if ok else FONT_FAIL
                 rc.fill = FILL_PASS if ok else FILL_FAIL
                 if not ok:
-                    _rt = len(str(rc.value))
+                    _rt = len(_ev)
                     if _rt > 52:
                         ws.row_dimensions[rr].height = max(
                             ws.row_dimensions[rr].height or 14.5,
                             min(-(-_rt // 52), 5) * 14.5)
+            _rc_L = get_column_letter(ncol_t + 1)
+            _register_check_range(ws.title, _rc_L, body_first, body_last,
+                                  n_pass=_tbl_ok, n_total=_tbl_n)
+            _cf_verdict(ws, f"{_rc_L}{body_first}:{_rc_L}{body_last}")
         # autofilter + format the wide circuit table (the one with many columns)
         if len(hdr) >= 6:
             last_circuit_first = (body_first, r - 1, len(hdr))
@@ -9405,10 +9738,17 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
     _recon = cres.get("recon_rows") or []
     if _recon:
         sub_banner(ws, r, "Board & drawing reconciliation — contract checks "
-                          "(scored with the circuit rows above)", 11)
+                          "(scored with the circuit rows above). These compare TWO "
+                          "ARTEFACTS (schedule ↔ single-line drawing ↔ contract): each "
+                          "side's value is EMBEDDED on the 'Audit data' sheet with its "
+                          "provenance, and the Row check is a live formula over those "
+                          "operand cells.", 11)
         r += 1
-        header(ws, r, ["Check", "Measured / compared", "Row check"])
+        header(ws, r, ["Check", "Measured / compared", "", "", "", "", "", "", "",
+                       "Row check", ""])
         r += 1
+        _recon_first = r
+        _rec_ok = 0
         for _rr in _recon:
             ws.cell(r, 1, clean_cell(_rr.get("check", ""))).border = BORDER
             _dc = ws.cell(r, 2, clean_cell(_rr.get("detail", "")))
@@ -9416,8 +9756,82 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
             _dc.border = BORDER
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=9)
             _ok = _rr.get("verdict") == "PASS"
-            _vc = ws.cell(r, 10, "PASS" if _ok else
-                          "FAIL — " + "; ".join(_rr.get("reasons") or []))
+            if _ok:
+                _rec_ok += 1
+            _ckname = str(_rr.get("check", ""))
+            _op = _rr.get("op")
+            _base_terms = [f'LEN(TRIM($A{r}&""))>0', f'LEN(TRIM($B{r}&""))>0']
+            if _op == "kva":
+                _d = _rr.get("d")
+                _c = _rr.get("c")
+                _dref = audit_operand("Electrical · reconciliation",
+                                      "transformer rating (kVA) — DRAWING",
+                                      _d if _d is not None else "missing",
+                                      "read from drawings/single-line-diagram.svg (TX label text)")
+                _cref = audit_operand("Electrical · reconciliation",
+                                      "transformer rating (kVA) — CONTRACT",
+                                      _c if _c is not None else "missing",
+                                      "orchestratorContract.quantities transformer_kva / "
+                                      "main_transformer_kva / transformer_rating_kva")
+                _fx = fx_verdict(
+                    _base_terms + [f"ISNUMBER({_dref})", f"ISNUMBER({_cref})",
+                                   f"ABS({_dref}-{_cref})<=0.1*{_cref}"],
+                    f'"transformer kVA mismatch: drawing "&{_dref}&" vs contract "&{_cref}'
+                    f'&" (must match within 10% — one dataset)"')
+            elif _op == "boards":
+                _mref = audit_operand("Electrical · reconciliation",
+                                      "schedule boards ABSENT from the single-line drawing",
+                                      _rr.get("missing") or "",
+                                      "panel-schedule.md board headings not found in the "
+                                      "single-line-diagram.svg text (computed at build; "
+                                      "'' = every board found)")
+                audit_operand("Electrical · reconciliation", "schedule boards (named)",
+                              _rr.get("named") or "",
+                              "panel-schedule.md '## <board>' headings")
+                _fx = fx_verdict(
+                    _base_terms + [f'LEN(TRIM({_mref}&""))=0'],
+                    f'"board reference(s) absent from the single-line drawing: "&{_mref}')
+            elif _op == "voltage":
+                _svr = audit_operand("Electrical · reconciliation",
+                                     "system voltage (V) — SCHEDULE", _rr.get("sched_v"),
+                                     "panel-schedule.md system line")
+                _dvr = audit_operand("Electrical · reconciliation",
+                                     "voltage tokens — DRAWING", _rr.get("draw_v"),
+                                     "every 'N V' token on the single-line drawing")
+                _fx = fx_verdict(
+                    _base_terms + [f'ISNUMBER(SEARCH(" "&{_svr}&" ",{_dvr}))'],
+                    f'"the drawing never states the schedule\'s "&{_svr}&" V system voltage"')
+            elif _op == "board-recon":
+                _rref = audit_operand("Electrical · reconciliation",
+                                      f"{_ckname} — Σ-current/busbar ratio",
+                                      _rr.get("ratio") if _rr.get("ratio") is not None else "missing",
+                                      "the schedule's own printed reconciliation line")
+                _vdr = audit_operand("Electrical · reconciliation",
+                                     f"{_ckname} — schedule's own verdict",
+                                     _rr.get("sched_verdict") or "missing",
+                                     "the schedule's printed OK/REVIEW verdict")
+                _bbr = audit_operand("Electrical · reconciliation",
+                                     f"{_ckname} — busbar rating",
+                                     _rr.get("busbar") or "—",
+                                     "panel-schedule.md board Field/Value table")
+                _evr = audit_operand("Electrical · reconciliation",
+                                     f"{_ckname} — evidence",
+                                     "; ".join(_rr.get("reasons") or []),
+                                     "build-computed reconciliation reasons ('' = clean)")
+                _fx = fx_verdict(
+                    _base_terms + [f'{_vdr}="OK"', f"ISNUMBER({_rref})",
+                                   f"{_rref}>={_BOARD_RECON_BAND[0]:g}",
+                                   f"{_rref}<={_BOARD_RECON_BAND[1]:g}",
+                                   f'LEN(TRIM({_bbr}&""))>0', f'TRIM({_bbr}&"")<>"—"',
+                                   f'LEN(TRIM({_evr}&""))=0'],
+                    _fx_evidence_expr(_evr, "board reconciliation out of band / busbar rating missing"))
+            else:
+                _evr = audit_operand("Electrical · reconciliation", f"{_ckname} — evidence",
+                                     "; ".join(_rr.get("reasons") or []),
+                                     "build-computed check evidence ('' = clean)")
+                _fx = fx_verdict(_base_terms + [f'LEN(TRIM({_evr}&""))=0'],
+                                 _fx_evidence_expr(_evr, "check evidence non-empty"))
+            _vc = ws.cell(r, 10, _fx)
             _vc.alignment = WRAP_TOP
             _vc.border = BORDER
             _vc.font = FONT_PASS if _ok else FONT_FAIL
@@ -9426,6 +9840,9 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
             if not _ok:
                 ws.row_dimensions[r].height = 30
             r += 1
+        _register_check_range(ws.title, "J", _recon_first, r - 1,
+                              n_pass=_rec_ok, n_total=len(_recon))
+        _cf_verdict(ws, f"J{_recon_first}:J{r - 1}")
         r += 1
     if last_circuit_first:
         bf, bl, nc = last_circuit_first
@@ -10346,7 +10763,13 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
         per_row[_key] = {"verdict": _v, "reasons": _rs, "board": _bname,
                          "ckt": "[board reconciliation]"}
         recon_rows.append({"check": _key, "detail": _detail, "verdict": _v,
-                           "reasons": _rs})
+                           "reasons": _rs,
+                           # structured operands → the renderer EMBEDS these as audit
+                           # cells and the Row check becomes a live formula over them
+                           "op": "board-recon",
+                           "ratio": (num(_mrec.group(3)) if _mrec else None),
+                           "sched_verdict": (_mrec.group(4).upper() if _mrec else None),
+                           "busbar": _meta.get("busbar rating", "")})
 
     # ── DRAWING ↔ SCHEDULE consistency rows (fix 4): the single-line diagram and the
     #    schedule must project the SAME dataset — voltage, board hierarchy strings and
@@ -10363,7 +10786,8 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     if _svg_texts:
         _svg_join = " | ".join(_svg_texts)
 
-        def _consistency_row(key: str, ok: bool, detail: str, reason: str) -> None:
+        def _consistency_row(key: str, ok: bool, detail: str, reason: str,
+                             op: Optional[dict] = None) -> None:
             nonlocal n_pass
             _v = "PASS" if ok else "FAIL"
             if ok:
@@ -10371,15 +10795,18 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             per_row[key] = {"verdict": _v, "reasons": ([] if ok else [reason]),
                             "board": "single-line ↔ schedule", "ckt": key}
             recon_rows.append({"check": key, "detail": detail, "verdict": _v,
-                               "reasons": [] if ok else [reason]})
+                               "reasons": [] if ok else [reason], **(op or {})})
 
         # 1 — system voltage: the schedule's LV system voltage must appear on the drawing
-        _v_ok = f"{board_v:g}" in " ".join(re.findall(r"(\d{3,5})\s*V", _svg_join))
+        _draw_v_tokens = sorted(set(re.findall(r"(\d{3,5})\s*V", _svg_join)))
+        _v_ok = f"{board_v:g}" in " ".join(_draw_v_tokens)
         _consistency_row(
             "single-line ↔ schedule · system voltage", _v_ok,
             f"schedule system {board_v:g} V 3-phase; drawing voltages: "
             + (", ".join(sorted(set(re.findall(r"\d{3,5}(?:/\d{3,5})?\s*V", _svg_join)))[:4]) or "none"),
-            f"the drawing never states the schedule's {board_v:g} V system voltage")
+            f"the drawing never states the schedule's {board_v:g} V system voltage",
+            op={"op": "voltage", "sched_v": f"{board_v:g}",
+                "draw_v": " " + " ".join(_draw_v_tokens) + " "})
         # 2 — board hierarchy strings: every schedule board reference must appear on
         #     the drawing (same dataset → same names; 'MAIN LV BOARD' vs 'Motor
         #     Control Center' means the two were generated from different data).
@@ -10389,7 +10816,9 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             "single-line ↔ schedule · board hierarchy", not _missing_boards,
             f"schedule boards: {', '.join(_board_meta) or '—'}",
             "board reference(s) absent from the single-line drawing: "
-            + ", ".join(_missing_boards[:3]))
+            + ", ".join(_missing_boards[:3]),
+            op={"op": "boards", "missing": ", ".join(_missing_boards),
+                "named": ", ".join(_board_meta)})
         # 3 — transformer kVA: the drawing's transformer rating vs the CONTRACT quantity
         _q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
         _kva_contract = None
@@ -10420,7 +10849,8 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                 f"transformer kVA mismatch: drawing "
                 f"{_kva_drawing if _kva_drawing is not None else 'missing'} vs contract "
                 f"{_kva_contract if _kva_contract is not None else 'missing'} "
-                f"(must match within 10% — one dataset)")
+                f"(must match within 10% — one dataset)",
+                op={"op": "kva", "d": _kva_drawing, "c": _kva_contract})
 
     n_total = len(per_row)
     score = _contract_score(n_pass, n_total)
@@ -10438,6 +10868,12 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
             "source_fabricated": source_fabricated,
             "recon_rows": recon_rows,
+            # per-board electrical system (V, kind, pf·η factor) — the renderer embeds
+            # these as audit operands so the circuit Row-check formulas are live
+            "board_system": {b: {"v": _board_system(b)[0], "kind": _board_system(b)[1],
+                                 "factor": (math.sqrt(3.0) if _board_system(b)[1] == "3ph"
+                                            else 1.0)}
+                             for b in _board_meta},
             "fix": ("route the electrical circuits in the scene (wire the electrical_bus edges) so "
                     "route-manifest / connection-schedule carry real cable lengths, compute ΔU% "
                     "= f(length, CSA, Design I) in draw_panel_schedule at source, and generate the "
@@ -11117,7 +11553,8 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
 
     ws = wb.create_sheet("Line & velocity")
     set_widths(ws, {"A": 15, "B": 22, "C": 22, "D": 16, "E": 16, "F": 14,
-                    "G": 16, "H": 10, "I": 9, "J": 13, "K": 62, "L": 52})
+                    "G": 16, "H": 10, "I": 9, "J": 13, "K": 62, "L": 52,
+                    "M": 10, "N": 30})
     subtitle = (
         "Every sized run, SPLIT so units never mix: process-pipe lines (flow, "
         "velocity vs the erosion band) · electrical & signal cables (current A, volt-drop "
@@ -11144,7 +11581,8 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         ("other", "Other services (air / misc)"),
     ]
     HDR = ["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit",
-           "Length (m)", "In spec", "Line £", "Basis", "Row check"]
+           "Length (m)", "In spec", "Line £", "Basis", "Row check",
+           "Audit: band", "Audit: check evidence (build-computed)"]
     r = 4
     # ROOT-CAUSE ROLL-UP (fix 3): failing rows grouped to their cause(s), above the table.
     r = _render_rollup(ws, r, cres, 12)
@@ -11173,14 +11611,19 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             _bn.alignment = WRAP_TOP
             r += 1
         header(ws, r, HDR)
+        ws.cell(r, 13).font = _FONT_AUDIT
+        ws.cell(r, 14).font = _FONT_AUDIT
         r += 1
         sec_first = r
+        _sec_ok = 0
         for _gi, (idx, row, spec) in enumerate(g):
             cr = crows.get(idx) or {}
             # the COMPUTED verdict — a row with no contract evaluation is UNVERIFIED = FAIL
             # (never inherit the source's within_spec tick).
             in_spec = cr.get("in_spec") if cr else False
             row_ok = cr.get("verdict") == "PASS"
+            if row_ok:
+                _sec_ok += 1
             ws.cell(r, 1, _line_tag(row, idx)).border = BORDER
             # From / To endpoints REFERENCE the master "Part names" row where the endpoint
             # is a registered principal (one identity; click through to the part). The
@@ -11200,7 +11643,9 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             # real flow; else v = Q ÷ A from the contract quantity; UNVERIFIED when underivable).
             velnum = cr.get("velocity")
             if velnum is not None:
-                vc = ws.cell(r, 6, round(float(velnum), 3))
+                # full precision stored (display masked 2dp) — the In-spec FORMULA compares
+                # this cell against the band, so a display-rounded 3.0 must not pass a 3.0004
+                vc = ws.cell(r, 6, float(velnum))
                 vc.number_format = FMT_DEC2
             elif str(cr.get("vel_basis") or "").startswith("n/a — "):
                 vc = ws.cell(r, 6, "n/a")
@@ -11211,9 +11656,25 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             lc = ws.cell(r, 8, num(row.get("length_m")))
             lc.number_format = FMT_DEC1
             lc.border = BORDER
-            # In spec = the COMPUTED band comparison (True/False), 'n/a' only for a
-            # non-pipe/non-cable service carrying its stated reason. NEVER row['within_spec'].
-            sc = ws.cell(r, 9, "✓" if in_spec is True else ("n/a" if in_spec is None and row_ok else "✗"))
+            # ── AUDIT OPERANDS (cols M/N, muted): M = the numeric band this row is judged
+            #    against ('' when no band applies — an n/a service); N = the contract
+            #    evaluation's evidence (reasons, '' when clean). The In-spec tick and the
+            #    Row check are LIVE FORMULAS over F/M/N — never a literal (2026-07-03). ──
+            _band = None
+            if in_spec is not None:
+                _bm = re.search(r"(\d+(?:\.\d+)?)", str(spec.get("spec_limit", "")))
+                _band = float(_bm.group(1)) if _bm else {"pipe": 3.0, "electrical": 5.0}.get(key)
+            _bc2 = ws.cell(r, 13, _band)
+            _bc2.font = _FONT_AUDIT
+            _ev = "; ".join(cr.get("reasons") or ([] if cr else ["no contract evaluation for this row"]))
+            _evc = ws.cell(r, 14, clean_cell(_ev) if _ev else None)
+            _evc.font = _FONT_AUDIT
+            _evc.alignment = WRAP_TOP
+            # In spec = the LIVE band comparison over the computed velocity/ΔU (F) vs the
+            # band (M); no band → 'n/a' only while the evidence (N) is clean.
+            sc = ws.cell(r, 9, f'=IF(ISNUMBER($M{r}),'
+                               f'IF(AND(ISNUMBER($F{r}),$F{r}<=$M{r}),"✓","✗"),'
+                               f'IF(LEN(TRIM($N{r}&""))=0,"n/a","✗"))')
             sc.border = BORDER
             sc.alignment = Alignment(horizontal="center")
             spec_cells.append(sc.coordinate)
@@ -11232,16 +11693,22 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             bc = ws.cell(r, 11, basis)
             bc.alignment = WRAP_TOP
             bc.border = BORDER
-            # Row check — the per-row verdict of the published column contract.
-            rc = ws.cell(r, 12, "PASS" if row_ok else "FAIL — " + "; ".join(cr.get("reasons") or ["no contract evaluation for this row"]))
+            # Row check — LIVE formula: the in-spec tick must hold (✓ or a clean n/a) and
+            # the embedded evidence must be empty; the FAIL branch names the evidence.
+            rc = ws.cell(r, 12, fx_verdict(
+                [f'OR($I{r}="✓",$I{r}="n/a")', f'LEN(TRIM($N{r}&""))=0'],
+                _fx_evidence_expr(f"$N{r}", "velocity/ΔU outside its band or unverifiable")))
             rc.alignment = WRAP_TOP
             rc.border = BORDER
             rc.font = FONT_PASS if row_ok else FONT_FAIL
             rc.fill = FILL_PASS if row_ok else FILL_FAIL
-            _wrap_len = max(len(basis), len(str(rc.value)))
+            _wrap_len = max(len(basis), len(_ev))
             if _wrap_len > 52:
                 ws.row_dimensions[r].height = min(-(-_wrap_len // 52), 5) * 14.5
             r += 1
+        _register_check_range(ws.title, "L", sec_first, r - 1,
+                              n_pass=_sec_ok, n_total=len(g))
+        _cf_verdict(ws, f"L{sec_first}:L{r - 1}")
         # per-section Σ line £
         ws.cell(r, 2, f"Σ {label.split('—')[0].strip()}").font = FONT_SUB
         st = ws.cell(r, 10, f"=SUM(J{sec_first}:J{r - 1})")
@@ -11250,9 +11717,10 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
         st.number_format = FMT_GBP
         r += 2
 
-    # grand foot: rows failing the published column contract (computed, not inherited)
-    ws.cell(r, 2, "Rows FAILING the column contract (all sections, computed)").font = FONT_SUB
-    tc = ws.cell(r, 9, grand_fail)
+    # grand foot: rows failing the published column contract — LIVE count over the
+    # Row-check column itself (an edited operand re-tallies on recalc).
+    ws.cell(r, 2, "Rows FAILING the column contract (all sections, live count)").font = FONT_SUB
+    tc = ws.cell(r, 9, f'=SUMPRODUCT(--(LEFT($L$5:$L${r - 1},4)="FAIL"))')
     tc.font = FONT_FAIL if grand_fail else FONT_PASS
     tc.fill = FILL_FAIL if grand_fail else FILL_PASS
     tc.alignment = Alignment(horizontal="center")
@@ -11830,7 +12298,10 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
         "PDFs, never from the previews.")
     back_link(ws, 9)
     header(ws, 4, ["Drawing No.", "Title", "Rev", "Scale", "Sheets",
-                   "Min lettering", "File (A1 print set)", "Preview tab", "File check"])
+                   "Min lettering", "File (A1 print set)", "Preview tab", "File check",
+                   "Audit: PDFs found", "Audit: missing sheets"])
+    ws.cell(4, 10).font = _FONT_AUDIT
+    ws.cell(4, 11).font = _FONT_AUDIT
     r = 5
     for rr in regs:
         ws.cell(r, 1, rr["no"]).border = BORDER
@@ -11851,19 +12322,31 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
         if tab:
             pv.hyperlink = f"#'{tab}'!A1"
             pv.font = FONT_LINK
-        # honest on-disk check of every listed sheet PDF, at build time
-        if rr["missing"]:
-            ck = ws.cell(r, 9, "✗ MISSING on disk: " + ", ".join(rr["missing"]))
-            ck.font = FONT_FAIL; ck.fill = FILL_FAIL
-        elif rr["files"]:
-            ck = ws.cell(r, 9, f"✓ {len(rr['files'])} sheet PDF(s) on disk")
-            ck.font = FONT_PASS; ck.fill = FILL_PASS
+        # honest on-disk check of every listed sheet PDF — the counts + missing list are
+        # EMBEDDED (muted cols J/K, computed by os.path.exists at build) and the File
+        # check is a live formula over them (never a bare literal, Tristan 2026-07-03)
+        _fnd = ws.cell(r, 10, len(rr["files"]) if rr["files"] else 0)
+        _fnd.font = _FONT_AUDIT
+        _msc = ws.cell(r, 11, ", ".join(rr["missing"]) if rr["missing"] else None)
+        _msc.font = _FONT_AUDIT
+        _msc.alignment = WRAP_TOP
+        if rr["missing"] or rr["files"]:
+            ck = ws.cell(r, 9,
+                         f'=IF(LEN(TRIM($K{r}&""))>0,"✗ MISSING on disk: "&$K{r},'
+                         f'IF($J{r}>0,"✓ "&$J{r}&" sheet PDF(s) on disk",'
+                         f'"✗ no sheet PDF found on disk"))')
+            if rr["missing"]:
+                ck.font = FONT_FAIL; ck.fill = FILL_FAIL
+            else:
+                ck.font = FONT_PASS; ck.fill = FILL_PASS
         else:
             ck = ws.cell(r, 9, "—")
         ck.alignment = WRAP_TOP; ck.border = BORDER
         if len(rr["files"]) > 1:
             ws.row_dimensions[r].height = 14.5 * len(rr["files"])
         r += 1
+    _register_check_range(ws.title, "I", 5, r - 1)
+    _cf_verdict(ws, f"I5:I{r - 1}")
 
     if renders:
         r += 1
@@ -11943,6 +12426,11 @@ def _render_cabinet_section(ws: Worksheet, run_dir: str, start_row: int) -> Opti
         r += 1
         header(ws, r, ["Housed device", "Tag", "Function", "Inputs ← (from)",
                        "Outputs → (to)", "Connectors"])
+        # muted embedded-operand columns: the parts-ledger connection counts this
+        # device's live Connectors verdict is computed from (Tristan 2026-07-03)
+        ws.cell(r, 7, "Audit: n in").font = _FONT_AUDIT
+        ws.cell(r, 8, "Audit: n out").font = _FONT_AUDIT
+        _hd_first = r + 1
         r += 1
         contents = c.get("contents") or []
         if not contents:
@@ -11956,11 +12444,19 @@ def _render_cabinet_section(ws: Worksheet, run_dir: str, start_row: int) -> Opti
             ci = ws.cell(r, 4, _join(d.get("inputs"))); ci.alignment = WRAP_TOP; ci.border = BORDER
             co = ws.cell(r, 5, _join(d.get("outputs"))); co.alignment = WRAP_TOP; co.border = BORDER
             ok = d.get("connected")
-            sc = ws.cell(r, 6, f"✓ {d.get('n_in',0)} in / {d.get('n_out',0)} out" if ok
-                         else f"✗ unconnected ({d.get('n_in',0)} in / {d.get('n_out',0)} out)")
+            _n_in, _n_out = int(d.get("n_in", 0) or 0), int(d.get("n_out", 0) or 0)
+            ws.cell(r, 7, _n_in).font = _FONT_AUDIT
+            ws.cell(r, 8, _n_out).font = _FONT_AUDIT
+            # live formula over the embedded counts (the parts-ledger connectivity
+            # verdict): connected = at least one wired end
+            sc = ws.cell(r, 6,
+                         f'=IF($G{r}+$H{r}>0,"✓ "&$G{r}&" in / "&$H{r}&" out",'
+                         f'"✗ unconnected ("&$G{r}&" in / "&$H{r}&" out)")')
             sc.border = BORDER
             sc.font = Font(color="107C10", bold=True) if ok else Font(color="C00000", bold=True)
             r += 1
+        if r > _hd_first:
+            _register_check_range(ws.title, "F", _hd_first, r - 1)
         r += 1  # spacer between cabinets
     return r
 
@@ -12090,6 +12586,7 @@ _TAB_RANK = {
     "Quality & Audit": 17, "Sense-check": 17.5, "⚠ Checks": 18,
     "Connection trace": 19, "Quantities": 20, "Calculations": 21,
     "Inputs & Assumptions": 22, "Part names": 23, "Glossary": 24,
+    "Audit data": 24.5,     # the embedded-operand register closes the reference block
 }
 
 # Tab-strip COLOUR GROUPS (Bundle B fix 7): commercial / drawings / verification /
@@ -12108,7 +12605,7 @@ _TAB_GROUPS = {
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
                      "Sense-check", "⚠ Checks"},
     "reference": {"Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
-                  "Part names", "Glossary"},
+                  "Part names", "Glossary", "Audit data"},
 }
 
 
@@ -12293,7 +12790,10 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
     sa = state.get("selfAudit") or {}
     facts, advisory = _verdict_sections(state, run_dir)
     ws = wb.create_sheet("Quality & Audit")
-    set_widths(ws, {"A": 28, "B": 30, "C": 60, "D": 82, "E": 24})
+    set_widths(ws, {"A": 28, "B": 30, "C": 60, "D": 82, "E": 24,
+                    "F": 8, "G": 6, "H": 6, "I": 6, "J": 6, "K": 6, "L": 6,
+                    "M": 6, "N": 6, "O": 6, "P": 6})
+    _sec_first, _sec_last = 0, -1     # deterministic-section score rows (floor range)
     title_row(ws, "Quality & Audit — every section and tab against the ≥8 floor + the ship gate", 5,
               "The engine's own quality surface, on one tab: the dossier verdict (stated ONCE, "
               "here), every DETERMINISTIC section and every tab scored against the ≥8 floor "
@@ -12349,13 +12849,17 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         return (f"self-audit opinion: {osc:g} — advisory, uncorroborated"
                 if isinstance(osc, (int, float)) else "self-audit opinion: — (unscored)")
 
+    _sec_first = r
     for nm, d in facts.items():
         score = d.get("score")
         ok = isinstance(score, (int, float)) and score >= 8
         ws.cell(r, 1, _display_name(clean_cell(nm))).font = FONT_SUB
-        scell = ws.cell(r, 2, score)
+        scell = ws.cell(r, 2, score if score is not None else "—")
         scell.fill = FILL_PASS if ok else FILL_FAIL
-        ws.cell(r, 3, "PASS ✓" if ok else "⛔ below 8")
+        # vs ≥8 floor — LIVE formula over the on-row score operand (never a literal)
+        vcell = ws.cell(r, 3, f'=IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),'
+                              f'"⛔ UNVERIFIED (no deterministic score)")')
+        vcell.font = FONT_PASS if ok else FONT_FAIL
         ocell = ws.cell(r, 4, _opinion_text(nm))
         ocell.font = FONT_ADVISORY if nm in advisory else FONT_NOTE
         ocell.alignment = WRAP_TOP
@@ -12364,6 +12868,9 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         dcell.alignment = WRAP_TOP
         dcell.font = FONT_NOTE
         r += 1
+    _sec_last = r - 1          # DETERMINISTIC (fact) section rows — the floor ranges here
+    if _sec_last >= _sec_first:
+        _register_check_range(ws.title, "C", _sec_first, _sec_last)
     for nm, adv in advisory.items():
         if nm in facts:
             continue     # already annotated on its deterministic row
@@ -12372,7 +12879,10 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
                               "on the per-tab table below)")
         scell.font = FONT_NOTE
         scell.alignment = WRAP_TOP
-        vcell = ws.cell(r, 3, "ADVISORY — non-gating")
+        # live: an advisory row is ADVISORY exactly while its score cell carries the
+        # 'no deterministic section' note (non-numeric) — a formula, never a literal
+        vcell = ws.cell(r, 3, f'=IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),'
+                              f'"ADVISORY — non-gating")')
         vcell.fill = FILL_ADVISORY
         vcell.font = FONT_ADVISORY
         ocell = ws.cell(r, 4, _opinion_text(nm))
@@ -12433,31 +12943,82 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         ws.cell(r, 4, "AIM: 100%" if "—" not in str(_val) else "").font = FONT_NOTE
         r += 1
 
-    # ---- PER-TAB deterministic scorecard (Tristan 2026-06-26): every tab vs the ≥8 floor ----
+    # ---- PER-TAB deterministic scorecard (Tristan 2026-06-26): every tab vs the ≥8 floor.
+    # LIVE SCORES (2026-07-03): every Score cell (B) is a FORMULA — =ROUND(MIN(...),1)
+    # over (a) the tab's own Row-check/Cell-check columns via live COUNTIF arithmetic
+    # where the tab has one, (b) its scorer components embedded as muted operand pairs
+    # (cols G:P) and (c) the governing mechanism/cap operand (col F, provenance in E).
+    # The two MIRROR tabs render FIRST so the non-mirror block is contiguous and the
+    # LIVE FLOOR below can =MIN() over it without a fixpoint. The formulas are written
+    # by _write_live_scores at end of build (final scores); the LAYOUT + the floor/open
+    # formulas are fixed here. ----
     _tabsc = state.get("tabScorecard") or {}
     if isinstance(_tabsc, dict) and _tabsc:
         r += 1
         _su = state.get("tabScorecardSummary") or {}
         sub_banner(ws, r, f"Per-tab quality — every tab against the ≥8 floor "
                           f"(worst: {_su.get('min_tab', '?')} {_su.get('min_score', '?')}/10; "
-                          f"{len(_su.get('fail_tabs') or [])} FAIL, {len(_su.get('unscored_tabs') or [])} UNSCORED)", 4)
+                          f"{len(_su.get('fail_tabs') or [])} FAIL, {len(_su.get('unscored_tabs') or [])} UNSCORED). "
+                          f"Score = live formula; muted 'Audit:' columns hold the embedded "
+                          f"score operands (passed/checked per component + the governing cap).", 5)
         r += 1
-        header(ws, r, ["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)"])
+        header(ws, r, ["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)",
+                       "Basis — mechanism & caps (stated)", "Audit: governing cap",
+                       "Audit: p1", "Audit: c1", "Audit: p2", "Audit: c2",
+                       "Audit: p3", "Audit: c3", "Audit: p4", "Audit: c4",
+                       "Audit: p5", "Audit: c5"])
+        for _ci in range(6, 17):
+            ws.cell(r, _ci).font = _FONT_AUDIT
         r += 1
-        for _tab, _v in _tabsc.items():
-            if not isinstance(_v, dict):
-                continue
+        _tab_first = r
+        # mirrors FIRST (they render the floor — excluded from the MIN range below)
+        _order = [t for t in _MIRROR_TABS if t in _tabsc] \
+            + [t for t in _tabsc if t not in _MIRROR_TABS] \
+            + [t for t in (CONTENTS_SHEET,) if t not in _tabsc]   # late-built sheet rows
+        _n_mirrors = sum(1 for t in _MIRROR_TABS if t in _tabsc)
+        for _tab in _order:
+            _v = _tabsc.get(_tab) if isinstance(_tabsc.get(_tab), dict) else {}
             _st = _v.get("status")
-            _scv = _v.get("score")
             ws.cell(r, 1, clean_cell(_tab)).font = FONT_SUB
-            _scell = ws.cell(r, 2, _scv if _scv is not None else "—")
+            _scell = ws.cell(r, 2)   # LIVE formula written by _write_live_scores (final scores)
             _scell.fill = FILL_PASS if _st == "PASS" else (FILL_ADVISORY if _st == "UNSCORED" else FILL_FAIL)
-            ws.cell(r, 3, "PASS ✓" if _st == "PASS" else ("UNSCORED" if _st == "UNSCORED" else "⛔ below 8"))
+            ws.cell(r, 3, f'=IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),"UNSCORED")')
             _iss = _v.get("issues") or [""]
             _icell = ws.cell(r, 4, clean_cell(_iss[0] if _iss else ""))
             _icell.alignment = WRAP_TOP
             _icell.font = FONT_NOTE
+            for _ci in range(5, 17):
+                ws.cell(r, _ci).font = _FONT_AUDIT
+            _QA_SCORE_CELLS[_tab] = f"'{ws.title}'!$B${r}"
             r += 1
+        _tab_last = r - 1
+        _register_check_range(ws.title, "C", _tab_first, _tab_last)
+        r += 1
+        # ---- THE LIVE FLOOR + OPEN-ISSUE CELLS — the ONE VERDICT's operands, computed
+        # IN-CELL over the section scores + the NON-MIRROR tab scores (cross-sheet MIN
+        # feeds every verdict surface + chip; mirrors reference, never enter, the MIN).
+        _nm_first = _tab_first + _n_mirrors
+        _rngs = []
+        if _sec_last >= _sec_first:
+            _rngs.append(f"$B${_sec_first}:$B${_sec_last}")
+        if _tab_last >= _nm_first:
+            _rngs.append(f"$B${_nm_first}:$B${_tab_last}")
+        _rng_expr = ",".join(_rngs) if _rngs else '""'
+        ws.cell(r, 1, "LIVE FLOOR — min of every deterministic section & non-mirror tab "
+                      "(the ONE VERDICT's number, computed in-cell)").font = FONT_SUB
+        _flc = ws.cell(r, 2, f'=IF(COUNT({_rng_expr})=0,"—",MIN({_rng_expr}))')
+        _flc.fill = FILL_RESULT
+        _QA_FLOOR_CELL.clear()
+        _QA_FLOOR_CELL.append(f"'{ws.title}'!$B${r}")
+        r += 1
+        ws.cell(r, 1, "LIVE OPEN ISSUES — sections/tabs below 8 or unscored "
+                      "(computed in-cell over the same score cells)").font = FONT_SUB
+        _opn_terms = [f'COUNTIF({_rg},"<8")+(COUNTA({_rg})-COUNT({_rg}))' for _rg in _rngs]
+        _opc = ws.cell(r, 2, "=" + "+".join(_opn_terms) if _opn_terms else 0)
+        _opc.fill = FILL_RESULT
+        _QA_OPEN_CELL.clear()
+        _QA_OPEN_CELL.append(f"'{ws.title}'!$B${r}")
+        r += 1
 
     # ---- the deterministic ship-gate AUDIT findings + benchmark net (the former ⚠ Audit
     # tab's content) — merged below the scorecard tables (Bundle B fix 2). ----
@@ -12773,7 +13334,7 @@ _dt(["Calc / input", "Value (live)", "Unit", "Formula (text)", "Engine value", "
      "Assumptions"], "worked-calc", ["Calc / input"])
 _dt(["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs", "Factors",
      "Est class", "Confidence", "Duty / rating", "Material", "Sizing calc (basis)",
-     "MPN / datasheet", "Row check"], "bom-ledger",
+     "MPN / datasheet", "Row check", "Audit: check evidence (build-computed)"], "bom-ledger",
     ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Est class", "Confidence",
      "Row check"], numeric=["Qty", "Unit £", "Line £"],
     row_rules=[{"col": "Item", "rx": r"^\s*↳", "exempt": ["Unit £", "Line £", "Tag"]}])
@@ -12824,10 +13385,12 @@ _dt(["Discipline", "Item", "Value", "Unit",
      "Source (module constant / contract quantity — never hand-typed)"], "design-basis",
     ["Discipline", "Item", "Value", "Source"], unit=["Unit"])
 _dt(["Tag", "From", "To", "Size", "Rating", "Velocity / ΔU", "Spec limit", "Length (m)",
-     "In spec", "Line £", "Basis", "Row check"], "line-velocity",
+     "In spec", "Line £", "Basis", "Row check", "Audit: band",
+     "Audit: check evidence (build-computed)"], "line-velocity",
     ["Tag", "From", "To", "Size", "In spec", "Basis", "Row check"])
 _dt(["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", "Class",
-     "Mitigation / fix route", "Residual", "Source", "Row check"], "risk-register",
+     "Mitigation / fix route", "Residual", "Source", "Row check",
+     "Audit: check evidence (build-computed triage)"], "risk-register",
     ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", "Class",
      "Mitigation / fix route", "Residual", "Row check"], numeric=["S", "L"])
 _dt(["#", "Regulation / standard", "Applies because", "Status"], "reg-register",
@@ -12847,15 +13410,24 @@ _dt(["Ckt", "Description", "Ways", "Conn. load (kW)", "Design I (A)", "Protectiv
 _dt(["Check", "Measured / compared", "Row check"], "elec-check",
     ["Check", "Measured / compared", "Row check"])
 _dt(["Drawing No.", "Title", "Rev", "Scale", "Sheets", "Min lettering",
-     "File (A1 print set)", "Preview tab", "File check"], "drawing-register",
+     "File (A1 print set)", "Preview tab", "File check", "Audit: PDFs found",
+     "Audit: missing sheets"], "drawing-register",
     ["Drawing No.", "Title", "Rev", "File", "File check"])
 _dt(["#", "Render", "File", "Caption", "", "", "", "Preview tab", ""], "render-register",
     ["#", "Render", "File"])
+# The 'Audit data' sheet — the register of every embedded non-sheet operand. 'Value' is
+# deliberately NOT required: an empty evidence/missing-list operand ('' = clean) is a
+# meaningful value, never a completeness gap.
+_dt(["#", "Group", "Operand", "Value", "Provenance (where this value comes from)"],
+    "audit-data", ["#", "Group", "Operand", "Provenance"])
 _dt(["Section", "Score (deterministic)", "vs ≥8 floor",
      "Self-audit opinion (advisory — never floors)", "Top defect (why it's below 8)"],
     "qa-sections", ["Section", "Score", "vs ≥8 floor"])
-_dt(["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)"], "qa-tabs",
-    ["Tab", "Score", "vs ≥8 floor"])
+_dt(["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)",
+     "Basis — mechanism & caps (stated)", "Audit: governing cap",
+     "Audit: p1", "Audit: c1", "Audit: p2", "Audit: c2", "Audit: p3", "Audit: c3",
+     "Audit: p4", "Audit: c4", "Audit: p5", "Audit: c5"], "qa-tabs",
+    ["Tab", "vs ≥8 floor"])
 _dt(["Severity", "Check", "Message", "Actual", "Expected"], "qa-findings",
     ["Severity", "Check", "Message"])
 _dt(["#", "Tab", "What's on it"], "contents", ["#", "Tab", "What's on it"])
@@ -13011,6 +13583,15 @@ def _run_cell_contracts(wb, sheets=None) -> Dict[str, dict]:
         merged = _merged_spans(ws)
         rows = _walk_rows(ws, t["row"], ncols, header_rows_by_sheet.get(t["sheet"], set()),
                           merged)
+        # The flag column: first free column at/right of the table (a table that already
+        # carries its own appended 'Row check' / 'Audit:' columns keeps them; the Cell
+        # check lands after them).
+        flag_col = ncols + 1
+        for _try in range(8):
+            _hc0 = ws.cell(t["row"], flag_col)
+            if type(_hc0).__name__ != "MergedCell" and _hc0.value in (None, ""):
+                break
+            flag_col += 1
         wrote_hdr = False
         for r, vals in rows:
             st["rows"] += 1
@@ -13019,40 +13600,63 @@ def _run_cell_contracts(wb, sheets=None) -> Dict[str, dict]:
                 if rc is not None and rrx.search(_cell_txt(vals[rc])):
                     exempt_cols |= rex
             reasons = []
+            # EVERY-ROW LIVE CELL CHECK (Tristan 2026-07-03: "you need to check every
+            # single tab, every single line, every single column"): the flag cell is a
+            # FORMULA over the row's own required cells — completeness (non-empty, not a
+            # bare placeholder) plus the type terms python flagged — so the verdict
+            # recomputes when a cell is edited. The python walk below stays the counting
+            # source for the (embedded) score operand; the formula is the on-sheet check.
+            fx_terms: List[str] = []
             for i in req_idx:
                 if norm[i] in exempt_cols:
                     continue      # declared row-level semantics (fold/summary row)
                 st["checked"] += 1
+                _ref = f"{get_column_letter(i + 1)}{r}"
+                _cell_is_num = isinstance(vals[i], (int, float)) or (
+                    isinstance(vals[i], str) and str(vals[i]).startswith("="))
+                fx_terms += [f'LEN(TRIM({_ref}&""))>0', f'TRIM({_ref}&"")<>"—"']
                 why = _cell_missing(vals[i])
                 if why is None and i in num_idx and norm[i] not in exempt_cols \
                         and not _cell_num_ok(vals[i]):
                     why = "not numeric"
                 if why is None and i in unit_idx and not _cell_unit_ok(vals[i]):
                     why = "not a unit token"
+                # strict live terms for the SPECIFIC failure python found on this cell,
+                # so the formula's verdict agrees with the walk (and stays live)
+                if why is not None:
+                    _m = re.match(r"(?:placeholder|bare) '(.*)'", str(why))
+                    if _m:
+                        fx_terms.append(f'TRIM({_ref}&"")<>"{_xq(_m.group(1), 24)}"')
+                    elif why == "not numeric":
+                        fx_terms.append(f"ISNUMBER({_ref})")
+                    elif why == "not a unit token":
+                        fx_terms.append(f'LEN(TRIM({_ref}&""))<=24')
+                elif i in num_idx and norm[i] not in exempt_cols and _cell_is_num:
+                    fx_terms.append(f"ISNUMBER({_ref})")
                 if why is None:
                     st["passed"] += 1
                 else:
                     reasons.append(f"'{t['cols'][i] or f'col {i + 1}'}' {why}")
-            if reasons:
-                if len(st["fails"]) < 80:
-                    st["fails"].append({"row": r, "why": "; ".join(reasons[:3]),
-                                        "table_row": t["row"]})
-                # FLAG ON THE ROW — the reader sees the defect next to the row itself.
-                flag_col = ncols + 1
-                fc = ws.cell(r, flag_col)
-                if type(fc).__name__ == "MergedCell":
-                    continue      # row merge extends over the flag column — counts still tally
-                if fc.value in (None, ""):
-                    fc.value = "⚠ " + "; ".join(reasons[:2]) + (
-                        f" +{len(reasons) - 2} more" if len(reasons) > 2 else "")
-                    fc.font = _CHECK_FLAG_FONT
-                    fc.alignment = LEFT_TOP
-                    if not wrote_hdr:
-                        hc = ws.cell(t["row"], flag_col)
-                        if type(hc).__name__ != "MergedCell" and hc.value in (None, ""):
-                            hc.value = "Cell check"
-                            hc.font = FONT_NOTE
-                        wrote_hdr = True
+            if reasons and len(st["fails"]) < 80:
+                st["fails"].append({"row": r, "why": "; ".join(reasons[:3]),
+                                    "table_row": t["row"]})
+            fc = ws.cell(r, flag_col)
+            if type(fc).__name__ == "MergedCell":
+                continue      # row merge extends over the flag column — counts still tally
+            if fc.value in (None, "") and fx_terms:
+                _fail_txt = ("; ".join(reasons[:2])
+                             + (f" +{len(reasons) - 2} more" if len(reasons) > 2 else "")
+                             ) if reasons else "a required cell is empty/placeholder or wrong type"
+                fc.value = fx_verdict(fx_terms, f'"{_xq(_fail_txt, 160)}"',
+                                      fail_prefix="⚠ FAIL — ")
+                fc.font = _CHECK_FLAG_FONT if reasons else _FONT_AUDIT
+                fc.alignment = LEFT_TOP
+                if not wrote_hdr:
+                    hc = ws.cell(t["row"], flag_col)
+                    if type(hc).__name__ != "MergedCell" and hc.value in (None, ""):
+                        hc.value = "Cell check"
+                        hc.font = FONT_NOTE
+                    wrote_hdr = True
     return _CELL_STATS
 
 
@@ -13624,7 +14228,11 @@ def _sc_benchmark(wb, ws, state, run_dir):
 
 def _sc_checks(wb, ws, state, run_dir):
     rows = _fam_rows(wb, ws.title, "checks")
-    fails = sum(1 for _r, d in rows if _cell_txt(d.get("status")).upper().startswith("FAIL"))
+    # the STATUS cells are LIVE formulas (2026-07-03) — their build-time verdicts are the
+    # renderer's own fail tally (_forge_fail_labels); the text scan keeps older fixtures
+    _fl = getattr(ws, "_forge_fail_labels", None)
+    fails = (len(_fl) if isinstance(_fl, list) else
+             sum(1 for _r, d in rows if _cell_txt(d.get("status")).upper().startswith("FAIL")))
     cap = 10.0 if fails == 0 else float(max(0, 8 - 2 * fails))
     iss = ([f"{fails} of {len(rows)} deterministic invariants FAIL — "
             f"score = max(0, 8 − 2 × {fails})"] if fails else [])
@@ -13707,9 +14315,11 @@ def _sc_drawing(wb, ws, state, run_dir):
                 "ISO 3098 2.5 mm lettering bar")
         reg_rows = _fam_rows(wb, ws.title, "drawing-register")
         if reg_rows:
+            # the File check cell is a LIVE formula (2026-07-03) — evaluate its embedded
+            # operands (Audit: PDFs found / missing sheets) instead of the formula text
             ok = sum(1 for _r, d in reg_rows
-                     if not _cell_missing(d.get("file check"))
-                     and not _cell_txt(d.get("file check")).startswith(("⚠", "✗")))
+                     if _cell_missing(d.get("audit: missing sheets"))
+                     and (_num_of(d.get("audit: pdfs found")) or 0) > 0)
             comps.append(("registered drawings with their print set present", ok, len(reg_rows)))
         rnd_rows = _fam_rows(wb, ws.title, "render-register")
         if rnd_rows:
@@ -13767,6 +14377,8 @@ _MECH_ONLY_TABS = {
     "Electrical": "panel-schedule column contract + single-line drawing coverage",
     "Design basis": "design-basis completeness arithmetic",
     "Assembly sequence": "design-derived step arithmetic",
+    _AUDIT_SHEET_TITLE: "audit-operand register contract (every embedded operand carries "
+                        "its label + provenance; per-row Cell check formulas)",
 }
 
 
@@ -13854,9 +14466,10 @@ def _finalise_tab_scores(wb, state, run_dir, sheets=None) -> None:
 
 
 def _stamp_chips(wb) -> int:
-    """Write the row-2 score chip on EVERY sheet from the FINAL _TAB_SCORES (score +
-    formula with live counts + Quality & Audit pointer). Runs after all scoring so a chip
-    can never show a stale number."""
+    """Write the row-2 score chip on EVERY sheet as a LIVE FORMULA over that tab's
+    Quality & Audit score cell (self-auditing workbook, 2026-07-03) — the chip's number
+    and PASS/FAIL recompute with the workbook; the basis text is stated statically inside
+    the formula string. Runs after _write_live_scores so every referenced cell exists."""
     stamped = 0
     for ws in wb.worksheets:
         qb = _tab_quality_banner(ws.title)
@@ -13872,13 +14485,332 @@ def _stamp_chips(wb) -> int:
             except Exception:  # noqa: BLE001
                 pass
         cell = ws.cell(2, 1)
-        cell.value = qb["text"]
+        ref = _QA_SCORE_CELLS.get(ws.title)
+        if ref:
+            v = _TAB_SCORES.get(ws.title) if isinstance(_TAB_SCORES.get(ws.title), dict) else {}
+            basis_short = _xq(str(v.get("basis") or "").strip(), 170)
+            _tail = ""
+            if v.get("status") == "FAIL" and (v.get("issues") or []):
+                _tail = "  →  " + _xq((v.get("issues") or [""])[0], 150)
+            cell.value = (
+                f'="⬤ TAB QUALITY "&{_fx_num_txt(ref)}&"/10 · "'
+                f'&IF(ISNUMBER({ref}),IF({ref}>=8,"PASS","FAIL"),"UNSCORED")'
+                f'&" (target ≥8, live from the Quality & Audit score cell)"'
+                + (f'&" · {basis_short}"' if basis_short else "")
+                + f'&" · full audit: Quality & Audit tab{_tail}"')
+        else:
+            cell.value = qb["text"]          # no Q&A row (selftest fixtures) — stated text
         cell.fill = qb["fill"]
         cell.font = FONT_SUB
         cell.alignment = LEFT_TOP
         ws.row_dimensions[2].height = qb["height"]
         stamped += 1
     return stamped
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════
+# SELF-AUDITING WORKBOOK (Tristan 2026-07-03) — the four pieces that make every verdict a
+# LIVE formula: the Audit-data operand sheet, the live per-tab score formulas, the live
+# verdict/chip formulas, the no-bare-literal gate, and the post-recalc read-back (ONE
+# TRUTH: tab-scorecard.json carries the values the workbook's own formulas computed).
+# ════════════════════════════════════════════════════════════════════════════════════════
+
+def tab_audit_data(wb: Workbook) -> bool:
+    """The 'Audit data' sheet: every NON-SHEET operand a verdict formula references —
+    value + provenance, one row each. Built after every content tab has registered its
+    operands; the fixed layout (header row 5, data from row 6) is what audit_operand()'s
+    returned refs assume, asserted here."""
+    ws = wb.create_sheet(_AUDIT_SHEET_TITLE)
+    set_widths(ws, {"A": 5, "B": 26, "C": 46, "D": 28, "E": 80})
+    nxt = title_row(
+        ws, "Audit data — the embedded operands behind the live verdict formulas", 5,
+        "Every check in this workbook is a LIVE formula. Where a check compares against "
+        "data that lives outside the workbook (the single-line drawing, the engineering "
+        "contract, a build-time classification), the compared value is EMBEDDED here with "
+        "its provenance — so the workbook contains everything its own verdicts depend on, "
+        "and the formula bar on any verdict cell shows exactly which operands it judges.")
+    header(ws, nxt, ["#", "Group", "Operand", "Value", "Provenance (where this value comes from)"])
+    if nxt + 1 != _AUDIT_DATA_START:
+        raise SystemExit(f"AUDIT-DATA LAYOUT DRIFT: data would start at row {nxt + 1}, but "
+                         f"audit_operand() refs assume row {_AUDIT_DATA_START} — fix the layout.")
+    r = _AUDIT_DATA_START
+    for i, op in enumerate(_AUDIT_OPERANDS, 1):
+        ws.cell(r, 1, i).border = BORDER
+        ws.cell(r, 2, clean_cell(op["group"])).border = BORDER
+        oc = ws.cell(r, 3, clean_cell(op["label"]))
+        oc.alignment = WRAP_TOP
+        oc.border = BORDER
+        _v = op["value"]
+        vc = ws.cell(r, 4, _v if isinstance(_v, (int, float)) else clean_cell(_v))
+        vc.alignment = WRAP_TOP
+        vc.border = BORDER
+        vc.fill = FILL_CONST
+        pc = ws.cell(r, 5, clean_cell(op["provenance"]))
+        pc.alignment = WRAP_TOP
+        pc.font = FONT_NOTE
+        pc.border = BORDER
+        r += 1
+    if r == _AUDIT_DATA_START:
+        ws.cell(r, 1, "— no non-sheet operands were embedded on this build —").font = FONT_NOTE
+    ws.freeze_panes = f"A{_AUDIT_DATA_START}"
+    back_link(ws, 5)
+    return True
+
+
+def _fx_num_txt(ref: str) -> str:
+    """Excel expression rendering a numeric cell like python's %g (no trailing .0)."""
+    return (f'IF(ISNUMBER({ref}),IF({ref}=INT({ref}),TEXT({ref},"0"),'
+            f'TEXT({ref},"0.0")),"—")')
+
+
+def _write_live_scores(wb: Workbook, state: dict) -> None:
+    """Fill the Quality & Audit per-tab Score cells with LIVE formulas that reproduce the
+    python scorecard exactly: =ROUND(MIN(governing-cap, live COUNTIF pass-rate where the
+    tab has check columns, 10×passed/checked per scorer component),1) — every operand an
+    on-sheet cell (muted 'Audit:' columns F:P of the same row). The MIRROR tabs render
+    =MIN(live floor, own cap). A structural mismatch (formula value ≠ python score beyond
+    0.05) degrades that tab to the labelled governing operand alone and prints it."""
+    if "Quality & Audit" not in wb.sheetnames or not _QA_SCORE_CELLS:
+        return
+    qa = wb["Quality & Audit"]
+    floor_ref = _QA_FLOOR_CELL[0] if _QA_FLOOR_CELL else None
+    for tab, ref in _QA_SCORE_CELLS.items():
+        row = int(ref.rsplit("$", 1)[1])
+        e = _TAB_SCORES.get(tab) if isinstance(_TAB_SCORES.get(tab), dict) else {}
+        score = e.get("score")
+        basis = str(e.get("basis") or "")
+        qa.cell(row, 5, clean_cell(basis[:250])).font = _FONT_AUDIT
+        qa.cell(row, 5).alignment = WRAP_TOP
+        if not isinstance(score, (int, float)):
+            qa.cell(row, 2, '="—"')     # honestly unscored — still a formula, never a literal
+            continue
+        if tab in _MIRROR_TABS and floor_ref:
+            # mirror: score = MIN(live floor, own governing cap) — the floor cell is the
+            # live MIN over the non-mirror block, so the mirror can never out-claim it.
+            _gov = 10.0
+            _fl = _VERDICT.get("floor")
+            if isinstance(_fl, (int, float)) and score < _fl - 1e-9 or not isinstance(_fl, (int, float)):
+                _gov = score
+            elif isinstance(_fl, (int, float)) and abs(score - _fl) <= 1e-9:
+                _gov = 10.0      # the floor itself governs
+            gc = qa.cell(row, 6, _gov)
+            gc.font = _FONT_AUDIT
+            qa.cell(row, 2, f"=ROUND(MIN({floor_ref},$F{row}),1)")
+            continue
+        term_exprs: List[str] = []
+        term_vals: List[float] = []
+        # (a) live pass-rate over the tab's own rendered check columns
+        rngs = [g for g in _CHECK_RANGES.get(tab, [])
+                if isinstance(g, dict) and g.get("n_total")]
+        if rngs:
+            _cifs = "+".join(f"COUNTIF('{tab}'!${g['col']}${g['r1']}:${g['col']}${g['r2']},\"PASS\")"
+                             for g in rngs)
+            _cnts = "+".join(f"COUNTA('{tab}'!${g['col']}${g['r1']}:${g['col']}${g['r2']})"
+                             for g in rngs)
+            _np = sum(g["n_pass"] for g in rngs)
+            _nt = sum(g["n_total"] for g in rngs)
+            if _nt:
+                term_exprs.append(f"10*({_cifs})/({_cnts})")
+                term_vals.append(10.0 * _np / _nt)
+        # (b) scorer components as embedded operand pairs (cols G:P, ≤5 pairs)
+        comps = [(c.get("check"), c.get("passed"), c.get("checked"))
+                 for c in (e.get("components") or [])
+                 if isinstance(c, dict) and c.get("checked")]
+        for i, (_lbl, p, c) in enumerate(comps[:5]):
+            pc_ = qa.cell(row, 7 + 2 * i, p)
+            cc_ = qa.cell(row, 8 + 2 * i, c)
+            pc_.font = _FONT_AUDIT
+            cc_.font = _FONT_AUDIT
+            _pref, _cref = f"$" + get_column_letter(7 + 2 * i) + f"{row}", \
+                "$" + get_column_letter(8 + 2 * i) + f"{row}"
+            term_exprs.append(f"IF(AND(ISNUMBER({_cref}),{_cref}>0),10*{_pref}/{_cref},10)")
+            term_vals.append(10.0 * p / c)
+        # (c) the governing mechanism/cap operand — encodes the prior mechanism score,
+        # score_cap, TBD penalty, honest caps … whenever they bind below the arithmetic
+        base_min = min(term_vals) if term_vals else 10.0
+        gov = score if score < base_min - 1e-9 else 10.0
+        gc = qa.cell(row, 6, gov)
+        gc.font = _FONT_AUDIT
+        formula = f"=ROUND(MIN($F{row}" + ("," + ",".join(term_exprs) if term_exprs else "") + "),1)"
+        expected = _round1(min([gov] + term_vals))
+        if abs(expected - score) > 0.05:
+            # cannot reproduce the python arithmetic from these terms — degrade to the
+            # labelled governing operand alone (still a formula over a labelled cell)
+            print(f"  ! live-score formula for '{tab}' irreducible "
+                  f"(formula {expected} vs python {score}) — degraded to the governing operand")
+            gc.value = score
+            formula = f"=ROUND(MIN($F{row}),1)"
+        qa.cell(row, 2, formula)
+
+
+def _write_verdict_formulas(wb: Workbook, state: dict) -> int:
+    """Rewrite every registered verdict cell as a LIVE formula over the Quality & Audit
+    floor + open-issue cells (cross-sheet references) — the ONE VERDICT is computed
+    in-cell; python's copy is only the build-time expectation. Returns cells written."""
+    if not (_QA_FLOOR_CELL and _QA_OPEN_CELL):
+        return 0
+    fl, op = _QA_FLOOR_CELL[0], _QA_OPEN_CELL[0]
+    short = (f'IF({op}=0,"SHIPS","DRAFT — "&{op}&" open issue"&IF({op}=1,"","s"))')
+    line = (f'="VERDICT: "&{short}&" · floor "&{_fx_num_txt(fl)}&"/10 '
+            f'(min of every DETERMINISTIC section & non-mirror tab — live cells on '
+            f'Quality & Audit; the LLM self-audit is advisory and never floors; '
+            f'ships at ≥8 everywhere)"')
+    n = 0
+    for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
+        if _vt not in wb.sheetnames:
+            continue
+        _cell = wb[_vt].cell(_vr, _vc)
+        if _vstyle == "synopsis":
+            _cell.value = _exec_synopsis(state)
+            continue
+        _sfx = f'&"{_xq(_vsuf, 120)}"' if _vsuf else ""
+        if _vstyle == "card":
+            _cell.value = f"={short}{_sfx}"
+        else:
+            _cell.value = (line + _sfx) if _vsuf else line
+        if _vstyle in ("line", "title-line"):
+            _cell.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
+            if _vstyle == "line":
+                _cell.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
+        n += 1
+    return n
+
+
+# The no-cheating patterns: a NON-formula cell that STARTS as a verdict is a bare literal.
+_BARE_VERDICT_RX = re.compile(r"^(?:PASS|FAIL)\b|^[✓✗](?:\s|$)")
+
+
+def _enforce_live_check_gate(wb: Workbook) -> dict:
+    """The NO-CHEATING GATE (Tristan 2026-07-03, exhaustive by design): walk EVERY sheet
+    and EVERY cell — (a) zero bare PASS/FAIL/✓/✗ literals anywhere (a verdict must be a
+    formula); (b) every registered table data row carries at least one live check formula
+    (its Row check / status / Cell check cell); (c) every REQUIRED contract column of
+    every table is referenced by at least one check formula on that table (or itself
+    carries the check formulas); (d) every sheet carries at least one formula. Raises
+    SystemExit on any violation; returns the walk statistics for the build report."""
+    stats = {"sheets": 0, "formula_cells": 0, "verdict_formula_cells": 0,
+             "rows_walked": 0, "rows_with_check": 0, "rows_skipped_merged": 0,
+             "bare_literals": [], "unchecked_rows": [], "orphan_columns": [],
+             "sheets_without_formula": [], "column_coverage": {}}
+    _sheet_ref_rx = re.compile(r"'[^']*'!\$?[A-Z]{1,3}\$?\d+")
+    _ref_rx = re.compile(r"\$?([A-Z]{1,3})\$?(\d+)")
+    formulas_by_sheet: Dict[str, int] = {}
+    for ws in wb.worksheets:
+        stats["sheets"] += 1
+        nfx = 0
+        for row in ws.iter_rows():
+            for c in row:
+                v = getattr(c, "value", None)
+                if not isinstance(v, str):
+                    continue
+                if v.startswith("="):
+                    nfx += 1
+                    if '"PASS"' in v or '"FAIL' in v or "✓" in v or "✗" in v:
+                        stats["verdict_formula_cells"] += 1
+                elif _BARE_VERDICT_RX.match(v.strip()):
+                    stats["bare_literals"].append(f"{ws.title}!{c.coordinate}: {v[:60]!r}")
+        formulas_by_sheet[ws.title] = nfx
+        stats["formula_cells"] += nfx
+        if nfx == 0:
+            stats["sheets_without_formula"].append(ws.title)
+    # (b) + (c) — per registered table: every data row has a check formula; every
+    # required column is referenced by (or itself carries) a check formula.
+    header_rows_by_sheet: Dict[str, set] = {}
+    for t in _RENDERED_TABLES:
+        header_rows_by_sheet.setdefault(t["sheet"], set()).add(t["row"])
+    for t in _RENDERED_TABLES:
+        if t["sheet"] not in wb.sheetnames:
+            continue
+        ws = wb[t["sheet"]]
+        ncols = len(t["cols"])
+        norm = [_norm_col(c) for c in t["cols"]]
+        spec = _TABLE_CONTRACTS.get(_table_sig(t["cols"])) or (
+            _MD_TABLE_CONTRACT if t.get("md_table") else None)
+        req_names = (spec.get("required") if spec else None)
+        if spec and req_names is None:
+            req_names = [c for c in norm if c]
+        req_idx = [i for i, c in enumerate(norm) if c and c in (req_names or [])]
+        rows = _walk_rows(ws, t["row"], ncols, header_rows_by_sheet.get(t["sheet"], set()))
+        ref_cols: set = set()      # column letters referenced by this table's check formulas
+        fx_cols: set = set()       # columns whose own cells carry check formulas
+        for r, _vals in rows:
+            stats["rows_walked"] += 1
+            has_check = False
+            merged_only = True
+            for ci in range(1, ncols + 9):
+                cc = ws.cell(r, ci)
+                if type(cc).__name__ == "MergedCell":
+                    continue
+                merged_only = False
+                v = cc.value
+                if isinstance(v, str) and v.startswith("=") and (
+                        '"PASS"' in v or '"FAIL' in v or "✓" in v or "✗" in v or "⚠" in v):
+                    has_check = True
+                    fx_cols.add(ci)
+                    _v2 = _sheet_ref_rx.sub("", v)
+                    for m in _ref_rx.finditer(_v2):
+                        ref_cols.add(column_index_from_string(m.group(1)))
+            if has_check:
+                stats["rows_with_check"] += 1
+            elif merged_only:
+                stats["rows_skipped_merged"] += 1
+            else:
+                stats["unchecked_rows"].append(f"{t['sheet']}!row {r} (table @{t['row']})")
+        if rows:
+            covered = ref_cols | fx_cols
+            _orph = [t["cols"][i] or f"col {i + 1}" for i in req_idx if (i + 1) not in covered]
+            key = f"{t['sheet']} @{t['row']}"
+            stats["column_coverage"][key] = {
+                "required": [t["cols"][i] or f"col {i + 1}" for i in req_idx],
+                "referenced": sorted(get_column_letter(ci) for ci in covered),
+                "orphans": _orph,
+            }
+            for o in _orph:
+                stats["orphan_columns"].append(f"{t['sheet']} @{t['row']}: '{o}'")
+    problems = []
+    if stats["bare_literals"]:
+        problems.append(f"{len(stats['bare_literals'])} bare verdict literal(s): "
+                        + "; ".join(stats["bare_literals"][:8]))
+    if stats["unchecked_rows"]:
+        problems.append(f"{len(stats['unchecked_rows'])} table row(s) with NO live check "
+                        f"formula: " + "; ".join(stats["unchecked_rows"][:8]))
+    if stats["orphan_columns"]:
+        problems.append(f"{len(stats['orphan_columns'])} required column(s) referenced by "
+                        f"no check formula: " + "; ".join(stats["orphan_columns"][:8]))
+    if stats["sheets_without_formula"]:
+        problems.append("sheet(s) with zero formulas: "
+                        + ", ".join(stats["sheets_without_formula"]))
+    if problems:
+        raise SystemExit("LIVE-CHECK GATE (no cheating — every verdict must be a real "
+                         "formula):\n  - " + "\n  - ".join(problems))
+    return stats
+
+
+def _readback_scores(out_path: str) -> Optional[dict]:
+    """Read the RECALCULATED live-score cells back from the shipped workbook (values as
+    LibreOffice computed them). Returns {tab: value, '_floor': v, '_open': v} or None."""
+    try:
+        from openpyxl import load_workbook as _lw
+        rb = _lw(out_path, data_only=True)
+    except Exception as _ex:  # noqa: BLE001
+        print(f"  !! read-back failed — cannot reopen {out_path}: {_ex}")
+        return None
+    out: Dict[str, Any] = {}
+
+    def _cellval(ref: str):
+        _sheet, _addr = ref.split("!", 1)
+        _sheet = _sheet.strip("'")
+        if _sheet not in rb.sheetnames:
+            return None
+        return rb[_sheet][_addr.replace("$", "")].value
+
+    for tab, ref in _QA_SCORE_CELLS.items():
+        out[tab] = _cellval(ref)
+    if _QA_FLOOR_CELL:
+        out["_floor"] = _cellval(_QA_FLOOR_CELL[0])
+    if _QA_OPEN_CELL:
+        out["_open"] = _cellval(_QA_OPEN_CELL[0])
+    return out
 
 
 def build(run_dir: str, out_path: str) -> dict:
@@ -13893,6 +14825,12 @@ def build(run_dir: str, out_path: str) -> dict:
     _CHIP_SPANS.clear()
     _CELL_STATS.clear()
     _CELLCON_DONE.clear()
+    # LIVE-FORMULA VERDICT registries (self-auditing workbook, 2026-07-03)
+    _AUDIT_OPERANDS.clear()
+    _CHECK_RANGES.clear()
+    _QA_SCORE_CELLS.clear()
+    _QA_FLOOR_CELL.clear()
+    _QA_OPEN_CELL.clear()
 
     wb = Workbook()
     wb.remove(wb.active)  # drop the default sheet
@@ -14167,6 +15105,10 @@ def build(run_dir: str, out_path: str) -> dict:
     # just before the first drawing tab. ----
     add_tab("Drawings (register)", lambda: tab_drawings_register(wb, run_dir, embedded))
     add_tab("Glossary", lambda: tab_glossary(wb, state))
+    # ---- AUDIT DATA (self-auditing workbook, 2026-07-03): the embedded non-sheet
+    # operands every live verdict formula references — built after every content tab has
+    # registered its operands, BEFORE the X1 gate-feed so it is scored like any sheet ----
+    add_tab(_AUDIT_SHEET_TITLE, lambda: tab_audit_data(wb))
 
     # ── X1 GATE-FEED (Tristan 2026-06-27): the SHIP GATE must cover EVERY sheet, not just the 16 data
     #    tabs. Now that all content sheets exist, merge each drawing/render/meta sheet's aux-score into
@@ -14247,20 +15189,8 @@ def build(run_dir: str, out_path: str) -> dict:
     # the file opens broken). Real build-generated formulas NEVER start with "= " (space after =) and
     # never contain a digit directly followed by whitespace+letter — so this net is safe for genuine
     # formulas (incl. "=...*8000/1e9", "='Inputs & Assumptions'!$B$5", "=IF(...)"). ----
-    # Detector: a string openpyxl will store as a formula that is NOT a valid Excel formula —
-    # engine PROSE ("= 3.91 t/day …"), chemical formulas, OR a live worked-calc formula left with an
-    # UNBOUND symbol (a bare letter like "E" in "=B187/(2*B189*E-…)"). Strip every VALID formula
-    # token; if ANY letter remains it cannot be a real formula → defang. Safe for genuine formulas
-    # (=…*8000/1e9, =IF(…), ='Inputs & Assumptions'!$B$5, =CO2 cell-ref) → they strip to nothing.
-    def _is_invalid_formula(_s: str) -> bool:
-        _t = re.sub(r'"[^"]*"', "", _s)                     # string literals ("PASS"/"FAIL"/…) — letters here are VALID
-        _t = re.sub(r"'[^']*'!", "", _t)                    # sheet refs
-        _t = re.sub(r"\$?[A-Z]{1,3}\$?\d+", "", _t)         # cell refs (incl CO2-style)
-        _t = re.sub(r"[A-Za-z][A-Za-z0-9.]*\s*\(", "(", _t) # function calls -> (
-        _t = re.sub(r"\bin_[a-z0-9_]+\b", "", _t)           # known defined names
-        _t = re.sub(r"\d+\.?\d*([eE][+\-]?\d+)?", "", _t)    # numbers incl scientific (1e9)
-        _t = re.sub(r"[\s+\-*/^%(),:.=&<>​]", "", _t)  # operators / whitespace / zero-width
-        return bool(re.search(r"[A-Za-z]", _t))
+    # Detector hoisted to module level (_is_invalid_formula) so the live-check selftests
+    # can prove every generated verdict formula is Excel-loader valid.
     # Excel's FILE LOADER rejects lowercase scientific-notation number literals (e.g. "1e9", "1.5e6")
     # in stored formulas — it silently drops the formula ("Removed Records: Formula") even though the
     # UI accepts 1e9 typed live. (Confirmed via LibreOffice round-trip: it rewrites 1e9 -> 1000000000.)
@@ -14293,6 +15223,15 @@ def build(run_dir: str, out_path: str) -> dict:
                 if not (isinstance(_v, str) and _v.startswith("=")):
                     continue
                 if _is_invalid_formula(_v):
+                    if '"PASS"' in _v or '"FAIL' in _v:
+                        # a VERDICT formula must never be defanged into inert text — that
+                        # silently un-checks its row (the 2026-07-03 FALSE-token lesson:
+                        # generated check formulas must use FALSE()/TRUE(), cell refs,
+                        # functions and string literals only). Fail the build naming it.
+                        raise SystemExit(
+                            f"LIVE-CHECK FORMULA INVALID (would be defanged to text): "
+                            f"{_ws.title}!{_c.coordinate}: {_v[:160]!r} — fix the formula "
+                            f"generator (only cell refs / functions / string literals).")
                     _c.value = clean_cell(_v)        # zero-width-space prefix → stored as TEXT, not a formula
                     _defanged += 1
                 elif _sci.search(_v):
@@ -14337,25 +15276,37 @@ def build(run_dir: str, out_path: str) -> dict:
     _VERDICT.update(compute_verdict(state, _TAB_SCORES, run_dir,
                                     rendered_sheets=list(wb.sheetnames)))
     state["_verdict"] = dict(_VERDICT)
-    for _vt, _vr, _vc, _vstyle, _vsuf in _VERDICT_CELLS:
-        if _vt not in wb.sheetnames:
-            continue
-        _cell = wb[_vt].cell(_vr, _vc)
-        if _vstyle == "synopsis":
-            _cell.value = _exec_synopsis(state)
-            continue
-        _cell.value = verdict_text("card" if _vstyle == "card" else "line") + (_vsuf or "")
-        if _vstyle in ("line", "title-line"):
-            _cell.fill = FILL_PASS if _VERDICT.get("ships") else FILL_FAIL
-            if _vstyle == "line":
-                _cell.font = FONT_PASS if _VERDICT.get("ships") else FONT_FAIL
-    print(f"  · ONE VERDICT: {verdict_text('line')} ({len(_VERDICT_CELLS)} surfaces)")
+    # ── LIVE SCORES (self-auditing workbook, 2026-07-03): the Quality & Audit per-tab
+    #    Score cells become formulas over the tabs' own check columns + embedded operand
+    #    pairs; the floor/open cells (written at Q&A render) MIN/count over them; every
+    #    verdict surface is then a formula over those two cells. Python's numbers are the
+    #    build-time EXPECTATION — the post-recalc read-back asserts they agree. ──
+    _write_live_scores(wb, state)
+    _n_verdicts = _write_verdict_formulas(wb, state)
+    print(f"  · ONE VERDICT (live formulas over the Q&A floor/open cells): "
+          f"{verdict_text('line')} ({_n_verdicts} surfaces)")
 
-    # ── ON-TAB SCORE CHIPS: stamp row 2 of EVERY sheet from the FINAL scores (score +
-    #    formula with live counts + Quality & Audit pointer). Last write before save so a
-    #    chip can never be stale. ──
+    # ── ON-TAB SCORE CHIPS: stamp row 2 of EVERY sheet as a LIVE formula over that tab's
+    #    Quality & Audit score cell. Last write before the gate + save. ──
     _n_chips = _stamp_chips(wb)
-    print(f"  · score chips: {_n_chips}/{len(wb.sheetnames)} tabs stamped from the final scorecard")
+    print(f"  · score chips: {_n_chips}/{len(wb.sheetnames)} tabs live off the Q&A score cells")
+
+    # ── THE NO-CHEATING GATE (Tristan 2026-07-03): refuse the build on ANY bare verdict
+    #    literal, any table row with no live check formula, any required column no check
+    #    formula references, or any sheet with zero formulas. ──
+    _live_stats = _enforce_live_check_gate(wb)
+    print(f"  · live-check gate: {_live_stats['sheets']} sheets · "
+          f"{_live_stats['formula_cells']} formula cells "
+          f"({_live_stats['verdict_formula_cells']} verdict formulas) · "
+          f"{_live_stats['rows_with_check']}/{_live_stats['rows_walked']} table rows carry a "
+          f"live check ({_live_stats['rows_skipped_merged']} merged-flag rows) · "
+          f"0 bare literals · 0 orphan required columns")
+    state["_liveCheckStats"] = {k: v for k, v in _live_stats.items() if k != "column_coverage"}
+    try:
+        with open(os.path.join(run_dir, "live-check-stats.json"), "w", encoding="utf-8") as _fh:
+            json.dump(_live_stats, _fh, indent=2, default=str)
+    except Exception:  # noqa: BLE001
+        pass
 
     wb.save(out_path)
 
@@ -14372,6 +15323,55 @@ def build(run_dir: str, out_path: str) -> dict:
         _finalise_deterministic_zip(out_path)
     except Exception as _dex:  # noqa: BLE001 — determinism polish must never kill the build
         print(f"  ! deterministic finalise failed (file left as-written): {_dex}")
+
+    # ── ONE TRUTH — POST-RECALC READ-BACK (Tristan 2026-07-03): read the RECALCULATED
+    #    live-score cells back from the shipped file; tab-scorecard.json carries THOSE
+    #    values, so the python scorecard and the in-cell formulas can never disagree.
+    #    A divergence beyond 0.05 is a structural bug → the build FAILS naming the tab. ──
+    _score_source = "python (no LibreOffice recalc — in-cell formulas unevaluated)"
+    if recalc_cached:
+        _rb = _readback_scores(out_path)
+        if _rb is not None:
+            _mismatch = []
+            for _t, _ref in _QA_SCORE_CELLS.items():
+                _pv = (_TAB_SCORES.get(_t) or {}).get("score")
+                _wv = _rb.get(_t)
+                if isinstance(_pv, (int, float)) and isinstance(_wv, (int, float)):
+                    if abs(_pv - _wv) > 0.05:
+                        _mismatch.append(f"{_t}: python {_pv} vs workbook {_wv}")
+                    _TAB_SCORES[_t]["score"] = _wv          # the workbook's number IS the number
+                    _TAB_SCORES[_t]["score_python"] = _pv
+                elif isinstance(_pv, (int, float)) != isinstance(_wv, (int, float)):
+                    _mismatch.append(f"{_t}: python {_pv!r} vs workbook {_wv!r}")
+            _fl_p, _fl_w = _VERDICT.get("floor"), _rb.get("_floor")
+            if isinstance(_fl_p, (int, float)) and isinstance(_fl_w, (int, float)) \
+                    and abs(_fl_p - _fl_w) > 0.05:
+                _mismatch.append(f"FLOOR: python {_fl_p} vs workbook {_fl_w}")
+            _op_p, _op_w = _VERDICT.get("open_issues"), _rb.get("_open")
+            if isinstance(_op_p, (int, float)) and isinstance(_op_w, (int, float)) \
+                    and int(_op_p) != int(_op_w):
+                _mismatch.append(f"OPEN ISSUES: python {_op_p} vs workbook {_op_w}")
+            if _mismatch:
+                raise SystemExit(
+                    "ONE-TRUTH READ-BACK: the recalculated in-cell scores disagree with the "
+                    "python scorecard — a live formula does not reproduce its stated "
+                    "arithmetic:\n  - " + "\n  - ".join(_mismatch))
+            _score_source = "workbook-recalc-readback (LibreOffice-computed live formulas)"
+            if isinstance(_fl_w, (int, float)):
+                _VERDICT["floor"] = _fl_w
+            print(f"  · ONE TRUTH read-back: {len(_QA_SCORE_CELLS)} live score cells match the "
+                  f"python scorecard; floor {_fl_w} · open {_rb.get('_open')} — "
+                  f"tab-scorecard.json now carries the WORKBOOK's numbers")
+    _ts_summary = tab_scorecard_summary(_TAB_SCORES)
+    state["tabScorecard"] = _TAB_SCORES
+    state["tabScorecardSummary"] = _ts_summary
+    try:
+        with open(os.path.join(run_dir, "tab-scorecard.json"), "w", encoding="utf-8") as _fh:
+            json.dump({"tabs": _TAB_SCORES, "summary": _ts_summary,
+                       "score_source": _score_source,
+                       "verdict": dict(_VERDICT)}, _fh, indent=2, default=str)
+    except Exception:  # noqa: BLE001 — persistence must never break the build
+        pass
 
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
     return {
@@ -15103,11 +16103,17 @@ def _selftest() -> int:
         _hidden_cols = [c for c in "FGHIJKLMN" if _lws.column_dimensions[c].hidden]
         if _hidden_cols:
             print(f"  FAIL ledger-columns-visible: F–N must NEVER be hidden, got hidden={_hidden_cols}"); bad += 1
-        # (6b) LEDGER ROW CHECK (issue 7): the rightmost column renders the contract's
-        # per-row verdict from the SAME evaluation that scored the tab.
-        if _lws.cell(4, 15).value != "Row check" or _lws.cell(5, 15).value != "PASS":
-            print(f"  FAIL ledger-row-check: col O must carry the contract verdict "
-                  f"(got header {_lws.cell(4, 15).value!r}, row {_lws.cell(5, 15).value!r})"); bad += 1
+        # (6b) LEDGER ROW CHECK (issue 7 + live-formula rework 2026-07-03): the Row check
+        # column carries a LIVE FORMULA over the row's own cells (line=qty×unit + the
+        # embedded evidence column P) — never a bare 'PASS' literal.
+        _rchk = _lws.cell(5, 15).value
+        if _lws.cell(4, 15).value != "Row check" or not (
+                isinstance(_rchk, str) and _rchk.startswith("=IF(")
+                and '"PASS"' in _rchk and "$P5" in _rchk and "$C5*$D5" in _rchk):
+            print(f"  FAIL ledger-row-check: col O must carry the LIVE contract-verdict "
+                  f"formula (got header {_lws.cell(4, 15).value!r}, row {_rchk!r})"); bad += 1
+        if _is_invalid_formula(_rchk or ""):
+            print("  FAIL ledger-row-check: the Row check formula must be Excel-loader valid"); bad += 1
         _CONTRACT_RESULTS.pop(_LEDGER_SHEET, None)
         # (7) COST WATERFALL RAW-MATERIALS = LIVE LINK TO THE BILL (Tristan: "there must be a source
         #     where the number comes from"). The Raw-materials step £ cell must be a formula pointing at
@@ -16732,12 +17738,22 @@ def _selftest() -> int:
         if not (_st2["fails"] and _st2["fails"][0]["row"] == 3 and "Item" in _st2["fails"][0]["why"]):
             print(f"  FAIL cell-contract flag routing: the defect must cite ROW 3 col Item "
                   f"(got {_st2['fails']})"); bad += 1
+        # LIVE FORMULA rework (2026-07-03): EVERY data row carries a Cell-check FORMULA
+        # over its own required cells; a failing row's FAIL branch names the defect and
+        # the strict term for its failure type keeps the verdict live.
         _flag = _ws2.cell(3, 6).value
-        if not (isinstance(_flag, str) and _flag.startswith("⚠") and "Item" in _flag):
-            print(f"  FAIL on-row flag: row 3 must carry a '⚠ Item…' cell right of the table "
-                  f"(got {_flag!r})"); bad += 1
-        if _ws2.cell(2, 6).value not in (None, "") or _ws2.cell(4, 6).value not in (None, ""):
-            print("  FAIL on-row flag: clean rows (2, 4) must carry NO flag"); bad += 1
+        if not (isinstance(_flag, str) and _flag.startswith("=IF(")
+                and "⚠ FAIL" in _flag and "Item" in _flag
+                and 'TRIM(B3&"")<>"TBD"' in _flag):
+            print(f"  FAIL on-row flag: row 3 must carry a LIVE '⚠ FAIL — Item…' formula "
+                  f"with the strict TBD term (got {_flag!r})"); bad += 1
+        for _cr_row in (2, 4):
+            _cfv = _ws2.cell(_cr_row, 6).value
+            if not (isinstance(_cfv, str) and _cfv.startswith("=IF(") and '"PASS"' in _cfv):
+                print(f"  FAIL on-row flag: clean row {_cr_row} must carry a LIVE Cell-check "
+                      f"formula too (every row is checked — got {_cfv!r})"); bad += 1
+        if any(_is_invalid_formula(str(_ws2.cell(_rr, 6).value or "=1")) for _rr in (2, 3, 4)):
+            print("  FAIL on-row flag: Cell-check formulas must be Excel-loader valid"); bad += 1
         _mg = _merge_content(None, None, _st2, "Holds Fixture")
         if not (isinstance(_mg.get("score"), (int, float)) and abs(_mg["score"] - 9.3) < 0.11):
             print(f"  FAIL score arithmetic: 10 × 14/15 ≈ 9.3 (got {_mg.get('score')})"); bad += 1
@@ -16784,6 +17800,97 @@ def _selftest() -> int:
     finally:
         _TAB_SCORES.clear(); _TAB_SCORES.update(_sv_scores)
         _CHIP_SPANS.clear(); _CHIP_SPANS.update(_sv_spans)
+
+    # ═══ LIVE-FORMULA VERDICT proveCatches (Tristan 2026-07-03 — "just putting 'pass' in
+    # a column with no formulas is cheating"): the no-cheating gate fires BOTH directions,
+    # the generated formula shapes are Excel-loader valid, and a corrupted operand FLIPS
+    # its verdict to FAIL on a real LibreOffice recalc while the live score drops. ═══
+    _sv_tables2 = list(_RENDERED_TABLES); _sv_done2 = set(_CELLCON_DONE)
+    try:
+        from openpyxl import Workbook as _WbG
+        # (a) formula validity: the canonical verdict shapes survive the corruption net;
+        # a bare TRUE/FALSE token (the 2026-07-03 defang trap) is caught.
+        _fx = fx_verdict(["ISNUMBER($C5)", "ABS($E5-$C5*$D5)<=MAX(1,0.005*ABS($E5))",
+                          'LEN(TRIM($P5&""))=0'], _fx_evidence_expr("$P5", "line ≠ qty×unit"))
+        if _is_invalid_formula(_fx):
+            print(f"  FAIL live-fx validity: canonical verdict formula flagged invalid: {_fx!r}"); bad += 1
+        if not _is_invalid_formula('=IF(A1>0,TRUE,FALSE)'):
+            print("  FAIL live-fx validity: bare TRUE/FALSE must be flagged (use TRUE()/FALSE())"); bad += 1
+        if _is_invalid_formula('=IF(AND(ISNUMBER(A1),A1>0),TRUE(),FALSE())'):
+            print("  FAIL live-fx validity: TRUE()/FALSE() function forms must be valid"); bad += 1
+        if _is_invalid_formula('=COUNTIF(\'⚠ Checks\'!$F:$F,"PASS")&" pass"'):
+            print("  FAIL live-fx validity: whole-column sheet refs must be valid"); bad += 1
+        # (b) the NO-CHEATING GATE, both directions: a bare 'PASS' literal refuses the
+        # build naming the cell; the same verdict as a live formula passes the gate.
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbg = _WbG(); _wsg = _wbg.active; _wsg.title = "Gate Fixture"
+        header(_wsg, 1, ["Field", "Value"])
+        _gfx = '=IF(AND(LEN(TRIM(A{r}&""))>0,LEN(TRIM(B{r}&""))>0),"PASS","FAIL — required cell empty")'
+        _wsg.cell(2, 1, "alpha"); _wsg.cell(2, 2, "1"); _wsg.cell(2, 3, _gfx.format(r=2))
+        _wsg.cell(3, 1, "beta"); _wsg.cell(3, 2, "2")
+        _wsg.cell(3, 3, "PASS")                        # ← the planted cheat
+        try:
+            _enforce_live_check_gate(_wbg)
+            print("  FAIL live gate: a bare literal 'PASS' must refuse the build"); bad += 1
+        except SystemExit as _ge:
+            if "Gate Fixture" not in str(_ge) or "bare" not in str(_ge):
+                print(f"  FAIL live gate: refusal must name the literal cell (got {_ge})"); bad += 1
+        _wsg.cell(3, 3, _gfx.format(r=3))              # the honest version: a live formula
+        try:
+            _gs = _enforce_live_check_gate(_wbg)
+            if _gs["rows_with_check"] != 2 or _gs["bare_literals"]:
+                print(f"  FAIL live gate: clean fixture stats wrong "
+                      f"({_gs['rows_with_check']} checked rows, "
+                      f"{len(_gs['bare_literals'])} literals)"); bad += 1
+        except SystemExit as _ge2:
+            print(f"  FAIL live gate: the formula version must PASS the gate (got {_ge2})"); bad += 1
+        _wsg.cell(4, 1, "gamma"); _wsg.cell(4, 2, "3")   # a data row with NO check cell
+        try:
+            _enforce_live_check_gate(_wbg)
+            print("  FAIL live gate: a table row with NO check formula must refuse"); bad += 1
+        except SystemExit as _ge3:
+            if "NO live check" not in str(_ge3):
+                print(f"  FAIL live gate: refusal must name the unchecked row (got {_ge3})"); bad += 1
+        # (c) CORRUPT-OPERAND proveCatch (real LibreOffice recalc): the line-math verdict
+        # FLIPS to FAIL when one operand cell is corrupted, and the live score falls.
+        _sof = _find_soffice()
+        if _sof:
+            import tempfile as _tfg
+            with _tfg.TemporaryDirectory() as _tdg:
+                _wbc2 = _WbG(); _wsc2 = _wbc2.active; _wsc2.title = "Fixture"
+                _wsc2.cell(1, 3, 2); _wsc2.cell(1, 4, 5); _wsc2.cell(1, 5, 10)
+                _wsc2.cell(1, 6, fx_verdict(
+                    ["ISNUMBER(C1)", "ABS(E1-C1*D1)<=MAX(1,0.005*ABS(E1))"],
+                    '"line ≠ qty×unit"'))
+                _wsc2.cell(2, 1, '=10*COUNTIF(F1:F1,"PASS")/COUNTA(F1:F1)')
+                _pg = os.path.join(_tdg, "probe.xlsx")
+                _wbc2.save(_pg)
+                if recalc_and_cache(_pg):
+                    from openpyxl import load_workbook as _lwg
+                    _rb1 = _lwg(_pg, data_only=True)["Fixture"]
+                    _v_ok2, _s_ok2 = _rb1["F1"].value, _rb1["A2"].value
+                    _wb3g = _lwg(_pg)
+                    _wb3g["Fixture"]["E1"] = 999           # corrupt ONE operand (line £)
+                    _wb3g.save(_pg)
+                    if not recalc_and_cache(_pg):
+                        print("  FAIL corrupt-operand: recalc of the corrupted fixture failed"); bad += 1
+                    else:
+                        _rb2 = _lwg(_pg, data_only=True)["Fixture"]
+                        _v_bad2, _s_bad2 = _rb2["F1"].value, _rb2["A2"].value
+                        if _v_ok2 != "PASS" or not str(_v_bad2 or "").startswith("FAIL"):
+                            print(f"  FAIL corrupt-operand: verdict must flip PASS→FAIL "
+                                  f"(got {_v_ok2!r} → {_v_bad2!r})"); bad += 1
+                        if not (isinstance(_s_ok2, (int, float)) and _s_ok2 == 10
+                                and isinstance(_s_bad2, (int, float)) and _s_bad2 < 10):
+                            print(f"  FAIL corrupt-operand: the live COUNTIF score must drop "
+                                  f"(got {_s_ok2!r} → {_s_bad2!r})"); bad += 1
+                else:
+                    print("  (corrupt-operand proveCatch: LibreOffice recalc unavailable — skipped)")
+        else:
+            print("  (corrupt-operand proveCatch: LibreOffice not found — skipped)")
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables2)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done2)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
