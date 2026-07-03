@@ -1748,12 +1748,10 @@ export function mintDemandCoverage(
         // branches + 2 per delivery group at the plant/irrigation room (v61: 2 × 20 + 4 =
         // the brief's stated 44); ring = out-and-return legs along each group's delivery
         // spine; DN from d = √(4Q/πv) at ≤ 1.3 m/s (25 m³/h → DN90, the brief's stated DN).
-        // PRICING HOOK (routed, not edited here): requirements_bom.py's
-        // _DISTRIBUTION_SEGMENTS / station-allowance families do not yet read
-        // `hand_watering_*` keys — adding the two segment entries + a tap-station allowance
-        // there (file owned elsewhere) turns these quantities into priced BoM lines; until
-        // then they carry the full derivation and the Brief reconciliation stays honestly
-        // short on the hand-watering section.
+        // PRICING: requirements_bom.py's _DISTRIBUTION_SEGMENTS reads
+        // `hand_watering_ring_main_*` (one length segment) and the tap-station
+        // allowance reads `hand_watering_riser_count` — these quantities become
+        // priced section-E BoM rows (parametric basis stated on each).
         let hwKey = ''
         let hwFlow = 0
         for (const k of r8Keys) {

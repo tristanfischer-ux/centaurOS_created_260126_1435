@@ -2990,7 +2990,9 @@ def _selftest() -> int:
     _drows = _distribution_network_rows(_dq)
     if len(_drows) != 4:
         print(f"  FAIL distribution rows: want 4 (2 segments + inlets + zone kits), got {len(_drows)}"); bad += 1
-    else:
+    if any("hand" in str(r["requirement"]).lower() for r in _drows):
+        print("  FAIL hand-watering rows minted WITHOUT the rule-8b quantities (must be a no-op)"); bad += 1
+    if len(_drows) == 4:
         _lat = next((r for r in _drows if "zone laterals" in r["requirement"]), None)
         _want_lat = round(8280 * _pvc_supply_rate_per_m(75))
         if not _lat or _lat["line_gbp"] != _want_lat:
@@ -3025,6 +3027,60 @@ def _selftest() -> int:
         print("  FAIL distribution rows must be [] with no zoned-delivery quantities (BESS/SAF/CO2/RAS byte-identity)"); bad += 1
     if _distribution_network_rows({"connected_electrical_load_kw": {"value": 53}}) != []:
         print("  FAIL distribution rows must ignore unrelated quantities"); bad += 1
+
+    # ── (k2) RULE-8b HAND-WATERING RING MAIN PRICING (client section E, 2026-07-03) —
+    # proveCatch: the sizer's hand_watering_ring_main_* quantities price as ONE length-priced
+    # DN90 segment (same supply-only £/m model as the section-D segments) + ONE per-station
+    # allowance, with EXACT conservation (length × rate + count × allowance), a 'client
+    # section E scope' basis on both, and a strict no-op when absent (proven above: the
+    # _dq run without the keys mints no hand-watering row; {} → []).
+    _dqh = dict(_dq)
+    _dqh.update({
+        "hand_watering_ring_main_length_m": {
+            "value": 428, "source": "demand-coverage",
+            "source_detail": "parametric — not routed: 2 delivery group(s) × 2 legs × 107 m spine"},
+        "hand_watering_ring_main_dn_mm": {"value": 90},
+        "hand_watering_riser_count": {
+            "value": 44, "source": "demand-coverage",
+            "source_detail": "parametric — not routed: 2/branch × 20 branches + 2/group = 44"},
+    })
+    _hrows = _distribution_network_rows(_dqh)
+    if len(_hrows) != 6:
+        print(f"  FAIL hand-watering pricing: want 6 rows (3 segments + inlets + kits + stations), got {len(_hrows)}"); bad += 1
+    else:
+        _ring = next((r for r in _hrows if "ring main" in r["requirement"].lower()), None)
+        _stat = next((r for r in _hrows if "tap/hose stations" in r["requirement"]), None)
+        _hw_rate = _pvc_supply_rate_per_m(90)
+        if not _ring or _ring["line_gbp"] != round(428 * _hw_rate):
+            print(f"  FAIL ring-main line £{_ring and _ring['line_gbp']} want £{round(428 * _hw_rate)} "
+                  f"(428 m × £{_hw_rate}/m DN90 supply share)"); bad += 1
+        if _ring and (_ring["qty"] != 428 or _ring["unit_gbp"] != _hw_rate or _ring.get("uom") != "m"
+                      or _ring.get("size") != "DN90"):
+            print(f"  FAIL ring-main row must be length-priced (qty 428 m × £{_hw_rate}/m, uom 'm', DN90); "
+                  f"got qty {_ring['qty']} × £{_ring['unit_gbp']}, uom {_ring.get('uom')!r}, size {_ring.get('size')!r}"); bad += 1
+        if not _stat or _stat["line_gbp"] != 44 * round(_HAND_WATERING_STATION_GBP):
+            print(f"  FAIL tap-station allowance £{_stat and _stat['line_gbp']} want £{44 * round(_HAND_WATERING_STATION_GBP)}"); bad += 1
+        if _stat and (_stat["qty"] != 44 or _stat["unit_gbp"] != round(_HAND_WATERING_STATION_GBP)):
+            print(f"  FAIL tap-station row shape: got qty {_stat['qty']} × £{_stat['unit_gbp']} "
+                  f"want 44 × £{round(_HAND_WATERING_STATION_GBP)}"); bad += 1
+        # EXACT conservation of the section-E addition: length × rate + count × allowance
+        _e_add = sum(r["line_gbp"] for r in _hrows) - sum(r["line_gbp"] for r in _drows)
+        _e_want = round(428 * _hw_rate) + 44 * round(_HAND_WATERING_STATION_GBP)
+        if _e_add != _e_want:
+            print(f"  FAIL section-E conservation: added £{_e_add} want £{_e_want} "
+                  f"(428 m × £{_hw_rate}/m + 44 × £{_HAND_WATERING_STATION_GBP:g})"); bad += 1
+        for _hr in (_ring, _stat):
+            if _hr and "parametric estimate — client section E scope" not in _hr["basis"]:
+                print(f"  FAIL {_hr['requirement'][:40]!r} basis must state the 'client section E scope' provenance"); bad += 1
+            if _hr and _hr["status"] != "PARAMETRIC":
+                print(f"  FAIL {_hr['requirement'][:40]!r} must carry PARAMETRIC status"); bad += 1
+        if _ring and "supply" not in _ring["basis"].lower():
+            print("  FAIL ring-main basis must state the supply-only share (no install double-count)"); bad += 1
+        if _stat and "allowance" not in _stat["basis"]:
+            print("  FAIL tap-station basis must state the per-station allowance breakdown"); bad += 1
+        # the section-D rows are UNTOUCHED by the hand-watering keys (same 4 rows, same £)
+        if [r for r in _hrows if "hand" not in r["requirement"].lower()] != _drows:
+            print("  FAIL section-D distribution rows changed when the hand-watering keys appeared"); bad += 1
 
     # (l) DEMAND-SIZED DUTY PROVENANCE (gate-36 round 3, 2026-07-03): a row whose m³/h duty
     # equals a contract *_demand_* flow gets the demand derivation stamped on its basis (so
@@ -3137,14 +3193,26 @@ def _pvc_supply_rate_per_m(dn_mm: float) -> float:
     return round(_hdpe_rate_per_m(dn_mm) * _PVC_SUPPLY_SHARE, 1)
 
 
-# The parametric network segments, in fixed render order (deterministic bill).
+# The parametric network segments, in fixed render order (deterministic bill). Each entry:
+# (quantity-key base, row label, basis SCOPE phrase — which client section owns the line).
+_DIST_SCOPE_D = ("zoned-delivery distribution network (engineered allowance, NOT "
+                 "per-pipe routed; client distribution-section scope)")
+# rule-8b HAND-WATERING RING MAIN (client section E, 2026-07-03): the universal sizer
+# mints hand_watering_ring_main_length_m / _dn_mm from the brief's OWN signals (the
+# 25 m³/h manual duty + the established zoned-delivery geometry — 2 groups × 2 legs
+# along the delivery spine, DN from d = √(4Q/πv) ≤ 1.3 m/s). The segment loop below
+# prices it exactly like the section-D segments (supply-only £/m share, qty-in-metres);
+# absent quantities (BESS / SAF / CO₂ / RAS) → the loop skips it, bill byte-identical.
+_DIST_SCOPE_E = ("client section E scope (hand-watering ring main — engineered "
+                 "allowance, NOT per-pipe routed)")
 _DISTRIBUTION_SEGMENTS = [
-    ("distribution_main", "Zoned distribution — department delivery mains"),
-    ("distribution_riser", "Zoned distribution — delivery risers"),
-    ("distribution_zone_lateral", "Zoned distribution — zone laterals (flood-fill lines)"),
-    ("distribution_drain_riser", "Zoned distribution — drain/return risers (gravity)"),
-    ("distribution_drain_collection", "Zoned distribution — drain collection lines"),
-    ("distribution_drain_main", "Zoned distribution — main drain headers"),
+    ("distribution_main", "Zoned distribution — department delivery mains", _DIST_SCOPE_D),
+    ("distribution_riser", "Zoned distribution — delivery risers", _DIST_SCOPE_D),
+    ("distribution_zone_lateral", "Zoned distribution — zone laterals (flood-fill lines)", _DIST_SCOPE_D),
+    ("distribution_drain_riser", "Zoned distribution — drain/return risers (gravity)", _DIST_SCOPE_D),
+    ("distribution_drain_collection", "Zoned distribution — drain collection lines", _DIST_SCOPE_D),
+    ("distribution_drain_main", "Zoned distribution — main drain headers", _DIST_SCOPE_D),
+    ("hand_watering_ring_main", "Hand watering — ring main to both departments", _DIST_SCOPE_E),
 ]
 
 # Per-connection supply allowances (£, ex-works fittings/stub materials — stated basis):
@@ -3154,14 +3222,21 @@ _DISTRIBUTION_SEGMENTS = [
 _DIST_INLET_STUB_GBP = 6.0
 _DIST_DRAIN_OUTLET_GBP = 9.0
 _DIST_ZONE_KIT_GBP = 40.0
+# hand-watering tap/hose station (rule 8b, client section E): each of the brief's risers
+# carries a hand valve + quick connector off the ring main. Supply-only materials
+# allowance per station: brass hand valve ~£14 + quick-release hose coupler ~£9 +
+# ring-main tee, riser stub + clamps ~£22 (ex-works) = £45.
+_HAND_WATERING_STATION_GBP = 45.0
 
 
 def _distribution_network_rows(q):
     """The parametric zoned-distribution network as BoM lines — one line per DN segment
-    family plus the per-connection allowances. Reads ONLY the `distribution_*` quantities
-    the universal sizer minted with 'parametric — not routed' provenance (absent on every
-    non-zoned archetype → returns [] and the bill is byte-identical). Lengths price at the
-    supply share of the existing installed £/m model (see _PVC_SUPPLY_SHARE)."""
+    family plus the per-connection allowances. Reads ONLY the `distribution_*` (rule 8,
+    client section D) and `hand_watering_ring_main_*` / `hand_watering_riser_count`
+    (rule 8b, client section E) quantities the universal sizer minted with 'parametric —
+    not routed' provenance (absent on every non-zoned archetype → returns [] and the bill
+    is byte-identical). Lengths price at the supply share of the existing installed £/m
+    model (see _PVC_SUPPLY_SHARE)."""
     q = q or {}
 
     def _qv(key):
@@ -3221,7 +3296,7 @@ def _distribution_network_rows(q):
             r.update(extra)
         rows.append(r)
 
-    for base, label in _DISTRIBUTION_SEGMENTS:
+    for base, label, scope in _DISTRIBUTION_SEGMENTS:
         length_m = _qv(f"{base}_length_m")
         dn = _qv(f"{base}_dn_mm")
         if not length_m or not dn:
@@ -3233,8 +3308,7 @@ def _distribution_network_rows(q):
             f"{label} · DN{int(dn)} PVC-U · {length_m:,.0f} m",
             f"DN{int(dn)} PVC-U pressure pipe + fittings + hangers, {length_m:,.0f} m (supply)",
             length_m, rate,
-            f"parametric estimate — zoned-delivery distribution network (engineered allowance, "
-            f"NOT per-pipe routed; client distribution-section scope): {length_m:,.0f} m × "
+            f"parametric estimate — {scope}: {length_m:,.0f} m × "
             f"£{rate:g}/m supply-only materials ({_PVC_SUPPLY_SHARE:.0%} of the uk-2026 "
             f"supply+install £{installed_rate:.0f}/m @ DN{int(dn)}; installation labour is "
             f"carried by the cost-stack field-install factors — no double count) · "
@@ -3274,6 +3348,18 @@ def _distribution_network_rows(q):
             f"actuated valve assemblies themselves are priced on their own BoM line "
             f"(assembly family £/DN) — this kit is the pipework tie-in only, no double count "
             f"· {_detail('distribution_zone_kits')}",
+        )
+    stations = _qv("hand_watering_riser_count")
+    if stations:
+        _row(
+            f"Hand watering — tap/hose stations (riser, hand valve + quick connector) · {stations:,.0f} off",
+            "Ring-main riser stub-in: brass hand valve, quick-release hose coupler, tee + clamps (supply)",
+            int(stations), _HAND_WATERING_STATION_GBP,
+            f"parametric estimate — {_DIST_SCOPE_E}: {stations:,.0f} tap/hose stations × "
+            f"£{_HAND_WATERING_STATION_GBP:g} per-station materials allowance (brass hand valve "
+            f"~£14 + quick-release hose coupler ~£9 + ring-main tee, riser stub + clamps ~£22, "
+            f"ex-works; installation labour is carried by the cost-stack field-install factors "
+            f"— no double count) · {_detail('hand_watering_riser_count')}",
         )
     return rows
 
