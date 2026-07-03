@@ -60,6 +60,7 @@ import {
 } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { createHash } from 'crypto'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
+import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
@@ -7981,6 +7982,79 @@ async function main() {
         console.error(`[chain] bom-cost-grounding failed (non-fatal): ${(err as Error).message}`)
         logAction({ step: 'bom_cost_grounding', ok: false, error: String(err).slice(0, 200) })
       }
+    }
+
+    // ── DISTRIBUTOR-CATALOGUE PRICE ADOPTION (gate-21 alignment, 2026-07-03) ──
+    //    THE RULE (codema v58 exit-21 block): a line carrying a REAL pinned MPN whose
+    //    price exists in the DB-cached cascade (the SAME source gate 21 reads —
+    //    lookupCached, DB-only, zero quota) ADOPTS the cascade price; its parametric
+    //    estimate survives only as a note. This is the LAST price mutation before the
+    //    state persists for render + gate 21 — it runs AFTER every estimate-minting
+    //    pass (physics bottom-up, R1 anchor re-price, bom-cost-grounding), which is
+    //    why the v58 £420 parametric-physics stamp survived: nothing preferred the
+    //    engine's own DB over the engine's own estimate. Never adopts onto TBD /
+    //    placeholder MPNs; never overrides an explicit distributor-sourced price
+    //    (emitter list_price pin, corpus price, take-off, db_cache); sanity band
+    //    > £0.50. Roll-up children keep their exclusion and the parent re-bases by
+    //    the delta so totals stay honest. Proven by
+    //    scripts/lib/cascade-price-adoption.ts --selftest + the gate-21 registry proof.
+    try {
+      const tAdopt = Date.now()
+      const adoption = adoptCascadePrices(liveState)
+      if (adoption.adoptions.length > 0) {
+        console.error(
+          `[chain] cascade-price adoption: ${adoption.adoptions.length} line(s) re-based to the DB-cached ` +
+          `distributor catalogue (the same source gate 21 reads); ${adoption.parent_rebases.length} parent roll-up(s) re-based`,
+        )
+        for (const a of adoption.adoptions) {
+          console.error(`  ↳ ${a.word_id} (${a.manufacturer ?? '?'} ${a.part_number}): £${a.previous_price_gbp?.toFixed(2) ?? '—'} → £${a.adopted_price_gbp.toFixed(2)} — ${a.basis}`)
+        }
+        // The pre-adoption cost_reality / costStack totals are now stale by the adopted
+        // delta — refresh BOTH from the post-adoption partVerifications with the SAME
+        // summation the G2 gate uses, so gate verdicts + cover figures agree.
+        try {
+          const qtyByWid = new Map<string, number>()
+          for (const m of (liveState.moduleDecomposition?.modules ?? []))
+            for (const sm of (m.sub_modules ?? []))
+              for (const w of (sm.words ?? [])) {
+                let qy = 1
+                const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+                if (qmod) { const n = parseInt(String(qmod.value).replace(/[×x,\s]/g, ''), 10); if (Number.isFinite(n) && n > 0) qy = n }
+                if (w.id) qtyByWid.set(String(w.id), qy)
+              }
+          let adoptedBomTotal = 0
+          for (const v of (Array.isArray(liveState.partVerifications) ? liveState.partVerifications : [])) {
+            const unit = Number(v.distributor_price_gbp) > 0 ? Number(v.distributor_price_gbp)
+              : (Number(v.price_estimate_gbp) > 0 ? Number(v.price_estimate_gbp) : 0)
+            if (unit <= 0 || v.cost_repair_excluded_from_subtotal === true) continue
+            adoptedBomTotal += unit * (qtyByWid.get(String(v.word_id ?? '')) ?? 1)
+          }
+          if (adoptedBomTotal > 0) {
+            if (liveState.cost_reality && typeof liveState.cost_reality === 'object') {
+              liveState.cost_reality.bom_total_gbp = Math.round(adoptedBomTotal)
+              liveState.cost_reality.order_of_magnitude = Math.round(Math.log10(adoptedBomTotal) * 10) / 10
+            }
+            if (liveState.costStack && typeof liveState.costStack === 'object') {
+              const { ratios: adRatios, class_key: adClassKey } = resolveCostStack(liveState)
+              liveState.costStack = computeCostStack(adoptedBomTotal, adRatios, adClassKey)
+            }
+            console.error(`[chain] cascade-price adoption: cost_reality + costStack refreshed to the post-adoption BoM £${Math.round(adoptedBomTotal).toLocaleString('en-GB')}`)
+          }
+        } catch (refreshErr) {
+          console.error(`[chain] cascade-price adoption: totals refresh threw: ${(refreshErr as Error).message}; continuing`)
+        }
+      }
+      logAction({
+        step: 'cascade_price_adoption', ok: true,
+        adoptions: adoption.adoptions.length, parent_rebases: adoption.parent_rebases.length,
+        scanned: adoption.scanned, skipped_explicit_distributor: adoption.skipped_explicit_distributor,
+        skipped_no_cache_price: adoption.skipped_no_cache_price,
+        adopted_lines: adoption.adoptions.map((a) => ({ word_id: a.word_id, part_number: a.part_number, from_gbp: a.previous_price_gbp, to_gbp: a.adopted_price_gbp, basis: a.basis })),
+        latency_ms: Date.now() - tAdopt,
+      })
+    } catch (err) {
+      console.error(`[chain] cascade-price adoption failed (non-fatal): ${(err as Error).message}`)
+      logAction({ step: 'cascade_price_adoption', ok: false, error: String(err).slice(0, 200) })
     }
 
     // ── Final emitter-identity re-assert (2026-05-31): the deterministic emitter

@@ -73,12 +73,14 @@ import { lookupCached } from '../../src/lib/pdf-engine-v2/lib/distributors/db-on
 // Flagging them would be noise (e.g. "M6 bolt" returns thousands of results;
 // the qty-1 price of the cheapest M6 fastener is meaningless as a benchmark
 // for a high-volume structural fastener order).
-const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|standard|n\/?a|tbd|various|custom|bespoke|oem|\d{1,4}mm?\s*(?:angle|plate|rod|tube|pipe|cable|wire|bracket|channel|gland|trunking)?|\d+(?:\.\d+)?\s*(?:A|V|W|kW|kVA|kWh|MWh|Hz|mm|m|kg)\s*[-_/]?\s*\w*)$/i
+// Exported: cascade-price-adoption.ts reuses BOTH skip regexes so the adoption
+// rule and this gate share ONE matcher (adoption only acts where gate 21 audits).
+export const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|standard|n\/?a|tbd|various|custom|bespoke|oem|\d{1,4}mm?\s*(?:angle|plate|rod|tube|pipe|cable|wire|bracket|channel|gland|trunking)?|\d+(?:\.\d+)?\s*(?:A|V|W|kW|kVA|kWh|MWh|Hz|mm|m|kg)\s*[-_/]?\s*\w*)$/i
 
 // Short alphanumeric (≤4 chars) — too ambiguous to reliably identify at
 // a distributor. The qty-1 price returned for a 4-char token would be
 // unreliable as a benchmark.
-const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
+export const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
 
 // ── PRICE LOOKUP (DB-ONLY) ────────────────────────────────────────────────────
 //

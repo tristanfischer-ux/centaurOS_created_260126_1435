@@ -34,6 +34,7 @@ import { extractOccurrences, cluster, buildFindings } from './cross-page-numeric
 import { auditJurisdictionalStandards } from './jurisdictional-standards-audit'
 import { STRUCTURED_PN_REGEX } from './fictional-pn-audit'
 import { classifySeverity } from './per-line-price-plausibility-audit'
+import { selftestCascadePriceAdoption } from './cascade-price-adoption'
 import { missingHardSlots } from '../../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runPayloadRatingAudit } from '../../src/lib/pdf-engine-v2/lib/payload-rating-audit'
 import { evaluateSelfAuditEnforcement } from './semantic-self-audit'
@@ -174,7 +175,13 @@ export const GATES: GateProof[] = [
   },
   {
     code: 21, name: 'per-line-price-plausibility', intent: 'a line priced >5× (or <0.2×) the catalogue price (a £18 part billed £180)',
-    proveCatch: () => classifySeverity(180 / 18) === 'HIGH' && classifySeverity(30 / 3000) === 'HIGH' && classifySeverity(100 / 90) === 'PASS',
+    // Two proofs: (a) the gate's severity decision FIRES on a 10×/0.01× line; (b) the gate's
+    // FIX-SIDE rule — cascade-price adoption (2026-07-03, codema v58: real pinned MPN whose
+    // price exists in the DB cascade ADOPTS it; a TBD MPN never adopts; an explicit
+    // distributor-sourced price is never overridden) — proves its catch on in-memory fixtures
+    // with an injected lookup (no DB dependency).
+    proveCatch: () => classifySeverity(180 / 18) === 'HIGH' && classifySeverity(30 / 3000) === 'HIGH' && classifySeverity(100 / 90) === 'PASS'
+      && selftestCascadePriceAdoption().ok,
     enforcedByDefault: gateBlockEnforced,
   },
   {

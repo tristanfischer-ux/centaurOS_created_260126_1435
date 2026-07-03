@@ -2120,6 +2120,26 @@ def _bespoke_class(name: str) -> str:
     return "none"
 
 
+def _catalogue_pinned_child(kmd, child_price):
+    """CATALOGUE-ADOPTED sub-component (cascade-price-adoption, 2026-07-03 codema v58):
+    a child word whose `price_basis` modifier is a distributor-catalogue quote renders its
+    OWN catalogue price + that basis — never a scaled share of the parent (the v58
+    Differential-Pressure Switch: £420 parametric share vs db:mouser £45.68). Returns
+    (unit_gbp, basis) to PIN the row (treated as capped, so pass-2 reconciliation cannot
+    re-inflate it), or None for every non-adopted child (BESS/SAF byte-identity rides on
+    the None path)."""
+    pb = str((kmd or {}).get("price_basis") or "").strip()
+    if not pb.lower().startswith("distributor catalogue"):
+        return None
+    try:
+        p = float(child_price or 0)
+    except (TypeError, ValueError):
+        return None
+    if p <= 0:
+        return None
+    return round(p), pb
+
+
 def _selftest() -> int:
     """Guards the head-noun rule that the qualifier-over-match bug (2026-06-13) broke."""
     cases = {
@@ -3035,6 +3055,21 @@ def _selftest() -> int:
         print("  FAIL demand-sized stamp must be idempotent"); bad += 1
     if _apply_demand_sized_basis([dict(_dsr[0], basis="catalogue")], {"nameplate_capacity_kwh": {"value": 2912, "unit": "kWh", "source_detail": "16 racks × 182 kWh"}}) != 0:
         print("  FAIL demand-sized must ignore non-demand and non-flow quantities (BESS byte-identity)"); bad += 1
+
+    # (m) CATALOGUE-ADOPTED SUB-COMPONENT PIN (cascade-price-adoption, 2026-07-03): a child
+    # whose price_basis modifier is a distributor-catalogue quote renders its OWN price +
+    # basis (pinned); every non-adopted child returns None — BESS/SAF byte-identity rides
+    # on the None path.
+    _cat_hit = _catalogue_pinned_child(
+        {"price_basis": "distributor catalogue (db:mouser £45.68) — supersedes parametric estimate £420.00"}, 45.68)
+    if _cat_hit != (46, "distributor catalogue (db:mouser £45.68) — supersedes parametric estimate £420.00"):
+        print(f"  FAIL catalogue-pinned child must render its own price + basis, got {_cat_hit!r}"); bad += 1
+    if _catalogue_pinned_child({"price_basis": "physics-sized"}, 45.68) is not None:
+        print("  FAIL non-catalogue price_basis must not pin (byte-identity)"); bad += 1
+    if _catalogue_pinned_child({}, 45.68) is not None:
+        print("  FAIL missing price_basis must not pin (byte-identity)"); bad += 1
+    if _catalogue_pinned_child({"price_basis": "distributor catalogue (db:mouser £45.68)"}, 0) is not None:
+        print("  FAIL a £0 child never pins (catalogue price must be plausible)"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -4594,12 +4629,18 @@ def assemble(out_dir: str):
                         # bare-commodity ceiling. line_gbp stays 0 → grand total unchanged.
                         kcap_pn = kpn if _is_structured_pn(kpn) else (pv_pn.get(kwid) or kpn)
                         was_capped = False
-                        kc, kcb = _commodity_catalogue_cap(kn, kcap_pn, float(scaled), dist_price.get(kwid))
-                        if kcb is not None:
-                            scaled, kbasis, was_capped = round(kc), kbasis + " · " + kcb, True
-                        kce, kceb = _apply_commodity_ceiling(kn, kmd, float(scaled), krat)
-                        if kceb is not None:
-                            scaled, kbasis, was_capped = round(kce), kbasis + " · " + kceb, True
+                        _cat = _catalogue_pinned_child(kmd, _child_price(k))
+                        if _cat is not None:
+                            # catalogue-adopted child: its REAL distributor price + basis,
+                            # pinned so pass-2 never re-inflates it back to a parent share.
+                            scaled, kbasis, was_capped = _cat[0], _cat[1], True
+                        else:
+                            kc, kcb = _commodity_catalogue_cap(kn, kcap_pn, float(scaled), dist_price.get(kwid))
+                            if kcb is not None:
+                                scaled, kbasis, was_capped = round(kc), kbasis + " · " + kcb, True
+                            kce, kceb = _apply_commodity_ceiling(kn, kmd, float(scaled), krat)
+                            if kceb is not None:
+                                scaled, kbasis, was_capped = round(kce), kbasis + " · " + kceb, True
                         kid_rows.append({"tag": f"{tag}.{i}",
                                          "requirement": f"↳ {kn}" + (f" · {krat}" if krat else ""),
                                          "status": "SUB-COMPONENT", "part": "assembly detail", "qty": 1,
