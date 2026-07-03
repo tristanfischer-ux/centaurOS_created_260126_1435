@@ -3161,13 +3161,26 @@ def _render_audit_findings(ws: Worksheet, report, state: Optional[dict], r: int)
                 continue
             _v = str(f.get("verdict", "")).lower()
             _fill, _font = _VF.get(_v, (FILL_LEGACY, FONT_NOTE))
-            ws.cell(r, 1, clean_cell(f.get("dimension", ""))).border = BORDER
+            _dim = clean_cell(f.get("dimension", "")) or "dimension"
+            ws.cell(r, 1, _dim).border = BORDER
             _c2 = ws.cell(r, 2, clean_cell(f.get("expected", ""))); _c2.alignment = WRAP_TOP; _c2.border = BORDER
             _c3 = ws.cell(r, 3, clean_cell(f.get("deterministic", ""))); _c3.alignment = WRAP_TOP; _c3.border = BORDER
             _rt = f.get("ratio")
             _c4 = ws.cell(r, 4, (f"{_rt:.2f}×" if isinstance(_rt, (int, float)) else "—")); _c4.border = BORDER
-            _note = (str(f.get("verdict", "")) + " — " + str(f.get("note", ""))).strip(" —")
-            _c5 = ws.cell(r, 5, clean_cell(_note)); _c5.alignment = WRAP_TOP
+            # LIVE formula (Tristan 2026-07-03, the OK-literal fix — this cell used to
+            # paint "ok — within the benchmark envelope" as a bare python string). The
+            # LLM's own verdict word + note (benchmarkDivergence.findings[], a
+            # python-computed classification from an external tool call) are EMBEDDED as
+            # audit operands — the sanctioned pattern for exactly this case (machinery
+            # header comment above) — and the cell concatenates them IN-FORMULA.
+            _vop = audit_operand(
+                "Benchmark net", f"{_dim} — LLM verdict", f.get("verdict", ""),
+                "benchmarkDivergence.findings[].verdict (scripts/lib/benchmark-expectation.ts "
+                "— the independent top-down/bottom-up compare)")
+            _nop = audit_operand("Benchmark net", f"{_dim} — LLM note", f.get("note", ""),
+                                 "benchmarkDivergence.findings[].note")
+            _c5 = ws.cell(r, 5, f'=TRIM({_vop}&IF(LEN(TRIM({_nop}&""))>0," — "&{_nop},""))')
+            _c5.alignment = WRAP_TOP
             _c5.fill = _fill; _c5.font = _font; _c5.border = BORDER
             r += 1
         r += 1
@@ -4528,18 +4541,26 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         return ""
 
     ws = wb.create_sheet("Connection trace")
-    set_widths(ws, {"A": 38, "B": 12, "C": 10, "D": 46, "E": 46, "F": 22})
+    set_widths(ws, {"A": 38, "B": 12, "C": 10, "D": 46, "E": 46, "F": 22, "G": 8, "H": 30})
     title_row(ws, "Connection trace — which part connects to what", 6,
               "The ledger authors every connection. INPUTS / OUTPUTS are LIVE cell-references "
               "to the connected part's own row (col A): select a cell and use Formulas ▸ Trace "
               "Precedents / Trace Dependents to draw the arrows, or click through to navigate. "
-              "Each part also carries its Tag. Bidirectionally consistent.")
+              "Each part also carries its Tag. Bidirectionally consistent. Status is a LIVE "
+              "formula: OK only when every endpoint resolves to a real row/boundary AND the "
+              "ledger's own completeness check is clean (columns G/H, muted).")
     # health banner
     sub_banner(ws, 4,
                f"{led.get('count', len(adj))} authored connections   ·   "
                f"completeness: {comp.get('n_concerns', 0)} part(s) missing a required tie   ·   "
                f"referential integrity: {ri.get('n_violations', 0)} broken reference(s)", 6)
     header(ws, 5, ["Part", "Tag", "Status", "Inputs ← (from)", "Outputs → (to)", "Services"])
+    # muted embedded-operand columns (Tristan 2026-07-03, the OK-literal fix): the Status
+    # formula's own operands, right beside the table it judges — same idiom as the
+    # Cabinets section's "Audit: n in" / "Audit: n out" (below) and every other live-check
+    # column in this workbook (machinery header comment, line ~612).
+    ws.cell(5, 7, "Audit: unresolved endpoints (build-computed)").font = _FONT_AUDIT
+    ws.cell(5, 8, "Audit: missing-tie evidence (build-computed)").font = _FONT_AUDIT
 
     # PASS 1 — assign every part a row so inputs/outputs can reference it by cell.
     names_sorted = sorted(adj.keys(), key=lambda s: str(s).lower())
@@ -4560,6 +4581,25 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
             return None
         return "=" + '&", "&'.join(parts)
 
+    def _n_unresolved(conn_names) -> int:
+        """ENDPOINT RESOLUTION (Tristan 2026-07-03, the OK-literal fix): a from/to name
+        this row references is 'resolved' when it either has its OWN row on this table
+        (a live A-cell reference — the tag list this trace itself carries) or is an
+        honest, explicitly-recognised process boundary (_TRACE_BOUNDARY_RE — battery
+        limit, grid tie, atmosphere, …). Anything else is a real part name that the
+        phantom-reference resolver upstream mapped to a genuine BoM part but which never
+        got its own adjacency row — a dangling endpoint. Mirrors exactly what
+        _ref_formula does per name, so the count and the rendered A-cell / literal
+        fallback in D/E can never disagree."""
+        n = 0
+        for nm in dict.fromkeys(conn_names):
+            if nm in name_to_row:
+                continue
+            if _TRACE_BOUNDARY_RE.search(str(nm)):
+                continue
+            n += 1
+        return n
+
     # PASS 2 — write the rows.
     r = first_row
     for name in names_sorted:
@@ -4571,7 +4611,8 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         svcs = ", ".join(sorted({(i.get("service") or "") for i in ins} |
                                 {(o.get("service") or "") for o in outs} - {""})) or "—"
         miss = incomplete.get(name)
-        status = "OK" if not miss else "missing: " + ", ".join(miss)
+        evidence = ", ".join(miss) if miss else ""
+        unresolved = _n_unresolved(in_list) + _n_unresolved(out_list)
         # Part name + tag REFERENCE the master "Part names" tab where the part is a
         # registered principal (one identity across the workbook); literal fallback for
         # boundary / aggregate endpoints the master doesn't carry.
@@ -4590,10 +4631,27 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         else:
             _pt = name_ref(name, "tag")
             ws.cell(r, 2, _pt if _pt else clean_cell(_tag_for(name))).border = BORDER
-        sc = ws.cell(r, 3, clean_cell(status))
+        # Status — a LIVE formula over this row's own embedded operands (Tristan
+        # 2026-07-03: the v65 catch — "OK" was a bare python string with no formula
+        # behind it). $G = unresolved-endpoint count (_n_unresolved, mirrors _ref_formula
+        # exactly), $H = the ledger's own missing-tie evidence ('' = clean). Never a
+        # repainted literal — never a bare "OK" again.
+        ws.cell(r, 7, unresolved).font = _FONT_AUDIT
+        ec = ws.cell(r, 8, evidence)
+        ec.font = _FONT_AUDIT
+        ec.alignment = WRAP_TOP
+        _un_ref, _ev_ref = f"$G{r}", f"$H{r}"
+        _fail_expr = (
+            f'TRIM(IF({_un_ref}>0,{_un_ref}&" unresolved endpoint(s)","")'
+            f'&IF(AND({_un_ref}>0,LEN(TRIM({_ev_ref}&""))>0),"; ","")'
+            f'&TRIM({_ev_ref}&""))')
+        _status_fx = fx_verdict(
+            [f'{_un_ref}=0', f'LEN(TRIM({_ev_ref}&""))=0'],
+            _fail_expr, pass_text="✓ OK", fail_prefix="✗ ISSUE — ")
+        sc = ws.cell(r, 3, _status_fx)
         sc.border = BORDER
-        if miss:
-            sc.font = Font(color="C00000", bold=True)
+        _row_ok = (unresolved == 0 and not evidence)
+        sc.font = FONT_PASS if _row_ok else FONT_FAIL
         in_f = _ref_formula(in_list)
         ci = ws.cell(r, 4, in_f if in_f else "—")
         ci.alignment = WRAP_TOP
@@ -4604,6 +4662,15 @@ def tab_connection_trace(wb: Workbook, state: dict, run_dir: str) -> bool:
         co.border = BORDER
         ws.cell(r, 6, clean_cell(svcs)).border = BORDER
         r += 1
+    if r > first_row:
+        # NOT n_pass/n_total (Tristan 2026-07-03): this column's PASS text is "✓ OK", not
+        # the literal "PASS" _write_live_scores' COUNTIF(...,"PASS") convention expects —
+        # registering counts here would silently degrade the tab's live score formula on
+        # a text-match mismatch. Same choice the Cabinets "Connectors" column (below,
+        # also ✓/✗-styled) already makes. The gate itself doesn't need n_pass/n_total —
+        # it recognises a check formula by the ✓/✗ marker regardless.
+        _register_check_range(ws.title, "C", first_row, r - 1)
+        _cf_verdict(ws, f"C{first_row}:C{r - 1}")
     ws.freeze_panes = "A6"
     ws.auto_filter.ref = f"A5:F{max(6, r - 1)}"
     # ── Cabinets section (Tristan 2026-06-24 consolidation): the deterministic proof
@@ -13220,13 +13287,22 @@ def tab_benchmark(wb: Workbook, state: dict) -> None:
         for f in findings:
             if not isinstance(f, dict):
                 continue
-            ws.cell(r, 1, clean_cell(f.get("dimension", ""))).font = FONT_SUB
+            _dim2 = clean_cell(f.get("dimension", "")) or "dimension"
+            ws.cell(r, 1, _dim2).font = FONT_SUB
             ws.cell(r, 2, clean_cell(str(f.get("expected", "")))).alignment = WRAP_TOP
             ws.cell(r, 3, clean_cell(str(f.get("deterministic", "")))).alignment = WRAP_TOP
             rr = f.get("ratio")
             ws.cell(r, 4, f"{num(rr):.1f}×" if num(rr) else "—")
             verd = str(f.get("verdict", ""))
-            vcell = ws.cell(r, 5, verd)
+            # LIVE formula (Tristan 2026-07-03, the OK-literal fix — this cell used to
+            # paint the bare LLM verdict word, e.g. "ok"). Embedded as its own audit
+            # operand (a fresh row per tab — the Quality & Audit BENCHMARK NET table
+            # embeds the same source data independently; both are honest, neither repeats
+            # a literal) and read back in-formula.
+            _sv_op = audit_operand(
+                "Sense-check", f"{_dim2} — LLM verdict", verd,
+                "benchmarkDivergence.findings[].verdict (scripts/lib/benchmark-expectation.ts)")
+            vcell = ws.cell(r, 5, f"={_sv_op}")
             vcell.fill = FILL_FAIL if verd in ("radical", "fail") else (FILL_ADVISORY if verd in ("warn", "review") else FILL_PASS)
             r += 1
         r += 1
@@ -14588,11 +14664,22 @@ def _sc_connection(wb, ws, state, run_dir):
         comps.append(("endpoint tags resolve to a real BoM/part tag", n_ok, n_ep))
         if n_ok < n_ep:
             iss.append(f"{n_ep - n_ok} connection endpoint(s) reference a tag no BoM/part row carries")
-    st_rows = [d for _r, d in rows if "status" in d]
+    # Status (col C) is now a LIVE formula (Tristan 2026-07-03 — the bare-'OK' fix), so
+    # `d.get("status")` here would be the pre-recalc FORMULA TEXT, not the computed
+    # word — reading it for pass/fail would silently score every row "clean" (no
+    # cell here ever literally contains "⚠"). Read the SAME embedded operands the
+    # formula itself judges (cols G/H, written alongside col C in tab_connection_trace)
+    # so this scorer's verdict can never disagree with the workbook's own formula.
+    st_rows = [(_r, d) for _r, d in rows if "status" in d]
     if st_rows:
-        ok = sum(1 for d in st_rows if not _cell_missing(d.get("status"))
-                 and "⚠" not in _cell_txt(d.get("status")))
-        comps.append(("connection rows carry a computed OK status", ok, len(st_rows)))
+        ok = 0
+        for _r, _d in st_rows:
+            _unresolved = ws.cell(_r, 7).value
+            _evidence = _cell_txt(ws.cell(_r, 8).value)
+            if isinstance(_unresolved, (int, float)) and _unresolved == 0 and not _evidence.strip():
+                ok += 1
+        comps.append(("connection rows carry a computed OK status "
+                      "(0 unresolved endpoints, no missing-tie evidence)", ok, len(st_rows)))
     return {"components": comps, "issues": iss,
             "mech": "resolved-endpoint fraction (every ← / → tag must exist) + per-row status",
             "fix": "fix the topology edge that names a non-existent tag at the connection emitter"}
@@ -15191,17 +15278,36 @@ def _write_verdict_formulas(wb: Workbook, state: dict) -> int:
 
 
 # The no-cheating patterns: a NON-formula cell that STARTS as a verdict is a bare literal.
-_BARE_VERDICT_RX = re.compile(r"^(?:PASS|FAIL)\b|^[✓✗](?:\s|$)")
+# EXTENDED (Tristan 2026-07-03, the Connection trace v65 catch): the original pattern
+# covered PASS/FAIL/✓/✗ but a bare 'OK' slipped straight through — the Connection trace
+# Status column painted "OK" as a python string with no formula behind it. Widened to the
+# whole status-word family: OK (either case — the actual bug's exact spelling), and the
+# ALL-CAPS convention this workbook already uses for its own verdict words (OKAY, GOOD,
+# DONE) — kept case-SENSITIVE-uppercase for those three specifically so ordinary sentence
+# prose ("Good afternoon", "Done deals…") occasionally opening a narrative cell is never
+# misflagged; audited against the built workbook (2026-07-03) with zero false positives.
+_BARE_VERDICT_RX = re.compile(
+    r"^(?:PASS|FAIL|OKAY|GOOD|DONE)\b|^[Oo][Kk]\b|^[✓✗](?:\s|$)")
 
 
 def _enforce_live_check_gate(wb: Workbook) -> dict:
     """The NO-CHEATING GATE (Tristan 2026-07-03, exhaustive by design): walk EVERY sheet
-    and EVERY cell — (a) zero bare PASS/FAIL/✓/✗ literals anywhere (a verdict must be a
-    formula); (b) every registered table data row carries at least one live check formula
-    (its Row check / status / Cell check cell); (c) every REQUIRED contract column of
-    every table is referenced by at least one check formula on that table (or itself
-    carries the check formulas); (d) every sheet carries at least one formula. Raises
-    SystemExit on any violation; returns the walk statistics for the build report."""
+    and EVERY cell — (a) zero bare PASS/FAIL/OK/OKAY/GOOD/DONE/✓/✗ literals anywhere (a
+    verdict must be a formula); (b) every registered table data row carries at least one
+    live check formula (its Row check / status / Cell check cell); (c) every REQUIRED
+    contract column of every table is referenced by at least one check formula on that
+    table (or itself carries the check formulas); (d) every sheet carries at least one
+    formula. Raises SystemExit on any violation; returns the walk statistics for the
+    build report.
+
+    ONE sanctioned exemption from (a): the 'Audit data' sheet's own Value column (col D)
+    is the documented, deliberate home for a raw upstream word EMBEDDED AS DATA (e.g. a
+    panel schedule's own printed 'OK'/'REVIEW' verdict, quoted verbatim so a check
+    formula ELSEWHERE can compare against it — see audit_operand() / the machinery
+    header comment above). That cell is never itself a claim about its own row; the
+    _dt() contract for the audit-data table family already states 'Value is deliberately
+    NOT required'. Every other cell on every other sheet, INCLUDING every other column
+    of the Audit data sheet, is fully swept."""
     stats = {"sheets": 0, "formula_cells": 0, "verdict_formula_cells": 0,
              "rows_walked": 0, "rows_with_check": 0, "rows_skipped_merged": 0,
              "bare_literals": [], "unchecked_rows": [], "orphan_columns": [],
@@ -15212,6 +15318,7 @@ def _enforce_live_check_gate(wb: Workbook) -> dict:
     for ws in wb.worksheets:
         stats["sheets"] += 1
         nfx = 0
+        _is_audit_value_col = ws.title == _AUDIT_SHEET_TITLE
         for row in ws.iter_rows():
             for c in row:
                 v = getattr(c, "value", None)
@@ -15221,6 +15328,8 @@ def _enforce_live_check_gate(wb: Workbook) -> dict:
                     nfx += 1
                     if '"PASS"' in v or '"FAIL' in v or "✓" in v or "✗" in v:
                         stats["verdict_formula_cells"] += 1
+                elif _is_audit_value_col and c.column == 4:
+                    continue    # 'Audit data'!D — sanctioned embedded-operand DATA, not a verdict
                 elif _BARE_VERDICT_RX.match(v.strip()):
                     stats["bare_literals"].append(f"{ws.title}!{c.coordinate}: {v[:60]!r}")
         formulas_by_sheet[ws.title] = nfx
@@ -18383,6 +18492,68 @@ def _selftest() -> int:
         except SystemExit as _ge3:
             if "NO live check" not in str(_ge3):
                 print(f"  FAIL live gate: refusal must name the unchecked row (got {_ge3})"); bad += 1
+        # (b2) OK-FAMILY GATE-HOLE proveCatch (Tristan 2026-07-03 — Connection trace v65:
+        # a bare 'OK' literal slipped past the original PASS/FAIL/✓/✗-only pattern). Same
+        # both-directions shape as (b): a bare 'OK' refuses the build naming the cell; the
+        # SAME verdict as a live formula (pass_text="OK") passes clean.
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbk = _WbG(); _wsk = _wbk.active; _wsk.title = "OK Gate Fixture"
+        _wsk.cell(1, 1, "alpha")
+        _wsk.cell(1, 2, "OK")                          # ← the planted cheat (the v65 bug)
+        try:
+            _enforce_live_check_gate(_wbk)
+            print("  FAIL live gate: a bare literal 'OK' must refuse the build"); bad += 1
+        except SystemExit as _oke:
+            if "OK Gate Fixture" not in str(_oke) or "bare" not in str(_oke):
+                print(f"  FAIL live gate: OK refusal must name the literal cell (got {_oke})"); bad += 1
+        _wsk.cell(1, 2, '=IF(LEN(TRIM(A1&""))>0,"OK","ISSUE — required cell empty")')
+        try:
+            _gsk = _enforce_live_check_gate(_wbk)
+            if _gsk["bare_literals"]:
+                print(f"  FAIL live gate: the OK live-formula fixture must have zero bare "
+                      f"literals (got {_gsk['bare_literals']})"); bad += 1
+        except SystemExit as _oke2:
+            print(f"  FAIL live gate: the OK live-formula version must PASS the gate "
+                  f"(got {_oke2})"); bad += 1
+        # synonym / case coverage: lowercase 'ok' + the OKAY/GOOD/DONE family all refuse.
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        for _bad_word in ("ok", "OKAY", "GOOD", "DONE"):
+            _wbw = _WbG(); _wsw = _wbw.active; _wsw.title = "Word Gate Fixture"
+            _wsw.cell(1, 1, _bad_word)                  # bare literal, no table needed
+            try:
+                _enforce_live_check_gate(_wbw)
+                print(f"  FAIL live gate: a bare literal {_bad_word!r} must refuse "
+                      f"the build"); bad += 1
+            except SystemExit as _we:
+                if "Word Gate Fixture" not in str(_we) or "bare" not in str(_we):
+                    print(f"  FAIL live gate: {_bad_word!r} refusal must name the "
+                          f"literal cell (got {_we})"); bad += 1
+        # Audit-data Value-column EXEMPTION proveCatch: the sanctioned embedded-operand
+        # slot (col D) legitimately holds a raw upstream verdict word AS DATA (e.g. a
+        # panel schedule's own printed 'OK' — see audit_operand() / _dt() 'Value is
+        # deliberately NOT required') — never itself a claim about its own row. Must NOT
+        # trip the OK-family extension, or every real board-reconciliation build refuses.
+        _wba = _WbG(); _wsa = _wba.active; _wsa.title = _AUDIT_SHEET_TITLE
+        _wsa.cell(1, 1, "=1+1")   # satisfies rule (d) 'every sheet carries a formula' —
+                                  # isolates this proveCatch to the Value-column exemption
+        _wsa.cell(_AUDIT_DATA_START, 4, "OK")           # col D = Value, row 6 = first data
+        try:
+            _gsa = _enforce_live_check_gate(_wba)
+            if _gsa["bare_literals"]:
+                print(f"  FAIL live gate: 'Audit data'!D (Value) holding 'OK' is "
+                      f"sanctioned embedded-operand data, must not trip the gate "
+                      f"(got {_gsa['bare_literals']})"); bad += 1
+        except SystemExit as _ae:
+            print(f"  FAIL live gate: 'Audit data'!D (Value) holding 'OK' must NOT "
+                  f"refuse the build (got {_ae})"); bad += 1
+        # ...but every OTHER column of the Audit data sheet stays fully swept.
+        _wsa.cell(_AUDIT_DATA_START, 3, "OK")           # col C = Operand (label), not Value
+        try:
+            _enforce_live_check_gate(_wba)
+            print("  FAIL live gate: 'Audit data'!C (Operand label) is NOT the "
+                  "sanctioned Value column — a bare 'OK' there must still refuse"); bad += 1
+        except SystemExit:
+            pass
         # (c) CORRUPT-OPERAND proveCatch (real LibreOffice recalc): the line-math verdict
         # FLIPS to FAIL when one operand cell is corrupted, and the live score falls.
         _sof = _find_soffice()
