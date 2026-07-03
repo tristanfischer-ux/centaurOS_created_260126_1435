@@ -104,10 +104,16 @@ def _add_box_fast(name, location, size, material, module=None,
     import mathutils as _mu
     mesh = _bpy.data.meshes.new(name + "_mesh")
     bm = _bmesh.new()
-    # half-extents in Blender units (size already in Blender units, not mm)
+    # bmesh.ops.create_cube(size=1.0) puts verts at ±0.5 — EDGE length 1.0 —
+    # UNLIKE bpy.ops.mesh.primitive_cube_add whose default cube has edge 2.0.
+    # So each vert scales by the FULL requested extent, NOT extent/2.
+    # (Root-cause fix 2026-07-03: the previous size/2.0 here shipped EVERY
+    # fl.add_box mesh at HALF its requested size while placements stayed
+    # full-scale — container walls floated apart as plates ("exploded view"),
+    # roofs hovered above wall tops, box-drawn tray segments read as dashes.
+    # The import-time probe below _selftest proves delivered == requested.)
     _bmesh.ops.create_cube(bm, size=1.0)
-    # Scale each vertex to the desired half-extents directly in bmesh (O(8 verts))
-    sx, sy, sz = size[0] / 2.0, size[1] / 2.0, size[2] / 2.0
+    sx, sy, sz = float(size[0]), float(size[1]), float(size[2])
     for v in bm.verts:
         v.co.x *= sx
         v.co.y *= sy
@@ -125,6 +131,35 @@ def _add_box_fast(name, location, size, material, module=None,
     return obj
 
 fl.add_box = _add_box_fast
+
+
+def _selftest_add_box_fast():
+    """PROVE-THE-CATCH probe (gate-intent rule): fl.add_box must deliver a mesh whose
+    dimensions EQUAL the requested size. The 2026-06-17→07-03 half-scale regression
+    (bmesh create_cube is edge-1, the patch scaled verts by size/2 → every box at HALF
+    size with full-scale placement = the BESS "exploded container" defect) ships again
+    silently if this drifts — so any mismatch fails the whole build LOUDLY here, before
+    a single part is placed. O(1); the probe object is removed immediately."""
+    import bpy as _bpy
+    want = (1.0, 2.0, 3.0)
+    probe = _add_box_fast("u_selftest_box_probe", (0.0, 0.0, 0.0), want, None)
+    got = tuple(probe.dimensions)
+    _bpy.data.objects.remove(probe, do_unlink=True)
+    if any(abs(g - w) > 1e-5 for g, w in zip(got, want)):
+        raise RuntimeError(
+            f"[univ][selftest] fl.add_box delivered dimensions {got} for requested {want} — "
+            f"the half-scale box regression (exploded-container defect) is back; fix "
+            f"_add_box_fast before building any scene")
+
+
+# The probe needs a REAL Blender session (bmesh + bpy.data). Guard-suite selftests
+# import this module OUTSIDE Blender (stubbed bpy, no bmesh) — skip there; every
+# actual scene build still proves the catch before placing a single part.
+try:
+    import bmesh as _probe_bmesh  # noqa: F401 — only importable inside Blender
+    _selftest_add_box_fast()
+except ImportError:
+    pass
 
 # Deterministic + universal connection-sizing engine (SIBLING module, no Blender
 # import). It turns each topology edge's rating (constraint_kind + required_value
@@ -4171,7 +4206,7 @@ class RackPlan:
     route_on_spine() reads the per-edge lane/tier the plan stored."""
 
     __slots__ = ("axis", "spine_pos", "lo", "hi", "base_z", "cross_lo", "cross_hi",
-                 "bboxes", "_lane", "_tier", "_n_tiers")
+                 "bboxes", "z_max", "_lane", "_tier", "_n_tiers")
 
     def __init__(self, axis, spine_pos, lo, hi, base_z, cross_lo, cross_hi, bboxes):
         self.axis = "x" if axis == "x" else "y"
@@ -4182,6 +4217,11 @@ class RackPlan:
         self.cross_lo = float(min(cross_lo, cross_hi))
         self.cross_hi = float(max(cross_lo, cross_hi))
         self.bboxes = list(bboxes or [])
+        # Ceiling for the tier stack (mm) — an ENCLOSED plant (container) sets this to
+        # the roof underside so overhead runs stay INSIDE the shell (attached under the
+        # ceiling), never towering through/above the roof. None (open plant) = the
+        # stock unbounded RACK_TIER_PITCH_MM stagger.
+        self.z_max = None
         self._lane = {}     # edge index → signed lane index (…-1,0,+1…)
         self._tier = {}     # edge index → tier index (0 = base)
         self._n_tiers = 1
@@ -4244,7 +4284,15 @@ class RackPlan:
         return self._lane.get(i, 0.0)
 
     def tier_z(self, i):
-        return self.base_z + RACK_TIER_PITCH_MM * self._tier.get(i, 0)
+        pitch = RACK_TIER_PITCH_MM
+        if self.z_max is not None and self._n_tiers > 1:
+            # compress the stagger so the TOP tier still clears z_max (roof underside):
+            # runs stay attached under the enclosure ceiling instead of stacking through
+            # the roof. Floor of 60 mm keeps adjacent tiers visually separable.
+            pitch = min(pitch, max(60.0, (self.z_max - self.base_z)
+                                   / (self._n_tiers - 1)))
+        z = self.base_z + pitch * self._tier.get(i, 0)
+        return min(z, self.z_max) if self.z_max is not None else z
 
 
 def _polyline_over_equipment(waypoints, bboxes, own):
@@ -5305,16 +5353,33 @@ _SYN_ROLE = {
     "array":     ("SA", "Solar array", False),
 }
 
+# Synthetic block-prefix → (BoM part name, module_id), recorded by the AGGREGATE
+# placers (place_rack_farm et al.) for every skid/rack whose role matched a REAL
+# design part. _synthetic_equipment_rows uses it so the manifest row carries the
+# BoM's own part name + module — the same naming discipline as the per-word rows —
+# and the parts-ledger / GA join on real names instead of generic role labels.
+_SYN_BLOCK_BOM = {}
+
 # Recognised synthetic prefixes → a regex that captures (block_key, role) from the
 # object name, so each distinct piece of kit becomes ONE manifest row. block_key
 # makes a rack r0c0 distinct from r0c1; role drives the tag.
 _SYN_PREFIX_RE = [
-    # rack-farm racks: u_rf_rack_r0_c0_<detail> → block 'rack_r0_c0', role 'rack'
+    # rack-farm racks, tier-aware naming (2026-06-25 vertical stacking):
+    # u_rf_rack_t0_r0_c0_<detail> → block 'rack_t0_r0_c0', role 'rack'.
+    # (2026-07-03: the manifest missed EVERY rack because only the pre-tier
+    # u_rf_rack_r0_c0_ form was recognised — 3/73 BoM coverage.)
+    (re.compile(r"^(u_rf_rack_t\d+_r\d+_c\d+)_"), "rack"),
+    # rack-farm racks, pre-tier naming (kept for old scenes): u_rf_rack_r0_c0_<detail>
     (re.compile(r"^(u_rf_rack_r\d+_c\d+)_"), "rack"),
     # rack-farm BoP with a bay index: u_rf_bop_pcs_bay0_<detail> → block keeps bay
     (re.compile(r"^(u_rf_bop_([a-z]+(?:_[a-z]+)?)_bay\d+)"), None),
     # rack-farm BoP single: u_rf_bop_chiller_<detail> → block 'bop_chiller'
     (re.compile(r"^(u_rf_bop_([a-z]+(?:_ctrl)?))_"), None),
+    # companion power-conversion container skids (battery-only split, 2026-06-24):
+    # u_rf_pcbop_pcs_bay0 / u_rf_pcbop_transformer_tank → ONE block per role
+    # (2026-07-03: PCS / step-up transformer / switchgear were absent from the
+    # manifest because the pcbop prefix had no pattern at all).
+    (re.compile(r"^(u_rf_pcbop_([a-z]+))_"), None),
     # tower-machine: u_tm_<role><idx?>_<detail>
     (re.compile(r"^(u_tm_(tower|nacelle|hub|foundation|blade\d*))"), None),
     # panel-array grow racks: u_gr_rack_<r>_<c>_<detail>
@@ -5409,6 +5474,8 @@ def _synthetic_equipment_rows(parts, region_rank_default):
                                 e[0]))
     counters = {}
     rows = []
+    # longest prefix first so a specific block key never falls to a shorter match
+    _bom_prefixes = sorted(_SYN_BLOCK_BOM.items(), key=lambda kv: -len(kv[0]))
     for (block_key, role, letter, label, is_round,
          cx, cy, cz, w, dep, h) in entries:
         counters[letter] = counters.get(letter, 100) + 1
@@ -5417,11 +5484,19 @@ def _synthetic_equipment_rows(parts, region_rank_default):
             dims = {"dia": round(max(w, dep), 1), "len": round(h, 1)}
         else:
             dims = {"w": round(w, 1), "d": round(dep, 1), "h": round(h, 1)}
+        # unify with the BoM: the placer recorded which REAL design part this block
+        # renders → the manifest row carries the BoM name + module_id (same naming
+        # discipline as the per-word rows); the role label is the fallback only.
+        bom_name = bom_module = None
+        for pref, (pn, pm) in _bom_prefixes:
+            if block_key.startswith(pref):
+                bom_name, bom_module = pn, pm
+                break
         rows.append({
             "tag": block_key,
             "equipment_tag": equip_tag,
-            "name": label,
-            "module": role,
+            "name": bom_name or label,
+            "module": bom_module or role,
             "shape": "synthetic_block",
             "qty": 1,
             "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
@@ -11243,6 +11318,14 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     n_racks, n_rows, racks_per_row, basis = _derive_rack_grid(quantities, parts)
     cells_per_rack = qval(quantities, "cells_per_rack")
     cell_count = qval(quantities, "cell_count")
+    # BoM-name unification for the parts-manifest: record which REAL design part
+    # each synthetic block renders (racks here; BoP skids as they place below).
+    _SYN_BLOCK_BOM.clear()
+    _rack_part = next((p for p in parts
+                       if re.search(r"(?<![a-z])rack(?![a-z])", str(p.name), re.IGNORECASE)),
+                      None)
+    if _rack_part is not None:
+        _SYN_BLOCK_BOM["u_rf_rack_"] = (_rack_part.name, _rack_part.module_id)
     unit_word = "sleds" if flavour == "compute" else "modules/cells"
     print(f"[univ][rackfarm] flavour = {flavour}; rack grid: {n_racks} racks "
           f"= {n_rows} row(s) × {racks_per_row} "
@@ -11376,6 +11459,13 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # racks + battery-side BoP and FITS. Universal — keyed on BoP role, no per-class table.
     _EXTERNAL_PC_ROLES = {"pcs", "transformer", "switchgear"}
     _external_bop = []
+    # Battery-side skids that do NOT fit any container floor lane go OUTSIDE on the
+    # pad beside the enclosure (Tristan 2026-07-03: the plant renders ASSEMBLED — a
+    # skid must never climb ABOVE the racks, which ballooned the enclosure to ~4.4 m
+    # and stranded equipment mid-air; a real containerised BESS bolts its chiller /
+    # auxiliary skids to the pad at the container side). Universal — keyed on FIT,
+    # no class table.
+    _pad_overflow = []
     if _container_bop:
         _external_bop = [it for it in bop_items if it[0] in _EXTERNAL_PC_ROLES]
         bop_items = [it for it in bop_items if it[0] not in _EXTERNAL_PC_ROLES]
@@ -11419,21 +11509,15 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         if _container_bop:
             # prefer a lane that still has length-budget for this skid; among those pick
             # the shortest. If NONE fit (every existing lane is full to the container
-            # length), open a NEW tier of lanes ABOVE the racks at the next Z and place the
-            # skid there from the rack origin — climbing vertically keeps the enclosure
-            # LENGTH at the real container envelope (the same stacking principle as racks).
+            # length), the skid moves OUTSIDE to the pad beside the enclosure — it must
+            # NEVER stack above the racks (that stranded gear mid-air + ballooned the
+            # shell past the real container height; the plant renders ASSEMBLED).
             _fits = [i for i in range(len(bop_row_x))
                      if _bop_x_cap is None or bop_row_x[i] + w_mm <= _bop_x_cap]
             if not _fits:
-                _new_z = max(bop_row_z) + tier_pitch
-                for _r in range(max(1, n_rows)):
-                    bop_row_x.append(racks_x0)
-                    bop_row_y.append(_r * row_pitch)
-                    bop_row_z.append(_new_z)
-                _fits = [i for i in range(len(bop_row_x))
-                         if _bop_x_cap is None or bop_row_x[i] + w_mm <= _bop_x_cap]
-            _pool = _fits if _fits else list(range(len(bop_row_x)))
-            r = min(_pool, key=lambda i: bop_row_x[i])
+                _pad_overflow.append((role, part_or_none, depth_mm, w_mm, h_mm, rgb))
+                continue
+            r = min(_fits, key=lambda i: bop_row_x[i])
             cx = bop_row_x[r] + w_mm / 2
             cy = bop_row_y[r]
             bop_z = bop_row_z[r]
@@ -11449,6 +11533,8 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             f"m_rf_bop_{role}", rgb, metallic=0.35, roughness=0.42)
         MAT[f"u_rf_bop_{role}"] = mat
         mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
+        if part_or_none is not None:
+            _SYN_BLOCK_BOM[nm] = (part_or_none.name, mod)
         if mod not in MO:
             MO[mod] = []
         # Fix 1 (2026-06-10): dispatch each BoP role to its REAL-SHAPE builder
@@ -11548,6 +11634,8 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             nm = f"u_rf_pcbop_{role}"
             mat = MAT.get(f"u_rf_pcbop_{role}") or fl.make_mat(f"m_rf_pcbop_{role}", rgb, metallic=0.35, roughness=0.42)
             MAT[f"u_rf_pcbop_{role}"] = mat
+            if part_or_none is not None:
+                _SYN_BLOCK_BOM[nm] = (part_or_none.name, mod)
             if role == "transformer":
                 _build_bop_transformer(nm, cx, pc_cy, DECK_Z_MM, w_mm, depth_mm, h_mm, mat, steel, MAT, mod, MO)
             else:  # pcs / switchgear → cabinet lineup
@@ -11563,10 +11651,52 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         print(f"[univ][rackfarm] companion power-conversion container: {pc_w/1000:.1f}×{pc_d/1000:.1f} m "
               f"({len(_external_bop)} skids: {', '.join(it[0] for it in _external_bop)})")
 
+    # ── 3c. EXTERIOR PAD BoP (battery-side overflow) ────────────────────────────
+    # Skids that did not fit a container floor lane sit on the pad along the +Y long
+    # wall (the companion power-conversion container has the −Y side). At deck level,
+    # real gear on real ground — never stacked above the racks.
+    _pad_y1 = enc_y1
+    if _pad_overflow:
+        pad_gap = 1500.0
+        pad_edge_y = enc_cy + enc_d / 2.0        # the battery container's +Y wall face
+        pad_cursor_x = enc_x0 + cont_margin
+        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_overflow:
+            cx = pad_cursor_x + w_mm / 2.0
+            cy = pad_edge_y + pad_gap + depth_mm / 2.0
+            mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
+            if mod not in MO:
+                MO[mod] = []
+            nm = f"u_rf_bop_{role}"
+            mat = MAT.get(f"u_rf_bop_{role}") or fl.make_mat(
+                f"m_rf_bop_{role}", rgb, metallic=0.35, roughness=0.42)
+            MAT[f"u_rf_bop_{role}"] = mat
+            if part_or_none is not None:
+                _SYN_BLOCK_BOM[nm] = (part_or_none.name, mod)
+            if role == "transformer":
+                _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                       mat, steel, MAT, mod, MO)
+            elif role in ("chiller", "cooling"):
+                _build_bop_chiller(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                   mat, steel, MAT, MO, mod)
+            elif role == "fire":
+                _build_bop_fire(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                mat, steel, MAT, mod, MO)
+            else:
+                _build_bop_wall_cabinet(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
+                                        mat, steel, MAT, mod, MO)
+            bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
+            region_centres[role] = (cx, cy)
+            pad_cursor_x += w_mm + BOP_GAP_MM
+            _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
+        print(f"[univ][rackfarm] exterior pad BoP: {', '.join(it[0] for it in _pad_overflow)} — "
+              f"no container floor lane fits; placed on the pad beside the enclosure "
+              f"(never stacked above the racks)")
+
     # ── 4. TOPOLOGY: electrical bus (racks→DC bus→PCS→transformer) as cable
     #    trays + thermal (PCS/racks→heat rejection) as coolant pipes to the chiller.
     #    Reuse the existing overhead-rack router + cable-tray / pipe primitives.
-    bbox = {"x0": enc_x0, "x1": enc_x1, "y0": min(enc_y0, _comp_y0), "y1": enc_y1}
+    bbox = {"x0": enc_x0, "x1": enc_x1, "y0": min(enc_y0, _comp_y0),
+            "y1": max(enc_y1, _pad_y1)}
     routed, unresolved = _route_rack_farm_topology(
         topology, parts, rack_anchor_by_index, bop_anchor, region_centres,
         frame_top_mm, bbox, MAT, MO)
@@ -11642,12 +11772,30 @@ def _select_bop_items(parts, flavour="battery"):
 
 
 def _build_container_enclosure(cx, cy, base_z_mm, w_mm, d_mm, h_mm, MAT, MO):
-    """Shipping-container-like enclosure (floor + roof + 4 walls), tagged with the
-    STRUCTURE_MODULE_ID and named u_skid_* so INSPECT mode renders it as the SAME
-    faint wireframe the process-skid frame uses (interior reads through it). cx/cy =
-    footprint centre (mm); base_z_mm = floor underside. Deterministic + universal."""
+    """Shipping-container-like enclosure, ASSEMBLED: an opaque floor + 4 walls joined
+    at the corners + the roof ON (walls span the full height floor-to-roof; end walls
+    butt INSIDE the long walls so every edge is shared — never free-floating plates).
+    Walls + roof carry a SEMI-TRANSPARENT shell material so the shaded hero reads as
+    a closed container WITH its interior visible (the transparent-shell treatment —
+    a section view, never an explosion). Tagged with the STRUCTURE_MODULE_ID and
+    named u_skid_* so INSPECT mode recolours it to the same faint wireframe the
+    process-skid frame uses. cx/cy = footprint centre (mm); base_z_mm = floor
+    underside. Deterministic + universal."""
     enc_mat = fl.make_mat("m_rf_container", (0.55, 0.56, 0.58),
                           metallic=0.30, roughness=0.50)
+    # transparent shell for walls + roof: interior equipment reads through the
+    # assembled box in the shaded (INSPECT=0) hero; INSPECT=1 recolours u_skid_*
+    # to the wireframe treatment regardless.
+    shell_mat = fl.make_mat("m_rf_container_shell", (0.55, 0.56, 0.58),
+                            metallic=0.10, roughness=0.35, alpha=0.28)
+    # make_mat sets the legacy EEVEE blend_method, which EEVEE-Next (Blender ≥4.2,
+    # the engine init_scene selects) IGNORES — alpha then renders fully OPAQUE and
+    # the shell hides the interior. EEVEE-Next needs surface_render_method=BLENDED.
+    try:
+        shell_mat.surface_render_method = "BLENDED"
+        shell_mat.use_transparency_overlap = True   # sort both wall layers, no artefacts
+    except AttributeError:
+        pass  # legacy EEVEE / future renames — blend_method already set by make_mat
     sid = STRUCTURE_MODULE_ID
     if sid not in MO:
         MO[sid] = []
@@ -11656,22 +11804,26 @@ def _build_container_enclosure(cx, cy, base_z_mm, w_mm, d_mm, h_mm, MAT, MO):
     def _mm3(t3):
         return tuple(c * fl.MM for c in t3)
 
-    # floor + roof
+    # floor (opaque — the deck the equipment stands on) + roof ON (transparent shell)
     fl.add_box("u_skid_rf_floor", _mm3((cx, cy, base_z_mm + t / 2)),
                _mm3((w_mm, d_mm, t)), enc_mat, module=sid, module_objects=MO)
     fl.add_box("u_skid_rf_roof", _mm3((cx, cy, base_z_mm + h_mm - t / 2)),
-               _mm3((w_mm, d_mm, t)), enc_mat, module=sid, module_objects=MO)
-    # 4 walls (back = -Y solid; front = +Y; both ends). Front wall kept so the
-    # enclosure reads as a closed container; INSPECT renders all of them faint.
+               _mm3((w_mm, d_mm, t)), shell_mat, module=sid, module_objects=MO)
+    # 4 walls joined at the edges: long walls (±Y) run the full length; end walls
+    # (±X) span between them (d − 2t) so the corners SHARE an edge. Full height
+    # from the floor top to the roof underside — no gap above the floor, none
+    # under the roof. Door faces closed; the transparency provides the interior
+    # view, not an opening.
     wall_h = h_mm - 2 * t
-    fl.add_box("u_skid_rf_wall_back", _mm3((cx, cy - d_mm / 2 + t / 2, base_z_mm + h_mm / 2)),
-               _mm3((w_mm, t, wall_h)), enc_mat, module=sid, module_objects=MO)
-    fl.add_box("u_skid_rf_wall_front", _mm3((cx, cy + d_mm / 2 - t / 2, base_z_mm + h_mm / 2)),
-               _mm3((w_mm, t, wall_h)), enc_mat, module=sid, module_objects=MO)
-    fl.add_box("u_skid_rf_wall_left", _mm3((cx - w_mm / 2 + t / 2, cy, base_z_mm + h_mm / 2)),
-               _mm3((t, d_mm, wall_h)), enc_mat, module=sid, module_objects=MO)
-    fl.add_box("u_skid_rf_wall_right", _mm3((cx + w_mm / 2 - t / 2, cy, base_z_mm + h_mm / 2)),
-               _mm3((t, d_mm, wall_h)), enc_mat, module=sid, module_objects=MO)
+    wall_cz = base_z_mm + t + wall_h / 2          # floor-top → roof-underside
+    fl.add_box("u_skid_rf_wall_back", _mm3((cx, cy - d_mm / 2 + t / 2, wall_cz)),
+               _mm3((w_mm, t, wall_h)), shell_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_front", _mm3((cx, cy + d_mm / 2 - t / 2, wall_cz)),
+               _mm3((w_mm, t, wall_h)), shell_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_left", _mm3((cx - w_mm / 2 + t / 2, cy, wall_cz)),
+               _mm3((t, d_mm - 2 * t, wall_h)), shell_mat, module=sid, module_objects=MO)
+    fl.add_box("u_skid_rf_wall_right", _mm3((cx + w_mm / 2 - t / 2, cy, wall_cz)),
+               _mm3((t, d_mm - 2 * t, wall_h)), shell_mat, module=sid, module_objects=MO)
 
 
 def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
@@ -11737,6 +11889,11 @@ def _route_rack_farm_topology(topology, parts, rack_anchors, bop_anchor,
     # Spine along X (rows run along X) in the free aisle; the racks are short cabinets
     # so cable trays at rack-top clear them — the audit's 3D-clearance handles that.
     plan = make_rack_plan_for_rows(bbox, rack_z, bess_bboxes, axis="x")
+    if _CONTAINER_LAYOUT:
+        # ENCLOSED plant: the tier stack must stay under the container roof — trays/
+        # pipes attach beneath the ceiling (the enclosure is the anchor), never rise
+        # through it. frame_top_mm is the shell top; roof plate is CONTAINER_WALL_MM.
+        plan.z_max = float(frame_top_mm) - CONTAINER_WALL_MM - 60.0
 
     resolved = []
     unresolved = []
@@ -15838,9 +15995,16 @@ def main():
         for _k in list(MO.keys()):
             MO[_k] = [_o for _o in MO[_k] if _alive(_o)]
         # 8. render the production PDF set (hero + per-module) — the INTERIOR LAYOUT (no shell).
+        # hero_open_frame: TRUE for an open skid / field-erected plant (paint the frame
+        # SOLID steel — ghosting an open frame reads as a glass box with a floating
+        # floor). FALSE for a CONTAINERISED plant, whose structure module IS the sealed
+        # enclosure: solid steel would hide the whole interior (Tristan 2026-07-03 —
+        # assembled shell + interior visible = the translucent-ghost treatment, the
+        # same one every enclosed-container bespoke template used). Keyed on the
+        # container SIGNAL, not a class table.
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
-                               hero_open_frame=True)
+                               hero_open_frame=not _CONTAINER_LAYOUT)
         # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
         #     subdir, so the architectural exterior + the interior layout are the IDENTICAL
         #     plant (two separate processes diverge — placement isn't deterministic across

@@ -15,6 +15,15 @@ Usage:
       --state /tmp/<run>/state.json \\
       --out-dir /tmp/<run>
 
+CONTAINERISED ROUTING (Tristan 2026-07-03): a design whose brief/contract carries a
+container/enclosure signal (long-thin max_dimensions_mm envelope, aspect >= 2.2, or a
+contract container_payload_rating_kg — the SAME detection build_universal_scene.py
+main() uses; a signal, never a class table) renders via the UNIVERSAL deterministic
+builder, which assembles the container shell + interior. The LLM-generated bespoke
+template (geom-gen, non-deterministic — it shipped BESS as an exploded view its own
+shadow critic passed) is bypassed for these designs.
+Kill-switch: UNIVERSAL_CONTAINERISED=0 (default ON) restores the bespoke/template path.
+
 Exit codes:
   0  success — all expected PNGs present at out_dir
   5  no template for this product_class (caller should fall back)
@@ -149,6 +158,41 @@ CLASS_TO_TEMPLATE: dict[str, str] = {
     "insulin_pump": "insulin-pump-9shot.py",
     "insulin-pump": "insulin-pump-9shot.py",
 }
+
+
+# mirrors build_universal_scene.py _CONTAINER_ASPECT_MIN (20-ft ISO = 2.48, 40-ft = 5.0)
+CONTAINER_ASPECT_MIN = 2.2
+
+
+def universal_containerised_on() -> bool:
+    """UNIVERSAL_CONTAINERISED flag — default ON. Set 0/false/no/off to kill-switch
+    containerised designs back onto the bespoke LLM-template path."""
+    return os.environ.get("UNIVERSAL_CONTAINERISED", "1").strip().lower() not in (
+        "0", "false", "no", "off")
+
+
+def has_container_signal(state: dict) -> bool:
+    """True when the design is a CONTAINERISED/enclosed plant. EXACTLY mirrors the
+    detection in build_universal_scene.py main() (2026-06-24): the brief fixes a
+    long-thin enclosure envelope (parsedBrief.constraints.max_dimensions_mm, aspect
+    >= CONTAINER_ASPECT_MIN) OR the contract emits container_payload_rating_kg
+    (present only for containerised classes). A signal in the contract/brief —
+    never a product-class table — so any unseen containerised archetype routes."""
+    try:
+        dims = ((state.get("parsedBrief") or {}).get("constraints") or {}).get(
+            "max_dimensions_mm") or {}
+        w, d = float(dims.get("w") or 0), float(dims.get("d") or 0)
+        q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+        payload = q.get("container_payload_rating_kg")
+        has_payload = (payload.get("value") if isinstance(payload, dict) else payload
+                       ) not in (None, 0, "")
+        if w > 0 and d > 0:
+            long_mm, short_mm = max(w, d), min(w, d)
+            return short_mm > 0 and (has_payload
+                                     or (long_mm / short_mm) >= CONTAINER_ASPECT_MIN)
+    except (TypeError, ValueError):
+        pass
+    return False
 
 
 def resolve_template(product_class: str) -> Path | None:
@@ -296,6 +340,18 @@ def main() -> int:
             flush=True,
         )
         return 0
+
+    # CONTAINERISED → UNIVERSAL (Tristan 2026-07-03): the plant must render ASSEMBLED
+    # (container shell joined + roof on + interior visible), which the deterministic
+    # universal builder guarantees — the LLM bespoke template shipped exploded views.
+    # Takes precedence over any generated blender-scene.py / class template.
+    if universal_containerised_on() and has_container_signal(state):
+        print(
+            "[render-scene] containerised design (enclosure signal in brief/contract) → "
+            "UNIVERSAL deterministic builder (kill-switch: UNIVERSAL_CONTAINERISED=0)",
+            flush=True,
+        )
+        return run_universal_fallback(state_path, out_dir, state)
 
     generated = out_dir / "blender-scene.py"
     if generated.exists():

@@ -389,6 +389,37 @@ async function main(): Promise<number> {
     console.error('[geom-gen] state has no product_class')
     return 5
   }
+  // CONTAINERISED → UNIVERSAL (Tristan 2026-07-03): render-blender-scene.py routes
+  // any design with a container/enclosure signal (long-thin max_dimensions_mm
+  // envelope aspect >= 2.2 OR contract container_payload_rating_kg — the same
+  // detection as build_universal_scene.py main(); a signal, never a class table)
+  // to the deterministic universal builder, so an LLM-generated blender-scene.py
+  // would be ignored. Skip the GPT-5.5 call entirely (saves ~2.5 min + the spend).
+  // Kill-switch: UNIVERSAL_CONTAINERISED=0 restores the bespoke geom-gen path.
+  const universalContainerisedOn = !['0', 'false', 'no', 'off'].includes(
+    String(process.env.UNIVERSAL_CONTAINERISED ?? '1').trim().toLowerCase(),
+  )
+  if (universalContainerisedOn) {
+    try {
+      const dims = state?.parsedBrief?.constraints?.max_dimensions_mm || {}
+      const w = Number(dims?.w || 0)
+      const d = Number(dims?.d || 0)
+      const payload = state?.orchestratorContract?.quantities?.container_payload_rating_kg
+      const payloadVal = payload && typeof payload === 'object' ? payload.value : payload
+      const hasPayload = payloadVal !== undefined && payloadVal !== null && payloadVal !== 0 && payloadVal !== ''
+      const aspect = w > 0 && d > 0 ? Math.max(w, d) / Math.min(w, d) : 0
+      if (w > 0 && d > 0 && (hasPayload || aspect >= 2.2)) {
+        console.error(
+          '[geom-gen] containerised design (enclosure signal in brief/contract) → render '
+          + 'routes to the UNIVERSAL builder; skipping the LLM geometry pass '
+          + '(kill-switch: UNIVERSAL_CONTAINERISED=0)',
+        )
+        return 5
+      }
+    } catch {
+      /* signal detection is best-effort — fall through to the normal path */
+    }
+  }
   const templatePath = resolveTemplate(productClass)
   if (!templatePath) {
     // B2/B3 (2026-06-10): registry-miss classes now have an on-the-fly
