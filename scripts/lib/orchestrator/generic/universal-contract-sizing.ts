@@ -2372,6 +2372,10 @@ const INSTRUMENT_FAMILIES: InstrumentSpec[] = [
 interface InstrumentConsolidation {
   vesselLocation: string // e.g. "rearing tank ×4 (0–2.8 m), biofilter ×1 (0–3.5 m), degasser ×2 (0–2.7 m)"
   combinedForm: string // the merged requirement string covering every served vessel
+  // BANDED consolidation (codema v61): when the served vessels span SEVERAL standard
+  // measuring ranges, each range band ships its OWN consolidated line — the suffix keeps
+  // the per-band word ids distinct + stable ('' / absent = the classic single-band line).
+  idSuffix?: string
 }
 function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: number, range: string, consolidation?: InstrumentConsolidation): WordLike {
   const hostName = host?.name_human ?? 'Recirculation Loop'
@@ -2394,8 +2398,11 @@ function instrumentWord(spec: InstrumentSpec, host: WordLike | undefined, qty: n
   mods.push(mod('installation', consolidation ? `Field-mounted across ${consolidation.vesselLocation}; signal wired to the control system` : `Field-mounted on ${hostName}; signal wired to the control system`))
   // single-underscore separator ONLY — a '__' would collide with the sub-component id
   // convention (parent__suffix) and the BoM would file the instrument as an assembly child. A
-  // CONSOLIDATED instrument is keyed by its spec (not a host) so it is one stable id, never per host.
-  const id = (consolidation ? `instr_${spec.key}_consolidated` : `instr_${spec.key}_on_${sanitizeId(hostId)}`).replace(/__+/g, '_')
+  // CONSOLIDATED instrument is keyed by its spec (not a host) so it is one stable id, never per
+  // host; a BANDED consolidated line (several standard-range bands) adds its range-band suffix.
+  const id = (consolidation
+    ? `instr_${spec.key}_consolidated${consolidation.idSuffix ? `_${consolidation.idSuffix}` : ''}`
+    : `instr_${spec.key}_on_${sanitizeId(hostId)}`).replace(/__+/g, '_')
   return {
     id,
     name_human: spec.label,
@@ -2474,26 +2481,65 @@ export function synthesizeInstrumentation(modules: ModuleLike[], quantities: Rec
       toAdd.push(instrumentWord(spec, v.w, v.count, spec.range(quantities, v.p)))
       continue
     }
-    // ≥2 vessel types → one consolidated line. Host it on the largest served vessel (the primary
-    // when it is served), sum the counts, build the location + combined-requirement strings.
-    const hostV = served.includes(primary) ? primary : served.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
-    // A consolidated LEVEL instrument's RANGE must span the TALLEST served vessel — its range IS the
-    // vessel height, and the host is the largest by CAPACITY (a wide, shallow sump) which can be
-    // SHORTER than a narrow, tall vessel it also serves. A 0–1.4 m range hosted on the sump cannot
-    // read a 1.6 m nutrient tank → "unmonitored dead zone / overflow risk" (physics-critic HIGH).
-    // Pick the max-HEIGHT served vessel for the consolidated RANGE only (host/name/form stay the
-    // largest). Keyed on the height-ranged 'level' family; temp/pressure/pH ranges are NOT vessel-
-    // height-derived so they keep the host range. UNIVERSAL — no class table.
-    const rangeV = spec.scope === 'level'
-      ? served.slice().sort((a, b) => (b.p.htM || 0) - (a.p.htM || 0))[0]
-      : hostV
-    const totalQty = served.reduce((s, v) => s + Math.max(1, Math.round(v.count)), 0)
-    const perVessel = served.map((v) => ({ name: v.w.name_human ?? 'vessel', qty: Math.max(1, Math.round(v.count)), range: spec.range(quantities, v.p) }))
-    const vesselLocation = perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')
-    // The combined requirement: the family's own form on the host, then the per-vessel breakdown so
-    // every served vessel's range is explicit on the single line.
-    const combinedForm = `${spec.form(hostV.w.name_human ?? 'the served vessels')} Consolidated across ${perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ')} — one schedule line for the ${spec.label.toLowerCase()} on every served vessel.`
-    toAdd.push(instrumentWord(spec, hostV.w, totalQty, spec.range(quantities, rangeV.p), { vesselLocation, combinedForm }))
+    // ≥2 vessel types → consolidate, ONE LINE PER STANDARD-RANGE BAND (codema v61 physics-
+    // critic, 2026-07-03). The v50 rule (range = next STANDARD range ≥ the TALLEST served
+    // vessel) is kept — but applied PER BAND, not across the whole plant: one 0–4 m line
+    // serving a 1.4 m GAC filter reads that vessel over ~1/3 of its span (a ~2/3 usable-
+    // resolution loss on every short vessel sharing the line). Each served vessel takes the
+    // SMALLEST standard range ≥ its own height (the STD_LEVEL_RANGES_M ladder, via
+    // spec.range), vessels sharing a range group into one band, and each band ships its own
+    // consolidated line (per-band quantity + vessel_location; total count conserved).
+    // Families whose range is NOT vessel-height-derived (temperature / pressure / DO read
+    // CONTRACT quantities — identical on every vessel) collapse to ONE band and keep the
+    // classic single consolidated line byte-identically (no gratuitous split). A vessel
+    // ABOVE the ladder max keeps a ≥-height CUSTOM range (never a shorter standard range —
+    // the v50 unmonitored-head-space bug) and its band is FLAGGED for detailed design.
+    // UNIVERSAL — banded on the emitted range string only, no class table.
+    const ladderMaxM = STD_LEVEL_RANGES_M[STD_LEVEL_RANGES_M.length - 1]
+    const isAboveLadder = (v: (typeof served)[number]) => spec.scope === 'level' && (v.p.htM || 0) > ladderMaxM
+    const bands = new Map<string, typeof served>()
+    for (const v of served) {
+      // all above-ladder vessels share ONE top band (keyed apart from the standard ranges so
+      // e.g. a 32 m and a 35 m silo don't fragment into two custom lines)
+      const key = isAboveLadder(v) ? '__above_ladder__' : spec.range(quantities, v.p)
+      const arr = bands.get(key) ?? []
+      arr.push(v)
+      bands.set(key, arr)
+    }
+    const bandNum = (key: string): number => {
+      if (key === '__above_ladder__') return Number.MAX_SAFE_INTEGER
+      const m = /([\d.]+)\s*m\b/.exec(key)
+      return m ? parseFloat(m[1]) : 1e9 // non-metric ranges ('0–100 %') sort after the metric bands
+    }
+    const multiBand = bands.size > 1
+    for (const [key, bandServed] of [...bands.entries()].sort((a, b) => bandNum(a[0]) - bandNum(b[0]))) {
+      const flagged = key === '__above_ladder__'
+      // Band host = the largest served vessel IN the band (the primary when it is in the band).
+      const hostV = bandServed.includes(primary) ? primary : bandServed.slice().sort((a, b) => b.cap * b.count - a.cap * a.count)[0]
+      // The band's RANGE must still span its TALLEST vessel (the v50 ≥-tallest direction) —
+      // the host is the largest by CAPACITY (a wide, shallow sump) which can be SHORTER than
+      // a narrow, tall vessel in the same band. Height-ranged 'level' family only; the other
+      // families' ranges are quantity-derived (identical on every band member).
+      const rangeV = spec.scope === 'level'
+        ? bandServed.slice().sort((a, b) => (b.p.htM || 0) - (a.p.htM || 0))[0]
+        : hostV
+      const range = spec.range(quantities, rangeV.p)
+      if (bandServed.length === 1 && !flagged) {
+        // a band serving ONE vessel type keeps its verbatim per-vessel word — the same rule
+        // as a single served vessel (no consolidation payload, host-keyed id).
+        const v = bandServed[0]
+        toAdd.push(instrumentWord(spec, v.w, v.count, range))
+        continue
+      }
+      const totalQty = bandServed.reduce((s, v) => s + Math.max(1, Math.round(v.count)), 0)
+      const perVessel = bandServed.map((v) => ({ name: v.w.name_human ?? 'vessel', qty: Math.max(1, Math.round(v.count)), range: spec.range(quantities, v.p) }))
+      const flag = flagged ? ' — above the standard measuring-range ladder: custom range, confirm at detailed design' : ''
+      const vesselLocation = perVessel.map((p) => `${p.name.toLowerCase()} ×${p.qty} (${p.range})`).join(', ') + flag
+      // The combined requirement: the family's own form on the band host, then the per-vessel
+      // breakdown so every served vessel's range is explicit on the line.
+      const combinedForm = `${spec.form(hostV.w.name_human ?? 'the served vessels')} Consolidated across ${vesselLocation} — one schedule line for the ${spec.label.toLowerCase()} on every served vessel${multiBand ? ` in the ${range} range band` : ''}.`
+      toAdd.push(instrumentWord(spec, hostV.w, totalQty, range, { vesselLocation, combinedForm, idSuffix: multiBand ? sanitizeId(range) : '' }))
+    }
   }
   ;((target.words ??= []) as WordLike[]).push(...toAdd)
   return toAdd.length
@@ -4666,6 +4712,13 @@ export function dedupePrincipalWords(modules: ModuleLike[]): number {
         if (!Array.isArray(sm.words)) continue
         for (const w of sm.words) {
           if (String(w.id ?? '').includes('__')) continue
+          // An ENGINE-MINTED field instrument is never a principal: its identity is owned by
+          // synthesizeInstrumentation's idempotent re-derive (drop-all + re-add), and the
+          // BANDED consolidation (codema v61) legitimately ships SEVERAL words sharing one
+          // human name ('Level Transmitter' 0–1.4 m + 0–4 m) — the same-name collapse here
+          // would eat a band line and break count conservation. LLM-authored / grounded
+          // instrument words carry no `_instrument` flag and still dedupe as before.
+          if ((w as { _instrument?: boolean })._instrument === true) continue
           const k = keyOf(w)
           if (!k) continue
           if (!groups.has(k)) groups.set(k, [])

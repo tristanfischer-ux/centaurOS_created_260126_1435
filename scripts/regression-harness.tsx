@@ -853,37 +853,45 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
   const wordI = (re: RegExp) => instr1.find((w: any) => re.test(String(w.name_human)))
   const qtyOfW = (w: any) => w ? String((w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value ?? '') : ''
   const hasVesselLoc = (re: RegExp) => { const w = wordI(re); return !!(w && (w.modifier_characters || []).some((mc: any) => mc.kind === 'vessel_location' && String(mc.value || '').length > 0)) }
-  // BUG C (Tristan 2026-06-19): the per-vessel-instance vital signs (level / temperature /
-  // dissolved-O₂) are CONSOLIDATED to ONE schedule line per family — a vessel_location modifier
-  // names every served vessel, the quantity is the SUM of per-vessel counts (rearing ×10 +
-  // biofilter ×1 = ×11), and the duplicate per-vessel lines are gone. pH + conductivity stay once
-  // on the loop; an OPEN tank gets NO pressure transmitter; idempotent (a 2nd pass = same count).
-  const levelW = wordI(/level transmitter/i), tempW = wordI(/temperature/i), doW = wordI(/dissolved.?oxygen/i)
+  // BUG C (Tristan 2026-06-19) + BANDED consolidation (codema v61, 2026-07-03): the per-
+  // vessel-instance vital signs are CONSOLIDATED — the height-ranged LEVEL family to ONE
+  // line PER STANDARD-RANGE BAND (each vessel in the smallest standard range ≥ its height,
+  // total count conserved: rearing ×10 + biofilter ×1 = 11 across the band lines, ranges
+  // distinct per line), the quantity-ranged families (temperature / dissolved-O₂) to ONE
+  // line each ×11 with a vessel_location modifier. pH + conductivity stay once on the
+  // loop; an OPEN tank gets NO pressure transmitter; idempotent (a 2nd pass = same count).
+  const tempW = wordI(/temperature/i), doW = wordI(/dissolved.?oxygen/i)
+  const levelWords = instr1.filter((w: any) => /level transmitter/i.test(String(w.name_human)))
+  const qtyNum = (w: any) => parseInt((/(\d+)/.exec(qtyOfW(w)) ?? ['0', '0'])[1], 10)
+  const rangeOfW = (w: any) => String((w.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')?.value ?? '')
   // idempotency: a 2nd pass re-derives the SAME instrument set (no duplication)
   applyUniversalContractSizing(instrMods, contractInstr, { synthesizeMissing: false, onlyUnsized: true, dedupeAndStrip: false, instrument: true })
   const instr2n = allInstr().length
   out.push(assertEq(
     'UNIVERSAL.process_instrumentation_synthesised_from_control_variables',
-    'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments. The per-vessel VITAL SIGNS (level / temperature / dissolved-O₂) are CONSOLIDATED to ONE schedule line each (BUG C) carrying a vessel_location modifier, with quantity = the SUM of per-vessel counts (rearing ×10 + biofilter ×1 = ×11) — NOT a duplicate line per vessel type; pH + conductivity once on the loop; NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
+    'the contract control variables (temp setpoint, dissolved-O₂ demand, pH, salinity) synthesise field instruments. The height-ranged LEVEL family is consolidated PER STANDARD-RANGE BAND (codema v61: distinct ranges per line, total count conserved = rearing ×10 + biofilter ×1 = 11); temperature / dissolved-O₂ (quantity-ranged) stay ONE line each ×11 with a vessel_location modifier; pH + conductivity once on the loop; NO pressure transmitter on an open tank; idempotent (2nd pass = same count)',
     JSON.stringify({
       level: hasI(/level transmitter/i), temp: hasI(/temperature/i), doA: hasI(/dissolved.?oxygen/i),
       ph: hasI(/\bph analyser/i), sal: hasI(/conductiv|salinity/i), pressure: hasI(/^pressure transmitter/i),
-      // consolidation: exactly ONE line per vital-sign family, each with a vessel_location modifier
-      levelLines: countI(/level transmitter/i), tempLines: countI(/temperature/i), doLines: countI(/dissolved.?oxygen/i),
-      levelLoc: hasVesselLoc(/level transmitter/i), tempLoc: hasVesselLoc(/temperature/i), doLoc: hasVesselLoc(/dissolved.?oxygen/i),
-      // summed quantity across served vessels (rearing ×10 + biofilter ×1 = ×11)
-      levelQty: qtyOfW(levelW), tempQty: qtyOfW(tempW), doQty: qtyOfW(doW),
+      tempLines: countI(/temperature/i), doLines: countI(/dissolved.?oxygen/i),
+      tempLoc: hasVesselLoc(/temperature/i), doLoc: hasVesselLoc(/dissolved.?oxygen/i),
+      // LEVEL: banded — total conserved across the band lines, every line ranged, ranges distinct
+      levelQtySum: levelWords.reduce((s: number, w: any) => s + qtyNum(w), 0),
+      levelRangesDistinct: new Set(levelWords.map(rangeOfW)).size === levelWords.length,
+      levelAllRanged: levelWords.every((w: any) => /0–/.test(rangeOfW(w))),
+      tempQty: qtyOfW(tempW), doQty: qtyOfW(doW),
       n1: instr1.length, n2: instr2n,
     }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
       return o.level && o.temp && o.doA && o.ph && o.sal && !o.pressure &&
-        o.levelLines === 1 && o.tempLines === 1 && o.doLines === 1 &&            // consolidated to ONE line each
-        o.levelLoc && o.tempLoc && o.doLoc &&                                    // each carries a vessel_location modifier
-        o.levelQty === '×11' && o.tempQty === '×11' && o.doQty === '×11' &&      // summed across rearing ×10 + biofilter ×1
-        o.n1 >= 6 && o.n2 === o.n1                                              // idempotent
+        o.tempLines === 1 && o.doLines === 1 &&                                  // quantity-ranged: ONE line each
+        o.tempLoc && o.doLoc &&                                                  // each carries a vessel_location modifier
+        o.levelQtySum === 11 && o.levelRangesDistinct && o.levelAllRanged &&     // banded LEVEL: count conserved, one line per band
+        o.tempQty === '×11' && o.doQty === '×11' &&                              // summed across rearing ×10 + biofilter ×1
+        o.n1 >= 6 && o.n2 === o.n1                                               // idempotent
     },
-    () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}`))} levelLines=${countI(/level transmitter/i)} levelQty=${qtyOfW(levelW)} n1=${instr1.length} n2=${instr2n}`,
+    () => `instruments=${JSON.stringify(instr1.map((w: any) => `${w.name_human}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'quantity')?.value}/${(w.modifier_characters || []).find((mc: any) => mc.kind === 'rating_primary')?.value}`))} levelQtySum=${levelWords.reduce((s: number, w: any) => s + qtyNum(w), 0)} n1=${instr1.length} n2=${instr2n}`,
   ))
 
   // ── A3b. CLEANING-SERVICE VESSEL one-charge rule + LT standard-range/coverage in BOTH

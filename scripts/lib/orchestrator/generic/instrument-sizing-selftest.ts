@@ -139,10 +139,13 @@ function run() {
     throw new Error('instrument-sizing: the electrical Changeover Switch lost its cabinet dims — the machine-box strip leaked onto an electrical switch')
   }
 
-  // CONSOLIDATED LEVEL RANGE must span the TALLEST served vessel (Tristan 2026-06-29 physics HIGH:
-  // a 0–1.4 m guided-radar consolidated onto a 1.6 m nutrient tank = unmonitored dead zone). The
-  // host is the largest by CAPACITY (the wide shallow sump, 1.4 m) but the range must cover the
-  // taller nutrient tank (1.6 m).
+  // CONSOLIDATED LEVEL RANGE — BANDED BY STANDARD RANGE (codema v61, 2026-07-03; supersedes
+  // the one-line-for-everything consolidation, KEEPS the v50 ≥-tallest-vessel direction).
+  // The sump (1.4 m) and the nutrient tank (1.6 m) fall in DIFFERENT standard ranges
+  // (0–1.4 m vs 0–2 m), so they must ship as TWO lines, each ranged ≥ its own vessels —
+  // never one 0–2 m line that wastes the sump's resolution, and NEVER a 0–1.4 m line on the
+  // 1.6 m tank (the v50 unmonitored-dead-zone bug: the largest-CAPACITY host is the wide
+  // shallow sump, which is SHORTER than the tank).
   const lvlModules: any = [{
     module: 'mass_fluid_transport_process', sub_modules: [{
       sub_module: 's', words: [
@@ -152,11 +155,22 @@ function run() {
     }],
   }]
   synthesizeInstrumentation(lvlModules as never[], {})
-  const lvl = modsOf(lvlModules, 'Level Transmitter')
-  const lvlRange = String(lvl.find((x) => x.kind === 'rating_primary')?.value ?? '')
-  // With the STANDARD-range rule (codema v50) the consolidated range is the next standard
-  // range ≥ the TALLEST served vessel: 1.6 m tank → 0–2 m (never the 1.4 m sump host range).
-  if (!/0–2\s*m/.test(lvlRange)) throw new Error(`instrument-sizing: consolidated LEVEL range "${lvlRange}" must be the next STANDARD range ≥ the tallest served vessel (1.6 m → 0–2 m), not the largest-capacity host (1.4 m sump)`)
+  const allWordsOf = (modules: any, name: string): any[] => {
+    const out: any[] = []
+    for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words) {
+      if ((w.name_human || '') === name) out.push(w)
+    }
+    return out
+  }
+  const rangeOf = (w: any): string => String((w.modifier_characters || []).find((x: any) => x.kind === 'rating_primary')?.value ?? '')
+  const qtyOf = (w: any): number => parseInt((/(\d+)/.exec(String((w.modifier_characters || []).find((x: any) => x.kind === 'quantity')?.value ?? '1')) ?? ['1', '1'])[1], 10)
+  const lvlWords = allWordsOf(lvlModules, 'Level Transmitter')
+  if (lvlWords.length !== 2) throw new Error(`instrument-sizing: a 1.4 m sump + a 1.6 m tank span TWO standard ranges (0–1.4 m / 0–2 m) and must ship TWO banded LT lines, got ${lvlWords.length} — the banded consolidation (codema v61) regressed`)
+  const lvlByRange = new Map(lvlWords.map((w) => [rangeOf(w), w]))
+  const sumpLine = lvlByRange.get('0–1.4 m'), tankLine = lvlByRange.get('0–2 m')
+  if (!sumpLine || qtyOf(sumpLine) !== 1) throw new Error(`instrument-sizing: the 1.4 m sump must get its own 0–1.4 m band line ×1 (full-span resolution), got ranges ${JSON.stringify([...lvlByRange.keys()])}`)
+  if (!tankLine || qtyOf(tankLine) !== 8) throw new Error(`instrument-sizing: the 1.6 m nutrient tanks (×8) must get the 0–2 m band line ×8 (next standard range ≥ their height — v50 direction kept), got ranges ${JSON.stringify([...lvlByRange.keys()])}`)
+  if (qtyOf(sumpLine) + qtyOf(tankLine) !== 9) throw new Error('instrument-sizing: banding must CONSERVE the total instrument count (1 + 8 = 9)')
 
   // ── LT RANGE FROM HOST VESSEL HEIGHT (codema v50 physics-critic HIGH) ──────────────
   // A 3.7 m-tall vessel needs the next STANDARD range ≥ 3.7 m → 0–4 m. A 0–1.4 m or a raw
@@ -172,6 +186,80 @@ function run() {
   const tallLvl = modsOf(tallModules, 'Level Transmitter')
   const tallRange = String(tallLvl.find((x) => x.kind === 'rating_primary')?.value ?? '')
   if (!/0–4\s*m/.test(tallRange)) throw new Error(`instrument-sizing: a 3.7 m vessel's LT range must be the next STANDARD range ≥ its height (0–4 m), got "${tallRange}" — the 0–1.4 m-on-a-3.7 m-tank bug regressed`)
+
+  // ── BANDED CONSOLIDATION proveCatch (codema v61 physics-critic, 2026-07-03) ──────────
+  // THE BUG: the consolidation rule sized ONE standard range = next standard ≥ the TALLEST
+  // served vessel and shipped a single 17-unit line whose vessel_location spanned 1.4 m GAC
+  // filters to 3.7 m tanks — a 0–4 m LT on a 1.4 m vessel loses ~2/3 of its usable
+  // resolution. THE RULE: one consolidated line PER STANDARD-RANGE BAND, each vessel in the
+  // SMALLEST standard range ≥ its height, count conserved, ≥-tallest direction kept per band.
+  const mkVessel = (id: string, name: string, dim: string, qty: number, capM3 = 0): any => ({
+    id: `${id}_word`, name_human: name, content_character: { character_id: id, name_human: name },
+    modifier_characters: [
+      { kind: 'dimension', value: dim }, { kind: 'quantity', value: `×${qty}` },
+      // a filter-named vessel qualifies as a fluid vessel via its m³ capacity (the v61 GAC word shape)
+      ...(capM3 > 0 ? [{ kind: 'capacity', value: String(capM3), unit: 'm³' }] : []),
+    ], _synthesized: true,
+  })
+  // (a) MIXED-height set, ≥2 vessel types per band → one consolidated line PER band, correct
+  // assignment, total conserved (the v61 shape: short filters + tall storage tanks).
+  const bandModules: any = [{
+    module: 'mass_fluid_transport_process', sub_modules: [{ sub_module: 's', words: [
+      mkVessel('gac_filter', 'Gac Filter', '1.2 m dia x 1.4 m', 1, 2),
+      mkVessel('softener_vessel', 'Softener Vessel', '1.0 m dia x 1.4 m', 2),
+      mkVessel('fresh_water_tank', 'Fresh Water Tank', '3.7 m dia x 3.7 m', 1),
+      mkVessel('drain_water_tank', 'Drain Water Tank', '3.7 m dia x 3.7 m', 2),
+    ] }],
+  }]
+  synthesizeInstrumentation(bandModules as never[], {})
+  const bandLvl = allWordsOf(bandModules, 'Level Transmitter')
+  if (bandLvl.length !== 2) throw new Error(`instrument-sizing banded: 1.4 m filters + 3.7 m tanks must ship exactly TWO banded LT lines (0–1.4 m + 0–4 m), got ${bandLvl.length}`)
+  const locOf = (w: any): string => String((w.modifier_characters || []).find((x: any) => x.kind === 'vessel_location')?.value ?? '')
+  const shortLine = bandLvl.find((w) => rangeOf(w) === '0–1.4 m'), tallLine = bandLvl.find((w) => rangeOf(w) === '0–4 m')
+  if (!shortLine || qtyOf(shortLine) !== 3) throw new Error(`instrument-sizing banded: the 0–1.4 m band must carry the GAC filter ×1 + softener ×2 = ×3, got ${shortLine ? qtyOf(shortLine) : 'no line'}`)
+  if (!tallLine || qtyOf(tallLine) !== 3) throw new Error(`instrument-sizing banded: the 0–4 m band must carry the fresh ×1 + drain ×2 tanks = ×3, got ${tallLine ? qtyOf(tallLine) : 'no line'}`)
+  if (!/gac filter/.test(locOf(shortLine)) || /gac filter/.test(locOf(tallLine))) throw new Error(`instrument-sizing banded: the GAC filter must be assigned to the 0–1.4 m band ONLY (its own standard range), not the 0–4 m line — the v61 resolution-loss bug regressed (short-band location: "${locOf(shortLine)}"; tall-band location: "${locOf(tallLine)}")`)
+  if (!/drain water tank/.test(locOf(tallLine))) throw new Error(`instrument-sizing banded: the 3.7 m drain water tanks must sit in the 0–4 m band, got "${locOf(tallLine)}"`)
+  if (String(shortLine.id) === String(tallLine.id)) throw new Error('instrument-sizing banded: the two band lines must carry DISTINCT stable ids')
+  if (String(shortLine.id).includes('__') || String(tallLine.id).includes('__')) throw new Error('instrument-sizing banded: a band id must never contain "__" (sub-component id collision)')
+  // (b) UNIFORM set (two types, SAME standard range) → ONE line, no gratuitous split.
+  const uniModules: any = [{
+    module: 'mass_fluid_transport_process', sub_modules: [{ sub_module: 's', words: [
+      mkVessel('fresh_water_tank_u', 'Fresh Water Tank', '3.5 m dia x 3.5 m', 1),
+      mkVessel('drain_water_tank_u', 'Drain Water Tank', '3.7 m dia x 3.7 m', 2),
+    ] }],
+  }]
+  synthesizeInstrumentation(uniModules as never[], {})
+  const uniLvl = allWordsOf(uniModules, 'Level Transmitter')
+  if (uniLvl.length !== 1) throw new Error(`instrument-sizing banded: a 3.5 m + 3.7 m set shares ONE standard range (0–4 m) and must stay ONE consolidated line (no gratuitous split), got ${uniLvl.length}`)
+  if (rangeOf(uniLvl[0]) !== '0–4 m' || qtyOf(uniLvl[0]) !== 3) throw new Error(`instrument-sizing banded: the uniform band must be 0–4 m ×3, got ${rangeOf(uniLvl[0])} ×${qtyOf(uniLvl[0])}`)
+  if (String(uniLvl[0].id) !== 'instr_level_consolidated') throw new Error(`instrument-sizing banded: a single-band consolidation must keep the classic stable id 'instr_level_consolidated', got '${uniLvl[0].id}'`)
+  // (c) ABOVE-LADDER vessel (taller than the 30 m ladder max) → its own top band with a
+  // ≥-height CUSTOM range (never a shorter standard range) + an explicit flag.
+  const silModules: any = [{
+    module: 'mass_fluid_transport_process', sub_modules: [{ sub_module: 's', words: [
+      mkVessel('storage_silo', 'Storage Silo', '6.0 m dia x 35 m', 1, 900),
+      mkVessel('buffer_tank_s', 'Buffer Tank', '3.7 m dia x 3.7 m', 2),
+    ] }],
+  }]
+  synthesizeInstrumentation(silModules as never[], {})
+  const silLvl = allWordsOf(silModules, 'Level Transmitter')
+  const silTop = silLvl.find((w) => /0–35\s*m/.test(rangeOf(w)))
+  if (silLvl.length !== 2 || !silTop) throw new Error(`instrument-sizing banded: a 35 m silo (above the 30 m ladder max) must get its own top band at a ≥-height custom range (0–35 m), got ${JSON.stringify(silLvl.map((w) => rangeOf(w)))}`)
+  const silForm = String((silTop.modifier_characters || []).find((x: any) => x.kind === 'form')?.value ?? '')
+  if (!/above the standard measuring-range ladder/.test(locOf(silTop) + silForm)) throw new Error('instrument-sizing banded: the above-ladder band must be FLAGGED for detailed design (custom range note missing)')
+  // (d) NON-height-ranged family (pressure — range from CONTRACT design_pressure, identical
+  // on every vessel) → ONE consolidated line even across mixed heights: no gratuitous split.
+  const ptModules: any = [{
+    module: 'mass_fluid_transport_process', sub_modules: [{ sub_module: 's', words: [
+      mkVessel('gac_filter_p', 'Gac Filter', '1.2 m dia x 1.4 m', 1, 2),
+      mkVessel('fresh_water_tank_p', 'Fresh Water Tank', '3.7 m dia x 3.7 m', 2),
+    ] }],
+  }]
+  synthesizeInstrumentation(ptModules as never[], { design_pressure_bar: 2 })
+  const ptWords = allWordsOf(ptModules, 'Pressure Transmitter')
+  if (ptWords.length !== 1) throw new Error(`instrument-sizing banded: the PT range is CONTRACT-derived (identical on every vessel) so mixed heights must still yield ONE consolidated PT line, got ${ptWords.length}`)
+  if (qtyOf(ptWords[0]) !== 3 || String(ptWords[0].id) !== 'instr_pressure_consolidated') throw new Error(`instrument-sizing banded: the single-band PT line must stay ×3 with the classic id, got ×${qtyOf(ptWords[0])} '${ptWords[0].id}'`)
 
   // ── CLEANING-SERVICE (CIP) VESSEL: one-charge rule (codema v50 physics-critic HIGH) ──
   // A "Cip Tank"/"Cleaning Tank" on an 8 m³/h plant must size ≤2 m³ (one cleaning-solution
@@ -476,7 +564,7 @@ function run() {
     throw new Error('demand-coverage rules 3+4: a BESS-like contract (no m³/h flows, metrics already-verifiable or basis-less) must stay BYTE-IDENTICAL with briefMetrics + modules supplied')
 
   // eslint-disable-next-line no-console
-  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated level range = next standard range ≥ tallest served vessel; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied)')
+  console.log('instrument-sizing --selftest OK (3 instruments un-sized as machines; real pump still sized from contract; consolidated LT BANDED by standard range (codema v61): one line per range band with the smallest standard range ≥ each vessel, ≥-tallest kept per band, count conserved, uniform set = 1 line, above-ladder band flagged at a ≥-height custom range, contract-ranged PT never splits; 3.7 m vessel LT = 0–4 m; CIP/cleaning tank ≤2 m³ one-charge rule with plain storage NOT clamped; reconcile-minted vessel gets its LT; demand-coverage: uncovered fluid demand → delivered pump pair + principal in BOTH paths, existing word suppresses the synth twin, tool values never overwritten, no-demand contract byte-identical; synth type-derived dims: 4 flow-rated principals all DISTINCT (pump-set boxes grow with flow, softener = media-bed cylinder), transformer adopts NOTHING from a fluid group, treatment synths home with the process module, non-pump/media families keep the legacy box byte-identically; demand-coverage rules 3+4: brief count-metric → served-count in the metric\'s unit + per-share flow metric → delivered ÷ shares in BOTH paths, no-basis/already-verified metrics mint nothing, CIP one-charge recirc + unique-token vessel duties published as _line_flow keys that never synthesise equipment, ambiguity/valve/tool-key counter-cases hold, BESS-like byte-identical with metrics+modules supplied)')
 }
 
 run()

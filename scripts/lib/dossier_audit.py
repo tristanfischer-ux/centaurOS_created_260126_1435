@@ -697,6 +697,32 @@ def _brief_numbers(state) -> set:
     return out
 
 
+# Equipment nouns the COUNT shape may corroborate against (a *_count contract quantity).
+_COUNT_EQUIP_NOUNS = ("pump", "tank", "vessel", "blower", "compressor", "filter",
+                      "skid", "exchanger")
+
+
+def _singular_claim_nouns(txt: str) -> list:
+    """→ [(noun, window_qualifiers)] — the equipment noun(s) a singular phrase is actually
+    ABOUT, read from the short noun window right after 'a single / only one / …', plus the
+    window's other tokens as the noun's qualifiers. 'a single water-powered DOSING PUMP' →
+    [('pump', ['dosing', 'powered', 'water'])]. 'consolidated into a single SCHEDULE LINE of
+    17 units … reverse osmosis skid ×1 …' → [] — the phrase counts a schedule LINE, not
+    equipment; matching 'skid' from the vessel roster against the unrelated
+    reverse_osmosis_skid_count = 1 manufactured the codema-v61 false corroboration (a row no
+    design change could ever clear). Deterministic; used by the count-shape corroborator."""
+    out = []
+    for m in _PHYS_SINGULAR_RX.finditer(txt or ""):
+        window_toks = re.findall(r"[a-z]{4,}", txt[m.end():m.end() + 44].lower())[:5]
+        for t in window_toks:
+            noun = _singularise(t)
+            if noun in _COUNT_EQUIP_NOUNS and noun not in [n for n, _q in out]:
+                quals = sorted({_singularise(q) for q in window_toks
+                                if _singularise(q) != noun and q not in _EXIST_GENERIC_TOKENS})
+                out.append((noun, quals))
+    return out
+
+
 def _finding_shape(issue) -> str:
     """Classify a critic finding into its corroborable claim shape (most specific first)."""
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
@@ -776,10 +802,18 @@ def _corroborate_finding(state, issue):
     if shape == "count":
         # not falsified → the contract does NOT show ≥2; corroborated iff a matching
         # *_count quantity exists and equals exactly 1 (the claimed deficiency).
-        nouns = [n for n in ("pump", "tank", "vessel", "blower", "compressor", "filter",
-                             "skid", "exchanger") if n in toks]
-        for noun in nouns:
-            quals = [t for t in toks if t != noun][:6]
+        # The noun must be what the singular phrase is ABOUT (its immediate noun window) —
+        # scanning the WHOLE claim for any equipment noun manufactured the codema-v61 false
+        # corroboration: "consolidated into a single SCHEDULE LINE of 17 units … reverse
+        # osmosis skid ×1 …" grabbed 'skid' from the vessel roster and "confirmed" the
+        # unrelated reverse_osmosis_skid_count = 1, so the row could NEVER clear however the
+        # design changed. A false corroboration is as dishonest as a false PASS.
+        txt_sing = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}"
+        for noun, win_quals in _singular_claim_nouns(txt_sing):
+            # qualifiers = the words of the singular phrase itself ('a single DOSING pump' →
+            # 'dosing'), widened to the whole claim when the phrase is bare — deterministic
+            # (sorted), never an arbitrary slice of an unordered set.
+            quals = (win_quals or sorted(t for t in toks if t != noun))[:6]
             for ck in ("orchestratorContract", "engineeringContract"):
                 qs = (state.get(ck) or {}).get("quantities")
                 if not isinstance(qs, dict):
@@ -3488,6 +3522,30 @@ def _selftest() -> int:
     once = _canonicalise_issues(corr_state, reroll_a)
     expect(_canonicalise_issues(corr_state, once) == once,
            "CORR(6): canonicalisation must be idempotent (marker-guarded)")
+    # (7) COUNT shape is noun-ADJACENT (codema v61 false corroboration): a claim whose
+    #     singular phrase counts a SCHEDULE LINE ("consolidated into a single schedule line
+    #     of 17 units … reverse osmosis skid ×1 …") must NOT corroborate against an
+    #     unrelated *_count == 1 grabbed from the vessel roster — such a row could never
+    #     clear however the design changed. A REAL undercount ("only a single dosing pump")
+    #     still corroborates when the contract confirms the deficiency.
+    count_state = {"orchestratorContract": {"quantities": {
+        "reverse_osmosis_skid_count": {"value": 1, "unit": ""},
+        "dosing_pump_count": {"value": 1, "unit": ""},
+    }}}
+    v7_line = _corroborate_finding(count_state, {
+        "severity": "low",
+        "issue": "The level transmitters and pressure transmitters are consolidated into a "
+                 "single schedule line of 17 units, but the 'vessel_location' modifier lists "
+                 "'reverse osmosis skid x1 (0-3 m)' and 'gac filter x1 (0-1.4 m)'."})
+    expect(v7_line[0] != "corroborated",
+           f"CORR(7): 'a single SCHEDULE LINE' is not an equipment undercount — matching the "
+           f"unrelated reverse_osmosis_skid_count=1 manufactured a permanent false corroboration (got {v7_line[:2]})")
+    v7_pump = _corroborate_finding(count_state, {
+        "severity": "high",
+        "issue": "The design provides only a single dosing pump for both acid and base duty."})
+    expect(v7_pump[0] == "corroborated" and v7_pump[1] == "count",
+           f"CORR(7): a REAL 'only a single dosing pump' undercount with dosing_pump_count=1 "
+           f"must still corroborate (got {v7_pump[:2]})")
 
     if failures:
         print("SELFTEST FAILED:")
