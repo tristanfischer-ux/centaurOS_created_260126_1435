@@ -89,7 +89,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _worked import worked_calc  # noqa: E402
+from _worked import self_check_worked, sig, worked_calc  # noqa: E402
 from _fail_soft import safe_choice  # noqa: E402
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -201,15 +201,20 @@ def compute_internal(payload: dict) -> dict:
     passes = yield_sf >= sf_required
 
     # ----- worked[] — drift-safe, chained off rounded intermediates, INTERNAL maths -----
-    p_design_mpa_r = round(p_design_mpa, 4)
-    p_design_barg_r = round(p_design_barg, 3)
-    s_allow_r = round(s_allow_mpa, 2)
-    t_pressure_r = round(t_pressure_mm, 4)
-    t_adopt_r = round(wall_t_mm, 3)
-    sigma_hoop_r = round(sigma_hoop_mpa, 3)
-    yield_sf_r = round(yield_sf, 3)
-    cyl_mass_r = round(cyl_mass_kg, 3)
-    head_mass_r = round(head_mass_kg, 3)
+    # Display intermediates use SIGNIFICANT-FIGURE rounding (sig, _worked.py), not
+    # fixed decimals: on v56d, round(diameter, 1) printed D=1.4 while sigma was
+    # computed from 1.3587, and round(head_mass, 3) printed 0.013 for 0.013455 —
+    # so the printed arithmetic did NOT evaluate to the printed result (2.9% /
+    # 3.4% off; harness UNIVERSAL.worked_calc_arithmetic_sound fails). 2026-07-03.
+    p_design_mpa_r = sig(p_design_mpa)
+    p_design_barg_r = sig(p_design_barg)
+    s_allow_r = sig(s_allow_mpa)
+    diameter_r = sig(diameter_mm)
+    t_adopt_r = sig(wall_t_mm)
+    sigma_hoop_r = sig(sigma_hoop_mpa)
+    yield_sf_r = sig(yield_sf)
+    cyl_mass_r = sig(cyl_mass_kg)
+    head_mass_r = sig(head_mass_kg)
 
     worked = [
         worked_calc(
@@ -225,12 +230,12 @@ def compute_internal(payload: dict) -> dict:
             formula="t = p_design x D / (2 x S x E - 1.2 x p_design) + corr",
             values={
                 "p_design": (p_design_mpa_r, "MPa"),
-                "D": (round(diameter_mm, 1), "mm"),
+                "D": (diameter_r, "mm"),
                 "S": (s_allow_r, "MPa"),
                 "E": (weld_eff, ""),
                 "corr": (corr_mm, "mm"),
             },
-            result=round(t_pressure_mm + corr_mm, 3), result_unit="mm",
+            result=sig(t_pressure_mm + corr_mm), result_unit="mm",
             assumptions=["ASME VIII Div.1 UG-27 circumferential-stress form (BS EN 13445 equivalent)",
                          s_basis, f"+ {corr_mm} mm corrosion allowance",
                          f"adopted shell t = {t_adopt_r} mm (>= 5 mm practical handling minimum)"],
@@ -240,7 +245,7 @@ def compute_internal(payload: dict) -> dict:
             formula="sigma_hoop = p_design x D / (2 x t)",
             values={
                 "p_design": (p_design_mpa_r, "MPa"),
-                "D": (round(diameter_mm, 1), "mm"),
+                "D": (diameter_r, "mm"),
                 "t": (t_adopt_r, "mm"),
             },
             result=sigma_hoop_r, result_unit="MPa",
@@ -261,9 +266,9 @@ def compute_internal(payload: dict) -> dict:
             label="Cylinder wall mass",
             formula="mass = pi x (r_outer^2 - r_inner^2) x length_mm x density / 1e9",
             values={
-                "r_outer": (round(r_outer_mm, 2), "mm"),
-                "r_inner": (round(r_inner_mm, 2), "mm"),
-                "length_mm": (round(length_mm, 1), "mm"),
+                "r_outer": (sig(r_outer_mm), "mm"),
+                "r_inner": (sig(r_inner_mm), "mm"),
+                "length_mm": (sig(length_mm), "mm"),
                 "density": (mat["density"], "kg/m3"),
             },
             result=cyl_mass_r, result_unit="kg",
@@ -274,7 +279,7 @@ def compute_internal(payload: dict) -> dict:
             label="Head mass (2 flat-plate heads)",
             formula="mass = 2 x pi x r_outer^2 x t x density / 1e9",
             values={
-                "r_outer": (round(r_outer_mm, 2), "mm"),
+                "r_outer": (sig(r_outer_mm), "mm"),
                 "t": (t_adopt_r, "mm"),
                 "density": (mat["density"], "kg/m3"),
             },
@@ -289,10 +294,13 @@ def compute_internal(payload: dict) -> dict:
                 "mass_cylinder": (cyl_mass_r, "kg"),
                 "mass_heads": (head_mass_r, "kg"),
             },
-            result=round(total_mass_kg, 3), result_unit="kg",
+            result=sig(total_mass_kg), result_unit="kg",
             assumptions=[],
         ),
     ]
+    # Emission-time self-check (2026-07-03): refuse any worked line whose printed
+    # arithmetic does not evaluate to its printed result within 0.5%.
+    worked = self_check_worked(worked, tool_id="pressure-vessel:design")
 
     return {
         "mode": "internal",
@@ -391,35 +399,36 @@ def compute_external(payload: dict) -> dict:
     passes = (safety_factor >= sf_required) and (buckling_sf >= sf_required)
 
     # Worked calculations — chained off rounded intermediates so a reviewer
-    # can verify each step by hand without the source code.
-    p_ext_mpa_r = round(p_ext_mpa, 4)
+    # can verify each step by hand without the source code. Display
+    # intermediates use SIGNIFICANT-FIGURE rounding (sig, _worked.py), not fixed
+    # decimals, so the printed arithmetic always evaluates to the printed result
+    # (the v56d internal-mode precision bug applied here too). 2026-07-03.
+    p_ext_mpa_r = sig(p_ext_mpa)
     if thin_wall:
-        sigma_hoop_r = round(sigma_hoop_mpa, 3)
+        sigma_hoop_r = sig(sigma_hoop_mpa)
         hoop_formula = "sigma_hoop = p_ext x r_outer / t"
         hoop_values = {
             "p_ext": (p_ext_mpa_r, "MPa"),
-            "r_outer": (r_outer_mm, "mm"),
-            "t": (wall_t_mm, "mm"),
+            "r_outer": (sig(r_outer_mm), "mm"),
+            "t": (sig(wall_t_mm), "mm"),
         }
         hoop_note = "thin-wall formula (t < r/10)"
     else:
-        sigma_hoop_r = round(sigma_hoop_mpa, 3)
+        sigma_hoop_r = sig(sigma_hoop_mpa)
         hoop_formula = "sigma_hoop = 2 x p_ext x r_outer^2 / (r_outer^2 - r_inner^2)"
         hoop_values = {
             "p_ext": (p_ext_mpa_r, "MPa"),
-            "r_outer": (round(r_outer_mm, 2), "mm"),
-            "r_inner": (round(r_inner_mm, 2), "mm"),
+            "r_outer": (sig(r_outer_mm), "mm"),
+            "r_inner": (sig(r_inner_mm), "mm"),
         }
         hoop_note = "Lame thick-wall formula (external pressure only)"
-    sigma_long_r = round(sigma_long_mpa, 3)
-    p_cr_mpa_r = round(p_cr_mpa, 4)
-    safety_factor_r = round(safety_factor, 3)
-    buckling_sf_r = round(buckling_sf, 3)
-    vol_m3_r = round(vol_m3, 6)
-    mass_kg_r = round(mass_kg, 3)
-    end_cap_area_mm2_r = round(end_cap_area_mm2, 2)
-    end_cap_vol_mm3_r = round(end_cap_vol_mm3, 2)
-    end_cap_mass_kg_r = round(end_cap_mass_kg, 3)
+    sigma_long_r = sig(sigma_long_mpa)
+    p_cr_mpa_r = sig(p_cr_mpa)
+    safety_factor_r = sig(safety_factor)
+    buckling_sf_r = sig(buckling_sf)
+    vol_m3_r = sig(vol_m3)
+    mass_kg_r = sig(mass_kg)
+    end_cap_mass_kg_r = sig(end_cap_mass_kg)
 
     worked = [
         worked_calc(
@@ -445,8 +454,8 @@ def compute_external(payload: dict) -> dict:
             formula="sigma_long = p_ext x r_outer / (2 x t)",
             values={
                 "p_ext": (p_ext_mpa_r, "MPa"),
-                "r_outer": (r_outer_mm, "mm"),
-                "t": (wall_t_mm, "mm"),
+                "r_outer": (sig(r_outer_mm), "mm"),
+                "t": (sig(wall_t_mm), "mm"),
             },
             result=sigma_long_r, result_unit="MPa",
             assumptions=["closed end-cap assumption; sigma_long = sigma_hoop / 2 for thin wall"],
@@ -466,8 +475,8 @@ def compute_external(payload: dict) -> dict:
             formula="p_cr = 2 x E_gpa x 1000 x (t / diameter)^3 / (1 - nu^2)",
             values={
                 "E_gpa": (mat["E_gpa"], "GPa"),
-                "t": (wall_t_mm, "mm"),
-                "diameter": (diameter_mm, "mm"),
+                "t": (sig(wall_t_mm), "mm"),
+                "diameter": (sig(diameter_mm), "mm"),
                 "nu": (0.3, ""),
             },
             result=p_cr_mpa_r, result_unit="MPa",
@@ -491,9 +500,9 @@ def compute_external(payload: dict) -> dict:
             label="Cylinder wall volume",
             formula="vol_m3 = pi x (r_outer^2 - r_inner^2) x length_mm / 1e9",
             values={
-                "r_outer": (r_outer_mm, "mm"),
-                "r_inner": (round(r_inner_mm, 2), "mm"),
-                "length_mm": (length_mm, "mm"),
+                "r_outer": (sig(r_outer_mm), "mm"),
+                "r_inner": (sig(r_inner_mm), "mm"),
+                "length_mm": (sig(length_mm), "mm"),
             },
             result=vol_m3_r, result_unit="m3",
             assumptions=["cylindrical shell only; end caps computed separately", "1e9 converts mm3 to m3"],
@@ -512,8 +521,8 @@ def compute_external(payload: dict) -> dict:
             label="End-cap mass (both flat-plate approximation)",
             formula="end_cap_mass = 2 x pi x r_outer^2 x t x density / 1e9",
             values={
-                "r_outer": (r_outer_mm, "mm"),
-                "t": (wall_t_mm, "mm"),
+                "r_outer": (sig(r_outer_mm), "mm"),
+                "t": (sig(wall_t_mm), "mm"),
                 "density": (mat["density"], "kg/m3"),
             },
             result=end_cap_mass_kg_r, result_unit="kg",
@@ -526,10 +535,13 @@ def compute_external(payload: dict) -> dict:
                 "mass_cylinder": (mass_kg_r, "kg"),
                 "mass_end_caps": (end_cap_mass_kg_r, "kg"),
             },
-            result=round(total_mass_kg, 3), result_unit="kg",
+            result=sig(total_mass_kg), result_unit="kg",
             assumptions=[],
         ),
     ]
+    # Emission-time self-check (2026-07-03): refuse any worked line whose printed
+    # arithmetic does not evaluate to its printed result within 0.5%.
+    worked = self_check_worked(worked, tool_id="pressure-vessel:design")
 
     return {
         "depth_m": depth_m,
@@ -557,7 +569,76 @@ def compute_external(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """proveCatch for the v56d worked-calc arithmetic defect (fake-tick doctrine
+    applied to formulas): the adversarial input is the Codema v56d softener
+    vessel — internal mode, 6 barg, a metre-scale diameter (1.3587) reaching the
+    mm-denominated tool. The OLD code display-rounded D to 1 decimal (1.4) and
+    the head mass to 3 decimals (0.013), so the PRINTED arithmetic did not
+    evaluate to the PRINTED result: "sigma_hoop = 0.6 x 1.4 / (2 x 6) = 0.068"
+    (evaluates 0.07, 2.9% off) and "mass = 2 x pi x 6.68^2 x 6 x 8,000 / 1e9 =
+    0.013" (evaluates 0.01346, 3.4% off) — both fail the harness invariant
+    UNIVERSAL.worked_calc_arithmetic_sound. This selftest (a) drives that exact
+    input and asserts EVERY worked line re-evaluates within 0.5%; (b) covers the
+    default internal, thin-wall external, and thick-wall (Lame) external
+    branches the same way; (c) proves the emission-time self-check REFUSES the
+    literal v56d bad line; (d) asserts the numeric outputs are unchanged."""
+    from _worked import worked_is_sound
+
+    fails: list[str] = []
+
+    def chk(name: str, cond: bool) -> None:
+        if not cond:
+            fails.append(name)
+
+    def all_sound(tag: str, out: dict, min_lines: int) -> None:
+        worked = out.get("worked") or []
+        chk(f"{tag}.worked_nonempty", len(worked) >= min_lines)
+        for w in worked:
+            chk(f"{tag}.arith_sound[{w.get('label')}]", worked_is_sound(w))
+            chk(f"{tag}.shape[{w.get('label')}]", all(k in w for k in ("label", "formula", "substitution", "inputs", "result")))
+
+    # (a) the v56d-realistic softener-vessel input (internal mode)
+    v56d = {"mode": "internal", "design_pressure_barg": 6, "diameter_mm": 1.358748,
+            "length_mm": 1800, "material": "steel_316L", "wall_thickness_mm": 6,
+            "allowable_stress_mpa": 137}
+    out = compute(v56d)
+    all_sound("v56d_internal", out, 7)
+    # (d) numeric outputs unchanged by the worked-calc fix
+    chk("v56d.mass_kg", out.get("mass_kg") == 2.011)
+    chk("v56d.hoop", out.get("hoop_stress_mpa") == 0.068)
+    chk("v56d.wall", out.get("wall_thickness_mm") == 6.0)
+
+    # (b) the other branches: default internal / thin-wall external / Lame thick-wall
+    all_sound("internal_default", compute({"mode": "internal"}), 7)
+    all_sound("external_thin", compute({}), 9)
+    all_sound("external_thick_lame", compute({"depth_m": 2000, "diameter_mm": 300,
+                                              "wall_thickness_mm": 40, "length_mm": 900,
+                                              "material": "Ti_grade5"}), 9)
+
+    # (c) proveCatch: the self-check REFUSES the literal v56d bad lines
+    bad_hoop = {"label": "Hoop stress at adopted wall (internal pressure)",
+                "formula": "sigma_hoop = p_design x D / (2 x t)",
+                "substitution": "sigma_hoop = 0.6 x 1.4 / (2 x 6) = 0.068 MPa",
+                "inputs": [], "result": {"value": 0.068, "unit": "MPa"}, "assumptions": []}
+    bad_head = {"label": "Head mass (2 flat-plate heads)",
+                "formula": "mass = 2 x pi x r_outer^2 x t x density / 1e9",
+                "substitution": "mass = 2 x pi x 6.68^2 x 6 x 8,000 / 1e9 = 0.013 kg",
+                "inputs": [], "result": {"value": 0.013, "unit": "kg"}, "assumptions": []}
+    kept = self_check_worked([bad_hoop, bad_head], tool_id="pressure-vessel:design(selftest)")
+    chk("self_check_refuses_v56d_lines", kept == [])
+
+    if fails:
+        print(f"[pressure_vessel] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
+        return 1
+    print("[pressure_vessel] selftest OK (v56d internal + default internal + thin/thick external worked "
+          "calcs all re-evaluate within 0.5%; both v56d fake-arithmetic lines are refused at emission)")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)

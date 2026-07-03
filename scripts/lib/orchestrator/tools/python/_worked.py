@@ -37,6 +37,9 @@ easy to read and free of unicode-glyph rendering risk in the PDF.
 """
 from __future__ import annotations
 
+import math
+import re
+import sys
 from typing import Any
 
 
@@ -96,3 +99,143 @@ def worked_calc(
         "result": {"value": result, "unit": result_unit},
         "assumptions": list(assumptions or []),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Emission-time SELF-CHECK (2026-07-03 — the fake-tick doctrine applied to
+# formulas, after v56d shipped "flow_lpm = (6,000 x 2) / 60 = 1,500" where the
+# printed substitution evaluates to 200): a tool must REFUSE to emit a worked
+# line whose printed arithmetic does not evaluate to its printed result within
+# 0.5%. The safe re-evaluator is the ast-based pattern from
+# control_systems_run.py (commit 9303ade9f), extended to tolerate the display
+# idioms _worked emits: thousands commas, 'x' multiply, '^' power, literal
+# 'pi', and scientific-notation constants like 1e9. It mirrors the harness
+# invariant UNIVERSAL.worked_calc_arithmetic_sound (regression-harness.tsx) so
+# a line this check accepts cannot fail the harness.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Function-bearing substitutions (sqrt/ln/min/…) are not plain +-*/ arithmetic;
+# the harness skips them, and so does this check (same list).
+_FN_SKIP = re.compile(
+    r"\b(sqrt|cbrt|ln|log10|log|exp|ceil_to_standard|ceil|round|floor|min|max|abs)\s*\(",
+    re.IGNORECASE,
+)
+_NUM_TOKEN = re.compile(r"\d+\.?\d*(?:[eE][+-]?\d+)?")
+
+
+def _eval_arith(expr: str):
+    """SAFE arithmetic evaluation via ast (NO eval — numbers and + - * / ** ( )
+    unary +/- only; anything else → None). Same pattern as
+    control_systems_run.py::_eval_arith (commit 9303ade9f)."""
+    import ast
+    try:
+        # strip: leading whitespace raises IndentationError in mode="eval"
+        tree = ast.parse(expr.strip(), mode="eval")
+    except (SyntaxError, ValueError, MemoryError, RecursionError):
+        return None
+
+    def ev(node):
+        if isinstance(node, ast.Expression):
+            return ev(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            v = ev(node.operand)
+            return None if v is None else (-v if isinstance(node.op, ast.USub) else v)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)):
+            a, b = ev(node.left), ev(node.right)
+            if a is None or b is None:
+                return None
+            try:
+                if isinstance(node.op, ast.Add):
+                    return a + b
+                if isinstance(node.op, ast.Sub):
+                    return a - b
+                if isinstance(node.op, ast.Mult):
+                    return a * b
+                if isinstance(node.op, ast.Div):
+                    return a / b
+                return a ** b
+            except (ZeroDivisionError, OverflowError):
+                return None
+        return None
+
+    v = ev(tree)
+    return v if (v is not None and math.isfinite(v)) else None
+
+
+def eval_substitution(substitution: str):
+    """Re-evaluate the PRINTED middle of a worked-calc substitution string
+    ("LHS = <printed numbers> = <result unit>"). Returns the evaluated float,
+    or None when the line is not plainly evaluable (function call, residual
+    symbol, malformed) — mirroring the harness's skip behaviour."""
+    parts = str(substitution).split("=")
+    if len(parts) < 3:
+        return None
+    expr = "=".join(parts[1:-1])
+    if _FN_SKIP.search(expr):
+        return None
+    expr = expr.replace(",", "")
+    expr = re.sub(r"\bpi\b", repr(math.pi), expr, flags=re.IGNORECASE)
+    expr = expr.replace("^", "**")
+    # display multiply: 'x' between numbers/parens/whitespace (never inside a word)
+    expr = re.sub(r"(?<=[\d\s()])x(?=[\s(\d])", "*", expr)
+    # any residual alphabetic symbol (excluding scientific-notation exponents,
+    # stripped with the number tokens) → not plainly evaluable
+    if re.search(r"[A-Za-z]", _NUM_TOKEN.sub("", expr)):
+        return None
+    return _eval_arith(expr)
+
+
+def worked_is_sound(record: dict, rel_tol: float = 0.005) -> bool:
+    """True when the record's printed substitution evaluates to its stated
+    result within rel_tol (default 0.5%), or when it is not plainly evaluable
+    (function-bearing / symbolic lines pass through — same as the harness)."""
+    got = eval_substitution((record or {}).get("substitution", ""))
+    if got is None:
+        return True
+    stated = ((record or {}).get("result") or {}).get("value")
+    try:
+        stated = float(stated)
+    except (TypeError, ValueError):
+        return True
+    if not math.isfinite(stated):
+        return True
+    return abs(got - stated) <= rel_tol * max(abs(stated), 1e-9)
+
+
+def self_check_worked(records: list, tool_id: str = "", rel_tol: float = 0.005) -> list:
+    """Emission-time gate: keep only worked records whose printed arithmetic
+    adds up (within rel_tol); REFUSE (drop + warn on stderr — stdout stays pure
+    JSON) any record that would mislead a reviewer re-deriving the maths. A
+    dropped line is a TOOL BUG: fix the formula template / display precision at
+    source rather than widening the tolerance."""
+    kept: list = []
+    for rec in records:
+        if rec is None:
+            continue
+        if worked_is_sound(rec, rel_tol):
+            kept.append(rec)
+        else:
+            got = eval_substitution(rec.get("substitution", ""))
+            sys.stderr.write(
+                f"[{tool_id or 'worked-calc'}] WARN: refused worked line "
+                f"'{rec.get('substitution', '')}' — printed arithmetic evaluates to "
+                f"{got!r}, not the stated result (>{rel_tol * 100:.1f}% off). "
+                f"Formula-template/precision bug: fix the emitting code.\n"
+            )
+    return kept
+
+
+def sig(v: Any, n: int = 6):
+    """Round a number to n significant figures for worked-calc display values +
+    results. Fixed-decimal round() was the v56d precision bug: round(1.3587, 1)
+    → 1.4 printed in a substitution whose result was computed from 1.3587 (2.9%
+    off — the harness fails it). Significant-figure rounding keeps display drift
+    ~1e-6, far inside the 0.5% self-check, at any magnitude."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return v
+    fv = float(v)
+    if fv == 0 or not math.isfinite(fv):
+        return fv
+    return float(f"%.{int(n)}g" % fv)

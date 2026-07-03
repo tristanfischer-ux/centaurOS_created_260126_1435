@@ -41,7 +41,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _worked import worked_calc  # noqa: E402  (same-dir shared helper)
+from _worked import self_check_worked, worked_calc  # noqa: E402  (same-dir shared helpers)
 
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
@@ -168,14 +168,36 @@ def compute(payload: dict) -> dict:
     h_total_r = round(h_total_m, 2)
     p_hyd_r = round(p_hydraulic_w, 1)
     p_shaft_r = round(p_shaft_w, 1)
-    worked = [
-        worked_calc(
+
+    # Total-system-flow worked line — GENERATED FROM the branch the computation
+    # actually took (v56d defect: the emitter template was printed with the
+    # DEMAND-governed result, so "(6,000 x 2) / 60 = 1,500" evaluated to 200.
+    # The substitution must always be the arithmetic that produced the number).
+    if target_flow_m3_h > emitter_flow_m3_h:
+        flow_worked = worked_calc(
+            label="Total system flow",
+            formula="flow_lpm = (demand_m3_h x 1000) / 60",
+            values={"demand_m3_h": (round(target_flow_m3_h, 4), "m3/h")},
+            result=round(total_flow_lpm, 2), result_unit="L/min",
+            assumptions=[
+                (f"stated peak irrigation demand governs: {round(target_flow_m3_h, 2)} m3/h >= "
+                 f"emitter-summed flow {n_emitters} x {flow_per_emitter_lph} L/h "
+                 f"= {round(emitter_flow_m3_h, 2)} m3/h (pump never undersized vs the demand)"),
+                "x 1000 converts m3/h to L/h; / 60 converts L/h to L/min",
+            ],
+        )
+    else:
+        flow_worked = worked_calc(
             label="Total system flow",
             formula="flow_lpm = (n_emitters x flow_per_emitter) / 60",
             values={"n_emitters": (n_emitters, ""),
                     "flow_per_emitter": (flow_per_emitter_lph, "L/h")},
             result=round(total_flow_lpm, 2), result_unit="L/min",
-        ),
+            assumptions=["n_emitters x flow_per_emitter gives L/h; / 60 converts L/h to L/min"],
+        )
+
+    worked = [
+        flow_worked,
         worked_calc(
             label="Total pump head",
             formula="head = static_head + friction_head + emitter_head",
@@ -217,6 +239,10 @@ def compute(payload: dict) -> dict:
                          "Q_m3h / 3600 converts m3/h to m3/s; pipe_area / 1e6 converts mm2 to m2"],
         ),
     ]
+    # Emission-time self-check (2026-07-03): refuse any worked line whose printed
+    # arithmetic does not evaluate to its printed result within 0.5% — a working
+    # that doesn't add up is worse than none (misleads the reviewer).
+    worked = self_check_worked(worked, tool_id="irrigation:pump-sizing")
 
     return {
         "system_type": system_type,
@@ -253,7 +279,72 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """proveCatch for the v56d worked-calc arithmetic defect (fake-tick doctrine
+    applied to formulas): the adversarial input is the Codema v56d shape — a
+    stated 90 m3/h ebb-flow demand governing over 6,000 x 2 L/h emitters. The
+    OLD code printed the EMITTER template with the DEMAND result:
+    "flow_lpm = (6,000 x 2) / 60 = 1,500 L/min" — the substitution evaluates to
+    200, a 7.5x lie a reviewer re-deriving the maths catches instantly. This
+    selftest (a) drives that exact input and asserts EVERY emitted worked line
+    re-evaluates to its printed result within 0.5%; (b) proves the emission-time
+    self-check REFUSES the literal v56d bad line; (c) asserts the numeric
+    outputs are unchanged by the worked-calc fix."""
+    from _worked import worked_is_sound
+
+    fails: list[str] = []
+
+    def chk(name: str, cond: bool) -> None:
+        if not cond:
+            fails.append(name)
+
+    # (a) the v56d-realistic input: demand 90 m3/h wins over the emitter sum
+    v56d = {"total_emitters": 6000, "flow_per_emitter_l_h": 2, "target_flow_m3_h": 90,
+            "static_head_m": 5, "pipe_length_m": 200, "pressure_loss_kpa": 150}
+    out = compute(v56d)
+    worked = out.get("worked") or []
+    chk("worked_nonempty", len(worked) >= 6)
+    for w in worked:
+        chk(f"arith_sound[{w.get('label')}]", worked_is_sound(w))
+        chk(f"shape[{w.get('label')}]", all(k in w for k in ("label", "formula", "substitution", "inputs", "result")))
+    flow_lines = [w for w in worked if w.get("label") == "Total system flow"]
+    chk("flow_worked_present", len(flow_lines) == 1)
+    if flow_lines:
+        # the demand branch must print the demand conversion, not the emitter product
+        chk("flow_from_demand_branch", "demand_m3_h" in str(flow_lines[0].get("formula")))
+        chk("flow_evaluates_to_1500", worked_is_sound(flow_lines[0]))
+    # (c) numeric outputs unchanged by the worked-calc fix
+    chk("output_flow_90", out.get("pump_flow_m3_h") == 90.0)
+    chk("output_motor_w", out.get("motor_power_w") == 9653.4)
+    chk("output_head", out.get("pump_head_m") == 22.51)
+
+    # emitter-governed branch still prints (and passes) the emitter template
+    out2 = compute({"total_emitters": 100, "flow_per_emitter_l_h": 2.0, "system_type": "drip"})
+    fl2 = [w for w in (out2.get("worked") or []) if w.get("label") == "Total system flow"]
+    chk("emitter_branch_present", len(fl2) == 1 and "n_emitters" in str(fl2[0].get("formula")))
+    chk("emitter_branch_sound", bool(fl2) and worked_is_sound(fl2[0]))
+    for w in (out2.get("worked") or []):
+        chk(f"emitter_case_sound[{w.get('label')}]", worked_is_sound(w))
+
+    # (b) proveCatch: the self-check REFUSES the literal v56d bad line
+    bad = {"label": "Total system flow",
+           "formula": "flow_lpm = (n_emitters x flow_per_emitter) / 60",
+           "substitution": "flow_lpm = (6,000 x 2) / 60 = 1,500 L/min",
+           "inputs": [], "result": {"value": 1500.0, "unit": "L/min"}, "assumptions": []}
+    kept = self_check_worked([bad], tool_id="irrigation:pump-sizing(selftest)")
+    chk("self_check_refuses_v56d_line", kept == [])
+
+    if fails:
+        print(f"[irrigation_pump_sizing] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
+        return 1
+    print(f"[irrigation_pump_sizing] selftest OK ({len(worked)} worked calcs on the v56d demand-governed "
+          f"input all re-evaluate within 0.5%; the v56d fake-arithmetic line is refused at emission)")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)
