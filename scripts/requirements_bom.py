@@ -950,12 +950,15 @@ _COMMODITY_NOUN_FLOORS = [
     # label / marker / nameplate / tag — die-cut adhesive, pennies-to-£1 each
     ({"label", "labels", "marker", "markers", "nameplate", "nameplates", "tag", "tags",
       "sticker", "stickers", "placard"}, 1.0),
-    # cable lug / ferrule / terminal / crimp / connector pin — a stamped contact, ~£2
+    # cable lug / ferrule / terminal (block) / crimp / connector pin — a stamped contact
+    # / DIN-rail terminal, ~£2 (the commodity-electrical £2-8 band, v56c 'Terminal
+    # Blocks £0' family)
     ({"lug", "lugs", "ferrule", "ferrules", "terminal", "terminals", "crimp", "crimps",
       "ferule", "spade", "bootlace"}, 2.0),
-    # gasket / seal / o-ring / grommet / bung — moulded elastomer, ~£5
+    # gasket / seal / o-ring / grommet / bung / cable gland — moulded elastomer /
+    # threaded brass gland, ~£5
     ({"gasket", "gaskets", "seal", "seals", "oring", "grommet", "grommets", "bung",
-      "bungs", "washer", "washers"}, 5.0),
+      "bungs", "washer", "washers", "gland", "glands"}, 5.0),
     # fuse / mcb / breaker (bare commodity protective device), ~£8
     ({"fuse", "fuses", "mcb", "mcbs", "breaker", "breakers", "fuselink"}, 8.0),
     # capacitor / cap, ~£15
@@ -969,13 +972,20 @@ _COMMODITY_GENERIC_FLOOR_GBP = 3.0
 
 def _commodity_zero_floor(name: str):
     """A small, deterministic, NOUN-keyed minimum price (£) for a line that finalised at
-    £0 — the 'no £0 priced line' guard. Returns (floor_gbp, noun) keyed off the line's
-    principal NOUN; falls back to the conservative generic floor for any other noun.
-    Universal, no per-MPN table. CONSERVATIVE — a small floor, never an inflated guess."""
+    £0 — the 'no £0 priced line' guard. Returns (floor_gbp, noun). Matches the line's
+    principal NOUN first, then ANY of its tokens against the class bands (v56c fix:
+    'Terminal Blocks' has principal noun 'blocks', but the CLASS token is 'terminal' —
+    last-token-only matching sent every multi-word commodity to the generic catch-all).
+    Falls back to the conservative generic floor for any other noun. Universal, no
+    per-MPN table. CONSERVATIVE — a small floor, never an inflated guess."""
     noun = _principal_noun(name)
+    toks = [t for t in re.findall(r"[a-z]{3,}", (name or "").lower()) if t not in _NOUN_STOP]
     for nouns, floor in _COMMODITY_NOUN_FLOORS:
         if noun in nouns:
             return (floor, noun)
+        hit = next((t for t in toks if t in nouns), None)
+        if hit:
+            return (floor, hit)
     return (_COMMODITY_GENERIC_FLOOR_GBP, noun)
 
 
@@ -1176,6 +1186,24 @@ def _pneumatic_actuator_band(name: str, gbp: float):
     return None
 
 
+def _structural_material_from_name(name: str) -> str:
+    """The stated material of a budget-estimated STRUCTURAL part, read from the part's
+    OWN name tokens (universal — the name IS the data; no class table): 'Sst304 / SS316 /
+    stainless' → the stainless grade; 'galvanised' → galvanised steel; 'aluminium' →
+    aluminium alloy; 'painted steel' (or any other steel frame) → painted structural
+    carbon steel (the trade default for a skid/frame)."""
+    nm = (name or "").lower()
+    m = re.search(r"(?:sst|ss)\s*_?(304|316)l?|\b(304|316)l?\s+stainless|\bstainless\b", nm)
+    if m:
+        grade = next((g for g in m.groups() if g), None)
+        return f"{grade} stainless steel" if grade else "stainless steel"
+    if re.search(r"galvani[sz]", nm):
+        return "galvanised steel"
+    if re.search(r"aluminium|aluminum", nm):
+        return "aluminium alloy"
+    return "painted structural carbon steel (S275/S355)"
+
+
 def _dedupe_actuator_assembly_rows(rows):
     """DOUBLE-REPRESENTATION de-dup (benchmark net v56, 2026-07-02): when the bill
     carries BOTH an actuated-valve ASSEMBLY line (N units, actuator included in the
@@ -1204,6 +1232,12 @@ def _dedupe_actuator_assembly_rows(rows):
             continue                      # more actuators than assemblies — stands alone
         r["line_gbp"] = 0
         r["status"] = "IN ASSEMBLY"
+        # PARENT LINK (v56c ledger column-contract fix, 2026-07-03): a folded line is an
+        # APPORTIONMENT of its host assembly — mark it sub_of so the ledger contract
+        # treats it as a child ('incl. in parent'), not a broken qty×unit≠line row.
+        _htag = str(host.get("tag") or "").strip()
+        r["sub_of"] = _htag if _htag and _htag != "—" else \
+            str(host.get("requirement", "")).split("·")[0].strip()
         r["basis"] = (str(r.get("basis", ""))
                       + f" · de-duplicated: these {qy}× actuators are the actuators ON the "
                       f"{int(host.get('qty') or 1)}× actuated-valve assemblies "
@@ -1293,6 +1327,12 @@ def _dedupe_membrane_synonym_rows(rows):
                                 f"(was £{round(float(r.get('line_gbp') or 0)):,})")
             r["line_gbp"] = 0
             r["status"] = "MERGED·SYNONYM"
+            # PARENT LINK (v56c ledger column-contract fix, 2026-07-03): a merged synonym
+            # is an apportionment of its survivor — mark it sub_of so the ledger contract
+            # treats it as a child ('incl. in parent'), not a broken qty×unit≠line row.
+            _stag = str(survivor.get("tag") or "").strip()
+            r["sub_of"] = _stag if _stag and _stag != "—" else \
+                str(survivor.get("requirement", "")).split("·")[0].strip()
             r["basis"] = (str(r.get("basis", ""))
                           + f" · de-duplicated: names the SAME {'/'.join(sorted(key)).upper()} stage as "
                           f"'{str(survivor.get('requirement', '')).split('·')[0].strip()}' — synonym line "
@@ -2848,6 +2888,56 @@ def _selftest() -> int:
     if not (_dedupe_membrane_synonym_rows(_mem_alone) == 0 and _mem_alone[0]["line_gbp"] == 9100 and "merged" not in _mem_alone[0]["basis"]):
         print("  FAIL standalone membrane line wrongly folded"); bad += 1
 
+    # ── (j) v56c LEDGER COLUMN-CONTRACT convergence fixes (2026-07-03) — proveCatch each.
+    # (j1) COMMODITY-ELECTRICAL CLASS-TOKEN FLOOR: 'Terminal Blocks' (principal noun
+    # 'blocks') must reach the £2 terminal-contact band via its CLASS token — the v56c
+    # rows shipped unit £0 because the £0.11 estimate ROUNDED to £0 and last-token-only
+    # matching missed the class. Both directions: an in-band price is untouched.
+    for _nm, _want_floor, _want_tok in [
+            ("Terminal Blocks", 2.0, "terminal"),       # class token, not the last noun
+            ("Terminal Block", 2.0, "terminal"),
+            ("Cable Gland", 5.0, "gland"),              # gland → moulded/threaded fitting band
+            ("DIN Rail", 3.0, "rail"),                  # no class band → generic £3 (£2-8 family)
+            ("Compartment Spacers", 3.0, "spacers"),    # generic catch-all
+            ("Leveling Feet", 3.0, "feet")]:
+        _f2, _n2 = _commodity_zero_floor(_nm)
+        if _f2 != _want_floor or _n2 != _want_tok:
+            print(f"  FAIL class-token floor {_nm!r}: got (£{_f2}, {_n2!r}) want (£{_want_floor}, {_want_tok!r})"); bad += 1
+    # (j2) RENDERS-£0 guard mirror: a 0 < £ < 0.5 estimate (emits unit £0 after round())
+    # is floored; a £0.60 estimate (renders £1) and a pack micro-commodity are untouched.
+    def _apply_render_zero_floor(name, gbp):
+        if gbp <= 0 or (gbp < 0.5 and _pack_micro_band(name or "") is None):
+            _cf3, _cn3 = _commodity_zero_floor(name)
+            return (_cf3, "floored")
+        return (gbp, "untouched")
+    if _apply_render_zero_floor("Terminal Blocks", 0.11) != (2.0, "floored"):
+        print("  FAIL £0.11 Terminal Blocks (renders £0) not floored to £2"); bad += 1
+    if _apply_render_zero_floor("Leveling Feet", 0.11) != (3.0, "floored"):
+        print("  FAIL £0.11 Leveling Feet (renders £0) not floored"); bad += 1
+    if _apply_render_zero_floor("Trelleborg gasket", 0.6) != (0.6, "untouched"):
+        print("  FAIL £0.60 gasket (renders £1) wrongly floored"); bad += 1
+    if _apply_render_zero_floor("cell tap wire", 0.3) != (0.3, "untouched"):
+        print("  FAIL pack micro-commodity £0.30 tap wire wrongly lifted out of its band"); bad += 1
+    # (j3) DE-DUP PARENT LINK: a folded (IN ASSEMBLY / MERGED·SYNONYM) row carries sub_of
+    # → the ledger column contract treats it as an apportioned child ('incl. in parent'),
+    # never a broken qty×unit≠line row (the v56c Z-102/Z-103/Pneumatic-Actuators fails).
+    if not (_rows_fold[1].get("sub_of") == "Pneumatic Actuated Valves"):
+        print(f"  FAIL folded actuator line carries no sub_of parent link (got {_rows_fold[1].get('sub_of')!r})"); bad += 1
+    if not (_mem_rows[0].get("sub_of") and _mem_rows[1].get("sub_of")):
+        print(f"  FAIL merged membrane synonym lines carry no sub_of parent link "
+              f"(got {_mem_rows[0].get('sub_of')!r}, {_mem_rows[1].get('sub_of')!r})"); bad += 1
+    if _rows_alone[0].get("sub_of") or _mem_alone[0].get("sub_of"):
+        print("  FAIL an un-folded line wrongly gained a sub_of link"); bad += 1
+    # (j4) STRUCTURAL MATERIAL from the part's own name (X-134/X-135 skid frames shipped
+    # material-less): stainless grade read from Sst304/SS316; painted steel defaults.
+    for _nm, _want in [("Sst304 Skid Frame · 2.3 m dia x 2.4 m", "304 stainless steel"),
+                       ("SS316 Support Frame", "316 stainless steel"),
+                       ("Painted Steel Skid Frame · 2.3 m dia x 2.4 m", "painted structural carbon steel (S275/S355)"),
+                       ("Galvanised Access Platform", "galvanised steel"),
+                       ("Aluminium Gantry", "aluminium alloy")]:
+        if _structural_material_from_name(_nm) != _want:
+            print(f"  FAIL structural material {_nm!r}: got {_structural_material_from_name(_nm)!r} want {_want!r}"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -3336,6 +3426,19 @@ def _connection_rows(out_dir: str, q=None):
             part = f"{size} {matlabel} {kind}, {float(length or 0):.1f} m"
         else:
             part = str(r.get("qty") or f"{size} {kind}")
+        # ── MATERIAL OF CONSTRUCTION (v56c ledger column-contract fix, 2026-07-03): a
+        # routed run is a PHYSICAL fabricated take-off, so every service states its
+        # material — the water branch already sized one (matlabel); a CABLE is the
+        # £/m·conductor copper model by construction; a DUCT is galvanised sheet. The 27
+        # 'material missing on a PHYSICAL fabricated part' C-row fails were exactly the
+        # electrical runs shipping with no stated material. Universal — keyed on the
+        # service the row itself carries, no class table. ──
+        if service == "water":
+            conn_material = matlabel
+        elif service == "electrical":
+            conn_material = "Cu conductor, LSZH/XLPE insulated (BS 6724/BS 5467 class)"
+        else:
+            conn_material = "galvanised steel duct (DW/144)"
         row = {
             "tag": f"C{i + 1:02d}",
             "requirement": req,
@@ -3345,6 +3448,7 @@ def _connection_rows(out_dir: str, q=None):
             "unit_gbp": round(line),
             "line_gbp": round(line),
             "basis": basis,
+            "material": conn_material,
             # extras (length + sizing focus) — consumed by the run dashboard:
             "connection": True, "service": service, "size": size,
             "length_m": round(float(length), 1) if isinstance(length, (int, float)) else None,
@@ -3858,6 +3962,14 @@ def assemble(out_dir: str):
                     elif pv > 0:
                         status, part = "BESPOKE", "made to spec (structural)"
                         gbp, basis = pv, "made-to-spec · structural budget estimate"
+                        # MATERIAL (v56c ledger fix, 2026-07-03): a budget-estimated
+                        # structural part is still a PHYSICAL fabricated part — state its
+                        # material from the part's OWN name tokens ('Sst304 Skid Frame' →
+                        # 304 stainless; 'Painted Steel Skid Frame' → painted carbon
+                        # steel), defaulting to structural carbon steel. The X-134/X-135
+                        # skid frames shipped material-less because this branch (unlike
+                        # the take-off branch) emitted no mt_spec.
+                        mt_spec = {"material": _structural_material_from_name(name)}
                     else:
                         status, part = "NOT FOUND", "requirement stated — structural"
                         gbp, basis = 0.0, "structural element — footprint take-off (no footprint driver; confidence low)"
@@ -4070,18 +4182,27 @@ def assemble(out_dir: str):
                                  f"reference £{pre_gbp:,.0f} is "
                                  f"{gbp / pre_gbp:.0f}× below the duty-rated price "
                                  f"(undersized for the duty)")
-                # ── ZERO-PRICE COMMODITY FLOOR (2026-06-25): FINAL guard — no priced
-                # principal/IDENTIFIED line may emit unit £0. A real commodity MPN (Klauke
-                # cable lug, Vishay capacitor, Schaffner line filter, Trelleborg gasket,
-                # Brady labels) that missed the catalogue, the DB-spec resolver and the list
-                # price reaches here at £0 — every part costs SOMETHING. Apply a small,
-                # conservative minimum keyed off the principal NOUN (commodity-floor, no
-                # DB price). Skips a SUB-COMPONENT (its £ lives in the parent's breakdown,
+                # ── ZERO-PRICE COMMODITY FLOOR (2026-06-25; RENDERS-£0 extension
+                # 2026-07-03): FINAL guard — no priced principal/IDENTIFIED line may emit
+                # unit £0. A real commodity MPN (Klauke cable lug, Vishay capacitor,
+                # Schaffner line filter, Trelleborg gasket, Brady labels) that missed the
+                # catalogue, the DB-spec resolver and the list price reaches here at £0 —
+                # every part costs SOMETHING. v56c ROW-FAIL family: a stray SUB-£0.50
+                # estimate (Terminal Blocks @ £0.11) is just as bad — the emitted row
+                # rounds it to unit £0, failing the ledger column contract ('unit £
+                # missing/zero'). So the floor fires whenever the price would RENDER as
+                # £0 (round(gbp) == 0), keyed off the commodity class token (terminal →
+                # £2, gland → £5, generic → £3). A PACK-MICRO consumable (tap wire /
+                # insulation pad, deliberate £0.3-2.5 band) keeps its band — only a true
+                # £0 lifts, to the band FLOOR, never the commodity floor above its
+                # ceiling. Skips a SUB-COMPONENT (its £ lives in the parent's breakdown,
                 # line_gbp=0) and a BUILDING/structural line (handled on its own path). ──
-                if gbp <= 0 and status not in ("SUB-COMPONENT", "BUILDING"):
+                if status not in ("SUB-COMPONENT", "BUILDING") and (
+                        gbp <= 0 or (gbp < 0.5 and _pack_micro_band(name or "") is None)):
                     _cf, _cnoun = _commodity_zero_floor(name)
+                    _why = "no DB price" if gbp <= 0 else f"estimate £{gbp:.2f} renders £0"
                     gbp = _cf
-                    basis = (basis + f" · commodity-floor (no DB price; '{_cnoun}' → £{_cf:g})"
+                    basis = (basis + f" · commodity-floor ({_why}; '{_cnoun}' → £{_cf:g})"
                              if "commodity-floor" not in basis else basis)
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),

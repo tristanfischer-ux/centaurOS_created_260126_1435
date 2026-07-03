@@ -101,50 +101,72 @@ export function runSettleLoop(
 //     contract, so the BoM line + the single-line drawing reflect the as-routed demand.
 // The loop body B→C→D is runSettleLoop; the E pass is applied once on the settled state.
 
+// The preferred distribution-transformer / incomer rating ladder. IEC 60076 series
+// EXTENDED with the 75 kVA step (the UK dry-type / packaged-substation trade ladder —
+// 50/75/100/160/250 — carries it; without it a 53 kW plant's 66.25 kVA requirement
+// jumped a whole size class to 100 kVA, and a rounding-edge shape could even quote a
+// raw 66 that FAILS the ≥ load × 1.25 adequacy invariant).
 const IEC_KVA_LADDER = [
-  25, 50, 100, 160, 200, 250, 315, 400, 500, 630, 800,
+  25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800,
   1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
 ]
 
-/** Smallest IEC-60076 standard kVA ≥ s_req (mirrors electrical_transformer_sizing._next_standard_kva:
- *  above the top of the ladder, round UP to the next 100 kVA — never under-size). */
+/** Smallest standard kVA rating ≥ s_req over IEC_KVA_LADDER (above the top of the
+ *  ladder, round UP to the next 100 kVA — never under-size). An exactly-on-a-step
+ *  requirement returns that step (the ≥ is inclusive: 40 kW × 1.25 = 50 → 50 kVA). */
 export function nextStandardKva(sReqKva: number): number {
   for (const r of IEC_KVA_LADDER) if (r >= sReqKva - 1e-9) return r
   return Math.ceil(sReqKva / 100) * 100
 }
 
+// The incomer sizing margin: kVA ≥ load kW × 1.25. Because kVA ≥ kW for ANY power
+// factor, load × 1.25 is the assumption-free adequacy requirement — the SAME basis the
+// deterministic adequacy check ('Main incomer kVA >= connected load x 1.25') verifies,
+// so the mint and the check can never disagree on the rule.
+export const INCOMER_KVA_MARGIN = 1.25
+
 /**
- * E PASS (pure): re-size the incomer transformer from the CONVERGED supply demand. Reads
- * quantities.total_supply_demand_kw (written by the writeback); returns the updated quantities
- * with an ADDITIVE total_supply_demand_kva (S = P/pf × (1+headroom) → next IEC standard) so the
- * BoM + drawings reflect the as-routed demand. Returns null (no change) when there is no converged
- * demand to size from. Never touches the brief plant-load metric. UNIVERSAL — no class logic.
+ * E PASS (pure): size the incomer/transformer kVA from the reconciled supply demand.
+ * THE RULE (v56c convergence round): incomer kVA = next STANDARD rating ≥ load × 1.25
+ * (ladder incl. 75; kVA ≥ kW for any power factor, so this is assumption-free and
+ * matches the deterministic adequacy check exactly). Reads quantities.total_supply_demand_kw
+ * (the connected-load alias the writeback reconciles); writes ONE additive
+ * total_supply_demand_kva — the single mint the checks, the Excel and the single-line all
+ * read. Returns null (no change) when there is no demand to size from. Never touches the
+ * brief plant-load metric. UNIVERSAL — no class logic.
  */
 export function resizeFromConvergedDemand(
   quantities: Record<string, any>,
-  opts: { powerFactor?: number; headroom?: number } = {},
+  opts: { margin?: number } = {},
 ): { quantities: Record<string, any>; kva: number; kw: number } | null {
   const q = quantities || {}
   const sup = q.total_supply_demand_kw
   const kw = (sup && typeof sup === 'object') ? Number(sup.value) : Number(sup)
   if (!Number.isFinite(kw) || kw <= 0) return null
-  const pf = opts.powerFactor ?? 0.9
-  const headroom = opts.headroom ?? 0.25
-  const sReq = (kw / pf) * (1 + headroom)
+  const margin = opts.margin ?? INCOMER_KVA_MARGIN
+  const sReq = Math.round(kw * margin * 1000) / 1000
   const kva = nextStandardKva(sReq)
   const next = { ...q }
   const prev = next.total_supply_demand_kva
   // TRACEABILITY SPINE: this incomer kVA is computed FROM total_supply_demand_kw — record that
-  // lineage + a prose source_detail so it is not born sourceless.
+  // lineage + a formula-bearing source_detail so it is not born sourceless and the
+  // Calculations surface can show the working (the '=' makes calc-coverage count it SHOWN).
+  const detail =
+    `incomer kVA = next standard rating ≥ load × ${margin}: ${kw} kW × ${margin} = ${sReq} kVA → ` +
+    `${kva} kVA (standard ladder 50/75/100/160/250…; kVA ≥ kW for any power factor — the ` +
+    `assumption-free adequacy basis the deterministic check verifies)`
   const meta = {
     source: 'design-loop',
-    source_detail: `incomer S=P/pf×(1+headroom) from total_supply_demand_kw=${kw} kW (pf ${pf}, ${Math.round(headroom * 100)}% headroom → next IEC-60076 standard)`,
-    lineage: { from: ['total_supply_demand_kw'], via: 'design-loop:incomer-sizing' },
+    source_detail: detail,
+    lineage: {
+      from: ['total_supply_demand_kw'], via: 'design-loop:incomer-sizing',
+      formula: `NEXT_STANDARD_KVA(total_supply_demand_kw*${margin})`,
+    },
   }
   if (prev != null && typeof prev === 'object') next.total_supply_demand_kva = { ...prev, value: kva, ...meta }
   else next.total_supply_demand_kva = {
     value: kva, unit: 'kVA', family: 'power',
-    basis: `incomer re-sized from the as-routed supply demand ${kw} kW (S=P/pf×(1+headroom), pf ${pf}, ${Math.round(headroom * 100)}% headroom → next IEC-60076 standard); converged-loop E pass`,
+    basis: `incomer sized from the supply demand ${kw} kW: next standard rating ≥ ${kw} × ${margin} = ${sReq} kVA → ${kva} kVA; converged-loop E pass`,
     ...meta,
   }
   return { quantities: next, kva, kw }

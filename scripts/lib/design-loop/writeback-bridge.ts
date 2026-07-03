@@ -29,6 +29,9 @@ export interface QuantityUpdate {
                          // NOT reconcile against the plant's connected load — it is recorded
                          // in the loop ledger as an UNVERIFIED-ARTEFACT but NEVER written as
                          // a design quantity (applyUpdates skips it; isSettled ignores it).
+  as_routed_kw?: number  // ALIAS RECONCILE (2026-07-03): the raw converged (as-routed) demand
+                         // the loop measured, recorded for the ledger when the written value
+                         // was reconciled to the connected-load alias (see SUPPLY_ALIAS_TOLERANCE).
 }
 
 // An as-routed supply demand = plant load + distribution parasitic (pump friction + cable
@@ -37,6 +40,26 @@ export interface QuantityUpdate {
 // ×2.5 million, from a corrupted 90 m³/s edge flow), never a design output that may feed
 // cost / financial / drawings.
 export const SUPPLY_RECONCILE_FACTOR = 3
+
+// ALIAS RECONCILE (2026-07-03, the v56c PROVENANCE FAIL 'Tool output used:
+// total_supply_demand_kw'): `total_supply_demand_kw` is an ALIAS of the plant's connected
+// electrical load — the engineering contract mints it = connected_electrical_load_kw and the
+// first-principles tool CLAIMS that value, so any writer that moves the alias off the
+// connected load makes the dossier contradict its own tool provenance (v56c: the loop wrote
+// the as-routed 55.032 kW over the 53 kW alias → the deterministic provenance check failed
+// STALE, and the lineage closure then tainted the derived incomer kVA). THE RULE, enforced at
+// the ENTRY (this writer), never patched downstream:
+//   • the alias equals the connected load BY CONSTRUCTION — a converged as-routed demand
+//     within ±SUPPLY_ALIAS_TOLERANCE of the connected load is RECONCILED to it (the written
+//     value IS the connected load; the as-routed figure is recorded in the update's basis +
+//     `as_routed_kw` for the ledger, so nothing is hidden);
+//   • a writer trying to move the alias beyond ±SUPPLY_ALIAS_TOLERANCE is REFUSED
+//     (unverified_artefact — recorded in the loop ledger, never written as a design quantity).
+//     This is TIGHTER than the ×3 phantom bound, which let a 2.9× write through when the
+//     alias anchor existed.
+// The ×3 bound survives ONLY for the anchorless case (no connected-load quantity in the
+// contract — the writeback then mints a genuinely NEW aggregate, not an alias).
+export const SUPPLY_ALIAS_TOLERANCE = 0.10
 
 export interface ConvergenceReport {
   base_demand_kw?: number
@@ -88,39 +111,65 @@ export function computeQuantityUpdates(
   const traj = Array.isArray(conv?.trajectory) ? conv!.trajectory! : []
   const last = traj[traj.length - 1] || {}
 
-  // 1. supply demand (converged) — ADDITIVE new quantity, NOT a replacement for the brief's
-  //    plant-load metric. The converged total = plant load + distribution parasitic (pump
-  //    friction + cable I²R); it is the SUPPLY requirement that sizes the incomer / transformer /
-  //    feeder, and is correctly slightly higher than the plant load. Writing it as a NEW key
-  //    avoids (a) overwriting the brief metric (connected_electrical_load_kw, which the prose +
-  //    compliance cap reference) and (b) a false cap breach — so the writeback is purely additive
-  //    and safe to apply without reordering the narrative.
-  // RECONCILE BOUND (2026-07-02, the v55 total_supply_demand_kw = 1.326e8 fix): the
-  // converged aggregate must reconcile against the plant's own connected electrical load
-  // within SUPPLY_RECONCILE_FACTOR. v55's scrambled connection graph carried a 90 m³/s
-  // phantom flow → 132.4 GW of "pump friction" → the writeback minted it as a quantity the
-  // single-line / panel-schedule / Excel PREFER — shipping a 132.6 GW cover + a 201,464,029 A
-  // busbar on a 53 kW plant. Beyond the bound the value is recorded in the loop ledger as
-  // UNVERIFIED-ARTEFACT (durable, diagnosable) but never becomes a design quantity.
-  const baseLoad = curValue(q, 'connected_electrical_load_kw')
+  // 1. supply demand — total_supply_demand_kw is an ALIAS of the connected electrical load
+  //    (the contract mints it = connected_electrical_load_kw; the first-principles tool claims
+  //    that value), so with an anchor present it is RECONCILED to the anchor by construction
+  //    (SUPPLY_ALIAS_TOLERANCE; the as-routed converged figure rides in the basis +
+  //    as_routed_kw). It never replaces / moves the brief plant-load metric.
+  // RECONCILE BOUND (2026-07-02, the v55 total_supply_demand_kw = 1.326e8 fix): without an
+  // anchor, the converged aggregate must still reconcile within SUPPLY_RECONCILE_FACTOR.
+  // v55's scrambled connection graph carried a 90 m³/s phantom flow → 132.4 GW of "pump
+  // friction" → the writeback minted it as a quantity the single-line / panel-schedule /
+  // Excel PREFER — shipping a 132.6 GW cover + a 201,464,029 A busbar on a 53 kW plant.
+  // Beyond a bound the value is recorded in the loop ledger as UNVERIFIED-ARTEFACT
+  // (durable, diagnosable) but never becomes a design quantity.
+  // The ALIAS ANCHOR: the contract's own connected-load quantity. When present,
+  // total_supply_demand_kw is that quantity's alias and may never move off it (see
+  // SUPPLY_ALIAS_TOLERANCE above). Only without an anchor does the writeback mint a
+  // genuinely new aggregate, bounded by the ×3 phantom factor.
+  const aliasAnchor = curValue(q, 'connected_electrical_load_kw')
     ?? curValue(q, 'total_electrical_demand_kw')
+  const baseLoad = aliasAnchor
     ?? (Number(conv?.base_demand_kw) > 0 ? Number(conv!.base_demand_kw) : null)
   const reconciles = (v: number) => baseLoad == null || v <= baseLoad * SUPPLY_RECONCILE_FACTOR
 
   const converged = Number(last.total_demand_kw)
   if (Number.isFinite(converged) && converged > 0) {
     const from = curValue(q, 'total_supply_demand_kw')
-    const ok = reconciles(converged)
-    updates.push({
-      key: 'total_supply_demand_kw', from, to: converged, unit: 'kW',
-      source: 'convergence-report',
-      basis: ok
-        ? 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric'
-        : `UNVERIFIED-ARTEFACT: converged ${converged} kW does not reconcile against the connected load ${baseLoad} kW (limit ×${SUPPLY_RECONCILE_FACTOR}) — a corrupted-flow phantom, NOT written as a design quantity`,
-      rel_change: rel(from, converged),
-      from_keys: ['connected_electrical_load_kw', 'total_electrical_demand_kw'],
-      ...(ok ? {} : { unverified_artefact: true }),
-    })
+    if (aliasAnchor != null) {
+      // ALIAS RECONCILE: equal to the connected load by construction, or refused.
+      const dev = Math.abs(converged - aliasAnchor) / Math.max(Math.abs(aliasAnchor), EPS)
+      const withinTol = dev <= SUPPLY_ALIAS_TOLERANCE
+      updates.push({
+        key: 'total_supply_demand_kw', from, to: withinTol ? aliasAnchor : converged, unit: 'kW',
+        source: 'convergence-report',
+        basis: withinTol
+          ? `alias of connected_electrical_load_kw = ${aliasAnchor} kW by construction (the tool-claimed plant load); ` +
+            `the as-routed converged demand ${converged} kW (plant load + distribution parasitic, ` +
+            `${(dev * 100).toFixed(1)}% off) RECONCILES within ±${Math.round(SUPPLY_ALIAS_TOLERANCE * 100)}% ` +
+            `and is recorded here — the alias itself never moves`
+          : `UNVERIFIED-ARTEFACT: converged ${converged} kW deviates ${(dev * 100).toFixed(0)}% from the ` +
+            `connected load ${aliasAnchor} kW — a writer may never move the alias-of-connected-load beyond ` +
+            `±${Math.round(SUPPLY_ALIAS_TOLERANCE * 100)}% (REFUSED; recorded in the loop ledger only)`,
+        rel_change: rel(from, withinTol ? aliasAnchor : converged),
+        from_keys: ['connected_electrical_load_kw', 'total_electrical_demand_kw'],
+        as_routed_kw: converged,
+        ...(withinTol ? {} : { unverified_artefact: true }),
+      })
+    } else {
+      // No connected-load anchor → a genuinely NEW aggregate; the ×3 phantom bound applies.
+      const ok = reconciles(converged)
+      updates.push({
+        key: 'total_supply_demand_kw', from, to: converged, unit: 'kW',
+        source: 'convergence-report',
+        basis: ok
+          ? 'as-routed supply demand = plant load + distribution parasitic (pump friction + cable I²R); sizes the incomer/transformer — does NOT replace the brief plant-load metric'
+          : `UNVERIFIED-ARTEFACT: converged ${converged} kW does not reconcile against the connected load ${baseLoad} kW (limit ×${SUPPLY_RECONCILE_FACTOR}) — a corrupted-flow phantom, NOT written as a design quantity`,
+        rel_change: rel(from, converged),
+        from_keys: ['connected_electrical_load_kw', 'total_electrical_demand_kw'],
+        ...(ok ? {} : { unverified_artefact: true }),
+      })
+    }
   }
   // 2. cooling load (converged) — only if the engine already carries the quantity; the same
   //    reconcile bound applies (v55's phantom minted 161,131 kW of "cooling" from cable I²R)

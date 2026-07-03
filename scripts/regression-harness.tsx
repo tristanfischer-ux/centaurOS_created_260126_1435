@@ -264,11 +264,15 @@ function checkReactionToolsWorkedSound(): Assertion[] {
   return out
 }
 
-// ── UNIVERSAL: the design-loop writeback (Increment 2) is ADDITIVE — the converged demand maps
-// to a NEW total_supply_demand_kw (plant load + distribution losses, which sizes the incomer),
-// NEVER overwriting the brief's plant-load metric connected_electrical_load_kw (which the prose +
-// the compliance cap reference). Pure-function check — no snapshot, no .venv. Would have caught the
-// overwrite mapping I shipped + corrected in Inc 1.
+// ── UNIVERSAL: the design-loop writeback (Increment 2) is ADDITIVE and ALIAS-SAFE —
+// total_supply_demand_kw is an ALIAS of connected_electrical_load_kw (the contract mints it =
+// the connected load; the first-principles tool CLAIMS that value), so a converged as-routed
+// demand within ±10% is RECONCILED to the anchor (equal by construction, as-routed figure in
+// the basis + as_routed_kw), a writer beyond ±10% is REFUSED (unverified_artefact), and the
+// brief plant-load metric itself is never touched. proveCatch is the v56c PROVENANCE FAIL
+// shape: connected 53 kW, converged 55.032 kW → the OLD writeback wrote 55.032 over the alias
+// (tool claim 53 → STALE, and the lineage closure tainted the incomer kVA); the fixed rule
+// writes 53. A 2.9× writer (which the ×3 phantom bound USED to let through) is refused.
 function checkDesignLoopWritebackAdditive(): Assertion[] {
   const out: Assertion[] = []
   const conv = { iterations: 2, trajectory: [{ total_demand_kw: 6000 }, { total_demand_kw: 6013.9, cooling_load_kw: 12.5 }] }
@@ -280,10 +284,42 @@ function checkDesignLoopWritebackAdditive(): Assertion[] {
   const pipe = updates.find(u => u.key === 'interconnect_pipe_length_m')
   out.push(assertEq(
     'UNIVERSAL.design_loop_writeback_additive',
-    'design-loop writeback maps converged demand → NEW total_supply_demand_kw (6013.9 kW), never overwrites the brief plant-load metric, harvests interconnect length (34.8 m pipe)',
-    JSON.stringify({ supply: supply?.to, touchesBriefMetric, pipe: pipe?.to }),
-    () => !!supply && Math.abs(Number(supply.to) - 6013.9) < 0.01 && !touchesBriefMetric && !!pipe && Math.abs(Number(pipe.to) - 34.8) < 0.01,
-    () => `supply=${supply?.to} touchesBriefMetric=${touchesBriefMetric} pipe=${pipe?.to}`,
+    'design-loop writeback RECONCILES the converged demand (6013.9 kW, +0.23%) to the connected-load alias 6000 kW (equal by construction, as-routed recorded), never overwrites the brief plant-load metric, harvests interconnect length (34.8 m pipe)',
+    JSON.stringify({ supply: supply?.to, asRouted: supply?.as_routed_kw, touchesBriefMetric, pipe: pipe?.to }),
+    () => !!supply && Math.abs(Number(supply.to) - 6000) < 0.01
+      && Math.abs(Number(supply.as_routed_kw) - 6013.9) < 0.01
+      && !supply.unverified_artefact
+      && !touchesBriefMetric && !!pipe && Math.abs(Number(pipe.to) - 34.8) < 0.01,
+    () => `supply=${supply?.to} as_routed=${supply?.as_routed_kw} touchesBriefMetric=${touchesBriefMetric} pipe=${pipe?.to}`,
+  ))
+
+  // proveCatch (the v56c shape): connected 53, converged 55.032 (+3.8%, INSIDE ±10%) → the
+  // written value must be 53 (the alias), NOT 55.032 — the exact write that made the
+  // deterministic provenance check fail STALE on v56c.
+  const convV56c = { iterations: 3, trajectory: [{ total_demand_kw: 55.03 }, { total_demand_kw: 55.032 }] }
+  const qV56c = { connected_electrical_load_kw: { value: 53, unit: 'kW', source: 'calculator' } }
+  const upV56c = computeQuantityUpdates(convV56c as any, null, qV56c)
+  const sV56c = upV56c.find(u => u.key === 'total_supply_demand_kw')
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_writeback_alias_reconciled_v56c',
+    'ALIAS RECONCILE proveCatch (v56c): converged 55.032 kW on a 53 kW connected load writes 53 (the alias, equal by construction) with the as-routed 55.032 recorded — never 55.032 over the tool-claimed alias',
+    JSON.stringify({ to: sV56c?.to, asRouted: sV56c?.as_routed_kw, refused: !!sV56c?.unverified_artefact }),
+    () => !!sV56c && Number(sV56c.to) === 53 && Math.abs(Number(sV56c.as_routed_kw) - 55.032) < 0.001 && !sV56c.unverified_artefact,
+    () => `to=${sV56c?.to} as_routed=${sV56c?.as_routed_kw} refused=${sV56c?.unverified_artefact}`,
+  ))
+
+  // proveCatch (other direction): a 2.9× writer (153.7 kW on a 53 kW plant) sits INSIDE the
+  // old ×3 phantom bound but OUTSIDE the ±10% alias tolerance → REFUSED (never a design quantity).
+  const conv29 = { iterations: 2, trajectory: [{ total_demand_kw: 153.7 }] }
+  const up29 = computeQuantityUpdates(conv29 as any, null, { connected_electrical_load_kw: { value: 53 } })
+  const s29 = up29.find(u => u.key === 'total_supply_demand_kw')
+  const applied29 = applyUpdates({ connected_electrical_load_kw: { value: 53 } }, up29)
+  out.push(assertEq(
+    'UNIVERSAL.design_loop_writeback_alias_refuses_2_9x',
+    'ALIAS BOUND proveCatch: a 2.9× write (153.7 kW over the 53 kW alias — inside the old ×3 factor) is REFUSED as unverified_artefact and never applied as a design quantity',
+    JSON.stringify({ refused: !!s29?.unverified_artefact, applied: 'total_supply_demand_kw' in applied29 }),
+    () => !!s29 && s29.unverified_artefact === true && !('total_supply_demand_kw' in applied29),
+    () => `refused=${s29?.unverified_artefact} appliedKeys=${Object.keys(applied29).join(',')}`,
   ))
   return out
 }
@@ -291,22 +327,25 @@ function checkDesignLoopWritebackAdditive(): Assertion[] {
 // ── UNIVERSAL: the design loop CLOSES (Increment 2+3, 2026-06-14) ──
 //
 // The structural fix: the physics<->CAD loop now runs EARLY (before the cost stack), so the
-// converged supply demand actually REACHES the engineering output instead of being computed-then-
+// reconciled supply demand actually REACHES the engineering output instead of being computed-then-
 // ignored. This invariant guards the full D→E→render closure as a pure chain (no snapshot, no
-// .venv), reproducing the CO2 signal 87.25 → 87.39 kW:
-//   D (writeback) : computeQuantityUpdates + applyUpdates writes total_supply_demand_kw = 87.39
-//                   (the converged demand), brief metric connected_electrical_load_kw stays 87.25.
-//   E (re-size)   : resizeFromConvergedDemand derives the incomer kVA from the CONVERGED 87.39
-//                   (NOT the pre-loop 87.25) → next IEC-60076 standard.
-//   render        : the single-line / panel-schedule load read PREFERS total_supply_demand_kw, so
-//                   the rendered engineering load is the CONVERGED value, not the pre-loop value.
-// Would have caught a regression that re-opens the loop (drawings reading the pre-loop metric, or
-// the resize sizing from the stale brief load). UNIVERSAL — no class logic; the same code path runs
-// for CO2 / e-fuel / RAS (only the numbers differ).
+// .venv), on the CO2 shape (connected 87.25, converged 87.39):
+//   D (writeback) : computeQuantityUpdates + applyUpdates writes total_supply_demand_kw = 87.25
+//                   (the connected-load ALIAS — the converged 87.39 reconciles within ±10% and is
+//                   recorded as the as-routed figure; alias-equality is the 2026-07-03 rule).
+//   E (re-size)   : resizeFromConvergedDemand sizes the incomer kVA from the RECONCILED demand:
+//                   next STANDARD rating ≥ load × 1.25 (ladder incl. 75; kVA ≥ kW at any pf —
+//                   the same assumption-free basis the deterministic adequacy check verifies).
+//   render        : the single-line / panel-schedule load read PREFERS total_supply_demand_kw,
+//                   which now EQUALS the connected load by construction — the SLD, the contract
+//                   and the tool claim can never disagree.
+// Would have caught a regression that re-opens the loop (the alias drifting off the tool-claimed
+// load — the v56c PROVENANCE FAIL — or the resize under-sizing vs load × 1.25). UNIVERSAL — no
+// class logic; the same code path runs for CO2 / e-fuel / RAS (only the numbers differ).
 function checkDesignLoopClosesEarly(): Assertion[] {
   const out: Assertion[] = []
 
-  // D — the writeback (CO2 trajectory: base 87.25 → converged 87.39).
+  // D — the writeback (CO2 trajectory: base 87.25 → converged 87.39 → reconciled 87.25).
   const conv = { iterations: 2, trajectory: [{ total_demand_kw: 87.25 }, { total_demand_kw: 87.39 }] }
   const rm = { lines: [{ length_m: 106.9, mechanism: 'fluid_loop' }, { length_m: 29.4, mechanism: 'electrical_bus' }] }
   const quantities: Record<string, any> = { connected_electrical_load_kw: { value: 87.25, unit: 'kW', source: 'brief' } }
@@ -314,36 +353,43 @@ function checkDesignLoopClosesEarly(): Assertion[] {
   const afterD = applyUpdates(quantities, updates)
 
   // The rendered-engineering-load PRECEDENCE the drawings use (draw_single_line / draw_panel_schedule):
-  // total_supply_demand_kw if present, else connected_electrical_load_kw. This is the closure: the
-  // rendered figure is the CONVERGED demand, not the pre-loop brief metric.
+  // total_supply_demand_kw if present, else connected_electrical_load_kw. The closure is now
+  // ALIAS-EQUALITY: the rendered figure equals the connected load by construction, and the
+  // as-routed converged demand is recorded on the update (never hidden, never the alias value).
   const renderedLoadKw = (afterD.total_supply_demand_kw?.value) ?? (afterD.connected_electrical_load_kw?.value)
-  const preLoopKw = quantities.connected_electrical_load_kw.value
+  const asRouted = updates.find(u => u.key === 'total_supply_demand_kw')?.as_routed_kw
 
   out.push(assertEq(
     'UNIVERSAL.design_loop_closes_rendered_load_is_converged',
-    'design loop CLOSES: the rendered engineering load (single-line/panel) adopts the CONVERGED supply demand 87.39 kW (≠ the pre-loop 87.25), while the brief plant-load metric is preserved at 87.25',
-    JSON.stringify({ renderedLoadKw, preLoopKw, briefPreserved: afterD.connected_electrical_load_kw?.value }),
+    'design loop CLOSES on the alias: the rendered engineering load (single-line/panel) equals the connected load 87.25 kW by construction (converged 87.39 reconciled + recorded as as-routed), brief metric preserved',
+    JSON.stringify({ renderedLoadKw, asRouted, briefPreserved: afterD.connected_electrical_load_kw?.value }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return Math.abs(o.renderedLoadKw - 87.39) < 0.01           // rendered = converged
-        && Math.abs(o.renderedLoadKw - o.preLoopKw) > 0.1        // and it MOVED off the pre-loop value
-        && Math.abs(o.briefPreserved - 87.25) < 0.01            // brief metric untouched
+      return Math.abs(o.renderedLoadKw - 87.25) < 0.01           // rendered = the alias (connected load)
+        && Math.abs(o.asRouted - 87.39) < 0.01                   // as-routed figure recorded, not lost
+        && Math.abs(o.briefPreserved - 87.25) < 0.01             // brief metric untouched
     },
-    () => `renderedLoadKw=${renderedLoadKw} preLoopKw=${preLoopKw} brief=${afterD.connected_electrical_load_kw?.value}`,
+    () => `renderedLoadKw=${renderedLoadKw} asRouted=${asRouted} brief=${afterD.connected_electrical_load_kw?.value}`,
   ))
 
-  // E — the incomer re-size is driven by the CONVERGED demand, not the pre-loop one.
+  // E — the incomer kVA rule: next STANDARD rating ≥ load × 1.25 (proveCatch: 53 kW → 75 kVA,
+  // never a raw 66.25 and never a whole-class jump forced by a ladder missing 75; an
+  // exactly-on-a-step requirement passes: 60 kW × 1.25 = 75 → 75).
   const resized = resizeFromConvergedDemand(afterD)
-  const expectKva = nextStandardKva((87.39 / 0.9) * 1.25)        // S=P/pf×(1+headroom) → next IEC standard
+  const expectKva = nextStandardKva(87.25 * 1.25)                // kVA ≥ load × 1.25 → next standard
+  const kva53 = resizeFromConvergedDemand({ total_supply_demand_kw: { value: 53 } })?.kva
+  const kva60 = resizeFromConvergedDemand({ total_supply_demand_kw: { value: 60 } })?.kva
   out.push(assertEq(
     'UNIVERSAL.design_loop_resize_from_converged',
-    'E pass re-sizes the incomer transformer from the CONVERGED supply demand (87.39 kW → next IEC-60076 standard kVA), additive total_supply_demand_kva, never from the stale brief load',
-    JSON.stringify({ kw: resized?.kw, kva: resized?.kva, expectKva }),
+    'E pass sizes the incomer kVA = next STANDARD rating ≥ load × 1.25 (v56c proveCatch: 53 kW → 75 kVA not 66/100; exactly-1.25× edge 60 kW → 75 passes; 87.25 kW → next standard ≥ 109.06)',
+    JSON.stringify({ kw: resized?.kw, kva: resized?.kva, expectKva, kva53, kva60 }),
     (v) => {
       const o = JSON.parse(v as unknown as string)
-      return o.kw != null && Math.abs(o.kw - 87.39) < 0.01 && o.kva === o.expectKva && o.kva > 0
+      return o.kw != null && Math.abs(o.kw - 87.25) < 0.01 && o.kva === o.expectKva && o.kva > 0
+        && o.kva >= o.kw * 1.25                                  // the adequacy invariant itself
+        && o.kva53 === 75 && o.kva60 === 75
     },
-    () => `resized=${JSON.stringify(resized)} expectKva=${expectKva}`,
+    () => `resized=${JSON.stringify(resized)} expectKva=${expectKva} kva53=${kva53} kva60=${kva60}`,
   ))
 
   // Honesty backstop: with NO converged demand (loop never ran), the resize is a safe no-op (null)
@@ -1147,6 +1193,23 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
       drain_transfer_pump_count: { value: 2, unit: '', source: 'brief' },
     } }
     applyUniversalContractSizing(mkMods([]), fC, { synthesizeMissing: false, dedupeAndStrip: false, explode: false, instrument: false })
+    // (g) v56c PHANTOM-RESERVE proveCatch (2026-07-03): the storage principals exist ONLY
+    // as contract QUANTITY families (their words are minted later in the same pass) —
+    // fresh_water_tank 1× 40 m³ + drain_water_tank 2× 40 m³ = 120 m³ delivered against the
+    // 120 m³ pin → NO reserve tank may be synthesised (v56c minted a phantom 120 m³
+    // water_storage_reserve_tank on top, claiming '0 m³ delivered'). The nutrient_tank
+    // family (no water/storage identity token) must NOT count toward the pin, and a
+    // cleaning/CIP family never counts.
+    const gC = uvContract()
+    gC.quantities.fresh_water_tank_volume_each_m3 = { value: 40, unit: 'm³', source: 'brief' }
+    gC.quantities.fresh_water_tank_count = { value: 1, unit: '', source: 'brief' }
+    gC.quantities.drain_water_tank_volume_each_m3 = { value: 40, unit: 'm³', source: 'brief' }
+    gC.quantities.drain_water_tank_count = { value: 2, unit: '', source: 'brief' }
+    gC.quantities.nutrient_tank_volume_each_m3 = { value: 1, unit: 'm³', source: 'brief' }
+    gC.quantities.nutrient_tank_count = { value: 8, unit: '', source: 'brief' }
+    gC.quantities.cleaning_tank_volume_each_m3 = { value: 2, unit: 'm³', source: 'brief' }
+    const gMods = mkMods([])   // NO tank words yet — the v56c ordering
+    applyUniversalContractSizing(gMods, gC, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: storageMetric })
     out.push(assertEq(
       'UNIVERSAL.demand_coverage_disinfection_storage_and_per_unit_total_both_paths',
       'a hygiene-critical loop (potable/irrigation/fertigation/recirculating nouns) with NO disinfection word/quantity gets a UV principal sized by the validated-dose rule (flow × 40 mJ/cm² ⇒ ~0.046 kWe per m³/h) in BOTH synthesis paths; a grounded disinfection word suppresses the twin; a brief STORAGE pin (volume-family metric) is DELIVERED — tank principals summing to the pin are synthesised on shortfall, and the `_delivered_m3` total is minted either way; a per-unit rate × count mints its explicit corroborated `_total_m3_h` twin; BESS-like contracts and non-corroborated duty/standby pairs are untouched',
@@ -1167,6 +1230,9 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
         dDelivered: qv(dC, 'water_storage_delivered_m3'),
         eBessUntouched: JSON.stringify(eBess) === eBefore,
         fNoTotal: Object.keys(fC.quantities).every((k: string) => !/_total_m3_h$/.test(k)),
+        gNoReserve: qv(gC, 'water_storage_reserve_tank_count') === undefined
+          && qv(gC, 'water_storage_reserve_tank_volume_each_m3') === undefined,
+        gDelivered: qv(gC, 'water_storage_delivered_m3'),
       }),
       (v) => {
         const o = JSON.parse(v as unknown as string)
@@ -1175,7 +1241,8 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
           o.bUvWords === 1 && o.bDelivered === 120 &&
           o.cUvTotal === 1 && o.cGroundedKept === 1 &&
           o.dReserveWords === 1 && o.dReserveEach === 40 && o.dReserveCnt === 2 && o.dDelivered === 120 &&
-          o.eBessUntouched === true && o.fNoTotal === true
+          o.eBessUntouched === true && o.fNoTotal === true &&
+          o.gNoReserve === true && o.gDelivered === 120
       },
       (v) => `result=${v}`,
     ))

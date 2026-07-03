@@ -136,6 +136,35 @@ class Feeder:
     note: str = ""
 
 
+# ── incomer / transformer kVA — the ONE sizing rule (parity with the engine mint) ─────────
+# incomer/transformer kVA = next STANDARD rating ≥ connected load kW × 1.25. kVA ≥ kW for
+# ANY power factor, so load × 1.25 is the assumption-free adequacy requirement — the SAME
+# rule scripts/lib/design-loop/settle-loop.ts (resizeFromConvergedDemand) mints into the
+# contract and deterministic_checks_lib's adequacy invariant verifies. The SLD must carry
+# the SAME value as the contract (one mint, one rule) — the old `kw / pf × 1.25` rounded
+# raw (no ladder) diverged from the contract's laddered rating.
+INCOMER_KVA_MARGIN = 1.25
+STD_KVA_LADDER = [
+    25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800,
+    1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
+]
+
+
+def next_standard_kva(s_req_kva: float) -> float:
+    """Smallest standard kVA rating ≥ s_req (inclusive: exactly-on-a-step returns the
+    step); above the ladder, round UP to the next 100 kVA — never under-size."""
+    for r in STD_KVA_LADDER:
+        if r >= s_req_kva - 1e-9:
+            return float(r)
+    return float(math.ceil(s_req_kva / 100.0) * 100)
+
+
+def incomer_kva_for_load(kw: float) -> float:
+    """The plant incomer / step-down transformer nameplate for a connected load [kW]:
+    next standard rating ≥ kw × 1.25 (assumption-free — kVA ≥ kW at any pf)."""
+    return next_standard_kva(kw * INCOMER_KVA_MARGIN)
+
+
 def _3ph_current_a(kw: float, voltage_v: float, pf: float = POWER_FACTOR) -> float:
     """3-phase line current [A] for a real power [kW] at a line voltage [V]."""
     denom = math.sqrt(3.0) * max(1e-6, voltage_v) * pf
@@ -270,10 +299,11 @@ def select_distribution_voltage(connected_load_kw: Optional[float],
         # incomer step-down: utility MV → the MV board is fed from the DNO at the
         # SAME MV (a primary substation), so the SLD shows the board at MV with a
         # downstream LV sub-board for the small loads. We record the standard
-        # MV→LV ratio the board's outgoing LV distribution would use, and a
-        # transformer kVA sized to the connected load (+25% headroom).
+        # MV→LV ratio the board's outgoing LV distribution would use, and the
+        # transformer kVA from the ONE sizing rule (next standard rating ≥ load ×
+        # 1.25 — identical to the contract mint, so SLD and contract agree).
         plan.transformer_ratio = f"{v:g}/{lv_voltage_v:g} V"
-        plan.transformer_kva = round(kw / POWER_FACTOR * 1.25, 0)
+        plan.transformer_kva = incomer_kva_for_load(kw)
     return plan
 
 
@@ -627,6 +657,17 @@ def _selftest() -> int:
         all(f(n, q) == f(n, q_rev) for n in
             ("Fertigation Dosing Pump", "Ro High Pressure Pump", "Drain Transfer Pump",
              "Irrigation Pump", "Hand Watering Pump", "Dosing Pump")))
+    # ── incomer/transformer kVA rule (v56c ADEQUACY FAIL proveCatch, 2026-07-03) ──
+    # THE RULE: kVA = next STANDARD rating ≥ load × 1.25 (ladder incl. 75). proveCatch:
+    # a 53 kW load must yield 75 kVA — never a raw 66.25 (which the un-laddered
+    # `round(kw/pf×1.25)` family produced) and never a whole-class jump to 100.
+    chk("K1.53kw_gives_75kva_not_66", incomer_kva_for_load(53) == 75.0)
+    chk("K2.exact_edge_40kw_gives_50kva", incomer_kva_for_load(40) == 50.0)   # 40×1.25 = 50 exactly → 50 passes
+    chk("K3.exact_edge_60kw_gives_75kva", incomer_kva_for_load(60) == 75.0)   # 60×1.25 = 75 exactly → 75
+    chk("K4.never_below_load_x_1_25",
+        all(incomer_kva_for_load(kw) >= kw * INCOMER_KVA_MARGIN - 1e-9
+            for kw in (1, 19, 53, 61, 87.39, 100, 400, 999, 12000)))
+    chk("K5.above_ladder_rounds_up_100", incomer_kva_for_load(8500) == 10700.0)  # 10,625 → next 100
     print(f"[edm-selftest] {'PASS' if fails == 0 else f'FAIL ({fails})'}")
     return 1 if fails else 0
 

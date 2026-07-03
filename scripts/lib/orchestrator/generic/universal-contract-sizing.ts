@@ -1397,6 +1397,7 @@ export function mintDemandCoverage(
       const items: string[] = []
       let delivered = 0
       let refEach = 0
+      const countedWordTokSets: Set<string>[] = []
       for (const m of mods) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
         if (isInstrument(w) || isSubcomponent(w)) continue
         const name = String(w.name_human ?? '')
@@ -1412,7 +1413,37 @@ export function mintDemandCoverage(
         const qn = qtyMod ? (parseInt(String(qtyMod.value).replace(/[^\d]/g, ''), 10) || 1) : 1
         delivered += each * qn
         refEach = Math.max(refEach, each)
+        countedWordTokSets.push(wToks)
         items.push(`${name} ${qn}× ${each} m³`)
+      }
+      // QUANTITY-FAMILY DELIVERED STORAGE (the v56c phantom-reserve fix, 2026-07-03): at
+      // this point in the pass a storage principal may exist ONLY as a contract quantity
+      // family (`<stem>_volume_each_m3` + `<stem>_count`) — buildGroups mints its WORD
+      // later in the SAME pass. v56c: fresh_water_tank (1× 40 m³) + drain_water_tank
+      // (2× 40 m³) were quantity families with no words yet → the word-only sum read
+      // "0 m³ delivered" → a phantom 120 m³ water_storage_reserve_tank was synthesised
+      // ON TOP of the 120 m³ the design already delivers (the Quantities-tab 120×
+      // same-role flag). Count each quantity family that (a) is a storage-vessel noun,
+      // (b) shares an identity token with the pin, (c) is not a cleaning/CIP charge, and
+      // (d) is not this rule's own reserve mint — unless a counted WORD already covers
+      // the same family (grounded words stay the primary source; no double count).
+      for (const [qk, qvv] of Object.entries(quantities)) {
+        const qm = /^(.+)_volume_each_m3$/.exec(qk)
+        if (!qm || !Number.isFinite(qvv) || qvv <= 0) continue
+        const stem = qm[1]
+        if (stem === `${core}_reserve_tank`) continue // never count our own mint
+        const stemPhrase = stem.replace(/_/g, ' ')
+        if (!STORAGE_VESSEL_NOUN_RE.test(stemPhrase)) continue
+        if (isCleaningRolePhrase(stemPhrase)) continue
+        const sToks = new Set((stemPhrase.toLowerCase().match(/[a-z]+/g) ?? []).map(depluralToken))
+        if (!idTokens.some((t) => sToks.has(t))) continue
+        // a counted word already covers this family (its tokens ⊇ the stem's) → skip
+        if (countedWordTokSets.some((ws) => [...sToks].every((t) => ws.has(t)))) continue
+        const cntRaw = quantities[`${stem}_count`]
+        const qn = Number.isFinite(cntRaw) && cntRaw >= 1 ? Math.round(cntRaw) : 1
+        delivered += qvv * qn
+        refEach = Math.max(refEach, qvv)
+        items.push(`${titleCase(stem)} ${qn}× ${qvv} m³ (contract quantity family)`)
       }
       const shortfall = target - delivered
       let mintedReserveM3 = 0

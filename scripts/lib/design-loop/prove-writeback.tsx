@@ -32,11 +32,20 @@ for (const c of CASES) {
     console.error(`   ${u.key}: ${fromS} » ${u.to} ${u.unit}   (Δ ${(u.rel_change * 100).toFixed(2)}%)  ← ${u.source}`)
   }
 
-  // assertions — the converged SUPPLY demand must be read + written ADDITIVELY (new key)
+  // assertions — the supply demand is the connected-load ALIAS (2026-07-03 rule): with an
+  // anchor present the written value EQUALS the connected load by construction, and the
+  // converged as-routed figure is recorded on the update (never written over the alias).
   const elec = updates.find(u => u.key === 'total_supply_demand_kw')
   const convergedKw = (conv.trajectory || []).slice(-1)[0]?.total_demand_kw
+  const anchorKw = (quantities.connected_electrical_load_kw?.value) ?? (quantities.total_electrical_demand_kw?.value)
+  const expectKw = anchorKw != null ? Number(anchorKw) : Number(convergedKw)
   check(!!elec, 'supply-demand update produced (additive)')
-  check(!!elec && Math.abs(elec.to - Number(convergedKw)) < 0.01, `writes the converged demand (${convergedKw} kW)`)
+  check(!!elec && Math.abs(elec.to - expectKw) < 0.01,
+        anchorKw != null
+          ? `reconciles to the connected-load alias (${anchorKw} kW; as-routed ${convergedKw} kW recorded)`
+          : `writes the converged demand (${convergedKw} kW — no alias anchor)`)
+  check(!!elec && (anchorKw == null || Math.abs(Number(elec.as_routed_kw) - Number(convergedKw)) < 0.01),
+        'the as-routed converged figure rides on the update (ledger honesty)')
   check(!('total_supply_demand_kw' in quantities), 'is a NEW key (does not overwrite a brief metric)')
   // interconnect lengths must be harvested from the routed runs
   check(updates.some(u => u.key === 'interconnect_pipe_length_m'), 'pipe-length harvested from routes')
