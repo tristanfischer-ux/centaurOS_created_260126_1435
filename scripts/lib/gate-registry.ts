@@ -235,8 +235,30 @@ export const GATES: GateProof[] = [
     enforcedByDefault: () => ['1', 'true', 'yes', 'on'].includes(String(process.env.DRAWING_GATES_ENFORCING || '').toLowerCase()),
   },
   {
-    code: 36, name: 'generative-benchmark-net', intent: 'a >2.5× divergence between the deterministic engine and an independent top-down expectation',
-    proveCatch: () => compareToBenchmark(BENCH_EXP, { costStack: { oem_transfer_price_gbp: 8_900_000 }, keyMetrics: {}, requirementsBom: [] } as any).needs_full_check === true,
+    code: 36, name: 'generative-benchmark-net',
+    intent: 'a >2.5× engine-vs-benchmark divergence with NO basis in the brief (the 132.6 GW cover) — while an engine value the BRIEF itself states downgrades to a review note, never a block (gate-36 round 4, the v57/v57b re-rolled framings)',
+    proveCatch: () => {
+      // (a) the un-anchored cost RADICAL still blocks (the real BESS £8.9M vs a £1.3M envelope)
+      const cost = compareToBenchmark(BENCH_EXP, { costStack: { oem_transfer_price_gbp: 8_900_000 }, keyMetrics: {}, requirementsBom: [] } as any)
+      // (b) the 132.6-GW-shaped output absurdity (v51 era): NO basis in the brief → still blocks,
+      //     even with other brief anchors present
+      const gw = compareToBenchmark(
+        { ...BENCH_EXP, expected_cost: { low_gbp: 0, expected_gbp: 0, high_gbp: 0 } as any, expected_outputs: [{ metric: 'rated_power', value: 2000, unit: 'kW' }] },
+        { keyMetrics: {}, requirementsBom: [],
+          parsedBrief: { constraints: { target_performance: { metrics: [{ key_metric: 'nameplate_capacity', value: 3, unit: 'MWh' }] } } },
+          orchestratorContract: { quantities: { rated_power_kw: { value: 132_600_000, unit: 'kW' } } } } as any)
+      // (c) the corroboration direction (v57b): a 6.2× divergence whose ENGINE value is the
+      //     brief's own stated arithmetic (45 m³/h per department × 2 departments = 90) must
+      //     downgrade to WARN — a review note, not an exit-36 block
+      const anchored = compareToBenchmark(
+        { ...BENCH_EXP, expected_cost: { low_gbp: 0, expected_gbp: 0, high_gbp: 0 } as any, expected_outputs: [{ metric: 'treated_water_throughput', value: 14.5, unit: 'm3/h' }] },
+        { keyMetrics: {}, requirementsBom: [],
+          parsedBrief: { original_text: 'maximum demand of 45 cubic metres per hour per department (two departments)',
+            constraints: { target_performance: { metrics: [{ key_metric: 'max_irrigation_demand_per_department', value: 45, unit: 'm3/h' }] } } },
+          orchestratorContract: { quantities: { uv_disinfection_throughput_m3_h: { value: 90, unit: 'm³/h', source: 'calculator', source_detail: 'sized to the peak recirculated flow (= irrigation demand 90 m³/h)' } } } } as any)
+      return cost.needs_full_check === true && gw.needs_full_check === true
+        && anchored.needs_full_check === false && anchored.worst === 'warn'
+    },
     enforcedByDefault: () => !['', '0', 'false', 'no', 'off', 'shadow'].includes(String(process.env.BENCHMARK_NET_ENFORCING || '').toLowerCase()),
   },
   {

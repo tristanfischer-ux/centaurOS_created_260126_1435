@@ -8885,7 +8885,10 @@ async function main() {
         try {
           const desc = briefDescriptionFromState(st)
           console.error('[chain] benchmark net: generating independent top-down expectation (LLM)…')
-          const exp = await generateBenchmarkExpectation(desc)
+          // st → the (brief-hash + engine-summary-hash) expectation cache in out/.benchmark-cache/
+          // (gate-36 round 4): an unchanged design reuses the SAME saved framing instead of the
+          // LLM re-rolling a new one every run — consulted once per genuinely-new design.
+          const exp = await generateBenchmarkExpectation(desc, st)
           if (exp) {
             const report = compareToBenchmark(exp, st)
             const faults: Fault[] = report.findings.some(f => f.verdict !== 'ok')

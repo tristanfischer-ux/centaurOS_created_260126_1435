@@ -27,9 +27,10 @@
  *   npx tsx scripts/lib/benchmark-expectation.ts <out-dir>     # generate + compare + print the full check
  *   npx tsx scripts/lib/benchmark-expectation.ts --selftest    # pure comparison logic
  */
-import { readFileSync, existsSync, writeFileSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync } from 'fs'
 import { resolve, join } from 'path'
-import { homedir } from 'os'
+import { homedir, tmpdir } from 'os'
+import { createHash } from 'crypto'
 
 // ── env (same places the chain reads) ──────────────────────────────────────────
 for (const p of [
@@ -78,6 +79,9 @@ export interface DivergenceFinding {
   ratio: number | null
   verdict: Verdict
   note: string
+  // gate-36 round 4: set when the ENGINE's value is corroborated by the brief itself — the quote.
+  // A corroborated dimension never exceeds WARN (review note, not a block).
+  brief_anchor?: string
 }
 export interface DivergenceReport {
   findings: DivergenceFinding[]
@@ -117,8 +121,43 @@ export function briefDescriptionFromState(state: any): string {
   return lines.join('\n')
 }
 
+// ── EXPECTATION STABILITY — the cross-run cache (2026-07-03, gate-36 round 4) ─────────────────
+// Same pattern as the critique cache (commit 247494a32): the LLM re-rolls a DIFFERENT framing of
+// the same design every run (v57 expected 'ro_permeate 8'; v57b re-framed the identical engine
+// values as 'treated_water_throughput 14.5' + 'fertigation_delivery 45'), so re-validation runs
+// on an unchanged design kept diffing against a moving target. Key = sha256(brief-description) +
+// sha256(engine summary: headline cost + sorted contract quantities); an unchanged design reuses
+// the SAME saved expectation verbatim — the LLM is consulted once per genuinely-new design.
+// Store: out/.benchmark-cache/<key>.json (override dir: BENCHMARK_CACHE_DIR; kill switch:
+// BENCHMARK_EXPECTATION_CACHE=0).
+export function engineSummaryForCache(state: any): string {
+  const det = state ? deterministicHeadlineCostGbp(state) : null
+  const q: Record<string, any> = state?.orchestratorContract?.quantities || {}
+  const qs = Object.keys(q).sort().map(k => `${k}=${(q[k] as any)?.value}${(q[k] as any)?.unit || ''}`).join(';')
+  return `${det ? Math.round(det.gbp) : 0}|${qs}`
+}
+export function benchmarkCacheKey(briefDescription: string, state?: any): string {
+  const briefHash = createHash('sha256').update(String(briefDescription || '')).digest('hex')
+  const engineHash = createHash('sha256').update(engineSummaryForCache(state)).digest('hex')
+  return createHash('sha256').update(`${briefHash}:${engineHash}`).digest('hex').slice(0, 32)
+}
+const benchmarkCacheDir = () => process.env.BENCHMARK_CACHE_DIR || resolve(process.cwd(), 'out/.benchmark-cache')
+const benchmarkCacheOn = () => !['0', 'false', 'off', 'no'].includes(String(process.env.BENCHMARK_EXPECTATION_CACHE ?? '1').toLowerCase())
+
 // ── the generative benchmark (LLM) ─────────────────────────────────────────────
-export async function generateBenchmarkExpectation(briefDescription: string): Promise<BenchmarkExpectation | null> {
+export async function generateBenchmarkExpectation(briefDescription: string, cacheState?: any): Promise<BenchmarkExpectation | null> {
+  // cache FIRST (a hit needs neither an API key nor a network call — deterministic re-validation)
+  const cacheKey = benchmarkCacheKey(briefDescription, cacheState)
+  const cachePath = join(benchmarkCacheDir(), `${cacheKey}.json`)
+  if (benchmarkCacheOn() && existsSync(cachePath)) {
+    try {
+      const c = JSON.parse(readFileSync(cachePath, 'utf8'))
+      if (c?.expectation?.expected_cost && typeof c.expectation.expected_cost.expected_gbp === 'number') {
+        console.error(`[benchmark] expectation cache HIT (${cacheKey}) — reusing the saved framing; LLM not consulted`)
+        return c.expectation as BenchmarkExpectation
+      }
+    } catch { /* corrupt cache entry → regenerate */ }
+  }
   if (!OPENROUTER_KEY) { console.error('[benchmark] no OPENROUTER_API_KEY — cannot generate benchmark'); return null }
   const prompt =
     `You are a senior cost & systems engineer giving a fast, independent SANITY benchmark for a piece of ` +
@@ -168,7 +207,17 @@ export async function generateBenchmarkExpectation(briefDescription: string): Pr
     if (a === -1 || b === -1) return null
     const p = JSON.parse(raw.slice(a, b + 1))
     if (!p.expected_cost || typeof p.expected_cost.expected_gbp !== 'number') return null
-    return { ...p, model: BENCHMARK_MODEL } as BenchmarkExpectation
+    const expectation = { ...p, model: BENCHMARK_MODEL } as BenchmarkExpectation
+    // write-through: the NEXT run on this (brief, engine-summary) reuses this exact framing
+    if (benchmarkCacheOn()) {
+      try {
+        mkdirSync(benchmarkCacheDir(), { recursive: true })
+        writeFileSync(cachePath, JSON.stringify({
+          key: cacheKey, cached_at: new Date().toISOString(), model: BENCHMARK_MODEL, expectation,
+        }, null, 2))
+      } catch (cErr) { console.error(`[benchmark] cache write failed (non-fatal): ${(cErr as Error).message.slice(0, 120)}`) }
+    }
+    return expectation
   } catch (e) {
     console.error(`[benchmark] generation failed: ${(e as Error).message}`)
     return null
@@ -259,6 +308,156 @@ export function briefPinnedVolumesM3(state: any): { total_m3: number; pins: Brie
                 m3: cm.v, item_m3: item_m3.length ? item_m3 : [cm.v], basis })
   }
   return { total_m3: pins.reduce((a, p) => a + p.m3, 0), pins }
+}
+
+// ── BRIEF-ANCHOR CORROBORATION (2026-07-03, gate-36 round 4 — the v57/v57b re-rolled framings) ──
+// The corroboration doctrine applied to gate 36's BLOCKING decision. The benchmark LLM re-rolls a
+// different FRAMING of the same design every run (v57 framed the RO stage as 'ro_permeate 8';
+// v57b re-framed the treatment train as 'treated_water_throughput 14.5' + 'fertigation_delivery
+// 45') — the ENGINE values were identical between the two runs; only the LLM's words moved, and
+// each new framing manufactured a fresh >2.5× RADICAL. Gate 36's INTENT is catching ENGINE
+// absurdities with NO basis in the brief (the 132.6 GW cover). So before a divergence blocks, we
+// try to corroborate the ENGINE'S value against the BRIEF itself — parsedBrief metrics +
+// derived_requirements + constraint values, matched by unit FAMILY + a shared DISTINGUISHING
+// token, INCLUDING the brief's own stated-arithmetic combinations (per-department × department-
+// count: '45 m³/h per department (two departments)' → 90; items-sum: 40 m³ fresh + 2×40 m³ drain
+// → 120). ENGINE VALUE BRIEF-ANCHORED → the dimension downgrades to a WARN note (review, not a
+// block). NO brief anchor + >2.5× → RADICAL still BLOCKS — the 132-GW direction is proven in the
+// selftest + the gate-registry proveCatch.
+const ANCHOR_GENERIC = new Set([
+  // grammar / qualifiers
+  'the', 'and', 'for', 'with', 'from', 'each', 'per', 'max', 'maximum', 'min', 'minimum', 'peak',
+  'total', 'overall', 'aggregate', 'combined', 'rated', 'system', 'nominal', 'design', 'continuous',
+  'output', 'installed', 'delivered', 'stated', 'brief', 'derived', 'metric', 'approx', 'approximately',
+  // family words — too generic to distinguish one quantity from another in the same plant
+  // (NOT 'storage'/'volume': those genuinely distinguish the storage inventory from process flows)
+  'capacity', 'flow', 'water', 'rate', 'throughput', 'level', 'value', 'count', 'number',
+  // unit-ish tokens that survive splitting a snake_case key
+  'm3', 'm2', 'mm', 'kwh', 'mwh', 'gwh', 'kw', 'mw', 'gw', 'kv', 'ka', 'bar', 'lpm', 'hr', 'hrs',
+  'hour', 'hours', 'day', 'days', 'year', 'years', 'pct', 'percent', 'off',
+])
+/** DISTINGUISHING tokens of a key/label/basis: lowercase, singularised, generic + unit noise dropped. Pure. */
+export function anchorToks(s: string): string[] {
+  const out = new Set<string>()
+  for (const raw of String(s || '').toLowerCase().split(/[^a-z0-9]+/)) {
+    if (!raw || /^\d/.test(raw)) continue
+    const t = raw.length > 3 ? raw.replace(/s$/, '') : raw
+    if (t.length < 3 || ANCHOR_GENERIC.has(t) || ANCHOR_GENERIC.has(raw)) continue
+    out.add(t)
+  }
+  return [...out]
+}
+const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 }
+// physical-grouping nouns a brief states counts of ("two departments", "10 tunnels") — deliberately
+// EXCLUDES time words, so a `_per_hr` key can never mint a ×N combo.
+const COUNT_NOUNS = 'departments?|zones?|tunnels?|rooms?|compartments?|units?|trains?|lines?|bays?|sections?|levels?|layers?|modules?|cells?|banks?|skids?|streams?|circuits?|loops?|risers?|tanks?|pumps?|valves?|containers?'
+/** Counts of grouping nouns the brief itself states ("(two departments)" → department→2). Pure; first mention wins (deterministic). */
+export function nounCountsFromBrief(state: any): Map<string, number> {
+  const pb = state?.parsedBrief || {}
+  const text = [pb.original_text, pb.summary, JSON.stringify(pb.constraints || {})].filter(Boolean).join('\n').toLowerCase()
+  const counts = new Map<string, number>()
+  for (const m of text.matchAll(new RegExp(`\\b(\\d{1,3}|${Object.keys(COUNT_WORDS).join('|')})\\s+(${COUNT_NOUNS})\\b`, 'g'))) {
+    const n = COUNT_WORDS[m[1]] ?? parseInt(m[1], 10)
+    const noun = m[2].replace(/s$/, '')
+    if (n >= 2 && n <= 500 && !counts.has(noun)) counts.set(noun, n)
+  }
+  return counts
+}
+export interface BriefAnchor {
+  key: string; value: number; unit: string; family: string; v: number   // v = canonical (family base)
+  kind: 'stated' | 'arithmetic'                                          // arithmetic = per-X × count / items-sum
+  toks: string[]                                                         // distinguishing tokens
+  quote: string                                                          // the brief's own words
+}
+/** Every numeric value the BRIEF itself states or trivially combines. Pure + deterministic. */
+export function briefAnchorsFromState(state: any): BriefAnchor[] {
+  const c = state?.parsedBrief?.constraints || {}
+  const base: BriefAnchor[] = []
+  const add = (key: string, label: string, value: any, unit: any, quote: string) => {
+    const n = Number(value)
+    const cm = canonicalMeasure(n, String(unit ?? ''))
+    if (!cm || !(n > 0)) return
+    const toks = anchorToks(`${key} ${label}`)
+    if (!toks.length) return
+    base.push({ key: String(key), value: n, unit: String(unit ?? ''), family: cm.family, v: cm.v, kind: 'stated', toks, quote })
+  }
+  const tp = c.target_performance || {}
+  if (tp.value != null) add(String(tp.key_metric || 'headline_target'), '', tp.value, tp.unit,
+    `brief headline target: ${tp.key_metric || 'output'} = ${tp.value} ${tp.unit || ''}`)
+  for (const m of (Array.isArray(tp.metrics) ? tp.metrics : [])) {
+    add(String(m.key_metric || m.key || ''), String(m.label || ''), m.value, m.unit,
+      `brief metric: ${m.key_metric || m.key} = ${m.value} ${m.unit || ''}`)
+  }
+  for (const e of (Array.isArray(c.derived_requirements) ? c.derived_requirements : [])) {
+    add(String(e.key || ''), String(e.label || ''), e.value, e.unit,
+      `brief-derived requirement: ${e.label || e.key} = ${e.value} ${e.unit || ''}${e.basis ? ` — "${String(e.basis).slice(0, 140)}"` : ''}`)
+  }
+  const out = base.slice()
+  // stated-arithmetic (a): per-<noun> × <noun>-count ('45 m³/h per department' × '(two departments)' = 90)
+  const counts = nounCountsFromBrief(state)
+  for (const a of base) {
+    const m = a.key.toLowerCase().match(/(?:^|[_\s])per[_\s]+([a-z]+)/)
+    const noun = m ? m[1].replace(/s$/, '') : null
+    const n = noun ? counts.get(noun) : undefined
+    if (!noun || !n) continue
+    out.push({ key: `${a.key} × ${n} ${noun}s`, value: a.value * n, unit: a.unit, family: a.family, v: a.v * n,
+      kind: 'arithmetic', toks: [...new Set([...a.toks, noun])],
+      quote: `stated arithmetic: ${a.key} = ${a.value} ${a.unit || ''} × ${n} ${noun}s (both stated in the brief)` })
+  }
+  // stated-arithmetic (b): items-sum over same-family anchors sharing a distinguishing token
+  // (fresh_water_storage 40 + drain_water_storage 80 → 120). EPSILON-ADDEND GUARD: each addend
+  // must carry ≥10% of the sum — a tiny sibling value (softener effluent 0.43 on a 14.5
+  // throughput) must never nudge a near-miss into the ±2% match tolerance (a coincidence, not
+  // the brief's arithmetic; caught on the v57b GAC-vessel fault).
+  for (let i = 0; i < base.length; i++) for (let j = i + 1; j < base.length; j++) {
+    const A = base[i], B = base[j]
+    if (A.family !== B.family || !A.toks.some(t => B.toks.includes(t))) continue
+    if (Math.min(A.v, B.v) < 0.1 * (A.v + B.v)) continue
+    out.push({ key: `${A.key} + ${B.key}`, value: A.value + B.value, unit: A.unit, family: A.family, v: A.v + B.v,
+      kind: 'arithmetic', toks: [...new Set([...A.toks, ...B.toks])],
+      quote: `stated arithmetic: ${A.key} (${A.value} ${A.unit || ''}) + ${B.key} (${B.value} ${B.unit || ''}), both stated in the brief` })
+  }
+  return out
+}
+/** Does the BRIEF corroborate this ENGINE value? Family + value (±2%) + a shared DISTINGUISHING
+ *  token between the anchor and the engine-side context (source key / source_detail / line text).
+ *  A directly-STATED anchor outranks an arithmetic combination. Pure. */
+export function corroborateEngineValue(
+  v: number, family: string | null | undefined, contextToks: string[], anchors: BriefAnchor[], relTol = 0.02,
+): BriefAnchor | null {
+  if (!Number.isFinite(v) || !(v > 0)) return null
+  const ctx = new Set(contextToks)
+  let best: BriefAnchor | null = null
+  for (const a of anchors) {
+    if (family && a.family !== family) continue
+    if (Math.abs(a.v - v) > relTol * Math.max(Math.abs(a.v), Math.abs(v))) continue
+    if (!a.toks.some(t => ctx.has(t))) continue
+    if (!best || (best.kind === 'arithmetic' && a.kind === 'stated')) best = a
+  }
+  return best
+}
+/** Is this value a BRIEF-DERIVED contract quantity with its derivation formula stated? (the v57
+ *  8,280 m zone laterals: source_detail = 'zone laterals = 200 zones × (30 positions/zone ÷ 2 rows
+ *  × 2.76 m pitch) …', lineage.from → the brief's 200-valve count). Requires: value match (±1%),
+ *  a stated formula ('='), brief provenance (source='brief' OR lineage from a source='brief'
+ *  quantity OR the detail cites the brief), and a shared distinguishing token with the line. Pure. */
+export function briefAnchoredQuantityQuote(state: any, v: number, contextToks: string[], relTol = 0.01): string | null {
+  const qAll: Record<string, any> = state?.orchestratorContract?.quantities || {}
+  const ctx = new Set(contextToks)
+  for (const [key, q] of Object.entries(qAll)) {
+    const val = Number((q as any)?.value)
+    if (!Number.isFinite(val) || !(val > 0)) continue
+    if (Math.abs(val - v) > relTol * Math.max(val, v)) continue
+    const sd = String((q as any)?.source_detail || '')
+    const lineageFrom: string[] = Array.isArray((q as any)?.lineage?.from) ? (q as any).lineage.from : []
+    const anchored = (q as any)?.source === 'brief'
+      || (/=/.test(sd) && (lineageFrom.some(fk => (qAll[fk] as any)?.source === 'brief') || /brief/i.test(sd)))
+    if (!anchored) continue
+    const toks = anchorToks(`${key} ${sd}`)
+    if (!toks.some(t => ctx.has(t))) continue
+    return `${key} = ${val}${(q as any).unit ? ` ${(q as any).unit}` : ''} — ${sd.slice(0, 180) || 'stated by the brief'}`
+  }
+  return null
 }
 
 // Find the engine's actual value for a predicted output metric. (1) exact orchestrator-contract
@@ -375,6 +574,8 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
   const qAll: Record<string, any> = (state?.orchestratorContract?.quantities) || {}
   const km = state?.keyMetrics || {}
   const ho = km.headline_output || {}
+  // gate-36 round 4: every value the brief itself states/combines — the corroboration set.
+  const anchors = briefAnchorsFromState(state)
   for (const o of (exp.expected_outputs || [])) {
     if (!o || !(o.value > 0)) continue
     const want = canonicalMeasure(o.value, o.unit)
@@ -382,16 +583,36 @@ export function compareToBenchmark(exp: BenchmarkExpectation, state: any): Diver
     const got = engineValueForMetric(o.metric, o.unit, qAll, ho)
     if (!got) continue                        // engine has no comparable quantity → skip
     const ratio = got.v / want.v
-    const verdict = classify(ratio)
+    let verdict = classify(ratio)
+    let note = verdict === 'ok'
+      ? 'design meets the expected output'
+      : `design ${o.metric} is ${ratio < 1 ? 'BELOW' : 'ABOVE'} the brief/benchmark expectation by ${(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×`
+    let brief_anchor: string | undefined
+    // BRIEF-ANCHOR CORROBORATION (gate-36 round 4 — the v57b 'treated_water_throughput 14.5 vs
+    // 90' false-RADICAL): when the ENGINE's value is the brief's own number (directly stated, or
+    // a stated-arithmetic combination like 45 m³/h per department × 2 departments = 90), the
+    // divergence is the BENCHMARK re-framing the brief, not an engine absurdity. Downgrade to a
+    // WARN note. An un-anchored >2.5× (the 132.6 GW shape) still goes RADICAL and blocks.
+    if (verdict !== 'ok') {
+      const srcKey = got.source.startsWith('contract.') ? got.source.slice('contract.'.length) : ''
+      const q = srcKey ? qAll[srcKey] : null
+      const ctx = anchorToks([srcKey, q ? String((q as any).source_detail || '') : '',
+        srcKey ? '' : `${(ho as any).label || ''} ${(ho as any).id || ''}`].join(' '))
+      const hit = corroborateEngineValue(got.v, want.family, ctx, anchors)
+      if (hit) {
+        brief_anchor = hit.quote
+        if (verdict === 'radical') verdict = 'warn'
+        note = `engine value corroborated by the brief (${hit.quote}); the benchmark's framing differs — review note, not a block`
+      }
+    }
     findings.push({
       dimension: `output — ${o.metric}`,
       expected: `${o.value} ${o.unit}`,
       deterministic: `${got.raw} (${got.source})`,
       ratio: Number(ratio.toFixed(2)),
       verdict,
-      note: verdict === 'ok'
-        ? 'design meets the expected output'
-        : `design ${o.metric} is ${ratio < 1 ? 'BELOW' : 'ABOVE'} the brief/benchmark expectation by ${(ratio >= 1 ? ratio : 1 / ratio).toFixed(2)}×`,
+      note,
+      ...(brief_anchor ? { brief_anchor } : {}),
     })
   }
 
@@ -625,6 +846,8 @@ export function routeFaults(faults: Fault[], state: any): Array<Fault & { source
   const pinned = briefPinnedVolumesM3(state)
   const pinItems = pinned.pins.flatMap(p => p.item_m3)
   const pinLabel = pinned.pins.map(p => p.label || p.key).join(', ')
+  // gate-36 round 4: the brief-anchor corroboration set, built lazily (once per routeFaults call)
+  let anchorsMemo: BriefAnchor[] | null = null
   return (faults || []).map(f => {
     const key = norm(f.line)
     // match the fault's line to a BoM row by tag, then by requirement-name containment.
@@ -793,6 +1016,45 @@ export function routeFaults(faults: Fault[], state: any): Array<Fault & { source
         }
       }
     }
+    // BRIEF-ANCHOR CORROBORATION (gate-36 round 4 — 2026-07-03, the v57/v57b re-rolled framings):
+    // a sizing/quantity fault DISPUTING an engine value the BRIEF itself states — directly, as a
+    // stated-arithmetic combination ('45 m³/h per department (two departments)' → the 90 m³/h
+    // pump), or as a brief-derived contract quantity whose derivation formula is stated in its
+    // source_detail (zone laterals = 200 zones × (30 positions/zone ÷ 2 rows × 2.76 m pitch) =
+    // 8,280 m, lineage from the brief's 200-valve count) — is the benchmark re-framing the brief,
+    // not an engine fault → downgrade to a note. A fault whose disputed value has NO brief anchor
+    // still routes (both directions in the selftest). Guards: the fault's own text must QUOTE the
+    // engine value it disputes (never downgrades a complaint about a different aspect of the
+    // line), and the anchor must share a distinguishing token with the line/quantity.
+    if (routed.dimension !== 'note' && !routed.brief_pinned
+      && /sizing|quantity/i.test(String(f.dimension || '')) && line) {
+      anchorsMemo = anchorsMemo ?? briefAnchorsFromState(state)
+      const lineToks = anchorToks(`${line.tag || ''} ${line.requirement || ''} ${line.basis || ''}`)
+      // the ENGINE's own values on the matched line: its quantity + each '· N unit' duty token
+      const engVals: Array<{ v: number; family: string | null }> = []
+      if (Number(line.qty) > 0) {
+        const uomFam = line.uom ? canonicalMeasure(1, String(line.uom))?.family ?? null : null
+        engVals.push({ v: Number(line.qty), family: uomFam })
+      }
+      for (const dm of String(line.requirement || '').matchAll(/·\s*([\d,]+(?:\.\d+)?)\s*([a-z£³²%/]+)/gi)) {
+        const cm = canonicalMeasure(parseFloat(dm[1].replace(/,/g, '')), dm[2])
+        if (cm && cm.v > 0) engVals.push({ v: cm.v, family: cm.family })
+      }
+      const faultNums = Array.from(`${f.line || ''} ${f.issue || ''} ${f.magnitude || ''}`
+        .matchAll(/(\d{1,3}(?:[,\s  ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/g))
+        .map(m => parseFloat(m[1].replace(/[,\s  ]/g, '')))
+      for (const ev of engVals) {
+        if (!faultNums.some(n => Math.abs(n - ev.v) <= 0.01 * Math.max(n, ev.v))) continue
+        const hit = corroborateEngineValue(ev.v, ev.family, lineToks, anchorsMemo)
+        const quote = hit?.quote ?? briefAnchoredQuantityQuote(state, ev.v, lineToks)
+        if (!quote) continue
+        ;(routed as any).brief_anchored = true
+        routed.dimension = 'note'
+        routed.issue = `brief-anchored engine value — the disputed ${ev.v.toLocaleString()} is corroborated by the `
+          + `brief (${quote}); the benchmark's framing differs — review note, not an engine fault. (was: ${f.issue})`
+        break
+      }
+    }
     return routed
   })
 }
@@ -806,7 +1068,7 @@ async function main() {
   const state = JSON.parse(readFileSync(statePath, 'utf8'))
   const desc = briefDescriptionFromState(state)
   console.error(`[benchmark] generating expectation via ${BENCHMARK_MODEL}…`)
-  const exp = await generateBenchmarkExpectation(desc)
+  const exp = await generateBenchmarkExpectation(desc, state)
   if (!exp) { console.error('[benchmark] could not generate — aborting'); process.exit(2) }
   const report = compareToBenchmark(exp, state)
   // auto-diagnose: when anything flagged, have the LLM step into the numbers and name the faults
@@ -1182,9 +1444,189 @@ function _selftest() {
     const r2 = routeFaults([faults[8]], st2)
     if (r2[0]?.dimension === 'note') { console.log('FAIL: a brief-NAMED multimedia filter missing must stay a fault'); bad++ }
   }
+  // ── GATE-36 ROUND 4 (2026-07-03, v57/v57b) — BRIEF-ANCHOR CORROBORATION, proveCatch both
+  // directions per rule. The benchmark LLM re-rolled its FRAMING between two runs of the SAME
+  // design (v57: 'ro_permeate 8'; v57b: 'treated_water_throughput 14.5' + 'fertigation_delivery
+  // 45') and each new framing manufactured a fresh RADICAL against identical engine values. An
+  // ENGINE value the brief itself states (directly or by stated arithmetic) downgrades to a WARN
+  // note; an UN-anchored radical (the 132.6 GW shape) still blocks.
+  {
+    const briefState: any = {
+      parsedBrief: {
+        original_text: 'Maximum irrigation demand: approximately 45 cubic metres per hour per department (two departments). Reverse-osmosis permeate capacity: approximately 8 cubic metres per hour.',
+        constraints: {
+          target_performance: { key_metric: 'cultivation_containers', value: 6000, unit: 'count', metrics: [
+            { key_metric: 'max_irrigation_demand_per_department', value: 45, unit: 'm3/h' },
+            { key_metric: 'ro_permeate_capacity', value: 8, unit: 'm3/h' },
+          ] },
+          derived_requirements: [
+            { key: 'total_fertigation_flow_m3_h', label: 'Total Fertigation Delivery Capacity', value: 90, unit: 'm3/h',
+              basis: 'Two A/B nutrient-dosing units, each rated at 45 m3/h.' },
+          ],
+        },
+      },
+      orchestratorContract: { quantities: {
+        uv_disinfection_throughput_m3_h: { value: 90, unit: 'm³/h', source: 'calculator',
+          source_detail: 'medium-pressure UV-C reactor sized to the peak recirculated flow (= irrigation demand 90 m³/h)' },
+        fertigation_dosing_total_m3_h: { value: 90, unit: 'm3/h', source: 'demand-coverage' },
+        ro_permeate_capacity_m3_h: { value: 8, unit: 'm³/h' },
+      } },
+      keyMetrics: {},
+    }
+    // (c1) the exact v57b shape: 14.5 expected vs the engine's 90 (6.2×) — but 90 IS the brief's
+    // own arithmetic (45 per department × 2 departments) → WARN note, no block.
+    const expW: any = { expected_cost: { low_gbp: 0, expected_gbp: 0, high_gbp: 0 },
+      expected_outputs: [
+        { metric: 'treated_water_throughput', value: 14.5, unit: 'm³/h' },
+        { metric: 'fertigation_delivery', value: 45, unit: 'm³/h' },
+      ],
+      expected_bom: [], required_components: [], expected_sizing: {}, reasoning: '', model: 't' }
+    const rep = compareToBenchmark(expW, briefState)
+    const fT = rep.findings.find(f => f.dimension === 'output — treated_water_throughput')
+    if (!fT || fT.verdict !== 'warn' || !fT.brief_anchor || !/corroborated by the brief/.test(fT.note)) {
+      console.log(`FAIL: v57b replay — a brief-anchored 6.2× must downgrade to a WARN note (got ${JSON.stringify(fT)})`); bad++
+    }
+    const fF = rep.findings.find(f => f.dimension === 'output — fertigation_delivery')
+    if (!fF || fF.verdict !== 'warn' || !fF.brief_anchor) {
+      console.log(`FAIL: v57b replay — the anchored 2× fertigation warn must carry the brief quote (got ${JSON.stringify(fF)})`); bad++
+    }
+    if (rep.worst !== 'warn' || rep.needs_full_check !== false) {
+      console.log(`FAIL: v57b replay — worst must be WARN with needs_full_check=false (got ${rep.worst}/${rep.needs_full_check})`); bad++
+    }
+    // (c2) the SAME shape with NO brief anchors must stay RADICAL and block (the exemption must
+    // never blind the net).
+    const rep2 = compareToBenchmark(expW, { ...briefState, parsedBrief: {} })
+    if (rep2.worst !== 'radical' || !rep2.needs_full_check) {
+      console.log(`FAIL: the same 6.2× WITHOUT a brief anchor must stay RADICAL (got ${rep2.worst})`); bad++
+    }
+    // (c3) the 132.6-GW-shaped absurdity (v51 era): an output with NO basis in the brief still
+    // blocks even when the brief has plenty of other anchors.
+    const gwState: any = { parsedBrief: briefState.parsedBrief, keyMetrics: {},
+      orchestratorContract: { quantities: { rated_power_kw: { value: 132_600_000, unit: 'kW' } } } }
+    const rep3 = compareToBenchmark({ ...expW, expected_outputs: [{ metric: 'rated_power', value: 2000, unit: 'kW' }] }, gwState)
+    if (rep3.worst !== 'radical' || !rep3.needs_full_check) {
+      console.log(`FAIL: the 132.6 GW shape must still be RADICAL + needs_full_check (got ${rep3.worst})`); bad++
+    }
+    // (c4) anchor building blocks: the per-department × count combo + the stated-value set
+    const anchors = briefAnchorsFromState(briefState)
+    const combo = anchors.find(a => a.kind === 'arithmetic' && Math.abs(a.v - 90) < 0.01 && a.toks.includes('department'))
+    if (!combo) { console.log(`FAIL: briefAnchorsFromState must mint the 45 × 2 departments = 90 combo`); bad++ }
+    if (nounCountsFromBrief(briefState).get('department') !== 2) {
+      console.log('FAIL: nounCountsFromBrief must read "(two departments)" as department→2'); bad++
+    }
+    // a per_HR key must never mint a ×N combo (time words are not grouping nouns)
+    const hrState: any = { parsedBrief: { original_text: 'runs 2 departments',
+      constraints: { target_performance: { metrics: [{ key_metric: 'irrigation_demand_m3_per_hr', value: 45, unit: 'm3/h' }] } } } }
+    if (briefAnchorsFromState(hrState).some(a => a.kind === 'arithmetic' && a.key.includes('hr'))) {
+      console.log('FAIL: a _per_hr key minted a ×N combo (time ≠ grouping noun)'); bad++
+    }
+    // items-sum both directions: a REAL itemised sum (fresh 40 + drain 80 = 120) mints an anchor;
+    // an EPSILON addend (softener throughput 14.5 + effluent 0.43 ≈ 15) must NOT — a tiny sibling
+    // nudging a near-miss into the ±2% tolerance is a coincidence, not the brief's arithmetic.
+    const sumState: any = { parsedBrief: { constraints: { derived_requirements: [
+      { key: 'fresh_water_storage_volume_m3', label: 'Fresh Water Storage Volume', value: 40, unit: 'm3', basis: 'one 40 m3 tank' },
+      { key: 'drain_water_storage_volume_m3', label: 'Drain Water Storage Volume', value: 80, unit: 'm3', basis: 'two 40 m3 tanks' },
+      { key: 'gac_softener_throughput_m3_h', label: 'GAC Softener Throughput', value: 14.5, unit: 'm3/h', basis: 'stated' },
+      { key: 'softener_effluent_flow_avg_m3_h', label: 'Average Softener Regeneration Waste Flow', value: 0.43, unit: 'm3/h', basis: 'derived' },
+    ] } } }
+    const sums = briefAnchorsFromState(sumState).filter(a => a.kind === 'arithmetic')
+    if (!sums.some(a => Math.abs(a.v - 120) < 0.01)) { console.log('FAIL: items-sum must mint 40 + 80 = 120'); bad++ }
+    if (sums.some(a => Math.abs(a.v - 14.93) < 0.05)) { console.log('FAIL: an epsilon addend (14.5 + 0.43) must not mint a sum anchor'); bad++ }
+  }
+  // (c5) routeFaults BRIEF-ANCHOR CORROBORATION — a quantity fault against the brief-geometry
+  // 8,280 m laterals (formula stated in the quantity's source_detail, lineage from the brief's
+  // 200-valve count) + a sizing fault against the brief-arithmetic 90 m³/h pump both downgrade;
+  // a token-unlinked pump and an un-anchored absurd skid still route (both directions).
+  {
+    const st: any = {
+      parsedBrief: {
+        original_text: '30 containers per valve, 200 electrically-actuated valves; maximum demand of 45 cubic metres per hour per department (two departments).',
+        constraints: { target_performance: { metrics: [
+          { key_metric: 'max_irrigation_demand_per_department', value: 45, unit: 'm3/h' },
+          { key_metric: 'actuated_valves', value: 200, unit: 'count' },
+        ] } },
+      },
+      orchestratorContract: { quantities: {
+        actuated_distribution_valve_count: { value: 200, unit: '', source: 'brief',
+          source_detail: '200 electrically-actuated distribution valves' },
+        distribution_zone_lateral_length_m: { value: 8280, unit: 'm', source: 'demand-coverage',
+          lineage: { from: ['actuated_distribution_valve_count'] },
+          source_detail: 'parametric — zone laterals = 200 zones × (30 positions/zone ÷ 2 rows × 2.76 m position pitch) = 8,280 m' },
+      } },
+      requirementsBom: [
+        { tag: '—', requirement: 'Zoned distribution — zone laterals (flood-fill lines) · DN75 PVC-U · 8,280 m',
+          qty: 8280, unit_gbp: 13.2, line_gbp: 109296, uom: 'm',
+          basis: 'parametric estimate — zoned-delivery distribution network: 8,280 m × £13.2/m supply-only materials' },
+        { tag: 'P-201', requirement: 'Irrigation Booster Pump · 90 m³/h', qty: 1, unit_gbp: 9000, line_gbp: 9000, basis: 'catalogue' },
+        { tag: 'P-202', requirement: 'Transfer Pump · 90 m³/h', qty: 1, unit_gbp: 9000, line_gbp: 9000, basis: 'catalogue' },
+        { tag: 'Z-301', requirement: 'Mystery Skid · 700 m³/h', qty: 1, unit_gbp: 50000, line_gbp: 50000, basis: 'catalogue' },
+      ],
+    }
+    const r = routeFaults([
+      { line: '— (Zoned distribution — zone laterals)', dimension: 'quantity',
+        issue: 'qty 8280 far above realistic lateral length for a 45 m³/h system', magnitude: '~5× too long', suggested: '~1,600 m', likely_cause: 'wrong quantity' },
+      { line: 'P-201 (Irrigation Booster Pump)', dimension: 'sizing',
+        issue: '90 m³/h pump on 45 m³/h benchmark flow', magnitude: '~2× oversized', suggested: '45 m³/h', likely_cause: 'oversize' },
+      { line: 'P-202 (Transfer Pump)', dimension: 'sizing',
+        issue: '90 m³/h pump on 45 m³/h benchmark flow', magnitude: '~2× oversized', suggested: '45 m³/h', likely_cause: 'oversize' },
+      { line: 'Z-301 (Mystery Skid)', dimension: 'sizing',
+        issue: '700 m³/h skid absurd for this plant', magnitude: '~15× too large', suggested: '45 m³/h', likely_cause: 'volume bug' },
+    ] as any, st)
+    if (!((r[0] as any)?.brief_anchored === true && r[0]?.dimension === 'note' && /corroborated by the brief/.test(r[0]?.issue || ''))) {
+      console.log(`FAIL: the 8,280 m brief-geometry laterals fault must downgrade to a note (got ${JSON.stringify({ d: r[0]?.dimension, i: (r[0]?.issue || '').slice(0, 80) })})`); bad++
+    }
+    if (!((r[1] as any)?.brief_anchored === true && r[1]?.dimension === 'note')) {
+      console.log(`FAIL: the 90 m³/h IRRIGATION pump (brief: 45 per department × 2) must downgrade (got ${JSON.stringify({ d: r[1]?.dimension })})`); bad++
+    }
+    if ((r[2] as any)?.brief_anchored || r[2]?.dimension !== 'sizing') {
+      console.log(`FAIL: a token-unlinked Transfer Pump must NOT ride the irrigation anchor (got ${JSON.stringify({ d: r[2]?.dimension })})`); bad++
+    }
+    if ((r[3] as any)?.brief_anchored || r[3]?.dimension !== 'sizing') {
+      console.log(`FAIL: an un-anchored 700 m³/h skid fault must still route (got ${JSON.stringify({ d: r[3]?.dimension })})`); bad++
+    }
+  }
   console.log(bad === 0 ? 'benchmark-expectation selftest: OK' : `benchmark-expectation selftest: ${bad} FAIL`)
   if (bad) process.exit(1)
 }
 
-if (process.argv.includes('--selftest')) _selftest()
+// ── EXPECTATION-CACHE selftest (async — the roundtrip needs the real read path) ────────────────
+async function _selftestCache(): Promise<number> {
+  let bad = 0
+  const st1: any = { costStack: { oem_transfer_price_gbp: 1000 }, orchestratorContract: { quantities: { a: { value: 1, unit: 'kW' } } } }
+  const st2: any = { costStack: { oem_transfer_price_gbp: 1000 }, orchestratorContract: { quantities: { a: { value: 2, unit: 'kW' } } } }
+  const k1 = benchmarkCacheKey('brief A', st1), k1b = benchmarkCacheKey('brief A', st1)
+  const k2 = benchmarkCacheKey('brief A', st2), k3 = benchmarkCacheKey('brief B', st1)
+  if (k1 !== k1b) { console.log('FAIL: cache key must be deterministic (same inputs → same key)'); bad++ }
+  if (k1 === k2) { console.log('FAIL: a changed engine summary must change the cache key'); bad++ }
+  if (k1 === k3) { console.log('FAIL: a changed brief must change the cache key'); bad++ }
+  // roundtrip: a seeded entry is returned VERBATIM without an LLM call (works offline)
+  const dir = mkdtempSync(join(tmpdir(), 'bench-cache-selftest-'))
+  const prevDir = process.env.BENCHMARK_CACHE_DIR, prevOn = process.env.BENCHMARK_EXPECTATION_CACHE
+  process.env.BENCHMARK_CACHE_DIR = dir
+  delete process.env.BENCHMARK_EXPECTATION_CACHE
+  try {
+    const seeded: BenchmarkExpectation = {
+      expected_cost: { low_gbp: 1, expected_gbp: 2, high_gbp: 3, per_output_unit: '£/kWh', basis: 'seeded' },
+      expected_outputs: [], expected_bom: [], required_components: [],
+      expected_sizing: { footprint_m2: 1, volume_m3: 1, envelope: 't', basis: 't' }, reasoning: 'seeded', model: 'cache-test',
+    }
+    writeFileSync(join(dir, `${k1}.json`), JSON.stringify({ key: k1, expectation: seeded }))
+    const got = await generateBenchmarkExpectation('brief A', st1)
+    if (!got || got.model !== 'cache-test' || got.expected_cost.expected_gbp !== 2) {
+      console.log(`FAIL: a cached expectation must be reused verbatim, no LLM (got ${JSON.stringify(got)?.slice(0, 80)})`); bad++
+    }
+    const got2 = await generateBenchmarkExpectation('brief A', st1)
+    if (JSON.stringify(got2) !== JSON.stringify(got)) { console.log('FAIL: two cache reads must be identical (expectation stability)'); bad++ }
+  } finally {
+    if (prevDir === undefined) delete process.env.BENCHMARK_CACHE_DIR; else process.env.BENCHMARK_CACHE_DIR = prevDir
+    if (prevOn === undefined) delete process.env.BENCHMARK_EXPECTATION_CACHE; else process.env.BENCHMARK_EXPECTATION_CACHE = prevOn
+  }
+  console.log(bad === 0 ? 'benchmark-expectation cache selftest: OK' : `benchmark-expectation cache selftest: ${bad} FAIL`)
+  return bad
+}
+
+if (process.argv.includes('--selftest')) {
+  _selftest()
+  _selftestCache().then(bad => { if (bad) process.exit(1) }).catch(e => { console.error(e); process.exit(1) })
+}
 else if (require.main === module) main().catch(e => { console.error(e); process.exit(1) })
