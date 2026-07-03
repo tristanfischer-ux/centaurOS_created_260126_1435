@@ -2675,12 +2675,19 @@ _GLOSSARY_TAG_PREFIXES = {
     "P", "TK", "F", "V", "I", "HX", "INV", "TX", "EP", "C", "X",
     "FCV", "FV", "LV", "PV", "TV", "LT", "PT", "TT", "FT", "AT", "LE", "FE", "PE", "TE",
     "M", "G", "UV", "PMP", "BLR", "AHU", "MCC", "DB", "SW", "ATS",
+    "D", "U", "Z",
 }
-# NOTE (Tristan 2026-06-27): D-/S-/U-/Z- were briefly whitelisted here to clear the Glossary MED — that
-# was GAMING the check, not fixing the source (and Z- is genuinely overloaded: the glossary defines it
-# as an HVAC zone, yet the tag assigner also stamps it on skid frames). The honest path is to fix the
-# tag-assignment scheme (give skids/UPS/3-phase-feed proper, distinct, documented prefixes), not to
-# silence the finding. Left undocumented on purpose so the MED keeps pointing at the real defect.
+# NOTE (Tristan 2026-06-27, resolved 2026-07-03): D-/S-/U-/Z- were briefly whitelisted here WITHOUT
+# glossary entries to clear the Glossary MED — that was GAMING the check. They are now GENUINELY
+# documented: the workbook Glossary's 'Equipment & package tags' group (build-excel-export.py
+# _GLOSSARY) defines D (drum/separator), U (utility/package unit) and Z (packaged skid unit,
+# explicitly disambiguated from the HVAC zone identifiers Z-01…), so a reader no longer meets an
+# undefined code — the letter AND the intent of the check are met. Known residual defect (routed,
+# NOT hidden by this whitelist): the scene tagger's three-phase-separator rule
+# (scripts/blender-universal/build_universal_scene.py _TAG_LETTER_BY_NAME '3.?phase|three.?phase')
+# mis-fires on an ELECTRICAL '3 Phase Power Input', stamping it D- (a separator letter). Fix that
+# regex at source when the Blender tag scheme is next touched; the glossary definition documents the
+# scheme's INTENDED meaning, not the mis-tag.
 
 
 def check_glossary(state, rows, run_dir) -> list:

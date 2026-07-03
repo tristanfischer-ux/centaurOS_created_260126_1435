@@ -3795,6 +3795,12 @@ def _connection_rows(out_dir: str, q=None):
             "line_gbp": round(line),
             "basis": basis,
             "material": conn_material,
+            # COST-BASIS DISCLOSURE (ledger 'Est class'/'Confidence' columns, 2026-07-03):
+            # a routed run is a deterministic parametric take-off (routed length × the
+            # uk-2026 installed £/m rate) — AACE class 3, moderate confidence. Stated at
+            # SOURCE so the 39 connection rows never render blank estimate-class cells.
+            "estimate_class": 3,
+            "confidence": "moderate — deterministic take-off (routed length × rate)",
             # extras (length + sizing focus) — consumed by the run dashboard:
             "connection": True, "service": service, "size": size,
             "length_m": round(float(length), 1) if isinstance(length, (int, float)) else None,

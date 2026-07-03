@@ -2022,31 +2022,71 @@ _CLIENT_SECTION_RE = re.compile(
 _CLIENT_TOTAL_RE = re.compile(
     r"^[\s​]*[-•*]?\s*Total\s*:\s*approximately\s*£([\d,]+)", re.M | re.I)
 
-# Subsystem keyword families: each client section label picks the FIRST family whose
-# label-pattern matches it; each BoM line is then classed to the FIRST section (in the
-# client's own A→F order) whose stems match the line's requirement text. Generic process
-# vocabulary, keyed off the section's OWN title words — no archetype table.
-_SECTION_FAMILY_STEMS: List[Tuple["re.Pattern", "re.Pattern"]] = [
-    (re.compile(r"purificat|treatment|filtrat", re.I),
+# Subsystem SERVICE/SCOPE families (allocation fix, 2026-07-03 — the A/B over-fill
+# defect): each client section label picks the FIRST family whose label-pattern matches
+# it; each BoM line is then classed to the section whose stems match its text MOST
+# SPECIFICALLY (longest matched keyword wins — 'cloth filter' beats 'filter', 'water
+# tank' beats 'drain'; ties resolve in the client's own A→F order), with three
+# line-level SERVICE overrides so a line lands with the section that OWNS its service:
+#   · an electrical/control/signal interconnect → the controls section (control cabling)
+#   · a process interconnect touching the distribution/drain family → the distribution
+#     section (the drain/delivery NETWORK owns collection + delivery pipework — the old
+#     first-match rule dumped every 'Gac Filter → Drain Collection Sump' drain line into
+#     Water purification because the treatment noun matched first)
+#   · other process interconnects → their SOURCE endpoint's section (a tank suction
+#     line is the storage section's, exactly the client's own convention)
+#   · a field-instrument line (sensor / transmitter / analyser / meter / switch) → the
+#     controls-and-instrumentation section (plant-WIDE instrumentation; the old rule
+#     put £31k of vessel level transmitters into Water storage because the stem 'level
+#     transmitter' lives there)
+# Generic process vocabulary, keyed off the section's OWN title words — no archetype table.
+_SECTION_FAMILY_STEMS: List[Tuple[str, "re.Pattern", "re.Pattern"]] = [
+    ("treatment", re.compile(r"purificat|treatment|filtrat", re.I),
      re.compile(r"reverse osmosis|\bro\b|permeate|concentrate|membrane|ultrafiltra|\buf\b|"
-                r"softener|brine|carbon|\bgac\b|filter|blend|backflow|intake", re.I)),
-    (re.compile(r"storage", re.I),
+                r"softener|brine|carbon|\bgac\b|filter|blend|backflow|intake|"
+                r"\buv\b|ultraviolet|disinfect", re.I)),
+    ("storage", re.compile(r"storage", re.I),
      re.compile(r"storage tank|water tank|level (?:transmitter|processor|sensor|monitor)|"
                 r"suction line", re.I)),
-    (re.compile(r"fertilis|fertiliz|fertigation|nutrient", re.I),
+    ("dosing", re.compile(r"fertilis|fertiliz|fertigation|nutrient", re.I),
      re.compile(r"fertigation|fertilis|fertiliz|nutrient|dosing|venturi|mixer|"
                 r"ph analy|\bph\b|conductivity|acid", re.I)),
-    (re.compile(r"irrigation|ebb|flood|distribution|drain", re.I),
+    ("distribution", re.compile(r"irrigation|ebb|flood|distribution|drain", re.I),
      re.compile(r"irrigation|ebb|flood|riser|distribution|actuated|actuator|drain|sump|"
                 r"cloth filter|container", re.I)),
-    (re.compile(r"hand.?water", re.I),
+    ("hand_watering", re.compile(r"hand.?water", re.I),
      re.compile(r"hand.?water|ring main", re.I)),
-    (re.compile(r"control|computer|automation", re.I),
+    ("controls", re.compile(r"control|computer|automation|instrument", re.I),
      re.compile(r"\bplc\b|scada|process[- ]?control|control (?:panel|cabinet|computer|"
                 r"system)|\bhmi\b|modbus|ethernet|\bups\b|monitor|instrument|transmitter|"
                 r"sensor|switchboard|motor control|\bmcc\b|\bvfd\b|transformer|incomer|"
                 r"power|electrical|cabling|circuit breaker|terminal|relay|signal", re.I)),
 ]
+
+# Interconnect / instrument line detectors for the SERVICE overrides above. Universal —
+# they key on the connection-BoM emitter's own "<service> connection: FROM → TO" grammar
+# and standard instrument nouns, never on an archetype table.
+_CONN_LINE_RX = re.compile(
+    r"^\s*([A-Za-z][\w /+-]*?)\s+connection:\s*(.*?)\s*(?:→|->)\s*([^·]+?)\s*(?:·.*)?$")
+_ELEC_SERVICE_RX = re.compile(r"electric|control|signal|data|network", re.I)
+_INSTRUMENT_LINE_RX = re.compile(
+    r"sensor|transmitter|analy[sz]|flow ?meter|\bmeters?\b|detector|instrument|"
+    r"\bswitch(?:es)?\b", re.I)
+
+
+def _alloc_best_section(text: str, stems: List[Optional["re.Pattern"]]) -> Optional[int]:
+    """The index of the section whose stems match `text` MOST SPECIFICALLY (the longest
+    matched keyword wins; a tie resolves to the earlier section in the client's own
+    order). None when no section's stems match — the caller keeps the line VISIBLY
+    unallocated, never forces a match."""
+    best, best_len = None, 0
+    for si, rx in enumerate(stems):
+        if rx is None:
+            continue
+        ln = max((m.end() - m.start() for m in rx.finditer(text)), default=0)
+        if ln > best_len:
+            best, best_len = si, ln
+    return best
 
 
 def _parse_client_offer_sections(orig: str) -> Optional[dict]:
@@ -2066,10 +2106,14 @@ def _parse_client_offer_sections(orig: str) -> Optional[dict]:
 def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
     """Client offer vs this design, by subsystem — the deterministic reconciliation the
     Brief tab renders + the holds register reads. Each BoM line (principal rows only) is
-    classed to the FIRST client section whose keyword family matches its requirement
-    text; unmapped lines stay unmapped (NEVER forced into a match). Engine installed-
-    equivalent = section BoM materials × the run's installed÷materials ratio (client
-    section prices are INSTALLED). Returns None when the brief has no section costs."""
+    classed to a client section by its SERVICE/SCOPE family (see _SECTION_FAMILY_STEMS:
+    most-specific stem match; interconnects by service + endpoints; instrumentation to
+    the controls section); unmapped lines stay VISIBLY unmapped (NEVER forced into a
+    match). Every section row carries its mapping rule — WHICH line families it counted.
+    Engine installed-equivalent = section BoM materials × the run's installed÷materials
+    ratio (client section prices are INSTALLED). Conservation is asserted: Σ sections +
+    unallocated == Σ BoM lines EXACTLY (no line double-counted or dropped). Returns None
+    when the brief has no section costs."""
     parsed = _parse_client_offer_sections(orig)
     if not parsed:
         return None
@@ -2078,32 +2122,79 @@ def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
     if not bom:
         return None
     cs = state.get("costStack") or {}
-    raw_total = num(cs.get("raw_materials_bom_gbp")) \
-        or sum(num(r.get("line_gbp")) or 0 for r in bom)
+    line_sum = sum(num(r.get("line_gbp")) or 0.0 for r in bom)
+    raw_total = num(cs.get("raw_materials_bom_gbp")) or line_sum
     installed = num(cs.get("installed_asp_gbp")) or num(cs.get("all_in_capex_gbp"))
     ratio = (installed / raw_total) if (installed and raw_total) else 1.0
 
-    # attach a stems regex to each parsed section via its OWN title words
+    # attach a service family (name + stems) to each parsed section via its OWN title
+    # words; remember which section owns the distribution/drain network and which owns
+    # controls-and-instrumentation (the two service-override targets).
     stems: List[Optional["re.Pattern"]] = []
+    fam_idx: Dict[str, int] = {}
     for sec in parsed["sections"]:
-        rx = next((s for lbl_rx, s in _SECTION_FAMILY_STEMS
-                   if lbl_rx.search(sec["label"])), None)
-        stems.append(rx)
+        hit = next(((nm, s) for nm, lbl_rx, s in _SECTION_FAMILY_STEMS
+                    if lbl_rx.search(sec["label"])), None)
+        stems.append(hit[1] if hit else None)
+        if hit and hit[0] not in fam_idx:
+            fam_idx[hit[0]] = len(stems) - 1
+    dist_idx = fam_idx.get("distribution")
+    ctrl_idx = fam_idx.get("controls")
+
+    def _classify(req: str) -> Tuple[Optional[int], str]:
+        """(section index or None, the mapping rule that decided it)."""
+        m = _CONN_LINE_RX.match(req)
+        if m:
+            service, frm, to = m.group(1), m.group(2), m.group(3)
+            if ctrl_idx is not None and _ELEC_SERVICE_RX.search(service):
+                return ctrl_idx, "electrical/control cabling"
+            ei = _alloc_best_section(frm, stems)
+            ej = _alloc_best_section(to, stems)
+            if dist_idx is not None and dist_idx in (ei, ej):
+                return dist_idx, "distribution/drain-network pipework"
+            if ei is not None:
+                return ei, "process interconnect (by source endpoint)"
+            if ej is not None:
+                return ej, "process interconnect (by destination endpoint)"
+            return None, "interconnect with no in-scope endpoint"
+        if ctrl_idx is not None and _INSTRUMENT_LINE_RX.search(req):
+            return ctrl_idx, "field instrumentation (plant-wide)"
+        si = _alloc_best_section(req, stems)
+        if si is not None:
+            return si, "section scope stems (most-specific match)"
+        return None, "no section family match"
 
     totals = [0.0] * len(parsed["sections"])
+    rules: List[Dict[str, dict]] = [dict() for _ in parsed["sections"]]
     unmapped = 0.0
+    unmapped_rules: Dict[str, dict] = {}
     for row in bom:
         req = str(row.get("requirement") or "")
         line = num(row.get("line_gbp")) or 0.0
-        for si, rx in enumerate(stems):
-            if rx is not None and rx.search(req):
-                totals[si] += line
-                break
-        else:
+        si, rule = _classify(req)
+        if si is None:
             unmapped += line
+            bucket = unmapped_rules.setdefault(rule, {"n": 0, "gbp": 0.0})
+        else:
+            totals[si] += line
+            bucket = rules[si].setdefault(rule, {"n": 0, "gbp": 0.0})
+        bucket["n"] += 1
+        bucket["gbp"] += line
+
+    # CONSERVATION proveCatch (deterministic invariant): every line lands in EXACTLY one
+    # bucket, so Σ sections + unallocated == Σ BoM lines. A violation is a code bug —
+    # refuse to render a table that silently drops or double-counts a line.
+    if abs((sum(totals) + unmapped) - line_sum) > 0.005:
+        raise AssertionError(
+            f"client-offer recon lost/duplicated cost: Σ sections {sum(totals):,.2f} + "
+            f"unallocated {unmapped:,.2f} != Σ BoM lines {line_sum:,.2f}")
+
+    def _fmt_rules(rd: Dict[str, dict]) -> str:
+        return " · ".join(f"{v['n']}× {k} £{v['gbp']:,.0f}"
+                          for k, v in sorted(rd.items(), key=lambda kv: -kv[1]["gbp"]))
 
     out_secs = []
-    for sec, eng in zip(parsed["sections"], totals):
+    for si, (sec, eng) in enumerate(zip(parsed["sections"], totals)):
         client = sec["client_gbp"]
         inst_eq = eng * ratio
         if eng <= 0:
@@ -2128,11 +2219,14 @@ def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
         out_secs.append({**sec, "engine_bom_gbp": round(eng),
                          "engine_installed_gbp": round(inst_eq),
                          "delta_gbp": (round(delta) if delta is not None else None),
-                         "status": status, "note": note})
+                         "status": status, "note": note,
+                         "mapping_rule": _fmt_rules(rules[si])})
     return {"sections": out_secs, "client_total_gbp": parsed["client_total_gbp"],
-            "engine_bom_total_gbp": round(raw_total),
+            "engine_bom_total_gbp": round(line_sum),
             "engine_installed_total_gbp": round(installed or raw_total * ratio),
-            "unmapped_bom_gbp": round(unmapped), "install_ratio": round(ratio, 3)}
+            "unmapped_bom_gbp": round(unmapped),
+            "unmapped_rule": _fmt_rules(unmapped_rules),
+            "install_ratio": round(ratio, 3)}
 
 
 def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
@@ -2143,16 +2237,22 @@ def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
     r += 1
     note = ws.cell(
         r, 1,
-        f"Mapping: each BoM line is classed to the FIRST client section whose subsystem "
-        f"keyword family matches its requirement text (the client's own A→F order); "
-        f"unmapped lines are shown separately, NEVER forced into a match. The client's "
-        f"section prices are INSTALLED, so the comparison column is the engine "
-        f"installed-equivalent = section BoM materials × {recon['install_ratio']:g} "
-        f"(this run's installed ÷ materials ratio from the cost stack).")
+        f"Mapping: each BoM line is classed to a client section by its SERVICE/SCOPE "
+        f"family — the MOST SPECIFIC subsystem keyword match wins (ties in the client's "
+        f"own A→F order); an interconnect line follows its service (electrical/control "
+        f"cabling → the controls section; pipework touching the distribution/drain "
+        f"network → that section; other process runs → their source endpoint's section); "
+        f"plant-wide field instrumentation → the controls-and-instrumentation section. "
+        f"Each row states WHICH line families it counted. Unallocated lines are shown "
+        f"separately, NEVER forced into a match, and Σ sections + unallocated equals the "
+        f"bill total EXACTLY (asserted at build). The client's section prices are "
+        f"INSTALLED, so the comparison column is the engine installed-equivalent = "
+        f"section BoM materials × {recon['install_ratio']:g} (this run's installed ÷ "
+        f"materials ratio from the cost stack).")
     note.font = Font(italic=True, size=9, color="555555")
     note.alignment = WRAP_TOP
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.row_dimensions[r].height = 42
+    ws.row_dimensions[r].height = 84
     r += 1
     header(ws, r, ["Client section", "", "Client offer £ (installed)",
                    "This design £ (BoM materials)", "Installed-equivalent £",
@@ -2169,23 +2269,29 @@ def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
             ws.cell(r, 4, sec["engine_bom_gbp"]).number_format = FMT_GBP
             ws.cell(r, 5, sec["engine_installed_gbp"]).number_format = FMT_GBP
             dc = ws.cell(r, 6, sec["delta_gbp"]); dc.number_format = FMT_GBP
-        nc = ws.cell(r, 7, clean_cell(sec["note"]))
+        _note_txt = sec["note"]
+        if sec.get("mapping_rule"):
+            _note_txt += "  ·  COUNTED: " + sec["mapping_rule"]
+        nc = ws.cell(r, 7, clean_cell(_note_txt))
         nc.font = FONT_NOTE
         nc.alignment = WRAP_TOP
         if sec["status"] in ("out_of_scope", "partial"):
             nc.font = Font(size=9, bold=True, color="9C2B2E")
-        ws.row_dimensions[r].height = 14.5 * min(4, max(1, -(-len(sec["note"]) // 58)))
+        ws.row_dimensions[r].height = 14.5 * min(7, max(1, -(-len(_note_txt) // 58)))
         r += 1
     # unmapped engine lines — honesty row so the section columns reconcile to the bill
     if recon.get("unmapped_bom_gbp"):
         ws.cell(r, 1, "(engine lines not mapped to any client section)").font = FONT_NOTE
         ws.cell(r, 4, recon["unmapped_bom_gbp"]).number_format = FMT_GBP
-        un = ws.cell(r, 7, "engine-added scope with no client section counterpart "
-                           "(e.g. standby power, skid frames, CIP) — kept unmapped, "
-                           "not forced into a section")
+        _un_txt = ("engine-added scope with no client section counterpart "
+                   "(e.g. standby power, skid frames, CIP) — kept VISIBLY unallocated, "
+                   "never forced into a section")
+        if recon.get("unmapped_rule"):
+            _un_txt += "  ·  COUNTED: " + recon["unmapped_rule"]
+        un = ws.cell(r, 7, clean_cell(_un_txt))
         un.font = FONT_NOTE
         un.alignment = WRAP_TOP
-        ws.row_dimensions[r].height = 29
+        ws.row_dimensions[r].height = 14.5 * min(7, max(2, -(-len(_un_txt) // 58)))
         r += 1
     # totals row
     ws.cell(r, 1, "TOTAL").font = Font(bold=True)
@@ -4848,8 +4954,17 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             _g = _g or _bg
             _h = _h or _bh
         _method = _cbasis.get("method") or _basis_method(row.get("basis"))
-        _eclass = _cbasis.get("estimate_class", "")
-        _conf = _cbasis.get("confidence", "")
+        # Est class / Confidence: the joined cost line first, then the row's OWN emitter
+        # fields (the connection-BoM emitter states them at source, 2026-07-03). A
+        # CONNECTION row with neither is still a deterministic take-off by construction
+        # (routed length × uk-2026 installed £/m rate — its basis string carries the full
+        # derivation), so it discloses that class honestly rather than render a blank
+        # cell (the '39 connection lines missing Est class/Confidence' MED).
+        _eclass = _cbasis.get("estimate_class", "") or row.get("estimate_class", "")
+        _conf = _cbasis.get("confidence", "") or row.get("confidence", "")
+        if row.get("connection"):
+            _eclass = _eclass or 3
+            _conf = _conf or "moderate — deterministic take-off (routed length × rate)"
         if _is_subcomp:
             # apportioned child of a parent principal — say so rather than show blanks
             _eclass = _eclass or "↳ apportioned"
@@ -8151,6 +8266,18 @@ _GLOSSARY: List[tuple] = [
         ("4–20 mA", "The standard analogue field-signal current loop (4 mA = zero, 20 mA = full scale)."),
         ("HART", "Highway Addressable Remote Transducer — a digital signal superimposed on the 4–20 mA loop."),
         ("PLC / SCADA", "Programmable Logic Controller / Supervisory Control And Data Acquisition — the plant control system."),
+    ]),
+    ("Equipment & package tags", [
+        ("P (tag)", "Pump — equipment-tag letter (P-101, P-102 …)."),
+        ("TK (tag)", "Tank — bulk liquid storage vessel (TK-101 …)."),
+        ("V (tag)", "Vessel — pressure / process vessel, guard bed, filter housing (V-101 …)."),
+        ("D (tag)", "Drum / separator — knock-out drum, decanter, three-phase separator (D-101 …). The tag scheme's separator letter."),
+        ("U (tag)", "Utility / package unit — a balance-of-plant utility supplied as one packaged item, e.g. an uninterruptible power supply (U-201 …)."),
+        ("Z (tag)", "Packaged skid unit — a vendor skid delivered as one assembly, e.g. a reverse-osmosis or ultrafiltration skid (Z-101 …). Distinct from the HVAC zone identifiers Z-01, Z-02 … (see the HVAC group)."),
+        ("EP (tag)", "Electrical panel — switchgear, motor-control-centre or control cabinet (EP-101 …)."),
+        ("X (tag)", "General / unclassified equipment block (X-101 …)."),
+        ("C (tag)", "Column / tower (C-101 …); on the bill of materials a C-numbered row (C01, C02 …) is a CONNECTION line — an interconnecting pipe or cable run."),
+        ("I (tag)", "Field instrument or in-line device (I-101 …)."),
     ]),
     ("Valves & safety", [
         ("FC", "Fail Closed — the valve drives to the CLOSED position on loss of signal, air or power."),
@@ -15327,6 +15454,94 @@ def _selftest() -> int:
                   f"(got {_rec['unmapped_bom_gbp']})"); bad += 1
     if _client_offer_reconciliation(_rec_state, "no cost lines here") is not None:
         print("  FAIL client-recon: a brief with no section costs must render NO table"); bad += 1
+    # (1b) SECTION ALLOCATION BY SERVICE/SCOPE FAMILY (fix 2026-07-03 — the A/B over-fill
+    # defect). proveCatch each adversarial mis-allocation the v61 first-match rule made:
+    #   · a drain-network interconnect naming treatment kit must land in DISTRIBUTION (D),
+    #     never purification (A) — the £10k/section 'X → Drain Collection Sump' leak;
+    #   · a cloth filter is the drain-recovery network's (D), though 'filter' ∈ A's stems;
+    #   · plant-wide field instrumentation lands with CONTROLS (F), never storage (B) —
+    #     the £31k Level Transmitter leak;
+    #   · 'Drain Water Tank' stays STORAGE (most-specific 'water tank' beats 'drain');
+    #   · electrical cabling lands with controls, never the endpoint's section;
+    #   · a treatment-train interconnect stays with treatment (source endpoint);
+    #   · total conserved EXACTLY (Σ sections + unallocated == Σ lines, no double-count);
+    #   · the unallocated line stays VISIBLE; every row states its counted families.
+    _brief_c1b = ("Cost and calibration context:\n"
+                  "- A. Water purification: approximately £85,000\n"
+                  "- B. Water storage: approximately £31,000\n"
+                  "- D. Ebb/flow irrigation installation: approximately £895,000\n"
+                  "- F. Process-control computer: approximately £128,000\n"
+                  "- Total: approximately £1,250,000\n")
+    _rec_state_b = {"requirementsBom": [
+        {"tag": "F-1", "requirement": "Cloth Filter · 80 m³/h", "qty": 1,
+         "unit_gbp": 16540, "line_gbp": 16540},
+        {"tag": "C01", "requirement": "water connection: Gac Filter → Drain Collection "
+                                      "Sump · 45 m3/h", "qty": 1, "unit_gbp": 1243,
+         "line_gbp": 1243, "connection": True, "service": "water"},
+        {"tag": "C02", "requirement": "water connection: Gac Softener → Softener Vessel "
+                                      "· 14.5 m3/h", "qty": 1, "unit_gbp": 905,
+         "line_gbp": 905, "connection": True, "service": "water"},
+        {"tag": "LT-201", "requirement": "Level Transmitter · 0–4 m", "qty": 17,
+         "unit_gbp": 1843, "line_gbp": 31331},
+        {"tag": "TK-101", "requirement": "Drain Water Tank · 3.7 m dia x 3.7 m", "qty": 2,
+         "unit_gbp": 13615, "line_gbp": 27230},
+        {"tag": "C03", "requirement": "electrical connection: Motor Control Center → "
+                                      "Gac Filter · 4.2 A", "qty": 1, "unit_gbp": 113,
+         "line_gbp": 113, "connection": True, "service": "electrical"},
+        {"tag": "X-1", "requirement": "Widget Bracket", "qty": 1, "unit_gbp": 100,
+         "line_gbp": 100},
+    ], "costStack": {"raw_materials_bom_gbp": 77462, "installed_asp_gbp": 131685}}
+    _recb = _client_offer_reconciliation(_rec_state_b, _brief_c1b)
+    if not _recb or len(_recb["sections"]) != 4:
+        print(f"  FAIL client-recon-alloc: 4 sections must parse (got {_recb})"); bad += 1
+    else:
+        _by = {s["key"]: s for s in _recb["sections"]}
+        if _by["D"]["engine_bom_gbp"] != 16540 + 1243:
+            print(f"  FAIL client-recon-alloc: the cloth filter (£16,540) + the drain-"
+                  f"network run (£1,243) must land in D — the distribution/drain section "
+                  f"owns them — never A (got D={_by['D']['engine_bom_gbp']})"); bad += 1
+        if _by["A"]["engine_bom_gbp"] != 905:
+            print(f"  FAIL client-recon-alloc: ONLY the treatment-train interconnect "
+                  f"(£905, source endpoint) may land in A "
+                  f"(got A={_by['A']['engine_bom_gbp']})"); bad += 1
+        if _by["F"]["engine_bom_gbp"] != 31331 + 113:
+            print(f"  FAIL client-recon-alloc: plant-wide instrumentation (£31,331) + "
+                  f"electrical cabling (£113) must land with CONTROLS (F), never "
+                  f"storage/endpoint sections (got F={_by['F']['engine_bom_gbp']})"); bad += 1
+        if _by["B"]["engine_bom_gbp"] != 27230:
+            print(f"  FAIL client-recon-alloc: 'Drain Water Tank' must stay STORAGE "
+                  f"('water tank' beats 'drain' on specificity) "
+                  f"(got B={_by['B']['engine_bom_gbp']})"); bad += 1
+        _sum_b = sum(s["engine_bom_gbp"] for s in _recb["sections"]) + _recb["unmapped_bom_gbp"]
+        if _sum_b != _recb["engine_bom_total_gbp"] or _recb["unmapped_bom_gbp"] != 100:
+            print(f"  FAIL client-recon-alloc: conservation broken — Σ sections + "
+                  f"unallocated ({_sum_b}) must equal the bill total "
+                  f"({_recb['engine_bom_total_gbp']}) with the £100 bracket VISIBLY "
+                  f"unallocated (got {_recb['unmapped_bom_gbp']})"); bad += 1
+        if "instrumentation" not in _by["F"].get("mapping_rule", "") \
+                or "distribution/drain-network pipework" not in _by["D"].get("mapping_rule", ""):
+            print(f"  FAIL client-recon-alloc: every section row must STATE the line "
+                  f"families it counted (got F={_by['F'].get('mapping_rule')!r}, "
+                  f"D={_by['D'].get('mapping_rule')!r})"); bad += 1
+    # (1c) CONNECTION rows disclose their estimate class on the ledger (the '39
+    # connection lines missing Est class/Confidence' MED): a connection row with no
+    # joined cost line and no emitter fields is a deterministic take-off by
+    # construction → Est class 3 + stated confidence, never a blank cell.
+    import tempfile as _tfc
+    with _tfc.TemporaryDirectory() as _tdc:
+        _wbc = Workbook(); _wbc.remove(_wbc.active)
+        tab_parts_master(_wbc, {"requirementsBom": []}, _tdc)
+        tab_bom(_wbc, {"requirementsBom": [
+            {"tag": "C01", "requirement": "water connection: Pump A → Tank B · 45 m3/h",
+             "qty": 1, "unit_gbp": 905, "line_gbp": 905, "connection": True,
+             "basis": "pipe £66/m @ DN80 × 10.8 m + 2 ends"}]}, _tdc)
+        _wsc1 = _wbc[_LEDGER_SHEET]
+        _ec = _wsc1.cell(_LEDGER_DATA_START, 9).value
+        _cf = _wsc1.cell(_LEDGER_DATA_START, 10).value
+        if _ec != 3 or not (isinstance(_cf, str) and "take-off" in _cf):
+            print(f"  FAIL conn-est-class: a connection row must disclose Est class 3 + "
+                  f"a stated take-off confidence, never blanks (got {_ec!r}, {_cf!r})")
+            bad += 1
 
     # (2+3) COST-OF-SERVICE: the levelised divisor is design flow × 8760 × the WATER
     # utilisation Inputs driver (never the ELECTRICAL load factor — the 512,460 m³ bug),
