@@ -184,7 +184,20 @@ async function runStep(
     const input = step.input_from_contract(contract, brief)
     result = await tool.invoke(input, contract)
   } catch (err) {
-    return { ok: false, contract: null, warnings: [], error: `tool ${step.tool_id} threw: ${(err as Error).message}` }
+    // RECORD the refusal/throw as an ok:false tool result (2026-07-03): an input-
+    // mapping veto (unit-mismatch magnitude refusal, economics basis veto) or a
+    // throwing invoke used to VANISH for required:false steps — absent from
+    // tool_results, invisible in 4-orchestrator-tool-results.json. The plan must
+    // RECORD the refusal, never silently drop the step.
+    const error = `tool ${step.tool_id} threw: ${(err as Error).message}`
+    tool_results.set(step.tool_id, {
+      ok: false,
+      output: null,
+      provenance: { source: `tool:${step.tool_id}`, tool_id: step.tool_id },
+      warnings: [],
+      error,
+    } as ToolResult<unknown>)
+    return { ok: false, contract: null, warnings: [], error }
   }
 
   tool_results.set(step.tool_id, result)

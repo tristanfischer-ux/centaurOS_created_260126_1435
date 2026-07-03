@@ -109,6 +109,7 @@ import type {
 import { getTool, listTools } from '../registry'
 import { composeToolGraph, type ToolIOSchema } from '../auto-planner'
 import { sweepToolRelevance, checkUnitCoverage } from './relevance-sweep'
+import { coerceContractValueToParamUnit, magnitudeRefusal } from './unit-coercion'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -1366,12 +1367,50 @@ export function economicsRevenueBasisMissing(
 
 /** Build the input payload for a step from its inputs[] spec. from_contract_key
  *  → q(c, key, fallback); else the literal constant. A pump-sizing step is then
- *  normalised onto the PER-PUMP basis (parallel_pumps + authoritative TDH). */
-function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): Record<string, unknown> {
+ *  normalised onto the PER-PUMP basis (parallel_pumps + authoritative TDH).
+ *
+ *  UNIT-COERCION LAYER (2026-07-03, the v56d metres-into-mm vessel — see
+ *  unit-coercion.ts): a value read FROM THE CONTRACT is converted from the
+ *  quantity's own declared unit (else its key's dimension suffix) into the unit
+ *  the PARAMETER NAME declares (`gac_vessel_diameter_m` 1.3587 m → diameter_mm
+ *  1358.7), and a contract-wired value whose magnitude is physically absurd for
+ *  the param (a vessel diameter_mm < 50 or > 50,000) is REFUSED with a loud
+ *  throw — the executor fail-softs the step (required:false) and records the
+ *  refusal in tool_results, so the plan never carries a silent absurd number.
+ *  Plan-authored constants and numeric fallbacks are ALREADY in param units
+ *  (the author wrote them against the param name) — neither is coerced nor
+ *  magnitude-checked. Identity wirings return the untouched original number
+ *  (byte-identity on runs with no mismatch). Exported as a test seam. */
+export function buildStepInput(step: ToolPlanStepSpec, c: ContractInProgress): Record<string, unknown> {
   const payload: Record<string, unknown> = {}
   for (const inp of step.inputs) {
     if (inp.from_contract_key) {
-      payload[inp.param] = q(c, inp.from_contract_key, typeof inp.fallback === 'number' ? inp.fallback : 0)
+      const qv = (c.quantities as Record<string, any> | undefined)?.[inp.from_contract_key]
+      const raw = qv && typeof qv === 'object' ? qv.value : undefined
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        const declaredUnit = String(qv?.unit ?? '')
+        const co = coerceContractValueToParamUnit(inp.param, raw, declaredUnit, inp.from_contract_key)
+        if (co.converted) {
+          console.warn(
+            `[unit-coercion] ${step.tool_id}.${inp.param}: ${raw} ${co.from_unit} → ${co.value} ${co.to_unit} ` +
+            `(×${co.factor}; from contract key "${inp.from_contract_key}", via ${co.source_of_truth})`,
+          )
+        }
+        const refusal = magnitudeRefusal(inp.param, co.value, {
+          tool_id: step.tool_id,
+          from_key: inp.from_contract_key,
+          declared_unit: declaredUnit,
+        })
+        if (refusal) {
+          console.error(`[unit-coercion] ${refusal}`)
+          throw new Error(refusal)
+        }
+        payload[inp.param] = co.value
+      } else {
+        // Contract lacks the key → the plan-authored numeric fallback (already
+        // in param units), exactly as before.
+        payload[inp.param] = typeof inp.fallback === 'number' ? inp.fallback : 0
+      }
     } else if (inp.constant !== undefined) {
       payload[inp.param] = inp.constant
     }

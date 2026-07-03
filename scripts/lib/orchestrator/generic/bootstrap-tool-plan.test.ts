@@ -40,6 +40,7 @@ import {
   materialisePlan,
   bootstrapToolPlan,
   economicsRevenueBasisMissing,
+  buildStepInput,
   type ToolPlanSpec,
   type ToolPlanStepSpec,
 } from './bootstrap-tool-plan'
@@ -251,6 +252,64 @@ function pureTests(): void {
   // non-economics steps are untouched (a pump-sizing step never trips the veto)
   check('VETO never fires on a non-economics step',
     economicsRevenueBasisMissing(goodSpec().steps[0], baseContract) === null)
+
+  // ── UNIT-COERCION LAYER (proveCatch, 2026-07-03): the v56d metres-into-mm vessel.
+  //    pressure-vessel:design received diameter_mm = 1.3587 (the METRES value of
+  //    gac_vessel_diameter_m wired straight through) → an absurd 2.011 kg "vessel
+  //    mass" in total_system_mass_kg. The input mapping must CONVERT from the
+  //    quantity's declared unit to the param's suffix unit, and REFUSE (throw,
+  //    fail-soft + recorded) an absurd magnitude it cannot resolve.
+  const vesselContract: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      gac_vessel_diameter_m: { value: 1.358748446131949, unit: 'm', family: 'length' } as any,
+      recirc_flow_m3_h: { value: 90, unit: 'm3/h', family: 'volflow' } as any,
+      unlabelled_diameter: { value: 1.36, unit: '', family: 'length' } as any, // no unit, no key suffix
+    },
+  }
+  const vesselStep: ToolPlanStepSpec = {
+    tool_id: 'pressure-vessel:design',
+    inputs: [
+      { param: 'diameter_mm', from_contract_key: 'gac_vessel_diameter_m', fallback: 1200 },
+      { param: 'length_mm', constant: 2000 },
+      { param: 'wall_thickness_mm', constant: 6 },
+    ],
+    outputs: [{ contract_key: 'gac_vessel_mass_kg', tool_output_field: 'mass_kg', unit: 'kg', family: 'mass' }],
+  }
+  const coerced = buildStepInput(vesselStep, vesselContract)
+  check('unit-coercion: metres-declared contract value converts into a _mm param (×1000)',
+    Math.abs((coerced.diameter_mm as number) - 1358.748446131949) < 1e-9, `diameter_mm=${coerced.diameter_mm}`)
+  check('unit-coercion: plan-authored constants pass through in param units (never coerced)',
+    coerced.length_mm === 2000 && coerced.wall_thickness_mm === 6)
+  // identity wiring (same unit) returns the untouched original number
+  const identStep: ToolPlanStepSpec = {
+    tool_id: 'process:pump-sizing',
+    inputs: [{ param: 'flow_m3_h', from_contract_key: 'recirc_flow_m3_h', fallback: 10 }],
+    outputs: [{ contract_key: 'pump_kw', tool_output_field: 'motor_power_kw', unit: 'kW', family: 'power' }],
+  }
+  check('unit-coercion: identity wiring (m3/h → m3/h) is byte-identical',
+    buildStepInput(identStep, vesselContract).flow_m3_h === 90)
+  // MAGNITUDE REFUSAL proveCatch: a metres-scale magnitude with NO resolvable unit
+  // (blank declared unit + suffix-less key) into a vessel diameter_mm must THROW loudly.
+  const absurdStep: ToolPlanStepSpec = {
+    ...vesselStep,
+    inputs: [{ param: 'diameter_mm', from_contract_key: 'unlabelled_diameter', fallback: 1200 }],
+  }
+  let refusalMsg = ''
+  try { buildStepInput(absurdStep, vesselContract) } catch (e) { refusalMsg = (e as Error).message }
+  check('unit-coercion proveCatch: unresolvable metres-into-mm magnitude is REFUSED loudly (throw names the suspected mismatch)',
+    /UNIT-MISMATCH REFUSAL/.test(refusalMsg) && /METRES/.test(refusalMsg), refusalMsg.slice(0, 120))
+  // …and the correct-mm direction passes (no false catch)
+  const okContract: ContractInProgress = {
+    ...baseContract,
+    quantities: { vessel_diameter_mm: { value: 1358.7, unit: 'mm', family: 'length' } as any },
+  }
+  const okStep: ToolPlanStepSpec = {
+    ...vesselStep,
+    inputs: [{ param: 'diameter_mm', from_contract_key: 'vessel_diameter_mm', fallback: 1200 }],
+  }
+  check('unit-coercion proveCatch (other direction): a correct mm value passes untouched',
+    buildStepInput(okStep, okContract).diameter_mm === 1358.7)
 }
 
 // ── SMOKE block — ONE real Gemini call on the RAS brief ─────────────────────
