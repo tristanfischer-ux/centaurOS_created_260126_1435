@@ -9,14 +9,26 @@ pick the next standard rating, and the primary + secondary line currents at the
 stated voltages.
 
 WHAT IT DOES
-    Given the plant active electrical load P [kW], the load power factor pf, a
-    spare-capacity headroom and the primary/secondary line-to-line voltages:
+    Given the plant active electrical load P [kW], a spare-capacity headroom and
+    the primary/secondary line-to-line voltages:
 
-      S_load   = P / pf                                  apparent power demand [kVA]
-      S_req    = S_load x (1 + headroom)                 + spare capacity
+      S_req    = P x (1 + headroom)                      required rating [kVA]
       S_rated  = next standard IEC 60076 rating >= S_req (transformer nameplate kVA)
       I_pri    = S_rated x 1000 / (sqrt(3) x V_pri)      primary line current  [A] (3-ph)
       I_sec    = S_rated x 1000 / (sqrt(3) x V_sec)      secondary line current [A] (3-ph)
+
+    THE ONE-MINT RULE (v56c convergence round, commit e74d4502e): the incomer /
+    distribution-transformer kVA is minted by ONE rule on EVERY surface —
+    kVA = next STANDARD rating >= load x 1.25. Because kVA >= kW for ANY power
+    factor, load x 1.25 is the assumption-free adequacy requirement — the SAME
+    basis the deterministic adequacy check ('Main incomer kVA >= connected load
+    x 1.25') verifies, so the mint and the check can never disagree. This tool
+    MIRRORS scripts/lib/design-loop/settle-loop.ts (INCOMER_KVA_MARGIN +
+    IEC_KVA_LADDER incl. the 75 kVA trade step) so the tool and the settle-loop
+    E-pass can never diverge (53 kW -> 66.25 -> 75 kVA, NOT 100). The supplied
+    power factor is reported (and the P/pf apparent demand shown as an
+    informational line) but does NOT change the mint — dividing by an assumed
+    pf and jumping the unladdered series is exactly the divergence this fixes.
 
 WHY (CO2-mineralisation Electrical Distribution module had NO computation):
     The plant has no electrical sizing tool, so the distribution transformer +
@@ -69,22 +81,34 @@ PROVENANCE = {
         "(transformer current = S / (sqrt(3) x U) for a 3-phase supply)."
     ),
     "physics_basis": (
-        "Apparent power S = P / pf (kVA from active kW and displacement power "
-        "factor). Transformer nameplate = the smallest IEC 60076 preferred "
-        "rating >= S x (1 + headroom). Three-phase line current "
+        "ONE-MINT incomer rule (settle-loop E pass, commit e74d4502e): "
+        "transformer nameplate = the smallest standard preferred rating >= "
+        "load kW x 1.25. kVA >= kW for any power factor, so load x 1.25 is the "
+        "assumption-free adequacy requirement — the same basis the "
+        "deterministic adequacy check verifies. Three-phase line current "
         "I = S x 1000 / (sqrt(3) x U_LL); single-phase I = S x 1000 / U. "
         "No fabricated constants; the preferred-rating ladder is the published "
-        "IEC standard kVA series."
+        "IEC 60076 standard kVA series extended with the 75 kVA UK dry-type / "
+        "packaged-substation trade step."
     ),
     "confidence_class": "standard",
-    "last_reviewed_date": "2026-06-04",
+    "last_reviewed_date": "2026-07-03",
 }
 
-# Standard IEC 60076 distribution/power transformer preferred kVA ratings.
+# Standard distribution/power transformer preferred kVA ratings.
+# MIRROR of IEC_KVA_LADDER in scripts/lib/design-loop/settle-loop.ts (the one-mint
+# rule surface, commit e74d4502e) — IEC 60076 series EXTENDED with the 75 kVA step
+# (the UK dry-type / packaged-substation trade ladder 50/75/100/160/250 carries it;
+# without it a 53 kW plant's 66.25 kVA requirement jumps a whole size class to 100).
+# If you change ONE ladder you MUST change BOTH — they implement the same rule.
 STANDARD_KVA_LADDER = [
-    25, 50, 100, 160, 200, 250, 315, 400, 500, 630, 800,
+    25, 50, 75, 100, 160, 200, 250, 315, 400, 500, 630, 800,
     1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000,
 ]
+
+# MIRROR of INCOMER_KVA_MARGIN in scripts/lib/design-loop/settle-loop.ts.
+# kVA >= load kW x 1.25 — assumption-free (kVA >= kW at any power factor).
+INCOMER_KVA_MARGIN = 1.25
 
 
 def _next_standard_kva(s_req_kva: float, ladder: list[float]) -> tuple[float, bool]:
@@ -112,7 +136,7 @@ def compute(payload: dict) -> dict:
     if not 0.0 < pf <= 1.0:
         raise ValueError("power_factor must be in (0, 1]")
 
-    headroom = float(payload.get("headroom_fraction", 0.25))
+    headroom = float(payload.get("headroom_fraction", INCOMER_KVA_MARGIN - 1.0))
     if not 0.0 <= headroom <= 2.0:
         raise ValueError("headroom_fraction must be in [0, 2]")
 
@@ -146,9 +170,15 @@ def compute(payload: dict) -> dict:
             pass
     ladder = _parsed or [float(x) for x in STANDARD_KVA_LADDER]
 
-    # ---- Apparent power demand + required (with headroom) ----
-    s_load_kva = p_kw / pf                       # kVA = kW / pf
-    s_req_kva = s_load_kva * (1.0 + headroom)    # add spare capacity
+    # ---- ONE-MINT INCOMER RULE (mirrors settle-loop.ts resizeFromConvergedDemand,
+    # commit e74d4502e): required kVA = load kW x (1 + headroom), default margin
+    # 1.25 — ASSUMPTION-FREE (kVA >= kW at any power factor). The supplied pf
+    # yields an informational apparent-power line only; it must NOT change the
+    # mint (dividing by an assumed pf is how this tool minted 100 kVA while the
+    # settle-loop minted 75 kVA for the same 53 kW load).
+    s_load_kva = p_kw / pf                       # informational: apparent demand at stated pf
+    margin = 1.0 + headroom
+    s_req_kva = p_kw * margin
     s_rated_kva, off_ladder = _next_standard_kva(s_req_kva, ladder)
 
     # ---- Line currents at the chosen nameplate rating ----
@@ -172,18 +202,21 @@ def compute(payload: dict) -> dict:
 
     worked = [
         worked_calc(
-            label="Apparent power demand",
+            label="Apparent power demand (informational)",
             formula="S_load = P / pf",
             values={"P": (round(p_kw, 2), "kW"), "pf": (pf, "")},
             result=s_load_r, result_unit="kVA",
-            assumptions=["apparent power from active load and displacement power factor (IEC 60076 basis)"],
+            assumptions=["informational only — the nameplate mint below is pf-free (kVA >= kW at any pf)"],
         ),
         worked_calc(
-            label="Required rating with spare capacity",
-            formula="S_req = S_load x (1 + headroom)",
-            values={"S_load": (s_load_r, "kVA"), "headroom": (headroom, "")},
+            label="Required rating (one-mint incomer rule)",
+            formula="S_req = P x (1 + headroom)",
+            values={"P": (round(p_kw, 2), "kW"), "headroom": (headroom, "")},
             result=s_req_r, result_unit="kVA",
-            assumptions=[f"{round(headroom * 100)}% spare-capacity headroom over demand"],
+            assumptions=[
+                f"kVA >= load x {round(margin, 4)} — assumption-free adequacy (kVA >= kW at any power factor)",
+                "same rule as the settle-loop incomer mint + the deterministic adequacy check (commit e74d4502e)",
+            ],
         ),
         worked_calc(
             label="Transformer nameplate (next standard rating)",
@@ -191,7 +224,7 @@ def compute(payload: dict) -> dict:
             values={"S_req": (s_req_r, "kVA")},
             result=s_rated_r, result_unit="kVA",
             assumptions=[
-                "smallest IEC 60076 preferred kVA rating >= required",
+                "smallest standard preferred kVA rating >= required (IEC 60076 series + the 75 kVA trade step; ladder 25/50/75/100/160/250…)",
                 *(["demand exceeds the standard ladder — rounded up to the next 100 kVA (bespoke)"] if off_ladder else []),
             ],
         ),
@@ -236,7 +269,42 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """proveCatch for the one-mint alignment (commit e74d4502e residual #4):
+    the ADVERSARIAL input is the v56d divergence — a 53 kW plant that this tool
+    minted at 100 kVA (pf-divided + unladdered) while the settle-loop E pass
+    minted 75 kVA. The tool MUST now produce 75 on the same rule/ladder."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    # THE catch: 53 kW -> 53 x 1.25 = 66.25 -> next standard (ladder incl. 75) = 75
+    out = compute({"plant_load_kw": 53})
+    chk("v56d_53kw_mints_75", out["transformer_kva"] == 75.0)
+    chk("v56d_required_66_25", abs(out["required_with_headroom_kva"] - 66.25) < 1e-6)
+    chk("v56d_on_ladder", out["rating_off_standard_ladder"] is False)
+    # pf must NOT change the mint (the assumption-free basis) — pf 0.7 still 75
+    chk("pf_free_mint", compute({"plant_load_kw": 53, "power_factor": 0.7})["transformer_kva"] == 75.0)
+    # exactly-on-a-step is inclusive: 40 kW x 1.25 = 50 -> 50 kVA (settle-loop parity)
+    chk("inclusive_step_40kw", compute({"plant_load_kw": 40})["transformer_kva"] == 50.0)
+    # above the ladder top: never under-size — round UP to the next 100 kVA, flagged bespoke
+    big = compute({"plant_load_kw": 12000})
+    chk("off_ladder_rounds_up", big["transformer_kva"] == 15000.0 and big["rating_off_standard_ladder"] is True)
+    # worked[] present + the nameplate line references the standard-ladder rule
+    chk("worked_present", len(out.get("worked") or []) == 5)
+
+    if fails:
+        print(f"[electrical_transformer_sizing] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
+        return 1
+    print("[electrical_transformer_sizing] selftest OK (one-mint kVA rule: 53 kW -> 75 kVA, pf-free, ladder incl. 75)")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t = time.time()
     try:
         payload = json.load(sys.stdin)

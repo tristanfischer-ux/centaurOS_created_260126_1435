@@ -407,13 +407,71 @@ export function wordFlowDutyM3h(w: WordLike): number | null {
   return null
 }
 
+/**
+ * Classify a DB-open failure as a native-module ABI mismatch (better-sqlite3
+ * compiled for a different Node major — the dlopen failure you get running the
+ * chain under system Node 25 when node_modules was built under Node 22).
+ * Exported for the proveCatch: a wrong-ABI error MUST be recognised so the
+ * guard below can shout instead of silently returning a NULL DB (0 fills, no
+ * error — the routed residual this fixes).
+ */
+export function isNodeAbiMismatchError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null
+  const msg = String(e?.message ?? err ?? '')
+  return (
+    e?.code === 'ERR_DLOPEN_FAILED' ||
+    /ERR_DLOPEN_FAILED/.test(msg) ||
+    /NODE_MODULE_VERSION/.test(msg) ||
+    /was compiled against a different Node\.js version/i.test(msg) ||
+    /did not self-register/i.test(msg)
+  )
+}
+
+/** One-line operator-facing description of the ABI failure (names the running
+ *  Node + the fix). Pure — unit-testable without a real dlopen failure. */
+export function describeNodeAbiMismatch(err: unknown, nodeVersion: string = process.version): string {
+  const msg = String((err as { message?: string })?.message ?? err ?? '').split('\n')[0]
+  return (
+    `[emitter-completion] better-sqlite3 failed to load under Node ${nodeVersion} ` +
+    `(native-module ABI mismatch: ${msg.slice(0, 160)}). The parts library is ` +
+    `UNAVAILABLE this run — every DB-first lookup will miss (0 fills) and the ` +
+    `growing-DB loop is dead. Fix: run under Node 22 (nvm use 22 / ` +
+    `/opt/homebrew/opt/node@22/bin) or rebuild the module for this Node ` +
+    `(npm rebuild better-sqlite3).`
+  )
+}
+
+// Warn ONCE per process (per failure family) — openLibraryDb is called per
+// lookup path; a per-call warning would spam the chain log without adding
+// information.
+let _abiWarned = false
+let _openWarned = false
+
 function openLibraryDb(dbPath: string): Database.Database | null {
   try {
     if (!existsSync(dbPath)) return null
     const db = new Database(dbPath, { readonly: true })
     db.pragma('busy_timeout = 2000')
     return db
-  } catch {
+  } catch (err) {
+    // FAIL-SOFT stays (a chain run must not crash for a missing library), but a
+    // wrong-ABI Node must be LOUD: silently swallowing the dlopen failure gave
+    // a NULL DB → 0 DB-first fills → no error anywhere (routed residual,
+    // commit e74d4502e). Name the Node version + the fix on stderr.
+    if (isNodeAbiMismatchError(err)) {
+      if (!_abiWarned) {
+        _abiWarned = true
+        console.error(describeNodeAbiMismatch(err))
+      }
+    } else if (!_openWarned) {
+      // Any other open failure is also worth one line — a corrupt/locked DB
+      // silently degrading to "no fills" is the same invisible-failure family.
+      _openWarned = true
+      console.error(
+        `[emitter-completion] library DB open failed (${String((err as Error)?.message ?? err).slice(0, 160)}) — ` +
+        `DB-first lookups will miss this run (fail-soft).`,
+      )
+    }
     return null
   }
 }
@@ -487,6 +545,15 @@ export function dbFirstLookup(
 
   let stmt: Database.Statement
   try {
+    // DETERMINISTIC ORDER (2026-07-03, routed residual commit e74d4502e): the
+    // per-token LIMIT 60 previously ran with NO ORDER BY, so SQLite returned
+    // rowid (insertion) order — on a common token ('drive' = 778 rows) the 60-row
+    // window was locked to the OLDEST ingested rows and a newly-ingested,
+    // high-confidence row was permanently UNREACHABLE (the growing-DB loop wrote
+    // rows the read side could never serve). Order by verified confidence first,
+    // then NEWEST id, so fresh verified ingest displaces stale low-confidence
+    // rows inside the window. IFNULL(confidence,0): a NULL-confidence legacy row
+    // ranks below any scored row but stays reachable on sparse tokens.
     stmt = db.prepare(`
       SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp, raw_excerpt
       FROM pretraining_extracted_parts
@@ -494,6 +561,7 @@ export function dbFirstLookup(
         AND part_number IS NOT NULL AND length(part_number) >= 4
         AND (LOWER(part_name) LIKE '%' || ? || '%'
              OR LOWER(IFNULL(component_class,'')) LIKE '%' || ? || '%')
+      ORDER BY IFNULL(confidence, 0) DESC, id DESC
       LIMIT 60
     `)
   } catch {

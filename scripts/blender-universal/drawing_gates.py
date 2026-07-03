@@ -86,6 +86,71 @@ _NON_POWERED_RE = re.compile(
     r"enclosure|busbar|fuse|surge|cable|connection|\bmedia\b", re.I)
 
 
+def _housed_power_re():
+    """The cabinet-HOUSED power-gear rule — ONE rule shared with the ledger.
+
+    parts_ledger._HOUSED_POWER_RE classifies a VFD / variable-frequency drive /
+    soft-start / breaker / contactor / protection relay as CABINET CONTENTS (the
+    cabinet deck houses it inside the MCC / power board), and ga_massing drops
+    the same vocabulary from the GA as switchgear/panel internals. Such a device
+    is fed by the panel BUSBAR inside its enclosure — there is never an authored
+    'supply → <device>' edge on the single-line, so requiring one is an
+    EXPECTATION bug: G3 flagged 'Vfd Drive' with no electrical feeder run after
+    run (v54…v56d) while the motor it drives (the pump) carried the real feeder.
+    Import the ledger's own regex so the gate and the ledger can never diverge;
+    the inline fallback mirrors it only when the sibling import is unavailable."""
+    try:
+        import parts_ledger
+        return parts_ledger._HOUSED_POWER_RE
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        try:
+            import parts_ledger
+            return parts_ledger._HOUSED_POWER_RE
+        except ImportError:
+            # MIRROR of parts_ledger._HOUSED_POWER_RE (fallback only — keep in sync)
+            return re.compile(
+                r"\bbreaker\b|\bfuse\b|surge|\bSPD\b|\brelay\b|\bMCB\b|\bMCCB\b|\bMPCB\b|\bRCD\b|\bRCBO\b|"
+                r"contactor|isolator|motor[- ]?protection|earth[- ]?leakage|\bVFD\b|variable[- ]?frequency|"
+                r"frequency\s*drive|soft[- ]?start|blower/centrifuge\s*VSD", re.I)
+
+
+def g3_missing_feeders(bom: list, elec_dests: set) -> list:
+    """PURE G3 decision — the principal powered BoM heads with NO electrical
+    feeder edge. Extracted from run_gates so the selftest can proveCatch the
+    housed-power carve-out directly. A head is required to have its own
+    'supply → <part>' edge iff it matches the principal-powered vocabulary AND
+    is neither passive/instrument gear (_NON_POWERED_RE) NOR cabinet-housed
+    power gear (parts_ledger._HOUSED_POWER_RE — panel-internal, busbar-fed)."""
+    housed = _housed_power_re()
+    missing = []
+    seen = set()
+    for r in bom:
+        if not isinstance(r, dict):
+            continue
+        req = str(r.get("requirement") or "")
+        head = req.split("·", 1)[0].strip()
+        if "connection" in head.lower() or "↳" in head:
+            continue
+        if not _PRINCIPAL_POWERED_RE.search(head) or _NON_POWERED_RE.search(head):
+            continue
+        # Cabinet-housed power gear (VFD / soft-start / starter / protection):
+        # fed by the panel busbar INSIDE its enclosure — the cabinet deck proves
+        # that tie; a dedicated one-line feeder is not the drawing convention.
+        if housed.search(head):
+            continue
+        key = head.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        # is this principal powered part fed? (its head tokens ⊆ some electrical destination)
+        htoks = set(re.findall(r"[a-z0-9]+", key))
+        fed = any(htoks and htoks <= set(re.findall(r"[a-z0-9]+", d)) for d in elec_dests)
+        if not fed:
+            missing.append(head)
+    return missing
+
+
 # ── G1b — min text height at A1 print scale (ISO 3098: ≥2.5 mm lettering) ─────────
 # Drawings with an A1 print pipeline (a1_print.py, hooked in their generators):
 # gate name → the print set's file base (<base>-A1.pdf / <base>-A1.json).
@@ -335,6 +400,8 @@ def run_gates(out_dir: str) -> list:
                           f"panel total {panel_total:.0f} kW vs contract {cload:.0f} kW (ratio {ratio:.2f}, ±15%)"))
 
     # ── G3 PART COVERAGE — every principal powered part has its OWN electrical feeder ─
+    # (decision extracted to g3_missing_feeders above; cabinet-housed power gear —
+    # VFD / soft-start / starter — is busbar-fed panel contents, never a feeder row)
     elec_dests = set()
     for e in conn:
         if not isinstance(e, dict):
@@ -342,26 +409,7 @@ def run_gates(out_dir: str) -> list:
         med = str(e.get("mechanism") or e.get("medium") or e.get("service") or "")
         if "electr" in med.lower():
             elec_dests.add(str(e.get("to_part") or e.get("to") or "").strip().lower())
-    missing = []
-    seen = set()
-    for r in bom:
-        if not isinstance(r, dict):
-            continue
-        req = str(r.get("requirement") or "")
-        head = req.split("·", 1)[0].strip()
-        if "connection" in head.lower() or "↳" in head:
-            continue
-        if not _PRINCIPAL_POWERED_RE.search(head) or _NON_POWERED_RE.search(head):
-            continue
-        key = head.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        # is this principal powered part fed? (its head tokens ⊆ some electrical destination)
-        htoks = set(re.findall(r"[a-z0-9]+", key))
-        fed = any(htoks and htoks <= set(re.findall(r"[a-z0-9]+", d)) for d in elec_dests)
-        if not fed:
-            missing.append(head)
+    missing = g3_missing_feeders(bom, elec_dests)
     gates.append(Gate("part_coverage", ["single-line-diagram", "panel-schedule", "pid"],
                       "high", len(missing) == 0,
                       "all principal powered parts fed" if not missing
@@ -568,6 +616,28 @@ def _selftest() -> int:
     htoks = set("recirc pump".split())
     chk("part_fed", htoks <= set("standby diesel generator recirc pump".split()))
     chk("part_unfed", not (htoks <= set("standby diesel generator heat pump".split())))
+    # G3 housed-power carve-out proveCatch (the v54…v56d 'Vfd Drive' repeat-flag):
+    # a cabinet-HOUSED power device (VFD / soft-start — parts_ledger._HOUSED_POWER_RE,
+    # the ONE rule shared with the ledger's cabinet deck + ga_massing's panel-internal
+    # drop) is busbar-fed INSIDE its enclosure → needs NO dedicated SLD feeder; a real
+    # powered principal with no feeder MUST still fire (both directions).
+    _g3_bom = [{"requirement": "Vfd Drive"},           # housed → never a feeder row
+               {"requirement": "Soft-Start Unit"},     # housed → never a feeder row
+               {"requirement": "Recirc Pump"},         # principal, UNFED → must fire
+               {"requirement": "Irrigation Pump"},     # principal, fed → clean
+               {"requirement": "Agitator Drive"}]      # a REAL drive-driven machine, UNFED → must fire
+    _g3_missing = g3_missing_feeders(_g3_bom, {"motor control center irrigation pump"})
+    chk("g3_vfd_housed_not_flagged", "Vfd Drive" not in _g3_missing)
+    chk("g3_softstart_housed_not_flagged", "Soft-Start Unit" not in _g3_missing)
+    chk("g3_unfed_pump_still_fires", "Recirc Pump" in _g3_missing)
+    chk("g3_real_drive_still_fires", "Agitator Drive" in _g3_missing)
+    chk("g3_fed_pump_clean", "Irrigation Pump" not in _g3_missing)
+    # the shared rule really is the ledger's own regex (import, not a drifted copy)
+    try:
+        import parts_ledger as _pl
+        chk("g3_shares_ledger_rule", _housed_power_re() is _pl._HOUSED_POWER_RE)
+    except ImportError:
+        pass
     # qty coverage threshold
     chk("qty_ok", 8 >= max(2, int(8 * 0.8)))
     chk("qty_collapsed", not (1 >= max(2, int(8 * 0.8))))    # collapsed-to-1 fails
@@ -652,7 +722,7 @@ def _selftest() -> int:
     if fails:
         print("[drawing-gates] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[drawing-gates] selftest OK (38 deterministic-gate invariants incl. G8 connection-sanity proveCatch on v55)")
+    print("[drawing-gates] selftest OK (deterministic-gate invariants incl. G3 housed-power carve-out proveCatch on the v54/v56d 'Vfd Drive' + G8 connection-sanity proveCatch on v55)")
     return 0
 
 

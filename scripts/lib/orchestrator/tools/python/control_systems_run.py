@@ -53,11 +53,13 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fail_soft import safe_choice, safe_float_list  # noqa: E402  (FAIL-SOFT: off-vocab categorical / string-wired list)
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper — drift-safe worked calculations)
 
 PROVENANCE = {
     "tool_name": "python-control",
@@ -87,11 +89,13 @@ PROVENANCE = {
 }
 
 
-def fit_foptd(num: list[float], den: list[float]) -> tuple[float, float, float]:
+def fit_foptd(num: list[float], den: list[float]) -> tuple[float, float, float, float | None, float | None]:
     """
     First-Order-Plus-Dead-Time (FOPTD) approximation:
         G(s) ≈ K * exp(-θ s) / (τ s + 1)
-    Returns (K, τ, θ).
+    Returns (K, τ, θ, t_28, t_63) — the two Smith-method response times are
+    surfaced so the worked[] appendix can show the τ/θ fit by hand (None when
+    the fit fell back / clamped and the two-point formula does not hold).
 
     Method: identify FOPTD parameters from step response of full plant.
     Used for Ziegler-Nichols, Cohen-Coon, AMIGO tuning that take FOPTD inputs.
@@ -105,7 +109,7 @@ def fit_foptd(num: list[float], den: list[float]) -> tuple[float, float, float]:
     y_final = y[-1]
     if abs(y_final) < 1e-9:
         # Pure differentiator or unstable — can't fit FOPTD
-        return 1.0, 1.0, 0.0
+        return 1.0, 1.0, 0.0, None, None
 
     K = float(y_final)
     # 28% response time and 63% response time per Smith's two-point method
@@ -127,67 +131,98 @@ def fit_foptd(num: list[float], den: list[float]) -> tuple[float, float, float]:
     # Smith's method: τ = 1.5 × (t_63 - t_28), θ = t_63 - τ
     tau = 1.5 * (t_63 - t_28)
     theta = t_63 - tau
+    clamped = False
     if tau <= 0:
         tau = max(0.01, t_63)
+        clamped = True
     if theta < 0:
         theta = 0.0  # no dead time detected
-    return K, tau, theta
+        clamped = True
+    # When either value was clamped the two-point formula no longer reproduces the
+    # returned τ/θ — suppress the response times so no misleading working is printed.
+    return K, tau, theta, (None if clamped else t_28), (None if clamped else t_63)
 
 
 def tune_pid(method: str, K: float, tau: float, theta: float,
-             controller_type: str, lambda_imc: float = 1.0) -> tuple[float, float, float]:
-    """Return (Kp, Ki, Kd) per the requested tuning method.
+             controller_type: str, lambda_imc: float = 1.0) -> tuple[float, float, float, dict]:
+    """Return (Kp, Ki, Kd, info) per the requested tuning method.
     Inputs are FOPTD parameters K, tau, theta. theta=0 forces lambda or
-    method-specific fallback."""
+    method-specific fallback.
+
+    `info` carries the LIVE per-branch tuning-rule formula + values (kp_formula /
+    kp_values / kp_assumptions, plus Ti and Td) so compute() can print a
+    drift-safe worked[] record — the formula string is authored HERE, next to the
+    arithmetic it describes, never re-derived in the renderer (the documented
+    "two copies drift apart" failure family)."""
     # Avoid division by zero in theta-based methods
     theta_safe = max(0.01, theta)
 
     method = method.lower()
     controller_type = controller_type.upper()
 
+    kp_assumptions: list[str] = []
     if method == "ziegler_nichols":
         # ZN open-loop (step) tuning
         # FOPTD: Kp = (1.2 * tau) / (K * theta) for PID, etc.
+        kp_values = {"K": (round(max(1e-6, K), 6), ""), "tau": (round(tau, 6), "s"),
+                     "theta": (round(theta_safe, 6), "s")}
+        kp_assumptions.append("Ziegler-Nichols open-loop step rule on the fitted FOPTD plant")
         if controller_type == "P":
             Kp = tau / (max(1e-6, K) * theta_safe)
             Ti = 1e9; Td = 0.0
+            kp_formula = "Kp = tau / (K x theta)"
         elif controller_type == "PI":
             Kp = (0.9 * tau) / (max(1e-6, K) * theta_safe)
             Ti = theta_safe / 0.3
             Td = 0.0
+            kp_formula = "Kp = 0.9 x tau / (K x theta)"
         else:  # PID
             Kp = (1.2 * tau) / (max(1e-6, K) * theta_safe)
             Ti = 2.0 * theta_safe
             Td = 0.5 * theta_safe
+            kp_formula = "Kp = 1.2 x tau / (K x theta)"
     elif method == "cohen_coon":
         # Cohen-Coon for FOPTD plants
         r = theta_safe / tau if tau > 0 else 1.0
+        kp_values = {"K": (round(K, 6), ""), "r": (round(r, 6), "")}
+        kp_assumptions.append(f"Cohen-Coon rule; r = theta / tau = {round(theta_safe, 4)} / {round(tau, 4)}")
         if controller_type == "P":
             Kp = (1.0 / (K * r)) * (1 + r/3)
             Ti = 1e9; Td = 0.0
+            kp_formula = "Kp = (1 / (K x r)) x (1 + r / 3)"
         elif controller_type == "PI":
             Kp = (1.0 / (K * r)) * (0.9 + r/12)
             Ti = theta_safe * (30 + 3*r) / (9 + 20*r)
             Td = 0.0
+            kp_formula = "Kp = (1 / (K x r)) x (0.9 + r / 12)"
         else:  # PID
             Kp = (1.0 / (K * r)) * (1.35 + r/4)
             Ti = theta_safe * (32 + 6*r) / (13 + 8*r)
             Td = theta_safe * 4 / (11 + 2*r)
+            kp_formula = "Kp = (1 / (K x r)) x (1.35 + r / 4)"
     elif method == "amigo":
         # AMIGO (Astrom-Hagglund 2004) for FOPTD
+        kp_values = {"K": (round(max(1e-6, K), 6), ""), "tau": (round(tau, 6), "s"),
+                     "theta": (round(theta_safe, 6), "s")}
+        kp_assumptions.append("AMIGO rule (Astrom & Hagglund 2004) on the fitted FOPTD plant")
         if controller_type == "PI":
             Kp = (0.15 / max(1e-6, K)) + (0.35 - (theta_safe*tau)/((theta_safe+tau)**2)) * (tau / (max(1e-6, K) * theta_safe))
             Ti = (0.35*theta_safe + 13*tau*theta_safe**2/(tau**2 + 12*tau*theta_safe + 7*theta_safe**2))
             Td = 0.0
+            kp_formula = "Kp = 0.15 / K + (0.35 - (theta x tau) / (theta + tau)^2) x (tau / (K x theta))"
         else:  # PID (default)
             Kp = (1.0 / max(1e-6, K)) * (0.2 + 0.45 * tau / theta_safe)
             Ti = (0.4*theta_safe + 0.8*tau) / (theta_safe + 0.1*tau) * theta_safe
             Td = 0.5 * theta_safe * tau / (0.3 * theta_safe + tau)
+            kp_formula = "Kp = (1 / K) x (0.2 + 0.45 x tau / theta)"
     elif method == "imc" or method == "lambda":
         # IMC / Skogestad SIMC: aggressiveness controlled by lambda
         # For PID on FOPTD: Kp = (1/K) * tau/(lambda + theta)
         # Ti = min(tau, 4*(lambda + theta)); Td = 0 for FOPTD, or tau*theta/(tau+theta) for SOPTD
         L = lambda_imc
+        kp_values = {"K": (round(max(1e-6, K), 6), ""), "tau": (round(tau, 6), "s"),
+                     "theta": (round(theta_safe, 6), "s"), "L": (round(L, 6), "s")}
+        kp_assumptions.append("IMC / Skogestad SIMC rule; L = the IMC lambda time-constant")
         if controller_type == "P":
             Kp = (1.0 / max(1e-6, K)) * tau / (L + theta_safe)
             Ti = 1e9; Td = 0.0
@@ -199,12 +234,15 @@ def tune_pid(method: str, K: float, tau: float, theta: float,
             Kp = (1.0 / max(1e-6, K)) * tau / (L + theta_safe)
             Ti = min(tau, 4*(L + theta_safe))
             Td = tau * theta_safe / (tau + theta_safe) if theta > 0 else 0.0
+        kp_formula = "Kp = (1 / K) x tau / (L + theta)"
     else:
         raise ValueError(f"unknown tuning_method: {method!r}")
 
     Ki = Kp / Ti if Ti > 0 else 0.0
     Kd = Kp * Td if Td > 0 else 0.0
-    return float(Kp), float(Ki), float(Kd)
+    info = {"Ti": float(Ti), "Td": float(Td), "kp_formula": kp_formula,
+            "kp_values": kp_values, "kp_assumptions": kp_assumptions}
+    return float(Kp), float(Ki), float(Kd), info
 
 
 def compute(payload: dict) -> dict:
@@ -226,10 +264,56 @@ def compute(payload: dict) -> dict:
     stable_open = all(p.real < 0 for p in poles)
 
     # Identify FOPTD parameters for tuning
-    K, tau, theta = fit_foptd(num, den)
+    K, tau, theta, t_28, t_63 = fit_foptd(num, den)
 
     # Compute PID gains
-    Kp, Ki, Kd = tune_pid(method, K, tau, theta, controller_type, lambda_imc)
+    Kp, Ki, Kd, tune_info = tune_pid(method, K, tau, theta, controller_type, lambda_imc)
+
+    # ── worked[] — the hand-checkable tuning maths (inputs → formula → result) ──
+    # Built HERE from the SAME live values the gains were computed with (_worked.py
+    # drift-safety contract); the Calculations tab renders these so a reviewer can
+    # check e.g. ph_control_kp by hand. The per-method Kp rule comes from tune_pid
+    # (authored next to its arithmetic); Ki/Kd follow from the standard parallel-
+    # form identities Ki = Kp / Ti and Kd = Kp x Td.
+    worked = []
+    if t_28 is not None and t_63 is not None:
+        worked.append(worked_calc(
+            label="FOPTD time constant (Smith two-point fit)",
+            formula="tau = 1.5 x (t63 - t28)",
+            values={"t63": (round(t_63, 4), "s"), "t28": (round(t_28, 4), "s")},
+            result=round(tau, 4), result_unit="s",
+            assumptions=["Smith's method: 28.3% / 63.2% step-response times of the full plant"],
+        ))
+        worked.append(worked_calc(
+            label="FOPTD dead time",
+            formula="theta = t63 - tau",
+            values={"t63": (round(t_63, 4), "s"), "tau": (round(tau, 4), "s")},
+            result=round(theta, 4), result_unit="s",
+            assumptions=["dead time from the same two-point FOPTD fit"],
+        ))
+    worked.append(worked_calc(
+        label=f"Proportional gain ({method.upper()} {controller_type} rule)",
+        formula=tune_info["kp_formula"],
+        values=tune_info["kp_values"],
+        result=round(Kp, 6), result_unit="",
+        assumptions=tune_info["kp_assumptions"],
+    ))
+    if 0 < tune_info["Ti"] < 1e8:  # a real integral term (P controllers carry Ti=1e9 sentinel)
+        worked.append(worked_calc(
+            label="Integral gain",
+            formula="Ki = Kp / Ti",
+            values={"Kp": (round(Kp, 6), ""), "Ti": (round(tune_info["Ti"], 6), "s")},
+            result=round(Ki, 6), result_unit="1/s",
+            assumptions=[f"integral time Ti = {round(tune_info['Ti'], 4)} s from the {method.upper()} rule"],
+        ))
+    if tune_info["Td"] > 0:
+        worked.append(worked_calc(
+            label="Derivative gain",
+            formula="Kd = Kp x Td",
+            values={"Kp": (round(Kp, 6), ""), "Td": (round(tune_info["Td"], 6), "s")},
+            result=round(Kd, 6), result_unit="s",
+            assumptions=[f"derivative time Td = {round(tune_info['Td'], 4)} s from the {method.upper()} rule"],
+        ))
 
     # Build PID controller transfer function
     # PID: Kp + Ki/s + Kd*s = (Kd*s^2 + Kp*s + Ki) / s
@@ -329,11 +413,107 @@ def compute(payload: dict) -> dict:
         "controller_denominator": den_c,
         "target_response": target_resp,
         "target_value": target_val,
+        "worked": worked,
         "_provenance": PROVENANCE,
     }
 
 
+def _eval_arith(expr: str):
+    """SAFE arithmetic evaluation via ast (NO eval — numbers and + - * / ** ( )
+    unary-minus only; anything else → None). Mirrors the harness's no-eval
+    evaluator in UNIVERSAL.worked_calc_arithmetic_sound."""
+    import ast
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        return None
+
+    def ev(node):
+        if isinstance(node, ast.Expression):
+            return ev(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            v = ev(node.operand)
+            return None if v is None else (-v if isinstance(node.op, ast.USub) else v)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)):
+            a, b = ev(node.left), ev(node.right)
+            if a is None or b is None:
+                return None
+            try:
+                if isinstance(node.op, ast.Add):
+                    return a + b
+                if isinstance(node.op, ast.Sub):
+                    return a - b
+                if isinstance(node.op, ast.Mult):
+                    return a * b
+                if isinstance(node.op, ast.Div):
+                    return a / b
+                return a ** b
+            except (ZeroDivisionError, OverflowError):
+                return None
+        return None
+    return ev(tree)
+
+
+def _subst_holds(wc: dict, tol: float = 0.015) -> bool:
+    """Re-evaluate a worked record's substituted expression and check it equals the
+    stated result (the same check as harness UNIVERSAL.worked_calc_arithmetic_sound).
+    Records whose expression uses a function (min/max/ceil/…) are skipped → True."""
+    parts = str(wc.get("substitution", "")).split("=")
+    if len(parts) < 3:
+        return True
+    expr = "=".join(parts[1:-1]).replace(",", "").replace("^", "**")
+    expr = re.sub(r"(?<=[\d\s()])x(?=[\d\s(])", "*", expr)
+    if re.search(r"[A-Za-z]", expr):  # function call / symbol left → not plainly evaluable
+        return True
+    got = _eval_arith(expr)
+    if got is None:
+        return True
+    stated = (wc.get("result") or {}).get("value")
+    try:
+        stated = float(stated)
+    except (TypeError, ValueError):
+        return True
+    return abs(got - stated) <= tol * max(abs(stated), 1e-9)
+
+
+def _selftest() -> int:
+    """proveCatch for the worked[] emission gap (routed residual, commit e74d4502e):
+    the adversarial input is the v56d run — pid-tuning minted ph_control_kp with
+    ZERO worked calculations, capping the Calculations tab at 7 tools. The default
+    IMC PID plant MUST now emit a hand-checkable Kp/Ki/Kd working that adds up."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    out = compute({})  # default plant 1/(s^2+2s+1), IMC PID — the v56d shape
+    worked = out.get("worked") or []
+    chk("worked_nonempty", len(worked) >= 3)
+    labels = " | ".join(str(w.get("label")) for w in worked)
+    chk("kp_worked_present", "Proportional gain" in labels)
+    chk("ki_worked_present", "Integral gain" in labels)
+    for w in worked:
+        chk(f"arith_sound[{w.get('label')}]", _subst_holds(w))
+        chk(f"shape[{w.get('label')}]", all(k in w for k in ("label", "formula", "substitution", "inputs", "result")))
+    # every tuning method emits a Kp working (per-branch formula authored in tune_pid)
+    for m in ("ziegler_nichols", "cohen_coon", "amigo", "imc"):
+        o = compute({"tuning_method": m})
+        wl = [w for w in (o.get("worked") or []) if "Proportional gain" in str(w.get("label"))]
+        chk(f"kp_worked[{m}]", len(wl) == 1 and _subst_holds(wl[0]))
+
+    if fails:
+        print(f"[control_systems_run] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
+        return 1
+    print(f"[control_systems_run] selftest OK ({len(worked)} worked calcs on the default plant; all 4 tuning rules emit a hand-checkable Kp working)")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)

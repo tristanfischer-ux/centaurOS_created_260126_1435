@@ -85,6 +85,15 @@ export const regulatoryCertificationCostTool: Tool<any, any> = {
       )
       warnings.push('regulatory-cert-cost not calibrated for process-plant class — output marked not_estimated_for_class')
     }
+    // 2026-07-03 (routed residual, commit e74d4502e): the Python now declares
+    // not_estimated_for_class ITSELF for any class/region with no schedule on
+    // file (total_cost_gbp: null — an honest absent, never a fabricated £0; the
+    // v56d UK/EU water plant minted regulatory_cert_cost_gbp = 0 from that
+    // path). Surface it as a warning so the operator sees WHY no cost quantity
+    // was minted.
+    if (output && typeof output === 'object' && output.status === 'not_estimated_for_class' && warnings.length === 0) {
+      warnings.push(`regulatory-cert-cost: ${String(output.not_estimated_reason ?? 'no certification schedule on file for this class/region')} — total_cost_gbp withheld (honest absent, not £0)`)
+    }
     return {
       ok: true,
       output,

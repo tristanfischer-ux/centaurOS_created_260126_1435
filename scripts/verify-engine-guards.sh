@@ -51,6 +51,10 @@ run "render service-coherence guard"             "$PY" scripts/blender-universal
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
+# TOOL WRAPPERS — worked[] emission + one-mint kVA alignment + honest-absent cert cost (2026-07-03)
+run "electrical_transformer_sizing --selftest" "$PY" scripts/lib/orchestrator/tools/python/electrical_transformer_sizing.py --selftest
+run "control_systems_run --selftest"          "$PY" scripts/lib/orchestrator/tools/python/control_systems_run.py --selftest
+run "regulatory_certification_cost --selftest" "$PY" scripts/lib/orchestrator/tools/python/regulatory_certification_cost.py --selftest
 run "ga_massing.py --selftest"                "$PY" scripts/blender-universal/ga_massing.py --selftest
 run "deterministic_layout --selftest"         "$PY" scripts/blender-universal/deterministic_layout.py --selftest
 run "parts_ledger.py --selftest"              "$PY" scripts/blender-universal/parts_ledger.py --selftest

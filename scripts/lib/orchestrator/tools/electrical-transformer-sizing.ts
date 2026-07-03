@@ -2,10 +2,12 @@
  * scripts/lib/orchestrator/tools/electrical-transformer-sizing.ts
  *
  * electrical:transformer-sizing — first-principles sizing of the plant supply
- * (distribution) transformer from the connected electrical load: apparent power
- * (kVA = kW / pf), a spare-capacity headroom to pick the next standard IEC 60076
- * rating, and the primary + secondary line currents (S / (sqrt(3) x U) for a
- * three-phase supply).
+ * (distribution) transformer from the connected electrical load, on the ONE-MINT
+ * incomer rule (settle-loop E pass, commit e74d4502e): nameplate kVA = next
+ * STANDARD rating >= load kW x 1.25 (ladder incl. the 75 kVA trade step; kVA >=
+ * kW at any power factor, so the rule is assumption-free and matches the
+ * deterministic adequacy check exactly — 53 kW -> 75 kVA, never 100). Primary +
+ * secondary line currents follow as S / (sqrt(3) x U) for a three-phase supply.
  *
  * Grounds the CO2-mineralisation Electrical Distribution module — which showed
  * NO computation because the engine had no electrical sizing tool. A transformer

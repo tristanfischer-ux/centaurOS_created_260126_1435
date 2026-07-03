@@ -50,6 +50,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fail_soft import safe_choice  # noqa: E402  (FAIL-SOFT: never crash on off-vocab categorical)
+from _worked import worked_calc  # noqa: E402  (same-dir shared helper — drift-safe worked calculations)
 
 # Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
 # block in its output so the report's Tools-Used page can audit each claim.
@@ -400,35 +401,93 @@ CERTIFICATIONS: dict[tuple[str, str], list[dict]] = {
 }
 
 
+# Aliases → the table's canonical class slugs. EXPLICIT + conservative — this
+# replaces the old blind fuzzy snap (safe_choice) for product_class, which
+# silently relabelled ANY unknown class to the alphabetically-first table entry
+# ("water_treatment" → "3d_printer", v56d) and then rendered a WRONG-CLASS or £0
+# certification basis as if it were real. Extend as genuinely-equivalent slugs
+# appear; a class with no certification regime on file must fall to the honest
+# not-estimated path, never a neighbour's numbers.
+CLASS_SYNONYMS: dict[str, str] = {
+    "battery_energy_storage": "bess", "battery_storage": "bess", "grid_battery": "bess",
+    "vertical_farm": "vf", "vertical_farming": "vf",
+    "heatpump": "heat_pump", "ashp": "heat_pump", "gshp": "heat_pump",
+    "uav": "drone", "uas": "drone", "quadcopter": "drone",
+    "uuv": "auv", "rov": "auv",
+    "hydrogen_electrolyser": "h2_electrolyser", "electrolyser": "h2_electrolyser",
+    "electrolyzer": "h2_electrolyser",
+    "wind": "wind_turbine", "onshore_wind": "wind_turbine",
+    "ev_charging_station": "ev_charger", "evse": "ev_charger",
+    "cubesat_platform": "cubesat", "smallsat_platform": "smallsat",
+    "continuous_glucose_monitor": "cgm", "glucose_monitor": "cgm",
+}
+
+
+def _resolve_class(raw, classes: list[str]) -> str | None:
+    """Resolve the payload's product_class to a table slug: exact (normalised) →
+    explicit synonym → None (honestly uncovered). Deliberately NO fuzzy nearest-
+    neighbour: certification regimes are class-specific, so a mis-snap fabricates
+    a wrong-class cost basis (the v56d "water_treatment → 3d_printer" trap)."""
+    s = str(raw or "").strip().lower()
+    if not s:
+        return None
+    norm = {str(c).strip().lower(): c for c in classes}
+    if s in norm:
+        return norm[s]
+    syn = CLASS_SYNONYMS.get(s)
+    if syn and syn in norm:
+        return norm[syn]
+    return None
+
+
 def compute(payload: dict) -> dict:
     # FAIL-SOFT: region is a fixed vocabulary (the table's regions) — snap an
     # off-list value to the nearest rather than missing every key. product_class
-    # is snapped to a known class when it is a near-miss (fuzzy/synonym); a
-    # genuinely-uncovered class returns an honest empty result (no "error" key,
-    # so an unseen archetype never reads as a crash).
+    # resolves EXACT-or-synonym only (_resolve_class above); a genuinely-uncovered
+    # class returns an HONEST not-estimated result — total_cost_gbp: null + a
+    # not_estimated_for_class status (the same convention as generic-tool-class-
+    # applicability.ts markNotEstimatedForClass) — NEVER a fabricated £0 (v56d
+    # minted regulatory_cert_cost_gbp = 0 for a UK/EU water plant from exactly
+    # this path; a zero with no basis must be an honest absent).
     _regions = sorted({r for r, _ in CERTIFICATIONS.keys()})
     _classes = sorted({c for _, c in CERTIFICATIONS.keys()})
     region = safe_choice(payload.get("region", "UK"), _regions, default="UK", label="region")
-    cls = safe_choice(payload.get("product_class", ""), _classes, default=None, label="product_class")
+    raw_class = payload.get("product_class", "")
+    cls = _resolve_class(raw_class, _classes)
     volume = float(payload.get("target_market_volume_units_per_year", 0))
 
     key = (region, cls)
-    if key not in CERTIFICATIONS:
+    if cls is None or key not in CERTIFICATIONS:
         # Try GLOBAL fallback
         global_key = ("GLOBAL", cls)
-        if global_key in CERTIFICATIONS:
+        if cls is not None and global_key in CERTIFICATIONS:
             certs = CERTIFICATIONS[global_key]
             key_used = global_key
         else:
+            if cls is None:
+                reason = (f"no certification schedule on file for product class "
+                          f"{str(raw_class)!r} — the lookup table covers "
+                          f"{len(_classes)} discrete-product classes and refuses to "
+                          f"substitute a neighbouring class's fee schedule. Scope the "
+                          f"certification cost & critical path with the relevant "
+                          f"conformity body at FEED stage.")
+            else:
+                reason = (f"no certification data on file for ({region}, {cls}); "
+                          f"regions with data for this class: "
+                          f"{sorted(set(r for r, c in CERTIFICATIONS.keys() if c == cls))}.")
             return {
-                "product_class": cls,
+                "product_class": cls if cls is not None else str(raw_class),
                 "region": region,
-                "note": (f"No certification data on file for ({region}, {cls}). "
-                         f"Regions with data for this class: "
-                         f"{sorted(set(r for r, c in CERTIFICATIONS.keys() if c == cls))}."),
+                # HONEST ABSENT: null, not 0 — the bootstrap quantity materialiser
+                # (num(output, field) undefined → no mint) then leaves
+                # regulatory_cert_cost_gbp unminted instead of minting £0.
+                "status": "not_estimated_for_class",
+                "not_estimated_reason": reason,
+                "note": reason,
                 "mandatory_certifications": [],
-                "total_cost_gbp": 0,
-                "total_critical_path_months": 0,
+                "total_cost_gbp": None,
+                "total_critical_path_months": None,
+                "worked": [],
             }
     else:
         certs = CERTIFICATIONS[key]
@@ -453,14 +512,44 @@ def compute(payload: dict) -> dict:
         if c["duration_months"] > max_duration:
             max_duration = c["duration_months"]
 
-    # Volume-dependent uplift (above 10k units/yr, add 10-20% surveillance fees)
+    # Volume-dependent uplift (above 10k units/yr, add surveillance fees).
+    # NOTE fix 2026-07-03: the >50k branch was previously unreachable (an
+    # `elif` behind `> 10000`), so a 60k unit/yr programme got +15% not +25% —
+    # check the LARGER threshold first.
+    base_cost_gbp = total_cost_gbp
     surveillance_uplift_pct = 0
-    if volume > 10000:
-        surveillance_uplift_pct = 15
-        total_cost_gbp = total_cost_gbp * 1.15
-    elif volume > 50000:
+    if volume > 50000:
         surveillance_uplift_pct = 25
-        total_cost_gbp = total_cost_gbp * 1.25
+    elif volume > 10000:
+        surveillance_uplift_pct = 15
+    total_cost_gbp = base_cost_gbp * (1.0 + surveillance_uplift_pct / 100.0)
+
+    # ── worked[] — hand-checkable totals (inputs → formula → result) ────────────
+    # Built from the SAME live values summed above (_worked.py drift-safety
+    # contract) so the Calculations tab shows HOW total_cost_gbp / the critical
+    # path arise from the per-certification schedule, not just the outputs.
+    worked = [
+        worked_calc(
+            label="Total certification cost",
+            formula="C_total = C_certs x (1 + uplift / 100)",
+            values={"C_certs": (round(base_cost_gbp), "GBP"),
+                    "uplift": (surveillance_uplift_pct, "%")},
+            result=round(total_cost_gbp), result_unit="GBP",
+            assumptions=[
+                f"C_certs = sum of the {len(items)} mandatory certification fees for ({key_used[0]}, {key_used[1]}): "
+                + " + ".join(f"£{it['est_cost_gbp']:,}" for it in items),
+                f"USD-quoted vendor fees converted at 1 USD = {USD_GBP} GBP",
+                "volume surveillance uplift: +15% above 10k units/yr, +25% above 50k",
+            ],
+        ),
+        worked_calc(
+            label="Certification critical path",
+            formula="T_critical = max(cert durations)",
+            values={"cert durations": (" / ".join(str(it["est_duration_months"]) for it in items), "months")},
+            result=max_duration, result_unit="months",
+            assumptions=["critical path = MAX of individual standards (parallel testing assumed), not the sum"],
+        ),
+    ]
 
     return {
         "product_class": cls,
@@ -470,6 +559,7 @@ def compute(payload: dict) -> dict:
         "total_cost_gbp": round(total_cost_gbp),
         "total_critical_path_months": max_duration,
         "surveillance_uplift_pct": surveillance_uplift_pct,
+        "worked": worked,
         "notes": (
             f"Costs are USD-quoted vendor fees converted at 1 USD=0.78 GBP. "
             f"Critical path = MAX of individual standards (parallel testing assumed). "
@@ -479,7 +569,61 @@ def compute(payload: dict) -> dict:
     }
 
 
+def _selftest() -> int:
+    """proveCatch for the routed residuals (commit e74d4502e): (a) the v56d
+    adversarial input — an uncovered water-treatment class — minted a fabricated
+    regulatory_cert_cost_gbp = £0 (silently snapped to '3d_printer' by the old
+    fuzzy default, then the (EU, 3d_printer) miss returned literal 0); it MUST
+    now return an HONEST ABSENT (null + not_estimated_for_class). (b) a covered
+    class emitted NO worked[] — it must now show the hand-checkable totals."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    # (a) THE catch — the exact v56d shape: uncovered class must be honest-absent
+    for region in ("EU", "UK"):
+        out = compute({"product_class": "water_treatment", "region": region})
+        chk(f"uncovered_null_not_zero[{region}]", out["total_cost_gbp"] is None)
+        chk(f"uncovered_status[{region}]", out.get("status") == "not_estimated_for_class")
+        chk(f"uncovered_keeps_raw_class[{region}]", out["product_class"] == "water_treatment")
+    # the old fuzzy snap must be dead: no wrong-class basis ('3d_printer') anywhere
+    chk("no_wrong_class_snap", "3d_printer" not in json.dumps(compute({"product_class": "water_treatment", "region": "UK"})))
+
+    # (b) covered class: real cost + worked[] present and arithmetically sound
+    out = compute({"product_class": "bess", "region": "UK"})
+    chk("covered_cost_positive", isinstance(out["total_cost_gbp"], int) and out["total_cost_gbp"] > 0)
+    worked = out.get("worked") or []
+    chk("covered_worked_present", len(worked) == 2)
+    total_wc = worked[0]
+    chk("worked_total_matches_output", (total_wc.get("result") or {}).get("value") == out["total_cost_gbp"])
+    base = sum(it["est_cost_gbp"] for it in out["mandatory_certifications"])
+    chk("worked_base_is_cert_sum", f"{base:,}" in str(total_wc.get("substitution")) or str(base) in str(total_wc.get("substitution")).replace(",", ""))
+    chk("critical_path_is_max", (worked[1].get("result") or {}).get("value")
+        == max(it["est_duration_months"] for it in out["mandatory_certifications"]))
+
+    # explicit synonym still resolves (conservative alias, not fuzzy)
+    chk("synonym_vf", compute({"product_class": "vertical_farm", "region": "UK"})["total_cost_gbp"] > 0)
+    # GLOBAL fallback intact (haps has GLOBAL + UK entries; US falls to GLOBAL)
+    chk("global_fallback", compute({"product_class": "haps", "region": "US"})["lookup_key_used"] == ["GLOBAL", "haps"])
+
+    # volume-uplift order fix: >50k must take +25%, not the +15% elif shadow
+    hi = compute({"product_class": "bess", "region": "UK", "target_market_volume_units_per_year": 60000})
+    chk("uplift_50k_is_25pct", hi["surveillance_uplift_pct"] == 25)
+    mid = compute({"product_class": "bess", "region": "UK", "target_market_volume_units_per_year": 20000})
+    chk("uplift_10k_is_15pct", mid["surveillance_uplift_pct"] == 15)
+
+    if fails:
+        print(f"[regulatory_certification_cost] SELFTEST FAIL: {', '.join(fails)}", file=sys.stderr)
+        return 1
+    print("[regulatory_certification_cost] selftest OK (uncovered class → honest absent, never £0; covered class → 2 worked calcs; uplift order fixed)")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     t_start = time.time()
     try:
         payload = json.load(sys.stdin)

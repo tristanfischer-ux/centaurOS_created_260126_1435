@@ -117,6 +117,56 @@ export interface MassAggregatorOutput {
    *  road-transport abnormal-load limit (every skid is road-transportable).
    *  undefined when the product is containerised. */
   all_skids_road_transportable?: boolean
+  /** Hand-checkable worked calculations (inputs → formula → substitution →
+   *  result). Same record shape as python/_worked.py::worked_calc; the executor
+   *  stows output.worked in contract.worked_calculations[tool_id] and the
+   *  Calculations tab renders it. Added 2026-07-03 (routed residual, commit
+   *  e74d4502e — this tool minted total_system_mass_kg with ZERO worked calcs). */
+  worked: unknown[]
+}
+
+// ── TS mirror of python/_worked.py (worked_calc) ─────────────────────────────
+// Same drift-safety contract: the substitution string is built HERE from the
+// SAME live values the tool computed with — never re-derived elsewhere — and the
+// harness invariant UNIVERSAL.worked_calc_arithmetic_sound re-evaluates each
+// substitution against the stated result. Keep formulas in plain ASCII
+// (x for multiply) exactly like the Python helper.
+function fmtWorked(v: unknown): string {
+  if (typeof v === 'boolean') return String(v)
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const af = Math.abs(v)
+    if (af !== 0 && (af >= 1e7 || af < 1e-3)) return v.toPrecision(4).replace(/\.?0+e/, 'e')
+    const s = v.toLocaleString('en-GB', { maximumFractionDigits: 4 })
+    return s || '0'
+  }
+  return String(v)
+}
+
+export function workedCalc(
+  label: string,
+  formula: string,
+  values: Record<string, [unknown, string]>,
+  result: number,
+  resultUnit = '',
+  assumptions: string[] = [],
+): Record<string, unknown> {
+  const eq = formula.indexOf('=')
+  const lhs = (eq >= 0 ? formula.slice(0, eq) : label).trim() || label
+  const expr = (eq >= 0 ? formula.slice(eq + 1) : formula).trim()
+  // Substitute longest symbols first (P vs P_in — same rule as _worked.py).
+  let subst = expr
+  for (const sym of Object.keys(values).sort((a, b) => b.length - a.length)) {
+    subst = subst.split(sym).join(fmtWorked(values[sym][0]))
+  }
+  const resultStr = fmtWorked(result) + (resultUnit ? ` ${resultUnit}` : '')
+  return {
+    label,
+    formula,
+    substitution: `${lhs} = ${subst} = ${resultStr}`,
+    inputs: Object.entries(values).map(([symbol, [value, unit]]) => ({ symbol, value, unit })),
+    result: { value: result, unit: resultUnit },
+    assumptions: [...assumptions],
+  }
 }
 
 /** Coerce a possibly-undefined/null/NaN numeric input to a finite number (0
@@ -225,6 +275,33 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
       + extra_component_mass_kg
     )
 
+    // worked[] (2026-07-03): the hand-checkable mass roll-up, built from the SAME
+    // live buckets summed above (drift-safety contract of _worked.py). The generic
+    // component buckets are itemised in the assumptions so a reviewer can see WHAT
+    // was summed, not just that something was.
+    const genericBuckets = genericComponentBuckets(input)
+    const totalRounded = Math.round(total_system_mass_kg * 10) / 10
+    const workedTotal = workedCalc(
+      input.field_erected ? 'Site mass (informational sum of supplied buckets)' : 'Total system mass',
+      'M_total = M_cells + M_transformer + M_pcs + M_racks + M_tare + M_components',
+      {
+        M_cells: [total_cell_mass_kg, 'kg'],
+        M_transformer: [transformer_mass_kg, 'kg'],
+        M_pcs: [pcs_mass_kg_estimate, 'kg'],
+        M_racks: [rack_total_mass_kg, 'kg'],
+        M_tare: [container_tare_kg_estimate, 'kg'],
+        M_components: [extra_component_mass_kg, 'kg'],
+      },
+      totalRounded, 'kg',
+      [
+        `M_racks = rack_count x rack mass each = ${num(input.rack_count)} x ${num(input.rack_mass_kg_each_estimate)} kg`,
+        genericBuckets.length > 0
+          ? `M_components = ${genericBuckets.map((b) => `${b.label} ${fmtWorked(Math.round(b.kg * 10) / 10)} kg`).join(' + ')}`
+          : 'M_components = 0 (no generic component-mass inputs wired)',
+        'unsupplied buckets default to 0 (non-BESS classes omit the cell/rack/PCS fields)',
+      ],
+    )
+
     // FIELD-ERECTED PLANT (2026-06-05): a fixed installation, not a containerised
     // product. There is NO plant-wide gross-mass cap to breach — report the total
     // as informational SITE MASS, set the container count to null, skip the
@@ -274,6 +351,7 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
         per_container_mass_kg: 0,
         site_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
         all_skids_road_transportable,
+        worked: [workedTotal],
       }
       return {
         ok: true,
@@ -323,6 +401,37 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
       warnings.push(`Mass budget tight: ${mass_budget_utilisation_pct.toFixed(1)}% utilised. Consider splitting into 2 containers for transport-stress and balance.`)
     }
 
+    // worked[] for the containerised path — chained off the rounded total (the
+    // same chained-rounding idiom as electrical_transformer_sizing.py) so every
+    // substitution re-evaluates to its stated result.
+    const utilRounded = Math.round(mass_budget_utilisation_pct * 10) / 10
+    const breachRounded = Math.round(mass_budget_breach_kg * 10) / 10
+    const worked: unknown[] = [
+      workedTotal,
+      workedCalc(
+        'Mass budget utilisation',
+        'U = M_total / M_envelope x 100',
+        { M_total: [totalRounded, 'kg'], M_envelope: [input.max_mass_kg_envelope, 'kg'] },
+        utilRounded, '%',
+        ['brief mass envelope from max_mass_kg_envelope'],
+      ),
+      workedCalc(
+        'Mass budget breach (positive = over the envelope)',
+        'B = M_total - M_envelope',
+        { M_total: [totalRounded, 'kg'], M_envelope: [input.max_mass_kg_envelope, 'kg'] },
+        breachRounded, 'kg',
+      ),
+      workedCalc(
+        'Recommended container count',
+        'N = ceil(M_total / M_envelope)',
+        { M_total: [totalRounded, 'kg'], M_envelope: [input.max_mass_kg_envelope, 'kg'] },
+        recommended_container_count, '',
+        contract_container_count !== null
+          ? [`engineering contract authoritatively chose ${contract_container_count} container(s) — overrides the heuristic ceil (${heuristic_container_count})`]
+          : ['round up: any breach forces an additional road-transportable container'],
+      ),
+    ]
+
     const out: MassAggregatorOutput = {
       total_system_mass_kg: Math.round(total_system_mass_kg * 10) / 10,
       cell_mass_kg: Math.round(total_cell_mass_kg * 10) / 10,
@@ -330,10 +439,11 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
       pcs_mass_kg: Math.round(pcs_mass_kg_estimate * 10) / 10,
       rack_total_mass_kg: Math.round(rack_total_mass_kg * 10) / 10,
       container_tare_kg: Math.round(container_tare_kg_estimate * 10) / 10,
-      mass_budget_breach_kg: Math.round(mass_budget_breach_kg * 10) / 10,
-      mass_budget_utilisation_pct: Math.round(mass_budget_utilisation_pct * 10) / 10,
+      mass_budget_breach_kg: breachRounded,
+      mass_budget_utilisation_pct: utilRounded,
       recommended_container_count,
       per_container_mass_kg: Math.round(per_container_mass_kg * 10) / 10,
+      worked,
     }
     return {
       ok: true,

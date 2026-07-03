@@ -45,7 +45,7 @@ import { computeRenderQuality, resolveBlenderTemplate } from '../src/lib/pdf-eng
 import { formFactorForClass, isFieldErectedForClass } from './lib/orchestrator/envelope'
 import { computeNetInfeasibilityFlag } from './lib/brief-infeasibility-net'
 import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constraint-normaliser'
-import { massAggregator } from './lib/orchestrator/tools/mass-aggregator'
+import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
@@ -107,7 +107,7 @@ import { gatherModuleOpenItems, questionHasProcurementLeak } from '../src/lib/pd
 import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { scanEmitterForBriefLiterals, scanContractForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily, extractOccurrences as gate18ExtractOccurrences, cluster as gate18Cluster, buildFindings as gate18BuildFindings, currentCalcSignatureOf, constraintRoleOf } from './lib/cross-page-numeric-consistency-audit'
-import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, isNodeAbiMismatchError, describeNodeAbiMismatch, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, type CorpusPriceRow } from './estimate-missing-prices'
 import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
 import { keywordCeilingGbp, PRICE_CEILING_BY_COMPONENT_CLASS, isConsumable, classCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
@@ -8992,6 +8992,124 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         () => `${mispins.length} mis-pin(s): ${mispins.join(' | ')}. The matcher loosened and now binds a wrong-type part — revert; the under-pricing fix is ingesting prices for bioprocess instruments, not relaxing acceptance.`,
       ))
     }
+  }
+
+  // ── UNIVERSAL.db_first_lookup_order_reaches_new_rows (2026-07-03) ─────────
+  // proveCatch for the dbFirstLookup ORDER fix (routed residual, commit
+  // e74d4502e): the per-token SELECT runs LIMIT 60, and with NO ORDER BY SQLite
+  // returns rowid (insertion) order — on a common token ('drive' = 778 live
+  // rows) the window was locked to the OLDEST rows, so a newly-ingested,
+  // high-confidence, exactly-matching part was permanently UNREACHABLE (the
+  // growing-DB loop wrote rows the read side could never serve). ADVERSARIAL
+  // INPUT: an in-memory DB with 70 stale low-confidence 'drive' rows inserted
+  // BEFORE one fresh high-confidence "Servo Drive Controller" — under the old
+  // rowid order the new row sits outside the 60-row window and the lookup
+  // returns null; under ORDER BY IFNULL(confidence,0) DESC, id DESC it MUST be
+  // served. Also guards the IFNULL choice: a NULL-confidence legacy row stays
+  // reachable on a sparse token (ranked last, never filtered out).
+  {
+    let hitPn = ''
+    let nullConfPn = ''
+    let err = ''
+    try {
+      const mem = new Database(':memory:')
+      mem.exec(`CREATE TABLE pretraining_extracted_parts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, document_id INTEGER, part_name TEXT,
+        manufacturer TEXT, part_number TEXT, quantity REAL, unit_price_gbp REAL,
+        module_assignment TEXT, sub_module_assignment TEXT, source_page INTEGER,
+        raw_excerpt TEXT, confidence REAL, embedding BLOB, embed_hash TEXT,
+        component_class TEXT, source_doc_id TEXT, discovered_at TEXT, discovery_source TEXT)`)
+      const ins = mem.prepare(
+        'INSERT INTO pretraining_extracted_parts (part_name, manufacturer, part_number, component_class, unit_price_gbp, confidence) VALUES (?,?,?,?,?,?)',
+      )
+      // 70 stale low-confidence rows on the common token — they fill a rowid-ordered LIMIT 60 window.
+      for (let i = 0; i < 70; i++) ins.run(`Legacy Drive Unit ${i}`, 'OldCo', `OLD-${1000 + i}`, 'motor_actuator', 12, 0.3)
+      // THE new verified ingest row (row 71 — outside any rowid-ordered 60-row window on 'drive').
+      ins.run('Servo Drive Controller', 'Siemens', 'SINAMICS-V90', 'motor_actuator', 385, 0.95)
+      // A NULL-confidence legacy row on a SPARSE token — must remain reachable.
+      ins.run('Peristaltic Dosing Micropump Head', 'Watson-Marlow', 'WM-114DV', 'pump', 96, null)
+      const hit = dbFirstLookup(mem, ['servo', 'drive', 'controller'], 'drive')
+      hitPn = String(hit?.part_number ?? '(null — new row unreachable)')
+      const sparse = dbFirstLookup(mem, ['peristaltic', 'dosing', 'micropump'], 'micropump')
+      nullConfPn = String(sparse?.part_number ?? '(null — NULL-confidence row filtered)')
+      mem.close()
+    } catch (e) {
+      err = String(e).slice(0, 160)
+    }
+    const ok = hitPn === 'SINAMICS-V90' && nullConfPn === 'WM-114DV' && !err
+    assertions.push(assertEq(
+      'UNIVERSAL.db_first_lookup_order_reaches_new_rows',
+      'dbFirstLookup per-token window is deterministic (ORDER BY IFNULL(confidence,0) DESC, id DESC): a newly-ingested high-confidence row on a common token (row 71 of 71 "drive" rows, LIMIT 60) IS reachable — the pre-fix rowid order hid every new ingest behind the oldest 60 rows; and a NULL-confidence legacy row stays reachable on a sparse token (IFNULL ranks it last, never filters it).',
+      ok,
+      (v: boolean) => v === true,
+      () => `new-row hit=${hitPn}, null-confidence hit=${nullConfPn}${err ? `, error=${err}` : ''} — the ORDER BY regressed (new verified ingest is invisible to the read side again).`,
+    ))
+  }
+
+  // ── UNIVERSAL.node_abi_mismatch_guard_is_loud (2026-07-03) ────────────────
+  // proveCatch for the openLibraryDb Node guard (routed residual, commit
+  // e74d4502e): under wrong-ABI Node the better-sqlite3 dlopen failure was
+  // silently swallowed → NULL DB, 0 DB-first fills, NO error anywhere. The
+  // guard must (a) RECOGNISE the dlopen/ABI failure family, (b) NOT misfire on
+  // an ordinary DB error, and (c) produce an operator message that names the
+  // running Node version and the 'run under Node 22' fix. Pure classifier test
+  // — simulates the dlopen failure path without needing a wrong-ABI Node.
+  {
+    const dlopenErr = Object.assign(
+      new Error("The module '/repo/node_modules/better-sqlite3/build/Release/better_sqlite3.node' was compiled against a different Node.js version using NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 137."),
+      { code: 'ERR_DLOPEN_FAILED' },
+    )
+    const bareCode = Object.assign(new Error('dlopen failed'), { code: 'ERR_DLOPEN_FAILED' })
+    const selfRegister = new Error('Module did not self-register: better_sqlite3.node')
+    const ordinary = new Error('database disk image is malformed')
+    const fires = isNodeAbiMismatchError(dlopenErr) && isNodeAbiMismatchError(bareCode) && isNodeAbiMismatchError(selfRegister)
+    const quiet = !isNodeAbiMismatchError(ordinary) && !isNodeAbiMismatchError(null)
+    const msg = describeNodeAbiMismatch(dlopenErr, 'v25.8.0')
+    const loud = msg.includes('v25.8.0') && /Node 22/.test(msg) && /better-sqlite3/.test(msg) && /ABI/i.test(msg)
+    const ok = fires && quiet && loud
+    assertions.push(assertEq(
+      'UNIVERSAL.node_abi_mismatch_guard_is_loud',
+      'openLibraryDb ABI guard: the better-sqlite3 dlopen/NODE_MODULE_VERSION/did-not-self-register failure family is RECOGNISED (fires), an ordinary DB error is not misclassified (quiet), and the stderr message names the running Node version + better-sqlite3 + the "run under Node 22" fix (loud) — kills the silent NULL-DB/0-fills failure.',
+      ok,
+      (v: boolean) => v === true,
+      () => `fires=${fires} quiet=${quiet} loud=${loud} msg="${msg.slice(0, 160)}"`,
+    ))
+  }
+
+  // ── UNIVERSAL.mass_aggregator_emits_worked (2026-07-03) ───────────────────
+  // proveCatch for the mass-aggregator worked[] emission (routed residual,
+  // commit e74d4502e): the tool minted total_system_mass_kg (v56d: 902.2 kg)
+  // with ZERO worked calculations, so the Calculations tab capped at 7 tools.
+  // (a) the exported workedCalc helper (TS mirror of python/_worked.py) builds
+  // a substitution whose arithmetic re-evaluates to the stated result, and
+  // (b) BOTH invoke() return paths (containerised + field-erected) wire a
+  // `worked` array into the output the executor stows (source-scan — the
+  // invoke path is async and checkSnapshot is sync, same convention as
+  // supplier_write_paths_embed_on_write).
+  {
+    const wc = workedCalcTs(
+      'Total system mass',
+      'M_total = M_cells + M_transformer + M_pcs + M_racks + M_tare + M_components',
+      {
+        M_cells: [26500, 'kg'], M_transformer: [3000, 'kg'], M_pcs: [1800, 'kg'],
+        M_racks: [2100, 'kg'], M_tare: [4000, 'kg'], M_components: [0, 'kg'],
+      },
+      37400, 'kg',
+    ) as { substitution?: string; result?: { value?: number } }
+    const subst = String(wc.substitution ?? '')
+    const sumOk = subst.replace(/,/g, '').includes('26500 + 3000 + 1800 + 2100 + 4000 + 0') && wc.result?.value === 37400
+    let srcOk = false
+    try {
+      const src = readFileSync(resolve(__dirname, 'lib', 'orchestrator', 'tools', 'mass-aggregator.ts'), 'utf-8')
+      srcOk = /worked:\s*\[workedTotal\]/.test(src) && /^\s*worked,\s*$/m.test(src) && /worked:\s*unknown\[\]/.test(src)
+    } catch { srcOk = false }
+    assertions.push(assertEq(
+      'UNIVERSAL.mass_aggregator_emits_worked',
+      'mass-aggregator:envelope-check emits hand-checkable worked[] on BOTH return paths (containerised + field-erected), and the TS workedCalc helper (mirror of python/_worked.py) builds an arithmetically-sound substitution — the v56d run minted total_system_mass_kg=902.2 with zero worked calcs, capping the Calculations tab at 7 tools.',
+      sumOk && srcOk,
+      (v: boolean) => v === true,
+      () => `helperArithmetic=${sumOk} (subst="${subst.slice(0, 120)}") bothPathsWired=${srcOk} — a return path dropped its worked[] or the helper's substitution no longer adds up.`,
+    ))
   }
 
   // ── UNIVERSAL.supplier_write_paths_embed_on_write (2026-06-04) ────────────
