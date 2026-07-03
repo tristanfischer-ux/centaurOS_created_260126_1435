@@ -1,0 +1,33 @@
+{
+  "_what": "DECISIONS REGISTER for briefs-loop/fischer_farms_codema.md — recorded client-facing scope decisions the Brief-tab 'Client offer vs this design' reconciliation renders inline. INPUT, not code: a diverging section covered by an entry reads CONSISTENT-WITH-DECISION (who/date/rationale shown); a diverging section with NO entry still FAILS; an entry whose section no longer diverges renders as a note only. The exporter finds this file by matching the run's verbatim 0-original-brief.md back to its source brief (build-excel-export.py::_load_brief_decisions).",
+  "brief": "fischer_farms_codema.md",
+  "decisions": [
+    {
+      "section": "A",
+      "scope": "Water purification",
+      "decision": "The engine's fuller purification design stands versus the leaner client offer — accepted scope, not a defect to tune away.",
+      "rationale": "The engine includes an ultrafiltration membrane bank, ultraviolet disinfection and duplicated granular-activated-carbon/softener treatment trains that the client's offer never priced; the whole-plant total remains ~1.1x the client's GBP 1,250,000 offer.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-03",
+      "evidence": "engine installed-equivalent ~2.3x the client section (v61: GBP 198,958 vs GBP 85,000); whole-plant total 1.11x"
+    },
+    {
+      "section": "B",
+      "scope": "Water storage",
+      "decision": "The engine's fuller tank scope stands versus the leaner client offer — accepted scope, not a defect to tune away.",
+      "rationale": "The engine prices fuller installed tank scope (~GBP 23k per installed 40 m3 galvanised tank vs the client's ~GBP 10k) plus level instrumentation the client's offer never priced; the whole-plant total remains ~1.1x the client's GBP 1,250,000 offer.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-03",
+      "evidence": "engine installed-equivalent ~2.4x the client section (v61: GBP 74,465 vs GBP 31,000); whole-plant total 1.11x"
+    },
+    {
+      "section": "F",
+      "scope": "Process-control computer",
+      "decision": "The engine's fuller controls-and-instrumentation design stands versus the leaner client offer — accepted scope, not a defect to tune away.",
+      "rationale": "The engine includes a SCADA/process-control system plus plant-wide field instrumentation (17 banded level transmitters and the electrical/control cabling) that the client's single process-control-computer line never priced; the whole-plant total remains ~1.1x the client's GBP 1,250,000 offer.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-03",
+      "evidence": "engine installed-equivalent ~1.8x the client section (v61: GBP 234,124 vs GBP 128,000); whole-plant total 1.11x"
+    }
+  ]
+}

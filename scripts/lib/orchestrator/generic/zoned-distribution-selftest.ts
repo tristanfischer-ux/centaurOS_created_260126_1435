@@ -39,6 +39,8 @@ function waterQuantities(): Record<string, number> {
     // drain/return signal (activates the drain mirror)
     drain_water_tank_volume_each_m3: 40,
     drain_water_tank_count: 2,
+    // hand-watering signal (rule 8b — the brief-stated 25 m³/h @ 3 bar manual duty)
+    hand_watering_pump_throughput_m3_h: 25,
   }
 }
 
@@ -79,6 +81,16 @@ function run(): void {
   expectEq('drain outlet connections', q.distribution_drain_outlet_connections, 3000)
   expectEq('manifold count (delivery groups)', q.distribution_manifold_count, 2)
   expectEq('manifold duty (90 ÷ 2 groups)', q.distribution_manifold_throughput_m3_h, 45)
+  // rule 8b — HAND-WATERING RING MAIN from the brief's own signals (Tristan 2026-07-03,
+  // client section E): the SAME zoning geometry reproduces the brief's stated numbers —
+  // 44 risers ("two per tunnel plus four at the irrigation room") and DN90 at 25 m³/h.
+  expectEq('hand-watering ring main (2 groups × 2 legs × the 107 m delivery spine)', q.hand_watering_ring_main_length_m, 428)
+  expectEq('hand-watering ring DN (25 m³/h ≤ 1.3 m/s → DN90, the brief-stated DN)', q.hand_watering_ring_main_dn_mm, 90)
+  expectEq('hand-watering risers (2/branch × 20 branches + 2/group at the plant room = the brief-stated 44)', q.hand_watering_riser_count, 44)
+  // conserved arithmetic: the ring is EXACTLY the out-and-return mirror of the delivery
+  // spine (2 × mains), and the riser count is EXACTLY the branch/group split — no slack.
+  expectEq('ring length conservation (ring == 2 × delivery mains)', q.hand_watering_ring_main_length_m, 2 * q.distribution_main_length_m)
+  expectEq('riser count conservation (2×20 + 2×2)', q.hand_watering_riser_count, 2 * 20 + 2 * 2)
   // provenance: 'parametric — not routed' + the derivation formula on the contract quantity
   const cq = (contract as unknown as { quantities: Record<string, { source_detail?: string; source?: string }> }).quantities
   const lat = cq.distribution_zone_lateral_length_m
@@ -92,8 +104,8 @@ function run(): void {
   // ── 2. IDEMPOTENT + DETERMINISTIC: a second pass over its own mints is a no-op ──
   const snap = JSON.stringify(q)
   const mints2 = mintDemandCoverage(q, contract, { modules: [{ sub_modules: [{ words: [] }] }] as never, briefMetrics })
-  if (mints2.some((m) => m.key.startsWith('distribution_'))) {
-    throw new Error('zoned-distribution: rule 8 re-minted on a second pass (must be idempotent)')
+  if (mints2.some((m) => m.key.startsWith('distribution_') || m.key.startsWith('hand_watering_'))) {
+    throw new Error('zoned-distribution: rule 8/8b re-minted on a second pass (must be idempotent)')
   }
   if (JSON.stringify(q) !== snap) throw new Error('zoned-distribution: a second pass changed the quantity map')
 
@@ -110,6 +122,26 @@ function run(): void {
   mintDemandCoverage(noFlow, freshContract(noFlow), { modules: [], briefMetrics: [] })
   if (Object.keys(noFlow).some((k) => k.startsWith('distribution_'))) {
     throw new Error('zoned-distribution: no delivered-flow basis must mean NO network mint (never fabricate)')
+  }
+  // rule 8b no-fabricate both ways: a hand-watering flow WITHOUT zoned geometry mints
+  // nothing (no spine to ring around), and a zoned plant WITHOUT a hand-watering flow
+  // (SAF-like: zoning but no manual duty) gains no hand_watering_* key.
+  const hwOnly: Record<string, number> = { hand_watering_pump_throughput_m3_h: 25 }
+  mintDemandCoverage(hwOnly, freshContract(hwOnly), { modules: [], briefMetrics: [] })
+  if (Object.keys(hwOnly).some((k) => k.startsWith('hand_watering_ring') || k.startsWith('hand_watering_riser'))) {
+    throw new Error('zoned-distribution: a hand-watering flow with NO zoned geometry must mint nothing (never fabricate)')
+  }
+  const noHw = waterQuantities()
+  delete noHw.hand_watering_pump_throughput_m3_h
+  mintDemandCoverage(noHw, freshContract(noHw), { modules: [{ sub_modules: [{ words: [] }] }] as never, briefMetrics })
+  if (Object.keys(noHw).some((k) => k.startsWith('hand_watering_'))) {
+    throw new Error('zoned-distribution: a zoned plant with NO hand-watering flow must gain no hand_watering_* key')
+  }
+  // provenance + formula on the ring-main quantity itself
+  const hwq = cq.hand_watering_ring_main_length_m
+  if (!hwq || !/parametric — not routed/.test(String(hwq.source_detail))
+    || !/2 legs \(ring out-and-return along the 107 m delivery spine/.test(String(hwq.source_detail))) {
+    throw new Error(`zoned-distribution: the hand-watering ring main must carry 'parametric — not routed' provenance + its derivation formula (got ${JSON.stringify(hwq)})`)
   }
 
   // ── 4. the MANIFOLD principal synthesises via the normal group path, and a 1-stem
@@ -146,7 +178,7 @@ function run(): void {
   }
 
   // eslint-disable-next-line no-console
-  console.log('zoned-distribution --selftest OK (water-brief signals mint the 14,844 m parametric network — laterals 8,280 m DN75, mains/risers DN125, drain mirror DN110/DN160, 200 zone kits, 6,000 inlets — with formula provenance; idempotent; BESS-like map byte-identical; no-flow-basis never fabricates; manifold ×2 synthesised and shielded from 1-stem fuzzy matches)')
+  console.log('zoned-distribution --selftest OK (water-brief signals mint the 14,844 m parametric network — laterals 8,280 m DN75, mains/risers DN125, drain mirror DN110/DN160, 200 zone kits, 6,000 inlets — with formula provenance; rule 8b hand-watering ring 428 m DN90 + the brief-stated 44 risers, conserved vs the spine, no-op without either signal; idempotent; BESS-like map byte-identical; no-flow-basis never fabricates; manifold ×2 synthesised and shielded from 1-stem fuzzy matches)')
 }
 
 run()

@@ -1734,6 +1734,46 @@ export function mintDemandCoverage(
           `${prov}: one distribution manifold station (delivery header, isolation + non-return valves, drain tie-in) per delivery group = ${groups}`)
         mint('distribution_manifold_throughput_m3_h', groupFlow, 'm3/h', 'flow_rate', zoneValveKey,
           `${prov}: each distribution manifold passes its group's ${groupFlow} m³/h delivery duty (${flowBasis})`)
+        // ── rule 8b: HAND-WATERING RING MAIN (parametric — Tristan 2026-07-03, the
+        // fischer-codema client section E £24k vs a pump-only £4k model, 0.18×). A zoned
+        // facility that ALSO states a hand-watering duty (the brief: "a DN90 … hand-watering
+        // ring main to both departments with 44 risers (two per tunnel plus four at the
+        // irrigation room), each with a hand valve and a quick connector") carries a manual
+        // tap RING around the same delivery grid — never per-pipe routed, exactly like the
+        // zoned network above. KEYED ON THE BRIEF'S OWN SIGNALS ONLY: a `hand_watering*`
+        // flow quantity (the pump duty the water builder parses from the brief) PLUS the
+        // zoned-delivery geometry already established in this scope — no hand-watering flow
+        // (BESS / SAF / CO₂) or no zoning → strict no-op (never fabricate). The SAME zoning
+        // geometry reproduces the brief's stated numbers: risers = risers-per-branch ×
+        // branches + 2 per delivery group at the plant/irrigation room (v61: 2 × 20 + 4 =
+        // the brief's stated 44); ring = out-and-return legs along each group's delivery
+        // spine; DN from d = √(4Q/πv) at ≤ 1.3 m/s (25 m³/h → DN90, the brief's stated DN).
+        // PRICING HOOK (routed, not edited here): requirements_bom.py's
+        // _DISTRIBUTION_SEGMENTS / station-allowance families do not yet read
+        // `hand_watering_*` keys — adding the two segment entries + a tap-station allowance
+        // there (file owned elsewhere) turns these quantities into priced BoM lines; until
+        // then they carry the full derivation and the Brief reconciliation stays honestly
+        // short on the hand-watering section.
+        let hwKey = ''
+        let hwFlow = 0
+        for (const k of r8Keys) {
+          if (!/^hand_?watering/.test(k)) continue
+          if (!/_(m3_h|m3_hr|m3_per_hr)$/.test(k) || SERVICE_LINE_FLOW_KEY_RE.test(k)) continue
+          if (FLOW_ECHO_TOKEN_RE.test(k) || /(^|_)(calc|computed)_/i.test(k)) continue
+          const v = quantities[k]
+          if (Number.isFinite(v) && v > 0 && v > hwFlow) { hwFlow = v; hwKey = k }
+        }
+        if (hwFlow > 0 && !Object.prototype.hasOwnProperty.call(quantities, 'hand_watering_ring_main_length_m')) {
+          const hwRingM = Math.round(groups * 2 * spineM)
+          const hwDn = dnFor(hwFlow, 1.3)
+          const hwRisers = Math.round(risersPerBranch * branches + 2 * groups)
+          mint('hand_watering_ring_main_length_m', hwRingM, 'm', 'length', hwKey,
+            `${prov}: hand-watering ring main = ${groups} delivery group(s)/department(s) × 2 legs (ring out-and-return along the ${spineM} m delivery spine, serving every branch head) = ${hwRingM} m · ${geomBasis}`)
+          mint('hand_watering_ring_main_dn_mm', hwDn, 'mm', 'dimension', hwKey,
+            `${prov}: DN${hwDn} from d = √(4·Q/π·v) at the ${hwFlow} m³/h hand-watering duty (${hwKey}) ≤ 1.3 m/s ring velocity — see hand_watering_ring_main_length_m for the run derivation`)
+          mint('hand_watering_riser_count', hwRisers, '', 'count', hwKey,
+            `${prov}: hand-watering tap risers (each a hand valve + quick connector) = ${risersPerBranch} per branch × ${branches} branches + 2 per delivery group at the plant/irrigation room (${2 * groups}) = ${hwRisers}`)
+        }
       }
     }
   }

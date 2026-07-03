@@ -2103,7 +2103,68 @@ def _parse_client_offer_sections(orig: str) -> Optional[dict]:
             "client_total_gbp": float(tm.group(1).replace(",", "")) if tm else None}
 
 
-def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
+# ── DECISIONS REGISTER (Tristan 2026-07-03: "I'm happy for it to be a fuller design") ──
+# A recorded client-facing SCOPE DECISION lives NEXT TO ITS BRIEF as
+# briefs-loop/<brief>.decisions.json — an authored INPUT, never a score tweak in code.
+# The register is found by matching the run's verbatim 0-original-brief.md back to its
+# source brief file (the run state carries no brief path), so a register only ever
+# attaches to ITS OWN brief; every other brief (BESS / SAF / …) finds no register and
+# its reconciliation is byte-identical. Semantics (proveCatch'd both directions in the
+# selftest): a DIVERGING section covered by a decision reads CONSISTENT-WITH-DECISION
+# and renders who/date/rationale + the real numbers, visibly distinct from a plain
+# 'consistent'; a diverging section with NO decision still FAILS; a decision whose
+# section no longer diverges renders as a note only — it never inflates anything.
+_BRIEFS_DIR_NAMES = ("briefs-loop", "briefs-holdout", "briefs-rerun")
+_DECISION_REQUIRED_FIELDS = ("section", "decision", "rationale", "decided_by", "date")
+
+
+def _load_brief_decisions(orig: str, briefs_dirs: Optional[List[str]] = None) -> Optional[dict]:
+    """Locate + validate the decisions register for THIS run's brief. Returns
+    {"path": <register path>, "by_key": {<SECTION KEY>: entry}} or None when no
+    register belongs to this brief. A malformed register or an entry missing a
+    required field RAISES — an authored decision silently dropped would silently
+    un-cover a reconciliation row, which is exactly the dishonesty this register
+    exists to prevent."""
+    text = " ".join((orig or "").split())
+    if not text:
+        return None
+    if briefs_dirs is None:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        briefs_dirs = [os.path.join(root, d) for d in _BRIEFS_DIR_NAMES]
+    for bdir in briefs_dirs:
+        if not os.path.isdir(bdir):
+            continue
+        for fn in sorted(os.listdir(bdir)):
+            if not fn.endswith(".decisions.json"):
+                continue
+            md = os.path.join(bdir, fn[: -len(".decisions.json")] + ".md")
+            if not os.path.exists(md):
+                continue
+            try:
+                brief_txt = " ".join(open(md, "r").read().split())
+            except Exception:  # noqa: BLE001
+                continue
+            if brief_txt != text:
+                continue  # a register never attaches to a foreign brief
+            reg_path = os.path.join(bdir, fn)
+            reg = json.loads(open(reg_path, "r").read())  # malformed JSON → loud
+            by_key: Dict[str, dict] = {}
+            for ent in reg.get("decisions") or []:
+                missing = [f for f in _DECISION_REQUIRED_FIELDS
+                           if not str((ent or {}).get(f) or "").strip()]
+                if missing:
+                    raise ValueError(
+                        f"decisions register {reg_path}: entry "
+                        f"{(ent or {}).get('section')!r} is missing required field(s) "
+                        f"{missing} — fix the register; an incomplete decision is "
+                        f"never silently dropped")
+                by_key[str(ent["section"]).strip().upper()] = ent
+            return {"path": reg_path, "by_key": by_key} if by_key else None
+    return None
+
+
+def _client_offer_reconciliation(state: dict, orig: str,
+                                 decisions: Optional[dict] = None) -> Optional[dict]:
     """Client offer vs this design, by subsystem — the deterministic reconciliation the
     Brief tab renders + the holds register reads. Each BoM line (principal rows only) is
     classed to a client section by its SERVICE/SCOPE family (see _SECTION_FAMILY_STEMS:
@@ -2112,8 +2173,11 @@ def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
     match). Every section row carries its mapping rule — WHICH line families it counted.
     Engine installed-equivalent = section BoM materials × the run's installed÷materials
     ratio (client section prices are INSTALLED). Conservation is asserted: Σ sections +
-    unallocated == Σ BoM lines EXACTLY (no line double-counted or dropped). Returns None
-    when the brief has no section costs."""
+    unallocated == Σ BoM lines EXACTLY (no line double-counted or dropped). `decisions`
+    (from _load_brief_decisions) overlays recorded scope decisions: a diverging section
+    with a decision reads consistent_with_decision (who/date/rationale + real numbers);
+    without one it still fails; on a non-diverging section the decision is a note only.
+    Returns None when the brief has no section costs."""
     parsed = _parse_client_offer_sections(orig)
     if not parsed:
         return None
@@ -2216,16 +2280,42 @@ def _client_offer_reconciliation(state: dict, orig: str) -> Optional[dict]:
                 note = (f"engine installed-equivalent within "
                         f"{abs(delta) / client:.0%} of the client section"
                         if client > 0 else "no client £ to compare")
+        # ── decisions-register overlay (Tristan 2026-07-03) — status semantics above ──
+        dec = ((decisions or {}).get("by_key") or {}).get(
+            str(sec["key"]).strip().upper())
+        if dec is not None:
+            who = f"{dec['decided_by']}, {dec['date']}"
+            if status in ("above", "partial", "out_of_scope"):
+                real = (f"engine {inst_eq / client:.1f}× the client section "
+                        f"(installed-equiv £{inst_eq:,.0f} vs client £{client:,.0f})"
+                        if (client > 0 and eng > 0) else
+                        f"client £{client:,.0f}; engine models £{eng:,.0f} of materials")
+                status = "consistent_with_decision"
+                note = (f"CONSISTENT WITH RECORDED DECISION — {real}. "
+                        f"{dec['decision']} — {who}. Rationale: {dec['rationale']}"
+                        + (f" [evidence: {dec['evidence']}]"
+                           if str(dec.get("evidence") or "").strip() else ""))
+            else:
+                # the section no longer diverges: the decision renders as a NOTE only —
+                # it never upgrades a status or inflates a score.
+                note += (f"  ·  a recorded decision covers this section but it no "
+                         f"longer diverges, so the decision is shown as a note only "
+                         f"({who}: {dec['decision']})")
         out_secs.append({**sec, "engine_bom_gbp": round(eng),
                          "engine_installed_gbp": round(inst_eq),
                          "delta_gbp": (round(delta) if delta is not None else None),
                          "status": status, "note": note,
+                         "decision": dec,
                          "mapping_rule": _fmt_rules(rules[si])})
+    reg_path = str((decisions or {}).get("path") or "")
     return {"sections": out_secs, "client_total_gbp": parsed["client_total_gbp"],
             "engine_bom_total_gbp": round(line_sum),
             "engine_installed_total_gbp": round(installed or raw_total * ratio),
             "unmapped_bom_gbp": round(unmapped),
             "unmapped_rule": _fmt_rules(unmapped_rules),
+            "decisions_register": (os.path.join(os.path.basename(os.path.dirname(reg_path)),
+                                                os.path.basename(reg_path))
+                                   if reg_path else None),
             "install_ratio": round(ratio, 3)}
 
 
@@ -2248,11 +2338,16 @@ def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
         f"bill total EXACTLY (asserted at build). The client's section prices are "
         f"INSTALLED, so the comparison column is the engine installed-equivalent = "
         f"section BoM materials × {recon['install_ratio']:g} (this run's installed ÷ "
-        f"materials ratio from the cost stack).")
+        f"materials ratio from the cost stack)."
+        + (f" Recorded scope decisions ({recon['decisions_register']}) render inline: "
+           f"a diverging section covered by a decision reads CONSISTENT WITH RECORDED "
+           f"DECISION (who/date/rationale + the real numbers); a diverging section "
+           f"with NO recorded decision still fails."
+           if recon.get("decisions_register") else ""))
     note.font = Font(italic=True, size=9, color="555555")
     note.alignment = WRAP_TOP
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.row_dimensions[r].height = 84
+    ws.row_dimensions[r].height = 108 if recon.get("decisions_register") else 84
     r += 1
     header(ws, r, ["Client section", "", "Client offer £ (installed)",
                    "This design £ (BoM materials)", "Installed-equivalent £",
@@ -2277,6 +2372,10 @@ def _render_client_offer_recon(ws: Worksheet, recon: dict, r: int) -> int:
         nc.alignment = WRAP_TOP
         if sec["status"] in ("out_of_scope", "partial"):
             nc.font = Font(size=9, bold=True, color="9C2B2E")
+        elif sec["status"] == "consistent_with_decision":
+            # visibly distinct from a plain 'consistent': bold dark blue, and the note
+            # itself opens with CONSISTENT WITH RECORDED DECISION + who/date/rationale.
+            nc.font = Font(size=9, bold=True, color="1F4E79")
         ws.row_dimensions[r].height = 14.5 * min(7, max(1, -(-len(_note_txt) // 58)))
         r += 1
     # unmapped engine lines — honesty row so the section columns reconcile to the bill
@@ -2425,7 +2524,7 @@ def tab_brief(wb: Workbook, state: dict, run_dir: str) -> None:
             _value(str(notes))
 
     # ── Client offer vs this design, by subsystem (fix 1, reviewers 2026-07-02) ──
-    recon = _client_offer_reconciliation(state, orig)
+    recon = _client_offer_reconciliation(state, orig, _load_brief_decisions(orig))
     if recon:
         state["_clientOfferRecon"] = recon      # the holds register reads this
         _render_client_offer_recon(ws, recon, max(left_r, right_r) + 2)
@@ -13153,15 +13252,21 @@ def _sc_brief(wb, ws, state, run_dir):
     secs = ((state.get("_clientOfferRecon") or {}).get("sections") or [])
     rows = _fam_rows(wb, ws.title, "recon")
     if secs or rows:
-        cons = sum(1 for s in secs if s.get("status") == "consistent")
-        comps.append(("client-offer reconciliation sections consistent", cons, len(secs)))
+        # a decision-covered row PASSES (consistent_with_decision — the recorded scope
+        # decision renders inline on the Brief tab); a diverging row with NO recorded
+        # decision still fails the tab.
+        _PASSING = ("consistent", "consistent_with_decision")
+        cons = sum(1 for s in secs if s.get("status") in _PASSING)
+        comps.append(("client-offer reconciliation sections consistent "
+                      "(incl. decision-covered)", cons, len(secs)))
         keys = {str(s.get("key") or "").strip().upper() for s in secs}
         sec_rows = [1 for _r, d in rows
                     if _cell_txt(d.get("client section")).split(".")[0].strip().upper() in keys]
         comps.append(("every live section rendered as a reconciliation row",
                       1 if len(sec_rows) == len(secs) else 0, 1))
         if cons < len(secs):
-            others = sorted({str(s.get("status")) for s in secs if s.get("status") != "consistent"})
+            others = sorted({str(s.get("status")) for s in secs
+                             if s.get("status") not in _PASSING})
             iss.append(f"{len(secs) - cons} client-offer section(s) not consistent "
                        f"({', '.join(others)}) — mirrored as HOLDS")
     return {"components": comps, "issues": iss,
@@ -15523,6 +15628,128 @@ def _selftest() -> int:
             print(f"  FAIL client-recon-alloc: every section row must STATE the line "
                   f"families it counted (got F={_by['F'].get('mapping_rule')!r}, "
                   f"D={_by['D'].get('mapping_rule')!r})"); bad += 1
+    # (1d) DECISIONS REGISTER (Tristan 2026-07-03: "I'm happy for it to be a fuller
+    # design") — proveCatch BOTH directions plus the note-only case:
+    #   · a DIVERGING (2.3×) section COVERED by a recorded decision reads
+    #     consistent_with_decision and renders who/date/rationale + the real numbers;
+    #   · the SAME diverging section WITHOUT a decision still FAILS (above);
+    #   · a decision on a section that no longer diverges stays 'consistent' — the
+    #     decision renders as a note only, never inflating a status or score;
+    #   · the register only attaches to ITS OWN brief (verbatim content match), a
+    #     malformed entry raises (an authored decision is never silently dropped);
+    #   · the renderer styles the decision row visibly distinct from plain consistent;
+    #   · the Brief scorer counts decision-covered rows as passing.
+    _brief_d = ("Cost and calibration context:\n"
+                "- A. Water purification: approximately £85,000 (€94,735)\n"
+                "- B. Water storage: approximately £31,000 (€34,553)\n"
+                "- Total: approximately £1,250,000 (€1,395,019)\n")
+    _dec_state = {"requirementsBom": [
+        {"tag": "Z-1", "requirement": "Reverse Osmosis Skid", "qty": 1,
+         "unit_gbp": 115000, "line_gbp": 115000},
+        {"tag": "TK-1", "requirement": "Fresh Water Tank · 3.6 m dia x 3.9 m", "qty": 1,
+         "unit_gbp": 18235, "line_gbp": 18235},
+    ], "costStack": {"raw_materials_bom_gbp": 133235, "installed_asp_gbp": 226500}}
+    _dec_a = {"section": "A", "decision": "The engine's fuller purification design stands.",
+              "rationale": "UF membrane bank + UV disinfection the offer never priced.",
+              "decided_by": "Tristan Fischer", "date": "2026-07-03",
+              "evidence": "engine ~2.3x the client section"}
+    _decs = {"path": "briefs-loop/x.decisions.json", "by_key": {"A": _dec_a}}
+    _recd = _client_offer_reconciliation(_dec_state, _brief_d, _decs)
+    _bare = _client_offer_reconciliation(_dec_state, _brief_d)
+    if not _recd or not _bare:
+        print("  FAIL client-recon-dec: fixture must reconcile"); bad += 1
+    else:
+        _da = next(s for s in _recd["sections"] if s["key"] == "A")
+        _db = next(s for s in _recd["sections"] if s["key"] == "B")
+        _ba = next(s for s in _bare["sections"] if s["key"] == "A")
+        if _ba["status"] != "above":
+            print(f"  FAIL client-recon-dec: WITHOUT a decision the 2.3× section must "
+                  f"still FAIL as 'above' (got {_ba['status']})"); bad += 1
+        if _da["status"] != "consistent_with_decision" \
+                or "CONSISTENT WITH RECORDED DECISION" not in _da["note"] \
+                or "Tristan Fischer, 2026-07-03" not in _da["note"] \
+                or "UF membrane bank" not in _da["note"] \
+                or "2.3× the client section" not in _da["note"] \
+                or f"£{_da['engine_installed_gbp']:,.0f}" not in _da["note"]:
+            print(f"  FAIL client-recon-dec: the covered 2.3× section must read "
+                  f"consistent_with_decision and render who/date/rationale + the real "
+                  f"numbers (got {_da['status']}: {_da['note']!r})"); bad += 1
+        if _db["status"] != "consistent" or _db.get("decision") is not None:
+            print(f"  FAIL client-recon-dec: the uncovered consistent section must be "
+                  f"untouched (got {_db['status']})"); bad += 1
+        if _recd.get("decisions_register") != os.path.join("briefs-loop", "x.decisions.json"):
+            print(f"  FAIL client-recon-dec: the recon must state WHICH register it "
+                  f"applied (got {_recd.get('decisions_register')!r})"); bad += 1
+        # a decision on a NO-LONGER-DIVERGING section: note only, never an upgrade
+        _decs_b = {"path": "briefs-loop/x.decisions.json",
+                   "by_key": {"B": {**_dec_a, "section": "B"}}}
+        _recn = _client_offer_reconciliation(_dec_state, _brief_d, _decs_b)
+        _nb = next(s for s in _recn["sections"] if s["key"] == "B")
+        if _nb["status"] != "consistent" or "note only" not in _nb["note"] \
+                or "Tristan Fischer, 2026-07-03" not in _nb["note"]:
+            print(f"  FAIL client-recon-dec: a decision on a non-diverging section must "
+                  f"stay 'consistent' with the decision as a NOTE only "
+                  f"(got {_nb['status']}: {_nb['note']!r})"); bad += 1
+        # renderer: the decision row is VISIBLY distinct (bold dark blue) + names the
+        # register in the mapping note; a plain consistent row keeps the plain font
+        _wbd2 = Workbook(); _wbd2.remove(_wbd2.active)
+        _wsd2 = _wbd2.create_sheet("Brief")
+        _render_client_offer_recon(_wsd2, _recd, 1)
+        _dcell = _ccell = _mnote = None
+        for _rw in _wsd2.iter_rows():
+            for _c in _rw:
+                if not isinstance(_c.value, str):
+                    continue
+                if "Recorded scope decisions" in _c.value:
+                    _mnote = _c  # the mapping note (checked FIRST — it also quotes the row wording)
+                elif "CONSISTENT WITH RECORDED DECISION" in _c.value:
+                    _dcell = _c
+                elif _c.value.startswith("engine installed-equivalent within"):
+                    _ccell = _c
+        if not _dcell or not _dcell.font.bold or "1F4E79" not in str(_dcell.font.color.rgb):
+            print(f"  FAIL client-recon-dec: the decision row must render bold dark-blue "
+                  f"(visibly distinct) (got {_dcell and _dcell.font})"); bad += 1
+        if not _ccell or _ccell.font.bold:
+            print("  FAIL client-recon-dec: a plain consistent row must keep the plain "
+                  "note font"); bad += 1
+        if not _mnote or "briefs-loop" not in _mnote.value:
+            print("  FAIL client-recon-dec: the mapping note must name the register it "
+                  "applied"); bad += 1
+        # the Brief scorer counts decision-covered rows as passing
+        _sc = _sc_brief(_wbd2, _wsd2, {"_clientOfferRecon": _recd}, ".")
+        _c0 = next(c for c in _sc["components"] if "reconciliation sections" in c[0])
+        if _c0[1] != _c0[2] or _c0[2] != 2:
+            print(f"  FAIL client-recon-dec: the Brief scorer must count the decision-"
+                  f"covered row as passing (got {_c0})"); bad += 1
+        _scb = _sc_brief(_wbd2, _wsd2, {"_clientOfferRecon": _bare}, ".")
+        _cb0 = next(c for c in _scb["components"] if "reconciliation sections" in c[0])
+        if _cb0[1] != 1 or not _scb["issues"] or "above" not in _scb["issues"][0]:
+            print(f"  FAIL client-recon-dec: WITHOUT the decision the scorer must fail "
+                  f"the diverging row and name its status (got {_cb0}, "
+                  f"{_scb['issues']})"); bad += 1
+    # the register LOOKUP: attaches only to its OWN brief; malformed entries raise
+    import tempfile as _tfd
+    with _tfd.TemporaryDirectory() as _tdd:
+        with open(os.path.join(_tdd, "own.md"), "w") as _fh:
+            _fh.write("The one true brief.\nWith two lines.\n")
+        with open(os.path.join(_tdd, "own.decisions.json"), "w") as _fh:
+            json.dump({"decisions": [_dec_a]}, _fh)
+        _got = _load_brief_decisions("The one true brief.\n With   two lines.", [_tdd])
+        if not _got or "A" not in _got["by_key"] \
+                or _got["path"] != os.path.join(_tdd, "own.decisions.json"):
+            print(f"  FAIL decisions-load: the register must attach to its own brief "
+                  f"(whitespace-normalised match) (got {_got})"); bad += 1
+        if _load_brief_decisions("A different brief entirely.", [_tdd]) is not None:
+            print("  FAIL decisions-load: a register must NEVER attach to a foreign "
+                  "brief (BESS/SAF byte-identity)"); bad += 1
+        with open(os.path.join(_tdd, "own.decisions.json"), "w") as _fh:
+            json.dump({"decisions": [{"section": "A", "decision": "x"}]}, _fh)
+        try:
+            _load_brief_decisions("The one true brief. With two lines.", [_tdd])
+            print("  FAIL decisions-load: an entry missing required fields must RAISE, "
+                  "never silently drop an authored decision"); bad += 1
+        except ValueError:
+            pass
     # (1c) CONNECTION rows disclose their estimate class on the ledger (the '39
     # connection lines missing Est class/Confidence' MED): a connection row with no
     # joined cost line and no emitter fields is a deterministic take-off by
