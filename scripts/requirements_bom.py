@@ -360,6 +360,25 @@ def _membrane_area_price(name, md):
                  f"(spiral-wound/UF module supply, UK-2026; NOT a steel take-off)")
 
 
+def _membrane_pin_is_real(pn: str, wid: str, curve_only: dict) -> bool:
+    """MEMBRANE PIN RULE (2026-07-04, round-4 dissection fix 2). The membrane/media
+    branch below used to route EVERY membrane/media row to the area-parametric price
+    UNCONDITIONALLY — discarding even a genuinely pinned real MPN (e.g. a DuPont
+    FilmTec BW30-400). A real catalogue pin is IDENTITY (which element this actually
+    is); the membrane-area parametric is PRICE (membrane pricing genuinely scales by
+    m², not a small-parts catalogue curve) — the two are orthogonal, so a real pin
+    should keep its identity even though the price still comes from the area
+    parametric. "Real" is judged by the SAME type-coherence discipline the bespoke-
+    shell branch (`bc == "simple"`) applies to a catalogue/DB pin: a structured,
+    non-TBD part number (`_is_structured_pn`) whose price was NOT derived solely from
+    Engine B's generic small-parts commodity curve (`curve_only[wid]` — that curve has
+    no ComponentClass for a membrane consumable, so a curve-only price is a family
+    mismatch, never proof of a genuine pin). A pinless row, or a row whose only 'pin'
+    is a curve-only guess, is NOT real — the caller keeps today's area-parametric
+    behaviour byte-identically. proveCatch both directions in `_selftest`."""
+    return bool(pn) and _is_structured_pn(pn) and not curve_only.get(wid, False)
+
+
 def _structural_takeoff(name, md, geom=None):
     """Cost a STRUCTURAL part (a frame / space-frame / support structure / enclosure
     skeleton) from its PLAN FOOTPRINT at the structural-steel £/m² rate — the SAME basis
@@ -3000,6 +3019,23 @@ def _selftest() -> int:
     if not (_dedupe_membrane_synonym_rows(_mem_alone) == 0 and _mem_alone[0]["line_gbp"] == 9100 and "merged" not in _mem_alone[0]["basis"]):
         print("  FAIL standalone membrane line wrongly folded"); bad += 1
 
+    # ── MEMBRANE PIN RULE proveCatch (2026-07-04, round-4 dissection fix 2). A real
+    # pinned MPN (structured, non-TBD, NOT priced by Engine B's curve-only small-parts
+    # class) must be treated as real; a pinless row, a TBD placeholder, and a
+    # structured-looking PN whose price is curve-only (family mismatch) must all be
+    # rejected — the caller then keeps today's area-parametric behaviour byte-
+    # identically. Both directions.
+    if not _membrane_pin_is_real("BW30-400", "w1", {}):
+        print("  FAIL membrane-pin: a real structured PN with no curve-only price must be REAL"); bad += 1
+    if _membrane_pin_is_real("BW30-400", "w1", {"w1": True}):
+        print("  FAIL membrane-pin: a curve-only-priced PN is a family mismatch — must NOT be real"); bad += 1
+    if _membrane_pin_is_real("TBD (detailed design)", "w2", {}):
+        print("  FAIL membrane-pin: a TBD placeholder must NOT be real"); bad += 1
+    if _membrane_pin_is_real("", "w3", {}):
+        print("  FAIL membrane-pin: a pinless row must NOT be real"); bad += 1
+    if _membrane_pin_is_real("M6", "w4", {}):
+        print("  FAIL membrane-pin: a bare fastener-size token must NOT be real"); bad += 1
+
     # ── (j) v56c LEDGER COLUMN-CONTRACT convergence fixes (2026-07-03) — proveCatch each.
     # (j1) COMMODITY-ELECTRICAL CLASS-TOKEN FLOOR: 'Terminal Blocks' (principal noun
     # 'blocks') must reach the £2 terminal-contact band via its CLASS token — the v56c
@@ -4850,7 +4886,27 @@ def assemble(out_dir: str):
                 # to (the v55 £122k membrane-as-steel bill, 16% of the total). ──
                 if _MEMBRANE_MEDIA_RE.search(name):
                     mem = _membrane_area_price(name, md)
-                    if mem:
+                    if _membrane_pin_is_real(pn, wid, curve_only):
+                        # a REAL pin keeps its IDENTITY; the PRICE still comes from the
+                        # area parametric unless a real distributor price exists — see
+                        # `_membrane_pin_is_real` for the type-coherence rule.
+                        status, part = "IDENTIFIED", f"{mfr} {pn}".strip()
+                        mt_spec = {"material": "membrane/filtration media"}
+                        dpv = dist_price.get(wid)
+                        if dpv and dpv > 0:
+                            gbp, basis = dpv, (f"catalogue · real pinned part {mfr!s} {pn!r} "
+                                               "(distributor price)")
+                        elif mem:
+                            gbp, basis = mem[0], (f"catalogue · real pinned part {mfr!s} {pn!r} "
+                                                   f"(identity) · price from membrane-area "
+                                                   f"parametric: {mem[1]}")
+                        else:
+                            pv = price.get(wid, 0.0)
+                            gbp = pv if pv > 0 else 0.0
+                            basis = (f"catalogue · real pinned part {mfr!s} {pn!r} (identity); "
+                                     "no membrane-area driver for a parametric price — the "
+                                     "part's own verified price is used")
+                    elif mem:
                         status, part = "NOT FOUND", "requirement stated — membrane-area parametric"
                         gbp, basis = mem
                         mt_spec = {"material": "membrane/filtration media"}

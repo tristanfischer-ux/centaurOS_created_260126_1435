@@ -100,6 +100,70 @@ MECH_KIND = {"fluid_loop": "pipe", "fluid": "pipe", "process": "pipe", "thermal"
              "electrical": "cable", "power": "cable", "signal": "signal/sensor tie",
              "control": "signal/sensor tie", "gas": "gas pipe", "oxygen": "gas pipe"}
 
+# ── NOT-FOUND STATUS SPLIT (Tristan 2026-07-04, round-4 dissection, fix 1) ─────────
+# The ledger's flat "NOT FOUND" bucket conflated FOUR honest categories under one
+# dishonest umbrella — a genuinely unresearched gap read identically to a part that
+# was never going to carry a catalogue identity in the first place. Split every
+# status=='NOT FOUND' equipment row by its OWN evidence (never a per-part table),
+# in this priority order (a row matches at most one):
+#   OEM-PROPRIETARY         — the row's own `basis` states a RECORDED research
+#     finding that no public MPN exists (mirrors build-excel-export.py's
+#     `_oem_proprietary_row` / `_OEM_PROPRIETARY_RESEARCH_RX` EXACTLY — same
+#     regex, kept in sync by hand since the two scripts are independent CLI entry
+#     points). Never inferred from a merely-absent price/part.
+#   ARCHITECTURALLY-EXCLUDED — the row's NAME is in the membrane/filtration-media
+#     family (mirrors requirements_bom.py's `_MEMBRANE_MEDIA_RE` EXACTLY — the
+#     same regex that routes the row to the area-parametric price in the first
+#     place). Until the membrane-pin rule lets a genuinely-pinned real MPN
+#     through (in which case the row's status becomes IDENTIFIED and it never
+#     reaches this classifier at all), a pinless membrane/media row is honestly
+#     excluded from catalogue-identity research BY DESIGN, not failed research.
+#   FABRICATED               — the row's own `basis` states a materials-take-off /
+#     bespoke-fabrication pricing family (a manifold header, a structural
+#     footprint take-off …) — these have NO catalogue identity BY NATURE, so the
+#     gap is not a research failure either.
+#   NOT FOUND                — kept ONLY for a part that SHOULD have a catalogue
+#     identity (a pump, a sensor, a switchgear item …) and does not yet — the
+#     true, honest, still-open research gap.
+# The Part names scorer (build-excel-export.py `_sc_partnames`) already consumes
+# only the top-level `not_found` list — narrowing THAT list to true residuals is
+# the whole fix; the exporter needs no change (verified: it reads `pl.get(
+# "not_found")` and `pl.get("orphan_equipment")` only, never a per-part status).
+# proveCatch per status both directions in `_selftest`: a fabricated manifold
+# never counts not-found; a plain unpinned pump still does.
+_OEM_PROPRIETARY_RESEARCH_RX = re.compile(
+    r"oem[- ]proprietary|"
+    r"no\s+public(?:ly)?[- ]?(?:available|listed|disclosed)?\s*(?:part\s*number|mpn)|"
+    r"no\s+published\s+(?:part\s*number|mpn)|"
+    r"(?:manufacturer|oem)\s+(?:does\s+not|doesn't)\s+publish|"
+    r"not\s+publicly\s+(?:available|listed|disclosed)", re.I)
+# mirrors requirements_bom.py's _MEMBRANE_MEDIA_RE EXACTLY (the regex that routes a
+# row to the area-parametric price) — keep the two in sync by hand.
+_MEMBRANE_MEDIA_RE = re.compile(
+    r"\bmembranes?\b|"
+    r"\b(?:ro|uf|nf|mf|edi)\s+(?:membrane|element|module|bank|housing)s?\b|"
+    r"\bfilter\s+media\b|\bmedia\s+(?:bed|fill|charge)\b|"
+    r"\bspiral[- ]wound\b|\bhollow[- ]fib(?:re|er)\b",
+    re.I)
+_FABRICATED_BASIS_RX = re.compile(
+    r"materials?\s+take-?off|structural\s+take-?off|footprint\s+take-?off|\bfabricat\w*\b",
+    re.I)
+
+
+def _not_found_substatus(name: str, basis: str) -> str:
+    """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
+    evidence (name + basis) — never a per-part table. One of 'OEM-PROPRIETARY',
+    'ARCHITECTURALLY-EXCLUDED', 'FABRICATED', or 'NOT FOUND' (the true residual).
+    See the module-level comment above for the full rationale and priority order."""
+    b = str(basis or "")
+    if _OEM_PROPRIETARY_RESEARCH_RX.search(b):
+        return "OEM-PROPRIETARY"
+    if _MEMBRANE_MEDIA_RE.search(str(name or "")):
+        return "ARCHITECTURALLY-EXCLUDED"
+    if _FABRICATED_BASIS_RX.search(b):
+        return "FABRICATED"
+    return "NOT FOUND"
+
 # A manifest instrument/valve part is REPRESENTED on a P&ID by its ISA LETTER (TT/PT/LT/AT/FCV/
 # XV/PSV), NOT by its manifest tag ("u_temperature_sensor") — so the coverage matcher's tag/name
 # text-match FALSE-NEGATIVES every such part (the part IS drawn, just as an ISA bubble). Credit
@@ -571,6 +635,10 @@ def main() -> int:
             expected = expected - {"blender", "general-arrangement"}
         basis_full = str(r.get("basis", ""))
         eq_tools = _find_tools_for_equipment(tag, name, basis_full)
+        # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
+        # truncated `basis` field below) so a signal past 90 chars is never missed.
+        # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
+        nf_substatus = _not_found_substatus(name, basis_full) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
@@ -581,7 +649,7 @@ def main() -> int:
             transformation=TRANSFORM.get(typ, "—"),
             coverage=cov, expected=sorted(expected),
             gaps=sorted(k for k in expected if not cov.get(k)),
-            tools=eq_tools,
+            tools=eq_tools, not_found_status=nf_substatus,
             inputs=[], outputs=[]))
 
     # resolver: a connection-schedule internal key → the equipment row (by norm name)
@@ -745,7 +813,18 @@ def main() -> int:
         pres = sum(1 for c in applic if c["coverage"][key])
         conn_cov[key] = dict(present=pres, applicable=len(applic),
                              pct=round(100 * pres / len(applic), 1) if applic else None)
-    not_found = [e["tag"] for e in equipment if e["status"] == "NOT FOUND"]
+    # `not_found` is narrowed to the TRUE residual (the honest, still-open research
+    # gap) — the other three honest sub-categories get their OWN tally below, never
+    # folded back in here. This is the whole fix: the Part names scorer + every other
+    # consumer already reads only `pl.get("not_found")` / `pl.get("orphan_equipment")`
+    # (verified — see the module-level comment above `_not_found_substatus`), so
+    # narrowing this ONE list is sufficient; no downstream consumer needs a change.
+    not_found = [e["tag"] for e in equipment
+                 if e["status"] == "NOT FOUND" and e.get("not_found_status") == "NOT FOUND"]
+    fabricated_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "FABRICATED"]
+    architecturally_excluded_equipment = [e["tag"] for e in equipment
+                                          if e.get("not_found_status") == "ARCHITECTURALLY-EXCLUDED"]
+    oem_proprietary_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "OEM-PROPRIETARY"]
     gapped = [e for e in equipment if e["gaps"]]
 
     # ── connectivity audit (type-aware) ────────────────────────────────────────
@@ -1037,6 +1116,12 @@ def main() -> int:
     for e in equipment:
         if e["type"] not in PROCESS_TYPES:
             continue
+        # FABRICATED items (a manifold header, a structural take-off …) are unpenalised
+        # by the orphan check — the take-off IS the part; by nature it does not
+        # necessarily carry the conventional equipment-to-equipment tie this check
+        # looks for. Same exemption discipline as AIR_OR_SUBCOMPONENT_KEYWORDS above.
+        if e.get("not_found_status") == "FABRICATED":
+            continue
         ident = (str(e["tag"] or "—"), _norm(e["name"]))
         if ident in _orph_seen:
             continue
@@ -1083,6 +1168,11 @@ def main() -> int:
                   connections_gbp=round(sum(c["line_gbp"] or 0 for c in connections)),
                   coverage_by_drawing=by_drawing, connection_coverage=conn_cov,
                   not_found=not_found, n_gapped=len(gapped), orphan_equipment=orphans,
+                  # honest NOT-FOUND sub-statuses (2026-07-04 round-4 dissection, fix 1) —
+                  # each its OWN visible tally, never folded back into `not_found` above.
+                  fabricated_equipment=fabricated_equipment,
+                  architecturally_excluded_equipment=architecturally_excluded_equipment,
+                  oem_proprietary_equipment=oem_proprietary_equipment,
                   n_connections_off_pid=len(uncov_conn),
                   n_ambiguous_tags=len(ambiguous_tags),
                   ambiguous_tags=sorted(ambiguous_tags),
@@ -1145,7 +1235,10 @@ def main() -> int:
             print(f"    {ts['tool_id']:40} → {ts['n_parts']:3} parts  {ts['n_calculations']:3} calcs  {ts['n_claims']:3} claims")
             for s in ts.get("sample_calculations", [])[:1]:
                 print(f"      └ {s.get('part','?')[:24]:24} {str(s.get('label',''))[:40]}")
-    print(f"  → {len(not_found)} NOT FOUND · {len(gapped)} parts w/ coverage gap · "
+    print(f"  → {len(not_found)} NOT FOUND (true gap) · {len(fabricated_equipment)} fabricated "
+          f"(no catalogue identity by nature) · {len(architecturally_excluded_equipment)} "
+          f"architecturally-excluded (membrane/media) · {len(oem_proprietary_equipment)} "
+          f"OEM-proprietary (recorded finding) · {len(gapped)} parts w/ coverage gap · "
           f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  "
           f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  "
           f"{len(parts_without_tools)}/{len(equipment)} parts have NO tool provenance.  "
@@ -1274,6 +1367,54 @@ def _selftest() -> int:
     if _structural is not None:
         print(f"  FAIL passive-boundary: a genuinely-structural part (no origin/sink "
               f"noun) must NEVER be flagged (got {_structural!r})")
+        bad += 1
+    # ── NOT-FOUND STATUS SPLIT proveCatch (2026-07-04, round-4 dissection fix 1).
+    # Per status, both directions: the positive fires on its own evidence, the
+    # negative (a plain unpinned part with none of that evidence) stays the true,
+    # honest 'NOT FOUND' residual. Real corpus examples (out/fischer-codema-v73). ──
+    _fab_hit = _not_found_substatus(
+        "Distribution Manifold",
+        "distribution-manifold parametric: 45 m³/h delivery duty × £25/(m³·h) + £600 base "
+        "— fabricated header + isolation/non-return valves + gauge tappings + supports")
+    if _fab_hit != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a fabricated manifold must classify FABRICATED "
+              f"(got {_fab_hit!r}) — a fabricated manifold must never count not-found")
+        bad += 1
+    _pump_hit = _not_found_substatus("Ro High Pressure Pump", "bottom-up parametric")
+    if _pump_hit != "NOT FOUND":
+        print(f"  FAIL not-found-substatus: an unpinned pump with a plain parametric basis "
+              f"must stay the true NOT FOUND residual (got {_pump_hit!r})")
+        bad += 1
+    _mem_hit = _not_found_substatus(
+        "Ro Membrane Elements",
+        "membrane-area parametric: 364 m² × £25/m² (spiral-wound/UF module supply, "
+        "UK-2026; NOT a steel take-off)")
+    if _mem_hit != "ARCHITECTURALLY-EXCLUDED":
+        print(f"  FAIL not-found-substatus: a pinless membrane row must classify "
+              f"ARCHITECTURALLY-EXCLUDED (got {_mem_hit!r})")
+        bad += 1
+    _oem_hit = _not_found_substatus(
+        "Veolia Ro40 Controller",
+        "bottom-up parametric · OEM-proprietary — no public MPN (verified 2026-07-04: "
+        "Veolia Water Technologies RO40)")
+    if _oem_hit != "OEM-PROPRIETARY":
+        print(f"  FAIL not-found-substatus: a recorded no-public-MPN finding must classify "
+              f"OEM-PROPRIETARY (got {_oem_hit!r})")
+        bad += 1
+    _oem_neg = _not_found_substatus("Some Controller", "bottom-up parametric")
+    if _oem_neg != "NOT FOUND":
+        print(f"  FAIL not-found-substatus: a merely-unpriced controller with NO recorded "
+              f"finding must NOT self-declare OEM-PROPRIETARY (got {_oem_neg!r})")
+        bad += 1
+    # priority: a recorded OEM finding on a membrane-named part must win OEM-PROPRIETARY
+    # (the more specific, verified evidence), never fall through to the architectural
+    # exclusion — proves the two categories never silently swap.
+    _oem_over_mem = _not_found_substatus(
+        "Ro Membrane Elements",
+        "membrane-area parametric · OEM-proprietary — no public MPN (verified)")
+    if _oem_over_mem != "OEM-PROPRIETARY":
+        print(f"  FAIL not-found-substatus: a recorded OEM finding must take priority over "
+              f"the membrane-family classification (got {_oem_over_mem!r})")
         bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
