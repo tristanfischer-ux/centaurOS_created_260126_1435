@@ -189,6 +189,7 @@ const HTML = `<style>
       <a href="#partners">For partners</a>
       <a href="#how">How it works</a>
       <a href="#examples">What&rsquo;s inside</a>
+      <a href="/insights">Insights</a>
       <a href="#about">About</a>
     </nav>
     <a class="btn btn-primary" href="/brief">Work with us</a>

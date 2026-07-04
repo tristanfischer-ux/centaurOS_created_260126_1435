@@ -40,7 +40,7 @@ const PUBLIC_ROUTES = [
     '/about',             // company / story
     '/contact',           // contact + lead capture
     '/story',             // founder story (SEO)
-    '/case-study',        // case studies (SEO / social proof)
+    '/insights',          // essays hub — HFN cross-links (SEO / E-E-A-T / GEO)
     '/sample-package',    // sample dossier — the product showcase, a top conversion asset
     '/investor-readiness',// investor-readiness landing
     '/preview-landing',   // preview / campaign landing

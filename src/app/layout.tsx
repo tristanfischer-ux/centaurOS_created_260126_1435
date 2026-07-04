@@ -80,6 +80,48 @@ export const metadata: Metadata = {
   },
 };
 
+// Sitewide structured data (GEO/AEO): make "Fractional Forge" and
+// "Tristan Fischer" resolvable entities for search + AI answer-engines.
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://fractionalforge.app/#organization",
+      name: "Fractional Forge",
+      legalName: "Fractional Forge Ltd",
+      url: "https://fractionalforge.app",
+      logo: "https://fractionalforge.app/icons/icon-192x192.png",
+      description:
+        "The front end for hardware. Fractional Forge helps deep-tech and hardware founders get funded and built: commercial strategy, capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.",
+      slogan: "The front end for hardware",
+      areaServed: ["United Kingdom", "Europe"],
+      founder: { "@id": "https://fractionalforge.app/#tristan-fischer" },
+    },
+    {
+      "@type": "Person",
+      "@id": "https://fractionalforge.app/#tristan-fischer",
+      name: "Tristan Fischer",
+      jobTitle: "Founder",
+      url: "https://fractionalforge.app/about",
+      worksFor: { "@id": "https://fractionalforge.app/#organization" },
+      description:
+        "Founder of Fractional Forge. 25+ years founding, financing and scaling capital-intensive technology businesses across solar, wind, tidal, batteries, vertical farming and carbon capture. Project finance at Citigroup, corporate venture capital at Shell Technology Ventures, an AIM IPO, around £200m raised, and a decade building Fischer Farms.",
+      sameAs: [
+        "https://www.linkedin.com/in/tristanfischer/",
+        "https://www.historyfuturenow.com/",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://fractionalforge.app/#website",
+      url: "https://fractionalforge.app",
+      name: "Fractional Forge",
+      publisher: { "@id": "https://fractionalforge.app/#organization" },
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -87,7 +129,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+        />
+      </head>
       <body
         className={`${outfit.variable} ${playfair.variable} ${inter.variable} ${jetbrains.variable} antialiased font-sans`}
       >
