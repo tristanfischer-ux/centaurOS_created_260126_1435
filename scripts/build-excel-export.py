@@ -856,6 +856,21 @@ def _fx_evidence_expr(ev_ref: str, structural_label: str) -> str:
             f'"{_xq(structural_label, 120)}")')
 
 
+def _compliance_verdict_fx(verd_ref: str, reason_ref: str) -> str:
+    """LIVE formula for the Risk & Regulatory compliance-gate verdict cell (Tristan
+    2026-07-04, the 4th conditional-literal-family fix — after FAIL(soft), the
+    generative-benchmark verdicts, and the Connection-trace bare-'OK'). PASS iff the
+    embedded engine verdict word IS EXACTLY 'PASS'; the fail branch echoes the engine's
+    own verdict word + reason. NOT re-derived from conflicts.length===0 — proven wrong
+    on Codema v79 (water_treatment): compliance-gate.ts has a fail-open THIRD branch
+    ("No class-standards registered for <class>") that also carries conflicts=[] but
+    returns verdict='WARN', reached by a CODE PATH with no distinguishing field in the
+    exposed result — a conflicts-count shortcut would silently paint that WARN green.
+    `verd_ref`/`reason_ref` are cell references (or quoted literals in a selftest) to
+    the AUDITED engine verdict word + reason — never a python literal is embedded here."""
+    return f'=IF(EXACT({verd_ref},"PASS"),"PASS",{verd_ref}&" — "&{reason_ref})'
+
+
 # ═══ SOFT-MISS DEFECT/ISSUE TEXT → LIVE FORMULA (Tristan 2026-07-04, the v67 escape) ═══
 # A quality-scorecard section's `defects`/`issues` list is an opaque, upstream-classified
 # STRING (e.g. a soft brief-compliance miss: 'FAIL (soft): ro_working_pressure_bar —
@@ -10510,9 +10525,35 @@ def _render_regulatory_section(ws: Worksheet, state: dict, start_row: int) -> in
     if cg.get("reason"):
         sub_banner(ws, r, "Engine compliance-gate verdict", 4)
         r += 1
-        vc = ws.cell(r, 1, verdict)
+        # LIVE-FORMULA VERDICT (the 4th conditional-literal-family fix, 2026-07-04 —
+        # after FAIL(soft) defects/issues, the generative-benchmark verdicts, and the
+        # Connection-trace bare-'OK': this cell painted `verdict` — a python STRING
+        # computed once at build time from state.complianceGate — straight into A,
+        # with no formula behind it. bess-campaign-v1's compliance gate closes with
+        # ZERO conflicts, so the cell held a bare 'PASS' literal — caught (correctly)
+        # by _enforce_live_check_gate / GATE 38. Fix: embed the engine's own verdict
+        # word + reason as AUDITED operands ('Risk & Regulatory' renders before the
+        # 'Audit data' tab fixes its row list, same ordering the Electrical/Process-
+        # schedules reconciliations already rely on) and recompute with a real =IF —
+        # see _compliance_verdict_fx() for why this is NOT a conflicts-count shortcut.
+        _cg_verd_ref = audit_operand(
+            "Regulatory · compliance-gate", "verdict (engine)", verdict,
+            "engine complianceGate.verdict")
+        _cg_reason_ref = audit_operand(
+            "Regulatory · compliance-gate", "reason", clean_cell(cg.get("reason", "")),
+            "engine complianceGate.reason")
+        _cg_fx = _compliance_verdict_fx(_cg_verd_ref, _cg_reason_ref)
+        vc = ws.cell(r, 1, _cg_fx)
         vc.font = FONT_SUB
         vc.fill = FILL_PASS if verdict == "PASS" else _FILL_RISK_MED
+        from openpyxl.formatting.rule import CellIsRule
+        _cg_rng = f"$A${r}"
+        ws.conditional_formatting.add(_cg_rng, CellIsRule(
+            operator="equal", formula=['"PASS"'], fill=FILL_PASS, font=FONT_PASS))
+        ws.conditional_formatting.add(_cg_rng, CellIsRule(
+            operator="beginsWith", formula=['"HALT"'], fill=FILL_FAIL, font=FONT_FAIL))
+        ws.conditional_formatting.add(_cg_rng, CellIsRule(
+            operator="beginsWith", formula=['"WARN"'], fill=_FILL_RISK_MED))
         m = ws.cell(r, 2, clean_cell(cg.get("reason", "")))
         m.alignment = WRAP_TOP
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
@@ -21525,6 +21566,67 @@ def _selftest() -> int:
                   "sanctioned Value column — a bare 'OK' there must still refuse"); bad += 1
         except SystemExit:
             pass
+        # (b3) COMPLIANCE-GATE VERDICT proveCatch (Tristan 2026-07-04 — the 4th
+        # conditional-literal-family member: bess-campaign-v1's Risk & Regulatory A19
+        # was a bare 'PASS' literal). Both directions, on the REAL render path
+        # (_render_regulatory_section + _run_cell_contracts, the same order build()
+        # uses): (i) the naive "conflicts.length===0" shortcut this fix explicitly
+        # rejects is proven wrong on the Codema v79 fail-open shape (conflicts=[],
+        # verdict='WARN', mandatory_total=0 — "No class-standards registered"); (ii)
+        # the actual formula recomputes via EXACT() on the embedded engine verdict
+        # word, not a conflicts-count proxy, and reads correctly on BOTH a genuine
+        # PASS state and that WARN-with-empty-conflicts state; (iii) zero bare
+        # literals survive on either rendered sheet.
+        _codema_cg = {"verdict": "WARN", "conflicts": [], "mandatory_total": 0,
+                      "mandatory_covered": 0,
+                      "reason": 'No class-standards registered for "water_treatment". '
+                                "Compliance check skipped — engineer must verify "
+                                "manually before sale."}
+        _naive_shortcut_result = "PASS" if len(_codema_cg["conflicts"]) == 0 else "WARN"
+        if _naive_shortcut_result != "PASS":
+            print("  FAIL compliance-verdict proveCatch: fixture must demonstrate the "
+                  "naive conflicts-only shortcut giving the WRONG answer"); bad += 1
+        _pass_cg = {"verdict": "PASS", "conflicts": [], "mandatory_total": 3,
+                    "mandatory_covered": 3,
+                    "reason": "3/3 mandatory standards covered in the brief."}
+        _sv_audit_ops = list(_AUDIT_OPERANDS)
+        try:
+            for _cg_case, _case_name in ((_pass_cg, "PASS"), (_codema_cg, "Codema WARN")):
+                _AUDIT_OPERANDS.clear()
+                _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+                _wbrr = Workbook()
+                _wsrr = _wbrr.active
+                _wsrr.title = "Risk & Regulatory"
+                _render_regulatory_section(_wsrr, {"complianceGate": _cg_case}, 4)
+                _run_cell_contracts(_wbrr)
+                _vfx = _wsrr.cell(6, 1).value
+                if not (isinstance(_vfx, str) and _vfx.startswith("=") and "EXACT(" in _vfx):
+                    print(f"  FAIL compliance-verdict proveCatch [{_case_name}]: verdict "
+                          f"cell must be a live EXACT()-recompute formula, not a "
+                          f"conflicts-count shortcut or a bare literal (got {_vfx!r})")
+                    bad += 1
+                # simulate Excel's evaluation of the emitted formula (mirrors the ONLY
+                # two branches _compliance_verdict_fx can take)
+                _evald = "PASS" if _cg_case["verdict"] == "PASS" else \
+                    f'{_cg_case["verdict"]} — {_cg_case["reason"]}'
+                _expect_pass = (_case_name == "PASS")
+                if (_evald == "PASS") != _expect_pass:
+                    print(f"  FAIL compliance-verdict proveCatch [{_case_name}]: expected "
+                          f"{'PASS' if _expect_pass else 'non-PASS'}, formula evaluates "
+                          f"to {_evald!r}"); bad += 1
+                try:
+                    _gst = _enforce_live_check_gate(_wbrr)
+                    if _gst["bare_literals"]:
+                        print(f"  FAIL compliance-verdict proveCatch [{_case_name}]: 0 "
+                              f"bare literals expected (got {_gst['bare_literals']})")
+                        bad += 1
+                except SystemExit as _cge:
+                    print(f"  FAIL compliance-verdict proveCatch [{_case_name}]: the "
+                          f"rendered sheet must pass the live-check gate cleanly "
+                          f"(got {_cge})"); bad += 1
+        finally:
+            _AUDIT_OPERANDS.clear(); _AUDIT_OPERANDS.extend(_sv_audit_ops)
+            _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
         # (c) CORRUPT-OPERAND proveCatch (real LibreOffice recalc): the line-math verdict
         # FLIPS to FAIL when one operand cell is corrupted, and the live score falls.
         _sof = _find_soffice()
