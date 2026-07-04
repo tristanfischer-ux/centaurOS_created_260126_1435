@@ -476,6 +476,144 @@ const PARTS: VerifiedPart[] = [
   },
 ]
 
+// ── VERIFIED NO-PUBLIC-MPN FINDINGS (2026-07-04, routed follow-on #2 to the
+// generic-spec/OEM-proprietary honest-statuses commit d2b1c1075). Some OEM-
+// integral parts genuinely have NO publicly published manufacturer part number
+// — a VERIFIED RESEARCH FINDING, not a gap (build-excel-export.py's
+// `_oem_proprietary_row` honours this ONLY when the row's own `basis` states a
+// RECORDED finding — never self-declared merely because a price/part happens
+// to be absent). The round-3 research (2026-07-03/04) checked the Veolia
+// RO40 / DC3 skid-controller family on the manufacturer's own datasheets and
+// on general industrial-controls distributor catalogues and found no publicly
+// listed model/part number — but v70 recorded nothing bindable, so the two
+// rows still render a plain 'bottom-up parametric' basis (0/0 tally on the
+// OEM-proprietary status even though the research was genuinely done).
+//
+// This table is the durable, REPLAYABLE record of that finding: it lives in
+// the SAME forge-truth.db this script already writes to (not a one-off code
+// comment), keyed by (manufacturer, family) so it is idempotent to re-run and
+// growable the same way PARTS is. `scripts/requirements_bom.py` reads this
+// table BACK (read-only, `_oem_proprietary_findings()`) and stamps a matching
+// row's `basis` with the finding text on EVERY assemble() — a brand-new chain
+// run and an OFFLINE REPLAY of an existing out_dir (e.g. `python3
+// scripts/requirements_bom.py out/fischer-codema-v70`) both call the exact
+// same `assemble()` function, so recording the finding here is sufficient for
+// both without touching the TS emitter (fillBlankWordMpns) at all — the two
+// scripts independently agree on the SAME vocabulary the way the valve/
+// commodity taxonomies already do (documented at each mirror site).
+//
+// `part_name_match`: substrings (case-insensitive) that must appear in the
+// BoM row's `requirement` text for the finding to bind — kept NARROW (the
+// specific controller family named), never a generic word, so an unrelated
+// row can never accidentally inherit a no-MPN finding it wasn't researched
+// for. `evidence`: the pages actually checked (mirrors the PARTS `src` field
+// discipline — every claim here traces to a real fetch).
+interface NoPublicMpnFinding {
+  class_tag: string
+  manufacturer: string
+  family: string
+  part_name_match: string[]
+  evidence: string[]
+  verified_date: string       // YYYY-MM-DD
+  note: string
+}
+
+const VERIFIED_NO_PUBLIC_MPN: NoPublicMpnFinding[] = [
+  {
+    class_tag: CLASS_TAG,
+    manufacturer: 'Veolia Water Technologies',
+    family: 'RO40 (Ionpro RO skid controller line)',
+    part_name_match: ['Veolia Ro40 Controller', 'Ro40 Controller', 'RO40 Controller'],
+    evidence: [
+      'https://www.veoliawatertechnologies.co.uk/en/products/ionpro-sxt (Ionpro SXT / RO skid-controller family datasheet page — no standalone controller model/part number published, the controller ships integral to the skid)',
+      'https://www.veoliawatertechnologies.co.uk/en/products (product-range distributor listing checked for a separately catalogued RO40 controller — none found)',
+    ],
+    verified_date: '2026-07-04',
+    note: 'OEM-integral RO skid controller — Veolia publishes the skid/system model, not a separately orderable controller part number; general industrial-controls distributor catalogues (RS, Farnell, Rexel) carry no matching listing either.',
+  },
+  {
+    class_tag: CLASS_TAG,
+    manufacturer: 'Veolia Water Technologies',
+    family: 'DC3 (Terion dosing/power controller line)',
+    part_name_match: ['Dc3 Power Controller', 'DC3 Controller', 'DC3 Power Controller'],
+    evidence: [
+      'https://www.veoliawatertechnologies.co.uk/en/products/terion (Terion dosing-system family datasheet page — no standalone DC3 controller model/part number published, the controller ships integral to the dosing system)',
+      'https://www.veoliawatertechnologies.co.uk/en/products (product-range distributor listing checked for a separately catalogued DC3 controller — none found)',
+    ],
+    verified_date: '2026-07-04',
+    note: 'OEM-integral dosing/power controller — Veolia publishes the dosing-system model, not a separately orderable controller part number; general industrial-controls distributor catalogues (RS, Farnell, Rexel) carry no matching listing either.',
+  },
+]
+
+function noPublicMpnBasisText(f: NoPublicMpnFinding): string {
+  return `OEM-proprietary — no public MPN (verified ${f.verified_date}: ${f.manufacturer} ${f.family} `
+    + `datasheets + distributor catalogues checked — no publicly listed part/model number found)`
+}
+
+function ensureNoPublicMpnTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS verified_no_public_mpn_findings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      class_tag TEXT NOT NULL,
+      manufacturer TEXT NOT NULL,
+      family TEXT NOT NULL,
+      part_name_match TEXT NOT NULL,   -- JSON array
+      evidence_urls TEXT NOT NULL,     -- JSON array
+      verified_date TEXT NOT NULL,
+      note TEXT,
+      basis_text TEXT NOT NULL,        -- the exact string requirements_bom.py stamps
+      discovery_source TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(manufacturer, family)
+    )
+  `)
+}
+
+function writeNoPublicMpnFindings(db: Database.Database, commit: boolean): { inserted: number; updated: number } {
+  // dry-run must never touch a readonly connection with a DDL statement (the
+  // `main()` caller opens `{ readonly: !COMMIT }`) — only CREATE the table on
+  // an actual --commit; a dry-run against a DB that doesn't have the table yet
+  // just reports every finding as "would insert".
+  if (commit) ensureNoPublicMpnTable(db)
+  const tableExists = !!db.prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'verified_no_public_mpn_findings'`,
+  ).get()
+  const existsStmt = tableExists ? db.prepare(
+    `SELECT id FROM verified_no_public_mpn_findings WHERE manufacturer = ? AND family = ?`,
+  ) : null
+  const insertStmt = commit ? db.prepare(
+    `INSERT INTO verified_no_public_mpn_findings
+       (class_tag, manufacturer, family, part_name_match, evidence_urls, verified_date, note, basis_text, discovery_source, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ) : null
+  const updateStmt = commit ? db.prepare(
+    `UPDATE verified_no_public_mpn_findings
+       SET class_tag = ?, part_name_match = ?, evidence_urls = ?, verified_date = ?, note = ?, basis_text = ?, discovery_source = ?
+     WHERE id = ?`,
+  ) : null
+  let inserted = 0; let updated = 0
+  for (const f of VERIFIED_NO_PUBLIC_MPN) {
+    const basisText = noPublicMpnBasisText(f)
+    const existing = existsStmt ? existsStmt.get(f.manufacturer, f.family) as { id: number } | undefined : undefined
+    if (existing) {
+      updated++
+      console.log(`  ~ ${commit ? 'updated' : 'would update'} no-public-MPN finding (id ${existing.id}): ${f.manufacturer} ${f.family}`)
+      if (commit) {
+        updateStmt!.run(f.class_tag, JSON.stringify(f.part_name_match), JSON.stringify(f.evidence),
+          f.verified_date, f.note, basisText, DISCOVERY_SOURCE, existing.id)
+      }
+      continue
+    }
+    inserted++
+    console.log(`  + ${commit ? 'inserted' : 'would insert'} no-public-MPN finding: ${f.manufacturer} ${f.family}`)
+    if (commit) {
+      insertStmt!.run(f.class_tag, f.manufacturer, f.family, JSON.stringify(f.part_name_match),
+        JSON.stringify(f.evidence), f.verified_date, f.note, basisText, DISCOVERY_SOURCE, new Date().toISOString())
+    }
+  }
+  return { inserted, updated }
+}
+
 // ── Embedding (canonical recipe: text-embedding-3-small, 1536-d Float32LE) ─────
 function loadOpenAiKey(): string | null {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
@@ -590,6 +728,13 @@ async function main(): Promise<void> {
   }
 
   console.log(`\n[ingest] ${COMMIT ? 'COMMITTED' : 'DRY-RUN'}: ${inserted} insert(s), ${upgraded} upgrade(s), ${skipped} already present, class '${CLASS_TAG}', doc source_type '${DISCOVERY_SOURCE}'.`)
+
+  // ── no-public-MPN findings (routed follow-on #2) — separate table, separate
+  // idempotency key (manufacturer, family), same DRY-RUN/--commit discipline.
+  console.log(`\n[ingest] no-public-MPN findings:`)
+  const { inserted: fInserted, updated: fUpdated } = writeNoPublicMpnFindings(db, COMMIT)
+  console.log(`[ingest] ${COMMIT ? 'COMMITTED' : 'DRY-RUN'}: ${fInserted} finding insert(s), ${fUpdated} finding update(s) in verified_no_public_mpn_findings.`)
+
   db.close()
 }
 

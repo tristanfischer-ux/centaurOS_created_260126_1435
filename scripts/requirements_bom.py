@@ -3230,6 +3230,97 @@ def _selftest() -> int:
     if abs((_v_small or 0) - 0.05) > 1e-9:
         print(f"  FAIL 50 L must convert to 0.05 m3 (unit-family guard), got {_v_small!r}"); bad += 1
 
+    # ═══ proveCatch the VALVE SPEC STAMPING follow-on (2026-07-04, routed follow-on
+    # #1). Claims: (a) `_engine_refused_process_valve` mirrors the excel scorer's
+    # `_commodity_process_valve` vocabulary exactly (manual/isolation/check/ball/
+    # sample refused, actuated never); (b) a valve row naming EXACTLY ONE piece of
+    # connection-schedule equipment stamps that equipment's LARGEST-bore DN + a
+    # provenance note, and a stated rating token when the schedule carries one;
+    # (c) a valve naming ZERO or TWO-OR-MORE equipment items NEVER stamps (honest
+    # absent — zero silently, two-or-more with an ambiguity note); (d) an
+    # already-sized row is never overwritten. ═══
+    if not _engine_refused_process_valve("Manual Ball Valve") or \
+       not _engine_refused_process_valve("Sample Valves") or \
+       not _engine_refused_process_valve("Isolation Valves"):
+        print("  FAIL valve-stamping: manual/sample/isolation valves must be engine-refused"); bad += 1
+    for _av in ("Pneumatic Actuated Valves", "Solenoid Valve", "Pressure Relief Valve"):
+        if _engine_refused_process_valve(_av):
+            print(f"  FAIL valve-stamping: {_av!r} must stay ENGINEERED (actuation never refused)"); bad += 1
+    _cs_rows = [
+        {"from": "Softener Vessel", "to": "Gac Softener", "size": "DN65", "outer_dia_mm": 73.0,
+         "rating": "14.5 m3/h"},
+        {"from": "Softener Vessel", "to": "Drain Collection Sump", "size": "DN25", "outer_dia_mm": 30.0,
+         "rating": "2 m3/h"},
+        {"from": "Ro High Pressure Pump", "to": "Reverse Osmosis Skid", "size": "DN50", "outer_dia_mm": 60.0,
+         "rating": "PN16"},
+    ]
+    if _named_equipment_candidates("Manual Isolation Valve on the Softener Vessel", _cs_rows) != {"Softener Vessel"}:
+        print("  FAIL valve-stamping: naming ONE equipment item must yield exactly that candidate"); bad += 1
+    if _named_equipment_candidates("Manual Ball Valve", _cs_rows):
+        print("  FAIL valve-stamping: naming NO equipment must yield zero candidates"); bad += 1
+    if _named_equipment_candidates("Valve between the Softener Vessel and the Ro High Pressure Pump", _cs_rows) \
+            != {"Softener Vessel", "Ro High Pressure Pump"}:
+        print("  FAIL valve-stamping: naming TWO equipment items must yield both candidates"); bad += 1
+    if _dn_for_named_equipment("Softener Vessel", _cs_rows) != "DN65":
+        print(f"  FAIL valve-stamping: the LARGEST-bore connection must win, got "
+              f"{_dn_for_named_equipment('Softener Vessel', _cs_rows)!r}"); bad += 1
+    if _rating_for_named_equipment("Ro High Pressure Pump", _cs_rows) != "PN16":
+        print("  FAIL valve-stamping: a STATED pressure-class token must be read back"); bad += 1
+    if _rating_for_named_equipment("Softener Vessel", _cs_rows):
+        print("  FAIL valve-stamping: no pressure class stated must stay honest absent (never a default)"); bad += 1
+    _vs_rows = [
+        {"tag": "V-1", "requirement": "Manual Isolation Valve on the Softener Vessel",
+         "part": "requirement stated", "basis": "bottom-up parametric", "qty": 1, "unit_gbp": 95, "line_gbp": 95},
+        {"tag": "V-2", "requirement": "Manual Ball Valve", "part": "requirement stated",
+         "basis": "bottom-up parametric", "qty": 1, "unit_gbp": 9, "line_gbp": 9},
+        {"tag": "V-3", "requirement": "Manual Isolation Valve between the Softener Vessel and the Ro High Pressure Pump",
+         "part": "requirement stated", "basis": "bottom-up parametric", "qty": 1, "unit_gbp": 9, "line_gbp": 9},
+        {"tag": "V-4", "requirement": "Manual Isolation Valve on the Softener Vessel",
+         "part": "requirement stated", "basis": "bottom-up parametric", "size": "DN300",
+         "qty": 1, "unit_gbp": 9, "line_gbp": 9},
+    ]
+    import copy as _copy
+    _stamped = _apply_valve_stamping(_copy.deepcopy(_vs_rows), _cs_rows)
+    _by_tag = {r["tag"]: r for r in _stamped}
+    if _by_tag["V-1"].get("size") != "DN65" or "derived from connection schedule (line Softener Vessel)" \
+            not in _by_tag["V-1"].get("basis", ""):
+        print(f"  FAIL valve-stamping: an unambiguous single-equipment valve must stamp its DN "
+              f"+ provenance, got {_by_tag['V-1']!r}"); bad += 1
+    if _by_tag["V-2"].get("size"):
+        print(f"  FAIL valve-stamping: a valve naming NO equipment must NEVER stamp a DN, "
+              f"got {_by_tag['V-2']!r}"); bad += 1
+    if _by_tag["V-3"].get("size") or "ambiguous join" not in _by_tag["V-3"].get("basis", ""):
+        print(f"  FAIL valve-stamping: a valve naming TWO equipment items must stay unstamped "
+              f"+ carry an ambiguity note, got {_by_tag['V-3']!r}"); bad += 1
+    if _by_tag["V-4"].get("size") != "DN300":
+        print(f"  FAIL valve-stamping: an ALREADY-sized row must never be overwritten, "
+              f"got {_by_tag['V-4']!r}"); bad += 1
+
+    # ═══ proveCatch the OEM-PROPRIETARY FINDING RECORDING follow-on (2026-07-04,
+    # routed follow-on #2). Claims: (a) a row whose requirement matches a recorded
+    # finding's names gets the finding's basis text appended; (b) a row matching NO
+    # finding is left untouched; (c) applying the same findings twice is idempotent
+    # (no duplicated basis text). ═══
+    _findings = [(["Veolia Ro40 Controller"],
+                  "OEM-proprietary — no public MPN (verified 2026-07-04: Veolia Water "
+                  "Technologies RO40 datasheets + distributor catalogues checked)")]
+    _oem_rows = [
+        {"tag": "X-1", "requirement": "Veolia Ro40 Controller", "basis": "bottom-up parametric"},
+        {"tag": "X-2", "requirement": "Dc3 Power Controller", "basis": "bottom-up parametric"},
+    ]
+    _oem_stamped = _apply_oem_findings(_copy.deepcopy(_oem_rows), _findings)
+    _oem_by_tag = {r["tag"]: r for r in _oem_stamped}
+    if "OEM-proprietary — no public MPN" not in _oem_by_tag["X-1"].get("basis", ""):
+        print(f"  FAIL oem-finding: a row matching a recorded finding must have its basis "
+              f"stamped, got {_oem_by_tag['X-1']!r}"); bad += 1
+    if _oem_by_tag["X-2"].get("basis") != "bottom-up parametric":
+        print(f"  FAIL oem-finding: a row matching NO finding must be left untouched, "
+              f"got {_oem_by_tag['X-2']!r}"); bad += 1
+    _oem_twice = _apply_oem_findings(_apply_oem_findings(_copy.deepcopy(_oem_rows), _findings), _findings)
+    if _oem_twice[0]["basis"].count("OEM-proprietary — no public MPN") != 1:
+        print(f"  FAIL oem-finding: applying findings twice must be idempotent (no duplicate "
+              f"stamp), got {_oem_twice[0]['basis']!r}"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -3741,6 +3832,267 @@ def _size_pipe_from_flow(flow_m3h: float, target_v_ms: float = 2.0) -> tuple:
     dn = _PIPE_DN_LADDER[-1]
     v = q_s / (_m.pi * (dn / 1000.0 / 2.0) ** 2)
     return (dn, dn, round(v, 2))
+
+
+# ── ENGINE-REFUSED VALVE SPEC STAMPING (2026-07-04, routed follow-on #1 to the
+# honest generic-spec/OEM-proprietary taxonomy landed in build-excel-export.py
+# commit d2b1c1075). The excel scorer's `_generic_spec_valve` reclassifies an
+# engine-refused process valve (check / manual isolation / ball / sample — see
+# `_engine_refused_process_valve` below, which MIRRORS build-excel-export.py's
+# `_commodity_process_valve` EXACTLY: same three regex legs, same verdict, kept
+# in sync by hand since the two scripts are independent CLI entry points) ONLY
+# when the row's OWN cells carry a full DN + material + rating spec. Material
+# is already stamped (the existing `_wetted_moc`/`_material` MoC pass below —
+# the "material from the connected line's service MoC" leg of this follow-on
+# was already closed). DN and a pressure-class rating were never stamped
+# because nothing joined the valve back to the routed connection that knows
+# its bore — this closes that join.
+#
+# THE JOIN (proven by the process-schedules fix, commit 5237e446e): the
+# connection-schedule.json rows draw_process_schedules.py already uses are
+# keyed by the HUMAN equipment name (`from`/`to`) — e.g. 'Softener Vessel',
+# 'Ro High Pressure Pump'. A valve row whose OWN requirement/basis/part text
+# NAMES exactly ONE of those equipment items joins that equipment's largest-
+# bore connection (a vessel/skid's several nozzles legitimately differ in
+# size — same "hosting vessel's connection DN" precedent as
+# draw_process_schedules._dn_by_equipment_name); a rating token (PN/ANSI/bar/
+# psi/class) is stamped ONLY when the schedule itself states one for that
+# equipment (the schedule mostly carries FLOW ratings, not pressure classes —
+# 'honest absent where not stated', never a default).
+#
+# NEVER STAMPS when the row's text names ZERO equipment (a class-level
+# 'Manual Ball Valve' completion line naming no specific line — the common
+# case for an auto-generated BoM-completion accessory, verified 2026-07-04:
+# `partVerifications[*].sub_module_id` for these exact 7 rows resolves to
+# essentially arbitrary template buckets — 'Isolation Valves' lands under
+# `maintenance_serviceability__leveling_feet`, 'Check Valve' under
+# `safety_protection__overcurrent_protection` — proving there is NO real
+# per-row engineering placement to join against; inventing one via name/tag
+# proximity would be exactly the fabrication this taxonomy exists to refuse)
+# OR names TWO OR MORE *different* pieces of equipment (a genuinely ambiguous
+# reference — ADDS a note instead of guessing). proveCatch both directions in
+# `_selftest`.
+_VALVE_ACTUATION_RX = re.compile(
+    r"actuat|automat|solenoid|motoris|motoriz|\bcontrol\b|dosing|metering|modulat|"
+    r"throttl|pneumatic|electric|relief|safety", re.I)
+_COMMODITY_VALVE_NOUN_RX = re.compile(
+    r"\b(check|non.?return|swing|ball|gate|globe|needle|wafer|lift|foot|"
+    r"isolation|isolat\w*|manual|sample)\b", re.I)
+_VALVE_RATING_RX = re.compile(
+    r"\bPN\s*\d{1,3}\b|\bclass\s*\d{2,4}\s*#?\b|\bANSI\s*\d{2,4}\b|"
+    r"\b\d+(?:\.\d+)?\s*bar(?:\s+rating)?\b|\b\d+(?:\.\d+)?\s*psi\b", re.I)
+
+
+def _engine_refused_process_valve(text: str) -> bool:
+    """Mirrors build-excel-export.py's `_commodity_process_valve` EXACTLY — the two
+    scripts must agree on which rows this taxonomy covers, or a row could stamp
+    here and still miss the scorer's own `_generic_spec_valve` gate."""
+    n = str(text or "")
+    if not re.search(r"\bvalves?\b|\bnon.?return\b", n, re.I):
+        return False
+    if _VALVE_ACTUATION_RX.search(n):
+        return False
+    return bool(_COMMODITY_VALVE_NOUN_RX.search(n))
+
+
+def _connection_schedule_rows(out_dir: str) -> list:
+    p = os.path.join(out_dir, "connection-schedule.json")
+    if not os.path.exists(p):
+        return []
+    try:
+        return (json.load(open(p)).get("rows") or [])
+    except Exception:
+        return []
+
+
+def _named_equipment_candidates(text: str, cs_rows: list) -> set:
+    """Equipment NAMES the row's own text mentions that also appear as a connection-
+    schedule endpoint (from/to) — a real, non-fabricated reference, never a token-
+    overlap guess. Case-insensitive whole-NAME substring match (a name like
+    'Softener Vessel' must appear verbatim in the row's text, not merely share a
+    word with it — 'Isolation Valves' sharing no word with any equipment name is
+    exactly the point: it correctly yields NO candidate, not a guessed one)."""
+    blob = f" {str(text or '').lower()} "
+    names = set()
+    for r in cs_rows:
+        if not isinstance(r, dict):
+            continue
+        for key in ("from", "to"):
+            nm = str(r.get(key) or "").strip()
+            if nm and len(nm) >= 4 and nm.lower() in blob:
+                names.add(nm)
+    return names
+
+
+def _dn_for_named_equipment(name: str, cs_rows: list) -> str:
+    """Largest-bore DN among every connection-schedule run touching equipment NAME
+    <name> (either end) — the vessel's main process nozzle, not a drain/vent stub.
+    Mirrors draw_process_schedules.py's `_dn_by_equipment_name` exactly (the proven
+    join). '' when the equipment has no sized connection at all — a genuine gap,
+    never invented."""
+    best_dn, best_bore = "", -1.0
+    for r in cs_rows:
+        if not isinstance(r, dict) or name not in (r.get("from"), r.get("to")):
+            continue
+        dn = str(r.get("size") or "").strip()
+        if not dn:
+            continue
+        try:
+            bore = float(r.get("outer_dia_mm") or 0)
+        except (TypeError, ValueError):
+            bore = 0.0
+        if bore >= best_bore:
+            best_dn, best_bore = dn, bore
+    return best_dn
+
+
+def _rating_for_named_equipment(name: str, cs_rows: list) -> str:
+    """A pressure-CLASS token (PN/ANSI/bar/psi/class) STATED on a connection-schedule
+    run touching equipment NAME <name> — never a default, never inferred from price
+    or material. '' when the schedule states no pressure class for that equipment
+    (the common case — the schedule carries FLOW ratings, e.g. '45 m3/h', not
+    pressure classes; honest absent, per this follow-on's own instruction)."""
+    for r in cs_rows:
+        if not isinstance(r, dict) or name not in (r.get("from"), r.get("to")):
+            continue
+        for fld in ("rating", "cost_basis", "qty"):
+            hit = _VALVE_RATING_RX.search(str(r.get(fld) or ""))
+            if hit:
+                return hit.group(0).strip()
+    return ""
+
+
+def _apply_valve_stamping(rows: list, cs_rows: list) -> list:
+    """Pure application of the join rule onto `rows` given an already-loaded
+    connection-schedule `cs_rows` list — split from `_stamp_engine_refused_valve_specs`
+    so `_selftest` can proveCatch the join with a synthetic schedule, independent of
+    any on-disk connection-schedule.json. See the module docstring above for the
+    join/ambiguity rule this implements."""
+    if not cs_rows:
+        return rows
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("size") or "").strip():
+            continue    # already sized — never overwrite
+        req = str(row.get("requirement") or "")
+        # SUB-COMPONENT rows (requirement starts '↳', or `sub_of` set) are OUT OF SCOPE:
+        # the excel scorer's taxonomy (`_eval_bom_ledger_contract`'s own `is_sub` check,
+        # mirrored here exactly) never evaluates them for generic-spec/OEM-proprietary —
+        # their unit/line/MPN/size live on the PARENT line by apportionment. A sub-
+        # component's OWN basis often already names its parent equipment (e.g. "physics-
+        # sized component of Ro High Pressure Pump"), which WOULD join unambiguously —
+        # but stamping it would be scope creep on a row this follow-on's target taxonomy
+        # never reads, so it is explicitly skipped rather than silently mutated.
+        if req.startswith("↳") or row.get("sub_of"):
+            continue
+        part = str(row.get("part") or "")
+        if not _engine_refused_process_valve(f"{req} {part}"):
+            continue
+        blob = f"{req} {part} {row.get('basis') or ''}"
+        candidates = _named_equipment_candidates(blob, cs_rows)
+        if len(candidates) != 1:
+            if len(candidates) > 1:
+                row["basis"] = (str(row.get("basis") or "").rstrip(" ·")
+                                 + f" · size/rating not stamped: row names {len(candidates)} "
+                                   f"distinct connection-schedule equipment items — ambiguous join")
+            continue    # zero → no reference at all; >1 → genuinely ambiguous, never guess
+        name = next(iter(candidates))
+        dn = _dn_for_named_equipment(name, cs_rows)
+        if not dn:
+            continue    # named equipment has no sized connection — honest absent
+        row["size"] = dn
+        note = f" · size {dn} derived from connection schedule (line {name})"
+        rating = _rating_for_named_equipment(name, cs_rows)
+        if rating:
+            note += f" · rating {rating} (from the connected line's stated pressure class)"
+        row["basis"] = str(row.get("basis") or "").rstrip(" ·") + note
+    return rows
+
+
+def _stamp_engine_refused_valve_specs(rows: list, out_dir: str) -> list:
+    """Stamps DN (`size`) + (when the schedule states one) a rating token onto every
+    engine-refused process valve row in `rows` whose own size field is empty, by
+    reading `out_dir`'s connection-schedule.json. See `_apply_valve_stamping` for the
+    join/ambiguity rule."""
+    return _apply_valve_stamping(rows, _connection_schedule_rows(out_dir))
+
+
+# ── OEM-PROPRIETARY (no public MPN) FINDING RECORDING (2026-07-04, routed
+# follow-on #2). `build-excel-export.py`'s `_oem_proprietary_row` honours the
+# OEM-proprietary status ONLY when a row's own `basis` states a RECORDED
+# research finding — never self-declared merely because a price/part is
+# absent. `scripts/ingest/ingest-water-treatment-verified-parts.ts` writes
+# VERIFIED findings (mfr + family + evidence URLs + date, narrowly matched by
+# requirement substring) into forge-truth.db's `verified_no_public_mpn_findings`
+# table; this reads them back — read-only, defensive (a missing DB/table is a
+# no-op, never a crash) — and stamps the matching row's basis on EVERY
+# `assemble()` call, so a brand-new chain run and an offline replay of an
+# existing out_dir (`python3 scripts/requirements_bom.py out/<run>`) both pick
+# up the SAME recorded finding without touching the TS emitter at all.
+_NO_PUBLIC_MPN_CACHE = None
+
+
+def _oem_proprietary_findings() -> list:
+    """[(part_name_match:list[str], basis_text:str)] from forge-truth.db, cached for
+    the process lifetime. [] when the DB or table doesn't exist yet (a fresh
+    checkout that hasn't run the ingest script) — never raises."""
+    global _NO_PUBLIC_MPN_CACHE
+    if _NO_PUBLIC_MPN_CACHE is not None:
+        return _NO_PUBLIC_MPN_CACHE
+    out = []
+    if os.path.exists(_FORGE_TRUTH_DB):
+        try:
+            import sqlite3
+            con = sqlite3.connect(f"file:{_FORGE_TRUTH_DB}?mode=ro", uri=True)
+            rows = con.execute(
+                "SELECT part_name_match, basis_text FROM verified_no_public_mpn_findings"
+            ).fetchall()
+            con.close()
+            for match_json, basis_text in rows:
+                try:
+                    names = json.loads(match_json)
+                except Exception:
+                    names = []
+                if names and basis_text:
+                    out.append(([str(n) for n in names], str(basis_text)))
+        except Exception:
+            out = []
+    _NO_PUBLIC_MPN_CACHE = out
+    return out
+
+
+def _apply_oem_findings(rows: list, findings: list) -> list:
+    """Pure application of a `findings` list ([(names, basis_text), …]) onto `rows` —
+    split from `_stamp_oem_proprietary_findings` so `_selftest` can proveCatch the
+    matching/idempotency behaviour with a synthetic findings list, independent of
+    whether forge-truth.db happens to be present in the run environment. NEVER
+    inferred from a merely-missing price/part — a row only stamps when a finding
+    actually names it. Idempotent — skips a row whose basis already carries the
+    finding text."""
+    if not findings:
+        return rows
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        if not req:
+            continue
+        basis = str(row.get("basis") or "")
+        for names, basis_text in findings:
+            if basis_text in basis:
+                break   # already stamped
+            if any(n.lower() in req.lower() for n in names):
+                row["basis"] = (basis.rstrip(" ·") + " · " + basis_text) if basis.strip() else basis_text
+                break
+    return rows
+
+
+def _stamp_oem_proprietary_findings(rows: list) -> list:
+    """Stamps every recorded no-public-MPN research finding (forge-truth.db) onto its
+    matching row's `basis`. See `_apply_oem_findings` for the matching/idempotency
+    rule."""
+    return _apply_oem_findings(rows, _oem_proprietary_findings())
 
 
 def _connection_rows(out_dir: str, q=None):
@@ -5076,6 +5428,15 @@ def assemble(out_dir: str):
             _enqueue_db_misses(rows)
         except Exception:
             pass
+    # ROUTED FOLLOW-ONS to the honest generic-spec/OEM-proprietary taxonomy (commit
+    # d2b1c1075) — run LAST, after every row/basis exists: (1) stamp an engine-refused
+    # process valve's DN (+ rating, where the schedule states one) from the connection
+    # schedule, when the join is unambiguous; (2) stamp a recorded no-public-MPN
+    # research finding onto its matching row's basis. Both defensive (missing schedule
+    # / DB / table = no-op) and idempotent (never overwrite an already-sized/-stamped
+    # row).
+    rows = _stamp_engine_refused_valve_specs(rows, out_dir)
+    rows = _stamp_oem_proprietary_findings(rows)
     return rows
 
 
