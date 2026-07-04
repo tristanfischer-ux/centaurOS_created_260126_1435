@@ -1,8 +1,8 @@
 /**
  * @file Sample Engineering Package Page
  *
- * @description Public marketing page showcasing a real ForgeOS engineering
- * package output. Uses the smart-irrigation case study (a sensor- and
+ * @description Public marketing page showcasing a real Fractional Forge engineering
+ * package output. Uses the smart-irrigation example (a sensor- and
  * connectivity-equipped product, exactly the kind of smart-product wave
  * the Forge is built for) to demonstrate platform value to non-logged-in
  * visitors.
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
       "Product architecture, bill of materials, design-for-manufacturing analysis, competitive benchmarking, and matched suppliers — all generated from a paragraph of plain English.",
     type: "website",
     url: "https://fractionalforge.app/sample-package",
-    siteName: "ForgeOS by Fractional Forge",
+    siteName: "Fractional Forge",
   },
   alternates: {
     canonical: "https://fractionalforge.app/sample-package",
@@ -332,8 +332,8 @@ export default function SamplePackagePage() {
             </Card>
             <p className="text-xs text-muted-foreground">
               Prices are indicative and based on supplier catalogue data at
-              time of generation. Request live quotes through the ForgeOS
-              marketplace.
+              time of generation. We help you request live quotes from the
+              shortlisted suppliers.
             </p>
           </section>
 
@@ -411,7 +411,7 @@ export default function SamplePackagePage() {
                               size="sm"
                               className="ml-2"
                             >
-                              ForgeOS
+                              Fractional Forge
                             </Badge>
                           )}
                         </td>
@@ -478,11 +478,10 @@ export default function SamplePackagePage() {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Filtered from ForgeOS&apos;s marketplace of 18,000+ verified
+                  Shortlisted from a curated network of 18,000+ UK and European
                   suppliers by injection moulding capability, electronics
                   assembly, and ingress-protected (weatherproof) enclosure
-                  production. Request quotes from multiple suppliers
-                  simultaneously through the platform.
+                  production. We help you request quotes from the right ones.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   {[
@@ -504,7 +503,7 @@ export default function SamplePackagePage() {
           {/* ── Comparison Banner ─────────────────────────────────── */}
           <section className="space-y-6">
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
-              Traditional vs ForgeOS
+              Traditional vs Fractional Forge
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <Card>
@@ -523,7 +522,7 @@ export default function SamplePackagePage() {
               <Card className="border-international-orange/30">
                 <CardContent className="pt-6 space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-international-orange">
-                    With ForgeOS
+                    With Fractional Forge
                   </h3>
                   <ul className="space-y-2 text-sm text-foreground">
                     <li className="flex items-center gap-2">
@@ -532,7 +531,7 @@ export default function SamplePackagePage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Free to start, £20/month for the Starter tier
+                      Your first Design Dossier is free
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
@@ -551,22 +550,23 @@ export default function SamplePackagePage() {
           {/* ── CTA ───────────────────────────────────────────────── */}
           <section className="text-center space-y-6 py-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-              Generate your own engineering package
+              Get your own Design Dossier
             </h2>
             <p className="mx-auto max-w-lg text-muted-foreground">
-              Type a paragraph. The Forge breaks it into modules, suggests a
-              bill of materials, and matches every part to UK and European
-              manufacturers. Twenty-minute first pass, hours of detail after.
+              Describe your idea in a short brief. We build your Design Dossier
+              — an auditable, engineer-checked workbook with the modules, a
+              costed bill of materials, and matched UK and European
+              manufacturers — and I send it within a day.
             </p>
             <Link
-              href="/signup?role=founder"
+              href="/brief"
               className="inline-flex items-center gap-2 rounded-lg bg-international-orange px-8 py-3.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Start free, generate your package
+              Start a brief
               <ArrowRight className="h-4 w-4" />
             </Link>
             <p className="text-xs text-muted-foreground">
-              Free to start. No credit card required.
+              Your first Design Dossier is free.
             </p>
           </section>
         </div>

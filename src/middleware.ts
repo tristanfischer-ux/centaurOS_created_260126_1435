@@ -91,8 +91,11 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
+         * - public crawler files: robots.txt, sitemap.xml, llms.txt, manifest
+         *   (must NOT hit auth middleware, or crawlers get 307'd to /login and
+         *   the site goes invisible to Google + AI answer-engines)
          * Feel free to modify this pattern to include more paths.
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt|xml|ico|webmanifest)$).*)',
     ],
 }

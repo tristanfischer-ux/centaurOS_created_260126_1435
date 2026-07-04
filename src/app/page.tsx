@@ -188,7 +188,7 @@ const HTML = `<style>
       <a href="#founders">For founders</a>
       <a href="#partners">For partners</a>
       <a href="#how">How it works</a>
-      <a href="#examples">Example dossiers</a>
+      <a href="#examples">What&rsquo;s inside</a>
       <a href="#about">About</a>
     </nav>
     <a class="btn btn-primary" href="/brief">Work with us</a>
@@ -237,8 +237,8 @@ const HTML = `<style>
         <div class="n">1</div>
         <h3>Strategy &amp; commercial</h3>
         <p>We sharpen what you&rsquo;re building, for whom, and why they buy &mdash; the positioning, the route to market, and the team you need.</p>
-        <p>It starts on day one with a free <strong>Design Dossier</strong>: an 80+ page, first-principles engineering and procurement briefing on your idea.</p>
-        <p><a href="#examples">See a real Dossier &darr;</a></p>
+        <p>It starts on day one with a free <strong>Design Dossier</strong>: an auditable engineering-and-costing model where every number traces back to a formula you can check.</p>
+        <p><a href="#whats-in">See what&rsquo;s inside &darr;</a></p>
       </div>
       <div class="step">
         <div class="n">2</div>
@@ -263,7 +263,7 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">Start here &mdash; the Design Dossier</span>
       <h2>Your day-one on-ramp: a full Design Dossier, free.</h2>
-      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph to a page. Anvil, the engine inside Fractional Forge, returns an 80+ page Design Dossier: the engineering, the costs, the licences and regulations, the risks you haven&rsquo;t spotted &mdash; and investors who&rsquo;ve backed similar products. It&rsquo;s how every founder relationship starts, and the basis for the conversations that follow.</p>
+      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph to a page. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; the engineering, a costed bill-of-materials ledger, a full financial model, the licences and regulations, the risks you haven&rsquo;t spotted &mdash; and investors who&rsquo;ve backed similar products. Every number is a live formula you can trace. It&rsquo;s how every founder relationship starts, and the basis for the conversations that follow.</p>
     </div>
     <div class="feat">
       <div class="card"><h3>System architecture</h3><p>Your idea broken into buildable sub-systems and modules.</p></div>
@@ -278,57 +278,21 @@ const HTML = `<style>
   </div>
 </section>
 
-<!-- EXAMPLE DOSSIERS -->
+<!-- WHAT'S INSIDE — AUDITABLE WORKBOOK -->
 <section class="s examples" id="examples">
   <div class="wrap">
     <div class="s-head">
-      <span class="eyebrow">See it for yourself</span>
-      <h2>Four real Design Dossiers. Open one and scroll.</h2>
-      <p class="muted" style="margin-top:12px">Each was built by Anvil from a short brief &mdash; architecture, full physics and workings, a costed bill of materials, and named suppliers. Real and unedited. Yours covers your idea, not these.</p>
+      <span class="eyebrow">See how it&rsquo;s built</span>
+      <h2>An auditable workbook, not a black box.</h2>
+      <p class="muted" style="margin-top:12px">Your Design Dossier is a live Excel model. Every cost traces from the inputs and assumptions, through the calculations and quantities, into a bill-of-materials ledger, a cost waterfall and a full financial model &mdash; so you and your investors can change an assumption and watch the numbers move. Nothing is a black box.</p>
     </div>
-    <div class="ex-grid">
-      <div class="ex">
-        <a href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-bess-dossier.pdf" target="_blank"><img class="cover" src="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/bess-cover.png" alt="Grid-scale battery storage — Design Dossier cover" /></a>
-        <div class="top">
-          <span class="tag">Energy storage</span>
-          <h3>Grid-scale battery storage</h3>
-          <p class="desc">A 3.5&nbsp;MWh containerised battery energy-storage system for the UK grid-scale market.</p>
-        </div>
-        <div class="meta"><span>83 pages</span><span>23 MB</span></div>
-        <div class="act"><a class="btn btn-primary" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-bess-dossier.pdf" target="_blank">Open the Dossier &rarr;</a></div>
-      </div>
-      <div class="ex">
-        <a href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-vertical-farm-dossier.pdf" target="_blank"><img class="cover" src="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/vf-cover.png" alt="Modular vertical farm — Design Dossier cover" /></a>
-        <div class="top">
-          <span class="tag">Agritech</span>
-          <h3>Modular vertical farm</h3>
-          <p class="desc">A 40&nbsp;ft container modular vertical farm for high-care leafy-green production.</p>
-        </div>
-        <div class="meta"><span>82 pages</span><span>25 MB</span></div>
-        <div class="act"><a class="btn btn-primary" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-vertical-farm-dossier.pdf" target="_blank">Open the Dossier &rarr;</a></div>
-      </div>
-      <div class="ex">
-        <a href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-co2-dossier.pdf" target="_blank"><img class="cover" src="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/co2-cover.png" alt="CO2 capture and mineralisation plant — Design Dossier cover" /></a>
-        <div class="top">
-          <span class="tag">Carbon capture</span>
-          <h3>CO&#8322; capture &amp; mineralisation</h3>
-          <p class="desc">A containerised CO&#8322; capture and mineralisation plant, designed against the Carbfix reference.</p>
-        </div>
-        <div class="meta"><span>99 pages</span><span>22 MB</span></div>
-        <div class="act"><a class="btn btn-primary" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-co2-dossier.pdf" target="_blank">Open the Dossier &rarr;</a></div>
-      </div>
-      <div class="ex">
-        <a href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-saf-dossier.pdf" target="_blank"><img class="cover" src="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/saf-cover.png" alt="Power-to-Liquid sustainable aviation fuel plant — Design Dossier cover" /></a>
-        <div class="top">
-          <span class="tag">Synthetic fuels</span>
-          <h3>Power-to-Liquid aviation fuel</h3>
-          <p class="desc">A field-erected Power-to-Liquid plant making sustainable aviation fuel from biogenic CO&#8322; and renewable hydrogen.</p>
-        </div>
-        <div class="meta"><span>100 pages</span><span>18 MB</span></div>
-        <div class="act"><a class="btn btn-primary" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-saf-dossier.pdf" target="_blank">Open the Dossier &rarr;</a></div>
-      </div>
+    <div class="feat">
+      <div class="card"><h3>Traceable costs</h3><p>Inputs &amp; assumptions &rarr; calculations &rarr; quantities &rarr; bill-of-materials ledger &rarr; cost waterfall &rarr; financial model. Every number is a formula.</p></div>
+      <div class="card"><h3>Engineering drawings</h3><p>General arrangement, P&amp;ID, block-flow, single-line, HVAC and electrical &mdash; plus 3D renders of the build.</p></div>
+      <div class="card"><h3>Risk &amp; open questions</h3><p>What you&rsquo;ll need to certify, the holds and exclusions, and the questions still to resolve &mdash; stated plainly, not buried.</p></div>
+      <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer reviews the whole workbook.</p></div>
     </div>
-    <p class="ex-note">Real, unedited Dossiers (~25&nbsp;MB each) &mdash; they open in a new tab.</p>
+    <p class="ex-note">Built for real, complex products &mdash; grid-scale battery storage, vertical farms, CO&#8322; capture, power-to-liquid aviation fuel, water treatment and more. Yours covers your idea.</p>
   </div>
 </section>
 
@@ -438,37 +402,37 @@ const HTML = `<style>
 <section class="s" id="pricing" style="background:var(--surface)">
   <div class="wrap">
     <div class="s-head">
-      <span class="eyebrow">Pricing</span>
-      <h2>Start free. Go deeper when it&rsquo;s worth it.</h2>
+      <span class="eyebrow">How we work</span>
+      <h2>Start with a free Dossier. Go deeper when it&rsquo;s worth it.</h2>
     </div>
     <div class="price">
       <div class="plan feat-plan">
         <span class="tag-pill tag-ember">Start here</span>
-        <h3 style="margin-top:14px">Design Dossiers</h3>
-        <div class="price-big">Free<small>your first Dossier &middot; then &pound;100 each</small></div>
+        <h3 style="margin-top:14px">The Design Dossier</h3>
+        <div class="price-big">Free<small>your first Dossier &mdash; hand-built and engineer-checked</small></div>
         <ul>
-          <li>One paragraph in, a full Design Dossier out</li>
-          <li>Architecture, bill of materials &amp; costs</li>
-          <li>Manufacturer shortlist per module</li>
-          <li>5 investor matches + how to reach them</li>
-          <li>First Dossier free &mdash; &pound;100 per Dossier after</li>
+          <li>One paragraph in, an auditable Design Dossier out</li>
+          <li>Architecture, a traceable bill-of-materials ledger &amp; full costs</li>
+          <li>Engineering drawings and a live financial model</li>
+          <li>Manufacturer shortlist and investor matches</li>
+          <li>Reviewed by a senior engineer before you see it</li>
         </ul>
-        <a class="btn btn-primary" href="/brief">Get your brief</a>
+        <a class="btn btn-primary" href="/brief">Start a brief</a>
       </div>
       <div class="plan">
         <span class="tag-pill tag-grey">Work with me</span>
-        <h3 style="margin-top:14px">Advisory</h3>
-        <div class="price-big">&pound;1,500<small>per day &middot; day-rate or fixed-scope</small></div>
+        <h3 style="margin-top:14px">Advisory, capital &amp; build</h3>
+        <div class="price-big" style="font-size:24px;line-height:1.25">Scoped to you<small>advisory &middot; fundraising &middot; build introductions</small></div>
         <ul>
           <li>We work through your Dossier together</li>
-          <li>Pressure-test the design, costs &amp; sourcing</li>
-          <li>Shape the raise &amp; the investor approach</li>
-          <li>Introductions to the build network</li>
+          <li>Pressure-test the design, the costs &amp; the sourcing</li>
+          <li>Fundraising on an introducer / success-fee basis &mdash; no raise, no fee</li>
+          <li>Introductions to the curated build network</li>
         </ul>
         <a class="btn btn-ghost" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener">Book a call</a>
       </div>
     </div>
-    <p class="price-note"><b>Fundraising is introducer / success-fee.</b> We raise, we take a success fee, and if there&rsquo;s no raise there&rsquo;s no fee. Introductions to our curated build network are part of working with us.</p>
+    <p class="price-note"><b>No self-serve, for now.</b> Every Dossier is hand-built and reviewed by a senior engineer &mdash; a self-serve version is on the way. Anything beyond the free Dossier is scoped to your project; there&rsquo;s no standard price list, because no two hardware companies are the same.</p>
   </div>
 </section>
 

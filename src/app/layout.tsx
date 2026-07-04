@@ -42,10 +42,10 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "ForgeOS — Ship the smart version of every hardware product",
-    template: "%s | ForgeOS",
+    default: "Fractional Forge — the front end for hardware",
+    template: "%s | Fractional Forge",
   },
-  description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+  description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
   metadataBase: new URL("https://fractionalforge.app"),
   manifest: "/manifest.json",
   icons: {
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ForgeOS",
+    title: "Fractional Forge",
   },
   formatDetection: {
     telephone: false,
@@ -64,15 +64,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_GB",
-    siteName: "ForgeOS by Fractional Forge",
-    title: "ForgeOS — Ship the smart version of every hardware product",
-    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+    siteName: "Fractional Forge",
+    title: "Fractional Forge — the front end for hardware",
+    description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
     url: "https://fractionalforge.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ForgeOS — Ship the smart version of every hardware product",
-    description: "Cheap intelligence is making every commodity hardware product re-imaginable. ForgeOS helps founders ship the smart version — find the spec, the suppliers, and the investors who fund it. Free to start.",
+    title: "Fractional Forge — the front end for hardware",
+    description: "Fractional Forge helps deep-tech and hardware founders get funded — and built. We bring the commercial strategy, the capital (introducer/success-fee), and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer before you see it. Your first is free.",
   },
   robots: {
     index: true,

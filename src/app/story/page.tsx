@@ -38,10 +38,10 @@ export default function StoryPage() {
             FRACTIONAL FORGE
           </Link>
           <Link
-            href="/signup"
+            href="/brief"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
           >
-            Start Free
+            Start a brief
           </Link>
         </div>
       </nav>
@@ -94,30 +94,30 @@ export default function StoryPage() {
             </p>
             <p>
               Fractional Forge is my attempt at that equivalent. Rather than
-              building your own factory from scratch, the platform connects
-              you directly to over 18,000 UK and European manufacturers who
-              already have the building, the machinery, and the expertise. As
-              you work through your product, you can see who can make what
-              you are designing, and reach out to them for real advice on how
-              it actually gets made.
+              building your own factory from scratch, we connect you to a
+              curated network of Europe&apos;s best manufacturers and design
+              partners who already have the building, the machinery, and the
+              expertise. We work alongside you to build an auditable,
+              engineer-checked Design Dossier, so you get real advice on how
+              your product actually gets made.
             </p>
             <p>
               Alongside the manufacturing network, Fractional Forge brings
-              together specialist support across thirteen disciplines, an
-              investor database of over 7,800 firms, strategy and cash-burn
-              tools, and a marketplace of experienced fractional executives,
-              so the rest of the hardware founder&apos;s job sits in one place
-              too.
+              specialist support across thirteen disciplines, a fractional
+              bench of senior engineers, and introductions to the investors
+              most likely to back it, on an introducer / success-fee basis.
+              We do the connecting and the checking, so the rest of the
+              hardware founder&apos;s job becomes manageable.
             </p>
             <p>
               One of the less obvious things about running a hardware startup
               is just how distributed the team ends up being: a designer here,
               a fractional engineer there, a manufacturer in another country,
               a finance advisor in a third. Keeping everyone moving in the
-              same direction becomes its own full-time job. Fractional Forge
-              has strategy, objectives, and tasks built in, so the whole team
-              knows what they are doing and why, whether they are full-time,
-              fractional, or one of the specialists.
+              same direction becomes its own full-time job. A lot of what we
+              do is exactly that — holding the thread across the specialists,
+              the partners and the raise, so the whole thing keeps moving in
+              one direction.
             </p>
             <p>
               It is also a genuine home for fractional executives. I know so
@@ -141,10 +141,10 @@ export default function StoryPage() {
 
           <div className="mt-12 sm:mt-16 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 border-t border-muted pt-10">
             <Link
-              href="/signup"
+              href="/brief"
               className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
             >
-              Start Free <ArrowRight className="h-4 w-4" />
+              Start a brief <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/"

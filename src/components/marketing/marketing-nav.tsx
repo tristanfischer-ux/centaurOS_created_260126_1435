@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
-    { href: '/pricing', label: 'Pricing' },
+    { href: '/pricing', label: 'How it works' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
 ] as const
@@ -104,9 +104,9 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                     Sign In
                                 </Button>
                             </Link>
-                            <Link href="/signup">
+                            <Link href="/brief">
                                 <Button size="sm" className="gap-1.5">
-                                    Get Started
+                                    Work with us
                                     <ArrowRight className="h-3.5 w-3.5" />
                                 </Button>
                             </Link>
@@ -141,11 +141,11 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                     <div className="border-t bg-background shadow-lg md:hidden">
                         <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
                             <Link
-                                href={isAuthed ? '/investors' : '/signup'}
+                                href={isAuthed ? '/investors' : '/brief'}
                                 className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-xs font-mono font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                {isAuthed ? 'Open app' : 'Get Started'}
+                                {isAuthed ? 'Open app' : 'Work with us'}
                             </Link>
                             {NAV_LINKS.map((link) => (
                                 <Link
