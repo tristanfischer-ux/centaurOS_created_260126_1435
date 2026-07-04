@@ -745,6 +745,94 @@ def _fx_evidence_expr(ev_ref: str, structural_label: str) -> str:
             f'"{_xq(structural_label, 120)}")')
 
 
+# ═══ SOFT-MISS DEFECT/ISSUE TEXT → LIVE FORMULA (Tristan 2026-07-04, the v67 escape) ═══
+# A quality-scorecard section's `defects`/`issues` list is an opaque, upstream-classified
+# STRING (e.g. a soft brief-compliance miss: 'FAIL (soft): ro_working_pressure_bar —
+# target 10.6 bar, achieved 1 (ro_high_pressure_pump_served_bar)'). The Overview and
+# Quality & Audit tabs rendered that string straight into the cell, so a build that
+# happened to carry a SOFT compliance miss painted a bare 'FAIL (soft): …' literal on
+# Overview!D and 'Quality & Audit'!E — caught (correctly) by _enforce_live_check_gate,
+# but only on a state that actually carries the miss, so it slipped every clean-state
+# selftest. _SOFT_MISS_RX recognises the 'VERDICT (soft): label — target T [unit],
+# achieved A …' family (PASS/FAIL/WARN); target + achieved + label are parsed out and the
+# cell becomes a REAL recompute over them (the 24484fb3f/3b01cb73a standard) — the
+# comparison direction (>= or <=) is the one that reproduces the SOURCE verdict from the
+# two parsed numbers (deterministic from the data itself, no per-metric direction table).
+# The operands are embedded as INLINE formula literals rather than 'Audit data' sheet rows
+# — Overview and (especially) Quality & Audit render LATE in build() (Quality & Audit is
+# built AFTER tab_audit_data has already fixed the Audit-data row list, per its own
+# 'built after every content tab has registered its operands' contract; a late
+# audit_operand() call here would return a ref to a row that sheet never actually
+# rendered). The target/achieved/label are already fully known at python build time —
+# the same footing as the fixed-constant literals baked directly into other formulas in
+# this file (e.g. _BOARD_RECON_BAND) — so an inline literal is the correct embed, not a
+# workaround. Any other string _BARE_VERDICT_RX would catch (a sibling with no parseable
+# target/achieved) still never ships as a literal: it becomes a trivial one-literal
+# formula. Ordinary prose (no bare-verdict prefix) is unaffected.
+_SOFT_MISS_RX = re.compile(
+    r"^(?P<verdict>PASS|FAIL|WARN)\s*\(soft\)\s*:\s*(?P<label>.+?)\s*[—-]\s*target\s+"
+    r"(?P<target>-?[\d,]*\.?\d+)\s*(?P<tunit>[^\s,]*)\s*,\s*achieved\s+"
+    r"(?P<achieved>-?[\d,]*\.?\d+)\s*(?P<tail>.*)$",
+    re.IGNORECASE)
+
+
+def _verdict_expr(text: str) -> str:
+    """EXCEL EXPRESSION (no leading '=') for ONE verdict-prefixed defect/issue STRING —
+    used both as a whole-cell formula (_write_defect_cell) and as a join component when
+    several defects render in one cell (_write_defect_join_cell). Only called once the
+    caller has confirmed `text` matches _BARE_VERDICT_RX."""
+    m = _SOFT_MISS_RX.match(text.strip())
+    if m:
+        try:
+            tgt = float(m.group("target").replace(",", ""))
+            ach = float(m.group("achieved").replace(",", ""))
+        except ValueError:
+            m = None
+    if m:
+        verdict = m.group("verdict").upper()
+        label = m.group("label").strip()
+        tunit = (m.group("tunit") or "").strip()
+        tail = (m.group("tail") or "").strip()
+        target_disp = f"{m.group('target')} {tunit}".strip()
+        achieved_disp = f"{m.group('achieved')} {tail}".strip()
+        # direction inferred FROM THE DATA: whichever comparison reproduces the recorded
+        # verdict for these two numbers (no hardcoded higher-/lower-is-better table).
+        ge_reads_pass = ach >= tgt
+        cmp_op = ">=" if ge_reads_pass == (verdict == "PASS") else "<="
+        return (f'IF({ach:g}{cmp_op}{tgt:g},"PASS","{verdict} (soft) — "&"{_xq(label, 120)}"&'
+                f'": target "&"{_xq(target_disp, 60)}"&", achieved "&"{_xq(achieved_disp, 60)}")')
+    # sibling / unparsed bare-verdict string — still never a literal: a trivial formula
+    # that reduces to the escaped text.
+    return f'"{_xq(text, 300)}"'
+
+
+def _write_defect_cell(ws: Worksheet, row: int, col: int, text: str):
+    """Write a SINGLE defect/issue string to a cell: a LIVE formula the moment the text
+    is verdict-prefixed (_BARE_VERDICT_RX), else the plain text unchanged. Returns the
+    cell so the caller can still style it (font/fill/border/alignment) as before."""
+    t = clean_cell(text) if text is not None else ""
+    t = t if isinstance(t, str) else str(t)
+    if t and _BARE_VERDICT_RX.match(t.strip()):
+        return ws.cell(row, col, "=" + _verdict_expr(t))
+    return ws.cell(row, col, t)
+
+
+def _write_defect_join_cell(ws: Worksheet, row: int, col: int, items: List[str]):
+    """Write a list of defect/issue strings, joined with '; ', to ONE cell. Falls back to
+    the original plain join when none of the items is verdict-prefixed; otherwise builds
+    ONE formula concatenating every item (a verdict-prefixed item becomes a live
+    recompute / escaped-literal sub-expression, a plain item becomes a quoted literal) —
+    so a soft miss buried among several defects still never ships as a bare literal."""
+    cleaned = [clean_cell(d) for d in (items or []) if clean_cell(d)]
+    if not any(_BARE_VERDICT_RX.match(s.strip()) for s in cleaned):
+        return ws.cell(row, col, "; ".join(cleaned))
+    parts = [_verdict_expr(s) if _BARE_VERDICT_RX.match(s.strip())
+             else f'"{_xq(s, 300)}"' for s in cleaned]
+    if not parts:
+        return ws.cell(row, col, "")
+    return ws.cell(row, col, "=" + '&"; "&'.join(parts))
+
+
 def _cf_verdict(ws: Worksheet, rng: str) -> None:
     """Conditional formatting for a live verdict column: green on PASS, red on FAIL —
     so a formula that FLIPS on recalc recolours itself (the static build-time fill only
@@ -2109,7 +2197,7 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
             cp.font = vfont
             cp.border = BORDER
             _register_check_range(ws.title, "C", row, row)
-            cd = ws.cell(row, 4, "; ".join(str(d) for d in defects))
+            cd = _write_defect_join_cell(ws, row, 4, [str(d) for d in defects])
             cd.alignment = WRAP_TOP
             cd.border = BORDER
             row += 1
@@ -13553,7 +13641,7 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         ocell.font = FONT_ADVISORY if nm in advisory else FONT_NOTE
         ocell.alignment = WRAP_TOP
         defect = d.get("defects") or [""]
-        dcell = ws.cell(r, 5, clean_cell(defect[0] if defect else ""))
+        dcell = _write_defect_cell(ws, r, 5, defect[0] if defect else "")
         dcell.alignment = WRAP_TOP
         dcell.font = FONT_NOTE
         r += 1
@@ -13578,7 +13666,7 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         ocell.font = FONT_ADVISORY
         ocell.alignment = WRAP_TOP
         defect = adv.get("defects") or [""]
-        dcell = ws.cell(r, 5, clean_cell(defect[0] if defect else ""))
+        dcell = _write_defect_cell(ws, r, 5, defect[0] if defect else "")
         dcell.alignment = WRAP_TOP
         dcell.font = FONT_NOTE
         r += 1
@@ -13673,7 +13761,7 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
             _scell.fill = FILL_PASS if _st == "PASS" else (FILL_ADVISORY if _st == "UNSCORED" else FILL_FAIL)
             ws.cell(r, 3, f'=IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),"UNSCORED")')
             _iss = _v.get("issues") or [""]
-            _icell = ws.cell(r, 4, clean_cell(_iss[0] if _iss else ""))
+            _icell = _write_defect_cell(ws, r, 4, _iss[0] if _iss else "")
             _icell.alignment = WRAP_TOP
             _icell.font = FONT_NOTE
             for _ci in range(5, 17):
@@ -18874,6 +18962,71 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables2)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done2)
+
+    # ═══ SOFT-MISS DEFECT/ISSUE proveCatch (Tristan 2026-07-04, the v67 escape): a
+    # SOFT compliance miss ('FAIL (soft): ro_working_pressure_bar — target 10.6 bar,
+    # achieved 1 (ro_high_pressure_pump_served_bar)') painted a bare literal on
+    # Overview!D and 'Quality & Audit'!E — the live-check gate correctly refused that
+    # build, but only on a state carrying the miss, so it slipped every clean-state
+    # selftest. Both directions + the join-cell variant + the gate-net regression check. ═══
+    _SOFT_MISS_TXT = ("FAIL (soft): ro_working_pressure_bar — target 10.6 bar, achieved 1 "
+                      "(ro_high_pressure_pump_served_bar)")
+    # (a) WITH the soft miss, via the real render helper — a live formula, gate clean,
+    # and (when LibreOffice is available) the recalculated value reproduces the miss.
+    _wbs = _WbG(); _wss = _wbs.active; _wss.title = "Overview"
+    _sc1 = _write_defect_cell(_wss, 1, 1, _SOFT_MISS_TXT)
+    if not (isinstance(_sc1.value, str) and _sc1.value.startswith("=")):
+        print(f"  FAIL soft-miss: a SOFT compliance miss must render as a live formula "
+              f"(got {_sc1.value!r})"); bad += 1
+    _gss = _enforce_live_check_gate(_wbs)
+    if _gss["bare_literals"]:
+        print(f"  FAIL soft-miss: the live-formula render must pass the no-cheating gate "
+              f"(got {_gss['bare_literals']})"); bad += 1
+    _sof2 = _find_soffice()
+    if _sof2:
+        import tempfile as _tfs
+        with _tfs.TemporaryDirectory() as _tds:
+            _ps = os.path.join(_tds, "soft-miss.xlsx")
+            _wbs.save(_ps)
+            if recalc_and_cache(_ps):
+                from openpyxl import load_workbook as _lws
+                _rbs = _lws(_ps, data_only=True)["Overview"]
+                _rv = _rbs["A1"].value
+                if not (isinstance(_rv, str) and _rv.startswith("FAIL (soft)")
+                        and "target 10.6" in _rv and "achieved 1" in _rv):
+                    print(f"  FAIL soft-miss: recalculated cell must reproduce the soft "
+                          f"miss (got {_rv!r})"); bad += 1
+            else:
+                print("  (soft-miss proveCatch: LibreOffice recalc unavailable — skipped)")
+    else:
+        print("  (soft-miss proveCatch: LibreOffice not found — skipped)")
+    # (b) NO soft miss — ordinary prose renders unchanged, plain text, no formula.
+    _wsn = Workbook().active
+    _sc2 = _write_defect_cell(_wsn, 1, 1, "everything nominal, no issues")
+    if not (isinstance(_sc2.value, str) and not _sc2.value.startswith("=")):
+        print(f"  FAIL soft-miss: ordinary prose must render unchanged, no formula "
+              f"(got {_sc2.value!r})"); bad += 1
+    # (c) the join-cell variant — a soft miss buried among several plain defects still
+    # becomes a live formula (no bare literal buried mid-cell).
+    _wbj = _WbG(); _wsj = _wbj.active; _wsj.title = "Overview"
+    _write_defect_join_cell(_wsj, 1, 1,
+                            ["all nominal here", _SOFT_MISS_TXT, "another plain note"])
+    _gsj = _enforce_live_check_gate(_wbj)
+    if _gsj["bare_literals"]:
+        print(f"  FAIL soft-miss: the join-cell render must pass the no-cheating gate "
+              f"(got {_gsj['bare_literals']})"); bad += 1
+    # (d) GATE-NET REGRESSION: a genuinely PLANTED bare literal (bypassing the render
+    # helper entirely — the real 2026-07-04 bug shape) must still refuse the build; this
+    # family is fixed at the render site, not by weakening the gate.
+    _wbp = _WbG(); _wsp = _wbp.active; _wsp.title = "Quality & Audit"
+    _wsp.cell(1, 1, _SOFT_MISS_TXT)                     # ← the planted cheat
+    try:
+        _enforce_live_check_gate(_wbp)
+        print("  FAIL soft-miss: a planted bare 'FAIL (soft)' literal must refuse "
+              "the build"); bad += 1
+    except SystemExit as _pe:
+        if "Quality & Audit" not in str(_pe) or "bare" not in str(_pe):
+            print(f"  FAIL soft-miss: refusal must name the literal cell (got {_pe})"); bad += 1
 
     # ═══ QUESTIONS-FOR-THE-CUSTOMER proveCatch (WAVE 1, 2026-07-03, both directions):
     # a state with still_missing / inferred fields / contradictions / uncovered recon

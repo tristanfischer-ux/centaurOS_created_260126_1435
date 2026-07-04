@@ -3369,7 +3369,7 @@ async function main() {
   // completeness, cross-page prose, jurisdiction inference) flag + route but ship a DRAFT, since a
   // wrong jurisdiction guess or a legit side-by-side column must not halt the whole run. Escape:
   // CHAIN_GATE_SOFT=1 makes every gateBlock gate flag-only (a deliberate draft run).
-  const WRONGNESS_GATES = new Set([10, 12, 13, 14, 15, 16, 20, 21, 30])
+  const WRONGNESS_GATES = new Set([10, 12, 13, 14, 15, 16, 20, 21, 30, 38])
   const gateSoft = ['1', 'true', 'yes', 'on'].includes(String(process.env.CHAIN_GATE_SOFT || '').toLowerCase())
   const gateBlock = (code: number, gateName: string, summary: string, opts?: { catastrophic?: boolean }): void => {
     const enforce = opts?.catastrophic === true || !!process.env.CHAIN_GATE_ENFORCE
@@ -9216,13 +9216,54 @@ async function main() {
   //    build-excel-export exits non-zero when the ⚠Checks tab carries a FAIL — that is the
   //    honest gate signal, NOT a build failure (the .xlsx is written first), so a throw is
   //    caught and the file still opened. Open is best-effort + worker/RENDER_NO_OPEN-guarded.
+  //
+  //    STALENESS GATE — GATE 38 (Tristan 2026-07-04, ordering-by-construction). The comment
+  //    above ("the .xlsx is written first") is FALSE for one path: build-excel-export.py's
+  //    own no-cheating check (`_enforce_live_check_gate`) can `raise SystemExit` BEFORE
+  //    `wb.save()` ever runs, when a bare (non-formula) verdict string survives on a sheet —
+  //    e.g. stale fix-directive narrative text copied verbatim from a PRIOR DATA-FIX
+  //    iteration. When that fires, the OLD dossier.xlsx on disk is untouched while state.json
+  //    has already moved on (v67: dossier.xlsx stayed pinned to iteration-1's
+  //    "Brief target met: ro_working_pressure_bar" FAIL — achieved 3, then achieved 1 on the
+  //    retry — while the deterministic scorecard, reading the FINAL state, showed a clean
+  //    PASS; the second build's `wb.save()` never executed, so the "fresh" Downloads copy was
+  //    a re-timestamped copy of the stale file). A real `wb.save()` ALWAYS rewrites the file's
+  //    mtime (even when the recomputed bytes happen to be identical to the last save —
+  //    `_finalise_deterministic_zip`'s byte-identity guarantee normalises the ZIP's internal
+  //    metadata, not the OS-level file mtime), so "did the mtime advance past its pre-build
+  //    snapshot" is a precise, pure proxy for "did a save actually happen" — no schema
+  //    knowledge of what the workbook embeds is required. Detect → rebuild ONCE (bounded,
+  //    never a loop) → a second stale result is WRONGNESS (a workbook provably NOT reflecting
+  //    the delivered design) and hard-blocks via the existing gateBlock() idiom (added to
+  //    WRONGNESS_GATES above) rather than silently shipping it.
   try {
     const xlsxPath = resolve(outDir, 'dossier.xlsx')
-    try {
-      execFileSync('python3', [resolve(__dirname, 'build-excel-export.py'), outDir, xlsxPath],
-        { stdio: 'inherit', timeout: 300_000 })
-    } catch { /* non-zero exit = ⚠Checks FAIL surfaced; the .xlsx is still written */ }
-    const xlsxBytes = readFileSync(xlsxPath)   // throws if the build genuinely produced nothing
+    const xlsxMtimeMs = (): number => (existsSync(xlsxPath) ? statSync(xlsxPath).mtimeMs : 0)
+    const isExcelArtefactStale = (beforeMtimeMs: number): boolean =>
+      !existsSync(xlsxPath) || xlsxMtimeMs() <= beforeMtimeMs
+    const buildExcelOnce = (): void => {
+      try {
+        execFileSync('python3', [resolve(__dirname, 'build-excel-export.py'), outDir, xlsxPath],
+          { stdio: 'inherit', timeout: 300_000 })
+      } catch { /* non-zero exit = ⚠Checks FAIL surfaced (still saved) OR a pre-save gate fired
+                    (NOT saved) — the mtime check below tells the two apart, not this catch */ }
+    }
+    let beforeMtimeMs = xlsxMtimeMs()
+    buildExcelOnce()
+    if (isExcelArtefactStale(beforeMtimeMs)) {
+      console.error('[chain] ⚠ Excel staleness gate: dossier.xlsx did not advance past its pre-build snapshot — build-excel-export.py exited without a wb.save() (its own pre-save no-cheating gate almost certainly fired on stale content) — rebuilding ONCE')
+      logAction({ step: 'excel_staleness_gate', ok: false, retry: true })
+      beforeMtimeMs = xlsxMtimeMs()
+      buildExcelOnce()
+      if (isExcelArtefactStale(beforeMtimeMs)) {
+        logAction({ step: 'excel_staleness_gate', ok: false, retry: false })
+        gateBlock(38, 'GATE 38 excel-staleness',
+          'dossier.xlsx was not rewritten after 1 retry — build-excel-export.py refused to save over the same stale content twice; the shipped workbook would not reflect the delivered design (see the build-excel-export.py output above for the underlying ⚠Checks / LIVE-CHECK GATE finding to fix at source)')
+      } else {
+        logAction({ step: 'excel_staleness_gate', ok: true, retried: true })
+      }
+    }
+    const xlsxBytes = readFileSync(xlsxPath)   // provably fresh — the mtime gate above proves a real wb.save() ran (or GATE 38 already exited/flagged above)
     const home = process.env.HOME || ''
     const dt = new Date()
     const ts = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}_${String(dt.getHours()).padStart(2, '0')}${String(dt.getMinutes()).padStart(2, '0')}`
