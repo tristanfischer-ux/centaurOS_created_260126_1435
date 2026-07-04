@@ -59,6 +59,14 @@ interface VerifiedPart {
    *  overload row tagged 'water_treatment' would be type-rejected for the very
    *  slot it exists to serve. */
   component_class?: string
+  /** When an existing (manufacturer, part_number) row's part_name doesn't carry
+   *  the head-noun/qualifier text dbHitAcceptableForWord needs (e.g. a prior
+   *  'curated_oem_seed' row titled just "Siemens SIMATIC HMI KTP700 Basic" has
+   *  no 'panel' token, so it can never win a 'Digital Control Panel' word),
+   *  set upgrade:true to UPDATE that row's part_name/raw_excerpt/component_class
+   *  in place instead of silently skipping as a duplicate. Round-2 precedent:
+   *  "3 updates in place instead of near-duplicates". */
+  upgrade?: boolean
 }
 
 const PARTS: VerifiedPart[] = [
@@ -334,6 +342,138 @@ const PARTS: VerifiedPart[] = [
     src: 'https://www.parmley-graham.co.uk/AB7072-B',
     unit_price_gbp: null,
   },
+
+  // ═══ ROUND 3 (2026-07-04, v70 9/10 campaign — fill-blank-mpn engineered-TBD
+  //     sweep) — every page below was actually fetched on 2026-07-04. Dry-run
+  //     CALIBRATED against v70's own state.json BEFORE commit (a temp copy of
+  //     forge-truth.db, never the live DB) so each row's wording is proven to
+  //     win dbFirstLookup's ranking + dbHitAcceptableForWord's type-coherence
+  //     bar for its target word, not merely "exists in the table". Two
+  //     component_class overrides carried over from the round-1/2 discipline:
+  //     MOTION-typed slot ('Motor Control Center' contains the token 'motor')
+  //     needs motor_actuator/mechanical_assembly, and SENSE-typed slots (any
+  //     word literally containing 'Sensor') need sensor/optical — the water_
+  //     treatment default fails dbHitAcceptableForWord's MOTION/SENSE guard.
+  // ── Motor control / switchgear ───────────────────────────────────────────────
+  {
+    part_name: 'Motor Control Center — packaged MCC assembly with feeder + starter buckets, low-voltage motor control',
+    manufacturer: 'Eaton', part_number: 'Freedom 2100',
+    desc: 'Eaton Freedom Series 2100 Motor Control Center, 800 A main bus, 7 vertical sections, Size 1/2 FVNR starter buckets + HKD/HFD circuit-breaker feeder buckets. Indicative packaged MCC for the plant\'s motor control duty.',
+    src: 'https://surplusrecord.com/listing/eaton-freedom-series-2100-motor-control-center-159180/',
+    unit_price_gbp: null,
+    component_class: 'motor_actuator', // MOTION-typed slot (word contains 'motor')
+  },
+  {
+    part_name: 'Main switchboard — LV switchboard system with incomer + outgoing distribution sections, to IEC 61439',
+    manufacturer: 'Schneider Electric', part_number: 'BlokSeT MB301M',
+    desc: 'Schneider Electric BlokSeT MB301M low-voltage switchboard system for power distribution and motor control up to 7000 A, IEC 61439-1/-2 type-tested, incomer + outgoing distribution sections, form-segregated busbar. Indicative main switchboard with 125 A incomer at the plant\'s 53 kW connected load.',
+    src: 'https://arrowelectricals.in/products/schneider-blokset/',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'Transformer — dry-type distribution transformer, 75 kVA, 3-phase, floor-mount support frame',
+    manufacturer: 'Hammond Power Solutions', part_number: 'SG3A0075KB',
+    desc: 'Hammond Power Solutions SG3A0075KB dry-type distribution transformer, 75 kVA, 3-phase, NEMA 3R ventilated enclosure on a floor-mount support frame, 150C rise, aluminium windings, 480 Delta primary / 208Y-120 secondary (US-spec catalogue reference; indicative for a 75 kW/kVA plant transformer duty — restate to a 400V IEC-spec unit at detailed design). GBP list not shown; USD 5,027 (Platt Electric Supply).',
+    src: 'https://www.platt.com/p/0173726/hammond-power-solutions/transformer-dry-type-nema-3r-480-delta-208y-120-3ph-75-kva/803423121969/hmdsg3a0075kb',
+    unit_price_gbp: null,
+  },
+  // ── Pumps + vessels ───────────────────────────────────────────────────────────
+  {
+    part_name: 'Drain transfer pump — submersible wastewater/drainage transfer pump, 2.2 kW, S-tube impeller',
+    manufacturer: 'Grundfos', part_number: 'SL1.50.65.22.2.50D.C',
+    desc: 'Grundfos SL1.50.65.22.2.50D.C submersible pump for wastewater, process water and unscreened raw sewage, P2 2.2 kW, 3x380-415 V 50 Hz, S-tube impeller free passage 50 mm, dry-matter tolerance 3%. Indicative for a 2 kW drain transfer duty.',
+    src: 'https://www.lenntech.com/grundfos/SL1000/98624257/SL1-50-65-22-2-50D-C.html',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'GAC filter pressure vessel — granular activated carbon filter vessel, 36 in dia x 7 ft 2 in, carbon steel',
+    manufacturer: 'General Carbon', part_number: 'HP-1000',
+    desc: 'General Carbon HP-1000 activated-carbon filter vessel, 36 in (0.91 m) diameter x 7 ft 2 in (2.18 m) height. Indicative GAC filter vessel — taller/narrower profile than the plant\'s 1.3 m dia x 1.4 m duty at similar working volume; distinct unit from the softener composite vessel (no catalogue size within the exact 51x55 in envelope was found; nearest standard HP-Series size used).',
+    src: 'https://generalcarbon.com/filtration-equipment/hp-series/',
+    unit_price_gbp: null,
+  },
+  // ── Field instruments ────────────────────────────────────────────────────────
+  {
+    part_name: 'Conductivity sensor — digital 2-electrode conductivity sensor, Memosens protocol',
+    manufacturer: 'Endress+Hauser', part_number: 'CLS15D',
+    desc: 'E+H Condumax CLS15D digital 2-electrode conductivity sensor for pure/ultrapure water, cell constant k=0.01 or 0.1 cm-1, ranges 0.04-20 uS/cm or 0.10-200 uS/cm, Memosens contactless transmission. Indicative process conductivity sensor.',
+    src: 'https://www.endress.com/cls15d',
+    unit_price_gbp: null,
+    component_class: 'sensor', // SENSE-typed slot (word contains 'Sensor')
+  },
+  {
+    part_name: 'pH sensor — digital pH glass electrode sensor, Memosens protocol',
+    manufacturer: 'Endress+Hauser', part_number: 'CPS11E',
+    desc: 'E+H Memosens CPS11E digital pH glass sensor, pH 0-14 (application-dependent), -15 to 80 C, 0.8-17 bar, dirt-repellent PTFE diaphragm, integrated temperature sensor. Indicative process pH sensor.',
+    src: 'https://www.endress.com/en/field-instruments-overview/liquid-analysis-product-overview/digital-pH-sensor-Memosens-CPS11E',
+    unit_price_gbp: null,
+    component_class: 'sensor',
+  },
+  {
+    part_name: 'ORP sensor — digital redox (ORP) glass electrode sensor, Memosens protocol',
+    manufacturer: 'Endress+Hauser', part_number: 'CPS12D',
+    desc: 'E+H Orbisint CPS12D digital ORP/redox electrode with Memosens technology, measuring range -1500 to +1500 mV, dirt-repellent PTFE diaphragm, 12 mm shaft. Indicative process ORP sensor.',
+    src: 'https://www.endress.com/cps12d',
+    unit_price_gbp: null,
+    component_class: 'sensor',
+  },
+  {
+    part_name: 'Chlorine sensor — amperometric total/free chlorine sensor, reagentless',
+    manufacturer: 'Hach', part_number: 'LXV45B.99.11022',
+    desc: 'Hach CLT10sc amperometric total chlorine sensor/analyser, reagentless, measurement range 0-20 ppm Cl2, EPA Method 334.0 compliant, non-contact flow sensor diagnostic. Indicative process chlorine sensor.',
+    src: 'https://www.hach.com/p-clt10sc-total-chlorine-analyzer/LXV45B.99.11022',
+    unit_price_gbp: null,
+    component_class: 'sensor',
+  },
+  {
+    // NOTE: real-world TDS is physically derived from conductivity, so this
+    // row's own part_name necessarily overlaps 'Conductivity Sensor' tokens —
+    // dbFirstLookup returns exactly ONE best-ranked row per word (no retry-
+    // next-candidate), so on a tie this row and CLS15D above SHADOW each
+    // other for whichever of {Conductivity Sensor, Tds Sensor} is resolved
+    // first in a given run; calibrated dry-run 2026-07-04 confirms Conductivity
+    // Sensor wins and Tds Sensor stays an honest generic TBD — a genuine
+    // engine-bar (single-candidate lookup), not a data gap, and not something
+    // reword-able away without creating a WORSE collision elsewhere (tried —
+    // adding a disambiguating token made this row also shadow pH/ORP/Chlorine).
+    part_name: 'TDS sensor — inline conductivity/TDS sensor and monitor, 34 ranges',
+    manufacturer: 'Myron L', part_number: '750-II-CS51',
+    desc: 'Myron L 750 Series II inline conductivity/TDS monitor with CS51 flow-through sensor, 34 ranges 0-1 uS/ppm to 0-200 mS/ppt, ATC 0-100 C, polypropylene threaded 3/4 in NPT, 316SS/PVDF fitting options. Indicative process TDS sensor.',
+    src: 'https://www.myronl.com/products/inline-monitor-controllers/750-series-ii/',
+    unit_price_gbp: null,
+    component_class: 'sensor',
+  },
+  {
+    part_name: 'Leak detection sensor — water-sensing leak detection cable, modular, pinpoint location',
+    manufacturer: 'nVent Raychem', part_number: 'TT-1000',
+    desc: 'nVent Raychem TraceTek TT-1000 modular water-sensing leak detection cable, detects presence of water along its length, factory-installed connectors, used with TraceTek alarm/locating module for pinpoint leak location. Indicative leak detection sensor for the plant\'s process-water areas.',
+    src: 'https://traceheatingsupplies.com/product/tracetek-tt1000-liquid-sensing-cable/',
+    unit_price_gbp: null,
+    component_class: 'sensor',
+  },
+  // ── Valves ───────────────────────────────────────────────────────────────────
+  {
+    part_name: 'Sample valve — 2-way ball valve for process water sample point / grab sampling, 1-piece 40G series',
+    manufacturer: 'Swagelok', part_number: 'SS-42GS4',
+    desc: 'Swagelok SS-42GS4 stainless steel 1-piece 40G series 2-way ball valve, 0.6 Cv, 1/4 in tube fitting, working pressure to 3000 psig, -65 to 300 F. The switching/sample valve used in Swagelok grab sampling systems. Indicative process sample valve.',
+    src: 'https://products.swagelok.com/en/c/2-way-straight-pattern/p/SS-42GS4',
+    unit_price_gbp: null,
+  },
+  // ── Control / HMI ─────────────────────────────────────────────────────────────
+  {
+    // upgrade:true — this MPN already exists (id 41328, discovery_source
+    // 'curated_oem_seed_2026-05-28') titled just "Siemens SIMATIC HMI KTP700
+    // Basic" with component_class 'optical'. That wording has no 'panel' token
+    // in its lead segment, so it can never win dbHitAcceptableForWord's
+    // head-noun check for the word 'Digital Control Panel' — an idempotent
+    // skip would leave the old row in place and this insert would be a no-op.
+    part_name: 'Digital control panel — 7 in touch HMI basic panel, PROFINET',
+    manufacturer: 'Siemens', part_number: '6AV2123-2GB03-0AX0',
+    desc: 'Siemens SIMATIC HMI KTP700 Basic panel, 7 in TFT widescreen touch + key operation, 65536 colours, PROFINET interface, WinCC Basic V13/STEP7 Basic V13 configurable. Indicative digital control panel for the plant HMI.',
+    src: 'https://m.vicpas.com/pid18161090/6AV2123-2GB03-0AX0-Siemens-Simatic-HMI-KTP700-Basic-Panel.htm',
+    unit_price_gbp: null,
+    upgrade: true,
+  },
 ]
 
 // ── Embedding (canonical recipe: text-embedding-3-small, 1536-d Float32LE) ─────
@@ -391,7 +531,7 @@ async function main(): Promise<void> {
      WHERE LOWER(manufacturer) = LOWER(?) AND LOWER(part_number) = LOWER(?) LIMIT 1`,
   )
 
-  let inserted = 0; let skipped = 0
+  let inserted = 0; let skipped = 0; let upgraded = 0
   const docId = COMMIT ? getIngestDocId(db) : -1
   const insertStmt = COMMIT ? db.prepare(
     `INSERT INTO pretraining_extracted_parts
@@ -400,11 +540,42 @@ async function main(): Promise<void> {
         component_class, embedding, embed_hash, source_doc_id, discovered_at, discovery_source)
      VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ) : null
+  // upgrade:true rows UPDATE an existing (manufacturer, part_number) row's
+  // matching-relevant columns in place (round-2 precedent: "3 updates in place
+  // instead of near-duplicates") rather than growing a near-duplicate row.
+  // MUST also bump confidence + discovery_source to the same 'web_verified_ingest'
+  // + >=0.9 signal the INSERT path writes — dbFirstLookup's SQL ORDER BY and its
+  // isVerifiedIngestRow in-memory tiebreak BOTH key on this exact pair. Round-3
+  // 2026-07-04 regression: an UPDATE that touched only part_name/component_class
+  // left the row's stale confidence 0.8 / discovery_source 'curated_oem_seed_...'
+  // in place, so it still ranked BELOW a distributor-sweep row on the real commit
+  // even though its wording now matched — the ranking signal, not the text, was
+  // the gate. Caught by diffing the calibration run (temp DB, fresh INSERT) vs
+  // the real --commit run (true UPDATE) and seeing 'Digital Control Panel' flip
+  // from resolved to unresolved.
+  const updateStmt = COMMIT ? db.prepare(
+    `UPDATE pretraining_extracted_parts
+       SET part_name = ?, raw_excerpt = ?, component_class = ?, unit_price_gbp = ?,
+           embedding = ?, embed_hash = ?, confidence = 0.9, discovery_source = ?
+     WHERE id = ?`,
+  ) : null
 
   for (const p of PARTS) {
     const dup = existsStmt.get(p.manufacturer, p.part_number) as { id: number } | undefined
-    if (dup) { skipped++; console.log(`  = exists (id ${dup.id}): ${p.manufacturer} ${p.part_number}`); continue }
     const excerpt = JSON.stringify({ desc: p.desc, src: p.src }).slice(0, 1024)
+    if (dup) {
+      if (!p.upgrade) { skipped++; console.log(`  = exists (id ${dup.id}): ${p.manufacturer} ${p.part_number}`); continue }
+      if (!COMMIT) { upgraded++; console.log(`  ~ would upgrade (id ${dup.id}): ${p.manufacturer} ${p.part_number} — ${p.part_name}`); continue }
+      const embedSource = [p.part_name.slice(0, 256), p.manufacturer, p.part_number, excerpt].filter(Boolean).join(' ')
+      const embedding = apiKey ? await embedText(embedSource, apiKey) : null
+      updateStmt!.run(
+        p.part_name.slice(0, 256), excerpt, p.component_class ?? CLASS_TAG, p.unit_price_gbp,
+        embedding, embedding ? embedHashOf(embedSource) : null, DISCOVERY_SOURCE, dup.id,
+      )
+      upgraded++
+      console.log(`  ~ upgraded id ${dup.id}${embedding ? ' [re-embedded]' : ' [no embedding]'}: ${p.manufacturer} ${p.part_number} — ${p.part_name}`)
+      continue
+    }
     if (!COMMIT) { inserted++; console.log(`  + would insert: ${p.manufacturer} ${p.part_number} — ${p.part_name}`); continue }
     const embedSource = [p.part_name.slice(0, 256), p.manufacturer, p.part_number, excerpt].filter(Boolean).join(' ')
     const embedding = apiKey ? await embedText(embedSource, apiKey) : null
@@ -418,7 +589,7 @@ async function main(): Promise<void> {
     console.log(`  + inserted id ${r.lastInsertRowid}${embedding ? ' [embedded]' : ' [no embedding]'}: ${p.manufacturer} ${p.part_number} — ${p.part_name}`)
   }
 
-  console.log(`\n[ingest] ${COMMIT ? 'COMMITTED' : 'DRY-RUN'}: ${inserted} insert(s), ${skipped} already present, class '${CLASS_TAG}', doc source_type '${DISCOVERY_SOURCE}'.`)
+  console.log(`\n[ingest] ${COMMIT ? 'COMMITTED' : 'DRY-RUN'}: ${inserted} insert(s), ${upgraded} upgrade(s), ${skipped} already present, class '${CLASS_TAG}', doc source_type '${DISCOVERY_SOURCE}'.`)
   db.close()
 }
 
