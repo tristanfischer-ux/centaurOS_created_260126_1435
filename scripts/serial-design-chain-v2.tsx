@@ -111,7 +111,14 @@ import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
 import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-domain-guard'
 import { runPayloadRatingAudit } from '../src/lib/pdf-engine-v2/lib/payload-rating-audit'
-import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
+import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt, BRIEF_PARSING_SYSTEM } from '../src/lib/pdf-engine-v2/prompts'
+// THE FINAL DETERMINISM PIECE (drawer #86, 2026-07-04): the critic (247494a32), the benchmark
+// net (284c69c09), and the vision critique (3c4e7d7de) already cache per content-hash. Brief
+// parsing, the Phase-0 plausibility critic + rewriter, and the generator/reviewer passes
+// (R1/R4/R4.5, all via callLlm below) were the remaining uncached LLM stages that re-roll the
+// DESIGN itself — proven on this repo's own v64-vs-v67 artefacts (same brief, different
+// 1-parsed-brief-original.json). See scripts/lib/design-stage-cache.ts for the doctrine.
+import { cachedDesignStage, designStageCacheKey, readDesignStageCache, writeDesignStageCache } from './lib/design-stage-cache'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { generateModuleParagraphs } from '../src/lib/pdf-engine-v2/radical/module-paragraph-llm'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -392,6 +399,30 @@ async function callLlm(opts: {
   //       reproduces; needs prompt redesign or max_tokens increase)
   //   • Council unanimous on length: retrying same params wastes money + produces
   //     same truncation. Fail loudly with clear diagnostic instead.
+  //
+  // DESIGN-STAGE CACHE (determinism #86, 2026-07-04): callLlm() is the single choke point every
+  // reviewer pass funnels through (R1 "generator", R4, R4.5 specialist) — the cache key is the
+  // ACTUAL request OpenRouter would receive (model + system + user + sampling params), so it is
+  // by construction the "exact input payload" doctrine requires: `user` already embeds the brief,
+  // parsed constraints, research, and the upstream design (+ any quality-loop fix-directive
+  // blocks); `system` embeds the reviewer template/prompt verbatim, so an edited prompt changes
+  // the key automatically — no separate version counter to forget to bump. A genuinely identical
+  // request (same design, same directives) hits and the LLM is never called; a request that
+  // legitimately differs (new fix directives, a revised upstream design) misses naturally.
+  const llmStageCfg = LLM_CONFIG[opts.stage ?? 'brief_parser']
+  const llmCacheKey = designStageCacheKey({
+    model: opts.model, system: opts.system, user: opts.user,
+    maxTokens: opts.maxTokens ?? 150_000,
+    thinkingLevel: opts.thinkingLevel ?? null,
+    groundWithGoogleSearch: opts.groundWithGoogleSearch ?? false,
+    temperature: opts.temperature ?? llmStageCfg.temperature,
+    seed: llmStageCfg.seed,
+  })
+  const llmCached = readDesignStageCache<{ text: string; latency_ms: number; tokens_in?: number; tokens_out?: number }>('callLlm', llmCacheKey)
+  if (llmCached && llmCached.text) {
+    console.error(`[callLlm] cache HIT (${llmCacheKey}) for ${opts.model} — LLM not called (determinism #86)`)
+    return llmCached
+  }
   const maxAttempts = 3
   const backoffMs = [5_000, 15_000, 45_000]  // applied AFTER attempts 1, 2 (no backoff after attempt 3 = fatal)
   let lastErr: unknown
@@ -471,12 +502,16 @@ async function callLlm(opts: {
         await new Promise(r => setTimeout(r, backoffMs[attempt - 1]))
         continue
       }
-      return {
+      const llmResult = {
         text,
         latency_ms: Date.now() - t0,
         tokens_in: json.usage?.prompt_tokens,
         tokens_out: json.usage?.completion_tokens,
       }
+      // Write-through only on a genuine non-empty success — never cache the empty-text fallthrough
+      // that can occur on the final exhausted attempt.
+      if (text.length > 0) writeDesignStageCache('callLlm', llmCacheKey, llmResult)
+      return llmResult
     } catch (err) {
       clearTimeout(timeout)
       lastErr = err
@@ -3448,9 +3483,21 @@ async function main() {
 
   // Parse + classify the original
   const t0 = Date.now()
-  const parsedResultOriginal = await runBriefParsing(brief)
+  // DESIGN-STAGE CACHE (determinism #86): brief parsing is an LLM call (gemini-3.1-pro-preview)
+  // that is NOT actually bit-reproducible run-to-run despite temperature:0/seed:42 — verified on
+  // this repo's own v64/v67 artefacts, where `0-original-brief.md` is byte-identical but
+  // `1-parsed-brief-original.json` differs (different derived-requirement key spellings). The
+  // payload folds in the brief text, the model id, AND the live prompt text (BRIEF_PARSING_SYSTEM)
+  // so an edited parsing prompt misses automatically.
+  const { value: parsedResultOriginal, cacheHit: briefParseCacheHit } = await cachedDesignStage({
+    stage: 'brief-parsing',
+    payload: { brief, model: 'google/gemini-3.1-pro-preview', prompt: BRIEF_PARSING_SYSTEM },
+    run: () => runBriefParsing(brief),
+    isValid: (v) => !!v?.ok && !!v?.data,
+  })
   if (!parsedResultOriginal.ok || !parsedResultOriginal.data) throw new Error('Brief parsing failed')
-  logAction({ step: 'parse_brief', model: 'gemini-3.1-pro', latency_ms: Date.now() - t0 })
+  if (briefParseCacheHit) console.error(`[chain] brief-parsing cache HIT — LLM not called (determinism #86)`)
+  logAction({ step: 'parse_brief', model: 'gemini-3.1-pro', latency_ms: Date.now() - t0, cache_hit: briefParseCacheHit })
   writeFileSync(resolve(outDir, '1-parsed-brief-original.json'), JSON.stringify(parsedResultOriginal.data, null, 2))
 
   const classificationOriginal = classifyProduct(brief)
@@ -3509,7 +3556,19 @@ async function main() {
   while (briefIter < MAX_BRIEF_ITERS) {
     const tPlaus = Date.now()
     console.error(`\n[chain] brief refinement iter ${briefIter}: running plausibility critic ...`)
-    plausibility = await generateBriefPlausibilityCritic({ brief: currentBriefText, parsedBrief: currentParsed, productClass: currentProductClass, apiKey: apiKeyEarly })
+    // DESIGN-STAGE CACHE (determinism #86): the plausibility critic decides WHETHER + HOW the
+    // brief gets revised — if it flip-flops run-to-run on the same (brief, parsedBrief) the whole
+    // downstream chain forks onto a different brief text. Payload = everything the verdict is a
+    // pure function of; the quality loop's outer restart re-enters this SAME briefIter=0 call with
+    // an unchanged brief, so this is exactly the "identical input -> must reproduce" case.
+    const plausibilityCached = await cachedDesignStage({
+      stage: 'brief-plausibility',
+      payload: { brief: currentBriefText, parsedBrief: currentParsed, productClass: currentProductClass },
+      run: () => generateBriefPlausibilityCritic({ brief: currentBriefText, parsedBrief: currentParsed, productClass: currentProductClass, apiKey: apiKeyEarly }),
+      isValid: (v) => typeof v?.possible === 'boolean',
+    })
+    plausibility = plausibilityCached.value
+    if (plausibilityCached.cacheHit) console.error(`[chain] brief-plausibility cache HIT (iter ${briefIter}) — LLM not called (determinism #86)`)
     console.error(`[chain] brief plausibility iter ${briefIter}: possible=${plausibility.possible} (confidence=${plausibility.confidence}, ${plausibility.contradictions.length} contradiction${plausibility.contradictions.length === 1 ? '' : 's'}, ${plausibility.proposed_revisions?.length ?? 0} revisions proposed, ${((Date.now() - tPlaus) / 1000).toFixed(1)}s)`)
     for (const c of plausibility.contradictions) {
       console.error(`  ✗ ${c.constraint}: brief=${c.brief_value}, floor=${c.physical_floor}, ratio=${c.ratio} — ${c.reasoning}`)
@@ -3587,7 +3646,20 @@ async function main() {
     console.error(`[chain] brief refinement iter ${briefIter}: applying revision ${chosen.target_constraint}: ${chosen.current_value} → ${chosen.proposed_value} (${chosen.relax_factor}); ${alternatives.length} alternative${alternatives.length === 1 ? '' : 's'} surfaced for reader`)
 
     const tRewrite = Date.now()
-    const rewritten = await rewriteBriefWithRevision({ briefText: currentBriefText, revision: chosen, apiKey: apiKeyEarly })
+    // DESIGN-STAGE CACHE (determinism #86): keyed on (briefText, revision) — NOT on briefIter — so
+    // within one Phase-0 loop, distinct iterations (each choosing a distinct `revision`) diverge
+    // naturally, while a quality-loop restart re-asking for the SAME revision on the SAME brief
+    // text reproduces the identical rewrite instead of re-rolling (the rewriter is intentionally
+    // unseeded — see rewriteBriefWithRevision's LLM_CONFIG.brief_rewriter comment — so without this
+    // cache two runs of the same Phase-0 iteration could legitimately diverge).
+    const rewriteCached = await cachedDesignStage({
+      stage: 'brief-rewrite',
+      payload: { briefText: currentBriefText, revision: chosen },
+      run: () => rewriteBriefWithRevision({ briefText: currentBriefText, revision: chosen, apiKey: apiKeyEarly }),
+      isValid: (v) => v !== null,
+    })
+    const rewritten = rewriteCached.value
+    if (rewriteCached.cacheHit) console.error(`[chain] brief-rewrite cache HIT (iter ${briefIter}) — LLM not called (determinism #86)`)
     logAction({ step: `brief_rewrite_iter${briefIter}`, model: FLASH_LITE, latency_ms: Date.now() - tRewrite, ok: rewritten != null })
     if (!rewritten) {
       entry.rationale = entry.rationale + ' [BLOCKED: Flash-Lite rewriter returned null]'
@@ -3599,8 +3671,14 @@ async function main() {
 
     // Re-parse + re-classify on the revised brief
     const reParseT = Date.now()
-    const reParsed = await runBriefParsing(rewritten)
-    logAction({ step: `re_parse_brief_iter${briefIter + 1}`, latency_ms: Date.now() - reParseT, ok: reParsed.ok })
+    const { value: reParsed, cacheHit: reParseCacheHit } = await cachedDesignStage({
+      stage: 'brief-parsing',
+      payload: { brief: rewritten, model: 'google/gemini-3.1-pro-preview', prompt: BRIEF_PARSING_SYSTEM },
+      run: () => runBriefParsing(rewritten),
+      isValid: (v) => !!v?.ok && !!v?.data,
+    })
+    if (reParseCacheHit) console.error(`[chain] brief-parsing (re-parse) cache HIT (iter ${briefIter}) — LLM not called (determinism #86)`)
+    logAction({ step: `re_parse_brief_iter${briefIter + 1}`, latency_ms: Date.now() - reParseT, ok: reParsed.ok, cache_hit: reParseCacheHit })
     if (!reParsed.ok || !reParsed.data) {
       entry.rationale = entry.rationale + ' [BLOCKED: re-parse of revised brief failed]'
       console.error(`[chain] brief refinement iter ${briefIter}: re-parse failed on revised brief; halting`)
