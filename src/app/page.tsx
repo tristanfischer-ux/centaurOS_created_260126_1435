@@ -328,7 +328,7 @@ const HTML = `<style>
       <div class="card"><h3>Risk &amp; open questions</h3><p>What you&rsquo;ll need to certify, the holds and exclusions, and the questions still to resolve &mdash; stated plainly, not buried.</p></div>
       <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer reviews the whole workbook.</p></div>
     </div>
-    <div style="text-align:center;margin-top:30px"><a class="btn btn-ghost btn-lg" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx">See a real example workbook &mdash; Excel &darr;</a></div>
+    <div style="text-align:center;margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a class="btn btn-ghost btn-lg" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx">See a real example workbook &mdash; Excel &darr;</a><a class="btn btn-ghost btn-lg" href="/cost/water-treatment-plant">Read a worked cost breakdown &rarr;</a></div>
     <p class="ex-note">A worked example (a water-treatment plant): open it and change an assumption to watch the model recompute. Also built for grid-scale battery storage, vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your idea.</p>
   </div>
 </section>

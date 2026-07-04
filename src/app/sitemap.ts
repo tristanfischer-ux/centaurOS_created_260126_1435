@@ -94,6 +94,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             priority: 0.8,
         },
         {
+            url: `${appUrl}/cost/water-treatment-plant`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.8,
+        },
+        {
             url: `${appUrl}/investor-readiness`,
             lastModified: now,
             changeFrequency: 'monthly',

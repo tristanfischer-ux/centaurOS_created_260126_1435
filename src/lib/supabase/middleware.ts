@@ -41,6 +41,7 @@ const PUBLIC_ROUTES = [
     '/contact',           // contact + lead capture
     '/story',             // founder story (SEO)
     '/insights',          // essays hub — HFN cross-links (SEO / E-E-A-T / GEO)
+    '/cost',              // cost-breakdown guides — /cost/* (SEO / GEO commercial-intent)
     '/sample-package',    // sample dossier — the product showcase, a top conversion asset
     '/investor-readiness',// investor-readiness landing
     '/preview-landing',   // preview / campaign landing
