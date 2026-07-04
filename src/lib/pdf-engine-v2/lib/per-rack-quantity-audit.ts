@@ -22,6 +22,10 @@
  *   - "1 per X" / "one per X" -> 1:1 mapping, skip.
  *   - "max N per X" / "up to N per X" / "no more than N per X" -> limiting language, skip.
  *   - "0 per X" -> skip (zero makes no sense as a multiplied quantity).
+ *   - a digit GLUED to the tail of an alphanumeric token (no separator) -> never a
+ *     standalone count. "aluminium 6061-T6 cold-plate manifolds per rack" must not
+ *     match N=6 (from "T6"); same for "M6 bolts per bracket" (M6) and "DN50 valve
+ *     per skid" (DN50). Enforced by a `(?<![A-Za-z0-9])` lookbehind on PER_RACK_RE.
  *
  * Examples caught:
  *   - "14 cold plates per rack" -> expected = 14 * 14 racks = 196; BoM x14 = HIGH
@@ -156,8 +160,26 @@ function parseCount(s: string): number | null {
 // 40260 instead of the real "250 series cells per rack". A real "N <noun> per X"
 // count phrase is short (2-4 words); bounding to 6 stops the year-spanning match
 // so the regex finds the true "250 series cells per rack" instead.
+//
+// ALLOY-GRADE / SIZE-DESIGNATOR digit-suffix guard (2026-07-04, BESS exit-26
+// false positive #5 — out/bess-campaign-v2): a leading `(?<![A-Za-z0-9])`
+// word-boundary lookbehind on the count group stops a digit that is GLUED to
+// the tail of an alphanumeric token (no whitespace/punctuation separator) from
+// ever being read as a standalone count. Without it, "aluminium 6061-T6
+// cold-plate manifolds per rack" matched N=6 (the trailing digit of the alloy
+// grade "T6") × 13 racks = 78, vs the BoM's correct qty=13 (one manifold per
+// rack) — 3 phantom HIGHs (the emitter was RIGHT; the gate was wrong). Same
+// class of bug: "M6 bolts per bracket" (6 from the metric-thread designator),
+// "DN50 valve per skid" (50 from the nominal-diameter designator) must never
+// mint a phantom count either. The lookbehind requires the character
+// immediately before the count digits to be neither a letter nor a digit, so
+// only a digit run that starts at a real token boundary (preceded by
+// whitespace, punctuation, or start-of-string) can ever be a count — a
+// genuine "14 cold plates per rack" (14 preceded by whitespace) is untouched,
+// and the citation-year guard above still finds "250 series cells per rack"
+// (250 preceded by whitespace) rather than the glued alloy/size digits.
 const PER_RACK_RE =
-  /((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty))\s+([a-zA-Z\-\/]+(?:\s+[a-zA-Z\-\/]+){0,5}?)\s+per\s+(?:each\s+)?((?:\d+\s+)?[\w\s\-]+?)(?=[,;.!?]|$|\s{2,})/gi
+  /(?<![A-Za-z0-9])((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty))\s+([a-zA-Z\-\/]+(?:\s+[a-zA-Z\-\/]+){0,5}?)\s+per\s+(?:each\s+)?((?:\d+\s+)?[\w\s\-]+?)(?=[,;.!?]|$|\s{2,})/gi
 
 /** Limiting-language guards — these indicate capacity limits, not multiplied totals. */
 const LIMITING_LANGUAGE_RE = /\b(max|maximum|up\s+to|at\s+most|no\s+more\s+than|at\s+least|minimum)\b/i

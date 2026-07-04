@@ -8506,6 +8506,60 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL.per_rack_audit_ignores_glued_alloy_grade_digit ──────────────
+  // Guards the 2026-07-04 gate-26 fix (BESS exit-26 false positive #5,
+  // out/bess-campaign-v2): a digit GLUED to the tail of an alphanumeric token
+  // (alloy grade / thread size / pipe-diameter designator, no separator) must
+  // never be read as a standalone count. "Wieland aluminium 6061-T6 cold-plate
+  // manifolds per rack" matched N=6 (from "T6") × 13 racks = 78 vs the BoM's
+  // CORRECT qty=13 (one manifold per rack) — 3 phantom HIGHs the agent
+  // correctly refused to mint 78 fictitious manifolds for. Same family: "M6
+  // bolts per bracket" (M6) and "DN50 valve per skid" (DN50) must also produce
+  // ZERO findings. Asserts BOTH directions: the alloy-grade/designator digit
+  // never fires, a genuine "14 cold plates per rack" co-located in the SAME
+  // prose blob still fires (the fix suppresses the false positive without
+  // blinding the gate to a real per-rack multiplication miss).
+  {
+    const mk = (prose: string, words: Array<{ id: string; qty: number }>) => ([{
+      module: 'm',
+      overview_paragraph_en: prose,
+      sub_modules: [{ id: 's', words: words.map((w) => ({ id: w.id, modifier_characters: [{ kind: 'quantity', value: String(w.qty) }] })) }],
+    }])
+    const Q = { rack_count: { value: 13 } }
+    // alloy-grade alone → must be SKIPPED (0 findings); BoM qty=13 is CORRECT
+    // (one manifold per rack), a phantom N=6×13=78 must never be minted.
+    const alloyFindings = runPerRackQuantityAudit(
+      mk('Wieland aluminium 6061-T6 cold-plate manifolds per rack reject battery and PCS waste heat.', [{ id: 'cold_plate_manifold_word', qty: 13 }]) as never,
+      Q as never, 'energy_storage',
+    ).findings?.length ?? 0
+    // metric-thread / nominal-diameter designators → must also be SKIPPED (0 findings)
+    const m6Findings = runPerRackQuantityAudit(
+      mk('M6 bolts per bracket secure the frame.', [{ id: 'bolt_word', qty: 1 }]) as never,
+      Q as never, 'energy_storage',
+    ).findings?.length ?? 0
+    const dn50Findings = runPerRackQuantityAudit(
+      mk('DN50 valve per skid isolates the loop.', [{ id: 'valve_word', qty: 1 }]) as never,
+      Q as never, 'energy_storage',
+    ).findings?.length ?? 0
+    // genuine count CO-LOCATED with the alloy-grade text → must still FIRE:
+    // 14 cold plates/rack × 13 racks = 182, BoM under-emits at 14.
+    const counterFindings = runPerRackQuantityAudit(
+      mk(
+        'Wieland aluminium 6061-T6 cold-plate manifolds per rack reject battery and PCS waste heat. The module uses 14 cold plates per rack across the system.',
+        [{ id: 'cold_plate_manifold_word', qty: 13 }, { id: 'cold_plate_word', qty: 14 }],
+      ) as never,
+      Q as never, 'energy_storage',
+    ).findings?.length ?? 0
+    const ok = alloyFindings === 0 && m6Findings === 0 && dn50Findings === 0 && counterFindings >= 1
+    assertions.push(assertEq(
+      'UNIVERSAL.per_rack_audit_ignores_glued_alloy_grade_digit',
+      'gate-26 never reads a digit glued to an alphanumeric token (6061-T6 / M6 / DN50) as a standalone count, yet still fires on a genuine co-located "14 cold plates per rack" under-emission — guards the 2026-07-04 out/bess-campaign-v2 alloy-grade false-positive fix (3 phantom HIGHs) without over-skipping',
+      ok,
+      (v: boolean) => v === true,
+      () => `alloy=${alloyFindings} (want 0), M6=${m6Findings} (want 0), DN50=${dn50Findings} (want 0), counter-case=${counterFindings} (want >=1)`,
+    ))
+  }
+
   // ── UNIVERSAL.gate25_skips_cross_unit_mod_literals ────────────────────────
   // Guards the 2026-05-31 gate-25 fix: a value inside mod(key,'500','kbit/s') or
   // mod(key,'500','A') carries its UNIT in the NEXT arg, not adjacent to the

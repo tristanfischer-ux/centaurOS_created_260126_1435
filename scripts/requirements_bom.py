@@ -335,6 +335,23 @@ _MEMBRANE_GBP_PER_M2 = 25.0        # spiral-wound RO / UF module supply ≈ £15
 _HOUSING_M2_PER_UNIT = 37.0        # one 8040 element ≈ 37 m² membrane area
 _HOUSING_GBP_PER_UNIT = 1100.0     # 8-in GRP pressure housing, 300 psi class, supplied
 
+# ── INTERNAL ACCESSORY FAN TRAY (2026-07-04, corpus-mismatch family, BESS
+# out/bess-campaign-v2) ── a "fan tray" is an internal cooling accessory bolted
+# INSIDE its parent assembly (a PCS, VSD, telecoms rack) and rated in TENS of watts
+# — the "fan" corpus median is dominated by STANDALONE process/exhaust/HVAC fan
+# UNITS (whole catalogue products in their own right, hundreds of watts to
+# multi-kW), so a corpus lift over-bills the internal accessory ~6x (£28→£181 on a
+# Sungrow PCS fan tray, n=5 median £191). An accessory can never price against a
+# principal-scale corpus family sharing only the noun. Deliberately narrow to the
+# "tray" form factor (a multi-fan module mounted inside another assembly) so a
+# genuine standalone fan — "enclosure ventilation fan", "off-gas exhaust fan",
+# both real corpus-priced lines in the same BESS bill — is UNAFFECTED; combined
+# with a sub-1000 W rating check at the call site so a "tray" that happens to be
+# a large standalone unit is still left to the corpus. Same family as the
+# heater/actuator/membrane guards above (a same-noun corpus dominated by a bigger
+# sibling class), universal — no per-class table.
+_INTERNAL_FAN_TRAY_RE = re.compile(r"\bfan[\s_-]?tray\b", re.I)
+
 
 def _membrane_area_price(name, md):
     """(gbp, basis) for a membrane/media line from its MEMBRANE AREA (m²), read from
@@ -694,9 +711,47 @@ def _spec_like_tokens(name: str, md: dict):
             return (unit, n, [f"%{n}{unit}%", f"%{n} {unit}%"])
     return None
 
+# FAMILY-QUALIFIER groups (2026-07-04, BESS out/bess-campaign-v2 chiller mismatch): a DB
+# noun match ("chiller") can span mutually-exclusive PHYSICAL SUB-FAMILIES that share the
+# noun but are priced completely differently — an air-cooled process/HVAC chiller vs a
+# compact liquid-only BESS thermal-management chiller. `_db_spec_price` matched "liquid
+# cooling chiller · 148 kW" against the ONLY forge-truth.db row carrying the exact "148kw"
+# spec token — a Daikin EWAD-TZBXS150 *Air Cooled* Chiller £48,500 — while the DB holds
+# several real LIQUID coolant chillers (Pfannenberg/SPX/Trane, £18.5k-£34k) that simply
+# don't share that exact wattage. The noun-plus-exact-spec rule has no discipline for a
+# same-noun opposite-family candidate; this closes that gap the SAME way emitter-
+# completion.ts's `headNounHit`/`isAccessoryRow` already close it for DB-first part-pinning
+# (family coherence: match the noun's DECLARED SUB-FAMILY, not just the noun). Universal —
+# keyed on qualifier TEXT, not a per-class table; a requirement/candidate pair that names no
+# qualifier at all (most components) is completely unaffected.
+_FAMILY_QUALIFIER_GROUPS: list[list[str]] = [
+    ["liquid cool", "liquid-cool", "water cool", "water-cool", "glycol"],
+    ["air cool", "air-cool"],
+]
+
+
+def _family_qualifier_conflict(req_blob: str, cand_blob: str) -> bool:
+    """True when req_blob names a qualifier from ONE _FAMILY_QUALIFIER_GROUPS group and
+    cand_blob names a qualifier from a DIFFERENT group (a real cross-family mismatch).
+    False whenever either blob is silent on every group (nothing to discriminate on) or
+    both name a qualifier from the SAME group — so a noun-only requirement/candidate pair
+    (the overwhelming majority) is never affected."""
+    req_l, cand_l = req_blob.lower(), cand_blob.lower()
+    req_groups = {i for i, grp in enumerate(_FAMILY_QUALIFIER_GROUPS) if any(t in req_l for t in grp)}
+    if not req_groups:
+        return False
+    cand_groups = {i for i, grp in enumerate(_FAMILY_QUALIFIER_GROUPS) if any(t in cand_l for t in grp)}
+    if not cand_groups:
+        return False
+    return req_groups.isdisjoint(cand_groups)
+
+
 def _db_spec_price(name: str, md: dict):
     """UNIVERSAL: (median_gbp, n, noun, spec) of forge-truth.db parts matching this component's
-    principal NOUN + discriminating SPEC (≥2 rows), else None. The one DB-first price path."""
+    principal NOUN + discriminating SPEC (≥2 rows), else None. The one DB-first price path.
+    Candidates whose part_name names an OPPOSITE physical sub-family qualifier to the
+    requirement (liquid-cooled vs air-cooled, …) are excluded before the median is taken —
+    see _family_qualifier_conflict."""
     if not os.path.exists(_FORGE_TRUTH_DB):
         return None
     noun = _principal_noun(name)
@@ -704,7 +759,7 @@ def _db_spec_price(name: str, md: dict):
     if not noun or not spec:
         return None
     unit, nstr, likes = spec
-    key = (noun, unit, nstr)
+    key = (noun, unit, nstr, (name or "").lower())
     if key in _DB_PRICE_CACHE:
         return _DB_PRICE_CACHE[key]
     out = None
@@ -712,12 +767,15 @@ def _db_spec_price(name: str, md: dict):
         import sqlite3
         con = sqlite3.connect(f"file:{_FORGE_TRUTH_DB}?mode=ro", uri=True)
         rows = con.execute(
-            "SELECT unit_price_gbp FROM pretraining_extracted_parts "
+            "SELECT unit_price_gbp, part_name FROM pretraining_extracted_parts "
             "WHERE lower(part_name) LIKE ? AND (lower(part_name) LIKE ? OR lower(part_name) LIKE ?) "
             "AND unit_price_gbp > 0",
             (f"%{noun}%", likes[0], likes[1])).fetchall()
         con.close()
-        prices = sorted(float(r[0]) for r in rows if r and r[0])
+        req_blob = f"{name} {md.get('form', '') if isinstance(md, dict) else ''}"
+        coherent = [r for r in rows if r and r[0]
+                    and not _family_qualifier_conflict(req_blob, str(r[1] or ""))]
+        prices = sorted(float(r[0]) for r in coherent)
         # ≥1 is enough: the match is noun + EXACT spec token (same component, same rating), and the
         # growing-DB loop ingests VERIFIED real parts one at a time — a single comparable must price
         # so the loop closes (a freshly-ingested 86 kW chiller resolves next run). 2026-06-25.
@@ -2397,6 +2455,53 @@ def _selftest() -> int:
     # field at all (they were priced by the flat parametric estimate the lift exists for).
     if _is_real_mpn_grounded({"engine_c_flag": "under", "engine_c_ref_median_gbp": 65000, "engine_c_ref_count": 5}):
         print("  FAIL: a plain engine_c_* pv (no cost_grounding_provenance) must NOT read as real-MPN-grounded (would silently disable the legitimate Degasser lift)"); bad += 1
+
+    # ── FAMILY-QUALIFIER CONFLICT proveCatch (2026-07-04, BESS out/bess-campaign-v2
+    # CH-101 chiller £48,500 bug): _db_spec_price matched "liquid cooling chiller ·
+    # 148 kW" against the ONLY forge-truth.db row with the exact "148kw" spec token
+    # — a Daikin EWAD-TZBXS150 AIR COOLED chiller — while the DB holds several real
+    # LIQUID coolant chillers it never considered. Both directions: a genuine
+    # cross-family pair (liquid vs air-cooled) MUST conflict; a same-family pair,
+    # and any pair where either side names no qualifier at all (the overwhelming
+    # majority of components — untouched by this guard), must NOT.
+    _fq_cases = [
+        ("liquid cooling chiller · 148 kW", "Daikin EWAD-TZBXS150 Air Cooled Chiller 148kW", True),   # the live bug — MUST conflict
+        ("liquid cooling chiller · 148 kW", "Pfannenberg EB XT 1000 WT liquid coolant chiller", False),  # same family — MUST NOT conflict
+        ("chiller · 148 kW", "Daikin EWAD-TZBXS150 Air Cooled Chiller 148kW", False),   # requirement names NO qualifier — untouched
+        ("liquid cooling chiller · 148 kW", "Generic Process Chiller 148kW", False),    # candidate names NO qualifier — untouched
+        ("PCS inverter 1 MW bidirectional", "Sungrow SC1000UD-MV", False),              # no qualifier on either side — untouched (the overwhelming case)
+    ]
+    for _req, _cand, _want_conflict in _fq_cases:
+        _got_conflict = _family_qualifier_conflict(_req, _cand)
+        if _got_conflict != _want_conflict:
+            print(f"  FAIL _family_qualifier_conflict({_req!r}, {_cand!r}) → {_got_conflict} (want {_want_conflict})"); bad += 1
+    # End-to-end (real forge-truth.db, when present): the live CH-101 case must no
+    # longer resolve to the air-cooled Daikin row at all (either a real LIQUID
+    # comparable wins, or — since none share the exact 148kw token — the DB match
+    # is correctly declined and the caller falls through to the rating-based model,
+    # never silently re-labelling itself "real DB median" over a wrong-family part).
+    if os.path.exists(_FORGE_TRUTH_DB):
+        _ch101 = _db_spec_price("liquid cooling chiller", {"rating_primary": "148 kW"})
+        if _ch101 is not None and _ch101[0] == 48500.0:
+            print("  FAIL CH-101 proveCatch: _db_spec_price still resolves the air-cooled Daikin £48,500 row for a 'liquid cooling chiller' requirement"); bad += 1
+
+    # ── INTERNAL ACCESSORY FAN TRAY proveCatch (2026-07-04, BESS out/bess-campaign-v2
+    # INV-4 £181 bug): the "fan" corpus median is dominated by STANDALONE process/
+    # exhaust/HVAC fan units, so a "fan tray" internal accessory (rated in tens of
+    # watts) must never corpus-lift against it. Both directions: the accessory
+    # phrase fires; a genuine standalone fan line (the SAME bill's enclosure
+    # ventilation fan / off-gas exhaust fan, both real corpus-priced lines) does not.
+    _fan_cases = [
+        ("PCS cooling fan tray", True),
+        ("module cooling fan tray", True),
+        ("enclosure ventilation fan", False),
+        ("off-gas exhaust fan", False),
+        ("PCS liquid cooling interface", False),
+    ]
+    for _name, _want_fires in _fan_cases:
+        _got_fires = bool(_INTERNAL_FAN_TRAY_RE.search(_name))
+        if _got_fires != _want_fires:
+            print(f"  FAIL _INTERNAL_FAN_TRAY_RE.search({_name!r}) → {_got_fires} (want {_want_fires})"); bad += 1
 
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
@@ -5436,6 +5541,14 @@ def assemble(out_dir: str):
         if (re.search(r"\bheater\b", req_lead, re.I)
                 and not re.search(r"immersion|backup|process|duct|inline|booster|jacket|reboil", req_lead, re.I)
                 and re.search(r"\b\d[\d,]*\s*w\b", str(row.get("requirement") or ""), re.I)):
+            continue
+        # INTERNAL ACCESSORY FAN TRAY: skip whenever the requirement names a "fan
+        # tray" (see _INTERNAL_FAN_TRAY_RE docstring) AND its own rating is sub-
+        # 1000 W (the accessory scale); a standalone fan rated in hundreds of watts
+        # to kW (the enclosure ventilation fan / off-gas exhaust fan lines, which
+        # the corpus genuinely describes) is untouched.
+        if (_INTERNAL_FAN_TRAY_RE.search(req_lead)
+                and re.search(r"\b\d{1,3}\s*w\b", str(row.get("requirement") or ""), re.I)):
             continue
         # MEMBRANE/MEDIA family: the line is AREA-GROUNDED (membrane-area/housing
         # parametric, 2026-07-02) — the corpus median for a 'membrane bank/skid' noun is
