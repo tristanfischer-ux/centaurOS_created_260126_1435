@@ -66,18 +66,28 @@ export function designStageCacheDir(stage: string): string {
  * `{a,b}` and `{b,a}` must produce the same key). Arrays keep their order (order is semantic there).
  */
 export function stableStringify(value: unknown): string {
-  const seen = new WeakSet<object>()
+  // `path` tracks only the CURRENT ancestor chain (added before children, removed after), so a
+  // true cycle still throws while a DAG — the same sub-object legitimately referenced from two
+  // places, which real parsed-brief objects contain — walks fine. A shared WeakSet across the
+  // whole walk false-threw on DAGs (v70 crash, 2026-07-04).
+  const path = new WeakSet<object>()
   const walk = (v: unknown): unknown => {
     if (v === null || typeof v !== 'object') return v
     if (v instanceof Date) return v.toISOString()
     const obj = v as object
-    if (seen.has(obj)) throw new Error('stableStringify: circular reference')
-    seen.add(obj)
-    if (Array.isArray(v)) return v.map(walk)
-    const out: Record<string, unknown> = {}
-    for (const k of Object.keys(v as Record<string, unknown>).sort()) {
-      out[k] = walk((v as Record<string, unknown>)[k])
+    if (path.has(obj)) throw new Error('stableStringify: circular reference')
+    path.add(obj)
+    let out: unknown
+    if (Array.isArray(v)) {
+      out = v.map(walk)
+    } else {
+      const rec: Record<string, unknown> = {}
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        rec[k] = walk((v as Record<string, unknown>)[k])
+      }
+      out = rec
     }
+    path.delete(obj)
     return out
   }
   return JSON.stringify(walk(value))
