@@ -96,6 +96,11 @@ FILL_FAIL = PatternFill("solid", fgColor="FFC7CE")         # red fail
 FILL_ADVISORY = PatternFill("solid", fgColor="FFF2CC")     # amber = advisory (non-gating LLM)
 FILL_LEGACY = PatternFill("solid", fgColor="F2F2F2")       # grey = static legacy calc
 FILL_TITLE = PatternFill("solid", fgColor="2E5A88")
+# Phase B auditability (Tristan, drawer 047565b65ce05148): the three-tier cell model's
+# CLASS 3 — a LABELLED TOOL NODE (an engine-produced result, frozen at the pipeline
+# stage that computed it; not a primitive, not an in-sheet formula). Distinct from every
+# other fill above so a reader can tell "this is a tool snapshot" at a glance.
+FILL_TOOLNODE = PatternFill("solid", fgColor="D9D2E9")     # lavender = labelled tool node
 
 FONT_TITLE = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
 FONT_HEADER = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -974,7 +979,12 @@ def _is_invalid_formula(_s: str) -> bool:
     _t = re.sub(r"\$?[A-Z]{1,3}\$?:\$?[A-Z]{1,3}(?![A-Za-z0-9])", "", _t)  # whole-column refs ($F:$F)
     _t = re.sub(r"\$?[A-Z]{1,3}\$?\d+", "", _t)         # cell refs (incl CO2-style)
     _t = re.sub(r"[A-Za-z][A-Za-z0-9.]*\s*\(", "(", _t)  # function calls -> (
-    _t = re.sub(r"\bin_[a-z0-9_]+\b", "", _t)           # known defined names
+    _t = re.sub(r"\bin_[a-z0-9_]+\b", "", _t)           # known defined names (Inputs & Assumptions)
+    _t = re.sub(r"\bINP_[A-Z0-9_]+\b", "", _t)          # known defined names (M0 — Phase B, drawer
+                                                          # 047565b65ce05148: a bare '=INP_FOO' M0
+                                                          # cross-sheet reference is a genuine formula,
+                                                          # not prose — without this the guard defangs
+                                                          # every direct M0 name reference workbook-wide)
     _t = re.sub(r"\d+\.?\d*([eE][+\-]?\d+)?", "", _t)   # numbers incl scientific (1e9)
     _t = re.sub(r"[\s+\-*/^%(),:.=&<>​]", "", _t)  # operators / whitespace / zero-width
     return bool(re.search(r"[A-Za-z]", _t))
@@ -7484,6 +7494,49 @@ def _ref(name: str) -> str:
 _M0_SHEET = "Inputs Master (M0)"
 _EQUIP_REG_SHEET = "Equipment & Dimensions Register"
 
+# Phase B (Tristan, drawer 047565b65ce05148): label -> INP_ defined-name, so a tab built
+# AFTER M0 (add_tab order: Inputs & Assumptions -> M0 -> Equipment Register -> Financial
+# model -> ...) can reference an M0 primitive by NAME in a live formula. Rebuilt fresh
+# every tab_inputs_master() call (cleared first) — never carries a stale label across runs.
+_M0_REF_BY_LABEL: Dict[str, str] = {}
+
+
+def _m0_ref(label: str) -> Optional[str]:
+    """The INP_ defined name for an M0 primitive registered under this exact label, or
+    None if M0 didn't build (older dossier) or never carried that primitive — callers
+    fall back to a labelled literal/tool-node cell so the tab still builds cleanly."""
+    return _M0_REF_BY_LABEL.get(label)
+
+
+def _mark_tool_node(cell, note: str) -> None:
+    """Label a CLASS-3 cell — a value an ENGINE TOOL computed (not a tier-1 primitive,
+    not a same-sheet formula) — with the lavender fill + a full cell COMMENT carrying
+    the tool id/version, the worked substitution/decision, the input cells it consumed,
+    and the 'recompute requires an engine re-run' note the directive asks for. The
+    numeric-orphan gate (_enforce_numeric_orphan_gate) recognises this fill + a non-
+    trivial comment as a legitimate CLASS 3 cell, not an orphan literal."""
+    from openpyxl.comments import Comment
+    cell.fill = FILL_TOOLNODE
+    c = Comment(note, "ForgeOS auditability (Phase B)")
+    c.width = 380
+    c.height = 170
+    cell.comment = c
+
+
+def _is_tool_node_cell(cell) -> bool:
+    """True when a cell is a LABELLED class-3 tool node: the lavender fill AND a real
+    (non-trivial) comment — both required, so a stray lavender fill with no provenance
+    text never silently passes the orphan gate."""
+    try:
+        rgb = getattr(cell.fill.start_color, "rgb", None) or ""
+        if str(rgb)[-6:] != "D9D2E9":
+            return False
+        cm = getattr(cell, "comment", None)
+        return bool(cm and len(str(cm.text or "").strip()) >= 20)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 _INP_SLUG_RX = re.compile(r"[^A-Z0-9]+")
 
 
@@ -7600,6 +7653,19 @@ def _m0_collect_primitives(state: dict) -> List[dict]:
     _rho_default, _rho_note = _process_fluid_density(state)
     out.append({"label": "Process fluid density (engine default)", "value": _rho_default,
                "unit": "kg/m3", "cls": "constant", "provenance": f"engine default — {_rho_note}"})
+    # M0 GROWTH (Phase B, 2026-07-04): sweet-spot.ts::reconcile()'s capacity-scaling
+    # exponent is a hardcoded literature default (n=0.65, six-tenths rule) with NO
+    # in-model ancestor — a genuine tier-1 primitive Phase A's sweep missed because it
+    # lives inside a TS module, not the Python driver rows. Only added when this build
+    # actually used the reconciliation tool (state.sweetSpot present) — an unused
+    # constant is an orphan M0 row, not a rewire win.
+    if state.get("sweetSpot"):
+        out.append({"label": "Sweet-spot capacity-scaling exponent (n)", "value": 0.65,
+                   "unit": "n (dimensionless)", "cls": "constant",
+                   "provenance": "sweet-spot.ts DEFAULT_N — the six-tenths capacity-"
+                                 "scaling-law exponent (chemical-plant cost-scaling "
+                                 "literature default, n≈0.6–0.7); a hardcoded engine "
+                                 "default, not case-specific to this run"})
     _seen_const: set = set()
     for t in ((state.get("toolsUsedPage") or {}).get("tools") or []):
         for w in (t.get("worked") or []):
@@ -7696,9 +7762,11 @@ def tab_inputs_master(wb: Workbook, state: dict) -> bool:
     class_fill = {"brief": FILL_INPUT, "assumption": FILL_ADVISORY, "constant": FILL_CONST,
                  "catalogue": FILL_RESULT, "factor": FILL_SUB}
     seen: Dict[str, int] = {}
+    _M0_REF_BY_LABEL.clear()   # Phase B: fresh label->ref map for THIS build, every build
     r = nxt + 1
     for p in prims:
         ref = _m0_slug(p["label"], seen)
+        _M0_REF_BY_LABEL[p["label"]] = ref
         used_by = _m0_used_by_count(state, p.get("value"))
         rc = ws.cell(r, 1, ref); rc.font = FONT_MONO; rc.border = BORDER
         ws.cell(r, 2, clean_cell(p["label"])).border = BORDER
@@ -8879,6 +8947,12 @@ def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Op
     within_ceiling = ss.get("within_cost_ceiling")
     meets_floor = ss.get("meets_output_floor")
     notes = ss.get("notes") if isinstance(ss.get("notes"), list) else []
+    # Phase B auditability (Tristan, drawer 047565b65ce05148): the reconciliation tool's
+    # OWN inputs — frozen snapshots taken at the pipeline stage that ran it.
+    ref_output = num(ss.get("ref_output"))
+    ref_capex = num(ss.get("ref_capex_gbp"))
+    ref_capex_source = str(ss.get("ref_capex_source") or "engine cost-sanity headline")
+    scale_n_ref = _m0_ref("Sweet-spot capacity-scaling exponent (n)")
 
     r = start_row
 
@@ -8915,22 +8989,108 @@ def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Op
     # ── recommended operating point ──
     header(ws, r, ["Recommended operating point", "Value", "", "", "", "", "", ""])
     r += 1
-    def _kv(label: str, value: Any, fmt: Optional[str] = None) -> None:
+    def _kv(label: str, value: Any, fmt: Optional[str] = None) -> int:
         nonlocal r
         ws.cell(r, 1, label).font = FONT_SUB
         c = ws.cell(r, 2, value)
         if fmt:
             c.number_format = fmt
         c.fill = FILL_RESULT
+        row_used = r
         r += 1
+        return row_used
+
+    # Phase B auditability (Tristan, drawer 047565b65ce05148): "Recommended output" is
+    # the OUTPUT of sweet-spot.ts::reconcile() — a branchy decision over the brief's
+    # objective + verdict, not a closed-form recompute — so it stays a labelled CLASS-3
+    # cell. Everything downstream of it (capex, £/unit, rescale, the whole frontier) IS
+    # closed-form (capex(Q) = ref_capex · (Q/ref_output)^n) so those become genuine
+    # CLASS-2 formulas off this cell + the tool's own frozen inputs, never bare literals.
+    ref_out_row = ref_cap_row = n_row = None
+    if ref_output is not None and ref_capex is not None:
+        ref_out_row = _kv("Reference output — tool snapshot (Q_ref)", ref_output, FMT_DEC1)
+        _mark_tool_node(ws.cell(ref_out_row, 2),
+            "TOOL NODE — deriveOutputDenominator() (independent-cost-sanity-audit.ts) v1, "
+            "captured by sweet-spot.ts::reconcile() v1 (Phase 1, 2026-06-24) at the "
+            "reconciliation pipeline stage. Input consumed: parsedBrief.constraints."
+            "target_performance (the brief's primary scale metric, annualised). Frozen "
+            "at capture time — recompute requires an engine re-run.")
+        ref_cap_row = _kv("Reference capex, ex-works — tool snapshot (Q_ref)", ref_capex, FMT_GBP)
+        _mark_tool_node(ws.cell(ref_cap_row, 2),
+            f"TOOL NODE — readHeadlineCostGbp() (independent-cost-sanity-audit.ts) v1, "
+            f"source '{ref_capex_source}', captured by sweet-spot.ts::reconcile() v1 at "
+            "the reconciliation pipeline stage. MAY differ from the Cost waterfall tab's "
+            "current total if the plant was re-costed after reconciliation ran. Frozen "
+            "at capture time — recompute requires an engine re-run.")
+        if scale_n_ref:
+            n_row = r
+            ws.cell(r, 1, "Capacity-scaling exponent (n)").font = FONT_SUB
+            nc = ws.cell(r, 2, f"={scale_n_ref}")
+            nc.number_format = FMT_DEC2
+            nc.fill = FILL_RESULT
+            r += 1
+        else:
+            n_row = _kv("Capacity-scaling exponent (n) — engine default", 0.65, FMT_DEC2)
+            _mark_tool_node(ws.cell(n_row, 2),
+                "CONSTANT — sweet-spot.ts DEFAULT_N: the six-tenths capacity-scaling-law "
+                "exponent (chemical-plant cost-scaling literature default, n≈0.6–0.7). "
+                "Not on M0 this build (Inputs Master absent) — recompute requires an "
+                "engine re-run.")
+
+    rec_out_row = None
     if rec_out is not None:
-        _kv(f"Recommended output ({unit})", rec_out, FMT_DEC1)
-    if rec_cap is not None:
-        _kv("Recommended capex (£)", rec_cap, FMT_GBP)
-    if rec_cpu is not None:
-        _kv(f"Recommended £/{unit}", rec_cpu, FMT_GBP2 if rec_cpu < 100 else FMT_GBP)
-    if rescale is not None:
-        _kv("Recommended scale vs brief (×)", rescale, FMT_DEC1)
+        rec_out_row = _kv(f"Recommended output ({unit})", rec_out, FMT_DEC1)
+        _ceiling_ref = _m0_ref("Unit cost ceiling")
+        _inputs_txt = (f"reference output (B{ref_out_row}), reference capex (B{ref_cap_row})"
+                      if ref_out_row else "the brief's target output + cost ceiling (tool "
+                      "snapshot rows unavailable this build)")
+        _mark_tool_node(ws.cell(rec_out_row, 2),
+            "TOOL NODE — sweet-spot.ts::reconcile() v1 (Phase 1, 2026-06-24): the "
+            "reconciliation algorithm's CHOSEN operating point given the brief's "
+            f"objective ({objective}) and verdict ({verdict}) — a branchy decision, "
+            f"not a closed-form recompute. Inputs consumed: {_inputs_txt}"
+            + (f", cost ceiling ({_ceiling_ref})" if _ceiling_ref else "")
+            + ". Recompute requires an engine re-run.")
+    live_frontier = bool(ref_out_row and ref_cap_row and n_row)
+    if rec_cap is not None and live_frontier:
+        rec_cap_row = r
+        ws.cell(r, 1, "Recommended capex (£)").font = FONT_SUB
+        cc = ws.cell(r, 2, f"=ROUND($B${ref_cap_row}*($B${rec_out_row}/$B${ref_out_row})^$B${n_row},0)")
+        cc.number_format = FMT_GBP
+        cc.fill = FILL_RESULT
+        r += 1
+    elif rec_cap is not None:
+        rec_cap_row = _kv("Recommended capex (£)", rec_cap, FMT_GBP)
+        _mark_tool_node(ws.cell(rec_cap_row, 2),
+            "TOOL NODE — sweet-spot.ts::reconcile() v1: capex at the recommended output "
+            "(tool snapshot rows unavailable this build, so this can't be re-derived as "
+            "an in-sheet formula). Recompute requires an engine re-run.")
+    else:
+        rec_cap_row = None
+    if rec_cpu is not None and rec_cap_row and rec_out_row and live_frontier:
+        ws.cell(r, 1, f"Recommended £/{unit}").font = FONT_SUB
+        cc = ws.cell(r, 2, f"=$B${rec_cap_row}/$B${rec_out_row}")
+        cc.number_format = FMT_GBP2 if rec_cpu < 100 else FMT_GBP
+        cc.fill = FILL_RESULT
+        r += 1
+    elif rec_cpu is not None:
+        _cpu_row = _kv(f"Recommended £/{unit}", rec_cpu, FMT_GBP2 if rec_cpu < 100 else FMT_GBP)
+        _mark_tool_node(ws.cell(_cpu_row, 2),
+            "TOOL NODE — sweet-spot.ts::reconcile() v1: cost-per-unit at the recommended "
+            "output (tool snapshot rows unavailable this build). Recompute requires an "
+            "engine re-run.")
+    if rescale is not None and rec_out_row and ref_out_row and live_frontier:
+        ws.cell(r, 1, "Recommended scale vs brief (×)").font = FONT_SUB
+        cc = ws.cell(r, 2, f"=$B${rec_out_row}/$B${ref_out_row}")
+        cc.number_format = FMT_DEC1
+        cc.fill = FILL_RESULT
+        r += 1
+    elif rescale is not None:
+        _rescale_row = _kv("Recommended scale vs brief (×)", rescale, FMT_DEC1)
+        _mark_tool_node(ws.cell(_rescale_row, 2),
+            "TOOL NODE — sweet-spot.ts::reconcile() v1: recommended output ÷ the "
+            "brief's target output (tool snapshot rows unavailable this build). "
+            "Recompute requires an engine re-run.")
     _kv("Within cost ceiling?", "Yes" if within_ceiling else ("No" if within_ceiling is False else "—"))
     _kv("Meets hard output floor?", "Yes" if meets_floor else ("No" if meets_floor is False else "—"))
     r += 1
@@ -8943,14 +9103,34 @@ def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Op
         header(ws, r, [f"Output ({unit})", "Capex (£)", f"£/{unit}", "", "", "", "", ""])
         r += 1
         chart_first = r
-        for pt in frontier:
+        for i, pt in enumerate(frontier):
             if not isinstance(pt, dict):
                 continue
             o = num(pt.get("output")); cap = num(pt.get("capex_gbp")); cpu = num(pt.get("cost_per_unit"))
-            ws.cell(r, 1, o).number_format = FMT_DEC1
-            ws.cell(r, 2, cap).number_format = FMT_GBP
-            cc = ws.cell(r, 3, cpu)
-            cc.number_format = FMT_GBP2 if (cpu is not None and cpu < 100) else FMT_GBP
+            oc = ws.cell(r, 1)
+            cc1 = ws.cell(r, 2)
+            cc2 = ws.cell(r, 3)
+            if live_frontier:
+                # Q_i = Q_ref · 16^(i/12) · 0.25 — the SAME 0.25×..4× log-spaced sweep
+                # sweet-spot.ts::reconcile() builds (13 points, i=0..12); i is the
+                # sweep's own structural index (which of the 13 points), not a hidden
+                # magic number — every OTHER term is a cell reference.
+                oc.value = f"=$B${ref_out_row}*16^({i}/12)*0.25"
+                cc1.value = f"=ROUND($B${ref_cap_row}*(A{r}/$B${ref_out_row})^$B${n_row},0)"
+                cc2.value = f"=B{r}/A{r}"
+            else:
+                oc.value = o
+                cc1.value = cap
+                cc2.value = cpu
+                _fnote = ("TOOL NODE — sweet-spot.ts::reconcile() v1 frontier sweep point "
+                         f"{i + 1}/13 (tool snapshot rows unavailable this build, so this "
+                         "can't be re-derived as an in-sheet formula). Recompute requires "
+                         "an engine re-run.")
+                _mark_tool_node(cc1, _fnote)
+                _mark_tool_node(cc2, _fnote)
+            oc.number_format = FMT_DEC1
+            cc1.number_format = FMT_GBP
+            cc2.number_format = FMT_GBP2 if (cpu is not None and cpu < 100) else FMT_GBP
             r += 1
         chart_last = r - 1
 
@@ -15812,9 +15992,10 @@ def _sc_financial(wb, ws, state, run_dir):
                     if isinstance(v, str) and not v.startswith("=") and _num_of(v) is None:
                         continue   # text notes are the cell-contract's business
                     checked += 1
+                    cell = ws.cell(r, i + 1)
                     if isinstance(v, str) and v.startswith("="):
                         passed += 1
-                    elif _is_input_fill(ws.cell(r, i + 1)):
+                    elif _is_input_fill(cell) or _is_tool_node_cell(cell):
                         passed += 1
                     else:
                         if len(orphan_rows) < 4:
@@ -16722,6 +16903,133 @@ def _enforce_live_check_gate(wb: Workbook) -> dict:
     return stats
 
 
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# PHASE B — THE ORPHAN-LITERAL GATE, EXTENDED TO NUMBERS (Tristan, drawer
+# 047565b65ce05148, 2026-07-04): the no-cheating gate above polices VERDICTS (a PASS/FAIL
+# must be a formula). This extends the same discipline to every NUMBER in a contracted
+# table: a numeric cell must be class 1 (an M0/1b input — yellow/peach fill, or a row
+# carrying its own stated basis/source/provenance — "the orphan gate treats a priced
+# ledger cell with a stated basis as class 1b"), class 2 (a live in-sheet FORMULA), or
+# class 3 (a LABELLED TOOL NODE — _mark_tool_node's lavender fill + a real comment). A
+# bare number with none of the three REFUSES the build, naming the cell — but only for
+# the tables ROLLED OUT this round (ENFORCED); every other declared-numeric table is
+# swept and reported as WARN so the next round can tighten it without a surprise outage.
+# ═══════════════════════════════════════════════════════════════════════════════════════
+_PROVENANCE_COL_HINTS = ("basis", "source", "provenance", "where-from", "derivation")
+# Rolled out (hard-fail) this round: the Financial model's fin-* families — the tables
+# actually rewired in this pass (all 30 prior orphan literals lived in fin-curve +
+# fin-oppoint; the other fin-* families were already 100% live formulas).
+_NUMERIC_GATE_ENFORCED_FAMILIES = set(_FIN_FAMILIES)
+# Axiomatically class-1 by construction — the M0 register itself IS the input surface;
+# its own Value column can never be an "orphan" (a primitive has no ancestor by
+# definition). Excluded from the sweep entirely (not even WARN-counted).
+_NUMERIC_GATE_EXEMPT_FAMILIES = {"m0-inputs"}
+
+
+def _row_has_provenance(raw_cols: List[str], vals: list) -> bool:
+    """True when this row states its own basis/source/provenance in a companion
+    column — the class-1b/3-by-provenance rule (item 2 of the directive): '400+ BoM unit
+    prices … already priced cells with basis' and the Quantities/tool-flow tables' own
+    Source/Where-from columns. Universal — matches by column-name HINT, not table name,
+    so it covers every present + future table shaped this way without special-casing.
+    Matches against the RAW header text (lowercased, parens kept) — e.g. the BoM
+    ledger's basis column is literally named 'Sizing calc (basis)': _norm_col() strips
+    parenthesised text for signature-matching elsewhere in this file, which would
+    silently swallow the word 'basis' if used here instead."""
+    for i, c in enumerate(raw_cols):
+        cl = str(c or "").lower()
+        if not cl or not any(h in cl for h in _PROVENANCE_COL_HINTS):
+            continue
+        if i >= len(vals):
+            continue
+        v = vals[i]
+        if v is None:
+            continue
+        if isinstance(v, str) and _cell_txt(v).strip() in ("", "—"):
+            continue
+        return True
+    return False
+
+
+_ORPHAN_MONEY_COL_RX = re.compile(
+    r"£|capex|revenue|opex|ebitda|npv|cashflow|value|swing|low|central|high")
+
+
+def _enforce_numeric_orphan_gate(wb: Workbook) -> dict:
+    """Walk every declared-numeric contracted table; classify each numeric cell as
+    class 1 (input fill or row-has-provenance), class 2 (formula), or class 3 (labelled
+    tool node); anything else is an ORPHAN. Hard-fails (SystemExit) on an orphan in an
+    ENFORCED family; WARNs (records, never raises) on every other declared-numeric
+    family so the sweep is honest about what's rewired vs still pending."""
+    header_rows_by_sheet: Dict[str, set] = {}
+    for t in _RENDERED_TABLES:
+        header_rows_by_sheet.setdefault(t["sheet"], set()).add(t["row"])
+    by_family: Dict[str, dict] = {}
+    fatal: List[str] = []
+    for t in _RENDERED_TABLES:
+        if t["sheet"] not in wb.sheetnames:
+            continue
+        spec = _TABLE_CONTRACTS.get(_table_sig(t["cols"]))
+        if spec is None:
+            continue
+        fam = spec["family"]
+        if fam in _NUMERIC_GATE_EXEMPT_FAMILIES:
+            continue
+        norm = [_norm_col(c) for c in t["cols"]]
+        # numeric columns for THIS table: the declared contract list, unioned with a
+        # money-header match for the fin-* families (same detection _sc_financial
+        # already validated the 30-orphan count against — one source, not a second
+        # money-sniffing regex).
+        num_idx = {i for i, c in enumerate(norm) if c and c in (spec.get("numeric") or [])}
+        if fam in _FIN_FAMILIES:
+            num_idx |= {i for i, c in enumerate(norm) if _ORPHAN_MONEY_COL_RX.search(c)}
+        if not num_idx:
+            continue
+        ws = wb[t["sheet"]]
+        rows = _walk_rows(ws, t["row"], len(t["cols"]), header_rows_by_sheet.get(t["sheet"], set()))
+        fstat = by_family.setdefault(fam, {"checked": 0, "class1": 0, "class2": 0,
+                                            "class3": 0, "orphans": []})
+        for r, vals in rows:
+            has_prov = _row_has_provenance(t["cols"], vals)
+            for i in sorted(num_idx):
+                if i >= len(vals):
+                    continue
+                v = vals[i]
+                if v in (None, ""):
+                    continue
+                if isinstance(v, str) and not v.startswith("=") and _num_of(v) is None:
+                    continue   # honest non-numeric text (e.g. "n/a", "Yes") — not this gate's business
+                fstat["checked"] += 1
+                cell = ws.cell(r, i + 1)
+                if isinstance(v, str) and v.startswith("="):
+                    fstat["class2"] += 1
+                elif _is_tool_node_cell(cell):
+                    fstat["class3"] += 1
+                elif _is_input_fill(cell) or has_prov:
+                    fstat["class1"] += 1
+                else:
+                    fstat["orphans"].append(f"{t['sheet']}!{cell.coordinate} (family {fam})")
+    for fam, fstat in by_family.items():
+        if fstat["orphans"] and fam in _NUMERIC_GATE_ENFORCED_FAMILIES:
+            fatal.append(f"{fam}: {len(fstat['orphans'])} orphan numeric literal(s) — "
+                        + "; ".join(fstat["orphans"][:6]))
+    if fatal:
+        raise SystemExit("NUMERIC ORPHAN-LITERAL GATE (a number must be class 1/M0-input, "
+                         "class 2/formula, or class 3/labelled tool node):\n  - "
+                         + "\n  - ".join(fatal))
+    declared_families = {spec["family"] for spec in _TABLE_CONTRACTS.values()}
+    not_yet_declared_numeric = sorted(
+        f for f in declared_families
+        if f not in _NUMERIC_GATE_EXEMPT_FAMILIES
+        and not any(_TABLE_CONTRACTS[s].get("numeric") for s in _TABLE_CONTRACTS
+                   if _TABLE_CONTRACTS[s]["family"] == f)
+        and f not in _FIN_FAMILIES)
+    return {"by_family": by_family, "enforced": sorted(_NUMERIC_GATE_ENFORCED_FAMILIES),
+            "warn_families_swept": sorted(f for f in by_family
+                                          if f not in _NUMERIC_GATE_ENFORCED_FAMILIES),
+            "not_yet_declared_numeric": not_yet_declared_numeric}
+
+
 def _readback_scores(out_path: str) -> Optional[dict]:
     """Read the RECALCULATED live-score cells back from the shipped workbook (values as
     LibreOffice computed them). Returns {tab: value, '_floor': v, '_open': v} or None."""
@@ -17254,6 +17562,33 @@ def build(run_dir: str, out_path: str) -> dict:
     try:
         with open(os.path.join(run_dir, "live-check-stats.json"), "w", encoding="utf-8") as _fh:
             json.dump(_live_stats, _fh, indent=2, default=str)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── PHASE B — THE ORPHAN-LITERAL GATE, EXTENDED TO NUMBERS (Tristan, drawer
+    #    047565b65ce05148): every numeric cell in an ENFORCED table must be class 1/2/3;
+    #    every other declared-numeric table is swept + WARN-reported (the ratchet). ──
+    _num_gate = _enforce_numeric_orphan_gate(wb)
+    _warn_lines = []
+    for fam in _num_gate["warn_families_swept"]:
+        fs = _num_gate["by_family"][fam]
+        if fs["orphans"]:
+            _warn_lines.append(f"{fam}: {len(fs['orphans'])}/{fs['checked']} orphan "
+                              f"(e.g. {fs['orphans'][0]})")
+    _enf_total_checked = sum(_num_gate["by_family"].get(f, {}).get("checked", 0)
+                             for f in _num_gate["enforced"])
+    print(f"  · numeric orphan-literal gate: ENFORCED {sorted(_num_gate['enforced'])} — "
+          f"0 orphans/{_enf_total_checked} checked · WARN-swept "
+          f"{len(_num_gate['warn_families_swept'])} other declared-numeric famil"
+          f"{'y' if len(_num_gate['warn_families_swept']) == 1 else 'ies'}"
+          + (f" ({'; '.join(_warn_lines)})" if _warn_lines else " (0 orphans)")
+          + f" · {len(_num_gate['not_yet_declared_numeric'])} famil"
+          f"{'y' if len(_num_gate['not_yet_declared_numeric']) == 1 else 'ies'} "
+          f"not yet declared numeric (next round)")
+    state["_numericOrphanGate"] = _num_gate
+    try:
+        with open(os.path.join(run_dir, "numeric-orphan-stats.json"), "w", encoding="utf-8") as _fh:
+            json.dump(_num_gate, _fh, indent=2, default=str)
     except Exception:  # noqa: BLE001
         pass
 
@@ -20730,6 +21065,49 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables4)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done4)
+
+    # ═══ proveCatch the NUMERIC ORPHAN-LITERAL GATE (Phase B auditability directive,
+    # Tristan, drawer 047565b65ce05148, 2026-07-04) — BOTH directions: a bare numeric
+    # literal in an ENFORCED fin-* table must hard-fail naming the cell + family; a
+    # clean cell (live formula, OR a row that states its own Basis — "the orphan gate
+    # treats a priced ledger cell with a stated basis as class 1b") must NOT. ═══
+    from openpyxl import Workbook as _WbN
+    _sv_tables5 = list(_RENDERED_TABLES); _sv_done5 = set(_CELLCON_DONE)
+    try:
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbn = _WbN(); _wsn = _wbn.active; _wsn.title = "Financial model"
+        _hdr_row = 4
+        header(_wsn, _hdr_row, ["Item", "Value (£)", "", "Basis"])
+        _RENDERED_TABLES.append({"sheet": "Financial model", "row": _hdr_row,
+                                 "cols": ["Item", "Value (£)", "", "Basis"]})
+        _wsn.cell(_hdr_row + 1, 1, "Clean row"); _wsn.cell(_hdr_row + 1, 2, "=1+1")
+        _wsn.cell(_hdr_row + 1, 4, "test basis")
+        try:
+            _enforce_numeric_orphan_gate(_wbn)
+        except SystemExit as _ex:
+            print(f"  FAIL numeric-orphan-gate: a live-formula row must NOT raise ({_ex})"); bad += 1
+        _wsn.cell(_hdr_row + 2, 1, "Bad row"); _wsn.cell(_hdr_row + 2, 2, 42)
+        _caught_msg = None
+        try:
+            _enforce_numeric_orphan_gate(_wbn)
+        except SystemExit as _ex:
+            _caught_msg = str(_ex)
+        if _caught_msg is None:
+            print("  FAIL numeric-orphan-gate: a bare numeric literal in an ENFORCED "
+                  "family must hard-fail"); bad += 1
+        elif "fin-item" not in _caught_msg or _wsn.cell(_hdr_row + 2, 2).coordinate not in _caught_msg:
+            print(f"  FAIL numeric-orphan-gate: must NAME the offending cell + family "
+                  f"({_caught_msg!r})"); bad += 1
+        # the SAME bare literal, but the row now states its own Basis, must PASS.
+        _wsn.cell(_hdr_row + 2, 4, "a real stated basis")
+        try:
+            _enforce_numeric_orphan_gate(_wbn)
+        except SystemExit as _ex:
+            print(f"  FAIL numeric-orphan-gate: a row with a stated Basis is class-1b, "
+                  f"not orphan ({_ex})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables5)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done5)
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
