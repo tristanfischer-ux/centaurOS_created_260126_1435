@@ -1030,11 +1030,20 @@ def _project_bom_ancillaries(state: dict, nodes: dict, out_dir) -> list:
     # board kit (breaker / busbar / fuse / relay / SPD / contactor) belongs on the single-
     # line, and bulk structural / pipework items on the GA — so those are excluded here
     # (keeps the register authentic). Universal — keyed on the derived type, not the class.
+    # NOTE (2026-07-05 coverage-gap fix): 'emergency stop' was REMOVED from this exclusion —
+    # an emergency-stop pushbutton/pull-cord is a SAFETY device (matches _SAFETY_RE below,
+    # kind='safety'), not electrical board kit, and the suppression logic two blocks down
+    # explicitly ALWAYS keeps 'safety'/'instrument' items. Excluding it here contradicted
+    # that intent and left it homeless: the single-line/panel-schedule it was assumed to
+    # "belong on" never actually draws it either (verified: no drawing surface in a built
+    # dossier mentions "Emergency Stop" anywhere), so 3 real safety devices (Eaton 216516
+    # ×2, Banner SSA-EB1PS1 ×1) rendered on NO drawing at all — the Part names tab's "master
+    # tag not shown on ANY drawing/manifest" gap. The P&ID register is the correct home.
     _EXCLUDE_NAME = re.compile(
         r"\bpipework\b|distribution manifold|support frame|structural frame|enclosure panel|"
         r"htu|ntu tool|signal conditioner|isolation device|interlock switch|main breaker|"
         r"distribution busbar|fuse holder|surge protect|power contactor|protective relay|"
-        r"emergency stop|\bcontroller\b|communication gateway|i/o module|network switch|"
+        r"\bcontroller\b|communication gateway|i/o module|network switch|"
         r"controller power supply|local control panel", re.I)
 
     out: list = []

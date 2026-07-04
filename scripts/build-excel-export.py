@@ -11478,6 +11478,12 @@ def _collapse_instrument_rows(hdr: List[str], rows: List[List[str]],
 
 
 _VALVE_TAG_MULT_RX = re.compile(r"\(×(\d+)\)")
+# A tag RANGE ('FCV-201–202') names >1 physical valve under one schedule row, exactly the
+# same convention _expand_tags()/_TAG_RANGE_RX already expand for the Part names master
+# (2026-07-05 valve-recon fix: FCV-201–202 was silently counted as 1 tag, undercounting the
+# schedule's own raw total by (hi-lo) per range — mirror the SAME range grammar here so the
+# schedule's raw count and the master's tag-expansion never disagree on the same notation).
+_VALVE_TAG_RANGE_RX = re.compile(r"[A-Z]{1,5}-(\d{1,4})[–—-](\d{1,4})\b")
 
 
 def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = None) -> int:
@@ -11575,8 +11581,15 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
             n_valves_schedule = 0
             for rw in rows:
                 cell0 = str(rw[tag_i]) if tag_i < len(rw) else ""
-                m = _VALVE_TAG_MULT_RX.search(cell0)
-                n_valves_schedule += int(m.group(1)) if m else 1
+                rmatch = _VALVE_TAG_RANGE_RX.search(cell0)
+                mmatch = _VALVE_TAG_MULT_RX.search(cell0)
+                if rmatch:
+                    lo, hi = int(rmatch.group(1)), int(rmatch.group(2))
+                    n_valves_schedule += (hi - lo + 1) if hi >= lo else 1
+                elif mmatch:
+                    n_valves_schedule += int(mmatch.group(1))
+                else:
+                    n_valves_schedule += 1
         # instrument index: collapse the per-index copy-paste rows into typed group
         # rows (fix 5, reviewers 2026-07-02) — 'LT-201…217 … (17 off)' instead of 17
         # identical lines; host tags appended only where the manifest knows them.
@@ -11605,13 +11618,39 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
     # live formulas over EMBEDDED operands (never a bare comparison), ±20% band. ──
     bom = ((state or {}).get("requirementsBom")) or []
     _valve_rx = re.compile(r"\bvalve", re.I)
+    # LIKE-FOR-LIKE SCOPE (2026-07-05 valve-recon fix): the VALVE LIST's own population is
+    # line-mounted valves only (control / relief / isolation / check / solenoid — see the
+    # schedule's own "24 valve types (control / relief / isolation / ESD)" caption). A bare
+    # /valve/i match on the BoM's `requirement` text ALSO catches the zoned-distribution
+    # zone-KIT connection allowance (200 off — per-zone pipework tie-ins, no schedule tag) and
+    # the hand-watering tap/hose STATION allowance (44 off — a riser/hand-valve/coupler
+    # station, no schedule tag either): both are PARAMETRIC NETWORK ALLOWANCES, not discrete
+    # schedule-listed line valves, and both say so in their own `basis` text (the universal
+    # signal requirements_bom.py already stamps on every such row: "...materials allowance").
+    # Exclude on that basis-level signal — never a name/requirement guess — so any future
+    # archetype's own allowance rows self-exclude with no new per-class code.
+    _valve_allowance_rx = re.compile(r"\ballowance\b", re.I)
     _inst_rx = _INSTRUMENT_ROW_RX
     recon_rows = []
     if n_valves_schedule is not None:
-        bom_valves = sum(int(num(b.get("qty")) or 1) for b in bom
-                         if isinstance(b, dict) and _valve_rx.search(str(b.get("requirement") or "")))
+        _valve_rows = [b for b in bom if isinstance(b, dict)
+                       and _valve_rx.search(str(b.get("requirement") or ""))]
+        _valve_rows_scoped = [b for b in _valve_rows
+                              if not _valve_allowance_rx.search(str(b.get("basis") or ""))]
+        _valve_rows_excl = [b for b in _valve_rows
+                            if _valve_allowance_rx.search(str(b.get("basis") or ""))]
+        bom_valves = sum(int(num(b.get("qty")) or 1) for b in _valve_rows_scoped)
+        _excl_qty = sum(int(num(b.get("qty")) or 1) for b in _valve_rows_excl)
+        _excl_desc = ", ".join(f"{int(num(b.get('qty')) or 1)}× "
+                               f"{str(b.get('requirement') or '')[:40]}" for b in _valve_rows_excl)
+        print(f"      Valve recon: {bom_valves} line-mounted-valve BoM line(s) (like-for-like "
+              f"vs the schedule's own population) · excluded {len(_valve_rows_excl)} network-"
+              f"allowance row(s) totalling {_excl_qty} off — {_excl_desc}")
         recon_rows.append(("Valve count: schedule vs BoM", n_valves_schedule, bom_valves,
-                           "valve list (incl. '(×N)' multiplicities)", "BoM lines matching /valve/i"))
+                           "valve list (incl. '(×N)' / tag-range multiplicities)",
+                           "BoM lines matching /valve/i whose basis is NOT a network-allowance "
+                           "(excludes zone-kit + hand-watering station allowances — per-zone/"
+                           "per-station pipework tie-ins, not schedule-listed line valves)"))
     if n_instruments_schedule is not None:
         bom_inst = sum(int(num(b.get("qty")) or 1) for b in bom
                        if isinstance(b, dict) and _inst_rx.search(str(b.get("requirement") or "")))
@@ -16430,6 +16469,23 @@ def _sc_partnames(wb, ws, state, run_dir):
     pl = load_json(os.path.join(run_dir, "parts-ledger.json")) if run_dir else None
     if isinstance(pl, dict) and pl.get("equipment"):
         eq_by_tag = {str(e.get("tag")): e for e in pl["equipment"] if isinstance(e, dict) and e.get("tag")}
+        # RANGE-TAG EXPANSION (2026-07-05 valve/instrument-recon fix): a ledger equipment row
+        # is often keyed by a COMBINED range tag ('LT-201–213' for 13 physically-replicated
+        # level transmitters, 'FCV-201–202' for 2 control valves) — the SAME range grammar
+        # _expand_tags() already expands for the Part names master's own tag column. Without
+        # this, every INDIVIDUAL tag the master expands from that same range (LT-201, LT-202,
+        # ... LT-213) misses the exact-string lookup here and reads as "not shown on any
+        # drawing" even though the combined tag's OWN coverage is genuinely True on the P&ID
+        # — a false negative in the matcher, not a real gap. Filled ADDITIVELY (setdefault)
+        # so a literal per-tag ledger entry that already exists is never overridden.
+        for _e in pl["equipment"]:
+            if not isinstance(_e, dict):
+                continue
+            _etag = str(_e.get("tag") or "")
+            if not _etag:
+                continue
+            for _t in _expand_tags(_etag):
+                eq_by_tag.setdefault(_t, _e)
         _principal_tags = sorted({t for lst in tag_lists for t in lst})
         _linked = 0
         _unlinked = []
@@ -18020,19 +18076,36 @@ _SOFT_CAVEAT_RX = re.compile(
 # scan entirely; a genuine verification-gap advisory (e.g. "no vision critic has looked at this
 # render") carries no such marker and still caps normally.
 _NON_SCORING_RX = re.compile(r"does not score|informational only", re.I)
+# SELF-PRICED CAVEAT marker (2026-07-05, the BoM-ledger TBD double-penalty bug): the ledger's own
+# column-contract arithmetic (`_eval_bom_ledger_contract`) already prices its TBD caveat
+# PROPORTIONATELY into the score — score = arithmetic − 4 × engineered-TBD-fraction, ranging 6-10
+# by how much of the bill is still TBD (10.0 at 0% down to 6.0 at 100%) — a strictly finer-grained,
+# more honest signal than a flat cap. The blanket _SOFT_CAVEAT_RX's bare `\bTBD\b` match re-caps
+# EVERY non-zero TBD fraction to <=8 regardless of size, silently overriding that arithmetic with a
+# cap that PREDATES it (this cap: 2026-06-27; the TBD-fraction formula: 2026-07-03, extended
+# 2026-07-04) — a dossier with a genuine 22% engineered-TBD fraction scored 9.1 by its own
+# calibrated formula, then flattened to the SAME 8 a 45%-TBD bill would also get, destroying the
+# discrimination the newer formula exists to provide. An issue that states its own caveat is
+# ALREADY reflected in the score's arithmetic is excluded from the blanket scan (same idiom as
+# _NON_SCORING_RX above) — the caveat still renders in the issue text, it is just never
+# double-capped on top of its own stated penalty.
+_SELF_PRICED_RX = re.compile(r"score = arithmetic\b", re.I)
 
 
 def _apply_universal_honest_cap(scores: dict) -> dict:
     """ONE universal rule (no whack-a-mole): cap each tab's score by the caveats IT declares in its
     own issues. VERIFICATION GAP → ≤7 (FAIL); SOFTER caveat → ≤8 (never a perfect 10). Applied to
     EVERY tab from EVERY source so a new archetype's gaps cap themselves. An issue that itself
-    declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory) is excluded
-    from the scan — it must not cap a score it explicitly says it does not move."""
+    declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory) OR that its
+    caveat is already self-priced into the stated score arithmetic (the BoM-ledger TBD-fraction
+    formula) is excluded from the scan — neither must cap a score it explicitly says it does not
+    move / already accounts for."""
     for _name, e in (scores or {}).items():
         if not isinstance(e, dict) or not isinstance(e.get("score"), (int, float)):
             continue
         issues = " ".join(str(i) for i in (e.get("issues") or [])
-                          if not _NON_SCORING_RX.search(str(i)))
+                          if not _NON_SCORING_RX.search(str(i))
+                          and not _SELF_PRICED_RX.search(str(i)))
         if not issues:
             continue
         cap = 7 if _VERIF_GAP_RX.search(issues) else (8 if _SOFT_CAVEAT_RX.search(issues) else None)
@@ -18872,6 +18945,13 @@ def _selftest() -> int:
         "X": {"score": 10, "issues": ["the model is UNVERIFIED — no price derivable"]},
         "Y": {"score": 10, "issues": ["values are an estimate pending vendor quote"]},
         "Z": {"score": 10, "issues": ["12/12 invariants pass"]},
+        # W: the BoM-ledger shape — a small (22%) engineered-TBD fraction ALREADY priced
+        # proportionately into the score (9.1, per the -4x tbd-fraction formula) must NOT be
+        # re-flattened to the SAME 8 a much larger TBD fraction would also get — proveCatch
+        # for the double-penalty bug (2026-07-05).
+        "W": {"score": 9.1, "issues": [
+            "15/68 ENGINEERED bought-out lines carry MPN 'TBD (detailed design)' — an "
+            "ESTIMATE-stage gap; score = arithmetic − 4 × engineered-TBD-fraction = 10.0 − 0.9"]},
     })
     if _hc["X"]["score"] != 7 or _hc["X"]["status"] != "FAIL":
         print(f"  FAIL honest-cap: an UNVERIFIED tab must cap at 7/FAIL (got {_hc['X']})"); bad += 1
@@ -18879,6 +18959,9 @@ def _selftest() -> int:
         print(f"  FAIL honest-cap: an ESTIMATE tab must cap at 8 (got {_hc['Y']})"); bad += 1
     if _hc["Z"]["score"] != 10:
         print(f"  FAIL honest-cap: a CLEAN tab must stay 10 (got {_hc['Z']})"); bad += 1
+    if _hc["W"]["score"] != 9.1:
+        print(f"  FAIL honest-cap: a self-priced TBD-fraction caveat must NOT be re-capped "
+              f"on top of its own stated penalty (got {_hc['W']})"); bad += 1
     # proveCatch the honest HEADLINE OUTPUT (Tristan 2026-06-27): a foreign served-asset COUNT
     # ('6000 cultivation containers' for a water plant) must be replaced by the plant's boundary
     # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an
