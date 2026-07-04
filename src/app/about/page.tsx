@@ -86,7 +86,7 @@ export default function AboutPage() {
                     Software founders rent infrastructure from AWS so they can focus on shipping code. Hardware has no equivalent — you&apos;re expected to build the factory yourself. I&apos;m building one.
                   </p>
                   <p className="text-muted-foreground leading-relaxed">
-                    If you&apos;re a deep-tech or hardware founder, describe your idea and we&apos;ll build your Design Dossier — an 80-plus-page engineering and procurement briefing, reviewed by a senior engineer before it reaches you. From there we work together on advisory, capital and build. No self-serve dashboards — just experienced people doing the work.
+                    If you&apos;re a deep-tech or hardware founder, describe your idea and we&apos;ll build your Design Dossier — an auditable engineering-and-costing model where every number traces back to a formula you can check, reviewed by a senior engineer before it reaches you. From there we work together on advisory, capital and build. No self-serve dashboards — just experienced people doing the work.
                   </p>
                   <a
                     href="https://linkedin.com/in/tristanfischer"
