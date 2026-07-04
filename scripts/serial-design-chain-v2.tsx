@@ -111,7 +111,7 @@ import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
 import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-domain-guard'
 import { runPayloadRatingAudit } from '../src/lib/pdf-engine-v2/lib/payload-rating-audit'
-import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt, BRIEF_PARSING_SYSTEM } from '../src/lib/pdf-engine-v2/prompts'
+import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt, BRIEF_PARSING_SYSTEM, RESEARCH_SYNTHESIS_SYSTEM_PA } from '../src/lib/pdf-engine-v2/prompts'
 // THE FINAL DETERMINISM PIECE (drawer #86, 2026-07-04): the critic (247494a32), the benchmark
 // net (284c69c09), and the vision critique (3c4e7d7de) already cache per content-hash. Brief
 // parsing, the Phase-0 plausibility critic + rewriter, and the generator/reviewer passes
@@ -2561,10 +2561,23 @@ function critiquePayloadHash(opts: {
   modules: any[]; brief: any; keyMetrics?: any; productClass: string
   contractTradeOffs?: any; model?: string
 }): string {
+  // determinism #86 (2026-07-04): `keyMetrics` is `deriveHeadlineFromModules()`'s output, which
+  // stamps `generated_at: new Date().toISOString()` on every call (headline-deriver.ts) — a
+  // wall-clock bookkeeping field, not a design value. Hashing it verbatim meant this cache
+  // NEVER hit across two separate chain invocations, even with byte-identical modules/brief/
+  // productClass/contractTradeOffs (verified: v68 vs v69 fischer-codema — same design, keyMetrics
+  // identical in every field except generated_at, 16 minutes apart — a guaranteed miss on every
+  // run of the SAME brief). That, in turn, made the skeleton-critique text fed into R1's prompt
+  // (`skeletonCriticAppend`) re-roll every run, cascading a MISS into the design-stage-cache
+  // callLlm entry for R1 even after R1's own inputs were otherwise reproducible. Strip the
+  // timestamp at this wiring site — the ONLY change — so the key reflects the design content
+  // `keyMetrics` actually carries (headline/constraint/utilisation/supporting_metrics/
+  // product_class/generated_by), never the moment it was computed.
+  const { generated_at: _droppedTimestamp, ...keyMetricsForHash } = (opts.keyMetrics ?? {}) as Record<string, unknown>
   return createHash('sha256').update(stableStringify({
     modules: opts.modules ?? [],
     brief: opts.brief ?? null,
-    keyMetrics: opts.keyMetrics ?? null,
+    keyMetrics: opts.keyMetrics ? keyMetricsForHash : null,
     productClass: opts.productClass ?? '',
     contractTradeOffs: opts.contractTradeOffs ?? null,
     model: opts.model ?? null,
@@ -4050,9 +4063,28 @@ async function main() {
   }
 
   const t1 = Date.now()
-  const researchResult = await runResearchSynthesis(parsedResult.data, productClass)
+  // DESIGN-STAGE CACHE (determinism #86, gap closed 2026-07-04): research synthesis was the
+  // ONE LLM stage feeding the R1/R4/R4.5 prompts that this module's original wiring missed —
+  // it called OpenRouter directly (mimo-v2.5-pro, unseeded) with no cache, so on the SAME brief
+  // it re-rolled a DIFFERENT market synthesis every run (proven on v68 vs v69 fischer-codema:
+  // byte-identical 1-parsed-brief-original.json, wholly different 3-research.json market_context
+  // / competitors / why_now text). Because `research` is embedded verbatim into every reviewer's
+  // `user` prompt ("RESEARCH SYNTHESIS: ${JSON.stringify(opts.research)}"), that re-roll alone
+  // was enough to miss the R1 cache — which then cascades: R1's differing design output changes
+  // R4's `currentDesign` input, and R4's differing physics-critique/BoM changes the semantic
+  // self-audit's digest — so ALL THREE downstream callLlm cache entries missed from this ONE
+  // upstream gap, not from any run-varying path/id/timestamp in the callLlm keys themselves.
+  // Payload folds in parsedBrief + productClass (runResearchSynthesis's only real inputs) + the
+  // model id + the live prompt text, so an edited research prompt misses automatically.
+  const { value: researchResult, cacheHit: researchCacheHit } = await cachedDesignStage({
+    stage: 'research',
+    payload: { parsedBrief: parsedResult.data, productClass, model: 'xiaomi/mimo-v2.5-pro', prompt: RESEARCH_SYNTHESIS_SYSTEM_PA },
+    run: () => runResearchSynthesis(parsedResult.data, productClass),
+    isValid: (v) => !!v?.ok && !!v?.data,
+  })
+  if (researchCacheHit) console.error(`[chain] research-synthesis cache HIT — LLM not called (determinism #86)`)
   const research = researchResult.ok ? researchResult.data : null
-  logAction({ step: 'research', model: 'mimo-v2.5-pro', latency_ms: Date.now() - t1, ok: researchResult.ok })
+  logAction({ step: 'research', model: 'mimo-v2.5-pro', latency_ms: Date.now() - t1, ok: researchResult.ok, cache_hit: researchCacheHit })
   writeFileSync(resolve(outDir, '3-research.json'), JSON.stringify(research, null, 2))
 
   // Phase C registry pre-seed REVERTED 2026-05-15. Reuse of registry entries
