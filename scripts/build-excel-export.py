@@ -5698,6 +5698,8 @@ def _combine_contract_rows(crows: Dict[int, dict], idxs: List[int]) -> dict:
     lead["reasons"] = reasons
     lead["tbd"] = any(c.get("tbd") for c in crs)
     lead["commodity"] = any(c.get("commodity") for c in crs)
+    lead["generic_spec"] = any(c.get("generic_spec") for c in crs)
+    lead["oem_proprietary"] = any(c.get("oem_proprietary") for c in crs)
     return lead
 
 
@@ -5742,7 +5744,14 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                      f"procurement' (commodity noun family + unit £ ≤ "
                      f"£{_COMMODITY_UNIT_GBP_MAX:g}, both required — unpenalised, tallied "
                      f"separately; real practice carries no MPN on class-basis commodity parts "
-                     f"at concept stage). " + _contract_note(cres))
+                     f"at concept stage) · generic-spec {cres.get('tbd_generic_spec_count', 0)}"
+                     f"/{cres.get('generic_spec_count', 0)} engine-refused process valves carry "
+                     f"'generic spec — MPN at procurement' (a spec-complete DN/material/rating "
+                     f"on the row itself, no £ cap — unpenalised) · OEM-proprietary "
+                     f"{cres.get('tbd_oem_proprietary_count', 0)}/{cres.get('oem_proprietary_count', 0)} "
+                     f"lines carry 'OEM-proprietary (no public MPN)' (a recorded research "
+                     f"finding on the row, never self-declared — unpenalised). "
+                     + _contract_note(cres))
     title_row(ws, "Bill of Materials (Ledger)", 15, subtitle)
     header(ws, 4, ["Tag", "Item", "Qty", "Unit £", "Line £",
                    "Cost method", "Key inputs", "Factors", "Est class", "Confidence",
@@ -5893,6 +5902,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
                 pc.fill = FILL_ADVISORY
                 pc.font = FONT_ADVISORY
             elif _cr.get("commodity") and str(_mpn).startswith("commodity"):
+                pc.font = FONT_NOTE
+            elif _cr.get("generic_spec") and str(_mpn).startswith("generic spec"):
+                pc.font = FONT_NOTE
+            elif _cr.get("oem_proprietary") and str(_mpn).startswith("OEM-proprietary"):
                 pc.font = FONT_NOTE
 
         # ── ROW CHECK (col O) — a LIVE formula over the row's own cells (line £ = qty ×
@@ -11614,16 +11627,25 @@ def _contract_note(res: dict) -> str:
     else:
         formula = (f"score = 10 × rows-passing ÷ rows = "
                    f"10 × {_np}/{_nt} = {res.get('score')}")
-    # HONEST TBD TAXONOMY (2026-07-03): when the tab tracks MPN tallies, the formula
-    # line prints BOTH — the penalised engineered-TBD count and the unpenalised (but
-    # visible) commodity 'MPN at procurement' count.
+    # HONEST TBD TAXONOMY (2026-07-03; extended 2026-07-04): when the tab tracks MPN
+    # tallies, the formula line prints ALL FIVE — resolved / commodity / generic-spec
+    # / OEM-proprietary (all unpenalised) / the penalised engineered-TBD count.
     tallies = ""
-    if ("tbd_required" in res) or res.get("commodity_count"):
-        tallies = (f" MPN TALLIES: engineered TBD {res.get('tbd_count', 0)}"
-                   f"/{res.get('tbd_required', 0)} (penalised) · commodity 'MPN at "
-                   f"procurement' {res.get('tbd_commodity_count', 0)}"
-                   f"/{res.get('commodity_count', 0)} (unpenalised, visible; commodity = "
-                   f"noun family + unit £ ≤ £{_COMMODITY_UNIT_GBP_MAX:g}, both required).")
+    if ("tbd_required" in res) or res.get("commodity_count") \
+            or res.get("generic_spec_count") or res.get("oem_proprietary_count"):
+        _resolved = res.get("resolved_count", max(0, res.get("tbd_required", 0) - res.get("tbd_count", 0)))
+        tallies = (f" MPN TALLIES: resolved {_resolved}/{res.get('tbd_required', 0)} · "
+                   f"engineered TBD {res.get('tbd_count', 0)}/{res.get('tbd_required', 0)} "
+                   f"(penalised) · commodity 'MPN at procurement' "
+                   f"{res.get('tbd_commodity_count', 0)}/{res.get('commodity_count', 0)} "
+                   f"(unpenalised, visible; noun family + unit £ ≤ £{_COMMODITY_UNIT_GBP_MAX:g}, "
+                   f"both required) · generic spec — MPN at procurement "
+                   f"{res.get('tbd_generic_spec_count', 0)}/{res.get('generic_spec_count', 0)} "
+                   f"(unpenalised, visible; engine-refused process valve with a spec-complete "
+                   f"DN/material/rating on its own row, no £ cap) · OEM-proprietary (no public "
+                   f"MPN) {res.get('tbd_oem_proprietary_count', 0)}/{res.get('oem_proprietary_count', 0)} "
+                   f"(unpenalised, visible; requires a recorded research finding on the row, "
+                   f"never self-declared).")
     return (f"ROW CHECK CONTRACT ({formula}):{tallies} {cols}. "
             "A dash / empty / unverifiable contracted cell FAILS its row — honest red beats fake green.")
 
@@ -12405,25 +12427,44 @@ def _bom_row_mpn(row: dict, mpn_by_word: Dict[str, str]) -> str:
 
 _TBD_MPN_TEXT = "TBD (detailed design)"
 
-# ── HONEST TBD TAXONOMY (2026-07-03). Real concept-stage EPC practice: COMMODITY
-# small parts (glands, unions, DIN rail, terminal blocks, fasteners — class-basis
-# priced) do NOT carry MPNs at concept stage; nobody expects a manufacturer part
-# number on a £2 terminal block until procurement. The credibility gap the TBD
-# penalty exists for is unidentified ENGINEERED equipment — a pump, analyser or
-# VFD with no part number. The taxonomy therefore splits the bought-out lines:
+# ── HONEST TBD TAXONOMY (2026-07-03; extended 2026-07-04 round-3 dissection). Real
+# concept-stage EPC practice: several classes of bought-out line do NOT carry MPNs
+# at concept stage FOR HONEST REASONS — nobody expects a manufacturer part number on
+# a £2 terminal block until procurement; the engine DELIBERATELY refuses an MPN pin
+# on a generic-spec process valve (bought by DN/material/rating, never a single
+# part number); an OEM-integral controller can genuinely have no published part
+# number at all. Penalising any of those exactly like an unidentified ENGINEERED
+# pump/analyser/VFD would be dishonest scorer-softening in the OTHER direction —
+# these are engine-refused-by-design or verified gaps, not skipped research. The
+# taxonomy therefore splits the bought-out lines into FIVE tallies (all printed in
+# the tab header — resolved / commodity / generic-spec / OEM-proprietary /
+# engineered-TBD), evaluated in that priority order so no row double-counts:
 #   • COMMODITY — requires BOTH signals (proveCatch: neither alone can reclassify):
 #       (a) a commodity NOUN family match (_COMMODITY_NOUN_RX — a universal
 #           small-parts lexicon, never a per-class table), AND
 #       (b) a class-basis unit price under the STATED threshold
 #           (_COMMODITY_UNIT_GBP_MAX, printed in the tab header), with a stated
 #           pricing basis on the row.
-#     Renders 'commodity — MPN at procurement'; tallied SEPARATELY (visible in the
-#     header + results), NEVER penalised.
+#     Renders 'commodity — MPN at procurement'; tallied SEPARATELY, NEVER penalised.
+#   • GENERIC-SPEC PROCESS VALVE — requires BOTH (proveCatch both directions):
+#       (a) the engine's own refusal vocabulary (_commodity_process_valve — mirrors
+#           isCommodityProcessValve exactly), AND
+#       (b) the row's OWN cells carry the FULL procurable spec — DN/size + material
+#           + rating/PN (_valve_spec_complete, formula-checked from the row, no £ cap).
+#     A spec-INCOMPLETE engine-refused valve stays engineered-TBD — the gap is real.
+#     Renders 'generic spec — MPN at procurement'; tallied SEPARATELY (distinct from
+#     COMMODITY — not price-gated), NEVER penalised.
+#   • OEM-PROPRIETARY (no public MPN) — requires a RECORDED research finding on the
+#     row's own `basis` (_oem_proprietary_row) — never self-declared by a merely
+#     absent price/part. Renders 'OEM-proprietary (no public MPN)'; tallied
+#     SEPARATELY, NEVER penalised.
 #   • ENGINEERED — every other bought-out line; a missing MPN stays the explicit
 #     'TBD (detailed design)' and keeps the FULL proportional score penalty.
 # proveCatch in _selftest: an engineered pump with TBD still penalises (noun family
 # fails even under the price threshold); a £5k 'gland plate' package still
-# penalises (price threshold fails even with the noun). ──
+# penalises (price threshold fails even with the noun); a spec-complete valve
+# qualifies generic-spec, a spec-incomplete one stays TBD; a researched
+# no-public-MPN row qualifies OEM-proprietary, a merely-unpriced one never does. ──
 _COMMODITY_MPN_TEXT = "commodity — MPN at procurement"
 _COMMODITY_UNIT_GBP_MAX = 100.0
 _COMMODITY_NOUN_RX = re.compile(
@@ -12448,17 +12489,21 @@ _COMMODITY_NOUN_RX = re.compile(
     r"\bfittings?\b", re.I)
 
 
-# ── COMMODITY PROCESS VALVE (Bar B, 2026-07-03): the ENGINE refuses MPNs on a
-# simple mechanical process valve by design (emitter-completion
-# isCommodityProcessValve — a DN50 ball valve is bought BY SPEC: size + rating +
-# material, never by a single name-matched MPN), so the SCORER must agree: a
-# generic-spec process valve WITHOUT actuation is 'commodity — MPN at
-# procurement', not an engineered TBD. Mirrors the engine's vocabulary exactly
-# (+ manual/sample). An ACTUATED / control / solenoid / dosing / relief valve
-# stays ENGINEERED (it has a real pin path — e.g. Bürkert Type 2000 — or a set
-# pressure to certify) and keeps the full TBD penalty. The price + basis legs of
-# the triple guard still apply in _commodity_bought_out (proveCatch both
-# directions in _selftest).
+# ── COMMODITY PROCESS VALVE (Bar B, 2026-07-03; SPLIT OUT to its own GENERIC-SPEC
+# taxonomy 2026-07-04 — round-3 dissection): the ENGINE refuses MPNs on a simple
+# mechanical process valve by design (emitter-completion isCommodityProcessValve —
+# a DN50 ball valve is bought BY SPEC: size + rating + material, never by a single
+# name-matched MPN). Mirrors the engine's vocabulary exactly (+ manual/sample). An
+# ACTUATED / control / solenoid / dosing / relief valve stays ENGINEERED (it has a
+# real pin path — e.g. Bürkert Type 2000 — or a set pressure to certify) and keeps
+# the full TBD penalty.
+# 2026-07-04 CORRECTION: this valve family is NO LONGER folded into the £-capped
+# COMMODITY bucket (_commodity_bought_out below) — a DN300 isolation valve refused
+# an MPN by the engine is not a £2 gland, and gating it on the commodity PRICE cap
+# was dishonest in the other direction (a £500 ball valve used to stay penalised
+# TBD purely because it cleared the price cap, even though the engine refuses it
+# an MPN regardless of price). It is now its OWN tally, GATED ON SPEC COMPLETENESS
+# instead of price — see _GENERIC_SPEC taxonomy below.
 _VALVE_ACTUATION_RX = re.compile(
     r"actuat|automat|solenoid|motoris|motoriz|\bcontrol\b|dosing|metering|modulat|"
     r"throttl|pneumatic|electric|relief|safety", re.I)
@@ -12477,16 +12522,80 @@ def _commodity_process_valve(text: str) -> bool:
 
 
 def _commodity_bought_out(row: dict, unit: Optional[float]) -> bool:
-    """True only when BOTH commodity signals hold: the commodity noun family (small
-    parts OR a generic-spec unactuated process valve) AND a stated class-basis unit
-    price under the threshold. An engineered pump can never be reclassified by price
-    alone; a £5k 'gland' package never by noun alone; an ACTUATED valve never at all."""
+    """True only when BOTH commodity signals hold: a commodity small-parts noun family
+    AND a stated class-basis unit price under the threshold. An engineered pump can
+    never be reclassified by price alone; a £5k 'gland' package never by noun alone.
+    Engine-refused PROCESS VALVES are handled separately (_generic_spec_valve, gated
+    on spec completeness, never on this £ cap — 2026-07-04)."""
     if unit is None or unit <= 0 or unit > _COMMODITY_UNIT_GBP_MAX:
         return False
     if not str(row.get("basis") or "").strip():
         return False        # class-basis priced small parts only — never an unpriced mystery
     text = f"{row.get('requirement') or ''} {row.get('part') or ''}"
-    return bool(_COMMODITY_NOUN_RX.search(text)) or _commodity_process_valve(text)
+    return bool(_COMMODITY_NOUN_RX.search(text))
+
+
+# ── GENERIC-SPEC PROCESS VALVE taxonomy (2026-07-04, round-3 dissection). An
+# engine-refused process valve (_commodity_process_valve, above) is procured BY
+# SPEC — DN/size + material + pressure/class rating — never by a single MPN. The
+# scorer honours that ONLY when the row's OWN cells actually carry that full
+# procurable spec (formula-checked, never assumed): a spec-INCOMPLETE valve row
+# stays engineered-TBD, because the spec work is then genuinely missing — the
+# penalty is honest. Distinct from the COMMODITY-PRICE class above: no £ cap here
+# at all, a £2,000 DN300 isolation valve with a complete spec still qualifies.
+# proveCatch both directions in _selftest.
+_VALVE_DN_SIZE_RX = re.compile(
+    r"\bDN\s*\d{2,4}\b|\b\d+(?:\.\d+)?\s*(?:\"|in(?:ch)?)\b", re.I)
+_VALVE_RATING_RX = re.compile(
+    r"\bPN\s*\d{1,3}\b|\bclass\s*\d{2,4}\s*#?\b|\bANSI\s*\d{2,4}\b|"
+    r"\b\d+(?:\.\d+)?\s*bar(?:\s+rating)?\b|\b\d+(?:\.\d+)?\s*psi\b", re.I)
+
+
+def _valve_spec_complete(row: dict) -> bool:
+    """True when the row's OWN cells (requirement / basis / part / size / material)
+    carry the FULL procurable generic spec a bought-by-spec valve needs: DN/size AND
+    material AND a pressure/class rating. Never inferred from anything outside the
+    row. A row missing any one leg is spec-INCOMPLETE (stays engineered-TBD — an
+    honest gap, not a reclassification)."""
+    text = " ".join(str(row.get(k) or "") for k in ("requirement", "basis", "part", "size"))
+    has_size = bool(str(row.get("size") or "").strip()) or bool(_VALVE_DN_SIZE_RX.search(text))
+    has_material = bool(_bom_row_material(row))
+    has_rating = bool(_VALVE_RATING_RX.search(text))
+    return has_size and has_material and has_rating
+
+
+def _generic_spec_valve(row: dict) -> bool:
+    """True only when BOTH legs hold: the row names an engine-refused process valve
+    (_commodity_process_valve) AND that row's own cells carry the full procurable
+    spec (_valve_spec_complete). Neither leg alone reclassifies."""
+    text = f"{row.get('requirement') or ''} {row.get('part') or ''}"
+    return _commodity_process_valve(text) and _valve_spec_complete(row)
+
+
+# ── OEM-PROPRIETARY (no public MPN) taxonomy (2026-07-04, round-3 dissection). Some
+# bought-out parts (e.g. an OEM-integral RO skid controller) genuinely have no
+# publicly published manufacturer part number — that is a VERIFIED RESEARCH FINDING,
+# not a gap. It is honoured ONLY when the row's own `basis` states that finding was
+# actually recorded by the ingest/verification pass (a real research result) — NEVER
+# self-declared merely because a price or part happens to be absent (that would be
+# indistinguishable from an unresearched gap and would let every unresolved row
+# quietly escape the TBD penalty). proveCatch both directions in _selftest.
+_OEM_PROPRIETARY_RESEARCH_RX = re.compile(
+    r"oem[- ]proprietary|"
+    r"no\s+public(?:ly)?[- ]?(?:available|listed|disclosed)?\s*(?:part\s*number|mpn)|"
+    r"no\s+published\s+(?:part\s*number|mpn)|"
+    r"(?:manufacturer|oem)\s+(?:does\s+not|doesn't)\s+publish|"
+    r"not\s+publicly\s+(?:available|listed|disclosed)", re.I)
+
+
+def _oem_proprietary_row(row: dict) -> bool:
+    """True ONLY when the row's own `basis` carries a stated research finding that no
+    public part number exists — never inferred from a merely-missing price/part."""
+    return bool(_OEM_PROPRIETARY_RESEARCH_RX.search(str(row.get("basis") or "")))
+
+
+_GENERIC_SPEC_MPN_TEXT = "generic spec — MPN at procurement"
+_OEM_PROPRIETARY_MPN_TEXT = "OEM-proprietary (no public MPN)"
 
 
 # ── CLASS-ALIEN PART MARKERS (fix 6, reviewers 2026-07-02 — 'Aquavista Remote
@@ -12524,13 +12633,17 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     'N/A — proprietary assembly' (na_with_reason). The distinction derives from data the
     rows already carry — never a per-class table.
     MPN / DATASHEET — a real or DB-sourced part reference for a bought-out row, else an
-    EXPLICIT disclosure. HONEST TBD TAXONOMY (2026-07-03): a COMMODITY line (commodity
-    noun family AND unit £ under the stated threshold — both required) renders
-    'commodity — MPN at procurement' and lands in a SEPARATE, unpenalised-but-visible
-    tally; every other (ENGINEERED) bought-out line without a reference stays the
-    flagged 'TBD (detailed design)' and the TAB score is penalised in PROPORTION to
-    the ENGINEERED-TBD fraction — a fully-TBD bill can never reach 8. BOTH tallies are
-    surfaced in the tab header.
+    EXPLICIT disclosure. HONEST TBD TAXONOMY (2026-07-03, extended 2026-07-04): a
+    COMMODITY line (commodity noun family AND unit £ under the stated threshold — both
+    required) renders 'commodity — MPN at procurement'; an engine-refused GENERIC-SPEC
+    process valve whose OWN row carries the full DN/material/rating spec (no £ cap)
+    renders 'generic spec — MPN at procurement'; a row carrying a RECORDED research
+    finding of no public part number renders 'OEM-proprietary (no public MPN)' — all
+    three land in SEPARATE, unpenalised-but-visible tallies; every other (ENGINEERED)
+    bought-out line without a reference stays the flagged 'TBD (detailed design)' and
+    the TAB score is penalised in PROPORTION to the ENGINEERED-TBD fraction — a
+    fully-TBD bill can never reach 8. ALL FIVE tallies (resolved / commodity /
+    generic-spec / OEM-proprietary / engineered-TBD) are surfaced in the tab header.
     NUMBERS — qty > 0 · unit £ > 0 · line £ = qty × unit £ (per-row arithmetic) · a
     non-empty pricing basis. A '↳' sub-component is an apportionment of its parent
     (unit/line waived WITH that stated reason, exactly as the ledger renders it)."""
@@ -12558,8 +12671,11 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
          "real or DB-sourced part reference for a bought-out row, else an explicit disclosure: "
          "ENGINEERED lines carry 'TBD (detailed design)' (counted + penalising the tab score by "
          "their fraction); COMMODITY lines (commodity noun family AND unit £ ≤ the stated "
-         "threshold, both required) carry 'commodity — MPN at procurement' (tallied separately, "
-         "unpenalised)"),
+         "threshold, both required) carry 'commodity — MPN at procurement'; engine-refused "
+         "GENERIC-SPEC process valves with a spec-complete row (DN/size + material + rating, "
+         "no £ cap) carry 'generic spec — MPN at procurement'; a row with a RECORDED research "
+         "finding of no public part number carries 'OEM-proprietary (no public MPN)' — all "
+         "three tallied separately, unpenalised"),
     ]
 
     per_row: Dict[int, dict] = {}
@@ -12568,6 +12684,10 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     mpn_required = 0       # ENGINEERED bought-out lines (the penalty denominator)
     commodity_tbd = 0      # COMMODITY bought-out lines with no reference (visible, unpenalised)
     commodity_total = 0    # COMMODITY bought-out lines
+    generic_spec_tbd = 0       # GENERIC-SPEC valve lines with no reference (visible, unpenalised)
+    generic_spec_total = 0     # GENERIC-SPEC valve lines (engine-refused + spec-complete)
+    oem_proprietary_tbd = 0    # OEM-PROPRIETARY lines with no reference (visible, unpenalised)
+    oem_proprietary_total = 0  # OEM-PROPRIETARY lines (verified no public MPN)
     for idx, row in enumerate(bom):
         if not isinstance(row, dict):
             continue
@@ -12587,6 +12707,8 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         mpn_txt = _bom_row_mpn(row, mpn_by_word)
         tbd = False
         commodity = False
+        generic_spec = False
+        oem_proprietary = False
 
         if is_sub and not (line or 0):
             # apportioned child — unit/line/material/MPN live on the PARENT line; the
@@ -12609,16 +12731,31 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
             elif not material_txt:
                 material_txt = "N/A — proprietary assembly / bought-out package, see datasheet"
             if kind == "assembly":
-                # HONEST TBD TAXONOMY: commodity small parts (noun family + price
-                # threshold, BOTH required) do not owe an MPN at concept stage —
-                # separate visible tally, no penalty. Engineered lines keep the
-                # full TBD penalty.
+                # HONEST TBD TAXONOMY: evaluated in priority order so a row never lands
+                # in two buckets — commodity small parts (noun family + price threshold,
+                # BOTH required), then engine-refused GENERIC-SPEC process valves (no
+                # price cap — gated on the row's own spec completeness instead), then
+                # OEM-PROPRIETARY (a recorded no-public-MPN research finding). None of
+                # the three owe an MPN at concept stage — each a separate visible tally,
+                # no penalty. Every other (ENGINEERED) line keeps the full TBD penalty.
                 commodity = _commodity_bought_out(row, unit)
+                generic_spec = (not commodity) and _generic_spec_valve(row)
+                oem_proprietary = (not commodity) and (not generic_spec) and _oem_proprietary_row(row)
                 if commodity:
                     commodity_total += 1
                     if not mpn_txt:
                         mpn_txt = _COMMODITY_MPN_TEXT
                         commodity_tbd += 1
+                elif generic_spec:
+                    generic_spec_total += 1
+                    if not mpn_txt:
+                        mpn_txt = _GENERIC_SPEC_MPN_TEXT
+                        generic_spec_tbd += 1
+                elif oem_proprietary:
+                    oem_proprietary_total += 1
+                    if not mpn_txt:
+                        mpn_txt = _OEM_PROPRIETARY_MPN_TEXT
+                        oem_proprietary_tbd += 1
                 else:
                     mpn_required += 1
                     if not mpn_txt:
@@ -12639,7 +12776,8 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
             n_pass += 1
         per_row[idx] = {"verdict": verdict, "reasons": reasons, "kind": kind,
                         "material": material_txt, "mpn": mpn_txt, "tbd": tbd,
-                        "commodity": commodity}
+                        "commodity": commodity, "generic_spec": generic_spec,
+                        "oem_proprietary": oem_proprietary}
 
     if not per_row:
         return None
@@ -12648,14 +12786,16 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     # TBD penalty — PROPORTIONAL to the fraction of ENGINEERED bought-out rows still
     # 'TBD (detailed design)': score = arithmetic − 4 × engineered-TBD-fraction, so a
     # fully-TBD bill caps at 6 (<8) even when every row check passes. The gap is honest
-    # but it is still a gap. Commodity lines ('MPN at procurement') are OUTSIDE both the
-    # numerator and the denominator — they owe no MPN at concept stage (honest TBD
-    # taxonomy 2026-07-03), but their tally stays visible.
+    # but it is still a gap. Commodity / generic-spec / OEM-proprietary lines are
+    # OUTSIDE both the numerator and the denominator — none of the three owe an MPN
+    # at concept stage (honest TBD taxonomy 2026-07-03, extended 2026-07-04), but all
+    # three tallies stay visible.
     tbd_frac = (tbd_count / mpn_required) if mpn_required else 0.0
     score = base
     if base is not None and tbd_frac > 0:
         score = max(0.0, round(base - 4.0 * tbd_frac, 1))
     n_fail = n_total - n_pass
+    resolved_count = max(0, mpn_required - tbd_count)
     issues: List[str] = []
     if n_fail:
         # reference the REAL sheet row each failing bom line renders on (fix 3 — the
@@ -12668,22 +12808,33 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         issues.append(f"{n_fail}/{n_total} ledger rows FAIL the column contract (arithmetic "
                       f"10 × {n_pass}/{n_total} = {base}) — e.g. " + " · ".join(ex))
     if tbd_count:
+        _visible = []
+        if commodity_tbd:
+            _visible.append(f"{commodity_tbd} commodity")
+        if generic_spec_tbd:
+            _visible.append(f"{generic_spec_tbd} generic-spec valve")
+        if oem_proprietary_tbd:
+            _visible.append(f"{oem_proprietary_tbd} OEM-proprietary")
         issues.append(f"{tbd_count}/{mpn_required} ENGINEERED bought-out lines carry MPN 'TBD "
                       f"(detailed design)' — an ESTIMATE-stage gap; score = arithmetic − 4 × "
                       f"engineered-TBD-fraction = {base} − {4.0 * tbd_frac:.1f}"
-                      + (f" ({commodity_tbd} commodity line(s) 'MPN at procurement' tallied "
-                         f"separately, unpenalised)" if commodity_tbd else ""))
+                      + (f" ({' + '.join(_visible)} line(s) tallied separately, unpenalised)"
+                         if _visible else ""))
     return {"tab": _LEDGER_SHEET, "contract": contract, "rows": per_row,
             "n_pass": n_pass, "n_total": n_total, "score": score,
             "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
             "source_fabricated": 0,
             "tbd_count": tbd_count, "tbd_required": mpn_required,
-            "tbd_fraction": round(tbd_frac, 3),
+            "tbd_fraction": round(tbd_frac, 3), "resolved_count": resolved_count,
             "tbd_commodity_count": commodity_tbd, "commodity_count": commodity_total,
+            "tbd_generic_spec_count": generic_spec_tbd, "generic_spec_count": generic_spec_total,
+            "tbd_oem_proprietary_count": oem_proprietary_tbd,
+            "oem_proprietary_count": oem_proprietary_total,
             "fix": ("price the £0 lines at source (requirements_bom.py emitter), state the "
                     "material on fabricated parts in the sizing pass, and close ENGINEERED MPN "
                     "TBDs by growing the parts DB (Stage 17.6 ingest) so partVerifications "
-                    "resolves them (commodity lines resolve at procurement — no hold)")}
+                    "resolves them (commodity / generic-spec valve lines resolve at "
+                    "procurement — no hold; OEM-proprietary lines never resolve by design)")}
 
 
 # ── RISK REGISTER column contract (Tristan 2026-07-02, issue 12) ────────────────────────
@@ -18193,39 +18344,119 @@ def _selftest() -> int:
         if _commodity_bought_out(_lo_row, float(_hi)):
             print(f"  FAIL fitting-taxonomy: a £{_hi} {_noun!r} must stay engineered "
                   f"(price leg binds)"); bad += 1
-    # ═══ proveCatch the COMMODITY PROCESS VALVE taxonomy (Bar B, 2026-07-03). Claims:
-    # (a) a generic-spec unactuated process valve (manual/ball/check/isolation/sample)
-    #     with class-basis price ≤ threshold is 'commodity — MPN at procurement';
-    # (b) an ACTUATED valve NEVER reclassifies (real pin path — engineered TBD),
-    #     even under the price threshold;
-    # (c) the price + basis legs of the triple guard still bind (a £500 ball valve /
-    #     a basis-less £9 valve both stay engineered). ═══
+    # ═══ proveCatch the engine-refusal vocabulary (Bar B, 2026-07-03 — unchanged; the
+    # GENERIC-SPEC gating built on top of it is proveCatch'd separately below). Claims:
+    # (a) manual/isolation/sample/non-return/ball/etc valves are engine-refused;
+    # (b) an ACTUATED / control / relief / non-valve NEVER matches. ═══
     if not _commodity_process_valve("Manual Ball Valve") or \
        not _commodity_process_valve("Suction Isolation Valves") or \
        not _commodity_process_valve("Sample Valves") or \
        not _commodity_process_valve("Non-Return Valve"):
         print("  FAIL valve-taxonomy: manual/isolation/sample/non-return valves must "
-              "classify as generic-spec commodity process valves"); bad += 1
+              "classify as engine-refused process valves"); bad += 1
     for _av in ("Pneumatic Actuated Valves", "Solenoid Valve", "Automated Ball Valves",
                 "Flow Control Valve", "Pressure Relief Valve", "Chemical Dosing Pump"):
         if _commodity_process_valve(_av):
             print(f"  FAIL valve-taxonomy: {_av!r} must stay ENGINEERED (actuation / "
                   f"control / relief / non-valve never reclassifies)"); bad += 1
-    _vrow = {"requirement": "Manual Ball Valve", "part": "requirement stated",
-             "basis": "bottom-up parametric · MoC: PVC-U"}
-    if not _commodity_bought_out(_vrow, 9.0):
-        print("  FAIL valve-taxonomy: a £9 basis-backed manual ball valve must be "
-              "commodity"); bad += 1
-    if _commodity_bought_out(_vrow, 500.0):
-        print("  FAIL valve-taxonomy: a £500 ball valve must stay engineered (price "
-              "leg binds)"); bad += 1
-    if _commodity_bought_out({"requirement": "Manual Ball Valve", "basis": ""}, 9.0):
-        print("  FAIL valve-taxonomy: a basis-less valve must stay engineered (basis "
-              "leg binds)"); bad += 1
-    if _commodity_bought_out({"requirement": "Pneumatic Actuated Valves",
-                              "basis": "actuated-valve assembly"}, 90.0):
-        print("  FAIL valve-taxonomy: an actuated valve under the threshold must stay "
-              "engineered"); bad += 1
+    # ═══ proveCatch the GENERIC-SPEC PROCESS VALVE taxonomy (2026-07-04, round-3
+    # dissection — SUPERSEDES the old price-capped Bar B valve fold). Claims:
+    # (a) an engine-refused valve whose OWN row carries a full DN + material + rating
+    #     spec qualifies 'generic spec — MPN at procurement' with NO £ cap at all (a
+    #     £2,000 valve qualifies exactly like a £9 one — distinct from COMMODITY);
+    # (b) a spec-complete valve NEVER folds into the £-capped commodity class either
+    #     — the two taxonomies are disjoint;
+    # (c) the SAME valve missing ANY ONE leg (DN / material / rating) stays engineered
+    #     -TBD — a genuine spec gap is never waved through;
+    # (d) an ACTUATED valve NEVER qualifies even with a full spec (real pin path). ═══
+    _spec_complete_row = {"requirement": "Manual Isolation Valve DN80 PN16",
+                           "material": "316L stainless", "part": "requirement stated",
+                           "basis": "bottom-up parametric"}
+    if not _generic_spec_valve(_spec_complete_row):
+        print("  FAIL generic-spec-valve: a DN80/316L/PN16 manual valve must qualify "
+              "generic-spec"); bad += 1
+    if _commodity_bought_out(_spec_complete_row, 9.0) or _commodity_bought_out(_spec_complete_row, 2000.0):
+        print("  FAIL generic-spec-valve: a spec-complete valve must NEVER fold into "
+              "the £-capped commodity class, at any price"); bad += 1
+    _no_dn_row = {"requirement": "Manual Isolation Valve", "material": "316L stainless",
+                  "part": "requirement stated", "basis": "bottom-up parametric · PN16"}
+    if _generic_spec_valve(_no_dn_row):
+        print("  FAIL generic-spec-valve: a valve with NO DN/size must stay "
+              "engineered-TBD (spec-incomplete)"); bad += 1
+    _no_material_row = {"requirement": "Manual Isolation Valve DN80 PN16",
+                         "part": "requirement stated", "basis": "bottom-up parametric"}
+    if _generic_spec_valve(_no_material_row):
+        print("  FAIL generic-spec-valve: a valve with NO stated material must stay "
+              "engineered-TBD (spec-incomplete)"); bad += 1
+    _no_rating_row = {"requirement": "Manual Isolation Valve DN80", "material": "316L stainless",
+                      "part": "requirement stated", "basis": "bottom-up parametric"}
+    if _generic_spec_valve(_no_rating_row):
+        print("  FAIL generic-spec-valve: a valve with NO rating/PN must stay "
+              "engineered-TBD (spec-incomplete)"); bad += 1
+    _actuated_full_spec = {"requirement": "Pneumatic Actuated Valve DN80 PN16",
+                            "material": "316L stainless", "part": "requirement stated",
+                            "basis": "bottom-up parametric"}
+    if _generic_spec_valve(_actuated_full_spec):
+        print("  FAIL generic-spec-valve: an ACTUATED valve must NEVER qualify even "
+              "with a full spec (real pin path)"); bad += 1
+    _gsv = _eval_bom_ledger_contract(".", {"requirementsBom": [
+        dict(_spec_complete_row, tag="V-1", qty=1, unit_gbp=2000, line_gbp=2000),
+        dict(_no_dn_row, tag="V-2", qty=1, unit_gbp=90, line_gbp=90),
+    ]})
+    if not _gsv or _gsv["rows"][0]["mpn"] != _GENERIC_SPEC_MPN_TEXT or _gsv["rows"][0]["tbd"] \
+            or not _gsv["rows"][0]["generic_spec"]:
+        print(f"  FAIL generic-spec-valve: the ledger must render "
+              f"'{_GENERIC_SPEC_MPN_TEXT}' and never count as a TBD "
+              f"(got {_gsv and _gsv['rows'][0]})"); bad += 1
+    if not _gsv or _gsv["rows"][1]["mpn"] != _TBD_MPN_TEXT or not _gsv["rows"][1]["tbd"] \
+            or _gsv["rows"][1]["generic_spec"]:
+        print(f"  FAIL generic-spec-valve: a spec-incomplete valve must stay a "
+              f"penalised TBD (got {_gsv and _gsv['rows'][1]})"); bad += 1
+    if not _gsv or _gsv["tbd_generic_spec_count"] != 1 or _gsv["generic_spec_count"] != 1 \
+            or _gsv["tbd_count"] != 1 or _gsv["tbd_required"] != 1:
+        print(f"  FAIL generic-spec-valve: tallies must read generic-spec 1/1 + "
+              f"engineered TBD 1/1 (got {_gsv})"); bad += 1
+    _note5 = _contract_note(_gsv)
+    if "generic spec — MPN at procurement 1/1" not in _note5:
+        print(f"  FAIL generic-spec-valve: header note must print the generic-spec "
+              f"tally (got {_note5[:280]})"); bad += 1
+    # ═══ proveCatch the OEM-PROPRIETARY (no public MPN) taxonomy (2026-07-04,
+    # round-3 dissection). Claims: (a) a row whose OWN basis states a RECORDED
+    # research finding of no public part number qualifies; (b) a merely-unpriced /
+    # un-MPN'd row with NO such finding NEVER self-declares OEM-proprietary — price
+    # absence alone can never reclassify it, it stays engineered-TBD. ═══
+    _oem_row = {"requirement": "Veolia RO40 Controller", "part": "requirement stated",
+                "basis": "OEM-proprietary — integral skid controller; no public part "
+                         "number published (verified via manufacturer correspondence)"}
+    if not _oem_proprietary_row(_oem_row):
+        print("  FAIL oem-proprietary: a row with a recorded no-public-MPN research "
+              "finding must qualify"); bad += 1
+    _unpriced_row = {"requirement": "Veolia DC3 Controller", "part": "requirement stated",
+                      "basis": "bottom-up parametric"}
+    if _oem_proprietary_row(_unpriced_row):
+        print("  FAIL oem-proprietary: a merely-unpriced/un-MPN'd row must NEVER "
+              "self-declare OEM-proprietary without a recorded finding"); bad += 1
+    _oem_ledger = _eval_bom_ledger_contract(".", {"requirementsBom": [
+        dict(_oem_row, tag="C-1", qty=1, unit_gbp=8000, line_gbp=8000),
+        dict(_unpriced_row, tag="C-2", qty=1, unit_gbp=90, line_gbp=90),
+    ]})
+    if not _oem_ledger or _oem_ledger["rows"][0]["mpn"] != _OEM_PROPRIETARY_MPN_TEXT \
+            or _oem_ledger["rows"][0]["tbd"] or not _oem_ledger["rows"][0]["oem_proprietary"]:
+        print(f"  FAIL oem-proprietary: the ledger must render "
+              f"'{_OEM_PROPRIETARY_MPN_TEXT}' and never count as a TBD "
+              f"(got {_oem_ledger and _oem_ledger['rows'][0]})"); bad += 1
+    if not _oem_ledger or _oem_ledger["rows"][1]["mpn"] != _TBD_MPN_TEXT \
+            or not _oem_ledger["rows"][1]["tbd"] or _oem_ledger["rows"][1]["oem_proprietary"]:
+        print(f"  FAIL oem-proprietary: an unresearched unpriced row must stay a "
+              f"penalised TBD (got {_oem_ledger and _oem_ledger['rows'][1]})"); bad += 1
+    if not _oem_ledger or _oem_ledger["tbd_oem_proprietary_count"] != 1 \
+            or _oem_ledger["oem_proprietary_count"] != 1 or _oem_ledger["tbd_count"] != 1:
+        print(f"  FAIL oem-proprietary: tallies must read OEM-proprietary 1/1 + "
+              f"engineered TBD 1/1 (got {_oem_ledger})"); bad += 1
+    _note6 = _contract_note(_oem_ledger)
+    if "OEM-proprietary (no public MPN) 1/1" not in _note6:
+        print(f"  FAIL oem-proprietary: header note must print the OEM-proprietary "
+              f"tally (got {_note6[:280]})"); bad += 1
     # ═══ proveCatch the FOLD-TOLERANT MPN JOIN (Bar C, 2026-07-03). Claims:
     # (a) a verified singular pin joins the plural ledger row ('Pneumatic Actuated
     #     Valve' → 'Pneumatic Actuated Valves');
