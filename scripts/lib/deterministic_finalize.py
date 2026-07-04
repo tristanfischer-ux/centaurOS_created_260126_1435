@@ -40,6 +40,13 @@ import os
 import re
 import sys
 
+# connection_ledger.py (scripts/blender-universal/) is the connection-trace AUTHORITY —
+# reused here (never re-implemented) so the post-demotion ledger reconciliation applies
+# the SAME endpoint-validity rule finalize_ledger enforces at authoring time. Lightweight,
+# bpy-free (only `import re`), safe to import outside Blender's interpreter.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "blender-universal"))
+import connection_ledger  # noqa: E402
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # shared helpers (mirror universal-grammar-gates.ts normalisation)
@@ -780,6 +787,151 @@ def finalize(state) -> dict:
     return r
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# TRACE-LAYER RECONCILIATION (2026-07-04, the 'Piping Network' ghost) — every fix above
+# mutates state.moduleDecomposition (the word tree), but the connection-ledger.json /
+# connection-schedule.json artefacts on disk were authored EARLIER by Blender's drawing-
+# generation settle loop (which runs BEFORE this pass, ahead of the cost stack) against
+# the design AS IT STOOD THEN. A word this pass demotes/merges/folds out of the tree can
+# still be named by an edge those artefacts already authored — a dangling trace reference
+# the ledger's OWN authority rule (finalize_ledger's ENDPOINT VALIDITY) would have refused
+# had it run last. This is the SAME "no dangling reference anywhere" discipline the fold
+# registry + ghost-prune already apply to BoM rows, extended to the connection layer:
+# fix the FAMILY (any name the tree drops leaves no trace reference, universal, keyed on
+# current membership) rather than patch the one observed name. Runs LAST, after every
+# other fix above has settled the tree, so it sees the FINAL valid-name set.
+# ─────────────────────────────────────────────────────────────────────────────
+def _valid_part_names(state) -> set:
+    """Every DISPLAY name a connection-trace edge may legitimately still reference, from the
+    CURRENT, settled word tree. Mirrors build_universal_scene.py's `extract_parts()` /
+    `_ri_names` referential-integrity set construction — both read the word's OWN
+    `name_human` FIRST (`w.get("name_human") or w.get("character_id")`), union of every
+    authored word's name(s), not filtered to only the massed/placed subset, so a signal tie
+    to a non-massed instrument is never a false dangling-reference catch here either.
+
+    No slug form is added: connection_ledger.py's resolver (`_endpoint_tokens` /
+    `_resolve_to_valid_name`) already tokenises on any non-alphanumeric separator, so a
+    snake_case reference ('motor_control_center') tokenises identically to its Title Case
+    display form ('Motor Control Center') and resolves without a separate slug entry.
+    Adding a slug string here would instead risk WINNING the resolver's tie-break (both
+    forms carry the SAME token set) and being written back as the re-homed/canonical name —
+    a real regression caught empirically replaying this fix on codema v77 ('Motor Control
+    Center' edges were being re-homed to the ugly 'motor_control_center' slug).
+
+    Deliberately does NOT use this module's shared `_name(w)` helper — that helper prefers
+    `content_character.name_human` (the GENERIC template name, e.g. 'PLC Controller') over
+    the word's own `name_human` (the SPECIFIC brief-adapted / DB-filled display name, e.g.
+    'Hoogendoorn iSii Process Computer'), which is the right precedence for _name()'s OTHER
+    callers (scope-word / class-alien vocabulary matching against the generic template) but
+    the WRONG one here — the ledger/BoM/prose reference the DISPLAY name, so a word whose
+    two names diverge (a DB-fill or brief-adaptation renames name_human but leaves the
+    template's content_character.name_human untouched) would otherwise read as a false
+    'gone' reference. Both forms are still recorded as aliases so a reference using either
+    name resolves."""
+    names: set = set()
+    for m in _modules(state):
+        for sm in (m.get("sub_modules") or []):
+            for w in _words(sm):
+                cc = w.get("content_character") or {}
+                for nm in (w.get("name_human"), cc.get("name_human")):
+                    if nm:
+                        names.add(nm)
+    return names
+
+
+def _recompute_schedule_totals(rows: list, totals: dict) -> dict:
+    """Recompute ONLY the connection-schedule.json total fields VERIFIED (byte-checked
+    against live artefacts, 2026-07-04) to be exact sums over `rows`: install_gbp,
+    terminations_gbp, grand_total_gbp, runs_sized, and the length-by-size maps
+    (cable_m_by_csa / pipe_m_by_dn / duct_m_by_size, grouped by each row's own `size`).
+    The material-cost sub-totals (cable_gbp / pipe_gbp / duct_gbp / transformer_gbp /
+    other_gbp) are NOT simple row sums — their formula lives in build_universal_scene.py's
+    connection-sizing cost model (not replicated here) — so they are left AS-IS; a prune
+    can leave them marginally stale by the removed rows' small material-cost share. Never
+    silently wrong: the caller logs this bound explicitly."""
+    out = dict(totals or {})
+    out["runs_sized"] = len(rows)
+    out["install_gbp"] = round(sum((r.get("install_gbp") or 0) for r in rows), 2)
+    out["terminations_gbp"] = round(sum((r.get("termination_gbp") or 0) for r in rows), 2)
+    out["grand_total_gbp"] = round(sum((r.get("line_total_gbp") or 0) for r in rows), 2)
+    _cable_mechs = {"electrical_bus", "signal"}
+    by_csa: dict = {}
+    by_dn: dict = {}
+    by_duct: dict = {}
+    for r in rows:
+        size = r.get("size")
+        length = r.get("length_m") or 0
+        mech = r.get("mechanism")
+        if not size:
+            continue
+        if mech in _cable_mechs:
+            by_csa[size] = round(by_csa.get(size, 0) + length, 2)
+        elif mech == "fluid_loop":
+            by_dn[size] = round(by_dn.get(size, 0) + length, 2)
+        elif mech == "duct":
+            by_duct[size] = round(by_duct.get(size, 0) + length, 2)
+    if "cable_m_by_csa" in out:
+        out["cable_m_by_csa"] = by_csa
+    if "pipe_m_by_dn" in out:
+        out["pipe_m_by_dn"] = by_dn
+    if "duct_m_by_size" in out:
+        out["duct_m_by_size"] = by_duct
+    return out
+
+
+def reconcile_trace_artifacts(run_dir: str, state, log=print) -> dict:
+    """Post-hoc-clean the on-disk connection-ledger.json / connection-schedule.json
+    artefacts against the FINAL, settled `state` — dropping (never silently keeping) any
+    edge whose endpoint no longer names a real part, exactly as finalize_ledger would have
+    refused it at authoring time. Idempotent: a run with no stale reference makes no write
+    (byte-identical artefacts, no spurious rebuild). Returns a summary dict."""
+    valid = _valid_part_names(state)
+    summary = {"connection_ledger_pruned": 0, "connection_schedule_pruned": 0}
+
+    ledger_path = os.path.join(run_dir, "connection-ledger.json")
+    if os.path.isfile(ledger_path):
+        try:
+            with open(ledger_path, "r", encoding="utf-8") as fh:
+                ledger = json.load(fh)
+        except (OSError, ValueError) as e:
+            log(f"[trace-reconcile] could not read connection-ledger.json (skipped): {e}")
+            ledger = None
+        if isinstance(ledger, dict):
+            new_ledger, n = connection_ledger.reconcile_ledger_with_parts(ledger, valid, log=log)
+            if n:
+                with open(ledger_path, "w", encoding="utf-8") as fh:
+                    json.dump(new_ledger, fh, indent=1)
+                summary["connection_ledger_pruned"] = n
+                log(f"[trace-reconcile] connection-ledger.json: pruned {n} dangling edge(s), "
+                    f"rewrote rows/dropped/adjacency/completeness/referential_integrity")
+
+    sched_path = os.path.join(run_dir, "connection-schedule.json")
+    if os.path.isfile(sched_path):
+        try:
+            with open(sched_path, "r", encoding="utf-8") as fh:
+                sched = json.load(fh)
+        except (OSError, ValueError) as e:
+            log(f"[trace-reconcile] could not read connection-schedule.json (skipped): {e}")
+            sched = None
+        if isinstance(sched, dict) and isinstance(sched.get("rows"), list):
+            # prune_indexed_schedule (not the plain prune_dangling_rows) — `specs` is
+            # authored INDEX-PARALLEL to `rows` (specs[i] describes the SAME run as
+            # rows[i]); pruning rows alone would desynchronise the two arrays.
+            new_sched, dropped = connection_ledger.prune_indexed_schedule(sched, valid, log=log)
+            if dropped:
+                new_sched["totals"] = _recompute_schedule_totals(new_sched["rows"], sched.get("totals"))
+                with open(sched_path, "w", encoding="utf-8") as fh:
+                    json.dump(new_sched, fh)
+                summary["connection_schedule_pruned"] = len(dropped)
+                log(f"[trace-reconcile] connection-schedule.json: pruned {len(dropped)} dangling "
+                    f"row(s) (rows + index-parallel specs); recomputed runs_sized/install_gbp/"
+                    f"terminations_gbp/grand_total_gbp/length-by-size (material-cost sub-totals "
+                    f"cable_gbp/pipe_gbp/duct_gbp/transformer_gbp/other_gbp are NOT simple row "
+                    f"sums and are left as-is — bounded stale by the {len(dropped)} pruned "
+                    f"row(s)' own small material share)")
+    return summary
+
+
 def _selftest() -> int:
     st = {"moduleDecomposition": {"modules": [{
         "module": "mass_fluid_transport_process",
@@ -1018,11 +1170,113 @@ def _selftest() -> int:
     scope_ok = (scope_fires_ok and other_families_ok and real_part_stays_ok and owns_children_stays_ok
                 and catalogue_priced_stays_ok and mis_emission_flag_ok and no_match_untouched_ok)
 
+    # ── TRACE-LAYER RECONCILE proveCatch (2026-07-04, the 'Piping Network' ghost) — both
+    # directions, end-to-end through reconcile_trace_artifacts (the real main() call path),
+    # not just the pure connection_ledger functions (already proven in that module's own
+    # --selftest). Uses a real temp dir so the disk read/write round-trip is exercised too.
+    import tempfile
+    _tv_state = {"moduleDecomposition": {"modules": [{
+        "module": "mass_fluid_transport_process",
+        "sub_modules": [{"id": "sm1", "english_sentence": "x", "words": [
+            {"id": "gac_softener_word", "name_human": "Gac Softener"},
+            {"id": "softener_vessel_word", "name_human": "Softener Vessel"},
+            # DIVERGENT-NAMES proveCatch (the real codema v77 root cause behind THIS fix,
+            # found only by empirically re-checking the 12-vs-2 drop count on real v77
+            # artefacts): a DB-fill / brief-adaptation renames a word's DISPLAY name_human
+            # ('Hoogendoorn iSii Process Computer') but leaves its content_character's
+            # GENERIC template name_human ('PLC Controller') untouched. The ledger/BoM
+            # reference the DISPLAY name — _valid_part_names must resolve it (the shared
+            # _name() helper here would wrongly prefer the generic template name and this
+            # word would read as a false 'gone' reference).
+            {"id": "plc_controller_word", "name_human": "Hoogendoorn iSii Process Computer",
+             "content_character": {"character_id": "plc_controller", "name_human": "PLC Controller"}},
+            {"id": "mcc_word", "name_human": "Motor Control Center"},
+            # NOTE: no 'Piping Network' word — it was demoted/removed upstream, exactly
+            # like the real codema v77 case this fix targets.
+        ]}],
+    }]}}
+    _tv_names = _valid_part_names(_tv_state)
+    valid_names_exclude_demoted_ok = ("Piping Network" not in _tv_names
+                                      and "Gac Softener" in _tv_names
+                                      and "gac_softener" not in _tv_names  # NO slug string —
+                                      # would win the resolver's tie-break and get written
+                                      # back as the canonical (ugly) name; a snake_case ROW
+                                      # reference still resolves via tokenisation (below),
+                                      # with no slug entry needed in valid_names at all.
+                                      and "Hoogendoorn iSii Process Computer" in _tv_names
+                                      and "PLC Controller" in _tv_names)  # both names alias in
+    _tv_dir = tempfile.mkdtemp(prefix="dfin_selftest_")
+    _tv_ledger = {
+        "schema": "connection-ledger/1", "count": 3,
+        "rows": [
+            {"from_part": "Gac Softener", "to_part": "Softener Vessel", "mechanism": "fluid_loop"},
+            {"from_part": "Motor Control Center", "to_part": "Piping Network", "mechanism": "electrical_bus"},
+            # a SNAKE_CASE/slug-style reference to a real part (no slug entry in
+            # valid_names — pure tokenisation) must resolve AND re-home to the nice
+            # DISPLAY form, never stay/regress to the slug string itself.
+            {"from_part": "motor_control_center", "to_part": "Gac Softener", "mechanism": "signal"},
+        ],
+        "dropped": [], "completeness": {"n_concerns": 0, "concerns": []},
+        "adjacency": {}, "referential_integrity": {},
+    }
+    _tv_sched = {"rows": [
+        {"from": "Motor Control Center", "to": "Piping Network", "mechanism": "electrical_bus",
+         "size": "1.5 mm²", "length_m": 24.2, "install_gbp": 72.63, "termination_gbp": 12.0,
+         "line_total_gbp": 84.63},
+        {"from": "Gac Softener", "to": "Softener Vessel", "mechanism": "fluid_loop",
+         "size": "DN25", "length_m": 10.0, "install_gbp": 50.0, "termination_gbp": 5.0,
+         "line_total_gbp": 55.0},
+    ], "totals": {"runs_sized": 2, "install_gbp": 122.63, "terminations_gbp": 17.0,
+                  "grand_total_gbp": 139.63, "cable_m_by_csa": {"1.5 mm²": 24.2},
+                  "pipe_m_by_dn": {"DN25": 10.0}}}
+    with open(os.path.join(_tv_dir, "connection-ledger.json"), "w") as _f:
+        json.dump(_tv_ledger, _f)
+    with open(os.path.join(_tv_dir, "connection-schedule.json"), "w") as _f:
+        json.dump(_tv_sched, _f)
+    _tv_summary = reconcile_trace_artifacts(_tv_dir, _tv_state, log=lambda *a: None)
+    with open(os.path.join(_tv_dir, "connection-ledger.json")) as _f:
+        _tv_ledger_after = json.load(_f)
+    with open(os.path.join(_tv_dir, "connection-schedule.json")) as _f:
+        _tv_sched_after = json.load(_f)
+    _tv_mcc_rows = [r for r in _tv_ledger_after["rows"] if r["to_part"] == "Gac Softener"]
+    trace_catch_ok = (
+        _tv_summary["connection_ledger_pruned"] == 1
+        and _tv_summary["connection_schedule_pruned"] == 1
+        and len(_tv_ledger_after["rows"]) == 2
+        and any(r["to_part"] == "Softener Vessel" for r in _tv_ledger_after["rows"])
+        and len(_tv_mcc_rows) == 1 and _tv_mcc_rows[0]["from_part"] == "Motor Control Center"
+        and len(_tv_sched_after["rows"]) == 1
+        and _tv_sched_after["totals"]["runs_sized"] == 1
+        and _tv_sched_after["totals"]["install_gbp"] == 50.0
+        and _tv_sched_after["totals"]["terminations_gbp"] == 5.0
+        and _tv_sched_after["totals"]["grand_total_gbp"] == 55.0
+        and _tv_sched_after["totals"]["cable_m_by_csa"] == {}
+        and _tv_sched_after["totals"]["pipe_m_by_dn"] == {"DN25": 10.0}
+    )
+    # NO FALSE CATCH: a second run against the ALREADY-CLEAN artefacts must change nothing
+    # (idempotent — the real chain calls deterministic_finalize.py's fixes and could, in
+    # principle, be invoked more than once on the same run_dir).
+    _tv_summary2 = reconcile_trace_artifacts(_tv_dir, _tv_state, log=lambda *a: None)
+    trace_idem_ok = (_tv_summary2["connection_ledger_pruned"] == 0
+                     and _tv_summary2["connection_schedule_pruned"] == 0)
+    # a run with NO stale reference (a real part's ties) leaves the files byte-untouched.
+    _tv_dir2 = tempfile.mkdtemp(prefix="dfin_selftest_clean_")
+    _tv_clean_ledger = {"rows": [{"from_part": "Gac Softener", "to_part": "Softener Vessel",
+                                  "mechanism": "fluid_loop"}],
+                        "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    with open(os.path.join(_tv_dir2, "connection-ledger.json"), "w") as _f:
+        json.dump(_tv_clean_ledger, _f)
+    _tv_clean_bytes_before = open(os.path.join(_tv_dir2, "connection-ledger.json")).read()
+    reconcile_trace_artifacts(_tv_dir2, _tv_state, log=lambda *a: None)
+    _tv_clean_bytes_after = open(os.path.join(_tv_dir2, "connection-ledger.json")).read()
+    trace_untouched_ok = _tv_clean_bytes_before == _tv_clean_bytes_after
+    trace_ok = valid_names_exclude_demoted_ok and trace_catch_ok and trace_idem_ok and trace_untouched_ok
+
     if (ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok
             and domain_ok and rename_ok and rename_none_ok and home_ok and non_telemetry_ok
-            and extract_ok and scope_ok):
+            and extract_ok and scope_ok and trace_ok):
         print("deterministic_finalize selftest OK (class-alien-rename / scope-word-demotion / "
-              "density-merge / modifier / prose / overview / idempotent)")
+              "density-merge / modifier / prose / overview / trace-layer-reconcile / idempotent)")
         return 0
     print(f"SELFTEST FAIL: ok={ok} idem={idem} named={named} one_dim={one_dim} "
           f"merge_ok={merge_ok} loop_ok={loop_ok} exempt_ok={exempt_ok} "
@@ -1033,6 +1287,8 @@ def _selftest() -> int:
           f"real_part_stays_ok={real_part_stays_ok} owns_children_stays_ok={owns_children_stays_ok} "
           f"catalogue_priced_stays_ok={catalogue_priced_stays_ok} mis_emission_flag_ok={mis_emission_flag_ok} "
           f"no_match_untouched_ok={no_match_untouched_ok} "
+          f"trace_ok={trace_ok} (names_ok={valid_names_exclude_demoted_ok} catch_ok={trace_catch_ok} "
+          f"idem_ok={trace_idem_ok} untouched_ok={trace_untouched_ok}) "
           f"before={before} after={after}")
     return 1
 
@@ -1060,6 +1316,18 @@ def main(argv) -> int:
           f"density-merged={r['thin_sub_modules_merged']} "
           f"modifiers={r['modifier_conflicts_fixed']} prose={r['prose_covered']} "
           f"overview={r['overview_scrubbed']} · residual violations {rv}")
+    # TRACE-LAYER RECONCILE — runs on the FINAL, settled `state` regardless of whether the
+    # word-tree fixes above touched anything (a stale ledger reference can predate this
+    # run entirely), against connection-ledger.json / connection-schedule.json already on
+    # disk in the SAME run_dir. Non-fatal: a missing/unreadable artefact is skipped, never
+    # a hard failure of this pass.
+    try:
+        ts = reconcile_trace_artifacts(argv[0], state, log=print)
+        print(f"[deterministic-finalize] trace-reconcile: connection-ledger.json pruned="
+              f"{ts['connection_ledger_pruned']} connection-schedule.json pruned="
+              f"{ts['connection_schedule_pruned']}")
+    except Exception as e:  # noqa: BLE001 — never let a trace-artefact hiccup break finalize
+        print(f"[deterministic-finalize] trace-reconcile failed (non-fatal): {e}", file=sys.stderr)
     return 0
 
 

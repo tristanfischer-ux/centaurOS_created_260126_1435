@@ -506,12 +506,26 @@ _INLINE_TAP_RE = re.compile(
 # (which already passed). Keyed on the service-family NAME (snake_case contract node
 # ids); a real part name ('DC busbar 1500 V') or a misspelled part never matches.
 # Keep in sync with deterministic_checks_lib._SERVICE_BOUNDARY_ENDPOINT_RE.
+#
+# WIDENED 2026-07-04 (+busway / +ctrl / +board): found empirically replaying the trace-layer
+# reconciliation (below) against REAL BESS artefacts (bess-crossval-v1/v2) — 'bms_ctrl' /
+# '(busway)' / a bare distribution-board id are ELECTRICAL-DISTRIBUTION pseudo-nodes the
+# electrical model authors as routing structure (never a catalogue part), and
+# dossier_audit.py's `_ABSTRACT_TERMINUS_RX` already treats them as legitimate — but THIS
+# regex (and its documented mirror, deterministic_checks_lib._SERVICE_BOUNDARY_ENDPOINT_RE)
+# did not, so the post-hoc reconciler was about to DROP real, already-shipped BESS
+# connections as false dangling references (a regression the byte-identity proveCatch below
+# now guards). Union of both regexes' vocabulary, so the ledger authority and the exporter's
+# phantom-reference net agree on what "not a physical part" means. `ctrl`/`board` use
+# `[_ -]?` (not `\b`) so an underscore-joined id like 'bms_ctrl' matches — a bare `\bctrl\b`
+# does NOT fire inside 'bms_ctrl' because `_` counts as a word character in Python regex.
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
-    r"\b(?:dc|ac|hv|lv|mv)_bus\b|\bheat[_ -]?reject(?:ion)?\b|"
-    r"\b(?:heat|thermal|cold)[_ -]?sink\b", re.I)
+    r"\b(?:dc|ac|hv|lv|mv)[_ -]?bus\b|\bheat[_ -]?reject(?:ion)?\b|"
+    r"\b(?:heat|thermal|cold)[_ -]?sink\b|"
+    r"bus[_ -]?way|(?:^|[_ -])ctrl(?:$|[_ -])|(?:^|[_ -])board(?:$|[_ -])", re.I)
 
 
 def audit_completeness(parts, final_topology, required_services, log=print):
@@ -1368,6 +1382,301 @@ def ledger_rows(final_topology):
     return rows
 
 
+# ── POST-AUTHORING RECONCILIATION (2026-07-04, the 'Piping Network' trace-layer ghost) ────
+# finalize_ledger's ENDPOINT VALIDITY rule (rule 1 above) only ever sees the design as it
+# stood AT AUTHORING TIME — but the drawing-generation settle loop runs EARLY (before the
+# cost stack), and deterministic_finalize.py's scope-word demotion + reconcile_hollow's
+# un-scatter + the thin-sub-module density merge all mutate state.moduleDecomposition LATER,
+# on the delivered state.json. A word the ledger tied an edge to (e.g. 'Piping Network', a
+# scope-vocabulary word demoted to a scope note post-render) can vanish from the design
+# AFTER the ledger already authored connections to it — leaving a dangling reference the
+# ledger's own authority rule would have refused had it run last. This is the SAME
+# "no dangling reference anywhere" discipline the fold registry + ghost-prune already apply
+# to BoM rows (a word folded/removed downstream must leave no BoM ghost) — extended here to
+# the connection layer: a name-family fix, not a per-name patch. Universal — keyed on
+# membership in the CURRENT valid-part-name set, never a hardcoded word list.
+def _row_endpoints(row):
+    """(from_name, to_name) for a connection row, tolerant of both schemas in play:
+    connection-ledger.json rows use from_part/to_part; connection-schedule.json rows use
+    from/to. Returns (None, None) for a non-dict / unrecognised row."""
+    if not isinstance(row, dict):
+        return None, None
+    frm = row.get("from_part", row.get("from"))
+    to = row.get("to_part", row.get("to"))
+    return frm, to
+
+
+def _set_row_endpoints(row, frm, to):
+    """Write a (possibly re-homed) endpoint pair back using WHICHEVER key pair the row
+    already carries (from_part/to_part or from/to) — mirrors _row_endpoints so a read
+    followed by a write always round-trips through the same schema."""
+    if "from_part" in row or "to_part" in row:
+        row["from_part"], row["to_part"] = frm, to
+    else:
+        row["from"], row["to"] = frm, to
+
+
+def _endpoint_tokens(s):
+    """Lowercase alphanumeric tokens of an endpoint name — the join key for resolution.
+    Mirrors build-excel-export.py's `_trace_tokens` intent (its own docstring: "'[N]' index
+    dropped") — but that function's IMPLEMENTATION never actually strips the bracket, a
+    pre-existing latent mismatch found empirically replaying this fix against real BESS
+    artefacts: a qty-N replicated instance name ('rack[0]', 'rack[1]', …) tokenised WITHOUT
+    stripping the index picks up a spurious digit token ('0'/'1'/…) that is never a subset
+    of the real part's tokens, so EVERY indexed instance reference falsely read as dangling
+    and its row was dropped (a real, already-shipped connection destroyed by a resolver bug,
+    not by any real design change — exactly the regression the byte-identity proveCatch
+    below guards against). Fixed HERE (this module's own resolver); the exporter's
+    `_trace_tokens` carries the identical latent gap and is a documented follow-up, not
+    touched by this fix (out of the named defect's scope)."""
+    import unicodedata as _ud
+    t = _ud.normalize("NFKC", str(s or "")).replace("↳", " ")
+    for sep in ("·", "•"):
+        if sep in t:
+            t = t.split(sep)[0]
+    t = re.sub(r"\[\d+\]", "", t)
+    return [x for x in re.findall(r"[a-z0-9]+", t.lower())]
+
+
+def _build_valid_index(valid_names):
+    """(display_name, token_set) for every name in `valid_names`, deduped. `valid_names`
+    is normally every word's name_human in the settled design (see deterministic_finalize.
+    _valid_part_names)."""
+    out, seen = [], set()
+    for nm in (valid_names or ()):
+        ts = frozenset(_endpoint_tokens(nm))
+        if not ts:
+            continue
+        key = (str(nm).strip().lower(), ts)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((str(nm).strip(), ts))
+    return out
+
+
+def _resolve_to_valid_name(name, index):
+    """Resolve a (possibly stale/abbreviated/relabelled) endpoint name to the CURRENT real
+    part it UNIQUELY names, or None when it matches nothing OR matches more than one. Same
+    subset rule as build-excel-export.py's `_resolve_endpoint_name` (one shared semantic,
+    see _endpoint_tokens): the endpoint's tokens must be a SUBSET of a real part's tokens (a
+    short token may match by PREFIX, so an abbreviation resolves — 'bm ctrl' ⊂ 'bms
+    controller'). A reference carrying tokens the real part doesn't have ('toray hfu 2020an
+    ro membrane elements' vs 'ro membrane elements') is NOT a subset and resolves to None —
+    a genuinely stale/removed reference, not an abbreviation.
+
+    STRICTER than the exporter's own resolver (2026-07-04, found empirically replaying this
+    fix against real BESS artefacts): the exporter's shortest-real-name-wins tie-break is
+    fine for a DISPLAY-only backstop, but this function's caller decides whether to DROP or
+    REWRITE a real connection — a wrong guess is a silent mis-attribution, not just a cosmetic
+    label. A bare, low-specificity abbreviation like 'pcs' subset-matches SEVERAL distinct
+    real parts ('PCS inverter…', 'PCS cooling fan tray', 'PCS DC surge arrester', …) —
+    shortest-wins would have silently picked whichever happened to have the fewest tokens,
+    which is not necessarily the part the edge actually meant. Requires an UNAMBIGUOUS
+    (exactly one) match; ≥2 candidates return None (the caller's internal-id passthrough,
+    not a drop, handles the common case where this ambiguity is itself the signal that
+    `name` was never a BoM display name to begin with).
+
+    EXACT MATCH ALWAYS WINS FIRST, before the subset scan (2026-07-04, a second real BESS
+    regression found the same replay run): BESS names its own real parts with shared-word
+    families — 'rack string fuse' is itself a real, exact word name, but its tokens are
+    ALSO a legitimate subset of the unrelated 'rack-level HRC string fuse' word, so the
+    subset scan alone finds 2 candidates and (correctly, per the rule above) refuses to
+    guess — even though the query was never actually ambiguous, it named itself exactly.
+    An exact (case/punctuation-insensitive) match to any index entry is definitionally
+    unambiguous and is returned immediately, without ever reaching the subset scan."""
+    for disp, _rt in index:
+        if _norm_name(disp) == _norm_name(name):
+            return disp
+    ets = set(_endpoint_tokens(name))
+    if not ets or not any(len(t) >= 2 for t in ets):
+        return None
+    candidates = []
+    for disp, rt in index:
+        ok = True
+        for et in ets:
+            if et in rt:
+                continue
+            if len(et) >= 2 and any(rtok.startswith(et) for rtok in rt):
+                continue
+            ok = False
+            break
+        if ok:
+            candidates.append(disp)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+# An endpoint written as a bare lowercase/snake_case token ('bms_ctrl', 'rack_block', 'pcs',
+# 'dc_bus') is — by this codebase's own consistent authoring convention — a TOPOLOGY-INTERNAL
+# id (a module-representative / distribution-hub placeholder the closers mint, resolved to a
+# real part only inside Blender's OWN `resolve_endpoint()` at render time), never a BoM word's
+# DISPLAY name (which is always authored Title Case with spaces, e.g. 'Piping Network',
+# 'Hoogendoorn iSii Process Computer'). Found empirically (2026-07-04) replaying this fix
+# against real BESS artefacts: 'pcs' / 'bms_ctrl' / 'rack_block' each fail (or ambiguously
+# multi-match) _resolve_to_valid_name, and — being internal ids this post-hoc pass has no
+# visibility into via the word-tree alone — must NEVER be dropped nor guessed at; the only
+# safe action is to leave the reference exactly as authored (a no-op for that endpoint).
+_INTERNAL_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+
+
+def _row_keep_decisions(rows, valid_names):
+    """Per-row (keep: bool, canon_from, canon_to, bad_name_or_None) decisions against the
+    CURRENT valid-part-name set — the ONE resolution pass shared by prune_dangling_rows
+    (connection-ledger.json / connection-schedule.json `rows`) and prune_indexed_schedule
+    (connection-schedule.json's INDEX-PARALLEL `specs`/`out_of_spec`/`upsized`/
+    `design_feedback`, which must be pruned by the identical index decision as `rows` or the
+    two arrays drift out of lockstep). Four outcomes per endpoint, in order: (1) an explicit
+    abstract battery-limit boundary (_ABSTRACT_BOUNDARY_RE) is kept as-is; (2) an endpoint
+    that UNIQUELY resolves to a real part (exact name, or the SAME token-subset rule the
+    exporter's phantom-reference resolver uses) is kept, canonicalised to the resolved name;
+    (3) a bare lowercase/snake_case topology-internal id that does NOT uniquely resolve
+    (_INTERNAL_ID_RE) is kept UNCHANGED — this pass has no visibility into Blender's own
+    topology-id resolution, so the only safe action is a no-op, never a guess or a drop;
+    (4) anything else resolving to NOTHING is a genuinely dangling DISPLAY-name reference —
+    the row is dropped."""
+    index = _build_valid_index(valid_names)
+
+    def _canon(name):
+        if not name:
+            return None
+        s = str(name)
+        if _ABSTRACT_BOUNDARY_RE.search(s):
+            return name
+        resolved = _resolve_to_valid_name(name, index)
+        if resolved:
+            return resolved
+        if _INTERNAL_ID_RE.fullmatch(re.sub(r"\[\d+\]$", "", s.strip())):
+            return name   # can't verify a topology-internal id — leave unchanged, never drop
+        return None
+
+    out = []
+    for r in (rows or []):
+        frm, to = _row_endpoints(r)
+        cfrm, cto = _canon(frm), _canon(to)
+        if cfrm and cto:
+            out.append((True, cfrm, cto, None))
+        else:
+            out.append((False, cfrm, cto, frm if not cfrm else to))
+    return out
+
+
+def prune_dangling_rows(rows, valid_names, log=print, context=""):
+    """Split `rows` (either connection-ledger.json's from_part/to_part rows or
+    connection-schedule.json's from/to rows) into (kept, dropped) against a CURRENT set of
+    real part names — see _row_keep_decisions for the per-endpoint resolution rule. A kept
+    row with a re-homed endpoint is REWRITTEN to the resolved name; `dropped` mirrors
+    finalize_ledger's own dropped schema. Pure; idempotent (a ledger already consistent with
+    valid_names returns dropped=[] and rewrites nothing)."""
+    decisions = _row_keep_decisions(rows, valid_names)
+    kept, dropped = [], []
+    for r, (keep, cfrm, cto, bad) in zip((rows or []), decisions):
+        if keep:
+            frm, to = _row_endpoints(r)
+            if cfrm != frm or cto != to:
+                r = dict(r)
+                _set_row_endpoints(r, cfrm, cto)
+            kept.append(r)
+        else:
+            frm, to = _row_endpoints(r)
+            dropped.append({"from": frm, "to": to, "mechanism": r.get("mechanism") if isinstance(r, dict) else None,
+                             "reason": f"endpoint '{bad}' no longer resolves to any real part in "
+                                       f"the settled design (removed downstream of ledger "
+                                       f"authoring — scope-word demotion / fold / merge)"})
+    if dropped:
+        log(f"[ledger] reconcile{f' ({context})' if context else ''}: dropped {len(dropped)} "
+            f"row(s) whose endpoint no longer resolves to any real part in the settled design")
+    return kept, dropped
+
+
+def prune_indexed_schedule(sched, valid_names, log=print):
+    """connection-schedule.json's `rows` (BoM-costed) and `specs` (sizing detail) are
+    authored INDEX-PARALLEL by write_connection_schedule — one entry per physical run in
+    lockstep, `specs[i]` describing the SAME run as `rows[i]`. Pruning `rows` alone (as
+    prune_dangling_rows does) would silently desynchronise the two arrays — `specs[i]` would
+    then describe a DIFFERENT run than `rows[i]` for every index after a drop. This applies
+    the identical per-index keep/drop/re-home decision (drawn once from `rows`) to `specs`
+    AND, defensively, to any other top-level list of the SAME original length
+    (`out_of_spec` / `upsized` / `design_feedback` — always empty in practice as of
+    2026-07-04, but future-proofed rather than assumed empty forever) — re-homing each
+    item's own from_part/to_part when present, using the SAME resolved endpoints. Returns
+    (new_sched, dropped)."""
+    rows = list(sched.get("rows") or [])
+    n = len(rows)
+    decisions = _row_keep_decisions(rows, valid_names)
+    dropped = []
+    for r, (keep, cfrm, cto, bad) in zip(rows, decisions):
+        if not keep:
+            frm, to = _row_endpoints(r)
+            dropped.append({"from": frm, "to": to, "mechanism": r.get("mechanism") if isinstance(r, dict) else None,
+                             "reason": f"endpoint '{bad}' no longer resolves to any real part in "
+                                       f"the settled design (removed downstream of ledger "
+                                       f"authoring — scope-word demotion / fold / merge)"})
+    new_sched = dict(sched)
+    for key in ("rows", "specs", "out_of_spec", "upsized", "design_feedback"):
+        arr = sched.get(key)
+        if not isinstance(arr, list) or len(arr) != n:
+            continue
+        new_arr = []
+        for item, (keep, cfrm, cto, _bad) in zip(arr, decisions):
+            if not keep:
+                continue
+            if isinstance(item, dict) and (item.get("from_part") is not None or item.get("to_part") is not None
+                                            or item.get("from") is not None or item.get("to") is not None):
+                ifrm, ito = _row_endpoints(item)
+                if cfrm != ifrm or cto != ito:
+                    item = dict(item)
+                    _set_row_endpoints(item, cfrm, cto)
+            new_arr.append(item)
+        new_sched[key] = new_arr
+    if dropped:
+        log(f"[ledger] reconcile (connection-schedule.json): dropped {len(dropped)} row(s) "
+            f"(+ its index-parallel specs/out_of_spec/upsized/design_feedback entries) whose "
+            f"endpoint no longer resolves to any real part in the settled design")
+    return new_sched, dropped
+
+
+def reconcile_ledger_with_parts(ledger, valid_names, log=print):
+    """Re-validate an ALREADY-WRITTEN connection-ledger.json dict against the CURRENT
+    valid-part-name set. Returns (new_ledger, n_changed): new_ledger is a FRESH dict with
+    `rows`/`dropped`/`count`/`adjacency`/`referential_integrity` rebuilt from the surviving
+    (and possibly re-homed) rows (via the SAME build_adjacency / audit_referential_integrity
+    the original authoring pass used, so the schema is byte-identical to a clean initial
+    build) and any `completeness` concern naming a now-gone part removed (that part no
+    longer exists to be incomplete). `n_changed` counts DROPPED rows only (re-homed rows are
+    kept, so they don't need a `state.json` re-render to reconcile — but a re-home still
+    counts as a write, tracked via the returned ledger being distinct from the input).
+    Pure + idempotent: a ledger already fully resolved against valid_names round-trips with
+    n_changed=0 and IS the same object (no rewrite)."""
+    rows = list(ledger.get("rows") or [])
+    kept, newly_dropped = prune_dangling_rows(rows, valid_names, log=log, context="connection-ledger.json")
+    if not newly_dropped and kept == rows:
+        return ledger, 0
+
+    dropped = list(ledger.get("dropped") or []) + newly_dropped
+    new_ledger = dict(ledger)
+    new_ledger["rows"] = kept
+    new_ledger["dropped"] = dropped
+    new_ledger["count"] = len(kept)
+    new_ledger["adjacency"] = build_adjacency(kept)
+
+    comp = dict(ledger.get("completeness") or {})
+    concerns = comp.get("concerns")
+    if isinstance(concerns, list):
+        valid = {_norm_name(n) for n in (valid_names or ()) if n}
+        kept_concerns = [c for c in concerns
+                         if _norm_name(c.get("part") if isinstance(c, dict) else None) in valid]
+        if len(kept_concerns) != len(concerns):
+            comp = dict(comp)
+            comp["concerns"] = kept_concerns
+            comp["n_concerns"] = len(kept_concerns)
+    new_ledger["completeness"] = comp
+
+    part_names = {p for r in kept for p in _row_endpoints(r) if p}
+    violations = audit_referential_integrity(kept, part_names, log=lambda *a: None)
+    new_ledger["referential_integrity"] = {"n_violations": len(violations), "violations": violations}
+    return new_ledger, len(newly_dropped)
+
+
 # --------------------------------------------------------------------------- selftest
 def _selftest():
     class _P:
@@ -1742,6 +2051,166 @@ def _selftest():
     # re-run is idempotent (pure function of state+parts+topology, no hidden state).
     _a_extra2 = close_actuator_host_ties(_a_state, _a_parts, _a_topo, log=lambda *a: None)
     assert _a_extra == _a_extra2, "close_actuator_host_ties must be deterministic/idempotent"
+
+    # ── reconcile_ledger_with_parts proveCatch (2026-07-04, the 'Piping Network' trace-layer
+    # ghost) — BOTH directions: a demoted word's ledger references are cleaned (dropped +
+    # adjacency/referential-integrity/completeness rebuilt); a real part's references are
+    # left byte-untouched (no rebuild triggered when nothing is dangling).
+    _rl_ledger = {
+        "schema": "connection-ledger/1", "count": 3,
+        "rows": [
+            {"from_part": "Gac Softener", "to_part": "Softener Vessel", "mechanism": "fluid_loop",
+             "service": "water"},
+            {"from_part": "Motor Control Center", "to_part": "Piping Network",
+             "mechanism": "electrical_bus", "service": "power"},
+            {"from_part": "Piping Network", "to_part": "Process Computer",
+             "mechanism": "signal", "service": "signal"},
+        ],
+        "dropped": [],
+        "completeness": {"n_concerns": 1,
+                         "concerns": [{"part": "Piping Network", "missing": ["fluid input"]}]},
+        "adjacency": {}, "referential_integrity": {},
+    }
+    # (a) CATCH: 'Piping Network' was demoted (removed from the word tree) downstream of
+    # ledger authoring — its edges must be pruned and every derived structure rebuilt clean.
+    _rl_valid = {"Gac Softener", "Softener Vessel", "Motor Control Center", "Process Computer"}
+    _rl_new, _rl_n = reconcile_ledger_with_parts(_rl_ledger, _rl_valid, log=lambda *a: None)
+    assert _rl_n == 2, f"both Piping Network edges must be pruned; got n_pruned={_rl_n}"
+    assert {(_row_endpoints(r)) for r in _rl_new["rows"]} == {("Gac Softener", "Softener Vessel")}, \
+        f"the real edge must survive and the two ghost edges must be gone; got {_rl_new['rows']}"
+    assert _rl_new["count"] == 1, f"count must reflect the surviving rows only; got {_rl_new['count']}"
+    assert "Piping Network" not in _rl_new["adjacency"], \
+        f"the demoted word must not remain as an adjacency node; got {list(_rl_new['adjacency'])}"
+    assert _rl_new["completeness"]["n_concerns"] == 0, \
+        "a completeness concern naming a now-gone part must be dropped too (nothing left to be incomplete)"
+    assert len(_rl_new["dropped"]) == 2 and all("Piping Network" in (d["from"] or "") + (d["to"] or "")
+                                                for d in _rl_new["dropped"][-2:]), \
+        f"both drops must be recorded with transparency; got {_rl_new['dropped']}"
+    # (b) NO FALSE CATCH: a ledger with no dangling reference is untouched — n_pruned=0 and
+    # the SAME object is returned (no spurious rebuild / no drift on a clean ledger).
+    _rl_clean = {"rows": [{"from_part": "Gac Softener", "to_part": "Softener Vessel",
+                           "mechanism": "fluid_loop", "service": "water"}],
+                 "dropped": [], "completeness": {"n_concerns": 0, "concerns": []},
+                 "adjacency": {}, "referential_integrity": {}}
+    _rl_same, _rl_n0 = reconcile_ledger_with_parts(_rl_clean, _rl_valid, log=lambda *a: None)
+    assert _rl_n0 == 0 and _rl_same is _rl_clean, \
+        "a ledger with every endpoint still real must round-trip untouched (idempotent, no false catch)"
+    # (c) an abstract battery-limit boundary endpoint is NEVER treated as dangling even
+    # though it names no real part.
+    _rl_boundary = {"rows": [{"from_part": "Fresh Water Tank", "to_part": "utility incomer",
+                              "mechanism": "electrical_bus", "service": "power"}],
+                    "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    _rl_bnew, _rl_bn = reconcile_ledger_with_parts(_rl_boundary, {"Fresh Water Tank"}, log=lambda *a: None)
+    assert _rl_bn == 0, f"an explicit abstract boundary terminus must never be pruned as dangling; got {_rl_bn}"
+
+    # (d) RE-HOME, DON'T DROP: an endpoint that is an ABBREVIATED/relabelled form of a
+    # CURRENT real part (its tokens a subset of the real part's, short tokens matching by
+    # PREFIX — the SAME rule build-excel-export.py's phantom-reference resolver already
+    # uses: 'bm'⊂'bms', 'pc'⊂'pcs') is rewritten to the real part's name and the row KEPT —
+    # dropping it would destroy real connectivity data just because a downstream pass
+    # shortened/reworded the name. Distinct from (a): 'Piping Network' has NO subset
+    # relationship to any real part and is correctly dropped; 'Pc Inverter' IS a
+    # prefix-subset of 'Pcs Inverter Module' and must be re-homed instead.
+    _rh_ledger = {"rows": [{"from_part": "Pc Inverter", "to_part": "Rack String Fuse",
+                            "mechanism": "signal"}],
+                 "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    _rh_new, _rh_n = reconcile_ledger_with_parts(
+        _rh_ledger, {"Pcs Inverter Module", "Rack String Fuse"}, log=lambda *a: None)
+    assert _rh_n == 0, f"a resolvable abbreviation must NOT be counted as a drop; got n={_rh_n}"
+    assert _row_endpoints(_rh_new["rows"][0]) == ("Pcs Inverter Module", "Rack String Fuse"), \
+        f"'Pc Inverter' must re-home to the real part's current name, row kept; got {_rh_new['rows']}"
+    # a reference carrying tokens the real part does NOT have (more specific than any
+    # current part — e.g. a manufacturer+model detail that was later genericised) is a
+    # genuine miss, not an abbreviation, and is still dropped.
+    _rh_miss = {"rows": [{"from_part": "Toray HFU-2020AN RO Membrane Elements",
+                          "to_part": "Cloth Filter", "mechanism": "fluid_loop"}],
+               "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    _rh_mnew, _rh_mn = reconcile_ledger_with_parts(
+        _rh_miss, {"Ro Membrane Elements", "Cloth Filter"}, log=lambda *a: None)
+    assert _rh_mn == 1, (
+        f"a reference with EXTRA tokens no real part carries (manufacturer+model detail "
+        f"the design later genericised) is a genuine miss, not an abbreviation — must "
+        f"still be dropped; got n={_rh_mn}")
+
+    # (e) AMBIGUOUS BARE TOKEN — NEVER GUESS, NEVER DROP (2026-07-04, the real BESS
+    # regression found replaying this fix against bess-crossval-v1/v2 before this fix:
+    # 'pcs' subset-matched ALL of 'PCS Inverter Module' / 'PCS Cooling Fan Tray' / 'PCS DC
+    # Surge Arrester' and the exporter-style shortest-wins tie-break silently picked the
+    # WRONG one — a mis-attributed connection, worse than either an honest drop or a no-op).
+    # 'bms_ctrl' / 'rack_block' are bare lowercase/snake_case topology-internal ids this
+    # pass cannot verify at all — must be left UNCHANGED, not dropped.
+    _amb_valid = {"PCS Inverter Module", "PCS Cooling Fan Tray", "PCS DC Surge Arrester",
+                  "Rack String Fuse"}
+    _amb_ledger = {"rows": [
+        {"from_part": "rack_block", "to_part": "pcs", "mechanism": "electrical_bus"},
+        {"from_part": "bms_ctrl", "to_part": "Rack String Fuse", "mechanism": "electrical_bus"},
+    ], "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    _amb_new, _amb_n = reconcile_ledger_with_parts(_amb_ledger, _amb_valid, log=lambda *a: None)
+    assert _amb_n == 0, (
+        f"an ambiguous bare-token / topology-internal-id endpoint must NEVER be dropped "
+        f"(no confident diagnosis, so no action) — got n_pruned={_amb_n}, dropped={_amb_new.get('dropped')}")
+    assert _row_endpoints(_amb_new["rows"][0]) == ("rack_block", "pcs"), (
+        f"'pcs' is ambiguous among 3 PCS-prefixed parts — must be left UNCHANGED (never "
+        f"guessed at via shortest-wins); got {_amb_new['rows'][0]}")
+    assert _row_endpoints(_amb_new["rows"][1]) == ("bms_ctrl", "Rack String Fuse"), (
+        f"'bms_ctrl' is a topology-internal id with no real-part match at all — left "
+        f"unchanged, the real 'Rack String Fuse' endpoint untouched; got {_amb_new['rows'][1]}")
+
+    # (f) an INDEXED INSTANCE reference ('rack[0]', 'rack[7]', …) is likewise never dropped
+    # nor mis-resolved to an unrelated same-brand-token part — Blender's own qty-N
+    # replication naming is invisible to this word-tree-only pass.
+    _idx_ledger = {"rows": [{"from_part": "bms_ctrl", "to_part": "rack[3]", "mechanism": "electrical_bus"}],
+                  "dropped": [], "completeness": {}, "adjacency": {}, "referential_integrity": {}}
+    _idx_new, _idx_n = reconcile_ledger_with_parts(
+        _idx_ledger, {"Rack String Fuse", "Steel Rack Frame"}, log=lambda *a: None)
+    assert _idx_n == 0 and _row_endpoints(_idx_new["rows"][0]) == ("bms_ctrl", "rack[3]"), (
+        f"an indexed instance reference must be left exactly as authored, never dropped "
+        f"nor resolved to an unrelated rack-brand part; got n={_idx_n} row={_idx_new['rows']}")
+
+    # prune_dangling_rows also handles connection-schedule.json's from/to schema (distinct
+    # key names from connection-ledger.json's from_part/to_part) with the SAME authority.
+    _sched_rows = [
+        {"from": "Motor Control Center", "to": "Piping Network", "mechanism": "electrical_bus"},
+        {"from": "Gac Softener", "to": "Softener Vessel", "mechanism": "fluid_loop"},
+    ]
+    _sk, _sd = prune_dangling_rows(_sched_rows, _rl_valid, log=lambda *a: None)
+    assert len(_sk) == 1 and _row_endpoints(_sk[0]) == ("Gac Softener", "Softener Vessel"), \
+        f"the from/to schedule schema must resolve identically to from_part/to_part; got {_sk}"
+    assert len(_sd) == 1, f"exactly the Piping Network row must be dropped; got {_sd}"
+
+    # prune_indexed_schedule proveCatch (2026-07-04, the connection-schedule.json 'specs'
+    # lockstep bug found empirically replaying this fix on codema v77 — `specs[i]` describes
+    # the SAME run as `rows[i]`; pruning `rows` alone desynchronised the two arrays so
+    # `specs[1]` (the surviving Gac Softener run) still carried the DROPPED row's sizing
+    # detail from index 0). Three rows: dangling / real / dangling, `specs` carrying its OWN
+    # from_part/to_part per index that must be pruned/re-homed IN LOCKSTEP.
+    _pi_sched = {
+        "rows": [
+            {"from": "Motor Control Center", "to": "Piping Network", "mechanism": "electrical_bus"},
+            {"from": "motor_control_center", "to": "Gac Softener", "mechanism": "signal"},
+            {"from": "Fresh Water Tank", "to": "Piping Network", "mechanism": "fluid_loop"},
+        ],
+        "specs": [
+            {"from_part": "Motor Control Center", "to_part": "Piping Network", "size_label": "1.5mm2"},
+            {"from_part": "motor_control_center", "to_part": "Gac Softener", "size_label": "1.5mm2"},
+            {"from_part": "Fresh Water Tank", "to_part": "Piping Network", "size_label": "DN25"},
+        ],
+        "out_of_spec": [], "upsized": [], "design_feedback": [],
+        "totals": {},
+    }
+    _pi_valid = {"Motor Control Center", "Gac Softener", "Fresh Water Tank"}
+    _pi_new, _pi_dropped = prune_indexed_schedule(_pi_sched, _pi_valid, log=lambda *a: None)
+    assert len(_pi_dropped) == 2, f"both Piping Network rows must be dropped; got {_pi_dropped}"
+    assert len(_pi_new["rows"]) == 1 and len(_pi_new["specs"]) == 1, (
+        f"rows and specs must shrink to the SAME single survivor (lockstep); "
+        f"got rows={_pi_new['rows']} specs={_pi_new['specs']}")
+    assert _row_endpoints(_pi_new["rows"][0]) == ("Motor Control Center", "Gac Softener"), (
+        f"the surviving row must be the real one, re-homed from its 'motor_control_center' "
+        f"slug to the display name; got {_pi_new['rows'][0]}")
+    assert _row_endpoints(_pi_new["specs"][0]) == ("Motor Control Center", "Gac Softener"), (
+        f"specs[0] must describe the SAME surviving run as rows[0] (lockstep, re-homed) — "
+        f"a plain per-array prune (not index-aligned) would leave specs pointing at the "
+        f"wrong run; got {_pi_new['specs'][0]}")
 
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
