@@ -24,7 +24,7 @@ const EXAMPLE_XLSX =
 export const metadata: Metadata = {
   title: "What does an industrial water-treatment plant cost to build?",
   description:
-    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.39M installed. Every number from a real, engineer-checked Design Dossier you can download and check.",
+    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.38M installed. Every number from a real, engineer-checked Design Dossier you can download and check.",
   alternates: { canonical: "https://fractionalforge.app/cost/water-treatment-plant" },
 }
 
@@ -47,14 +47,14 @@ const SECTIONS = [
   {
     name: "Process equipment, dosing & distribution",
     covers: "Fertigation dosing, flood-and-drain (ebb/flow) distribution, pumps, pipework, drain-water recovery and the hand-watering ring main",
-    cost: "≈ £910,000",
+    cost: "≈ £900,000",
   },
 ]
 
 const FAQ = [
   {
     q: "How much does an industrial water-treatment plant cost to build?",
-    a: "For this worked example — a water-handling, purification and fertigation plant supplying a large indoor cultivation facility — the installed cost is around £1.39 million. The single biggest cost centres are the controls and instrumentation (~£206k) and the purification train (~£199k). Your figure depends on flow rate, water quality, the treatment steps you need and how much of the plant is duplicated for resilience.",
+    a: "For this worked example — a water-handling, purification and fertigation plant supplying a large indoor cultivation facility — the installed cost is around £1.38 million. The single biggest cost centres are the controls and instrumentation (~£206k) and the purification train (~£199k). Your figure depends on flow rate, water quality, the treatment steps you need and how much of the plant is duplicated for resilience.",
   },
   {
     q: "What's included in that number?",
@@ -78,7 +78,7 @@ export default function WaterTreatmentCostPage() {
         "@type": "Article",
         headline: "What does an industrial water-treatment plant cost to build?",
         description:
-          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.39M installed — from a real, engineer-checked Design Dossier.",
+          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.38M installed — from a real, engineer-checked Design Dossier.",
         author: { "@id": "https://fractionalforge.app/#tristan-fischer" },
         publisher: { "@id": "https://fractionalforge.app/#organization" },
         mainEntityOfPage: "https://fractionalforge.app/cost/water-treatment-plant",
@@ -119,10 +119,38 @@ export default function WaterTreatmentCostPage() {
             </p>
             <div className="flex flex-wrap items-baseline gap-3 pt-2">
               <span className="text-4xl sm:text-5xl font-bold text-international-orange tabular-nums">
-                ≈ £1.39M
+                ≈ £1.38M
               </span>
               <span className="text-muted-foreground">installed, for this example plant</span>
             </div>
+          </section>
+
+          {/* Real dossier visuals */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <figure className="m-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/site/dossier-render.webp"
+                alt="Photoreal isometric render of the water-treatment plant"
+                className="w-full rounded-xl border border-border shadow-sm"
+                loading="lazy"
+              />
+              <figcaption className="mt-2 text-xs text-muted-foreground text-center">
+                The plant, built from the same model as the costs
+              </figcaption>
+            </figure>
+            <figure className="m-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/site/dossier-exec.webp"
+                alt="The Design Dossier's Executive Summary tab — 90 cubic metres per hour, £1,375,105 installed, ship verdict"
+                className="w-full rounded-xl border border-border shadow-sm bg-white"
+                loading="lazy"
+              />
+              <figcaption className="mt-2 text-xs text-muted-foreground text-center">
+                The dossier's own Executive Summary tab
+              </figcaption>
+            </figure>
           </section>
 
           {/* Breakdown table */}
@@ -152,7 +180,7 @@ export default function WaterTreatmentCostPage() {
                   <div className="flex items-center gap-4 px-5 py-4 bg-muted/40">
                     <p className="flex-1 font-bold text-foreground">Total installed</p>
                     <p className="font-bold text-international-orange tabular-nums text-lg">
-                      ≈ £1.39M
+                      ≈ £1.38M
                     </p>
                   </div>
                 </div>
