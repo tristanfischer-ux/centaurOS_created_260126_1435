@@ -40,7 +40,11 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { resolve } from 'path'
 
-const DB_PATH = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+// FORGE_TRUTH_DB_PATH_OVERRIDE (round-4 addition): lets a calibration harness
+// point --commit at a TEMP COPY of forge-truth.db instead of the live one —
+// the round-3 discipline ("a temp copy of forge-truth.db, never the live DB")
+// made mechanical instead of by convention. Defaults to the live path.
+const DB_PATH = process.env.FORGE_TRUTH_DB_PATH_OVERRIDE || resolve(homedir(), '.forge-truth', 'forge-truth.db')
 const CLASS_TAG = 'water_treatment'
 const DISCOVERY_SOURCE = 'web_verified_ingest'
 const COMMIT = process.argv.includes('--commit')
@@ -471,6 +475,149 @@ const PARTS: VerifiedPart[] = [
     manufacturer: 'Siemens', part_number: '6AV2123-2GB03-0AX0',
     desc: 'Siemens SIMATIC HMI KTP700 Basic panel, 7 in TFT widescreen touch + key operation, 65536 colours, PROFINET interface, WinCC Basic V13/STEP7 Basic V13 configurable. Indicative digital control panel for the plant HMI.',
     src: 'https://m.vicpas.com/pid18161090/6AV2123-2GB03-0AX0-Siemens-Simatic-HMI-KTP700-Basic-Panel.htm',
+    unit_price_gbp: null,
+    upgrade: true,
+  },
+
+  // ═══ ROUND 4 (2026-07-04, v73 Part-names 5.2 sweep) — driven by the actual
+  //     parts-ledger not_found population (46 tags), inventoried BEFORE writing
+  //     a single row (round-3 discipline). Calibration against the REAL
+  //     dbFirstLookup/dbHitAcceptableForWord/pickBestDbCandidate functions
+  //     (temp-DB rerun, never the live DB pre-commit) surfaced TWO distinct
+  //     findings that shaped this round:
+  //       (1) 12 of the 46 tags ALREADY resolve against the CURRENT (rounds
+  //           1-3) forge-truth.db once the exclusive-assignment retry
+  //           (4cf5f3d9b) runs fresh — no new ingest needed, only a chain
+  //           re-run bakes them in (V-105 Gac Softener -> Pentair Structural
+  //           36X72 COMP; P-101 Ro High Pressure Pump -> Grundfos 96502039;
+  //           V-101 Gac Filter -> General Carbon HP-1000; X-126/V-109 Bürkert
+  //           Type 2000/2301; TX-101 Transformer -> Hammond SG3A0075KB;
+  //           V-110/I-112 Goetze 851 / Danfoss 060-121966; X-149 Cable Glands
+  //           -> Cabletec CG-M20-IP68; I-105/X-131 Flow Meter(s) already
+  //           resolve too, but to a Sensirion SFM-series BOARD-MOUNT gas-flow
+  //           sensor chip — see finding (2)).
+  //       (2) the existing DB-first match for 'Flow Meter'/'Flow Meters'
+  //           (tokens ['flow','meter'] + sub_module tokens) picks a Sensirion
+  //           SFM41xx — a microfluidic/board-mount GAS flow sensor chip
+  //           (~£150 dev kit), not an industrial process WATER flow meter.
+  //           isBoardMountSensorMispin's curated MPN-prefix regex (HSC/SSC/
+  //           ABP/MPR/TBP/NBP/RSC/DLC/DLV/DLLR/MS5xxx/ELVH/BMxx/LPSx) does
+  //           NOT cover Sensirion's 'SFM'/'SEK' prefixes, so this wrong-scale/
+  //           wrong-fluid mis-pin is NOT caught by the existing guard (an
+  //           engine-side gap, out of scope for this ingest-only round — flag
+  //           for a future gate-7/mis-pin-table extension, do not silently
+  //           patch the guard here). The fix available to THIS deliverable:
+  //           ingest a genuinely industrial, family-coherent process flow
+  //           meter with real 'flow'+'meter' name tokens so it wins the
+  //           pickBestDbCandidate rank outright on headHit (a Sensirion
+  //           dev-kit title never mentions 'flow meter' as a whole phrase).
+  //     Everything else in the 46 either (a) is architecturally EXCLUDED from
+  //     ever becoming IDENTIFIED via ingest — F-1/F-2/F-3 membrane-area rows
+  //     route through requirements_bom.py's _MEMBRANE_MEDIA_RE branch
+  //     UNCONDITIONALLY to 'membrane-area parametric NOT FOUND' regardless of
+  //     any pinned MPN (line ~4851) — or (b) is a genuine honest miss: a
+  //     duty-less drive slot (Motor Starter/Vfd Drive/Vfd Controller, correct
+  //     per the 4cf5f3d9b duty-aware fix), a commodity process valve (Check
+  //     Valves/Manual Ball Valve(s)/Isolation Valves/Automated Ball Valves,
+  //     correct per isCommodityProcessValve policy), fabricated pipework
+  //     costed parametrically (Distribution Manifold, Piping Network, CIP
+  //     system + connections — a multi-vessel RO/GAC skid manifold is welded/
+  //     glued branch pipework sized to the skid, not a single catalogue SKU),
+  //     generic low-value hardware correctly floor-priced (Terminal Blocks/
+  //     Block excepted — see below — Compartment Spacers, Leveling Feet,
+  //     Flexmount Connectors, 3-Part Union Fittings, Overcurrent Protection,
+  //     DC Power Cabling, Module Support System, Modular Stack Design), or
+  //     already-honoured OEM-proprietary (Veolia RO40/DC3 — 0faea5550,
+  //     unchanged this round). See PARTS-ROUND-4-NOTFOUND-INVENTORY for the
+  //     full 46-tag breakdown.
+  // ── Electrical (commodity, but real + cheap + family-coherent) ─────────────
+  {
+    part_name: 'DIN rail terminal block — 2-conductor feedthrough terminal block for electrical control panel wiring, 800 V, 24 A, 12-22 AWG',
+    manufacturer: 'WAGO', part_number: '2002-1201',
+    desc: 'WAGO TOPJOB S 2002-1201 2-conductor feed-through terminal block, Push-in CAGE CLAMP, DIN-rail 35 mm mount, 800 V / 24 A, 12-22 AWG (2.5 mm²), grey, IECEx/ATEX Ex e II rated. Indicative electrical control panel DIN-rail terminal block. USD 1.48 (Kinequip, sale price).',
+    src: 'https://kinequip.com/products/wago-2002-1201-2-conductor-through-terminal-block/',
+    unit_price_gbp: null,
+  },
+  // A SECOND, genuinely-distinct terminal-block SKU (3-conductor, not just a
+  // re-list of the row above) — the parts-ledger carries TWO separate terminal-
+  // block tags ('Terminal Blocks' + 'Terminal Block') in the SAME sub_module;
+  // fillBlankWordMpns' per-sub_module exclusivity (never pin the same part
+  // twice in one sub_module) means one real terminal-block row can only ever
+  // close ONE of the two tags — a distinct real WAGO variant closes the other
+  // honestly instead of leaving it to fall through to a mis-pinned Littelfuse
+  // fuse-block row on the exclusive-assignment retry.
+  {
+    part_name: 'DIN rail terminal block — 3-conductor feedthrough terminal block for electrical control panel wiring, 800 V, 24 A',
+    manufacturer: 'WAGO', part_number: '2002-1301',
+    desc: 'WAGO TOPJOB S 2002-1301 3-conductor feed-through terminal block, Push-in CAGE CLAMP, DIN-rail 35 mm mount, 800 V / 24 A, grey, IECEx/ATEX Ex e II rated. Indicative electrical control panel DIN-rail terminal block (2nd distinct SKU for a plant with >1 terminal-block tag). USD 2.09 (Platt Electric Supply).',
+    src: 'https://www.platt.com/p/0084813/wago/3-conductor-through-terminal-blocks-ex/017332999223/wag20021301',
+    unit_price_gbp: null,
+  },
+  // ── Field instruments (replaces a wrong-scale board-mount mis-pin risk) ─────
+  // upgrade:true — this (manufacturer, part_number) already exists (id 33579,
+  // a distributor-sweep row) titled "Flow Sensors – Industrial Electromagnetic
+  // flowmeter PEEK, stainl. steel; EPDM; G male thread; stainl. steel" — the
+  // WHOLE WORD 'flowmeter' (no space) never matches the word's tokenize()d
+  // 'flow'+'meter' as separate whole words (hasWholeWordFolded requires a word
+  // boundary either side; 'flow' immediately runs into 'meter' with no
+  // separator), so this existing row was invisible to the per-word matcher —
+  // the real reason the calibration DB-first pass fell through to the
+  // Sensirion mis-pin instead of this genuinely-better industrial E+H row.
+  // Re-wording (space-separated 'flow meter') fixes the tokenizer visibility;
+  // keeps the row's own known GBP price (£528.17) rather than a USD retail
+  // quote for the same MPN. Second calibration pass: the Sensirion mis-pin row
+  // ALSO carries a 3rd nameHit ('Flow Sensors' category label folds to the
+  // 'sensor' token from this word's sub_module id) that this row's original
+  // wording lacked, so it still lost pickBestDbCandidate's nameHits.size tier
+  // (3 vs 2) before ever reaching the verified-ingest tiebreak. 'Flow meter /
+  // flow sensor' is how E+H's own literature genuinely describes this product
+  // class (an electromagnetic flow METER is colloquially and technically also
+  // a flow SENSOR) — an honest 3rd token, not an invented one — which ties the
+  // nameHits tier and lets the verified-ingest tiebreak correctly prefer the
+  // real industrial device over the board-mount gas-sensor chip.
+  {
+    part_name: 'Flow meter / flow sensor — compact inline electromagnetic flow meter, DN25, 0.2-150 l/min, BSPP',
+    manufacturer: 'Endress+Hauser', part_number: 'DMA25-AAABA1',
+    desc: 'Endress+Hauser Picomag DMA25-AAABA1 compact inline electromagnetic flow meter (industrial-grade PEEK/stainless/EPDM wetted parts, G male thread), DN25 (1 in) BSPP, 0.2-150 l/min (0.012-9 m³/h), built-in temperature + conductivity, Bluetooth/SmartBlue app config. Indicative process/instrumentation-tap flow meter (industrial process device — NOT a board-mount microfluidic sensor chip). £528.17 (distributor catalogue, same MPN); £/USD 1,018.93 retail cross-check at John M. Ellsworth Co.',
+    src: 'https://www.jmesales.com/endress-hauser-picomag-dn25-1-in-bspp-electromagnetic-flow-meter/',
+    unit_price_gbp: 528.17,
+    upgrade: true,
+  },
+  // A SECOND, distinct flow-meter SKU (larger DN50 bore) — same exclusivity
+  // reasoning as the terminal-block pair above: the parts-ledger carries TWO
+  // flow-meter tags ('Flow Meter' + 'Flow Meters') in the same sub_module, and
+  // one real MPN can only close one of them — without a second distinct row
+  // the retry falls through to the Sensirion board-mount mis-pin again.
+  // upgrade:true — same pre-existing-row situation as DMA25-AAABA1 above (id
+  // 33875, a distributor-sweep row titled with the unspaced 'flowmeter' that
+  // tokenize() can never split into whole-word 'flow'+'meter'); keeps its own
+  // known GBP price (£708.88).
+  {
+    part_name: 'Flow meter / flow sensor — compact inline electromagnetic flow meter, DN50, 1.5-750 l/min, BSPP',
+    manufacturer: 'Endress+Hauser', part_number: 'DMA50-AAABA1',
+    desc: 'Endress+Hauser Picomag DMA50-AAABA1 compact inline electromagnetic flow meter (industrial-grade PEEK/stainless/EPDM wetted parts, G male thread), DN50 (2 in) BSPP, 1.5-750 l/min (0.09-45 m³/h), built-in temperature + conductivity, Bluetooth/SmartBlue app config. Indicative process flow meter/sensor at a larger bore duty (2nd distinct SKU for a plant with >1 flow-meter tag). £708.88 (distributor catalogue, same MPN); USD 1,368.00 retail cross-check at John M. Ellsworth Co.',
+    src: 'https://www.jmesales.com/endress-hauser-picomag-dn50-2-in-bspp-electromagnetic-flow-meter/',
+    unit_price_gbp: 708.88,
+    upgrade: true,
+  },
+  // ── Control / comms — WORDING UPGRADE (round-2's AB7072-B row, id present)
+  // to add the PLC/controller-coherent qualifier text its lead segment lacked.
+  // Calibration finding: 'Ethernet Ip Module' tokenizes to ONLY ['ethernet']
+  // (tokenize() drops 'ip' <3 chars, 'module' is a STOP_TOKEN) — with a single
+  // specific token, pickBestDbCandidate's acceptance bar ((headHit && hits>=2)
+  // || hits>=3) is UNREACHABLE regardless of any DB content, unless the
+  // candidate ALSO shares a sub_module-context token (this word's sub_module
+  // is 'control_compute_communication__plc_controller' -> tokens 'control',
+  // 'compute', 'communication', 'plc', 'controller'). The AB7072-B Anybus
+  // Communicator genuinely IS a PLC-facing communications gateway (its real
+  // application, not an invented one) — the original round-2 wording just
+  // never said so. Re-wording to state that true fact honestly gives the
+  // match a 2nd token ('controller') to clear the bar.
+  {
+    part_name: 'Ethernet/IP interface module — PLC-facing serial-to-EtherNet/IP + Modbus-TCP communications gateway controller, 2-port, 24 V DC',
+    manufacturer: 'HMS Networks', part_number: 'AB7072-B',
+    desc: 'HMS Anybus Communicator AB7072-B, serial RS-232/485 to EtherNet/IP + Modbus-TCP 2-port gateway, 24 V DC, DIN rail, IP20 (509 bytes in / 505 out) — a PLC communications controller module bridging a serial-only device into the plant PLC/SCADA network via EtherNet/IP. Indicative Modbus-TCP / EtherNet-IP interface for the plant PLC controller. NOTE: superseded by ABC3007-A — state at procurement.',
+    src: 'https://www.parmley-graham.co.uk/AB7072-B',
     unit_price_gbp: null,
     upgrade: true,
   },
