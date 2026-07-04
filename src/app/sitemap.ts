@@ -3,6 +3,7 @@ import { getDirectoryExpertSlugs, getDirectoryLocations } from '@/actions/direct
 import { DIRECTORY_ROLE_CATEGORIES, locationToSlug } from '@/lib/directory/types'
 import type { DirectoryRoleSlug } from '@/lib/directory/types'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getArticleSlugs } from '@/lib/insights-articles'
 
 // INTENT: Force dynamic so sitemap is generated at request time, not during build.
 // Supabase calls timeout during Vercel build (60s limit) because the build
@@ -192,5 +193,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         console.error('[Sitemap] Failed to fetch published blog posts:', error)
     }
 
-    return [...staticPages, ...rolePages, ...expertPages, ...locationPages, ...blogPages]
+    // Native Insights articles (republished HFN essays)
+    const articlePages: MetadataRoute.Sitemap = getArticleSlugs().map((slug) => ({
+        url: `${appUrl}/insights/${slug}`,
+        lastModified: now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+    }))
+
+    return [...staticPages, ...rolePages, ...expertPages, ...locationPages, ...blogPages, ...articlePages]
 }

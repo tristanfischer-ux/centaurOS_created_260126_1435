@@ -12,7 +12,7 @@
 
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowUpRight, ArrowRight } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MarketingNav } from "@/components/marketing/marketing-nav"
@@ -24,8 +24,6 @@ export const metadata: Metadata = {
     "Essays by Tristan Fischer on why hardware is harder than software, the return of manufacturing, and the physical economy — the thinking behind Fractional Forge, the front end for hardware.",
   alternates: { canonical: "https://fractionalforge.app/insights" },
 }
-
-const HFN = "https://www.historyfuturenow.com/articles"
 
 type Essay = { title: string; hook: string; slug: string }
 type Section = { key: string; heading: string; intro: string; essays: Essay[] }
@@ -164,25 +162,23 @@ export default function InsightsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {section.essays.map((essay) => (
-                  <a
+                  <Link
                     key={essay.slug}
-                    href={`${HFN}/${essay.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={`/insights/${essay.slug}`}
                     className="group"
                   >
                     <Card className="h-full transition-colors hover:border-international-orange/40">
                       <CardContent className="pt-6 space-y-2">
                         <h3 className="font-semibold text-foreground flex items-start gap-1.5">
                           <span>{essay.title}</span>
-                          <ArrowUpRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-international-orange" />
+                          <ArrowRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-international-orange" />
                         </h3>
                         <p className="text-sm text-muted-foreground leading-relaxed">
                           {essay.hook}
                         </p>
                       </CardContent>
                     </Card>
-                  </a>
+                  </Link>
                 ))}
               </div>
             </section>
