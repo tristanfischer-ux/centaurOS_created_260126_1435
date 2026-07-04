@@ -621,6 +621,154 @@ const PARTS: VerifiedPart[] = [
     unit_price_gbp: null,
     upgrade: true,
   },
+
+  // ═══ ROUND 5 (2026-07-05, v74 BoM-9 + Part-names Z-102/Z-103 + not-found-tail
+  //     sweep) — every page below was actually fetched 2026-07-05. Calibrated
+  //     against the REAL exported dbFirstLookup/dbHitAcceptableForWord/
+  //     pickBestDbCandidate (a scratch-DB harness, never the live DB pre-commit;
+  //     never a re-implementation) using v74's OWN words (name + sub_module id +
+  //     real modifier_characters extracted verbatim from
+  //     out/fischer-codema-v74/state.json — not regex-reconstructed). FINDINGS:
+  //       (1) 7 of v74's 21 engineered-TBD BoM lines (V-105 Gac Softener, P-101
+  //           Ro High Pressure Pump, V-101 Gac Filter, FCV-201–202 Inlet Flow
+  //           Control Valve, TX-101 Transformer, I-113 High Pressure Switch,
+  //           I-116 CIP Pressure Gauge) ALREADY resolve against rounds 1–4's
+  //           existing DB content on a calibrated replay — no v74 chain re-run
+  //           has happened since those rounds landed, so the fill is LATENT,
+  //           not yet baked into v74's own state.json (only a fresh chain run
+  //           bakes it in, same 4cf5f3d9b-era caveat as round 4). Reported, not
+  //           re-ingested (idempotent — nothing to add).
+  //       (2) X-108/INV-1/INV-2 (Motor Starter/Vfd Drive/Vfd Controller),
+  //           X-102/X-136/X-144/X-146/X-101 (Piping Network/Module Support
+  //           System/Cip System Connections/Modular Stack Design/Cip System)
+  //           are NOT words in moduleDecomposition at all (confirmed by direct
+  //           name-match against v74's state.json — the first is a duty-less
+  //           drive slot, correct per 4cf5f3d9b; the rest are SUB-MODULE-level
+  //           synthesized system/structure lines, architecturally never a
+  //           single catalogue word fillBlankWordMpns can reach) — genuine
+  //           honest misses, unchanged from round 4's dissection, no ingest
+  //           possible.
+  //       (3) EP-102 Mains Incomer stays an HONEST MISS despite a duty-matched
+  //           ABB Tmax XT1N 125 A MCCB (1SDA067417R1) already in the DB since
+  //           round 3: tokenize()'s foldPluralToken folds 'Mains'->'main', and
+  //           'main' is itself a STOP_TOKEN — the qualifying token is silently
+  //           unreachable by design, and the sub_module-id fallback tokens
+  //           ('storage','source' from 'energy_storage_source__mains_incomer')
+  //           don't appear in the ABB part name, so the row never clears the
+  //           2-hit acceptance bar. A genuine ENGINE bug (STOP_TOKENS/plural-
+  //           fold interaction), routed, not fixed here (no engine edits this
+  //           round). X-141 Overcurrent Protection carries no rating/duty
+  //           modifier at all — a genuinely duty-less slot, left honest.
+  //       (4) X-117 Modbus Interface / X-123 Modbus Tcp Interface: dbFirstLookup
+  //           picks HMS AB7072-B as the single best-ranked candidate for BOTH
+  //           words (its round-4 wording scores 5 whole-word hits — modbus,
+  //           interface, communication, plc, controller — via incidental tail
+  //           phrases, beating the Siemens CM1241 row's 3) but then FAILS
+  //           dbHitAcceptableForWord's qualifier-coherence check: 'Modbus' sits
+  //           past the 6-token LEAD segment in AB7072-B's part_name, and
+  //           dbFirstLookup never retries a 2nd-best candidate when the top one
+  //           fails a downstream guard (the same single-candidate-lookup limit
+  //           round-3 documented for TDS-vs-Conductivity) — so the perfectly
+  //           good Siemens row is never even tried. Fix available at the ingest
+  //           layer: reword the Siemens CM1241 row (honest — it IS a PLC
+  //           controller's communications module) to also carry 'plc' +
+  //           'controller' + 'control' tokens so it OUTRANKS AB7072-B outright
+  //           (6 hits vs 5) for the generic 'Modbus Interface' word, and ingest
+  //           a genuinely-distinct real Modbus-TCP gateway (Moxa MGate MB3180 —
+  //           already in the DB since a 2026-05-28 curated seed, id 41317, but
+  //           worded 'Moxa MGate MB3180 1-port Modbus gateway' with no
+  //           'interface'/'tcp'/'communication' whole-word tokens at all, so it
+  //           never even reaches AB7072-B's rank) for the TCP-specific word —
+  //           never touching AB7072-B's own wording (owned by round 4's
+  //           'Ethernet Ip Module' target; a second edit there would trade one
+  //           word's resolution for another's).
+  //       (5) Z-102 Uf Module Bank stays an HONEST MISS: tokenize('Uf') drops
+  //           to nothing (2-char token, not in SHORT_DOMAIN_TOKENS which only
+  //           lists 'uv'/'ro'/'ph' — 'uf' is missing), so the word's OWN name
+  //           contributes zero identifying tokens and headNoun falls back to
+  //           'bank' (from the sub_module tokens) — no real UF membrane part
+  //           can ever match on 'bank' alone without a dishonest reword. A
+  //           genuine ENGINE tokenizer gap (the SHORT_DOMAIN_TOKENS list),
+  //           routed, not fixed here. Z-103 Ultrafiltration Module (the
+  //           SPELLED-OUT synonym of the SAME physical UF bank — both dedupe
+  //           onto 'Uf Membrane Bank' F-2 in requirements_bom.py's
+  //           _dedupe_membrane_synonym_rows) is NOT blocked the same way
+  //           ('ultrafiltration' is a real >=3-char token) — a genuine, duty-
+  //           matched Toray HFU-2020AN UF module (verified fetched page) fills
+  //           it, and the 2026-07-04 membrane-pin identity rule
+  //           (_membrane_pin_is_real, requirements_bom.py) keeps that IDENTITY
+  //           even after the synonym-dedup fold, so the pin flows end-to-end
+  //           whichever of the 3 synonym rows survives the fold. Z-102 itself
+  //           still resolves an HONEST status either way — parts-ledger.json's
+  //           MERGED·SYNONYM status is read by the (already-in-tree, uncommitted
+  //           this session) Part-names honest-status fallback in
+  //           build-excel-export.py, so it is not a bare unexplained gap.
+  //       (6) I-113 High Pressure Switch currently DOES resolve on a calibrated
+  //           replay — but to the round-1 Danfoss KPI35 row, whose OWN part
+  //           name says 'Low-pressure switch — process pressure switch, -0.2 to
+  //           8 bar'. The word's own name says HIGH; the pinned part's own name
+  //           says LOW — a latent mis-pin risk (2 hits: 'pressure'+'switch',
+  //           no 'high'). A genuinely HIGH-range Danfoss KPS39 (10-35 bar, a
+  //           distinctly higher regulation band, fetched from Danfoss's own
+  //           store) is ingested so it OUTRANKS KPI35 on nameHits (3: high +
+  //           pressure + switch, vs KPI35's 2) — the correct family+duty match
+  //           wins the slot instead.
+  // ── Field instruments ────────────────────────────────────────────────────────
+  {
+    part_name: 'High pressure switch — process pressure switch, 10-35 bar regulation range',
+    manufacturer: 'Danfoss', part_number: '060-310266',
+    desc: 'Danfoss KPS39 pressure switch, regulation range 10-35 bar, differential 2-6 bar, max working pressure 45 bar, SPDT gold contact, G 3/8 in connection, IP67, automatic reset, -40 to 70 C. Indicative HIGH-pressure protection switch (distinct duty band from the KPI35 low-pressure switch already in the library).',
+    src: 'https://store.danfoss.com/us/en/Sensing-solutions/Switches/Pressure-switches/KPS/Pressure-switch,-KPS39/p/060-310266',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'Silica calibration standard — silica standard solution, 1000 mg/L as SiO2 (NIST-traceable), 500 mL',
+    manufacturer: 'Hach', part_number: '19449',
+    desc: 'Hach silica standard solution, 1000 mg/L as SiO2, NIST-traceable, 500 mL bottle. Indicative calibration standard for a silica analyser (e.g. Hach 5500sc) loop.',
+    src: 'https://www.hach.com/p-silica-standard-solution-1000-mgl-as-sio2-nist-500-ml/19449',
+    unit_price_gbp: null,
+  },
+  // ── Electrical / earthing ─────────────────────────────────────────────────────
+  {
+    part_name: 'Main earthing terminal — 600 A mains earth bar, hard-drawn copper, bolted disconnecting link',
+    manufacturer: 'Eaton', part_number: '600MEB',
+    desc: 'Eaton MEM 600MEB main earthing terminal / mains earth bar, 600 A rating, hard-drawn copper on painted-steel supports, bolted disconnecting link for earth-resistance testing. Indicative main earthing terminal for the plant LV switchroom. GBP 400.23 trade price (Electrika).',
+    src: 'https://www.electrika.com/catalogues/industrial-switch-and-fusegear/main-earthing-terminal-bars/600meb/part/270352',
+    unit_price_gbp: 400.23,
+  },
+  // ── Process — UF membrane (Z-103 Ultrafiltration Module; see finding 5 above
+  // for why Z-102 Uf Module Bank stays an honest miss regardless) ──────────────
+  {
+    part_name: 'Ultrafiltration membrane module — PVDF hollow-fibre UF module, outside-to-inside flow, 60-200 m3/day',
+    manufacturer: 'Toray', part_number: 'HFU-2020AN',
+    desc: 'Toray HFU-2020AN pressurised PVDF hollow-fibre ultrafiltration module, outside-to-inside flow direction, rated 60-200 m3/day per module (~2.5-8.3 m3/h), NSF/ANSI 61-certified for drinking-water production. Indicative UF module for the plant UF bank (multiple modules make up the stated 364 m2 membrane area). USD 3,900 (Streamline Filtration).',
+    src: 'https://www.streamlinefiltration.com/product/toray-hfu-2020an-uf-membrane-2/',
+    unit_price_gbp: null,
+  },
+  // ── Control / comms — Modbus fixes (X-117 Modbus Interface / X-123 Modbus Tcp
+  // Interface; see finding 4 above). The Siemens row is a WORDING UPGRADE (id
+  // already exists, round 1) adding honest PLC-controller qualifier tokens so
+  // it outranks AB7072-B for the generic 'Modbus Interface' word WITHOUT
+  // touching AB7072-B's own wording (round 4's 'Ethernet Ip Module' target).
+  // The Moxa row is also a WORDING UPGRADE of a PRE-EXISTING 2026-05-28 curated
+  // seed row (id 41317) whose original wording carried none of the whole-word
+  // tokens ('interface'/'tcp'/'communication') the matcher needs. ──────────────
+  {
+    part_name: 'Modbus RTU interface module — PLC controller communications control interface, RS422/485, for Siemens SIMATIC S7-1200 controller',
+    manufacturer: 'Siemens', part_number: '6ES7241-1CH32-0XB0',
+    desc: 'Siemens CM 1241 RS422/485 communication module, 9-pin sub-D, Modbus RTU master/slave + Freeport/USS, for SIMATIC S7-1200 PLC controller. Indicative generic Modbus interface for the plant PLC controller (RS422/485 serial — for a Modbus-TCP-specific duty see the Moxa MGate MB3180 TCP gateway).',
+    src: 'https://media.automation24.com/datasheet/se/6ES72411CH320XB0.pdf',
+    unit_price_gbp: null,
+    upgrade: true,
+  },
+  {
+    part_name: 'Modbus TCP interface module — Moxa MGate MB3180 1-port Modbus TCP to RTU/ASCII industrial control-network communications gateway interface, RS-232/422/485, DIN rail',
+    manufacturer: 'Moxa', part_number: 'MGate MB3180',
+    desc: 'Moxa MGate MB3180 1-port Modbus TCP-to-RTU/ASCII protocol gateway, RS-232/422/485 serial interface, 12-48 VDC, metal housing IP30, 0-55 C, web console + SNMPv3 management. Indicative Modbus-TCP interface module bridging a serial device into the plant PLC/SCADA control network.',
+    src: 'https://www.moxa.com/en/products/industrial-edge-connectivity/protocol-gateways/modbus-tcp-gateways/mgate-mb3180-mb3280-mb3480-series',
+    unit_price_gbp: null,
+    upgrade: true,
+  },
 ]
 
 // ── VERIFIED NO-PUBLIC-MPN FINDINGS (2026-07-04, routed follow-on #2 to the

@@ -243,7 +243,7 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
 // 'batteries'→'battery'. Conservative — never folds short tokens, -ss/-us/-is
 // endings (chassis, modbus, stainless) or known non-plurals (UPS, lens, bellows),
 // so an acronym/mass noun is never mangled into a false match.
-const NEVER_FOLD = new Set<string>(['ups', 'lens', 'bellows', 'scada'])
+const NEVER_FOLD = new Set<string>(['ups', 'lens', 'bellows', 'scada', 'mains'])  // 'mains' is a mass noun (mains power/water), not a plural — folding it to 'main' lands on a STOP token and silently kills the qualifier (EP-102, round 5)
 export function foldPluralToken(t: string): string {
   const s = String(t ?? '').toLowerCase()
   if (s.length < 4 || NEVER_FOLD.has(s)) return s
@@ -353,7 +353,7 @@ export function tokenize(s: string | undefined | null): string[] {
 // 'RO Membrane', 'pH Analyser') — the blanket ≥3-char filter silently dropped
 // them, so a 'Uv Disinfection' word could never reach the WEDECO UV row on the
 // 2-hit acceptance bar.
-const SHORT_DOMAIN_TOKENS = new Set<string>(['uv', 'ro', 'ph'])
+const SHORT_DOMAIN_TOKENS = new Set<string>(['uv', 'ro', 'ph', 'uf', 'nf', 'mf'])  // membrane fineness family (MF<UF<NF) — 'Uf Module Bank' was unreachable by any honest part (round 5)
 
 // Generic/structural tokens that carry no component-type signal — excluded so a
 // DB match is driven by the DISTINGUISHING noun (blade, gearbox, stator, seal),
