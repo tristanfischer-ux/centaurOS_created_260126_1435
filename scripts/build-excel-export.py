@@ -5263,10 +5263,18 @@ def _collect_principals(bom: list, run_dir: str) -> Tuple[List[dict], int]:
         req = str(row.get("requirement", "") or "")
         if "." in tag or req.strip().startswith("↳"):
             continue                         # sub-component / instance — not a master name
-        # Connection / pipework lines ("air connection: A → B", tag C01…) are priced in the
-        # BoM but are not PARTS — keep them off the name master (the arrow / "connection" noun
-        # is the universal signal, independent of class).
-        if "→" in req or re.search(r"\bconnection\b", req, re.I):
+        # Connection / pipework ROUTE lines ("air connection: A → B", tag C01…) are priced
+        # in the BoM but are not PARTS — keep them off the name master. X-140 THREAD FIX
+        # (Tristan 2026-07-04): the signal is the ARROW (a routed A→B pipe/cable run), NOT
+        # the bare noun "connection" — a bare `\bconnection\b` match also caught genuine
+        # physical fittings whose engineering name happens to contain that word (a "Drain
+        # Connection" nozzle, a "zone valve connection kit"), silently dropping them from
+        # the master even though they are real principals with their own BoM-ledger row.
+        # Verified across every archetype run in out/: of 97 "connection"-worded BoM lines,
+        # 95 are routed pipe/cable segments (tag C0N, status ROUTED, arrow present) and
+        # exactly 2 are real parts with no arrow (Drain Connection / zone valve connection
+        # kit) — the arrow is the universal, class-independent discriminator.
+        if "→" in req:
             continue
         nm = _clean_name(req)
         key = _norm_name(req)
@@ -17836,16 +17844,29 @@ _VERIF_GAP_RX = re.compile(
 _SOFT_CAVEAT_RX = re.compile(
     r"\bassumption\b|\bassumed\b|\bestimate(?:d)?\b|out[- ]of[- ]scope|to be (?:confirmed|determined)|"
     r"\bTBD\b|placeholder|provisional|supplied by others", re.I)
+# SELF-DECLARED NON-SCORING marker (Tristan 2026-07-04, the Renders-tab regression): the
+# corroboration doctrine (3c4e7d7de) explicitly renders an UNCORROBORATED vision finding as
+# "ADVISORY: ... informational only, does not score" — a note that states IN ITS OWN TEXT that
+# it must never move a number. The honest-cap's blanket _VERIF_GAP_RX matches the literal
+# "advisory[: ]" prefix on ANY advisory line, so it was capping the score to 7 anyway —
+# silently reintroducing the vision term into the score arithmetic the doctrine deliberately
+# kept it out of. An issue that self-declares it does not score is excluded from the honest-cap
+# scan entirely; a genuine verification-gap advisory (e.g. "no vision critic has looked at this
+# render") carries no such marker and still caps normally.
+_NON_SCORING_RX = re.compile(r"does not score|informational only", re.I)
 
 
 def _apply_universal_honest_cap(scores: dict) -> dict:
     """ONE universal rule (no whack-a-mole): cap each tab's score by the caveats IT declares in its
     own issues. VERIFICATION GAP → ≤7 (FAIL); SOFTER caveat → ≤8 (never a perfect 10). Applied to
-    EVERY tab from EVERY source so a new archetype's gaps cap themselves. Returns the same dict."""
+    EVERY tab from EVERY source so a new archetype's gaps cap themselves. An issue that itself
+    declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory) is excluded
+    from the scan — it must not cap a score it explicitly says it does not move."""
     for _name, e in (scores or {}).items():
         if not isinstance(e, dict) or not isinstance(e.get("score"), (int, float)):
             continue
-        issues = " ".join(str(i) for i in (e.get("issues") or []))
+        issues = " ".join(str(i) for i in (e.get("issues") or [])
+                          if not _NON_SCORING_RX.search(str(i)))
         if not issues:
             continue
         cap = 7 if _VERIF_GAP_RX.search(issues) else (8 if _SOFT_CAVEAT_RX.search(issues) else None)
@@ -17885,6 +17906,26 @@ def _selftest() -> int:
         ["Ref", "Label", "Value", "Units", "Class", "Provenance", "Used-by count"]))
     if not _m0_spec or "provenance" not in (_m0_spec.get("required") or []):
         print("  FAIL m0-contract: 'Provenance' must be a REQUIRED column on M0"); bad += 1
+    # ═══ proveCatch the X-140 THREAD fix — _collect_principals must keep a real part
+    # whose NAME merely contains the word "connection" (no routing arrow), and must
+    # still drop a genuine routed pipe/cable run (arrow present), both directions
+    # (Tristan 2026-07-04, the X-140 "Drain Connection" master-collection miss). ═══
+    _pc_bom = [
+        {"tag": "X-140", "requirement": "Drain Connection", "qty": 1},
+        {"tag": "V-117", "requirement": "Zoned distribution — zone valve connection kits · 200 off", "qty": 200},
+        {"tag": "C01", "requirement": "water connection: Gac Softener → Softener Vessel · 14.5 m3/h", "qty": 1},
+    ]
+    _pc_principals, _ = _collect_principals(_pc_bom, "")
+    _pc_names = {p["name"] for p in _pc_principals}
+    if not any("Drain Connection" in n for n in _pc_names):
+        print(f"  FAIL x140-collect: a real part named 'Drain Connection' (no arrow) "
+              f"must be a collected principal (got {sorted(_pc_names)})"); bad += 1
+    if not any("zone valve connection kits" in n.lower() for n in _pc_names):
+        print(f"  FAIL x140-collect: a real 'zone valve connection kit' part (no arrow) "
+              f"must be a collected principal (got {sorted(_pc_names)})"); bad += 1
+    if any("Gac Softener" in n for n in _pc_names):
+        print(f"  FAIL x140-collect: a routed pipe run (arrow present) must NOT become "
+              f"a master principal (got {sorted(_pc_names)})"); bad += 1
     # ═══ proveCatch the EQUIPMENT REGISTER name-divergence checks — both directions
     # independent (a name present in the BoM but never drawn fails ONLY the drawings
     # check; the reverse fails ONLY the BoM check), plus the base cases. ═══

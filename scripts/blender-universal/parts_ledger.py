@@ -253,6 +253,50 @@ def _classify(name: str, tag: str) -> str:
     return "other"
 
 
+# Origin/sink BOUNDARY-NODE noun signal (hoisted to module level 2026-07-04 so
+# _passive_boundary_concern below can share it with main()'s connectivity audit —
+# ONE list, never two copies that could drift). A part matching one of these nouns is
+# a legitimate battery-limit origin/sink regardless of its TYPE_RULES classification.
+_ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up water",
+                    "make-up", "makeup", "make up",
+                    "feed", "food", "fuel", "air intake", "seawater", "freshwater",
+                    "oxygen supply", "chemical supply", "intake",
+                    "lox", "liquid oxygen", "bulk storage", "supply tank", "storage tank",
+                    "day tank", "bulk tank", "buffer tank", "dosing tank"}
+_SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust",
+                  "heat rejection", "mortality", "overflow", "reject"}
+
+
+def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
+    """proveCatch target (Tristan's X-140 thread, 2026-07-04): a PASSIVE-typed part
+    ('structural' / the 'other' fallback) is normally never a connectivity concern —
+    frames, cladding, foundations legitimately carry no process tie. But the 'other'
+    fallback ALSO catches parts TYPE_RULES has no pattern for at all — e.g. a nozzle
+    named 'Drain Connection' or 'Zone valve connection kit', which the origin/sink
+    NOUN signal already recognises as a genuine battery-limit boundary (the SAME
+    keyword check the PROCESS-typed branch uses). Before this fix such a part was
+    silently exempted from ANY connectivity concern — a genuinely-unconnected part
+    (no drawn discharge) escaped the ledger's own completeness audit. Returns a
+    concern dict {issue, detail} or None. A truly-structural part with no origin/sink
+    noun (e.g. 'Structural Support Beam') matches neither list and stays exempt —
+    universal, keyed on the same noun signal, never a per-part table."""
+    name_l = (name or "").lower()
+    is_origin = any(kw in name_l for kw in _ORIGIN_KEYWORDS)
+    is_sink = any(kw in name_l for kw in _SINK_KEYWORDS)
+    if is_origin and not has_in:
+        return {"issue": "missing_input",
+                "detail": "Battery-limit origin with no upstream feed drawn — the TYPE "
+                          "classifier has no pattern for this part, but its name names "
+                          "an origin boundary that still needs its feed."}
+    if is_sink and not has_out:
+        return {"issue": "missing_output",
+                "detail": "Battery-limit sink/drain with no downstream connection drawn "
+                          "— where does this discharge to? The TYPE classifier has no "
+                          "pattern for this part, but its name names a sink boundary "
+                          "that still needs its discharge tie."}
+    return None
+
+
 def _load(p: Path):
     try:
         return json.loads(p.read_text())
@@ -732,22 +776,10 @@ def main() -> int:
     # SINKS (drains, effluent, waste, exhaust):
     #   Legitimate end points — no output required, but SHOULD have input.
 
-    ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up water",
-                       # a make-up / dosing / day tank is fed by manual delivery (bagged
-                       # reagent, tanker) — a battery-limit ORIGIN with an OUTPUT only.
-                       # Aligns parts_ledger with connection_ledger._FLUID_ORIGIN_RE which
-                       # already exempts "make-up" (Tristan 2026-06-24: the two audits must
-                       # agree on what is a legitimate single-direction origin).
-                       "make-up", "makeup", "make up",
-                       "feed", "food", "fuel", "air intake", "seawater", "freshwater",
-                       "oxygen supply", "chemical supply", "intake",
-                       # a stored-medium SUPPLY tank (LOX / bulk chemical / fuel storage)
-                       # is a battery-limit FEED — it legitimately has an OUTPUT only (it
-                       # is filled by tanker, not piped from the process). Type-keyed.
-                       "lox", "liquid oxygen", "bulk storage", "supply tank", "storage tank",
-                       "day tank", "bulk tank", "buffer tank", "dosing tank"}
-    SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust",
-                     "heat rejection", "mortality", "overflow", "reject"}
+    # Hoisted to module level (_ORIGIN_KEYWORDS / _SINK_KEYWORDS, 2026-07-04) so
+    # _passive_boundary_concern shares the SAME noun signal — no second copy to drift.
+    ORIGIN_KEYWORDS = _ORIGIN_KEYWORDS
+    SINK_KEYWORDS = _SINK_KEYWORDS
     # a BUFFER / SURGE / EXPANSION vessel is a DEAD-LEG on the loop: it tees off at a
     # single point to absorb thermal expansion / pressure surge / level swing, so it
     # legitimately has ONE process connection (not a flow-through in + out). Universal —
@@ -863,7 +895,22 @@ def main() -> int:
             sink_parts.append({"tag": tag, "name": e["name"], "type": etype})
 
         if etype in PASSIVE_TYPES:
-            continue  # structural elements — never a connectivity concern
+            # X-140 THREAD FIX (Tristan 2026-07-04): a PASSIVE-typed part is normally
+            # never a connectivity concern (genuinely structural — frames, cladding).
+            # But the 'other' fallback ALSO catches parts TYPE_RULES has no pattern
+            # for at all (e.g. 'Drain Connection', 'Zone valve connection kit') — the
+            # origin/sink noun match just computed above (is_origin/is_sink) already
+            # correctly identifies these as boundary nodes and tallies them into
+            # origin_parts/sink_parts, but they were silently dropped HERE before a
+            # real concern was ever raised — a genuinely-unconnected boundary part
+            # (no drawn discharge) escaped the ledger completeness audit entirely.
+            # Promote via the shared pure predicate; a truly-structural part with no
+            # origin/sink noun match stays exempt (untouched).
+            _pbc = _passive_boundary_concern(e["name"], has_in, has_out)
+            if _pbc is not None:
+                connectivity_concerns.append({
+                    "tag": tag, "name": e["name"], "type": etype, **_pbc})
+            continue
 
         # AIR-mover / HVAC / sub-component: carries AIR or belongs to a parent, NOT a
         # process-WATER flow-through node — its air/parent tie is the correct connection,
@@ -1204,6 +1251,30 @@ def _selftest() -> int:
             print(f"  FAIL ga-expectation: '{_kn}' is a massed principal and MUST stay "
                   f"GA-expected (got {sorted(_exp)})")
             bad += 1
+    # ── X-140 THREAD proveCatch (Tristan 2026-07-04): a PASSIVE ('other')-typed
+    # boundary nozzle whose noun matches SINK/ORIGIN_KEYWORDS still needs its ONE
+    # required tie — both directions, plus the negative (a genuinely-structural
+    # part with no origin/sink noun must stay exempt, never flagged). ──
+    _bad_drain = _passive_boundary_concern("Drain Connection", has_in=False, has_out=False)
+    if not _bad_drain or _bad_drain.get("issue") != "missing_output":
+        print(f"  FAIL passive-boundary: an unconnected 'Drain Connection' (sink noun, "
+              f"no output) must raise missing_output (got {_bad_drain!r})")
+        bad += 1
+    _ok_drain = _passive_boundary_concern("Drain Connection", has_in=False, has_out=True)
+    if _ok_drain is not None:
+        print(f"  FAIL passive-boundary: a 'Drain Connection' WITH a drawn output must "
+              f"raise no concern (got {_ok_drain!r})")
+        bad += 1
+    _bad_origin = _passive_boundary_concern("Chemical Supply Skid", has_in=False, has_out=False)
+    if not _bad_origin or _bad_origin.get("issue") != "missing_input":
+        print(f"  FAIL passive-boundary: an unconnected origin-noun part with no input "
+              f"must raise missing_input (got {_bad_origin!r})")
+        bad += 1
+    _structural = _passive_boundary_concern("Structural Support Beam", has_in=False, has_out=False)
+    if _structural is not None:
+        print(f"  FAIL passive-boundary: a genuinely-structural part (no origin/sink "
+              f"noun) must NEVER be flagged (got {_structural!r})")
+        bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

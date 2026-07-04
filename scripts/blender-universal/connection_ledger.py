@@ -1068,9 +1068,22 @@ def close_residual_completeness(parts, topology, required_services, log=print):
         svc = e.get("_ledger_service") or _service_of(e.get("mechanism"))
         f, t = e.get("from_part"), e.get("to_part")
         if svc in ("water", "thermal"):
-            if f:
+            # SERVICE-DOMAIN GUARD (Tristan's V-111/Pressure-Vessels thread, 2026-07-04):
+            # a candidate-topology edge (e.g. from an earlier, less-careful closer) that
+            # terminates on switching/control gear ('Fresh Water Tank -> Mains Incomer')
+            # is ITSELF about to be dropped by finalize_ledger's service-domain-
+            # compatibility rule below — but this closer ran BEFORE that filter and had
+            # no visibility into the future rejection, so it inherited the mistake and
+            # picked the SAME doomed gear as a fluid consumer for an unrelated part
+            # ('Pressure Vessels -> Mains Incomer'), which finalize_ledger also dropped —
+            # leaving the part's completeness gap UNFILLED despite the closer's own
+            # "cannot miss a gap it leaves" guarantee. Never add switch/control gear to
+            # the fluid source/consumer pool at all — mirrors SWITCH_CONTROL_GEAR_RE,
+            # the exact rule finalize_ledger enforces, so the closer never proposes an
+            # edge the authority step would reject.
+            if f and not SWITCH_CONTROL_GEAR_RE.search(f):
                 sources.add(f)
-            if t:
+            if t and not SWITCH_CONTROL_GEAR_RE.search(t):
                 consumers.add(t)
             if f and t:
                 fwd_fluid.add((f, t))
@@ -1330,6 +1343,32 @@ def _selftest():
     rres = close_residual_completeness(rparts, rtopo, lambda n, m, f: {"water"}, log=lambda *a: None)
     assert any(e["from_part"] == "Belt Filter" for e in rres), \
         "residual closer gives an output-less flow-through part an output (nearest consumer / boundary)"
+
+    # proveCatch — the V-111/Pressure-Vessels thread (Tristan 2026-07-04): an EARLIER,
+    # less-careful closer left a fluid edge terminating on switch/control gear ('Fresh
+    # Water Tank -> Mains Incomer') sitting in the candidate topology. finalize_ledger
+    # would drop that edge as a service-domain mismatch — but close_residual_completeness
+    # ran BEFORE finalize_ledger and, without this guard, would have trusted 'Mains
+    # Incomer' as a legitimate fluid consumer and picked it for an UNRELATED output-less
+    # part too ('Pressure Vessels'), a pick finalize_ledger would ALSO drop — leaving
+    # Pressure Vessels' completeness gap unfilled despite the closer's own "cannot miss a
+    # gap it leaves" guarantee. The closer must never propose a switch/control-gear
+    # endpoint for a fluid pick, even when a bad peer edge suggests one is available.
+    _gparts = [_PR("Pressure Vessels", 2)]
+    _gtopo = [{"from_part": "Fresh Water Tank", "to_part": "Mains Incomer", "mechanism": "fluid_loop"},
+              {"from_part": "Piping Manifold", "to_part": "Pressure Vessels", "mechanism": "fluid_loop"}]
+    _gres = close_residual_completeness(_gparts, _gtopo, lambda n, m, f: {"water"}, log=lambda *a: None)
+    _g_edge = next((e for e in _gres if e["from_part"] == "Pressure Vessels"), None)
+    assert _g_edge is not None, \
+        "residual closer must still give Pressure Vessels an output (some pick, not silence)"
+    assert not SWITCH_CONTROL_GEAR_RE.search(_g_edge["to_part"]), \
+        (f"residual closer picked switch/control gear {_g_edge['to_part']!r} as a fluid "
+         f"consumer — finalize_ledger will drop this edge and the completeness gap "
+         f"resurfaces (got {_gres})")
+    assert _g_edge["to_part"] == _BL_EXPORT, \
+        (f"with no legitimate in-plant consumer left (Mains Incomer excluded), the "
+         f"closer must fall to the battery-limit export, not silently vanish "
+         f"(got {_g_edge['to_part']!r})")
     # service-aware dedup: a power edge A→B must NOT block a signal edge A→B.
     class _PS:
         def __init__(self, name, mod=""):
