@@ -117,6 +117,10 @@ export default function FindContractManufacturerGuide() {
             </p>
           </section>
 
+          {/* Header illustration */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/insights/guide-how-to-find-a-contract-manufacturer-uk.webp" alt="" className="w-full aspect-[16/9] object-cover rounded-2xl border border-border bg-[#faf7f3]" loading="lazy" />
+
           {/* Historical anchor */}
           <section className="space-y-4">
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">

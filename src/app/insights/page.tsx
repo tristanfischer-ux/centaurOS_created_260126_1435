@@ -167,8 +167,19 @@ export default function InsightsPage() {
                     href={`/insights/${essay.slug}`}
                     className="group"
                   >
-                    <Card className="h-full transition-colors hover:border-international-orange/40">
-                      <CardContent className="pt-6 space-y-2">
+                    <Card className="h-full overflow-hidden transition-colors hover:border-international-orange/40">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/images/insights/${essay.slug}.webp`}
+                        alt=""
+                        className="w-full aspect-[16/9] object-cover border-b border-border"
+                        style={{ background: "#faf7f3" }}
+                        loading="lazy"
+                      />
+                      <CardContent className="pt-5 space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-international-orange">
+                          Essay
+                        </p>
                         <h3 className="font-semibold text-foreground flex items-start gap-1.5">
                           <span>{essay.title}</span>
                           <ArrowRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-international-orange" />
@@ -197,15 +208,26 @@ export default function InsightsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { href: "/guides/how-to-find-a-contract-manufacturer-uk", title: "How to find a contract manufacturer in the UK", hook: "Tiers, shortlisting, the questions to ask and the red flags." },
-                { href: "/guides/how-to-cost-a-hardware-bill-of-materials", title: "How to cost a hardware bill of materials", hook: "Unit vs volume pricing, and the costs founders always miss." },
-                { href: "/guides/how-to-get-a-hardware-startup-investor-ready", title: "How to get a hardware startup investor-ready", hook: "What hardware investors actually check — and why they pass." },
-                { href: "/guides/design-for-manufacture-explained", title: "Design for manufacture, explained", hook: "What DFM is, why it matters early, and how it saves cost." },
-                { href: "/cost/water-treatment-plant", title: "What an industrial water-treatment plant costs to build", hook: "A worked £1.39M breakdown from a real, auditable model." },
+                { href: "/guides/how-to-find-a-contract-manufacturer-uk", img: "/images/insights/guide-how-to-find-a-contract-manufacturer-uk.webp", title: "How to find a contract manufacturer in the UK", hook: "Tiers, shortlisting, the questions to ask and the red flags." },
+                { href: "/guides/how-to-cost-a-hardware-bill-of-materials", img: "/images/insights/guide-how-to-cost-a-hardware-bill-of-materials.webp", title: "How to cost a hardware bill of materials", hook: "Unit vs volume pricing, and the costs founders always miss." },
+                { href: "/guides/how-to-get-a-hardware-startup-investor-ready", img: "/images/insights/guide-how-to-get-a-hardware-startup-investor-ready.webp", title: "How to get a hardware startup investor-ready", hook: "What hardware investors actually check — and why they pass." },
+                { href: "/guides/design-for-manufacture-explained", img: "/images/insights/guide-design-for-manufacture-explained.webp", title: "Design for manufacture, explained", hook: "What DFM is, why it matters early, and how it saves cost." },
+                { href: "/cost/water-treatment-plant", img: "/images/site/dossier-render.webp", title: "What an industrial water-treatment plant costs to build", hook: "A worked £1.38M breakdown from a real, auditable model." },
               ].map((g) => (
                 <Link key={g.href} href={g.href} className="group">
-                  <Card className="h-full transition-colors hover:border-international-orange/40">
-                    <CardContent className="pt-6 space-y-2">
+                  <Card className="h-full overflow-hidden transition-colors hover:border-international-orange/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={g.img}
+                      alt=""
+                      className="w-full aspect-[16/9] object-cover border-b border-border"
+                      style={{ background: "#faf7f3" }}
+                      loading="lazy"
+                    />
+                    <CardContent className="pt-5 space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-international-orange">
+                        Guide
+                      </p>
                       <h3 className="font-semibold text-foreground flex items-start gap-1.5">
                         <span>{g.title}</span>
                         <ArrowRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-international-orange" />

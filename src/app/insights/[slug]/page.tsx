@@ -86,6 +86,15 @@ export default async function ArticlePage({
             )}
           </header>
 
+          {/* Header illustration */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/images/insights/${slug}.webp`}
+            alt=""
+            className="mt-8 w-full aspect-[16/9] object-cover rounded-2xl border border-border"
+            style={{ background: "#faf7f3" }}
+          />
+
           <div className="mt-10 space-y-5 text-[17px] leading-relaxed text-foreground/90">
             {a.paragraphs.map((p, i) =>
               p.startsWith("## ") ? (
