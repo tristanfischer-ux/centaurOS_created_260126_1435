@@ -287,6 +287,58 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_voltage_dc_v: 1000,
     notes: 'ABB OTDC_E02P family (DC-dedicated disconnect): 1000 V DC, IEC 60947-3 DC-21B, IP65, direct-mount handle. Available 100/160/200/250 A current variants. EV22 variants extend to 1500 V DC. Canonical replacement for OT_E03P (600 V) on BESS rack isolators. Datasheet: https://library.e.abb.com/public/9c3426d8764d4c4aa6852ef4b7f753cc/1SCC301021C0202_TC_OTDC_OTDCP.pdf.',
   },
+  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): ABB's real
+  // 1500 V DC line for PV/ESS applications is the "F" suffix family
+  // (2-pole, IEC 60947-3 DC21B up to DC-PV2), with an "-ESS" variant sold
+  // specifically for energy-storage systems (e.g. OTDC315FV11-ESS). Smallest
+  // catalogue step is 315 A — there is NO 100/160/200/250 A step at 1500 V
+  // (those only exist in the 1000 V E02P family above). One entry per
+  // current variant (the current is unambiguous per part number, same
+  // convention as the PV-ANH1/1XL/2XL/3L fuse families below — avoids the
+  // family-max approximation the E02P entry above uses, which would falsely
+  // flag a real 315 A unit as "0.39× under-claimed" against an 800 A ceiling).
+  // Confirmed via ABB technical library + RS/distributor listings, 2026-07-04:
+  // https://library.e.abb.com/public/42e37f85a3864a4b80decc6a569df8f9/9AKK107492A6191%202-pole%20OTDC%20switch-disconnectors%20for%201500V%20DC.pdf
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC315FV11(?:-ESS)?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 315,
+    rated_voltage_dc_v: 1500,
+    notes: 'ABB OTDC315FV11(-ESS): 315 A / 1500 V DC 2-pole disconnect, IEC 60947-3 DC21B up to DC-PV2. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC400FV11(?:-ESS)?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 400,
+    rated_voltage_dc_v: 1500,
+    notes: 'ABB OTDC400FV11(-ESS): 400 A / 1500 V DC 2-pole disconnect, IEC 60947-3 DC21B up to DC-PV2. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC500FV11(?:-ESS)?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 500,
+    rated_voltage_dc_v: 1500,
+    notes: 'ABB OTDC500FV11(-ESS): 500 A / 1500 V DC 2-pole disconnect, IEC 60947-3 DC21B up to DC-PV2. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC630FV11(?:-ESS)?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 630,
+    rated_voltage_dc_v: 1500,
+    notes: 'ABB OTDC630FV11(-ESS): 630 A / 1500 V DC 2-pole disconnect, IEC 60947-3 DC21B up to DC-PV2. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC800FV11(?:-ESS)?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 800,
+    rated_voltage_dc_v: 1500,
+    notes: 'ABB OTDC800FV11(-ESS): 800 A / 1500 V DC 2-pole disconnect, IEC 60947-3 DC21B up to DC-PV2. Confirmed real 2026-07-04.',
+  },
   // ── BESS thermal: coolant circulation pumps ──────────────────
   // L35 fix (2026-05-26): pin Grundfos NB 65-250/245 BQQE on cooling_pump_word
   // to prevent reviewer-LLM PIN STAMP substitution. Prior chain runs had
@@ -547,6 +599,54 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_voltage_dc_v: 1000,
     notes: 'Bussmann PV-630ANH2 (alias). See Eaton Bussmann entry.',
   },
+  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): the PV-ANH1/
+  // ANH2 (NH1/NH2 body) family above tops out at 1000 V DC — Eaton's real
+  // 1500 V DC gPV line uses BOLT-IN body styles (1XL/2XL/3L), a DIFFERENT
+  // mechanical form factor (does NOT fit an NH1 DIN-rail base). One entry
+  // per current variant (matches the ANH1/ANH2 convention above — the
+  // variant current is unambiguous per part number). Independently verified
+  // real (Digi-Key / RS Components / Mouser / Amazon listings, 2026-07-04).
+  // Source: https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-photovoltaic-high-speed-fuses/eaton-bussmann-series-1500vdc-photovoltaic-fuses-product-aid-pa135007en.pdf
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-160A-2XL-B-15$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 160,
+    rated_voltage_dc_v: 1500,
+    notes: 'Eaton Bussmann PV-160A-2XL-B-15: 160 A / 1500 V DC / 2XL bolt-in body / Class gPV per IEC 60269-6. Confirmed real via Zoro listing 2026-07-04.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-200A-1XL-B-15$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 200,
+    rated_voltage_dc_v: 1500,
+    notes: 'Eaton Bussmann PV-200A-1XL-B-15: 200 A / 1500 V DC / 1XL bolt-in body / Class gPV per IEC 60269-6, UL Listed + CSA + CE/RoHS. Confirmed real via Digi-Key part 5441535 + RS 71461163 + Amazon listing 2026-07-04.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-250A-3L-15$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 250,
+    rated_voltage_dc_v: 1500,
+    notes: 'Eaton Bussmann PV-250A-3L-15: 250 A / 1500 V DC / 3L bolt-in body / Class gPV per IEC 60269-6. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-315A-3L-15$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 315,
+    rated_voltage_dc_v: 1500,
+    notes: 'Eaton Bussmann PV-315A-3L-15: 315 A / 1500 V DC / 3L bolt-in body / Class gPV per IEC 60269-6. Confirmed real 2026-07-04.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-400A-3L-15$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 400,
+    rated_voltage_dc_v: 1500,
+    notes: 'Eaton Bussmann PV-400A-3L-15: 400 A / 1500 V DC / 3L bolt-in body / Class gPV per IEC 60269-6. Confirmed real 2026-07-04.',
+  },
   // ── BESS isolation monitor ────────────────────────────────────
   {
     manufacturer: 'Bender',
@@ -554,6 +654,44 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     category: 'iso_monitor',
     rated_voltage_dc_v: 1000,
     notes: 'Bender iso685-D-B (datasheet): 1000 V DC, IEC 61557-8.',
+  },
+  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): Bender's real
+  // 1500 V-class BESS/PV insulation monitor. isoPV1685 (and RTU/P/DP
+  // variants) is rated DC 1500 V for "insulation monitoring of large PV
+  // systems up to 1500 V designed as IT systems" — the iso685-D-B (1000 V,
+  // above) is UNDER-RATED for a 1500 V-nominal DC bus. Source:
+  // https://www.benderinc.com/products/ground-fault-monitoring-ungrounded/isometer-isopv1685-series/
+  {
+    manufacturer: 'Bender',
+    part_number_pattern: /^isoPV1685(?:RTU|P|DP)?$/i,
+    category: 'iso_monitor',
+    rated_voltage_dc_v: 1500,
+    notes: 'Bender isoPV1685 (+ RTU/P/DP variants): insulation + residual-current monitoring for unearthed (IT) DC systems up to 1500 V DC, designed specifically for large PV/BESS installations. IEC 61557-8, rated impulse voltage 8 kV, pollution degree 2. Correct 1500 V-class replacement for iso685-D-B on a >1000 V nominal bus.',
+  },
+  // ── BESS DC-bus voltage transducers (LEM LV / DVL series) ──────
+  // LV 25-1000 was NOT previously in this table (gate 4 silently skipped it
+  // as parts_unknown) despite being pinned by the emitter since 2026-05-28 —
+  // closing that coverage gap here alongside the new 1500V-class DVL entries.
+  {
+    manufacturer: 'LEM',
+    part_number_pattern: /^LV\s*25-1000$/i,
+    category: 'voltage_transducer',
+    rated_voltage_dc_v: 1000,
+    notes: 'LEM LV 25-1000: closed-loop Hall-effect voltage transducer, 1000 V DC measuring range, 10 mA nominal primary via integral precision resistor, 0.8% accuracy. Correct for buses <=1000 V nominal; UNDER-RATED above that (see DVL 2000, BESS WAVE C item 1, 2026-07-04).',
+  },
+  {
+    manufacturer: 'LEM',
+    part_number_pattern: /^DVL\s*1500(?:-UI|\/SP\d)?$/i,
+    category: 'voltage_transducer',
+    rated_voltage_dc_v: 1500,
+    notes: 'LEM DVL 1500 (+ -UI / /SPx variants): insulated voltage transducer, bipolar/insulated measurement up to 1500 V. Source: https://www.lem.com/sites/default/files/products_datasheets/dvl_1500.pdf.',
+  },
+  {
+    manufacturer: 'LEM',
+    part_number_pattern: /^DVL\s*2000(?:-UI|\/SP\d)?$/i,
+    category: 'voltage_transducer',
+    rated_voltage_dc_v: 2000,
+    notes: 'LEM DVL 2000 (+ -UI / /SPx variants): insulated voltage transducer, 2000 V nominal primary, insulated measurement to 3000 V, 0.5% accuracy. BESS WAVE C item 1 (2026-07-04) pin for a 1500 V-nominal DC bus with a full-charge string voltage approaching/exceeding 1500 V — clears the full range with margin. Source: https://www.lem.com/en/dvl-2000 + https://www.lem.com/sites/default/files/products_datasheets/dvl_2000.pdf.',
   },
   // ── BESS current transducers (LEM HASS series) ────────────────
   // HASS series: rated current x specifies nominal (A); peak measuring range

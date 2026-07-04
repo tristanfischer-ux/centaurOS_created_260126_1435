@@ -411,6 +411,184 @@ export function auditSizing(state: any): SizingAuditResult {
   }
 }
 
+// ── VOLTAGE SIZING (BESS WAVE C item 1, 2026-07-04) ─────────────────────────
+// Additive to the current-sizing audit above — a SEPARATE rule table + a
+// SEPARATE exported function (auditVoltageSizing), so the existing
+// auditSizing() current-rating behaviour and its `SizingFinding` shape are
+// completely unchanged (no risk to any existing consumer/test).
+//
+// Root cause this closes: DC-bus-facing protection/monitoring parts (an
+// insulation monitor, a DC-bus voltage transducer, a rack DC isolator, a
+// DC HRC/string fuse) must be rated >= the DC bus nominal voltage class.
+// BESS WAVE C item 1 found FOUR such parts pinned at 1000 V on a 1500 V-
+// nominal bus (Bender iso685-D-B, LEM LV 25-1000, ABB OTDC200E02P, Eaton
+// Bussmann PV-200ANH1/170M6812) — the deterministic-emitter fix (2026-07-04)
+// now branches on `dc_bus_voltage_v` to pick the real 1500 V-class part
+// family; this rule is the regression GUARD so that class of defect can
+// never regress silently. Sizing criterion: rated voltage >= the bus's
+// NOMINAL voltage class (dc_bus_voltage_v) — matching real industry
+// practice (equipment is sold/rated to the market's NOMINAL system-voltage
+// class, e.g. "1500V-class BESS/PV" hardware, not to an internal worst-case
+// full-charge string voltage that can exceed the class nameplate by design;
+// see deterministic-emitter.ts's selectBessDcFuse1500V header comment for
+// the full reasoning). No safety-factor multiplier — this mirrors
+// engineering-contract.ts's own `voltage_closure` invariant (string voltage
+// <= bus nominal class), not an arbitrary margin.
+
+export interface VoltageSizingRule {
+  /** Match a word by id (case-insensitive) — voltage-class rules are
+   * word-scoped, not sub_module-scoped, because a sub_module can hold both
+   * DC-bus-facing parts (need this rule) and unrelated commodity parts
+   * (labels, mounting hardware) that must NOT be checked. */
+  match_word_id: RegExp
+  /** Design parameter holding the required minimum rated voltage. */
+  design_param: string
+  applies_to_classes?: string[]
+  description: string
+}
+
+export const VOLTAGE_SIZING_RULES: VoltageSizingRule[] = [
+  {
+    match_word_id: /insulation_monitor|pack_voltage_sensor|rack_dc_isolator|hrc_fuse|string_fuse/i,
+    design_param: 'dc_bus_voltage_v',
+    applies_to_classes: ['energy_storage', 'bess', 'solar_inverter', 'ev_charger'],
+    description:
+      'DC-bus-facing protection/monitoring parts (insulation monitor, DC-bus voltage transducer, rack DC isolator, DC HRC/string fuse) must be rated >= dc_bus_voltage_v (the bus nominal voltage class) — real 1500V-class BESS/PV hardware exists and must be selected once the bus nominal exceeds a lower class (e.g. 1000 V).',
+  },
+]
+
+interface EmittedVoltageRating {
+  word_id: string
+  word_name_human: string
+  module_id: string
+  sub_module_id: string
+  claimed_v: number
+  manufacturer: string | null
+  part_number: string | null
+}
+
+function parseVoltageDcV(value: string): number | null {
+  if (typeof value !== 'string') return null
+  const cleaned = value.replace(/,(?=\d{3}\b)/g, '')
+  const m = cleaned.match(/(\d+(?:\.\d+)?)\s*V\b/i)
+  return m ? parseFloat(m[1]) : null
+}
+
+function collectEmittedVoltageRatings(state: any): EmittedVoltageRating[] {
+  const out: EmittedVoltageRating[] = []
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  for (const m of modules) {
+    const moduleId = String(m?.module ?? m?.id ?? 'unknown')
+    const subs: any[] = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+    for (const sm of subs) {
+      const subId = String(sm?.id ?? sm?.sub_module_id ?? 'unknown')
+      const words: any[] = Array.isArray(sm?.words) ? sm.words : []
+      for (const w of words) {
+        const mods: any[] = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        let claimedV: number | null = null
+        // Voltage is emitted under `dimension`, `capacity`, or `rating_primary`
+        // depending on the word (see deterministic-emitter.ts's mod() calls
+        // for these parts) — try all three, first V-shaped value wins.
+        for (const kind of ['dimension', 'capacity', 'rating_primary']) {
+          const mod = mods.find((mc) => mc.kind === kind)
+          if (!mod) continue
+          const v = parseVoltageDcV(String(mod.value) + (mod.unit ? ' ' + mod.unit : ''))
+          if (v != null) {
+            claimedV = v
+            break
+          }
+        }
+        if (claimedV == null) continue
+        const wordId = String(w?.id ?? w?.content_character?.character_id ?? 'unknown')
+        const nameHuman = String(w?.name_human ?? w?.content_character?.name_human ?? wordId)
+        const mfrMod = mods.find((mc) => mc.kind === 'manufacturer')
+        const pnMod = mods.find((mc) => mc.kind === 'part_number')
+        out.push({
+          word_id: wordId,
+          word_name_human: nameHuman,
+          module_id: moduleId,
+          sub_module_id: subId,
+          claimed_v: claimedV,
+          manufacturer: mfrMod ? String(mfrMod.value) : null,
+          part_number: pnMod ? String(pnMod.value) : null,
+        })
+      }
+    }
+  }
+  return out
+}
+
+export interface VoltageSizingFinding {
+  word_id: string
+  word_name_human: string
+  module_id: string
+  sub_module_id: string
+  manufacturer: string | null
+  part_number: string | null
+  claimed_v: number
+  required_v: number
+  severity: 'HIGH'
+  explanation: string
+}
+
+export interface VoltageSizingAuditResult {
+  findings: VoltageSizingFinding[]
+  words_with_voltage_rating: number
+  words_matched_to_rule: number
+  product_class: string
+}
+
+/**
+ * auditVoltageSizing — gate 6 extension (BESS WAVE C item 1, 2026-07-04).
+ * proveCatch: feed a state whose insulation-monitor/voltage-transducer/
+ * isolator/fuse word is rated below dc_bus_voltage_v — must return exactly
+ * one HIGH finding for that word (verified via deterministic-emitter.ts's
+ * pre-fix behaviour on out/bess-campaign-v2: iso685-D-B @ 1000 V on a
+ * 1500 V bus would have fired this rule before the emitter fix).
+ */
+export function auditVoltageSizing(state: any): VoltageSizingAuditResult {
+  const ctx = buildContext(state)
+  const emitted = collectEmittedVoltageRatings(state)
+  const findings: VoltageSizingFinding[] = []
+  let words_matched_to_rule = 0
+  for (const e of emitted) {
+    const rule = VOLTAGE_SIZING_RULES.find((r) => {
+      if (r.applies_to_classes && r.applies_to_classes.length > 0) {
+        const matches = r.applies_to_classes.some((cls) => ctx.product_class.toLowerCase().includes(cls.toLowerCase()))
+        if (!matches) return false
+      }
+      return r.match_word_id.test(e.word_id)
+    })
+    if (!rule) continue
+    const requiredV = ctx.quantities[rule.design_param]
+    if (typeof requiredV !== 'number' || requiredV <= 0) continue
+    words_matched_to_rule += 1
+    if (e.claimed_v >= requiredV) continue
+    findings.push({
+      word_id: e.word_id,
+      word_name_human: e.word_name_human,
+      module_id: e.module_id,
+      sub_module_id: e.sub_module_id,
+      manufacturer: e.manufacturer,
+      part_number: e.part_number,
+      claimed_v: e.claimed_v,
+      required_v: requiredV,
+      severity: 'HIGH',
+      explanation:
+        `${e.word_name_human} (id ${e.word_id}) in ${e.module_id} → ${e.sub_module_id} is ${e.manufacturer ?? ''} ` +
+        `${e.part_number ?? '<no-part-number>'} rated ${e.claimed_v} V DC but the DC bus nominal is ${requiredV} V — ` +
+        `an under-rated DC-bus-facing protection/monitoring part cannot reliably operate at the bus voltage it is meant ` +
+        `to supervise/protect (a live safety defect, not a cosmetic spec mismatch). ${rule.description}`,
+    })
+  }
+  return {
+    findings,
+    words_with_voltage_rating: emitted.length,
+    words_matched_to_rule,
+    product_class: ctx.product_class,
+  }
+}
+
 // ── CLI ENTRYPOINT ───────────────────────────────────────────────────────────
 
 function renderMarkdown(result: SizingAuditResult, statePath: string): string {
@@ -475,13 +653,22 @@ if (isMain) {
   } else {
     console.log(md)
   }
+  // BESS WAVE C item 1 (2026-07-04): additive voltage-sizing check, folded
+  // into the SAME exit-14 gate — an under-rated DC-bus-facing protection/
+  // monitoring part is a safety defect of the same class the current-sizing
+  // rules already hard-exit on.
+  const voltageResult = auditVoltageSizing(state)
+  if (voltageResult.findings.length > 0) {
+    console.error(`[sizing-audit] voltage-sizing: ${voltageResult.findings.length} HIGH finding(s)`)
+    for (const f of voltageResult.findings) console.error(`  [HIGH] ${f.explanation}`)
+  }
   // Exit 14 on any HIGH finding (gate 14 — reserved alongside 10/11/12/13).
   const high = result.findings.filter((f) => f.severity === 'HIGH')
-  if (high.length > 0) {
-    console.error(`[sizing-audit] FAIL: ${high.length} HIGH-severity finding(s)`)
+  if (high.length > 0 || voltageResult.findings.length > 0) {
+    console.error(`[sizing-audit] FAIL: ${high.length} current-sizing HIGH + ${voltageResult.findings.length} voltage-sizing HIGH finding(s)`)
     process.exit(14)
   }
   console.log(
-    `[sizing-audit] PASS: ${result.words_matched_to_rule}/${result.words_with_rating} matched-to-rule, ${result.findings.length} findings (${result.findings.filter((f) => f.severity === 'MED').length} MED, ${result.findings.filter((f) => f.severity === 'LOW').length} LOW)`,
+    `[sizing-audit] PASS: ${result.words_matched_to_rule}/${result.words_with_rating} matched-to-rule, ${result.findings.length} findings (${result.findings.filter((f) => f.severity === 'MED').length} MED, ${result.findings.filter((f) => f.severity === 'LOW').length} LOW); voltage-sizing ${voltageResult.words_matched_to_rule}/${voltageResult.words_with_voltage_rating} matched, 0 findings`,
   )
 }

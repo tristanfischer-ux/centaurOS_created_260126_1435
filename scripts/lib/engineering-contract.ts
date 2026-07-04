@@ -612,8 +612,66 @@ registerArchetype('bess', (brief: any) => {
   // (dimensionless or hr⁻¹ unit) as target_performance, the old "else briefValue"
   // branch silently treated it as kWh. Now: scan desc for "X kWh / MWh capacity"
   // first; accept target_performance.value only if unit is in the energy family.
+  //
+  // BESS WAVE C addendum 5 (2026-07-04, "feasibility mass-cap bug" — the REAL
+  // root cause): a real BESS brief commonly states BOTH "Nameplate energy
+  // capacity: 5 MWh" AND "Usable energy capacity: approximately 4.5 MWh" as
+  // separate lines (see briefs-loop/bess_20ft_grid_storage.md lines 18-19).
+  // The old descPatterns[0] regex — `(?:nameplate|usable|energy|rated)\s+
+  // (?:capacity|energy)...` — treats "nameplate" and "usable" as EQUALLY
+  // valid anchors and `.match()` returns the FIRST hit in the text, which is
+  // "Nameplate energy capacity: 5 MWh" (it appears first). So `usableKwh`
+  // silently held the NAMEPLATE value (5000), not the USABLE value (4500) —
+  // on THIS exact brief the closure then compared the achieved usable kWh
+  // against the WRONG (inflated) 5000 kWh target, reporting "5000 kWh usable
+  // EXCEEDS envelope" and a "12.8% shortfall" that was actually a ~3.1%
+  // shortfall against the real 4500 kWh usable target. The mass cap itself
+  // was NOT the bug (briefMassCapKg below already correctly reads 44,000 kg
+  // from the brief — verified: container_payload_rating_kg = 44,000 in the
+  // contract, mass_feasibility already computes true vs that real cap).
+  //
+  // Fix: an explicit "usable" match is STRUCTURALLY UNAMBIGUOUS ground truth
+  // and must win over a same-sentence-family "nameplate" match. Priority:
+  //   1. tp.metrics[] structured entry whose key_metric names "usable" energy
+  //      (the parser already extracts this separately from nameplate — no
+  //      regex guessing needed when it's present).
+  //   2. An EXPLICIT "usable ... capacity/energy: X kWh|MWh" phrase in desc
+  //      (narrower than the old pattern — anchors ONLY on "usable", never on
+  //      "nameplate" or the generic "energy"/"rated" siblings).
+  //   3. The OLD broad pattern (nameplate|usable|energy|rated), preserved as
+  //      a fallback for briefs that never say "usable" explicitly — this
+  //      keeps every brief that only states ONE capacity figure unchanged.
+  //   4. target_performance.value / class default, unchanged.
   const usableKwh = (() => {
-    // FIRST: explicit "nameplate / usable / energy capacity: X kWh|MWh" in desc
+    // FIRST: structured metrics array — an explicit usable-energy entry is
+    // unambiguous (no regex adjacency risk). Mirrors how nameplateKwhRequested
+    // already trusts explicit numbers rather than re-deriving them.
+    const metrics = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+    const usableMetric = metrics.find((m: any) =>
+      /usable/i.test(String(m?.key_metric ?? m?.metric ?? m?.name ?? '')),
+    )
+    if (usableMetric && Number(usableMetric.value) > 0) {
+      const v = Number(usableMetric.value)
+      const u = String(usableMetric.unit ?? 'kwh').toLowerCase()
+      if (u === 'mwh') return v * 1000
+      if (u === 'gwh') return v * 1_000_000
+      if (u === 'wh') return v / 1000
+      return v
+    }
+    // SECOND: explicit "usable ... capacity/energy: X kWh|MWh" in desc —
+    // anchored ONLY on "usable", never on nameplate/energy/rated.
+    const usablePattern = /usable\s+(?:energy\s+)?(?:capacity|energy)[\s:]{0,12}(?:approximately\s+)?(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(kwh|mwh|gwh|wh)\b/i
+    const um = desc.match(usablePattern)
+    if (um) {
+      const v = parseFloat(um[1].replace(/,/g, ''))
+      const u = um[2].toLowerCase()
+      if (u === 'mwh') return v * 1000
+      if (u === 'gwh') return v * 1_000_000
+      if (u === 'wh') return v / 1000
+      return v
+    }
+    // THIRD (fallback, unchanged behaviour for briefs with no explicit
+    // "usable" figure): "nameplate / usable / energy capacity: X kWh|MWh"
     const descPatterns = [
       /(?:nameplate|usable|energy|rated)\s+(?:capacity|energy)[\s:]{0,8}(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(kwh|mwh|gwh|wh)\b/i,
       /(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(kwh|mwh|gwh|wh)\s*(?:bess|battery|energy[\s-]?storage|ess|capacity)/i,
@@ -629,7 +687,7 @@ registerArchetype('bess', (brief: any) => {
         return v
       }
     }
-    // SECOND: target_performance ONLY if unit is in the energy family
+    // FOURTH: target_performance ONLY if unit is in the energy family
     if (briefValue > 0) {
       if (briefUnit === 'kwh') return briefValue
       if (briefUnit === 'mwh') return briefValue * 1000
@@ -637,7 +695,7 @@ registerArchetype('bess', (brief: any) => {
       if (briefUnit === 'wh') return briefValue / 1000
       // Wrong unit (C-rate, cycles, hr, %) → fall to class default below
     }
-    // THIRD: class default for utility-scale BESS
+    // FIFTH: class default for utility-scale BESS
     return 3500  // kWh = 3.5 MWh, matches brief default
   })()
   // Default DoD 80% per BESS class convention; nameplate = usable / dod
@@ -929,7 +987,7 @@ registerArchetype('bess', (brief: any) => {
     usable_capacity_kwh_requested: q(usableKwh, 'kWh', 'energy', 'usable', 'system', 'brief', { source_detail: 'parsedBrief.constraints.target_performance (NOT necessarily feasible)' }),
     nameplate_capacity_kwh: q(nameplateKwh, 'kWh', 'energy', 'nameplate', 'system', 'calculator', { source_detail: 'cell_count × cell_energy_kwh (integer-clean)' }),
     dod_fraction: q(dodFraction, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
-    cell_count: q(cellCount, '', 'dimensionless', 'rated', 'cell', 'calculator', { source_detail: 'rack_count × cells_per_rack (integer-clean: 1P × 250S per rack)' }),
+    cell_count: q(cellCount, '', 'dimensionless', 'rated', 'cell', 'calculator', { source_detail: `rack_count × cells_per_rack (integer-clean: ${parallelStringsPerRack}P × ${seriesCellsPerString}S per rack)` }),
     cell_capacity_ah: q(cellAh, 'Ah', 'dimensionless', 'rated', 'cell', 'physics_constant', { source_detail: 'CATL 280 Ah LFP prismatic class default' }),
     cell_voltage_v: q(cellVoltageV, 'V', 'dimensionless', 'rated', 'cell', 'physics_constant'),
     cell_mass_kg: q(cellMassKg, 'kg', 'mass', 'gross_takeoff', 'cell', 'physics_constant'),
@@ -1148,9 +1206,20 @@ registerArchetype('bess', (brief: any) => {
     status: briefTargetFeasibility ? 'pass' : 'warn',
     measured: { value: usableKwhAchieved, unit: 'kWh', basis: 'usable', source_detail: 'integer-rack-feasible (rack_count × cells_per_rack × cell_energy × dod)' } as any,
     required: { value: usableKwh, unit: 'kWh', basis: 'usable', source_detail: 'brief target_performance' } as any,
+    // BESS WAVE C addendum 5 (2026-07-04): this reason string previously
+    // hardcoded "800 V + 28 t" and "1P × 250S" — stale literals from the
+    // ORIGINAL topology this closure was written against. On the real
+    // 2026-07-04 run (1500 V nominal, 468S per rack, 44,000 kg cap) the
+    // rendered reason still claimed "800 V + 28 t" and "1P × 250S", which is
+    // a gate-25-class bug (brief-value-literal-scanner catches hardcoded
+    // brief-derived numbers in emitter prose; this is the same defect inside
+    // a closure `reason` string in the contract builder). Now reads the
+    // live `dcBusVoltage`, `briefMassCapKg`, `seriesCellsPerString` and
+    // `parallelStringsPerRack` variables so the narrative always matches the
+    // config it describes.
     reason: briefTargetFeasibility
-      ? `Brief target ${usableKwh.toFixed(0)} kWh usable met by integer-feasible config (${rackCount} racks × ${cellsPerRack} cells × 1P × 250S → ${usableKwhAchieved.toFixed(0)} kWh usable).`
-      : `Brief target ${usableKwh.toFixed(0)} kWh usable EXCEEDS single-container envelope at 800 V + 28 t. Integer-feasible config (${rackCount} racks × ${cellsPerRack} cells × 1P × 250S) delivers ${usableKwhAchieved.toFixed(0)} kWh usable — ${((1 - usableKwhAchieved / usableKwh) * 100).toFixed(1)}% shortfall. Options: (a) accept shortfall, (b) upgrade to 314 Ah cells (+12%), (c) relax mass cap or container count.`,
+      ? `Brief target ${usableKwh.toFixed(0)} kWh usable met by integer-feasible config (${rackCount} racks × ${cellsPerRack} cells × ${parallelStringsPerRack}P × ${seriesCellsPerString}S → ${usableKwhAchieved.toFixed(0)} kWh usable).`
+      : `Brief target ${usableKwh.toFixed(0)} kWh usable EXCEEDS single-container envelope at ${dcBusVoltage} V + ${(briefMassCapKg / 1000).toFixed(0)} t. Integer-feasible config (${rackCount} racks × ${cellsPerRack} cells × ${parallelStringsPerRack}P × ${seriesCellsPerString}S) delivers ${usableKwhAchieved.toFixed(0)} kWh usable — ${((1 - usableKwhAchieved / usableKwh) * 100).toFixed(1)}% shortfall. Options: (a) accept shortfall, (b) upgrade to 314 Ah cells (+12%), (c) relax mass cap or container count.`,
   })
 
   // Macro-assembly pricing — sized to the deterministic Contract quantities.
@@ -1269,6 +1338,135 @@ registerArchetype('bess', (brief: any) => {
       source_detail: `£3,500 flat — Schaltbau C330-A 2000 A continuous / 1500 V DC bi-directional main bus contactor (real product, MCS Level 2/3, IEC 60947-4-1, ≥1.25 × ${busContinuousA.toFixed(0)} A bus current per UL 9540A)`,
     },
   ]
+
+  // BESS WAVE C addendum 6 (2026-07-04, Tristan: "build it") — DELIVERED
+  // round_trip_efficiency_percent and cost_per_kwh_gbp, both with full
+  // lineage, so the Brief Compliance table can verify the ACHIEVED value by
+  // name+unit family instead of silently having no row for these two brief
+  // targets (round_trip_efficiency_percent: 88, cost_per_kwh_gbp: 63).
+  // GROUNDING RULE: every operand below is either (a) a REAL contract
+  // quantity already computed above (never re-derived/guessed), or (b) an
+  // explicitly-labelled STATED ASSUMPTION with its source cited in the
+  // source_detail lineage string — never a silently-fabricated number. If a
+  // required real input is degenerate (usableKwhAchieved <= 0 or
+  // continuousKw <= 0), the computation refuses to claim a value rather than
+  // emit a divide-by-zero/garbage percentage or £/kWh figure.
+  //
+  // round_trip_efficiency_percent = cell RTE × PCS efficiency² × aux-load
+  // factor:
+  //   - cell RTE: LFP prismatic round-trip (coulombic + voltage) efficiency.
+  //     No per-cell datasheet RTE is present in the corpus for this brief —
+  //     STATED ASSUMPTION 97% (mid-point of the 96-98% published range for
+  //     LFP prismatic cells at moderate C-rate).
+  //   - PCS efficiency²: the REAL contract single-pass inverterEfficiency
+  //     (0.98, computed above from `dissipatedKw`'s own formula) applied
+  //     TWICE — AC→DC on charge, DC→AC on discharge — because round-trip
+  //     energy crosses the PCS in both directions.
+  //   - aux-load factor: parasitic energy (chiller electrical input + HVAC +
+  //     BMS/standby) consumed over one full charge+discharge cycle, as a
+  //     fraction of the usable energy delivered. Chiller electrical input is
+  //     estimated from the REAL systemThermalDissipationKw contract quantity
+  //     via a STATED ASSUMPTION packaged-liquid-chiller COP of 3.5 (typical
+  //     for this class — no per-unit chiller electrical-input quantity is
+  //     wired into the contract yet; the deterministic emitter selects the
+  //     physical chiller downstream). hvacDesignLoadKw + standbyAuxLossKw are
+  //     REAL contract constants (defined above). Cycle duration assumes the
+  //     charge half of the cycle takes the same time as the discharge half.
+  const cellRoundTripEfficiency = 0.97
+  const pcsRoundTripEfficiency = inverterEfficiency * inverterEfficiency
+  const assumedChillerCop = 3.5
+  const chillerElectricalKw = systemThermalDissipationKw / assumedChillerCop
+  const cycleDischargeHr = continuousKw > 0 ? usableKwhAchieved / continuousKw : 0
+  const cycleDurationHr = cycleDischargeHr * 2  // charge assumed same duration as discharge
+  const auxEnergyKwh = (chillerElectricalKw + hvacDesignLoadKw + standbyAuxLossKw) * cycleDurationHr
+  const auxLoadFactor = usableKwhAchieved > 0 ? Math.max(0, 1 - auxEnergyKwh / usableKwhAchieved) : null
+  // Refuse (null) rather than fabricate a percentage when the design has no
+  // usable energy or no discharge power to compute a cycle duration from.
+  const roundTripEfficiencyPercent =
+    auxLoadFactor !== null ? cellRoundTripEfficiency * pcsRoundTripEfficiency * auxLoadFactor * 100 : null
+  const rteTargetPct = (() => {
+    const metrics = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+    const m = metrics.find((mm: any) => /round.?trip.*efficiency/i.test(String(mm?.key_metric ?? mm?.metric ?? mm?.name ?? '')))
+    return m && Number(m.value) > 0 ? Number(m.value) : 88
+  })()
+
+  // cost_per_kwh_gbp = macro-assembly BoM estimate ÷ usable kWh delivered.
+  // macroAssemblyTotal is the SAME macro_assembly_prices array used for the
+  // cover-page cost stack (cells + PCS + container + BMS + liquid cooling +
+  // main bus contactor) — a pre-distributor-priced ESTIMATE, not the final
+  // distributor-priced BoM total (that reconciles downstream once the
+  // deterministic emitter's per-word prices + live distributor cascade run —
+  // see cost_reality.bom_total_gbp in the rendered dossier for the final
+  // figure). SCOPE NOTE: macro_assembly_prices does not itemise the step-up
+  // transformer, MV switchgear, structural racks or per-rack protection, so
+  // this is a partial-BoM estimate, not a scope-matched comparison against
+  // either brief cost anchor (the brief's £63/kWh target is explicitly
+  // scoped to the battery-container-only portion; the £900k ceiling is for
+  // the COMPLETE system including PCS/transformer/switchgear — see brief
+  // §"SCOPE OF THIS CONTAINER"). Refuses (null) rather than divide-by-zero
+  // when usableKwhAchieved is degenerate.
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+  const costPerKwhGbp = usableKwhAchieved > 0 ? macroAssemblyTotal / usableKwhAchieved : null
+  // Ceiling-implied £/kWh — the brief's OWN unit_cost_ceiling (£900k, whole
+  // system) divided by the ACHIEVED usable kWh. This is the scope-consistent
+  // comparator for costPerKwhGbp (both are whole-system-flavoured, even
+  // though macroAssemblyTotal is a partial BoM) — closer to apples-to-apples
+  // than comparing against the battery-only £63/kWh anchor.
+  const unitCostCeilingGbp = Number(brief?.constraints?.unit_cost_ceiling?.value ?? 0)
+  const ceilingImpliedGbpPerKwh = unitCostCeilingGbp > 0 && usableKwhAchieved > 0 ? unitCostCeilingGbp / usableKwhAchieved : null
+
+  if (roundTripEfficiencyPercent !== null) {
+    quantities.round_trip_efficiency_percent = q(
+      roundTripEfficiencyPercent, '%', 'dimensionless', 'rated', 'system', 'calculator',
+      {
+        source_detail:
+          `cell RTE ${(cellRoundTripEfficiency * 100).toFixed(0)}% (LFP prismatic coulombic+voltage efficiency, ` +
+          `STATED ASSUMPTION — no per-cell datasheet RTE in corpus) × PCS efficiency² ${(pcsRoundTripEfficiency * 100).toFixed(1)}% ` +
+          `(${(inverterEfficiency * 100).toFixed(0)}% single-pass, real contract value, squared for AC-DC charge + DC-AC discharge) × ` +
+          `aux-load factor ${(auxLoadFactor! * 100).toFixed(1)}% (chiller @ COP ${assumedChillerCop} STATED ASSUMPTION on real ` +
+          `systemThermalDissipationKw=${systemThermalDissipationKw.toFixed(1)} kW + real hvacDesignLoadKw=${hvacDesignLoadKw} kW + ` +
+          `real standbyAuxLossKw=${standbyAuxLossKw} kW, over a ${cycleDurationHr.toFixed(2)} h charge+discharge cycle, ` +
+          `${auxEnergyKwh.toFixed(1)} kWh aux vs ${usableKwhAchieved.toFixed(0)} kWh usable) = ${roundTripEfficiencyPercent.toFixed(1)}%`,
+      },
+    )
+  }
+  if (costPerKwhGbp !== null) {
+    quantities.cost_per_kwh_gbp = q(
+      costPerKwhGbp, 'GBP/kWh', 'currency', 'gross', 'system', 'calculator',
+      {
+        source_detail:
+          `macro-assembly BoM estimate £${macroAssemblyTotal.toLocaleString('en-GB')} (cells + PCS + container + BMS + liquid ` +
+          `cooling + main bus contactor — see macro_assembly_prices; EXCLUDES step-up transformer, MV switchgear, structural ` +
+          `racks, per-rack protection; pre-distributor-priced ESTIMATE, reconciles against the final costed BoM downstream) ÷ ` +
+          `${usableKwhAchieved.toFixed(0)} kWh usable achieved = £${costPerKwhGbp.toFixed(0)}/kWh. Brief scope note: the £63/kWh ` +
+          `target is for the battery-container-only portion (excludes PCS/transformer/switchgear per brief §"SCOPE OF THIS ` +
+          `CONTAINER"); this estimate includes a bare PCS price so is NOT scope-matched to that anchor. Ceiling-implied £/kWh ` +
+          `(£${unitCostCeilingGbp.toLocaleString('en-GB')} unit_cost_ceiling ÷ usable kWh) = ` +
+          `${ceilingImpliedGbpPerKwh !== null ? `£${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh` : 'n/a'} — the scope-consistent comparator.`,
+      },
+    )
+  }
+  if (roundTripEfficiencyPercent !== null) {
+    closures.push({
+      invariant_id: 'round_trip_efficiency_closure',
+      status: roundTripEfficiencyPercent >= rteTargetPct ? 'pass'
+            : roundTripEfficiencyPercent >= rteTargetPct * 0.95 ? 'warn'
+            : 'fail',
+      measured: quantities.round_trip_efficiency_percent,
+      required: { value: rteTargetPct, unit: '%', basis: 'min', source_detail: 'brief target_performance round_trip_efficiency_percent' } as any,
+      reason: `Delivered round-trip efficiency ${roundTripEfficiencyPercent.toFixed(1)}% (cell RTE × PCS efficiency² × aux-load factor) vs brief floor ${rteTargetPct}%.`,
+    })
+  }
+  if (costPerKwhGbp !== null && ceilingImpliedGbpPerKwh !== null) {
+    const ratio = costPerKwhGbp / ceilingImpliedGbpPerKwh
+    closures.push({
+      invariant_id: 'cost_per_kwh_closure',
+      status: ratio <= 1.0 ? 'pass' : ratio <= 1.15 ? 'warn' : 'fail',
+      measured: quantities.cost_per_kwh_gbp,
+      required: { value: ceilingImpliedGbpPerKwh, unit: 'GBP/kWh', basis: 'max', source_detail: 'unit_cost_ceiling / usable_capacity_kwh_achieved' } as any,
+      reason: `Macro-assembly estimate £${costPerKwhGbp.toFixed(0)}/kWh vs ceiling-implied £${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh (ratio ${ratio.toFixed(2)}). NOTE: macro_assembly_prices is a PARTIAL BoM (excludes transformer/switchgear/racks) — this is a directional cost-trend check, not the final priced-BoM reconciliation.`,
+    })
+  }
 
   return {
     product_class: 'bess',

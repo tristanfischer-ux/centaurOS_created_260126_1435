@@ -539,6 +539,52 @@ export function selectPfannenbergEbXt(
 }
 
 // ---------------------------------------------------------------------------
+// BESS WAVE C item 1 (2026-07-04, 1500V family safety fix) — real DC-PV /
+// battery-storage fuse selector.
+//
+// scripts/lib/hardware-selectors.ts::selectDcFuseFor() is OUT OF SCOPE for
+// this fix (owned by a different agent per the task boundary) — its local
+// BUSSMANN_170M_RANGE table claims "170M6812: 1250 A / 1500 V DC", but
+// parts-spec-validator.ts's KNOWN_PART_AUTHORITATIVE (the gate-4 source of
+// truth, cross-checked 2026-07-04) rates the SAME 170M68xx subfamily at only
+// 1100 V DC — an internal contradiction — and the wider 170M family's
+// standard Eaton 720014 datasheet is primarily an AC (690/700 V) rating (see
+// the L21 note on the 170M18xx entry above). Bypassing that call entirely:
+// this selector picks from Eaton Bussmann's EXPLICIT DC-PV / battery-storage
+// bolt-in "PV-<current>A-<style>-15" family, independently verified real
+// (Digi-Key / RS / Mouser / Amazon listings, 2026-07-04) at 1500 V DC:
+//   PV-160A-2XL-B-15  (160 A, 2XL bolt-in)
+//   PV-200A-1XL-B-15  (200 A, 1XL bolt-in)
+//   PV-250A-3L-15     (250 A, 3L bolt-in)
+//   PV-315A-3L-15     (315 A, 3L bolt-in)
+//   PV-400A-3L-15     (400 A, 3L bolt-in)
+// Source: https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-photovoltaic-high-speed-fuses/eaton-bussmann-series-1500vdc-photovoltaic-fuses-product-aid-pa135007en.pdf
+// NOTE: these bolt-in body styles (1XL/2XL/3L) do NOT fit a DIN-rail NH1
+// fuse base — the mounting/holder description at each call site is updated
+// to match (bolt-in block, not "DIN-rail NH1 fuse base").
+const BUSSMANN_PV_1500V_RANGE: Array<{ part_number: string; rated_current_a: number }> = [
+  { part_number: 'PV-160A-2XL-B-15', rated_current_a: 160 },
+  { part_number: 'PV-200A-1XL-B-15', rated_current_a: 200 },
+  { part_number: 'PV-250A-3L-15', rated_current_a: 250 },
+  { part_number: 'PV-315A-3L-15', rated_current_a: 315 },
+  { part_number: 'PV-400A-3L-15', rated_current_a: 400 },
+]
+
+/**
+ * selectBessDcFuse1500V — real, verified Eaton Bussmann 1500 V DC gPV
+ * bolt-in fuse, sized to >= requiredCurrentA (already margin-applied by the
+ * caller). Falls back to the largest catalogued step when the required
+ * current exceeds the family (mirrors selectPfannenbergEbXt's saturation
+ * pattern — the caller/gate surfaces the residual gap rather than this
+ * function inventing a part that doesn't exist).
+ */
+function selectBessDcFuse1500V(requiredCurrentA: number): { manufacturer: string; part_number: string; rated_current_a: number; rated_voltage_dc_v: number } {
+  const hit = BUSSMANN_PV_1500V_RANGE.find((f) => f.rated_current_a >= requiredCurrentA)
+  const chosen = hit ?? BUSSMANN_PV_1500V_RANGE[BUSSMANN_PV_1500V_RANGE.length - 1]
+  return { manufacturer: 'Eaton Bussmann', part_number: chosen.part_number, rated_current_a: chosen.rated_current_a, rated_voltage_dc_v: 1500 }
+}
+
+// ---------------------------------------------------------------------------
 // BESS TEMPLATE — module emitters
 // ---------------------------------------------------------------------------
 
@@ -550,6 +596,14 @@ export function selectPfannenbergEbXt(
 // a fixed real-part reference price, not a brief-derived value; the scanner
 // explicitly skips SCREAMING_SNAKE_CASE const declarations. Universal fix.
 const SUNGROW_PCS_INVERTER_LIST_PRICE_GBP = 75000
+
+// BESS WAVE C item 3 (2026-07-04): the Sungrow SC1000UD-MV is a 1000 kW
+// (1 MW) continuous / 1100 kW peak PCS unit — per parts-spec-validator.ts
+// KNOWN_PART_AUTHORITATIVE ("SC1000UD-MV: 1000 kW continuous ... Claiming
+// >1100 kW on this model is wrong"). A NAMED CONSTANT (not a bare literal)
+// so the per-unit rating and the emitted quantity always derive from the
+// SAME source-of-truth number.
+const SUNGROW_PCS_INVERTER_RATED_KW = 1000
 
 interface BessParams {
   cellCount: number
@@ -1174,21 +1228,45 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           ],
         )
       })(),
-      word(
-        'insulation_monitor_word',
-        'insulation monitor word',
-        cc('insulation_monitor', 'insulation monitor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
-        [
-          mod('quantity', '×1'),
-          // 2026-05-24 L7: IR427-D6 rated 250 V DC only — for 800 V DC bus use
-          // ISOMETER iso685-D-B (DC up to 1000 V, IEC 61557-8 + UL 508).
-          mod('form', 'Bender ISOMETER iso685-D-B (1000 V DC, IEC 61557-8)'),
-          mod('dimension', '1000', 'V'),
-          mod('manufacturer', 'Bender'),
-          mod('part_number', 'iso685-D-B'),
-          mod('regulatory', 'IEC 61557-8'),
-        ],
-      ),
+      // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): iso685-D-B
+      // is rated 1000 V DC only (per Bender datasheet). For a 1500 V-nominal
+      // DC bus (this contract: dcBusVoltageV=1500, max string charge voltage
+      // ~1708 V) the 1000 V part is UNDER-RATED — an insulation monitor that
+      // cannot withstand the bus voltage it is meant to supervise is a live
+      // safety defect, not a cosmetic spec mismatch. Bender's 1500 V-class
+      // BESS/PV insulation monitor is the isoPV1685 (rated DC 1500 V, IEC
+      // 61557-8, designed for exactly this application — large PV/BESS
+      // unearthed IT-system DC circuits up to 1500 V). Universal rule: pick
+      // the 1000 V part for buses ≤1000 V nominal, the 1500 V part above
+      // that (real Bender catalogue currently tops out at 1500 V for this
+      // product family — see parts-spec-validator.ts KNOWN_PART_AUTHORITATIVE
+      // for the authoritative rating and gate-6 SIZING_RULES for the
+      // "rated >= dc_bus_voltage_v" invariant that fails the WRONG choice).
+      // Source: https://www.benderinc.com/products/ground-fault-monitoring-ungrounded/isometer-isopv1685-series/
+      (() => {
+        const isHighVoltageBus = p.dcBusVoltageV > 1000
+        const partNumber = isHighVoltageBus ? 'isoPV1685' : 'iso685-D-B'
+        const ratedVoltageV = isHighVoltageBus ? 1500 : 1000
+        return word(
+          'insulation_monitor_word',
+          'insulation monitor word',
+          cc('insulation_monitor', 'insulation monitor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+          [
+            mod('quantity', '×1'),
+            mod('form', `Bender ISOMETER ${partNumber} (${ratedVoltageV} V DC, IEC 61557-8) — rated >= the ${p.dcBusVoltageV} V DC bus nominal`),
+            mod('dimension', String(ratedVoltageV), 'V'),
+            mod('manufacturer', 'Bender'),
+            mod('part_number', partNumber),
+            mod('regulatory', 'IEC 61557-8'),
+            // Estimate — no live UK distributor GBP quote found (2026-07-04
+            // web search); Bender ISOMETER units are a premium safety-
+            // instrument category (used-market USD $550-1,020 observed on
+            // eBay for isoPV1685 variants). Flagged as an estimate pending
+            // a live distributor cascade price.
+            mod('list_price_gbp', isHighVoltageBus ? '650' : '450'),
+          ],
+        )
+      })(),
       // L36 MED fix (2026-05-26): Vishay NTCLE100E3103JT1 was a duplicate of the
       // EPCOS / TDK B57703M0103G040 specified in thermistor_attachment_word
       // (cell_string sub-module). Physics Critic flagged two different NTC
@@ -1218,33 +1296,51 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
       ),
       // L52 fix (2026-05-28, gate-11 + Physics Critic recurring): the pack DC
       // bus voltage sensor was LLM-introduced (pack_voltage_sensor_word) with
-      // LEM LV 25-P @ 500 V — BELOW the 912.5 V max string voltage. The
-      // narrative LLM correctly flagged "voltage class mismatch" (gate 11 then
-      // clustered 500 V vs 912.5 V as a contradiction; the L31 fix-T relabel
-      // regressed because the part itself was under-rated). Root fix: emitter
-      // now OWNS this slot with the LEM LV 25-1000 — the 1000 V-range member of
-      // the LV 25 closed-loop Hall voltage-transducer family (10 mA nominal
-      // primary via integral precision resistor, 0.8% accuracy, ±15 V supply,
-      // galvanic isolation). 1000 V range covers the 912.5 V bus with 9.6%
-      // margin → no mismatch, no contradiction. The LV 25-1000 is the
-      // canonical BESS DC-bus voltage transducer (CATL EnerC+, Sungrow
-      // PowerStack pack-monitor reference). Datasheet: LEM LV 25 family
-      // (1000 V variant). One per rack for per-string pack-voltage telemetry.
-      word(
-        'pack_voltage_sensor_word',
-        'pack voltage sensor word',
-        cc('pack_voltage_sensor', 'pack DC-bus voltage transducer', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
-        [
-          mod('quantity', fmtQty(p.rackCount)),
-          mod('manufacturer', 'LEM'),
-          mod('part_number', 'LV 25-1000'),
-          mod('capacity', '1000', 'V'),
-          mod('form', `LEM LV 25-1000 closed-loop Hall-effect DC-bus voltage transducer (1000 V measuring range — covers the ${p.dcBusVoltageV} V nominal / 912.5 V max string with margin; 10 mA nominal primary via integral precision resistor, 0.8% accuracy, galvanic isolation, ±15 V supply)`),
-          mod('rating_primary', '1000 V measuring range'),
-          mod('regulatory', 'IEC 60688'),
-          mod('list_price_gbp', '112.92'), // 2026-05-28 gate 21: was £1 curve estimate; real Mouser LV 25-1000 ≈ £112.92
-        ],
-      ),
+      // LEM LV 25-P @ 500 V — BELOW the max string voltage. Root fix: emitter
+      // OWNS this slot with a contract-voltage-derived LEM transducer.
+      //
+      // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): the LEM
+      // LV 25 family is a 1000 V-range CURRENT-loop closed-loop Hall
+      // transducer line — its top member (LV 25-1000) is undersized for a
+      // 1500 V-nominal / ~1708 V max-charge bus (this contract). LEM's
+      // DEDICATED higher-voltage line is the DVL series: DVL 1500 (1500 V)
+      // and DVL 2000 (2000 V nominal / insulated to 3000 V — confirmed real,
+      // Newark/Mouser/Farnell stocked). Universal rule: below 1000 V nominal
+      // bus, LV 25-1000 remains correct (1000 V range covers with margin);
+      // above 1000 V, step up to the DVL family sized so its RATED voltage
+      // clears the bus nominal (DVL 1500 for <=1500 V nominal, DVL 2000 for
+      // a 1500 V nominal bus with a max-charge voltage approaching/exceeding
+      // 1500 V — DVL 2000 clears the full 1708 V max-charge case outright,
+      // removing the residual margin question the 1500 V-class part alone
+      // would leave open). Source: https://www.lem.com/en/dvl-2000 +
+      // https://www.lem.com/sites/default/files/products_datasheets/dvl_2000.pdf.
+      (() => {
+        const isHighVoltageBus = p.dcBusVoltageV > 1000
+        const partNumber = isHighVoltageBus ? 'DVL 2000' : 'LV 25-1000'
+        const ratedVoltageV = isHighVoltageBus ? 2000 : 1000
+        const priceGbp = isHighVoltageBus ? '220' : '112.92'
+        return word(
+          'pack_voltage_sensor_word',
+          'pack voltage sensor word',
+          cc('pack_voltage_sensor', 'pack DC-bus voltage transducer', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+          [
+            mod('quantity', fmtQty(p.rackCount)),
+            mod('manufacturer', 'LEM'),
+            mod('part_number', partNumber),
+            mod('capacity', String(ratedVoltageV), 'V'),
+            mod('form', `LEM ${partNumber} ${isHighVoltageBus ? 'insulated' : 'closed-loop Hall-effect'} DC-bus voltage transducer (${ratedVoltageV} V ${isHighVoltageBus ? 'nominal, insulated measurement to 3000 V' : 'measuring range'} — covers the ${p.dcBusVoltageV} V DC bus nominal with margin; 0.5-0.8% accuracy, galvanic isolation, ±15 V supply)`),
+            mod('rating_primary', `${ratedVoltageV} V ${isHighVoltageBus ? 'nominal' : 'measuring range'}`),
+            mod('regulatory', 'IEC 60688'),
+            // 2026-05-28 gate 21 (LV 25-1000): real Mouser price £112.92.
+            // DVL 2000: no live UK distributor GBP quote found (2026-07-04
+            // web search — Farnell/Mouser list the part but hide price
+            // behind a quote request); estimate positioned above the LV
+            // 25-1000 for the higher-voltage insulated-measurement class.
+            // Flagged as an estimate pending a live distributor cascade price.
+            mod('list_price_gbp', priceGbp),
+          ],
+        )
+      })(),
       // class-killer #2 (2026-05-26): pack_instrumentation had 4 words, below
       // the 5-word density floor. Adding one rack-level part (NOT per-cell —
       // avoids Stage 1.7 × cell_count multiplier trap per drawer 3dbfe2f5f00ff0a3).
@@ -1387,8 +1483,30 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   // With 1.25× safety margin: ceil(104.2 × 1.25 / 100) × 100 = 200 A rated.
   // OTDC family covers 100/160/200/250 A at 1000 V DC; emitter clamps to
   // available sizes (100/160/200/250) so the dynamic MPN always resolves.
+  //
+  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): the E02P
+  // suffix denotes ABB's 1000 V DC OTDC line — WRONG for a 1500 V-nominal
+  // bus (this contract). ABB's real 1500 V DC line is the "F" suffix family
+  // (OTDC315FV11 / OTDC400FV11 / OTDC500FV11 / OTDC630FV11 / OTDC800FV11,
+  // 2-pole, IEC 60947-3 DC21B up to DC-PV2, an "-ESS" variant sold
+  // specifically for energy-storage systems: OTDC315FV11-ESS). The 1500 V
+  // line's smallest catalogue step is 315 A (no 100/160/200/250 A steps
+  // exist at 1500 V) — confirmed via ABB technical library + RS/distributor
+  // listings, 2026-07-04. Universal rule: below 1000 V nominal bus, use the
+  // E02P family snapped to its own steps; above 1000 V, use the FV11(-ESS)
+  // family snapped to ITS real steps (315/400/500/630/800 A).
+  // Source: https://library.e.abb.com/public/42e37f85a3864a4b80decc6a569df8f9/9AKK107492A6191%202-pole%20OTDC%20switch-disconnectors%20for%201500V%20DC.pdf
   const rackStringContinuousA = p.busContinuousA / p.parallelStringsTotal
-  const rackIsolatorRatingA = Math.max(200, Math.ceil(rackStringContinuousA * 1.25 / 100) * 100)
+  const rackIsolatorRequiredA = rackStringContinuousA * 1.25
+  const isHighVoltageDcBus = p.dcBusVoltageV > 1000
+  const OTDC_1500V_STEPS_A = [315, 400, 500, 630, 800]
+  const rackIsolatorRatingA = isHighVoltageDcBus
+    ? (OTDC_1500V_STEPS_A.find((a) => a >= rackIsolatorRequiredA) ?? OTDC_1500V_STEPS_A[OTDC_1500V_STEPS_A.length - 1])
+    : Math.max(200, Math.ceil(rackIsolatorRequiredA / 100) * 100)
+  const rackIsolatorPartNumber = isHighVoltageDcBus
+    ? `OTDC${rackIsolatorRatingA}FV11-ESS`
+    : `OTDC${rackIsolatorRatingA}E02P`
+  const rackIsolatorRatedVoltageV = isHighVoltageDcBus ? 1500 : 1000
   const rackFuseProtection = makeSubModule(
     'rack_fuse_protection',
     'rack fuse protection',
@@ -1401,11 +1519,15 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('rack_dc_isolator', 'manual DC isolation switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', `rotary 3-pole lockable DC disconnect switch, ${rackIsolatorRatingA} A, 1000 V DC, IP65, direct-mount handle`),
+          mod('form', `rotary 2-pole lockable DC disconnect switch, ${rackIsolatorRatingA} A, ${rackIsolatorRatedVoltageV} V DC, IP65, direct-mount handle${isHighVoltageDcBus ? ', ESS variant' : ''}`),
           mod('manufacturer', 'ABB'),
-          mod('part_number', `OTDC${rackIsolatorRatingA}E02P`),
+          mod('part_number', rackIsolatorPartNumber),
           mod('rating_primary', String(rackIsolatorRatingA) + ' A'),
           mod('regulatory', 'IEC 60947-3 DC-21B'),
+          // Estimate — no live UK distributor GBP quote found for the
+          // OTDC…FV11-ESS 1500V line (2026-07-04 web search); positioned
+          // above the 1000V E02P analogue for the larger 1500V-class frame.
+          ...(isHighVoltageDcBus ? [mod('list_price_gbp', '220')] : []),
         ],
       ),
       word(
@@ -1551,26 +1673,41 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
       // £0 because mfr+pn not in dedicated modifiers (form-only) + no
       // list_price_gbp. Sungrow SC1000UD-MV 1 MW utility BESS PCS UK trade
       // ~£60-90k (Sungrow direct ~£60-70k; UK distributor ~£75-90k). Pin £75k.
-      word(
-        'pcs_inverter_1mw_bidirectional_word',
-        'PCS inverter 1 MW bidirectional word',
-        cc('pcs_inverter_1mw_bidirectional', 'PCS 1 MW bidirectional inverter', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
-        [
-          mod('quantity', '×1'),
-          mod('capacity', String(Math.round(p.continuousPowerKw / 1000)), 'MW'),
-          mod('manufacturer', 'Sungrow'),
-          mod('part_number', 'SC1000UD-MV'),
-          mod('list_price_gbp', String(SUNGROW_PCS_INVERTER_LIST_PRICE_GBP)),
-          mod('form', 'Sungrow SC1000UD-MV'),
-          // L29 council fix: authoritative spec is 1500 V DC max (per Sungrow
-          // datasheet + KNOWN_PART_AUTHORITATIVE entry). 1700 V was the IGBT
-          // transistor rating inside the PCS — the system-level DC-bus limit
-          // is 1500 V. Gate 13 (parts-spec-validator) rejects >1500 V claims.
-          // Use rating_primary (not dimension) to prevent modifier_consistency
-          // conflict when Phase 1 LLM adds a physical-size dimension modifier.
-          mod('rating_primary', '1500 V DC max'),
-        ],
-      ),
+      //
+      // BESS WAVE C item 3 (2026-07-04): the word previously hardcoded
+      // quantity=×1 regardless of the brief's rated_power_mw — for this
+      // 2.5 MW brief a single 1 MW-class SC1000UD-MV is 2.5x UNDERSIZED.
+      // The `capacity` modifier also mislabeled the PER-UNIT part's rating
+      // as the SYSTEM total power (Math.round(2500/1000)=3 "MW" — reading
+      // as if a single unit were rated 3 MW, when the real part is 1 MW).
+      // Fix: quantity = ceil(brief continuous MW / per-unit rated MW), real
+      // per-unit price unchanged (list_price_gbp is PER UNIT — the BoM line
+      // total = price × quantity, same convention as every other multi-unit
+      // word in this file), capacity now correctly labels the PER-UNIT
+      // rating (1 MW, the real SC1000UD-MV spec).
+      (() => {
+        const pcsUnitCount = Math.max(1, Math.ceil(p.continuousPowerKw / SUNGROW_PCS_INVERTER_RATED_KW))
+        return word(
+          'pcs_inverter_1mw_bidirectional_word',
+          'PCS inverter 1 MW bidirectional word',
+          cc('pcs_inverter_1mw_bidirectional', 'PCS 1 MW bidirectional inverter', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+          [
+            mod('quantity', fmtQty(pcsUnitCount)),
+            mod('capacity', String(SUNGROW_PCS_INVERTER_RATED_KW / 1000), 'MW'),
+            mod('manufacturer', 'Sungrow'),
+            mod('part_number', 'SC1000UD-MV'),
+            mod('list_price_gbp', String(SUNGROW_PCS_INVERTER_LIST_PRICE_GBP)),
+            mod('form', `Sungrow SC1000UD-MV, ${pcsUnitCount}× in parallel for ${(SUNGROW_PCS_INVERTER_RATED_KW * pcsUnitCount / 1000).toFixed(1)} MW aggregate (design continuous ${(p.continuousPowerKw / 1000).toFixed(1)} MW; each unit rated ${SUNGROW_PCS_INVERTER_RATED_KW} kW continuous / 1100 kW peak per Sungrow datasheet)`),
+            // L29 council fix: authoritative spec is 1500 V DC max (per Sungrow
+            // datasheet + KNOWN_PART_AUTHORITATIVE entry). 1700 V was the IGBT
+            // transistor rating inside the PCS — the system-level DC-bus limit
+            // is 1500 V. Gate 13 (parts-spec-validator) rejects >1500 V claims.
+            // Use rating_primary (not dimension) to prevent modifier_consistency
+            // conflict when Phase 1 LLM adds a physical-size dimension modifier.
+            mod('rating_primary', '1500 V DC max'),
+          ],
+        )
+      })(),
       word(
         'pcs_dc_link_capacitor_bank_word',
         'PCS DC-link capacitor bank word',
@@ -2342,25 +2479,55 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // Rack peak ≈ bus_peak_A / rackCount (e.g. 1562 A / 15 ≈ 104 A), so 200 A nominal gives
       // ~1.9× margin — same selection logic as the L17 fix, just the part
       // is now unambiguously DC-rated on the canonical datasheet.
-      word(
-        'dc_hrc_fuse_word',
-        'DC HRC fuse word',
-        cc('dc_hrc_fuse', 'DC HRC fuse', 'electromechanical_switching_function', 'copper'),
-        [
-          mod('quantity', fmtQty(p.rackCount)),
-          mod('capacity', '200', 'A'),
-          mod('manufacturer', 'Eaton Bussmann'),
-          mod('part_number', 'PV-200ANH1'),
-          mod('form', 'Eaton Bussmann PV-200ANH1 photovoltaic / battery-storage fuse (200 A / 1000 V DC / NH1 size / Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS — the EXPLICIT DC-PV variant; NOT a 170M AC-rated variant)'),
-          mod('dimension', '1000', 'V'),
-          // L48 council fix (2026-05-27, L43+L45+L46 carry-forward + L46 GPT-5.5):
-          // Engine B class curve emitted £613 each — flagged ">2x" by gate 21
-          // and council 1-of-4 seats. Real Eaton Bussmann PV-200ANH1 UK trade
-          // ~£200-350 (RS Components shows ~£245; Farnell ~£285). Pin £285.
-          mod('list_price_gbp', '285'),
-          mod('regulatory', 'IEC 60269-6 (gPV)'),
-        ],
-      ),
+      //
+      // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): PV-200ANH1
+      // is 1000 V DC — under-rated for a 1500 V-nominal bus (this contract).
+      // Above 1000 V nominal, select the real Eaton Bussmann 1500 V DC gPV
+      // bolt-in fuse via selectBessDcFuse1500V() (defined above, verified
+      // real part numbers — see its header comment for sourcing). The
+      // bolt-in 1XL/2XL/3L body does NOT use an NH1 DIN-rail base, so the
+      // form text is updated to describe a bolt-in mounting block instead.
+      (() => {
+        const isHighVoltageBus = p.dcBusVoltageV > 1000
+        if (!isHighVoltageBus) {
+          return word(
+            'dc_hrc_fuse_word',
+            'DC HRC fuse word',
+            cc('dc_hrc_fuse', 'DC HRC fuse', 'electromechanical_switching_function', 'copper'),
+            [
+              mod('quantity', fmtQty(p.rackCount)),
+              mod('capacity', '200', 'A'),
+              mod('manufacturer', 'Eaton Bussmann'),
+              mod('part_number', 'PV-200ANH1'),
+              mod('form', 'Eaton Bussmann PV-200ANH1 photovoltaic / battery-storage fuse (200 A / 1000 V DC / NH1 size / Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS — the EXPLICIT DC-PV variant; NOT a 170M AC-rated variant)'),
+              mod('dimension', '1000', 'V'),
+              mod('list_price_gbp', '285'),
+              mod('regulatory', 'IEC 60269-6 (gPV)'),
+            ],
+          )
+        }
+        const requiredA = p.stringContinuousA * 1.25
+        const fuse = selectBessDcFuse1500V(requiredA)
+        return word(
+          'dc_hrc_fuse_word',
+          'DC HRC fuse word',
+          cc('dc_hrc_fuse', 'DC HRC fuse', 'electromechanical_switching_function', 'copper'),
+          [
+            mod('quantity', fmtQty(p.rackCount)),
+            mod('capacity', String(fuse.rated_current_a), 'A'),
+            mod('manufacturer', fuse.manufacturer),
+            mod('part_number', fuse.part_number),
+            mod('form', `Eaton Bussmann ${fuse.part_number} photovoltaic / battery-storage fuse (${fuse.rated_current_a} A / ${fuse.rated_voltage_dc_v} V DC bolt-in / Class gPV per IEC 60269-6, UL Listed + CSA + CE/RoHS — 1500 V DC gPV line for a ${p.dcBusVoltageV} V nominal bus; bolt-in mounting block, NOT an NH1 DIN-rail base)`),
+            mod('dimension', String(fuse.rated_voltage_dc_v), 'V'),
+            // Estimate — no live UK distributor GBP quote found for the
+            // 1500V PV-*-15 bolt-in family (2026-07-04 web search);
+            // positioned above the 1000V PV-200ANH1 analogue for the
+            // higher-voltage bolt-in body.
+            mod('list_price_gbp', '320'),
+            mod('regulatory', 'IEC 60269-6 (gPV)'),
+          ],
+        )
+      })(),
       // FIX 1 (2026-06-25): id/name MUST NOT bake the voltage. The old
       // 'dc_busbar_800v' id + 'DC busbar 800 V' name shipped a busbar
       // labelled "800 V" even for a 1500 V brief (stale-label form of the
@@ -2711,6 +2878,25 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   const chillerKw = Math.max(30, Math.ceil(p.thermalRejectionKw / 30) * 30)
   const pinnedChillerCapacityKw = selected.nominal_capacity_kw
   const deratedCapacityKw = selected.derated_capacity_kw
+  // BESS WAVE C item 4 (2026-07-04): the real Pfannenberg EB XT family tops
+  // out at 148 kW nominal (EB XT 1600 WT — confirmed 2026-07-04: Pfannenberg's
+  // entire packaged-chiller line is "1.1 kW up to 150 kW", no larger single
+  // unit exists) — selectPfannenbergEbXt() correctly SATURATES to that top
+  // model when required capacity exceeds it (see its own header comment +
+  // the existing regression test `deterministic-emitter-chiller.test.ts`,
+  // which asserts the saturated part_number stays EB XT 1600 WT — DO NOT
+  // change that function's return shape). The design-level fix belongs at
+  // THIS call site: when saturated, deploy N identical units in parallel
+  // (same pattern as cooling_pump_word's redundant ×2, main_bus_contactor_
+  // word's N-parallel-when-saturated, and the code's own long-standing
+  // comment: "the design must add a redundant unit ... e.g. Trane utility
+  // chiller for >150 kW BESS"). chillerUnitCount is 1 in every NON-saturated
+  // case (derated_capacity_kw >= required by construction from the selector
+  // above), so this is a no-op for every previously-passing design — it only
+  // engages when the single-unit selector saturates.
+  const chillerUnitCount = Math.max(1, Math.ceil(requiredChillerKwAtAmbient / deratedCapacityKw))
+  const aggregateDeratedCapacityKw = deratedCapacityKw * chillerUnitCount
+  const aggregateNominalCapacityKw = pinnedChillerCapacityKw * chillerUnitCount
   // L38 HIGH fix (2026-05-26, class-killer A): use p.coolantChemistryDesc
   // (read from contract.shared_quantities) instead of the hardcoded
   // "water/glycol 80/20". An 80/20 water/glycol only protects to ~-8°C;
@@ -2719,8 +2905,9 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   // (shared-quantity-consistency-audit.ts) walks the emitted prose and
   // flags HIGH if two distinct values appear for the same coolant anchor.
   const chillerFormText =
-    `Pfannenberg ${selected.part_number} packaged liquid chiller, ${pinnedChillerCapacityKw} kW @ 35°C ambient ` +
-    `(${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C design ambient per EN 14511 derate curve), ` +
+    `${chillerUnitCount}× Pfannenberg ${selected.part_number} packaged liquid chiller, ${pinnedChillerCapacityKw} kW @ 35°C ambient each ` +
+    `(${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C design ambient per EN 14511 derate curve each` +
+    `${chillerUnitCount > 1 ? `; ${aggregateDeratedCapacityKw.toFixed(1)} kW aggregate derated, ${chillerUnitCount}× in parallel for redundancy + capacity — single-unit EB XT range tops out at 148 kW nominal` : ''}), ` +
     `${p.coolantChemistryDesc}, IP54 outdoor mount, AC 400 3~/50 Hz`
 
   // ── DELIVERABLE B: select pump once, use in cooling_pump_word below (class-killer B) ──
@@ -2742,7 +2929,15 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         'liquid cooling chiller word',
         cc('liquid_cooling_chiller', 'liquid cooling chiller', 'thermal_transfer_function', 'aluminium'),
         [
-          mod('quantity', '×1'),
+          // BESS WAVE C item 4 (2026-07-04): quantity now reflects
+          // chillerUnitCount (1 in every non-saturated case — no-op there;
+          // >1 only when the required capacity exceeds what a single real
+          // EB XT 1600 WT (the top of the real 36-150 kW Pfannenberg line)
+          // can deliver at the design ambient). list_price_gbp stays the
+          // PER-UNIT catalogue price (£8,500 — unchanged, matches the real
+          // catalogue) — the BoM line total = price × quantity, the same
+          // convention as every other multi-unit word in this file.
+          mod('quantity', fmtQty(chillerUnitCount)),
           mod('capacity', String(pinnedChillerCapacityKw), 'kW'),
           mod('form', chillerFormText),
           // BESS L25 fix (2026-05-25): explicit manufacturer + part_number
@@ -2760,7 +2955,17 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           // BESS L22 (2026-05-25, task #122): explicit design-ambient +
           // derated-capacity modifiers so the downstream gate 16 audit can
           // read them deterministically without re-parsing the form string.
-          mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient`),
+          // NOTE (2026-07-04): gate 16 (scripts/lib/thermal-derating-audit.ts,
+          // NOT owned by this fix) re-derives its OWN per-unit derated
+          // capacity from the authoritative cooling_curve table and compares
+          // it against the FULL system load — it does not read this
+          // `performance` claim, and it does not multiply by the word's
+          // `quantity` modifier. So even after this fix correctly deploys
+          // chillerUnitCount real units meeting the AGGREGATE load, gate 16
+          // will keep reporting the same per-unit MED finding until it is
+          // made quantity-aware. This claim states the honest aggregate so a
+          // human/narrative reader sees the true fleet capacity.
+          mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient per unit${chillerUnitCount > 1 ? `; ${aggregateDeratedCapacityKw.toFixed(1)} kW aggregate (${chillerUnitCount} units) vs ${requiredChillerKwAtAmbient.toFixed(1)} kW required` : ''}`),
           mod('list_price_gbp', '8500'),  // Pfannenberg EB XT 500-600 WT UK trade ≈ £8,500; FIX A 2026-05-29
         ],
       ),
@@ -3026,7 +3231,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
 
   return {
     module: 'environmental_interface',
-    module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller, plus a ${containerHvacQty}× Pfannenberg ${selectedContainerHvac.part_number} container interior HVAC pair for the ${containerSensibleLoadKw.toFixed(1)} kW auxiliary-load + solar-gain sensible heat, and four enclosure ventilation fans.`,
+    module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via ${chillerUnitCount}× Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient each${chillerUnitCount > 1 ? `, ${aggregateDeratedCapacityKw.toFixed(1)} kW aggregate derated` : ''}) glycol/water chiller${chillerUnitCount > 1 ? 's' : ''}, plus a ${containerHvacQty}× Pfannenberg ${selectedContainerHvac.part_number} container interior HVAC pair for the ${containerSensibleLoadKw.toFixed(1)} kW auxiliary-load + solar-gain sensible heat, and four enclosure ventilation fans.`,
     overview_paragraph_en: '',
     derived_parameters: {
       // class-killer #2 (2026-05-26): cooling_power gate reads this field and
@@ -3035,7 +3240,15 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
       // is always < required. Fix: emit the SELECTED chiller's nominal capacity
       // (pinnedChillerCapacityKw = e.g. 59 kW for EB XT 600 WT at 35°C) so
       // the gate reads the actual chiller spec we emitted.
-      cooling_capacity_kw: pinnedChillerCapacityKw,
+      //
+      // BESS WAVE C item 4 (2026-07-04): these three fields now report the
+      // AGGREGATE fleet capacity (unit × chillerUnitCount), not a single
+      // unit's — the site actually has chillerUnitCount real chillers
+      // installed, and regression-harness.tsx's cooling_power invariant
+      // (`cooling_capacity_kw >= system_thermal_dissipation_kw × 1.25`)
+      // must see the TRUE installed capacity to validate correctly. No-op
+      // when chillerUnitCount=1 (every previously-passing design).
+      cooling_capacity_kw: aggregateNominalCapacityKw,
       thermal_rejection_required_kw: p.thermalRejectionKw,
       // BESS L22 (2026-05-25, task #122): expose the contract's design
       // ambient AND the chiller's derated capacity at that ambient for
@@ -3044,8 +3257,8 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
       // tracks the brief's operating_environment.temp_max_c.
       max_ambient_c: p.ambientDesignTempC,
       ambient_design_temp_c: p.ambientDesignTempC,
-      chiller_nominal_capacity_kw: pinnedChillerCapacityKw,
-      chiller_derated_capacity_kw: deratedCapacityKw,
+      chiller_nominal_capacity_kw: aggregateNominalCapacityKw,
+      chiller_derated_capacity_kw: aggregateDeratedCapacityKw,
       system_thermal_dissipation_kw: p.systemThermalDissipationKw,
     },
     allowed_radicals: [
@@ -3812,12 +4025,34 @@ function emitSafetyProtection(p: BessParams): DesignModule {
   // eslint-disable-next-line @typescript-eslint/no-magic-numbers
   const LFP_MAX_CELL_VOLTAGE_V = 3.65
   const stringMaxVoltageV = p.seriesCellsPerString * LFP_MAX_CELL_VOLTAGE_V
-  const dcFuse = selectDcFuseFor({
-    continuous_current_a: p.stringContinuousA,
-    string_max_voltage_v: stringMaxVoltageV,
-    family: 'bussmann_170m',
-  })
-  const fuseFormStr = `IEC 60269-4 Class aR, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC (≥1.5× string max ${stringMaxVoltageV.toFixed(0)} V = ${(stringMaxVoltageV * 1.5).toFixed(0)} V min; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/us/en-us/catalog/bussmann-series-low-voltage-semiconductor-fuses/170m-series-fuses.html`
+  //
+  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): for a
+  // 1500 V-nominal bus, selectDcFuseFor()'s ≥1.5× string-max-voltage rule
+  // demands a >=2562 V-rated fuse — no catalogue DC-PV/battery fuse of any
+  // manufacturer is rated that high; the OLD rule was implicitly calibrated
+  // against the previous 800V-nominal/912.5V-max topology (1369V threshold,
+  // satisfiable by any real 1500V-class part) and silently saturates on a
+  // 1500V-nominal bus, which is why it fell through to the mis-rated
+  // 170M6812 fallback (see selectBessDcFuse1500V's header comment for the
+  // full diagnosis). Real industry practice for 1500V-class BESS/PV DC
+  // protection is to select equipment RATED TO THE BUS NOMINAL CLASS
+  // (1500 V), not 1.5× its worst-case full-charge voltage — this is exactly
+  // why the whole equipment market segment is named "1500V-class" even
+  // though real LFP full-charge string voltage commonly exceeds 1500 V (as
+  // it does here, 1708 V). Below 1000 V nominal the existing selectDcFuseFor
+  // path is UNCHANGED (byte-identical) — only >1000 V buses take the new
+  // verified-real path.
+  const isHighVoltageBus = p.dcBusVoltageV > 1000
+  const dcFuse = isHighVoltageBus
+    ? selectBessDcFuse1500V(p.stringContinuousA * 1.25)
+    : selectDcFuseFor({
+        continuous_current_a: p.stringContinuousA,
+        string_max_voltage_v: stringMaxVoltageV,
+        family: 'bussmann_170m',
+      })
+  const fuseFormStr = isHighVoltageBus
+    ? `Class gPV per IEC 60269-6, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC bolt-in (rated to the ${p.dcBusVoltageV} V DC bus nominal class — the real 1500V-class BESS/PV DC-fuse market segment; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-photovoltaic-high-speed-fuses/eaton-bussmann-series-1500vdc-photovoltaic-fuses-product-aid-pa135007en.pdf`
+    : `IEC 60269-4 Class aR, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC (≥1.5× string max ${stringMaxVoltageV.toFixed(0)} V = ${(stringMaxVoltageV * 1.5).toFixed(0)} V min; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/us/en-us/catalog/bussmann-series-low-voltage-semiconductor-fuses/170m-series-fuses.html`
 
   const cellFuseProtection = makeSubModule(
     'cell_fuse_protection',
@@ -3842,18 +4077,36 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', fuseFormStr),
           mod('rating_primary', `${dcFuse.rated_current_a} A`),
           mod('dimension', String(dcFuse.rated_voltage_dc_v), 'V'),
-          mod('regulatory', 'IEC 60269-4 + IEC 62619 §6.4.4'),
+          mod('regulatory', isHighVoltageBus ? 'IEC 60269-6 (gPV) + IEC 62619 §6.4.4' : 'IEC 60269-4 + IEC 62619 §6.4.4'),
+          // Estimate — no live UK distributor GBP quote found for the 1500V
+          // PV-*-15 bolt-in family (2026-07-04 web search); positioned
+          // consistent with the dc_hrc_fuse_word analogue (£320) for the
+          // same real 1500V DC gPV bolt-in line.
+          ...(isHighVoltageBus ? [mod('list_price_gbp', '320')] : []),
         ],
       ),
+      // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): the
+      // selectBessDcFuse1500V() bolt-in family (1XL/2XL/3L body style) does
+      // NOT mount in an NH1 DIN-rail base — that holder (BK/NH1-T) is
+      // specific to the NH1-body PV-ANH1 family (which tops out at 1000 V
+      // DC). Bolt-in PV/BESS fuses of this body style bolt directly to a
+      // busbar or disconnect assembly with the mounting hardware supplied
+      // with the fuse itself (no separate discrete "holder" catalogue SKU
+      // was found and verified for the 1XL/2XL/3L bolt-in family as of
+      // 2026-07-04 — rather than pin an unverified part number, this word
+      // honestly describes the real bolt-in mounting method). Below 1000 V
+      // nominal the NH1 base (unchanged, byte-identical) still applies.
       word(
         'fuse_holder_word',
         'fuse holder word',
-        cc('fuse_holder', 'NH1 fuse holder / disconnector', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        cc('fuse_holder', isHighVoltageBus ? 'bolt-in fuse mounting hardware' : 'NH1 fuse holder / disconnector', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'DIN-rail NH1 fuse base / disconnector, 1500 V DC rated, finger-safe cover'),
+          mod('form', isHighVoltageBus
+            ? 'bolt-in mounting hardware for 1XL/2XL/3L body fuses, bolts directly to busbar/disconnect assembly (supplied with fuse — no separate DIN-rail base for this body style), 1500 V DC rated, finger-safe cover'
+            : 'DIN-rail NH1 fuse base / disconnector, 1500 V DC rated, finger-safe cover'),
           mod('manufacturer', 'Eaton Bussmann'),
-          mod('part_number', 'BK/NH1-T'),
+          ...(isHighVoltageBus ? [] : [mod('part_number', 'BK/NH1-T')]),
           mod('regulatory', 'IEC 60947-3'),
         ],
       ),
