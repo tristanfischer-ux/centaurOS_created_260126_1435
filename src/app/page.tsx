@@ -129,6 +129,7 @@ const HTML = `<style>
 
   .founders-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-top:8px;}
   .founders-img{width:100%;border-radius:var(--radius);box-shadow:var(--shadow);display:block;}
+  .hero-img{width:100%;height:auto;display:block;border-radius:16px;box-shadow:var(--shadow);}
   .wb-visuals{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:10px 0 36px;}
   .wb-visuals figure{margin:0;}
   .wb-visuals img{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow-sm);display:block;background:#fff;}
@@ -243,19 +244,8 @@ const HTML = `<style>
       </div>
       <p class="hero-trust"><span class="dot"></span> Strategy and capital up front, a curated build network behind you &mdash; and your first Design Dossier free.</p>
     </div>
-    <div class="hero-visual" aria-hidden="true">
-      <div class="wb">
-        <div class="wb-top"><span class="flame"></span> Design Dossier <span class="wb-file">water-treatment.xlsx</span></div>
-        <div class="wb-tabs"><span class="wb-tab on">Cost waterfall</span><span class="wb-tab">Financial model</span><span class="wb-tab">BoM ledger</span><span class="wb-tab">Drawings</span></div>
-        <div class="wb-rows">
-          <div class="wb-row"><span>Reverse-osmosis skid</span><b>&pound;86,198</b></div>
-          <div class="wb-row"><span>Storage &amp; tanks</span><b>&pound;40,845</b></div>
-          <div class="wb-row"><span>Controls &amp; instrumentation</span><b>&pound;206,365</b></div>
-          <div class="wb-row"><span>Pipework &amp; distribution</span><b>&pound;11,985</b></div>
-          <div class="wb-row total"><span>Total installed</span><b>&pound;1.39M</b></div>
-        </div>
-        <div class="wb-foot"><span class="dot"></span> Every number is a live formula &middot; engineer-checked</div>
-      </div>
+    <div class="hero-visual">
+      <img class="hero-img" src="/images/site/hero-illustration.webp" alt="A software-style control panel piped into an industrial process plant — the front end for hardware" width="1500" height="661" />
     </div>
   </div>
 </section>
