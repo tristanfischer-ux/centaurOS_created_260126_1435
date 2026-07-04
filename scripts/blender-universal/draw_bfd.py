@@ -513,6 +513,82 @@ def _supporting_equipment(state: dict, topology_blocks: list) -> list:
     return supporting
 
 
+# a topology node with no MATCHED manifest part (draw_pid._build_manifest_tag_index only
+# indexes parts the manifest actually placed) falls back to draw_pid's synthetic 'X-9nn'
+# placeholder tag (_next_tag, seeded at 900). Correct as a P&ID fallback (out of this
+# generator's scope); wrong on the BFD, which must cross-reference the SAME tag as the
+# ledger / schedules / Excel export.
+_SYNTHETIC_TAG_RE = re.compile(r"^X-9\d\d$")
+
+
+def _retag_blocks_from_ledger(blocks: list, state: dict) -> None:
+    """Re-tag any block still carrying draw_pid's synthetic 'X-9nn' placeholder with its
+    REAL bill-of-materials tag, by NAME match against requirementsBom — so a NOT-FOUND
+    principal with no manufacturer part yet (e.g. 'F-3 · Grp Membrane Housings', which has
+    no manifest equipment_tag because nothing has been matched to it) still reads its own
+    BoM tag on the BFD instead of a P&ID-only fallback that no other schedule recognises
+    (routed gap #3: the ledger's coverage matcher already credits the block by NAME, but a
+    chartered engineer cross-referencing the BFD tag against the parts list would find
+    nothing under 'X-912'). In-place; a block with a genuine tag, or no ledger match at
+    all, is left untouched — this never invents an identity, only aligns two names for the
+    SAME physical part the ledger already knows about."""
+    try:
+        import parts_ledger as PL
+    except Exception:
+        return
+    tag_by_norm: dict[str, str] = {}
+    for r in (state.get("requirementsBom") or []):
+        if not isinstance(r, dict) or r.get("status") == "SUB-COMPONENT" or PL._is_connection(r):
+            continue
+        tag = str(r.get("tag", "")).strip()
+        req = str(r.get("requirement", ""))
+        name = (req.split("·")[0].strip() or str(r.get("part", "")) or tag)
+        if tag and name and PL._norm(name) not in tag_by_norm:
+            tag_by_norm[PL._norm(name)] = tag
+    for b in blocks:
+        if not _SYNTHETIC_TAG_RE.match(b.tag or ""):
+            continue
+        ledger_tag = tag_by_norm.get(PL._norm(b.label))
+        if ledger_tag and ledger_tag != b.tag:
+            b.tag = ledger_tag
+
+
+def _bfd_missing_principals(svg_text: str, state: dict) -> list[str]:
+    """Every parts-ledger PRINCIPAL (vessel / rotating / exchanger / separator — the four
+    types `parts_ledger.TYPE_EXPECTED` says must appear on the block-flow-diagram) that does
+    NOT show up on the rendered BFD text, by the LEDGER'S OWN name/tag match rule — ONE
+    matcher, so this can never diverge from what `parts_ledger.py` itself reports missing.
+    Returns the list of requirement heads absent; empty = every principal is drawn directly
+    or credited via a stated group block whose label names it (routed gap #3)."""
+    try:
+        import parts_ledger as PL
+    except Exception:
+        return []
+    txt = " " + re.sub(r"\s+", " ", " ".join(re.findall(r">([^<>]+)<", svg_text))).strip() + " "
+
+    def _present(nm: str) -> bool:
+        nm = (nm or "").strip()
+        if not nm or len(nm) < 4:
+            return False
+        _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
+        return nm.lower() in txt.lower() or _sing(nm) in _sing(txt)
+
+    missing = []
+    for r in (state.get("requirementsBom") or []):
+        if not isinstance(r, dict) or r.get("status") == "SUB-COMPONENT" or PL._is_connection(r):
+            continue
+        tag = str(r.get("tag", ""))
+        req = str(r.get("requirement", ""))
+        name = (req.split("·")[0].strip() or str(r.get("part", "")) or tag)
+        typ = PL._classify(name, tag)
+        if "block-flow-diagram" not in PL.TYPE_EXPECTED.get(typ, set()):
+            continue
+        tag_hit = bool(tag) and (f" {tag} " in txt or f">{tag}<" in txt)
+        if not (tag_hit or _present(name)):
+            missing.append(name)
+    return missing
+
+
 def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
     """Build the BlockFlow from the P&ID's canonical Process (single source of truth) +
     the routed artifacts, laid out in TRUE process order."""
@@ -544,6 +620,7 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
         b.array_n = getattr(nd, "array_n", 1)
         b.array_tags = list(getattr(nd, "array_tags", []) or [])
         blocks.append(b)
+    _retag_blocks_from_ledger(blocks, state)
     block_keys = {b.key for b in blocks}
 
     # ---- streams from the process lines (skip electrical; those become a note) ----
@@ -1597,11 +1674,17 @@ def generate_bfd(out_dir: str, state_path: Optional[str] = None,
     except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
         print(f"[bfd] A1 PDF export skipped: {type(ex).__name__}: {ex}")
 
+    # routed gap #3 — every parts-ledger PRINCIPAL must appear on the BFD directly or via a
+    # stated group block whose label credits it; surface the residual honestly (non-fatal —
+    # the ledger's own coverage % is the scored source of truth, this is the CLI diagnostic).
+    missing_principals = _bfd_missing_principals(svg_text, state)
+
     summary = {
         "archetype": bf.archetype,
         "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
         "a1": a1,
+        "missing_principals": missing_principals,
         "blocks": len(bf.blocks),
         "streams": len(bf.streams),
         "process_streams": sum(1 for s in bf.streams if s.style == STREAM_PROCESS),
@@ -1695,6 +1778,36 @@ def _selftest() -> int:
         p = a1_print.plan_sheets(*_dims(svg), a1_print.min_font_px(svg))
         chk(f"F5.a1_plan_meets_bar_{name}", p["meets_bar"] and p["min_text_mm"] >= 2.5)
 
+    # B1 — RETAG proveCatch (routed gap #3): a block still carrying draw_pid's synthetic
+    # 'X-9nn' fallback tag must be RE-TAGGED to its real BoM tag when the ledger names the
+    # same equipment (e.g. 'X-912' → 'F-3' for 'Grp Membrane Housings', a NOT-FOUND
+    # principal with no manifest equipment_tag yet) — never left showing a tag no other
+    # schedule recognises. A block with a genuine tag must NOT be touched.
+    _b_synth = Block(key="grp_membrane_housings", tag="X-912", label="Grp Membrane Housings", sym=PID.SYM_VESSEL)
+    _b_real = Block(key="uv", tag="V-102", label="Uv Disinfection", sym=PID.SYM_VESSEL)
+    _fake_bom_state = {"requirementsBom": [
+        {"tag": "F-3", "requirement": "Grp Membrane Housings · 364 m² area", "status": "NOT FOUND"},
+        {"tag": "V-102", "requirement": "Uv Disinfection · duty", "status": "MATCHED"},
+    ]}
+    _retag_blocks_from_ledger([_b_synth, _b_real], _fake_bom_state)
+    chk("B1.synthetic_tag_retagged_to_ledger_tag", _b_synth.tag == "F-3")
+    chk("B1.genuine_tag_left_untouched", _b_real.tag == "V-102")
+
+    # B2 — ABSENT-PRINCIPAL proveCatch (routed gap #3): a ledger principal that never makes
+    # it onto the rendered BFD text (no block, no group-block credit) MUST be flagged by
+    # _bfd_missing_principals — the same rule the ledger's coverage matcher applies — and a
+    # principal that IS drawn (directly, by name) must NOT be false-flagged.
+    _absent_state = {"requirementsBom": [
+        {"tag": "F-9", "requirement": "Widget Storage Tank · test rig", "status": "NOT FOUND"},
+    ]}
+    chk("B2.absent_principal_caught",
+        "Widget Storage Tank" in _bfd_missing_principals(svg5, _absent_state))
+    _present_state = {"requirementsBom": [
+        {"tag": "U-000", "requirement": "Unit 0 · test rig", "status": "NOT FOUND"},
+    ]}
+    chk("B2.present_principal_clears",
+        _bfd_missing_principals(svg5, _present_state) == [])
+
     for f in fails:
         print(f"[bfd][selftest] FAIL {f}")
     print(f"[bfd][selftest] {'PASS' if not fails else 'FAIL'} "
@@ -1732,6 +1845,12 @@ def main(argv):
     if a1 and a1.get("pdf_ok"):
         print(f"[bfd] A1  → {a1['pdfs'][0]}  ({a1['sheets']} sheet(s), "
               f"min text {a1['min_text_mm']} mm on A1)")
+    missing = summary.get("missing_principals") or []
+    if missing:
+        print(f"[bfd] WARNING: {len(missing)} ledger principal(s) absent from the BFD "
+              f"(no block, no group-block credit): {missing}")
+    else:
+        print("[bfd] every ledger principal appears on the BFD (directly or via a group block)")
     return 0
 
 

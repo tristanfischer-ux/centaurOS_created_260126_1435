@@ -1964,11 +1964,23 @@ def generate_hvac(out_dir: str, state_path: Optional[str] = None,
     svg_path.write_text(svg_text)
     png_ok = rasterise(svg_path, png_path) if rasterise_png else False
 
+    # print-ready ISO A1 PDF set (routed gap #1 — FF-HVAC-001 rendered PNG/SVG masters but
+    # never exported an A1 print set, unlike every other drawing family; the Drawings tab's
+    # per-sheet pdf_ok check failed for HVAC as a result). Mirrors draw_pid.py / draw_bfd.py's
+    # A1 export exactly: additive (the SVG master above is untouched) + non-fatal by contract.
+    a1 = None
+    try:
+        import a1_print
+        a1 = a1_print.export_a1(svg_path, base="hvac", title="HVAC & Cooling Layout")
+    except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
+        print(f"[hvac] A1 PDF export skipped: {type(ex).__name__}: {ex}")
+
     summary = {
         "archetype": sysm.archetype,
         "medium": sysm.medium,
         "svg": str(svg_path),
         "png": str(png_path) if png_ok else None,
+        "a1": a1,
         "hubs": len(sysm.hubs),
         "zones": len(sysm.zones),
         "ducts": len(sysm.ducts),
@@ -2007,6 +2019,10 @@ def main(argv):
         print(f"[hvac] PNG → {summary['png']}")
     else:
         print("[hvac] PNG not written (no rasteriser available — SVG is the master)")
+    a1 = summary.get("a1")
+    if a1 and a1.get("pdf_ok"):
+        print(f"[hvac] A1  → {a1['pdfs'][0]}  ({a1['sheets']} sheet(s), "
+              f"min text {a1['min_text_mm']} mm on A1)")
     return 0
 
 

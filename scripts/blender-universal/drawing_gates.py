@@ -163,7 +163,7 @@ def g3_missing_feeders(bom: list, elec_dests: set) -> list:
 # Drawings with an A1 print pipeline (a1_print.py, hooked in their generators):
 # gate name → the print set's file base (<base>-A1.pdf / <base>-A1.json).
 _A1_PRINT_BASES = {"pid": "pid", "block-flow-diagram": "bfd",
-                   "single-line-diagram": "single-line"}
+                   "single-line-diagram": "single-line", "hvac-layout": "hvac"}
 A1_MIN_TEXT_MM = 2.5
 
 

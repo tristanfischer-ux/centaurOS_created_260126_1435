@@ -408,6 +408,13 @@ def build_line_list(proc, schedule: dict, state: dict,
     topo = PID._topology(state)
     proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
     tag_of = {n.key: n.tag for n in proc.nodes}
+    # topology-key → human LABEL (e.g. 'softener_vessel' → 'Softener Vessel'). The
+    # connection-schedule's `specs`/`rows` are keyed by the human name (from_part /
+    # from), NOT the topology key — joining on the raw key silently missed on every
+    # topology-spine line (DN showed '—' even though the schedule sized every one of
+    # them), which was the root cause of most "Size" placeholders downstream on the
+    # valve list (2026-07-04, routed gap #2). Join on the label, always.
+    label_of = {n.key: n.label for n in proc.nodes}
     # canonical name → equipment-tag map so routed-line endpoints (human names) resolve
     # to the SAME tag the BoM/GA use, never an invented abbreviation.
     tag_by_name = _manifest_tag_by_name(out_dir)
@@ -425,8 +432,15 @@ def build_line_list(proc, schedule: dict, state: dict,
     # proc.lines is in the SAME order as proc_topo (draw_pid builds it 1:1), so we can pair.
     for ln, edge in zip(proc.lines, proc_topo):
         mc = edge.get("material_context") or ""
-        spec = _spec_for(schedule, ln.from_key, ln.to_key)
-        srow = _row_for(schedule, ln.from_key, ln.to_key)
+        # join on the LABEL (the schedule's own key on SOME archetypes — e.g. water_treatment
+        # writes 'Gac Softener'), falling back to the raw topology KEY (the convention OTHER
+        # archetypes' connection-schedule writer uses — e.g. co2_mineralisation writes
+        # 'absorber_column' verbatim as from_part/to_part). Two real conventions exist
+        # upstream; try both rather than assume one, so this join never regresses either.
+        frm_label = label_of.get(ln.from_key, ln.from_key)
+        to_label = label_of.get(ln.to_key, ln.to_key)
+        spec = _spec_for(schedule, frm_label, to_label) or _spec_for(schedule, ln.from_key, ln.to_key)
+        srow = _row_for(schedule, frm_label, to_label) or _row_for(schedule, ln.from_key, ln.to_key)
         svc_blob = f"{ln.from_key} {ln.to_key} {mc}"
         # the 2-letter code embedded in the P&ID line number (….-ST-…. → 'ST')
         code_m = re.search(r"-([A-Z]{2})\b", ln.number)
@@ -444,7 +458,7 @@ def build_line_list(proc, schedule: dict, state: dict,
             service=PID._service_text(mc) or PID._humanise(code) or "Process line",
             fluid=fluid,
             phase=phase,
-            dn=ln.dn or "—",
+            dn=ln.dn or _dn_of_size(spec.get("size_label")) or _dn_of_size(srow.get("size")) or "—",
             material=material,
             rating=rating,
             insulation=insulation,
@@ -595,8 +609,13 @@ _VALVE_KINDS = [
      "XV", "Solenoid shut-off", "FC"),
     # Non-return / check valve — a passive one-way device (no fail-action). Was MISSING, so a
     # "Check Valve" BoM line entered no schedule row and the P&ID/process-schedule coverage dropped.
+    # Default fail-action is 'n/a (passive)', not a bare '—': a check valve has no powered
+    # fail-state to state at all (legitimately inapplicable, distinct from a genuine unknown
+    # — routed gap #2). Short form (the Type column already says "Non-return (check)" — the
+    # fuller basis lives in the Set/Cv cell + the table footnote); the narrow Fail column
+    # (52-90 px) cannot hold a long phrase without overflowing into its neighbours.
     (re.compile(r"check[_ ]?valve|non.?return|\bnrv\b|one.?way.?valve|foot.?valve|clack_valve", re.I),
-     "NV", "Non-return (check)", "—"),
+     "NV", "Non-return (check)", "n/a (passive)"),
     # Actuated on/off isolation (pneumatic / electric / motorised actuator) — a powered isolating
     # valve that is NOT an ESD/solenoid by name. Catches "Pneumatic Actuated Valve", "Automated Ball
     # Valve", a bare "Pneumatic Actuator". (The XV/ESD + solenoid rules above need an esd/shutdown/
@@ -703,10 +722,15 @@ def _fail_action_from_contract(blob: str, fail_states: dict) -> str:
 def _valve_fail_action(prefix: str, default_fail: str, cid: str, name: str,
                        form: str, rating: str, fail_states: dict) -> str:
     """The valve's fail-action read FROM the ledger (word text → contract fail-state), with
-    the kind's default only as the last resort. PSV/HV keep '—' (a relief / manual-isolation
-    valve has no powered fail-action). Universal: the drawn fail-action is the ledger value."""
-    if prefix in ("PSV", "HV"):
-        return "—"
+    the kind's default only as the last resort. PSV/HV carry an honest 'n/a' with its BASIS,
+    not a bare '—' (routed gap #2: a relief valve is self-actuated by its own spring — it has
+    no POWERED fail-action to lose; a manual valve has no actuator to fail at all — both are
+    legitimately inapplicable, distinct from a genuine unknown). Universal: the drawn
+    fail-action is the ledger value for every powered/actuated valve."""
+    if prefix == "PSV":
+        return "n/a (self-actuated)"
+    if prefix == "HV":
+        return "n/a (manual)"
     blob = f"{cid} {name} {form} {rating}"
     verdict = _fail_action_from_text(blob) or _fail_action_from_contract(blob, fail_states)
     return verdict or default_fail
@@ -853,12 +877,52 @@ def _valve_location_and_ref(vtype: str, cid: str, name: str, proc, line_rows, us
     return "—", pid_sheet
 
 
-def _valve_size_from(location: str, line_rows) -> str:
-    """If the valve sits on a line, inherit that line's DN; on equipment, leave to derive."""
+def _dn_by_equipment_name(schedule: dict, name: str) -> str:
+    """The DN of a connection-schedule run touching equipment NAME <name> (either end) —
+    joins the SAME connection-schedule.json rows the line list uses, keyed by the
+    equipment's human name. Used for a valve mounted ON EQUIPMENT (a relief/breather valve
+    on a vessel, `location` = the vessel's tag) rather than in-line on a process line, where
+    there is no line-list row to inherit from. Picks the LARGEST-bore matching run (a
+    vessel's main process nozzle rather than a small drain/vent stub) so the cited size is
+    representative, never fabricated. Returns '' — a genuine gap, never invented — when the
+    equipment has no sized connection at all."""
+    if not name:
+        return ""
+    best_dn, best_bore = "", -1.0
+    for r in (schedule.get("rows") or []):
+        if not isinstance(r, dict) or name not in (r.get("from"), r.get("to")):
+            continue
+        dn = r.get("size") or ""
+        if not dn:
+            continue
+        try:
+            bore = float(r.get("outer_dia_mm") or 0)
+        except (TypeError, ValueError):
+            bore = 0.0
+        if bore >= best_bore:
+            best_dn, best_bore = dn, bore
+    return best_dn
+
+
+def _valve_size_from(location: str, line_rows, proc=None, schedule=None) -> str:
+    """DN inherited from the valve's HOSTING CONNECTION (routed gap #2 — Size was 85/464
+    of the placeholder count, mostly here): a line-mounted valve inherits its line's DN
+    (now resolved by build_line_list's label-keyed schedule join, see the label_of comment
+    there); an EQUIPMENT-mounted valve (PSV / PV — `location` is a vessel tag, optionally
+    suffixed '(storage)') joins the connection schedule by the vessel's OWN name to find its
+    largest sized nozzle. Returns '' — a genuine, honestly-flagged gap, never invented — when
+    neither the line nor the equipment has a sized connection to inherit from."""
     for lr in line_rows:
         if lr.number == location:
-            return lr.dn
-    return "line size"
+            return lr.dn if lr.dn and lr.dn != "—" else ""
+    if proc is not None and schedule is not None:
+        tag = re.sub(r"\s*\([^)]*\)\s*$", "", location or "").strip()
+        node = next((n for n in proc.nodes if n.tag == tag), None)
+        if node is not None:
+            dn = _dn_by_equipment_name(schedule, node.label)
+            if dn:
+                return dn
+    return ""
 
 
 def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[ValveRow]:
@@ -918,13 +982,21 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             form = mods.get("form", "") or name
             if prefix == "PSV":
                 set_or_cv = _parse_set_pressure(mods, form)
-                fail = "—"
             elif prefix == "XV":
                 set_or_cv = "on/off (tight-shutoff)"     # ESD = isolating, not modulating
             elif prefix == "PCV":
                 set_or_cv = _parse_cv(mods)
             elif prefix == "PV":
                 set_or_cv = "reg. + breather"
+            elif prefix == "HV":
+                # a manual full-bore isolation valve has no Cv/set-point to state — this is
+                # LEGITIMATELY INAPPLICABLE, not a missing data point (routed gap #2: a bare
+                # '—' here read as an unresolved unknown; the honest content distinguishes
+                # the two with a basis).
+                set_or_cv = "n/a (isolation — full bore)"
+            elif prefix == "NV":
+                # a check valve is a passive one-way body — it has no set-point either.
+                set_or_cv = "n/a (check — passive)"
             else:
                 set_or_cv = "—"
             # FAIL-ACTION FROM THE LEDGER (universal): the valve's OWN fail-state text, then a
@@ -933,11 +1005,11 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             # FO instead of the fixed FC default.
             fail = _valve_fail_action(prefix, fail, cid, name, form,
                                       mods.get("rating_primary", "") or "", fail_states)
-            size = _valve_size_from(location, line_rows)
+            size = _valve_size_from(location, line_rows, proc, schedule) or "—"
             rows.append(ValveRow(
                 tag=tag, vtype=vtype,
                 service=_norm(form),
-                location=location, size=size or "line size",
+                location=location, size=size,
                 set_or_cv=set_or_cv, fail_action=fail, pid_ref=pid_ref))
             break
     return rows
@@ -1261,7 +1333,9 @@ def render_markdown(sc: Schedules) -> str:
         out.append(f"| `{v.tag}` | {v.vtype} | {_norm(v.service)} | {v.location} | "
                    f"{v.size} | {v.set_or_cv} | {v.fail_action} | {v.pid_ref} |")
     out.append(f"\n*{len(sc.valves)} valve types (control / relief / isolation / ESD). "
-               "Fail-action: FC = fail-closed, FO = fail-open.*\n")
+               "Fail-action: FC = fail-closed, FO = fail-open, n/a = no powered fail-state "
+               "(self-actuated relief / manual / passive check) — stated with its basis, "
+               "never a bare dash.*\n")
 
     # ── INSTRUMENT INDEX ──
     out.append("\n## 3 · INSTRUMENT INDEX\n")
@@ -1391,10 +1465,15 @@ _LINE_COLS = [
     ("Insul.", 84, "c"), ("P&ID", 92, "c"),
 ]
 _LINE_MONO = {0, 1, 2, 6}     # line no. + tags + DN in mono
+#  Set/Cv + Fail widened (routed gap #2: the honest 'n/a (isolation — full bore)' /
+#  'n/a (manual)' content is longer than the old dash it replaced) — Type + Service
+#  narrowed by the same total so the table width is unchanged; long cells are still
+#  `_short()`-truncated for THIS fixed-pixel table only (build_table_svg), never for the
+#  markdown/Excel cell, which always carries the full basis.
 _VALVE_COLS = [
-    ("Tag", 96, "l"), ("Type", 168, "l"), ("Service", 300, "l"),
-    ("Line / loc.", 120, "c"), ("Size", 78, "c"), ("Set / Cv", 120, "c"),
-    ("Fail", 52, "c"), ("P&ID", 92, "c"),
+    ("Tag", 96, "l"), ("Type", 138, "l"), ("Service", 262, "l"),
+    ("Line / loc.", 120, "c"), ("Size", 78, "c"), ("Set / Cv", 150, "c"),
+    ("Fail", 90, "c"), ("P&ID", 92, "c"),
 ]
 _VALVE_MONO = {0, 3}
 _INSTR_COLS = [
@@ -1446,10 +1525,13 @@ def build_table_svg(sc: Schedules) -> str:
                     f"{len(sc.lines)} process lines · line numbers match the P&ID")
 
     # ── VALVE LIST ──
+    # Set/Cv + Fail are `_short()`-truncated for THIS fixed-pixel table ONLY (matches the
+    # existing Service/Material precedent) — the markdown/Excel cell (render_markdown, below)
+    # always carries the untruncated basis; only the drawing-page image needs the cap.
     valve_cells = []
     for v in sc.valves:
-        vals = [v.tag, v.vtype, _short(v.service, 56), v.location, v.size, v.set_or_cv,
-                v.fail_action, v.pid_ref]
+        vals = [v.tag, v.vtype, _short(v.service, 56), v.location, v.size,
+                _short(v.set_or_cv, 30), _short(v.fail_action, 17), v.pid_ref]
         valve_cells.append([(val, (j in _VALVE_MONO)) for j, val in enumerate(vals)])
     y = _draw_table(svg, _MARGIN, y, _VALVE_COLS, valve_cells,
                     "2 · VALVE LIST",
