@@ -16424,7 +16424,14 @@ def _sc_partnames(wb, ws, state, run_dir):
     # parts-ledger.json (never re-derived here, so the two surfaces cannot disagree);
     # a bare 'NOT FOUND' with no honest sub-status — the true residual gap — still
     # fails, exactly as it does today (proveCatch both directions in _selftest).
-    _HONEST_NOT_FOUND_SUBSTATUS = {"ARCHITECTURALLY-EXCLUDED", "OEM-PROPRIETARY", "FABRICATED"}
+    # 2026-07-04 one-truth name-family split (parts_ledger.py fix 2) adds three more
+    # honest sub-statuses, read from the SAME parts-ledger.json field — never re-derived
+    # here: COMMODITY-FITTING (a bare accessory/fastener/fitting, no catalogue identity
+    # by nature — mirrors ga_massing.GA_NON_MASSING_RE), BOUNDARY-STUB (a bare process
+    # connection endpoint, not a catalogue part), SCOPE-DOCUMENTED (a design/system/
+    # network LABEL, not a single purchasable item).
+    _HONEST_NOT_FOUND_SUBSTATUS = {"ARCHITECTURALLY-EXCLUDED", "OEM-PROPRIETARY", "FABRICATED",
+                                   "COMMODITY-FITTING", "BOUNDARY-STUB", "SCOPE-DOCUMENTED"}
     _pl_honest = load_json(os.path.join(run_dir, "parts-ledger.json")) if run_dir else None
     _pl_status_by_tag: Dict[str, dict] = {}
     if isinstance(_pl_honest, dict) and _pl_honest.get("equipment"):

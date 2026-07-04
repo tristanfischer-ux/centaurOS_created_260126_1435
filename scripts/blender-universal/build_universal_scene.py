@@ -15620,6 +15620,15 @@ def main():
     # analogue of the power-closer — closes the parts_ledger n_instrument_associated orphan gap).
     _candidate = _candidate + cl.close_instrument_signals(parts, _candidate, log=lambda m: print(m))
     _candidate = _candidate + cl.close_subcomponents(parts, _candidate, log=lambda m: print(m))
+    # actuator-host closer (2026-07-04, the X-124/FCV-201-202 orphan diagnosis): every
+    # OTHER closer above iterates `parts` (the MASSED list only), so a GA-non-massed
+    # inline valve/solenoid (dropped from the 3-D scene by ga_massing — accessory,
+    # P&ID-level detail) was never a candidate node for any of them, despite ga_massing's
+    # own docstring promising it "REMAINS in the... connection ledger". This closer reads
+    # the FULL authored word list (`state`) instead of just `parts`, tying a GA-dropped
+    # valve to its host vessel via an explicit `_actuator_of` reference or its sibling
+    # valve-nest's resolved host — see connection_ledger.py's docstring for the full rule.
+    _candidate = _candidate + cl.close_actuator_host_ties(state, parts, _candidate, log=lambda m: print(m))
     # final boundary connector: sinks fed from their producer + discharged to disposal;
     # feed-stage/product units with no in-plant neighbour tied to the battery limit.
     _candidate = _candidate + cl.close_boundaries(parts, _candidate, log=lambda m: print(m))

@@ -149,19 +149,100 @@ _FABRICATED_BASIS_RX = re.compile(
     r"materials?\s+take-?off|structural\s+take-?off|footprint\s+take-?off|\bfabricat\w*\b",
     re.I)
 
+# ── ONE-TRUTH NAME FAMILIES (Tristan 2026-07-04, round-4 dissection, fix 2) ────────────
+# The split above narrows the residual by BASIS-TEXT signals (OEM-PROPRIETARY, FABRICATED)
+# and by a NAME signal specific to membrane media. It still left the ledger blind to name
+# families the BoM taxonomy + ga_massing.py's GA-non-massing classifier ALREADY apply —
+# under-covering real Codema v76 rows ('Piping Network', 'Cip System', 'Cip System
+# Connections', 'Modular Stack Design', '3 Part Union Fittings', 'Leveling Feet',
+# 'Flexmount Connectors', 'Permeate Outlet', 'Concentrate Outlet' …) as a dishonest
+# residual "NOT FOUND" when the BoM/GA taxonomy already knows exactly what they are:
+#   COMMODITY-FITTING — a bare accessory / fastener / fitting / connector / cabling noun
+#     with no catalogue identity BY NATURE (a union, gland, gasket, bolt, terminal block,
+#     cable gland, leveling foot, support frame …). Mirrors ga_massing.GA_NON_MASSING_RE's
+#     accessory/fastener/fitting + cabling/wiring + pipework-attached-fitting alternations
+#     EXACTLY (the same regex the 3-D massing decision already applies to these names) —
+#     kept in sync by hand since the two modules serve different decisions (massing vs
+#     catalogue-identity research) but must never diverge on WHICH names are "not a
+#     discrete purchasable item". Deliberately EXCLUDES ga_massing's instrument / inline-
+#     valve / switchgear-internal alternations — those ARE real catalogue-class parts
+#     (a Modbus Interface, a Pressure Relief Valve) that must stay a TRUE 'NOT FOUND' gap
+#     until researched; GA-non-massing them from the 3-D scene is a rendering decision,
+#     not a catalogue-identity one.
+#   BOUNDARY-STUB — a bare process connection ENDPOINT ('Permeate Outlet', 'Concentrate
+#     Outlet') — a topological reference point ga_massing deliberately KEEPS massed (its
+#     must_keep list: dropping it dangles/re-homes a real fluid_loop edge) but which is
+#     still not a catalogue part with its own MPN. TERMINAL-anchored (head noun = Inlet/
+#     Outlet) so a real device whose head noun is something else ('Outlet Damper
+#     Assembly') is untouched.
+#   SCOPE-DOCUMENTED — the row's own name IS a design/system LABEL, not a single
+#     purchasable item: either a design-metadata head noun (mirrors ga_massing.py's
+#     design/concept/philosophy/strategy/approach/methodology/scheme/basis rule EXACTLY —
+#     'Modular Stack Design') or a bare '<qualifier> System'/'<qualifier> Network'
+#     aggregate whose own constituent parts are ALREADY separate BoM rows ('Cip System'
+#     rolls up 'Cip Tank' + 'Cip System Connections'; 'Piping Network' is the RO skid's
+#     interconnect run, not a single SKU). The System/Network check only fires when
+#     TYPE_RULES found no real equipment/control keyword at all (`typ == "other"`) — a
+#     genuine 'SCADA System' / 'Control System' is typed 'control' upstream (SCADA/
+#     controller keyword) and never reaches this generic fallback, so it is never
+#     wrongly exempted.
+# proveCatch both directions in `_selftest`: every family member reclassifies; a real
+# unresearched catalogue part (pump/vessel/valve/VFD/transformer/motor-starter/PLC
+# interface) does not.
+_COMMODITY_FITTING_RE = re.compile(
+    # mirrors ga_massing.GA_NON_MASSING_RE's accessory/fastener/fitting/support-frame
+    # alternation EXACTLY (ga_massing.py lines ~33-58) — independent CLI entry points,
+    # kept in sync by hand.
+    r"\b(?:union|glands?|couplings?|adapters?|adaptors?|ferrules?|olives?|"
+    r"nipples?|connectors?|flexmount|spacers?|baffles?)\b|"
+    r"\bflanges?\b|\bgaskets?\b|\bend caps?\b|\bblanking (?:plates?|caps?)\b|"
+    r"\banchor\s+bolts?\b|\b(?:bolts?|nuts?|washers?|screws?|studs?|rivets?)\b|"
+    r"\blev(?:el)?ling feet\b|\bleveling feet\b|\bdistribution plate(?:s)?\b|"
+    r"\bcip (?:system )?connection(?:s)?\b|\bquick coupling\b|"
+    r"\bsupport (?:system|frame|structure|stand)\b|"
+    r"\b(?:skid|base|equipment|mounting|baseplate|sub|structural) frame\b|\bframe assembly\b|"
+    r"\bpneumatic actuator(?:s)?\b|\belectric actuator(?:s)?\b|"
+    # mirrors ga_massing.py lines ~94-97 EXACTLY (cabling/wiring/distribution accessories)
+    r"\bcabling\b|\bcable tray(?:s)?\b|\bcable gland(?:s)?\b|"
+    r"\bterminal block(?:s)?\b|\b(?:power )?distribution block(?:s)?\b|"
+    r"\bpower supply unit\b|\bdin rail\b|\bwireway\b|"
+    # mirrors ga_massing.py lines ~126-127 EXACTLY (pipework-attached small fittings)
+    r"\bspray balls?\b|\bsampl(?:e|ing) points?\b|"
+    r"\b(?:hose|flexible hose) assembl(?:y|ies)\b|\bflexible hoses?\b",
+    re.I)
+_BOUNDARY_STUB_RE = re.compile(r"\b(?:inlet|outlet)\s*\d*\s*$", re.I)
+# mirrors ga_massing.py's design-metadata rule EXACTLY (lines ~147-148) — kept in sync.
+_SCOPE_DESIGN_METADATA_RE = re.compile(
+    r"\b(?:design|concept|philosophy|strategy|approach|methodology|scheme|basis)s?\s*\d*\s*$",
+    re.I)
+# NOT in ga_massing (a 'Cip System'/'Piping Network' stays MASSED there, correctly, for
+# 3-D placement) — this is the catalogue-identity analogue, gated on `typ == "other"` so
+# a genuine control/electrical "*System" is never caught (see docstring above).
+_SCOPE_SYSTEM_NETWORK_RE = re.compile(r"\b(?:system|network)\s*\d*\s*$", re.I)
 
-def _not_found_substatus(name: str, basis: str) -> str:
+
+def _not_found_substatus(name: str, basis: str, typ: str = "other") -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
-    evidence (name + basis) — never a per-part table. One of 'OEM-PROPRIETARY',
-    'ARCHITECTURALLY-EXCLUDED', 'FABRICATED', or 'NOT FOUND' (the true residual).
-    See the module-level comment above for the full rationale and priority order."""
+    evidence (name + basis + its parts_ledger TYPE_RULES classification) — never a
+    per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED', 'FABRICATED',
+    'COMMODITY-FITTING', 'BOUNDARY-STUB', 'SCOPE-DOCUMENTED', or 'NOT FOUND' (the true
+    residual). See the module-level comments above for the full rationale + priority."""
     b = str(basis or "")
+    n = str(name or "")
     if _OEM_PROPRIETARY_RESEARCH_RX.search(b):
         return "OEM-PROPRIETARY"
-    if _MEMBRANE_MEDIA_RE.search(str(name or "")):
+    if _MEMBRANE_MEDIA_RE.search(n):
         return "ARCHITECTURALLY-EXCLUDED"
     if _FABRICATED_BASIS_RX.search(b):
         return "FABRICATED"
+    if _BOUNDARY_STUB_RE.search(n):
+        return "BOUNDARY-STUB"
+    if _COMMODITY_FITTING_RE.search(n):
+        return "COMMODITY-FITTING"
+    if _SCOPE_DESIGN_METADATA_RE.search(n):
+        return "SCOPE-DOCUMENTED"
+    if typ == "other" and _SCOPE_SYSTEM_NETWORK_RE.search(n):
+        return "SCOPE-DOCUMENTED"
     return "NOT FOUND"
 
 # A manifest instrument/valve part is REPRESENTED on a P&ID by its ISA LETTER (TT/PT/LT/AT/FCV/
@@ -638,7 +719,7 @@ def main() -> int:
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
         # truncated `basis` field below) so a signal past 90 chars is never missed.
         # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
-        nf_substatus = _not_found_substatus(name, basis_full) if r.get("status") == "NOT FOUND" else None
+        nf_substatus = _not_found_substatus(name, basis_full, typ) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
@@ -825,6 +906,11 @@ def main() -> int:
     architecturally_excluded_equipment = [e["tag"] for e in equipment
                                           if e.get("not_found_status") == "ARCHITECTURALLY-EXCLUDED"]
     oem_proprietary_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "OEM-PROPRIETARY"]
+    # 2026-07-04 one-truth name-family split (fix 2) — each its OWN visible tally,
+    # never folded back into `not_found` above (same discipline as the three above).
+    commodity_fitting_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "COMMODITY-FITTING"]
+    boundary_stub_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "BOUNDARY-STUB"]
+    scope_documented_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "SCOPE-DOCUMENTED"]
     gapped = [e for e in equipment if e["gaps"]]
 
     # ── connectivity audit (type-aware) ────────────────────────────────────────
@@ -1120,7 +1206,26 @@ def main() -> int:
         # by the orphan check — the take-off IS the part; by nature it does not
         # necessarily carry the conventional equipment-to-equipment tie this check
         # looks for. Same exemption discipline as AIR_OR_SUBCOMPONENT_KEYWORDS above.
-        if e.get("not_found_status") == "FABRICATED":
+        # ARCHITECTURALLY-EXCLUDED (2026-07-04, F-2 fix): a pinless membrane/media row is
+        # honestly excluded from catalogue-identity research BY DESIGN (see
+        # `_not_found_substatus`'s docstring) — its own basis ALREADY discloses it has no
+        # conventional equipment-to-equipment tie either (a membrane BANK's own elements
+        # are its internals, not a separate flow-through node); the orphan check must
+        # honour that disclosed reason exactly like FABRICATED, not silently ignore it
+        # (F-2 'Uf Membrane Bank' was flagged an orphan despite its own honest basis).
+        if e.get("not_found_status") in ("FABRICATED", "ARCHITECTURALLY-EXCLUDED"):
+            continue
+        # PARAMETRIC network/kit take-off rows (2026-07-04, V-110/V-111 fix): the row's
+        # OWN basis states "engineered allowance, NOT per-pipe routed" — a materials-count
+        # aggregate (a run of metres, a count of connection kits), not a discrete flow-
+        # through node, so it structurally cannot carry the conventional equipment-to-
+        # equipment tie this check looks for — same exemption discipline as FABRICATED.
+        # Universal: status-keyed, not name-keyed — the 9 sibling PARAMETRIC rows already
+        # escape this loop by TYPE ('other'); V-110/V-111 only differ because their
+        # generic descriptive NAME happens to contain the word 'valve', tripping
+        # `_classify` into type='valve' (in PROCESS_TYPES) — a naming accident, not a
+        # real topology distinction from their 9 exempt siblings.
+        if e.get("status") == "PARAMETRIC":
             continue
         ident = (str(e["tag"] or "—"), _norm(e["name"]))
         if ident in _orph_seen:
@@ -1173,6 +1278,9 @@ def main() -> int:
                   fabricated_equipment=fabricated_equipment,
                   architecturally_excluded_equipment=architecturally_excluded_equipment,
                   oem_proprietary_equipment=oem_proprietary_equipment,
+                  commodity_fitting_equipment=commodity_fitting_equipment,
+                  boundary_stub_equipment=boundary_stub_equipment,
+                  scope_documented_equipment=scope_documented_equipment,
                   n_connections_off_pid=len(uncov_conn),
                   n_ambiguous_tags=len(ambiguous_tags),
                   ambiguous_tags=sorted(ambiguous_tags),
@@ -1238,7 +1346,11 @@ def main() -> int:
     print(f"  → {len(not_found)} NOT FOUND (true gap) · {len(fabricated_equipment)} fabricated "
           f"(no catalogue identity by nature) · {len(architecturally_excluded_equipment)} "
           f"architecturally-excluded (membrane/media) · {len(oem_proprietary_equipment)} "
-          f"OEM-proprietary (recorded finding) · {len(gapped)} parts w/ coverage gap · "
+          f"OEM-proprietary (recorded finding) · {len(commodity_fitting_equipment)} "
+          f"commodity-fitting (accessory/fastener, no catalogue identity by nature) · "
+          f"{len(boundary_stub_equipment)} boundary-stub (connection endpoint, not a part) · "
+          f"{len(scope_documented_equipment)} scope-documented (system/network/design label) · "
+          f"{len(gapped)} parts w/ coverage gap · "
           f"{len(orphans)} orphan · {len(uncov_conn)} connections off the P&ID.  "
           f"{len(ambiguous_tags)} ambiguous tag(s) (name-corroborated).  "
           f"{len(parts_without_tools)}/{len(equipment)} parts have NO tool provenance.  "
@@ -1416,6 +1528,64 @@ def _selftest() -> int:
         print(f"  FAIL not-found-substatus: a recorded OEM finding must take priority over "
               f"the membrane-family classification (got {_oem_over_mem!r})")
         bad += 1
+    # ── ONE-TRUTH NAME-FAMILY proveCatch (2026-07-04, fix 2) — real Codema v76 rows,
+    # both directions: every family member reclassifies off a bare 'bottom-up parametric'
+    # basis (no distinguishing basis text exists for any of these); a real unresearched
+    # catalogue part with the SAME generic basis stays the true NOT FOUND residual. ──
+    _commodity_cases = [
+        "3 Part Union Fittings", "Leveling Feet", "Flexmount Connectors",
+        "Cip System Connections", "Terminal Block", "Hydraulic Connectors",
+        "Compartment Spacers", "Module Support System", "Cable Glands", "DC Power Cabling",
+    ]
+    for _nm in _commodity_cases:
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
+        if _hit != "COMMODITY-FITTING":
+            print(f"  FAIL not-found-substatus: {_nm!r} must classify COMMODITY-FITTING "
+                  f"(mirrors ga_massing.GA_NON_MASSING_RE) — got {_hit!r}")
+            bad += 1
+    for _nm in ("Permeate Outlet", "Concentrate Outlet"):
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
+        if _hit != "BOUNDARY-STUB":
+            print(f"  FAIL not-found-substatus: {_nm!r} must classify BOUNDARY-STUB "
+                  f"(bare process-connection endpoint) — got {_hit!r}")
+            bad += 1
+    _stub_neg = _not_found_substatus("Outlet Damper Assembly", "bottom-up parametric", "other")
+    if _stub_neg == "BOUNDARY-STUB":
+        print(f"  FAIL not-found-substatus: 'Outlet Damper Assembly' is a real device whose "
+              f"head noun is 'Assembly', not a bare stub — must NOT classify BOUNDARY-STUB")
+        bad += 1
+    _scope_design = _not_found_substatus("Modular Stack Design", "bottom-up parametric", "other")
+    if _scope_design != "SCOPE-DOCUMENTED":
+        print(f"  FAIL not-found-substatus: 'Modular Stack Design' (ga_massing design-"
+              f"metadata head noun) must classify SCOPE-DOCUMENTED — got {_scope_design!r}")
+        bad += 1
+    for _nm in ("Piping Network", "Cip System"):
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
+        if _hit != "SCOPE-DOCUMENTED":
+            print(f"  FAIL not-found-substatus: {_nm!r} (bare System/Network aggregate "
+                  f"label, typ='other') must classify SCOPE-DOCUMENTED — got {_hit!r}")
+            bad += 1
+    # a genuine control/electrical '*System' is typed upstream by TYPE_RULES (SCADA /
+    # controller / PLC keyword) and never reaches the generic System/Network fallback —
+    # simulated here by passing typ='control' as _classify() would return for it.
+    _ctrl_neg = _not_found_substatus("Control System", "bottom-up parametric", "control")
+    if _ctrl_neg == "SCOPE-DOCUMENTED":
+        print("  FAIL not-found-substatus: a control-typed '*System' (typ != 'other') "
+              "must NOT be swept into SCOPE-DOCUMENTED by the generic System/Network rule")
+        bad += 1
+    # proveCatch the other direction — real, still-unresearched catalogue-class parts
+    # (pump/VFD/motor-starter/valve-assembly/instrument-interface/transformer) sharing the
+    # SAME bare 'bottom-up parametric' basis as every family member above must stay the
+    # true NOT FOUND residual; none of the three new families may over-reach into them.
+    for _nm in ("Motor Starter", "Vfd Drive", "Vfd Controller", "Modbus Interface",
+                "Pneumatic Actuated Valves", "Ro High Pressure Pump", "Gac Filter",
+                "Gac Softener", "Transformer", "Overcurrent Protection",
+                "Pressure Relief Valve", "Pneumatic Control Valve"):
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
+        if _hit != "NOT FOUND":
+            print(f"  FAIL not-found-substatus OVER-REACH: {_nm!r} is a real unresearched "
+                  f"catalogue part and must stay NOT FOUND — got {_hit!r}")
+            bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

@@ -1031,6 +1031,138 @@ def close_boundaries(parts, topology, log=print):
     return extra
 
 
+# mirrors parts_ledger.py's own TYPE_RULES valve pattern EXACTLY (\bvalve\b|solenoid|
+# actuator|damper) — kept in sync by hand so "is this word an inline valve/actuator" is
+# the SAME verdict on both independent ledgers.
+_ACTUATOR_VALVE_NAME_RE = re.compile(r"\bvalve\b|solenoid|actuator|damper", re.I)
+
+
+def close_actuator_host_ties(state, parts, topology, log=print):
+    """UNIVERSAL closer for GA-NON-MASSED actuator/valve words (Tristan 2026-07-04, the
+    X-124 / FCV-201-202 orphan diagnosis). `ga_massing.is_ga_non_massing()` drops every
+    inline valve/solenoid from the 3-D scene at `extract_parts()` (accessory, P&ID-level
+    detail) — its own docstring promises "the parts REMAIN in the... connection ledger",
+    but every OTHER closer in this module iterates `parts` (the MASSED list only), so a
+    GA-dropped valve was never a candidate NODE for any of them: it wasn't orphaned by a
+    bad closer rule, it was never given to a closer as a node in the first place. This
+    closer restores the promise, reading the FULL authored word list (`state`) instead of
+    just `parts`, using two universal, no-per-tag-whitelist signals in priority order:
+
+      1. EXPLICIT HOST — the generic-emitter stamps a synthesized actuator word with
+         `_actuator_of: <host_word_id>` when it derives the valve FROM a specific vessel
+         (e.g. Fischer Codema's 'Inlet Flow Control Valve … on the inlet of Softener
+         Vessel'). Resolve the host word_id to its name_human, then to the MASSED Part
+         sharing that name (exact, else token-overlap) — tie a fluid edge host<->valve.
+         A host that fails to resolve to a real placed part is left alone (never invents
+         a dangling reference).
+      2. SIBLING-GROUP HOST — an un-hosted GA-dropped valve/actuator word in the SAME
+         sub_module as a word that DOES carry `_actuator_of` shares its sibling's host (a
+         valve NEST is authored one sub_module per parent vessel — Fischer Codema's
+         'Solenoid Valves' sits beside the explicitly-hosted 'Inlet Flow Control Valve' in
+         the SAME sub_module, but only the actuator word itself carries the structured
+         reference). A sub_module with NO explicitly-hosted sibling is left untouched —
+         never guessed (see the V-107 diagnosis in the caller's commit message: a bare
+         'representative actuation kinematics component' placeholder with no host
+         reference anywhere in its OWN sub_module cannot be honestly closed here; the
+         correct fix is upstream, stamping `_actuator_of` on every synthesized valve).
+
+    A word already massed (present in `parts`) or already carrying ANY edge in the
+    candidate `topology` is skipped — this closer only ever adds what ga_massing removed
+    and never duplicates an existing tie. Pure + deterministic; no per-tag table."""
+    massed_names = {getattr(p, "name", None) for p in parts if getattr(p, "name", None)}
+
+    def _toks(s):
+        return {t for t in re.split(r"[^a-z0-9]+", str(s).lower()) if len(t) > 2}
+
+    massed_by_tok = {nm: _toks(nm) for nm in massed_names}
+
+    by_id: dict = {}
+    by_submodule: dict = {}
+    for m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+        for sm in m.get("sub_modules") or []:
+            smid = sm.get("id") or sm.get("sub_module_id")
+            words = sm.get("words") or []
+            by_submodule[smid] = words
+            for w in words:
+                wid = w.get("id")
+                if wid:
+                    by_id[wid] = w
+
+    def _resolve_host_part(host_word_id):
+        hw = by_id.get(host_word_id) or {}
+        hname = hw.get("name_human")
+        if not hname:
+            return None
+        if hname in massed_names:
+            return hname
+        # token-overlap fallback — the host word itself may ALSO be renamed/non-massed
+        # (e.g. a *_synth_word whose canonical Part name differs slightly).
+        htoks = _toks(hname)
+        best, best_ov = None, 0
+        for nm, toks in massed_by_tok.items():
+            ov = len(htoks & toks)
+            if ov > best_ov:
+                best, best_ov = nm, ov
+        return best if best_ov >= 1 else None
+
+    connected = set()
+    for e in topology:
+        for k in ("from_part", "to_part"):
+            if e.get(k):
+                connected.add(e.get(k))
+
+    extra, seen = [], set()
+
+    def _tie(host_name, valve_name):
+        if not host_name or not valve_name or host_name == valve_name:
+            return
+        if (host_name, valve_name) in seen:
+            return
+        seen.add((host_name, valve_name))
+        extra.append({"from_part": host_name, "to_part": valve_name, "mechanism": "fluid_loop",
+                      "constraint_kind": "final_control_element",
+                      "material_context": "actuator/valve on the host's process line "
+                                           "(actuator-host closer: explicit _actuator_of "
+                                           "or sibling-group host)",
+                      "_augmented": True, "_actuator_host_closed": True})
+
+    # PASS 1 — explicit `_actuator_of` host.
+    submodule_host: dict = {}
+    for smid, words in by_submodule.items():
+        for w in words:
+            name = w.get("name_human")
+            host_wid = w.get("_actuator_of")
+            if not host_wid or not name:
+                continue
+            if name in massed_names or name in connected:
+                continue
+            host_name = _resolve_host_part(host_wid)
+            if host_name is None:
+                continue
+            _tie(host_name, name)
+            submodule_host[smid] = host_name
+
+    # PASS 2 — sibling-group fallback: an un-hosted, GA-dropped valve/actuator word in a
+    # sub_module that NOW has a resolved host (from pass 1) shares it.
+    for smid, words in by_submodule.items():
+        host_name = submodule_host.get(smid)
+        if not host_name:
+            continue
+        for w in words:
+            name = w.get("name_human")
+            if not name or name in massed_names or name in connected:
+                continue
+            if not _ACTUATOR_VALVE_NAME_RE.search(name):
+                continue
+            _tie(host_name, name)
+
+    if extra:
+        log(f"[ledger] actuator-host closer: +{len(extra)} tie(s) — GA-dropped inline "
+            f"valve(s)/actuator(s) connected to their host vessel (explicit _actuator_of "
+            f"+ sibling-group fallback)")
+    return extra
+
+
 def close_residual_completeness(parts, topology, required_services, log=print):
     """FINAL self-healing net (Tristan 2026-06-24: "all parts have a confirmed connector
     point for things going in and out and ALL connector points are connected"). Whatever
@@ -1548,6 +1680,68 @@ def _selftest():
     assert len(_sb_v) == 1 and _sb_v[0]["name"] == "Bufer Tank", (
         f"referential integrity must exempt service-boundary termini (dc_bus / "
         f"heat_rejection) while still flagging the misspelled part; got {_sb_v}")
+
+    # ── close_actuator_host_ties proveCatch (2026-07-04, the X-124/FCV-201-202 orphan
+    # diagnosis) — a synthetic 'actuation_kinematics' module shaped exactly like the real
+    # Fischer Codema v76 state: one sub_module with an EXPLICIT `_actuator_of` host word
+    # + 2 un-hosted siblings (sibling-group case), a SECOND sub_module with NO explicit
+    # host anywhere (the honest V-107 diagnosis — must stay untouched), a MASSED valve
+    # that must never be duplicated, and an ALREADY-CONNECTED valve that must be skipped.
+    class _AP:
+        def __init__(self, name):
+            self.name = name
+    _a_parts = [_AP("Softener Vessel"), _AP("Already Massed Valve")]
+    _a_state = {"moduleDecomposition": {"modules": [{
+        "module": "actuation_kinematics",
+        "sub_modules": [
+            {
+                "id": "actuation_kinematics__solenoid_valves",
+                "words": [
+                    {"id": "solenoid_valves_word", "name_human": "Solenoid Valves"},
+                    {"id": "actr_valve_on_softener_vessel_synth_word",
+                     "name_human": "Inlet Flow Control Valve",
+                     "_actuator_of": "softener_vessel_synth_word"},
+                    {"id": "already_massed_valve_word", "name_human": "Already Massed Valve"},
+                    {"id": "already_connected_valve_word", "name_human": "Already Connected Valve"},
+                ],
+            },
+            {
+                "id": "actuation_kinematics__solenoid_valve",
+                "words": [
+                    {"id": "solenoid_valve_word", "name_human": "Solenoid Valve"},
+                    {"id": "pneumatic_control_valve_word", "name_human": "Pneumatic Control Valve"},
+                ],
+            },
+        ],
+    }, {
+        "module": "mass_fluid_transport_process",
+        "sub_modules": [{"id": "mass_fluid_transport_process__softener",
+                          "words": [{"id": "softener_vessel_synth_word",
+                                     "name_human": "Softener Vessel"}]}],
+    }]}}
+    _a_topo = [{"from_part": "Already Connected Valve", "to_part": "Softener Vessel",
+                "mechanism": "signal"}]
+    _a_extra = close_actuator_host_ties(_a_state, _a_parts, _a_topo, log=lambda *a: None)
+    _a_pairs = {(e["from_part"], e["to_part"]) for e in _a_extra}
+    assert ("Softener Vessel", "Inlet Flow Control Valve") in _a_pairs, (
+        f"EXPLICIT _actuator_of host must be tied (FCV-201-202 case); got {_a_extra}")
+    assert ("Softener Vessel", "Solenoid Valves") in _a_pairs, (
+        f"SIBLING-GROUP fallback must tie an un-hosted valve in the SAME sub_module as an "
+        f"explicitly-hosted one (X-124 case); got {_a_extra}")
+    assert not any(e["to_part"] == "Solenoid Valve" for e in _a_extra), (
+        f"a valve in a sub_module with NO explicit host anywhere (V-107) must NOT be "
+        f"guessed a host — never invent a connection; got {_a_extra}")
+    assert not any(e["to_part"] == "Already Massed Valve" for e in _a_extra), (
+        "a word already present in `parts` (successfully massed) must be left to the "
+        "normal closers, never duplicated by the actuator-host closer"
+    )
+    assert not any(e["to_part"] == "Already Connected Valve" for e in _a_extra), (
+        "a word already carrying an edge in the candidate topology must be skipped "
+        "(no duplicate tie)"
+    )
+    # re-run is idempotent (pure function of state+parts+topology, no hidden state).
+    _a_extra2 = close_actuator_host_ties(_a_state, _a_parts, _a_topo, log=lambda *a: None)
+    assert _a_extra == _a_extra2, "close_actuator_host_ties must be deterministic/idempotent"
 
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "
