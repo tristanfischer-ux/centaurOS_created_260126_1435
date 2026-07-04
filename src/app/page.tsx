@@ -136,7 +136,7 @@ const HTML = `<style>
   @media(max-width:760px){.founders-grid{grid-template-columns:1fr;}}
 
   .about{background:linear-gradient(120deg,#eef4ff,#fff 70%);border:1px solid var(--line);border-radius:var(--radius);padding:44px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:30px;align-items:start;box-shadow:var(--shadow-sm);}
-  .about .ava{width:108px;height:108px;border-radius:50%;background:linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:34px;color:#fff;box-shadow:var(--shadow-sm);}
+  .about .ava{width:108px;height:108px;border-radius:50%;object-fit:cover;box-shadow:var(--shadow-sm);display:block;}
   .about h2{color:var(--ink);}
   .about p{color:var(--ink-soft);margin-top:14px;max-width:66ch;}
   .about .essays{margin-top:18px;display:flex;flex-direction:column;gap:6px;}
@@ -418,7 +418,7 @@ const HTML = `<style>
 <section class="s" id="about">
   <div class="wrap">
     <div class="about">
-      <div class="ava">TF</div>
+      <img class="ava" src="/images/site/tristan.webp" alt="Tristan Fischer, Founder of Fractional Forge" width="108" height="108" />
       <div>
         <span class="eyebrow">Behind Fractional Forge</span>
         <h2 style="margin-top:10px">I&rsquo;ve built the factories, raised the money, and sat on both sides of the table.</h2>
