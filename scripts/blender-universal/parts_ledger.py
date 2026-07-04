@@ -426,10 +426,16 @@ def main() -> int:
         _tag_names.setdefault(tag, set()).add(nm)
     ambiguous_tags = {t for t, names in _tag_names.items() if len(names) > 1}
 
-    # rendered text per view (deterministic, no OCR)
+    # rendered text per view (deterministic, no OCR). Whitespace is COLLAPSED (a label
+    # wrapped onto two SVG <tspan> lines renders as "Drain Collection \n Sump" — a raw
+    # newline breaks the plain substring match against the manifest's single-line name
+    # even though the label IS present; canonical-name audit 2026-07-04 traced 2 of the
+    # 13 true drawing-coverage gaps — TK-114, F-3 — to exactly this, not an absent part).
     def _svg_text(f: Path) -> str:
-        return " " + " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore"))) + " " \
-            if f.exists() else ""
+        if not f.exists():
+            return ""
+        raw = " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore")))
+        return " " + re.sub(r"\s+", " ", raw).strip() + " "
 
     rep_text = {"blender": ""}
     for key in REPS:
@@ -446,19 +452,33 @@ def main() -> int:
         rep_text[key] = _svg_text(ddir / f"{key}.svg")
     placed_norms = {_norm(str(p.get("name", ""))) for p in placed.values()}
 
-    def covered(tag: str, name: str, key: str) -> bool:
+    def covered(tag: str, name: str, key: str, canonical: str | None = None) -> bool:
+        """`canonical` (added 2026-07-04, canonical-name-register audit): the manifest's OWN
+        name for this tag (parts-manifest.json `name`), tried as a SECOND match candidate
+        alongside the BoM `requirement`-derived `name` — the two surfaces sometimes diverge
+        (e.g. a combined manifest label "Grp Membrane Housings" vs a per-item BoM
+        requirement) even though the same physical part is drawn under one of the two
+        strings. Consuming it is additive-only: a canonical hit can turn a NOT-found into a
+        found, never the reverse."""
         if key == "blender":
             return tag in placed or _norm(name) in placed_norms
         txt = rep_text.get(key, "")
         if not txt:
             return False
-        nm = (name or "").strip()
-        # PLURAL-INSENSITIVE name match: a 'Circuit Breakers' BoM line IS represented by a 'Circuit
-        # Breaker' on the drawing (and vice-versa) — a trailing-s on either side must not break the
-        # substring credit. Singularise each word (strip a word-final 's') on BOTH the name and the
-        # drawing text before comparing. Universal; corrects a coverage false-negative, not a relax.
-        _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
-        name_present = bool(nm and len(nm) >= 4 and (nm.lower() in txt.lower() or _sing(nm) in _sing(txt)))
+
+        def _present(nm: str) -> bool:
+            nm = (nm or "").strip()
+            if not nm or len(nm) < 4:
+                return False
+            # PLURAL-INSENSITIVE name match: a 'Circuit Breakers' BoM line IS represented by a
+            # 'Circuit Breaker' on the drawing (and vice-versa) — a trailing-s on either side
+            # must not break the substring credit. Singularise each word (strip a word-final
+            # 's') on BOTH the name and the drawing text before comparing. Universal; corrects
+            # a coverage false-negative, not a relax.
+            _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
+            return bool(nm.lower() in txt.lower() or _sing(nm) in _sing(txt))
+
+        name_present = _present(name) or (bool(canonical) and canonical != name and _present(canonical))
         if tag and (f" {tag} " in txt or f">{tag}<" in txt):
             # Tag is present in the drawing. If the tag is UNAMBIGUOUS (unique
             # identity — one equipment per tag), credit on tag alone. If the tag
@@ -470,10 +490,13 @@ def main() -> int:
             return name_present
         if name_present:
             return True
-        # ISA-bubble credit: an instrument/valve is drawn on a P&ID (or single-line) by its ISA
-        # LETTER (TT/PT/LT/AT/FCV/XV/PSV), not its manifest tag — credit when the function's symbol
-        # is present in the drawing text. Corrects a matcher false-negative (the part IS drawn).
-        if key in ("pid", "single-line-diagram"):
+        # ISA-bubble credit: an instrument/valve is drawn on a P&ID / single-line / process
+        # schedule (added 2026-07-04 — I-104 "Conductivity Sensor" is drawn as the combined
+        # "pH / conductivity" row under its OWN AT-20x ISA tag on Process schedules, not
+        # under its manifest name) by its ISA LETTER (TT/PT/LT/AT/FCV/XV/PSV), not its
+        # manifest tag — credit when the function's symbol is present in the drawing text.
+        # Corrects a matcher false-negative (the part IS drawn).
+        if key in ("pid", "single-line-diagram", "process-schedules"):
             for L in _isa_letters(tag, name):
                 if re.search(rf"\b{re.escape(L)}\b", txt):
                     return True
@@ -491,7 +514,9 @@ def main() -> int:
         typ = _classify(name, tag)
         pm = placed.get(tag, {})
         sublist = subs.get(tag, [])
-        cov = {key: covered(tag, name, key) for key in REPS}
+        # canonical = the manifest's OWN name for this tag — the second match candidate
+        # (2026-07-04 canonical-name-register audit; see covered()'s docstring).
+        cov = {key: covered(tag, name, key, pm.get("name")) for key in REPS}
         expected = TYPE_EXPECTED.get(typ, set())
         # Consistency with the 3D scene: a part the GA/render correctly OMIT — inline valves,
         # field instruments, switchgear/panel internals, fittings (P&ID-level detail dropped

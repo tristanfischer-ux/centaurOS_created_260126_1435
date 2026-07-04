@@ -1108,6 +1108,8 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Assembly sequence": "Order of works from civils through to commissioning.",
     "Drawings": "Drawing register — number, revision, scale, sheets and full-size A1 files.",
     "Audit data": "Embedded operands every live verdict formula references, with provenance.",
+    "Inputs Master (M0)": "Every primitive number behind the model, with class and provenance.",
+    "Equipment & Dimensions Register": "Every manifest part — geometry, volume formula, MPN, coverage.",
 }
 
 # ============================================================================
@@ -6742,6 +6744,12 @@ INPUTS_SHEET = "Inputs & Assumptions"
 # tabs stay wired even if the Inputs layout shifts.
 _ECON_INPUT_ADDR: Dict[str, str] = {}
 
+# The EXACT (name, label, value, unit, basis, fmt) rows tab_inputs_assumptions wrote —
+# captured so M0 (Tristan's auditability directive, drawer 047565b65ce05148) can read
+# its ASSUMPTION-class primitives from the ONE place they're derived, never a second
+# copy of the derivation logic. Populated at the end of tab_inputs_assumptions.
+_ECON_INPUT_ROWS: List[Tuple] = []
+
 # The economics-model input DEFAULTS (mirrored exactly from tab_inputs_assumptions
 # so the Python-side sweet-spot pre-compute reproduces what the LIVE formulas show
 # at the as-built inputs). These drive ONLY the colouring + the recommended-row pick
@@ -7410,6 +7418,9 @@ def tab_inputs_assumptions(wb: Workbook, state: dict) -> bool:
     rows.append(("project_life", "Project life", 20.0, "yr",
                  "asset economic life for the NPV horizon", FMT_DEC1))
 
+    global _ECON_INPUT_ROWS
+    _ECON_INPUT_ROWS = list(rows)
+
     for name, label, value, unit, basis, fmt in rows:
         ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
         vc = ws.cell(r, 2, value)
@@ -7448,6 +7459,422 @@ def _ref(name: str) -> str:
     "'Inputs & Assumptions'!$B$6"). Raises if the input wasn't built — callers
     only run after tab_inputs_assumptions succeeded."""
     return _ECON_INPUT_ADDR[name]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# PHASE A — AUDITABILITY DIRECTIVE (Tristan, drawer 047565b65ce05148, 2026-07-04):
+# "an engineer needs to track all numbers back to their source using cells that are
+# referencing or computations of other cells... all numbers start from a master input
+# sheet." Three-tier cell model: INPUT (a literal with NO in-model ancestor) / IN-SHEET
+# FORMULA (a live recompute) / LABELLED TOOL NODE (an engine-produced result).
+#
+# M0 — INPUTS MASTER enumerates every PRIMITIVE (tier-1 INPUT) the model rests on, across
+# five classes, each with its own provenance discipline:
+#   brief      — a value the client stated (quoted from the brief where the literal
+#                appears verbatim; else cited by field path)
+#   assumption — a U5/class default the engine assumed, OPEN until the customer confirms
+#                (tied to 'Questions for the customer')
+#   constant   — a physics constant (named + sourced)
+#   catalogue  — a live distributor/db price (db:source + MPN)
+#   factor     — a margin/install/corpus-lift ratio (standard/basis cited)
+# This is a REPRESENTATIVE, honestly-scoped enumeration (five real classes, real state
+# data, real citations) — not a claim to have swept every literal in the 20k-line engine;
+# Phase B (a separate pass) rewires the REST of the workbook to reference these cells.
+# ═══════════════════════════════════════════════════════════════════════════════════════
+_M0_SHEET = "Inputs Master (M0)"
+_EQUIP_REG_SHEET = "Equipment & Dimensions Register"
+
+_INP_SLUG_RX = re.compile(r"[^A-Z0-9]+")
+
+
+def _m0_slug(label: str, seen: Dict[str, int]) -> str:
+    """Deterministic Excel DEFINED NAME (INP_<slug>) for an M0 primitive: uppercase,
+    non-alphanumeric runs collapse to '_', trimmed. `seen` is walked in the primitives'
+    own build order (itself deterministic — same state -> same order every build), so a
+    label repeated across two primitives always gets the SAME _2/_3 suffix — collision
+    is resolved, never silently overwritten. proveCatch in _selftest."""
+    base = _INP_SLUG_RX.sub("_", str(label or "").upper()).strip("_") or "X"
+    base = f"INP_{base}"
+    n = seen.get(base, 0) + 1
+    seen[base] = n
+    return base if n == 1 else f"{base}_{n}"
+
+
+def _m0_number_tokens(value) -> List[str]:
+    """String forms of a number worth substring-searching for (bare + thousands-sep)."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return [str(value)]
+    toks = [str(value)]
+    if f == int(f):
+        n = int(f)
+        toks += [str(n), f"{n:,}"]
+    return list(dict.fromkeys(toks))
+
+
+def _m0_brief_quote(original_text: str, value) -> Optional[str]:
+    """Best-effort VERBATIM quote from the brief's own text containing this value, so a
+    brief-class primitive carries the client's own words. None when the literal doesn't
+    appear verbatim (it was parsed/derived) — the caller falls back to a field-path cite."""
+    if not original_text or value is None:
+        return None
+    text = str(original_text)
+    for token in _m0_number_tokens(value):
+        i = text.find(token)
+        if i >= 0:
+            start, end = max(0, i - 60), min(len(text), i + len(token) + 60)
+            snippet = re.sub(r"\s+", " ", text[start:end]).strip()
+            return f'brief: "…{snippet}…"'
+    return None
+
+
+def _m0_used_by_count(state: dict, value) -> int:
+    """Honest, PYTHON-COMPUTED (Phase A) count of how many other places in THIS build
+    already carry the same number — requirementsBom basis/requirement text plus
+    orchestratorContract.quantities values. A real, reproducible proxy; Phase B replaces
+    it with a live cross-sheet COUNTIF once other tabs reference these cells directly."""
+    if not isinstance(value, (int, float)):
+        return 0
+    toks = set(_m0_number_tokens(value))
+    n = 0
+    for row in (state.get("requirementsBom") or []):
+        blob = f"{row.get('basis', '')} {row.get('requirement', '')}"
+        if any(t and t in blob for t in toks):
+            n += 1
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    for qv in q.values():
+        if isinstance(qv, dict) and any(t == str(qv.get("value")) for t in toks):
+            n += 1
+    return n
+
+
+_M0_FACTOR_NAMES = {"scale_exp", "discount_rate", "hurdle_rate", "maint_pct"}
+
+
+def _m0_collect_primitives(state: dict) -> List[dict]:
+    """Every PRIMITIVE (tier-1 INPUT, no in-model ancestor) this build is grounded in,
+    across the five classes. Returns ordered [{label, value, unit, cls, provenance}]."""
+    out: List[dict] = []
+    pb = state.get("parsedBrief") or {}
+    cons = pb.get("constraints") or {}
+    orig = str(pb.get("original_text") or "")
+
+    # ---- A. BRIEF-STATED ----
+    def _brief_row(label, value, unit, path):
+        if value is None:
+            return
+        q = _m0_brief_quote(orig, value)
+        out.append({"label": label, "value": value, "unit": unit, "cls": "brief",
+                   "provenance": q or f"brief.constraints.{path} (source: user)"})
+
+    ucc = cons.get("unit_cost_ceiling") or {}
+    _brief_row("Unit cost ceiling", num(ucc.get("value")), ucc.get("currency") or "GBP",
+               "unit_cost_ceiling.value")
+    bsz = cons.get("batch_size") or {}
+    _brief_row("Batch size", num(bsz.get("value")), "count", "batch_size.value")
+    dl = cons.get("design_life") or {}
+    _dl_m = re.search(r"[\d.]+", str(dl.get("value") or ""))
+    if _dl_m:
+        _brief_row("Design life", float(_dl_m.group(0)), "years", "design_life.value")
+    for m in ((cons.get("target_performance") or {}).get("metrics") or []):
+        v = num(m.get("value"))
+        if v is None:
+            continue
+        _brief_row(_humanize_class(m.get("key_metric") or "target metric"), v,
+                   m.get("unit") or "", f"target_performance.metrics[{m.get('key_metric')}]")
+
+    # ---- B. ASSUMPTION (U5/class default) + a slice of FACTOR (scaling/rate literals
+    #      the SAME driver sheet already carries as hardcoded defaults, not engine-derived) ----
+    for name, label, value, unit, basis, _fmt in (_ECON_INPUT_ROWS or []):
+        basis_s = str(basis or "")
+        if basis_s.startswith("from engine") or basis_s.startswith("N/A"):
+            continue                              # has an in-model ancestor — not a primitive
+        cls = "factor" if name in _M0_FACTOR_NAMES else "assumption"
+        prov = basis_s if cls == "factor" else (
+            f"{basis_s} — ASSUMPTION, open until the customer confirms "
+            f"(see 'Questions for the customer')")
+        out.append({"label": label, "value": value, "unit": unit, "cls": cls, "provenance": prov})
+
+    # ---- C. PHYSICS CONSTANT ----
+    _rho_default, _rho_note = _process_fluid_density(state)
+    out.append({"label": "Process fluid density (engine default)", "value": _rho_default,
+               "unit": "kg/m3", "cls": "constant", "provenance": f"engine default — {_rho_note}"})
+    _seen_const: set = set()
+    for t in ((state.get("toolsUsedPage") or {}).get("tools") or []):
+        for w in (t.get("worked") or []):
+            for a in (w.get("assumptions") or []):
+                for mm in re.finditer(r"\b(rho|g)\s+([\d.]+)\s*(kg/m3|m/s2)", str(a), re.I):
+                    if mm.group(1).lower() in _seen_const:
+                        continue
+                    _seen_const.add(mm.group(1).lower())
+                    lbl = ("Water density (pump-sizing worked calc)" if mm.group(1).lower() == "rho"
+                          else "Standard gravitational acceleration")
+                    out.append({"label": lbl, "value": float(mm.group(2)), "unit": mm.group(3),
+                               "cls": "constant",
+                               "provenance": f"{t.get('tool_id')} · \"{w.get('label')}\" "
+                                             f"assumption: \"{_xq(a, 140)}\""})
+
+    # ---- D. CATALOGUE / DB PRICE ----
+    # state.partVerifications is a flat LIST (each entry the same shape the standalone
+    # 10-part-verifications.json keys by id under .verifications) — accept either shape.
+    _pv_raw = state.get("partVerifications") or []
+    if isinstance(_pv_raw, dict):
+        pv = (_pv_raw.get("verifications") or _pv_raw).values()
+    else:
+        pv = _pv_raw
+    _cat_n = 0
+    for v in pv:
+        if _cat_n >= 8:
+            break
+        price = num(v.get("distributor_price_gbp"))
+        mpn = v.get("part_number")
+        if price is None or not mpn or v.get("status") != "verified":
+            continue
+        _cat_n += 1
+        label = f"{v.get('manufacturer') or ''} {v.get('word_name') or ''}".strip() or mpn
+        out.append({"label": label, "value": price, "unit": "£", "cls": "catalogue",
+                   "provenance": f"db:{v.get('source_method') or 'distributor'} · MPN {mpn}"
+                                 + (f" · {v.get('distributor_availability')}"
+                                    if v.get("distributor_availability") else "")})
+
+    # ---- E. RATE / FACTOR ----
+    ra = (state.get("costStack") or {}).get("ratios_applied") or {}
+    _fnote = ra.get("notes") or ""
+    for key, label in (("install_factor", "Install factor"),
+                       ("foak_contingency_factor", "FOAK contingency factor"),
+                       ("epc_engineering_factor", "EPC/engineering factor")):
+        v = num(ra.get(key))
+        if v:
+            out.append({"label": label, "value": v, "unit": "ratio", "cls": "factor",
+                       "provenance": f"costStack.ratios_applied.{key} — {_fnote}"})
+    roll = (state.get("costBasis") or {}).get("rollup") or {}
+    ifc = num(roll.get("install_factor_central"))
+    if ifc:
+        out.append({"label": "Installed-cost factor (central)", "value": ifc, "unit": "×",
+                   "cls": "factor",
+                   "provenance": f"costBasis.rollup.install_factor_central — {roll.get('note', '')}"})
+    # corpus median anchors — the KEY INPUT a corpus-priced BoM line is set from, quoted
+    # verbatim off the line's own basis text (the same regex the BoM ledger's basis-split
+    # already uses — ONE source, never a second corpus-parsing rule).
+    _seen_corpus: set = set()
+    for row in (state.get("requirementsBom") or []):
+        mm = _BASIS_CORPUS_RE.search(str(row.get("basis") or ""))
+        if mm and mm.group(0) not in _seen_corpus:
+            if len(_seen_corpus) >= 6:
+                break
+            _val_m = re.search(r"£([\d,]+(?:\.\d+)?)", mm.group(0))
+            if not _val_m:
+                continue
+            _seen_corpus.add(mm.group(0))
+            out.append({"label": f"Corpus median — {row.get('requirement') or row.get('tag')}",
+                       "value": float(_val_m.group(1).replace(",", "")), "unit": "£",
+                       "cls": "factor",
+                       "provenance": f"corpus anchor, {mm.group(0)} · tag {row.get('tag')}"})
+    return out
+
+
+def tab_inputs_master(wb: Workbook, state: dict) -> bool:
+    """M0 — INPUTS MASTER: every PRIMITIVE number the model is built from, one row each,
+    with class + provenance + a workbook DEFINED NAME (Ref). Phase A of the auditability
+    directive — this tab EXISTS, fully contracted; Phase B rewires the rest of the
+    workbook to reference these cells live."""
+    prims = _m0_collect_primitives(state)
+    if not prims:
+        return False
+    ws = wb.create_sheet(_M0_SHEET)
+    set_widths(ws, {"A": 16, "B": 34, "C": 14, "D": 10, "E": 12, "F": 70, "G": 14})
+    nxt = title_row(
+        ws, "M0 — Inputs Master: every primitive number the model is built from", 7,
+        "A PRIMITIVE = a number with NO in-model ancestor: brief-stated, a class "
+        "assumption (open until the customer confirms), a physics constant, a live "
+        "catalogue/distributor price, or a margin/install/corpus factor. Every row "
+        "mints an Excel DEFINED NAME (Ref) so a downstream formula can reference it "
+        "by name and self-document. Phase A: this register exists, fully cited. "
+        "Phase B rewires the rest of the workbook to reference these cells live.")
+    header(ws, nxt, ["Ref", "Label", "Value", "Units", "Class", "Provenance", "Used-by count"])
+    class_fill = {"brief": FILL_INPUT, "assumption": FILL_ADVISORY, "constant": FILL_CONST,
+                 "catalogue": FILL_RESULT, "factor": FILL_SUB}
+    seen: Dict[str, int] = {}
+    r = nxt + 1
+    for p in prims:
+        ref = _m0_slug(p["label"], seen)
+        used_by = _m0_used_by_count(state, p.get("value"))
+        rc = ws.cell(r, 1, ref); rc.font = FONT_MONO; rc.border = BORDER
+        ws.cell(r, 2, clean_cell(p["label"])).border = BORDER
+        vc = ws.cell(r, 3, p["value"]); vc.border = BORDER
+        vc.fill = class_fill.get(p["cls"], FILL_CONST)
+        vc.number_format = FMT_NUM
+        ws.cell(r, 4, clean_cell(p["unit"])).border = BORDER
+        ws.cell(r, 5, p["cls"]).border = BORDER
+        pc = ws.cell(r, 6, clean_cell(p["provenance"])); pc.alignment = WRAP_TOP
+        pc.font = FONT_NOTE; pc.border = BORDER
+        uc = ws.cell(r, 7, used_by); uc.border = BORDER; uc.number_format = FMT_INT
+        addr = f"${get_column_letter(3)}${r}"
+        try:
+            from openpyxl.workbook.defined_name import DefinedName
+            if ref not in wb.defined_names:
+                wb.defined_names[ref] = DefinedName(ref, attr_text=f"'{_M0_SHEET}'!{addr}")
+        except Exception:  # noqa: BLE001 — a defined name is a nicety, never fatal
+            pass
+        r += 1
+    ws.freeze_panes = f"A{nxt + 1}"
+    back_link(ws, 7)
+    return True
+
+
+_GEOM_SHAPE_CLASS = {
+    "tank": "cylinder", "vertical_vessel": "cylinder", "inline_spool": "cylinder",
+    "box": "box", "cabinet": "box", "cabinet_small": "box", "transformer_box": "box",
+    "skid_box": "box", "pump": "box", "instrument": "box",
+}
+
+
+def _geom_dims(shape: str, dims: dict) -> Tuple[str, Optional[float], Optional[float],
+                                                 Optional[float], Optional[float]]:
+    """(shape_class, L, W, H, D) in mm straight from the manifest's own dims_mm — a
+    cylinder/dished vessel carries D/H, a box carries L/W/H. A missing dim is an honest
+    None (never a fabricated default), so the volume formula reads a real gap."""
+    cls = _GEOM_SHAPE_CLASS.get(shape, "box")
+    if cls in ("cylinder", "dished"):
+        d = num(dims.get("dia"))
+        h = num(dims.get("len")) or num(dims.get("h")) or num(dims.get("height"))
+        return cls, None, None, h, d
+    has_l = dims.get("l") is not None
+    l_ = num(dims.get("l")) if has_l else num(dims.get("w"))
+    w_ = num(dims.get("w")) if has_l else num(dims.get("d"))
+    h_ = num(dims.get("h")) or num(dims.get("height"))
+    return cls, l_, w_, h_, None
+
+
+def _reg_name_in_bom_ok(canonical_name: str, bom_item_names: List[str]) -> bool:
+    """Mirrors the register's live 'Name in BoM' formula (a case-insensitive substring
+    match of the canonical name against the BoM ledger's Item column) as a PURE,
+    directly-testable function — proveCatch in _selftest."""
+    n = str(canonical_name or "").strip().lower()
+    return bool(n) and any(n in str(x or "").lower() for x in bom_item_names)
+
+
+def _reg_name_in_drawings_ok(cov_true: int) -> bool:
+    """Mirrors the register's live 'Name in drawings' formula (>0 drawing surfaces
+    matched this part's name, per parts_ledger.py's covered()) — proveCatch in _selftest."""
+    return (cov_true or 0) > 0
+
+
+def _bom_ledger_range(wb: Workbook) -> Optional[Tuple[str, int, int]]:
+    """(Item-column letter, first data row, last row) on the BoM Ledger sheet, looked up
+    from its OWN declared column order (never hardcoded) — a future column reshuffle on
+    that sheet cannot silently break the register's cross-sheet Name-in-BoM check."""
+    _bom_cols = ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs",
+                "Factors", "Est class", "Confidence", "Duty / rating", "Material",
+                "Sizing calc (basis)", "MPN / datasheet", "Row check",
+                "Audit: check evidence (build-computed)"]
+    sig = _table_sig(_bom_cols)
+    for t in _RENDERED_TABLES:
+        if t["sheet"] == _LEDGER_SHEET and _table_sig(t["cols"]) == sig:
+            idx = t["cols"].index("Item") + 1
+            ws = wb[_LEDGER_SHEET]
+            return get_column_letter(idx), t["row"] + 1, max(t["row"] + 1, ws.max_row)
+    return None
+
+
+def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """EQUIPMENT & DIMENSIONS REGISTER: one row per parts-manifest part — tag, canonical
+    name, shape, dims, a LIVE volume/footprint FORMULA (self-auditing geometry — corrupt
+    a dim and it moves on recalc), material, MPN/status, drawing-appearance count, and
+    two cross-surface consistency checks (name-in-BoM, name-in-drawings) that FAIL
+    honestly where the surfaces disagree. 'Canonical name' IS the name registry — one
+    name per part id, the manifest's own name."""
+    pm = load_json(os.path.join(run_dir, "parts-manifest.json")) or {}
+    parts = sorted(pm.get("parts") or [],
+                   key=lambda p: str(p.get("equipment_tag") or p.get("tag") or ""))
+    if not parts:
+        return False
+    ledger = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+    equip_by_tag = {e.get("tag"): e for e in (ledger.get("equipment") or [])}
+    bom_by_tag: Dict[str, dict] = {}
+    for row in (state.get("requirementsBom") or []):
+        t = row.get("tag")
+        if t and t not in bom_by_tag:
+            bom_by_tag[t] = row
+
+    ws = wb.create_sheet(_EQUIP_REG_SHEET)
+    set_widths(ws, {"A": 10, "B": 30, "C": 22, "D": 10, "E": 9, "F": 9, "G": 9, "H": 9,
+                    "I": 11, "J": 12, "K": 26, "L": 24, "M": 12, "N": 30, "O": 34})
+    nxt = title_row(
+        ws, "Equipment & Dimensions Register — one row per manifest part, self-auditing geometry",
+        15,
+        "VOLUME and FOOTPRINT are IN-CELL FORMULAS over the L/W/H or D/H columns — "
+        "corrupt a dimension and they move on recalc, never a python-baked number. "
+        "'Canonical name' is the ONE name registry for this part; the two check "
+        "columns cross-reference the BoM ledger and the drawing-name match this SAME "
+        "part got from parts_ledger.py's covered() — where the surfaces genuinely "
+        "diverge, the check FAILS honestly rather than being forced green.")
+    cols = ["Tag", "Canonical name", "Module", "Shape", "L (mm)", "W (mm)", "H (mm)", "D (mm)",
+            "Volume (m3)", "Footprint (m2)", "Material", "MPN / status",
+            "Drawing appearances", "Name in BoM (live check)", "Name in drawings (live check)"]
+    header(ws, nxt, cols)
+    r = nxt + 1
+    bom_range = _bom_ledger_range(wb)
+    for p in parts:
+        tag = p.get("equipment_tag") or p.get("tag") or "—"
+        name = p.get("name") or p.get("tag") or "—"
+        module = p.get("module") or "—"
+        shape_cls, l_, w_, h_, d_ = _geom_dims(p.get("shape") or "", p.get("dims_mm") or {})
+        equip = equip_by_tag.get(tag) or {}
+        bom_row = bom_by_tag.get(tag) or {}
+        material = _bom_row_material(bom_row) or (
+            "n/a — not a fabricated part (bought-out assembly)" if bom_row else "—")
+        mpn_status = f"{equip.get('part') or '—'} · {equip.get('status') or bom_row.get('status') or '—'}"
+        cov = equip.get("coverage") or {}
+        cov_true = sum(1 for v in cov.values() if v)
+        cov_total = len(cov)
+
+        ws.cell(r, 1, clean_cell(tag)).border = BORDER
+        ws.cell(r, 2, clean_cell(name)).border = BORDER
+        ws.cell(r, 3, clean_cell(_humanize_class(module))).border = BORDER
+        ws.cell(r, 4, shape_cls).border = BORDER
+        for ci, v in ((5, l_), (6, w_), (7, h_), (8, d_)):
+            c = ws.cell(r, ci, v if v is not None else "")
+            c.border = BORDER
+            c.number_format = FMT_DEC1
+        L, W, H, D = (f"{get_column_letter(ci)}{r}" for ci in (5, 6, 7, 8))
+        vol_f = (f'=IF({D}<>"",PI()*({D}/2000)^2*({H}/1000),'
+                f'IF(AND({L}<>"",{W}<>"",{H}<>""),{L}/1000*{W}/1000*{H}/1000,""))')
+        fp_f = (f'=IF({D}<>"",PI()*({D}/2000)^2,'
+               f'IF(AND({L}<>"",{W}<>""),{L}/1000*{W}/1000,""))')
+        vc = ws.cell(r, 9, vol_f); vc.border = BORDER; vc.fill = FILL_RESULT
+        vc.number_format = FMT_DEC2
+        fc = ws.cell(r, 10, fp_f); fc.border = BORDER; fc.fill = FILL_RESULT
+        fc.number_format = FMT_DEC2
+        ws.cell(r, 11, clean_cell(material)).border = BORDER
+        ws.cell(r, 12, clean_cell(mpn_status)).border = BORDER
+        ws.cell(r, 13, f"{cov_true}/{cov_total}" if cov_total else "—").border = BORDER
+
+        if bom_range:
+            name_col, r1, r2 = bom_range
+            bf = fx_verdict(
+                [f'COUNTIF(\'{_LEDGER_SHEET}\'!${name_col}${r1}:${name_col}${r2},'
+                 f'"*"&B{r}&"*")>0'],
+                '"canonical name not found in the BoM ledger Item column"')
+        else:
+            bf = '="FAIL — BoM ledger not built this run"'
+        ws.cell(r, 14, bf).border = BORDER
+
+        op_ref = audit_operand(
+            "Equipment register — drawing-name match", f"{tag} · {name}", cov_true,
+            f"parts_ledger.py covered() matcher — {cov_true}/{cov_total or '?'} drawing "
+            f"surface(s) matched this part's name (parts-ledger.json equipment[].coverage, "
+            f"tag {tag})")
+        df = fx_verdict([f"{op_ref}>0"],
+                        f'"canonical name not matched in any drawing surface '
+                        f'({cov_true}/{cov_total or 0} surfaces)"')
+        ws.cell(r, 15, df).border = BORDER
+        r += 1
+    _cf_verdict(ws, f"N{nxt + 1}:O{r - 1}")
+    ws.freeze_panes = f"A{nxt + 1}"
+    back_link(ws, 15)
+    return True
 
 
 def _render_economics_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
@@ -13873,7 +14300,12 @@ def _render_tool_io_section(ws: Worksheet, state: dict, run_dir: str, start_row:
 # Calculations → Inputs → Part names → Glossary. Overview (kept — run provenance) sits
 # between Contents and Renders; Sense-check (when present) joins the verification block.
 _TAB_RANK = {
-    "Executive Summary": -1, "Contents": 0, "Overview": 0.5, "Renders": 1,
+    "Executive Summary": -1, "Contents": 0,
+    # M0 auditability directive (Tristan, drawer 047565b65ce05148, 2026-07-04): the
+    # INPUTS MASTER is "the first sheet after Contents" — literally ranked immediately
+    # after it; the Equipment & Dimensions Register is its natural companion.
+    "Inputs Master (M0)": 0.1, "Equipment & Dimensions Register": 0.2,
+    "Overview": 0.5, "Renders": 1,
     "Cost waterfall": 2, "Financial model": 3, "Bill of Materials (Ledger)": 4,
     "Brief": 5,
     "Design basis": 5.5,                                # the basis statement follows the Brief
@@ -13905,7 +14337,8 @@ _TAB_GROUPS = {
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
                      "Questions for the customer", "Sense-check", "⚠ Checks"},
     "reference": {"Connection trace", "Quantities", "Calculations", "Inputs & Assumptions",
-                  "Part names", "Glossary", "Audit data"},
+                  "Part names", "Glossary", "Audit data",
+                  "Inputs Master (M0)", "Equipment & Dimensions Register"},
 }
 
 
@@ -14760,6 +15193,21 @@ _dt(["Tab", "Score", "vs ≥8 floor", "Top issue / coverage gap (fix at source)"
 _dt(["Severity", "Check", "Message", "Actual", "Expected"], "qa-findings",
     ["Severity", "Check", "Message"])
 _dt(["#", "Tab", "What's on it"], "contents", ["#", "Tab", "What's on it"])
+# M0 — Inputs Master (Phase A auditability directive, 2026-07-04): every primitive
+# number cited with its class + provenance; provenance is REQUIRED — an M0 row with no
+# provenance fails the contract (proveCatch in _selftest).
+_dt(["Ref", "Label", "Value", "Units", "Class", "Provenance", "Used-by count"],
+    "m0-inputs", ["Ref", "Label", "Value", "Units", "Class", "Provenance"],
+    numeric=["Value", "Used-by count"])
+# Equipment & Dimensions Register: L/W/H/D are legitimately blank on the OTHER shape
+# (a cylinder has no L/W; a box has no D), so they are NOT required — the geometry
+# columns' own honesty is enforced by the live Volume/Footprint formulas reading a real
+# gap, not by the completeness contract.
+_dt(["Tag", "Canonical name", "Module", "Shape", "L (mm)", "W (mm)", "H (mm)", "D (mm)",
+     "Volume (m3)", "Footprint (m2)", "Material", "MPN / status", "Drawing appearances",
+     "Name in BoM (live check)", "Name in drawings (live check)"], "equipment-register",
+    ["Tag", "Canonical name", "Module", "Shape", "Material", "MPN / status",
+     "Drawing appearances", "Name in BoM (live check)", "Name in drawings (live check)"])
 
 # Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
 # drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
@@ -16541,6 +16989,16 @@ def build(run_dir: str, out_path: str) -> dict:
     # FIRST + kept SEPARATE so _ECON_INPUT_ADDR is populated before the model
     # references it. Each self-guards (skips cleanly with no usable output metric).
     add_tab(INPUTS_SHEET, lambda: tab_inputs_assumptions(wb, state))
+    # M0 — Inputs Master + the Equipment & Dimensions Register (Phase A of the
+    # auditability directive, drawer 047565b65ce05148, 2026-07-04). Built HERE — after
+    # Inputs & Assumptions (M0's 'assumption' class reads _ECON_INPUT_ROWS) and after
+    # the BoM Ledger (the register's Name-in-BoM check looks up its rendered column
+    # layout) — but _TAB_RANK places both immediately after Contents regardless of
+    # build order (_reorder_tabs is the sole ordering mechanism, confirmed elsewhere
+    # in this file). Phase B (separate pass) wires the REST of the workbook to
+    # reference the M0 cells live; this round only builds the two tabs, contracted.
+    add_tab("Inputs Master (M0)", lambda: tab_inputs_master(wb, state))
+    add_tab("Equipment & Dimensions Register", lambda: tab_equipment_register(wb, state, run_dir))
     add_tab("Financial model", lambda: tab_financial_model(wb, state))
     # Design basis is BUILT after Inputs (its utilisation drivers reference the live
     # Inputs cells) but PLACED after Brief in the strip (_TAB_RANK 5.5).
@@ -16915,6 +17373,51 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch M0 DEFINED-NAME slugging — deterministic + collide-free (Tristan's
+    # auditability directive, drawer 047565b65ce05148, 2026-07-04). Two primitives with the
+    # SAME label must not silently overwrite one workbook DEFINED NAME; the SAME input
+    # sequence must ALWAYS mint the SAME names (this is what makes two builds of the same
+    # run byte-identical). ═══
+    _seen_m0: Dict[str, int] = {}
+    _n1 = _m0_slug("Sale price (per output unit)", _seen_m0)
+    _n2 = _m0_slug("Sale price (per output unit)", _seen_m0)   # a repeat label — must NOT collide
+    _n3 = _m0_slug("Install factor!!", _seen_m0)               # punctuation must collapse cleanly
+    if _n1 != "INP_SALE_PRICE_PER_OUTPUT_UNIT" or _n2 == _n1 or not _n2.startswith(_n1):
+        print(f"  FAIL m0-slug: collision handling broke ({_n1!r}, {_n2!r})"); bad += 1
+    if _n3 != "INP_INSTALL_FACTOR":
+        print(f"  FAIL m0-slug: punctuation must collapse to one underscore, got {_n3!r}"); bad += 1
+    _seen_m0b: Dict[str, int] = {}
+    _replay = [_m0_slug(lbl, _seen_m0b) for lbl in
+              ["Sale price (per output unit)", "Sale price (per output unit)", "Install factor!!"]]
+    if _replay != [_n1, _n2, _n3]:
+        print(f"  FAIL m0-slug: replaying the SAME label sequence must mint the SAME names "
+              f"(determinism) — got {_replay!r} vs {[_n1, _n2, _n3]!r}"); bad += 1
+    # ═══ proveCatch the M0 required-provenance contract: a primitive with NO provenance
+    # must be UNSHIPPABLE (the generic per-cell walker's 'Provenance' required column) —
+    # confirmed by declaration, not by re-deriving the walker here. ═══
+    _m0_spec = _TABLE_CONTRACTS.get(_table_sig(
+        ["Ref", "Label", "Value", "Units", "Class", "Provenance", "Used-by count"]))
+    if not _m0_spec or "provenance" not in (_m0_spec.get("required") or []):
+        print("  FAIL m0-contract: 'Provenance' must be a REQUIRED column on M0"); bad += 1
+    # ═══ proveCatch the EQUIPMENT REGISTER name-divergence checks — both directions
+    # independent (a name present in the BoM but never drawn fails ONLY the drawings
+    # check; the reverse fails ONLY the BoM check), plus the base cases. ═══
+    if not _reg_name_in_bom_ok("Distribution Manifold", ["Distribution Manifold Assembly"]):
+        print("  FAIL reg-name-in-bom: an exact substring must match"); bad += 1
+    if _reg_name_in_bom_ok("Distribution Manifold", ["Irrigation Pump"]):
+        print("  FAIL reg-name-in-bom: an unrelated name must NOT match"); bad += 1
+    if not _reg_name_in_drawings_ok(3):
+        print("  FAIL reg-name-in-drawings: 3 coverage hits must PASS"); bad += 1
+    if _reg_name_in_drawings_ok(0):
+        print("  FAIL reg-name-in-drawings: 0 coverage hits must FAIL"); bad += 1
+    _a_bom, _a_draw = _reg_name_in_bom_ok("Foo", ["Foo Bar"]), _reg_name_in_drawings_ok(0)
+    if not (_a_bom and not _a_draw):
+        print("  FAIL reg-name-divergence: in-BoM/not-in-drawings must split (BoM PASS, "
+              "drawings FAIL) independently"); bad += 1
+    _b_bom, _b_draw = _reg_name_in_bom_ok("Foo", ["Baz"]), _reg_name_in_drawings_ok(2)
+    if not (not _b_bom and _b_draw):
+        print("  FAIL reg-name-divergence: not-in-BoM/in-drawings must split (BoM FAIL, "
+              "drawings PASS) independently"); bad += 1
     # ═══ proveCatch the COLUMN-CONTRACT REGISTRY (Tristan 2026-07-02 — the v52 fabricated
     # ticks: velocity 0.0 "in spec ✓" × 45; dash-ΔU panel rows scoring 10/10). Four claims:
     # (a) a 0-velocity fluid row can NEVER evaluate in-spec (tick impossible); (b) a dash-ΔU
