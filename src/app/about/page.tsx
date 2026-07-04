@@ -1,7 +1,7 @@
 /**
  * @file About Page
  *
- * @description Public-facing about page for Fractional Forge / ForgeOS.
+ * @description Public-facing about page for Fractional Forge.
  * Includes mission statement, founder bio, company info, and CTA.
  * Server component — exports metadata for SEO.
  */

@@ -99,13 +99,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'monthly',
             priority: 0.7,
         },
-        // Audience-specific pages removed for launch — may return later
-        {
-            url: `${appUrl}/case-study`,
-            lastModified: now,
-            changeFrequency: 'monthly',
-            priority: 0.8,
-        },
         {
             url: `${appUrl}/sample-package`,
             lastModified: now,

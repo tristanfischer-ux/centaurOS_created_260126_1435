@@ -22,7 +22,6 @@ Human-curated, not self-serve. A founder describes their idea in a short brief (
 - About: https://fractionalforge.app/about
 - Pricing: https://fractionalforge.app/pricing
 - Example engineering package: https://fractionalforge.app/sample-package
-- Case study: https://fractionalforge.app/case-study
 - Investor-readiness tool: https://fractionalforge.app/investor-readiness
 - Manufacturing techniques library: https://fractionalforge.app/techniques
 
