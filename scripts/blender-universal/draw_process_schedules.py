@@ -1041,10 +1041,28 @@ def _pump_duty_size(cid: str, state: dict) -> str:
     return f"ambiguous — no principal named '{pump_name.title()}' in the BoM"
 
 
+# A word minted by derive-skeleton.ts's generic Tier-C/GENERIC_FLOOR filler carries this
+# EXACT marker in its 'form' modifier ("<name> — representative <module> component") — the
+# universal stamp for an UNDIFFERENTIATED catch-all placeholder, not a word tied to a real
+# numbered process line. Several near-synonym fillers (singular/plural noun variants, or a
+# valve/its-own-actuator synonym pair — e.g. "Pneumatic Actuated Valve", "Pneumatic Actuated
+# Valves", "Pneumatic Actuators") can independently inherit the SAME contract count (e.g.
+# actuated_distribution_valve_count=200) from derive-skeleton's fuzzy contractCountFor() —
+# three distinct WORDS, one real population. Each still mints its OWN valve-list row here
+# (keyed on cid, not on the population it represents), so the schedule triple-counted 200
+# actuated valves as 600 (Codema v75, 2026-07-04: schedule 630 vs BoM 476, >20% cross-
+# schedule reconciliation fault). requirements_bom.py already folds these to ONE BoM line;
+# the valve list needs the same discipline. Fix: a GENERIC-REPRESENTATIVE row (same vtype,
+# same quantity) is only listed ONCE — a second one is the same undifferentiated count
+# restated under a synonym, not a second population.
+_GENERIC_REPRESENTATIVE_FORM_RE = re.compile(r"representative\s+\S.*\bcomponent\b", re.I)
+
+
 def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[ValveRow]:
     rows: list[ValveRow] = []
     used_lines: dict[str, int] = {}     # line number → how many valves already cite it
     vseq = 0
+    generic_repr_seen: dict[tuple[str, int], str] = {}  # (vtype, qty) → the cid first seen
     # CANONICAL TAGS (shared with the bill-of-materials): a valve that the synthesis
     # flagged as an actuator (`_actuator`) carries its canonical tag here too, so the
     # same physical valve has ONE name in the bill-of-materials and the valve list. A

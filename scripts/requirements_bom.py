@@ -1090,6 +1090,28 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     return round(target), basis
 
 
+def _is_real_mpn_grounded(pv: dict) -> bool:
+    """True when `pv` (a partVerifications entry) is priced from a VERIFIED distributor-
+    cascade hit for a REAL pinned MPN (the chain's bom-cost-grounding step stamps
+    cost_grounding_provenance='distributor-cache'; cascade-price-adoption.ts's
+    adoptCascadePrices choke point is the sibling mechanism for the SAME signal). Such a
+    price is the market price for the EXACT part being shipped — strictly more
+    authoritative than a corpus-median heuristic, which can only ever compare against
+    OTHER products in the same family (2026-07-05, the X-115 £190→£1,582 bug: the corpus's
+    top matches were Siemens S7-1500 CPU 1511-1/1513-1 PN — different, pricier CPU models
+    than the part actually pinned) and exists as a fallback for a line the engine priced
+    with NO real grounding at all — `_corpus_median_lift`'s own docstring says as much
+    ("a principal that has NO rating/take-off basis... keeps the engine's flat parametric
+    estimate"). Universal — keyed on the verification provenance the grounding step itself
+    stamps, no per-part table; a line with no such grounding (the Degasser/Drum Filter
+    cases the lift exists for) is unaffected."""
+    return (
+        isinstance(pv, dict)
+        and str(pv.get("cost_grounding_provenance") or "").lower() == "distributor-cache"
+        and str(pv.get("status") or "").lower() == "verified"
+    )
+
+
 # ── CONTROL-ELEMENT CLASS BUDGETS (council 2026-06-19, the RAS £0 DN400 valve) ──
 # A FINAL CONTROL ELEMENT (a modulating / on-off process valve or actuator) must
 # NEVER render at £0. The live RAS run shipped a DN400 modulating control valve at
@@ -2344,6 +2366,37 @@ def _selftest() -> int:
             print(f"  FAIL corpus-lift £{u} → {got} (want £{want})"); bad += 1
         elif res and got is not None and got < u:
             print(f"  FAIL corpus-lift LOWERED £{u} → £{got}"); bad += 1
+
+    # ── REAL-MPN CATALOGUE GROUNDING GUARD proveCatch (2026-07-05, the X-115 £190→£1,582
+    # bug: a REAL pinned MPN's verified distributor-cascade price must never be
+    # corpus-lifted, however 'under' the corpus thinks it is). Tests BOTH the pure
+    # predicate _is_real_mpn_grounded AND the exact X-115 scenario end-to-end (the
+    # combined `pv and not _is_real_mpn_grounded(pv)` gate the caller loop applies).
+    _x115_pv = {
+        "status": "verified", "cost_grounding_provenance": "distributor-cache",
+        "engine_c_flag": "under", "engine_c_ref_median_gbp": 1715,
+        "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 1582.5,
+    }
+    if not _is_real_mpn_grounded(_x115_pv):
+        print("  FAIL _is_real_mpn_grounded: a verified distributor-cache line must read as grounded"); bad += 1
+    _x115_res = _corpus_median_lift(190.0, _x115_pv) if not _is_real_mpn_grounded(_x115_pv) else None
+    if _x115_res is not None:
+        print(f"  FAIL X-115 proveCatch: a real-MPN-grounded £190 line was corpus-lifted to {_x115_res}"); bad += 1
+    _ungrounded_cases = [
+        ({}, True),                                                       # no pv info at all → not grounded
+        ({"cost_grounding_provenance": "distributor-cache"}, True),       # provenance present but NEVER verified → not grounded (half-signal)
+        ({"status": "verified"}, True),                                   # verified but no distributor-cache hit → not grounded
+        ({"status": "verified", "cost_grounding_provenance": "corpus-median"}, True),  # a DIFFERENT grounding source → not grounded
+        ({"status": "verified", "cost_grounding_provenance": "distributor-cache"}, False),  # the real signal → grounded
+    ]
+    for _pv, _want_ungrounded in _ungrounded_cases:
+        _got_grounded = _is_real_mpn_grounded(_pv)
+        if _got_grounded == _want_ungrounded:
+            print(f"  FAIL _is_real_mpn_grounded({_pv}) → {_got_grounded} (want {'ungrounded' if _want_ungrounded else 'grounded'})"); bad += 1
+    # The Degasser/Drum Filter cases MUST still lift — no pv carries a cost_grounding_*
+    # field at all (they were priced by the flat parametric estimate the lift exists for).
+    if _is_real_mpn_grounded({"engine_c_flag": "under", "engine_c_ref_median_gbp": 65000, "engine_c_ref_count": 5}):
+        print("  FAIL: a plain engine_c_* pv (no cost_grounding_provenance) must NOT read as real-MPN-grounded (would silently disable the legitimate Degasser lift)"); bad += 1
 
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
@@ -5403,7 +5456,7 @@ def assemble(out_dir: str):
             continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
-        res = _corpus_median_lift(u, pv) if pv else None
+        res = _corpus_median_lift(u, pv) if (pv and not _is_real_mpn_grounded(pv)) else None
         if res:
             new_u, suffix = res
             qy = row.get("qty") or 1

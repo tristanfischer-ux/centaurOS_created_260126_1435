@@ -579,6 +579,67 @@ function removeWordFromSub(sub: SubModuleLike, word: WordLike): void {
   if (idx >= 0) words.splice(idx, 1)
 }
 
+// ── DUPLICATE-REPRESENTATIVE-POPULATION FOLD (2026-07-05, the round-5 residual: the
+// pneumatic-actuated-valve triple-count) — derive-skeleton.ts's Tier-C/GENERIC_FLOOR
+// component list can independently mint 2+ near-synonym filler words for the SAME
+// physical population: a singular/plural noun pair ("Pneumatic Actuated Valve" /
+// "Pneumatic Actuated Valves", "Solenoid Valve" / "Solenoid Valves"), or a valve and
+// its own inseparable actuator ("Pneumatic Actuated Valve" / "Pneumatic Actuators").
+// Each independently inherits the SAME contract count (e.g.
+// actuated_distribution_valve_count=200) via derive-skeleton's fuzzy contractCountFor
+// — three WORDS, one real population — and each is a legitimate fillBlankWordMpns
+// candidate (isCommodityProcessValve excludes ACTUATED/pneumatic valves, by design,
+// because those legitimately carry a real MPN — so the tether-or-suppress path above
+// never sees them). Left alone, the BoM prices the population 2-3× over AND the
+// process-schedule valve list lists it 2-3× over (Codema v75, 2026-07-04: BoM billed
+// 600 actuated valves as 3 separate 200-off lines; the schedule showed 3 separate
+// "(×200)" rows — the cross-schedule reconciliation net (630 vs 476) caught the
+// SYMPTOM on the schedule side, but the true fault is upstream, in the design tree
+// both readers walk).
+//
+// Fix: fold every GENERIC-REPRESENTATIVE filler (the derive-skeleton "<name> —
+// representative <module> component" stamp — never a hand-authored/real-MPN word) to
+// a population key = its token set (existing plural-fold) with the small, universal
+// {actuator, actuated, valve} family collapsed to one member (an actuated valve's
+// actuator is not a separately-purchasable population from the valve itself in a
+// generic filler context) + its own quantity. A LATER word in the same sub_module
+// that folds to a key already seen is the SAME population restated under a synonym
+// — remove it, never re-price or re-list it. UNIVERSAL: keyed on the stamp + a small
+// justified noun family, no per-class table; a class with no such duplicate filler
+// (BESS, SAF — their actuated valves carry real hand-authored MPNs, never this
+// skeleton path) is byte-for-byte unaffected.
+const _GENERIC_REPRESENTATIVE_FORM_RE = /representative\s+\S.*\bcomponent\b/i
+const _ACTUATOR_VALVE_FAMILY = new Set(['actuator', 'actuated', 'valve'])
+
+function _wordFormText(word: WordLike): string {
+  return String((word.modifier_characters ?? []).find((m) => m.kind === 'form')?.value ?? '')
+}
+
+/** True for a derive-skeleton Tier-C/GENERIC_FLOOR filler word (the "<name> —
+ *  representative <module> component" stamp) — never a hand-authored/real-MPN word. */
+export function isGenericRepresentativeFiller(word: WordLike): boolean {
+  return _GENERIC_REPRESENTATIVE_FORM_RE.test(_wordFormText(word))
+}
+
+/** Parse a '×N' quantity modifier to an integer (1 when absent/unparseable). */
+export function wordQuantity(word: WordLike): number {
+  const raw = (word.modifier_characters ?? []).find((m) => m.kind === 'quantity')?.value
+  const n = parseInt(String(raw ?? '').replace(/[^\d]/g, ''), 10)
+  return Number.isFinite(n) && n > 0 ? n : 1
+}
+
+/** The duplicate-population key for a generic-representative filler: its tokenised,
+ *  plural-folded name with the actuator≡actuated-valve family collapsed, plus its
+ *  own quantity — so two fillers describing the SAME sized population (regardless of
+ *  which family noun they happen to be named after) land on the same key. */
+export function representativeDuplicateKey(word: WordLike, name: string): string {
+  const toks = tokenize(name)
+  const hasFamily = toks.some((t) => _ACTUATOR_VALVE_FAMILY.has(t))
+  const rest = [...new Set(toks.filter((t) => !_ACTUATOR_VALVE_FAMILY.has(t)))].sort()
+  const base = hasFamily ? `valve:${rest.join(',')}` : `plain:${[...new Set(toks)].sort().join(',')}`
+  return `${base}#${wordQuantity(word)}`
+}
+
 // A MOTOR DRIVE slot — VFD / variable-speed/-frequency drive / soft-starter / inverter drive / motor
 // starter — is power electronics SIZED TO A SPECIFIC MOTOR (the frame is chosen from the driven motor's
 // kW / full-load current), so it must NOT be pinned by a loose name-token DB match: that match has no
@@ -1727,9 +1788,35 @@ export async function fillBlankWordMpns(
   // multiple slots is a generic over-match (an Abracon crystal "matching" busbar +
   // sensor + harness on the shared token "battery"). Keyed by sub_module id.
   const usedInSub = new Map<string, Set<string>>()
+  // DUPLICATE-REPRESENTATIVE-POPULATION fold (see _representativeDuplicateKey above) —
+  // keyed by sub_module id, so a legitimate same-named population in a DIFFERENT
+  // sub_module is never touched.
+  const representativeSeenInSub = new Map<string, Set<string>>()
 
   try {
     for (const cand of candidates) {
+      // A generic-representative filler ("<name> — representative <module> component")
+      // that folds to a population key ALREADY minted by an earlier word in this SAME
+      // sub_module is the same undifferentiated count restated under a plural or
+      // actuator/valve synonym — remove it before it can be independently DB-matched
+      // and double/triple-priced + double/triple-listed. Real hand-authored words
+      // (BESS/SAF's actuated valves) never carry this stamp and are unaffected.
+      if (isGenericRepresentativeFiller(cand.word)) {
+        const key = representativeDuplicateKey(cand.word, cand.name)
+        let seen = representativeSeenInSub.get(cand.subId)
+        if (!seen) { seen = new Set<string>(); representativeSeenInSub.set(cand.subId, seen) }
+        if (seen.has(key)) {
+          removeWordFromSub(cand.sub, cand.word)
+          mutated = true
+          log(
+            `[fill-blank-mpn]   ⊘ fold ${cand.moduleId}::${cand.subId} (${cand.name}): ` +
+            `duplicate representative population (key ${key}) already counted by an ` +
+            `earlier filler in this sub_module — removed, never re-priced/re-listed`,
+          )
+          continue
+        }
+        seen.add(key)
+      }
       // TOKEN PRIORITY (2026-07-03, Bar A): the WORD'S OWN tokens lead the query
       // list — dbFirstLookup slices the first 8, and with subId first a long
       // module path ('mass_fluid_transport_process__ro_membrane_elements')

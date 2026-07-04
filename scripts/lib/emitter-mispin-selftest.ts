@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -277,5 +277,78 @@ expect(isCatalogueComponent('Water Supply mass_fluid_transport_process__utility_
     'a principal-equipment word must never be classified as a commodity valve (scope guard for byte-identity)')
 }
 
+// ── DUPLICATE-REPRESENTATIVE-POPULATION fold (2026-07-05, the Codema v75 pneumatic-
+// actuated-valve triple-count: BoM billed 600 units as 3 separate 200-off lines
+// [Pneumatic Actuated Valve / Pneumatic Actuated Valves / Pneumatic Actuators], the
+// process-schedule valve list showed 3 separate "(×200)" rows, and the cross-schedule
+// reconciliation net caught the symptom (630 vs 476, >20%) without naming the fault).
+{
+  const repWord = (name: string, qty: number, moduleDisplay = 'actuation kinematics') => ({
+    id: `${name.toLowerCase().replace(/\s+/g, '_')}_word`,
+    name_human: name,
+    content_character: { name_human: name },
+    modifier_characters: [
+      { kind: 'quantity', value: `×${qty}` },
+      { kind: 'form', value: `${name} — representative ${moduleDisplay} component` },
+    ],
+  })
+  const realWord = (name: string) => ({
+    id: `${name.toLowerCase().replace(/\s+/g, '_')}_word`,
+    name_human: name,
+    content_character: { name_human: name },
+    modifier_characters: [{ kind: 'form', value: `${name} — principal equipment sized from the engineering contract` }],
+  })
+
+  const valve = repWord('Pneumatic Actuated Valve', 200) as any
+  const valves = repWord('Pneumatic Actuated Valves', 200) as any
+  const actuators = repWord('Pneumatic Actuators', 200) as any
+  const solenoid1 = repWord('Solenoid Valve', 1) as any
+  const solenoid2 = repWord('Solenoid Valves', 1) as any
+  const different = repWord('Pneumatic Actuated Valve', 2) as any  // same name, DIFFERENT qty → NOT a duplicate
+  const principal = realWord('Reverse Osmosis Skid') as any
+
+  expect(isGenericRepresentativeFiller(valve) === true,
+    'a "<name> — representative <module> component" word IS a generic filler')
+  expect(isGenericRepresentativeFiller(principal) === false,
+    'a "<name> — principal equipment sized from the engineering contract" word is NOT a generic filler (real equipment must never be folded)')
+
+  const kValve = representativeDuplicateKey(valve, 'Pneumatic Actuated Valve')
+  const kValves = representativeDuplicateKey(valves, 'Pneumatic Actuated Valves')
+  const kActuators = representativeDuplicateKey(actuators, 'Pneumatic Actuators')
+  const kSolenoid1 = representativeDuplicateKey(solenoid1, 'Solenoid Valve')
+  const kSolenoid2 = representativeDuplicateKey(solenoid2, 'Solenoid Valves')
+  const kDifferent = representativeDuplicateKey(different, 'Pneumatic Actuated Valve')
+
+  expect(kValve === kValves,
+    `singular/plural of the SAME filler must fold to one key (got ${kValve} vs ${kValves})`)
+  expect(kValve === kActuators,
+    `an actuated valve and its own inseparable actuator (same qty) must fold to one key — the ` +
+    `{actuator,actuated,valve} family (got ${kValve} vs ${kActuators})`)
+  expect(kSolenoid1 === kSolenoid2,
+    `'Solenoid Valve' / 'Solenoid Valves' (the v75 REAL second instance, qty×1 each) must fold to one key`)
+  expect(kValve !== kSolenoid1,
+    'two genuinely DIFFERENT populations (pneumatic vs solenoid) must NOT collide')
+  expect(kValve !== kDifferent,
+    `the SAME name at a DIFFERENT quantity is not provably the same population — quantity must be ` +
+    `part of the key (got ${kValve} vs ${kDifferent})`)
+  expect(wordQuantity(valve) === 200 && wordQuantity(solenoid1) === 1,
+    'wordQuantity parses the ×N quantity modifier')
+
+  // The actual fold LOOP a caller runs (mirrors fillBlankWordMpns's per-sub_module walk):
+  // only the FIRST of N duplicates in one sub_module survives.
+  const subWords = [valve, valves, actuators, principal]
+  const seen = new Set<string>()
+  const survivors = subWords.filter((w) => {
+    if (!isGenericRepresentativeFiller(w)) return true // real equipment always survives
+    const key = representativeDuplicateKey(w, w.name_human)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  expect(survivors.length === 2 && survivors[0] === valve && survivors[1] === principal,
+    `folding a 3-way duplicate (valve/valves/actuators, same qty) in one sub_module must leave ` +
+    `exactly the FIRST filler + the real principal (got ${survivors.map((w: any) => w.name_human)})`)
+}
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment + untethered-accessory-valve tether-or-suppress proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven)')

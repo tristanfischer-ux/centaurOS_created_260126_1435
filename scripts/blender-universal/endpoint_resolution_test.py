@@ -77,6 +77,28 @@ def main() -> int:
     r = bus.resolve_endpoint("co2_degasser", parts)
     chk("an unqualified candidate still matches a qualified endpoint "
         "(the CO2-degasser rule survives)", r is not None and r.name == "Degasser")
+
+    # ── proveCatch: "<N> m² area" is a SURFACE area, never a plan footprint ──────
+    # (2026-07-04, Codema v75) — a skeleton-derived "Uf Membrane Bank" representative
+    # BoM line carrying "364 m² area" (a membrane SURFACE area) was read as a plan
+    # FOOTPRINT: sqrt(364)*1000 ≈ 19,079 mm side → a ~19 m rogue skid_box sited nowhere
+    # near its real siblings. The router then favoured that rogue box (token overlap on
+    # 'uf'/'module') over the part's genuinely-placed sibling, dragging OTHER edges into
+    # a long stray-pipe detour off the platform. Fix: an area dim is treated as NO
+    # USABLE FOOTPRINT (same as no dim at all) → the shape's TYPE_DEFAULTS apply.
+    area_part = bus.Part("Pentair X-Flow X-Line 64 UF Module", "mass_fluid_transport_process",
+                          "mass_fluid_transport_process", 45, "skid_box",
+                          {"kind": "area", "area_m2": 364.0}, 1, "representative component")
+    rd = bus.resolved_dims_mm(area_part)
+    chk("a 364 m² AREA dim never mints an oversized (>5 m) footprint from sqrt(area)",
+        rd.get("w", 0) < 5000 and rd.get("d", 0) < 5000)
+    chk("a 364 m² AREA dim falls to the shape's TYPE_DEFAULTS footprint (not 'explicit')",
+        rd.get("explicit") is False
+        and rd.get("w") == bus.TYPE_DEFAULTS_MM["skid_box"]["w"]
+        and rd.get("d") == bus.TYPE_DEFAULTS_MM["skid_box"]["d"])
+    h = bus._dimensioned_height_mm(area_part)
+    chk("an AREA dim is never read as an explicit HEIGHT either", h is None)
+
     print("endpoint-resolution selftest: OK" if bad == 0
           else f"endpoint-resolution selftest: FAIL ({bad})")
     return 1 if bad else 0

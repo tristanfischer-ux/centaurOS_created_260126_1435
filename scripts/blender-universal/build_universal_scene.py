@@ -2474,8 +2474,8 @@ def _dimensioned_height_mm(part):
         return d.get("len_mm")            # None when only a diameter was given
     if d.get("kind") == "box":
         return d.get("h_mm")
-    if d.get("kind") == "area":
-        return max(1000.0, math.sqrt(d["area_m2"]) * 1000) * 0.45
+    # An "area" dim is a SURFACE/TRANSFER area (heat-exchanger or membrane m²), never
+    # a physical height — see resolved_dims_mm's identical guard for the full story.
     return None
 
 
@@ -2587,6 +2587,22 @@ def resolved_dims_mm(part):
     shape = part.shape
     d = part.dim
     qty = int(getattr(part, "qty", 1) or 1)
+    # An "area" dim ("<N> m² area") is a SURFACE/TRANSFER area — heat-exchanger duty
+    # or membrane area (RO/UF/NF) — NEVER a physical plan footprint. This mirrors the
+    # identical rule already enforced TS-side (universal-contract-sizing.ts's
+    # isSynthesisable() membrane/RO/UF/NF guard + planFootprintM2()'s own comment: "a
+    # HEAT-TRANSFER / membrane SURFACE area, NOT a plan footprint (a 117 m² HEX
+    # occupies a ~few-m² shell)"). Deriving a square footprint from it (sqrt(area))
+    # minted a ~19 m skid_box for a "Uf Membrane Bank" representative BoM line (364 m²
+    # membrane area → 19,079 mm side) sited nowhere near its real siblings; the router
+    # then favoured this rogue box over the part's genuinely-placed sibling via token
+    # overlap, producing a long stray-pipe detour clear off the platform (Codema v75,
+    # 2026-07-04). Treat an area dim as NO USABLE FOOTPRINT — same as "no explicit
+    # dim" — so the shape's TYPE_DEFAULTS footprint (sized for a real skid/vessel of
+    # that kind) is used instead. Universal: any archetype whose emitter attaches a
+    # surface-area dimension to a word is fixed, not just this one.
+    if d and d["kind"] == "area":
+        d = None
     # cylinder-like dim available
     if d and d["kind"] == "cyl":
         dia = d.get("dia_mm", TYPE_DEFAULTS_MM.get(shape, {}).get("dia", 800))
@@ -2600,11 +2616,6 @@ def resolved_dims_mm(part):
     elif d and d["kind"] == "box":
         rd = {"shape": shape, "w_mm": d["w_mm"], "d_mm": d["d_mm"],
               "h_mm": d["h_mm"], "explicit": True}
-    elif d and d["kind"] == "area":
-        # area → derive a square package footprint (sqrt), height ~ 0.4× side
-        side = max(1000.0, math.sqrt(d["area_m2"]) * 1000)
-        rd = {"shape": shape, "w_mm": side, "d_mm": side, "h_mm": side * 0.45,
-              "explicit": True}
     elif d and d["kind"] == "volume":
         # bare volume → SHAPE-AWARE cylinder dia + height (mirrors the contract's
         # cylinderDimsForVolume aspect logic, keyed on the part's SHAPE not its noun).
