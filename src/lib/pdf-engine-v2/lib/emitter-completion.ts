@@ -233,6 +233,9 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   // reach a 'Variable-Speed Drive' word at all — the guard isMotorDriveSlot still
   // routes them to the sized-to-motor path, never a loose name match.
   'drive', 'vfd', 'vsd', 'starter',
+  // LEXICON ROUND 2 (2026-07-04): 'incomer' is unambiguous (a mains/switchgear
+  // incomer breaker or board) — admitted directly, no qualifier needed.
+  'incomer',
 ])
 
 // English plural→singular fold for TOKEN classification + matching (the f9dfc2918
@@ -261,6 +264,26 @@ const HOUSING_QUALIFIERS = new Set<string>([
   'distribution', 'junction', 'mcc', 'switchboard', 'switchgear',
 ])
 
+// LEXICON ROUND 2 (2026-07-04, round-3 residual dissection): five more real catalogue
+// families that isCatalogueComponent refused to admit as fill-blank candidates AT ALL —
+// 'Emergency Stop' (bare, no button/switch head noun), 'Mains Incomer', 'Power Supply
+// Unit', 'Ethernet IP Module', 'Overcurrent Protection' — each sits in forge-truth.db but
+// the WORD never even reached dbFirstLookup because isCatalogueComponent(name) was false.
+// 'incomer' is unambiguous (an electrical switchgear/board incomer) and admitted directly
+// below. 'stop' / 'module' / 'protection' / 'supply' are each too GENERIC on their own — a
+// bare 'stop', a bare 'module' ('Module Support System' / 'Modular Stack Design' MUST stay
+// refused — they are scope words, not catalogue parts), a bare 'protection' or 'supply' —
+// so each is QUALIFIER-GATED: the head only counts as catalogue when a qualifying token is
+// ALSO present in the same name. UNIVERSAL — no class table; the qualifier lists are the
+// same real families the rest of this lexicon already recognises (surge/overcurrent
+// protection devices, an ethernet/IP/comms network module, a power supply unit).
+const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
+  stop: new Set(['emergency']),
+  module: new Set(['ethernet', 'ip', 'comms', 'communication', 'communications']),
+  protection: new Set(['overcurrent', 'surge']),
+  supply: new Set(['power']),
+}
+
 /**
  * True when a word is a purchased catalogue component worth attaching a part
  * number to. False for fabricated structures (material-costed) and for words
@@ -282,7 +305,13 @@ export function isCatalogueComponent(name: string): boolean {
   const structural = toks.some((t) => STRUCTURAL_TOKEN_SET.has(t))
   const qualifiedHousing =
     toks.some((t) => HOUSING_HEADS.has(t)) && toks.some((t) => HOUSING_QUALIFIERS.has(t))
-  const catalogue = toks.some((t) => CATALOGUE_TOKEN_SET.has(t)) || qualifiedHousing
+  // QUALIFIER-GATED heads (LEXICON ROUND 2): a bare 'stop'/'module'/'protection'/'supply' is
+  // NOT catalogue evidence — the qualifying token is. Never fires on 'Module Support System'
+  // or 'Modular Stack Design' (no ethernet/ip/comms present) — those stay scope words.
+  const qualifiedGated = Object.entries(QUALIFIER_GATED_HEADS).some(
+    ([head, quals]) => toks.includes(head) && toks.some((t) => quals.has(t)),
+  )
+  const catalogue = toks.some((t) => CATALOGUE_TOKEN_SET.has(t)) || qualifiedHousing || qualifiedGated
   if (catalogue && !structural) return true
   if (structural && !catalogue) return false
   if (catalogue && structural) {
@@ -803,79 +832,62 @@ const HEAVY_INDUSTRIAL_TOKENS = new Set<string>([
  * with-real-OEM is strictly better than a coincidental 2-token pin that would
  * fail the slot-mispin / Physics-Critic gates and read as nonsense.
  */
-export function dbFirstLookup(
-  db: Database.Database | null,
-  tokens: string[],
-  headNoun: string | null,
-  opts: { excludeMakerVendors?: boolean } = {},
-): DbPart | null {
-  if (!db || tokens.length === 0) return null
+export interface DbFirstLookupOpts {
+  excludeMakerVendors?: boolean
+  /**
+   * EXCLUSIVE ASSIGNMENT (2026-07-04, the TDS-vs-conductivity shadowing fix): keys
+   * (`manufacturer|part_number`, case-insensitive) to remove from ranking ENTIRELY —
+   * not merely from winning. Two real DB rows can shadow each other when a common
+   * candidate mentions BOTH families in its own text (an E+H CLS15D listed as
+   * "Conductivity / TDS sensor" ranks #1 for both a 'Conductivity Sensor' word AND a
+   * distinct 'TDS Sensor' word, permanently hiding the genuinely-distinct Myron L TDS
+   * row). Passing the already-claimed keys here lets the SECOND word's query see the
+   * candidate pool with the claim already removed, so the next real match — not a
+   * fallback GENERATE guess — wins.
+   */
+  excludeKeys?: Set<string>
+}
 
-  const specificTokens = [...new Set(tokens)].slice(0, 8)
+/**
+ * Pure ranking core of dbFirstLookup — given the pre-fetched candidate ROWS (the union
+ * of the per-token SQL results), pick the single best-ranked, ACCEPTED row. Extracted
+ * from dbFirstLookup (2026-07-04) so the exclusive-assignment retry — and its proveCatch
+ * — can drive the exact ranking/acceptance logic with a handful of fixture rows, with no
+ * sqlite dependency. Behaviour-preserving: a row appearing more than once (fetched under
+ * multiple tokens) collapses to its single best nameHits count, identical to the prior
+ * incremental `seen` map (nameHits is a pure function of the row + the full token list,
+ * so which query round found the row never changes its score).
+ */
+export function pickBestDbCandidate(
+  rows: DbPart[],
+  specificTokens: string[],
+  headNoun: string | null,
+  opts: DbFirstLookupOpts = {},
+): DbPart | null {
   const isHeavy = specificTokens.some((t) => HEAVY_INDUSTRIAL_TOKENS.has(t))
   const seen = new Map<string, { row: DbPart; nameHits: Set<string>; headHit: boolean }>()
 
-  let stmt: Database.Statement
-  try {
-    // DETERMINISTIC ORDER (2026-07-03, routed residual commit e74d4502e): the
-    // per-token LIMIT 60 previously ran with NO ORDER BY, so SQLite returned
-    // rowid (insertion) order — on a common token ('drive' = 778 rows) the 60-row
-    // window was locked to the OLDEST ingested rows and a newly-ingested,
-    // high-confidence row was permanently UNREACHABLE (the growing-DB loop wrote
-    // rows the read side could never serve). Order by verified confidence first,
-    // then NEWEST id, so fresh verified ingest displaces stale low-confidence
-    // rows inside the window. IFNULL(confidence,0): a NULL-confidence legacy row
-    // ranks below any scored row but stays reachable on sparse tokens.
-    // SATURATION FIX (2026-07-03): the 60-row per-token window ordered by bare
-    // confidence let the 36k-row distributor sweep (conf 0.9-1.0) saturate a
-    // common token and lock out the 33 CLASS-TAGGED verified-ingest rows (conf
-    // 0.9) harvested FOR this plant — verified-ingest rows now enter the window
-    // FIRST, then confidence, then newest.
-    stmt = db.prepare(`
-      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp,
-             raw_excerpt, confidence, discovery_source
-      FROM pretraining_extracted_parts
-      WHERE manufacturer IS NOT NULL AND manufacturer != ''
-        AND part_number IS NOT NULL AND length(part_number) >= 4
-        AND (LOWER(part_name) LIKE '%' || ? || '%'
-             OR LOWER(IFNULL(component_class,'')) LIKE '%' || ? || '%')
-      ORDER BY (CASE WHEN discovery_source = 'web_verified_ingest'
-                      AND IFNULL(confidence, 0) >= 0.9 THEN 1 ELSE 0 END) DESC,
-               IFNULL(confidence, 0) DESC, id DESC
-      LIMIT 60
-    `)
-  } catch {
-    return null
-  }
-
-  for (const tok of specificTokens) {
-    let rows: DbPart[]
-    try {
-      rows = stmt.all(tok, tok) as DbPart[]
-    } catch {
-      continue
-    }
-    for (const r of rows) {
-      // PER-WORD path (2026-07-03): a maker/hobby vendor can NEVER pass the
-      // per-word acceptance (dbHitAcceptableForWord refuses them outright), so
-      // letting one win the single-winner rank is a guaranteed silent miss —
-      // a Kratos e-stop shaded the verified Eaton safety station on a
-      // component_class 4th hit. Exclude them from ranking for that caller.
-      if (opts.excludeMakerVendors && MAKER_VENDORS.has((r.manufacturer ?? '').trim().toLowerCase())) continue
-      // Whole-word hits across BOTH part_name and component_class (fold-tolerant,
-      // so the folded token 'valve' still hits a catalogue 'Valves' row).
-      const hay = `${(r.part_name ?? '')} ${(r.component_class ?? '')}`.toLowerCase()
-      const nameHits = new Set<string>()
-      for (const t of specificTokens) if (hasWholeWordFolded(hay, t)) nameHits.add(t)
-      // HEAD HIT = the head noun in the LEADING FAMILY SEGMENT of the part name
-      // (type coherence, 2026-07-03) — an incidental tail mention ('…terminal
-      // block connector' on a panel PC) is NOT a family match.
-      const headHit = headNoun ? headNounHit(partNameLeadSegment(r.part_name), headNoun) : false
-      const key = `${r.manufacturer}|${r.part_number}`
-      const prev = seen.get(key)
-      if (!prev || nameHits.size > prev.nameHits.size) {
-        seen.set(key, { row: r, nameHits, headHit })
-      }
+  for (const r of rows) {
+    const key = `${r.manufacturer}|${r.part_number}`
+    if (opts.excludeKeys?.has(key.toLowerCase())) continue
+    // PER-WORD path (2026-07-03): a maker/hobby vendor can NEVER pass the
+    // per-word acceptance (dbHitAcceptableForWord refuses them outright), so
+    // letting one win the single-winner rank is a guaranteed silent miss —
+    // a Kratos e-stop shaded the verified Eaton safety station on a
+    // component_class 4th hit. Exclude them from ranking for that caller.
+    if (opts.excludeMakerVendors && MAKER_VENDORS.has((r.manufacturer ?? '').trim().toLowerCase())) continue
+    // Whole-word hits across BOTH part_name and component_class (fold-tolerant,
+    // so the folded token 'valve' still hits a catalogue 'Valves' row).
+    const hay = `${(r.part_name ?? '')} ${(r.component_class ?? '')}`.toLowerCase()
+    const nameHits = new Set<string>()
+    for (const t of specificTokens) if (hasWholeWordFolded(hay, t)) nameHits.add(t)
+    // HEAD HIT = the head noun in the LEADING FAMILY SEGMENT of the part name
+    // (type coherence, 2026-07-03) — an incidental tail mention ('…terminal
+    // block connector' on a panel PC) is NOT a family match.
+    const headHit = headNoun ? headNounHit(partNameLeadSegment(r.part_name), headNoun) : false
+    const prev = seen.get(key)
+    if (!prev || nameHits.size > prev.nameHits.size) {
+      seen.set(key, { row: r, nameHits, headHit })
     }
   }
 
@@ -916,6 +928,61 @@ export function dbFirstLookup(
   // Acceptance: (head-noun hit AND ≥2 total hits) OR (≥3 total hits).
   const accept = (best.headHit && best.nameHits.size >= 2) || best.nameHits.size >= 3
   return accept ? best.row : null
+}
+
+export function dbFirstLookup(
+  db: Database.Database | null,
+  tokens: string[],
+  headNoun: string | null,
+  opts: DbFirstLookupOpts = {},
+): DbPart | null {
+  if (!db || tokens.length === 0) return null
+
+  const specificTokens = [...new Set(tokens)].slice(0, 8)
+
+  let stmt: Database.Statement
+  try {
+    // DETERMINISTIC ORDER (2026-07-03, routed residual commit e74d4502e): the
+    // per-token LIMIT 60 previously ran with NO ORDER BY, so SQLite returned
+    // rowid (insertion) order — on a common token ('drive' = 778 rows) the 60-row
+    // window was locked to the OLDEST ingested rows and a newly-ingested,
+    // high-confidence row was permanently UNREACHABLE (the growing-DB loop wrote
+    // rows the read side could never serve). Order by verified confidence first,
+    // then NEWEST id, so fresh verified ingest displaces stale low-confidence
+    // rows inside the window. IFNULL(confidence,0): a NULL-confidence legacy row
+    // ranks below any scored row but stays reachable on sparse tokens.
+    // SATURATION FIX (2026-07-03): the 60-row per-token window ordered by bare
+    // confidence let the 36k-row distributor sweep (conf 0.9-1.0) saturate a
+    // common token and lock out the 33 CLASS-TAGGED verified-ingest rows (conf
+    // 0.9) harvested FOR this plant — verified-ingest rows now enter the window
+    // FIRST, then confidence, then newest.
+    stmt = db.prepare(`
+      SELECT part_name, manufacturer, part_number, component_class, unit_price_gbp,
+             raw_excerpt, confidence, discovery_source
+      FROM pretraining_extracted_parts
+      WHERE manufacturer IS NOT NULL AND manufacturer != ''
+        AND part_number IS NOT NULL AND length(part_number) >= 4
+        AND (LOWER(part_name) LIKE '%' || ? || '%'
+             OR LOWER(IFNULL(component_class,'')) LIKE '%' || ? || '%')
+      ORDER BY (CASE WHEN discovery_source = 'web_verified_ingest'
+                      AND IFNULL(confidence, 0) >= 0.9 THEN 1 ELSE 0 END) DESC,
+               IFNULL(confidence, 0) DESC, id DESC
+      LIMIT 60
+    `)
+  } catch {
+    return null
+  }
+
+  const rows: DbPart[] = []
+  for (const tok of specificTokens) {
+    try {
+      rows.push(...(stmt.all(tok, tok) as DbPart[]))
+    } catch {
+      continue
+    }
+  }
+
+  return pickBestDbCandidate(rows, specificTokens, headNoun, opts)
 }
 
 // High-precision acceptance for a per-WORD DB pin (stricter than the
@@ -1569,8 +1636,23 @@ export async function fillBlankWordMpns(
       //    natural-language name is the LAST token (busbar/sensor/controller), not
       //    the first — to appear as a whole word in the candidate, AND never reuse
       //    a part within the sub_module.
-      const dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true })
-      if (dbHit) {
+      let used = usedInSub.get(cand.subId)
+      if (!used) { used = new Set<string>(); usedInSub.set(cand.subId, used) }
+
+      // EXCLUSIVE ASSIGNMENT (2026-07-04, the TDS-vs-conductivity shadowing fix): the
+      // initial pick may already be CLAIMED by an earlier word in this sub_module (a
+      // real DB row that mentions both families — an E+H CLS15D listed as "Conductivity
+      // / TDS sensor" — wins the rank for BOTH a 'Conductivity Sensor' word and a
+      // distinct 'TDS Sensor' word). Rather than fall straight to a GENERATE guess the
+      // moment the top pick is unavailable, retry ONCE with every key already claimed in
+      // this sub_module excluded from ranking entirely — a genuinely distinct DB row (if
+      // one exists) wins instead. A single-part run (no collision) never triggers the
+      // retry, so behaviour is unchanged outside the shadowing case.
+      let dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true })
+      let pinned = false
+      let blocked = false // a guard refused the pin outright — never fall through to generate
+      let retriesLeft = 1
+      while (dbHit && !pinned && !blocked) {
         // CAPACITY VALIDATION (Tristan 2026-06-27): a flow-machine pin must not be grossly
         // undersized vs the engine's own computed duty. A 'Grundfos CM3-3' (3 m³/h) pinned for a
         // 90 m³/h pump is a ~30× mis-pin (the DB name-match ignores capacity). When the gap word is
@@ -1582,7 +1664,8 @@ export async function fillBlankWordMpns(
         const cap = duty ? partFlowCapacityM3h(dbHit) : null
         if (duty && cap !== null && cap < duty * 0.5) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): DB ${dbHit.manufacturer} ${dbHit.part_number} ~${cap} m³/h << duty ${duty} m³/h — keeping generic spec`)
-          continue
+          blocked = true
+          break
         }
         // COMMODITY PROCESS VALVE (Tristan 2026-06-27): a simple mechanical valve — check / non-return /
         // swing / ball / gate / globe / needle — is specified GENERICALLY at design stage (by size,
@@ -1594,7 +1677,8 @@ export async function fillBlankWordMpns(
         // MPN — e.g. the brief's Keystone Composeal). UNIVERSAL — keyed on the commodity-valve vocabulary.
         if (isCommodityProcessValve(cand.name)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
-          continue
+          blocked = true
+          break
         }
         // ELECTRONICS-IC MIS-PIN (Tristan 2026-06-27): a process FIELD instrument / switch must not be
         // pinned to an electronics-component vendor's IC (a Maxim MAX31827A temp-sensor IC landed on a
@@ -1602,7 +1686,8 @@ export async function fillBlankWordMpns(
         // device needs an industrial instrument (E+H / WIKA / Hach), not a chip. Keep generic. UNIVERSAL.
         if (isElectronicsIcMispin(cand.name, dbHit.manufacturer)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): electronics-IC vendor ${dbHit.manufacturer} on a process field instrument — generic spec, not a chip MPN (was ${dbHit.part_number})`)
-          continue
+          blocked = true
+          break
         }
         // BOARD-MOUNT-SENSOR MIS-PIN (Tristan 2026-06-29): a process field switch/transmitter must not be
         // pinned to a PCB board-mount sensor CHIP. A Honeywell HSCDLNN100MDSA5 (£39 board sensor) landed
@@ -1610,34 +1695,43 @@ export async function fillBlankWordMpns(
         // legit (Honeywell makes both chip + field DP switch), so this keys on the board-sensor MPN pattern.
         if (isBoardMountSensorMispin(cand.name, dbHit.part_number)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): board-mount PCB sensor ${dbHit.manufacturer} ${dbHit.part_number} on a process field-instrument slot — generic field-device spec, not a chip MPN`)
-          continue
+          blocked = true
+          break
         }
         // INDICATOR-LIGHT MIS-PIN (Tristan 2026-06-28): a panel pilot light / LED indicator (Banner
         // K30LMBXXP EZ-LIGHT) must not pin a non-light slot ('Cable Trays'). Keep the generic spec.
         if (isIndicatorLightMispin(cand.name, dbHit)) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): indicator/pilot-light part ${dbHit.manufacturer} ${dbHit.part_number} on a non-light slot — generic spec`)
-          continue
+          blocked = true
+          break
         }
         // (Motor-drive slots never reach here — the DUTY-AWARE block above owns
         // them entirely: in-band DB pin when the duty is known, honest TBD when
         // not. A loose name-token pin on a drive is still impossible.)
         const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
         const key = `${dbHit.manufacturer}|${dbHit.part_number}`.toLowerCase()
-        let used = usedInSub.get(cand.subId)
-        if (!used) { used = new Set<string>(); usedInSub.set(cand.subId, used) }
         if (typeOk && !used.has(key)) {
           used.add(key)
           setWordMpn(cand.word, dbHit.manufacturer, dbHit.part_number, 'db')
           mutated = true
           filled.push({ module_id: cand.moduleId, sub_module_id: cand.subId, source: 'db', manufacturer: dbHit.manufacturer, part_number: dbHit.part_number, name: cand.name })
           log(`[fill-blank-mpn]   ✓ DB   ${cand.moduleId}::${cand.subId} (${cand.name}) → ${dbHit.manufacturer} ${dbHit.part_number}`)
+          pinned = true
+          break
+        }
+        if (typeOk && used.has(key) && retriesLeft > 0) {
+          retriesLeft -= 1
+          log(`[fill-blank-mpn]   ↻ retry ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} already claimed in this sub_module — re-ranking excluding claimed part(s) (exclusive assignment)`)
+          dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true, excludeKeys: used })
           continue
         }
-        // type mismatch or duplicate → treat as a MISS (fall through to
-        // generate) — LOGGED (2026-07-03): the silent fall-through hid why a
-        // word stayed TBD (the Kratos-shades-Eaton diagnosis took a debugger).
-        log(`[fill-blank-mpn]   ⊘ miss ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} ${typeOk ? 'already used in this sub_module' : 'fails type-coherence'} — ${opts.skipGenerate ? 'staying generic' : 'falling through to generate'}`)
+        // type mismatch, or a duplicate with no distinct alternative left → treat as a
+        // MISS (fall through to generate) — LOGGED (2026-07-03): the silent fall-through
+        // hid why a word stayed TBD (the Kratos-shades-Eaton diagnosis took a debugger).
+        log(`[fill-blank-mpn]   ⊘ miss ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} ${typeOk ? 'already claimed in this sub_module (no distinct alternative)' : 'fails type-coherence'} — ${opts.skipGenerate ? 'staying generic' : 'falling through to generate'}`)
+        break
       }
+      if (pinned || blocked) continue
 
       // 2. ON MISS → generate (real OEM + honest deferred MPN) + write-back to
       //    grow the DB. Capped (cost guard); skippable for offline/test runs.

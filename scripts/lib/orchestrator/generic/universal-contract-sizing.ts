@@ -2066,6 +2066,143 @@ export function reconcileDriveTrainRatings(
   return repaired
 }
 
+// ── DUTY-LESS DRIVE WORD DERIVATION (Tristan 2026-07-04 — round-3 residual class) ──────
+// A drive-family filler word ('Motor Starter' / 'VFD Drive' / 'VFD Controller') the
+// skeleton emits with a FLAT character_id (no `<parent>_word__<child>` lineage join —
+// 'motor_starter', not '<pump>_word__vfd') carries NO rating_primary at all, so the
+// fill-blank duty-aware pin (emitter-completion.wordMotorDriveDutyKw) is permanently
+// blind and the slot stays an honest-but-uninformative generic TBD forever. Two REAL
+// signals can still supply the duty without guessing:
+//   1. the SAME lineage join reconcileDriveTrainRatings uses (parent_word__child
+//      character_id) — covers a properly-linked drive that simply hasn't run through
+//      the reconcile yet (this pass runs BEFORE the reconcile in the sizing sequence,
+//      so it stamps the INITIAL rating_primary the reconcile then re-asserts later);
+//   2. MODULE-LEVEL driven-motor evidence: any DRIVEN_PARENT_NOUN_RE word in the SAME
+//      module with a resolvable kW that is not already lineage-paired to another drive
+//      word — the LARGEST unpaired one for a single starter/VFD word, or the SUM of all
+//      unpaired ones for an MCC-LEVEL starter group (a 'Motor Control Center' / plural
+//      'Starters' word represents the whole panel, not one motor).
+// When NEITHER signal exists ANYWHERE in the module (the codema v70 case: 'Motor
+// Starter' / 'Vfd Drive' / 'Vfd Controller' sit in `power_distribution`, which owns no
+// pump/blower/compressor word at all — the driven equipment lives in a DIFFERENT
+// module), the word has no physical referent to size against. Guessing a duty here
+// would be worse than honesty (the ACS580-on-15kW physics HIGH this whole family exists
+// to prevent) — stamp `mis_emission_note` so deterministic_finalize's scope-word rule
+// can demote it to a scope note instead of shipping a fictional-duty or forever-generic
+// priced equipment line. UNIVERSAL — no class table; keyed on the drive/starter
+// vocabulary + the driven-machine noun family already used by the lineage reconcile.
+const DRIVE_WORD_NAME_RE = /\b(vfd|vsd|variable[- ]?(?:speed|frequency)[- ]?(?:drive|controller)|soft[- ]?start\w*|motor starter|frequency converter|inverter drive)\b/i
+// 'Motor Starter' (bare, singular) is the panel abstraction for the WHOLE starter group
+// in an MCC — sum every unpaired motor. 'VFD Drive'/'VFD Controller'/'Soft Starter' are
+// channel-specific (one drive sized to one motor, matching the Bar-B duty-aware pin
+// philosophy elsewhere in this file) — largest-single, never a sum.
+const MCC_GROUP_NAME_RE = /\bmotor control cent(?:er|re)\b|\bmcc\b|\bstarters\b|\bmotor starter\b/i
+
+export interface DutylessDriveDerivationResult { derived: number; flagged: number }
+
+export function deriveDutylessDriveWords(
+  modules: ModuleLike[],
+  quantities: Record<string, number>,
+  briefPinnedKeys?: Set<string>,
+): DutylessDriveDerivationResult {
+  const safeModules = modules ?? []
+  // Same global cid map reconcileDriveTrainRatings uses (lineage join, any module).
+  const byCid = new Map<string, WordLike>()
+  for (const m of safeModules) for (const sm of m.sub_modules ?? []) for (const w of sm.words ?? []) {
+    const cid = String(w.content_character?.character_id ?? '')
+    if (cid && !byCid.has(cid)) byCid.set(cid, w)
+  }
+  // Every parent character_id already lineage-paired to SOME drive word (any module) —
+  // excluded from the module-level unpaired-motor fallback below.
+  const pairedParentCids = new Set<string>()
+  for (const cid of byCid.keys()) {
+    const m2 = /^(.+?)_word__(.+)$/.exec(cid)
+    if (m2 && DRIVE_CHILD_ID_RE.test(m2[2])) pairedParentCids.add(m2[1])
+  }
+
+  let derived = 0
+  let flagged = 0
+  for (const m of safeModules) {
+    const moduleId = String((m as { module?: string }).module ?? '')
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const nm = String(w.name_human ?? w.content_character?.name_human ?? '')
+        if (!DRIVE_WORD_NAME_RE.test(nm)) continue
+        if (wordPowerKw(w) > 0) continue // already carries a duty — nothing to derive
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue // already dispositioned
+
+        let dutyKw = 0
+        let basis = ''
+
+        // 1. LINEAGE JOIN — the same exact rule reconcileDriveTrainRatings uses.
+        const cid = String(w.content_character?.character_id ?? '')
+        const lineageMatch = /^(.+?)_word__(.+)$/.exec(cid)
+        if (lineageMatch && DRIVE_CHILD_ID_RE.test(lineageMatch[2])) {
+          const parent = byCid.get(lineageMatch[1])
+          if (parent && DRIVEN_PARENT_NOUN_RE.test(String(parent.name_human ?? ''))) {
+            const cmk = motorKwFromContract(parent, quantities)
+            if (cmk.kw > 0) {
+              const pinned = briefPinnedKeys?.has(cmk.key) ?? false
+              dutyKw = pinned ? cmk.kw : nextMotorFrameKw(cmk.kw)
+              basis = `duty derived from driven motor ${dutyKw} kW (lineage: ${lineageMatch[1]}, contract requirement ${cmk.kw} kW${pinned ? ', brief-pinned' : ''})`
+            } else {
+              const parentKw = wordPowerKw(parent)
+              if (parentKw > 0) {
+                dutyKw = nextMotorFrameKw(Math.max(1.5, parentKw / 0.88))
+                basis = `duty derived from driven motor ${parentKw} kW (lineage: ${lineageMatch[1]})`
+              }
+            }
+          }
+        }
+
+        // 2. MODULE-LEVEL FALLBACK — the largest unpaired driven machine in the SAME
+        //    module, or the sum of all unpaired ones for an MCC-level group word.
+        if (!(dutyKw > 0)) {
+          const driven: number[] = []
+          for (const sm2 of m.sub_modules ?? []) {
+            for (const w2 of sm2.words ?? []) {
+              if (w2 === w) continue
+              const nm2 = String(w2.name_human ?? w2.content_character?.name_human ?? '')
+              if (!DRIVEN_PARENT_NOUN_RE.test(nm2)) continue
+              const cid2 = String(w2.content_character?.character_id ?? '')
+              if (cid2 && pairedParentCids.has(cid2)) continue // already lineage-paired elsewhere
+              const cmk2 = motorKwFromContract(w2, quantities)
+              const kw2 = cmk2.kw > 0 ? cmk2.kw : wordPowerKw(w2)
+              if (kw2 > 0) driven.push(kw2)
+            }
+          }
+          if (driven.length > 0) {
+            if (MCC_GROUP_NAME_RE.test(nm)) {
+              const sum = driven.reduce((s, d) => s + d, 0)
+              dutyKw = nextMotorFrameKw(sum)
+              basis = `duty derived from driven motor ${sum} kW (MCC-level group sum of ${driven.length} unpaired motor(s) in ${moduleId})`
+            } else {
+              const largestKw = driven.reduce((a, b) => Math.max(a, b), 0)
+              dutyKw = nextMotorFrameKw(largestKw)
+              basis = `duty derived from driven motor ${largestKw} kW (largest unpaired motor in ${moduleId})`
+            }
+          }
+        }
+
+        if (dutyKw > 0) {
+          mergeMods(w, [
+            mod('rating_primary', String(Math.round(dutyKw * 100) / 100), 'kW'),
+            mod('sizing_basis', basis),
+          ])
+          derived += 1
+        } else {
+          // MIS-EMISSION: no motor evidence anywhere in the module — do not guess.
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `deterministic_finalize scope-note candidate: '${nm}' is a drive/starter word with ` +
+            `no driven-motor evidence anywhere in module '${moduleId}' — a mis-emission (nothing to size against)`
+          flagged += 1
+        }
+      }
+    }
+  }
+  return { derived, flagged }
+}
+
 // ── matching ────────────────────────────────────────────────────────────────
 function wordStems(w: WordLike): string[] {
   return significantStems(
@@ -4588,6 +4725,18 @@ export function reconcilePrincipalEquipment(
       res.repaired += dtr
       res.details.push(`drive-train reconcile: ${dtr} motor/VSD rating(s) re-asserted (pin-honour / single IEC rounding)`)
     }
+    // DUTY-LESS DRIVE WORDS (both-paths coverage — see deriveDutylessDriveWords): a
+    // flat-cid drive/starter word the reconcile above cannot touch (it requires an
+    // EXISTING rating_primary) — this pass STAMPS the initial one, or flags a
+    // mis-emission when the module owns no driven-motor evidence at all. Same
+    // both-synthesis-paths discipline as the DRIVE-TRAIN reconcile immediately above
+    // (a re-mint via reconcilePrincipalEquipment must never resurrect an un-derived
+    // duty-less drive word — verified in the FINAL state, not per-function).
+    const ddw = deriveDutylessDriveWords(modules, quantities, briefPinnedQuantityKeys(contract))
+    if (ddw.derived > 0 || ddw.flagged > 0) {
+      res.repaired += ddw.derived
+      res.details.push(`duty-less drive words: ${ddw.derived} duty-derived, ${ddw.flagged} flagged as mis-emissions (no driven-motor evidence)`)
+    }
   }
 
   // RE-HOST + DE-DUP DEPENDENTS OF A COLLAPSED "computed_*" TWIN. The instrument / actuator
@@ -5009,6 +5158,18 @@ export function applyUniversalContractSizing(
   if (driveTrainRepaired > 0) {
     // eslint-disable-next-line no-console
     console.error(`[universal-sizing] drive-train reconcile: ${driveTrainRepaired} motor/VSD rating(s) re-asserted (pin-honour / single IEC rounding)`)
+  }
+  // Duty-less drive-word derivation (round-3 residual class, 2026-07-04): stamp an
+  // initial rating_primary on any flat-cid drive/starter word the reconcile above cannot
+  // touch (it requires an EXISTING rating_primary), or flag a mis-emission when the
+  // module owns no driven-motor evidence at all — see deriveDutylessDriveWords. Wired
+  // in BOTH synthesis paths (here AND reconcilePrincipalEquipment, mirroring the
+  // drive-train reconcile immediately above) so neither path silently re-mints an
+  // un-derived duty-less drive word.
+  const driveDuty = (opts.explode ?? true) ? deriveDutylessDriveWords(modules, quantities, pinnedKeys) : { derived: 0, flagged: 0 }
+  if (driveDuty.derived > 0 || driveDuty.flagged > 0) {
+    // eslint-disable-next-line no-console
+    console.error(`[universal-sizing] duty-less drive words: ${driveDuty.derived} duty-derived, ${driveDuty.flagged} flagged as mis-emissions (no driven-motor evidence)`)
   }
 
   // ── E. TYPED SERVICE (Phase 0 root fix): stamp every characterisable word with a

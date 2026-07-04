@@ -614,6 +614,130 @@ def scrub_overview_orphans(state) -> int:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 4. scope_word_demotion — a scope/system/consumable head-noun word emitted as a
+#    PRICED BoM equipment line is a documentation/scope/consumable mis-emission
+#    (round-3 residual dissection, 2026-07-04): 'Piping Network', 'Module Support
+#    System', 'Modular Stack Design', 'Protective Coating', 'Sealant', 'CIP System
+#    [Connections]' are never themselves a purchasable catalogue item — they are
+#    SCOPE NOTES (what the plant's piping/structure/CIP loop INCLUDES), not a line
+#    a buyer can order. A word is demoted to a scope note (folded into its
+#    sub-module's prose, removed from the priced word list) only when ALL of:
+#      (a) its name matches the SCOPE_WORD vocabulary below, OR it carries the
+#          `mis_emission_note` provenance a upstream duty-derivation pass (e.g.
+#          universal-contract-sizing.deriveDutylessDriveWords) stamps on a word it
+#          positively determined has no physical referent to size against —
+#          ONE shared drop mechanism for any upstream pass that can prove a word
+#          is not real equipment, never a second bespoke removal path;
+#      (b) it carries NO real manufacturer + part_number (a genuinely-pinned real
+#          part — e.g. a branded packaged CIP skid — is NEVER demoted regardless
+#          of name);
+#      (c) it owns no exploded sub-components (no sibling word's id is prefixed
+#          `<this id>__` — a real principal with children stays);
+#      (d) its cost-basis method (costBasis.lines[*].basis.method) is a generic
+#          parametric estimate (class_reference / llm_estimate) when costBasis
+#          data exists for the word — a genuinely catalogue-priced line never
+#          demotes even if its name coincidentally matches the vocabulary.
+#    'CIP System' bare and 'CIP System Connections' both qualify on codema v70
+#    (both TBD, no manufacturer, no children, class_reference-priced) — a FUTURE
+#    run where the generator emits a REAL packaged CIP skid (branded, dims, its
+#    own sub-components) stays untouched by guards (b)+(c).
+# ─────────────────────────────────────────────────────────────────────────────
+_SCOPE_WORD_RE = re.compile(
+    r"\bpiping\s+network\b|\bmodule\s+support\s+system\b|\bmodular\s+stack\s+design\b|"
+    r"\bprotective\s+coating\b|\bsealant\b|\bcip\s+system(?:\s+connections)?\b",
+    re.I)
+
+_BLANK_MPN_RE = re.compile(
+    r"^\s*$|\b(specify|tbd|to\s+be\s+(confirmed|selected|determined|advised)|detailed\s+design|"
+    r"n/?a|placeholder|unknown)\b", re.I)
+
+_GENERIC_BASIS_METHODS = {"class_reference", "llm_estimate"}
+
+
+def _is_blank_mpn(pn) -> bool:
+    s = str(pn or "").strip()
+    return (not s) or bool(_BLANK_MPN_RE.search(s))
+
+
+def _mod_value(w, norm_kind_wanted: str):
+    for mc in (w.get("modifier_characters") or []):
+        if _norm_kind(mc.get("kind")) == norm_kind_wanted:
+            return mc.get("value")
+    return None
+
+
+def _has_real_mpn(w) -> bool:
+    mfr = str(_mod_value(w, "manufacturer") or "").strip()
+    return bool(mfr) and not _is_blank_mpn(_mod_value(w, "partnumber"))
+
+
+def _owns_subcomponents(w, sm) -> bool:
+    wid = str(w.get("id") or "")
+    if not wid:
+        return False
+    prefix = wid + "__"
+    return any(str(o.get("id") or "").startswith(prefix) for o in _words(sm) if o is not w)
+
+
+def _cost_basis_method(state, word_id):
+    cb = state.get("costBasis") or {}
+    lines = cb.get("lines") if isinstance(cb, dict) else cb
+    if not isinstance(lines, list) or not word_id:
+        return None
+    for l in lines:
+        if isinstance(l, dict) and l.get("word_id") == word_id:
+            return (l.get("basis") or {}).get("method")
+    return None
+
+
+def scope_word_candidates(state):
+    """[(module, sub_module, word)] eligible for scope-note demotion — pure query, no
+    mutation, so the selftest / a dry-run report can inspect the set before committing."""
+    out = []
+    for m in _modules(state):
+        for sm in (m.get("sub_modules") or []):
+            for w in _words(sm):
+                name = _name(w)
+                flagged_upstream = bool(w.get("mis_emission_note"))
+                if not flagged_upstream and not (name and _SCOPE_WORD_RE.search(name)):
+                    continue
+                if _has_real_mpn(w):
+                    continue                       # a genuinely-pinned real part stays
+                if _owns_subcomponents(w, sm):
+                    continue                        # a real principal with children stays
+                method = _cost_basis_method(state, w.get("id"))
+                if method is not None and method not in _GENERIC_BASIS_METHODS:
+                    continue                        # a catalogue-priced line stays
+                out.append((m, sm, w))
+    return out
+
+
+def demote_scope_words(state) -> int:
+    """Fix 4 — demote each scope-word / upstream-flagged-mis-emission candidate to a scope
+    note in its sub-module prose, and drop it from the priced word list (never a priced
+    BoM equipment line). Idempotent (a re-run finds no candidates: the word is gone)."""
+    demoted = 0
+    for m, sm, w in scope_word_candidates(state):
+        name = _name(w) or "?"
+        reason = w.get("mis_emission_note")
+        note = (f"Scope includes {name.lower()} (specified at detailed design; "
+                f"not a separately priced line).")
+        base = str(sm.get("english_sentence") or "").rstrip()
+        if base and not base.endswith("."):
+            base += "."
+        if note not in base:
+            sm["english_sentence"] = (base + " " + note).strip() if base else note
+        sm["words"] = [o for o in _words(sm) if o is not w]
+        w["scope_note_demoted_from_priced_line"] = reason or (
+            f"deterministic_finalize scope_word_demotion: '{name}' matches the "
+            f"scope/system/consumable vocabulary, carries no real MPN, owns no "
+            f"sub-components, and has a generic parametric price basis — demoted "
+            f"to a scope note, never a priced equipment line")
+        demoted += 1
+    return demoted
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # gate REPLICAS (for verification / selftest) — count residual violations
 # ─────────────────────────────────────────────────────────────────────────────
 def count_violations(state):
@@ -642,6 +766,10 @@ def finalize(state) -> dict:
         # class-alien rename VERY FIRST so every later fix (density merge / prose
         # coverage / overview scrub) sees the corrected, brief-named system name
         "class_alien_renamed": rename_class_alien_control(state),
+        # scope-word demotion BEFORE the density merge so the merge's word-count
+        # decisions see the FINAL word set (a sub-module a demotion thins out must
+        # be judged on what's left, not on a count that's about to shrink)
+        "scope_words_demoted": demote_scope_words(state),
         # density merge next so prose coverage (fix 2) names the transplanted words
         "thin_sub_modules_merged": merge_thin_sub_modules(state),
         "modifier_conflicts_fixed": fix_modifier_conflicts(state),
@@ -810,17 +938,101 @@ def _selftest() -> int:
                   and brief_named_control_system({"parsedBrief": {"original_text":
                       "A robust control system shall manage the plant."}}) is None)
 
+    # ── fix 4: scope_word_demotion — proveCatch BOTH directions ─────────────────
+    def _scope_word(name, wid, mfr=None, pn="TBD (detailed design)", mis_note=None):
+        mods = [{"kind": "quantity", "value": "×1"},
+                {"kind": "part_number", "value": pn}]
+        if mfr:
+            mods.append({"kind": "manufacturer", "value": mfr})
+        w = {"id": wid, "name_human": name,
+             "content_character": {"character_id": wid, "name_human": name},
+             "modifier_characters": mods}
+        if mis_note:
+            w["mis_emission_note"] = mis_note
+        return w
+
+    def _scope_state(word, method="class_reference", child=None, filler_count=6):
+        words = [word] + [_w(i) for i in range(filler_count)]
+        if child is not None:
+            words.append(child)
+        st = {"moduleDecomposition": {"modules": [{
+            "module": "m1",
+            "sub_modules": [{"id": "m1__s", "english_sentence": "The skid comprises the listed items.",
+                              "words": words}]}]}}
+        if method is not None:
+            st["costBasis"] = {"lines": [{"word_id": word["id"], "basis": {"method": method}}]}
+        return st
+
+    # (a) FIRES: 'Piping Network' — vocabulary match, no MPN, no children, generic basis.
+    st_sw1 = _scope_state(_scope_word("Piping Network", "piping_network_word"))
+    n_sw1 = demote_scope_words(st_sw1)
+    sub1 = st_sw1["moduleDecomposition"]["modules"][0]["sub_modules"][0]
+    scope_fires_ok = (n_sw1 == 1
+                       and not any(w["id"] == "piping_network_word" for w in sub1["words"])
+                       and "piping network" in sub1["english_sentence"].lower()
+                       and "not a separately priced line" in sub1["english_sentence"]
+                       and demote_scope_words(st_sw1) == 0)               # idempotent
+
+    # (b) FIRES on the OTHER 4 named vocabulary families too.
+    other_families_ok = True
+    for nm, wid in [("Module Support System", "mss_word"), ("Modular Stack Design", "msd_word"),
+                     ("Protective Coating", "pc_word"), ("Sealant", "sealant_word"),
+                     ("Cip System Connections", "cipc_word")]:
+        st_x = _scope_state(_scope_word(nm, wid))
+        other_families_ok = other_families_ok and demote_scope_words(st_x) == 1
+
+    # (c) NEVER fires on a genuinely-pinned real part (a real manufacturer + MPN) even
+    #     though the name matches the vocabulary — the CIP-System caution.
+    st_real = _scope_state(_scope_word("Cip System", "cip_system_word", mfr="Alfa Laval", pn="CIP-2000-SS"))
+    real_part_stays_ok = demote_scope_words(st_real) == 0
+
+    # (d) NEVER fires on a word that owns exploded sub-components (a real principal).
+    child = {"id": "cip_system_word__pump", "name_human": "CIP Pump",
+             "content_character": {"character_id": "cip_system_word__pump", "name_human": "CIP Pump"},
+             "modifier_characters": []}
+    st_owns = _scope_state(_scope_word("Cip System", "cip_system_word"), child=child)
+    owns_children_stays_ok = demote_scope_words(st_owns) == 0
+
+    # (e) NEVER fires on a catalogue-priced line even if the name coincidentally matches.
+    st_cat = _scope_state(_scope_word("Sealant", "sealant_word"), method="catalogue")
+    catalogue_priced_stays_ok = demote_scope_words(st_cat) == 0
+
+    # (f) FIRES on an upstream mis_emission_note flag alone — no vocabulary match needed
+    #     (the shared drop mechanism deriveDutylessDriveWords feeds into).
+    st_flagged = _scope_state(_scope_word("Vfd Drive", "vfd_drive_word",
+                                           mis_note="deterministic_finalize scope-note candidate: "
+                                                     "'Vfd Drive' is a drive/starter word with no "
+                                                     "driven-motor evidence anywhere in module 'power_distribution' "
+                                                     "— a mis-emission (nothing to size against)"))
+    n_flagged = demote_scope_words(st_flagged)
+    sub_flagged = st_flagged["moduleDecomposition"]["modules"][0]["sub_modules"][0]
+    mis_emission_flag_ok = (n_flagged == 1
+                             and not any(w["id"] == "vfd_drive_word" for w in sub_flagged["words"]))
+
+    # (g) a word with NEITHER a vocabulary match NOR an upstream flag is untouched.
+    st_none = _scope_state(_scope_word("Reverse Osmosis Skid", "ro_skid_word"))
+    no_match_untouched_ok = (demote_scope_words(st_none) == 0
+                              and any(w["id"] == "ro_skid_word"
+                                      for w in st_none["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"]))
+
+    scope_ok = (scope_fires_ok and other_families_ok and real_part_stays_ok and owns_children_stays_ok
+                and catalogue_priced_stays_ok and mis_emission_flag_ok and no_match_untouched_ok)
+
     if (ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok
             and domain_ok and rename_ok and rename_none_ok and home_ok and non_telemetry_ok
-            and extract_ok):
-        print("deterministic_finalize selftest OK (class-alien-rename / density-merge / "
-              "modifier / prose / overview / idempotent)")
+            and extract_ok and scope_ok):
+        print("deterministic_finalize selftest OK (class-alien-rename / scope-word-demotion / "
+              "density-merge / modifier / prose / overview / idempotent)")
         return 0
     print(f"SELFTEST FAIL: ok={ok} idem={idem} named={named} one_dim={one_dim} "
           f"merge_ok={merge_ok} loop_ok={loop_ok} exempt_ok={exempt_ok} "
           f"partition_ok={partition_ok} domain_ok={domain_ok} rename_ok={rename_ok} "
           f"rename_none_ok={rename_none_ok} home_ok={home_ok} "
           f"non_telemetry_ok={non_telemetry_ok} extract_ok={extract_ok} "
+          f"scope_fires_ok={scope_fires_ok} other_families_ok={other_families_ok} "
+          f"real_part_stays_ok={real_part_stays_ok} owns_children_stays_ok={owns_children_stays_ok} "
+          f"catalogue_priced_stays_ok={catalogue_priced_stays_ok} mis_emission_flag_ok={mis_emission_flag_ok} "
+          f"no_match_untouched_ok={no_match_untouched_ok} "
           f"before={before} after={after}")
     return 1
 
@@ -838,12 +1050,13 @@ def main(argv) -> int:
     with open(sp, "r", encoding="utf-8") as fh:
         state = json.load(fh)
     r = finalize(state)
-    if (r["class_alien_renamed"] or r["thin_sub_modules_merged"] or r["modifier_conflicts_fixed"]
-            or r["prose_covered"] or r["overview_scrubbed"]):
+    if (r["class_alien_renamed"] or r["scope_words_demoted"] or r["thin_sub_modules_merged"]
+            or r["modifier_conflicts_fixed"] or r["prose_covered"] or r["overview_scrubbed"]):
         with open(sp, "w", encoding="utf-8") as fh:
             json.dump(state, fh)
     rv = r["residual_violations"]
     print(f"[deterministic-finalize] class-alien-renamed={r['class_alien_renamed']} "
+          f"scope-words-demoted={r['scope_words_demoted']} "
           f"density-merged={r['thin_sub_modules_merged']} "
           f"modifiers={r['modifier_conflicts_fixed']} prose={r['prose_covered']} "
           f"overview={r['overview_scrubbed']} · residual violations {rv}")

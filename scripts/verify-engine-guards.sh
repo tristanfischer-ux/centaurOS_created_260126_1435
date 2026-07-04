@@ -62,6 +62,7 @@ run "connection_ledger.py --selftest"         "$PY" scripts/blender-universal/co
 run "endpoint-resolution proveCatch"          "$PY" scripts/blender-universal/endpoint_resolution_test.py
 run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/generic/derive-topology.ts --selftest
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts
+run "drive-duty --selftest"                   npx tsx scripts/lib/orchestrator/generic/drive-duty-selftest.ts
 run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/generic/instrument-sizing-selftest.ts
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts

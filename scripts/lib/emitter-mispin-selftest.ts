@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -129,5 +129,58 @@ expect(wordMotorDriveDutyKw({ modifier_characters: [{ kind: 'rating_primary', va
 expect(wordMotorDriveDutyKw({ modifier_characters: [{ kind: 'quantity', value: '×1' }] } as any) === null,
   'a duty-less drive word resolves NO duty (stays the honest generic TBD)')
 
+// ── LEXICON ROUND 2 (2026-07-04): 5 real catalogue families that isCatalogueComponent
+//    refused to admit as fill-blank candidates at all — the round-3 residual dissection.
+//    proveCatch BOTH directions per noun: the qualified form is admitted; the bare head
+//    noun / the scope-word lookalikes stay refused.
+for (const [name, subId] of [
+  ['Emergency Stop', 'safety_protection__overcurrent_protection'],
+  ['Overcurrent Protection', 'safety_protection__overcurrent_protection'],
+  ['Mains Incomer', 'energy_storage_source__mains_incomer'],
+  ['Power Supply Unit', 'energy_storage_source__mains_incomer'],
+  ['Ethernet Ip Module', 'control_compute_communication__plc_controller'],
+] as const) {
+  expect(isCatalogueComponent(`${name} ${subId}`) === true,
+    `Lexicon round 2: '${name}' (${subId}) is a real catalogue part and MUST become a fill-blank candidate`)
+}
+for (const [name, subId] of [
+  ['Module Support System', 'structure_containment__module_support_system'],
+  ['Modular Stack Design', 'maintenance_serviceability__leveling_feet'],
+] as const) {
+  expect(isCatalogueComponent(`${name} ${subId}`) === false,
+    `Lexicon round 2: '${name}' (${subId}) MUST stay refused (scope word, not a catalogue part)`)
+}
+expect(isCatalogueComponent('Full Stop safety_protection__end_of_line') === false,
+  "a bare 'stop' with no 'emergency' qualifier MUST stay refused (qualifier-gated, not admitted outright)")
+expect(isCatalogueComponent('Cathodic Protection safety_protection__corrosion_control') === false,
+  "a bare 'protection' with no overcurrent/surge qualifier MUST stay refused")
+expect(isCatalogueComponent('Water Supply mass_fluid_transport_process__utility_supply') === false,
+  "a bare 'supply' with no 'power' qualifier MUST stay refused")
+
+// ── TDS-vs-CONDUCTIVITY SHADOWING (2026-07-04): two real DB rows shadow each other
+//    when the top-ranked candidate mentions BOTH families in its own text — the
+//    Conductivity word's dbFirstLookup pick ALSO wins the TDS word's ranking, hiding
+//    the genuinely-distinct row. Exclusive assignment (excludeKeys) must recover it.
+{
+  const ehRow: DbPart = { part_name: 'Conductivity Sensor CLS15D — TDS-capable 4-electrode contacting cell', manufacturer: 'Endress+Hauser', part_number: 'CLS15D-A1A', component_class: 'water_treatment', unit_price_gbp: null }
+  const myronRow: DbPart = { part_name: 'TDS Sensor Myron L 750-Series II conductivity meter', manufacturer: 'Myron L', part_number: '750-II', component_class: 'water_treatment', unit_price_gbp: null }
+  const rows = [ehRow, myronRow]
+  const condPick = pickBestDbCandidate(rows, ['conductivity', 'sensor'], 'sensor')
+  const tdsPickNoExclude = pickBestDbCandidate(rows, ['tds', 'sensor'], 'sensor')
+  expect(condPick?.part_number === 'CLS15D-A1A', 'shadowing fixture: the Conductivity word picks the E+H row')
+  expect(tdsPickNoExclude?.part_number === 'CLS15D-A1A',
+    'shadowing fixture: the TDS word ALSO picks the E+H row when nothing is excluded (reproduces the bug)')
+  const claimed = new Set<string>([`${condPick!.manufacturer}|${condPick!.part_number}`.toLowerCase()])
+  const tdsPickExcluded = pickBestDbCandidate(rows, ['tds', 'sensor'], 'sensor', { excludeKeys: claimed })
+  expect(tdsPickExcluded?.part_number === '750-II',
+    'exclusive assignment: excluding the claimed E+H row lets the TDS word resolve the genuinely-distinct Myron L row')
+  // a genuinely single-part run (no collision) is unaffected — excluding an UNRELATED key
+  // changes nothing.
+  const unrelated = new Set<string>(['nobody|nothing'])
+  const condPickUnaffected = pickBestDbCandidate(rows, ['conductivity', 'sensor'], 'sensor', { excludeKeys: unrelated })
+  expect(condPickUnaffected?.part_number === 'CLS15D-A1A',
+    'exclusive assignment: excluding an unrelated key never changes a single, non-colliding pick')
+}
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment proven)')
