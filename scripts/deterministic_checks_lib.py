@@ -701,11 +701,27 @@ def _checks_balance(state: dict, run_dir: str) -> List[Check]:
 # ============================================================================
 # Basis vocabulary the pricing pass writes when it DELIBERATELY corrects a line's price
 # away from its raw parametric estimate (corpus lift / credible-price floor / commodity
-# floor / micro-commodity cap / gate-21 distributor correction). Keyed on the correction
-# STATEMENT, never on part class — universal. See the exemption note in _checks_cost.
+# floor / micro-commodity cap / gate-21 distributor correction / actuated-valve assembly
+# formula). Keyed on the correction STATEMENT, never on part class — universal. See the
+# exemption note in _checks_cost.
+#
+# 'actuated-valve assembly' (codema v77, 2026-07-05): requirements_bom.py's
+# _actuated_valve_assembly_price() prices an ACTUATED valve (actuator + valve body as
+# ONE procurable unit) from an explicit, self-documenting formula — "£80 base +
+# £1.85/DN·mm × DN65 assumed = £200 (... never the bare-valve band)" — and its own
+# comment states it is LIFT-ONLY (never lowers a real catalogue price). Banding that
+# honest £200 assembly price against a partVerifications estimate that only ever priced
+# the BARE valve body (£18-25, an Engine-B commodity-curve reference for a component
+# class that pre-dates the actuation upgrade) compares two different physical scopes —
+# the same self-contradiction the corpus-lift/commodity-floor patterns above already
+# exempt. v77 V-107/V-109/V-110 (Bürkert Type 2000/2301 actuated valves) FAILED the x5
+# band at £200 vs a stale £18 bare-valve price_estimate_gbp for exactly this reason.
+# Matches the LITERAL basis prefix requirements_bom.py always emits for this family, so
+# it can never accidentally exempt an unrelated line.
 _DELIBERATE_PRICE_CORRECTION_RE = re.compile(
     r"lifted\s*£?[\d,.]+\s*→|to the engine corpus|floored to min credible price|"
-    r"commodity-floor|micro-commodity ceiling|gate-21\s*>?\s*\d*×?\s*correction",
+    r"commodity-floor|micro-commodity ceiling|gate-21\s*>?\s*\d*×?\s*correction|"
+    r"actuated-valve assembly",
     re.I)
 
 # Basis vocabulary that states the line's rendered price IS a catalogue / distributor /
@@ -1266,34 +1282,89 @@ def _requirements_bom(state: dict) -> List[dict]:
 
 
 def _index_partverifications_by_mpn(state: dict
-                                    ) -> Dict[Tuple[str, str], dict]:
+                                    ) -> Dict[Tuple[str, str], List[dict]]:
     """Index partVerifications by (manufacturer.lower, part_number.lower) — the one
     unambiguous join key. Only real part numbers (>=4 chars) are indexed; the
-    generic placeholder rows have no usable MPN and are simply absent."""
-    idx: Dict[Tuple[str, str], dict] = {}
+    generic placeholder rows have no usable MPN and are simply absent.
+
+    Returns ALL partVerifications sharing a key, in state order (codema v77 fix,
+    2026-07-05): two DIFFERENT principal words can legitimately share one
+    manufacturer+part_number — a DB-first match resolving to the same generic
+    catalogue shell (Pentair's "36X72 COMP" composite pressure vessel serves both
+    a softener vessel AND a GAC-softener vessel at different sizes), or an early
+    placeholder word superseded by a later, correctly-priced duplicate (a
+    'Solenoid Valves' Engine-B curve estimate vs a 'Solenoid Valve' verified
+    Farnell price). The OLD ``setdefault`` shape kept only the FIRST pv per key
+    and silently discarded every other candidate, so a BoM row that genuinely
+    matched the SECOND (freshly-priced) word was joined to the FIRST (stale)
+    sibling's price instead — a two-truths artefact (v77 V-103 £14,825 vs a
+    stale £840; V-108 £393 vs a stale £25), not a wrong price. See
+    ``_best_pv_candidate`` for how a BoM row picks among multiple candidates."""
+    idx: Dict[Tuple[str, str], List[dict]] = {}
     for pv in (state.get("partVerifications") or []):
         pn = str(pv.get("part_number") or "").strip()
         mfr = str(pv.get("manufacturer") or "").strip()
         if len(pn) >= 4 and mfr:
-            idx.setdefault((mfr.lower(), pn.lower()), pv)
+            idx.setdefault((mfr.lower(), pn.lower()), []).append(pv)
     return idx
 
 
+def _best_pv_candidate(bom_row: dict, candidates: List[dict]) -> dict:
+    """Disambiguate when >=2 partVerifications share one (manufacturer, part_number)
+    key (codema v77, 2026-07-05). A requirementsBom row carries no word_id, so there is
+    no exact identity link back to a specific word — but two words that GENUINELY
+    price the same real catalogue part must carry the SAME reference price, while a
+    word that merely coincidentally collides on that (manufacturer, part_number) string
+    (a DB-first mis-match — e.g. codema v77's "Grundfos 96122012" landed on the real
+    fertigation pump AND, wrongly, on an unrelated pump-assembly word AND a suction
+    valve) prices from an entirely different component-class curve and sits far away.
+    Picks the candidate whose OWN reference price (``_reference_unit_price`` — the same
+    field cascade the band check itself reads) is closest to the row's rendered
+    ``unit_gbp``, compared on a log scale so an over-bid (x17.6) and an under-bid
+    (x0.004) are weighed the same way. This is NOT circular: it does not always pick a
+    PASS — a row whose true price genuinely diverges from every candidate still has no
+    close match to prefer and keeps today's FAIL (see the V-CTRL adversarial proveCatch
+    below, and P-106 above the wrong 'closer-looking' name once mis-selected before this
+    was tried on price instead of text). An earlier text-overlap heuristic was rejected
+    here (proveCatch regression on P-106 codema v77: a verbose duplicate word's name
+    shared MORE requirement tokens than the actually-correct concise duplicate). Falls
+    back to the FIRST candidate (today's behaviour) when no candidate carries a usable
+    reference price — an unresolvable ambiguity never invents a match it can't support.
+    """
+    if len(candidates) == 1:
+        return candidates[0]
+    unit_p = num(bom_row.get("unit_gbp"))
+    if unit_p is None or unit_p <= 0:
+        return candidates[0]
+    best, best_dist = candidates[0], None
+    for pv in candidates:
+        ref, _ = _reference_unit_price(pv)
+        if ref is None or ref <= 0:
+            continue
+        dist = abs(math.log(unit_p / ref))
+        if best_dist is None or dist < best_dist:
+            best, best_dist = pv, dist
+    return best
+
+
 def _match_partverification_by_mpn(bom_row: dict,
-                                   idx: Dict[Tuple[str, str], dict]
+                                   idx: Dict[Tuple[str, str], List[dict]]
                                    ) -> Optional[dict]:
     """Match a BoM line to its partVerification ONLY by an exact manufacturer +
     part_number both appearing in the line's ``part`` string (e.g. the part
     'Grundfos UP15-42' joins the pv whose mfr='Grundfos', pn='UP15-42'). Returns
     None for any line that does not name a real mfr+MPN (e.g. 'requirement
     stated', 'made to spec', a structural take-off) — those have no authoritative
-    independent price to band against, so we never fabricate a cost FAIL on them."""
+    independent price to band against, so we never fabricate a cost FAIL on them.
+    When more than one partVerification shares that (mfr, pn) key, disambiguates
+    via ``_best_pv_candidate`` (codema v77, 2026-07-05) instead of the first one
+    indexed."""
     part = str(bom_row.get("part") or "").strip().lower()
     if not part:
         return None
-    for (mfr, pn), pv in idx.items():
+    for (mfr, pn), candidates in idx.items():
         if mfr in part and pn in part:
-            return pv
+            return _best_pv_candidate(bom_row, candidates)
     return None
 
 
@@ -2032,6 +2103,118 @@ def _selftest() -> int:
         check(_has(checks, "Tool output used: cell_heat_generation_kw", FAIL),
               "XVAL PROVENANCE: a same-name claim whose value disagrees with the contract "
               "(45.1 vs 22.0) must still FAIL (stale tool output stays caught)")
+
+    # ---- CODEMA V77 proveCatches (2026-07-05) — duplicate-MPN join disambiguation +
+    #      actuated-valve-assembly exemption. Reproduces V-103/V-108 (two partVerifications
+    #      legitimately share one manufacturer+part_number; the check must join the BoM row
+    #      to the candidate its own `requirement` text actually names, not the first one
+    #      indexed) and V-107/V-109/V-110 (an honest actuated-valve-assembly price must not
+    #      band against the bare-valve-body estimate it deliberately supersedes). ----
+    dup_state = {
+        "orchestratorContract": {"product_class": "synthetic_dup_mpn", "quantities": {}},
+        "requirementsBom": [
+            # V-103 shape: TWO words share (Pentair Structural, 36X72 COMP...) — the
+            # STALE 'Softener Vessel' sibling (£840) must NOT win this row's join; the
+            # row's own requirement text names 'Gac Softener', which the fresh sibling's
+            # word_name matches exactly.
+            {"tag": "V-103", "part": "Pentair Structural 36X72 COMP 6\"TF 6\"BF",
+             "qty": 1, "unit_gbp": 14825, "line_gbp": 14825,
+             "requirement": "Gac Softener · 15 m³/h · 0.9 m dia x 1.8 m",
+             "basis": "catalogue"},
+            # V-108 shape: TWO words share (Sensata, SOL7A4) — an early Engine-B curve
+            # placeholder ('Solenoid Valves', £25) and a later Farnell-verified duplicate
+            # ('Solenoid Valve', £393.05). The row names the SINGULAR form.
+            {"tag": "V-108", "part": "Sensata Technologies, Inc. SOL7A4",
+             "qty": 1, "unit_gbp": 393, "line_gbp": 393,
+             "requirement": "Solenoid Valve", "basis": "catalogue"},
+            # V-107/109/110 shape: an ACTUATED-VALVE ASSEMBLY price (£200) must not band
+            # against the bare-valve-body Engine-B curve estimate (£18) it supersedes.
+            {"tag": "V-107", "part": "Bürkert Type 2000", "qty": 1,
+             "unit_gbp": 200, "line_gbp": 200,
+             "requirement": "Keystone Composeal 125 mm Pneumatic Butterfly Valve",
+             "basis": "actuated-valve assembly (actuator + valve body as ONE unit): "
+                      "£80 base + £1.85/DN·mm × DN65 assumed (2½ in class) = £200 "
+                      "(UK-2026 trade supply, never the bare-valve band)"},
+            # Adversarial control: the SAME basis wording, but the reference is a LIVE
+            # DISTRIBUTOR price (independent market evidence) rather than a parametric
+            # curve estimate — the exemption must NOT engage here (a genuinely wrong
+            # price behind honest-looking basis text must still be caught).
+            {"tag": "V-CTRL", "part": "Bürkert Type 9999", "qty": 1,
+             "unit_gbp": 200, "line_gbp": 200,
+             "requirement": "Control actuated valve",
+             "basis": "actuated-valve assembly (actuator + valve body as ONE unit): "
+                      "£80 base + £1.85/DN·mm × DN65 assumed (2½ in class) = £200 "
+                      "(UK-2026 trade supply, never the bare-valve band)"},
+            # P-106 shape (the text-overlap heuristic's own regression, caught before this
+            # fix shipped): THREE words share (Grundfos, 96122012) — the true match
+            # ('Grundfos CR 32-4-2 ... Circulation Pump', £8,634) plus two unrelated
+            # DB-mismatch words whose VERBOSE names happen to share MORE requirement
+            # tokens ('fertigation', 'dosing', 'pump') than the true match's concise
+            # name does. A name/token-overlap disambiguator picks the wrong one; picking
+            # by closest reference PRICE does not.
+            {"tag": "P-106", "part": "Grundfos 96122012", "qty": 2,
+             "unit_gbp": 8634, "line_gbp": 17268,
+             "requirement": "Fertigation Dosing Pump · 8 kW · 600x510x660 mm",
+             "basis": "catalogue"},
+        ],
+        "partVerifications": [
+            {"word_id": "softener_vessel_synth_word", "word_name": "Pentair Fleck 2900S Softener Vessel Assembly",
+             "manufacturer": "Pentair Structural", "part_number": "36X72 COMP 6\"TF 6\"BF",
+             "price_estimate_gbp": 840},
+            {"word_id": "gac_softener_synth_word", "word_name": "Gac Softener",
+             "manufacturer": "Pentair Structural", "part_number": "36X72 COMP 6\"TF 6\"BF",
+             "price_estimate_gbp": 14825},
+            {"word_id": "solenoid_valves_word", "word_name": "Solenoid Valves",
+             "manufacturer": "Sensata Technologies, Inc.", "part_number": "SOL7A4",
+             "price_estimate_gbp": 25},
+            {"word_id": "solenoid_valve_word", "word_name": "Solenoid Valve",
+             "manufacturer": "Sensata Technologies, Inc.", "part_number": "SOL7A4",
+             "distributor_price_gbp": 393.05},
+            {"word_id": "pneumatic_actuated_valves_word", "word_name": "Pneumatic Actuated Valves",
+             "manufacturer": "Bürkert", "part_number": "Type 2000",
+             "price_estimate_gbp": 18},
+            {"word_id": "ctrl_valve_word", "word_name": "Control actuated valve",
+             "manufacturer": "Bürkert", "part_number": "Type 9999",
+             "distributor_price_gbp": 6.5},
+            {"word_id": "fertigation_dosing_pump_synth_word",
+             "word_name": "Grundfos CR 32-4-2 A-F-A-E-HQQE Circulation Pump",
+             "manufacturer": "Grundfos", "part_number": "96122012",
+             "price_estimate_gbp": 8634},
+            {"word_id": "fertigation_dosing_system__primary_assembly_completion_word",
+             "word_name": "Fertigation dosing / injection pump — vertical multistage, 30 m3/h @ 53.1 m, 7.5",
+             "manufacturer": "Grundfos", "part_number": "96122012",
+             "price_estimate_gbp": 35},
+            {"word_id": "fertigation_dosing_pump_synth_word__suction_isolation_valve",
+             "word_name": "Suction Isolation Valve (on Fertigation Dosing Pump)",
+             "manufacturer": "Grundfos", "part_number": "96122012",
+             "price_estimate_gbp": 448},
+        ],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, dup_state, {}, {})
+        checks = run_all_checks(d)
+        check(_has(checks, "BoM V-103: unit price", PASS),
+              "DUP-MPN JOIN: V-103's £14,825 must band against its OWN 'Gac Softener' "
+              "sibling (also £14,825), not the stale 'Softener Vessel' sibling's £840 "
+              "(would read x17.6 and FAIL as a two-truths artefact)")
+        check(_has(checks, "BoM V-108: unit price", PASS),
+              "DUP-MPN JOIN: V-108's £393 must band against its OWN 'Solenoid Valve' "
+              "(singular) sibling's £393.05 distributor price, not the stale 'Solenoid "
+              "Valves' (plural) placeholder's £25")
+        check(_has(checks, "BoM V-107: unit price", PASS),
+              "ACTUATED-VALVE ASSEMBLY: an honest £200 actuator+valve assembly price must "
+              "not band against the £18 bare-valve-body estimate it deliberately "
+              "supersedes (basis states the derivation + 'never the bare-valve band')")
+        check(_has(checks, "BoM V-CTRL: unit price", FAIL),
+              "ACTUATED-VALVE ASSEMBLY (adversarial control): the SAME basis wording must "
+              "NOT exempt a price that diverges from a LIVE DISTRIBUTOR reference (£200 "
+              "vs £6.50 = x30.8) — the exemption only ever supersedes a weak parametric "
+              "estimate, never real market evidence")
+        check(_has(checks, "BoM P-106: unit price", PASS),
+              "DUP-MPN JOIN (3-way, closest-price not closest-text): P-106's £8,634 must "
+              "band against the true 'Grundfos CR 32-4-2 ... Circulation Pump' sibling "
+              "(also £8,634), not the two unrelated £35 / £448 DB-mismatch siblings whose "
+              "VERBOSE names share more requirement tokens ('fertigation dosing pump')")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----
