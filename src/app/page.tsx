@@ -182,8 +182,17 @@ const HTML = `<style>
   .paths .plan p{margin:10px 0 20px;font-size:15px;color:var(--ink-soft);max-width:none;}
   @media(max-width:640px){.paths{grid-template-columns:1fr;}}
 
-  footer{border-top:1px solid var(--line);padding:40px 0;color:var(--muted);font-size:14px;}
-  .foot-inner{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+  footer{border-top:1px solid var(--line);padding:56px 0 38px;color:var(--muted);font-size:14px;background:var(--surface);}
+  .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;}
+  .foot-brand .brand{margin-bottom:14px;}
+  .foot-brand p{max-width:430px;line-height:1.65;color:var(--muted);margin:0;}
+  .foot-col h4{font-size:14px;font-weight:700;color:var(--ink);margin:0 0 14px;}
+  .foot-col a{display:block;color:var(--muted);margin-bottom:9px;font-size:14px;}
+  .foot-col a:hover{color:var(--ink);text-decoration:none;}
+  .foot-bottom{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid var(--line);margin-top:44px;padding-top:24px;font-size:12.5px;}
+  .foot-legal a{color:var(--muted);margin-left:18px;}
+  .foot-legal a:hover{color:var(--ink);text-decoration:none;}
+  @media(max-width:760px){.foot-grid{grid-template-columns:1fr;gap:28px;} .foot-bottom{flex-direction:column;align-items:flex-start;} .foot-legal a{margin-left:0;margin-right:18px;} }
 
   .hood-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;margin-top:34px;}
   @media(max-width:760px){.hood-grid{grid-template-columns:1fr;}}
@@ -533,9 +542,26 @@ const HTML = `<style>
 </section>
 
 <footer>
-  <div class="wrap foot-inner">
-    <div><span class="brand" style="font-size:16px"><span class="flame"></span> Fractional Forge</span></div>
-    <div>&copy; 2026 Fractional Forge &middot; The front end for hardware &mdash; funded and built.</div>
+  <div class="wrap foot-grid">
+    <div class="foot-brand">
+      <span class="brand" style="font-size:18px"><span class="flame"></span> Fractional Forge</span>
+      <p>The front end for hardware. We help deep-tech and hardware founders get funded &mdash; and built: commercial strategy, capital, and a curated network of Europe&rsquo;s best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.</p>
+    </div>
+    <div class="foot-col">
+      <h4>Explore</h4>
+      <a href="/brief">Start a brief</a>
+      <a href="/sample-package">Example package</a>
+      <a href="/pricing">How it works</a>
+    </div>
+    <div class="foot-col">
+      <h4>Company</h4>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </div>
+  </div>
+  <div class="wrap foot-bottom">
+    <span>&copy; 2026 Fractional Forge Ltd. All rights reserved.</span>
+    <span class="foot-legal"><a href="/">Home</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>
   </div>
 </footer>
 

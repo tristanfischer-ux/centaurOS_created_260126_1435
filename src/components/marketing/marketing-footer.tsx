@@ -12,7 +12,6 @@
  */
 
 import Link from 'next/link'
-import { Flame } from 'lucide-react'
 
 export function MarketingFooter() {
     const currentYear = new Date().getFullYear()
@@ -23,11 +22,16 @@ export function MarketingFooter() {
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
                     {/* Brand */}
                     <div className="space-y-4 md:col-span-2">
-                        <Link href="/" className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-international-orange">
-                                <Flame className="h-4 w-4 text-primary-foreground" />
-                            </div>
-                            <span className="text-lg font-semibold text-foreground">
+                        <Link href="/" className="flex items-center gap-2.5">
+                            <span
+                                aria-hidden
+                                className="inline-block h-[26px] w-[26px] rounded-lg"
+                                style={{
+                                    background:
+                                        'linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c)',
+                                }}
+                            />
+                            <span className="text-lg font-bold tracking-tight text-foreground">
                                 Fractional Forge
                             </span>
                         </Link>
@@ -67,7 +71,7 @@ export function MarketingFooter() {
                                     href="/pricing"
                                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                                 >
-                                    Pricing
+                                    How it works
                                 </Link>
                             </li>
                         </ul>

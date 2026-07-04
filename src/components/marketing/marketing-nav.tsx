@@ -4,34 +4,49 @@
  * MarketingNav - Shared navigation bar for all public marketing pages.
  *
  * @description Consistent, SEO-friendly navigation that appears on all
- * public pages (pricing, about, contact, experts directory, etc.).
- * No authentication required — visible to all visitors.
+ * public pages. Deliberately matches the homepage's own inline nav
+ * (src/app/page.tsx) 1:1 — same gradient-square logo, same link set, same
+ * "Work with us" CTA, no "Sign In" — so the chrome never changes when a
+ * visitor moves from the homepage into /insights, /about, /guides, etc.
+ * Landing-only sections link back to the homepage anchors (/#…).
  *
  * @component
- *
- * @example
- * <MarketingNav />
  */
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Flame, ArrowRight, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
 const NAV_LINKS = [
-    { href: '/pricing', label: 'How it works' },
+    { href: '/#founders', label: 'For founders' },
+    { href: '/#partners', label: 'For partners' },
+    { href: '/#how', label: 'How it works' },
+    { href: '/#examples', label: "What's inside" },
     { href: '/insights', label: 'Insights' },
     { href: '/about', label: 'About' },
-    { href: '/contact', label: 'Contact' },
 ] as const
 
+/** The single Fractional Forge brand mark — an amber→ember→orange gradient
+ *  rounded square, identical to the homepage `.flame` element. */
+function BrandMark({ size = 26 }: { size?: number }) {
+    return (
+        <span
+            aria-hidden
+            className="inline-block rounded-lg"
+            style={{
+                width: size,
+                height: size,
+                background: 'linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c)',
+            }}
+        />
+    )
+}
+
 interface MarketingNavProps {
-    /** When true, the viewer is logged in — swap "Sign In" / "Get Started"
-     *  CTAs for a single "Open app" link so authed users aren't sent back
-     *  to /signup or /login. W30 fix: Sarah + Marcus saw "Sign In" after
-     *  landing on /pricing while already logged in. */
+    /** When true, the viewer is logged in — the CTA becomes "Open app". */
     isAuthed?: boolean
 }
 
@@ -39,19 +54,15 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
     const pathname = usePathname()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-    // Lock body scroll when mobile menu is open
     useEffect(() => {
-        if (mobileMenuOpen) {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = ''
-        }
+        document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
         return () => {
             document.body.style.overflow = ''
         }
     }, [mobileMenuOpen])
 
     function isActive(href: string): boolean {
+        if (href.startsWith('/#')) return false
         return pathname === href || pathname.startsWith(href + '/')
     }
 
@@ -61,26 +72,24 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                 {/* Logo */}
                 <Link
                     href="/"
-                    className="flex items-center gap-2 transition-colors hover:opacity-80"
+                    className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
                 >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-international-orange">
-                        <Flame className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <span className="text-lg font-semibold text-foreground">
+                    <BrandMark />
+                    <span className="text-lg font-bold tracking-tight text-foreground">
                         Fractional Forge
                     </span>
                 </Link>
 
                 {/* Desktop Navigation */}
-                <nav className="hidden items-center gap-6 md:flex">
+                <nav className="hidden items-center gap-6 lg:flex">
                     {NAV_LINKS.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
                             className={cn(
-                                'text-sm font-medium transition-colors duration-200',
+                                'text-[15px] font-semibold transition-colors duration-200',
                                 isActive(link.href)
-                                    ? 'text-international-orange font-semibold'
+                                    ? 'text-international-orange'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
@@ -89,44 +98,26 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                     ))}
                 </nav>
 
-                {/* Desktop CTA — authed users see "Open app", anonymous see Sign In + Get Started */}
-                <div className="hidden items-center gap-3 md:flex">
-                    {isAuthed ? (
-                        <Link href="/investors">
-                            <Button size="sm" className="gap-1.5 bg-international-orange text-white hover:bg-international-orange-hover">
-                                Open app
-                                <ArrowRight className="h-3.5 w-3.5" />
-                            </Button>
-                        </Link>
-                    ) : (
-                        <>
-                            <Link href="/login">
-                                <Button variant="ghost" size="sm">
-                                    Sign In
-                                </Button>
-                            </Link>
-                            <Link href="/brief">
-                                <Button size="sm" className="gap-1.5 bg-international-orange text-white hover:bg-international-orange-hover">
-                                    Work with us
-                                    <ArrowRight className="h-3.5 w-3.5" />
-                                </Button>
-                            </Link>
-                        </>
-                    )}
+                {/* Desktop CTA */}
+                <div className="hidden items-center gap-3 lg:flex">
+                    <Link href={isAuthed ? '/investors' : '/brief'}>
+                        <Button
+                            size="sm"
+                            className="bg-international-orange text-white hover:bg-international-orange-hover"
+                        >
+                            {isAuthed ? 'Open app' : 'Work with us'}
+                        </Button>
+                    </Link>
                 </div>
 
                 {/* Mobile menu button */}
                 <button
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground md:hidden"
+                    className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground lg:hidden"
                     aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                     aria-expanded={mobileMenuOpen}
                 >
-                    {mobileMenuOpen ? (
-                        <X className="h-6 w-6" />
-                    ) : (
-                        <Menu className="h-6 w-6" />
-                    )}
+                    {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
             </div>
 
@@ -134,16 +125,16 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
             {mobileMenuOpen && (
                 <>
                     <div
-                        className="fixed inset-0 bg-foreground/20 md:hidden"
+                        className="fixed inset-0 bg-foreground/20 lg:hidden"
                         style={{ zIndex: -1 }}
                         onClick={() => setMobileMenuOpen(false)}
                         aria-hidden="true"
                     />
-                    <div className="border-t bg-background shadow-lg md:hidden">
+                    <div className="border-t bg-background shadow-lg lg:hidden">
                         <div className="flex flex-col gap-1 px-4 py-4 sm:px-6">
                             <Link
                                 href={isAuthed ? '/investors' : '/brief'}
-                                className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-xs font-mono font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-international-orange-hover"
+                                className="mb-3 flex min-h-[48px] items-center justify-center rounded-md bg-international-orange text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-international-orange-hover"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 {isAuthed ? 'Open app' : 'Work with us'}
@@ -153,9 +144,9 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                     key={link.href}
                                     href={link.href}
                                     className={cn(
-                                        'flex min-h-[48px] items-center border-b border-muted/50 py-3.5 text-sm transition-colors last:border-b-0',
+                                        'flex min-h-[48px] items-center border-b border-muted/50 py-3.5 text-sm font-semibold transition-colors last:border-b-0',
                                         isActive(link.href)
-                                            ? 'text-international-orange font-semibold'
+                                            ? 'text-international-orange'
                                             : 'text-muted-foreground hover:text-foreground'
                                     )}
                                     onClick={() => setMobileMenuOpen(false)}
@@ -163,15 +154,6 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                     {link.label}
                                 </Link>
                             ))}
-                            {!isAuthed && (
-                                <Link
-                                    href="/login"
-                                    className="flex min-h-[48px] items-center py-3.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    Sign In
-                                </Link>
-                            )}
                         </div>
                     </div>
                 </>
