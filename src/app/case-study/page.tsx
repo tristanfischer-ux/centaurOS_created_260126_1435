@@ -140,7 +140,7 @@ export default function CaseStudyPage() {
                   icon: Banknote,
                   label: "Cost",
                   traditional: "$5,000-$15,000",
-                  forgeos: "£20/month",
+                  forgeos: "Free first Dossier",
                 },
                 {
                   icon: Users,
@@ -305,15 +305,15 @@ export default function CaseStudyPage() {
               <span className="text-international-orange">Your</span> Product?
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto">
-              Start with a free account. Describe your product in plain English
-              and get your first engineering package today.
+              Describe your idea in a short brief and get your first Design
+              Dossier free — hand-built and reviewed by a senior engineer.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/signup"
+                href="/brief"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-6 py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
-                Get Started Free
+                Start a brief
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
