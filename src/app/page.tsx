@@ -129,6 +129,11 @@ const HTML = `<style>
 
   .founders-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-top:8px;}
   .founders-img{width:100%;border-radius:var(--radius);box-shadow:var(--shadow);display:block;}
+  .wb-visuals{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:10px 0 36px;}
+  .wb-visuals figure{margin:0;}
+  .wb-visuals img{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow-sm);display:block;background:#fff;}
+  .wb-visuals figcaption{font-size:12.5px;color:var(--muted);margin-top:9px;text-align:center;}
+  @media(max-width:640px){.wb-visuals{grid-template-columns:1fr;} }
   .founders-grid ul{list-style:none;padding:0;margin:0;}
   .founders-grid li{padding:11px 0 11px 30px;position:relative;font-size:16px;color:var(--ink-soft);border-bottom:1px solid var(--line);}
   .founders-grid li:last-child{border-bottom:none;}
@@ -322,6 +327,10 @@ const HTML = `<style>
       <span class="eyebrow">See how it&rsquo;s built</span>
       <h2>An auditable workbook, not a black box.</h2>
       <p class="muted" style="margin-top:12px">Your Design Dossier is a live Excel model. Every cost traces from the inputs and assumptions, through the calculations and quantities, into a bill-of-materials ledger, a cost waterfall and a full financial model &mdash; so you and your investors can change an assumption and watch the numbers move. Nothing is a black box.</p>
+    </div>
+    <div class="wb-visuals">
+      <figure><img src="/images/site/dossier-render.webp" alt="Photoreal isometric render of a water-treatment plant Fractional Forge designed" loading="lazy" /><figcaption>A photoreal render of the plant &mdash; built from the same model as the costs</figcaption></figure>
+      <figure><img src="/images/site/dossier-ga.webp" alt="General-arrangement engineering drawing: plan and elevations with an equipment schedule" loading="lazy" /><figcaption>Its general-arrangement drawing &mdash; one of a full ISO A1 set</figcaption></figure>
     </div>
     <div class="feat">
       <div class="card"><h3>Traceable costs</h3><p>Inputs &amp; assumptions &rarr; calculations &rarr; quantities &rarr; bill-of-materials ledger &rarr; cost waterfall &rarr; financial model. Every number is a formula.</p></div>
