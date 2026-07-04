@@ -64,6 +64,20 @@ GA_NON_MASSING_RE = re.compile(
     r"(?:\bdn\s?\d{2,4}\b|\b(?:pvc|upvc|cpvc|hdpe|abs|grp|frp|stainless|carbon[- ]?steel|"
     r"mild[- ]?steel|galvanis\w+|copper)\b)[^.]*\bpipe(?:s|work)?\s*\d*\s*$|"
     r"\bpipework\s*\d*\s*$|\bpipe spools?\s*\d*\s*$|\bprocess tubing\s*\d*\s*$|"
+    # a bare RING MAIN ("Hand watering — ring main to both departments") is the SAME routed
+    # distribution-network take-off as the 'Zoned distribution … mains/risers/…' family two
+    # rules below — a closed-loop distribution pipe run priced by the metre, not a discrete
+    # massed object — but it carries no zoned/distribution/delivery/drain/return anchor word AND
+    # is followed by a qualifying phrase ("… to both departments") rather than a hard terminator,
+    # so neither the head-anchored network rule below nor a terminal-anchor reached it (the
+    # X-146/X-152 inconsistency, 2026-07-04: X-146 'Zoned distribution — department delivery
+    # mains' dropped correctly, X-152 'Hand watering — ring main to both departments' did not,
+    # even though parts_ledger.py marks both status=PARAMETRIC — the SAME take-off row shape).
+    # Self-sufficient (no anchor word required, like the bare pipework/pipe-spool rule above) but
+    # NEGATIVE-LOOKAHEAD anchored instead of terminal — excludes 'ring main UNIT' (a real
+    # electrical switchgear cabinet, RMU, which must stay massed; proveCatch counter-case in
+    # _selftest).
+    r"\bring mains?\b(?!\s+units?\b)|"
     # routed DISTRIBUTION-NETWORK take-off quantities (v58b GA coverage: the 8
     # 'Zoned distribution — …' rows X-150..X-157, qty 214-8,280 = metres of delivery/
     # drain mains, risers, zone laterals, collection lines, per-position inlet stubs /
@@ -184,6 +198,10 @@ def _selftest():
         "Zoned distribution — delivery inlet stubs, one per served position",
         "Zoned distribution — drain outlet connections (one per 2 positions)",
         "Zoned distribution — zone valve connection kits",
+        # X-146/X-152 family-consistency fix (2026-07-04): a bare ring-main take-off is the
+        # same PARAMETRIC network row as the zoned-distribution family above, just without a
+        # zoned/distribution/delivery/drain/return anchor word.
+        "Hand watering — ring main to both departments", "Ring Main", "Fire Ring Main 2",
         # Codema v63 residual (2026-07-03): 5 of the 8 default-box litter names are
         # real bought-out FASTENERS / FITTINGS with genuine manufacturer+DN specs
         # (Hilti M20 anchor bolts, Georg Fischer PVC-U flange/end cap, Klinger
@@ -228,6 +246,10 @@ def _selftest():
         # is head-anchored, so none of these may drop (proves the rule is tight)
         "Distribution Transformer", "Drain Collection Sump", "Drain Transfer Pump",
         "Drain Line Filter", "Delivery Pump Skid", "Return Sludge Pump",
+        # 'ring main UNIT' (RMU) counter-case — a real MV switchgear cabinet, not a pipe run;
+        # proves the bare ring-main rule above is TERMINAL-anchored (tight), not "contains
+        # ring main" (2026-07-04, X-146/X-152 fix).
+        "Ring Main Unit", "11kV Ring Main Unit",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

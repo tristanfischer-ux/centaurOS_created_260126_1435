@@ -16489,16 +16489,32 @@ def _sc_partnames(wb, ws, state, run_dir):
         _principal_tags = sorted({t for lst in tag_lists for t in lst})
         _linked = 0
         _unlinked = []
+        _takeoff_exempt = 0
         for t in _principal_tags:
             e = eq_by_tag.get(t)
+            # PARAMETRIC TAKE-OFF EXEMPTION (2026-07-04, the X-146/X-152 thread): a network
+            # take-off row ('Zoned distribution — …', 'Hand watering — ring main …' — qty in
+            # metres, priced as an engineered allowance) is not a taggable drawing OBJECT; it is
+            # a quantity, not a placeable thing. parts_ledger.py marks every row in this family
+            # with the distinct status "PARAMETRIC" (never used for a real discrete part) and,
+            # via ga_massing.is_ga_non_massing(), already computes an EMPTY `expected` list for
+            # every one of them — "expected nowhere" is the honest, correct state, not a gap.
+            # Exempt from the cross-link check entirely (same "out-of-scope, not penalised"
+            # idiom as HVAC's disclosed-scope cap) rather than counting "shown nowhere" as a
+            # failure the drawing generators can never satisfy. A real discrete part (anything
+            # NOT status=PARAMETRIC) is untouched — still expected + still scored.
+            if (e or {}).get("status") == "PARAMETRIC":
+                _takeoff_exempt += 1
+                continue
             cov = (e or {}).get("coverage") or {}
             if isinstance(cov, dict) and any(bool(v) for v in cov.values()):
                 _linked += 1
             else:
                 _unlinked.append(t)
-        if _principal_tags:
+        _scored_tags = len(_principal_tags) - _takeoff_exempt
+        if _scored_tags:
             comps.append(("master tags cross-linked to >=1 drawing/manifest reference",
-                          _linked, len(_principal_tags)))
+                          _linked, _scored_tags))
             if _unlinked:
                 iss.append(f"{len(_unlinked)} master tag(s) not shown on ANY drawing/manifest: "
                            + ", ".join(_unlinked[:4]))
@@ -18090,22 +18106,38 @@ _NON_SCORING_RX = re.compile(r"does not score|informational only", re.I)
 # _NON_SCORING_RX above) — the caveat still renders in the issue text, it is just never
 # double-capped on top of its own stated penalty.
 _SELF_PRICED_RX = re.compile(r"score = arithmetic\b", re.I)
+# CELL-CONTRACT SELF-PRICED marker (2026-07-04, the Process-schedules 8-not-9 bug): every tab's
+# missing/invalid required cells are already priced into content_score via the "cell
+# completeness+type contract" component (_merge_content appends cellstat.passed/checked to
+# comp_scores BEFORE content_score is taken as their min) — e.g. Process schedules' 384/400 already
+# yields 9.6. `_merge_content` then ALSO appends a diagnostic issue quoting ONE example failing
+# cell's reason ("cell contract: 16 of 400 required cells empty/invalid … e.g. row 26: 'Size'
+# placeholder '—'") purely for human legibility. That quoted "why" text is drawn from whatever the
+# offending cell happens to contain, so it can coincidentally contain a _SOFT_CAVEAT_RX/_VERIF_GAP_RX
+# trigger word (here "placeholder") — re-capping the SAME already-priced gap a second time down to
+# 8, the exact double-penalty shape as the BoM-ledger TBD fix above, just via the generic cell-
+# contract diagnostic instead of a tab-specific caveat line. Excluded from the scan for the same
+# reason: the number is already in the arithmetic; scanning its illustrative quote for keywords
+# double-counts it.
+_CELL_CONTRACT_RX = re.compile(r"^cell contract:\s*\d+ of \d+ required cells empty/invalid", re.I)
 
 
 def _apply_universal_honest_cap(scores: dict) -> dict:
     """ONE universal rule (no whack-a-mole): cap each tab's score by the caveats IT declares in its
     own issues. VERIFICATION GAP → ≤7 (FAIL); SOFTER caveat → ≤8 (never a perfect 10). Applied to
     EVERY tab from EVERY source so a new archetype's gaps cap themselves. An issue that itself
-    declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory) OR that its
+    declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory), OR that its
     caveat is already self-priced into the stated score arithmetic (the BoM-ledger TBD-fraction
-    formula) is excluded from the scan — neither must cap a score it explicitly says it does not
-    move / already accounts for."""
+    formula, OR the generic per-tab cell-completeness contract diagnostic — both numeric gaps are
+    already folded into content_score before this cap ever runs), is excluded from the scan —
+    none of the three must cap a score it explicitly says it does not move / already accounts for."""
     for _name, e in (scores or {}).items():
         if not isinstance(e, dict) or not isinstance(e.get("score"), (int, float)):
             continue
         issues = " ".join(str(i) for i in (e.get("issues") or [])
                           if not _NON_SCORING_RX.search(str(i))
-                          and not _SELF_PRICED_RX.search(str(i)))
+                          and not _SELF_PRICED_RX.search(str(i))
+                          and not _CELL_CONTRACT_RX.search(str(i)))
         if not issues:
             continue
         cap = 7 if _VERIF_GAP_RX.search(issues) else (8 if _SOFT_CAVEAT_RX.search(issues) else None)
@@ -18952,6 +18984,14 @@ def _selftest() -> int:
         "W": {"score": 9.1, "issues": [
             "15/68 ENGINEERED bought-out lines carry MPN 'TBD (detailed design)' — an "
             "ESTIMATE-stage gap; score = arithmetic − 4 × engineered-TBD-fraction = 10.0 − 0.9"]},
+        # V: the Process-schedules shape — the generic cell-contract diagnostic quotes an
+        # example failing cell whose OWN "why" text ("placeholder") coincidentally hits
+        # _SOFT_CAVEAT_RX, even though the 384/400 ratio it describes is ALREADY the content_score
+        # (9.6) via the "cell completeness+type contract" component. Must NOT re-cap to 8
+        # (2026-07-04 double-penalty fix).
+        "V": {"score": 9.6, "issues": [
+            "cell contract: 16 of 400 required cells empty/invalid across 16 row(s) — "
+            "e.g. row 26: 'Size' placeholder '—'"]},
     })
     if _hc["X"]["score"] != 7 or _hc["X"]["status"] != "FAIL":
         print(f"  FAIL honest-cap: an UNVERIFIED tab must cap at 7/FAIL (got {_hc['X']})"); bad += 1
@@ -18962,6 +19002,9 @@ def _selftest() -> int:
     if _hc["W"]["score"] != 9.1:
         print(f"  FAIL honest-cap: a self-priced TBD-fraction caveat must NOT be re-capped "
               f"on top of its own stated penalty (got {_hc['W']})"); bad += 1
+    if _hc["V"]["score"] != 9.6:
+        print(f"  FAIL honest-cap: the generic cell-contract diagnostic must NOT re-cap a score "
+              f"its own ratio already prices in (got {_hc['V']})"); bad += 1
     # proveCatch the honest HEADLINE OUTPUT (Tristan 2026-06-27): a foreign served-asset COUNT
     # ('6000 cultivation containers' for a water plant) must be replaced by the plant's boundary
     # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an
@@ -20189,6 +20232,56 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_save_tables_pn)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_save_done_pn)
+
+    # ═══ proveCatch the PARAMETRIC TAKE-OFF EXEMPTION (the X-146/X-152 thread,
+    # 2026-07-04): a network take-off row (status=PARAMETRIC, qty in metres) is not a
+    # taggable drawing OBJECT and must be EXEMPTED from the cross-link check (never
+    # counted as "not shown on ANY drawing"), while a real discrete part with the same
+    # empty coverage still FAILS the check as a genuine gap. One fixture, both
+    # directions: X-146 (PARAMETRIC, no coverage) must be exempt; P-201 (a real part,
+    # no coverage) must still fail. ═══
+    _save_tables_to = list(_RENDERED_TABLES); _save_done_to = set(_CELLCON_DONE)
+    try:
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _to_state = {"requirementsBom": [
+            {"tag": "X-146", "requirement": "Zoned distribution — department delivery mains",
+             "qty": 214, "line_gbp": 4451},
+            {"tag": "P-201", "requirement": "Transfer Pump", "qty": 1, "line_gbp": 4000},
+        ]}
+        with _tfh.TemporaryDirectory() as _tdto:
+            _wbto = Workbook(); _wbto.remove(_wbto.active)
+            tab_parts_master(_wbto, _to_state, _tdto)
+            _lwsto = _wbto.create_sheet(_LEDGER_SHEET)
+            header(_lwsto, 4, ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method",
+                               "Key inputs", "Factors", "Est class", "Confidence",
+                               "Duty / rating", "Material", "Sizing calc (basis)",
+                               "MPN / datasheet", "Row check",
+                               "Audit: check evidence (build-computed)"])
+            _lwsto.cell(5, 1, "X-146"); _lwsto.cell(5, 2, "Zoned distribution")
+            _lwsto.cell(5, 14, "n/a — parametric take-off, no catalogue MPN")
+            _lwsto.cell(6, 1, "P-201"); _lwsto.cell(6, 2, "Transfer Pump")
+            with open(os.path.join(_tdto, "parts-ledger.json"), "w") as _fh:
+                json.dump({"n_equipment": 2, "orphan_equipment": [], "not_found": [],
+                           "equipment": [
+                               {"tag": "X-146", "status": "PARAMETRIC", "expected": [],
+                                "coverage": {"pid": False, "general-arrangement": False}},
+                               {"tag": "P-201", "status": "IDENTIFIED",
+                                "coverage": {"pid": False, "general-arrangement": False}},
+                           ]}, _fh)
+            _to_res = _sc_partnames(_wbto, _wbto["Part names"], _to_state, _tdto)
+            _to_xlink = {l: (p, c) for (l, p, c) in _to_res.get("components", [])}.get(
+                "master tags cross-linked to >=1 drawing/manifest reference")
+            if _to_xlink != (0, 1):
+                print(f"  FAIL partnames-takeoff: X-146 (PARAMETRIC) must be EXEMPT from the "
+                      f"denominator, leaving only P-201 (0/1 — P-201 fails) (got {_to_xlink})"); bad += 1
+            _to_issues = " ".join(str(i) for i in _to_res.get("issues", []))
+            if "X-146" in _to_issues or "P-201" not in _to_issues:
+                print(f"  FAIL partnames-takeoff: only P-201 (a real part) may be named as "
+                      f"unlinked — X-146 (a take-off row) must never appear (got "
+                      f"{_to_res.get('issues')})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_save_tables_to)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_save_done_to)
 
     # ═══ proveCatch the HONEST-STATUS FALLBACK (codema v74 Z-102/Z-103, 2026-07-05):
     # a principal with a BLANK ledger MPN cell must still PASS when parts-ledger.json
