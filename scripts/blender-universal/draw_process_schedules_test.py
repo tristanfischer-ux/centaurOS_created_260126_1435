@@ -311,6 +311,78 @@ def _run_schedule_less():
           f"valves={len(sc.valves)}, instruments={len(sc.instruments)})")
 
 
+def _run_pump_duty_and_psv_set():
+    """PUMP-DUTY VALVE-SIZE + PSV-SET-FROM-PRESSURE-CLASS (2026-07-05, the codema v74
+    Process-schedules closer). proveCatch both directions:
+      - a Suction/Discharge Isolation or Non-Return valve on a pump with a stated
+        m3/h duty gets a real DN + 'derived from host pump duty' provenance (never
+        a bare dash);
+      - the SAME valve family on a pump stated only in kW (no flow modifier) gets
+        an HONEST, explicit 'not derivable … no flow duty' flag — never a guess;
+      - a PSV protecting a vessel whose own requirementsBom basis states a design
+        pressure ('P=13 kPa head') gets a derived bar figure with provenance;
+      - a valve family this fix does NOT touch (Solenoid / Actuated — no host-pump
+        cid) still shows the PRE-EXISTING honest '—' unchanged.
+    Uses the real codema v74 water-treatment run (out/fischer-codema-v74) — the one
+    archetype in the corpus that carries pump sub-assembly valves + a vessel whose
+    basis states a design pressure. SKIPs (not fails) when that reference run is
+    absent, exactly like the CASES loader above."""
+    import json
+    run_dir = REPO / "out/fischer-codema-v74"
+    state_path = run_dir / "state.json"
+    sched_path = run_dir / "connection-schedule.json"
+    if not state_path.is_file() or not sched_path.is_file():
+        print("\n=== pump-duty / PSV-set derivation === SKIP "
+              "(out/fischer-codema-v74 reference run not found)")
+        return
+    print("\n=== pump-duty valve-size + PSV-set derivation (codema v74) ===")
+    state = json.load(open(state_path))
+    schedule = json.load(open(sched_path))
+    proc = PID.reconstruct_process(schedule, state, str(run_dir))
+    line_rows = PS.build_line_list(proc, schedule, state, str(run_dir))
+    valve_rows = PS.build_valve_list(proc, schedule, state, line_rows)
+
+    derived = [v for v in valve_rows if "derived from host pump duty" in v.size]
+    no_flow = [v for v in valve_rows if v.size.startswith("not derivable")]
+    _check(len(derived) >= 1,
+           "pump-duty: expected at least one valve Size derived from a host pump's duty")
+    for v in derived:
+        _check(re.match(r"^DN\d+ — derived from host pump duty \([\d.]+ m3/h @ "
+                         r"[\d.]+ m/s (suction|discharge)\)$", v.size),
+               f"pump-duty: {v.tag} size string malformed: {v.size!r}")
+    _check(len(no_flow) >= 1,
+           "pump-duty: expected at least one honest 'not derivable' no-flow flag "
+           "(a kW-rated pump has no m3/h to size a line from)")
+    for v in no_flow:
+        _check("no flow duty" in v.size,
+               f"pump-duty: {v.tag} no-flow flag malformed: {v.size!r}")
+
+    psvs = [v for v in valve_rows if v.vtype.startswith("Pressure relief")]
+    _check(psvs, "PSV-set: no PSV in the v74 valve list")
+    derived_set = [v for v in psvs if "design pressure" in v.set_or_cv]
+    _check(derived_set,
+           "PSV-set: expected at least one PSV Set derived from the protected "
+           "vessel's stated design pressure")
+    for v in derived_set:
+        _check(re.match(r"^[\d.]+ bar \(design P\) — derived from .+ design pressure",
+                        v.set_or_cv),
+               f"PSV-set: {v.tag} set string malformed: {v.set_or_cv!r}")
+
+    # proveCatch the OTHER direction: an unrelated valve family (no host-pump cid,
+    # not a PSV) is UNCHANGED — it still falls to the pre-existing honest '—' when
+    # nothing else resolves it. This fix must never touch a different valve family.
+    untouched = [v for v in valve_rows
+                if v.vtype in ("Solenoid shut-off", "Actuated isolation") and v.size == "—"]
+    _check(untouched,
+           "pump-duty: a non-pump-family valve with no resolvable line must still "
+           "show the pre-existing honest '—' (this fix must not touch unrelated "
+           "valve families)")
+    print(f"  PASS  ({len(derived)} valve size(s) derived from host-pump duty; "
+          f"{len(no_flow)} honest no-flow flag(s); {len(derived_set)} PSV set(s) "
+          f"derived from vessel design pressure; {len(untouched)} unrelated "
+          f"valve(s) correctly untouched)")
+
+
 def main():
     missing = [str(s) for _l, s, _d in CASES if not Path(s).is_file()]
     if missing:
@@ -320,6 +392,7 @@ def main():
         for label, state_path, sched in CASES:
             _run_case(label, state_path, sched)
         _run_schedule_less()
+        _run_pump_duty_and_psv_set()
     except Fail as ex:
         print(f"\n[proc-sched-test] FAIL: {ex}")
         return 1

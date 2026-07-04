@@ -16373,6 +16373,39 @@ def _sc_partnames(wb, ws, state, run_dir):
     # (1) MPN or an HONEST status on every principal — read back from the SAME ledger
     #     cells the sheet's own live INDEX/MATCH formula resolves to; a bare 'TBD' /
     #     '—' fails, a real MPN or an explicit 'TBD (…reason…)' passes.
+    # HONEST-STATUS FALLBACK (codema v74 Z-102/Z-103, 2026-07-05): a principal whose
+    # ledger MPN cell is blank is not automatically a research gap — parts_ledger.py
+    # already classifies WHY a part carries no catalogue MPN (commit 3dea8ca8a): a
+    # MERGED·SYNONYM row is a de-duplicated twin whose identity/MPN lives on the
+    # sibling physical part it was folded into, and a 'NOT FOUND' row may carry an
+    # honest not_found_status sub-verdict — ARCHITECTURALLY-EXCLUDED (membrane/media
+    # class, no catalogue identity BY DESIGN), OEM-PROPRIETARY (a recorded finding
+    # that no public part number exists) or FABRICATED (a materials take-off, no
+    # catalogue identity by nature). We READ that SAME classification from
+    # parts-ledger.json (never re-derived here, so the two surfaces cannot disagree);
+    # a bare 'NOT FOUND' with no honest sub-status — the true residual gap — still
+    # fails, exactly as it does today (proveCatch both directions in _selftest).
+    _HONEST_NOT_FOUND_SUBSTATUS = {"ARCHITECTURALLY-EXCLUDED", "OEM-PROPRIETARY", "FABRICATED"}
+    _pl_honest = load_json(os.path.join(run_dir, "parts-ledger.json")) if run_dir else None
+    _pl_status_by_tag: Dict[str, dict] = {}
+    if isinstance(_pl_honest, dict) and _pl_honest.get("equipment"):
+        for _e in _pl_honest["equipment"]:
+            if isinstance(_e, dict) and _e.get("tag"):
+                _pl_status_by_tag[str(_e["tag"])] = _e
+
+    def _honest_status_text(tag: str) -> str:
+        """A short, human-readable HONEST reason this tag carries no MPN — '' when
+        the ledger records no such reason (a genuine gap)."""
+        e = _pl_status_by_tag.get(tag) or {}
+        status = str(e.get("status") or "")
+        nf_sub = str(e.get("not_found_status") or "")
+        basis = str(e.get("basis") or "").strip()
+        if status == "MERGED·SYNONYM":
+            return f"MERGED·SYNONYM — {basis}" if basis else "MERGED·SYNONYM"
+        if nf_sub in _HONEST_NOT_FOUND_SUBSTATUS:
+            return f"{nf_sub} — {basis}" if basis else nf_sub
+        return ""
+
     if all_tags:
         _principal_tags = sorted({t for lst in tag_lists for t in lst})
         n_mpn_ok = 0
@@ -16380,6 +16413,8 @@ def _sc_partnames(wb, ws, state, run_dir):
         for t in _principal_tags:
             v = ledger_mpn.get(t, "")
             if v and not _PLACEHOLDER_RX.match(v.strip()) and v.strip().upper() != "TBD":
+                n_mpn_ok += 1
+            elif _honest_status_text(t):
                 n_mpn_ok += 1
             else:
                 _mpn_missing.append(t)
@@ -20071,6 +20106,68 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_save_tables_pn)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_save_done_pn)
+
+    # ═══ proveCatch the HONEST-STATUS FALLBACK (codema v74 Z-102/Z-103, 2026-07-05):
+    # a principal with a BLANK ledger MPN cell must still PASS when parts-ledger.json
+    # records an honest reason (MERGED·SYNONYM or a not_found_status of
+    # ARCHITECTURALLY-EXCLUDED/OEM-PROPRIETARY/FABRICATED) — and must still FAIL when
+    # the ledger records no such reason (a genuine, un-classified 'NOT FOUND' gap).
+    # Both directions in ONE fixture: Z-102 (MERGED·SYNONYM) and Z-104
+    # (ARCHITECTURALLY-EXCLUDED) PASS; Z-105 (bare 'NOT FOUND', no honest sub-status)
+    # FAILS — a genuine gap is never waved through. ═══
+    _save_tables_hs = list(_RENDERED_TABLES); _save_done_hs = set(_CELLCON_DONE)
+    try:
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _hs_state = {"requirementsBom": [
+            {"tag": "Z-102", "requirement": "Uf Module Bank", "qty": 1, "line_gbp": 0,
+             "status": "MERGED·SYNONYM", "sub_of": "Uf Membrane Bank"},
+            {"tag": "Z-104", "requirement": "RO Membrane Elements", "qty": 1, "line_gbp": 9100,
+             "status": "NOT FOUND"},
+            {"tag": "Z-105", "requirement": "Dosing Skid Controller", "qty": 1, "line_gbp": 3200,
+             "status": "NOT FOUND"},
+        ]}
+        with _tfh.TemporaryDirectory() as _tdhs:
+            _wbhs = Workbook(); _wbhs.remove(_wbhs.active)
+            tab_parts_master(_wbhs, _hs_state, _tdhs)
+            _lwshs = _wbhs.create_sheet(_LEDGER_SHEET)
+            header(_lwshs, 4, ["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method",
+                               "Key inputs", "Factors", "Est class", "Confidence",
+                               "Duty / rating", "Material", "Sizing calc (basis)",
+                               "MPN / datasheet", "Row check",
+                               "Audit: check evidence (build-computed)"])
+            for _r_i, _t in enumerate(("Z-102", "Z-104", "Z-105")):
+                _lwshs.cell(5 + _r_i, 1, _t); _lwshs.cell(5 + _r_i, 2, _t)
+                # column 14 (MPN / datasheet) left BLANK — mirrors the real folded/
+                # excluded rows, which carry no engineering-spec cells at all.
+            with open(os.path.join(_tdhs, "parts-ledger.json"), "w") as _fh:
+                json.dump({"n_equipment": 3, "orphan_equipment": [], "not_found": [],
+                           "equipment": [
+                               {"tag": "Z-102", "status": "MERGED·SYNONYM",
+                                "basis": "de-duplicated: names the SAME UF stage as "
+                                         "'Uf Membrane Bank'",
+                                "coverage": {"pid": True}},
+                               {"tag": "Z-104", "status": "NOT FOUND",
+                                "not_found_status": "ARCHITECTURALLY-EXCLUDED",
+                                "basis": "membrane-area parametric — no catalogue identity",
+                                "coverage": {"pid": True}},
+                               {"tag": "Z-105", "status": "NOT FOUND",
+                                "not_found_status": "NOT FOUND",
+                                "coverage": {"pid": True}},
+                           ]}, _fh)
+            _hs_res = _sc_partnames(_wbhs, _wbhs["Part names"], _hs_state, _tdhs)
+            _hs_labels = {l: (p, c) for (l, p, c) in _hs_res.get("components", [])}
+            if _hs_labels.get("every principal carries an MPN or an honest TBD status") != (2, 3):
+                print(f"  FAIL partnames-honest-status: Z-102 (MERGED·SYNONYM) + Z-104 "
+                      f"(ARCHITECTURALLY-EXCLUDED) must PASS, Z-105 (bare NOT FOUND) must "
+                      f"FAIL (got "
+                      f"{_hs_labels.get('every principal carries an MPN or an honest TBD status')})"); bad += 1
+            _hs_issues = " ".join(str(i) for i in _hs_res.get("issues", []))
+            if "Z-105" not in _hs_issues or "Z-102" in _hs_issues or "Z-104" in _hs_issues:
+                print(f"  FAIL partnames-honest-status: only Z-105 (the genuine gap) may be "
+                      f"named in the issues (got {_hs_res.get('issues')})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_save_tables_hs)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_save_done_hs)
 
     # (5) INSTRUMENT-INDEX COLLAPSE: N copy-paste '(#i of N)' rows → ONE typed group row
     # ('LT-201…203', '(3 off)'); a row with a DIFFERENT range stays its own row; host

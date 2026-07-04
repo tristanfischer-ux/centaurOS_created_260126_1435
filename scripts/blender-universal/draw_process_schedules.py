@@ -61,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import draw_pid as PID  # noqa: E402  (the P&ID generator — single source of truth)
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
 import canonical_tags  # noqa: E402  (the SHARED auxiliary-tag authority — one tag, BoM + drawings)
+import connection_sizing as CS  # noqa: E402  (pump-duty line-DN + PSV-set derivation, below)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_process_schedules() from the run's own artifacts; '' until set ('—').
@@ -748,6 +749,68 @@ def _parse_set_pressure(mods: dict, mc_text: str) -> str:
     return "—"
 
 
+# ── PSV SET-PRESSURE FROM THE PROTECTED VESSEL/LINE'S PRESSURE CLASS (2026-07-05) ──
+# When the PSV's OWN word text states no set pressure (_parse_set_pressure above
+# returns '—'), the relief is still not an unknown: a PSV protects a SPECIFIC
+# vessel/line, and that vessel's own design pressure (already computed by the
+# wall-thickness sizing that produced its BoM basis, e.g. 'P=13 kPa head') or a
+# connected line's PN pressure-class rating is the real engineering reference for
+# where it must lift. Only when NEITHER the vessel nor a connected line states a
+# pressure class do we disclose the honest, explicit gap.
+_VESSEL_DESIGN_PRESSURE_RX = re.compile(r"\bP\s*=\s*([\d.]+)\s*(kPa|MPa|bar|psi)\b", re.I)
+_LINE_PN_RATING_RX = re.compile(r"\bPN\s?(\d{1,3})\b", re.I)
+_PSV_SET_NOT_STATED = "not yet specified — requires process datasheet"
+
+
+def _bar_from(value: float, unit: str) -> float:
+    u = unit.strip().lower()
+    if u == "kpa":
+        return value / 100.0
+    if u == "mpa":
+        return value * 10.0
+    if u == "psi":
+        return value / 14.5038
+    return value   # already bar
+
+
+def _psv_set_from_protected_equipment(location: str, state: dict, schedule: dict,
+                                      proc=None) -> str:
+    """The PSV's Set cell derived from the PROTECTED vessel/line's OWN stated
+    pressure class — never invented. Priority: (1) the protected vessel's
+    requirementsBom `basis` states its design pressure (the wall-thickness
+    calculation's own input for THIS exact vessel — the most direct reference);
+    (2) a connection-schedule line touching that vessel states a PN pressure-
+    class rating. Returns the honest, explicit `_PSV_SET_NOT_STATED` (never a
+    bare dash) when neither is stated anywhere — a genuine, disclosed gap,
+    distinct from a resolved one."""
+    tag = re.sub(r"\s*\([^)]*\)\s*$", "", location or "").strip()
+    if not tag:
+        return _PSV_SET_NOT_STATED
+    for row in (state.get("requirementsBom") or []):
+        if not isinstance(row, dict) or str(row.get("tag") or "") != tag:
+            continue
+        m = _VESSEL_DESIGN_PRESSURE_RX.search(str(row.get("basis") or ""))
+        if m:
+            bar = _bar_from(float(m.group(1)), m.group(2))
+            return (f"{bar:.2f} bar (design P) — derived from {tag}'s stated "
+                    f"design pressure ({m.group(1)} {m.group(2)}, basis)")
+        break
+    node = next((n for n in (getattr(proc, "nodes", None) or []) if n.tag == tag), None)
+    name = node.label if node is not None else None
+    if name:
+        for spec in ((schedule or {}).get("specs") or []):
+            if not isinstance(spec, dict) or name not in (spec.get("from_part"),
+                                                           spec.get("to_part")):
+                continue
+            blob = (f"{spec.get('material_qty_desc') or ''} "
+                    f"{' '.join(spec.get('assumptions') or [])}")
+            m = _LINE_PN_RATING_RX.search(blob)
+            if m:
+                return (f"~{m.group(1)} bar class (PN{m.group(1)}) — derived from "
+                        f"the connected line's PN rating (basis)")
+    return _PSV_SET_NOT_STATED
+
+
 def _parse_cv(mods: dict) -> str:
     """Control-valve sizing hint: a Cv / Kv or a capacity figure where stated."""
     blob = f"{mods.get('form','')} {mods.get('capacity','')} {mods.get('rating_primary','')}"
@@ -925,6 +988,59 @@ def _valve_size_from(location: str, line_rows, proc=None, schedule=None) -> str:
     return ""
 
 
+# ── PUMP-DUTY VALVE-SIZE DERIVATION (2026-07-05) ──────────────────────────────
+# A sub-assembly valve on a pump skid (Suction/Discharge Isolation, Non-Return) is
+# not an independent line item — it sits directly on its HOST PUMP's suction or
+# discharge nozzle, whose bore follows from the pump's OWN duty at a standard line
+# velocity (suction ~1.3 m/s to avoid cavitation at the pump eye; discharge ~2.0
+# m/s — the check valve rides the discharge nozzle too, preventing backflow). This
+# is the EXACT D=sqrt(4Q/πv) + DN-ladder rule connection_sizing.py already applies
+# to every routed line; connection_sizing.size_pump_line_dn exposes it pure (no
+# subprocess) for this documentation path. The synthesiser names the host pump
+# directly in the valve word's OWN cid ('<pump_slug>_synth_word__suction_isolation_
+# valve' etc, see _iter_words) — we are a CONSUMER of that identity, never a
+# re-derivation of it.
+_PUMP_VALVE_CID_RX = re.compile(
+    r"^(?P<slug>.+?)_synth_word__(?P<kind>suction_isolation_valve|"
+    r"discharge_isolation_valve|non_return_valve)$")
+_PUMP_FLOW_RX = re.compile(r"[·\-]\s*([\d.]+)\s*m[³3]/h\b", re.I)
+
+
+def _pump_duty_size(cid: str, state: dict) -> str:
+    """A DN + provenance string derived from the host pump's OWN stated flow, for a
+    Suction/Discharge Isolation or Non-Return valve whose cid names that pump
+    (see the module comment above). '' when the cid does not name a host pump at
+    all (a different valve family — untouched, falls through to the existing '—').
+    An HONEST, explicit flag — never a bare dash — when the cid DOES name a host
+    pump but the derivation cannot complete: no principal of that name exists
+    (ambiguous), or the pump's own requirement states a duty with no flow (e.g. a
+    dosing pump stated only in kW — genuinely no-flow)."""
+    m = _PUMP_VALVE_CID_RX.match(cid or "")
+    if not m:
+        return ""
+    pump_name = re.sub(r"_", " ", m.group("slug")).strip()
+    is_suction = m.group("kind") == "suction_isolation_valve"
+    side = "suction" if is_suction else "discharge"
+    velocity = (CS.PUMP_SUCTION_VELOCITY_MS if is_suction
+                else CS.PUMP_DISCHARGE_VELOCITY_MS)
+    for row in (state.get("requirementsBom") or []):
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        head = req.split("·")[0].strip()
+        if head.lower() != pump_name.lower():
+            continue
+        fm = _PUMP_FLOW_RX.search(req)
+        if not fm:
+            return (f"not derivable — {head} states no flow duty (host pump has "
+                    f"no m3/h to size a line from)")
+        flow_m3h = float(fm.group(1))
+        dn_label, _bore_mm = CS.size_pump_line_dn(flow_m3h, velocity)
+        return (f"{dn_label} — derived from host pump duty ({flow_m3h:g} m3/h @ "
+                f"{velocity:g} m/s {side})")
+    return f"ambiguous — no principal named '{pump_name.title()}' in the BoM"
+
+
 def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[ValveRow]:
     rows: list[ValveRow] = []
     used_lines: dict[str, int] = {}     # line number → how many valves already cite it
@@ -982,6 +1098,9 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             form = mods.get("form", "") or name
             if prefix == "PSV":
                 set_or_cv = _parse_set_pressure(mods, form)
+                if set_or_cv == "—":
+                    set_or_cv = _psv_set_from_protected_equipment(
+                        location, state, schedule, proc)
             elif prefix == "XV":
                 set_or_cv = "on/off (tight-shutoff)"     # ESD = isolating, not modulating
             elif prefix == "PCV":
@@ -1005,7 +1124,8 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
             # FO instead of the fixed FC default.
             fail = _valve_fail_action(prefix, fail, cid, name, form,
                                       mods.get("rating_primary", "") or "", fail_states)
-            size = _valve_size_from(location, line_rows, proc, schedule) or "—"
+            size = (_valve_size_from(location, line_rows, proc, schedule)
+                    or _pump_duty_size(cid, state) or "—")
             rows.append(ValveRow(
                 tag=tag, vtype=vtype,
                 service=_norm(form),
@@ -1525,12 +1645,15 @@ def build_table_svg(sc: Schedules) -> str:
                     f"{len(sc.lines)} process lines · line numbers match the P&ID")
 
     # ── VALVE LIST ──
-    # Set/Cv + Fail are `_short()`-truncated for THIS fixed-pixel table ONLY (matches the
-    # existing Service/Material precedent) — the markdown/Excel cell (render_markdown, below)
-    # always carries the untruncated basis; only the drawing-page image needs the cap.
+    # Size/Set/Cv + Fail are `_short()`-truncated for THIS fixed-pixel table ONLY
+    # (matches the existing Service/Material precedent) — the markdown/Excel cell
+    # (render_markdown, below) always carries the untruncated basis + provenance;
+    # only the drawing-page image needs the cap. Size gained a cap 2026-07-05: a
+    # pump-duty-derived Size now carries its provenance too ('DN80 — derived from
+    # host pump duty …') which would otherwise overflow the narrow 78 px column.
     valve_cells = []
     for v in sc.valves:
-        vals = [v.tag, v.vtype, _short(v.service, 56), v.location, v.size,
+        vals = [v.tag, v.vtype, _short(v.service, 56), v.location, _short(v.size, 20),
                 _short(v.set_or_cv, 30), _short(v.fail_action, 17), v.pid_ref]
         valve_cells.append([(val, (j in _VALVE_MONO)) for j, val in enumerate(vals)])
     y = _draw_table(svg, _MARGIN, y, _VALVE_COLS, valve_cells,

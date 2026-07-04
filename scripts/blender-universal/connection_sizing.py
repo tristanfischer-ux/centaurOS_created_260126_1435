@@ -238,6 +238,16 @@ DEFAULT_STEAM_VELOCITY_MS = 30.0    # steam line 25–40 m/s
 DEFAULT_COOLANT_DT_K = 6.0          # chilled-water loop supply→return ΔT
 DEFAULT_DUCT_VELOCITY_MS = 6.0      # supply-air duct 4–8 m/s
 
+# Pump SUCTION / DISCHARGE nozzle line velocities (standard pump-skid practice —
+# suction is sized generously to avoid cavitation at the pump eye; discharge runs
+# faster since it is already pressurised). Used by size_pump_line_dn — the same
+# d=sqrt(4Q/πv) + DN-ladder rule as size_fluid above, exposed as a light,
+# subprocess-free helper for a caller (e.g. a schedule/documentation generator)
+# that only needs the nominal bore from a pump's OWN stated duty, not a full
+# pressure-drop calculation.
+PUMP_SUCTION_VELOCITY_MS = 1.3      # pump suction nozzle / line
+PUMP_DISCHARGE_VELOCITY_MS = 2.0    # pump discharge nozzle / line
+
 # Busbar copper current density [A/mm²] — natural-convection flat bar, IEC 61439
 # ballpark (~1.3–1.6 A/mm² for an un-forced bar). Stated in assumptions.
 BUSBAR_CU_A_PER_MM2 = 1.55
@@ -833,6 +843,21 @@ def _round_up_pipe_dn(required_bore_mm: float) -> tuple[str, float]:
         if bore >= required_bore_mm - 1e-9:
             return label, bore
     return PIPE_DN_LADDER[-1]
+
+
+def size_pump_line_dn(flow_m3_h: float, velocity_ms: float) -> tuple[str, float]:
+    """The nominal pipe DN for a pump suction/discharge nozzle carrying
+    `flow_m3_h` at the target `velocity_ms` — the SAME D=sqrt(4Q/πv) + DN-ladder
+    rule size_fluid (above) applies to every routed line, exposed as a light,
+    pure, subprocess-free helper (no process_pump_sizing.py round-trip — a
+    caller that only needs the nominal bore, not a pressure-drop calc, e.g. a
+    process-schedule generator deriving a sub-assembly valve's line size from
+    its host pump's own stated duty). Returns (dn_label, bore_mm). Positional
+    args only (a caller with no flow / a non-positive velocity must not call
+    this — that is an honest 'not derivable' case, not a 0 mm result)."""
+    q_m3s = flow_m3_h / 3600.0
+    ideal_dia_m = math.sqrt(4.0 * q_m3s / (math.pi * max(1e-9, velocity_ms)))
+    return _round_up_pipe_dn(ideal_dia_m * 1000.0)
 
 
 def _round_up_duct(required_side_mm: float) -> int:

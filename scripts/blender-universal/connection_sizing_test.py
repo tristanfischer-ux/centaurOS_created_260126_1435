@@ -714,6 +714,24 @@ def main() -> int:
     check("real-flow fluid edge still sizes (within_spec bool, velocity > 0)",
           isinstance(_rf.get("within_spec"), bool) and (_rf.get("drop_pct_or_velocity") or 0) > 0)
 
+    # ---- PUMP-DUTY LINE DN (2026-07-05 — process-schedules valve-list derivation):
+    # size_pump_line_dn is the SAME D=sqrt(4Q/πv) + DN-ladder rule as size_fluid,
+    # exposed pure/subprocess-free so a documentation-only caller (draw_process_
+    # schedules.py) can derive a pump sub-assembly valve's line size from the
+    # host pump's own stated flow, without a process_pump_sizing.py round-trip. ----
+    print("\nPUMP-DUTY LINE DN (size_pump_line_dn):")
+    _suc_label, _suc_bore = cs.size_pump_line_dn(90.0, cs.PUMP_SUCTION_VELOCITY_MS)
+    _dis_label, _dis_bore = cs.size_pump_line_dn(90.0, cs.PUMP_DISCHARGE_VELOCITY_MS)
+    check("90 m3/h suction (1.3 m/s) sizes to a real DN off the standard ladder",
+          _suc_label in dict(cs.PIPE_DN_LADDER))
+    check("the SAME flow at the faster discharge velocity needs a bore <= the "
+          "slower suction bore (higher v -> smaller or equal pipe)",
+          _dis_bore <= _suc_bore)
+    check("a bigger flow at the same velocity never sizes to a smaller DN",
+          cs.size_pump_line_dn(180.0, cs.PUMP_DISCHARGE_VELOCITY_MS)[1] >= _dis_bore)
+    check("a tiny 0.1 m3/h duty still resolves to the smallest ladder DN, never blows up",
+          cs.size_pump_line_dn(0.1, cs.PUMP_SUCTION_VELOCITY_MS)[0] == cs.PIPE_DN_LADDER[0][0])
+
     # ---- Verdict ----
     print()
     if failures:
