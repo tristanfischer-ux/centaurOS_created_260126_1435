@@ -701,21 +701,46 @@ def _aux_tab_score(title: str, run_dir: str):
         _sc = round(min(10.0 * min(p / c for _l, p, c in _components), 8.0), 1)
         if _sc == int(_sc):
             _sc = int(_sc)
-        _issues = ["HVAC is OUT OF SCOPE for this process / fluid plant — its climate hardware "
-                   "(heating / ventilation / cooling) is supplied by others (per the brief); the "
-                   "sheet honestly documents building-ventilation only, with no HVAC equipment to "
-                   "size or mis-represent. Verified out-of-scope + brief-cited; ceilinged at 8 "
-                   "— there is no HVAC engineering ON the sheet to make it a 9-10 'wow'."]
+        _comps_out = [{"check": l, "passed": p, "checked": c} for l, p, c in _components]
         if not _excl_hit:
-            _issues = ["the sheet claims HVAC is out of scope, but the brief's own exclusions do "
-                       "NOT explicitly name the climate/HVAC hardware — an unsupported disclosure"]
-        return {"score": _sc, "target": 8, "status": "PASS" if _sc >= 8 else "FAIL",
-                "issues": _issues,
-                "fix": "none — an HVAC duty would switch this to a coverage-scored check automatically"
-                       if _excl_hit else
-                       "cite the excluded climate/HVAC hardware explicitly in the brief's own "
-                       "'Explicitly EXCLUDED' section",
-                "components": [{"check": l, "passed": p, "checked": c} for l, p, c in _components]}
+            # UNVERIFIED scope claim (Tristan 2026-07-05, Option A — the both-directions
+            # proveCatch this generalisation exists to guarantee): the sheet DECLARES itself
+            # out of scope, but its own second verification check (the brief citing the
+            # excluded hardware) did NOT pass. This is exactly the "unverified scope dodge"
+            # the mechanism below must never reward — it stays a NORMAL, LOW-scoring tab
+            # (never `scored: False`), so it cannot escape the ≥8 floor by merely CLAIMING
+            # inapplicability.
+            return {"score": _sc, "target": 8, "status": "FAIL",
+                    "issues": ["the sheet claims HVAC is out of scope, but the brief's own "
+                               "exclusions do NOT explicitly name the climate/HVAC hardware — "
+                               "an unsupported disclosure (stays scored, at this low value, "
+                               "until the claim is verified)"],
+                    "fix": "cite the excluded climate/HVAC hardware explicitly in the brief's "
+                           "own 'Explicitly EXCLUDED' section",
+                    "components": _comps_out}
+        # VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A directive): every declared
+        # verification check passed (both components 1/1) — this discipline sheet is
+        # GENUINELY inapplicable to this archetype, not merely undersized or dodging the
+        # floor. GENERIC CONTRACT (not HVAC-specific — any tab's scorer may set `scored:
+        # False` on its own return dict when its OWN verification checks all pass; the
+        # consumers — compute_verdict, tab_scorecard_summary, the Q&A per-tab table, the
+        # chip — key ONLY on this flag, never on a tab name):
+        #   • compute_verdict / tab_scorecard_summary EXCLUDE the tab from the floor, the
+        #     open-issue count, and the fail/unscored tallies — a verified "not applicable"
+        #     is not an open issue.
+        #   • the sheet still renders normally with its verification checks visible, a chip
+        #     reading "OUT OF SCOPE FOR THIS ARCHETYPE — VERIFIED, NOT SCORED", and the Q&A
+        #     per-tab row shows "n/a — verified out of scope" instead of a numeric score.
+        #   • tab-scorecard.json carries `scored: false` + this entry's basis (built from
+        #     `components` below, same as every other tab) so the verification is auditable.
+        return {"score": _sc, "target": 8, "status": "PASS", "scored": False,
+                "issues": ["out of scope for this archetype — VERIFIED, not scored: HVAC's "
+                           "climate hardware (heating / ventilation / cooling) is supplied by "
+                           "others (per the brief), confirmed by both checks below — excluded "
+                           "from the ≥8 floor rather than penalised for having no HVAC "
+                           "engineering to show."],
+                "fix": "none — an HVAC duty would switch this to a coverage-scored check automatically",
+                "components": _comps_out}
     return None  # Contents / ⭐ Scorecard navigation tabs
 
 
@@ -1244,6 +1269,15 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
         if str(t) in _MIRROR_TABS:
             continue      # a mirror RENDERS the floor — it never computes it (fixpoint fix)
         if isinstance(v, dict):
+            if v.get("scored") is False:
+                # VERIFIED OUT-OF-SCOPE (Option A, 2026-07-05): a tab whose scorer proved
+                # BOTH its own verification checks pass (e.g. HVAC — no contract duty AND
+                # the brief's own exclusions cite the hardware) is excluded from the floor
+                # AND the open-issue count entirely — it is neither a fail nor "unscored",
+                # an honestly-verified "not applicable". GENERIC: keyed on the `scored` flag
+                # any tab's own scorer may set, never on the tab's name — an out-of-scope
+                # CLAIM without both checks passing never sets this flag (stays scored, low).
+                continue
             sv = v.get("score")
             tabs[str(t)] = float(sv) if isinstance(sv, (int, float)) else None  # UNSCORED → None
     all_vals = list(secs.values()) + list(tabs.values())
@@ -7867,6 +7901,47 @@ def _bom_ledger_range(wb: Workbook) -> Optional[Tuple[str, int, int]]:
     return None
 
 
+def _manifest_fold_registry(parts: list, bom_by_tag: dict) -> Dict[str, str]:
+    """Map a manifest part's OWN equipment_tag -> the fold-PARENT equipment_tag whose
+    BoM ledger row actually carries its Material/MPN/coverage (the P-105/P-107 gap,
+    2026-07-05): a qty-N principal is REPLICATED into N distinct parts-manifest
+    instances for Blender placement (equipment_tag P-104, P-105, ... — see
+    forgeos_physics_derived_equipment_pivot) but requirements_bom.py folds them into
+    ONE ledger row (P-104, qty=N) — so every instance past the first has no row of
+    its own in `bom_by_tag` and previously rendered Material/MPN/coverage as a bare
+    dash, even though the fold PARENT (right there in the same instance group) holds
+    the real data.
+
+    Grouping key: the manifest's OWN `tag` field with its trailing `_instN` instance
+    suffix stripped (the physical equipment CLASS, e.g. 'u_drain_transfer_pump') —
+    never `equipment_tag` itself, which is exactly the field missing for a folded
+    member. Only resolves a fold when EXACTLY ONE sibling in the instance group has
+    its own bom_by_tag row: zero real rows means there is no parent to fold into (an
+    honest gap, left alone); two-or-more means the group was never actually folded —
+    e.g. a coincidental tag reuse where every instance kept its own distinct BoM row
+    (the softener-vessel V-106/V-107 case) — and inventing a parent there would be a
+    guess, never made. Pure + deterministic; proveCatch in `_selftest`."""
+    groups: Dict[str, List[dict]] = {}
+    for p in parts:
+        tag = str(p.get("tag") or "")
+        m = re.match(r"^(.*)_inst\d+$", tag)
+        base = m.group(1) if m else tag
+        groups.setdefault(base, []).append(p)
+    registry: Dict[str, str] = {}
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        own_tags = [str(p.get("equipment_tag") or p.get("tag") or "") for p in members]
+        parents = [t for t in own_tags if t in bom_by_tag]
+        if len(parents) != 1:
+            continue  # 0 = no real fold parent (honest gap); >=2 = never folded — never guess
+        parent_tag = parents[0]
+        for t in own_tags:
+            if t and t != parent_tag and t not in bom_by_tag:
+                registry[t] = parent_tag
+    return registry
+
+
 def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
     """EQUIPMENT & DIMENSIONS REGISTER: one row per parts-manifest part — tag, canonical
     name, shape, dims, a LIVE volume/footprint FORMULA (self-auditing geometry — corrupt
@@ -7886,6 +7961,7 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
         t = row.get("tag")
         if t and t not in bom_by_tag:
             bom_by_tag[t] = row
+    fold_registry = _manifest_fold_registry(parts, bom_by_tag)
 
     ws = wb.create_sheet(_EQUIP_REG_SHEET)
     set_widths(ws, {"A": 10, "B": 30, "C": 22, "D": 10, "E": 9, "F": 9, "G": 9, "H": 9,
@@ -7912,9 +7988,20 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
         shape_cls, l_, w_, h_, d_ = _geom_dims(p.get("shape") or "", p.get("dims_mm") or {})
         equip = equip_by_tag.get(tag) or {}
         bom_row = bom_by_tag.get(tag) or {}
-        material = _bom_row_material(bom_row) or (
-            "n/a — not a fabricated part (bought-out assembly)" if bom_row else "—")
-        mpn_status = f"{equip.get('part') or '—'} · {equip.get('status') or bom_row.get('status') or '—'}"
+        # FOLD RESOLUTION (the P-105/P-107 gap, 2026-07-05): a duplicate-tag instance
+        # folded upstream into a sibling BoM line has no bom_row/equip of its own —
+        # resolve through the fold registry's PARENT tag instead of a bare dash, with
+        # an honest provenance note so the reader knows the data is inherited, never
+        # invented.
+        fold_parent = fold_registry.get(tag)
+        if not bom_row and fold_parent:
+            bom_row = bom_by_tag.get(fold_parent) or {}
+        if not equip and fold_parent:
+            equip = equip_by_tag.get(fold_parent) or {}
+        fold_note = f" (via fold: {fold_parent})" if fold_parent else ""
+        material = (_bom_row_material(bom_row) or (
+            "n/a — not a fabricated part (bought-out assembly)" if bom_row else "—")) + fold_note
+        mpn_status = f"{equip.get('part') or '—'} · {equip.get('status') or bom_row.get('status') or '—'}{fold_note}"
         cov = equip.get("coverage") or {}
         cov_true = sum(1 for v in cov.values() if v)
         cov_total = len(cov)
@@ -7938,7 +8025,7 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
         fc.number_format = FMT_DEC2
         ws.cell(r, 11, clean_cell(material)).border = BORDER
         ws.cell(r, 12, clean_cell(mpn_status)).border = BORDER
-        ws.cell(r, 13, f"{cov_true}/{cov_total}" if cov_total else "—").border = BORDER
+        ws.cell(r, 13, (f"{cov_true}/{cov_total}{fold_note}" if cov_total else "—")).border = BORDER
 
         if bom_range:
             name_col, r1, r2 = bom_range
@@ -15060,10 +15147,16 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         for _tab in _order:
             _v = _tabsc.get(_tab) if isinstance(_tabsc.get(_tab), dict) else {}
             _st = _v.get("status")
+            _voos = _v.get("scored") is False   # VERIFIED OUT-OF-SCOPE (Option A, 2026-07-05)
             ws.cell(r, 1, clean_cell(_tab)).font = FONT_SUB
             _scell = ws.cell(r, 2)   # LIVE formula written by _write_live_scores (final scores)
-            _scell.fill = FILL_PASS if _st == "PASS" else (FILL_ADVISORY if _st == "UNSCORED" else FILL_FAIL)
-            ws.cell(r, 3, f'=IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),"UNSCORED")')
+            _scell.fill = (FILL_ADVISORY if _voos else
+                           (FILL_PASS if _st == "PASS" else (FILL_ADVISORY if _st == "UNSCORED" else FILL_FAIL)))
+            # column C: a GENERIC string match on the exact literal _write_live_scores writes
+            # for scored:False (never a tab-name check) so the "verified, not scored" case
+            # reads distinctly from a genuine UNSCORED gap.
+            ws.cell(r, 3, f'=IF($B{r}="n/a — verified out of scope","VERIFIED — not scored",'
+                          f'IF(ISNUMBER($B{r}),IF($B{r}>=8,"PASS ✓","⛔ below 8"),"UNSCORED"))')
             _iss = _v.get("issues") or [""]
             _icell = _write_defect_cell(ws, r, 4, _iss[0] if _iss else "")
             _icell.alignment = WRAP_TOP
@@ -15082,8 +15175,22 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         _rngs = []
         if _sec_last >= _sec_first:
             _rngs.append(f"$B${_sec_first}:$B${_sec_last}")
-        if _tab_last >= _nm_first:
-            _rngs.append(f"$B${_nm_first}:$B${_tab_last}")
+        # VERIFIED OUT-OF-SCOPE tabs (scored:False — Option A, 2026-07-05) are excluded from
+        # the floor/open-issue surface entirely. MIN() already skips their non-numeric "n/a —
+        # verified out of scope" literal harmlessly, but COUNTA()-COUNT() would otherwise
+        # wrongly count that same literal as an "unscored" open issue — so the tab range is
+        # built as a UNION of individual cell refs (excluding those rows) rather than one
+        # contiguous span, since an excluded row can sit anywhere inside the non-mirror block.
+        # GENERIC: keyed on the `scored` flag per tab, never a tab name.
+        _floor_tab_refs = []
+        for _tab2 in _order[_n_mirrors:]:
+            if (_tabsc.get(_tab2) or {}).get("scored") is False:
+                continue
+            _ref2 = _QA_SCORE_CELLS.get(_tab2)
+            if _ref2:
+                _floor_tab_refs.append("$B$" + _ref2.rsplit("$", 1)[1])
+        if _floor_tab_refs:
+            _rngs.append("(" + ",".join(_floor_tab_refs) + ")")
         _rng_expr = ",".join(_rngs) if _rngs else '""'
         ws.cell(r, 1, "LIVE FLOOR — min of every deterministic section & non-mirror tab "
                       "(the ONE VERDICT's number, computed in-cell)").font = FONT_SUB
@@ -16743,15 +16850,24 @@ def _stamp_chips(wb) -> int:
         if ref:
             v = _TAB_SCORES.get(ws.title) if isinstance(_TAB_SCORES.get(ws.title), dict) else {}
             basis_short = _xq(str(v.get("basis") or "").strip(), 170)
-            _tail = ""
-            if v.get("status") == "FAIL" and (v.get("issues") or []):
-                _tail = "  →  " + _xq((v.get("issues") or [""])[0], 150)
-            cell.value = (
-                f'="⬤ TAB QUALITY "&{_fx_num_txt(ref)}&"/10 · "'
-                f'&IF(ISNUMBER({ref}),IF({ref}>=8,"PASS","FAIL"),"UNSCORED")'
-                f'&" (target ≥8, live from the Quality & Audit score cell)"'
-                + (f'&" · {basis_short}"' if basis_short else "")
-                + f'&" · full audit: Quality & Audit tab{_tail}"')
+            if v.get("scored") is False:
+                # VERIFIED OUT-OF-SCOPE (Option A, 2026-07-05) — GENERIC: any tab whose own
+                # scorer set `scored: False` gets this distinct chip instead of a numeric
+                # "N/10" one, keyed purely on the flag (never the tab's name).
+                cell.value = (
+                    f'="⬤ OUT OF SCOPE FOR THIS ARCHETYPE — VERIFIED, NOT SCORED"'
+                    + (f'&" · {basis_short}"' if basis_short else "")
+                    + f'&" · full audit: Quality & Audit tab"')
+            else:
+                _tail = ""
+                if v.get("status") == "FAIL" and (v.get("issues") or []):
+                    _tail = "  →  " + _xq((v.get("issues") or [""])[0], 150)
+                cell.value = (
+                    f'="⬤ TAB QUALITY "&{_fx_num_txt(ref)}&"/10 · "'
+                    f'&IF(ISNUMBER({ref}),IF({ref}>=8,"PASS","FAIL"),"UNSCORED")'
+                    f'&" (target ≥8, live from the Quality & Audit score cell)"'
+                    + (f'&" · {basis_short}"' if basis_short else "")
+                    + f'&" · full audit: Quality & Audit tab{_tail}"')
         else:
             cell.value = qb["text"]          # no Q&A row (selftest fixtures) — stated text
         cell.fill = qb["fill"]
@@ -16835,6 +16951,14 @@ def _write_live_scores(wb: Workbook, state: dict) -> None:
         basis = str(e.get("basis") or "")
         qa.cell(row, 5, clean_cell(basis[:250])).font = _FONT_AUDIT
         qa.cell(row, 5).alignment = WRAP_TOP
+        if e.get("scored") is False:
+            # VERIFIED OUT-OF-SCOPE (Option A, 2026-07-05): a non-numeric literal, same
+            # no-bare-literal-safe idiom as the UNSCORED "—" below, so MIN()/COUNTIF()/
+            # COUNT() naturally skip it — but a DISTINCT string so the reader (and the
+            # live-check gate) can tell "verified, excluded on purpose" apart from a
+            # genuine unscored gap.
+            qa.cell(row, 2, '="n/a — verified out of scope"')
+            continue
         if not isinstance(score, (int, float)):
             qa.cell(row, 2, '="—"')     # honestly unscored — still a formula, never a literal
             continue
@@ -17777,7 +17901,14 @@ def build(run_dir: str, out_path: str) -> dict:
         if _rb is not None:
             _mismatch = []
             for _t, _ref in _QA_SCORE_CELLS.items():
-                _pv = (_TAB_SCORES.get(_t) or {}).get("score")
+                _entry = _TAB_SCORES.get(_t) or {}
+                if _entry.get("scored") is False:
+                    # VERIFIED OUT-OF-SCOPE (Option A, 2026-07-05): the workbook cell is
+                    # DELIBERATELY the literal "n/a — verified out of scope" (never a
+                    # number), while python keeps an informational numeric `score` — not a
+                    # divergence, so it is exempt from the numeric ONE-TRUTH comparison.
+                    continue
+                _pv = _entry.get("score")
                 _wv = _rb.get(_t)
                 if isinstance(_pv, (int, float)) and isinstance(_wv, (int, float)):
                     if abs(_pv - _wv) > 0.05:
@@ -17945,6 +18076,42 @@ def _selftest() -> int:
     if not (not _b_bom and _b_draw):
         print("  FAIL reg-name-divergence: not-in-BoM/in-drawings must split (BoM FAIL, "
               "drawings PASS) independently"); bad += 1
+    # ═══ proveCatch the EQUIPMENT REGISTER FOLD REGISTRY (2026-07-05 — the P-105/P-107
+    # gap: a qty-N principal replicated into N manifest instances but folded into ONE
+    # BoM ledger row must resolve Material/MPN/coverage through its fold PARENT, never a
+    # dash). Three claims, mirroring the real Drain Transfer Pump (P-104/P-105) +
+    # Fertigation Dosing Pump (P-106/P-107) + Softener Vessel (V-106/V-107 — NOT folded,
+    # a coincidental tag collision where both kept their own row) shapes. ═══
+    _fr_parts = [
+        {"tag": "u_drain_transfer_pump_inst0", "equipment_tag": "P-104"},
+        {"tag": "u_drain_transfer_pump_inst1", "equipment_tag": "P-105"},
+        {"tag": "u_fertigation_dosing_pump_inst0", "equipment_tag": "P-106"},
+        {"tag": "u_fertigation_dosing_pump_inst1", "equipment_tag": "P-107"},
+        {"tag": "u_softener_vessel_inst0", "equipment_tag": "V-106"},
+        {"tag": "u_softener_vessel_inst1", "equipment_tag": "V-107"},
+        {"tag": "u_lone_tank_inst0", "equipment_tag": "TK-901"},
+    ]
+    _fr_bom_by_tag = {
+        "P-104": {"tag": "P-104", "material": "PVC-U / 304 stainless (WRAS)"},
+        "P-106": {"tag": "P-106", "material": "PVC-U / 304 stainless (WRAS)"},
+        "V-106": {"tag": "V-106", "material": "carbon steel"},
+        "V-107": {"tag": "V-107", "material": "PVC-U / 304 stainless (WRAS)"},  # own row — NOT a fold
+        # TK-901 deliberately absent — a lone (non-replicated) part with no BoM row at all.
+    }
+    _fold_reg = _manifest_fold_registry(_fr_parts, _fr_bom_by_tag)
+    if _fold_reg.get("P-105") != "P-104":
+        print(f"  FAIL fold-registry: P-105 (folded Drain Transfer Pump instance) must "
+              f"resolve to fold parent P-104 (got {_fold_reg.get('P-105')!r})"); bad += 1
+    if _fold_reg.get("P-107") != "P-106":
+        print(f"  FAIL fold-registry: P-107 (folded Fertigation Dosing Pump instance) must "
+              f"resolve to fold parent P-106 (got {_fold_reg.get('P-107')!r})"); bad += 1
+    if "V-106" in _fold_reg or "V-107" in _fold_reg:
+        print(f"  FAIL fold-registry: V-106/V-107 BOTH carry their own BoM row (never "
+              f"actually folded) — must NOT invent a fold parent for either (got {_fold_reg!r})"); bad += 1
+    if "TK-901" in _fold_reg:
+        print(f"  FAIL fold-registry: a lone part with no sibling and no BoM row of its "
+              f"own has no real fold parent — must stay an honest gap, never guessed "
+              f"(got {_fold_reg.get('TK-901')!r})"); bad += 1
     # ═══ proveCatch the COLUMN-CONTRACT REGISTRY (Tristan 2026-07-02 — the v52 fabricated
     # ticks: velocity 0.0 "in spec ✓" × 45; dash-ΔU panel rows scoring 10/10). Four claims:
     # (a) a 0-velocity fluid row can NEVER evaluate in-spec (tick impossible); (b) a dash-ΔU
@@ -19087,6 +19254,35 @@ def _selftest() -> int:
     if _b3b["floor"] != 4:
         print(f"  FAIL b3-floor: a DETERMINISTIC section at 4 must still pin the floor "
               f"at 4 — the fix relaxes nothing (got {_b3b['floor']})"); bad += 1
+    # ═══ (10c) VERIFIED OUT-OF-SCOPE proveCatch (Tristan 2026-07-05, Option A) —
+    # compute_verdict must EXCLUDE a `scored:False` tab from both the floor AND the
+    # open-issue count entirely (never even a None/UNSCORED entry), while an out-of-scope
+    # CLAIM that never proved its own verification checks (no `scored:False`) floors and
+    # counts normally — the "unverified scope dodge" the mechanism must never reward.
+    # GENERIC fixture ("Discipline X") — the mechanism is keyed on the flag, not a name. ═══
+    _voos_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]}},
+        {"Overview": {"score": 10, "status": "PASS"},
+         "Discipline X": {"score": 8, "status": "PASS", "scored": False}})
+    if _voos_v["floor"] != 9 or _voos_v["open_issues"] != 0 or not _voos_v["ships"]:
+        print(f"  FAIL verified-out-of-scope: a scored:False tab must NEVER enter the floor "
+              f"or the open-issue count — floor should stay 9 (from 'gates'), 0 open issues, "
+              f"SHIPS (got {_voos_v})"); bad += 1
+    _dodge_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]}},
+        {"Overview": {"score": 10, "status": "PASS"},
+         "Discipline X": {"score": 0, "status": "FAIL"}})   # claims nothing; no `scored` key
+    if _dodge_v["floor"] != 0 or _dodge_v["open_issues"] != 1 or _dodge_v["ships"]:
+        print(f"  FAIL verified-out-of-scope: an UNVERIFIED low-scoring tab (no scored:False) "
+              f"must floor normally at 0 with 1 open issue, never exempted "
+              f"(got {_dodge_v})"); bad += 1
+    _duty_v = compute_verdict(
+        {"qualityScorecard": {"sections": [{"name": "gates", "score": 9}]}},
+        {"Overview": {"score": 10, "status": "PASS"}, "HVAC": {"score": 6, "status": "FAIL"}})
+    if _duty_v["floor"] != 6 or _duty_v["open_issues"] != 1 or _duty_v["ships"]:
+        print(f"  FAIL verified-out-of-scope: the DUTY branch (real HVAC content, normally "
+              f"scored) must floor exactly like any other tab, unaffected by the mechanism's "
+              f"existence (got {_duty_v})"); bad += 1
     # ═══ (11) MARKDOWN EMPHASIS never renders as literal text (fix 4) ═══
     if clean_cell("**TOTALS**") != "TOTALS" or clean_cell("**42.7 kW**") != "42.7 kW":
         print(f"  FAIL md-emphasis: '**TOTALS**' must render 'TOTALS' (got "

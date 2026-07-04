@@ -476,6 +476,109 @@ export function isCommodityProcessValve(name: string): boolean {
   return /\b(check|non.?return|swing|ball|gate|globe|needle|wafer|lift|foot|isolation|isolat)\b/.test(n)
 }
 
+// ── UNTETHERED ACCESSORY VALVE — tether-or-suppress at emission (2026-07-05, the
+// 0faea5550 routed follow-on: "the completion pass must tether representative
+// accessory valve lines to their service at emission (or stop emitting them
+// untethered) — stamping [the join] would be guessing"). derive-skeleton.ts /
+// universal-contract-sizing.ts mint a commodity-valve word's TEXT before either
+// completion function below ever sees it (the "<name> — representative <module>
+// component" TIER_C_FLOOR scaffold, or the "(assembly component)" sub-assembly
+// explosion); completeEmitterGaps (injecting a brand-new representative word) and
+// fillBlankWordMpns (finalising an EXISTING placeholder one) are the ONLY code on
+// the emission path that inspects the word's sub_module CONTEXT before it ships
+// into the BoM. Left alone, an accessory valve's requirement text is a bare noun
+// phrase ("Isolation Valves") the valve spec-join in requirements_bom.py can never
+// match to a real line — not a bug in the join (it correctly REFUSES to guess), a
+// gap in what gets minted here.
+//
+// THE TETHER: universal-contract-sizing.ts's `explodeEquipmentSubAssemblies`
+// stamps a principal-equipment word "— principal equipment sized from the
+// engineering contract" and then APPENDS its exploded children (Casing, Drive
+// Motor, ..., Suction Isolation Valve, Discharge Isolation Valve, Non-Return
+// Valve, ...) contiguously right after it in the SAME sub_module's `words` array,
+// before the next principal's own block begins — verified on v73's REAL shape,
+// where one module's entire equipment list (16 distinct principals: pumps,
+// vessels, tanks) lives in ONE flat sub_module, so "does a principal-equipment
+// sibling exist ANYWHERE in this sub_module" is not enough to identify WHICH one
+// hosts a given valve (16 candidates, genuinely ambiguous by presence alone).
+// Array ORDER resolves it deterministically: walking BACKWARD from the valve's
+// own position, the FIRST principal-equipment word encountered is its direct
+// parent (children never precede their own parent, and the next principal's
+// block only starts after the previous one's children end) — no guessing, no
+// per-class table, just the construction order this design already carries.
+//
+// When NO principal-equipment word precedes the valve at all (the cross-cutting
+// TIER_C_FLOOR catch-all buckets — actuation_kinematics, safety_protection,
+// maintenance_serviceability — whose siblings are themselves other generic
+// placeholders, never a real tag; verified 2026-07-04 on v70/v73: the sub_module
+// id itself is an arbitrary bucket, e.g. 'Isolation Valves' landing under
+// maintenance_serviceability__leveling_feet) there is NO real per-row placement
+// to join against — inventing one would be exactly the fabrication
+// requirements_bom.py's own taxonomy refuses. SUPPRESS the line instead: the
+// plant's real valves are already counted in the zoned-distribution kits + the
+// process-schedule valve list (draw_process_schedules.py mints one accessory
+// valve per real line independently), so an untethered duplicate is noise that
+// can never be spec-stamped. UNIVERSAL — keyed on the principal-equipment
+// ordering signal, never a per-class table; a non-valve word never reaches this
+// code (both call sites gate on isCommodityProcessValve first), so a design with
+// no untethered commodity-valve candidates (BESS, SAF) is byte-for-byte
+// unaffected.
+
+const _PRINCIPAL_EQUIPMENT_FORM_RE = /principal equipment sized from the engineering contract/i
+
+/**
+ * The name of the nearest PRECEDING principal-equipment word in `sub.words`
+ * relative to `word`'s own position (the word that hosts it — see the
+ * explodeEquipmentSubAssemblies contiguous-append rationale above), or null when
+ * no principal-equipment word precedes it at all. `word` may not yet be present
+ * in `sub.words` (a brand-new gap-fill word about to be appended) — in that case
+ * the scan starts from the END of the array, i.e. "the last principal this
+ * sub_module minted so far".
+ */
+export function hostingPrincipalEquipmentName(sub: SubModuleLike, word: WordLike): string | null {
+  const words = Array.isArray(sub.words) ? sub.words : []
+  let idx = words.indexOf(word)
+  if (idx === -1) idx = words.length
+  for (let i = idx - 1; i >= 0; i--) {
+    const w = words[i]
+    const form = (w.modifier_characters ?? []).find((m) => m.kind === 'form')?.value ?? ''
+    if (!_PRINCIPAL_EQUIPMENT_FORM_RE.test(form)) continue
+    const nm = w.content_character?.name_human || w.name_human
+    if (nm) return nm
+  }
+  return null
+}
+
+/**
+ * Tether an accessory-valve word to its hosting principal equipment by naming it
+ * in the word's own requirement text (mutates `word` in place — both name_human
+ * and content_character.name_human, since either may be read downstream as the
+ * BoM row's requirement label), or report that no tether exists so the caller can
+ * decline to emit the line at all. Callers gate on `isCommodityProcessValve`
+ * first — this function does not re-check that itself.
+ */
+export function tetherOrSuppressAccessoryValve(
+  word: WordLike,
+  sub: SubModuleLike,
+): { verdict: 'tethered'; hostName: string } | { verdict: 'suppress' } {
+  const hostName = hostingPrincipalEquipmentName(sub, word)
+  if (!hostName) return { verdict: 'suppress' }
+  const base = word.content_character?.name_human || word.name_human || ''
+  const tethered = `${base} (on ${hostName})`
+  word.name_human = tethered
+  if (word.content_character) word.content_character.name_human = tethered
+  return { verdict: 'tethered', hostName }
+}
+
+/** Remove `word` from `sub.words` in place (splice by reference identity). No-op
+ *  if `word` is not present — safe to call defensively. */
+function removeWordFromSub(sub: SubModuleLike, word: WordLike): void {
+  const words = sub.words
+  if (!Array.isArray(words)) return
+  const idx = words.indexOf(word)
+  if (idx >= 0) words.splice(idx, 1)
+}
+
 // A MOTOR DRIVE slot — VFD / variable-speed/-frequency drive / soft-starter / inverter drive / motor
 // starter — is power electronics SIZED TO A SPECIFIC MOTOR (the frame is chosen from the driven motor's
 // kW / full-load current), so it must NOT be pinned by a loose name-token DB match: that match has no
@@ -1400,6 +1503,24 @@ export async function completeEmitterGaps(
           'db',
           dbHit.unit_price_gbp,
         )
+        // UNTETHERED ACCESSORY VALVE (see the block above isCommodityProcessValve):
+        // a commodity valve minted here must be tethered to a real principal-
+        // equipment sibling in THIS sub_module, or not emitted at all.
+        if (isCommodityProcessValve(word.name_human ?? '')) {
+          const tether = tetherOrSuppressAccessoryValve(word, sub)
+          if (tether.verdict === 'suppress') {
+            log(
+              `[emitter-completion]   ⊘ suppress ${key}: untethered accessory valve gap — ` +
+              `no principal-equipment sibling in this sub_module to host it (declined DB hit ` +
+              `${dbHit.manufacturer} ${dbHit.part_number}); the plant's real valves are already ` +
+              `counted in the zoned-distribution kits + process schedule`,
+            )
+            continue // leave this gap unfilled — never emit an untethered accessory valve
+          }
+          log(`[emitter-completion]   ✓ DB   ${key} → ${dbHit.manufacturer} ${dbHit.part_number} [tethered to '${tether.hostName}']`)
+        } else {
+          log(`[emitter-completion]   ✓ DB   ${key} → ${dbHit.manufacturer} ${dbHit.part_number}`)
+        }
         ;(sub.words ??= []).push(word)
         mutated = true
         filled.push({
@@ -1410,7 +1531,6 @@ export async function completeEmitterGaps(
           part_number: dbHit.part_number,
           name: word.name_human ?? '',
         })
-        log(`[emitter-completion]   ✓ DB   ${key} → ${dbHit.manufacturer} ${dbHit.part_number}`)
         continue
       }
 
@@ -1453,6 +1573,30 @@ export async function completeEmitterGaps(
         humanName,
         'generated',
       )
+      // UNTETHERED ACCESSORY VALVE — same rule as the DB-first branch above: a
+      // generated commodity valve must be tethered to a real principal-equipment
+      // sibling, or it is not emitted.
+      if (isCommodityProcessValve(word.name_human ?? '')) {
+        const tether = tetherOrSuppressAccessoryValve(word, sub)
+        if (tether.verdict === 'suppress') {
+          log(
+            `[emitter-completion]   ⊘ suppress ${key}: untethered accessory valve gap — ` +
+            `no principal-equipment sibling in this sub_module to host it (declined generated ` +
+            `${emittedMfr}); the plant's real valves are already counted in the zoned-distribution ` +
+            `kits + process schedule`,
+          )
+          continue // leave this gap unfilled — never emit an untethered accessory valve
+        }
+        log(
+          `[emitter-completion]   ✓ GEN  ${key} → ${emittedMfr} [tethered to '${tether.hostName}'] ` +
+          `[MPN deferred${realMpnFromLlm ? `; LLM suggested "${realMpnFromLlm}" stored in DB` : ''}]`,
+        )
+      } else {
+        log(
+          `[emitter-completion]   ✓ GEN  ${key} → ${emittedMfr} ` +
+          `[MPN deferred${realMpnFromLlm ? `; LLM suggested "${realMpnFromLlm}" stored in DB` : ''}]`,
+        )
+      }
       ;(sub.words ??= []).push(word)
       mutated = true
       filled.push({
@@ -1461,12 +1605,8 @@ export async function completeEmitterGaps(
         source: 'generated',
         manufacturer: emittedMfr,
         part_number: emittedMpn,
-        name: humanName,
+        name: word.name_human ?? humanName,
       })
-      log(
-        `[emitter-completion]   ✓ GEN  ${key} → ${emittedMfr} ` +
-        `[MPN deferred${realMpnFromLlm ? `; LLM suggested "${realMpnFromLlm}" stored in DB` : ''}]`,
-      )
     }
   } finally {
     try { db?.close() } catch { /* no-op */ }
@@ -1629,6 +1769,43 @@ export async function fillBlankWordMpns(
         continue
       }
 
+      // COMMODITY PROCESS VALVE (Tristan 2026-06-27, tether-or-suppress added
+      // 2026-07-05): a simple mechanical valve — check / non-return / swing /
+      // ball / gate / globe / needle — is specified GENERICALLY at design stage
+      // (by size, rating, material: "DN100 PN16 wafer check valve"), NOT by a
+      // single MPN. A DB name-token match pins an unreliable part: a Crouzet
+      // sub-miniature non-return FLOW SENSOR (81529907) + a 24V DC solenoid
+      // (81519648) were pinned onto a process Non-Return / Solenoid Valve in a
+      // 90 m³/h plant — right "valve"/"non-return" token, wrong SCALE + vendor
+      // (the physics critic's valve HIGHs). Keep the generic spec. NOT applied
+      // to an ACTUATED / control / dosing valve (those carry a real MPN — e.g.
+      // the brief's Keystone Composeal). UNIVERSAL — keyed on the commodity-
+      // valve vocabulary. Hoisted ahead of the DB lookup (2026-07-05) so a
+      // commodity valve is ALWAYS routed here regardless of whether a DB hit
+      // exists — tether it to a real principal-equipment sibling in this
+      // sub_module, or suppress the line entirely (see the block above
+      // isCommodityProcessValve for the full rationale).
+      if (isCommodityProcessValve(cand.name)) {
+        const tether = tetherOrSuppressAccessoryValve(cand.word, cand.sub)
+        if (tether.verdict === 'suppress') {
+          removeWordFromSub(cand.sub, cand.word)
+          mutated = true
+          log(
+            `[fill-blank-mpn]   ⊘ suppress ${cand.moduleId}::${cand.subId} (${cand.name}): ` +
+            `untethered accessory valve — no principal-equipment sibling in this sub_module to ` +
+            `host it; the plant's real valves are already counted in the zoned-distribution kits ` +
+            `+ process schedule`,
+          )
+        } else {
+          log(
+            `[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): commodity ` +
+            `process valve — tethered to its host '${tether.hostName}', generic spec ` +
+            `(size/rating/material), not a name-matched MPN`,
+          )
+        }
+        continue
+      }
+
       // 1. DB-FIRST — cache-real structured MPN (gate-20-safe). Per-word matching
       //    needs a TIGHTER precision bar than sub_module-gap matching (council
       //    seat 1): a loose token overlap mis-pins (Abracon crystal → "battery
@@ -1667,19 +1844,9 @@ export async function fillBlankWordMpns(
           blocked = true
           break
         }
-        // COMMODITY PROCESS VALVE (Tristan 2026-06-27): a simple mechanical valve — check / non-return /
-        // swing / ball / gate / globe / needle — is specified GENERICALLY at design stage (by size,
-        // rating, material: "DN100 PN16 wafer check valve"), NOT by a single MPN. A DB name-token match
-        // pins an unreliable part: a Crouzet sub-miniature non-return FLOW SENSOR (81529907) + a 24V DC
-        // solenoid (81519648) were pinned onto a process Non-Return / Solenoid Valve in a 90 m³/h plant
-        // — right "valve"/"non-return" token, wrong SCALE + vendor (the physics critic's valve HIGHs).
-        // Keep the generic spec. NOT applied to an ACTUATED / control / dosing valve (those carry a real
-        // MPN — e.g. the brief's Keystone Composeal). UNIVERSAL — keyed on the commodity-valve vocabulary.
-        if (isCommodityProcessValve(cand.name)) {
-          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): commodity process valve — generic spec (size/rating/material), not a name-matched MPN (was ${dbHit.manufacturer} ${dbHit.part_number})`)
-          blocked = true
-          break
-        }
+        // (Commodity process valves never reach here — the tether-or-suppress block
+        // above owns them entirely, hoisted ahead of this loop so it fires whether
+        // or not a DB hit exists.)
         // ELECTRONICS-IC MIS-PIN (Tristan 2026-06-27): a process FIELD instrument / switch must not be
         // pinned to an electronics-component vendor's IC (a Maxim MAX31827A temp-sensor IC landed on a
         // 'Low Pressure Switch' via the loose 'switch' token). The DB is electronics-heavy; a field

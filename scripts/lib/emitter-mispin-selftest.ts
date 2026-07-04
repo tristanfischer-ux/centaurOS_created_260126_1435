@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -182,5 +182,100 @@ expect(isCatalogueComponent('Water Supply mass_fluid_transport_process__utility_
     'exclusive assignment: excluding an unrelated key never changes a single, non-colliding pick')
 }
 
+// ── UNTETHERED ACCESSORY VALVE — tether-or-suppress at emission (2026-07-05,
+//    the 0faea5550 routed follow-on). proveCatch BOTH directions: a commodity
+//    valve word sitting beside a real principal-equipment sibling (the
+//    universal-contract-sizing.ts "— principal equipment sized from the
+//    engineering contract" stamp) MUST be tethered (its name mutated to carry
+//    the host equipment, so requirements_bom.py's substring join can find it);
+//    a commodity valve in a catch-all bucket with NO such sibling (the exact
+//    v70/v73 shape — 'Isolation Valves' under maintenance_serviceability__
+//    leveling_feet, siblings all other generic placeholders) MUST be refused a
+//    tether (verdict 'suppress'), never fabricated. The v73 REAL shape puts
+//    MANY distinct principal-equipment words in ONE flat sub_module (16 pumps/
+//    vessels/tanks sharing a single words[] — "presence anywhere" is genuinely
+//    ambiguous), so the host is resolved by ARRAY ORDER: the nearest PRECEDING
+//    principal-equipment word is the direct parent (explodeEquipmentSubAssemblies
+//    always appends a parent's children contiguously right after it, before the
+//    next principal's own block begins) — proven below on a 2-pump array.
+{
+  const principalWord = (name: string) => ({
+    id: `${name.toLowerCase().replace(/\s+/g, '_')}_word`,
+    name_human: name,
+    content_character: { name_human: name },
+    modifier_characters: [{ kind: 'form', value: `${name} — principal equipment sized from the engineering contract` }],
+  })
+  const genericWord = (name: string) => ({
+    id: `${name.toLowerCase().replace(/\s+/g, '_')}_word`,
+    name_human: name,
+    content_character: { name_human: name },
+    modifier_characters: [{ kind: 'form', value: `${name} — representative maintenance serviceability component` }],
+  })
+
+  // (a) a real tether exists — the pump's own exploded Suction Isolation Valve
+  // sitting beside its parent pump word.
+  const valveWord = genericWord('Suction Isolation Valve') as any
+  const pumpSub = { id: 'mass_fluid_transport__pump', words: [principalWord('Fertigation Dosing Pump'), valveWord] } as any
+  const host = hostingPrincipalEquipmentName(pumpSub, valveWord)
+  expect(host === 'Fertigation Dosing Pump',
+    `hostingPrincipalEquipmentName must find the nearest preceding principal-equipment word (got ${JSON.stringify(host)})`)
+  const tetheredResult = tetherOrSuppressAccessoryValve(valveWord, pumpSub)
+  expect(tetheredResult.verdict === 'tethered' && (tetheredResult as any).hostName === 'Fertigation Dosing Pump',
+    `a valve beside a real principal-equipment sibling MUST tether (got ${JSON.stringify(tetheredResult)})`)
+  expect(valveWord.name_human === 'Suction Isolation Valve (on Fertigation Dosing Pump)',
+    `the tether MUST mutate name_human to carry the host equipment (got ${JSON.stringify(valveWord.name_human)})`)
+  expect(valveWord.content_character.name_human === 'Suction Isolation Valve (on Fertigation Dosing Pump)',
+    'the tether MUST also mutate content_character.name_human (whichever the BoM renderer reads)')
+
+  // (b) the exact v70/v73 shape — NO real principal-equipment sibling, only
+  // other generic TIER_C_FLOOR placeholders. MUST refuse, never guess.
+  const isoValveWord = genericWord('Isolation Valves') as any
+  const catchAllSub = {
+    id: 'maintenance_serviceability__leveling_feet',
+    words: [genericWord('Cable Glands'), genericWord('Cleaning Tank'), isoValveWord],
+  } as any
+  const noHost = hostingPrincipalEquipmentName(catchAllSub, isoValveWord)
+  expect(noHost === null,
+    `a catch-all bucket with no principal-equipment sibling MUST resolve no tether (got ${JSON.stringify(noHost)})`)
+  const suppressResult = tetherOrSuppressAccessoryValve(isoValveWord, catchAllSub)
+  expect(suppressResult.verdict === 'suppress',
+    `an untethered accessory valve MUST be refused a tether, never fabricated (got ${JSON.stringify(suppressResult)})`)
+  expect(isoValveWord.name_human === 'Isolation Valves',
+    'a suppressed word MUST be left untouched by the tether attempt (the caller removes it, this function never mutates on suppress)')
+
+  // (c) the v73 REAL multi-principal shape — TWO distinct pumps in ONE flat
+  // sub_module, each with its OWN exploded valve child. The valve after
+  // "Softener Vessel" MUST tether to Softener Vessel (not Gac Filter, which
+  // comes AFTER it in the array — array order, never presence-anywhere).
+  const softenerValve = genericWord('Discharge Isolation Valve') as any
+  const gacFilterValve = genericWord('Non-Return Valve') as any
+  const multiPrincipalSub = {
+    id: 'mass_fluid_transport__shared',
+    words: [principalWord('Softener Vessel'), softenerValve, principalWord('Gac Filter'), gacFilterValve],
+  } as any
+  const softenerHost = hostingPrincipalEquipmentName(multiPrincipalSub, softenerValve)
+  expect(softenerHost === 'Softener Vessel',
+    `a valve between two principals MUST tether to the NEARER preceding one, not a later one (got ${JSON.stringify(softenerHost)})`)
+  const gacFilterHost = hostingPrincipalEquipmentName(multiPrincipalSub, gacFilterValve)
+  expect(gacFilterHost === 'Gac Filter',
+    `a valve after the SECOND principal MUST tether to that second principal, not the first (got ${JSON.stringify(gacFilterHost)})`)
+
+  // (d) a valve with NO principal-equipment word preceding it AT ALL (even though
+  // one exists LATER in the array) MUST refuse — array order only looks backward,
+  // never forward (a forward guess would be exactly the fabrication refused above).
+  const leadingValve = genericWord('Check Valve') as any
+  const leadingSub = { id: 'mass_fluid_transport__leading', words: [leadingValve, principalWord('Irrigation Pump')] } as any
+  const leadingHost = hostingPrincipalEquipmentName(leadingSub, leadingValve)
+  expect(leadingHost === null,
+    `a valve with no principal PRECEDING it must refuse even if one follows later (got ${JSON.stringify(leadingHost)})`)
+
+  // (e) a non-valve word is never touched by this mechanism — isCommodityProcessValve
+  // gates both call sites, so a real principal-equipment word itself never reaches
+  // tetherOrSuppressAccessoryValve in production; confirmed here that the vocabulary
+  // guard is what keeps the mechanism scoped (BESS/SAF byte-identity rests on this).
+  expect(isCommodityProcessValve('Fertigation Dosing Pump') === false,
+    'a principal-equipment word must never be classified as a commodity valve (scope guard for byte-identity)')
+}
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment + untethered-accessory-valve tether-or-suppress proven)')

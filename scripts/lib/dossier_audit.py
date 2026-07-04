@@ -2940,10 +2940,24 @@ def tab_scores(state: dict, rows: list, run_dir: str) -> dict:
 
 
 def tab_scorecard_summary(scores: dict) -> dict:
-    """Headline numbers over the per-tab scorecard: the min scored tab + how many fail / are unscored."""
-    scored = [(t, v) for t, v in scores.items() if isinstance(v.get("score"), (int, float))]
+    """Headline numbers over the per-tab scorecard: the min scored tab + how many fail / are
+    unscored.
+
+    VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A): a tab whose own scorer set
+    `scored: False` — meaning it PROVED both its own verification checks pass (e.g. HVAC on
+    a process plant: no contract HVAC/ventilation/cooling duty AND the brief's own exclusions
+    explicitly cite the climate hardware) — is excluded from EVERY count here: not a fail,
+    not "unscored", not a floor/min candidate. An honestly-verified "not applicable" is not an
+    open issue. GENERIC: keyed on the `scored` flag any tab's own scorer may set, never on the
+    tab's name — an out-of-scope CLAIM whose verification checks do NOT both pass never sets
+    this flag, so it stays a normal (and typically low-scoring) tab that still counts here —
+    the mechanism cannot be used to dodge the floor by merely asserting inapplicability."""
+    verified_oos = [t for t, v in scores.items() if v.get("scored") is False]
+    scored = [(t, v) for t, v in scores.items()
+              if v.get("scored") is not False and isinstance(v.get("score"), (int, float))]
     fails = [t for t, v in scored if v["score"] < v["target"]]
-    unscored = [t for t, v in scores.items() if v.get("status") == "UNSCORED"]
+    unscored = [t for t, v in scores.items()
+                if v.get("scored") is not False and v.get("status") == "UNSCORED"]
     min_tab, min_score = (None, None)
     if scored:
         min_tab, mv = min(scored, key=lambda kv: kv[1]["score"])
@@ -2951,6 +2965,7 @@ def tab_scorecard_summary(scores: dict) -> dict:
     return {
         "min_tab": min_tab, "min_score": min_score,
         "scored_count": len(scored), "fail_tabs": fails, "unscored_tabs": unscored,
+        "verified_out_of_scope_tabs": verified_oos,
         "all_pass": (not fails and not unscored),
     }
 
@@ -3618,6 +3633,51 @@ def _selftest() -> int:
     expect(v7_pump[0] == "corroborated" and v7_pump[1] == "count",
            f"CORR(7): a REAL 'only a single dosing pump' undercount with dosing_pump_count=1 "
            f"must still corroborate (got {v7_pump[:2]})")
+
+    # ---- VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A) — tab_scorecard_summary
+    #      must exclude a `scored:False` tab from EVERY count (min/fail/unscored), while an
+    #      out-of-scope CLAIM that has NOT proved both its own verification checks (never
+    #      sets `scored:False`) must still be scored normally, and score LOW so the "unverified
+    #      scope dodge" cannot escape the floor. GENERIC — the fixture below is a generic
+    #      "Discipline X" tab name, never "HVAC", proving the mechanism is keyed on the
+    #      `scored` flag alone. ----
+    _voos_scores = {
+        "Executive Summary": {"score": 9, "target": 8},
+        "Discipline X": {"score": 8, "target": 8, "status": "PASS", "scored": False},
+    }
+    _voos_sum = tab_scorecard_summary(_voos_scores)
+    expect(_voos_sum["min_tab"] == "Executive Summary" and _voos_sum["min_score"] == 9,
+           f"a scored:False tab must NEVER be the min/floor candidate, even when its own "
+           f"score is the lowest in the dict (got min_tab={_voos_sum['min_tab']!r}, "
+           f"min_score={_voos_sum['min_score']!r})")
+    expect("Discipline X" not in _voos_sum["fail_tabs"] and "Discipline X" not in _voos_sum["unscored_tabs"],
+           "a scored:False tab must be neither a FAIL nor an UNSCORED tab")
+    expect(_voos_sum.get("verified_out_of_scope_tabs") == ["Discipline X"],
+           f"the verified-out-of-scope tab must be named in its own tally "
+           f"(got {_voos_sum.get('verified_out_of_scope_tabs')!r})")
+    expect(_voos_sum["all_pass"] is True,
+           "a workbook whose ONLY non-9 tab is verified out-of-scope must still all_pass")
+    # direction 2: a LOW-scoring tab that does NOT set scored:False (the "unverified scope
+    # dodge" — claims inapplicability but never proved it) MUST still count as a normal FAIL.
+    _dodge_scores = {
+        "Executive Summary": {"score": 9, "target": 8},
+        "Discipline X": {"score": 0, "target": 8, "status": "FAIL"},   # no `scored` key at all
+    }
+    _dodge_sum = tab_scorecard_summary(_dodge_scores)
+    expect(_dodge_sum["min_tab"] == "Discipline X" and _dodge_sum["min_score"] == 0,
+           f"an UNVERIFIED out-of-scope claim (no scored:False) must floor normally — "
+           f"got min_tab={_dodge_sum['min_tab']!r}, min_score={_dodge_sum['min_score']!r}")
+    expect("Discipline X" in _dodge_sum["fail_tabs"],
+           "the unverified-claim tab must be a normal FAIL, never exempted")
+    expect(_dodge_sum["all_pass"] is False,
+           "a workbook with a genuine 0-scoring tab must NOT all_pass, scored:False or not")
+    # direction 3: a normal, fully-scored tab (the "duty branch" — real content present) is
+    # completely unaffected by the mechanism's existence.
+    _normal_scores = {"Overview": {"score": 10, "target": 8}, "Brief": {"score": 9, "target": 8}}
+    _normal_sum = tab_scorecard_summary(_normal_scores)
+    expect(_normal_sum["min_tab"] == "Brief" and _normal_sum["min_score"] == 9 and _normal_sum["all_pass"] is True,
+           f"a workbook with no scored:False tabs at all must behave exactly as before "
+           f"(got {_normal_sum!r})")
 
     if failures:
         print("SELFTEST FAILED:")
