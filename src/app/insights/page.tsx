@@ -184,6 +184,42 @@ export default function InsightsPage() {
             </section>
           ))}
 
+          {/* Practical guides */}
+          <section className="space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+                Practical guides
+              </h2>
+              <p className="text-muted-foreground max-w-2xl leading-relaxed">
+                Straight, useful answers to the questions hardware founders
+                actually ask.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { href: "/guides/how-to-find-a-contract-manufacturer-uk", title: "How to find a contract manufacturer in the UK", hook: "Tiers, shortlisting, the questions to ask and the red flags." },
+                { href: "/guides/how-to-cost-a-hardware-bill-of-materials", title: "How to cost a hardware bill of materials", hook: "Unit vs volume pricing, and the costs founders always miss." },
+                { href: "/guides/how-to-get-a-hardware-startup-investor-ready", title: "How to get a hardware startup investor-ready", hook: "What hardware investors actually check — and why they pass." },
+                { href: "/guides/design-for-manufacture-explained", title: "Design for manufacture, explained", hook: "What DFM is, why it matters early, and how it saves cost." },
+                { href: "/cost/water-treatment-plant", title: "What an industrial water-treatment plant costs to build", hook: "A worked £1.39M breakdown from a real, auditable model." },
+              ].map((g) => (
+                <Link key={g.href} href={g.href} className="group">
+                  <Card className="h-full transition-colors hover:border-international-orange/40">
+                    <CardContent className="pt-6 space-y-2">
+                      <h3 className="font-semibold text-foreground flex items-start gap-1.5">
+                        <span>{g.title}</span>
+                        <ArrowRight className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-international-orange" />
+                      </h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {g.hook}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </section>
+
           {/* CTA */}
           <section className="text-center space-y-4 py-6 border-t border-border">
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">

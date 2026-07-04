@@ -100,6 +100,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             changeFrequency: 'monthly',
             priority: 0.8,
         },
+        ...[
+            'how-to-find-a-contract-manufacturer-uk',
+            'how-to-cost-a-hardware-bill-of-materials',
+            'how-to-get-a-hardware-startup-investor-ready',
+            'design-for-manufacture-explained',
+        ].map((slug) => ({
+            url: `${appUrl}/guides/${slug}`,
+            lastModified: now,
+            changeFrequency: 'monthly' as const,
+            priority: 0.8,
+        })),
         {
             url: `${appUrl}/investor-readiness`,
             lastModified: now,

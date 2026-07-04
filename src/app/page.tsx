@@ -127,7 +127,8 @@ const HTML = `<style>
   .partners .pnote{margin-top:18px;font-size:13px;color:#94a3bd;font-style:italic;}
   @media(max-width:760px){.partners .offer{grid-template-columns:1fr;} }
 
-  .founders-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:center;margin-top:8px;}
+  .founders-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-top:8px;}
+  .founders-img{width:100%;border-radius:var(--radius);box-shadow:var(--shadow);display:block;}
   .founders-grid ul{list-style:none;padding:0;margin:0;}
   .founders-grid li{padding:11px 0 11px 30px;position:relative;font-size:16px;color:var(--ink-soft);border-bottom:1px solid var(--line);}
   .founders-grid li:last-child{border-bottom:none;}
@@ -341,14 +342,15 @@ const HTML = `<style>
       <h2>Build a hardware company that behaves like a software company.</h2>
     </div>
     <div class="founders-grid">
-      <ul>
-        <li>Focus on your product and your customers, not factories.</li>
-        <li>Access world-class manufacturing without the capital expenditure.</li>
-        <li>Get design-for-manufacture advice from day one.</li>
-        <li>Get fundraising-ready, with a built-in manufacturing story investors trust.</li>
-      </ul>
+      <img class="founders-img" src="/images/site/founders-workshop.webp" alt="A senior engineer and a younger engineer examining a machined hardware part together in a workshop" loading="lazy" width="1600" height="643" />
       <div>
-        <p class="muted" style="margin-bottom:20px">Most founders we work with are deep in the science and the engineering. We take the commercial, the capital and the build off your plate &mdash; so you can run the company, not the workshop.</p>
+        <ul>
+          <li>Focus on your product and your customers, not factories.</li>
+          <li>Access world-class manufacturing without the capital expenditure.</li>
+          <li>Get design-for-manufacture advice from day one.</li>
+          <li>Get fundraising-ready, with a built-in manufacturing story investors trust.</li>
+        </ul>
+        <p class="muted" style="margin:20px 0">Most founders we work with are deep in the science and the engineering. We take the commercial, the capital and the build off your plate &mdash; so you can run the company, not the workshop.</p>
         <a class="btn btn-primary btn-lg" href="/brief">Tell us what you&rsquo;re building &rarr;</a>
       </div>
     </div>
