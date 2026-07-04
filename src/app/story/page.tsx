@@ -38,10 +38,10 @@ export default function StoryPage() {
             FRACTIONAL FORGE
           </Link>
           <Link
-            href="/signup"
+            href="/brief"
             className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
           >
-            Start Free
+            Start a brief
           </Link>
         </div>
       </nav>
@@ -141,10 +141,10 @@ export default function StoryPage() {
 
           <div className="mt-12 sm:mt-16 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 border-t border-muted pt-10">
             <Link
-              href="/signup"
+              href="/brief"
               className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]"
             >
-              Start Free <ArrowRight className="h-4 w-4" />
+              Start a brief <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/"

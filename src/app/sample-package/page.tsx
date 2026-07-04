@@ -532,7 +532,7 @@ export default function SamplePackagePage() {
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                      Free to start, £20/month for the Starter tier
+                      Your first Design Dossier is free
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
