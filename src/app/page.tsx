@@ -300,17 +300,17 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">Start here &mdash; the Design Dossier</span>
       <h2>Your day-one on-ramp: a full Design Dossier, free.</h2>
-      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph to a page. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; the engineering, a costed bill-of-materials ledger, a full financial model, the licences and regulations, the risks you haven&rsquo;t spotted &mdash; and investors who&rsquo;ve backed similar products. Every number is a live formula you can trace. It&rsquo;s how every founder relationship starts, and the basis for the conversations that follow.</p>
+      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph to a page. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; a buildable design, a costed bill-of-materials ledger, the true cost and a live financial model, the engineering drawings, and the risks and codes it must meet. Every number is a live formula you can trace, and it checks itself against a ship gate. It&rsquo;s how every founder relationship starts, and the basis for the conversations that follow.</p>
     </div>
     <div class="feat">
-      <div class="card"><h3>System architecture</h3><p>Your idea broken into buildable sub-systems and modules.</p></div>
-      <div class="card"><h3>Full bill of materials</h3><p>Real manufacturer part numbers and costed lines &mdash; with the maths shown so you can check it.</p></div>
-      <div class="card"><h3>13-stage engineering review</h3><p>An honest gate-by-gate verdict: what&rsquo;s sound, what still needs work.</p></div>
-      <div class="card"><h3>Manufacturer shortlist</h3><p>Named UK &amp; EU suppliers per module, drawn from 14,000+ profiles.</p></div>
-      <div class="card"><h3>Licences &amp; regulations</h3><p>The standards, certifications and approvals you&rsquo;ll face &mdash; BS EN, IEC, UL, G99 &mdash; so nothing blindsides you later.</p></div>
-      <div class="card"><h3>Investors who&rsquo;ve backed similar</h3><p>5 investors who&rsquo;ve funded products like yours, with a starting point on how to reach them &mdash; researched, not a guarantee.</p></div>
-      <div class="card"><h3>Risk &amp; readiness audit</h3><p>A straight &ldquo;what&rsquo;s not ready yet&rdquo; list, so nothing bites you in diligence.</p></div>
-      <div class="card"><h3>Worked calculations</h3><p>Every key number derived in plain sight with real, open physics libraries &mdash; PyBaMM, CoolProp, ASHRAE psychrometrics &mdash; hand-checkable, not a black box.</p></div>
+      <div class="card"><h3>A buildable design</h3><p>Your idea broken into modules, with every principal part sized and dimensioned &mdash; geometry that audits itself.</p></div>
+      <div class="card"><h3>Costed bill of materials</h3><p>A full BoM ledger: every line costed, with the method, the confidence, and where each number came from.</p></div>
+      <div class="card"><h3>True cost &amp; a financial model</h3><p>A cost waterfall from materials to installed price, and a live financial model &mdash; capex, opex, levelised cost &mdash; you can change.</p></div>
+      <div class="card"><h3>Engineering drawings</h3><p>General arrangement, P&amp;ID, block-flow, single-line and HVAC &mdash; real, print-ready ISO A1 drawings &mdash; plus photoreal renders.</p></div>
+      <div class="card"><h3>Worked calculations</h3><p>Every key number recomputed live in the sheet and checked &mdash; hand-verifiable, not a black box.</p></div>
+      <div class="card"><h3>Risk &amp; regulatory</h3><p>A hazard and risk register, and the codes and standards the design was actually sized to.</p></div>
+      <div class="card"><h3>Holds &amp; open questions</h3><p>The honest open-items list: what&rsquo;s assumed, what&rsquo;s excluded, and the exact questions to confirm with us.</p></div>
+      <div class="card"><h3>It checks itself</h3><p>A quality-audit surface scoring every section, live invariant checks, an independent sense-check, and a ship verdict.</p></div>
     </div>
   </div>
 </section>
@@ -342,15 +342,14 @@ const HTML = `<style>
       <h2>Build a hardware company that behaves like a software company.</h2>
     </div>
     <div class="founders-grid">
-      <img class="founders-img" src="/images/site/founders-workshop.webp" alt="A senior engineer and a younger engineer examining a machined hardware part together in a workshop" loading="lazy" width="1600" height="643" />
+      <ul>
+        <li>Focus on your product and your customers, not factories.</li>
+        <li>Access world-class manufacturing without the capital expenditure.</li>
+        <li>Get design-for-manufacture advice from day one.</li>
+        <li>Get fundraising-ready, with a built-in manufacturing story investors trust.</li>
+      </ul>
       <div>
-        <ul>
-          <li>Focus on your product and your customers, not factories.</li>
-          <li>Access world-class manufacturing without the capital expenditure.</li>
-          <li>Get design-for-manufacture advice from day one.</li>
-          <li>Get fundraising-ready, with a built-in manufacturing story investors trust.</li>
-        </ul>
-        <p class="muted" style="margin:20px 0">Most founders we work with are deep in the science and the engineering. We take the commercial, the capital and the build off your plate &mdash; so you can run the company, not the workshop.</p>
+        <p class="muted" style="margin-bottom:20px">Most founders we work with are deep in the science and the engineering. We take the commercial, the capital and the build off your plate &mdash; so you can run the company, not the workshop.</p>
         <a class="btn btn-primary btn-lg" href="/brief">Tell us what you&rsquo;re building &rarr;</a>
       </div>
     </div>

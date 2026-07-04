@@ -65,7 +65,7 @@ export default function HowWeWorkPage() {
                 "Architecture and a traceable bill-of-materials ledger",
                 "Full costs, a cost waterfall and a live financial model",
                 "Engineering drawings, risk and regulatory, open questions",
-                "Manufacturer shortlist and investors who back similar products",
+                "Engineering drawings, worked calculations and a built-in self-audit",
               ].map((item) => (
                 <div key={item} className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-international-orange mt-0.5 flex-shrink-0" />

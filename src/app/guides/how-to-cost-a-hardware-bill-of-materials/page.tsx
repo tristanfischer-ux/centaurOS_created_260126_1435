@@ -120,11 +120,42 @@ export default function CostBillOfMaterialsGuide() {
               How to cost a hardware bill of materials
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              A bill of materials is the spine of your unit economics, and the
-              number most founders first quote is the one most likely to be wrong.
-              This is how to structure a bill of materials, cost it honestly at
-              volume, and account for everything a plain parts list leaves out.
+              A bill of materials is the spine of your unit economics, and the first
+              number a founder quotes for it is almost always the wrong one — not
+              because they cannot add up, but because most of the cost is hiding
+              somewhere the parts list cannot see. This is how to structure a bill of
+              materials, cost it honestly at volume, and account for everything a
+              plain parts list leaves out.
             </p>
+          </section>
+
+          {/* Historical anchor */}
+          <section className="space-y-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+              The most expensive part of the cost is the part you cannot see
+            </h2>
+            <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
+              <p>
+                On 26 April 1956 a converted tanker called the <em>Ideal-X</em>{" "}
+                sailed from Newark to Houston carrying fifty-eight aluminium boxes.
+                Nobody at the dockside thought much of it. Yet the man behind it, a
+                North Carolina trucker named Malcolm McLean, had just quietly attacked
+                the largest cost in world trade — and it was not the goods, or the
+                ship, or the fuel. It was the handling.
+              </p>
+              <p>
+                In the historian Marc Levinson&apos;s account of the episode,{" "}
+                <em>The Box</em> (2006), loading loose cargo the old way cost roughly
+                5.83 dollars a ton. McLean&apos;s containers brought that figure down
+                to about 16 cents. Same cargo, same ocean, same distance; the price
+                collapsed by a factor of more than thirty. The lesson for anyone
+                costing a physical product is uncomfortable and permanent: the sticker
+                price of a thing tells you remarkably little about what it costs to
+                get it built, moved and into a customer&apos;s hands. A bill of
+                materials that lists only the parts is doing exactly what the shipping
+                world did before McLean — pricing the cargo and ignoring the wharf.
+              </p>
+            </div>
           </section>
 
           {/* Structure */}
@@ -133,10 +164,9 @@ export default function CostBillOfMaterialsGuide() {
               Start with a structured bill of materials
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              A good bill of materials is hierarchical, not a flat list. The
-              finished product breaks into sub-assemblies, each sub-assembly into
-              parts, and every line carries the same fields so the model can add
-              itself up:
+              A good bill of materials is hierarchical, not a flat list. The finished
+              product breaks into sub-assemblies, each sub-assembly into parts, and
+              every line carries the same fields so the model can add itself up:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
               {[
@@ -157,8 +187,9 @@ export default function CostBillOfMaterialsGuide() {
             </div>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
               Get the structure right and the rest is arithmetic. Get it wrong —
-              missing lines, no quantity, prices from a single-unit web listing —
-              and every number downstream inherits the error.
+              missing lines, no quantity, prices lifted from a single-unit web listing
+              — and every number downstream inherits the error, quietly, all the way
+              to the pitch deck.
             </p>
           </section>
 
@@ -169,27 +200,28 @@ export default function CostBillOfMaterialsGuide() {
             </h2>
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
-                The single most common costing mistake is pricing parts at
-                one-off or sample quantities and calling it the unit cost.
-                Component prices step down at published quantity breaks, and the
-                gap between the price of one and the price of ten thousand is
-                often large. Cost your bill of materials at{" "}
-                <strong className="text-foreground">the volumes you will
-                actually order</strong> — typically a low pilot run, a first
-                production batch, and a mature volume — and show all three.
+                The single most common costing mistake is pricing parts at one-off or
+                sample quantities and calling it the unit cost. Component prices step
+                down at published quantity breaks, and the gap between the price of
+                one and the price of ten thousand is often large. Cost your bill of
+                materials at{" "}
+                <strong className="text-foreground">the volumes you will actually
+                order</strong> — typically a low pilot run, a first production batch,
+                and a mature volume — and show all three.
               </p>
               <p>
-                At <strong className="text-foreground">1,000 units</strong> you
-                are usually paying near list, tooling is barely amortised, and
-                assembly is manual. At{" "}
-                <strong className="text-foreground">10,000</strong> the quantity
-                breaks bite, tooling starts to disappear into the per-unit number,
-                and it is worth semi-automating. At{" "}
+                At <strong className="text-foreground">1,000 units</strong> you are
+                usually paying near list, tooling is barely amortised, and assembly is
+                manual. At <strong className="text-foreground">10,000</strong> the
+                quantity breaks bite, tooling starts to disappear into the per-unit
+                number, and it is worth semi-automating. At{" "}
                 <strong className="text-foreground">100,000</strong> you negotiate
-                directly, tooling is a rounding error per unit, and the design
-                itself gets optimised for the line. The same product can cost
-                markedly less at the top of that range than the bottom — which is
-                exactly why you must state the volume every cost is quoted at.
+                directly, tooling is a rounding error per unit, and the design itself
+                gets optimised for the line. The same product can cost markedly less
+                at the top of that range than the bottom — which is precisely why you
+                must state the volume every cost is quoted at, and precisely why a
+                figure quoted at a volume you will not reach for three years is not a
+                cost but a wish.
               </p>
             </div>
           </section>
@@ -201,8 +233,8 @@ export default function CostBillOfMaterialsGuide() {
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
               The parts are usually only 40 to 60 per cent of the true landed unit
-              cost. The rest hides in lines a spreadsheet of component prices never
-              shows:
+              cost. The rest — McLean&apos;s wharf, in miniature — hides in lines a
+              spreadsheet of component prices never shows:
             </p>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
@@ -219,9 +251,9 @@ export default function CostBillOfMaterialsGuide() {
               </CardContent>
             </Card>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              Add these and the honest number is often close to double the
-              parts-only figure. That is not pessimism — it is the number your
-              gross margin actually has to survive.
+              Add these and the honest number is often close to double the parts-only
+              figure. That is not pessimism — it is the number your gross margin
+              actually has to survive.
             </p>
           </section>
 
@@ -232,23 +264,23 @@ export default function CostBillOfMaterialsGuide() {
             </h2>
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
-                A cost model earns trust when every figure traces to a source and
-                the total recomputes when an input changes. Each part price should
-                carry its quote date and quantity break; each labour and tooling
-                assumption should be stated, not buried; and the landed unit cost
-                should fall out of the model rather than being typed in. When you
-                change a volume or a part, you should be able to watch the total
-                move and see why.
+                A cost model earns trust when every figure traces to a source and the
+                total recomputes when an input changes. Each part price should carry
+                its quote date and quantity break; each labour and tooling assumption
+                should be stated, not buried; and the landed unit cost should fall out
+                of the model rather than being typed in. When you change a volume or a
+                part, you should be able to watch the total move and see why. That is
+                the whole difference between a model and a number: one you can
+                interrogate, the other you can only believe.
               </p>
               <p>
-                This is precisely what a Fractional Forge Design Dossier produces —
-                an auditable Excel model where the bill of materials, the labour,
-                tooling and logistics, and the margin stack all trace from your
-                inputs into a single landed unit cost you can defend line by line.
-                It is reviewed by a senior engineer before it is used, and your
-                first one is free. But the discipline matters more than the tool:
-                a bill of materials nobody can reconstruct is a guess wearing a
-                spreadsheet.
+                This is precisely what a Fractional Forge Design Dossier produces — an
+                auditable Excel model where the bill of materials, the labour, tooling
+                and logistics, and the margin stack all trace from your inputs into a
+                single landed unit cost you can defend line by line. It is reviewed by
+                a senior engineer before it is used, and your first one is free. But
+                the discipline matters more than the tool: a bill of materials nobody
+                can reconstruct is a guess wearing a spreadsheet.
               </p>
             </div>
           </section>
@@ -280,8 +312,7 @@ export default function CostBillOfMaterialsGuide() {
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
               auditable, engineer-checked model with a full bill of materials and a
-              landed unit cost at the volumes you care about. Your first one is
-              free.
+              landed unit cost at the volumes you care about. Your first one is free.
             </p>
             <Link
               href="/brief"

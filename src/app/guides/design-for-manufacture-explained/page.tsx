@@ -117,11 +117,42 @@ export default function DesignForManufactureGuide() {
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
               Design for manufacture is the difference between a product that works
-              and a product that can be built cheaply, again and again, without
-              drama. It is also where most of a product&apos;s cost is quietly
-              decided. Here is what it is, why it pays to think about it early, and
-              the principles that do the work.
+              and a product that can be built cheaply, again and again, without drama.
+              It is also where most of a product&apos;s cost is quietly decided, long
+              before anyone orders a single part. Here is what it is, why it pays to
+              think about it early, and the principles that do the work.
             </p>
+          </section>
+
+          {/* Historical anchor */}
+          <section className="space-y-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+              The gunsmith who took a musket lock from a heap
+            </h2>
+            <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
+              <p>
+                In 1785 the American minister to France, Thomas Jefferson, watched a
+                Parisian gunsmith named Honoré Blanc do something that ought to have
+                been dull and was in fact revolutionary. Blanc had made the parts of
+                his musket locks so uniform that, as Jefferson wrote home to John Jay,
+                they could be &quot;taken promiscuously from a heap&quot; and
+                assembled into a working lock at random. No filing, no fitting, no
+                skilled hand coaxing this piece to marry that one. Any part fitted any
+                assembly.
+              </p>
+              <p>
+                It sounds like a parlour trick. It was, in fact, the beginning of mass
+                production — the principle that would later be called the American
+                system of manufactures and would build everything from Springfield
+                rifles to the Model T. And the insight underneath it is precisely
+                design for manufacture: Blanc did not make his parts interchangeable by
+                working harder at assembly. He made them interchangeable by{" "}
+                <em>designing</em> them to a controlled tolerance, so the difficulty
+                was solved on the drawing board rather than at the bench. That is the
+                whole idea, and it is more than two centuries old. A prototype needs a
+                clever hand. A product needs to work without one.
+              </p>
+            </div>
           </section>
 
           {/* What it is */}
@@ -131,21 +162,21 @@ export default function DesignForManufactureGuide() {
             </h2>
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
-                Design for manufacture — often shortened to the letters D, F and M
-                — is the practice of designing a product so that it is easy and
-                cheap to make repeatably, not merely so that it functions. A
-                prototype only has to work once, on a bench, built by the person
-                who designed it. A product has to be built by someone else, to the
-                same standard, thousands of times, on a line. Those are different
-                problems, and design for manufacture is how you solve the second
-                one on purpose rather than by accident.
+                Design for manufacture — often shortened to the letters D, F and M —
+                is the practice of designing a product so that it is easy and cheap to
+                make repeatably, not merely so that it functions. A prototype only has
+                to work once, on a bench, built by the person who designed it. A
+                product has to be built by someone else, to the same standard,
+                thousands of times, on a line. Those are different problems, and design
+                for manufacture is how you solve the second one on purpose rather than
+                by accident — the difference between Blanc&apos;s heap and a skilled
+                fitter working late.
               </p>
               <p>
-                In practice it means shaping every part to suit the process that
-                will make it, choosing components a factory can actually buy and
-                handle, and specifying precision only where the function needs it.
-                It is not a phase that happens after design — it is a way of
-                designing.
+                In practice it means shaping every part to suit the process that will
+                make it, choosing components a factory can actually buy and handle, and
+                specifying precision only where the function needs it. It is not a
+                phase that happens after design. It is a way of designing.
               </p>
             </div>
           </section>
@@ -157,20 +188,21 @@ export default function DesignForManufactureGuide() {
             </h2>
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
-                A product&apos;s cost is largely locked in by its design, and most
-                of that is settled in the earliest decisions — the part choices,
-                the materials, the way things fit together. Those decisions are
-                nearly free to change on a drawing. They become expensive once
-                tooling is cut, and painful once production has started and every
-                change ripples through work instructions, inventory and validation.
+                A product&apos;s cost is largely locked in by its design, and most of
+                that is settled in the earliest decisions — the part choices, the
+                materials, the way things fit together. Those decisions are nearly free
+                to change on a drawing. They become expensive once tooling is cut, and
+                painful once production has started and every change ripples through
+                work instructions, inventory and validation.
               </p>
               <p>
                 So the value of design for manufacture is highest at the start and
                 decays as the design freezes. Applied early, it costs an hour of
-                thought; applied late, it costs a redesign, or a higher unit price
-                you pay on every unit for the life of the product. This is the whole
+                thought; applied late, it costs a redesign, or a higher unit price you
+                pay on every unit for the life of the product. This is the whole
                 argument for bringing a manufacturing view in while the design can
-                still move.
+                still move — and the reason Blanc worked on the tolerance, not the
+                assembly line.
               </p>
             </div>
           </section>
@@ -181,8 +213,8 @@ export default function DesignForManufactureGuide() {
               The principles that do the work
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              Design for manufacture is not a mystery. A handful of principles
-              deliver most of the benefit, and they reinforce each other:
+              Design for manufacture is not a mystery. A handful of principles deliver
+              most of the benefit, and they reinforce each other:
             </p>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
@@ -206,8 +238,8 @@ export default function DesignForManufactureGuide() {
               How it saves cost
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              The savings are not one dramatic cut; they are many small ones that
-              apply to every unit forever:
+              The savings are not one dramatic cut; they are many small ones that apply
+              to every unit forever:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
               {[
@@ -227,14 +259,15 @@ export default function DesignForManufactureGuide() {
               ))}
             </div>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              Because each saving repeats on every unit, a few pounds shaved per
-              unit becomes a serious number at volume — and it lands straight in
-              your gross margin. Seeing where those pounds sit is easier with a
-              costed model in front of you: a Fractional Forge Design Dossier lays
-              out the bill of materials and the landed unit cost so you can spot the
-              part-count, tolerance and process savings worth chasing. Your first
-              one is free — though the principles above will improve almost any
-              design on their own.
+              Because each saving repeats on every unit, a few pounds shaved per unit
+              becomes a serious number at volume — and it lands straight in your gross
+              margin. This is why interchangeable parts did not merely make muskets
+              tidier; they made an industry. Seeing where those pounds sit is easier
+              with a costed model in front of you: a Fractional Forge Design Dossier
+              lays out the bill of materials and the landed unit cost so you can spot
+              the part-count, tolerance and process savings worth chasing. Your first
+              one is free — though the principles above will improve almost any design
+              on their own.
             </p>
           </section>
 
@@ -264,9 +297,9 @@ export default function DesignForManufactureGuide() {
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your product in a short brief and get a Design Dossier — an
-              auditable, engineer-checked model with the bill of materials and
-              landed unit cost, so the design-for-manufacture savings are easy to
-              find. Your first one is free.
+              auditable, engineer-checked model with the bill of materials and landed
+              unit cost, so the design-for-manufacture savings are easy to find. Your
+              first one is free.
             </p>
             <Link
               href="/brief"

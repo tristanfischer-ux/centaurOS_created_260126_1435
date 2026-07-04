@@ -116,11 +116,43 @@ export default function InvestorReadyGuide() {
               How to get a hardware startup investor-ready
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              Hardware fundraising is not software fundraising with a physical
-              product bolted on. Investors ask different questions and pass for
-              different reasons. This is what they actually check, why they walk
-              away, and the manufacturing story that earns their confidence.
+              Hardware fundraising is not software fundraising with a physical product
+              bolted on. Investors ask different questions and pass for different
+              reasons — and the difference is far older than venture capital itself.
+              This is what they actually check, why they walk away, and the
+              manufacturing story that earns their confidence.
             </p>
+          </section>
+
+          {/* Historical anchor */}
+          <section className="space-y-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+              What a seventeenth-century coffee house knew about your round
+            </h2>
+            <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
+              <p>
+                In the 1680s a Londoner named Edward Lloyd ran a coffee house near the
+                Thames that happened to attract ship owners, captains and merchants.
+                They came for the coffee and stayed for the shipping news, and before
+                long men with capital began sitting among them to take on a share of
+                the risk of a voyage in exchange for a premium. Each wrote his name{" "}
+                <em>beneath</em> the details of the ship and cargo on a slip of paper.
+                That signature under the risk is where the word{" "}
+                <strong className="text-foreground">underwriter</strong> comes from,
+                and Lloyd&apos;s coffee house is where modern insurance was born.
+              </p>
+              <p>
+                The interesting part is not the etymology; it is what those men asked
+                before they signed. Not &quot;how exciting is this voyage?&quot; but
+                the condition of the hull, the record of the captain, the season, the
+                route, the cargo. They were pricing whether the ship could actually
+                make it — with evidence, because their own money was under the line. A
+                hardware investor is doing the identical thing three and a half
+                centuries later. They are underwriting a build. The founder who thinks
+                they are selling a vision, when the person across the table is quietly
+                surveying the hull, has misread the room.
+              </p>
+            </div>
           </section>
 
           {/* What investors check */}
@@ -156,20 +188,20 @@ export default function InvestorReadyGuide() {
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
                 The single most frequent reason a hardware round stalls is that the{" "}
-                <strong className="text-foreground">manufacturing and cost story
-                does not hold up under questioning</strong>. The founder can show
-                a working prototype but cannot say what it costs to build at volume,
-                who builds it, or how the margin works at scale. When the answer to
-                &quot;what is your landed unit cost at ten thousand units?&quot; is
-                a shrug, the conversation is usually over.
+                <strong className="text-foreground">manufacturing and cost story does
+                not hold up under questioning</strong>. The founder can show a working
+                prototype but cannot say what it costs to build at volume, who builds
+                it, or how the margin works at scale. When the answer to &quot;what is
+                your landed unit cost at ten thousand units?&quot; is a shrug, the
+                underwriter has seen the hull, and the conversation is usually over.
               </p>
               <p>
                 Close behind: a bill of materials that has plainly been costed at
-                sample prices, a single source for a critical part with no
-                fallback, a team with no experience shipping physical product, and
-                traction that is all forecast and no field evidence. None of these
-                is fatal on its own — but each one is a place a diligent investor
-                can lose confidence, and hardware diligence is patient.
+                sample prices, a single source for a critical part with no fallback, a
+                team with no experience shipping physical product, and traction that
+                is all forecast and no field evidence. None of these is fatal on its
+                own — but each is a place a diligent investor can lose confidence, and
+                hardware diligence is patient. It has been patient since 1686.
               </p>
             </div>
           </section>
@@ -203,9 +235,10 @@ export default function InvestorReadyGuide() {
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
               The through-line is credibility under pressure. An investor trusts a
               founder who can be pinned down — who answers &quot;how do you know?&quot;
-              with a sourced figure rather than a hopeful one. The strongest version
-              of this is a cost and manufacturing model an investor can open and
-              interrogate for themselves.
+              with a sourced figure rather than a hopeful one. The strongest version of
+              this is a cost and manufacturing model an investor can open and
+              interrogate for themselves, the way a marine underwriter would have
+              wanted to walk the deck rather than read the brochure.
             </p>
           </section>
 
@@ -217,19 +250,20 @@ export default function InvestorReadyGuide() {
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
                 The deck is the easy part. The manufacturing plan and the unit
-                economics are what diligence probes hardest, and they take longer
-                to build credibly than a founder expects. Doing that work before
-                you open a round turns the most dangerous part of diligence into a
-                point of strength — you hand over a model instead of promising to
-                &quot;follow up with the numbers&quot;.
+                economics are what diligence probes hardest, and they take longer to
+                build credibly than a founder expects. Doing that work before you open
+                a round turns the most dangerous part of diligence into a point of
+                strength — you hand over a model instead of promising to &quot;follow
+                up with the numbers&quot;, which is the sentence that ends more
+                hardware rounds than any other.
               </p>
               <p>
-                A Fractional Forge Design Dossier is built for exactly this moment:
-                an auditable, engineer-checked Excel model where the bill of
-                materials, the build plan, the landed unit cost and the margin all
-                trace from stated inputs and recompute when an assumption changes.
-                An investor can open it and check the arithmetic themselves. Your
-                first one is free — but even without it, the lesson stands: walk in
+                A Fractional Forge Design Dossier is built for exactly this moment: an
+                auditable, engineer-checked Excel model where the bill of materials,
+                the build plan, the landed unit cost and the margin all trace from
+                stated inputs and recompute when an assumption changes. An investor can
+                open it and check the arithmetic themselves. Your first one is free —
+                but even without it, the lesson from the coffee house stands: walk in
                 able to defend every number, or expect to walk out.
               </p>
             </div>

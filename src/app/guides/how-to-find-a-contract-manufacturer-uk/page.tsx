@@ -49,7 +49,7 @@ const TIERS = [
 const FAQ = [
   {
     q: "How do I find a contract manufacturer in the UK?",
-    a: "Start by naming the tier you actually need — design house, new-product-introduction specialist, mid-volume electronics manufacturing services, or a complex-integration house — because they are different businesses. Then shortlist three or four by capability match: process fit, typical volume band, sector experience and certifications. Use trade bodies (Make UK, the Manufacturing Technology Centre catapult network), sector directories and referrals from other founders. Visit before you commit, and never single-source your first production run.",
+    a: "Start by naming the tier you actually need — design house, new-product-introduction specialist, mid-volume electronics manufacturing services, or a complex-integration house — because they are different businesses. Then shortlist three or four by capability match: process fit, typical volume band, sector experience and certifications. Use trade bodies (Make UK, the High Value Manufacturing Catapult network), sector directories and referrals from other founders. Visit before you commit, and never single-source your first production run.",
   },
   {
     q: "How many manufacturers should I approach?",
@@ -109,11 +109,45 @@ export default function FindContractManufacturerGuide() {
               How to find a contract manufacturer in the UK
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-              Choosing a contract manufacturer is one of the more consequential
-              decisions a hardware business makes — it sets your unit cost, your
-              lead time and your quality for years. This is how to shortlist the
-              right kind of partner, what to ask, and when to bring them in.
+              You have a working prototype and a search bar. Somewhere on the other
+              side of it is the firm that will set your unit cost, your lead time and
+              your quality for years — if you can tell it apart from the several
+              hundred that merely look the part. This is how to shortlist the right
+              kind of partner, what to ask, and when to bring them in.
             </p>
+          </section>
+
+          {/* Historical anchor */}
+          <section className="space-y-4">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+              Someone else has been making your product for five hundred years
+            </h2>
+            <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
+              <p>
+                The idea of paying a specialist to build your thing is not a
+                twenty-first-century convenience. By the sixteenth century the
+                Venetian Arsenal — a state shipyard covering some sixty acres and
+                employing thousands — could fit out a war galley in a single day,
+                floating each hull past a line of stations where standardised,
+                pre-made parts were fitted in sequence. Visiting dignitaries were
+                treated to the spectacle as after-dinner entertainment. It was
+                contract manufacturing, moving assembly line and just-in-time
+                sourcing, three centuries before Henry Ford was born.
+              </p>
+              <p>
+                Two hundred years later Adam Smith explained why it worked. In the
+                opening pages of <em>The Wealth of Nations</em> (1776) he watched a
+                pin factory: a single untrained workman could &quot;scarce&quot;
+                make twenty pins a day, but ten men who split the job into eighteen
+                distinct operations turned out upwards of forty-eight thousand.
+                Specialisation, not effort, was the multiplier. That is the whole
+                reason contract manufacturers exist — and the whole reason choosing
+                one is harder than it looks. A firm optimised for one operation is,
+                by design, poorly suited to another. Your task is to find the
+                specialist whose specialism is <em>your</em> product, not merely a
+                factory that will say yes.
+              </p>
+            </div>
           </section>
 
           {/* Tiers */}
@@ -122,11 +156,12 @@ export default function FindContractManufacturerGuide() {
               First, work out which tier you need
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              &quot;Contract manufacturer&quot; covers four quite different kinds
-              of business. Approaching the wrong tier wastes everyone&apos;s time —
-              a volume line will not nurse a prototype, and a design consultancy
-              will not ship you ten thousand units. Name the tier before you name
-              the company.
+              &quot;Contract manufacturer&quot; covers four quite different kinds of
+              business, and the division of labour Smith admired now runs between
+              firms as much as within them. Approaching the wrong tier wastes
+              everyone&apos;s time — a volume line will not nurse a prototype, and a
+              design consultancy will not ship you ten thousand units. Name the tier
+              before you name the company.
             </p>
             <Card className="overflow-hidden">
               <CardContent className="p-0">
@@ -150,9 +185,10 @@ export default function FindContractManufacturerGuide() {
               Shortlist by capability, not by website
             </h2>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              Most manufacturer websites claim to do everything. Ignore the copy
-              and match against the things that actually determine whether they can
-              build your product well:
+              Most manufacturer websites claim to do everything, which is a polite
+              way of saying they specialise in nothing you can verify from the sofa.
+              Ignore the copy and match against the things that actually determine
+              whether they can build your product well:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
               {[
@@ -172,12 +208,13 @@ export default function FindContractManufacturerGuide() {
               ))}
             </div>
             <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              A clean, costed design pack makes this far easier for both sides. If
-              a manufacturer can see your bill of materials, your quantities and
-              your test requirements up front, their quote is faster and closer to
-              real. A Fractional Forge Design Dossier is exactly that pack — an
-              auditable model of the build you can hand to three houses and get
-              comparable numbers back.
+              A clean, costed design pack makes this far easier for both sides. If a
+              manufacturer can see your bill of materials, your quantities and your
+              test requirements up front, their quote is faster and closer to real. A
+              Fractional Forge Design Dossier is exactly that pack — an auditable
+              model of the build you can hand to three houses and get comparable
+              numbers back, rather than three quotes that each assumed something
+              different.
             </p>
           </section>
 
@@ -190,22 +227,23 @@ export default function FindContractManufacturerGuide() {
               <p>
                 Ask <strong className="text-foreground">what they will not
                 quote</strong> — an honest house tells you where a job is outside
-                their comfort. Ask <strong className="text-foreground">who owns
-                the tooling</strong> if you fund it, because tooling you paid for
-                but cannot move is a lock-in you did not agree to. Ask{" "}
+                their comfort, and the honesty is the point. Ask{" "}
+                <strong className="text-foreground">who owns the tooling</strong> if
+                you fund it, because tooling you paid for but cannot move is a lock-in
+                you never agreed to. Ask{" "}
                 <strong className="text-foreground">how they handle a part going
-                end-of-life</strong>, because on a multi-year product it will
-                happen, and you want to know whether they redesign, buy ahead, or
-                simply stop.
+                end-of-life</strong>, because on a multi-year product it will happen,
+                and you want to know whether they redesign, buy ahead, or simply
+                stop.
               </p>
               <p>
-                Ask <strong className="text-foreground">what their first-article
-                and test process looks like</strong>, how they log traceability,
-                and what the minimum order quantity and lead time really are once
-                the queue is honest. Finally, ask to{" "}
+                Ask <strong className="text-foreground">what their first-article and
+                test process looks like</strong>, how they log traceability, and what
+                the minimum order quantity and lead time really are once the queue is
+                honest. Finally, ask to{" "}
                 <strong className="text-foreground">speak to a customer at your
                 volume</strong> — a good manufacturer will connect you; a reluctant
-                one is telling you something.
+                one has just answered a different question.
               </p>
             </div>
           </section>
@@ -218,18 +256,18 @@ export default function FindContractManufacturerGuide() {
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
                 A quote that arrives with no questions asked is a warning, not a
-                convenience — it means they have not engaged with your design.
-                Be wary of a house that will not name its typical volume band, that
-                is vague about who holds the tooling, or that quotes a unit price
-                without seeing a bill of materials. A price that is far below the
-                others is rarely a bargain; it usually means something has been left
-                out — assembly labour, test, or the tooling amortisation — and it
-                will reappear later as a change note.
+                convenience — it means they have not engaged with your design. Be
+                wary of a house that will not name its typical volume band, that is
+                vague about who holds the tooling, or that quotes a unit price without
+                seeing a bill of materials. A price far below the others is rarely a
+                bargain; it usually means something has been left out — assembly
+                labour, test, or the tooling amortisation — and it will reappear later
+                as a change note, with interest.
               </p>
               <p>
-                Single-sourcing your first production run is its own red flag. Even
-                a strong partner has a bad quarter, and a second source keeps you
-                honest on price and gives you somewhere to go.
+                Single-sourcing your first production run is its own red flag. Even a
+                strong partner has a bad quarter, and a second source keeps you honest
+                on price and gives you somewhere to go when the first line is full.
               </p>
             </div>
           </section>
@@ -237,7 +275,7 @@ export default function FindContractManufacturerGuide() {
           {/* When to engage */}
           <section className="space-y-4">
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
-              When to engage
+              When to engage — and why proximity is worth paying for
             </h2>
             <div className="space-y-4 text-muted-foreground max-w-2xl leading-relaxed">
               <p>
@@ -245,15 +283,25 @@ export default function FindContractManufacturerGuide() {
                 The cheapest time to design for manufacture is before the drawings
                 are frozen; the most expensive is after tooling is cut. Engaging
                 during new-product-introduction lets their process knowledge shape
-                part choices, tolerances and assembly order while those decisions
-                are still free to make.
+                part choices, tolerances and assembly order while those decisions are
+                still free to make.
               </p>
               <p>
-                You do not need a finished product to start the conversation. You
-                need a clear specification, a bill of materials, a realistic volume
-                and an honest view of your cost target. With those, a good
-                manufacturer can tell you very quickly whether they are the right
-                tier for you.
+                There is also a plainer commercial case for building nearer to home
+                than the last two decades made fashionable. A manufacturer a train
+                ride away is one you can visit when the first article is wrong; the
+                freight is cheaper, the duty simpler, the lead time shorter, and the
+                supply chain has fewer places to break — a lesson the shocks of the
+                early 2020s taught expensively. None of that is patriotism. It is
+                risk, cash and time, which are the only three things a hardware
+                business ever really spends.
+              </p>
+              <p>
+                You do not need a finished product to start the conversation. You need
+                a clear specification, a bill of materials, a realistic volume and an
+                honest view of your cost target. With those, a good manufacturer can
+                tell you very quickly whether they are the right tier for you — which
+                is, in the end, the only question that matters.
               </p>
             </div>
           </section>
