@@ -97,7 +97,7 @@ export function BriefIntake() {
             <div className="card">
               <span className="eyebrow">Get your Design Dossier</span>
               <h1>Tell me about your idea.</h1>
-              <p className="sub">A short brief is all I need &mdash; a paragraph to a page. Anvil builds your Design Dossier &mdash; architecture, a full bill of materials and costs, the licences and regulations you&rsquo;ll face, the risks to watch, and investors who&rsquo;ve backed similar products &mdash; and I send it within a day. No account, and your first one is free.</p>
+              <p className="sub">A short brief is all I need &mdash; a paragraph to a page. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and investors who&rsquo;ve backed similar products &mdash; every number a formula you can trace. A senior engineer reviews it before I send it, within a day. No account, and your first one is free.</p>
               <form onSubmit={onSubmit}>
                 <div>
                   <label htmlFor="idea">Your idea <span className="req">*</span> <span className="hint">&mdash; what it does, who it&rsquo;s for, roughly how big.</span></label>
@@ -141,7 +141,7 @@ export function BriefIntake() {
             <div className="card done">
               <div className="check">&#10003;</div>
               <h1>Thanks, {firstName} &mdash; your brief&rsquo;s in.</h1>
-              <p className="sub">Anvil will build your Design Dossier and I&rsquo;ll email it to <strong>{email}</strong> within a day &mdash; the full engineering build, costs, risks, and your investor matches.</p>
+              <p className="sub">Anvil will build your Design Dossier &mdash; an auditable Excel workbook &mdash; and once a senior engineer has reviewed it, I&rsquo;ll email it to <strong>{email}</strong>, usually within a day.</p>
               <p className="sub">Want to talk it through first? Grab a slot:</p>
               <a className="btn" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener" style={{ maxWidth: "320px", margin: "14px auto 0" }}>Book a 30-min call</a>
               <p className="sign">&mdash; Tristan, Founder, Fractional Forge</p>
