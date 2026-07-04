@@ -22,7 +22,7 @@ import { MarketingFooter } from "@/components/marketing/marketing-footer"
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Fractional Forge is building ForgeOS — the operating system for the smart-product wave. Everyday objects are becoming sensors and software; we help hardware founders ship the smart version, find the suppliers, and reach the investors who fund it.",
+    "Fractional Forge helps deep-tech and hardware founders get funded and built — strategy, capital, and a curated network of Europe's best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.",
 }
 
 export default function AboutPage() {
@@ -49,10 +49,10 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4 text-lg text-muted-foreground leading-relaxed max-w-3xl">
               <p className="text-xl sm:text-2xl font-medium text-foreground">
-                Fractional Forge is building ForgeOS — the operating system for the smart-product wave.
+                We are building the AWS for atoms.
               </p>
               <p>
-                Everyday objects are becoming sensors and software, kettles, drills, air-quality monitors. Compute and connectivity dropped under £5 a unit, and that is what makes the smart version commercially viable. ForgeOS pulls together the manufacturers, the investors, specialist support across thirteen disciplines, the team tools, and the cash burn tracking that a hardware founder needs to ship the smart version, all in one place, from day one.
+                Software founders rent infrastructure on AWS and focus on product. Hardware founders have no equivalent — they&apos;re expected to build factories, source suppliers and navigate procurement alone. Fractional Forge provides the missing layer: strategy and commercialisation, starting with a first-principles Design Dossier; capital, through fundraising and grants on an introducer/success-fee basis; and build, via a curated network of Europe&apos;s best engineering firms and a fractional bench of senior engineers. Every dossier is reviewed by a senior engineer before the founder sees it.
               </p>
             </div>
           </section>
@@ -80,13 +80,13 @@ export default function AboutPage() {
                     </p>
                   </div>
                   <p className="text-muted-foreground leading-relaxed">
-                    I have spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK&apos;s larger vertical farms. Fractional Forge is essentially my wish list of all the things I could have had as a hardware startup founder over those 26 years.
+                    I&apos;ve spent 25 years founding, financing and scaling capital-intensive technology businesses across solar, wind, tidal, batteries, vertical farming and carbon capture. Along the way I&apos;ve raised around £200 million across my own and advised companies, done project finance at Citigroup and corporate venture capital at Shell Technology Ventures, taken a company public on AIM, and spent a decade building Fischer Farms into one of the world&apos;s largest vertical farms.
                   </p>
                   <p className="text-muted-foreground leading-relaxed">
-                    One of the main issues I&apos;ve had is that I&apos;ve spent so much time and energy (and money!) on infrastructure rather than focusing on the product. A software startup gets to focus on the product and let companies like AWS deal with the infrastructure. Hardware doesn&apos;t have an AWS. Fractional Forge is my attempt to build one.
+                    Software founders rent infrastructure from AWS so they can focus on shipping code. Hardware has no equivalent — you&apos;re expected to build the factory yourself. I&apos;m building one.
                   </p>
                   <p className="text-muted-foreground leading-relaxed">
-                    It&apos;s for three groups: hardware founders who need expertise across a dozen domains but can&apos;t afford full-time seniors in every role; experienced people with decades of domain expertise who want to work with startups on their own terms; and people who&apos;d love to have their own startup but don&apos;t know where to begin.
+                    If you&apos;re a deep-tech or hardware founder, describe your idea and we&apos;ll build your Design Dossier — an 80-plus-page engineering and procurement briefing, reviewed by a senior engineer before it reaches you. From there we work together on advisory, capital and build. No self-serve dashboards — just experienced people doing the work.
                   </p>
                   <a
                     href="https://linkedin.com/in/tristanfischer"
@@ -136,16 +136,16 @@ export default function AboutPage() {
           {/* CTA */}
           <section className="text-center space-y-4 py-8">
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
-              Want to build with us?
+              Start your Design Dossier
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Free tier, no credit card needed. Have a look and let me know how you get on.
+              Describe your idea in a short brief — your first Design Dossier is free, and I&apos;ll send it within a day.
             </p>
             <Link
-              href="/signup"
+              href="/brief"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-international-orange text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
             >
-              Get started
+              Start a brief
               <ArrowRight className="w-4 h-4" />
             </Link>
           </section>
