@@ -136,15 +136,15 @@ export default function WaterTreatmentCostPage() {
                   {SECTIONS.map((s) => (
                     <div
                       key={s.name}
-                      className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-5 py-4"
+                      className="flex items-start justify-between gap-4 px-5 py-4"
                     >
-                      <div className="sm:w-64 flex-shrink-0">
+                      <div className="min-w-0">
                         <p className="font-semibold text-foreground">{s.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                          {s.covers}
+                        </p>
                       </div>
-                      <p className="flex-1 text-sm text-muted-foreground leading-relaxed">
-                        {s.covers}
-                      </p>
-                      <p className="font-semibold text-foreground tabular-nums sm:text-right sm:w-28">
+                      <p className="font-semibold text-foreground tabular-nums whitespace-nowrap flex-shrink-0">
                         {s.cost}
                       </p>
                     </div>
