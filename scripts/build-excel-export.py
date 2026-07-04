@@ -3030,6 +3030,78 @@ def _perline_agg_key(c) -> Optional[str]:
     return None
 
 
+# ── UNIT-BASIS RECONCILIATION for the COST-band row (Tristan checks item 2,
+#    2026-07-05) — mirrors scripts/lib/per-line-price-plausibility-audit.ts::
+#    reconcileUnitBasis EXACTLY (gate 21). ONE rule now drives BOTH surfaces: the
+#    live TS gate downgrades a die-cut/cut-length PIECE priced against a
+#    distributor's whole-STOCK unit (e.g. Bergquist GP3000S30 gasket pad £2.50/
+#    cell vs its £56.48 stock-sheet distributor price — X-6) from HIGH to MEDIUM,
+#    but the workbook's ⚠ Checks COST1 band row (rendered below) previously had
+#    no such reconciliation and hard-FAILed the identical numbers gate 21 itself
+#    no longer blocks on. NEVER excuses the OVER direction, and never fires for a
+#    non-piece-of-stock noun — a genuine mispriced principal (INV-4: a £181 PCS
+#    vs its £75,000 distributor reference) is not this SHAPE and stays caught.
+_PIECE_OF_STOCK_RX = re.compile(
+    r"\b(pads?|gaskets?|shims?|labels?|seals?|die[- ]?cut|decals?|stickers?|tapes?|foils?|"
+    r"films?|liners?|membranes?|wires?|cables?|tub(?:e|es|ing)|hoses?|sleev(?:e|es|ing)|"
+    r"heat[- ]?shrink|braid(?:ed|ing)?|cords?|lacing|webbing|per[- ]?met(?:re|er))\b",
+    re.I)
+_UNIT_BASIS_YIELD_MIN = 2
+_UNIT_BASIS_YIELD_MAX = 500
+
+
+def _reconcile_unit_basis_gbp(word_name, bom_unit_price_gbp, distributor_best_gbp
+                              ) -> Tuple[bool, Optional[int], Optional[str]]:
+    """Pure + deterministic. Returns (applied, implied_yield, note). Applied ONLY when
+    (a) the item name is a piece-of-stock noun family, (b) the BoM price is BELOW the
+    reference (the over direction is never excused), and (c) some integer yield in
+    [2, 500] lands piece_price × yield within [0.5×, 2×] of the reference price."""
+    try:
+        bom_p = float(bom_unit_price_gbp)
+        ref_p = float(distributor_best_gbp)
+    except (TypeError, ValueError):
+        return False, None, None
+    if not (bom_p > 0 and ref_p > 0):
+        return False, None, None
+    if bom_p >= ref_p:
+        return False, None, None          # (c) the over direction is NEVER excused
+    if not _PIECE_OF_STOCK_RX.search(str(word_name or "")):
+        return False, None, None          # (a) piece-of-stock noun family only
+    implied_yield = ref_p / bom_p
+    y_lo = max(_UNIT_BASIS_YIELD_MIN, math.ceil(0.5 * implied_yield))
+    y_hi = min(_UNIT_BASIS_YIELD_MAX, math.floor(2 * implied_yield))
+    if y_lo > y_hi:
+        return False, None, None          # (b) no plausible integer yield lands in-band
+    rounded = round(implied_yield)
+    note = (f"unit-basis reconciliation: per-piece £{bom_p:,.2f} vs stock unit "
+            f"£{ref_p:,.2f} — implied yield ~{rounded}, unit-basis differs; "
+            f"verify die-cut/cut-length yield (mirrors gate 21 reconcileUnitBasis)")
+    return True, rounded, note
+
+
+def _rb_tag_to_part_name(state: dict) -> Dict[str, str]:
+    """tag -> human item name, from the SAME requirementsBom rows the COST1 band
+    check itself joins against (dcl._requirements_bom) — the one source both the
+    live TS gate 21 and this workbook check key their reconciliation shape test on."""
+    out: Dict[str, str] = {}
+    try:
+        rows = dcl._requirements_bom(state)  # noqa: SLF001 — same-repo sibling module
+    except Exception:  # noqa: BLE001
+        rows = []
+    for row in rows or []:
+        tag = str(row.get("tag") or "").strip()
+        if tag:
+            # BOTH fields, concatenated (mirrors dcl's own name-building idiom at its
+            # requirement-vocab checks): "part" is often the resolved MANUFACTURER +
+            # MPN (e.g. "Bergquist GP3000S30" — no piece-of-stock noun in it at all),
+            # while "requirement" carries the human description ("cell insulation
+            # pad") the shape test actually needs. Reading "part" alone (as a first
+            # cut of this fix did) silently defeated the reconciliation for the
+            # exact X-6 case it exists to catch.
+            out[tag] = f"{row.get('part') or ''} {row.get('requirement') or ''}".strip()
+    return out
+
+
 def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
                        data_r: int, data_col_a: str,
                        fail_labels: List[str]) -> Tuple[int, int, int]:
@@ -3059,6 +3131,7 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
     fail_count = 0
     if not checks:
         return r, data_r, fail_count
+    _tag_to_part = _rb_tag_to_part_name(state)   # for the COST-band unit-basis reconciliation
 
     fam_titles = {
         "CONSISTENCY": "E1 · CONSISTENCY — per-unit×count, Σsub==line, rating==quantity",
@@ -3151,6 +3224,25 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         is_band = (c.category == "COST" and c.relation == "eq" and not c.tol)
         tol_cell_val = dcl.COST_BAND_FACTOR if is_band else c.tol
 
+        # unit-basis reconciliation (Tristan checks item 2, 2026-07-05) — mirrors gate
+        # 21's reconcileUnitBasis EXACTLY so the two surfaces can never disagree: a
+        # piece-of-stock line under-priced by a plausible die-cut/cut-length yield of
+        # its reference (X-6 Bergquist GP3000S30) is the SAME false-defect gate 21
+        # downgrades HIGH->MEDIUM, not an independent workbook hard-FAIL. The verdict
+        # is embedded as an explicit OPERAND (hidden col N) the STATUS formula reads —
+        # never folded silently into the arithmetic. Genuine mispricing (a non-piece-
+        # of-stock noun, or the OVER direction — INV-4's £181-vs-£75,000 PCS) is NEVER
+        # excused and stays a hard FAIL.
+        _recon_applied = False
+        _recon_note = None
+        if is_band and c.status == dcl.FAIL:
+            _tag_m = re.match(r"BoM\s+(\S+):", str(c.name or ""))
+            _part_name = _tag_to_part.get(_tag_m.group(1), "") if _tag_m else ""
+            _recon_applied, _recon_yld, _recon_note = _reconcile_unit_basis_gbp(
+                _part_name, c.actual, c.expected)
+        if is_band:
+            ws.cell(r, 14, 1 if _recon_applied else 0).fill = FILL_INPUT  # N = reconciled flag
+
         # --- visible live row ---
         ws.cell(r, 1, c.name).border = BORDER
         ws.cell(r, 1).alignment = WRAP_TOP
@@ -3166,8 +3258,9 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
             # dishonestly recompute to PASS, so the verdict renders STATIC.
             status_f = "FAIL"
         elif is_band:                   # COST ratio band: flag >xN or <1/N of ref
-            status_f = (f'=IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
-                        f'B{r}/C{r}>=1/E{r})),"PASS","FAIL")')
+            status_f = (f'=IF(N{r}=1,"RECONCILED — unit-basis (non-blocking)",'
+                        f'IF(OR(C{r}=0,AND(B{r}/C{r}<=E{r},'
+                        f'B{r}/C{r}>=1/E{r})),"PASS","FAIL"))')
         elif c.relation == "ge" and _ceiling is not None:
             # rating >= duty AND <= the magnitude sanity ceiling (the 184 GVA lesson)
             status_f = f'=IF(AND(B{r}>=C{r}-E{r},B{r}<={_ceiling!r}),"PASS","FAIL")'
@@ -3182,14 +3275,22 @@ def _render_lib_checks(ws: Worksheet, state: dict, run_dir: str, r: int,
         cs = ws.cell(r, 6, status_f)
         cs.border = BORDER
         cs.font = Font(bold=True)
-        cdet = ws.cell(r, 7, c.detail)
+        cdet_text = f"{c.detail} — {_recon_note}" if _recon_applied and _recon_note else c.detail
+        cdet = ws.cell(r, 7, cdet_text)
         cdet.alignment = WRAP_TOP
         cdet.font = FONT_NOTE
         cdet.border = BORDER
 
         # pre-evaluate now so we can colour + count FAILs (and so the CLI and
         # the tab agree before Excel recomputes on open)
-        if c.status == dcl.FAIL:
+        if _recon_applied:
+            # non-blocking (gate 21 parity) — visibly flagged amber, never counted
+            # as a FAIL: the divergence is real but explained by unit-basis, not a
+            # pricing defect.
+            cs.font = FONT_ADVISORY
+            for col in range(1, 8):
+                ws.cell(r, col).fill = FILL_ADVISORY
+        elif c.status == dcl.FAIL:
             fail_count += 1
             fail_labels.append(f"[{fam}] {c.name}")
             for col in range(1, 8):
@@ -9285,6 +9386,25 @@ def _render_sweet_spot_section(ws: Worksheet, state: dict, start_row: int) -> Op
     return r
 
 
+# A storage/grid class genuinely earns arbitrage, capacity or ancillary-service REVENUE
+# (it is not an infrastructure plant with no product to sell at all, like water/treatment/
+# fertigation) — Tristan checks item 3, 2026-07-05. When the cost-of-service floor engages
+# for one of these classes because no revenue-path signal exists YET in this run's state,
+# the tab must say so explicitly rather than silently reusing the "no product to sell"
+# framing built for a genuine infrastructure class.
+_REVENUE_BEARING_STORAGE_CLASS_RX = re.compile(
+    r"energy_storage|battery_storage|\bbess\b|grid_storage|frequency_response", re.I)
+
+
+def _revenue_bearing_class(state: dict) -> Optional[str]:
+    """The product_class string when it is a storage/grid class that has a genuine revenue
+    model (arbitrage/capacity/ancillary), else None. Universal — keyed on the class-slug
+    signal, not a per-run special case; NEVER invents a revenue number itself."""
+    pc = str(((state.get("orchestratorContract") or {}).get("product_class")
+              or (state.get("parsedBrief") or {}).get("product_class")) or "")
+    return pc if _REVENUE_BEARING_STORAGE_CLASS_RX.search(pc) else None
+
+
 def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     """COST-OF-SERVICE economics for a no-market-revenue infrastructure / utility plant (water /
     treatment / fertigation): the HONEST, COMPLETE economic model is capex + annual opex + the
@@ -9370,7 +9490,26 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
                          f"drivers — edit an input and this recomputes.")
     note.font = Font(italic=True, size=9, color="555555")
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-    r += 2
+    r += 1
+    _rb_class = _revenue_bearing_class(state)
+    if _rb_class:
+        # class-aware honest framing (NOT an output-sales-shaped gap): a storage/grid
+        # plant genuinely earns revenue — this run's state simply has no revenue-path
+        # signal yet. Never invents a revenue/EBITDA/NPV number to fill the gap.
+        rev = ws.cell(r, 1,
+            f"⚠ revenue model not yet derived (class: {_rb_class}) — a plant of this "
+            f"class earns arbitrage / capacity / ancillary-service REVENUE, not an "
+            f"output sale; this run carries no revenue-path signal yet, so the model "
+            f"below is the honest cost-of-service FLOOR, not a claim that this class "
+            f"has nothing to sell. Close the gap with a revenue-path input, not an "
+            f"invented figure.")
+        rev.font = Font(italic=True, size=9, color="9C6500", bold=True)
+        rev.alignment = WRAP_TOP
+        rev.fill = FILL_ADVISORY
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = 28
+        r += 1
+    r += 1
     header(ws, r, ["Item", "Value (£)", "", "Basis"])
     r += 1
 
@@ -10001,6 +10140,14 @@ _GLOSSARY: List[tuple] = [
         ("AHU", "Air-Handling Unit — the fan/coil/filter box serving a zone."),
         ("Z-01, Z-02 …", "HVAC zone identifiers — each Z-number is a separately-served air zone (supply / return)."),
         ("ACH", "Air Changes per Hour — room-volume ventilation rate."),
+    ]),
+    ("Battery storage (BESS tags)", [
+        ("BMS (tag)", "Battery Management System — the master controller (+ per-rack slave modules) monitoring cell voltage, temperature and state of charge, and enforcing safe charge/discharge limits (BMS-101 …)."),
+        ("BR (tag)", "Battery Rack — a rack of series/parallel-connected battery modules (cells) forming one string, plus its wiring carrier / busbar hardware (BR-101 …)."),
+        ("CH (tag)", "Chiller — the liquid-cooling package rejecting battery and PCS waste heat via a coolant loop (CH-101 …)."),
+        ("FS (tag)", "Fire Suppression — the clean-agent (e.g. Novec/FM-200) or aerosol fire-suppression cylinder + detection system serving the container (FS-101 …)."),
+        ("PCS (tag)", "Power Conversion System — the bidirectional inverter converting between the battery's DC bus and the AC grid connection (PCS-101 …)."),
+        ("SG (tag)", "Switchgear — the AC main breaker / protection and isolation assembly at the grid-connection point (SG-101 …)."),
     ]),
     ("Bill-of-materials status codes", [
         ("BESPOKE", "Made-to-order item — fabricated / engineered to spec; no off-the-shelf part number."),
@@ -15810,10 +15957,28 @@ def _merged_spans(ws) -> Dict[int, int]:
 
 
 def _walk_rows(ws, hdr_row: int, ncols: int, header_rows: set,
-               merged: Optional[Dict[int, int]] = None) -> List[Tuple[int, list]]:
+               merged: Optional[Dict[int, int]] = None, *,
+               tolerate_blank_banner: bool = False) -> List[Tuple[int, list]]:
     """The DATA rows of a rendered table: rows below its header until the first fully-empty
     row / the next table's header. Section banners (single-row merges), TOTAL rows and
-    italic note rows are skipped — they are not data and carry no per-cell obligation."""
+    italic note rows are skipped — they are not data and carry no per-cell obligation.
+
+    `tolerate_blank_banner` (default OFF — every existing caller keeps today's exact
+    behaviour, byte-for-byte) narrows a SPECIFIC boundary-detection bug (2026-07-05):
+    on the "⚠ Checks" tab, `_render_lib_checks` renders its 7 check families
+    (CONSISTENCY/ADEQUACY/.../PROVENANCE) as ONE logical table, but separates each
+    family with "r += 1  # spacer between families" — a genuinely blank row — followed
+    by the next family's full-width merged sub-banner. With this OFF, that first
+    inter-family blank row is (mis-)read as the table's END, so `_fam_rows(wb, title,
+    "checks")` returned only the FIRST family's ~2 rows against the tab's real ~337 —
+    undercounting the denominator so badly that `checked - fails` went NEGATIVE and the
+    generic 10×passed/checked arithmetic minted a -25-style score. Turning this ON is
+    scoped to ONLY the one call site that needs it (`_sc_checks`'s own `_fam_rows` read)
+    — NOT the generic per-cell-completeness walker (`_run_cell_contracts`) or any other
+    `_fam_rows`/`_read_rows` caller, which must keep walking every OTHER table exactly
+    as before (proven by the codema-v79 byte-identity regression this scoping fixes:
+    turning it on globally swept unrelated sections on 'Assembly sequence' and
+    'Executive Summary' into their neighbours' cell contracts, inventing new FAILs)."""
     merged = _merged_spans(ws) if merged is None else merged
     out: List[Tuple[int, list]] = []
     r = hdr_row + 1
@@ -15823,6 +15988,15 @@ def _walk_rows(ws, hdr_row: int, ncols: int, header_rows: set,
         vals = [ws.cell(r, c).value for c in range(1, ncols + 1)]
         idx = [i for i, v in enumerate(vals) if v not in (None, "")]
         if not idx:
+            if tolerate_blank_banner:
+                # A TRUE table end still breaks: two consecutive blank rows (the real
+                # gap before the next section) or a blank row followed by nothing/the
+                # next registered header.
+                nxt = r + 1
+                if (nxt <= ws.max_row and nxt not in header_rows
+                        and merged.get(nxt, 0) >= max(2, min(3, ncols))):
+                    r = nxt
+                    continue
             break
         if merged.get(r, 0) >= max(2, min(3, ncols)):
             r += 1
@@ -15979,12 +16153,14 @@ def _tables_of(wb, sheet_title: str, family=None) -> List[dict]:
     return out
 
 
-def _read_rows(wb, tbl: dict) -> List[Tuple[int, Dict[str, Any]]]:
+def _read_rows(wb, tbl: dict, *, tolerate_blank_banner: bool = False
+              ) -> List[Tuple[int, Dict[str, Any]]]:
     """Data rows of a registered table as (sheet_row, {normalised col name: value})."""
     ws = wb[tbl["sheet"]]
     header_rows = {t["row"] for t in _RENDERED_TABLES if t["sheet"] == tbl["sheet"]}
     norm = [_norm_col(c) for c in tbl["cols"]]
-    rows = _walk_rows(ws, tbl["row"], len(tbl["cols"]), header_rows)
+    rows = _walk_rows(ws, tbl["row"], len(tbl["cols"]), header_rows,
+                      tolerate_blank_banner=tolerate_blank_banner)
     out = []
     for r, vals in rows:
         d: Dict[str, Any] = {}
@@ -15995,10 +16171,11 @@ def _read_rows(wb, tbl: dict) -> List[Tuple[int, Dict[str, Any]]]:
     return out
 
 
-def _fam_rows(wb, sheet: str, family: str) -> List[Tuple[int, Dict[str, Any]]]:
+def _fam_rows(wb, sheet: str, family: str, *, tolerate_blank_banner: bool = False
+             ) -> List[Tuple[int, Dict[str, Any]]]:
     out: List[Tuple[int, Dict[str, Any]]] = []
     for t in _tables_of(wb, sheet, family):
-        out.extend(_read_rows(wb, t))
+        out.extend(_read_rows(wb, t, tolerate_blank_banner=tolerate_blank_banner))
     return out
 
 
@@ -16691,7 +16868,11 @@ def _sc_benchmark(wb, ws, state, run_dir):
 
 
 def _sc_checks(wb, ws, state, run_dir):
-    rows = _fam_rows(wb, ws.title, "checks")
+    # tolerate_blank_banner: the checks family is ONE logical table split into 7
+    # family sub-tables by "r += 1  # spacer between families" — a genuinely blank
+    # row — in _render_lib_checks. Scoped to THIS read only (never the generic
+    # per-cell-completeness walker) so no other table's boundary detection changes.
+    rows = _fam_rows(wb, ws.title, "checks", tolerate_blank_banner=True)
     # the STATUS cells are LIVE formulas (2026-07-03) — their build-time verdicts are the
     # renderer's own fail tally (_forge_fail_labels); the text scan keeps older fixtures
     _fl = getattr(ws, "_forge_fail_labels", None)
@@ -21958,6 +22139,118 @@ def _selftest() -> int:
     finally:
         _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables5)
         _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done5)
+
+    # ═══ BESS WAVE A proveCatch (Tristan 2026-07-05) — the three "⚠ Checks" scorer-
+    # honesty fixes: (1) _walk_rows must not mistake a mid-table family spacer for a
+    # table boundary; (2) _sc_checks must never go negative (the -25 bug); (3) the
+    # COST-band unit-basis reconciliation must mirror gate 21 exactly, both directions. ═══
+    _sv_tables6 = list(_RENDERED_TABLES); _sv_done6 = set(_CELLCON_DONE)
+    try:
+        from openpyxl import Workbook as _WbChk
+        _CHECKS_COLS = ["Check", "ACTUAL", "EXPECTED", "Δ (actual-exp)", "Tol", "STATUS",
+                        "Detail / why"]
+
+        # --- (1) _walk_rows / _fam_rows: a blank spacer row followed by a full-width
+        # merged family banner is NOT a table boundary; two consecutive blanks (or a
+        # blank with nothing/a new header after it) IS. ---
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbw = _WbChk(); _wsw = _wbw.active; _wsw.title = "⚠ Checks"
+        header(_wsw, 4, _CHECKS_COLS)
+        for i, rr in enumerate((5, 6)):        # family A: 2 data rows
+            for ci, v in enumerate([f"chk-a{i}", 1, 1, 0, 0.01, "PASS", "d"], start=1):
+                _wsw.cell(rr, ci, v)
+        # row 7 blank (inter-family spacer) — row 8 the next family's full-width banner
+        _wsw.merge_cells(start_row=8, start_column=1, end_row=8, end_column=7)
+        _wsw.cell(8, 1, "E9 · FAMILY B BANNER")
+        for i, rr in enumerate((9, 10)):       # family B: 2 more data rows
+            for ci, v in enumerate([f"chk-b{i}", 1, 1, 0, 0.01, "PASS", "d"], start=1):
+                _wsw.cell(rr, ci, v)
+        # rows 11+12 blank (the REAL end) — row 13 unrelated content must NOT be swept in
+        _wsw.cell(13, 1, "unrelated content after the true table boundary")
+        _fr = _fam_rows(_wbw, "⚠ Checks", "checks", tolerate_blank_banner=True)
+        if len(_fr) != 4:
+            print(f"  FAIL walk_rows: a blank spacer + family banner must NOT end the "
+                  f"table (expected 4 rows across both families, got {len(_fr)}: "
+                  f"{[r for r, _ in _fr]}) — this is the undercount that fed the -25 bug"); bad += 1
+        if any(_cell_txt(d.get("check")) == "unrelated content after the true table "
+               "boundary" for _r, d in _fr):
+            print("  FAIL walk_rows: two consecutive blank rows must still end the "
+                  "table (unrelated trailing content leaked in)"); bad += 1
+        # DEFAULT (tolerate_blank_banner OFF, every OTHER _fam_rows/_read_rows caller —
+        # the codema-v79 regression guard, 2026-07-05): the SAME fixture must keep
+        # TODAY'S behaviour — stop at the first blank spacer — when the flag is not
+        # explicitly requested, so the generic per-cell-completeness walker (and every
+        # other _fam_rows call) never sweeps a neighbouring section into the wrong
+        # table's contract (that swept "Assembly sequence"/"Executive Summary" rows
+        # from unrelated sections into their FIRST table's row-count on codema v79).
+        _fr_default = _fam_rows(_wbw, "⚠ Checks", "checks")
+        if len(_fr_default) != 2:
+            print(f"  FAIL walk_rows: tolerate_blank_banner must be OFF by default — "
+                  f"every OTHER caller (cell-completeness contract, every other scorer) "
+                  f"must keep stopping at the first blank spacer (expected 2 rows, got "
+                  f"{len(_fr_default)}: {[r for r, _ in _fr_default]})"); bad += 1
+
+        # --- (2) _sc_checks: the arithmetic must never go negative. 10 real rows,
+        # 7 marked FAIL via the SAME _forge_fail_labels tally the renderer stamps. ---
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _wbk = _WbChk(); _wsk = _wbk.active; _wsk.title = "⚠ Checks"
+        header(_wsk, 4, _CHECKS_COLS)
+        _NROWS = 10
+        for i in range(_NROWS):
+            rr = 5 + i
+            for ci, v in enumerate([f"chk{i}", 1, 1, 0, 0.01, "PASS", "d"], start=1):
+                _wsk.cell(rr, ci, v)
+        _wsk._forge_fail_labels = [f"[X] chk{i}" for i in range(7)]  # type: ignore[attr-defined]
+        _res7 = _sc_checks(_wbk, _wsk, {}, ".")
+        _merged7 = _merge_content({}, _res7, None, "⚠ Checks")
+        if _merged7.get("score") != 0:
+            print(f"  FAIL sc_checks: 7 fails on {_NROWS} real rows must score 0, not "
+                  f"{_merged7.get('score')} (the -25 bug: 10×(checked-fails)/checked goes "
+                  f"negative when checked is undercounted)"); bad += 1
+        if _res7["components"][0][2] != _NROWS:
+            print(f"  FAIL sc_checks: the denominator must count the REAL rendered rows "
+                  f"({_NROWS}), got {_res7['components'][0][2]}"); bad += 1
+        _wsk._forge_fail_labels = []  # type: ignore[attr-defined]
+        _res0 = _sc_checks(_wbk, _wsk, {}, ".")
+        _merged0 = _merge_content({}, _res0, None, "⚠ Checks")
+        if _merged0.get("score") != 10:
+            print(f"  FAIL sc_checks: 0 fails must score a clean 10 (got "
+                  f"{_merged0.get('score')})"); bad += 1
+    finally:
+        _RENDERED_TABLES.clear(); _RENDERED_TABLES.extend(_sv_tables6)
+        _CELLCON_DONE.clear(); _CELLCON_DONE.update(_sv_done6)
+
+    # --- (3) unit-basis reconciliation — mirrors per-line-price-plausibility-audit.ts'
+    # own selftestPerLinePriceAudit() test vectors exactly (gate 21 parity). ---
+    _ubr = _reconcile_unit_basis_gbp("cell insulation pad", 2.5, 56.48)
+    if not (_ubr[0] and _ubr[1] == 23 and "implied yield ~23" in (_ubr[2] or "")
+            and "unit-basis differs" in (_ubr[2] or "")):
+        print(f"  FAIL unit-basis: Bergquist GP3000S30 (£2.50 vs £56.48) must reconcile "
+              f"to implied yield ~23 (got {_ubr})"); bad += 1
+    if _reconcile_unit_basis_gbp("differential pressure switch", 420, 45.68)[0]:
+        print("  FAIL unit-basis: the OVER direction (£420 vs £45.68) must NEVER "
+              "reconcile — genuine over-billing stays caught"); bad += 1
+    if _reconcile_unit_basis_gbp("cell insulation pad", 420, 56.48)[0]:
+        print("  FAIL unit-basis: a piece-of-stock noun in the OVER direction (pad at "
+              "7.4× the full stock price) must still stay HIGH — never excused"); bad += 1
+    if _reconcile_unit_basis_gbp("string inverter", 30, 3000)[0]:
+        print("  FAIL unit-basis: a non-piece-of-stock noun (INV-4 shape: £30-vs-£3,000 "
+              "'string inverter') must NEVER reconcile — genuine mispricing stays caught"); bad += 1
+    if _reconcile_unit_basis_gbp("adhesive label", 0.01, 56.48)[0]:
+        print("  FAIL unit-basis: an implied yield >500 (5,648×) is not a credible "
+              "unit-basis artefact — must stay caught"); bad += 1
+    if not _reconcile_unit_basis_gbp("control wire (per metre)", 3, 60)[0]:
+        print("  FAIL unit-basis: a cut-from-reel family (wire per metre vs per reel) "
+              "must reconcile too"); bad += 1
+    if not _reconcile_unit_basis_gbp("door gasket", 14, 56)[0]:
+        print("  FAIL unit-basis: a MEDIUM-band piece-of-stock under-bill must still "
+              "reconcile (stays non-blocking, carries the note)"); bad += 1
+    # INV-4 shape: a genuinely mispriced principal (PCS) at a ratio that WOULD fall in a
+    # plausible "yield" range numerically must still stay caught because it is not a
+    # piece-of-stock noun — shape, not magnitude, is the gate.
+    if _reconcile_unit_basis_gbp("power conversion system", 181, 75000)[0]:
+        print("  FAIL unit-basis: INV-4 (£181 vs £75,000 PCS) must stay caught — not a "
+              "piece-of-stock shape, regardless of the numeric ratio"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

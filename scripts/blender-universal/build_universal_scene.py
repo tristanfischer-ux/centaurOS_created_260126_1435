@@ -704,6 +704,15 @@ GROUND_SLAB_MARGIN_MM  = 3000.0   # (was 4000) a stated 3 m PERIMETER ACCESS AIS
 #                                   occupied hull — the deck must fit the plant, not the reverse
 #                                   (Tristan 2026-07-02: v52's plant sat in a corner of an
 #                                   oversized deck; the slab spans drawn-mesh bbox + this apron)
+# CONTAINERISED classes (BESS et al, `_CONTAINER_LAYOUT`) don't get a truck/forklift access
+# road on all 4 sides — a shipping-container-scale enclosure needs a MAINTENANCE WALKWAY
+# (industry norm ~1-1.5 m for cable/HVAC service access), not an open-plot perimeter aisle.
+# Root-cause of the site_utilisation HIGH on energy_storage (2026-07-04): the universal
+# GROUND_SLAB_MARGIN_MM (sized for a sprawling open-plot water-treatment site) was applied
+# unchanged to a compact ~5×7 m container footprint — a fixed 3 m apron consumes a much
+# LARGER share of a small hull than a large one, so every containerised class's deck was
+# ~4-5× its equipment footprint regardless of how tightly the container itself was packed.
+CONTAINER_GROUND_SLAB_MARGIN_MM = 1500.0
 # Concrete-grey — darker than before (was 0.62) against the 0.85 INSPECT world so the
 # deck reads UNMISTAKABLY as the plant floor in the hero/iso view (Tristan 2026-06-22:
 # "no floor"), while staying subordinate to the equipment.
@@ -5711,9 +5720,22 @@ SITE_UTIL_CELL_MM   = 500.0
 SITE_HULL_AISLE_MM  = 1000.0
 
 
-def _compute_site_utilisation(parts):
+def _compute_site_utilisation(rows):
     """{deck_m2, hull_m2, utilisation, …} for the drawn deck, or None when no slab exists
-    (free-space families / BLENDER_GROUND_SLAB=0) — the G7 gate then skips."""
+    (free-space families / BLENDER_GROUND_SLAB=0) — the G7 gate then skips.
+
+    Takes the FINAL parts-manifest `rows` (pos_mm/dims_mm), not the raw `parts` Part-object
+    list. Fix 2026-07-04: the original version read `p.placed_xyz_mm`, which is populated
+    ONLY by the per-word region placer. Containerised/aggregate assemblies (BESS rack-farm,
+    panel-array, tower-machine, aero-body) draw their kit via a synthetic-block path that
+    never touches `Part.placed_xyz_mm` — so on those classes EVERY part failed the
+    `placed_xyz_mm` check, `filled` stayed empty, and hull_m2 came out exactly 0.0 regardless
+    of how densely the deck was actually packed (BESS: 19 racks/cabinets drawn, hull 0.0 m²).
+    `rows` is universal across every placement family (mirrors `build_parts_manifest`'s own
+    "geometry comes from the placed BLENDER OBJECTS' world bounding boxes" principle, and
+    `add_ground_slab`'s "span the ACTUAL drawn EQUIPMENT MESH world-bboxes" — the same ground
+    truth this function should have used from the start) — same schema whether a row came
+    from the per-word placer or `_synthetic_equipment_rows`."""
     slab = bpy.data.objects.get("u_ground_slab")
     if slab is None:
         return None
@@ -5725,14 +5747,16 @@ def _compute_site_utilisation(parts):
     C = SITE_UTIL_CELL_MM
     nx, ny = max(1, int(sw // C) + 1), max(1, int(sd // C) + 1)
     filled = set()
-    for p in parts:
-        if not getattr(p, "placed_xyz_mm", None):
+    for row in rows:
+        pos = row.get("pos_mm")
+        dims = row.get("dims_mm")
+        if not pos or not dims:
             continue
-        cx, cy = p.placed_xyz_mm[0], p.placed_xyz_mm[1]
-        try:
-            fx, fy, _ = footprint_mm(resolved_dims_mm(p))
-        except Exception:
-            continue
+        cx, cy = pos[0], pos[1]
+        if "dia" in dims:
+            fx = fy = dims["dia"]
+        else:
+            fx, fy = dims.get("w", 1000.0), dims.get("d", 900.0)
         a = SITE_HULL_AISLE_MM
         i0 = max(0, int((cx - fx / 2 - a - x0) // C))
         i1 = min(nx - 1, int((cx + fx / 2 + a - x0) // C))
@@ -5748,8 +5772,9 @@ def _compute_site_utilisation(parts):
             "deck_rect_mm": [round(x0, 1), round(y0, 1),
                              round(x0 + sw, 1), round(y0 + sd, 1)],
             "hull_aisle_mm": SITE_HULL_AISLE_MM, "cell_mm": SITE_UTIL_CELL_MM,
-            "basis": "hull = union of placed part footprints each inflated 1 m (its access "
-                     "strip); deck = drawn u_ground_slab plan rect (mesh bbox + 3 m apron)"}
+            "basis": "hull = union of drawn-equipment footprints (parts-manifest rows, real "
+                     "geometry) each inflated 1 m (its access strip); deck = drawn "
+                     "u_ground_slab plan rect (mesh bbox + 3 m apron)"}
 
 
 def write_parts_manifest(out_dir, parts, state=None):
@@ -5812,7 +5837,7 @@ def write_parts_manifest(out_dir, parts, state=None):
     # SITE UTILISATION — hull ÷ deck, the deterministic "empty deck" signal (G7 reads it).
     site = None
     try:
-        site = _compute_site_utilisation(parts)
+        site = _compute_site_utilisation(rows)
     except Exception as _se:   # pure diagnostics — never fail the export
         print(f"[parts-manifest] site-utilisation skipped: {_se}")
     if site:
@@ -10312,12 +10337,14 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
     ON A FLOOR (Tristan 2026-06-21: "everything floating in the air, no floor showing").
 
     The slab spans the EQUIPMENT footprint (equipment_bbox_mm — the equipment bulk, NOT
-    the tall frame/stacks, so the apron hugs the plant) + GROUND_SLAB_MARGIN_MM apron on
-    every side; its TOP sits at DECK_Z_MM (the datum every part's underside rests on, so
+    the tall frame/stacks, so the apron hugs the plant) + an apron on every side —
+    GROUND_SLAB_MARGIN_MM (open-plot) or CONTAINER_GROUND_SLAB_MARGIN_MM (`_CONTAINER_LAYOUT`
+    classes — a shipping-container-scale plant gets a maintenance walkway, not a truck
+    access road); its TOP sits at DECK_Z_MM (the datum every part's underside rests on, so
     the equipment sits ON the slab — no z-fight, nothing buried) and it extends
     GROUND_SLAB_THICK_MM downward. Concrete-grey matte. Named u_ground_slab so it is
     skipped by the parts-manifest (it is the deck, not an equipment item) and recoloured
-    as the deck in the INSPECT pass. Universal — footprint-keyed, no per-class logic.
+    as the deck in the INSPECT pass. Universal — footprint-keyed signal, no per-class logic.
 
     Returns the slab object."""
     # The FLOOR must sit under EVERY placed part (Tristan 2026-06-22: "the slab does not cover
@@ -10345,9 +10372,12 @@ def add_ground_slab(parts, MAT, MO, bbox_mm=None):
                 _y1 = wy if _y1 is None else max(_y1, wy)
     except Exception:
         _x0 = None
-    _m = GROUND_SLAB_MARGIN_MM
+    # a containerised class (BESS et al) gets its own tighter apron — see
+    # CONTAINER_GROUND_SLAB_MARGIN_MM's comment: the open-plot 3 m access road is
+    # disproportionate on a compact ~5×7 m container footprint.
+    _m = CONTAINER_GROUND_SLAB_MARGIN_MM if _CONTAINER_LAYOUT else GROUND_SLAB_MARGIN_MM
     if _x0 is None:
-        eb = equipment_bbox_mm(parts, margin_mm=GROUND_SLAB_MARGIN_MM)
+        eb = equipment_bbox_mm(parts, margin_mm=_m)
     else:
         eb = {"x0": _x0 - _m, "x1": _x1 + _m, "y0": _y0 - _m, "y1": _y1 + _m}
     # DEFINITIVE per-part coverage test (Tristan 2026-06-22: stop reporting slab SIZE, test
@@ -11562,7 +11592,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             _build_bop_cabinet_lineup(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=2,
                                       louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
-        elif role in ("chiller", "cooling"):   # BESS chiller / compute CRAC-CRAH
+        elif role in ("chiller", "cooling", "hvac"):   # BESS chiller/HVAC condenser / compute CRAC-CRAH
             _build_bop_chiller(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                mat, steel, MAT, MO, mod)
         elif role in ("pdu", "ups"):           # compute power: tall cabinet lineup
@@ -11572,7 +11602,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         elif role == "fire":
             _build_bop_fire(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                             mat, steel, MAT, mod, MO)
-        else:  # bms_ctrl / network / any other controller role → small wall cabinet
+        else:  # bms_ctrl / ems_ctrl / network / any other controller role → small wall cabinet
             _build_bop_wall_cabinet(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                     mat, steel, MAT, mod, MO)
         bop_anchor[role] = (cx, cy, bop_z + h_mm)
@@ -11686,13 +11716,13 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             if role == "transformer":
                 _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                        mat, steel, MAT, mod, MO)
-            elif role in ("chiller", "cooling"):
+            elif role in ("chiller", "cooling", "hvac"):
                 _build_bop_chiller(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                    mat, steel, MAT, MO, mod)
             elif role == "fire":
                 _build_bop_fire(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                 mat, steel, MAT, mod, MO)
-            else:
+            else:  # bms_ctrl / ems_ctrl / any other controller role
                 _build_bop_wall_cabinet(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                         mat, steel, MAT, mod, MO)
             bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
@@ -11735,10 +11765,25 @@ _BOP_ROLES = [
     ("switchgear",  r"switchgear|breaker|\brmu\b|main bus|ac main",
                                                           900.0, 1000.0, 2000.0, (0.30, 0.34, 0.40)),
     ("transformer", r"transformer",                      1500.0, 1300.0, 1300.0, (0.02, 0.22, 1.00)),
-    ("bms_ctrl",    r"\bbms\b|ems |\bems\b|controller|scada",
+    ("bms_ctrl",    r"\bbms\b|controller|scada",
                                                           700.0, 700.0, 1800.0, (0.05, 0.42, 1.00)),
-    ("chiller",     r"chiller|hvac|cooling unit|air handler|condens",
+    # EMS cabinet (industrial PC / UPS backup / fibre patch / managed switch) — a
+    # SEPARATE enclosure from the BMS master cabinet above (Tristan 2026-07-04, BESS
+    # WAVE B coverage: the old bare `ems ` alternation in bms_ctrl's regex meant the
+    # EMS parts were only ever CREDITED via whichever part `_select_bop_items` happened
+    # to sample first — they never got their own drawn block). Real BESS containers
+    # site the plant-level EMS server rack apart from the per-container BMS master.
+    ("ems_ctrl",    r"\bems\b",                          700.0, 700.0, 1800.0, (0.10, 0.50, 0.90)),
+    ("chiller",     r"chiller|\bhvac\s*duct\b|hvac\s*condensate|cooling unit|air handler|condens",
                                                           1000.0, 1600.0, 1400.0, (0.95, 0.84, 0.55)),
+    # HVAC condenser / container AC unit — the OUTDOOR/roof-mounted air-conditioning
+    # skid (distinct from the chiller/ducting block above; Tristan 2026-07-04, BESS
+    # WAVE B coverage #1 "HVAC/fire units on/in the container" — "container AC unit"
+    # matched NEITHER the chiller role's old bare `hvac` term (that only ever
+    # sampled "HVAC duct"/"HVAC condensate pump") nor any other role, so it was a
+    # silent 3D-scene drop despite being a genuine principal assembly.
+    ("hvac",        r"\bac\s*unit\b|air.?condition|condensing\s*unit|\blouvre\b",
+                                                          900.0, 1300.0, 1200.0, (0.85, 0.87, 0.90)),
     # fire suppression skid (clean-agent bottle bank) — always drawn (Fix 3)
     ("fire",        r"fire|suppress|aerosol|novec|fm[- ]?200|clean[- ]?agent",
                                                           700.0, 800.0, 1700.0, (0.80, 0.20, 0.16)),
