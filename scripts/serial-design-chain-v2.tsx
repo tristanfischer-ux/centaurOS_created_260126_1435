@@ -4732,7 +4732,7 @@ async function main() {
   // reassertEmitterIdentity() call after Phase-2 restores it before the gates,
   // so no LLM mutation path (reviewer / physics-repair / Phase-2) can leave a
   // changed part_number / manufacturer / spec / quantity on an emitter word.
-  const emitterIdentitySnapshot: EmitterIdentitySnapshot = snapshotEmitterIdentity(design.modules ?? [])
+  let emitterIdentitySnapshot: EmitterIdentitySnapshot = snapshotEmitterIdentity(design.modules ?? [])
   logAction({ step: 'emitter_identity_snapshot', pinned_words: emitterIdentitySnapshot.pinnedWordCount })
 
   // ── Build #19a (2026-05-22): COLLAPSED R1+R2+R3 cascade → single reviewer.
@@ -5633,6 +5633,26 @@ async function main() {
       console.error(`[chain] fill-blank-mpn skipped (non-fatal): ${(err as Error).message}`)
     }
   }
+
+  // ── PIN-THEN-LOST fix (round-6 dissection, 2026-07-04): re-take the emitter-identity
+  // snapshot NOW that fillBlankWordMpns has committed its real (DB-first, gate-20-safe)
+  // manufacturer + part_number pins. The ORIGINAL snapshot above was taken before the
+  // fill ran, so its `lockedMods` for a just-filled word still carry the pre-fill
+  // placeholder (part_number='TBD (detailed design)', no manufacturer). The ONLY later
+  // consumer of this snapshot is the pre-render `restoreStrippedPartNumbers` safety net
+  // (~line 8188), which re-adds a snapshot's part_number to any word a downstream pass
+  // (stripUnverifiedParts' LLM-unverified / "looks like a descriptor, not a SKU" pattern
+  // strip — e.g. Bürkert's genuine "Type 2000"/"Type 2301" series names, Goetze's genuine
+  // "Series 851") blanks entirely. Without this re-snapshot, that safety net "heals" a
+  // stripped REAL DB-pin by resurrecting the STALE pre-fill TBD — the manufacturer
+  // survives (fill's write) but the part_number reverts to TBD (restore's write from the
+  // old snapshot): a real pin is LOST to a later pass despite the restore mechanism's own
+  // purpose being to PREVENT exactly that loss. Re-snapshotting here makes the restore
+  // path field-level anti-regression-safe: it can only ever restore the MOST RECENT real
+  // identity, never an older placeholder. Universal — no class branch; a word fill never
+  // touched is byte-identical (still carries its pre-fill locked mods).
+  emitterIdentitySnapshot = snapshotEmitterIdentity(design.modules ?? [])
+  logAction({ step: 'emitter_identity_snapshot_post_fill', pinned_words: emitterIdentitySnapshot.pinnedWordCount })
 
   // ── Gate 24: Shared-Quantity Consistency Audit (exit 24, 2026-05-26, class-killer A) ──────────
   // Runs AFTER Phase 2 so we check the FINAL emitted state (Phase 2 can
@@ -7067,6 +7087,60 @@ async function main() {
   } catch (err) {
     console.error(`[chain] principal-equipment reconcile failed (non-fatal): ${(err as Error).message}`)
     logAction({ step: 'principal_equipment_reconcile', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── INJECTION-ORDERING fix (round-6 dissection, 2026-07-04): a bounded LATE fill
+  // sweep for words MINTED AFTER the main fillBlankWordMpns pass above. reconcile-
+  // PrincipalEquipment (just above) can RE-SYNTHESISE a missing principal (a real
+  // word the LLM dropped/renamed, e.g. "Ro High Pressure Pump" / "Gac Filter" —
+  // v76's ro_high_pressure_pump_synth_word / gac_filter_synth_word) via synthWord(),
+  // which stamps the honest placeholder part_number='TBD (detailed design)' — the
+  // SAME shape fillBlankWordMpns exists to resolve. But that principal fill pass
+  // already ran (line ~5612, BEFORE this reconcile), so a word born HERE never gets
+  // a fill attempt at all — not a mis-pin, a pass it was never offered. Confirmed on
+  // v76: reconcile minted 5 principals (Reverse Osmosis Skid, Ro High Pressure Pump,
+  // Gac Filter, Fresh Water Tank, Drain Water Tank); none appear anywhere in the
+  // fill-blank-mpn log. Re-invoking fillBlankWordMpns here is naturally SCOPED to
+  // exactly the late-minted words: its own candidate scan (isBlankOrPlaceholderMpn)
+  // skips every word the first pass already gave a real manufacturer + part_number,
+  // so a word attempted once and pinned is untouched (idempotent, no re-pin risk);
+  // only a word with NO prior fill attempt (blank at this point) is a candidate.
+  // Same DB-first-only default (skipGenerate) as the first pass — no added LLM cost
+  // on the common path. Skip via CHAIN_SKIP_BLANK_MPN_FILL=1 (mirrors the first pass).
+  if (process.env.CHAIN_SKIP_BLANK_MPN_FILL !== '1') {
+    try {
+      const tLateFill = Date.now()
+      const lateFill = await fillBlankWordMpns(
+        (state.moduleDecomposition?.modules ?? []) as any[],
+        currentProductClass ?? 'unknown',
+        {
+          designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? ''),
+          skipGenerate: process.env.CHAIN_BLANK_MPN_GENERATE !== '1',
+        },
+      )
+      if (lateFill.filled.length > 0) {
+        const dbN = lateFill.filled.filter((f) => f.source === 'db').length
+        const genN = lateFill.filled.filter((f) => f.source === 'generated').length
+        console.error(
+          `[chain] fill-blank-mpn (late sweep, post-reconcile): branded ${lateFill.filled.length}/${lateFill.candidates} ` +
+          `catalogue word(s) minted AFTER the first fill pass (${dbN} DB-first real MPN, ${genN} generated real-OEM)`,
+        )
+        // The re-snapshot (see the post-fill emitter-identity re-take above) already ran
+        // before this late sweep exists as a source of truth, so also refresh it here —
+        // a late-sweep pin must be exactly as protected from the strip/restore choke
+        // point as a first-pass pin (the same PIN-THEN-LOST guarantee, no second class).
+        emitterIdentitySnapshot = snapshotEmitterIdentity((state.moduleDecomposition?.modules ?? []) as any)
+      }
+      logAction({
+        step: 'fill_blank_word_mpns_late_sweep', filled_count: lateFill.filled.length, db_first: lateFill.filled.filter((f) => f.source === 'db').length,
+        generated: lateFill.filled.filter((f) => f.source === 'generated').length, skipped_structural: lateFill.skipped_structural,
+        candidates: lateFill.candidates, modules_mutated: lateFill.modulesMutated, filled: lateFill.filled,
+        class_name: currentProductClass ?? 'unknown', latency_ms: Date.now() - tLateFill,
+      })
+    } catch (err) {
+      console.error(`[chain] fill-blank-mpn late sweep skipped (non-fatal): ${(err as Error).message}`)
+      logAction({ step: 'fill_blank_word_mpns_late_sweep', ok: false, error: String(err).slice(0, 200) })
+    }
   }
 
   // UNIVERSAL process-topology fallback — the P&ID + BFD draw their flow graph from
@@ -9216,6 +9290,82 @@ async function main() {
   } catch (ferr) {
     console.error(`[chain] deterministic-finalize failed (non-fatal): ${(ferr as Error).message.slice(0, 140)}`)
     logAction({ step: 'deterministic_finalize', ok: false, error: String(ferr).slice(0, 160) })
+  }
+
+  // ── GHOST-SNAPSHOT fix (round-6 dissection, 2026-07-04): the BoM was assembled BEFORE
+  // dossier_repair / reconcile_hollow / deterministic_finalize ran — all three MUTATE the
+  // module tree (dedup, un-scatter, thin-sub-module merge) — so a word alive at assembly
+  // time (e.g. v76's motor_starter_word / vfd_drive_word / vfd_controller_word) can be
+  // folded/removed by any of them, yet `state.requirementsBom` + `state.partVerifications`
+  // are never re-derived afterward: they still carry a fully-priced NOT-FOUND requirement
+  // line for a word the FINAL tree doesn't have (X-107/INV-1/INV-2 on v76 — a snapshot
+  // stamped by Engine B/C up to tens of seconds AFTER `state.savedAt`, containing words the
+  // duplicate-fold already decided the fate of). PRUNE `state.partVerifications` against the
+  // FINAL, fully-settled tree, then RE-RUN the SAME requirements_bom.py assembler (its
+  // row-walk is entirely module-tree-driven — a word absent from the tree emits no row, so
+  // a clean re-run is byte-correct by construction) and RE-RUN dossier_repair.py once more
+  // so the fresh, ghost-free rows keep their tags/dedup. Both re-invocations are the exact
+  // same idempotent tools already used earlier in the chain — this is a repeat call on
+  // settled state, not new logic. Non-fatal: a failure leaves the (stale but rendered)
+  // pre-existing requirementsBom in place, same as before this fix existed.
+  try {
+    const finalState = JSON.parse(readFileSync(statePath, 'utf8'))
+    const finalWordIds = new Set<string>()
+    for (const m of finalState.moduleDecomposition?.modules ?? []) {
+      for (const sm of m?.sub_modules ?? []) {
+        for (const w of sm?.words ?? []) {
+          const wid = String(w?.id ?? w?.word_id ?? '')
+          if (wid) finalWordIds.add(wid)
+        }
+      }
+    }
+    const pvBefore = Array.isArray(finalState.partVerifications) ? finalState.partVerifications.length : 0
+    const rbBefore = Array.isArray(finalState.requirementsBom) ? finalState.requirementsBom.length : 0
+    let pvPruned = 0
+    if (Array.isArray(finalState.partVerifications)) {
+      const kept = finalState.partVerifications.filter((pv: any) => {
+        const wid = String(pv?.word_id ?? pv?.id ?? '')
+        // Keep an entry with no resolvable word_id (defensive — never drop on ambiguity)
+        // or one whose word_id still exists in the settled tree; drop a genuine ghost.
+        return !wid || finalWordIds.has(wid)
+      })
+      pvPruned = finalState.partVerifications.length - kept.length
+      if (pvPruned > 0) finalState.partVerifications = kept
+    }
+    if (pvPruned > 0) {
+      console.error(`[chain] ghost-snapshot prune: removed ${pvPruned}/${pvBefore} partVerifications entr${pvPruned === 1 ? 'y' : 'ies'} for word(s) no longer in the final tree`)
+    }
+    // Re-derive UNCONDITIONALLY, not only when a partVerifications ghost was pruned — a word
+    // can be folded/removed by dossier_repair/reconcile_hollow/deterministic_finalize without
+    // ever having carried a partVerifications entry (e.g. a structural word never LLM-verified),
+    // and its requirementsBom row would still be a ghost. requirements_bom.py's row-walk reads
+    // straight off state.moduleDecomposition.modules, so a clean re-run is byte-correct by
+    // construction regardless of which mechanism removed the word.
+    writeFileSync(statePath, JSON.stringify(finalState, null, 2))
+    const reqPyLate = resolve(__dirname, 'requirements_bom.py')
+    const reqVenvLate = resolve(__dirname, '..', '.venv', 'bin', 'python')
+    const reqBinLate = existsSync(reqVenvLate) ? reqVenvLate : 'python3'
+    const reqOutLate = execFileSync(reqBinLate, [reqPyLate, outDir, '--json'], { encoding: 'utf8', cwd: resolve(__dirname, '..'), maxBuffer: 16 * 1024 * 1024 })
+    const reqRowsLate = JSON.parse(reqOutLate)
+    const stLate = JSON.parse(readFileSync(statePath, 'utf8'))
+    const rbAfter = Array.isArray(reqRowsLate) ? reqRowsLate.length : 0
+    if (Array.isArray(reqRowsLate)) stLate.requirementsBom = reqRowsLate
+    writeFileSync(statePath, JSON.stringify(stLate, null, 2))
+    console.error(`[chain] ghost-snapshot re-derive: requirementsBom ${rbBefore} → ${rbAfter} row(s) on the FINAL settled tree (pruned ${pvPruned} stale partVerifications entr${pvPruned === 1 ? 'y' : 'ies'})`)
+    logAction({ step: 'ghost_snapshot_prune_and_rederive', ok: true, part_verifications_pruned: pvPruned, part_verifications_before: pvBefore, requirements_bom_before: rbBefore, requirements_bom_after: rbAfter })
+    // Re-run dossier_repair once more on the freshly-derived rows so tags / by-function-
+    // duplicate merges / £0-sibling pricing still apply — same idempotent tool, safe to repeat.
+    try {
+      execFileSync('python3', [resolve(__dirname, 'lib', 'dossier_repair.py'), outDir],
+        { stdio: 'inherit', timeout: 120_000 })
+      logAction({ step: 'dossier_repair_post_ghost_prune', ok: true })
+    } catch (rerr2) {
+      console.error(`[chain] dossier-repair (post ghost-prune) failed (non-fatal): ${(rerr2 as Error).message.slice(0, 140)}`)
+      logAction({ step: 'dossier_repair_post_ghost_prune', ok: false, error: String(rerr2).slice(0, 160) })
+    }
+  } catch (gerr) {
+    console.error(`[chain] ghost-snapshot prune/re-derive failed (non-fatal): ${(gerr as Error).message.slice(0, 160)}`)
+    logAction({ step: 'ghost_snapshot_prune_and_rederive', ok: false, error: String(gerr).slice(0, 200) })
   }
 
   // ── TRACEABILITY SPINE (Tristan 2026-06-25: "every number should come from some original
