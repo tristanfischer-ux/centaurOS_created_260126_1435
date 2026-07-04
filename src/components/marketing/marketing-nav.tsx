@@ -93,7 +93,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                 <div className="hidden items-center gap-3 md:flex">
                     {isAuthed ? (
                         <Link href="/investors">
-                            <Button size="sm" className="gap-1.5">
+                            <Button size="sm" className="gap-1.5 bg-international-orange text-white hover:bg-international-orange-hover">
                                 Open app
                                 <ArrowRight className="h-3.5 w-3.5" />
                             </Button>
@@ -106,7 +106,7 @@ export function MarketingNav({ isAuthed = false }: MarketingNavProps = {}) {
                                 </Button>
                             </Link>
                             <Link href="/brief">
-                                <Button size="sm" className="gap-1.5">
+                                <Button size="sm" className="gap-1.5 bg-international-orange text-white hover:bg-international-orange-hover">
                                     Work with us
                                     <ArrowRight className="h-3.5 w-3.5" />
                                 </Button>

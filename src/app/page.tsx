@@ -54,6 +54,25 @@ const HTML = `<style>
   .hero-trust{margin-top:18px;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px;}
   .dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;}
 
+  .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center;}
+  .hero-copy .sub{max-width:52ch;}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr;} .hero-visual{display:none;} }
+  .wb{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .wb-top{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--line);font-weight:800;font-size:14px;color:var(--ink);}
+  .wb-top .flame{width:20px;height:20px;border-radius:6px;}
+  .wb-file{margin-left:auto;color:var(--muted);font-weight:600;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .wb-tabs{display:flex;gap:6px;padding:11px 14px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .wb-tab{font-size:11px;padding:4px 9px;border-radius:6px;color:var(--muted);background:#fff;border:1px solid var(--line);}
+  .wb-tab.on{color:var(--ember-dark);background:var(--ember-soft);border-color:transparent;font-weight:700;}
+  .wb-row{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;font-size:13.5px;border-bottom:1px solid var(--surface-2);}
+  .wb-row span{color:var(--ink-soft);}
+  .wb-row b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  .wb-row.total{border-top:2px solid var(--line);border-bottom:none;}
+  .wb-row.total span{font-weight:800;color:var(--ink);}
+  .wb-row.total b{color:var(--ember);font-weight:800;}
+  .wb-foot{padding:11px 16px;font-size:11.5px;color:var(--muted);background:var(--surface);border-top:1px solid var(--line);display:flex;align-items:center;gap:7px;}
+  .wb-foot .dot{background:var(--ember);}
+
   section.s{padding:72px 0;}
   .s-head{max-width:64ch;}
   .s-head h2{margin-bottom:14px;}
@@ -198,15 +217,31 @@ const HTML = `<style>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="wrap">
-    <span class="eyebrow">For deep-tech &amp; hardware founders</span>
-    <h1>The front end for hardware. Get funded &mdash; and built.</h1>
-    <p class="sub">Fractional Forge helps deep-tech and hardware founders get funded &mdash; and built. We bring the commercial strategy, the capital, and a curated network of Europe&rsquo;s best manufacturing and design partners &mdash; so you can run like a software company instead of drowning in engineering and manufacturing.</p>
-    <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="/brief">Work with us</a>
-      <a class="btn btn-ghost btn-lg" href="#partners">Become a build partner</a>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">For deep-tech &amp; hardware founders</span>
+      <h1>The front end for hardware. Get funded &mdash; and built.</h1>
+      <p class="sub">Fractional Forge helps deep-tech and hardware founders get funded &mdash; and built. We bring the commercial strategy, the capital, and a curated network of Europe&rsquo;s best manufacturing and design partners &mdash; so you can run like a software company instead of drowning in engineering and manufacturing.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="/brief">Work with us</a>
+        <a class="btn btn-ghost btn-lg" href="#partners">Become a build partner</a>
+      </div>
+      <p class="hero-trust"><span class="dot"></span> Strategy and capital up front, a curated build network behind you &mdash; and your first Design Dossier free.</p>
     </div>
-    <p class="hero-trust"><span class="dot"></span> Strategy and capital up front, a curated build network behind you &mdash; and your first Design Dossier free.</p>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="wb">
+        <div class="wb-top"><span class="flame"></span> Design Dossier <span class="wb-file">water-treatment.xlsx</span></div>
+        <div class="wb-tabs"><span class="wb-tab on">Cost waterfall</span><span class="wb-tab">Financial model</span><span class="wb-tab">BoM ledger</span><span class="wb-tab">Drawings</span></div>
+        <div class="wb-rows">
+          <div class="wb-row"><span>Reverse-osmosis skid</span><b>&pound;86,198</b></div>
+          <div class="wb-row"><span>Storage &amp; tanks</span><b>&pound;40,845</b></div>
+          <div class="wb-row"><span>Controls &amp; instrumentation</span><b>&pound;206,365</b></div>
+          <div class="wb-row"><span>Pipework &amp; distribution</span><b>&pound;11,985</b></div>
+          <div class="wb-row total"><span>Total installed</span><b>&pound;1.39M</b></div>
+        </div>
+        <div class="wb-foot"><span class="dot"></span> Every number is a live formula &middot; engineer-checked</div>
+      </div>
+    </div>
   </div>
 </section>
 
