@@ -24,7 +24,7 @@ const EXAMPLE_XLSX =
 export const metadata: Metadata = {
   title: "What does an industrial water-treatment plant cost to build?",
   description:
-    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.38M installed. Every number from a real, engineer-checked Design Dossier you can download and check.",
+    "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed. Every number from a real, engineer-checked Design Dossier you can download and check.",
   alternates: { canonical: "https://fractionalforge.app/cost/water-treatment-plant" },
 }
 
@@ -32,29 +32,29 @@ const SECTIONS = [
   {
     name: "Water purification",
     covers: "Reverse osmosis, ultrafiltration, granular-activated-carbon and softening trains",
-    cost: "£199,000",
+    cost: "£175,000",
   },
   {
     name: "Controls & instrumentation",
     covers: "SCADA / process-control system plus plant-wide field instrumentation and cabling",
-    cost: "£206,000",
+    cost: "£239,000",
   },
   {
     name: "Storage & tanks",
     covers: "Galvanised process and buffer tanks with level instrumentation",
-    cost: "£74,000",
+    cost: "£77,000",
   },
   {
     name: "Process equipment, dosing & distribution",
     covers: "Fertigation dosing, flood-and-drain (ebb/flow) distribution, pumps, pipework, drain-water recovery and the hand-watering ring main",
-    cost: "≈ £900,000",
+    cost: "≈ £870,000",
   },
 ]
 
 const FAQ = [
   {
     q: "How much does an industrial water-treatment plant cost to build?",
-    a: "For this worked example — a water-handling, purification and fertigation plant supplying a large indoor cultivation facility — the installed cost is around £1.38 million. The single biggest cost centres are the controls and instrumentation (~£206k) and the purification train (~£199k). Your figure depends on flow rate, water quality, the treatment steps you need and how much of the plant is duplicated for resilience.",
+    a: "For this worked example — a water-handling, purification and fertigation plant supplying a large indoor cultivation facility — the installed cost is around £1.36 million. The single biggest cost centres are the controls and instrumentation (~£239k) and the purification train (~£175k). Your figure depends on flow rate, water quality, the treatment steps you need and how much of the plant is duplicated for resilience.",
   },
   {
     q: "What's included in that number?",
@@ -78,7 +78,7 @@ export default function WaterTreatmentCostPage() {
         "@type": "Article",
         headline: "What does an industrial water-treatment plant cost to build?",
         description:
-          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.38M installed — from a real, engineer-checked Design Dossier.",
+          "A worked cost breakdown for an industrial water-handling, purification and fertigation plant — around £1.36M installed — from a real, engineer-checked Design Dossier.",
         author: { "@id": "https://fractionalforge.app/#tristan-fischer" },
         publisher: { "@id": "https://fractionalforge.app/#organization" },
         mainEntityOfPage: "https://fractionalforge.app/cost/water-treatment-plant",
@@ -119,7 +119,7 @@ export default function WaterTreatmentCostPage() {
             </p>
             <div className="flex flex-wrap items-baseline gap-3 pt-2">
               <span className="text-4xl sm:text-5xl font-bold text-international-orange tabular-nums">
-                ≈ £1.38M
+                ≈ £1.36M
               </span>
               <span className="text-muted-foreground">installed, for this example plant</span>
             </div>
@@ -143,7 +143,7 @@ export default function WaterTreatmentCostPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/site/dossier-exec.webp"
-                alt="The Design Dossier's Executive Summary tab — 90 cubic metres per hour, £1,375,105 installed, ship verdict"
+                alt="The Design Dossier's Executive Summary tab — 45 cubic metres per hour, £1,360,613 installed, ship verdict"
                 className="w-full rounded-xl border border-border shadow-sm bg-white"
                 loading="lazy"
               />
@@ -180,7 +180,7 @@ export default function WaterTreatmentCostPage() {
                   <div className="flex items-center gap-4 px-5 py-4 bg-muted/40">
                     <p className="flex-1 font-bold text-foreground">Total installed</p>
                     <p className="font-bold text-international-orange tabular-nums text-lg">
-                      ≈ £1.38M
+                      ≈ £1.36M
                     </p>
                   </div>
                 </div>

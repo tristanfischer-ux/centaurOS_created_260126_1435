@@ -212,7 +212,7 @@ export default function InsightsPage() {
                 { href: "/guides/how-to-cost-a-hardware-bill-of-materials", img: "/images/insights/guide-how-to-cost-a-hardware-bill-of-materials.webp", title: "How to cost a hardware bill of materials", hook: "Unit vs volume pricing, and the costs founders always miss." },
                 { href: "/guides/how-to-get-a-hardware-startup-investor-ready", img: "/images/insights/guide-how-to-get-a-hardware-startup-investor-ready.webp", title: "How to get a hardware startup investor-ready", hook: "What hardware investors actually check — and why they pass." },
                 { href: "/guides/design-for-manufacture-explained", img: "/images/insights/guide-design-for-manufacture-explained.webp", title: "Design for manufacture, explained", hook: "What DFM is, why it matters early, and how it saves cost." },
-                { href: "/cost/water-treatment-plant", img: "/images/site/dossier-render.webp", title: "What an industrial water-treatment plant costs to build", hook: "A worked £1.38M breakdown from a real, auditable model." },
+                { href: "/cost/water-treatment-plant", img: "/images/site/dossier-render.webp", title: "What an industrial water-treatment plant costs to build", hook: "A worked £1.36M breakdown from a real, auditable model." },
               ].map((g) => (
                 <Link key={g.href} href={g.href} className="group">
                   <Card className="h-full overflow-hidden transition-colors hover:border-international-orange/40">

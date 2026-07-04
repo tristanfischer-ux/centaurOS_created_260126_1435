@@ -20,7 +20,7 @@ Human-curated, not self-serve. A founder describes their idea in a short brief (
 - Start a brief (first dossier free): https://fractionalforge.app/brief
 - The founder's story: https://fractionalforge.app/story
 - Insights (essays on hardware, manufacturing & the physical economy): https://fractionalforge.app/insights
-- Cost guide — what an industrial water-treatment plant costs to build (~£1.39M, worked breakdown from a real engineer-checked model): https://fractionalforge.app/cost/water-treatment-plant
+- Cost guide — what an industrial water-treatment plant costs to build (~£1.36M, worked breakdown from a real engineer-checked model): https://fractionalforge.app/cost/water-treatment-plant
 - About: https://fractionalforge.app/about
 - Pricing: https://fractionalforge.app/pricing
 - Example engineering package: https://fractionalforge.app/sample-package
