@@ -175,7 +175,18 @@ function findMatchingBomWord(claim: NumericClaim, bom: BomWordQty[]): BomWordQty
   // ambiguous (every valve/pump/tank matches "valve"/"pump"/"tank"). A confident match needs a
   // DISTINGUISHING (qualifier) token too — "actuated_distribution_valve_count" must land on the
   // word sharing "actuated", not just any "valve".
-  const GENERIC_HEADS = new Set(['valve', 'valves', 'pump', 'tank', 'filter', 'vessel', 'sensor', 'transmitter', 'motor', 'fan', 'blower', 'cable', 'pipe', 'unit', 'module', 'board', 'switch', 'meter'])
+  // 2026-07-04 fischer-codema v74 FALSE JOIN fix (gate 12 itself, the f9dfc2918 substring family):
+  // "riser" is a bare pipe-fitting noun shared by UNRELATED families (a zoned-distribution DN125
+  // riser vs a hand-watering tap-station riser) exactly like "valve"/"pump"/"tank" above — it was
+  // missing from this list, so `hand_watering_riser_count` (44, an engineered allowance with no
+  // matching BoM word) name-substring-matched `dn125_riser_word` (×200, the zoned-distribution
+  // riser family minted by rule 8) purely on the shared bare noun "riser", manufacturing a 78%
+  // drift between two unrelated quantities. Adding "riser" here means a claim sharing ONLY "riser"
+  // (no qualifier overlap) is correctly left unmatched — the honest outcome for an allowance value
+  // with no BoM word — while a claim that ALSO shares a distinguishing qualifier with a riser word
+  // (e.g. "zone" in `zone_riser_count` vs `zone_riser_word`) still matches and still catches a
+  // genuine drift.
+  const GENERIC_HEADS = new Set(['valve', 'valves', 'pump', 'tank', 'filter', 'vessel', 'sensor', 'transmitter', 'motor', 'fan', 'blower', 'cable', 'pipe', 'riser', 'unit', 'module', 'board', 'switch', 'meter'])
   // The claim's BASE tokens = the longest (most-specific) search term, singularised.
   const baseTerm = claim.noun_search_terms.reduce((a, b) => (b.split(/[\s_]+/).length > a.split(/[\s_]+/).length ? b : a), '')
   const baseToks = baseTerm.split(/[\s_]+/).map(sing).filter(Boolean)

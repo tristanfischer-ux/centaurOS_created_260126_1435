@@ -8,6 +8,14 @@
 // design failed to ship. THE FIX: singular/plural-insensitive tokens + score by the COUNT of shared
 // base tokens (the more-qualified word wins) + reject a multi-token claim that shares ONLY a generic
 // head noun (ambiguous → advisory unmatched, never a HIGH). This guard fails the build on regression.
+//
+// 2026-07-04 SECOND false join (fischer-codema v74, the same f9dfc2918 substring family, this time
+// IN THE GATE ITSELF): `hand_watering_riser_count` (44, an engineered allowance priced only as a
+// Python requirements_bom.py row — no moduleDecomposition word) bound to `dn125_riser_word` (×200,
+// the UNRELATED zoned-distribution riser family) on the shared bare noun "riser", which was missing
+// from GENERIC_HEADS. Test 5 proves the false join is gone (advisory-unmatched); test 6 proves a
+// GENUINE drift inside a riser family that shares a real qualifier ("zone") still fires HIGH — the
+// fix must not blind the gate to real riser-family drift, only to the bare-noun coincidence.
 
 import { detectNumericDrift } from './numeric-claim-drift-detector'
 
@@ -53,8 +61,33 @@ function run() {
     throw new Error('numeric-drift-matcher: rack_count=12 vs "Battery Racks" ×12 must be 0 drift (plural-insensitive)')
   }
 
+  // 5. THE fischer-codema v74 FALSE JOIN (2026-07-04, gate 12 itself, the f9dfc2918 substring
+  //    family): `hand_watering_riser_count` (44, an engineered allowance with NO matching BoM
+  //    word — it prices as a Python requirements_bom.py row, never a moduleDecomposition word)
+  //    must NOT bind to `dn125_riser_word` (×200, the UNRELATED zoned-distribution riser family
+  //    minted by rule 8) on the shared bare noun "riser" alone. Must stay advisory-unmatched.
+  const s5 = state(
+    { hand_watering_riser_count: 44 },
+    [word('dn125_riser_word', 'DN125 PVC Riser', 200)],
+  )
+  const r5 = detectNumericDrift(s5)
+  if (r5.findings.length !== 0) {
+    throw new Error(`numeric-drift-matcher: hand_watering_riser_count=44 must NOT false-join "DN125 PVC Riser" (×200, a different riser family) on the bare noun "riser": ${JSON.stringify(r5.findings)}`)
+  }
+  if (!r5.unmatched_contract_quantities.includes('hand_watering_riser_count')) {
+    throw new Error('numeric-drift-matcher: hand_watering_riser_count with no qualified BoM word must report as unmatched (advisory), not silently disappear')
+  }
+
+  // 6. COUNTER-CASE for fix #5 — "riser" joining GENERIC_HEADS must not blind the gate to a
+  //    GENUINE drift within a riser family that shares a real DISTINGUISHING qualifier ("zone").
+  //    zone_riser_count=300 vs "Zone Riser" ×200 is a real 33% drift and must still fire HIGH.
+  const s6 = state({ zone_riser_count: 300 }, [word('zone_riser_word', 'Zone Riser', 200)])
+  if (!detectNumericDrift(s6).findings.some((f) => f.severity === 'HIGH')) {
+    throw new Error('numeric-drift-matcher: zone_riser_count=300 vs "Zone Riser" ×200 (qualifier "zone" shared) is a genuine drift and must still be flagged HIGH — "riser" joining GENERIC_HEADS must not over-suppress a qualified match')
+  }
+
   // eslint-disable-next-line no-console
-  console.log('numeric-drift-matcher --selftest OK (200 actuated valves no false-drift onto a ×2 suction valve; generic-head-only = advisory; real 313→165 drift still HIGH; plural matched)')
+  console.log('numeric-drift-matcher --selftest OK (200 actuated valves no false-drift onto a ×2 suction valve; generic-head-only = advisory; real 313→165 drift still HIGH; plural matched; v74 hand-watering/DN125-riser false join fixed; qualified zone-riser drift still HIGH)')
 }
 
 run()
