@@ -769,6 +769,129 @@ const PARTS: VerifiedPart[] = [
     unit_price_gbp: null,
     upgrade: true,
   },
+  // ═══ ROUND 6 (2026-07-04, v76 catalogue-tail sweep, dd0564b74 baseline) —
+  //     regenerated parts-ledger.json against v76's own state.json first (the
+  //     "two levers" commit already cut true not-founds 27→12). Calibrated
+  //     against the REAL exported fillBlankWordMpns (a scratch-DB harness
+  //     copy, `/private/tmp/.../scratch-forge-truth.db`; the live DB touched
+  //     ONLY for this one genuinely-new row, below) using v76's OWN words
+  //     (id + content_character + modifier_characters extracted verbatim from
+  //     out/fischer-codema-v76/state.json). FINDINGS on the 12 live true
+  //     not-founds (X-107 Motor Starter, INV-1 Vfd Drive, INV-2 Vfd
+  //     Controller, V-103 Gac Softener, P-101 Ro High Pressure Pump, V-101
+  //     Gac Filter, X-116 Modbus Interface, X-125 Pneumatic Actuated Valves,
+  //     V-108 Pneumatic Control Valve, TX-101 Transformer, V-109 Pressure
+  //     Relief Valve, X-139 Overcurrent Protection):
+  //       (1) GHOST BOM LINES, no ingest possible (X-107/INV-1/INV-2): the
+  //           words with character_id motor_starter/vfd_drive/vfd_controller
+  //           (module power_distribution::electrical_control_panel) do NOT
+  //           exist ANYWHERE in v76's live moduleDecomposition.modules tree —
+  //           confirmed by walking the whole power_distribution module (11
+  //           other words present, these three absent). partVerifications /
+  //           costBasis.lines still carry them (generated_at
+  //           2026-07-04T14:42:46Z by estimate-missing-prices.tsx, 38s AFTER
+  //           state.savedAt 14:42:08Z) — a stale downstream BoM-line snapshot
+  //           for a word the design tree no longer contains, so
+  //           requirements_bom.py renders a line with literally zero duty
+  //           evidence to size a drive against. universal-contract-sizing.ts's
+  //           deriveDutylessDriveWords (round-3, 4cf5f3d9b) is BUILT for
+  //           exactly this "no driven-motor evidence in the module" case and
+  //           would correctly decline to guess even if the word still
+  //           existed. No DB row can fix a line with no live word — routed,
+  //           not forced, per the mandate.
+  //       (2) PIN-THEN-LOST (X-125/V-108/V-109, 3 of 12 — the single highest-
+  //           leverage lever available, ZERO new data needed): the v76 RUN'S
+  //           OWN LOG (out-fischer-codema-v76.log) shows fill-blank-mpn
+  //           SUCCESSFULLY pinning all three mid-run — "✓ DB
+  //           actuation_kinematics::actuation_kinematics__solenoid_valves
+  //           (Pneumatic Actuated Valves) → Bürkert Type 2000",
+  //           "✓ DB …__solenoid_valve (Pneumatic Control Valve) → Bürkert
+  //           Type 2301", "✓ DB safety_protection::…__pressure_relief_valve
+  //           (Pressure Relief Valve) → Goetze Series 851" — yet the
+  //           PERSISTED state.json / parts-ledger show all three back at
+  //           part_number 'TBD (detailed design)' while `manufacturer`
+  //           (Bürkert / Goetze) survives. A downstream stage between
+  //           fill-blank-mpn and state persistence strips part_number only
+  //           (never touches manufacturer) for at least these three words.
+  //           Reproduced independently on today's scratch-DB calibration
+  //           (isolated single-word fillBlankWordMpns re-run pins all three
+  //           cleanly again — the DB rows and the matcher are both correct;
+  //           the persistence path is the bug). NOT a catalogue gap — no
+  //           ingest possible or needed; routed as an engine finding (report
+  //           only, no engine edit this round).
+  //       (3) LATENT-BUT-UNREACHABLE physics-derived words (V-103/P-101/V-101/
+  //           TX-101, 4 of 12): all four carry `_synthesized: true`
+  //           (generic-emitter's physics-derived-equipment pass). Calibrated
+  //           in isolation against TODAY's DB, all four pin cleanly (Gac
+  //           Softener → a distinct real GAC-softener row once the sub_module's
+  //           OTHER word 'Softener Vessel' — a duplicate representation of the
+  //           SAME physical vessel — is excluded; Ro High Pressure Pump →
+  //           Grundfos 96502039; Gac Filter → General Carbon HP-1000;
+  //           Transformer → Hammond Power Solutions SG3A0075KB), proving the
+  //           DB has zero coverage gap here. But the v76 log shows 'Ro High
+  //           Pressure Pump' / 'Gac Filter' / 'Transformer' NEVER even
+  //           attempted by fill-blank-mpn (no skip/retry/miss/success line at
+  //           all) despite 'transformer' being named in the SAME early
+  //           synthesis batch (line 70) as 'Gac Softener' (which DID get a
+  //           candidate attempt — a retry against 'Softener Vessel's
+  //           duplicate claim). Root cause not fully isolated (candidate:
+  //           the physics-derived-equipment word-injection into
+  //           moduleDecomposition happens in two passes, one before and one
+  //           after fill-blank-mpn's single tree-walk) — routed, not fixed
+  //           this round; no ingest needed, the DB is already correct.
+  //       (4) Modbus Interface (X-116) stays an HONEST MISS in the real run
+  //           (best candidate HMS Networks AB7072-B fails
+  //           dbHitAcceptableForWord's qualifier-coherence check — same
+  //           finding as round 5 #4, still present) but a TODAY calibration
+  //           projects a Siemens 6ES7241-1CH32-0XB0 pin instead (both rows
+  //           pre-date the v76 run, so this is a ranking/DB-growth effect
+  //           between duplicate rows, not a guaranteed re-run outcome) —
+  //           reported as a possible improvement, NOT claimed as fixed; no
+  //           new ingest (round 5 already upgraded the Siemens/Moxa wording).
+  //       (5) Overcurrent Protection (X-139) — the ONE genuine catalogue gap
+  //           left standing (isolated calibration: zero DB candidates at all,
+  //           confirming the ledger's own basis 'bottom-up parametric' with
+  //           no pinned identity). Filled below with a duty-matched MCCB
+  //           (TX-101's 75 kVA transformer secondary FLC ≈108 A at 400 V
+  //           3-phase → next standard MCCB frame, 125-160 A).
+  //       (6) V-107/V-108/V-109 valve trio (orphan analysis): V-107 Solenoid
+  //           Valve is already IDENTIFIED (Sensata/Cynergy3 SOL7A4, confirmed
+  //           real — 20+ distributor rows) and stays a connectivity orphan
+  //           only (no host tie anywhere — a routing gap, not a catalogue
+  //           gap, per dd0564b74's own note: "V-107 has NO host signal
+  //           anywhere"). V-108/V-109 are the pin-then-lost bug (2) above —
+  //           BOTH already pin to real, duty-coherent, family-correct parts
+  //           already in the DB (Bürkert Type 2301 2-way globe control valve
+  //           DN10-100; Goetze Series 851 spring-loaded relief valve
+  //           DN15-50) on today's calibrated dry-run. No new valve ingest
+  //           needed — the DB fill from round 5 already covers this trio.
+  //       (7) REGRESSION CHECK (round 4-5 fills + the Toray UF pin): spot-
+  //           verified against TODAY's DB + the real matcher. High Pressure
+  //           Switch still resolves IDENTIFIED (Danfoss KPS39, round 5) —
+  //           confirmed live in v76's own parts-ledger (I-112). The Toray
+  //           HFU-2020AN UF module row (id 46764) is present, well-formed,
+  //           and would satisfy requirements_bom.py's _membrane_pin_is_real
+  //           identity check IF a real part_number ever reached the word —
+  //           but isCatalogueComponent (emitter-completion.ts) has NO
+  //           catalogue token for 'membrane'/'ultrafiltration'/'module' (only
+  //           a qualifier-gated bare 'module'), so 'Ultrafiltration Module' /
+  //           'Uf Module Bank' / 'Uf Membrane Bank' are ALL skipped as
+  //           structural by fill-blank-mpn BEFORE dbFirstLookup ever runs —
+  //           confirmed on today's isolated calibration ("skipped_structural:
+  //           3"). The round-5 Toray fill is real and un-regressed, but has
+  //           NEVER been reachable via this path for v76's own membrane
+  //           wording — masked by the honest ARCHITECTURALLY-EXCLUDED bucket
+  //           (0 score impact today), routed as a lexicon gap for a future
+  //           round (add a qualified 'membrane'/'ultrafiltration' head to
+  //           CATALOGUE_TOKEN_SET / QUALIFIER_GATED_HEADS), not fixed here.
+  // ── Electrical protection ────────────────────────────────────────────────────
+  {
+    part_name: 'Overcurrent protection — Compact NSX160F moulded-case circuit breaker, TMD thermal-magnetic trip, 160 A, 3-pole, 36 kA',
+    manufacturer: 'Schneider Electric', part_number: 'LV430630',
+    desc: 'Schneider Electric ComPacT NSX160F MCCB, 160 A, 3-pole 3d, 36 kA breaking capacity at 380/415 V AC (IEC 60947-2), TMD thermal-magnetic adjustable trip unit, 690 V AC max operational, fixed mounting. Indicative main overcurrent-protection device sized above the plant transformer secondary full-load current (75 kVA / 400 V 3-phase ≈ 108 A) with standard margin. USD 611.92 (nsxbreakers.com); no GBP-quoted page found.',
+    src: 'https://nsxbreakers.com/compact-nsx/102/lv430630-square-d-schneider-electric.html',
+    unit_price_gbp: null,
+  },
 ]
 
 // ── VERIFIED NO-PUBLIC-MPN FINDINGS (2026-07-04, routed follow-on #2 to the
