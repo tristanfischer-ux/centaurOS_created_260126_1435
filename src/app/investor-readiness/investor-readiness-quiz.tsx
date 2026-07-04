@@ -85,25 +85,25 @@ function getTier(score: number): { label: string; color: string; icon: React.Rea
     label: "Investor Ready",
     color: "text-emerald-600",
     icon: <Zap className="size-5" />,
-    description: "Your fundamentals are strong. Focus on tightening your deck and identifying the right investors for your stage.",
+    description: "Your fundamentals are strong. Tighten the deck — and we can introduce you to the investors most likely to back a product like yours, on an introducer / success-fee basis (no raise, no fee).",
   }
   if (score >= 55) return {
     label: "Getting There",
     color: "text-blue-600",
     icon: <TrendingUp className="size-5" />,
-    description: "You have solid foundations but a few gaps to address before institutional investors will move fast.",
+    description: "Solid foundations, with a few gaps before institutional investors move fast. A senior-engineer-checked Design Dossier answers the manufacturing and cost questions they will ask first.",
   }
   if (score >= 35) return {
     label: "Early Stage",
     color: "text-amber-600",
     icon: <Target className="size-5" />,
-    description: "You're building in the right direction. Focus on de-risking manufacturing and landing your first paying customer.",
+    description: "You're building in the right direction. A free Design Dossier de-risks the manufacturing and the numbers — and from there we help you get built and reach the right capital.",
   }
   return {
     label: "Not Yet",
     color: "text-red-500",
     icon: <AlertTriangle className="size-5" />,
-    description: "Most investors will pass at this stage. That's normal. Focus on proof of concept before approaching VCs.",
+    description: "Early — and that's normal. Start with a free Design Dossier to pin down what it actually takes to build your idea, before you spend on prototypes or pitch investors.",
   }
 }
 
@@ -298,10 +298,10 @@ export function InvestorReadinessQuiz() {
 
             {/* CTA */}
             <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-background p-6 text-center">
-              <p className="mb-1 font-semibold text-foreground">ForgeOS helps you close these gaps fast</p>
-              <p className="mb-4 text-sm text-muted-foreground">CAD Lab, AI specialists, and 18,000+ UK manufacturers — everything you need to get investor-ready.</p>
+              <p className="mb-1 font-semibold text-foreground">Fractional Forge helps you close these gaps</p>
+              <p className="mb-4 text-sm text-muted-foreground">A senior operator, an auditable Design Dossier, and a curated network of engineering and manufacturing partners — so you get funded and built. Your first Dossier is free.</p>
               <Button asChild size="lg" className="gap-2 bg-[#ff4500] text-white hover:bg-[#e03d00]">
-                <Link href="/signup">Start free trial <ArrowRight className="size-4" /></Link>
+                <Link href="/brief">Start a brief <ArrowRight className="size-4" /></Link>
               </Button>
               {submitted && (
                 <p className="mt-3 text-xs text-muted-foreground">Results sent to {email}</p>
