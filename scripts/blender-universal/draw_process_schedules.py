@@ -1158,12 +1158,28 @@ def build_valve_list(proc, schedule: dict, state: dict, line_rows) -> list[Valve
 # ═══════════════════════════════════════════════════════════════════════════
 
 # (regex, ISA letters, measured variable, sensing-type hint).  Order: specific → generic.
+# 2026-07-05 BESS process-schedules coverage pass: two real field instruments in the BESS
+# design carried a `content_character.character_id` no existing pattern recognised — the
+# words fell through EVERY _INSTR_KINDS regex and never became a schedule row (the design
+# itself has them; this was a matcher gap, not a missing part):
+#   `pressure_transducer` ("pressure transducer", the coolant-loop instrument, BoM X-43) —
+#   the PT pattern only knew '..._transmitter'/'..._sensor'/'..._gauge' synonyms, never
+#   'transducer'. Scoped to `pressure_transducer` specifically (NOT a bare '\btransducer\b')
+#   so this does not also swallow `current_transducer` — an ELECTRICAL/BMS parameter that
+#   belongs on the single-line diagram as a protection callout, not a process-ISA row.
+#   `gas_sensor` ("gas sensor", the atmosphere/off-gas detection instrument, BoM I-8, ×13) —
+#   the AT pattern's gas-detection alternatives (gas_analys/co2_analys) never matched the
+#   design's actual cid. Scoped to the exact `\bgas_sensor\b` token (word-boundary after
+#   the 'r' — underscore is a \w char, so this does NOT match 'gas_sensor_mount' /
+#   'gas_sensor_label', the accessory/labelling rows for the SAME 13 physical sensors, nor
+#   'gas_detector_controller', a control-panel word, not a field instrument).
 _INSTR_KINDS = [
     (re.compile(r"\bph\b|ph_probe|ph_electrode|liquiline.*ph|\bph/", re.I),
      "AT", "pH / conductivity", "Memosens electrode"),
     (re.compile(r"\borp\b|redox", re.I),
      "AT", "Redox (ORP)", "Pt ORP electrode"),
-    (re.compile(r"analy[sz]er|ndir|gas_analys|co2_analys|composition|chromatograph", re.I),
+    (re.compile(r"analy[sz]er|ndir|gas_analys|co2_analys|composition|chromatograph|"
+                r"\bgas_sensor\b", re.I),
      "AT", "Composition", "NDIR analyser"),
     (re.compile(r"instr_level|level_transmitter|level[_\s]?transmitter|radar_level|"
                 r"level_sensor|level_gauge|displacer_level|\bradar\b", re.I),
@@ -1173,7 +1189,8 @@ _INSTR_KINDS = [
                 re.I),
      "FT", "Flow", "Electromagnetic"),
     (re.compile(r"instr_pressure|pressure_transmitter|pressure[_\s]?transmitter|"
-                r"rosemount.*pressure|pressure_sensor|pressure_gauge|coplanar|\b3051\b", re.I),
+                r"rosemount.*pressure|pressure_sensor|pressure_gauge|coplanar|\b3051\b|"
+                r"\bpressure_transducer\b", re.I),
      "PT", "Pressure", "Coplanar gauge / DP"),
     (re.compile(r"instr_temperature|temperature_transmitter|temperature[_\s]?transmitter|"
                 r"temp_transmitter|temp_probe|thermowell|thermocouple|itherm|\brtd\b|pt100|"

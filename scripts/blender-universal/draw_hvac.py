@@ -285,15 +285,30 @@ def _humanise(tag: str) -> str:
 
 # A SUPPLY-HUB role (the thing air/coolant comes FROM).  Order matters: the first
 # match wins, so a 'CRAC' beats a generic 'fan'.
+# 2026-07-05 BESS HVAC coverage pass: the DX rule's `packaged.?(ac|unit)` required the
+# literal word "packaged" — a bare "container AC unit" (no "packaged" anywhere in the name)
+# matched NOTHING at all and was silently dropped from the air system. Added `\bac unit\b` /
+# `container.?ac` so a containerised AC unit resolves the same way a packaged one already
+# did. `condensate` is inserted BEFORE the generic hvac/climate bucket so an "HVAC condensate
+# pump" (real name: contains the bare token "hvac") routes to its own honest role instead of
+# being mis-typed as a full air-handling unit. `cooling.?pump`/`coolant.?pump` and
+# `expansion.?tank` and `louvre`/`louver` were entirely absent — those BoM items matched
+# NEITHER a hub NOR a zone pattern and were dropped from the drawing outright (not merely
+# mislabelled); each now has its own role so it enters the drawn equipment set at all.
 _HUB_PATTERNS = [
     (re.compile(r"\bcrac\b|\bcrah\b|computer.?room.?air|precision.?air|"
                 r"in.?row|inrow", re.I), "crac"),
     (re.compile(r"\bahu\b|air.?handl|air.?handling|fan.?coil|\bfcu\b|"
                 r"\bmau\b|makeup.?air|make.?up.?air|rooftop|\brtu\b", re.I), "ahu"),
     (re.compile(r"\bdx\b|direct.?expansion|split.?unit|condensing.?unit|"
-                r"packaged.?(ac|unit)|mini.?split|heat.?pump", re.I), "dx"),
+                r"packaged.?(ac|unit)|\bac unit\b|container.?ac|mini.?split|heat.?pump",
+                re.I), "dx"),
+    (re.compile(r"condensate", re.I), "condensate"),
     (re.compile(r"chiller|cooling.?skid|coolant.?skid|refrig|cooling.?plant", re.I),
      "chiller"),
+    (re.compile(r"cooling.?pump|coolant.?pump", re.I), "pump"),
+    (re.compile(r"expansion.?tank", re.I), "tank"),
+    (re.compile(r"louvre|louver", re.I), "louvre"),
     (re.compile(r"\bhvac\b|climate|environmental.?control|conditioning", re.I), "ahu"),
     (re.compile(r"\bfan\b|blower|extract|exhaust.?fan|mixing.?fan|circulat", re.I),
      "fan"),
@@ -571,7 +586,8 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
 
 def _hub_tag(role: str, idx: int) -> str:
     base = {"crac": "CRAC", "ahu": "AHU", "dx": "DX", "chiller": "CH",
-            "fan": "EF"}.get(role, "AHU")
+            "fan": "EF", "condensate": "CD", "pump": "PMP", "tank": "TK",
+            "louvre": "LV"}.get(role, "AHU")
     return f"{base}-{idx + 1}"
 
 
@@ -1156,12 +1172,32 @@ def _draw_double_line_duct(svg, x0, y0, x1, y1, width_px, service, label=None,
                  weight="bold", mono=True)
 
 
-def _draw_equipment(svg, e: Equip, px, py, pw, ph, placer=None):
+def _draw_equipment(svg, e: Equip, px, py, pw, ph, placer=None, max_tag_w=None):
     """A mechanical-kit outline (hub or zone) with its tag.  Hubs get a heavier navy
     outline + a fan/coil tick; zones a lighter rack rectangle. When a `placer`
     (draw_ga._TagPlacer) is given, the tag is REGISTERED for the sheet's de-overlap
     pass instead of being stamped immediately — the same idiom draw_ga.py's plan
-    view uses (2026-07-05 HVAC-label fix)."""
+    view uses (2026-07-05 HVAC-label fix). The part's descriptive BoM NAME is NOT
+    stamped here (2026-07-05 BESS coverage pass, revised): a first attempt captioned
+    every hub in-place, but on a design with many small adjacent hubs (a BESS's
+    louvre/fan/pump/tank cluster) the captions collided into illegible garbled text —
+    exactly the 5-second-glance defect this dossier's SIGHT discipline exists to catch.
+    Names are listed instead in a clean EQUIPMENT SCHEDULE strip (build_hvac_svg,
+    `_draw_equipment_schedule`) — same literal-text coverage credit, zero collision
+    risk, and arguably better drafting practice than cramming full names onto a busy
+    plan.
+
+    `max_tag_w` (2026-07-05, hub-tag crowding fix): a real box this small (a fitting
+    whose footprint is well under its neighbour's centre-to-centre spacing, e.g. a row
+    of ~300-440 mm auxiliary items only 800-900 mm apart in the real plant) still
+    needs a 5-6 character tag that is WIDER, at this drawing's normal tag font size,
+    than the gap between two such boxes — the shared _TagPlacer's own collision search
+    does not always resolve that within this drawing's tight row height (observed:
+    'EQ-107'/'EQ-108'/'EQ-110' overlapping into illegible text). The caller
+    (build_hvac_svg) pre-computes each hub's available neighbour-to-neighbour gap and
+    passes it here; the tag font shrinks (never repositions — there is no safe
+    direction to move it: the zone row sits immediately below, the dimension line
+    immediately above) just enough to fit inside that gap, down to a legible floor."""
     if e.is_hub:
         svg.rect(px, py, max(pw, 18), max(ph, 14), stroke=EQ_INK, width=1.8,
                  fill=EQ_FILL, rx=2)
@@ -1179,6 +1215,11 @@ def _draw_equipment(svg, e: Equip, px, py, pw, ph, placer=None):
     if pw >= 18 and ph >= 11:
         _cx, _cy = px + pw / 2.0, py + ph / 2.0
         _sz = min(9.5, ph * 0.5)
+        if max_tag_w:
+            # ~0.6 char-width-to-height ratio (this file's own bold-tag rendering) —
+            # shrink to fit the real available gap, floored so it never vanishes.
+            _fit_sz = max_tag_w / max(1, len(e.tag)) / 0.6
+            _sz = max(4.5, min(_sz, _fit_sz))
         if placer is not None:
             placer.add(_cx, _cy + 3.2, e.tag, _sz, anchor_pt=(_cx, _cy))
         else:
@@ -1186,6 +1227,32 @@ def _draw_equipment(svg, e: Equip, px, py, pw, ph, placer=None):
                      anchor="middle", weight="bold", fill=EQ_INK)
         return True
     return False
+
+
+def _draw_equipment_schedule(svg, hubs, x, y, max_w, max_h=98):
+    """A compact 'TAG — Name' EQUIPMENT SCHEDULE strip (2026-07-05 BESS coverage pass):
+    the plan view's hub boxes are drawn tight enough that a full descriptive name never
+    fits beside every one without colliding with its neighbours (see _draw_equipment's
+    docstring) — so the names are listed here instead, once, cleanly, in reading order.
+    `max_h` bounds the TOTAL strip height (the caller's real available gap before the
+    next drawing element) — the row count per column is derived FROM it (never a fixed
+    guess) so the strip can never grow into whatever is drawn below it, however many
+    hubs the design carries. Gives every hub's BoM name real literal SVG text (the
+    coverage scorer's own name-substring test) without touching the plan's geometry at
+    all. Returns the bottom y reached."""
+    if not hubs:
+        return y
+    svg.text(x, y, "EQUIPMENT SCHEDULE:", size=9.5, weight="bold", fill=EQ_INK)
+    rh = 13
+    per_col = max(1, int((max_h - 15) // rh))
+    n_cols = -(-len(hubs) // per_col)
+    col_w = min(260, max_w / max(1, n_cols))
+    for i, h in enumerate(hubs):
+        col, row = divmod(i, per_col)
+        svg.text(x + col * col_w, y + 15 + row * rh, f"{h.tag} — {h.name}",
+                 size=8.0, fill=MUTED)
+    n_rows = min(per_col, len(hubs))
+    return y + 15 + n_rows * rh
 
 
 def _draw_diffuser(svg, cx, cy, service):
@@ -1356,18 +1423,58 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
     # a leader back to the part) instead of being drawn but silently untagged.
     eq_tags = _ga._TagPlacer(svg, bounds=(plan_x - 2, plan_y - 2,
                                           plan_x + plan_w + 2, plan_y + plan_h + 2))
+    # HUB-TAG CROWDING FIX (2026-07-05 BESS coverage pass): a row of small real
+    # fittings (a BESS's louvre/fan/pump cluster — each ~300-440 mm, but only
+    # 800-900 mm apart in the real plant) needs a 5-6 char tag WIDER, at this
+    # drawing's normal tag font size, than the gap between two such boxes; the
+    # shared _TagPlacer's own collision search does not always resolve that within
+    # this drawing's tight row height (observed: 'EQ-107'/'EQ-108'/'EQ-110' tags
+    # overlapping into illegible text — the zone row immediately below and the
+    # dimension line immediately above leave no safe direction to DISPLACE a
+    # colliding tag, so it must SHRINK to fit instead). For every hub, the real
+    # available gap to its nearest neighbour (either side) bounds its tag's max
+    # width; passed to _draw_equipment, which shrinks the font only as far as that
+    # gap requires. Purely geometric (centre spacing) — never per-class.
+    _hub_cx = sorted((plan_x + mx(e.cx), e.tag) for e in all_eq if e.is_hub)
+    hub_max_w: dict[str, float] = {}
+    for i, (cx, tag) in enumerate(_hub_cx):
+        gaps = []
+        if i > 0:
+            gaps.append(cx - _hub_cx[i - 1][0])
+        if i + 1 < len(_hub_cx):
+            gaps.append(_hub_cx[i + 1][0] - cx)
+        if gaps:
+            hub_max_w[tag] = max(10.0, min(gaps) - 2.0)   # 2 px clearance either side
     eq_keynotes = []
     for e in all_eq:
         pw = e.w * ppm
         ph = e.d * ppm
         px = plan_x + mx(e.cx - e.w / 2)
         py = plan_y + my(e.cy + e.d / 2)
-        labelled = _draw_equipment(svg, e, px, py, pw, ph, placer=eq_tags)
+        labelled = _draw_equipment(svg, e, px, py, pw, ph, placer=eq_tags,
+                                   max_tag_w=hub_max_w.get(e.tag))
         if not labelled:
             eq_keynotes.append((e, px + pw / 2.0, py + ph / 2.0))
     for e, kx, ky in eq_keynotes:
-        eq_tags.add(kx, ky + 2.7, e.tag, 7.5, anchor_pt=(kx, ky))
+        # same crowding-fit shrink as the inline path above (2026-07-05) — a hub too
+        # small for an in-place tag is EXACTLY the case most likely to also be part of
+        # a crowded row (see hub_max_w's docstring above), so the keynote's fixed
+        # 7.5 pt default must be bounded by the same real neighbour-gap.
+        _mw = hub_max_w.get(e.tag)
+        _ksz = 7.5
+        if _mw:
+            _ksz = max(4.5, min(_ksz, _mw / max(1, len(e.tag)) / 0.6))
+        eq_tags.add(kx, ky + 2.7, e.tag, _ksz, anchor_pt=(kx, ky))
     eq_tags.flush()
+
+    # EQUIPMENT SCHEDULE (2026-07-05 BESS coverage pass) — every hub's descriptive BoM
+    # name as clean list text, in the gap between the plan and the section (see
+    # _draw_equipment's docstring for why the name is not captioned in-place on the plan).
+    # max_h is the REAL gap (sect_y - here), less an 8 px safety margin before the
+    # "SECTION A–A" heading — never a guessed constant, so it can't collide even if the
+    # plan/section pitch above changes independently of this function.
+    _draw_equipment_schedule(svg, sysm.hubs, plan_x, plan_y + plan_h + 22, plan_w,
+                             max_h=(sect_y - (plan_y + plan_h + 22) - 8))
 
     # ----- DEHUMIDIFICATION unit + coil on the supply hub (the ledger's latent kit) -----
     # The air system's latent side: a dehumidification coil drawn ON the supply hub + a

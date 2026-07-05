@@ -937,6 +937,101 @@ def _group_critical_life_support(tree: Tree, state: dict, devices: list):
         "critical equipment needs."]
 
 
+# ── AUX DISTRIBUTION BOARD — house loads with NO connection-schedule electrical row ──────────
+# UNIVERSAL rotating/powered auxiliary noun set — the SAME noun family parts_ledger.py's
+# TYPE_RULES uses for its "rotating" classification (\bpump\b|blower|\bfan\b|compressor),
+# never a per-class table. A design's connection-schedule can model the PRIMARY power path
+# (rack strings → combiner/PCS → step-up → grid) in full while never wiring the container's
+# own house loads (enclosure ventilation fans, a coolant/condensate pump) to any board at all
+# — a sparse-schedule gap, not a drawing bug, but real equipment still draws real current and
+# a single-line that omits it is incomplete. Distinct from `_apply_distribution_voltage_model`'s
+# per-equipment feeder synthesis (which only runs for an AC LV/MV board and explicitly skips a
+# DC / grid-tie bus — see that function's docstring): this covers exactly the residual case that
+# skip leaves behind.
+_AUX_ROTATING_RE = re.compile(r"\bpump\b|blower|\bfan\b|compressor", re.I)
+
+
+def _add_aux_equipment_board(tree: Tree, devices: list, state: dict):
+    """A rotating/powered auxiliary load named in requirementsBom but not yet a branch
+    ANYWHERE on the tree gets hung off a new 'AUX DISTRIBUTION BOARD' sub-board — a genuine
+    local LV panel any containerised plant carries for its own house loads. Identical repeats
+    collapse to one '× N' way (the same convention as the rack-tap fan-out). Left unsized here
+    (rating=""); `_size_powered_load_feeders` (called right after, in the SAME pass as every
+    other feeder) derives each one's current from requirementsBom → contract quantity →
+    duty-type estimate — the same honest, disclosed fallback every other unsized load gets,
+    never a fabricated current. No-op when every rotating load is already drawn somewhere (an
+    AC-board design whose voltage-model synthesis already wired them — this never double-adds)."""
+    rb = state.get("requirementsBom")
+    if not isinstance(rb, list) or not rb:
+        return
+
+    drawn: set[str] = set()
+
+    def _collect(bus: Bus):
+        for br in bus.branches:
+            for nm in (br.label, br.to_node):
+                n = _norm_load_name(nm or "")
+                if n:
+                    drawn.add(n)
+            if br.sub_bus is not None:
+                _collect(br.sub_bus)
+    _collect(tree.main_bus)
+
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for row in rb:
+        if not isinstance(row, dict):
+            continue
+        req = str(row.get("requirement") or "")
+        name = req.split("·", 1)[0].strip()
+        # a connection-DESCRIPTION row ("water connection: cooling pump → liquid cooling
+        # chiller") names a PIPE/CABLE, not equipment — its text just happens to contain a
+        # rotating-equipment noun because it quotes the equipment it runs between. Exclude
+        # the same way every other BoM-driven collector in this file does.
+        if not name or name.lower().startswith(("water connection", "electrical connection",
+                                                 "signal connection", "air connection")):
+            continue
+        # a component fed from INSIDE a parent cabinet/skid (e.g. 'PCS cooling fan tray' —
+        # the power-electronics enclosure's own internal fan) is busbar-fed by that parent,
+        # not a standalone house load — the same cabinet-housed exemption principle
+        # `_SLD_BOARD_RE`'s siblings (parts_ledger._HOUSED_POWER_RE / drawing_gates'
+        # _housed_power_re) already apply to breakers/contactors/relays.
+        if re.match(r"^pcs\b", name, re.I):
+            continue
+        if not _AUX_ROTATING_RE.search(name):
+            continue
+        norm = _norm_load_name(name)
+        if not norm or norm in drawn:
+            continue
+        try:
+            qty = int(row.get("qty") or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        g = groups.setdefault(norm, {"name": name, "n": 0})
+        g["n"] += max(1, qty)
+        if norm not in order:
+            order.append(norm)
+    if not groups:
+        return
+
+    sub = Bus(tag="AUX DISTRIBUTION BOARD", is_sub=True)
+    for norm in order:
+        g = groups[norm]
+        sub.branches.append(Branch(
+            from_node=sub.tag, to_node=g["name"],
+            label=g["name"] + (f" × {g['n']}" if g["n"] > 1 else ""),
+            rating="", cable="", role="branch", target_sym=SYM_LOAD))
+    feeder = Branch(
+        from_node=tree.main_bus.tag, to_node=sub.tag,
+        label="Aux distribution — HVAC / house loads",
+        rating="", cable="", role="branch", target_sym=SYM_LOAD)
+    feeder.sub_bus = sub
+    cb = _pick_device(devices, kind="breaker")
+    if cb:
+        feeder.devices.append(_as_device(cb, "breaker", "CB"))
+    tree.main_bus.branches.append(feeder)
+
+
 # ── powered-load real-current sizing ─────────────────────────────────────────
 # A powered process LOAD on the board must never read 0.0 A (a placeholder) nor sit at a
 # wholesale fallback default shared across many feeders (the schedule emits ~27 A for
@@ -1534,6 +1629,17 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
             for ri in rows_in:
                 used.add(ri["idx"])
             continue
+        # BOARD-NAME VISIBILITY (2026-07-05): this branch's row SOURCE is itself a secondary
+        # hub (feeds ≥2 distinct groups — e.g. a 'bms_ctrl' node fanning out to the 13 rack
+        # taps + a chiller tap) but is not the chosen main-bus hub, so it is drawn here as a
+        # plain main-bus branch. The schedule may still name that source as its OWN board
+        # (draw_panel_schedule.py renders a second '## <board>' heading for it) — naming it
+        # in the branch label keeps the two projections' board names visibly consistent
+        # instead of silently absorbing a real secondary board into an anonymous bus tap.
+        if src and src != main_hub and src_group_count.get(src, 0) >= 2:
+            src_h = _humanise(src)
+            if src_h and src_h.lower() not in (br.label or "").lower():
+                br.label = f"{br.label} (via {src_h})"
         main_bus.branches.append(br)
         for ri in rows_in:
             used.add(ri["idx"])
@@ -1645,6 +1751,14 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # load feeder. Strip those before grouping so the main breaker stays the incomer
     # device, the SPD a bus shunt, and the busbar the bus (not a 54 A load tap).
     _strip_board_element_feeders(tree)
+    # UNIVERSAL: a rotating/powered auxiliary load (fan / pump / blower / compressor) named
+    # in the BoM but never wired to any board by the connection-schedule (the residual case
+    # `_apply_distribution_voltage_model`'s per-equipment synthesis leaves behind on a DC /
+    # grid-tie bus) still needs a feeder — hang it off a new AUX DISTRIBUTION BOARD before
+    # sizing runs, so it gets a real (or honestly-disclosed-estimated) current like every
+    # other load. Run AFTER the board-element strip (so it never re-adds a device the strip
+    # just removed) and BEFORE _size_powered_load_feeders (so the new ways get sized too).
+    _add_aux_equipment_board(tree, devices, state)
     # The standby annotation names the load FAMILIES actually on the board (post-strip,
     # so only real consuming loads classify) — never the genset word's minted narrative.
     if tree.standby_source is not None:
@@ -2060,7 +2174,11 @@ def _build_source(state, schedule, devices, main_bus, arch):
             tag="TX1",
             kva=(f"{cont_kw/0.95:,.0f} kVA" if cont_kw else ""),
             ratio=(f"{ac_v:,.0f} V / {gv}" if ac_v else f"LV / {gv}"),
-            detail="external pad-mount step-up (IEC 62933-5-2)")
+            # LV/MV BOUNDARY MARKER (2026-07-05): TX1 is not just a step-up rating change —
+            # it is the physical LV(PCS output)/MV(grid) demarcation point on this diagram;
+            # named explicitly so the boundary is a marked feature, not an implication left
+            # for the reader to infer from the kV numbers either side.
+            detail="external pad-mount step-up (IEC 62933-5-2) — LV / MV boundary")
         # G99 protection relay + AC main breaker sit at the grid interface
         g99 = _pick_device(devices, "g99", "grid_protection", "protection_relay")
         if g99:
@@ -2464,14 +2582,28 @@ def _balance_rows(items, spans, n_rows):
 # (which matches the BoM part NAME/tag in the SVG text) misses it. Collect these from the BoM and
 # print them in a compact "board components" schedule strip so each is named. UNIVERSAL — keyed on
 # the board-infrastructure noun, excluding process equipment + field instruments (other drawings).
+# 2026-07-05 BESS single-line coverage pass: added `fuse` (with an accessory lookahead so a fuse
+# HOLDER/LABEL/mount-rail/torque-card — never the fuse itself — is excluded, mirroring the
+# `_DEVICE_NOISE` accessory idiom elsewhere in this file) and `busbar` (a DC/cell busbar is
+# board-infrastructure exactly like a switchboard) — both were entirely absent, so a design's
+# real fuses/busbars never reached this schedule regardless of the BoM. `\blcl\b` recovers a
+# power-electronics output-filter component (PCS LCL output filter inductor) that the (correct,
+# process-filter-excluding) filter exclusion below would otherwise catch.
 _SLD_BOARD_RE = re.compile(
     r"\b(control panel|digital control|circuit breaker|breaker|surge|\bspd\b|\bups\b|"
     r"switchboard|switchgear|\bmcc\b|distribution board|isolator|disconnect|contactor|relay|"
     r"power supply|\bpsu\b|vfd|soft[- ]start|standby (?:diesel )?generator|genset|"
-    r"transfer switch|\bats\b|plc|scada|hmi|gateway|controller)\b", re.I)
+    r"transfer switch|\bats\b|plc|scada|hmi|gateway|controller|"
+    r"fuse(?!\s*(?:holder|label|mount|install))|busbar|\blcl\b)\b", re.I)
 _SLD_BOARD_EXCLUDE_RE = re.compile(
-    r"\b(pump|tank|valve|filter|membrane|vessel|skid|motor|sensor|transmitter|analy[sz]er|"
-    r"probe|gauge|nozzle|frame|wall|floor|nutrient)\b", re.I)
+    r"\b(pump|tank|valve|membrane|vessel|skid|motor|sensor|transmitter|analy[sz]er|"
+    r"probe|gauge|nozzle|frame|wall|floor|nutrient)\b|"
+    r"\bfilter\b(?!\s+(?:inductor|capacitor|choke|reactor))", re.I)
+# 2026-07-05: the 18-item cap (below) pre-dated the fuse/busbar/LCL keywords above and — on a
+# BESS with ~28 genuine board-infrastructure BoM rows — silently truncated real matches (PE surge
+# counter, safety relay, arc flash relay) purely by BoM row ORDER, not by relevance. Raised to a
+# generous ceiling; a strip this size still reads fine (wrapped 3-across, see the render site).
+_SLD_BOARD_COMPONENTS_CAP = 40
 
 
 def _collect_board_components(state: dict):
@@ -2492,7 +2624,44 @@ def _collect_board_components(state: dict):
         seen.add(nm.lower())
         tag = str(r.get("tag") or "")
         out.append(f"{nm}" + (f" ({tag})" if tag else ""))
-    return out[:18]
+    return out[:_SLD_BOARD_COMPONENTS_CAP]
+
+
+# PROTECTION & METERING callouts (2026-07-05 BESS coverage pass): apparatus that sits beside the
+# power path but is never drawn as its own symbol on the primary chain — a DC insulation monitor
+# (IMD), current/voltage transducers, a metering CT/VT. A real single-line names these in a
+# dedicated protection/instrumentation schedule strip (distinct from "BOARD COMPONENTS & CONTROL
+# GEAR", which is cabinet-internal switching/control gear) — kept as its OWN regex/function
+# (rather than folded into _SLD_BOARD_RE) so the widely-shared board-components matcher (every
+# product class routes through it) is not widened by BESS-specific protection-instrument nouns.
+_SLD_PROTECTION_RE = re.compile(
+    r"\b(insulation monitor|current transducer|voltage transducer|"
+    r"current sensor|voltage sensor|voltage transformer|current transformer|"
+    r"grid pcc metering|metering\s+ct|metering\s+vt)\b", re.I)
+
+
+def _collect_protection_instrumentation(state: dict):
+    """Field protection/metering apparatus (IMD, CT/VT, current/voltage transducers) the
+    single-line names as callouts even when it has no dedicated symbol for it. Additive to
+    _collect_board_components — never double-drawn (a different regex, a different strip)."""
+    seen: set = set()
+    out: list = []
+    rows = state.get("requirementsBom") if isinstance(state, dict) else None
+    for r in (rows if isinstance(rows, list) else []):
+        if not isinstance(r, dict):
+            continue
+        nm = str(r.get("name") or r.get("requirement") or "").split(" · ")[0].strip()
+        if not nm or nm.lower().startswith(("water connection", "electrical connection",
+                                            "signal connection", "air connection")):
+            continue
+        if not _SLD_PROTECTION_RE.search(nm):
+            continue
+        if nm.lower() in seen:
+            continue
+        seen.add(nm.lower())
+        tag = str(r.get("tag") or "")
+        out.append(f"{nm}" + (f" ({tag})" if tag else ""))
+    return out[:14]
 
 
 def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
@@ -2511,6 +2680,21 @@ def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
     margin_r = 60
     title_h = 152          # +14 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     legend_gutter = 220   # dedicated right-hand column for the symbol legend
+    # BOARD COMPONENTS / PROTECTION & METERING footer strips (rendered near the bottom of the
+    # sheet, above the title block) — computed HERE (not at render time) so their real row
+    # count can grow the page height BEFORE the SVG canvas is sized (2026-07-05: raising
+    # _SLD_BOARD_COMPONENTS_CAP from 18 to 40 meant a design with ~28 real matches could
+    # overflow the previous fixed 150 px footer reserve into the title block — the reserve
+    # now scales with the actual strip row counts instead of assuming a small pre-cap list).
+    _footer_comps = _collect_board_components(state or {})
+    _footer_prot = _collect_protection_instrumentation(state or {})
+    _FOOTER_PER_ROW = 3
+    _footer_rows = 0
+    if _footer_comps:
+        _footer_rows += -(-len(_footer_comps) // _FOOTER_PER_ROW) + 1   # +1 for its heading
+    if _footer_prot:
+        _footer_rows += -(-len(_footer_prot) // _FOOTER_PER_ROW) + 1
+    footer_h = max(150, _footer_rows * 13 + 24)   # never SMALLER than the old fixed reserve
     # sub-distribution branches need extra vertical space below their parent slot.
     has_sub = any(br.sub_bus for br in main_branches)
 
@@ -2616,7 +2800,7 @@ def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
         max_rs = max((sum(sp for _, sp in r) for r in rws), default=1.0) or 1.0
         dia_w = margin_l + max_rs * col_w
         w = max(dia_w + legend_gutter + margin_r, 1060)
-        h = bus_y + sum(_row_heights(rws)) + title_h
+        h = bus_y + sum(_row_heights(rws)) + title_h + footer_h - 150
         return w, h, rws, dia_w
 
     rows = [list(zip(main_branches, spans))]
@@ -2713,20 +2897,32 @@ def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
             content_bottom = max(content_bottom, bot or base_y)
 
     # ===== LEGEND (lower-right of the body, above the title block) =====
-    legend_y = min(content_bottom + 24, height - title_h - 170)
+    legend_y = min(content_bottom + 24, height - title_h - (footer_h + 20))
     legend_y = max(legend_y, bus_y + 24)
     _draw_legend(svg, bus_x1, legend_y)
 
     # ===== BOARD COMPONENTS & CONTROL-GEAR SCHEDULE (names the symbol-only devices) =====
-    comps = _collect_board_components(state or {})
+    # ===== + PROTECTION & METERING (IMD / CT / VT / transducer callouts) =====
+    # Reuse the SAME lists computed up-front (they sized `footer_h`/the page height) rather
+    # than recomputing — one source, so the reserved space and the rendered content can never
+    # disagree.
+    comps = _footer_comps
+    prot = _footer_prot
+    strip_y = height - title_h - footer_h + 24
+    per_row = 3
+    col_w = (width - 60) / per_row
     if comps:
-        strip_y = height - title_h - 150
         svg.text(30, strip_y, "BOARD COMPONENTS & CONTROL GEAR (schedule):", size=9.5,
                  weight="bold", fill=BUS_INK)
-        # wrap into rows of ~3 across the width so the strip stays inside the free gap
-        per_row = 3
-        col_w = (width - 60) / per_row
         for i, name in enumerate(comps):
+            rr = i // per_row
+            cc = i % per_row
+            svg.text(30 + cc * col_w, strip_y + 15 + rr * 13, "• " + name, size=8.6, fill=MUTED)
+        strip_y += (-(-len(comps) // per_row)) * 13 + 15
+    if prot:
+        svg.text(30, strip_y, "PROTECTION & METERING (callouts):", size=9.5,
+                 weight="bold", fill=BUS_INK)
+        for i, name in enumerate(prot):
             rr = i // per_row
             cc = i % per_row
             svg.text(30 + cc * col_w, strip_y + 15 + rr * 13, "• " + name, size=8.6, fill=MUTED)
