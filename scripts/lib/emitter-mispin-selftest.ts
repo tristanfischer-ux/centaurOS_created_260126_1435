@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -349,6 +349,25 @@ expect(isCatalogueComponent('Water Supply mass_fluid_transport_process__utility_
     `folding a 3-way duplicate (valve/valves/actuators, same qty) in one sub_module must leave ` +
     `exactly the FIRST filler + the real principal (got ${survivors.map((w: any) => w.name_human)})`)
 }
+
+// ── isCatalogueComponentByEitherName — the bess-campaign-v11 alias-resolution fix
+// (2026-07-05): a word's PRIMARY name and its ALIAS (content_character.name_human vs
+// name_human) are two independent authored surfaces; a candidate must reach DB-first/
+// generate when EITHER carries the lexicon's catalogue signal, not only whichever the
+// caller happened to prefer. Real X-32/I-15 v11 cases: the alias alone lacks the signal
+// the primary name carries — the union must still fire.
+expect(isCatalogueComponentByEitherName('earth rod', 'driven earth electrode', 'emc_grounding') === true,
+  "'earth rod' (qualified rod+earth) must reach catalogue even though its alias 'driven earth " +
+  "electrode' carries no lexicon signal on its own (the X-32 real not-found root cause)")
+expect(isCatalogueComponentByEitherName('smoke detector sounder', 'fire alarm sounder-beacon', 'smoke_detector') === true,
+  "'smoke detector sounder' (qualified detector+smoke) must reach catalogue even though its alias " +
+  "'fire alarm sounder-beacon' carries no lexicon signal on its own (the I-15 real not-found root cause)")
+expect(isCatalogueComponentByEitherName('driven earth electrode', 'earth rod', 'emc_grounding') === true,
+  'the union is symmetric — order of (name, aliasName) must never matter')
+expect(isCatalogueComponentByEitherName('module top cover', 'module top cover', 'rack_structure') === false,
+  'a genuinely non-catalogue name (no signal in EITHER surface, alias identical to primary) must stay excluded')
+expect(isCatalogueComponentByEitherName('wing spar', null, 'airframe') === false,
+  'no alias at all must behave exactly like the single-name isCatalogueComponent check')
 
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
 console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven)')

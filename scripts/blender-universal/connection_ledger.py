@@ -300,6 +300,131 @@ def join_flow_demands(edges, quantities, log=print):
     return joined
 
 
+# ── POWER-DEMAND JOIN (2026-07-05, the "Line & velocity" bms_ctrl→chiller / →coldplate-
+# manifold / DC busbar→(busway) fix) ── the ELECTRICAL analogue of join_flow_demands
+# above. An electrical run a closer (or the topology augmenters upstream of this ledger
+# choke point) mints with NO required_value cannot be sized — connection_sizing / Blender's
+# _sized_dia_mm correctly refuses to fabricate a ✓ over an unknown current (the 2026-07-02
+# "0 A → 10×0 mm Cu bar, within ✓" fix) and reports it honestly UNVERIFIED, but that leaves
+# the Line & velocity schedule with a run that never gets a real current at all unless
+# something joins it on. Same PRECEDENCE + never-fabricate discipline as the fluid join:
+#   1. the DESTINATION device's own contract-quantity current demand governs;
+#   2. else the SOURCE's own contract-quantity delivery current;
+#   3. else — a duplicate/monitoring tie to a device that ALREADY carries a real demand
+#      elsewhere in THIS topology (e.g. a BMS interlock tap to the SAME chiller the
+#      distribution busbar already feeds) inherits that device's own already-established
+#      demand — copied from the ledger's own record, never re-derived or invented;
+#   4. no match anywhere (a genuinely non-power-consuming destination — a passive coolant
+#      manifold with no motor/heater draw) → required_value stays None, honest UNVERIFIED,
+#      exactly like the fluid twin. UNIVERSAL — no per-class/per-part table.
+_CURRENT_QTY_SUFFIXES = ("_current_a", "_rated_current_a", "_design_current_a",
+                        "_load_current_a", "_full_load_current_a")
+# Loose-match floor for the sibling-destination fallback (step 3): a role-token endpoint
+# ('chiller') is a SUBSTRING of its resolved display name ('liquid cooling chiller'), not
+# an exact match — mirrors parts_ledger.py's own `resolve()` loose contains-match. Guarded
+# by a minimum length so a short generic token ('ch', 'fan') never over-matches.
+_SIBLING_MATCH_MIN_LEN = 4
+
+
+def _current_qty_for_part(name, quantities):
+    """(quantity_key, current_amps) for an endpoint name, or None — CURRENT-family twin
+    of _flow_qty_for_part; identical MATCH SEMANTICS (exact snake+suffix, else a UNIQUE
+    prefixed candidate; a name made only of generic tokens never rides the prefix path)."""
+    s = _snake_name(name)
+    if not s or not quantities:
+        return None
+    for suf in _CURRENT_QTY_SUFFIXES:
+        v = _qty_num(quantities.get(s + suf))
+        if v is not None and v > 0:
+            return (s + suf, v)
+    toks = [t for t in s.split("_") if t]
+    if toks and all(t in _GENERIC_FLOW_TOKENS for t in toks):
+        return None
+    cands = []
+    for k in quantities:
+        if not k.startswith(s + "_") or not any(k.endswith(x) for x in _CURRENT_QTY_SUFFIXES):
+            continue
+        v = _qty_num(quantities.get(k))
+        if v is not None and v > 0:
+            cands.append((k, v))
+    if len(cands) == 1:
+        return cands[0]
+    return None
+
+
+def join_power_demands(edges, quantities, log=print):
+    """Join a POWER-service edge's missing required_value from the DESTINATION device's
+    own demand (see the module comment above for the full precedence + rationale). Only an
+    electrical edge (mechanism resolves to the 'power' service — mirrors join_flow_demands'
+    own mechanism-keyed test, works whether called standalone or via finalize_ledger) with
+    NO existing required_value is touched — an authored/joined rating is never overwritten.
+    Returns the number joined."""
+    if not edges:
+        return 0
+    def _is_power(e):
+        return (e.get("_ledger_service") or _service_of(e.get("mechanism"))) == "power"
+    # Index every ALREADY-rated power edge by its destination — step 3's sibling lookup
+    # (a second tie to a device that already carries a real demand inherits it). A
+    # destination matching _ABSTRACT_BOUNDARY_RE (a GENERIC pseudo-node — '(busway)',
+    # 'bms_ctrl', a bare 'board'/'bus' — is reused across MULTIPLE unrelated physical
+    # trunks, never a single real device) is excluded from BOTH sides of this lookup: it
+    # is not a uniquely-identified destination, so its "own demand" cannot be established
+    # OR looked up without cross-attributing one trunk's total onto an unrelated one (the
+    # v79 catch: a bare '(busway)' sibling-matched a DIFFERENT hub's small BMS-comms trunk
+    # (15 A) onto the DC busbar's own ~1667 A main trunk — wrong by two orders of magnitude).
+    established = []   # [(norm_name, amps, unit, real_to_name)]
+    for e in edges:
+        if not isinstance(e, dict) or not _is_power(e):
+            continue
+        v = _qty_num(e.get("required_value"))
+        to = str(e.get("to_part") or "")
+        if v is not None and v > 0 and to and not _ABSTRACT_BOUNDARY_RE.search(to):
+            established.append((_norm_name(to), v, e.get("required_unit") or "A", to))
+
+    joined = 0
+    for e in edges:
+        if not isinstance(e, dict) or not _is_power(e):
+            continue
+        if e.get("required_value") is not None:
+            continue    # never overwrite an authored/already-joined rating
+        dst, src = e.get("to_part"), e.get("from_part")
+        hit = _current_qty_for_part(dst, quantities)
+        which = "destination demand"
+        if not hit:
+            hit = _current_qty_for_part(src, quantities)
+            which = "source delivery"
+        if hit:
+            key, amps = hit
+            e["required_value"] = amps
+            e["required_unit"] = "A"
+            e["_power_join_basis"] = f"contract qty {key} = {amps:g} A ({which})"
+            joined += 1
+            continue
+        # Step 3 — sibling-destination fallback (never fabricated: copies a REAL value
+        # already established elsewhere in this SAME topology for the SAME device). A
+        # pseudo-node destination is never a lookup key either (same reasoning as above).
+        if _ABSTRACT_BOUNDARY_RE.search(str(dst or "")):
+            continue
+        nk = _norm_name(str(dst or ""))
+        if len(nk) < _SIBLING_MATCH_MIN_LEN:
+            continue
+        matches = [(amps, unit, real_to) for (enk, amps, unit, real_to) in established
+                   if (nk in enk or enk in nk) and len(enk) >= _SIBLING_MATCH_MIN_LEN]
+        if len(matches) == 1:
+            amps, unit, real_to = matches[0]
+            e["required_value"] = amps
+            e["required_unit"] = unit
+            e["_power_join_basis"] = (f"same destination's already-established demand "
+                                       f"({real_to} = {amps:g} {unit} elsewhere in this topology)")
+            joined += 1
+        # >1 ambiguous match, or 0 matches (a genuinely non-power-consuming destination) —
+        # NEVER guess. required_value stays None; the honest-UNVERIFIED path reports it.
+    if joined:
+        log(f"[ledger] power-demand join: {joined} electrical edge(s) now carry their "
+            f"destination's real current demand (required_value A) — cables size from true loads")
+    return joined
+
+
 def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=None):
     """Return (final_topology, dropped). `final_topology` is the AUTHORITATIVE connection
     list — every edge endpoint-resolved to a real placed part, spurious ties removed,
@@ -406,6 +531,11 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
         # (the v55 90 m³/h → '90 m³/s' → 324,000 m³/h phantom); re-stamp when the bare
         # magnitude fits the demand family, else mark _flow_implausible for the gate.
         canonicalise_flow_units(final, quantities, log=log)
+    # POWER-DEMAND JOIN — the electrical analogue, same choke point (see join_power_demands'
+    # docstring). Runs unconditionally (not gated on `quantities` truthiness) because step 3
+    # (sibling-destination fallback) needs no contract quantities at all — only the topology
+    # itself; `quantities` may legitimately be {} for a class with no per-part current family.
+    join_power_demands(final, quantities or {}, log=log)
 
     if dropped:
         from collections import Counter
@@ -1868,6 +1998,76 @@ def _selftest():
     # …but its EXACT key still matches (the full name IS the identity):
     assert _flow_qty_for_part("tank", {"tank_flow_m3_h": 33}) == ("tank_flow_m3_h", 33.0), \
         "flow-join: exact snake-name + suffix must match even for a generic name"
+
+    # ── POWER-DEMAND JOIN (the v79 bms_ctrl→chiller/coldplatemanifold "Line & velocity"
+    # 3-rows-fail fix) — same three proveCatch shapes as the flow twin + the sibling-
+    # destination fallback the electrical case needed. ──────────────────────────────────
+    pq = {"softener_pump_current_a": 12.4}
+    pt = [
+        # destination demand governs:
+        {"from_part": "Mains Incomer", "to_part": "Softener Pump",
+         "mechanism": "electrical_bus", "constraint_kind": "current_rating"},
+        # sibling-destination fallback: 'chiller' is a role-token substring of the
+        # already-rated 'Liquid Cooling Chiller' fed elsewhere in the SAME topology —
+        # copy that device's own already-established demand, never invent a new one.
+        {"from_part": "Dc Busbar 1500 V", "to_part": "Liquid Cooling Chiller",
+         "mechanism": "electrical_bus", "constraint_kind": "power_feed",
+         "required_value": 15, "required_unit": "A"},
+        {"from_part": "Bms Ctrl", "to_part": "chiller",
+         "mechanism": "electrical_bus", "constraint_kind": "power_feed"},
+        # NO-FABRICATION counter-case: a passive device with no contract current AND no
+        # established sibling demand anywhere (a coolant manifold draws no current) must
+        # stay honestly None — never guessed at.
+        {"from_part": "Bms Ctrl", "to_part": "coldplatemanifold",
+         "mechanism": "electrical_bus", "constraint_kind": "power_feed"},
+        # an authored rating is NEVER overwritten:
+        {"from_part": "Grid Pcc Metering Ct", "to_part": "Step-Up Transformer",
+         "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+         "required_value": 15, "required_unit": "A"},
+        # a NON-electrical edge is untouched even when its endpoints carry current qty:
+        {"from_part": "Softener Pump", "to_part": "Storage Tank", "mechanism": "fluid_loop"},
+    ]
+    npj = join_power_demands(pt, pq, log=lambda *a: None)
+    assert npj == 2, f"power-join: expected exactly 2 edges joined, got {npj}"
+    assert pt[0]["required_value"] == 12.4 and "destination demand" in pt[0]["_power_join_basis"], \
+        f"power-join: destination demand must govern; got {pt[0]}"
+    assert pt[2]["required_value"] == 15 and pt[2]["required_unit"] == "A" and \
+        "already-established demand" in pt[2]["_power_join_basis"], \
+        f"power-join: sibling-destination fallback must copy the SAME device's real demand; got {pt[2]}"
+    assert pt[3].get("required_value") is None, \
+        "power-join: NO-FABRICATION violated — a non-power-consuming destination with no " \
+        "sibling demand must stay None, never guessed"
+    assert pt[4]["required_value"] == 15, "power-join: an authored rating must never be overwritten"
+    assert pt[5].get("required_value") is None, "power-join: a non-electrical edge must be untouched"
+    # finalize_ledger applies the power join unconditionally at the choke point (runs even
+    # when quantities={} — the sibling fallback needs no contract quantities at all):
+    fptopo = [
+        {"from_part": "Dc Busbar 1500 V", "to_part": "Liquid Cooling Chiller",
+         "mechanism": "electrical_bus", "constraint_kind": "power_feed",
+         "required_value": 15, "required_unit": "A"},
+        {"from_part": "Bms Ctrl", "to_part": "chiller", "mechanism": "electrical_bus",
+         "constraint_kind": "power_feed"},
+    ]
+    fpparts = [_P("Dc Busbar 1500 V"), _P("chiller"), _P("Liquid Cooling Chiller"), _P("Bms Ctrl")]
+    fpj, _ = finalize_ledger(list(fptopo), fpparts, resolve, log=lambda *a: None, quantities={})
+    _bms_edge = next(e for e in fpj if e["from_part"] == "Bms Ctrl")
+    assert _bms_edge["required_value"] == 15, \
+        f"finalize_ledger must run the power join at its choke point; got {_bms_edge}"
+    # PSEUDO-NODE GUARD proveCatch (the v79 near-miss caught replaying real bess-campaign-v11
+    # data): '(busway)' is a GENERIC label reused by MULTIPLE unrelated trunks (one per
+    # originating hub) — an unguarded sibling lookup keyed on that shared label would
+    # cross-attribute one hub's small aux trunk onto a totally different hub's own real
+    # trunk. Must NEVER match through a pseudo-node destination.
+    ppt = [
+        {"from_part": "Bms Ctrl", "to_part": "(busway)", "mechanism": "electrical_bus",
+         "constraint_kind": "power_feed", "required_value": 15, "required_unit": "A"},
+        {"from_part": "Dc Busbar 1500 V", "to_part": "(busway)", "mechanism": "electrical_bus",
+         "constraint_kind": "power_feed"},
+    ]
+    npj2 = join_power_demands(ppt, {}, log=lambda *a: None)
+    assert npj2 == 0 and ppt[1].get("required_value") is None, \
+        (f"power-join: PSEUDO-NODE GUARD violated — a bare '(busway)' destination must never "
+         f"sibling-match across unrelated trunks; got joined={npj2}, edge={ppt[1]}")
     # finalize_ledger applies the join when quantities are passed (the choke point) and is
     # a no-op join with quantities=None (byte-identical pre-join behaviour).
     ftopo = [{"from_part": "Rearing Tank", "to_part": "Rotary Drum Filter", "mechanism": "fluid_loop"}]

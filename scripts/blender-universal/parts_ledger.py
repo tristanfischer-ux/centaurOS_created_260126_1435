@@ -260,13 +260,54 @@ _SCOPE_DESIGN_METADATA_RE = re.compile(
 # a genuine control/electrical "*System" is never caught (see docstring above).
 _SCOPE_SYSTEM_NETWORK_RE = re.compile(r"\b(?:system|network)\s*\d*\s*$", re.I)
 
+# ── VERIFIED_NO_PUBLIC_MPN + evidence-based FABRICATED (2026-07-05, the BESS v11
+# 17-not-found dissection) ── two more honest sub-statuses, read from the SAME per-part
+# verification record the chain's OWN research stage already wrote (state.partVerifications
+# / 10-part-verifications.json) — never re-derived, never a per-part table.
+#
+#   FABRICATED (evidence-based) — the verification record for this row carries NO
+#     manufacturer AND NO part_number (there was never a catalogue candidate to check in
+#     the first place) and its own reasoning states it was priced from a parametric
+#     materials/labour cost curve ("Engine B curve: class=…", requirements_bom.py's own
+#     bespoke-fabrication cost estimator) rather than researched against a catalogue. This
+#     is the SAME FABRICATED family the basis-text rule above already recognises
+#     ("materials/structural/footprint take-off") — a second, independent evidence source
+#     for the identical verdict (a battery-module top cover / bottom tray / compression
+#     plate has no catalogue identity by nature), not a new category.
+#   VERIFIED_NO_PUBLIC_MPN — the verification pipeline ran a genuine, EXHAUSTIVE search
+#     (not merely one rejected candidate — see below) for this row and found no public
+#     manufacturer part number. Evidence: the matching verification record's OWN status
+#     is the literal enum value 'verified_no_public_mpn' — a DISTINCT disposition from a
+#     plain 'unverified'/'uncertain' (which only means "the one candidate tried didn't pan
+#     out" and may still be genuinely researchable — see requirements_bom.py's ingest
+#     path). The chain's Stage 10 verifier (or a manual research pass writing the SAME
+#     shaped record, e.g. scripts/ingest/ingest-bess-verified-parts.ts's disposition
+#     writer) is the ONLY place licensed to stamp this status, and only after checking
+#     multiple real catalogues/distributors, never after a single failed guess — so the
+#     ledger classifier here is a pure CONSUMER of that verdict, exactly like every other
+#     substatus in this function, never a guess of its own.
+_ENGINE_B_CURVE_RX = re.compile(r"engine\s*b\s*curve", re.I)
 
-def _not_found_substatus(name: str, basis: str, typ: str = "other") -> str:
+
+def _pv_for_name(name: str, pv_by_norm: dict | None) -> dict:
+    """The (single, first) partVerifications record matching this row's display name, or
+    {} — matched on the SAME normalised-name identity `name` already uses throughout this
+    module (word_name mirrors the BoM display name; both derive from the same requirement
+    text). Never guesses between ambiguous matches — the caller reads {} for those too."""
+    if not pv_by_norm:
+        return {}
+    hits = pv_by_norm.get(_norm(str(name or "")))
+    return hits[0] if hits else {}
+
+
+def _not_found_substatus(name: str, basis: str, typ: str = "other",
+                          pv_by_norm: dict | None = None) -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
-    evidence (name + basis + its parts_ledger TYPE_RULES classification) — never a
-    per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED', 'FABRICATED',
-    'COMMODITY-FITTING', 'BOUNDARY-STUB', 'SCOPE-DOCUMENTED', or 'NOT FOUND' (the true
-    residual). See the module-level comments above for the full rationale + priority."""
+    evidence (name + basis + its parts_ledger TYPE_RULES classification + its verification
+    record) — never a per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED',
+    'FABRICATED', 'VERIFIED_NO_PUBLIC_MPN', 'COMMODITY-FITTING', 'BOUNDARY-STUB',
+    'SCOPE-DOCUMENTED', or 'NOT FOUND' (the true residual). See the module-level comments
+    above for the full rationale + priority."""
     b = str(basis or "")
     n = str(name or "")
     if _OEM_PROPRIETARY_RESEARCH_RX.search(b):
@@ -275,6 +316,15 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other") -> str:
         return "ARCHITECTURALLY-EXCLUDED"
     if _FABRICATED_BASIS_RX.search(b):
         return "FABRICATED"
+    pv = _pv_for_name(n, pv_by_norm)
+    if pv:
+        mfr = str(pv.get("manufacturer") or "").strip()
+        pn = str(pv.get("part_number") or "").strip()
+        reasoning = str(pv.get("reasoning") or "")
+        if not mfr and not pn and _ENGINE_B_CURVE_RX.search(reasoning):
+            return "FABRICATED"
+        if str(pv.get("status") or "").strip().lower() == "verified_no_public_mpn":
+            return "VERIFIED_NO_PUBLIC_MPN"
     if _BOUNDARY_STUB_RE.search(n):
         return "BOUNDARY-STUB"
     if _COMMODITY_FITTING_RE.search(n):
@@ -557,6 +607,16 @@ def main() -> int:
     cledger = _load(out_dir / "connection-ledger.json") or {}
     route = _load(out_dir / "route-manifest.json") or {}
     rb = state.get("requirementsBom") or []
+
+    # partVerifications lookup, keyed by NORMALISED word_name (2026-07-05, the
+    # VERIFIED_NO_PUBLIC_MPN + evidence-based FABRICATED not-found-substatus fix — see
+    # _not_found_substatus's docstring). state.partVerifications is the SAME data as the
+    # sibling 10-part-verifications.json artefact; read from state so a caller passing a
+    # bare state dict (no on-disk sibling file) still gets the classification.
+    _pv_by_norm: dict[str, list] = {}
+    for _pv in (state.get("partVerifications") or []):
+        if isinstance(_pv, dict) and _pv.get("word_name"):
+            _pv_by_norm.setdefault(_norm(str(_pv["word_name"])), []).append(_pv)
 
     # ── tool invocations + calculations (Tristan 2026-06-18) ──────────────────────
     # The ledger shows which tools were invoked for each part and the calculations
@@ -850,7 +910,7 @@ def main() -> int:
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
         # truncated `basis` field below) so a signal past 90 chars is never missed.
         # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
-        nf_substatus = _not_found_substatus(name, basis_full, typ) if r.get("status") == "NOT FOUND" else None
+        nf_substatus = _not_found_substatus(name, basis_full, typ, _pv_by_norm) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
@@ -1357,6 +1417,16 @@ def main() -> int:
         # `_classify` into type='valve' (in PROCESS_TYPES) — a naming accident, not a
         # real topology distinction from their 9 exempt siblings.
         if e.get("status") == "PARAMETRIC":
+            continue
+        # AIR-mover / HVAC / sub-component EXEMPTION (2026-07-05, the INV-4 'PCS cooling
+        # fan tray' orphan fix): the comment above this loop has always PROMISED "same
+        # exemption discipline as AIR_OR_SUBCOMPONENT_KEYWORDS above" (the connectivity-
+        # tally loop at line ~1216), but the check itself was never actually added HERE —
+        # a fan/blower/HVAC accessory carries an AIR or PARENT tie, never the conventional
+        # equipment-to-equipment fluid/electrical edge this orphan check looks for, so it
+        # was flagged an orphan on the exact same false-negative the connectivity tally
+        # already fixed for it. Universal — the SAME keyword set, no new heuristic.
+        if any(kw in (e.get("name") or "").lower() for kw in AIR_OR_SUBCOMPONENT_KEYWORDS):
             continue
         ident = (str(e["tag"] or "—"), _norm(e["name"]))
         if ident in _orph_seen:

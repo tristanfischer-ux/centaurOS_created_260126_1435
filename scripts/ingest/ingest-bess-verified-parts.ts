@@ -332,6 +332,36 @@ const PARTS: VerifiedPart[] = [
     unit_price_gbp: null,
     component_class: 'sensor',
   },
+
+  // ── ROUND 2 (2026-07-05, the bess-campaign-v11 17-not-found dissection) — three
+  // tags NEW to v11 (not in v10's 33-tag round-1 inventory) with a genuine, web-
+  // fetched real MPN found this round. Family-coherence + head-noun discipline
+  // (see file header) applied identically to round 1. ─────────────────────────
+  {
+    part_name: 'PCS DC-link capacitor bank — Vishay Roederstein MKP1848C DC-link film capacitor, 60 µF, 1200 VDC',
+    manufacturer: 'Vishay Roederstein', part_number: 'MKP1848C66012JY5',
+    desc: 'Vishay Roederstein MKP1848C DC-link series metallised polypropylene film capacitor, 60 microfarad, 1200 VDC rated (the family’s nominal-voltage class nearest the ~1100 V DC-link bus; no 1100 V-nominal member exists in the series). A 1 MW PCS DC-link bank parallels multiple units to the required capacitance/ripple-current rating — standard practice, not a single all-in-one bank SKU. Indicative DC-link capacitor for the PCS inverter.',
+    src: 'https://www.vishay.com/docs/26015/mkp1848cdclink.pdf',
+    unit_price_gbp: null,
+  },
+  {
+    part_name: 'PE surge counter — DEHN DCC 2 impulse/surge-event counter for lightning/surge protection monitoring',
+    manufacturer: 'DEHN', part_number: '994101',
+    desc: 'DEHN DCC 2 impulse counter (the discrete surge-event-counter family; "DEHNrecord" is DEHN’s DIGITAL monitoring line, a different product, not this device). Indicative PE surge counter for lightning-protection-system event monitoring.',
+    src: 'https://www.dehn-international.com/store/p/en-DE/F137826/impulse-counter',
+    unit_price_gbp: null,
+  },
+  {
+    // ONE catalogue SKU serves BOTH the coolant-loop supply AND return legs (the
+    // same stock DN80 SCH10S pipe, cut to each run's own routed length at detailed
+    // design) — a single DB row is correct here, not a duplicate: fillBlankWordMpns
+    // matches it independently for each word via the shared 'coolant'/'pipe' tokens.
+    part_name: 'Coolant supply/return pipe — Integraflow DN80 Schedule 10S seamless 304/1.4301 stainless steel pipe',
+    manufacturer: 'Integraflow', part_number: 'SS-PIP-80-S10-304-SML',
+    desc: 'Integraflow DN80 (3in NB) Schedule 10S seamless stainless steel pipe, grade 304/1.4301, sold as a stock catalogue item (mill producers like Outokumpu publish no fixed pipe part number — this is a genuine live distributor SKU for the exact DN/schedule/grade). Indicative BESS coolant-loop supply AND return pipe, cut to each routed length at detailed design.',
+    src: 'https://www.integraflow.co.uk/shop/ss-pip-80-s10-304-sml-dn80-3-nb-schedule-10s-stainless-seamless-pipe-304-15920',
+    unit_price_gbp: null,
+  },
 ]
 
 // ── VERIFIED NO-PUBLIC-MPN FINDINGS ─────────────────────────────────────────

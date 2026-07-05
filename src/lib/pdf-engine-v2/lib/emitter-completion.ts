@@ -390,6 +390,22 @@ const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
 }
 
 /**
+ * The candidate's two independent name surfaces are BOTH tried against the catalogue
+ * lexicon (2026-07-05, the bess-campaign-v11 Part-names alias-resolution fix): `name`
+ * (the word's primary/display name) and `aliasName` (its OTHER authored name — e.g.
+ * `name_human` vs `content_character.name_human`). Returns true iff EITHER resolves
+ * catalogue via `isCatalogueComponent`. Exported standalone (rather than left inline in
+ * fillBlankWordMpns) so the union rule itself — not just its caller's plumbing — carries
+ * a direct regression guard. See isCatalogueComponent's docstring for the lexicon rules.
+ */
+export function isCatalogueComponentByEitherName(
+  name: string, aliasName: string | null | undefined, subId: string,
+): boolean {
+  if (isCatalogueComponent(`${name} ${subId}`)) return true
+  return !!aliasName && isCatalogueComponent(`${aliasName} ${subId}`)
+}
+
+/**
  * True when a word is a purchased catalogue component worth attaching a part
  * number to. False for fabricated structures (material-costed) and for words
  * with no clear signal (conservative — never pin an MPN on something uncertain).
@@ -1147,9 +1163,22 @@ export interface DbFirstLookupOpts {
 export function pickBestDbCandidate(
   rows: DbPart[],
   specificTokens: string[],
-  headNoun: string | null,
+  headNoun: string | string[] | null,
   opts: DbFirstLookupOpts = {},
 ): DbPart | null {
+  // ALIAS HEAD NOUNS (2026-07-05): a word may carry >1 legitimate family noun — its
+  // primary requirement name's head ('electrode') and an alias's ('rod') — and a
+  // catalogue row can be genuinely typed under EITHER vocabulary ('Earth rod — ABB
+  // Furse RC012 …' heads with 'rod', not 'electrode'). Accepting an ARRAY here (a
+  // single string still works — existing callers untouched) fixes the RANKING, not
+  // just the later per-word acceptance check: without this, a stray higher-ranked
+  // WRONG-CLASS row that merely happens to head-match the PRIMARY noun (a
+  // wind-turbine-completion hallucinated 'Copper-Bonded Grounding Electrode' heading
+  // with 'electrode') could out-rank the correct, web-verified row before either
+  // name's acceptance check even runs (the v79 earth-rod near-miss).
+  const headNouns = (Array.isArray(headNoun) ? headNoun : [headNoun]).filter(
+    (h): h is string => !!h,
+  )
   const isHeavy = specificTokens.some((t) => HEAVY_INDUSTRIAL_TOKENS.has(t))
   const seen = new Map<string, { row: DbPart; nameHits: Set<string>; headHit: boolean }>()
 
@@ -1167,10 +1196,11 @@ export function pickBestDbCandidate(
     const hay = `${(r.part_name ?? '')} ${(r.component_class ?? '')}`.toLowerCase()
     const nameHits = new Set<string>()
     for (const t of specificTokens) if (hasWholeWordFolded(hay, t)) nameHits.add(t)
-    // HEAD HIT = the head noun in the LEADING FAMILY SEGMENT of the part name
-    // (type coherence, 2026-07-03) — an incidental tail mention ('…terminal
-    // block connector' on a panel PC) is NOT a family match.
-    const headHit = headNoun ? headNounHit(partNameLeadSegment(r.part_name), headNoun) : false
+    // HEAD HIT = ANY of the head nouns in the LEADING FAMILY SEGMENT of the part name
+    // (type coherence, 2026-07-03; alias-widened 2026-07-05) — an incidental tail
+    // mention ('…terminal block connector' on a panel PC) is NOT a family match.
+    const lead = partNameLeadSegment(r.part_name)
+    const headHit = headNouns.some((h) => headNounHit(lead, h))
     const prev = seen.get(key)
     if (!prev || nameHits.size > prev.nameHits.size) {
       seen.set(key, { row: r, nameHits, headHit })
@@ -1219,7 +1249,7 @@ export function pickBestDbCandidate(
 export function dbFirstLookup(
   db: Database.Database | null,
   tokens: string[],
-  headNoun: string | null,
+  headNoun: string | string[] | null,
   opts: DbFirstLookupOpts = {},
 ): DbPart | null {
   if (!db || tokens.length === 0) return null
@@ -1877,7 +1907,22 @@ export async function fillBlankWordMpns(
   const safeModules = Array.isArray(modules) ? modules : []
 
   // Collect blank CATALOGUE-word candidates (skip structures + real-MPN words).
-  interface Candidate { module: DesignModuleLike; sub: SubModuleLike; word: WordLike; name: string; subId: string; moduleId: string }
+  //
+  // ALIAS RESOLUTION (2026-07-05, the bess-campaign-v11 Part-names 8.7 fix): `name_human`
+  // and `content_character.name_human` are TWO independent authored surfaces for the SAME
+  // word — a BoM-facing requirement name ('earth rod', 'smoke detector sounder') and a
+  // content-character alias ('driven earth electrode', 'fire alarm sounder-beacon'). The
+  // catalogue-component gate below used to pick ONE via `||` (content_character.name_human
+  // first) and classify ONLY that string — so a word whose ALIAS happened to carry none of
+  // the lexicon's catalogue signal (no 'rod'/'detector' token — 'driven earth electrode' /
+  // 'fire alarm sounder-beacon') was wrongly bucketed `skippedStructural` and NEVER reached
+  // DB-first/generate at all, even though its OWN requirement name ('earth rod', 'smoke
+  // detector sounder') is squarely catalogue (X-32, I-15's true root cause — not a DB/LLM
+  // failure, a classification skip upstream of either). Fix: gate on the UNION of BOTH
+  // names (isCatalogueComponent(A) OR isCatalogueComponent(B)) and carry the alias forward
+  // so its tokens/head-noun also inform the DB search below — universal, bounded, changes
+  // nothing about `cand.name` itself (every existing downstream consumer is untouched).
+  interface Candidate { module: DesignModuleLike; sub: SubModuleLike; word: WordLike; name: string; aliasName: string | null; subId: string; moduleId: string }
   const candidates: Candidate[] = []
   let skippedStructural = 0
   for (const m of safeModules) {
@@ -1888,8 +1933,10 @@ export async function fillBlankWordMpns(
         const pn = (w.modifier_characters ?? []).find((mc) => mc.kind === 'part_number')?.value
         if (!isBlankOrPlaceholderMpn(pn)) continue // already has a real MPN — leave it
         const name = w.content_character?.name_human || w.name_human || w.content_character?.character_id || subId
-        if (!isCatalogueComponent(`${name} ${subId}`)) { skippedStructural++; continue }
-        candidates.push({ module: m, sub: sm, word: w, name, subId, moduleId })
+        const otherName = w.name_human || w.content_character?.name_human || null
+        const aliasName = otherName && otherName !== name ? otherName : null
+        if (!isCatalogueComponentByEitherName(name, aliasName, subId)) { skippedStructural++; continue }
+        candidates.push({ module: m, sub: sm, word: w, name, aliasName, subId, moduleId })
       }
     }
   }
@@ -1943,8 +1990,13 @@ export async function fillBlankWordMpns(
       // list — dbFirstLookup slices the first 8, and with subId first a long
       // module path ('mass_fluid_transport_process__ro_membrane_elements')
       // crowded the word's actual component nouns ('pump') out of the window.
+      // ALIAS TOKENS (2026-07-05): the alias name's tokens ride the SAME window — a
+      // catalogue row indexed under the alias vocabulary ('driven earth electrode',
+      // 'sounder-beacon') is otherwise unreachable even though the word passed the
+      // catalogue gate on its alias (see the candidate-collection comment above).
       const tokens = new Set<string>([
         ...tokenize(cand.name),
+        ...tokenize(cand.aliasName),
         ...tokenize(cand.word.content_character?.character_id),
         ...tokenize(cand.subId),
       ])
@@ -1956,6 +2008,11 @@ export async function fillBlankWordMpns(
       const nameToks = tokenize(cand.name)
       const subToks = tokenize(cand.subId)
       const headNoun = nameToks[nameToks.length - 1] ?? subToks[subToks.length - 1] ?? null
+      // ALIAS HEAD NOUN (2026-07-05): a fallback family noun from the alias name — tried
+      // ONLY when the primary head noun's DB lookup misses (below), never in place of it,
+      // so an alias never outranks the word's own authored requirement identity.
+      const aliasToks = cand.aliasName ? tokenize(cand.aliasName) : []
+      const aliasHeadNoun = aliasToks.length ? (aliasToks[aliasToks.length - 1] ?? null) : null
 
       // MOTOR-DRIVE, DUTY-AWARE (2026-07-03, Bar B): a VFD/starter is sized to
       // its driven motor. When the word CARRIES that duty (rating_primary kW —
@@ -2034,7 +2091,20 @@ export async function fillBlankWordMpns(
       // this sub_module excluded from ranking entirely — a genuinely distinct DB row (if
       // one exists) wins instead. A single-part run (no collision) never triggers the
       // retry, so behaviour is unchanged outside the shadowing case.
-      let dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true })
+      // ALIAS HEAD NOUNS AT RANKING TIME (2026-07-05): pass BOTH the primary and alias
+      // head nouns together (pickBestDbCandidate now accepts an array) rather than
+      // retrying sequentially on a null result — a sequential retry only helps when the
+      // FIRST attempt finds NOTHING, but the real v79 failure mode was a WRONG top-
+      // ranked row winning on the primary noun alone (a stray hallucinated
+      // 'wind_turbine_completion' row headed with 'electrode' out-ranked the correct
+      // web-verified 'Earth rod' row before either name's acceptance check ever ran).
+      // Ranking on the union fixes the ROOT cause; a single-name candidate is
+      // unaffected (aliasHeadNoun is null or identical → the array degenerates to one
+      // element, byte-identical to the pre-fix ranking).
+      const headNounsForRank = aliasHeadNoun && aliasHeadNoun !== headNoun
+        ? [headNoun, aliasHeadNoun].filter((h): h is string => !!h)
+        : headNoun
+      let dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true })
       let pinned = false
       let blocked = false // a guard refused the pin outright — never fall through to generate
       let retriesLeft = 1
@@ -2084,7 +2154,15 @@ export async function fillBlankWordMpns(
         // (Motor-drive slots never reach here — the DUTY-AWARE block above owns
         // them entirely: in-band DB pin when the duty is known, honest TBD when
         // not. A loose name-token pin on a drive is still impossible.)
-        const typeOk = dbHitAcceptableForWord(dbHit, cand.name)
+        // ALIAS TYPE-COHERENCE FALLBACK (2026-07-05): dbHitAcceptableForWord's head-noun
+        // check reads its OWN `name` argument's LAST token — a real earth-rod catalogue
+        // row ('Earth rod — ABB Furse RC012 …') carries 'rod' in its lead segment, not
+        // 'electrode' (the primary name's head noun when the alias 'driven earth
+        // electrode' is what fillBlankWordMpns happened to prefer). Try the primary name
+        // first (unchanged priority); only on a REJECT does the alias name get a second,
+        // independent attempt — an alias never overrides a primary ACCEPT.
+        const typeOk = dbHitAcceptableForWord(dbHit, cand.name) ||
+          (!!cand.aliasName && dbHitAcceptableForWord(dbHit, cand.aliasName))
         const key = `${dbHit.manufacturer}|${dbHit.part_number}`.toLowerCase()
         if (typeOk && !used.has(key)) {
           used.add(key)
@@ -2098,7 +2176,7 @@ export async function fillBlankWordMpns(
         if (typeOk && used.has(key) && retriesLeft > 0) {
           retriesLeft -= 1
           log(`[fill-blank-mpn]   ↻ retry ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} already claimed in this sub_module — re-ranking excluding claimed part(s) (exclusive assignment)`)
-          dbHit = dbFirstLookup(db, tokenList, headNoun, { excludeMakerVendors: true, excludeKeys: used })
+          dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true, excludeKeys: used })
           continue
         }
         // type mismatch, or a duplicate with no distinct alternative left → treat as a
