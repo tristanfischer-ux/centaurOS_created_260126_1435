@@ -40,6 +40,42 @@ function q(c: ContractInProgress, key: string, fallback: number): number {
 }
 function fmtQty(n: number): string { return Number.isInteger(n) ? `×${n}` : `×${n.toFixed(2)}` }
 function mod(k: string, v: string, u?: string): Mod { return u !== undefined ? { kind: k, value: v, unit: u } : { kind: k, value: v } }
+
+// ── HX-shell footprint from heat-transfer area (item 3, 2026-07-05) ────────────
+// Several compact plate/shell heat exchangers in this class (the MEA-loop cross-
+// exchanger, reboiler, overhead condenser + the K2SO4-recovery accessory
+// exchangers) carried NO `dimension` modifier at all — the tab-scorecard's
+// default-size litter (37/106 parts sharing the blender {1060×1100×1000} generic
+// box) traced to these words: with no dimension modifier, the blender renderer's
+// `build_universal_scene.py` type-default fallback fills the box in (700 mm dia ×
+// a generic length) — FOUR unrelated heat exchangers with wildly different duties
+// (E-101..E-104: 40/60/91/50.9 kW) all rendered at the IDENTICAL {dia:700,
+// len:3630} box, because none of them told the renderer their real size. Fix at
+// the SOURCE (the emitter word), not the renderer: derive a physical shell
+// footprint from the part's own heat-transfer AREA — the sizing-tool-derived
+// contract quantity where one exists (reboiler_area_m2 / lean_rich_cross_
+// exchanger_area_m2 / overhead_condenser_area_m2, all minted in engineering-
+// contract.ts from the ht:ntu-heat-exchanger tool's duty), else a standard
+// U=1000 W/m²K, LMTD=20 K liquid/liquid compact-plate estimate from the word's
+// own stated duty (hxAreaFromDutyKw) for the accessory exchangers no dedicated
+// sizing tool covers. A fixed compact-frame cross-section (0.30 × 0.60 m, typical
+// brazed-plate/shell-and-tube frame) with a plate-pack/tube-bundle LENGTH that
+// scales with area makes every exchanger's box DIFFERENT + monotonic in its own
+// duty — the qualitative defect (N unrelated parts sharing ONE box) is fixed
+// regardless of the exact frame constants, which are an order-of-magnitude
+// engineering estimate, not a datasheet claim (the part_number carries the real
+// catalogue identity; this is only the RENDERED envelope).
+function hxBoxFromAreaM2(areaM2: number): string {
+  const frameWidthM = 0.30
+  const frameHeightM = 0.60
+  const packLengthM = Math.max(0.15, areaM2 * 0.12)
+  return `${frameWidthM.toFixed(2)} × ${frameHeightM.toFixed(2)} × ${packLengthM.toFixed(2)} m`
+}
+function hxAreaFromDutyKw(dutyKw: number): number {
+  const uWM2K = 1000
+  const lmtdK = 20
+  return Math.max(0.1, (dutyKw * 1000) / (uWM2K * lmtdK))
+}
 function cc(id: string, n: string, fp: string | null, mp: string | null, fs: string | null = null, ms: string | null = null): CC {
   return { character_id: id, name_human: n, function_radical_primary: fp, function_radical_secondary: fs, material_radical_primary: mp, material_radical_secondary: ms }
 }
@@ -104,6 +140,13 @@ interface Co2MinParams {
   crystalliserHeightM: number
   dryerHeatKw: number
   steamKgH: number
+  // Heat-transfer AREAS for the three ht:ntu-heat-exchanger-sized units (item 3,
+  // 2026-07-05) — read from engineering-contract.ts's contract quantities so the
+  // emitted word's `dimension` box tracks the same sizing-tool basis the pricing
+  // macro-anchors already use, instead of shipping with no dimension at all.
+  reboilerAreaM2: number
+  crossExchangerAreaM2: number
+  condenserAreaM2: number
   boilerSteamKgH: number
   boilerElectricalKw: number
   electricalKw: number
@@ -210,6 +253,12 @@ function deriveParams(c: ContractInProgress): Co2MinParams {
     mccRatingKw,
     bagKg,
     bagsPerDay: Math.round(((caco3 + k2so4) * 1000) / bagKg),
+    // Same contract quantities engineering-contract.ts's macro_assembly_prices
+    // section already reads for PRICING (£/m²) — reused here for the word's
+    // physical `dimension` box (item 3, 2026-07-05).
+    reboilerAreaM2: q(c, 'reboiler_area_m2', 3.0),
+    crossExchangerAreaM2: q(c, 'lean_rich_cross_exchanger_area_m2', 8.0),
+    condenserAreaM2: q(c, 'overhead_condenser_area_m2', 3.2),
   }
 }
 
@@ -232,15 +281,15 @@ function emitAbsorptionCapture(p: Co2MinParams): DesignModule {
        mod('part_number', 'CRNE 5-8'), mod('list_price_gbp', '4200')]),
     word('rich_lean_mea_exchanger_word', 'rich/lean MEA exchanger',
       cc('rich_lean_mea_exchanger', 'rich/lean MEA plate exchanger', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'gasketed plate cross-exchanger'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'gasketed plate cross-exchanger'), mod('dimension', hxBoxFromAreaM2(p.crossExchangerAreaM2)), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'M10-BFG'), mod('list_price_gbp', '8800')]),
     word('lean_amine_cooler_word', 'lean-amine cooler',
       cc('lean_amine_cooler', 'lean-amine trim cooler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'gasketed plate cooler, cooling-water served'), mod('capacity', '120', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'gasketed plate cooler, cooling-water served'), mod('capacity', '120', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(120))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'M6-FG'), mod('list_price_gbp', '6200')]),
     word('rich_amine_trim_cooler_word', 'rich-amine inlet cooler',
       cc('rich_amine_trim_cooler', 'rich-amine inlet trim cooler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'brazed-plate cooler'), mod('capacity', '40', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'brazed-plate cooler'), mod('capacity', '40', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(40))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB60'), mod('list_price_gbp', '3800')]),
     word('mea_exchanger_plate_pack_word', 'spare cross-exchanger plate pack',
       cc('mea_exchanger_plate_pack', 'M10 cross-exchanger plate pack + gaskets', 'thermal_transfer_function', 'stainless_steel'),
@@ -377,11 +426,11 @@ function emitCaco3Recovery(p: Co2MinParams): DesignModule {
        mod('part_number', 'finned process air-heater battery — made to order'), mod('list_price_gbp', '4200')]),
     word('dryer_heat_recovery_exchanger_word', 'dryer exhaust heat-recovery exchanger',
       cc('dryer_heat_recovery_exchanger', 'dryer exhaust-to-inlet heat-recovery exchanger', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'glass-tube air-to-air recuperator'), mod('capacity', '30', 'kW'), mod('manufacturer', 'GEA'),
+      [mod('quantity', '×1'), mod('form', 'glass-tube air-to-air recuperator'), mod('capacity', '30', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(30))), mod('manufacturer', 'GEA'),
        mod('part_number', 'air-to-air glass-tube recuperator — packaged'), mod('list_price_gbp', '6800')]),
     word('dryer_condensate_cooler_word', 'dryer condensate cooler',
       cc('dryer_condensate_cooler', 'dryer exhaust condensate cooler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'brazed-plate condensate cooler, cooling-water served'), mod('capacity', '25', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'brazed-plate condensate cooler, cooling-water served'), mod('capacity', '25', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(25))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB30'), mod('list_price_gbp', '2400')]),
   ])
   return { module: 'mass_fluid_transport_process', display_name: 'CaCO3 Filtration & Drying',
@@ -443,15 +492,15 @@ function emitK2so4Recovery(p: Co2MinParams): DesignModule {
        mod('part_number', 'FLUIDBED VIBRO-FLUIDISER'), mod('list_price_gbp', '22000')]),
     word('crystalliser_heater_word', 'crystalliser circulation heater',
       cc('crystalliser_heater', 'crystalliser forced-circulation heater', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'shell-and-tube circulation heater, steam-heated'), mod('capacity', '90', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'shell-and-tube circulation heater, steam-heated'), mod('capacity', '90', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(90))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB110'), mod('list_price_gbp', '8500')]),
     word('crystalliser_cooler_word', 'crystalliser product cooler',
       cc('crystalliser_cooler', 'crystalliser product cooler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'gasketed plate cooler, cooling-water served'), mod('capacity', '40', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'gasketed plate cooler, cooling-water served'), mod('capacity', '40', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(40))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'M6-FG'), mod('list_price_gbp', '5200')]),
     word('crystalliser_vacuum_condenser_word', 'crystalliser vacuum condenser',
       cc('crystalliser_vacuum_condenser', 'crystalliser vacuum/MEA-vapour condenser', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'shell-and-tube vacuum condenser with vapour ejector'), mod('capacity', '60', 'kW'), mod('manufacturer', 'GEA'),
+      [mod('quantity', '×1'), mod('form', 'shell-and-tube vacuum condenser with vapour ejector'), mod('capacity', '60', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(60))), mod('manufacturer', 'GEA'),
        mod('part_number', 'shell-and-tube vacuum condenser — packaged'), mod('list_price_gbp', '9200')]),
   ])
   return { module: 'energy_conversion_transduction', display_name: 'K2SO4 Recovery & Crystallisation',
@@ -470,19 +519,19 @@ function emitMeaRecovery(p: Co2MinParams): DesignModule {
        mod('part_number', 'fabricated 316L packed stripping column — bespoke vessel'), mod('list_price_gbp', '20000'), mod('regulatory', 'PED 2014/68/EU')]),
     word('reboiler_word', 'distillation reboiler',
       cc('reboiler', 'thermosiphon reboiler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'shell-and-tube thermosiphon'), mod('capacity', String(p.steamKgH.toFixed(0)), 'kg/h steam'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'shell-and-tube thermosiphon'), mod('capacity', String(p.steamKgH.toFixed(0)), 'kg/h steam'), mod('dimension', hxBoxFromAreaM2(p.reboilerAreaM2)), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB60 (brazed-plate reboiler)'), mod('list_price_gbp', '8900')]),
     word('overhead_condenser_word', 'overhead condenser',
       cc('overhead_condenser', 'overhead condenser', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'plate condenser'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'plate condenser'), mod('dimension', hxBoxFromAreaM2(p.condenserAreaM2)), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB30 (brazed-plate condenser)'), mod('list_price_gbp', '7500')]),
     word('feed_bottoms_economiser_word', 'feed/bottoms economiser',
       cc('feed_bottoms_economiser', 'feed/reclaimed-bottoms economiser exchanger', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'gasketed plate economiser preheating column feed'), mod('capacity', '55', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'gasketed plate economiser preheating column feed'), mod('capacity', '55', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(55))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'M6-FG'), mod('list_price_gbp', '4800')]),
     word('reflux_subcooler_word', 'reflux subcooler',
       cc('reflux_subcooler', 'overhead reflux subcooler', 'thermal_transfer_function', 'stainless_steel'),
-      [mod('quantity', '×1'), mod('form', 'brazed-plate subcooler on the reflux line'), mod('capacity', '20', 'kW'), mod('manufacturer', 'Alfa Laval'),
+      [mod('quantity', '×1'), mod('form', 'brazed-plate subcooler on the reflux line'), mod('capacity', '20', 'kW'), mod('dimension', hxBoxFromAreaM2(hxAreaFromDutyKw(20))), mod('manufacturer', 'Alfa Laval'),
        mod('part_number', 'CB30'), mod('list_price_gbp', '2300')]),
     word('mea_recycle_pump_word', 'MEA recycle pump',
       cc('mea_recycle_pump', 'recovered-MEA recycle pump', 'mass_fluid_transport_process', 'stainless_steel'),

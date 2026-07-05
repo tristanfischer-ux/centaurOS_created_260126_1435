@@ -1315,6 +1315,12 @@ _INEQUALITY_PROSE = re.compile(
     re.IGNORECASE,
 )
 
+# A literal 'A/B' fraction with digits on BOTH sides (e.g. the CaCO3/CO2 molar-mass
+# ratio '100/44') — a CONVERSION RATIO embedded in the closure prose, never two
+# independent multiplicands. 'ah / 1000' (a unit-scaling divisor with no digit before
+# the slash) does NOT match, so this stays scoped to genuine numeric fractions.
+_FRACTION_RE = re.compile(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)")
+
 
 def _extract_equality_target(required: str, measured: Optional[float]) -> Optional[float]:
     """A numeric EQUALITY target out of a closure's prose ('A x B'); None for a
@@ -1324,7 +1330,25 @@ def _extract_equality_target(required: str, measured: Optional[float]) -> Option
         return None
     s = required.replace(",", "")
     nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", s)]
-    if "×" in required or " x " in required.lower():
+    has_x = "×" in required or " x " in required.lower()
+    # RATIO-FRACTION GUARD (caco3 stoichiometry fix, 2026-07-06): a closure like
+    # 'CaCO3 output ≈ CO2 fixed × 100/44 ≈ 2.27 t/d (stoichiometric)' multiplies an
+    # UNSTATED base quantity ('CO2 fixed', no literal number in the prose) by a molar-
+    # mass RATIO written as 'A/B'. Blindly taking nums[0]*nums[1] reads the ratio's own
+    # numerator/denominator as if they were the two "A × B" operands (100×44=4400 — a
+    # fabricated target 1900× the closure's OWN already-computed, explicitly-stated
+    # closing value). When the prose embeds such a fraction AND states a further number
+    # afterwards (its own declared result — CaCO3-mineralisation runs consistently
+    # write '≈ 2.27 t/d' etc.), trust that trailing stated value instead of synthesising
+    # one from the ratio's parts. Universal: keyed on the fraction SHAPE, not on any
+    # archetype-specific quantity name.
+    if has_x:
+        frac = _FRACTION_RE.search(s)
+        if frac:
+            frac_nums = {float(frac.group(1)), float(frac.group(2))}
+            trailing = [n for n in nums if n not in frac_nums]
+            if trailing:
+                return trailing[-1]
         if len(nums) >= 2:
             return nums[0] * nums[1]
     if len(nums) == 1 and measured is not None:
@@ -1427,11 +1451,25 @@ def _match_partverification_by_mpn(bom_row: dict,
     independent price to band against, so we never fabricate a cost FAIL on them.
     When more than one partVerification shares that (mfr, pn) key, disambiguates
     via ``_best_pv_candidate`` (codema v77, 2026-07-05) instead of the first one
-    indexed."""
+    indexed.
+
+    MOST-SPECIFIC-FIRST (E-104 fix, 2026-07-06): a BoM row's ``part`` string can
+    substring-match MULTIPLE indexed (mfr, pn) keys at once — e.g. a fully-qualified
+    'CB30 (brazed-plate condenser)' key AND a plainer 'CB30' key shared by two
+    UNRELATED CB30 duplicates both substring-match the row 'Alfa Laval CB30
+    (brazed-plate condenser)'. Iterating ``idx.items()`` in plain (insertion) order
+    returned on WHICHEVER key happened to be indexed first — on the CO2-mineralisation
+    run that was the plainer 'CB30' key (indexed from an earlier, unrelated word), so
+    the row joined a sibling's price (£3,000) instead of its own exact entry (£21,500),
+    fabricating a x7.2 cost-band FAIL that was actually a checker mis-join, not a real
+    mispriced part. The fuller/longer part_number is always the more precise
+    identification of the specific catalogue variant a row names — checking the
+    longest-pn keys first (while still requiring the same strict substring match)
+    prefers that precision without weakening the match test itself."""
     part = str(bom_row.get("part") or "").strip().lower()
     if not part:
         return None
-    for (mfr, pn), candidates in idx.items():
+    for (mfr, pn), candidates in sorted(idx.items(), key=lambda kv: -len(kv[0][1])):
         if mfr in part and pn in part:
             return _best_pv_candidate(bom_row, candidates)
     return None
@@ -1981,6 +2019,33 @@ def _selftest() -> int:
         check(not any("ceiling_satisfied_elsewhere" in c.name for c in checks),
               "PASS inequality closure must stay silent (never fabricate a FAIL)")
 
+    # ---- RATIO-FRACTION CLOSURE proveCatch (CO2-mineralisation cross-val 2026-07-06):
+    #      a molar-mass/conversion RATIO written as 'A/B' inside an 'X x A/B ~ Y' closure
+    #      must never be read as two literal multiplicands (100x44=4400) — the closure's
+    #      OWN trailing stated value (2.27) is the target. Both directions: the ratio
+    #      shape must PASS when measured matches the trailing value, and a genuine plain
+    #      'A x B' closure (no fraction) must still compute its product as before. ----
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, {
+            "orchestratorContract": {"quantities": {}, "closures": [
+                {"invariant_id": "caco3_output_reconciles_with_co2_fixed", "status": "pass",
+                 "measured": 2.27,
+                 "required": "CaCO₃ output ≈ CO₂ fixed × 100/44 ≈ 2.27 t/d (stoichiometric)",
+                 "reason": "CaCO3 output 2.27 t/d vs stoichiometric 2.27 t/d from 1.00 t/d CO2 fixed."},
+                {"invariant_id": "plain_product_closure", "status": "pass", "measured": 4400,
+                 "required": "widget count x unit mass = 100 x 44 total mass",
+                 "reason": "sanity: a genuine A x B closure with no fraction still multiplies."},
+            ]},
+            "requirementsBom": [], "partVerifications": []}, {}, {})
+        checks = run_all_checks(d)
+        check(_has(checks, "caco3_output_reconciles_with_co2_fixed", PASS),
+              "RATIO-FRACTION: a stoichiometric '... x 100/44 ... 2.27' closure whose "
+              "measured value (2.27) matches its OWN trailing stated result must PASS, "
+              "not FAIL against a fabricated 100x44=4400 target")
+        check(_has(checks, "plain_product_closure", PASS),
+              "RATIO-FRACTION (control): a genuine plain 'A x B' closure with no "
+              "embedded fraction must still compute its product normally (100x44=4400)")
+
     # ---- MAGNITUDE CEILING + CROSS-CHECK JOIN proveCatch (2026-07-02, the v55 shape):
     #      an ABSURD incomer (184,166,200 kVA on a 53 kW load) must FAIL the adequacy
     #      check (was: PASSed — ">= load x 1.25" had no upper bound); the STALE tool
@@ -2282,6 +2347,18 @@ def _selftest() -> int:
              "unit_gbp": 8634, "line_gbp": 17268,
              "requirement": "Fertigation Dosing Pump · 8 kW · 600x510x660 mm",
              "basis": "catalogue"},
+            # E-104 shape (CO2-mineralisation cross-val 2026-07-06, MOST-SPECIFIC-FIRST
+            # fix): the row's OWN part string 'CB30 (brazed-plate condenser)' is a
+            # SUBSTRING match for BOTH the plainer 'CB30' key (indexed first, shared by
+            # two UNRELATED CB30 duplicates) AND its own fully-qualified 'CB30
+            # (brazed-plate condenser)' key (an EXACT match, indexed later). Before the
+            # fix, plain dict-iteration order picked the plainer key first and joined
+            # this row to an unrelated £3,000 sibling instead of its own £21,500 exact
+            # entry — a fabricated x7.2 cost-band FAIL that was a checker mis-join, not a
+            # real mispriced part.
+            {"tag": "E-104", "part": "Alfa Laval CB30 (brazed-plate condenser)",
+             "qty": 1, "unit_gbp": 21500, "line_gbp": 21500,
+             "requirement": "overhead condenser", "basis": "catalogue"},
         ],
         "partVerifications": [
             {"word_id": "softener_vessel_synth_word", "word_name": "Pentair Fleck 2900S Softener Vessel Assembly",
@@ -2314,6 +2391,17 @@ def _selftest() -> int:
              "word_name": "Suction Isolation Valve (on Fertigation Dosing Pump)",
              "manufacturer": "Grundfos", "part_number": "96122012",
              "price_estimate_gbp": 448},
+            # E-104 shape — insertion order matters: the plainer 'CB30' key's FIRST
+            # candidate is indexed before the fuller 'CB30 (brazed-plate condenser)' key.
+            {"word_id": "dryer_condensate_cooler_word", "word_name": "dryer condensate cooler",
+             "manufacturer": "Alfa Laval", "part_number": "CB30",
+             "distributor_price_gbp": 2400},
+            {"word_id": "overhead_condenser_word", "word_name": "overhead condenser",
+             "manufacturer": "Alfa Laval", "part_number": "CB30 (brazed-plate condenser)",
+             "distributor_price_gbp": 21500},
+            {"word_id": "reflux_subcooler_word", "word_name": "reflux subcooler",
+             "manufacturer": "Alfa Laval", "part_number": "CB30",
+             "distributor_price_gbp": 3000},
         ],
     }
     with tempfile.TemporaryDirectory() as tmp:
@@ -2341,6 +2429,12 @@ def _selftest() -> int:
               "band against the true 'Grundfos CR 32-4-2 ... Circulation Pump' sibling "
               "(also £8,634), not the two unrelated £35 / £448 DB-mismatch siblings whose "
               "VERBOSE names share more requirement tokens ('fertigation dosing pump')")
+        check(_has(checks, "BoM E-104: unit price", PASS),
+              "MOST-SPECIFIC-FIRST MPN JOIN: E-104's £21,500 must band against its OWN "
+              "fully-qualified 'CB30 (brazed-plate condenser)' entry (also £21,500, an "
+              "exact match), not the plainer 'CB30' key's £3,000/£2,400 UNRELATED "
+              "siblings merely because that shorter key was indexed first (would read "
+              "x7.2 and FAIL as a checker mis-join, not a real mispriced part)")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----

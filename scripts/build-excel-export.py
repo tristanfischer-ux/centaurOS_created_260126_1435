@@ -565,7 +565,19 @@ def _aux_tab_score(title: str, run_dir: str):
                   or (_st.get("engineeringContract") or {}).get("quantities") or {})
             has_hvac_duty = any(
                 re.search(r"hvac|ventilation_supply_air|cooling_load|chiller|space_heating|"
-                          r"air_change|supply_air_m3_h|extract_air", str(k), re.I)
+                          r"air_change|supply_air_m3_h|extract_air|"
+                          # PROCESS DRYING AIR-HANDLING DUTY (CO2-mineralisation cross-val
+                          # 2026-07-06): a material dryer moves heated air THROUGH the
+                          # process ('hot air for two drying stages' — a real air-handling
+                          # duty, engine-sized via tool:dryer:thermal-sizing) — the SAME
+                          # climate/air-handling scope this tab exists to represent, not a
+                          # building-HVAC-only signal. Missing this made the tab claim "no
+                          # HVAC/ventilation/cooling contract duty" over a design carrying
+                          # 49 kW + 1,469 kg/h of dryer thermal/air duty — a dishonest
+                          # out-of-scope disclosure. Universal: any archetype with a
+                          # dryer_*_duty_kw / dryer_*_air_flow_kg_h quantity pair counts.
+                          r"dryer_.*(?:duty|air_flow)|drying_air|hot_air",
+                          str(k), re.I)
                 and isinstance((v or {}).get("value"), (int, float)) and (v or {}).get("value")
                 for k, v in _q.items())
         except Exception:  # noqa: BLE001
@@ -588,7 +600,17 @@ def _aux_tab_score(title: str, run_dir: str):
             _svgp = os.path.join(run_dir or "", "drawings", "hvac-layout.svg")
             _AIRSIDE_FAM = re.compile(
                 r"air[ -]?handl|\bahu\b|air[ -]?condition|\bac unit\b|ventilat|"
-                r"vent[ -]?fan|extract|supply[ -]?air|\bduct\b|damper|louvre|fan[ -]?coil",
+                r"vent[ -]?fan|extract|supply[ -]?air|\bduct\b|damper|louvre|fan[ -]?coil|"
+                # PROCESS DRYING / AIR-BLOW air-handling equipment (CO2-mineralisation
+                # cross-val 2026-07-06): a material dryer's air-heater battery + exhaust
+                # heat-recovery exchanger + inlet/air-blow blowers are the SAME air-
+                # handling family as ducting/AHU — real equipment moving process air, not
+                # building comfort air. Crediting these closes the false "no air-side
+                # scope" reading (the has_hvac_duty widening above) with the actual
+                # equipment carrying the duty, instead of silently vacuous-passing on
+                # zero matched air-side parts.
+                r"hot[ -]?air dryer|air[ -]?heater|heat[- ]?recovery exchanger|"
+                r"air[- ]?blow|inlet blower",
                 re.I)
             _COOLANT_FAM = re.compile(
                 r"\bhvac\b|chiller|\bcool|coolant|cold[ -]?plate|condensate|radiator|"
@@ -600,10 +622,23 @@ def _aux_tab_score(title: str, run_dir: str):
                 _all_bom = [r for r in (_st2.get("requirementsBom") or []) if isinstance(r, dict)]
             except Exception:  # noqa: BLE001
                 _all_bom = []
+            # EQUIPMENT, not routing edges (2026-07-06 fix, exposed by the has_hvac_duty
+            # widening above): a process-plant requirementsBom also carries ROUTED rows
+            # ('water connection: CaCO3 hot-air dryer -> CaCO3 vacuum belt filter') and
+            # SUB-COMPONENT rows — pipe/cable RUNS between two pieces of equipment, drawn
+            # as connecting lines, never as their own tagged equipment block. The drawing's
+            # own 'equipment schedule' only ever lists principal equipment (r-103, v-113,
+            # k-101, …). Counting every connection-edge SENTENCE that happens to name a
+            # matched noun as its own "part" inflated the denominator with entries the
+            # drawing was never going to tag individually, manufacturing false "MISSING"
+            # findings once air-side matching switched on. Universal — ROUTED/SUB-COMPONENT
+            # are generic status tags used across every archetype, not a CO2-specific fix.
+            _NON_EQUIPMENT_STATUS = {"ROUTED", "ROUTED·REVIEW", "SUB-COMPONENT"}
             def _fam_parts(fam_rx):
                 return sorted({str(r.get("requirement") or r.get("part") or "").split("·")[0].strip()
                               for r in _all_bom
-                              if fam_rx.search(str(r.get("requirement") or r.get("part") or ""))} - {""})
+                              if str(r.get("status") or "") not in _NON_EQUIPMENT_STATUS
+                              and fam_rx.search(str(r.get("requirement") or r.get("part") or ""))} - {""})
             _air_parts = _fam_parts(_AIRSIDE_FAM)
             _cool_parts = _fam_parts(_COOLANT_FAM)
             _svg_txt = ""
@@ -645,11 +680,41 @@ def _aux_tab_score(title: str, run_dir: str):
                     if not _ok:
                         _load_issue = (f"HVAC load reconciliation FAILS: contract quantities "
                                        f"{', '.join(_load_keys)} diverge >15% ({_lo:g}–{_hi:g})")
+                # ATEX/DSEAR HAZARDOUS-AREA VENTILATION (honest-gap check, 2026-07-06):
+                # a brief citing DSEAR/ATEX for a named handling/drying area asserts a real
+                # hazardous-area classification, which normally REQUIRES dedicated forced
+                # dilution/area-extract ventilation (IEC 60079-10 / DSEAR ACOP). A design
+                # that credits its process air-handling equipment (above) but has NO
+                # dedicated area-extract/purge ventilation for that cited hazardous area is
+                # a genuine engineering GAP — this must score LOW with a routed note, never
+                # be silently dropped and never be dressed up as "out of scope" (the brief
+                # never excluded it). Universal: keyed on the brief's own ATEX/DSEAR
+                # citation + a generic area-ventilation noun set, no archetype table.
+                _orig_brief_txt = ""
+                try:
+                    with open(os.path.join(run_dir or "", "0-original-brief.md"),
+                              "r", encoding="utf-8") as _fh:
+                        _orig_brief_txt = _fh.read()
+                except Exception:  # noqa: BLE001
+                    _orig_brief_txt = ""
+                _atex_cited = bool(re.search(
+                    r"\bdsear\b|\batex\b|explosion[- ]?proof|hazardous area|explosive atmosphere",
+                    _orig_brief_txt, re.I))
+                _area_extract_present = any(
+                    re.search(r"area extract|extract fan|purge ventilat|zone ventilat|"
+                              r"hazardous.{0,25}ventilat|explosion.{0,20}vent",
+                              str(r.get("requirement") or r.get("part") or ""), re.I)
+                    for r in _all_bom)
+                _comp_atex = ((1 if _area_extract_present else 0, 1) if _atex_cited else None)
                 _components = [
                     ("air-side (ducting/AHU/ventilation) parts shown on the HVAC drawing", *_comp_air),
                     ("coolant/refrigeration parts shown on the HVAC drawing", *_comp_cool),
                     ("HVAC load reconciliation across contract quantities", *_comp_load),
                 ]
+                if _comp_atex is not None:
+                    _components.append((
+                        "ATEX/DSEAR hazardous-area ventilation for the brief's cited "
+                        "handling/drying area(s)", *_comp_atex))
                 _sc = round(10.0 * min(p / c for _l, p, c in _components if c), 1)
                 if _sc == int(_sc):
                     _sc = int(_sc)
@@ -662,13 +727,24 @@ def _aux_tab_score(title: str, run_dir: str):
                                    f"— MISSING from the drawing: {', '.join(_cool_missing[:5])}")
                 if _load_issue:
                     _issues.append(_load_issue)
+                if _comp_atex is not None and _comp_atex[0] < _comp_atex[1]:
+                    _issues.append(
+                        "the brief cites DSEAR/ATEX hazardous-area classification for the "
+                        "MEA-handling + drying areas, but no dedicated area-extract/purge "
+                        "ventilation equipment appears in the design — a genuine hazardous-"
+                        "area ventilation GAP (not an out-of-scope item; the brief never "
+                        "excludes it)")
                 return {"score": _sc, "target": 8, "status": "PASS" if _sc >= 8 else "FAIL",
                         "issues": _issues or [f"air-side {_comp_air[0]}/{_comp_air[1]}, coolant "
                                                f"{_comp_cool[0]}/{_comp_cool[1]}, load reconciliation "
                                                f"{_comp_load[0]}/{_comp_load[1]}"],
                         "fix": ("the HVAC drawing generator must draw the design's full HVAC scope "
                                 "(air-side AC / ventilation / ducting as well as the coolant loop)"
-                                if (_air_missing or _cool_missing) else ""),
+                                if (_air_missing or _cool_missing)
+                                else ("size + add dedicated area-extract/purge ventilation for the "
+                                      "brief's cited DSEAR/ATEX hazardous area(s)"
+                                      if (_comp_atex is not None and _comp_atex[0] < _comp_atex[1])
+                                      else "")),
                         "components": [{"check": l, "passed": p, "checked": c}
                                        for l, p, c in _components]}
             return {
@@ -19535,6 +19611,60 @@ def _selftest() -> int:
             print(f"  FAIL hvac-outofscope: an out-of-scope claim with NO supporting "
                   f"brief citation must score BELOW 8 (unsupported disclosure), got "
                   f"{_hv5}"); bad += 1
+
+    # ═══ proveCatch the PROCESS-DRYER air-handling duty + ATEX/DSEAR ventilation gap
+    # (CO2-mineralisation cross-val 2026-07-06) — a chemical-process design carrying a
+    # material dryer's thermal/air duty must NEVER be scored via the out-of-scope path
+    # (that would be a dishonest disclosure over real, un-excluded HVAC-adjacent scope);
+    # it must be CREDITED via the coverage path instead, AND a brief citing DSEAR/ATEX
+    # for a named hazardous area with NO area-extract/purge ventilation equipment in the
+    # design must score a hard, routed GAP — never silently pass. ═══
+    with _tfh.TemporaryDirectory() as _tdh3:
+        os.makedirs(os.path.join(_tdh3, "drawings"), exist_ok=True)
+        with open(os.path.join(_tdh3, "drawings", "hvac-layout.svg"), "w") as _fh:
+            _fh.write("<svg><text>hot-air dryer</text><text>trim cooler</text></svg>")
+        with open(os.path.join(_tdh3, "state.json"), "w") as _fh:
+            json.dump({"orchestratorContract": {"quantities": {
+                           "product_dryer_duty_kw": {"value": 17.8, "unit": "kW"},
+                           "product_dryer_air_flow_kg_h": {"value": 532.0, "unit": "kg/h"}}},
+                       "requirementsBom": [
+                           {"tag": "E-1", "requirement": "hot-air dryer", "status": "IDENTIFIED"},
+                           {"tag": "E-2", "requirement": "trim cooler", "status": "IDENTIFIED"},
+                           {"tag": "R-1", "requirement": "water connection: hot-air dryer -> trim cooler",
+                            "status": "ROUTED"},
+                       ]}, _fh)
+        with open(os.path.join(_tdh3, "0-original-brief.md"), "w") as _fh:
+            _fh.write("DSEAR and ATEX Directive 2014/34/EU for the solvent handling and "
+                      "drying areas (solvent is combustible).\n")
+        _hv6 = _aux_tab_score("HVAC", _tdh3)
+        if not _hv6 or "out of scope" in " ".join(str(i) for i in (_hv6.get("issues") or [])).lower() \
+                or _hv6.get("scored") is False:
+            print(f"  FAIL hvac-dryer-duty: a design with a real dryer thermal/air duty "
+                  f"must NEVER take the out-of-scope path (got {_hv6})"); bad += 1
+        _hv6_comps = {c["check"]: (c["passed"], c["checked"]) for c in (_hv6.get("components") or [])}
+        _atex_key = next((k for k in _hv6_comps if "ATEX" in k), None)
+        if _atex_key is None or _hv6_comps[_atex_key] != (0, 1) or _hv6.get("score") != 0:
+            print(f"  FAIL hvac-atex-gap: a brief citing DSEAR/ATEX with NO area-extract/"
+                  f"purge ventilation equipment must score the ATEX component 0/1 and "
+                  f"floor the tab to 0 (got components={_hv6_comps}, score={_hv6.get('score')})")
+            bad += 1
+        # both directions: adding a real area-extract fan must clear the ATEX component.
+        with open(os.path.join(_tdh3, "state.json"), "w") as _fh:
+            json.dump({"orchestratorContract": {"quantities": {
+                           "product_dryer_duty_kw": {"value": 17.8, "unit": "kW"},
+                           "product_dryer_air_flow_kg_h": {"value": 532.0, "unit": "kg/h"}}},
+                       "requirementsBom": [
+                           {"tag": "E-1", "requirement": "hot-air dryer", "status": "IDENTIFIED"},
+                           {"tag": "E-2", "requirement": "trim cooler", "status": "IDENTIFIED"},
+                           {"tag": "E-3", "requirement": "hazardous area extract fan", "status": "IDENTIFIED"},
+                       ]}, _fh)
+        _COV_CACHE.pop(_tdh3, None)
+        _hv7 = _aux_tab_score("HVAC", _tdh3)
+        _hv7_comps = {c["check"]: (c["passed"], c["checked"]) for c in (_hv7.get("components") or [])}
+        _atex_key7 = next((k for k in _hv7_comps if "ATEX" in k), None)
+        if _atex_key7 is None or _hv7_comps[_atex_key7] != (1, 1):
+            print(f"  FAIL hvac-atex-gap: a design WITH a hazardous-area extract fan must "
+                  f"clear the ATEX component 1/1 (got {_hv7_comps})"); bad += 1
 
     # ═══ proveCatch the BoM LEDGER column contract (Tristan 2026-07-02, issue 7) ═══
     # Claims: (a) a bought-out ASSEMBLY without a material PASSES with the stated

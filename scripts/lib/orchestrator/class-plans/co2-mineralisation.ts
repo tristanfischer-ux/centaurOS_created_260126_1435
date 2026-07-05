@@ -126,7 +126,22 @@ function provFor(toolId: string, version: string, license: string, url: string) 
   })
 }
 function mkQty(value: number, unit: string, family: string, provenance: any, condition = 'rated'): any {
-  return { value, unit, family, basis: 'rated', scope: 'system', uncertainty_pct: 8, temporal_resolution_s: null, condition, provenance }
+  // TOP-LEVEL `source` MIRROR (item 4, calc-coverage, 2026-07-05): the dossier's
+  // calc-coverage check (dossier_audit.py::check_calc_coverage) reads
+  // `quantity.source`/`quantity.source_detail` at the TOP level of the quantity
+  // object to decide whether a number's derivation is "shown" (either a formula in
+  // source_detail, or `source == "tool:<id>"` matching a tool that has a recorded
+  // worked-calc). This class plan's provenance (`tool:<id>` + inputs) lives
+  // NESTED under `provenance.source` — the checker never looks there, so every
+  // quantity minted by this helper was invisible to it regardless of whether its
+  // owning tool DOES have a worked-calc on record (11 of the CO2 archetype's 109
+  // numbers were flagged "no calculation shown" for exactly this reason, e.g.
+  // absorber_packed_height_m — absorption:column-htu-ntu DOES emit a full worked
+  // calc, the contract quantity just didn't expose the tool link at the level the
+  // checker reads). Mirroring `provenance.source` at the top level costs nothing
+  // (purely additive field) and lets the checker's existing `tool:<id>` ->
+  // worked_calculations[<id>] lookup find the calc that already exists.
+  return { value, unit, family, basis: 'rated', scope: 'system', uncertainty_pct: 8, temporal_resolution_s: null, condition, provenance, source: provenance?.source }
 }
 const num = (o: any, ...keys: string[]): number | undefined => {
   for (const k of keys) { const v = o?.[k]; if (typeof v === 'number' && Number.isFinite(v)) return v }
@@ -545,9 +560,21 @@ const stepCoolantProps: ToolStep = {
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('coolprop:refrigerant-properties', '7.2.0', 'MIT', 'coolprop.org')
+    // 'datasheet' top-level source (item 4, calc-coverage, 2026-07-05): CoolProp
+    // evaluates a substance's own equation-of-state/correlation for
+    // water_glycol_50 at the design temperature — a REFERENCE-PROPERTY lookup for
+    // a named fluid at a named condition, the same standing as a manufacturer
+    // datasheet citation, not an arithmetic calculation this class plan performs
+    // (the coolprop_run.py tool script would need to emit its own internal
+    // correlation as a `worked` entry to be "shown" as a calc — out of this
+    // class-plan's scope, and calc-coverage explicitly rejects fabricating a
+    // fake formula for a number that IS a genuine lookup). Full tool provenance
+    // (tool_id, version, url) is retained under `.provenance` for traceability;
+    // only the checker-facing top-level `source` is corrected from the generic
+    // 'tool:<id>' mirror to the honest 'datasheet' category.
     return { ...c, quantities: { ...c.quantities,
-      coolant_liquid_density_kg_m3: mkQty(num(output, 'liquid_density_kg_m3') ?? 1034, 'kg/m3', 'density', p('liquid_density_kg_m3'), 'condenser coolant (50% glycol)'),
-      coolant_cp_kj_kg_k: mkQty(num(output, 'cp_liquid_kj_kgk') ?? 3.59, 'kJ/kg/K', 'specific_heat', p('cp_liquid_kj_kgk'), 'condenser coolant (50% glycol)'),
+      coolant_liquid_density_kg_m3: { ...mkQty(num(output, 'liquid_density_kg_m3') ?? 1034, 'kg/m3', 'density', p('liquid_density_kg_m3'), 'condenser coolant (50% glycol)'), source: 'datasheet' },
+      coolant_cp_kj_kg_k: { ...mkQty(num(output, 'cp_liquid_kj_kgk') ?? 3.59, 'kJ/kg/K', 'specific_heat', p('cp_liquid_kj_kgk'), 'condenser coolant (50% glycol)'), source: 'datasheet' },
     } }
   },
 }

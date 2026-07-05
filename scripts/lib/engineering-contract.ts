@@ -11765,7 +11765,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     mea_concentration_wt_pct: q(meaConcentrationWtPct, '%', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '30 wt% aqueous monoethanolamine solvent' }),
     flue_gas_flow_m3_per_hour: q(flueGasFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~225 m³/h flue gas (~12% CO₂) to the absorber' }),
     mea_circulation_m3_per_hour: q(meaCirculationM3PerHour, 'm³/h', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: 'first-principles lean-amine circulation; 0.68 m³/h @ 1 t/d (NOT 2.9 — the engine 4× over-flow)' }),
-    mea_circulation_pump_kw: q(meaPumpKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '0.75 kW lean-amine circulation pump' }),
+    mea_circulation_pump_kw: q(meaPumpKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `0.75 kW/(t/d) × ${scale.toFixed(2)} scale = ${meaPumpKw.toFixed(2)} kW lean-amine circulation pump` }),
 
     // ── Packed absorber column (316L) ──
     absorber_column_diameter_m: q(absorberDiameterM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'DN300 flooding-limited; the brief 100 mm floods at full flue-gas flow (≈4× flooding velocity)' }),
@@ -11776,21 +11776,27 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     absorber_material: q(1, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'enum: 1 = 316L stainless (amine service, ≤120 °C)' }),
 
     // ── Stripper / regenerator (316L) ──
-    stripper_column_diameter_m: q(stripperDiameterM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: 'DN300 regenerator' }),
+    // physics_constant (not 'calculator'): DN300 is a fixed design choice matching
+    // the absorber's flooding-limited diameter, not a value derived by arithmetic
+    // from another quantity — honestly tagged as an INPUT so calc-coverage never
+    // demands a fabricated formula for a number that isn't actually computed.
+    stripper_column_diameter_m: q(stripperDiameterM, 'm', 'length', 'rated', 'module', 'physics_constant', { source_detail: 'DN300 regenerator — fixed design constant, matches the absorber\'s flooding-limited diameter (not scaled with throughput)' }),
     stripper_column_height_m: q(stripperHeightM, 'm', 'length', 'rated', 'module', 'calculator', { source_detail: '12 m stripper/regenerator column, 316L' }),
 
     // ── Thermal duties (MEA heat integration) ──
     reboiler_duty_kw: q(reboilerDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: 'steam reboiler at the stripper base; ≈ recovered cross-exchanger duty (correct amine-plant signature)' }),
-    reboiler_area_m2: q(reboilerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~3 m² kettle/thermosiphon reboiler' }),
+    reboiler_area_m2: q(reboilerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: `3.0 m²/(t/d) × ${scale.toFixed(2)} scale = ${reboilerAreaM2.toFixed(2)} m² kettle/thermosiphon reboiler` }),
     lean_rich_cross_exchanger_duty_kw: q(crossExchangerDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '43.6 kW lean/rich amine cross-exchanger (NOT 186 kW — engine 4× over-duty). Reboiler ≈ this duty = correct heat-integration fingerprint' }),
-    lean_rich_cross_exchanger_area_m2: q(crossExchangerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~8 m² plate or shell-and-tube cross-exchanger' }),
+    lean_rich_cross_exchanger_area_m2: q(crossExchangerAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: `8.0 m²/(t/d) × ${scale.toFixed(2)} scale = ${crossExchangerAreaM2.toFixed(2)} m² plate or shell-and-tube cross-exchanger` }),
     overhead_condenser_duty_kw: q(condenserDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '50.9 kW overhead condenser (reflux + CO₂ knock-out)' }),
-    overhead_condenser_area_m2: q(condenserAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '~3.2 m² overhead condenser' }),
+    overhead_condenser_area_m2: q(condenserAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: `3.2 m²/(t/d) × ${scale.toFixed(2)} scale = ${condenserAreaM2.toFixed(2)} m² overhead condenser` }),
 
     // ── PRIMARY gypsum carbonation reactor ──
     gypsum_feed_t_per_day: q(gypsumFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '3.1 t/d gypsum (CaSO₄·2H₂O) → ~18 kmol/d Ca' }),
     gypsum_carbonation_reactor_volume_m3: q(gypsumReactorVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '1.0 m³ stirred carbonation reactor, 316L (NOT 4 m³ — engine 4× oversize)' }),
-    gypsum_reactor_agitator_kw: q(gypsumAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '4 kW top-entry agitator for the gypsum carbonation slurry' }),
+    // was '4 kW top-entry agitator' — stale prose (2026-06-08) never updated when the
+    // constant became 5.0 kW/(t/d); the formula string now tracks the real constant.
+    gypsum_reactor_agitator_kw: q(gypsumAgitatorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `5.0 kW/(t/d) × ${scale.toFixed(2)} scale = ${gypsumAgitatorKw.toFixed(2)} kW top-entry agitator for the gypsum carbonation slurry` }),
     co2_fixed_gypsum_route_t_per_day: q(co2FixedGypsumTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~1.0 t/d CO₂ fixed; fixes the FULL 1 t/d captured CO2 (excess-CO2 operation + recycle to absorber)' }),
     total_co2_fixed_t_per_day: q(totalCo2FixedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '~1.0 t/d → the single gypsum sink closes the full 1 t/d capture (excess-CO2 operation + recycle to absorber)' }),
 
@@ -11800,12 +11806,12 @@ registerArchetype('co2_mineralisation', (brief: any) => {
 
     // ── K₂SO₄ recovery ──
     koh_feed_t_per_day: q(kohFeedTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '2.6 t/d potassium hydroxide for sulfate → K₂SO₄ conversion' }),
-    k2so4_crystalliser_volume_m3: q(crystalliserVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '~1.1 m³ forced-circulation crystalliser body' }),
-    k2so4_crystalliser_evap_kw: q(crystalliserEvapKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '~80 kW evaporative duty (forced-circulation K₂SO₄ crystalliser)' }),
+    k2so4_crystalliser_volume_m3: q(crystalliserVolumeM3, 'm³', 'volume', 'rated', 'module', 'calculator', { source_detail: `1.1 m³/(t/d) × ${scale.toFixed(2)} scale = ${crystalliserVolumeM3.toFixed(2)} m³ forced-circulation crystalliser body` }),
+    k2so4_crystalliser_evap_kw: q(crystalliserEvapKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `80 kW/(t/d) × ${scale.toFixed(2)} scale = ${crystalliserEvapKw.toFixed(2)} kW evaporative duty (forced-circulation K₂SO₄ crystalliser)` }),
 
     // ── Flue-gas blower ──
-    flue_gas_blower_flow_m3_per_hour: q(blowerFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: '225 m³/h flue-gas blower' }),
-    flue_gas_blower_kw: q(blowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: '1.5 kW flue-gas blower' }),
+    flue_gas_blower_flow_m3_per_hour: q(blowerFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `225 m³/h/(t/d) × ${scale.toFixed(2)} scale = ${blowerFlowM3PerHour.toFixed(0)} m³/h flue-gas blower flow` }),
+    flue_gas_blower_kw: q(blowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `1.5 kW/(t/d) × ${scale.toFixed(2)} scale = ${blowerKw.toFixed(2)} kW flue-gas blower` }),
 
     // ── System ──
     connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ motor + evaporative duties (MEA pump + agitators + crystalliser evap + blower)' }),
@@ -11979,12 +11985,33 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   })
   // CaCO₃ mass balance — products should reconcile with CO₂ fixed (CaCO₃ M=100,
   // CO₂ M=44, so CaCO₃ ≈ CO₂ × 100/44 ≈ 2.27×).
+  //
+  // REQUIRED-STRING GRAMMAR (2026-07-05, item-12 unit-family family again): the
+  // generic deterministic checker (scripts/deterministic_checks_lib.py
+  // `_extract_equality_target`) re-derives an independent "A × B == target" from
+  // this closure's OWN `required` prose whenever it contains a "×" — it takes the
+  // FIRST TWO numbers it finds, left-to-right, and multiplies them. The old prose
+  // "CO₂ fixed × 100/44 ≈ 2.27 t/d" put the stoichiometric RATIO's numerator and
+  // denominator (100, 44) first — the checker read those as the two operands and
+  // computed 100 × 44 = 4,400 as its target, then FAILED the closure against the
+  // correct 2.27 t/d measured value (a false FAIL: 2.27 vs 4,400 — the engine's own
+  // "pass" verdict below was right all along, only the generic checker's naive
+  // parse of the prose was wrong). Fix at the SOURCE of the prose, not the shared
+  // parser (which is correct for its OTHER "A × B == C" closures, e.g. the flow-
+  // continuity check in the same file) — put the TRUE operands (CO₂ fixed t/d,
+  // then the single-number stoichiometric factor 100/44) as the first two numbers
+  // in reading order so ANY "first two numbers × " parser lands on the right
+  // target. proveCatch: co2Fixed=1.00 -> nums[0]=1.00, nums[1]=2.2727 -> target
+  // 2.2727 (matches measured 2.27, within the checker's tolerance); co2Fixed=3.50
+  // -> target 7.95 (matches 3.50 × 100/44), never 100×44=4400 regardless of scale.
+  const caco3StoichiometricFactor = 100 / 44
+  const caco3StoichiometricTargetTonsPerDay = totalCo2FixedTonsPerDay * caco3StoichiometricFactor
   closures.push({
     invariant_id: 'caco3_output_reconciles_with_co2_fixed',
-    status: Math.abs(totalCaco3TonsPerDay - totalCo2FixedTonsPerDay * (100 / 44)) / (totalCo2FixedTonsPerDay * (100 / 44)) <= 0.15 ? 'pass' : 'warn',
+    status: Math.abs(totalCaco3TonsPerDay - caco3StoichiometricTargetTonsPerDay) / caco3StoichiometricTargetTonsPerDay <= 0.15 ? 'pass' : 'warn',
     measured: Number(totalCaco3TonsPerDay.toFixed(2)),
-    required: `CaCO₃ output ≈ CO₂ fixed × 100/44 ≈ ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d (stoichiometric)`,
-    reason: `CaCO₃ output ${totalCaco3TonsPerDay.toFixed(2)} t/d vs stoichiometric ${(totalCo2FixedTonsPerDay * (100 / 44)).toFixed(2)} t/d from ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed (single gypsum route).`,
+    required: `${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed × ${caco3StoichiometricFactor.toFixed(4)} (stoichiometric CaCO₃:CO₂ mass ratio, M100/M44) ≈ ${caco3StoichiometricTargetTonsPerDay.toFixed(2)} t/d CaCO₃ output`,
+    reason: `CaCO₃ output ${totalCaco3TonsPerDay.toFixed(2)} t/d vs stoichiometric ${caco3StoichiometricTargetTonsPerDay.toFixed(2)} t/d from ${totalCo2FixedTonsPerDay.toFixed(2)} t/d CO₂ fixed (single gypsum route).`,
   })
   // Absorber flooding margin — DN300 vs the brief's un-grounded 100 mm.
   closures.push({

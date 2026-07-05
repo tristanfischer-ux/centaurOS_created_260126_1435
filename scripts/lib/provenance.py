@@ -250,6 +250,19 @@ _GENERIC_ROLE = {
     # exactly as 'power'/'mass' above; only the genuine domain token (cell/bus/string)
     # discriminates.
     "voltage", "volt", "current", "amperage", "frequency",
+    # UNIT-PHRASE time words spelled out INSIDE a key name (CO2-mineralisation cross-val
+    # 2026-07-06): a key like 'flue_gas_flow_m3_per_hour' encodes its unit as literal
+    # tokens ('per', 'hour') rather than in the `unit` field ('m³/h' has no letter run
+    # ≥3 chars for `_unit_tokens` to strip). 'per' was already generic; 'hour' (and its
+    # day/week/month/year/minute/second siblings) were NOT, so any two *_per_hour /
+    # *_per_day quantities shared 'hour'/'day' as a spurious "role" regardless of what
+    # they actually measure — flue_gas_flow_m3_per_hour (a GAS volumetric flow) and
+    # mea_circulation_m3_per_hour (a LIQUID circulation flow) unioned on 'hour' alone and
+    # false-flagged a 331× "divergence" between two genuinely different physical
+    # quantities. These are unit vocabulary, never a domain discriminator — universal
+    # across any '<qty>_per_<time>' naming convention, not CO2-specific.
+    "hour", "hours", "day", "days", "week", "weeks", "month", "months",
+    "year", "years", "minute", "minutes", "second", "seconds",
 }
 
 # Aggregate qualifiers: a key carrying one of these is a SYSTEM ROLL-UP of a same-role
@@ -361,6 +374,26 @@ def _selftest() -> int:
     }}}
     expect(not any(f.kind == "divergence" for f in audit_provenance(pumps).findings),
            "a metering pump and a circulation pump (different devices) must NOT be flagged divergent")
+
+    # UNIT-PHRASE TIME-WORD guard (CO2-mineralisation cross-val 2026-07-06, both
+    # directions): a GAS flow and a LIQUID circulation flow named '..._per_hour' must
+    # NOT cluster merely because 'hour' is spelled out in both key names — they carry no
+    # genuine shared domain token (flue/gas vs mea). Two truly same-role '..._per_hour'
+    # values (same domain token) must still flag.
+    per_hour = {"orchestratorContract": {"quantities": {
+        "flue_gas_flow_m3_per_hour":        {"value": 225.0, "unit": "m³/h", "source": "brief"},
+        "flue_gas_blower_flow_m3_per_hour": {"value": 225.0, "unit": "m³/h", "source": "brief"},
+        "mea_circulation_m3_per_hour":      {"value": 0.68, "unit": "m³/h", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(per_hour).findings),
+           "flue-gas flow and MEA circulation ('..._per_hour' siblings) must NOT be "
+           "flagged divergent merely because 'hour' is spelled out in both key names")
+    same_role_per_hour = {"orchestratorContract": {"quantities": {
+        "mea_circulation_m3_per_hour":       {"value": 0.68, "unit": "m³/h", "source": "brief"},
+        "mea_makeup_circulation_m3_per_hour": {"value": 68.0, "unit": "m³/h", "source": "brief"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_role_per_hour).findings),
+           "two genuinely same-role ('mea') '..._per_hour' values must still cluster/flag")
 
     # ELECTRICAL-ARCHETYPE role guards (BESS cross-val 2026-07-03, both directions):
     # a 3.2 V cell vs its 1500 V series bus, and a per-cell mass vs its ×6097 system
