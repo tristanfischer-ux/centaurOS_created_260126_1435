@@ -5393,6 +5393,16 @@ _SYN_ROLE = {
 # and the parts-ledger / GA join on real names instead of generic role labels.
 _SYN_BLOCK_BOM = {}
 
+# Synthetic block-prefix → a short human description of the PHYSICAL HOST a small
+# accessory was surface-mounted on (2026-07-06, HOST-ATTACHMENT fix — Tristan:
+# "what are all the components at the top doing? ... why are they not wired into
+# anything?"). Only populated for items place_rack_farm mounted ON a derivable
+# host (rack bank / container wall / coolant skid) instead of stranding them on
+# the exterior pad; every other archetype/role leaves this empty, so the manifest
+# schema for everything else is byte-identical to before. _synthetic_equipment_rows
+# reads it to add an ADDITIVE `placed_on` field (only present when a host exists).
+_SYN_BLOCK_HOST = {}
+
 # Recognised synthetic prefixes → a regex that captures (block_key, role) from the
 # object name, so each distinct piece of kit becomes ONE manifest row. block_key
 # makes a rack r0c0 distinct from r0c1; role drives the tag.
@@ -5520,6 +5530,7 @@ def _synthetic_equipment_rows(parts, region_rank_default):
     rows = []
     # longest prefix first so a specific block key never falls to a shorter match
     _bom_prefixes = sorted(_SYN_BLOCK_BOM.items(), key=lambda kv: -len(kv[0]))
+    _syn_host_prefixes = sorted(_SYN_BLOCK_HOST.items(), key=lambda kv: -len(kv[0]))
     for (block_key, role, letter, label, is_round,
          cx, cy, cz, w, dep, h) in entries:
         counters[letter] = counters.get(letter, 100) + 1
@@ -5536,7 +5547,16 @@ def _synthetic_equipment_rows(parts, region_rank_default):
             if block_key.startswith(pref):
                 bom_name, bom_module = pn, pm
                 break
-        rows.append({
+        # HOST-ATTACHMENT (2026-07-06): if this block was surface-mounted on a real
+        # host (rack bank / container wall / coolant skid — see place_rack_farm §3c),
+        # record it. `placed_on` is ADDITIVE and only appears on rows with a derived
+        # host, so every other row/archetype's JSON is byte-identical to before.
+        placed_on = None
+        for pref, host in _syn_host_prefixes:
+            if block_key.startswith(pref):
+                placed_on = host
+                break
+        row = {
             "tag": block_key,
             "equipment_tag": equip_tag,
             "name": bom_name or label,
@@ -5545,7 +5565,10 @@ def _synthetic_equipment_rows(parts, region_rank_default):
             "qty": 1,
             "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
             "dims_mm": dims,
-        })
+        }
+        if placed_on:
+            row["placed_on"] = placed_on
+        rows.append(row)
     return rows
 
 
@@ -11414,6 +11437,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # BoM-name unification for the parts-manifest: record which REAL design part
     # each synthetic block renders (racks here; BoP skids as they place below).
     _SYN_BLOCK_BOM.clear()
+    _SYN_BLOCK_HOST.clear()
     _rack_part = next((p for p in parts
                        if re.search(r"(?<![a-z])rack(?![a-z])", str(p.name), re.IGNORECASE)),
                       None)
@@ -11756,27 +11780,38 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         print(f"[univ][rackfarm] companion power-conversion container: {pc_w/1000:.1f}×{pc_d/1000:.1f} m "
               f"({len(_external_bop)} skids: {', '.join(it[0] for it in _external_bop)})")
 
-    # ── 3c. EXTERIOR PAD BoP (battery-side overflow) ────────────────────────────
+    # ── 3c. EXTERIOR PAD BoP (battery-side overflow) + HOST-ATTACHED accessories ──
     # Skids that did not fit a container floor lane sit on the pad along the +Y long
     # wall (the companion power-conversion container has the −Y side). At deck level,
     # real gear on real ground — never stacked above the racks.
     #
-    # TWO-ROW PACK (2026-07-05, BESS v3 LAP-3 coverage pass): a FRONT row (real
-    # balance-of-plant skids — chiller/aircon/louvre/fire/ems_ctrl/…) and a BACK row
-    # (genuinely small accessories — rack heater/isolator/BMS module/duct+manifold
-    # stubs) run in PARALLEL along X instead of one single chained line. A single
-    # line grows the pad — and so the deck + the longest cable-tray run down it — by
-    # the FULL SUM of every item's width; two parallel rows grow it by only the
-    # LONGER row's sum. Adding a dozen genuine small principals (the coverage fix
-    # this pass makes) down ONE line regressed site_utilisation 0.43→0.30 and nearly
-    # tripped gate no_stray_beam (19.6 m > the 16 m limit); two rows recovers both.
-    # Universal split on the item's own WIDTH (BOP_SMALL_ITEM_MM), not a role list.
+    # FRONT ROW (real freestanding balance-of-plant skids — chiller/aircon/louvre/
+    # fire/ems_ctrl/…, ≥ BOP_SMALL_ITEM_MM) stays exactly as before: it reads fine
+    # as equipment standing on the pad beside the enclosure.
+    #
+    # HOST-ATTACHMENT for the small accessories (2026-07-06, replaces the 2026-07-05
+    # "BACK ROW" — Tristan, verbatim: "what are all the components at the top doing?
+    # what are they and why are they not wired into anything?"). A rack heater / DC
+    # isolator / BMS slave / cold-plate manifold / duct stub / vent fan / fire panel
+    # is not free-standing equipment in a real BESS container — it is bolted ON its
+    # host: the rack bank it monitors or heats, the container wall it penetrates
+    # (duct/vent/fire hardware), or the coolant skid it plumbs into (loop pumps /
+    # tank / filter). Chaining all of them into one stranded line far from the racks
+    # (the old back row) is what read as "loose unlabeled unwired boxes." Mounting
+    # them AT their host instead both fixes the read AND shrinks the pad (the small
+    # items no longer add their own length to the exterior lineup at all), which is
+    # what recovers the site_utilisation regression the old back row caused.
+    # Universal: keyed on the BoP ROLE NAME (the same signal _BOP_ROLES itself is
+    # keyed on) mapped to a HOST CLASS, never a per-instance position table. A role
+    # with no derivable host (future roles _BOP_ROLES may add) still falls through
+    # to the old back-row pad placement — an honest fallback, never a silent drop.
     _pad_y1 = enc_y1
     if _pad_overflow:
         pad_gap = 1500.0
         pad_edge_y = enc_cy + enc_d / 2.0        # the battery container's +Y wall face
 
-        def _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy):
+        def _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy,
+                             host_tag=None):
             mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
             if mod not in MO:
                 MO[mod] = []
@@ -11786,6 +11821,8 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             MAT[f"u_rf_bop_{role}"] = mat
             if part_or_none is not None:
                 _SYN_BLOCK_BOM[nm] = (part_or_none.name, mod)
+            if host_tag:
+                _SYN_BLOCK_HOST[nm] = host_tag
             if role == "transformer":
                 _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                        mat, steel, MAT, mod, MO)
@@ -11803,23 +11840,105 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
 
         _pad_front = [it for it in _pad_overflow if it[3] >= BOP_SMALL_ITEM_MM]
         _pad_back = [it for it in _pad_overflow if it[3] < BOP_SMALL_ITEM_MM]
-        # front row hugs the wall; back row starts beyond the front row's deepest item
-        # (or the wall itself, if the front row is empty) + its own small clearance.
+
+        # front row hugs the wall — unchanged.
+        pad_cursor_x = enc_x0 + cont_margin
+        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_front:
+            cx = pad_cursor_x + w_mm / 2.0
+            cy = pad_edge_y + pad_gap + depth_mm / 2.0
+            _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy)
+            pad_cursor_x += w_mm + _bop_gap_mm(w_mm, depth_mm)
+            _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
         _front_depth = max((it[2] for it in _pad_front), default=0.0)
-        _row_gap = pad_gap if _pad_front else 0.0
-        _back_y0 = pad_edge_y + pad_gap + _front_depth + (_row_gap if _pad_front else 0.0)
-        for row, row_y0 in ((_pad_front, pad_edge_y + pad_gap), (_pad_back, _back_y0)):
+
+        # ROLE → HOST CLASS. Per-rack monitoring/heating/cooling hardware mounts ON
+        # the rack bank; duct/vent/fire penetration hardware mounts ON the container
+        # wall at the duct route; coolant-loop rotating equipment mounts BESIDE the
+        # coolant skid (chiller/aircon) it plumbs into.
+        _RACK_HOST_ROLES = {"rackheater", "dcisolator", "isolatorenclosure",
+                             "bmsslave", "coldplatemanifold", "coldplaterack",
+                             "coolantdistmanifold"}
+        _WALL_HOST_ROLES = {"hvacduct", "offgasduct", "deflagrationseal",
+                             "smokeinterlock", "ventfan", "offgasfan",
+                             "firerelease", "arcflash"}
+        _COOLANT_SKID_HOST_ROLES = {"coolingpump", "circpump", "condensatepump",
+                                     "expansiontank", "airfilter"}
+        _MOUNT_GAP_MM = 60.0     # surface-mount standoff off the host face
+
+        # rack-bank host: the LAST rack row's front (+Y, outward-facing) face —
+        # already the row nearest the exterior pad, so nothing moves far.
+        _rack_front_y = _rack_host_x0 = None
+        if rack_anchor_by_index:
+            _last_row_y = max(y for (_, y, _) in rack_anchor_by_index)
+            _rack_front_y = _last_row_y + RACK_D_MM / 2.0
+            _rack_host_x0 = min(x for (x, y, _) in rack_anchor_by_index
+                                 if y == _last_row_y) - RACK_W_MM / 2.0
+
+        # coolant-skid host: wherever the chiller/aircon/cooling role actually
+        # landed (floor lane, companion container, or the front pad row above —
+        # all already populate bop_anchor by this point).
+        _skid_role = next((r for r in ("chiller", "aircon", "cooling") if r in bop_anchor), None)
+        _skid_anchor = bop_anchor.get(_skid_role) if _skid_role else None
+        _role_wd = {it[0]: (it[3], it[2]) for it in list(bop_items) + list(_external_bop)}
+        _skid_w = _role_wd.get(_skid_role, (1600.0, 1000.0))[0] if _skid_role else None
+
+        _still_pad = []           # no derivable host → honest fallback (below)
+        _hosted_log = {"rack": [], "wall": [], "coolant skid": []}
+        _rack_cursor_x = _rack_host_x0
+        _wall_cursor_x = enc_x0 + cont_margin
+        _skid_cursor = 0.0
+        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_back:
+            if role in _RACK_HOST_ROLES and _rack_front_y is not None:
+                # a linear item (manifold/duct-stub) whose long axis is DEPTH would
+                # poke through the container wall if mounted with depth as the
+                # protrusion off the rack face — orient it along the row instead
+                # (long axis along X, matching how it actually runs past the racks).
+                mw, md = (depth_mm, w_mm) if depth_mm > w_mm else (w_mm, depth_mm)
+                cx = _rack_cursor_x + mw / 2.0
+                cy = _rack_front_y + _MOUNT_GAP_MM + md / 2.0
+                _build_pad_item(role, part_or_none, md, mw, h_mm, rgb, cx, cy,
+                                 host_tag="rack bank (last row, front face)")
+                _rack_cursor_x += mw + BOP_GAP_SMALL_MM
+                _pad_y1 = max(_pad_y1, cy + md / 2.0)
+                _hosted_log["rack"].append(role)
+            elif role in _WALL_HOST_ROLES:
+                cx = _wall_cursor_x + w_mm / 2.0
+                cy = enc_y1 + _MOUNT_GAP_MM + depth_mm / 2.0
+                _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy,
+                                 host_tag="container wall (+Y face, duct route)")
+                _wall_cursor_x += w_mm + BOP_GAP_SMALL_MM
+                _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
+                _hosted_log["wall"].append(role)
+            elif role in _COOLANT_SKID_HOST_ROLES and _skid_anchor is not None:
+                skid_cx, skid_cy, _ = _skid_anchor
+                cx = skid_cx - _skid_w / 2.0 - _MOUNT_GAP_MM - _skid_cursor - w_mm / 2.0
+                cy = skid_cy
+                _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy,
+                                 host_tag=f"coolant skid ({_skid_role})")
+                _skid_cursor += w_mm + BOP_GAP_SMALL_MM
+                _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
+                _hosted_log["coolant skid"].append(role)
+            else:
+                _still_pad.append((role, part_or_none, depth_mm, w_mm, h_mm, rgb))
+
+        if _still_pad:
+            _row_gap = pad_gap if _pad_front else 0.0
+            _back_y0 = pad_edge_y + pad_gap + _front_depth + (_row_gap if _pad_front else 0.0)
             pad_cursor_x = enc_x0 + cont_margin
-            for role, part_or_none, depth_mm, w_mm, h_mm, rgb in row:
+            for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _still_pad:
                 cx = pad_cursor_x + w_mm / 2.0
-                cy = row_y0 + depth_mm / 2.0
+                cy = _back_y0 + depth_mm / 2.0
                 _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy)
                 pad_cursor_x += w_mm + _bop_gap_mm(w_mm, depth_mm)
                 _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
+
         print(f"[univ][rackfarm] exterior pad BoP: {', '.join(it[0] for it in _pad_front)} (front row); "
-              f"{', '.join(it[0] for it in _pad_back)} (back row, small accessories) — "
-              f"no container floor lane fits; placed on the pad beside the enclosure "
-              f"(never stacked above the racks)")
+              f"{len(_pad_back) - len(_still_pad)} small accessories HOST-MOUNTED — "
+              f"rack bank: {', '.join(_hosted_log['rack']) or '—'}; "
+              f"container wall: {', '.join(_hosted_log['wall']) or '—'}; "
+              f"coolant skid: {', '.join(_hosted_log['coolant skid']) or '—'}"
+              + (f"; no derivable host (honest pad fallback): {', '.join(it[0] for it in _still_pad)}"
+                 if _still_pad else ""))
 
     # ── 4. TOPOLOGY: electrical bus (racks→DC bus→PCS→transformer) as cable
     #    trays + thermal (PCS/racks→heat rejection) as coolant pipes to the chiller.
