@@ -7214,7 +7214,12 @@ def _load_required_services():
             # PROCESS-FLUID role gated on the WET-plant signal (M1, 2026-06-23 — keep in
             # sync with component_engineering._required_services). RAS-only tokens
             # ('rear','cone') are a conditional extension folded in here, never universal.
-            if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress'))
+            # 'chill' ADDED (2026-07-05, BESS out/bess-campaign-v5 CH-101 — keep in sync
+            # with component_engineering._required_services): a chiller is a coolant-loop
+            # flow-through exchanger by definition (already in the POWER list above under
+            # the same noun) — without it no closer ever saw the part as needing a fluid
+            # tie at all.
+            if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress', 'chill'))
                               or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
                 req.add('water')
             # SERVICE-FAMILY EXCLUSION (2026-07-03): electrical gear / documentation /

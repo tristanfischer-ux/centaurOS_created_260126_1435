@@ -2582,6 +2582,97 @@ def _selftest() -> int:
             print(f"  FAIL INV-4 field-swap guard: a kW-rated 'fan tray' (standalone-unit scale) "
                   f"must be OUT OF SCOPE for the accessory override ({_big and _big['part']!r})"); bad += 1
 
+    # ── ACCESSORY IDENTITY FAMILY proveCatch (2026-07-05, I-10 'gas sensor mount' —
+    # generalising the fan-tray field-swap guard to the mount/bracket/tray/holder/
+    # rail/cradle/clamp noun family). Regex-shape cases first (both directions).
+    _accessory_cases = [
+        ("gas sensor mount", True),
+        ("DIN rail mount", True),
+        ("cable tray holder", True),
+        ("battery rack mounting bracket", True),
+        ("cold plate cradle clamp", True),
+        ("PCS cooling fan tray", True),      # fan-tray shape also matches (harmless — `elif` scoping below keeps it disjoint)
+        ("gas sensor", False),
+        ("gas detector controller", False),
+        ("PCS liquid cooling interface", False),
+    ]
+    for _name, _want_fires in _accessory_cases:
+        _got_fires = bool(_ACCESSORY_IDENTITY_RE.search(_name))
+        if _got_fires != _want_fires:
+            print(f"  FAIL _ACCESSORY_IDENTITY_RE.search({_name!r}) → {_got_fires} (want {_want_fires})"); bad += 1
+
+    # End-to-end via the real assemble() path — the fix AND its two scope boundaries
+    # (a rated principal sharing the noun; a cheap-but-honest accessory above no
+    # duty but with an EXPENSIVE own price, i.e. not actually accessory-scale).
+    with _fs_tf.TemporaryDirectory() as _gd:
+        _gwords = [
+            {"id": "gas_sensor_word", "name_human": "gas sensor",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×13"},
+                 {"kind": "manufacturer", "value": "Crowcon"},
+                 {"kind": "part_number", "value": "TXgard-IS+"},
+             ]},
+            # FIELD-SWAP shape: mount copies the parent detector's exact identity.
+            {"id": "gas_sensor_mount_word", "name_human": "gas sensor mount",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×13"},
+                 {"kind": "manufacturer", "value": "Crowcon"},
+                 {"kind": "part_number", "value": "TXgard-IS+"},
+             ]},
+            # SCOPE BOUNDARY 1 — a RATED principal sharing the 'rail'/'mount' noun
+            # (a structural rack rail) with a disagreeing pv_pn must be UNTOUCHED —
+            # the rating_primary duty check gates this fix, same as the fan-tray's
+            # kW scope boundary above.
+            {"id": "structural_rail_word", "name_human": "battery rack DIN rail mount",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "rating_primary", "value": "500", "unit": "kg"},
+                 {"kind": "manufacturer", "value": "Phoenix Contact"},
+                 {"kind": "part_number", "value": "NS-35-RAIL-HD"},
+             ]},
+            # SCOPE BOUNDARY 2 — no duty rating, but the researched price is well
+            # ABOVE the accessory ceiling — not actually accessory-scale — must be
+            # UNTOUCHED even though the noun matches and the PN disagrees.
+            {"id": "expensive_mount_word", "name_human": "sensor enclosure wall mount",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Crowcon"},
+                 {"kind": "part_number", "value": "TXgard-IS+"},
+             ]},
+        ]
+        _gpvs = [
+            {"word_id": "gas_sensor_word", "manufacturer": "Crowcon", "part_number": "TXgard-IS+",
+             "price_estimate_gbp": 150},
+            {"word_id": "gas_sensor_mount_word", "manufacturer": "Crowcon", "part_number": "A1TXG-ACC-MOUNT",
+             "price_estimate_gbp": 1},
+            {"word_id": "structural_rail_word", "manufacturer": "Phoenix Contact", "part_number": "OTHER-PN-999",
+             "price_estimate_gbp": 340},
+            {"word_id": "expensive_mount_word", "manufacturer": "Crowcon", "part_number": "WALL-MOUNT-HD-500",
+             "price_estimate_gbp": 340},
+        ]
+        json.dump({"moduleDecomposition": {"modules": [{"sub_modules": [{"words": _gwords}]}]},
+                   "partVerifications": _gpvs}, open(os.path.join(_gd, "state.json"), "w"))
+        _grows = assemble(_gd)
+        _gby_req = {r["requirement"].split(" · ")[0]: r for r in _grows}
+        _gdet = _gby_req.get("gas sensor")
+        _gmount = _gby_req.get("gas sensor mount")
+        _grail = _gby_req.get("battery rack DIN rail mount")
+        _gexp = _gby_req.get("sensor enclosure wall mount")
+        if not _gmount or _gmount["part"] != "Crowcon A1TXG-ACC-MOUNT":
+            print(f"  FAIL accessory-identity guard: gas sensor mount part = "
+                  f"{_gmount and _gmount['part']!r} (want 'Crowcon A1TXG-ACC-MOUNT')"); bad += 1
+        if not _gdet or _gdet["part"] != "Crowcon TXgard-IS+":
+            print(f"  FAIL accessory-identity guard: the genuine DETECTOR's own row "
+                  f"must stay untouched ({_gdet and _gdet['part']!r})"); bad += 1
+        if not _grail or _grail["part"] != "Phoenix Contact NS-35-RAIL-HD":
+            print(f"  FAIL accessory-identity guard: a rated principal sharing the "
+                  f"'rail'/'mount' noun must be OUT OF SCOPE for the accessory "
+                  f"override ({_grail and _grail['part']!r})"); bad += 1
+        if not _gexp or _gexp["part"] != "Crowcon TXgard-IS+":
+            print(f"  FAIL accessory-identity guard: a 'mount'-named line priced ABOVE "
+                  f"the accessory ceiling must be OUT OF SCOPE for the override "
+                  f"({_gexp and _gexp['part']!r})"); bad += 1
+
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
     # recirculation flow / DN300 / 316L. The schedule blanket-tags every water edge
@@ -4763,6 +4854,34 @@ def _normalise_partverification_prices(state: dict) -> list:
     return changes
 
 
+# ── ACCESSORY IDENTITY FAMILY (2026-07-05, generalising the fan-tray field-swap
+# guard above to I-10 'gas sensor mount' — BESS out/bess-campaign-v5, same
+# corpus-mismatch/field-swap MECHANISM, a different word noun). An accessory
+# that is physically fitted to / racked alongside a parent PRINCIPAL (a
+# mounting bracket, a DIN-rail mount, a cable-tray segment, a cradle, a clamp —
+# the fan-tray shape stays under its own established `_INTERNAL_FAN_TRAY_RE`
+# guard, untouched here) is frequently authored with the PARENT's own
+# manufacturer+part_number silently copied onto its modifier_characters — e.g.
+# 'gas sensor mount' carrying manufacturer=Crowcon / part_number=TXgard-IS+,
+# the PARENT DETECTOR's own catalogue identity (a real device, £150-580
+# corpus median), while the mount's independently-researched partVerification
+# correctly priced it as a £1 commodity accessory (A1TXG-ACC-MOUNT — an
+# unresolved but DISTINCT SKU, never inherited from a sibling by construction).
+# Rendering the copied identity false-joins the accessory to the parent's
+# price/spec wherever a downstream check matches by manufacturer+PN substring
+# (the exact x2,679 fan-tray mechanism). Universal accessory-noun match; scoped
+# to ACCESSORY SCALE so a genuine principal that happens to share one of these
+# nouns (a rated structural mounting frame, a priced cable-tray run) is never
+# touched: fires only when the line carries NO rating_primary duty of its own
+# AND its independently-researched price sits under an accessory ceiling — a
+# real principal at this scale would price well above it. proveCatch both
+# directions in `_selftest`.
+_ACCESSORY_IDENTITY_RE = re.compile(
+    r"\bfan[\s_-]?tray\b|\bmount(?:ing)?\b|\bbracket\b|\btray\b|\bholder\b|"
+    r"\brail\b|\bcradle\b|\bclamp\b", re.I)
+_ACCESSORY_IDENTITY_PRICE_CEILING_GBP = 50.0
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -4972,6 +5091,19 @@ def assemble(out_dir: str):
                         and re.search(r"\b\d{1,3}\s*w\b", requirement, re.I)):
                     _own_pv_pn = str(pv_pn.get(wid) or "").strip()
                     if _own_pv_pn and _own_pv_pn.upper() != pn.strip().upper():
+                        pn = _own_pv_pn
+                # ACCESSORY IDENTITY FAMILY (see _ACCESSORY_IDENTITY_RE docstring above) —
+                # a mount/bracket/tray/holder/rail/cradle/clamp word with NO rating_primary
+                # duty of its own AND a cheap (< £50) independently-researched price is
+                # accessory-scale; when its own researched PN disagrees with the (possibly
+                # copied) modifier PN, the researched identity wins. `elif` — never double-
+                # applies with the fan-tray branch above (disjoint noun shapes + duty check).
+                elif _ACCESSORY_IDENTITY_RE.search(name) and not duty:
+                    _own_pv_pn = str(pv_pn.get(wid) or "").strip()
+                    _own_price = price.get(wid)
+                    if (_own_pv_pn and _own_pv_pn.upper() != pn.strip().upper()
+                            and isinstance(_own_price, (int, float))
+                            and 0 < _own_price < _ACCESSORY_IDENTITY_PRICE_CEILING_GBP):
                         pn = _own_pv_pn
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
                 # ── FIELD INSTRUMENT (synthesizeInstrumentation #140): a level / temp /

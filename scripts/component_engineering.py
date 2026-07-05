@@ -60,7 +60,15 @@ def _required_services(name, module, function, wet_plant=True):
     # 'duct' inside the MODULE name 'energy_conversion_transDUCTion' handed every PCS
     # capacitor/arrester/transformer a process-water pipe); the short tokens
     # 'uv'/'fan' match whole words only ('loUVre' and 'relieF ANd' are not fluid kit).
-    if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress'))
+    # 'chill' ADDED (2026-07-05, BESS out/bess-campaign-v5 CH-101 'liquid cooling
+    # chiller'): a chiller is a coolant-loop FLOW-THROUGH exchanger by definition (it
+    # ALREADY carries the 'chiller' token in the POWER list two lines above — the
+    # same NOUN, now also correctly recognised as a fluid node) — without it the
+    # classifier never asked audit_completeness for a fluid tie on the part at all,
+    # so no closer ever ran (a "no host signal anywhere" gap indistinguishable from a
+    # genuinely dry part). Universal — matches 'chiller'/'chilled'/'chilling' by the
+    # bare substring, mirrors the existing 'exchanger'/'pump' fluid-noun entries.
+    if wet_plant and (any(k in tn for k in ('tank', 'rear', 'filter', 'mbbr', 'degas', 'oxygen', 'skim', 'sump', 'vessel', 'pump', 'clarifier', 'reservoir', 'manifold', 'header', 'pipework', 'pipe', 'duct', 'valve', 'exchanger', 'cone', 'column', 'tower', 'reactor', 'separator', 'contactor', 'blower', 'compress', 'chill'))
                       or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
         req.add('water')
     # ── (1a) SERVICE-FAMILY EXCLUSION (BESS cross-val 2026-07-03, the fluid-plant rule
@@ -538,6 +546,24 @@ def _selftest():
     # (e) dry plant: no water anywhere
     expect('water' not in _required_services("Buffer Tank", "structure", "", False),
            "a DRY archetype never gets process water")
+    # (f) CHILLER FAMILY proveCatch (2026-07-05, BESS out/bess-campaign-v5 CH-101 —
+    # 'liquid cooling chiller' got {'power'} only, never 'water', so audit_completeness
+    # never even flagged it as needing a fluid tie and no closer ever ran — a coolant
+    # loop's own heat-rejection unit was invisible to the whole connectivity net).
+    # 'chiller' already granted POWER by name (line ~52); it must ALSO grant water,
+    # generalised by the SAME noun token — never a per-tag fix.
+    expect('water' in _required_services("liquid cooling chiller", "environmental_interface", "", True),
+           "a liquid cooling chiller is a coolant flow-through node and must require water")
+    expect('water' in _required_services("Pfannenberg chiller unit", "environmental_interface", "", True),
+           "any chiller-named part keeps water (universal noun match, not a specific SKU)")
+    expect('water' in _required_services("chilled water circuit chiller", "environmental_interface", "", True),
+           "a chiller keeps water regardless of surrounding qualifier words")
+    # scope boundary — the added token is the narrow 'chill' (chiller/chilled/chilling),
+    # never the broader 'cool', so it does not touch any other keyword's existing verdict.
+    # 'step-up transformer' etc. (case (a) above) stay water-free: 'chill' doesn't appear
+    # in that family at all — this fix only ever ADDS a match for the literal chiller noun.
+    expect('water' not in _required_services("step-up transformer", "energy_conversion_transduction", "", True),
+           "the 'chill' addition must not affect unrelated electrical gear")
     if fails:
         print("component_engineering selftest FAILED:")
         for m in fails:
