@@ -75,7 +75,8 @@ import deterministic_checks_lib as dcl  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 from dossier_audit import (audit_dossier, tab_scores, tab_scorecard_summary,  # noqa: E402
                            _physics_high_is_design_defect, _TAG_PREFIX_OVERRIDES,
-                           check_brief_metric_fail)
+                           check_brief_metric_fail, _physics_issues, _corroborate_finding,
+                           _physics_claim_falsified, _PHYS_FP_PAYLOAD, _PHYS_FP_VAGUE)
 from dossier_repair import repair_dossier  # noqa: E402
 
 # The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
@@ -10798,40 +10799,129 @@ def _classify_risk_row(source: str, text: str) -> str:
     return CLS_EXTERNAL
 
 
+def _advisory_classify(state: dict, iss: dict):
+    """Mirrors dossier_audit._physics_high_is_design_defect's exact decision cascade (the SAME
+    gate-33 false-positive + corroboration-layer logic that scores the tab), but returns the
+    HONEST explanation instead of a bare bool — (is_defect, why_not_scored, clearing_action).
+
+    is_defect=True  → a deterministic check CORROBORATED this finding against the delivered
+                      design: it is a genuine hazard and belongs in the risk register.
+    is_defect=False → uncorroborated / falsified / a critic I/O artifact / a vague no-part
+                      hedge: it belongs in the 'Engine advisories' section, never the register,
+                      and NEVER with a re-run instruction that will not actually clear it — an
+                      uncorroborated finding is Stage 7.5 LLM-variance the corroboration layer
+                      already quarantines regardless of how the critic re-phrases it on a re-roll
+                      (Tristan 2026-07-05: "how can you give this a 10/10 … if you still have
+                      some risks as high" — the finding's OWN mitigation text said false-positive
+                      while still scoring/colouring as a hazard; this is the fix)."""
+    _NO_ACTION = "No action needed — the claim does not describe the shipped design; nothing to fix or re-run."
+    _LLM_VARIANCE = ("Stage 7.5 physics-critic LLM output variance, not a design property. The "
+                     "corroboration layer already excludes it from scoring on every run, "
+                     "regardless of how the critic re-phrases the claim on a re-roll — no design "
+                     "action is required and re-running Stage 7.5 is NOT expected to clear it. "
+                     "It will move into the risk register automatically if a future run's "
+                     "deterministic check corroborates it against the delivered design.")
+    corr = iss.get("corroboration") if isinstance(iss, dict) else None
+    if corr == "corroborated":
+        return True, "", ""
+    if corr == "falsified":
+        return False, "The corroboration layer checked this claim against the delivered design and found it DETERMINISTICALLY FALSE.", _NO_ACTION
+    if corr == "uncorroborated":
+        return False, "No deterministic check over the delivered artefacts can confirm this claim.", _LLM_VARIANCE
+    txt = f"{iss.get('issue') or ''} {iss.get('title') or ''} {iss.get('where') or ''}"
+    if _PHYS_FP_PAYLOAD.search(txt):
+        return False, ("The critic's OWN INPUT was a truncated JSON payload — an engine I/O "
+                       "artifact, not a claim about the design."), \
+               ("No design action needed. A re-run is not guaranteed to receive a complete "
+                "payload either (LLM I/O variance); the corroboration layer already excludes "
+                "this class of finding from scoring.")
+    if _PHYS_FP_VAGUE.search(txt) and not re.search(r"/words?[\[/]|\bsub_modules?\b", txt):
+        return False, "A holistic advisory hedge naming no specific part — gate-33 false-positive discipline.", \
+               ("No design action needed; this is a generic recommendation, not a defect tied "
+                "to a named part. Re-running will not make it more specific.")
+    if state is not None and _physics_claim_falsified(state, iss):
+        return False, "The corroboration layer checked this claim against the delivered design and found it DETERMINISTICALLY FALSE.", _NO_ACTION
+    if state is not None:
+        verdict, _shape, detail = _corroborate_finding(state, iss)
+        if verdict == "corroborated":
+            return True, "", ""
+        return False, f"No deterministic check over the delivered artefacts can confirm this claim ({detail}).", _LLM_VARIANCE
+    return True, "", ""
+
+
+def _clean_physics_issue_text(iss: dict) -> str:
+    """Strip the corroboration-layer's own wrapper prose ('ADVISORY (...): ' prefix /
+    '[corroborated: ...]' suffix) back to the critic's original claim text for display."""
+    txt = str((iss or {}).get("issue") or "").strip()
+    m = re.match(r"^ADVISORY \([^)]*\):\s*(.*)$", txt, re.S)
+    if m:
+        txt = m.group(1).strip()
+    txt = re.sub(r"\s*\[corroborated:[^\]]*\]\s*$", "", txt).strip()
+    return txt or "Design concern"
+
+
+def _build_risk_advisories(state: dict) -> List[dict]:
+    """Physics-critic findings that do NOT corroborate against the delivered design (Tristan
+    2026-07-05): visible, honest, and explicitly OUTSIDE the hazard risk register — no
+    severity / likelihood / score / rating, because an uncorroborated engine self-diagnostic
+    is not a design property and must never masquerade as a safety hazard. Each row: the
+    advisory text, why it does not score, and the honest clearing action (never a re-run
+    instruction the corroboration layer already knows will not clear an LLM-variance note)."""
+    out: List[dict] = []
+    for iss in _physics_issues(state, _RUN_DIR):
+        if not isinstance(iss, dict):
+            continue
+        is_defect, why, clear = _advisory_classify(state, iss)
+        if is_defect:
+            continue
+        out.append(dict(
+            cat="Engineering — design (physics-critic advisory)",
+            text=_clean_physics_issue_text(iss),
+            why=why, clear=clear,
+            source="state.physicsCritique.issues",
+        ))
+    return out
+
+
 def _build_risk_rows(state: dict) -> List[dict]:
     """The ONE row-builder for the Risk register — shared by the column-contract evaluator
     AND the renderer (one classifier, no divergence). Each row: cat / hazard / cause / sev /
-    lik / mit / source / cls (triage verdict) / fix (routed source stage, engine-fixable)."""
+    lik / mit / source / cls (triage verdict) / fix (routed source stage, engine-fixable).
+
+    ONLY genuine hazards ship here: the universal hazard library, live gate/cost findings, and
+    physics-critic findings the corroboration layer has CONFIRMED against the delivered design.
+    An uncorroborated / falsified / artifact physics-critic finding is NEVER added — it renders
+    in the separate 'Engine advisories' section instead (_build_risk_advisories), with no
+    severity/likelihood/score (Tristan 2026-07-05 — see _advisory_classify for the rationale)."""
     rows: List[dict] = []
 
-    def _add(cat, hz, cause, sev, lik, mit, src, fix="", force_external_reason=""):
-        cls = CLS_EXTERNAL if force_external_reason else _classify_risk_row(src, f"{hz} {cause}")
+    def _add(cat, hz, cause, sev, lik, mit, src, fix=""):
+        cls = _classify_risk_row(src, f"{hz} {cause}")
         rows.append(dict(cat=cat, hazard=hz, cause=cause, sev=sev, lik=lik,
-                         mit=(force_external_reason or mit), source=src, cls=cls,
+                         mit=mit, source=src, cls=cls,
                          fix=(fix if cls == CLS_ENGINE_FIXABLE else "")))
 
-    # 1) LIVE engineering findings — the physics critic's issues. A finding that is the
-    # critic's OWN I/O artifact (truncated payload / vague hedge with no named part — the
-    # gate-33 false-positive discipline, same filter as dossier_audit Check 6) is NOT a
-    # design property: it renders with an explicit re-run note instead of failing the tab
-    # (the critic is an LLM; a flaky artifact must not flip a deterministic score).
-    pc = state.get("physicsCritique") or {}
-    for iss in (pc.get("issues") or []):
+    # 1) LIVE engineering findings — the physics critic's issues, CANONICAL corroborated view.
+    # Only a finding the corroboration layer CONFIRMED against the delivered design enters the
+    # hazard register (always ENGINE-FIXABLE — a corroborated physics defect is, by definition,
+    # a property of the design the engine controls). Everything uncorroborated / falsified / an
+    # I/O artifact is excluded here entirely — see _build_risk_advisories for where it renders.
+    for iss in _physics_issues(state, _RUN_DIR):
         if not isinstance(iss, dict):
             continue
+        is_defect, _why, _clear = _advisory_classify(state, iss)
+        if not is_defect:
+            continue   # rendered in the "Engine advisories" section — never the hazard register
         sevtxt = str(iss.get("severity", "")).lower()
         sev = 5 if sevtxt == "high" else 3 if sevtxt in ("medium", "med") else 2
-        artifact = not _physics_high_is_design_defect(iss, state)
-        _add("Engineering — design", iss.get("issue", "").strip() or "Design concern",
-             f"Physics critic ({iss.get('dimension', 'engineering')}), at {iss.get('where', 'design')}.",
+        _add("Engineering — design", _clean_physics_issue_text(iss),
+             f"Physics critic ({iss.get('dimension', 'engineering')}), at {iss.get('where', 'design')} — "
+             "CORROBORATED against the delivered design by a deterministic check.",
              sev, 3, "Resolve / re-spec before procurement; re-run the physics check to confirm closure.",
              "state.physicsCritique.issues",
              fix=(f"Stage 7.5 physics-critic finding ({iss.get('dimension', 'engineering')}) — fix the "
                   "source rule that spec'd the flagged part (universal-contract-sizing / requirements_bom "
-                  "emitter), add its regression guard, re-run; the finding clears and this row disappears"),
-             force_external_reason=("Physics-critic I/O artifact — not a design property "
-                                    "(gate-33 false-positive discipline); re-run Stage 7.5 to clear."
-                                    if artifact else ""))
+                  "emitter), add its regression guard, re-run; the finding clears and this row disappears"))
 
     # 2) LIVE residual gate flags (QA / commercial)
     for ri in (state.get("residualIssues") or []):
@@ -10968,27 +11058,68 @@ def _render_risk_section(ws: Worksheet, state: dict, start_row: int) -> Optional
     return r
 
 
+def _render_advisory_section(ws: Worksheet, advisories: List[dict], start_row: int) -> int:
+    """Render the 'Engine advisories (uncorroborated — do not treat as hazards)' table
+    (Tristan 2026-07-05). These are physics-critic findings the corroboration layer could NOT
+    confirm against the delivered design — Stage 7.5 LLM output, not a proven design property.
+    Deliberately carries NO severity / likelihood / score / rating / red fill: an uncorroborated
+    engine self-diagnostic must never masquerade as a safety hazard (the exact bug this fixes —
+    the tab previously rendered these INSIDE the hazard register with High/Medium severity chips
+    while the row's own text said 'not a design property'). Each row: the advisory text, why it
+    does not score, and the HONEST clearing action (never a re-run instruction the corroboration
+    layer already knows will not clear an LLM-variance note)."""
+    header(ws, start_row, ["#", "Category", "Advisory (uncorroborated — not a hazard)",
+                           "Why it does not score / clearing action"])
+    r = start_row + 1
+    for i, adv in enumerate(advisories):
+        ws.cell(r, 1, i + 1).border = BORDER
+        ws.cell(r, 2, clean_cell(adv["cat"])).border = BORDER
+        c3 = ws.cell(r, 3, clean_cell(adv["text"])); c3.alignment = WRAP_TOP; c3.border = BORDER
+        combo = f"{adv['why']}  ·  CLEARING ACTION: {adv['clear']}"
+        c4 = ws.cell(r, 4, clean_cell(combo)); c4.alignment = WRAP_TOP; c4.border = BORDER
+        longest = max(len(str(adv["text"])), len(combo))
+        if longest > 40:
+            ws.row_dimensions[r].height = min(-(-longest // 40), 8) * 14.5
+        r += 1
+    ws.auto_filter.ref = f"A{start_row}:D{r - 1}"
+    return r
+
+
 def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
     """E (consolidation 2026-06-24) — "Risk & Regulatory": the Risk register section
     on top, the Regulatory & compliance section below, on ONE sheet (both derive from
     the SAME universal hazard library, so they belong together). Each section keeps its
-    full table. Universal; skips only if NEITHER section has content."""
+    full table. Universal; skips only if NEITHER section has content.
+
+    SPLIT REGISTER (Tristan 2026-07-05 — "how can you give this a 10/10 score when you still
+    have some risks as high?"): a physics-critic advisory the corroboration layer could NOT
+    confirm against the delivered design NEVER enters the hazard register with a severity chip
+    — it renders in a separate 'Engine advisories' section with no S/L/score/rating at all. A
+    CORROBORATED critic finding still ships as a genuine, scored hazard (never hidden)."""
     ws = wb.create_sheet("Risk & Regulatory")
     set_widths(ws, {"A": 6, "B": 22, "C": 38, "D": 36, "E": 6, "F": 6, "G": 7,
                     "H": 10, "I": 16, "J": 46, "K": 24, "L": 24, "M": 36, "N": 30})
+    _hz_rows = _build_risk_rows(state)
+    _adv_rows = _build_risk_advisories(state)
+    _n_hi = sum(1 for rw in _hz_rows if _rag(rw["sev"] * rw["lik"])[0] == "High")
+    _n_med = sum(1 for rw in _hz_rows if _rag(rw["sev"] * rw["lik"])[0] == "Medium")
+    _n_lo = sum(1 for rw in _hz_rows if _rag(rw["sev"] * rw["lik"])[0] == "Low")
     subtitle = (
         "Preliminary hazard & risk register PLUS the regulatory / compliance duties, on "
         "one sheet (both derive from the same universal hazard library). Risk rows come "
-        "LIVE from the physics critic, the deterministic gate flags, the cost-sanity check "
-        "and the equipment present; the regulatory section adds the engine's compliance-gate "
-        "verdict and the jurisdiction × hazard → regulation matrix. Score = S × L (≤7 Low / "
-        "8–14 Medium / ≥15 High). Every row is TRIAGED from its own provenance + content: "
-        "an ENGINE-FIXABLE row (a design defect the engine controls — sizing / spec / "
-        "coverage / consistency) is an OPEN DEFECT that names its routed fix stage and can "
-        "never ship as 'tolerable with mitigation'; only a genuinely EXTERNAL risk (inherent "
-        "process hazard, site / utility / supply-chain / regulatory factor) carries a "
-        "mitigation. Universal — not plant-specific. Preliminary; a site-specific HAZID / "
-        "HAZOP and a regulatory review are required before construction / sale."
+        "LIVE from the physics critic (CORROBORATED findings only — an uncorroborated critic "
+        "note is never a hazard; see 'Engine advisories' below), the deterministic gate flags, "
+        "the cost-sanity check and the equipment present; the regulatory section adds the "
+        "engine's compliance-gate verdict and the jurisdiction × hazard → regulation matrix. "
+        "Score = S × L (≤7 Low / 8–14 Medium / ≥15 High). Every row is TRIAGED from its own "
+        "provenance + content: an ENGINE-FIXABLE row (a design defect the engine controls — "
+        "sizing / spec / coverage / consistency) is an OPEN DEFECT that names its routed fix "
+        "stage and can never ship as 'tolerable with mitigation'; only a genuinely EXTERNAL "
+        "risk (inherent process hazard, site / utility / supply-chain / regulatory factor) "
+        "carries a mitigation. Universal — not plant-specific. Preliminary; a site-specific "
+        "HAZID / HAZOP and a regulatory review are required before construction / sale. "
+        "TAB SCORE = register structure & completeness, not a claim of 'no risk' — read the "
+        "register summary below the 'Risk register' heading."
     )
     _cres = _CONTRACT_RESULTS.get("Risk & Regulatory")
     if _cres:
@@ -10998,12 +11129,36 @@ def tab_risk_regulatory(wb: Workbook, state: dict) -> bool:
     # ── Risk register section ──
     sub_banner(ws, r, "Risk register", 11)
     r += 1
+    # HONEST REGISTER SUMMARY (Tristan 2026-07-05): the tab's "TAB QUALITY N/10" banner scores
+    # STRUCTURE & COMPLETENESS (every declared column present + correctly triaged) — it is
+    # NOT a claim that there is no risk. This line states the real hazard count by severity SO
+    # THE SCORE CAN NEVER READ AS "NO RISKS", plus how many uncorroborated advisories are
+    # listed separately (never counted as hazards).
+    _reg_note = (
+        f"Register summary: {len(_hz_rows)} genuine hazard(s) in this register — "
+        f"{_n_hi} High / {_n_med} Medium / {_n_lo} Low — plus {len(_adv_rows)} uncorroborated "
+        "engine advisory(ies) listed separately in 'Engine advisories' below (NOT counted as "
+        "hazards, no severity/likelihood scoring). The 'TAB QUALITY' score above this register "
+        "measures structure & completeness of the triage, never the absence of risk."
+    )
+    nc = ws.cell(r, 1, _reg_note)
+    nc.font = FONT_NOTE
+    nc.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=13)
+    ws.row_dimensions[r].height = max(15, 14.5 * max(1, -(-len(_reg_note) // 100)))
+    r += 1
     nxt = _render_risk_section(ws, state, r)
     if nxt is None:
         ws.cell(r, 1, "— no live risk findings or process hazards for this design —").font = FONT_NOTE
         r += 2
     else:
         r = nxt + 1
+    # ── Engine advisories section (Tristan 2026-07-05: uncorroborated critic notes live
+    # HERE, never inside the hazard register — no severity chips, no red fill) ──
+    if _adv_rows:
+        sub_banner(ws, r, "Engine advisories (uncorroborated — do not treat as hazards)", 11)
+        r += 1
+        r = _render_advisory_section(ws, _adv_rows, r) + 1
     # ── Regulatory & compliance section ──
     sub_banner(ws, r, "Regulatory & compliance", 11)
     r += 1
@@ -16339,6 +16494,12 @@ _dt(["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", 
      "Audit: check evidence (build-computed triage)"], "risk-register",
     ["#", "Category", "Hazard / finding", "Cause", "S", "L", "Score", "Rating", "Class",
      "Mitigation / fix route", "Residual", "Row check"], numeric=["S", "L"])
+# Engine advisories (Tristan 2026-07-05): uncorroborated physics-critic notes — deliberately
+# NO severity/likelihood/score columns (see _render_advisory_section); every field required.
+_dt(["#", "Category", "Advisory (uncorroborated — not a hazard)",
+     "Why it does not score / clearing action"], "risk-advisory",
+    ["#", "Category", "Advisory (uncorroborated — not a hazard)",
+     "Why it does not score / clearing action"])
 _dt(["#", "Regulation / standard", "Applies because", "Status"], "reg-register",
     ["#", "Regulation / standard", "Applies because", "Status"])
 _dt(["#", "Regulation / standard", "Triggered by (hazard present)", "Status"],
@@ -17174,9 +17335,15 @@ def _sc_partnames(wb, ws, state, run_dir):
     # here: COMMODITY-FITTING (a bare accessory/fastener/fitting, no catalogue identity
     # by nature — mirrors ga_massing.GA_NON_MASSING_RE), BOUNDARY-STUB (a bare process
     # connection endpoint, not a catalogue part), SCOPE-DOCUMENTED (a design/system/
-    # network LABEL, not a single purchasable item).
+    # network LABEL, not a single purchasable item). VERIFIED_NO_PUBLIC_MPN (2026-07-05,
+    # the bess-campaign-v11 17-not-found dissection) — parts_ledger.py's _not_found_substatus
+    # stamps this ONLY when the row's OWN verification record (state.partVerifications)
+    # carries the literal status 'verified_no_public_mpn' — a genuinely EXHAUSTIVE search
+    # (never a single rejected candidate) found no public manufacturer part number. Read
+    # from the SAME one-truth field as every other entry in this set — never re-derived.
     _HONEST_NOT_FOUND_SUBSTATUS = {"ARCHITECTURALLY-EXCLUDED", "OEM-PROPRIETARY", "FABRICATED",
-                                   "COMMODITY-FITTING", "BOUNDARY-STUB", "SCOPE-DOCUMENTED"}
+                                   "COMMODITY-FITTING", "BOUNDARY-STUB", "SCOPE-DOCUMENTED",
+                                   "VERIFIED_NO_PUBLIC_MPN"}
     _pl_honest = load_json(os.path.join(run_dir, "parts-ledger.json")) if run_dir else None
     _pl_status_by_tag: Dict[str, dict] = {}
     if isinstance(_pl_honest, dict) and _pl_honest.get("equipment"):
@@ -19652,12 +19819,16 @@ def _selftest() -> int:
     # (b) an EXTERNAL risk WITHOUT a mitigation FAILS;
     # (c) a register of ONLY external risks with mitigations scores 10 PASS;
     # (d) the defect-vocabulary net classifies a non-live-source row by its own text;
-    # (e) a physics-critic I/O ARTIFACT (truncated payload) is NOT an engine-fixable
-    #     design defect — a flaky LLM artifact must never flip the deterministic score. ═══
-    # CORROBORATION LAYER (2026-07-03, dossier_audit.py): a critic finding triages
-    # ENGINE-FIXABLE only when a deterministic check over the delivered artefacts
-    # corroborates it. The fixture's physics HIGH is therefore a rating-pair claim whose
-    # BOTH values live on the delivered words below (pump 4 kW ↔ drive motor 11 kW,
+    # (e) a physics-critic I/O ARTIFACT (truncated payload) is NEVER placed in the hazard
+    #     register at all (2026-07-05 split — Tristan: "how can you give this a 10/10 score
+    #     when you still have some risks as high?"): it renders ONLY in the separate
+    #     'Engine advisories' section, with no severity/likelihood/score, and its clearing
+    #     text never promises a re-run will clear an LLM-variance note. ═══
+    # CORROBORATION LAYER (2026-07-03, dossier_audit.py; SPLIT RENDERING 2026-07-05): a
+    # critic finding enters the hazard register ONLY when a deterministic check over the
+    # delivered artefacts CORROBORATES it — otherwise it is an advisory, never a hazard row,
+    # never scored, and never coloured. The fixture's physics HIGH is a rating-pair claim
+    # whose BOTH values live on the delivered words below (pump 4 kW ↔ drive motor 11 kW,
     # paired by character-id lineage) — the exact corroborable shape.
     _risk_state = {
         "physicsCritique": {"issues": [
@@ -19687,10 +19858,13 @@ def _selftest() -> int:
     }
     _rr = _build_risk_rows(_risk_state)
     _rv = _eval_risk_rows(_rr)
-    # rows: physics-defect + physics-artifact + gate flag + cost sanity + hazards
-    # (pressure vessel → stored pressure + tank/vessel + chemical dosing hits)
-    if not _rv or _rv["n_total"] != len(_rr) or _rv["n_total"] < 6:
-        print(f"  FAIL contract-risk: expected ≥6 evaluated rows (got {_rv and _rv['n_total']})"); bad += 1
+    _radv = _build_risk_advisories(_risk_state)
+    # rows: physics-defect (rating pair) + gate flag + cost sanity + hazards (pressure vessel
+    # → stored pressure + tank/vessel + chemical dosing hits) — the truncated-payload artifact
+    # is EXCLUDED from the register entirely (it lives only in _radv, asserted below).
+    if not _rv or _rv["n_total"] != len(_rr) or _rv["n_total"] != 6:
+        print(f"  FAIL contract-risk: expected exactly 6 evaluated hazard rows, artifact "
+              f"excluded (got {_rv and _rv['n_total']})"); bad += 1
     else:
         # (a) the NAMED physics finding, the gate flag and the cost-sanity row are all
         # ENGINE-FIXABLE and FAIL with a routed fix — 'tolerable with mitigation' impossible
@@ -19708,12 +19882,19 @@ def _selftest() -> int:
             print("  FAIL contract-risk: the physics-critic row must route to Stage 7.5"); bad += 1
         if not any("gate 'price_floor'" in _rr[i]["fix"] for i in _fx):
             print("  FAIL contract-risk: the gate-flag row must route to its named gate"); bad += 1
-        # (e) the truncated-payload artifact is NOT a design defect → EXTERNAL with the
-        # explicit artifact note, and it PASSES (never flips the deterministic score)
-        _art = [i for i, r in enumerate(_rr) if "artifact" in str(r["mit"]).lower()]
-        if not _art or _rr[_art[0]]["cls"] != CLS_EXTERNAL or _rv["rows"][_art[0]]["verdict"] != "PASS":
-            print(f"  FAIL contract-risk: a physics-critic I/O artifact must triage EXTERNAL "
-                  f"with the re-run note, never fail the tab (got {_art and _rr[_art[0]]})"); bad += 1
+        # (e) the truncated-payload artifact must NOT appear in the register at all (no
+        # "mitigation"-disguised row, no severity, no rating) — it lives ONLY in _radv
+        if any("truncat" in str(r["hazard"]).lower() for r in _rr):
+            print("  FAIL contract-risk: a physics-critic I/O artifact must NEVER appear in "
+                  "the hazard register (it belongs in Engine advisories only)"); bad += 1
+        if len(_radv) != 1 or "truncat" not in _radv[0]["text"].lower():
+            print(f"  FAIL contract-risk: the truncated-payload artifact must render as the "
+                  f"ONE advisory row (got {_radv})"); bad += 1
+        elif ("re-run" in _radv[0]["clear"].lower() and "not " not in _radv[0]["clear"].lower()
+              and "no re-run" not in _radv[0]["clear"].lower()
+              and "no design action" not in _radv[0]["clear"].lower()):
+            print(f"  FAIL contract-risk: an advisory's clearing text must never promise a "
+                  f"bare re-run will clear it (got {_radv[0]['clear']!r})"); bad += 1
         # hazard-library rows are EXTERNAL with mitigations → PASS
         _hz = [i for i, r in enumerate(_rr) if r["source"].startswith("Equipment present")]
         if not _hz or any(_rv["rows"][i]["verdict"] != "PASS" for i in _hz):
@@ -19722,6 +19903,40 @@ def _selftest() -> int:
         if _rv["status"] != "FAIL" or (_rv["score"] or 0) >= 8 or _rv["source_fabricated"] != 3:
             print(f"  FAIL contract-risk: 3 open defects must FAIL the tab <8 with 3 fabricated "
                   f"tolerances counted (got {_rv['score']}, {_rv['source_fabricated']})"); bad += 1
+    # (f) BOTH DIRECTIONS of the split (issue instruction #2): a CORROBORATED critic finding
+    # renders as a hazard (never hidden); an UNCORROBORATED one renders ONLY as an advisory.
+    _corr_state = {"physicsCritique": {"issues": [
+        {"severity": "high", "dimension": "engineering_plausibility",
+         "issue": "The feed pump is undersized for the stated duty", "where": "process/words[1]",
+         "corroboration": "corroborated"}]}}
+    _uncorr_state = {"physicsCritique": {"issues": [
+        {"severity": "high", "dimension": "engineering_plausibility",
+         "issue": "The feed pump is undersized for the stated duty", "where": "process/words[1]",
+         "corroboration": "uncorroborated"}]}}
+    _corr_rr = _build_risk_rows(_corr_state)
+    _corr_adv = _build_risk_advisories(_corr_state)
+    if len(_corr_rr) != 1 or _corr_rr[0]["cls"] != CLS_ENGINE_FIXABLE or _corr_adv:
+        print(f"  FAIL contract-risk: a CORROBORATED finding must render as a hazard in the "
+              f"register, never as an advisory (got rows={_corr_rr}, adv={_corr_adv})"); bad += 1
+    _uncorr_rr = _build_risk_rows(_uncorr_state)
+    _uncorr_adv = _build_risk_advisories(_uncorr_state)
+    if _uncorr_rr or len(_uncorr_adv) != 1:
+        print(f"  FAIL contract-risk: an UNCORROBORATED finding must render ONLY as an "
+              f"advisory, never a hazard row (got rows={_uncorr_rr}, adv={_uncorr_adv})"); bad += 1
+    elif "NOT expected to clear" not in _uncorr_adv[0]["clear"]:
+        print(f"  FAIL contract-risk: an uncorroborated advisory's clearing text must honestly "
+              f"say a re-run is NOT expected to clear it (LLM-variance, corroboration layer "
+              f"already quarantines it) — got {_uncorr_adv[0]['clear']!r}"); bad += 1
+    # (g) a FALSIFIED claim also renders as an advisory (never a hazard) with an honest
+    # "no action needed" clearing text (never a re-run instruction)
+    _fals_state = {"physicsCritique": {"issues": [
+        {"severity": "med", "issue": "Stale claim already disproven", "where": "x",
+         "corroboration": "falsified"}]}}
+    _fals_adv = _build_risk_advisories(_fals_state)
+    if _build_risk_rows(_fals_state) or len(_fals_adv) != 1 or "no action needed" not in _fals_adv[0]["clear"].lower():
+        print(f"  FAIL contract-risk: a FALSIFIED claim must render as an advisory with an "
+              f"honest 'no action needed' clearing text, never a hazard row "
+              f"(got {_fals_adv})"); bad += 1
     # (a cont.) the <8 cap holds even when engine-fixables are a small fraction: 1 defect
     # over 19 mitigated externals is arithmetically 9.5 — it must still cap below 8
     _many = ([{"cat": "Engineering — design", "hazard": "Undersized pump", "cause": "x", "sev": 3,
