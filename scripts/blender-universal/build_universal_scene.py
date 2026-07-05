@@ -5343,6 +5343,7 @@ def _world_bbox_mm_for_exact_prefix(prefix):
 _SYN_ROLE = {
     # rack-farm BoP + racks
     "rack":      ("BR", "Battery / equipment rack", False),
+    "cellfield": ("CF", "Aggregated cell field", False),
     "pcs":       ("PCS", "Power conversion system", False),
     "chiller":   ("CH", "Liquid chiller / cooling skid", False),
     "bms":       ("BMS", "Battery management controller", False),
@@ -5350,6 +5351,18 @@ _SYN_ROLE = {
     "fire":      ("FS", "Fire suppression skid", False),
     "transformer": ("TX", "Step-up transformer", False),
     "switchgear": ("SG", "Switchgear / LV board", False),
+    # per-rack accessories + coolant/off-gas ductwork (BESS v3 LAP-3, 2026-07-05)
+    "hvacduct":   ("DU", "HVAC duct", False),
+    "deflagrationseal": ("DS", "Deflagration vent seal", False),
+    "smokeinterlock":   ("SI", "Smoke vent interlock", False),
+    "offgasduct": ("OG", "Off-gas duct section", False),
+    "rackheater": ("RH", "Rack heater", False),
+    "dcisolator": ("DI", "Rack DC isolator", False),
+    "isolatorenclosure": ("IE", "Rack DC isolator enclosure", False),
+    "bmsslave":   ("BS", "BMS slave module", False),
+    "coldplatemanifold": ("CM", "Cold plate manifold", False),
+    "coldplaterack":     ("CP", "Cold plate per rack", False),
+    "coolantdistmanifold": ("CD", "Coolant distribution manifold", False),
     # tower-machine
     "tower":     ("WT", "Turbine tower", True),
     "nacelle":   ("WT", "Nacelle", False),
@@ -5384,6 +5397,17 @@ _SYN_BLOCK_BOM = {}
 # object name, so each distinct piece of kit becomes ONE manifest row. block_key
 # makes a rack r0c0 distinct from r0c1; role drives the tag.
 _SYN_PREFIX_RE = [
+    # per-rack CELL FIELD (BESS v3 LAP-3, 2026-07-05): carve the FIRST rack's FIRST
+    # module box out of the general rack block below so the aggregated cells (the
+    # 6,084-off LFP prismatic cell, X-1 — a real priced principal ga_massing's own
+    # must_keep proveCatch insists survives) get their OWN tagged manifest row
+    # instead of disappearing into the rack's own name (the rack itself is a
+    # SEPARATE, distinctly-named BoM line — 'rack wiring carrier'). Checked BEFORE
+    # the general rack rule (regex list = first-match-wins, so the more specific
+    # exact-name pattern must come first); every OTHER module/frame/door/bus/plinth
+    # mesh on every rack (including this rack's own remaining meshes) still falls
+    # through to the general rack block below — only this one sub-mesh is carved out.
+    (re.compile(r"^(u_rf_rack_t0_r0_c0_mod0)$"), "cellfield"),
     # rack-farm racks, tier-aware naming (2026-06-25 vertical stacking):
     # u_rf_rack_t0_r0_c0_<detail> → block 'rack_t0_r0_c0', role 'rack'.
     # (2026-07-03: the manifest missed EVERY rack because only the pre-tier
@@ -10887,7 +10911,30 @@ RACK_ROW_GAP_MM    = 1500.0   # end gap before the balance-of-plant lineup
 RACK_MAX_PER_ROW   = 10       # cap a single row's length; wrap to more rows beyond
 BOP_LANE_W_MM      = 2400.0   # depth of the balance-of-plant lane along the end wall
 BOP_GAP_MM         = 500.0    # gap between successive BoP skids in the lineup
+# a genuinely SMALL accessory (rack heater, isolator, BMS slave board, cold-plate
+# hardware, duct/manifold stubs — BESS v3 LAP-3, 2026-07-05) does not need the same
+# 500 mm service clearance a full BALANCE-OF-PLANT skid (chiller/transformer/PCS)
+# needs between cabinets; using the full gap for every item on an already-full
+# exterior pad (Tristan 2026-07-03: EVERY BoP role already spills to the pad on a
+# tightly-packed container — the racks alone fill the internal length) makes the
+# pad — and so the deck + the longest cable-tray run down it — grow by ~1 m per
+# small item added, which is how an honest coverage fix regressed site_utilisation
+# and tripped gate no_stray_beam. Keyed on the item's OWN footprint, universal.
+BOP_SMALL_ITEM_MM  = 500.0    # max(w,d) below this = a small accessory, not a skid
+BOP_GAP_SMALL_MM   = 150.0    # its pad/lineup gap
 CONTAINER_MARGIN_MM = 700.0   # clearance from racks+BoP bulk to the container walls
+
+
+def _bop_gap_mm(w_mm: float, depth_mm: float) -> float:
+    """The lineup/pad spacing AFTER this item, sized to the item's WIDTH (the X
+    footprint ALONG the lineup — the dimension that actually consumes pad/lane
+    length; an item's depth runs perpendicular, away from the wall, and does not
+    add to the running length) — see BOP_SMALL_ITEM_MM docstring above. A small
+    accessory gets a tight gap; a real balance-of-plant skid keeps its full
+    service clearance."""
+    return BOP_GAP_SMALL_MM if w_mm < BOP_SMALL_ITEM_MM else BOP_GAP_MM
+
+
 CONTAINER_WALL_MM  = 90.0     # container wall/roof thickness
 # Default rack grid when the contract is silent (so an unparametrised BESS still
 # renders sensibly) — a single 40-ft-container-ish 2-row × N layout.
@@ -11372,6 +11419,18 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
                       None)
     if _rack_part is not None:
         _SYN_BLOCK_BOM["u_rf_rack_"] = (_rack_part.name, _rack_part.module_id)
+    # cell-field companion (BESS v3 LAP-3, 2026-07-05): the FIRST rack's FIRST module
+    # box (carved out by the _SYN_PREFIX_RE 'cellfield' rule above) is credited to the
+    # aggregated-cell BoM line (X-1 'LFP prismatic cell') so it gets its own tagged
+    # manifest row + GA/blender coverage — real cells, aggregated into the rack, never
+    # drawn one-by-one, but the priced line still gets a named box like every other
+    # principal. `\bcell\b` alone (not '__cell' sub-component ids, already dropped by
+    # extract_parts) safely finds ONLY the top-level cell line in a battery design.
+    _cell_part = next((p for p in parts
+                       if re.search(r"(?<![a-z])cell(?![a-z])", str(p.name), re.IGNORECASE)),
+                      None)
+    if _cell_part is not None:
+        _SYN_BLOCK_BOM["u_rf_rack_t0_r0_c0_mod0"] = (_cell_part.name, _cell_part.module_id)
     unit_word = "sleds" if flavour == "compute" else "modules/cells"
     print(f"[univ][rackfarm] flavour = {flavour}; rack grid: {n_racks} racks "
           f"= {n_rows} row(s) × {racks_per_row} "
@@ -11613,9 +11672,9 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         bop_anchor[role] = (cx, cy, bop_z + h_mm)
         region_centres[role] = (cx, cy)
         if _container_bop:
-            bop_row_x[r] += w_mm + BOP_GAP_MM
+            bop_row_x[r] += w_mm + _bop_gap_mm(w_mm, depth_mm)
         else:
-            cursor_y += depth_mm + BOP_GAP_MM
+            cursor_y += depth_mm + _bop_gap_mm(w_mm, depth_mm)
     bop_x1 = (max(bop_row_x) if _container_bop
               else bop_x + max((it[3] for it in bop_items), default=BOP_LANE_W_MM))
 
@@ -11701,14 +11760,23 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
     # Skids that did not fit a container floor lane sit on the pad along the +Y long
     # wall (the companion power-conversion container has the −Y side). At deck level,
     # real gear on real ground — never stacked above the racks.
+    #
+    # TWO-ROW PACK (2026-07-05, BESS v3 LAP-3 coverage pass): a FRONT row (real
+    # balance-of-plant skids — chiller/aircon/louvre/fire/ems_ctrl/…) and a BACK row
+    # (genuinely small accessories — rack heater/isolator/BMS module/duct+manifold
+    # stubs) run in PARALLEL along X instead of one single chained line. A single
+    # line grows the pad — and so the deck + the longest cable-tray run down it — by
+    # the FULL SUM of every item's width; two parallel rows grow it by only the
+    # LONGER row's sum. Adding a dozen genuine small principals (the coverage fix
+    # this pass makes) down ONE line regressed site_utilisation 0.43→0.30 and nearly
+    # tripped gate no_stray_beam (19.6 m > the 16 m limit); two rows recovers both.
+    # Universal split on the item's own WIDTH (BOP_SMALL_ITEM_MM), not a role list.
     _pad_y1 = enc_y1
     if _pad_overflow:
         pad_gap = 1500.0
         pad_edge_y = enc_cy + enc_d / 2.0        # the battery container's +Y wall face
-        pad_cursor_x = enc_x0 + cont_margin
-        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_overflow:
-            cx = pad_cursor_x + w_mm / 2.0
-            cy = pad_edge_y + pad_gap + depth_mm / 2.0
+
+        def _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy):
             mod = part_or_none.module_id if part_or_none else "energy_conversion_transduction"
             if mod not in MO:
                 MO[mod] = []
@@ -11732,9 +11800,24 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
                                         mat, steel, MAT, mod, MO)
             bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
             region_centres[role] = (cx, cy)
-            pad_cursor_x += w_mm + BOP_GAP_MM
-            _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
-        print(f"[univ][rackfarm] exterior pad BoP: {', '.join(it[0] for it in _pad_overflow)} — "
+
+        _pad_front = [it for it in _pad_overflow if it[3] >= BOP_SMALL_ITEM_MM]
+        _pad_back = [it for it in _pad_overflow if it[3] < BOP_SMALL_ITEM_MM]
+        # front row hugs the wall; back row starts beyond the front row's deepest item
+        # (or the wall itself, if the front row is empty) + its own small clearance.
+        _front_depth = max((it[2] for it in _pad_front), default=0.0)
+        _row_gap = pad_gap if _pad_front else 0.0
+        _back_y0 = pad_edge_y + pad_gap + _front_depth + (_row_gap if _pad_front else 0.0)
+        for row, row_y0 in ((_pad_front, pad_edge_y + pad_gap), (_pad_back, _back_y0)):
+            pad_cursor_x = enc_x0 + cont_margin
+            for role, part_or_none, depth_mm, w_mm, h_mm, rgb in row:
+                cx = pad_cursor_x + w_mm / 2.0
+                cy = row_y0 + depth_mm / 2.0
+                _build_pad_item(role, part_or_none, depth_mm, w_mm, h_mm, rgb, cx, cy)
+                pad_cursor_x += w_mm + _bop_gap_mm(w_mm, depth_mm)
+                _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
+        print(f"[univ][rackfarm] exterior pad BoP: {', '.join(it[0] for it in _pad_front)} (front row); "
+              f"{', '.join(it[0] for it in _pad_back)} (back row, small accessories) — "
               f"no container floor lane fits; placed on the pad beside the enclosure "
               f"(never stacked above the racks)")
 
@@ -11779,8 +11862,17 @@ _BOP_ROLES = [
     # to sample first — they never got their own drawn block). Real BESS containers
     # site the plant-level EMS server rack apart from the per-container BMS master.
     ("ems_ctrl",    r"\bems\b",                          700.0, 700.0, 1800.0, (0.10, 0.50, 0.90)),
-    ("chiller",     r"chiller|\bhvac\s*duct\b|hvac\s*condensate|cooling unit|air handler|condens",
+    ("chiller",     r"chiller|hvac\s*condensate|cooling unit|air handler|condens",
                                                           1000.0, 1600.0, 1400.0, (0.95, 0.84, 0.55)),
+    # HVAC DUCT — a distinct physical duct run, split out of the chiller role above
+    # (2026-07-05, BESS v3 LAP-3 3D/GA-coverage pass): the chiller regex used to carry
+    # a `\bhvac\s*duct\b` alternative, but `_select_bop_items` credits only the FIRST
+    # part matching a role's regex (`next()`), so whichever real BoM line the scan met
+    # first for the SHARED regex (the liquid cooling chiller) starved the duct of its
+    # own box — the SAME "one regex, two real parts, one wins" collision already fixed
+    # for aircon/louvre and coolingpump/circpump. Own role now, so both are drawn.
+    ("hvacduct",    r"\bhvac\s*duct\b",
+                                                          900.0, 300.0, 300.0, (0.62, 0.65, 0.68)),
     # HVAC condenser / container AC unit — the OUTDOOR/roof-mounted air-conditioning
     # skid (distinct from the chiller/ducting block above; Tristan 2026-07-04, BESS
     # WAVE B coverage #1 "HVAC/fire units on/in the container" — "container AC unit"
@@ -11845,8 +11937,47 @@ _BOP_ROLES = [
                                                           150.0, 400.0, 500.0, (0.95, 0.75, 0.10)),
     ("deflagration", r"deflagration\s*vent\s*panel",
                                                           200.0, 600.0, 800.0, (0.75, 0.35, 0.15)),
+    # the deflagration vent SEAL (the gasket ring in the vent panel opening, distinct
+    # from the panel itself above) + a SMOKE VENT INTERLOCK (the roof-vent release
+    # mechanism) — both real small principal hardware that matched no role before
+    # (BESS v3 LAP-3 3D/GA-coverage pass, 2026-07-05); an off-gas DUCT SECTION (one
+    # length of venting per rack, distinct from the HVAC duct above) is the third
+    # "off-gas duct hardware" item the same pass surfaced.
+    ("deflagrationseal", r"deflagration\s*vent\s*seal",
+                                                          40.0, 80.0, 200.0, (0.55, 0.20, 0.10)),
+    ("smokeinterlock",   r"smoke\s*vent\s*interlock\b(?!\s*mount)",
+                                                          150.0, 200.0, 150.0, (0.70, 0.15, 0.12)),
+    ("offgasduct",       r"off.?gas\s*duct\s*section",
+                                                          800.0, 250.0, 250.0, (0.58, 0.60, 0.55)),
     ("thermalpanel", r"thermal\s*insulation\s*panel",
                                                           100.0, 600.0, 600.0, (0.85, 0.85, 0.80)),
+    # ── per-rack accessories (BESS v3 LAP-3 3D/GA-coverage pass, 2026-07-05):
+    # the rack heater + thermostat + DC isolator (+ its enclosure) + a BMS SLAVE
+    # module (the per-rack cell-monitoring board — distinct from the bms_ctrl MASTER
+    # cabinet above) + the cold-plate cooling hardware are real, priced BoM lines
+    # (EP-1/EP-6/EP-9/X-17/X-36/EP-12) that survived ga_massing's non-massing filter
+    # (they are genuine principals, not P&ID-level accessories) but matched no BoP
+    # role — a silent 3D/GA drop despite ga_massing's own must_keep proveCatch
+    # insisting "LFP prismatic cell / rack DC isolator / PTC rack heater" survive.
+    # One representative box per role stands for the whole per-rack population,
+    # exactly like every other BoP role here (a chiller line item with qty>1 still
+    # draws ONE skid). `(?!\s*thermostat)` on the heater regex stops it also
+    # matching "rack heater thermostat" (a co-located but textually-overlapping
+    # BoM line) so the heater box is credited to the heater, not the thermostat.
+    ("rackheater",       r"rack\s*heater(?!\s*thermostat)",
+                                                          120.0, 200.0, 250.0, (0.90, 0.35, 0.10)),
+    ("dcisolator",       r"rack\s*dc\s*isolator(?!\s*(?:enclosure|label|padlock))",
+                                                          100.0, 150.0, 180.0, (0.85, 0.65, 0.10)),
+    ("isolatorenclosure", r"rack\s*dc\s*isolator\s*enclosure",
+                                                          150.0, 250.0, 300.0, (0.45, 0.47, 0.50)),
+    ("bmsslave",         r"bms\s*slave\s*module",
+                                                          60.0, 150.0, 100.0, (0.10, 0.55, 0.95)),
+    ("coldplatemanifold", r"cold\s*plate\s*manifold",
+                                                          900.0, 150.0, 120.0, (0.55, 0.58, 0.62)),
+    ("coldplaterack",    r"cold\s*plate\s*per\s*rack",
+                                                          400.0, 200.0, 50.0, (0.60, 0.63, 0.66)),
+    ("coolantdistmanifold", r"coolant\s*distribution\s*manifold",
+                                                          1000.0, 200.0, 200.0, (0.35, 0.40, 0.55)),
 ]
 
 # Balance-of-plant roles for a COMPUTE rack farm (a server room / edge node): the

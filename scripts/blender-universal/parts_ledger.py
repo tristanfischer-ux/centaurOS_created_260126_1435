@@ -490,6 +490,35 @@ def _load(p: Path):
         return None
 
 
+def _tag_covered_verdict(t: str, txt: str, ambiguous_tags: set, name_present: bool):
+    """Pure decision used by covered()'s tag-matching loop — module-level (no bpy, no
+    live drawing) so it is a proveCatch-able regression guard (see _selftest).
+
+    Returns None when tag string `t` is a PLACEHOLDER ("—", the dash every untagged
+    synthetic/documentation row carries) or is simply absent from `txt` — the caller
+    should try the next tag candidate (e.g. the manifest's canonical_tag). Returns a
+    final True/False verdict once `t` is a genuine, present tag.
+
+    A placeholder tag is never an identity: dozens of unrelated rows share it, and the
+    bare dash character is ubiquitous drawing furniture (dimension placeholders, table
+    blanks, "— —" cells), so " — " ALWAYS appears somewhere in a non-trivial SVG's
+    text. Treating it as an "unambiguous tag hit" gave every dash-tagged row a FALSE
+    True on every 2D drawing regardless of whether it was actually drawn (found
+    2026-07-05: "deflagration vent seal" read GA-covered purely because " — " sits in
+    an unrelated table cell). Require NAME matching for a placeholder tag exactly as
+    for an ambiguous one — never bare-tag credit.
+
+    For a genuine (non-placeholder) present tag: if UNAMBIGUOUS (unique identity — one
+    equipment per tag), credit on tag alone. If AMBIGUOUS (collision: same tag → >1
+    distinct equipment name), require the NAME to also be present — otherwise a
+    different unit that happens to share the tag would be wrongly credited."""
+    if not t or t == "—" or not (f" {t} " in txt or f">{t}<" in txt):
+        return None
+    if t not in ambiguous_tags:
+        return True
+    return name_present
+
+
 def _is_connection(r: dict) -> bool:
     return (r.get("status") == "ROUTED" or bool(re.fullmatch(r"C\d+", str(r.get("tag", ""))))
             or str(r.get("basis", "")).startswith(("pipe ", "cable ", "gas ")))
@@ -633,6 +662,21 @@ def main() -> int:
 
     placed = {str(p.get("equipment_tag") or p.get("tag")): p
               for p in (manifest.get("parts", []) if isinstance(manifest, dict) else [])}
+    # NAME-KEYED fallback (added 2026-07-05, BESS v3 LAP-3 pass): a SYNTHETIC aggregated
+    # block (the rack-farm BoP lineup — one drawn box standing for a whole BoM line) mints
+    # its OWN counter-based equipment_tag ("RH-101") that is never the underlying BoM row's
+    # own tag ("EP-1") — `placed.get(tag)` above then misses entirely for every such row,
+    # so `pm` resolves to {} and every field read off it (module, dims_mm, modelled_qty,
+    # AND the canonical name/tag `covered()` needs) silently reads as absent even though the
+    # part IS drawn. Resolve by NORMALISED NAME as a second-chance lookup — the manifest
+    # row's own `name` field is the SAME BoM part name the placer recorded (`_SYN_BLOCK_BOM`),
+    # so this closes the identity gap universally, not per-part. First-match-wins (stable
+    # dict insertion order); only consulted when the direct tag lookup misses.
+    placed_by_name: dict[str, dict] = {}
+    for _p in (manifest.get("parts", []) if isinstance(manifest, dict) else []):
+        _pk = _norm(str(_p.get("name", "")))
+        if _pk and _pk not in placed_by_name:
+            placed_by_name[_pk] = _p
     subs: dict[str, list] = {}
     for r in rb:
         if r.get("status") == "SUB-COMPONENT" and r.get("sub_of"):
@@ -682,14 +726,27 @@ def main() -> int:
         rep_text[key] = _svg_text(ddir / f"{key}.svg")
     placed_norms = {_norm(str(p.get("name", ""))) for p in placed.values()}
 
-    def covered(tag: str, name: str, key: str, canonical: str | None = None) -> bool:
+    def covered(tag: str, name: str, key: str, canonical: str | None = None,
+                canonical_tag: str | None = None) -> bool:
         """`canonical` (added 2026-07-04, canonical-name-register audit): the manifest's OWN
         name for this tag (parts-manifest.json `name`), tried as a SECOND match candidate
         alongside the BoM `requirement`-derived `name` — the two surfaces sometimes diverge
         (e.g. a combined manifest label "Grp Membrane Housings" vs a per-item BoM
         requirement) even though the same physical part is drawn under one of the two
         strings. Consuming it is additive-only: a canonical hit can turn a NOT-found into a
-        found, never the reverse."""
+        found, never the reverse.
+
+        `canonical_tag` (added 2026-07-05, BESS v3 LAP-3 GA-coverage pass): the manifest's
+        OWN equipment_tag for this row, tried as a SECOND tag candidate alongside the BoM's
+        own `tag` — the SAME divergence as `canonical`/`name`, just for tag identity. A
+        SYNTHETIC aggregated block (the rack-farm BoP lineup — one drawn box standing for a
+        whole BoM line, e.g. every per-rack accessory) mints its OWN counter-based tag
+        ("RH-101") that is never the BoM's tag ("EP-1"); the drawing genuinely shows + tags
+        the part, but under a different tag string, and its NAME never reaches the area-
+        capped GA schedule when the item is small. Without this, a real, honestly-drawn
+        small principal reads as a GA-coverage gap purely because of tag-string divergence.
+        Also additive-only, tried ONLY when the primary tag is absent from the text at all
+        (never overrides an ambiguous-tag verdict on the primary tag)."""
         if key == "blender":
             return tag in placed or _norm(name) in placed_norms
         txt = rep_text.get(key, "")
@@ -709,15 +766,13 @@ def main() -> int:
             return bool(nm.lower() in txt.lower() or _sing(nm) in _sing(txt))
 
         name_present = _present(name) or (bool(canonical) and canonical != name and _present(canonical))
-        if tag and (f" {tag} " in txt or f">{tag}<" in txt):
-            # Tag is present in the drawing. If the tag is UNAMBIGUOUS (unique
-            # identity — one equipment per tag), credit on tag alone. If the tag
-            # is AMBIGUOUS (collision: same tag → different equipment), require
-            # the NAME to also be present — otherwise we'd credit coverage for a
-            # different unit that happens to share the tag.
-            if tag not in ambiguous_tags:
-                return True
-            return name_present
+
+        # tag-matching decision extracted to the module-level, unit-testable
+        # _tag_covered_verdict (see its docstring + _selftest's TAG_VERDICT_CASES).
+        for _t in (tag, canonical_tag):
+            _v = _tag_covered_verdict(_t, txt, ambiguous_tags, name_present)
+            if _v is not None:
+                return _v
         if name_present:
             return True
         # ISA-bubble credit: an instrument/valve is drawn on a P&ID / single-line / process
@@ -742,11 +797,15 @@ def main() -> int:
         req = str(r.get("requirement", ""))
         name = (req.split("·")[0].strip() or str(placed.get(tag, {}).get("name", "")) or tag)
         typ = _classify(name, tag)
-        pm = placed.get(tag, {})
+        # pm resolution: direct TAG lookup first; NAME fallback second (2026-07-05 — a
+        # synthetic aggregated block's own tag never equals the BoM tag; see
+        # placed_by_name's docstring above).
+        pm = placed.get(tag) or placed_by_name.get(_norm(name)) or {}
         sublist = subs.get(tag, [])
-        # canonical = the manifest's OWN name for this tag — the second match candidate
-        # (2026-07-04 canonical-name-register audit; see covered()'s docstring).
-        cov = {key: covered(tag, name, key, pm.get("name")) for key in REPS}
+        # canonical / canonical_tag = the manifest's OWN name / equipment_tag for this
+        # row — second match candidates (2026-07-04 canonical-name-register audit +
+        # 2026-07-05 canonical-tag extension; see covered()'s docstring).
+        cov = {key: covered(tag, name, key, pm.get("name"), pm.get("equipment_tag")) for key in REPS}
         expected = TYPE_EXPECTED.get(typ, set())
         # Consistency with the 3D scene: a part the GA/render correctly OMIT — inline valves,
         # field instruments, switchgear/panel internals, fittings (P&ID-level detail dropped
@@ -1423,6 +1482,28 @@ def _selftest() -> int:
     Now `\\bscreen\\b` matches a filtration screen but not a touchscreen, and the control rule
     recognises HMI / touchscreen / DCS / operator panel positively."""
     bad = 0
+    # covered()'s TAG-matching decision (2026-07-05, BESS v3 LAP-3 GA-coverage pass):
+    # a placeholder tag ("—") must NEVER bare-match (the false-GA-coverage bug found
+    # on "deflagration vent seal" — " — " sits in unrelated drawing furniture, every
+    # dash-tagged row read as covered on every 2D drawing); an ambiguous real tag
+    # requires NAME corroboration; a genuinely absent tag returns None so the caller
+    # tries the next candidate (the manifest's canonical_tag, closing the "synthetic
+    # aggregated block mints its own counter-based tag" gap).
+    _tv_cases = [
+        # (tag, txt, ambiguous_tags, name_present) -> want
+        ("—", " some — table row ", set(), False, None),
+        ("—", " some — table row ", set(), True, None),
+        ("EP-1", " drawn as >EP-1< here ", set(), False, True),
+        ("AT", " multiple >AT< bubbles ", {"AT"}, False, False),
+        ("AT", " multiple >AT< bubbles ", {"AT"}, True, True),
+        ("RH-101", " no such tag text at all ", set(), False, None),
+    ]
+    for _t, _txt, _amb, _namep, _want in _tv_cases:
+        _got = _tag_covered_verdict(_t, _txt, _amb, _namep)
+        if _got != _want:
+            print(f"  FAIL _tag_covered_verdict({_t!r}, ambiguous={_amb!r}, "
+                  f"name_present={_namep!r}) = {_got!r}, want {_want!r}")
+            bad += 1
     cases = [
         ("HMI Touchscreen", "control"),
         ("Operator Interface Panel", "control"),

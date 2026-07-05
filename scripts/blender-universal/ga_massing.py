@@ -170,7 +170,33 @@ GA_NON_MASSING_RE = re.compile(
     r"\bduct\s*penetration\s*seals?\b|\bsuppression\s*nozzles?\b|"
     r"\biso\s*corner\s*castings?\b|\b(?:structural\s*)?floor\s*reinforcements?\b|"
     r"\bdoor\s*assembly\b|\bsmoke\s*vent\s*interlock\s*mounts?\b|"
-    r"\biso\s*container\s*(?:20|40)\s*(?:hc|gp|ft)?\b",
+    r"\biso\s*container\s*(?:20|40)\s*(?:hc|gp|ft)?\b|"
+    # ── FLUID/GAS CHARGE, inline pipe-mounted accessories, bare service pipes, and
+    # a thermostat (2026-07-05, BESS v3 LAP-3 3D/GA-coverage denominator-honesty
+    # pass) — closing the SAME "not a discrete massed object" gap the families
+    # above already cover, extended to four more shapes found in the 314 Ah
+    # recalibration's coolant-loop + rack-heater lines:
+    #  - a CHARGE is a consumable fluid/gas FILL QUANTITY (a costed BoM line for
+    #    accounting), not a physical part — it has no footprint of its own; it
+    #    lives dissolved inside the pipe/heat-exchanger it charges.
+    r"\b(?:coolant|refrigerant|glycol|nitrogen|gas)\s+charge\b|"
+    #  - a SIGHT GLASS is an inline visual level/flow indicator bolted to a pipe —
+    #    the same "accessory that lives ON a parent connection" family as the
+    #    flange/gasket/end-cap fittings above. A bundled relief+glass compound
+    #    ("pressure relief and sight glass") is caught via its sight-glass half.
+    r"\bsight\s*glass(?:es)?\b|"
+    #  - a bare "<service> SUPPLY/RETURN/FEED/DISCHARGE/DELIVERY pipe" is routed
+    #    pipework, the same principle as the DN/material-anchored bare-pipe rule
+    #    above, extended to a service-direction-anchored bare pipe with no DN/
+    #    material qualifier ("coolant supply pipe", "coolant return pipe").
+    #    TERMINAL-anchored so a real vessel/structure whose head noun differs
+    #    ("Pipe Bridge Support") is untouched.
+    r"\b(?:supply|return|feed|discharge|delivery)\s+pipe(?:s|work)?\s*\d*\s*$|"
+    #  - a THERMOSTAT is a small temperature-actuated control switch — the same
+    #    P&ID-level instrument family as the existing 'temperature switch' rule
+    #    (a thermostat IS a temperature switch by function), mounted on/in its
+    #    parent heater/vessel, never its own GA box.
+    r"\bthermostats?\b",
     re.I)
 
 # Pure DOCUMENTATION / signage / compliance-record rows (2026-07-05, BESS v3 dissection):
@@ -273,6 +299,12 @@ def _selftest():
         "ISO corner casting", "structural floor reinforcement",
         "door assembly double leaf", "smoke vent interlock mount",
         "ISO container 20 HC",
+        # fluid/gas charge, pipe-mounted accessories, bare service pipes, thermostat
+        # (2026-07-05 BESS v3 LAP-3 denominator-honesty pass)
+        "coolant charge", "refrigerant charge", "nitrogen charge",
+        "pressure relief and sight glass", "sight glass",
+        "coolant supply pipe", "coolant return pipe",
+        "rack heater thermostat",
     ]
     # pure documentation/signage — expected on NO representation at all.
     must_be_documentation = [
