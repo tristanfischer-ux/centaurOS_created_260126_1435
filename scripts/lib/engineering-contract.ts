@@ -11757,6 +11757,70 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   // pumps + blower + structure/skid + piping ≈ 7 t; bagging line ≈ 1.5 t.
   const totalSystemMassKg = Math.round((1300 + 950 + 1500 + 7000 + 1500) * Math.max(1, Math.cbrt(scale)))
 
+  // ── PROCESS-FLUID STREAM FLOWS (LINE & VELOCITY FIX, 2026-07-05) ──────────
+  // 42/131 connection-ledger rows FAILED "claimed within_spec ✓ over data the
+  // contract judges unverifiable — now rendered ✗": the CaCO3-slurry, wash-water,
+  // MEA-recirculation and condensate/feedwater process-fluid runs (e.g. 'packed
+  // absorber column → condensate + feedwater vessel') had NO flow/throughput
+  // quantity under ANY name, so the connection-ledger flow-matcher
+  // (scripts/blender-universal/connection_ledger.py::_flow_qty_for_part —
+  // exact snake(endpoint)+suffix, else a UNIQUE snake(endpoint)-prefixed
+  // candidate, destination governs else source delivery, NEVER a guess between
+  // two) had nothing to join onto those edges and pipe sizing/velocity stayed
+  // UNVERIFIABLE. Fix AT THE SOURCE: derive each stream's m³/h flow from the
+  // SAME mass balance already established above (gypsum/CaCO3/K2SO4/KOH
+  // tonnages, MEA circulation, reboiler duty) at the process density for its
+  // phase, and name each quantity EXACTLY after the snake-cased topology
+  // endpoint name (e.g. 'CaCO3 slurry transfer pump' →
+  // 'caco3_slurry_transfer_pump_m3_per_hour') so the ledger's exact-match path
+  // resolves every edge terminating on, or originating from, that equipment —
+  // never a fabricated number, always the mass-balance figure at a cited
+  // density. proveCatch: replay the contract — these keys are present, every
+  // value reconciles with capture_capacity_tco2_per_day × scale, and the
+  // previously-UNVERIFIED rows above now carry a real required_value.
+  //
+  // Densities (process basis — C. Schoolderman's mass balance + standard
+  // process-fluid references): carbonation/transfer SLURRY ~1300 kg/m³
+  // (mid-point of the stated 1.2-1.5 t/m³ band; matches the EXISTING
+  // fluid_density_kg_m3 already used for this same slurry in the
+  // agitation:power tool step, class-plan stepReactorAgitator); K2SO4 magma
+  // ~1250 kg/m³ (matches the EXISTING stepCrystalliserAgitator density);
+  // wash-water/condensate/feedwater ~1000 kg/m³ (the stated ~1 t/m³ band); LP
+  // saturated steam (~130 °C reboiler supply, stepReboilerHx's t_hot_in_c)
+  // ~1.5 kg/m³ (steam tables, VAPOUR phase — not the condensate-side density).
+  const SLURRY_DENSITY_KG_M3 = 1300      // CaCO3 carbonation/transfer slurry (1.2-1.5 t/m3 band)
+  const MAGMA_DENSITY_KG_M3 = 1250       // K2SO4 crystalliser magma
+  const WATER_DENSITY_KG_M3 = 1000       // wash-water / condensate / feedwater (~1 t/m3)
+  const STEAM_DENSITY_KG_M3 = 1.5        // saturated steam @ ~130 C reboiler supply (steam tables)
+
+  // CaCO3 carbonation-product slurry — the flow the transfer pump moves to the
+  // maturation vessel/filter (same physical stream feeds the vacuum belt filter).
+  const caco3SlurryM3PerHour = (totalCaco3TonsPerDay * 1000 / 24) / SLURRY_DENSITY_KG_M3
+  // K2SO4 magma slurry feed — net K2SO4 output at the crystalliser-magma density.
+  const k2so4SlurryM3PerHour = (k2so4OutputTonsPerDay * 1000 / 24) / MAGMA_DENSITY_KG_M3
+  // Reactor slurry recirculation — the SAME recirculating-liquor duty already
+  // assumed by the CSTR sizing tool (class-plan stepCarbonationReactorSizing:
+  // carbonationLiquorKgH = 4000 kg/h @ 1 t/d), formalised as a contract
+  // quantity and scaled with plant capacity, at the slurry density above.
+  const reactorRecircLiquorKgPerHour = 4000 * scale
+  const reactorRecircM3PerHour = reactorRecircLiquorKgPerHour / SLURRY_DENSITY_KG_M3
+  // Wash-water for the CaCO3 vacuum-belt-filter cake wash — a 1:1 mass
+  // wash-ratio to dry CaCO3 solids (Perry's Chemical Engineers' Handbook,
+  // typical vacuum-belt-filter range 0.5-1.5 kg wash water/kg dry cake; 1:1
+  // adopted as the design mid-point) at wash-water density.
+  const washWaterM3PerHour = (totalCaco3TonsPerDay * 1000 / 24 * 1.0) / WATER_DENSITY_KG_M3
+  // Reboiler steam mass flow — the SAME latent-heat basis the class-plan's
+  // stepReboilerHx already uses in reverse (steamKgH × 2200 kJ/kg ÷ 3600 =
+  // reboilerDutyKw), inverted here from the reboiler duty established above.
+  const reboilerSteamKgPerHour = (reboilerDutyKw * 3600) / 2200
+  // Condensate + boiler-feedwater makeup — the reboiler's steam condenses and
+  // returns mass-conserved, at condensate density.
+  const condensateFeedwaterM3PerHour = reboilerSteamKgPerHour / WATER_DENSITY_KG_M3
+  // Electric steam generator output — the SAME steam mass flow, but as vapour
+  // at generation (steam, not condensate) density — correctly a much larger
+  // volumetric flow than the condensate side, reflecting the phase change.
+  const electricSteamGeneratorM3PerHour = reboilerSteamKgPerHour / STEAM_DENSITY_KG_M3
+
   const quantities: Record<string, Quantity> = {
     // ── Capture ──
     capture_capacity_tco2_per_day: q(captureTonsPerDay, 't/day', 'flow_rate', 'rated', 'system', 'brief', { source_detail: '1 t/day pilot (≈42 kg/h continuous) point-source flue-gas capture' }),
@@ -11812,6 +11876,18 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     // ── Flue-gas blower ──
     flue_gas_blower_flow_m3_per_hour: q(blowerFlowM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `225 m³/h/(t/d) × ${scale.toFixed(2)} scale = ${blowerFlowM3PerHour.toFixed(0)} m³/h flue-gas blower flow` }),
     flue_gas_blower_kw: q(blowerKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `1.5 kW/(t/d) × ${scale.toFixed(2)} scale = ${blowerKw.toFixed(2)} kW flue-gas blower` }),
+
+    // ── Process-fluid stream flows (Line & Velocity fix, 2026-07-05) — keyed
+    // EXACTLY to the topology endpoint name so connection_ledger.py's exact-
+    // match flow-join resolves each run; see the derivation comments above. ──
+    caco3_slurry_transfer_pump_m3_per_hour: q(caco3SlurryM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `CaCO3 carbonation-product slurry: ${totalCaco3TonsPerDay.toFixed(2)} t/d × 1000/24 ÷ ${SLURRY_DENSITY_KG_M3} kg/m³ slurry density = ${caco3SlurryM3PerHour.toFixed(3)} m³/h (transfer pump to the maturation vessel/filter)`, from: ['caco3_output_t_per_day'] }),
+    caco3_vacuum_belt_filter_m3_per_hour: q(caco3SlurryM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: 'same CaCO3 carbonation-product slurry stream fed to the vacuum belt filter for solid/liquid separation (identical to the transfer-pump flow)', from: ['caco3_output_t_per_day'] }),
+    k2so4_slurry_feed_pump_m3_per_hour: q(k2so4SlurryM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `K2SO4 crystalliser-magma slurry feed: ${k2so4OutputTonsPerDay.toFixed(2)} t/d × 1000/24 ÷ ${MAGMA_DENSITY_KG_M3} kg/m³ magma density = ${k2so4SlurryM3PerHour.toFixed(3)} m³/h`, from: ['k2so4_output_t_per_day'] }),
+    reactor_slurry_recirculation_pump_m3_per_hour: q(reactorRecircM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `carbonation-reactor external recirculation liquor: ${reactorRecircLiquorKgPerHour.toFixed(0)} kg/h (matches the CSTR sizing tool's own recirculating-liquor assumption, scaled ${scale.toFixed(2)}× to plant capacity) ÷ ${SLURRY_DENSITY_KG_M3} kg/m³ = ${reactorRecircM3PerHour.toFixed(2)} m³/h — ~${(reactorRecircM3PerHour / gypsumReactorVolumeM3).toFixed(1)} reactor-volume turnovers/hour against the ${gypsumReactorVolumeM3.toFixed(1)} m³ gypsum carbonation reactor` }),
+    wash_water_feed_pump_m3_per_hour: q(washWaterM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `CaCO3 vacuum-belt-filter cake wash: 1:1 mass wash-ratio (Perry's Chemical Engineers' Handbook, typical vacuum-belt-filter range 0.5-1.5 kg wash water/kg dry cake) × ${totalCaco3TonsPerDay.toFixed(2)} t/d CaCO3 × 1000/24 ÷ ${WATER_DENSITY_KG_M3} kg/m³ wash-water density = ${washWaterM3PerHour.toFixed(3)} m³/h`, from: ['caco3_output_t_per_day'] }),
+    condensate_feedwater_vessel_m3_per_hour: q(condensateFeedwaterM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `stripper reboiler steam condensate + boiler-feedwater makeup: ${reboilerSteamKgPerHour.toFixed(1)} kg/h steam (${reboilerDutyKw.toFixed(1)} kW reboiler duty ÷ 2200 kJ/kg latent heat) ÷ ${WATER_DENSITY_KG_M3} kg/m³ condensate density = ${condensateFeedwaterM3PerHour.toFixed(3)} m³/h`, from: ['reboiler_duty_kw'] }),
+    mea_distillation_column_m3_per_hour: q(meaCirculationM3PerHour, 'm³/h', 'flow_rate', 'continuous', 'module', 'calculator', { source_detail: 'the MEA regenerator ("MEA distillation column") is fed by the SAME rich-amine circulation loop as mea_circulation_m3_per_hour', from: ['mea_circulation_m3_per_hour'] }),
+    electric_steam_generator_m3_per_hour: q(electricSteamGeneratorM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `stripper reboiler steam supply, vapour phase: ${reboilerSteamKgPerHour.toFixed(1)} kg/h ÷ ${STEAM_DENSITY_KG_M3} kg/m³ saturated-steam density at ~130 °C (steam tables) = ${electricSteamGeneratorM3PerHour.toFixed(1)} m³/h`, from: ['reboiler_duty_kw'] }),
 
     // ── System ──
     connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'Σ motor + evaporative duties (MEA pump + agitators + crystalliser evap + blower)' }),
