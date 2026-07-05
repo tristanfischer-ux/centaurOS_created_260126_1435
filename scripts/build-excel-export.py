@@ -10800,7 +10800,7 @@ _CRANE_CLASSES = [
 _VESSEL_SHAPE_RX = re.compile(
     r"tank|vessel|column|silo|sump|basin|stack|reactor|clarifier|tall_", re.I)
 _INSTRUMENT_ROW_RX = re.compile(
-    r"transmitter|\bsensor\b|\bprobe\b|analys|instrument|flow meter|\bgauge\b|"
+    r"transmitter|transducer|\bsensor\b|\bprobe\b|analys|instrument|flow meter|\bgauge\b|"
     r"level switch|\bplc\b|\bhmi\b|\bscada\b", re.I)
 
 # ── SCHEDULES-RECON like-for-like matchers (2026-07-05) — module-level so the
@@ -10835,6 +10835,29 @@ _SCHED_VALVE_RX = re.compile(
 # redefinition of the shared constant.
 _SCHED_CONTROL_SYSTEM_RX = re.compile(r"\bplc\b|\bhmi\b|\bscada\b|\bcontroller\b|\bgateway\b",
                                       re.I)
+# NON-FIELD-INSTRUMENT EXCLUSIONS (2026-07-05 schedules-recon over-match fix, BESS v7:
+# 110 BoM-matched vs the schedule's own honest 67). The schedule's INSTRUMENT INDEX lists
+# FIELD-mounted PROCESS-VARIABLE devices only — the classic ISA T/P/F/L/A measured-variable
+# letters (temperature / pressure / flow / level / composition). Two non-field families were
+# inflating the BoM-side count once `transducer` was added to `_INSTRUMENT_ROW_RX` above (to
+# stop UNDER-matching the schedule's own PT-201/202 'pressure transducer' rows):
+#   1. ELECTRICAL sense elements — a per-rack/per-string VOLTAGE or CURRENT sensor/transducer
+#      (BMS cell-balancing + protection input) measures an ELECTRICAL quantity, not a PROCESS
+#      one; it is a CT/VT-class device that belongs on the single-line/panel schedule, never
+#      the P&ID instrument index (BESS: 'pack voltage sensor' ×13, 'pack current transducer'
+#      ×13). 'arc flash …sensor' is the same family — a switchgear PROTECTION input, not a
+#      process measurement (BESS: 'arc flash fibre-optic point sensor' ×4).
+#   2. ACCESSORY / hardware lines that ride on an ALREADY-counted instrument's own BoM
+#      line — a mounting bracket or a nameplate/label is not a second physical device
+#      (BESS: 'gas sensor mount' ×13, 'gas sensor label' ×13 — the gas sensor itself is
+#      already counted once under its own 'gas sensor' line).
+# Both are keyed on the MEASURED-QUANTITY / accessory-noun signal, never a class table or a
+# named part — an unseen archetype's own electrical-sense or accessory lines self-exclude the
+# same way, and a genuine field instrument (temperature / gas / pressure) is untouched.
+_SCHED_ELECTRICAL_SENSE_RX = re.compile(
+    r"\b(?:voltage|current)\s+(?:sensor|transducer|transmitter)\b|\barc.?flash\b", re.I)
+_SCHED_ACCESSORY_RX = re.compile(
+    r"\b(?:mount(?:ing)?|bracket|label|nameplate|gland|clamp)\b", re.I)
 
 
 def _crane_class(mass_kg: float) -> str:
@@ -11878,23 +11901,33 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
                            "(excludes zone-kit + hand-watering station allowances — per-zone/"
                            "per-station pipework tie-ins, not schedule-listed line valves)"))
     if n_instruments_schedule is not None:
+        _electrical_sense_rx = _SCHED_ELECTRICAL_SENSE_RX
+        _accessory_rx = _SCHED_ACCESSORY_RX
         _inst_rows = [b for b in bom if isinstance(b, dict)
                       and _inst_rx.search(str(b.get("requirement") or ""))]
-        _inst_rows_scoped = [b for b in _inst_rows
-                             if not _control_system_rx.search(str(b.get("requirement") or ""))]
-        _inst_rows_excl = [b for b in _inst_rows
-                           if _control_system_rx.search(str(b.get("requirement") or ""))]
+        def _non_field(b: dict) -> bool:
+            req = str(b.get("requirement") or "")
+            return bool(_control_system_rx.search(req) or _electrical_sense_rx.search(req)
+                       or _accessory_rx.search(req))
+        _inst_rows_scoped = [b for b in _inst_rows if not _non_field(b)]
+        _inst_rows_excl = [b for b in _inst_rows if _non_field(b)]
         bom_inst = sum(int(num(b.get("qty")) or 1) for b in _inst_rows_scoped)
         _inst_excl_qty = sum(int(num(b.get("qty")) or 1) for b in _inst_rows_excl)
+        _inst_excl_desc = ", ".join(f"{int(num(b.get('qty')) or 1)}× "
+                                    f"{str(b.get('requirement') or '')[:40]}" for b in _inst_rows_excl)
         print(f"      Instrument recon: {bom_inst} field-instrument BoM line(s) (like-for-like "
               f"vs the schedule's own field-device population) · excluded "
-              f"{len(_inst_rows_excl)} control-system row(s) totalling {_inst_excl_qty} off "
-              f"(PLC/HMI/SCADA — panel-schedule items, not process instruments)")
+              f"{len(_inst_rows_excl)} non-field row(s) totalling {_inst_excl_qty} off "
+              f"(PLC/HMI/SCADA control-system + electrical CT/VT-class sense/protection + "
+              f"mount/label accessories — none are schedule-listed process field instruments) "
+              f"— {_inst_excl_desc}")
         recon_rows.append(("Instrument count: schedule vs BoM", n_instruments_schedule, bom_inst,
                            "instrument index (raw rows, pre-collapse)",
                            "BoM lines matching the instrument family whose requirement is NOT "
-                           "a control-system item (excludes PLC/HMI/SCADA — panel-schedule "
-                           "items, not process instruments)"))
+                           "a control-system item, an electrical voltage/current sense or "
+                           "protection element (CT/VT-class — panel-schedule items, not "
+                           "process instruments), or a mount/label accessory of an "
+                           "already-counted instrument"))
     if recon_rows:
         sub_banner(ws, r, "Cross-schedule consistency — schedule item totals vs the BoM", span)
         r += 1
@@ -22350,6 +22383,63 @@ def _selftest() -> int:
     if _si_total != 52:
         print(f"  FAIL sched-inst-e2e: I-1 (52) must reconcile after excluding the two "
               f"HMI rows (got {_si_total} from {len(_si_rows)} rows)"); bad += 1
+
+    # ═══ proveCatch the NON-FIELD-INSTRUMENT exclusions (2026-07-05, BESS v7: 110 BoM-
+    # matched vs the schedule's own honest 67 before this fix). `transducer` was added to
+    # `_INSTRUMENT_ROW_RX` to stop UNDER-matching a genuine field device ('pressure
+    # transducer'); that widening must NOT let an electrical CT/VT-class sense element or an
+    # accessory line for an already-counted instrument slip in as a second field instrument.
+    # Both directions checked — a genuine field instrument (pressure transducer, gas sensor)
+    # must NOT be caught by either exclusion. ═══
+    if not _INSTRUMENT_ROW_RX.search("pressure transducer · 0-10 bar"):
+        print("  FAIL sched-inst: a pressure TRANSDUCER (BESS PT-201/202) must match the "
+              "instrument family — under-match was the root cause of the 110-vs-67 gap "
+              "(the schedule's 2 PTs had nothing to reconcile against)"); bad += 1
+    if not _SCHED_ELECTRICAL_SENSE_RX.search("pack voltage sensor · 2000 V nominal"):
+        print("  FAIL sched-elec-sense: a per-rack VOLTAGE sensor (BMS cell-balancing "
+              "input, a CT/VT-class electrical element) must be excluded — it lives on "
+              "the panel schedule, not the P&ID instrument index"); bad += 1
+    if not _SCHED_ELECTRICAL_SENSE_RX.search("pack current transducer · 300 A"):
+        print("  FAIL sched-elec-sense: a per-rack CURRENT transducer (protection input) "
+              "must be excluded as an electrical sense element"); bad += 1
+    if not _SCHED_ELECTRICAL_SENSE_RX.search("arc flash fibre-optic point sensor"):
+        print("  FAIL sched-elec-sense: an arc-flash detection sensor (switchgear "
+              "PROTECTION input) must be excluded — not a process measurement"); bad += 1
+    if _SCHED_ELECTRICAL_SENSE_RX.search("pressure transducer · 0-10 bar"):
+        print("  FAIL sched-elec-sense: a genuine PROCESS pressure transducer must NOT "
+              "be caught by the electrical-sense exclusion (over-reach)"); bad += 1
+    if not _SCHED_ACCESSORY_RX.search("gas sensor mount"):
+        print("  FAIL sched-accessory: a sensor MOUNT (hardware for an already-counted "
+              "device) must be excluded — not a second physical instrument"); bad += 1
+    if not _SCHED_ACCESSORY_RX.search("gas sensor label"):
+        print("  FAIL sched-accessory: a sensor LABEL/nameplate must be excluded — not "
+              "a second physical instrument"); bad += 1
+    if _SCHED_ACCESSORY_RX.search("gas sensor"):
+        print("  FAIL sched-accessory: the gas sensor's OWN line must NOT be caught by "
+              "the accessory exclusion (over-reach)"); bad += 1
+    # end-to-end: the exact BESS v7 shape (110 → 67) reconciles like-for-like.
+    _sched_bom2 = [
+        {"tag": "TT", "requirement": "pack temperature sensor · 10", "qty": 52},
+        {"tag": "PT", "requirement": "pressure transducer · 0-10", "qty": 2},
+        {"tag": "AT", "requirement": "gas sensor", "qty": 13},
+        {"tag": "AT-mnt", "requirement": "gas sensor mount", "qty": 13},
+        {"tag": "AT-lbl", "requirement": "gas sensor label", "qty": 13},
+        {"tag": "BMS-V", "requirement": "pack voltage sensor · 2000 V nominal", "qty": 13},
+        {"tag": "BMS-I", "requirement": "pack current transducer · 300 A", "qty": 13},
+        {"tag": "PROT", "requirement": "arc flash fibre-optic point sensor", "qty": 4},
+    ]
+    def _non_field2(b: dict) -> bool:
+        req = b["requirement"]
+        return bool(_SCHED_CONTROL_SYSTEM_RX.search(req) or _SCHED_ELECTRICAL_SENSE_RX.search(req)
+                   or _SCHED_ACCESSORY_RX.search(req))
+    _si2_rows = [b for b in _sched_bom2 if _INSTRUMENT_ROW_RX.search(b["requirement"])
+                and not _non_field2(b)]
+    _si2_total = sum(b["qty"] for b in _si2_rows)
+    if _si2_total != 67:
+        print(f"  FAIL sched-inst-e2e-v7: the BESS v7 shape must reconcile to the "
+              f"schedule's own 67 field instruments (52 TT + 2 PT + 13 AT), excluding "
+              f"mount/label accessories + BMS electrical-sense + arc-flash protection "
+              f"(got {_si2_total} from {len(_si2_rows)} rows)"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

@@ -1298,6 +1298,60 @@ def _dominant_default_amps(amps: list) -> Optional[float]:
     return None
 
 
+def _dedup_row_amps_for_schedule(rows) -> list:
+    """One amps reading PER DISTINCT (from, to-base, role) edge — the SAME rack/tap
+    collapsing `_fill_circuits` already applies per board — so the schedule-WIDE dominant-
+    default detector (`_set_incoming` / `_set_sub_incoming`) compares like-for-like samples.
+    Without this, a single board's own large fan-out (e.g. 13 rack branches all inheriting
+    one placeholder current) out-votes the value that is ACTUALLY the schedule-wide
+    placeholder (recurring once per distinct edge across every other board) purely because
+    it has more raw ROWS — a BESS-class regression (2026-07-05 J98 board-recon fix): 13×
+    1.2 A rack branches out-voted the 8 distinct 15 A placeholder edges, so the schedule-wide
+    default resolved to 1.2 A instead of 15 A and the MAIN board's stale-default guard never
+    fired. Universal — keyed on the topology's own from/to shape, never a product class."""
+    groups: dict = {}
+    for r in rows:
+        to = r.get("to") or ""
+        m = _RACK_TAP_RE.match(to)
+        base = m.group(1) if m else to
+        key = (r.get("from"), base, r.get("role"))
+        if key in groups:
+            continue
+        a = _row_amps(r)
+        if a and a > 0:
+            groups[key] = a
+    return list(groups.values())
+
+
+# The SAME pass/review tolerance `reconcile()` renders (Σ circuit current within 0.85-1.25×
+# the board's stated demand) is the ONE MINT used to decide whether a raw schedule reading is
+# trustworthy enough to keep, or is a stale placeholder that must yield to the board's own
+# circuits (Codema J98 discipline: a board's demand is judged by ONE rule regardless of
+# board TYPE, so a MAIN board and a SUB/AUX board can never disagree on what counts as
+# "reconciled"). Defined once here; `reconcile()` re-uses the same tuple for its verdict.
+_RECON_BAND = (0.85, 1.25)
+
+
+def _demand_needs_circuit_override(raw_a: Optional[float], downstream_a: Optional[float],
+                                   schedule_default_a: Optional[float]) -> bool:
+    """True when a board's raw demand reading is PROVABLY a stale schedule-wide placeholder:
+    it equals the schedule's own dominant default AND trusting it would fail the identical
+    reconciliation band `reconcile()` renders. This is the ONE test both `_set_incoming`
+    (MAIN board) and `_set_sub_incoming` (SUB/AUX board) call — before this fix only the MAIN
+    board carried the guard, so a SUB board (e.g. a BESS 'BMS ctrl' aux board) whose own
+    busway-trunk row happened to carry the same 15 A schedule-wide placeholder as everywhere
+    else locked onto a 16 A busbar rating while its own circuits (13 rack feeders) demanded
+    1,685 A — a REVIEW ratio of 112× instead of the true reconciled 1.0×. Root cause fixed at
+    the RULE (both callers), not the one BESS instance."""
+    if raw_a is None or not downstream_a or schedule_default_a is None:
+        return False
+    if round(raw_a, 1) != round(schedule_default_a, 1):
+        return False
+    lo, hi = _RECON_BAND
+    ratio = downstream_a / raw_a
+    return not (lo <= ratio <= hi)
+
+
 def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
                    equip_qty: Optional[dict] = None):
     """Build the outgoing-circuit rows for a board: every row whose `from` is this board
@@ -1770,9 +1824,13 @@ def _set_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict
     default current it puts on many unrelated trunk/branch rows (e.g. 4.2 A repeated across
     4 trunk stages + 11 branches) — trusting that raw reading made a MAIN board's demand read
     orders of magnitude below its own Σ circuit current (ratio ~20). Guard it: when the raw
-    incoming reading (a) doesn't exist, or (b) IS the schedule-wide dominant default AND sits
-    implausibly below the board's own downstream circuit sum, derive the demand from that sum
-    instead — the board's own circuits are real (kW-derived, 2026-07-02), never a stale row."""
+    incoming reading (a) doesn't exist, or (b) is PROVABLY a stale placeholder per
+    `_demand_needs_circuit_override` (2026-07-05 J98 fix: the SAME test `_set_sub_incoming`
+    now shares — one mint), derive the demand from the board's own circuit sum instead — the
+    board's own circuits are real (kW-derived, 2026-07-02), never a stale row. When (b) fires,
+    the displayed feeder cable is RE-SIZED from that corrected current too — leaving the
+    placeholder row's undersized cable label standing next to a corrected demand figure would
+    just relocate the lie from the amps column to the cable column."""
     bus = _lv_busbar_row(board_id, rows)
     if bus is not None:
         panel.busbar_a = _row_amps(bus) or panel.busbar_a
@@ -1787,23 +1845,23 @@ def _set_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict
 
     downstream_a = _circuit_current_sum(panel)
     raw_a = _row_amps(inc) if inc is not None else None
-    schedule_default_a = _dominant_default_amps(
-        [a for a in (_row_amps(r) for r in rows) if a and a > 0])
-    stale_default = (raw_a is not None and downstream_a > 0
-                      and schedule_default_a is not None
-                      and round(raw_a, 1) == schedule_default_a
-                      and raw_a < downstream_a * 0.5)
+    schedule_default_a = _dominant_default_amps(_dedup_row_amps_for_schedule(rows))
+    stale_default = _demand_needs_circuit_override(raw_a, downstream_a, schedule_default_a)
 
-    if inc is not None:
-        panel.incoming = _incoming_descr(inc)          # cable/length/ΔU stay useful either way
     if inc is None and downstream_a > 0:
         panel.incoming_a = downstream_a                 # (a) no incoming row — use own circuits
         if bus is None and not panel.busbar_a:
             panel.busbar_a = downstream_a
+        panel.incoming = "—"
     elif stale_default:
         panel.incoming_a = downstream_a                 # (b) stale wholesale default — use own
-    elif inc is not None:                                #     circuits' derived sum instead
+        _csa_label = size_cable_csa(downstream_a)[1]     #     circuits' derived sum + cable
+        panel.incoming = (f"{_csa_label or '—'} (re-sized from the board's own {downstream_a:,.0f} A "
+                          f"circuit demand — the schedule's own reading was the "
+                          f"{schedule_default_a:g} A wholesale placeholder)")
+    elif inc is not None:
         panel.incoming_a = raw_a
+        panel.incoming = _incoming_descr(inc)            # a genuine reading — show its own cable
 
     # (c) the busbar RATING is a separate figure from the demand current — never a bare echo.
     _set_busbar_rating(panel)
@@ -1816,12 +1874,30 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
     (≈ Σ of its load circuits) is in a DIFFERENT current domain from the MV feeder that
     supplies it.  The board demand we reconcile against is the LV BUSBAR current (the
     '<board> → (local busway)' trunk row), NOT the MV feeder amps.  The MV feeder + the
-    step-down transformer are recorded separately for the header."""
-    # 1) LV busbar = the local-busway trunk this sub-board carries (the demand basis).
+    step-down transformer are recorded separately for the header.
+
+    2026-07-05 J98 board-recon fix: this LV busway reading is subject to the SAME
+    stale-placeholder guard the MAIN board's `_set_incoming` already carried
+    (`_demand_needs_circuit_override` — one mint, shared). Before this fix an AUX/control
+    board whose busway-trunk row happened to carry the schedule-wide wholesale placeholder
+    (e.g. a BESS 'BMS ctrl' board reading 15 A on its own trunk while its 13 rack-feeder
+    circuits actually demand 1,685 A) locked its busbar rating onto that placeholder — a
+    112× REVIEW ratio — because only the MAIN board ever cross-checked the reading against
+    its own circuits. A board's demand is now judged by the IDENTICAL rule regardless of
+    board TYPE (main vs sub/aux)."""
+    # 1) LV busbar = the local-busway trunk this sub-board carries (the demand basis) —
+    # unless that reading is provably the schedule-wide placeholder (see docstring above).
     bus = _lv_busbar_row(board_id, rows)
-    lv_a = _row_amps(bus) if bus is not None else None
+    raw_lv_a = _row_amps(bus) if bus is not None else None
+    downstream_a = _circuit_current_sum(panel)
+    schedule_default_a = _dominant_default_amps(_dedup_row_amps_for_schedule(rows))
+    stale_default = _demand_needs_circuit_override(raw_lv_a, downstream_a, schedule_default_a)
+    if raw_lv_a is None or stale_default:
+        lv_a = downstream_a if downstream_a > 0 else raw_lv_a
+    else:
+        lv_a = raw_lv_a
     if lv_a is None:
-        # no busway row — fall back to the largest load circuit on this board.
+        # no busway row, no circuits yet sized — fall back to the largest load circuit.
         lv_a = max(((c.design_a or 0) * 1 for c in panel.circuits), default=None) or None
     panel.busbar_a = lv_a
     panel.incoming_a = lv_a            # reconcile circuits against the LV busbar
@@ -1888,8 +1964,11 @@ def reconcile(panel: Panel) -> dict:
     if demand_a and sum_a:
         ratio = sum_a / demand_a
         # Σ of the parallel circuit currents should be ≈ the board busbar / incoming
-        # current (allow a diversity / aux margin: 0.85–1.25 reads as reconciled).
-        verdict = "OK" if 0.85 <= ratio <= 1.25 else "REVIEW"
+        # current (allow a diversity / aux margin — the SAME _RECON_BAND the stale-default
+        # guard uses, one mint: a reading that would already fail here is what makes the
+        # guard override it in the first place).
+        lo, hi = _RECON_BAND
+        verdict = "OK" if lo <= ratio <= hi else "REVIEW"
 
     # transformer-headroom check (sub-boards fed via a step-down): Σ connected kW must sit
     # within the transformer kVA nameplate (× ~0.95 pf headroom).
