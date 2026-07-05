@@ -2168,11 +2168,38 @@ def _build_source(state, schedule, devices, main_bus, arch):
         gv = "11 kV / 33 kV"
         source = Source(sym=SYM_UTILITY, tag="GRID CONNECTION POINT",
                         detail=f"{gv} MV grid · G99 (≤ 1 MW export)", voltage=gv)
-        # incomer step-up transformer (LV PCS → MV grid)
+        # incomer step-up transformer (LV PCS → MV grid).
         cont_kw = _q(state, "continuous_power_kw")
+        # ONE MINT, ONE OWNER (grid-tie step-up transformer, distinct from the
+        # incomer/supply-demand alias family — settle-loop.ts INCOMER_KVA_ALIAS_KEYS
+        # excludes `transformer_rating_kva` deliberately: "it is the grid-tie
+        # STEP-UP/export transformer's rating ... BESS carries 3150 kVA against a
+        # 1600 kVA supply-demand mint, legitimately — not a supply-demand alias").
+        # TX1's rating READS the contract, in the SAME preference order the Excel
+        # 'single-line ↔ schedule · transformer kVA' recon check uses
+        # (build-excel-export.py ~line 13205): transformer_kva, main_transformer_kva,
+        # transformer_rating_kva (v13's 0.5-engineering-contract.json quantity —
+        # transformer_rating_kva = 3150 kVA — is this last one). The drawing NEVER
+        # derives its own rating while a contract value exists: the old
+        # `cont_kw / 0.95` pf-divide minted an off-ladder THIRD number (2632 kVA vs
+        # the contract's 3150 kVA) that the Electrical 'single-line ↔ schedule ·
+        # transformer kVA' recon FAILed on. Only when the contract carries NONE of
+        # these keys does the drawing derive one — via the SAME one-mint rule the
+        # MV-fed branch above uses (edm.incomer_kva_for_load = next standard rating
+        # ≥ load × 1.25), and it says so on the sheet.
+        kva_contract = (_q(state, "transformer_kva")
+                        or _q(state, "main_transformer_kva")
+                        or _q(state, "transformer_rating_kva"))
+        if kva_contract:
+            kva_label = f"{kva_contract:,.0f} kVA"
+        elif cont_kw:
+            kva_label = (f"{edm.incomer_kva_for_load(cont_kw):,.0f} kVA "
+                         f"(derived — no contract rating)")
+        else:
+            kva_label = ""
         inc_xfmr = Transformer(
             tag="TX1",
-            kva=(f"{cont_kw/0.95:,.0f} kVA" if cont_kw else ""),
+            kva=kva_label,
             ratio=(f"{ac_v:,.0f} V / {gv}" if ac_v else f"LV / {gv}"),
             # LV/MV BOUNDARY MARKER (2026-07-05): TX1 is not just a step-up rating change —
             # it is the physical LV(PCS output)/MV(grid) demarcation point on this diagram;
