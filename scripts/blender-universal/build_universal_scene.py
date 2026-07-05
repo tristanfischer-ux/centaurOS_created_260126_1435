@@ -6589,16 +6589,35 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
             for pt, nm in big_pts:
                 if pt is None or math.dist(pt[:2], hub_pt[:2]) < 300.0:
                     continue
+                # MINT-SITE GUARD (2026-07-05, the v12 bms_ctrl→coldplatemanifold
+                # "no carried current" catch): the thermal/fluid hub `hubs[fam]`
+                # resolved above is whatever part NAME matched HUB_THERMAL_RE /
+                # HUB_FLUID_SUPPLY_RE for FLUID-LOOP purposes — a chiller (a real
+                # motor-driven load) legitimately matches, but so does a bare
+                # "manifold"/"header"/"reservoir" (HUB_FLUID_SUPPLY_RE matches
+                # 'manifold' by design, for the FLUID fan-out above), which is a
+                # PASSIVE header with no draw of its own. Minting an electrical
+                # feeder here is an ASSERTION that `nm` is powered equipment; ask
+                # the SAME universal classifier the ledger's own power-closer uses
+                # (component_engineering._required_services, module-loaded as
+                # _REQUIRED_SERVICES) rather than assume every hub needs a cable.
+                # Evidence decides: no 'power' service → the row must not exist at
+                # all (never a fabricated current on a device that draws none).
+                if "power" not in _REQUIRED_SERVICES(nm, "", "", True):
+                    continue
                 key = (round(pt[0]), round(pt[1]))
                 if key in seen_pt:
                     continue
                 seen_pt.add(key)
                 # discrete big load (HVAC/chiller/reservoir pump): an individual
                 # feeder of UNKNOWN current (not 1/N of the bus, not the full bus) —
-                # leave rating-less so it draws at the small fallback diameter.
+                # leave rating-less so it draws at the small fallback diameter
+                # (join_power_demands below fills it from an already-ESTABLISHED
+                # sibling demand for the SAME device when one exists — never a guess).
                 _emit(hub_pt, pt, "electrical_bus", hub_nm, nm,
                       edge={"from_part": hub_nm, "to_part": nm,
-                            "mechanism": "electrical_bus"})
+                            "mechanism": "electrical_bus",
+                            "constraint_kind": "current_rating"})
         # DOWNSTREAM electrical chain: rack block → first stage (PCS) → next
         # (transformer) → … So the power path reads in series, not just a fan-out.
         # The WHOLE bus current flows through each stage in series, so each chain
@@ -6617,6 +6636,28 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
                       edge=_share_edge("electrical", "electrical_bus", prev_nm,
                                        stage_nm, 1, is_trunk=True))
                 prev_pt, prev_nm = stage_pt, stage_nm
+        # CARRIED-CURRENT JOIN (2026-07-05, the v12 bms_ctrl→chiller "no carried
+        # current" catch): every edge minted above (the per-rack taps + the discrete
+        # big-load feeders + the downstream chain) is synthesized HERE, entirely
+        # AFTER cl.finalize_ledger already ran + joined `explicit_topology` — so
+        # cl.join_power_demands (a0308d864) never touched them, even when the
+        # destination (e.g. 'liquid cooling chiller') already carries a REAL
+        # established demand elsewhere in the SAME topology (e.g. 'DC busbar 1500 V'
+        # → 'liquid cooling chiller'). Re-run the SAME join rule — never a bespoke
+        # copy of its logic — on the combined pool: `explicit_topology` supplies the
+        # ESTABLISHED sibling demands (an edge that already has a required_value is
+        # never touched twice, so nothing here can double-join or overwrite an
+        # authored rating), and each `derived` record's OWN edge dict is mutated IN
+        # PLACE (the exact object `_emit_routes_on_plan` sizes from downstream), so
+        # the fill is visible wherever that edge is read. Universal — no per-class
+        # table; a destination with no established sibling anywhere stays honestly
+        # None (never fabricated), exactly like the ledger choke point itself.
+        _electrical_derived_edges = [d["edge"] for d in derived
+                                     if d.get("edge") is not None
+                                     and d["edge"].get("mechanism") == "electrical_bus"]
+        if _electrical_derived_edges:
+            cl.join_power_demands(list(explicit_topology) + _electrical_derived_edges,
+                                  {}, log=lambda m: print(m))
 
     # On a RICH process-flow graph we STOP here: the fluid/thermal loops are
     # already authored as real edges; do not override them (e-fuel stays intact).
@@ -6823,9 +6864,30 @@ def group_fanout_trunks(resolved, min_consumers=TRUNK_MIN_CONSUMERS):
         trunk_edge = None
         if c0_edge is not None:
             total = c0_edge.get("parent_total_value")
+            if total is None:
+                # BUSWAY-AGGREGATION FIX (2026-07-05, the v12 "DC busbar 1500 V →
+                # (busway): no carried current" catch): `parent_total_value` is
+                # ONLY stamped by _share_edge for a DERIVED fan-out whose parent
+                # family rating resolved (e.g. the racks' bms_ctrl trunk) — a trunk
+                # built from REAL EXPLICIT ledger edges (each tap already carrying
+                # its OWN established required_value, e.g. a completion-closer's
+                # protective tap) has no such field on any of its taps, so the
+                # aggregation stayed honestly-blank even though every one of its
+                # own tributaries already carries a real number. The pseudo-node's
+                # carried current IS the DETERMINISTIC SUM of its tributary runs
+                # (Kirchhoff: a trunk carries what its branches carry) — never a
+                # re-derivation from a different family total, never a guess.
+                # Universal — keyed on the group's own consumer edges, no class
+                # table; a group whose taps are ALSO unresolved sums to None,
+                # honestly (never fabricated).
+                tap_vals = [c["edge"].get("required_value") for c in consumers
+                            if c.get("edge") and isinstance(c["edge"].get("required_value"),
+                                                            (int, float))]
+                if tap_vals:
+                    total = sum(tap_vals)
             trunk_edge = {
                 "from_part": origin_nm, "to_part": "(busway)", "mechanism": mech,
-                "constraint_kind": c0_edge.get("constraint_kind"),
+                "constraint_kind": c0_edge.get("constraint_kind") or "current_rating",
                 "required_value": total, "required_unit": c0_edge.get("required_unit"),
                 "required_margin_factor": 1.0,
                 "material_context": c0_edge.get("material_context"),

@@ -231,6 +231,85 @@ check(len(g2) == 0 and len(p2) == 2,
 check(B.TRUNK_MIN_CONSUMERS == 3, "trunk threshold = 3 distinct consumers")
 
 
+# ── 7b. v12 CARRIED-CURRENT proveCatches (2026-07-05) — the three "no carried
+#      current" Line & velocity rows that survived the a0308d864 join_power_demands
+#      fix on a FRESH rack-farm rebuild: derive_flows()'s discrete big-load feeder
+#      + the trunk-and-branch aggregation both synthesize edges AFTER
+#      cl.finalize_ledger's join already ran, and the electrical-hub role here
+#      resolves to a NON-part label ('bms_ctrl') rather than a placed busbar — the
+#      exact shape that starved the fix on the real v12 artefacts. ────────────────
+print("[7b] v12 carried-current catches: join reproduction + mint-site guard")
+parts_v12 = [
+    _part("DC busbar 1500 V", placed=(0.0, 0.0, 2400.0)),
+    _part("liquid cooling chiller", placed=(6000.0, 1200.0, 2400.0)),
+    _part("cold plate manifold", placed=(6000.0, -1200.0, 2400.0)),
+]
+# electrical hub resolves to the BMS-controller ROLE LABEL (not a placed part) —
+# reproduces the real v12 shape where hubs['electrical'] is 'bms_ctrl'; the fluid
+# hub resolves to the passive manifold itself (HUB_FLUID_SUPPLY_RE matches
+# 'manifold' for the FLUID fan-out, but that does NOT make it a powered device).
+hubs_v12 = {"electrical": ("bms_ctrl", (5000.0, -900.0, 2400.0)),
+            "fluid": ("cold plate manifold", (6000.0, -1200.0, 2400.0))}
+# explicit_topology carries (a) the dropped-at-the-ledger aggregate edge (both
+# endpoints unresolvable against parts_v12 — exactly finalize_ledger's real
+# "both-endpoints-unresolved" drop) so _RATING['electrical'] resolves to None,
+# and (b) a REAL already-ESTABLISHED sibling demand for the chiller (as the
+# ledger's own completion-closer would stamp), which the join must find + copy.
+topo_v12 = [
+    {"mechanism": "electrical_bus", "from_part": "lfp_cell_string", "to_part": "dc_bus"},
+    {"mechanism": "electrical_bus", "from_part": "DC busbar 1500 V",
+     "to_part": "liquid cooling chiller", "constraint_kind": "current_rating",
+     "required_value": 12.0, "required_unit": "A"},
+]
+derived_v12 = B.derive_flows(parts_v12, [(1000.0, 0.0, 2400.0)], topo_v12,
+                             _mechs("electrical"), hubs=hubs_v12)
+chiller_d = next((d for d in derived_v12 if d.get("b_nm") == "liquid cooling chiller"), None)
+check(chiller_d is not None and chiller_d.get("edge", {}).get("required_value") == 12.0,
+      f"CATCH 1: bms_ctrl→chiller inherits the chiller's already-established demand "
+      f"via join_power_demands (got {chiller_d.get('edge') if chiller_d else 'no edge'})")
+manifold_d = next((d for d in derived_v12 if d.get("b_nm") == "cold plate manifold"), None)
+check(manifold_d is None,
+      "CATCH 2: no electrical tie minted to a passive fluid header with no power "
+      "draw (mint-site guard — the row must not exist, never a fabricated current)")
+
+# CATCH 3 — busway aggregation: a trunk grouped from REAL explicit ledger edges
+# (each already carrying its OWN required_value; none has _share_edge's
+# parent_total_value) must SUM its tributary taps rather than stay unsized.
+real_taps = [
+    {"i": 200 + j, "mech": "electrical_bus",
+     "a_xyz": (0.0, 0.0, 2400.0), "b_xyz": (1000.0 * (j + 1), 0.0, 2400.0),
+     "a_abstract": True, "b_abstract": True, "a_nm": "DC busbar 1500 V",
+     "b_nm": f"tap{j}", "pa": None, "pb": None,
+     "edge": {"from_part": "DC busbar 1500 V", "to_part": f"tap{j}",
+              "mechanism": "electrical_bus", "constraint_kind": "current_rating",
+              "required_value": 12.0, "required_unit": "A"}}
+    for j in range(5)
+]
+g9, _p9 = B.group_fanout_trunks(real_taps)
+check(len(g9) == 1, f"5 real explicit taps sharing an origin → ONE trunk (got {len(g9)})")
+if g9:
+    te = g9[0]["trunk_edge"]
+    check(te is not None and te.get("required_value") == 60.0,
+          f"CATCH 3: busway trunk sums its real tributary taps (5×12A=60A) — "
+          f"got {te.get('required_value') if te else None}")
+    check(te.get("to_part") == "(busway)", "busway trunk still targets the pseudo-node")
+# NO-FABRICATION counter-case: a trunk whose taps carry no required_value at all
+# (and no parent_total_value) must stay honestly None — never a guessed total.
+unrated_taps = [
+    {"i": 300 + j, "mech": "electrical_bus",
+     "a_xyz": (0.0, 0.0, 2400.0), "b_xyz": (1000.0 * (j + 1), 0.0, 2400.0),
+     "a_abstract": True, "b_abstract": True, "a_nm": "unrated hub",
+     "b_nm": f"utap{j}", "pa": None, "pb": None,
+     "edge": {"from_part": "unrated hub", "to_part": f"utap{j}",
+              "mechanism": "electrical_bus"}}
+    for j in range(4)
+]
+g10, _p10 = B.group_fanout_trunks(unrated_taps)
+check(len(g10) == 1 and g10[0]["trunk_edge"] is not None
+      and g10[0]["trunk_edge"].get("required_value") is None,
+      "busway sum: an unrated fan-out stays honestly None (never fabricated)")
+
+
 # ── 8. FLOW-LAYOUT region ordering (place_process_plant process train) ────────
 #      flow_order_regions must (a) order the flow regions in CONNECTIVITY order so
 #      directly-connected stages are ADJACENT, keeping each connected sub-chain
