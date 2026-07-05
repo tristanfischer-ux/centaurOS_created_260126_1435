@@ -641,18 +641,32 @@ def _aux_tab_score(title: str, run_dir: str):
                               and fam_rx.search(str(r.get("requirement") or r.get("part") or ""))} - {""})
             _air_parts = _fam_parts(_AIRSIDE_FAM)
             _cool_parts = _fam_parts(_COOLANT_FAM)
-            _svg_txt = ""
+            _svg_texts: List[str] = []
             try:
-                _svg_txt = " ".join(re.findall(r">([^<>]+)<", open(_svgp).read())).lower()
+                _svg_texts = re.findall(r">([^<>]+)<", open(_svgp).read())
             except Exception:  # noqa: BLE001
-                _svg_txt = ""
+                _svg_texts = []
+            _svg_txt = " ".join(_svg_texts).lower()
             _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
-            _svg_sing = _sing(_svg_txt)
+            # PER-SEGMENT (not whole-blob) matching (CO2-mineralisation v2 cross-val
+            # 2026-07-05): joining every drawing text node into ONE string before matching
+            # let a candidate's tokens be satisfied by UNRELATED labels — 'rich-amine inlet
+            # cooler' false-credited via 'inlet' from a DIFFERENT part's label ('K-102 —
+            # flue-gas inlet blower') + 'cooler' from ANOTHER unrelated label ('E-108 — dryer
+            # condensate cooler'); neither 'rich' nor 'amine' appears anywhere on the
+            # drawing. A candidate is only "on the drawing" if its own majority of tokens
+            # co-occur WITHIN A SINGLE drawing text segment (an equipment-schedule line or
+            # label), never scattered across independent labels that merely share a common
+            # word. Universal — no part-name table, same generic-token guard as before.
+            _svg_segs_sing = [_sing(t) for t in _svg_texts]
             _generic = {"unit", "system", "main", "panel", "skid", "rack", "plant"}
             def _on_drawing(pn: str) -> bool:
                 toks = [w for w in re.findall(r"[a-z]{4,}", pn.lower()) if w not in _generic]
-                hits = sum(1 for w in toks if _sing(w) in _svg_sing)
-                return bool(toks) and hits >= max(1, (len(toks) + 1) // 2)
+                if not toks:
+                    return False
+                need = max(1, (len(toks) + 1) // 2)
+                return any(sum(1 for w in toks if _sing(w) in seg) >= need
+                           for seg in _svg_segs_sing)
             if (_air_parts or _cool_parts) and _svg_txt:
                 _air_shown = [p for p in _air_parts if _on_drawing(p)]
                 _air_missing = [p for p in _air_parts if p not in _air_shown]
@@ -734,17 +748,22 @@ def _aux_tab_score(title: str, run_dir: str):
                         "ventilation equipment appears in the design — a genuine hazardous-"
                         "area ventilation GAP (not an out-of-scope item; the brief never "
                         "excludes it)")
+                # ROUTE EVERY open gap (not just the first) — a run can carry both a
+                # missing-coverage AND a missing-ATEX-ventilation defect simultaneously;
+                # the fix text must not silently drop the second (2026-07-05 fix).
+                _fixes = []
+                if _air_missing or _cool_missing:
+                    _fixes.append("the HVAC drawing generator must draw the design's full "
+                                   "HVAC scope (air-side AC / ventilation / ducting as well "
+                                   "as the coolant loop)")
+                if _comp_atex is not None and _comp_atex[0] < _comp_atex[1]:
+                    _fixes.append("size + add dedicated area-extract/purge ventilation for "
+                                  "the brief's cited DSEAR/ATEX hazardous area(s)")
                 return {"score": _sc, "target": 8, "status": "PASS" if _sc >= 8 else "FAIL",
                         "issues": _issues or [f"air-side {_comp_air[0]}/{_comp_air[1]}, coolant "
                                                f"{_comp_cool[0]}/{_comp_cool[1]}, load reconciliation "
                                                f"{_comp_load[0]}/{_comp_load[1]}"],
-                        "fix": ("the HVAC drawing generator must draw the design's full HVAC scope "
-                                "(air-side AC / ventilation / ducting as well as the coolant loop)"
-                                if (_air_missing or _cool_missing)
-                                else ("size + add dedicated area-extract/purge ventilation for the "
-                                      "brief's cited DSEAR/ATEX hazardous area(s)"
-                                      if (_comp_atex is not None and _comp_atex[0] < _comp_atex[1])
-                                      else "")),
+                        "fix": " · ".join(_fixes),
                         "components": [{"check": l, "passed": p, "checked": c}
                                        for l, p, c in _components]}
             return {
@@ -19582,6 +19601,35 @@ def _selftest() -> int:
             print(f"  FAIL hvac-load-recon: two HVAC duty quantities diverging >15% "
                   f"(30 kW vs 55 kW) must FAIL the reconciliation component and drag "
                   f"the tab below 8 (got {_hv3})"); bad += 1
+
+        # ═══ proveCatch PER-SEGMENT (not whole-blob) drawing-coverage matching
+        # (CO2-mineralisation v2 cross-val 2026-07-05): 'rich-amine inlet cooler'
+        # must NOT be credited when 'inlet' and 'cooler' each appear on the drawing
+        # only inside OTHER UNRELATED equipment labels (neither 'rich' nor 'amine'
+        # appears anywhere) — joining every text node into one blob before matching
+        # let scattered unrelated tokens satisfy a candidate that isn't really drawn.
+        # A candidate whose own majority of tokens DO co-occur in a single label
+        # (the real 'dryer condensate cooler') must still be credited. ═══
+        with open(os.path.join(_tdh, "state.json"), "w") as _fh:
+            json.dump({"orchestratorContract": {"quantities": {
+                           "hvac_cooling_load_kw": {"value": 30, "unit": "kW"}}},
+                       "requirementsBom": [
+                           {"tag": "E-108", "requirement": "dryer condensate cooler"},
+                           {"tag": "E-102", "requirement": "rich-amine inlet cooler"},
+                       ]}, _fh)
+        with open(os.path.join(_tdh, "drawings", "hvac-layout.svg"), "w") as _fh:
+            _fh.write("<svg><text>K-102 flue-gas inlet blower</text>"
+                      "<text>E-108 dryer condensate cooler</text></svg>")
+        _COV_CACHE.pop(_tdh, None)
+        _hv4 = _aux_tab_score("HVAC", _tdh)
+        _hv4_issues = " ".join(str(i) for i in (_hv4.get("issues") or []))
+        if "rich-amine inlet cooler" not in _hv4_issues:
+            print(f"  FAIL hvac-per-segment: 'rich-amine inlet cooler' must be flagged "
+                  f"MISSING — 'inlet' and 'cooler' each only appear in OTHER unrelated "
+                  f"labels, never together, never with 'rich'/'amine' (got {_hv4})"); bad += 1
+        if "dryer condensate cooler" in _hv4_issues:
+            print(f"  FAIL hvac-per-segment: 'dryer condensate cooler' IS drawn verbatim "
+                  f"in one label and must NOT be flagged missing (got {_hv4})"); bad += 1
 
     # ═══ proveCatch the HVAC OUT-OF-SCOPE disclosure verification (9/10 campaign,
     # 2026-07-04) — the old flat literal 'score: 8' is GONE. Both directions: a brief

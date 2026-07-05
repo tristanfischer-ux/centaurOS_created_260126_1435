@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional
 # constant, a cited standard/datasheet value) and needs no further tracing — it IS a source.
 ROOT_SOURCES = {
     "brief", "physics_constant", "constant", "standard", "standards",
-    "anchor", "datasheet", "spec", "specification",
+    "anchor", "class_anchor", "datasheet", "spec", "specification",
 }
 
 # Source tags that are DERIVED — they MUST record how they were produced (source_detail or
@@ -270,11 +270,42 @@ _GENERIC_ROLE = {
 # per-unit basis legitimately differ by the unit COUNT — that is a consistent design,
 # not a contradiction. Two AGGREGATES that disagree (total_supply_demand 124,478 vs
 # total_electrical_demand 41.3 — the original catch) still flag: both carry the qualifier.
-_AGGREGATE_QUALIFIERS = {"total", "overall", "gross", "system", "aggregate", "sum", "combined"}
+# 'lifecycle' / 'cradle_to_grave' / 'whole_life' (CO2-mineralisation cross-val 2026-07-05):
+# a plant's CRADLE-TO-GRAVE total (embodied materials + years of operational emissions) is
+# the SAME roll-up relation as total_cell_mass vs cell_mass — it legitimately dwarfs its
+# EMBODIED (materials-only) component by the operating-years multiplier, not a contradiction.
+_AGGREGATE_QUALIFIERS = {"total", "overall", "gross", "system", "aggregate", "sum", "combined",
+                         "lifecycle", "cradle", "grave", "wholelife"}
 
 
 def _is_aggregate(key: str) -> bool:
     return bool(_AGGREGATE_QUALIFIERS & set(_NUM_RE.findall(str(key).lower())))
+
+
+# GEOMETRIC-DIMENSION roles (CO2-mineralisation v2 cross-val 2026-07-05): 'height' was
+# already a GENERIC measurement noun (stripped from the role set entirely, alongside mass/
+# power/area), while 'diameter' was NOT — so an equipment stem shared between a height
+# quantity and a diameter quantity (both 'absorber_*') fell through to the stem token alone
+# ('absorber') as the "role", merging two DIFFERENT geometric axes of the SAME vessel into
+# one false divergence (24.5 m tan-to-tan height vs 0.2346 m diameter — a 104× "contradiction"
+# that is just two different dimensions of one column). A vessel's height/length and its
+# diameter/width are NEVER the same physical role, however tightly their equipment stem
+# matches — so when EITHER key carries a dimension-family token, the two keys may only be
+# compared if they carry the SAME dimension family (a real same-axis divergence, e.g. two
+# competing HEIGHT claims for the same vessel, must still flag).
+_DIMENSION_GROUPS = {
+    "height": {"height", "ht", "tt", "tan", "tall", "length"},
+    "diameter": {"diameter", "dia", "id", "od"},
+    "width": {"width", "wide"},
+}
+
+
+def _dimension_group(key: str) -> Optional[str]:
+    toks = set(_NUM_RE.findall(str(key).lower()))
+    for group, members in _DIMENSION_GROUPS.items():
+        if toks & members:
+            return group
+    return None
 
 
 def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
@@ -292,7 +323,7 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         roles = _role_tokens(key) - _GENERIC_ROLE - _unit_tokens(unit)
         if not roles:
             continue
-        by_unit.setdefault(unit, []).append((key, float(v), roles))
+        by_unit.setdefault(unit, []).append((key, float(v), roles, _dimension_group(key)))
 
     for unit, items in by_unit.items():
         if len(items) < 2:
@@ -304,9 +335,16 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         flagged: Dict[str, tuple] = {}   # hi_key -> (lo_key, ratio, hi, lo)
         n = len(items)
         for i in range(n):
-            ki, vi, ri = items[i]
+            ki, vi, ri, di = items[i]
             for j in range(i + 1, n):
-                kj, vj, rj = items[j]
+                kj, vj, rj, dj = items[j]
+                if di and dj and di != dj:
+                    # a HEIGHT-family quantity and a DIAMETER/WIDTH-family quantity are
+                    # distinct geometric roles even when they share an equipment-stem token
+                    # (absorber_column_height_tt_m vs absorber_diameter_m both carry
+                    # 'absorber' but measure orthogonal axes of the same vessel) — never
+                    # a same-role contradiction, regardless of stem overlap.
+                    continue
                 if not (ri & rj):           # must DIRECTLY share a domain role token
                     continue
                 if _is_aggregate(ki) != _is_aggregate(kj):
@@ -414,6 +452,40 @@ def _selftest() -> int:
     }}}
     expect(any(f.kind == "divergence" for f in audit_provenance(twin_totals).findings),
            "two contradicting same-role AGGREGATES must still flag (the original catch)")
+
+    # GEOMETRIC-DIMENSION role guard (CO2-mineralisation v2 cross-val 2026-07-05, both
+    # directions): a vessel's HEIGHT and its DIAMETER are different geometric axes and must
+    # NEVER cluster merely because they share an equipment-stem token; two competing claims
+    # for the SAME axis (both height) must still flag.
+    dims = {"orchestratorContract": {"quantities": {
+        "absorber_column_height_tt_m": {"value": 24.5, "unit": "m", "source": "brief"},
+        "absorber_diameter_m":         {"value": 0.2346, "unit": "m", "source": "brief"},
+        "absorber_packed_height_m":    {"value": 20.0, "unit": "m", "source": "brief"},
+        "stripper_column_height_m":    {"value": 12.0, "unit": "m", "source": "brief"},
+        "stripper_diameter_m":         {"value": 0.2288, "unit": "m", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(dims).findings),
+           "a vessel's height/tan-to-tan and its diameter must NOT cluster as the same "
+           "geometric role, even on the same equipment stem (absorber/stripper)")
+    same_axis = {"orchestratorContract": {"quantities": {
+        "absorber_column_height_tt_m": {"value": 24.5, "unit": "m", "source": "brief"},
+        "absorber_shell_height_m":     {"value": 0.2, "unit": "m", "source": "brief"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_axis).findings),
+           "two genuinely same-axis (both HEIGHT) absorber claims that disagree 122x must "
+           "still flag — the dimension-group guard must not swallow real height-vs-height "
+           "divergences")
+
+    # LIFECYCLE-vs-EMBODIED aggregate guard (CO2-mineralisation v2 cross-val 2026-07-05):
+    # a cradle-to-grave lifecycle total (embodied + years of operation) legitimately dwarfs
+    # its embodied (materials-only) component — a roll-up relation, not a contradiction.
+    lifecycle = {"orchestratorContract": {"quantities": {
+        "plant_lifecycle_co2_t": {"value": 3412.24, "unit": "t", "source": "brief"},
+        "plant_embodied_co2_t":  {"value": 30.6, "unit": "t", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(lifecycle).findings),
+           "a plant's lifecycle (cradle-to-grave) CO2 total and its embodied-only component "
+           "are a roll-up relation, not a same-role contradiction")
 
     # TOOL-CLAIM ORIGIN (both directions): a quantity matching the run's recorded tool
     # claim is TRACED (the tool run IS its recorded origin); a claim whose value

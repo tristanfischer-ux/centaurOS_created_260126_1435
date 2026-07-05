@@ -2635,7 +2635,19 @@ def check_calc_coverage(state, rows, run_dir) -> list:
                         worked.add(str(f).lower())
     # A ROOT (a brief assumption or a physics constant) is an INPUT, not a calculation — it has
     # no formula because it isn't computed. Only DERIVED quantities need a shown calculation.
-    _ROOTS = {"brief", "physics_constant", "constant", "standard", "anchor", "datasheet", "spec"}
+    # 'class_anchor' (CO2-mineralisation v2 cross-val 2026-07-05): the orchestrator's own
+    # provenance vocabulary (scripts/lib/orchestrator/types.ts, 'class-specific default
+    # constant' — a cited engineering-estimate/rule-of-thumb value a tool cannot derive from
+    # first principles, e.g. '90% MEA packed-absorber design capture rate') is a ROOT exactly
+    # like 'anchor'/'standard'/'datasheet' — a citation, not an arithmetic derivation — but was
+    # missing from this set (tuned to v1's quantity list, not the general source-tag FAMILY),
+    # so every class_anchor value in a fresh design hid as an "uncaptured calculation" no
+    # matter which quantity carried it. aggregator.ts:75 already treats 'class_anchor' as a
+    # root for its own purpose — this closes the same gap on the Python/Excel side. Universal:
+    # keyed on the source TAG (a fixed, class-agnostic provenance vocabulary), never a
+    # per-quantity-key list, so it holds for any future design's own class_anchor values.
+    _ROOTS = {"brief", "physics_constant", "constant", "standard", "anchor", "class_anchor",
+              "datasheet", "spec"}
     _OPS = ("=", "×", "*", "/", "+", "−", "·", "^")
     # CITED-MEASURED taxonomy (2026-07-05, the interconnect_cable_length_m fix): a quantity
     # MEASURED from as-built/as-routed geometry (route-manifest segment lengths) has no
@@ -4119,6 +4131,32 @@ def _selftest() -> int:
            "a genuine civil-scope BoM line (concrete foundation pad) built despite an excluded "
            "civil-works scope must still surface as a scope_fidelity HIGH — got: "
            f"{[f.message for f in _civil_bad_findings]!r}")
+
+    # ---- calc-coverage 'class_anchor' ROOT guard (CO2-mineralisation v2 cross-val
+    # 2026-07-05, both directions): a class_anchor value (a cited engineering-estimate
+    # default, e.g. '90% MEA absorber capture rate') is an INPUT citation like anchor/
+    # standard/datasheet — it must NOT hide as an uncaptured calculation merely because
+    # it carries no arithmetic operator. A genuinely-derived quantity with no formula
+    # and no worked-calc must still be flagged (the guarantee still bites).
+    _anchor_state = {"orchestratorContract": {"quantities": {
+        "co2_capture_efficiency_pct": {
+            "value": 90, "unit": "%", "source": "class_anchor",
+            "source_detail": "computed by dac:regeneration-energy (inputs from brief)"},
+        "carbonation_conversion_pct": {
+            "value": 95, "unit": "%", "source": "class_anchor",
+            "source_detail": "computed by dac:regeneration-energy (inputs from brief)"},
+        "mystery_hidden_pct": {"value": 42, "unit": "%", "source": "calculator",
+                               "source_detail": "an engineering judgement call, no formula"},
+    }}}
+    _anchor_findings = check_calc_coverage(_anchor_state, [], "")
+    _anchor_hidden = ", ".join(f.actual for f in _anchor_findings if f.check == "calc_coverage")
+    expect("co2_capture_efficiency_pct" not in _anchor_hidden
+           and "carbonation_conversion_pct" not in _anchor_hidden,
+           "a class_anchor (cited engineering-estimate) value must NOT be flagged as an "
+           f"uncaptured calculation — got hidden={_anchor_hidden!r}")
+    expect("mystery_hidden_pct" in _anchor_hidden,
+           "a genuinely-derived quantity with no formula/worked-calc must STILL be flagged "
+           f"hidden (the guarantee must not over-widen) — got hidden={_anchor_hidden!r}")
 
     if failures:
         print("SELFTEST FAILED:")
