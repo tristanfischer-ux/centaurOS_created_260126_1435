@@ -9,12 +9,13 @@
  */
 
 import { useState, type FormEvent } from "react"
-import Link from "next/link"
 import { submitBrief } from "@/actions/brief"
+import { MarketingNav } from "@/components/marketing/marketing-nav"
+import { MarketingFooter } from "@/components/marketing/marketing-footer"
 
 const CSS = `
 .ff-intake{--ink:#0f1729;--ink-soft:#334155;--muted:#64748b;--line:#e6eaf0;--surface:#f8fafc;--ember:#e2562a;--ember-dark:#c2410c;--ember-soft:#fff2ec;--blue:#1d4ed8;--green:#0f7a4d;--green-soft:#ecfdf5;--radius:18px;--radius-sm:12px;--shadow:0 1px 2px rgba(15,23,41,.04),0 10px 30px rgba(15,23,41,.07);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.6;min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.6;flex:1;
   background:radial-gradient(900px 420px at 85% -10%, var(--ember-soft), transparent 60%),radial-gradient(700px 380px at 0% 0%, #eef4ff, transparent 55%), #fff;}
 .ff-intake *{box-sizing:border-box;}
 .ff-intake a{color:var(--blue);text-decoration:none;}
@@ -83,15 +84,11 @@ export function BriefIntake() {
   }
 
   return (
-    <div className="ff-intake">
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
-      <header className="topbar">
-        <div className="row">
-          <Link className="brand" href="/"><span className="flame" /> Fractional&nbsp;Forge</Link>
-          <Link className="back" href="/">&larr; Back to home</Link>
-        </div>
-      </header>
-      <main>
+    <div className="flex min-h-screen flex-col bg-background">
+      <MarketingNav />
+      <div className="ff-intake">
+        <style dangerouslySetInnerHTML={{ __html: CSS }} />
+        <main>
         <div className="wrap">
           {!done ? (
             <div className="card">
@@ -149,6 +146,8 @@ export function BriefIntake() {
           )}
         </div>
       </main>
+      </div>
+      <MarketingFooter />
     </div>
   )
 }
