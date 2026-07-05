@@ -32,9 +32,26 @@
 #                              empty.
 #
 # Usage:
-#   scripts/run-validation.sh <brief.md> <out-dir> [--dry-run]
+#   scripts/run-validation.sh <brief.md> <out-dir> [--dry-run] [--force]
 #
 #   --dry-run   print the resolved environment + the exact command, run nothing.
+#               The archetype pre-flight STILL executes and prints — it is part
+#               of the execution path, not an optional extra.
+#   --force     proceed past a PAUSED archetype pre-flight (a new-class
+#               cold-start with open findings). Established classes never pause.
+#
+# ── ARCHETYPE PRE-FLIGHT (Tristan 2026-07-05: "it needs to be in the code and
+#    not an md file as you frequently forget to use the md files") ──
+#   Before the chain launches, scripts/archetype-preflight.py derives the class
+#   slug (prior-run classification cache, else fast token parse) and audits the
+#   six known gap surfaces against the playbook's 9 defect families
+#   (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §"New-archetype pre-flight"). The
+#   report ALWAYS prints into the run log. If the class has NEVER completed a
+#   full-nets run (no out/*/tab-scorecard.json whose sibling state.json carries
+#   the slug, and no scripts/.preflight-cleared/<slug> marker), any FINDING
+#   PAUSES the runner (exit 2) — a NEW archetype cannot cold-start past known
+#   gap families silently. Override: --force, or (after reviewing the report)
+#   mkdir -p scripts/.preflight-cleared && touch scripts/.preflight-cleared/<slug>.
 #
 # Iteration runs (fast, nets skipped) are a DIFFERENT workflow — do not add skip
 # flags here. If you need a cheap loop, call the chain directly and accept that
@@ -46,16 +63,18 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE22_BIN="/opt/homebrew/opt/node@22/bin"
 
 usage() {
-  echo "Usage: scripts/run-validation.sh <brief.md> <out-dir> [--dry-run]" >&2
+  echo "Usage: scripts/run-validation.sh <brief.md> <out-dir> [--dry-run] [--force]" >&2
   echo "THE RULE: iteration runs may skip nets; VALIDATION runs NEVER." >&2
   exit 1
 }
 
 DRY_RUN=0
+PREFLIGHT_FORCE=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --dry-run) DRY_RUN=1 ;;
+    --force) PREFLIGHT_FORCE=1 ;;
     -h|--help) usage ;;
     *) ARGS+=("$a") ;;
   esac
@@ -92,6 +111,54 @@ preflight_venv() {
   fi
   echo "· .venv preflight OK: $("$VENV_PY" -V 2>&1) + numpy imports"
 }
+
+# ── ARCHETYPE PRE-FLIGHT (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md — ENFORCED) ────
+# Runs in BOTH real and --dry-run invocations: the report must land in every
+# run log, and a new class must pause BEFORE any chain cost is spent.
+PY3="$REPO_DIR/.venv/bin/python"; [ -x "$PY3" ] || PY3="python3"
+SLUG="$("$PY3" "$REPO_DIR/scripts/archetype-preflight.py" --derive-slug "$BRIEF" 2>/dev/null | tail -1 || true)"
+[ -n "$SLUG" ] || SLUG="UNKNOWN"
+echo "── archetype pre-flight: class '$SLUG' (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight) ──"
+PREFLIGHT_OUT="$("$PY3" "$REPO_DIR/scripts/archetype-preflight.py" "$SLUG" "$BRIEF" 2>&1 || true)"
+printf '%s\n' "$PREFLIGHT_OUT"
+FCOUNT="$(printf '%s\n' "$PREFLIGHT_OUT" | sed -n 's/^PRE-FLIGHT SUMMARY: \([0-9][0-9]*\) finding.*/\1/p' | tail -1)"
+FCOUNT="${FCOUNT:-0}"
+
+# Established = the class has at least one COMPLETED full-nets run (a
+# tab-scorecard.json whose sibling state.json carries this class slug), or a
+# reviewed clearance marker.
+ESTABLISHED=0
+if [ -f "$REPO_DIR/scripts/.preflight-cleared/$SLUG" ]; then
+  ESTABLISHED=1
+else
+  for sc in "$REPO_DIR"/out/*/tab-scorecard.json; do
+    [ -f "$sc" ] || continue
+    st="$(dirname "$sc")/state.json"
+    if [ -f "$st" ] && grep -qE "\"class\"[[:space:]]*:[[:space:]]*\"$SLUG\"" "$st"; then
+      ESTABLISHED=1
+      break
+    fi
+  done
+fi
+
+if [ "$ESTABLISHED" -eq 1 ]; then
+  echo "· pre-flight: class '$SLUG' is ESTABLISHED (has a completed full-nets run) — report printed above, run proceeds ($FCOUNT finding(s) are the campaign backlog, not a cold-start block)"
+elif [ "$FCOUNT" -gt 0 ] && [ "$PREFLIGHT_FORCE" -eq 0 ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════════════"
+  echo "PAUSED: class '$SLUG' has NEVER completed a full-nets run and the"
+  echo "pre-flight reports $FCOUNT finding(s) across the known defect families."
+  echo "A NEW archetype cannot cold-start past known gap families silently"
+  echo "(docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md — pre-flight fixes are phase 1)."
+  echo "Options:"
+  echo "  1. Fix the findings above, then re-run."
+  echo "  2. Re-run with --force to proceed anyway."
+  echo "  3. After review: mkdir -p scripts/.preflight-cleared && touch scripts/.preflight-cleared/$SLUG"
+  echo "════════════════════════════════════════════════════════════════════════"
+  exit 2
+else
+  [ "$PREFLIGHT_FORCE" -eq 1 ] && echo "· pre-flight: --force given — proceeding past $FCOUNT finding(s) on never-run class '$SLUG'"
+fi
 
 # ── VALIDATION ENV: full nets ON — force-UNSET every degrading skip ──────────
 # (an inherited CHAIN_SKIP_* in the calling shell must not silently degrade a

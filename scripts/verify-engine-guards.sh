@@ -59,6 +59,10 @@ run "ga_massing.py --selftest"                "$PY" scripts/blender-universal/ga
 run "deterministic_layout --selftest"         "$PY" scripts/blender-universal/deterministic_layout.py --selftest
 run "parts_ledger.py --selftest"              "$PY" scripts/blender-universal/parts_ledger.py --selftest
 run "connection_ledger.py --selftest"         "$PY" scripts/blender-universal/connection_ledger.py --selftest
+# NEW-ARCHETYPE PRE-FLIGHT auditor (docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight; wired
+# into run-validation.sh) — proves every detector fires on a planted defect AND stays silent
+# on a clean fixture, and that every scraped lexicon still loads from its live source file.
+run "archetype-preflight --selftest"          "$PY" scripts/archetype-preflight.py --selftest
 run "endpoint-resolution proveCatch"          "$PY" scripts/blender-universal/endpoint_resolution_test.py
 run "derive-topology.ts --selftest"           npx tsx scripts/lib/orchestrator/generic/derive-topology.ts --selftest
 run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/generic/pump-motor-selftest.ts

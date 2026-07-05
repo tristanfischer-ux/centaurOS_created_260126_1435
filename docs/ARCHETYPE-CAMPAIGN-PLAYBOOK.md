@@ -1,5 +1,11 @@
 # Archetype Campaign Playbook — how to take any archetype to ≥9/10 fast
 
+> **ENFORCED BY `scripts/archetype-preflight.py` via `scripts/run-validation.sh` — this
+> document is the rationale, the code is the rule.** The runner derives the class slug,
+> prints the pre-flight report into every validation run log, and PAUSES a never-run
+> class on findings (`--force` overrides; established classes never pause).
+> `scripts/verify-engine-guards.sh` runs the auditor's `--selftest` so it cannot rot.
+
 > Distilled from the Codema water-treatment campaign (~80 commits, v50→v79) and the BESS campaign
 > (~30 commits, v1→v8), 2026-07-02 → 2026-07-05. Every lesson here was paid for. Read this BEFORE
 > starting a new archetype; run the pre-flight (`scripts/archetype-preflight.py`) before the first

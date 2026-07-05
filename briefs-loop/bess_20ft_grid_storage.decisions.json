@@ -1,0 +1,20 @@
+{
+  "decisions": [
+    {
+      "scope": "cell_generation_density",
+      "decision": "Design uses current-generation 314 Ah LFP cells (CATL CBC00 class); 5 MWh nameplate in a single 20-ft container is the market standard and the design target stands.",
+      "rationale": "Tristan 2026-07-05 (verbatim): 'people are getting 5mwh with 2.5mw peak in a 20ft container' — the prior 4,361 kWh ceiling was an old 280 Ah cell assumption, not physics.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-05",
+      "evidence": "CATL CBC00 314 Ah datasheets (3 distributor citations in commit 77cd04276); recalibrated config 13 racks x 468 cells = 6,113 kWh nameplate / 4,891 kWh usable at 44,000 kg / 1,500 V."
+    },
+    {
+      "scope": "battery_procurement_model_and_cost_anchor",
+      "decision": "The battery container prices as a procured integrated DC block at the cited market rate (~USD 80/kWh ~= GBP 60/kWh); scope is BESS-only — excluding PCS and ALL MV equipment.",
+      "rationale": "Tristan 2026-07-05 (verbatim): 'they are paying 80cents per kwh for a 2hr system' + 'that is bess only not with no MV equipment' — the market buys integrated blocks, not component-by-component self-assembly.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-05",
+      "evidence": "BNEF 2025 cost survey + PowerChina/Huadian tender data (citations in commit 77cd04276); battery-only closure lands 0.95x the brief's GBP63/kWh anchor."
+    }
+  ]
+}
