@@ -3765,6 +3765,64 @@ def _selftest() -> int:
         print(f"  FAIL oem-finding: applying findings twice must be idempotent (no duplicate "
               f"stamp), got {_oem_twice[0]['basis']!r}"); bad += 1
 
+    # ═══ proveCatch the CROSS-MODULE WORD-ID COLLISION GUARD (2026-07-06, the
+    # co2-mineralisation round-2 X-117/119/120 regression: Part-names 8.4 → 0). A word
+    # id authored in ONE module (name_human + content_character, a real price) also
+    # appears as a BARE stub (no name_human, just modifier_characters incl. a mis-matched
+    # manufacturer/part_number) in a DIFFERENT module. Claims: (a) the bare stub emits NO
+    # row at all — never a blank-requirement ledger tag the Part-names master can't
+    # collect; (b) the authored twin still emits its own correct, unaffected row; (c) a
+    # bare word whose id is NOT authored anywhere else is untouched (stays the honest
+    # 'NOT FOUND — requirement stated' gap, never over-suppressed). ═══
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as _pc_dir:
+        _pc_state = {
+            "moduleDecomposition": {"modules": [
+                {"module": "energy_conversion_transduction", "sub_modules": [
+                    {"words": [
+                        # bare cross-module duplicate of k2so4_recrystalliser_word,
+                        # mistakenly attached to a DIFFERENT module — no name_human/
+                        # content_character, wearing an unrelated (wrong-class) MPN.
+                        {"id": "k2so4_recrystalliser_word", "modifier_characters": [
+                            {"kind": "manufacturer", "value": "Alps Alpine"},
+                            {"kind": "part_number", "value": "AFT14A903A"}]},
+                        # a genuinely orphaned bare word — no authored twin anywhere —
+                        # must NOT be suppressed by this guard.
+                        {"id": "truly_unauthored_word", "modifier_characters": [
+                            {"kind": "list_price_gbp", "value": "500"}]},
+                    ]},
+                ]},
+                {"module": "energy_conversion_transduction", "sub_modules": [
+                    {"words": [
+                        {"id": "k2so4_recrystalliser_word", "name_human": "K2SO4 recrystalliser",
+                         "content_character": {"character_id": "k2so4_recrystalliser",
+                                                "name_human": "K2SO4 forced-circulation recrystalliser"},
+                         "modifier_characters": [
+                             {"kind": "manufacturer", "value": "GEA Messo"},
+                             {"kind": "list_price_gbp", "value": "21000"}]},
+                    ]},
+                ]},
+            ]},
+        }
+        json.dump(_pc_state, open(os.path.join(_pc_dir, "state.json"), "w"))
+        _pc_rows = assemble(_pc_dir)
+        _pc_by_part = [r for r in _pc_rows if "Alps Alpine" in str(r.get("part") or "")
+                       or "AFT14A903A" in str(r.get("basis") or "")]
+        if _pc_by_part:
+            print(f"  FAIL word-id-collision guard: the bare cross-module duplicate must emit "
+                  f"NO row (no Alps Alpine identity anywhere in the output), got {_pc_by_part!r}"); bad += 1
+        _pc_real = [r for r in _pc_rows if r.get("requirement") == "K2SO4 recrystalliser"]
+        if len(_pc_real) != 1:
+            print(f"  FAIL word-id-collision guard: the authored twin must still emit exactly "
+                  f"its own row, got {_pc_real!r}"); bad += 1
+        # exactly 2 rows: the authored twin + the genuinely-orphaned bare word (no
+        # authored twin anywhere) — proving the guard is narrow (excludes ONLY the
+        # phantom duplicate) rather than over-reaching onto every bare word.
+        if len(_pc_rows) != 2:
+            print(f"  FAIL word-id-collision guard: expected exactly 2 rows (the authored twin "
+                  f"+ the genuine orphan; the phantom duplicate excluded), got {len(_pc_rows)}: "
+                  f"{_pc_rows!r}"); bad += 1
+
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
 
@@ -5164,6 +5222,42 @@ def assemble(out_dir: str):
                 if "__" in _wid:
                     kids_by_parent.setdefault(_wid.split("__")[0], []).append(_w)
 
+    # ── CROSS-MODULE WORD-ID COLLISION GUARD (root cause of the X-117/119/120 blank-
+    # name ledger rows, co2-mineralisation round-2): a word `id` occasionally appears
+    # MORE THAN ONCE across the whole module tree — once fully authored (name_human +
+    # content_character) in its OWN module, and once as a BARE stub (only a couple of
+    # modifier_characters, no name_human/content_character) mistakenly attached to a
+    # DIFFERENT module (e.g. `k2so4_recrystalliser_word` authored in "K2SO4 Recovery &
+    # Crystallisation" AND, bare, inside "Gypsum Carbonation Reactor"). The bare stub
+    # still carries enough (manufacturer/part_number) to render an IDENTIFIED/NOT-FOUND
+    # row, but with an EMPTY requirement — a row the Part-names master can't collect as
+    # a principal (empty name → excluded), while the LEDGER (every non-sub-component
+    # tag) still lists it: a tag present in the ledger but absent from the master. Worse,
+    # sharing the SAME word_id means downstream word_id-keyed lookups (price/pv) can
+    # resolve the bare stub's row against its AUTHORED TWIN's contract-priced
+    # partVerification while the row itself wears the bare stub's own (often wrong-
+    # class) manufacturer+part_number — a phantom mis-priced line for a part that
+    # doesn't structurally exist. Pre-scan the WHOLE tree once: an id is "authored" if
+    # ANY occurrence carries a non-empty name (its own name_human, or its
+    # content_character's). A bare occurrence of an id that IS authored elsewhere is a
+    # phantom cross-module duplicate — skip it entirely, so the tag is honestly excluded
+    # from BOTH the ledger and the master, never one without the other. A bare id with
+    # NO authored occurrence anywhere is a genuine gap and is left untouched — it falls
+    # through to the existing 'NOT FOUND — requirement stated' path unchanged.
+    _id_occurrences: dict = {}
+    _authored_ids: set = set()
+    for _m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
+        for _sm in (_m.get("sub_modules") or []):
+            for _w in (_sm.get("words") or []):
+                _wid0 = str(_w.get("id") or "")
+                if not _wid0:
+                    continue
+                _id_occurrences[_wid0] = _id_occurrences.get(_wid0, 0) + 1
+                _nm0 = _w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or ""
+                if str(_nm0).strip():
+                    _authored_ids.add(_wid0)
+    _phantom_duplicate_ids = {i for i, n in _id_occurrences.items() if n > 1 and i in _authored_ids}
+
     rows = []
     for m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
         for sm in (m.get("sub_modules") or []):
@@ -5172,6 +5266,8 @@ def assemble(out_dir: str):
                 if "__" in wid:                       # sub-component → itemised under its parent below
                     continue
                 name = w.get("name_human") or ""
+                if not name and wid in _phantom_duplicate_ids:
+                    continue                          # phantom cross-module id collision — its authored twin already emits the real row
                 if re.search(r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
                              r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
                     continue                          # hardware detail — not a requirement line
