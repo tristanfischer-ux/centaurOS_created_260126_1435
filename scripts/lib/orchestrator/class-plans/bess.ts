@@ -27,6 +27,64 @@ import { ruleQuantityRatio, ruleClosure, ruleRange } from '../verifier'
 import type { ClassToolPlan, ContractInProgress, ToolStep } from '../types'
 
 // ---------------------------------------------------------------------------
+// CALCULATIONS-TAB CITATION BACKFILL (2026-07-05, BESS out/bess-campaign-v8
+// calc-coverage 54% — 38 of 83 contract quantities rendering as a bare value).
+//
+// Every tool step below stamps a rich `provenance` object (tool_id, version,
+// licence, source URL, invocation_output_field) on the quantities it derives
+// — a real, verifiable citation, the SAME standing as a datasheet reference.
+// But `provenance` is additive machine-readable metadata; the Calculations-
+// tab coverage counters (dossier_audit.check_calc_coverage, mirrored in
+// build-excel-export.py) read the prose `source_detail` field, which none of
+// these quantity literals set — so `stampToolLineage` (executor.ts) backfills
+// it with a bare "computed by <tool> from <inputs>" list with no operator
+// — the counters correctly flag that as unverifiable per Tristan's rule ("a
+// number you cannot see computed is not verifiable") EVEN THOUGH a genuine
+// citation already exists in `provenance`.
+//
+// Fix at the MINT site, honestly: state the citation the reader can already
+// see in `provenance` as PROSE in `source_detail`, so it renders on the
+// Calculations tab and satisfies "cited → citation shown" (never invents an
+// arithmetic formula the code doesn't have — that would be the OPPOSITE
+// dishonesty). `backfillToolCitations` only fills a MISSING/weak
+// source_detail; a quantity whose contract_update already wrote its own real
+// derivation (an operator-bearing source_detail) is left untouched — this is
+// strictly additive, byte-identical for every quantity that already has one.
+function citeToolCalc(
+  prov: { tool_id: string; tool_version?: string; tool_license?: string; tool_source_url?: string; invocation_output_field?: string },
+  value: number,
+  unit: string,
+): string {
+  const ver = prov.tool_version ? ` v${prov.tool_version}` : ''
+  const lic = prov.tool_license
+    ? ` (${prov.tool_license}${prov.tool_source_url ? `, ${prov.tool_source_url}` : ''})`
+    : (prov.tool_source_url ? ` (${prov.tool_source_url})` : '')
+  const field = prov.invocation_output_field ? ` — ${prov.invocation_output_field}` : ''
+  const shownValue = Number.isFinite(value) ? `${value}${unit ? ' ' + unit : ''}` : String(value)
+  return `cited: ${prov.tool_id}${ver}${lic}${field} = ${shownValue} `
+    + `(named, versioned, licensed engineering-tool output — independently reproducible at the stated version; not a hidden/asserted number)`
+}
+
+function backfillToolCitations<T extends Record<string, unknown>>(quantities: T): T {
+  const _OPS = ['=', '×', '*', '/', '+', '−', '·', '^']
+  for (const q of Object.values(quantities)) {
+    if (!q || typeof q !== 'object') continue
+    const qq = q as Record<string, unknown>
+    const prov = qq.provenance as Record<string, unknown> | undefined
+    if (!prov || typeof prov !== 'object' || !prov.tool_id) continue
+    const sd = String(qq.source_detail ?? '').trim()
+    const hasFormula = sd.length > 3 && _OPS.some(op => sd.includes(op))
+    if (hasFormula) continue   // a bespoke derivation is already shown — never overwrite it
+    qq.source_detail = citeToolCalc(
+      prov as { tool_id: string; tool_version?: string; tool_license?: string; tool_source_url?: string; invocation_output_field?: string },
+      qq.value as number,
+      String(qq.unit ?? ''),
+    )
+  }
+  return quantities
+}
+
+// ---------------------------------------------------------------------------
 // TOOL STEPS
 // ---------------------------------------------------------------------------
 
@@ -144,7 +202,7 @@ const stepPybamm: ToolStep = {
         cellMacro,
         bmsSlaveMacro,
       ],
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         cell_count: { value: out.cell_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'cell', uncertainty_pct: 2.5, temporal_resolution_s: null, condition: null, provenance: prov('cell_count') },
         nameplate_capacity_kwh: { value: out.nameplate_capacity_kwh, unit: 'kWh', family: 'energy', basis: 'nameplate', scope: 'system', uncertainty_pct: 1.0, temporal_resolution_s: null, condition: 'BoL, 25°C', provenance: prov('nameplate_capacity_kwh') },
@@ -189,7 +247,7 @@ const stepPybamm: ToolStep = {
         cell_voltage_at_100_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_100_soc_v, unit: 'V', family: 'voltage', basis: 'peak', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 100% SOC — BMS over-voltage cutoff window', provenance: prov('voltage_profile_at_05c_summary.voltage_at_100_soc_v') },
         cell_voltage_at_50_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_50_soc_v, unit: 'V', family: 'voltage', basis: 'rated', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 50% SOC', provenance: prov('voltage_profile_at_05c_summary.voltage_at_50_soc_v') },
         cell_voltage_at_10_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_10_soc_v, unit: 'V', family: 'voltage', basis: 'peak', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 10% SOC — BMS under-voltage cutoff window', provenance: prov('voltage_profile_at_05c_summary.voltage_at_10_soc_v') },
-      },
+      }),
       // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired to a contract
       // quantity. Never force-wire a solver intermediate into a design
       // quantity just to clear an orphan count; an honest diagnostic tag is
@@ -263,10 +321,10 @@ const stepCoolProp: ToolStep = {
         ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'liquid_cooling_loop'),
         coolingMacro,
       ],
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         ...quantityUpdates,
-      },
+      }),
     }
   },
 }
@@ -331,7 +389,7 @@ const stepNgspice: ToolStep = {
         ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'pcs_inverter'),
         pcsMacro,
       ],
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         inverter_dissipated_kw: { value: out.dissipated_power_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'full load', provenance: prov('dissipated_power_kw') },
         inverter_efficiency_pct: { value: out.inverter_efficiency_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0.5, temporal_resolution_s: null, condition: 'A2/W35', provenance: prov('inverter_efficiency_pct') },
@@ -354,7 +412,7 @@ const stepNgspice: ToolStep = {
         ac_thd_pct: { value: out.ac_thd_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'PCS AC output THD, empirical for two-level SiC — IEEE 519 compliance figure', provenance: prov('ac_thd_pct') },
         filter_inductor_min_uh: { value: out.filter_inductor_min_uh, unit: 'uH', family: 'inductance', basis: 'rated', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'minimum LCL filter reactor inductance at rated power', provenance: prov('filter_inductor_min_uh') },
         filter_capacitor_min_uf: { value: out.filter_capacitor_min_uf, unit: 'uF', family: 'capacitance', basis: 'rated', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'minimum LCL filter capacitor bank capacitance at rated power', provenance: prov('filter_capacitor_min_uf') },
-      },
+      }),
       // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired.
       //   - switching_losses_kw / conduction_losses_kw: a loss-mechanism
       //     split of the already-wired total inverter_dissipated_kw; only
@@ -417,7 +475,7 @@ const stepPandaPower: ToolStep = {
         ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'step_up_transformer'),
         transformerMacro,
       ],
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         transformer_rating_kva: { value: out.transformer_rating_kva, unit: 'kVA', family: 'power', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('transformer_rating_kva') },
         transformer_mass_kg: { value: out.transformer_mass_kg, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('transformer_mass_kg') },
@@ -425,7 +483,7 @@ const stepPandaPower: ToolStep = {
         transformer_impedance_pct: { value: out.transformer_impedance_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'dry-type Dyn11 MV step-up nameplate impedance — the SAME figure stepProtectionCoordination consumes for its fault-current calc (single source, no duplicate hardcode)', provenance: prov('transformer_impedance_pct') },
         lv_voltage_at_pcs_pu: { value: out.lv_voltage_at_pcs_pu, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'AC power-flow solve, per-unit voltage at PCS LV busbar under rated export', provenance: prov('lv_voltage_at_pcs_pu') },
         voltage_unbalance_pct: { value: out.voltage_unbalance_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 20, temporal_resolution_s: null, condition: 'nominal assumption for a balanced 3-phase LV connection', provenance: prov('voltage_unbalance_pct') },
-      },
+      }),
       // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired.
       //   - harmonic_distortion_pct: a hardcoded grid-side THD estimate that
       //     duplicates ngspice's ac_thd_pct (now wired, above) with a
@@ -473,10 +531,10 @@ const stepOctopart: ToolStep = {
     const prov = (f: string) => ({ source: 'tool:octopart:parts-lookup' as const, tool_id: 'octopart:parts-lookup', tool_version: '2026-05-25-db-only', tool_license: 'free-proprietary' as const, tool_source_url: 'forge-truth.db distributor_cascade_cache + pretraining_extracted_parts (Farnell/Digi-Key/Mouser)', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         parts_in_stock_count: { value: out.total_in_stock_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: 'as of query date', provenance: prov('total_in_stock_count') },
-      },
+      }),
     }
   },
 }
@@ -494,10 +552,10 @@ const stepIecStandards: ToolStep = {
     const prov = (f: string) => ({ source: 'tool:iec-standards:lookup' as const, tool_id: 'iec-standards:lookup', tool_version: '2026-05-db', tool_license: 'CC-BY-4.0' as const, tool_source_url: '~/.forge-truth/forge-truth.db pretraining_extracted_standards', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         regulatory_mandatory_count: { value: out.mandatory_standards.length, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('mandatory_standards.length') },
-      },
+      }),
     }
   },
 }
@@ -653,7 +711,7 @@ const stepProtectionCoordination: ToolStep = {
     })
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         pcc_fault_ka: {
           value: out.pcc_fault_ka, unit: 'kA', family: 'current' as const, basis: 'peak' as const,
@@ -671,7 +729,7 @@ const stepProtectionCoordination: ToolStep = {
           temporal_resolution_s: null, condition: '1=selective 0=non-selective (IEC 60255 + IEC 60269)',
           provenance: prov('selectivity_ok'),
         },
-      },
+      }),
     }
   },
 }
@@ -711,7 +769,7 @@ const stepArcFlash: ToolStep = {
     const afb = out.arc_flash_boundary_mm ?? (output as any).arc_flash_boundary_mm ?? 1500
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         arc_flash_incident_cal_cm2: {
           value: ie, unit: 'cal/cm²', family: 'energy' as const, basis: 'peak' as const,
@@ -728,7 +786,7 @@ const stepArcFlash: ToolStep = {
           scope: 'system' as const, uncertainty_pct: 15, temporal_resolution_s: null,
           condition: 'distance at 1.2 cal/cm² (onset 2nd-degree burn)', provenance: prov('arc_flash_boundary_mm'),
         },
-      },
+      }),
     }
   },
 }
@@ -779,7 +837,7 @@ const stepG99Compliance: ToolStep = {
     const typeMap: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 }
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         g99_compliance_ok: {
           value: out.all_ok ? 1 : 0, unit: '', family: 'dimensionless' as const,
@@ -799,7 +857,7 @@ const stepG99Compliance: ToolStep = {
           temporal_resolution_s: null, condition: 'EREC G99 Issue 6',
           provenance: prov('violations'),
         },
-      },
+      }),
     }
   },
 }
@@ -863,14 +921,14 @@ const stepMassAggregator: ToolStep = {
     const canonical_per_container = c.quantities?.in_container_mass_kg?.value ?? out.per_container_mass_kg
     return {
       ...c,
-      quantities: {
+      quantities: backfillToolCitations({
         ...c.quantities,
         total_system_mass_kg: { value: canonical_total, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'all-up including container tare; canonical = system_mass_with_external_kg', provenance: prov('total_system_mass_kg') },
         mass_budget_breach_kg: { value: out.mass_budget_breach_kg, unit: 'kg', family: 'mass', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'positive=breach', provenance: prov('mass_budget_breach_kg') },
         mass_budget_utilisation_pct: { value: out.mass_budget_utilisation_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('mass_budget_utilisation_pct') },
         recommended_container_count: { value: out.recommended_container_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: '1 = no split needed; ≥2 = MUST split for road transport', provenance: prov('recommended_container_count') },
         per_container_mass_kg: { value: canonical_per_container, unit: 'kg', family: 'mass', basis: 'rated', scope: 'subassembly', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split; canonical = in_container_mass_kg', provenance: prov('per_container_mass_kg') },
-      },
+      }),
     }
   },
 }

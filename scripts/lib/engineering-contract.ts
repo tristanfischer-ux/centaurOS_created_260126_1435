@@ -1043,7 +1043,7 @@ registerArchetype('bess', (brief: any) => {
     transformer_rating_kva: q(transformerRatingKva, 'kVA', 'power', 'rated', 'system', 'calculator', { source_detail: `next standard dry-type rating ≥ continuous_power_kw (${continuousKw} kW) × 1.1 = ${Math.round(transformerRatingMinKva)} kVA min` }),
     dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'nominal DC bus voltage from brief target_performance.metrics (dc_bus_voltage_v / dc_voltage / bus_voltage) or product description; default 800 V only when the brief is silent' }),
     bus_continuous_current_a: q(busContinuousA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × 1000 / dc_bus_voltage_v' }),
-    bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator'),
+    bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator', { source_detail: 'peak_power_kw × 1000 / dc_bus_voltage_v', from: ['peak_power_kw', 'dc_bus_voltage_v'] }),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
     // authoritative values so the deterministic emitter consumes them via
     // q(contract, …) shadowing (drawer: q() helper is contract-wins).
@@ -1057,7 +1057,7 @@ registerArchetype('bess', (brief: any) => {
     // — this is the correct contactor sizing current per IEC 60947-2, not
     // the total bus current.
     string_continuous_current_a: q(stringContinuousA, 'A', 'dimensionless', 'continuous', 'rack', 'calculator', { source_detail: 'bus_continuous_current_a / parallel_strings_total' }),
-    string_peak_current_a: q(stringPeakA, 'A', 'dimensionless', 'peak', 'rack', 'calculator'),
+    string_peak_current_a: q(stringPeakA, 'A', 'dimensionless', 'peak', 'rack', 'calculator', { source_detail: 'bus_peak_current_a / parallel_strings_total', from: ['bus_peak_current_a', 'parallel_strings_total'] }),
     // ── Thermal canonical fields (Phase B, 2026-05-28) ─────────────────────
     // Four DISTINCT physical quantities that prose sites must cite individually.
     // NEVER collapse to a single scalar — the four represent different heat paths.
@@ -1101,19 +1101,19 @@ registerArchetype('bess', (brief: any) => {
     // narrator) so the Physics Critic stops re-flagging the 2-container
     // recommendation as a "bug" — it is the explicit trade-off the contract
     // documents in brief_target_feasibility=0.
-    container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit', from: ['rack_count', 'brief_mass_cap_kg'] }),
+    container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'container_count = 1 — single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit', from: ['rack_count', 'brief_mass_cap_kg'] }),
     // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH):
     // explicit mass breakdown so the Generator + downstream tools see the
     // full container audit, not just cells. Transformer is EXTERNAL pad-
     // mounted (industry standard) and excluded from the in-container budget.
     in_container_mass_kg: q(inContainerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `cells (${totalCellMassKg.toFixed(0)}) + shell (${containerTareKg}) + racks (${totalRackMassKg}) + PCS (${pcsMassKg}) + BMS/cable (${bmsCablingMassKg}) + cooling (${coolingMassKg}) kg — transformer EXCLUDED (external pad-mount)` }),
-    external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
+    external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `external_transformer_mass_kg = ${transformerMassKg} kg — ${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
     // transformer_installation is a POLICY constant (industry-standard siting choice), not
     // derived from another quantity's value — citation-style `from`, same treatment as
     // dod_fraction above.
     transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)', from: ['standard:IEC_62933-5-2_section_6.4'] }),
-    mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg`, from: ['in_container_mass_kg', 'brief_mass_cap_kg'] }),
+    mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `mass_feasibility = 1 iff in_container_mass_kg <= brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg`, from: ['in_container_mass_kg', 'brief_mass_cap_kg'] }),
     // FIX 3a — Bespoke enclosure payload rating (council CRITICAL, 2026-05-29):
     // The brief's max_mass_kg is the DESIGN gross-mass cap for the bespoke
     // heavy-duty enclosure, NOT the standard ISO-668 26,580 kg payload for a

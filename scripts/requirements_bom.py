@@ -2679,6 +2679,80 @@ def _selftest() -> int:
                   f"the accessory ceiling must be OUT OF SCOPE for the override "
                   f"({_gexp and _gexp['part']!r})"); bad += 1
 
+    # ── SIBLING-IDENTITY-COLLISION GUARD proveCatch (2026-07-05, BESS I-17 —
+    # generalising the fan-tray / accessory-identity families to any noun shape).
+    with _fs_tf.TemporaryDirectory() as _bd:
+        _bwords = [
+            # DONOR — the real, verified owner of Arcteq/AQ-210. Must stay untouched.
+            {"id": "arc_flash_relay_word", "name_human": "arc flash relay",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Arcteq"},
+                 {"kind": "part_number", "value": "AQ-210"},
+             ]},
+            # BORROWER — inherited the donor's exact identity post-verification
+            # (part_number_inherited_from_sibling); its OWN pv identity (AQ-PS01)
+            # disagrees, confirming it never owned AQ-210. Its own price (£140) must
+            # survive; its `part`/`status` must not falsely pin the donor's SKU.
+            {"id": "arc_flash_fibre_sensor_word", "name_human": "arc flash fibre-optic point sensor",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×4"},
+                 {"kind": "manufacturer", "value": "Arcteq"},
+                 {"kind": "part_number", "value": "AQ-210"},
+             ]},
+            # AMBIGUOUS COLLISION — two words share one PN but NEITHER's own pv
+            # confirms ownership (no confirmed donor) — must stay UNTOUCHED (leave
+            # ambiguous cases alone rather than guess).
+            {"id": "ambiguous_widget_a_word", "name_human": "ambiguous widget A",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Foo"},
+                 {"kind": "part_number", "value": "SHARED-1"},
+             ]},
+            {"id": "ambiguous_widget_b_word", "name_human": "ambiguous widget B",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Foo"},
+                 {"kind": "part_number", "value": "SHARED-1"},
+             ]},
+        ]
+        _bpvs = [
+            {"word_id": "arc_flash_relay_word", "manufacturer": "Arcteq", "part_number": "AQ-210",
+             "price_estimate_gbp": 6.5},
+            {"word_id": "arc_flash_fibre_sensor_word", "manufacturer": "Arcteq", "part_number": "AQ-PS01",
+             "price_estimate_gbp": 140},
+            {"word_id": "ambiguous_widget_a_word", "manufacturer": "Foo", "part_number": "OTHER-A",
+             "price_estimate_gbp": 20},
+            {"word_id": "ambiguous_widget_b_word", "manufacturer": "Foo", "part_number": "OTHER-B",
+             "price_estimate_gbp": 30},
+        ]
+        json.dump({"moduleDecomposition": {"modules": [{"sub_modules": [{"id": "arc_flash_protection",
+                                                                          "words": _bwords}]}]},
+                   "partVerifications": _bpvs}, open(os.path.join(_bd, "state.json"), "w"))
+        _brows = assemble(_bd)
+        _bby_req = {r["requirement"].split(" · ")[0]: r for r in _brows}
+        _bdonor = _bby_req.get("arc flash relay")
+        _bsensor = _bby_req.get("arc flash fibre-optic point sensor")
+        _bamb_a = _bby_req.get("ambiguous widget A")
+        _bamb_b = _bby_req.get("ambiguous widget B")
+        if not _bdonor or _bdonor["part"] != "Arcteq AQ-210":
+            print(f"  FAIL sibling-identity guard: the DONOR's own row must stay "
+                  f"untouched ({_bdonor and _bdonor['part']!r})"); bad += 1
+        if not _bsensor or _bsensor["status"] != "NOT FOUND" or _bsensor["unit_gbp"] != 140:
+            print(f"  FAIL sibling-identity guard: BESS I-17 shape — borrower must "
+                  f"render NOT FOUND at its OWN £140 (got status="
+                  f"{_bsensor and _bsensor['status']!r}, unit_gbp="
+                  f"{_bsensor and _bsensor['unit_gbp']!r})"); bad += 1
+        if not _bsensor or "MPN unresolved" not in _bsensor["basis"]:
+            print(f"  FAIL sibling-identity guard: borrower's basis must disclose "
+                  f"the unresolved MPN ({_bsensor and _bsensor['basis']!r})"); bad += 1
+        if not _bamb_a or _bamb_a["part"] != "Foo SHARED-1":
+            print(f"  FAIL sibling-identity guard: an AMBIGUOUS collision (no "
+                  f"confirmed donor) must stay untouched ({_bamb_a and _bamb_a['part']!r})"); bad += 1
+        if not _bamb_b or _bamb_b["part"] != "Foo SHARED-1":
+            print(f"  FAIL sibling-identity guard: an AMBIGUOUS collision (no "
+                  f"confirmed donor) must stay untouched ({_bamb_b and _bamb_b['part']!r})"); bad += 1
+
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
     # recirculation flow / DN300 / 316L. The schedule blanket-tags every water edge
@@ -4888,6 +4962,82 @@ _ACCESSORY_IDENTITY_RE = re.compile(
 _ACCESSORY_IDENTITY_PRICE_CEILING_GBP = 50.0
 
 
+# ── SIBLING-IDENTITY-COLLISION GUARD (2026-07-05, BESS out/bess-campaign-v8 I-17) —
+# the UNIVERSAL generalisation of the fan-tray / accessory-identity families above,
+# for the noun shapes those two narrow regexes don't cover (a sensor, a label, a
+# padlock, a tape roll — anything). The chain's part-verification rescue
+# (`inheritPartNumberFromDeterministicSibling`, serial-design-chain-v2.tsx) copies a
+# VERIFIED sibling word's OWN manufacturer+part_number onto a word whose own PN was
+# stripped as a hallucination, so gate 20 (fictional-PN) has something real to find —
+# a legitimate rescue FOR THAT GATE. But it also silently makes two structurally
+# DIFFERENT parts (an arc-flash RELAY and its fibre-optic point SENSOR; a compliance
+# label and a warning label; an isolator label and its padlock) share one exact
+# catalogue SKU. No real design ever gives two different components the same MPN, so
+# this is detected structurally — never a noun table: within one sub_module, 2+
+# DISTINCT words carrying the identical (manufacturer, part_number) is the collision
+# signature. The TRUE owner is confirmed by ITS OWN independently-researched
+# partVerification (`pv_pn`, keyed by word_id — a fresh call per word, never mutated
+# by the in-place sibling copy); every OTHER member whose own pv_pn DISAGREES with the
+# shared PN is a borrower. Rendering the borrower as `IDENTIFIED · catalogue` against
+# that borrowed SKU false-JOINS its (correct) own price to the DONOR's unrelated
+# reference price in the downstream per-line cost-band check (BESS I-17: a £140 fibre
+# sensor, own price untouched, banded against the £6.5 relay estimate it borrowed the
+# identity from — a corpus/identity mismatch, not a pricing error). Fix at SOURCE:
+# a borrower's `pn` is blanked before the fulfilment branch below, so it falls through
+# to the SAME honest 'NOT FOUND — requirement stated' path a word with no pinned part
+# already takes (still priced from its OWN wid-keyed estimate, untouched) instead of
+# a false catalogue pin. Returns {word_id: (mfr_norm, pn_norm)} for BORROWERS only —
+# the confirmed donor's own row is never touched. proveCatch in `_selftest`.
+def _detect_borrowed_identities(modules, pv_pn: dict) -> dict:
+    groups: dict = {}
+    for m in (modules or []):
+        for sm in (m.get("sub_modules") or []):
+            smid = sm.get("id") or id(sm)
+            for w in (sm.get("words") or []):
+                wid = str(w.get("id") or "")
+                if not wid or "__" in wid:
+                    continue
+                md = _mods(w)
+                pn = str(md.get("part_number") or "").strip()
+                mfr = str(md.get("manufacturer") or "").strip()
+                # a STRUCTURED catalogue-style PN only (`_is_structured_pn`) — never a
+                # bespoke descriptive placeholder ('fabricated compressor-suction
+                # knock-out drum — bespoke vessel') shared, entirely legitimately,
+                # across several DIFFERENT made-to-order vessels that simply have no
+                # real catalogue MPN (SAF oxccu-saf-v21 D-102/D-103: two genuinely
+                # distinct bespoke separators, correctly both 'made-to-order
+                # fabrication' — never a collision). proveCatch (negative) in `_selftest`.
+                if not pn or not mfr or _TBD_RE.search(pn) or not _is_structured_pn(pn):
+                    continue
+                # a rated principal (its own `rating_primary` duty OR a `capacity`
+                # dimension — the MCC 'motor control centre' word carries its 3000 kW
+                # under `capacity`, not `rating_primary`) already runs the full
+                # universal rating-based reconciliation pipeline further down (grounds
+                # /rejects an undersized named MPN with a SPECIFIC diagnostic — SAF
+                # EP-109 'motor control centre · 3000 kW' correctly borrowed the
+                # co-located VFD's ACS580-01 in the emitted data, but the rating
+                # pipeline already relabels it more precisely than a bare identity
+                # note could); a bare structural/instrument/accessory line has no such
+                # downstream mechanism, which is exactly the gap this guard closes.
+                if md.get("rating_primary") or md.get("capacity"):
+                    continue
+                groups.setdefault((smid, mfr.lower(), pn.upper()), []).append(wid)
+    borrowed = {}
+    for (smid, mfr_norm, pn_norm), wids in groups.items():
+        if len(wids) < 2:
+            continue
+        owners = [w for w in wids if str(pv_pn.get(w) or "").strip().upper() == pn_norm]
+        if not owners:
+            continue   # no confirmed owner in this sub_module — ambiguous, leave untouched
+        for w in wids:
+            if w in owners:
+                continue
+            own_pv = str(pv_pn.get(w) or "").strip()
+            if own_pv and own_pv.upper() != pn_norm:
+                borrowed[w] = (mfr_norm, pn_norm)
+    return borrowed
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -4985,6 +5135,13 @@ def assemble(out_dir: str):
              or v.get("distributor_price_gbp"))   # bridge: keep the verified distributor price
         if isinstance(p, (int, float)) and p > 0 and not v.get("cost_repair_excluded_from_subtotal"):
             price[wid] = float(p)
+
+    # see _detect_borrowed_identities docstring — a word whose displayed mfr+PN was
+    # copied from an unrelated sibling (part_number_inherited_from_sibling rescue)
+    # false-joins its own (correct) price to the sibling's unrelated reference price
+    # downstream. {word_id: (mfr_norm, pn_norm)} for BORROWERS only.
+    _borrowed_identity = _detect_borrowed_identities(
+        (st.get("moduleDecomposition") or {}).get("modules") or [], pv_pn)
 
     # Sub-components (explodeEquipmentSubAssemblies, id 'parent__suffix') = the ASSEMBLY
     # BREAKDOWN of their principal. Collect per parent → itemise beneath each principal
@@ -5111,6 +5268,22 @@ def assemble(out_dir: str):
                             and isinstance(_own_price, (int, float))
                             and 0 < _own_price < _ACCESSORY_IDENTITY_PRICE_CEILING_GBP):
                         pn = _own_pv_pn
+                # SIBLING-IDENTITY-COLLISION GUARD (see _detect_borrowed_identities
+                # docstring) — the FALLBACK for noun shapes the two narrow guards above
+                # don't cover (a sensor, a label, a padlock, a tape roll — never a fan
+                # tray or a mount/bracket/tray/holder/rail/cradle/clamp, which stay
+                # entirely on THEIR OWN scope-boundary decision, acted on or not, so an
+                # already-corrected — or deliberately-declined — narrow-guard word is
+                # never re-litigated here). Blank `pn` so the fulfilment branch below
+                # falls through to its own honest 'NOT FOUND — requirement stated' path
+                # — same price (own wid-keyed estimate, untouched), no false catalogue pin.
+                _borrowed = _borrowed_identity.get(wid)
+                _borrowed_from = None
+                if (_borrowed and _borrowed[1] == pn.strip().upper() and _borrowed[0] == mfr.strip().lower()
+                        and not _INTERNAL_FAN_TRAY_RE.search(name)
+                        and not _ACCESSORY_IDENTITY_RE.search(name)):
+                    _borrowed_from = f"{mfr} {pn}".strip()
+                    pn = ""
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
                 # ── FIELD INSTRUMENT (synthesizeInstrumentation #140): a level / temp /
                 # pressure / DO / pH / conductivity transmitter measuring a contract-declared
@@ -5584,6 +5757,18 @@ def assemble(out_dir: str):
                     gbp = _cf
                     basis = (basis + f" · commodity-floor ({_why}; '{_cnoun}' → £{_cf:g})"
                              if "commodity-floor" not in basis else basis)
+                # SIBLING-IDENTITY-COLLISION disclosure (see _detect_borrowed_identities
+                # docstring) — state plainly why this line carries no catalogue pin even
+                # though the design DOES name a manufacturer: the identity it would have
+                # shown was a different, verified sibling part's SKU, not this part's own.
+                if _borrowed_from:
+                    basis = (basis + f" · MPN unresolved — {mfr or 'the manufacturer'} "
+                             f"is correct but the specific part number is not; the "
+                             f"identity this line would otherwise show ({_borrowed_from}) "
+                             f"belongs to a different, verified sibling part in the same "
+                             f"sub-system and is not this component's true SKU, so this "
+                             f"line is priced from its own independent estimate rather "
+                             f"than pinned to that catalogue reference")
                 row = {"tag": tag, "requirement": requirement, "status": status,
                        "part": part, "qty": qy, "unit_gbp": round(gbp), "line_gbp": round(gbp * qy),
                        "basis": basis}
