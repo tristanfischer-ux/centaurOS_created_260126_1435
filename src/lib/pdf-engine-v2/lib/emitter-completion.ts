@@ -236,6 +236,30 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   // LEXICON ROUND 2 (2026-07-04): 'incomer' is unambiguous (a mains/switchgear
   // incomer breaker or board) — admitted directly, no qualifier needed.
   'incomer',
+  // LEXICON ROUND 3 (2026-07-05, the bess-campaign-v10 not-found dissection): five
+  // more UNAMBIGUOUS purchased-catalogue nouns admitted bare — each is a real family
+  // with a verified DB row (EQ-105 Envicool container AC unit, FS-101 Kidde-Fenwal
+  // clean-agent cylinder, X-63 PRM Filtration double-leaf door, I-6/I-15 System
+  // Sensor/Apollo thermal + smoke detectors, X-25 Mersen Infini-Cell DC busbar) and
+  // NONE collides with a bespoke/fabricated fixture in either the BESS negative set
+  // (X-7..X-10 rack sheet-metal, X-62 structural floor reinforcement) or the water-
+  // treatment/SAF corpora (checked against out/fischer-codema-v79 + out/oxccu-saf-v21
+  // word lists — zero hits for any of the five). Deliberately NOT admitted bare here:
+  // 'manifold', 'nozzle', 'plate', 'rod', 'lug', 'casting', 'ct', 'pc', 'vent',
+  // 'detector' — each is genuinely ambiguous (water's RO-vessel "Distribution
+  // Manifold" / "Inlet Nozzle Set" / "Lower Underdrain / Nozzle Plate" / "Air Scour /
+  // Vent" / "Tank Vent / Pressure Relief", BESS's own "compression tie rod set" /
+  // "compression plate", BESS's own "weldable lifting point" sharing the
+  // `container_lifting_lugs` sub_module id with X-64's grounding lug, SAF's catalyst/
+  // adsorbent "charge" AND SAF's own process gas/flame detectors — "H2/CO/hydrocarbon
+  // gas detectors", "optical flame detectors", "fixed gas detectors", all correctly
+  // bottom-up process safety instrumentation, not a fire-suppression catalogue item —
+  // a bare 'detector' admit flipped exactly those three on the cross-class replay, so
+  // it was reverted to QUALIFIER-GATED below) are ALL correctly-excluded fabricated/
+  // process items that a bare admit would wrongly flip — those are QUALIFIER-GATED
+  // below instead (qualifiers decide, generics support). 'louvre' (EQ-103 Rittal
+  // 3239.200 louvre vent) is admitted bare — 'vent' is NOT, for exactly that reason.
+  'hvac', 'cylinder', 'door', 'busbar', 'louvre',
 ])
 
 // English plural→singular fold for TOKEN classification + matching (the f9dfc2918
@@ -262,6 +286,14 @@ const HOUSING_HEADS = new Set<string>(['panel', 'enclosure', 'cabinet'])
 const HOUSING_QUALIFIERS = new Set<string>([
   'control', 'electrical', 'electric', 'instrument', 'instrumentation',
   'distribution', 'junction', 'mcc', 'switchboard', 'switchgear',
+  // LEXICON ROUND 3 (2026-07-05): 'releasing' — a fire-suppression RELEASING panel
+  // (EQ-106, Kidde ARIES-SLX) is a purchased addressable control panel, exactly the
+  // same purchased-housing family as a control/electrical panel. Deliberately does
+  // NOT admit 'barrier' (EQ-107 'arc flash barrier panel' stays correctly excluded —
+  // an arc-flash barrier is engineered to the specific switchgear compartment, not a
+  // standalone catalogue SKU; no credible generic match exists — see the ingest
+  // round's disposition notes).
+  'releasing',
 ])
 
 // LEXICON ROUND 2 (2026-07-04, round-3 residual dissection): five more real catalogue
@@ -277,11 +309,84 @@ const HOUSING_QUALIFIERS = new Set<string>([
 // ALSO present in the same name. UNIVERSAL — no class table; the qualifier lists are the
 // same real families the rest of this lexicon already recognises (surge/overcurrent
 // protection devices, an ethernet/IP/comms network module, a power supply unit).
+// LEXICON ROUND 3 (2026-07-05, bess-campaign-v10 not-found dissection): eight more
+// heads that are each real catalogue families ONLY when qualified — a bare admit of
+// any of these heads would flip a genuinely bespoke/fabricated/process fixture that
+// shares the same head noun (proven against the negative fixtures named per head
+// below; verified byte-identical against out/fischer-codema-v79 (water) +
+// out/oxccu-saf-v21 (SAF) — no word in either corpus carries both a listed head AND
+// its qualifier, so neither class's isCatalogueComponent verdict moves):
+//   pc        — EQ-104 'EMS industrial PC' (Beckhoff C6015-0010). A bare 'pc' is too
+//               short/generic to admit alone; 'industrial' is the real signal.
+//   rod       — X-32 'earth rod' (ABB Furse RC012). A bare 'rod' would wrongly admit
+//               X-10 'compression tie rod set' (bespoke rack compression hardware,
+//               correctly fabricated/material-costed) — 'earth'/'ground'/'grounding'
+//               is the qualifier that makes it an electrode, not a mechanical rod.
+//   plate     — CP-101 'cold plate per rack' (Wieland MicroCool CP-E-4009-S3XJ). A
+//               bare 'plate' would wrongly admit X-9 'compression plate' (bespoke
+//               rack hardware) AND water's 'Base / Floor Plate' / 'Baseplate' / the
+//               RO-vessel 'Lower Underdrain / Nozzle Plate' (all correctly fabricated
+//               vessel internals) — 'cold'/'cooling' is the liquid-cooling signal.
+//   charge    — X-34 'coolant charge' (Dow DOWFROST HD). A bare 'charge' would wrongly
+//               admit SAF's process catalyst/adsorbent charges ('shaped iron FT
+//               catalyst charge', 'guard-bed adsorbent + deoxo charge', 'hydroprocessing
+//               catalyst charge' — all correctly bottom-up process-engineering mass,
+//               not a purchased part) — 'coolant'/'glycol'/'refrigerant' is the fluid
+//               signal.
+//   manifold  — CM-101 'cold plate manifold' (Motivair In-Rack Manifold) + CD-101
+//               'coolant distribution manifold' (CoolIT Systems rack manifold). A bare
+//               'manifold' would wrongly admit water's RO-vessel 'Distribution
+//               Manifold' / 'Inlet / Outlet Manifolds' (fabricated pressure-vessel
+//               internals) — 'coolant'/'cooling'/'cold' is the liquid-cooling signal.
+//   nozzle    — X-39 'suppression nozzle' (Kidde Fenwal 90-194028). A bare 'nozzle'
+//               would wrongly admit water's RO-vessel 'Inlet/Outlet Nozzle Set',
+//               'Drain Nozzle', 'Lower Underdrain / Nozzle Plate' (fabricated vessel
+//               internals) — 'suppression'/'discharge'/'sprinkler'/'deluge'/'fire' is
+//               the fire-protection signal.
+//   casting   — X-65 'ISO corner casting' (Tandemloc 243000C). A bare 'casting' risks
+//               admitting a bespoke integrated structural casting in an unrelated
+//               class (e.g. a turbine hub/nacelle casting costed by weight) —
+//               'corner'/'iso' is the ISO-freight-container signal.
+//   ct        — X-71 'grid PCC metering CT' (Crompton Instruments MB5Z-2000/5). Bare
+//               'ct' is a 2-char token too ambiguous to admit alone — 'metering' /
+//               'pcc' / 'grid' is the current-transformer signal.
+//   lug       — X-64 'grounding lug set' (Burndy YA292N). A bare 'lug' would wrongly
+//               admit BESS's own 'weldable lifting point' (a bespoke welded structural
+//               attachment that shares the `container_lifting_lugs` sub_module id,
+//               whose own id token folds 'lugs'→'lug') — 'grounding' is the electrical-
+//               lug signal.
+//   door      — X-63 'door assembly double leaf' (PRM Filtration manway double door).
+//               'door' is ALSO admitted bare above (CATALOGUE_TOKEN_SET) — that alone
+//               is not enough to REACH X-63, because its sub_module id
+//               `iso_container_shell` contributes the STRUCTURAL token 'shell', which
+//               wins the ambiguous-compound tie-break below by default (last-token
+//               rule). 'assembly'/'leaf' qualify it so the QUALIFIER-GATED override
+//               (see the tie-break below) can win instead of the coarse tie-break.
+//   detector  — I-6 'thermal detector' (System Sensor 5601P) + I-15 'smoke detector
+//               sounder' (Apollo AlarmSense 55000-392), both fire-SUPPRESSION-system
+//               detectors. A bare 'detector' was tried first and reverted: it flipped
+//               THREE SAF process-safety instrument words on the cross-class replay
+//               ("H2/CO/hydrocarbon gas detectors", "optical flame detectors", "fixed
+//               gas detectors" — correctly bottom-up process instrumentation, not a
+//               fire-suppression catalogue part) from false to true. 'thermal' /
+//               'smoke' / 'heat' is the fire-suppression-detector signal that SAF's
+//               gas/flame detector names never carry.
 const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
   stop: new Set(['emergency']),
   module: new Set(['ethernet', 'ip', 'comms', 'communication', 'communications']),
   protection: new Set(['overcurrent', 'surge']),
   supply: new Set(['power']),
+  pc: new Set(['industrial']),
+  rod: new Set(['earth', 'ground', 'grounding']),
+  plate: new Set(['cold', 'cooling']),
+  charge: new Set(['coolant', 'glycol', 'refrigerant']),
+  manifold: new Set(['coolant', 'cooling', 'cold']),
+  nozzle: new Set(['suppression', 'discharge', 'sprinkler', 'deluge', 'fire']),
+  casting: new Set(['corner', 'iso']),
+  ct: new Set(['metering', 'pcc', 'grid']),
+  lug: new Set(['grounding']),
+  door: new Set(['assembly', 'leaf']),
+  detector: new Set(['thermal', 'smoke', 'heat']),
 }
 
 /**
@@ -317,6 +422,23 @@ export function isCatalogueComponent(name: string): boolean {
   if (catalogue && structural) {
     const lastTok = toks[toks.length - 1] ?? ''
     if (HOUSING_HEADS.has(lastTok) && qualifiedHousing) return true
+    // QUALIFIER-GATED override (LEXICON ROUND 3, 2026-07-05): callers always test
+    // `${name} ${subId}` concatenated — so the coarse last-token tie-break below is
+    // frequently deciding on the SUB_MODULE's own last token (e.g. `iso_container_
+    // shell` contributes 'shell'), not the WORD's own head noun. That silently
+    // blocks a genuinely catalogue word merely for living in a structurally-named
+    // sub_module (X-64 'grounding lug set' + X-63 'door assembly double leaf', both
+    // under `iso_container_shell`). A QUALIFIER_GATED_HEADS hit is already a
+    // hand-vetted, narrow (head, qualifier) pair proven against negative fixtures
+    // (see the comment block above) — strictly higher-precision evidence than an
+    // incidental structural token from elsewhere in the string — so it wins the
+    // tie the same way a qualified HOUSING head does. Proven inert on both cross-
+    // class corpora checked this round (out/fischer-codema-v79, out/oxccu-saf-v21):
+    // every existing qualifiedGated hit in either corpus already resolves catalogue
+    // (its sub_module id carries no structural token), so this override changes
+    // NEITHER corpus's verdicts — it only reaches words that were previously
+    // wrongly blocked.
+    if (qualifiedGated) return true
     return !STRUCTURAL_TOKEN_SET.has(lastTok)
   }
   return false
