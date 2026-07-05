@@ -181,6 +181,84 @@ export interface DeterministicDesign {
   excluded_modules: string[]
   rationale_excluded: string
   brief_overview_prose: BriefOverviewProse
+  /** Calculations tab fix (2026-07-05): worked calculations captured at this
+   *  emitter's OWN arithmetic sites (rack/string current, fuse sizing, RTE
+   *  components, DC-block reconciliation, thermal loads) — the arithmetic
+   *  already ran to produce the BoM/prose numbers above; this array exposes
+   *  the working so the Calculations tab can render it instead of only the
+   *  bare result. Same record shape as the established `worked[]` pattern
+   *  (scripts/lib/orchestrator/tools/python/_worked.py::worked_calc /
+   *  scripts/lib/orchestrator/tools/mass-aggregator.ts::workedCalc). Optional
+   *  because non-BESS emitters (none yet) don't populate it. */
+  worked_calculations?: WorkedCalcEntry[]
+}
+
+// ---------------------------------------------------------------------------
+// WORKED-CALC CAPTURE (Calculations tab fix, 2026-07-05)
+//
+// Local mirror of the established worked[] shape — kept LOCAL (not imported
+// from orchestrator/tools/mass-aggregator.ts) to preserve this file's
+// zero-cross-module-dependency purity contract (see file header: "avoid a
+// circular import"). `emitBessDesign` resets `_emitterWorked` at the START of
+// each call and reads it back at the END — safe because this emitter is
+// synchronous (no I/O, no await) and therefore never re-entrant mid-call; two
+// separate calls to emitBessDesign() never interleave their buffers.
+//
+// Self-check: refuses (drops, returns null) a calc whose result or any
+// operand is non-finite — the same defect class Python's
+// self_check_worked() catches (a printed calc that doesn't evaluate to its
+// own stated result), applied directly to the REAL numeric operands this
+// emitter already holds (no string-reparse needed, unlike the Python tools
+// which only have JSON-serialised values to check).
+// ---------------------------------------------------------------------------
+
+export interface WorkedCalcEntry {
+  label: string
+  formula: string
+  substitution: string
+  inputs: { symbol: string; value: number; unit: string }[]
+  result: { value: number; unit: string }
+  assumptions: string[]
+}
+
+let _emitterWorked: WorkedCalcEntry[] = []
+
+function workedCalc(
+  label: string,
+  formula: string,
+  values: Record<string, [number, string]>,
+  result: number,
+  resultUnit = '',
+  assumptions: string[] = [],
+): WorkedCalcEntry | null {
+  if (!Number.isFinite(result)) return null
+  for (const [v] of Object.values(values)) {
+    if (!Number.isFinite(v)) return null
+  }
+  const eq = formula.indexOf('=')
+  const lhs = (eq >= 0 ? formula.slice(0, eq) : label).trim() || label
+  const expr = (eq >= 0 ? formula.slice(eq + 1) : formula).trim()
+  let subst = expr
+  for (const sym of Object.keys(values).sort((a, b) => b.length - a.length)) {
+    subst = subst.split(sym).join(String(values[sym][0]))
+  }
+  const resultStr = `${result}${resultUnit ? ` ${resultUnit}` : ''}`
+  return {
+    label,
+    formula,
+    substitution: `${lhs} = ${subst} = ${resultStr}`,
+    inputs: Object.entries(values).map(([symbol, [value, unit]]) => ({ symbol, value, unit })),
+    result: { value: result, unit: resultUnit },
+    assumptions: [...assumptions],
+  }
+}
+
+/** Push a worked-calc capture into the current emitBessDesign() call's buffer.
+ *  No-op (silently drops) when workedCalc()'s self-check refused the entry —
+ *  never throws, matching this emitter's "never crash on a defensive check"
+ *  convention elsewhere in the file. */
+function pushWorked(entry: WorkedCalcEntry | null): void {
+  if (entry) _emitterWorked.push(entry)
 }
 
 // ---------------------------------------------------------------------------
@@ -784,6 +862,15 @@ interface BessParams {
   // Design concentration for Novec 1230 clean-agent total-flooding per NFPA 2001.
   // Class A minimum 5.0% v/v; standard BESS practice 5.3% v/v per NFPA 2001 §5.4.
   fireSuppressionDesignConcentrationPct: number
+
+  // Calculations tab fix (2026-07-05): the REAL contract-computed system-level
+  // AC-to-AC round-trip efficiency (engineering-contract.ts's cell RTE × PCS
+  // efficiency² × aux-load factor formula, WAVE C addendum 6) — replaces the
+  // bare literal 86 previously hardcoded in emitEnergyConversionTransduction's
+  // derived_parameters with NO computation behind it anywhere in code (only a
+  // narrated comment). Falls back to 86 only for a legacy contract that
+  // predates this contract quantity.
+  roundTripEfficiencyPercent: number
 }
 
 function deriveBessParams(contract: ContractShape): BessParams {
@@ -800,6 +887,12 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const parallelStringsTotal = Math.max(1, Math.round(q(contract, 'parallel_strings_total', parallelStringsPerRack * rackCount)))
   const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)
   const dcBlockReconciliationFactor = q(contract, 'dc_block_reconciliation_factor', 1)
+  // Calculations tab fix: read the contract's REAL computed system-level RTE
+  // (engineering-contract.ts's cell RTE × PCS efficiency² × aux-load factor)
+  // instead of the bare literal 86 previously hardcoded in
+  // emitEnergyConversionTransduction's derived_parameters with no computation
+  // behind it anywhere in code.
+  const roundTripEfficiencyPercent = q(contract, 'round_trip_efficiency_percent', 86)
   const stringVoltageNominalV = q(contract, 'string_voltage_nominal_v', seriesCellsPerString * cellVoltageV)
   const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)
   const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)
@@ -827,6 +920,26 @@ function deriveBessParams(contract: ContractShape): BessParams {
   // computes it locally for legacy Contracts that omit the field.
   const stringContinuousA = q(contract, 'string_continuous_current_a', busContinuousA / parallelStringsTotal)
   const stringPeakA = q(contract, 'string_peak_current_a', busPeakA / parallelStringsTotal)
+  // Calculations tab fix: capture the per-string current derivation. Uses the
+  // SAME operands as the fallback expression above (bus current ÷ parallel
+  // strings) even when the value came straight from the contract — the
+  // contract's own quantity is itself derived from this identical division,
+  // so the worked-calc is honest either way (IEC 60947-2 contactor sizing
+  // current per rack).
+  pushWorked(workedCalc(
+    'Per-string continuous current',
+    'string_continuous_current_a = bus_continuous_current_a / parallel_strings_total',
+    { bus_continuous_current_a: [busContinuousA, 'A'], parallel_strings_total: [parallelStringsTotal, ''] },
+    stringContinuousA, 'A',
+    ['IEC 60947-2 contactor/fuse sizing current is per-string, not total bus current'],
+  ))
+  pushWorked(workedCalc(
+    'Per-string peak current',
+    'string_peak_current_a = bus_peak_current_a / parallel_strings_total',
+    { bus_peak_current_a: [busPeakA, 'A'], parallel_strings_total: [parallelStringsTotal, ''] },
+    stringPeakA, 'A',
+    [],
+  ))
   // ONE-MINT (2026-07-05): fallback matches the current contract default (CATL
   // CBC00 314 Ah, engineering-contract.ts ~line 1009 — was the pre-recalibration
   // 280 Ah LF280K predecessor). The contract mints cell_capacity_ah unconditionally
@@ -941,6 +1054,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
     briefMassCapKg,
     enclosureVolumeM3,
     fireSuppressionDesignConcentrationPct,
+    roundTripEfficiencyPercent,
   }
 }
 
@@ -978,6 +1092,24 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   // — reopening the exact gap addendum 8 closed.
   const cellEnergyKwh = (p.cellCapacityAh * p.cellVoltageV) / 1000
   const cellUnitPriceGbp = Math.round(57 * cellEnergyKwh * p.dcBlockReconciliationFactor * 100) / 100
+  // Calculations tab fix: capture both steps of the DC-block cell-price
+  // reconciliation (per-cell energy, then the procurement-model-adjusted
+  // unit price) — previously only the final cellUnitPriceGbp reached the BoM
+  // word, with the arithmetic behind it visible only in code comments.
+  pushWorked(workedCalc(
+    'Per-cell energy',
+    'cell_energy_kwh = cell_capacity_ah * cell_voltage_v / 1000',
+    { cell_capacity_ah: [p.cellCapacityAh, 'Ah'], cell_voltage_v: [p.cellVoltageV, 'V'] },
+    cellEnergyKwh, 'kWh',
+    [],
+  ))
+  pushWorked(workedCalc(
+    'Cell unit price (procurement-model reconciled)',
+    'cell_unit_price_gbp = 57 * cell_energy_kwh * dc_block_reconciliation_factor',
+    { cell_energy_kwh: [cellEnergyKwh, 'kWh'], dc_block_reconciliation_factor: [p.dcBlockReconciliationFactor, ''] },
+    cellUnitPriceGbp, 'GBP',
+    ['£57/kWh raw component estimate (CATL CBC00-class, 2026); reconciled to the £60/kWh procured DC-block market price — see dc_block_reconciliation_factor'],
+  ))
 
   const cellString = makeSubModule(
     'cell_string',
@@ -1624,6 +1756,23 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   // Source: https://library.e.abb.com/public/42e37f85a3864a4b80decc6a569df8f9/9AKK107492A6191%202-pole%20OTDC%20switch-disconnectors%20for%201500V%20DC.pdf
   const rackStringContinuousA = p.busContinuousA / p.parallelStringsTotal
   const rackIsolatorRequiredA = rackStringContinuousA * 1.25
+  // Calculations tab fix: capture the rack isolator sizing chain (per-rack
+  // current, then the 1.25× required rating that drives the OTDC catalogue
+  // step selection below).
+  pushWorked(workedCalc(
+    'Rack string continuous current',
+    'rack_string_continuous_a = bus_continuous_current_a / parallel_strings_total',
+    { bus_continuous_current_a: [p.busContinuousA, 'A'], parallel_strings_total: [p.parallelStringsTotal, ''] },
+    rackStringContinuousA, 'A',
+    [],
+  ))
+  pushWorked(workedCalc(
+    'Rack isolator required rating',
+    'rack_isolator_required_a = rack_string_continuous_a * 1.25',
+    { rack_string_continuous_a: [rackStringContinuousA, 'A'] },
+    rackIsolatorRequiredA, 'A',
+    ['1.25× continuous-current margin for the rack DC isolator/disconnector (ABB OTDC family selection)'],
+  ))
   const isHighVoltageDcBus = p.dcBusVoltageV > 1000
   const OTDC_1500V_STEPS_A = [315, 400, 500, 630, 800]
   const rackIsolatorRatingA = isHighVoltageDcBus
@@ -2008,6 +2157,14 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         // Trihal frame spans 100–3150 kVA; tag the model by its kVA so the PN is real.
         const trihalKva = kva <= 3150 ? kva : 3150
         const priceGbp = Math.round(25000 * Math.pow(kva / 1250, 0.7))
+        // Calculations tab fix: capture the power-law cost-scaling curve.
+        pushWorked(workedCalc(
+          'Step-up transformer price (power-law cost scaling)',
+          'price_gbp = 25000 * (kva / 1250) ^ 0.7',
+          { kva: [kva, 'kVA'] },
+          priceGbp, 'GBP',
+          ['£25k @ 1250 kVA reference dry-type Trihal price; standard transformer cost-vs-rating exponent 0.7'],
+        ))
         return word(
           'step_up_transformer_word',
           'step-up transformer word',
@@ -2114,16 +2271,23 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
       // → required 50 kW → covered by EB XT 600 WT (59 kW nominal at 35°C).
       // NOTE: this is PCS-ONLY efficiency. The headline-deriver reads
       // round_trip_efficiency_percent FIRST, then falls back to efficiency_percent.
-      // We emit round_trip_efficiency_percent = 86 (system-level AC-to-AC RTE) to
+      // We emit p.roundTripEfficiencyPercent (system-level AC-to-AC RTE) to
       // prevent headline-deriver from reporting 98% as the BESS utilisation metric.
       efficiency_percent: 98,
       // System-level AC-to-AC round-trip efficiency (skeleton-critic fix 2026-05-26):
       // headline-deriver (headline-deriver.ts:267) reads round_trip_efficiency_percent
       // FIRST, then falls back to efficiency_percent. Without this field it reads
       // efficiency_percent=98 (PCS-only) and reports 98% as system utilisation — a
-      // HIGH skeleton-critic issue. Compounded: cell RTE ~96% × PCS one-way 98%² ×
-      // transformer one-way 98.5%² × auxiliary parasitics ~4% → system RTE ≈ 86%.
-      round_trip_efficiency_percent: 86,
+      // HIGH skeleton-critic issue.
+      // Calculations tab fix (2026-07-05): this used to be a bare hardcoded literal
+      // 86 with the compounding math (cell RTE ~96% × PCS one-way 98%² × transformer
+      // one-way 98.5%² × auxiliary parasitics ~4%) living ONLY in this comment, never
+      // actually computed anywhere in code. Now reads p.roundTripEfficiencyPercent —
+      // the REAL value engineering-contract.ts computes from cell RTE × PCS
+      // efficiency² × aux-load factor, with the full worked breakdown in that
+      // quantity's source_detail/lineage (round_trip_efficiency_percent). Falls back
+      // to 86 only for a legacy contract that predates the real computation.
+      round_trip_efficiency_percent: p.roundTripEfficiencyPercent,
     },
     allowed_radicals: [
       'silicon_semiconductor_function',
@@ -2655,7 +2819,18 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       (() => {
         const isHighVoltageBus = p.dcBusVoltageV > 1000
         if (!isHighVoltageBus) {
-          const fuse = selectBessDcFuse1000V(p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR)
+          const requiredA1000V = p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR
+          // Calculations tab fix: capture the fuse-sizing arithmetic (the
+          // catalogue-step LOOKUP inside selectBessDcFuse1000V isn't itself a
+          // calculation to show — this required-current derivation is).
+          pushWorked(workedCalc(
+            'DC HRC fuse required current (≤1000 V bus)',
+            'required_a = string_continuous_current_a * RACK_FUSE_AMPACITY_SAFETY_FACTOR',
+            { string_continuous_current_a: [p.stringContinuousA, 'A'], RACK_FUSE_AMPACITY_SAFETY_FACTOR: [RACK_FUSE_AMPACITY_SAFETY_FACTOR, ''] },
+            requiredA1000V, 'A',
+            ['1.25× continuous-current margin, then snapped up to the nearest PV-ANH1/ANH2 catalogue step'],
+          ))
+          const fuse = selectBessDcFuse1000V(requiredA1000V)
           return word(
             'dc_hrc_fuse_word',
             'DC HRC fuse word',
@@ -2678,6 +2853,14 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           )
         }
         const requiredA = p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR
+        // Calculations tab fix: same capture as the ≤1000 V branch above.
+        pushWorked(workedCalc(
+          'DC HRC fuse required current (>1000 V bus)',
+          'required_a = string_continuous_current_a * RACK_FUSE_AMPACITY_SAFETY_FACTOR',
+          { string_continuous_current_a: [p.stringContinuousA, 'A'], RACK_FUSE_AMPACITY_SAFETY_FACTOR: [RACK_FUSE_AMPACITY_SAFETY_FACTOR, ''] },
+          requiredA, 'A',
+          ['1.25× continuous-current margin, then snapped up to the nearest ABB FV11-ESS catalogue step'],
+        ))
         const fuse = selectBessDcFuse1500V(requiredA)
         return word(
           'dc_hrc_fuse_word',
@@ -3041,6 +3224,15 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   // classes too. Pattern: `ambient_design_temp_c` from the contract → here.
   const thermalMarginFactor = 1.20  // engineering practice: 20% headroom above raw dissipation
   const requiredChillerKwAtAmbient = p.systemThermalDissipationKw * thermalMarginFactor
+  // Calculations tab fix: capture the required-cooling-capacity derivation
+  // that drives the EB XT catalogue selection below.
+  pushWorked(workedCalc(
+    'Required chiller capacity at design ambient',
+    'required_chiller_kw = system_thermal_dissipation_kw * thermal_margin_factor',
+    { system_thermal_dissipation_kw: [p.systemThermalDissipationKw, 'kW'], thermal_margin_factor: [thermalMarginFactor, ''] },
+    requiredChillerKwAtAmbient, 'kW',
+    ['20% engineering headroom above raw dissipation, per standard liquid-chiller sizing practice'],
+  ))
   const selected = selectPfannenbergEbXt(requiredChillerKwAtAmbient, p.ambientDesignTempC)
   // Legacy derived parameter — sized to the next 30 kW step from raw thermal
   // rejection. Kept for downstream prose / cover-page parity (Physics Critic
@@ -3068,6 +3260,23 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   const chillerUnitCount = Math.max(1, Math.ceil(requiredChillerKwAtAmbient / deratedCapacityKw))
   const aggregateDeratedCapacityKw = deratedCapacityKw * chillerUnitCount
   const aggregateNominalCapacityKw = pinnedChillerCapacityKw * chillerUnitCount
+  // Calculations tab fix: capture the parallel-unit-count derivation (the
+  // saturation fallback) and the resulting aggregate derated capacity — both
+  // previously only visible as narrated numbers in the module_brief/word prose.
+  pushWorked(workedCalc(
+    'Chiller unit count (parallel units when the single-unit selector saturates)',
+    'chiller_unit_count = CEILING(required_chiller_kw / derated_capacity_kw_each)',
+    { required_chiller_kw: [requiredChillerKwAtAmbient, 'kW'], derated_capacity_kw_each: [deratedCapacityKw, 'kW'] },
+    chillerUnitCount, '',
+    ['1 in every non-saturated case; >1 only when required capacity exceeds the largest single EB XT model (148 kW nominal, EB XT 1600 WT)'],
+  ))
+  pushWorked(workedCalc(
+    'Aggregate derated chiller capacity',
+    'aggregate_derated_capacity_kw = derated_capacity_kw_each * chiller_unit_count',
+    { derated_capacity_kw_each: [deratedCapacityKw, 'kW'], chiller_unit_count: [chillerUnitCount, ''] },
+    aggregateDeratedCapacityKw, 'kW',
+    [],
+  ))
   // L38 HIGH fix (2026-05-26, class-killer A): use p.coolantChemistryDesc
   // (read from contract.shared_quantities) instead of the hardcoded
   // "water/glycol 80/20". An 80/20 water/glycol only protects to ~-8°C;
@@ -3543,6 +3752,16 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
   // smaller BESS designs).
   // Min floor: 1 L/min per rack (prevents zero or negative values on edge cases).
   const perRackFlowLpm = Math.max(1, Math.round((selectedPump.required_flow_lpm / p.rackCount) * 10) / 10)
+  // Calculations tab fix: capture the per-rack coolant flow derivation — the
+  // exact figure the L38 skeleton-critic HIGH found silently contradicting
+  // the cold-plate spec (see comment above).
+  pushWorked(workedCalc(
+    'Per-rack coolant flow',
+    'per_rack_flow_lpm = pump_required_flow_lpm / rack_count',
+    { pump_required_flow_lpm: [selectedPump.required_flow_lpm, 'L/min'], rack_count: [p.rackCount, ''] },
+    perRackFlowLpm, 'L/min',
+    [],
+  ))
   // systemFlowLpm: keep for manifold port-count word and module_brief template.
   const systemFlowLpm = selectedPump.nominal_flow_lpm  // nominal, not required, for module_brief
 
@@ -5037,6 +5256,29 @@ function emitInterconnect(p: BessParams): DesignModule {
   const continuousAcA = (p.continuousPowerKw * 1000) / (acLineToLineV * Math.sqrt(3))
   const cablesPerPhase = Math.max(1, Math.ceil(continuousAcA / AMPS_PER_CABLE))
   const totalGlands = PHASES * cablesPerPhase + NEUTRAL_GLANDS + PE_GLANDS
+  // Calculations tab fix: capture the AC interconnect current → cable-count
+  // → gland-count chain.
+  pushWorked(workedCalc(
+    'AC interconnect continuous current',
+    'continuous_ac_a = (continuous_power_kw * 1000) / (ac_line_to_line_v * SQRT(3))',
+    { continuous_power_kw: [p.continuousPowerKw, 'kW'], ac_line_to_line_v: [acLineToLineV, 'V'] },
+    continuousAcA, 'A',
+    ['3-phase, 400 V line-to-line'],
+  ))
+  pushWorked(workedCalc(
+    'AC cables per phase',
+    'cables_per_phase = CEILING(continuous_ac_a / AMPS_PER_CABLE)',
+    { continuous_ac_a: [continuousAcA, 'A'], AMPS_PER_CABLE: [AMPS_PER_CABLE, 'A'] },
+    cablesPerPhase, '',
+    ['240 mm² Cu XLPE 90°C ground-mounted single-conductor ampacity ≈ 500 A/cable'],
+  ))
+  pushWorked(workedCalc(
+    'Total cable glands',
+    'total_glands = PHASES * cables_per_phase + NEUTRAL_GLANDS + PE_GLANDS',
+    { PHASES: [PHASES, ''], cables_per_phase: [cablesPerPhase, ''], NEUTRAL_GLANDS: [NEUTRAL_GLANDS, ''], PE_GLANDS: [PE_GLANDS, ''] },
+    totalGlands, '',
+    [],
+  ))
   const acGridInterconnect = makeSubModule(
     'ac_grid_interconnect',
     'AC grid interconnect',
@@ -5301,6 +5543,11 @@ export function canEmitBess(contract: ContractShape): boolean {
 }
 
 export function emitBessDesign(contract: ContractShape, brief: unknown): DeterministicDesign {
+  // Calculations tab fix: reset the worked-calc buffer BEFORE deriveBessParams()
+  // runs, so its own rack/string-current captures are included (see the
+  // _emitterWorked / pushWorked() doc comment above for the single-call-buffer
+  // safety argument).
+  _emitterWorked = []
   const p = deriveBessParams(contract)
   const modules: DesignModule[] = [
     emitEnergyStorageSource(p),
@@ -5325,6 +5572,7 @@ export function emitBessDesign(contract: ContractShape, brief: unknown): Determi
     excluded_modules: [],
     rationale_excluded: 'All 10 canonical modules apply to utility-scale containerised BESS.',
     brief_overview_prose: emitBriefOverviewProse(p, brief),
+    worked_calculations: _emitterWorked,
   }
   return sanitizeAllWordMpns(design)
 }

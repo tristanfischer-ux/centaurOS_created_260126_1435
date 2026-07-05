@@ -100,6 +100,19 @@ const stepPybamm: ToolStep = {
       per_cell_current_at_rated_a: number
       total_bus_current_at_rated_a: number
       system_thermal_dissipation_kw: number
+      // 2026-07-05 (Part-names orphan wiring): design-relevant fields that
+      // pybamm_run.py already computes and returns but that contract_update
+      // previously dropped on the floor — see "ORPHANED — diagnostic only"
+      // block below the return statement for the fields deliberately NOT
+      // wired (pre-EoL-margin intermediates, per-cell mass, static BMS
+      // constant, thermal alias) and why.
+      capacity_fade_at_6000_cycles_pct: number
+      internal_resistance_mohm: number
+      voltage_profile_at_05c_summary: {
+        voltage_at_100_soc_v: number
+        voltage_at_50_soc_v: number
+        voltage_at_10_soc_v: number
+      }
     }
     const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
     // Build #18n-fix1 (2026-05-22): feed pybamm's cell_count into BoM
@@ -165,7 +178,34 @@ const stepPybamm: ToolStep = {
         // contract.ts; no BESS-only hardcodes.
         cell_heat_generation_kw: { value: out.system_thermal_dissipation_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'cell I²R heat at rated power (pybamm output — replaces pre-pybamm 5 kW default)', provenance: prov('system_thermal_dissipation_kw') },
         system_thermal_dissipation_kw: { value: out.system_thermal_dissipation_kw + ((c.quantities?.inverter_dissipated_kw?.value as number) ?? 20), unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'ENFORCED: cell_heat_generation_kw (pybamm) + inverter_dissipated_kw — invariant guaranteed; no sum-of-parts contradiction possible', provenance: prov('system_thermal_dissipation_kw') },
+        // 2026-07-05 (Part-names orphan wiring, universal-fix #3): four
+        // pybamm outputs that were computed every run but never reached a
+        // contract quantity — genuinely design-relevant (a DC-bus margin
+        // check, a warranty/cycle-life claim, the I²R basis for cell thermal
+        // sizing, and the BMS cutoff-voltage window), not solver diagnostics.
+        dc_bus_headroom_pct: { value: out.dc_bus_headroom_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'margin between string_voltage_max_charge_v and dc_bus_voltage_v rating', provenance: prov('dc_bus_headroom_pct') },
+        cell_capacity_fade_at_6000_cycles_pct: { value: out.capacity_fade_at_6000_cycles_pct, unit: '%', family: 'dimensionless', basis: 'nameplate', scope: 'cell', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'DFN physics-model projection at 6,000 cycles, 0.5C — the warranty/cycle-life claim narrated in the compliance table', provenance: prov('capacity_fade_at_6000_cycles_pct') },
+        cell_internal_resistance_mohm: { value: out.internal_resistance_mohm, unit: 'mΩ', family: 'resistance', basis: 'rated', scope: 'cell', uncertainty_pct: 20, temporal_resolution_s: null, condition: 'DFN model — basis for cell I²R thermal sizing; not calibrated for absolute thermal design (informational band, not a hard rating)', provenance: prov('internal_resistance_mohm') },
+        cell_voltage_at_100_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_100_soc_v, unit: 'V', family: 'voltage', basis: 'peak', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 100% SOC — BMS over-voltage cutoff window', provenance: prov('voltage_profile_at_05c_summary.voltage_at_100_soc_v') },
+        cell_voltage_at_50_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_50_soc_v, unit: 'V', family: 'voltage', basis: 'rated', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 50% SOC', provenance: prov('voltage_profile_at_05c_summary.voltage_at_50_soc_v') },
+        cell_voltage_at_10_soc_v: { value: out.voltage_profile_at_05c_summary.voltage_at_10_soc_v, unit: 'V', family: 'voltage', basis: 'peak', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: '0.5C discharge, 10% SOC — BMS under-voltage cutoff window', provenance: prov('voltage_profile_at_05c_summary.voltage_at_10_soc_v') },
       },
+      // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired to a contract
+      // quantity. Never force-wire a solver intermediate into a design
+      // quantity just to clear an orphan count; an honest diagnostic tag is
+      // the correct closure for these (per bess-drawing-campaign-part3 §3):
+      //   - cell_count_raw_physics / cell_count_theoretical: pre-EoL-margin
+      //     intermediates superseded by the wired, integer-clean cell_count.
+      //   - cell_mass_kg (per-cell): superseded by the wired aggregate
+      //     total_cell_mass_kg; the per-cell figure has no independent design use.
+      //   - bms_channels_per_slave: a static hardware constant (LTC6813-1 =
+      //     18 channels), not a computed result — bms_total_channels /
+      //     bms_slave_count (both wired) already carry the derived values.
+      //   - system_thermal_dissipation_at_05c_kw / thermal_dissipation_at_05c_w:
+      //     stale pre-rename aliases of the wired system_thermal_dissipation_kw.
+      //   - _meta / _provenance / worked: tool-run metadata + the worked-calc
+      //     array itself, consumed by the executor/attribution layer directly
+      //     (scripts/lib/orchestrator/attribution.ts), not a design quantity.
     }
   },
 }
@@ -259,6 +299,15 @@ const stepNgspice: ToolStep = {
       dc_contactor_rating_a: number
       dc_breaker_rating_a: number
       ac_contactor_rating_a: number
+      // 2026-07-05 (Part-names orphan wiring, universal-fix #3): the actual
+      // LCL filter reactor/capacitor values ngspice_run.py already computes
+      // (only the current RATING was wired before — the L/C values that let
+      // the BoM cite a real inductor/capacitor part number were dropped) plus
+      // the IEEE-519 THD figure. switching_losses_kw/conduction_losses_kw/
+      // _ngspice_op_voltage_v remain diagnostic-only — see comment below.
+      ac_thd_pct: number
+      filter_inductor_min_uh: number
+      filter_capacitor_min_uf: number
     }
     const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '46', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
     // Build #18n: feed ngspice efficiency into PCS pricing.
@@ -294,7 +343,26 @@ const stepNgspice: ToolStep = {
         dc_contactor_rating_a: { value: out.dc_contactor_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'DC continuous × 1.30', provenance: prov('dc_contactor_rating_a') },
         dc_breaker_rating_a: { value: out.dc_breaker_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'DC continuous × 1.50 (arc-flash coord)', provenance: prov('dc_breaker_rating_a') },
         ac_contactor_rating_a: { value: out.ac_contactor_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'AC continuous × 1.30', provenance: prov('ac_contactor_rating_a') },
+        // 2026-07-05 (Part-names orphan wiring, universal-fix #3): the LCL
+        // filter's actual reactance/capacitance — only the current RATING
+        // (lcl_filter_rating_a, above) was wired; these are what would let a
+        // real inductor/capacitor part number be pinned in the BoM instead of
+        // a rating-only placeholder. ac_thd_pct is the IEEE-519 compliance
+        // figure for the PCS output — canonical source for THD (pandapower's
+        // harmonic_distortion_pct is the grid-side estimate and is marked
+        // diagnostic-only below to avoid two competing THD numbers).
+        ac_thd_pct: { value: out.ac_thd_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'PCS AC output THD, empirical for two-level SiC — IEEE 519 compliance figure', provenance: prov('ac_thd_pct') },
+        filter_inductor_min_uh: { value: out.filter_inductor_min_uh, unit: 'uH', family: 'inductance', basis: 'rated', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'minimum LCL filter reactor inductance at rated power', provenance: prov('filter_inductor_min_uh') },
+        filter_capacitor_min_uf: { value: out.filter_capacitor_min_uf, unit: 'uF', family: 'capacitance', basis: 'rated', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'minimum LCL filter capacitor bank capacitance at rated power', provenance: prov('filter_capacitor_min_uf') },
       },
+      // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired.
+      //   - switching_losses_kw / conduction_losses_kw: a loss-mechanism
+      //     split of the already-wired total inverter_dissipated_kw; only
+      //     useful if cooling design differentiated heatsink zones (it
+      //     doesn't today).
+      //   - _ngspice_op_voltage_v: SPICE solver self-check confirming the DC
+      //     operating-point solve matched the input — a convergence check,
+      //     not a design quantity.
     }
   },
 }
@@ -310,7 +378,23 @@ const stepPandaPower: ToolStep = {
     grid_strength: 'medium' as const,  // TODO: derive from brief
   }),
   contract_update: (c: ContractInProgress, output: any) => {
-    const out = output as { transformer_rating_kva: number; transformer_mass_kg: number; pcc_short_circuit_ka: number }
+    const out = output as {
+      transformer_rating_kva: number
+      transformer_mass_kg: number
+      pcc_short_circuit_ka: number
+      // 2026-07-05 (Part-names orphan wiring, universal-fix #3): the
+      // transformer impedance pandapower_run.py already returns — genuinely
+      // design-relevant because stepProtectionCoordination (below) NEEDED
+      // this exact figure and, absent a wired quantity, independently
+      // hardcoded its own `transformer_impedance_pct: 6.0` — two places
+      // asserting the same number with no link between them (a latent
+      // divergence bug if either changes alone). lv_voltage_at_pcs_pu is the
+      // literal purpose of running an AC power-flow study (the PCS-side
+      // voltage-quality result) and was previously invisible.
+      transformer_impedance_pct: number
+      lv_voltage_at_pcs_pu: number
+      voltage_unbalance_pct: number
+    }
     const prov = (f: string) => ({ source: 'tool:pandapower:grid-integration' as const, tool_id: 'pandapower:grid-integration', tool_version: '3.4.0', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/e2nIEE/pandapower', invocation_output_field: f, duration_ms: 0 })
     // Build #18l: feed pandapower's transformer rating into the BoM via
     // a macro_assembly_price. The renderer's macro-override (Build #4)
@@ -338,7 +422,25 @@ const stepPandaPower: ToolStep = {
         transformer_rating_kva: { value: out.transformer_rating_kva, unit: 'kVA', family: 'power', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('transformer_rating_kva') },
         transformer_mass_kg: { value: out.transformer_mass_kg, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('transformer_mass_kg') },
         pcc_short_circuit_ka: { value: out.pcc_short_circuit_ka, unit: 'kA', family: 'current', basis: 'peak', scope: 'site', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'fault', provenance: prov('pcc_short_circuit_ka') },
+        transformer_impedance_pct: { value: out.transformer_impedance_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'dry-type Dyn11 MV step-up nameplate impedance — the SAME figure stepProtectionCoordination consumes for its fault-current calc (single source, no duplicate hardcode)', provenance: prov('transformer_impedance_pct') },
+        lv_voltage_at_pcs_pu: { value: out.lv_voltage_at_pcs_pu, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'AC power-flow solve, per-unit voltage at PCS LV busbar under rated export', provenance: prov('lv_voltage_at_pcs_pu') },
+        voltage_unbalance_pct: { value: out.voltage_unbalance_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 20, temporal_resolution_s: null, condition: 'nominal assumption for a balanced 3-phase LV connection', provenance: prov('voltage_unbalance_pct') },
       },
+      // 2026-07-05: DIAGNOSTIC ONLY — deliberately NOT wired.
+      //   - harmonic_distortion_pct: a hardcoded grid-side THD estimate that
+      //     duplicates ngspice's ac_thd_pct (now wired, above) with a
+      //     different empirical value and no reconciliation rule between
+      //     them; wiring BOTH as "THD" would present two disagreeing numbers
+      //     for the same claim. ngspice's PCS-output figure is canonical
+      //     (it is the actual simulated inverter output, not a grid-side
+      //     guess); this pandapower figure stays unwired until a real
+      //     IEEE-519 THD solve replaces the hardcode.
+      //   - ena_g99_compliance / ieee_519_compliance: crude boolean flags
+      //     superseded by the dedicated, far more rigorous
+      //     g99:dynamic-compliance tool (LVRT/HVRT/frequency-response/
+      //     reactive-capability, below) which already wires
+      //     g99_compliance_ok / g99_violation_count from a real
+      //     first-principles check.
     }
   },
 }
@@ -522,7 +624,12 @@ const stepProtectionCoordination: ToolStep = {
   input_from_contract: (c: any) => ({
     pcc_voltage_kv: c.envelope?.voltage_class_v ? c.envelope.voltage_class_v / 1000 : 11,
     transformer_kva: c.quantities?.transformer_rating_kva?.value ?? 1000,
-    transformer_impedance_pct: 6.0,
+    // 2026-07-05 (Part-names orphan wiring, universal-fix #3): read the
+    // SAME transformer_impedance_pct pandapower now wires (above) instead of
+    // an independent hardcode — was previously two places asserting 6.0 with
+    // no link between them; 6.0 kept only as the fallback for a contract
+    // that ran without pandapower.
+    transformer_impedance_pct: c.quantities?.transformer_impedance_pct?.value ?? 6.0,
     grid_sc_mva: 250.0,
     dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
     // pack_resistance_ohm and bus_resistance_ohm use protection_coordination defaults

@@ -94,6 +94,17 @@ export interface Quantity {
   condition?: string  // free-text e.g. '25°C ambient', 'BoL', 'sea-level standard atmosphere'
   source: 'brief' | 'calculator' | 'physics_constant' | 'override' | 'inherited'
   source_detail?: string  // e.g. 'cells_ah_voltage_capacity_closure', 'brief.constraints.target_performance.value'
+  // Quantities 7.8 fix (2026-07-05): machine-readable provenance, additive to the
+  // prose-only `source_detail` above. `from` names the OTHER contract quantity keys
+  // this value was computed from (read by provenance-trace.ts::resolveRootToBrief and
+  // the Excel Quantities tab's where-from/used-by columns, build-excel-export.py
+  // tab_quantities()); `via` records HOW (mirrors `source`); `formula` — when the
+  // expression is a clean function of `from` keys only — lets the Excel tab render a
+  // LIVE in-cell formula instead of a bare asserted number. Optional: a leaf physics/
+  // engineering-judgment constant with no upstream contract quantity (e.g. an assumed
+  // depth-of-discharge fraction) legitimately has no `from` — its citation stays in
+  // `source_detail` only.
+  lineage?: { from: string[]; via?: string; formula?: string }
 }
 
 export function q(
@@ -103,9 +114,13 @@ export function q(
   basis: QuantityBasis,
   scope: QuantityScope,
   source: Quantity['source'],
-  opts?: { condition?: string; source_detail?: string },
+  opts?: { condition?: string; source_detail?: string; from?: string[]; formula?: string },
 ): Quantity {
-  return { value, unit, family, basis, scope, source, ...(opts ?? {}) }
+  const { from, formula, ...rest } = opts ?? {}
+  return {
+    value, unit, family, basis, scope, source, ...rest,
+    ...(from && from.length ? { lineage: { from, via: source, ...(formula ? { formula } : {}) } } : {}),
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1004,10 +1019,18 @@ registerArchetype('bess', (brief: any) => {
     usable_capacity_kwh: q(usableKwhAchieved, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: 'nameplate × dod_fraction (integer-rack-feasible)', condition: '25°C, 80% DoD, BoL' }),
     usable_capacity_kwh_requested: q(usableKwh, 'kWh', 'energy', 'usable', 'system', 'brief', { source_detail: 'parsedBrief.constraints.target_performance (NOT necessarily feasible)' }),
     nameplate_capacity_kwh: q(nameplateKwh, 'kWh', 'energy', 'nameplate', 'system', 'calculator', { source_detail: 'cell_count × cell_energy_kwh (integer-clean)' }),
-    dod_fraction: q(dodFraction, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
-    cell_count: q(cellCount, '', 'dimensionless', 'rated', 'cell', 'calculator', { source_detail: `rack_count × cells_per_rack (integer-clean: ${parallelStringsPerRack}P × ${seriesCellsPerString}S per rack)` }),
-    cell_capacity_ah: q(cellAh, 'Ah', 'dimensionless', 'rated', 'cell', 'physics_constant', { source_detail: 'CATL CBC00 314 Ah LFP prismatic class default (2026 generation, 12% denser successor to the 280 Ah predecessor in the same cell footprint; verified against 3 independent 2026 distributor/datasheet listings)' }),
-    cell_voltage_v: q(cellVoltageV, 'V', 'dimensionless', 'rated', 'cell', 'physics_constant'),
+    // Quantities 7.8 fix (2026-07-05): dod_fraction is a genuine LEAF engineering
+    // convention — it has no upstream CONTRACT quantity to causally derive from (it is
+    // an INPUT to nameplateKwhRequested, not an output of one). Per the Quantity.lineage
+    // contract (never fabricate a causal chain that doesn't exist), it gets a citation-
+    // style `from` entry naming the standard it is drawn from, not a fake quantity key.
+    dod_fraction: q(dodFraction, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: '80% DoD is the standard LFP utility-BESS design point — preserves the ≥6,000-cycle/15-year design life at 80% SoH floor (EN 62933-5-2 typical operating envelope); not derived from a brief-stated number', from: ['assumption:bess_class_convention_80pct_dod'] }),
+    cell_count: q(cellCount, '', 'dimensionless', 'rated', 'cell', 'calculator', { source_detail: `rack_count × cells_per_rack (integer-clean: ${parallelStringsPerRack}P × ${seriesCellsPerString}S per rack)`, from: ['rack_count', 'cells_per_rack'] }),
+    // Quantities 7.8 fix: thread the 314 Ah recalibration's datasheet citation (see the
+    // WAVE C addendum 9 comment above `const cellAh = 314`, 2026-07-05) into structured
+    // lineage — same citation, now machine-linked instead of prose-only.
+    cell_capacity_ah: q(cellAh, 'Ah', 'dimensionless', 'rated', 'cell', 'physics_constant', { source_detail: 'CATL CBC00 314 Ah LFP prismatic class default (2026 generation, 12% denser successor to the 280 Ah predecessor in the same cell footprint; verified against 3 independent 2026 distributor/datasheet listings: evlithium.com, dlcpo.com, enfsolar.com cdn datasheet PDF)', from: ['datasheet:CATL_CBC00_314Ah_2026'] }),
+    cell_voltage_v: q(cellVoltageV, 'V', 'dimensionless', 'rated', 'cell', 'physics_constant', { source_detail: 'CATL CBC00 314 Ah LFP prismatic class default — nominal voltage 3.2 V (unchanged from the 280 Ah predecessor); same 3-listing datasheet verification as cell_capacity_ah', from: ['datasheet:CATL_CBC00_314Ah_2026'] }),
     cell_mass_kg: q(cellMassKg, 'kg', 'mass', 'gross_takeoff', 'cell', 'physics_constant'),
     total_cell_mass_kg: q(totalCellMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'cell_count × cell_mass_kg' }),
     brief_mass_cap_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief'),
@@ -1066,7 +1089,7 @@ registerArchetype('bess', (brief: any) => {
     // instructions: "rewrite the contract to ALWAYS solve for the integer-
     // feasible config (round-down to nearest valid pack) and let the cover
     // note the actual achieved energy."
-    brief_target_feasibility: q(briefTargetFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff usable_kwh_achieved ≥ 0.99 × usable_kwh_requested (achieved ${usableKwhAchieved.toFixed(0)} vs requested ${usableKwh.toFixed(0)} kWh)` }),
+    brief_target_feasibility: q(briefTargetFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff usable_kwh_achieved ≥ 0.99 × usable_kwh_requested (achieved ${usableKwhAchieved.toFixed(0)} vs requested ${usableKwh.toFixed(0)} kWh)`, from: ['usable_capacity_kwh', 'usable_capacity_kwh_requested'] }),
     // BESS L4 (2026-05-24, physics-critic L3 issue #4): explicit container
     // count emitted by the contract so the orchestrator + downstream emitters
     // + Physics Critic see ONE authoritative answer. Always 1 for the utility
@@ -1078,7 +1101,7 @@ registerArchetype('bess', (brief: any) => {
     // narrator) so the Physics Critic stops re-flagging the 2-container
     // recommendation as a "bug" — it is the explicit trade-off the contract
     // documents in brief_target_feasibility=0.
-    container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit' }),
+    container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit', from: ['rack_count', 'brief_mass_cap_kg'] }),
     // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH):
     // explicit mass breakdown so the Generator + downstream tools see the
     // full container audit, not just cells. Transformer is EXTERNAL pad-
@@ -1086,8 +1109,11 @@ registerArchetype('bess', (brief: any) => {
     in_container_mass_kg: q(inContainerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `cells (${totalCellMassKg.toFixed(0)}) + shell (${containerTareKg}) + racks (${totalRackMassKg}) + PCS (${pcsMassKg}) + BMS/cable (${bmsCablingMassKg}) + cooling (${coolingMassKg}) kg — transformer EXCLUDED (external pad-mount)` }),
     external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
-    transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)' }),
-    mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg` }),
+    // transformer_installation is a POLICY constant (industry-standard siting choice), not
+    // derived from another quantity's value — citation-style `from`, same treatment as
+    // dod_fraction above.
+    transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)', from: ['standard:IEC_62933-5-2_section_6.4'] }),
+    mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg`, from: ['in_container_mass_kg', 'brief_mass_cap_kg'] }),
     // FIX 3a — Bespoke enclosure payload rating (council CRITICAL, 2026-05-29):
     // The brief's max_mass_kg is the DESIGN gross-mass cap for the bespoke
     // heavy-duty enclosure, NOT the standard ISO-668 26,580 kg payload for a
@@ -1460,7 +1486,15 @@ registerArchetype('bess', (brief: any) => {
   // addendum 8 closed for the cell line specifically.
   quantities.dc_block_reconciliation_factor = q(
     blockReconciliationFactor, '', 'dimensionless', 'rated', 'system', 'calculator',
-    { source_detail: `procured integrated DC-block price £${procuredBlockPriceGbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })} (£${MARKET_DC_BLOCK_GBP_PER_KWH_2026}/kWh × ${nameplateKwh.toFixed(0)} kWh nameplate) ÷ raw battery-only component sum £${rawBatteryOnlyComponentSum.toLocaleString('en-GB', { maximumFractionDigits: 0 })} (cells + enclosure + BMS + cooling + DC bus contactor, Western catalogue/trade prices) = ${blockReconciliationFactor.toFixed(3)}× — applied uniformly to every battery-only macro_assembly_prices line so the transparency breakdown sums exactly to the procured block price` },
+    {
+      source_detail: `procured integrated DC-block price £${procuredBlockPriceGbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })} (£${MARKET_DC_BLOCK_GBP_PER_KWH_2026}/kWh × ${nameplateKwh.toFixed(0)} kWh nameplate) ÷ raw battery-only component sum £${rawBatteryOnlyComponentSum.toLocaleString('en-GB', { maximumFractionDigits: 0 })} (cells + enclosure + BMS + cooling + DC bus contactor, Western catalogue/trade prices) = ${blockReconciliationFactor.toFixed(3)}× — applied uniformly to every battery-only macro_assembly_prices line so the transparency breakdown sums exactly to the procured block price`,
+      // Quantities 7.8 fix: nameplate_capacity_kwh is a real, already-rooted contract
+      // quantity (the numerator's driver); rawBatteryOnlyComponentSum has no quantity key
+      // of its own (it's a local sum over macro_assembly_prices, not a named contract
+      // input) so the £60/kWh 2026 market anchor is cited as an assumption instead of a
+      // fabricated quantity key.
+      from: ['nameplate_capacity_kwh', 'assumption:market_dc_block_60gbp_per_kwh_2026'],
+    },
   )
 
   // BESS WAVE C addendum 6 (2026-07-04, Tristan: "build it") — DELIVERED
@@ -1604,6 +1638,15 @@ registerArchetype('bess', (brief: any) => {
           `systemThermalDissipationKw=${systemThermalDissipationKw.toFixed(1)} kW + real hvacDesignLoadKw=${hvacDesignLoadKw} kW + ` +
           `real standbyAuxLossKw=${standbyAuxLossKw} kW, over a ${cycleDurationHr.toFixed(2)} h charge+discharge cycle, ` +
           `${auxEnergyKwh.toFixed(1)} kWh aux vs ${usableKwhAchieved.toFixed(0)} kWh usable) = ${roundTripEfficiencyPercent.toFixed(1)}%`,
+        // Quantities 7.8 fix: the five REAL contract quantities this figure is causally
+        // computed from (already minted above), plus the two STATED ASSUMPTIONS (cell RTE,
+        // chiller COP) that have no contract-quantity key of their own — cited the same way
+        // as dod_fraction above, honestly, rather than silently omitted.
+        from: [
+          'system_thermal_dissipation_kw', 'hvac_design_load_kw', 'standby_aux_loss_kw',
+          'continuous_power_kw', 'usable_capacity_kwh',
+          'assumption:cell_rte_97pct_lfp_prismatic', 'assumption:chiller_cop_3.5',
+        ],
       },
     )
   }
