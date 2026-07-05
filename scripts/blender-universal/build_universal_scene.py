@@ -564,6 +564,23 @@ SHAPE_RULES = [
     (r"\bskid\b|package|additisation|generation|inerting|nitrogen", "skid_box"),
     (r"gantry|loading arm|loading", "gantry"),
     (r"\bmixer\b|static mixer", "inline_spool"),
+    # PROCESS/PACKAGING MACHINES (2026-07-06, CO2-mineralisation round-2 residual-
+    # litter fix): a CENTRIFUGE (a solid/liquid separation drum machine), a CONVEYOR
+    # (a belt/chain material-handling run), a SEALER (a bag/band heat sealer) and a
+    # WRAPPER (a pallet/stretch wrapper) are each real standalone process/packaging
+    # machines — none matched any rule above and all four fell to the shared DEFAULT
+    # box (the {1000,1060,1100} litter cluster: 4 distinct machines rendering as one
+    # indistinguishable grey crate). ga_massing already drops their true internals
+    # (mechanical seal, heating element) — these are the parent machines themselves
+    # and MUST stay massed, sized from a realistic footprint for their kind (not the
+    # shared box default). Universal — generic machine nouns, no per-part table. A
+    # VSD/drive PANEL that happens to mention a driven machine in its name (e.g.
+    # "blower/centrifuge VSDs") is caught by ga_massing's variable-speed-drive rule
+    # BEFORE extract_parts ever reaches shape classification, so it never lands here.
+    (r"centrifuge", "centrifuge"),
+    (r"conveyor", "conveyor_machine"),
+    (r"\bsealers?\b|band sealer|heat sealer", "sealer_machine"),
+    (r"\bwrappers?\b|stretch.?wrap|palletiser|palletizer", "wrapper_machine"),
     # GENERIC process vessel catch-all (Tristan 2026-06-24: a part named "…vessel" /
     # "…pot" / "maturation vessel" / "reservoir" / "accumulator" matched NO earlier rule
     # and fell to a flat BOX. A closed process vessel is a vertical cylinder with dished
@@ -619,6 +636,13 @@ TYPE_DEFAULTS_MM = {
     "horizontal_vessel": dict(dia=700,  length=2600),
     "compressor":        dict(w=1800,   d=1100, h=1300),
     "pump":              dict(w=900,    d=500,  h=700),
+    # PROCESS/PACKAGING MACHINES (2026-07-06, CO2-mineralisation round-2 residual-
+    # litter fix) — realistic per-kind footprints, replacing the shared {1000,900,
+    # 1100} default box that 4 distinct machines were colliding on:
+    "centrifuge":        dict(w=2000,   d=1500, h=1700),  # small process pusher/basket centrifuge
+    "conveyor_machine":  dict(w=3500,   d=650,  h=900),   # belt/chain conveyor run
+    "sealer_machine":    dict(w=1500,   d=650,  h=1150),  # bag/band continuous heat sealer
+    "wrapper_machine":   dict(w=1800,   d=1800, h=2300),  # pallet/stretch-wrap turntable + mast
     "tank":              dict(dia=3000, height=3500),
     "stack":             dict(dia=500,  height=9000),
     "package_box":       dict(w=2400,   d=1600, h=2200),
@@ -2600,7 +2624,7 @@ def _vessel_grid_span_mm(unit_dia_mm: float, n: int):
 # 1). N==1 is byte-identical to the old single machine (inm==nm, xo==yo==0). Universal — any
 # pump/blower/compressor array, any class. Like the vessel grid, this is the SINGLE source of
 # truth shared by build_part (draws the N instances) and footprint_mm (reserves the grid span).
-_REPLICATED_MACHINE_KIND = {"pump", "compressor"}
+_REPLICATED_MACHINE_KIND = {"pump", "compressor", "centrifuge"}
 _MACHINE_GRID_PITCH_X_FACTOR = 1.7    # centre-to-centre X pitch = unit footprint width × this
 _MACHINE_GRID_PITCH_Y_FACTOR = 1.9    # centre-to-centre Y pitch = unit footprint depth × this
 
@@ -2758,8 +2782,9 @@ def footprint_mm(rd):
             sx, sy = _machine_grid_span_mm(w, dep, n)
             return sx, sy, h
         return w, dep, h
-    if shape in ("package_box", "skid_box",
-                 "transformer_box", "cabinet", "cabinet_small", "box"):
+    if shape in ("package_box", "skid_box", "transformer_box", "cabinet",
+                 "cabinet_small", "box", "conveyor_machine", "sealer_machine",
+                 "wrapper_machine"):
         w = rd.get("w_mm", TYPE_DEFAULTS_MM[shape].get("w", 1000))
         dep = rd.get("d_mm", TYPE_DEFAULTS_MM[shape].get("d", 900))
         h = rd.get("h_mm", TYPE_DEFAULTS_MM[shape].get("h", 1100))
@@ -2959,7 +2984,8 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
         return first
 
     if shape in ("package_box", "skid_box", "transformer_box", "cabinet",
-                 "cabinet_small", "box"):
+                 "cabinet_small", "box", "conveyor_machine", "sealer_machine",
+                 "wrapper_machine"):
         w = rd.get("w_mm", TYPE_DEFAULTS_MM[shape].get("w", 1000))
         dep = rd.get("d_mm", TYPE_DEFAULTS_MM[shape].get("d", 900))
         h = rd.get("h_mm", TYPE_DEFAULTS_MM[shape].get("h", 1100))
@@ -9461,10 +9487,64 @@ def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None,
         return cand_xy
     cand_yx = _wire_candidate(sx, sy, sz, dx, dy, dz, z_cross, False)
     if cand_yx == cand_xy:
-        return cand_xy
-    over_xy = _polyline_over_equipment(cand_xy, bboxes, own)
-    over_yx = _polyline_over_equipment(cand_yx, bboxes, own)
-    return cand_yx if over_yx < over_xy else cand_xy
+        best_pts, best_over = cand_xy, _polyline_over_equipment(cand_xy, bboxes, own)
+    else:
+        over_xy = _polyline_over_equipment(cand_xy, bboxes, own)
+        over_yx = _polyline_over_equipment(cand_yx, bboxes, own)
+        best_pts, best_over = (cand_yx, over_yx) if over_yx < over_xy else (cand_xy, over_xy)
+    # DETOUR RESCUE (2026-07-06, CO2-mineralisation round-2 over-equipment regression):
+    # the denser round-2 layout moved a THIRD part's bbox under a LOCAL run's low deck
+    # (sized only to clear this run's own two endpoints — see the comment above), so
+    # neither X-first nor Y-first ordering clears it at that height. When a HIGHER deck
+    # is available (`overhead_base_z` — the tallest equipment top in the whole plant +
+    # clearance, i.e. provably above every bbox) and the low deck is still blocked,
+    # retry both orderings up there and take it if it clears more — the SAME 'try both,
+    # keep the cleaner' idiom as above, extended with an elevation escalation (mirrors
+    # _direct_route's low→rack-tier fallback for the rack-spine router). A no-op
+    # whenever the low deck is already clean (best_over == 0), no higher deck exists,
+    # or the low deck already IS the high deck (a long run already lifted above).
+    if best_over > 0 and overhead_base_z is not None and float(overhead_base_z) > deck + 1.0:
+        z_hi = float(overhead_base_z) + tier + run_off
+        hi_xy = _wire_candidate(sx, sy, sz, dx, dy, dz, z_hi, True)
+        hi_yx = _wire_candidate(sx, sy, sz, dx, dy, dz, z_hi, False)
+        if hi_yx == hi_xy:
+            hi_pts, hi_over = hi_xy, _polyline_over_equipment(hi_xy, bboxes, own)
+        else:
+            over_hi_xy = _polyline_over_equipment(hi_xy, bboxes, own)
+            over_hi_yx = _polyline_over_equipment(hi_yx, bboxes, own)
+            hi_pts, hi_over = (hi_yx, over_hi_yx) if over_hi_yx < over_hi_xy else (hi_xy, over_hi_xy)
+        if hi_over < best_over:
+            best_pts, best_over = hi_pts, hi_over
+    # TALL-OBSTRUCTION RESCUE (2026-07-06, CO2-mineralisation round-2 over-equipment
+    # regression, tier 2): `overhead_base_z` is deliberately capped to the BULK equipment
+    # top (is_tall_for_frame parts — columns/reactors/stacks — are EXCLUDED so the shared
+    # deck isn't dragged up to a flare tip), so a run whose corridor happens to pass near a
+    # genuinely TALL vessel can still clip it at every deck tried above. Rather than a
+    # second fixed guess, compute the ACTUAL clearance this run needs — the tallest top_z
+    # among the equipment bboxes (excluding this run's own endpoints) whose XY falls inside
+    # the run's own bounding rectangle — and fly the across-leg above THAT. Deterministic,
+    # universal (no class table), and a no-op whenever tier 0/1 already cleared everything.
+    if best_over > 0 and bboxes:
+        rx0, rx1 = min(sx, dx), max(sx, dx)
+        ry0, ry1 = min(sy, dy), max(sy, dy)
+        _tops = [bb[4] for bb in bboxes
+                 if len(bb) >= 5 and not (own and _bbox_is_own(bb, own))
+                 and bb[2] >= rx0 and bb[0] <= rx1 and bb[3] >= ry0 and bb[1] <= ry1]
+        if _tops:
+            z_clear = max(_tops) + _CLEAR_OVER_MM + 50.0 + tier + run_off
+            if z_clear > z_cross + 1.0:
+                cl_xy = _wire_candidate(sx, sy, sz, dx, dy, dz, z_clear, True)
+                cl_yx = _wire_candidate(sx, sy, sz, dx, dy, dz, z_clear, False)
+                if cl_yx == cl_xy:
+                    cl_pts, cl_over = cl_xy, _polyline_over_equipment(cl_xy, bboxes, own)
+                else:
+                    over_cl_xy = _polyline_over_equipment(cl_xy, bboxes, own)
+                    over_cl_yx = _polyline_over_equipment(cl_yx, bboxes, own)
+                    cl_pts, cl_over = ((cl_yx, over_cl_yx) if over_cl_yx < over_cl_xy
+                                       else (cl_xy, over_cl_xy))
+                if cl_over < best_over:
+                    best_pts, best_over = cl_pts, cl_over
+    return best_pts
 
 
 # A SOURCE that feeds this many destinations of the SAME service is a FAN-OUT — route it

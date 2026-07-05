@@ -221,7 +221,50 @@ GA_NON_MASSING_RE = re.compile(
     #    P&ID-level instrument family as the existing 'temperature switch' rule
     #    (a thermostat IS a temperature switch by function), mounted on/in its
     #    parent heater/vessel, never its own GA box.
-    r"\bthermostats?\b",
+    r"\bthermostats?\b|"
+    # ── CO2-mineralisation residual LITTER (2026-07-06, GA/Renders round-2
+    # denominator-honesty pass): 6 of the 10 names sharing the {1000,1060,1100}
+    # default box are commodity/structural fittings that live ON or INSIDE a
+    # parent item — the SAME "not a discrete massed object" principle as the
+    # families above, extended to this archetype's vocabulary. The other 4
+    # (centrifuge, bag sealer, conveyor, pallet wrapper) are GENUINE standalone
+    # process/packaging MACHINES and are deliberately NOT added here — they stay
+    # massed and get real per-basis dims from build_universal_scene.py's SHAPE_RULES
+    # instead (the fix is to SIZE them honestly, not to hide them).
+    #  - a MECHANICAL SEAL is the shaft seal cartridge on a pump/agitator — an
+    #    internal wear part bolted into its parent's stuffing box, never its own
+    #    GA box (same "internals live inside the parent" family as the membrane-
+    #    skid-internals rule above). TIGHT on the full compound so a real seal-LESS
+    #    pump or an unrelated "…seal…" name is untouched (proveCatch counter-case).
+    r"\bmechanical seals?\b|"
+    #  - CABLE TRANSIT FRAMES (e.g. a Roxtec modular multi-cable transit) are the
+    #    wall/floor cable-penetration seal hardware — an accessory that lives IN a
+    #    wall/floor penetration, the same family as the existing cable-gland/cable-
+    #    tray accessories above, extended to the transit-frame compound.
+    r"\bcable transits?\b|\bcable transit frames?\b|"
+    #  - an ACCESS PLATFORM (+ its ladders/handrails) is the SAME walkway/egress
+    #    structural steel the generator already draws PROGRAMMATICALLY on tall
+    #    vessels (_add_platforms_and_ladder in build_universal_scene.py) — a BoM
+    #    line describing the same structure for a shorter vessel is documentation
+    #    of that structural steel, not its own free-standing GA box. HEAD-anchored
+    #    on 'access platform' (not bare 'platform') so a genuinely different
+    #    principal ("Weighing Platform", "Loading Platform") is untouched.
+    r"\baccess platforms?\b|"
+    #  - STRUCTURED / RANDOM PACKING (e.g. Mellapak) is the internal mass-transfer
+    #    media inside a packed column — the same "internals represented by the
+    #    parent vessel" principle as the membrane-element/media rule above. Keyed
+    #    on the packing-media compound so a real packaging-LINE machine ("Case
+    #    Packing Machine", "Packing Station") is untouched (proveCatch counter-case).
+    r"\b(?:structured|random) packings?\b|\bpacking (?:bed|media|rings?)\b|"
+    #  - a SPARGER (RING) is a perforated gas-distribution fitting mounted under an
+    #    agitator/impeller inside a vessel — an internal fitting, not its own box.
+    r"\bspargers?\b|\bsparger rings?\b|"
+    #  - a (SEALER JAW) HEATING ELEMENT is a replaceable resistive component inside
+    #    a parent machine (a bag/band sealer's jaw) — the same panel/cell-packaging
+    #    INTERNALS family as the BESS module-internals rules above. Keyed on the
+    #    full compound so a real standalone heater unit ('Immersion Heater',
+    #    'Crystalliser Circulation Heater') is untouched.
+    r"\bheating elements?\b",
     re.I)
 
 # Pure DOCUMENTATION / signage / compliance-record rows (2026-07-05, BESS v3 dissection):
@@ -347,6 +390,14 @@ def _selftest():
         "motor-protection relays", "safety relays", "SIL-rated isolation barriers",
         "variable-speed drives", "VSD panel", "soft starters",
         "drive fieldbus modules", "emergency shutdown system", "safety shower + eyewash",
+        # CO2-mineralisation round-2 RESIDUAL litter (2026-07-06, GA/Renders
+        # denominator-honesty pass): 6 of the 10 names sharing the default
+        # {1000,1060,1100} box are commodity/structural fittings — must drop.
+        # (The other 4 — centrifuge, bag sealer, conveyor, pallet wrapper — are
+        # real standalone machines and are proven in must_keep below instead.)
+        "agitator shaft mechanical seal", "cable transit frames",
+        "access platform + ladders", "structured packing",
+        "CO2 sparger ring", "sealer jaw heating element",
     ]
     # pure documentation/signage — expected on NO representation at all.
     must_be_documentation = [
@@ -401,6 +452,20 @@ def _selftest():
         "cooling pump", "container AC unit", "coolant circulation pump",
         "HVAC condensate pump", "off-gas exhaust fan", "LFP prismatic cell",
         "rack DC isolator", "PTC rack heater",
+        # CO2-mineralisation round-2 RESIDUAL — the 4 of 10 default-box-litter names
+        # that are GENUINE standalone process/packaging machines (2026-07-06): a
+        # pusher centrifuge, a band sealer, a belt conveyor and a stretch-wrapper
+        # are each their own free-standing piece of kit, not internals/fittings of
+        # a parent — these MUST stay massed (and get real per-basis dims from
+        # build_universal_scene.py's SHAPE_RULES, not the litter default box).
+        "K2SO4 pusher centrifuge", "bag heat sealer", "bag take-away conveyor",
+        "pallet wrapper",
+        # tightness counter-cases (proves the new exclusion rules above are keyed on
+        # the full compound, not a bare substring):
+        "Sealless Magnetic Drive Pump",   # no 'mechanical seal' phrase — stays massed
+        "Weighing Platform", "Loading Platform",  # no 'access' prefix — stays massed
+        "Case Packing Machine", "Packing Station",  # 'packing' machine ≠ packing media
+        "Immersion Heater",   # no 'heating element' phrase — stays massed
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]

@@ -312,7 +312,27 @@ _HUB_PATTERNS = [
     (re.compile(r"\bhvac\b|climate|environmental.?control|conditioning", re.I), "ahu"),
     (re.compile(r"\bfan\b|blower|extract|exhaust.?fan|mixing.?fan|circulat", re.I),
      "fan"),
+    # PROCESS THERMAL UTILITY (2026-07-06, CO2-mineralisation HVAC air-side/coolant
+    # coverage pass): a process COOLER (a trim/product/inlet cooler rejecting heat from
+    # a process stream) or a process AIR-HEATER / HEAT-RECOVERY EXCHANGER (a dryer's
+    # inlet air-heater battery or exhaust heat-recovery unit) is the SAME mechanical-
+    # services scope as the chiller/AHU roles above — it belongs on the HVAC/coolant
+    # sheet even though it is named for the process stream it serves, not for "HVAC".
+    # LOWEST PRIORITY (end of the list) so it never steals a match from a more specific
+    # existing role (a "cooling pump" still resolves to the "pump" role above). Kept out
+    # of _MAIN_HUB_ROLES (see derive_air_system) so a small process cooler/heater can
+    # never become the plan's supply-hub origin — it is drawn + tagged + scheduled like
+    # any other hub, never the duct-sizing source. Universal — generic mechanical-
+    # equipment nouns, no per-class/per-part table.
+    (re.compile(r"\bcoolers?\b", re.I), "cooler"),
+    (re.compile(r"heat.?recovery exchanger|heater battery|\bair.?heater\b", re.I),
+     "process_air_heater"),
 ]
+
+# Hub roles that are PROCESS THERMAL UTILITY equipment shown on the HVAC sheet for
+# coverage/labelling only — never eligible to become the plan's supply-hub origin (see
+# the _HUB_PATTERNS comment above + derive_air_system's main_hub selection).
+_PROCESS_THERMAL_ROLES = {"cooler", "process_air_heater"}
 
 # A SERVED-ZONE role (the thing air/coolant goes TO).  Racks / grow zones / aisles.
 _ZONE_PATTERNS = [
@@ -547,7 +567,14 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
 
     # the primary hub is the largest-footprint hub (the main AHU/CRAC/chiller).
     hubs.sort(key=lambda e: -(e.w * e.d))
-    main_hub = hubs[0]
+    # PROCESS THERMAL UTILITY hubs (cooler / process_air_heater, added 2026-07-06) are
+    # drawn + tagged + scheduled like any other hub but must NEVER become the duct-
+    # sizing origin (they aren't the air/coolant SOURCE — they're process kit shown for
+    # HVAC-sheet coverage). Excluding them from the candidate list is a no-op whenever
+    # the design carries none (every archetype before this addition): the filtered list
+    # equals `hubs` and `main_hub` is unchanged.
+    _main_candidates = [h for h in hubs if h.role not in _PROCESS_THERMAL_ROLES]
+    main_hub = _main_candidates[0] if _main_candidates else hubs[0]
 
     if medium == "liquid":
         _build_liquid_loop(main_hub, zones, schedule, ducts, diffusers, notes)
