@@ -11900,10 +11900,55 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             bop_anchor[role] = (cx, cy, DECK_Z_MM + h_mm)
             region_centres[role] = (cx, cy)
 
-        _pad_front = [it for it in _pad_overflow if it[3] >= BOP_SMALL_ITEM_MM]
-        _pad_back = [it for it in _pad_overflow if it[3] < BOP_SMALL_ITEM_MM]
+        # ROLE → HOST CLASS. Per-rack monitoring/heating/cooling hardware mounts ON
+        # the rack bank; duct/vent/fire/envelope/HVAC/EMS penetration hardware mounts
+        # ON the container wall at the duct route; coolant-loop rotating equipment
+        # mounts BESIDE the coolant skid (chiller/aircon) it plumbs into.
+        #
+        # Computed BEFORE the front/back pad split below so host-eligibility is
+        # decided by ROLE alone, never by size (2026-07-06b, Tristan's second catch:
+        # "why are [these] not wired into anything" / floating on the pad — six WIDE
+        # items — container AC unit, EMS industrial PC, thermal insulation panel,
+        # deflagration vent panel, louvre vent panel, clean-agent fire cylinder — are
+        # all ≥ BOP_SMALL_ITEM_MM, so the 2026-07-06a host-attachment pass (which only
+        # ever looked at the size-based "back row") never saw them; they fell into the
+        # "front row" bucket meant for genuinely freestanding skids like the liquid
+        # cooling chiller and rendered as the same floating unlabelled row the
+        # original back-row bug produced). A container AC unit is roof/wall HVAC
+        # plant; an EMS industrial PC is a control-cabinet item at the wall; the
+        # insulation/deflagration/louvre panels ARE the container envelope/cladding
+        # itself; the clean-agent fire cylinder bank mounts on an internal wall
+        # bracket beside its own releasing panel (`firerelease`, already wall-hosted
+        # below) — none of these five is free-standing equipment, so size must never
+        # exempt a role from the host map. The liquid cooling chiller (`chiller`) is
+        # deliberately NOT added here — it is a genuine principal skid that legitimately
+        # stands on its own pad slab (Tristan: "do NOT move it").
+        _RACK_HOST_ROLES = {"rackheater", "dcisolator", "isolatorenclosure",
+                             "bmsslave", "coldplatemanifold", "coldplaterack",
+                             "coolantdistmanifold"}
+        _WALL_HOST_ROLES = {"hvacduct", "offgasduct", "deflagrationseal",
+                             "smokeinterlock", "ventfan", "offgasfan",
+                             "firerelease", "arcflash",
+                             "aircon", "ems_ctrl", "thermalpanel", "deflagration",
+                             "louvre", "fire"}
+        _COOLANT_SKID_HOST_ROLES = {"coolingpump", "circpump", "condensatepump",
+                                     "expansiontank", "airfilter"}
+        _MOUNT_GAP_MM = 60.0     # surface-mount standoff off the host face
+        _HOST_ELIGIBLE_ROLES = _RACK_HOST_ROLES | _WALL_HOST_ROLES | _COOLANT_SKID_HOST_ROLES
 
-        # front row hugs the wall — unchanged.
+        # Split by HOST-ELIGIBILITY first (role-keyed, size-independent). Only a role
+        # with NO derivable host at all still falls back to the old size-keyed
+        # front/back pad placement — an honest fallback, never a silent drop.
+        _pad_hostable = [it for it in _pad_overflow if it[0] in _HOST_ELIGIBLE_ROLES]
+        _pad_remaining = [it for it in _pad_overflow if it[0] not in _HOST_ELIGIBLE_ROLES]
+        # host-less items keep the old size split: a real freestanding skid (≥
+        # BOP_SMALL_ITEM_MM, e.g. the chiller) fronts the wall; a genuinely small
+        # host-less accessory seeds the honest-fallback bucket below (never dropped).
+        _pad_front = [it for it in _pad_remaining if it[3] >= BOP_SMALL_ITEM_MM]
+        _pad_back = [it for it in _pad_remaining if it[3] < BOP_SMALL_ITEM_MM]
+
+        # front row hugs the wall — unchanged (only genuinely host-less freestanding
+        # skids, e.g. the liquid cooling chiller, ever reach this bucket now).
         pad_cursor_x = enc_x0 + cont_margin
         for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_front:
             cx = pad_cursor_x + w_mm / 2.0
@@ -11912,20 +11957,6 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             pad_cursor_x += w_mm + _bop_gap_mm(w_mm, depth_mm)
             _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
         _front_depth = max((it[2] for it in _pad_front), default=0.0)
-
-        # ROLE → HOST CLASS. Per-rack monitoring/heating/cooling hardware mounts ON
-        # the rack bank; duct/vent/fire penetration hardware mounts ON the container
-        # wall at the duct route; coolant-loop rotating equipment mounts BESIDE the
-        # coolant skid (chiller/aircon) it plumbs into.
-        _RACK_HOST_ROLES = {"rackheater", "dcisolator", "isolatorenclosure",
-                             "bmsslave", "coldplatemanifold", "coldplaterack",
-                             "coolantdistmanifold"}
-        _WALL_HOST_ROLES = {"hvacduct", "offgasduct", "deflagrationseal",
-                             "smokeinterlock", "ventfan", "offgasfan",
-                             "firerelease", "arcflash"}
-        _COOLANT_SKID_HOST_ROLES = {"coolingpump", "circpump", "condensatepump",
-                                     "expansiontank", "airfilter"}
-        _MOUNT_GAP_MM = 60.0     # surface-mount standoff off the host face
 
         # rack-bank host: the LAST rack row's front (+Y, outward-facing) face —
         # already the row nearest the exterior pad, so nothing moves far.
@@ -11944,12 +11975,15 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
         _role_wd = {it[0]: (it[3], it[2]) for it in list(bop_items) + list(_external_bop)}
         _skid_w = _role_wd.get(_skid_role, (1600.0, 1000.0))[0] if _skid_role else None
 
-        _still_pad = []           # no derivable host → honest fallback (below)
+        # seeded with the genuinely-small host-less items (_pad_back) so they are never
+        # silently dropped; the loop below extends it with any host-eligible item whose
+        # anchor prerequisite (racks present / cooling skid present) didn't hold.
+        _still_pad = list(_pad_back)
         _hosted_log = {"rack": [], "wall": [], "coolant skid": []}
         _rack_cursor_x = _rack_host_x0
         _wall_cursor_x = enc_x0 + cont_margin
         _skid_cursor = 0.0
-        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_back:
+        for role, part_or_none, depth_mm, w_mm, h_mm, rgb in _pad_hostable:
             if role in _RACK_HOST_ROLES and _rack_front_y is not None:
                 # a linear item (manifold/duct-stub) whose long axis is DEPTH would
                 # poke through the container wall if mounted with depth as the
@@ -11994,8 +12028,9 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
                 pad_cursor_x += w_mm + _bop_gap_mm(w_mm, depth_mm)
                 _pad_y1 = max(_pad_y1, cy + depth_mm / 2.0)
 
+        _n_hosted = sum(len(v) for v in _hosted_log.values())
         print(f"[univ][rackfarm] exterior pad BoP: {', '.join(it[0] for it in _pad_front)} (front row); "
-              f"{len(_pad_back) - len(_still_pad)} small accessories HOST-MOUNTED — "
+              f"{_n_hosted} accessories HOST-MOUNTED — "
               f"rack bank: {', '.join(_hosted_log['rack']) or '—'}; "
               f"container wall: {', '.join(_hosted_log['wall']) or '—'}; "
               f"coolant skid: {', '.join(_hosted_log['coolant skid']) or '—'}"
