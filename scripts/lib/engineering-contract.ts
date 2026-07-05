@@ -1409,11 +1409,64 @@ registerArchetype('bess', (brief: any) => {
   const costPerKwhGbp = usableKwhAchieved > 0 ? macroAssemblyTotal / usableKwhAchieved : null
   // Ceiling-implied £/kWh — the brief's OWN unit_cost_ceiling (£900k, whole
   // system) divided by the ACHIEVED usable kWh. This is the scope-consistent
-  // comparator for costPerKwhGbp (both are whole-system-flavoured, even
-  // though macroAssemblyTotal is a partial BoM) — closer to apples-to-apples
-  // than comparing against the battery-only £63/kWh anchor.
+  // comparator for the FULL-SYSTEM flavour of costPerKwhGbp (both are whole-
+  // system-flavoured, even though macroAssemblyTotal is a partial BoM).
   const unitCostCeilingGbp = Number(brief?.constraints?.unit_cost_ceiling?.value ?? 0)
   const ceilingImpliedGbpPerKwh = unitCostCeilingGbp > 0 && usableKwhAchieved > 0 ? unitCostCeilingGbp / usableKwhAchieved : null
+
+  // BESS WAVE C addendum 7 (2026-07-05, cost_per_kwh_closure SCOPE FIX) —
+  // Tristan/council finding: comparing the FULL macroAssemblyTotal (which
+  // INCLUDES the PCS) against the ceiling-implied £/kWh NEVER actually tests
+  // the brief's own named cost target ("Cost target for battery container
+  // only (excluding PCS/MV) is £315,000 / £63 per kWh") — it silently
+  // substitutes a laxer whole-system comparator instead. On a real run this
+  // hides a genuine ~2.3x battery-only cost overrun (£147/kWh vs the £63/kWh
+  // anchor) behind a mild 1.10x "warn" against the ceiling. Per CORE FIX
+  // PRINCIPLE this is fixed at the SOURCE by deriving BOTH scopes so the
+  // brief's actual named anchor is confronted directly, never softened:
+  //   1. battery_only_cost_per_kwh_gbp — the SAME word set the brief itself
+  //      scopes into "the battery container" (cells, enclosure, BMS,
+  //      cooling, DC distribution/protection — i.e. every macro_assembly_
+  //      prices line EXCEPT pcs_inverter), ÷ NAMEPLATE kWh (matching the
+  //      brief's own derivation: £315,000 / 5,000 kWh nameplate = £63/kWh —
+  //      not usable kWh). Compared against the anchor PARSED from the
+  //      brief's own text (never hardcoded 63 — a different brief's anchor
+  //      must drive this, or the closure refuses to fabricate one).
+  //   2. cost_per_kwh_gbp (unchanged formula, full macro total incl. PCS ÷
+  //      usable kWh) is RENAMED IN MEANING to the full-system-flavoured
+  //      figure, kept and compared against the ceiling-implied £/kWh as
+  //      before — but now under its OWN closure id with an explicit "partial
+  //      BoM, not scope-complete" caveat, never conflated with the brief's
+  //      headline anchor.
+  // Both closures independently PROVE they catch a genuine blowout in their
+  // own scope (src/lib/__tests__/engineering-contract-bess-wave-c.test.ts).
+  const batteryOnlyAssemblyTotal = macro_assembly_prices
+    .filter((m) => m.word_name !== 'pcs_inverter')
+    .reduce((a, m) => a + m.total_gbp, 0)
+  const batteryOnlyCostPerKwhGbp = nameplateKwh > 0 ? batteryOnlyAssemblyTotal / nameplateKwh : null
+  // Parse the brief's OWN battery-container-only £/kWh anchor from its prose
+  // (additional_constraints[] descriptions, falling back to original_text) —
+  // e.g. "Cost target for battery container only (excluding PCS/MV) is
+  // £315,000 / £63 per kWh". Never hardcoded: a brief without this anchor
+  // text yields null and the closure below refuses to fabricate a target.
+  const batteryOnlyAnchorGbpPerKwh = ((): number | null => {
+    const texts: string[] = []
+    const ac = brief?.constraints?.additional_constraints
+    if (Array.isArray(ac)) {
+      for (const a of ac) if (a?.description) texts.push(String(a.description))
+    }
+    if (brief?.original_text) texts.push(String(brief.original_text))
+    for (const t of texts) {
+      const m =
+        t.match(/batter(?:y|ies)[^.]*?(?:container\s+only|only)[^.]*?£\s*([\d,.]+)\s*per\s*kwh/i) ??
+        t.match(/£\s*([\d,.]+)\s*per\s*kwh[^.]*?batter(?:y|ies)/i)
+      if (m) {
+        const v = parseFloat(m[1].replace(/,/g, ''))
+        if (v > 0) return v
+      }
+    }
+    return null
+  })()
 
   if (roundTripEfficiencyPercent !== null) {
     quantities.round_trip_efficiency_percent = q(
@@ -1435,14 +1488,30 @@ registerArchetype('bess', (brief: any) => {
       costPerKwhGbp, 'GBP/kWh', 'currency', 'gross', 'system', 'calculator',
       {
         source_detail:
-          `macro-assembly BoM estimate £${macroAssemblyTotal.toLocaleString('en-GB')} (cells + PCS + container + BMS + liquid ` +
-          `cooling + main bus contactor — see macro_assembly_prices; EXCLUDES step-up transformer, MV switchgear, structural ` +
-          `racks, per-rack protection; pre-distributor-priced ESTIMATE, reconciles against the final costed BoM downstream) ÷ ` +
-          `${usableKwhAchieved.toFixed(0)} kWh usable achieved = £${costPerKwhGbp.toFixed(0)}/kWh. Brief scope note: the £63/kWh ` +
-          `target is for the battery-container-only portion (excludes PCS/transformer/switchgear per brief §"SCOPE OF THIS ` +
-          `CONTAINER"); this estimate includes a bare PCS price so is NOT scope-matched to that anchor. Ceiling-implied £/kWh ` +
+          `FULL-SYSTEM-flavoured figure (NOT the brief's headline battery-only anchor — see ` +
+          `battery_only_cost_per_kwh_gbp for that scope-matched comparison): macro-assembly BoM estimate ` +
+          `£${macroAssemblyTotal.toLocaleString('en-GB')} (cells + PCS + container + BMS + liquid cooling + main bus ` +
+          `contactor — see macro_assembly_prices; EXCLUDES step-up transformer, MV switchgear, structural racks, ` +
+          `per-rack protection; pre-distributor-priced ESTIMATE, reconciles against the final costed BoM downstream) ÷ ` +
+          `${usableKwhAchieved.toFixed(0)} kWh usable achieved = £${costPerKwhGbp.toFixed(0)}/kWh. Ceiling-implied £/kWh ` +
           `(£${unitCostCeilingGbp.toLocaleString('en-GB')} unit_cost_ceiling ÷ usable kWh) = ` +
-          `${ceilingImpliedGbpPerKwh !== null ? `£${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh` : 'n/a'} — the scope-consistent comparator.`,
+          `${ceilingImpliedGbpPerKwh !== null ? `£${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh` : 'n/a'} — the scope-consistent ` +
+          `comparator for THIS figure (see full_system_cost_per_kwh_closure).`,
+      },
+    )
+  }
+  if (batteryOnlyCostPerKwhGbp !== null) {
+    quantities.battery_only_cost_per_kwh_gbp = q(
+      batteryOnlyCostPerKwhGbp, 'GBP/kWh', 'currency', 'gross', 'system', 'calculator',
+      {
+        source_detail:
+          `SCOPE-MATCHED to the brief's own battery-container-only cost anchor: £${batteryOnlyAssemblyTotal.toLocaleString('en-GB')} ` +
+          `(every macro_assembly_prices line EXCEPT pcs_inverter — cells + container + BMS master + BMS slaves + liquid ` +
+          `cooling + main bus contactor, i.e. exactly the brief §"SCOPE OF THIS CONTAINER" word set: cells, modules, ` +
+          `racks, battery management, liquid-cooling, DC distribution/protection) ÷ ${nameplateKwh.toFixed(0)} kWh ` +
+          `nameplate = £${batteryOnlyCostPerKwhGbp.toFixed(0)}/kWh. Nameplate (not usable) kWh is the denominator because ` +
+          `the brief derives its own £63/kWh anchor from £315,000 / 5,000 kWh NAMEPLATE. Anchor ` +
+          `${batteryOnlyAnchorGbpPerKwh !== null ? `£${batteryOnlyAnchorGbpPerKwh}/kWh (parsed from the brief's own cost-anchor text)` : 'not found in this brief — no fabricated target'}.`,
       },
     )
   }
@@ -1457,14 +1526,39 @@ registerArchetype('bess', (brief: any) => {
       reason: `Delivered round-trip efficiency ${roundTripEfficiencyPercent.toFixed(1)}% (cell RTE × PCS efficiency² × aux-load factor) vs brief floor ${rteTargetPct}%.`,
     })
   }
-  if (costPerKwhGbp !== null && ceilingImpliedGbpPerKwh !== null) {
-    const ratio = costPerKwhGbp / ceilingImpliedGbpPerKwh
+  // cost_per_kwh_closure — the brief's HEADLINE named cost target (battery-
+  // container-only, £N/kWh) vs the SCOPE-MATCHED battery-only rollup.
+  // Genuine over/under (proveCatch: a battery-only actual that blows past the
+  // anchor) still fails — this closure never softens by comparing against a
+  // laxer whole-system figure. Refuses (no closure) when the brief carries no
+  // parseable battery-only anchor — never fabricates a target.
+  if (batteryOnlyCostPerKwhGbp !== null && batteryOnlyAnchorGbpPerKwh !== null) {
+    const ratio = batteryOnlyCostPerKwhGbp / batteryOnlyAnchorGbpPerKwh
     closures.push({
       invariant_id: 'cost_per_kwh_closure',
       status: ratio <= 1.0 ? 'pass' : ratio <= 1.15 ? 'warn' : 'fail',
+      measured: quantities.battery_only_cost_per_kwh_gbp,
+      required: { value: batteryOnlyAnchorGbpPerKwh, unit: 'GBP/kWh', basis: 'max', source_detail: 'brief battery-container-only cost anchor (parsed from brief text)' } as any,
+      reason: `Battery-only rollup £${batteryOnlyCostPerKwhGbp.toFixed(0)}/kWh (cells + enclosure + BMS + cooling + DC ` +
+        `distribution ÷ nameplate kWh) vs the brief's own battery-container-only anchor £${batteryOnlyAnchorGbpPerKwh}/kWh ` +
+        `(ratio ${ratio.toFixed(2)}). Scope-matched to brief §"SCOPE OF THIS CONTAINER" — PCS/transformer/switchgear ` +
+        `excluded from both sides, per the brief's own cost-anchor derivation.`,
+    })
+  }
+  // full_system_cost_per_kwh_closure — the SEPARATE full-system-flavoured
+  // comparison (kept from the pre-addendum-7 closure, unchanged formula),
+  // with its own honest caveat that macro_assembly_prices is a partial BoM
+  // (excludes transformer/switchgear/racks) — a directional cost-trend check
+  // against the brief's ceiling, never conflated with the battery-only
+  // headline anchor above.
+  if (costPerKwhGbp !== null && ceilingImpliedGbpPerKwh !== null) {
+    const ratio = costPerKwhGbp / ceilingImpliedGbpPerKwh
+    closures.push({
+      invariant_id: 'full_system_cost_per_kwh_closure',
+      status: ratio <= 1.0 ? 'pass' : ratio <= 1.15 ? 'warn' : 'fail',
       measured: quantities.cost_per_kwh_gbp,
       required: { value: ceilingImpliedGbpPerKwh, unit: 'GBP/kWh', basis: 'max', source_detail: 'unit_cost_ceiling / usable_capacity_kwh_achieved' } as any,
-      reason: `Macro-assembly estimate £${costPerKwhGbp.toFixed(0)}/kWh vs ceiling-implied £${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh (ratio ${ratio.toFixed(2)}). NOTE: macro_assembly_prices is a PARTIAL BoM (excludes transformer/switchgear/racks) — this is a directional cost-trend check, not the final priced-BoM reconciliation.`,
+      reason: `Macro-assembly estimate £${costPerKwhGbp.toFixed(0)}/kWh vs ceiling-implied £${ceilingImpliedGbpPerKwh.toFixed(0)}/kWh (ratio ${ratio.toFixed(2)}). NOTE: macro_assembly_prices is a PARTIAL BoM (excludes transformer/switchgear/racks) — this is a directional cost-trend check, not the final priced-BoM reconciliation, and NOT the brief's battery-only headline anchor (see cost_per_kwh_closure).`,
     })
   }
 

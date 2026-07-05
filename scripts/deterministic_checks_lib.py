@@ -736,6 +736,58 @@ _CATALOGUE_PIN_BASIS_RE = re.compile(
 _DB_PIN_QUOTE_RE = re.compile(r"\(db:[^)]*?£\s*([\d,]+(?:\.\d+)?)", re.I)
 
 
+# UNIT-BASIS RECONCILIATION (2026-07-05, X-6 CLI PARITY fix) — mirrors
+# scripts/lib/per-line-price-plausibility-audit.ts::reconcileUnitBasis (gate 21)
+# AND scripts/build-excel-export.py::_reconcile_unit_basis_gbp EXACTLY, so the
+# live TS gate, the workbook's Checks tab, and this CLI can never disagree.
+# Gate 21 downgrades a die-cut/cut-length PIECE priced against a distributor's
+# whole-STOCK unit (Bergquist GP3000S30 gasket pad £2.50/cell vs its £56.48
+# stock-sheet distributor price — X-6) from HIGH to a non-blocking note; the
+# workbook mirrors that as "RECONCILED — unit-basis (non-blocking)". Before
+# this fix the CLI had NO such reconciliation and hard-FAILed the identical
+# numbers gate 21 no longer blocks on (the X-6 CLI PARITY gap). NEVER excuses
+# the OVER direction, and never fires for a non-piece-of-stock noun — a
+# genuine mispriced principal (INV-4: a £181 PCS vs its £75,000 distributor
+# reference) is not this SHAPE and stays caught. KEEP THIS FUNCTION BYTE-
+# IDENTICAL to build-excel-export.py's copy of the same name.
+_PIECE_OF_STOCK_RX = re.compile(
+    r"\b(pads?|gaskets?|shims?|labels?|seals?|die[- ]?cut|decals?|stickers?|tapes?|foils?|"
+    r"films?|liners?|membranes?|wires?|cables?|tub(?:e|es|ing)|hoses?|sleev(?:e|es|ing)|"
+    r"heat[- ]?shrink|braid(?:ed|ing)?|cords?|lacing|webbing|per[- ]?met(?:re|er))\b",
+    re.I)
+_UNIT_BASIS_YIELD_MIN = 2
+_UNIT_BASIS_YIELD_MAX = 500
+
+
+def _reconcile_unit_basis_gbp(word_name, bom_unit_price_gbp, distributor_best_gbp
+                              ) -> Tuple[bool, Optional[int], Optional[str]]:
+    """Pure + deterministic. Returns (applied, implied_yield, note). Applied ONLY when
+    (a) the item name is a piece-of-stock noun family, (b) the BoM price is BELOW the
+    reference (the over direction is never excused), and (c) some integer yield in
+    [2, 500] lands piece_price × yield within [0.5x, 2x] of the reference price."""
+    try:
+        bom_p = float(bom_unit_price_gbp)
+        ref_p = float(distributor_best_gbp)
+    except (TypeError, ValueError):
+        return False, None, None
+    if not (bom_p > 0 and ref_p > 0):
+        return False, None, None
+    if bom_p >= ref_p:
+        return False, None, None          # (c) the over direction is NEVER excused
+    if not _PIECE_OF_STOCK_RX.search(str(word_name or "")):
+        return False, None, None          # (a) piece-of-stock noun family only
+    implied_yield = ref_p / bom_p
+    y_lo = max(_UNIT_BASIS_YIELD_MIN, math.ceil(0.5 * implied_yield))
+    y_hi = min(_UNIT_BASIS_YIELD_MAX, math.floor(2 * implied_yield))
+    if y_lo > y_hi:
+        return False, None, None          # (b) no plausible integer yield lands in-band
+    rounded = round(implied_yield)
+    note = (f"unit-basis reconciliation: per-piece £{bom_p:,.2f} vs stock unit "
+            f"£{ref_p:,.2f} — implied yield ~{rounded}, unit-basis differs; "
+            f"verify die-cut/cut-length yield (mirrors gate 21 reconcileUnitBasis)")
+    return True, rounded, note
+
+
 def _own_catalogue_quote(pv: dict, basis: str) -> Tuple[Optional[float], str]:
     """The catalogue-pinned row's OWN quote to band against (codema v60 I-104):
     (1) a £ figure the basis itself embeds ('distributor catalogue (db:mouser £45.68)');
@@ -832,11 +884,27 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
                 out_of_band = (ratio > COST_BAND_FACTOR
                                or ratio < (1.0 / COST_BAND_FACTOR))
         bad = (not exempt) and out_of_band
+        # UNIT-BASIS RECONCILIATION (X-6 CLI PARITY, 2026-07-05) — engages ONLY
+        # where the band would otherwise FIRE, same idiom as the catalogue-pin
+        # re-band above: a piece-of-stock line under-priced by a plausible
+        # die-cut/cut-length yield of its reference is the SAME false-defect
+        # gate 21 downgrades, not an independent CLI hard-FAIL. Genuine
+        # mispricing (a non-piece-of-stock noun, or the OVER direction — INV-4's
+        # £181-vs-£75,000 PCS) is NEVER excused and stays a hard FAIL — proven
+        # by the XVAL selftest below.
+        recon_applied = False
+        recon_note = None
+        if bad:
+            _item_name = f"{row.get('part') or ''} {row.get('requirement') or ''}".strip()
+            recon_applied, _recon_yield, recon_note = _reconcile_unit_basis_gbp(
+                _item_name, unit_p, ref)
+            if recon_applied:
+                bad = False
         out.append(Check(
             name=f"BoM {tag}: unit price within x{COST_BAND_FACTOR:g} of {ref_src}",
             category="COST", relation="eq",
             status=FAIL if bad else PASS,
-            actual=unit_p, expected=(unit_p if exempt else ref), tol=0.0, unit="GBP",
+            actual=unit_p, expected=(unit_p if (exempt or recon_applied) else ref), tol=0.0, unit="GBP",
             producer=f"cost:{tag}:ref",
             detail=(f"{tag} ({pv.get('manufacturer','?')} {pv.get('part_number','?')}): "
                     + (f"price GROUNDED to the market band (£{unit_p:,.0f}); the pre-grounding "
@@ -846,8 +914,9 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
                              f"basis: {basis[:80]}); the parametric {ref_src} £{ref:,.0f} was "
                              f"rejected/superseded by that correction — banding against it is "
                              f"self-contradictory." if exempt
+                             else (f"RECONCILED — unit-basis (non-blocking): {recon_note}" if recon_applied
                              else f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} = x{ratio:.1f}. "
-                             f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}."))),
+                             f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}.")))),
         ))
 
     # --- COST2. Sigma BoM line_gbp == cover / grand total ---
@@ -2013,6 +2082,33 @@ def _selftest() -> int:
              "line_gbp": 46, "requirement": "Lever connector",
              "basis": "distributor catalogue (db:mouser £45.68) — supersedes parametric "
                       "estimate £420.00"},
+            # UNIT-BASIS RECONCILIATION proveCatches (X-6 CLI PARITY, 2026-07-05) — the
+            # exact Bergquist GP3000S30 numbers cited throughout this codebase: a
+            # die-cut per-piece price banded against the distributor's whole-STOCK-
+            # SHEET price → reconciled (non-blocking), never a hard FAIL.
+            {"tag": "X-6", "part": "Bergquist GP3000S30", "qty": 1, "unit_gbp": 2.50,
+             "line_gbp": 2.50, "requirement": "cell insulation pad", "basis": "catalogue"},
+            # SAME piece-of-stock noun + SAME pv, OVER direction (£420 vs £56.48) — the
+            # over direction is NEVER excused, must stay FAIL.
+            {"tag": "X-6B", "part": "Bergquist GP3000S30", "qty": 1, "unit_gbp": 420,
+             "line_gbp": 420, "requirement": "cell insulation pad (over-direction)",
+             "basis": "catalogue"},
+            # Piece-of-stock noun but an implied yield >500 (5,648x) is not a credible
+            # unit-basis artefact — must stay caught.
+            {"tag": "X-6C", "part": "Generic LABELR001", "qty": 1, "unit_gbp": 0.01,
+             "line_gbp": 0.01, "requirement": "adhesive label", "basis": "catalogue"},
+            # Cut-from-reel family (wire per metre vs per reel) — must reconcile.
+            {"tag": "X-6D", "part": "Generic WIREROLL01", "qty": 1, "unit_gbp": 3,
+             "line_gbp": 3, "requirement": "control wire (per metre)", "basis": "catalogue"},
+            # Out-of-band piece-of-stock under-bill with a plausible yield — must still
+            # reconcile even though it is well outside the plain x5 band.
+            {"tag": "X-6E", "part": "Generic GASKET001", "qty": 1, "unit_gbp": 14,
+             "line_gbp": 14, "requirement": "door gasket", "basis": "catalogue"},
+            # INV-4 SHAPE, second instance (non-piece-of-stock noun, £30-vs-£3,000 under-
+            # bill) — confirms the reconciliation never fires for a principal component,
+            # only for X-6-shaped consumables.
+            {"tag": "X-6F", "part": "Generic INVERTER01", "qty": 1, "unit_gbp": 30,
+             "line_gbp": 30, "requirement": "string inverter", "basis": "catalogue"},
         ],
         "partVerifications": [
             {"word_id": "a", "word_name": "DC switch disconnector", "manufacturer": "ABB",
@@ -2032,6 +2128,16 @@ def _selftest() -> int:
              "engine_b_reference_unit_cost_gbp": 75.75},
             {"word_id": "f", "word_name": "Lever connector", "manufacturer": "Wago",
              "part_number": "221-TEST-415", "price_estimate_gbp": 420},
+            {"word_id": "g", "word_name": "cell insulation pad", "manufacturer": "Bergquist",
+             "part_number": "GP3000S30", "distributor_price_gbp": 56.48},
+            {"word_id": "i", "word_name": "adhesive label", "manufacturer": "Generic",
+             "part_number": "LABELR001", "distributor_price_gbp": 56.48},
+            {"word_id": "j", "word_name": "control wire", "manufacturer": "Generic",
+             "part_number": "WIREROLL01", "distributor_price_gbp": 60},
+            {"word_id": "k", "word_name": "door gasket", "manufacturer": "Generic",
+             "part_number": "GASKET001", "distributor_price_gbp": 100},
+            {"word_id": "l", "word_name": "string inverter", "manufacturer": "Generic",
+             "part_number": "INVERTER01", "distributor_price_gbp": 3000},
         ],
     }
     # tool claims: the WRONG declared output_field must not trump an exact same-name
@@ -2046,7 +2152,7 @@ def _selftest() -> int:
              "output_field": "system_thermal_dissipation_kw"},
         ]}]}
     xv_ledger = {
-        "grand_total_gbp": 4133,  # Σ line_gbp: 430+181+900+76+2500+46
+        "grand_total_gbp": 4602.51,  # Σ line_gbp: 430+181+900+76+2500+46+2.50+420+0.01+3+14+30
         "connectivity": {"n_process_total": 2, "n_process_connected": 2,
                          "n_instrument_total": 1, "n_instrument_associated": 1,
                          "n_concerns": 0},
@@ -2083,6 +2189,26 @@ def _selftest() -> int:
         check(_has(checks, "BoM V-1: unit price", PASS),
               "CATALOGUE-PIN: a 'distributor catalogue (db:…£N)' basis must band against "
               "the quote it EMBEDS, not the superseded parametric estimate (PASS)")
+        # UNIT-BASIS RECONCILIATION proveCatches (X-6 CLI PARITY, 2026-07-05) — the CLI
+        # must now agree with the workbook + live TS gate 21 on the SAME shapes.
+        check(_has(checks, "BoM X-6: unit price", PASS),
+              "X-6 CLI PARITY: the Bergquist GP3000S30 die-cut-pad-vs-stock-sheet shape "
+              "(£2.50 vs £56.48) must RECONCILE (PASS), matching gate 21 + the workbook")
+        check(_has(checks, "BoM X-6B: unit price", FAIL),
+              "X-6 CLI PARITY: the SAME piece-of-stock noun in the OVER direction "
+              "(£420 vs £56.48) must NEVER be excused — stays FAIL")
+        check(_has(checks, "BoM X-6C: unit price", FAIL),
+              "X-6 CLI PARITY: a piece-of-stock noun with an implied yield >500 "
+              "(5,648x) is not a credible unit-basis artefact — must stay FAIL")
+        check(_has(checks, "BoM X-6D: unit price", PASS),
+              "X-6 CLI PARITY: a cut-from-reel family (wire per metre vs per reel, "
+              "yield 20) must RECONCILE (PASS)")
+        check(_has(checks, "BoM X-6E: unit price", PASS),
+              "X-6 CLI PARITY: an out-of-band piece-of-stock under-bill with a "
+              "plausible yield (door gasket, yield 7) must still RECONCILE (PASS)")
+        check(_has(checks, "BoM X-6F: unit price", FAIL),
+              "X-6 CLI PARITY / INV-4 SHAPE: a non-piece-of-stock principal (string "
+              "inverter, £30 vs £3,000) must NEVER reconcile — genuine under-bill stays FAIL")
         check(_has(checks, "Tool output used: cell_heat_generation_kw", PASS),
               "XVAL PROVENANCE: an exact same-name contract match (45.1==45.1) must PASS even "
               "when the claim's declared output_field points at a different quantity")

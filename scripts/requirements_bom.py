@@ -2503,6 +2503,85 @@ def _selftest() -> int:
         if _got_fires != _want_fires:
             print(f"  FAIL _INTERNAL_FAN_TRAY_RE.search({_name!r}) → {_got_fires} (want {_want_fires})"); bad += 1
 
+    # ── FAMILY COHERENCE / FIELD-SWAP GUARD proveCatch (2026-07-05, INV-4 reproduced
+    # fresh on out/bess-campaign-v3): "PCS cooling fan tray" carried modifier_characters
+    # manufacturer=Sungrow / part_number=SC1000UD-MV — the PARENT 1 MW PCS's OWN
+    # catalogue identity, silently copied — while its independently-researched
+    # partVerification correctly found a distinct accessory PN (A01-FAN-SC1000). The
+    # copied identity false-joined the £28 accessory to the parent's £75,000
+    # partVerification in the cost-band check (x2,679 false FAIL). End-to-end via the
+    # real assemble() path — both the fix AND its scope boundaries.
+    import tempfile as _fs_tf
+    with _fs_tf.TemporaryDirectory() as _fd:
+        _fwords = [
+            {"id": "pcs_parent_word", "name_human": "PCS inverter 1 MW bidirectional",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Sungrow"},
+                 {"kind": "part_number", "value": "SC1000UD-MV"},
+             ]},
+            # FIELD-SWAP shape: accessory copies the parent's exact identity.
+            {"id": "pcs_fan_tray_word", "name_human": "PCS cooling fan tray",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "80", "unit": "W"},
+                 {"kind": "manufacturer", "value": "Sungrow"},
+                 {"kind": "part_number", "value": "SC1000UD-MV"},
+             ]},
+            # CONTROL — same accessory shape, but no field-swap (its own pv_pn matches
+            # its modifier pn): must render byte-identically, never spuriously changed.
+            {"id": "module_fan_tray_word", "name_human": "module cooling fan tray",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "60", "unit": "W"},
+                 {"kind": "manufacturer", "value": "Sanyo Denki"},
+                 {"kind": "part_number", "value": "SF-9WNS"},
+             ]},
+            # SCOPE BOUNDARY — a "fan tray" rated in the STANDALONE-unit range (kW, not
+            # sub-1000 W) with a mismatched pv_pn must be UNAFFECTED (the rating check,
+            # same one the price-side guard already uses, must still gate this fix).
+            {"id": "big_fan_tray_word", "name_human": "exhaust cooling fan tray",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "rating_primary", "value": "5", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "Sungrow"},
+                 {"kind": "part_number", "value": "SC1000UD-MV"},
+             ]},
+        ]
+        _fpvs = [
+            {"word_id": "pcs_parent_word", "manufacturer": "Sungrow", "part_number": "SC1000UD-MV",
+             "price_estimate_gbp": 75000, "distributor_price_gbp": 75000},
+            {"word_id": "pcs_fan_tray_word", "manufacturer": "Sungrow", "part_number": "A01-FAN-SC1000",
+             "price_estimate_gbp": 28},
+            {"word_id": "module_fan_tray_word", "manufacturer": "Sanyo Denki", "part_number": "SF-9WNS",
+             "price_estimate_gbp": 19},
+            {"word_id": "big_fan_tray_word", "manufacturer": "Sungrow", "part_number": "OTHER-PN-123",
+             "price_estimate_gbp": 4500},
+        ]
+        json.dump({"moduleDecomposition": {"modules": [{"sub_modules": [{"words": _fwords}]}]},
+                   "partVerifications": _fpvs}, open(os.path.join(_fd, "state.json"), "w"))
+        _frows = assemble(_fd)
+        _by_req = {r["requirement"].split(" · ")[0]: r for r in _frows}
+        _parent = _by_req.get("PCS inverter 1 MW bidirectional")
+        _fan = _by_req.get("PCS cooling fan tray")
+        _ctrl = _by_req.get("module cooling fan tray")
+        _big = _by_req.get("exhaust cooling fan tray")
+        if not _fan or _fan["part"] != "Sungrow A01-FAN-SC1000":
+            print(f"  FAIL INV-4 field-swap guard: fan tray part = {_fan and _fan['part']!r} "
+                  f"(want 'Sungrow A01-FAN-SC1000')"); bad += 1
+        if not _fan or _fan["unit_gbp"] != 28:
+            print(f"  FAIL INV-4 field-swap guard: fan tray price changed to "
+                  f"{_fan and _fan['unit_gbp']} (want 28, unaffected by the identity fix)"); bad += 1
+        if not _parent or _parent["part"] != "Sungrow SC1000UD-MV":
+            print(f"  FAIL INV-4 field-swap guard: the PARENT's own row must stay untouched "
+                  f"({_parent and _parent['part']!r})"); bad += 1
+        if not _ctrl or _ctrl["part"] != "Sanyo Denki SF-9WNS":
+            print(f"  FAIL INV-4 field-swap guard: a non-swapped accessory must render "
+                  f"byte-identically ({_ctrl and _ctrl['part']!r})"); bad += 1
+        if not _big or _big["part"] != "Sungrow SC1000UD-MV":
+            print(f"  FAIL INV-4 field-swap guard: a kW-rated 'fan tray' (standalone-unit scale) "
+                  f"must be OUT OF SCOPE for the accessory override ({_big and _big['part']!r})"); bad += 1
+
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
     # recirculation flow / DN300 / 316L. The schedule blanket-tags every water edge
@@ -4870,6 +4949,30 @@ def assemble(out_dir: str):
                 # ── FULFILMENT + COST/BASIS ──
                 pn = str(md.get("part_number") or "")
                 mfr = str(md.get("manufacturer") or "")
+                # FAMILY COHERENCE / FIELD-SWAP GUARD (2026-07-05, INV-4 reproduced fresh on
+                # out/bess-campaign-v3) — an INTERNAL ACCESSORY (a "fan tray", sub-1000 W; see
+                # _INTERNAL_FAN_TRAY_RE's docstring for the same corpus-mismatch family this
+                # mirrors) can be authored with its PARENT ASSEMBLY's own manufacturer+part_number
+                # copied onto its modifier_characters — e.g. "PCS cooling fan tray" carrying
+                # part_number=SC1000UD-MV, the 1 MW PCS's OWN catalogue identity — while its
+                # independently-researched partVerification (`pv_pn`, a SEPARATE per-word_id
+                # lookup, never copied from the parent) correctly found a DISTINCT accessory PN
+                # (A01-FAN-SC1000). Rendering the copied PN as this row's `part` string
+                # (`f"{mfr} {pn}"` below) false-JOINS this row to the PARENT's partVerification in
+                # the downstream cost-band check (deterministic_checks_lib._match_partverification_
+                # by_mpn matches by mfr+pn SUBSTRING, not word identity) — banding an honest £28
+                # accessory price against the parent's £75,000 principal price, a spurious
+                # ~x2,679 under-bill FAIL. Fix at SOURCE (never mask downstream in the checker):
+                # for this narrow, already-guarded shape, prefer the word's OWN independently-
+                # researched partVerification identity over its (possibly copied) modifier PN
+                # whenever the two disagree — the PV lookup is a fresh call per word_id and
+                # cannot inherit a sibling's identity by construction, so it is the more
+                # trustworthy source for exactly this family. proveCatch in `_selftest`.
+                if (_INTERNAL_FAN_TRAY_RE.search(name)
+                        and re.search(r"\b\d{1,3}\s*w\b", requirement, re.I)):
+                    _own_pv_pn = str(pv_pn.get(wid) or "").strip()
+                    if _own_pv_pn and _own_pv_pn.upper() != pn.strip().upper():
+                        pn = _own_pv_pn
                 qy = int((re.search(r"\d+", str(md.get("quantity") or "1")) or re.search(r"(1)", "1")).group(0))
                 # ── FIELD INSTRUMENT (synthesizeInstrumentation #140): a level / temp /
                 # pressure / DO / pH / conductivity transmitter measuring a contract-declared
