@@ -49,6 +49,13 @@ run "render-vision rot-test (skip offline)"     "$PY" scripts/lib/render_vision_
 run "emitter mis-pin guards"                      npx tsx scripts/lib/emitter-mispin-selftest.ts
 run "render service-coherence guard"             "$PY" scripts/blender-universal/service_coherence_selftest.py
 run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --selftest
+# EXCEL-STRICT OOXML validator (2026-07-05) — catches the class of defect LibreOffice
+# (our only prior verifier) silently tolerates: Tristan opened bess-campaign-v3's
+# dossier.xlsx in real Excel for Mac and got a "we found a problem with some content"
+# repair prompt. proveCatch: a synthetic fixture reproducing the LibreOffice-recalc
+# duplicate-VML-id defect (byte-identical pattern to the real BESS + Codema output)
+# must fire HIGH; a clean fixture must be silent.
+run "ooxml_strict_check.py --selftest"       "$PY" scripts/lib/ooxml_strict_check.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
 # TOOL WRAPPERS — worked[] emission + one-mint kVA alignment + honest-absent cert cost (2026-07-03)

@@ -74,7 +74,7 @@ import deterministic_checks_lib as dcl  # noqa: E402
 # path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 from dossier_audit import (audit_dossier, tab_scores, tab_scorecard_summary,  # noqa: E402
-                           _physics_high_is_design_defect)
+                           _physics_high_is_design_defect, _TAG_PREFIX_OVERRIDES)
 from dossier_repair import repair_dossier  # noqa: E402
 
 # The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
@@ -10169,6 +10169,44 @@ _GLOSSARY: List[tuple] = [
 ]
 
 
+def _generative_tag_prefix_entries(state: dict) -> List[Tuple[str, str]]:
+    """GENERATIVE tag-prefix glossary (2026-07-05, the BESS 18-missing-prefix fix — see the
+    matching comment in dossier_audit.py::check_glossary, the ONE source of truth this
+    mirrors). Every tag-prefix the bill uses that isn't already covered by a curated
+    `_GLOSSARY` category gets a real definition here: the CURATED override's canonical
+    expansion when the abbreviation is an acronym (BMS, PCS, …), else the ledger's own
+    first-occurrence part name — a genuine citation to the engine's own data, never an
+    invented formula/definition. A brand-new archetype's fresh tag families self-document
+    without a manual glossary edit; `check_glossary` accepts the IDENTICAL derivation so
+    the render and the check can never disagree."""
+    rows = [r for r in (state.get("requirementsBom") or []) if isinstance(r, dict)]
+    first_by_prefix: Dict[str, str] = {}
+    for r in rows:
+        raw = str(r.get("tag") or "").strip()
+        m = re.match(r"^([A-Z]{1,4})-?\d", raw)
+        if not m:
+            continue
+        pref = m.group(1)
+        if pref not in first_by_prefix:
+            name = str(r.get("requirement") or r.get("part") or "").split("·")[0].strip()
+            if name:
+                first_by_prefix[pref] = name
+    _known = {str(t).split("(")[0].strip().upper()
+              for _cat, entries in _GLOSSARY for t, _m in entries}
+    out: List[Tuple[str, str]] = []
+    for pref, name in sorted(first_by_prefix.items()):
+        if pref.upper() in _known:
+            continue
+        canon = _TAG_PREFIX_OVERRIDES.get(pref)
+        if canon:
+            meaning = f"{canon} — tag prefix for this equipment family (e.g. '{name}', {pref}-101 …)."
+        else:
+            meaning = (f"Tag prefix for '{name}' and its numbered siblings ({pref}-101, {pref}-102, "
+                       f"…) — self-documented from the bill of materials' own first occurrence.")
+        out.append((f"{pref} (tag)", meaning))
+    return out
+
+
 def _workbook_text_blob(wb: Workbook, exclude: str = "") -> str:
     """Lower-cased concatenation of every string cell on every sheet except `exclude` —
     the usage corpus for the glossary term matcher."""
@@ -10218,6 +10256,15 @@ def tab_glossary(wb: Workbook, state: dict) -> bool:
     _blob = _workbook_text_blob(wb, exclude="Glossary")
     _gloss = [(cat, [(t, m) for (t, m) in entries if _term_used_in(t, _blob)])
               for cat, entries in _GLOSSARY]
+    # GENERATIVE tag-prefix category (2026-07-05) — any BoM tag-prefix not already in a
+    # curated _GLOSSARY entry self-documents from the ledger's own data (see
+    # _generative_tag_prefix_entries). Appended as its own category so the curated groups
+    # above stay hand-authored prose; the SAME orphan filter applies (a generated entry for
+    # a prefix that ends up unused anywhere else in the workbook is dropped, same as any
+    # other term) — never rendered as a false 'documented' claim.
+    _generated = [(t, m) for (t, m) in _generative_tag_prefix_entries(state) if _term_used_in(t, _blob)]
+    if _generated:
+        _gloss.append(("Tag-prefix families (self-documented from the bill of materials)", _generated))
     _gloss = [(cat, entries) for cat, entries in _gloss if entries]
     r = 4
     for category, entries in _gloss:
@@ -15394,13 +15441,22 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
                     _f = _c.get("output_field") or _c.get("field") or _c.get("label")
                     if _f:
                         _worked.add(str(_f).lower())
+    # CITED-MEASURED taxonomy (2026-07-05, mirrors dossier_audit.check_calc_coverage): a
+    # quantity measured from as-routed geometry (route-manifest segment lengths) has no
+    # arithmetic formula — a citation naming the route-manifest + segment count is the honest
+    # disclosure, never a fake operator tacked onto the prose.
+    _cited_measured_re = re.compile(r"measured from routed geometry \(route-manifest, \d+ segments?\)")
     _shown = _tot = 0
     for _k, _v in _q.items():
         if not isinstance(_v, dict) or str(_v.get("source", "")).lower() in _roots:
             continue
         _tot += 1
         _sd = str(_v.get("source_detail") or "")
-        if _k.lower() in _worked or (len(_sd) > 3 and any(o in _sd for o in ("=", "×", "*", "/", "+"))):
+        _src = str(_v.get("source", "")).strip().lower()
+        _is_cited_measurement = _src == "route-manifest" and bool(_cited_measured_re.search(_sd))
+        if (_k.lower() in _worked
+                or (len(_sd) > 3 and any(o in _sd for o in ("=", "×", "*", "/", "+")))
+                or _is_cited_measurement):
             _shown += 1
     _cov = round(_shown / _tot * 100) if _tot else 100
     for _label, _val, _aim in [
@@ -15563,6 +15619,63 @@ _CHART_AXID_RX = re.compile(rb'<c:axId val="(\d+)"/>')
 _CHART_CROSSAX_RX = re.compile(rb'<c:crossAx val="(\d+)"/>')
 _DOCPROPS_MODIFIED_RX = re.compile(rb"<dcterms:modified[^>]*>[^<]*</dcterms:modified>")
 
+# (4) legacy-comment VML duplicate-id corruption (Excel-strict repair-trigger,
+# found 2026-07-05 — Tristan opened bess-campaign-v3's dossier.xlsx in real Excel
+# for Mac and got "we found a problem with some content ... recover?"; LibreOffice,
+# our only automated verifier until now, opens the SAME file cleanly). Root cause,
+# reproduced in isolation with a bare 3-comment openpyxl workbook (no ForgeOS code
+# involved): openpyxl writes ONE '<v:shapetype id="_x0000_t202">' + N shapes with
+# UNIQUE ids ("_x0000_s1026", "_x0000_s1027", ...) — correct, Excel-strict-clean.
+# The recalc_and_cache() LibreOffice round-trip REPLACES that file wholesale with
+# `soffice --convert-to xlsx`'s own re-export, and LibreOffice's OOXML writer
+# re-emits the FULL '<v:shapetype>' boilerplate once PER shape (instead of once,
+# referenced by all) and stamps every '<v:shape>' with the literal, non-unique
+# id="shape_0" — so any worksheet with >=2 legacy comments ships with N duplicate
+# "_x0000_t202" shapetype declarations and N duplicate "shape_0" shapes in the same
+# vmlDrawing part. UNIVERSAL, not BESS-specific: Codema v79's already-shipped
+# dossier.xlsx has the identical defect (verified 2026-07-05) — every workbook with
+# >=1 legacy comment that passes through recalc_and_cache() ships quietly corrupt;
+# LibreOffice's own reader just doesn't enforce VML id uniqueness so it never
+# noticed its own output was broken.
+_VML_SHAPETYPE_RX = re.compile(
+    rb'<v:shapetype\b[^>]*/>|<v:shapetype\b[^>]*>.*?</v:shapetype>', re.DOTALL)
+_VML_ID_ATTR_RX = re.compile(rb'\bid="[^"]*"')
+_VML_SHAPE_OPEN_RX = re.compile(rb'<v:shape\b[^>]*?>', re.DOTALL)
+
+
+def _dedupe_vml_shape_ids(data: bytes) -> bytes:
+    """Repair a post-LibreOffice-recalc vmlDrawing part: collapse duplicate
+    '<v:shapetype id="...">' re-declarations to their first occurrence, then
+    renumber every '<v:shape>' with a fresh unique id in Excel's own convention
+    ("_x0000_s1026", "_x0000_s1027", ...) — the same scheme openpyxl's own
+    ShapeWriter uses. A no-op on an already-clean part (0/1 shapetype, unique
+    shape ids) — safe to run on every 'xl/drawings/*.vml' member unconditionally."""
+    seen_shapetype_ids: set = set()
+
+    def _shapetype_sub(m: "re.Match[bytes]") -> bytes:
+        block = m.group(0)
+        idm = _VML_ID_ATTR_RX.search(block)
+        sid = idm.group(0) if idm else None
+        if sid is not None:
+            if sid in seen_shapetype_ids:
+                return b""
+            seen_shapetype_ids.add(sid)
+        return block
+
+    data = _VML_SHAPETYPE_RX.sub(_shapetype_sub, data)
+
+    _ctr = {"n": 1025}
+
+    def _shape_sub(m: "re.Match[bytes]") -> bytes:
+        tag = m.group(0)
+        _ctr["n"] += 1
+        new_id_attr = b'id="_x0000_s%d"' % _ctr["n"]
+        if _VML_ID_ATTR_RX.search(tag):
+            return _VML_ID_ATTR_RX.sub(new_id_attr, tag, count=1)
+        return tag[:-1] + b" " + new_id_attr + b">"
+
+    return _VML_SHAPE_OPEN_RX.sub(_shape_sub, data)
+
 
 def _sheet_file_for_name(z, sheet_name: str) -> Optional[str]:
     """Resolve a sheet NAME to its xl/worksheets/sheetN.xml member via workbook.xml + rels."""
@@ -15638,6 +15751,12 @@ def _finalise_deterministic_zip(out_path: str) -> None:
                     lambda m: b'<c:axId val="' + idmap.get(m.group(1), m.group(1)) + b'"/>', data)
                 data = _CHART_CROSSAX_RX.sub(
                     lambda m: b'<c:crossAx val="' + idmap.get(m.group(1), m.group(1)) + b'"/>', data)
+            elif n.startswith("xl/drawings/") and n.endswith(".vml"):
+                # LibreOffice's recalc round-trip re-serialises legacy comment shapes
+                # with duplicate ids (see _dedupe_vml_shape_ids docstring) — the exact
+                # defect that made Excel refuse bess-campaign-v3's dossier.xlsx while
+                # LibreOffice opened it fine. Repair unconditionally; a no-op if clean.
+                data = _dedupe_vml_shape_ids(data)
             items.append((n, data))
     tmp = out_path + ".det-tmp"
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
@@ -18309,6 +18428,29 @@ def build(run_dir: str, out_path: str) -> dict:
         _finalise_deterministic_zip(out_path)
     except Exception as _dex:  # noqa: BLE001 — determinism polish must never kill the build
         print(f"  ! deterministic finalise failed (file left as-written): {_dex}")
+
+    # ── OOXML STRICT CHECK (Tristan 2026-07-05): Excel refused bess-campaign-v3's
+    #    dossier.xlsx ("we found a problem with some content") while LibreOffice — our
+    #    only automated verifier — opened it fine. Root cause: the recalc_and_cache()
+    #    LibreOffice round-trip corrupts legacy-comment VML (duplicate ids), fixed above
+    #    by _dedupe_vml_shape_ids inside _finalise_deterministic_zip. This is the standing
+    #    GATE — it re-validates the FINAL shipped bytes against that exact rule plus the
+    #    other Excel-strict structural checks (scripts/lib/ooxml_strict_check.py) and
+    #    HARD-FAILS the build on any HIGH: a workbook Excel will refuse must never ship
+    #    quietly. Deterministic, no LLM, <100ms — never skipped.
+    from ooxml_strict_check import check_workbook as _ooxml_check
+    _ooxml_findings = _ooxml_check(out_path)
+    _ooxml_highs = [f for f in _ooxml_findings if f.severity == "HIGH"]
+    if _ooxml_highs:
+        print("  !! OOXML STRICT CHECK FAILED — Excel will likely refuse this file:")
+        for _f in _ooxml_highs:
+            print(f"       [{_f.rule}] {_f.part}: {_f.message}")
+        raise RuntimeError(
+            f"ooxml_strict_check: {len(_ooxml_highs)} HIGH finding(s) — refusing to ship "
+            "a workbook Excel's strict parser will reject. Fix the writer at source "
+            "(see scripts/lib/ooxml_strict_check.py rule docstrings) and rebuild.")
+    print(f"  · ooxml-strict-check: 0 HIGH ({len(_ooxml_findings)} total findings) — "
+          "Excel-strict clean")
 
     # ── ONE TRUTH — POST-RECALC READ-BACK (Tristan 2026-07-03): read the RECALCULATED
     #    live-score cells back from the shipped file; tab-scorecard.json carries THOSE
