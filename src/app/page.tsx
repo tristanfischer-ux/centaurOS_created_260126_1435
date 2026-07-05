@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HeroNavScroll } from "./nav-scroll";
 
 export const metadata: Metadata = {
   title: "Fractional Forge — the front end for hardware",
@@ -36,7 +37,8 @@ const HTML = `<style>
   .btn-ghost:hover{border-color:var(--ink-soft);text-decoration:none;}
   .btn-lg{padding:16px 28px;font-size:17px;}
 
-  header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);}
+  header.nav{position:sticky;top:0;z-index:50;background:transparent;border-bottom:1px solid transparent;transition:background .25s ease,border-color .25s ease,box-shadow .25s ease;}
+  header.nav.scrolled{background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);box-shadow:0 4px 20px rgba(15,23,41,.05);}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:68px;}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-.02em;}
   .brand:hover{text-decoration:none;}
@@ -579,5 +581,10 @@ const HTML = `<style>
 `;
 
 export default function HomePage() {
-  return <div dangerouslySetInnerHTML={{ __html: HTML }} />;
+  return (
+    <>
+      <div dangerouslySetInnerHTML={{ __html: HTML }} />
+      <HeroNavScroll />
+    </>
+  );
 }

@@ -128,11 +128,13 @@ export default function HowWeWorkPage() {
             </h2>
             <div className="space-y-4 text-lg text-muted-foreground leading-relaxed max-w-3xl">
               <p>
+                We take on a small number of engagements each quarter — so the
+                first Design Dossier is also how we get to know your project.
                 There&apos;s no standard price list, because no two hardware
-                companies are the same. The first Design Dossier is free.
-                Anything beyond it — advisory, the raise, build introductions —
-                is scoped to your project and agreed up front. Fundraising is
-                introducer / success-fee: no raise, no fee.
+                companies are the same. Everything beyond the free Dossier —
+                advisory, the raise, build introductions — is scoped to your
+                project and agreed up front. Fundraising is introducer /
+                success-fee: no raise, no fee.
               </p>
               <p>
                 A self-serve version is on the way. For now, every Dossier is
