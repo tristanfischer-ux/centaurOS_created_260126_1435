@@ -669,8 +669,14 @@ def _pack_micro_band(name: str):
 # Gotion 280 Ah LFP ≈ £51-53). So price the cell from the REAL DB cell market (by chemistry +
 # capacity), and ONLY fall back to a £/kWh estimate when the DB has no comparable cell. The fallback
 # constant is itself GROUNDED in that DB cell data (~£57/kWh = ~£52 for a 0.896 kWh 280 Ah cell),
-# NOT back-solved from the system price. Universal across chemistries (LFP/NMC/NCA/Na-ion).
-CELL_GBP_PER_KWH = 57.0   # DB-grounded: median real 280 Ah LFP cell ≈ £52 / 0.896 kWh ≈ £58/kWh (forge-truth.db)
+# NOT back-solved from the system price. Universal across chemistries (LFP/NMC/NCA/Na-ion) and Ah
+# ratings — the formula is £/kWh × Ah × V, never a flat per-Ah-class number, so the SAME constant
+# applies unchanged when the emitted cell moves to a newer generation (2026-07-05 WAVE C addendum
+# 9, engineering-contract.ts BESS archetype recalibrated cellAh 280 → 314, CATL CBC00 class): at
+# 314 Ah × 3.2 V = 1.0048 kWh/cell, £57/kWh ≈ £57.27/cell, still within the $41-56/kWh (≈£31-42/kWh)
+# 2025-26 bulk 300 Ah+ LFP cell band this constant is grounded against (see engineering-contract.ts
+# CELL_GBP_PER_KWH_MARKET_2026 for the full citation trail) — no change needed here.
+CELL_GBP_PER_KWH = 57.0   # DB-grounded: median real 280 Ah LFP cell ≈ £52 / 0.896 kWh ≈ £58/kWh (forge-truth.db); £/kWh basis is Ah-agnostic
 _FORGE_TRUTH_DB = os.path.expanduser("~/.forge-truth/forge-truth.db")
 _CELL_DB_CACHE: dict = {}
 _BATTERY_CELL_RE = re.compile(

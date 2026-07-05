@@ -719,6 +719,13 @@ interface BessParams {
   stringPeakA: number
   cellCapacityAh: number
   cellVoltageV: number
+  // BESS WAVE C addendum 9 (2026-07-05, PROCUREMENT-MODEL PRICING): the ratio between the
+  // procured, integrated DC-block market price and the raw component-by-component sum,
+  // computed ONCE in engineering-contract.ts (`dc_block_reconciliation_factor`) and applied
+  // here to the BoM cell-word price — single source of truth, so the rendered BoM line stays
+  // in sync with the contract's cover-page cost-stack figure (the exact two-cost-surfaces gap
+  // addendum 8 closed for the cell line). Default 1 (no reconciliation) for legacy callers.
+  dcBlockReconciliationFactor: number
   // BESS L22 (2026-05-25, task #122): universal thermal subsystem ambient-
   // derating. The chiller selector below uses these two fields to pick the
   // right EB XT model — the design's actual thermal load (pybamm-computed
@@ -792,6 +799,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const parallelStringsPerRack = Math.max(1, Math.round(q(contract, 'parallel_strings_per_rack', 1)))
   const parallelStringsTotal = Math.max(1, Math.round(q(contract, 'parallel_strings_total', parallelStringsPerRack * rackCount)))
   const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)
+  const dcBlockReconciliationFactor = q(contract, 'dc_block_reconciliation_factor', 1)
   const stringVoltageNominalV = q(contract, 'string_voltage_nominal_v', seriesCellsPerString * cellVoltageV)
   const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)
   const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)
@@ -916,6 +924,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
     stringPeakA,
     cellCapacityAh,
     cellVoltageV,
+    dcBlockReconciliationFactor,
     ambientDesignTempC,
     systemThermalDissipationKw,
     inverterDissipatedKw,
@@ -953,8 +962,17 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   // final priced BoM in requirements_bom.py's CELL_GBP_PER_KWH (closing the two-cost-
   // surfaces divergence between the macro estimate and the final requirementsBom line).
   // See scripts/lib/engineering-contract.ts CELL_GBP_PER_KWH_MARKET_2026 (same anchor).
+  //
+  // BESS WAVE C addendum 9 (2026-07-05, PROCUREMENT-MODEL PRICING): the raw £57/kWh
+  // component estimate is further scaled by `dcBlockReconciliationFactor` — the same factor
+  // engineering-contract.ts applies to its macro_assembly_prices battery-only lines to
+  // reconcile the Western-catalogue component sum to the market's procured, integrated
+  // DC-block price (£60/kWh @ 2-hour duration, ex-PCS, ex-MV — see
+  // dc_block_reconciliation_factor's source_detail for the full citation). Without this the
+  // rendered BoM cell line would silently diverge from the cover-page cost-stack figure again
+  // — reopening the exact gap addendum 8 closed.
   const cellEnergyKwh = (p.cellCapacityAh * p.cellVoltageV) / 1000
-  const cellUnitPriceGbp = Math.round(57 * cellEnergyKwh * 100) / 100
+  const cellUnitPriceGbp = Math.round(57 * cellEnergyKwh * p.dcBlockReconciliationFactor * 100) / 100
 
   const cellString = makeSubModule(
     'cell_string',
@@ -981,7 +999,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.cellCount)),
           mod('capacity', String(p.cellCapacityAh), 'Ah'),
           mod('manufacturer', 'CATL'),
-          mod('part_number', 'LF280K'),
+          // BESS WAVE C addendum 9 (2026-07-05): CBC00 is CATL's 314 Ah successor to LF280K
+          // (same physical footprint, +12% capacity) — verified against 3 independent 2026
+          // distributor/datasheet listings (evlithium.com, dlcpo.com, enfsolar.com datasheet
+          // PDF). Updated in lockstep with p.cellCapacityAh (314) above.
+          mod('part_number', 'CBC00'),
           mod('list_price_gbp', String(cellUnitPriceGbp)),
           mod('form', 'prismatic'),
           mod('dimension', String(p.cellVoltageV), 'V'),
