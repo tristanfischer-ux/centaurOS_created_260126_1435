@@ -222,9 +222,20 @@ _COMMODITY_FITTING_RE = re.compile(
     # mirrors ga_massing.GA_NON_MASSING_RE's accessory/fastener/fitting/support-frame
     # alternation EXACTLY (ga_massing.py lines ~33-58) — independent CLI entry points,
     # kept in sync by hand.
+    # NARROW DELIBERATE DIVERGENCE (2026-07-05, the DS-101 'deflagration vent seal' fix):
+    # 'seals?' is added HERE but NOT to ga_massing.GA_NON_MASSING_RE. A moulded/extruded
+    # gasket-family seal has no catalogue identity (same £5 commodity-noun floor as a
+    # gasket in requirements_bom._COMMODITY_NOUN_FLOORS — the two ALREADY agree there),
+    # so it is an honest COMMODITY-FITTING for BoM/MPN purposes. But unlike a gasket it
+    # is drawn as its own visible geometry on the GA/3-D scene (a perimeter seal strip
+    # around a deflagration vent is a real, inspectable installed item) — the SAME
+    # "still a real massing target" carve-out already documented above for the
+    # instrument/valve/switchgear-internal exclusions ga_massing deliberately keeps
+    # wider on. Catalogue-identity and 3-D-massing are orthogonal decisions; only the
+    # former changes here.
     r"\b(?:union|glands?|couplings?|adapters?|adaptors?|ferrules?|olives?|"
     r"nipples?|connectors?|flexmount|spacers?|baffles?)\b|"
-    r"\bflanges?\b|\bgaskets?\b|\bend caps?\b|\bblanking (?:plates?|caps?)\b|"
+    r"\bflanges?\b|\bgaskets?\b|\bseals?\b|\bend caps?\b|\bblanking (?:plates?|caps?)\b|"
     r"\banchor\s+bolts?\b|\b(?:bolts?|nuts?|washers?|screws?|studs?|rivets?)\b|"
     r"\blev(?:el)?ling feet\b|\bleveling feet\b|\bdistribution plate(?:s)?\b|"
     r"\bcip (?:system )?connection(?:s)?\b|\bquick coupling\b|"

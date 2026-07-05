@@ -2554,6 +2554,16 @@ def check_calc_coverage(state, rows, run_dir) -> list:
     # no formula because it isn't computed. Only DERIVED quantities need a shown calculation.
     _ROOTS = {"brief", "physics_constant", "constant", "standard", "anchor", "datasheet", "spec"}
     _OPS = ("=", "×", "*", "/", "+", "−", "·", "^")
+    # CITED-MEASURED taxonomy (2026-07-05, the interconnect_cable_length_m fix): a quantity
+    # MEASURED from as-built/as-routed geometry (route-manifest segment lengths) has no
+    # arithmetic formula — it is a citation to a physical measurement, the same standing as a
+    # datasheet reference. Recognised ONLY when the source_detail actually names the
+    # route-manifest AND a segment count — never a bare 'measured' claim with no citation, and
+    # NEVER by tacking a fake operator onto the prose to trip has_formula (that would be the
+    # OPPOSITE dishonesty — Tristan: "never a fake formula"). This also closes the latent
+    # false-positive where 'measured routed fluid + thermal pipe length' only passed has_formula
+    # because the English word 'fluid + thermal' happens to contain a literal '+'.
+    _CITED_MEASURED_RE = re.compile(r"measured from routed geometry \(route-manifest, \d+ segments?\)")
     hidden, total = [], 0
     for k, v in q.items():
         if not isinstance(v, dict):
@@ -2572,7 +2582,8 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         # outputs hidden (a bare lookup is not a shown calculation).
         src = str(v.get("source", "")).strip().lower()
         tool_shown = src.startswith("tool:") and src[len("tool:"):] in worked_tool_ids
-        if str(k).lower() in worked or has_formula or tool_shown:
+        is_cited_measurement = src == "route-manifest" and bool(_CITED_MEASURED_RE.search(sd))
+        if str(k).lower() in worked or has_formula or tool_shown or is_cited_measurement:
             continue
         hidden.append(str(k))
     cov = round((total - len(hidden)) / total * 100) if total else 100
@@ -2829,11 +2840,68 @@ _GLOSSARY_TAG_PREFIXES = {
 # regex at source when the Blender tag scheme is next touched; the glossary definition documents the
 # scheme's INTENDED meaning, not the mis-tag.
 
+# GENERATIVE tag-prefix glossary (2026-07-05, the BESS 18-missing-prefix fix). Two prior static
+# whitelists had already DIVERGED from the workbook's real Glossary tab: build-excel-export.py's
+# `_GLOSSARY` 'Battery storage (BESS tags)' category defines BMS/BR/CH/FS/PCS/SG with real prose,
+# but `_GLOSSARY_TAG_PREFIXES` above (this module's OWN whitelist, consulted by THIS check) was
+# never updated to match — so those 6 "already landed" definitions still flagged undocumented. A
+# hand-maintained whitelist that must be edited in TWO files every time a new archetype mints a
+# fresh tag family is exactly the "kept in sync by hand" trap this codebase keeps hitting (see
+# parts_ledger.py's ga_massing-mirror comments). Fix: a tag-prefix is documented when EITHER (a) a
+# curated override gives its canonical expansion (an ACRONYM whose meaning isn't self-evident from
+# its own first occurrence — BMS, PCS, …) OR (b) it self-documents from the bill's own first
+# occurrence of that prefix (a real named part — 'coolant distribution manifold' IS its own honest
+# definition). `build-excel-export.py`'s `tab_glossary` renders the IDENTICAL generative entry (the
+# override text, else the ledger's own first-occurrence name) for every such prefix, so the check
+# and the render can never disagree — mirrors the CITED-MEASURED taxonomy pattern used for
+# calc-coverage: never invent a fake definition, always a REAL citation to the engine's own data.
+# A prefix with NO derivable name at all (blank/garbage requirement text) is the one true residual
+# gap this still catches.
+_TAG_PREFIX_OVERRIDES = {
+    "BMS": "Battery Management System",
+    "BR": "Battery Rack (wiring carrier / busbar hardware)",
+    "BS": "BMS Slave (per-rack battery-management slave module)",
+    "CD": "Coolant Distribution (manifold)",
+    "CF": "Cell / Frame (battery cell — prismatic, cylindrical or pouch format)",
+    "CH": "Chiller",
+    "CM": "Cold-plate Manifold",
+    "CP": "Cold Plate",
+    "DI": "DC Isolator",
+    "DS": "Deflagration (vent) Seal",
+    "DU": "Duct",
+    "EQ": "Equipment (generic catalogue-class package)",
+    "FS": "Fire Suppression (system component)",
+    "IE": "Isolator Enclosure",
+    "OG": "Off-gas (duct / handling)",
+    "PCS": "Power Conversion System (inverter)",
+    "RH": "Rack Heater",
+    "SG": "Switchgear",
+    "SI": "Smoke (vent) Interlock",
+}
+
+
+def _tag_prefix_self_documents(pref: str, principals: list) -> bool:
+    """True when `pref` has a curated override OR the bill carries a genuinely-named part
+    under that prefix (the same first-occurrence text the generative Glossary section
+    renders as the definition). See the module-level comment above."""
+    if pref in _TAG_PREFIX_OVERRIDES or pref in _GLOSSARY_TAG_PREFIXES:
+        return True
+    for r in principals:
+        raw = str(r.get("tag") or "").strip()
+        m = re.match(r"^([A-Z]{1,4})-?\d", raw)
+        if m and m.group(1) == pref:
+            name = str(r.get("requirement") or r.get("part") or "").strip()
+            if name:
+                return True
+    return False
+
 
 def check_glossary(state, rows, run_dir) -> list:
     """'Glossary' must define every abbreviation the dossier USES. Genuine coverage check: every
     ISA tag-prefix that appears in the bill must be a documented family (else a reader meets an
-    undefined code). The static glossary covers the standard families; a NOVEL prefix flags."""
+    undefined code). The curated whitelist + override table cover the standard/acronym families;
+    any OTHER prefix is checked against the GENERATIVE self-documentation rule (see above) — a
+    prefix with no derivable name at all is the true residual gap that still flags."""
     tab = "Glossary"
     out: list = []
     principals = _principal_rows(rows)
@@ -2846,7 +2914,7 @@ def check_glossary(state, rows, run_dir) -> list:
         if not m:
             continue
         pref = m.group(1)
-        if pref not in _GLOSSARY_TAG_PREFIXES:
+        if pref not in _GLOSSARY_TAG_PREFIXES and not _tag_prefix_self_documents(pref, principals):
             undocumented[pref] = undocumented.get(pref, 0) + 1
     if undocumented:
         ex = ", ".join(f"{p}- (×{n})" for p, n in sorted(undocumented.items())[:6])

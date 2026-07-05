@@ -5749,9 +5749,18 @@ def assemble(out_dir: str):
                 # insulation pad, deliberate £0.3-2.5 band) keeps its band — only a true
                 # £0 lifts, to the band FLOOR, never the commodity floor above its
                 # ceiling. Skips a SUB-COMPONENT (its £ lives in the parent's breakdown,
-                # line_gbp=0) and a BUILDING/structural line (handled on its own path). ──
-                if status not in ("SUB-COMPONENT", "BUILDING") and (
-                        gbp <= 0 or (gbp < 0.5 and _pack_micro_band(name or "") is None)):
+                # line_gbp=0) and a BUILDING/structural line (handled on its own path).
+                # BOUNDARY FIX (2026-07-05, the DS-101 £0 deflagration-vent-seal miss):
+                # the guard's own comment states the intent as 'round(gbp) == 0', but the
+                # implemented test was `gbp <= 0 or (gbp < 0.5 and …)` — a STRICT `< 0.5`
+                # never catches gbp EXACTLY 0.5, yet Python's round(0.5) == 0 (round-half-
+                # to-even) renders it as unit £0 regardless. DS-101 priced at £0.50 slipped
+                # through both clauses and shipped a £0 line. Test round(gbp) directly for
+                # a non-pack-micro line (matches the stated intent exactly); a pack-micro
+                # consumable keeps its narrower 'only a TRUE £0' exemption unchanged. ──
+                _is_pack_micro = _pack_micro_band(name or "") is not None
+                _renders_zero = (gbp <= 0) if _is_pack_micro else (round(gbp) <= 0)
+                if status not in ("SUB-COMPONENT", "BUILDING") and _renders_zero:
                     _cf, _cnoun = _commodity_zero_floor(name)
                     _why = "no DB price" if gbp <= 0 else f"estimate £{gbp:.2f} renders £0"
                     gbp = _cf

@@ -9405,6 +9405,119 @@ def _revenue_bearing_class(state: dict) -> Optional[str]:
     return pc if _REVENUE_BEARING_STORAGE_CLASS_RX.search(pc) else None
 
 
+# GB STORAGE REVENUE BENCHMARKS (2026-07-05, Tristan council item 3 — "build real models,
+# the RTE precedent"). Conservative, CITED 2025-2026 GB market figures — NEVER an invented
+# number. A storage/grid asset earns a BLENDED STACK across two separate markets:
+#   1. TRADING (wholesale arbitrage + Balancing Mechanism + ancillary/frequency-response) —
+#      the Modo Energy 'ME BESS GB' index, the FCA-recognised GB battery-storage revenue
+#      benchmark: a 2-hour-duration asset earned £73,145/MW/yr over the trailing 12 months
+#      to April 2026 (source: Modo Energy, "ME BESS GB" revenue-index research notes,
+#      Jan-Apr 2026; monthly figures ranged £47k-£76k/MW/yr across 2025-26 — genuinely
+#      volatile, so the trailing-12-month figure is used as the conservative, smoothed
+#      basis, never a cherry-picked high month).
+#   2. CAPACITY MARKET — a DE-RATED-capacity payment, separate from the trading stack. The
+#      2026/27 T-1 auction cleared at £5/kW/yr — the lower/more conservative of the two live
+#      2026 GB auctions (the 2029/30 T-4 cleared far higher at £27.10/kW/yr; an upside
+#      reference, deliberately NOT the modelled case). Source: Modo Energy, "Capacity
+#      Market: 2026/27 T-1 auction clears at £5/kW/yr", March 2026.
+#   3. DE-RATING FACTOR — the Capacity Market pays on DE-RATED capacity, never nameplate
+#      power. A 2-hour-duration battery's Equivalent Firm Capacity de-rating factor is
+#      20.94% (T-4 scaled-EFC methodology, 2026) / 27.15% (T-1) — the LOWER (T-4) figure is
+#      paired here with the T-1 clearing price (both the conservative choice; never mixed
+#      to inflate the estimate). Source: Modo Energy / NESO EMR Delivery Body, 2026 storage
+#      de-rating factor methodology review.
+# These are MARKET BENCHMARKS (what a comparable live GB asset earns today), not a bespoke
+# forecast for this specific design — stated as assumptions on the rendered row, with their
+# source, so a reader can substitute their own view. Duration-specific (2-hour); a design
+# well outside that band should treat this as an approximation, not a precise quote.
+_GB_BESS_TRADING_GBP_PER_MW_YR = 73_145.0
+_GB_BESS_TRADING_BASIS = (
+    "Modo Energy 'ME BESS GB' revenue index — a 2-hour-duration GB battery earned "
+    "£73,145/MW/yr (wholesale arbitrage + Balancing Mechanism + ancillary/frequency-"
+    "response), trailing 12 months to Apr-2026 (monthly range £47k-£76k/MW/yr, 2025-26)")
+_GB_CM_CLEARING_GBP_PER_KW_YR = 5.0
+_GB_CM_BASIS = (
+    "GB Capacity Market 2026/27 T-1 auction clearing price £5/kW/yr (Modo Energy, Mar-2026) "
+    "— the lower/conservative of the two live 2026 auctions (2029/30 T-4 cleared "
+    "£27.10/kW/yr, an upside reference, not modelled)")
+_GB_BESS_DERATING_2H = 0.2094
+_GB_DERATING_BASIS = (
+    "NESO scaled-EFC de-rating factor for a 2-hour-duration battery, T-4 methodology, "
+    "20.94% (2026) — the Capacity Market pays de-rated, not nameplate, capacity")
+
+
+def _storage_revenue_model(power_kw: Optional[float]) -> Optional[Dict[str, float]]:
+    """A cited, conservative GB market revenue model for a storage/grid-class asset — the
+    TRADING stack (wholesale arbitrage + Balancing Mechanism + ancillary) plus the
+    CAPACITY MARKET (de-rated), from the REAL 2025-2026 GB benchmarks above. NEVER an
+    invented number — every figure traces to a named, dated source. Returns None when
+    there is no power rating to scale the benchmark from (no fabricated denominator)."""
+    if not power_kw or power_kw <= 0:
+        return None
+    power_mw = power_kw / 1000.0
+    trading_gbp = _GB_BESS_TRADING_GBP_PER_MW_YR * power_mw
+    capacity_market_gbp = _GB_CM_CLEARING_GBP_PER_KW_YR * power_kw * _GB_BESS_DERATING_2H
+    return {
+        "power_mw": power_mw,
+        "trading_arbitrage_ancillary_revenue_gbp": trading_gbp,
+        "capacity_market_revenue_gbp": capacity_market_gbp,
+        "total_annual_revenue_gbp": trading_gbp + capacity_market_gbp,
+    }
+
+
+def _storage_revenue_and_dcf(state: dict) -> Optional[Dict[str, Any]]:
+    """Self-contained (state + _ECON_DEFAULTS ONLY — no module-global _ECON_GENERIC, which
+    doesn't exist yet at ship-gate-audit time) cited GB revenue model + a light annuity DCF
+    for a storage/grid-class asset. Called TWICE from the SAME arithmetic: EARLY in build()
+    (before dossier_audit.check_economics runs, so the audit sees a genuine revenue-path
+    signal instead of flagging 'no revenue line') and again when the Financial model tab
+    renders its table — both calls are byte-identical, so the audited signal and the
+    rendered numbers can never disagree. Returns None when the class isn't revenue-bearing,
+    or capex/power aren't yet derivable (never a fabricated denominator)."""
+    rb_class = _revenue_bearing_class(state)
+    if not rb_class:
+        return None
+    cs = state.get("costStack") or {}
+    capex = num(cs.get("all_in_capex_gbp")) or num(cs.get("installed_asp_gbp"))
+    if not capex or capex <= 0:
+        return None
+    q = (state.get("orchestratorContract") or {}).get("quantities") or {}
+
+    def _qv(*keys: str) -> float:
+        for k in keys:
+            v = q.get(k)
+            if isinstance(v, dict) and isinstance(v.get("value"), (int, float)):
+                return float(v["value"])
+        return 0.0
+
+    power_kw = _qv("continuous_power_kw", "rated_power_kw",
+                   "nameplate_power_kw", "rated_ac_power_kw")
+    srm = _storage_revenue_model(power_kw or None)
+    if not srm:
+        return None
+    d = _ECON_DEFAULTS
+    conn_kw = _qv("connected_electrical_load_kw", "total_electrical_demand_kw",
+                  "total_connected_load_kw", "connected_load_kw")
+    energy = conn_kw * float(d["hours"]) * float(d["load_factor"]) * float(d["energy_price"])
+    maint = capex * float(d["maint_pct"]) / 100.0
+    opex = energy + maint + float(d["labour"]) + float(d["other_opex"])
+    ebitda = srm["total_annual_revenue_gbp"] - opex
+    i = float(d["discount_rate"]) / 100.0
+    n = float(d["project_life"])
+    npv = (-capex + ebitda * (1 - (1 + i) ** -n) / i) if (ebitda and i > 0) else None
+    return {
+        "class": rb_class, "power_mw": srm["power_mw"], "capex_gbp": capex,
+        "opex_gbp": opex, "discount_rate_pct": d["discount_rate"], "project_life_yr": n,
+        "trading_arbitrage_ancillary_revenue_gbp": srm["trading_arbitrage_ancillary_revenue_gbp"],
+        "capacity_market_revenue_gbp": srm["capacity_market_revenue_gbp"],
+        "total_annual_revenue_gbp": srm["total_annual_revenue_gbp"],
+        "ebitda_gbp": ebitda, "npv_gbp": npv, "irr": _annuity_irr(ebitda, capex, n),
+        "payback_yr": (capex / ebitda) if (ebitda and ebitda > 0) else None,
+        "basis": {"trading": _GB_BESS_TRADING_BASIS, "capacity_market": _GB_CM_BASIS,
+                  "derating": _GB_DERATING_BASIS},
+    }
+
+
 def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     """COST-OF-SERVICE economics for a no-market-revenue infrastructure / utility plant (water /
     treatment / fertigation): the HONEST, COMPLETE economic model is capex + annual opex + the
@@ -9493,22 +9606,78 @@ def _render_cost_of_service_section(ws, state: dict, r: int) -> Optional[int]:
     r += 1
     _rb_class = _revenue_bearing_class(state)
     if _rb_class:
-        # class-aware honest framing (NOT an output-sales-shaped gap): a storage/grid
-        # plant genuinely earns revenue — this run's state simply has no revenue-path
-        # signal yet. Never invents a revenue/EBITDA/NPV number to fill the gap.
-        rev = ws.cell(r, 1,
-            f"⚠ revenue model not yet derived (class: {_rb_class}) — a plant of this "
-            f"class earns arbitrage / capacity / ancillary-service REVENUE, not an "
-            f"output sale; this run carries no revenue-path signal yet, so the model "
-            f"below is the honest cost-of-service FLOOR, not a claim that this class "
-            f"has nothing to sell. Close the gap with a revenue-path input, not an "
-            f"invented figure.")
-        rev.font = Font(italic=True, size=9, color="9C6500", bold=True)
-        rev.alignment = WRAP_TOP
-        rev.fill = FILL_ADVISORY
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
-        ws.row_dimensions[r].height = 28
-        r += 1
+        # REAL revenue model (2026-07-05, Tristan council item 3: "build real models, the
+        # RTE precedent" — never invent uncited numbers). A storage/grid plant earns
+        # arbitrage / capacity / ancillary-service revenue; derive it from cited, current
+        # GB market benchmarks. Read the EARLY-computed model (build() runs
+        # _storage_revenue_and_dcf BEFORE the ship-gate audit so check_economics sees the
+        # revenue-path signal) when present, so the audited numbers and this render can
+        # never disagree; else compute now (a caller that skips the early hook, e.g. a
+        # direct tab_financial_model() invocation in a fixture/selftest).
+        _srm = ((state.get("financials") or {}).get("storage_revenue_model")
+                or _storage_revenue_and_dcf(state))
+        if _srm:
+            ebitda, npv, irr = _srm["ebitda_gbp"], _srm["npv_gbp"], _srm["irr"]
+            payback = _srm["payback_yr"]
+            sub_banner(ws, r, f"STORAGE REVENUE MODEL — GB market benchmarks, cited (class: {_rb_class})", 8)
+            r += 1
+            note = ws.cell(r, 1,
+                f"Revenue is a BLENDED STACK from live GB market benchmarks (2025-2026), scaled "
+                f"to this design's {_srm['power_mw']:.2f} MW rating — never an invented figure; "
+                f"every line names its source. See the Basis column.")
+            note.font = Font(italic=True, size=9, color="555555")
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+            r += 1
+            _rev_rows = [
+                ("Trading (wholesale arbitrage + Balancing Mechanism + ancillary)",
+                 round(_srm["trading_arbitrage_ancillary_revenue_gbp"]), _GB_BESS_TRADING_BASIS),
+                ("Capacity Market (de-rated)",
+                 round(_srm["capacity_market_revenue_gbp"]),
+                 _GB_CM_BASIS + " · " + _GB_DERATING_BASIS),
+                ("TOTAL annual revenue", round(_srm["total_annual_revenue_gbp"]),
+                 "sum of the two market benchmarks above"),
+                ("less: annual opex", -round(_srm["opex_gbp"]),
+                 "energy + maintenance + labour + other opex (see the cost-of-service model below)"),
+                ("EBITDA / yr", round(ebitda), "total revenue − annual opex"),
+                ("Simple payback (yr)", (round(payback, 1) if payback else "n/a — EBITDA ≤ 0"),
+                 "all-in capex ÷ EBITDA"),
+                ("NPV", (round(npv) if npv is not None else "n/a"),
+                 f"annuity DCF: −capex + EBITDA×(1−(1+{i:.0%})^-{n:.0f})/{i:.0%}"),
+                ("IRR", (f"{irr:.1%}" if irr is not None else "n/a — EBITDA ≤ 0"),
+                 f"annuity IRR over the {n:.0f}-yr project life (level EBITDA)"),
+            ]
+            for label, val, basis in _rev_rows:
+                bold = label.startswith(("TOTAL", "EBITDA", "NPV", "IRR"))
+                ws.cell(r, 1, label).font = Font(bold=bold)
+                vc = ws.cell(r, 2, val)
+                if isinstance(val, (int, float)):
+                    vc.number_format = FMT_INT
+                if bold:
+                    vc.font = Font(bold=True)
+                bc = ws.cell(r, 4, basis)
+                bc.font = Font(size=9, color="555555")
+                bc.alignment = WRAP_TOP
+                r += 1
+            r += 1
+            # record the revenue path (idempotent — already present when the early hook ran)
+            # so the deterministic economics check (dossier_audit.check_economics ::
+            # _state_has_revenue_signal) reads a genuine, cited arbitrage/revenue signal —
+            # never a gamed keyword, the real computed model.
+            state.setdefault("financials", {})["storage_revenue_model"] = _srm
+        else:
+            # no power rating to scale the benchmark from — honestly say so (never a
+            # fabricated denominator), rather than a silent gap or an invented figure.
+            rev = ws.cell(r, 1,
+                f"⚠ revenue model needs a power rating (class: {_rb_class}) — no "
+                f"continuous_power_kw / rated_power_kw contract quantity is present to "
+                f"scale the GB market £/MW benchmarks from; the model below is the "
+                f"cost-of-service floor until that quantity is derived.")
+            rev.font = Font(italic=True, size=9, color="9C6500", bold=True)
+            rev.alignment = WRAP_TOP
+            rev.fill = FILL_ADVISORY
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+            ws.row_dimensions[r].height = 28
+            r += 1
     r += 1
     header(ws, r, ["Item", "Value (£)", "", "Basis"])
     r += 1
@@ -17922,6 +18091,20 @@ def build(run_dir: str, out_path: str) -> dict:
     _repair = repair_dossier(state, rows, run_dir)
     state, rows = _repair.state, _repair.rows
     state["requirementsBom"] = rows                       # downstream tabs read the repaired bill
+    # STORAGE REVENUE MODEL (2026-07-05, Tristan council item 3) — computed EARLY, before the
+    # ship-gate audit, so a storage/grid class's cited GB arbitrage/capacity-market revenue
+    # path is a genuine signal `dossier_audit.check_economics` can see (it previously always
+    # ran before any tab existed, so a revenue path computed only at render time — inside
+    # tab_financial_model — could never clear the 'no revenue line' MED). The Financial model
+    # tab renders this SAME dict later (byte-identical — one computation, two consumers).
+    _srm_early = _storage_revenue_and_dcf(state)
+    if _srm_early:
+        state.setdefault("financials", {})["storage_revenue_model"] = _srm_early
+        print(f"  · storage revenue model ({_srm_early['class']}): "
+              f"£{_srm_early['total_annual_revenue_gbp']:,.0f}/yr (trading "
+              f"£{_srm_early['trading_arbitrage_ancillary_revenue_gbp']:,.0f} + capacity market "
+              f"£{_srm_early['capacity_market_revenue_gbp']:,.0f}), EBITDA "
+              f"£{_srm_early['ebitda_gbp']:,.0f}/yr — cited GB market benchmarks")
     # ── HEADLINE INTEGRITY JOIN (Tristan 2026-07-02): compute the flagged-quantity set
     #    (deterministic checks + lineage closure) ONCE, before ANY tab renders, so every
     #    headline surface (Exec OUTPUT, Overview metrics, Quantities roles) excludes a

@@ -1315,6 +1315,75 @@ def _draw_dehumidifier_glyph(svg, dh, hub_px, hub_py, hub_w_px, hub_d_px):
              "dehumidifier (latent)", size=6.4, anchor="middle", fill=MUTED)
 
 
+def _draw_duct_penetration_seal(svg, sysm, meta, pc, plan_x, plan_y, plan_w, plan_h):
+    """Draw the WALL-PENETRATION detail for a duct that exits the enclosure to atmosphere
+    (an off-gas / exhaust duct's fire/gas-tight transit seal, e.g. a Roxtec frame) — a
+    penetration detail at the container wall (2026-07-05 HVAC air-side coverage pass:
+    the seal is a real BoM line but was never drawn, so the HVAC layout silently dropped
+    a life-safety detail a chartered engineer would expect to see). Anchors on the
+    nearest EXHAUST-role hub (an 'off-gas exhaust fan' or similar); a no-op when the
+    design carries no such hub or the BoM has no matching seal line — never fabricated
+    geometry with no real anchor. Universal: keyed on the hub's role + the BoM's own
+    requirement text, no product-class table."""
+    pen = meta.get("duct_penetration_seal")
+    if not pen:
+        return
+    # anchor: prefer a hub whose NAME says off-gas/exhaust; else any 'fan' (exhaust) hub —
+    # the duct run this seal terminates is the one that vents to outside.
+    hub = next((h for h in sysm.hubs if re.search(r"off.?gas", h.name, re.I)), None)
+    if hub is None:
+        hub = next((h for h in sysm.hubs if h.role == "fan"), None)
+    if hub is None or hub.tag not in pc:
+        return
+    hx, hy = pc[hub.tag]
+    # nearest wall edge of the plan rectangle (the enclosure wall this duct penetrates).
+    x0, x1, y0, y1 = plan_x, plan_x + plan_w, plan_y, plan_y + plan_h
+    dists = [("left", hx - x0), ("right", x1 - hx), ("top", hy - y0), ("bottom", y1 - hy)]
+    side, _ = min(dists, key=lambda t: t[1])
+    if side == "left":
+        wx, wy, nx, ny = x0, hy, -1.0, 0.0
+    elif side == "right":
+        wx, wy, nx, ny = x1, hy, 1.0, 0.0
+    elif side == "top":
+        wx, wy, nx, ny = hx, y0, 0.0, -1.0
+    else:
+        wx, wy, nx, ny = hx, y1, 0.0, 1.0
+    # duct stub from the hub to the wall (dashed amber — the same EXHAUST convention the
+    # legend already uses for "relief to outside").
+    svg.line(hx, hy, wx, wy, stroke=EXHAUST_INK, width=2.2, dash="6,3")
+    # the penetration-seal glyph: a small transit-frame rectangle straddling the wall line,
+    # cross-hatched (the standard "sealed/fire-stopped" convention), oriented along the wall.
+    seal_w, seal_d = (16.0, 8.0) if ny == 0 else (8.0, 16.0)
+    sx, sy = wx - seal_w / 2, wy - seal_d / 2
+    svg.rect(sx, sy, seal_w, seal_d, stroke=EXHAUST_INK, width=1.4, fill="#f5e8d3")
+    if ny == 0:
+        for i in range(1, 4):
+            fx = sx + seal_w * i / 4
+            svg.line(fx, sy, fx - 3, sy + seal_d, stroke=EXHAUST_INK, width=0.8)
+    else:
+        for i in range(1, 4):
+            fy = sy + seal_d * i / 4
+            svg.line(sx, fy, sx + seal_w, fy - 3, stroke=EXHAUST_INK, width=0.8)
+    # label — named from the BoM's own requirement/part/qty (never hardcoded), placed
+    # INSIDE the plan boundary (offset AWAY from the wall) so it never collides with the
+    # exterior setout-grid dimension chain (which runs along the plan's outer edges).
+    part = str(pen.get("part") or "").strip()
+    qty = pen.get("qty")
+    bits = ["Off-gas duct penetration seal"]
+    if part and part.upper() not in ("TBD", "—", "NOT FOUND", "REQUIREMENT STATED"):
+        bits.append(part)
+    if isinstance(qty, (int, float)) and qty:
+        bits.append(f"×{qty:g}")
+    label = " · ".join(bits)
+    lx = wx - nx * 14 + (10 if ny == 0 else 0)
+    ly = wy - ny * 14 + (4 if ny == 0 else 0)
+    anchor = "start" if nx >= 0 else "end"
+    if ny != 0:
+        anchor = "middle"
+        lx = wx
+    svg.text(lx, ly, label, size=7.2, anchor=anchor, weight="bold", fill=EXHAUST_INK)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1415,6 +1484,7 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
     # far side with perpendicular pickups.  This reads as a real ducted distribution,
     # never a diagonal star.  Diffusers are drawn inside the same routine.
     _draw_plan_distribution(svg, sysm, pc, ppm, plan_x, plan_y, plan_w, plan_h)
+    _draw_duct_penetration_seal(svg, sysm, meta, pc, plan_x, plan_y, plan_w, plan_h)
 
     # ----- equipment outlines (hubs + zones) -----
     # de-overlap + GUARANTEED full-tag pass (2026-07-05 HVAC-label fix) — the SAME
@@ -2112,6 +2182,24 @@ def generate_hvac(out_dir: str, state_path: Optional[str] = None,
     manifest, state, schedule = load_inputs(out_dir, state_path, manifest_path)
     sysm = derive_air_system(manifest, state, schedule, out_dir)
     meta = {"count": manifest.get("count", 0), "schema": manifest.get("schema", "")}
+    # WALL-PENETRATION SEAL (2026-07-05, HVAC air-side coverage pass): a BoM line
+    # describing a duct's fire/gas-tight wall-penetration seal (the transit frame where a
+    # duct crosses the enclosure wall — e.g. an off-gas exhaust duct's Roxtec transit) is
+    # drawn as an explicit glyph on the duct run, never assumed absent. The label is read
+    # from the BoM's OWN requirement/part/qty, never a hardcoded manufacturer/count —
+    # universal, keyed on the requirement text (any '<...> duct <...> penetration <...>
+    # seal <...>' line), no product-class table. Absent for a design with no such line.
+    _pen_rx = re.compile(r"duct.*penetration.*seal|penetration.*seal.*duct", re.I)
+    _pen_row = next((r for r in (state.get("requirementsBom") or [])
+                     if isinstance(r, dict) and _pen_rx.search(str(r.get("requirement") or ""))),
+                    None)
+    if _pen_row:
+        meta["duct_penetration_seal"] = {
+            "requirement": _pen_row.get("requirement"),
+            "part": _pen_row.get("part"),
+            "qty": _pen_row.get("qty"),
+            "tag": _pen_row.get("tag"),
+        }
     svg_text = build_hvac_svg(sysm, meta)
 
     draw_dir = Path(out_dir) / "drawings"

@@ -85,6 +85,22 @@ export function routedLengthM(rm: RouteManifest | null, pred: (mech: string) => 
   return lines.filter(l => pred(String(l.mechanism ?? ''))).reduce((s, l) => s + (Number(l.length_m) || 0), 0)
 }
 
+/** Count routed segments (line entries) over the runs whose mechanism matches `pred` — the
+ *  honest CITED-MEASURED denominator: 'measured from routed geometry (route-manifest, N
+ *  segments)'. Companion to routedLengthM (2026-07-05, the interconnect_cable_length_m fix). */
+export function routedSegmentCount(rm: RouteManifest | null, pred: (mech: string) => boolean): number {
+  const lines = Array.isArray(rm?.lines) ? rm!.lines! : []
+  return lines.filter(l => pred(String(l.mechanism ?? ''))).length
+}
+
+/** The honest CITED-MEASURED citation text for a geometry-measured quantity — a MEASUREMENT,
+ *  not a formula. Never tack a fake operator onto this prose to trick a calc-coverage checker
+ *  (the opposite dishonesty); this exact phrasing is what dossier_audit.check_calc_coverage
+ *  (+ its build-excel-export.py mirror) recognise as the CITED taxonomy. */
+function citeMeasuredGeometry(segCount: number): string {
+  return `measured from routed geometry (route-manifest, ${segCount} segment${segCount === 1 ? '' : 's'})`
+}
+
 function curValue(quantities: Record<string, any>, key: string): number | null {
   const q = quantities?.[key]
   if (q == null) return null
@@ -187,13 +203,15 @@ export function computeQuantityUpdates(
     })
   }
   // 3. interconnect lengths (measured) — universal; feed the bill of materials + Stage F
-  const pipeM = Math.round(routedLengthM(rm, m => m === 'fluid_loop' || m === 'thermal') * 10) / 10
-  const cableM = Math.round(routedLengthM(rm, m => m === 'electrical_bus') * 10) / 10
+  const pipePred = (m: string) => m === 'fluid_loop' || m === 'thermal'
+  const cablePred = (m: string) => m === 'electrical_bus'
+  const pipeM = Math.round(routedLengthM(rm, pipePred) * 10) / 10
+  const cableM = Math.round(routedLengthM(rm, cablePred) * 10) / 10
   if (pipeM > 0) {
     const from = curValue(q, 'interconnect_pipe_length_m')
     updates.push({
       key: 'interconnect_pipe_length_m', from, to: pipeM, unit: 'm',
-      source: 'route-manifest', basis: 'measured routed fluid + thermal pipe length',
+      source: 'route-manifest', basis: citeMeasuredGeometry(routedSegmentCount(rm, pipePred)),
       rel_change: rel(from, pipeM),
     })
   }
@@ -201,7 +219,7 @@ export function computeQuantityUpdates(
     const from = curValue(q, 'interconnect_cable_length_m')
     updates.push({
       key: 'interconnect_cable_length_m', from, to: cableM, unit: 'm',
-      source: 'route-manifest', basis: 'measured routed power-bus length',
+      source: 'route-manifest', basis: citeMeasuredGeometry(routedSegmentCount(rm, cablePred)),
       rel_change: rel(from, cableM),
     })
   }

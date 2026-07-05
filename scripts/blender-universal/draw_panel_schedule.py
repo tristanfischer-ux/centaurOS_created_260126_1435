@@ -1475,6 +1475,37 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         dev, dev_a = _device_for(base, design_a, devices, panel,
                                  frame_override=frame_override)
 
+        # CABLE ≥ DEVICE RATING (2026-07-05, the 'BMS ctrl · W1–13' fix): BS 7671 In ≤ Iz
+        # — once the protective/switching DEVICE is picked (above), the cable must carry AT
+        # LEAST that device's own rating, not just the row's per-way design current. A REAL
+        # picked device (e.g. a rack DC isolator matched from the BoM by `_pick_device`)
+        # carries its OWN catalogue ampacity, independent of this row's kW-derived design
+        # current — the smallest ABB OTDC-ESS DC isolator frame is 315 A even when the
+        # per-rack demand it protects is only ~128 A (a real, deliberately-oversized-for-
+        # margin catalogue part, not a sizing bug), so a cable sized purely from the load
+        # current (Iz just above Ib) can sit below the LARGER In actually installed on the
+        # circuit (v9 BESS: a 315 A isolator on a 35 mm²/138 A cable). Re-size the cable to
+        # the standard CSA whose Method-C ampacity ≥ dev_a whenever the picked device's
+        # rating exceeds what the load-derived cable already covers — never DOWN-sizes (a
+        # load-derived cable that already clears a smaller device stays as-is). Universal:
+        # keyed on the device's OWN stamped rating, never a per-class table.
+        # TABLE CHOICE: uses electrical_distribution_model's `_CSA_AMPACITY_A` (via `edm`,
+        # already imported), NOT this module's own (more generous, multicore) `_CSA_AMPACITY_A`
+        # — the workbook's In≤Iz column-contract check (build-excel-export.py
+        # `_METHOD_C_AMPACITY_A`) is explicitly documented as MIRRORING the electrical
+        # model's table, so sizing against it here is what actually satisfies that check
+        # (mixing two divergent 'Method-C' tables for the SAME comparison would size a
+        # cable that passes this module's own ladder yet still fails the workbook's).
+        if dev_a is not None and dev_a > 0:
+            _need = dev_a  # Iz ≥ In directly — no ×1.25 (that margin sizes Ib→In, not In→Iz)
+            _need_csa = next((c for c in sorted(edm._CSA_AMPACITY_A)
+                              if edm._CSA_AMPACITY_A[c] >= _need), None)
+            _need_label = f"{_need_csa:g} mm²" if _need_csa is not None else ""
+            _cur_csa_m = re.search(r"([\d.]+)\s*mm²", str(cable or ""))
+            _cur_csa = float(_cur_csa_m.group(1)) if _cur_csa_m else None
+            if _need_csa is not None and (_cur_csa is None or _need_csa > _cur_csa):
+                cable = _cores_for(_need_label, panel.is_dc, panel.phases)
+
         # ΔU AT SOURCE (2026-07-02): the connection-schedule row's Vd was computed on the
         # ROW's cable at the ROW's (often wholesale-default) current; this panel re-derives
         # Design I from the circuit's own kW and re-sizes the cable — so recompute

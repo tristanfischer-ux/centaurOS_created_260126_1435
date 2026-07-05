@@ -72,6 +72,28 @@ function backfillToolCitations<T extends Record<string, unknown>>(quantities: T)
     const qq = q as Record<string, unknown>
     const prov = qq.provenance as Record<string, unknown> | undefined
     if (!prov || typeof prov !== 'object' || !prov.tool_id) continue
+    // TOP-LEVEL source + lineage BACKFILL (2026-07-05, the 22-row Quantities-provenance
+    // fix): every quantity literal here sets a NESTED `provenance` object (tool_id,
+    // version, licence…) but never the FLAT `source` / `lineage` fields the Quantities
+    // tab's provenance-completeness check reads (build-excel-export.py tab_quantities /
+    // _sc_quantities — 'Source' column = quantity.source, a SIBLING of `provenance`, not
+    // a child of it). c1f9a0290 threaded `source`/`lineage.from` onto the design-loop's
+    // OWN quantities (writeback-bridge.ts) but these tool-minted quantities predate that
+    // convention, so their 'Source' cell renders BLANK even though a real, rich citation
+    // already exists one level down in `provenance` — never invented, just not flattened
+    // to where the reader (and the check) look. Additive only: never overwrites a
+    // `source`/`lineage` a caller already set.
+    if (qq.source == null || qq.source === '') {
+      qq.source = String(prov.source || `tool:${prov.tool_id}`)
+    }
+    if (qq.lineage == null) {
+      // A tool-derived quantity's real inputs are the tool's OWN physical model
+      // (PyBaMM's cell electrochemistry, CoolProp's fluid tables, …) — not other named
+      // contract quantities in general, so 'brief' (the ultimate root of the design
+      // intent the tool was invoked for) is the honest upstream, exactly the same
+      // convention `writeback-bridge.ts` uses for its own measured/derived quantities.
+      qq.lineage = { from: ['brief'], via: String(prov.source || `tool:${prov.tool_id}`) }
+    }
     const sd = String(qq.source_detail ?? '').trim()
     const hasFormula = sd.length > 3 && _OPS.some(op => sd.includes(op))
     if (hasFormula) continue   // a bespoke derivation is already shown — never overwrite it
