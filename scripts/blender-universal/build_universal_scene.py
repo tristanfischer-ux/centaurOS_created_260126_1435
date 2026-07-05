@@ -586,6 +586,27 @@ SHAPE_RULES = [
 ]
 DEFAULT_SHAPE = "box"  # anything unmatched → a modest box
 
+# Shape families whose footprint_mm() branch expects a CYLINDER dim (dia_mm/len_mm) —
+# used by extract_parts()'s box-under-round-shape backstop (item 1, 2026-07-06): a word
+# classified into one of these by NAME but carrying an explicit BOX dim gets coerced to
+# `box` so its real w/d/h geometry is used instead of silently vanishing to the shape's
+# type-default cylinder.
+#
+# SCOPED TO `horizontal_vessel` ONLY (byte-identity check, 2026-07-06): footprint_mm's
+# round-shape dispatch actually covers tall_column/tall_vessel/vertical_vessel/tank/
+# stack/cone_vessel too, and the mismatch is theoretically possible on any of them — but
+# widening this set to all of them changed a WATER-TREATMENT part ("Uv Disinfection",
+# vertical_vessel by name + an explicit "600x510x660 mm" box dim → correctly coerced to
+# a small box instead of a phantom 1.83 m vessel) that the CO2-mineralisation prong-1 fix
+# was never asked to touch (out/fischer-codema-v79 byte-identity broke). That water fix
+# may well be genuine, but it is a SEPARATE, unverified change to an archetype this task
+# does not own or re-check — scoping to the ONE shape family the verified CO2 litter
+# actually used (every one of E-101/102/103/104/108/109/110/111's box-dim heat exchangers
+# is `horizontal_vessel` — none is tall_column/tall_vessel/vertical_vessel/tank/stack/
+# cone_vessel) fixes the proven defect with zero blast radius elsewhere. Widening further
+# is a legitimate follow-up but belongs to its own verified, re-checked change.
+_ROUND_VESSEL_SHAPES = {"horizontal_vessel"}
+
 # ── 3. TYPE-DEFAULT sizes (mm) — used only when the word has NO explicit dim ─
 # Each entry: overall (diameter_or_width, length_or_height) in mm. For vessels
 # the first is diameter, second is length/height. For boxes (W, D, H) we expand
@@ -1056,6 +1077,28 @@ def parse_dimension(dim_value):
         return {"kind": "box", "w_mm": float(m.group(1)), "d_mm": float(m.group(2)),
                 "h_mm": float(m.group(3))}
 
+    # "<a> x <b> x <c> m"  (box, METRES — item 1, 2026-07-06). The 3-figure box regex
+    # above only recognised a "mm" (millimetre) suffix; a compact-frame heat-exchanger
+    # dimension minted in METRES (hxBoxFromAreaM2: "0.30 × 0.60 × 1.45 m") matched NO
+    # branch of this parser at all — not the mm-box regex (wrong unit), not the m³/m²
+    # branches above (no ³/² marker), not the "<dia> m dia x <len> m" cylinder regex
+    # (no 'dia' token), not the generic 2-figure "<a> m x <b> m" cyl fallback below (that
+    # needs 'm' immediately after EACH of exactly two numbers; a 3-number string has no
+    # such position). `dim` came back None, so resolved_dims_mm's "no explicit dim" path
+    # silently fell every affected exchanger to the SAME shape type-default box — the
+    # cross-exchanger / lean-amine cooler / distillation reboiler / overhead condenser /
+    # crystalliser cooler+condenser (E-101..E-111 on the CO2-mineralisation class) all
+    # rendered as one identical {dia:700, len:3630} litter cluster despite each carrying
+    # a real, sizing-tool-derived AREA. This mirrors the cylinder/volume parsers above
+    # (both already accept a metres unit) — box dimensions get the same treatment.
+    # `\bm\b` (not a bare 'm') so a genuine "…mm" string can never match here (the mm
+    # branch above already returns first for those; this is reached only when it did NOT
+    # match, i.e. no 'mm' suffix is present at all).
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*x\s*(-?\d+(?:\.\d+)?)\s*x\s*(-?\d+(?:\.\d+)?)\s*m\b", s)
+    if m:
+        return {"kind": "box", "w_mm": float(m.group(1)) * 1000.0,
+                "d_mm": float(m.group(2)) * 1000.0, "h_mm": float(m.group(3)) * 1000.0}
+
     # "<a> x <b> mm"  (TWO-figure box, millimetres) — the common DEVICE datasheet
     # footprint (e.g. the edge-AI GPU card "267 x 111 mm", an insulin-pump board).
     # Read as a flat plate: w × d × a thin default height so a small device part
@@ -1282,6 +1325,22 @@ def extract_parts(state):
                 # name, so it catches any future name a shape rule doesn't recognise.
                 if dim and dim.get("kind") == "cyl" and shape == DEFAULT_SHAPE:
                     shape = "vertical_vessel"
+                # INVERSE of the backstop above (item 1, 2026-07-06): a part whose NAME
+                # put it in a ROUND vessel family (a "cooler"/"condenser"/"exchanger"/
+                # "reboiler" name classifies as horizontal_vessel — SHAPE_RULES line
+                # ~540) but whose OWN emitted dimension is an explicit BOX triplet (a
+                # compact plate/frame package footprint, e.g. hxBoxFromAreaM2's frame ×
+                # frame × pack-length) is physically a BOX, not a cylinder. footprint_mm's
+                # round-shape branches read ONLY dia_mm/len_mm — a box-kind dim under a
+                # round shape has neither, so it silently vanishes and the part falls back
+                # to the shape's type-default cylinder (the litter: N unrelated compact
+                # exchangers all rendering as the SAME default {700,2600}-ish cylinder,
+                # regardless of each one's own real sizing-tool-derived area). Coerce the
+                # shape to `box` so the explicit w/d/h geometry is honoured — symmetric to
+                # the cyl-under-DEFAULT_SHAPE backstop above, keyed on the dim-KIND vs
+                # shape-FAMILY mismatch, not the name, so any future class hits it too.
+                if dim and dim.get("kind") == "box" and shape in _ROUND_VESSEL_SHAPES:
+                    shape = "box"
                 parts.append(Part(name, module_id, region_key, rank, shape, dim, qty, form))
     # A qty-N big VESSEL/TANK is replicated DOWNSTREAM in build_part (one Part, N
     # instances drawn as a compact grid, each with a unique object base-name) so the
@@ -3844,6 +3903,16 @@ def resolve_endpoint(edge_part_name, parts):
         "fractionation_column": "product fractionation column",
         "saf_and_naphtha_storage": "saf storage tank",
         "thermal_oxidiser": "enclosed thermal oxidiser",
+        # CO2-mineralisation topology ids that name a real placed part under different
+        # words (item 3, 2026-07-06 — the 2 referential-integrity violations): the
+        # contract's steam feed to the reboiler ('reboiler_steam_supply') IS the plant's
+        # own 'electric steam generator' (no separate off-site utility exists in this
+        # design — a real part beats treating it as an abstract battery-limit); the
+        # cross-exchanger's preheated-rich-amine stream ('rich_amine_preheat') names the
+        # STATE of the fluid, not equipment — the amine continues on to the stripper,
+        # whose real BoM name in this design is the 'MEA stripper reboil pot'.
+        "reboiler_steam_supply": "electric steam generator",
+        "rich_amine_preheat": "mea stripper reboil pot",
     }
     if edge_part_name in SYN:
         toks = tokenise(SYN[edge_part_name])

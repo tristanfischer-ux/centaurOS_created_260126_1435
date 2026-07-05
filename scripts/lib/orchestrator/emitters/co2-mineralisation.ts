@@ -65,11 +65,32 @@ function mod(k: string, v: string, u?: string): Mod { return u !== undefined ? {
 // regardless of the exact frame constants, which are an order-of-magnitude
 // engineering estimate, not a datasheet claim (the part_number carries the real
 // catalogue identity; this is only the RENDERED envelope).
+//
+// VERIFIED STILL BROKEN post-2026-07-05 (item 1, 2026-07-06): this string never
+// actually parsed. build_universal_scene.py's `parse_dimension` box regex only
+// recognised a 3-figure dimension ending in "mm" (millimetres); this function
+// returns its triple with a bare " m" (metres) unit — the SAME unit convention
+// the cylinder/volume dimension strings elsewhere in this file already use
+// ("2.38 m dia x 5.17 m", "3 m³"), but the box branch of the parser had no metres
+// variant. So `dim` came back None for every word using this helper, and each one
+// silently fell to the shape's type-default cylinder — the exact litter this
+// comment describes (E-101/102/103/104/108/109/110 all rendering as the IDENTICAL
+// {dia:700, len:3630} box) was STILL present after the 2026-07-05 fix landed.
+// Fixed at the parser (build_universal_scene.py: parse_dimension now accepts a
+// "<a> x <b> x <c> m" box triple, the SAME treatment the cyl/volume branches
+// already had) — a universal parser fix, not a per-word patch, so every emitter
+// (this one and any future one) that mints a box dimension in metres is covered.
+// Argument ORDER here is (width, pack-length, height) — not (width, height, pack-
+// length) as first written — because the parser's box triple is canonically
+// (w, d, h): putting the scaling pack-length in the MIDDLE (depth) slot means the
+// exchanger's footprint grows along the deck (a sensible "longer unit = a longer
+// skid footprint" silhouette) while its height stays the fixed frame height,
+// instead of the reverse (a fixed-footprint box that grows arbitrarily TALL).
 function hxBoxFromAreaM2(areaM2: number): string {
   const frameWidthM = 0.30
   const frameHeightM = 0.60
   const packLengthM = Math.max(0.15, areaM2 * 0.12)
-  return `${frameWidthM.toFixed(2)} × ${frameHeightM.toFixed(2)} × ${packLengthM.toFixed(2)} m`
+  return `${frameWidthM.toFixed(2)} × ${packLengthM.toFixed(2)} × ${frameHeightM.toFixed(2)} m`
 }
 function hxAreaFromDutyKw(dutyKw: number): number {
   const uWM2K = 1000

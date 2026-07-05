@@ -702,9 +702,25 @@ _INLINE_TAP_RE = re.compile(
 # phantom-reference net agree on what "not a physical part" means. `ctrl`/`board` use
 # `[_ -]?` (not `\b`) so an underscore-joined id like 'bms_ctrl' matches — a bare `\bctrl\b`
 # does NOT fire inside 'bms_ctrl' because `_` counts as a word character in Python regex.
+#
+# WIDENED 2026-07-06 (+generic utility SUPPLY — the CO2-mineralisation reboiler-
+# steam gap): the existing supply vocabulary only covered ELECTRICAL (power_supply/
+# incoming_supply/electrical_supply) — a THERMAL/gas utility authored the same way
+# ('reboiler_steam_supply' → the site steam main feeding a reboiler) fell through as
+# a broken reference even though it is the identical "battery-limit utility feed"
+# concept, just a different service. Keyed on the SERVICE noun immediately before
+# `_supply` (steam/nitrogen/instrument-air/cooling-water/chilled-water/compressed-
+# air/inert-gas — the common industrial-utility set), not a per-class name, so any
+# archetype whose contract authors '<utility>_steam_supply'-style ids is covered.
+# NOTE: when a design's own BoM contains a REAL part for the utility source (e.g. an
+# "electric steam generator"), resolve_endpoint's SYN table (build_universal_scene.
+# py) resolves the edge to that PART first — a real part beats an abstract boundary
+# every time, and this pattern only fires as the fallback when no such part exists.
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
+    r"(?:steam|nitrogen|instrument[_ -]?air|compressed[_ -]?air|inert[_ -]?gas|"
+    r"cooling[_ -]?water|chilled[_ -]?water)[_ -]?supply\b|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
     r"\b(?:dc|ac|hv|lv|mv)[_ -]?bus\b|\bheat[_ -]?reject(?:ion)?\b|"
     r"\b(?:heat|thermal|cold)[_ -]?sink\b|"
@@ -2486,6 +2502,32 @@ def _selftest():
         f"specs[0] must describe the SAME surviving run as rows[0] (lockstep, re-homed) — "
         f"a plain per-array prune (not index-aligned) would leave specs pointing at the "
         f"wrong run; got {_pi_new['specs'][0]}")
+
+    # audit_referential_integrity + _ABSTRACT_BOUNDARY_RE utility-supply widening
+    # (2026-07-06, CO2-mineralisation prong-3 proveCatch): a generic UTILITY-SUPPLY
+    # endpoint id (steam / nitrogen / instrument-air / …) that names no real part must
+    # be treated as a legitimate battery-limit terminus, NOT a broken reference — but
+    # a genuinely bogus endpoint (matches no part AND no recognised utility/boundary
+    # vocabulary) must still be flagged. Both directions proven so the widening cannot
+    # silently swallow real dangling references (the anti-Goodhart counter-case).
+    _ri_names = {"MEA Stripper Reboil Pot", "Packed Absorber Column"}
+    _ri_topo = [
+        {"from_part": "reboiler_steam_supply", "to_part": "Packed Absorber Column",
+         "mechanism": "thermal"},
+        {"from_part": "nitrogen_supply", "to_part": "MEA Stripper Reboil Pot",
+         "mechanism": "fluid_loop"},
+        {"from_part": "MEA Stripper Reboil Pot", "to_part": "totally_made_up_widget",
+         "mechanism": "fluid_loop"},
+    ]
+    _ri_violations = audit_referential_integrity(_ri_topo, _ri_names, log=lambda *a: None)
+    _ri_bad = {v["name"] for v in _ri_violations}
+    assert "reboiler_steam_supply" not in _ri_bad, \
+        "a <service>_supply utility endpoint is a legitimate boundary, not a broken reference"
+    assert "nitrogen_supply" not in _ri_bad, \
+        "the utility-supply pattern is generic (any service noun), not a per-name patch"
+    assert "totally_made_up_widget" in _ri_bad, \
+        "a genuinely unresolved endpoint must still be flagged (the widening must not " \
+        "swallow real dangling references)"
 
     print("connection_ledger selftest: OK (authority + completeness + integrity + direction-closer + residual + flow-demand join)")
     print(f"connection_ledger selftest: OK (2 authored, dangling+dry+dup dropped; "

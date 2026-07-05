@@ -101,11 +101,21 @@ GA_NON_MASSING_RE = re.compile(
     # cartridge/module/bank are the internals; a 'membrane skid/unit/package' stays massed.
     r"\bmembrane (?:element(?:s)?|media|cartridge(?:s)?|module(?:s)?|housings?|bank)\b|"
     r"\b(?:ro|uf|nf|mf) membrane(?:s)?\b|\bmembrane stack(?:s)?\b|"
-    # field instruments -> P&ID tags
-    r"\btransmitter\b|\btransducer(?:s)?\b|\bsensor\b|\banaly[sz]er\b|"
-    r"\bflow ?meter(?:s)?\b|\bgauge\b|\bprobe\b|\bdetector\b|\bindicator\b|"
+    # field instruments -> P&ID tags (2026-07-06: PLURAL-BOUNDARY FIX — every noun
+    # here previously had NO `(?:s)?`, so a plural name ("CO2 asphyxiation
+    # DETECTORS", "radar level TRANSMITTERS", "pH/conductivity ANALYSERS") broke the
+    # trailing \b — a word boundary requires a NON-word char immediately after the
+    # match, but the plural 's' sits right there with no boundary, so \btransmitter\b
+    # never fires inside "transmitters". The CO2-mineralisation instrument-index
+    # litter (8 parts sharing one 600×600×600 default box: detectors, isolation
+    # barriers, transmitters, relays, analysers all slipped through singular-only
+    # patterns) is this exact bug family across every instrument noun at once — a
+    # SOURCE-rule fix (not a per-name patch), universal across every archetype that
+    # authors its instrument index in the plural.
+    r"\btransmitters?\b|\btransducer(?:s)?\b|\bsensors?\b|\banaly[sz]ers?\b|"
+    r"\bflow ?meter(?:s)?\b|\bgauges?\b|\bprobes?\b|\bdetectors?\b|\bindicators?\b|"
     # switchgear / protection / control-panel internals -> inside the cabinet
-    r"\bcircuit breaker(?:s)?\b|\bmotor starter(?:s)?\b|\bvfd\b|"
+    r"\bcircuit breaker(?:s)?\b|\bmotor starter(?:s)?\b|\bvfds?\b|"
     r"\bcontactor(?:s)?\b|\bemergency stop\b|\bplc\b|\bhmi\b|"
     r"\bcontroller(?:s)?\b|\binterface\b|\bethernet\b|\bmodbus\b|"
     r"\bprofibus\b|\bgateway\b|\b(?:remote )?monitoring\b|"
@@ -113,6 +123,21 @@ GA_NON_MASSING_RE = re.compile(
     r"thermal|fault) protection\b|"
     r"\b(?:low|high|pressure|level|float|limit|flow|proximity|"
     r"temperature) switch(?:es)?\b|"
+    # more panel/instrument-index internals (2026-07-06, CO2-mineralisation family-6
+    # denominator-honesty pass): a bare protection RELAY (motor-protection relay,
+    # safety relay) is the same panel-internal-device family as the circuit-breaker/
+    # motor-starter/contactor line above; an ISOLATION BARRIER is a DIN-rail-mounted
+    # SIL/Zener barrier (panel internals, not a floor-standing enclosure of its own —
+    # distinct from the module-authority INSTRUMENT-SHAPE rule that already forces
+    # these small devices off the vessel-shape path); a VARIABLE-SPEED DRIVE (VSD) is
+    # the same drive-cabinet-internals concept as the existing bare \bvfd\b; a SOFT
+    # STARTER and a FIELDBUS MODULE are likewise panel/motor-control-centre internals;
+    # an EMERGENCY SHUTDOWN SYSTEM is SIS/ESD control LOGIC (a P&ID/cause-and-effect
+    # concept), not a discrete 3D object; a SAFETY SHOWER + EYEWASH is a P&ID safety-
+    # utility symbol. Universal — keyed on the device/utility noun, no per-class table.
+    r"\brelays?\b|\bisolation barriers?\b|\bvariable[- ]speed drives?\b|\bvsds?\b|"
+    r"\bsoft starters?\b|\bfieldbus modules?\b|"
+    r"\bemergency shutdown system\b|\bsafety shower\b|\beyewash(?:es)?\b|"
     # pipework-attached fittings that live ON/IN a parent (Codema litter clusters
     # 2026-07-02): a CIP SPRAY BALL sits INSIDE the tank; a SAMPLING POINT is a
     # port+valve (P&ID tag, same object as the 'Sample Valve' already dropped); a
@@ -305,6 +330,23 @@ def _selftest():
         "pressure relief and sight glass", "sight glass",
         "coolant supply pipe", "coolant return pipe",
         "rack heater thermostat",
+        # PLURAL-BOUNDARY fix proveCatch (2026-07-06, CO2-mineralisation instrument-
+        # index family-6 denominator-honesty pass) — every one of these is the SAME
+        # noun as an existing must_drop singular above, but plural, and previously
+        # slipped the \bnoun\b boundary (no trailing 's' handling): amine-vapour/CO2
+        # asphyxiation DETECTORS, radar level / pressure / temperature TRANSMITTERS,
+        # pH/conductivity ANALYSERS all shared one 600×600×600 default box.
+        "amine-vapour detectors", "CO2 asphyxiation detectors",
+        "radar level transmitters", "pressure transmitters", "temperature transmitters",
+        "pH/conductivity analysers", "flow transducers", "gauges 2", "probes 2",
+        "level indicators",
+        # new panel/instrument-index device families (relay / isolation barrier / VSD /
+        # soft starter / fieldbus module / ESD logic / safety shower) — the SAME
+        # panel-internals + P&ID-symbol principle as the switchgear-internals family
+        # above, extended to the CO2-mineralisation electrical/safety-loop vocabulary.
+        "motor-protection relays", "safety relays", "SIL-rated isolation barriers",
+        "variable-speed drives", "VSD panel", "soft starters",
+        "drive fieldbus modules", "emergency shutdown system", "safety shower + eyewash",
     ]
     # pure documentation/signage — expected on NO representation at all.
     must_be_documentation = [
