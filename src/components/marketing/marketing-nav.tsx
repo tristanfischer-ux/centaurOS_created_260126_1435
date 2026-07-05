@@ -16,7 +16,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Menu, X } from 'lucide-react'
+import { Flame, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 
@@ -35,13 +35,19 @@ function BrandMark({ size = 26 }: { size?: number }) {
     return (
         <span
             aria-hidden
-            className="inline-block rounded-lg"
+            className="inline-flex items-center justify-center rounded-lg"
             style={{
                 width: size,
                 height: size,
                 background: 'linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c)',
             }}
-        />
+        >
+            <Flame
+                className="text-white"
+                strokeWidth={2.2}
+                style={{ width: size * 0.58, height: size * 0.58 }}
+            />
+        </span>
     )
 }
 

@@ -40,7 +40,8 @@ const HTML = `<style>
   .nav-inner{display:flex;align-items:center;justify-content:space-between;height:68px;}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;color:var(--ink);letter-spacing:-.02em;}
   .brand:hover{text-decoration:none;}
-  .flame{width:26px;height:26px;border-radius:8px;background:linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c);display:inline-block;}
+  .flame{width:26px;height:26px;border-radius:8px;background:linear-gradient(160deg,#f59e0b,#e2562a 60%,#c2410c);display:inline-flex;align-items:center;justify-content:center;}
+  .flame svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
   .nav-links{display:flex;gap:26px;align-items:center;}
   .nav-links a{color:var(--ink-soft);font-weight:600;font-size:15px;}
   @media(max-width:920px){.nav-links{display:none;} }
@@ -57,6 +58,15 @@ const HTML = `<style>
   .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center;}
   .hero-copy .sub{max-width:52ch;}
   @media(max-width:900px){.hero-grid{grid-template-columns:1fr;} .hero-visual{display:none;} }
+  .hero h1{font-size:clamp(40px,6.2vw,72px);line-height:1.04;}
+  .cred{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface);padding:26px 0 24px;}
+  .cred-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;align-items:start;}
+  .cred-stat{display:flex;flex-direction:column;gap:5px;}
+  .cred-stat b{font-size:26px;font-weight:800;color:var(--ember);letter-spacing:-.02em;line-height:1;}
+  .cred-stat span{font-size:13px;color:var(--muted);line-height:1.4;}
+  .cred-by{margin-top:18px;font-size:14px;color:var(--muted);}
+  .cred-by strong{color:var(--ink);}
+  @media(max-width:760px){.cred-inner{grid-template-columns:repeat(2,1fr);gap:20px;} }
   .wb{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
   .wb-top{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--line);font-weight:800;font-size:14px;color:var(--ink);}
   .wb-top .flame{width:20px;height:20px;border-radius:6px;}
@@ -218,7 +228,7 @@ const HTML = `<style>
 
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="#"><span class="flame"></span> Fractional&nbsp;Forge</a>
+    <a class="brand" href="#"><span class="flame"><svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span> Fractional&nbsp;Forge</a>
     <nav class="nav-links">
       <a href="#founders">For founders</a>
       <a href="#partners">For partners</a>
@@ -250,6 +260,17 @@ const HTML = `<style>
   </div>
 </section>
 
+<!-- CREDIBILITY BAND -->
+<section class="cred">
+  <div class="wrap cred-inner">
+    <div class="cred-stat"><b>25+ yrs</b><span>building capital-intensive deep-tech &amp; manufacturing</span></div>
+    <div class="cred-stat"><b>~&pound;200m</b><span>raised across his own &amp; advised companies</span></div>
+    <div class="cred-stat"><b>6 sectors</b><span>solar &middot; wind &middot; tidal &middot; batteries &middot; vertical farming &middot; carbon capture</span></div>
+    <div class="cred-stat"><b>Ex-Citigroup</b><span>&amp; Shell Ventures &middot; took a company public on AIM</span></div>
+  </div>
+  <p class="wrap cred-by">Founded by <strong>Tristan Fischer</strong> &mdash; a decade building Fischer Farms into one of the world&rsquo;s largest vertical farms. Every Design Dossier is reviewed by a senior engineer.</p>
+</section>
+
 <!-- THESIS: why hardware is harder than software -->
 <section class="s">
   <div class="wrap">
@@ -258,7 +279,7 @@ const HTML = `<style>
         <span class="eyebrow">The missing layer</span>
         <h2 style="margin-top:10px">Hardware is harder than software &mdash; by design.</h2>
         <p>Software won partly because the hard infrastructure is rented. AWS and Azure run the compute; the app stores handle distribution. A founder can stay product- and customer-led and let someone else own the atoms. Hardware has no equivalent: founders must invent the product, engineer it, stand up a factory or supply chain, <em>and</em> raise the capital &mdash; all at once. It&rsquo;s why so many genuinely good hardware companies stall.</p>
-        <p style="margin-top:16px"><a href="https://www.historyfuturenow.com/articles/from-basement-servers-to-billion-users-what-software-learned-that-hardware-hasnt" target="_blank">Read: Hardware Needs Its AWS Moment &rarr;</a></p>
+        <p style="margin-top:16px"><a href="/insights/from-basement-servers-to-billion-users-what-software-learned-that-hardware-hasnt">Read: Hardware Needs Its AWS Moment &rarr;</a></p>
       </div>
       <div><div class="big">Fractional&nbsp;Forge is building <span>the AWS for atoms.</span></div></div>
     </div>
@@ -433,9 +454,9 @@ const HTML = `<style>
         <p>Most recently I spent a decade building and running Fischer Farms, one of the world&rsquo;s largest vertical farms. I know what it takes to get a physical product designed, funded and built &mdash; because I&rsquo;ve done it, repeatedly, and from every seat at the table. Fractional Forge is the front end I wish founders had had.</p>
         <div class="essays">
           <span class="lbl">I write about why hardware is hard, and how to fix it:</span>
-          <a href="https://www.historyfuturenow.com/articles/the-eighteen-month-trap-why-hardware-startups-are-structurally-slow" target="_blank">The Eighteen-Month Trap &rarr;</a>
-          <a href="https://www.historyfuturenow.com/articles/from-basement-servers-to-billion-users-what-software-learned-that-hardware-hasnt" target="_blank">Hardware Needs Its AWS Moment &rarr;</a>
-          <a href="https://www.historyfuturenow.com/articles/the-fifteen-minute-factory-why-proximity-still-wins" target="_blank">The Fifteen-Minute Factory &rarr;</a>
+          <a href="/insights/the-eighteen-month-trap-why-hardware-startups-are-structurally-slow">The Eighteen-Month Trap &rarr;</a>
+          <a href="/insights/from-basement-servers-to-billion-users-what-software-learned-that-hardware-hasnt">Hardware Needs Its AWS Moment &rarr;</a>
+          <a href="/insights/the-fifteen-minute-factory-why-proximity-still-wins">The Fifteen-Minute Factory &rarr;</a>
         </div>
         <a class="btn btn-primary" href="https://calendly.com/tristan-fischer-wjlf/30min" target="_blank" rel="noopener">Book a call with me</a>
         <p class="sign">&mdash; Tristan, Founder, Fractional Forge</p>
@@ -534,7 +555,7 @@ const HTML = `<style>
 <footer>
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <span class="brand" style="font-size:18px"><span class="flame"></span> Fractional Forge</span>
+      <span class="brand" style="font-size:18px"><span class="flame"><svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span> Fractional Forge</span>
       <p>The front end for hardware. We help deep-tech and hardware founders get funded &mdash; and built: commercial strategy, capital, and a curated network of Europe&rsquo;s best engineering and manufacturing partners. Every Design Dossier is reviewed by a senior engineer.</p>
     </div>
     <div class="foot-col">
