@@ -267,7 +267,7 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
 // 'batteries'→'battery'. Conservative — never folds short tokens, -ss/-us/-is
 // endings (chassis, modbus, stainless) or known non-plurals (UPS, lens, bellows),
 // so an acronym/mass noun is never mangled into a false match.
-const NEVER_FOLD = new Set<string>(['ups', 'lens', 'bellows', 'scada', 'mains'])  // 'mains' is a mass noun (mains power/water), not a plural — folding it to 'main' lands on a STOP token and silently kills the qualifier (EP-102, round 5)
+const NEVER_FOLD = new Set<string>(['ups', 'lens', 'bellows', 'scada', 'mains', 'gas'])  // 'mains' is a mass noun (mains power/water), not a plural — folding it to 'main' lands on a STOP token and silently kills the qualifier (EP-102, round 5). 'gas' is a mass noun too (folding would strip to 'ga') — kept in sync with build-excel-export.py::_JOIN_NEVER_FOLD (co2_mineralisation pre-flight family 1, 2026-07-05)
 export function foldPluralToken(t: string): string {
   const s = String(t ?? '').toLowerCase()
   if (s.length < 4 || NEVER_FOLD.has(s)) return s

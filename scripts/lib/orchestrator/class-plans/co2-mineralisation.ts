@@ -801,6 +801,15 @@ const stepCarbonationReactorSizing: ToolStep = {
 //     column_diameter_m, ntu, design_velocity_m_s, flooding_velocity_m_s.
 //     Distinct quantity names from the stripper instance (multi-instance idiom).
 // ===========================================================================
+// ONE MINT, ONE OWNER (2026-07-05 pre-flight family 2): a single named fallback
+// constant, not a repeated magic-number literal, for the (never-hit, contract-
+// always-mints) missing-quantity case on absorber_packed_height_m below — two
+// independent hardcoded `20`s are exactly how a future edit to ONE of them
+// silently diverges from the other (the multi-mint bug class this discipline
+// exists to prevent). Matches engineering-contract.ts's absorberPackedHeightM
+// empirical anchor (C. Schoolderman 2026-06-08).
+const ABSORBER_PACKED_HEIGHT_FALLBACK_M = 20
+
 const stepCo2AbsorberSizing: ToolStep = {
   tool_id: 'absorption:column-htu-ntu',
   required: false,
@@ -823,12 +832,20 @@ const stepCo2AbsorberSizing: ToolStep = {
     // Reactive-MEA empirical packed-height override (~20 m; C. Schoolderman 2026-06-08):
     // Colburn HTU·NTU is invalid for kinetically-enhanced MEA + assumed zero lean loading.
     // GOVERNS the packed height; the flooding DIAMETER stays first-principles.
-    packed_height_override_m: q(c, 'absorber_packed_height_m', 20),
+    // engineering-contract.ts mints absorber_packed_height_m unconditionally before this
+    // class plan runs, so `q(c, ...)` always resolves the real contract value here — the
+    // fallback constant covers the (never-hit) missing-quantity case only (the
+    // getSharedQty-fallback idiom this file uses throughout, e.g. capture_capacity_
+    // tco2_per_day above), not a second source of truth.
+    packed_height_override_m: q(c, 'absorber_packed_height_m', ABSORBER_PACKED_HEIGHT_FALLBACK_M),
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const p = provFor('absorption:column-htu-ntu', '1.0.0', 'free-proprietary', 'internal://forgeos/process')
+    // Fall back to the SAME contract-read value fed to the tool as packed_height_override_m
+    // above (the same named constant, not a second hardcoded literal) — if the tool doesn't
+    // echo packed_height_m back, this stays self-consistent with what we told it to use.
     return { ...c, quantities: { ...c.quantities,
-      absorber_packed_height_m: mkQty(num(output, 'packed_height_m') ?? 20, 'm', 'length', p('packed_height_m'), 'CO2 absorber packed height (empirical reactive-MEA anchor)'),
+      absorber_packed_height_m: mkQty(num(output, 'packed_height_m') ?? q(c, 'absorber_packed_height_m', ABSORBER_PACKED_HEIGHT_FALLBACK_M), 'm', 'length', p('packed_height_m'), 'CO2 absorber packed height (empirical reactive-MEA anchor)'),
       absorber_diameter_m: mkQty(num(output, 'column_diameter_m') ?? 0.23, 'm', 'length', p('column_diameter_m'), 'CO2 absorber diameter (flooding-grounded)'),
       absorber_ntu: mkQty(num(output, 'ntu') ?? 2.35, '', 'dimensionless', p('ntu'), 'CO2 absorber transfer units'),
     } }

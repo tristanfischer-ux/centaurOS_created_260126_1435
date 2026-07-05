@@ -5864,7 +5864,7 @@ def _build_costbasis_by_name(state: dict) -> Dict[str, dict]:
 # the HEAD noun through a tiny same-family synonym map. NEVER cross-joins
 # different head nouns — 'pressure transmitter' can never join 'pressure switch'
 # (proveCatch in _selftest).
-_JOIN_NEVER_FOLD = {"ups", "lens", "bellows", "scada", "gas"}
+_JOIN_NEVER_FOLD = {"ups", "lens", "bellows", "scada", "gas", "mains"}  # 'mains' is a mass noun (mains power/water), not a plural — kept in sync with emitter-completion.ts::NEVER_FOLD (co2_mineralisation pre-flight family 1, 2026-07-05)
 _HEAD_NOUN_SYNONYM = {"button": "switch", "pushbutton": "switch"}
 
 
@@ -23228,6 +23228,23 @@ def _selftest() -> int:
     if not (isinstance(_pc_miss_score, (int, float)) and _pc_miss_score < 8):
         print(f"  FAIL performance-card-fact: a genuine under-delivery (3.2 MWh vs 5 MWh "
               f"floor) must NOT be rescued to >=8 — got {_pc_miss_score!r}"); bad += 1
+
+    # ═══ proveCatch NEVER_FOLD union parity (co2_mineralisation pre-flight family 1,
+    # 2026-07-05): _JOIN_NEVER_FOLD here and NEVER_FOLD in emitter-completion.ts must
+    # be the SAME set, or a name containing a diverged token plural-folds differently
+    # on the two sides of the join. Assert every member actually resists folding (the
+    # catch: a token present in the set but still folded would mean the guard is dead
+    # code, e.g. the length<4 short-circuit silently satisfying 'gas' without the set
+    # membership doing any work) AND assert the known cross-file union membership.
+    _expected_never_fold = {"ups", "lens", "bellows", "scada", "gas", "mains"}
+    if _JOIN_NEVER_FOLD != _expected_never_fold:
+        print(f"  FAIL never-fold-union: _JOIN_NEVER_FOLD drifted from the TS-side "
+              f"union — got {sorted(_JOIN_NEVER_FOLD)}, want {sorted(_expected_never_fold)}"); bad += 1
+    for _nf_tok, _nf_would_fold_to in (("mains", "main"), ("gas", "ga")):
+        _nf_got = _fold_plural_token(_nf_tok)
+        if _nf_got != _nf_tok:
+            print(f"  FAIL never-fold-union: '{_nf_tok}' folded to '{_nf_got}' "
+                  f"(expected untouched — mass noun, would collide with '{_nf_would_fold_to}')"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

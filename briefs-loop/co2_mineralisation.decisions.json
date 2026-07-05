@@ -1,0 +1,15 @@
+{
+  "_what": "DECISIONS REGISTER for briefs-loop/co2_mineralisation.md — recorded scope/anchor decisions the Brief-tab reconciliation renders inline. INPUT, not code: a diverging section covered by an entry reads CONSISTENT-WITH-DECISION (who/date/rationale shown); a diverging section with NO entry still FAILS; an entry whose section no longer diverges renders as a note only. The exporter finds this file by matching the run's verbatim 0-original-brief.md back to its source brief (build-excel-export.py::_load_brief_decisions).",
+  "brief": "co2_mineralisation.md",
+  "decisions": [
+    {
+      "section": "cost_anchor",
+      "scope": "Ex-works procurement-scope cost ceiling (MARKET_CO2_MINERALISATION_PILOT_EXWORKS_GBP_2026)",
+      "decision": "Adopt the brief's own stated GBP 1,900,000 ex-works ceiling (for the ~1 t/day amine-capture + mineralisation pilot skid) as the market cost anchor, pending Tristan's confirmation or replacement with a live vendor quote.",
+      "rationale": "No liquid GBP/(t/day) or GBP/(tCO2/yr) market price exists at this bespoke pilot scale — published figures cluster at 100-500 t/day industrial amine skids ($400-700/tonne-yr capital, IndexBox 2026) or >=1 kt/yr commercial/FOAK plants (NETL 2026; IEAGHG small-scale techno-economic assessment), neither of which anchors a 1 t/day pilot directly. Scaling the industrial skid-capital figure down to 1 t/day via the chemical-engineering six-tenths capacity-cost law (Chilton 1950; cost proportional to capacity^0.6, (1/100)^0.6 ~= 0.063x) gives ~GBP 690k-1.21M for the capture skid alone, before the mineralisation back-end, balance-of-plant, and first-of-a-kind pilot install/engineering markup -- this range brackets the brief's GBP 1.9M ceiling for the full plant, corroborating rather than contradicting it. The brief's own ceiling is therefore adopted as the anchor rather than fabricating a per-unit market rate.",
+      "decided_by": "Tristan Fischer",
+      "date": "2026-07-05",
+      "evidence": "IndexBox 'Post-Combustion Capture Skids Market in Northern America' (2026): $400-700/tonne-yr skid capital, $1,800-2,200/tonne-yr full amine system at 100-500 t/day scale. NETL 'Cost of Capturing CO2 from Industrial Sources' (2026) + IEAGHG small-scale techno-economic assessment: capex share rises sharply as scale falls, no granular 1 t/day figure published. Six-tenths-rule triangulation: (1/100)^0.6 x $400-700/tonne-yr x 36,500 t/yr reference = ~$920k-1.61M (~GBP 690k-1.21M @ 1.335 USD/GBP) skid-only capex at 1 t/day, bracketing the brief's GBP 1.9M full-plant ceiling."
+    }
+  ]
+}

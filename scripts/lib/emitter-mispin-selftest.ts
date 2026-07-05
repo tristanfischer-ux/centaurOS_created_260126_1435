@@ -79,6 +79,15 @@ expect(isMotorDriveSlot('Hard Disk Drive') === false, "a disk drive is not a mot
 expect(foldPluralToken('valves') === 'valve' && foldPluralToken('switches') === 'switch' &&
        foldPluralToken('batteries') === 'battery' && foldPluralToken('ups') === 'ups',
   'plural fold: valves→valve, switches→switch, batteries→battery; UPS never folds')
+// ── NEVER_FOLD union parity (co2_mineralisation pre-flight family 1, 2026-07-05): TS
+//    NEVER_FOLD and Python _JOIN_NEVER_FOLD must be the SAME set of mass-noun/acronym
+//    tokens, or a name containing a diverged token plural-folds differently on the two
+//    sides of the emitter↔Excel join. proveCatch: 'mains' and 'gas' must resist folding
+//    on the TS side too (the union add for this class plan).
+expect(foldPluralToken('mains') === 'mains',
+  "NEVER_FOLD union: 'mains' is a mass noun (mains power/water) — folding to 'main' would land on a STOP token")
+expect(foldPluralToken('gas') === 'gas',
+  "NEVER_FOLD union: 'gas' must resist folding (kept in sync with build-excel-export.py::_JOIN_NEVER_FOLD)")
 for (const nm of ['Manual Isolation Valves', 'Pressure Transmitters', 'Control + Instrument UPS',
                   'Standby Diesel Generator', 'SCADA / Plant Control System', 'pH Analyser',
                   'UV Disinfection', 'Electrical Control Panel', 'Main Switchboard',
