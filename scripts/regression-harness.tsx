@@ -77,7 +77,7 @@ import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleto
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
 import { buildAuthorDigest, buildCheckSpec } from './author-blender-scene'
-import { evaluatePhysicsCriticEnforcement } from './lib/physics-critic-enforcement'
+import { evaluatePhysicsCriticEnforcement, makePythonCorroborationOracle } from './lib/physics-critic-enforcement'
 import { scrubModuleParagraph, buildFrozenQuantitiesBlock, roundToSigFigs } from '../src/lib/pdf-engine-v2/radical/module-paragraph-llm'
 import { buildNaturalLanguageLayer as buildNlLayerForHarness } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { selectCorrectableFindings, locateWordForFinding, parseCorrection } from './lib/physics-critic-autocorrect'
@@ -12032,6 +12032,108 @@ print(json.dumps({"lv": r_lv, "dc": r_dc}))
       passed: false,
       detail: `probe failed: ${(err as Error).message.slice(0, 160)}`,
     })
+  }
+
+  // ── UNIVERSAL: gate 33 blocking requires DETERMINISTIC CORROBORATION — the doctrine's
+  //    fourth application (2026-07-05, ROUTED from f20303c3e's v4 fuse-vindication commit) ──
+  //
+  // UNIVERSAL.physics_critic_enforcement_corroboration — v4 proved a gap in the block-
+  // predicate-alone design (UNIVERSAL.physics_critic_enforcement_blocks_failing_part,
+  // above): `issueIsBlocking` correctly cleared bars (a)-(c) on a plausible-but-FALSE
+  // "the 200 A rack fuse is undersized" HIGH (the Critic's own cited arithmetic — 128.2 A
+  // rack demand, 1.56x margin — already showed the fuse was fine; it pivoted to comparing
+  // the fuse's rating against an unrelated switch/contactor rating to still call it
+  // undersized). evaluatePhysicsCriticEnforcement's third parameter (CorroborationOracle)
+  // now runs every bar-(a)-(c)-clearing finding through a deterministic check over the
+  // delivered artefacts (the REAL bridge here — python dossier_audit.py's
+  // `_corroborate_finding`, commit 247494a32's corroboration layer, extended 2026-07-05
+  // with the `current_rating_pair` shape for protective-device Amp ratings): REFUTED (the
+  // pair is arithmetically coherent) -> advisory, does NOT block; CORROBORATED (the pair
+  // genuinely diverges) -> blocks, same as before; UNCORROBORABLE (no rating fields to
+  // compare — e.g. the CO₂ MDPE-at-120°C material-vs-temperature shape) -> conservative,
+  // STILL blocks (a known-failure claim with no counter-evidence must not ship silently).
+  // Uses the REAL python bridge (makePythonCorroborationOracle), not a synthetic oracle,
+  // so this proves the actual cross-language integration works, not just the pure TS
+  // branching — pure/snapshot-independent (a python3 subprocess call, no network, no LLM),
+  // so it belongs here in checkQualityLoopInvariants (unconditional), not checkSnapshot.
+  try {
+    const issue = (o: Partial<{ severity: string; confidence: string; where: string; issue: string }>) => ({
+      dimension: 'engineering_plausibility', severity: 'high', confidence: 'high',
+      where: 'power_distribution.sub_modules[0].words[4]', issue: 'placeholder', ...o,
+    }) as any
+    const crit = (issues: any[]) => ({ scores: {}, headline: '', issues, what_worked: [], model: 't', latency_ms: 0 }) as any
+    const fuseWord = (partNumber: string, ratedA: number) => ({
+      name_human: 'DC HRC fuse',
+      content_character: { character_id: 'dc_hrc_fuse_word' },
+      modifier_characters: [
+        { kind: 'quantity', value: '×13' },
+        { kind: 'capacity', value: String(ratedA), unit: 'A' },
+        { kind: 'manufacturer', value: 'Eaton Bussmann' },
+        { kind: 'part_number', value: partNumber },
+        { kind: 'dimension', value: '1500', unit: 'V' },
+      ],
+    })
+    const fuseState = (partNumber: string, ratedA: number) => ({
+      moduleDecomposition: { modules: [{ module: 'power_distribution', sub_modules: [{ words: [fuseWord(partNumber, ratedA)] }] }] },
+      orchestratorContract: { quantities: { string_continuous_current_a: { value: 128.2051282051282, unit: 'A' } } },
+    })
+
+    // (1) REFUTED — the v4 fuse HIGH verbatim: 200 A fuse, 128.2 A rack demand (1.56x
+    //     margin, clears the 1.25x floor). Must NOT block once corroboration is wired.
+    const v4FuseHigh = issue({
+      issue: 'The rack-level fuses are specified as Eaton Bussmann PV-200A-1XL-B-15 rated at 200 A. '
+        + 'However, the maximum DC current of the system is 1,667 A. Split across 13 parallel racks, '
+        + 'the nominal current per rack is 1,667 A / 13 = 128.2 A. A 200 A fuse provides a 1.56x margin, '
+        + 'which is acceptable. However, the sub-module description also lists \'Schaltbau C310K/500\' '
+        + 'contactors rated at 500 A continuous and \'OTDC315FV11-ESS\' disconnect switches rated at 315 A. '
+        + 'The 200 A fuse is undersized relative to the 315 A switch and 500 A contactor, and will run hot '
+        + 'at 128 A continuous in a 45°C ambient container environment.',
+    })
+    const refutedDecision = evaluatePhysicsCriticEnforcement(crit([v4FuseHigh]), 'on', makePythonCorroborationOracle(fuseState('PV-200A-1XL-B-15', 200)))
+
+    // (2) CORROBORATED — a GENUINELY undersized rack fuse (100 A on the SAME 128.2 A
+    //     rack, needs >=160.25 A). Must STILL block — the corroboration layer must not
+    //     become a universal "never block" escape hatch.
+    const genuineFuseHigh = issue({
+      issue: 'The rack-level fuses are specified as Eaton Bussmann PV-100A-2XL-B-15 rated at 100 A, '
+        + 'undersized relative to the 315 A disconnect switch and 500 A contactor.',
+    })
+    const corroboratedDecision = evaluatePhysicsCriticEnforcement(crit([genuineFuseHigh]), 'on', makePythonCorroborationOracle(fuseState('PV-100A-2XL-B-15', 100)))
+
+    // (3) UNCORROBORABLE — the CO₂ MDPE-at-120°C material-vs-temperature shape: no
+    //     rating fields exist to compare (a material/temperature claim, not a rating
+    //     pair), so the real python bridge returns 'uncorroborated'. Must STILL block
+    //     (conservative — a known-failure claim with no counter-evidence must not ship
+    //     silently), proving the corroboration layer never accidentally unblocks a
+    //     genuinely undecidable claim shape.
+    const mdpeHigh = issue({
+      where: 'mass_fluid_transport_process/MEA Recovery & Recycle/sub_modules/0/words/3',
+      issue: 'The design specifies a moulded MDPE buffer tank for a loop operating at 120 °C. MDPE has a '
+        + 'maximum service temperature of 60-80 °C and melts around 120-130 °C, meaning it will lose '
+        + 'structural integrity and fail.',
+    })
+    const uncorroborableDecision = evaluatePhysicsCriticEnforcement(crit([mdpeHigh]), 'on', makePythonCorroborationOracle({ moduleDecomposition: { modules: [] } }))
+
+    const corrChecks: Array<[string, boolean]> = [
+      ['(1) REFUTED fuse HIGH does NOT block', refutedDecision.shouldExit === false],
+      ['(1) REFUTED fuse HIGH recorded in refutedFaults', refutedDecision.refutedFaults.length === 1],
+      ['(1) REFUTED fuse HIGH NOT in blockingFaults', refutedDecision.blockingFaults.length === 0],
+      ['(1) REFUTED fault tagged corroboration=refuted', refutedDecision.refutedFaults[0]?.corroboration === 'refuted'],
+      ['(2) CORROBORATED genuine undersizing STILL blocks', corroboratedDecision.shouldExit === true],
+      ['(2) CORROBORATED fault tagged corroboration=corroborated', corroboratedDecision.blockingFaults[0]?.corroboration === 'corroborated'],
+      ['(3) UNCORROBORABLE MDPE STILL blocks (conservative)', uncorroborableDecision.shouldExit === true],
+      ['(3) UNCORROBORABLE fault tagged corroboration=uncorroborable', uncorroborableDecision.blockingFaults[0]?.corroboration === 'uncorroborable'],
+    ]
+    const corrFailed = corrChecks.filter(([, ok]) => !ok).map(([n]) => n)
+    out.push(assertEq(
+      'UNIVERSAL.physics_critic_enforcement_corroboration',
+      `gate 33 blocking requires deterministic corroboration (real python bridge): REFUTED (v4 fuse, arithmetically coherent) advisory-only; CORROBORATED (genuinely undersized) still blocks; UNCORROBORABLE (MDPE, no rating fields) still blocks conservatively (8 cases)`,
+      corrFailed.length,
+      (n) => n === 0,
+      () => `corroboration-aware enforcement decision wrong on: ${corrFailed.join('; ')}`,
+    ))
+  } catch (err) {
+    out.push({ id: 'UNIVERSAL.physics_critic_enforcement_corroboration', description: 'physics-critic corroboration-aware enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
   return out

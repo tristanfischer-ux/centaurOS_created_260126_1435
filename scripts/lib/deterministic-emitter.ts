@@ -39,7 +39,6 @@ import {
   selectCoolantPumpFor,
   selectFireSuppressionAgentMass,
   selectCurrentSensorFor,
-  selectDcFuseFor,
   selectContainerHvacFor,
   formatMassKg,
 } from './hardware-selectors'
@@ -569,6 +568,53 @@ const BUSSMANN_PV_1500V_RANGE: Array<{ part_number: string; rated_current_a: num
   { part_number: 'PV-315A-3L-15', rated_current_a: 315 },
   { part_number: 'PV-400A-3L-15', rated_current_a: 400 },
 ]
+
+// FUSE-DUPLICATE FIX (2026-07-05): the ≤1000 V bus branch of dc_hrc_fuse_word
+// (below) used to hardcode a fixed 'PV-200ANH1 @ 200 A' regardless of the
+// design's actual rack current — a stale literal from the single L21 design
+// it was fixed for (see the L21 note above BUSSMANN_PV_1500V_RANGE). This
+// range makes that branch current-derived, using the SAME verified Eaton
+// Bussmann EXPLICIT DC-PV / battery-storage line already authoritative in
+// parts-spec-validator.ts's KNOWN_PART_AUTHORITATIVE table (gate-4 source of
+// truth, cross-checked 2026-07-04) — the "PV-<current>ANH1/ANH2" family, all
+// 1000 V DC / NH1(-NH2 above 315 A) / Class gPV per IEC 60269-6:
+//   PV-80ANH1 / PV-100ANH1 / PV-125ANH1 / PV-160ANH1 / PV-200ANH1 /
+//   PV-250ANH1 / PV-315ANH1 / PV-400ANH2 / PV-500ANH2 / PV-630ANH2
+// Deliberately NOT selectDcFuseFor()'s 170M family (see the "OUT OF SCOPE"
+// note above) — the PV-ANH1/ANH2 line is the family the L21 fix specifically
+// moved dc_hrc_fuse_word TO (an AC-rating-ambiguity concern the 170M family
+// has, per the L21 note on the 170M18xx entry above), so this stays in the
+// SAME family rather than reintroducing the family L21 moved away from; it
+// also keeps the existing 'NH1 fuse holder' accessory (fuse_holder_word,
+// safety_protection module) correctly matched to the fuse it mounts.
+// Source: https://www.eaton.com/us/en-us/skuPage.PV-200ANH1.html + the same
+// PV-<n>ANH1/ANH2 product-page family (parts-spec-validator.ts KNOWN_PART_
+// AUTHORITATIVE, 2026-07-04 sourcing).
+const BUSSMANN_PV_1000V_RANGE: Array<{ part_number: string; rated_current_a: number }> = [
+  { part_number: 'PV-80ANH1', rated_current_a: 80 },
+  { part_number: 'PV-100ANH1', rated_current_a: 100 },
+  { part_number: 'PV-125ANH1', rated_current_a: 125 },
+  { part_number: 'PV-160ANH1', rated_current_a: 160 },
+  { part_number: 'PV-200ANH1', rated_current_a: 200 },
+  { part_number: 'PV-250ANH1', rated_current_a: 250 },
+  { part_number: 'PV-315ANH1', rated_current_a: 315 },
+  { part_number: 'PV-400ANH2', rated_current_a: 400 },
+  { part_number: 'PV-500ANH2', rated_current_a: 500 },
+  { part_number: 'PV-630ANH2', rated_current_a: 630 },
+]
+
+/**
+ * selectBessDcFuse1000V — real, verified Eaton Bussmann 1000 V DC gPV PV-ANH1/
+ * ANH2 fuse, sized to >= requiredCurrentA (already margin-applied by the
+ * caller — see RACK_FUSE_AMPACITY_SAFETY_FACTOR). Mirrors
+ * selectBessDcFuse1500V's saturation pattern (falls back to the largest
+ * catalogued step rather than inventing a part that doesn't exist).
+ */
+function selectBessDcFuse1000V(requiredCurrentA: number): { manufacturer: string; part_number: string; rated_current_a: number; rated_voltage_dc_v: number } {
+  const hit = BUSSMANN_PV_1000V_RANGE.find((f) => f.rated_current_a >= requiredCurrentA)
+  const chosen = hit ?? BUSSMANN_PV_1000V_RANGE[BUSSMANN_PV_1000V_RANGE.length - 1]
+  return { manufacturer: 'Eaton Bussmann', part_number: chosen.part_number, rated_current_a: chosen.rated_current_a, rated_voltage_dc_v: 1000 }
+}
 
 // v4 physics-critic HIGH #1 (2026-07-05, out/bess-campaign-v4, gate 33
 // blocking): flagged the emitted PV-200A-1XL-B-15 rack fuse "undersized-vs
@@ -2526,20 +2572,65 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // real part numbers — see its header comment for sourcing). The
       // bolt-in 1XL/2XL/3L body does NOT use an NH1 DIN-rail base, so the
       // form text is updated to describe a bolt-in mounting block instead.
+      //
+      // FUSE-DUPLICATE FIX (2026-07-05, ROUTED from f20303c3e's v4 fuse-
+      // vindication commit: "dc_hrc_fuse_word + rack_string_fuse_word
+      // resolve to the identical part via identical arithmetic — same
+      // pattern [as the coolant-circulation-pump double-emission fixed the
+      // same commit], next fix"). INVESTIGATED: this word and safety_
+      // protection's (former) rack_string_fuse_word were NOT two genuine
+      // populations (e.g. a per-string combiner fuse vs a separate per-rack
+      // protection fuse at a different count/location) — the contract only
+      // ever derives ONE rack/string continuous-current figure
+      // (p.stringContinuousA) and ONE quantity (p.rackCount) for BOTH
+      // words in EVERY topology the contract can express
+      // (parallel_strings_per_rack defaults to 1, and neither word's
+      // quantity was ever parameterised by parallel_strings_total — so even
+      // a >1-string-per-rack contract would still have emitted both at
+      // qty=rackCount, never a genuinely distinct per-string count). Above
+      // 1000 V the two words called selectBessDcFuse1500V() with byte-
+      // identical arguments; this word is now the SOLE emitter of the rack/
+      // string DC fuse — the class-reference-graph (bess-utility-scale.ts:
+      // "DC distribution panel houses pack-level fuses … before the
+      // inverter") places pack/rack-level fuses inside power_distribution's
+      // DC distribution panel, so THIS location is canonical. The rack-
+      // level SAFETY accessories (fuse holder, ID label, mount rail, torque
+      // card) remain emitted once, under safety_protection's
+      // cell_fuse_protection sub-module (see emitSafetyProtection below) —
+      // only the priced fuse ITSELF was duplicated.
+      //
+      // The two branches were NOT byte-identical below 1000 V: this word
+      // previously hardcoded a fixed 'PV-200ANH1 @ 200 A' regardless of
+      // p.stringContinuousA (a stale literal calibrated to the single L21
+      // design it was fixed for — see the L21 comment above). Deleting the
+      // safety_protection twin without fixing that hardcoding would have
+      // shipped an UNVERIFIED-vs-load fuse pick for every future low-voltage
+      // brief whose rack current differs from the L21 design — so the
+      // ≤1000 V branch below is now current-derived too, via
+      // selectBessDcFuse1000V() (defined above, same PV-ANH1/ANH2 family,
+      // same RACK_FUSE_AMPACITY_SAFETY_FACTOR margin as the >1000 V branch),
+      // closing that latent under/over-sizing gap at the same time as the
+      // dedup.
       (() => {
         const isHighVoltageBus = p.dcBusVoltageV > 1000
         if (!isHighVoltageBus) {
+          const fuse = selectBessDcFuse1000V(p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR)
           return word(
             'dc_hrc_fuse_word',
             'DC HRC fuse word',
             cc('dc_hrc_fuse', 'DC HRC fuse', 'electromechanical_switching_function', 'copper'),
             [
               mod('quantity', fmtQty(p.rackCount)),
-              mod('capacity', '200', 'A'),
-              mod('manufacturer', 'Eaton Bussmann'),
-              mod('part_number', 'PV-200ANH1'),
-              mod('form', 'Eaton Bussmann PV-200ANH1 photovoltaic / battery-storage fuse (200 A / 1000 V DC / NH1 size / Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS — the EXPLICIT DC-PV variant; NOT a 170M AC-rated variant)'),
-              mod('dimension', '1000', 'V'),
+              mod('capacity', String(fuse.rated_current_a), 'A'),
+              mod('manufacturer', fuse.manufacturer),
+              mod('part_number', fuse.part_number),
+              mod('form', `Eaton Bussmann ${fuse.part_number} photovoltaic / battery-storage fuse (${fuse.rated_current_a} A / ${fuse.rated_voltage_dc_v} V DC / NH1 size / Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS — the EXPLICIT DC-PV variant, NOT a 170M AC-rated variant; sized to >=1.25x the ${p.stringContinuousA.toFixed(1)} A rack continuous current; rack-level string fuse, NOT a per-cell fuse — per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice)`),
+              mod('dimension', String(fuse.rated_voltage_dc_v), 'V'),
+              // £285 verified for PV-200ANH1 (the L21 reference price); flat
+              // across the PV-ANH1/ANH2 family for now, same estimate
+              // convention as the >1000V branch's flat £320 below (no live
+              // per-step UK distributor quote sweep has been done for the
+              // wider 80-630 A range).
               mod('list_price_gbp', '285'),
               mod('regulatory', 'IEC 60269-6 (gPV)'),
             ],
@@ -2556,7 +2647,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
             mod('capacity', String(fuse.rated_current_a), 'A'),
             mod('manufacturer', fuse.manufacturer),
             mod('part_number', fuse.part_number),
-            mod('form', `Eaton Bussmann ${fuse.part_number} photovoltaic / battery-storage fuse (${fuse.rated_current_a} A / ${fuse.rated_voltage_dc_v} V DC bolt-in / Class gPV per IEC 60269-6, UL Listed + CSA + CE/RoHS — 1500 V DC gPV line for a ${p.dcBusVoltageV} V nominal bus; bolt-in mounting block, NOT an NH1 DIN-rail base)`),
+            mod('form', `Eaton Bussmann ${fuse.part_number} photovoltaic / battery-storage fuse (${fuse.rated_current_a} A / ${fuse.rated_voltage_dc_v} V DC bolt-in / Class gPV per IEC 60269-6, UL Listed + CSA + CE/RoHS — 1500 V DC gPV line for a ${p.dcBusVoltageV} V nominal bus; bolt-in mounting block, NOT an NH1 DIN-rail base; rack-level string fuse, qty = rack_count — NOT a per-cell fuse)`),
             mod('dimension', String(fuse.rated_voltage_dc_v), 'V'),
             // Estimate — no live UK distributor GBP quote found for the
             // 1500V PV-*-15 bolt-in family (2026-07-04 web search);
@@ -4028,85 +4119,44 @@ function emitSafetyProtection(p: BessParams): DesignModule {
   // BESS L31 (2026-05-25): cell_fuse_protection sub-module added to the
   // deterministic emitter to prevent Stage 1.7 densification from injecting
   // cell_fuse_mount_word × 3750 (per-cell scope) into OTHER safety sub-modules.
-  // IMPORTANT: cell fuses here are RACK-LEVEL HRC STRING FUSES (qty = rackCount),
+  // IMPORTANT: cell fuses are RACK-LEVEL HRC STRING FUSES (qty = rackCount),
   // NOT per-cell items. Engineering basis (see line ~557 above): in a 1P × NS
   // series string, every cell carries the full string current so per-cell fuses
-  // cannot open selectively — the rack-level Eaton Bussmann PV-200ANH1 already
-  // protects the entire string. Per-cell fuses on series strings = mass, cost,
-  // voltage drop and failure points for zero protective benefit.
+  // cannot open selectively — the rack-level fuse already protects the entire
+  // string. Per-cell fuses on series strings = mass, cost, voltage drop and
+  // failure points for zero protective benefit.
   // Real utility BESS (Tesla Megapack 2 XL, CATL EnerC+, Sungrow PowerStack)
   // all rely solely on rack-level semiconductor / HRC fusing.
-  // ── DELIVERABLE D: DC fuse voltage selector (2026-05-26, L39 class-killer D) ──
-  // L39 [LOW]: PV-200ANH1 (1000 V DC) for 912.5 V string max → only 9.6% margin.
-  // UK utility BESS norm: rated_voltage_dc_v ≥ 1.5 × string_max_voltage_v.
-  // selectDcFuseFor() enforces this: for 912.5 V string max, requires ≥ 1369 V
-  // → 1500 V class fuse (Bussmann 170M family).
-  // String max voltage: seriesCellsPerString × 3.65 V/cell (LFP max charge voltage).
-  // Pre-change mempalace search: "universal hardware selector fuse sensor" → loaded
-  // drawers on selector-input-upstream-debug and distributor-API-coverage patterns.
-  // eslint-disable-next-line @typescript-eslint/no-magic-numbers
-  const LFP_MAX_CELL_VOLTAGE_V = 3.65
-  const stringMaxVoltageV = p.seriesCellsPerString * LFP_MAX_CELL_VOLTAGE_V
   //
-  // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): for a
-  // 1500 V-nominal bus, selectDcFuseFor()'s ≥1.5× string-max-voltage rule
-  // demands a >=2562 V-rated fuse — no catalogue DC-PV/battery fuse of any
-  // manufacturer is rated that high; the OLD rule was implicitly calibrated
-  // against the previous 800V-nominal/912.5V-max topology (1369V threshold,
-  // satisfiable by any real 1500V-class part) and silently saturates on a
-  // 1500V-nominal bus, which is why it fell through to the mis-rated
-  // 170M6812 fallback (see selectBessDcFuse1500V's header comment for the
-  // full diagnosis). Real industry practice for 1500V-class BESS/PV DC
-  // protection is to select equipment RATED TO THE BUS NOMINAL CLASS
-  // (1500 V), not 1.5× its worst-case full-charge voltage — this is exactly
-  // why the whole equipment market segment is named "1500V-class" even
-  // though real LFP full-charge string voltage commonly exceeds 1500 V (as
-  // it does here, 1708 V). Below 1000 V nominal the existing selectDcFuseFor
-  // path is UNCHANGED (byte-identical) — only >1000 V buses take the new
-  // verified-real path.
+  // FUSE-DUPLICATE FIX (2026-07-05, ROUTED from f20303c3e — see the matching
+  // comment above emitPowerDistribution's dc_hrc_fuse_word): this sub-module
+  // used to emit its OWN priced 'rack_string_fuse_word' at the SAME quantity
+  // (p.rackCount) as emitPowerDistribution's dc_hrc_fuse_word — the same
+  // physical rack/string DC fuse, priced and counted twice on every run (the
+  // coolant-circulation-pump double-emission's exact pattern: two modules
+  // independently deriving the SAME asset from the SAME contract quantity).
+  // Above 1000 V both words called selectBessDcFuse1500V() with byte-
+  // identical arguments (p.stringContinuousA × the same safety factor); below
+  // 1000 V this word called selectDcFuseFor() (170M family) while
+  // dc_hrc_fuse_word had a stale hardcoded literal — genuinely different
+  // outputs, but still ONE physical fuse being counted/priced twice, not two
+  // populations (see the dc_hrc_fuse_word comment for the full ≤1000 V fix).
+  // The class-reference-graph places pack/rack-level fuses inside power_
+  // distribution's DC distribution panel, so dc_hrc_fuse_word is the
+  // canonical listing; this sub-module no longer emits the fuse itself. It
+  // KEEPS the rack-level SAFETY accessories that are genuinely this module's
+  // own scope regardless of which module prices the fuse — the mounting
+  // hardware, ID label, DIN-rail section and torque card below all reference
+  // "the rack-level HRC string fuse listed under power_distribution" rather
+  // than re-deriving/re-pricing a second copy of it.
   const isHighVoltageBus = p.dcBusVoltageV > 1000
-  const dcFuse = isHighVoltageBus
-    ? selectBessDcFuse1500V(p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR)
-    : selectDcFuseFor({
-        continuous_current_a: p.stringContinuousA,
-        string_max_voltage_v: stringMaxVoltageV,
-        family: 'bussmann_170m',
-      })
-  const fuseFormStr = isHighVoltageBus
-    ? `Class gPV per IEC 60269-6, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC bolt-in (rated to the ${p.dcBusVoltageV} V DC bus nominal class — the real 1500V-class BESS/PV DC-fuse market segment; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-photovoltaic-high-speed-fuses/eaton-bussmann-series-1500vdc-photovoltaic-fuses-product-aid-pa135007en.pdf`
-    : `IEC 60269-4 Class aR, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC (≥1.5× string max ${stringMaxVoltageV.toFixed(0)} V = ${(stringMaxVoltageV * 1.5).toFixed(0)} V min; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/us/en-us/catalog/bussmann-series-low-voltage-semiconductor-fuses/170m-series-fuses.html`
 
   const cellFuseProtection = makeSubModule(
     'cell_fuse_protection',
     'cell fuse protection',
     'protects',
-    'rack-level HRC string fuses, one per rack; NO per-cell fuses on series-string topology',
+    'mounting hardware, ID labelling and installation instructions for the rack-level HRC string fuse (one per rack, priced once under power_distribution — see dc_hrc_fuse_word); NO per-cell fuses on series-string topology',
     [
-      // BESS L31 (2026-05-25): Eaton Bussmann rack-level HRC string fuse.
-      // BESS L39 (2026-05-26, Deliverable D): selectDcFuseFor() now picks the
-      // correct voltage class. Previous hardcoded PV-200ANH1 (1000 V DC) only
-      // had 9.6% margin on 912.5 V string max. UK utility BESS norm requires
-      // ≥1.5× string max → 1500 V class fuse (Bussmann 170M series).
-      // Source: Eaton Bussmann 170M series catalogue.
-      word(
-        'rack_string_fuse_word',
-        'rack string fuse word',
-        cc('rack_string_fuse', 'rack-level HRC string fuse', 'cell_fuse_protection_function', 'steel'),
-        [
-          mod('quantity', fmtQty(p.rackCount)),
-          mod('manufacturer', dcFuse.manufacturer),
-          mod('part_number', dcFuse.part_number),
-          mod('form', fuseFormStr),
-          mod('rating_primary', `${dcFuse.rated_current_a} A`),
-          mod('dimension', String(dcFuse.rated_voltage_dc_v), 'V'),
-          mod('regulatory', isHighVoltageBus ? 'IEC 60269-6 (gPV) + IEC 62619 §6.4.4' : 'IEC 60269-4 + IEC 62619 §6.4.4'),
-          // Estimate — no live UK distributor GBP quote found for the 1500V
-          // PV-*-15 bolt-in family (2026-07-04 web search); positioned
-          // consistent with the dc_hrc_fuse_word analogue (£320) for the
-          // same real 1500V DC gPV bolt-in line.
-          ...(isHighVoltageBus ? [mod('list_price_gbp', '320')] : []),
-        ],
-      ),
       // BESS WAVE C item 1 (2026-07-04, 1500V family safety fix): the
       // selectBessDcFuse1500V() bolt-in family (1XL/2XL/3L body style) does
       // NOT mount in an NH1 DIN-rail base — that holder (BK/NH1-T) is
@@ -4525,7 +4575,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
 
   return {
     module: 'safety_protection',
-    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, marks all safety-critical surfaces, detects off-gas, provides rack-level HRC string fusing, exhausts cell off-gas per rack, detects arc flash events, and contains DC switchgear arc faults via passive Mersen PV-Stop barriers. NOTE: cell_fuse_protection uses rack-level fuses (qty=rack_count) — per-cell fuses are NOT used on 1P×NS series-string topology.',
+    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, marks all safety-critical surfaces, detects off-gas, mounts + labels the rack-level HRC string fuse (priced once, under power_distribution), exhausts cell off-gas per rack, detects arc flash events, and contains DC switchgear arc faults via passive Mersen PV-Stop barriers. NOTE: the rack-level fuse (qty=rack_count) is listed exactly once, in power_distribution — per-cell fuses are NOT used on 1P×NS series-string topology.',
     overview_paragraph_en: '',
     derived_parameters: {
       rack_count: p.rackCount,

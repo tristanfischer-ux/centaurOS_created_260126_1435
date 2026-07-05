@@ -605,6 +605,114 @@ def _iter_words_with_module(state):
                 yield mid, w
 
 
+# --------------------------------------------------------------------------- #
+# CURRENT-RATING-PAIR shape (Tristan 2026-07-05 — the doctrine's fourth
+# application: gate 33 blocking requires deterministic corroboration).
+#
+# The v4 BESS rack-fuse case: the Physics Critic named a PROTECTIVE device
+# (fuse/breaker/contactor/switch) by its OWN part number and asserted it is
+# "undersized" — but relative to an UNRELATED device's rating (a disconnect
+# switch / contactor), not a genuine current-vs-load deficiency (matching a
+# fuse's rating to upstream switching hardware inverts protective
+# coordination — see deterministic-emitter.ts's RACK_FUSE_AMPACITY_SAFETY_
+# FACTOR comment). Unlike the kW rating_pair shape (a motor vs its OWN driven
+# machine, paired by character-id lineage), a protective-device sizing claim
+# has no such lineage to pair on — it is verified by LOCATING the delivered
+# part BY ITS OWN part_number (quoted in the claim text) and comparing its
+# OWN rated current against the contract's continuous-current demand — the
+# same DELIVERED-ROWS'-OWN-VALUES discipline as _rating_pair_sweep, extended
+# from kW to Amps.
+# --------------------------------------------------------------------------- #
+
+_CORR_PROTECTIVE_NOUN_RX = re.compile(r"\bfuses?\b|\bbreakers?\b|\bcontactors?\b|\bswitchgear\b|\bdisconnects?\b", re.I)
+_CORR_UNDERSIZE_RX = re.compile(
+    r"undersiz|under-siz|underrat|under-rat|insufficient(?:ly)?\s+rated|inadequate|too\s+small|"
+    r"will\s+run\s+hot|nuisance[- ]trip", re.I)
+_CORR_AMP_MENTION_RX = re.compile(r"\d+(?:\.\d+)?\s*a\b(?!h)", re.I)
+_CORR_AMP_RX = re.compile(r"(\d+(?:\.\d+)?)\s*a\b(?!h)", re.I)
+# Candidate part-number tokens: alphanumeric groups joined by hyphen/slash
+# (PV-200A-1XL-B-15, C310K/500, OTDC315FV11-ESS, …) — deliberately loose,
+# every candidate is verified against a REAL delivered part_number below, so
+# a false candidate simply fails to match anything (no false corroboration).
+_PN_CAND_RX = re.compile(r"\b[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+){1,6}\b")
+
+
+def _word_amps(w):
+    """The word's own rated CURRENT in Amps, or None. Mirrors _word_kw for the
+    amp family — reads capacity/rating_primary/rating modifiers (the three
+    kinds the emitter uses for a fuse/breaker's rating — see
+    collectEmittedVoltageRatings in sizing-vs-design-audit.ts), rejecting an
+    obvious non-current unit (kW/V/flow/pressure/Ah) sharing the same
+    modifier."""
+    for mc in (w.get("modifier_characters") or []):
+        if mc.get("kind") in ("capacity", "rating_primary", "rating"):
+            txt = f"{mc.get('value') or ''} {mc.get('unit') or ''}".strip()
+            if re.search(r"\bk?w\b|kilowatt|\bv\b|volt|m³|m3|/h|/s|bar|°c|litre|liter|\bah\b", txt, re.I):
+                continue
+            m = _CORR_AMP_RX.search(txt)
+            if m:
+                try:
+                    return float(m.group(1))
+                except ValueError:
+                    pass
+    return None
+
+
+def _find_word_by_part_number(state, candidates):
+    """Locate the delivered word whose OWN part_number modifier matches one of
+    the candidate tokens extracted from the critic's claim text (case-
+    insensitive, exact or substring either direction — the critic sometimes
+    quotes a shortened/lengthened form of the real PN). None if no candidate
+    resolves to a real delivered part."""
+    if not candidates:
+        return None
+    cand_u = [c.upper() for c in candidates if len(c) >= 4]
+    if not cand_u:
+        return None
+    for _mid, w in _iter_words_with_module(state):
+        pn = None
+        for mc in (w.get("modifier_characters") or []):
+            if mc.get("kind") == "part_number":
+                pn = str(mc.get("value") or "").strip()
+                break
+        if not pn:
+            continue
+        pn_u = pn.upper()
+        for cu in cand_u:
+            if cu == pn_u or cu in pn_u or pn_u in cu:
+                return w
+    return None
+
+
+def _contract_continuous_current_a(state, prefer_tokens=()):
+    """Best-effort UNIVERSAL lookup of a 'continuous current' contract quantity
+    (Amps) — any quantities-key carrying BOTH 'current' and 'continuous'
+    tokens; when several match, prefers the one that ALSO carries a token in
+    `prefer_tokens` (e.g. {'string','rack'} for a per-rack/string demand, so
+    a bus-level AND a rack-level continuous-current quantity co-existing does
+    not pick the wrong one)."""
+    best = None
+    best_score = -1
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if not isinstance(qs, dict):
+            continue
+        for k, v in qs.items():
+            kt = set(re.findall(r"[a-z0-9]+", k.lower()))
+            if not ({"current", "continuous"} <= kt):
+                continue
+            val = (v or {}).get("value") if isinstance(v, dict) else v
+            try:
+                fval = float(str(val))
+            except (TypeError, ValueError):
+                continue
+            score = sum(1 for t in prefer_tokens if t in kt)
+            if score > best_score:
+                best_score = score
+                best = fval
+    return best
+
+
 def _rating_pair_sweep(state) -> list:
     """CANONICAL sweep of every delivered machine ↔ motor/drive rating pair.
 
@@ -729,6 +837,9 @@ def _finding_shape(issue) -> str:
     kws = _CORR_KW_RX.findall(txt)
     if len(kws) >= 2 and _CORR_DRIVE_CHILD_RX.search(txt) and _CORR_DRIVEN_PARENT_RX.search(txt):
         return "rating_pair"
+    if (_CORR_PROTECTIVE_NOUN_RX.search(txt) and _CORR_AMP_MENTION_RX.search(txt)
+            and _CORR_UNDERSIZE_RX.search(txt)):
+        return "current_rating_pair"
     if kws and _CORR_BRIEF_CITE_RX.search(txt):
         return "brief_vs_delivered"
     if _PHYS_OMITS_RX.search(txt):
@@ -756,6 +867,35 @@ def _corroborate_finding(state, issue):
                         f"delivered rows confirm the rating divergence on {row['parent_name']}")
         return ("uncorroborated", shape,
                 "the claimed rating pair does not diverge beyond tolerance on any delivered row pair")
+    if shape == "current_rating_pair":
+        # locate the flagged protective device by ITS OWN part number (quoted
+        # in the claim text) — never by the LLM's `where` index, which is
+        # unreliable when a module/sub_module name repeats (same discipline
+        # as physics-critic-autocorrect's locate-by-part-tokens fix).
+        raw_cp = f"{issue.get('issue') or ''} {issue.get('title') or ''}"
+        candidates = _PN_CAND_RX.findall(raw_cp)
+        w = _find_word_by_part_number(state, candidates)
+        if w is None:
+            return ("uncorroborated", shape,
+                    "the named protective device could not be located among delivered words by part number")
+        delivered_a = _word_amps(w)
+        if delivered_a is None:
+            return ("uncorroborated", shape,
+                    "the delivered part carries no extractable current rating to verify against")
+        required_a = _contract_continuous_current_a(state, prefer_tokens={"string", "rack"})
+        if not required_a or required_a <= 0:
+            return ("uncorroborated", shape,
+                    "no contract continuous-current quantity available to verify the claimed undersizing")
+        ratio = delivered_a / required_a
+        if ratio >= _RATING_PAIR_SERVICE_TOL - 1e-9:
+            return ("falsified", shape,
+                    f"delivered part ({w.get('name_human')}) is rated {delivered_a:g} A vs the contract's "
+                    f"{required_a:g} A continuous demand — {ratio:.2f}x margin clears the "
+                    f"{_RATING_PAIR_SERVICE_TOL}x floor; the claimed undersizing is arithmetically false")
+        return ("corroborated", shape,
+                f"delivered part ({w.get('name_human')}) is rated {delivered_a:g} A against the contract's "
+                f"{required_a:g} A continuous demand — {ratio:.2f}x margin genuinely falls short of the "
+                f"{_RATING_PAIR_SERVICE_TOL}x floor")
     if shape == "brief_vs_delivered":
         txt = f"{issue.get('issue') or ''} {issue.get('title') or ''}"
         cited = {round(float(v), 6) for v in _CORR_KW_RX.findall(txt)}
@@ -3633,6 +3773,70 @@ def _selftest() -> int:
     expect(v7_pump[0] == "corroborated" and v7_pump[1] == "count",
            f"CORR(7): a REAL 'only a single dosing pump' undercount with dosing_pump_count=1 "
            f"must still corroborate (got {v7_pump[:2]})")
+
+    # ── proveCatch: CURRENT-RATING-PAIR shape (Tristan 2026-07-05 — the
+    # doctrine's fourth application: gate 33 blocking requires deterministic
+    # corroboration). The v4 BESS fuse HIGH verbatim ("The rack-level fuses
+    # are specified as Eaton Bussmann PV-200A-1XL-B-15 rated at 200 A. …
+    # nominal current per rack is 1,667 A / 13 = 128.2 A. A 200 A fuse
+    # provides a 1.56x margin, which is acceptable. However, … the 200 A
+    # fuse is undersized relative to the 315 A switch and 500 A contactor …")
+    # must FALSIFY (the claimed undersizing does not survive contact with the
+    # delivered part's own rating vs the contract's demand) — both directions
+    # asserted against a genuinely undersized synthetic counterpart.
+    def _fuse_word(pn, amps, kind="capacity"):
+        mods = [{"kind": "quantity", "value": "×13"}, {"kind": "manufacturer", "value": "Eaton Bussmann"},
+                {"kind": "part_number", "value": pn}, {"kind": kind, "value": str(amps), "unit": "A"}]
+        return {"name_human": "DC HRC fuse", "content_character": {"character_id": "dc_hrc_fuse_word"},
+                "modifier_characters": mods}
+    fuse_state_ok = {
+        "moduleDecomposition": {"modules": [{"module": "power_distribution", "sub_modules": [{"words": [
+            _fuse_word("PV-200A-1XL-B-15", 200)]}]}]},
+        "orchestratorContract": {"quantities": {
+            "string_continuous_current_a": {"value": 128.2051282051282, "unit": "A"}}},
+    }
+    v4_fuse_claim = {
+        "severity": "high", "confidence": "high",
+        "issue": ("The rack-level fuses are specified as Eaton Bussmann PV-200A-1XL-B-15 rated at 200 A. "
+                  "However, the maximum DC current of the system is 1,667 A. Split across 13 parallel racks, "
+                  "the nominal current per rack is 1,667 A / 13 = 128.2 A. A 200 A fuse provides a 1.56x "
+                  "margin, which is acceptable. However, the sub-module description also lists 'Schaltbau "
+                  "C310K/500' contactors rated at 500 A continuous and 'OTDC315FV11-ESS' disconnect switches "
+                  "rated at 315 A. The 200 A fuse is undersized relative to the 315 A switch and 500 A "
+                  "contactor, and will run hot at 128 A continuous in a 45°C ambient container environment."),
+    }
+    v8 = _corroborate_finding(fuse_state_ok, v4_fuse_claim)
+    expect(v8[0] == "falsified" and v8[1] == "current_rating_pair",
+           f"CORR(8): the v4 fuse HIGH (200 A fuse, 128.2 A rack demand, 1.56x margin) must FALSIFY "
+           f"— the claimed undersizing does not survive its own cited numbers (got {v8[:2]})")
+    expect(_physics_high_is_design_defect(v4_fuse_claim, fuse_state_ok) is False,
+           "CORR(8): the v4 fuse HIGH must NEVER score once corroborated as falsified")
+    # (9) a GENUINELY undersized rack fuse (100 A on a 128.2 A rack, required
+    #     160.25 A) must CORROBORATE — the shape must still catch a real fault.
+    fuse_state_bad = {
+        "moduleDecomposition": {"modules": [{"module": "power_distribution", "sub_modules": [{"words": [
+            _fuse_word("PV-100A-2XL-B-15", 100)]}]}]},
+        "orchestratorContract": {"quantities": {
+            "string_continuous_current_a": {"value": 128.2051282051282, "unit": "A"}}},
+    }
+    v9 = _corroborate_finding(fuse_state_bad, {
+        "severity": "high", "confidence": "high",
+        "issue": "The rack-level fuses are specified as Eaton Bussmann PV-100A-2XL-B-15 rated at 100 A, "
+                 "undersized relative to the 315 A disconnect switch and 500 A contactor.",
+    })
+    expect(v9[0] == "corroborated" and v9[1] == "current_rating_pair",
+           f"CORR(9): a genuinely undersized 100 A fuse on a 128.2 A rack (needs >=160.25 A) must "
+           f"CORROBORATE (got {v9[:2]})")
+    # (10) UNCORROBORABLE: a protective-device claim naming NO part the design
+    #      actually ships (a fabricated/typo'd PN) must stay uncorroborated —
+    #      never silently falsified just because nothing matched.
+    v10 = _corroborate_finding(fuse_state_ok, {
+        "severity": "high", "confidence": "high",
+        "issue": "The XYZ-9999-NOPE fuse rated at 50 A is undersized relative to the 315 A disconnect switch.",
+    })
+    expect(v10[0] == "uncorroborated" and v10[1] == "current_rating_pair",
+           f"CORR(10): a claim naming a part that matches NO delivered row must stay UNCORROBORABLE, "
+           f"never falsified/corroborated by accident (got {v10[:2]})")
 
     # ---- VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A) — tab_scorecard_summary
     #      must exclude a `scored:False` tab from EVERY count (min/fail/unscored), while an

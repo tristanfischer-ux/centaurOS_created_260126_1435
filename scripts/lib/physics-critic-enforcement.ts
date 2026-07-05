@@ -54,6 +54,8 @@
 // guarantee that a KNOWN-failing part never reaches a paying client.
 
 import type { CritiqueReport, CritiqueIssue } from '../../src/lib/pdf-engine-v2/radical/physics-critic'
+import { execFileSync } from 'child_process'
+import { resolve } from 'path'
 
 // ---------------------------------------------------------------------------
 // Concrete-failure-mode detection (universal — no per-class table)
@@ -163,6 +165,134 @@ export function issueDescribesConcreteFailure(issue: CritiqueIssue): { matched: 
 }
 
 // ---------------------------------------------------------------------------
+// THE DOCTRINE'S FOURTH APPLICATION (Tristan 2026-07-05) — gate 33 blocking
+// requires DETERMINISTIC CORROBORATION, not just the three name/failure-mode
+// bars above. v4 proved the gap: `issueIsBlocking` correctly cleared bars
+// (a)/(b)/(c) on a plausible-but-FALSE "the 200 A rack fuse is undersized"
+// HIGH — the Critic's OWN cited arithmetic (128.2 A rack demand, 1.56x
+// margin) already showed the fuse was fine; it pivoted to comparing the
+// fuse's rating against an unrelated switch/contactor rating (inverting
+// protective coordination) to still call it "undersized". Blocking on a
+// name+failure-mode-shaped finding alone cannot tell a genuine defect from
+// this kind of confabulation — only a check against the DELIVERED artefacts
+// can. This extends the enforcement decision with a THIRD gate, run only on
+// findings that already cleared issueIsBlocking:
+//
+//   REFUTED        — a deterministic check over the delivered rows/contract
+//                     shows the claim is FALSE (the rating-pair is actually
+//                     coherent). Renders ADVISORY; the gate does NOT block
+//                     (logged loudly — a refutation is as important a signal
+//                     as a corroboration).
+//   CORROBORATED   — the deterministic check confirms the pair genuinely
+//                     diverges. Blocks, exactly as bars (a)-(c) alone did
+//                     before this change.
+//   UNCORROBORABLE — no deterministic evidence either way (e.g. a material-
+//                     vs-temperature claim has no rating fields to compare —
+//                     the CO₂ MDPE-at-120°C shape). CONSERVATIVE: still
+//                     blocks — a known-failure claim with no counter-evidence
+//                     must not ship silently — but the class is logged
+//                     distinctly so an operator can see WHY it blocked.
+//
+// The corroboration oracle is INJECTED (`corroborate`), never called
+// directly by the pure decision function, so `evaluatePhysicsCriticEnforcement`
+// stays synchronous + harness-testable with a synthetic oracle. The REAL
+// oracle (`corroborateFindingViaPython`, below) is a thin bridge onto
+// `dossier_audit.py`'s existing deterministic corroboration layer (commit
+// 247494a32's `_corroborate_finding` — rating-pair claims verify against the
+// delivered rows' OWN values; extended 2026-07-05 with the `current_rating_pair`
+// shape for protective-device Amp ratings, the v4 fuse case's shape). This
+// reads that machinery rather than reinventing it in TypeScript. The DEFAULT
+// oracle (`alwaysUncorroborable`) preserves the exact PRE-2026-07-05 blocking
+// behaviour for any caller that does not wire a corroboration context — a
+// caller that upgrades wiring later can only ever REDUCE false blocks
+// (REFUTED cases), never introduce a new one.
+// ---------------------------------------------------------------------------
+
+/** REFUTED = a deterministic check proves the claim FALSE (do not block).
+ *  CORROBORATED = a deterministic check confirms the claim (block).
+ *  UNCORROBORABLE = no deterministic evidence either way (block, conservative). */
+export type CorroborationVerdict = 'corroborated' | 'refuted' | 'uncorroborable'
+
+export interface CorroborationResult {
+  verdict: CorroborationVerdict
+  shape: string     // the claim shape the corroborator classified this as (rating_pair, current_rating_pair, other, …)
+  detail: string     // human-readable evidence, logged alongside the verdict
+}
+
+/** Injectable corroboration oracle. PURE consumers (evaluatePhysicsCriticEnforcement)
+ *  never touch python/state directly — they take this function so the harness can
+ *  inject a synthetic oracle and the chain can inject the real bridge
+ *  (makePythonCorroborationOracle, below) without the decision function itself
+ *  becoming impure or async. */
+export type CorroborationOracle = (issue: CritiqueIssue) => CorroborationResult
+
+/** The conservative default: no corroboration context was supplied, so every
+ *  blocking-eligible finding is UNCORROBORABLE — i.e. blocks, exactly as the
+ *  chain behaved before 2026-07-05. This is what makes the extension strictly
+ *  backward-compatible: omit the third argument and nothing changes. */
+export const alwaysUncorroborable: CorroborationOracle = () => ({
+  verdict: 'uncorroborable',
+  shape: 'unavailable',
+  detail: 'no corroboration context supplied — conservative default (blocks)',
+})
+
+// The python bridge probe: calls dossier_audit.py's _corroborate_finding directly
+// (NOT the full canonicalise_physics_critique — this decides ONE issue at a time,
+// synchronously, from inside the pure-ish enforcement call site) so gate 33 reads
+// the SAME deterministic machinery the final-shipped-critique canonicalisation uses,
+// rather than re-deriving a second copy of the logic in TypeScript.
+const CORROBORATE_FINDING_PROBE_PY = `
+import sys, os, json
+scripts_dir = sys.argv[1]
+sys.path.insert(0, os.path.join(scripts_dir, 'lib'))
+import dossier_audit as da
+payload = json.load(sys.stdin)
+verdict, shape, detail = da._corroborate_finding(payload.get('state') or {}, payload.get('issue') or {})
+print(json.dumps({'verdict': verdict, 'shape': shape, 'detail': detail}))
+`
+
+/** Map dossier_audit.py's verdict vocabulary onto this module's:
+ *  'falsified' (the claim is deterministically FALSE) -> 'refuted' (do not block);
+ *  'corroborated' -> 'corroborated' (block); anything else -> 'uncorroborable' (block). */
+function mapPythonVerdict(v: string): CorroborationVerdict {
+  if (v === 'corroborated') return 'corroborated'
+  if (v === 'falsified') return 'refuted'
+  return 'uncorroborable'
+}
+
+/** Call the real deterministic corroboration bridge for a single issue against
+ *  a state-shaped context (moduleDecomposition.modules, orchestratorContract /
+ *  engineeringContract.quantities, parsedBrief — whatever _corroborate_finding's
+ *  claim-shape matchers need; see dossier_audit.py). NEVER throws — a bridge
+ *  failure (missing python3, malformed state, …) degrades to UNCORROBORABLE
+ *  (conservative: still blocks) with the error recorded in `detail`, so a
+ *  broken bridge can never silently unblock a real defect. */
+export function corroborateFindingViaPython(issue: CritiqueIssue, state: unknown): CorroborationResult {
+  try {
+    const raw = execFileSync('python3', ['-c', CORROBORATE_FINDING_PROBE_PY, resolve(__dirname, '..')], {
+      input: JSON.stringify({ state, issue }),
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+    })
+    const parsed = JSON.parse(raw) as { verdict: string; shape: string; detail: string }
+    return { verdict: mapPythonVerdict(parsed.verdict), shape: String(parsed.shape ?? ''), detail: String(parsed.detail ?? '') }
+  } catch (err) {
+    return {
+      verdict: 'uncorroborable',
+      shape: 'bridge-error',
+      detail: `corroboration bridge failed (conservative — still blocks): ${(err as Error).message.slice(0, 160)}`,
+    }
+  }
+}
+
+/** Build a CorroborationOracle bound to a fixed state context — the convenience
+ *  the chain calls once per critique: `evaluatePhysicsCriticEnforcement(critique,
+ *  mode, makePythonCorroborationOracle(state))`. */
+export function makePythonCorroborationOracle(state: unknown): CorroborationOracle {
+  return (issue) => corroborateFindingViaPython(issue, state)
+}
+
+// ---------------------------------------------------------------------------
 // The block predicate + the pure enforcement decision (mirrors self-audit)
 // ---------------------------------------------------------------------------
 
@@ -179,6 +309,12 @@ export interface PhysicsCriticBlockingFault {
   confidence: string
   issue: string          // truncated for the log
   suggested_check?: string
+  /** THE DOCTRINE'S FOURTH APPLICATION (2026-07-05): every blocking-eligible
+   *  fault now also carries its corroboration verdict, so a log/audit reader
+   *  can tell a genuinely-corroborated block apart from a conservative
+   *  uncorroborable one without re-deriving it. */
+  corroboration: CorroborationVerdict
+  corroboration_detail: string
 }
 
 export interface PhysicsCriticEnforcementDecision {
@@ -187,6 +323,11 @@ export interface PhysicsCriticEnforcementDecision {
   mode: PhysicsCriticEnforceMode
   reasons: string[]       // one human-readable reason per blocking fault (empty if none)
   blockingFaults: PhysicsCriticBlockingFault[]
+  /** REFUTED findings (2026-07-05): cleared bars (a)-(c) but a deterministic
+   *  check proved the claim FALSE. Never contribute to shouldExit/reasons —
+   *  logged here so the refutation is visible (loudly) rather than silently
+   *  dropped. Empty when mode is 'off' or no candidate finding refuted. */
+  refutedFaults: PhysicsCriticBlockingFault[]
 }
 
 const truncate = (s: any, n: number): string => {
@@ -214,38 +355,60 @@ export function issueIsBlocking(issue: CritiqueIssue): { blocking: boolean; tag:
 }
 
 /**
- * PURE + deterministic given (critique, mode): decide whether enforcing mode must
- * hard-exit the chain because the Physics Critic has flagged a SPECIFIC part with
- * a CONCRETE, high-confidence failure mode. A vague/holistic concern, a low/unknown
- * confidence flag, a MED, or an advisory "verify the rating" never blocks (matching
- * the gate-severity philosophy: a KNOWN-WRONG part hard-exits, a soft deviation
- * flags + renders). Harness-tested both directions
- * (UNIVERSAL.physics_critic_enforcement_blocks_failing_part).
+ * PURE + deterministic given (critique, mode, corroborate): decide whether enforcing
+ * mode must hard-exit the chain because the Physics Critic has flagged a SPECIFIC
+ * part with a CONCRETE, high-confidence failure mode THAT DETERMINISTIC EVIDENCE
+ * DOES NOT REFUTE. A vague/holistic concern, a low/unknown confidence flag, a MED,
+ * or an advisory "verify the rating" never blocks (bars (a)-(c), unchanged — matching
+ * the gate-severity philosophy: a KNOWN-WRONG part hard-exits, a soft deviation flags
+ * + renders). A finding that DOES clear bars (a)-(c) then passes through the
+ * corroboration oracle (THE DOCTRINE'S FOURTH APPLICATION, 2026-07-05, see the design
+ * note above): REFUTED -> advisory only, does NOT block; CORROBORATED or
+ * UNCORROBORABLE -> blocks (conservative default for UNCORROBORABLE preserves the
+ * pre-2026-07-05 behaviour exactly when `corroborate` is omitted). Harness-tested
+ * both directions (UNIVERSAL.physics_critic_enforcement_blocks_failing_part) plus the
+ * three corroboration branches (UNIVERSAL.physics_critic_enforcement_corroboration).
  *
- * NEVER throws — a malformed/absent critique yields a clean no-block decision, so a
- * Critic that errored upstream (returns null → caller passes null) can never wedge
- * the chain.
+ * NEVER throws — a malformed/absent critique yields a clean no-block decision, and the
+ * oracle itself (corroborateFindingViaPython) never throws either, so a Critic that
+ * errored upstream OR a broken corroboration bridge can never wedge the chain.
  */
 export function evaluatePhysicsCriticEnforcement(
   critique: CritiqueReport | null | undefined,
   mode: PhysicsCriticEnforceMode,
+  corroborate: CorroborationOracle = alwaysUncorroborable,
 ): PhysicsCriticEnforcementDecision {
-  const base: PhysicsCriticEnforcementDecision = { shouldExit: false, exitCode: 0, mode, reasons: [], blockingFaults: [] }
+  const base: PhysicsCriticEnforcementDecision = { shouldExit: false, exitCode: 0, mode, reasons: [], blockingFaults: [], refutedFaults: [] }
   if (mode === 'off') return base
   const issues: CritiqueIssue[] = Array.isArray(critique?.issues) ? (critique!.issues as CritiqueIssue[]) : []
   const reasons: string[] = []
   const blockingFaults: PhysicsCriticBlockingFault[] = []
+  const refutedFaults: PhysicsCriticBlockingFault[] = []
   for (const issue of issues) {
     const v = issueIsBlocking(issue)
     if (!v.blocking) continue
-    blockingFaults.push({
+    const corr = corroborate(issue)
+    const fault: PhysicsCriticBlockingFault = {
       where: String(issue.where ?? '?'),
       failure_mode: v.tag,
       confidence: String(issue.confidence ?? '?'),
       issue: truncate(issue.issue, 200),
       suggested_check: issue.suggested_check ? truncate(issue.suggested_check, 160) : undefined,
-    })
-    reasons.push(`physics:${v.tag} @ ${truncate(issue.where, 80)} — ${truncate(issue.issue, 140)}`)
+      corroboration: corr.verdict,
+      corroboration_detail: truncate(corr.detail, 200),
+    }
+    if (corr.verdict === 'refuted') {
+      // REFUTED: a deterministic check proved the claim FALSE against the delivered
+      // artefacts — renders advisory, does NOT block. Logged loudly (refutedFaults),
+      // never silently dropped — the v4 fuse case's exact shape.
+      refutedFaults.push(fault)
+      continue
+    }
+    // CORROBORATED or UNCORROBORABLE — both block. UNCORROBORABLE is the
+    // conservative default: a known-failure claim with no deterministic
+    // counter-evidence must not ship silently.
+    blockingFaults.push(fault)
+    reasons.push(`physics:${v.tag}[${corr.verdict}] @ ${truncate(issue.where, 80)} — ${truncate(issue.issue, 140)}`)
   }
   const shouldExit = reasons.length > 0
   return {
@@ -254,6 +417,7 @@ export function evaluatePhysicsCriticEnforcement(
     mode,
     reasons,
     blockingFaults,
+    refutedFaults,
   }
 }
 
@@ -266,12 +430,17 @@ export function physicsCriticEnforceModeFromEnv(v: string | undefined): PhysicsC
   return 'on'
 }
 
-/** Convenience for the chain: decide in one call from the env value. */
+/** Convenience for the chain: decide in one call from the env value. Pass `state`
+ *  (the design/contract context corroboration needs — see makePythonCorroborationOracle)
+ *  to wire the real deterministic corroboration bridge; omit it to keep the exact
+ *  pre-2026-07-05 behaviour (every candidate finding blocks, uncorroborable-conservative). */
 export function runPhysicsCriticEnforcement(
   critique: CritiqueReport | null | undefined,
   envValue?: string,
+  state?: unknown,
 ): PhysicsCriticEnforcementDecision {
-  return evaluatePhysicsCriticEnforcement(critique, physicsCriticEnforceModeFromEnv(envValue))
+  const corroborate = state !== undefined ? makePythonCorroborationOracle(state) : alwaysUncorroborable
+  return evaluatePhysicsCriticEnforcement(critique, physicsCriticEnforceModeFromEnv(envValue), corroborate)
 }
 
 // ---------------------------------------------------------------------------

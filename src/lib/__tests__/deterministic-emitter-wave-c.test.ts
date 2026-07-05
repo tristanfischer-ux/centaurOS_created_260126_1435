@@ -93,11 +93,8 @@ describe('BESS WAVE C item 1 — 1500V family', () => {
     expect(modVal(w, 'part_number')).toMatch(/^PV-\d+A-(1XL|2XL|3L)-B?-?15$/)
   })
 
-  it('rack string fuse: same real 1500V family, not the mis-rated 170M6812', () => {
-    const w = findWord(design, 'rack_string_fuse_word')
-    expect(modVal(w, 'part_number')).not.toBe('170M6812')
-    expect(modVal(w, 'manufacturer')).toBe('Eaton Bussmann')
-    expect(modVal(w, 'dimension')).toBe('1500')
+  it('fuse dedup: rack_string_fuse_word no longer exists (2026-07-05 dedup — the rack/string DC fuse is listed exactly once, under power_distribution as dc_hrc_fuse_word)', () => {
+    expect(findWord(design, 'rack_string_fuse_word')).toBeUndefined()
   })
 
   it('below 1000V nominal, the ORIGINAL 1000V-class parts are unchanged (byte-identical for non-1500V briefs)', () => {
@@ -149,10 +146,10 @@ describe('BESS WAVE C item 1 follow-up — rack fuse ampacity (v4 physics-critic
   // in BUSSMANN_PV_1500V_RANGE is 200 A (160 A falls 0.25 A short) -> PV-200A-1XL-B-15.
   const design = emitBessDesign(makeContract(), {})
 
-  it('rack string fuse: PV-200A-1XL-B-15 at 200 A clears 1.25x rack-current floor (1.56x actual margin) — the v4 critic finding was a false positive', () => {
-    const w = findWord(design, 'rack_string_fuse_word')
+  it('rack/string DC fuse (dc_hrc_fuse_word, power_distribution — canonical since the 2026-07-05 dedup): PV-200A-1XL-B-15 at 200 A clears 1.25x rack-current floor (1.56x actual margin) — the v4 critic finding was a false positive', () => {
+    const w = findWord(design, 'dc_hrc_fuse_word')
     expect(modVal(w, 'part_number')).toBe('PV-200A-1XL-B-15')
-    expect(modVal(w, 'rating_primary')).toBe('200 A')
+    expect(modVal(w, 'capacity')).toBe('200')
   })
 
   it('gate-6 ampacity leg: zero HIGH findings on the real v4-shaped design (confirms 200 A is NOT undersized)', () => {
@@ -162,15 +159,15 @@ describe('BESS WAVE C item 1 follow-up — rack fuse ampacity (v4 physics-critic
     expect(ampacityFindings).toHaveLength(0)
   })
 
-  it('gate-6 ampacity leg proveCatch: fires HIGH when a rack fuse is rated below 1.25x string_continuous_current_a', () => {
+  it('gate-6 ampacity leg proveCatch: fires HIGH when the rack/string DC fuse is rated below 1.25x string_continuous_current_a', () => {
     const badDesign = JSON.parse(JSON.stringify(design))
     for (const m of badDesign.modules) {
       for (const sm of m.sub_modules) {
         for (const w of sm.words) {
-          if (w.id === 'rack_string_fuse_word') {
+          if (w.id === 'dc_hrc_fuse_word') {
             // 100 A on a 128.2 A rack (required 160.25 A) — genuinely undersized.
             w.modifier_characters = w.modifier_characters.map((mc: any) =>
-              mc.kind === 'rating_primary' ? { ...mc, value: '100 A' } : mc,
+              mc.kind === 'capacity' ? { ...mc, value: '100' } : mc,
             )
           }
         }
@@ -178,11 +175,42 @@ describe('BESS WAVE C item 1 follow-up — rack fuse ampacity (v4 physics-critic
     }
     const fakeState = { moduleDecomposition: { modules: badDesign.modules, product_class: 'energy_storage' }, orchestratorContract: { quantities: makeContract().quantities } }
     const result = auditVoltageSizing(fakeState)
-    const ampacityFindings = result.findings.filter((f) => f.check === 'ampacity' && f.word_id === 'rack_string_fuse_word')
+    const ampacityFindings = result.findings.filter((f) => f.check === 'ampacity' && f.word_id === 'dc_hrc_fuse_word')
     expect(ampacityFindings.length).toBeGreaterThanOrEqual(1)
     expect(ampacityFindings[0].severity).toBe('HIGH')
     expect(ampacityFindings[0].claimed_a).toBe(100)
     expect(ampacityFindings[0].required_a).toBeCloseTo(160.25, 1)
+  })
+
+  it('fuse dedup (2026-07-05): dc_hrc_fuse_word is the ONLY rack/string DC fuse word in the whole design — no duplicate priced line under safety_protection', () => {
+    const fuseWords: any[] = []
+    for (const m of design.modules) {
+      for (const sm of m.sub_modules) {
+        for (const w of sm.words) {
+          if (w.id === 'dc_hrc_fuse_word' || w.id === 'rack_string_fuse_word') fuseWords.push(`${m.module}:${w.id}`)
+        }
+      }
+    }
+    expect(fuseWords).toEqual(['power_distribution:dc_hrc_fuse_word'])
+  })
+
+  it('below 1000V nominal, the rack/string DC fuse is current-derived (not a stale hardcoded 200 A literal) — PV-ANH1/ANH2 family', () => {
+    // out/bess-campaign-v4 shape but a much higher rack current, forcing the
+    // ≤1000V branch off the old hardcoded 200 A literal: string_continuous_
+    // current_a = 600 A -> required = 600 x 1.25 = 750 A -> PV-630ANH2 is the
+    // largest catalogued step (saturates, per selectBessDcFuse1000V's
+    // fallback) rather than the stale PV-200ANH1.
+    const highCurrentDesign = emitBessDesign(
+      makeContract({
+        dc_bus_voltage_v: { value: 800, unit: 'V' },
+        string_continuous_current_a: { value: 600, unit: 'A' },
+      }),
+      {},
+    )
+    const w = findWord(highCurrentDesign, 'dc_hrc_fuse_word')
+    expect(modVal(w, 'part_number')).not.toBe('PV-200ANH1')
+    expect(modVal(w, 'part_number')).toBe('PV-630ANH2')
+    expect(modVal(w, 'dimension')).toBe('1000')
   })
 
   it('rejects the shadow-autocorrect fuse pick: "PV-315A-2XL-B-15" is not a real body-style/rating combination the emitter would ever choose', () => {
