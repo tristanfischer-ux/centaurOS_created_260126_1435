@@ -943,6 +943,19 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   const totalBusbars = Math.max(0, p.cellCount - p.rackCount)
   const tempSensorCount = p.rackCount * 4
 
+  // BESS WAVE C addendum 8 (2026-07-05, battery-cost investigation): the £100 flat
+  // per-cell price below (L48 council 2026-05-27) does not scale with cell ENERGY and
+  // priced ~2.2x above 2026 market (£111.6/kWh vs a verified £41-56/kWh market band —
+  // BNEF stationary-ESS pack price $70/kWh global average 2025 + international utility
+  // LFP tender cluster $55-75/kWh, @ 1.335 USD/GBP). Fixed at the source: price scales
+  // with the cell's own capacity × voltage (universal — correct for any Ah/V combination,
+  // never a flat per-unit guess), aligned to the SAME £57/kWh rate already used for the
+  // final priced BoM in requirements_bom.py's CELL_GBP_PER_KWH (closing the two-cost-
+  // surfaces divergence between the macro estimate and the final requirementsBom line).
+  // See scripts/lib/engineering-contract.ts CELL_GBP_PER_KWH_MARKET_2026 (same anchor).
+  const cellEnergyKwh = (p.cellCapacityAh * p.cellVoltageV) / 1000
+  const cellUnitPriceGbp = Math.round(57 * cellEnergyKwh * 100) / 100
+
   const cellString = makeSubModule(
     'cell_string',
     'cell string',
@@ -955,10 +968,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
       // value BoM line emitting £0 (no list_price_gbp + Engine B class curve
       // returned 0 for the LFP prismatic cell radical). With L47's macro
       // mfr/pn preservation, the cell line rendered without a price at all
-      // — collapsing part_realism from 6.25 → 3.75. Real CATL 280 Ah LFP
-      // prismatic cell UK trade ~£90-110 each (CATL bulk orders £70-85; UK
-      // distributor mark-up + import to ~£100). Pin £100 to match the trade
-      // band; 3,750 × £100 = £375k matching the cells line on the cover.
+      // — collapsing part_realism from 6.25 → 3.75.
+      // BESS WAVE C addendum 8 (2026-07-05): the flat £100 trade-band guess this
+      // comment used to cite is now REPLACED by cellUnitPriceGbp (£/kWh-scaled,
+      // market-verified — see comment above cellEnergyKwh) so the pin never
+      // drifts from the macro-assembly estimate again.
       word(
         'lfp_prismatic_cell_word',
         'LFP prismatic cell word',
@@ -968,7 +982,7 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('capacity', String(p.cellCapacityAh), 'Ah'),
           mod('manufacturer', 'CATL'),
           mod('part_number', 'LF280K'),
-          mod('list_price_gbp', '100'),
+          mod('list_price_gbp', String(cellUnitPriceGbp)),
           mod('form', 'prismatic'),
           mod('dimension', String(p.cellVoltageV), 'V'),
           mod('regulatory', 'IEC 62619'),

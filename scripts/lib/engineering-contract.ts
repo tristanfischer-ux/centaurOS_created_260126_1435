@@ -1237,14 +1237,39 @@ registerArchetype('bess', (brief: any) => {
   // the per-rack formula is correct because 250 % 18 = 16 leftover cells
   // per rack each require a full extra board (14 boards × 15 racks = 210).
   const slaveCount = Math.ceil(cellsPerRack / 18) * rackCount  // 18-channel LTC6813-1, per-rack boundary
+  // BESS WAVE C addendum 8 (2026-07-05, battery-cost investigation — Tristan: the honest
+  // battery_only_cost_per_kwh_gbp closure exposed a 2.33x overrun, £147/kWh vs the brief's
+  // £63/kWh anchor). Root cause: this cell line was a FLAT £100/cell hand-set guess (L48
+  // council, 2026-05-27) that does not scale with cell ENERGY — a 100 Ah cell and a 280 Ah
+  // cell would cost the same £100 — and at 280 Ah × 3.2 V it prices out to £111.6/kWh, ~2.2x
+  // the 2026 market rate for LFP prismatic cells at programme/bulk scale. Verified against
+  // three independent 2026 sources: (1) BloombergNEF Lithium-Ion Battery Price Survey 2025 —
+  // stationary energy-storage PACK price $70/kWh global average (lowest of any market
+  // segment) ≈ £52/kWh @ 1.335 USD/GBP (2026-07 spot); (2) BNEF/Ember 2025-2026 coverage —
+  // international utility-scale LFP cell tender results clustering $55-75/kWh ≈ £41-56/kWh;
+  // (3) bulk (5,000+ unit) CATL/Gotion 280 Ah prismatic cell listings $30-46/kWh ≈ £22-34/kWh
+  // (a floor, since programme buys carry BESS-grade warranty/QA/logistics margin above raw
+  // spot). This is the SAME rate already used for the FINAL priced BoM in
+  // requirements_bom.py's `CELL_GBP_PER_KWH = 57.0` (independently DB-grounded against
+  // forge-truth.db real prismatic-cell listings, per that file's own 2026-06-25 fix) — this
+  // macro-assembly ESTIMATE had drifted from that already-corrected rate, a genuine "two cost
+  // surfaces" divergence (v5: this macro said £608,400 for 6,084 cells vs the SAME run's final
+  // requirementsBom line X-1, which independently priced the identical 6,084 cells at
+  // £310,284 via CELL_GBP_PER_KWH). Fixed at the SOURCE: price scales with the component's own
+  // cellEnergyKwh (universal — a different brief's cell chemistry/capacity/voltage combination
+  // prices correctly with no new hardcode), aligned to the same £57/kWh anchor, never a flat
+  // per-unit price. Regression guard: src/lib/__tests__/engineering-contract-bess-wave-c.test.ts
+  // 'battery-only cell price scales with cell energy, not a flat per-cell guess'.
+  const CELL_GBP_PER_KWH_MARKET_2026 = 57  // matches requirements_bom.py CELL_GBP_PER_KWH (DB-grounded)
+  const cellUnitPriceGbp = Math.round(CELL_GBP_PER_KWH_MARKET_2026 * cellEnergyKwh * 100) / 100
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
       word_name: 'lfp_prismatic_cell',
-      unit_price_gbp: 100,
+      unit_price_gbp: cellUnitPriceGbp,
       dimension_basis: 'cell_count',
       dimension_value: cellCount,
-      total_gbp: 100 * cellCount,
-      source_detail: `£100/cell × ${cellCount} cells (CATL 280 Ah LFP prismatic, programme-rate)`,
+      total_gbp: cellUnitPriceGbp * cellCount,
+      source_detail: `£${CELL_GBP_PER_KWH_MARKET_2026}/kWh × ${cellEnergyKwh.toFixed(3)} kWh/cell = £${cellUnitPriceGbp.toFixed(2)}/cell × ${cellCount} cells (2026 programme-rate LFP prismatic cell — BNEF stationary-ESS pack price $70/kWh global average 2025 + international utility LFP tender cluster $55-75/kWh, ≈£41-56/kWh @ 1.335 USD/GBP; matches requirements_bom.py's DB-grounded CELL_GBP_PER_KWH, closing the two-cost-surfaces divergence)`,
     },
     {
       // L52 council fix (2026-05-28, 4/4 seats #1 finding): this macro priced
