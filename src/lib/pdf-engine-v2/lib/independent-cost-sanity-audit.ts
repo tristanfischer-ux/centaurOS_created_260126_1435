@@ -406,17 +406,48 @@ function massToKg(v: number, u: string): number {
  * and a human label for the £/(unit·yr) denominator. The `getV` indirection
  * lets `familyFromUnit` probe the unit shape without a real value first.
  * Returns null if the unit is not a recognised rate.
+ *
+ * UNIT-FAMILY FIX (2026-07-05, gate 32 CO₂ false-block — the recurring family
+ * in CLAUDE.md mistake #12): this ALSO normalises the MASS/VOLUME sub-unit to
+ * the CANONICAL unit the throughput class bands are quoted in — mass
+ * throughput → TONNES (co2_mineralisation / aquaculture_ras / e_fuel_synthesis
+ * are all £/(t·yr)), volume throughput → m³ (water_treatment is £/(m³·yr)).
+ * Previously only the TIME axis (day/hour/year → per-year) was normalised;
+ * the MASS axis was left in whatever sub-unit the brief happened to use (kg,
+ * g, t) and the raw number was divided straight into a per-TONNE band. A
+ * brief quoting "1000 kg/day" (→ 365,000 kg/yr, uncoverted) divided the
+ * £1.44M headline cost by 365,000 instead of 365 — a 1000× denominator error
+ * that read as a 381.5× false "cost sanity HIGH" (undercounted) when the
+ * true £3,931/(t·yr) sits comfortably inside the £1,500-10,000/(t·yr) band.
+ * (A sibling CO₂ brief that happened to quote "1 t/day" was already correct
+ * by coincidence — same bug, silent when the brief's native unit matched the
+ * band's.) Fix: convert the amount to the family's canonical unit HERE, once,
+ * so every consumer (deriveOutputDenominator → computeCostSanity's ratio)
+ * always divides by a value already in the band's unit. resolveClassOutputBand
+ * still gates on the coarse OutputFamily ('throughput'); this reconciles the
+ * sub-unit universally for every mass/volume-quoting archetype, seen or not.
  */
 function throughputToPerYear(getV: (x: number) => number, uRaw: string): { value: number; label: string } | null {
   const u = String(uRaw ?? '').toLowerCase().replace(/\s/g, '')
-  // The "amount" part before the time denominator, for a label.
-  const amountUnit = (() => {
-    if (/(^|\W)(t|tonne|tonnes)\//.test(u) || /^tp[dhy]$/.test(u)) return 't'
-    if (/(^|\W)kg\//.test(u) || /^kgp[dhy]$/.test(u)) return 'kg'
-    if (/nm3|m3|m³/.test(u)) return 'm³'
-    if (/(^|\W)l\//.test(u)) return 'L'
-    return 'unit'
-  })()
+
+  // The amount unit + its conversion factor TO THE CANONICAL unit for its
+  // family. Order matters: the more specific tonne(s)/kg tokens are checked
+  // before the bare "g" so "kg/day" is never mis-read as a gram rate.
+  let amountUnit: string
+  let toCanonicalFactor: number
+  if (/(^|\W)(t|tonne|tonnes)\//.test(u) || /^tp[dhy]$/.test(u)) {
+    amountUnit = 't'; toCanonicalFactor = 1        // already tonnes
+  } else if (/(^|\W)kg\//.test(u) || /^kgp[dhy]$/.test(u)) {
+    amountUnit = 't'; toCanonicalFactor = 0.001    // kg → t
+  } else if (/(^|\W)g\//.test(u) || /^gp[dhy]$/.test(u)) {
+    amountUnit = 't'; toCanonicalFactor = 0.000001 // g → t
+  } else if (/nm3|m3|m³/.test(u)) {
+    amountUnit = 'm³'; toCanonicalFactor = 1       // already m³
+  } else if (/(^|\W)l\//.test(u)) {
+    amountUnit = 'm³'; toCanonicalFactor = 0.001   // L → m³
+  } else {
+    amountUnit = 'unit'; toCanonicalFactor = 1     // no scalable mass/volume unit — untouched
+  }
 
   let perYearFactor: number | null = null
   // tpd / t/day / kg/day / units/day → ×365
@@ -429,7 +460,7 @@ function throughputToPerYear(getV: (x: number) => number, uRaw: string): { value
   else if (/\/yr$|\/year$|\/a$|py$|pa$/.test(u)) perYearFactor = 1
 
   if (perYearFactor == null) return null
-  return { value: getV(1) * perYearFactor, label: `${amountUnit}/yr` }
+  return { value: getV(1) * perYearFactor * toCanonicalFactor, label: `${amountUnit}/yr` }
 }
 
 /**

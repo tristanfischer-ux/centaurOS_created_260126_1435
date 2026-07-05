@@ -700,6 +700,64 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── UNIT-FAMILY CONVERSION for throughput denominators (2026-07-05, gate 32
+  // CO₂ false-block — the recurring unit-family bug, CLAUDE.md mistake #12). The
+  // co2-campaign-v1 baseline blocked exit 32 with "£1,435,052 / 365,000 kg/yr =
+  // £3.9/(t·yr) is 381.5× below the £1,500 low edge" — the gate divided £ by a
+  // value STILL IN KILOGRAMS against a band quoted PER TONNE. The engine cost was
+  // correct: £1,435,052 / 365 t/yr = £3,931/(t·yr), comfortably inside the
+  // £1,500-10,000/(t·yr) band. Root cause: throughputToPerYear() normalised the
+  // TIME axis (day→year) but never the MASS axis (kg→t) to the class band's
+  // canonical unit. Two directions guarded: (a) the exact CO₂ kg/day shape must
+  // now read PASS with the CORRECT ~£3,931/(t·yr) ratio (not a 381× false HIGH);
+  // (b) a genuinely underpriced design on the SAME 365 t/yr output (£3,600, a
+  // real ~152× undercount) must STILL block HIGH — the fix must not become a
+  // blanket pass. A third case proves the conversion is a NO-OP where the brief
+  // already quotes the band's native unit (a sibling CO₂ brief using "1 t/day"
+  // was already correct by coincidence — same code path, unaffected by the fix).
+  const co2KgDayState: any = {
+    keyMetrics: { product_class: 'co2_mineralisation' },
+    parsedBrief: { constraints: { target_performance: {
+      key_metric: 'co2_capture_kg_per_day', value: 1000, unit: 'kg/day',
+      metrics: [{ key_metric: 'co2_capture_kg_per_day', value: 1000, unit: 'kg/day', category: 'scale' }],
+    } } },
+    costStack: { oem_transfer_price_gbp: 1_435_052 },
+  }
+  const co2KgDayCS = computeCostSanity(co2KgDayState)
+  const co2KgDayUnderpriced: any = JSON.parse(JSON.stringify(co2KgDayState))
+  co2KgDayUnderpriced.costStack.oem_transfer_price_gbp = 3_600
+  const co2KgDayUnderpricedCS = computeCostSanity(co2KgDayUnderpriced)
+  const co2TDayState: any = {
+    keyMetrics: { product_class: 'co2_mineralisation' },
+    parsedBrief: { constraints: { target_performance: {
+      key_metric: 'co2_capture_capacity_tpd', value: 1, unit: 't/day',
+      metrics: [{ key_metric: 'co2_capture_capacity_tpd', value: 1, unit: 't/day', category: 'scale' }],
+    } } },
+    costStack: { oem_transfer_price_gbp: 1_435_052 },
+  }
+  const co2TDayCS = computeCostSanity(co2TDayState)
+  out.push(assertEq(
+    'UNIVERSAL.cost_sanity_unit_family_conversion',
+    'computeCostSanity converts a throughput denominator to the class band\'s canonical mass unit (tonnes) before dividing: a "1000 kg/day" CO₂ brief (365,000 kg/yr) now reads PASS at ~£3,931/(t·yr) instead of a 381.5× false HIGH; a genuinely ~152×-underpriced design on the SAME 365 t/yr output still blocks HIGH; and a sibling brief already quoting "1 t/day" (no conversion needed) produces the IDENTICAL output_value/ratio shape — the fix is a no-op where units already matched',
+    JSON.stringify({
+      kgDayVerdict: co2KgDayCS.verdict,
+      kgDayOutputValue: co2KgDayCS.output_value,
+      kgDayOutputUnitLabel: co2KgDayCS.output_unit_label,
+      kgDayRatio: co2KgDayCS.cost_per_output_unit,
+      underpricedVerdict: co2KgDayUnderpricedCS.verdict,
+      tDayVerdict: co2TDayCS.verdict,
+      tDayOutputValue: co2TDayCS.output_value,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.kgDayVerdict === 'pass' && o.kgDayOutputValue === 365 && o.kgDayOutputUnitLabel === 't/yr' &&
+        Math.abs(o.kgDayRatio - 3931.65) < 1 &&
+        o.underpricedVerdict === 'high' &&
+        o.tDayVerdict === 'pass' && o.tDayOutputValue === 365
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── GENERATIVE BENCHMARK SANITY NET — pure comparison guards the "pull it back when the
   // determinism goes off" net wired into the chain (gate 36, 2026-06-24). compareToBenchmark is
   // the deterministic half of an LLM-anchored check: given an independent top-down expectation
