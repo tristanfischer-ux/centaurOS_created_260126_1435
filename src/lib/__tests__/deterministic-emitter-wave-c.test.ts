@@ -142,6 +142,107 @@ describe('BESS WAVE C item 1 — 1500V family', () => {
   })
 })
 
+describe('BESS WAVE C item 1 follow-up — rack fuse ampacity (v4 physics-critic HIGH #1, 2026-07-05)', () => {
+  // out/bess-campaign-v4 contract: continuous_power_kw=2500, dc_bus_voltage_v=1500,
+  // rack_count=13 -> bus_continuous_current_a=1666.67, string_continuous_current_a=128.2.
+  // Arithmetic: 128.2 x 1.25 = 160.25 A required; next standard gPV step >= that
+  // in BUSSMANN_PV_1500V_RANGE is 200 A (160 A falls 0.25 A short) -> PV-200A-1XL-B-15.
+  const design = emitBessDesign(makeContract(), {})
+
+  it('rack string fuse: PV-200A-1XL-B-15 at 200 A clears 1.25x rack-current floor (1.56x actual margin) — the v4 critic finding was a false positive', () => {
+    const w = findWord(design, 'rack_string_fuse_word')
+    expect(modVal(w, 'part_number')).toBe('PV-200A-1XL-B-15')
+    expect(modVal(w, 'rating_primary')).toBe('200 A')
+  })
+
+  it('gate-6 ampacity leg: zero HIGH findings on the real v4-shaped design (confirms 200 A is NOT undersized)', () => {
+    const fakeState = { moduleDecomposition: { modules: design.modules, product_class: 'energy_storage' }, orchestratorContract: { quantities: makeContract().quantities } }
+    const result = auditVoltageSizing(fakeState)
+    const ampacityFindings = result.findings.filter((f) => f.check === 'ampacity')
+    expect(ampacityFindings).toHaveLength(0)
+  })
+
+  it('gate-6 ampacity leg proveCatch: fires HIGH when a rack fuse is rated below 1.25x string_continuous_current_a', () => {
+    const badDesign = JSON.parse(JSON.stringify(design))
+    for (const m of badDesign.modules) {
+      for (const sm of m.sub_modules) {
+        for (const w of sm.words) {
+          if (w.id === 'rack_string_fuse_word') {
+            // 100 A on a 128.2 A rack (required 160.25 A) — genuinely undersized.
+            w.modifier_characters = w.modifier_characters.map((mc: any) =>
+              mc.kind === 'rating_primary' ? { ...mc, value: '100 A' } : mc,
+            )
+          }
+        }
+      }
+    }
+    const fakeState = { moduleDecomposition: { modules: badDesign.modules, product_class: 'energy_storage' }, orchestratorContract: { quantities: makeContract().quantities } }
+    const result = auditVoltageSizing(fakeState)
+    const ampacityFindings = result.findings.filter((f) => f.check === 'ampacity' && f.word_id === 'rack_string_fuse_word')
+    expect(ampacityFindings.length).toBeGreaterThanOrEqual(1)
+    expect(ampacityFindings[0].severity).toBe('HIGH')
+    expect(ampacityFindings[0].claimed_a).toBe(100)
+    expect(ampacityFindings[0].required_a).toBeCloseTo(160.25, 1)
+  })
+
+  it('rejects the shadow-autocorrect fuse pick: "PV-315A-2XL-B-15" is not a real body-style/rating combination the emitter would ever choose', () => {
+    // The 315 A step in BUSSMANN_PV_1500V_RANGE is body style 3L (PV-315A-3L-15);
+    // 2XL-B only exists at the 160 A step. The emitter must never produce the
+    // fabricated combination the physics-critic-autocorrect shadow record proposed.
+    for (const m of design.modules) {
+      for (const sm of m.sub_modules) {
+        for (const w of sm.words) {
+          const pn = modVal(w, 'part_number')
+          if (pn) expect(pn).not.toBe('PV-315A-2XL-B-15')
+        }
+      }
+    }
+  })
+})
+
+describe('BESS WAVE C item 2 — duplicate coolant circulation pump listing (v4 physics-critic MED, 2026-07-05)', () => {
+  const design = emitBessDesign(makeContract(), {})
+
+  function findWords(wordId: string) {
+    const hits: any[] = []
+    for (const m of design.modules) {
+      for (const sm of m.sub_modules) {
+        for (const w of sm.words) {
+          if (w.id === wordId) hits.push(w)
+        }
+      }
+    }
+    return hits
+  }
+
+  it('the circulation pump word exists exactly once, in environmental_interface (not duplicated into mass_fluid_transport_process)', () => {
+    expect(findWords('cooling_pump_word')).toHaveLength(1)
+    expect(findWords('coolant_circulation_pump_word')).toHaveLength(0)
+    const owningModule = design.modules.find((m: any) => m.sub_modules.some((sm: any) => sm.words.some((w: any) => w.id === 'cooling_pump_word')))
+    expect(owningModule.module).toBe('environmental_interface')
+  })
+
+  it('no Grundfos pump part number appears more than once across the whole design (the general dedup invariant)', () => {
+    const pumpPartNumbers: string[] = []
+    for (const m of design.modules) {
+      for (const sm of m.sub_modules) {
+        for (const w of sm.words) {
+          const mfr = modVal(w, 'manufacturer')
+          const pn = modVal(w, 'part_number')
+          if (mfr === 'Grundfos' && pn) pumpPartNumbers.push(`${m.module}:${w.id}:${pn}`)
+        }
+      }
+    }
+    const byPn: Record<string, number> = {}
+    for (const entry of pumpPartNumbers) {
+      const pn = entry.split(':')[2]
+      byPn[pn] = (byPn[pn] ?? 0) + 1
+    }
+    const duplicated = Object.entries(byPn).filter(([, count]) => count > 1)
+    expect(duplicated).toEqual([])
+  })
+})
+
 describe('BESS WAVE C item 3 — PCS undersizing', () => {
   it('2.5 MW brief: PCS quantity = ceil(2500/1000) = 3, not 1', () => {
     const design = emitBessDesign(makeContract(), {})

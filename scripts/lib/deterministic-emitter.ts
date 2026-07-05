@@ -570,13 +570,52 @@ const BUSSMANN_PV_1500V_RANGE: Array<{ part_number: string; rated_current_a: num
   { part_number: 'PV-400A-3L-15', rated_current_a: 400 },
 ]
 
+// v4 physics-critic HIGH #1 (2026-07-05, out/bess-campaign-v4, gate 33
+// blocking): flagged the emitted PV-200A-1XL-B-15 rack fuse "undersized-vs
+// -load", and the SHADOW autocorrect (physics-critic-autocorrect.ts)
+// proposed replacing it with "PV-315A-2XL-B-15" to "match the 315 A
+// disconnect switch rating".
+//
+// INVESTIGATED + REJECTED (do not blindly adopt):
+// 1. The ampacity RULE was already correctly applied. Arithmetic, quoted
+//    from the v4 engineering contract (0.5-engineering-contract.json):
+//      rack_continuous_current_a = bus_continuous_current_a / rack_count
+//                                 = 1,666.67 A / 13 = 128.2 A
+//                                 (equivalently: PCS_kw × 1000 / dc_bus_voltage_v
+//                                  / rack_count = 2,500,000 / 1,500 / 13)
+//      required_a = rack_continuous_current_a × RACK_FUSE_AMPACITY_SAFETY_FACTOR
+//                 = 128.2 × 1.25 = 160.26 A
+//      next standard gPV rating in BUSSMANN_PV_1500V_RANGE >= 160.26 A → 200 A
+//      → PV-200A-1XL-B-15 (160 A itself is 0.26 A short of the floor, so the
+//        selector correctly skips it and steps up to 200 A).
+//    200 A / 128.2 A = 1.56× actual margin — comfortably clears the 1.25×
+//    floor. The fuse is NOT undersized against the rack's continuous load.
+// 2. "PV-315A-2XL-B-15" is not a verified real part: this family's body
+//    style is tied to its rating (see parts-spec-validator.ts
+//    KNOWN_PART_AUTHORITATIVE, confirmed via distributor listings
+//    2026-07-04) — 160 A is the ONLY rating sold in a 2XL-B body; the real
+//    315 A part in this range is PV-315A-3L-15 (3L body). The autocorrect
+//    fabricated a rating+body-style combination that doesn't exist in the
+//    catalogue.
+// 3. Matching a fuse's rating to an upstream disconnect switch's rating is
+//    not a valid protective-device sizing principle — fuses are DELIBERATELY
+//    rated below switching/interrupting hardware (that is what lets the
+//    fuse clear a fault before the switch/contactor needs to); coordinating
+//    a fuse UP to a switch's rating defeats selective coordination rather
+//    than fixing anything.
+// The gate-6 VOLTAGE_SIZING_RULES ampacity leg (sizing-vs-design-audit.ts,
+// same date) now makes this margin a deterministic, provable guard instead
+// of depending on the LLM physics critic to reach the right conclusion.
+const RACK_FUSE_AMPACITY_SAFETY_FACTOR = 1.25
+
 /**
  * selectBessDcFuse1500V — real, verified Eaton Bussmann 1500 V DC gPV
  * bolt-in fuse, sized to >= requiredCurrentA (already margin-applied by the
- * caller). Falls back to the largest catalogued step when the required
- * current exceeds the family (mirrors selectPfannenbergEbXt's saturation
- * pattern — the caller/gate surfaces the residual gap rather than this
- * function inventing a part that doesn't exist).
+ * caller — see RACK_FUSE_AMPACITY_SAFETY_FACTOR above). Falls back to the
+ * largest catalogued step when the required current exceeds the family
+ * (mirrors selectPfannenbergEbXt's saturation pattern — the caller/gate
+ * surfaces the residual gap rather than this function inventing a part
+ * that doesn't exist).
  */
 function selectBessDcFuse1500V(requiredCurrentA: number): { manufacturer: string; part_number: string; rated_current_a: number; rated_voltage_dc_v: number } {
   const hit = BUSSMANN_PV_1500V_RANGE.find((f) => f.rated_current_a >= requiredCurrentA)
@@ -2506,7 +2545,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
             ],
           )
         }
-        const requiredA = p.stringContinuousA * 1.25
+        const requiredA = p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR
         const fuse = selectBessDcFuse1500V(requiredA)
         return word(
           'dc_hrc_fuse_word',
@@ -3341,15 +3380,27 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
     coolantDensityKgPerL: p.coolantDensityKgPerL,
     coolantCpKjPerKgK: p.coolantCpKjPerKgK,
   })
-  // Build the pump form string — universal: uses contract-derived thermal load,
-  // not a hardcoded flow value. "duty + standby redundant pair" is a separate
-  // BESS-specific requirement (not universal — some classes use single pump).
-  const pumpFormText =
-    `Grundfos ${selectedPump.part_number} ${selectedPump.family === 'TPE' ? 'inline' : 'end-suction'} ` +
-    `centrifugal pump; selected for ${p.systemThermalDissipationKw.toFixed(1)} kW system thermal load ` +
-    `(required ${selectedPump.required_with_safety_lpm} L/min at ${selectedPump.head_m} m head ` +
-    `including 1.25× safety factor; pump rated ${selectedPump.nominal_flow_lpm} L/min ` +
-    `— ${selectedPump.flow_utilisation_pct}% utilisation)`
+  // BESS WAVE C item 2 fix (2026-07-05, v4 physics-critic MED "Grundfos NB
+  // 50-160/143 BQQE pumps are listed twice with identical quantities and
+  // descriptions: once under environmental_interface, once under
+  // mass_fluid_transport_process"): CONFIRMED — emitEnvironmentalInterface()
+  // (selectedPumpEI, above in this file) and this function both called
+  // selectCoolantPumpFor() with the SAME p.systemThermalDissipationKw /
+  // coolant properties and DEFAULT dtK=8 / headM=20 / safetyFactor=1.25 (the
+  // explicit values passed here ARE the function defaults — see
+  // hardware-selectors.ts::selectCoolantPumpFor), so the two calls are
+  // guaranteed to pick the IDENTICAL Grundfos part + quantity every run —
+  // the same physical duty pump pair rendered as two separate priced BoM
+  // lines. Per the 2026-05-17 pretraining ontology study (10/10 reference
+  // BESS designs place coolant_pump under environmental_interface, not
+  // mass_fluid_transport_process), environmental_interface's cooling_pump_word
+  // is the CANONICAL listing. This module keeps calling selectCoolantPumpFor()
+  // ONLY to derive perRackFlowLpm / systemFlowLpm (needed for the cold-plate
+  // and manifold sizing below) — it no longer emits a duplicate priced pump
+  // word. Root-cause pattern: this is the same "computed-twin" /
+  // shared-quantity double-emission family as the L38 coolant-chemistry
+  // duplication — two sub-modules independently deriving the SAME physical
+  // asset from the SAME contract quantity, each believing it owns the part.
 
   // ── Per-rack flow — derived from first-principles (class-killer B followup) ──
   // L38 skeleton-critic HIGH: "pump rated 90 L/min but cold plates specified as
@@ -3369,47 +3420,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
     'routes',
     `${p.coolantChemistryDesc} coolant from cold plates to chiller via SS304 piping`,
     [
-      // Circulation pump — SIZED FROM CONTRACT via selectCoolantPumpFor().
-      // L38 MED fix (2026-05-26, class-killer B): previous Grundfos NB 65-250/245
-      // BQQE (900 L/min) was hardcoded based on legacy 15-rack × 60 L/min/rack
-      // assumption. For the L38 14-rack design (34.45 kW total thermal load),
-      // physics-based sizing gives only ~68 L/min required, so the TPE 50-180
-      // (280 L/min) is the correct pump — not the NB 65-250 (900 L/min, 3× over-spec).
+      // BESS WAVE C item 2 fix (2026-07-05): the circulation pump itself is
+      // NOT emitted here — see the comment above selectedPump's declaration.
+      // It is owned exclusively by emitEnvironmentalInterface()'s
+      // cooling_pump_word (industry-canonical placement). This sub-module
+      // starts directly with the cold plates it DOES own.
       //
-      // UNIVERSAL ARCHITECTURE NOTE: any hardware rating that DERIVES from a
-      // contract quantity must use a selector function. The selectCoolantPumpFor()
-      // call above pulls from p.systemThermalDissipationKw (contract-derived) and
-      // returns the smallest pump in the Grundfos catalogue that meets the duty.
-      //
-      // L30 council FIX 1 (physics bug introduced L30): previous Grundfos
-      // CR 32-2 was rated 60 L/min — adequate for ONE rack cold plate but not
-      // for the whole system. Total system flow = rackCount × perRackFlowLpm
-      // per cold plate = p.rackCount × 60 L/min (parametric, not hardcoded).
-      // The CR 32-2 is a multistage vertical in-line pump (up to ~60 L/min
-      // nominal) designed for high-head, low-flow building services — completely
-      // wrong for a high-flow BESS coolant loop.
-      // Correct sizing: Grundfos NB 65-250/245 BQQE — real end-suction
-      // centrifugal pump (ISO 2858 / EN 12162), 900 L/min at ~10 m head,
-      // ~7.5-11 kW motor, glycol/water compatible SS304 impeller/shaft.
-      // Source: Grundfos NB / NBE product range (grundfos.com/products/pumps/
-      // centrifugal-pumps/nb-nbe). Catalogue reference: NB 65-250/245.
-      word(
-        'coolant_circulation_pump_word',
-        'coolant circulation pump word',
-        cc('coolant_circulation_pump', 'Grundfos coolant circulation pump', 'thermal_transfer_function', 'steel'),
-        [
-          mod('quantity', '×2'),
-          // ── DELIVERABLE B: contract-derived pump selection ──────────────
-          // Form text built from selectCoolantPumpFor() result above — includes
-          // the thermal load, required flow, pump rating, and utilisation %.
-          mod('form', pumpFormText),
-          mod('manufacturer', 'Grundfos'),
-          mod('part_number', selectedPump.part_number),
-          mod('capacity', String(selectedPump.nominal_flow_lpm), 'L/min'),
-          mod('performance', `duty + standby redundant pair; ${selectedPump.required_with_safety_lpm} L/min required at 20 m head including 1.25× margin (${p.systemThermalDissipationKw.toFixed(1)} kW system thermal load, ${p.coolantChemistryDesc})`),
-          mod('regulatory', selectedPump.family === 'TPE' ? 'EN 12162' : 'ISO 2858 / EN 12162'),
-        ],
-      ),
       // Cold plates — one aluminium 6061-T6 cold plate per rack, manifolded
       // to the main coolant loop. Industry cost: £500-1,000 each.
       word(
@@ -3576,7 +3592,13 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
   return {
     module: 'mass_fluid_transport_process',
     // ── DELIVERABLE B: module_brief uses contract-derived pump PN (class-killer B) ──
-    module_brief: `Routes ${p.coolantChemistryDesc.split(' (')[0]} coolant between cold-plate manifolds and the chiller via SS304 piping, Grundfos ${selectedPump.part_number} circulation pumps (${selectedPump.nominal_flow_lpm} L/min nominal; ${selectedPump.required_with_safety_lpm} L/min required — ${p.rackCount} racks × ${perRackFlowLpm} L/min per cold plate), aluminium cold plates, ${manifoldPorts}-way distribution manifold, and 200 L coolant charge.`,
+    // BESS WAVE C item 2 fix (2026-07-05): narrative now attributes the
+    // circulation pumps to environmental_interface (their canonical BoM
+    // home — see selectedPump comment above) instead of re-claiming them
+    // as a component OF this module, while still surfacing the same
+    // physics-derived flow numbers for reader coherence (no duplicate
+    // priced BoM line is implied).
+    module_brief: `Routes ${p.coolantChemistryDesc.split(' (')[0]} coolant between cold-plate manifolds and the chiller via SS304 piping, circulated by the redundant Grundfos ${selectedPump.part_number} pumps specified in the environmental_interface module (${selectedPump.nominal_flow_lpm} L/min nominal; ${selectedPump.required_with_safety_lpm} L/min required — ${p.rackCount} racks × ${perRackFlowLpm} L/min per cold plate), aluminium cold plates, ${manifoldPorts}-way distribution manifold, and 200 L coolant charge.`,
     overview_paragraph_en: '',
     derived_parameters: {},
     allowed_radicals: [
@@ -4044,7 +4066,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
   // verified-real path.
   const isHighVoltageBus = p.dcBusVoltageV > 1000
   const dcFuse = isHighVoltageBus
-    ? selectBessDcFuse1500V(p.stringContinuousA * 1.25)
+    ? selectBessDcFuse1500V(p.stringContinuousA * RACK_FUSE_AMPACITY_SAFETY_FACTOR)
     : selectDcFuseFor({
         continuous_current_a: p.stringContinuousA,
         string_max_voltage_v: stringMaxVoltageV,

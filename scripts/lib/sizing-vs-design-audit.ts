@@ -445,6 +445,24 @@ export interface VoltageSizingRule {
   design_param: string
   applies_to_classes?: string[]
   description: string
+  /**
+   * v4 physics-critic HIGH #1 follow-up (2026-07-05, out/bess-campaign-v4,
+   * gate 33 blocking): rack-level fuses (and any other word matched by
+   * match_word_id that carries a current rating) also need an AMPACITY
+   * floor, not just a voltage-class floor — the two dimensions are
+   * independent failure modes (a part can be the right voltage class and
+   * still be undersized for the load, or vice versa). Optional — rules
+   * with no ampacity_design_param are voltage-only (unchanged behaviour).
+   * When set: required_a = quantities[ampacity_design_param] ×
+   * (ampacity_safety_factor ?? 1); any matched word with a parseable A
+   * rating below required_a is flagged HIGH, mirroring SIZING_RULES'
+   * safety-factor convention (IEC 60269-6 / UL 9540A 13.2.4 = 1.25×
+   * continuous). Words with NO parseable A value (e.g. a voltage-only
+   * insulation monitor) are silently skipped for this leg — they still get
+   * the voltage check above.
+   */
+  ampacity_design_param?: string
+  ampacity_safety_factor?: number
 }
 
 export const VOLTAGE_SIZING_RULES: VoltageSizingRule[] = [
@@ -454,6 +472,20 @@ export const VOLTAGE_SIZING_RULES: VoltageSizingRule[] = [
     applies_to_classes: ['energy_storage', 'bess', 'solar_inverter', 'ev_charger'],
     description:
       'DC-bus-facing protection/monitoring parts (insulation monitor, DC-bus voltage transducer, rack DC isolator, DC HRC/string fuse) must be rated >= dc_bus_voltage_v (the bus nominal voltage class) — real 1500V-class BESS/PV hardware exists and must be selected once the bus nominal exceeds a lower class (e.g. 1000 V).',
+    // Ampacity leg (added 2026-07-05, v4 physics-critic HIGH #1): rack-level
+    // fuses/isolators in this SAME word_id group carry the rack's full
+    // continuous current — arithmetic: rack_continuous_current_a =
+    // string_continuous_current_a (1P per rack topology; = bus_continuous_
+    // current_a / rack_count = PCS_kw × 1000 / dc_bus_voltage_v / rack_count).
+    // required_a = rack_continuous_current_a × 1.25 (IEC 60269-6 + UL 9540A
+    // 13.2.4). Words in this group with no A-parseable rating (the voltage
+    // instruments — insulation monitor, DC-bus voltage transducer) are
+    // skipped for this leg automatically (no false positive — see
+    // collectEmittedVoltageRatings). Verified deliberately universal, not
+    // narrowed to *_fuse only: the rack DC isolator carries the identical
+    // rack current and must clear the same floor.
+    ampacity_design_param: 'string_continuous_current_a',
+    ampacity_safety_factor: 1.25,
   },
 ]
 
@@ -462,7 +494,11 @@ interface EmittedVoltageRating {
   word_name_human: string
   module_id: string
   sub_module_id: string
-  claimed_v: number
+  claimed_v: number | null
+  /** Ampacity leg (2026-07-05) — parsed the same way as SIZING_RULES'
+   * collectEmittedRatings, via the shared parseCurrentA() helper. null when
+   * the word carries no A-shaped rating (e.g. a voltage-only instrument). */
+  claimed_a: number | null
   manufacturer: string | null
   part_number: string | null
 }
@@ -498,7 +534,22 @@ function collectEmittedVoltageRatings(state: any): EmittedVoltageRating[] {
             break
           }
         }
-        if (claimedV == null) continue
+        // Ampacity leg (2026-07-05): independently look for an A-shaped
+        // value across the same three kinds (reuses parseCurrentA — the
+        // same parser SIZING_RULES uses above). A word can have a voltage
+        // value, an ampacity value, both, or neither; each leg is only
+        // evaluated by auditVoltageSizing when its own value is present.
+        let claimedA: number | null = null
+        for (const kind of ['rating_primary', 'capacity', 'dimension']) {
+          const mod = mods.find((mc) => mc.kind === kind)
+          if (!mod) continue
+          const a = parseCurrentA(String(mod.value) + (mod.unit ? ' ' + mod.unit : ''))
+          if (a != null) {
+            claimedA = a
+            break
+          }
+        }
+        if (claimedV == null && claimedA == null) continue
         const wordId = String(w?.id ?? w?.content_character?.character_id ?? 'unknown')
         const nameHuman = String(w?.name_human ?? w?.content_character?.name_human ?? wordId)
         const mfrMod = mods.find((mc) => mc.kind === 'manufacturer')
@@ -509,6 +560,7 @@ function collectEmittedVoltageRatings(state: any): EmittedVoltageRating[] {
           module_id: moduleId,
           sub_module_id: subId,
           claimed_v: claimedV,
+          claimed_a: claimedA,
           manufacturer: mfrMod ? String(mfrMod.value) : null,
           part_number: pnMod ? String(pnMod.value) : null,
         })
@@ -525,8 +577,14 @@ export interface VoltageSizingFinding {
   sub_module_id: string
   manufacturer: string | null
   part_number: string | null
-  claimed_v: number
-  required_v: number
+  /** Which leg fired — the two dimensions are independent (BESS WAVE C
+   * item 1 follow-up, 2026-07-05): a part can be the right voltage class
+   * and still be undersized for the load, or vice versa. */
+  check: 'voltage' | 'ampacity'
+  claimed_v?: number
+  required_v?: number
+  claimed_a?: number
+  required_a?: number
   severity: 'HIGH'
   explanation: string
 }
@@ -539,12 +597,25 @@ export interface VoltageSizingAuditResult {
 }
 
 /**
- * auditVoltageSizing — gate 6 extension (BESS WAVE C item 1, 2026-07-04).
- * proveCatch: feed a state whose insulation-monitor/voltage-transducer/
- * isolator/fuse word is rated below dc_bus_voltage_v — must return exactly
- * one HIGH finding for that word (verified via deterministic-emitter.ts's
- * pre-fix behaviour on out/bess-campaign-v2: iso685-D-B @ 1000 V on a
- * 1500 V bus would have fired this rule before the emitter fix).
+ * auditVoltageSizing — gate 6 extension (BESS WAVE C item 1, 2026-07-04;
+ * ampacity leg added 2026-07-05).
+ *
+ * proveCatch (voltage leg): feed a state whose insulation-monitor/voltage-
+ * transducer/isolator/fuse word is rated below dc_bus_voltage_v — must
+ * return exactly one HIGH finding for that word (verified via
+ * deterministic-emitter.ts's pre-fix behaviour on out/bess-campaign-v2:
+ * iso685-D-B @ 1000 V on a 1500 V bus would have fired this rule before the
+ * emitter fix).
+ *
+ * proveCatch (ampacity leg, both directions — see
+ * src/lib/__tests__/deterministic-emitter-wave-c.test.ts):
+ *   (a) FIRES: a rack fuse claiming an A rating below
+ *       string_continuous_current_a × 1.25 must return >= 1 HIGH finding
+ *       with check:'ampacity'.
+ *   (b) DOES NOT FALSE-POSITIVE: the real out/bess-campaign-v4 pick
+ *       (PV-200A-1XL-B-15 on a 128.2 A rack, 1.56× actual margin) must
+ *       return ZERO ampacity findings — this is the case the v4 physics
+ *       critic wrongly flagged; the deterministic gate is the tie-breaker.
  */
 export function auditVoltageSizing(state: any): VoltageSizingAuditResult {
   const ctx = buildContext(state)
@@ -560,26 +631,62 @@ export function auditVoltageSizing(state: any): VoltageSizingAuditResult {
       return r.match_word_id.test(e.word_id)
     })
     if (!rule) continue
+    let matchedThisWord = false
+
+    // ── Voltage leg (unchanged behaviour) ──────────────────────────────
     const requiredV = ctx.quantities[rule.design_param]
-    if (typeof requiredV !== 'number' || requiredV <= 0) continue
-    words_matched_to_rule += 1
-    if (e.claimed_v >= requiredV) continue
-    findings.push({
-      word_id: e.word_id,
-      word_name_human: e.word_name_human,
-      module_id: e.module_id,
-      sub_module_id: e.sub_module_id,
-      manufacturer: e.manufacturer,
-      part_number: e.part_number,
-      claimed_v: e.claimed_v,
-      required_v: requiredV,
-      severity: 'HIGH',
-      explanation:
-        `${e.word_name_human} (id ${e.word_id}) in ${e.module_id} → ${e.sub_module_id} is ${e.manufacturer ?? ''} ` +
-        `${e.part_number ?? '<no-part-number>'} rated ${e.claimed_v} V DC but the DC bus nominal is ${requiredV} V — ` +
-        `an under-rated DC-bus-facing protection/monitoring part cannot reliably operate at the bus voltage it is meant ` +
-        `to supervise/protect (a live safety defect, not a cosmetic spec mismatch). ${rule.description}`,
-    })
+    if (typeof requiredV === 'number' && requiredV > 0) {
+      matchedThisWord = true
+      if (e.claimed_v != null && e.claimed_v < requiredV) {
+        findings.push({
+          word_id: e.word_id,
+          word_name_human: e.word_name_human,
+          module_id: e.module_id,
+          sub_module_id: e.sub_module_id,
+          manufacturer: e.manufacturer,
+          part_number: e.part_number,
+          check: 'voltage',
+          claimed_v: e.claimed_v,
+          required_v: requiredV,
+          severity: 'HIGH',
+          explanation:
+            `${e.word_name_human} (id ${e.word_id}) in ${e.module_id} → ${e.sub_module_id} is ${e.manufacturer ?? ''} ` +
+            `${e.part_number ?? '<no-part-number>'} rated ${e.claimed_v} V DC but the DC bus nominal is ${requiredV} V — ` +
+            `an under-rated DC-bus-facing protection/monitoring part cannot reliably operate at the bus voltage it is meant ` +
+            `to supervise/protect (a live safety defect, not a cosmetic spec mismatch). ${rule.description}`,
+        })
+      }
+    }
+
+    // ── Ampacity leg (added 2026-07-05, v4 physics-critic HIGH #1) ─────
+    if (rule.ampacity_design_param) {
+      const baseA = ctx.quantities[rule.ampacity_design_param]
+      if (typeof baseA === 'number' && baseA > 0 && e.claimed_a != null) {
+        matchedThisWord = true
+        const requiredA = baseA * (rule.ampacity_safety_factor ?? 1)
+        if (e.claimed_a < requiredA) {
+          findings.push({
+            word_id: e.word_id,
+            word_name_human: e.word_name_human,
+            module_id: e.module_id,
+            sub_module_id: e.sub_module_id,
+            manufacturer: e.manufacturer,
+            part_number: e.part_number,
+            check: 'ampacity',
+            claimed_a: e.claimed_a,
+            required_a: requiredA,
+            severity: 'HIGH',
+            explanation:
+              `${e.word_name_human} (id ${e.word_id}) in ${e.module_id} → ${e.sub_module_id} is ${e.manufacturer ?? ''} ` +
+              `${e.part_number ?? '<no-part-number>'} rated ${e.claimed_a} A but ${rule.ampacity_design_param} = ${baseA.toFixed(1)} A ` +
+              `× ${rule.ampacity_safety_factor ?? 1} safety factor requires >= ${requiredA.toFixed(1)} A — an under-rated ` +
+              `current-carrying protection part will nuisance-trip or overheat under normal continuous load. ${rule.description}`,
+          })
+        }
+      }
+    }
+
+    if (matchedThisWord) words_matched_to_rule += 1
   }
   return {
     findings,
