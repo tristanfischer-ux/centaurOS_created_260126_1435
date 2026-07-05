@@ -397,6 +397,263 @@ def _rule_relationship_integrity(z: zipfile.ZipFile) -> List[Finding]:
     return findings
 
 
+# --------------------------------------------------------------------------- #
+# Rule 9 — formula legality: no bare '~' operator outside a string literal
+# (Tristan 2026-07-05, Excel repair round 2: real Excel's repair report on a
+# shipped v10 dossier said EXACTLY "Removed Records: Formula from
+# /xl/worksheets/sheet24.xml part"; LibreOffice opened the same file clean).
+# --------------------------------------------------------------------------- #
+
+_FORMULA_TAG_RX = re.compile(rb'<f\b[^>]*>(.*?)</f>', re.S)
+_STRING_LITERAL_RX = re.compile(r'"(?:[^"]|"")*"')
+
+
+def _strip_string_literals(formula: str) -> str:
+    """Blank out every quoted string literal (Excel's '""'-escaped-quote convention
+    honoured) so an operator-legality check never trips on a character that is
+    legitimate INSIDE a text literal (e.g. the wildcard-escape '~*' passed to
+    FIND/SEARCH, or plain prose like '~£11.6k')."""
+    return _STRING_LITERAL_RX.sub(lambda m: '"' * len(m.group(0)), formula)
+
+
+def _rule_formula_illegal_tilde_operator(z: zipfile.ZipFile) -> List[Finding]:
+    """Excel's A1 formula grammar has NO '~' operator outside a quoted string
+    literal. ROOT CAUSE (reproduced in isolation): a parenthesised reference-UNION
+    argument list — valid, comma-joined Excel A1 syntax used to pass several
+    non-contiguous cells as ONE argument to a function that takes exactly one
+    range (COUNTIF/COUNTIFS), e.g. `COUNTIF(($B$33,$B$34,$B$35),"<8")` — is
+    silently REWRITTEN by `build-excel-export.py :: recalc_and_cache()`'s
+    `soffice --convert-to xlsx` round-trip (LibreOffice's OOXML export filter
+    substitutes the ODFF reference-CONCATENATION operator '~' for the OOXML
+    union operator ',' inside that construct: `($B$33~$B$34~$B$35)`). Real Excel's
+    strict parser cannot parse '~' as a formula operator and DROPS the whole
+    formula on open. LibreOffice's own reader is what PRODUCED the corruption, so
+    it opens its own broken output without complaint — exactly why a structural
+    gate is needed rather than relying on LibreOffice as the verifier. The fix at
+    source (`_contiguous_col_ranges()` in build-excel-export.py) never emits a
+    union-in-parens at all: MIN/COUNT/COUNTA take multiple plain range arguments
+    directly (they are variadic — no union needed), and a COUNTIF over
+    non-contiguous cells is decomposed into one COUNTIF PER contiguous run,
+    summed. proveCatch: fires on the pre-fix literal '~' pattern; a rebuild using
+    only `_contiguous_col_ranges()` output never emits '~' and passes clean."""
+    findings: List[Finding] = []
+    for name in z.namelist():
+        if not (name.startswith("xl/worksheets/sheet") and name.endswith(".xml")):
+            continue
+        data = z.read(name)
+        for m in _FORMULA_TAG_RX.finditer(data):
+            formula = html.unescape(m.group(1).decode("utf-8", "replace"))
+            if "~" not in formula:
+                continue
+            if "~" in _strip_string_literals(formula):
+                findings.append(Finding(
+                    "formula_illegal_tilde_operator", "HIGH", name,
+                    "formula contains a '~' character outside any string literal "
+                    "— not a valid Excel A1 operator; real Excel silently DROPS "
+                    f"the whole formula on open: {formula[:200]}"))
+    return findings
+
+
+# --------------------------------------------------------------------------- #
+# Rule 10 — workbook-wide circular-reference detection (Tristan 2026-07-05,
+# Excel repair round 2's SEPARATE report: a workbook-wide "one or more circular
+# references" warning, independent of the formula-legality repair above).
+# --------------------------------------------------------------------------- #
+
+_SHEET_TAG_RX = re.compile(rb'<sheet name="([^"]*)"[^>]*r:id="(rId\d+)"')
+_SHEET_REL_RX = re.compile(rb'Id="(rId\d+)"[^>]*Target="worksheets/(sheet\d+\.xml)"')
+_DEFNAME_FULL_RX = re.compile(rb'<definedName\b[^>]*name="([^"]*)"[^>]*>(.*?)</definedName>', re.S)
+_CELL_TAG_RX = re.compile(rb'<c\b([^>]*?)(?:/>|>(.*?)</c>)', re.S)
+_CELL_R_ATTR_RX = re.compile(rb'r="([A-Z]+[0-9]+)"')
+
+_QSHEET_OR_BARE = r"(?:'(?P<qsheet>(?:[^']|'')+)'|(?P<sheet>[A-Za-z_][A-Za-z0-9_.]*))"
+_REF_TOKEN_RX = re.compile(
+    _QSHEET_OR_BARE + r"?!(?P<cell1>\$?[A-Z]{1,3}\$?[0-9]{1,7})"
+    r"(?::(?P<cell2>\$?[A-Z]{1,3}\$?[0-9]{1,7}))?"
+)
+_BARE_CELL_RX = re.compile(
+    r"(?<![A-Za-z0-9_!])(\$?[A-Z]{1,3}\$?[0-9]{1,7})"
+    r"(?::(\$?[A-Z]{1,3}\$?[0-9]{1,7}))?(?![A-Za-z0-9_(])"
+)
+_NAME_TOKEN_RX = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+_DEFNAME_TARGET_RX = re.compile(
+    r"(?:'(?P<q>[^']+)'|(?P<b>[A-Za-z_][A-Za-z0-9_.]*))!"
+    r"(?P<c1>\$?[A-Z]{1,3}\$?[0-9]{1,7})(?::(?P<c2>\$?[A-Z]{1,3}\$?[0-9]{1,7}))?"
+)
+
+
+def _col_to_num(col: str) -> int:
+    n = 0
+    for ch in col:
+        n = n * 26 + (ord(ch) - 64)
+    return n
+
+
+def _num_to_col(n: int) -> str:
+    s = ""
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        s = chr(65 + rem) + s
+    return s
+
+
+def _split_cell(cell: str):
+    m = re.match(r"\$?([A-Z]{1,3})\$?([0-9]{1,7})", cell)
+    return m.group(1), int(m.group(2))
+
+
+def _expand_range(cell1: str, cell2: Optional[str], cap: int = 4000):
+    """A cell/range token -> its individual cell addresses, or None if the range
+    is too large to expand cheaply (>cap cells) — treated as opaque; any formula
+    CELL inside an opaque range is still discovered independently via its own
+    <f> entry, so a genuine cycle through it is caught from the OTHER side."""
+    c1, r1 = _split_cell(cell1)
+    c2, r2 = _split_cell(cell2) if cell2 else (c1, r1)
+    n1, n2 = sorted((_col_to_num(c1), _col_to_num(c2)))
+    r1, r2 = sorted((r1, r2))
+    if (n2 - n1 + 1) * (r2 - r1 + 1) > cap:
+        return None
+    return [f"{_num_to_col(cn)}{rn}" for cn in range(n1, n2 + 1) for rn in range(r1, r2 + 1)]
+
+
+def _load_sheet_map_and_defined_names(z: zipfile.ZipFile):
+    wb = z.read("xl/workbook.xml")
+    try:
+        rels = z.read("xl/_rels/workbook.xml.rels")
+    except KeyError:
+        return {}, {}
+    rid_to_file = {m.group(1).decode(): m.group(2).decode() for m in _SHEET_REL_RX.finditer(rels)}
+    name_to_file: Dict[str, str] = {}
+    for m in _SHEET_TAG_RX.finditer(wb):
+        nm = html.unescape(m.group(1).decode())
+        rid = m.group(2).decode()
+        if rid in rid_to_file:
+            name_to_file[nm] = "xl/worksheets/" + rid_to_file[rid]
+    defined: Dict[str, str] = {}
+    for m in _DEFNAME_FULL_RX.finditer(wb):
+        nm = html.unescape(m.group(1).decode())
+        defined[nm] = html.unescape(m.group(2).decode()).strip()
+    return name_to_file, defined
+
+
+def _parse_sheet_formulas(data: bytes) -> Dict[str, str]:
+    """Cell-ref -> formula text for every FORMULA cell on one worksheet part.
+    Correctly distinguishes a self-closing empty cell (`<c r="P36" s="84"/>`, no
+    body, cannot carry a formula) from an open/close cell (`<c r="O36" ...>
+    <f>...</f>...</c>`) — a naive `<c [^>]*r="X"[^>]*>(.*?)</c>` regex matches a
+    self-closing cell's own attributes but then walks forward to the NEXT
+    `</c>` in the file for its body, misattributing a LATER cell's formula to
+    THIS cell's ref (confirmed on row 36 of a real 'Bill of Materials' sheet: a
+    genuinely empty P36 was misread as containing a formula that actually lived
+    in Q36, manufacturing a false P36<->O36 circular-reference report)."""
+    out: Dict[str, str] = {}
+    for m in _CELL_TAG_RX.finditer(data):
+        body = m.group(2)
+        if body is None:
+            continue
+        rm = _CELL_R_ATTR_RX.search(m.group(1))
+        if not rm:
+            continue
+        fm = _FORMULA_TAG_RX.search(body)
+        if fm:
+            out[rm.group(1).decode()] = html.unescape(fm.group(1).decode("utf-8", "replace"))
+    return out
+
+
+def _rule_circular_references(z: zipfile.ZipFile) -> List[Finding]:
+    """A deterministic replica of Excel's own circular-reference check: parse
+    every formula on every sheet (+ every defined name), build the cell-level
+    dependency graph, and DFS for a cycle. Real-world catch (v10 dossier,
+    2026-07-05): a display formula written into the SAME cell as the raw
+    sentinel value it read (`ws.cell(r, 11, sentinel)` immediately overwritten
+    by `ws.cell(r, 11, f'=IF($K{r}=1,...)')`) — the sentinel was clobbered
+    before it could be read, leaving the formula reading its own cell, on every
+    one of 5 registered-drawing rows. Fixed at source by moving the sentinel to
+    its own column. Cross-sheet, same-sheet, and defined-name references are
+    all resolved; ranges over 4000 cells are opaque (not proof against a cycle,
+    but any formula cell inside one is still discovered via its own <f> entry)."""
+    names = set(z.namelist())
+    if "xl/workbook.xml" not in names:
+        return []
+    name_to_file, defined = _load_sheet_map_and_defined_names(z)
+    all_formulas: Dict[tuple, str] = {}
+    for sheetname, path in name_to_file.items():
+        if path not in names:
+            continue
+        for cell, formula in _parse_sheet_formulas(z.read(path)).items():
+            all_formulas[(sheetname, cell)] = formula
+
+    edges: Dict[tuple, set] = {}
+
+    def add_edge(src, tgt_sheet, c1, c2):
+        cells = _expand_range(c1, c2)
+        if cells is None:
+            return
+        edges.setdefault(src, set()).update((tgt_sheet, cc) for cc in cells)
+
+    for (sheet, cell), formula in all_formulas.items():
+        src = (sheet, cell)
+        for m in _REF_TOKEN_RX.finditer(formula):
+            tgt_sheet = (m.group("qsheet") or "").replace("''", "'") or m.group("sheet")
+            if tgt_sheet not in name_to_file:
+                continue
+            add_edge(src, tgt_sheet, m.group("cell1"), m.group("cell2"))
+        stripped = _REF_TOKEN_RX.sub(" ", formula)
+        for m in _BARE_CELL_RX.finditer(stripped):
+            add_edge(src, sheet, m.group(1), m.group(2))
+        for m in _NAME_TOKEN_RX.finditer(stripped):
+            tok = m.group(0)
+            if tok not in defined or re.match(r"^[A-Z]{1,3}[0-9]{1,7}$", tok):
+                continue
+            tm = _DEFNAME_TARGET_RX.match(defined[tok])
+            if tm:
+                tgt_sheet = tm.group("q") or tm.group("b")
+                if tgt_sheet in name_to_file:
+                    add_edge(src, tgt_sheet, tm.group("c1"), tm.group("c2"))
+
+    WHITE, GRAY = 0, 1
+    color: Dict[tuple, int] = {}
+    findings: List[Finding] = []
+    seen_sigs = set()
+
+    def dfs(start):
+        stack = [(start, iter(edges.get(start, ())))]
+        color[start] = GRAY
+        path = [start]
+        while stack:
+            node, it = stack[-1]
+            advanced = False
+            for nxt in it:
+                if nxt not in edges:
+                    continue
+                if color.get(nxt, WHITE) == WHITE:
+                    color[nxt] = GRAY
+                    path.append(nxt)
+                    stack.append((nxt, iter(edges.get(nxt, ()))))
+                    advanced = True
+                    break
+                if color.get(nxt) == GRAY:
+                    idx = path.index(nxt)
+                    cyc = path[idx:] + [nxt]
+                    sig = frozenset(cyc)
+                    if sig not in seen_sigs:
+                        seen_sigs.add(sig)
+                        chain = " -> ".join(f"'{s}'!{c}" for s, c in cyc)
+                        part = name_to_file.get(cyc[0][0], cyc[0][0])
+                        findings.append(Finding(
+                            "circular_reference", "HIGH", part,
+                            f"circular reference: {chain}"))
+            if not advanced:
+                color[node] = 2  # BLACK
+                stack.pop()
+                path.pop()
+
+    for node in list(edges.keys()):
+        if color.get(node, WHITE) == WHITE:
+            dfs(node)
+    return findings
+
+
 RULES = (
     _rule_well_formed_xml,
     _rule_content_types_completeness,
@@ -406,6 +663,8 @@ RULES = (
     _rule_cf_sqref_validity,
     _rule_hyperlink_integrity,
     _rule_relationship_integrity,
+    _rule_formula_illegal_tilde_operator,
+    _rule_circular_references,
 )
 
 
@@ -469,7 +728,7 @@ _GOOD_WORKBOOK_RELS = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?
 
 _GOOD_SHEET1 = b"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>
+<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1" t="str"><f>IF(A1&gt;0,"ok ~ non-zero","~bad")</f><v>ok ~ non-zero</v></c></row></sheetData>
 <conditionalFormatting sqref="A1:A1"><cfRule type="cellIs" priority="1" operator="lessThan"><formula>0</formula></cfRule></conditionalFormatting>
 <hyperlinks><hyperlink ref="A1" location="Sheet1!A1" display="x"/></hyperlinks>
 <legacyDrawing r:id="rId2"/>
@@ -576,6 +835,21 @@ def _fixture_bad(rule: str) -> bytes:
     elif rule == "well_formed_xml":
         parts["xl/worksheets/sheet1.xml"] = _GOOD_SHEET1.replace(
             b'</worksheet>', b'')  # unclosed root element
+    elif rule == "formula_illegal_tilde_operator":
+        # the ACTUAL v10-dossier defect: a reference-union argument list corrupted by
+        # LibreOffice's OOXML round-trip export from ',' to '~' between BARE cell refs
+        # (outside any string literal) — real Excel drops the whole formula on open.
+        parts["xl/worksheets/sheet1.xml"] = _GOOD_SHEET1.replace(
+            b'<c r="B1" t="str"><f>IF(A1&gt;0,"ok ~ non-zero","~bad")</f><v>ok ~ non-zero</v></c>',
+            b'<c r="B1" t="n"><f>COUNT(A1:A1,($A$1~$A$1))</f><v>1</v></c>')
+    elif rule == "circular_reference":
+        # two cells that each read the other -- the exact shape of the real defect
+        # (a display formula written into the same cell as the sentinel it reads).
+        parts["xl/worksheets/sheet1.xml"] = _GOOD_SHEET1.replace(
+            b'<c r="B1" t="str"><f>IF(A1&gt;0,"ok ~ non-zero","~bad")</f><v>ok ~ non-zero</v></c>',
+            b'<c r="B1" t="n"><f>A1+1</f><v>2</v></c>').replace(
+            b'<c r="A1"><v>1</v></c>',
+            b'<c r="A1"><f>B1+1</f><v>3</v></c>')
     else:
         raise ValueError(f"no BAD fixture for rule '{rule}'")
     return _build_zip(parts)
@@ -595,7 +869,8 @@ def _selftest() -> int:
     for rule in ("vml_duplicate_id", "comment_vml_pairing", "defined_name_syntax",
                  "cf_sqref_validity", "hyperlink_integrity",
                  "content_types_completeness", "relationship_integrity",
-                 "well_formed_xml"):
+                 "well_formed_xml", "formula_illegal_tilde_operator",
+                 "circular_reference"):
         data = _fixture_bad(rule)
         findings = check_workbook_bytes(data)
         hits = [f for f in findings if f.rule == rule and f.severity == "HIGH"]

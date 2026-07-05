@@ -2558,13 +2558,33 @@ def check_scope_fidelity(state, rows, run_dir) -> list:
     if not excl.strip():
         return out
     # (exclusion keywords the brief might state) → (BoM part terms that mean that subsystem)
+    #
+    # "civil works" is its OWN category, deliberately SEPARATE from "building / structure"
+    # (evidence, BESS v10, 2026-07-05): the brief excludes "civil works" (external site
+    # engineering — groundworks, foundations, cable trenches around the equipment) alongside
+    # the MV transformer + switchgear, but the container's OWN internal floor-reinforcement
+    # plate ("structural floor reinforcement", S355 checker-plate welded to the container's
+    # floor frame — required to carry the rack loads) is in-scope EQUIPMENT MOUNTING, part of
+    # the brief's own explicitly in-scope "20-foot enclosure". Bucketing "civil" together with
+    # "building / structure" (whose bom_kw list carried the over-broad "structural floor")
+    # matched that in-scope word and manufactured a false Exec Summary HIGH — "the brief
+    # EXCLUDES building / structure, but the design builds it: structural floor reinforcement".
+    # "Civil works" and "the equipment's own structure" are different scopes in ordinary
+    # engineering usage; conflating them in one bucket is the wrong RULE, not a one-off data
+    # point (CORE FIX PRINCIPLE — fix the rule, universal, with a guard). The civil bucket's
+    # bom_kw is kept to genuinely EXTERNAL groundworks/foundation terms so a real civil-scope
+    # breach (e.g. a "concrete foundation pad" or "site groundworks" BoM line built despite an
+    # excluded civil scope) still fails — proveCatch in _selftest, both directions.
     SUBSYS = [
         ("lighting", ("lighting", "light", "led", "luminaire"),
          ("led", "luminaire", "grow light", "horticultural", "photoperiod fixture")),
         ("climate / HVAC", ("climate", "hvac", "ventilation", "heating", "air-condition", "heating-ventilation"),
          ("hvac", "chiller", "dehumidif", " ahu", "air handling", "condenser", "cooling unit", "heat pump", "refrigerant")),
-        ("building / structure", ("building", "rack framework", "cultivation rack", "structure", "civil"),
-         ("building", "canopy", "growing rack", "cultivation rack", "trolley", "structural floor")),
+        ("building / structure", ("building", "rack framework", "cultivation rack", "structure"),
+         ("building", "canopy", "growing rack", "cultivation rack", "trolley")),
+        ("civil works / groundworks", ("civil work", "civil engineering"),
+         ("foundation", "groundwork", "ground work", "concrete pad", "concrete base", "pile cap",
+          "piling", "plinth", "cable trench", "site preparation", "earthwork", "retaining wall")),
     ]
     for label, excl_kw, bom_kw in SUBSYS:
         if not any(kw in excl for kw in excl_kw):
@@ -4067,6 +4087,38 @@ def _selftest() -> int:
     expect(any(f.check == "brief_metric_fail" for f in _miss_findings),
            "a scope-matched battery_only quantity that STILL misses the brief's £63/kWh target "
            "must surface as a HIGH brief_metric_fail, never be silently rescued to a PASS")
+
+    # ---- civil-works exclusion must not catch in-scope equipment structure (2026-07-05) ----
+    # proveCatch direction 1: a container's OWN internal structural item (in-scope equipment
+    # mounting) must NOT be flagged when the brief excludes "civil works".
+    _civil_ok_state = {
+        "parsedBrief": {
+            "original_text": (
+                "The battery-energy-storage portion only — cells, racks, battery management, "
+                "the 20-foot enclosure — but EXCLUDING the medium-voltage step-up transformer, "
+                "the 11 kV switchgear, and civil works — costs approximately £63 per kWh."
+            ),
+        },
+    }
+    _civil_ok_rows = [
+        {"requirement": "structural floor reinforcement", "status": "OK", "line_gbp": 450},
+        {"requirement": "ISO container 20-ft HC", "status": "OK", "line_gbp": 5200},
+    ]
+    _civil_ok_findings = check_scope_fidelity(_civil_ok_state, _civil_ok_rows, "")
+    expect(not any(f.check == "scope_fidelity" for f in _civil_ok_findings),
+           "a container's own in-scope structural floor reinforcement must NOT be flagged as "
+           "excluded 'civil works' scope — got: "
+           f"{[f.message for f in _civil_ok_findings]!r}")
+    # proveCatch direction 2: a GENUINE civil-scope line (external groundworks/foundation)
+    # built despite the same exclusion must still be caught.
+    _civil_bad_rows = _civil_ok_rows + [
+        {"requirement": "concrete foundation pad", "status": "OK", "line_gbp": 18000},
+    ]
+    _civil_bad_findings = check_scope_fidelity(_civil_ok_state, _civil_bad_rows, "")
+    expect(any(f.check == "scope_fidelity" and "civil works" in f.message for f in _civil_bad_findings),
+           "a genuine civil-scope BoM line (concrete foundation pad) built despite an excluded "
+           "civil-works scope must still surface as a scope_fidelity HIGH — got: "
+           f"{[f.message for f in _civil_bad_findings]!r}")
 
     if failures:
         print("SELFTEST FAILED:")

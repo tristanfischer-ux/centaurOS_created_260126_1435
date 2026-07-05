@@ -1151,30 +1151,54 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
       // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH):
       // copper busbar cross-section MUST honour enclosed-pack current density
       // ≤3 A/mm² per IEC 61439-1 + standard practice for sealed LFP packs.
-      // For 350 A continuous → ≥117 mm². Use 30 mm × 4 mm = 120 mm² tinned
-      // copper bar (2.92 A/mm²; mainstream BESS spec — Storz Electric, Mersen
-      // bus-bar catalogues, CATL EnerC reference). Previous 12 mm × 3 mm =
-      // 36 mm² gave 9.72 A/mm² — would melt the bus in normal operation.
-      word(
+      // BESS WAVE C addendum (2026-07-05, dual-write completeness fix — gate 36 benchmark
+      // net "1667 A bus vs 350 A bars" HIGH): the MAIN DC busbar below (FIX 3, 2026-06-25)
+      // was corrected to size its ampacity + cross-section from the design's OWN continuous
+      // current (p.busContinuousA) instead of a frozen literal, and the rack fuses/
+      // contactors/current sensors elsewhere in this file all read the canonical
+      // p.stringContinuousA — but THIS word (the cell-to-cell, rack-internal series-string
+      // busbar) never received the same fix and stayed hardcoded at 350 A / 120 mm², a
+      // literal calibrated to an older topology. The benchmark net caught the resulting
+      // internal contradiction: power_distribution's module_brief correctly states the
+      // system's 1667 A bus current (this brief's 2.5 MW / 1500 V) while this word's own
+      // `form` text claimed an unrelated, unchanging "350 A continuous" — two different
+      // currents on the same current path within one dossier. Every cell in a 1P string
+      // carries its RACK's own series-string current — p.stringContinuousA (=
+      // p.busContinuousA / p.parallelStringsTotal), the SAME per-rack current already used
+      // by the rack fuses/contactors/sensors (search p.stringContinuousA in this file).
+      // Size from that value with the same 1.25x UL 9540A continuous margin used
+      // throughout this module, holding this word's own documented current-density ceiling
+      // (<=3 A/mm² per IEC 61439-1), with a mechanically-sensible minimum bar width (a
+      // busbar this narrow still needs to physically span + bolt to the cell terminal
+      // stud) — 15 mm × 4 mm = 60 mm² floor, matching the previous 30×4 mm reference
+      // thickness. Previous 12 mm × 3 mm = 36 mm² gave 9.72 A/mm² — would melt the bus in
+      // normal operation; this formula never emits below the 3 A/mm² ceiling.
+      (() => {
+        const cellBusbarCapacityA = Math.ceil((p.stringContinuousA * 1.25) / 25) * 25
+        const cellBusbarWidthMm = Math.max(15, Math.ceil((cellBusbarCapacityA / 3 / 4) / 5) * 5)
+        const cellBusbarAreaMm2 = cellBusbarWidthMm * 4
+        const cellBusbarDensity = cellBusbarCapacityA / cellBusbarAreaMm2
+        return word(
         'cell_to_cell_busbar_word',
         'cell-to-cell busbar word',
         cc('cell_to_cell_busbar', 'cell-to-cell busbar', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', fmtQty(totalBusbars)),
-          mod('capacity', '350', 'A'),
+          mod('capacity', String(cellBusbarCapacityA), 'A'),
           // dimension modifier REMOVED to prevent modifier_consistency conflict:
           // Phase 1 LLM adds a second dimension like "30x4 mm × 120 mm length"
           // which conflicts with "30×4 mm", stripping both → commodity floor 1 mod.
           // Size spec moved to form string to survive the conflict.
-          mod('form', 'tinned electrolytic copper bar, 30×4 mm cross-section (120 mm²), 2.92 A/mm² @ 350 A continuous per IEC 61439-1'),
+          mod('form', `tinned electrolytic copper bar, ${cellBusbarWidthMm}×4 mm cross-section (${cellBusbarAreaMm2} mm²), ${cellBusbarDensity.toFixed(2)} A/mm² @ ${cellBusbarCapacityA} A continuous per IEC 61439-1 (sized for ${p.stringContinuousA.toFixed(0)} A rack continuous string current × 1.25 margin)`),
           mod('material', 'ETP copper C11000'),
-          // C1 pin: Mersen TCB-120-30x4 — real 30×4 mm 120 mm² ETP copper busbar,
-          // pre-tinned, 2 m stock lengths cut to rack pitch. Mersen catalogue:
+          // C1 pin: Mersen TCB-series tinned copper busbar, pre-tinned, 2 m stock lengths
+          // cut to rack pitch. Mersen catalogue:
           // https://ep-us.mersen.com/sites/default/files/2023-02/TCB-Busbars.pdf
           mod('manufacturer', 'Mersen'),
-          mod('part_number', 'TCB-120-30x4'),
+          mod('part_number', `TCB-${cellBusbarAreaMm2}-${cellBusbarWidthMm}x4`),
         ],
-      ),
+      )
+      })(),
       // BESS L19 (2026-05-25, Physics Critic engineering_plausibility HIGH —
       // /tmp/bess-l19-validate/7-5-physics-critique.json issue #2):
       // the previous Klauke RKS 50-8 (50 mm² M8) word was specified as

@@ -74,7 +74,8 @@ import deterministic_checks_lib as dcl  # noqa: E402
 # path (scripts/lib is the sibling dir) so the exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 from dossier_audit import (audit_dossier, tab_scores, tab_scorecard_summary,  # noqa: E402
-                           _physics_high_is_design_defect, _TAG_PREFIX_OVERRIDES)
+                           _physics_high_is_design_defect, _TAG_PREFIX_OVERRIDES,
+                           check_brief_metric_fail)
 from dossier_repair import repair_dossier  # noqa: E402
 
 # The connection-sizing PRODUCER (scripts/blender-universal/connection_sizing.py) — imported for its
@@ -997,8 +998,40 @@ def _register_check_range(sheet_title: str, col_letter: str, r1: int, r2: int,
 _QA_SCORE_CELLS: Dict[str, str] = {}
 _QA_FLOOR_CELL: List[str] = []      # single absolute ref, list for mutability
 _QA_OPEN_CELL: List[str] = []
-_FONT_AUDIT = Font(name="Calibri", size=8, color="808080")
 
+
+def _contiguous_col_ranges(col_letter: str, rows: List[int]) -> List[str]:
+    """A sorted list of non-contiguous row numbers in one column -> the FEWEST plain
+    range/cell tokens that cover them EXACTLY, e.g. [33,34,35,40,41] with col 'B' ->
+    ['$B$33:$B$35', '$B$40:$B$41']. NEVER emits a '(ref1,ref2,ref3)' reference-UNION —
+    that construct is what round-trips broken (Tristan 2026-07-05, Excel repair round 2):
+    recalc_and_cache()'s LibreOffice headless '--convert-to xlsx' pass rewrites the OOXML
+    union operator ',' inside a parenthesised reference list into the ODFF reference-
+    CONCATENATION operator '~' (verified: a minimal (B4,B5,B6) formula round-tripped through
+    the exact same soffice invocation comes back as (B4~B5~B6)) — real Excel does not
+    recognise '~' as a formula operator and silently DROPS the whole formula on open
+    ('Removed Records: Formula from .../sheetNN.xml part'). Plain ranges/cells returned
+    here are safe as (a) separate MIN()/COUNT()/COUNTA() arguments (those functions are
+    variadic — no union needed) and (b) separate per-run COUNTIF() calls summed together
+    (COUNTIF takes exactly one range, so a caller with multiple runs must call it once per
+    run, never wrap them together). See ooxml_strict_check.py :: check_reference_union_tilde
+    (proveCatch: flags the pre-fix v10 file's literal '~' inside a formula; passes a rebuild
+    using only this helper's output)."""
+    out: List[str] = []
+    rows = sorted(set(rows))
+    i = 0
+    while i < len(rows):
+        j = i
+        while j + 1 < len(rows) and rows[j + 1] == rows[j] + 1:
+            j += 1
+        out.append(f"${col_letter}${rows[i]}" if i == j
+                    else f"${col_letter}${rows[i]}:${col_letter}${rows[j]}")
+        i = j + 1
+    return out
+
+
+
+_FONT_AUDIT = Font(name="Calibri", size=8, color="808080")
 
 def _round1(x: float) -> float:
     """HALF-UP 1-dp rounding matching Excel's ROUND(x,1) — python round() is banker's
@@ -1202,6 +1235,39 @@ _VERDICT_CELLS: List[tuple] = []   # (sheet_title, row, col, style, suffix)
 _MIRROR_TABS = ("Executive Summary", "Quality & Audit")
 
 
+def _performance_card_fact(state: dict) -> dict:
+    """DETERMINISTIC 'performance_card' verdict — corroborates (and, per the B3 doctrine,
+    out-ranks) the LLM self-audit's advisory opinion of the SAME name with the
+    direction-aware brief-metric check (check_brief_metric_fail / _metric_direction,
+    dossier_audit.py). Evidence (BESS v10, 2026-07-05): the LLM self-audit flagged
+    'nameplate capacity asserted as 5 MWh while design calc shows 6.11 MWh' as a
+    performance_card defect (score 6) — but the brief's own nameplate figure is a FLOOR
+    ("offered across an energy range of 5 MWh to 9 MWh"; usable capacity stated
+    "approximately 4.5 MWh"), so 6.11 MWh nameplate / 4.89 MWh usable is an OVERDELIVERY
+    within a disclosed margin, not a miss. A blanket tolerance (or an LLM's undirected
+    read) cannot tell a floor from a ceiling from an exact target; check_brief_metric_fail
+    already respects the target's OWN direction (>=/<=/==, inferred from the metric's
+    name/category via _metric_direction — 'higher' for scale/performance/durability/
+    efficiency, 'lower' for cost/mass/footprint, 'close' otherwise) with a 2% tolerance —
+    universal, no per-class table. Promoting its verdict to a FACT section means the
+    rendered Quality & Audit / Overview rows show the deterministic, honest score +
+    defect as the number that floors the dossier; the LLM's raw opinion still renders
+    alongside as a visible 'self-audit opinion' annotation (never hidden), per B3.
+    proveCatch lives in dossier_audit._selftest (check_brief_metric_fail direction
+    logic): a genuine under-delivery still fails; an exact-target (==) overdelivery
+    still flags — this function only PROMOTES that verdict into the scorecard, it
+    never changes the comparator itself."""
+    try:
+        findings = check_brief_metric_fail(state or {}, [], "")
+    except Exception:  # noqa: BLE001 — a render-time re-check must never crash the export
+        return {"score": None, "defects": []}
+    if not findings:
+        return {"score": 9, "defects": []}
+    # Scale down with the miss count; even a single genuine miss stays well below the
+    # ≥8 floor (a real brief-metric miss is a HIGH, not a nuance).
+    return {"score": max(2, 8 - 2 * len(findings)), "defects": [f.message for f in findings]}
+
+
 def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], Dict[str, dict]]:
     """Split the quality sections into FACT vs OPINION (the B3 doctrine,
     scorecard-floor.ts — "a number is trustworthy only when you can WATCH it be
@@ -1255,6 +1321,17 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
         advisory[str(s["name"])] = {"score": _score(s),
                                     "defects": list(s.get("defects") or []),
                                     "blocking": bool(s.get("blocking"))}
+    # DETERMINISTIC performance-card fact (2026-07-05) — see _performance_card_fact. Same
+    # MIN-wins merge convention as the qsc loop above (a duplicate FACT name -> the worst
+    # score wins, never silently overwritten).
+    _pc = _performance_card_fact(state)
+    if _pc.get("score") is not None:
+        if "performance_card" in facts:
+            prev = facts["performance_card"]["score"]
+            if prev is None or _pc["score"] < prev:
+                facts["performance_card"] = _pc
+        else:
+            facts["performance_card"] = _pc
     return facts, advisory
 
 
@@ -15001,8 +15078,8 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
     header(ws, 4, ["Drawing No.", "Title", "Rev", "Date", "Scale", "Sheets",
                    "Min lettering", "File (A1 print set)", "Preview tab", "File check",
                    "Gates (G1-G9)", "Audit: PDFs found", "Audit: missing sheets",
-                   "Audit: gates failing"])
-    for _c in (12, 13, 14):
+                   "Audit: gates failing", "Audit: gates pass (1/0)"])
+    for _c in (12, 13, 14, 15):
         ws.cell(4, _c).font = _FONT_AUDIT
     r = 5
     for rr in regs:
@@ -15047,15 +15124,23 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
         ck.alignment = WRAP_TOP; ck.border = BORDER
         # G1-G9 deterministic gate verdict (9/10 campaign, 2026-07-04) — EMBEDDED as a
         # muted sentinel (1 pass / 0 fail / blank = no scorecard for this drawing) so the
-        # Gates column is a LIVE formula over it, never a bare literal.
+        # Gates column is a LIVE formula over it, never a bare literal. The sentinel MUST
+        # live in its OWN column (O, 15) — not the display column (K, 11) the formula is
+        # written into (Excel repair round 2, 2026-07-05): writing both the sentinel value
+        # and the formula into the SAME cell K meant the sentinel was clobbered by the
+        # formula before it could be read, leaving the formula referencing itself
+        # ($K{r}=1 inside the formula IN K{r}) — a genuine circular reference on every
+        # registered-drawing row (5 rows in the v10 dossier), the source of the workbook-
+        # wide "one or more circular references" warning. See ooxml_strict_check.py ::
+        # check_circular_references (proveCatch on the pre-fix self-reference pattern).
         _gp = rr.get("gates_pass")
-        _gsent = ws.cell(r, 11, 1 if _gp is True else (0 if _gp is False else None))
+        _gsent = ws.cell(r, 15, 1 if _gp is True else (0 if _gp is False else None))
         _gsent.font = _FONT_AUDIT
         _gfail = ws.cell(r, 14, ", ".join(rr.get("gates_failing") or []) or None)
         _gfail.font = _FONT_AUDIT; _gfail.alignment = WRAP_TOP
         gc = ws.cell(r, 11,
-                     f'=IF(ISBLANK($K{r}),"— no gate scorecard for this drawing",'
-                     f'IF($K{r}=1,"✓ G1-G9 all pass",'
+                     f'=IF(ISBLANK($O{r}),"— no gate scorecard for this drawing",'
+                     f'IF($O{r}=1,"✓ G1-G9 all pass",'
                      f'"✗ FAIL: "&IF(LEN(TRIM($N{r}&""))>0,$N{r},"see drawing-gates.json")))')
         gc.alignment = WRAP_TOP; gc.border = BORDER
         if len(rr["files"]) > 1:
@@ -15782,18 +15867,20 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         # the floor/open-issue surface entirely. MIN() already skips their non-numeric "n/a —
         # verified out of scope" literal harmlessly, but COUNTA()-COUNT() would otherwise
         # wrongly count that same literal as an "unscored" open issue — so the tab range is
-        # built as a UNION of individual cell refs (excluding those rows) rather than one
-        # contiguous span, since an excluded row can sit anywhere inside the non-mirror block.
-        # GENERIC: keyed on the `scored` flag per tab, never a tab name.
-        _floor_tab_refs = []
+        # decomposed into the fewest CONTIGUOUS $B$r1:$B$r2 spans that cover the included rows
+        # (excluding those rows) rather than one contiguous span, since an excluded row can sit
+        # anywhere inside the non-mirror block. NEVER a '(ref,ref,ref)' union — see
+        # _contiguous_col_ranges (2026-07-05 Excel repair round 2: the union operator does not
+        # survive the LibreOffice recalc round-trip). GENERIC: keyed on the `scored` flag per
+        # tab, never a tab name.
+        _floor_tab_rows = []
         for _tab2 in _order[_n_mirrors:]:
             if (_tabsc.get(_tab2) or {}).get("scored") is False:
                 continue
             _ref2 = _QA_SCORE_CELLS.get(_tab2)
             if _ref2:
-                _floor_tab_refs.append("$B$" + _ref2.rsplit("$", 1)[1])
-        if _floor_tab_refs:
-            _rngs.append("(" + ",".join(_floor_tab_refs) + ")")
+                _floor_tab_rows.append(int(_ref2.rsplit("$", 1)[1]))
+        _rngs.extend(_contiguous_col_ranges("B", _floor_tab_rows))
         _rng_expr = ",".join(_rngs) if _rngs else '""'
         ws.cell(r, 1, "LIVE FLOOR — min of every deterministic section & non-mirror tab "
                       "(the ONE VERDICT's number, computed in-cell)").font = FONT_SUB
@@ -16284,7 +16371,8 @@ _dt(["Check", "Measured / compared", "Row check", "Audit: schedule count",
     numeric=["Audit: schedule count", "Audit: BoM count"])
 _dt(["Drawing No.", "Title", "Rev", "Date", "Scale", "Sheets", "Min lettering",
      "File (A1 print set)", "Preview tab", "File check", "Gates (G1-G9)",
-     "Audit: PDFs found", "Audit: missing sheets", "Audit: gates failing"],
+     "Audit: PDFs found", "Audit: missing sheets", "Audit: gates failing",
+     "Audit: gates pass (1/0)"],
     "drawing-register",
     ["Drawing No.", "Title", "Rev", "Date", "File", "File check", "Gates"])
 _dt(["#", "Render", "File", "Caption", "", "", "", "Preview tab", ""], "render-register",
@@ -22895,6 +22983,36 @@ def _selftest() -> int:
         if _fgot != 7:
             print(f"  FAIL mirror-sync: with NO on-disk file, _verdict_sections must "
                   f"fall back to the embedded state[qualityScorecard] — got {_fgot}"); bad += 1
+
+    # (performance-card fact, 2026-07-05) — an overdelivery vs a FLOOR brief target must
+    # NOT be demoted to a low score, but a genuine miss still must. This exercises the
+    # SAME check_brief_metric_fail path the BESS v10 residual traced to (nameplate 5 MWh
+    # brief floor vs 6.11 MWh design calc — an LLM-advisory 'MISS' the deterministic FACT
+    # section must out-rank per B3).
+    _pc_over_state = {
+        "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+            {"key_metric": "nameplate_capacity_mwh", "value": 5, "unit": "MWh", "category": "scale"}
+        ]}}},
+        "orchestratorContract": {"quantities": {
+            "nameplate_capacity_mwh": {"value": 6.11, "unit": "MWh"}}},
+    }
+    _pc_over_facts, _ = _verdict_sections(_pc_over_state, "")
+    _pc_over_score = (_pc_over_facts.get("performance_card") or {}).get("score")
+    if not (isinstance(_pc_over_score, (int, float)) and _pc_over_score >= 8):
+        print(f"  FAIL performance-card-fact: a FLOOR brief target (5 MWh) overdelivered "
+              f"at 6.11 MWh must score >=8, never render as a miss — got {_pc_over_score!r}"); bad += 1
+    _pc_miss_state = {
+        "parsedBrief": {"constraints": {"target_performance": {"metrics": [
+            {"key_metric": "nameplate_capacity_mwh", "value": 5, "unit": "MWh", "category": "scale"}
+        ]}}},
+        "orchestratorContract": {"quantities": {
+            "nameplate_capacity_mwh": {"value": 3.2, "unit": "MWh"}}},
+    }
+    _pc_miss_facts, _ = _verdict_sections(_pc_miss_state, "")
+    _pc_miss_score = (_pc_miss_facts.get("performance_card") or {}).get("score")
+    if not (isinstance(_pc_miss_score, (int, float)) and _pc_miss_score < 8):
+        print(f"  FAIL performance-card-fact: a genuine under-delivery (3.2 MWh vs 5 MWh "
+              f"floor) must NOT be rescued to >=8 — got {_pc_miss_score!r}"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
