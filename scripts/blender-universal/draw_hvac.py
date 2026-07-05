@@ -80,6 +80,11 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
 import drawing_building_envelope as _be  # noqa: E402  (ledger-slab building footprint)
+# the SAME small-part-full-tag discipline draw_ga.py's plan view uses (v58b GA coverage
+# fix): an item too small for an in-place tag still gets its FULL equipment tag drawn,
+# via a keynote + leader line, so a real principal is never silently untagged on the
+# HVAC sheet (2026-07-05 HVAC-label fix).
+import draw_ga as _ga  # noqa: E402  (_TagPlacer — shared tag de-overlap/keynote idiom)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_hvac() from the run's own artifacts; '' until set (block shows '—').
@@ -447,7 +452,16 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
         if role == "hub":
             cx, cy, w, d, h, z = _equip_from_row(r)
             cx, cy = _fit(cx, cy)
-            hubs.append(Equip(tag=_hub_tag(sub, len(hubs)), name=name, role=sub,
+            # REAL BoM tag first (2026-07-05 HVAC-label fix): a placed hub row already
+            # carries its own equipment_tag (e.g. 'CH-101' for the liquid cooling
+            # chiller) post the manifest real-name pass — the old code threw that away
+            # and always minted a synthetic counter-based tag ('CH-1'), so the HVAC
+            # sheet's chiller never matched its OWN BoM/schedule tag anywhere else in
+            # the dossier. Fall back to the synthetic role tag only when the manifest
+            # genuinely has no tag for this row (mirrors the zone branch below, which
+            # already used the real tag).
+            hub_tag = tag if tag and tag != "?" else _hub_tag(sub, len(hubs))
+            hubs.append(Equip(tag=hub_tag, name=name, role=sub,
                               cx=cx, cy=cy, w=w, d=d, h=h, z=z, is_hub=True))
         elif role == "zone" and not _NEUTRAL_RE.search(f"{name} {module}"):
             cx, cy, w, d, h, z = _equip_from_row(r)
@@ -1142,9 +1156,12 @@ def _draw_double_line_duct(svg, x0, y0, x1, y1, width_px, service, label=None,
                  weight="bold", mono=True)
 
 
-def _draw_equipment(svg, e: Equip, px, py, pw, ph):
+def _draw_equipment(svg, e: Equip, px, py, pw, ph, placer=None):
     """A mechanical-kit outline (hub or zone) with its tag.  Hubs get a heavier navy
-    outline + a fan/coil tick; zones a lighter rack rectangle."""
+    outline + a fan/coil tick; zones a lighter rack rectangle. When a `placer`
+    (draw_ga._TagPlacer) is given, the tag is REGISTERED for the sheet's de-overlap
+    pass instead of being stamped immediately — the same idiom draw_ga.py's plan
+    view uses (2026-07-05 HVAC-label fix)."""
     if e.is_hub:
         svg.rect(px, py, max(pw, 18), max(ph, 14), stroke=EQ_INK, width=1.8,
                  fill=EQ_FILL, rx=2)
@@ -1160,8 +1177,13 @@ def _draw_equipment(svg, e: Equip, px, py, pw, ph):
         svg.rect(px, py, max(pw, 10), max(ph, 8), stroke=EQ_INK, width=1.2,
                  fill="#f0f3f7", rx=1)
     if pw >= 18 and ph >= 11:
-        svg.text(px + pw / 2.0, py + ph / 2.0 + 3.2, e.tag,
-                 size=min(9.5, ph * 0.5), anchor="middle", weight="bold", fill=EQ_INK)
+        _cx, _cy = px + pw / 2.0, py + ph / 2.0
+        _sz = min(9.5, ph * 0.5)
+        if placer is not None:
+            placer.add(_cx, _cy + 3.2, e.tag, _sz, anchor_pt=(_cx, _cy))
+        else:
+            svg.text(_cx, _cy + 3.2, e.tag, size=_sz,
+                     anchor="middle", weight="bold", fill=EQ_INK)
         return True
     return False
 
@@ -1328,12 +1350,24 @@ def build_hvac_svg(sysm: AirSystem, meta: dict) -> str:
     _draw_plan_distribution(svg, sysm, pc, ppm, plan_x, plan_y, plan_w, plan_h)
 
     # ----- equipment outlines (hubs + zones) -----
+    # de-overlap + GUARANTEED full-tag pass (2026-07-05 HVAC-label fix) — the SAME
+    # _TagPlacer idiom draw_ga.py's plan view uses: an item too small for an in-place
+    # tag becomes a small numbered-style keynote carrying its FULL real BoM tag (with
+    # a leader back to the part) instead of being drawn but silently untagged.
+    eq_tags = _ga._TagPlacer(svg, bounds=(plan_x - 2, plan_y - 2,
+                                          plan_x + plan_w + 2, plan_y + plan_h + 2))
+    eq_keynotes = []
     for e in all_eq:
         pw = e.w * ppm
         ph = e.d * ppm
         px = plan_x + mx(e.cx - e.w / 2)
         py = plan_y + my(e.cy + e.d / 2)
-        _draw_equipment(svg, e, px, py, pw, ph)
+        labelled = _draw_equipment(svg, e, px, py, pw, ph, placer=eq_tags)
+        if not labelled:
+            eq_keynotes.append((e, px + pw / 2.0, py + ph / 2.0))
+    for e, kx, ky in eq_keynotes:
+        eq_tags.add(kx, ky + 2.7, e.tag, 7.5, anchor_pt=(kx, ky))
+    eq_tags.flush()
 
     # ----- DEHUMIDIFICATION unit + coil on the supply hub (the ledger's latent kit) -----
     # The air system's latent side: a dehumidification coil drawn ON the supply hub + a
@@ -1609,6 +1643,21 @@ def _draw_section(svg, sysm, ox, oy, pw, ph, L_mm, H_mm, ppm, x_min, mx):
     def sx(e_along):
         return ox + (e_along - a_lo) / a_span * pw
 
+    # de-overlap pass for the SECTION's own tags (2026-07-05 HVAC-label fix, G9): a
+    # narrow section cut can clamp several zones into nearly the same along-coordinate
+    # (drawing_gates G9 caught 'Z-01'..'Z-08' piling up 100% on a tight BESS section
+    # BOTH before and after the equipment-label fix above — a pre-existing, separate
+    # collision this SAME _TagPlacer idiom closes) — register every zone + the hub tag
+    # here and resolve them in one pass, exactly like draw_ga.py's elevations.
+    sect_tags = _ga._TagPlacer(svg, bounds=(ox - 2, oy - 2, ox + pw + 2, floor_y + 2))
+    # the supply/return main BAND width (also used below, unchanged, when the mains
+    # are actually drawn) — computed early so the placer can reserve those rows.
+    band = max(sysm.ducts[0].width_mm * ppm if sysm.ducts else 8, 6)
+    # reserve the supply/return main-label bands (drawn below, after zxs/hx are known)
+    # so a displaced zone/hub tag can never overprint them.
+    sect_tags.block(ox - 2, sup_y - band - 14, ox + pw + 2, sup_y - 2)
+    sect_tags.block(ox - 2, ret_y + 2, ox + pw + 2, ret_y + band + 20)
+
     # zones standing on the floor, laid along the row.
     zxs = []
     for z in sysm.zones:
@@ -1619,7 +1668,7 @@ def _draw_section(svg, sysm, ox, oy, pw, ph, L_mm, H_mm, ppm, x_min, mx):
         zy = floor_y - zh
         svg.rect(zx, zy, zw, zh, stroke=EQ_INK, width=1.2, fill="#f0f3f7", rx=1)
         if zw > 16:
-            svg.text(zx + zw / 2, zy - 4, z.tag, size=7.0, anchor="middle", fill=MUTED)
+            sect_tags.add(zx + zw / 2, zy - 4, z.tag, 7.0, anchor_pt=(zx + zw / 2, zy))
         zxs.append((zx + zw / 2, zy))
 
     # the hub on the floor at its along-coordinate (clamped into the frame).
@@ -1628,12 +1677,13 @@ def _draw_section(svg, sysm, ox, oy, pw, ph, L_mm, H_mm, ppm, x_min, mx):
     hh = max(min(hub.h, H_mm * 0.7) * ppm, 30)
     hx = min(max(sx(hub.cx if row_is_x else hub.cy) - hw / 2, ox), ox + pw - hw)
     svg.rect(hx, floor_y - hh, hw, hh, stroke=EQ_INK, width=1.7, fill=EQ_FILL, rx=2)
-    svg.text(hx + hw / 2, floor_y - hh - 4, hub.tag, size=8.0, anchor="middle",
-             weight="bold", fill=EQ_INK)
+    sect_tags.add(hx + hw / 2, floor_y - hh - 4, hub.tag, 8.0,
+                  anchor_pt=(hx + hw / 2, floor_y - hh))
+    sect_tags.flush()
 
     # supply main at high level across the zones + a return main low — drawn as a
-    # double-line band, with drops to each zone.
-    band = max(sysm.ducts[0].width_mm * ppm if sysm.ducts else 8, 6)
+    # double-line band, with drops to each zone. (`band` computed earlier, above the
+    # zone loop, so the tag placer can reserve its row.)
     xL = min([p[0] for p in zxs] + [hx + hw]) if zxs else hx + hw
     xR = max([p[0] for p in zxs] + [hx]) if zxs else ox + pw - 20
     # supply

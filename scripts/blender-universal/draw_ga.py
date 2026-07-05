@@ -1024,12 +1024,37 @@ _GA_SCHED_MAX_ROWS = 10
 def _principal_schedule_rows(parts):
     """(rows, total_rows, total_items): the collapsed schedule rows for the largest-
     footprint principals (≤ _GA_SCHED_MAX_ROWS rows), plus the FULL collapsed-row and
-    item counts for the pointer note. Deterministic (area then tag)."""
+    item counts for the pointer note.
+
+    COLLAPSE FIRST, THEN CAP — never the reverse (BESS-containerised fix, 2026-07-05):
+    the old order picked the top-N-by-RAW-footprint PARTS first (with a '+6 headroom'
+    fudge for ranges) and only THEN collapsed same-family runs. A wide same-family
+    run (13 battery racks) fills most of that raw-item headroom on its own, so two
+    genuinely distinct standalone principals (BMS-101 'BMS master housing', EQ-101
+    'EMS industrial PC' — both real BoM tags, not synthetic placeholders) fell OUTSIDE
+    the top-(10+6) raw slice and were silently dropped from the schedule entirely —
+    even though the FULL range-collapse of all 21 BESS parts is only 9 rows, comfortably
+    under the 10-row cap. Every manifest principal must get a row whenever the honestly-
+    collapsed list already fits the cap; the fallback (large multi-service plants like
+    the water GA's 49 parts -> 37 collapsed rows, still over the cap) truncates the
+    COLLAPSED ROWS by each row's own representative footprint — a family's single range
+    row now competes fairly against a standalone principal on genuine size, not on how
+    many raw un-collapsed instances happened to occupy the pre-collapse top-N slice.
+    Deterministic (area then tag)."""
     all_rows = _collapse_schedule(parts)
-    by_area = sorted(parts, key=lambda p: (-(max(p.x1 - p.x0, 1.0)
-                                             * max(p.y1 - p.y0, 1.0)), p.tag))
-    sel = by_area[: _GA_SCHED_MAX_ROWS + 6]       # headroom — ranges collapse rows away
-    rows = _collapse_schedule(sel)[:_GA_SCHED_MAX_ROWS]
+    if len(all_rows) <= _GA_SCHED_MAX_ROWS:
+        return all_rows, len(all_rows), len(parts)
+    area_by_tag = {p.tag: max(p.x1 - p.x0, 1.0) * max(p.y1 - p.y0, 1.0) for p in parts}
+
+    def _row_area(row):
+        return area_by_tag.get(row[0].split("…")[0], 0.0)
+
+    ranked = sorted(all_rows, key=lambda r: (-_row_area(r), r[0]))
+    selected = set(ranked[:_GA_SCHED_MAX_ROWS])
+    # keep the SCHEDULE's own process-flow reading order (all_rows is already sorted
+    # that way by _collapse_schedule) — area only drives WHICH rows are kept, not the
+    # order they print in, exactly like the pre-fix schedule always read.
+    rows = [r for r in all_rows if r in selected]
     return rows, len(all_rows), len(parts)
 
 
@@ -1388,6 +1413,36 @@ def _selftest() -> int:
             bad += 1
     except ImportError:
         pass
+    # 6 — SCHEDULE collapse-BEFORE-cap proveCatch (BESS containerised, 2026-07-05):
+    #     adversarial input = one huge same-family run (13 battery racks, which used
+    #     to fill the old pre-collapse '+6 headroom' slice on raw-part count alone)
+    #     PLUS two small standalone principals with real BoM tags. The FULL collapse
+    #     is only 9 rows — under the cap — so every principal (including the small
+    #     ones) MUST appear; nothing may be dropped just because a family is wide.
+    rack_nest = [GAPart(tag=f"BR-{101+i}", obj_tag=f"br{101+i}", name="rack wiring carrier",
+                        module="m", shape="box", qty=1, is_round=False,
+                        x0=i * 700, x1=i * 700 + 600, y0=0, y1=1200, z0=0, z1=2200,
+                        cx=i * 700 + 300, cy=600, rank=1)
+                 for i in range(13)]
+    standalones = [
+        GAPart(tag="BMS-101", obj_tag="bms101", name="BMS master housing", module="m",
+               shape="box", qty=1, is_round=False, x0=9500, x1=9700, y0=1400, y1=1500,
+               z0=0, z1=600, cx=9600, cy=1450, rank=2),
+        GAPart(tag="EQ-101", obj_tag="eq101", name="EMS industrial PC", module="m",
+               shape="box", qty=1, is_round=False, x0=9800, x1=9950, y0=1400, y1=1470,
+               z0=0, z1=400, cx=9875, cy=1435, rank=3),
+    ]
+    sched_rows, sched_total, sched_items = _principal_schedule_rows(rack_nest + standalones)
+    if len(sched_rows) != sched_total:
+        print(f"  FAIL ga-sched-cap: a fully-collapsed schedule ({sched_total} rows) "
+              f"under the {_GA_SCHED_MAX_ROWS}-row cap must show EVERY row, got "
+              f"{len(sched_rows)}")
+        bad += 1
+    sched_tags = {r[0] for r in sched_rows}
+    if "BMS-101" not in sched_tags or "EQ-101" not in sched_tags:
+        print("  FAIL ga-sched-cap: a wide rack family must not crowd out standalone "
+              f"principals with real BoM tags (got {sorted(sched_tags)})")
+        bad += 1
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
 

@@ -10803,6 +10803,39 @@ _INSTRUMENT_ROW_RX = re.compile(
     r"transmitter|\bsensor\b|\bprobe\b|analys|instrument|flow meter|\bgauge\b|"
     r"level switch|\bplc\b|\bhmi\b|\bscada\b", re.I)
 
+# ── SCHEDULES-RECON like-for-like matchers (2026-07-05) — module-level so the
+# _selftest() proveCatch below can exercise them directly. Used ONLY by the
+# "Cross-schedule consistency" recon in the process-schedules tab. ──
+#
+# LIKE-FOR-LIKE VALVE VOCABULARY: a BoM requirement often names a valve by its
+# FUNCTION, not the literal word "valve" — a pressure-relief valve's BoM line reads
+# "pressure relief and sight glass" (BESS X-41), a solenoid shut-off valve's BoM line
+# reads "off-gas activation solenoid" (BESS X-47) — both real line-mounted valves
+# matching the schedule's own PSV-201 / XV-201 (×13) rows, but matching NEITHER the
+# bare \bvalve\b regex (schedule 14 vs BoM 0 — the false total-mismatch this fixes).
+# Mirrors the SAME ISA valve-function vocabulary parts_ledger.py's `_ISA_FUNC` already
+# uses for the P&ID/GA coverage credit (PSV: relief/pressure-relief/safety valve; XV:
+# solenoid/ESD/shut-off/actuated; NV/XV: check/non-return) — kept to FUNCTION nouns
+# that are valve-specific (never a bare \bisolat\w*\b or \bactuat\w*\b), so an
+# ELECTRICAL isolator (rack DC isolator, digital isolator) or an emergency-stop
+# button is never miscounted as a process valve.
+_SCHED_VALVE_RX = re.compile(
+    r"\bvalve|\bpressure.?relief\b|\bprv\b|\bpsv\b|\bsolenoid\b|\bshut.?off\b|"
+    r"\bnon.?return\b|\bnrv\b", re.I)
+# INSTRUMENT-vs-CONTROL-SYSTEM split: the process schedules' own "INSTRUMENT INDEX"
+# lists FIELD-mounted measurement devices only (transmitters / sensors / probes /
+# analysers / flow meters / gauges / level switches). A PLC / HMI / SCADA is a
+# CONTROL-SYSTEM item — it lives in the Electrical / panel schedule, not the process
+# instrument index — exactly the split ga_massing.py's `GA_NON_MASSING_RE` already
+# draws between field instruments and "switchgear / protection / control-panel
+# internals" (its \bplc\b|\bhmi\b|\bcontroller\b family). `_INSTRUMENT_ROW_RX` itself
+# is DELIBERATELY broader for the installation/commissioning loop-count estimate
+# elsewhere in this file — a PLC/HMI genuinely needs a loop-check + commissioning day
+# there — so this exclusion is scoped to the schedule-vs-BoM recon only, never a
+# redefinition of the shared constant.
+_SCHED_CONTROL_SYSTEM_RX = re.compile(r"\bplc\b|\bhmi\b|\bscada\b|\bcontroller\b|\bgateway\b",
+                                      re.I)
+
 
 def _crane_class(mass_kg: float) -> str:
     for cap, label in _CRANE_CLASSES:
@@ -11805,7 +11838,11 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
     # schedule's own item TOTAL against the BoM's stated quantity for that class —
     # live formulas over EMBEDDED operands (never a bare comparison), ±20% band. ──
     bom = ((state or {}).get("requirementsBom")) or []
-    _valve_rx = re.compile(r"\bvalve", re.I)
+    # LIKE-FOR-LIKE matchers (2026-07-05 valve + instrument recon fix) — see the
+    # module-level `_SCHED_VALVE_RX` / `_SCHED_CONTROL_SYSTEM_RX` docstrings above for
+    # the full rationale (function-noun valve vocabulary; PLC/HMI/SCADA are control-
+    # system items, not field instruments).
+    _valve_rx = _SCHED_VALVE_RX
     # LIKE-FOR-LIKE SCOPE (2026-07-05 valve-recon fix): the VALVE LIST's own population is
     # line-mounted valves only (control / relief / isolation / check / solenoid — see the
     # schedule's own "24 valve types (control / relief / isolation / ESD)" caption). A bare
@@ -11819,6 +11856,7 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
     # archetype's own allowance rows self-exclude with no new per-class code.
     _valve_allowance_rx = re.compile(r"\ballowance\b", re.I)
     _inst_rx = _INSTRUMENT_ROW_RX
+    _control_system_rx = _SCHED_CONTROL_SYSTEM_RX
     recon_rows = []
     if n_valves_schedule is not None:
         _valve_rows = [b for b in bom if isinstance(b, dict)
@@ -11840,11 +11878,23 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
                            "(excludes zone-kit + hand-watering station allowances — per-zone/"
                            "per-station pipework tie-ins, not schedule-listed line valves)"))
     if n_instruments_schedule is not None:
-        bom_inst = sum(int(num(b.get("qty")) or 1) for b in bom
-                       if isinstance(b, dict) and _inst_rx.search(str(b.get("requirement") or "")))
+        _inst_rows = [b for b in bom if isinstance(b, dict)
+                      and _inst_rx.search(str(b.get("requirement") or ""))]
+        _inst_rows_scoped = [b for b in _inst_rows
+                             if not _control_system_rx.search(str(b.get("requirement") or ""))]
+        _inst_rows_excl = [b for b in _inst_rows
+                           if _control_system_rx.search(str(b.get("requirement") or ""))]
+        bom_inst = sum(int(num(b.get("qty")) or 1) for b in _inst_rows_scoped)
+        _inst_excl_qty = sum(int(num(b.get("qty")) or 1) for b in _inst_rows_excl)
+        print(f"      Instrument recon: {bom_inst} field-instrument BoM line(s) (like-for-like "
+              f"vs the schedule's own field-device population) · excluded "
+              f"{len(_inst_rows_excl)} control-system row(s) totalling {_inst_excl_qty} off "
+              f"(PLC/HMI/SCADA — panel-schedule items, not process instruments)")
         recon_rows.append(("Instrument count: schedule vs BoM", n_instruments_schedule, bom_inst,
                            "instrument index (raw rows, pre-collapse)",
-                           "BoM lines matching the instrument family"))
+                           "BoM lines matching the instrument family whose requirement is NOT "
+                           "a control-system item (excludes PLC/HMI/SCADA — panel-schedule "
+                           "items, not process instruments)"))
     if recon_rows:
         sub_banner(ws, r, "Cross-schedule consistency — schedule item totals vs the BoM", span)
         r += 1
@@ -22251,6 +22301,55 @@ def _selftest() -> int:
     if _reconcile_unit_basis_gbp("power conversion system", 181, 75000)[0]:
         print("  FAIL unit-basis: INV-4 (£181 vs £75,000 PCS) must stay caught — not a "
               "piece-of-stock shape, regardless of the numeric ratio"); bad += 1
+
+    # ═══ proveCatch the SCHEDULES-RECON like-for-like matchers (2026-07-05, BESS v3):
+    # valve family must catch FUNCTION-named valves with no literal "valve" word (the
+    # BESS X-41/X-47 shape: schedule 14 vs BoM 0 before this fix), and the instrument
+    # family must EXCLUDE control-system items (PLC/HMI/SCADA) so a panel-schedule
+    # device never inflates the process instrument-index recon (114 vs schedule 52
+    # before this fix). Both directions checked — a genuine non-match/non-exclusion
+    # candidate must still behave honestly (no over-reach). ═══
+    if not _SCHED_VALVE_RX.search("pressure relief and sight glass"):
+        print("  FAIL sched-valve: a pressure-relief valve named without the literal "
+              "word 'valve' (BESS X-41) must still match the valve family"); bad += 1
+    if not _SCHED_VALVE_RX.search("off-gas activation solenoid"):
+        print("  FAIL sched-valve: a solenoid shut-off valve named without the literal "
+              "word 'valve' (BESS X-47) must still match the valve family"); bad += 1
+    if _SCHED_VALVE_RX.search("rack DC isolator"):
+        print("  FAIL sched-valve: an ELECTRICAL isolator must NOT be counted as a "
+              "process valve (over-reach)"); bad += 1
+    if _SCHED_VALVE_RX.search("digital isolator"):
+        print("  FAIL sched-valve: an electronic digital isolator must NOT be counted "
+              "as a process valve (over-reach)"); bad += 1
+    if not _INSTRUMENT_ROW_RX.search("HMI panel"):
+        print("  FAIL sched-inst: HMI must still match the BROAD installation/"
+              "commissioning instrument family (unchanged elsewhere in this file)"); bad += 1
+    if not _SCHED_CONTROL_SYSTEM_RX.search("HMI panel"):
+        print("  FAIL sched-control: HMI must match the control-system exclusion"); bad += 1
+    if not _SCHED_CONTROL_SYSTEM_RX.search("EMS industrial PC PLC"):
+        print("  FAIL sched-control: PLC must match the control-system exclusion"); bad += 1
+    if _SCHED_CONTROL_SYSTEM_RX.search("pack temperature sensor"):
+        print("  FAIL sched-control: a genuine field instrument must NOT be excluded "
+              "as a control-system item"); bad += 1
+    # end-to-end: the exact BESS X-41/X-47/EP-18/X-68 shape reconciles like-for-like.
+    _sched_bom = [
+        {"tag": "X-41", "requirement": "pressure relief and sight glass", "qty": 1},
+        {"tag": "X-47", "requirement": "off-gas activation solenoid", "qty": 13},
+        {"tag": "EP-18", "requirement": "HMI panel · 15.4", "qty": 1},
+        {"tag": "X-68", "requirement": "HMI ethernet cable", "qty": 1},
+        {"tag": "I-1", "requirement": "pack temperature sensor · 10", "qty": 52},
+    ]
+    _sv_rows = [b for b in _sched_bom if _SCHED_VALVE_RX.search(b["requirement"])]
+    _sv_total = sum(b["qty"] for b in _sv_rows)
+    if _sv_total != 14:
+        print(f"  FAIL sched-valve-e2e: X-41 (1) + X-47 (13) must reconcile to 14 "
+              f"line-mounted valves (got {_sv_total} from {len(_sv_rows)} rows)"); bad += 1
+    _si_rows = [b for b in _sched_bom if _INSTRUMENT_ROW_RX.search(b["requirement"])
+               and not _SCHED_CONTROL_SYSTEM_RX.search(b["requirement"])]
+    _si_total = sum(b["qty"] for b in _si_rows)
+    if _si_total != 52:
+        print(f"  FAIL sched-inst-e2e: I-1 (52) must reconcile after excluding the two "
+              f"HMI rows (got {_si_total} from {len(_si_rows)} rows)"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
