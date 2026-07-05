@@ -11592,7 +11592,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             _build_bop_cabinet_lineup(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                       mat, steel, MAT, mod, MO, n_sections=2,
                                       louvres=True, louvre_rgb=(0.22, 0.24, 0.28))
-        elif role in ("chiller", "cooling", "hvac"):   # BESS chiller/HVAC condenser / compute CRAC-CRAH
+        elif role in ("chiller", "cooling", "hvac", "aircon"):   # BESS chiller/HVAC condenser / compute CRAC-CRAH
             _build_bop_chiller(nm, cx, cy, bop_z, w_mm, depth_mm, h_mm,
                                mat, steel, MAT, MO, mod)
         elif role in ("pdu", "ups"):           # compute power: tall cabinet lineup
@@ -11716,7 +11716,7 @@ def place_rack_farm(parts, regions, topology, MAT, MO):
             if role == "transformer":
                 _build_bop_transformer(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                        mat, steel, MAT, mod, MO)
-            elif role in ("chiller", "cooling", "hvac"):
+            elif role in ("chiller", "cooling", "hvac", "aircon"):
                 _build_bop_chiller(nm, cx, cy, DECK_Z_MM, w_mm, depth_mm, h_mm,
                                    mat, steel, MAT, MO, mod)
             elif role == "fire":
@@ -11782,11 +11782,66 @@ _BOP_ROLES = [
     # matched NEITHER the chiller role's old bare `hvac` term (that only ever
     # sampled "HVAC duct"/"HVAC condensate pump") nor any other role, so it was a
     # silent 3D-scene drop despite being a genuine principal assembly.
-    ("hvac",        r"\bac\s*unit\b|air.?condition|condensing\s*unit|\blouvre\b",
+    # SPLIT 2026-07-05 (BESS v3 LAP-2 dissection): the roof AC/condensing unit and the
+    # wall louvre/vent grille are TWO distinct physical items that both matched this
+    # ONE role's regex — `_select_bop_items` takes only the FIRST matching part per
+    # role, so whichever BoM line the scan met first (the louvre) starved the other
+    # (the AC unit) of its own box even though both are real principals. Two roles now
+    # so BOTH are always drawn. NAMED AS SINGLE WORDS (no internal `_`, `aircon`/
+    # `louvre`/… not `hvac_ac`/`hvac_vent`): the block-name collapse regex at line
+    # ~5397 (`^(u_rf_bop_([a-z]+(?:_ctrl)?))_`) truncates a role name at its FIRST
+    # internal underscore when consolidating a multi-mesh BoP block — a two-word role
+    # like `hvac_ac` silently collapsed to block `hvac`, losing its `_SYN_BLOCK_BOM`
+    # name lookup (falls back to a generic "Equipment" label) and colliding with any
+    # sibling role sharing the same first word. Verified via an offline Blender
+    # rebuild (2026-07-05): the two-word names DID lose their real BoM name; the
+    # single-word rename fixed it (see build_universal_scene ownership notes).
+    ("aircon",      r"\bac\s*unit\b|air.?condition|condensing\s*unit",
                                                           900.0, 1300.0, 1200.0, (0.85, 0.87, 0.90)),
+    ("louvre",      r"\blouvre\b",
+                                                          300.0, 1300.0, 1200.0, (0.80, 0.82, 0.85)),
+    # enclosure ventilation fan + off-gas exhaust fan (BESS v3 LAP-2: neither matched
+    # ANY existing role — 'enclosure ventilation fan' has no 'ac unit/condition/louvre'
+    # token, and 'off-gas exhaust fan' has no 'chiller/hvac duct/condens' token — so
+    # both were a silent 3D-scene drop despite being real small principal machines).
+    ("ventfan",     r"enclosure\s*ventilation\s*fan|\bventilation\s*fan\b",
+                                                          300.0, 400.0, 400.0, (0.55, 0.58, 0.62)),
+    ("offgasfan",   r"off.?gas\s*exhaust\s*fan|exhaust\s*fan",
+                                                          300.0, 400.0, 400.0, (0.55, 0.58, 0.62)),
+    # coolant-loop rotating equipment (cooling pump / coolant circulation pump / HVAC
+    # condensate pump) + the expansion tank + the air intake filter — real small
+    # massable principals that matched no role before (BESS v3 LAP-2).
+    # SAME collision pattern as aircon/louvre above (self-inflicted 2026-07-05: 'cooling
+    # pump' and 'coolant circulation pump' both matched ONE role's regex, so the later
+    # one starved — caught in the SAME offline-rebuild verification pass). Two roles.
+    ("coolingpump", r"\bcooling\s*pump\b",
+                                                          350.0, 300.0, 450.0, (0.30, 0.34, 0.55)),
+    ("circpump",    r"coolant\s*circulation\s*pump|\bcoolant\s*pump\b",
+                                                          350.0, 300.0, 450.0, (0.30, 0.34, 0.55)),
+    ("condensatepump", r"condensate\s*pump",
+                                                          250.0, 250.0, 350.0, (0.30, 0.34, 0.55)),
+    ("expansiontank",  r"expansion\s*tank",
+                                                          400.0, 400.0, 600.0, (0.70, 0.72, 0.75)),
+    ("airfilter",      r"air\s*intake\s*filter",
+                                                          300.0, 300.0, 400.0, (0.60, 0.62, 0.65)),
     # fire suppression skid (clean-agent bottle bank) — always drawn (Fix 3)
     ("fire",        r"fire|suppress|aerosol|novec|fm[- ]?200|clean[- ]?agent",
                                                           700.0, 800.0, 1700.0, (0.80, 0.20, 0.16)),
+    # container-mounted fire/HVAC/safety PANELS (BESS v3 LAP-2: 'suppression releasing
+    # panel' / 'arc flash barrier panel' / 'deflagration vent panel' / 'thermal
+    # insulation panel' were previously mistyped 'electrical' by parts_ledger's bare
+    # \bpanel\b keyword and so never reached this BoP table at all; now correctly
+    # typed 'other' and given their own small wall-mounted boxes). Scoped tight
+    # (the qualifier word immediately before 'panel') so a real distribution/control
+    # panel elsewhere is untouched.
+    ("firerelease",  r"suppression\s*releasing\s*panel",
+                                                          150.0, 400.0, 500.0, (0.80, 0.20, 0.16)),
+    ("arcflash",     r"arc\s*flash\s*barrier\s*panel",
+                                                          150.0, 400.0, 500.0, (0.95, 0.75, 0.10)),
+    ("deflagration", r"deflagration\s*vent\s*panel",
+                                                          200.0, 600.0, 800.0, (0.75, 0.35, 0.15)),
+    ("thermalpanel", r"thermal\s*insulation\s*panel",
+                                                          100.0, 600.0, 600.0, (0.85, 0.85, 0.80)),
 ]
 
 # Balance-of-plant roles for a COMPUTE rack farm (a server room / edge node): the

@@ -145,7 +145,46 @@ GA_NON_MASSING_RE = re.compile(
     # basis is documentation, not equipment. A real 'Vent Stack' / 'Membrane
     # Stack' / 'Design Pressure Vessel' has a different head noun and is kept.
     r"\b(?:design|concept|philosophy|strategy|approach|methodology|scheme|basis)"
-    r"s?\s*\d*\s*$",
+    r"s?\s*\d*\s*$|"
+    # ── BESS commodity/wiring/grounding/cell-packaging INTERNALS (2026-07-05, BESS
+    # v3 3D-coverage denominator-honesty pass) — small bonding/ground hardware and
+    # cell/module/PCS-cabinet packaging internals that live INSIDE an already-massed
+    # rack/cabinet, never their own GA box (same "internals represented by the
+    # parent package" principle as the membrane-skid-internals rule above, extended
+    # to a battery rack + its grounding network + a PCS cabinet's internal
+    # electronics). A pump/fan/tank/AC-unit/filter (real small massable principals)
+    # matches NONE of this — proveCatch counter-cases in _selftest.
+    r"\bground(?:ing)?\s*braids?\b|\bearth\s*bars?\b|\bearth\s*rods?\b|"
+    r"\bequipotential\s*bonding\s*cables?\b|\bbonding\s*cables?\b|\bgrounding\s*lug(?:s)?\b|"
+    r"\bneutral\s*grounding\b|"
+    r"\bpadlocks?\b|\bmount\s*rails?\b|\bfuse\s*(?:holders?|mounts?)\b|"
+    r"\bcable\s*sealing\s*ends?\b|\bsealing\s*ends?\b|"
+    r"\bcell\s*terminal\s*hardware\b|\bthermistor\s*attachments?\b|"
+    r"\bcell\s*(?:voltage\s*)?tap\s*wires?\b|\bcell\s*insulation\s*pads?\b|"
+    r"\bmodule\s*steel\s*frames?\b|\bmodule\s*top\s*covers?\b|\bmodule\s*bottom\s*trays?\b|"
+    r"\bcompression\s*plates?\b|\bcompression\s*tie\s*rod\s*sets?\b|"
+    r"\bdc-?link\s*capacitor\s*banks?\b|\bcooling\s*fan\s*trays?\b|"
+    r"\bdigital\s*isolators?\b|\bcan\s*transceivers?\b|\bpre-?charge\s*resistors?\b|"
+    r"\bfib(?:re|er)\s*patch\s*panels?\b|"
+    r"\bheater\s*cables?\b|\bdetection\s*harness(?:es)?\b|\bwiring\s*harness(?:es)?\b|"
+    r"\bduct\s*penetration\s*seals?\b|\bsuppression\s*nozzles?\b|"
+    r"\biso\s*corner\s*castings?\b|\b(?:structural\s*)?floor\s*reinforcements?\b|"
+    r"\bdoor\s*assembly\b|\bsmoke\s*vent\s*interlock\s*mounts?\b|"
+    r"\biso\s*container\s*(?:20|40)\s*(?:hc|gp|ft)?\b",
+    re.I)
+
+# Pure DOCUMENTATION / signage / compliance-record rows (2026-07-05, BESS v3 dissection):
+# a label, a hazard/warning/compliance placard, barrier tape, a certification record, or
+# a quality/torque card is not a physical part at all — it has NO engineering-drawing
+# home (not GA, not P&ID, not a single-line symbol, not even a panel-schedule row).
+# TERMINAL-anchored on the bare 'label' head noun (a compound like 'high voltage safety
+# label' or 'IEC 62619 compliance label' still ends in 'label') plus a few named
+# document/record compounds. Distinct from GA_NON_MASSING_RE: those are still REAL
+# physical/functional parts (just not separately massed); these are paperwork.
+GA_PURE_DOCUMENTATION_RE = re.compile(
+    r"\blabels?\s*\d*\s*$|\blabel\s*mounts?\b|"
+    r"\bbarrier\s*tapes?\b|\bcertification\s*records?\b|\btorque\s*cards?\b|"
+    r"\bquality\s*records?\b",
     re.I)
 
 
@@ -153,6 +192,13 @@ def is_ga_non_massing(name):
     """True if `name` is P&ID-level detail (accessory / instrument / inline
     valve / panel-internal) that must NOT be placed as a 3D GA equipment box."""
     return bool(GA_NON_MASSING_RE.search(name or ""))
+
+
+def is_pure_documentation(name):
+    """True if `name` is a document/label/record/compliance-placard with NO physical
+    engineering-drawing home at all (not equipment, not a routed connection) —
+    expected on NO representation whatsoever (mirrors a PARAMETRIC allowance row)."""
+    return bool(GA_PURE_DOCUMENTATION_RE.search(name or ""))
 
 
 def _selftest():
@@ -212,6 +258,30 @@ def _selftest():
         "End Cap", "Outlet Manifold End Cap",
         "Flange", "Permeate Outlet Flange",
         "Gasket", "Permeate Outlet Gasket",
+        # BESS commodity/grounding/cell-packaging internals (2026-07-05 v3 dissection)
+        "EMC ground braid", "earth bar", "equipotential bonding cable", "earth rod",
+        "grounding lug set", "transformer neutral grounding",
+        "rack DC isolator padlock", "fuse mount rail",
+        "transformer cable sealing end",
+        "cell terminal hardware", "thermistor attachment", "cell voltage tap wire",
+        "cell insulation pad", "module steel frame", "module top cover",
+        "module bottom tray", "compression plate", "compression tie rod set",
+        "PCS DC-link capacitor bank", "PCS cooling fan tray", "digital isolator",
+        "CAN transceiver", "DC pre-charge resistor", "EMS fibre patch panel",
+        "rack heater cable", "gas detection harness",
+        "off-gas duct penetration seal", "suppression nozzle",
+        "ISO corner casting", "structural floor reinforcement",
+        "door assembly double leaf", "smoke vent interlock mount",
+        "ISO container 20 HC",
+    ]
+    # pure documentation/signage — expected on NO representation at all.
+    must_be_documentation = [
+        "rack DC isolator label", "fuse label", "safety label mount",
+        "IEC 62619 compliance label", "NFPA 855 warning label",
+        "high voltage safety label", "arc flash hazard label",
+        "arc flash boundary label", "arc flash barrier tape",
+        "deflagration vent label", "fuse install torque card",
+        "lifting certification record",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [
@@ -250,14 +320,28 @@ def _selftest():
         # proves the bare ring-main rule above is TERMINAL-anchored (tight), not "contains
         # ring main" (2026-07-04, X-146/X-152 fix).
         "Ring Main Unit", "11kV Ring Main Unit",
+        # BESS true massable principals (2026-07-05 v3 dissection) — real small pumps/
+        # fans/tank/filter/AC-unit that MUST survive the new grounding/cell-packaging
+        # families above (proves those rules are tight, not "contains cell/module").
+        "enclosure ventilation fan", "air intake filter", "expansion tank",
+        "cooling pump", "container AC unit", "coolant circulation pump",
+        "HVAC condensate pump", "off-gas exhaust fan", "LFP prismatic cell",
+        "rack DC isolator", "PTC rack heater",
     ]
     bad_drop = [n for n in must_drop if not is_ga_non_massing(n)]
     bad_keep = [n for n in must_keep if is_ga_non_massing(n)]
+    bad_doc = [n for n in must_be_documentation if not is_pure_documentation(n)]
+    bad_doc_keep = [n for n in must_keep if is_pure_documentation(n)]
     if bad_drop:
         raise AssertionError(f"GA-non-massing FAILED to drop (litter would survive): {bad_drop}")
     if bad_keep:
         raise AssertionError(f"GA-non-massing WRONGLY dropped principal equipment: {bad_keep}")
-    print(f"ga_massing --selftest OK ({len(must_drop)} dropped, {len(must_keep)} principal kept)")
+    if bad_doc:
+        raise AssertionError(f"pure-documentation FAILED to classify: {bad_doc}")
+    if bad_doc_keep:
+        raise AssertionError(f"pure-documentation WRONGLY caught principal equipment: {bad_doc_keep}")
+    print(f"ga_massing --selftest OK ({len(must_drop)} dropped, {len(must_keep)} principal kept, "
+          f"{len(must_be_documentation)} pure-documentation)")
 
 
 if __name__ == "__main__":

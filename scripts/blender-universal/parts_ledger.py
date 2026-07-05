@@ -78,11 +78,40 @@ TYPE_RULES = [
                    r"data\s*logger|\bIoT\b|edge\s*gateway|\bgateway\b"),
     ("instrument", r"transmitter|analy[sz]er|\bprobe\b|sensor|\bgauge\b|level switch|"
                    r"flow meter|flowmeter|\bmeter\b|densit|turbidit|viscosit|coriolis|"
-                   r"mass flow|detector|monitor"),
+                   r"mass flow|detector|monitor|"
+                   # a position/door/limit switch is a field SENSOR (open/closed state), not a
+                   # power-distribution device — checked here (not the electrical rule) so it is
+                   # P&ID/schedule-expected, not a phantom single-line feeder (BESS v3 dissection
+                   # 2026-07-05: 'door position switch' had NO TYPE_RULES match at all → fell to
+                   # 'other' → wrongly blender/GA-expected).
+                   r"position switch|door switch|limit switch"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
     ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
                    r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)"),
-    ("electrical", r"transformer|switchgear|\bMCC\b|\bpanel\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge"),
+    ("electrical", r"transformer|switchgear|\bMCC\b|busbar|generator|genset|breaker|relay|\bATS\b|fuse|surge|"
+                   # metering/instrument transformers are switchgear-adjacent power apparatus,
+                   # not a bare field instrument (BESS v3: 'grid PCC metering CT' had no match at
+                   # all → fell to 'other').
+                   r"metering\s*CT|current\s*transformer|voltage\s*transformer|"
+                   # an LCL/EMI/RFI/harmonic output filter INDUCTOR/capacitor/choke/reactor is a
+                   # power-electronics component, not a process SEPARATOR — checked here (before
+                   # the separator rule below) so the generic '\bfilter\b' token in "PCS LCL output
+                   # filter inductor" doesn't misclassify it as a process filter (BESS v3: this
+                   # caused a FALSE 'no downstream connection' connectivity concern on a PCS
+                   # cabinet-internal component that was never meant to have a discrete flow path).
+                   r"\bLCL\b|filter\s+inductor|filter\s+capacitor|filter\s+choke|filter\s+reactor|"
+                   r"\bEMI\s+filter\b|\bRFI\s+filter\b|harmonic\s+filter|"
+                   # 'panel' means an ELECTRICAL distribution/control panel — but a bare match also
+                   # caught non-electrical HVAC/fire/insulation/data compounds sharing the same head
+                   # noun (BESS v3 dissection 2026-07-05): a louvre VENT panel, a suppression
+                   # RELEASING panel, an arc flash BARRIER panel, a DEFLAGRATION vent panel, a
+                   # thermal INSULATION panel, and a fibre PATCH panel are none of them power/
+                   # control distribution equipment. Exclude those specific qualifiers (fixed-width
+                   # lookbehind per qualifier) so a genuine 'Electrical Control Panel' / 'Digital
+                   # Control Panel' / 'Distribution Panel' / 'Enclosure Panel' still matches.
+                   # proveCatch both directions in build/verify-engine-guards selftest coverage.
+                   r"(?<!vent )(?<!insulation )(?<!barrier )(?<!releasing )(?<!deflagration )"
+                   r"(?<!louvre )(?<!fibre )(?<!fiber )(?<!patch )\bpanel\b"),
     ("rotating",   r"\bpump\b|blower|\bfan\b|compressor|skimmer|aerat"),
     ("exchanger",  r"heat exchanger|heat pump|\bHEX\b|chiller|\bUV\b|ozone|steril|oxygenat|degas|makeup hex"),
     # `\bscreen\b` (not bare `screen`) so a filtration screen / drum screen matches but an HMI
@@ -242,6 +271,18 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other") -> str:
     if _SCOPE_DESIGN_METADATA_RE.search(n):
         return "SCOPE-DOCUMENTED"
     if typ == "other" and _SCOPE_SYSTEM_NETWORK_RE.search(n):
+        return "SCOPE-DOCUMENTED"
+    # 2026-07-05 BESS v3 dissection: reuse the SHARED ga_massing pure-documentation signal
+    # (the same one driving the "expected nowhere" decision above) so a NOT-FOUND row
+    # whose name is pure paperwork/signage gets the SAME honest substatus instead of a
+    # dishonest catalogue-research-gap flag. NOTE: deliberately NOT reusing the broader
+    # `ga_massing.is_ga_non_massing()` here — that classifier is intentionally WIDER (it
+    # also drops valve/instrument/control-panel-internal families that are legitimate
+    # 3D-massing exclusions but are STILL real catalogue-research targets, e.g. a VFD
+    # Drive, a Modbus Interface, a Pressure Relief Valve). Conflating the two caused a
+    # real proveCatch OVER-REACH regression (verify-engine-guards.sh) — reverted to the
+    # narrower LOCAL `_COMMODITY_FITTING_RE` above for that decision.
+    if ga_massing.is_pure_documentation(n):
         return "SCOPE-DOCUMENTED"
     return "NOT FOUND"
 
@@ -712,8 +753,19 @@ def main() -> int:
         # from the Blender scene by build_universal_scene's ga_massing filter) — must NOT be
         # EXPECTED in the render or GA either; otherwise its guaranteed-absence deflates
         # render/GA coverage. It REMAINS expected on the P&ID / schedules (its proper home).
+        # EXTENDED 2026-07-05 (BESS v3 denominator-honesty pass): the SAME "lives inside an
+        # already-massed parent, never its own drawn object" principle also applies to the
+        # SINGLE-LINE one-line diagram — a rack's grounding wire, a transformer's cable
+        # sealing end, a fibre patch panel, are not power-path feeder equipment either, so
+        # they must not inflate the single-line/panel-schedule denominator (Electrical tab).
         if ga_massing.is_ga_non_massing(name):
-            expected = expected - {"blender", "general-arrangement"}
+            expected = expected - {"blender", "general-arrangement", "single-line-diagram"}
+        # A pure document/label/certification-record row (Tristan's Codema-discipline ask,
+        # 2026-07-05) has NO engineering-drawing home at all — expected NOWHERE, exactly like
+        # a PARAMETRIC materials-allowance row. Never inferred from status; a name-level
+        # signal shared with the 3D-massing decision (ga_massing.is_pure_documentation).
+        if ga_massing.is_pure_documentation(name):
+            expected = set()
         basis_full = str(r.get("basis", ""))
         eq_tools = _find_tools_for_equipment(tag, name, basis_full)
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
