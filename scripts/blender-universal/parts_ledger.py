@@ -44,6 +44,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling modules
 import ga_massing  # GA non-massing classifier — keep render/GA EXPECTED consistent with the scene
+import connection_ledger as cl  # _ABSTRACT_BOUNDARY_RE — ONE shared boundary-noun authority
+                                 # (never a second copy that could drift from the ledger's own)
 
 # Isometric drawings REMOVED from the dossier (Tristan 2026-06-28). 'isometric-index' is dropped from
 # the tracked drawing reps + every type's expected-set, so no part is isometric-expected and no
@@ -113,11 +115,22 @@ TYPE_RULES = [
                    r"(?<!vent )(?<!insulation )(?<!barrier )(?<!releasing )(?<!deflagration )"
                    r"(?<!louvre )(?<!fibre )(?<!fiber )(?<!patch )\bpanel\b"),
     ("rotating",   r"\bpump\b|blower|\bfan\b|compressor|skimmer|aerat"),
-    ("exchanger",  r"heat exchanger|heat pump|\bHEX\b|chiller|\bUV\b|ozone|steril|oxygenat|degas|makeup hex"),
+    # `reboil` (not the narrower 'reboiler') catches BOTH 'distillation reboiler' and a
+    # 'stripper reboil pot' — a column reboiler is process-plant heat-transfer equipment,
+    # same TYPE_EXPECTED {blender, GA, pid, block-flow-diagram} as 'vessel' below (CO2-v1
+    # coverage-classification fix, 2026-07-05: both fell to 'other' → {blender, GA} only,
+    # shrinking their honest P&ID/BFD coverage expectation even though both are already
+    # drawn there — the 'one-classification-both-sides' rule).
+    ("exchanger",  r"heat exchanger|heat pump|\bHEX\b|chiller|\bUV\b|ozone|steril|oxygenat|degas|"
+                   r"makeup hex|reboil"),
     # `\bscreen\b` (not bare `screen`) so a filtration screen / drum screen matches but an HMI
     # "touchscreen" does NOT fall to separator (the HMI is caught by the control rule above anyway).
     ("separator",  r"drum filter|\bscreen\b|filter|clarifi|settl|cyclone|membrane|biofilter|\bMBBR\b"),
-    ("vessel",     r"\btank\b|vessel|reservoir|\bsump\b|\bcone\b|column|reactor|silo|hopper|\bLOX\b|storage"),
+    # 'crystalli[sz]er' (crystalliser/crystallizer/recrystalliser/recrystallizer) is a
+    # process VESSEL by shape (same CO2-v1 fix as 'reboil' above) — 'K2SO4 recrystalliser'
+    # fell to 'other' despite being drawn on the P&ID + block-flow-diagram already.
+    ("vessel",     r"\btank\b|vessel|reservoir|\bsump\b|\bcone\b|column|reactor|silo|hopper|"
+                   r"\bLOX\b|storage|crystalli[sz]er"),
 ]
 TRANSFORM = {"vessel": "holds / contains working fluid", "rotating": "adds head / moves fluid",
              "exchanger": "transfers heat / treats stream", "separator": "separates a phase",
@@ -390,6 +403,43 @@ def _norm(s: str) -> str:
     s = re.sub(r"[_\-]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return re.sub(r"s\b", "", s)
+
+
+# ── BOUNDARY-ENDPOINT canonicalisation (Tristan CO2-v1 dossier, 2026-07-05) ─────────
+# An unresolved connection endpoint (no matching BoM/manifest part) is NOT automatically
+# a phantom — the electrical model + connection_ledger both author legitimate BATTERY-
+# LIMIT nodes (grid / mains / utility incomer / atmosphere / heat-rejection / …) that
+# are never a purchasable part. build_universal_scene.py's own EXTERNAL_SUPPLY_RE
+# already treats 'electrical_supply' / 'power_supply' / 'grid' / 'mains' / 'incomer' /
+# 'utility' / 'battery_limit' as ONE incomer-marker family (it synthesises a small
+# 'incomer' marker at the plant edge for exactly this group) — so an unresolved
+# 'electrical supply' endpoint is the SAME concept as a 'utility incomer', not a
+# missing BoM line. Before this fix the ledger's connections list fell straight to
+# `fr_key.title()` for ANY unresolved endpoint, so 'electrical_supply' rendered as the
+# bare phantom-looking "Electrical Supply" — indistinguishable from a genuinely-missing
+# part reference (CO2 v1 dossier: 'connection trace references Electrical Supply but no
+# such part exists in the bill of materials / design', tab-scorecard HIGH).
+# Fix: reuse connection_ledger.py's OWN `_ABSTRACT_BOUNDARY_RE` (the ledger's authority
+# on what counts as a legitimate abstract boundary — ONE regex, never a second copy
+# that could drift) to detect the case, and render an EXPLICIT boundary label. The
+# electrical/power-incomer sub-family renders with the SAME 'Utility Incomer' noun
+# every other archetype's grid tie already carries, so a downstream connection-trace
+# consumer that only recognises that canonical phrase (not the raw contract key) still
+# resolves it as a boundary — universal, keyed on the noun family, never a per-part table.
+_ELECTRICAL_INCOMER_RE = re.compile(
+    r"electrical[_ -]?supply|power[_ -]?supply\b|incoming[_ -]?supply", re.I)
+
+
+def _boundary_label(raw_key: str):
+    """Canonical boundary-service label for an UNRESOLVED connection endpoint, or None
+    if `raw_key` is not a recognised abstract boundary (caller falls back to a plain
+    title-cased name — a genuinely unresolved / phantom reference, left untouched)."""
+    if not raw_key or not cl._ABSTRACT_BOUNDARY_RE.search(raw_key):
+        return None
+    title = raw_key.title()
+    if _ELECTRICAL_INCOMER_RE.search(raw_key):
+        return f"Utility Incomer ({title})"
+    return title
 
 
 # ── CABINET GROUPING (universal, role-keyed — no per-class table) ─────────────────
@@ -956,8 +1006,8 @@ def main() -> int:
         size = r.get("size") or spec.get("size_label") or ""
         lineno = runname_to_lineno.get(spec.get("run_name")) or tagpair_to_lineno.get((fr_key, to_key))
         fe, te = resolve(fr_key), resolve(to_key)
-        fn = fe["name"] if fe else fr_key.title()
-        tn = te["name"] if te else to_key.title()
+        fn = fe["name"] if fe else (_boundary_label(fr_key) or fr_key.title())
+        tn = te["name"] if te else (_boundary_label(to_key) or to_key.title())
         # coverage by the AUTHORITATIVE line number (exact join via route-manifest): the
         # P&ID + line-list label the line number, the isometric spool file is named for
         # it, the Blender route-manifest carries the run. P&ID falls back to "both
@@ -1052,8 +1102,8 @@ def main() -> int:
             continue
         attached_pairs.add((fr_key, to_key, mech))
         kind = MECH_KIND.get(mech, MECH_KIND.get(r.get("service", ""), "tie"))
-        fn = fe["name"] if fe else fr_key.title()
-        tn = te["name"] if te else to_key.title()
+        fn = fe["name"] if fe else (_boundary_label(fr_key) or fr_key.title())
+        tn = te["name"] if te else (_boundary_label(to_key) or to_key.title())
         if te:
             te["inputs"].append(f"{fn} ({(fe or {}).get('tag') or '?'}) via {kind} [{mech}]")
         if fe:
@@ -1619,6 +1669,21 @@ def _selftest() -> int:
         ("Manual Ball Valve", "valve"),
         ("Manifold Drain Valve", "valve"),
     ]
+    cases += [
+        # COVERAGE-CLASSIFICATION fix (CO2-v1, 2026-07-05): a column reboiler / reboil pot
+        # and a crystalliser/recrystalliser are process equipment by SHAPE, not 'other' —
+        # 'other' shrinks TYPE_EXPECTED to {blender, general-arrangement} only, hiding an
+        # honest P&ID/BFD coverage check even though both are already drawn there.
+        ("MEA Stripper Reboil Pot", "exchanger"),
+        ("Distillation Reboiler", "exchanger"),
+        ("K2SO4 Recrystalliser", "vessel"),
+        ("K2SO4 Recrystallizer", "vessel"),
+        # already correctly classified via the pre-existing 'column'/'reactor' tokens —
+        # proveCatch that the new 'reboil'/'crystalli[sz]er' additions don't regress these.
+        ("Packed Absorber Column", "vessel"),
+        ("Stirred Carbonation Reactor", "vessel"),
+        ("MEA Distillation Column", "vessel"),
+    ]
     for name, want in cases:
         got = _classify(name, "")
         if got != want:
@@ -1809,6 +1874,42 @@ def _selftest() -> int:
             print(f"  FAIL not-found-substatus OVER-REACH: {_nm!r} is a real unresearched "
                   f"catalogue part and must stay NOT FOUND — got {_hit!r}")
             bad += 1
+    # ── _boundary_label proveCatch (CO2-v1 CONNECTION TRACE fix, 2026-07-05) ───────────
+    # 'electrical supply' (the _norm'd form of the contract's 'electrical_supply' boundary
+    # node) is a legitimate battery-limit utility incomer — mirrors connection_ledger.py's
+    # OWN _ABSTRACT_BOUNDARY_RE (electrical[_ -]?supply is already in that regex) + the
+    # SAME 'incomer marker' family build_universal_scene.EXTERNAL_SUPPLY_RE groups
+    # electrical_supply/power_supply/grid/mains/incomer/utility/battery_limit under. Must
+    # render with the canonical 'Utility Incomer' noun (not a naive title-cased phantom
+    # "Electrical Supply" that a downstream connection-trace consumer reads as a missing
+    # BoM part — the CO2-v1 tab-scorecard HIGH this fix closes).
+    if _boundary_label("electrical supply") != "Utility Incomer (Electrical Supply)":
+        print(f"  FAIL _boundary_label('electrical supply') = "
+              f"{_boundary_label('electrical supply')!r}, want the canonical Utility "
+              f"Incomer label")
+        bad += 1
+    for _bk in ("power supply", "incoming supply"):
+        _bl = _boundary_label(_bk)
+        if not _bl or not _bl.lower().startswith("utility incomer"):
+            print(f"  FAIL _boundary_label({_bk!r}) = {_bl!r}, want a 'Utility Incomer (…)' label")
+            bad += 1
+    # a NON-electrical abstract boundary (atmosphere / grid / mains / battery limit) is
+    # STILL recognised (via cl._ABSTRACT_BOUNDARY_RE) but keeps its own plain title —
+    # only the electrical/power-supply sub-family needs the 'Utility Incomer' rename
+    # (its OWN raw key already contains 'grid'/'mains'/'battery limit', which the
+    # narrower downstream mirror regex already accepts verbatim).
+    for _bk, _want in (("atmosphere", "Atmosphere"), ("grid", "Grid"), ("mains", "Mains")):
+        _bl = _boundary_label(_bk)
+        if _bl != _want:
+            print(f"  FAIL _boundary_label({_bk!r}) = {_bl!r}, want {_want!r} (unchanged plain title)")
+            bad += 1
+    # a genuinely unresolved, NON-boundary endpoint (a real missing part reference) must
+    # return None so the caller falls through to its honest fr_key.title() — never
+    # silently laundered into a fake boundary label.
+    if _boundary_label("stray unresolved pump") is not None:
+        print("  FAIL _boundary_label: a non-boundary unresolved endpoint must return "
+              "None (an honest phantom reference, not laundered as a boundary)")
+        bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

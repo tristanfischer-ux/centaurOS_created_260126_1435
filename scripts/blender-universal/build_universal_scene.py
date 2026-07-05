@@ -4055,6 +4055,16 @@ RACK_DIRECT_MAX_MM   = 13000.0 # an edge whose endpoints are within this XY dist
                                # a LOCAL jumper: route it DIRECT (clean L) if that
                                # avoids equipment, instead of detouring to the spine.
                                # Longer edges always take the spine (visual coherence).
+DETOUR_RESCUE_RATIO = 2.2      # a spine-routed edge whose XY length exceeds this many ×
+                               # the straight-line distance is a DETOUR OUTLIER (route-
+                               # audit's own target is ≤~1.6×) — worth trying a direct L
+                               # rescue for, even beyond RACK_DIRECT_MAX_MM / an abstract
+                               # endpoint (CO2-v1 RENDERS-1 fix, 2026-07-05: both endpoints
+                               # sitting on the SAME side of the spine forces a needless
+                               # down-and-back-up round trip through empty aisle space).
+DETOUR_RESCUE_KEEP_FRAC = 0.70 # the rescue direct-L candidate is kept only when it is
+                               # MEANINGFULLY shorter than the spine route (never a
+                               # marginal coin-flip swap that could flip run-to-run).
 LOCAL_JUMPER_MAX_MM  = 6000.0  # a DIRECT jumper this short between two LOW nozzles runs
                                # at a LOW local elevation (just over the taller endpoint),
                                # NOT up at the overhead rack — a real plant runs a short
@@ -8712,6 +8722,30 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
             if waypoints is None:
                 waypoints = route_on_spine(rack_plan, slot, a_xyz, b_xyz,
                                            r["a_abstract"], r["b_abstract"], own=own_bb)
+                # DETOUR-RESCUE (RENDERS-1 fix, CO2-v1 2026-07-05): route_on_spine ALWAYS
+                # detours via the shared aisle — when both endpoints sit on the SAME side
+                # of the spine (far from it), that detour roughly DOUBLES the cross-lateral
+                # leg (down to the spine, then back up almost the same distance) — the
+                # 'pipe routing extending out into blank space' the vision critic caught
+                # (a utility-incomer→transformer feeder routed via an aisle far from both
+                # parts, detour ratio 3.68× vs the ≤1.6 target the audit itself documents).
+                # A direct L is tried as a rescue ONLY when the spine route is a clear
+                # outlier AND a clean (equipment-clear) direct L exists, kept ONLY when it
+                # is MEANINGFULLY shorter (never a marginal coin-flip swap). Universal — a
+                # length + clearance test, never a per-part/per-class rule; applies to any
+                # edge (including a long one or an abstract boundary endpoint) that
+                # route_on_spine would otherwise route through empty aisle space.
+                _spine_len_m = _polyline_len_m(waypoints)
+                _straight_m = straight * fl.MM
+                if _straight_m > 0 and _spine_len_m > DETOUR_RESCUE_RATIO * _straight_m:
+                    _direct_candidate = _direct_route(rack_plan, slot, a_xyz, b_xyz, own_bb)
+                    if _direct_candidate is not None:
+                        _direct_len_m = _polyline_len_m(_direct_candidate)
+                        if _direct_len_m < DETOUR_RESCUE_KEEP_FRAC * _spine_len_m:
+                            print(f"[univ] DETOUR-RESCUE edge {tag}{i} ({mech}): spine route "
+                                  f"{_spine_len_m:.1f} m ({_spine_len_m / _straight_m:.2f}x "
+                                  f"straight) -> direct L {_direct_len_m:.1f} m")
+                            waypoints = _direct_candidate
         else:   # no layout to thread a spine through → legacy per-pipe route
             waypoints = route_rack(a_xyz, b_xyz,
                                    rack_base_z + RACK_TIER_PITCH_MM * (slot % 4))
@@ -9291,20 +9325,55 @@ WIRE_RUN_STAGGER_MM = 110.0
 WIRE_RUN_STAGGER_LEVELS = 6    # cycle the per-run offset over this many levels per service
 
 
-def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
+def _wire_candidate(sx, sy, sz, dx, dy, dz, z_cross, x_first):
+    """ONE orthogonal Manhattan candidate for _wire_path: rise → across (X-then-Y when
+    `x_first`, else Y-then-X) → drop. Factored out so _wire_path can build BOTH orderings
+    and keep whichever clears equipment — the SAME 'try both orderings, keep the cleaner'
+    idiom _direct_route()/route_on_spine() already use for the rack-spine router."""
+    pts = [(sx, sy, sz)]
+    if abs(sx - dx) < 1.0 and abs(sy - dy) < 1.0:
+        pts.append((dx, dy, dz))
+        return pts
+    pts.append((sx, sy, z_cross))
+    if x_first:
+        if abs(sx - dx) > 1.0:
+            pts.append((dx, sy, z_cross))
+        if abs(sy - dy) > 1.0:
+            pts.append((dx, dy, z_cross))
+    else:
+        if abs(sy - dy) > 1.0:
+            pts.append((sx, dy, z_cross))
+        if abs(sx - dx) > 1.0:
+            pts.append((dx, dy, z_cross))
+    pts.append((dx, dy, dz))
+    return pts
+
+
+def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None,
+              bboxes=None, own=()):
     """Build the orthogonal Manhattan waypoint path (mm) FROM the source port TO the
     destination port: RISE straight up from src to an overhead clearance Z → run
-    ACROSS (in X then Y) at that Z → DROP straight down onto dst. The across-leg runs
-    at a shared OVERHEAD-DECK Z (overhead_base_z = the equipment-bulk top + clearance,
-    like a real overhead pipe rack) so a port-to-port run FLIES ABOVE the equipment it
-    spans (e.g. the tall tank farm) instead of draping across the tank tops; it is
-    lifted further by a per-SERVICE tier stagger (services don't co-incide) plus a
-    per-RUN micro-stagger (run_idx) so two runs of the SAME service that share a span
-    sit at distinct heights (cuts the same-Z-crossing tangle). The deck never drops
-    below either port (a run between two tall nozzles stays at its own height + clear).
+    ACROSS at that Z → DROP straight down onto dst. The across-leg runs at a shared
+    OVERHEAD-DECK Z (overhead_base_z = the equipment-bulk top + clearance, like a real
+    overhead pipe rack) so a port-to-port run FLIES ABOVE the equipment it spans (e.g.
+    the tall tank farm) instead of draping across the tank tops; it is lifted further
+    by a per-SERVICE tier stagger (services don't co-incide) plus a per-RUN micro-
+    stagger (run_idx) so two runs of the SAME service that share a span sit at
+    distinct heights (cuts the same-Z-crossing tangle). The deck never drops below
+    either port (a run between two tall nozzles stays at its own height + clear).
     Endpoints are EXACTLY the two port coordinates (the run starts on the source port,
     ends on the destination port — nothing floats). Degenerate near-coincident ports
-    get a direct 2-pt run."""
+    get a direct 2-pt run.
+
+    ORDER CHOICE (RENDERS-1 fix, CO2-v1 2026-07-05): the across-leg used to always run
+    X-then-Y — a fixed order that has NO chance of avoiding a third part's footprint
+    sitting between the two ports in the OTHER axis. When `bboxes` is supplied (the
+    plant's equipment footprints) the Y-then-X ordering is ALSO built and whichever
+    clears more equipment (route-audit's own _polyline_over_equipment test) is kept —
+    the SAME 'try both, keep the cleaner' rule _direct_route() already applies to the
+    rack-spine router, extended to the port-to-port wire router. `bboxes=None`
+    (the default) reproduces the ORIGINAL X-then-Y-only behaviour exactly — a caller
+    that doesn't pass equipment footprints is completely unaffected."""
     sx, sy, sz = (float(c) for c in src_xyz)
     dx, dy, dz = (float(c) for c in dst_xyz)
     tier = _WIRE_SERVICE_TIER.get(service, 0) * WIRE_SERVICE_TIER_MM
@@ -9318,17 +9387,15 @@ def _wire_path(src_xyz, dst_xyz, service, run_idx=0, overhead_base_z=None):
     if overhead_base_z is not None and _span > WIRE_LOCAL_DIRECT_MAX_MM:
         deck = max(deck, float(overhead_base_z))
     z_cross = deck + tier + run_off
-    pts = [(sx, sy, sz)]                       # start ON the source port
-    if abs(sx - dx) < 1.0 and abs(sy - dy) < 1.0:
-        pts.append((dx, dy, dz))              # ports stacked → straight drop/rise
-        return pts
-    pts.append((sx, sy, z_cross))             # rise to the overhead lane
-    if abs(sx - dx) > 1.0:
-        pts.append((dx, sy, z_cross))         # across in X
-    if abs(sy - dy) > 1.0:
-        pts.append((dx, dy, z_cross))         # across in Y
-    pts.append((dx, dy, dz))                  # drop ONTO the destination port
-    return pts
+    cand_xy = _wire_candidate(sx, sy, sz, dx, dy, dz, z_cross, True)
+    if not bboxes:
+        return cand_xy
+    cand_yx = _wire_candidate(sx, sy, sz, dx, dy, dz, z_cross, False)
+    if cand_yx == cand_xy:
+        return cand_xy
+    over_xy = _polyline_over_equipment(cand_xy, bboxes, own)
+    over_yx = _polyline_over_equipment(cand_yx, bboxes, own)
+    return cand_yx if over_yx < over_xy else cand_xy
 
 
 # A SOURCE that feeds this many destinations of the SAME service is a FAN-OUT — route it
@@ -9476,6 +9543,9 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                   if getattr(p, "anchors", None) and "top" in p.anchors
                   and not is_tall_for_frame(p)]
     overhead_base_z = (max(_bulk_tops) + WIRE_OVERHEAD_CLEAR_MM) if _bulk_tops else None
+    # equipment footprints for _wire_path's X-then-Y vs Y-then-X ordering choice
+    # (RENDERS-1 fix, CO2-v1 2026-07-05) — computed ONCE, reused per port-to-port run.
+    _wire_bboxes = equipment_xy_bboxes_mm(parts)
     if overhead_base_z is not None:
         print(f"[univ][wire]   overhead deck Z = {overhead_base_z:.0f} mm "
               f"(equipment-bulk top + {WIRE_OVERHEAD_CLEAR_MM:.0f} mm clearance)")
@@ -9731,8 +9801,11 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         for r in grp:
             _run_i = _svc_run_count.get(service, 0)
             _svc_run_count[service] = _run_i + 1
+            _own_bb = [bb for bb in (part_xy_bbox_mm(r["src_part"]), part_xy_bbox_mm(r["dst_part"]))
+                      if bb is not None]
             waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], service, run_idx=_run_i,
-                                   overhead_base_z=overhead_base_z)
+                                   overhead_base_z=overhead_base_z,
+                                   bboxes=_wire_bboxes, own=_own_bb)
             nm = f"u_wire_{r['idx']:03d}_{_part_prefix(str(frm))}_{service}"
             try:
                 _record(r, nm, waypoints, _polyline_len_m(waypoints), "per_edge")
@@ -15565,6 +15638,21 @@ def _tag_callout_top_z_mm(row):
     return z + vert / 2.0
 
 
+def _percentile_mm(values, pct):
+    """Nearest-rank-interpolated percentile of a list of numbers, or 0.0 for an
+    empty list — a dependency-free (no numpy) robust statistic so ONE extreme
+    outlier (e.g. a rare 24 m vessel's own pipe connections) can't set a ceiling
+    every OTHER value then anchors to (the RENDERS-1 corridor-top fix)."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    k = (len(s) - 1) * (pct / 100.0)
+    f, c = math.floor(k), math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    return s[f] + (s[c] - s[f]) * (k - f)
+
+
 def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
     """Add the billboard tag chips for the top `limit` principals by footprint.
     Reads the written parts-manifest dict (canonical tags); returns the number
@@ -15641,16 +15729,34 @@ def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
     # Lift every chip CLEAR of the overhead pipe corridor: a chip at part-top
     # height sits INSIDE the pipe rack that runs above the tanks and is occluded
     # in both the hero and the plan (run-A finding, 2026-07-02). The corridor top
-    # is the highest routed pipe/tray/rack member actually in the scene.
-    corridor_top_mm = 0.0
+    # is the TYPICAL highest routed pipe/tray/rack member in the scene.
+    #
+    # ROBUST STATISTIC, not the absolute max (RENDERS-1 fix, CO2-v1 2026-07-05): a
+    # flat max let ONE genuinely tall vessel's own pipe connections (e.g. a 24.5 m
+    # packed absorber column) drag the corridor ceiling to ~29 m — then EVERY chip
+    # in the plant (including ones over 2-5 m equipment) anchored at that SAME
+    # extreme height, producing the vision critic's 'floating labels with lines
+    # extending upward into empty space': absurdly long parallel leader stems, one
+    # of which cleared even the hero camera's tighter 'pulled-closer' crop (visible
+    # in the full bbox-fit iso render, invisible in the hero — a bare stem with no
+    # box). The 85th-PERCENTILE of every pipe/tray/rack top is robust to the rare
+    # tall outlier (same discipline wire_ports' overhead_base_z already applies via
+    # is_tall_for_frame, extended here without needing the `parts` list this
+    # function doesn't receive) while still clearing the corridor for the vast
+    # majority of runs. Falls back to 0.0 (no lift) when the scene has no such
+    # geometry at all — never a crash on an empty candidate list.
     _PIPE_PREF = ("u_route_", "u_pipe_", "u_trunk_", "u_tap_", "u_wire_", "u_rack_")
+    _corridor_tops_mm = []
     for obj in bpy.data.objects:
         if getattr(obj, "type", None) != "MESH" or obj.data is None \
                 or not obj.name.startswith(_PIPE_PREF):
             continue
+        _obj_top_mm = 0.0
         for c in obj.bound_box:
             w = obj.matrix_world @ mathutils_vec(c)
-            corridor_top_mm = max(corridor_top_mm, w.z / fl.MM)
+            _obj_top_mm = max(_obj_top_mm, w.z / fl.MM)
+        _corridor_tops_mm.append(_obj_top_mm)
+    corridor_top_mm = _percentile_mm(_corridor_tops_mm, 85.0)
 
     # ── PLACEMENT (all computed BEFORE any chip geometry exists, so the occlusion
     # rays below only ever test PLANT geometry, never another chip) ──

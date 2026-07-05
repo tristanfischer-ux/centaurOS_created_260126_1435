@@ -210,14 +210,48 @@ def _service_of(mech):
 # loop's flow: the return pump that drives the loop names it). NEVER fabricate: no
 # matching quantity on either endpoint → required_value stays None and the honest-
 # UNVERIFIED path from 1303f8535 reports it.
-_FLOW_QTY_SUFFIXES = ("_throughput_m3_h", "_flow_m3_h", "_demand_m3_h", "_capacity_m3_h",
-                      "_throughput_m3_per_hr", "_flow_m3_per_hr", "_demand_m3_per_hr")
+#
+# UNIT-SPELLING FAMILY (CO2-v1 Line & velocity fix, 2026-07-05): the contract also
+# spells the per-hour unit "_m3_per_hour" (e.g. 'flue_gas_flow_m3_per_hour',
+# 'mea_circulation_m3_per_hour') — a THIRD spelling alongside the existing '_m3_h' /
+# '_m3_per_hr' families this list already covered. Every 43 stuck 'velocity
+# underivable' rows in the CO2 dossier trace back to a real contract flow quantity
+# using a suffix spelling this list didn't recognise. Also added: a BARE unit-only
+# suffix (no throughput/flow/demand/capacity verb stem) for all three spellings —
+# 'mea_circulation_m3_per_hour' names the STREAM directly with no verb at all.
+_FLOW_QTY_SUFFIXES = ("_throughput_m3_h", "_flow_m3_h", "_demand_m3_h", "_capacity_m3_h", "_m3_h",
+                      "_throughput_m3_per_hr", "_flow_m3_per_hr", "_demand_m3_per_hr", "_capacity_m3_per_hr", "_m3_per_hr",
+                      "_throughput_m3_per_hour", "_flow_m3_per_hour", "_demand_m3_per_hour", "_capacity_m3_per_hour", "_m3_per_hour")
 
 # Tokens that carry no identity — every pump/tank/filter shares them; a name made ONLY
 # of these must never decide a prefix match (same discipline as _GENERIC_EQUIP_TOKENS in
 # electrical_distribution_model.py).
 _GENERIC_FLOW_TOKENS = {"pump", "tank", "vessel", "filter", "water", "system", "unit",
                         "skid", "motor", "line", "pipe", "main", "process", "supply"}
+
+# GENERIC EQUIPMENT-TYPE tail nouns (CO2-v1 fix, 2026-07-05): a part is usually named
+# <functional descriptor> + <equipment-type noun> ('MEA Circulation PUMP'), while the
+# contract's per-stream flow quantity often names only the STREAM the equipment-type
+# noun drives ('mea_circulation_m3_per_hour' — no '_pump'). Stripping ONE trailing
+# generic noun gives the matcher a second, still-honest subject to try (the SAME
+# exact-then-unique-prefix discipline applies to it — no new fabrication path, just a
+# second candidate name). Universal equipment-class nouns, never a per-part table.
+_GENERIC_TAIL_NOUNS = {
+    "pump", "tank", "vessel", "column", "reactor", "exchanger", "valve", "pipe", "skid",
+    "system", "unit", "blower", "compressor", "filter", "tower", "drum", "silo", "hopper",
+    "cooler", "condenser", "dryer", "mixer", "agitator", "heater", "reboiler", "separator",
+    "manifold", "header", "line",
+}
+
+
+def _strip_generic_tail(s: str):
+    """Drop ONE trailing generic equipment-type noun token, or None if `s` has no such
+    tail (or would strip to nothing) — a second, still-honest match subject, never a
+    replacement for the full name (tried only when the full name fails to match)."""
+    toks = [t for t in s.split("_") if t]
+    if len(toks) < 2 or toks[-1] not in _GENERIC_TAIL_NOUNS:
+        return None
+    return "_".join(toks[:-1])
 
 
 def _qty_num(v):
@@ -235,17 +269,17 @@ def _snake_name(name):
     return re.sub(r"[^a-z0-9]+", "_", str(name or "").lower()).strip("_")
 
 
-def _flow_qty_for_part(name, quantities):
-    """(quantity_key, flow_m3h) for an endpoint name, or None — see MATCH SEMANTICS above."""
-    s = _snake_name(name)
-    if not s or not quantities:
+def _match_flow_subject(s, quantities):
+    """(quantity_key, flow_m3h) for ONE snake-cased subject string, or None: (1) exact
+    subject + flow-suffix; (2) else a UNIQUE subject-prefixed flow-suffix candidate —
+    generic-only subjects are barred from the prefix path. Shared by the full part
+    name AND its generic-tail-stripped fallback (same discipline, either subject)."""
+    if not s:
         return None
-    # (1) exact snake-name + flow-suffix
     for suf in _FLOW_QTY_SUFFIXES:
         v = _qty_num(quantities.get(s + suf))
         if v is not None and v > 0:
             return (s + suf, v)
-    # (2) a UNIQUE prefixed candidate — generic-only names are barred from this path
     toks = [t for t in s.split("_") if t]
     if toks and all(t in _GENERIC_FLOW_TOKENS for t in toks):
         return None
@@ -258,6 +292,25 @@ def _flow_qty_for_part(name, quantities):
             cands.append((k, v))
     if len(cands) == 1:
         return cands[0]
+    return None
+
+
+def _flow_qty_for_part(name, quantities):
+    """(quantity_key, flow_m3h) for an endpoint name, or None — see MATCH SEMANTICS above.
+    Tries the FULL name first (an authored match always wins); when that fails, tries
+    ONE generic-equipment-noun stripped off the tail ('MEA Circulation Pump' → 'mea
+    circulation' — the STREAM the pump drives, when the contract names the stream but
+    not the pump). Same exact-then-unique-prefix discipline either way — no fabrication,
+    just a second honest subject to test it against."""
+    s = _snake_name(name)
+    if not s or not quantities:
+        return None
+    hit = _match_flow_subject(s, quantities)
+    if hit is not None:
+        return hit
+    stripped = _strip_generic_tail(s)
+    if stripped:
+        return _match_flow_subject(stripped, quantities)
     return None
 
 
@@ -1998,6 +2051,28 @@ def _selftest():
     # …but its EXACT key still matches (the full name IS the identity):
     assert _flow_qty_for_part("tank", {"tank_flow_m3_h": 33}) == ("tank_flow_m3_h", 33.0), \
         "flow-join: exact snake-name + suffix must match even for a generic name"
+
+    # ── CO2-v1 'Line & velocity' fix (2026-07-05): '_m3_per_hour' unit-spelling family +
+    # generic-tail stripping ('MEA Circulation Pump' -> the 'mea_circulation' stream the
+    # contract actually named). proveCatch both the new match AND that it doesn't over-reach.
+    _q_co2 = {"mea_circulation_m3_per_hour": 0.68, "flue_gas_flow_m3_per_hour": 225}
+    assert _flow_qty_for_part("MEA Circulation Pump", _q_co2) == ("mea_circulation_m3_per_hour", 0.68), \
+        (f"flow-join: a bare-unit '_m3_per_hour' stream quantity must match its equipment "
+         f"via the generic-tail-stripped subject; got {_flow_qty_for_part('MEA Circulation Pump', _q_co2)}")
+    # the bare-unit suffix also matches a verb-qualified sibling without stripping:
+    assert _flow_qty_for_part("Flue Gas Flow", _q_co2) == ("flue_gas_flow_m3_per_hour", 225.0), \
+        "flow-join: '_m3_per_hour' (bare, no verb stem) must be a recognised suffix spelling"
+    # a part whose tail noun ISN'T generic (no equipment-type tail) must not be stripped —
+    # 'MEA Distillation Column' -> strip 'column' -> 'mea_distillation', which matches
+    # NOTHING in _q_co2 (honestly None, no fabricated match to the unrelated MEA stream):
+    assert _flow_qty_for_part("MEA Distillation Column", _q_co2) is None, \
+        "flow-join: a stripped subject with no real quantity must stay honestly None"
+    # _strip_generic_tail itself: never strips to nothing, never strips a non-generic tail.
+    assert _strip_generic_tail("mea_circulation_pump") == "mea_circulation"
+    assert _strip_generic_tail("pump") is None, "flow-join: must not strip a single-token name to nothing"
+    assert _strip_generic_tail("mea_distillation_column") == "mea_distillation"
+    assert _strip_generic_tail("k2so4_recrystalliser") is None, \
+        "flow-join: a non-generic tail noun (not in _GENERIC_TAIL_NOUNS) must not be stripped"
 
     # ── POWER-DEMAND JOIN (the v79 bms_ctrl→chiller/coldplatemanifold "Line & velocity"
     # 3-rows-fail fix) — same three proveCatch shapes as the flow twin + the sibling-
