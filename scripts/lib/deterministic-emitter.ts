@@ -827,7 +827,12 @@ function deriveBessParams(contract: ContractShape): BessParams {
   // computes it locally for legacy Contracts that omit the field.
   const stringContinuousA = q(contract, 'string_continuous_current_a', busContinuousA / parallelStringsTotal)
   const stringPeakA = q(contract, 'string_peak_current_a', busPeakA / parallelStringsTotal)
-  const cellCapacityAh = q(contract, 'cell_capacity_ah', 280)
+  // ONE-MINT (2026-07-05): fallback matches the current contract default (CATL
+  // CBC00 314 Ah, engineering-contract.ts ~line 1009 — was the pre-recalibration
+  // 280 Ah LF280K predecessor). The contract mints cell_capacity_ah unconditionally
+  // so this fallback is dead on any live BESS run; kept in sync for legacy/test
+  // contracts that omit the quantity.
+  const cellCapacityAh = q(contract, 'cell_capacity_ah', 314)
   // BESS L22 (2026-05-25, task #122): ambient + actual thermal load.
   // ambient_design_temp_c default 35°C (EN 14511 nominal); legacy contracts
   // without the field land on the nominal rating point.

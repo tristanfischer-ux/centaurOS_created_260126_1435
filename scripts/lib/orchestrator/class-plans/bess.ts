@@ -53,7 +53,12 @@ const stepPybamm: ToolStep = {
       ?? 3500,
     dod_fraction: c.quantities?.dod_fraction?.value ?? 0.80,
     cell_chemistry: 'lfp' as const,  // TODO #18o: engineering-judgment dispatch from brief.target_material text
-    cell_capacity_ah: c.quantities?.cell_capacity_ah?.value ?? 280,
+    // ONE-MINT (2026-07-05): fallback matches the current contract default (CATL
+    // CBC00 314 Ah — was the pre-recalibration 280 Ah LF280K predecessor). The
+    // contract mints cell_capacity_ah unconditionally (engineering-contract.ts
+    // ~line 1009) so this fallback is dead on any live BESS run; kept in sync
+    // for legacy/test contracts that omit the quantity.
+    cell_capacity_ah: c.quantities?.cell_capacity_ah?.value ?? 314,
     cell_voltage_v: c.quantities?.cell_voltage_v?.value ?? 3.2,
     ambient_temp_c: c.envelope?.operating_environment?.temp_max_c ?? 25,
     dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
@@ -106,7 +111,7 @@ const stepPybamm: ToolStep = {
       dimension_basis: 'count' as const,
       dimension_value: out.cell_count,
       total_gbp: 85 * out.cell_count,
-      source_detail: `pybamm-derived: £85/cell × ${out.cell_count.toLocaleString()} cells = £${(85 * out.cell_count).toLocaleString()} (CATL CB-280Ah-A-50 + module integration)`,
+      source_detail: `pybamm-derived: £85/cell × ${out.cell_count.toLocaleString()} cells = £${(85 * out.cell_count).toLocaleString()} (CATL CBC00 314 Ah + module integration)`,
     }
     // Build #18p: macro for BMS slave boards. The word name matches the
     // bms_slave_module that Loop 21 flagged as macro_assembly_miss.
@@ -342,9 +347,16 @@ const stepOctopart: ToolStep = {
   tool_id: 'octopart:parts-lookup',
   required: false,
   feeds_into: [] as string[],
-  input_from_contract: () => ({
+  // ONE-MINT (2026-07-05): part_number + quantity used to be hardcoded literals
+  // for the pre-recalibration 280 Ah / 5,006-cell design (CB-280Ah-A-50) and never
+  // read the contract at all, so a parts-availability lookup for a stale cell at a
+  // stale count ran regardless of the actual design. Now reads the same
+  // cell_count / cell_capacity_ah quantities every other step consumes; part number
+  // is CATL's current CBC00 314 Ah successor (deterministic-emitter.ts pins the
+  // same MPN — see mod('part_number', 'CBC00')).
+  input_from_contract: (c: any) => ({
     parts: [
-      { manufacturer: 'CATL', part_number: 'CB-280Ah-A-50', quantity: 5006 },
+      { manufacturer: 'CATL', part_number: 'CBC00', quantity: Math.round(c.quantities?.cell_count?.value ?? 6084) },
       { manufacturer: 'Sungrow', part_number: 'SC1000UD-MV', quantity: 1 },
       { manufacturer: 'Gigavac', part_number: 'GX21BAB', quantity: 18 },
     ],
@@ -416,7 +428,21 @@ const rules = [
     (c) => {
       const cc = c.quantities.cell_count?.value
       if (!cc) return null
-      return cc * 3.2 * 280 / 1000
+      // ONE-MINT FIX (2026-07-05, STAGE-4-ORCHESTRATOR-FALLBACK exit 7 on
+      // out/bess-campaign-v7): this closure used to hardcode 3.2 V x 280 Ah —
+      // the pre-recalibration CATL LF280K predecessor cell — instead of
+      // consuming the contract's cell_capacity_ah / cell_voltage_v quantities
+      // (the SAME quantities stepPybamm's input_from_contract already reads
+      // above). After the 314 Ah CATL CBC00 recalibration (commit 77cd04276,
+      // engineering-contract.ts ~line 1009) the contract's nameplate_capacity_kwh
+      // is correctly 314 Ah-derived while this rule kept computing the OLD
+      // 280 Ah figure, so cell_count=6,084 gave computed=5,451.26 kWh vs
+      // target=6,113.20 kWh — a false 10.83% "inconsistency" fatal-failing
+      // every BESS run. Cell Ah/energy is ONE contract quantity consumed
+      // everywhere; a verifier rule derives from it, never restates it.
+      const cellVoltageV = c.quantities.cell_voltage_v?.value ?? 3.2
+      const cellAh = c.quantities.cell_capacity_ah?.value ?? 314
+      return cc * cellVoltageV * cellAh / 1000
     },
     5,
     'fatal',

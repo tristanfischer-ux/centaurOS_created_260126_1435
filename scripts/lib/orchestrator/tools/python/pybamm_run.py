@@ -17,7 +17,7 @@ Input:
       "target_energy_kwh": 3500,
       "dod_fraction": 0.80,
       "cell_chemistry": "lfp" | "nmc" | "lto",
-      "cell_capacity_ah": 280,
+      "cell_capacity_ah": 314,
       "cell_voltage_v": 3.2,
       "ambient_temp_c": 25
     }
@@ -58,7 +58,7 @@ def deterministic_cell_count(payload: dict) -> tuple[int, int, float]:
     """Pure arithmetic — same as the stub. Returns (cell_count, cell_count_theoretical, nameplate_kwh)."""
     target_kwh = float(payload.get("target_energy_kwh", 3500))
     dod = float(payload.get("dod_fraction", 0.80))
-    cell_ah = float(payload.get("cell_capacity_ah", 280))
+    cell_ah = float(payload.get("cell_capacity_ah", 314))
     cell_v = float(payload.get("cell_voltage_v", 3.2))
     cell_energy = (cell_ah * cell_v) / 1000.0
     nameplate = target_kwh / dod
@@ -150,7 +150,16 @@ def real_pybamm_voltage_profile(chemistry: str, c_rate: float = 0.5) -> dict:
 
 
 CELL_MASS_KG_BY_CHEMISTRY = {
-    "lfp": 5.3,   # CATL CB-280Ah-A-50, EVE 280Ah, others — 280 Ah prismatic class
+    # ONE-MINT (2026-07-05): 5.49 kg mirrors engineering-contract.ts's cellMassKg
+    # (CATL CBC00 314 Ah datasheet mass, ~line 805) — this table used to carry the
+    # PRE-recalibration 280 Ah predecessor's 5.3 kg regardless of the cell_capacity_ah
+    # actually passed in the payload, so total_cell_mass_kg (written back into the
+    # contract by bess.ts's stepPybamm) silently diverged from the contract's own
+    # cell_count x cell_mass_kg (33,401 kg vs 32,245 kg for 6,084 cells — a second,
+    # un-synced mint of the same cell's mass). No payload field carries cell_mass_kg
+    # yet, so this stays a chemistry-keyed default; keep it numerically pinned to
+    # engineering-contract.ts's cellMassKg until the payload threads it through.
+    "lfp": 5.49,  # CATL CBC00 314 Ah class (2026 generation; was 5.3 kg / 280 Ah predecessor)
     "nmc": 4.7,   # higher energy density per kg
     "lto": 5.9,   # higher mass per kWh
 }
@@ -170,7 +179,7 @@ PROVENANCE = {
     "confidence_class": "library",  # one of: library | datasheet | textbook | standard | empirical | estimated
     "embedded_constants": {
         "CELL_MASS_KG_BY_CHEMISTRY": {
-            "source": "CATL CB-280Ah-A-50 + EVE 280Ah + Calb 280Ah public datasheets, 2024-2025",
+            "source": "CATL CBC00 314 Ah class datasheet, 2026 (5.49 kg; mirrors engineering-contract.ts cellMassKg); superseded the CB-280Ah-A-50 + EVE 280Ah + Calb 280Ah 2024-2025 predecessor generation",
             "confidence": "datasheet",
         },
         "R_MIN_MOHM_BY_CHEMISTRY": {
@@ -334,7 +343,7 @@ def compute(payload: dict) -> dict:
         # contract has chosen the topology deliberately).
         theoretical = cell_count
         # Update nameplate to match the authoritative cell count.
-        cell_ah_input = float(payload.get("cell_capacity_ah", 280))
+        cell_ah_input = float(payload.get("cell_capacity_ah", 314))
         cell_v_input = float(payload.get("cell_voltage_v", 3.2))
         nameplate = (cell_count * cell_ah_input * cell_v_input) / 1000.0
 
@@ -359,7 +368,7 @@ def compute(payload: dict) -> dict:
     capacity_fade_pct = EMPIRICAL_CAPACITY_FADE_PCT.get(chemistry, 8.0)
 
     # Thermal dissipation at 0.5C = I^2 * R per cell
-    cell_ah = float(payload.get("cell_capacity_ah", 280))
+    cell_ah = float(payload.get("cell_capacity_ah", 314))
     discharge_current_a = cell_ah * 0.5
     # Build #18p-fix2 (2026-05-22): clamp internal_resistance_mohm. PyBaMM's
     # DFN startup-transient R estimate returned 0.022 mOhm (Loop 26 — unphysical
@@ -480,7 +489,7 @@ def compute(payload: dict) -> dict:
     # Thermal: I^2 R and system overhead multiplier are clean once r_ohm and current are known.
     target_kwh = float(payload.get("target_energy_kwh", 3500))
     dod = float(payload.get("dod_fraction", 0.80))
-    cell_ah_w = float(payload.get("cell_capacity_ah", 280))
+    cell_ah_w = float(payload.get("cell_capacity_ah", 314))
     cell_v_w = float(payload.get("cell_voltage_v", 3.2))
     nameplate_r = round(cell_count_rounded * cell_ah_w * cell_v_w / 1000.0, 1)
     total_bus_current_r = round(total_bus_current_a, 1)
@@ -559,7 +568,7 @@ def compute(payload: dict) -> dict:
                 "cell_mass_kg": (cell_mass_kg, "kg"),
             },
             result=round(total_cell_mass_r, 1), result_unit="kg",
-            assumptions=[f"cell_mass_kg from {chemistry.upper()} 280Ah prismatic class datasheets"],
+            assumptions=[f"cell_mass_kg from {chemistry.upper()} {cell_ah_w:.0f}Ah prismatic class datasheets"],
         ),
         worked_calc(
             label="Cold plate total capacity (with 1.25 safety factor)",
