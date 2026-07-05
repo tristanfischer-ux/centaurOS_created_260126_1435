@@ -825,11 +825,20 @@ def main() -> int:
         # render/GA coverage. It REMAINS expected on the P&ID / schedules (its proper home).
         # EXTENDED 2026-07-05 (BESS v3 denominator-honesty pass): the SAME "lives inside an
         # already-massed parent, never its own drawn object" principle also applies to the
-        # SINGLE-LINE one-line diagram — a rack's grounding wire, a transformer's cable
-        # sealing end, a fibre patch panel, are not power-path feeder equipment either, so
-        # they must not inflate the single-line/panel-schedule denominator (Electrical tab).
+        # SINGLE-LINE one-line diagram AND the PANEL SCHEDULE — a rack's grounding wire, a
+        # transformer's cable sealing end, a fibre patch panel, a fuse's holder/mount-rail,
+        # are not power-path feeder equipment either, so they must not inflate the single-
+        # line/panel-schedule denominator (Electrical tab). CORRECTED 2026-07-05 (v10 Part
+        # names 7.6 gap): the comment above always said "panel-schedule" too, but the code
+        # only ever stripped {blender, general-arrangement, single-line-diagram} — leaving
+        # panel-schedule STILL expected for every one of these accessories (TX-102 transformer
+        # neutral grounding, TX-105 transformer cable sealing end, X-40 fuse holder, X-42 fuse
+        # mount rail all landed as false "not shown on ANY drawing/manifest" gaps even though
+        # they are exactly the mounting/termination hardware this exemption was written for).
+        # Universal — keyed on the SAME is_ga_non_massing noun signal already proven against
+        # cable glands / terminal blocks / mounting frames, not a per-tag table.
         if ga_massing.is_ga_non_massing(name):
-            expected = expected - {"blender", "general-arrangement", "single-line-diagram"}
+            expected = expected - {"blender", "general-arrangement", "single-line-diagram", "panel-schedule"}
         # A pure document/label/certification-record row (Tristan's Codema-discipline ask,
         # 2026-07-05) has NO engineering-drawing home at all — expected NOWHERE, exactly like
         # a PARAMETRIC materials-allowance row. Never inferred from status; a name-level

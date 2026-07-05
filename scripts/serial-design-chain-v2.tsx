@@ -2446,12 +2446,18 @@ try:
     if not metrics and tp.get('value') is not None:
         metrics = [tp]
     quantities = (state.get('orchestratorContract') or {}).get('quantities') or {}
+    # scope-qualified brief targets (battery/container-only cost anchors, 2026-07-05) need the
+    # brief's own prose to detect an 'only ... excluding ...' restriction — see
+    # bxe._brief_scope_qualified_text / dossier_audit._brief_scope_qualified.
+    brief_text = pb.get('original_text') or pb.get('revised_text') or ''
+    if not isinstance(brief_text, str):
+        brief_text = ''
     rows = []
     for m in metrics:
         if not isinstance(m, dict):
             continue
         key = (m.get('key_metric') or m.get('metric') or m.get('name') or '').strip()
-        matched = bxe._match_quantity(m, quantities)
+        matched = bxe._match_quantity(m, quantities, brief_text)
         rows.append({
             'key': key,
             'unit': m.get('unit', '') or '',

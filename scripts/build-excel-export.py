@@ -1222,8 +1222,19 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
         v = s.get("score")
         return float(v) if isinstance(v, (int, float)) else None
 
-    qsc = (state or {}).get("qualityScorecard") or (
-        load_json(os.path.join(run_dir, "quality-scorecard.json")) if run_dir else None) or {}
+    # MIRROR-SYNC FIX (2026-07-05, Overview 7.9 gap): quality-scorecard.json is the ONE
+    # authority — the chain OVERWRITES this file on every quality-loop iteration, but
+    # state["qualityScorecard"] is an in-memory/embedded snapshot that can go stale (a
+    # copy taken at an earlier iteration and never refreshed as the loop continues). A
+    # v10 run showed the Overview tab's "Headline (advisory)"/"Design narrative
+    # (advisory)"/"Physics fidelity (advisory)" rows rendering an EARLIER iteration's
+    # scores (7.0/8.0/9.0) while the final on-disk quality-scorecard.json (the file this
+    # SAME function now reads first) already carried the settled scores (8.0/9.0/7.0).
+    # Read the FILE FIRST (freshest, continuously updated); fall back to the embedded
+    # state copy only when no run_dir/file is available at all (e.g. a unit-test fixture
+    # that hand-builds state["qualityScorecard"] with no on-disk file to match).
+    qsc = (load_json(os.path.join(run_dir, "quality-scorecard.json")) if run_dir else None) or (
+        state or {}).get("qualityScorecard") or {}
     for s in (qsc.get("sections") or []):
         if not isinstance(s, dict) or not s.get("name"):
             continue
@@ -2264,9 +2275,15 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
     row += 1
 
     # ---- quality scorecard ----
-    sc = state.get("qualityScorecard") or load_json(
-        os.path.join(run_dir, "quality-scorecard.json")
-    )
+    # MIRROR-SYNC FIX (2026-07-05, Overview 7.9 gap — see the matching comment on
+    # _verdict_sections above): read the FILE first — it is the ONE authority the chain
+    # keeps current across every quality-loop iteration — never the embedded
+    # state["qualityScorecard"] snapshot, which can be a stale copy from an earlier
+    # iteration. This is the SAME precedence _verdict_sections now uses (the source
+    # _sc_overview's self-audit checks this render against), so the rendered row and the
+    # audit's expectation can never diverge again.
+    sc = (load_json(os.path.join(run_dir, "quality-scorecard.json")) if run_dir else None) or (
+        state.get("qualityScorecard"))
     sub_banner(ws, row, "Quality scorecard", 4)
     row += 1
     # ---- the ONE VERDICT first (fix 2, 2026-07-02): identical on every verdict surface;
@@ -6340,14 +6357,46 @@ def _norm_qty_name(s: str) -> str:
     return _QTY_UNIT_SUFFIX.sub("", str(s or "").lower())
 
 
-def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[str, float, str]]:
+# Scope-qualified brief targets — "battery/container-only" cost (or other) anchors. Mirrors
+# scripts/lib/dossier_audit.py's _brief_scope_qualified / Pass 0: a brief may state a target for a
+# SUBSET of the design ("the battery-energy-storage portion only ... but EXCLUDING the medium-
+# voltage step-up transformer, the switchgear ... costs approximately £63 per kWh") while the
+# engine also derives a FULL-SYSTEM figure of the same NAME for transparency (cost_per_kwh_gbp =
+# £113/kWh, battery+PCS). Matching the brief's scope-restricted number against the full-system
+# quantity is the right unit family but the WRONG SCOPE. The closure layer publishes a scope-
+# restricted sibling under the naming convention "<scope>_only_<metric_name>" (e.g.
+# battery_only_cost_per_kwh_gbp alongside cost_per_kwh_gbp) whenever one exists; this finds it by
+# that NAMING CONVENTION (never a hardcoded class/metric table) and ONLY when the brief's own
+# prose, within a short window of THIS metric's cited target value, carries an explicit scope
+# restriction ("... only ... excluding ..."). Universal: keyed off exclusion language near the
+# cited number, so it fires for any future scope-restricted brief target, in any class.
+_SCOPE_ONLY_RX = re.compile(r"\bonly\b", re.I)
+_SCOPE_EXCLUDE_RX = re.compile(r"\bexclud\w*\b", re.I)
+
+
+def _brief_scope_qualified_text(brief_text: str, value) -> bool:
+    v = num(value)
+    if v is None or not brief_text:
+        return False
+    reps = {f"{v:g}", f"{v:.0f}", f"{v:.1f}", f"{v:.2f}"}
+    for rep in reps:
+        for m in re.finditer(re.escape(rep), brief_text):
+            window = brief_text[max(0, m.start() - 250): m.start() + 60]
+            if _SCOPE_ONLY_RX.search(window) and _SCOPE_EXCLUDE_RX.search(window):
+                return True
+    return False
+
+
+def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = "") -> Optional[Tuple[str, float, str]]:
     """Find the ACHIEVED contract quantity that fulfils a brief metric, by NAME + UNIT FAMILY.
     (2026-06-25 fix) Match by NAME — NOT by which value is closest to the target. Closeness-to-
     target is Goodhart: it grabs a brief-ECHO quantity (usable_capacity_kwh_REQUESTED=5000) over
     the real achieved value (nameplate_capacity_kwh=2912), manufacturing a false PASS in the
-    compliance table. Strategy mirrors the benchmark net's engineValueForMetric: (1) exact/
-    unit-normalised NAME match to the achieved quantity (echoes excluded); (2) same unit-family,
-    best name-token overlap, de-prioritising echoes + peak/max. Returns (name, achieved, unit)."""
+    compliance table. Strategy mirrors the benchmark net's engineValueForMetric: (0) SCOPE-
+    QUALIFIED sibling match when the brief text scopes this metric's cited value (see block
+    comment above); (1) exact/unit-normalised NAME match to the achieved quantity (echoes
+    excluded); (2) same unit-family, best name-token overlap, de-prioritising echoes + peak/max.
+    Returns (name, achieved, unit)."""
     b_val = num(metric.get("value"))
     if b_val is None:
         return None
@@ -6380,6 +6429,22 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any]) -> Optional[Tuple[
             return (a_fam in ("count", "ratio") or a_fam.startswith("?")) and \
                    bool(re.search(r"(count|qty|number|_nr|valves?|containers?|units?)$", qname.lower()))
         return False
+
+    # (0) SCOPE-QUALIFIED sibling match — only engages when the brief's own prose scopes this
+    # metric's cited value (never fires on an ordinary, unscoped metric).
+    if brief_text and _brief_scope_qualified_text(brief_text, b_val):
+        sib_rx = re.compile(r"^[a-z0-9]+_only_" + re.escape(b_norm) + r"$")
+        for qname, qv in quantities.items():
+            if not isinstance(qv, dict):
+                continue
+            a_val = num(qv.get("value"))
+            if a_val is None:
+                continue
+            a_fam, _ = _unit_family(qv.get("unit", ""))
+            if not _fam_ok(a_fam, qname):
+                continue
+            if sib_rx.match(_norm_qty_name(qname)):
+                return qname, a_val, qv.get("unit", "")
 
     # (1) exact / unit-normalised NAME match — the achieved quantity of the SAME name (no echoes)
     for qname, qv in quantities.items():
@@ -6441,6 +6506,9 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
     if not metrics:
         return None
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    brief_text = pb.get("original_text") or pb.get("revised_text") or ""
+    if not isinstance(brief_text, str):
+        brief_text = ""
 
     header(ws, start_row, ["Brief metric", "Target", "Unit", "Matched contract quantity",
                            "Achieved", "Direction", "STATUS", "Note"])
@@ -6451,7 +6519,7 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         tgt = num(m.get("value"))
         unit = m.get("unit", "") or ""
         category = (m.get("category") or "").lower()
-        matched = _match_quantity(m, quantities)
+        matched = _match_quantity(m, quantities, brief_text)
 
         # Display names are HUMANISED (fix 4, 2026-07-02) — the raw snake_case keys stay
         # in the Note column so the metric remains traceable to the brief/contract.
@@ -17099,7 +17167,20 @@ def _sc_partnames(wb, ws, state, run_dir):
             # idiom as HVAC's disclosed-scope cap) rather than counting "shown nowhere" as a
             # failure the drawing generators can never satisfy. A real discrete part (anything
             # NOT status=PARAMETRIC) is untouched — still expected + still scored.
-            if (e or {}).get("status") == "PARAMETRIC":
+            #
+            # EXPECTED-NOWHERE EXEMPTION, widened (2026-07-05, Part names 7.6 fix): PARAMETRIC
+            # status was only ever a PROXY for "parts_ledger.py already computes an empty
+            # `expected` list for this row" — but is_ga_non_massing()/is_pure_documentation()
+            # also zero `expected` for plenty of NON-PARAMETRIC accessory rows (mounting/
+            # termination hardware that lives on an already-drawn parent, never its own
+            # object): TX-102 transformer neutral grounding, TX-105 transformer cable sealing
+            # end, X-40 fuse holder, X-42 fuse mount rail all landed as false "not shown on ANY
+            # drawing/manifest" gaps despite parts_ledger.py's own ledger already recording
+            # expected=[] for each. Read `expected` directly — it is the ledger's own
+            # authoritative verdict, universal, no per-tag table — rather than the narrower
+            # PARAMETRIC-status proxy.
+            _exp = (e or {}).get("expected")
+            if (e or {}).get("status") == "PARAMETRIC" or (isinstance(_exp, list) and len(_exp) == 0):
                 _takeoff_exempt += 1
                 continue
             cov = (e or {}).get("coverage") or {}
@@ -19761,6 +19842,29 @@ def _selftest() -> int:
         print(f"  FAIL count-noun: actuated_valves_count (unit 'valves') must match actuated_distribution_valve_count (got {vm})"); bad += 1
     if _match_quantity({"key_metric": "design_pressure_bar", "value": 6, "unit": "bar"}, count_qs) is not None:
         print("  FAIL count-noun: a real physical unit ('bar') must NOT be promoted to count + falsely matched"); bad += 1
+    # (1d) SCOPE-QUALIFIED brief target (2026-07-05, battery-only vs full-system): a brief cost
+    # anchor scoped to a SUBSET of the design ("battery-energy-storage portion only ... EXCLUDING
+    # the ... transformer ... costs approximately £63 per kWh") must render against the
+    # scope-restricted sibling quantity, never the full-system figure of the same name.
+    scope_qs = {
+        "cost_per_kwh_gbp": {"value": 113.34, "unit": "GBP/kWh"},
+        "battery_only_cost_per_kwh_gbp": {"value": 60.0, "unit": "GBP/kWh"},
+    }
+    scope_brief_text = (
+        "Cost anchors: the battery-energy-storage portion only — cells, racks, battery "
+        "management — but EXCLUDING the medium-voltage step-up transformer and the 11 kV "
+        "switchgear — costs approximately £63 per kWh at the two-hour configuration."
+    )
+    sm = _match_quantity({"key_metric": "cost_per_kwh_gbp", "value": 63, "unit": "GBP/kWh"}, scope_qs, scope_brief_text)
+    if not sm or sm[0] != "battery_only_cost_per_kwh_gbp" or sm[1] != 60.0:
+        print(f"  FAIL scope-qualified: a battery-only £63/kWh brief target must match the "
+              f"battery_only_ sibling (60), not the full-system quantity (113.34) — got {sm}"); bad += 1
+    # proveCatch: WITHOUT the scope signal in the brief text, the plain exact-name match wins.
+    um = _match_quantity({"key_metric": "cost_per_kwh_gbp", "value": 63, "unit": "GBP/kWh"}, scope_qs,
+                         "Cost target: approximately £63 per kWh.")
+    if not um or um[0] != "cost_per_kwh_gbp" or um[1] != 113.34:
+        print(f"  FAIL scope-qualified: an UNSCOPED brief target must match the plain full-system "
+              f"quantity, never the _only_ sibling by accident — got {um}"); bad += 1
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
@@ -22765,6 +22869,32 @@ def _selftest() -> int:
               f"schedule's own 67 field instruments (52 TT + 2 PT + 13 AT), excluding "
               f"mount/label accessories + BMS electrical-sense + arc-flash protection "
               f"(got {_si2_total} from {len(_si2_rows)} rows)"); bad += 1
+
+    # (mirror-sync) Overview must read the ON-DISK quality-scorecard.json FIRST, never a
+    # stale state["qualityScorecard"] snapshot from an earlier quality-loop iteration
+    # (2026-07-05, Overview 7.9 gap — v10 rendered 'Headline (advisory)' 7.0 while the
+    # settled scorecard already said 8.0). proveCatch: an embedded state copy at a
+    # DIFFERENT iteration than the on-disk file must resolve to the FILE's values.
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as _mstd:
+        json.dump({"iteration": 2, "sections": [{"name": "headline", "score": 8,
+                   "defects": [], "advisory": True}]},
+                  open(os.path.join(_mstd, "quality-scorecard.json"), "w"))
+        _mstate = {"qualityScorecard": {"iteration": 1, "sections": [
+            {"name": "headline", "score": 7, "defects": [], "advisory": True}]}}
+        _mfacts, _madv = _verdict_sections(_mstate, _mstd)
+        _mgot = (_madv.get("headline") or {}).get("score")
+        if _mgot != 8:
+            print(f"  FAIL mirror-sync: _verdict_sections must prefer the on-disk "
+                  f"quality-scorecard.json (headline=8) over a stale embedded "
+                  f"state[qualityScorecard] (headline=7) — got {_mgot}"); bad += 1
+        # a fixture with NO on-disk file at all must still fall back to the embedded
+        # state copy (never regress a caller that hand-builds state only, e.g. a test).
+        _ffacts, _fadv = _verdict_sections(_mstate, os.path.join(_mstd, "does-not-exist"))
+        _fgot = (_fadv.get("headline") or {}).get("score")
+        if _fgot != 7:
+            print(f"  FAIL mirror-sync: with NO on-disk file, _verdict_sections must "
+                  f"fall back to the embedded state[qualityScorecard] — got {_fgot}"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

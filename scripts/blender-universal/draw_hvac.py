@@ -2200,6 +2200,50 @@ def generate_hvac(out_dir: str, state_path: Optional[str] = None,
             "qty": _pen_row.get("qty"),
             "tag": _pen_row.get("tag"),
         }
+    else:
+        # FALLBACK — moduleDecomposition word (2026-07-05, fresh-run coverage fix): on a
+        # fresh chain run this stage can execute BEFORE state.requirementsBom carries the
+        # seal line at all — requirementsBom is synthesised/enriched by LATER pipeline
+        # stages (price-lift, dedupe), so a run that reached HVAC drawing early in an
+        # iteration legitimately has no such row yet, even though the design's own
+        # moduleDecomposition (Phase-2 emission, well upstream of BoM synthesis) already
+        # carries the word. A REBUILD against an already-finalised state.json (requirements
+        # Bom populated) never hit this gap — only a genuinely FRESH end-to-end run does.
+        # Same universal keying as the requirementsBom lookup above (the word's OWN
+        # name_human text, no product-class table) — just read from the earlier-available
+        # source when the later one hasn't caught up yet.
+        for _m in (state.get("moduleDecomposition") or {}).get("modules") or []:
+            if _pen_row:
+                break
+            for _sm in (_m.get("sub_modules") or []) if isinstance(_m, dict) else []:
+                if _pen_row:
+                    break
+                for _w in (_sm.get("words") or []) if isinstance(_sm, dict) else []:
+                    if not isinstance(_w, dict):
+                        continue
+                    _nm = str(_w.get("name_human") or "")
+                    _cc = _w.get("content_character") or {}
+                    if not _pen_rx.search(_nm) and not _pen_rx.search(str(_cc.get("name_human") or "")):
+                        continue
+                    _mods = {mc.get("kind"): mc.get("value") for mc in (_w.get("modifier_characters") or [])
+                              if isinstance(mc, dict)}
+                    _mfr = str(_mods.get("manufacturer") or "").strip()
+                    _pn = str(_mods.get("part_number") or "").strip()
+                    _qty_raw = str(_mods.get("quantity") or "").strip().lstrip("×x").strip()
+                    try:
+                        _qty = float(_qty_raw) if _qty_raw else None
+                        _qty = int(_qty) if _qty is not None and _qty == int(_qty) else _qty
+                    except (TypeError, ValueError):
+                        _qty = None
+                    _pen_row = {
+                        "requirement": _nm or str(_cc.get("name_human") or ""),
+                        "part": (f"{_mfr} {_pn}".strip() or None),
+                        "qty": _qty,
+                        "tag": _w.get("id"),
+                    }
+                    break
+        if _pen_row:
+            meta["duct_penetration_seal"] = _pen_row
     svg_text = build_hvac_svg(sysm, meta)
 
     draw_dir = Path(out_dir) / "drawings"

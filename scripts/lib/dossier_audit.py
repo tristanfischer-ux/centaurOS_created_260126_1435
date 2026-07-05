@@ -1079,11 +1079,66 @@ def _name_tokens(name) -> set:
     return {_singularise(t) for t in base.split("_") if t and t not in _MATCH_STOP_TOKENS}
 
 
-def _contract_match(state, metric_name, metric_unit):
+# --------------------------------------------------------------------------- #
+# Scope-qualified brief targets — "battery/container-only" cost (or other) anchors
+# --------------------------------------------------------------------------- #
+# A brief may state a target for a SUBSET of the design ("the battery-energy-storage
+# portion only — cells, racks, ... — but EXCLUDING the medium-voltage step-up
+# transformer, the switchgear, and civil works — costs approximately £63 per kWh")
+# while the engine also derives a FULL-SYSTEM figure of the same NAME for transparency
+# (cost_per_kwh_gbp = £113/kWh, battery+PCS). Matching the brief's scope-restricted
+# number against the full-system quantity compares the right unit family but the WRONG
+# SCOPE — it manufactures a false FAIL (or, the other direction, a false PASS). The
+# closure layer publishes a scope-restricted sibling under the naming convention
+# "<scope>_only_<metric_name>" (e.g. battery_only_cost_per_kwh_gbp alongside
+# cost_per_kwh_gbp) whenever one exists; this pass finds it by that NAMING CONVENTION
+# (never a hardcoded class/metric table) and ONLY when the brief's own prose, within a
+# short window of THIS metric's cited target value, carries an explicit scope
+# restriction ("... only ... excluding ..."). A genuinely-missed scoped target still
+# fails downstream — this only redirects WHICH quantity is compared, it never
+# manufactures a PASS. Universal: keyed off exclusion language near the cited number,
+# so it fires for any future scope-restricted brief target, in any class.
+_SCOPE_ONLY_RX = re.compile(r"\bonly\b", re.I)
+_SCOPE_EXCLUDE_RX = re.compile(r"\bexclud\w*\b", re.I)
+
+
+def _brief_value_reprs(value) -> set:
+    v = _num(value)
+    if v is None:
+        return set()
+    reps = {f"{v:g}"}
+    for nd in (0, 1, 2):
+        reps.add(f"{v:.{nd}f}")
+    return reps
+
+
+def _brief_scope_qualified(state, metric_value) -> bool:
+    """True when the brief's own text, within a short window of THIS metric's cited
+    target value, states BOTH an 'only' restriction and an 'excluding' exclusion — i.e.
+    the brief itself scopes the target to a SUBSET of the full design."""
+    reps = _brief_value_reprs(metric_value)
+    if not reps:
+        return False
+    pb = state.get("parsedBrief") or {}
+    for text in (pb.get("original_text"), pb.get("revised_text")):
+        if not isinstance(text, str) or not text:
+            continue
+        for rep in reps:
+            for m in re.finditer(re.escape(rep), text):
+                window = text[max(0, m.start() - 250): m.start() + 60]
+                if _SCOPE_ONLY_RX.search(window) and _SCOPE_EXCLUDE_RX.search(window):
+                    return True
+    return False
+
+
+def _contract_match(state, metric_name, metric_unit, metric_value=None):
     """
     Return (key, value) of a contract quantity that FULFILS the brief metric (same unit
     family, matching name), else (None, None). This is the deterministic "would the
-    brief-compliance matcher find it" oracle. Three passes, most-specific first:
+    brief-compliance matcher find it" oracle. Passes, most-specific first:
+      0. SCOPE-QUALIFIED sibling match — see the block comment above. Only engages when
+         `metric_value` is given AND the brief's own prose scopes it (Pass 0 never fires
+         on an ordinary, unscoped metric).
       1. EXACT normalised-name match in the same family.
       2. SYNONYM-folded match (usable_energy ↔ usable_capacity).
       3. TOKEN-SUBSET match in the same family — the brief's identity tokens are covered
@@ -1098,6 +1153,14 @@ def _contract_match(state, metric_name, metric_unit):
     target_syn = _norm_name_syn(metric_name)
     if not target:
         return (None, None)
+    # Pass 0: scope-qualified sibling match (see block comment above _contract_match).
+    if metric_value is not None and _brief_scope_qualified(state, metric_value):
+        sib_rx = re.compile(r"^[a-z0-9]+_only_" + re.escape(target) + r"$")
+        for k, v in _quantities(state).items():
+            if not isinstance(v, dict):
+                continue
+            if sib_rx.match(_norm_name(k)) and _fam_compatible(fam, _unit_family(v.get("unit"))):
+                return (k, v.get("value"))
     # Pass 1: exact normalised-name match in the same family.
     for k, v in _quantities(state).items():
         if not isinstance(v, dict):
@@ -1361,7 +1424,7 @@ def _would_show_unverified(state, m) -> bool:
     name = _metric_name(m)
     if not name:
         return False
-    qk, _ = _contract_match(state, name, m.get("unit"))
+    qk, _ = _contract_match(state, name, m.get("unit"), m.get("value") if isinstance(m, dict) else None)
     return qk is None
 
 
@@ -1419,7 +1482,7 @@ def check_cross_tab(state, rows, run_dir) -> list:
         if not _would_show_unverified(state, m):
             continue
         # Shown UNVERIFIED on one tab — is there a concrete value elsewhere?
-        qk, qv = _contract_match(state, name, m.get("unit"))
+        qk, qv = _contract_match(state, name, m.get("unit"), m.get("value") if isinstance(m, dict) else None)
         concrete = _num(qv)
         src = qk
         if concrete is None and hl_val is not None and _norm_name(name) == hl_name:
@@ -1834,7 +1897,7 @@ def check_brief_metric_fail(state, rows, run_dir) -> list:
         target = _num(m.get("value") if isinstance(m, dict) else None)
         if target is None:
             continue
-        qk, qv = _contract_match(state, name, unit)
+        qk, qv = _contract_match(state, name, unit, target)
         if qk is None:
             continue  # no matched quantity -> brief_compliance/cross_tab handle UNVERIFIED
         # Convert the achieved value into the brief metric's unit where possible.
@@ -2430,7 +2493,7 @@ def check_brief_unverified(state, rows, run_dir) -> list:
         name = m.get("key_metric") or m.get("metric") or m.get("name") or ""
         if not name:
             continue
-        mk = _contract_match(state, name, m.get("unit") or "")
+        mk = _contract_match(state, name, m.get("unit") or "", m.get("value"))
         matched = mk[0] if isinstance(mk, tuple) else mk   # _contract_match → (key, value) or (None, None)
         if matched is not None:
             continue  # matched → PASS/FAIL handled by check_brief_metric_fail (a matched miss is its own HIGH)
@@ -3950,6 +4013,60 @@ def _selftest() -> int:
     expect(_normal_sum["min_tab"] == "Brief" and _normal_sum["min_score"] == 9 and _normal_sum["all_pass"] is True,
            f"a workbook with no scored:False tabs at all must behave exactly as before "
            f"(got {_normal_sum!r})")
+
+    # ---- scope-qualified brief target matcher (2026-07-05, battery-only vs full-system) -----
+    # A brief cost anchor scoped to a SUBSET of the design ("battery-energy-storage portion
+    # only ... EXCLUDING the ... transformer ... costs approximately £63 per kWh") must match
+    # the scope-restricted sibling quantity, never the full-system figure of the same name.
+    _scope_state = {
+        "parsedBrief": {
+            "original_text": (
+                "Cost anchors: the battery-energy-storage portion only — cells, racks, "
+                "battery management — but EXCLUDING the medium-voltage step-up transformer "
+                "and the 11 kV switchgear — costs approximately £63 per kWh at the two-hour "
+                "configuration."
+            ),
+        },
+        "orchestratorContract": {
+            "quantities": {
+                "cost_per_kwh_gbp": {"value": 113.34, "unit": "GBP/kWh", "family": "currency"},
+                "battery_only_cost_per_kwh_gbp": {"value": 60.0, "unit": "GBP/kWh", "family": "currency"},
+            }
+        },
+    }
+    _sk, _sv = _contract_match(_scope_state, "cost_per_kwh_gbp", "GBP/kWh", 63)
+    expect(_sk == "battery_only_cost_per_kwh_gbp" and _sv == 60.0,
+           f"a battery-only-scoped £63/kWh brief target must match the battery_only_ sibling "
+           f"(60), not the full-system quantity (113.34) — got ({_sk!r}, {_sv!r})")
+    # proveCatch: WITHOUT the scope signal in the brief text, the plain exact-name match must
+    # still win (no false redirect on an ordinary, unscoped metric).
+    _unscoped_state = {
+        "parsedBrief": {"original_text": "Cost target: approximately £63 per kWh."},
+        "orchestratorContract": {"quantities": _scope_state["orchestratorContract"]["quantities"]},
+    }
+    _uk, _uv = _contract_match(_unscoped_state, "cost_per_kwh_gbp", "GBP/kWh", 63)
+    expect(_uk == "cost_per_kwh_gbp" and _uv == 113.34,
+           f"an UNSCOPED brief target must match the plain full-system quantity, never the "
+           f"_only_ sibling by accident — got ({_uk!r}, {_uv!r})")
+    # proveCatch: a genuinely-missed SCOPED target must still FAIL, not be silently rescued —
+    # the pass only redirects WHICH quantity is compared, it never manufactures a PASS.
+    _miss_state = dict(_scope_state)
+    _miss_state["orchestratorContract"] = {
+        "quantities": {
+            "cost_per_kwh_gbp": {"value": 113.34, "unit": "GBP/kWh", "family": "currency"},
+            "battery_only_cost_per_kwh_gbp": {"value": 90.0, "unit": "GBP/kWh", "family": "currency"},
+        }
+    }
+    _miss_state["parsedBrief"] = {
+        "constraints": {"target_performance": {"metrics": [
+            {"key_metric": "cost_per_kwh_gbp", "value": 63, "unit": "GBP/kWh", "category": "cost"}
+        ]}},
+        "original_text": _scope_state["parsedBrief"]["original_text"],
+    }
+    _miss_findings = check_brief_metric_fail(_miss_state, [], "")
+    expect(any(f.check == "brief_metric_fail" for f in _miss_findings),
+           "a scope-matched battery_only quantity that STILL misses the brief's £63/kWh target "
+           "must surface as a HIGH brief_metric_fail, never be silently rescued to a PASS")
 
     if failures:
         print("SELFTEST FAILED:")
