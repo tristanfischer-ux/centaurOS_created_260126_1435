@@ -758,6 +758,163 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── UNIT-FAMILY COMPARISON DETECTOR (2026-07-06) — the reusable, cross-archetype
+  // GENERALISATION of the gate-32 kg-vs-tonne false-block guarded immediately above
+  // (item-12 in CLAUDE.md's recurring-bug list: hit BESS cell-Ah, then CO2 TWICE in one
+  // session — gate-32 kg-vs-tonne + a caco3 closure t/day-vs-kg/day). Where the test
+  // above exercises ONE function's behaviour (computeCostSanity), this is a static,
+  // structural DETECTOR that finds the STRUCTURAL PATTERN in any source file: a value in
+  // unit A compared/divided against a band/target in unit B of the SAME physical family
+  // with no canonical conversion (targetPerformanceValueAs / an explicit factor) on the
+  // path. It fires when an arithmetic (/) or comparison operator sits DIRECTLY BETWEEN
+  // two identifier mentions that (a) share a non-generic base token — the same physical
+  // quantity — and (b) carry unit suffixes in DIFFERENT members of the same conflict
+  // group (mass_kg vs mass_t; time_day vs time_yr; kwh/mwh/gwh; w/kw/mw), with no
+  // conversion literal/call within 2 lines either side. Requiring the operator strictly
+  // BETWEEN the two mentions (not just co-occurrence on the line) is what keeps this a
+  // comparison detector, not a co-occurrence detector — verified against two REAL false-
+  // positive shapes found on the live engineering-contract.ts during development: two
+  // quantities quoted in the SAME narrative template literal, and a two-step kg->t
+  // conversion written as `x / 100) / 10`. This is a Python->TypeScript PORT of
+  // scripts/archetype-preflight.py::scan_unit_family_comparisons (SURFACE 7 / family 10)
+  // — the two tools run in different runtimes so this is a deliberate parallel
+  // implementation kept in sync by proveCatch fixtures on BOTH sides, not a shared
+  // import. Wired here so a future regression that reintroduces the pattern in either of
+  // the two known real comparison sites (the cost-sanity gate itself, the CO2 emitter)
+  // FAILS THE BUILD, not just the pre-flight audit.
+  const UNIT_SUFFIX_FAMILY: Record<string, string> = {
+    kg: 'mass_kg', kgs: 'mass_kg', kilogram: 'mass_kg', kilograms: 'mass_kg',
+    t: 'mass_t', tonne: 'mass_t', tonnes: 'mass_t', ton: 'mass_t', tons: 'mass_t',
+    day: 'time_day', days: 'time_day', daily: 'time_day', pd: 'time_day',
+    yr: 'time_yr', yrs: 'time_yr', year: 'time_yr', years: 'time_yr', py: 'time_yr', annum: 'time_yr', pa: 'time_yr',
+    kwh: 'energy_kwh', mwh: 'energy_mwh', gwh: 'energy_gwh',
+    w: 'power_w', kw: 'power_kw', mw: 'power_mw',
+  }
+  const UNIT_CONFLICT_GROUPS: string[][] = [
+    ['mass_kg', 'mass_t'],
+    ['time_day', 'time_yr'],
+    ['energy_kwh', 'energy_mwh', 'energy_gwh'],
+    ['power_w', 'power_kw', 'power_mw'],
+  ]
+  const UNIT_GENERIC_TOKENS = new Set([
+    'value', 'output', 'target', 'low', 'high', 'band', 'cost', 'price', 'total',
+    'rate', 'capacity', 'actual', 'expected', 'result', 'amount', 'per', 'gbp',
+  ])
+  const UNIT_CANONICAL_CONVERTER_NAMES = [
+    'targetPerformanceValueAs', 'toCanonicalUnit', 'convertUnit', 'canonicalUnitValue',
+    'normaliseUnit', 'normalizeUnit', 'unitFamilyConvert', 'throughputToPerYear',
+  ]
+  const UNIT_CONVERSION_DEFUSE_RX = new RegExp(
+    String.raw`\b(1000|0\.001|1e3|1e-3|365(?:\.25)?|24|8760|3600|2204\.6)\b|` +
+    UNIT_CANONICAL_CONVERTER_NAMES.join('|'))
+  const UNIT_ARITH_OR_COMPARE_RX = /\/|<=|>=|<|>|===|!==|==/
+  const UNIT_BOUNDARY_CHARS = ['`', '$', '{', '}', "'", '"']
+  const unitIdentTokens = (name: string): string[] =>
+    name.replace(/(?<=[a-z0-9])(?=[A-Z])/g, '_').toLowerCase().split(/[_.]/).filter(Boolean)
+  const unitFamiliesAndBase = (name: string): { fams: Set<string>; base: Set<string> } => {
+    const fams = new Set<string>()
+    const base = new Set<string>()
+    for (const t of unitIdentTokens(name)) {
+      if (UNIT_SUFFIX_FAMILY[t]) fams.add(UNIT_SUFFIX_FAMILY[t])
+      else if (!UNIT_GENERIC_TOKENS.has(t)) base.add(t)
+    }
+    return { fams, base }
+  }
+  const unitSetsIntersect = (a: Set<string>, b: Set<string>) => [...a].some((x) => b.has(x))
+  const unitSetsEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((x) => b.includes(x))
+  function scanUnitFamilyComparisons(src: string): Array<{ line: number; message: string }> {
+    const lines = src.split('\n')
+    const hits: Array<{ line: number; message: string }> = []
+    const identRx = /\b[A-Za-z_][A-Za-z0-9_]*\b/g
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const occ: Array<{ start: number; end: number; tok: string; fams: Set<string>; base: Set<string> }> = []
+      identRx.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = identRx.exec(line)) !== null) {
+        const { fams, base } = unitFamiliesAndBase(m[0])
+        if (fams.size > 0) occ.push({ start: m.index, end: m.index + m[0].length, tok: m[0], fams, base })
+      }
+      if (occ.length < 2) continue
+      let conflict: { ta: string; famsA: string[]; tb: string; famsB: string[] } | null = null
+      for (let a = 0; a < occ.length && !conflict; a++) {
+        for (let b = a + 1; b < occ.length && !conflict; b++) {
+          const A = occ[a], B = occ[b]
+          if (A.tok === B.tok || !unitSetsIntersect(A.base, B.base)) continue
+          const [loPos, hiPos] = A.end <= B.start ? [A.end, B.start] : [B.end, A.start]
+          const between = line.slice(loPos, hiPos)
+          if (UNIT_BOUNDARY_CHARS.some((ch) => between.includes(ch))) continue
+          if (!UNIT_ARITH_OR_COMPARE_RX.test(between)) continue
+          for (const group of UNIT_CONFLICT_GROUPS) {
+            const aIn = [...A.fams].filter((f) => group.includes(f))
+            const bIn = [...B.fams].filter((f) => group.includes(f))
+            if (aIn.length && bIn.length && !unitSetsEqual(aIn, bIn)) {
+              conflict = { ta: A.tok, famsA: aIn, tb: B.tok, famsB: bIn }
+              break
+            }
+          }
+        }
+      }
+      if (!conflict) continue
+      const lo = Math.max(0, i - 2), hi = Math.min(lines.length, i + 3)
+      if (UNIT_CONVERSION_DEFUSE_RX.test(lines.slice(lo, hi).join('\n'))) continue
+      const snippet = line.trim().slice(0, 120)
+      hits.push({
+        line: i + 1,
+        message: `\`${conflict.ta}\` (${conflict.famsA.join('/')}) vs \`${conflict.tb}\` (${conflict.famsB.join('/')}) compared/divided with no unit-family conversion nearby: ${snippet}`,
+      })
+    }
+    return hits
+  }
+  const unitBadFixture = [
+    'const co2OutputKgPerYear = 365000',
+    'const co2BandLowGbpPerTonne = 1500',
+    'if (cost / co2OutputKgPerYear < co2BandLowGbpPerTonne) { flag() }',
+  ].join('\n')
+  const unitGoodFixture = [
+    'const co2OutputKgPerYear = 365000',
+    "const co2OutputCanonical = targetPerformanceValueAs(state, 't/yr')",
+    'const co2BandLowGbpPerTonne = 1500',
+    'if (cost / co2OutputKgPerYear < co2BandLowGbpPerTonne) { flag() }',
+  ].join('\n')
+  const dayYrBadFixture = [
+    'const caco3OutputKgPerDay = 2270',
+    'const caco3TargetKgPerYear = 828550',
+    'if (caco3OutputKgPerDay > caco3TargetKgPerYear) { flag() }',
+  ].join('\n')
+  const narrativeFalsePositiveFixture =
+    "brief_summary: `${ratedMw.toFixed(2)} MW electrolyser (approx £${(macroAssemblyTotal / ratedKw).toFixed(0)}/kW benchmark).`,"
+  const twoStepConversionFalsePositiveFixture =
+    'total_salt_inventory_t: Math.round(totalSaltInventoryKg / 100) / 10,'
+  // the two REAL comparison sites the two known bugs actually lived in — a future
+  // regression that reintroduces the raw-comparison shape here fails THIS invariant.
+  const costSanitySrcForUnitScan = readFileSync(
+    resolve(__dirname, '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit.ts'), 'utf-8')
+  const co2EmitterPathForUnitScan = resolve(__dirname, 'lib/orchestrator/emitters/co2-mineralisation.ts')
+  const co2EmitterSrcForUnitScan = existsSync(co2EmitterPathForUnitScan)
+    ? readFileSync(co2EmitterPathForUnitScan, 'utf-8') : ''
+  out.push(assertEq(
+    'UNIVERSAL.unit_family_comparison_normalized',
+    'scanUnitFamilyComparisons (the TypeScript port of scripts/archetype-preflight.py\'s SURFACE 7 static detector, family 10) fires on a raw kg-vs-tonne comparison sharing a base stem (the gate-32 shape) and a raw day-vs-year comparison (the caco3 closure shape); a nearby targetPerformanceValueAs() call defuses the identical kg-vs-tonne comparison; a narrative template literal quoting two unrelated quantities on one line and a two-step kg->t conversion (/100)/10) never fire (the two real false-positive shapes found developing this detector); and the two REAL comparison sites (independent-cost-sanity-audit.ts, co2-mineralisation.ts) currently have zero un-normalised hits — a future regression reintroducing the pattern there fails this invariant, not just the pre-flight audit',
+    JSON.stringify({
+      badHits: scanUnitFamilyComparisons(unitBadFixture).length,
+      goodHits: scanUnitFamilyComparisons(unitGoodFixture).length,
+      dayYrHits: scanUnitFamilyComparisons(dayYrBadFixture).length,
+      narrativeHits: scanUnitFamilyComparisons(narrativeFalsePositiveFixture).length,
+      twoStepHits: scanUnitFamilyComparisons(twoStepConversionFalsePositiveFixture).length,
+      costSanityHits: scanUnitFamilyComparisons(costSanitySrcForUnitScan).length,
+      co2EmitterHits: scanUnitFamilyComparisons(co2EmitterSrcForUnitScan).length,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.badHits >= 1 && o.goodHits === 0 && o.dayYrHits >= 1 &&
+        o.narrativeHits === 0 && o.twoStepHits === 0 &&
+        o.costSanityHits === 0 && o.co2EmitterHits === 0
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── GENERATIVE BENCHMARK SANITY NET — pure comparison guards the "pull it back when the
   // determinism goes off" net wired into the chain (gate 36, 2026-06-24). compareToBenchmark is
   // the deterministic half of an LLM-anchored check: given an independent top-down expectation

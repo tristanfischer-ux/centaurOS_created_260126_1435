@@ -11,7 +11,7 @@
 > starting a new archetype; run the pre-flight (`scripts/archetype-preflight.py`) before the first
 > chain run.
 
-## The 9 defect families (every campaign defect fell into one of these)
+## The 10 defect families (every campaign defect fell into one of these)
 
 1. **Vocabulary/matcher gaps** — the class's nouns, tag prefixes, and ISA letters are unknown to
    shared matchers. Hit ~10 different matchers across two campaigns (benchmark metric matcher,
@@ -61,6 +61,22 @@
    corroboration.** Both directions matter: gates also produce FALSE positives (the alloy-grade
    regex count, the fuse ampacity claim, the autocorrect proposing a non-existent part) — verify
    the gate's claim against deterministic evidence before "fixing".
+10. **Unit-family comparison without normalization** — the #1 recurring cross-archetype defect
+    (item-12 in CLAUDE.md's mistakes-to-avoid list): a value in unit A (kg, day, kWh, W…) reaches
+    a comparison or division against a band/target in unit B of the SAME physical family (tonne,
+    year, MWh, kW…) with no canonical conversion on the path. Hit BESS (cell-Ah) and CO2 TWICE in
+    one session (gate-32 kg-vs-tonne false-block on the cost-sanity gate; a caco3 closure
+    t/day-vs-kg/day mismatch). **Rule: a value in unit A compared to a band/target in unit B needs
+    a `targetPerformanceValueAs`-style canonical-factor conversion somewhere on the path — never
+    compare raw magnitudes across a unit-family boundary.** GUARDED as a reusable DETECTOR (not a
+    refactor — it finds the structural pattern, it never edits the files it scans): SURFACE 7 /
+    family 10 in `scripts/archetype-preflight.py` (`scan_unit_family_comparisons`) and its
+    TypeScript port `UNIVERSAL.unit_family_comparison_normalized` in
+    `scripts/regression-harness.tsx` (`scanUnitFamilyComparisons`) — kept in sync by proveCatch
+    fixtures on both sides, not a shared import (the two tools run in different runtimes). Fires
+    when an arithmetic/comparison operator sits directly between two identifiers that share a
+    physical-quantity stem but carry conflicting unit suffixes (mass_kg vs mass_t; time_day vs
+    time_yr; kwh/mwh/gwh; w/kw/mw) with no conversion literal/call nearby.
 
 ## The campaign process (what actually worked)
 
@@ -99,7 +115,25 @@
 5. Procurement model: is there a market-cited block price / anchor scope for the class's cost
    closures? A decisions file?
 6. Dormant defaults: schedule-wide placeholder values the class's topology would trust.
-Every finding maps to one of the 9 families above with its known fix pattern.
+7. Unit-family comparison: a codebase-wide (class-agnostic) static scan for a value in unit A
+   compared/divided against a band or target in unit B of the same physical family with no
+   canonical conversion on the path — the gate-32 kg-vs-tonne + caco3 t/day-vs-kg/day shape.
+Every finding maps to one of the 10 families above with its known fix pattern.
+
+**Severity weighting (2026-07-05):** a flat finding count overstates difficulty — CO2 got 21/33
+tabs ≥9 on its first run despite 61 raw findings. Every finding is additionally tagged BLOCKER
+(hits a hard gate / a contract HARD_REQUIRED_SLOT / a closure — the run dies or a tab reads 0) or
+QUALITY (vocabulary/coverage polish that manifests as a sub-9 score, not a failure). The summary
+reads e.g. "CO2: 57 findings — 15 BLOCKER, 42 QUALITY-polish" so a campaign fixes blockers first.
+Family 2 (constants) splits on WHETHER the shadowing literal reads the contract first (`?? literal`
+/ `q(contract, name, literal)` = a defensive default, QUALITY) or is a bare closure-hardcode with
+no read at all (the true "two-truths" shape, BLOCKER). Family 6 (BoP roles) splits on whether the
+part gets NO placement regex at all (a visible 3D scene drop, BLOCKER) vs merely falling through
+TYPE_RULES to 'other' (a narrower drawing-coverage expectation, QUALITY). Families 7 and 10 are
+always BLOCKER (a wrong verdict or an un-normalised unit comparison corrupts the scorecard itself);
+families 1, 5, 8 are always QUALITY (vocabulary gaps, dormant-default review notes, and a missing
+market anchor — the last only feeds gate 32/36, both SHADOW by default). See
+`scripts/archetype-preflight.py::_finding_weight`.
 
 ## Campaign phase order (fastest observed path)
 1. Pre-flight fixes (above) → 2. baseline run → 3. classified triage → 4. parallel waves
@@ -108,3 +142,34 @@ Every finding maps to one of the 9 families above with its known fix pattern.
    → 8. convergence runs → 9. reproduction pair → 10. certified workbook.
 Codema took ~10 laps learning these; BESS took ~8 applying half of them; the next archetype
 should take ~4 with the pre-flight.
+
+## Cross-archetype meta-lessons (learned live 2026-07-05)
+
+1. **Unit-family comparison is the #1 recurring defect, and it is now guarded.** Hit BESS
+   (cell-Ah) and CO2 TWICE in one session (gate-32 kg-vs-tonne false-block; a caco3 closure
+   t/day-vs-kg/day mismatch). Family 10 + `scripts/archetype-preflight.py` SURFACE 7
+   (`scan_unit_family_comparisons`) + `scripts/regression-harness.tsx`
+   (`UNIVERSAL.unit_family_comparison_normalized`) now catch the STRUCTURAL shape
+   class-agnostically, in both the pre-flight audit and the build-blocking harness — a future
+   archetype should never re-pay this lesson from scratch.
+2. **A new archetype fuzzes the gates.** Expect 1-2 UNIVERSAL gate bugs per new class (a gate
+   written against the first few classes' shapes trips on an assumption the new class breaks) —
+   these are gifts, not setbacks: fixing them tightens the gate for every class, not just the one
+   that found it. Both CO2 and BESS surfaced universal gate bugs, not class-specific ones.
+3. **A flat pre-flight finding count overstates difficulty — weight by stage.** CO2's first run
+   scored 21/33 tabs ≥9 despite 61 raw pre-flight findings; most were vocabulary/coverage QUALITY
+   polish, not blockers. The pre-flight now tags every finding BLOCKER or QUALITY (see §Severity
+   weighting above) so a campaign fixes the handful of true blockers first instead of triaging a
+   flat list top-to-bottom.
+4. **`--force-measure-then-triage` beats fix-blind when a class-plan already exists.** Running the
+   full measurement (baseline chain + audits) before triaging, on a class that already has a
+   `class-plans/<slug>.ts` file, surfaces the REAL defect set faster than reasoning from the
+   pre-flight report alone — the pre-flight narrows WHERE to look, the measured run confirms WHAT
+   is actually broken.
+5. **Partition parallel waves by engine LAYER, not by tab.** The three-sibling-agent split that
+   worked was (a) contract/emitter (`engineering-contract.ts`, the class emitters,
+   `requirements_bom.py`), (b) geometry/drawings (`scripts/blender-universal/*.py`), and (c)
+   exporter/tabs (`scripts/build-excel-export.py`, `scripts/lib/dossier_audit.py`) — each a
+   file-disjoint region with its own defect families. Splitting by RENDERED TAB instead (e.g. "one
+   agent per worksheet") repeatedly produced merge conflicts because every tab reads from the same
+   contract/emitter layer; splitting by layer keeps waves file-disjoint and cheaply parallel.

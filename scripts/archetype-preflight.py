@@ -3,9 +3,9 @@
 scripts/archetype-preflight.py — NEW-ARCHETYPE PRE-FLIGHT AUDITOR (read-only).
 
 Executable form of docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md § "New-archetype pre-flight
-(run BEFORE the first chain run)". Audits the six known gap surfaces for a class
+(run BEFORE the first chain run)". Audits the seven known gap surfaces for a class
 that has never been through a campaign, and maps every finding to one of the
-playbook's 9 defect families with its known fix pattern.
+playbook's 10 defect families with its known fix pattern.
 
 USAGE
     python3 scripts/archetype-preflight.py <class_slug> <brief_path> [--no-node]
@@ -29,13 +29,26 @@ ENFORCEMENT (Tristan 2026-07-05: "it needs to be in the code and not an md file"
       unless --force is given.
     - scripts/verify-engine-guards.sh runs --selftest so the auditor cannot rot.
 
-THE SIX SURFACES (→ defect family)
+THE SEVEN SURFACES (→ defect family)
     1. VOCABULARY            → family 1 (vocabulary/matcher gaps)
     2. CONSTANTS             → family 2 (two-truths / multi-mint — the 280 Ah pattern)
     3. BOP ROLES             → family 6 (one classification, both sides)
     4. CONDITIONAL LITERALS  → family 7 (verdict honesty — bare-literal siblings)
     5. PROCUREMENT MODEL     → family 8 (procurement-model mismatch) + decisions register
     6. DORMANT DEFAULTS      → family 5 (placeholder/default trust)
+    7. UNIT-FAMILY COMPARISON → family 10 (unit-family comparison w/o normalisation —
+       the gate-32 kg-vs-tonne + caco3 t/day-vs-kg/day pattern, item-12 recurring bug)
+
+SEVERITY WEIGHTING (2026-07-05: a flat finding count OVERSTATES difficulty — CO2
+got 21/33 tabs >=9 on its first run despite 61 raw findings). Every FINDING is
+additionally tagged BLOCKER or QUALITY:
+    BLOCKER  hits a hard gate / a contract HARD_REQUIRED_SLOT / a closure — the
+             run dies or a tab reads 0 (families 2, 7, 10; the "no _BOP_ROLES*
+             placement regex" shape of family 6).
+    QUALITY  vocabulary/coverage polish that manifests as a sub-9 score, not a
+             failure (families 1, 5, 8; the "TYPE_RULES 'other'" shape of family 6).
+The summary line reads e.g. "61 finding(s) — 2 BLOCKER, 59 QUALITY-polish" so a
+campaign fixes blockers first. See _finding_weight().
 
 PROPERTIES
     - READ-ONLY: never writes inside the repo; never mutates any state.
@@ -117,7 +130,52 @@ FAMILIES: Dict[int, Tuple[str, str]] = {
     9: ("LLM re-roll surfaces",
         "no LLM opinion may score, block, or vary a deliverable without a cache hit or "
         "deterministic corroboration — and verify a gate's claim before 'fixing'"),
+    10: ("Unit-family comparison without normalization",
+         "a value in unit A (kg, day, kWh, W…) compared or divided against a band/"
+         "target in unit B of the SAME physical family (tonne, year, MWh, kW…) needs "
+         "a canonical unit-family conversion (targetPerformanceValueAs / an explicit "
+         "conversion factor) somewhere on the path — never compare raw magnitudes "
+         "across a unit-family boundary (the gate-32 kg/tonne false-block + the "
+         "caco3 closure t/day-vs-kg/day pattern, item-12 in CLAUDE.md's recurring-bug list)"),
 }
+
+# families whose FINDING-severity findings are, structurally, BLOCKER-weight: the
+# failure mode is "the run dies or a tab reads 0" (a hard gate, a contract
+# HARD_REQUIRED_SLOT, or a closure/verdict computed wrong) rather than a coverage/
+# vocabulary gap that merely shaves a score. See module docstring §SEVERITY WEIGHTING.
+_BLOCKER_FAMILIES = {7, 10}
+_QUALITY_FAMILIES = {1, 5, 8}
+# a family-2 finding whose snippet contains a READ-FIRST marker (`??` fallback or
+# a `q(contract, ...)` mint helper) reads the contract quantity and only falls
+# back to the literal when it is absent — a defensive default, not an active
+# divergence (QUALITY, the "280 Ah pattern" only bites if the fallback is ever
+# actually hit). A BARE literal on a quantity name with NEITHER marker present
+# (a closure assigning `total_cell_mass_kg: 7000,` with no read at all, or "no
+# registerArchetype block"/"no class plan file") is the true "literal-shadow-
+# in-a-closure" shape the task calls out — BLOCKER.
+_READ_FIRST_MARKER_RX = re.compile(r"\?\?|q\(")
+
+
+def _finding_weight(f: "Finding") -> str:
+    """BLOCKER | QUALITY | INFO — the stage-weight for one finding. Only FINDING-
+    severity findings are weighted (INFO stays INFO — it was never counted in the
+    headline count either). Family 2 (constants) is mixed: see
+    _READ_FIRST_MARKER_RX above. Family 6 (BoP roles) is mixed: a family whose
+    part gets NO placement regex at all is a visible drop (BLOCKER — a box is
+    silently missing from every 3D render); a part that merely falls through
+    TYPE_RULES to 'other' only narrows which drawing types check it (QUALITY — a
+    coverage-expectation shrink, not a visible miss). Unclassified/future
+    families default to QUALITY (the conservative, non-alarming bucket) until a
+    campaign proves otherwise."""
+    if f.severity != "FINDING":
+        return "INFO"
+    if f.family == 2:
+        return "QUALITY" if _READ_FIRST_MARKER_RX.search(f.text) else "BLOCKER"
+    if f.family == 6:
+        return "BLOCKER" if "_BOP_ROLES* placement regex" in f.text else "QUALITY"
+    if f.family in _BLOCKER_FAMILIES:
+        return "BLOCKER"
+    return "QUALITY"
 
 # The four conditional-literal families already fixed (context for surface 4;
 # from _compliance_verdict_fx's own docstring in build-excel-export.py):
@@ -146,11 +204,13 @@ class Finding:
         self.text = text
         self.where = where
         self.severity = severity  # FINDING | INFO
+        self.weight: Optional[str] = None  # BLOCKER | QUALITY | INFO — set by run_audit()
 
     def render(self) -> str:
         fam_name = FAMILIES[self.family][0]
         loc = f" ({self.where})" if self.where else ""
-        return (f"- **[{self.severity}] [family {self.family} — {fam_name}]** "
+        tag = self.weight or self.severity
+        return (f"- **[{tag}] [family {self.family} — {fam_name}]** "
                 f"{self.text}{loc}\n  - fix pattern: {FAMILIES[self.family][1]}")
 
 
@@ -1013,6 +1073,174 @@ def audit_dormant_defaults(brief_text: str) -> List[Finding]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# SURFACE 7 — UNIT-FAMILY COMPARISON (family 10, the gate-32 kg/tonne pattern)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# The #1 recurring cross-archetype defect (CLAUDE.md item-12): a value in unit A
+# reaches a comparison/division against a band or target in unit B of the SAME
+# physical family with no canonical conversion on the path. Hit BESS (cell-Ah)
+# and CO2 TWICE in one session (gate-32 kg-vs-tonne; a caco3 closure
+# t/day-vs-kg/day). This is a DETECTOR (finds the structural pattern), not a
+# refactor — it never edits engineering-contract.ts / the emitters / the gates
+# it reads. A mirror of this exact detector is ported into
+# scripts/regression-harness.tsx (UNIVERSAL.unit_family_comparison_normalized)
+# so a future regression fails the BUILD, not just the pre-flight audit.
+
+_UNIT_SUFFIX_FAMILY: Dict[str, str] = {
+    "kg": "mass_kg", "kgs": "mass_kg", "kilogram": "mass_kg", "kilograms": "mass_kg",
+    "t": "mass_t", "tonne": "mass_t", "tonnes": "mass_t", "ton": "mass_t", "tons": "mass_t",
+    "day": "time_day", "days": "time_day", "daily": "time_day", "pd": "time_day",
+    "yr": "time_yr", "yrs": "time_yr", "year": "time_yr", "years": "time_yr",
+    "py": "time_yr", "annum": "time_yr", "pa": "time_yr",
+    "kwh": "energy_kwh", "mwh": "energy_mwh", "gwh": "energy_gwh",
+    "w": "power_w", "kw": "power_kw", "mw": "power_mw",
+}
+# two identifiers whose unit suffixes land in different members of the SAME
+# group are the same physical dimension at a different scale/period — dividing
+# or comparing them raw (no conversion between) is the bug shape.
+_UNIT_CONFLICT_GROUPS: List[set] = [
+    {"mass_kg", "mass_t"},
+    {"time_day", "time_yr"},
+    {"energy_kwh", "energy_mwh", "energy_gwh"},
+    {"power_w", "power_kw", "power_mw"},
+]
+_UNIT_GENERIC_TOKENS = {
+    "value", "output", "target", "low", "high", "band", "cost", "price", "total",
+    "rate", "capacity", "actual", "expected", "result", "amount", "per", "gbp",
+}
+_UNIT_CANONICAL_CONVERTER_NAMES = (
+    "targetPerformanceValueAs", "toCanonicalUnit", "convertUnit", "canonicalUnitValue",
+    "normaliseUnit", "normalizeUnit", "unitFamilyConvert", "throughputToPerYear",
+)
+# a nearby conversion-factor literal (1000 kg/t, 0.001, 365 day/yr, 24 h/day,
+# 8760 h/yr, 2204.6 lb/t) or a canonical-converter call name defuses the
+# finding — the path DOES normalise between the two units.
+_UNIT_CONVERSION_DEFUSE_RX = re.compile(
+    r"\b(1000|0\.001|1e3|1e-3|365(?:\.25)?|24|8760|3600|2204\.6)\b|"
+    + "|".join(re.escape(n) for n in _UNIT_CANONICAL_CONVERTER_NAMES))
+_UNIT_IDENT_RX = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+_UNIT_ARITH_OR_COMPARE_RX = re.compile(r"/|<=|>=|<|>|===|!==|==")
+
+
+def _unit_ident_tokens(name: str) -> List[str]:
+    """camelCase AND snake_case → lowercase token list ('caco3OutputKgPerDay' and
+    'caco3_output_kg_per_day' both → [caco3, output, kg, per, day])."""
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
+    return [p.lower() for p in re.split(r"[_.]", s) if p]
+
+
+def _unit_families_and_base(name: str) -> Tuple[set, set]:
+    """→ (unit-family set, base/stem token set). The base set is what identifies
+    'the same physical quantity' across two differently-unit-suffixed names."""
+    toks = _unit_ident_tokens(name)
+    fams = {_UNIT_SUFFIX_FAMILY[t] for t in toks if t in _UNIT_SUFFIX_FAMILY}
+    base = {t for t in toks if t not in _UNIT_SUFFIX_FAMILY and t not in _UNIT_GENERIC_TOKENS}
+    return fams, base
+
+
+# chars that mean "the gap between these two identifier mentions crosses a
+# template-literal / string boundary" — two `${...}` interpolations sitting in
+# the SAME narrative sentence are not a code-level comparison of each other,
+# even though both idents and some unrelated '/' (a unit-label like "kg/day"
+# inside the prose) share the line.
+_UNIT_BOUNDARY_CHARS = ("`", "$", "{", "}", "'", '"')
+
+
+def scan_unit_family_comparisons(src: str, label: str = "<src>",
+                                 window: int = 2) -> List[Tuple[str, int, str]]:
+    """DETECTOR (not a refactor): flags a line where an arithmetic (/) or
+    comparison (<,<=,>,>=,==,===) operator sits DIRECTLY BETWEEN two identifier
+    mentions that (a) share at least one non-generic base token (the same
+    physical quantity) and (b) carry CONFLICTING unit-family suffixes within
+    the same conflict group (mass_kg vs mass_t; time_day vs time_yr; kwh vs
+    mwh vs gwh; w vs kw vs mw), with no canonical-conversion literal/call
+    within `window` lines either side. Requiring the operator to sit strictly
+    between the two mentions (not merely present anywhere on the line) is what
+    keeps this a comparison detector rather than a co-occurrence detector — a
+    narrative string quoting two unrelated quantities ("ratedMw ... /kW ...
+    ratedKw" in one long template literal) shares a line but never places an
+    operator directly between the two idents without crossing a template-
+    literal/string boundary, so it does not fire. Structural + universal —
+    keyed on identifier UNIT SUFFIXES and shared stems, never a class name.
+    proveCatch (both directions, incl. the two known real-world false-positive
+    shapes) lives in _selftest(). Returns (label, 1-based line, message)."""
+    lines = src.splitlines()
+    hits: List[Tuple[str, int, str]] = []
+    for i, line in enumerate(lines):
+        occurrences = []
+        for m in _UNIT_IDENT_RX.finditer(line):
+            fams, base = _unit_families_and_base(m.group(0))
+            if fams:
+                occurrences.append((m.start(), m.end(), m.group(0), fams, base))
+        if len(occurrences) < 2:
+            continue
+        conflict = None
+        for a_i in range(len(occurrences)):
+            for b_i in range(a_i + 1, len(occurrences)):
+                sa, ea, ta, fams_a, base_a = occurrences[a_i]
+                sb, eb, tb, fams_b, base_b = occurrences[b_i]
+                if ta == tb or not (base_a & base_b):
+                    continue
+                lo_pos, hi_pos = (ea, sb) if ea <= sb else (eb, sa)
+                between = line[lo_pos:hi_pos]
+                if any(ch in between for ch in _UNIT_BOUNDARY_CHARS):
+                    continue  # the two mentions live in separate template/string spans
+                if not _UNIT_ARITH_OR_COMPARE_RX.search(between):
+                    continue  # co-occur on the line, but no operator DIRECTLY between them
+                for group in _UNIT_CONFLICT_GROUPS:
+                    a_in, b_in = fams_a & group, fams_b & group
+                    if a_in and b_in and a_in != b_in:
+                        conflict = (ta, sorted(a_in), tb, sorted(b_in))
+                        break
+                if conflict:
+                    break
+            if conflict:
+                break
+        if not conflict:
+            continue
+        lo, hi = max(0, i - window), min(len(lines), i + window + 1)
+        if _UNIT_CONVERSION_DEFUSE_RX.search("\n".join(lines[lo:hi])):
+            continue
+        ta, fams_a, tb, fams_b = conflict
+        snippet = line.strip()
+        if len(snippet) > 120:
+            snippet = snippet[:117] + "…"
+        hits.append((label, i + 1,
+                     f"`{ta}` ({'/'.join(fams_a)}) vs `{tb}` ({'/'.join(fams_b)}) "
+                     f"compared/divided with no unit-family conversion nearby: {snippet}"))
+    return hits
+
+
+def audit_unit_family_comparisons() -> List[Finding]:
+    """Runs the detector across the known comparison sites: the independent
+    cost-sanity gate (gate 32 — the CO2 kg/tonne false-block), the CO2 emitter
+    + closure library (the caco3 t/day-vs-kg/day pattern), and the contract
+    itself. Read-only, class-agnostic (runs on every pre-flight regardless of
+    slug — this is a codebase-wide lint, not a per-brief check)."""
+    findings: List[Finding] = []
+    targets = [
+        (COST_SANITY, "src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit.ts"),
+        (REPO / "scripts/lib/orchestrator/emitters/co2-mineralisation.ts",
+         "scripts/lib/orchestrator/emitters/co2-mineralisation.ts"),
+        (REPO / "scripts/deterministic_checks_lib.py", "scripts/deterministic_checks_lib.py"),
+        (CONTRACT, "scripts/lib/engineering-contract.ts"),
+    ]
+    for path, label in targets:
+        if not path.exists():
+            continue
+        for f, line, what in scan_unit_family_comparisons(_read(path), label):
+            findings.append(Finding(10, "UNIT-FAMILY COMPARISON", what, f"{f}:{line}"))
+    if not findings:
+        findings.append(Finding(
+            10, "UNIT-FAMILY COMPARISON",
+            "no un-normalised unit-family comparisons detected in the known gate-32/"
+            "caco3-closure comparison sites (independent-cost-sanity-audit.ts, "
+            "co2-mineralisation.ts, deterministic_checks_lib.py, engineering-contract.ts)",
+            "", severity="INFO"))
+    return findings
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # SLUG DERIVATION (used by run-validation.sh — deterministic fast parse)
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -1089,7 +1317,8 @@ def derive_slug(brief_path: Path, slugs: Optional[Sequence[str]] = None,
 # REPORT
 # ═════════════════════════════════════════════════════════════════════════════
 
-def run_audit(slug: str, brief_path: Path, use_node: bool = True) -> Tuple[str, int]:
+def run_audit(slug: str, brief_path: Path, use_node: bool = True
+             ) -> Tuple[str, int, int, int]:
     brief_text = _read(brief_path)
     plan_path = CLASS_PLANS_DIR / f"{slug.replace('_', '-')}.ts"
     plan_src = _read(plan_path) if plan_path.exists() else ""
@@ -1105,6 +1334,7 @@ def run_audit(slug: str, brief_path: Path, use_node: bool = True) -> Tuple[str, 
     all_findings += audit_conditional_literals()
     all_findings += audit_procurement(slug, brief_path)
     all_findings += audit_dormant_defaults(brief_text)
+    all_findings += audit_unit_family_comparisons()
 
     if not plan_src:
         all_findings.append(Finding(
@@ -1114,12 +1344,17 @@ def run_audit(slug: str, brief_path: Path, use_node: bool = True) -> Tuple[str, 
             f"stop domain-mismatched tool contamination)",
             str(CLASS_PLANS_DIR.relative_to(REPO))))
 
+    for f in all_findings:
+        f.weight = _finding_weight(f)
+
     by_family: Dict[int, List[Finding]] = {}
     for f in all_findings:
         by_family.setdefault(f.family, []).append(f)
 
     n_findings = sum(1 for f in all_findings if f.severity == "FINDING")
     n_info = sum(1 for f in all_findings if f.severity == "INFO")
+    n_blocker = sum(1 for f in all_findings if f.weight == "BLOCKER")
+    n_quality = sum(1 for f in all_findings if f.weight == "QUALITY")
 
     lines = [
         f"# Archetype pre-flight audit — `{slug}`",
@@ -1127,17 +1362,21 @@ def run_audit(slug: str, brief_path: Path, use_node: bool = True) -> Tuple[str, 
         f"- brief: `{brief_path}`",
         f"- class plan: `{plan_path.name}`" + ("" if plan_src else " **(MISSING)**"),
         f"- catalogue-candidacy mode: {detail['mode']}",
-        f"- playbook: docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md (9 defect families; run "
+        f"- playbook: docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md (10 defect families; run "
         f"pre-flight fixes BEFORE the first chain run)",
         "",
-        f"## Summary: {n_findings} finding(s), {n_info} informational note(s)",
+        f"## Summary: {n_findings} finding(s) — {n_blocker} BLOCKER, {n_quality} "
+        f"QUALITY-polish; {n_info} informational note(s)",
         "",
     ]
     for fam in sorted(by_family):
         fam_name, fix = FAMILIES[fam]
         fs = by_family[fam]
         nf = sum(1 for f in fs if f.severity == "FINDING")
-        lines.append(f"## Family {fam} — {fam_name} ({nf} finding(s))")
+        nfb = sum(1 for f in fs if f.weight == "BLOCKER")
+        nfq = sum(1 for f in fs if f.weight == "QUALITY")
+        lines.append(f"## Family {fam} — {fam_name} ({nf} finding(s): "
+                     f"{nfb} BLOCKER, {nfq} QUALITY-polish)")
         lines.append("")
         for f in sorted(fs, key=lambda f: (f.severity != "FINDING", f.surface)):
             lines.append(f.render())
@@ -1153,7 +1392,7 @@ def run_audit(slug: str, brief_path: Path, use_node: bool = True) -> Tuple[str, 
                     sorted(detail["coverage"].items()) if k][:20]
     lines.append(f"- sample known tokens: {', '.join(known_sample)}")
     lines.append("")
-    return "\n".join(lines), n_findings
+    return "\n".join(lines), n_findings, n_blocker, n_quality
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1298,6 +1537,113 @@ const NEVER_FOLD = new Set<string>(['ups', 'mains'])  // trailing comment
     expect(ds == [("DEFAULT_SYSTEM_VOLTAGE_V", 400.0, 1)],
            f"numeric DEFAULT_* scraped, non-DEFAULT and string skipped ({ds})")
 
+    print("[selftest] family 10 — unit-family comparison, both directions "
+          "(the gate-32 kg/tonne + caco3 t/day-vs-kg/day pattern)")
+    unit_bad = (
+        "const co2OutputKgPerYear = 365000\n"
+        "const co2BandLowGbpPerTonne = 1500\n"
+        "if (cost / co2OutputKgPerYear < co2BandLowGbpPerTonne) { flag() }\n"
+    )
+    unit_hits = scan_unit_family_comparisons(unit_bad, "fixture.ts")
+    expect(len(unit_hits) >= 1,
+           f"raw kg-vs-tonne comparison with a shared 'co2' stem fires ({unit_hits})")
+    unit_good = (
+        "const co2OutputKgPerYear = 365000\n"
+        "const co2OutputCanonical = targetPerformanceValueAs(state, 't/yr')\n"
+        "const co2BandLowGbpPerTonne = 1500\n"
+        "if (cost / co2OutputKgPerYear < co2BandLowGbpPerTonne) { flag() }\n"
+    )
+    expect(scan_unit_family_comparisons(unit_good, "fixture.ts") == [],
+           "a nearby targetPerformanceValueAs() canonical-conversion call defuses "
+           "the same raw comparison")
+    unit_ok_converted = (
+        "const co2OutputTPerYear = 365\n"
+        "const co2BandLowGbpPerTonne = 1500\n"
+        "if (cost / co2OutputTPerYear < co2BandLowGbpPerTonne) { flag() }\n"
+    )
+    expect(scan_unit_family_comparisons(unit_ok_converted, "fixture.ts") == [],
+           "already-matching units (both tonne) never fire — no false positive "
+           "once normalised")
+    day_yr_bad = (
+        "const caco3OutputKgPerDay = 2270\n"
+        "const caco3TargetKgPerYear = 828550\n"
+        "if (caco3OutputKgPerDay > caco3TargetKgPerYear) { flag() }\n"
+    )
+    expect(len(scan_unit_family_comparisons(day_yr_bad, "fixture.ts")) >= 1,
+           "day-vs-year denominator mismatch on the same 'caco3'+'target'/'output' "
+           "stem fires (the caco3 closure shape)")
+    unrelated = (
+        "const pumpFlowKgPerDay = 50\n"
+        "const boilerDutyMwh = 12\n"
+        "if (pumpFlowKgPerDay / boilerDutyMwh > 1) { noop() }\n"
+    )
+    expect(scan_unit_family_comparisons(unrelated, "fixture.ts") == [],
+           "two DIFFERENT physical quantities (no shared base stem) never fire, "
+           "even with conflicting-family unit suffixes")
+
+    print("[selftest] family 10 — false-positive guards (the 3 real hits found "
+          "on the live engineering-contract.ts, all narrative/multi-step, not bugs)")
+    narrative_fp = (
+        "brief_summary: `${ratedMw.toFixed(2)} MW electrolyser "
+        "(≈£${(macroAssemblyTotal / ratedKw).toFixed(0)}/kW benchmark).`,\n"
+    )
+    expect(scan_unit_family_comparisons(narrative_fp, "fixture.ts") == [],
+           "ratedMw and ratedKw quoted in the SAME narrative template literal, "
+           "with an unrelated '/' inside a DIFFERENT ${} interpolation, does not "
+           "fire — the operator never sits directly between the two mentions "
+           "without crossing a template-literal boundary")
+    two_step_conversion_fp = (
+        "total_salt_inventory_t: Math.round(totalSaltInventoryKg / 100) / 10,\n"
+    )
+    expect(scan_unit_family_comparisons(two_step_conversion_fp, "fixture.ts") == [],
+           "a two-step kg->t conversion written as '/100)/10' (the property KEY "
+           "and the source IDENT are not directly flanking an operator) does not fire")
+
+    print("[selftest] severity weighting — BLOCKER vs QUALITY, both directions")
+    f_fam2_readfirst_qq = Finding(
+        2, "CONSTANTS",
+        "numeric literal shadows contract quantity `dod_fraction`: "
+        "`dod_fraction: c.quantities?.dod_fraction?.value ?? 0.80,`")
+    f_fam2_readfirst_qcall = Finding(
+        2, "CONSTANTS",
+        "numeric literal shadows contract quantity `cell_voltage_v`: "
+        "`const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)`")
+    f_fam2_bare_closure = Finding(
+        2, "CONSTANTS",
+        "numeric literal shadows contract quantity `total_cell_mass_kg`: "
+        "`total_cell_mass_kg: 7000,`")
+    f_fam2_no_contract_block = Finding(
+        2, "CONSTANTS",
+        "no registerArchetype('zzz') block in engineering-contract.ts — the "
+        "class has no contract quantity namespace yet")
+    f_fam1 = Finding(1, "VOCABULARY", "brief token unknown to every matcher lexicon")
+    f_fam8 = Finding(8, "PROCUREMENT MODEL", "NO market-cited block-price anchor")
+    f_fam7 = Finding(7, "CONDITIONAL LITERALS", "bare verdict literal")
+    f_fam10 = Finding(10, "UNIT-FAMILY COMPARISON", "kg vs tonne no conversion")
+    f_fam6_drop = Finding(6, "BOP ROLES", "matches NO _BOP_ROLES* placement regex")
+    f_fam6_other = Finding(6, "BOP ROLES", "falls to TYPE_RULES 'other' fallthrough")
+    f_info = Finding(1, "VOCABULARY", "prose note", severity="INFO")
+    expect(_finding_weight(f_fam2_readfirst_qq) == "QUALITY",
+           "family 2 `?? fallback` read-the-contract-first shape = QUALITY "
+           "(a defensive default, not an active divergence)")
+    expect(_finding_weight(f_fam2_readfirst_qcall) == "QUALITY",
+           "family 2 `q(contract, name, literal)` read-first helper shape = QUALITY")
+    expect(_finding_weight(f_fam2_bare_closure) == "BLOCKER",
+           "family 2 BARE closure literal with NO read-first marker "
+           "(literal-shadow-in-a-closure) = BLOCKER")
+    expect(_finding_weight(f_fam2_no_contract_block) == "BLOCKER",
+           "family 2 'no registerArchetype block' (no contract namespace at all) "
+           "= BLOCKER")
+    expect(_finding_weight(f_fam1) == "QUALITY", "family 1 (vocab/matcher) = QUALITY")
+    expect(_finding_weight(f_fam8) == "QUALITY", "family 8 (no market anchor) = QUALITY")
+    expect(_finding_weight(f_fam7) == "BLOCKER", "family 7 (verdict literal) = BLOCKER")
+    expect(_finding_weight(f_fam10) == "BLOCKER", "family 10 (unit-family) = BLOCKER")
+    expect(_finding_weight(f_fam6_drop) == "BLOCKER",
+           "family 6 'no placement regex' (visible 3D scene drop) = BLOCKER")
+    expect(_finding_weight(f_fam6_other) == "QUALITY",
+           "family 6 'TYPE_RULES other' (coverage-expectation shrink) = QUALITY")
+    expect(_finding_weight(f_info) == "INFO", "an INFO-severity finding stays INFO")
+
     print("[selftest] NEVER_FOLD divergence detection, both directions")
     a, b = {"ups", "mains"}, {"ups", "gas"}
     expect(bool(a.symmetric_difference(b)), "diverged sets fire")
@@ -1363,10 +1709,11 @@ def main(argv: List[str]) -> int:
         print(f"brief not found: {brief}")
         return 0  # an audit, not a gate — but nothing to audit
     use_node = "--no-node" not in argv
-    report, n = run_audit(slug, brief, use_node=use_node)
+    report, n, n_blocker, n_quality = run_audit(slug, brief, use_node=use_node)
     print(report)
-    print(f"PRE-FLIGHT SUMMARY: {n} finding(s) for `{slug}` — an audit, not a gate "
-          f"(exit 0). Fix findings BEFORE the first chain run "
+    print(f"PRE-FLIGHT SUMMARY: {n} finding(s) for `{slug}` — {n_blocker} BLOCKER, "
+          f"{n_quality} QUALITY-polish — an audit, not a gate (exit 0). Fix BLOCKERs "
+          f"first, then QUALITY-polish, BEFORE the first chain run "
           f"(docs/ARCHETYPE-CAMPAIGN-PLAYBOOK.md §pre-flight).")
     return 0
 
