@@ -594,6 +594,16 @@ _PANEL_DUTY_FRACTION = [
 _WHOLE_PLANT_KW_RE = re.compile(
     r"·\s*([\d.,]+)\s*kW\s*(plant|site|total|connected|aggregate|whole)", re.I)
 _OWN_KW_RE = re.compile(r"·\s*([\d.,]+)\s*kW\b")
+# A routed CONNECTION row ('<medium> connection: A → B · NN kW') carries a TRANSFER duty between
+# TWO pieces of equipment (e.g. 'water connection: electric steam generator → distillation
+# reboiler · 49.22 kW' = the THERMAL steam duty delivered to the reboiler), never either
+# endpoint's own electrical rating. A token-overlap match (both 'name' resolvers below match on
+# head-noun subset) lets a device's name appear in a connection row it's merely one endpoint of,
+# misattributing the transfer duty as that device's OWN draw — confirmed on the CO2-campaign-v7
+# panel, where 'Electric steam generator' inherited this row's 49.22 kW instead of its real
+# electrical-input rating. Universal — keyed on the connection-row SHAPE, never a product class.
+def _is_connection_row_head(head: str) -> bool:
+    return bool(re.match(r"\s*\w[\w /-]*\bconnection\b\s*:", head) or "→" in head or "->" in head)
 # A motor circuit's CONNECTED (absorbed) electrical load is the SHAFT power, not the motor
 # NAMEPLATE rating. The requirementsBom states both for a sized drive, e.g. 'Circulation Pump
 # · 132 kW motor (94 kW shaft)' — the 132 is the frame the motor is BUILT on (the next standard
@@ -675,6 +685,8 @@ def _panel_req_bom_kw(name: str, state: dict) -> Optional[float]:
             continue
         req = str(row.get("requirement") or "")
         head = req.split("·", 1)[0]
+        if _is_connection_row_head(head):
+            continue                       # A→B transfer duty, not either endpoint's own draw
         h_toks = set(_norm_load_name(head).split())
         if not h_toks:
             continue
@@ -723,7 +735,10 @@ def _panel_motor_nameplate_kw(name: str, state: dict) -> Optional[float]:
         if not isinstance(row, dict):
             continue
         req = str(row.get("requirement") or "")
-        h_toks = set(_norm_load_name(req.split("·", 1)[0]).split())
+        head = req.split("·", 1)[0]
+        if _is_connection_row_head(head):
+            continue                       # A→B transfer duty, not either endpoint's own draw
+        h_toks = set(_norm_load_name(head).split())
         if not h_toks or len(t_toks & h_toks) < len(t_toks):
             continue
         if _WHOLE_PLANT_KW_RE.search(req):
@@ -743,6 +758,22 @@ def _panel_motor_nameplate_kw(name: str, state: dict) -> Optional[float]:
     return best[1] if best else None
 
 
+# A DISTRIBUTION/SWITCHGEAR ASSEMBLY (motor control centre / MCC, distribution board,
+# switchboard, switchgear, busbar) HOUSES motor starters but is not itself a motor — yet its
+# head noun contains the substring 'motor' ('motor control centre') so the anchor regex below
+# would otherwise match it. Its own '· NN kW' figure is a BUSBAR/BOARD rating (or, as seen on
+# the CO2 mineralisation run, a rating-BASIS placeholder used purely to PRICE the switchboard via
+# a generic '£/kW as if it were a motor' costing rule — 'motor control centre · 750 kW' — never
+# an actual shaft/nameplate duty). Reading it as "the plant's principal motor load" corrupts every
+# downstream duty-fraction estimate that falls back to _panel_type_kw (e.g. a 250 m³/h ATEX
+# extract fan inflated to 90 kW, a passive static mixer inflated to 60 kW) — the root cause of the
+# CO2-campaign-v7 load_reconcile failure (panel total inflated to 846 kW vs the grounded 87 kW
+# contract load). Universal — keyed on the ASSEMBLY noun, never a product class.
+_SWITCHGEAR_ASSEMBLY_RE = re.compile(
+    r"\bmotor control cent(?:re|er)\b|\bmcc\b|distribution board|switchboard|switchgear|"
+    r"\bbusbar\b", re.I)
+
+
 def _panel_principal_motor_kw(state: dict) -> float:
     """The plant's principal motor load [kW] — anchor for the type-based estimate. Largest
     pump/motor/drive '· NN kW' figure in the BoM, else a quarter of the connected load."""
@@ -759,7 +790,12 @@ def _panel_principal_motor_kw(state: dict) -> float:
             # heat-transfer duty), NOT an equipment's own motor rating — and its head can match
             # 'heat pump'/'pump'. Never read it as the principal-motor anchor (it would inflate
             # every duty-fraction circuit). Keyed on the connection shape, universal.
-            if re.match(r"\s*\w[\w /-]*\bconnection\b\s*:", head) or "→" in head or "->" in head:
+            if _is_connection_row_head(head):
+                continue
+            # A switchgear/distribution ASSEMBLY (motor control centre, switchboard, busbar) is
+            # never itself a motor, even though 'motor control centre' contains 'motor' — see
+            # _SWITCHGEAR_ASSEMBLY_RE above.
+            if _SWITCHGEAR_ASSEMBLY_RE.search(head):
                 continue
             if not re.search(r"pump|motor|drive|fan|blower|compressor|heat pump", head):
                 continue
@@ -826,26 +862,52 @@ def _panel_resolve_ledger_kw(name: str, state: dict) -> Optional[float]:
                           r"total_(?:installed|connected)|plant_(?:load|demand)|"
                           r"site_(?:load|demand)|peak_demand", re.I)
     btoks = set(_norm_load_name(base).split()) - _GENERIC_TOK
+    best: Optional[tuple[int, float]] = None
     if btoks:
         for k, v in q.items():
             kl = k.lower()
             if not kl.endswith("_kw") or _AGG_KEY.search(kl):
                 continue
-            if re.search(r"thermal|cooling|heating|dissipation|rejection|duty(?!_)|"
+            # NOTE 2026-07-06: was 'duty(?!_)' — a negative lookahead that can NEVER fire against
+            # the overwhelmingly common '..._duty_kw' key shape (duty is ALWAYS immediately
+            # followed by '_kw' there), so it silently failed to exclude a single real thermal-duty
+            # quantity. Root cause of the CO2-campaign-v7 load_reconcile failure: the MEA
+            # lean/rich cross-exchanger's THERMAL duty ('lean_rich_cross_exchanger_duty_kw' =
+            # 43.6 kW) leaked into the unrelated 'dryer exhaust heat-recovery exchanger' circuit
+            # purely because both share the token 'exchanger'. Plain 'duty' correctly excludes
+            # every '*_duty_kw' thermal/process quantity (the elec/motor/drive/compressor/fan/pump
+            # escape hatch below still lets a genuinely-electrical '*_duty_kw' through).
+            if re.search(r"thermal|cooling|heating|dissipation|rejection|duty|"
                          r"recover|capacity|loss", kl) and not re.search(r"elec|motor|drive|"
                          r"compressor|fan|pump", kl):
                 continue                       # a *_recovery_kw / heat-recovery duty is THERMAL,
                 #                                not the fan's electrical draw (HRV 941 kW bug)
             ktoks = set(re.split(r"[_\s]+", kl.replace("_kw", ""))) - _GENERIC_TOK
-            if btoks & ktoks:
-                val = v.get("value") if isinstance(v, dict) else v
-                try:
-                    val = float(val)
-                except (TypeError, ValueError):
-                    continue
-                if val > 0:
-                    return val
-    return None       # ledger does not price this item — caller decides aux bound vs estimate
+            if not btoks or not ktoks:
+                continue
+            # NOTE 2026-07-06: was 'any shared token' (btoks & ktoks) — too weak once the CO2
+            # contract carries several similarly-worded packaging/drying quantities: 'dryer exhaust
+            # heat-recovery exchanger' matched 'dryer_air_heater_battery_kw' on the single shared
+            # token 'dryer' (67.5 kW misattributed), and 'bag-mouth pre-heater' matched
+            # 'hot_air_process_heater_kw' on the single shared token 'heater' (150 kW
+            # misattributed) — the SAME false-positive class as the switchgear/duty-regex bugs
+            # above, just against multi-word contract keys instead of BoM rows. Require a FULL
+            # SUBSET match in either direction (mirrors _panel_req_bom_kw's discipline) so two
+            # genuinely-distinct pieces of equipment sharing one generic noun never collide;
+            # among qualifying candidates, prefer the LARGEST (most specific) overlap.
+            if not (btoks <= ktoks or ktoks <= btoks):
+                continue
+            val = v.get("value") if isinstance(v, dict) else v
+            try:
+                val = float(val)
+            except (TypeError, ValueError):
+                continue
+            if val <= 0:
+                continue
+            overlap = len(btoks & ktoks)
+            if best is None or overlap > best[0]:
+                best = (overlap, val)
+    return best[1] if best else None       # ledger does not price this item — caller decides aux bound vs estimate
 
 
 def _equipment_dup_sig(name: str, kw: Optional[float], ways: int,
