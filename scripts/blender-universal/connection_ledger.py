@@ -908,6 +908,84 @@ def close_flow_directions(parts, topology, log=print):
     return extra
 
 
+# STEAM-SOURCE → REBOILER redirect (2026-07-06, the L&V-flagged mis-wire). ROOT CAUSE
+# (proven by tracing close_flow_directions live on the CO2-mineralisation plant): the
+# engineering contract authors its stripper-reboiler steam tie using a raw topology id
+# ('stripper_column') that names no REAL placed part — the design's actual reboiling
+# equipment is called 'distillation reboiler' / 'MEA stripper reboil pot', neither of
+# which contains the word "column". Both close_flow_directions' OWN unresolved-candidate
+# ranking (an id with no matching Part.name silently defaults to the module-level RANK
+# FALLBACK, which can outrank every real process vessel) AND build_universal_scene's
+# resolve_endpoint() token-overlap matcher (whose only placed part carrying a "column"
+# token is the ABSORBER) independently steer the tie onto 'packed absorber column' — a
+# bare separation vessel with no heat-exchange duty of its own. The result: the plant's
+# OWN steam generator, sized in engineering-contract.ts specifically as "stripper
+# reboiler steam supply", ends up wired to the wrong vessel on both the authored
+# ('source: contract', mechanism 'thermal') AND the direction-closer's completion
+# ('source: completion', mechanism 'fluid_loop') edges.
+#
+# THE FIX (a correction pass, same idiom as close_air_directions "physically-correct
+# tie, not the spurious one"): whenever a STEAM-GENERATION utility's edge terminates on
+# a bare separation/contact VESSEL (absorber/column/vessel — no reboil duty in its own
+# name) AND the plant has a REAL placed part whose name says it reboils, re-home that
+# edge onto the reboiler. Deterministic + universal — keyed on the STEAM-SOURCE and
+# REBOILER-NAME vocabulary (no per-class table); a no-op wherever the plant has no
+# reboiler-named part (nothing honest to redirect to, never fabricates a target) or the
+# edge already terminates on one (idempotent — a second pass changes nothing).
+_STEAM_SOURCE_NAME_RE = re.compile(r"steam\s*generator|\bboiler\b", re.I)
+_REBOILER_EXACT_NAME_RE = re.compile(r"\breboilers?\b", re.I)
+_REBOIL_ANY_NAME_RE = re.compile(r"reboil", re.I)
+_BARE_SEPARATION_VESSEL_RE = re.compile(r"\babsorber\b|\bcolumn\b|\bvessel\b", re.I)
+
+
+def _find_reboiler_part(parts):
+    """The placed part that does the reboiling, or None. Prefers an exact 'reboiler'
+    noun (the heat exchanger that actually receives the steam duty) over a looser
+    'reboil' match (e.g. a 'reboil pot' — the vessel the reboiler feeds); deterministic
+    alphabetical tie-break within either tier so the pick never depends on dict/list
+    ordering."""
+    names = [getattr(p, "name", None) for p in parts]
+    exact = sorted(n for n in names if n and _REBOILER_EXACT_NAME_RE.search(n))
+    if exact:
+        return exact[0]
+    any_ = sorted(n for n in names if n and _REBOIL_ANY_NAME_RE.search(n))
+    return any_[0] if any_ else None
+
+
+def redirect_steam_to_reboiler(topology, parts, log=print):
+    """Re-home any edge FROM a steam-generation utility that lands on a bare
+    absorber/column/vessel onto the plant's real reboiler part (see module comment
+    above). Mutates matching edges IN PLACE (re-homing, not adding a duplicate) and
+    returns the count changed. proveCatch + counter-cases in _selftest()."""
+    reboiler = _find_reboiler_part(parts)
+    if reboiler is None:
+        return 0
+    n = 0
+    for e in topology:
+        if not isinstance(e, dict):
+            continue
+        frm = str(e.get("from_part") or "")
+        to = str(e.get("to_part") or "")
+        if not _STEAM_SOURCE_NAME_RE.search(frm):
+            continue
+        if _service_of(e.get("mechanism")) not in ("thermal", "water"):
+            continue
+        if to == reboiler or _REBOIL_ANY_NAME_RE.search(to):
+            continue           # already correct — idempotent
+        if not _BARE_SEPARATION_VESSEL_RE.search(to):
+            continue           # only correct a genuine bare-vessel mis-target
+        old_to = e.get("to_part")
+        e["to_part"] = reboiler
+        e["material_context"] = (str(e.get("material_context") or "").strip()
+                                  + f" [direction-closer: steam re-homed from '{old_to}' to the "
+                                    f"reboiler '{reboiler}' — a steam source feeds the reboiler, "
+                                    f"not a bare separation vessel]").strip()
+        n += 1
+    if n:
+        log(f"[ledger] steam-to-reboiler redirect: {n} edge(s) re-homed onto '{reboiler}'")
+    return n
+
+
 def close_air_directions(parts, topology, log=print):
     """Connect every AIR-MOVER (blower/fan) to the process unit it aerates by an AIR line —
     the physically-correct tie (a degasser's forced draught, an MBBR's/biofilter's process
@@ -1948,6 +2026,37 @@ def _selftest():
     closed = close_flow_directions(cparts, ctopo, log=lambda *a: None)
     assert any(e["to_part"] == "Degasser" and e["from_part"] in ("Biofilter", "Drum Filter")
                for e in closed), f"degasser (output-only) must be fed from upstream; got {closed}"
+
+    # redirect_steam_to_reboiler proveCatch (2026-07-06, the L&V-flagged CO2-mineralisation
+    # mis-wire): a steam generator's authored edge to a bare separation VESSEL must be
+    # re-homed onto the plant's real reboiler-named part.
+    rparts = [_PR("Electric Steam Generator", 60), _PR("Distillation Reboiler", 30),
+              _PR("MEA Stripper Reboil Pot", 20), _PR("Packed Absorber Column", 45)]
+    rtopo = [{"from_part": "Electric Steam Generator", "to_part": "Packed Absorber Column",
+              "mechanism": "thermal"}]
+    n_redirected = redirect_steam_to_reboiler(rtopo, rparts, log=lambda *a: None)
+    assert n_redirected == 1 and rtopo[0]["to_part"] == "Distillation Reboiler", \
+        f"steam→absorber must redirect to the reboiler; got n={n_redirected} edge={rtopo[0]}"
+    # idempotent — a second pass over the now-correct edge changes nothing.
+    assert redirect_steam_to_reboiler(rtopo, rparts, log=lambda *a: None) == 0, \
+        "a second redirect pass over an already-correct edge must be a no-op"
+    # counter-case: NO reboiler-named part in the plant → never invents a target.
+    no_reboiler_parts = [_PR("Electric Steam Generator", 60), _PR("Packed Absorber Column", 45)]
+    no_reboiler_topo = [{"from_part": "Electric Steam Generator", "to_part": "Packed Absorber Column",
+                         "mechanism": "thermal"}]
+    assert redirect_steam_to_reboiler(no_reboiler_topo, no_reboiler_parts, log=lambda *a: None) == 0, \
+        "with no reboiler-named part present, the edge must be left untouched (never fabricate a target)"
+    assert no_reboiler_topo[0]["to_part"] == "Packed Absorber Column"
+    # counter-case: a legitimate steam tie to a real process vessel with NO reboiler
+    # present at all is untouched (already covered above); a legitimate tie that is NOT
+    # to a bare separation vessel (e.g. a jacketed reactor) must also survive unchanged.
+    non_vessel_parts = [_PR("Electric Steam Generator", 60), _PR("Distillation Reboiler", 30),
+                        _PR("Jacketed Reactor", 20)]
+    non_vessel_topo = [{"from_part": "Electric Steam Generator", "to_part": "Jacketed Reactor",
+                        "mechanism": "thermal"}]
+    assert redirect_steam_to_reboiler(non_vessel_topo, non_vessel_parts, log=lambda *a: None) == 0, \
+        "a steam tie to a non-vessel-named part (not the mis-wire signature) must be left alone"
+    assert non_vessel_topo[0]["to_part"] == "Jacketed Reactor"
 
     # close_oxygen_directions: an O₂ consumer (solenoid+diffuser / DO valve) with NO
     # process feed (only a power tie) is supplied from its nearest O₂ SOURCE by an oxygen

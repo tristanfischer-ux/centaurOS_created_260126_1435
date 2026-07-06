@@ -1276,10 +1276,82 @@ def region_rank_for(display_name, module_id):
     return REGION_PRIORITY_DEFAULT
 
 
+
+# ── DUTY-SCALED default for a small rotating machine with NO explicit dimension
+# (2026-07-06, GA/Renders litter fix). A "pump"/"compressor"/"centrifuge" word that
+# carries no dimension modifier falls to the ONE static TYPE_DEFAULTS_MM["pump"] box
+# — fine for a single machine, but when SEVERAL distinct pumps of genuinely different
+# duty all lack a dimension, they collide on that one shared box and manifest_sight's
+# litter detector (correctly) flags "N distinct parts share a default box" (the CO2-
+# mineralisation mass-balance pumps: filter-vacuum / filtrate-receiver / mother-liquor-
+# recycle / reactor-slurry-recirculation / wash-water-feed all landed on the identical
+# {w:1930,d:728.5,h:784} machine-assembly bbox). The honest, UNIVERSAL fix (CORE FIX
+# PRINCIPLE — size them, don't hide them) is to derive EACH one's box from its OWN
+# duty when the plant states one, and leave it at the generic default only when no
+# duty is known — never fabricate a distinguishing number for two genuinely identical-
+# duty machines (a real defect is DISTINCT parts sharing a box; two duty/standby units
+# of the SAME pump sharing the same real size is correct engineering, not litter).
+#
+# Duty source, in order (first hit wins, honest — no guess between two):
+#  (1) the word's OWN "capacity" modifier_character (a real emitted number+unit, e.g.
+#      the liquid-ring vacuum pump's "250 m³/h" gas-handling capacity) — universal,
+#      no archetype table, works for any class that emits a capacity modifier;
+#  (2) the connection ledger's OWN name→flow-quantity matcher (cl._flow_qty_for_part —
+#      exact snake(name)+flow-suffix, else a UNIQUE prefix candidate; the SAME honest
+#      matcher connection_ledger.py already uses to join a contract flow onto a
+#      topology edge) — picks up the mass-balance flow quantities the engineering
+#      contract derives per pump (e.g. reactor_slurry_recirculation_pump_m3_per_hour).
+#  A part with neither stays at the plain type-default (honestly "no data yet"), so a
+# 2-pump residual tie never trips MIN_CLUSTER (5) — the fix differentiates what it can
+# prove and is silent about the rest, never fabricating a size to break a tie.
+#
+# SCALE: cube-root of (duty ÷ a 1 m³/h reference) — a reference chosen because the
+# static TYPE_DEFAULTS_MM["pump"] box (900×500×700 mm, a small Grundfos-CRNE-class
+# transfer pump) already represents a plant duty in the low single-digit m³/h range.
+# Cube-root keeps growth realistic for a similarity-scaled pump family (volume ∝
+# duty) without letting a 250 m³/h vacuum-pump package explode past a sane skid size;
+# clamped so a tiny dosing duty never shrinks to near-nothing either.
+_MACHINE_DUTY_REF_M3H = 1.0
+_MACHINE_DUTY_SCALE_MIN = 0.55
+_MACHINE_DUTY_SCALE_MAX = 1.8
+_CAPACITY_M3H_RE = re.compile(r"m.?3\s*/\s*h|m3/hr|m³/h", re.I)
+
+
+def _machine_duty_m3h(name, mods, quantities):
+    """(duty_m3h) for a pump/compressor/centrifuge word, or None — see the module-
+    level comment above for the two honest sources tried, in order."""
+    for mc in (mods or []):
+        if mc.get("kind") == "capacity":
+            unit = str(mc.get("unit") or "")
+            if _CAPACITY_M3H_RE.search(unit):
+                try:
+                    v = float(mc.get("value"))
+                except (TypeError, ValueError):
+                    v = None
+                if v and v > 0:
+                    return v
+    if quantities:
+        hit = cl._flow_qty_for_part(name, quantities)
+        if hit is not None:
+            return hit[1]
+    return None
+
+
+def _machine_duty_scaled_dim(duty_m3h):
+    """A {kind:'box', w_mm, d_mm, h_mm} dim, isotropically scaled off the plain pump
+    type-default by cube-root(duty ÷ reference), clamped — see module comment."""
+    scale = (max(duty_m3h, 1e-6) / _MACHINE_DUTY_REF_M3H) ** (1.0 / 3.0)
+    scale = max(_MACHINE_DUTY_SCALE_MIN, min(_MACHINE_DUTY_SCALE_MAX, scale))
+    base = TYPE_DEFAULTS_MM["pump"]
+    return {"kind": "box", "w_mm": base["w"] * scale, "d_mm": base["d"] * scale,
+            "h_mm": base["h"] * scale}
+
+
 def extract_parts(state):
     """Walk modules→sub_modules→words; return (parts, dropped, stats)."""
     parts, dropped = [], []
     modules = state.get("moduleDecomposition", {}).get("modules", [])
+    quantities = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
     for m in modules:
         module_id = m.get("module", "unknown")
         display = m.get("display_name", module_id)
@@ -1288,7 +1360,25 @@ def extract_parts(state):
         rank = region_rank_for(display, module_id)
         for s in m.get("sub_modules", []):
             for w in s.get("words", []):
-                name = w.get("name_human") or w.get("character_id") or "part"
+                # NAME FALLBACK (2026-07-06, the L&V-flagged "'Part' references no real
+                # part" Connection-trace HIGH): a malformed word entry with neither
+                # `name_human` nor a top-level `character_id` (a duplicate/partial patch
+                # in moduleDecomposition — e.g. two words sharing id 'cake_wash_manifold_
+                # word', one properly named, one missing its name_human) used to fall to
+                # the bare literal "part", which then wires into the topology as an
+                # unresolvable node the Connection-trace tab correctly flags: '"Part"
+                # references no such part exists in the bill of materials'. The word's
+                # OWN `id` (e.g. 'cake_wash_manifold_word') still names it — de-slugify
+                # that BEFORE falling to the meaningless generic literal, so a malformed
+                # entry at least reads as its real equipment name instead of "part".
+                # Universal: any archetype with a similarly malformed word benefits;
+                # unaffected when name_human/character_id are present (every existing
+                # part keeps its exact name — proveCatch + counter-case in the harness).
+                name = w.get("name_human") or w.get("character_id")
+                if not name:
+                    _wid = str(w.get("id") or "").strip()
+                    _deslugged = re.sub(r"_word$", "", _wid).replace("_", " ").strip()
+                    name = _deslugged or "part"
                 mods = w.get("modifier_characters", []) or []
                 form = " ".join(mc.get("value", "") for mc in mods
                                 if mc.get("kind") == "form")
@@ -1339,6 +1429,15 @@ def extract_parts(state):
                         qty = parse_quantity(mc.get("value"))
                         break
                 shape = classify_shape(name, form, module_id)
+                # DUTY-SCALED default for an undimensioned small rotating machine
+                # (2026-07-06, GA/Renders litter fix — see the module-level comment
+                # above _machine_duty_m3h): only fires when the word has NO explicit
+                # dimension AND the plant states a real duty (capacity modifier or a
+                # matched contract flow quantity) — never fabricates a size.
+                if dim is None and shape in _REPLICATED_MACHINE_KIND:
+                    duty = _machine_duty_m3h(name, mods, quantities)
+                    if duty is not None:
+                        dim = _machine_duty_scaled_dim(duty)
                 # UNIVERSAL backstop: a part carrying an explicit CYLINDER dim
                 # ("2.1 m dia x 1.4 m") IS a cylindrical vessel — but a `box` shape
                 # drops dia/len (footprint_mm reads w/d/h) and the part collapses to
@@ -16351,6 +16450,17 @@ def main():
     topology, _ledger_dropped = cl.finalize_ledger(_candidate, parts, resolve_endpoint,
                                                    log=lambda m: print(m),
                                                    quantities=quantities)
+    # STEAM-SOURCE → REBOILER redirect (2026-07-06, the L&V-flagged mis-wire). Runs AFTER
+    # finalize_ledger (not on the raw pre-resolution candidate list) because the authored
+    # topology names its endpoints with raw contract ids ('reboiler_steam_supply',
+    # 'stripper_column') that finalize_ledger's resolve_endpoint() has ALREADY canonicalised
+    # to real placed-part names by this point — resolve_endpoint's only "column"-token match
+    # for 'stripper_column' is the absorber (neither 'distillation reboiler' nor 'MEA
+    # stripper reboil pot' contains the word "column"), so the plant's own steam generator
+    # lands on the wrong vessel. Re-home onto the real reboiler-named part; a no-op on any
+    # archetype with no such pattern (no steam-source edge onto a bare vessel, or no
+    # reboiler-named part to redirect to).
+    cl.redirect_steam_to_reboiler(topology, parts, log=lambda m: print(m))
     # STRICT completeness gate — every part must SHOW its required input + output (Tristan
     # 2026-06-20). A concern = a part not fully connected; it is written to the ledger
     # artifact so the deterministic suite can FAIL on it (no 80%-coverage absorption).
