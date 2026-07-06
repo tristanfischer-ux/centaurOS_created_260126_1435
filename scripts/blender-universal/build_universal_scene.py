@@ -6241,14 +6241,17 @@ def write_route_manifest(out_dir):
         # PIPE-LINE MATERIAL (universal, fluid-keyed): the corrosion-appropriate material
         # the line list + the BoM both quote — a corrosive-fluid run (seawater / saline /
         # brine / effluent) defaults to HDPE/PE100 (chloride-proof), an oxidiser/LOX/ozone
-        # line to 316L, everything else to the substring-or-carbon default. Same resolver
-        # cost uses, so the drawn line list agrees with the costed BoM. Only fluid/pipe runs
-        # carry a pipe material; an electrical bus / duct leaves it null.
+        # line to 316L, a coolant/glycol run to stainless (hard) / EPDM hose (a 'branch'
+        # drop — same `role` this row already carries), everything else to the substring-
+        # or-carbon default. Same resolver cost uses, so the drawn line list agrees with
+        # the costed BoM. Only fluid/pipe runs carry a pipe material; an electrical bus /
+        # duct leaves it null. `role` threads the connection-role signal connection_sizing
+        # needs to tell a hard header run from a short flexible tap.
         pipe_material = None
         if dn or any(k in (mech or "").lower()
                      for k in ("fluid", "pipe", "thermal", "process", "water",
                                "steam", "gas", "coolant")):
-            _mf, pipe_material = cs._pipe_material_factor(mc or None)
+            _mf, pipe_material = cs._pipe_material_factor(mc or None, role=role)
         rows.append({
             "line_number": line_number,
             "run_name": nm,

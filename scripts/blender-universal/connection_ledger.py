@@ -680,6 +680,21 @@ _INLINE_TAP_RE = re.compile(
     r"\bvalve\b|flow[_ -]?meter|\bmeter\b|manifold|distribution[_ -]?manifold|"
     r"pipework|\bheader\b|sight[_ -]?glass|sampl|strainer|\btee\b|\bspool\b", re.I)
 
+# COOLANT/GLYCOL LOOP COMPONENTS — a part whose name IS the liquid-cooling loop (a
+# chiller, a cold plate / cold-plate manifold / coolant-distribution manifold, a
+# cooling pump, an expansion tank, or an explicit glycol/coolant tag). When
+# close_flow_directions closes a fluid tie between two such parts it is completing a
+# GLYCOL/WATER COOLANT LOOP, not a generic process-fluid tie — the closed edge's
+# material_context should SAY so (connection_sizing._pipe_material_factor reads this
+# same string to pick the real construction: stainless hard run / EPDM flex drop),
+# rather than the bland "process-flow input/output" placeholder that carries no fluid-
+# identity at all and would otherwise fall through to a fabricated carbon-steel default.
+# Universal — keyed on the liquid-cooling component VOCABULARY, never an archetype
+# check (a BESS rack loop and a CO2/SAF chiller circuit match identically).
+_COOLANT_LOOP_PART_RE = re.compile(
+    r"\bchiller\b|cold[_ -]?plate|coolant|glycol|cooling[_ -]?pump|expansion[_ -]?tank",
+    re.I)
+
 # ABSTRACT BATTERY-LIMIT boundary nodes — the grid connection, the atmosphere, the sea/
 # sewer. Intentional system edges with no physical part; a legitimate trace terminus, so
 # they are NOT 'broken references' in the referential-integrity check.
@@ -884,9 +899,19 @@ def close_flow_directions(parts, topology, log=print):
         if pick is None or (pick, nm) in seen:
             continue  # no genuine upstream → leave it for the gate (never guess)
         seen.add((pick, nm))
+        # a tie between two COOLANT-LOOP-named parts (chiller/cold plate/coolant
+        # manifold/cooling pump/expansion tank) is completing a glycol/water coolant
+        # loop, not a generic process-fluid tie — say so, so the downstream pipe-
+        # material resolver picks the real construction instead of a fabricated
+        # carbon-steel default.
+        if _COOLANT_LOOP_PART_RE.search(pick) or _COOLANT_LOOP_PART_RE.search(nm):
+            mc = ("glycol/water coolant-loop input (direction-closer: nearest "
+                  "upstream) — coolant/glycol service")
+        else:
+            mc = "process-flow input (direction-closer: nearest upstream)"
         extra.append({"from_part": pick, "to_part": nm, "mechanism": "fluid_loop",
                       "constraint_kind": "flow_capacity",
-                      "material_context": "process-flow input (direction-closer: nearest upstream)",
+                      "material_context": mc,
                       "_augmented": True, "_direction_closed": True})
         has_in.add(nm)
 
@@ -911,9 +936,14 @@ def close_flow_directions(parts, topology, log=print):
         if pick is None or (nm, pick) in seen:
             continue
         seen.add((nm, pick))
+        if _COOLANT_LOOP_PART_RE.search(nm) or _COOLANT_LOOP_PART_RE.search(pick):
+            mc = ("glycol/water coolant-loop output (direction-closer: nearest "
+                  "downstream) — coolant/glycol service")
+        else:
+            mc = "process-flow output (direction-closer: nearest downstream)"
         extra.append({"from_part": nm, "to_part": pick, "mechanism": "fluid_loop",
                       "constraint_kind": "flow_capacity",
-                      "material_context": "process-flow output (direction-closer: nearest downstream)",
+                      "material_context": mc,
                       "_augmented": True, "_direction_closed": True})
         has_out.add(nm)
 
@@ -2071,6 +2101,40 @@ def _selftest():
     closed = close_flow_directions(cparts, ctopo, log=lambda *a: None)
     assert any(e["to_part"] == "Degasser" and e["from_part"] in ("Biofilter", "Drum Filter")
                for e in closed), f"degasser (output-only) must be fed from upstream; got {closed}"
+
+    # close_flow_directions COOLANT-LOOP material_context proveCatch (2026-07-06, the
+    # BESS liquid-cooling-loop material fix): a direction-closed tie between two
+    # coolant-loop-named parts (a chiller / cold plate manifold / cooling pump /
+    # expansion tank) must carry a coolant/glycol-identifying material_context, NOT the
+    # bland generic placeholder — connection_sizing.coolant_service_material reads this
+    # exact string to pick stainless (hard run) / EPDM hose (branch drop) instead of
+    # defaulting to a fabricated carbon-steel pipe. Counter-case proves the widening is
+    # NOT a blanket "always tag coolant" — a plain non-coolant process-fluid tie (Drum
+    # Filter -> Biofilter, tested above) still gets the generic placeholder.
+    ccparts = [_PR("Liquid Cooling Chiller", 0), _PR("Cold Plate Manifold", 1),
+               _PR("Expansion Tank", 2)]
+    cctopo = [{"from_part": "Liquid Cooling Chiller", "to_part": "Cold Plate Manifold",
+               "mechanism": "fluid_loop"},
+              {"from_part": "Expansion Tank", "to_part": "Cold Plate Manifold",
+               "mechanism": "fluid_loop"}]   # Expansion Tank has an output but no input
+    cclosed = close_flow_directions(ccparts, cctopo, log=lambda *a: None)
+    _ct_edge = next((e for e in cclosed if e["to_part"] == "Expansion Tank"), None)
+    assert _ct_edge is not None, f"Expansion Tank (needs an input) must be fed; got {cclosed}"
+    assert "coolant/glycol service" in _ct_edge["material_context"], (
+        f"a direction-closed tie touching a coolant-loop-named part must carry a "
+        f"coolant/glycol-identifying material_context, not the bland generic "
+        f"placeholder; got {_ct_edge['material_context']!r}")
+    assert "process-flow input" not in _ct_edge["material_context"], (
+        f"coolant-loop tie must NOT fall back to the generic placeholder; "
+        f"got {_ct_edge['material_context']!r}")
+    # counter-case: the earlier Degasser-fed-from-Biofilter tie (neither part named a
+    # coolant-loop component) must still carry the ORIGINAL generic placeholder —
+    # the widening is keyed on vocabulary, never a blanket change.
+    _degasser_edge = next(e for e in closed if e["to_part"] == "Degasser")
+    assert _degasser_edge["material_context"] == \
+        "process-flow input (direction-closer: nearest upstream)", (
+        f"a non-coolant process-fluid tie must keep the original generic "
+        f"placeholder unchanged; got {_degasser_edge['material_context']!r}")
 
     # redirect_steam_to_reboiler proveCatch (2026-07-06, the L&V-flagged CO2-mineralisation
     # mis-wire): a steam generator's authored edge to a bare separation VESSEL must be

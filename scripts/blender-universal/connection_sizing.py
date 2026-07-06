@@ -484,6 +484,74 @@ _COMBUSTION_OXIDISER_RE = re.compile(
     rf"thermal{_SEP}?oxidi[sz]|\brto\b|incinerat|enclosed{_SEP}?flare|regenerative{_SEP}?therm",
     re.I)
 
+# ── COOLANT/GLYCOL LIQUID-COOLING SERVICE → REAL CONSTRUCTION MATERIAL (universal,
+# keyed on SERVICE + CONNECTION-ROLE, never a class table) ──────────────────────────
+# A closed glycol/water liquid-cooling loop (a BESS rack cold-plate loop, a CO2/SAF
+# chiller circuit, ANY class's heat-rejection loop that runs glycol rather than plain
+# water) is NEITHER bare carbon steel end-to-end NOR a plain water main (HDPE):
+#   - carbon steel corrodes in a glycol/water mix over the design life — wrong for the
+#     HARD header/riser run (chiller <-> distribution manifold, manifold headers);
+#     the correct hard-run material is STAINLESS STEEL (glycol-compatible);
+#   - the SHORT manifold -> cold-plate / manifold -> module DROP is never welded hard
+#     pipe in real construction — it is a FLEXIBLE EPDM RUBBER HOSE (crimped/clamped
+#     ends), because individual cold plates/modules need to tolerate vibration + be
+#     swapped for service without re-welding a header.
+# Keyed on the SERVICE text (coolant/glycol/chilled-non-water/cold-plate) + the
+# CONNECTION ROLE ('branch' = the short tap/drop every trunk-and-branch fan-out already
+# stamps — size_distribution_tree / group_fanout_trunks; anything else = a hard trunk/
+# header run). Never keyed on archetype: a BESS rack loop and a CO2/SAF chiller circuit
+# are treated identically by this rule.
+_COOLANT_GLYCOL_SERVICE_RE = re.compile(
+    rf"glycol|(?:^|{_SEP})coolant(?:$|{_SEP})|coolant{_SEP}?(?:loop|circuit|line|supply|"
+    rf"return|header|manifold|distribution|charge)|"
+    rf"chill(?:ed)?{_SEP}?(?:glycol|coolant)|"
+    rf"cold{_SEP}?plate", re.I)
+# Pipe-material multiplier + label for a coolant/glycol HARD run (stainless — matches
+# the existing PIPE_MATERIAL_FACTORS stainless factor so the two sources agree).
+_COOLANT_STAINLESS_FACTOR = 1.9
+# Flexible EPDM rubber hose for a short manifold->cold-plate/module DROP: no welding,
+# but the reinforced hose + crimped/clamped barb fittings roughly track a carbon-steel
+# small-bore run rather than undercutting it — a citable, conservative multiplier
+# (industrial reinforced coolant hose ~ comparable £/m to small-bore CS pipe at DN25-50).
+_EPDM_HOSE_FACTOR = 0.9
+
+
+def _is_coolant_glycol_service(material_context: Optional[str]) -> bool:
+    """True when `material_context` names a glycol/coolant liquid-cooling service
+    (universal, fluid-keyed — never an archetype check). 'chilled' alone (no 'glycol'/
+    'coolant' token) only counts when the string does NOT also say 'water' — so a plain
+    'chilled water' HVAC main (genuinely water, correctly HDPE via corrosive_service_
+    material) is left untouched; 'chilled glycol'/'chiller' variants are already caught
+    by the main regex."""
+    if not material_context:
+        return False
+    s = material_context.lower()
+    if _COOLANT_GLYCOL_SERVICE_RE.search(s):
+        return True
+    return "chilled" in s and "water" not in s
+
+
+def coolant_service_material(material_context: Optional[str],
+                              role: Optional[str] = None) -> Optional[tuple]:
+    """If `material_context` names a glycol/coolant liquid-cooling service, return the
+    (factor, label) for the REAL construction at this connection's ROLE; else None.
+
+    role == 'branch' (the short manifold->cold-plate/module DROP every trunk-and-branch
+    fan-out already stamps) -> flexible EPDM rubber hose (glycol-compatible, no weld).
+    Anything else (trunk / header / unstamped hard run) -> stainless steel (glycol-
+    compatible) — carbon steel corrodes in a glycol/water mix over the design life.
+
+    No-op (None) for a non-coolant service, so a plain process-water/process-fluid tie
+    is completely unaffected — the strict no-op guarantee every service-keyed default
+    in this module carries (mirrors corrosive_service_material's contract)."""
+    if not _is_coolant_glycol_service(material_context):
+        return None
+    if str(role or "").strip().lower() == "branch":
+        return (_EPDM_HOSE_FACTOR,
+                "EPDM flexible hose (glycol-compatible manifold-to-cold-plate drop)")
+    return (_COOLANT_STAINLESS_FACTOR,
+            "stainless steel (glycol-compatible coolant hard run)")
+
 
 def corrosive_service_material(material_context: Optional[str]) -> Optional[tuple]:
     """If `material_context` describes a fluid service that warrants a NON-carbon-steel
@@ -2520,20 +2588,67 @@ def _parse_csa_from_label(size_label: Optional[str]) -> Optional[float]:
     return last
 
 
-def _pipe_material_factor(material_context: Optional[str]) -> tuple[float, str]:
+_MATERIAL_CONTEXT_DISCLOSURE_RE = re.compile(r"\(from material_context:\s*([^)]*)\)")
+
+
+def _disclosed_material_context(material_context: Optional[str]) -> Optional[str]:
+    """The caller's own, genuinely-disclosed material_context — never the GENERIC
+    boilerplate `_spec_material_ctx` (below) reconstructs from the sizing tool's fixed
+    assumptions wording, which can itself contain a service-sounding word for ANY
+    thermal/fluid edge regardless of the real fluid (every thermal-duty computation
+    emits the FIXED phrase "thermal duty -> coolant flow -> pipe" + "liquid coolant;"
+    even for a contextless edge or a plain oil loop — proven by the
+    connection_sizing_test.py DEFECT-2 regression: a thermal edge with NO stated
+    material_context at all was misread as a coolant service purely from that
+    boilerplate, defaulting it to stainless with zero real information disclosed).
+
+    Two cases:
+      - the reconstructed hint DOES quote the original context verbatim as
+        "(from material_context: ...)" -> return exactly that quoted substring;
+      - no such marker AND the string carries the sizing tool's own "ideal bore"
+        phrase (present in every `_spec_material_ctx` hint, from ANY sizing pass,
+        regardless of whether an original context existed) -> this is boilerplate
+        with NOTHING disclosed -> return None (no real fluid-identity signal);
+      - otherwise the string IS the caller's raw, undecorated material_context
+        (the common case — a direct contract/ledger string, never reconstructed)
+        -> return it unchanged.
+    Used ONLY by the coolant/glycol service check below — the pre-existing explicit-
+    material / corrosive-service / substring-table checks continue to read the FULL
+    string as before (unaffected, already verified correct)."""
+    if not material_context:
+        return None
+    m = _MATERIAL_CONTEXT_DISCLOSURE_RE.search(material_context)
+    if m:
+        return m.group(1).strip()
+    if "ideal bore" in material_context.lower():
+        return None
+    return material_context
+
+
+def _pipe_material_factor(material_context: Optional[str],
+                           role: Optional[str] = None) -> tuple[float, str]:
     """Material multiplier + label on the carbon-steel pipe rate (carbon = 1.0).
 
-    Resolution order (universal, keyed on the SERVICE / fluid in material_context):
+    Resolution order (universal, keyed on the SERVICE / fluid in material_context, +
+    the CONNECTION ROLE for the coolant/glycol case):
       1. An EXPLICIT plastic / copper / exotic-alloy material named in the context wins
          (e.g. the context literally says "HDPE" or "Hastelloy").
-      2. Else a CORROSIVE-FLUID service forces a corrosion-resistant default — HDPE/PE100
+      2. Else a COOLANT/GLYCOL liquid-cooling service — read from a genuinely DISCLOSED
+         context only (see _disclosed_material_context) — picks the REAL construction
+         for its ROLE: stainless steel for the hard header/riser run, flexible EPDM hose
+         for a short manifold->cold-plate/module drop (role == 'branch'). Never a plain
+         water main (HDPE) or bare carbon steel, and never fired purely by the generic
+         sizing-tool boilerplate wording that wraps a contextless/other-fluid edge.
+      3. Else a CORROSIVE-FLUID service forces a corrosion-resistant default — HDPE/PE100
          for corrosive water (seawater / saline / brine / effluent / wastewater), 316L for
          an oxidiser / LOX / ozone line — OVERRIDING the carbon/stainless the substring
          table would otherwise pick (a seawater main is HDPE, never carbon steel and never
          plain 316L which pits in chloride).
-      3. Else the generic substring table (a stated 316/stainless, copper, etc.).
-      4. Else carbon steel.
-    No-op for a non-corrosive service with no stated material → carbon steel as before."""
+      4. Else the generic substring table (a stated 316/stainless, copper, etc.).
+      5. Else carbon steel.
+    No-op for a non-corrosive, non-coolant service with no stated material → carbon
+    steel as before (`role` is otherwise inert — it only ever changes the OUTCOME for a
+    detected coolant/glycol service, never for any other line)."""
     if not material_context:
         return 1.0, "carbon steel (assumed)"
     s = material_context.lower()
@@ -2552,13 +2667,23 @@ def _pipe_material_factor(material_context: Optional[str]) -> tuple[float, str]:
         if label in ("plastic/composite", "copper", "exotic alloy") and _match(subs):
             return factor, label
 
-    # (2) corrosive-fluid service → corrosion-resistant default (HDPE water / 316L oxidiser),
+    # (2) coolant/glycol liquid-cooling service → real construction for this ROLE
+    #     (stainless hard run / EPDM flex drop) — checked BEFORE the generic water
+    #     default so a glycol coolant loop is never mistaken for a plain water main.
+    #     Decided ONLY from a genuinely disclosed context (never the sizing-tool's
+    #     generic post-sizing boilerplate wording).
+    disclosed = _disclosed_material_context(material_context)
+    cool = coolant_service_material(disclosed, role) if disclosed is not None else None
+    if cool is not None:
+        return cool
+
+    # (3) corrosive-fluid service → corrosion-resistant default (HDPE water / 316L oxidiser),
     #     overriding the carbon-vs-stainless substring guess.
     corr = corrosive_service_material(material_context)
     if corr is not None:
         return corr
 
-    # (3) a stated stainless (or any remaining table entry), then (4) carbon steel.
+    # (4) a stated stainless (or any remaining table entry), then (5) carbon steel.
     for subs, factor, label in PIPE_MATERIAL_FACTORS:
         if _match(subs):
             return factor, label
@@ -2696,7 +2821,8 @@ def connection_cost(spec: dict,
             per_m = PIPE_COST_GBP_PER_M_BY_DN["DN50"]   # neutral mid fallback
             dn = dn or "DN50?"
         mat_factor, mat_label = _pipe_material_factor(spec.get("material_context")
-                                                      or _spec_material_ctx(spec))
+                                                      or _spec_material_ctx(spec),
+                                                      role=spec.get("role"))
         # Parallel headers (a "3×DN300" auto-split) cost N× the single line: N
         # parallel runs each of `length_m`, each flanged at both ends. The cable
         # branch already does this via `conductors`; mirror it for pipes so the
