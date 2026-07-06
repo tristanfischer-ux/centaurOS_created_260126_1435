@@ -1290,6 +1290,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Sense-check": "Independent market benchmark versus the engine's numbers.",
     "Brief": "Original client brief and the engine's structured interpretation.",
     "Design basis": "Codes, design duties, fluid and utilisation basis — with sources.",
+    "Engineering Analysis": "Allowable stress, safety factor and stress-strain per part.",
     "⚠ Checks": "Live arithmetic invariants — red rows show numbers that don't reconcile.",
     "Part names": "Master parts list; every other tab references these cells.",
     "Connection trace": "Which part connects to what, with live cell references.",
@@ -11164,6 +11165,507 @@ def _term_used_in(term: str, blob: str) -> bool:
     return False
 
 
+# ═══ ENGINEERING ANALYSIS — allowable stress / safety factor / stress-strain ═══════════
+# (Tristan 2026-07-06, priorities #3 SAFETY FACTOR + #6 STRESS-STRAIN): a chartered
+# engineer's first question of any pressure/structural part is "what's it rated to, and
+# by how much margin?" — no tab in the dossier answered that. UNIVERSAL: keyed on the
+# SAME fabrication-physics fields _bom_row_kind() already uses to call a BoM row
+# 'fabricated' (wall_mm + mass_kg + diameter_m — a materials take-off's own geometry,
+# never a per-class table) + the row's own `material` field + `basis` string (the SAME
+# materials-take-off sentence requirements_bom.py::_materials_takeoff() emits — "...
+# P=<N> kPa head · σ=<N> MPa → ..." — the engine's own design pressure + the allowable
+# stress it sized the wall to). Works for a RAS softener vessel, a CO2 absorber shell or
+# a BESS enclosure alike — no product class is ever named here.
+
+# The universal material-property reference (E / yield / UTS / elongation) — keyed by a
+# SMALL set of MATERIAL FAMILIES, matched against the BoM row's own `material` string
+# (never a per-class part table). 'family' selects the allowable-stress code route: a
+# METALLIC part gets the ASME BPVC VIII Div.1 UTS/yield safety-factor route; a
+# COMPOSITE/CONCRETE part has no UTS/yield ratio code — its allowable is the design
+# stress the engine's own wall-sizing physics already used (requirements_bom.py::
+# _wall_physics()), shown directly and honestly labelled as such.
+_EA_MATERIALS: Dict[str, dict] = {
+    "carbon steel": {
+        "display": "Carbon steel",
+        "family": "metallic", "e_gpa": 200.0, "yield_mpa": 250.0, "uts_mpa": 400.0,
+        "elong_pct": 21.0,
+        "code": "ASME BPVC VIII Div.1 (SA-516 Gr 70 carbon steel plate, room temp)",
+    },
+    "316l stainless": {
+        "display": "316L stainless",
+        "family": "metallic", "e_gpa": 193.0, "yield_mpa": 170.0, "uts_mpa": 485.0,
+        "elong_pct": 40.0,
+        "code": "ASME BPVC VIII Div.1 (SA-240 316L stainless, room temp)",
+    },
+    "304 stainless": {
+        "display": "304 stainless",
+        "family": "metallic", "e_gpa": 193.0, "yield_mpa": 205.0, "uts_mpa": 515.0,
+        "elong_pct": 40.0,
+        "code": "ASME BPVC VIII Div.1 (SA-240 304 stainless, room temp)",
+    },
+    "structural steel": {
+        "display": "Structural steel",
+        "family": "metallic", "e_gpa": 200.0, "yield_mpa": 275.0, "uts_mpa": 430.0,
+        "elong_pct": 20.0,
+        "code": "BS EN 1993-1-1 (S275 structural steel)",
+    },
+    "aluminium": {
+        "display": "Aluminium",
+        "family": "metallic", "e_gpa": 69.0, "yield_mpa": 240.0, "uts_mpa": 290.0,
+        "elong_pct": 12.0,
+        "code": "ASME BPVC VIII Div.1 (SB-209 6061-T6 aluminium, room temp)",
+    },
+    "frp/grp": {
+        "display": "FRP/GRP",
+        "family": "composite", "e_gpa": 17.0, "yield_mpa": None, "uts_mpa": 150.0,
+        "elong_pct": 2.5,
+        "code": "BS 4994 (GRP laminate design stress — no ASME UTS/yield ratio applies)",
+    },
+    "concrete": {
+        "display": "Reinforced concrete",
+        "family": "concrete", "e_gpa": 30.0, "yield_mpa": None, "uts_mpa": 30.0,
+        "elong_pct": 0.35,
+        "code": "BS EN 1992-1-1 (C30/37 reinforced concrete, compressive char. strength)",
+    },
+}
+# ASME BPVC Section II Part D basis for a metallic pressure part: the code allowable is
+# the LOWER of UTS/SF_UTS and Yield/SF_YIELD — both safety factors are EXPLICIT, shown,
+# labelled inputs (never buried in a formula) so a reader can see and challenge them.
+_EA_SF_UTS = 3.5
+_EA_SF_YIELD = 1.5
+
+_EA_HDR = ["Tag", "Part", "Qty", "Family", "Material", "Yield (MPa)", "UTS (MPa)",
+           "SF applied — UTS", "SF applied — yield", "Allowable (MPa)",
+           "Actual stress (MPa)", "Utilisation %", "Verdict", "Code basis", "Row check"]
+_EA_MAT_HDR = ["Material", "Family", "E (GPa)", "Yield (MPa)", "UTS (MPa)",
+               "Elongation (%)", "Code / reference"]
+_EA_CURVE_HDR = ["#", "X (Strain %)", "Y (Stress MPa)"]
+
+
+def _ea_match_material(material_label: str) -> Tuple[Optional[str], Optional[dict]]:
+    """(material key, properties) for a BoM row's own `material` string — substring
+    match against the label _material() in requirements_bom.py already emits. (None,
+    None) when the label matches nothing in the reference table — honest 'not in
+    contract', never a fabricated guess."""
+    m = str(material_label or "").lower()
+    if not m:
+        return None, None
+    if "concrete" in m:
+        return "concrete", _EA_MATERIALS["concrete"]
+    if "frp" in m or "grp" in m:
+        return "frp/grp", _EA_MATERIALS["frp/grp"]
+    if "316" in m:
+        return "316l stainless", _EA_MATERIALS["316l stainless"]
+    if "304" in m:
+        return "304 stainless", _EA_MATERIALS["304 stainless"]
+    if "structural" in m or "s275" in m or "s355" in m:
+        return "structural steel", _EA_MATERIALS["structural steel"]
+    if "alumin" in m:
+        return "aluminium", _EA_MATERIALS["aluminium"]
+    if "carbon steel" in m or "carbon" in m:
+        return "carbon steel", _EA_MATERIALS["carbon steel"]
+    return None, None
+
+
+_EA_BASIS_RE = re.compile(r"P=([\d.,]+)\s*kPa.*?σ=([\d.,]+)\s*MPa", re.I | re.S)
+
+
+def _build_engineering_analysis_rows(state: dict) -> List[dict]:
+    """Every PRINCIPAL pressure-containing / structural part in this BoM: a fabricated
+    shell with its own take-off geometry (wall_mm + mass_kg + diameter_m — the SAME
+    fabrication signal _bom_row_kind() uses; a vessel, tank or shell, whatever the
+    class). For each: the material + allowable stress (explicit SF) + an independent
+    thin-wall actual/design stress at the adopted wall + utilisation. UNIVERSAL — no
+    product class is ever named; a class whose BoM carries no such take-off row (e.g.
+    all bought-out equipment) legitimately returns []."""
+    rows = state.get("requirementsBom") or []
+    out: List[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        wall_mm = num(row.get("wall_mm"))
+        mass_kg = num(row.get("mass_kg"))
+        dia_m = num(row.get("diameter_m"))
+        if not (wall_mm and mass_kg and dia_m):
+            continue                      # not a physics-sized shell — nothing to analyse
+        material = str(row.get("material") or "").strip()
+        basis = str(row.get("basis") or "")
+        bm = _EA_BASIS_RE.search(basis)
+        p_kpa = float(bm.group(1).replace(",", "")) if bm else None
+        sigma_engine_mpa = float(bm.group(2).replace(",", "")) if bm else None
+        mat_key, props = _ea_match_material(material)
+        rec: dict = {
+            "tag": str(row.get("tag") or "").strip() or "—",
+            "name": str(row.get("requirement") or "").strip() or "—",
+            "qty": num(row.get("qty")) or 1,
+            "material": material or "—", "material_key": mat_key,
+            "wall_mm": wall_mm, "mass_kg": mass_kg, "diameter_m": dia_m,
+            "p_kpa": p_kpa, "sigma_engine_mpa": sigma_engine_mpa,
+        }
+        if props is None:
+            rec.update(
+                family=None, e_gpa=None, yield_mpa=None, uts_mpa=None, elong_pct=None,
+                allowable_mpa=None, sf_uts=None, sf_yield=None,
+                code_basis=(f"material '{material or 'unstated'}' not in the universal "
+                            "reference table — allowable stress NOT computed (data not "
+                            "in contract)"),
+                actual_mpa=None, utilisation_pct=None, verdict="DATA NOT IN CONTRACT")
+            out.append(rec)
+            continue
+        rec.update(family=props["family"], e_gpa=props["e_gpa"],
+                   yield_mpa=props["yield_mpa"], uts_mpa=props["uts_mpa"],
+                   elong_pct=props["elong_pct"])
+        if props["family"] == "metallic":
+            cands = [v for v in (
+                (props["uts_mpa"] / _EA_SF_UTS) if props["uts_mpa"] else None,
+                (props["yield_mpa"] / _EA_SF_YIELD) if props["yield_mpa"] else None,
+            ) if v is not None]
+            rec["allowable_mpa"] = min(cands) if cands else None
+            rec["sf_uts"], rec["sf_yield"] = _EA_SF_UTS, _EA_SF_YIELD
+            rec["code_basis"] = (f"{props['code']} — allowable S = min(UTS/{_EA_SF_UTS:g}, "
+                                 f"Yield/{_EA_SF_YIELD:g})")
+        else:
+            rec["allowable_mpa"] = sigma_engine_mpa
+            rec["sf_uts"], rec["sf_yield"] = None, None
+            rec["code_basis"] = (
+                f"{props['code']} — this design's own wall-sizing stress "
+                f"(σ={sigma_engine_mpa:g} MPa), no UTS/yield SF ratio applies"
+                if sigma_engine_mpa is not None else
+                f"{props['code']} — no design-stress figure in this row's own basis "
+                "(data not in contract)")
+        # ACTUAL/DESIGN STRESS — independent thin-wall (Barlow) hoop-stress cross-check
+        # from the row's OWN P, D, adopted wall t (the same 'thin-wall cylinder' basis
+        # the pressure-vessel:design tool itself states) — never the engine's own sigma
+        # parroted back; a genuine second calculation from the row's own numbers.
+        if p_kpa is not None and wall_mm:
+            p_mpa = p_kpa / 1000.0
+            rec["actual_mpa"] = p_mpa * (dia_m * 1000.0 / 2.0) / wall_mm
+        else:
+            rec["actual_mpa"] = None
+        if rec["allowable_mpa"] and rec["actual_mpa"] is not None:
+            rec["utilisation_pct"] = 100.0 * rec["actual_mpa"] / rec["allowable_mpa"]
+            rec["verdict"] = ("PASS" if rec["utilisation_pct"] <= 100.0
+                              else "FAIL — actual stress exceeds the code allowable")
+        else:
+            rec["utilisation_pct"] = None
+            rec["verdict"] = "DATA NOT IN CONTRACT — actual/allowable stress not derivable"
+        out.append(rec)
+    return out
+
+
+def _eval_engineering_analysis_rows(rows: List[dict]) -> Optional[dict]:
+    """Column-contract arithmetic for the Engineering Analysis tab: a principal
+    pressure/structural part PASSES only when it carries a real material match, a
+    computed allowable, an independent actual/design stress AND a utilisation ≤100% —
+    a part with any of those missing (honest 'data not in contract') or over-utilised
+    FAILS. No rows at all (a BoM with no physics-sized shell) is None — an honest
+    'nothing to analyse', never a fabricated score over zero parts."""
+    if not rows:
+        return None
+    contract = [
+        ("Material", "computed", "matched against the universal material reference table"),
+        ("Allowable (MPa)", "computed", "ASME UTS/yield SF route (metallic) or the engine's "
+         "own wall-sizing design stress (composite/concrete)"),
+        ("Actual stress (MPa)", "computed", "independent thin-wall (Barlow) hoop stress from "
+         "the row's own design pressure, diameter and adopted wall thickness"),
+        ("Utilisation %", "computed", "actual ÷ allowable — PASS only at ≤100%"),
+    ]
+    per_row: Dict[int, dict] = {}
+    n_pass = 0
+    for idx, rec in enumerate(rows):
+        reasons = []
+        if rec.get("material_key") is None:
+            reasons.append(f"material '{rec.get('material')}' not in the universal reference "
+                           "table — allowable not computed")
+        if rec.get("allowable_mpa") is None:
+            reasons.append("no allowable stress derivable")
+        if rec.get("actual_mpa") is None:
+            reasons.append("no design pressure in the row's own basis — actual stress not "
+                           "derivable")
+        if rec.get("utilisation_pct") is not None and rec["utilisation_pct"] > 100.0:
+            reasons.append(f"utilisation {rec['utilisation_pct']:.0f}% exceeds the code "
+                           "allowable")
+        verdict = "PASS" if not reasons else "FAIL"
+        if verdict == "PASS":
+            n_pass += 1
+        per_row[idx] = {"verdict": verdict, "reasons": reasons}
+    n_total = len(per_row)
+    score = _contract_score(n_pass, n_total)
+    issues: List[str] = []
+    if n_pass < n_total:
+        ex = [f"{rows[i]['tag'] or rows[i]['name']} ({'; '.join(r['reasons'][:1])})"
+              for i, r in per_row.items() if r["verdict"] == "FAIL"][:3]
+        issues.append(f"{n_total - n_pass}/{n_total} principal pressure/structural part(s) "
+                      f"missing an allowable/actual/utilisation or over-stressed: "
+                      + " · ".join(ex))
+    return {"tab": "Engineering Analysis", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "fix": ("add the missing material to the universal reference table "
+                    "(_EA_MATERIALS) or the missing P=/σ= figures to the row's own "
+                    "materials-take-off basis string (requirements_bom.py::"
+                    "_materials_takeoff) — never hand-type a value into this tab")}
+
+
+def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[dict]:
+    """Registry adapter — build() calls this BEFORE any tab renders (the same idiom as
+    the Risk & Regulatory / Line & velocity / BoM ledger contracts)."""
+    return _eval_engineering_analysis_rows(_build_engineering_analysis_rows(state))
+
+
+def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """Engineering Analysis — safety factor / allowables + stress-strain (Tristan
+    2026-07-06, priorities #3 + #6). UNIVERSAL: keyed on the BoM's own fabrication-
+    physics fields + material string (never a per-class table); a class with no
+    physics-sized shell in its BoM legitimately skips (returns False), same idiom as
+    Electrical / Process schedules."""
+    rows = _build_engineering_analysis_rows(state)
+    if not rows:
+        return False
+    cres = _CONTRACT_RESULTS.get("Engineering Analysis") or _eval_engineering_analysis_rows(rows) or {}
+    crows = cres.get("rows") or {}
+
+    ws = wb.create_sheet("Engineering Analysis")
+    set_widths(ws, {"A": 10, "B": 30, "C": 6, "D": 12, "E": 20, "F": 11, "G": 11,
+                    "H": 11, "I": 11, "J": 13, "K": 14, "L": 12, "M": 34, "N": 46,
+                    "O": 34})
+    subtitle = (
+        "Every PRINCIPAL pressure-containing / structural part this BoM sized from its "
+        "own take-off geometry (wall thickness, mass, diameter — never a per-class "
+        "table): the material's allowable stress with an EXPLICIT safety factor (edit "
+        "B5/B6 below — metallic rows recompute live), the independent thin-wall actual/"
+        "design stress at the adopted wall, and the utilisation. A material outside the "
+        "reference table, or a part whose take-off carries no design pressure, renders "
+        "'DATA NOT IN CONTRACT' — never a fabricated number."
+    )
+    if cres:
+        subtitle += " " + _contract_note(cres)
+    title_row(ws, "Engineering Analysis — safety factor, allowables & stress-strain", 15,
+              subtitle)
+    r = 4
+
+    # ── EXPLICIT safety-factor inputs — live-editable; every metallic row below
+    # recomputes its Allowable/Utilisation/Verdict from these two cells. ──
+    sub_banner(ws, r, "Safety factor — explicit, editable input (ASME BPVC VIII Div.1 "
+                      "UG-23 basis)", 15)
+    r += 1
+    ws.cell(r, 1, "SF applied to UTS").font = FONT_SUB
+    sf_uts_cell = ws.cell(r, 2, _EA_SF_UTS)
+    sf_uts_cell.fill = FILL_RESULT
+    sf_uts_ref = f"$B${r}"
+    nt = ws.cell(r, 3, "Allowable (metallic) = MIN(UTS ÷ SF-UTS, Yield ÷ SF-yield) — "
+                       "edit either cell and every metallic row below recomputes.")
+    nt.font = FONT_NOTE
+    r += 1
+    ws.cell(r, 1, "SF applied to yield").font = FONT_SUB
+    sf_yield_cell = ws.cell(r, 2, _EA_SF_YIELD)
+    sf_yield_cell.fill = FILL_RESULT
+    sf_yield_ref = f"$B${r}"
+    r += 2
+
+    sub_banner(ws, r, "Safety factor & allowables — per principal part", 15)
+    r += 1
+    header(ws, r, _EA_HDR)
+    r += 1
+    n_ok = 0
+    row1 = r
+    for idx, rec in enumerate(rows):
+        cr = crows.get(idx) or {}
+        row_ok = cr.get("verdict") == "PASS"
+        if row_ok:
+            n_ok += 1
+        ws.cell(r, 1, clean_cell(rec["tag"])).border = BORDER
+        pc = ws.cell(r, 2, clean_cell(rec["name"])); pc.alignment = WRAP_TOP; pc.border = BORDER
+        ws.cell(r, 3, rec["qty"]).border = BORDER
+        ws.cell(r, 4, clean_cell(rec["family"] or "—")).border = BORDER
+        ws.cell(r, 5, clean_cell(rec["material"])).border = BORDER
+        yc = ws.cell(r, 6, rec["yield_mpa"]); yc.border = BORDER
+        if rec["yield_mpa"] is not None:
+            yc.number_format = FMT_DEC1
+        uc = ws.cell(r, 7, rec["uts_mpa"]); uc.border = BORDER
+        if rec["uts_mpa"] is not None:
+            uc.number_format = FMT_DEC1
+        if rec["family"] == "metallic":
+            sfu = ws.cell(r, 8, f"={sf_uts_ref}")
+            sfy = ws.cell(r, 9, f"={sf_yield_ref}")
+            alw = ws.cell(r, 10, f"=MIN(G{r}/{sf_uts_ref},F{r}/{sf_yield_ref})")
+            alw.number_format = FMT_DEC1
+        else:
+            sfu = ws.cell(r, 8, "n/a — no UTS/yield SF ratio for this material family")
+            sfy = ws.cell(r, 9, "n/a")
+            alw = ws.cell(r, 10, rec["allowable_mpa"])
+            if rec["allowable_mpa"] is not None:
+                alw.number_format = FMT_DEC1
+        sfu.border = BORDER; sfy.border = BORDER; alw.border = BORDER
+        act = ws.cell(r, 11, rec["actual_mpa"]); act.border = BORDER
+        if rec["actual_mpa"] is not None:
+            act.number_format = FMT_DEC2
+        util = ws.cell(r, 12, f'=IF(AND(ISNUMBER(K{r}),ISNUMBER(J{r}),J{r}<>0),'
+                              f'100*K{r}/J{r},"")')
+        util.number_format = FMT_DEC1
+        util.border = BORDER
+        vc = ws.cell(r, 13, f'=IF(ISNUMBER(L{r}),IF(L{r}<=100,"PASS",'
+                            f'"FAIL — actual stress exceeds the code allowable"),'
+                            f'"DATA NOT IN CONTRACT — actual/allowable stress not derivable")')
+        vc.border = BORDER
+        vc.font = FONT_PASS if row_ok else FONT_FAIL
+        vc.fill = FILL_PASS if row_ok else FILL_FAIL
+        cb = ws.cell(r, 14, clean_cell(rec["code_basis"])); cb.alignment = WRAP_TOP
+        cb.border = BORDER
+        _reasons = "; ".join(cr.get("reasons") or [])
+        rc = ws.cell(r, 15, fx_verdict(
+            [f"ISNUMBER(J{r})", f"ISNUMBER(K{r})", f"ISNUMBER(L{r})",
+             f"IFERROR(ABS(L{r}-100*K{r}/J{r})<0.5,FALSE())", f'EXACT(M{r},"PASS")'],
+            f'"{_xq(_reasons or "see Verdict / Code basis", 160)}"'))
+        rc.alignment = WRAP_TOP
+        rc.border = BORDER
+        rc.font = FONT_PASS if row_ok else FONT_FAIL
+        rc.fill = FILL_PASS if row_ok else FILL_FAIL
+        if not row_ok:
+            for col in range(1, 13):
+                ws.cell(r, col).fill = FILL_FAIL
+        longest = max(len(str(rec["name"])), len(str(rec["code_basis"])), len(_reasons))
+        if longest > 46:
+            ws.row_dimensions[r].height = min(-(-longest // 46), 5) * 14.5
+        r += 1
+    _register_check_range(ws.title, "O", row1, r - 1, n_pass=n_ok, n_total=len(rows))
+    _cf_verdict(ws, f"O{row1}:O{r - 1}")
+    ws.auto_filter.ref = f"A{row1 - 1}:O{r - 1}"
+    r += 1
+
+    # ── STRESS-STRAIN CHARACTERISATION — the universal material table + per-material
+    # idealised curve with THIS run's own design operating point(s) marked. ──
+    sub_banner(ws, r, "Stress-strain characterisation — material curve with the design "
+                      "operating point marked", 15)
+    r += 1
+    note = ws.cell(r, 1, clean_cell(
+        "A universal material-property lookup (E, yield, UTS, elongation — never a "
+        "per-class table), keyed by the material each part above actually uses. The "
+        "curve is an idealised engineering stress-strain line (elastic origin → yield "
+        "→ UTS at the material's stated elongation; a non-metallic composite/concrete "
+        "has no distinct yield so the line runs straight to its ultimate/characteristic "
+        "strength). The design operating point(s) plotted on each curve are this run's "
+        "own actual stress from the table above — how far below its material's limit "
+        "each part sits."))
+    note.font = Font(italic=True, size=9, color="555555")
+    note.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=15)
+    ws.row_dimensions[r].height = 46
+    r += 2
+
+    seen_mats: List[str] = []
+    for rec in rows:
+        if rec.get("material_key") and rec["material_key"] not in seen_mats:
+            seen_mats.append(rec["material_key"])
+
+    if seen_mats:
+        sub_banner(ws, r, "Material property reference (universal — keyed by material, "
+                          "not class)", 7)
+        r += 1
+        header(ws, r, _EA_MAT_HDR)
+        r += 1
+        for mk in seen_mats:
+            props = _EA_MATERIALS[mk]
+            ws.cell(r, 1, clean_cell(props["display"])).border = BORDER
+            ws.cell(r, 2, clean_cell(props["family"])).border = BORDER
+            ec = ws.cell(r, 3, props["e_gpa"]); ec.number_format = FMT_DEC1; ec.border = BORDER
+            yc = ws.cell(r, 4, props["yield_mpa"]); yc.border = BORDER
+            if props["yield_mpa"] is not None:
+                yc.number_format = FMT_DEC1
+            uc = ws.cell(r, 5, props["uts_mpa"]); uc.border = BORDER
+            if props["uts_mpa"] is not None:
+                uc.number_format = FMT_DEC1
+            pc2 = ws.cell(r, 6, props["elong_pct"]); pc2.number_format = FMT_DEC2
+            pc2.border = BORDER
+            cc = ws.cell(r, 7, clean_cell(props["code"])); cc.alignment = WRAP_TOP
+            cc.border = BORDER
+            r += 1
+        r += 1
+
+    from openpyxl.chart import ScatterChart, Reference, Series
+    charts_added = 0
+    for mk in seen_mats:
+        props = _EA_MATERIALS[mk]
+        e_mpa = props["e_gpa"] * 1000.0
+        parts_here = [rc for rc in rows
+                      if rc.get("material_key") == mk and rc.get("actual_mpa") is not None]
+        sub_banner(ws, r, f"{props['display']} — stress-strain", 6)
+        r += 1
+        header(ws, r, _EA_CURVE_HDR)
+        curve_hdr = r
+        r += 1
+        curve_first = r
+        if props["yield_mpa"]:
+            pts = [(0.0, 0.0),
+                   (props["yield_mpa"] / e_mpa * 100.0, props["yield_mpa"]),
+                   (props["elong_pct"], props["uts_mpa"])]
+        else:
+            pts = [(0.0, 0.0), (props["elong_pct"], props["uts_mpa"])]
+        for i, (x, y) in enumerate(pts):
+            ws.cell(r, 1, i + 1)
+            xcell = ws.cell(r, 2, x); xcell.number_format = FMT_DEC2
+            ycell = ws.cell(r, 3, y); ycell.number_format = FMT_DEC1
+            r += 1
+        curve_last = r - 1
+        r += 1
+        op_first = op_last = None
+        op_labels: List[str] = []
+        if parts_here:
+            header(ws, r, _EA_CURVE_HDR)
+            r += 1
+            op_first = r
+            for i, prt in enumerate(parts_here):
+                strain = prt["actual_mpa"] / e_mpa * 100.0
+                ws.cell(r, 1, i + 1)
+                xcell = ws.cell(r, 2, strain); xcell.number_format = "0.0000"
+                ycell = ws.cell(r, 3, prt["actual_mpa"]); ycell.number_format = FMT_DEC2
+                r += 1
+                util_txt = (f"{prt['utilisation_pct']:.1f}%"
+                           if prt.get("utilisation_pct") is not None else "—")
+                op_labels.append(f"#{i + 1} = {prt.get('tag') or prt.get('name')} "
+                                 f"(utilisation {util_txt})")
+            op_last = r - 1
+        src_txt = (f"Curve: idealised engineering stress-strain from the universal "
+                  f"material table ({props['code']}). Operating point(s): this run's own "
+                  f"actual/design stress for every '{props['display']}' part above" +
+                  (" — " + "; ".join(op_labels) if op_labels else " (none derivable).") )
+        src = ws.cell(r, 1, clean_cell(src_txt))
+        src.font = FONT_NOTE
+        src.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = 32
+        r += 1
+
+        ch = ScatterChart()
+        ch.title = f"{props['display']} — stress vs strain (operating point marked)"
+        ch.height, ch.width = 8, 14
+        ch.x_axis.title = "Strain (%)"
+        ch.y_axis.title = "Stress (MPa)"
+        xref = Reference(ws, min_col=2, min_row=curve_first, max_row=curve_last)
+        yref = Reference(ws, min_col=3, min_row=curve_first, max_row=curve_last)
+        s1 = Series(yref, xref, title="Material curve (idealised)")
+        ch.series.append(s1)
+        if op_first is not None:
+            xref2 = Reference(ws, min_col=2, min_row=op_first, max_row=op_last)
+            yref2 = Reference(ws, min_col=3, min_row=op_first, max_row=op_last)
+            s2 = Series(yref2, xref2, title="Design operating point(s)")
+            ch.series.append(s2)
+        style_chart(ch, legend=True)
+        # style_chart blanks every marker/line to one hygiene default — re-apply the
+        # operating-point's marker-only style AFTER it (it would otherwise be wiped).
+        if op_first is not None:
+            s2 = ch.series[-1]
+            s2.marker.symbol = "diamond"
+            s2.marker.size = 9
+            s2.graphicalProperties.line.noFill = True
+        ws.add_chart(ch, f"E{curve_hdr}")
+        charts_added += 1
+        r = max(r, curve_hdr + 16)
+
+    back_link(ws, 15)
+    return True
+
+
 def tab_glossary(wb: Workbook, state: dict) -> bool:
     """Reference glossary of every abbreviation used across the dossier tabs and
     drawings. Universal (standard engineering nomenclature, identical for any
@@ -14456,6 +14958,7 @@ _CONTRACT_TABS = {
     "Panel schedule": _eval_panel_schedule_contract,
     _LEDGER_SHEET: _eval_bom_ledger_contract,
     "Risk & Regulatory": _eval_risk_register_contract,
+    "Engineering Analysis": _eval_engineering_analysis_contract,
 }
 
 
@@ -16181,6 +16684,7 @@ _TAB_RANK = {
     "Cost waterfall": 2, "Financial model": 3, "Bill of Materials (Ledger)": 4,
     "Brief": 5,
     "Design basis": 5.5,                                # the basis statement follows the Brief
+    "Engineering Analysis": 5.6,          # allowables/stress-strain follows the basis statement
     "Drawings": 6,                                      # the drawing REGISTER opens the drawings block
     # drawings in reading order: BFD 7 → P&ID 8 → Process schedules 9 → GA 10 → HVAC 11 →
     # Electrical 12 → Line & velocity 13 (prefix ranks in _tab_rank fill the gaps)
@@ -16203,7 +16707,8 @@ _TAB_GROUP_COLOUR = {
 }
 _TAB_GROUPS = {
     "commercial": {"Executive Summary", "Contents", "Overview", "Renders", "Cost waterfall",
-                   "Financial model", "Bill of Materials (Ledger)", "Brief", "Design basis"},
+                   "Financial model", "Bill of Materials (Ledger)", "Brief", "Design basis",
+                   "Engineering Analysis"},
     "drawings": {"Drawings", "Process schedules", "Electrical", "Line & velocity",
                  "Assembly sequence"},
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
@@ -17181,6 +17686,16 @@ _dt(["Tag", "Canonical name", "Module", "Shape", "L (mm)", "W (mm)", "H (mm)", "
      "Name in BoM (live check)", "Name in drawings (live check)"], "equipment-register",
     ["Tag", "Canonical name", "Module", "Shape", "Material", "MPN / status",
      "Drawing appearances", "Name in BoM (live check)", "Name in drawings (live check)"])
+# Engineering Analysis (safety factor / allowables + stress-strain, Tristan 2026-07-06):
+# Family/Yield/UTS/SF/Allowable/Actual/Utilisation are legitimately blank on a row whose
+# material isn't in the universal reference table (honest 'data not in contract') — only
+# the ALWAYS-populated text columns are required; the tab's own contract (n_pass/n_total
+# over material+allowable+actual+utilisation) is the real coverage signal, rendered in
+# Verdict/Row check.
+_dt(_EA_HDR, "engineering-analysis",
+    ["Tag", "Part", "Material", "Verdict", "Code basis", "Row check"], numeric=["Qty"])
+_dt(_EA_MAT_HDR, "engineering-analysis-materials",
+    ["Material", "Family", "Code / reference"])
 
 # Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
 # drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
@@ -18559,6 +19074,9 @@ _MECH_ONLY_TABS = {
     "Electrical": "panel-schedule column contract + single-line drawing coverage",
     "Design basis": "design-basis completeness arithmetic",
     "Assembly sequence": "design-derived step arithmetic",
+    "Engineering Analysis": "safety-factor/allowable column contract (per-part material + "
+                           "allowable + actual stress + utilisation triage) + material "
+                           "stress-strain characterisation",
     _AUDIT_SHEET_TITLE: "audit-operand register contract (every embedded operand carries "
                         "its label + provenance; per-row Cell check formulas)",
 }
@@ -19439,6 +19957,10 @@ def build(run_dir: str, out_path: str) -> dict:
     # Design basis is BUILT after Inputs (its utilisation drivers reference the live
     # Inputs cells) but PLACED after Brief in the strip (_TAB_RANK 5.5).
     add_tab("Design basis", lambda: tab_design_basis(wb, state, run_dir))
+    # Engineering Analysis (priorities #3 safety factor + #6 stress-strain, 2026-07-06):
+    # self-guards — a class whose BoM carries no physics-sized pressure/structural shell
+    # (wall_mm + mass_kg + diameter_m) skips cleanly, same idiom as Electrical above.
+    add_tab("Engineering Analysis", lambda: tab_engineering_analysis(wb, state, run_dir))
     # 'Electrical' (single-line drawing + panel schedule, ONE tab — Bundle B fix 4) is
     # built with the image tabs below, so its embedded drawing registers a preview link.
     # process schedules creates 0..3 sheets; treat >0 as success
