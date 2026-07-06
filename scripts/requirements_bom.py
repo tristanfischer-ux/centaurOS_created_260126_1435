@@ -677,7 +677,14 @@ def _pack_micro_band(name: str):
 # 2025-26 bulk 300 Ah+ LFP cell band this constant is grounded against (see engineering-contract.ts
 # CELL_GBP_PER_KWH_MARKET_2026 for the full citation trail) — no change needed here.
 CELL_GBP_PER_KWH = 57.0   # DB-grounded: median real 280 Ah LFP cell ≈ £52 / 0.896 kWh ≈ £58/kWh (forge-truth.db); £/kWh basis is Ah-agnostic
-_FORGE_TRUTH_DB = os.path.expanduser("~/.forge-truth/forge-truth.db")
+# FORGE_TRUTH_DB_PATH_OVERRIDE (2026-07-06, mirrors the TS chain-side ingest
+# scripts' own env var — scripts/ingest/ingest-*.ts): lets a calibration
+# harness replay requirements_bom.py against a TEMP COPY of forge-truth.db
+# (with candidate ingest rows committed to the copy only) instead of the live
+# DB, so a before/after diff can prove "no cross-class hit" without ever
+# writing to the live DB. Defaults to the live path — every existing call site
+# is unaffected when the env var is unset.
+_FORGE_TRUTH_DB = os.environ.get("FORGE_TRUTH_DB_PATH_OVERRIDE") or os.path.expanduser("~/.forge-truth/forge-truth.db")
 _CELL_DB_CACHE: dict = {}
 _BATTERY_CELL_RE = re.compile(
     r"\b(?:lfp|nmc|nca|lto|li[\s_-]?ion|lithium|sodium[\s_-]?ion|prismatic|pouch|cylindrical)\b"
@@ -1554,6 +1561,45 @@ def _is_structured_pn(pn: str) -> bool:
     return bool(_STRUCTURED_PN_RE.match(pn))
 
 
+# a GENERIC bespoke/fabrication placeholder ('bespoke vessel', 'made-to-order
+# fabrication', 'fabricated compressor-suction knock-out drum') NAMES ITS OWN
+# genericness — this is what `_detect_borrowed_identities` must never flag as a
+# collision (SAF oxccu-saf-v21 D-102/D-103: two genuinely distinct bespoke
+# separators, correctly both this shape). A REAL manufacturer's product-family
+# name with no digit-bearing model code (GEA's 'FLUIDBED VIBRO-FLUIDISER') does
+# NOT use this language — it names a specific product, just without a numeric
+# suffix — so it is not caught by this placeholder pattern.
+_BESPOKE_PLACEHOLDER_PN_RE = re.compile(
+    r"\bbespoke\b|\bmade[- ]?to[- ]?(?:order|spec)\b|\bcustom\b|\bfabricat\w*\b|"
+    r"\bengineered[- ]?to[- ]?order\b", re.I)
+
+
+def _is_identity_bearing_pn(pn: str) -> bool:
+    """True for a `part_number` value that plausibly identifies ONE specific real
+    part — either a STRUCTURED catalogue MPN (`_is_structured_pn`: has a digit, no
+    spaces) or a non-structured but still SPECIFIC descriptive product-family name
+    (a real manufacturer's product line named without a numeric model code — e.g.
+    'FLUIDBED VIBRO-FLUIDISER'). False for a GENERIC bespoke/fabrication
+    placeholder (see `_BESPOKE_PLACEHOLDER_PN_RE`) that is legitimately reused
+    verbatim across many genuinely-different made-to-order items.
+
+    Used by `_detect_borrowed_identities` (2026-07-06, CO₂-mineralisation
+    out/co2-campaign-v5 E-101/E-107): the prior `_is_structured_pn`-only gate could
+    never catch a collision where the copied identity is itself non-numeric — GEA's
+    real MPN was emitted as its bare product-FAMILY name ('FLUIDBED VIBRO-
+    FLUIDISER', no digits), so the SAME collision-detection discipline that already
+    catches a numeric MPN copied onto an unrelated word must also catch a
+    descriptive-but-specific one, without reopening the SAF bespoke-placeholder
+    false-positive the digit-only gate was originally protecting against.
+    proveCatch (both directions) in `_selftest`."""
+    pn = (pn or "").strip()
+    if not pn or len(pn) < 5 or _TBD_RE.search(pn):
+        return False
+    if _is_structured_pn(pn):
+        return True
+    return not _BESPOKE_PLACEHOLDER_PN_RE.search(pn)
+
+
 def _commodity_catalogue_cap(name: str, pn: str, gbp: float, cat_price):
     """Cap a commodity catalogue line at ≤ COMMODITY_CAP_MULT × its catalogue/list
     price. Applies ONLY when (a) the noun is a commodity, (b) the line carries a
@@ -1921,6 +1967,28 @@ _RATING_COST_MODELS = [
 # kit whose rating is a kVA quantity (so the curve is £/kVA, and a stray "kW" on the
 # word is treated as kVA-equivalent rather than mis-scaling the price).
 _KVA_NOUN_RE = re.compile(r"generat|\bups\b|uninterruptible|transformer", re.I)
+
+
+def _has_rating_cost_model(name: str) -> bool:
+    """True iff `name`'s own noun matches one of _RATING_COST_MODELS's families
+    (motor/VFD/blower/compressor/heat-pump/chiller/heat-exchanger/fan/mixer/pump/
+    generator/UPS/transformer) — i.e. this word already flows through
+    `_reconcile_rated_price`'s downstream rating-based reconciliation elsewhere in
+    this module. Used by `_detect_borrowed_identities` to scope its "already
+    reconciled downstream" exemption to the NOUN FAMILIES that exemption was
+    actually written for (2026-07-05 SAF EP-109 motor control centre) — NOT to
+    every word that merely carries a capacity/rating_primary value. A thermal-
+    transfer noun (condenser, heat-recovery exchanger) can carry a kW capacity
+    too, but _RATING_COST_MODELS has no £/kW curve for it, so no downstream
+    price-reconciliation ever inspects its identity — exempting it from the
+    collision check left a copied sibling identity to render as a false
+    'IDENTIFIED · catalogue' row with no reconciliation catching it at all (the
+    CO₂-mineralisation v5 E-101/E-107 GEA VIBRO-FLUIDISER bug: a K2SO4 dryer's own
+    MPN copied onto an unrelated vacuum condenser AND an unrelated heat-recovery
+    exchanger — neither noun has a rating-cost model, so neither was ever
+    downstream-reconciled). Pure noun-regex test — does not evaluate any kw value,
+    so it is correct regardless of whether a usable kw can be extracted."""
+    return any(rx.search(name or "") for rx, _ in _RATING_COST_MODELS)
 
 
 def _rating_kw(md: dict, name: str = "", requirement: str = ""):
@@ -2324,6 +2392,7 @@ def _catalogue_pinned_child(kmd, child_price):
 
 def _selftest() -> int:
     """Guards the head-noun rule that the qualifier-over-match bug (2026-06-13) broke."""
+    global _FORGE_TRUTH_DB
     cases = {
         "Fischer-Tropsch synthesis reactor": "strong",
         "product fractionation column · 0.8 m dia x 18 m": "strong",
@@ -2752,6 +2821,120 @@ def _selftest() -> int:
         if not _bamb_b or _bamb_b["part"] != "Foo SHARED-1":
             print(f"  FAIL sibling-identity guard: an AMBIGUOUS collision (no "
                   f"confirmed donor) must stay untouched ({_bamb_b and _bamb_b['part']!r})"); bad += 1
+
+    # ── _is_identity_bearing_pn proveCatch (2026-07-06) — both directions: a real
+    # descriptive product-family name (no digits) IS identity-bearing; a generic
+    # bespoke/fabrication placeholder is NOT, even at the same length/shape.
+    _identity_pn_cases = [
+        ("FLUIDBED VIBRO-FLUIDISER", True),          # GEA's real product family (E-101/E-107)
+        ("shell-and-tube vacuum condenser", True),    # a specific descriptive product, no digits
+        ("bespoke vessel", False),
+        ("made-to-order fabrication", False),
+        ("fabricated compressor-suction knock-out drum — bespoke vessel", False),
+        ("custom engineered enclosure", False),
+        ("GRU-99803652", True),                       # structured MPN still passes
+        ("TBD (detailed design)", False),
+    ]
+    for _pn, _want in _identity_pn_cases:
+        _got = _is_identity_bearing_pn(_pn)
+        if _got != _want:
+            print(f"  FAIL _is_identity_bearing_pn({_pn!r}) → {_got} (want {_want})"); bad += 1
+
+    # ── SIBLING-IDENTITY-COLLISION on a THERMAL-TRANSFER noun proveCatch (2026-07-06,
+    # CO₂-mineralisation out/co2-campaign-v5 E-101/E-107) — the guard above only fires
+    # when `_detect_borrowed_identities` doesn't exempt the word first; v5's real bug
+    # was the EXEMPTION itself firing wrongly for a 'condenser'/'heat-recovery
+    # exchanger' noun (capacity present, but no _RATING_COST_MODELS family matches
+    # either noun) while correctly staying exempt for a 'motor control centre' noun
+    # (capacity present, 'motor' DOES match a _RATING_COST_MODELS family). Both
+    # directions in one real state.json via the real assemble() path.
+    with _fs_tf.TemporaryDirectory() as _td_thermal:
+        _thermal_words = [
+            # DONOR — the real, verified K2SO4 dryer. Must stay untouched.
+            {"id": "k2so4_hot_air_dryer_word", "name_human": "K2SO4 hot-air dryer",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "75", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "GEA"},
+                 {"kind": "part_number", "value": "FLUIDBED VIBRO-FLUIDISER"},
+             ]},
+            # BORROWER — a condenser copied the dryer's exact identity. Own pv is a
+            # DIFFERENT (unverified) part — 'condenser' matches no _RATING_COST_MODELS
+            # family, so this must NOT be exempted by the capacity check; must demote.
+            {"id": "crystalliser_vacuum_condenser_word", "name_human": "crystalliser vacuum condenser",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "60", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "GEA"},
+                 {"kind": "part_number", "value": "FLUIDBED VIBRO-FLUIDISER"},
+             ]},
+            # BORROWER 2 — a heat-recovery exchanger, same shape (different sub-noun,
+            # still no _RATING_COST_MODELS hit: 'heat-recovery exchanger' does not
+            # match the tight 'heat[_ -]?exchang' family regex).
+            {"id": "dryer_heat_recovery_exchanger_word", "name_human": "dryer exhaust heat-recovery exchanger",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "30", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "GEA"},
+                 {"kind": "part_number", "value": "FLUIDBED VIBRO-FLUIDISER"},
+             ]},
+            # SCOPE BOUNDARY — a motor control centre sharing a VFD's identity: 'motor'
+            # DOES match _RATING_COST_MODELS, so the pre-existing SAF EP-109 exemption
+            # must still hold — this word is UNAFFECTED by the narrowing.
+            {"id": "motor_control_centre_word", "name_human": "motor control centre",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "capacity", "value": "750", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "ABB"},
+                 {"kind": "part_number", "value": "ACS580-01"},
+             ]},
+            {"id": "vfd_drive_word", "name_human": "VFD drive",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "rating_primary", "value": "30", "unit": "kW"},
+                 {"kind": "manufacturer", "value": "ABB"},
+                 {"kind": "part_number", "value": "ACS580-01"},
+             ]},
+        ]
+        _thermal_pvs = [
+            {"word_id": "k2so4_hot_air_dryer_word", "manufacturer": "GEA", "part_number": "FLUIDBED VIBRO-FLUIDISER",
+             "status": "verified", "price_estimate_gbp": 22000},
+            {"word_id": "crystalliser_vacuum_condenser_word", "manufacturer": "GEA",
+             "part_number": "shell-and-tube vacuum condenser — packaged", "status": "unverified",
+             "price_estimate_gbp": 9200},
+            {"word_id": "dryer_heat_recovery_exchanger_word", "manufacturer": "GEA",
+             "part_number": "air-to-air glass-tube recuperator — packaged", "status": "unverified",
+             "price_estimate_gbp": 6800},
+            {"word_id": "motor_control_centre_word", "manufacturer": "ABB", "part_number": "OTHER-MCC-PN",
+             "price_estimate_gbp": 112500},
+            {"word_id": "vfd_drive_word", "manufacturer": "ABB", "part_number": "ACS580-01",
+             "status": "verified", "price_estimate_gbp": 3200},
+        ]
+        json.dump({"moduleDecomposition": {"modules": [{"sub_modules": [{"id": "k2so4_recovery_line_thermal_transfer",
+                                                                          "words": _thermal_words}]}]},
+                   "partVerifications": _thermal_pvs}, open(os.path.join(_td_thermal, "state.json"), "w"))
+        _thermal_rows = assemble(_td_thermal)
+        _thermal_by_req = {r["requirement"].split(" · ")[0]: r for r in _thermal_rows}
+        _t_dryer = _thermal_by_req.get("K2SO4 hot-air dryer")
+        _t_cond = _thermal_by_req.get("crystalliser vacuum condenser")
+        _t_hx = _thermal_by_req.get("dryer exhaust heat-recovery exchanger")
+        _t_mcc = _thermal_by_req.get("motor control centre")
+        if not _t_dryer or _t_dryer["part"] != "GEA FLUIDBED VIBRO-FLUIDISER":
+            print(f"  FAIL thermal-noun collision guard: the DONOR dryer's own row must "
+                  f"stay untouched ({_t_dryer and _t_dryer['part']!r})"); bad += 1
+        if not _t_cond or _t_cond["status"] != "NOT FOUND":
+            print(f"  FAIL thermal-noun collision guard (E-101 regression): 'crystalliser "
+                  f"vacuum condenser' must demote off the borrowed dryer MPN (got status="
+                  f"{_t_cond and _t_cond['status']!r}, part={_t_cond and _t_cond.get('part')!r})"); bad += 1
+        if not _t_hx or _t_hx["status"] != "NOT FOUND":
+            print(f"  FAIL thermal-noun collision guard (E-107 regression): 'dryer exhaust "
+                  f"heat-recovery exchanger' must demote off the borrowed dryer MPN (got "
+                  f"status={_t_hx and _t_hx['status']!r}, part={_t_hx and _t_hx.get('part')!r})"); bad += 1
+        if not _t_mcc or _t_mcc["part"] != "ABB ACS580-01":
+            print(f"  FAIL thermal-noun collision guard: a 'motor control centre' (matches "
+                  f"_RATING_COST_MODELS via 'motor') must stay OUT OF SCOPE for this "
+                  f"narrowing — the pre-existing SAF EP-109 exemption must be unaffected "
+                  f"({_t_mcc and _t_mcc['part']!r})"); bad += 1
 
     # ── PHANTOM-PIPEWORK GUARD (council 2026-06-16) — a make-up / bleed / chemical-
     # dosing branch and an instrument-SIGNAL tie must NOT be priced at the whole-plant
@@ -3765,6 +3948,70 @@ def _selftest() -> int:
         print(f"  FAIL oem-finding: applying findings twice must be idempotent (no duplicate "
               f"stamp), got {_oem_twice[0]['basis']!r}"); bad += 1
 
+    # ═══ proveCatch the CROSS-CLASS OEM-FINDING LEAK FIX (2026-07-06, the CO2-
+    # mineralisation ingest round's own SAF-v21 replay regression: a CO2-tagged
+    # 'cooling-water skid' no-public-MPN finding (S&S Technical's bespoke PCW skid)
+    # silently stamped onto SAF's OWN, UNRELATED 'cooling-water skid · 1200 kW'
+    # line the moment the CO2 ingest committed to forge-truth.db — the finding
+    # table was never filtered by class_tag. End-to-end via the real assemble()
+    # path + a real temp sqlite DB (FORGE_TRUTH_DB_PATH_OVERRIDE): two findings
+    # share the IDENTICAL part_name_match text but carry DIFFERENT class_tag;
+    # a run whose own orchestratorContract.product_class is class A must stamp
+    # ONLY class A's finding, never class B's (and vice versa). ═══
+    import sqlite3 as _sqlite3_selftest
+    with _fs_tf.TemporaryDirectory() as _oem_db_dir:
+        _oem_db_path = os.path.join(_oem_db_dir, "forge-truth-oem-selftest.db")
+        _con = _sqlite3_selftest.connect(_oem_db_path)
+        _con.execute("""CREATE TABLE verified_no_public_mpn_findings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, class_tag TEXT NOT NULL,
+            manufacturer TEXT NOT NULL, family TEXT NOT NULL, part_name_match TEXT NOT NULL,
+            evidence_urls TEXT NOT NULL, verified_date TEXT NOT NULL, note TEXT,
+            basis_text TEXT NOT NULL, discovery_source TEXT NOT NULL, created_at TEXT NOT NULL)""")
+        _con.execute(
+            "INSERT INTO verified_no_public_mpn_findings (class_tag, manufacturer, family, "
+            "part_name_match, evidence_urls, verified_date, basis_text, discovery_source, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("co2_mineralisation", "S&S Technical, Inc.", "PCW skid", '["cooling-water skid"]',
+             "[]", "2026-07-06", "OEM-proprietary — no public MPN (CO2 finding)", "test", "2026-07-06"))
+        _con.execute(
+            "INSERT INTO verified_no_public_mpn_findings (class_tag, manufacturer, family, "
+            "part_name_match, evidence_urls, verified_date, basis_text, discovery_source, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("e_fuel_synthesis", "Some SAF Vendor", "SAF cooling skid", '["cooling-water skid"]',
+             "[]", "2026-07-06", "OEM-proprietary — no public MPN (SAF finding)", "test", "2026-07-06"))
+        _con.commit(); _con.close()
+        _oem_words = [{"id": "cooling_water_skid_word", "name_human": "cooling-water skid",
+                       "modifier_characters": [{"kind": "quantity", "value": "×1"}]}]
+        _real_forge_truth_db = _FORGE_TRUTH_DB
+        for _class, _want_substr, _reject_substr in (
+            ("co2_mineralisation", "CO2 finding", "SAF finding"),
+            ("e_fuel_synthesis", "SAF finding", "CO2 finding"),
+        ):
+            with _fs_tf.TemporaryDirectory() as _oem_run_dir:
+                json.dump({
+                    "moduleDecomposition": {"product_class": _class, "modules": [{"sub_modules": [{"words": _oem_words}]}]},
+                    "orchestratorContract": {"product_class": _class},
+                    "partVerifications": [],
+                }, open(os.path.join(_oem_run_dir, "state.json"), "w"))
+                # `_FORGE_TRUTH_DB` is bound once at module import from the env var — a
+                # bare os.environ[...] set here would NOT retroactively change it within
+                # this same process, so the module GLOBAL is monkey-patched directly
+                # (the exact value the real CLI path gets via the env var at import time).
+                _FORGE_TRUTH_DB = _oem_db_path
+                _NO_PUBLIC_MPN_CACHE.clear()
+                try:
+                    _oem_class_rows = assemble(_oem_run_dir)
+                finally:
+                    _FORGE_TRUTH_DB = _real_forge_truth_db
+                    _NO_PUBLIC_MPN_CACHE.clear()
+            _oem_skid = next((r for r in _oem_class_rows if r["requirement"].split(" · ")[0] == "cooling-water skid"), None)
+            if not _oem_skid or _want_substr not in _oem_skid.get("basis", ""):
+                print(f"  FAIL cross-class oem-finding leak fix: class {_class!r} must stamp its OWN "
+                      f"finding ({_want_substr!r}), got {_oem_skid and _oem_skid.get('basis')!r}"); bad += 1
+            if _oem_skid and _reject_substr in _oem_skid.get("basis", ""):
+                print(f"  FAIL cross-class oem-finding leak fix (REGRESSION): class {_class!r} stamped "
+                      f"the OTHER class's finding ({_reject_substr!r}) — basis={_oem_skid.get('basis')!r}"); bad += 1
+
     # ═══ proveCatch the CROSS-MODULE WORD-ID COLLISION GUARD (2026-07-06, the
     # co2-mineralisation round-2 X-117/119/120 regression: Part-names 8.4 → 0). A word
     # id authored in ONE module (name_human + content_character, a real price) also
@@ -4532,23 +4779,60 @@ def _stamp_engine_refused_valve_specs(rows: list, out_dir: str) -> list:
 # `assemble()` call, so a brand-new chain run and an offline replay of an
 # existing out_dir (`python3 scripts/requirements_bom.py out/<run>`) both pick
 # up the SAME recorded finding without touching the TS emitter at all.
-_NO_PUBLIC_MPN_CACHE = None
+_NO_PUBLIC_MPN_CACHE: dict = {}
 
 
-def _oem_proprietary_findings() -> list:
-    """[(part_name_match:list[str], basis_text:str)] from forge-truth.db, cached for
-    the process lifetime. [] when the DB or table doesn't exist yet (a fresh
-    checkout that hasn't run the ingest script) — never raises."""
+def _run_class_tag(st: dict) -> str:
+    """The current run's own class tag — matches the `class_tag` an ingest script
+    (scripts/ingest/ingest-*-verified-parts.ts) stamps on its
+    `verified_no_public_mpn_findings` rows. Prefers `orchestratorContract.
+    product_class` (the ingest scripts' own CLASS_TAG constant — 'bess',
+    'water_treatment', 'co2_mineralisation', 'e_fuel_synthesis' — matches this
+    exactly); falls back to `moduleDecomposition.product_class` when the contract
+    is absent (offline/synthetic states, e.g. `_selftest`'s inline fixtures).
+    '' when neither is present — `_oem_proprietary_findings` then matches NO
+    finding rather than every finding (fail closed, never fail open)."""
+    if not isinstance(st, dict):
+        return ""
+    oc = (st.get("orchestratorContract") or {}).get("product_class")
+    if oc:
+        return str(oc)
+    md = (st.get("moduleDecomposition") or {}).get("product_class")
+    return str(md) if md else ""
+
+
+def _oem_proprietary_findings(class_tag: str) -> list:
+    """[(part_name_match:list[str], basis_text:str)] from forge-truth.db, SCOPED to
+    `class_tag` (the current run's own class — see `_run_class_tag`), cached per
+    class_tag for the process lifetime. [] when the DB or table doesn't exist yet
+    (a fresh checkout that hasn't run the ingest script), or when `class_tag` is
+    empty — never raises.
+
+    CROSS-CLASS LEAK FIX (2026-07-06): this used to read EVERY row in
+    `verified_no_public_mpn_findings` regardless of class, matching purely on the
+    generic `part_name_match` text — so a CO2-mineralisation finding for
+    'cooling-water skid' (S&S Technical PCW skid, a bespoke build-to-order item)
+    silently stamped onto SAF's OWN, UNRELATED 'cooling-water skid · 1200 kW' line
+    (a different real design, same generic English name) the moment the CO2
+    ingest committed to forge-truth.db — a genuine cross-class contamination
+    caught by this round's own byte-identity replay across BESS-v15/water-v79/
+    SAF-v21 (SAF was NOT byte-identical before this fix). The table's `class_tag`
+    column already exists (every ingest script stamps it); this was simply never
+    read. Universal, keyed on the SAME class_tag string every ingest script
+    already writes — no per-class table."""
     global _NO_PUBLIC_MPN_CACHE
-    if _NO_PUBLIC_MPN_CACHE is not None:
-        return _NO_PUBLIC_MPN_CACHE
+    if not class_tag:
+        return []
+    if class_tag in _NO_PUBLIC_MPN_CACHE:
+        return _NO_PUBLIC_MPN_CACHE[class_tag]
     out = []
     if os.path.exists(_FORGE_TRUTH_DB):
         try:
             import sqlite3
             con = sqlite3.connect(f"file:{_FORGE_TRUTH_DB}?mode=ro", uri=True)
             rows = con.execute(
-                "SELECT part_name_match, basis_text FROM verified_no_public_mpn_findings"
+                "SELECT part_name_match, basis_text FROM verified_no_public_mpn_findings WHERE class_tag = ?",
+                (class_tag,),
             ).fetchall()
             con.close()
             for match_json, basis_text in rows:
@@ -4560,7 +4844,7 @@ def _oem_proprietary_findings() -> list:
                     out.append(([str(n) for n in names], str(basis_text)))
         except Exception:
             out = []
-    _NO_PUBLIC_MPN_CACHE = out
+    _NO_PUBLIC_MPN_CACHE[class_tag] = out
     return out
 
 
@@ -4590,11 +4874,14 @@ def _apply_oem_findings(rows: list, findings: list) -> list:
     return rows
 
 
-def _stamp_oem_proprietary_findings(rows: list) -> list:
-    """Stamps every recorded no-public-MPN research finding (forge-truth.db) onto its
-    matching row's `basis`. See `_apply_oem_findings` for the matching/idempotency
-    rule."""
-    return _apply_oem_findings(rows, _oem_proprietary_findings())
+def _stamp_oem_proprietary_findings(rows: list, class_tag: str = "") -> list:
+    """Stamps every recorded no-public-MPN research finding FOR THIS RUN'S OWN
+    CLASS (forge-truth.db, scoped by `class_tag` — see `_oem_proprietary_findings`)
+    onto its matching row's `basis`. See `_apply_oem_findings` for the matching/
+    idempotency rule. `class_tag=""` (the pre-2026-07-06 default) matches nothing
+    — callers that know their class MUST pass it; `assemble()` passes
+    `_run_class_tag(st)`."""
+    return _apply_oem_findings(rows, _oem_proprietary_findings(class_tag))
 
 
 def _connection_rows(out_dir: str, q=None):
@@ -5056,16 +5343,22 @@ def _detect_borrowed_identities(modules, pv_pn: dict) -> dict:
                 if not wid or "__" in wid:
                     continue
                 md = _mods(w)
+                name = str(w.get("name_human") or "")
                 pn = str(md.get("part_number") or "").strip()
                 mfr = str(md.get("manufacturer") or "").strip()
-                # a STRUCTURED catalogue-style PN only (`_is_structured_pn`) — never a
-                # bespoke descriptive placeholder ('fabricated compressor-suction
-                # knock-out drum — bespoke vessel') shared, entirely legitimately,
-                # across several DIFFERENT made-to-order vessels that simply have no
-                # real catalogue MPN (SAF oxccu-saf-v21 D-102/D-103: two genuinely
-                # distinct bespoke separators, correctly both 'made-to-order
-                # fabrication' — never a collision). proveCatch (negative) in `_selftest`.
-                if not pn or not mfr or _TBD_RE.search(pn) or not _is_structured_pn(pn):
+                # an IDENTITY-BEARING PN only (`_is_identity_bearing_pn`: a structured
+                # catalogue MPN OR a specific-but-non-numeric product-family name) —
+                # never a GENERIC bespoke descriptive placeholder ('fabricated
+                # compressor-suction knock-out drum — bespoke vessel') shared,
+                # entirely legitimately, across several DIFFERENT made-to-order
+                # vessels that simply have no real catalogue MPN (SAF oxccu-saf-v21
+                # D-102/D-103: two genuinely distinct bespoke separators, correctly
+                # both 'made-to-order fabrication' — never a collision). Widened
+                # 2026-07-06 from `_is_structured_pn` alone (see that function's
+                # docstring) to also catch a non-numeric copied identity (CO₂-
+                # mineralisation E-101/E-107: GEA 'FLUIDBED VIBRO-FLUIDISER', no
+                # digits). proveCatch (both directions) in `_selftest`.
+                if not pn or not mfr or _TBD_RE.search(pn) or not _is_identity_bearing_pn(pn):
                     continue
                 # a rated principal (its own `rating_primary` duty OR a `capacity`
                 # dimension — the MCC 'motor control centre' word carries its 3000 kW
@@ -5077,7 +5370,29 @@ def _detect_borrowed_identities(modules, pv_pn: dict) -> dict:
                 # pipeline already relabels it more precisely than a bare identity
                 # note could); a bare structural/instrument/accessory line has no such
                 # downstream mechanism, which is exactly the gap this guard closes.
-                if md.get("rating_primary") or md.get("capacity"):
+                #
+                # NARROWED (2026-07-06, CO₂-mineralisation v5 E-101/E-107 fix): the
+                # "downstream rating pipeline" this exemption defers to is
+                # `_reconcile_rated_price` / `_rated_equipment_cost`, and THAT
+                # pipeline only recognises the noun families in _RATING_COST_MODELS
+                # (motor/VFD/pump/blower/compressor/heat-pump/chiller/heat-exchanger/
+                # fan/mixer/generator/UPS/transformer). A capacity/rating_primary
+                # value alone is NOT proof a downstream mechanism exists — v5's
+                # "crystalliser vacuum condenser" (capacity 60 kW) and "dryer exhaust
+                # heat-recovery exchanger" (capacity 30 kW) both carried a copied
+                # sibling identity (GEA FLUIDBED VIBRO-FLUIDISER, the CO₂/K2SO4 hot-
+                # air DRYER's own MPN) and were exempted here on the bare presence of
+                # `capacity`, even though neither noun ('condenser', 'heat-recovery
+                # exchanger') matches any _RATING_COST_MODELS family — so NO
+                # downstream mechanism ever inspected either identity, and the
+                # borrowed dryer MPN rendered as a false 'IDENTIFIED · catalogue' row
+                # (parts_ledger.py's orphan check separately flagged both as
+                # zero-connectivity orphans — a DIFFERENT axis, this fix addresses the
+                # dishonest STATUS). Require the noun to actually match a rating-cost
+                # family before deferring to it; every previously-exempted case this
+                # guard was written for (motor/VFD/pump/MCC/blower/…) still matches
+                # `_has_rating_cost_model` and is unaffected. proveCatch in `_selftest`.
+                if (md.get("rating_primary") or md.get("capacity")) and _has_rating_cost_model(name):
                     continue
                 groups.setdefault((smid, mfr.lower(), pn.upper()), []).append(wid)
     borrowed = {}
@@ -6189,7 +6504,7 @@ def assemble(out_dir: str):
     # / DB / table = no-op) and idempotent (never overwrite an already-sized/-stamped
     # row).
     rows = _stamp_engine_refused_valve_specs(rows, out_dir)
-    rows = _stamp_oem_proprietary_findings(rows)
+    rows = _stamp_oem_proprietary_findings(rows, _run_class_tag(st))
     return rows
 
 
