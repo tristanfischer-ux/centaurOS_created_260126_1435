@@ -260,6 +260,21 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   // below instead (qualifiers decide, generics support). 'louvre' (EQ-103 Rittal
   // 3239.200 louvre vent) is admitted bare — 'vent' is NOT, for exactly that reason.
   'hvac', 'cylinder', 'door', 'busbar', 'louvre',
+  // LEXICON ROUND 4 (2026-07-06, the co2-campaign-v5 round-5-parts latent-noun
+  // dissection): five more UNAMBIGUOUS purchased-catalogue nouns admitted bare —
+  // each is a real family with a verified DB row this round ingested (K-102 CEM
+  // BLC-ex ATEX blower, X-102 ANDRITZ ecoOne pusher centrifuge, X-107 Fischbein
+  // B2600 band sealer, X-140 Foscott FRD675 heater-cartridge sealer-jaw element,
+  // X-133 Hughes Safety Showers L18GS34G combination unit) — checked against the
+  // BESS-v15 + water-v79 + SAF-v21 word lists (every word's own name_human,
+  // content_character.name_human, character_id and sub_module id) for a hit on
+  // 'blower' / 'centrifuge' / 'sealer' / 'shower' / 'eyewash': ZERO hits in any
+  // of the three, so none of the five can flip a cross-class verdict. 'access
+  // platform' and 'nitrogen blanketing skid' (the other two round-5 latent
+  // nouns) are DELIBERATELY NOT admitted bare here — see the COMPOUND_
+  // QUALIFIER_GATED_HEADS + QUALIFIER_GATED_HEADS['skid'] entries below for why
+  // each needs a tighter, AND-style gate instead of a bare/OR-qualifier admit.
+  'blower', 'centrifuge', 'sealer', 'shower', 'eyewash',
 ])
 
 // English plural→singular fold for TOKEN classification + matching (the f9dfc2918
@@ -371,6 +386,28 @@ const HOUSING_QUALIFIERS = new Set<string>([
 //               fire-suppression catalogue part) from false to true. 'thermal' /
 //               'smoke' / 'heat' is the fire-suppression-detector signal that SAF's
 //               gas/flame detector names never carry.
+// LEXICON ROUND 4 (2026-07-06, co2-campaign-v5 round-5-parts latent-noun dissection):
+//   skid — I-105 'nitrogen blanketing skid' (Groth 3011 tank-blanketing regulator). A
+//          bare 'skid' is hopelessly generic (23 hits across water-v79's own
+//          `mass_fluid_transport_process__ro_membrane_elements` RO skid alone, plus
+//          BESS/SAF/CO2 skid-frame words) — nowhere near admittable bare. The obvious
+//          qualifiers ('nitrogen', 'blanketing', 'n2') were TRIED FIRST and REJECTED:
+//          SAF-v21's own 'nitrogen inerting skid' (name_human, sub_module
+//          `utilities_offsites`) carries 'nitrogen' + 'skid' on its ALIAS surface
+//          ("nitrogen inerting skid") and 'blanketing' + 'skid' on its PRIMARY-name
+//          surface ("N2 generation + inerting/blanketing skid") — never both signal
+//          words on the SAME tested string, but isCatalogueComponentByEitherName
+//          tests each surface independently, so a single-qualifier OR-admit on
+//          EITHER 'nitrogen' or 'blanketing' flips that correctly-excluded SAF word
+//          (a real bottom-up process-safety N2 skid, not this round's ownership) from
+//          false to true on the cross-class replay. 'exclusion' — from I-105's own
+//          alias "MEA-tank nitrogen blanketing skid (O2 exclusion)", the actual
+//          engineering PURPOSE of nitrogen blanketing (excluding O2 from the
+//          headspace) — is the narrow qualifier that reaches I-105 without reaching
+//          SAF's word (checked: 'exclusion' appears nowhere in either SAF-v21 test
+//          surface for that skid, or anywhere else in BESS-v15/water-v79/SAF-v21
+//          alongside 'skid').
+//   detector (unchanged from round 3) stays as-is below.
 const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
   stop: new Set(['emergency']),
   module: new Set(['ethernet', 'ip', 'comms', 'communication', 'communications']),
@@ -387,6 +424,28 @@ const QUALIFIER_GATED_HEADS: Record<string, Set<string>> = {
   lug: new Set(['grounding']),
   door: new Set(['assembly', 'leaf']),
   detector: new Set(['thermal', 'smoke', 'heat']),
+  skid: new Set(['exclusion']),
+}
+
+// COMPOUND (AND-of-N) qualifier gate — a stricter sibling of QUALIFIER_GATED_HEADS
+// for the rare head noun where a SINGLE qualifier still over-fires and the head only
+// becomes safe to admit when TWO OR MORE qualifiers are ALL present together.
+//   platform — X-131 'access platform + ladders' (Kee Safety Kee Platform modular
+//              access system), sub_module `skid_structure`. A single-qualifier
+//              ('access') admit was TRIED FIRST and REJECTED: water-v79's own
+//              'Access Ladder & Platform' (a small built-in RO-vessel walkway
+//              fixture, sub_module `mass_fluid_transport_process__ro_membrane_
+//              elements`, correctly fabricated/material-costed — no catalogue MPN,
+//              no DB row) carries BOTH 'access' AND 'platform' on its own name —
+//              a single-qualifier OR-admit on 'access' flips it from false to true
+//              on the cross-class replay. X-131's OWN sub_module id contributes a
+//              THIRD token, 'skid' (from `skid_structure`), that water's RO-vessel
+//              word never carries alongside 'access'+'platform' anywhere in
+//              BESS-v15/water-v79/SAF-v21 — requiring ALL THREE (head 'platform'
+//              AND both qualifiers 'access' + 'skid') present together reaches
+//              X-131 without reaching water's word.
+const COMPOUND_QUALIFIER_GATED_HEADS: Record<string, string[][]> = {
+  platform: [['access', 'skid']],
 }
 
 /**
@@ -432,7 +491,14 @@ export function isCatalogueComponent(name: string): boolean {
   const qualifiedGated = Object.entries(QUALIFIER_GATED_HEADS).some(
     ([head, quals]) => toks.includes(head) && toks.some((t) => quals.has(t)),
   )
-  const catalogue = toks.some((t) => CATALOGUE_TOKEN_SET.has(t)) || qualifiedHousing || qualifiedGated
+  // COMPOUND (AND-of-N) qualifier gate (LEXICON ROUND 4): a head admits only when
+  // EVERY token in at least one of its qualifier SETS is present — strictly tighter
+  // than QUALIFIER_GATED_HEADS' single-qualifier OR. See COMPOUND_QUALIFIER_GATED_HEADS
+  // above for why 'platform' needs this (a single qualifier over-fires on water-v79).
+  const compoundGated = Object.entries(COMPOUND_QUALIFIER_GATED_HEADS).some(
+    ([head, qualifierSets]) => toks.includes(head) && qualifierSets.some((qs) => qs.every((q) => toks.includes(q))),
+  )
+  const catalogue = toks.some((t) => CATALOGUE_TOKEN_SET.has(t)) || qualifiedHousing || qualifiedGated || compoundGated
   if (catalogue && !structural) return true
   if (structural && !catalogue) return false
   if (catalogue && structural) {
@@ -453,8 +519,14 @@ export function isCatalogueComponent(name: string): boolean {
     // every existing qualifiedGated hit in either corpus already resolves catalogue
     // (its sub_module id carries no structural token), so this override changes
     // NEITHER corpus's verdicts — it only reaches words that were previously
-    // wrongly blocked.
-    if (qualifiedGated) return true
+    // wrongly blocked. compoundGated (LEXICON ROUND 4) is the same class of
+    // evidence — an even narrower, hand-vetted AND-of-N pair — and wins the tie
+    // the same way: X-131's 'skid_structure' sub_module contributes the STRUCTURAL
+    // token 'structure' as its last token, which would otherwise silently block
+    // the qualifying 'platform'+'access'+'skid' word merely for living in a
+    // structurally-named sub_module (the same shape of bug the door/lug override
+    // above fixed in round 3).
+    if (qualifiedGated || compoundGated) return true
     return !STRUCTURAL_TOKEN_SET.has(lastTok)
   }
   return false

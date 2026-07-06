@@ -378,5 +378,56 @@ expect(isCatalogueComponentByEitherName('module top cover', 'module top cover', 
 expect(isCatalogueComponentByEitherName('wing spar', null, 'airframe') === false,
   'no alias at all must behave exactly like the single-name isCatalogueComponent check')
 
+// ── LEXICON ROUND 4 (2026-07-06, co2-campaign-v5 round-5-parts latent-noun
+//    dissection): 7 real catalogue nouns that isCatalogueComponent refused to admit,
+//    even though the round-5 parts agent had already verified+ingested a real MPN row
+//    for each (K-102 CEM blower, X-102 ANDRITZ ecoOne centrifuge, X-131 Kee Safety
+//    platform, X-133 Hughes Safety Showers unit, I-105 Groth 3011 regulator, X-107
+//    Fischbein sealer, X-140 Foscott heater-cartridge element) — fillBlankWordMpns
+//    never reached dbFirstLookup for any of them. proveCatch BOTH directions: the
+//    real word (name+subId, verbatim from out/co2-campaign-v5/state.json) is now
+//    admitted; the cross-class NEGATIVE fixtures that motivated qualifier-gating
+//    instead of a bare admit (SAF-v21's nitrogen/blanketing skid, water-v79's RO-vessel
+//    access-ladder-platform) stay refused — proven verbatim against their OWN real
+//    name/alias/subId text (out/oxccu-saf-v21 + out/fischer-codema-v79 state.json).
+for (const [name, aliasName, subId] of [
+  ['flue-gas inlet blower', null, 'mea_absorption_train_mass_fluid_transport_process'],
+  ['K2SO4 pusher centrifuge', null, 'k2so4_recovery_line_mass_fluid_transport_process'],
+  ['bag heat sealer', null, 'bagging_packaging_line_thermal_transfer'],
+  ['band-sealer jaw heating element', 'sealer jaw heating element', 'bagging_packaging_line_thermal_transfer'],
+  ['safety shower and eyewash', 'safety shower + eyewash', 'safety_protection_mass_fluid_transport_process'],
+  ['access platform and ladders', 'access platform + ladders', 'skid_structure'],
+  ['MEA-tank nitrogen blanketing skid (O2 exclusion)', 'nitrogen blanketing skid', 'safety_protection_mass_fluid_transport_process'],
+] as const) {
+  expect(isCatalogueComponentByEitherName(name, aliasName, subId) === true,
+    `Lexicon round 4: '${name}' (${subId}) has a verified DB row (round-5 CO2 parts ingest) and MUST become a fill-blank candidate`)
+}
+// Negative fixture 1 — SAF-v21's REAL 'nitrogen inerting skid' (utilities_offsites): carries
+// 'nitrogen'+'skid' on its alias surface and 'blanketing'+'skid' on its primary-name surface,
+// but NEVER 'exclusion' on either — the qualifier this round deliberately chose BECAUSE the
+// obvious 'nitrogen'/'blanketing' qualifiers each individually collide with this exact word.
+expect(isCatalogueComponentByEitherName(
+  'N2 generation + inerting/blanketing skid', 'nitrogen inerting skid', 'utilities_offsites',
+) === false,
+  "Lexicon round 4 negative fixture: SAF-v21's real 'nitrogen inerting skid' MUST stay refused " +
+  "(no 'exclusion' qualifier on either surface) — proves the skid qualifier is 'exclusion', not " +
+  "'nitrogen'/'blanketing', which would have flipped this word")
+// Negative fixture 2 — water-v79's REAL 'Access Ladder & Platform' (RO-vessel structural
+// accessory, mass_fluid_transport_process__ro_membrane_elements): carries 'access'+'platform'
+// together but NEVER 'skid' — the compound gate requires ALL of {access, skid} alongside the
+// 'platform' head, so a single-qualifier ('access') admit would have wrongly flipped this word.
+expect(isCatalogueComponentByEitherName(
+  'Access Ladder & Platform', null, 'mass_fluid_transport_process__ro_membrane_elements',
+) === false,
+  "Lexicon round 4 negative fixture: water-v79's real 'Access Ladder & Platform' MUST stay " +
+  "refused (no 'skid' token) — proves the platform gate is a 3-way AND (platform+access+skid), " +
+  "not a single 'access' qualifier, which would have flipped this word")
+// Bare-noun sanity: 'skid' and 'platform' alone (no qualifier at all) must still be refused —
+// the new gates are additive, not a backdoor bare admit.
+expect(isCatalogueComponent('cooling-water skid thermal_utilities') === false,
+  "a bare 'skid' with no 'exclusion' qualifier MUST stay refused (still qualifier-gated, not admitted outright)")
+expect(isCatalogueComponent('platform assembly maintenance_serviceability__leveling_feet') === false,
+  "a bare 'platform' with no access+skid compound qualifier MUST stay refused")
+
 if (failures) { console.error(`emitter-mispin selftest: ${failures} FAILED`); process.exit(1) }
-console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven)')
+console.log('emitter-mispin selftest OK (IC-vendor wrong-domain + commodity-valve + flow-capacity + motor-drive guards + Bar-A candidacy + type-coherence + duty-band + lexicon-round-2 + lexicon-round-4 + exclusive-assignment + untethered-accessory-valve tether-or-suppress + duplicate-representative-population fold proven)')
