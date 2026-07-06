@@ -327,12 +327,29 @@ _HUB_PATTERNS = [
     (re.compile(r"\bcoolers?\b", re.I), "cooler"),
     (re.compile(r"heat.?recovery exchanger|heater battery|\bair.?heater\b", re.I),
      "process_air_heater"),
+    # COOLANT DISTRIBUTION MANIFOLD (2026-07-06, BESS HVAC coverage fix): the header/
+    # manifold that splits the chiller's flow/return mains out to the per-rack cold
+    # plates is a real, separately-tagged BoM item (e.g. CD-101 'coolant distribution
+    # manifold') that sat on NEITHER the hub list NOR the zone list — it matched no
+    # pattern at all and was silently dropped from the drawing even though it is a
+    # named principal on the coolant loop between the chiller and the racks. Same
+    # idiom as the process-thermal-utility roles above: drawn + tagged (with its own
+    # real BoM tag, per the "REAL BoM tag first" hub-creation rule) + scheduled, but
+    # excluded from the sizing-origin candidates below (a manifold is a distribution
+    # point, not the coolant SOURCE). Universal — generic plumbing noun, no per-class
+    # table; covers any coolant-loop archetype with a distribution/collector manifold.
+    # SCOPED to coolant/cooling/glycol (not a bare "distribution manifold" — a water-
+    # treatment or fertigation plant has its own unrelated distribution manifolds on
+    # the process-water side that must NEVER be pulled onto the HVAC/coolant sheet).
+    (re.compile(r"coolant.{0,20}manifold|cooling.{0,20}manifold|glycol.{0,20}manifold",
+                re.I), "manifold"),
 ]
 
-# Hub roles that are PROCESS THERMAL UTILITY equipment shown on the HVAC sheet for
-# coverage/labelling only — never eligible to become the plan's supply-hub origin (see
+# Hub roles that are PROCESS THERMAL UTILITY equipment (or auxiliary distribution
+# plumbing, e.g. a coolant manifold) shown on the HVAC sheet for coverage/labelling
+# only — never eligible to become the plan's supply-hub origin (see
 # the _HUB_PATTERNS comment above + derive_air_system's main_hub selection).
-_PROCESS_THERMAL_ROLES = {"cooler", "process_air_heater"}
+_PROCESS_THERMAL_ROLES = {"cooler", "process_air_heater", "manifold"}
 
 # A SERVED-ZONE role (the thing air/coolant goes TO).  Racks / grow zones / aisles.
 _ZONE_PATTERNS = [
@@ -614,7 +631,7 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
 def _hub_tag(role: str, idx: int) -> str:
     base = {"crac": "CRAC", "ahu": "AHU", "dx": "DX", "chiller": "CH",
             "fan": "EF", "condensate": "CD", "pump": "PMP", "tank": "TK",
-            "louvre": "LV"}.get(role, "AHU")
+            "louvre": "LV", "manifold": "CDM"}.get(role, "AHU")
     return f"{base}-{idx + 1}"
 
 

@@ -714,9 +714,31 @@ def _aux_tab_score(title: str, run_dir: str):
                 _atex_cited = bool(re.search(
                     r"\bdsear\b|\batex\b|explosion[- ]?proof|hazardous area|explosive atmosphere",
                     _orig_brief_txt, re.I))
+                # CROSS-CLASS FIX (2026-07-06): pull the brief's OWN cited hazard-area
+                # description out of its DSEAR/ATEX clause instead of a hardcoded CO2
+                # phrase — "the MEA handling and drying areas" (CO2-mineralisation) vs
+                # "vented battery gases" (BESS) are DIFFERENT hazards; a fixed CO2 string
+                # here previously fired verbatim on ANY DSEAR/ATEX brief. Universal: a
+                # lazy "…dsear/atex…for <desc>" capture, generic across archetypes; falls
+                # back to a neutral phrase when the brief's clause doesn't parse.
+                _hazard_desc_m = re.search(
+                    r"\b(?:dsear|atex)\b[^\n]{0,160}?\bfor\b\s+(?:the\s+)?([^\n(.;]+)",
+                    _orig_brief_txt, re.I)
+                _hazard_desc = (_hazard_desc_m.group(1).strip().rstrip(".,")
+                                if _hazard_desc_m else "the cited hazardous area(s)")
+                # CREDIT existing area-extract/purge/off-gas ventilation equipment
+                # (2026-07-06): broadened beyond the original CO2-only phrasing so a
+                # design that already HAS dedicated hazardous-area ventilation — under
+                # whatever real-world name it carries (BESS's "enclosure ventilation
+                # fan" / "off-gas exhaust fan", CO2's "ATEX area extract fan") — PASSES
+                # instead of being false-flagged as a gap. Only a design that genuinely
+                # has NONE of these still flags. Generic equipment nouns, no per-class
+                # table.
                 _area_extract_present = any(
                     re.search(r"area extract|extract fan|purge ventilat|zone ventilat|"
-                              r"hazardous.{0,25}ventilat|explosion.{0,20}vent",
+                              r"hazardous.{0,25}ventilat|explosion.{0,20}vent|"
+                              r"enclosure ventilat|off.?gas.{0,20}(?:exhaust|extract|"
+                              r"fan|vent)|exhaust fan|ventilation fan",
                               str(r.get("requirement") or r.get("part") or ""), re.I)
                     for r in _all_bom)
                 _comp_atex = ((1 if _area_extract_present else 0, 1) if _atex_cited else None)
@@ -727,8 +749,8 @@ def _aux_tab_score(title: str, run_dir: str):
                 ]
                 if _comp_atex is not None:
                     _components.append((
-                        "ATEX/DSEAR hazardous-area ventilation for the brief's cited "
-                        "handling/drying area(s)", *_comp_atex))
+                        f"ATEX/DSEAR hazardous-area ventilation for the brief's cited "
+                        f"{_hazard_desc}", *_comp_atex))
                 _sc = round(10.0 * min(p / c for _l, p, c in _components if c), 1)
                 if _sc == int(_sc):
                     _sc = int(_sc)
@@ -743,11 +765,11 @@ def _aux_tab_score(title: str, run_dir: str):
                     _issues.append(_load_issue)
                 if _comp_atex is not None and _comp_atex[0] < _comp_atex[1]:
                     _issues.append(
-                        "the brief cites DSEAR/ATEX hazardous-area classification for the "
-                        "MEA-handling + drying areas, but no dedicated area-extract/purge "
-                        "ventilation equipment appears in the design — a genuine hazardous-"
-                        "area ventilation GAP (not an out-of-scope item; the brief never "
-                        "excludes it)")
+                        f"the brief cites DSEAR/ATEX hazardous-area classification for "
+                        f"{_hazard_desc}, but no dedicated area-extract/purge "
+                        f"ventilation equipment appears in the design — a genuine hazardous-"
+                        f"area ventilation GAP (not an out-of-scope item; the brief never "
+                        f"excludes it)")
                 # ROUTE EVERY open gap (not just the first) — a run can carry both a
                 # missing-coverage AND a missing-ATEX-ventilation defect simultaneously;
                 # the fix text must not silently drop the second (2026-07-05 fix).
