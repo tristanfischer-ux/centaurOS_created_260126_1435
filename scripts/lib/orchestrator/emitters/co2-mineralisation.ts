@@ -784,8 +784,30 @@ function emitStructure(_p: Co2MinParams): DesignModule {
 
 // 11. Safety ----------------------------------------------------------------------
 function emitSafety(_p: Co2MinParams): DesignModule {
+  // ── ATEX/DSEAR AREA VENTILATION sizing basis (added 2026-07-06 — the HVAC-floor
+  // honest-gap fix) ─────────────────────────────────────────────────────────────
+  // The brief cites "DSEAR and ATEX Directive 2014/34/EU for the MEA handling and
+  // drying areas (MEA is combustible)" — a hazardous-area classification that
+  // requires dedicated forced dilution/area-extract ventilation to keep the
+  // classified zones below their Lower Explosive Limit (LEL) per the DSEAR ACOP /
+  // IEC 60079-10-1 area-classification guidance. Every other safety word below is
+  // DETECTION or CONTAINMENT (gas detectors, PRVs, N2 blanketing, ESD) — none of it
+  // actually MOVES air out of the classified zones, so the design had ZERO
+  // ventilation equipment despite mandating the classification that requires it.
+  // Sized from the plant's own fixed geometry, not an invented number: the two
+  // hazardous-area zones (MEA storage/handling around the absorber base + storage
+  // tank + circulation pumps; drying around the two fluid-bed hot-air dryers) each
+  // occupy an estimated 4 m slice of the 12 m × 2.4 m × 2.59 m transportable skid
+  // (skid_structure sub-module) — 4 × 2.4 × 2.59 ≈ 24.9 m³, rounded to 25 m³ per
+  // zone. DSEAR-typical dilution ventilation for a Zone 2 (occasional-release)
+  // classified area runs 6-12 air changes/hour (ACH); this pilot skid is sized at
+  // the mid-band 10 ACH: 25 m³ × 10 ACH = 250 m³/h per zone, rounded up to the
+  // next standard small in-line ATEX fan frame (300 m³/h).
+  const ATEX_ZONE_VOLUME_M3 = 25
+  const ATEX_ACH_PER_HOUR = 10
+  const atexZoneAirflowM3H = Math.ceil((ATEX_ZONE_VOLUME_M3 * ATEX_ACH_PER_HOUR) / 50) * 50
   const sub = makeSub('safety_protection', 'safety + protection', 'protects',
-    `DSEAR/ATEX zoning, pressure relief, gas detection and emergency shutdown for MEA and KOH handling`, [
+    `DSEAR/ATEX zoning, pressure relief, gas detection, area ventilation and emergency shutdown for MEA and KOH handling`, [
     word('pressure_relief_valve_word', 'pressure relief valves',
       cc('pressure_relief_valve', 'pressure relief valves', 'mass_fluid_transport_process', 'stainless_steel'),
       [mod('quantity', '×6'), mod('form', 'spring-loaded PRV'), mod('manufacturer', 'LESER'),
@@ -812,6 +834,26 @@ function emitSafety(_p: Co2MinParams): DesignModule {
       [mod('quantity', '×3'), mod('form', 'fixed PID VOC head for amine vapour'), mod('manufacturer', 'Dräger'),
        mod('part_number', 'Polytron 8000 PID'), mod('list_price_gbp', '2100'), mod('regulatory', 'DSEAR')]),
     // flame detector REMOVED 2026-06-08 (C. Schoolderman: no fire risk in the non-flammable MEA/CO2 process)
+    // ── ATEX/DSEAR AREA VENTILATION (added 2026-07-06 — the HVAC-floor honest-gap
+    // fix; sizing basis + rationale documented above emitSafety()) ────────────────
+    word('atex_area_extract_fan_word', 'ATEX area extract fan',
+      cc('atex_area_extract_fan', 'ATEX-rated area extract fan', 'mass_fluid_transport_process', 'steel'),
+      [mod('quantity', '×2'), mod('form', `ATEX Ex d/Ex e motor centrifugal in-line extract fan, II 2G/3G Ex db eb IIA T3 gas group/temperature class (MEA autoignition ~410 °C, T3 = 200 °C max surface — ample margin); one per hazardous-area zone (MEA handling + drying), sized at ${ATEX_ACH_PER_HOUR} ACH over the ${ATEX_ZONE_VOLUME_M3} m³ classified-zone envelope = ${Math.round(ATEX_ZONE_VOLUME_M3 * ATEX_ACH_PER_HOUR)} m³/h, rounded to the standard frame`),
+       mod('capacity', String(atexZoneAirflowM3H), 'm³/h'), mod('manufacturer', 'Axair Fans UK'),
+       mod('part_number', 'ATEX-certified centrifugal in-line extract fan, II 2G/3G Ex db eb IIA T3 — exact frame size specified at quotation from the zone duty'), mod('list_price_gbp', '3200'), mod('regulatory', 'ATEX 2014/34/EU')]),
+    word('atex_inlet_louvre_word', 'ATEX-zone inlet louvre',
+      cc('atex_inlet_louvre', 'ATEX-zone make-up-air inlet louvre', 'mass_fluid_transport_process', 'steel'),
+      [mod('quantity', '×2'), mod('form', 'weatherproof aerofoil-bladed make-up-air louvre with bird/insect mesh, one per hazardous-area zone, providing balanced make-up air for the extract fan at the zone airflow'),
+       mod('dimension', '0.3 m × 0.3 m'), mod('manufacturer', 'Gilberts (Blackpool)'),
+       mod('part_number', 'AWL aerofoil weather louvre — sized at quotation'), mod('list_price_gbp', '450')]),
+    word('atex_ductwork_word', 'ATEX-bonded ductwork run',
+      cc('atex_ductwork', 'ATEX-bonded ventilation ductwork', 'mass_fluid_transport_process', 'steel'),
+      [mod('quantity', '×1'), mod('form', 'galvanised-steel ducting with continuous electrical bonding/earthing straps across every joint (static-charge dissipation, DSEAR requirement) connecting each inlet louvre to its hazardous-area zone and each zone to its extract fan discharge'),
+       mod('part_number', 'ATEX-bonded galvanised ventilation ductwork — fabricated to layout'), mod('list_price_gbp', '2800'), mod('regulatory', 'ATEX 2014/34/EU')]),
+    word('atex_fan_interlock_relay_word', 'fan-trip gas-detection relay',
+      cc('atex_fan_interlock_relay', 'ventilation fan-trip gas-detection interlock relay', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+      [mod('quantity', '×2'), mod('form', "ties the existing amine-vapour/LEL detectors' 4-20 mA signal to its zone's extract fan start/trip logic plus a local visual+audible alarm, per DSEAR ACOP dilution-ventilation interlock practice — one relay per extract fan"), mod('manufacturer', 'Pilz'),
+       mod('part_number', 'PNOZ s3'), mod('list_price_gbp', '180'), mod('regulatory', 'BS EN 61511')]),
     word('emergency_stop_word', 'emergency shutdown system',
       cc('emergency_stop', 'emergency shutdown system', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
       [mod('quantity', '×1'), mod('form', 'SIL-2 ESD chain controller'), mod('manufacturer', 'Siemens'),
@@ -830,9 +872,9 @@ function emitSafety(_p: Co2MinParams): DesignModule {
        mod('part_number', 'REGARD 7000'), mod('list_price_gbp', '4800'), mod('regulatory', 'BS EN 61511')]),
   ])
   return { module: 'safety_protection', display_name: 'Safety & Protection',
-    module_brief: `DSEAR/ATEX zoning, SIL-2 emergency shutdown, pressure relief and gas detection protect the MEA and corrosive-KOH handling areas.`,
-    overview_paragraph_en: '', derived_parameters: { regulatory_mandatory_count: 4 },
-    allowed_radicals: ['mass_fluid_transport_process', 'chemical_sensing_function', 'polymer_thermoplastic'], applicability_confidence: 'high', sub_modules: [sub] }
+    module_brief: `DSEAR/ATEX zoning, pressure relief, gas detection, forced area ventilation (${atexZoneAirflowM3H} m³/h per hazardous-area zone at ${ATEX_ACH_PER_HOUR} ACH) and SIL-2 emergency shutdown protect the MEA and corrosive-KOH handling areas.`,
+    overview_paragraph_en: '', derived_parameters: { regulatory_mandatory_count: 4, atex_zone_airflow_m3_h: atexZoneAirflowM3H, atex_zone_volume_m3: ATEX_ZONE_VOLUME_M3, atex_ach_per_hour: ATEX_ACH_PER_HOUR },
+    allowed_radicals: ['mass_fluid_transport_process', 'chemical_sensing_function', 'polymer_thermoplastic', 'silicon_semiconductor_function', 'steel'], applicability_confidence: 'high', sub_modules: [sub] }
 }
 
 // 12. Solids bagging --------------------------------------------------------------
