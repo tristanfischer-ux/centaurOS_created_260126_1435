@@ -435,6 +435,23 @@ const HTML = `<style>
   </div>
 </section>
 
+<!-- FOR TEAMS WHO QUOTE -->
+<section class="s" id="teams" style="background:var(--surface)">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="eyebrow">For teams who quote</span>
+      <h2>Quote faster than anyone &mdash; and win more.</h2>
+      <p class="muted" style="margin-top:12px">If your team assesses briefs and quotes for customers, the same engine turns a project brief into a costed, engineer-checked proposal in about a day &mdash; so you&rsquo;re back to the client before your competitors have finished scoping. The fastest credible quote usually wins the contract.</p>
+    </div>
+    <div class="axis-grid">
+      <div class="axis"><span class="axis-k">Days, not months</span><p>A brief becomes a costed, engineer-checked proposal in about a day &mdash; and hours for work like something you&rsquo;ve done before.</p></div>
+      <div class="axis"><span class="axis-k">Win the near-misses</span><p>Get a credible number back first. On most tenders the fastest sound quote takes the contract.</p></div>
+      <div class="axis"><span class="axis-k">Right, not just fast</span><p>First-principles physics flags what a busy team can miss &mdash; and a human signs off every quote before it goes out.</p></div>
+    </div>
+    <div style="margin-top:30px"><a class="btn btn-primary btn-lg" href="/contact">Talk to us about your team &rarr;</a></div>
+  </div>
+</section>
+
 <!-- UNDER THE HOOD -->
 <section class="s" id="under-the-hood" style="background:var(--surface)">
   <div class="wrap">
