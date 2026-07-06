@@ -6730,8 +6730,72 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
                         e.get("material_context"))
         return best if best is not None else (None, None, None, None)
 
+    def _family_material_context(family):
+        """The best genuinely-disclosed material_context for a family, gathered from
+        EVERY matching explicit edge — rated or NOT. Rating and material identity are
+        orthogonal: `_parent_rating` above intentionally skips any edge with no
+        `required_value` (it can't size a trunk/tap from a rating that doesn't exist),
+        but an unrated edge — e.g. a direction-closer's completion tie (cold plate per
+        rack -> liquid cooling chiller) — still legitimately DECLARES the real fluid
+        service (a coolant/glycol string, per `connection_ledger.close_flow_directions`,
+        commit 1412ce08a) even though it carries no numeric rating. Skipping those
+        edges for MATERIAL too (not just rating) throws the only real fluid-identity
+        signal away, so a BESS's routed coolant pipes fall back to bare 'carbon steel
+        (assumed)' and material_diversity reads 1.
+
+        SECOND wrinkle (also fixed here): `close_flow_directions`'s gap-closer always
+        stamps its NEW completion tie with the generic mechanism 'fluid_loop' — it
+        never re-tags the edge 'thermal', even when the gap it is closing is a
+        coolant/thermal loop. So a 'thermal'-family lookup keyed purely on
+        `_FAMILY_MECHS['thermal']` (mechanisms 'thermal'/'thermal_return') NEVER sees
+        these ties at all — not a rating gap, a MECHANISM-TAG gap. Widen the 'thermal'
+        family's scan to 'fluid_loop' edges too, but gate acceptance on the DISCLOSED
+        STRING's own content via `cs._is_coolant_glycol_service` — the SAME semantic
+        test `connection_sizing.coolant_service_material` itself uses to pick
+        stainless/EPDM — rather than an endpoint-NAME heuristic. An endpoint-name match
+        (e.g. 'liquid cooling chiller' also has its own unrelated make-up-water utility
+        tie, material_context='process-water service tie-in (make-up / fill / drain)',
+        minted by this module's own `augment_topology_connect_orphans`) is NOT
+        sufficient — that string is a genuine disclosure but describes a DIFFERENT
+        service (utility water), and content-testing it correctly rejects it, leaving
+        the search to keep walking until it reaches the real coolant/glycol tie.
+        Universal — keyed on the SAME content classifier already used downstream to
+        pick the material, not a new per-archetype rule; 'fluid' family is untouched
+        (still only its own `_FAMILY_MECHS['fluid']` mechanisms, exactly as before).
+
+        Walks the matching edges in topology order (deterministic — see #86) and
+        returns the first context that is genuinely disclosed per
+        `cs._disclosed_material_context` (never the sizing tool's generic post-sizing
+        boilerplate wording)."""
+        mechs = set(_FAMILY_MECHS.get(family, ()))
+        thermal_via_fluid_loop = family == "thermal" and "fluid_loop" not in mechs
+        if thermal_via_fluid_loop:
+            mechs.add("fluid_loop")
+        for e in (explicit_topology or []):
+            mech = e.get("mechanism")
+            if mech not in mechs:
+                continue
+            mc = e.get("material_context")
+            if not mc or cs._disclosed_material_context(mc) is None:
+                continue
+            if thermal_via_fluid_loop and mech == "fluid_loop" and \
+                    not cs._is_coolant_glycol_service(mc):
+                continue
+            return mc
+        return None
+
     # Per-family parent (constraint_kind, total_design_value, unit, material_context).
-    _RATING = {fam: _parent_rating(fam) for fam in ("electrical", "fluid", "thermal")}
+    # The material_context slot is backfilled from ANY matching edge (rated or not)
+    # when the rated edge itself carries none/only-boilerplate — see
+    # `_family_material_context` above.
+    _RATING = {}
+    for _fam in ("electrical", "fluid", "thermal"):
+        _ck, _total, _unit, _mc = _parent_rating(_fam)
+        if not _mc or cs._disclosed_material_context(_mc) is None:
+            _fallback_mc = _family_material_context(_fam)
+            if _fallback_mc is not None:
+                _mc = _fallback_mc
+        _RATING[_fam] = (_ck, _total, _unit, _mc)
 
     def _share_edge(family, mech, a_nm, b_nm, n_consumers, is_trunk=False):
         """Synthesize a topology-edge dict carrying the rating THIS derived segment
