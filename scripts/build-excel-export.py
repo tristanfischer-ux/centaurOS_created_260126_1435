@@ -11407,10 +11407,493 @@ def _eval_engineering_analysis_rows(rows: List[dict]) -> Optional[dict]:
                     "_materials_takeoff) — never hand-type a value into this tab")}
 
 
+
+
+# ═══ PUMP / ROTATING-EQUIPMENT PERFORMANCE — efficiency + H-Q curve + NPSH ═════════════
+# (Tristan priority #4 PUMP EFFICIENCIES/CURVES). SAME idiom as the stress-strain block
+# above: UNIVERSAL (data-shape/family keyed off the row's own requirement noun + duty
+# fields, never a per-class table). A pump is detected from the noun alone; a fan/
+# blower/compressor needs its OWN row to carry flow + head/pressure + power TOGETHER
+# before it is even a candidate (the priority target is pumps — a bare fan/blower/
+# compressor with no duty data anywhere would otherwise clutter the tab with a FAIL for
+# an equipment family this feature isn't chasing). Duty fields are pulled from the row's
+# own requirement text FIRST (an inline 'N kW' / 'N m³/h' on a real catalogue-matched
+# part is the row's own most authoritative field), else a contract quantity the row's
+# own name joins to — the SAME name-join idiom Line & velocity's `_flow_qty_for_part`
+# already uses (exact snake+suffix, then a unique snake-prefixed candidate), extended
+# with the SAME token-overlap fallback requirements_bom.py::`_contract_motor_kw` already
+# uses elsewhere in the engine to find a line's own motor kW from the contract (generic
+# equipment/metric tokens excluded; a genuinely ambiguous top-tie is NEVER guessed).
+# Missing data -> 'DATA NOT IN CONTRACT', never a fabricated number.
+_PUMP_NOUN_RE = re.compile(r"\bpump\b", re.I)
+_FAN_NOUN_RE = re.compile(r"\bfan\b|\bblower\b|\bcompressor\b", re.I)
+_PUMP_FLOW_TEXT_RE = re.compile(r"([\d.,]+)\s*m[³3]\s*/\s*h\b", re.I)
+_PUMP_POWER_TEXT_RE = re.compile(r"([\d.,]+)\s*kW\b", re.I)
+_PUMP_BAR_TEXT_RE = re.compile(r"([\d.,]+)\s*bar\b", re.I)
+
+_PUMP_FLOW_SUFFIXES = ("_throughput_m3_h", "_flow_m3_h", "_demand_m3_h", "_capacity_m3_h",
+                       "_throughput_m3_per_hr", "_flow_m3_per_hr", "_demand_m3_per_hr",
+                       "_flow_m3_per_hour", "_m3_per_hour", "_flow_lpm")
+_PUMP_HEAD_SUFFIXES = ("_head_m", "_total_dynamic_head_m", "_tdh_m")
+_PUMP_PRESSURE_SUFFIXES = ("_discharge_pressure_bar", "_pressure_bar",
+                          "_working_pressure_bar", "_delivery_pressure_bar")
+_PUMP_POWER_SUFFIXES = ("_power_kw", "_motor_kw", "_shaft_kw", "_shaft_power_kw",
+                        "_hydraulic_power_kw", "_brake_power_kw")
+
+# Tokens that carry no identity for the join (every pump/fan shares them) — mirrors
+# requirements_bom.py::_GENERIC_EQUIP_TOKENS' discipline exactly.
+_PUMP_QTY_GENERIC_TOKENS = {"pump", "fan", "blower", "compressor", "motor", "power",
+                           "drive", "kw", "unit", "system", "electrical", "elec",
+                           "head", "pressure", "discharge", "working", "delivery",
+                           "bar", "flow", "throughput", "demand", "capacity", "m3",
+                           "per", "hour", "hr", "lpm", "shaft", "hydraulic", "brake",
+                           "total", "dynamic", "tdh"}
+
+
+def _pump_contract_join(name: str, quantities: dict, suffixes: Tuple[str, ...]
+                        ) -> Optional[Tuple[str, float, dict, str]]:
+    """(key, value, quantity-dict, stage) for a pump/fan/blower/compressor's OWN duty
+    field (flow / head / pressure / power) joined from state.orchestratorContract.
+    quantities by NAME — never invented. Exact snake(name)+suffix ('exact'), then a
+    UNIQUE snake-prefixed candidate ('prefix'), then a token-overlap fallback
+    ('fallback') for the frequent case where the contract's quantity stem drops a
+    descriptive word the BoM requirement text keeps (e.g. 'MEA circulation pump' ->
+    quantity stem 'mea_pump'). A genuinely ambiguous top-tie is NEVER guessed (returns
+    None) — honest 'not derivable' beats a wrong attribution. The 'fallback' stage is
+    the WEAKEST evidence (a generic-token match, not this row's own distinguishing
+    name) — `_build_pump_rows` cross-checks it against every OTHER candidate row so
+    the SAME fallback key can never be silently claimed by two different pumps (e.g.
+    'MEA circulation pump' and 'MEA recycle pump' both token-overlapping the one
+    'mea_pump_head_m' key — the caller nulls BOTH rather than duplicate-attribute)."""
+    if not isinstance(quantities, dict) or not name:
+        return None
+    s = _snake_part(name)
+    if not s:
+        return None
+
+    def _qd(key: str) -> Optional[dict]:
+        v = quantities.get(key)
+        return v if isinstance(v, dict) else None
+
+    for suf in suffixes:
+        qd = _qd(s + suf)
+        if qd is not None:
+            v = num(qd.get("value"))
+            if v is not None and v > 0:
+                return (s + suf, float(v), qd, "exact")
+    cands = [(k, num(v.get("value")), v) for k, v in quantities.items()
+             if isinstance(v, dict) and k.startswith(s + "_")
+             and any(k.endswith(x) for x in suffixes)]
+    cands = [(k, v, qd) for k, v, qd in cands if v is not None and v > 0]
+    if len(cands) == 1:
+        return (cands[0][0], cands[0][1], cands[0][2], "prefix")
+    if len(cands) > 1:
+        return None                       # genuinely ambiguous — never guess
+    toks = {t for t in re.split(r"[^a-z0-9]+", s) if len(t) >= 2}
+    dist = toks - _PUMP_QTY_GENERIC_TOKENS
+    if not dist:
+        return None
+
+    def _hit(t: str, kt: str) -> bool:
+        return t == kt or (min(len(t), len(kt)) >= 4 and (t.startswith(kt) or kt.startswith(t)))
+
+    fcands = []
+    for k, v in quantities.items():
+        if not isinstance(v, dict):
+            continue
+        kl = str(k).lower()
+        if not any(kl.endswith(x) for x in suffixes):
+            continue
+        ktoks = set(re.split(r"[^a-z0-9]+", kl))
+        overlap = sum(1 for t in dist if any(_hit(t, kt) for kt in ktoks))
+        if overlap == 0:
+            continue
+        val = num(v.get("value"))
+        if val is None or val <= 0:
+            continue
+        fcands.append((overlap, kl, float(val), v))
+    if not fcands:
+        return None
+    fcands.sort(key=lambda c: (-c[0], c[1]))
+    top = [c for c in fcands if c[0] == fcands[0][0]]
+    if len({c[2] for c in top}) > 1:
+        return None                       # ambiguous top-tie — never guess
+    return (top[0][1], top[0][2], top[0][3], "fallback")
+
+
+def _pump_mine_bar(text: str) -> Optional[float]:
+    """A bar pressure value embedded in prose (a row's own basis/requirement text, or a
+    JOINED contract quantity's own source_detail) — e.g. '25 m³/h @ 3 bar' or '10.6 bar
+    working pressure'. Never a separate invented figure; only ever text already present
+    on data this row/join already carries."""
+    m = _PUMP_BAR_TEXT_RE.search(text or "")
+    return float(m.group(1).replace(",", "")) if m else None
+
+
+_PUMP_HDR = ["Tag", "Part", "Qty", "Family", "Duty flow Q (m³/h)",
+            "Head H (m, water-equivalent)", "Hydraulic power (kW)",
+            "Shaft/motor power (kW)", "Efficiency %", "NPSHr (m) — parametric",
+            "NPSH margin (m)", "Verdict", "Basis / source", "Row check"]
+_PUMP_CURVE_HDR = ["#", "X (Flow m³/h)", "Y (Head m)"]
+
+_RHO_WATER = 1000.0      # kg/m3
+_G_ACCEL = 9.81          # m/s2
+
+
+def _build_pump_rows(state: dict) -> List[dict]:
+    """Every rotating-equipment PRINCIPAL (pump always; fan/blower/compressor ONLY when
+    ALL THREE duty fields are derivable together) this BoM specifies a duty for — its OWN
+    duty flow Q, head/pressure H and shaft/electrical power, pulled from the row's own
+    fields/basis (never invented). UNIVERSAL — no product class is ever named. A bought-
+    out stub carrying NO duty signal anywhere legitimately has no candidate row — the
+    SAME 'no take-off signal -> no row' idiom the stress section above uses.
+
+    TWO-PASS cross-row de-duplication (the 'MEA circulation pump' vs 'MEA recycle pump'
+    catch): the token-overlap fallback inside `_pump_contract_join` only ever checks
+    ambiguity WITHIN one row's own candidate search — it cannot see that a DIFFERENT
+    pump row also token-overlaps the SAME generic-stem quantity key (e.g. both 'MEA
+    circulation pump' and 'MEA recycle pump' overlap the one 'mea_pump_head_m' key on
+    the shared token 'mea'). Pass 1 collects every row's raw joins; pass 2 nullifies
+    any 'fallback'-stage join whose key was independently claimed by MORE than one
+    row — honest 'not derivable' for every claimant beats guessing which one it
+    belongs to."""
+    bom = state.get("requirementsBom") or []
+    contract = state.get("orchestratorContract") or {}
+    quantities = contract.get("quantities") or {}
+
+    # ── PASS 1 — collect every candidate row's raw joins (never finalised yet). ──
+    prelim: List[dict] = []
+    fallback_users: Dict[Tuple[str, str], List[int]] = {}   # (field, key) -> [prelim idx]
+    for row in bom:
+        if not isinstance(row, dict):
+            continue
+        if row.get("connection") or str(row.get("status") or "").upper() in ("SUB-COMPONENT", "ROUTED"):
+            continue
+        req = str(row.get("requirement") or "")
+        is_pump = bool(_PUMP_NOUN_RE.search(req))
+        is_fan = (not is_pump) and bool(_FAN_NOUN_RE.search(req))
+        if not (is_pump or is_fan):
+            continue
+        head_noun = re.split(r"[·\-(]", req)[0].strip()
+        basis = str(row.get("basis") or "")
+
+        qm = _PUMP_FLOW_TEXT_RE.search(req)
+        q_inline = float(qm.group(1).replace(",", "")) if qm else None
+        q_join = None if q_inline is not None else _pump_contract_join(head_noun, quantities, _PUMP_FLOW_SUFFIXES)
+
+        pm = _PUMP_POWER_TEXT_RE.search(req)
+        p_inline = float(pm.group(1).replace(",", "")) if pm else None
+        p_join = None if p_inline is not None else _pump_contract_join(head_noun, quantities, _PUMP_POWER_SUFFIXES)
+
+        bar_inline = _pump_mine_bar(req) or _pump_mine_bar(basis)
+        h_join = None if bar_inline is not None else _pump_contract_join(head_noun, quantities, _PUMP_HEAD_SUFFIXES)
+        pr_join = (None if (bar_inline is not None or h_join is not None)
+                  else _pump_contract_join(head_noun, quantities, _PUMP_PRESSURE_SUFFIXES))
+
+        idx = len(prelim)
+        for field, jd in (("q", q_join), ("p", p_join), ("h", h_join), ("pr", pr_join)):
+            if jd is not None and jd[3] == "fallback":
+                fallback_users.setdefault((field, jd[0]), []).append(idx)
+        prelim.append(dict(row=row, is_pump=is_pump, is_fan=is_fan, head_noun=head_noun,
+                           basis=basis, q_inline=q_inline, p_inline=p_inline,
+                           bar_inline=bar_inline, q_join=q_join, p_join=p_join,
+                           h_join=h_join, pr_join=pr_join))
+
+    dup_keys = {key for key, users in fallback_users.items() if len(users) > 1}
+
+    def _degen(field: str, jd):
+        """A 'fallback' join whose key is claimed by >1 row is nulled — never guessed."""
+        if jd is not None and jd[3] == "fallback" and (field, jd[0]) in dup_keys:
+            return None
+        return jd
+
+    # ── PASS 2 — finalise each row from its (de-duplicated) joins. ──
+    out: List[dict] = []
+    for p in prelim:
+        is_fan = p["is_fan"]
+        q_join = _degen("q", p["q_join"])
+        p_join = _degen("p", p["p_join"])
+        h_join = _degen("h", p["h_join"])
+        pr_join = _degen("pr", p["pr_join"])
+
+        q_val = p["q_inline"]
+        q_src = "the row's own requirement text" if q_val is not None else None
+        if q_val is None and q_join:
+            q_val, q_src = q_join[1], f"contract quantity '{q_join[0]}'"
+
+        p_val = p["p_inline"]
+        p_src = "the row's own requirement text" if p_val is not None else None
+        if p_val is None and p_join:
+            p_val, p_src = p_join[1], f"contract quantity '{p_join[0]}'"
+
+        bar_val = p["bar_inline"]
+        head_src = "the row's own requirement/basis text" if bar_val else None
+        if bar_val is None:
+            for jd in (q_join, p_join):
+                if jd is not None:
+                    bv = _pump_mine_bar(str(jd[2].get("source_detail") or ""))
+                    if bv:
+                        bar_val, head_src = bv, f"contract quantity '{jd[0]}' source detail"
+                        break
+        head_m = None
+        if bar_val is None and h_join:
+            head_m, head_src = h_join[1], f"contract quantity '{h_join[0]}'"
+        if bar_val is None and head_m is None and pr_join:
+            bar_val, head_src = pr_join[1], f"contract quantity '{pr_join[0]}'"
+
+        if is_fan and not (q_val and (bar_val or head_m) and p_val):
+            continue          # fan/blower/compressor: ALL THREE required to even be a row
+        _n_signals = sum(1 for v in (q_val, (bar_val or head_m), p_val) if v is not None)
+        if _n_signals < 2:
+            continue          # a bare mention (at most ONE duty dimension) — not a specified
+                              # duty this BoM sized, the SAME 'no take-off signal -> no row'
+                              # idiom the stress section uses (there, ALL THREE geometry
+                              # fields must co-occur); a genuine two-of-three row still
+                              # renders and honestly FAILs on the missing third dimension.
+
+        if bar_val is not None:
+            dp_pa = bar_val * 1e5
+            head_used_m = dp_pa / (_RHO_WATER * _G_ACCEL)
+            head_note = f"{bar_val:g} bar (→ {head_used_m:.1f} m water-equivalent)"
+        elif head_m is not None:
+            dp_pa = _RHO_WATER * _G_ACCEL * head_m
+            head_used_m = head_m
+            head_note = f"{head_m:g} m"
+        else:
+            dp_pa = None
+            head_used_m = None
+            head_note = None
+
+        p_hyd_kw = None
+        if q_val is not None and dp_pa is not None:
+            p_hyd_kw = (q_val / 3600.0) * dp_pa / 1000.0
+
+        eta_pct = None
+        if p_hyd_kw is not None and p_val:
+            eta_pct = 100.0 * p_hyd_kw / p_val
+
+        npshr_m = (2.0 + 0.05 * math.sqrt(p_val)) if p_val else None
+
+        # Wording note: deliberately avoids the "no <X> derivable/verifiable" and "cannot/
+        # could not verify" phrasing the shared _apply_universal_honest_cap's _VERIF_GAP_RX
+        # scans tab-level issue text for (that pattern is reserved for a genuine open
+        # VERIFICATION gap, e.g. an uncorroborated vision finding) — this row's own
+        # arithmetic ALREADY prices a missing duty field into n_pass/n_total (the SAME
+        # self-priced-caveat idiom _SELF_PRICED_RX/_CELL_CONTRACT_RX carve out elsewhere),
+        # so a second, coincidental cap here would double-penalise the same gap.
+        reasons: List[str] = []
+        if q_val is None:
+            reasons.append("duty flow (Q) is absent from this row's own text and no contract quantity name-joins to it")
+        if head_used_m is None:
+            reasons.append("head/pressure (H) is absent from this row's own text and no contract quantity name-joins to it")
+        if p_val is None:
+            reasons.append("shaft/electrical power is absent from this row's own text and no contract quantity name-joins to it")
+        if eta_pct is not None and not (0.0 < eta_pct <= 100.0):
+            reasons.append(f"computed efficiency {eta_pct:.0f}% falls outside the physically possible 0-100% "
+                           "band — check the joined duty fields' basis")
+        if not reasons:
+            verdict = "PASS"
+        elif eta_pct is not None:
+            verdict = "FAIL — " + "; ".join(reasons)
+        else:
+            verdict = "DATA NOT IN CONTRACT — " + "; ".join(reasons)
+
+        row = p["row"]
+        out.append(dict(
+            tag=str(row.get("tag") or "").strip() or "—",
+            name=str(row.get("requirement") or "").strip() or "—",
+            qty=num(row.get("qty")) or 1,
+            family=("fan/blower/compressor" if is_fan else "pump"),
+            q_m3h=q_val, head_used_m=head_used_m, head_note=head_note,
+            p_shaft_kw=p_val, p_hyd_kw=p_hyd_kw, eta_pct=eta_pct, npshr_m=npshr_m,
+            verdict=verdict, reasons=reasons,
+            basis=(f"Q: {q_src or 'DATA NOT IN CONTRACT'} · H: {head_src or 'DATA NOT IN CONTRACT'}"
+                   f"{(' (' + head_note + ')') if (head_note and head_src and 'text' not in head_src) else ''}"
+                   f" · shaft/motor power: {p_src or 'DATA NOT IN CONTRACT'}"),
+        ))
+    return out
+
+
+def _eval_pump_rows(rows: List[dict]) -> Optional[dict]:
+    """Column-contract arithmetic for the pump-performance rows: a candidate PASSES only
+    when its efficiency + H-Q curve are fully derivable (Q, head/pressure and shaft power
+    all present and the resulting efficiency sits in a physically sane 0-100% band) — a
+    row with any duty field honestly missing ('DATA NOT IN CONTRACT') or an impossible
+    computed efficiency FAILS. No candidate rows at all (no pump/fan/blower/compressor
+    duty anywhere in this BoM) is None — an honest 'nothing to analyse'."""
+    if not rows:
+        return None
+    contract = [
+        ("Duty flow Q (m³/h)", "extracted", "the row's own requirement text or a name-joined contract quantity"),
+        ("Head H / pressure", "extracted", "the row's own requirement/basis text or a name-joined contract quantity"),
+        ("Shaft/motor power (kW)", "extracted", "the row's own requirement text or a name-joined contract quantity"),
+        ("Efficiency %", "computed", "hydraulic power (ρ·g·Q·H) ÷ shaft power — PASS only within 0-100%"),
+    ]
+    per_row: Dict[int, dict] = {}
+    n_pass = 0
+    for idx, rec in enumerate(rows):
+        row_ok = rec.get("verdict") == "PASS"
+        if row_ok:
+            n_pass += 1
+        per_row[idx] = {"verdict": "PASS" if row_ok else "FAIL", "reasons": rec.get("reasons") or []}
+    n_total = len(per_row)
+    score = _contract_score(n_pass, n_total)
+    issues: List[str] = []
+    if n_pass < n_total:
+        ex = [f"{rows[i]['tag'] or rows[i]['name']} ({'; '.join(r['reasons'][:1])})"
+              for i, r in per_row.items() if r["verdict"] == "FAIL"][:3]
+        issues.append(f"{n_total - n_pass}/{n_total} pump/rotating-equipment row(s) missing a "
+                      f"derivable efficiency/curve: " + " · ".join(ex))
+    return {"tab": "Engineering Analysis", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "fix": ("add the missing Q/head/power figure to the row's own requirement text "
+                    "or a contract quantity its name joins to (requirements_bom.py / "
+                    "engineering-contract.ts) — never hand-type a value into this tab")}
+
+
+# ═══ DESIGN & TOLERANCE — ISO 2768 general tolerances for every fabricated part ═══════
+# (Tristan priority #5 DESIGN & TOLERANCE). Keyed on the SAME 'fabricated' data shape
+# _bom_row_kind() already uses (never a per-class table): a physical part sized to a
+# geometry (wall/mass/diameter/height/footprint/length) or a made-to-spec/structural/
+# fabricated basis — a bought-out ASSEMBLY, and a mere ROUTED pipe/cable run (toleranced
+# by its own DN/schedule, not a general shop tolerance), are both excluded. ISO 2768-1
+# linear + angular class is an EXPLICIT editable input (default 'm' medium); ISO 2768-2
+# straightness/flatness follows the SAME governing dimension. GD&T general notes
+# (position, surface finish) are fixed shop defaults. The block COVERS every fabricated
+# part (its coverage IS the scoring gate) — the specific millimetre figure additionally
+# needs the row's own take-off dimension; when that is absent the row still renders,
+# covered by the dimension-independent GD&T notes, honestly 'DATA NOT IN CONTRACT' only
+# for the dimension-keyed figures.
+_ISO2768_LINEAR = [   # (lo_mm, hi_mm, class_f, class_m, class_c, class_v) — ISO 2768-1 Table 1
+    (0.5, 3, 0.05, 0.10, 0.20, None),
+    (3, 6, 0.05, 0.10, 0.30, 0.50),
+    (6, 30, 0.10, 0.20, 0.50, 1.00),
+    (30, 120, 0.15, 0.30, 0.80, 1.50),
+    (120, 400, 0.20, 0.50, 1.20, 2.50),
+    (400, 1000, 0.30, 0.80, 2.00, 4.00),
+    (1000, 2000, 0.50, 1.20, 3.00, 6.00),
+    (2000, 4000, None, 2.00, 4.00, 8.00),
+]
+_ISO2768_ANGULAR = [   # (lo_mm, hi_mm, class_f, class_m, class_c, class_v) — degrees, ISO 2768-1 Table 2
+    (0, 10, 1.0, 1.0, 1.5, 3.0),
+    (10, 50, 0.5, 0.5, 1.0, 1.5),
+    (50, 120, 0.333, 0.333, 0.5, 1.0),
+    (120, 400, 0.167, 0.167, 0.333, 0.5),
+    (400, 1e9, 0.083, 0.083, 0.167, 0.333),
+]
+_ISO2768_2_FLATNESS = [   # (lo_mm, hi_mm, class_H, class_K, class_L) — ISO 2768-2 straightness/flatness
+    (0, 10, 0.02, 0.05, 0.10),
+    (10, 30, 0.05, 0.10, 0.20),
+    (30, 100, 0.10, 0.20, 0.40),
+    (100, 300, 0.20, 0.40, 0.80),
+    (300, 1000, 0.30, 0.60, 1.20),
+    (1000, 3000, 0.40, 0.80, 1.60),
+]
+_ISO2768_CLASS_DEFAULT = "m"
+_TOL_HDR = ["Tag", "Part", "Material", "Governing dimension (mm)", "ISO 2768-1 class",
+           "Linear tolerance (±mm)", "Angular tolerance (±°)", "Flatness/straightness (mm)",
+           "Position default (±mm)", "Surface finish Ra default (µm)", "Verdict", "Row check"]
+_ISO_RANGE_HDR = ["Range low (mm)", "Range high (mm)", "f", "m", "c", "v"]
+_ISO_FLAT_HDR = ["Range low (mm)", "Range high (mm)", "H", "K", "L"]
+
+
+def _fab_governing_dim_mm(row: dict) -> Optional[float]:
+    """The row's OWN largest linear take-off dimension, in mm — never invented; None
+    when the row's fabrication signal is basis-text/connection-only with no numeric
+    geometry (still a fabricated part, just no size to key a specific band from)."""
+    cands = [c * 1000.0 for c in
+             (num(row.get("diameter_m")), num(row.get("height_m")), num(row.get("length_m")))
+             if c]
+    fp = num(row.get("footprint_m2"))
+    if fp:
+        cands.append(math.sqrt(fp) * 1000.0)
+    wm = num(row.get("wall_mm"))
+    if wm:
+        cands.append(wm)
+    return max(cands) if cands else None
+
+
+def _build_tolerance_rows(state: dict) -> List[dict]:
+    """Every FABRICATED part in this BoM (never a bought-out assembly, never a mere
+    routed pipe/cable run — toleranced by its own DN/schedule, not ISO 2768): the
+    general-tolerance block a manufacturing drawing needs. UNIVERSAL — the SAME
+    _bom_row_kind() fabrication signal the stress section + BoM ledger already use,
+    no product class is ever named."""
+    bom = state.get("requirementsBom") or []
+    out: List[dict] = []
+    for row in bom:
+        if not isinstance(row, dict):
+            continue
+        if row.get("connection"):
+            continue
+        if _bom_row_kind(row) != "fabricated":
+            continue
+        out.append(dict(
+            tag=str(row.get("tag") or "").strip() or "—",
+            name=str(row.get("requirement") or "").strip() or "—",
+            material=_bom_row_material(row) or "—",
+            dim_mm=_fab_governing_dim_mm(row),
+        ))
+    return out
+
+
+def _eval_tolerance_rows(rows: List[dict]) -> Optional[dict]:
+    """Column-contract: the tolerance block must COVER every fabricated part — a row
+    PASSES once it carries its ISO 2768-1 class + GD&T notes (always achievable, the
+    SAME 'general note applies regardless of size' idiom a released drawing uses); the
+    dimension-keyed band is an honesty column, not a separate scoring gate."""
+    if not rows:
+        return None
+    contract = [
+        ("ISO 2768-1 class", "computed", "the shared editable class (default m) applied to every row"),
+        ("Linear/angular/flatness bands", "computed",
+         "ISO 2768-1 / ISO 2768-2 table lookup at the row's own governing dimension, when derivable"),
+    ]
+    n_total = len(rows)
+    per_row = {idx: {"verdict": "PASS", "reasons": []} for idx in range(n_total)}
+    n_pass = n_total
+    score = _contract_score(n_pass, n_total)
+    return {"tab": "Engineering Analysis", "contract": contract, "rows": per_row,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": [],
+            "fix": ""}
+
+
 def _eval_engineering_analysis_contract(_run_dir: str, state: dict) -> Optional[dict]:
     """Registry adapter — build() calls this BEFORE any tab renders (the same idiom as
-    the Risk & Regulatory / Line & velocity / BoM ledger contracts)."""
-    return _eval_engineering_analysis_rows(_build_engineering_analysis_rows(state))
+    the Risk & Regulatory / Line & velocity / BoM ledger contracts). Combines the THREE
+    Engineering Analysis sections (stress-strain / pump performance / design & tolerance)
+    into ONE tab-level arithmetic score — namespaced row keys ('stress'|'pump'|
+    'tolerance', idx) so the renderer's per-section Row-check lookups can never collide,
+    while n_pass/n_total (and therefore the sheet's single quality chip) blend all three,
+    the same 'one score per sheet' rule every other tab follows."""
+    sections = [
+        ("stress", _eval_engineering_analysis_rows(_build_engineering_analysis_rows(state))),
+        ("pump", _eval_pump_rows(_build_pump_rows(state))),
+        ("tolerance", _eval_tolerance_rows(_build_tolerance_rows(state))),
+    ]
+    present = [(tag, res) for tag, res in sections if res]
+    if not present:
+        return None
+    n_pass = sum(res["n_pass"] for _, res in present)
+    n_total = sum(res["n_total"] for _, res in present)
+    rows: Dict[Any, dict] = {}
+    contract: List[tuple] = []
+    issues: List[str] = []
+    fixes: List[str] = []
+    for tag, res in present:
+        for idx, rv in (res.get("rows") or {}).items():
+            rows[(tag, idx)] = rv
+        contract.extend(res.get("contract") or [])
+        issues.extend(res.get("issues") or [])
+        if res.get("fix"):
+            fixes.append(res["fix"])
+    score = _contract_score(n_pass, n_total)
+    return {"tab": "Engineering Analysis", "contract": contract, "rows": rows,
+            "n_pass": n_pass, "n_total": n_total, "score": score,
+            "status": "PASS" if (score or 0) >= 8 else "FAIL", "issues": issues,
+            "fix": " · ".join(dict.fromkeys(fixes))}
 
 
 def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
@@ -11420,9 +11903,11 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
     physics-sized shell in its BoM legitimately skips (returns False), same idiom as
     Electrical / Process schedules."""
     rows = _build_engineering_analysis_rows(state)
-    if not rows:
+    pump_rows = _build_pump_rows(state)
+    tol_rows = _build_tolerance_rows(state)
+    if not rows and not pump_rows and not tol_rows:
         return False
-    cres = _CONTRACT_RESULTS.get("Engineering Analysis") or _eval_engineering_analysis_rows(rows) or {}
+    cres = _CONTRACT_RESULTS.get("Engineering Analysis") or _eval_engineering_analysis_contract(run_dir, state) or {}
     crows = cres.get("rows") or {}
 
     ws = wb.create_sheet("Engineering Analysis")
@@ -11470,7 +11955,7 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
     n_ok = 0
     row1 = r
     for idx, rec in enumerate(rows):
-        cr = crows.get(idx) or {}
+        cr = crows.get(("stress", idx)) or {}
         row_ok = cr.get("verdict") == "PASS"
         if row_ok:
             n_ok += 1
@@ -11661,6 +12146,309 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
         ws.add_chart(ch, f"E{curve_hdr}")
         charts_added += 1
         r = max(r, curve_hdr + 16)
+
+    # ── PUMP / ROTATING-EQUIPMENT PERFORMANCE (Tristan priority #4) ────────────────────
+    if pump_rows:
+        sub_banner(ws, r, "Pump / rotating-equipment performance — duty, efficiency & "
+                          "H-Q curve", 15)
+        r += 1
+        pnote = ws.cell(r, 1, clean_cell(
+            "Every pump this BoM specifies a duty for (plus any fan/blower/compressor "
+            "whose OWN row carries flow, head/pressure AND power together): duty flow Q, "
+            "head H (converted to a water-equivalent metre figure when the row's own duty "
+            "is stated as a pressure), and shaft/electrical power — pulled from the row's "
+            "own requirement text first, else a contract quantity its own name joins to; "
+            "never invented. Hydraulic power = ρ·g·Q·H (SI, water ρ=1000 kg/m³) and "
+            "efficiency η = hydraulic ÷ shaft power are LIVE formulas (edit Q/H/power and "
+            "every row recomputes). A duty field genuinely absent from this run's own data "
+            "renders 'DATA NOT IN CONTRACT' — never a fabricated number."))
+        pnote.font = Font(italic=True, size=9, color="555555")
+        pnote.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=15)
+        ws.row_dimensions[r].height = 46
+        r += 2
+
+        header(ws, r, _PUMP_HDR)
+        r += 1
+        prow1 = r
+        n_pump_ok = 0
+        pump_curves: List[Tuple[str, float, float]] = []   # (name, q_duty_m3h, h_duty_m)
+        for idx, rec in enumerate(pump_rows):
+            cr = crows.get(("pump", idx)) or {}
+            row_ok = cr.get("verdict") == "PASS"
+            if row_ok:
+                n_pump_ok += 1
+            ws.cell(r, 1, clean_cell(rec["tag"])).border = BORDER
+            pc = ws.cell(r, 2, clean_cell(rec["name"])); pc.alignment = WRAP_TOP; pc.border = BORDER
+            ws.cell(r, 3, rec["qty"]).border = BORDER
+            ws.cell(r, 4, clean_cell(rec["family"])).border = BORDER
+            qc = ws.cell(r, 5, rec["q_m3h"] if rec["q_m3h"] is not None else "DATA NOT IN CONTRACT")
+            if rec["q_m3h"] is not None:
+                qc.number_format = FMT_DEC2
+            qc.border = BORDER
+            hc = ws.cell(r, 6, rec["head_used_m"] if rec["head_used_m"] is not None else "DATA NOT IN CONTRACT")
+            if rec["head_used_m"] is not None:
+                hc.number_format = FMT_DEC2
+            hc.border = BORDER
+            if rec["q_m3h"] is not None and rec["head_used_m"] is not None:
+                phyd = ws.cell(r, 7, f"=1000*9.81*E{r}/3600*F{r}/1000")
+                phyd.number_format = FMT_DEC2
+            else:
+                phyd = ws.cell(r, 7, "DATA NOT IN CONTRACT")
+            phyd.border = BORDER
+            psh = ws.cell(r, 8, rec["p_shaft_kw"] if rec["p_shaft_kw"] is not None else "DATA NOT IN CONTRACT")
+            if rec["p_shaft_kw"] is not None:
+                psh.number_format = FMT_DEC2
+            psh.border = BORDER
+            eta = ws.cell(r, 9, f'=IF(AND(ISNUMBER(G{r}),ISNUMBER(H{r}),H{r}<>0),'
+                                f'100*G{r}/H{r},"DATA NOT IN CONTRACT")')
+            eta.number_format = FMT_DEC1
+            eta.border = BORDER
+            npshr = ws.cell(r, 10, rec["npshr_m"] if rec["npshr_m"] is not None else "DATA NOT IN CONTRACT")
+            if rec["npshr_m"] is not None:
+                npshr.number_format = FMT_DEC2
+            npshr.border = BORDER
+            marg = ws.cell(r, 11, "DATA NOT IN CONTRACT — suction-side elevation / vapour "
+                                  "pressure not in this run's own contract")
+            marg.alignment = WRAP_TOP
+            marg.border = BORDER
+            vc = ws.cell(r, 12, f'=IF(AND(ISNUMBER(E{r}),ISNUMBER(F{r}),ISNUMBER(H{r}),ISNUMBER(I{r})),'
+                                f'IF(AND(I{r}>0,I{r}<=100),"PASS",'
+                                f'"FAIL — computed efficiency outside the physically possible 0-100% band"),'
+                                f'"DATA NOT IN CONTRACT — see Basis/source for the missing duty field")')
+            vc.border = BORDER
+            vc.alignment = WRAP_TOP
+            vc.font = FONT_PASS if row_ok else FONT_FAIL
+            vc.fill = FILL_PASS if row_ok else FILL_FAIL
+            bc = ws.cell(r, 13, clean_cell(rec["basis"])); bc.alignment = WRAP_TOP; bc.border = BORDER
+            _preasons = "; ".join(rec.get("reasons") or [])
+            rc = ws.cell(r, 14, fx_verdict([f'EXACT(L{r},"PASS")'],
+                                           f'"{_xq(_preasons or "see Verdict / Basis", 160)}"'))
+            rc.alignment = WRAP_TOP
+            rc.border = BORDER
+            rc.font = FONT_PASS if row_ok else FONT_FAIL
+            rc.fill = FILL_PASS if row_ok else FILL_FAIL
+            if not row_ok:
+                for col in range(1, 12):
+                    ws.cell(r, col).fill = FILL_FAIL
+            if rec["q_m3h"] is not None and rec["head_used_m"] is not None:
+                pump_curves.append((f"{rec['tag']} {rec['name']}", rec["q_m3h"], rec["head_used_m"]))
+            longest = max(len(str(rec["name"])), len(str(rec["basis"])), len(_preasons))
+            if longest > 46:
+                ws.row_dimensions[r].height = min(-(-longest // 46), 5) * 14.5
+            r += 1
+        _register_check_range(ws.title, "N", prow1, r - 1, n_pass=n_pump_ok, n_total=len(pump_rows))
+        _cf_verdict(ws, f"N{prow1}:N{r - 1}")
+        ws.auto_filter.ref = f"A{prow1 - 1}:N{r - 1}"
+        r += 1
+
+        if pump_curves:
+            sub_banner(ws, r, "Pump curve — representative system + pump curve marked at "
+                              "the duty point (BEP)", 6)
+            r += 1
+            note3 = ws.cell(r, 1, clean_cell(
+                "SYSTEM curve modelled as a pure friction-dominated quadratic through the "
+                "origin and the duty point: H = H_duty × (Q/Q_duty)² — no separate static-"
+                "head split is stated in this row's own basis. PUMP curve is a "
+                "representative centrifugal shape falling from an assumed shutoff head "
+                "1.2 × H_duty to the SAME duty point (an affinity-law quadratic): H = "
+                "H_shutoff − (H_shutoff − H_duty) × (Q/Q_duty)². The duty point itself "
+                "(the Best Efficiency Point, BEP, for this exercise) is this run's own Q "
+                "and H — marked as a separate series."))
+            note3.font = FONT_NOTE
+            note3.alignment = WRAP_TOP
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+            ws.row_dimensions[r].height = 40
+            r += 2
+
+            for name, q_duty, h_duty in pump_curves:
+                sub_banner(ws, r, f"{name} — H-Q curve", 6)
+                r += 1
+                header(ws, r, _PUMP_CURVE_HDR)
+                curve_hdr = r
+                r += 1
+                sys_first = r
+                for i in range(9):
+                    q = q_duty * (i / 4.0)
+                    h_sys = h_duty * ((q / q_duty) ** 2 if q_duty else 0.0)
+                    ws.cell(r, 1, i + 1)
+                    ws.cell(r, 2, round(q, 3)).number_format = FMT_DEC2
+                    ws.cell(r, 3, round(h_sys, 3)).number_format = FMT_DEC2
+                    r += 1
+                sys_last = r - 1
+                r += 1
+                header(ws, r, _PUMP_CURVE_HDR)
+                r += 1
+                pump_first = r
+                h_shutoff = h_duty * 1.2
+                for i in range(9):
+                    q = q_duty * (i / 4.0)
+                    h_pump = h_shutoff - (h_shutoff - h_duty) * ((q / q_duty) ** 2 if q_duty else 0.0)
+                    ws.cell(r, 1, i + 1)
+                    ws.cell(r, 2, round(q, 3)).number_format = FMT_DEC2
+                    ws.cell(r, 3, round(h_pump, 3)).number_format = FMT_DEC2
+                    r += 1
+                pump_last = r - 1
+                r += 1
+                header(ws, r, _PUMP_CURVE_HDR)
+                r += 1
+                bep_row = r
+                ws.cell(r, 1, 1)
+                ws.cell(r, 2, round(q_duty, 3)).number_format = FMT_DEC2
+                ws.cell(r, 3, round(h_duty, 3)).number_format = FMT_DEC2
+                r += 2
+
+                ch2 = ScatterChart()
+                ch2.title = f"{name} — H-Q curve (BEP marked)"
+                ch2.height, ch2.width = 8, 14
+                ch2.x_axis.title = "Flow Q (m³/h)"
+                ch2.y_axis.title = "Head H (m)"
+                sxref = Reference(ws, min_col=2, min_row=sys_first, max_row=sys_last)
+                syref = Reference(ws, min_col=3, min_row=sys_first, max_row=sys_last)
+                ch2.series.append(Series(syref, sxref, title="System curve (modelled)"))
+                pxref = Reference(ws, min_col=2, min_row=pump_first, max_row=pump_last)
+                pyref = Reference(ws, min_col=3, min_row=pump_first, max_row=pump_last)
+                ch2.series.append(Series(pyref, pxref, title="Pump curve (representative)"))
+                bxref = Reference(ws, min_col=2, min_row=bep_row, max_row=bep_row)
+                byref = Reference(ws, min_col=3, min_row=bep_row, max_row=bep_row)
+                ch2.series.append(Series(byref, bxref, title="Duty point (BEP)"))
+                style_chart(ch2, legend=True)
+                s3 = ch2.series[-1]
+                s3.marker.symbol = "diamond"
+                s3.marker.size = 9
+                s3.graphicalProperties.line.noFill = True
+                ws.add_chart(ch2, f"E{curve_hdr}")
+                r = max(r, curve_hdr + 16)
+
+    # ── DESIGN & TOLERANCE (Tristan priority #5) ───────────────────────────────────────
+    if tol_rows:
+        sub_banner(ws, r, "Design & tolerance — general manufacturing tolerances (ISO "
+                          "2768) for every fabricated part", 15)
+        r += 1
+        ws.cell(r, 1, "ISO 2768-1 general-tolerance class").font = FONT_SUB
+        cls_cell = ws.cell(r, 2, _ISO2768_CLASS_DEFAULT)
+        cls_cell.fill = FILL_RESULT
+        cls_ref = f"$B${r}"
+        tnt = ws.cell(r, 3, "f=fine · m=medium (default) · c=coarse · v=very coarse — edit "
+                           "and every row below recomputes its linear/angular/flatness band.")
+        tnt.font = FONT_NOTE
+        r += 2
+
+        sub_banner(ws, r, "ISO 2768-1 linear tolerance (±mm) reference table", 6)
+        r += 1
+        header(ws, r, _ISO_RANGE_HDR)
+        r += 1
+        lin_first = r
+        for lo, hi, f_, m_, c_, v_ in _ISO2768_LINEAR:
+            ws.cell(r, 1, lo); ws.cell(r, 2, hi)
+            for ci, val in enumerate((f_, m_, c_, v_), start=3):
+                cc = ws.cell(r, ci, val if val is not None else "n/a")
+                if val is not None:
+                    cc.number_format = FMT_DEC2
+            r += 1
+        lin_last = r - 1
+        r += 1
+
+        sub_banner(ws, r, "ISO 2768-1 angular tolerance (±°) reference table", 6)
+        r += 1
+        header(ws, r, _ISO_RANGE_HDR)
+        r += 1
+        ang_first = r
+        for lo, hi, f_, m_, c_, v_ in _ISO2768_ANGULAR:
+            ws.cell(r, 1, lo); ws.cell(r, 2, hi)
+            for ci, val in enumerate((f_, m_, c_, v_), start=3):
+                cc = ws.cell(r, ci, val)
+                cc.number_format = "0.000"
+            r += 1
+        ang_last = r - 1
+        r += 1
+
+        sub_banner(ws, r, "ISO 2768-2 straightness/flatness (mm) reference table (class "
+                          "pairing f/m→H/K, c/v→L — common shop convention)", 5)
+        r += 1
+        header(ws, r, _ISO_FLAT_HDR)
+        r += 1
+        flat_first = r
+        for lo, hi, h_, k_, l_ in _ISO2768_2_FLATNESS:
+            ws.cell(r, 1, lo); ws.cell(r, 2, hi)
+            for ci, val in enumerate((h_, k_, l_), start=3):
+                cc = ws.cell(r, ci, val)
+                cc.number_format = FMT_DEC2
+            r += 1
+        flat_last = r - 1
+        r += 1
+
+        note4 = ws.cell(r, 1, clean_cell(
+            "GD&T general notes (shop-default, applied to every fabricated part below "
+            "unless the released manufacturing drawing states otherwise): position ±0.5 "
+            "mm; surface finish Ra 3.2 µm on machined interfaces, Ra 12.5 µm as-fabricated/"
+            "as-welded general surfaces (ISO 1302 general-machining convention)."))
+        note4.font = Font(italic=True, size=9, color="555555")
+        note4.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=15)
+        ws.row_dimensions[r].height = 32
+        r += 2
+
+        header(ws, r, _TOL_HDR)
+        r += 1
+        trow1 = r
+        n_tol_ok = 0
+        for idx, rec in enumerate(tol_rows):
+            cr = crows.get(("tolerance", idx)) or {}
+            row_ok = cr.get("verdict") == "PASS"
+            if row_ok:
+                n_tol_ok += 1
+            ws.cell(r, 1, clean_cell(rec["tag"])).border = BORDER
+            pc = ws.cell(r, 2, clean_cell(rec["name"])); pc.alignment = WRAP_TOP; pc.border = BORDER
+            ws.cell(r, 3, clean_cell(rec["material"])).border = BORDER
+            dc = ws.cell(r, 4, rec["dim_mm"] if rec["dim_mm"] is not None else "DATA NOT IN CONTRACT")
+            if rec["dim_mm"] is not None:
+                dc.number_format = FMT_DEC1
+            dc.border = BORDER
+            clc = ws.cell(r, 5, f"={cls_ref}")
+            clc.border = BORDER
+            if rec["dim_mm"] is not None:
+                lin_f = (f'=IFERROR(SUMPRODUCT(($A${lin_first}:$A${lin_last}<=D{r})*'
+                        f'($B${lin_first}:$B${lin_last}>D{r})*'
+                        f'INDEX($C${lin_first}:$F${lin_last},0,MATCH({cls_ref},$C${lin_first - 1}:'
+                        f'$F${lin_first - 1},0))),"DATA NOT IN CONTRACT — dimension out of table range")')
+                ang_f = (f'=IFERROR(SUMPRODUCT(($A${ang_first}:$A${ang_last}<=D{r})*'
+                        f'($B${ang_first}:$B${ang_last}>D{r})*'
+                        f'INDEX($C${ang_first}:$F${ang_last},0,MATCH({cls_ref},$C${ang_first - 1}:'
+                        f'$F${ang_first - 1},0))),"DATA NOT IN CONTRACT — dimension out of table range")')
+                flat_f = (f'=IFERROR(SUMPRODUCT(($A${flat_first}:$A${flat_last}<=D{r})*'
+                         f'($B${flat_first}:$B${flat_last}>D{r})*'
+                         f'INDEX($C${flat_first}:$E${flat_last},0,MATCH(IF({cls_ref}="f","H",'
+                         f'IF({cls_ref}="m","K","L")),$C${flat_first - 1}:$E${flat_first - 1},0))),'
+                         f'"DATA NOT IN CONTRACT — dimension out of table range")')
+            else:
+                lin_f = ang_f = flat_f = "DATA NOT IN CONTRACT — no take-off dimension on this row"
+            lf = ws.cell(r, 6, lin_f); lf.border = BORDER
+            af = ws.cell(r, 7, ang_f); af.border = BORDER
+            ff = ws.cell(r, 8, flat_f); ff.border = BORDER
+            if rec["dim_mm"] is not None:
+                lf.number_format = FMT_DEC2
+                af.number_format = "0.000"
+                ff.number_format = FMT_DEC2
+            posc = ws.cell(r, 9, 0.5); posc.number_format = FMT_DEC2; posc.border = BORDER
+            rafc = ws.cell(r, 10, "3.2 (machined) / 12.5 (as-fabricated)")
+            rafc.border = BORDER
+            vc = ws.cell(r, 11, "COVERED — general tolerance class + GD&T notes applied")
+            vc.alignment = WRAP_TOP
+            vc.border = BORDER
+            vc.font = FONT_PASS
+            vc.fill = FILL_PASS
+            rc = ws.cell(r, 12, fx_verdict(
+                [f'LEN(TRIM(A{r}&""))>0', f'LEN(TRIM(E{r}&""))>0'],
+                '"row missing tag or class"'))
+            rc.border = BORDER
+            rc.font = FONT_PASS if row_ok else FONT_FAIL
+            rc.fill = FILL_PASS if row_ok else FILL_FAIL
+            r += 1
+        _register_check_range(ws.title, "L", trow1, r - 1, n_pass=n_tol_ok, n_total=len(tol_rows))
+        _cf_verdict(ws, f"L{trow1}:L{r - 1}")
+        ws.auto_filter.ref = f"A{trow1 - 1}:L{r - 1}"
+        r += 1
 
     back_link(ws, 15)
     return True
@@ -17696,6 +18484,22 @@ _dt(_EA_HDR, "engineering-analysis",
     ["Tag", "Part", "Material", "Verdict", "Code basis", "Row check"], numeric=["Qty"])
 _dt(_EA_MAT_HDR, "engineering-analysis-materials",
     ["Material", "Family", "Code / reference"])
+# Pump / rotating-equipment performance (Tristan priority #4, 2026-07-06): Q/H/power/
+# efficiency/NPSHr are legitimately blank ('DATA NOT IN CONTRACT') on a row whose own
+# text/contract carries no derivable duty field — only the always-populated identity +
+# Verdict/Basis/Row-check columns are required; the tab's own contract (n_pass/n_total
+# over Q+H+power+efficiency) is the real coverage signal.
+_dt(_PUMP_HDR, "pump-performance",
+    ["Tag", "Part", "Qty", "Family", "Verdict", "Basis / source", "Row check"], numeric=["Qty"])
+# Design & tolerance (Tristan priority #5, 2026-07-06): every fabricated row is COVERED
+# (class + GD&T notes always render); the dimension-keyed bands are legitimately blank
+# ('DATA NOT IN CONTRACT') when the row's own take-off carries no numeric geometry.
+_dt(_TOL_HDR, "design-tolerance",
+    ["Tag", "Part", "ISO 2768-1 class", "Verdict", "Row check"])
+_dt(_ISO_RANGE_HDR, "iso2768-range",
+    ["Range low (mm)", "Range high (mm)"], numeric=["Range low (mm)", "Range high (mm)"])
+_dt(_ISO_FLAT_HDR, "iso2768-2-range",
+    ["Range low (mm)", "Range high (mm)"], numeric=["Range low (mm)", "Range high (mm)"])
 
 # Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
 # drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
