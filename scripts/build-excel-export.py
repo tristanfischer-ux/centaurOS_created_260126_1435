@@ -1764,6 +1764,12 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
     if not rhs:
         return None
     expr = rhs
+    # 0) worked-calc formula text is a human-readable physics transcript, never genuine
+    # Excel array/structured-reference syntax — some tools author a function's argument
+    # list in square brackets ('ln[...]' instead of 'ln(...)'), which Excel's parser
+    # rejects outright. '[' / ']' are always equivalent to '(' / ')' in this transcript
+    # format, so normalise before anything else. Universal (no tool/class table).
+    expr = expr.replace("[", "(").replace("]", ")")
     # 1) operator translation
     expr = expr.replace("×", "*").replace("·", "*")
     expr = re.sub(r"(?<=[\w\)\s])x(?=[\s\(])", "*", expr)  # ' x ' multiplication
@@ -1772,6 +1778,53 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
     expr = expr.replace("π", "PI()")
     # standalone 'pi' token -> PI()
     expr = re.sub(r"\bpi\b", "PI()", expr)
+
+    # 1.5/1.6) Mask two things BEFORE identifier tokenising, using single-control-
+    # character placeholders (NOT digit-bearing markers — a '\x00N\x00'-style marker
+    # would itself contain a digit 'N' that the NUMBER mask below would then re-match
+    # and corrupt; a bare control char has no digits or letters for any later regex to
+    # catch):
+    #   (a) NON-IDENTIFIER symbol names (e.g. the engine's own literal 'mV/A/m' cable-
+    #       sizing input — a real symbol, not a typo) the identifier-token regex below
+    #       can't find ('/' isn't a word character). Longest-first so a short symbol
+    #       can't clobber part of a longer one.
+    #   (b) NUMBER LITERALS (incl. scientific notation) — '1e-3' contains a bare 'e'
+    #       that the identifier regex would otherwise extract as its OWN token,
+    #       indistinguishable from a genuine single-letter symbol also named 'e'/'E'
+    #       (e.g. ASME vessel joint efficiency — Tristan's "unbound physics symbols (a
+    #       bare E joint-efficiency)" case). Masking every number first means a real
+    #       bound 'E' symbol resolves to its cell reference below instead of being
+    #       silently passed through as "assume it's Euler's constant".
+    # Universal — keyed on token SHAPE, never a tool/class name. proveCatch in _selftest.
+    _placeholders: Dict[str, str] = {}
+    _ph_i = 0
+
+    def _mask(_needle: str, _restore_to: str) -> None:
+        nonlocal expr, _ph_i
+        _ph = chr(1 + _ph_i)     # a single non-digit, non-letter control character
+        _ph_i += 1
+        expr = expr.replace(_needle, _ph, 1)
+        _placeholders[_ph] = _restore_to
+
+    _non_ident_syms = [s for s in symbol_cell if s and not re.match(r"^[A-Za-z_]\w*$", s)]
+    for _sym in sorted(_non_ident_syms, key=len, reverse=True):
+        if _sym in expr:
+            _mask(_sym, symbol_cell[_sym])
+
+    # Number literals are masked via re.sub + callback (POSITION-based), never a naive
+    # str.replace(text, ph, 1) loop — a repeated literal like '1' occurs at MANY spans in
+    # a typical formula, and a text-based first-occurrence replace corrupts whichever '1'
+    # comes first in the STRING (even one embedded inside an unrelated identifier like
+    # 'y1', which the regex's own lookbehind correctly excluded from matching in the
+    # first place) rather than the one the regex actually matched.
+    def _mask_number(_m: "re.Match") -> str:
+        nonlocal _ph_i
+        _ph = chr(1 + _ph_i)
+        _ph_i += 1
+        _placeholders[_ph] = _m.group(0)
+        return _ph
+    expr = re.sub(r"(?<![A-Za-z0-9_])\d+\.?\d*(?:[eE][+\-]?\d+)?(?![A-Za-z0-9_])",
+                  _mask_number, expr)
 
     # 2) collect identifier-like tokens, decide which are symbols vs functions
     #    identifier = letters/digits/underscore, must start with a letter or underscore.
@@ -1791,21 +1844,43 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
         low = tok.lower()
         if tok in func_tokens or low in _FUNC_OK:
             continue  # it's a function call, leave it
-        if low in ("pi", "e"):
+        if tok in symbol_cell:
+            # a REAL bound symbol always wins, even when it's named 'e'/'pi'/'E' (e.g.
+            # ASME joint efficiency 'E') — binding a genuine input beats guessing it's
+            # Excel's own constant. Numbers are already masked above (1.6), so this
+            # can no longer misfire on a stray 'e' inside '1e-3'.
+            replacements.append((tok, symbol_cell[tok]))
             continue
-        if tok not in symbol_cell:
-            # An unbound symbol -> cannot make a faithful live formula.
-            return None
-        replacements.append((tok, symbol_cell[tok]))
+        if low in ("pi", "e"):
+            continue   # unbound — assume Excel's own constant context, leave as-is
+        # An unbound symbol -> cannot make a faithful live formula.
+        return None
 
     # 3) substitute longest-symbol-first so 'H_total' isn't clobbered by 'H'
     for tok, cell in sorted(replacements, key=lambda kv: -len(kv[0])):
         expr = re.sub(rf"(?<![A-Za-z0-9_]){re.escape(tok)}(?![A-Za-z0-9_])", cell, expr)
 
+    # 3.5) IMPLICIT MULTIPLICATION: the engine sometimes writes two adjacent symbols with
+    # NO operator between them (bare juxtaposition, e.g. 'm x2' meaning 'm times x2' — a
+    # standard physics-notation shorthand, used here BECAUSE an explicit ' x ' would be
+    # confusable with the symbol name 'x2' itself). After substitution those become two
+    # cell references separated only by whitespace ('B161 B162') — which Excel parses as
+    # the INTERSECTION operator, not multiplication, silently computing #NULL! instead of
+    # the intended product. Insert an explicit '*' between any two adjacent cell
+    # references with nothing but whitespace between them (looped for 3+-way chains).
+    _cellref = r"\$?[A-Z]{1,3}\$?\d{1,7}"
+    _prev_expr = None
+    while _prev_expr != expr:
+        _prev_expr = expr
+        expr = re.sub(rf"({_cellref})(\s+)({_cellref})", r"\1*\3", expr)
+
     # 4) uppercase the known math functions for Excel
     for fn in _FUNC_OK:
         expr = re.sub(rf"\b{fn}\b", fn.upper(), expr, flags=re.IGNORECASE)
     expr = expr.replace("LOG10", "LOG10").replace("LN(", "LN(")
+    # 5) restore the non-identifier symbols parked in step 1.5
+    for _ph, _cell in _placeholders.items():
+        expr = expr.replace(_ph, _cell)
     return expr
 
 
@@ -4771,6 +4846,61 @@ def _infer_inputs_from_formula(formula, substitution):
     return list(inputs.values()) or None
 
 
+# ── LIVE-FORMULA no-cheating property (Tristan 2026-07-06): the Calculations tab's
+# banner claims 'every value recomputed live', but a '= result' cell can legitimately be
+# a NON-arithmetic standards-table pick (ceil_to_standard, 'smallest standard with
+# ampacity >= …') that has no faithful Excel-formula form. The property this closes:
+# col B must EITHER be a genuine Excel formula (starts with '=', recomputes on an input
+# edit) OR the row must HONESTLY disclose that it isn't — a bare hardcoded number with
+# no disclosure is exactly the defect Tristan caught (B107/B112/... scored 10/10 while
+# static). Universal — no class/tool table, keyed on the RHS's own shape. ──
+_SELECTION_MARKERS_RX = re.compile(
+    r"\b(smallest|largest|nearest|standard|ladder|preferred|catalogue|catalog|select|"
+    r"lookup|next_standard|round_up_to|table|series)\b", re.I)
+
+
+def _rhs_is_selection_style(rhs: str) -> bool:
+    """True when a formula's RHS describes a STANDARDS-TABLE / catalogue PICK (e.g.
+    'smallest standard with ampacity x n_parallel >= I_t', or a call to a non-Excel
+    selection function like ceil_to_standard(...)) rather than pure arithmetic —
+    distinct from a genuine arithmetic RHS the translator merely failed to BIND to this
+    block's own input cells (unbound symbol / chaining gap), which must still FAIL the
+    no-cheating check (it looks like maths but isn't wired live). Universal: keyed on
+    prose/relational markers and unresolvable function calls, never a tool/class name.
+    proveCatch in _selftest, both directions."""
+    if not rhs:
+        return False
+    if re.search(r"[<>]=?", rhs):        # '... pick the smallest that satisfies X >= Y'
+        return True
+    # normalise the spaced 'x' multiplication sign FIRST (same as formula_to_excel) —
+    # otherwise 'x (Q_m3h / 3600)' misreads the literal multiply sign as a function
+    # call named 'x' and every ordinary "a x (b) x c" arithmetic RHS false-positives.
+    _expr = re.sub(r"(?<=[\w\)\s])x(?=[\s\(])", "*", rhs)
+    _expr = _expr.replace(" x ", " * ")
+    func_tokens = set(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", _expr))
+    excel_funcs = _FUNC_OK | {"pi", "ceiling", "floor", "round", "power", "sum"}
+    if any(fn.lower() not in excel_funcs for fn in func_tokens):
+        return True
+    return bool(_SELECTION_MARKERS_RX.search(rhs))
+
+
+_DISCLOSED_NONLIVE_MARK = "not a live arithmetic"
+
+
+def _worked_calc_result_is_live_or_disclosed(label_raw, value_raw) -> bool:
+    """ONE shared truth for the worked-calc no-cheating property (renderer + scorer): a
+    '= result' row passes when col B is a genuine Excel formula ('=…', recomputes on an
+    input edit) OR the row's OWN label honestly discloses it is NOT live (a
+    standards-table/ladder pick, or a non-numeric substitution) via the
+    _DISCLOSED_NONLIVE_MARK sentinel. A bare hardcoded number with no disclosure FAILS —
+    this is the property that closes the 'hardcoded result scored 10/10' gap (Tristan
+    2026-07-06). Pure; used by BOTH tab_calculations (writer) and _sc_calculations
+    (scorer) so the two can never diverge. proveCatch in _selftest, both directions."""
+    is_formula = isinstance(value_raw, str) and value_raw.strip().startswith("=")
+    is_disclosed = _DISCLOSED_NONLIVE_MARK in str(label_raw or "")
+    return is_formula or is_disclosed
+
+
 def _link_dataflow_to_calc(io_value_cells: List[Tuple[str, float, str]],
                            calc_results: Dict[str, List[Tuple[Optional[float], str]]]) -> Dict[str, str]:
     """PURE: decide which data-flow Value cells link to a worked-calc result cell.
@@ -5021,6 +5151,14 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         # whichever happened to register last at that value.
         produced: Dict[str, Tuple[str, float]] = {}
 
+        # COL I intra-tool forward-trace (Tristan 2026-07-06): a 'feeds this tool's
+        # calc(s): X' row must hyperlink to X's OWN row — but X may not have been
+        # written yet when this row is emitted (X can come before OR after in document
+        # order). Record each calc's '= result' row as it's written, defer every col-I
+        # write until the whole tool's rows exist, then resolve links in one pass.
+        _calc_row_of_label: Dict[str, int] = {}
+        _pending_forward_trace: List[Tuple] = []
+
         for w in worked:
             label = w.get("label", "")
             formula = w.get("formula", "")
@@ -5067,10 +5205,20 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 sc.font = FONT_MONO
                 sc.fill = FILL_LEGACY
                 r += 1
-                ws.cell(r, 1, "result").font = FONT_NOTE
+                # result row — SAME shape as a structured calc's '= result' row ('  =
+                # result', indented + '=' prefixed) so ONE scorer mechanism resolves
+                # both (no per-branch special-casing; see _sc_calculations).
+                _legacy_marker = ""
                 if isinstance(res_val, (int, float)):
                     _bval = ev_val if isinstance(ev_val, (int, float)) else res_val
-                    lc = ws.cell(r, 2, _bval)             # STATIC computed result — never a live worked-calc formula (Excel-safe)
+                    lc = ws.cell(r, 2)
+                    if ev_val is not None:
+                        # xl_formula ('=<numeric arithmetic>') was computed above from the
+                        # SAME substitution safe_eval_substitution just re-verified — a
+                        # GENUINE live Excel formula (edit-and-recompute), not a cheat.
+                        lc.value = xl_formula
+                    else:
+                        lc.value = _bval               # non-numeric substitution: honestly disclosed below
                     lc.fill = FILL_RESULT
                     lc.number_format = "#,##0.0000"
                     _rv = res_val if isinstance(res_val, (int, float)) else _bval
@@ -5084,6 +5232,8 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     dq = match_design_quantity(label, res_val, qindex)
                     _sfx = f"   ·   confirmed = design {dq[0]}" if dq else ""
                     if ev_val is None:
+                        _legacy_marker = (f"  [substitution — {_DISCLOSED_NONLIVE_MARK} "
+                                          f"(non-numeric)]")
                         verdict = "— result shown (substitution not auto-evaluable)" + _sfx
                         vfont = FONT_NOTE
                         static_count += 1
@@ -5107,20 +5257,19 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     vc.alignment = WRAP_TOP
                 else:
                     # non-arithmetic substitution (rare) — keep honest static text
+                    _legacy_marker = f"  [result — {_DISCLOSED_NONLIVE_MARK} (no result value)]"
                     static_count += 1
                     ws.cell(r, 5, res_val)
                     ws.cell(r, 7, res_unit)
                     ws.cell(r, 8, "— not auto-checkable (non-numeric substitution)").font = FONT_NOTE
-                # FORWARD TRACEABILITY (col I) — this result's contract quantity + its own
-                # downstream consumers, clickable to the destination cell (see _calc_forward_trace).
+                ws.cell(r, 1, "  = result" + _legacy_marker).font = FONT_NOTE
+                _calc_row_of_label[label] = r
+                # FORWARD TRACEABILITY (col I) — deferred until every calc in this tool has
+                # a known row (see _pending_forward_trace resolution after the tool loop).
                 _ds = [l for l in _consumers_by_sym.get(lhs_symbol(formula), []) if l != label]
-                _utx, _uprim = _calc_forward_trace(label, res_val, res_unit, _ds)
-                uc = ws.cell(r, 9, clean_cell(_utx))
+                uc = ws.cell(r, 9)
                 uc.alignment = WRAP_TOP
-                uc.font = FONT_NOTE
-                if _uprim is not None:
-                    _set_internal_hyperlink(uc, _uprim[0], _uprim[1])
-                    uc.font = FONT_LINK
+                _pending_forward_trace.append((uc, label, res_val, res_unit, _ds))
                 r += 1
                 r += 1  # spacer
                 continue
@@ -5158,35 +5307,65 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 ws.cell(r, 3, iunit)
                 r += 1
 
-            # ---- result row (STATIC computed value — NEVER a live worked-calc formula) ----
-            # A live worked-calc formula (formula_to_excel / substitution_to_excel) can be Excel-INVALID
-            # for some classes — unbound physics symbols (a bare "E" joint-efficiency), sci-notation, or
-            # patterns Excel's file loader rejects though openpyxl + LibreOffice both accept them. Result:
-            # "Removed Records: Formula from sheetN.xml" and a workbook that won't open (the recurring SAF
-            # break). The Calculations tab is a TRANSCRIPT (formula + substitution + result), so the result
-            # is emitted as the STATIC computed value and the formula-vs-result reconciliation is done HERE
-            # in Python and shown as a static verdict — which is exactly the "do the Excel numbers reconcile
-            # with the physics" check. Universal across every archetype. (Economics/Scenarios stay live.)
+            # ---- result row: a REAL Excel formula over THIS BLOCK'S OWN input cells ----
+            # (Tristan 2026-07-06 — the 'live formula' banner claim was FALSE: col B was a
+            # hardcoded number, so editing an input never recomputed anything and Δ (col F)
+            # was tautologically 0.) formula_to_excel(rhs, symbol_cell) binds each symbol in
+            # the RHS to the yellow/chained cell laid down above — genuinely live, genuinely
+            # editable. It returns None for a SELECTION/table pick (ceil_to_standard,
+            # 'smallest standard with ampacity >= …' — no faithful Excel-formula form) OR for
+            # a formula the translator couldn't BIND (unbound symbol / chaining gap — still a
+            # real gap, must not silently pass as done). Those two cases are told apart by
+            # _rhs_is_selection_style and rendered differently: a genuine selection is
+            # honestly LABELLED (never claims to recompute); an unbound-symbol failure is
+            # NOT labelled, so the no-cheating scorer below still fails it.
             rhs = rhs_of(formula)
             sub_s = str(w.get("substitution", "") or "")
             ev_s = safe_eval_substitution(sub_s)
             _bval = ev_s if isinstance(ev_s, (int, float)) else (res_val if isinstance(res_val, (int, float)) else None)
-            ws.cell(r, 1, "  = result").font = FONT_SUB
+            xl_live = formula_to_excel(rhs, symbol_cell)
+            is_selection = xl_live is None and _rhs_is_selection_style(rhs)
+            _label_suffix = (f"  [table selection — {_DISCLOSED_NONLIVE_MARK}]" if is_selection else "")
+            ws.cell(r, 1, "  = result" + _label_suffix).font = FONT_SUB
             live_cell = ws.cell(r, 2)
             produced_ok = False
-            if _bval is not None:
+            if xl_live is not None:
+                # GENUINE live formula: recomputes when any bound input cell is edited; Δ
+                # (col F, = B-E) is now a MEANINGFUL live-vs-engine cross-check, not a tautology.
+                live_cell.value = "=" + xl_live
+                live_cell.fill = FILL_RESULT
+                produced_ok = True
+                live_count += 1
+                _rv = res_val if isinstance(res_val, (int, float)) else _bval
+                if isinstance(_rv, (int, float)):
+                    calc_results.setdefault(_tid_norm, []).append((float(_rv), f"B{r}"))
+            elif _bval is not None:
                 live_cell.value = _bval
                 live_cell.fill = FILL_RESULT
                 produced_ok = True
                 _rv = res_val if isinstance(res_val, (int, float)) else _bval
                 if isinstance(_rv, (int, float)):
                     calc_results.setdefault(_tid_norm, []).append((float(_rv), f"B{r}"))
-                if isinstance(ev_s, (int, float)) and isinstance(res_val, (int, float)) and res_val:
+                if is_selection:
+                    # honestly disclosed — a standards-ladder pick, not a live formula;
+                    # never counted as a no-cheating FAIL because it never CLAIMS to recompute.
+                    static_count += 1
+                    _note = ws.cell(r, 8, "table selection — not a live arithmetic (standards-"
+                                          "ladder pick); the engine's own computed value is "
+                                          "shown, cross-checked at build time, not in-sheet")
+                    _note.font = FONT_NOTE
+                elif isinstance(ev_s, (int, float)) and isinstance(res_val, (int, float)) and res_val:
                     drift_s = abs(ev_s - res_val) / abs(res_val)
                     if drift_s <= 0.02:
-                        live_count += 1
+                        # arithmetic RHS the translator failed to BIND live (unbound symbol /
+                        # chaining gap) — Python confirms the maths checks out, but col B is
+                        # still not itself live: a real gap, so it still fails no-cheating.
+                        static_count += 1
+                        _dvc = ws.cell(r, 8, "⚠ maths checks out in Python but col B is NOT a "
+                                             "live formula (translation gap — an input symbol "
+                                             "could not be bound to this block's cells)")
+                        _dvc.font = FONT_FAIL
                     else:
-                        # live drift verdict over the on-row Δ (F = B−E), never static text
                         _dvc = ws.cell(r, 8, (
                             f'=IF(ABS($F{r})<=0.02*ABS($E{r}),'
                             f'"✓ maths checks out (live: |Δ| ≤ 2% of the engine value)",'
@@ -5195,7 +5374,7 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                         _register_check_range(ws.title, "H", r, r)
                         static_count += 1
                 else:
-                    live_count += 1
+                    static_count += 1
             else:
                 static_count += 1
             ws.cell(r, 3, res_unit)
@@ -5211,17 +5390,14 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 ac.font = FONT_NOTE
                 ac.alignment = WRAP_TOP
 
-            # FORWARD TRACEABILITY (col I) — this result's contract quantity + its own
-            # downstream consumers, clickable to the destination cell (see _calc_forward_trace).
+            _calc_row_of_label[label] = r
+            # FORWARD TRACEABILITY (col I) — deferred until every calc in this tool has a
+            # known row (see _pending_forward_trace resolution after the tool loop).
             _match_val = res_val if isinstance(res_val, (int, float)) else _bval
             _ds = [l for l in _consumers_by_sym.get(lhs_symbol(formula), []) if l != label]
-            _utx, _uprim = _calc_forward_trace(label, _match_val, res_unit, _ds)
-            uc = ws.cell(r, 9, clean_cell(_utx))
+            uc = ws.cell(r, 9)
             uc.alignment = WRAP_TOP
-            uc.font = FONT_NOTE
-            if _uprim is not None:
-                _set_internal_hyperlink(uc, _uprim[0], _uprim[1])
-                uc.font = FONT_LINK
+            _pending_forward_trace.append((uc, label, _match_val, res_unit, _ds))
 
             # register this result under its OUTPUT SYMBOL so later inputs chain by
             # symbol+label identity (bug #19), not by a numeric-value collision.
@@ -5229,6 +5405,26 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             if out_sym and isinstance(res_val, (int, float)):
                 produced[out_sym] = (f"$B${r}", float(res_val))
             r += 2  # spacer between calcs
+
+        # ── resolve the deferred col-I forward trace now every calc's row is known ──
+        # (Tristan 2026-07-06: 'lands in' rows hyperlinked but 'feeds this tool's
+        # calc(s)' / intermediate rows didn't — col I was inconsistent). A downstream
+        # consumer can appear BEFORE or AFTER its producer in document order, so this
+        # can only resolve once the WHOLE tool's rows exist. A consumer with no known
+        # row (should not happen — every worked calc gets a row) safely falls back to
+        # plain text, matching the tab's existing 'never claim a link that can't be
+        # backed up' discipline.
+        for uc, _label, _res_val, _res_unit, _ds in _pending_forward_trace:
+            _utx, _uprim = _calc_forward_trace(_label, _res_val, _res_unit, _ds)
+            if _uprim is None and _ds:
+                _target_row = _calc_row_of_label.get(_ds[0])
+                if _target_row:
+                    _uprim = (ws.title, f"A{_target_row}")
+            uc.value = clean_cell(_utx)
+            uc.font = FONT_NOTE
+            if _uprim is not None:
+                _set_internal_hyperlink(uc, _uprim[0], _uprim[1])
+                uc.font = FONT_LINK
 
         r += 1  # spacer between tools
 
@@ -17635,6 +17831,25 @@ def _sc_calculations(wb, ws, state, run_dir):
     # resolved by its trailing '= result' row carrying the computed value; INPUT rows are
     # the indented rows and must carry their value. A definition with no valued result row
     # is an unresolved worked calc — the fault Tristan's coverage fraction measures.
+    #
+    # NO-CHEATING (Tristan 2026-07-06): carrying a value is NOT enough — a hardcoded
+    # number in col B scored 10/10 while the tab's own banner claimed 'every value
+    # recomputed live'. A result row only resolves when
+    # _worked_calc_result_is_live_or_disclosed() is true: col B is a GENUINE Excel
+    # formula ('=…', starts with '='), OR the row's own label HONESTLY discloses it
+    # isn't (a standards-table pick / non-numeric substitution) via the shared
+    # _DISCLOSED_NONLIVE_MARK sentinel — the SAME predicate tab_calculations uses to
+    # decide what to write, so renderer and scorer can never disagree. A row that merely
+    # LOOKS resolved (has a bare static number, no disclosure) FAILS here. proveCatch in
+    # _selftest, both directions.
+    #
+    # 'formula' / 'substitution' are RESERVED echo-labels the legacy-calc writer uses to
+    # restate the title row's own formula text for readability — they carry the SAME col-D
+    # content as a genuine definition row but are NOT the start of a new calc; excluding
+    # them by literal label is what stops every legacy calc inflating n_def by 3x with
+    # spurious unresolved entries (that bug pre-dates and is orthogonal to the live-formula
+    # one, but the same audit surfaced it).
+    _ECHO_LABELS = {"formula", "substitution"}
     n_def = n_def_ok = n_in = n_in_ok = 0
     pending_def = None
     unresolved = []
@@ -17643,21 +17858,27 @@ def _sc_calculations(wb, ws, state, run_dir):
         label = _cell_txt(raw)
         indented = isinstance(raw, str) and raw.startswith("  ")
         has_val = not _cell_missing(d.get("value"))
-        if not indented and not _cell_missing(d.get("formula")):
+        if (not indented and not _cell_missing(d.get("formula"))
+                and label.lower() not in _ECHO_LABELS):
             if pending_def is not None:
                 unresolved.append(pending_def)
             n_def += 1
             if has_val:            # single-row calc: value on the definition row
-                n_def_ok += 1
+                _live_ok = _worked_calc_result_is_live_or_disclosed(raw, d.get("value"))
+                n_def_ok += 1 if _live_ok else 0
+                if not _live_ok:
+                    unresolved.append(label + " (hardcoded — not a live formula)")
                 pending_def = None
             else:
                 pending_def = label
             continue
         if indented and label.startswith("="):
             if pending_def is not None:
-                n_def_ok += 1 if has_val else 0
-                if not has_val:
-                    unresolved.append(pending_def)
+                _live_ok = has_val and _worked_calc_result_is_live_or_disclosed(raw, d.get("value"))
+                n_def_ok += 1 if _live_ok else 0
+                if not _live_ok:
+                    unresolved.append(pending_def if not has_val
+                                       else pending_def + " (hardcoded — not a live formula)")
                 pending_def = None
             continue
         if indented:
@@ -17667,10 +17888,10 @@ def _sc_calculations(wb, ws, state, run_dir):
     if pending_def is not None:
         unresolved.append(pending_def)
     if n_def:
-        comps.append(("worked-calc definitions resolve to a computed result", n_def_ok, n_def))
+        comps.append(("worked-calc definitions resolve to a LIVE computed result", n_def_ok, n_def))
         if n_def_ok < n_def:
-            iss.append(f"{n_def - n_def_ok} worked calc(s) never resolve to a result value — "
-                       f"e.g. {', '.join(u[:40] for u in unresolved[:3])}")
+            iss.append(f"{n_def - n_def_ok} worked calc(s) never resolve to a live/disclosed "
+                       f"result — e.g. {', '.join(u[:60] for u in unresolved[:3])}")
     if n_in:
         comps.append(("calc input rows carry their value", n_in_ok, n_in))
     tf_rows = _fam_rows(wb, ws.title, "tool-flow")
@@ -17678,9 +17899,11 @@ def _sc_calculations(wb, ws, state, run_dir):
         ok = sum(1 for _r, d in tf_rows if "⚠" not in _cell_txt(d.get("status")))
         comps.append(("tool outputs consumed downstream", ok, len(tf_rows)))
     return {"components": comps, "issues": iss,
-            "mech": "worked-calc coverage (every definition resolves to a computed result; "
-                    "inputs populated) + tool-flow consumption",
-            "fix": "emit the missing result/substitution rows at the calc renderer source"}
+            "mech": "worked-calc coverage (every definition resolves to a LIVE Excel formula "
+                    "or an honestly-disclosed non-arithmetic pick; inputs populated) + "
+                    "tool-flow consumption",
+            "fix": "bind the RHS's symbols to this block's own input cells at the calc "
+                   "renderer source (formula_to_excel), or honestly disclose the pick"}
 
 
 def _sc_waterfall(wb, ws, state, run_dir):
@@ -23980,6 +24203,95 @@ def _selftest() -> int:
         if _nf_got != _nf_tok:
             print(f"  FAIL never-fold-union: '{_nf_tok}' folded to '{_nf_got}' "
                   f"(expected untouched — mass noun, would collide with '{_nf_would_fold_to}')"); bad += 1
+
+    # ═══ proveCatch the LIVE-FORMULA no-cheating property (Tristan 2026-07-06 — the
+    # Calculations tab's banner claimed 'every value recomputed live' while col B was a
+    # hardcoded number). Both directions on each pure helper, renderer + scorer share. ═══
+    _fx_symcell = {"rho": "$B$5", "Q_m3h": "C12", "H_total": "C13"}
+    _fx_ok = formula_to_excel("rho x g x (Q_m3h / 3600) x H_total",
+                              {**_fx_symcell, "g": "$B$6"})
+    if not (_fx_ok and _fx_ok.startswith("$B$5") and "C12" in _fx_ok and "C13" in _fx_ok):
+        print(f"  FAIL formula_to_excel: a fully-bound arithmetic RHS must translate to a "
+              f"cell-referencing formula — got {_fx_ok!r}"); bad += 1
+    if formula_to_excel("rho x g x (Q_m3h / 3600) x H_total", _fx_symcell) is not None:
+        print("  FAIL formula_to_excel: an UNBOUND symbol ('g' missing from symbol_cell) "
+              "must return None, never a half-bound formula"); bad += 1
+    if formula_to_excel("S_rated = ceil_to_standard(S_req)".split("=", 1)[1].strip(),
+                        {"S_req": "B12"}) is not None:
+        print("  FAIL formula_to_excel: a non-Excel selection function "
+              "(ceil_to_standard) must return None, never a broken '#NAME?' formula"); bad += 1
+    # non-identifier symbol name (the engine's real 'mV/A/m' cable-sizing input) —
+    # the literal-substring pass (step 1.5) must bind it like any other symbol.
+    _fx_slash = formula_to_excel("(mV/A/m) x I_b x L / (1000 x n_parallel)",
+                                 {"mV/A/m": "B103", "I_b": "B104", "L": "B105",
+                                  "n_parallel": "B106"})
+    if _fx_slash != "(B103) * B104 * B105 / (1000 * B106)":
+        print(f"  FAIL formula_to_excel: a non-identifier symbol name ('mV/A/m') must "
+              f"bind via literal-substring substitution — got {_fx_slash!r}"); bad += 1
+    # BOUND SYMBOL NAMED 'E' (the co2-campaign-v11 ASME vessel-thickness regression: 'E' =
+    # joint efficiency, a genuine input — must NOT be treated as Excel's own constant and
+    # left bare, which _is_invalid_formula then defangs to garbled text).
+    _fx_e = formula_to_excel(
+        "p_design x D / (2 x S x E - 1.2 x p_design) + corr",
+        {"p_design": "B607", "D": "B608", "S": "B609", "E": "B610", "corr": "B611"})
+    if _fx_e is None or re.search(r"(?<![A-Za-z0-9_])E(?![A-Za-z0-9_])", _fx_e):
+        print(f"  FAIL formula_to_excel: a BOUND symbol literally named 'E' (ASME joint "
+              f"efficiency) must be substituted by its cell ref, never left as a bare "
+              f"unbound 'E' — got {_fx_e!r}"); bad += 1
+    if "B610" not in (_fx_e or ""):
+        print(f"  FAIL formula_to_excel: bound 'E' must resolve to its own cell "
+              f"(B610) — got {_fx_e!r}"); bad += 1
+    # NUMBER-MASKING must not corrupt a digit embedded INSIDE an identifier ('Q_m3h').
+    _fx_embed = formula_to_excel("rho x g x (Q_m3h / 3600) x H_total",
+                                 {"rho": "$B$5", "g": "$B$6", "Q_m3h": "C12", "H_total": "C13"})
+    if not (_fx_embed and "C12" in _fx_embed and "3600" in _fx_embed):
+        print(f"  FAIL formula_to_excel: number-masking must not corrupt a digit embedded "
+              f"inside an identifier ('Q_m3h') — got {_fx_embed!r}"); bad += 1
+    # SQUARE-BRACKET function-call syntax ('ln[...]') — some tools author the transcript
+    # this way; Excel rejects it outright, so it must normalise to parens, never ship '['.
+    _fx_brk = formula_to_excel(
+        "ln[((y1 - m x2)/(y2 - m x2)) x (1 - 1/A) + 1/A] / (1 - 1/A)",
+        {"y1": "B159", "y2": "B160", "m": "B161", "x2": "B162", "A": "B163"})
+    if _fx_brk is None or "[" in _fx_brk or "]" in _fx_brk or not _fx_brk.upper().startswith("LN("):
+        print(f"  FAIL formula_to_excel: square-bracket function syntax ('ln[...]') must "
+              f"normalise to parens ('LN(...)'), never ship a literal '[' — got {_fx_brk!r}"); bad += 1
+    # IMPLICIT MULTIPLICATION ('m x2' with a bare space, no operator) must insert an
+    # explicit '*' between the two substituted cell refs — a co2-campaign-v11 regression:
+    # 'B161 B162' (space only) is Excel's INTERSECTION operator, evaluates to #NULL!, not
+    # the intended product. The same case as _fx_brk above, checked for the '*' specifically.
+    if _fx_brk is not None and re.search(r"B16[12]\s+B16[12](?!\d)", _fx_brk):
+        print(f"  FAIL formula_to_excel: two adjacent cell refs with only whitespace "
+              f"between them ('B161 B162') must get an explicit '*' inserted (else Excel "
+              f"reads it as the INTERSECTION operator -> #NULL!) — got {_fx_brk!r}"); bad += 1
+    if _fx_brk is not None and "B161*B162" not in _fx_brk:
+        print(f"  FAIL formula_to_excel: implicit multiplication between adjacent bound "
+              f"symbols must become an explicit 'B161*B162' — got {_fx_brk!r}"); bad += 1
+
+    if not _rhs_is_selection_style("smallest standard with ampacity x n_parallel >= I_t"):
+        print("  FAIL rhs-is-selection-style: a relational standards-ladder pick "
+              "('>= I_t') must be classified as selection-style"); bad += 1
+    if not _rhs_is_selection_style("ceil_to_standard(S_req)"):
+        print("  FAIL rhs-is-selection-style: a call to a non-Excel selection function "
+              "must be classified as selection-style"); bad += 1
+    if _rhs_is_selection_style("rho x g x (Q_m3h / 3600) x H_total"):
+        print("  FAIL rhs-is-selection-style: an ordinary arithmetic RHS (no relational "
+              "operator, no unrecognised function) must NOT be classified as selection-"
+              "style — that would wrongly EXEMPT a genuine translation-gap failure"); bad += 1
+
+    if not _worked_calc_result_is_live_or_disclosed("  = result", "=B92 / (B93 * B94)"):
+        print("  FAIL worked-calc-live-or-disclosed: a genuine Excel formula ('=…') "
+              "must PASS"); bad += 1
+    if not _worked_calc_result_is_live_or_disclosed(
+            "  = result  [table selection — not a live arithmetic]", 25):
+        print("  FAIL worked-calc-live-or-disclosed: a HONESTLY-disclosed static pick "
+              "must PASS (it never claims to recompute)"); bad += 1
+    if _worked_calc_result_is_live_or_disclosed("  = result", 8.11875):
+        print("  FAIL worked-calc-live-or-disclosed: a bare hardcoded number with NO "
+              "disclosure must FAIL — this is the exact defect Tristan caught "
+              "(B107/B112/... scored 10/10 while static)"); bad += 1
+    if _worked_calc_result_is_live_or_disclosed("  = result", "not a formula string"):
+        print("  FAIL worked-calc-live-or-disclosed: a STRING that isn't an Excel "
+              "formula and carries no disclosure marker must still FAIL"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
