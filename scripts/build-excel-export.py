@@ -3804,9 +3804,265 @@ def _render_audit_findings(ws: Worksheet, report, state: Optional[dict], r: int)
 
 
 # ============================================================================
+# FORWARD TRACEABILITY — shared NAME → LOCATION resolution (Tristan 2026-07-06:
+# "not clear how you can trace that information to other parts of the spreadsheet
+# where all those numbers end up going" — the dossier already traces BACKWARD well
+# (Quantities col B live formulas, col F 'Where-from'); these helpers make the
+# FORWARD trace ('Used by') NAVIGABLE (a real internal hyperlink to the destination
+# cell, not just a name) on both the Quantities tab and the Calculations tab, so the
+# two surfaces can never describe the forward graph differently. Universal — every
+# match is keyed on noun tokens / normalised names, never a per-class table.
+# ============================================================================
+_ATTR_SUFFIX = re.compile(
+    r"_(volume_each_m3|volume_m3|capacity_m3_per_hr|capacity_m3|throughput_m3_h|power_kw|"
+    r"each_m3|diameter_m|secondary_current_a|current_a|breaker_frame_a|breaker_a|frame_a|"
+    r"salt_consumption_max_kg_per_reg|cal_cm2|voltdrop_pct|csa_mm2|kva|kwh|kw|percent|"
+    r"m3_h|m3|m2|kg|mm2|count|\ba\b)$", re.I)
+_GENERIC = {"tank", "pump", "valve", "vessel", "skid", "filter", "panel", "system", "unit", "water"}
+
+
+def _sing(t: str) -> str:
+    return t[:-1] if len(t) > 3 and t.endswith("s") else t
+
+
+def _noun_stem_toks(key: str) -> List[str]:
+    """ORDERED noun tokens of a quantity key with its attribute suffix stripped.
+    Ordered (not a set) so the HEAD noun below is deterministic — `next(iter(set))`
+    was hash-seed-dependent and made the Quantities where-to column differ between
+    two builds of the SAME run (determinism bug, fixed 2026-07-02)."""
+    s = key
+    while True:
+        s2 = _ATTR_SUFFIX.sub("", s)
+        if s2 == s:
+            break
+        s = s2
+    return [t for t in s.split("_") if t and t not in ("each", "total", "main", "of")]
+
+
+def _noun_stem(key: str) -> set:
+    return set(_noun_stem_toks(key))
+
+
+def _collect_part_names(state: dict) -> List[str]:
+    """Every BoM/module part display name (moduleDecomposition word name_human) — the
+    noun vocabulary a quantity's part-consumer match runs against."""
+    out: List[str] = []
+    for _m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+        for _sm in (_m.get("sub_modules") or []):
+            for _w in (_sm.get("words") or []):
+                _pn = _w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or ""
+                if _pn:
+                    out.append(_pn)
+    return out
+
+
+def _part_token_index(state: dict) -> List[Tuple[str, set]]:
+    return [(pn, set(_sing(t) for t in re.split(r"[^a-z0-9]+", pn.lower()) if t))
+            for pn in dict.fromkeys(_collect_part_names(state))]
+
+
+def _part_consumers_for(key: str, part_tok: List[Tuple[str, set]]) -> List[str]:
+    """A self-describing quantity key (<noun>_<attribute>, e.g.
+    fresh_water_tank_volume_each_m3 / softener_vessel_count) SIZES the part whose name
+    carries that noun. Strip the attribute suffix → the noun token-set, match it (subset)
+    against the design's part names. Universal — keyed on the noun, no class table."""
+    stem = set(_sing(t) for t in _noun_stem(key))
+    if not stem or (len(stem) == 1 and next(iter(stem)) in _GENERIC):
+        return []
+    _ord = _noun_stem_toks(key)
+    head = _sing(_ord[-1]) if _ord else ""  # last token of the key noun (the device)
+    out = []
+    for pn, toks in part_tok:
+        if stem <= toks:                                   # exact noun match
+            out.append(pn)
+        elif head and head not in _GENERIC and head in toks and len(stem & toks) >= 2:
+            out.append(pn)                                  # head noun + ≥1 qualifier overlap (plurals/extra words)
+    return sorted(set(out))
+
+
+def _quantities_used_by(quantities: dict) -> Dict[str, List[str]]:
+    """name → the OTHER quantities that consume it (via lineage.from) — the reverse edges
+    of the contract's own lineage graph. Shared by tab_quantities (a quantity's own
+    consumers) and tab_calculations (a worked-calc's matched quantity's consumers)."""
+    used_by: Dict[str, List[str]] = {}
+    for nm, v in quantities.items():
+        if isinstance(v, dict):
+            lin = (v.get("lineage") or {}).get("from") or []
+            for src in lin:
+                used_by.setdefault(src, []).append(nm)
+    return used_by
+
+
+def _quantities_key_row(quantities: dict, start_row: int = 5) -> Dict[str, int]:
+    """name → its Quantities-tab sheet row — the SAME enumeration order tab_quantities()
+    renders (data starts at row 5), so a predicted row here IS the rendered row."""
+    return {name: start_row + i for i, name in enumerate(quantities)}
+
+
+def _bom_row_index(state: dict, run_dir: str) -> Tuple[Dict[str, int], List[Tuple[str, set, int]]]:
+    """Part NAME → Bill of Materials (Ledger) sheet ROW, via the SAME _ledger_fold_layout()
+    pass tab_bom() itself uses later (pure + deterministic over state["requirementsBom"] —
+    a row predicted here IS the row tab_bom() renders, so a Quantities/Calculations
+    hyperlink minted BEFORE the Ledger tab exists still lands on the right cell). Two
+    lookup surfaces: an exact-normalised-name dict (fast hit), and a (name, token-set, row)
+    list for subset matching when the calling side's vocabulary (moduleDecomposition
+    name_human) diverges in wording from the ledger's 'requirement' text."""
+    bom = state.get("requirementsBom") or []
+    flat, sheet_row_by_idx = _ledger_fold_layout(bom, run_dir)
+    exact: Dict[str, int] = {}
+    fuzzy: List[Tuple[str, set, int]] = []
+    seen_fuzzy: set = set()
+    for ent in flat:
+        row = ent.get("row") or {}
+        idxs = ent.get("src_idx") or []
+        if not idxs:
+            continue
+        rr = sheet_row_by_idx.get(idxs[0])
+        if rr is None:
+            continue
+        req = str(row.get("requirement", "") or "")
+        nmh = row.get("name_human", "")
+        disp = _clean_name(req) or req
+        for cand in (req, nmh, disp):
+            key = _norm_name(cand)
+            if key and key not in exact:
+                exact[key] = rr
+        toks = set(_trace_tokens(nmh or req))
+        if toks and (disp, rr) not in seen_fuzzy:
+            seen_fuzzy.add((disp, rr))
+            fuzzy.append((disp, toks, rr))
+    return exact, fuzzy
+
+
+def _bom_row_for_part_name(pn: str, exact: Dict[str, int],
+                           fuzzy: List[Tuple[str, set, int]]) -> Optional[int]:
+    """Resolve a part display name to its Ledger sheet row — exact normalised-name hit
+    first, else the connection-trace subset-match rule (shortest real name wins)."""
+    key = _norm_name(pn)
+    if key in exact:
+        return exact[key]
+    pts = set(_trace_tokens(pn))
+    if not pts or not any(len(t) >= 2 for t in pts):
+        return None
+    best_row, best_len = None, 10 ** 9
+    for _disp, rt, rr in fuzzy:
+        ok = True
+        for pt in pts:
+            if pt in rt or (len(pt) >= 2 and any(rtok.startswith(pt) for rtok in rt)):
+                continue
+            ok = False
+            break
+        if ok and len(rt) < best_len:
+            best_row, best_len = rr, len(rt)
+    return best_row
+
+
+def _forward_trace_cell(q_consumers: List[str], p_consumers: List[str],
+                        qty_key_row: Dict[str, int], bom_exact: Dict[str, int],
+                        bom_fuzzy: List[Tuple[str, set, int]], *, max_parts: int = 4
+                        ) -> Tuple[str, Optional[Tuple[str, str]]]:
+    """Render the annotated 'Used by (where-to)' text (every named consumer inline with
+    its OWN location, so every destination stays locatable even past the hyperlinked one)
+    + choose the PRIMARY hyperlink target — a part it sizes outranks a downstream
+    quantity (the most load-bearing consumer; a cell has one hyperlink). Falls back to
+    the Ledger TAB (A1) when a part consumer's exact row can't be resolved — a
+    one-click-to-the-right-tab is still the goal even without the exact row."""
+    primary: Optional[Tuple[str, str]] = None
+    parts_bits = []
+    for pn in p_consumers[:max_parts]:
+        prow = _bom_row_for_part_name(pn, bom_exact, bom_fuzzy)
+        if prow:
+            loc = f"{_LEDGER_SHEET}!A{prow}"
+            if primary is None:
+                primary = (_LEDGER_SHEET, f"A{prow}")
+        else:
+            loc = f"{_LEDGER_SHEET} (tab)"
+            if primary is None:
+                primary = (_LEDGER_SHEET, "A1")
+        parts_bits.append(f"{pn} → {loc}")
+    extra_parts = len(p_consumers) - max_parts
+    parts_txt = ("→ part: " + "; ".join(parts_bits)
+                 + (f" (+{extra_parts} more)" if extra_parts > 0 else "")) if parts_bits else ""
+    q_bits = []
+    for qn in q_consumers:
+        qrow = qty_key_row.get(qn)
+        loc = f"Quantities!A{qrow}" if qrow else "Quantities (tab)"
+        if primary is None and qrow:
+            primary = ("Quantities", f"A{qrow}")
+        q_bits.append(f"{qn} → {loc}")
+    q_txt = "; ".join(q_bits)
+    whereto = q_txt
+    if parts_txt:
+        whereto = (whereto + "   " if whereto else "") + parts_txt
+    return whereto, primary
+
+
+def _norm_unit_token(u) -> str:
+    """Normalise a unit string for equality (m³→m3, strip spaces/case)."""
+    return (str(u or "").lower().replace(" ", "").replace("³", "3").replace("²", "2")
+            .replace("μ", "u"))
+
+
+def _calc_quantity_value_index(quantities: dict) -> List[Tuple[str, float, str]]:
+    """(key, numeric value, unit) for every contract quantity carrying a number — the
+    index a worked-calc RESULT is matched against (its result value IS what lands in the
+    contract quantity). Built once per Calculations render."""
+    out: List[Tuple[str, float, str]] = []
+    for k, v in quantities.items():
+        val = v.get("value") if isinstance(v, dict) else v
+        unit = v.get("unit", "") if isinstance(v, dict) else ""
+        if isinstance(val, (int, float)):
+            out.append((k, float(val), unit or ""))
+    return out
+
+
+def _result_produces_quantity(label: str, result_value, result_unit,
+                              qvalue_index: List[Tuple[str, float, str]]) -> Optional[str]:
+    """Resolve a worked-calc RESULT to the contract quantity it PRODUCES — the number the
+    calc computes IS the value that lands in that quantity (Tristan 2026-07-06: the calc's
+    '= result' row carries no key, so we match on VALUE, disambiguated by UNIT/token).
+
+    Rule (HIGH precision — a wrong hyperlink ships worse than an honest 'intermediate'):
+    a quantity K is a candidate when value(K) ≈ result within 1%; among candidates keep
+    those whose unit EQUALS the result unit when BOTH units are present, else those whose
+    key shares ≥1 token with the label (so a dimensionless/bare-number result still needs
+    a name signal, never a pure value coincidence — that rejected the 1500 L/min flow →
+    1500.8 kg mass and the 600 volume → 600 kg mass value collisions). Returns the key
+    ONLY when the surviving match is UNAMBIGUOUS (exactly one)."""
+    if not isinstance(result_value, (int, float)):
+        return None
+    ru = _norm_unit_token(result_unit)
+    ltoks = set(t for t in re.split(r"[^a-z0-9]+", str(label).lower()) if t and len(t) > 1)
+    cands = [(k, unit) for (k, val, unit) in qvalue_index
+             if val and abs(result_value - val) / abs(val) <= 0.01]
+    if not cands:
+        return None
+
+    def _keytoks(k):
+        return set(t for t in re.split(r"[^a-z0-9]+", k.lower()) if t)
+
+    survivors = []
+    for k, unit in cands:
+        un = _norm_unit_token(unit)
+        if ru and un:                       # both units present → must match exactly
+            if ru == un:
+                survivors.append(k)
+        elif ltoks & _keytoks(k):           # a unit is absent → require a name-token signal
+            survivors.append(k)
+    survivors = sorted(set(survivors))
+    if len(survivors) == 1:
+        return survivors[0]
+    if len(survivors) > 1:                  # tie-break the unit-equal survivors on token overlap
+        tok = sorted({k for k in survivors if ltoks & _keytoks(k)})
+        if len(tok) == 1:
+            return tok[0]
+    return None
+
+
+# ============================================================================
 # TAB 3 — QUANTITIES (orchestratorContract.quantities)
 # ============================================================================
-def tab_quantities(wb: Workbook, state: dict) -> None:
+def tab_quantities(wb: Workbook, state: dict, run_dir: str) -> None:
     ws = wb.create_sheet("Quantities")
     set_widths(ws, {"A": 34, "B": 14, "C": 10, "D": 14, "E": 12, "F": 50, "G": 34, "H": 34})
     quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
@@ -3817,65 +4073,21 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
     # what happens to it; apart from the brief, nothing should appear from nowhere"). where-FROM = each
     # value's source (brief / tool / a measured basis / the input quantities in its lineage). where-TO =
     # the REVERSE edges — which OTHER inputs consume this one (so the reader sees the value flow forward).
-    used_by: dict = {}
-    for nm, v in quantities.items():
-        if isinstance(v, dict):
-            lin = (v.get("lineage") or {}).get("from") or []
-            for src in lin:
-                used_by.setdefault(src, []).append(nm)
+    used_by = _quantities_used_by(quantities)
 
     # WHERE-TO also includes the BoM PARTS each input feeds — Tristan: "masses of these have no used-by;
-    # if it's not used by anything, what's the point?" A self-describing quantity key (<noun>_<attribute>,
-    # e.g. fresh_water_tank_volume_each_m3 / softener_vessel_count) SIZES the part whose name carries that
-    # noun. Strip the attribute suffix → the noun token-set, and match it (subset) against the design's
-    # part names. Universal — keyed on the noun, no class table.
-    _part_names = []
-    for _m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
-        for _sm in (_m.get("sub_modules") or []):
-            for _w in (_sm.get("words") or []):
-                _pn = _w.get("name_human") or (_w.get("content_character") or {}).get("name_human") or ""
-                if _pn:
-                    _part_names.append(_pn)
-    def _sing(t):
-        return t[:-1] if len(t) > 3 and t.endswith("s") else t
-    _part_tok = [(pn, set(_sing(t) for t in re.split(r"[^a-z0-9]+", pn.lower()) if t)) for pn in dict.fromkeys(_part_names)]
-    _ATTR_SUFFIX = re.compile(
-        r"_(volume_each_m3|volume_m3|capacity_m3_per_hr|capacity_m3|throughput_m3_h|power_kw|"
-        r"each_m3|diameter_m|secondary_current_a|current_a|breaker_frame_a|breaker_a|frame_a|"
-        r"salt_consumption_max_kg_per_reg|cal_cm2|voltdrop_pct|csa_mm2|kva|kwh|kw|percent|"
-        r"m3_h|m3|m2|kg|mm2|count|\ba\b)$", re.I)
-
-    def _noun_stem_toks(key: str):
-        """ORDERED noun tokens of a quantity key with its attribute suffix stripped.
-        Ordered (not a set) so the HEAD noun below is deterministic — `next(iter(set))`
-        was hash-seed-dependent and made the Quantities where-to column differ between
-        two builds of the SAME run (determinism bug, fixed 2026-07-02)."""
-        s = key
-        while True:
-            s2 = _ATTR_SUFFIX.sub("", s)
-            if s2 == s:
-                break
-            s = s2
-        return [t for t in s.split("_") if t and t not in ("each", "total", "main", "of")]
-
-    def _noun_stem(key: str):
-        return set(_noun_stem_toks(key))
-
-    _GENERIC = {"tank", "pump", "valve", "vessel", "skid", "filter", "panel", "system", "unit", "water"}
+    # if it's not used by anything, what's the point?" (shared _part_token_index/_part_consumers_for —
+    # see the FORWARD TRACEABILITY section above)
+    _part_tok = _part_token_index(state)
 
     def _part_consumers(key: str):
-        stem = set(_sing(t) for t in _noun_stem(key))
-        if not stem or (len(stem) == 1 and next(iter(stem)) in _GENERIC):
-            return []
-        _ord = _noun_stem_toks(key)
-        head = _sing(_ord[-1]) if _ord else ""  # last token of the key noun (the device)
-        out = []
-        for pn, toks in _part_tok:
-            if stem <= toks:                                   # exact noun match
-                out.append(pn)
-            elif head and head not in _GENERIC and head in toks and len(stem & toks) >= 2:
-                out.append(pn)                                  # head noun + ≥1 qualifier overlap (plurals/extra words)
-        return sorted(set(out))
+        return _part_consumers_for(key, _part_tok)
+
+    # FORWARD TRACEABILITY — part-consumer locations (Bill of Materials (Ledger) rows),
+    # resolved via a PRE-PASS over the SAME _ledger_fold_layout() the Ledger tab itself
+    # renders from later (tab_bom() runs after this tab) — so a hyperlink minted here
+    # lands on the exact row tab_bom() writes. Pure + deterministic.
+    _bom_exact, _bom_fuzzy = _bom_row_index(state, run_dir)
 
     # A value can also INFORM a calculation / closure / design-rule without a quantity-or-part link (e.g.
     # ro_recovery_percent feeds the RO mass-balance closure; cultivation_container_count drives the valve
@@ -3944,7 +4156,7 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
     header(ws, 4, ["Input", "Value", "Unit", "Family", "Source", "Where-from (source / inputs)", "Source detail", "Used by (where-to)"])
     # Map each quantity → its Excel row, so a recorded `lineage.formula` can be rendered as a LIVE
     # Excel formula referencing the input ROWS (the value PROVES itself rather than being asserted).
-    key_row = {name: 5 + i for i, name in enumerate(quantities)}
+    key_row = _quantities_key_row(quantities)
 
     def _live_formula(v):
         """Return an Excel formula string (with B<row> cell refs) for a value whose lineage records a
@@ -3990,11 +4202,11 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         cd.border = BORDER
         q_consumers = used_by.get(name, [])
         p_consumers = _part_consumers(name)
-        parts_txt = (["→ part: " + ", ".join(p_consumers[:4]) + (f" (+{len(p_consumers) - 4})" if len(p_consumers) > 4 else "")]
-                     if p_consumers else [])
-        whereto = ", ".join(q_consumers) if q_consumers else ""
-        if parts_txt:
-            whereto = (whereto + "  " if whereto else "") + parts_txt[0]
+        # FORWARD TRACEABILITY (Tristan 2026-07-06): every named consumer is annotated
+        # inline with its OWN location, and the cell carries a real internal hyperlink to
+        # the PRIMARY (most load-bearing) destination — see _forward_trace_cell above.
+        whereto, _primary = _forward_trace_cell(q_consumers, p_consumers, key_row,
+                                                 _bom_exact, _bom_fuzzy)
         orphan = False
         # HEADLINE INTEGRITY (2026-07-02): a quantity that FAILED a deterministic check on
         # THIS run must NEVER carry the "design output (feeds cost / financial / drawings)"
@@ -4008,17 +4220,23 @@ def tab_quantities(wb: Workbook, state: dict) -> None:
         elif not whereto:
             if _is_output(name):
                 whereto = "→ design output (feeds cost / financial / drawings)"
+                _primary = None
             elif _informs_calc(name):
                 whereto = "→ informs calculations / design rules (see Source detail)"
+                _primary = None
             else:
                 whereto = "⚠ no consumer found — verify it is needed"
                 orphan = True
+                _primary = None
         ct = ws.cell(r, 8, clean_cell(whereto))
         ct.alignment = WRAP_TOP
         ct.font = FONT_NOTE
         ct.border = BORDER
         if orphan:
             ct.fill = FILL_FAIL if "FILL_FAIL" in globals() else ct.fill
+        if _primary is not None:
+            _set_internal_hyperlink(ct, _primary[0], _primary[1])
+            ct.font = FONT_LINK
         r += 1
     apply_col_formats(ws, 5, {2: FMT_NUM}, r - 1)
     ws.auto_filter.ref = f"A4:H{r - 1}"
@@ -4603,13 +4821,16 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     are referenced by absolute address.
     """
     ws = wb.create_sheet("Calculations")
-    set_widths(ws, {"A": 30, "B": 18, "C": 12, "D": 46, "E": 16, "F": 12, "G": 10, "H": 64})
+    set_widths(ws, {"A": 30, "B": 18, "C": 12, "D": 46, "E": 16, "F": 12, "G": 10, "H": 64,
+                    "I": 44})
     title_row(
-        ws, "Worked calculations — every value recomputed live + checked", 8,
+        ws, "Worked calculations — every value recomputed live + checked", 9,
         "Yellow = editable input. Green col B = LIVE formula. 'Engine value' = the "
         "value the engine stored; Δ should be ~0 (inputs are display-rounded to 4 s.f.). "
         "Legacy calcs (no input map) are RECOMPUTED LIVE from their substitution and "
-        "cross-checked against the engine value (col H verdict).",
+        "cross-checked against the engine value (col H verdict). 'Used by (where-to)' "
+        "(col I) — FORWARD TRACE: the contract quantity this result feeds, and its own "
+        "downstream consumers, clickable to the destination cell.",
     )
     r = 4
 
@@ -4701,6 +4922,48 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     # data-flow Value cells above can be linked to the result that produced them.
     calc_results: Dict[str, List[Tuple[Optional[float], str]]] = {}
 
+    # FORWARD TRACEABILITY (Tristan 2026-07-06, added to Calculations to match Quantities):
+    # each worked-calc RESULT is resolved to the contract quantity it PRODUCES — the number
+    # the calc computes IS the value that lands in that quantity (matched on VALUE + unit,
+    # not on the '= result' row's empty key — the root cause the first cut missed) — then to
+    # THAT quantity's own downstream consumers via the SAME shared helpers tab_quantities()
+    # uses, so the two tabs can never describe the forward graph differently. A calc that
+    # produces no standalone contract quantity (a pure intermediate) reports where it FEEDS
+    # within its own tool instead of a bare 'not linked'.
+    _calc_quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    _calc_used_by = _quantities_used_by(_calc_quantities)
+    _calc_qty_key_row = _quantities_key_row(_calc_quantities)
+    _calc_qvalue_index = _calc_quantity_value_index(_calc_quantities)
+    _calc_part_tok = _part_token_index(state)
+    _calc_bom_exact, _calc_bom_fuzzy = _bom_row_index(state, run_dir)
+
+    def _calc_forward_trace(label, res_val, res_unit, downstream_labels
+                            ) -> Tuple[str, Optional[Tuple[str, str]]]:
+        """(text, primary hyperlink target) for a worked-calc's result. Resolves the
+        PRODUCED contract quantity by value+unit, then renders that quantity's own
+        Quantities row (the primary click — where this computed number lives as a contract
+        input, from which the Quantities tab's own forward-trace continues) plus its
+        downstream consumers. For a pure intermediate, names the tool's calc(s) it feeds."""
+        qname = _result_produces_quantity(label, res_val, res_unit, _calc_qvalue_index)
+        if not qname:
+            if downstream_labels:
+                shown = "; ".join(downstream_labels[:3]) + (
+                    f" (+{len(downstream_labels) - 3} more)" if len(downstream_labels) > 3 else "")
+                return f"→ feeds this tool's calc(s): {shown}", None
+            return "— intermediate/step value (not a standalone contract quantity)", None
+        qrow = _calc_qty_key_row.get(qname)
+        q_consumers = _calc_used_by.get(qname, [])
+        p_consumers = _part_consumers_for(qname, _calc_part_tok)
+        downstream_txt, _dprimary = _forward_trace_cell(
+            q_consumers, p_consumers, _calc_qty_key_row, _calc_bom_exact, _calc_bom_fuzzy)
+        qloc = f"Quantities!A{qrow}" if qrow else "Quantities (tab)"
+        # primary click = this value's OWN Quantities row (most load-bearing: it is where
+        # the number becomes a contract input); fall back to a consumer if the row is
+        # somehow unknown.
+        primary = ("Quantities", f"A{qrow}") if qrow else _dprimary
+        text = f"lands in: {qname} → {qloc}" + (f"   then {downstream_txt}" if downstream_txt else "")
+        return text, primary
+
     for tool in tools:
         worked = tool.get("worked") or []
         if not worked:
@@ -4708,11 +4971,25 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         tname = tool.get("tool_name") or tool.get("tool_id") or "tool"
         tid = tool.get("tool_id", "")
         _tid_norm = str(tid).strip().lower()
-        sub_banner(ws, r, f"{tname}   ·   {tid}", 8)
+        sub_banner(ws, r, f"{tname}   ·   {tid}", 9)
         r += 1
         header(ws, r, ["Calc / input", "Value (live)", "Unit",
-                       "Formula (text)", "Engine value", "Δ", "Unit", "Assumptions"])
+                       "Formula (text)", "Engine value", "Δ", "Unit", "Assumptions",
+                       "Used by (where-to)"])
         r += 1
+
+        # WITHIN-TOOL forward edges: output symbol → the labels of calcs that consume it as
+        # an input, so a pure intermediate can say where it feeds instead of 'not linked'.
+        # Deterministic (document order); a symbol is normally produced once per tool.
+        _consumers_by_sym: Dict[str, List[str]] = {}
+        for _cw in worked:
+            _cl = _cw.get("label", "")
+            for _inp in (_cw.get("inputs") or []):
+                _sy = _inp.get("symbol")
+                if _sy:
+                    _consumers_by_sym.setdefault(_sy, [])
+                    if _cl and _cl not in _consumers_by_sym[_sy]:
+                        _consumers_by_sym[_sy].append(_cl)
 
         # produced[output_symbol] -> (producing result cell, its value), for
         # within-tool chaining. BUG #19 FIX: key by the producing calc's OUTPUT
@@ -4812,6 +5089,16 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                     ws.cell(r, 5, res_val)
                     ws.cell(r, 7, res_unit)
                     ws.cell(r, 8, "— not auto-checkable (non-numeric substitution)").font = FONT_NOTE
+                # FORWARD TRACEABILITY (col I) — this result's contract quantity + its own
+                # downstream consumers, clickable to the destination cell (see _calc_forward_trace).
+                _ds = [l for l in _consumers_by_sym.get(lhs_symbol(formula), []) if l != label]
+                _utx, _uprim = _calc_forward_trace(label, res_val, res_unit, _ds)
+                uc = ws.cell(r, 9, clean_cell(_utx))
+                uc.alignment = WRAP_TOP
+                uc.font = FONT_NOTE
+                if _uprim is not None:
+                    _set_internal_hyperlink(uc, _uprim[0], _uprim[1])
+                    uc.font = FONT_LINK
                 r += 1
                 r += 1  # spacer
                 continue
@@ -4902,6 +5189,18 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 ac.font = FONT_NOTE
                 ac.alignment = WRAP_TOP
 
+            # FORWARD TRACEABILITY (col I) — this result's contract quantity + its own
+            # downstream consumers, clickable to the destination cell (see _calc_forward_trace).
+            _match_val = res_val if isinstance(res_val, (int, float)) else _bval
+            _ds = [l for l in _consumers_by_sym.get(lhs_symbol(formula), []) if l != label]
+            _utx, _uprim = _calc_forward_trace(label, _match_val, res_unit, _ds)
+            uc = ws.cell(r, 9, clean_cell(_utx))
+            uc.alignment = WRAP_TOP
+            uc.font = FONT_NOTE
+            if _uprim is not None:
+                _set_internal_hyperlink(uc, _uprim[0], _uprim[1])
+                uc.font = FONT_LINK
+
             # register this result under its OUTPUT SYMBOL so later inputs chain by
             # symbol+label identity (bug #19), not by a numeric-value collision.
             out_sym = lhs_symbol(formula)
@@ -4936,7 +5235,7 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
     # (not £, not General/scientific) is the safe universal display.
     apply_col_formats(ws, 5, {2: FMT_DEC2, 5: FMT_DEC2, 6: FMT_DEC2}, r)
     ws.freeze_panes = "A4"
-    back_link(ws, 8)
+    back_link(ws, 9)
     return live_count, static_count
 
 
@@ -16526,7 +16825,7 @@ _dt(["Constant", "Value", "Unit", "Note"], "constants", ["Constant", "Value"], u
 # curve family (derating, polarisation, …) with both point columns required + numeric.
 _dt(["#", "X", "Y"], "curve-points", ["#", "X", "Y"], numeric=["#", "X", "Y"])
 _dt(["Calc / input", "Value (live)", "Unit", "Formula (text)", "Engine value", "Δ", "Unit",
-     "Assumptions"], "worked-calc", ["Calc / input"])
+     "Assumptions", "Used by (where-to)"], "worked-calc", ["Calc / input"])
 _dt(["Tag", "Item", "Qty", "Unit £", "Line £", "Cost method", "Key inputs", "Factors",
      "Est class", "Confidence", "Duty / rating", "Material", "Sizing calc (basis)",
      "MPN / datasheet", "Row check", "Audit: check evidence (build-computed)"], "bom-ledger",
@@ -18846,7 +19145,7 @@ def build(run_dir: str, out_path: str) -> dict:
     print("  · Part names")
     tab_parts_master(wb, state, run_dir)
     print("  · Quantities")
-    tab_quantities(wb, state)
+    tab_quantities(wb, state, run_dir)
     print("  · Calculations")
     live_n, static_n = tab_calculations(wb, state, run_dir)
     print("  · Bill of Materials (Ledger)")
