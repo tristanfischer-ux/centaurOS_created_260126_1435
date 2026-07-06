@@ -314,6 +314,15 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
     for key, qty in q.items():
         if not isinstance(qty, dict):
             continue
+        # NAMESPACED BREAKDOWN LISTS (co2 one-mint, 2026-07-06): a key like
+        # 'electrical_consumer__<slug>_kw' is one entry of a deliberate per-consumer
+        # breakdown whose entries are DISTINCT BY CONSTRUCTION (a crystalliser at 80 kW and
+        # a pump at 0.75 kW are SUPPOSED to differ). They all share the 'electrical'+
+        # 'consumer' namespace tokens, so the same-role divergence check false-flagged every
+        # pair. The list's own invariant (Σ == connected_electrical_load_kw) is checked by
+        # the load_reconcile gate + a by-construction proveCatch — not here. Skip the namespace.
+        if str(key).lower().startswith("electrical_consumer__"):
+            continue
         v = qty.get("value")
         if not isinstance(v, (int, float)) or v == 0:
             continue
