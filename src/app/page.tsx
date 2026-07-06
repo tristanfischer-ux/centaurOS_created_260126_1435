@@ -150,6 +150,13 @@ const HTML = `<style>
   .wb-visuals img{width:100%;border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow-sm);display:block;background:#fff;}
   .wb-visuals figcaption{font-size:12.5px;color:var(--muted);margin-top:9px;text-align:center;}
   @media(max-width:640px){.wb-visuals{grid-template-columns:1fr;} }
+  .axis-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px;}
+  .axis{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:24px;box-shadow:var(--shadow-sm);}
+  .axis-k{display:inline-block;font-size:19px;font-weight:800;color:var(--ember);letter-spacing:-.01em;margin-bottom:8px;}
+  .axis p{font-size:14.5px;color:var(--ink-soft);}
+  .axis-foot{margin-top:24px;font-size:16px;color:var(--ink-soft);max-width:66ch;}
+  .axis-foot::before{content:"\\21bb";color:var(--ember);font-weight:800;margin-right:9px;}
+  @media(max-width:760px){.axis-grid{grid-template-columns:1fr;} }
   .founders-grid ul{list-style:none;padding:0;margin:0;}
   .founders-grid li{padding:11px 0 11px 30px;position:relative;font-size:16px;color:var(--ink-soft);border-bottom:1px solid var(--line);}
   .founders-grid li:last-child{border-bottom:none;}
@@ -330,7 +337,8 @@ const HTML = `<style>
     <div class="s-head">
       <span class="eyebrow">Start here &mdash; the Design Dossier</span>
       <h2>Your day-one on-ramp: a full Design Dossier, free.</h2>
-      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph to a page. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; a buildable design, a costed bill-of-materials ledger, the true cost and a live financial model, the engineering drawings, and the risks and codes it must meet. Every number is a live formula you can trace, and it checks itself against a ship gate. It&rsquo;s how every founder relationship starts, and the basis for the conversations that follow.</p>
+      <p class="muted" style="margin-top:12px">Describe your idea in a short brief &mdash; a paragraph is enough to start, and the more you tell it, the more precisely it hits your spec. Anvil, the engine inside Fractional Forge, builds your Design Dossier: an auditable Excel workbook &mdash; a buildable design, a costed bill-of-materials ledger, the true cost and a live financial model, the engineering drawings, and the risks and codes it must meet. Every number is a live formula you can trace, and it checks itself against a ship gate.</p>
+      <p style="margin-top:16px;font-weight:700;color:var(--ink);font-size:16.5px">About a day, not a quarter &mdash; a Design Dossier compresses the two-to-three months and &pound;20k&ndash;&pound;40k of upfront engineering study into one auditable workbook.</p>
     </div>
     <div class="feat">
       <div class="card"><h3>A buildable design</h3><p>Your idea broken into modules, with every principal part sized and dimensioned &mdash; geometry that audits itself.</p></div>
@@ -342,6 +350,23 @@ const HTML = `<style>
       <div class="card"><h3>Holds &amp; open questions</h3><p>The honest open-items list: what&rsquo;s assumed, what&rsquo;s excluded, and the exact questions to confirm with us.</p></div>
       <div class="card"><h3>It checks itself</h3><p>A quality-audit surface scoring every section, live invariant checks, an independent sense-check, and a ship verdict.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- DESIGN TO YOUR REALITY -->
+<section class="s" id="steer">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="eyebrow">Steer it</span>
+      <h2>Design to your reality &mdash; then change it.</h2>
+      <p class="muted" style="margin-top:12px">Every design has one number that can&rsquo;t move. Tell the engine which, and it engineers to hit it &mdash; flexing everything else.</p>
+    </div>
+    <div class="axis-grid">
+      <div class="axis"><span class="axis-k">Budget</span><p>Fix a &pound;5m ceiling and it designs the best plant that fits it.</p></div>
+      <div class="axis"><span class="axis-k">Footprint</span><p>Only a 30 &times; 10 m building? It makes the design fit the envelope.</p></div>
+      <div class="axis"><span class="axis-k">Output</span><p>Need a set output? It sizes to that and prices the rest.</p></div>
+    </div>
+    <p class="axis-foot">Change your mind and it re-solves in hours &mdash; no three-month sunk cost forcing you to ship a design you&rsquo;ve outgrown.</p>
   </div>
 </section>
 
@@ -361,7 +386,7 @@ const HTML = `<style>
       <div class="card"><h3>Traceable costs</h3><p>Inputs &amp; assumptions &rarr; calculations &rarr; quantities &rarr; bill-of-materials ledger &rarr; cost waterfall &rarr; financial model. Every number is a formula.</p></div>
       <div class="card"><h3>Engineering drawings</h3><p>General arrangement, P&amp;ID, block-flow, single-line, HVAC and electrical &mdash; plus 3D renders of the build.</p></div>
       <div class="card"><h3>Risk &amp; open questions</h3><p>What you&rsquo;ll need to certify, the holds and exclusions, and the questions still to resolve &mdash; stated plainly, not buried.</p></div>
-      <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer reviews the whole workbook.</p></div>
+      <div class="card"><h3>It checks itself</h3><p>A scorecard, sense-check, connection trace and audit run before delivery &mdash; then a senior engineer reviews the whole workbook. It&rsquo;s built to be checked: it makes an expert think, and catches what a busy team would miss.</p></div>
     </div>
     <div style="text-align:center;margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a class="btn btn-ghost btn-lg" href="https://jyarhvinengfyrwgtskq.supabase.co/storage/v1/object/public/dossiers/example-water-treatment-dossier.xlsx">See a real example workbook &mdash; Excel &darr;</a><a class="btn btn-ghost btn-lg" href="/cost/water-treatment-plant">Read a worked cost breakdown &rarr;</a></div>
     <p class="ex-note">A worked example (a water-treatment plant): open it and change an assumption to watch the model recompute. Also built for grid-scale battery storage, vertical farms, CO&#8322; capture and power-to-liquid aviation fuel. Yours covers your idea.</p>
@@ -417,6 +442,7 @@ const HTML = `<style>
       <span class="eyebrow">Why you can trust the work</span>
       <h2>Real physics. Real data. Not a black box.</h2>
       <p class="muted" style="margin-top:12px">The Design Dossier isn&rsquo;t a chatbot guessing numbers. Its engineering review runs <strong>231 calculation tools</strong> built on the same peer-reviewed, open physics libraries professional engineers use &mdash; and checks every part against live, real-world data. Each Dossier shows its workings <em>and</em> its sources.</p>
+      <p class="muted" style="margin-top:14px">Because it works from first principles, it flags what an experienced team can miss &mdash; a flow rate that ignores pipe friction, a heat load that forgets the pumps are warming the water. It will argue with the spec, and it&rsquo;s usually right.</p>
     </div>
     <div class="hood-grid">
       <div class="hood-col">
@@ -526,7 +552,7 @@ const HTML = `<style>
     </details>
     <details>
       <summary>How accurate are the costs and the investor list?</summary>
-      <div class="body">The Design Dossier is a rigorous first pass, not a guarantee. Costs are indicative and the maths is shown so you can check every number. The investor list is <strong>investors who&rsquo;ve backed similar products</strong> &mdash; a researched starting point, not a promise of funding.</div>
+      <div class="body">The Design Dossier is a rigorous first pass, not a guarantee. Costs are indicative and the maths is shown so you can check every number &mdash; and a senior engineer reviews the whole workbook before you see it.</div>
     </details>
     <details>
       <summary>Who owns the IP I create?</summary>

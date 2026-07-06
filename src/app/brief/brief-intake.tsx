@@ -94,7 +94,7 @@ export function BriefIntake() {
             <div className="card">
               <span className="eyebrow">Get your Design Dossier</span>
               <h1>Tell me about your idea.</h1>
-              <p className="sub">A short brief is all I need &mdash; a paragraph to a page. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer reviews it before I send it, within a day. No account, and your first one is free.</p>
+              <p className="sub">A short brief is all I need &mdash; a paragraph is enough to start, and the more you tell me, the more precisely it hits your spec. Anvil builds your Design Dossier: an auditable Excel workbook with the architecture, a costed bill-of-materials ledger, a full financial model, the licences and regulations you&rsquo;ll face, the risks to watch, and a built-in self-audit &mdash; every number a formula you can trace. A senior engineer reviews it before I send it, within a day. No account, and your first one is free.</p>
               <form onSubmit={onSubmit}>
                 <div>
                   <label htmlFor="idea">Your idea <span className="req">*</span> <span className="hint">&mdash; what it does, who it&rsquo;s for, roughly how big.</span></label>
