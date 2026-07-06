@@ -17025,13 +17025,154 @@ def _traces_to_state(val: float, index: List[float]) -> bool:
 # ── Per-tab content scorers. Each returns {"components": [(label, passed, checked)],
 #    "issues": [...], "fix": str, "mech": str, "score_cap": Optional[float]} — the merge
 #    turns components into arithmetic (min over checks of 10 × passed/checked). ──────────
-def _compliance_row_pass(d) -> Optional[bool]:
+#
+# COVER COMPLIANCE ARITHMETIC — feedstock-approximation relief + fallback matcher
+# (Tristan 2026-07-06). This is the THIRD independent brief-compliance computation in the
+# codebase (dossier_audit.py::_is_feedstock_metric/_brief_value_approximated and
+# scorecard-floor.ts::complianceMetricIsFeedstock/briefValueApproximated/
+# fallbackMatchQuantity are the other two, already fixed): _compliance_row_pass below is
+# the COVER's own second-opinion audit, re-deriving PASS/FAIL from the RENDERED cells
+# rather than trusting the workbook's live =IF STATUS formula — so the same two false
+# brief-misses those fixes already closed reproduce here unless the identical rules are
+# ported a third time:
+#   1. koh_feed_tpd (achieved 2.54 vs an approximate target ~2.6 t/day, 2.3% gap): a
+#      FEEDSTOCK/consumption metric the brief itself hedges with 'approximately' widens
+#      to a ±5% tolerance instead of the tight 2% band.
+#   2. co2_capture_capacity_tpd: the render's own _match_quantity exact-token overlap
+#      never matched the delivered 'capture_capacity_tco2_per_day' quantity ('tco2' !=
+#      'co2'), so the rendered row is UNVERIFIED (Achieved cell literally '—'). The
+#      recompute gets one more chance via a SAME-UNIT, SUBSTRING-tolerant token-overlap
+#      fallback read directly from state.orchestratorContract.quantities.
+# Both reliefs are OPT-IN via the `state` param — omitting it (as every pre-existing
+# caller/test does) preserves the exact prior behaviour byte-for-byte. proveCatch (both
+# directions) in _selftest.
+_COVER_FEEDSTOCK_METRIC_RX = re.compile(
+    r"\b(feed|feedstock|consum|reagent|dos(?:e|ing)|makeup|make_up|intake|uptake|input)\b", re.I)
+_COVER_HARD_PERFORMANCE_METRIC_RX = re.compile(
+    r"\b(capacity|output|throughput|yield|product|rated|nameplate|power|voltage|current|"
+    r"efficiency|energy|duty|captur\w*)\b", re.I)
+
+
+def _cover_metric_is_feedstock(name) -> bool:
+    """True for a feedstock/raw-material CONSUMPTION metric name; false for a hard
+    performance/output floor even when a token would otherwise overlap. Mirrors
+    dossier_audit.py::_is_feedstock_metric / scorecard-floor.ts::complianceMetricIsFeedstock."""
+    text = re.sub(r"[_\-]+", " ", str(name or ""))
+    return bool(_COVER_FEEDSTOCK_METRIC_RX.search(text)) and not _COVER_HARD_PERFORMANCE_METRIC_RX.search(text)
+
+
+_COVER_APPROX_RX = re.compile(r"~|\bapprox(?:imately|\.)?\b|\babout\b|\broughly\b", re.I)
+
+
+def _cover_brief_value_approximated(brief_text: str, target_value) -> bool:
+    """True when the brief's own text, within a short window before THIS metric's cited
+    target value, hedges it with an approximation word — the brief itself discloses the
+    figure is not exact. Mirrors dossier_audit.py::_brief_value_approximated."""
+    v = num(target_value)
+    if v is None or not brief_text:
+        return False
+    reps = {f"{v:g}", f"{v:.0f}", f"{v:.1f}", f"{v:.2f}"}
+    for rep in reps:
+        if not rep:
+            continue
+        for m in re.finditer(re.escape(rep), brief_text):
+            window = brief_text[max(0, m.start() - 40): m.start()]
+            if _COVER_APPROX_RX.search(window):
+                return True
+    return False
+
+
+# The fallback matcher's OWN stop-list (distinct from _QTY_STOP_TOKENS above, which backs
+# _match_quantity's exact-token overlap) — mirrors scorecard-floor.ts::MATCH_STOP_TOKENS,
+# including the generic measure-noun exclusions (temp/pressure/level/concentration) that
+# must never bridge two different subsystems on a single shared unit word.
+_COVER_ECHO_NAME_TOKEN_RX = re.compile(
+    r"_(requested|request|target|demand|brief|spec|setpoint|required)$", re.I)
+_COVER_FALLBACK_STOP_TOKENS = {
+    "the", "of", "per", "system", "total", "design", "rated", "nominal", "max", "min", "peak", "avg", "mean",
+    "capacity", "throughput", "flow", "rate", "demand", "output", "volume", "duty", "load",
+    "temp", "temperature", "pressure", "level", "concentration",
+    "m3", "m2", "m", "l", "hr", "h", "hour", "hrs", "min", "mins", "sec", "s", "day", "yr", "year",
+    "kw", "mw", "gw", "w", "kwh", "mwh", "gwh", "wh", "kg", "kt", "t", "g", "v", "kv", "a", "ka", "ma",
+    "bar", "pa", "kpa", "mpa", "psi", "c", "k", "pct", "percent", "mm", "cm", "km", "nm", "ppm",
+    "count", "nr", "no", "qty", "ea", "off", "unit", "units", "pcs", "number",
+}
+
+
+def _cover_name_tokens(name) -> List[str]:
+    base = re.sub(r"[^a-z0-9_]+", "_", str(name or "").lower())
+    base = re.sub(r"_+", "_", base).strip("_")
+    return [t for t in base.split("_") if t and t not in _COVER_FALLBACK_STOP_TOKENS]
+
+
+def _cover_token_overlap_count(brief_tokens: List[str], q_tokens: List[str]) -> int:
+    """Count of brief-metric identity tokens covered by a candidate quantity's tokens —
+    exact match OR (length >=3 both sides) substring match, so a compound token like
+    'tco2' still covers the brief's 'co2' without a per-instance alias table."""
+    n = 0
+    for bt in brief_tokens:
+        if any(qt == bt or (len(bt) >= 3 and len(qt) >= 3 and (qt in bt or bt in qt)) for qt in q_tokens):
+            n += 1
+    return n
+
+
+def _cover_norm_unit(u) -> str:
+    return re.sub(r"\s+", "", str(u or "").strip().lower())
+
+
+def _cover_fallback_match_quantity(metric_key: str, metric_unit: str, quantities: Dict[str, Any]
+                                   ) -> Optional[Tuple[str, float]]:
+    """Second-opinion fallback for the cover's own recompute — same-UNIT, SUBSTRING-
+    tolerant token overlap against the achieved-quantities map. Requirement-ECHO
+    quantities (…_target/_demand/…) are excluded so a genuine miss stays honest. Returns
+    None (never guesses) when nothing clears at least half the metric's identity tokens.
+    Mirrors scorecard-floor.ts::fallbackMatchQuantity."""
+    b_tokens = _cover_name_tokens(metric_key)
+    if not b_tokens:
+        return None
+    need = max(1, (len(b_tokens) + 1) // 2)
+    target_unit = _cover_norm_unit(metric_unit)
+    best = None  # (overlap, key, value)
+    for qname, qv in (quantities or {}).items():
+        if not isinstance(qv, dict) or _COVER_ECHO_NAME_TOKEN_RX.search(str(qname)):
+            continue
+        if _cover_norm_unit(qv.get("unit")) != target_unit:
+            continue
+        val = num(qv.get("value"))
+        if val is None:
+            continue
+        overlap = _cover_token_overlap_count(b_tokens, _cover_name_tokens(qname))
+        if overlap < need:
+            continue
+        if best is None or overlap > best[0]:
+            best = (overlap, qname, val)
+    return (best[1], best[2]) if best else None
+
+
+_COVER_NOTE_KEY_RX = re.compile(r"brief key:\s*([A-Za-z0-9_]+)")
+
+
+def _compliance_row_pass(d, state: Optional[dict] = None) -> Optional[bool]:
     """Recompute a rendered compliance row's verdict from its OWN cells. The STATUS cell
     is a live =IF formula (unreadable pre-recalc), so the check re-evaluates the same
     comparison: achieved vs target in the stated direction, 2% tolerance (the formulas
-    bake the same allowance). None = unverifiable (missing numbers) — counts as FAIL."""
+    bake the same allowance). None = unverifiable (missing numbers) — counts as FAIL.
+
+    `state` (optional, backward compatible) engages two second-opinion reliefs — see the
+    block comment above _cover_metric_is_feedstock: (a) an UNVERIFIED row (no numeric
+    Achieved cell) gets one more chance via the same-unit substring-tolerant fallback
+    matcher against state.orchestratorContract.quantities; (b) a FAIL on a feedstock/
+    consumption metric the brief itself hedges with 'approximately' widens to ±5%."""
     t = _num_of(d.get("target"))
     a = _num_of(d.get("achieved"))
+    note = _cell_txt(d.get("note"))
+    km = _COVER_NOTE_KEY_RX.search(note)
+    key = km.group(1) if km else ""
+    if a is None and t is not None and state is not None and key:
+        quantities = (state.get("orchestratorContract") or {}).get("quantities") or {}
+        fb = _cover_fallback_match_quantity(key, _cell_txt(d.get("unit")), quantities)
+        if fb is not None:
+            a = fb[1]
     if t is None or a is None:
         st = _cell_txt(d.get("status")).upper()
         if st.startswith("PASS"):
@@ -17039,15 +17180,23 @@ def _compliance_row_pass(d) -> Optional[bool]:
         return None
     dirn = _cell_txt(d.get("direction")).lower()
     if "≥" in dirn or ">=" in dirn or "meet/exceed" in dirn or "at least" in dirn:
-        return a >= t * 0.98
-    if "≤" in dirn or "<=" in dirn or "at most" in dirn or "ceiling" in dirn:
-        return a <= t * 1.02
-    return abs(a - t) <= 0.02 * max(abs(t), 1e-9)
+        passed = a >= t * 0.98
+    elif "≤" in dirn or "<=" in dirn or "at most" in dirn or "ceiling" in dirn:
+        passed = a <= t * 1.02
+    else:
+        passed = abs(a - t) <= 0.02 * max(abs(t), 1e-9)
+    if not passed and key and state is not None and _cover_metric_is_feedstock(key):
+        pb = state.get("parsedBrief") or {}
+        brief_text = pb.get("original_text") or pb.get("revised_text") or ""
+        if isinstance(brief_text, str) and _cover_brief_value_approximated(brief_text, t):
+            tol5 = abs(t) * 0.05
+            passed = abs(a - t) <= tol5 or t == 0
+    return passed
 
 
 def _sc_exec(wb, ws, state, run_dir):
     rows = _fam_rows(wb, ws.title, "compliance")
-    verdicts = [_compliance_row_pass(d) for _r, d in rows]
+    verdicts = [_compliance_row_pass(d, state) for _r, d in rows]
     p = sum(1 for v in verdicts if v is True)
     unv = sum(1 for v in verdicts if v is None)
     iss = []
@@ -20346,6 +20495,93 @@ def _selftest() -> int:
     if not um or um[0] != "cost_per_kwh_gbp" or um[1] != 113.34:
         print(f"  FAIL scope-qualified: an UNSCOPED brief target must match the plain full-system "
               f"quantity, never the _only_ sibling by accident — got {um}"); bad += 1
+
+    # ═══ proveCatch COVER COMPLIANCE ARITHMETIC (Tristan 2026-07-06) — the THIRD
+    # independent brief-compliance computation (dossier_audit.py + scorecard-floor.ts are
+    # the other two, already fixed). Both directions for each relief. ═══
+    if not _cover_metric_is_feedstock("koh_feed_tpd"):
+        print("  FAIL cover-feedstock-classifier: koh_feed_tpd must classify as feedstock"); bad += 1
+    if _cover_metric_is_feedstock("co2_capture_capacity_tpd"):
+        print("  FAIL cover-feedstock-classifier: co2_capture_capacity_tpd (captur*) must NOT "
+              "classify as feedstock"); bad += 1
+    _koh_brief = ("point-source flue-gas capture ... sulfate feedstock (approximately 3.1 t/day), "
+                  "potassium hydroxide (approximately 2.6 t/day), process water")
+    if not _cover_brief_value_approximated(_koh_brief, 2.6):
+        print("  FAIL cover-approx-hedge: '(approximately 2.6 t/day)' must be detected as a hedge"); bad += 1
+    if _cover_brief_value_approximated("potassium hydroxide 2.6 t/day, process water", 2.6):
+        print("  FAIL cover-approx-hedge: an UNHEDGED 2.6 t/day citation must NOT read as approximated"); bad += 1
+
+    # (1) proveCatch — CATCHES the false miss: koh_feed_tpd, matched achieved=2.54 vs an
+    # approximate target 2.6 (2.3% gap) → PASS via the cover's own recompute.
+    _koh_row = {"target": "2.6", "achieved": 2.54, "direction": "≥ target (meet/exceed)",
+                "status": "FAIL", "unit": "t/day", "note": "brief key: koh_feed_tpd → contract: koh_feed_t_per_day"}
+    _koh_state = {"parsedBrief": {"original_text": _koh_brief}}
+    if _compliance_row_pass(_koh_row, _koh_state) is not True:
+        print(f"  FAIL cover-recompute feedstock-relief: koh_feed_tpd 2.54 vs approx-2.6 must PASS "
+              f"(got {_compliance_row_pass(_koh_row, _koh_state)})"); bad += 1
+    # (2) proveCatch — WITHOUT the hedge in the brief text the SAME near-miss stays FAIL.
+    if _compliance_row_pass(_koh_row, {"parsedBrief": {"original_text": "potassium hydroxide 2.6 t/day"}}) is not False:
+        print("  FAIL cover-recompute feedstock-relief: no hedge in brief text must stay on the tight band (FAIL)"); bad += 1
+    # (3) proveCatch — a genuinely SHORT feedstock (>5% out) still fails even with the hedge.
+    _koh_far = dict(_koh_row); _koh_far["achieved"] = 2.3   # 11.5% short
+    if _compliance_row_pass(_koh_far, _koh_state) is not False:
+        print("  FAIL cover-recompute feedstock-relief: an 11.5% shortfall must still FAIL "
+              "(the relief widens the band, it does not remove it)"); bad += 1
+    # (4) proveCatch — the relief is scoped to FEEDSTOCK names only: a hard-performance metric
+    # with the SAME 2.3%-under miss, hedged 'approximately', stays on the tight 2% band.
+    _hard_row = {"target": "2.6", "achieved": 2.54, "direction": "≥ target (meet/exceed)",
+                 "status": "FAIL", "unit": "t/day",
+                 "note": "brief key: rated_output_capacity_tpd → contract: rated_output_t_per_day"}
+    if _compliance_row_pass(_hard_row, {"parsedBrief": {"original_text": "rated output approximately 2.6 t/day"}}) is not False:
+        print("  FAIL cover-recompute feedstock-relief: a hard-performance metric must NOT be "
+              "widened even when the brief hedges it 'approximately' (over-broadening)"); bad += 1
+    # (5) proveCatch — the row-recompute is UNCHANGED when `state` is omitted (every
+    # pre-existing caller): the SAME near-miss stays FAIL exactly as before this fix.
+    if _compliance_row_pass(_koh_row) is not False:
+        print("  FAIL cover-recompute feedstock-relief: omitting `state` must preserve the "
+              "ORIGINAL tight-2%-only behaviour (no relief without state)"); bad += 1
+
+    # (6) proveCatch — the fallback matcher DISCOVERS the delivered capture quantity under
+    # its compound (tco2) name and unit, turning a false UNVERIFIED into a genuine PASS.
+    _cover_qs = {
+        "capture_capacity_tco2_per_day": {"value": 1, "unit": "t/day"},
+        "co2_capture_rate_kg_per_hour": {"value": 41.6666666, "unit": "kg/h"},
+        "koh_feed_t_per_day": {"value": 2.54, "unit": "t/day"},
+    }
+    _fbm = _cover_fallback_match_quantity("co2_capture_capacity_tpd", "t/day", _cover_qs)
+    if not _fbm or _fbm[0] != "capture_capacity_tco2_per_day" or _fbm[1] != 1:
+        print(f"  FAIL cover-fallback-matcher: co2_capture_capacity_tpd must resolve to the "
+              f"compound-name 'capture_capacity_tco2_per_day' quantity (got {_fbm})"); bad += 1
+    _capture_row = {"target": 1, "achieved": None, "direction": "—", "status": "UNVERIFIED",
+                    "unit": "t/day", "note": "No contract quantity in the same unit family within "
+                                             "±50% of target — cannot auto-verify. (brief key: co2_capture_capacity_tpd)"}
+    _capture_state = {"orchestratorContract": {"quantities": _cover_qs}}
+    if _compliance_row_pass(_capture_row, _capture_state) is not True:
+        print(f"  FAIL cover-recompute fallback-matcher: the delivered 1 t/day capture must VERIFY "
+              f"(got {_compliance_row_pass(_capture_row, _capture_state)})"); bad += 1
+    # (7) proveCatch — a genuinely ABSENT target stays UNVERIFIED (None): no quantity in the
+    # map shares the identity tokens, so the fallback must never guess.
+    _no_match_qs = {"unrelated_pump_flow_m3h": {"value": 12, "unit": "m3/h"},
+                    "site_area_m2": {"value": 4500, "unit": "m2"}}
+    if _cover_fallback_match_quantity("co2_capture_capacity_tpd", "t/day", _no_match_qs) is not None:
+        print("  FAIL cover-fallback-matcher: a genuinely absent target must return None, never guess"); bad += 1
+    if _compliance_row_pass(_capture_row, {"orchestratorContract": {"quantities": _no_match_qs}}) is not None:
+        print("  FAIL cover-recompute fallback-matcher: a genuine gap must stay UNVERIFIED (None)"); bad += 1
+    # (8) proveCatch — omitting `state` entirely preserves ORIGINAL behaviour: the
+    # unverified row stays None, no fallback attempted.
+    if _compliance_row_pass(_capture_row) is not None:
+        print("  FAIL cover-recompute fallback-matcher: omitting `state` must preserve the "
+              "ORIGINAL no-fallback behaviour (None)"); bad += 1
+    # (9) proveCatch — the fallback never fires on a row the upstream matcher already
+    # resolved (a numeric Achieved cell present); it must not override an existing verdict.
+    _already_matched_row = {"target": 8, "achieved": 3, "direction": "≥ target (meet/exceed)",
+                            "status": "FAIL", "unit": "m3/h",
+                            "note": "brief key: ro_permeate_capacity → contract: ro_permeate_capacity_m3_h"}
+    _decoy_qs = {"ro_permeate_capacity_m3_h_alt": {"value": 8, "unit": "m3/h"}}
+    if _compliance_row_pass(_already_matched_row, {"orchestratorContract": {"quantities": _decoy_qs}}) is not False:
+        print("  FAIL cover-recompute fallback-matcher: must NEVER override an already-numeric "
+              "Achieved cell via the fallback matcher"); bad += 1
+
     # (2) _humanize_class display names
     if _humanize_class("bess") != "Battery Energy Storage System":
         print(f"  FAIL humanize bess (got {_humanize_class('bess')})"); bad += 1
