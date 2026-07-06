@@ -11761,7 +11761,20 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   const meaStripperPotDutyKw = 30 * scale          // steam-heated MEA stripper reboil-pot duty
   const shrinkTunnelHeaterKw = 24 * scale          // bagging-line shrink-wrap tunnel heater
   const dryerAirHeaterBatteryKw = dryerHeatDutyKw * 0.9  // CaCO3 dryer's own inlet air-heater battery
-  const hotAirProcessHeaterKw = 2 * dryerHeatDutyKw      // 2 × centralised duct heater (both dryers)
+  // 2026-07-06 fix (two-truths regression from the load-reconcile commit above): this
+  // used to publish the AGGREGATE of both centralised duct heaters (2 × 75 = 150 kW),
+  // but the emitter (co2-mineralisation.ts hot_air_heater_word) prices + rates them as
+  // ×2 individual units at dryerHeatDutyKw ("75 kW each") — every OTHER *_kw quantity
+  // in this file is a single-equipment rating (gypsum_reactor_agitator_kw,
+  // crystalliser_heater_duty_kw, ...), and the deterministic BoM-vs-contract rating
+  // check (scripts/deterministic_checks_lib.py::_checks_rating_equals_quantity) reads
+  // ONE unit's rating out of the BoM requirement text ("75 kW each") and expects the
+  // matching *_kw contract quantity to be that SAME per-unit figure, not a fleet total
+  // (BoM H-102 emitted 75 kW vs the old contract 150 kW). Publish the PER-UNIT rating
+  // here (== dryer_heat_duty_kw, matching the emitted part) and fold the ×2 multiplier
+  // into connectedLoadKw below instead, so the plant-wide total stays the true 150 kW.
+  const hotAirProcessHeaterKw = dryerHeatDutyKw          // ONE centralised duct heater's own rating (×2 fitted)
+  const hotAirProcessHeaterTotalKw = 2 * hotAirProcessHeaterKw  // both centralised duct heaters (both dryers)
   // Electric steam boiler: sized to cover every steam consumer (reboiler + crystalliser heater +
   // MEA stripper pot), same LP-steam latent-heat basis + standard-frame rounding as the emitter's
   // own boiler sizing (thermal_utilities module).
@@ -11775,7 +11788,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   // packaging/drying/steam-utility subsystem above) ─────────────────────────
   const connectedLoadKw =
     meaPumpKw + gypsumAgitatorKw + crystalliserEvapKw + blowerKw +
-    electricSteamGeneratorKw + hotAirProcessHeaterKw + dryerAirHeaterBatteryKw + shrinkTunnelHeaterKw
+    electricSteamGeneratorKw + hotAirProcessHeaterTotalKw + dryerAirHeaterBatteryKw + shrinkTunnelHeaterKw
 
   // ── Operating envelope ────────────────────────────────────────────────────
   const operatingTempMaxC = 120  // amine stripper reboiler loop ceiling (≤120 °C)
@@ -11918,7 +11931,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     // defaults exactly, so publishing them here is a no-op for the emitter today and
     // makes the contract the ONE-MINT source going forward. ──
     dryer_heat_duty_kw: q(dryerHeatDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `75 kW/(t/d) × ${scale.toFixed(2)} scale = ${dryerHeatDutyKw.toFixed(2)} kW hot-air duct-heater duty per dryer (CaCO3 + K2SO4 fluid-bed dryers)` }),
-    hot_air_process_heater_kw: q(hotAirProcessHeaterKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `2 × dryer_heat_duty_kw = ${hotAirProcessHeaterKw.toFixed(2)} kW — the two centralised electric hot-air duct heaters (Thermal Utilities module) serving both drying stages` }),
+    hot_air_process_heater_kw: q(hotAirProcessHeaterKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `= dryer_heat_duty_kw = ${hotAirProcessHeaterKw.toFixed(2)} kW — ONE centralised electric hot-air duct heater's own rating (matches the emitted BoM part, "×2 ... ${hotAirProcessHeaterKw.toFixed(0)} kW each"); the Thermal Utilities module fits ×2 of these (both drying stages) — the plant-wide total (${(2 * hotAirProcessHeaterKw).toFixed(1)} kW) is carried in connected_electrical_load_kw, not this per-unit figure` }),
     dryer_air_heater_battery_kw: q(dryerAirHeaterBatteryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `dryer_heat_duty_kw × 0.9 = ${dryerAirHeaterBatteryKw.toFixed(2)} kW — the CaCO3 dryer's own dedicated inlet air-heater battery (its own MCC feeder, distinct from the centralised hot_air_process_heater_kw pair)` }),
     shrink_tunnel_heater_kw: q(shrinkTunnelHeaterKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `24 kW/(t/d) × ${scale.toFixed(2)} scale = ${shrinkTunnelHeaterKw.toFixed(2)} kW bagging-line shrink-wrap tunnel heater` }),
     crystalliser_heater_duty_kw: q(crystalliserHeaterDutyKw, 'kW', 'power', 'thermal', 'module', 'calculator', { source_detail: `90 kW/(t/d) × ${scale.toFixed(2)} scale = ${crystalliserHeaterDutyKw.toFixed(2)} kW steam-heated crystalliser circulation-heater THERMAL duty (feeds the electric steam boiler's sizing, not a direct electrical draw of its own)` }),
@@ -11943,7 +11956,7 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     // stale relative to the packaging/drying/steam-utility equipment added in later rounds (ATEX
     // fans, dryers, bag-line, electric steam boiler), which the panel-schedule/single-line
     // correctly sum from their own real MCC-fed circuits. Now the honest plant-wide total.
-    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `Σ motor + evaporative duties (MEA pump ${meaPumpKw.toFixed(2)} + gypsum agitator ${gypsumAgitatorKw.toFixed(2)} + crystalliser evap ${crystalliserEvapKw.toFixed(2)} + flue-gas blower ${blowerKw.toFixed(2)}) + packaging/drying/steam-utility electrical loads (electric steam generator ${electricSteamGeneratorKw.toFixed(0)} + hot-air process heater ×2 ${hotAirProcessHeaterKw.toFixed(1)} + dryer air-heater battery ${dryerAirHeaterBatteryKw.toFixed(1)} + shrink-wrap tunnel heater ${shrinkTunnelHeaterKw.toFixed(1)}) = ${connectedLoadKw.toFixed(1)} kW` }),
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `Σ motor + evaporative duties (MEA pump ${meaPumpKw.toFixed(2)} + gypsum agitator ${gypsumAgitatorKw.toFixed(2)} + crystalliser evap ${crystalliserEvapKw.toFixed(2)} + flue-gas blower ${blowerKw.toFixed(2)}) + packaging/drying/steam-utility electrical loads (electric steam generator ${electricSteamGeneratorKw.toFixed(0)} + hot-air process heater ×2 × ${hotAirProcessHeaterKw.toFixed(1)} each = ${hotAirProcessHeaterTotalKw.toFixed(1)} + dryer air-heater battery ${dryerAirHeaterBatteryKw.toFixed(1)} + shrink-wrap tunnel heater ${shrinkTunnelHeaterKw.toFixed(1)}) = ${connectedLoadKw.toFixed(1)} kW` }),
     operating_temperature_max_c: q(operatingTempMaxC, '°C', 'temperature', 'max', 'system', 'physics_constant', { source_detail: 'amine stripper reboiler loop ceiling ≤120 °C' }),
     // Total skid gross mass — renderer compliance-table mass row + gate 17.
     total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up: absorber ~1.3 t + stripper ~0.95 t + reactors/crystalliser ~1.5 t + balance-of-plant/skid/piping ~7 t + bagging ~1.5 t' }),

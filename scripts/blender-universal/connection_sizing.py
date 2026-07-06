@@ -1125,6 +1125,22 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
 
     if best is not None:
         n_par, res = best
+        # 2026-07-06 fix (CORE FIX PRINCIPLE — source rule, not the data point):
+        # `n_par` here was the REQUESTED parallel-run count from the outer sweep
+        # (always 1 — electrical_cable_sizing.py never returns an "error" for a
+        # high current; it auto-escalates n_parallel INTERNALLY up to
+        # MAX_PARALLEL rather than failing, per its own module docstring "AUTO-
+        # ESCALATE the number of parallel conductor runs"). Using the requested
+        # value instead of the tool's own answer silently dropped the "×N
+        # parallel" multiplier: a 777.3 A crystalliser-circulation-heater
+        # feeder that the tool sized as 2 parallel runs of 185 mm² (392 A/run
+        # × 2 = 784 A >= 777.3 A — correctly adequate) was mislabelled/priced/
+        # ampacity-checked as a SINGLE 185 mm² run (392 A — ~2x undersized),
+        # tripping the deterministic ampacity-floor check (185 mm² vs the
+        # single-conductor-equivalent 630 mm² the check expects). Universal:
+        # every electrical_bus edge sized here goes through this same path, not
+        # a per-cable special case. Read the tool's OWN selected n_parallel.
+        n_par = int(_f(res.get("n_parallel"), n_par) or n_par)
         csa = _f(res.get("main_feeder_cable_csa_mm2"))
         mv_per_a_m = _f(res.get("mv_per_a_m"))
         # REAL volt-drop over the CAD run length (the tool already did this, but
