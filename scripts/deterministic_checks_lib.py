@@ -395,6 +395,14 @@ def _checks_rating_equals_quantity(rb: List[dict], quantities: Dict[str, Any]
             continue
         req = str(row.get("requirement", ""))
         name = (str(row.get("part", "")) + " " + req).lower()
+        # SKIP connection/transfer rows ("<service> connection: A → B · NN kW"): their
+        # kW is a downstream DUTY on a pipe/cable run, not an equipment's own rating, so
+        # matching it against a '<stem>_kw' equipment quantity is a name-collision
+        # false-positive (co2 C06: a steam→reboiler connection's 49.22 kW steam draw
+        # mis-matched electric_steam_generator_kw=230, the real boiler's own rating on a
+        # SEPARATE BoM line). Mirrors the panel-schedule connection-row exclusion.
+        if re.search(r"\bconnection\b|→|->", name):
+            continue
         # extract the FIRST motor/shaft kW figure in the requirement, if any
         m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*kw\s*(?:motor|shaft|rated)?", req, re.IGNORECASE)
         if not m:
