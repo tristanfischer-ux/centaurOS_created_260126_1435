@@ -238,6 +238,31 @@ def _metric_direction(name, category) -> str:
     return "close"
 
 
+# A FEEDSTOCK/CONSUMPTION metric (how much raw material the design draws in to hit its
+# output, e.g. koh_feed_tpd) is a DERIVED quantity, not a performance floor: the design's
+# achieved feed rate is correct when it matches the stoichiometric/process requirement,
+# and a brief that states the figure as an APPROXIMATION ('approximately 2.6 t/day')
+# is disclosing that the number is not exact. A capacity/output/rated PERFORMANCE metric
+# is the opposite — it is the thing being sold, and stays on the tight tolerance even
+# when the brief also hedges it with 'approximately'. Universal: keyed off the metric's
+# own name tokens, never a class table; the performance regex wins any token overlap so
+# a name can never accidentally qualify for both.
+_FEEDSTOCK_METRIC_RX = re.compile(
+    r"\b(feed|feedstock|consum|reagent|dos(?:e|ing)|makeup|make_up|intake|uptake|input)\b", re.I)
+_HARD_PERFORMANCE_METRIC_RX = re.compile(
+    r"\b(capacity|output|throughput|yield|product|rated|nameplate|power|voltage|current|"
+    r"efficiency|energy|duty|captur\w*)\b", re.I)
+
+
+def _is_feedstock_metric(name) -> bool:
+    """True for a feedstock/raw-material CONSUMPTION metric name; false for a hard
+    performance/output floor even when a token would otherwise overlap. Metric names are
+    snake_case (koh_feed_tpd) — underscores are \\w characters so \\b never breaks on
+    them; fold to spaces first so the word-bounded regexes actually see token edges."""
+    text = re.sub(r"[_\-]+", " ", str(name or ""))
+    return bool(_FEEDSTOCK_METRIC_RX.search(text)) and not _HARD_PERFORMANCE_METRIC_RX.search(text)
+
+
 def _num(x):
     """Coerce to float if possible, else None."""
     if x is None:
@@ -1131,6 +1156,34 @@ def _brief_scope_qualified(state, metric_value) -> bool:
     return False
 
 
+# An APPROXIMATION hedge on a brief-stated figure — 'approximately', 'approx.', '~',
+# 'about', 'roughly' — placed near the cited number. When the brief itself discloses a
+# value as approximate, a feedstock/consumption metric (see _is_feedstock_metric above)
+# gets a widened tolerance band instead of the tight 2% "meets" check: see
+# check_brief_metric_fail. This mirrors _brief_scope_qualified's window-around-the-
+# cited-value technique (same _brief_value_reprs helper) rather than reinventing it.
+_APPROX_RX = re.compile(r"~|\bapprox(?:imately|\.)?\b|\babout\b|\broughly\b", re.I)
+
+
+def _brief_value_approximated(state, metric_value) -> bool:
+    """True when the brief's own text, within a short window of THIS metric's cited
+    target value, hedges it with an approximation word — i.e. the brief itself states
+    the figure is not exact."""
+    reps = _brief_value_reprs(metric_value)
+    if not reps:
+        return False
+    pb = state.get("parsedBrief") or {}
+    for text in (pb.get("original_text"), pb.get("revised_text")):
+        if not isinstance(text, str) or not text:
+            continue
+        for rep in reps:
+            for m in re.finditer(re.escape(rep), text):
+                window = text[max(0, m.start() - 40): m.start()]
+                if _APPROX_RX.search(window):
+                    return True
+    return False
+
+
 def _contract_match(state, metric_name, metric_unit, metric_value=None):
     """
     Return (key, value) of a contract quantity that FULFILS the brief metric (same unit
@@ -1885,10 +1938,25 @@ def check_brief_metric_fail(state, rows, run_dir) -> list:
     achieved value MEETS the target (respecting direction). Emit HIGH on a real
     design miss (e.g. dc_bus_voltage_v target 1500 V, achieved 800 V). The existing
     audit only ever flags UNVERIFIED — it never catches a value that is present but
-    fails the brief."""
+    fails the brief.
+
+    FEEDSTOCK-APPROXIMATION RELIEF (2026-07-06, CO2-mineralisation KOH false miss): a
+    feedstock/consumption metric (koh_feed_tpd) is a DERIVED quantity — the stoichiometric
+    amount of raw material the design draws to hit its stated output — not a performance
+    floor. When the brief's own prose hedges the cited figure with 'approximately'/
+    'approx'/'~'/'about'/'roughly' (_brief_value_approximated), a near-miss under the
+    tight 2% band is widened to a ±5% tolerance before it is allowed to gate: 2.54 t/day
+    achieved vs an approximate 2.6 t/day target (2.3% gap, the correct stoichiometric
+    2*(3900/174)*56 for 3.9 t/day K2SO4) is COMPLIANT, not a HIGH. A genuinely short
+    feedstock (>5% out) still fails; a hard, non-approximate target, or a capacity/output
+    performance metric that merely happens to ALSO be hedged with 'approximately' in the
+    brief, both stay on the tight 2% band — the relief is scoped to feedstock/consumption
+    names only (_is_feedstock_metric) and only fires when the brief discloses the
+    approximation itself. proveCatch (both directions) in _selftest."""
     tab = "Exec Summary / Checks"
     out: list = []
     TOL = 0.02  # 2% tolerance for "meets" on equality/close metrics
+    APPROX_TOL = 0.05  # 5% tolerance for a brief-disclosed approximate feedstock metric
     for m in _brief_metrics(state):
         name = _metric_name(m)
         if not name:
@@ -1915,6 +1983,11 @@ def check_brief_metric_fail(state, rows, run_dir) -> list:
             meets = achieved <= target * (1 + TOL)
         else:  # close
             meets = abs(achieved - target) <= abs(target) * TOL or target == 0
+        if not meets and _is_feedstock_metric(name) and _brief_value_approximated(state, target):
+            # The brief itself discloses this feedstock/consumption figure as
+            # approximate — widen to a ±5% band; a genuine under/over-consumption
+            # outside that band still fails below.
+            meets = abs(achieved - target) <= abs(target) * APPROX_TOL or target == 0
         if not meets:
             u = str(unit or "").strip()
             out.append(Finding(
@@ -4099,6 +4172,68 @@ def _selftest() -> int:
     expect(any(f.check == "brief_metric_fail" for f in _miss_findings),
            "a scope-matched battery_only quantity that STILL misses the brief's £63/kWh target "
            "must surface as a HIGH brief_metric_fail, never be silently rescued to a PASS")
+
+    # ---- feedstock/consumption approximate-tolerance (2026-07-06, CO2-mineralisation ----
+    # KOH false brief-miss): 'brief metric koh_feed_tpd: target 2.6 t/day but design
+    # achieves 2.54 t/day' was flagging as a HIGH — but KOH is a DERIVED feedstock
+    # consumption (2.54 t/day is the correct stoichiometric amount for 3.9 t/day K2SO4:
+    # 2*(3900/174)*56 = 2.51-2.54 t/day) and the brief states the figure as
+    # 'approximately 2.6 t/day'. proveCatch, four directions.
+    _koh_state = {
+        "parsedBrief": {
+            "original_text": (
+                "Feedstocks: gypsum (approximately 3.1 t/day), potassium hydroxide "
+                "(approximately 2.6 t/day), process water"
+            ),
+            "constraints": {"target_performance": {"metrics": [
+                {"key_metric": "koh_feed_tpd", "value": 2.6, "unit": "t/day", "category": "scale"},
+            ]}},
+        },
+        "orchestratorContract": {"quantities": {
+            "koh_feed_t_per_day": {"value": 2.54, "unit": "t/day", "family": "mass"},
+        }},
+    }
+    # Direction 1: 2.54 vs an approximate 2.6 target (2.3% gap) is COMPLIANT, not a HIGH.
+    _koh_findings = check_brief_metric_fail(_koh_state, [], "")
+    expect(not _koh_findings,
+           f"a feedstock metric (2.54 vs approx-2.6 target, 2.3% gap) hedged by the "
+           f"brief's own 'approximately' must be COMPLIANT, not a HIGH miss — got "
+           f"{[f.message for f in _koh_findings]!r}")
+    # Direction 2: a genuinely-short feedstock (20% under) still FAILS — the tolerance
+    # is a band, not a blanket rescue of every feedstock metric.
+    _koh_short = json.loads(json.dumps(_koh_state))
+    _koh_short["orchestratorContract"]["quantities"]["koh_feed_t_per_day"]["value"] = 2.08
+    expect(any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_koh_short, [], "")),
+           "a feedstock 20% short of its approximate brief target must still FAIL")
+    # Direction 3: a HARD, non-approximate feedstock target (the brief states it exactly,
+    # no 'approximately'/'~'/'about'/'roughly' near the value) stays on the tight 2% band
+    # — the relief never fires without the brief's own hedge.
+    _koh_hard = json.loads(json.dumps(_koh_state))
+    _koh_hard["parsedBrief"]["original_text"] = (
+        "Feedstocks: gypsum (3.1 t/day), potassium hydroxide (exactly 2.6 t/day), process water")
+    expect(any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_koh_hard, [], "")),
+           "a feedstock target the brief states WITHOUT an approximation hedge must stay "
+           "on the tight 2% tolerance (2.54 vs 2.6 is a 2.3% gap, outside 2%)")
+    # Direction 4: a HARD PERFORMANCE metric (output/capacity) stays on the tight 2% band
+    # even though the brief ALSO hedges it with 'approximately' — the relief is scoped to
+    # feedstock/consumption names, it must never leak to a capacity/output floor.
+    _output_state = {
+        "parsedBrief": {
+            "original_text": (
+                "Product output: approximately 2.3 t/day precipitated calcium carbonate "
+                "and approximately 3.9 t/day potassium sulfate"
+            ),
+            "constraints": {"target_performance": {"metrics": [
+                {"key_metric": "caco3_output_tpd", "value": 2.3, "unit": "t/day", "category": "scale"},
+            ]}},
+        },
+        "orchestratorContract": {"quantities": {
+            "caco3_output_t_per_day": {"value": 2.24, "unit": "t/day", "family": "mass"},
+        }},
+    }
+    expect(any(f.check == "brief_metric_fail" for f in check_brief_metric_fail(_output_state, [], "")),
+           "an OUTPUT/capacity metric must stay on the tight 2% tolerance even when the "
+           "brief also says 'approximately' — the feedstock relief must not leak to output metrics")
 
     # ---- civil-works exclusion must not catch in-scope equipment structure (2026-07-05) ----
     # proveCatch direction 1: a container's OWN internal structural item (in-scope equipment

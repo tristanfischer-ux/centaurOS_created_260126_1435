@@ -741,31 +741,47 @@ def audit_completeness(parts, final_topology, required_services, log=print):
     pipe). Returns a list of {part, missing[], connects_from[], connects_to[],
     services_present[]}. Exempts recognised fluid origins / sinks (one legitimate
     direction) and dry material-handling ancillaries (no process-water need at all)."""
+    # NAME-FORMAT-INSENSITIVE indexing (2026-07-06, the CO2-mineralisation "CaCO3
+    # hot-air dryer" false concern): the topology's edges are stamped with a part's
+    # WIRING-time name string, but the `parts` list this function iterates can carry a
+    # DIFFERENTLY-FORMATTED display name for the identical equipment tag (case /
+    # hyphen / spacing drift — the ledger's own adjacency showed 'caco3 hot air dryer'
+    # fully wired with 4 inputs + 3 outputs while the completeness audit, keyed on the
+    # exact string 'CaCO3 hot-air dryer', saw zero of either and flagged a fully-
+    # connected part as an orphan). Index + look up every fluid/service map by
+    # `_norm_name` (the SAME case/punctuation-insensitive key finalize_ledger already
+    # trusts for self-loop identity, just above) instead of the raw string, so a
+    # formatting-only drift between the wiring name and the audited name can never
+    # manufacture a false completeness concern. `connects_from`/`connects_to` still
+    # report the original, human-readable edge endpoint strings — only the MEMBERSHIP
+    # test is normalised. proveCatch in _selftest (both directions: a format-drifted
+    # wired part passes; a genuinely-unwired part of the same name still fails).
     fluid_in, fluid_out, svc_have = {}, {}, {}
     for e in final_topology:
         f, t = e.get("from_part"), e.get("to_part")
         svc = e.get("_ledger_service") or _service_of(e.get("mechanism"))
         if svc in ("water", "thermal"):
             if t:
-                fluid_in.setdefault(t, []).append(f)
+                fluid_in.setdefault(_norm_name(t), []).append(f)
             if f:
-                fluid_out.setdefault(f, []).append(t)
+                fluid_out.setdefault(_norm_name(f), []).append(t)
         for endp in (f, t):
             if endp:
-                svc_have.setdefault(endp, set()).add(svc)
+                svc_have.setdefault(_norm_name(endp), set()).add(svc)
 
     concerns = []
     for p in parts:
         nm = getattr(p, "name", None) or (p.get("name") if isinstance(p, dict) else None)
         if not nm:
             continue
+        key = _norm_name(nm)
         mod = getattr(p, "module_id", "") or (p.get("module_id") if isinstance(p, dict) else "") or ""
         fn = getattr(p, "function", "") or (p.get("function") if isinstance(p, dict) else "") or ""
         try:
             req = set(required_services(nm, mod, fn) or set())
         except Exception:
             req = set()
-        has = svc_have.get(nm, set())
+        has = svc_have.get(key, set())
         missing = []
         for s in req:
             if s == "water":
@@ -776,8 +792,8 @@ def audit_completeness(parts, final_topology, required_services, log=print):
                 and not _SUBCOMPONENT_RE.search(nm) and not _AIR_MOVER_RE.search(nm)):
             # (sub-components are part of a parent; air-movers carry air — neither is a
             #  standalone process-water node, so neither needs its own water in+out)
-            has_in = nm in fluid_in
-            has_out = nm in fluid_out
+            has_in = key in fluid_in
+            has_out = key in fluid_out
             # an origin OR an injector supplies the loop (output only, no bulk-water inlet);
             # a sink receives it (input only); an inline tap (valve/meter) sits ON the line.
             is_origin = bool(_FLUID_ORIGIN_RE.search(nm)) or bool(_INJECTOR_RE.search(nm))
@@ -796,8 +812,8 @@ def audit_completeness(parts, final_topology, required_services, log=print):
             concerns.append({
                 "part": nm,
                 "missing": missing,
-                "connects_from": sorted(set(x for x in fluid_in.get(nm, []) if x))[:6],
-                "connects_to": sorted(set(x for x in fluid_out.get(nm, []) if x))[:6],
+                "connects_from": sorted(set(x for x in fluid_in.get(key, []) if x))[:6],
+                "connects_to": sorted(set(x for x in fluid_out.get(key, []) if x))[:6],
                 "services_present": sorted(has),
             })
     if concerns:
@@ -2013,6 +2029,35 @@ def _selftest():
     # still be flagged for missing-OUTPUT if it supplies nothing (correct).
     assert "fluid-input" not in by.get("Make-up Water System", []), \
         "make-up origin must be exempt from missing-input (hyphen regex)"
+
+    # NAME-FORMAT-INSENSITIVE completeness proveCatch (2026-07-06, CO2-mineralisation
+    # 'CaCO3 hot-air dryer' false concern): a part fully wired under one string ('caco3
+    # hot air dryer', the wiring-time name) must NOT be flagged an orphan merely because
+    # the `parts` list carries a differently-CASED/PUNCTUATED display name for the same
+    # equipment ('CaCO3 hot-air dryer') — both directions proven.
+    class _PD:
+        def __init__(self, name, mod="mass_fluid_transport_process"):
+            self.name, self.module_id, self.function = name, mod, ""
+    drift_topo = [
+        {"from_part": "stirred carbonation reactor", "to_part": "caco3 hot air dryer",
+         "mechanism": "fluid_loop"},
+        {"from_part": "caco3 hot air dryer", "to_part": "filter vacuum pump",
+         "mechanism": "fluid_loop"},
+    ]
+    drift_parts = [_PD("CaCO3 hot-air dryer"), _PD("stirred carbonation reactor"),
+                   _PD("filter vacuum pump")]
+    drift_concerns = audit_completeness(drift_parts, drift_topo, req_svc, log=lambda *a: None)
+    assert not any(c["part"] == "CaCO3 hot-air dryer" for c in drift_concerns), \
+        (f"a part wired under a case/hyphen-drifted name string must not be flagged an "
+         f"orphan — got {drift_concerns}")
+    # proveCatch direction 2: a part of the SAME (drifted) name that is genuinely
+    # unwired — no edges anywhere in the topology under any spelling — must still fail.
+    orphan_concerns = audit_completeness(
+        [_PD("CaCO3 hot-air dryer")], [], req_svc, log=lambda *a: None)
+    assert any(c["part"] == "CaCO3 hot-air dryer" and
+               {"fluid-input", "fluid-output"} <= set(c["missing"]) for c in orphan_concerns), \
+        (f"a genuinely unwired part must still be flagged missing both directions — "
+         f"got {orphan_concerns}")
 
     # close_flow_directions: a flow-through part with an output but no input gets fed from
     # its nearest process-upstream source (lower region_rank), never guessed.
