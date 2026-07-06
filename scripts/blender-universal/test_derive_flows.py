@@ -159,18 +159,76 @@ check(B.MECH_COLOUR["fluid_supply"] != B.MECH_COLOUR["fluid_return"],
       "fluid_supply colour != fluid_return colour (two distinct lines)")
 
 
-# ── 5. RICH topology DEFERS (e-fuel): no fluid/thermal loop derived ──────────
-print("[5] rich topology (≥6 edges) defers")
-topo_rich = [{"mechanism": "fluid_loop", "from_part": f"a{i}", "to_part": f"b{i}"}
+# ── 5. RICH topology DEFERS when it is genuinely ROUTABLE (Codema/CO2-shaped): many
+#      fluid/thermal edges whose BOTH endpoints are PLACED real parts — no
+#      fluid/thermal loop is derived (only the always-on electrical fan-out). This
+#      is the 2026-07-06 fix target: `rich` now counts ROUTABLE fluid/thermal edges
+#      (resolve_endpoint + placed_xyz_mm on both ends), never the raw ledger length —
+#      see [5b] for the BESS-shaped proveCatch this replaces (a mostly-electrical
+#      ledger with unresolved fluid edges must NOT read as rich).
+print("[5] rich topology (>=6 ROUTABLE fluid/thermal edges) defers")
+# 9 distinct PLACED process-vessel-style parts chained into 8 genuinely-resolvable
+# fluid/thermal edges — a real process-water/steam loop already drawn, Codema/CO2-
+# shaped (their process_plant path resolves + routes every one of these directly).
+_rich_chain = ["feed pump", "reactor vessel", "separator drum", "steam generator",
+               "product cooler", "condensate tank", "return header",
+               "storage vessel", "export pump"]
+parts_richflow = [_part(nm, placed=(i * 1000.0, 0.0, 2000.0))
+                  for i, nm in enumerate(_rich_chain)]
+topo_rich = [{"mechanism": "fluid_loop" if i % 2 == 0 else "thermal",
+              "from_part": _rich_chain[i], "to_part": _rich_chain[i + 1]}
              for i in range(8)]
+check(B._n_routable_fluid_thermal_edges(topo_rich, parts_richflow) == 8,
+      "all 8 chained edges are genuinely routable (both endpoints resolve + placed)")
 # even with rack consumers + a reservoir present, a rich topology must NOT derive a
 # fluid/thermal loop (only the electrical fan-out, and only if an electrical hub).
-derived_rich = B.derive_flows(parts_vf, racks_vf, topo_rich, _mechs("electrical", "fluid", "thermal"),
+derived_rich = B.derive_flows(parts_richflow, racks_vf, topo_rich, _mechs("electrical", "fluid", "thermal"),
                               hubs=hubs_vf, collectors=collectors_vf)
 check(not any(d["mech"] in ("fluid_supply", "fluid_return", "thermal", "thermal_return")
               for d in derived_rich),
       "rich topology derives NO fluid/thermal loop (defers to the explicit graph)")
 check(B.DERIVE_RICH_TOPOLOGY_EDGES == 6, "rich-topology threshold = 6 edges")
+
+
+# ── 5b. proveCatch — the exact BESS shape: a ledger DOMINATED by electrical_bus +
+#      unresolved/rack-aggregate fluid_loop entries (mostly-electrical, few REAL
+#      routable fluid edges) must NOT read as rich (the 2026-07-06 false-rich fix:
+#      the OLD predicate counted raw len(explicit_topology) — 62 >= 6 would have
+#      wrongly deferred and the coolant fan-out below would never have run). ──────
+print("[5b] proveCatch: mostly-electrical ledger with unresolved fluid edges -> NOT rich")
+parts_bess_shaped = [
+    _part("DC busbar 1500 V", placed=(0.0, 0.0, 2400.0)),
+    _part("liquid cooling chiller", placed=(6000.0, 1200.0, 2400.0)),
+    # 'cold plate manifold' / 'expansion tank' deliberately UNPLACED — host-mounted
+    # into a rack/BoP skid, exactly like the real BESS ledger (never given their own
+    # placed_xyz_mm), so resolve_endpoint finds the Part but the routability gate
+    # (placed_xyz_mm is not None) correctly fails it.
+    _part("cold plate manifold"), _part("expansion tank"),
+]
+topo_bess_shaped = (
+    # a big electrical_bus block of rack-aggregate candidates, like the real ledger.
+    [{"mechanism": "electrical_bus", "from_part": "lfp_cell_string", "to_part": "dc_bus"}
+     for _ in range(60)]
+    # a handful of fluid_loop edges that never resolve to two PLACED parts — the
+    # real BESS shape (chiller/tank -> the un-placed cold-plate manifold).
+    + [{"mechanism": "fluid_loop", "from_part": "liquid cooling chiller",
+        "to_part": "cold plate manifold"},
+       {"mechanism": "fluid_loop", "from_part": "expansion tank",
+        "to_part": "cold plate manifold"}]
+)
+check(len(topo_bess_shaped) >= B.DERIVE_RICH_TOPOLOGY_EDGES,
+      f"raw ledger size alone ({len(topo_bess_shaped)}) would have been "
+      f"'>= threshold' under the OLD buggy len()-based predicate")
+check(B._n_routable_fluid_thermal_edges(topo_bess_shaped, parts_bess_shaped) == 0,
+      "CATCH: zero genuinely-routable fluid/thermal edges (both fluid_loop edges "
+      "name an unplaced manifold) — the OLD raw-length check would have wrongly "
+      "called this ledger RICH")
+derived_bess_shaped = B.derive_flows(
+    parts_bess_shaped, racks[:3], topo_bess_shaped, _mechs("electrical", "thermal"),
+    hubs={"thermal": ("chiller", (11000.0, 1500.0, 2400.0))})
+check(any(d["mech"] == "thermal" for d in derived_bess_shaped),
+      "CATCH: correctly NOT rich -> the thermal fan-out actually runs and derives "
+      "chiller -> rack coolant drops (this is what was silently skipped on real BESS)")
 
 
 # ── 6. no consumers ⇒ no derivation (process-plant has no rack anchors) ───────

@@ -6473,10 +6473,58 @@ def write_connection_schedule(out_dir):
 # bus the topology omitted). So e-fuel stays essentially unchanged.
 # ───────────────────────────────────────────────────────────────────────────
 
-# A topology with at least this many explicit edges is RICH (a real process-flow
-# graph). We defer to it: derive only a missing electrical fan-out, never a full
-# supply/return loop. e-fuel ships 8; BESS/VF/edge-AI ship 3/3/5.
+# A topology with at least this many genuinely-ROUTABLE fluid/thermal edges is RICH
+# (a real process-flow graph already drawn). We defer to it: derive only a missing
+# electrical fan-out, never a full supply/return loop. e-fuel ships 8; CO2/Codema's
+# process-water/steam loops ship many more. See _n_routable_fluid_thermal_edges below
+# for what "routable" means (2026-07-06 fix — was a raw len(explicit_topology) count,
+# see its docstring for the BESS false-rich this replaces).
 DERIVE_RICH_TOPOLOGY_EDGES = 6
+
+# Mechanism strings that belong to a FLUID or THERMAL flow loop (never electrical) —
+# the family split every derive/rich rule in this module already uses (_FAMILY_MECHS
+# below mirrors this the other way: family -> mechs).
+_FLUID_THERMAL_MECHS = frozenset((
+    "fluid_loop", "fluid", "fluid_supply", "fluid_return", "thermal", "thermal_return",
+))
+
+
+def _n_routable_fluid_thermal_edges(explicit_topology, parts):
+    """Count explicit-topology edges that are GENUINELY ROUTABLE right now: a
+    fluid/thermal-family mechanism whose BOTH endpoints resolve (resolve_endpoint) to
+    a PLACED part (placed_xyz_mm is not None) — i.e. a real pipe could be drawn
+    between them today, with no derived synthesis needed.
+
+    THIS is the rich-topology predicate `derive_flows` gates on (2026-07-06 fix). The
+    OLD predicate counted `len(explicit_topology)` — the RAW finalized ledger size —
+    which conflates every mechanism (mostly electrical_bus on a rack farm) and every
+    resolution outcome (many entries are UNRESOLVED tags or rack-aggregate/BoP-anchor
+    candidates the resolve loop drops moments later; see place_rack_farm's
+    `_route_rack_farm_topology`). On BESS that raw count was 72 >= 6 ⇒ falsely RICH,
+    so the coolant-loop fan-out below never ran and the manifold→cold-plate drops
+    never routed (material_diversity stuck at 1). The count here walks the SAME
+    resolve_endpoint + placed_xyz_mm check `_route_rack_farm_topology._resolve` and
+    `route_topology` both already use to decide "is this edge drawable" — so it is
+    ZERO for BESS (its only fluid_loop endpoints are 'cold plate manifold' /
+    'expansion tank' / etc., all HOST-MOUNTED into a rack or a BoP skid, never
+    individually placed) and stays large for a plant whose fluid/thermal loop is
+    already a faithful drawn schematic (Codema/CO2 — many resolvable, placed
+    process-water/steam vessel-to-vessel edges). Universal — no archetype table, no
+    mechanism special-casing beyond the family split every other rich/derive rule in
+    this module already uses."""
+    n = 0
+    for e in (explicit_topology or []):
+        if e.get("mechanism") not in _FLUID_THERMAL_MECHS:
+            continue
+        pa = resolve_endpoint(str(e.get("from_part") or ""), parts)
+        if pa is None or pa.placed_xyz_mm is None:
+            continue
+        pb = resolve_endpoint(str(e.get("to_part") or ""), parts)
+        if pb is None or pb.placed_xyz_mm is None:
+            continue
+        n += 1
+    return n
+
 
 # ── ROLE detectors — robust, mechanism-scoped (NOT brittle exact regexes). A HUB
 #    is a DISTRIBUTION / SOURCE-named part of a mechanism that has many consumers;
@@ -6643,7 +6691,11 @@ def derive_flows(parts, consumer_anchors, explicit_topology, mechanisms_present,
     collectors = collectors or {}
     derived = []
     n_explicit = len(explicit_topology or [])
-    rich = n_explicit >= DERIVE_RICH_TOPOLOGY_EDGES
+    n_routable_ft = _n_routable_fluid_thermal_edges(explicit_topology, parts)
+    rich = n_routable_ft >= DERIVE_RICH_TOPOLOGY_EDGES
+    print(f"[univ][derive_flows] rich={rich} (routable fluid/thermal edges="
+          f"{n_routable_ft}, raw ledger size={n_explicit}, threshold="
+          f"{DERIVE_RICH_TOPOLOGY_EDGES})")
     next_i = [10_000]   # synthetic edge indices (well above any real topology index)
 
     # ── RATING the derived fan-out from the parent explicit edge. The sparse topology
