@@ -2467,6 +2467,11 @@ try:
             'achieved': (matched[1] if matched else None),
         })
     out['compliance_rows'] = rows
+    # 2026-07-06: expose the brief prose + raw quantities so the TS
+    # buildBriefComplianceSection ctx can engage the feedstock-approximation relief
+    # (koh_feed_tpd) + the fallback matcher (co2_capture_capacity_tpd → tco2 naming).
+    out['brief_text'] = brief_text
+    out['quantities'] = quantities
 except Exception as e:
     out['errors'].append('brief_compliance: %s' % e)
 try:
@@ -2792,7 +2797,11 @@ function computeQualityScorecard(state: any): QualityScorecard {
       console.error(`[chain] ⚠ deterministic-section probe error: ${e}`)
     }
     if (Array.isArray(probe.compliance_rows) && probe.compliance_rows.length > 0) {
-      const bc = buildBriefComplianceSection(probe.compliance_rows as ComplianceRowInput[])
+      const bc = buildBriefComplianceSection(probe.compliance_rows as ComplianceRowInput[], {
+        briefText: typeof probe.brief_text === 'string' ? probe.brief_text : undefined,
+        quantities:
+          probe.quantities && typeof probe.quantities === 'object' ? probe.quantities : undefined,
+      })
       sections.push({ name: bc.name, score: bc.score, defects: bc.defects ?? [] })
     }
     if (Array.isArray(probe.surviving_highs)) {
