@@ -487,11 +487,78 @@ def main() -> int:
           cost_dc["line_total_gbp"] > 5.0 * cost_drip["line_total_gbp"])
 
     # 10d. Stainless pipe costs MORE than the same DN in carbon steel (material factor).
+    # (Baseline is a genuinely non-coolant, non-water, non-oxidiser service — a thermal
+    # OIL heat-transfer loop, same liquid density bucket so the DN matches — since
+    # DEFECT-2 below makes EFUEL_THERMAL's own "water/glycol coolant" context resolve to
+    # stainless BY DEFAULT, so it is no longer a carbon-steel baseline to compare an
+    # explicit stainless callout against.)
+    cs_edge = dict(EFUEL_THERMAL); cs_edge["material_context"] = "thermal oil heat-transfer loop"
+    c_cs = cs.size_connection_to_spec(cs_edge, 20.0)
+    cost_cs = cs.connection_cost(c_cs)
     ss_edge = dict(EFUEL_THERMAL); ss_edge["material_context"] = "316L stainless coolant"
     c_ss = cs.size_connection_to_spec(ss_edge, 20.0)
     cost_ss = cs.connection_cost(c_ss)
     check("316L stainless pipe £/m > carbon-steel pipe £/m (material factor)",
-          cost_ss["unit_cost_gbp"] > cost_thermal["unit_cost_gbp"])
+          cost_ss["unit_cost_gbp"] > cost_cs["unit_cost_gbp"])
+
+    # ---- DEFECT-2 (BESS liquid-cooling loop, 2026-07-06): a COOLANT/GLYCOL service must
+    # NOT default to a uniform carbon-steel pipe — a real BESS/CO2/SAF coolant loop is
+    # STAINLESS on the hard header/riser run (glycol corrodes carbon steel) and a FLEXIBLE
+    # EPDM HOSE on the short manifold->cold-plate/module drop (role == 'branch'). Keyed on
+    # the SERVICE text + the CONNECTION ROLE, never a class table — so it fires
+    # identically for a BESS rack loop and a CO2/SAF chiller circuit, and is a strict
+    # no-op for a plain process-water/process-fluid tie. ----
+    def _mat_role(mc, role=None):
+        return cs._pipe_material_factor(mc, role=role)[1]
+    print("\nDEFECT-2 coolant/glycol liquid-cooling material resolution:")
+    check("EFUEL_THERMAL's own 'water/glycol coolant' context -> stainless BY DEFAULT "
+          "(was carbon steel pre-fix)",
+          "stainless" in cost_thermal["cost_basis"].lower())
+    check("glycol coolant, hard run (no role / trunk) -> stainless steel",
+          "stainless" in _mat_role("water/glycol coolant"))
+    check("glycol coolant, trunk role -> stainless steel",
+          "stainless" in _mat_role("glycol coolant distribution header", role="trunk"))
+    check("glycol coolant, BRANCH role (manifold->cold-plate drop) -> EPDM flexible hose",
+          "epdm" in _mat_role("coolant distribution manifold", role="branch").lower())
+    check("bare 'coolant' token (no glycol) still detected, hard run -> stainless",
+          "stainless" in _mat_role("chiller coolant supply"))
+    check("'chilled glycol' service -> stainless (coolant family, not a water main)",
+          "stainless" in _mat_role("chilled glycol loop"))
+    # counter-cases: the widening must be a STRICT no-op on a plain water/process tie.
+    check("NO-OP: 'chilled water' (genuine water, no glycol/coolant token) stays HDPE",
+          "HDPE" in _mat_role("chilled water supply"))
+    check("NO-OP: generic process-water tie-in (the BESS closer default) stays HDPE, "
+          "NOT reclassified as coolant",
+          "HDPE" in _mat_role("process-water service tie-in (make-up / fill / drain)"))
+    check("NO-OP: plain nutrient water (VF drip) stays HDPE",
+          "HDPE" in _mat_role("nutrient water"))
+    check("NO-OP: an explicit HDPE/plastic callout on a coolant tie still wins outright "
+          "(rule 1 beats rule 2)",
+          "plastic" in _mat_role("HDPE glycol coolant line"))
+    # BOILERPLATE-FALSE-POSITIVE proveCatch (found + fixed live during this task): a
+    # CONTEXTLESS thermal edge (no material_context at all — exactly the BESS PCS ->
+    # heat_rejection route) must stay at the honest carbon-steel default through
+    # connection_cost()'s post-sizing material re-derivation, NOT get misread as
+    # coolant service purely because size_connection_to_spec's own generic assumptions
+    # text says "thermal duty -> coolant flow -> pipe" for EVERY thermal edge.
+    contextless_thermal = {"from_part": "pcs", "to_part": "heat_rejection",
+                            "mechanism": "thermal", "constraint_kind": "thermal_rejection",
+                            "required_value": 75.0, "required_unit": "kW"}
+    c_noctx = cs.size_connection_to_spec(contextless_thermal, 5.0)
+    cost_noctx = cs.connection_cost(c_noctx)
+    check("PROVE-CATCH: a contextless thermal edge stays carbon steel through "
+          "connection_cost (NOT misread as coolant from generic sizing boilerplate)",
+          "carbon steel" in cost_noctx["cost_basis"].lower()
+          and "stainless" not in cost_noctx["cost_basis"].lower())
+    # EPDM hose costs LESS per metre than the stainless hard run at the same DN (no
+    # welding — a citable, conservative multiplier; see _EPDM_HOSE_FACTOR).
+    branch_edge = dict(EFUEL_THERMAL)
+    branch_edge["material_context"] = "coolant distribution manifold"
+    c_branch = cs.size_connection_to_spec(branch_edge, 20.0)
+    c_branch["role"] = "branch"
+    cost_branch = cs.connection_cost(c_branch)
+    check("EPDM hose (branch) £/m < stainless hard-run £/m at the same DN",
+          cost_branch["unit_cost_gbp"] < cost_thermal["unit_cost_gbp"])
 
     # 10e. connection_schedule rows now CARRY the cost fields.
     sched_rows = cs.connection_schedule([c_dc, c_drip, c_thermal])
