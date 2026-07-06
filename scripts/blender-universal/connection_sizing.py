@@ -115,7 +115,7 @@ import os
 import re
 import subprocess
 import sys
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 # ---------------------------------------------------------------------------
 # 0. Tool runner — locate the repo .venv python + the orchestrator tools dir
@@ -181,6 +181,55 @@ def run_tool(tool_filename: str, payload: dict, timeout_s: float = 30.0) -> dict
 # Cable conductor CSA ladder [mm²] — BS 7671 / IEC 60228 preferred sizes.
 CABLE_CSA_LADDER = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150,
                     185, 240, 300, 400]
+
+# Single-conductor ampacity ladder [mm² -> A], copper, 70 C thermoplastic (PVC),
+# Reference Method C — the SAME table deterministic_checks_lib._CU_AMPACITY
+# enforces (BS 7671 Appendix 4 flavour; kept as a literal copy here because
+# connection_sizing.py has no dependency on deterministic_checks_lib — any
+# change to one must be mirrored in the other). Used ONLY to express a
+# parallel-run cable's headline "size" number in single-conductor-EQUIVALENT
+# terms (see _ampacity_equivalent_csa_mm2); the real conductor selection keeps
+# using CABLE_CSA_LADDER / electrical_cable_sizing.py's own (narrower, 1-400
+# mm²) table, so this ladder never changes what gets bought — only what a
+# generic "chosen CSA >= ampacity-required CSA" reader parses off the label.
+_SINGLE_CONDUCTOR_AMPACITY_LADDER = [
+    (1.5, 19.5), (2.5, 27), (4, 36), (6, 46), (10, 63), (16, 85), (25, 112),
+    (35, 138), (50, 168), (70, 213), (95, 258), (120, 299), (150, 344),
+    (185, 392), (240, 461), (300, 530), (400, 634), (500, 723), (630, 826),
+]
+_AMPACITY_BY_CSA_MM2: Dict[float, float] = dict(_SINGLE_CONDUCTOR_AMPACITY_LADDER)
+
+
+def _ampacity_equivalent_csa_mm2(total_ampacity_a: float) -> Optional[float]:
+    """Smallest single-conductor CSA (mm²) whose tabulated ampacity >= the TOTAL
+    ampacity actually delivered by a (possibly parallel-run) conductor
+    arrangement. Returns None when even the top of the ladder (630 mm² / 826 A)
+    can't represent it (a true multi-hundred-amp busbar-class feeder) — callers
+    fall back to the plain "N×CSA" label in that case, which is honest and, for
+    a current that far off the ladder, was already skipped cleanly (N/A) by the
+    deterministic ampacity-floor check.
+
+    2026-07-06 fix (CO2-mineralisation crystalliser-heater cable, CORE FIX
+    PRINCIPLE — source rule, not the data point): a parallel-run cable's label
+    used to read "{n_parallel}×{csa} mm²" (e.g. "2×185 mm²"). The deterministic
+    ampacity-floor check (deterministic_checks_lib._checks_cable_csa) parses the
+    FIRST number out of that string with a generic regex — for "2×185 mm²" that
+    is the "2" (the parallel-run COUNT, not a CSA at all), so a genuinely
+    adequate 2×185 mm² feeder (392 A/run × 2 = 784 A >= a 777.3 A load) read as
+    "2 mm²" and failed the floor by two orders of magnitude. Reordering the
+    string alone does not fix it either: the checker has no concept of parallel
+    runs, so a bare "185 mm²" would still read as a single conductor and fail
+    against the ladder's single-run requirement (630 mm² for 777.3 A). The
+    honest fix is to report the AMPACITY-EQUIVALENT single-conductor CSA as the
+    label's leading number — the smallest ladder rung whose ampacity covers what
+    the parallel arrangement actually delivers (2×392 A = 784 A -> 630 mm² rung,
+    826 A) — so a reader that only understands "single CSA vs required CSA"
+    correctly sees the run as adequate. Universal: applies to every electrical
+    connection sized with n_parallel > 1, not a per-cable special case."""
+    for csa, cap in _SINGLE_CONDUCTOR_AMPACITY_LADDER:
+        if cap >= total_ampacity_a - 1e-9:
+            return csa
+    return None
 
 # Pipe nominal-bore ladder DN [mm] with a representative internal bore [mm].
 # (DN is a label; the bore is roughly the real schedule-40/-10 ID used to test
@@ -1150,11 +1199,14 @@ def size_electrical(edge: dict, length_m: float, current_a: float) -> dict:
         vd_pct = 100.0 * vd_v / v_sys
         within = vd_pct <= vd_limit
         outer = _cable_outer_dia_mm(csa, n_par)
+        # size_label goes through the SAME single point of truth as the Phase-D
+        # upsize path (_electrical_size_label) — see its 2026-07-06 fix note for
+        # why a parallel-run cable's leading number must be its ampacity-
+        # equivalent single-conductor CSA, not the raw parallel-run count.
+        size_label = _electrical_size_label(csa, n_par)
         if n_par == 1:
-            size_label = f"{csa:g} mm²"
             qty = f"1 × {csa:g} mm² Cu, {length_m:.1f} m"
         else:
-            size_label = f"{n_par}×{csa:g} mm²"
             qty = f"{n_par} × {csa:g} mm² Cu (parallel), {length_m:.1f} m each"
         assumptions.append(
             f"selected {n_par}×{csa:g} mm² Cu; tabulated ampacity "
@@ -1662,6 +1714,21 @@ def _cable_outer_for(csa_mm2: float, n_parallel: int) -> float:
 def _electrical_size_label(csa_mm2: float, n_parallel: int) -> str:
     if n_parallel <= 1:
         return f"{csa_mm2:g} mm²"
+    # 2026-07-06 fix: lead with the ampacity-EQUIVALENT single-conductor CSA (see
+    # _ampacity_equivalent_csa_mm2) so a "chosen CSA >= ampacity-required CSA"
+    # reader — which has no concept of parallel runs and simply parses the
+    # first number off this label — correctly reads the arrangement's real
+    # current-carrying capacity. Falls back to the plain "N×CSA" label,
+    # UNCHANGED, when the total ampacity is beyond the equivalence ladder (a
+    # true multi-hundred-amp busbar-class feeder, e.g. e-fuel's 8×400 mm² /
+    # 5217 A row) — that current was already off the top of the deterministic
+    # ladder and skipped cleanly (N/A), so the fallback is a byte-identical
+    # no-op for those rows.
+    per_run_ampacity = _AMPACITY_BY_CSA_MM2.get(csa_mm2)
+    if per_run_ampacity is not None:
+        equiv = _ampacity_equivalent_csa_mm2(n_parallel * per_run_ampacity)
+        if equiv is not None:
+            return f"{equiv:g} mm² equiv. ({n_parallel}×{csa_mm2:g} mm² parallel)"
     return f"{n_parallel}×{csa_mm2:g} mm²"
 
 

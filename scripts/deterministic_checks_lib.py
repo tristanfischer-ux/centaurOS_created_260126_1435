@@ -732,6 +732,32 @@ _DELIBERATE_PRICE_CORRECTION_RE = re.compile(
     r"actuated-valve assembly",
     re.I)
 
+# BESPOKE / MADE-TO-ORDER FABRICATION exemption (2026-07-06, CO2-mineralisation M-102
+# fix). A bespoke, made-to-order fabrication — a shop-built item quoted as ONE
+# procurable unit ("fabricated 316L wash-bar manifold — made to order") — has no
+# commodity per-kg/per-fitting equivalent; comparing its quoted price against a generic
+# parametric estimate is the same self-contradiction the grounded/corrected/catalogue-pin
+# exemptions above already codify, just triggered by a different upstream defect: a
+# bespoke item's partVerification can get indexed with manufacturer='fabricated' + the
+# full description AS its 'part_number' (no real MPN exists for a one-off fabrication),
+# which _match_partverification_by_mpn then joins as if it were a genuine catalogue part
+# — banding the £2,800 bespoke quote against an £11.70 commodity placeholder (239x FAIL,
+# M-102). Detected on the BoM row's OWN text ('made to order' / 'made to spec' /
+# 'fabricated' / 'bespoke') — universal, independent of how the false MPN join happened,
+# and mirrors the EXISTING made-to-spec exemption already applied to structural vessel
+# take-offs (see _match_partverification_by_mpn's docstring). NEVER exempts a genuine
+# commodity line: the keyword must appear in the row's own part/requirement description,
+# not merely a high ratio — a plain over-priced catalogue part still FAILs (proveCatch
+# below, both directions).
+_BESPOKE_FABRICATION_RE = re.compile(
+    r"\bmade[- ]to[- ]order\b|\bmade[- ]to[- ]spec\b|\bfabricated\b|\bbespoke\b", re.I)
+
+
+def _is_bespoke_fabrication(row: dict) -> bool:
+    text = f"{row.get('part') or ''} {row.get('requirement') or ''}"
+    return bool(_BESPOKE_FABRICATION_RE.search(text))
+
+
 # Basis vocabulary that states the line's rendered price IS a catalogue / distributor /
 # library quote ('catalogue', 'distributor catalogue (db:…)', 'library match') — anchored
 # at the START of the basis so 'catalogue-class budget' (a class-anchor ESTIMATE, not a
@@ -863,12 +889,16 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
         # real catalogue price stays FLAGGED (e.g. the 1 MW PCS 'lifted' to £181 vs its £75,000
         # distributor price — a genuine corpus-comparable mis-class, not a check artefact).
         corrected = bool(_DELIBERATE_PRICE_CORRECTION_RE.search(basis))
+        # BESPOKE / MADE-TO-ORDER fabrication (see _BESPOKE_FABRICATION_RE above): the
+        # row's own text names it a one-off shop-built item, so no commodity estimate is
+        # a valid comparator regardless of which direction the ratio falls.
+        bespoke = _is_bespoke_fabrication(row)
         ratio = unit_p / ref
         out_of_band = (ratio > COST_BAND_FACTOR or ratio < (1.0 / COST_BAND_FACTOR))
         # the correction exemption ENGAGES only where the band would otherwise FIRE —
         # an in-band corrected row keeps the plain band-comparison detail (a passing
         # row's rendered text is byte-identical to the pre-exemption behaviour).
-        exempt = grounded or (corrected and out_of_band and ref_src == "price_estimate_gbp")
+        exempt = grounded or bespoke or (corrected and out_of_band and ref_src == "price_estimate_gbp")
         # CATALOGUE-PIN re-band (codema v60 I-104, same self-contradiction family): a row
         # whose basis states the price IS a catalogue quote ('catalogue' / 'distributor
         # catalogue (db:…)' / 'library match') was banded against price_estimate_gbp — but
@@ -918,13 +948,17 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
                     + (f"price GROUNDED to the market band (£{unit_p:,.0f}); the pre-grounding "
                        f"{ref_src} £{ref:,.0f} was rejected as out-of-band — banding against it is "
                        f"not meaningful." if grounded
-                       else (f"price DELIBERATELY CORRECTED by the pricing pass (£{unit_p:,.0f}; "
+                       else (f"BESPOKE / MADE-TO-ORDER fabrication (£{unit_p:,.0f}); a commodity "
+                             f"{ref_src} £{ref:,.0f} is not a valid comparator for a one-off "
+                             f"fabricated-to-order item — banding against it is not meaningful."
+                             if bespoke
+                             else (f"price DELIBERATELY CORRECTED by the pricing pass (£{unit_p:,.0f}; "
                              f"basis: {basis[:80]}); the parametric {ref_src} £{ref:,.0f} was "
                              f"rejected/superseded by that correction — banding against it is "
                              f"self-contradictory." if exempt
                              else (f"RECONCILED — unit-basis (non-blocking): {recon_note}" if recon_applied
                              else f"BoM unit £{unit_p:,.0f} vs {ref_src} £{ref:,.0f} = x{ratio:.1f}. "
-                             f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}.")))),
+                             f"Flag when >x{COST_BAND_FACTOR:g} or <x{1/COST_BAND_FACTOR:g}."))))),
         ))
 
     # --- COST2. Sigma BoM line_gbp == cover / grand total ---
@@ -2182,10 +2216,37 @@ def _selftest() -> int:
             # only for X-6-shaped consumables.
             {"tag": "X-6F", "part": "Generic INVERTER01", "qty": 1, "unit_gbp": 30,
              "line_gbp": 30, "requirement": "string inverter", "basis": "catalogue"},
+            # BESPOKE FABRICATION proveCatch (2026-07-06, CO2-mineralisation M-102): the
+            # exact real-world shape — a bespoke, made-to-order fabrication whose
+            # partVerification got a false MPN join (manufacturer='fabricated' + the full
+            # description as its 'part_number', see word 'm' below) banded against an
+            # £11.70 commodity placeholder → must be EXEMPT (PASS) regardless of the ratio.
+            {"tag": "M-102", "part": "fabricated 316L wash-bar manifold — made to order",
+             "qty": 1, "unit_gbp": 2800, "line_gbp": 2800,
+             "requirement": "cake wash-water manifold", "basis": "catalogue"},
+            # SAME shape, "bespoke" vocabulary + UNDER-price direction — the exemption is
+            # NOT direction-specific (a bespoke quote below a stale commodity estimate is
+            # equally not a valid comparator).
+            {"tag": "M-103", "part": "Bespoke stainless drip-tray, made to spec",
+             "qty": 1, "unit_gbp": 20, "line_gbp": 20,
+             "requirement": "drip tray", "basis": "catalogue"},
+            # NEGATIVE CONTROL: a genuine commodity line (no bespoke keyword) 10x over its
+            # reference must STILL FAIL — the exemption must never swallow a real
+            # over-price just because SOME other row in the run is bespoke.
+            {"tag": "B-CTRL", "part": "Generic BRACKET01", "qty": 1, "unit_gbp": 500,
+             "line_gbp": 500, "requirement": "mounting bracket", "basis": "catalogue"},
         ],
         "partVerifications": [
             {"word_id": "a", "word_name": "DC switch disconnector", "manufacturer": "ABB",
              "part_number": "OTDC200E02P", "price_estimate_gbp": 6.5},
+            {"word_id": "m", "word_name": "cake_wash_manifold_word", "manufacturer": "fabricated",
+             "part_number": "fabricated 316L wash-bar manifold — made to order",
+             "price_estimate_gbp": 11.7},
+            {"word_id": "n", "word_name": "drip_tray_word", "manufacturer": "bespoke",
+             "part_number": "Bespoke stainless drip-tray, made to spec",
+             "price_estimate_gbp": 200},
+            {"word_id": "o", "word_name": "mounting bracket", "manufacturer": "Generic",
+             "part_number": "BRACKET01", "price_estimate_gbp": 50},
             {"word_id": "b", "word_name": "PCS skid", "manufacturer": "Sungrow",
              "part_number": "SC1000UD-MV", "distributor_price_gbp": 75000,
              "price_estimate_gbp": 75000},
@@ -2252,6 +2313,18 @@ def _selftest() -> int:
               "price must FAIL (the correction is not market evidence)")
         check(_has(checks, "BoM I-1: unit price", FAIL),
               "XVAL COST: an uncorrected out-of-band price must still FAIL")
+        # BESPOKE FABRICATION proveCatch (2026-07-06, CO2-mineralisation M-102), BOTH
+        # directions + a negative control:
+        check(_has(checks, "BoM M-102: unit price", PASS),
+              "BESPOKE: a made-to-order fabrication (£2,800) falsely MPN-joined to an "
+              "£11.70 commodity placeholder (239x) must be EXEMPT (PASS)")
+        check(_has(checks, "BoM M-103: unit price", PASS),
+              "BESPOKE: the 'made to spec' vocabulary + UNDER-price direction (£20 vs "
+              "£200) must ALSO be exempt — the exemption is not direction-specific")
+        check(_has(checks, "BoM B-CTRL: unit price", FAIL),
+              "BESPOKE NEGATIVE CONTROL: a genuine commodity line with no bespoke "
+              "keyword (£500 vs £50, 10x) must STILL FAIL — the exemption must never "
+              "swallow a real over-price")
         # catalogue-pin re-band proveCatch (codema v60 I-104), BOTH directions:
         check(_has(checks, "BoM I-2: unit price", PASS),
               "CATALOGUE-PIN: a catalogue-basis row banded against a cost-repair-"
