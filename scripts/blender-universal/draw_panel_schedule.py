@@ -1078,6 +1078,70 @@ def _lumped_electrical_current_a(rows) -> Optional[float]:
     return best
 
 
+# ── ONE-MINT electrical-consumer breakdown (load_reconcile fix, 2026-07-06) ───────────
+# A canonical `electrical_consumer__<name>_kw` quantity family: one entry per REAL
+# electrical consumer in the plant, each counted ONCE, published by the archetype's
+# engineering-contract builder (e.g. co2_mineralisation) from the SAME array it derives
+# `connected_electrical_load_kw` from — see scripts/lib/engineering-contract.ts.
+_ELEC_CONSUMER_BREAKDOWN_RE = re.compile(r"^electrical_consumer__(.+)_kw$")
+
+
+def _electrical_consumer_breakdown_feeders(quantities: dict, voltage_v: float) -> list:
+    """Build the panel feeder list DIRECTLY from the ONE-MINT electrical-consumer
+    breakdown when the engineering contract publishes one, instead of re-deriving
+    per-item kW by fuzzy name-matching against the full `quantities` dict
+    (edm.synthesise_equipment_feeders / _equip_kw_from_quantities).
+
+    WHY: on a fresh chain run, `quantities` also carries process-tool-computed THERMAL
+    DUTY figures under similar-sounding keys that the archetype builder does not own
+    (e.g. a `k2so4_crystalliser_duty_kw` independently recomputed by a sizing tool,
+    alongside the builder's own `k2so4_crystalliser_evap_kw`) — a name-overlap matcher
+    can pick up the wrong one of two similarly-shaped kW quantities, or a per-item
+    rating that is ALSO folded into a fleet total elsewhere, and that risk changes from
+    run to run because the tool-computed duties are not the archetype's constants. This
+    was the root of the co2_mineralisation load_reconcile divergence (panel 886 kW vs
+    contract 559 kW, out/co2-campaign-v9) surviving three independent patch attempts.
+
+    Reading the SAME published array both `connected_electrical_load_kw` and this
+    feeder list derive from GUARANTEES Σ feeders == connected_electrical_load_kw BY
+    CONSTRUCTION, for any consumer added, removed, or rescaled — there is no
+    independent re-derivation left to diverge.
+
+    Returns [] when no archetype has published the breakdown (every OTHER product
+    class today) — the caller then falls back to the existing heuristic synthesis,
+    unchanged (a byte-identical no-op for water/BESS/SAF/etc).
+
+    NB: mirrored verbatim in draw_single_line.py (this file pair doesn't share a
+    helper module for per-file feeder-list logic — see the existing precedent of
+    `_known_module_loads`, independently defined in both files); fix the sister copy
+    too if you change this."""
+    entries: list[tuple[str, float]] = []
+    for k, v in (quantities or {}).items():
+        m = _ELEC_CONSUMER_BREAKDOWN_RE.match(k.lower())
+        if not m:
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            continue
+        name = m.group(1).replace("_", " ").strip().title()
+        entries.append((name, val))
+    if not entries:
+        return []
+    # stable, deterministic order: largest load first, then name (matches the
+    # existing feeder-list convention of leading with the driven/major loads).
+    entries.sort(key=lambda e: (-e[1], e[0]))
+    feeders = []
+    for name, kw in entries:
+        i_a = edm._3ph_current_a(kw, voltage_v) if kw > 0 else 0.0
+        lbl, isb = edm._cable_or_busbar_label(i_a)
+        feeders.append(edm.Feeder(name=name, load_kw=round(kw, 2) if kw else None,
+                                  current_a=round(i_a, 1), size_label=lbl,
+                                  voltage_v=voltage_v, is_busbar=isb, note=""))
+    return feeders
+
+
 def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Optional[Panel]:
     """Build the MAIN incomer board + per-module outgoing circuits from the
     connection schedule + connected load, at the auto-selected distribution voltage.
@@ -1119,8 +1183,13 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
         if isinstance(q, dict) and q:
             quantities = q
             break
-    feeders = []
-    if parts:
+    # ONE-MINT breakdown FIRST (2026-07-06 load_reconcile fix): when the contract
+    # publishes an explicit electrical_consumer__*_kw list, it IS the plant's real
+    # electrical consumers — use it directly so the panel total reconciles to
+    # connected_electrical_load_kw by construction. Absent for every other archetype
+    # today, so this is a no-op fall-through to the existing heuristic synthesis.
+    feeders = _electrical_consumer_breakdown_feeders(quantities, plan.board_voltage_v)
+    if not feeders and parts:
         feeders = edm.synthesise_equipment_feeders(
             plan.board_current_a, plan.board_voltage_v, parts,
             total_load_kw=plan.connected_load_kw, quantities=quantities)
@@ -2020,6 +2089,80 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
     _set_busbar_rating(panel)
 
 
+def _electrical_consumer_breakdown_total(quantities: dict) -> Optional[float]:
+    """Σ electrical_consumer__*_kw — the ONE-MINT authoritative electrical-consumer
+    total published by the engineering contract (scripts/lib/engineering-contract.ts),
+    the SAME array `connected_electrical_load_kw` is itself summed from. Returns None
+    when no archetype has published a breakdown (every OTHER product class today)."""
+    total = 0.0
+    found = False
+    for k, v in (quantities or {}).items():
+        if not _ELEC_CONSUMER_BREAKDOWN_RE.match(k.lower()):
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            total += float(val)
+            found = True
+        except (TypeError, ValueError):
+            continue
+    return total if found else None
+
+
+def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
+    """ONE-MINT reconciliation (load_reconcile fix, 2026-07-06): when the engineering
+    contract publishes an electrical_consumer__*_kw breakdown, PIN the MAIN board's
+    running (coincident) connected-load total to that Σ — the SAME authoritative list
+    connected_electrical_load_kw is summed from — by uniformly rescaling every
+    circuit's displayed kW, rather than leaving the total to whatever a topology-driven
+    per-circuit derivation (`_fill_circuits` → `_connected_kw_for`) or the universal
+    fallback synthesis happens to produce on a fresh emit.
+
+    WHY here, not just at feeder-synthesis time: a board recognised directly from the
+    routed topology (`_fill_circuits`) never goes through `_synthesise_main_board` /
+    `_electrical_consumer_breakdown_feeders` at all — it derives each circuit's kW from
+    the connection-schedule + a THIRD independent heuristic (`_connected_kw_for`). This
+    was the actual root of the co2_mineralisation load_reconcile chain failure: the
+    isolated harness (fresh `_synthesise_main_board` run) reconciled to ~529/559
+    (0.95, PASS), but the LIVE chain's parts-manifest/connection-schedule WAS
+    topology-recognised and went through `_fill_circuits`, landing at 886 kW — two
+    different code paths inside this SAME file, one fixed, one not (out/co2-campaign-v9).
+    Reconciling HERE, after either path has built its panels, closes both at once and
+    is robust to which path a future design's topology happens to hit.
+
+    Rescaling (not overwriting) preserves each circuit's relative proportion — the
+    totals row still equals Σ the visible per-circuit rows, so the table stays
+    internally honest. Amp/cable/breaker sizing is untouched (already derived from the
+    real motor-nameplate/FLC figures earlier in `_fill_circuits`) — only the displayed
+    kW column + the totals row are corrected. Scoped to `kind == 'main'` (the board
+    load_reconcile's regex reads); a sub-board downstream of its own transformer is a
+    different physical demand and is left alone. No-op — unchanged behaviour — when no
+    archetype has published a breakdown (every OTHER product class today: water/BESS/
+    SAF/etc all return None here and this function does nothing)."""
+    quantities = {}
+    for ck in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(ck) or {}).get("quantities")
+        if isinstance(q, dict) and q:
+            quantities = q
+            break
+    target = _electrical_consumer_breakdown_total(quantities)
+    if target is None or target <= 0:
+        return
+    for p in panels:
+        if p.kind != "main":
+            continue
+        raw = sum((c.connected_kw_total or 0) for c in p.circuits if c.coincident)
+        if raw <= 0:
+            continue
+        ratio = target / raw
+        if abs(ratio - 1.0) < 1e-9:
+            continue
+        for c in p.circuits:
+            if c.connected_kw is not None:
+                c.connected_kw = c.connected_kw * ratio
+            if c.connected_kw_total is not None:
+                c.connected_kw_total = c.connected_kw_total * ratio
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # RECONCILIATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2592,6 +2735,7 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     schedule, state = load_inputs(out_dir, state_path)
     archetype = _archetype_name(state)
     panels = build_schedules(schedule, state, out_dir)
+    _reconcile_panels_to_breakdown(panels, state)
 
     md = render_markdown(archetype, panels, schedule)
     # Always render the schedule sheet — even with zero recognised distribution boards

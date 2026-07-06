@@ -1846,6 +1846,71 @@ def _feeder_specific_kw(name: str, quantities: dict):
     return best[1] if best else None
 
 
+# ── ONE-MINT electrical-consumer breakdown (load_reconcile fix, 2026-07-06) ───────────
+# A canonical `electrical_consumer__<name>_kw` quantity family: one entry per REAL
+# electrical consumer in the plant, each counted ONCE, published by the archetype's
+# engineering-contract builder (e.g. co2_mineralisation) from the SAME array it derives
+# `connected_electrical_load_kw` from — see scripts/lib/engineering-contract.ts.
+_ELEC_CONSUMER_BREAKDOWN_RE = re.compile(r"^electrical_consumer__(.+)_kw$")
+
+
+def _electrical_consumer_breakdown_feeders(quantities: dict, voltage_v: float) -> list:
+    """Build the single-line feeder list DIRECTLY from the ONE-MINT electrical-consumer
+    breakdown when the engineering contract publishes one, instead of re-deriving
+    per-item kW by fuzzy name-matching against the full `quantities` dict
+    (edm.synthesise_equipment_feeders / _feeder_specific_kw below).
+
+    WHY: on a fresh chain run, `quantities` also carries process-tool-computed THERMAL
+    DUTY figures under similar-sounding keys that the archetype builder does not own
+    (e.g. a `k2so4_crystalliser_duty_kw` independently recomputed by a sizing tool,
+    alongside the builder's own `k2so4_crystalliser_evap_kw`) — a name-overlap matcher
+    can pick up the wrong one of two similarly-shaped kW quantities, or a per-item
+    rating that is ALSO folded into a fleet total elsewhere, and that risk changes from
+    run to run because the tool-computed duties are not the archetype's constants. This
+    was the root of the co2_mineralisation load_reconcile divergence (panel 886 kW vs
+    contract 559 kW, out/co2-campaign-v9) surviving three independent patch attempts.
+
+    Reading the SAME published array both `connected_electrical_load_kw` and this
+    feeder list derive from GUARANTEES Σ feeders == connected_electrical_load_kw BY
+    CONSTRUCTION, for any consumer added, removed, or rescaled — there is no
+    independent re-derivation left to diverge. Feeders returned here are ALREADY final
+    (the caller must NOT run them through `_refine_feeder_currents` — that heuristic
+    refine pass is for the OTHER synthesis path below and could rematch a breakdown
+    feeder against an unrelated same-shaped quantity).
+
+    Returns [] when no archetype has published the breakdown (every OTHER product
+    class today) — the caller then falls back to the existing heuristic synthesis,
+    unchanged (a byte-identical no-op for water/BESS/SAF/etc).
+
+    NB: mirrored verbatim in draw_panel_schedule.py (this file pair doesn't share a
+    helper module for per-file feeder-list logic — see the existing precedent of
+    `_known_module_loads`, independently defined in both files); fix the sister copy
+    too if you change this."""
+    entries: list[tuple[str, float]] = []
+    for k, v in (quantities or {}).items():
+        m = _ELEC_CONSUMER_BREAKDOWN_RE.match(k.lower())
+        if not m:
+            continue
+        val = v.get("value") if isinstance(v, dict) else v
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            continue
+        name = m.group(1).replace("_", " ").strip().title()
+        entries.append((name, val))
+    if not entries:
+        return []
+    entries.sort(key=lambda e: (-e[1], e[0]))
+    feeders = []
+    for name, kw in entries:
+        i_a = edm._3ph_current_a(kw, voltage_v) if kw > 0 else 0.0
+        lbl, isb = edm._cable_or_busbar_label(i_a)
+        feeders.append(edm.Feeder(name=name, load_kw=round(kw, 2) if kw else None,
+                                  current_a=round(i_a, 1), size_label=lbl,
+                                  voltage_v=voltage_v, is_busbar=isb, note=""))
+    return feeders
+
+
 def _refine_feeder_currents(feeders, quantities, voltage_v):
     """Re-size each synthesised feeder from its equipment's OWN published electrical kW
     where one exists, so feeders aren't quantised to a handful of even-split buckets. The
@@ -1996,8 +2061,14 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
         if isinstance(q, dict) and q:
             quantities = q
             break
-    feeders = []
-    if parts:
+    # ONE-MINT breakdown FIRST (2026-07-06 load_reconcile fix): when the contract
+    # publishes an explicit electrical_consumer__*_kw list, it IS the plant's real
+    # electrical consumers — use it directly so the single-line total reconciles to
+    # connected_electrical_load_kw by construction. Absent for every other archetype
+    # today, so this is a no-op fall-through to the existing heuristic synthesis.
+    feeders = _electrical_consumer_breakdown_feeders(quantities, plan.board_voltage_v)
+    used_breakdown = bool(feeders)
+    if not feeders and parts:
         feeders = edm.synthesise_equipment_feeders(
             plan.board_current_a, plan.board_voltage_v, parts,
             total_load_kw=plan.connected_load_kw, quantities=quantities)
@@ -2014,8 +2085,11 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
     # Refine each feeder from the equipment's OWN published electrical kW (e.g. a heat pump
     # at 41 kW ≠ a circulation pump at 75 kW ≠ UV at 251 kW) so each feeder is sized from
     # its real load, not a wholesale bucket. Only OVERRIDES where a specific figure exists;
-    # leaves the disclosed even-split where the engine published no per-item load.
-    _refine_feeder_currents(feeders, quantities, plan.board_voltage_v)
+    # leaves the disclosed even-split where the engine published no per-item load. SKIPPED
+    # when the breakdown above already supplied final, authoritative per-item feeders (no
+    # re-derivation to risk a mismatch against an unrelated same-shaped quantity).
+    if not used_breakdown:
+        _refine_feeder_currents(feeders, quantities, plan.board_voltage_v)
     # Drop the lumped branches, append the synthesised per-module feeders.
     keep = [br for br in main.branches if br not in lumped]
     new_branches = []

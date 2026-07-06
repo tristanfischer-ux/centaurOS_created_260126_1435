@@ -11784,11 +11784,59 @@ registerArchetype('co2_mineralisation', (brief: any) => {
   const boilerElementDutyKw = (boilerSteamKgPerHour * (167 + 2150)) / 3600 / 0.98 // sensible+latent, 98% element eff.
   const electricSteamGeneratorKw = Math.ceil(boilerElementDutyKw / 10) * 10       // next 10 kW element-bank frame
 
-  // ── Connected electrical load (sum of motor + evaporative duties, PLUS the
-  // packaging/drying/steam-utility subsystem above) ─────────────────────────
-  const connectedLoadKw =
-    meaPumpKw + gypsumAgitatorKw + crystalliserEvapKw + blowerKw +
-    electricSteamGeneratorKw + hotAirProcessHeaterTotalKw + dryerAirHeaterBatteryKw + shrinkTunnelHeaterKw
+  // ── ONE-MINT electrical-consumer list (load_reconcile ONE-MINT fix, 2026-07-06) ──
+  // THE single canonical list of every real electrical consumer in the plant, each
+  // counted ONCE at its emitted rating. `connectedLoadKw` is DERIVED from this array
+  // (never hand-summed separately) and every entry is ALSO published below as its own
+  // `electrical_consumer__<slug>_kw` contract quantity, so draw_panel_schedule.py /
+  // draw_single_line.py can build the panel/single-line feeder list FROM THIS SAME
+  // ARRAY instead of independently re-deriving per-item kW by fuzzy name-matching
+  // against the full `quantities` dict.
+  //
+  // WHY the fuzzy match diverges (root cause of the 886 kW vs 559 kW chain failure,
+  // out/co2-campaign-v9): `quantities` on the live chain also carries process-tool-
+  // computed THERMAL DUTY figures under similar-sounding keys that this archetype
+  // does NOT own — e.g. a `k2so4_crystalliser_duty_kw` (958 kW) and `cross_exchanger_
+  // duty_kw` (186 kW) independently recomputed by the auto-selected sizing tools,
+  // alongside this builder's own `k2so4_crystalliser_evap_kw` (80 kW) and
+  // `lean_rich_cross_exchanger_duty_kw` (43.6 kW). A heuristic matcher scanning ALL
+  // of `quantities` for "looks electrical, name overlaps" can pick up the WRONG one
+  // of two similarly-named quantities, or double-count a per-unit rating that is
+  // ALSO folded into a fleet total elsewhere (the ×2 hot-air-heater case above) —
+  // and that risk is present on every fresh emit because the tool-computed duties
+  // change value from run to run while this builder's constants do not.
+  //
+  // THE FIX: panel_total == connected_electrical_load_kw BY CONSTRUCTION, for ANY
+  // consumer added, removed, or rescaled — because both read the SAME array, and the
+  // panel/single-line no longer need to guess WHICH of several same-shaped kW
+  // quantities is the real electrical feeder. proveCatch: scripts/blender-universal/
+  // draw_panel_schedule.py + draw_single_line.py build feeders straight from
+  // `electrical_consumer__*_kw` when present (bypassing the fuzzy matcher entirely)
+  // and fall back unchanged to the existing heuristic when absent (every other
+  // archetype today) — a no-op for water/BESS/SAF/etc.
+  const electricalConsumers: { key: string; name: string; kw: number }[] = [
+    { key: 'mea_circulation_pump', name: 'MEA circulation pump', kw: meaPumpKw },
+    { key: 'gypsum_reactor_agitator', name: 'Gypsum carbonation reactor agitator', kw: gypsumAgitatorKw },
+    { key: 'k2so4_crystalliser_evap', name: 'K2SO4 crystalliser evaporative duty', kw: crystalliserEvapKw },
+    { key: 'flue_gas_blower', name: 'Flue-gas blower', kw: blowerKw },
+    { key: 'electric_steam_generator', name: 'Electric steam generator', kw: electricSteamGeneratorKw },
+    { key: 'hot_air_process_heater_pair', name: 'Hot-air process heater ×2', kw: hotAirProcessHeaterTotalKw },
+    { key: 'dryer_air_heater_battery', name: 'CaCO3 dryer air-heater battery', kw: dryerAirHeaterBatteryKw },
+    { key: 'shrink_tunnel_heater', name: 'Shrink-wrap tunnel heater', kw: shrinkTunnelHeaterKw },
+  ]
+  const connectedLoadKw = electricalConsumers.reduce((sum, c) => sum + c.kw, 0)
+  // The breakdown quantities themselves — spread into `quantities` below. Kept as a
+  // separate object (rather than inline in the literal) so the array above stays the
+  // ONE place both connectedLoadKw and these quantities are derived from.
+  const electricalConsumerQuantities: Record<string, Quantity> = Object.fromEntries(
+    electricalConsumers.map(c => [
+      `electrical_consumer__${c.key}_kw`,
+      q(c.kw, 'kW', 'power', 'rated', 'module', 'calculator', {
+        source_detail: `ONE-MINT electrical-consumer-list entry: ${c.name} — counted once; Σ every ` +
+          `electrical_consumer__*_kw quantity == connected_electrical_load_kw by construction (same array).`,
+      }),
+    ]),
+  )
 
   // ── Operating envelope ────────────────────────────────────────────────────
   const operatingTempMaxC = 120  // amine stripper reboiler loop ceiling (≤120 °C)
@@ -11952,11 +12000,16 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     electric_steam_generator_m3_per_hour: q(electricSteamGeneratorM3PerHour, 'm³/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `stripper reboiler steam supply, vapour phase: ${reboilerSteamKgPerHour.toFixed(1)} kg/h ÷ ${STEAM_DENSITY_KG_M3} kg/m³ saturated-steam density at ~130 °C (steam tables) = ${electricSteamGeneratorM3PerHour.toFixed(1)} m³/h`, from: ['reboiler_duty_kw'] }),
 
     // ── System ──
-    // 2026-07-06 (drawing_gates load_reconcile fix): WAS just the motors/aux slice (87.25 kW) —
-    // stale relative to the packaging/drying/steam-utility equipment added in later rounds (ATEX
-    // fans, dryers, bag-line, electric steam boiler), which the panel-schedule/single-line
-    // correctly sum from their own real MCC-fed circuits. Now the honest plant-wide total.
-    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `Σ motor + evaporative duties (MEA pump ${meaPumpKw.toFixed(2)} + gypsum agitator ${gypsumAgitatorKw.toFixed(2)} + crystalliser evap ${crystalliserEvapKw.toFixed(2)} + flue-gas blower ${blowerKw.toFixed(2)}) + packaging/drying/steam-utility electrical loads (electric steam generator ${electricSteamGeneratorKw.toFixed(0)} + hot-air process heater ×2 × ${hotAirProcessHeaterKw.toFixed(1)} each = ${hotAirProcessHeaterTotalKw.toFixed(1)} + dryer air-heater battery ${dryerAirHeaterBatteryKw.toFixed(1)} + shrink-wrap tunnel heater ${shrinkTunnelHeaterKw.toFixed(1)}) = ${connectedLoadKw.toFixed(1)} kW` }),
+    // ONE-MINT electrical-consumer breakdown (2026-07-06) — one `electrical_consumer__
+    // <slug>_kw` quantity per entry in the `electricalConsumers` array above. Panel/
+    // single-line build their feeder list straight from these when present, so
+    // Σ electrical_consumer__*_kw == connected_electrical_load_kw BY CONSTRUCTION.
+    ...electricalConsumerQuantities,
+    // 2026-07-06 (drawing_gates load_reconcile ONE-MINT fix): connectedLoadKw is now
+    // DERIVED from the `electricalConsumers` array (never hand-summed) — this quantity
+    // is Σ electrical_consumer__*_kw above, guaranteed to match the panel/single-line
+    // total by construction (same array, single source, no independent re-derivation).
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `Σ electrical_consumer__*_kw (${electricalConsumers.map(c => `${c.name} ${c.kw.toFixed(2)}`).join(' + ')}) = ${connectedLoadKw.toFixed(1)} kW — the ONE-MINT electrical-consumer list (each consumer counted once); the panel-schedule/single-line total reconciles to this BY CONSTRUCTION` }),
     operating_temperature_max_c: q(operatingTempMaxC, '°C', 'temperature', 'max', 'system', 'physics_constant', { source_detail: 'amine stripper reboiler loop ceiling ≤120 °C' }),
     // Total skid gross mass — renderer compliance-table mass row + gate 17.
     total_system_mass_kg: q(totalSystemMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'bottom-up: absorber ~1.3 t + stripper ~0.95 t + reactors/crystalliser ~1.5 t + balance-of-plant/skid/piping ~7 t + bagging ~1.5 t' }),
