@@ -160,7 +160,124 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
       constraint_kind: thermal ? 'thermal_rejection' : 'flow_capacity',
     } as TopologyEdge)
   }
+
+  // ── UNIVERSAL RECIRCULATION-LOOP CLOSURE (2026-07-07, Sam Green SME review of
+  // the real Codema Fischer Farms system — "Process is not usually this straight
+  // a line. With flow only going one way at all times?"). The deriver above only
+  // ever builds a strict feed→product CHAIN — real recirculating plants (water
+  // reuse, condensate/glycol return, gas recycle) close a cycle instead. Detect a
+  // RECOVERY BUFFER: a storage/tank/reservoir/sump node whose name ALSO carries a
+  // recovery qualifier (drain(water)/recover/reclaim/recycle/return/reuse/
+  // condensate) — deliberately NARROWER than rank-6's disposal vocabulary (waste/
+  // reject/brine/concentrate/blowdown), which is the PURGE the design-basis memo
+  // says must NEVER be looped back (that is what stops salt/pathogen
+  // accumulation). When found, close the loop back to the spine HEAD
+  // (items[0]) — the same universal target the aquaculture_ras hand-authored
+  // loop already uses (`recirc_pumps -> rearing_tanks`, engineering-contract.ts).
+  // Keyed on generic stream vocabulary only — no class name — so it fires for
+  // water (Codema drainwater), condensate, glycol/coolant return, or any future
+  // archetype whose synthesised equipment includes a recovery buffer, and stays
+  // silent (untouched, no regression) for a genuinely once-through archetype
+  // (DAC, single-pass cooling, stoichiometric reactants consumed to completion).
+  const recoveryItem = [...items].reverse().find((it) => RECOVERY_BUFFER_RE.test(it.name))
+  if (recoveryItem && recoveryItem.slug !== items[0].slug) {
+    edges.push({
+      from_part: recoveryItem.slug,
+      to_part: items[0].slug,
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      material_context: 'recirculation return loop — recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)',
+      _recirculation_loop: true,
+    } as TopologyEdge)
+  }
+
   return edges
+}
+
+// A storage/buffer node whose name ALSO signals it holds a RECOVERED stream —
+// see the recirculation-loop-closure comment above for the disposal-vs-recovery
+// distinction. Matches either word order ("Drainwater Reservoir" / "Reservoir
+// for recovered condensate").
+const RECOVERY_BUFFER_RE =
+  /\b(drain(?:ed|age|water)?|recover(?:ed|y)?|reclaim(?:ed)?|recycl(?:ed|e)?|return(?:ed)?|reus(?:e|ed|able)|condensate)\b.{0,30}\b(tank|reservoir|storage|sump|buffer|cistern|basin)\b|\b(tank|reservoir|storage|sump|buffer|cistern|basin)\b.{0,30}\b(drain(?:ed|age|water)?|recover(?:ed|y)?|reclaim(?:ed)?|recycl(?:ed|e)?|return(?:ed)?|reus(?:e|ed|able)|condensate)\b/i
+
+// Generic FEED/makeup vocabulary (mirrors ROLE_PATTERNS rank 0) — used by the
+// makeup-sizing invariant below to identify the makeup-side flow, never a class name.
+const FEED_MAKEUP_RE = /feed|inlet|supply|make.?up|charge|intake|receiv|raw[ _-]?water/i
+
+/**
+ * UNIVERSAL makeup-sizing invariant (design-basis §5): when a recirculation loop
+ * exists, the MAKEUP/feed equipment must be sized to losses (Q_loss + Q_purge),
+ * NEVER to the loop's full circulation flow — the Codema defect ("RO sized as if
+ * no drainwater were recovered", a ~5-50x oversize). Pure + deterministic; reads
+ * `required_value` already joined onto fluid edges by `joinFlowDemandsOntoTopology`.
+ * NEVER fabricates: returns 'unverified' (not a false pass) when a loop exists but
+ * the two flows aren't both known from joined contract quantities, and
+ * 'not_applicable' when there is no loop at all (a once-through archetype is never
+ * flagged). Detects a loop generically (an edge whose `to_part` was an earlier
+ * edge's `from_part`), so it also covers a hand-authored cycle such as
+ * aquaculture_ras's `recirc_pumps -> rearing_tanks`, not just the auto-injected one.
+ */
+export interface MakeupSizingInvariantResult {
+  verdict: 'not_applicable' | 'pass' | 'unverified' | 'high'
+  has_loop: boolean
+  makeup_flow_m3_h: number | null
+  circulation_flow_m3_h: number | null
+  ratio: number | null
+  reason: string
+}
+
+export function evaluateMakeupSizingInvariant(
+  topology: Array<Record<string, unknown>>,
+  quantities: Record<string, unknown>,
+): MakeupSizingInvariantResult {
+  void quantities // reserved for a future direct-quantity lookup path; today reads joined required_value only
+  if (!Array.isArray(topology) || topology.length === 0) {
+    return { verdict: 'not_applicable', has_loop: false, makeup_flow_m3_h: null, circulation_flow_m3_h: null, ratio: null, reason: 'no topology' }
+  }
+  const seenFrom = new Set<string>()
+  let hasLoop = false
+  for (const e of topology) {
+    const from = String((e as Record<string, unknown>).from_part ?? '')
+    const to = String((e as Record<string, unknown>).to_part ?? '')
+    if (seenFrom.has(to)) hasLoop = true
+    seenFrom.add(from)
+  }
+  if (!hasLoop) {
+    return { verdict: 'not_applicable', has_loop: false, makeup_flow_m3_h: null, circulation_flow_m3_h: null, ratio: null, reason: 'no recirculation loop in this topology — invariant not applicable (once-through)' }
+  }
+  let makeup: number | null = null
+  let circulation: number | null = null
+  for (const e of topology) {
+    const rec = e as Record<string, unknown>
+    const mech = String(rec.mechanism ?? '').toLowerCase()
+    if (!(mech.includes('fluid') || mech === 'water')) continue
+    const v = qtyNum(rec.required_value)
+    if (v === null) continue
+    const from = String(rec.from_part ?? '')
+    if (FEED_MAKEUP_RE.test(from)) {
+      makeup = makeup === null ? v : Math.min(makeup, v)
+    } else {
+      circulation = circulation === null ? v : Math.max(circulation, v)
+    }
+  }
+  if (makeup === null || circulation === null) {
+    return {
+      verdict: 'unverified', has_loop: true, makeup_flow_m3_h: makeup, circulation_flow_m3_h: circulation, ratio: null,
+      reason: 'loop present but makeup/circulation flow not both known from joined contract quantities — cannot verify sizing without fabricating a value',
+    }
+  }
+  const ratio = makeup / circulation
+  if (makeup >= circulation) {
+    return {
+      verdict: 'high', has_loop: true, makeup_flow_m3_h: makeup, circulation_flow_m3_h: circulation, ratio,
+      reason: `makeup flow (${makeup} m3/h) is NOT smaller than the loop's circulation flow (${circulation} m3/h) — the source/makeup equipment reads as sized to the FULL loop instead of losses only (design-basis §5: Q_makeup = Q_loss + Q_purge)`,
+    }
+  }
+  return {
+    verdict: 'pass', has_loop: true, makeup_flow_m3_h: makeup, circulation_flow_m3_h: circulation, ratio,
+    reason: `makeup (${makeup} m3/h) < circulation (${circulation} m3/h), ratio ${(ratio * 100).toFixed(1)}%`,
+  }
 }
 
 // A FIELD INSTRUMENT word (sensor / transmitter / transducer / analyser / gauge / probe / level /
@@ -498,8 +615,94 @@ function _selftest() {
   const g = flowQtyForPart('tank', { tank_flow_m3_h: 33 })
   if (!g || g.flowM3h !== 33) throw new Error('flow-join: exact snake-name + suffix must match even for a generic name')
 
+  // ── UNIVERSAL RECIRCULATION-LOOP CLOSURE proveCatch + proveNoFalsePositive (2026-07-07) ──
+  // (a) proveCatch: the REAL Codema water-plant fixture (defined above, used by the whole
+  // existing test) already includes 'Drain Collection Sump' — a recovery-buffer name — so
+  // `topo` (computed above) must ALREADY contain the auto-injected back-edge closing the loop
+  // to the spine head. This proves the loop-closure fires on a genuinely recirculating,
+  // real-world equipment list, not just a hand-crafted synthetic one.
+  const backEdge = topo.find((e) => (e as unknown as { _recirculation_loop?: boolean })._recirculation_loop)
+  if (!backEdge) throw new Error('derive-topology RECIRC: expected an auto-injected recovery loop for the Codema water-plant fixture (Drain Collection Sump) — none found')
+  if (backEdge.from_part !== 'drain_collection_sump') throw new Error(`derive-topology RECIRC: expected the loop to close FROM the recovery buffer (drain_collection_sump), got ${backEdge.from_part}`)
+  if (backEdge.to_part !== order[0]) throw new Error(`derive-topology RECIRC: expected the loop to close back TO the spine head (${order[0]}), got ${backEdge.to_part}`)
+  if (backEdge.mechanism !== 'fluid_loop') throw new Error('derive-topology RECIRC: the closing edge must carry mechanism fluid_loop')
+  // a genuine cycle: the closing edge's to_part must equal an EARLIER edge's from_part.
+  const seenFromCheck = new Set<string>()
+  let cycleFound = false
+  for (const e of topo) {
+    if (seenFromCheck.has(e.to_part)) cycleFound = true
+    seenFromCheck.add(e.from_part)
+  }
+  if (!cycleFound) throw new Error('derive-topology RECIRC: topology must contain a genuine cycle (a to_part matching an earlier from_part), not just a line')
+
+  // (b) proveNoFalsePositive: a genuinely ONCE-THROUGH archetype (mirrors CO2 mineralisation /
+  // DAC — feed gas -> absorber -> reactor -> product storage, waste/reject genuinely disposed,
+  // never named as a recovery buffer) must get NO injected loop and stay a pure chain.
+  const onceThroughModules: AnyModule[] = [{
+    sub_modules: [{
+      words: [
+        mk('Flue Gas Intake'), mk('Amine Absorber Column'), mk('Mineralisation Reactor'),
+        mk('Gypsum Product Storage Silo'), mk('K2so4 Product Storage Tank'),
+        mk('Waste Brine Disposal Sump'), mk('Concentrate Reject Tank'), // disposal — must NOT loop
+      ],
+    }],
+  }]
+  const onceThroughTopo = deriveProcessTopology(onceThroughModules)
+  if (onceThroughTopo.length === 0) throw new Error('derive-topology RECIRC counter-case: expected a fluid spine for the once-through fixture')
+  if (onceThroughTopo.some((e) => (e as unknown as { _recirculation_loop?: boolean })._recirculation_loop)) {
+    throw new Error('derive-topology RECIRC: a FALSE loop was injected on a genuinely once-through archetype (waste/reject/brine disposal must never be looped back)')
+  }
+  const seenFromOT = new Set<string>()
+  let cycleFoundOT = false
+  for (const e of onceThroughTopo) {
+    if (seenFromOT.has(e.to_part)) cycleFoundOT = true
+    seenFromOT.add(e.from_part)
+  }
+  if (cycleFoundOT) throw new Error('derive-topology RECIRC: the once-through fixture must stay acyclic (a straight chain)')
+
+  // ── UNIVERSAL MAKEUP-SIZING INVARIANT proveCatch + proveNoFalsePositive ─────────────────
+  // (a) proveCatch: a loop exists AND the makeup edge is sized to (≈) the FULL circulation
+  // flow instead of losses only — must flag 'high'.
+  const badLoopTopo: Array<Record<string, unknown>> = [
+    { from_part: 'ro_makeup_skid', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 225 }, // WRONG: makeup sized to full loop
+    { from_part: 'cleanwater_reservoir', to_part: 'pump_units', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 225 },
+    { from_part: 'pump_units', to_part: 'drainwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 220 },
+    { from_part: 'drainwater_reservoir', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' }, // closes the cycle (to_part = an earlier from_part)
+  ]
+  const badVerdict = evaluateMakeupSizingInvariant(badLoopTopo, {})
+  if (badVerdict.verdict !== 'high') throw new Error(`makeup-sizing invariant proveCatch FAILED: expected 'high' for a makeup edge sized to the full loop, got '${badVerdict.verdict}' (${badVerdict.reason})`)
+
+  // (b) proveNoFalsePositive #1: a CORRECTLY-sized loop (makeup << circulation) must PASS.
+  const goodLoopTopo: Array<Record<string, unknown>> = [
+    { from_part: 'ro_makeup_skid', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 11 }, // RIGHT: losses only (~11 m3/h city water)
+    { from_part: 'cleanwater_reservoir', to_part: 'pump_units', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 225 },
+    { from_part: 'pump_units', to_part: 'drainwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 220 },
+    { from_part: 'drainwater_reservoir', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const goodVerdict = evaluateMakeupSizingInvariant(goodLoopTopo, {})
+  if (goodVerdict.verdict !== 'pass') throw new Error(`makeup-sizing invariant proveNoFalsePositive FAILED (correctly-sized loop): expected 'pass', got '${goodVerdict.verdict}' (${goodVerdict.reason})`)
+  if (goodVerdict.ratio === null || goodVerdict.ratio >= 0.5) throw new Error(`makeup-sizing invariant: expected a materially-smaller makeup ratio, got ${goodVerdict.ratio}`)
+
+  // (b) proveNoFalsePositive #2: NO loop at all → 'not_applicable' (never flagged 'high').
+  const lineTopo: Array<Record<string, unknown>> = [
+    { from_part: 'feed_pump', to_part: 'reactor', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 50 },
+    { from_part: 'reactor', to_part: 'product_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 50 },
+  ]
+  const naVerdict = evaluateMakeupSizingInvariant(lineTopo, {})
+  if (naVerdict.verdict !== 'not_applicable' || naVerdict.has_loop) throw new Error(`makeup-sizing invariant: a once-through line must be 'not_applicable', got '${naVerdict.verdict}'`)
+
+  // (b) proveNoFalsePositive #3: a loop exists but flow data is incomplete → 'unverified'
+  // (never a false 'pass' or a fabricated 'high').
+  const unknownFlowLoopTopo: Array<Record<string, unknown>> = [
+    { from_part: 'ro_makeup_skid', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' }, // no required_value
+    { from_part: 'cleanwater_reservoir', to_part: 'pump_units', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity', required_value: 225 },
+    { from_part: 'pump_units', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' }, // closes the cycle, no value
+  ]
+  const unverifiedVerdict = evaluateMakeupSizingInvariant(unknownFlowLoopTopo, {})
+  if (unverifiedVerdict.verdict !== 'unverified') throw new Error(`makeup-sizing invariant: a loop with unknown makeup flow must be 'unverified' (never fabricated), got '${unverifiedVerdict.verdict}'`)
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
