@@ -31,13 +31,15 @@
  *     industry protocols (CANopen, Modbus-RTU vs Modbus-TCP, IO-Link, etc).
  *
  * @scaffolding-status
- *   - Schema + 20 seeded graphs (BESS, heat pump residential/commercial, VFD,
+ *   - Schema + 21 seeded graphs (BESS, heat pump residential/commercial, VFD,
  *     PV inverter, PV module, industrial robot arm, DC fast EV charger,
  *     insulin pump, fuel cell power module, industrial 3D printer, hydrogen
  *     electrolyser, wind turbine small, AUV subsea, vehicle battery pack,
  *     bioreactor, industrial inspection drone, AGV/AMR, chiller,
  *     distribution transformer — last five added 2026-05-18 in the "B2:
- *     15 → 20 coverage" dispatch).
+ *     15 → 20 coverage" dispatch; fertigation-water-recycling added
+ *     2026-07-07 under the existing `water_treatment` slug — the K10
+ *     recirculation-loop calibration graph from the Sam Green SME review).
  *   - Validator function `validateConnectionsAgainstGraph` callable from
  *     test harness `scripts/test-reference-graph.tsx`.
  *   - G4 shadow-mode wire-up shipped 2026-05-18; 20-class coverage clears
@@ -489,6 +491,7 @@ export async function ensureGraphsRegistered(): Promise<void> {
   await import('./class-reference-graphs/chiller.js')
   await import('./class-reference-graphs/dc-fast-ev-charger.js')
   await import('./class-reference-graphs/distribution-transformer.js')
+  await import('./class-reference-graphs/fertigation-water-recycling.js')
   await import('./class-reference-graphs/fuel-cell-power-module.js')
   await import('./class-reference-graphs/heat-pump-commercial.js')
   await import('./class-reference-graphs/heat-pump-residential.js')
