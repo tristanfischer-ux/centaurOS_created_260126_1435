@@ -3216,6 +3216,63 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
     return summary, proc, svg_text
 
 
+# Symbol types that represent a MEASURABLE piece of equipment — something a level /
+# pressure / temperature / analytical instrument would legitimately tap into. The same
+# set `_attach_instruments` / `_project_synth_instruments` already reason over. A pump,
+# valve, or line-only node is excluded (it is a mover, not something a field instrument
+# is tapped into) — same universal set, no per-class table.
+_MEASURABLE_SYMS = (SYM_COLUMN, SYM_DRUM, SYM_VESSEL, SYM_TANK, SYM_HX, SYM_FIRED)
+
+
+def evaluate_instrument_clustering_invariant(nodes: dict) -> dict:
+    """UNIVERSAL instrument-attachment invariant (Sam Green SME review, 2026-07-07 —
+    "Seems all sensors on left are plugged into a softener vessel?"). Each instrument
+    must terminate on the SPECIFIC equipment it measures; a design where every placed
+    instrument clusters onto ONE node while >=2 OTHER measurable equipment nodes carry
+    zero instruments is exactly the defect Sam flagged (a P&ID that reads as if one
+    vessel wears the whole plant's sensor set). Pure + deterministic — reads the FINAL
+    placed `Node.instruments`, so it catches the defect regardless of which placement
+    path (the synthesised-instrument projection or the conventional symbol-based
+    fallback in `_attach_instruments`) produced it.
+
+    Verdicts:
+      'not_applicable' — fewer than 2 measurable equipment nodes (clustering is not a
+        meaningful concept on a 1-vessel plant), or zero instruments placed anywhere.
+        NEVER fabricates a verdict on a design too small to judge.
+      'high'  — ALL placed instruments sit on exactly one node while >=2 OTHER
+        measurable nodes carry none.
+      'pass'  — instruments spread across >=2 measurable nodes (the normal, correct
+        case), including a design where every measurable node happens to carry its own
+        instrument set.
+    """
+    measurable = [nd for nd in nodes.values() if getattr(nd, "sym", None) in _MEASURABLE_SYMS]
+    if len(measurable) < 2:
+        return {"verdict": "not_applicable",
+                "reason": "fewer than 2 measurable equipment nodes — clustering is not a meaningful concept here",
+                "instrumented_nodes": [], "empty_nodes": [nd.key for nd in measurable]}
+    instrumented = [nd for nd in measurable if nd.instruments]
+    empty = [nd for nd in measurable if not nd.instruments]
+    total_instr = sum(len(nd.instruments) for nd in measurable)
+    if total_instr == 0:
+        return {"verdict": "not_applicable",
+                "reason": "no instruments placed on any measurable node",
+                "instrumented_nodes": [], "empty_nodes": [nd.key for nd in empty]}
+    if len(instrumented) == 1 and len(empty) >= 2:
+        culprit = instrumented[0]
+        return {
+            "verdict": "high",
+            "reason": (f"all {total_instr} instrument(s) in the design are attached to a single "
+                       f"node ('{culprit.label}') while {len(empty)} other measurable equipment "
+                       f"item(s) ({', '.join(nd.label for nd in empty[:5])}"
+                       f"{'…' if len(empty) > 5 else ''}) carry none — each instrument must "
+                       f"terminate on the specific equipment it measures, not cluster onto one vessel"),
+            "instrumented_nodes": [culprit.key], "empty_nodes": [nd.key for nd in empty],
+        }
+    return {"verdict": "pass",
+            "reason": f"instruments spread across {len(instrumented)} of {len(measurable)} measurable nodes",
+            "instrumented_nodes": [nd.key for nd in instrumented], "empty_nodes": [nd.key for nd in empty]}
+
+
 def _symbol_breakdown(proc: Process):
     from collections import Counter
     c = Counter(n.sym for n in proc.nodes)
@@ -3298,6 +3355,51 @@ def _selftest() -> int:
     for name, svg in (("46col", svg46), ("5col", svg5)):
         p = a1_print.plan_sheets(*_dims(svg), a1_print.min_font_px(svg))
         chk(f"F5.a1_plan_meets_bar_{name}", p["meets_bar"] and p["min_text_mm"] >= 2.5)
+
+    # G1 — INSTRUMENT-CLUSTERING INVARIANT proveCatch + proveNoFalsePositive (Sam Green
+    # SME review 2026-07-07: "all sensors on left are plugged into a softener vessel?").
+    def _mk_node(key, label, sym=SYM_VESSEL, instrs=()):
+        nd = Node(key=key, tag=key.upper(), label=label, sym=sym)
+        nd.instruments = list(instrs)
+        return nd
+
+    # G1a proveCatch: 5 measurable vessels, ALL instruments dumped on ONE ("softener").
+    _clustered = {
+        "softener": _mk_node("softener", "Softener Vessel",
+                              instrs=[Instr("LT", "level"), Instr("PT", "pressure"), Instr("PHT", "ph")]),
+        "ro_skid": _mk_node("ro_skid", "Reverse Osmosis Skid"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank"),
+        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1"),
+        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2"),
+    }
+    _clu_verdict = evaluate_instrument_clustering_invariant(_clustered)
+    chk("G1a.clustering_proveCatch_flags_high", _clu_verdict["verdict"] == "high")
+    chk("G1a.clustering_names_the_culprit", _clu_verdict.get("instrumented_nodes") == ["softener"])
+    chk("G1a.clustering_names_the_empties", len(_clu_verdict.get("empty_nodes", [])) == 4)
+
+    # G1b proveNoFalsePositive: the SAME instrument set, correctly DISTRIBUTED across the
+    # equipment each instrument actually measures.
+    _distributed = {
+        "softener": _mk_node("softener", "Softener Vessel", instrs=[Instr("PHT", "ph")]),
+        "ro_skid": _mk_node("ro_skid", "Reverse Osmosis Skid", instrs=[Instr("PT", "pressure")]),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", instrs=[Instr("LT", "level")]),
+        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1", instrs=[Instr("LT", "level")]),
+        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2"),
+    }
+    _dist_verdict = evaluate_instrument_clustering_invariant(_distributed)
+    chk("G1b.clustering_proveNoFalsePositive_distributed", _dist_verdict["verdict"] == "pass")
+
+    # G1c proveNoFalsePositive: a genuinely SMALL plant (1 measurable vessel) — clustering
+    # is unavoidable and honest, must never be flagged (no false positive on a small design).
+    _one_vessel = {"tank": _mk_node("tank", "Buffer Tank", instrs=[Instr("LT", "level")])}
+    _one_verdict = evaluate_instrument_clustering_invariant(_one_vessel)
+    chk("G1c.clustering_single_vessel_not_applicable", _one_verdict["verdict"] == "not_applicable")
+
+    # G1d proveNoFalsePositive: multiple measurable nodes but ZERO instruments anywhere
+    # (a design stage before instrumentation is synthesised) — never fabricate 'high'.
+    _no_instr = {"a": _mk_node("a", "Tank A"), "b": _mk_node("b", "Tank B"), "c": _mk_node("c", "Tank C")}
+    _no_instr_verdict = evaluate_instrument_clustering_invariant(_no_instr)
+    chk("G1d.clustering_zero_instruments_not_applicable", _no_instr_verdict["verdict"] == "not_applicable")
 
     for f in fails:
         print(f"[pid][selftest] FAIL {f}")
