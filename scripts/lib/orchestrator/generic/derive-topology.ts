@@ -280,6 +280,66 @@ export function evaluateMakeupSizingInvariant(
   }
 }
 
+// ── FILTER-ON-DIRTY-STREAM INVARIANT (Sam Green SME review, 2026-07-07 — "RO water
+// feeds into cloth filter which doesn't make sense as it's clean already... Filters and
+// disinfection should be after drain pits"). A treatment unit-op (filter / cloth-belt /
+// paperbelt filter / disinfection / UV / chlorination) exists to turn a DIRTY stream
+// clean — it must sit on the dirty/recovered side, never immediately downstream of an
+// already-clean stream (RO permeate, a cleanwater reservoir, treated/product water).
+// UNIVERSAL: keyed on the stream_state vocabulary already in this file (RECOVERY_BUFFER_RE
+// = dirty/recovered) plus a CLEAN-source vocabulary (permeate/cleanwater/RO/UF/deionised),
+// never a class name — so it fires identically whether the topology came from the generic
+// deriver above or a hand-authored contract.topology (aquaculture_ras, co2_mineralisation,
+// any future archetype with a treatment stage). A filter EXPLICITLY named as a final-polish
+// / point-of-use stage is exempt — polishing already-clean water immediately before
+// delivery is legitimate engineering (a carbon polish filter before bottling), unlike a
+// coarse cloth/paperbelt filter (a dirty-stream solids-removal device) sitting on RO
+// permeate, which is the defect Sam flagged.
+const TREATMENT_UNIT_OP_RE =
+  /\b(filter|cloth[\s-]?filter|paperbelt|paper[\s-]?belt|disinfect(?:ion|ing)?|\buv\b|chlorinat(?:e|ion|ing)?|ozonat(?:e|ion|ing)?|strain(?:er)?)\b/i
+const POLISH_EXEMPT_RE =
+  /\b(polish(?:ing)?|final[\s-]?(?:stage|treatment|polish)|point[\s-]?of[\s-]?use|\bpou\b|pre[\s-]?(?:use|delivery|distribution|dispatch|bottling))\b/i
+const CLEAN_SOURCE_RE =
+  /\b(permeate|clean\s?water|cleanwater|treated\s?water|product\s?water|potable|purified|fresh\s?water|reverse[\s-]?osmosis|\bro\b|\buf\b|deioni[sz]ed?|\bedi\b)\b/i
+
+export interface FilterOnDirtyStreamResult {
+  verdict: 'not_applicable' | 'pass' | 'high'
+  violations: Array<{ filter: string; upstream: string; reason: string }>
+}
+
+/**
+ * UNIVERSAL filter-on-dirty-stream invariant (design-basis: a treatment unit-op processes
+ * a dirty/recovered stream, never re-treats an already-clean one). Pure + deterministic;
+ * string-vocabulary only, so it never fabricates a numeric verdict — 'not_applicable' when
+ * the topology has no treatment-unit-op node at all, 'high' when a non-polish treatment
+ * node's immediate upstream is a clean/RO-permeate source, 'pass' otherwise (incl. every
+ * legitimate dirty/recovered-side filter and every explicitly-named polish stage).
+ */
+export function evaluateFilterOnDirtyStreamInvariant(
+  topology: Array<Record<string, unknown>>,
+): FilterOnDirtyStreamResult {
+  if (!Array.isArray(topology) || topology.length === 0) return { verdict: 'not_applicable', violations: [] }
+  const violations: Array<{ filter: string; upstream: string; reason: string }> = []
+  let anyTreatmentNode = false
+  for (const e of topology) {
+    const rec = e as Record<string, unknown>
+    const from = String(rec.from_part ?? '')
+    const to = String(rec.to_part ?? '')
+    if (!TREATMENT_UNIT_OP_RE.test(to)) continue
+    anyTreatmentNode = true
+    if (POLISH_EXEMPT_RE.test(to)) continue // an explicit final-polish / point-of-use stage — legitimate on clean water
+    if (RECOVERY_BUFFER_RE.test(from)) continue // a genuinely dirty/recovered source — the filter's correct role
+    if (CLEAN_SOURCE_RE.test(from)) {
+      violations.push({
+        filter: to, upstream: from,
+        reason: `"${to}" (a treatment unit-op) sits immediately downstream of "${from}" — an already-CLEAN/RO-permeate stream. A non-polish filter/disinfection stage belongs on the DIRTY/recovered side (design-basis: it exists to make a dirty stream clean, never to re-treat one that already is), unless explicitly named as a final-polish/point-of-use stage.`,
+      })
+    }
+  }
+  if (!anyTreatmentNode) return { verdict: 'not_applicable', violations: [] }
+  return violations.length > 0 ? { verdict: 'high', violations } : { verdict: 'pass', violations: [] }
+}
+
 // A FIELD INSTRUMENT word (sensor / transmitter / transducer / analyser / gauge / probe / level /
 // flow / pressure / temperature element) — needs a SIGNAL tie to the control system.
 const INSTRUMENT_RE =
@@ -701,8 +761,47 @@ function _selftest() {
   const unverifiedVerdict = evaluateMakeupSizingInvariant(unknownFlowLoopTopo, {})
   if (unverifiedVerdict.verdict !== 'unverified') throw new Error(`makeup-sizing invariant: a loop with unknown makeup flow must be 'unverified' (never fabricated), got '${unverifiedVerdict.verdict}'`)
 
+  // ── FILTER-ON-DIRTY-STREAM INVARIANT proveCatch + proveNoFalsePositive (2026-07-07) ──
+  // (a) proveCatch: the EXACT Sam Green defect — RO permeate feeds straight into a cloth
+  // filter (a coarse dirty-stream device), with no polish qualifier anywhere.
+  const badFilterTopo: Array<Record<string, unknown>> = [
+    { from_part: 'Reverse Osmosis Skid', to_part: 'Cloth Filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'Cloth Filter', to_part: 'Cleanwater Reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const badFilterVerdict = evaluateFilterOnDirtyStreamInvariant(badFilterTopo)
+  if (badFilterVerdict.verdict !== 'high') throw new Error(`filter-on-dirty-stream proveCatch FAILED: expected 'high' for a cloth filter fed by RO permeate, got '${badFilterVerdict.verdict}'`)
+  if (!badFilterVerdict.violations.some((v) => v.filter === 'Cloth Filter' && v.upstream === 'Reverse Osmosis Skid')) {
+    throw new Error(`filter-on-dirty-stream proveCatch: expected the violation to name the Cloth Filter + its RO upstream, got ${JSON.stringify(badFilterVerdict.violations)}`)
+  }
+
+  // (b) proveNoFalsePositive #1: an explicitly-named FINAL POLISH filter on clean water
+  // (legitimate — polishing already-treated water immediately before delivery) must PASS.
+  const polishTopo: Array<Record<string, unknown>> = [
+    { from_part: 'Cleanwater Reservoir', to_part: 'Final Polish Filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'Final Polish Filter', to_part: 'Distribution Pump', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const polishVerdict = evaluateFilterOnDirtyStreamInvariant(polishTopo)
+  if (polishVerdict.verdict !== 'pass') throw new Error(`filter-on-dirty-stream proveNoFalsePositive FAILED (final-polish filter): expected 'pass', got '${polishVerdict.verdict}' (${JSON.stringify(polishVerdict.violations)})`)
+
+  // (b) proveNoFalsePositive #2: the SAME cloth filter, correctly placed on the RECOVERY
+  // side (fed by a drain-collection sump, the real Codema topology) must PASS.
+  const goodFilterTopo: Array<Record<string, unknown>> = [
+    { from_part: 'Drain Collection Sump', to_part: 'Cloth Filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'Cloth Filter', to_part: 'Drainwater Reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const goodFilterVerdict = evaluateFilterOnDirtyStreamInvariant(goodFilterTopo)
+  if (goodFilterVerdict.verdict !== 'pass') throw new Error(`filter-on-dirty-stream proveNoFalsePositive FAILED (dirty-side filter): expected 'pass', got '${goodFilterVerdict.verdict}' (${JSON.stringify(goodFilterVerdict.violations)})`)
+
+  // (b) proveNoFalsePositive #3: a topology with NO treatment-unit-op node at all → 'not_applicable'.
+  const noFilterTopo: Array<Record<string, unknown>> = [
+    { from_part: 'Feed Pump', to_part: 'Reactor', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'Reactor', to_part: 'Product Tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const noFilterVerdict = evaluateFilterOnDirtyStreamInvariant(noFilterTopo)
+  if (noFilterVerdict.verdict !== 'not_applicable') throw new Error(`filter-on-dirty-stream: a topology with no treatment unit-op must be 'not_applicable', got '${noFilterVerdict.verdict}'`)
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
