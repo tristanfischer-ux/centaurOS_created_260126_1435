@@ -6776,6 +6776,56 @@ async function main() {
     logAction({ step: 'structural_gate_routing', count: surfacedFromGates })
   }
 
+  // ── Stage 10.7: PCB Trigger (2026-07-07) — decide if a bespoke PCB is needed.
+  //
+  // Scans sub-modules for electronic control/driver functions with TBD parts.
+  // Checks COTS coverage in the parts database. If no COTS match + bespoke
+  // signals in the brief → runs pcb_chain.py and writes state.pcbDesign.
+  // If no bespoke PCB needed → state.pcbDesign is absent, no PCB tab in dossier.
+  // Skip via CHAIN_SKIP_PCB_TRIGGER=1.
+  if (process.env.CHAIN_SKIP_PCB_TRIGGER !== '1') {
+    const tPcbTrigger = Date.now()
+    try {
+      // Write a minimal state snapshot for the Python trigger to read
+      const stateSnapshot: any = {
+        moduleDecomposition: g23State?.moduleDecomposition || design,
+        parsedBrief,
+        orchestratorContract,
+      }
+      const triggerStatePath = resolve(outDir, '10.7-pcb-trigger-state.json')
+      writeFileSync(triggerStatePath, JSON.stringify(stateSnapshot, null, 2))
+
+      const triggerScript = resolve(__dirname, 'lib', 'pcb_trigger.py')
+      const result = await new Promise<{stdout: string, stderr: string, code: number}>((resolveP) => {
+        const child = require('child_process').spawn('python3', [triggerScript, triggerStatePath, outDir], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, PYTHONPATH: resolve(__dirname, 'lib') },
+        })
+        let stdout = '', stderr = ''
+        child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); process.stderr.write(d.toString()) })
+        child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); process.stderr.write(d.toString()) })
+        child.on('close', (code: number) => resolveP({ stdout, stderr, code: code ?? 0 }))
+      })
+
+      // Read the trigger's output (it writes pcbDesign into the state file)
+      const triggerResult = JSON.parse(readFileSync(triggerStatePath, 'utf8'))
+      if (triggerResult?.pcbDesign?.triggered) {
+        console.error(`[chain] Stage 10.7 PCB Trigger: FIRED for ${triggerResult.pcbDesign.sub_module}`)
+        if (g23State) {
+          g23State.pcbDesign = triggerResult.pcbDesign
+        }
+      } else {
+        console.error(`[chain] Stage 10.7 PCB Trigger: not triggered`)
+      }
+      logAction({ step: 'pcb_trigger', latency_ms: Date.now() - tPcbTrigger, triggered: triggerResult?.pcbDesign?.triggered || false })
+    } catch (err) {
+      console.error(`[chain] Stage 10.7 PCB Trigger threw: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'pcb_trigger', latency_ms: Date.now() - tPcbTrigger, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_PCB_TRIGGER=1 — skipping Stage 10.7 PCB Trigger')
+  }
+
   // ── Stage 10.5: Part Reality Check (council item #2, 2026-05-25).
   //
   // Walks every BoM word BEFORE the renderer ingests the design, queries

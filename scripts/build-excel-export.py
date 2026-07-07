@@ -419,6 +419,167 @@ def _drawing_gate_failing(run_dir: str, *keys: str) -> Optional[bool]:
     return False if seen else None
 
 
+def _build_pcb_tab(wb, run_dir: str, pcb_design: dict):
+    """Build the PCB tab — appears only when Stage 10.7 triggered a bespoke PCB design."""
+    ws = wb.create_sheet("PCB")
+    set_widths(ws, {"A": 20, "B": 40, "C": 12, "D": 15, "E": 10, "F": 12, "G": 50})
+
+    title_row(
+        ws, "Bespoke PCB Design", 14,
+        f"Triggered by Stage 10.7: {pcb_design.get('reason', 'No COTS module covers this function')}. "
+        f"Sub-module: {pcb_design.get('sub_module', 'unknown')}. "
+        f"The PCB chain ran non-interactively: atopile schematic → netlist → KiCad board → "
+        f"FreeRouter auto-route → DRC → Gerbers → drill → positions → 3D render.",
+    )
+
+    row = ws.max_row + 2
+
+    # ── Section 1: PCB Overview ──
+    _section_header(ws, row, "PCB Overview")
+    row += 1
+    params = pcb_design.get("parameters", {})
+    overview = [
+        ("Sub-module", pcb_design.get("sub_module", "")),
+        ("Trigger reason", pcb_design.get("reason", "")),
+        ("Input voltage", str(params.get("input_voltage", ""))),
+        ("Logic voltage", str(params.get("logic_voltage", ""))),
+        ("Output channels", str(params.get("output_channels", ""))),
+        ("Current per channel", str(params.get("current_per_channel", ""))),
+        ("Communication", ", ".join(params.get("communication", []))),
+        ("Form factor", str(params.get("form_factor", ""))),
+        ("Layer count", str(params.get("layer_count", ""))),
+        ("Board quantity", str(pcb_design.get("quantity", ""))),
+        ("Cost per board", f"£{pcb_design.get('cost_per_board', 0):.2f}" if pcb_design.get("cost_per_board") else "—"),
+        ("Total PCB cost", f"£{pcb_design.get('cost_per_board', 0) * pcb_design.get('quantity', 0):.2f}" if pcb_design.get("cost_per_board") else "—"),
+        ("DRC result", f"Unconnected: {pcb_design.get('drc', {}).get('unconnected', '?')}, Shorts: {pcb_design.get('drc', {}).get('shorts', '?')}"),
+    ]
+    for label, value in overview:
+        ws.cell(row=row, column=1, value=label).font = Font(bold=True, size=10)
+        ws.cell(row=row, column=2, value=str(value)).alignment = Alignment(wrap_text=True, vertical="top")
+        row += 1
+
+    row += 2
+
+    # ── Section 2: PCB Bill of Materials ──
+    _section_header(ws, row, "PCB Bill of Materials (sourced from LCSC)")
+    row += 1
+    headers = ["Footprint", "Designators", "Qty", "LCSC ID", "Unit £", "Ext £", "Function"]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = Font(bold=True, size=10, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="333333")
+        cell.alignment = Alignment(horizontal="center")
+    row += 1
+
+    # Try to read the BoM from the PCB build directory
+    pcb_build_dir = os.path.join(run_dir, "pcb", "build")
+    bom_rows = _read_pcb_bom(pcb_build_dir)
+    if bom_rows:
+        for bom_row in bom_rows:
+            ws.cell(row=row, column=1, value=bom_row["footprint"]).font = Font(size=10)
+            ws.cell(row=row, column=2, value=bom_row["designators"]).font = Font(size=10)
+            ws.cell(row=row, column=3, value=bom_row["qty"]).alignment = Alignment(horizontal="center")
+            ws.cell(row=row, column=4, value=bom_row["lcsc"]).font = Font(size=10)
+            ws.cell(row=row, column=5, value=bom_row["unit_price"]).number_format = "£0.0000"
+            ws.cell(row=row, column=6, value=bom_row["ext_price"]).number_format = "£0.0000"
+            ws.cell(row=row, column=7, value=bom_row.get("description", "")).alignment = Alignment(wrap_text=True, vertical="top")
+            row += 1
+
+    row += 2
+
+    # ── Section 3: Manufacturing Files ──
+    _section_header(ws, row, "Manufacturing Files")
+    row += 1
+    files = [
+        ("KiCad board file", pcb_design.get("board_file", "")),
+        ("Gerbers directory", pcb_design.get("gerbers_dir", "")),
+        ("3D render", pcb_design.get("render", "")),
+    ]
+    for label, path in files:
+        ws.cell(row=row, column=1, value=label).font = Font(bold=True, size=10)
+        ws.cell(row=row, column=2, value=str(path)).alignment = Alignment(wrap_text=True)
+        row += 1
+
+    _aux_tab_score_set(ws, "PCB")
+
+def _read_pcb_bom(pcb_build_dir: str) -> list:
+    """Read the PCB BoM CSV and enrich with prices + descriptions."""
+    import csv
+    bom_path = os.path.join(pcb_build_dir, "default.csv")
+    if not os.path.exists(bom_path):
+        return []
+
+    # Local price + description databases (from pcb_chain.py)
+    LCSC_PRICE_DB = {
+        "C8387": 0.08, "C395743": 0.12, "C8734": 1.50, "C50263": 0.90,
+        "C9168": 0.60, "C81869": 0.40, "C893914": 0.45, "C8678": 0.04,
+        "C2286": 0.01, "C12624": 0.01, "C15008": 0.04, "C96123": 0.05,
+        "C15850": 0.007, "C45783": 0.015, "C15849": 0.003, "C14663": 0.002,
+        "C25804": 0.001, "C21190": 0.001, "C22962": 0.001, "C22787": 0.001,
+        "C23138": 0.001, "C22859": 0.001, "C23162": 0.001,
+    }
+    LCSC_DESC_DB = {
+        "C8387": "2-pin screw terminal block — power/signal connectors",
+        "C395743": "3-pin screw terminal block — power/signal connectors",
+        "C8734": "STM32F103C8T6 — ARM Cortex-M3 MCU, 72MHz, 64KB flash. Runs firmware",
+        "C50263": "LAN8720A — Ethernet PHY. Converts RMII to differential pairs for network",
+        "C9168": "SN65HVD230 — CAN bus transceiver. Converts MCU TX/RX to CAN_H/CAN_L",
+        "C81869": "TPS54331 — Step-down buck regulator. Converts input to 5V for gate drive",
+        "C893914": "NTTFS4C25NTWG — N-channel power MOSFET, 25V, 88A. Low-side switch",
+        "C8678": "SS34 — Schottky diode, 40V, 3A. Reverse polarity protection + bootstrap",
+        "C2286": "KT-0603R — Red indicator LED. Status indicator",
+        "C12624": "KT-0603G — Green indicator LED. Power-ok indicator",
+        "C15008": "100µF capacitor — bulk decoupling on power input rail",
+        "C96123": "47µF tantalum capacitor — buck regulator output stabilisation",
+        "C15850": "10µF ceramic capacitor — power rail decoupling near ICs",
+        "C45783": "22µF ceramic capacitor — 5V rail stabilisation",
+        "C15849": "1µF ceramic capacitor — local decoupling for individual ICs",
+        "C14663": "100nF ceramic capacitor — high-frequency decoupling, one per IC power pin",
+        "C25804": "10kΩ resistor — pull-up/pull-down for logic signals",
+        "C21190": "1kΩ resistor — gate resistor for MOSFETs, limits inrush gate current",
+        "C22962": "220Ω resistor — current-limiting for indicator LEDs",
+        "C22787": "120Ω resistor — CAN bus termination resistor",
+        "C23138": "330Ω resistor — current-limiting for status LEDs at 3.3V",
+        "C22859": "10Ω resistor — gate drive resistor for motor MOSFETs, dampens ringing",
+        "C23162": "4.7kΩ resistor — I2C bus pull-up and 1-Wire temperature sensor pull-up",
+    }
+
+    rows = []
+    with open(bom_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            lcsc = row.get("LCSC", "").strip()
+            desigs = row.get("Designator", "").split(",")
+            qty = len(desigs)
+            price = float(row.get("Price", 0))
+            if price == 0 and lcsc in LCSC_PRICE_DB:
+                price = LCSC_PRICE_DB[lcsc]
+            ext_price = price * qty
+            desc = LCSC_DESC_DB.get(lcsc, "")
+            rows.append({
+                "footprint": row.get("Footprint", ""),
+                "designators": row.get("Designator", ""),
+                "qty": qty,
+                "lcsc": lcsc,
+                "unit_price": price,
+                "ext_price": ext_price,
+                "description": desc,
+            })
+    return rows
+
+def _section_header(ws, row: int, text: str):
+    """Write a section header row."""
+    cell = ws.cell(row=row, column=1, value=text)
+    cell.font = Font(bold=True, size=12, color="FFFFFF")
+    cell.fill = PatternFill("solid", fgColor="FF4500")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+
+def _aux_tab_score_set(ws, title: str):
+    """Set a placeholder quality score for the PCB tab."""
+    score_cell = ws.cell(row=1, column=8, value="N/A (bespoke PCB)")
+    score_cell.font = Font(size=8, italic=True, color="666666")
+
+
 def _aux_tab_score(title: str, run_dir: str):
     """A deterministic quality score for a DRAWING / RENDER / META sheet that the per-tab scorecard
     (the 16 data tabs) doesn't cover — so EVERY sheet shows a quality number (Tristan 2026-06-27).
@@ -25650,6 +25811,11 @@ def build(run_dir: str, out_path: str) -> dict:
             json.dump(_num_gate, _fh, indent=2, default=str)
     except Exception:  # noqa: BLE001
         pass
+
+    # ── PCB TAB (Stage 10.7 trigger output) — appears only when a bespoke PCB was triggered ──
+    pcb_design = state.get("pcbDesign")
+    if pcb_design and pcb_design.get("triggered"):
+        _build_pcb_tab(wb, run_dir, pcb_design)
 
     wb.save(out_path)
 
