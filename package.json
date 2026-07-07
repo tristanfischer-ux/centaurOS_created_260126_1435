@@ -144,7 +144,9 @@
       "dompurify": "3.2.4"
     },
     "dompurify": "3.2.4",
-    "minimatch": "10.2.1"
+    "minimatch": "10.2.1",
+    "jspdf": "4.2.1",
+    "protobufjs": "7.6.5"
   },
   "engines": {
     "node": ">=20.0.0"
