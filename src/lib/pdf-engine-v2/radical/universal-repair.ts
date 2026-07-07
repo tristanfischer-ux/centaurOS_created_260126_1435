@@ -273,26 +273,19 @@ export async function repair(opts: {
   apiKey: string
   timeoutMs?: number
   extraContext?: string
-  /** parsedBrief from the chain — used to build the jurisdiction guardrail.
-   *  Optional for backwards-compatibility; when absent falls back to UNKNOWN. */
   parsedBrief?: any
-  /**
-   * Verified-parts allowlist built at chain start from KNOWN_PART_AUTHORITATIVE
-   * + Stage 17.6 RAG candidates + deterministic-emitter emissions.
-   *
-   * When provided, the allowlist summary is injected into the system prompt so
-   * the repair LLM knows which MPNs are approved. The HARD REJECTION happens
-   * in applyPatches — this injection is the soft signal; applyPatches is the
-   * hard gate.
-   *
-   * Optional for backwards-compatibility (old callers that don't pass it still
-   * work; they just lose the prompt-level signal). Without it, applyPatches
-   * also skips MPN validation (allowlist guard only fires when passed).
-   *
-   * Codified 2026-05-26 per handover 2026-05-26T05-34-4dd3f4a39.md Shift B
-   * item 1: Phase 2 verified-parts allowlist class-killer fix.
-   */
   verifiedPartsAllowlist?: VerifiedPartsAllowlist
+  /**
+   * Optional LLM caller override (determinism #86, 2026-07-07):
+   * When provided, the repair function routes its LLM call through this
+   * callback INSTEAD of calling OpenRouter directly. This lets the chain
+   * pass its cached `callLlm` function so Phase 2 repair calls hit the
+   * design-stage cache — making the same design+gates produce identical
+   * repair patches across runs. Without this, Phase 2 is the #1 source
+   * of non-determinism (fresh OpenRouter call every time, temperature=0
+   * is not deterministic across separate API calls).
+   */
+  llmCaller?: (opts: { model: string; system: string; user: string; maxTokens?: number; temperature?: number; thinkingLevel?: string; groundWithGoogleSearch?: boolean; timeoutMs?: number }) => Promise<{ text: string; latency_ms: number }>
 }): Promise<RepairResult> {
   // Build a jurisdiction-aware system message that adds the guardrail block
   // after the core SYSTEM template. This prevents the repair LLM from emitting
@@ -317,6 +310,26 @@ FAILED GATES (must all be resolved):
 ${opts.failedGates.map(g => `  [${g.name}] affected=${g.affected.join(',') || '-'} | ${g.reasons.join(' | ')}`).join('\n')}
 ${opts.extraContext ? '\n' + opts.extraContext + '\n' : ''}
 Return the JSON patch. Emit as many patches as needed (up to 30) — DO NOT stop at 5-8; the failure list above shows the FULL set of items to fix, not just examples.`
+
+  // DETERMINISM #86 (2026-07-07): route through the chain's cached callLlm
+  // when available so Phase 2 repair calls hit the design-stage cache.
+  // Without this, Phase 2 makes a fresh OpenRouter call every run — the #1
+  // source of non-determinism (temperature=0 is NOT deterministic across
+  // separate API calls; only caching guarantees identical output).
+  if (opts.llmCaller) {
+    console.error(`[repair] routing through cached callLlm (determinism #86)`)
+    const result = await opts.llmCaller({
+      model: FLASH_LITE,
+      system: systemWithGuardrail,
+      user: userContent,
+      maxTokens: 30_000,
+      temperature: 0,
+      thinkingLevel: 'high',
+      groundWithGoogleSearch: true,
+      timeoutMs: opts.timeoutMs ?? 600_000,
+    })
+    return parseRepairResponse(result.text)
+  }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 600_000)

@@ -5563,15 +5563,22 @@ async function main() {
       apiKey,
       timeoutMs: 600_000,
       extraContext: computeDensityTargets(design),
-      // L31 guardrail (2026-05-25): pass parsedBrief so the repair LLM
-      // receives a jurisdiction constraint + ECARO-25 / EBS-500 banned list
-      // in its system prompt. Prevents re-introduction of foreign-jurisdiction
-      // citations (UL/NEC/ASTM for UK briefs) and known incompatible
-      // brand-product combinations on every repair iteration.
       parsedBrief: parsedResult.data,
-      // 2026-05-26 class-killer: inject verified-parts allowlist as soft
-      // prompt signal. Hard enforcement happens in applyPatches below.
       verifiedPartsAllowlist,
+      // DETERMINISM #86 (2026-07-07): route Phase 2 repair through callLlm
+      // so it hits the design-stage cache. Without this, Phase 2 is the #1
+      // source of non-determinism — fresh OpenRouter call every run.
+      llmCaller: (o) => callLlm({
+        model: o.model,
+        system: o.system,
+        user: o.user,
+        maxTokens: o.maxTokens,
+        temperature: o.temperature,
+        thinkingLevel: o.thinkingLevel as 'minimal' | 'low' | 'medium' | 'high' | undefined,
+        groundWithGoogleSearch: o.groundWithGoogleSearch,
+        timeoutMs: o.timeoutMs,
+        stage: 'phase2_repair',
+      }),
     })
     if (rep.unfixable) {
       console.error(`[chain] Phase 2: repair LLM returned unfixable: ${rep.reason}`)

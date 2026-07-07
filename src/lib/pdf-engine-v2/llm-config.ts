@@ -74,6 +74,13 @@ export const LLM_CONFIG = {
   /** Brief targets reconciliation — emits a structured JSON edit; SEEDED so the same brief
    *  reconciles the same way each run (determinism #86; Tristan 2026-06-29). */
   brief_reconciliation: { temperature: 0.1, seed: 42 } as StageConfig,
+
+  /** Phase 2 repair — gate-driven design patches. SEEDED + greedy so the same
+   *  design + same failed gates produce identical repair patches across runs
+   *  (determinism #86; Tristan 2026-07-07). Without this, Phase 2 was the #1
+   *  source of non-determinism: it called OpenRouter directly (bypassing
+   *  callLlm's cache), so every run got different patches even with temp=0. */
+  phase2_repair: { temperature: 0, seed: 42 } as StageConfig,
 } as const
 
 export type StageName = keyof typeof LLM_CONFIG
