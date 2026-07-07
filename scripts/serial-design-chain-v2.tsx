@@ -5409,6 +5409,16 @@ async function main() {
         {
           designContext: String((parsedResult?.data as any)?.product_description ?? (parsedResult?.data as any)?.brief?.original_text ?? ''),
           macroWordNames: macroWordNamesForGate23,
+          // DETERMINISM #86 root 3 (2026-07-07): default to the DB-first-only
+          // mode (same CHAIN_BLANK_MPN_GENERATE precedent as fillBlankWordMpns
+          // below). Without this, a gap with no DB hit fell through to an
+          // uncached LLM generate() call every run — non-deterministic on a
+          // cold twin (e.g. the access-panel completion word: "Southco" on one
+          // run, "Stainless Steel 316 / IP66 / BS EN 60529" on the other).
+          // The DB-only fallback still fills the gap with an honest deferred
+          // descriptor (gate-20-safe), just without the LLM round-trip.
+          skipGenerate: process.env.CHAIN_GAP_FILL_GENERATE !== '1',
+          skipWriteback: process.env.CHAIN_GAP_FILL_GENERATE !== '1',
         },
       )
       if (completion.filled.length > 0) {

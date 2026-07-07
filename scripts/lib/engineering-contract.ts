@@ -12985,11 +12985,25 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     const oe = brief?.constraints?.operating_environment ?? {}
     const explicit = Number(oe.heating_design_temp_c ?? oe.design_outdoor_temp_c ?? oe.winter_design_temp_c)
     if (Number.isFinite(explicit)) return explicit                  // brief-stated 99th-percentile design day wins
-    const annualMean = Number(oe.temp_min_c)
-    // temp_min_c here is the ANNUAL MEAN (≈8 °C), not a design-day minimum → map it DOWN to
-    // a 99th-percentile heating design day (≈ annual mean − 11 K marine margin), bounded so a
-    // genuinely cold continental site is not warmed up nor a mild marine site over-cooled.
-    if (Number.isFinite(annualMean)) return Math.min(annualMean - 11, -3)
+    // DETERMINISM FIX (#86 root 2, 2026-07-07): do NOT derive from
+    // operating_environment.temp_min_c. Stage-1 brief parsing is an LLM call
+    // that is documented as NOT bit-reproducible across separate cold calls
+    // even at temperature:0/seed:42 (scripts/lib/design-stage-cache.ts), and
+    // aquaculture_ras has no CLASS_AUGMENT_DEFAULTS row in brief-augment.ts
+    // (no deterministic backstop), so temp_min_c can come back present-with-
+    // a-value on one cold run and null on the next — the prior "annual mean
+    // − 11 K" formula then produced two different heating_design_outdoor_
+    // temp_c values (observed: −16 °C vs −11 °C) that cascaded through
+    // ventilation load, heat-pump sizing, and connected electrical load.
+    // This also happened to be internally inconsistent with this function's
+    // own documented target (a CIBSE 99th-percentile design day of ≈ −3 °C
+    // for this site) — the annual-mean-minus-11 heuristic could land well
+    // below that canonical figure depending on what Stage 1 extracted.
+    // Use the canonical class/site design day unconditionally when no
+    // EXPLICIT design-temp override is given — deterministic regardless of
+    // what Stage 1's brief-parse extracted this run. A brief that wants a
+    // different site's design day should state it explicitly via
+    // operating_environment.heating_design_temp_c (still honoured above).
     return -3                                                        // canonical west-Scotland CIBSE design day
   })()
   const TANK_WATER_DEPTH_M = 3.0                                  // shallow circular rearing tank
@@ -13440,7 +13454,16 @@ registerArchetype('aquaculture_ras', (brief: any) => {
     makeup_hex_area_m2: q(makeupHexAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: 'make-up/bleed counter-current plate HEX area from Q = U·A·LMTD (U ~3,000 W/m²K water/water, LMTD = (1−ε)·ΔT balanced-flow approach)' }),
     building_process_loss_kw: q(buildingProcessLossKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `building-fabric heat loss (BS EN 12831: ~0.2 W/m²K fabric over ~7,000 m² envelope at the ${designOutdoorTempC} °C heating design temp, ΔT ${Math.round(setpointTempC - designOutdoorTempC)} K → ~${buildingProcessLossKw} kW); the make-up water heat is the make-up term, NOT re-counted here` }),
     // ── HEATING DESIGN TEMPERATURE basis (auditable) — ventilation + fabric design loads use THIS, not the annual mean ──
-    heating_design_outdoor_temp_c: q(designOutdoorTempC, '°C', 'temperature', 'min', 'system', 'calculator', { source_detail: `CIBSE 99th-percentile heating DESIGN outdoor temperature (NOT the annual-mean ${Number(brief?.constraints?.operating_environment?.temp_min_c ?? 'n/a')} °C): ventilation + fabric design heating loads MUST be sized to the design day; ≈ −3 °C for the Tayinloan/Campbeltown west-Scotland marine site (brief override via operating_environment.heating_design_temp_c)` }),
+    // DETERMINISM FIX (#86 root 2, 2026-07-07): source_detail is part of the
+    // deterministic slice (orchestratorContract.quantities) that
+    // determinism-check.tsx diffs, so it must NEVER embed a value derived
+    // from the non-deterministic Stage-1 brief-parse (operating_environment.
+    // temp_min_c) — the prior template literal also produced a literal
+    // "NaN °C" in the string whenever temp_min_c was absent (`Number(undefined
+    // ?? 'n/a')` = NaN). This description is now a static, deterministic
+    // string; see designOutdoorTempC above for why the annual-mean path was
+    // removed entirely.
+    heating_design_outdoor_temp_c: q(designOutdoorTempC, '°C', 'temperature', 'min', 'system', 'calculator', { source_detail: 'CIBSE 99th-percentile heating DESIGN outdoor temperature (NOT the annual mean): ventilation + fabric design heating loads MUST be sized to the design day; ≈ −3 °C canonical for the Tayinloan/Campbeltown west-Scotland marine site (brief override via operating_environment.heating_design_temp_c)' }),
     // ── VENTILATION MAKE-UP HEATING (council RAS fix, ventilation; HVAC-seat regression) — folded into heating_duty above ──
     ventilation_supply_air_m3_h: q(ventilationSupplyAirM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: `mechanical ventilation supply airflow = hall volume (${Math.round(hallFloorAreaM2)} m² floor × ${HALL_CLEAR_HEIGHT_M} m) × ${HALL_AIR_CHANGES_PER_H} air-changes/h ≈ ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h — the air the moisture/CO₂-laden fish hall must continuously exchange; the HRV is sized to THIS full flow (gap-4)` }),
     ventilation_heating_gross_kw: q(ventilationHeatingGrossKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `GROSS ventilation heating = heat ${ventilationSupplyAirM3H.toLocaleString('en-GB')} m³/h supply air from the ${designOutdoorTempC} °C heating DESIGN outdoor temp to ${setpointTempC} °C setpoint (ṁ·cp·ΔT, ρ 1.2 kg/m³, cp 1.005 kJ/kg·K, ΔT ${ventDeltaTLift} K) ≈ ${ventilationHeatingGrossKw} kW — sized to the CIBSE design day, NOT the annual mean` }),

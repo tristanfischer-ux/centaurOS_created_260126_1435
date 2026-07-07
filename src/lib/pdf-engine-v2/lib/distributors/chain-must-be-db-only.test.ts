@@ -28,9 +28,11 @@
  *   scripts/ingest-distributor-catalogue.ts      — bulk sweep
  *   scripts/lib/background-enrichment.ts         — post-chain enrichment
  *
- * NOTE on part-reality-check.ts: this Stage 10.5 soft stage still uses live
- * API calls as of 2026-05-25 and is tracked as a follow-up conversion. It is
- * in the ALLOWED_LIVE_API_CALLERS list until converted.
+ * scripts/lib/part-reality-check.ts (Stage 10.5) was converted to DB-only on
+ * 2026-07-07 (determinism #86 root 4 — live-catalogue lookups made
+ * partVerifications prices jitter run-to-run on a cold twin) and is now
+ * covered by CHAIN_SIDE_FILES_UNDER_TEST below like the other chain-side
+ * gates.
  */
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
@@ -45,6 +47,7 @@ const CHAIN_SIDE_FILES_UNDER_TEST = [
   'scripts/lib/fictional-pn-audit.ts',
   'scripts/lib/per-line-price-plausibility-audit.ts',
   'scripts/lib/orchestrator/tools/distributor-cascade-real.ts',
+  'scripts/lib/part-reality-check.ts',
 ]
 
 // Pattern that identifies a forbidden live-adapter import.

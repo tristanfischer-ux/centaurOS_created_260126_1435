@@ -154,9 +154,9 @@ ALL CHAIN-SIDE READS GO THROUGH:
 
 QUOTA-PROTECTION GUARANTEE: chain runs cannot burn distributor free-tier quotas, because no chain-side code touches live APIs. Repeatedly broken before 2026-05-25 (L23-L26 burnt Mouser/DK/Nexar quotas via gate 20/21 + orchestrator tool — ~200 calls/chain × N chains = Mouser 1000/day, DK 1000/day, Nexar 100/month all exhausted within hours).
 
-KNOWN FOLLOW-UP: `scripts/lib/part-reality-check.ts` (Stage 10.5 soft stage) still uses live API calls as of 2026-05-25. It is the only remaining violator. Convert it when Stage 10.5 needs work.
+FOLLOW-UP CLOSED (2026-07-07): `scripts/lib/part-reality-check.ts` (Stage 10.5 soft stage) was the last remaining violator and is now converted to `lookupCached()` (determinism #86 root 4 — live-catalogue lookups made `partVerifications` prices jitter run-to-run on a cold twin).
 
-REGRESSION TEST: `src/lib/pdf-engine-v2/lib/distributors/chain-must-be-db-only.test.ts` enforces this principle. Build fails if fictional-pn-audit.ts, per-line-price-plausibility-audit.ts, or distributor-cascade-real.ts imports a live distributor adapter.
+REGRESSION TEST: `src/lib/pdf-engine-v2/lib/distributors/chain-must-be-db-only.test.ts` enforces this principle. Build fails if fictional-pn-audit.ts, per-line-price-plausibility-audit.ts, distributor-cascade-real.ts, or part-reality-check.ts imports a live distributor adapter.
 
 INGEST JOBS:
 - Weekly component sweep: `bash scripts/ingest/run-weekly-component-sweep.sh`

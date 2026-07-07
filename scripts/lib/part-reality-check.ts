@@ -40,11 +40,23 @@
  * --write-back: patch state.json in-place (the chain passes this flag). Without
  *   the flag the patched state is written to <statePath>.reality-checked.json.
  *
- * Quota conservation: same 4-native-first, Nexar-last-resort cascade as gate 20.
- *   All distributor calls go through the cascade-cache (dd51b9383) so repeated
- *   runs on the same BoM incur zero additional quota cost.
+ * CHAIN-AS-DB-CONSUMER (converted 2026-07-07, determinism #86 root 4): reads
+ * ONLY from forge-truth.db via lookupCached() — no live distributor API calls
+ * happen here. Previously this stage called the live Mouser/Digi-Key/Farnell/
+ * LCSC/Nexar APIs directly (a violation of CLAUDE.md's CHAIN-AS-DB-CONSUMER
+ * PRINCIPLE, tracked as a known follow-up since 2026-05-25); live catalogue
+ * state can change between two calls to the SAME query (a part goes in/out of
+ * stock, a distributor's own search index reorders), so on a cold twin run
+ * (caches cleared, no shared warm state) the SAME fictional/near-miss MPN
+ * could resolve real on one run and not on the other, or resolve to a
+ * DIFFERENT library substitute — the exact `partVerifications` price jitter
+ * (TBD catalogue class £1122 vs £2805) observed on the aquaculture_ras cold
+ * twin. DB reads are pure functions of forge-truth.db's current contents, so
+ * two cold runs against the same DB snapshot resolve identically. Live
+ * discovery is handled by scripts/ingest/* on its own schedule.
  *
- * Semaphore: max 3 concurrent distributor fan-outs (same as gate 20).
+ * Semaphore: kept for structural parity with gate 20 (harmless on synchronous
+ * DB reads — no actual fan-out cost since there is no network call left).
  *
  * Pre-change mempalace search: "reviewer R1 R4 specialist library override part
  * picking" → 3 drawers loaded. "stage 17.6 RAG library candidates BESS" →
@@ -56,24 +68,7 @@
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-
-// ── DISTRIBUTOR IMPORTS ──────────────────────────────────────────────────────
-// Mirror fictional-pn-audit.ts: dynamic require so the compiler doesn't demand
-// exact types at the import site. These are the same cached distributor wrappers
-// wired in dd51b9383.
-
-const distDir = resolve(__dirname, '../../src/lib/pdf-engine-v2/lib/distributors')
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuMouser } = require(resolve(distDir, 'mouser')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/mouser')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuDigikey } = require(resolve(distDir, 'digikey')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/digikey')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuFarnell } = require(resolve(distDir, 'farnell')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/farnell')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuLcsc } = require(resolve(distDir, 'lcsc')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/lcsc')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuNexar } = require(resolve(distDir, 'nexar')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/nexar')
+import { lookupCached } from '../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 // ── CURATED-TABLE SKIP ───────────────────────────────────────────────────────
 // Parts in KNOWN_PART_AUTHORITATIVE are gate 13's domain. Reality Check skips
@@ -101,28 +96,12 @@ function isInCuratedTable(mpn: string, manufacturer: string | null): boolean {
 const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|standard|n\/?a|tbd|various|custom|bespoke|oem|\d{1,4}mm?\s*(?:angle|plate|rod|tube|pipe|cable|wire|bracket|channel|gland|trunking)?|\d+(?:\.\d+)?\s*(?:A|V|W|kW|kVA|kWh|MWh|Hz|mm|m|kg)\s*[-_/]?\s*\w*)$/i
 const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
 
-// ── EXISTENCE CHECK ──────────────────────────────────────────────────────────
-// 4 native distributors in parallel, Nexar only as last resort.
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T | null> {
-  const abort = new AbortController()
-  const timer = setTimeout(
-    () => abort.abort(new Error(`[part-reality-check] ${label} timed out after ${ms}ms`)),
-    ms,
-  )
-  try {
-    const result = await promise
-    clearTimeout(timer)
-    return result
-  } catch {
-    clearTimeout(timer)
-    return null
-  }
-}
+// ── EXISTENCE CHECK (DB-ONLY) ─────────────────────────────────────────────────
+// CHAIN-AS-DB-CONSUMER: reads only forge-truth.db via lookupCached(). No live
+// distributor API calls happen here — see the file-header note (determinism
+// #86 root 4). `nexar_tried` / the `sources` labels are retained for the
+// markdown report + actions.jsonl shape; nexar_tried is always false now since
+// no live Nexar call is ever made from this stage.
 
 interface ExistenceResult {
   real: boolean
@@ -130,43 +109,16 @@ interface ExistenceResult {
   nexar_tried: boolean
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 async function checkExists(
   mpn: string,
   manufacturer: string | null,
 ): Promise<ExistenceResult> {
-  const TIMEOUT_MS = 8_000
-
-  const [m, d, f, l] = await Promise.all([
-    withTimeout(lookupSkuMouser(mpn).catch(() => null), TIMEOUT_MS, `mouser:${mpn}`),
-    withTimeout(lookupSkuDigikey(mpn).catch(() => null), TIMEOUT_MS, `digikey:${mpn}`),
-    withTimeout(lookupSkuFarnell(mpn).catch(() => null), TIMEOUT_MS, `farnell:${mpn}`),
-    withTimeout(lookupSkuLcsc(mpn).catch(() => null), TIMEOUT_MS, `lcsc:${mpn}`),
-  ])
-
-  function mfrCompatible(row: { manufacturer?: string } | null): boolean {
-    if (!row) return false
-    if (!manufacturer?.trim()) return true
-    const decl = manufacturer.trim().toLowerCase()
-    const rowMfr = (row.manufacturer ?? '').toLowerCase()
-    if (!rowMfr) return true
-    return rowMfr.includes(decl) || decl.includes(rowMfr)
+  const dbResult = lookupCached(manufacturer, mpn)
+  if (dbResult.found) {
+    return { real: true, sources: [dbResult.source], nexar_tried: false }
   }
-
-  const hits1: string[] = []
-  if (mfrCompatible(m)) hits1.push('mouser')
-  if (mfrCompatible(d)) hits1.push('digikey')
-  if (mfrCompatible(f)) hits1.push('farnell')
-  if (mfrCompatible(l)) hits1.push('lcsc')
-
-  if (hits1.length > 0) {
-    return { real: true, sources: hits1, nexar_tried: false }
-  }
-
-  const n = await withTimeout(lookupSkuNexar(mpn).catch(() => null), TIMEOUT_MS, `nexar:${mpn}`)
-  if (n && mfrCompatible(n)) {
-    return { real: true, sources: ['nexar'], nexar_tried: true }
-  }
-  return { real: false, sources: [], nexar_tried: true }
+  return { real: false, sources: [], nexar_tried: false }
 }
 
 // ── SEMAPHORE ────────────────────────────────────────────────────────────────

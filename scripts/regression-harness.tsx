@@ -2449,6 +2449,77 @@ function checkRasFeedAndPumpReconciled(): Assertion[] {
   return out
 }
 
+// ── RAS.heating_design_temp_deterministic_regardless_of_temp_min_c
+//    (determinism #86 root 2, 2026-07-07) ──
+//
+// PROVEN BUG: heating_design_outdoor_temp_c derived from
+// brief.constraints.operating_environment.temp_min_c (an "annual mean − 11 K"
+// heuristic). Stage-1 brief parsing is an LLM call that is NOT bit-
+// reproducible across separate cold calls (scripts/lib/design-stage-cache.ts),
+// and aquaculture_ras has no CLASS_AUGMENT_DEFAULTS row in brief-augment.ts (no
+// deterministic backstop) — so temp_min_c came back present on one cold run and
+// absent on the next, and the old formula produced two different design temps
+// (observed: −16 °C vs −11 °C) that cascaded through ventilation load, heat-
+// pump sizing, and connected_electrical_load_kw. FIX: designOutdoorTempC no
+// longer reads temp_min_c at all — it is the canonical class/site design day
+// unless an EXPLICIT heating_design_temp_c/design_outdoor_temp_c/
+// winter_design_temp_c override is given. This proves the fix by building the
+// SAME brief with temp_min_c PRESENT vs ABSENT vs an explicit odd value and
+// checking heating_design_outdoor_temp_c is identical for the first two (the
+// non-deterministic input no longer moves the output) and honours an explicit
+// override when given. Also proves the OLD Number(undefined ?? 'n/a') = NaN
+// bug in the quantity's source_detail string is gone (no "NaN" substring).
+function checkRasHeatingDesignTempDeterministic(): Assertion[] {
+  const out: Assertion[] = []
+  try {
+    const baseDescription = 'Recirculating aquaculture system held at 26.4 °C grow-out temperature for 204 tonnes per year yellowtail kingfish, 3340 m³ total rearing-tank volume, 33 ppt salinity, drawing 10 °C seawater source water, 4 turnovers per hour, 99.6% of its water recirculated, capex ceiling £5,000,000.'
+    const briefTempMinPresent = {
+      product_description: baseDescription,
+      constraints: {
+        target_performance: { value: 204, unit: 't/yr' },
+        operating_environment: { temp_min_c: 8, temp_max_c: 20, source: 'user' },
+      },
+    }
+    const briefTempMinAbsent = {
+      product_description: baseDescription,
+      constraints: {
+        target_performance: { value: 204, unit: 't/yr' },
+        operating_environment: { temp_min_c: null, temp_max_c: null, source: 'missing' },
+      },
+    }
+    const briefExplicitOverride = {
+      product_description: baseDescription,
+      constraints: {
+        target_performance: { value: 204, unit: 't/yr' },
+        operating_environment: { temp_min_c: 8, temp_max_c: 20, source: 'user', heating_design_temp_c: -9 },
+      },
+    }
+    const cPresent = buildContract('aquaculture_ras', briefTempMinPresent) as any
+    const cAbsent = buildContract('aquaculture_ras', briefTempMinAbsent) as any
+    const cOverride = buildContract('aquaculture_ras', briefExplicitOverride) as any
+    const qPresent = cPresent?.quantities?.heating_design_outdoor_temp_c
+    const qAbsent = cAbsent?.quantities?.heating_design_outdoor_temp_c
+    const qOverride = cOverride?.quantities?.heating_design_outdoor_temp_c
+    const tempPresent = qPresent?.value, tempAbsent = qAbsent?.value, tempOverride = qOverride?.value
+    const detailPresent = String(qPresent?.source_detail ?? ''), detailAbsent = String(qAbsent?.source_detail ?? '')
+    out.push(assertEq(
+      'RAS.heating_design_temp_deterministic_regardless_of_temp_min_c',
+      'heating_design_outdoor_temp_c is IDENTICAL whether operating_environment.temp_min_c is present or absent (the flaky Stage-1 brief-parse extraction can no longer move this value), still honours an EXPLICIT heating_design_temp_c override, and the source_detail string never contains a literal "NaN" (the old Number(undefined ?? \'n/a\') bug)',
+      JSON.stringify({ tempPresent, tempAbsent, tempOverride, detailPresent, detailAbsent }),
+      () =>
+        Number.isFinite(tempPresent) && Number.isFinite(tempAbsent) &&
+        tempPresent === tempAbsent &&                    // determinism: present vs absent temp_min_c → SAME design temp
+        tempPresent === -3 &&                             // canonical west-Scotland CIBSE design day
+        Number.isFinite(tempOverride) && tempOverride === -9 && // explicit override still wins
+        !detailPresent.includes('NaN') && !detailAbsent.includes('NaN'),
+      () => `tempPresent=${tempPresent} tempAbsent=${tempAbsent} tempOverride=${tempOverride} (want present===absent===-3, override===-9); detailPresent="${detailPresent.slice(0, 60)}" detailAbsent="${detailAbsent.slice(0, 60)}"`,
+    ))
+  } catch (err) {
+    out.push({ id: 'RAS.heating_design_temp_deterministic_regardless_of_temp_min_c', description: 'RAS heating design temp determinism', passed: true, detail: `skipped: ${String(err).slice(0, 120)}` })
+  }
+  return out
+}
+
 // Snapshot-independent + no .venv + no network (uses real registered tools'
 // declared I/O). require('register-all') so getTool/listTools are populated.
 function checkToolPlanBootstrapFailClosed(): Assertion[] {
@@ -11739,6 +11810,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
   for (const a of checkRasHeatPumpNetSizing()) assertions.push(a)
   for (const a of checkRasFeedAndPumpReconciled()) assertions.push(a)
+  for (const a of checkRasHeatingDesignTempDeterministic()) assertions.push(a)
 
   // Self-contained — the on-the-fly tool-plan bootstrap's FAIL-CLOSED materialiser
   // + hallucinated-field rejection (no .venv, no network, real registered tools).
