@@ -183,6 +183,15 @@ class AirSystem:
     schedule_present: bool = False
     duty_word: str = "cooling"   # 'heating' | 'cooling' — honest air-side duty label
     dehumidifier: Optional["Dehumidifier"] = None   # the ledger's dehumidification unit
+    # NO-ORPHAN-SUBSYSTEM (Sam Green SME review, 2026-07-07): True when NOTHING in the
+    # design carries an HVAC/climate-control requirement — see the check in
+    # derive_air_system for the exact signal set. When True, generate_hvac() writes NO
+    # drawing at all (the renderer's existing existsSync skip omits the sheet), instead
+    # of synthesising a fake AHU so "the layout still reads". A subsystem with no driving
+    # requirement anywhere in the brief/physics/BoM must never be hallucinated onto a
+    # dossier — universal, keyed on requirement signals, never a product-class name.
+    not_applicable: bool = False
+    not_applicable_reason: str = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -535,6 +544,39 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     # the air airflow may still exist (a container HVAC pair / cabinet AC aux load).
     medium = "liquid" if main_liquid and not airflow_cms else (
         "mixed" if main_liquid and airflow_cms else "air")
+
+    # ---- NO-ORPHAN-SUBSYSTEM SCOPE GATE (Sam Green SME review, 2026-07-07) ------
+    # Sam: "What is the HVAC required for? What is its design requirement?" — a real
+    # Fischer Farms water-treatment P&ID has NO HVAC at all, yet the old code below
+    # ALWAYS synthesised a fake AHU "so the layout still reads" whenever no real hub was
+    # placed, regardless of whether the design carries any climate-control need. That is
+    # a hallucinated subsystem: a drawing with no driving requirement anywhere in the
+    # brief/physics/BoM. The fix is a SCOPE CHECK on requirement PROVENANCE, universal
+    # across every archetype (never a class name): the design has an HVAC requirement
+    # iff AT LEAST ONE of — (a) real HVAC/cooling equipment was PLACED in the manifest
+    # (`hubs`); (b) a served zone (server rack / grow bench / aisle) was PLACED
+    # (`zones`, read before the derive-fallback below); (c) the physics/brief contract
+    # publishes a design airflow or cooling/heating duty quantity (`airflow_cms` /
+    # `cooling_kw`, both 0.0 only when NO such quantity exists — see _read_design_airflow
+    # / _read_cooling_kw, neither fabricates a value from nothing); (d) the routed
+    # connection schedule carries a thermal/duct distribution run (`_thermal_rows`); (e)
+    # the BoM carries a dehumidification unit. None of these ⇒ no HVAC anywhere in this
+    # design ⇒ return NOT-APPLICABLE and never synthesise a hub. A design that legitimately
+    # needs HVAC (BESS thermal management, a data-hall CRAC, a vertical-farm grow room)
+    # always trips at least one signal — proven both directions in the selftest below.
+    if not (hubs or zones or airflow_cms > 0 or cooling_kw > 0
+            or bool(_thermal_rows(schedule)) or _read_dehumidifier(state) is not None):
+        return AirSystem(
+            archetype=arch, hubs=[], zones=[], ducts=[], diffusers=[], bbox=bbox,
+            medium=medium, airflow_cms=0.0, cooling_kw=0.0, zones_derived=False,
+            notes=[], schedule_present=False, duty_word=_duty_word(state),
+            dehumidifier=None, not_applicable=True,
+            not_applicable_reason=(
+                "no HVAC/climate-control requirement anywhere in this design — no "
+                "placed air-handling/cooling equipment, no served zone, no design "
+                "airflow or cooling/heating duty quantity, no thermal distribution "
+                "run, and no dehumidification unit in the BoM"),
+        )
 
     # ---- ensure we have a hub --------------------------------------------------
     if not hubs:
@@ -2225,6 +2267,21 @@ def generate_hvac(out_dir: str, state_path: Optional[str] = None,
     _ISSUE_DATE = _tb.issue_date(out_dir)
     manifest, state, schedule = load_inputs(out_dir, state_path, manifest_path)
     sysm = derive_air_system(manifest, state, schedule, out_dir)
+    if sysm.not_applicable:
+        # NO-ORPHAN-SUBSYSTEM: write NOTHING — no SVG, no PNG, no A1 set. The renderer's
+        # existing existsSync-gated skip (the "same philosophy" this module's own module
+        # docstring already claims for a missing rasteriser) omits the HVAC sheet
+        # entirely, exactly as if Blender were absent — never a fabricated drawing for a
+        # subsystem the design has no requirement for.
+        print(f"[hvac] NOT APPLICABLE — {sysm.not_applicable_reason}")
+        summary = {
+            "archetype": sysm.archetype, "medium": sysm.medium, "svg": None, "png": None,
+            "a1": None, "hubs": 0, "zones": 0, "ducts": 0, "diffusers": 0,
+            "airflow_cms": 0.0, "airflow_cfm": 0, "cooling_kw": 0.0,
+            "zones_derived": False, "schedule_present": False,
+            "not_applicable": True, "not_applicable_reason": sysm.not_applicable_reason,
+        }
+        return summary, sysm, ""
     meta = {"count": manifest.get("count", 0), "schema": manifest.get("schema", "")}
     # WALL-PENETRATION SEAL (2026-07-05, HVAC air-side coverage pass): a BoM line
     # describing a duct's fire/gas-tight wall-penetration seal (the transit frame where a
@@ -2323,14 +2380,89 @@ def generate_hvac(out_dir: str, state_path: Optional[str] = None,
         "cooling_kw": round(sysm.cooling_kw, 1),
         "zones_derived": sysm.zones_derived,
         "schedule_present": sysm.schedule_present,
+        "not_applicable": False,
     }
     return summary, sysm, svg_text
+
+
+def _selftest() -> int:
+    """Pure, no-Blender proveCatch for the NO-ORPHAN-SUBSYSTEM scope gate in
+    derive_air_system (Sam Green SME review, 2026-07-07). Proves BOTH directions on
+    synthetic manifest/state fixtures — no fixture files, no Blender, no rasteriser."""
+    fails = []
+
+    def chk(name, cond):
+        if not cond:
+            fails.append(name)
+
+    empty_manifest = {"parts": [], "bbox_mm": {"x_min_mm": 0, "y_min_mm": 0,
+                                               "x_max_mm": 20000, "y_max_mm": 10000}}
+
+    # (a) proveCatch — a water-treatment-shaped design (Sam's Fischer Farms case): no
+    # placed HVAC equipment, no served zones, no airflow/cooling/heating quantity, no
+    # thermal schedule row, no dehumidifier. MUST come back not_applicable.
+    water_state = {"orchestratorContract": {"product_class": "aquaculture_ras",
+                                            "quantities": {
+                                                "irrigation_pump_flow_m3_h": {"value": 90},
+                                                "ro_permeate_flow_m3_h": {"value": 11},
+                                            }}}
+    sysm_water = derive_air_system(empty_manifest, water_state, {}, "/tmp")
+    chk("water_plant_not_applicable", sysm_water.not_applicable is True)
+    chk("water_plant_no_hub_synthesised", len(sysm_water.hubs) == 0)
+    chk("water_plant_reason_states_no_requirement",
+        "no HVAC" in sysm_water.not_applicable_reason)
+
+    # (b) proveNoFalsePositive — a design with a real published cooling duty (BESS
+    # thermal management) but NO equipment placed yet in the manifest. Must NOT be
+    # suppressed — a genuine requirement must still get its hub synthesised.
+    bess_state = {"orchestratorContract": {"product_class": "bess",
+                                           "quantities": {
+                                               "system_thermal_dissipation_kw": {"value": 42.0},
+                                           }}}
+    sysm_bess = derive_air_system(empty_manifest, bess_state, {}, "/tmp")
+    chk("bess_cooling_duty_not_suppressed", sysm_bess.not_applicable is False)
+    chk("bess_hub_synthesised", len(sysm_bess.hubs) == 1)
+
+    # (c) proveNoFalsePositive — a design with a real airflow quantity (data-hall CRAC)
+    # must also NOT be suppressed.
+    dc_state = {"orchestratorContract": {"quantities": {
+        "hvac_airflow_cms": {"value": 3.2},
+    }}}
+    sysm_dc = derive_air_system(empty_manifest, dc_state, {}, "/tmp")
+    chk("data_hall_airflow_not_suppressed", sysm_dc.not_applicable is False)
+
+    # (d) proveNoFalsePositive — a design with NO quantity signal but a REAL placed
+    # zone (a server rack physically in the manifest) must also NOT be suppressed —
+    # the served equipment itself is the requirement.
+    rack_manifest = {"parts": [{"name": "Server Rack 1", "module": "compute",
+                                "equipment_tag": "RK-1", "pos_mm": [1000, 1000, 0],
+                                "dims_mm": {"w": 600, "d": 1000, "h": 2000}}],
+                     "bbox_mm": empty_manifest["bbox_mm"]}
+    sysm_rack = derive_air_system(rack_manifest, {}, {}, "/tmp")
+    chk("placed_zone_not_suppressed", sysm_rack.not_applicable is False)
+
+    # (e) the generate_hvac() wrapper writes NO files when not_applicable (checked at
+    # the source level: the function must short-circuit before touching draw_dir).
+    import inspect
+    src = inspect.getsource(generate_hvac)
+    chk("generate_hvac_short_circuits_before_svg_write",
+        src.index("sysm.not_applicable") < src.index("svg_path.write_text"))
+
+    if fails:
+        print("[hvac] SELFTEST FAIL: " + ", ".join(fails))
+        return 1
+    print("[hvac] selftest OK (no-orphan-subsystem scope gate: fires on a water-only "
+          "design with zero HVAC signal; a real cooling-duty/airflow-quantity/placed-"
+          "zone design is never suppressed)")
+    return 0
 
 
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] in ("--selftest", "selftest"):
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:
