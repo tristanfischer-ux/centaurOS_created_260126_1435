@@ -21,6 +21,7 @@ import type { GateResult } from './universal-arithmetic-gates'
 import { normaliseKind, normaliseModifierValue } from './universal-grammar-gates'
 import type { VerifiedPartsAllowlist } from './allowlist-builder'
 import { allowlistContainsMpn, renderAllowlistForPrompt } from './allowlist-builder'
+import { isLockedKind } from '../lib/emitter-identity-lock'
 
 /**
  * In-place dedup of modifier_characters on a single word. Collapses entries
@@ -258,7 +259,7 @@ The chain's applyReviewerPatches sees an add_word_to_sub_module-like patch with 
 Do NOT fabricate NEW words to satisfy \`sub_module_word_density\` (sub-modules with <5 words): the gate forgives faithful split partitions + the single-thin exception, and the no-new-part_number rule below means any fabricated word becomes a prose-only "Filler word N" placeholder that pollutes the BoM. An under-covered sub-module is an emitter coverage gap (fix in deterministic-emitter.ts), NOT a Phase 2 padding task — leave it at its real word count.
 
 ARCHITECTURAL CONSTRAINT (2026-05-26 — do not violate):
-You may NOT add new BoM words with part numbers (part_number modifier) — those must come from the deterministic-emitter. The chain HARD REJECTS any patch adding a new word_id with a part_number modifier (exit path via applyPatches allowlist guard). You may only modify existing words' modifiers and add prose-only words (description / commentary / english_sentence updates). When a sub_module is missing BoM coverage, that is an emitter gap to be fixed in deterministic-emitter.ts, not a Phase 2 repair task.
+You may NOT add new BoM words carrying ANY emitter-owned identity/spec modifier — part_number, manufacturer, capacity, dimension, form, material, regulatory, rating_primary, rating_secondary, or quantity — those must come from the deterministic-emitter. The chain HARD REJECTS any patch adding a new word_id with any such modifier (exit path via applyPatches identity-lock guard). You may only modify existing words' modifiers and add prose-only words (description / commentary / english_sentence updates, with no material/quantity/regulatory/manufacturer/rating/capacity/dimension/form/part_number modifier). When a sub_module is missing BoM coverage, that is an emitter gap to be fixed in deterministic-emitter.ts, not a Phase 2 repair task.
 
 If you genuinely cannot fix all failures within 30 patches, return:
 { "unfixable": true, "reason": "...", "patches": [] }
@@ -721,19 +722,42 @@ export function applyPatches(
           continue
         }
       }
-      // ── NEW-WORD-WITH-MPN GUARD (2026-05-26 architectural invariant) ────────
-      // Phase 2 LLM may NEVER add a genuinely new word_id that carries a
-      // part_number modifier. The deterministic-emitter owns every MPN-bearing
-      // word; Phase 2 may only ENRICH existing words or add prose-only words.
+      // ── NEW-WORD IDENTITY-LOCK GUARD (2026-05-26 architectural invariant;
+      //    WIDENED 2026-07-07 determinism audit) ──────────────────────────────
+      // Phase 2 LLM may NEVER add a genuinely new word_id that carries ANY
+      // emitter-locked-kind modifier (part_number / manufacturer / capacity /
+      // dimension / form / material / regulatory / rating_primary /
+      // rating_secondary / quantity — the SAME EMITTER_LOCKED_KINDS set
+      // emitter-identity-lock.ts defines and serial-design-chain-v2.tsx's
+      // applyReviewerPatches A2 guard already enforces via isLockedKind()).
+      // The deterministic-emitter owns every locked-identity word; Phase 2
+      // may only ENRICH existing words or add prose-only words.
       //
-      // Gate 23 (emitter-completeness-gate.ts) enforces upstream that every
-      // sub_module has emitter MPN words. This guard is the downstream enforcement
-      // that keeps Phase 2 from bypassing gate 23's intent by inventing new MPNs.
+      // ROOT CAUSE THIS WIDENING CLOSES (determinism-check.tsx slice audit,
+      // 2026-07-07): this guard used to check ONLY `part_number`, so a Phase-2
+      // repair patch (fired to satisfy the sub_module_word_density gate on a
+      // thin sub_module) could freely add a brand-new word carrying
+      // material="Galvanised Steel" + quantity="×1" + regulatory="BS EN 10025"
+      // (no part_number → the narrow check missed it) — or even
+      // manufacturer="ABB" + rating_primary="132" (a full spec, still no PN).
+      // Confirmed on a cold aquaculture_ras twin pair: `mounting_bracket`,
+      // `wiring_harness`, `fastener_kit`, `gasket_seal`, `hinge_set` (twin A
+      // only) and `mftp_motor_m3bp` + `smo254_material_word` (twin B only) —
+      // six words with LOCKED modifiers that appeared on one run and not the
+      // other, because this file's own repair() call (line ~324) is a direct
+      // OpenRouter fetch with no seed/cache, so the LLM's patch SET varies
+      // run-to-run, and this guard let the locked-bearing adds straight
+      // through. Gate 23 (emitter-completeness-gate.ts) enforces upstream that
+      // every sub_module has emitter MPN words; this guard is the downstream
+      // enforcement that keeps Phase 2 from bypassing that intent by inventing
+      // ANY new locked-identity word, not just an MPN-bearing one.
       //
       // REJECT: add_word (words[+]) where the word_id is NEW (not in cursor) AND
-      //   the word carries a part_number modifier.
+      //   the word carries ANY EMITTER_LOCKED_KINDS modifier.
       // ALLOW: add_word with same id as existing word (merge path, handled above).
-      // ALLOW: add_word with no part_number modifier (prose-only enrichment).
+      // ALLOW: add_word with no locked-kind modifier (prose-only densification —
+      //   fillers/glands/brackets described in prose only, no material/quantity/
+      //   regulatory/manufacturer/rating/capacity/dimension/form/part_number).
       if (isWordEnrichment) {
         // We already handled the existing-word merge case above. If we're here,
         // the word_id is genuinely new (no existing match).
@@ -741,32 +765,28 @@ export function applyPatches(
         const modsForMpnCheck: any[] = Array.isArray(newValForMpnCheck?.modifier_characters)
           ? newValForMpnCheck.modifier_characters
           : []
-        const hasPnModifier = modsForMpnCheck.some((mc: any) => {
-          const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
-          return (kind === 'partnumber' || kind === 'part_number' || kind === 'pn') &&
-            String(mc?.value ?? '').trim().length >= 3
-        })
-        if (hasPnModifier) {
+        const lockedModifier = modsForMpnCheck.find((mc: any) => isLockedKind(mc?.kind))
+        if (lockedModifier) {
           const newWordId = String(newValForMpnCheck?.id ?? 'unknown')
-          const mpn = modsForMpnCheck.find((mc: any) => {
-            const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
-            return kind === 'partnumber' || kind === 'part_number' || kind === 'pn'
-          })?.value ?? 'unknown'
-          // Find sub_module path for log context.
           const pathStr = `${p.module}.${p.path}`
           skipped++
           allowlistRejected++
           reasons.push(
-            `[allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent ` +
-            `MPN-bearing words; word_id=${newWordId} mpn=${mpn} sub_module=${pathStr}. ` +
-            `The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this ` +
-            `upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should ` +
-            `enrich the EXISTING emitter word instead of adding a new one. (${p.reason})`
+            `[allowlist-strict] reject add_word with locked kind="${lockedModifier.kind}" ` +
+            `value="${lockedModifier.value}" — Phase 2 LLM may not invent words carrying ` +
+            `emitter-owned identity/spec modifiers (part_number/manufacturer/capacity/` +
+            `dimension/form/material/regulatory/rating_primary/rating_secondary/quantity); ` +
+            `word_id=${newWordId} sub_module=${pathStr}. The deterministic-emitter must own ` +
+            `all locked-identity words (determinism #86 — a non-cached, non-seeded LLM call ` +
+            `in this file must never be the one deciding whether a locked word exists). If the ` +
+            `emitter is complete for this sub_module, the Phase 2 LLM should enrich the ` +
+            `EXISTING emitter word instead of adding a new one, or add a prose-only word with ` +
+            `no locked-kind modifier. (${p.reason})`
           )
           continue
         }
       }
-      // ── END NEW-WORD-WITH-MPN GUARD ──────────────────────────────────────────
+      // ── END NEW-WORD IDENTITY-LOCK GUARD ──────────────────────────────────────
 
       // Cross-module link validation (2026-05-19 fix): reject undefined or
       // malformed appends to cross_module_grammar_links. The Phase 2 repair LLM

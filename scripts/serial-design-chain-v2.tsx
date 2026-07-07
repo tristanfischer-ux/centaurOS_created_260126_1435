@@ -2704,7 +2704,19 @@ function computeQualityScorecard(state: any): QualityScorecard {
     }
   }
 
-  // Physics critic enforcement (gate 33)
+  // Physics critic enforcement (gate 33) — DETERMINISM AUDIT (Tristan 2026-07-06):
+  // `pc.blockingFaults` is computed by evaluatePhysicsCriticEnforcement() straight off the
+  // RAW Stage-7.5 critique — it is NOT run through the corroboration layer (dossier_audit.py::
+  // _physics_issues) the way `physics_fidelity` below is. That corroboration step is exactly
+  // what B3-extended (2026-07-03) built after v56c vs v56d showed the SAME delivered design
+  // getting a re-rolled 3→5 finding set from independent critic calls — an uncorroborated
+  // count leaking straight into a non-advisory score is the identical failure mode, just on a
+  // different section. The gate-33 EXIT/BLOCK decision itself (process.exit at the enforcement
+  // check, ~line 4921) is untouched by this — that "never ship a known-failing part" guarantee
+  // stays live. This only cages the SCORE: gate 33's findings surface here as an ADVISORY
+  // annotation (visible, routes to a human) so a critic re-roll can never move the deterministic
+  // floor. The corroborated equivalent already gates the floor via the `physics_fidelity`
+  // section below (built from the python probe's corroborated finding set).
   const pc = state.physicsCriticEnforcement
   if (pc) {
     const nBlock = Array.isArray(pc.blockingFaults) ? pc.blockingFaults.length : 0
@@ -2714,6 +2726,7 @@ function computeQualityScorecard(state: any): QualityScorecard {
       // duplicate floor entry). Rename so each section appears exactly once.
       name: 'physics_gates',
       score: Math.max(0, 10 - nBlock * 3),
+      advisory: true,
       defects: Array.isArray(pc.blockingFaults)
         ? pc.blockingFaults.map((f: any) => `${f.issue || f.failure_mode || ''}`.slice(0, 200))
         : [],
@@ -3446,15 +3459,37 @@ async function main() {
     console.error(`[chain] ${gateName} (exit ${code}): FLAGGED (render-and-flag) — dossier ships as DRAFT, issue disclosed + routed. ${summary}`)
   }
   // The proven WRONGNESS enforce-gates (31 deterministic deceptions, 32 cost magnitude, 33 a part
-  // the engine KNOWS fails, 34 a domain-mismatched tool, 36 a >2.5× benchmark divergence) default
-  // to ENFORCING — each has a proven proveCatch. An explicit `=0`/`off` still wins (a deliberate
-  // shadow run). Drawing-gates (35) stays opt-in (it can be strict on a borderline aspect ratio).
+  // the engine KNOWS fails, 34 a domain-mismatched tool) default to ENFORCING — each has a proven
+  // proveCatch AND (32, 34) are pure/deterministic (no LLM in the decision itself), or (31, 33) are
+  // deterministic-hard-signal-gated / narrowly-classified. An explicit `=0`/`off` still wins (a
+  // deliberate shadow run). Drawing-gates (35) stays opt-in (it can be strict on a borderline
+  // aspect ratio).
+  //
+  // GATE 36 REVERTED TO SHADOW-BY-DEFAULT (2026-07-07, determinism audit — see B3 in
+  // ~/.claude/docs/meta-mistakes-to-avoid.md: "an LLM-driven gate must never gate the floor or
+  // exit"). Gate 36's verdict comes from a live top-down LLM benchmark (z-ai/glm-5.2) — even with
+  // the 2026-07-03 brief-anchored-blocking mitigation (284c69c09), it is NOT guaranteed to agree
+  // with itself run-to-run on an IDENTICAL brief. PROVEN on a cold aquaculture_ras twin pair
+  // (out/.determinism-twin-aquaculture_ras-{a,b}): twin B's actions.jsonl logged
+  // {"step":"benchmark_net_enforce","ok":false,"exit":36,"verdict":"radical"} while twin A's
+  // benchmark net did not even record a verdict for the same brief — an LLM opinion hard-exiting
+  // ONE twin of an identical run and not the other is exactly the failure mode B3 exists to
+  // prevent (one twin's state.json truncates before BoM/pricing settle, so
+  // determinism-check.tsx's structural-slice comparison is meaningless). This does NOT touch 32/
+  // 33/34's enforcement — those were left as Tristan set them 2026-06-24/2026-06-04. This ALSO
+  // does not undo 284c69c09's brief-anchored downgrade logic (still runs, still improves the
+  // WARN-vs-radical classification) — only the ability of a RADICAL verdict to call
+  // process.exit(36) is disabled by default. NAMED DECISION for Tristan: if the hard-stop is
+  // wanted back, prefer the QL11 pattern already used for gate 33 (scripts/regression-harness.tsx
+  // :: UNIVERSAL.physics_gates_section_stays_advisory) — keep the LLM's finding out of any
+  // deterministic score/floor/exit while still recording+routing it — rather than re-enabling a
+  // raw exit on an unreproducible verdict.
   for (const [flag, val] of [
     ['PDF_ENGINE_SELF_AUDIT_ENFORCING', 'deterministic'],
     ['COST_SANITY_ENFORCING', '1'],
     ['PHYSICS_CRITIC_ENFORCING', '1'],
     ['TOOL_ARCHETYPE_ENFORCING', '1'],
-    ['BENCHMARK_NET_ENFORCING', '1'],
+    ['BENCHMARK_NET_ENFORCING', '0'],
   ] as const) {
     if (process.env[flag] === undefined) process.env[flag] = val
   }

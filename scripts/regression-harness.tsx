@@ -12351,6 +12351,103 @@ print(json.dumps({"lv": r_lv, "dc": r_dc}))
     out.push({ id: 'UNIVERSAL.physics_critic_enforcement_corroboration', description: 'physics-critic corroboration-aware enforcement decision', passed: false, detail: `threw: ${String(err).slice(0, 160)}` })
   }
 
+  // QL11 (Tristan 2026-07-06, determinism-treadmill audit): the `physics_gates` section
+  // (gate 33 enforcement) MUST stay advisory in computeQualityScorecard(). Unlike
+  // `physics_fidelity` (QL9, corroboration-gated — a re-rolled critic finding set
+  // canonicalises to identical scoring), `physics_gates` reads pc.blockingFaults straight
+  // off the RAW Stage-7.5 critique with no corroboration layer of its own. Before this fix
+  // it was a non-advisory section — the IDENTICAL "critic re-rolls, uncorroborated count
+  // leaks into a gating score" failure mode QL9/B3 exists to close, just on a different
+  // section. Source-structural guard (computeQualityScorecard is not exported — the chain
+  // file runs main() on import — so this greps the literal the same way the
+  // density-repair guard above does) — a regression that drops `advisory: true` from the
+  // physics_gates section push would silently let a critic re-roll move the deterministic
+  // floor again.
+  {
+    const bad: string[] = []
+    try {
+      const chainSrc = readFileSync(resolve(__dirname, 'serial-design-chain-v2.tsx'), 'utf-8')
+      const m = chainSrc.match(/name:\s*'physics_gates',\s*\n\s*score:[^\n]*\n(\s*advisory:\s*true,)?/)
+      if (!m) bad.push('could not locate the physics_gates section-push literal in serial-design-chain-v2.tsx (structure changed — re-verify by hand)')
+      else if (!m[1]) bad.push('physics_gates section push is missing `advisory: true` — a re-rolled gate-33 critic finding count would drag the deterministic floor again (the exact QL9/B3 failure mode, uncaged)')
+    } catch (err) {
+      bad.push(`could not read serial-design-chain-v2.tsx: ${String(err).slice(0, 100)}`)
+    }
+    out.push(assertEq(
+      'UNIVERSAL.physics_gates_section_stays_advisory',
+      'the physics_gates (gate 33) scorecard section is advisory — its score comes straight from the uncorroborated Stage-7.5 critique, so it must never gate the deterministic floor (the corroborated equivalent, physics_fidelity, already does)',
+      bad.length, (n) => n === 0,
+      () => bad.join(' ; '),
+    ))
+  }
+
+  // ── UNIVERSAL.applypatches_rejects_new_word_with_any_locked_kind ──────────
+  // Guards the 2026-07-07 determinism audit fix: universal-repair.ts's
+  // add_word guard used to check ONLY `part_number` — a Phase-2 repair patch
+  // (fired by the density gate on a thin sub_module, sourced from a direct,
+  // non-cached, non-seeded OpenRouter fetch — repair() at line ~324) could
+  // add a brand-new word carrying material/quantity/regulatory/manufacturer/
+  // rating_primary with NO part_number and sail straight through. Confirmed
+  // live on a cold aquaculture_ras twin pair: `mounting_bracket` (material +
+  // quantity + regulatory) and `mftp_motor_m3bp` (manufacturer=ABB + material
+  // + rating_primary=132, no PN) each appeared on ONE twin and not the other —
+  // a real determinism-check.tsx identity-slice FAIL. The guard now rejects
+  // ANY new word carrying any EMITTER_LOCKED_KINDS modifier (isLockedKind),
+  // matching the A2 guard in serial-design-chain-v2.tsx's applyReviewerPatches
+  // and what determinism-check.tsx itself measures as "locked". A genuine
+  // prose-only densification add (no locked-kind modifier at all) must still
+  // pass — Phase 2 legitimately packs thin sub-modules with descriptive-only
+  // words.
+  {
+    const mkModules = () => ([{ module: 'm', sub_modules: [{ id: 'sm', words: [] }] }])
+    const lockedNoPn = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: {
+        id: 'mounting_bracket', name_human: 'Mounting bracket',
+        modifier_characters: [
+          { kind: 'material', value: 'Galvanised Steel' },
+          { kind: 'quantity', value: '×1' },
+          { kind: 'regulatory', value: 'BS EN 10025' },
+        ],
+      },
+      reason: 'density pack',
+    }]
+    const lockedMfr = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: {
+        id: 'mftp_motor_m3bp', name_human: 'Circulation pump motor',
+        modifier_characters: [
+          { kind: 'manufacturer', value: 'ABB' },
+          { kind: 'rating_primary', value: '132' },
+        ],
+      },
+      reason: 'density pack',
+    }]
+    const proseOnly = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: {
+        id: 'prose_note_word', name_human: 'Cable routing note',
+        modifier_characters: [{ kind: 'description', value: 'Routed along the north wall.' }],
+      },
+      reason: 'density pack',
+    }]
+    const r1 = applyPatches(mkModules() as never, [] as never, lockedNoPn as never)
+    const r2 = applyPatches(mkModules() as never, [] as never, lockedMfr as never)
+    const proseModules = mkModules()
+    const r3 = applyPatches(proseModules as never, [] as never, proseOnly as never)
+    const materialRejected = r1.applied === 0 && r1.allowlist_rejected === 1
+    const mfrRatingRejected = r2.applied === 0 && r2.allowlist_rejected === 1
+    const proseAllowed = r3.applied === 1 && (proseModules[0].sub_modules[0].words as never as unknown[]).length === 1
+    const ok = materialRejected && mfrRatingRejected && proseAllowed
+    out.push(assertEq(
+      'UNIVERSAL.applypatches_rejects_new_word_with_any_locked_kind',
+      'applyPatches REJECTS a new-word add carrying ANY emitter-locked-kind modifier (material+quantity+regulatory, or manufacturer+rating_primary — not just part_number) and STILL ALLOWS a genuine prose-only densification add — guards the 2026-07-07 determinism-check.tsx identity-slice fix (mounting_bracket / mftp_motor_m3bp twin-pair leak)',
+      ok,
+      (v: boolean) => v === true,
+      () => `materialRejected=${materialRejected}(applied=${r1.applied},rej=${r1.allowlist_rejected}) mfrRatingRejected=${mfrRatingRejected}(applied=${r2.applied},rej=${r2.allowlist_rejected}) proseAllowed=${proseAllowed}(applied=${r3.applied})`,
+    ))
+  }
+
   return out
 }
 
