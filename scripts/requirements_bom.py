@@ -2370,6 +2370,115 @@ def _bespoke_class(name: str) -> str:
     return "none"
 
 
+# ── UNDERGROUND-ELEMENT CIVILS DERIVATION (Sam Green SME review, 2026-07-07 — the
+# real Fischer Farms drawings' "Drain pits suggest a lot of underground civils work but
+# previous pages suggest almost no civils cost" two-truths contradiction, see also the
+# design-basis memo's cross-tab-consistency lesson). The engine already synthesises
+# below-grade drainage/collection vessels (a Drain Collection Sump / drain pit, or the
+# equivalent on any other archetype with floor drainage — RAS sumps, CO2-plant washdown
+# pits) as an open-tank fabricated SHELL, but nothing derived the separate EXCAVATION +
+# BACKFILL + CONCRETE-SURROUND civils cost of BURYING it — a genuinely different cost
+# from both the vessel's own shell fabrication AND the generic 'building / civil works'
+# hall take-off (`w.get("_structure")` above, synthesizeBuildingStructure's parametric
+# £/m² — out of scope for a class like water_treatment where no hall is synthesised).
+# A design with real underground physical scope (drain pits, buried pipe) and ~£0 on the
+# civils line is exactly the internal contradiction Sam flagged. UNIVERSAL: keyed on
+# GENERIC below-grade drainage vocabulary — a standalone below-grade noun (pit/manhole/
+# duct bank/buried/underground/below-grade/below-slab/excavation) OR a drainage-role
+# qualifier (drain/effluent/foul/surface-water/storm/sewage/collection) COLLOCATED with a
+# chamber-type noun (sump/chamber/well/pit) — never a class name, so it fires for
+# water_treatment's Drain Collection Sump, an aquaculture_ras drain sump, a
+# co2_mineralisation washdown pit, or any future archetype's below-grade drainage vessel.
+# A bare 'Coolant Sump' or 'Buffer Tank' (no drainage-role qualifier, no standalone
+# below-grade noun) never fires — proveNoFalsePositive in `_selftest`.
+_UNDERGROUND_STANDALONE_RE = re.compile(
+    r"\b(pit|manhole|duct[\s-]?bank|buried|underground|below[\s-]?grade|below[\s-]?"
+    r"(?:the\s+)?slab|excavat\w*)\b", re.I)
+_UNDERGROUND_DRAINAGE_ROLE_RE = re.compile(
+    r"\b(drain(?:age|water)?|effluent|foul|surface[\s-]?water|storm(?:water)?|sewage|collection)\b", re.I)
+_UNDERGROUND_CHAMBER_NOUN_RE = re.compile(r"\b(sump|chamber|well|pit)\b", re.I)
+
+
+def _is_underground_element(name: str) -> bool:
+    """A generically below-grade civil element — see the civils-derivation docstring
+    above. proveCatch/proveNoFalsePositive in `_selftest`."""
+    n = name or ""
+    if _UNDERGROUND_STANDALONE_RE.search(n):
+        return True
+    return bool(_UNDERGROUND_DRAINAGE_ROLE_RE.search(n) and _UNDERGROUND_CHAMBER_NOUN_RE.search(n))
+
+
+# UK-2026 groundworks parametric — DOCUMENTED model (same disclosure convention as
+# connection_sizing.py's cable/pipe £/m ladder header): bulk excavation + spoil
+# cart-away (~£180/m³ of WORKING volume, taken as 2.5× the vessel's own volume for
+# access/formwork clearance) + mass-concrete surround/backfill (~£220/m³ of the
+# vessel's OWN volume) + a fixed per-unit mobilisation/reinstatement allowance
+# (breaking ground, temporary support, surface reinstatement) of £900. Class-4
+# parametric (±30-50%, same honesty band as the DOE/NETL process-equipment curves) —
+# a real civils sub-contractor RFQ tightens it; the point is a DERIVED, non-trivial
+# line that SCALES with physical below-grade scope, never a disconnected placeholder.
+_CIVILS_EXCAVATION_GBP_PER_M3 = 180.0
+_CIVILS_EXCAVATION_WORKING_FACTOR = 2.5
+_CIVILS_CONCRETE_SURROUND_GBP_PER_M3 = 220.0
+_CIVILS_MOBILISATION_GBP = 900.0
+
+
+def _civils_cost_for_underground_vessel(vol_m3: float):
+    """Excavation + concrete surround + mobilisation for ONE below-grade vessel of
+    `vol_m3`. Returns (gbp:int, basis:str). Pure + deterministic; never zero (a
+    below-grade element always carries a non-trivial floor via the mobilisation term)."""
+    v = max(0.1, float(vol_m3 or 0.1))
+    excav_vol = v * _CIVILS_EXCAVATION_WORKING_FACTOR
+    excav = _CIVILS_EXCAVATION_GBP_PER_M3 * excav_vol
+    surround = _CIVILS_CONCRETE_SURROUND_GBP_PER_M3 * v
+    gbp = excav + surround + _CIVILS_MOBILISATION_GBP
+    basis = (f"below-grade civils (model:uk-2026-groundworks) — bulk excavation "
+             f"{excav_vol:.1f} m³ working volume @ £{_CIVILS_EXCAVATION_GBP_PER_M3:.0f}/m³ "
+             f"(£{excav:,.0f}) + mass-concrete surround/backfill {v:.1f} m³ @ "
+             f"£{_CIVILS_CONCRETE_SURROUND_GBP_PER_M3:.0f}/m³ (£{surround:,.0f}) + "
+             f"mobilisation/reinstatement £{_CIVILS_MOBILISATION_GBP:,.0f} — Class-4 "
+             f"parametric (±30-50%), scales with physical below-grade scope")
+    return round(gbp), basis
+
+
+_ROW_VOL_M3_RE = re.compile(r"(\d+(?:\.\d+)?)\s*m³")
+
+
+def civils_rows_from_underground_scope(rows: list) -> list:
+    """UNDERGROUND-ELEMENT CIVILS DERIVATION — additive post-pass (called from `assemble`
+    after every principal/connection/distribution row exists). For every PRINCIPAL row
+    (never a SUB-COMPONENT/ROUTED/CIVILS line, so this never re-fires on its own output)
+    whose requirement/part text signals a below-grade drainage vessel
+    (`_is_underground_element`), emits a PAIRED CIVILS BoM row deriving excavation +
+    concrete-surround + mobilisation cost from THAT row's OWN volume (parsed from its
+    'N m³' size text, already present in `requirement` — see the SIZE-line assembly
+    above) and quantity. NEVER FABRICATES: a matching row with no parseable volume is
+    skipped (no invented number) rather than guessed; an all-above-ground design (no
+    underground-signal rows at all) returns [] — the civils line is only as real as the
+    physical scope driving it. proveCatch/proveNoFalsePositive in `_selftest`."""
+    out = []
+    for row in rows:
+        if row.get("status") in ("SUB-COMPONENT", "ROUTED", "CIVILS"):
+            continue
+        req = str(row.get("requirement") or "")
+        part = str(row.get("part") or "")
+        if not (_is_underground_element(req) or _is_underground_element(part)):
+            continue
+        m = _ROW_VOL_M3_RE.search(req)
+        if not m:
+            continue  # no parseable volume on this row — never fabricate a civils quantity
+        vol_m3 = float(m.group(1))
+        qy = row.get("qty") or 1
+        unit_gbp, basis = _civils_cost_for_underground_vessel(vol_m3)
+        out.append({
+            "tag": "CIV", "requirement": f"{row.get('requirement', '')} · below-grade civils",
+            "status": "CIVILS",
+            "part": "civils — excavation / backfill / concrete surround (parametric take-off)",
+            "qty": qy, "unit_gbp": unit_gbp, "line_gbp": round(unit_gbp * qy), "basis": basis,
+        })
+    return out
+
+
 def _catalogue_pinned_child(kmd, child_price):
     """CATALOGUE-ADOPTED sub-component (cascade-price-adoption, 2026-07-03 codema v58):
     a child word whose `price_basis` modifier is a distributor-catalogue quote renders its
@@ -4069,6 +4178,74 @@ def _selftest() -> int:
             print(f"  FAIL word-id-collision guard: expected exactly 2 rows (the authored twin "
                   f"+ the genuine orphan; the phantom duplicate excluded), got {len(_pc_rows)}: "
                   f"{_pc_rows!r}"); bad += 1
+
+    # ═══ proveCatch/proveNoFalsePositive the UNDERGROUND-ELEMENT CIVILS DERIVATION
+    # (Sam Green SME review 2026-07-07 — "drain pits suggest a lot of underground
+    # civils work but previous pages suggest almost no civils cost"). ═══
+    # (a) proveCatch: a design with a real below-grade drain-collection sump (the
+    # Codema fixture, 5 m³ each × 2 rooms) must get a DERIVED, non-trivial civils line
+    # — not the ~£4k disconnected placeholder Sam flagged.
+    _ug_rows = [
+        {"tag": "T-1", "requirement": "Drain Collection Sump · 5 m³", "status": "SYSTEM",
+         "part": "requirement stated", "qty": 2, "unit_gbp": 3200, "line_gbp": 6400,
+         "basis": "bespoke shell take-off"},
+        # a legitimate clean-side principal — must NEVER get a civils line:
+        {"tag": "T-2", "requirement": "Fresh Water Tank · 40 m³", "status": "SYSTEM",
+         "part": "requirement stated", "qty": 1, "unit_gbp": 18000, "line_gbp": 18000,
+         "basis": "bespoke shell take-off"},
+    ]
+    _ug_civils = civils_rows_from_underground_scope(_ug_rows)
+    if len(_ug_civils) != 1:
+        print(f"  FAIL civils-derivation proveCatch: expected exactly 1 civils line for the "
+              f"1 underground row (Fresh Water Tank must NOT get one), got {len(_ug_civils)}: "
+              f"{_ug_civils!r}"); bad += 1
+    else:
+        _civ = _ug_civils[0]
+        if _civ["status"] != "CIVILS" or _civ["qty"] != 2:
+            print(f"  FAIL civils-derivation proveCatch: expected a CIVILS row at qty=2 "
+                  f"(matches the sump's own qty), got {_civ!r}"); bad += 1
+        if not (500 <= _civ["unit_gbp"] <= 5000):
+            print(f"  FAIL civils-derivation proveCatch: unit civils cost £{_civ['unit_gbp']} "
+                  f"for a 5 m³ drain pit is outside a sane Class-4 parametric band "
+                  f"(£500-£5,000) — {_civ!r}"); bad += 1
+        if _civ["line_gbp"] < 4000:
+            # this is the exact defect Sam flagged: "almost no civils cost" (~£4k on a
+            # design covered in drain pits) — the DERIVED line must clear that floor.
+            print(f"  FAIL civils-derivation proveCatch: total civils £{_civ['line_gbp']} for "
+                  f"2 drain pits reads as the SAME disconnected ~£4k placeholder Sam flagged "
+                  f"— {_civ!r}"); bad += 1
+    # (b) proveNoFalsePositive #1: an all-above-ground design (no underground-signal row
+    # at all) must get NO civils line — never fabricated.
+    _ag_rows = [
+        {"tag": "T-3", "requirement": "Fresh Water Tank · 40 m³", "status": "SYSTEM",
+         "part": "requirement stated", "qty": 1, "unit_gbp": 18000, "line_gbp": 18000,
+         "basis": "bespoke shell take-off"},
+        {"tag": "T-4", "requirement": "Softener Vessel · 1.5 m³", "status": "SYSTEM",
+         "part": "requirement stated", "qty": 2, "unit_gbp": 4200, "line_gbp": 8400,
+         "basis": "bespoke shell take-off"},
+    ]
+    if civils_rows_from_underground_scope(_ag_rows):
+        print(f"  FAIL civils-derivation proveNoFalsePositive: an all-above-ground design "
+              f"must get NO civils line, got {civils_rows_from_underground_scope(_ag_rows)!r}"); bad += 1
+    # (b) proveNoFalsePositive #2: a bare 'Coolant Sump' (drainage-role-free chamber noun,
+    # e.g. a CNC machine's skid-mounted drip tray) must NOT be read as below-grade.
+    if _is_underground_element("Coolant Sump · 0.2 m³"):
+        print("  FAIL civils-derivation proveNoFalsePositive: a bare 'Coolant Sump' (no "
+              "drainage-role qualifier) must not read as a below-grade element"); bad += 1
+    # (b) proveNoFalsePositive #3: the CIVILS row ITSELF (status='CIVILS') is excluded
+    # from re-scanning — running the pass over its own prior output never compounds.
+    _once = civils_rows_from_underground_scope(_ug_rows)
+    if civils_rows_from_underground_scope(_once):
+        print("  FAIL civils-derivation: a CIVILS row must never be re-scanned as its own "
+              "underground signal (would compound the cost on re-entry)"); bad += 1
+    # (b) proveNoFalsePositive #4: a matching underground row with NO parseable volume
+    # is skipped — never a fabricated civils number.
+    _no_vol_rows = [{"tag": "T-5", "requirement": "Drain Collection Sump", "status": "SYSTEM",
+                      "part": "requirement stated", "qty": 1, "unit_gbp": 3200, "line_gbp": 3200,
+                      "basis": "bespoke shell take-off"}]
+    if civils_rows_from_underground_scope(_no_vol_rows):
+        print("  FAIL civils-derivation: a row with no parseable volume must never get a "
+              "fabricated civils line"); bad += 1
 
     print("selftest:", "OK" if bad == 0 else f"{bad} FAILED")
     return 1 if bad else 0
@@ -6465,6 +6642,12 @@ def assemble(out_dir: str):
     # demand-sized duty provenance — stamp AFTER every row exists so a principal, connection or
     # network line whose duty IS a contract *_demand_* flow states its derivation (see helper).
     _apply_demand_sized_basis(rows, qcontract)
+
+    # ── UNDERGROUND-ELEMENT CIVILS DERIVATION (Sam Green SME review 2026-07-07) —
+    # additive; [] on any design with no below-grade drainage/collection vessel
+    # (byte-identical for every archetype without underground scope). See the
+    # function's own docstring for the full rationale.
+    rows += civils_rows_from_underground_scope(rows)
 
     # ── DISPLAY-ARITHMETIC CONSISTENCY (swarm-flagged £1 nits, 2026-06-20). A line built
     # as unit_gbp=round(x), line_gbp=round(x·qty) can show unit×qty ≠ line by up to £1
