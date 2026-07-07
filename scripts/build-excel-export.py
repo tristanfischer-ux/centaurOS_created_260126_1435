@@ -7961,6 +7961,84 @@ def _output_is_per_year(out_unit: str) -> bool:
     return False
 
 
+# ── ENERGY-FROM-DUTY-CYCLE (Sam Green SME review, 2026-07-07 — "£41k energy could be
+# too high — a lot of kit (pumps) may only operate infrequently"). The flat `load_factor`
+# below is a SINGLE average/peak ratio applied to the WHOLE connected load — the naive
+# nameplate×hours model: it costs a drain-pit submersible transfer pump (runs only when
+# its pit fills, a small fraction of the hour) the SAME duty as an RO high-pressure pump
+# (near-continuous — it maintains the makeup feed). UNIVERSAL: when the contract carries
+# a BREAKDOWN of per-part power quantities (any `*_power_kw` key), weight each part's
+# contribution by a ROLE-KEYED duty-cycle fraction — keyed on GENERIC role vocabulary in
+# the quantity key (transfer/submersible/drain/standby = intermittent; dosing/metering =
+# intermittent; RO/softener/filtration/compressor/chiller/aeration = near-continuous
+# process duty), never a class name — instead of one blanket ratio for the entire load.
+# Falls back to the EXISTING flat load_factor UNCHANGED whenever the contract carries
+# fewer than 2 distinct power lines (a single-scalar `connected_electrical_load_kw` with
+# no per-part breakdown has nothing to weight) — so a class with no power breakdown is
+# byte-identical, and an explicit engine `load_factor`/`capacity_factor` signal (checked
+# BEFORE this path, unchanged precedence) always wins over both.
+_DUTY_CYCLE_ROLE_BANDS: List[Tuple[Any, float, str]] = [
+    # (role-noun pattern, duty-cycle fraction, human label) — checked in order, first match wins.
+    (re.compile(r"\b(transfer|submersible|drain|backwash|standby|emergency|batch|sump)\b", re.I),
+     0.15, "intermittent transfer/standby duty"),
+    (re.compile(r"\b(dos(?:e|ing)|metering|nutrient|acid|chemical)\b", re.I),
+     0.35, "intermittent dosing/metering duty"),
+    (re.compile(r"\b(hand.?water|irrigation)\b", re.I),
+     0.40, "intermittent delivery duty"),
+    (re.compile(r"\b(reverse.?osmosis|ro|softener|gac|filtration|treatment|disinfection|"
+                r"uv|compressor|chiller|refrigerat\w*|aeration|blower)\b", re.I),
+     0.85, "near-continuous process/treatment duty"),
+    (re.compile(r"\b(circulation|process|main|distribution)\b", re.I),
+     0.60, "moderate circulation duty"),
+]
+_DUTY_CYCLE_DEFAULT = 0.65  # matches the existing flat-fallback assumption — an
+                            # unrecognised role is never penalised or favoured vs today
+
+
+def _duty_cycle_for_role(name: str) -> Tuple[float, str]:
+    """Role-keyed duty-cycle fraction for a named piece of powered equipment. UNIVERSAL —
+    no per-class table. Underscores are normalised to spaces so a snake_case quantity key
+    (e.g. 'ro_high_pressure_pump_power_kw') matches the same \\b-bounded vocabulary as a
+    human name. Falls back to `_DUTY_CYCLE_DEFAULT` (the SAME figure the flat model already
+    assumes) when no role vocabulary matches — never a fabricated penalty or bonus."""
+    blob = re.sub(r"[_\s]+", " ", name or "")
+    for rx, duty, label in _DUTY_CYCLE_ROLE_BANDS:
+        if rx.search(blob):
+            return duty, label
+    return _DUTY_CYCLE_DEFAULT, "unclassified — default average/peak duty"
+
+
+def _duty_weighted_load_factor(q: Dict[str, Any]) -> Optional[Tuple[float, str]]:
+    """Derive an EFFECTIVE electrical load factor as a POWER-WEIGHTED average of each named
+    part's own role duty-cycle, from every `*_power_kw` quantity in the contract. Returns
+    None (never fabricates) when fewer than 2 distinct positive power lines are present —
+    a single line (or none) has no diversity to weight, so the caller keeps the existing
+    flat load_factor unchanged. Pure + deterministic."""
+    parts: List[Tuple[str, float]] = []
+    for k in (q or {}).keys():
+        if not str(k).endswith("_power_kw"):
+            continue
+        kw = qval(q, k)
+        if kw is not None and kw > 0:
+            parts.append((k, float(kw)))
+    if len(parts) < 2:
+        return None
+    total_kw = sum(kw for _, kw in parts)
+    if total_kw <= 0:
+        return None
+    weighted = 0.0
+    labels = []
+    for name, kw in parts:
+        duty, label = _duty_cycle_for_role(name)
+        weighted += kw * duty
+        labels.append(f"{name}={duty:.2f} ({label})")
+    eff = weighted / total_kw
+    basis = (f"duty-cycle-weighted (Σ power_i × role_duty_cycle_i / Σ power_i) across "
+             f"{len(parts)} named power lines — {'; '.join(labels[:6])}"
+             f"{'…' if len(labels) > 6 else ''}")
+    return eff, basis
+
+
 def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
     """Derive the NON-RAS economics drivers from physical signals already in state,
     NOT from RAS-shaped hardcodes. Universal: keyed on signals (capex fraction,
@@ -7991,9 +8069,16 @@ def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
         load_factor = float(lf)
         lf_basis = "from engine · duty-cycle / load-factor signal"
     else:
-        load_factor = 0.65
-        lf_basis = ("assumed average/peak electrical load factor — supply a class "
-                    "duty-cycle to refine")
+        # no single engine-stated load factor — derive one from the contract's OWN
+        # per-part power breakdown (ENERGY-FROM-DUTY-CYCLE, see the function's docstring
+        # above) rather than defaulting the WHOLE load to one flat average/peak ratio.
+        _dw = _duty_weighted_load_factor(q)
+        if _dw is not None:
+            load_factor, lf_basis = _dw
+        else:
+            load_factor = 0.65
+            lf_basis = ("assumed average/peak electrical load factor — supply a class "
+                        "duty-cycle to refine")
 
     # ── labour: from a headcount/FTE signal if present, else a SANE fixed default.
     # (Tristan 2026-06-25: the old 4%-of-capex proxy gave ~£71k/yr for an unmanned battery
@@ -21238,6 +21323,58 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch/proveNoFalsePositive ENERGY-FROM-DUTY-CYCLE (Sam Green SME review
+    # 2026-07-07: "£41k energy could be too high — a lot of kit (pumps) may only operate
+    # infrequently"). ═══
+    # (a) proveCatch: a design dominated by intermittent transfer/dosing pumps must derive
+    # an EFFECTIVE load factor materially BELOW the flat 0.65 default — the exact defect
+    # (nameplate × one blanket average/peak ratio) Sam flagged.
+    _wt_q = {
+        "ro_high_pressure_pump_power_kw": 4.2,
+        "fertigation_dosing_pump_power_kw": 7.5,
+        "acid_dosing_pump_power_kw": 0.04,
+        "chemical_dosing_pump_power_kw": 0.04,
+        "drain_transfer_pump_power_kw": 4.0,
+    }
+    _wt_dw = _duty_weighted_load_factor(_wt_q)
+    if _wt_dw is None:
+        print("  FAIL duty-cycle proveCatch: expected a derived load factor from a "
+              "5-line power breakdown, got None"); bad += 1
+    else:
+        _wt_lf, _wt_basis = _wt_dw
+        if not (0.10 < _wt_lf < 0.65):
+            print(f"  FAIL duty-cycle proveCatch: expected the intermittent-pump-dominated "
+                  f"design to derive a load factor BELOW the flat 0.65 default, got {_wt_lf:.3f}"); bad += 1
+        if "duty-cycle-weighted" not in _wt_basis:
+            print(f"  FAIL duty-cycle proveCatch: basis must disclose the duty-cycle-weighted "
+                  f"derivation, got {_wt_basis!r}"); bad += 1
+    # (b) proveNoFalsePositive #1: a genuinely CONTINUOUS load (e.g. base compute / always-on
+    # cooling — no transfer/dosing/standby vocabulary anywhere) must stay near-continuous,
+    # never dragged down by the intermittent bands.
+    _cont_q = {
+        "base_compute_load_power_kw": 40.0,
+        "always_on_cooling_power_kw": 20.0,
+    }
+    _cont_dw = _duty_weighted_load_factor(_cont_q)
+    if _cont_dw is None or not (0.60 <= _cont_dw[0] <= 1.0):
+        print(f"  FAIL duty-cycle proveNoFalsePositive: a continuous-load design must stay "
+              f"near-continuous (>=0.60), got {_cont_dw!r}"); bad += 1
+    # (b) proveNoFalsePositive #2: fewer than 2 power lines → None (never fabricate a
+    # weighted figure from an insufficient breakdown; the flat load_factor stays untouched).
+    if _duty_weighted_load_factor({"single_pump_power_kw": 5.0}) is not None:
+        print("  FAIL duty-cycle proveNoFalsePositive: a single power line must return "
+              "None (insufficient diversity to weight)"); bad += 1
+    if _duty_weighted_load_factor({}) is not None:
+        print("  FAIL duty-cycle proveNoFalsePositive: an empty quantities dict must "
+              "return None"); bad += 1
+    # (b) proveNoFalsePositive #3: an explicit engine load_factor/capacity_factor signal
+    # still wins over the duty-cycle derivation (unchanged precedence) — checked at the
+    # call site in _econ_generic_drivers, but the role classifier itself must never
+    # penalise an UNRECOGNISED role below the existing flat assumption.
+    _unclassified_duty, _ = _duty_cycle_for_role("widget_power_kw")
+    if _unclassified_duty != _DUTY_CYCLE_DEFAULT:
+        print(f"  FAIL duty-cycle proveNoFalsePositive: an unrecognised role must fall back "
+              f"to the existing flat default ({_DUTY_CYCLE_DEFAULT}), got {_unclassified_duty}"); bad += 1
     # ═══ proveCatch M0 DEFINED-NAME slugging — deterministic + collide-free (Tristan's
     # auditability directive, drawer 047565b65ce05148, 2026-07-04). Two primitives with the
     # SAME label must not silently overwrite one workbook DEFINED NAME; the SAME input
