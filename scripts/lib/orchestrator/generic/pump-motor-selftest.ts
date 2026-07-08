@@ -10,7 +10,10 @@
 // Standalone (not a --selftest block inside the big module) so importing universal-contract-
 // sizing never accidentally trips a CLI path. Wired into verify-engine-guards.sh.
 
-import { explodeEquipmentSubAssemblies, reconcileDriveTrainRatings, briefPinnedQuantityKeys } from './universal-contract-sizing'
+import {
+  explodeEquipmentSubAssemblies, reconcileDriveTrainRatings, briefPinnedQuantityKeys,
+  reconcilePumpMotorAgainstStatedPressure,
+} from './universal-contract-sizing'
 
 function motorOf(modules: any, parentId: string): number {
   for (const m of modules) for (const sm of m.sub_modules) for (const w of sm.words) {
@@ -147,8 +150,77 @@ function run() {
     throw new Error('pump-motor: drive-train reconcile must be idempotent (second pass = 0 repairs)')
   }
 
+  // ── PUMP MOTOR vs BRIEF-STATED PRESSURE (Tristan 2026-07-08 — the Codema 90 m³/h @ 2.9
+  // bar physics-critic "undersized 11 kW" HIGH). proveCatch: a family's hydraulic-tool
+  // motor_kw (9.653 → single-rounds to 11 kW) undershoots the brief's OWN stated 2.9 bar
+  // discharge pressure for that same family (11.16 kW required → next frame 15 kW) — the
+  // cross-check must LIFT it to 15. proveNoFalsePositive: a brief-pinned nameplate is
+  // never re-margined; a dosing pump with no m³/h flow sibling never binds despite a stem
+  // overlap; a family whose own requirement is already adequate is left untouched; an
+  // archetype with no brief-stated pump pressure at all (RAS/CO2/BESS) is a strict no-op.
+  const q3: Record<string, number> = {
+    irrigation_pump_flow_m3_h: 90,
+    irrigation_pump_motor_kw: 9.653, // hydraulic tool's own (too-low-head) figure
+    fertigation_dosing_pump_power_kw: 7.5, // dosing pump — NO m3/h flow sibling → must not bind
+    hand_watering_pump_flow_m3_h: 25,
+    hand_watering_pump_motor_kw: 4.0, // already brief-pinned nameplate
+  }
+  const contract3: any = { quantities: {
+    irrigation_pump_motor_kw: { value: 9.653, source: 'tool:irrigation:pump-sizing' },
+    hand_watering_pump_motor_kw: { value: 4.0, source: 'brief' },
+  } }
+  const briefMetrics3 = [
+    { key_metric: 'fertigation_pump_pressure_bar', value: 2.9, unit: 'bar', category: 'performance' },
+    { key_metric: 'hand_watering_pressure_bar', value: 3.3, unit: 'bar', category: 'performance' },
+  ]
+  const corrected3 = reconcilePumpMotorAgainstStatedPressure(q3, contract3, briefMetrics3)
+  if (q3.irrigation_pump_motor_kw !== 15) {
+    throw new Error(`pump-motor: irrigation (fertigation-synonym) motor did not lift to 15 kW against the brief's 2.9 bar duty (got ${q3.irrigation_pump_motor_kw})`)
+  }
+  if (corrected3.length !== 1 || corrected3[0].key !== 'irrigation_pump_motor_kw') {
+    throw new Error(`pump-motor: expected exactly one correction (irrigation_pump_motor_kw), got ${JSON.stringify(corrected3)}`)
+  }
+  if (q3.fertigation_dosing_pump_power_kw !== 7.5) {
+    throw new Error(`pump-motor: dosing pump (no m3/h flow sibling) must never bind despite the 'fertigation' stem overlap (got ${q3.fertigation_dosing_pump_power_kw})`)
+  }
+  if (q3.hand_watering_pump_motor_kw !== 4.0) {
+    throw new Error(`pump-motor: brief-pinned hand-watering nameplate must never be re-margined (got ${q3.hand_watering_pump_motor_kw})`)
+  }
+  // idempotent: a second pass changes nothing (already at the correct frame)
+  const corrected3b = reconcilePumpMotorAgainstStatedPressure(q3, contract3, briefMetrics3)
+  if (corrected3b.length !== 0) throw new Error(`pump-motor: pressure reconcile must be idempotent (second pass = 0 corrections, got ${corrected3b.length})`)
+  // an ALREADY-adequate family (no brief pressure lower than its current sizing) is untouched
+  const q4: Record<string, number> = { recirc_pump_flow_m3_h: 50, recirc_pump_motor_kw: 30 }
+  reconcilePumpMotorAgainstStatedPressure(q4, undefined, [{ key_metric: 'recirc_pump_pressure_bar', value: 1.0, unit: 'bar' }])
+  if (q4.recirc_pump_motor_kw !== 30) throw new Error(`pump-motor: an adequately-sized pump must never be lowered (got ${q4.recirc_pump_motor_kw})`)
+  // strict no-op when the brief states no pump discharge pressure at all (RAS/CO2/BESS)
+  const q5: Record<string, number> = { recirc_pump_flow_m3_h: 1704, recirc_pump_motor_kw: 99 }
+  const corrected5 = reconcilePumpMotorAgainstStatedPressure(q5, undefined, [])
+  if (corrected5.length !== 0 || q5.recirc_pump_motor_kw !== 99) throw new Error('pump-motor: no brief pump pressure metric → must be a strict no-op')
+
+  // PLANT-WIDE / GENERIC pump pressure (the LIVE codema-pump run defect: the brief-parser
+  // named the metric generically 'pump_pressure_bar' = 2.9, which reduces to NO family
+  // token — a family-specific matcher would skip it. It is the brief's global "each at
+  // ~2.9 bar" and MUST apply as a floor to every bulk-flow delivery pump family).
+  const q6: Record<string, number> = {
+    irrigation_pump_flow_m3_h: 90,
+    irrigation_pump_motor_kw: 9.653, // tool's low-head figure → single-rounds to 11
+    fertigation_dosing_pump_power_kw: 7.5, // dosing pump: no m3/h sibling → must not bind
+  }
+  const corrected6 = reconcilePumpMotorAgainstStatedPressure(q6, undefined, [
+    { key_metric: 'pump_pressure_bar', value: 2.9, unit: 'bar', category: 'performance' },
+  ])
+  if (q6.irrigation_pump_motor_kw !== 15) throw new Error(`pump-motor: a plant-wide 'pump_pressure_bar' = 2.9 must lift the 90 m³/h delivery pump 9.653→15 kW (got ${q6.irrigation_pump_motor_kw})`)
+  if (q6.fertigation_dosing_pump_power_kw !== 7.5) throw new Error(`pump-motor: a plant-wide pressure must NOT over-motor a dosing pump with no m³/h flow sibling (got ${q6.fertigation_dosing_pump_power_kw})`)
+  if (corrected6.length !== 1) throw new Error(`pump-motor: plant-wide pressure expected exactly one correction (got ${JSON.stringify(corrected6)})`)
+  // a family-specific metric still wins where present, and a distinctive non-pump pressure
+  // (reactor_pressure_bar) is NOT global — it never touches a pump family.
+  const q7: Record<string, number> = { recirc_pump_flow_m3_h: 50, recirc_pump_motor_kw: 4 }
+  reconcilePumpMotorAgainstStatedPressure(q7, undefined, [{ key_metric: 'reactor_pressure_bar', value: 25, unit: 'bar' }])
+  if (q7.recirc_pump_motor_kw !== 4) throw new Error(`pump-motor: a distinctive 'reactor_pressure_bar' must never act as a global pump pressure (got ${q7.recirc_pump_motor_kw})`)
+
   // eslint-disable-next-line no-console
-  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent)`)
+  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent; brief-pressure cross-check: 90m³/h@2.9bar lifts 9.653→15kW, dosing pump + pinned nameplate + already-adequate family + no-pressure-metric archetype all untouched, idempotent)`)
 }
 
 run()

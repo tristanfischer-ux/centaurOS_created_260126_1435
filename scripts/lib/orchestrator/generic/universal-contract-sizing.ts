@@ -1872,6 +1872,148 @@ export function mintDemandCoverage(
   }
   return minted
 }
+
+// ── PUMP MOTOR vs BRIEF-STATED DISCHARGE PRESSURE (universal duty cross-check, Tristan
+// 2026-07-08 — the Codema 90 m³/h @ 2.9 bar pump physics-critic "undersized" HIGH) ──────
+// A pump/circulator/prime-mover's drive-motor rating must be sized from its HYDRAULIC DUTY
+// (P = rho·g·Q·H / eta), never a rough guess — the single-IEC-frame rounding rule fixed
+// 2026-07-03 is the right OUTPUT step, but it can only round what the hydraulic sizing
+// TOOL handed it. That tool's OWN assumed head/pressure is itself sometimes a generic
+// per-system-type default (e.g. 1.5 bar) that diverges from a REAL, EXPLICIT discharge
+// pressure the BRIEF states for this exact pump family ("90 m³/h at approximately 2.9
+// bar"). When that happens the tool's motor_kw undershoots the true duty and can land on
+// the wrong side of an IEC frame boundary (9.65 kW → rounds to 11 kW; the true 2.9 bar
+// duty needs ~11.2 kW → rounds to 15 kW) — the physics critic is right that 11 kW is
+// undersized even though the rounding rule itself is correct; the INPUT was wrong.
+//
+// THE FIX (universal, keyed on generic pump-role + flow + head signals, no class name):
+// cross-check every principal FLOW-RATED pump's motor_kw contract quantity against ANY
+// brief target_performance metric stating a discharge/design PRESSURE (a `..._pressure_bar`
+// key — this codebase's own self-describing-unit-suffix convention, mirroring
+// `reactor_pressure_bar` / `column_pressure_bar` elsewhere in this file) for the SAME pump
+// family, matched by stem overlap. 'irrigation' and 'fertigation' canonicalise to the same
+// stem: fertigation IS irrigation + in-line fertiliser dosing — the identical physical
+// delivery pump under two names, a standard horticultural/agricultural-engineering synonym
+// (like this file's existing recirc/recirculation collapse), not a class name. Recompute
+// P = rho·g·Q·H / eta at the REAL pressure (eta = 0.65, a sane combined pump+motor
+// efficiency default) and LIFT (never lower) the family's motor_kw when the resulting IEC
+// frame is higher than what's already there. A brief-pinned nameplate is honoured exactly
+// and never touched. A pump with no matching BULK-FLOW (`_flow_m3_h`) sibling never
+// qualifies — a dosing/trim pump's duty is litres/hour, not m³/h, so it can never bind here
+// regardless of any incidental stem overlap (the proveNoFalsePositive guard). Mutates
+// `quantities` in place (feeding buildGroups/motorKw downstream) and, when `contract` is
+// given, persists the correction with 'demand-coverage' provenance. Strict no-op when the
+// brief states no pump discharge pressure at all (BESS / RAS / CO2 / any archetype whose
+// pump head comes from a different signal — e.g. the RAS `<device>_head_m` sibling
+// injection in bootstrap-tool-plan.ts — is untouched).
+const PRESSURE_METRIC_SUFFIX_RE = /_(pressure_bar|discharge_pressure_bar|design_pressure_bar)$/i
+const PUMP_MOTOR_QTY_SUFFIX_RE = /_(motor_kw|motor_power_kw|power_kw|drive_kw)$/
+const PUMP_FLOW_QTY_SUFFIX_RE = /_(flow_m3_h|flow_m3_hr|throughput_m3_h)$/
+const PUMP_STEM_SYNONYMS: Record<string, string> = { ferti: 'irrig' }
+const canonPumpStem = (s: string): string => PUMP_STEM_SYNONYMS[s] ?? s
+// 'pump' + the plant-wide descriptor tokens (discharge / operating / main / delivery) are
+// near-universal — they must never by themselves decide a family match (the f9dfc2918
+// generic-token discipline used throughout this file), or a small DOSING pump
+// ('fertigation_dosing_pump…') would wrongly bind to the MAIN delivery pump on the shared
+// 'ferti'≡'irrig' + 'pump' tokens alone. A pressure metric that reduces to NO tokens after
+// this filter (e.g. `pump_pressure_bar`, `discharge_pressure_bar`, `system_pressure_bar`,
+// `operating_pressure_bar`) is a PLANT-WIDE pump discharge pressure — the brief's "each at
+// approximately 2.9 bar" stated once for every delivery pump — not one family's spec; it
+// applies as a GLOBAL floor to any bulk-flow pump family with no family-specific pressure of
+// its own. This mirrors the generic `operating_/system_pressure_bar` vessel fallback already
+// used for vessel-pressure lookup elsewhere in this file.
+const PUMP_FAMILY_GENERIC_TOKENS = new Set(['pump', 'disch', 'opera', 'main', 'deliv'])
+const pumpFamilyIdentity = (phrase: string): string[] =>
+  significantStems(phrase).map(canonPumpStem).filter((t) => !PUMP_FAMILY_GENERIC_TOKENS.has(t))
+/** exact-set equality (order-independent) of the non-generic identity tokens — a DOSING
+ *  pump carries an extra distinctive token ('dosin') the main pump doesn't, so it never
+ *  set-equals; two spellings of the SAME family (after synonym canonicalisation) do. */
+const sameFamilyIdentity = (a: string[], b: string[]): boolean =>
+  a.length > 0 && a.length === b.length && a.every((t) => b.includes(t))
+// P = rho·g·Q·H / eta with eta a sane COMBINED pump+motor efficiency default (0.6-0.7) —
+// deliberately a single combined factor (not separate pump-eff × motor-eff) so this cross-
+// check stays a simple, universal duty FLOOR independent of any one tool's own efficiency
+// assumptions.
+const PUMP_MOTOR_COMBINED_EFF = 0.65
+function requiredMotorKwFromPressure(m3h: number, bar: number): number {
+  const qM3s = m3h / 3600
+  const headM = bar * 10.2 // 1 bar ≈ 10.2 m water column
+  const pHydW = 1000 * 9.81 * qM3s * headM
+  return pHydW / PUMP_MOTOR_COMBINED_EFF / 1000
+}
+
+export function reconcilePumpMotorAgainstStatedPressure(
+  quantities: Record<string, number>,
+  contract?: ContractInProgress,
+  briefMetrics?: BriefTargetMetric[],
+): DemandCoverageMint[] {
+  const corrected: DemandCoverageMint[] = []
+  const metrics = (briefMetrics ?? []).filter((m) => {
+    const k = String(m?.key_metric ?? m?.metric ?? m?.name ?? '')
+    return PRESSURE_METRIC_SUFFIX_RE.test(k) && typeof m?.value === 'number' && Number.isFinite(m.value as number) && (m.value as number) > 0
+  })
+  if (metrics.length === 0) return corrected // no brief-stated pump pressure at all — untouched
+  // split into FAMILY-SPECIFIC pressures (a distinctive identity token survives, e.g.
+  // fertigation_pump_pressure_bar → 'irrig') and PLANT-WIDE pressures (reduce to no
+  // identity token, e.g. pump_pressure_bar / discharge_pressure_bar → the brief's global
+  // "each at ~2.9 bar"). A family uses its own metric first, else the global maximum.
+  const familyMetrics: Array<{ identity: string[]; bar: number }> = []
+  let globalBar = 0
+  for (const met of metrics) {
+    const mk = String(met.key_metric ?? met.metric ?? met.name ?? '')
+    const identity = pumpFamilyIdentity(mk.replace(PRESSURE_METRIC_SUFFIX_RE, ''))
+    if (identity.length > 0) familyMetrics.push({ identity, bar: met.value as number })
+    else globalBar = Math.max(globalBar, met.value as number)
+  }
+  const pinnedKeys = briefPinnedQuantityKeys(contract)
+  for (const key of Object.keys(quantities)) {
+    const mm = PUMP_MOTOR_QTY_SUFFIX_RE.exec(key)
+    if (!mm) continue
+    if (pinnedKeys.has(key)) continue // never re-margin a brief-pinned nameplate
+    const famPhrase = key.slice(0, mm.index)
+    if (!famPhrase) continue
+    const famStems = pumpFamilyIdentity(famPhrase)
+    if (famStems.length === 0) continue
+    // the family's own BULK-FLOW sibling — a dosing/trim pump (litres/hour, no m³/h
+    // quantity) never has one, so it can never qualify regardless of stem overlap. Exact
+    // identity-set match (not mere overlap) so a dosing pump's extra distinctive token
+    // ('dosin') keeps it from binding to the main delivery pump's flow.
+    let flowM3h: number | undefined
+    for (const fk of Object.keys(quantities)) {
+      const fm = PUMP_FLOW_QTY_SUFFIX_RE.exec(fk)
+      if (!fm) continue
+      const v = quantities[fk]
+      if (!(Number.isFinite(v) && v > 0)) continue
+      const fStems = pumpFamilyIdentity(fk.slice(0, fm.index))
+      if (sameFamilyIdentity(fStems, famStems)) { flowM3h = v; break }
+    }
+    if (!(flowM3h !== undefined && flowM3h > 0)) continue
+    // family-specific pressure first (exact identity-set match); else the plant-wide global.
+    let bestBar = 0
+    for (const fm of familyMetrics) if (sameFamilyIdentity(fm.identity, famStems)) bestBar = Math.max(bestBar, fm.bar)
+    if (!(bestBar > 0)) bestBar = globalBar // plant-wide pump discharge pressure (the brief's "each at ~X bar")
+    if (!(bestBar > 0)) continue
+    const requiredKw = requiredMotorKwFromPressure(flowM3h, bestBar)
+    const requiredFrame = nextMotorFrameKw(requiredKw)
+    const current = quantities[key]
+    if (!(requiredFrame > current + 1e-9)) continue // never lower an existing/oversized value
+    quantities[key] = requiredFrame
+    corrected.push({ key, value: requiredFrame, unit: 'kW', from: 'brief-pressure-reconcile' })
+    if (contract) {
+      const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
+      const prev = (typeof cq[key] === 'object' && cq[key] ? cq[key] : {}) as Record<string, unknown>
+      cq[key] = {
+        ...prev,
+        value: requiredFrame,
+        unit: 'kW',
+        source: 'demand-coverage',
+        source_detail: `duty cross-check: ${flowM3h} m³/h @ ${bestBar} bar stated in the brief → P = ρ·g·Q·H / ${PUMP_MOTOR_COMBINED_EFF} = ${requiredKw.toFixed(2)} kW → next IEC frame ${requiredFrame} kW (was ${current} kW, undersized against the brief's stated discharge pressure)`,
+      }
+    }
+  }
+  return corrected
+}
+
 const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 || 50) * 4) / Math.PI); const h = p.htM || d; return { shell: Math.PI * d * h, head: (Math.PI * d * d) / 4, d, h } }
 
 // Each entry: parts SIZED + PRICED from the parent's physics. Cost factors are
@@ -4562,6 +4704,9 @@ export function reconcilePrincipalEquipment(
   // persists to contract.quantities ('demand-coverage' provenance) so the compliance matrix
   // verifies the brief demand metric. Strict no-op (byte-identical) when nothing is missing.
   mintDemandCoverage(quantities, contract, { modules, briefMetrics: reconcileOpts.briefMetrics })
+  // PUMP MOTOR vs BRIEF-STATED PRESSURE (same choke-point, both synthesis paths — see the
+  // function doc): a pump's motor_kw must never undershoot the brief's own stated duty.
+  reconcilePumpMotorAgainstStatedPressure(quantities, contract, reconcileOpts.briefMetrics)
 
   // A `total_*`/overall/combined volume is a reporting SUM, not a vessel — exclude it from the
   // principal-equipment set when its constituent vessels are present (≥2 other non-aggregate
@@ -5064,6 +5209,9 @@ export function applyUniversalContractSizing(
   // a missing one is synthesised in part B. Mints persist to contract.quantities with
   // 'demand-coverage' provenance. Strict no-op (byte-identical) when nothing is missing.
   mintDemandCoverage(quantities, contract, { modules, briefMetrics: opts.briefMetrics })
+  // PUMP MOTOR vs BRIEF-STATED PRESSURE (same choke-point, both synthesis paths — see the
+  // function doc): a pump's motor_kw must never undershoot the brief's own stated duty.
+  reconcilePumpMotorAgainstStatedPressure(quantities, contract, opts.briefMetrics)
 
   const groups = buildGroups(quantities)
   const matched = new Set<string>() // group phrase → matched an existing word
