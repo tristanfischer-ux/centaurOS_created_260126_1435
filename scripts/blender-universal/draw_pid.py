@@ -119,6 +119,9 @@ _INSTR_WORD_FUNC = [
 LINE_PROCESS = "process"         # main process fluid (heavy solid)
 LINE_THERMAL = "thermal"         # heating / cooling / steam (dashed, warm tint)
 LINE_UTILITY = "utility"         # utility / minor (dashed grey)
+LINE_DRAIN = "drain"             # below-grade gravity drain / underground run (dash-dot,
+                                  # earth tone) — Sam Green SME review 2026-07-08, Renders
+                                  # J3: "a lot would have to be underground for drainage".
 
 
 @dataclass
@@ -902,7 +905,7 @@ def _synthesise_control_loops(nodes: dict, lines: list, placed_instr: set,
             loops.append(ControlLoop(
                 src_key=lvl_node.key, dst_key=mu_dest.key,
                 measure_tag="LT", controller_tag="LC",
-                label="level → make-up", dst_valve_tag="FCV"))
+                label="level -> make-up", dst_valve_tag="FCV"))
 
     # --- FT on the MAIN recirculation line ---
     # pick the principal forward process line out of the tank (the recirc draw) — the
@@ -1320,6 +1323,39 @@ def _line_style(mechanism: str, phase: str) -> str:
     return LINE_PROCESS
 
 
+# ── BELOW-GRADE / GRAVITY DRAIN detection (Sam Green SME review 2026-07-08) ──────
+# Sam Renders J3 (verbatim): "All pipework seems to be above ground whereas a lot of
+# this pipework may be better placed below ground ... a lot would have to be
+# underground for drainage." The real Codema drawings show drainpits + drain lines
+# UNDERGROUND (below the slab), separate from above-ground pressurised pipework.
+# UNIVERSAL — keyed only on generic drain/gravity/below-grade nouns (never a class
+# name), so it fires on any archetype whose topology feeds a gravity collection
+# point, and stays silent on an all-pressurised design (proveNoFalsePositive).
+_BELOW_GRADE_NODE_RE = re.compile(
+    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain", re.I)
+_GRAVITY_CONTEXT_RE = re.compile(r"\bgravity\b", re.I)
+_LIFT_PUMP_RE = re.compile(r"\bpump\b", re.I)
+
+
+def _is_below_grade_drain(frm: str, to: str, material_context: str) -> bool:
+    """True when a topology edge is a GRAVITY-FED run into a below-grade collection
+    point (a sump / drain-pit / catch-pit / manhole / floor drain) — the underground
+    drainage Sam's review says the engine draws as ordinary above-ground pipe. Also
+    fires when the edge's own material_context explicitly says 'gravity'. Excludes the
+    RISEN, pumped discharge leaving a lift pump (that run is above-ground once it has
+    been lifted out of the pit) — proveCatch/proveNoFalsePositive in draw_pid_test.py.
+    Node keys are snake_case ('drain_collection_sump'); underscores are \\w chars so a
+    bare \\bsump\\b never matches inside one — normalise separators to spaces first."""
+    if _GRAVITY_CONTEXT_RE.search(re.sub(r"[_\-]+", " ", material_context or "")):
+        return True
+    to_norm = re.sub(r"[_\-]+", " ", to or "")
+    to_is_pit = bool(_BELOW_GRADE_NODE_RE.search(to_norm))
+    if not to_is_pit:
+        return False
+    frm_norm = re.sub(r"[_\-]+", " ", frm or "")
+    return not _LIFT_PUMP_RE.search(frm_norm)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # PROCESS-FLOW LAYERING  (longest-path depth on the non-electrical edges)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1693,11 +1729,21 @@ def reconstruct_process(schedule: dict, state: dict,
             dn = _dn_from_flow(e.get("required_value"), e.get("required_unit"))
         svc_code = _service_code(frm, to, mc)
         number = f'{loop_seq + i}-{svc_code}' + (f'-{dn}' if dn else '')
+        below_grade = _is_below_grade_drain(frm, to, mc)
+        style = LINE_DRAIN if below_grade else _line_style(e.get("mechanism") or "", phase)
+        svc_text = _service_text(mc)
+        if below_grade:
+            detail = (detail + " · " if detail else "") + "U/G GRAVITY DRAIN"
+            # the schedule 'drop' often carries the ONLY hint text for this edge (mc is
+            # frequently empty on a gravity edge) — force the U/G call-out to print
+            # directly on the sheet, not just via colour/dash/legend, so a below-grade
+            # run reads as such even where the line-tag is drawn terse.
+            svc_text = svc_text or "Gravity drain (U/G)"
         ln = Line(
             from_key=frm, to_key=to, number=number, dn=dn,
-            service=_service_text(mc),
+            service=svc_text,
             detail=detail,
-            style=_line_style(e.get("mechanism") or "", phase),
+            style=style,
             is_return=((frm, to) in back_edges),
         )
         # a flow-transmitter on a FEED line if the design carries flow instruments
@@ -1747,7 +1793,7 @@ def reconstruct_process(schedule: dict, state: dict,
         except (TypeError, ValueError):
             amps_s = ""
         svc = _service_text(e.get("material_context") or "")
-        power_note = (f"Electrical: {_humanise(e.get('from_part') or 'supply')} → "
+        power_note = (f"Electrical: {_humanise(e.get('from_part') or 'supply')} -> "
                       f"{_humanise(e.get('to_part') or 'process loads')}"
                       + (f" ({amps_s})" if amps_s else "")
                       + " — see single-line diagram." )
@@ -1782,9 +1828,9 @@ def reconstruct_process(schedule: dict, state: dict,
                          or "makeup" in (cl.label or "").lower() for cl in control_loops)
         phrases = []
         if has_do:
-            phrases.append("dissolved-oxygen → oxygenation")
+            phrases.append("dissolved-oxygen -> oxygenation")
         if has_makeup:
-            phrases.append("tank level → make-up water")
+            phrases.append("tank level -> make-up water")
         for cl in control_loops:
             lbl = (cl.label or "").lower()
             if "do" in lbl or "oxygen" in lbl or "make-up" in lbl or "makeup" in lbl:
@@ -1848,6 +1894,7 @@ EQ_INK = "#10243e"         # equipment outline (deep navy)
 PROC_INK = "#10243e"       # process pipe
 THERMAL_INK = "#b5462a"    # thermal / steam pipe (warm)
 UTIL_INK = "#7a8290"       # utility / minor pipe
+DRAIN_INK = "#7a5230"      # below-grade gravity drain / underground run (earth tone)
 ACCENT = "#1a5fb4"         # instrument bubble accent (blue)
 FILL_BG = "#ffffff"        # page
 PANEL_BG = "#f4f6f9"       # title-block / equipment fill
@@ -1909,6 +1956,9 @@ class SVG:
             f'<marker id="flowT" markerWidth="11" markerHeight="11" refX="8" refY="4" '
             f'orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M0,0 L9,4 L0,8 Z" fill="{THERMAL_INK}"/></marker>'
+            f'<marker id="flowD" markerWidth="11" markerHeight="11" refX="8" refY="4" '
+            f'orient="auto" markerUnits="userSpaceOnUse">'
+            f'<path d="M0,0 L9,4 L0,8 Z" fill="{DRAIN_INK}"/></marker>'
             f'<marker id="sig" markerWidth="9" markerHeight="9" refX="6" refY="3" '
             f'orient="auto" markerUnits="userSpaceOnUse">'
             f'<path d="M0,0 L7,3 L0,6 Z" fill="{ACCENT}"/></marker>'
@@ -2216,7 +2266,7 @@ def _draw_ancillary_register(svg, proc: Process, x: float, y: float, w: float,
             ix = x + 12 + col * col_w
             iy = cy + 12 + row * 15
             qn = f" ×{a.qty}" if a.qty > 1 else ""
-            tie = f"  → {a.tie_line}" if a.tie_line else ""
+            tie = f"  -> {a.tie_line}" if a.tie_line else ""
             # the item's FULL name is the matchable identity (the ledger checks the BoM name
             # against the rendered text) — keep it intact and only trim the trailing duty
             # blurb to fit the cell, never the name. Tie-line is appended last (cross-ref).
@@ -2356,7 +2406,7 @@ def build_pid_svg(proc: Process) -> str:
     svg.text(40, 74, f"PIPING & INSTRUMENTATION DIAGRAM — {_humanise(proc.archetype)}",
              size=16, weight="bold", fill=EQ_INK)
     svg.text(40, 94, "Process flow projected from the as-modelled topology "
-                     "(feed → reaction → separation → product).",
+                     "(feed -> reaction -> separation -> product).",
              size=10, fill=MUTED)
     svg.line(40, 108, width - 40, 108, stroke=GRID_FAINT, width=1.2)
 
@@ -2450,9 +2500,11 @@ def build_pid_svg(proc: Process) -> str:
         (fx, fy) = centre[ln.from_key]
         (tx, ty) = centre[ln.to_key]
         stroke = {LINE_PROCESS: PROC_INK, LINE_THERMAL: THERMAL_INK,
-                  LINE_UTILITY: UTIL_INK}[ln.style]
-        dash = {LINE_PROCESS: None, LINE_THERMAL: "7,4", LINE_UTILITY: "3,3"}[ln.style]
-        marker = "flowT" if ln.style == LINE_THERMAL else "flow"
+                  LINE_UTILITY: UTIL_INK, LINE_DRAIN: DRAIN_INK}[ln.style]
+        dash = {LINE_PROCESS: None, LINE_THERMAL: "7,4", LINE_UTILITY: "3,3",
+                LINE_DRAIN: "2,2,8,2"}[ln.style]
+        marker = "flowT" if ln.style == LINE_THERMAL else (
+            "flowD" if ln.style == LINE_DRAIN else "flow")
         lw = _pipe_lw(ln.dn, ln.style)
         in_off = _face_offset(in_idx.get(id(ln), (0, 1)), 56) if fwd else 0.0
         out_off = _face_offset(out_idx.get(id(ln), (0, 1)), 52) if fwd else 0.0
@@ -2529,7 +2581,9 @@ def build_pid_svg(proc: Process) -> str:
 
     # ----- LEGEND + power note -----
     legend_x = width - legend_w + 10
-    legend_bottom = _draw_legend(svg, legend_x, margin_top + 6, legend_w - 30)
+    has_drain = any(ln.style == LINE_DRAIN for ln in proc.lines)
+    legend_bottom = _draw_legend(svg, legend_x, margin_top + 6, legend_w - 30,
+                                 has_drain=has_drain)
     if proc.power_note:
         _draw_power_note(svg, legend_x, legend_bottom + 16, legend_w - 30,
                          proc.power_note)
@@ -3021,8 +3075,11 @@ def _draw_node_instruments(svg, nd, cx, cy, port):
 
 # ---- legend / power note / title block --------------------------------------
 
-def _draw_legend(svg, x, y, w):
-    """Symbol legend panel — equipment glyphs + line styles + instrument bubble."""
+def _draw_legend(svg, x, y, w, has_drain=False):
+    """Symbol legend panel — equipment glyphs + line styles + instrument bubble.
+    has_drain shows the below-grade/gravity-drain line style ONLY when the sheet
+    actually draws one (proveNoFalsePositive: an all-pressurised design's legend
+    carries no underground-drainage row)."""
     items_eq = [
         (SYM_COLUMN, "Column / reactor"),
         (SYM_DRUM, "Separator / drum"),
@@ -3037,7 +3094,14 @@ def _draw_legend(svg, x, y, w):
     rowh = 30
     pad = 14
     header_h = 22
-    n_rows = len(items_eq) + 5   # + 3 line styles + instrument + valve
+    line_styles = [
+        (PROC_INK, None, "Process line"),
+        (THERMAL_INK, "7,4", "Thermal / steam"),
+        (UTIL_INK, "3,3", "Utility / minor"),
+    ]
+    if has_drain:
+        line_styles.append((DRAIN_INK, "2,2,8,2", "Below-grade / gravity drain (U/G)"))
+    n_rows = len(items_eq) + len(line_styles) + 2   # + line styles + instrument + valve
     bh = header_h + pad + n_rows * rowh
     svg.rect(x, y, w, bh, stroke=GRID_FAINT, width=1.2, fill=PANEL_BG, rx=4)
     svg.text(x + 12, y + 16, "LEGEND", size=10, weight="bold", fill=MUTED)
@@ -3049,14 +3113,13 @@ def _draw_legend(svg, x, y, w):
         svg.text(tx, yy + 4, lbl, size=8.8, fill=MUTED)
         yy += rowh
     # line styles
-    for stroke, dash, lbl in (
-            (PROC_INK, None, "Process line"),
-            (THERMAL_INK, "7,4", "Thermal / steam"),
-            (UTIL_INK, "3,3", "Utility / minor")):
+    for stroke, dash, lbl in line_styles:
         da = f' stroke-dasharray="{dash}"' if dash else ""
+        marker = "flowT" if stroke == THERMAL_INK else (
+            "flowD" if stroke == DRAIN_INK else "flow")
         svg.add(f'<line x1="{gx - 10:.1f}" y1="{yy:.1f}" x2="{gx + 14:.1f}" '
                 f'y2="{yy:.1f}" stroke="{stroke}" stroke-width="2.2"{da} '
-                f'marker-end="url(#{"flowT" if stroke == THERMAL_INK else "flow"})"/>')
+                f'marker-end="url(#{marker})"/>')
         svg.text(tx, yy + 4, lbl, size=8.8, fill=MUTED)
         yy += rowh
     # instrument bubble
@@ -3515,6 +3578,39 @@ def _selftest() -> int:
     _no_instr = {"a": _mk_node("a", "Tank A"), "b": _mk_node("b", "Tank B"), "c": _mk_node("c", "Tank C")}
     _no_instr_verdict = evaluate_instrument_clustering_invariant(_no_instr)
     chk("G1d.clustering_zero_instruments_not_applicable", _no_instr_verdict["verdict"] == "not_applicable")
+
+    # G2 — BELOW-GRADE / GRAVITY-DRAIN detection (Sam Green SME review 2026-07-08,
+    # Renders J3: "a lot would have to be underground for drainage"). proveCatch: a
+    # gravity-fed run INTO a sump/drainpit reads as an underground drain line;
+    # proveNoFalsePositive: the risen pumped discharge OUT of a lift pump, and an
+    # ordinary process line with no pit anywhere in it, both stay above-ground.
+    chk("G2a.gravity_into_sump_proveCatch",
+        _is_below_grade_drain("uv_disinfection", "drain_collection_sump", ""))
+    chk("G2b.pumped_discharge_out_of_sump_proveNoFalsePositive",
+        not _is_below_grade_drain("drain_transfer_pump", "cip_tank", ""))
+    chk("G2c.lift_pump_suction_into_pit_proveNoFalsePositive",
+        not _is_below_grade_drain("submersible_lift_pump", "drain_collection_sump", ""))
+    chk("G2d.ordinary_process_line_proveNoFalsePositive",
+        not _is_below_grade_drain("reverse_osmosis_skid", "cloth_filter", ""))
+    chk("G2e.explicit_gravity_context_proveCatch",
+        _is_below_grade_drain("floor_drain", "collection_tank", "gravity_fed_drainage"))
+    # G2f — end-to-end render: the drain edge draws with the DRAIN line style + the
+    # legend shows the below-grade row; an all-pressurised process shows neither.
+    _drain_nodes = [Node(key="a", tag="A-101", label="UV Disinfection", sym=SYM_VESSEL),
+                    Node(key="b", tag="TK-114", label="Drain Collection Sump", sym=SYM_TANK)]
+    _drain_lines = [Line(from_key="a", to_key="b", number="201-DR",
+                         style=LINE_DRAIN, detail="U/G GRAVITY DRAIN")]
+    _drain_proc = Process(archetype="selftest", nodes=_drain_nodes, lines=_drain_lines)
+    _svg_drain = build_pid_svg(_drain_proc)
+    chk("G2f.drain_line_dash_rendered", 'stroke-dasharray="2,2,8,2"' in _svg_drain)
+    chk("G2f.drain_line_colour_rendered", f'stroke="{DRAIN_INK}"' in _svg_drain)
+    chk("G2f.legend_shows_below_grade_row", "Below-grade / gravity drain" in _svg_drain)
+    _press_proc = _mk_proc(5)
+    _svg_press = build_pid_svg(_press_proc)
+    chk("G2g.no_drain_style_proveNoFalsePositive",
+        'stroke-dasharray="2,2,8,2"' not in _svg_press)
+    chk("G2g.no_legend_row_proveNoFalsePositive",
+        "Below-grade / gravity drain" not in _svg_press)
 
     for f in fails:
         print(f"[pid][selftest] FAIL {f}")

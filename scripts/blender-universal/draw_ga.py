@@ -52,6 +52,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -92,10 +93,22 @@ class GAPart:
     # reads in PROCESS ORDER, not tag-letter-alphabetical (Tristan 2026-07-02:
     # "manifolds scattered around the page — why are they where they are").
     rank: int = 10**9
+    # BELOW-GRADE / gravity-drain collection point (sump / drain-pit / manhole) —
+    # Sam Green SME review 2026-07-08, Renders J3: "a lot would have to be
+    # underground for drainage". UNIVERSAL: keyed on the generic noun in the name,
+    # never a class name. See _BELOW_GRADE_NAME_RE.
+    is_below_grade: bool = False
 
 
 def _round_extent(centre, half):
     return centre - half, centre + half
+
+
+# BELOW-GRADE / gravity-drain collection point — the same generic noun signal
+# draw_pid.py keys its underground-drainage line style on (_BELOW_GRADE_NODE_RE).
+# UNIVERSAL: no class name, just the noun a real drainpit/sump/manhole is called.
+_BELOW_GRADE_NAME_RE = re.compile(
+    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain", re.I)
 
 
 def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
@@ -130,16 +143,18 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
             x0, x1 = _round_extent(x, w / 2.0)
             y0, y1 = _round_extent(y, dep / 2.0)
             z0, z1 = z - h / 2.0, z + h / 2.0
+        _name = r.get("name") or ""
         parts.append(GAPart(
             tag=r.get("equipment_tag") or "?",
             obj_tag=r.get("tag") or "",
-            name=r.get("name") or "",
+            name=_name,
             module=r.get("module") or "",
             shape=r.get("shape") or "",
             qty=int(r.get("qty") or 1),
             is_round=is_round,
             x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1, cx=x, cy=y,
-            rank=int(r.get("region_rank") or 10**9)))
+            rank=int(r.get("region_rank") or 10**9),
+            is_below_grade=bool(_BELOW_GRADE_NAME_RE.search(_name))))
 
     bbox = man.get("bbox_mm") or {}
     if not bbox and parts:
@@ -252,6 +267,7 @@ PANEL_BG = "#f4f6f9"       # title-block / key fill
 GRID_FAINT = "#e4e8ee"     # setting-out grid / faint guide
 DATUM_INK = "#9aa3af"      # datum / centre-line grey
 MUTED = "#5b6470"
+UG_FILL_BG = "#f2ede4"     # below-grade item hatch backing (warm earth tint, not EQ_FILL)
 
 
 def _esc(s) -> str:
@@ -273,13 +289,15 @@ class SVG:
         self.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
                  f'stroke="{stroke}" stroke-width="{width}" stroke-linecap="{cap}"{d}/>')
 
-    def rect(self, x, y, w, h, stroke=INK, width=1.3, fill="none", rx=0):
+    def rect(self, x, y, w, h, stroke=INK, width=1.3, fill="none", rx=0, dash=None):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
         self.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
-                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"/>')
+                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"{d}/>')
 
-    def circle(self, cx, cy, r, stroke=INK, width=1.4, fill="none"):
+    def circle(self, cx, cy, r, stroke=INK, width=1.4, fill="none", dash=None):
+        d = f' stroke-dasharray="{dash}"' if dash else ""
         self.add(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{fill}" '
-                 f'stroke="{stroke}" stroke-width="{width}"/>')
+                 f'stroke="{stroke}" stroke-width="{width}"{d}/>')
 
     def path(self, d, stroke=INK, width=1.4, fill="none", join="round", cap="round"):
         self.add(f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{width}" '
@@ -296,13 +314,28 @@ class SVG:
                  f'font-weight="{weight}"{sp}{tr}>{_esc(s)}</text>')
 
     def render(self) -> str:
+        body = "\n".join(self.parts)
         defs = (
             '<defs>'
             f'<marker id="dim" markerWidth="12" markerHeight="12" refX="6" refY="5" '
             f'orient="auto" markerUnits="userSpaceOnUse">'
-            f'<path d="M0,5 L11,1.5 L8.5,5 L11,8.5 Z" fill="{DIM_INK}"/></marker>'
-            '</defs>')
-        body = "\n".join(self.parts)
+            f'<path d="M0,5 L11,1.5 L8.5,5 L11,8.5 Z" fill="{DIM_INK}"/></marker>')
+        # below-grade / buried-item hatch (45° ticks) — the standard drafting
+        # convention for a hidden/excavated feature (Sam Green SME review
+        # 2026-07-08: drainpits/sumps must read as UNDERGROUND, not an ordinary
+        # at-grade tank). Same idiom as _hatch_ground's earth-symbol ticks. ONLY
+        # emitted when the body actually references it (proveNoFalsePositive: an
+        # all-above-grade drawing's <defs> carries no unused pattern, and critically
+        # the pattern's OWN internal <line> tag must never leak into an SVG that
+        # drew none — ga-tags selftest #2 caught this leaking into every render).
+        if "url(#ug-hatch)" in body:
+            defs += (
+                '<pattern id="ug-hatch" width="6" height="6" patternUnits="userSpaceOnUse" '
+                'patternTransform="rotate(45)">'
+                f'<rect width="6" height="6" fill="{UG_FILL_BG}"/>'
+                f'<line x1="0" y1="0" x2="0" y2="6" stroke="{DATUM_INK}" stroke-width="1.6"/>'
+                '</pattern>')
+        defs += '</defs>'
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" '
                 f'height="{self.h}" viewBox="0 0 {self.w} {self.h}">\n{defs}\n'
                 f'<rect width="{self.w}" height="{self.h}" fill="{FILL_BG}"/>\n'
@@ -406,23 +439,55 @@ def scale_bar(svg: SVG, x, y, scale_S, px_per_mm, total_mm):
 # EQUIPMENT OUTLINE in a view
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _colocated_box_skip(parts) -> set:
+    """id()s of parts whose PLAN footprint outline should be SKIPPED because another
+    part occupies the identical plan (x, y) — a vertical stack (e.g. a control-
+    cabinet column: SCADA panel + UPS + electrical panel + digital panel racked one
+    above another, differing only in z). Keeps the LARGEST member's box (the rest
+    are hidden behind it in plan anyway); every member still gets its own tag."""
+    coloc: dict = defaultdict(list)
+    for p in parts:
+        coloc[(round(p.cx), round(p.cy))].append(p)
+    return {
+        id(g) for grp in coloc.values() if len(grp) > 1
+        for g in sorted(grp, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1)))[1:]
+    }
+
+
 def _draw_equipment_rect(svg, px, py, pw, ph, round_plan, tag, show_tag=True,
-                         tiny_fill=EQ_FILL, placer=None):
+                         tiny_fill=EQ_FILL, placer=None, below_grade=False,
+                         draw_box=True):
     """Draw one equipment outline at paper (px,py) size (pw,ph). round_plan=True
     draws a circle (a vessel/tank footprint in PLAN) inscribed in the box. When a
     `placer` (_TagPlacer) is given the tag is REGISTERED for the view's de-overlap
-    pass instead of being stamped immediately."""
-    if round_plan and pw > 4 and ph > 4:
-        # plan footprint of a cylinder = a circle (diameter = the box) + a centre dot
-        r = min(pw, ph) / 2.0
-        ccx, ccy = px + pw / 2.0, py + ph / 2.0
-        svg.circle(ccx, ccy, r, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
-        svg.line(ccx - r, ccy, ccx + r, ccy, stroke=DATUM_INK, width=0.6, dash="4,3")
-        svg.line(ccx, ccy - r, ccx, ccy + r, stroke=DATUM_INK, width=0.6, dash="4,3")
-    else:
-        svg.rect(px, py, max(pw, 1.5), max(ph, 1.5), stroke=EQ_INK, width=1.4,
-                 fill=tiny_fill)
-    if show_tag and pw >= 16 and ph >= 11:
+    pass instead of being stamped immediately. below_grade=True (a sump / drainpit /
+    manhole) draws a DASHED outline + hatch fill instead of the solid at-grade
+    convention — the standard drafting signal for a buried/hidden feature (Sam Green
+    SME review 2026-07-08: drainpits must read as underground, not an ordinary tank).
+    draw_box=False skips the outline (used for a CO-LOCATED stack — several parts at
+    the identical plan (x,y), e.g. panels racked one above another — where only the
+    LARGEST member's outline is drawn; every member still gets its own de-overlapped
+    tag + leader, so nothing is silently hidden, but the plan doesn't draw N nested,
+    indistinguishable rectangles on top of each other)."""
+    fill = "url(#ug-hatch)" if below_grade else tiny_fill
+    dash = "5,3" if below_grade else None
+    if draw_box:
+        if round_plan and pw > 4 and ph > 4:
+            # plan footprint of a cylinder = a circle (diameter = the box) + a centre dot
+            r = min(pw, ph) / 2.0
+            ccx, ccy = px + pw / 2.0, py + ph / 2.0
+            svg.circle(ccx, ccy, r, stroke=EQ_INK, width=1.4, fill=fill, dash=dash)
+            svg.line(ccx - r, ccy, ccx + r, ccy, stroke=DATUM_INK, width=0.6, dash="4,3")
+            svg.line(ccx, ccy - r, ccx, ccy + r, stroke=DATUM_INK, width=0.6, dash="4,3")
+        else:
+            svg.rect(px, py, max(pw, 1.5), max(ph, 1.5), stroke=EQ_INK, width=1.4,
+                     fill=fill, dash=dash)
+    if draw_box and below_grade and pw >= 16 and ph >= 11:
+        svg.text(px + pw / 2.0, py + ph - 2.5, "U/G", size=min(6.5, ph * 0.28),
+                 anchor="middle", fill=MUTED)
+    # a non-drawn (co-located, hidden-behind-the-largest) member always takes the
+    # keynote/leader path — never an in-place tag with no box under it.
+    if draw_box and show_tag and pw >= 16 and ph >= 11:
         _cx, _cy = px + pw / 2.0, py + ph / 2.0
         _sz = min(10.0, ph * 0.6)
         if placer is not None:
@@ -756,7 +821,10 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
 
     # ----- sheet geometry -----
     margin = 46
-    title_h = 166            # +16 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
+    has_below_grade = any(p.is_below_grade for p in parts)
+    title_h = 166             # +16 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
+    if has_below_grade:
+        title_h += 16         # +16 for the below-grade hatch-symbol note (conditional)
     gap = 96                 # gap between plan and the side elevation / dim gutters
     v_gap = 92               # gap between plan and front elevation (dim band)
     label_gutter = 30        # left gutter for the vertical (plant-width) dimension
@@ -825,13 +893,22 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     plan_tags.block(plan_x - 40, plan_y - 26, plan_x + plan_w + 40, plan_y - 2)
     plan_tags.block(plan_x - 28, plan_y - 2, plan_x - 2, plan_y + plan_h + 2)
     plan_tags.block(plan_x + plan_w - 40, plan_y + 2, plan_x + plan_w + 8, plan_y + 46)
+    # CO-LOCATED STACK collapse (v59b — a control-cabinet column: e.g. SCADA panel +
+    # UPS + electrical panel + digital panel racked one above another at the IDENTICAL
+    # plan (x,y), differing only in Z). Drawing N near-identical nested rectangles on
+    # top of each other reads as an illegible 'bullseye' (each tag's own de-overlap
+    # ladder still staggers the TEXT correctly, but the overlapping BOX ART behind it
+    # is what breaks legibility). Fix: draw only the LARGEST member's outline; every
+    # member keeps its own tag + leader (nothing is silently hidden from the sheet).
+    _plan_box_skip = _colocated_box_skip(parts)
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1))):
         pw = (p.x1 - p.x0) * ppm
         ph = (p.y1 - p.y0) * ppm
         px = plan_x + mx(p.x0)
         py = plan_y + my(p.y1)        # my inverts → top edge is the larger y
         labelled = _draw_equipment_rect(svg, px, py, pw, ph, p.is_round, p.tag,
-                                        placer=plan_tags)
+                                        placer=plan_tags, below_grade=p.is_below_grade,
+                                        draw_box=(id(p) not in _plan_box_skip))
         if not labelled:
             keynotes.append((p, px + pw / 2.0, py + ph / 2.0))
     # items too small for an IN-PLACE tag get their FULL equipment tag through the same
@@ -957,7 +1034,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     bar_total = _nice_bar_mm(scale_S)
     bar_y = height - title_h - 26
     scale_bar(svg, margin + 6, bar_y, scale_S, ppm, bar_total)
-    _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H)
+    _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H,
+                      has_below_grade=has_below_grade)
     return svg.render()
 
 
@@ -1021,15 +1099,21 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart):
     stacks) draw as a capsule (rounded top) so they read as vessels, not boxes;
     everything else a rect. Tagging is NOT done here — the view collects its
     items and tags them in one pass via _elevation_tag_groups + _TagPlacer
-    (range-collapse for stacked same-family nests, then the de-overlap ladder)."""
+    (range-collapse for stacked same-family nests, then the de-overlap ladder).
+
+    below_grade items (sump / drainpit / manhole) draw with the SAME dashed +
+    hatch below-grade convention as the plan (Sam Green SME review 2026-07-08) so
+    a reader scanning either the plan OR an elevation sees the same buried signal."""
     pw = max(pw, 1.5)
     ph = max(ph, 1.5)
+    fill = "url(#ug-hatch)" if p.is_below_grade else EQ_FILL
+    dash = "5,3" if p.is_below_grade else None
     if p.is_round and p.shape == "tank" and ph > 8 and pw > 5:
         # Atmospheric OPEN-TOP process tank (RAS rearing tank etc.): a flat-top
         # cylindrical shell with a water-surface line — NOT a domed/capsule roof.
         # RAS rearing tanks (and most process tanks) are open to the atmosphere;
         # the capsule arc wrongly drew every tank with a dome (Tristan 2026-06-13).
-        svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
+        svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=fill, dash=dash)
         wl = py + min(4.0, ph * 0.18)
         svg.line(px + 1.5, wl, px + pw - 1.5, wl, stroke=DATUM_INK, width=0.7)
     elif p.is_round and p.shape in ("tall_column", "tall_vessel", "vertical_vessel",
@@ -1038,14 +1122,14 @@ def _draw_elevation_item(svg, px, py, pw, ph, p: GAPart):
         svg.path(f"M {px:.1f} {py+rx:.1f} "
                  f"A {rx:.1f} {rx:.1f} 0 0 1 {px+pw:.1f} {py+rx:.1f} "
                  f"L {px+pw:.1f} {py+ph:.1f} L {px:.1f} {py+ph:.1f} Z",
-                 stroke=EQ_INK, width=1.4, fill=EQ_FILL)
+                 stroke=EQ_INK, width=1.4, fill=fill)
         # tray ticks on a column
         if p.shape == "tall_column" and ph > 40:
             for k in range(1, 5):
                 ty = py + rx + (ph - rx) * k / 5.0
                 svg.line(px + 2, ty, px + pw - 2, ty, stroke=DATUM_INK, width=0.6)
     else:
-        svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=EQ_FILL)
+        svg.rect(px, py, pw, ph, stroke=EQ_INK, width=1.4, fill=fill, dash=dash)
 
 
 def _hatch_ground(svg, x0, x1, y):
@@ -1077,11 +1161,15 @@ def _collapse_schedule(parts):
         while (j + 1 < n and items[j + 1].tag.split("-")[0] == fam
                and items[j + 1].name == nm):
             j += 1
+        # BELOW-GRADE suffix (Sam Green SME review 2026-07-08): the schedule row for
+        # a sump/drainpit reads "below grade" so the tag-only plan/elevation symbol
+        # isn't the only place the reader can tell it's buried.
+        nm_out = nm + ("  · below grade" if items[i].is_below_grade else "")
         if j > i:
             rows.append((f"{items[i].tag}…{items[j].tag}",
-                         f"{nm}  ×{j - i + 1}"))
+                         f"{nm_out}  ×{j - i + 1}"))
         else:
-            rows.append((items[i].tag, nm))
+            rows.append((items[i].tag, nm_out))
         i = j + 1
     return rows
 
@@ -1173,7 +1261,8 @@ def _draw_key(svg, parts, keynotes, x, y, x_right, h_max):
                  size=8.2, fill=EQ_INK, weight="bold")
 
 
-def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H):
+def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H,
+                      has_below_grade=False):
     """Standard GA title block — bottom strip with a description panel (left) and a
     drawing-metadata box (right), mirroring the SLD / P&ID."""
     y0 = height - title_h + 24
@@ -1218,6 +1307,11 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
              size=9.0, fill="#a4332a", weight="bold")
     # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
     svg.text(x0, y0 + 130, _tb.TOLERANCE_NOTE, size=8.6, fill=MUTED)
+    if has_below_grade:
+        svg.text(x0, y0 + 146,
+                 "Hatched / dashed outline = BELOW-GRADE item (sump, drainpit, "
+                 "manhole) — buried below the ± 0.000 slab; see the P&ID for its "
+                 "gravity drain run.", size=8.6, fill=MUTED)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1536,6 +1630,84 @@ def _selftest() -> int:
     if "BMS-101" not in sched_tags or "EQ-101" not in sched_tags:
         print("  FAIL ga-sched-cap: a wide rack family must not crowd out standalone "
               f"principals with real BoM tags (got {sorted(sched_tags)})")
+        bad += 1
+    # 7 — BELOW-GRADE proveCatch/proveNoFalsePositive (Sam Green SME review
+    #     2026-07-08, Renders J3: "a lot would have to be underground for
+    #     drainage"). A drainpit/sump must render with the hatch fill + dashed
+    #     outline + the title-block note; an all-pressurised design (no sump) must
+    #     show NONE of that — the below-grade signal must never false-positive on
+    #     an ordinary at-grade tank.
+    sump = GAPart(tag="TK-114", obj_tag="tk114", name="Drain Collection Sump",
+                  module="m", shape="tank", qty=1, is_round=True,
+                  x0=2000, x1=4100, y0=2000, y1=4100, z0=0, z1=1400,
+                  cx=3050, cy=3050, is_below_grade=True)
+    tank = GAPart(tag="TK-106", obj_tag="tk106", name="Drain Water Tank",
+                  module="m", shape="tank", qty=1, is_round=True,
+                  x0=8000, x1=11700, y0=2000, y1=5700, z0=0, z1=2563,
+                  cx=9850, cy=3850, is_below_grade=False)
+    bbox3 = {"x_min_mm": 0, "x_max_mm": 20000, "y_min_mm": 0, "y_max_mm": 15000,
+             "z_min_mm": 0, "z_max_mm": 4000}
+    svg_ug = build_ga_svg([sump, tank], bbox3, "water_treatment", {"count": 2})
+    if "url(#ug-hatch)" not in svg_ug or 'dasharray="5,3"' not in svg_ug:
+        print("  FAIL ga-below-grade: a drainpit/sump must render with the "
+              "below-grade hatch fill + dashed outline")
+        bad += 1
+    if "below grade" not in svg_ug.lower():
+        print("  FAIL ga-below-grade: the schedule/title-block must note the "
+              "below-grade item in text, not just a graphic convention")
+        bad += 1
+    all_pressurised = build_ga_svg([tank], bbox3, "water_treatment", {"count": 1})
+    if "url(#ug-hatch)" in all_pressurised or "below grade" in all_pressurised.lower():
+        print("  FAIL ga-below-grade-fp: an all-above-grade design (no sump) must "
+              "show NO below-grade signal")
+        bad += 1
+    # 8 — CO-LOCATED STACK proveCatch/proveNoFalsePositive (the real Codema control-
+    #     cabinet cluster EP-104/X-104/I-103/U-201, all at plan (x,y)=(-4150,9650) —
+    #     4 nested rectangles rendered as an illegible 'bullseye'). proveCatch: 4 parts
+    #     at the IDENTICAL plan centre collapse to ONE drawn box (the largest keeps
+    #     its outline; the other 3 are skipped) but EVERY tag stays findable.
+    #     proveNoFalsePositive: parts at genuinely DIFFERENT positions never collapse.
+    stack = [
+        GAPart(tag="X-104", obj_tag="x104", name="Electrical Control Panel", module="m",
+               shape="box", qty=1, is_round=False, x0=-4150 - 355, x1=-4150 + 355,
+               y0=9650 - 610, y1=9650 + 610, z0=482.5, z1=722.5, cx=-4150, cy=9650),
+        GAPart(tag="EP-104", obj_tag="ep104", name="SCADA / Plant Control System",
+               module="m", shape="box", qty=1, is_round=False, x0=-4150 - 287.5,
+               x1=-4150 + 287.5, y0=9650 - 410, y1=9650 + 410, z0=675, z1=915,
+               cx=-4150, cy=9650),
+        GAPart(tag="I-103", obj_tag="i103", name="Digital Control Panel", module="m",
+               shape="box", qty=1, is_round=False, x0=-4150 - 186.25, x1=-4150 + 186.25,
+               y0=9650 - 285, y1=9650 + 285, z0=290, z1=530, cx=-4150, cy=9650),
+        GAPart(tag="U-201", obj_tag="u201", name="Control + Instrument UPS", module="m",
+               shape="box", qty=1, is_round=False, x0=-4150 - 300, x1=-4150 + 300,
+               y0=9650 - 255, y1=9650 + 255, z0=165, z1=765, cx=-4150, cy=9650),
+    ]
+    skip = _colocated_box_skip(stack)
+    if not (len(skip) == 3 and id(stack[0]) not in skip
+            and all(id(m) in skip for m in stack[1:])):
+        print("  FAIL ga-colocated: a 4-part control-cabinet stack at the IDENTICAL "
+              "plan (x,y) must collapse to ONE drawn box (the largest kept, the "
+              f"other 3 skipped) — got skip-set size {len(skip)}")
+        bad += 1
+    bbox4 = {"x_min_mm": -6000, "x_max_mm": -2000, "y_min_mm": 8000, "y_max_mm": 11000,
+             "z_min_mm": 0, "z_max_mm": 2000}
+    svg_stack = build_ga_svg(stack, bbox4, "water_treatment", {"count": 4})
+    if not all(f">{p.tag}<" in svg_stack for p in stack):
+        print("  FAIL ga-colocated: every co-located member must still have a "
+              "findable tag on the sheet, even with its box outline skipped")
+        bad += 1
+    # a genuinely two-position layout must NOT collapse (proveNoFalsePositive).
+    apart = [
+        GAPart(tag="A-101", obj_tag="a101", name="Panel A", module="m", shape="box",
+               qty=1, is_round=False, x0=0, x1=600, y0=0, y1=600, z0=0, z1=600,
+               cx=300, cy=300),
+        GAPart(tag="B-101", obj_tag="b101", name="Panel B", module="m", shape="box",
+               qty=1, is_round=False, x0=5000, x1=5600, y0=0, y1=600, z0=0, z1=600,
+               cx=5300, cy=300),
+    ]
+    if len(_colocated_box_skip(apart)) != 0:
+        print("  FAIL ga-colocated-fp: two parts at genuinely DIFFERENT plan "
+              "positions must never collapse into one box")
         bad += 1
     print("[ga] selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return 1 if bad else 0
