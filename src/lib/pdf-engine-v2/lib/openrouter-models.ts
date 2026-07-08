@@ -11,6 +11,12 @@
  * non-deterministic chain stage — brief, emission, judge, physics critic, self-audit).
  */
 
+// Determinism #86 replay ledger (persistent, content-hash keyed, disk-backed). Same store the
+// chain's callLlm uses (out/.design-cache) so callFastExtract replays across same-brief re-runs.
+// scripts/lib is a sanctioned import target from src/lib/pdf-engine-v2 (precedent: allowlist-
+// builder.ts imports parts-spec-validator; engineering-lock-gate.ts imports engineering-contract).
+import { designStageCacheKey, readDesignStageCache, writeDesignStageCache } from '../../../../scripts/lib/design-stage-cache'
+
 // ─── Frontier models (high intelligence, high cost) ─────────────────────────
 
 /** GPT-5.5 xhigh — top intelligence (60), 94% hallucination risk. Avoid for facts. */
@@ -159,6 +165,31 @@ export async function callFastExtract(
   opts: FastExtractOpts = {},
 ): Promise<string> {
   const model = opts.model ?? GEMINI_3_1_FLASH_LITE
+
+  // DETERMINISM #86 REPLAY LEDGER (2026-07-07): callFastExtract is the single high-volume
+  // fast-extraction choke point for the chain — emitter-completion (feeds part IDENTITY),
+  // brief-expansion, advisor prose, llm-json helpers, physics-critic-autocorrect all funnel
+  // through it. It bypassed the design-stage ledger callLlm goes through, so on a same-brief
+  // re-run it re-rolled (OpenRouter is not bit-reproducible even at temperature:0), forking
+  // the identity slice. Route every call through the SAME persistent ledger keyed on the exact
+  // request the model receives (model + system + user + sampling/thinking params). A hit replays
+  // the recorded response and never touches the network; a genuinely different request misses
+  // naturally. Kill switch DESIGN_STAGE_CACHE=0 falls straight through to the live call.
+  const ledgerPayload = {
+    model,
+    systemPrompt: opts.systemPrompt ?? '',
+    userContent,
+    temperature: opts.temperature ?? 0,
+    maxTokens: opts.maxTokens ?? 32_000,
+    thinkingLevel: model === GEMINI_3_1_FLASH_LITE ? (opts.thinkingLevel ?? 'low') : null,
+    groundWithGoogleSearch: opts.groundWithGoogleSearch ?? false,
+  }
+  const ledgerKey = designStageCacheKey(ledgerPayload)
+  const replayed = readDesignStageCache<string>('callFastExtract', ledgerKey)
+  if (replayed !== null && replayed.length > 0) {
+    return replayed
+  }
+
   const messages: Array<{ role: 'system' | 'user'; content: string }> = []
   if (opts.systemPrompt) messages.push({ role: 'system', content: opts.systemPrompt })
   messages.push({ role: 'user', content: userContent })
@@ -179,6 +210,9 @@ export async function callFastExtract(
         model,
         messages,
         temperature: opts.temperature ?? 0,
+        // Fixed seed alongside temperature:0 — a determinism-supporting provider (OpenAI/
+        // Google) then greedy-decodes identically; the ledger backstops the rest.
+        seed: 42,
         max_tokens: opts.maxTokens ?? 32_000,
         // Gemini 3.1 Flash-Lite specific options (no-op on other models).
         ...(model === GEMINI_3_1_FLASH_LITE
@@ -216,5 +250,9 @@ export async function callFastExtract(
     )
     throw new Error(`finish_reason='${finishReason}' (likely truncation)`)
   }
-  return (choice?.message?.content ?? '').trim()
+  const text = (choice?.message?.content ?? '').trim()
+  // Record the decision (best-effort; a non-empty response only — an empty body is not a
+  // reproducible "answer" and must be re-asked next run).
+  if (text.length > 0) writeDesignStageCache('callFastExtract', ledgerKey, text)
+  return text
 }

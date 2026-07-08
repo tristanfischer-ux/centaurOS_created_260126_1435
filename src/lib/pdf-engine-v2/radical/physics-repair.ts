@@ -34,6 +34,9 @@
 
 import type { ModuleSpec, CrossModuleGrammarLink } from '../types/module-decomposition'
 import { runPhysicsCritic, type CritiqueReport, type CritiqueIssue } from './physics-critic'
+// Determinism #86 replay ledger — physics-repair mutates part identity, so its repair-model call
+// must replay across same-brief re-runs. Same on-disk store (out/.design-cache) as callLlm.
+import { designStageCacheKey, readDesignStageCache, writeDesignStageCache } from '../../../../scripts/lib/design-stage-cache'
 
 export interface PhysicsRepairResult {
   ran: boolean
@@ -272,29 +275,45 @@ ${JSON.stringify(opts.affectedSnippet, null, 2).slice(0, 20000)}
 
 Emit the patch JSON now. Remember: if the only fix violates brief constraints, return unfixable_reason — do NOT silently scale up the design.`
 
+  // DETERMINISM #86 REPLAY LEDGER (2026-07-07): the physics-repair loop mutates design.modules
+  // (patches part identity), so a re-rolled repair patch forks the identity slice. Route the
+  // repair-model call through the SAME persistent ledger the chain's callLlm uses — a hit replays
+  // the recorded patch verbatim, a genuinely different (finding, snippet) misses naturally. The
+  // key folds in everything the patch is a pure function of (model + system + the user block that
+  // embeds the finding + brief constraints + the affected design snippet).
+  const ledgerPayload = { model: opts.model, system: REPAIR_SYSTEM, user: userContent, maxTokens: 6000, temperature: 0 }
+  const ledgerKey = designStageCacheKey(ledgerPayload)
+  const replayed = readDesignStageCache<string>('physics-repair', ledgerKey)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 300_000)
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${opts.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: opts.model,
-        messages: [
-          { role: 'system', content: REPAIR_SYSTEM },
-          { role: 'user', content: userContent },
-        ],
-        temperature: 0,
-        max_tokens: 6000,
-      }),
-      signal: controller.signal,
-    })
-    if (!res.ok) return { patches: [], unfixable_reason: `OpenRouter ${res.status} during physics repair` }
-    const json = await res.json() as any
-    const raw = String(json.choices?.[0]?.message?.content ?? '').trim()
+    let raw: string
+    if (replayed !== null && replayed.length > 0) {
+      raw = replayed
+    } else {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${opts.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: opts.model,
+          messages: [
+            { role: 'system', content: REPAIR_SYSTEM },
+            { role: 'user', content: userContent },
+          ],
+          temperature: 0,
+          seed: 42,
+          max_tokens: 6000,
+        }),
+        signal: controller.signal,
+      })
+      if (!res.ok) return { patches: [], unfixable_reason: `OpenRouter ${res.status} during physics repair` }
+      const json = await res.json() as any
+      raw = String(json.choices?.[0]?.message?.content ?? '').trim()
+      if (raw.length > 0) writeDesignStageCache('physics-repair', ledgerKey, raw)
+    }
     const cleaned = raw.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
     try {
       const parsed = JSON.parse(cleaned)

@@ -364,6 +364,70 @@ export async function orchestrateDesign(
     return failResult(executorOutcome.contract, toolFailures.map(f => `${prefix}tool failure: ${f}`), fallback_on_failure, executorOutcome.tool_results, executorOutcome.iterations)
   }
 
+  // ── Step 3b: PRE-MERGE wrong-domain tool purge (DETERMINISM #86 root cause,
+  //    2026-07-07) ─────────────────────────────────────────────────────────
+  //
+  // CORE FIX PRINCIPLE: a self-inapplicable, wrong-domain tool's OUTPUT must never
+  // reach a consumer, not just be hidden from the rendered report. The prior gate-34
+  // drop-filter (serial-design-chain-v2.tsx, ~line 8760) ran AFTER finaliseContract +
+  // assembleDesign — it correctly identified e.g. `refrigeration-cycle:cop` (a COOLING
+  // tool) leaking onto an aquaculture_ras HEATING duty and removed it from the
+  // rendered tools-used page, but by then `applyUniversalContractSizing` (the generic
+  // emitter) had ALREADY consumed the tool's `heat_pump_compressor_power_kw` quantity
+  // (cop_cooling computed from cooling_load=heating_duty_kw ≈ 11, an absurd inversion)
+  // and synthesised a SEPARATE, wrongly-undersized "Heat Pump Compressor" principal —
+  // a duplicate of the correctly-sized `heat_pump_synth_word` (from the authoritative
+  // heat_pump_electrical_kw = heating_duty ÷ COP). The Physics Critic then correctly
+  // hard-blocked (gate 33) a part the engine itself had poisoned — and because tool
+  // selection/contamination could differ run-to-run (bootstrap-plan cold vs warm),
+  // this was ALSO a reproducibility hole: one twin sizes correctly, the other doesn't.
+  //
+  // Fix: build a PRELIMINARY tools-used page from `executorOutcome.contract` alone
+  // (buildToolsUsedPage only reads contract.quantities' provenance + worked_calculations
+  // — no design/modules dependency, so this is safe to call before assembleDesign) and
+  // run the SAME applicable_to + toolLeaksWrongDomain check gate 34 uses. Any tool that
+  // is BOTH self-inapplicable (`applicable_to(envelope, contract) === false`) AND trips
+  // a wrong-domain marker for THIS class has every quantity it wrote purged from
+  // `executorOutcome.contract.quantities` BEFORE finaliseContract/assembleDesign run —
+  // so the emitter never sees the contaminated value and never synthesises the
+  // duplicate. Universal + deterministic (no LLM): keyed on the tool's own author-scope
+  // signal + the domain-marker scan, never a per-class table. A domain-NEUTRAL tool
+  // (no marker, or applicable) is untouched — this never starves an unseen archetype of
+  // a legitimate stand-in. Strict no-op when no tool trips both conditions.
+  try {
+    const { listTools } = await import('./registry')
+    const { toolLeaksWrongDomain } = await import(
+      '../../../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+    )
+    const preToolsPage = buildToolsUsedPage(executorOutcome.contract, [])
+    const reg = listTools()
+    const droppedToolIds = new Set<string>()
+    for (const t of (preToolsPage.tools ?? []) as any[]) {
+      const toolDef = reg.get(t.tool_id)
+      if (!toolDef) continue
+      let applicable = true
+      try { applicable = toolDef.applicable_to(envelope, executorOutcome.contract) === true } catch { applicable = true }
+      if (!applicable && toolLeaksWrongDomain(t, envelope.class)) {
+        droppedToolIds.add(t.tool_id)
+      }
+    }
+    if (droppedToolIds.size > 0) {
+      const qs = executorOutcome.contract.quantities as Record<string, any>
+      let purged = 0
+      for (const [k, v] of Object.entries(qs)) {
+        const tid = (v as any)?.provenance?.tool_id
+        if (tid && droppedToolIds.has(tid)) { delete qs[k]; purged++ }
+      }
+      console.error(
+        `[orchestrator] tool-archetype pre-merge purge: dropped ${droppedToolIds.size} ` +
+        `self-inapplicable wrong-domain tool(s) [${[...droppedToolIds].join(', ')}] — removed ` +
+        `${purged} contaminated quantity key(s) before aggregation/assembly`,
+      )
+    }
+  } catch (e) {
+    console.error(`[orchestrator] tool-archetype pre-merge purge skipped (${(e as Error).message})`)
+  }
+
   // ── Step 4: Cross-tool consistency verifier ──────────────────────────
   const verifierOutcome = runConsistencyVerifier(
     plan.consistency_rules,

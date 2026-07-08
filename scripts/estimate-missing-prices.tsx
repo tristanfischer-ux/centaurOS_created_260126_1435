@@ -62,6 +62,12 @@ import {
 import {
   lookupCached,
 } from '../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
+// Determinism #86 replay ledger — Engine-B's two Flash-Lite calls (class classification +
+// unknown-class price estimate) feed the price slice determinism-check.tsx compares. Both run
+// at non-zero temperature (0.1 / 0.3) so they re-rolled hardest on a same-brief re-run. Route
+// through the SAME on-disk ledger the chain's callLlm uses; a subprocess shares out/.design-cache
+// with the parent because the key is content-hash + the store is a stable cwd-relative dir.
+import { cachedDesignStage } from './lib/design-stage-cache'
 
 const CONCURRENCY = 8
 const FORGE_TRUTH_DB = join(homedir(), '.forge-truth/forge-truth.db')
@@ -937,24 +943,35 @@ Return ONLY a JSON array, one entry per part in the same order:
 [{"idx":<idx>,"component_class":"<class or 'unknown'>"}, ...]
 No prose, no markdown.`
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENROUTER_KEY}`,
-        'HTTP-Referer': 'https://fractionalforge.com',
-        'X-Title': 'ForgeOS Engine B on-the-fly classifier',
+    // Replay ledger (determinism #86): a hit replays the recorded classifier text; a miss calls
+    // OpenRouter once (temperature:0.1 pinned with seed:42) and records it.
+    const { value: text } = await cachedDesignStage({
+      stage: 'engine-b-classify',
+      payload: { model: 'google/gemini-3.1-flash-lite-preview', prompt, temperature: 0.1, maxTokens: 1800 },
+      isValid: (v: string) => typeof v === 'string' && v.length > 0,
+      run: async () => {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            'HTTP-Referer': 'https://fractionalforge.com',
+            'X-Title': 'ForgeOS Engine B on-the-fly classifier',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3.1-flash-lite-preview',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1800,
+            temperature: 0.1,
+            seed: 42,
+          }),
+        })
+        if (!res.ok) return ''
+        const j: any = await res.json()
+        return String(j.choices?.[0]?.message?.content ?? '')
       },
-      body: JSON.stringify({
-        model: 'google/gemini-3.1-flash-lite-preview',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1800,
-        temperature: 0.1,
-      }),
     })
-    if (!res.ok) return result
-    const j: any = await res.json()
-    const text: string = j.choices?.[0]?.message?.content ?? ''
+    if (!text) return result
     const m = text.match(/\[[\s\S]*\]/)
     if (!m) return result
     const parsed = JSON.parse(m[0])
@@ -1145,24 +1162,35 @@ Guidance:
 - Use industry knowledge — don't return 0.`
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENROUTER_KEY}`,
-        'HTTP-Referer': 'https://fractionalforge.com',
-        'X-Title': 'ForgeOS price estimator (unknown class fallback)',
+    // Replay ledger (determinism #86): the unknown-class price estimate feeds partVerifications
+    // prices (the slice). temperature:0.3 pinned with seed:42; a hit replays, a miss records.
+    const { value: text } = await cachedDesignStage({
+      stage: 'engine-b-price-estimate',
+      payload: { model: 'google/gemini-3.1-flash-lite-preview', prompt, temperature: 0.3, maxTokens: 300 },
+      isValid: (v: string) => typeof v === 'string' && v.length > 0,
+      run: async () => {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            'HTTP-Referer': 'https://fractionalforge.com',
+            'X-Title': 'ForgeOS price estimator (unknown class fallback)',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-3.1-flash-lite-preview',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 300,
+            temperature: 0.3,
+            seed: 42,
+          }),
+        })
+        if (!res.ok) return ''
+        const j: any = await res.json()
+        return String(j.choices?.[0]?.message?.content ?? '')
       },
-      body: JSON.stringify({
-        model: 'google/gemini-3.1-flash-lite-preview',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300,
-        temperature: 0.3,
-      }),
     })
-    if (!res.ok) return null
-    const j: any = await res.json()
-    const text: string = j.choices?.[0]?.message?.content ?? ''
+    if (!text) return null
     const jsonMatch = text.match(/\{[\s\S]*?\}/)
     if (!jsonMatch) return null
     const parsed = JSON.parse(jsonMatch[0])

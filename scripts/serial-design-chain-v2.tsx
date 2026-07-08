@@ -3144,43 +3144,62 @@ Constraints:
 - patch MUST be a complete function (signature + body), not a diff, not a fragment
 - The patched function must have the SAME signature as the original (same params, same return type)`
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
+  // DETERMINISM #86 (2026-07-07): callGlmCodeFix used to hit OpenRouter directly with no
+  // ledger — the self-correcting quality loop's CODE-fix branch (as opposed to the DATA-fix
+  // re-run branch) could propose a DIFFERENT patch to the engine's OWN SOURCE FILES on two
+  // otherwise-identical runs. That is a determinism hole one order of magnitude worse than a
+  // design-content re-roll: it mutates the engine itself. Wrapped in cachedDesignStage() keyed
+  // on the full request the LLM would receive (model + system + prompt — the prompt already
+  // embeds the defect + ledger summary + source file contents verbatim, so it is the complete
+  // pure-function input per this module's own "fold in the real prompt text" doctrine).
+  const system = 'You are a senior TypeScript/Python engineer specialising in design automation. You diagnose defects across multiple files and write UNIVERSAL code fixes that work for any product class. You are precise, minimal, and defensive. Return valid JSON only.'
+  const { value: result } = await cachedDesignStage({
+    stage: 'glm-code-fix',
+    payload: { model: 'z-ai/glm-5.2', system, prompt },
+    isValid: (v: any) => typeof v?.patch === 'string' && v.patch.length > 0,
+    run: async () => {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'z-ai/glm-5.2',
+          max_tokens: 16000,
+          temperature: 0,
+          seed: 42,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(120000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`GLM-5.2 API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content || ''
+
+      // Extract JSON from the response (GLM may wrap in markdown code fences)
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        throw new Error(`GLM-5.2 did not return valid JSON: ${content.slice(0, 200)}`)
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        diagnosis: String(parsed.diagnosis || ''),
+        patch: String(parsed.patch || ''),
+        targetFile: String(parsed.targetFile || ''),
+        targetFunction: String(parsed.targetFunction || ''),
+      }
     },
-    body: JSON.stringify({
-      model: 'z-ai/glm-5.2',
-      max_tokens: 16000,
-      messages: [
-        { role: 'system', content: 'You are a senior TypeScript/Python engineer specialising in design automation. You diagnose defects across multiple files and write UNIVERSAL code fixes that work for any product class. You are precise, minimal, and defensive. Return valid JSON only.' },
-        { role: 'user', content: prompt },
-      ],
-    }),
-    signal: AbortSignal.timeout(120000),
   })
-
-  if (!response.ok) {
-    throw new Error(`GLM-5.2 API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  const content = data.choices?.[0]?.message?.content || ''
-
-  // Extract JSON from the response (GLM may wrap in markdown code fences)
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error(`GLM-5.2 did not return valid JSON: ${content.slice(0, 200)}`)
-  }
-
-  const result = JSON.parse(jsonMatch[0])
-  return {
-    diagnosis: String(result.diagnosis || ''),
-    patch: String(result.patch || ''),
-    targetFile: String(result.targetFile || ''),
-    targetFunction: String(result.targetFunction || ''),
-  }
+  return result
 }
 
 /**
@@ -3223,37 +3242,37 @@ Review for:
 
 Return JSON: { "findings": [{ "severity": "blocker"|"warning"|"info", "description": "..." }], "verdict": "PASS"|"WARNING"|"BLOCK" }`
 
+  // DETERMINISM #86 (2026-07-07): both dual-review calls used to hit OpenRouter directly with
+  // no ledger — same CODE-fix-mutates-the-engine determinism hole as callGlmCodeFix above.
+  // Each reviewer wrapped independently in cachedDesignStage() keyed on {model, system, prompt}
+  // so a replay of the SAME patch always reproduces the SAME PASS/WARNING/BLOCK verdict.
+  const mimoSystem = 'You are a code reviewer. Be honest — do not fabricate findings. If the patch is correct, say PASS.'
+  const glmSystem = 'You are a code reviewer specialising in schema and type safety. Be precise — do not fabricate findings.'
+  const callReviewer = (model: string, system: string) => cachedDesignStage({
+    stage: 'glm-code-fix-review',
+    payload: { model, system, prompt: reviewPrompt },
+    isValid: (v: any) => v && typeof v === 'object' && v.choices,
+    run: async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 8000,
+        temperature: 0,
+        seed: 42,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: reviewPrompt },
+        ],
+      }),
+    }).then(r => r.json()),
+  }).then(r => r.value)
   const [mimoResult, glmResult] = await Promise.all([
-    fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'xiaomi/mimo-v2.5-pro',
-        max_tokens: 8000,
-        messages: [
-          { role: 'system', content: 'You are a code reviewer. Be honest — do not fabricate findings. If the patch is correct, say PASS.' },
-          { role: 'user', content: reviewPrompt },
-        ],
-      }),
-    }).then(r => r.json()),
-    fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'z-ai/glm-5.1',
-        max_tokens: 8000,
-        messages: [
-          { role: 'system', content: 'You are a code reviewer specialising in schema and type safety. Be precise — do not fabricate findings.' },
-          { role: 'user', content: reviewPrompt },
-        ],
-      }),
-    }).then(r => r.json()),
+    callReviewer('xiaomi/mimo-v2.5-pro', mimoSystem),
+    callReviewer('z-ai/glm-5.1', glmSystem),
   ])
 
   const parseReview = (data: any): { findings: string[]; blockers: number } => {
@@ -4876,18 +4895,34 @@ async function main() {
         log: (rec) => logAction(rec),
         // Inject the fast-LLM re-spec caller: Gemini 3.5 Flash (the Critic's own model —
         // reasoning-first, sharp on engineering maths), Grok 4.3 fallback. temperature 0.
+        //
+        // DETERMINISM #86 (2026-07-07): this call used to hit OpenRouter directly with no
+        // ledger — a raw `fetch()` call-site the design-stage-cache audit found still
+        // bypassing callLlm. Wrapped in cachedDesignStage() keyed on the PROMPT alone (not
+        // which of the two models answered) so a replay always returns run 1's recorded
+        // text regardless of which tier produced it — the same "record the decision, replay
+        // it" doctrine as callLlm, applied to a caller with its own fast/fallback tiering
+        // that doesn't fit callLlm's single-model signature.
         llm: async (prompt: string) => {
-          const callOnce = async (model: string): Promise<string> => {
-            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://forge-os.com/autocorrect' },
-              body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 4096, temperature: 0 }),
-            })
-            if (!res.ok) throw new Error(`OpenRouter ${res.status} from ${model}`)
-            const j = await res.json() as any
-            return j?.choices?.[0]?.message?.content ?? ''
-          }
-          try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_3) }
+          const { value } = await cachedDesignStage({
+            stage: 'physicsCriticAutocorrectLlm',
+            payload: { prompt, maxTokens: 4096, temperature: 0 },
+            isValid: (v: string) => typeof v === 'string' && v.length > 0,
+            run: async () => {
+              const callOnce = async (model: string): Promise<string> => {
+                const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://forge-os.com/autocorrect' },
+                  body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' }, max_tokens: 4096, temperature: 0, seed: 42 }),
+                })
+                if (!res.ok) throw new Error(`OpenRouter ${res.status} from ${model}`)
+                const j = await res.json() as any
+                return j?.choices?.[0]?.message?.content ?? ''
+              }
+              try { return await callOnce(FLASH_3_5) } catch { return await callOnce(GROK_4_3) }
+            },
+          })
+          return value
         },
         // Re-critique callback: re-run the Physics Critic on the (working) modules.
         // Cached too — a mutated design hashes differently, so a genuine re-check
