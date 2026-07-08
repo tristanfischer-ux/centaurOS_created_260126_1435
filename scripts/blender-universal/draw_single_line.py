@@ -834,6 +834,116 @@ def _group_control_loads(tree: Tree, devices: list):
     main.branches = keep + [feeder]
 
 
+# DISTRIBUTION-HIERARCHY LEGIBILITY (Sam L10, 2026-07-08): "everything connected to one
+# line that doesn't really mean anything or show how they connect". A real LV design never
+# wires a dozen-plus final loads straight off the main incomer board — it drops through a
+# Motor Control Centre (MCC) for rotating plant and a distribution board for the rest, each
+# with its OWN incoming feeder + breaker, so the reader can see WHICH board serves WHICH
+# group. Keyed on the GENERIC rotating-equipment noun family (never a product class) — the
+# same family a wind turbine's yaw drive, a BESS's coolant pump, and a water-treatment
+# plant's process pump all share.
+_ROTATING_LOAD_RE = re.compile(
+    r"\bpump\b|blower|\bfan\b|compressor|mixer|agitator|conveyor|\bdrive\b|\bmotor\b|"
+    r"\bauger\b|\bscrew\b", re.I)
+
+
+def _group_motor_loads(tree: "Tree", devices: list):
+    """UNIVERSAL: group the remaining ROTATING/motor-driven feeders (pumps, fans, blowers,
+    compressors, mixers) still flat on the main board onto a dedicated MOTOR CONTROL CENTRE
+    (MCC) sub-board — the standard LV distribution tier for motor loads in any archetype.
+    Runs AFTER control/critical/aux grouping (so it only ever claims what those left behind)
+    and fires only when it genuinely declutters (≥ MIN_GROUP rotating loads remain flat); a
+    plant with one or two motors keeps them on the main board (no hierarchy theatre for a
+    trivial design). Each moved branch KEEPS its own protective device (or gets one from the
+    universal backstop below) — the MCC's incoming feeder is an ADDITIONAL protection tier,
+    not a replacement for per-load protection. Deterministic; keyed on the load NAME's
+    generic rotating-equipment signal, never a product class."""
+    MIN_GROUP = 4
+    main = tree.main_bus
+    rot = [br for br in main.branches
+           if br.sub_bus is None
+           and _ROTATING_LOAD_RE.search(f"{br.label} {br.to_node}")]
+    if len(rot) < MIN_GROUP:
+        return
+    keep = [br for br in main.branches if br not in rot]
+    sub = Bus(tag="MOTOR CONTROL CENTRE (MCC)", is_sub=True)
+    for br in rot:
+        br.from_node = sub.tag
+        sub.branches.append(br)
+    feeder = Branch(
+        from_node=main.tag,
+        to_node=sub.tag,
+        label="Motor control centre feeder",
+        rating="", cable="", role="branch", target_sym=SYM_LOAD,
+    )
+    feeder.sub_bus = sub
+    feeder.is_feeder = True   # type: ignore[attr-defined]  — same-voltage feeder, not a TX
+    cb = _pick_device(devices, kind="breaker")
+    feeder.devices.append(_as_device(cb, "breaker", "CB"))
+    main.branches = keep + [feeder]
+
+
+def _group_residual_process_loads(tree: "Tree", devices: list):
+    """UNIVERSAL: once control/critical/aux/motor loads have each claimed their own
+    sub-board, a plant with MANY remaining static/process feeders (filters, disinfection
+    units, dosing skids, panels, process outlets) still hanging directly off the main
+    incomer board is exactly the "everything on one line" defect — a flat spray with no
+    distribution hierarchy. Move the residue onto ONE generic PROCESS DISTRIBUTION BOARD
+    fed via its own feeder + breaker, mirroring the same MIN_GROUP-gated pattern as every
+    other grouping pass in this file (a plant with a handful of loads is left exactly as
+    it is). Deterministic; keyed on "a load feeder no other pass claimed", never a product
+    class."""
+    MIN_GROUP = 4
+    main = tree.main_bus
+    residual = [br for br in main.branches if br.sub_bus is None]
+    if len(residual) < MIN_GROUP:
+        return
+    keep = [br for br in main.branches if br.sub_bus is not None]
+    sub = Bus(tag="PROCESS DISTRIBUTION BOARD", is_sub=True)
+    for br in residual:
+        br.from_node = sub.tag
+        sub.branches.append(br)
+    feeder = Branch(
+        from_node=main.tag,
+        to_node=sub.tag,
+        label="Process distribution feeder",
+        rating="", cable="", role="branch", target_sym=SYM_LOAD,
+    )
+    feeder.sub_bus = sub
+    feeder.is_feeder = True   # type: ignore[attr-defined]  — same-voltage feeder, not a TX
+    cb = _pick_device(devices, kind="breaker")
+    feeder.devices.append(_as_device(cb, "breaker", "CB"))
+    main.branches = keep + [feeder]
+
+
+def _ensure_load_protective_devices(tree: "Tree", devices: list):
+    """UNIVERSAL BACKSTOP: every final LOAD feeder — on the main board or on any sub-board,
+    at any tier — must show its OWN protective device, so the diagram never draws a bare
+    conductor from a bus straight to a load. Uses a real BoM-matched breaker when
+    `extract_devices` found one; otherwise falls back to a genuinely-sized generic MCB (the
+    same `_as_device(None, ...)` fallback idiom every other device attachment in this file
+    already uses) rather than leaving the drop unprotected. A branch that terminates in
+    ANOTHER bus (a sub-distribution / UPS / MCC feeder) is left alone here — its own
+    transformer/UPS symbol already IS its protection stage; this only backstops branches
+    whose target is a genuine load box. Deterministic; keyed on the branch's own target
+    symbol, never a product class — so a plant whose BoM never modelled explicit breaker
+    parts still reads as a properly-protected distribution board rather than a flat,
+    unprotected line. Runs LAST (after every grouping pass) and is idempotent (skips a
+    branch that already carries a device)."""
+    def _walk(bus: "Bus"):
+        for br in bus.branches:
+            if br.sub_bus is not None:
+                _walk(br.sub_bus)
+                continue
+            if br.target_sym != SYM_LOAD or br.devices:
+                continue
+            frame = _next_frame_a(_rating_amps(br))
+            detail = f"{frame:g} A frame" if frame else ""
+            cb = _pick_device(devices, kind="breaker")
+            br.devices.append(_as_device(cb, "breaker", "CB", detail))
+    _walk(tree.main_bus)
+
+
 # LIFE-SAFETY / CRITICAL loads — the ways that MUST stay powered for the living process to
 # survive a mains failure (the genset + UPS carry these on the critical board). For a
 # recirculating-life-support plant: the recirculation / circulation pumps that keep water
@@ -1789,6 +1899,17 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # (a plant without a critical board still gets this; a critical board already took its
     # controls, so this handles the residue / the non-critical-redundancy case).
     _group_control_loads(tree, devices)
+    # UNIVERSAL distribution hierarchy (Sam L10, 2026-07-08): the loads no other pass
+    # claimed are exactly the "everything on one line" defect — group the rotating/motor
+    # plant onto an MCC tier, then the static residue onto a process distribution board,
+    # so the board reads incomer → main board → feeder+breaker → sub-board → load instead
+    # of a flat spray. Order matters: motor grouping runs first so the residual pass never
+    # re-claims a pump already placed on the MCC.
+    _group_motor_loads(tree, devices)
+    _group_residual_process_loads(tree, devices)
+    # UNIVERSAL backstop: every final load feeder, at any tier, shows its own protective
+    # device (real BoM-matched or a generically-sized MCB) — never a bare conductor.
+    _ensure_load_protective_devices(tree, devices)
     return tree
 
 
@@ -3034,8 +3155,9 @@ def build_sld_svg(tree: Tree, state: dict | None = None) -> str:
 
 
 def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
-    """Draw: parent-bus tap → two-winding transformer (or a UPS for a control board) →
-    SUB-BUSBAR → its load branches."""
+    """Draw: parent-bus tap → two-winding transformer (or a UPS for a control board, or a
+    plain protected feeder for a same-voltage MCC / distribution board) → SUB-BUSBAR → its
+    load branches."""
     sub = br.sub_bus
     svg.line(bx, y_from, bx, y_from + 12, width=1.8)
     if getattr(br, "is_ups", False):
@@ -3044,6 +3166,18 @@ def _draw_sub_distribution(svg: SVG, bx, y_from, br: Branch, col_w):
                           kva="", detail="back-up supply")
         sub_bus_y = ups_bot + 22
         bot_anchor = ups_bot
+    elif getattr(br, "is_feeder", False):
+        # SAME-VOLTAGE sub-distribution (a Motor Control Centre / distribution board fed
+        # off the main LV board) — a protected feeder straight into the sub-busbar, NOT a
+        # step-down transformer. Drawing a TX glyph here would claim a voltage change that
+        # doesn't exist (the exact "doesn't really mean anything" defect this fixes).
+        dev_end = y_from + 12 + 40
+        if br.devices:
+            _device_chain(svg, bx, y_from + 12, dev_end, br.devices)
+        else:
+            svg.line(bx, y_from + 12, bx, dev_end, width=1.8)
+        sub_bus_y = dev_end + 14
+        bot_anchor = dev_end
     else:
         xfmr = getattr(br, "transformer", None)
         tag = xfmr.tag if xfmr else "TX"
@@ -3373,6 +3507,45 @@ def _selftest() -> int:
         # S3 — the A1 pagination plan reaches the ISO 3098 bar for the real output.
         p = a1_print.plan_sheets(w, h, a1_print.min_font_px(svg))
         chk(f"S3.a1_plan_meets_bar_{name}", p["meets_bar"] and p["min_text_mm"] >= 2.5)
+
+    # S4 — DISTRIBUTION HIERARCHY (Sam L10, 2026-07-08: "everything connected to one line
+    # that doesn't really mean anything or show how they connect"). proveCatch: a multi-load
+    # flat board (rotating + static loads straight off the main bus) is pulled into a tiered
+    # incomer → main board → feeder → sub-board → load hierarchy, with every final load
+    # individually protected. proveNoFalsePositive: a trivial board (one of each) is left
+    # exactly as-is — no hierarchy theatre for a design that doesn't need it.
+    def _mk_flat_tree(rotating_n, static_n):
+        bus = Bus(tag="MAIN BOARD", voltage="400 V AC", rating="200 A")
+        for i in range(rotating_n):
+            bus.branches.append(Branch(from_node="MAIN BOARD", to_node=f"Pump {i}",
+                                       label=f"Pump {i}", rating="10 A", cable="2.5 mm²"))
+        for i in range(static_n):
+            bus.branches.append(Branch(from_node="MAIN BOARD", to_node=f"Filter {i}",
+                                       label=f"Filter {i}", rating="8 A", cable="1.5 mm²"))
+        return Tree(archetype="selftest", source=Source(), incomer_devices=[],
+                    incomer_transformer=None, main_bus=bus)
+
+    big = _mk_flat_tree(5, 5)
+    _group_motor_loads(big, [])
+    _group_residual_process_loads(big, [])
+    _ensure_load_protective_devices(big, [])
+    chk("S4.proveCatch_tiered_hierarchy",
+        len(big.main_bus.branches) < 10
+        and any(br.sub_bus is not None for br in big.main_bus.branches))
+    chk("S4.proveCatch_every_grouped_load_protected", all(
+        len(lb.devices) > 0
+        for br in big.main_bus.branches if br.sub_bus is not None
+        for lb in br.sub_bus.branches))
+    chk("S4.proveCatch_no_phantom_transformer_on_same_voltage_feeder", all(
+        getattr(br, "is_feeder", False) for br in big.main_bus.branches
+        if br.sub_bus is not None))
+
+    small = _mk_flat_tree(1, 1)
+    _group_motor_loads(small, [])
+    _group_residual_process_loads(small, [])
+    chk("S4.proveNoFalsePositive_trivial_board_stays_flat",
+        len(small.main_bus.branches) == 2
+        and all(br.sub_bus is None for br in small.main_bus.branches))
 
     for f in fails:
         print(f"[sld][selftest] FAIL {f}")
