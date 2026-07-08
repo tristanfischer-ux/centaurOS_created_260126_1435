@@ -365,10 +365,12 @@ export function selftestCascadePriceAdoption(): { ok: boolean; failures: string[
     { qty: 1, unitPriceGbp: 45.68 }, { qty: 5, unitPriceGbp: 38.53 },
     { qty: 10, unitPriceGbp: 35.8 }, { qty: 111, unitPriceGbp: 28.82 },
   ]
-  const mkState = (pv: any[], words: any[] = []) => ({
-    partVerifications: pv,
-    moduleDecomposition: { modules: [{ module: 'm', sub_modules: [{ id: 's', words }] }] },
-  })
+  const mkState = (pv: any[], words: any[] = []) => {
+    return {
+      partVerifications: pv,
+      moduleDecomposition: { modules: [{ module: 'm', sub_modules: [{ id: 's', words }] }] },
+    }
+  }
 
   // 1. REAL pinned MPN + cached price + parametric estimate → ADOPTS (the v58 case).
   {
