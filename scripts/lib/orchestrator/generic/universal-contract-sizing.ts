@@ -610,6 +610,27 @@ function isSynthesisable(g: EquipGroup): boolean {
     // Keyed on the stage noun family, universal, no class table (gate-36 round 2).
     return phraseLooksLikeDevice(g.phrase) || isDisinfectionPhrase(g.phrase)
   }
+  // EXPLICITLY-COUNTED SMALL DEVICE (Sam Green SME review, 2026-07-07 — "each pump unit has
+  // its own fertilizer + acid + hydrogen-peroxide dosing"). The 10 m³/h / 15 kW floor above
+  // exists to keep a diffuse NOISE quantity (a load/duty aggregate with no device identity)
+  // from minting a phantom machine — it was never meant to exclude a genuinely small,
+  // explicitly-counted DISCRETE unit. A metering/dosing pump (Iwaki EWN-C21, ~40 L/h, ~40 W)
+  // fails both floors by two orders of magnitude yet is real, priced, installed equipment —
+  // the brief states it, the contract carries its OWN `_count` (acid_dosing_pump_count = 2,
+  // chemical_dosing_pump_count = 2), and Sam's real Codema P&ID draws it as a named device.
+  // Before this fix those quantities existed on every fischer-codema run but ZERO acid/H₂O₂
+  // dosing pump ever reached the BoM/topology (isSynthesisable silently refused them) —
+  // Rule 2 of the multizone-distribution handover ("per-unit dosing depth") was
+  // unimplementable without this. UNIVERSAL, no class table: a group qualifies only when (a)
+  // it carries an EXPLICIT discrete count ≥1 (proof the contract/brief counted a real unit,
+  // not a synthesised default), (b) it also carries SOME rated duty (throughput or power —
+  // a bare, unrated count alone is still refused, e.g. a generic non-device `*_count`), and
+  // (c) its phrase names an actual device noun. proveNoFalsePositive: a diffuse load/duty
+  // quantity with no `_count` sibling never reaches this branch at all (measure !== 'count'
+  // is not how groups are gated — g.count is only ever set from a real `_count` key).
+  if (g.count !== undefined && g.count >= 1 && (g.throughput !== undefined || g.power !== undefined)) {
+    return phraseLooksLikeDevice(g.phrase)
+  }
   return false
 }
 
@@ -1772,6 +1793,80 @@ export function mintDemandCoverage(
           mint('hand_watering_riser_count', hwRisers, '', 'count', hwKey,
             `${prov}: hand-watering tap risers (each a hand valve + quick connector) = ${risersPerBranch} per branch × ${branches} branches + 2 per delivery group at the plant/irrigation room (${2 * groups}) = ${hwRisers}`)
         }
+      }
+    }
+  }
+  // ── rule 9: CRITICAL DISTRIBUTION-MOVER BACKUP — N+1 (2026-07-08, Sam Green SME review of
+  // the real Codema Fischer Farms system, RULE 3 of the UNIVERSAL multizone-distribution
+  // handover — "each pump unit has a backup pump" (P&ID SO21101551-100d); Exec J28 "why is
+  // it providing double capacity required?" traced to this redundancy existing but never
+  // being LABELLED as a deliberate N+1 decision). UNIVERSAL rule: a distribution prime-mover
+  // that has ALREADY been sized to N≥2 per-zone instances (rule-8's
+  // distribution_delivery_groups shape, or the mover's own zone-keyed vocabulary) — i.e. it
+  // is the SOLE path delivering its zone's continuous process duty from a shared source, no
+  // internal spare — is a single point of failure for that zone and gets a labelled BACKUP
+  // replica, rated IDENTICALLY to the duty unit it protects, minted as a REAL BoM word (not a
+  // fabricated topology-only node): `<stem>_backup_count` + `_throughput_m3_h` / `_power_kw`
+  // form their OWN equipment group (buildGroups) distinct from the duty group, so the P&ID/
+  // BoM render a genuine duty+backup pair.
+  //
+  // 'backup' (not 'standby') is the deliberate token: `stem('standby')` truncates to 'stand',
+  // which IS a STOP_STEMS entry — a `_standby_*` mint would silently collapse back into the
+  // SAME duty group (zero visible effect) instead of forming a new one. 'backup' truncates to
+  // 'backu', not a stop-stem, so it correctly forms a distinct group — and it is also Sam's
+  // own P&ID terminology ("backup pump"), so the rendered label matches the real drawing.
+  //
+  // proveNoFalsePositive (RULE 3's guard — "a non-critical / already-redundant duty gets
+  // none"): (a) a single-instance mover (count<2 — RO high-pressure pump, hand-watering pump)
+  // is untouched, nothing to protect since there is no per-zone replication; (b) a
+  // RECOVERY/DISPOSAL-side mover (drain transfer, backwash, reject, blowdown, purge) is
+  // untouched — Sam names backups only on the FORWARD distribution pumps; (c) a TRIM/METERING
+  // pump (acid/chemical dosing, ~0.04 m³/h, ~0.04 kW) is untouched by the magnitude floor —
+  // it shares the zone count (2, one per department) and the 'dosing' vocabulary, but losing
+  // it is tolerable for a period (unlike losing bulk water circulation), and Sam's review
+  // never mentions a backup for the small metering pumps, only the pump UNITS; (d) idempotent
+  // — mint() never overwrites, so a stem already carrying its own `_backup_count` (re-run, or
+  // a class builder's hand-authored redundancy) is left exactly as is.
+  {
+    // NB: `\b` does NOT break on `_` (it is a \w character) — a quantity key is underscore-
+    // joined (`fertigation_dosing_pump`), so `/\bpump\b/` never matches `..._pump` the way it
+    // would match "fertigation dosing pump". Match against the underscore→space-normalised
+    // stem (same fix as derive-topology.ts's `_normaliseSlugForMatch`, the identical trap).
+    const moverExclusionRe = /\b(drain|recover|reclaim|return|reject|waste|backwash|blowdown|transfer|purge|standby|backup|spare)\b/i
+    const moverNounRe = /\b(pump|blower|fan|compressor)\b/i
+    const deliveryZoneRe = /fertigation|irrigation|hand.?water|watering|sprinkler|distribution/i
+    const deliveryGroups = quantities['distribution_delivery_groups']
+    const r9Keys = Object.keys(quantities)
+    for (const k of r9Keys) {
+      const m = /^(.+)_count$/.exec(k)
+      if (!m) continue
+      const stemPhrase = m[1]
+      const stemNorm = stemPhrase.replace(/[_-]+/g, ' ')
+      if (moverExclusionRe.test(stemNorm) || !moverNounRe.test(stemNorm)) continue
+      const cnt = quantities[k]
+      if (!Number.isFinite(cnt) || cnt < 2 || Math.abs(cnt - Math.round(cnt)) > 1e-9) continue
+      const isZoneMover = deliveryZoneRe.test(stemNorm) ||
+        (Number.isFinite(deliveryGroups) && Math.round(cnt) === Math.round(deliveryGroups as number))
+      if (!isZoneMover) continue
+      if (Object.prototype.hasOwnProperty.call(quantities, `${stemPhrase}_backup_count`)) continue
+      const dutyThroughput = quantities[`${stemPhrase}_throughput_m3_h`] ?? quantities[`${stemPhrase}_flow_m3_h`]
+      const dutyPower = quantities[`${stemPhrase}_power_kw`] ?? quantities[`${stemPhrase}_motor_kw`]
+      // magnitude floor: a BULK circulation/distribution duty, never a small trim/metering
+      // pump (proveNoFalsePositive (c) above) — deliberately much lower than isSynthesisable's
+      // 10 m³/h / 15 kW BoM-inclusion floor (this is a "is it the critical bulk duty" test,
+      // not a "is it worth listing" test).
+      const dutyMagnitudeOk = (dutyThroughput !== undefined && dutyThroughput >= 1) ||
+        (dutyPower !== undefined && dutyPower >= 1)
+      if (!dutyMagnitudeOk) continue
+      mint(`${stemPhrase}_backup_count`, Math.round(cnt), '', 'count', k,
+        `RULE 3 (N+1 critical distribution redundancy, Sam Green SME review of the real Codema system): ${Math.round(cnt)} distribution-mover unit(s) (${k}) each serve their own zone from a shared source with no internal spare — a single point of failure for that zone's continuous process duty. One labelled BACKUP pump per duty unit (= ${Math.round(cnt)}), rated identically, mirrors the real system ("each pump unit has a backup pump")`)
+      if (dutyThroughput !== undefined) {
+        mint(`${stemPhrase}_backup_throughput_m3_h`, dutyThroughput, 'm3/h', 'flow_rate', k,
+          `RULE 3: backup pump rated identically to its duty unit's ${dutyThroughput} m³/h — a failed-over backup must meet the SAME per-zone duty, not a derated one`)
+      }
+      if (dutyPower !== undefined) {
+        mint(`${stemPhrase}_backup_power_kw`, dutyPower, 'kW', 'power', k,
+          `RULE 3: backup pump motor rated identically to its duty unit's ${dutyPower} kW`)
       }
     }
   }

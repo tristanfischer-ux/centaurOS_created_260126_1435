@@ -72,8 +72,11 @@ const STRUCTURAL_RE =
 //     the finer (pore-size physics, universal): microfiltration < ultrafiltration <
 //     nanofiltration < reverse osmosis. v55 lumped UF + RO at one rank and alphabetical
 //     tie-break sent the RO high-pressure pump discharging BACKWARDS into the UF bank.
+// Named (not just inline) so the trim/additive-chemical override below can test the SAME
+// vocabulary a sibling item was classified by, without duplicating/drifting the regex.
+const DELIVERY_APPLICATION_RE = /fertigation|irrigation|hand.?watering|\bwatering\b|sprinkler/i
 const ROLE_PATTERNS: Array<[RegExp, number]> = [
-  [/fertigation|irrigation|hand.?watering|\bwatering\b|sprinkler/i, 9], // delivery-application override (see 1)
+  [DELIVERY_APPLICATION_RE, 9], // delivery-application override (see 1)
   [/feed|inlet|supply|make.?up|charge|intake|receiv|raw[ _-]?water/i, 0],
   [/pre.?heat|preheater|guard.?bed|drier|dryer|conditioning|blend|mixer|saturat|soften|dechlor|antiscal|dosing/i, 1],
   [/micro.?filtrat|\bmf\b/i, 2.1],                                      // membrane fineness (see 2)
@@ -94,6 +97,33 @@ function roleRank(name: string): number {
   const blob = name || ''
   for (const [rx, rank] of ROLE_PATTERNS) if (rx.test(blob)) return rank
   return 5 // neutral mid-spine when no role keyword is present
+}
+
+// ── TRIM/ADDITIVE-CHEMICAL POINT-OF-USE OVERRIDE (2026-07-08, Sam Green SME review — Rule 2
+// "per-unit dosing depth": each Codema pump unit has its OWN acid + H₂O₂ trim dosing, injected
+// into that unit's pressurised discharge, NOT a shared central pretreatment stage). Bare
+// ROLE_PATTERNS rank-1 ("dosing" is in the generic pretreatment/conditioning vocabulary) puts
+// an "Acid Dosing Pump" / "Chemical Dosing Pump" right after FEED — before the RO/softener
+// treatment train — because those words carry no delivery-system name of their own the
+// rank-9 override (ROLE_PATTERNS[0]) can key on. That mis-positions a genuinely PER-ZONE trim
+// pump as if it were a shared upstream conditioning stage, scrambling the spine
+// (acid_dosing_pump -> chemical_dosing_pump -> gac_softener, upstream of the RO train).
+//
+// UNIVERSAL, no class name, and DELIBERATELY NARROW to avoid re-classifying the EXISTING
+// Rule-2 GENERAL conditioning path (a bare "Zone Chemical Dosing Skid" with no delivery-system
+// name of its own — the proveCatch fixture for an archetype whose per-zone conditioning unit
+// isn't fertigation/irrigation-named — which correctly STAYS at rank-1): a trim/additive-
+// chemical pump (acid, caustic, peroxide, biocide, scale-inhibitor/antiscalant, corrosion-
+// inhibitor, chemical) is relocated to rank-9 ONLY when it shares its exact zone COUNT with an
+// ALREADY-classified delivery-application item (ROLE_PATTERNS[0] — Fertigation/Irrigation/
+// Hand-watering Pump) elsewhere in the SAME design — i.e. there IS a known delivery mover this
+// trim item doses alongside. Without that co-located delivery-mover evidence (the "Zone
+// Chemical Dosing Skid" fixture: no fertigation/irrigation word present at all), it is left at
+// its natural rank — proveNoFalsePositive.
+const TRIM_ADDITIVE_CHEMICAL_RE = /\b(acid|caustic|chemical|peroxide|hydrogen[\s-]?peroxide|biocide|scale[\s-]?inhibitor|antiscalant|corrosion[\s-]?inhibitor)\b/i
+const TRIM_DOSING_ACTION_RE = /\bdos(?:e|ing|er)\b|\binject(?:ion|or)?\b|\bmeter(?:ing)?\b/i
+function isTrimAdditiveDosingPump(name: string): boolean {
+  return TRIM_ADDITIVE_CHEMICAL_RE.test(name || '') && TRIM_DOSING_ACTION_RE.test(name || '')
 }
 
 // Within one spine rank, direction is ROLE-BASED, never alphabetical (v55 fix 3): a stage's
@@ -155,11 +185,29 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
         const slug = slugify(name)
         if (!slug || seen.has(slug)) continue
         seen.add(slug)
-        items.push({ name, slug, rank: roleRank(name), sub: subRole(name), qty: wordQtyCount(w) })
+        const qty = wordQtyCount(w)
+        items.push({ name, slug, rank: roleRank(name), sub: subRole(name), qty })
       }
     }
   }
   if (items.length < 2) return [] // need ≥2 nodes to draw an edge
+
+  // TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION (see isTrimAdditiveDosingPump's header
+  // comment) — a second pass, run AFTER every item's natural rank is known: relocate a trim/
+  // additive-chemical item from its generic rank-1 pretreatment slot to rank-9 ONLY when a
+  // delivery-application item (ROLE_PATTERNS[0]) with the SAME zone count exists elsewhere in
+  // this design — the evidence that this trim pump doses alongside a known per-zone delivery
+  // mover, not a shared upstream conditioning stage. No co-located delivery mover of matching
+  // count → untouched (the "Zone Chemical Dosing Skid" rank-1 fixture, proveNoFalsePositive).
+  {
+    const deliveryQtys = new Set(items.filter((it) => DELIVERY_APPLICATION_RE.test(it.name)).map((it) => it.qty))
+    if (deliveryQtys.size > 0) {
+      for (const it of items) {
+        if (it.rank !== 1 || !isTrimAdditiveDosingPump(it.name)) continue
+        if (deliveryQtys.has(it.qty)) it.rank = 9
+      }
+    }
+  }
 
   // Order along the spine: rank, then ROLE-BASED sub-order within the rank (storage feeds its
   // mover, the mover discharges into the stage's process units — see subRole), then name as
@@ -1331,8 +1379,36 @@ function _selftest() {
     throw new Error(`parallel-distribution proveNoFalsePositive (once-through archetype) FAILED: a single-train archetype must never grow a parallel branch, got ${JSON.stringify(onceThroughTopo)}`)
   }
 
+  // ── TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION proveCatch + proveNoFalsePositive
+  // (2026-07-08, Sam Green SME review, Rule 2 depth — the real fischer-codema scramble this
+  // fix resolves: "Acid Dosing Pump" / "Chemical Dosing Pump" spliced in BEFORE the softener/
+  // RO treatment train instead of alongside the fertigation pump they actually dose). ──────
+  // proveCatch: a trim/additive-chemical pump CO-LOCATED (same qty) with a delivery-
+  // application mover relocates OFF the generic rank-1 slot — it must never sit directly
+  // downstream of Feed Pump (the rank-1 position this bug produced); it must sit adjacent to
+  // the Fertigation Dosing Pump it doses.
+  const trimRelocateCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Acid Dosing Pump', 2), mkQ('Fertigation Dosing Pump', 2), mkQ('Irrigation Pump')] }],
+  }])
+  if (trimRelocateCatchTopo.some((e) => e.from_part === 'feed_pump' && /^acid_dosing_pump/.test(e.to_part))) {
+    throw new Error(`trim-additive relocation proveCatch FAILED: a per-zone acid dosing pump co-located with a delivery mover must NOT sit directly downstream of Feed Pump (the rank-1 scramble position), got ${JSON.stringify(trimRelocateCatchTopo)}`)
+  }
+  if (!trimRelocateCatchTopo.some((e) => /^acid_dosing_pump/.test(e.from_part) && /^fertigation_dosing_pump/.test(e.to_part))
+    && !trimRelocateCatchTopo.some((e) => /^fertigation_dosing_pump/.test(e.from_part) && /^acid_dosing_pump/.test(e.to_part))) {
+    throw new Error(`trim-additive relocation proveCatch FAILED: expected the acid dosing pump adjacent to the fertigation dosing pump it doses, got ${JSON.stringify(trimRelocateCatchTopo)}`)
+  }
+  // proveNoFalsePositive: the SAME trim/additive-chemical pump with NO co-located delivery-
+  // application mover anywhere in the design (the "Zone Chemical Dosing Skid" shape, just with
+  // an "acid"-vocabulary name instead) is left at its natural rank-1 slot, untouched.
+  const trimRelocateNoFPTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Acid Dosing Pump', 2), mkQ('Product Tank')] }],
+  }])
+  if (!trimRelocateNoFPTopo.some((e) => e.from_part === 'feed_pump' && /^acid_dosing_pump/.test(e.to_part))) {
+    throw new Error(`trim-additive relocation proveNoFalsePositive FAILED: with no co-located delivery mover, the acid dosing pump must stay at its natural rank-1 position (feed_pump -> acid_dosing_pump), got ${JSON.stringify(trimRelocateNoFPTopo)}`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold; TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION: catch+no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()

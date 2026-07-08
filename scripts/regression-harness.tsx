@@ -1521,6 +1521,77 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     ))
   }
 
+  // ── A3f. UNIVERSAL multizone-distribution handover, RULES 2+3 (Sam Green SME review of the
+  // real Codema Fischer Farms system, 2026-07-08). Rule 2 depth: a small EXPLICITLY-COUNTED
+  // trim/metering pump (acid/H₂O₂-class dosing, ~0.04 m³/h, ~0.04 kW — two orders of magnitude
+  // under isSynthesisable's 10 m³/h / 15 kW floor) must still synthesise a real BoM word,
+  // because it carries its OWN `_count` (the brief/contract counted a real discrete unit).
+  // Rule 3: a critical distribution prime-mover already sized to N≥2 per-zone instances (one
+  // duty unit per zone, no internal spare) gets a labelled BACKUP replica as its OWN equipment
+  // group (mintDemandCoverage rule 9), rated identically — proveCatch. proveNoFalsePositive:
+  // a single-instance mover (RO high-pressure pump, count=1), a recovery-side mover (drain
+  // transfer pump), and the small trim/metering pumps themselves (acid/chemical dosing, below
+  // the N+1 magnitude floor) must never get a backup; a BESS-like contract is untouched.
+  {
+    const qv = (c: any, k: string) => c?.quantities?.[k]?.value
+    const r3Contract = (): any => ({ quantities: {
+      fertigation_dosing_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+      fertigation_dosing_pump_power_kw: { value: 7.5, unit: 'kW', source: 'brief' },
+      fertigation_dosing_pump_count: { value: 2, unit: '', source: 'brief' },
+      acid_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+      acid_dosing_pump_power_kw: { value: 0.04, unit: 'kW', source: 'brief' },
+      acid_dosing_pump_count: { value: 2, unit: '', source: 'brief' },
+      chemical_dosing_pump_throughput_m3_h: { value: 0.04, unit: 'm³/h', source: 'brief' },
+      chemical_dosing_pump_power_kw: { value: 0.04, unit: 'kW', source: 'brief' },
+      chemical_dosing_pump_count: { value: 2, unit: '', source: 'brief' },
+      drain_transfer_pump_throughput_m3_h: { value: 45, unit: 'm³/h', source: 'brief' },
+      drain_transfer_pump_power_kw: { value: 8, unit: 'kW', source: 'brief' },
+      drain_transfer_pump_count: { value: 2, unit: '', source: 'brief' },
+      ro_high_pressure_pump_throughput_m3_h: { value: 8, unit: 'm³/h', source: 'brief' },
+      ro_high_pressure_pump_power_kw: { value: 5.5, unit: 'kW', source: 'brief' },
+      ro_high_pressure_pump_count: { value: 1, unit: '', source: 'brief' },
+      distribution_delivery_groups: { value: 2, unit: '', source: 'brief' },
+    } })
+    const r3C: any = r3Contract()
+    const r3Mods: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+    const r3Res = applyUniversalContractSizing(r3Mods, r3C, { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: [] })
+    const r3Names: string[] = r3Mods.flatMap((m: any) => (m.sub_modules ?? []).flatMap((sm: any) => (sm.words ?? []).map((w: any) => String(w.name_human ?? ''))))
+    const r3Wc = (re: RegExp) => r3Names.filter((n) => re.test(n)).length
+    // a BESS-like contract must be byte-identical (no forward-mover vocabulary, no zone count)
+    const r3Bess: any = { quantities: { nameplate_capacity_kwh: { value: 3500, unit: 'kWh' }, rack_count: { value: 15, unit: '' } } }
+    const r3BessBefore = JSON.stringify(r3Bess)
+    applyUniversalContractSizing([{ module: 'energy_storage_source', sub_modules: [{ id: 'sm', words: [] }] }] as any, r3Bess,
+      { synthesizeMissing: true, dedupeAndStrip: false, explode: false, instrument: false, briefMetrics: [] })
+    out.push(assertEq(
+      'UNIVERSAL.critical_distribution_mover_backup_and_trim_dosing_synthesis',
+      'Rule 2 (per-unit dosing depth): a small explicitly-counted trim/metering pump (acid/chemical dosing, ~0.04 m³/h / ~0.04 kW) synthesises a real BoM word despite being two orders of magnitude under the 10 m³/h / 15 kW isSynthesisable floor. Rule 3 (N+1 critical distribution backup): a per-zone distribution mover (fertigation dosing pump, qty=2, no internal spare) gets ONE labelled backup replica per duty unit, rated identically (same throughput/power) — proveCatch; a single-instance mover (RO high-pressure pump, count=1), a recovery-side mover (drain transfer pump), and the trim/metering pumps themselves (below the backup magnitude floor) get NO backup — proveNoFalsePositive; a BESS-like contract is untouched',
+      JSON.stringify({
+        acidWords: r3Wc(/^acid dosing pump$/i),
+        chemicalWords: r3Wc(/^chemical dosing pump$/i),
+        backupWords: r3Wc(/fertigation dosing pump backup/i),
+        backupQty: (r3Mods.flatMap((m: any) => (m.sub_modules ?? []).flatMap((sm: any) => sm.words ?? []))
+          .find((w: any) => /fertigation dosing pump backup/i.test(String(w.name_human ?? '')))
+          ?.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')?.value,
+        backupThroughput: qv(r3C, 'fertigation_dosing_pump_backup_throughput_m3_h'),
+        backupPower: qv(r3C, 'fertigation_dosing_pump_backup_power_kw'),
+        noRoBackup: qv(r3C, 'ro_high_pressure_pump_backup_count') === undefined,
+        noDrainBackup: qv(r3C, 'drain_transfer_pump_backup_count') === undefined,
+        noAcidBackup: qv(r3C, 'acid_dosing_pump_backup_count') === undefined,
+        noChemicalBackup: qv(r3C, 'chemical_dosing_pump_backup_count') === undefined,
+        synthesizedCount: r3Res.synthesized,
+        bessUntouched: JSON.stringify(r3Bess) === r3BessBefore,
+      }),
+      (v) => {
+        const o = JSON.parse(v as unknown as string)
+        return o.acidWords === 1 && o.chemicalWords === 1 && o.backupWords === 1 && o.backupQty === '×2' &&
+          o.backupThroughput === 45 && o.backupPower === 7.5 &&
+          o.noRoBackup === true && o.noDrainBackup === true && o.noAcidBackup === true && o.noChemicalBackup === true &&
+          o.bessUntouched === true
+      },
+      (v) => `result=${v}`,
+    ))
+  }
+
   // ── A4. PROCESS ACTUATION: the final control elements the contract implies (#141) ──
   // An inlet flow control valve PER fluid vessel (closing the level loop, qty matches the
   // vessel count) + an aeration blower per air-flow duty (split into N units, sized with a
