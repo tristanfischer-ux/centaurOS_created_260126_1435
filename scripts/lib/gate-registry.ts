@@ -32,7 +32,8 @@ import { interpolateCoolingCurveKw } from './thermal-derating-audit'
 import { auditBriefConstraintCompleteness } from './brief-constraint-completeness-audit'
 import { extractOccurrences, cluster, buildFindings } from './cross-page-numeric-consistency-audit'
 import { auditJurisdictionalStandards } from './jurisdictional-standards-audit'
-import { STRUCTURED_PN_REGEX } from './fictional-pn-audit'
+import { STRUCTURED_PN_REGEX, CUSTOM_PREFIX_REGEX } from './fictional-pn-audit'
+import { libraryOverridesConfirmedMiss } from '../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 import { classifySeverity, classifyLineSeverity, selftestPerLinePriceAudit } from './per-line-price-plausibility-audit'
 import { selftestCascadePriceAdoption } from './cascade-price-adoption'
 import { missingHardSlots } from '../../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
@@ -168,9 +169,27 @@ export const GATES: GateProof[] = [
   },
   {
     code: 20, name: 'fictional-PN', intent: 'a hallucinated structured part number (looks like a real MPN but exists nowhere)',
-    // pure decision: the structured-PN classifier flags a structured MPN (→ HIGH when no
-    // distributor has it) but NOT a commodity descriptor. (DB-existence is the other input.)
-    proveCatch: () => STRUCTURED_PN_REGEX.test('ZXQW-9981-K7') === true && STRUCTURED_PN_REGEX.test('M6') === false,
+    // FOUR proofs (extended 2026-07-08, fischer_farms_codema gate-20 false-positive fix):
+    // (a) the structured-PN classifier still flags a structured MPN (→ HIGH when no distributor
+    //     has it) but NOT a commodity descriptor — unchanged base behaviour.
+    // (b) an honestly-declared "CUSTOM-<x>" MPN is NEVER treated as a structured hallucination
+    //     candidate — the gate's own error message has promised this skip since 2026-05-25 but no
+    //     code implemented it until this fix (proveNoFalsePositive: honest custom kit).
+    // (c) a curated library row at/above the override floor (0.75) DOES override a confirmed
+    //     cache-miss — the exact root cause of the false HIGH on Myron L "750-II-CS51" (a real,
+    //     web-verified conductivity sensor, confidence 0.9) that Mouser/Digi-Key/Farnell — which
+    //     don't stock industrial process instrumentation — had ALSO cached as a miss.
+    // (d) proveNoFalsePositive / regression guard: a LOW-confidence row (e.g. emitter_completion:llm
+    //     writeback at 0.6, or stage0_harvest:candidate at ~0.6) must NOT override a confirmed
+    //     miss — an LLM-hallucinated placeholder that also misses live distributors is still caught.
+    proveCatch: () =>
+      STRUCTURED_PN_REGEX.test('ZXQW-9981-K7') === true &&
+      STRUCTURED_PN_REGEX.test('M6') === false &&
+      CUSTOM_PREFIX_REGEX.test('CUSTOM-316L-MANIFOLD') === true &&
+      CUSTOM_PREFIX_REGEX.test('ZXQW-9981-K7') === false &&
+      libraryOverridesConfirmedMiss({ confidence: 0.9 }) === true &&
+      libraryOverridesConfirmedMiss({ confidence: 0.6 }) === false &&
+      libraryOverridesConfirmedMiss(undefined) === false,
     enforcedByDefault: gateBlockEnforced,
   },
   {

@@ -95,6 +95,22 @@ function isInCuratedTable(mpn: string, manufacturer: string | null): boolean {
 // search; flagging them as missing is noise, not signal.
 const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|standard|n\/?a|tbd|various|custom|bespoke|oem|\d{1,4}mm?\s*(?:angle|plate|rod|tube|pipe|cable|wire|bracket|channel|gland|trunking)?|\d+(?:\.\d+)?\s*(?:A|V|W|kW|kVA|kWh|MWh|Hz|mm|m|kg)\s*[-_/]?\s*\w*)$/i
 
+// ── HONEST-CUSTOM PREFIX (codified 2026-07-08, universal fix) ───────────────
+// A genuinely custom / OEM-direct / fabricated / assembly-level part (a skid,
+// a fabricated vessel, a bespoke frame — no real catalogue MPN can exist for
+// it) is declared with a "CUSTOM-" part-number prefix by the emitter. This is
+// the mechanism gate 20's OWN error message has promised since 2026-05-25
+// ("mark custom/OEM items with a CUSTOM- prefix so future runs skip the
+// existence check") but no code implemented it — COMMODITY_SKIP_REGEX only
+// matched the bare word "custom", never a "CUSTOM-<anything>" structured
+// marker, so a deliberately-honest custom part number would itself have been
+// misclassified as a hallucinated structured MPN (the opposite failure mode).
+// Universal: keyed on the prefix convention, not any class/part name. A part
+// that SHOULD be catalogue-findable must never be given this prefix by the
+// emitter — that is an emitter-side discipline (see deterministic-emitter.ts
+// sanitizeWordMpn's BESPOKE fallback), not something this gate can enforce.
+export const CUSTOM_PREFIX_REGEX = /^CUSTOM[-_]/i
+
 // Structured part-number pattern: uppercase letters + digits + separator +
 // more alphanumerics. This is the shape of most manufacturer part numbers
 // (e.g. "STM32H743ZIT6", "C310-1500V", "170M6810", "ABCD-1234-5X").
@@ -261,6 +277,8 @@ export interface FictionalPnAuditResult {
   lines_skipped_curated: number
   lines_skipped_commodity: number
   lines_skipped_too_short: number
+  /** Honestly-declared custom/OEM/fabricated parts ("CUSTOM-…" MPN prefix) — never existence-checked. */
+  lines_skipped_custom: number
   /** Always 0 in DB-only mode — retained for interface compatibility. */
   nexar_calls: number
   /** DB source hit counts for cache_hit + library_only (confirmed real). */
@@ -285,6 +303,7 @@ export async function auditFictionalPartNumbers(
   let linesSkippedCurated = 0
   let linesSkippedCommodity = 0
   let linesSkippedTooShort = 0
+  let linesSkippedCustom = 0
   const perDbSourceHit: Record<string, number> = {}
 
   const seen = new Set<string>()  // dedup by mpn+manufacturer
@@ -314,6 +333,13 @@ export async function auditFictionalPartNumbers(
     // Skip commodity descriptors
     if (COMMODITY_SKIP_REGEX.test(mpn)) {
       linesSkippedCommodity += 1
+      return
+    }
+
+    // Skip honestly-declared custom/OEM/fabricated parts ("CUSTOM-…" prefix) —
+    // no catalogue MPN can exist for these by definition; never existence-checked.
+    if (CUSTOM_PREFIX_REGEX.test(mpn)) {
+      linesSkippedCustom += 1
       return
     }
 
@@ -399,6 +425,7 @@ export async function auditFictionalPartNumbers(
     lines_skipped_curated: linesSkippedCurated,
     lines_skipped_commodity: linesSkippedCommodity,
     lines_skipped_too_short: linesSkippedTooShort,
+    lines_skipped_custom: linesSkippedCustom,
     nexar_calls: 0,  // DB-only mode: no live API calls ever
     per_distributor_hit: perDbSourceHit,
     product_class: productClass,
@@ -417,6 +444,7 @@ function renderMarkdown(result: FictionalPnAuditResult, statePath: string): stri
     `**${result.lines_audited} BoM line(s) audited** against forge-truth.db ` +
     `(${result.lines_skipped_curated} skipped — in curated gate-13 table; ` +
     `${result.lines_skipped_commodity} skipped — commodity descriptor; ` +
+    `${result.lines_skipped_custom} skipped — honestly-declared CUSTOM-prefixed part; ` +
     `${result.lines_skipped_too_short} skipped — too short / junk).`,
   )
   lines.push('')

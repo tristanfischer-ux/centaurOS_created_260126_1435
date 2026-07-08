@@ -136,6 +136,78 @@ function getDb(): Database.Database | null {
 
 // ── Core lookup helpers ───────────────────────────────────────────────────────
 
+type LibraryRow = { manufacturer: string; part_number: string; discovery_source: string; confidence: number }
+
+/** Raw pretraining_extracted_parts lookup — shared by the cache-miss override
+ *  (below) and the no-cache-row fallback. Never throws. */
+function queryLibraryRow(mpn: string, mfgKey: string): LibraryRow | undefined {
+  if (!libraryGetStmt) return undefined
+  try {
+    return libraryGetStmt.get(mpn, mfgKey, mfgKey) as LibraryRow | undefined
+  } catch (err) {
+    if (!warnedMissing) {
+      console.warn(`[db-only-cascade] library query error: ${(err as Error).message}`)
+      warnedMissing = true
+    }
+    return undefined
+  }
+}
+
+/** Build the minimal DistributorResult shape from a library row. Pricing/stock
+ *  fields are unknown — consumers must treat this as "part is real, but no
+ *  live pricing available". Pure. */
+function libraryResultFromRow(row: LibraryRow, mfgKey: string): DistributorResult {
+  const discoverySource = (row.discovery_source ?? '').split(':')
+  const sourceStr = (discoverySource[1] as DistributorResult['source']) || 'mouser'
+  return {
+    source: sourceStr,
+    mpn: row.part_number,
+    manufacturer: row.manufacturer || mfgKey,
+    description: `${row.manufacturer || mfgKey} ${row.part_number}`,
+    priceGBP: [],
+    stockUK: null,
+    datasheetUrl: null,
+    productUrl: '',
+    leadWeeks: null,
+    fetchedAt: new Date(0).toISOString(), // epoch — signals "library data, not fresh"
+  }
+}
+
+// ── LIBRARY-OVERRIDES-CACHE-MISS THRESHOLD (root-caused 2026-07-08) ─────────
+// A curated/verified pretraining_extracted_parts row is STRONGER evidence of
+// real-part existence than a live-distributor cache-miss for narrow-catalogue
+// classes: industrial process instrumentation (water treatment, RAS, process
+// plants — e.g. Myron L, Endress+Hauser, Hach) is routinely NOT stocked by
+// Mouser/Digi-Key/Farnell/LCSC (consumer/prototyping electronics distributors
+// that sell almost nothing from those OEMs) — a miss there does not mean the
+// part is fictional.
+//
+// Evidence: gate 20 (fictional-pn-audit.ts) flagged HIGH on Myron L
+// "750-II-CS51" — a real, web-verified inline conductivity/TDS sensor
+// (confidence 0.9, discovery_source='web_verified_ingest', product URL
+// myronl.com) — purely because distributor_cascade_cache ALSO held confirmed
+// misses from farnell/digikey/mouser for the same MPN, and the cache-miss
+// branch returned before ever consulting the library table.
+//
+// UNIVERSAL FIX (keyed on provenance/confidence, never a per-part table): on a
+// confirmed cache-miss, consult the library FIRST; a row at or above
+// LIBRARY_OVERRIDE_MIN_CONFIDENCE overrides the miss (source='library_only').
+// The floor deliberately EXCLUDES low-confidence unverified rows written by
+// emitter_completion:llm (0.6) / stage0_harvest:candidate (~0.55-0.64) — an
+// LLM-generated placeholder that ALSO misses live distributors must still be
+// caught as fictional; this is NOT a blanket "library always wins" rule.
+// Does NOT touch the existing no-cache-row fallback (step 2 below) — that
+// path's behaviour is unchanged and out of scope for this fix.
+const LIBRARY_OVERRIDE_MIN_CONFIDENCE = 0.75
+
+/** PURE decision for a confirmed cache-miss: does a library row override it?
+ *  No I/O, no Date — unit-testable without a DB (gate-registry.ts proveCatch
+ *  regression guard for the 2026-07-08 Myron L fix). `libraryRow` is
+ *  `undefined` when no row exists in pretraining_extracted_parts. */
+export function libraryOverridesConfirmedMiss(libraryRow: { confidence: number } | undefined): boolean {
+  return !!libraryRow && libraryRow.confidence >= LIBRARY_OVERRIDE_MIN_CONFIDENCE
+}
+
 /**
  * Look up a (manufacturer, mpn) pair from the DB.
  * manufacturer may be null/empty — when empty, only MPN is matched.
@@ -168,7 +240,14 @@ export function lookupCached(manufacturer: string | null, mpn: string): DbCascad
 
         if (!isExpired) {
           if (row.miss === 1) {
-            // Confirmed miss — ingest previously tried and the MPN doesn't exist.
+            // Confirmed miss — but a high-confidence curated library row
+            // overrides it (see LIBRARY_OVERRIDE_MIN_CONFIDENCE above).
+            if (db && libraryGetStmt) {
+              const libRow = queryLibraryRow(mpn, mfgKey)
+              if (libraryOverridesConfirmedMiss(libRow)) {
+                return { found: true, result: libraryResultFromRow(libRow!, mfgKey), source: 'library_only', ageHours: null }
+              }
+            }
             return { found: false, result: null, source: 'cache_miss_confirmed', ageHours }
           }
           if (row.result_json) {
@@ -191,38 +270,12 @@ export function lookupCached(manufacturer: string | null, mpn: string): DbCascad
     }
   }
 
-  // ── 2. Fallback to pretraining_extracted_parts ────────────────────────────
+  // ── 2. Fallback to pretraining_extracted_parts (unchanged — any confidence
+  //      passes when there is no cache row at all to weigh it against) ──────
   if (db && libraryGetStmt) {
-    try {
-      const row = libraryGetStmt.get(mpn, mfgKey, mfgKey) as
-        | { manufacturer: string; part_number: string; discovery_source: string; confidence: number }
-        | undefined
-
-      if (row) {
-        // Build a minimal DistributorResult from library data.
-        // Pricing/stock fields are unknown — consumers must treat this as
-        // "part is real, but no live pricing available".
-        const discoverySource = (row.discovery_source ?? '').split(':')
-        const sourceStr = (discoverySource[1] as DistributorResult['source']) || 'mouser'
-        const minimalResult: DistributorResult = {
-          source: sourceStr,
-          mpn: row.part_number,
-          manufacturer: row.manufacturer || mfgKey,
-          description: `${row.manufacturer || mfgKey} ${row.part_number}`,
-          priceGBP: [],
-          stockUK: null,
-          datasheetUrl: null,
-          productUrl: '',
-          leadWeeks: null,
-          fetchedAt: new Date(0).toISOString(), // epoch — signals "library data, not fresh"
-        }
-        return { found: true, result: minimalResult, source: 'library_only', ageHours: null }
-      }
-    } catch (err) {
-      if (!warnedMissing) {
-        console.warn(`[db-only-cascade] library query error: ${(err as Error).message}`)
-        warnedMissing = true
-      }
+    const row = queryLibraryRow(mpn, mfgKey)
+    if (row) {
+      return { found: true, result: libraryResultFromRow(row, mfgKey), source: 'library_only', ageHours: null }
     }
   }
 
