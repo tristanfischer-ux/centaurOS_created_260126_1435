@@ -173,6 +173,13 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // the fix, not merely a shadow verdict.
   repositionFiltersOntoRecoverySide(items)
 
+  // PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (2026-07-08 — see the function's own header
+  // comment below, RULES 1+2 of the multizone-distribution handover): splits a distribution
+  // prime-mover/manifold/header or a point-of-use conditioning unit the physics engine has
+  // already sized to N per-zone instances into N distinct parallel spine nodes, instead of
+  // the single collapsed node the plain slug-dedupe above produces.
+  expandDistributionBranchesPerZone(items)
+
   // PER-ZONE RECOVERY-COLLECTION EXPANSION (2026-07-08 — see the function's own header
   // comment below): splits a recovery COLLECTION node (drainpit/sump) the physics engine has
   // already sized to N per-zone instances into N distinct spine nodes, instead of the single
@@ -193,12 +200,14 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
     } as TopologyEdge)
   }
 
-  // Fan-out/fan-in correction for any per-zone recovery-collection group the expansion above
-  // created: the naive consecutive-chain loop above would otherwise wire the zone replicas
-  // SERIALLY (zone_1 → zone_2 → zone_3), implying one drainpit feeds the next — physically
-  // wrong (each zone's collection point is independent). reconcileZoneReplicaEdges replaces
-  // that with the correct fan-out (shared upstream → every zone) / fan-in (every zone →
-  // shared downstream conditioning) shape.
+  // Fan-out/fan-in correction for any zone-replica group EITHER expansion above created
+  // (distribution branches upstream, recovery-collection points downstream — the SAME
+  // _zoneGroup tagging mechanism, so this one reconciler handles both without change): the
+  // naive consecutive-chain loop above would otherwise wire the zone replicas SERIALLY
+  // (zone_1 → zone_2 → zone_3), implying one branch feeds the next — physically wrong (each
+  // zone's distribution branch / collection point is independent, fed from / feeding a
+  // SHARED header). reconcileZoneReplicaEdges replaces that with the correct fan-out (shared
+  // upstream → every zone) / fan-in (every zone → shared downstream) shape.
   reconcileZoneReplicaEdges(items, edges)
 
   // ── UNIVERSAL RECIRCULATION-LOOP CLOSURE (2026-07-07, Sam Green SME review of
@@ -450,6 +459,77 @@ function repositionFiltersOntoRecoverySide(
     }
     const insertAt = items.indexOf(recoveryItem) + 1
     items.splice(insertAt, 0, ...misplaced)
+  }
+}
+
+// ── PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (2026-07-08, the UNIVERSAL multizone
+// distribution design-rules handover — Sam Green's real Codema Fischer Farms drawings vs
+// the engine's output: "Process is not usually this straight a line" extended by the
+// follow-up SME review of the P&ID/BFD/layout — the REAL system is a SHARED-SOURCE,
+// PARALLEL-PER-ZONE DISTRIBUTION NETWORK (3 pump trains 90/90/45 m³/h from shared
+// reservoirs, each serving a zone with its OWN dosing, each zone's own drainpit), not the
+// single serial line the deriver emits.
+//
+// RULE 1 — a DISTRIBUTION-side item (a prime-mover/manifold/header on the delivery rank —
+// rank 9, e.g. a distribution/irrigation pump or a distribution manifold) that the physics
+// engine has ALREADY sized to N≥2 per-zone instances (its own `quantity` modifier, ×N — the
+// SAME demand-coverage mechanism wordQtyCount() reads for the recovery-collection expansion
+// below, e.g. `distribution_manifold_count` = delivery groups, `fertigation_dosing_pump_
+// count` = one per department) is expanded into N distinct PARALLEL-branch spine nodes,
+// instead of the single collapsed node the plain slug-dedupe above produces.
+//
+// RULE 2 (point-of-use conditioning) falls out of the SAME mechanism: a conditioning/dosing
+// unit whose setpoint varies PER ZONE (e.g. a fertigation A/B dosing skid, a per-zone chemical
+// trim/injection unit) is exactly this shape, so it renders attached to EACH branch (point of
+// use), not once centrally. The delivery-application override in ROLE_PATTERNS (rank 9,
+// "fertigation/irrigation/watering") already reclassifies most REAL water-plant dosing pumps
+// to rank 9 — the isDistributionBranchCandidate rank-9-mover branch below catches those; the
+// DOSING vocabulary branch keeps the rule general for an archetype whose conditioning unit
+// isn't named for its delivery system (a bare "Zone Chemical Dosing Skid", a per-reactor
+// injection unit, …). DELIBERATELY NARROWER than rank 1's full ROLE_PATTERNS vocabulary
+// (preheat/guard-bed/dryer/blend/mixer/saturate/SOFTEN/dechlor/antiscalant/dosing all share
+// rank 1): a shared PRETREATMENT stage sized ≥2 for its OWN reasons (e.g. two softener tanks
+// alternating regeneration cycles) is a CENTRAL stage, not a per-zone point-of-use dose, and
+// must NOT be mistaken for Rule 2 — only the DOSING/INJECTION/CHEMICAL-TRIM noun itself
+// (never the wider "conditioning" rank) signals "varies per zone".
+//
+// NEVER FABRICATES (RULE 1/2's proveNoFalsePositive): only expands a node the physics engine
+// has ALREADY counted ≥2 — a node stuck at qty=1 (a genuinely single shared prime-mover/
+// manifold, or a once-through/single-train archetype with no zone replication at all — BESS,
+// CO2 mineralisation, DAC) is untouched, so that design stays exactly ONE train/line, never an
+// invented parallel branch. Deliberately EXCLUDES the recovery-buffer/collection vocabulary
+// already owned by expandRecoveryCollectionPerZone below (RECOVERY_BUFFER_RE /
+// PER_ZONE_COLLECTION_RE) so the two expansion passes never double-process the same node —
+// distribution branches upstream (feed→zone), recovery collection downstream (zone→return),
+// mirror images of the same "network, not a line" fix on opposite sides of the spine.
+const DISTRIBUTION_HEADER_RE = /\b(manifold|header)\b/i
+const POINT_OF_USE_DOSING_RE = /\bdos(?:e|ing|er)\b|\binject(?:ion|or)?\b|\btrim\b|\bchemical\b/i
+
+function isDistributionBranchCandidate(it: { name: string; rank: number; sub: number }): boolean {
+  if (RECOVERY_BUFFER_RE.test(it.name) || PER_ZONE_COLLECTION_RE.test(it.name)) return false // owned by the recovery-side expansion below — never double-process
+  if (it.rank === 1 && POINT_OF_USE_DOSING_RE.test(it.name)) return true // a per-zone dosing/injection/chemical-trim unit — point-of-use (Rule 2); NOT the wider rank-1 "conditioning" vocabulary (a shared softener/preheat/dryer stage is central, not per-zone)
+  if (it.rank === 9 && (it.sub === 1 || DISTRIBUTION_HEADER_RE.test(it.name))) return true // a distribution prime-mover (mover sub-role) or a manifold/header
+  return false
+}
+
+function expandDistributionBranchesPerZone(
+  items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }>,
+): void {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]
+    if (!Number.isFinite(it.qty) || it.qty < 2) continue // single-zone / non-counted — untouched (no fabrication)
+    if (!isDistributionBranchCandidate(it)) continue
+    const n = Math.round(it.qty)
+    const zoneGroup = it.slug
+    const replicas = Array.from({ length: n }, (_, k) => ({
+      name: `${it.name} ${k + 1}`,
+      slug: `${it.slug}_${k + 1}`,
+      rank: it.rank,
+      sub: it.sub,
+      qty: 1,
+      _zoneGroup: zoneGroup,
+    }))
+    items.splice(i, 1, ...replicas)
   }
 }
 
@@ -1157,8 +1237,102 @@ function _selftest() {
     throw new Error(`per-zone-recovery proveNoFalsePositive (shared reservoir) FAILED: expected the single collapsed node untouched, got ${JSON.stringify(sharedReservoirTopo)}`)
   }
 
+  // ── PARALLEL-PER-ZONE DISTRIBUTION BRANCHES proveCatch + proveNoFalsePositive (2026-07-08,
+  // the UNIVERSAL multizone-distribution handover, RULES 1+2) ──────────────────────────────
+  // (a) proveCatch — the REAL Codema shape: a per-zone dosing pump (qty=2, delivery-override
+  // rank) AND a per-zone distribution manifold (qty=2) both downstream of ONE shared prime-
+  // mover. Both must fan out into PARALLEL branches from their shared upstream and fan back
+  // into their shared downstream — never a direct edge between the two zone replicas (that
+  // would draw the P&ID as ONE line through both zones, exactly the SME-flagged defect).
+  const distCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Feed Pump'), mkQ('Fertigation Dosing Pump', 2), mkQ('Irrigation Pump'), mkQ('Distribution Manifold', 2),
+    ] }],
+  }])
+  const dosingSlugs = ['fertigation_dosing_pump_1', 'fertigation_dosing_pump_2']
+  const manifoldSlugs = ['distribution_manifold_1', 'distribution_manifold_2']
+  for (const slug of dosingSlugs) {
+    if (!distCatchTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === slug)) {
+      throw new Error(`parallel-distribution proveCatch FAILED: expected fan-out feed_pump -> ${slug}, got ${JSON.stringify(distCatchTopo)}`)
+    }
+    if (!distCatchTopo.some((e) => e.from_part === slug && e.to_part === 'irrigation_pump')) {
+      throw new Error(`parallel-distribution proveCatch FAILED: expected fan-in ${slug} -> irrigation_pump, got ${JSON.stringify(distCatchTopo)}`)
+    }
+  }
+  for (const slug of manifoldSlugs) {
+    if (!distCatchTopo.some((e) => e.from_part === 'irrigation_pump' && e.to_part === slug)) {
+      throw new Error(`parallel-distribution proveCatch FAILED: expected fan-out irrigation_pump -> ${slug}, got ${JSON.stringify(distCatchTopo)}`)
+    }
+  }
+  if (distCatchTopo.some((e) => dosingSlugs.includes(e.from_part) && dosingSlugs.includes(e.to_part))) {
+    throw new Error(`parallel-distribution proveCatch FAILED: a direct edge between the two dosing-pump zone replicas must never be authored (implies one serial line), got ${JSON.stringify(distCatchTopo)}`)
+  }
+  if (distCatchTopo.some((e) => manifoldSlugs.includes(e.from_part) && manifoldSlugs.includes(e.to_part))) {
+    throw new Error(`parallel-distribution proveCatch FAILED: a direct edge between the two manifold zone replicas must never be authored (implies one serial line), got ${JSON.stringify(distCatchTopo)}`)
+  }
+  if (distCatchTopo.some((e) => e.from_part === 'fertigation_dosing_pump' || e.to_part === 'distribution_manifold')) {
+    throw new Error('parallel-distribution proveCatch FAILED: the un-suffixed collapsed nodes must not survive the expansion')
+  }
+
+  // (a2) proveCatch — RULE 2's GENERAL conditioning path (rank 1), for an archetype whose
+  // per-zone conditioning unit is NOT named for a delivery system (so the fertigation/
+  // irrigation/watering override never fires) — e.g. a bare "Zone Chemical Dosing Skid".
+  const conditioningCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Zone Chemical Dosing Skid', 2), mkQ('Product Tank')] }],
+  }])
+  const doseSlugs = ['zone_chemical_dosing_skid_1', 'zone_chemical_dosing_skid_2']
+  for (const slug of doseSlugs) {
+    if (!conditioningCatchTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === slug)) {
+      throw new Error(`parallel-distribution proveCatch (rank-1 conditioning) FAILED: expected fan-out feed_pump -> ${slug}, got ${JSON.stringify(conditioningCatchTopo)}`)
+    }
+    if (!conditioningCatchTopo.some((e) => e.from_part === slug && e.to_part === 'product_tank')) {
+      throw new Error(`parallel-distribution proveCatch (rank-1 conditioning) FAILED: expected fan-in ${slug} -> product_tank, got ${JSON.stringify(conditioningCatchTopo)}`)
+    }
+  }
+
+  // (b) proveNoFalsePositive #1 — qty=1 (a single shared manifold/dosing unit, no zoning):
+  // stays exactly ONE node, byte-identical to the pre-fix behaviour.
+  const distSingleTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Distribution Manifold', 1)] }],
+  }])
+  if (!distSingleTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === 'distribution_manifold')
+    || distSingleTopo.some((e) => /distribution_manifold_[12]/.test(e.from_part) || /distribution_manifold_[12]/.test(e.to_part))) {
+    throw new Error(`parallel-distribution proveNoFalsePositive (qty=1) FAILED: expected the plain single-train chain untouched, got ${JSON.stringify(distSingleTopo)}`)
+  }
+
+  // (b) proveNoFalsePositive #2 — a uniform-demand conditioning unit (qty=1, "doses once
+  // centrally") must stay a single node — Rule 2's own no-false-positive guard.
+  const conditioningSingleTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Zone Chemical Dosing Skid', 1), mkQ('Product Tank')] }],
+  }])
+  if (conditioningSingleTopo.some((e) => /zone_chemical_dosing_skid_[12]/.test(e.from_part) || /zone_chemical_dosing_skid_[12]/.test(e.to_part))) {
+    throw new Error(`parallel-distribution proveNoFalsePositive (uniform-demand conditioning) FAILED: a qty=1 conditioning unit must never be split, got ${JSON.stringify(conditioningSingleTopo)}`)
+  }
+
+  // (b) proveNoFalsePositive #4 — the REAL false positive caught on the fischer-codema fast
+  // re-render (2026-07-08): a SHARED PRETREATMENT stage sized ≥2 for its own reasons (e.g. two
+  // softener tanks alternating regeneration cycles) is a CENTRAL stage, not a per-zone
+  // point-of-use dose — the wider rank-1 "conditioning" vocabulary (soften/preheat/dry/blend/
+  // mixer/saturate/dechlor/antiscalant) must NEVER be mistaken for Rule 2 just because it
+  // shares rank 1 with genuine dosing; only the DOSING/INJECTION/CHEMICAL-TRIM noun itself
+  // signals "varies per zone".
+  const softenerTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Gac Softener'), mkQ('Softener Vessel', 2), mkQ('Grp Membrane Housings')] }],
+  }])
+  if (softenerTopo.some((e) => /softener_vessel_[12]/.test(e.from_part) || /softener_vessel_[12]/.test(e.to_part))) {
+    throw new Error(`parallel-distribution proveNoFalsePositive (shared pretreatment, e.g. softener duplex) FAILED: a central pretreatment stage must never be split as a per-zone branch, got ${JSON.stringify(softenerTopo)}`)
+  }
+
+  // (b) proveNoFalsePositive #5 — a genuinely ONCE-THROUGH / single-train archetype (the SAME
+  // BESS/CO2-mineralisation-style fixture used by the recirculation-loop proveNoFalsePositive
+  // above — every item qty=1, no zone replication anywhere) must stay a pure single-train
+  // chain: no node anywhere gets split into zone-numbered branches.
+  if (onceThroughTopo.some((e) => /_[12]$/.test(e.from_part) || /_[12]$/.test(e.to_part))) {
+    throw new Error(`parallel-distribution proveNoFalsePositive (once-through archetype) FAILED: a single-train archetype must never grow a parallel branch, got ${JSON.stringify(onceThroughTopo)}`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
