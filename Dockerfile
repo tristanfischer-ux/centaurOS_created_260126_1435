@@ -6,6 +6,9 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
+# postinstall (node scripts/patch-react-pdf.js) runs during `npm ci`, so the script
+# must be present in the image before it — else npm ci fails "Cannot find module".
+COPY scripts/patch-react-pdf.js ./scripts/patch-react-pdf.js
 RUN npm ci
 
 # Rebuild the source code only when needed
