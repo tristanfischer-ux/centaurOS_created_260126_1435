@@ -13843,17 +13843,44 @@ registerArchetype('water_treatment', (brief: any) => {
   const roPermeateM3H = pick(/(?:reverse[\s-]?osmosis|permeate)[^.]{0,150}?(\d{1,3}(?:\.\d)?)\s*(?:cubic\s+met|m³|m\^?3)/i, 8)
   const roRecoveryPct = pick(/recovery[^.]{0,40}?(\d{2})\s*(?:per\s*cent|percent|%)|(\d{2})\s*(?:per\s*cent|percent|%)[^.]{0,20}recovery/i, 75)
   const treatmentThroughputM3H = pick(/(?:granular[\s-]?activated|carbon\s+filter|soften)[^.]{0,150}?(\d{1,3}(?:\.\d)?)\s*(?:cubic\s+met|m³|m\^?3)/i, 14.5)
-  const departmentCount = Math.max(1, Math.round(pick(/(\d)\s*department/i, 2)))
-  const irrigationDemandM3HPerDept = pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?per\s+department/i, 45)
-  const irrigationDemandTotalM3H = Math.round(irrigationDemandM3HPerDept * departmentCount)
+  // departmentCount = the number of MAIN (uniform-size) fertigation pump units. Detected by
+  // counting "Pump Unit N" mentions (Sam Green's real Codema naming, e.g. "Pump Unit 1" /
+  // "Pump Unit 2"); falls back to the older "N department" phrasing for briefs of this class
+  // that still use that vocabulary, then a sane default. Never fabricated — a design's own count.
+  const numberedPumpUnitCount = (desc.match(/pump\s*unit\s*\d+/gi) || []).length
+  const departmentCount = Math.max(1, numberedPumpUnitCount || Math.round(pick(/(\d)\s*department/i, 2)))
+  // irrigationDemandM3HPerDept = the MAIN units' own per-unit flow ("Pump Unit 1 — 90 cubic
+  // metres per hour"); the older "N m³/h per department" phrasing is kept as a fallback.
+  const irrigationDemandM3HPerDept = pick(/pump\s*unit\s*1[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i,
+    pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?per\s+department/i, 45))
+  // NURSERY PUMP UNIT (Codema physics-fault fix, 2026-07-08): the real Fischer Farms system has
+  // a THIRD, differently-sized parallel pump unit serving the nursery zone (2×90 + 1×45 m³/h),
+  // point-of-use dosed and drained like the main units but never captured by the uniform
+  // departmentCount model above. Detected generically from a "Nursery Pump Unit" mention — a
+  // brief with no such distinctly-named unit yields nurseryZoneCount = 0 (never fabricated).
+  const hasNurseryPumpUnit = /nursery\s+pump\s+unit/i.test(desc)
+  const nurseryZoneCount = hasNurseryPumpUnit ? 1 : 0
+  const nurseryPumpFlowM3H = hasNurseryPumpUnit
+    ? pick(/nursery(?:\s+pump\s+unit)?[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 45)
+    : 0
+  const irrigationDemandTotalM3H = Math.round(irrigationDemandM3HPerDept * departmentCount + nurseryPumpFlowM3H * nurseryZoneCount)
   const storageTankVolEachM3 = pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 40)
-  const dosingFlowM3H = pick(/dosing\s+units?[^.]{0,150}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 45)
+  // The fertigation dosing PUMP is the same physical unit as "Pump Unit N" — the brief states
+  // each pump unit "carries its own on-board nutrient dosing" — so its flow tracks the main
+  // per-unit demand, not a separately-guessed "dosing units" figure (that regex coincidentally
+  // shared the OLD 45 m³/h default, which understated the real 90 m³/h main-unit flow).
+  const dosingFlowM3H = irrigationDemandM3HPerDept
   const dosingPumpKw = pick(/(\d(?:\.\d)?)[\s-]?kilowatt\s+(?:circulation\s+)?pump|pump[^.]{0,40}?(\d(?:\.\d)?)\s*kilowatt/i, 7.5)
   const handWaterM3H = pick(/hand[\s-]?water[^.]{0,150}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 25)
   const containerCount = Math.round(pick(/(\d{1,2}[,\s]?\d{3})\s*(?:cultivation\s+)?(?:container|tray)/i, 6000))
   const valveCount = Math.round(pick(/(\d{2,4})\s*(?:electrically[\s-]?actuated\s+|actuated\s+)?valves?/i, 200))
   const nutrientTankCount = 8        // 4 × A + 4 × B, 1,000 L each
-  const clothFilterM3H = 80          // per cultivation room
+  // Recovery/drain cloth filter — UNIVERSAL rule: a treatment/filter on a recovery stream sizes
+  // to that stream's OWN peak flow, not a generic default (Codema physics-fault fix, 2026-07-08).
+  // Each MAIN-zone filter clears its own zone's peak recovery flow (≈ that zone's supply, the
+  // brief: "the RO only makes up losses"); was a flat 80 m³/h default that undersized the real
+  // ~90 m³/h per-zone peak (3-zone total ≈ 216-225 m³/h vs the old 160 m³/h design).
+  const clothFilterM3H = irrigationDemandM3HPerDept   // per MAIN-zone cloth filter
   const drainPitVolM3 = 5            // 5,000 L drain pit per room
 
   // ── ZONED-DISTRIBUTION GEOMETRY (the brief's OWN section-D layout, 2026-07-03) ──────────
@@ -13893,10 +13920,13 @@ registerArchetype('water_treatment', (brief: any) => {
   // the vertical_farm path put LED+HVAC load on a water plant). Built bottom-up from the kit.
   const connectedLoadKw = Math.round(
     departmentCount * dosingPumpKw          // fertigation circulation pumps
+    + nurseryZoneCount * dosingPumpKw * 0.6  // nursery circulation pump (smaller duty, ~45 vs 90 m³/h)
     + 5.5                                    // RO high-pressure pump (installed)
     + Math.max(3, handWaterM3H * 0.16)       // hand-watering pump (~4 kW at 25 m³/h, 3 bar)
     + departmentCount * 4                    // drain-pit submersible transfer pumps
+    + nurseryZoneCount * 2                   // nursery drain-pit submersible pump (smaller)
     + departmentCount * 4                    // cloth-filter self-priming pumps
+    + nurseryZoneCount * 2                   // nursery cloth-filter self-priming pump (smaller)
     + nutrientTankCount * 0.37               // 8 nutrient mixers (~0.37 kW each)
     + uvDisinfectionKw                       // UV-C disinfection (Legionella control)
     + 5,                                     // instrumentation, dosing pumps, controls
@@ -13916,7 +13946,7 @@ registerArchetype('water_treatment', (brief: any) => {
   const quantities: Record<string, Quantity> = {
     // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
     ro_permeate_capacity_m3_h: q(roPermeateM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'reverse-osmosis permeate capacity (Codema HORTI PURE RO 8 m³/h); lock-gate HARD slot (exit 22)'),
-    irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments; lock-gate HARD slot (exit 22)`),
+    irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount} nursery pump unit(s) × ${nurseryPumpFlowM3H} m³/h` : ''}; lock-gate HARD slot (exit 22)`),
     // ── UV-C disinfection unit (Legionella / water-hygiene control on stored + recirculated water) ──
     uv_disinfection_throughput_m3_h: q(uvDisinfectionFlowM3H, 'm³/h', 'flow_rate', 'derived', 'system', 'calculator', `medium-pressure UV-C reactor sized to the peak recirculated flow (= irrigation demand ${irrigationDemandTotalM3H} m³/h) for Legionella control at ≈40 mJ/cm²`, ['irrigation_demand_m3_h'], 'irrigation_demand_m3_h'),
     uv_disinfection_power_kw: q(uvDisinfectionKw, 'kW', 'power', 'derived', 'system', 'calculator', `UV-C lamp electrical draw ≈ 0.045 kW per m³/h at the Legionella dose (${uvDisinfectionFlowM3H} m³/h × 0.045)`, ['uv_disinfection_throughput_m3_h'], 'uv_disinfection_throughput_m3_h*0.045'),
@@ -13952,11 +13982,12 @@ registerArchetype('water_treatment', (brief: any) => {
     fresh_water_tank_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one fresh-water storage tank'),
     drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'drain-water galvanised storage tank (40 m³) for reuse'),
     drain_water_tank_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two drain-water storage tanks'),
-    fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'A/B fertigation circulation pump (Lowara e-SHE 50-160/75, 45 m³/h @ 3.5 bar)'),
+    fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `A/B fertigation circulation pump — main pump unit (${dosingFlowM3H} m³/h @ 2.9 bar, 2×40-200/5.5 duty+standby)`),
     fertigation_dosing_pump_power_kw: q(dosingPumpKw, 'kW', 'power', 'rated', 'module', 'brief', 'fertigation circulation pump motor (7.5 kW)'),
     fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
-    // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL = both A/B dosing units (2 × 45 = 90 m³/h),
-    // not one unit's 45 — emit the aggregate under the brief metric name so compliance compares total-vs-total.
+    // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL across the MAIN dosing units (2 × 90 =
+    // 180 m³/h), not one unit's 90 — emit the aggregate under the brief metric name so compliance
+    // compares total-vs-total (the nursery unit is a separate, differently-sized 3rd unit, above).
     fertigation_dosing_capacity_m3_per_hr: q(dosingFlowM3H * departmentCount, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `total fertigation dosing capacity = ${departmentCount} units × ${dosingFlowM3H} m³/h = ${dosingFlowM3H * departmentCount} m³/h`, ['fertigation_dosing_pump_throughput_m3_h', 'fertigation_dosing_pump_count'], 'fertigation_dosing_pump_throughput_m3_h*fertigation_dosing_pump_count'),
     // A/B fertigation METERING pumps — distinct from the 7.5 kW CIRCULATION pumps above. The brief
     // specifies, per dosing unit, one acid dosing pump (Iwaki EWN-C21VCER) + one chemical dosing pump
@@ -13977,8 +14008,29 @@ registerArchetype('water_treatment', (brief: any) => {
     drain_collection_sump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} drain pits (one per cultivation room)`),
     drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'drain-pit submersible transfer pump (45 m³/h)'),
     drain_transfer_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} submersible drain pumps`),
-    cloth_filter_throughput_m3_h: q(clothFilterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'drain-water cloth filter (80 m³/h) on HDPE tank, returns to drain tank'),
+    cloth_filter_throughput_m3_h: q(clothFilterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `drain-water cloth filter (${clothFilterM3H} m³/h, sized to its own zone's peak recovery flow) on HDPE tank, returns to drain tank`),
     cloth_filter_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} cloth-filter units`),
+    // ── NURSERY PUMP UNIT — the brief's 3rd, differently-sized parallel pump unit (Codema
+    //    physics-fault fix, 2026-07-08). Its own dosing, drain pit and cloth filter, mirroring
+    //    the main units above, minted ONLY when the brief names a distinct nursery unit
+    //    (nurseryZoneCount > 0 — a brief with no such unit fabricates nothing here). ──
+    ...(nurseryZoneCount > 0 ? {
+      nursery_fertigation_dosing_pump_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery A/B fertigation circulation pump (${nurseryPumpFlowM3H} m³/h) — the brief's 3rd, differently-sized parallel pump unit`),
+      nursery_fertigation_dosing_pump_power_kw: q(Math.round(dosingPumpKw * 0.6 * 10) / 10, 'kW', 'power', 'rated', 'module', 'brief', 'nursery fertigation circulation pump motor (smaller duty than the main units)'),
+      nursery_fertigation_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery A/B fertigation dosing unit`),
+      nursery_acid_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery acid metering pump (100 L barrel, ~40 L/h)'),
+      nursery_acid_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery acid metering pump motor (frequency-controlled)'),
+      nursery_acid_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery acid dosing pump`),
+      nursery_chemical_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery chemical/nutrient metering pump (100 L barrel, ~40 L/h)'),
+      nursery_chemical_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery chemical metering pump motor (frequency-controlled)'),
+      nursery_chemical_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery chemical dosing pump`),
+      nursery_cloth_filter_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery drain-water cloth filter (${nurseryPumpFlowM3H} m³/h, sized to the nursery zone's own peak recovery flow) on HDPE tank, returns to nursery drain reservoir`),
+      nursery_cloth_filter_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery cloth-filter unit`),
+      nursery_drain_collection_sump_volume_each_m3: q(drainPitVolM3, 'm³', 'volume', 'rated', 'module', 'brief', 'nursery drain-water collection pit (5,000 L)'),
+      nursery_drain_collection_sump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery drain pit`),
+      nursery_drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery drain-pit submersible transfer pump'),
+      nursery_drain_transfer_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery submersible drain pump`),
+    } : {}),
 
     // ── Network parameters (visible scalars; the ebb/flow PIPEWORK + valve cost is the
     //    distributed-network costing follow-on — see closures note) ──
@@ -14020,7 +14072,7 @@ registerArchetype('water_treatment', (brief: any) => {
 
   return {
     product_class: 'water_treatment',
-    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and 80 m³/h cloth-filter drain-water reclaim. Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
+    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
     quantities,
     macro_assembly_prices: [],   // B-3: let the universal sizer mint the equipment lines (no double-count)
     closures,
