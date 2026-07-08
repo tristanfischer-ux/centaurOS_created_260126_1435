@@ -376,6 +376,62 @@ check(len(g10) == 1 and g10[0]["trunk_edge"] is not None
 #      (control / instruments — touched by no flow edge) to the periphery. Keyed on
 #      the connectivity graph, universal. Regression-harness rule 11 for the
 #      2026-06-11 UNIVERSAL FLOW-LAYOUT.
+print("[7c] BELOW-GRADE / GRAVITY-DRAIN routing (Sam Green SME review 2026-07-08) — "
+      "ported from draw_pid.py::_is_below_grade_drain / draw_ga.py::_BELOW_GRADE_NAME_RE "
+      "to the 3D scene: a gravity drain must route UNDERGROUND, never on the elevated "
+      "pipe rack, and its below-grade collection point must sink into the slab.")
+# proveCatch — a gravity-fed run into a below-grade collection point.
+check(B._is_below_grade_drain_edge("toray_tm720d_400_ro_membrane", "drain_collection_sump", ""),
+      "proveCatch: a run into a 'sump' node is flagged below-grade")
+check(B._is_below_grade_drain_edge("floor_drain", "collection_tank", "gravity_fed_drainage"),
+      "proveCatch: material_context explicitly saying 'gravity' is flagged below-grade "
+      "even when the destination node name doesn't itself carry a pit noun")
+check(B._is_below_grade_drain_edge("x", "5000L Concrete Drain Pit", ""),
+      "proveCatch: a human-readable 'Drain Pit' name (not just a snake_case tag) matches "
+      "the same noun signal build_part uses to sink the part")
+check(B._is_below_grade_drain_edge("x", "Catch-Pit 3", ""),
+      "proveCatch: 'catch-pit' / 'catch pit' spelling variants both match")
+# proveNoFalsePositive — the excluded/negative cases (mirrors draw_pid_test.py G2c-e).
+check(not B._is_below_grade_drain_edge("drain_transfer_pump", "cip_tank", ""),
+      "proveNoFalsePositive: a pump discharging into an ordinary tank stays above-ground")
+check(not B._is_below_grade_drain_edge("submersible_lift_pump", "drain_collection_sump", ""),
+      "proveNoFalsePositive: the RISEN discharge LEAVING a lift pump (source name carries "
+      "'pump') is excluded even though the destination is a sump")
+check(not B._is_below_grade_drain_edge("reverse_osmosis_skid", "cloth_filter", ""),
+      "proveNoFalsePositive: an ordinary process-to-process edge (no pit/gravity signal) "
+      "stays above-ground")
+check(not B._is_below_grade_drain_edge("dc_busbar_800v", "rack_block_01", ""),
+      "proveNoFalsePositive: an all-pressurised/electrical archetype (BESS-shaped names, "
+      "no sump/pit/gravity noun anywhere) never trips below-grade")
+
+# _route_below_grade: the underground leg must stay BELOW the ground-slab underside,
+# never rise to the rack, and must still land exactly on both given endpoints.
+_slab_underside = B.DECK_Z_MM - B.GROUND_SLAB_THICK_MM
+_before_count = B._UNDERGROUND_RUN_COUNT
+_a_xyz = (0.0, 0.0, 900.0)     # a normal above-slab source nozzle
+_b_xyz = (5000.0, 0.0, -900.0)  # a sunk collection point's inlet
+_wp = B._route_below_grade(_a_xyz, _b_xyz)
+check(_wp[0] == _a_xyz and _wp[-1] == _b_xyz,
+      "_route_below_grade: waypoints start/end exactly on the given source/destination")
+check(all(p[2] <= _slab_underside + 1.0 for p in _wp[1:-1]),
+      "_route_below_grade: every intermediate waypoint stays AT/BELOW the ground-slab "
+      "underside (never detours up onto the elevated rack)")
+check(B._UNDERGROUND_RUN_COUNT == _before_count + 1,
+      "_route_below_grade: advances the per-scene stagger counter (so 2+ underground "
+      "runs never share one trench elevation)")
+
+# build_part's below-grade PART SINK: the same name-noun signal pushes the part's own
+# base down so it sits sunk in the slab, top ≈ DECK_Z_MM, regardless of which vessel
+# KIND it resolves to (tank vs a leg/skirt-supported column/vertical/reactor/bed —
+# forcing "tank" avoids legs dangling below grade, see build_part's kind-override).
+check(B._BELOW_GRADE_NAME_RE.search("Drain Collection Sump") is not None
+      and B._BELOW_GRADE_NAME_RE.search("5000L Concrete Drain Pit") is not None,
+      "proveCatch: both a 'sump' name and a human 'Drain Pit' name trip the part-sink signal")
+check(B._BELOW_GRADE_NAME_RE.search("Reverse Osmosis Skid") is None
+      and B._BELOW_GRADE_NAME_RE.search("DC Busbar 800V") is None,
+      "proveNoFalsePositive: ordinary equipment names never trip the part-sink signal")
+
+
 print("[8] flow_order_regions — process-train ordering + periphery split")
 
 
@@ -516,6 +572,7 @@ check(_t["design_recommendations"] >= 1
 check(any(k in (_sched["design_feedback"][0]["recommendation"] or "").lower()
           for k in ("sub-distribution", "step-down", "relocate")),
       "Phase D: D2 recommendation proposes sub-distribution / step-down / relocate")
+
 
 
 # ── summary ──────────────────────────────────────────────────────────────────

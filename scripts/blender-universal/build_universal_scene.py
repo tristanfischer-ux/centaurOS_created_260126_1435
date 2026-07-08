@@ -807,6 +807,85 @@ CONTAINER_GROUND_SLAB_MARGIN_MM = 1500.0
 # "no floor"), while staying subordinate to the equipment.
 GROUND_SLAB_COLOUR     = (0.52, 0.52, 0.55)
 
+# ── BELOW-GRADE / GRAVITY-DRAIN routing (Sam Green SME review 2026-07-08, ported to
+# the 3D scene from the 2D fix — commit 60c57df81, draw_pid.py::_is_below_grade_drain
+# + draw_ga.py::_BELOW_GRADE_NAME_RE). Sam's Renders J3 review (verbatim): "All
+# pipework seems to be above ground whereas a lot of this pipework may be better
+# placed below ground ... a lot would have to be underground for drainage." That
+# commit fixed only the 2D P&ID (dash-dot drain line) + GA (hatched below-grade pit)
+# — it never reached this file, so the 3D router (route_on_spine / RackPlan) still
+# put every run, drains included, on the elevated overhead pipe rack, and every
+# sump/pit part sat on top of the slab like ordinary equipment. UNIVERSAL — keyed
+# only on the SAME generic drain/gravity/sump/pit nouns the 2D fix used, never a
+# class name: fires on any archetype whose topology feeds a gravity collection
+# point, stays silent on an all-pressurised design (no matching name/context at all).
+_BELOW_GRADE_NAME_RE = re.compile(
+    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain", re.I)
+_GRAVITY_CONTEXT_RE = re.compile(r"\bgravity\b", re.I)
+_LIFT_PUMP_RE = re.compile(r"\bpump\b", re.I)
+
+
+def _is_below_grade_drain_edge(frm, to, material_context):
+    """True when a routed topology edge is a GRAVITY-FED run into a below-grade
+    collection point (sump / drain-pit / catch-pit / manhole / gully / floor drain)
+    — the identical predicate draw_pid.py::_is_below_grade_drain uses to pick the
+    dash-dot line style in the 2D P&ID, reused here to route the 3D pipe UNDERGROUND
+    instead of onto the elevated rack. Also fires when the edge's own
+    material_context explicitly says 'gravity'. Excludes the RISEN, pumped discharge
+    LEAVING a lift pump (that run is above-ground once lifted out of the pit) —
+    proveCatch/proveNoFalsePositive in build_universal_scene_test.py."""
+    if _GRAVITY_CONTEXT_RE.search(re.sub(r"[_\-]+", " ", material_context or "")):
+        return True
+    to_norm = re.sub(r"[_\-]+", " ", to or "")
+    if not _BELOW_GRADE_NAME_RE.search(to_norm):
+        return False
+    frm_norm = re.sub(r"[_\-]+", " ", frm or "")
+    return not _LIFT_PUMP_RE.search(frm_norm)
+
+
+# Below-grade PART sink (the drain-pit/sump/manhole chamber itself, applied in
+# build_part): a real below-grade collection point is dug INTO the ground with its
+# rim roughly flush with grade, not perched on top of the slab like ordinary kit.
+# Depth used when the part's own contract dimension gives no usable height.
+BELOW_GRADE_SINK_DEFAULT_MM = 1500.0
+# Underground drain-run trench (applied in _route_below_grade): how far below the
+# LOWER of the run's two endpoints — and never shallower than the slab underside —
+# the horizontal underground leg travels; the per-run stagger keeps 2+ underground
+# runs from sharing one elevation (mirrors the rack's own per-tier separation).
+UNDERGROUND_TRENCH_CLEAR_MM = 300.0
+UNDERGROUND_MIN_DEPTH_MM    = 200.0
+UNDERGROUND_STAGGER_MM      = 150.0
+_UNDERGROUND_RUN_COUNT = 0   # module-level counter, reset per scene by main()
+
+
+def _route_below_grade(a_xyz, b_xyz):
+    """Route a GRAVITY-FED drain / recovery run BELOW the ground slab instead of on
+    the elevated overhead pipe rack. A gravity drain physically cannot detour
+    overhead — it falls to a below-grade sump — so this bypasses RackPlan /
+    route_on_spine entirely: straight down from the source to an underground trench
+    elevation (below the slab underside, staggered per underground run so parallels
+    never coincide), across to the destination's XY, then up into the destination
+    (a sunk collection point's inlet already sits low — see the below-grade sink in
+    build_part). Purely-orthogonal waypoints, the same convention every other routed
+    run in this file uses."""
+    global _UNDERGROUND_RUN_COUNT
+    ax, ay, az = (float(c) for c in a_xyz)
+    bx, by, bz = (float(c) for c in b_xyz)
+    slab_underside = DECK_Z_MM - GROUND_SLAB_THICK_MM
+    trench_z = min(az, bz) - UNDERGROUND_TRENCH_CLEAR_MM
+    trench_z = min(trench_z, slab_underside - UNDERGROUND_MIN_DEPTH_MM
+                   - UNDERGROUND_STAGGER_MM * _UNDERGROUND_RUN_COUNT)
+    _UNDERGROUND_RUN_COUNT += 1
+    raw = [(ax, ay, az), (ax, ay, trench_z), (bx, ay, trench_z),
+           (bx, by, trench_z), (bx, by, bz)]
+    pts = [raw[0]]
+    for p in raw[1:]:
+        if max(abs(p[0] - pts[-1][0]), abs(p[1] - pts[-1][1]),
+               abs(p[2] - pts[-1][2])) > 1.0:
+            pts.append(p)
+    return pts
+
+
 # ── STAGE 1 LINEAR LAYOUT (BLENDER_LINEAR_LAYOUT=1) ─────────────────────────
 # A DETERMINISTIC diagnostic placement that lays EVERY part in ONE straight row
 # along +X, ordered by process sequence (region_rank ascending, then a stable
@@ -2974,9 +3053,33 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
     rd = resolved_dims_mm(part)
     nm = "u_" + re.sub(r"[^a-z0-9]+", "_", part.name.lower()).strip("_")[:40]
 
+    # BELOW-GRADE / gravity-drain collection point (Sam Green SME review 2026-07-08,
+    # ported to 3D from the 2D P&ID/GA below-grade fix — commit 60c57df81, the same
+    # _BELOW_GRADE_NAME_RE signal draw_ga.py keys its hatched-pit convention on). A
+    # sump / drain-pit / catch-pit / manhole / gully / floor drain is a chamber SUNK
+    # into the ground with its rim roughly flush with grade — not equipment standing
+    # ON the slab like every other placed part. Push this part's own base down so
+    # its WHOLE body sits below grade: top ≈ DECK_Z_MM (the datum every other part's
+    # underside rests ON), extending DOWN by its own contract height (or the sump
+    # default depth when the contract gave no usable height). Universal — a name-noun
+    # signal, never a class name; an all-pressurised design with no sump/pit part is
+    # completely unaffected (this branch never fires).
+    if _BELOW_GRADE_NAME_RE.search(part.name or ""):
+        _sink_h = float(rd.get("len_mm") or rd.get("h_mm") or BELOW_GRADE_SINK_DEFAULT_MM)
+        base_z_mm = DECK_Z_MM - _sink_h
+
     # ── PROCESS VESSELS: shell + dished heads + kind-specific support ──
     if shape in _VESSEL_KIND:
         kind = _VESSEL_KIND[shape]
+        # A below-grade collection point ALWAYS reads as a squat sunk CHAMBER — a
+        # low plinth, never the tall leg/skirt supports build_vessel gives a
+        # standing column/reactor/vertical/bed vessel (those supports are meant to
+        # hold equipment UP off the deck; on a sunk part they render as legs
+        # dangling in the pit below grade — the wrong picture). Force the "tank"
+        # support convention (flat bottom on a thin plinth) whenever the part is a
+        # below-grade collection point, regardless of its nominal vessel shape.
+        if kind != "tank" and _BELOW_GRADE_NAME_RE.search(part.name or ""):
+            kind = "tank"
         # BOX-dimmed vessel fallback (Tristan 2026-06-22, the 13.3 m "Degasser" tower):
         # a vessel/column whose contract dim is a BOX (e.g. "1548x1316x1703 mm") carries
         # w/d/h, NOT dia/len — without the fallbacks below build_part ignored the box and
@@ -9088,7 +9191,17 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
         # universal guard against pathological edges (e.g. very long cross-plant runs
         # that generate hundreds of cable-tray rung objects on a large scene).
         _edge_t0 = time.monotonic()
-        if rack_plan is not None:
+        # BELOW-GRADE / GRAVITY-DRAIN (Sam Green SME review 2026-07-08): a run into a
+        # sump/drain-pit/catch-pit/manhole (or explicitly flagged 'gravity' in the
+        # edge's material_context) falls to a below-grade collection point — it
+        # cannot physically detour up onto the elevated rack. Route it underground
+        # and skip the rack-plan/direct-route logic entirely for this edge.
+        _edge_mc = (r.get("edge") or {}).get("material_context")
+        if _is_below_grade_drain_edge(r.get("a_nm"), r.get("b_nm"), _edge_mc):
+            waypoints = _route_below_grade(a_xyz, b_xyz)
+            print(f"[univ][below-grade] edge {tag}{i} ({mech}) routed UNDERGROUND "
+                  f"(gravity drain): {r['a_nm']}  ->  {r['b_nm']}")
+        elif rack_plan is not None:
             own_bb = [bb for bb in (part_xy_bbox_mm(pa) if pa else None,
                                     part_xy_bbox_mm(pb) if pb else None)
                       if bb is not None]
@@ -10110,11 +10223,17 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
         untouched: the declutter intent survives). Universal — reached only via the
         cable-service demotion paths, keyed on service/mechanism, never a class."""
         nonlocal n_logical
-        # run_idx=0: the per-run Z micro-stagger exists to untangle DRAWN geometry;
-        # an unmeshed run has nothing to tangle, and a fixed index keeps the length
-        # independent of registration order (determinism).
-        waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], r["service"], run_idx=0,
-                               overhead_base_z=overhead_base_z)
+        # BELOW-GRADE / GRAVITY-DRAIN (Sam Green SME review 2026-07-08): a run into a
+        # sump/drain-pit/manhole falls to a below-grade collection point — never the
+        # overhead deck _wire_path assumes. Same predicate as the per-edge draw loop.
+        if _is_below_grade_drain_edge(r["frm"], r["to"], (r.get("e") or {}).get("material_context")):
+            waypoints = _route_below_grade(r["src_xyz"], r["dst_xyz"])
+        else:
+            # run_idx=0: the per-run Z micro-stagger exists to untangle DRAWN geometry;
+            # an unmeshed run has nothing to tangle, and a fixed index keeps the length
+            # independent of registration order (determinism).
+            waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], r["service"], run_idx=0,
+                                   overhead_base_z=overhead_base_z)
         length_m = _polyline_len_m(waypoints)
         nm = f"u_route_{r['idx']:03d}_{_part_prefix(str(r['to']))}_{r['service']}_logical"
         render_mech = _WIRE_SERVICE_MECH.get(r["service"], "fluid_loop")
@@ -10239,9 +10358,21 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             _svc_run_count[service] = _run_i + 1
             _own_bb = [bb for bb in (part_xy_bbox_mm(r["src_part"]), part_xy_bbox_mm(r["dst_part"]))
                       if bb is not None]
-            waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], service, run_idx=_run_i,
-                                   overhead_base_z=overhead_base_z,
-                                   bboxes=_wire_bboxes, own=_own_bb)
+            # BELOW-GRADE / GRAVITY-DRAIN (Sam Green SME review 2026-07-08, Renders J3:
+            # "a lot would have to be underground for drainage"). This IS the router
+            # wire_ports actually uses for fluid edges (WIRE_FANOUT_MIN=999 keeps every
+            # fluid pipe direct port-to-port, never trayed) — so a gravity run into a
+            # sump/drain-pit/catch-pit/manhole must be diverted here, not just in the
+            # rack-spine router's _emit_routes_on_plan (which this state never reaches).
+            # Universal — same generic drain/gravity noun signal as the 2D P&ID fix.
+            if _is_below_grade_drain_edge(r["frm"], r["to"], (r.get("e") or {}).get("material_context")):
+                waypoints = _route_below_grade(r["src_xyz"], r["dst_xyz"])
+                print(f"[univ][wire][below-grade] {r['edge_lbl']} routed UNDERGROUND "
+                      f"(gravity drain)")
+            else:
+                waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], service, run_idx=_run_i,
+                                       overhead_base_z=overhead_base_z,
+                                       bboxes=_wire_bboxes, own=_own_bb)
             nm = f"u_wire_{r['idx']:03d}_{_part_prefix(str(frm))}_{service}"
             try:
                 _record(r, nm, waypoints, _polyline_len_m(waypoints), "per_edge")
