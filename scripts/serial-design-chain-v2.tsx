@@ -7296,6 +7296,34 @@ async function main() {
         logAction({ step: 'join_flow_demands_onto_topology', edges_joined: nJoined })
       }
     }
+    // FILTER-ON-DIRTY-STREAM INVARIANT (Sam Green SME review, 2026-07-07 — "RO water feeds
+    // into cloth filter which doesn't make sense as it's clean already"). The evaluator
+    // existed (derive-topology.ts::evaluateFilterOnDirtyStreamInvariant) but nothing in the
+    // render path CALLED it — it only ever ran inside this file's own --selftest, against
+    // display-name fixtures ('Reverse Osmosis Skid'), never the real SLUGIFIED topology
+    // (`ro_membrane_elements -> cloth_filter`) this deriver actually emits. Wired here
+    // (after the topology is fully settled — derived + signal edges + flow-demand join)
+    // so it runs on EVERY design, whether the topology came from the generic deriver above
+    // or a hand-authored per-class contract.topology. SHADOW (flags + records, never
+    // blocks) — the physical reorder this defect calls for is a topology-authoring fix
+    // (the ROLE_PATTERNS rank table), a deeper change than this detector should make
+    // silently; the routed punchlist is the fix-driver.
+    if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
+      const { evaluateFilterOnDirtyStreamInvariant } = await import('./lib/orchestrator/generic/derive-topology')
+      const filterVerdict = evaluateFilterOnDirtyStreamInvariant(orch.topology)
+      ;(state as any).filterOnDirtyStreamCheck = filterVerdict
+      if (filterVerdict.verdict === 'high') {
+        const lines = filterVerdict.violations.map((v) =>
+          `- "${v.filter}" sits immediately downstream of "${v.upstream}" (an already-clean/RO-permeate stream) — move it to the dirty/recovered side, or name it an explicit final-polish stage if that is genuinely intended.`)
+        const punchlist = `# Filter-on-dirty-stream punchlist\n\n${lines.join('\n')}\n`
+        writeFileSync(resolve(outDir, 'filter-on-dirty-stream-punchlist.md'), punchlist)
+        console.error(`[chain] FILTER-ON-DIRTY-STREAM invariant: HIGH — ${filterVerdict.violations.length} treatment unit-op(s) placed on an already-clean stream. See filter-on-dirty-stream-punchlist.md`)
+        logAction({ step: 'filter_on_dirty_stream_invariant', verdict: filterVerdict.verdict, violations: filterVerdict.violations.length })
+      } else {
+        console.error(`[chain] filter-on-dirty-stream invariant: ${filterVerdict.verdict}`)
+        logAction({ step: 'filter_on_dirty_stream_invariant', verdict: filterVerdict.verdict, violations: filterVerdict.violations.length })
+      }
+    }
   } catch (err) {
     console.error(`[chain] topology derivation failed (non-fatal): ${(err as Error).message}`)
     logAction({ step: 'derive_process_topology', ok: false, error: String(err).slice(0, 200) })

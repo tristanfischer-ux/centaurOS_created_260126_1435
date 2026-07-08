@@ -315,6 +315,22 @@ export interface FilterOnDirtyStreamResult {
  * node's immediate upstream is a clean/RO-permeate source, 'pass' otherwise (incl. every
  * legitimate dirty/recovered-side filter and every explicitly-named polish stage).
  */
+// The REAL topology this invariant runs against (deriveProcessTopology's own output, and
+// most hand-authored contract.topology arrays) keys nodes with SLUGIFIED endpoints
+// (`ro_membrane_elements`, `cloth_filter`, `drain_collection_sump` — underscore-joined,
+// see `slugify()` above), not the space-separated display names the vocabulary regexes
+// above were written against. `\b` does NOT break on `_` (it is a \w character), so
+// `/\bro\b/` never matches `ro_membrane_elements` and `/\bdrain\b/` never matches
+// `drain_collection_sump` — every regex above silently failed on the real slug shape.
+// This is exactly why the invariant returned 'not_applicable' on the real Codema
+// topology (ro_membrane_elements -> cloth_filter) even after being wired into the chain:
+// the FIXTURE-only selftest used display names ('Reverse Osmosis Skid', 'Cloth Filter')
+// and never caught it. Normalise underscores/hyphens to spaces before matching — for
+// THIS invariant's matching only; the shared vocabulary regexes are untouched.
+function _normaliseSlugForMatch(s: string): string {
+  return s.replace(/[_-]+/g, ' ')
+}
+
 export function evaluateFilterOnDirtyStreamInvariant(
   topology: Array<Record<string, unknown>>,
 ): FilterOnDirtyStreamResult {
@@ -325,11 +341,13 @@ export function evaluateFilterOnDirtyStreamInvariant(
     const rec = e as Record<string, unknown>
     const from = String(rec.from_part ?? '')
     const to = String(rec.to_part ?? '')
-    if (!TREATMENT_UNIT_OP_RE.test(to)) continue
+    const fromN = _normaliseSlugForMatch(from)
+    const toN = _normaliseSlugForMatch(to)
+    if (!TREATMENT_UNIT_OP_RE.test(toN)) continue
     anyTreatmentNode = true
-    if (POLISH_EXEMPT_RE.test(to)) continue // an explicit final-polish / point-of-use stage — legitimate on clean water
-    if (RECOVERY_BUFFER_RE.test(from)) continue // a genuinely dirty/recovered source — the filter's correct role
-    if (CLEAN_SOURCE_RE.test(from)) {
+    if (POLISH_EXEMPT_RE.test(toN)) continue // an explicit final-polish / point-of-use stage — legitimate on clean water
+    if (RECOVERY_BUFFER_RE.test(fromN)) continue // a genuinely dirty/recovered source — the filter's correct role
+    if (CLEAN_SOURCE_RE.test(fromN)) {
       violations.push({
         filter: to, upstream: from,
         reason: `"${to}" (a treatment unit-op) sits immediately downstream of "${from}" — an already-CLEAN/RO-permeate stream. A non-polish filter/disinfection stage belongs on the DIRTY/recovered side (design-basis: it exists to make a dirty stream clean, never to re-treat one that already is), unless explicitly named as a final-polish/point-of-use stage.`,
@@ -773,6 +791,34 @@ function _selftest() {
   if (!badFilterVerdict.violations.some((v) => v.filter === 'Cloth Filter' && v.upstream === 'Reverse Osmosis Skid')) {
     throw new Error(`filter-on-dirty-stream proveCatch: expected the violation to name the Cloth Filter + its RO upstream, got ${JSON.stringify(badFilterVerdict.violations)}`)
   }
+
+  // (a2) proveCatch — REAL SLUG SHAPE (2026-07-08 follow-up): the actual topology this
+  // invariant runs against in production is deriveProcessTopology's own SLUGIFIED output
+  // (underscore-joined endpoints), not the space-separated display names used above. The
+  // real out/codema-sam-verify/state.json topology reads
+  // `ro_membrane_elements -> cloth_filter`, exactly this shape — this fixture proves the
+  // invariant catches it (a bare `\b`-based regex does NOT break on `_`, so this failed
+  // silently before the `_normaliseSlugForMatch` fix).
+  const slugBadFilterTopo: Array<Record<string, unknown>> = [
+    { from_part: 'reverse_osmosis_skid', to_part: 'ro_membrane_elements', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'ro_membrane_elements', to_part: 'cloth_filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'cloth_filter', to_part: 'gac_filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const slugBadFilterVerdict = evaluateFilterOnDirtyStreamInvariant(slugBadFilterTopo)
+  if (slugBadFilterVerdict.verdict !== 'high') throw new Error(`filter-on-dirty-stream proveCatch (slug shape) FAILED: expected 'high' for ro_membrane_elements -> cloth_filter, got '${slugBadFilterVerdict.verdict}'`)
+  if (!slugBadFilterVerdict.violations.some((v) => v.filter === 'cloth_filter' && v.upstream === 'ro_membrane_elements')) {
+    throw new Error(`filter-on-dirty-stream proveCatch (slug shape): expected the violation to name cloth_filter + its ro_membrane_elements upstream, got ${JSON.stringify(slugBadFilterVerdict.violations)}`)
+  }
+
+  // (a3) proveNoFalsePositive — REAL SLUG SHAPE, correctly placed on the recovery side
+  // (drain_collection_sump -> cloth_filter, also from the real Codema topology's later
+  // stage) must PASS even in slug form.
+  const slugGoodFilterTopo: Array<Record<string, unknown>> = [
+    { from_part: 'drain_collection_sump', to_part: 'cloth_filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'cloth_filter', to_part: 'drainwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const slugGoodFilterVerdict = evaluateFilterOnDirtyStreamInvariant(slugGoodFilterTopo)
+  if (slugGoodFilterVerdict.verdict !== 'pass') throw new Error(`filter-on-dirty-stream proveNoFalsePositive (slug shape) FAILED: expected 'pass', got '${slugGoodFilterVerdict.verdict}' (${JSON.stringify(slugGoodFilterVerdict.violations)})`)
 
   // (b) proveNoFalsePositive #1: an explicitly-named FINAL POLISH filter on clean water
   // (legitimate — polishing already-treated water immediately before delivery) must PASS.
