@@ -1184,17 +1184,28 @@ def _discover_valves(state: dict):
 # DN / SERVICE / LINE-NUMBER helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _norm_part_key(s: str) -> str:
+    """Normalise a part identifier for cross-source joining: the topology carries
+    snake_case keys ('drain_transfer_pump') while connection-schedule.json rows carry
+    human-cased names ('Drain Transfer Pump') — lowercase + strip separators so the two
+    naming conventions compare equal. Universal (no class-specific casing rules)."""
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
 def _schedule_row(schedule: dict, frm: str, to: str):
+    nf, nt = _norm_part_key(frm), _norm_part_key(to)
     for r in (schedule.get("rows") or []):
-        if r.get("from") == frm and r.get("to") == to:
+        if _norm_part_key(r.get("from") or "") == nf and _norm_part_key(r.get("to") or "") == nt:
             return r
     # try the spec list too (carries phase)
     return None
 
 
 def _schedule_spec(schedule: dict, frm: str, to: str):
+    nf, nt = _norm_part_key(frm), _norm_part_key(to)
     for s in (schedule.get("specs") or []):
-        if s.get("from_part") == frm and s.get("to_part") == to:
+        if (_norm_part_key(s.get("from_part") or "") == nf
+                and _norm_part_key(s.get("to_part") or "") == nt):
             return s
     return None
 
@@ -1202,6 +1213,43 @@ def _schedule_spec(schedule: dict, frm: str, to: str):
 def _dn_from_context(mc: str) -> str:
     m = re.search(r"\b(DN\s?\d+)\b", mc or "", re.I)
     return m.group(1).replace(" ", "").upper() if m else ""
+
+
+def _dn_mm(dn: str) -> Optional[float]:
+    """Parse a nominal bore (e.g. 'DN80') to its millimetre value. Returns None for a
+    non-DN size label (a cable CSA, an unrated line) so the caller can fall back."""
+    m = re.search(r"\bDN\s?(\d+)\b", dn or "", re.I)
+    return float(m.group(1)) if m else None
+
+
+def _pipe_lw(dn: str, style: str) -> float:
+    """Stroke width PROPORTIONAL to the line's real nominal bore, clamped to a legible
+    drawn range — replaces a flat width that ignored size entirely (every process line
+    rendered at the same 2.4 px regardless of whether it was a DN15 instrument tap or a
+    DN300 header, which is what made the P&ID read as 'pipes weirdly big / can't tell
+    the runs apart'). Log2 scale so the huge real-world DN range (15-600+) still fits a
+    narrow, readable pixel range on the page; unrated lines keep the prior flat default
+    per style so a line the schedule never sized doesn't shrink to nothing or balloon.
+    """
+    base = 2.4 if style == LINE_PROCESS else 1.9
+    mm = _dn_mm(dn)
+    if not mm:
+        return base
+    lw = 1.3 + 0.55 * math.log2(max(mm, 10.0) / 15.0 + 1.0)
+    return round(min(max(lw, 1.3), 5.0), 2)
+
+
+def _canon_dn(raw: str) -> str:
+    """Canonicalise a schedule size string to a bare 'DNnn' token for the line number +
+    the width map. Some schedule rows carry a qualifier alongside the size (e.g.
+    'DN25 (nominal — flow unknown)') — strip that so the line number reads
+    '214-PR-DN25', not the whole parenthetical, and the width lookup still parses it.
+    Non-DN sizes (e.g. a cable CSA 'mm²') pass through unchanged so they still show."""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    m = re.search(r"\bDN\s?\d+\b", s, re.I)
+    return m.group(0).replace(" ", "").upper() if m else s
 
 
 def _dn_from_flow(value, unit) -> str:
@@ -1252,10 +1300,22 @@ def _service_text(mc: str) -> str:
     return s
 
 
+# Non-fluid mechanisms that must NEVER render as a heavy process pipe — mirrors the
+# taxonomy already used elsewhere in the pipeline (draw_process_schedules.py
+# _NON_PROCESS_MECH; build_universal_scene.py's electrical_bus/data_link/control_signal/
+# signal grouping). Before this fix, any mechanism other than the literal string
+# "electrical_bus" fell through to LINE_PROCESS — so instrument SIGNAL wiring (e.g. every
+# sensor -> SCADA edge) rendered as a solid navy fluid pipe with a flow arrowhead,
+# identical in weight to a real process line. A cluster of those converging on one
+# controller reads as one big fat pipe when it is actually N thin signal wires.
+_NON_PROCESS_MECH = {"electrical_bus", "signal", "power", "control", "data_link",
+                     "control_signal", "data"}
+
+
 def _line_style(mechanism: str, phase: str) -> str:
     if mechanism == "thermal" or (phase or "").lower() in ("steam", "condensate"):
         return LINE_THERMAL
-    if mechanism == "electrical_bus":
+    if (mechanism or "").lower() in _NON_PROCESS_MECH:
         return LINE_UTILITY
     return LINE_PROCESS
 
@@ -1623,10 +1683,10 @@ def reconstruct_process(schedule: dict, state: dict,
         dn = ""
         detail = ""
         if row:
-            dn = str(row.get("size") or "").strip()
+            dn = _canon_dn(str(row.get("size") or ""))
             detail = str(row.get("drop") or "").strip()
         if not dn and spec:
-            dn = str(spec.get("size_label") or "").strip()
+            dn = _canon_dn(str(spec.get("size_label") or ""))
         if not dn:
             dn = _dn_from_context(mc)
         if not dn:
@@ -2065,6 +2125,21 @@ def _sym_valve(svg, cx, cy, kind="manual"):
     return s
 
 
+# Extra clearance (px, added to the tag's normal -7/-8 offset) each valve KIND needs so
+# the line-number text sits clear above the glyph's own highest feature — the bowtie body
+# alone reaches to (cy - 8); a control valve's diaphragm actuator reaches further still.
+# Generic (keyed on the valve's drawn kind, never a class name).
+_VALVE_LIFT = {"manual": 4, "relief": 11, "esd": 15, "failopen": 15, "control": 18}
+
+
+def _valve_lift(valves) -> int:
+    """How far above its normal position the line-number tag must lift to clear the
+    tallest in-line valve glyph on this run (0 when the line carries no valve)."""
+    if not valves:
+        return 0
+    return max(_VALVE_LIFT.get(v.kind, 4) for v in valves)
+
+
 # ---- main layout -------------------------------------------------------------
 
 def _wrap(label: str, maxlen=18):
@@ -2378,7 +2453,7 @@ def build_pid_svg(proc: Process) -> str:
                   LINE_UTILITY: UTIL_INK}[ln.style]
         dash = {LINE_PROCESS: None, LINE_THERMAL: "7,4", LINE_UTILITY: "3,3"}[ln.style]
         marker = "flowT" if ln.style == LINE_THERMAL else "flow"
-        lw = 2.4 if ln.style == LINE_PROCESS else 1.9
+        lw = _pipe_lw(ln.dn, ln.style)
         in_off = _face_offset(in_idx.get(id(ln), (0, 1)), 56) if fwd else 0.0
         out_off = _face_offset(out_idx.get(id(ln), (0, 1)), 52) if fwd else 0.0
         # when the source fans out (>1 outlet) the tags share an x; keep them terse
@@ -2735,7 +2810,17 @@ def _draw_pipe(svg, pf, pt, fx, fy, tx, ty, forward, stroke, lw, dash, marker, l
         pts += [(x1, y1)]
         _polyline(svg, pts, stroke, lw, dash, marker)
         run_end = xm if xm != x0 else x1
-        _line_tag(svg, ln, (x0 + run_end) / 2, y0, stroke, terse=terse)
+        # An in-line valve glyph is drawn (by _decorate_line, below) at this SAME
+        # midpoint x, on the line — its actuator stem/dome (or spring/solenoid box)
+        # reaches back up into the exact spot the tag's number + service-hint text used,
+        # so the two collided (e.g. "224-PR" / "Instrument signal cab…" rendering
+        # straight through the control-valve symbol on every instrument-tap branch).
+        # Lift the number clear of the glyph's real height and drop the service hint —
+        # there is rarely room for a second text line beside a valve without it landing
+        # back on the symbol, especially on the short taps where this showed up worst.
+        v_lift = _valve_lift(ln.valves)
+        _line_tag(svg, ln, (x0 + run_end) / 2, y0, stroke,
+                  terse=(terse or bool(ln.valves)), lift=v_lift)
         _decorate_line(svg, ln, x0, y0, run_end, y0, stroke)
     else:
         # recycle / return: leave 'top', go UP above the equipment row, across, down into
@@ -2750,7 +2835,9 @@ def _draw_pipe(svg, pf, pt, fx, fy, tx, ty, forward, stroke, lw, dash, marker, l
         pts = [(x0, y0), (x0, up), (x1, up), (x1, y1)]
         _polyline(svg, pts, stroke, lw, dash, marker)
         mid_x = (x0 + x1) / 2
-        _line_tag(svg, ln, mid_x, up, stroke, above=True)
+        v_lift = _valve_lift(ln.valves)
+        _line_tag(svg, ln, mid_x, up, stroke, above=True, terse=bool(ln.valves),
+                  lift=v_lift)
         # For inferred recirc-return legs draw a bold "RECIRC RETURN" banner above the
         # line number so the return loop is visually unmistakable.
         if ln.detail == "RECIRC RETURN":
@@ -2767,11 +2854,13 @@ def _polyline(svg, pts, stroke, lw, dash, marker):
             f'marker-end="url(#{marker})"{da}/>')
 
 
-def _line_tag(svg, ln, x, y, stroke, above=False, terse=False):
+def _line_tag(svg, ln, x, y, stroke, above=False, terse=False, lift=0):
     """The line number (primary) + a SHORT service hint, on a small leader above the pipe.
     The full service description lives in the line schedule; here we keep it terse so
-    converging-inlet tags stay legible.  terse=True (source fans out) drops the hint."""
-    dy = -8 if above else -7
+    converging-inlet tags stay legible.  terse=True (source fans out, or an in-line valve
+    occupies this same spot) drops the hint. lift raises the tag clear of an in-line
+    valve glyph's own height (see _valve_lift) so the number never draws through it."""
+    dy = (-8 if above else -7) - lift
     svg.text(x, y + dy, ln.number, size=8.3, anchor="middle", weight="bold", fill=stroke,
              mono=True)
     if ln.service and not terse:
