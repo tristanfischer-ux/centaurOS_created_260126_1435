@@ -12520,6 +12520,106 @@ print(json.dumps({"lv": r_lv, "dc": r_dc}))
     ))
   }
 
+  // ── UNIVERSAL.applypatches_rejects_locked_modifier_add_or_change_on_existing_word ──
+  // Guards the 2026-07-08 B3 determinism fix (the one-cycle cold-vs-replay
+  // residual): the 2026-07-07 guard above only stops Phase 2 from inventing a
+  // brand-NEW word carrying a locked kind. It did nothing to stop Phase 2 from
+  // mutating an EXISTING word's modifiers — and the emitter-identity-lock.ts
+  // absorption layer only restores words that were ALREADY pinned (≥1 locked
+  // modifier) before the mutation, so a word with ZERO locked modifiers
+  // pre-repair (a thin/prose word) was invisible to it. Confirmed on a cold
+  // aquaculture_ras twin pair: `maintenance_serviceability__access_panel_
+  // completion_word` gained material="Stainless Steel 316L" +
+  // rating_primary="IP66" + regulatory="BS EN 60529" on one run and not the
+  // other via the repair prompt's own documented "BULK pattern"
+  // (`sub_modules[N].words[+]` with a matching existing id, merged in the
+  // word-enrichment branch). universal-repair.ts now runs every existing-word
+  // modifier write (merge branch, direct modifier_characters append, indexed
+  // modifier edit/delete, whole-word replace, whole-array field replace)
+  // through `reconcileLockedModifiers()`, which rejects (a) a locked-kind
+  // ADD (word did not carry that kind before) and (b) a locked-kind CHANGE
+  // (word carries the kind with a different value) — while still allowing a
+  // prose-only / non-locked enrichment patch on the SAME existing word to
+  // apply normally.
+  {
+    const mkModulesWithWord = () => ([{
+      module: 'm',
+      sub_modules: [{
+        id: 'sm',
+        words: [{
+          id: 'access_panel_completion_word',
+          name_human: 'Access panel completion',
+          modifier_characters: [] as { kind: string; value: string }[],
+        }],
+      }],
+    }])
+
+    // (a) ADD attempt — word had zero locked modifiers; patch tries to pin
+    // material + rating_primary + regulatory via the documented bulk merge shape.
+    const addAttempt = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: {
+        id: 'access_panel_completion_word',
+        modifier_characters: [
+          { kind: 'material', value: 'Stainless Steel 316L' },
+          { kind: 'rating_primary', value: 'IP66' },
+          { kind: 'regulatory', value: 'BS EN 60529' },
+        ],
+      },
+      reason: 'merge 3 modifiers into existing word',
+    }]
+    const addModules = mkModulesWithWord()
+    const rAdd = applyPatches(addModules as never, [] as never, addAttempt as never)
+    const addWord = addModules[0].sub_modules[0].words[0] as any
+    const addRejected = !addWord.modifier_characters.some((mc: any) => mc.kind === 'material' || mc.kind === 'rating_primary' || mc.kind === 'regulatory')
+    const addLogged = rAdd.reasons.some(r => r.startsWith('[locked-identity] REJECT') && r.includes('material'))
+
+    // (b) CHANGE attempt — word already carries a locked kind; patch tries to
+    // overwrite its value.
+    const changeModules = ([{
+      module: 'm',
+      sub_modules: [{
+        id: 'sm',
+        words: [{
+          id: 'jacketed_vessel_word',
+          name_human: 'Jacketed vessel',
+          modifier_characters: [{ kind: 'material', value: 'Stainless Steel 304' }],
+        }],
+      }],
+    }])
+    const changeAttempt = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: { id: 'jacketed_vessel_word', modifier_characters: [{ kind: 'material', value: 'Stainless Steel 316L' }] },
+      reason: 'merge corrected material',
+    }]
+    const rChange = applyPatches(changeModules as never, [] as never, changeAttempt as never)
+    const changeWord = changeModules[0].sub_modules[0].words[0] as any
+    const changeRejected = changeWord.modifier_characters.filter((mc: any) => mc.kind === 'material').length === 1
+      && changeWord.modifier_characters.find((mc: any) => mc.kind === 'material').value === 'Stainless Steel 304'
+    const changeLogged = rChange.reasons.some(r => r.startsWith('[locked-identity] REJECT') && r.includes('material'))
+
+    // proveNoFalsePositive — a genuine prose-only enrichment patch on the SAME
+    // existing word (no locked-kind modifier at all) must still apply.
+    const proseModules = mkModulesWithWord()
+    const proseAttempt = [{
+      module: 'm', path: 'sub_modules[0].words[+]',
+      new_value: { id: 'access_panel_completion_word', modifier_characters: [{ kind: 'description', value: 'Torque-checked during commissioning.' }] },
+      reason: 'prose enrichment',
+    }]
+    const rProse = applyPatches(proseModules as never, [] as never, proseAttempt as never)
+    const proseWord = proseModules[0].sub_modules[0].words[0] as any
+    const proseApplied = rProse.applied === 1 && proseWord.modifier_characters.some((mc: any) => mc.value === 'Torque-checked during commissioning.')
+
+    const ok = addRejected && addLogged && changeRejected && changeLogged && proseApplied
+    out.push(assertEq(
+      'UNIVERSAL.applypatches_rejects_locked_modifier_add_or_change_on_existing_word',
+      'applyPatches REJECTS a repair patch that ADDS a new locked-kind modifier (material/rating_primary/regulatory) to an EXISTING word that did not carry it, and REJECTS a patch that CHANGES an existing locked-kind modifier\'s value — both advisory-logged as "[locked-identity] REJECT", never silently dropped — while a genuine prose-only patch on the same existing word still applies. Guards the 2026-07-08 B3 one-cycle determinism fix (access_panel_completion_word twin-pair leak via the repair prompt\'s own documented bulk-merge shape).',
+      ok,
+      (v: boolean) => v === true,
+      () => `addRejected=${addRejected} addLogged=${addLogged} changeRejected=${changeRejected} changeLogged=${changeLogged} proseApplied=${proseApplied}`,
+    ))
+  }
+
   return out
 }
 

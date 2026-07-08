@@ -101,6 +101,96 @@ export function dedupAllModifiers(modules: ModuleSpec[]): { components_cleaned: 
   return { components_cleaned: componentsCleaned, modifiers_collapsed: modifiersCollapsed }
 }
 
+/**
+ * reconcileLockedModifiers — the B3 guard: the deterministic-emitter is the
+ * SOLE owner of EMITTER_LOCKED_KINDS identity/spec modifiers (part_number /
+ * manufacturer / capacity / dimension / form / material / regulatory /
+ * rating_primary / rating_secondary / quantity — the isLockedKind() set
+ * shared with emitter-identity-lock.ts and the new-word guard below).
+ *
+ * The NEW-WORD IDENTITY-LOCK GUARD (further down this file) only stops Phase 2
+ * from inventing a brand-new WORD that carries a locked kind. It does nothing
+ * to stop Phase 2 from mutating an EXISTING word's modifiers — and the
+ * emitter-identity-lock.ts absorption layer (snapshotEmitterIdentity /
+ * reassertEmitterIdentity) only restores words that were ALREADY pinned
+ * (≥1 locked modifier) before the mutation ran. A word with ZERO locked
+ * modifiers pre-repair (a thin/prose word) is invisible to that snapshot, so
+ * Phase 2 enriching it with a freshly-invented material/rating/regulatory
+ * value sailed straight through on every prior guard. Root cause of the
+ * one-cycle cold-vs-replay determinism residual (2026-07-08): a non-cached,
+ * non-seeded repair() call enriched `access_panel_completion_word` with
+ * material="Stainless Steel 316L" + rating_primary="IP66" +
+ * regulatory="BS EN 60529" on one run and not the other.
+ *
+ * This function is the single reconciliation used at EVERY existing-word
+ * modifier write site in applyPatches (word-enrichment merge, raw
+ * modifier_characters append, indexed modifier edit/delete, whole-word
+ * object replace). Given a word's CURRENT locked modifiers and a candidate
+ * set of INCOMING modifiers, it partitions the incoming set into:
+ *   - allowed: non-locked modifiers (always OK — prose/notes enrichment),
+ *     plus any locked modifier whose (kind,value) already matches the
+ *     existing one (harmless idempotent re-assertion).
+ *   - rejected: a locked-kind modifier that is either (a) a kind the word
+ *     did not already carry — Phase 2 may not INVENT a new locked identity
+ *     — or (b) a kind the word already carries with a DIFFERENT value —
+ *     Phase 2 may not OVERWRITE an emitter-pinned identity value.
+ *
+ * The caller MUST NOT silently drop `rejected` — log it into `reasons[]` so
+ * the signal (what the repair LLM would have set) survives in actions.jsonl,
+ * per the advisory-not-silent requirement.
+ *
+ * Pure, no I/O, keyed generically on EMITTER_LOCKED_KINDS — never a class name.
+ */
+export interface LockedModifierRejection {
+  kind: string
+  attemptedValue: string
+  existingValue?: string   // present only for a 'change' rejection
+  reasonKind: 'add' | 'change'
+}
+
+export function reconcileLockedModifiers(
+  existingMods: Array<{ kind?: unknown; value?: unknown }> | null | undefined,
+  incomingMods: Array<{ kind?: unknown; value?: unknown }> | null | undefined,
+): { allowed: Array<{ kind?: unknown; value?: unknown }>; rejected: LockedModifierRejection[] } {
+  const existingLockedByKind = new Map<string, string>() // normKind -> normalised existing value
+  for (const mc of existingMods ?? []) {
+    if (!isLockedKind(mc?.kind)) continue
+    const k = normaliseKind(String(mc?.kind ?? ''))
+    existingLockedByKind.set(k, normaliseModifierValue(String(mc?.value ?? '')))
+  }
+  const allowed: Array<{ kind?: unknown; value?: unknown }> = []
+  const rejected: LockedModifierRejection[] = []
+  for (const mc of incomingMods ?? []) {
+    if (!isLockedKind(mc?.kind)) { allowed.push(mc); continue }
+    const k = normaliseKind(String(mc?.kind ?? ''))
+    const incomingVal = normaliseModifierValue(String(mc?.value ?? ''))
+    const existingVal = existingLockedByKind.get(k)
+    if (existingVal === undefined) {
+      rejected.push({ kind: String(mc?.kind ?? ''), attemptedValue: String(mc?.value ?? ''), reasonKind: 'add' })
+      continue
+    }
+    if (existingVal !== incomingVal) {
+      rejected.push({ kind: String(mc?.kind ?? ''), attemptedValue: String(mc?.value ?? ''), existingValue: existingVal, reasonKind: 'change' })
+      continue
+    }
+    allowed.push(mc) // same kind, same normalised value — harmless no-op
+  }
+  return { allowed, rejected }
+}
+
+/** Formats a `reconcileLockedModifiers` rejection list into one reasons[] line
+ *  per rejection, for the advisory (never-silent) log. */
+function formatLockedRejections(pathStr: string, wordId: string, rejected: LockedModifierRejection[], patchReason: string): string[] {
+  return rejected.map((r) =>
+    `[locked-identity] REJECT ${pathStr} word=${wordId}: Phase 2 attempted to ${r.reasonKind === 'add' ? 'ADD a new' : 'CHANGE the'} ` +
+    `locked-kind modifier kind="${r.kind}" value="${r.attemptedValue}"` +
+    (r.reasonKind === 'change'
+      ? ` (existing emitter value="${r.existingValue}" retained)`
+      : ` (word was not emitter-pinned for this kind — the deterministic-emitter never asserted it)`) +
+    ` — EMITTER_LOCKED_KINDS identity/spec modifiers are deterministic-emitter-owned; Phase 2 may enrich prose/non-locked fields only. (${patchReason})`
+  )
+}
+
 const FLASH_LITE = 'google/gemini-3.1-flash-lite'
 
 export interface RepairPatch {
@@ -722,19 +812,57 @@ export function applyPatches(
           // cosmetic dupes (× vs x, "IP65" vs "IP65 protection") collapse at
           // write time. Run dedupWordModifiers at the end to clean any
           // pre-existing dupes on the existing word too.
+          //
+          // LOCKED-IDENTITY GUARD (B3, 2026-07-08 determinism fix): before
+          // merging, run every incoming modifier through
+          // reconcileLockedModifiers() — this is THE confirmed leak site (the
+          // SYSTEM prompt's own "BULK pattern" for word_modifier_richness
+          // instructs the repair LLM to emit exactly this shape). Locked-kind
+          // adds/changes are rejected (advisory-logged, never silently
+          // dropped); everything else (prose/non-locked enrichment, or a
+          // locked value that merely re-asserts what's already there) merges
+          // as before.
           const existingMods: any[] = Array.isArray(existing.modifier_characters) ? existing.modifier_characters : (existing.modifier_characters = [])
+          const incomingMods: any[] = Array.isArray(newVal.modifier_characters) ? newVal.modifier_characters : []
+          const { allowed, rejected } = reconcileLockedModifiers(existingMods, incomingMods)
           const seen = new Set(existingMods.map((mc: any) => `${normaliseKind(String(mc?.kind ?? ''))}::${normaliseModifierValue(String(mc?.value ?? ''))}`))
           let added = 0
-          for (const mc of (newVal.modifier_characters ?? [])) {
+          for (const mc of allowed) {
             const key = `${normaliseKind(String(mc?.kind ?? ''))}::${normaliseModifierValue(String(mc?.value ?? ''))}`
             if (!seen.has(key)) { existingMods.push(mc); seen.add(key); added++ }
           }
           const { collapsed } = dedupWordModifiers(existing)
           applied++
-          reasons.push(`~merge-into-existing-word ${p.module}.${p.path} (+${added} modifiers, ${collapsed} cosmetic dupes collapsed; ${p.reason})`)
+          if (rejected.length > 0) {
+            reasons.push(...formatLockedRejections(`${p.module}.${p.path}`, String(newVal.id ?? 'unknown'), rejected, p.reason))
+          }
+          reasons.push(`~merge-into-existing-word ${p.module}.${p.path} (+${added} modifiers, ${collapsed} cosmetic dupes collapsed, ${rejected.length} locked-kind rejected; ${p.reason})`)
           continue
         }
       }
+      // ── DIRECT MODIFIER-APPEND LOCKED GUARD (B3, 2026-07-08) ───────────────
+      // A patch can append straight into an EXISTING word's modifier_characters
+      // array without going through the `.words[+]` merge branch above — e.g.
+      // path `sub_modules[2].words[5].modifier_characters[+]`. That shape has
+      // no `.words[+]` in its path, so `isWordEnrichment` is false and this
+      // append would otherwise fall straight through to the raw `cursor.push`
+      // below with ZERO locked-kind check. Any append whose immediate parent
+      // container is `modifier_characters` is reconciled the same way as the
+      // merge branch: locked-kind adds/changes rejected + advisory-logged,
+      // everything else (or a re-asserted matching locked value) allowed.
+      const appendParentKey = tokens.length >= 2 ? tokens[tokens.length - 2].key : ''
+      if (!isWordEnrichment && appendParentKey === 'modifier_characters') {
+        const incoming: any[] = Array.isArray(p.new_value) ? p.new_value : [p.new_value]
+        const { allowed, rejected } = reconcileLockedModifiers(cursor as any[], incoming)
+        if (rejected.length > 0) {
+          skipped += rejected.length
+          reasons.push(...formatLockedRejections(`${p.module}.${p.path}`, 'unknown', rejected, p.reason))
+        }
+        for (const mc of allowed) { (cursor as any[]).push(mc); applied++ }
+        if (allowed.length > 0) reasons.push(`+${p.module}.${p.path} (${allowed.length} modifier(s) appended, ${rejected.length} locked-kind rejected; ${p.reason})`)
+        continue
+      }
+      // ── END DIRECT MODIFIER-APPEND LOCKED GUARD ────────────────────────────
       // ── NEW-WORD IDENTITY-LOCK GUARD (2026-05-26 architectural invariant;
       //    WIDENED 2026-07-07 determinism audit) ──────────────────────────────
       // Phase 2 LLM may NEVER add a genuinely new word_id that carries ANY
@@ -825,6 +953,26 @@ export function applyPatches(
     } else if (last.isIndex) {
       const idx = parseInt(last.key, 10)
       if (!Array.isArray(cursor) || idx >= cursor.length) { skipped++; reasons.push(`skip set-idx-out-of-range: ${p.module}.${p.path}`); continue }
+      // LOCKED-IDENTITY GUARD (B3, 2026-07-08): a patch that replaces or
+      // deletes an EXISTING modifier_characters[K] entry whose kind is
+      // locked is an attempted overwrite/removal of a deterministic-emitter-
+      // owned value (e.g. path "...words[5].modifier_characters[3]" with a
+      // whole new modifier object, or new_value=null to delete it). Reject
+      // the whole patch (advisory-logged) rather than partially applying —
+      // this is a structural edit, not a mergeable add.
+      const idxParentKey = tokens.length >= 2 ? tokens[tokens.length - 2].key : ''
+      if (idxParentKey === 'modifier_characters') {
+        const existingModAtIdx: any = cursor[idx]
+        if (existingModAtIdx && isLockedKind(existingModAtIdx?.kind)) {
+          skipped++
+          reasons.push(
+            `[locked-identity] REJECT ${p.module}.${p.path}: patch targets an existing locked-kind modifier ` +
+            `(kind="${existingModAtIdx.kind}" value="${existingModAtIdx.value}") at index ${idx} — Phase 2 may not ` +
+            `overwrite or delete a deterministic-emitter-owned identity/spec modifier. (${p.reason})`
+          )
+          continue
+        }
+      }
       if (p.new_value === null || p.new_value === undefined) {
         cursor.splice(idx, 1)
         reasons.push(`-${p.module}.${p.path} (${p.reason})`)
@@ -845,6 +993,21 @@ export function applyPatches(
         if (parentIsContainer && newIsObject && existingIsObject) {
           // Merge: preserve existing keys absent from new_value
           const merged: any = { ...existingItem, ...(p.new_value as any) }
+          // LOCKED-IDENTITY GUARD (B3, 2026-07-08): a whole-object replace
+          // (e.g. "sub_modules[N].words[M]" with a full new object) can
+          // smuggle a REBUILT modifier_characters array whose locked-kind
+          // entries were added/changed relative to the existing word — the
+          // plain spread above would let it through untouched. Reconcile the
+          // incoming array against the existing one; if ANY locked-kind
+          // add/change is detected, keep the EXISTING array verbatim
+          // (advisory-logged) rather than silently accept the replacement.
+          if (Array.isArray(existingItem.modifier_characters) && Array.isArray((p.new_value as any).modifier_characters)) {
+            const { rejected } = reconcileLockedModifiers(existingItem.modifier_characters, (p.new_value as any).modifier_characters)
+            if (rejected.length > 0) {
+              merged.modifier_characters = existingItem.modifier_characters
+              reasons.push(...formatLockedRejections(`${p.module}.${p.path}`, String(existingItem.id ?? existingItem.word_id ?? 'unknown'), rejected, p.reason))
+            }
+          }
           // Critical: never let a merge ZERO an array field that was previously populated.
           // If the merged result has a non-array where the existing had an array, restore.
           for (const arrKey of ['words', 'grammar_links', 'modifier_characters', 'sub_modules']) {
@@ -861,6 +1024,37 @@ export function applyPatches(
       }
       applied++
     } else {
+      // LOCKED-IDENTITY GUARD (B3, 2026-07-08), sub-case 1: a patch writing
+      // directly to an EXISTING word/sub_module's `.modifier_characters`
+      // field as a whole (path ends in "...words[N].modifier_characters",
+      // not an append/index) can replace the entire array in one shot,
+      // bypassing every append/index guard above. Reconcile the same way as
+      // the whole-object replace: if the new array conflicts with an
+      // existing locked value/kind, keep the EXISTING array (advisory-logged).
+      if (last.key === 'modifier_characters' && Array.isArray(cursor?.modifier_characters)) {
+        const incomingArr: any[] = Array.isArray(p.new_value) ? p.new_value : (p.new_value != null ? [p.new_value] : [])
+        const { rejected } = reconcileLockedModifiers(cursor.modifier_characters, incomingArr)
+        if (rejected.length > 0) {
+          reasons.push(...formatLockedRejections(`${p.module}.${p.path}`, String(cursor?.id ?? cursor?.word_id ?? 'unknown'), rejected, p.reason))
+          skipped++
+          continue
+        }
+      }
+      // LOCKED-IDENTITY GUARD, sub-case 2: a patch writing to a SUB-FIELD of
+      // an existing modifier object (e.g. "...modifier_characters[3].value"
+      // or "...modifier_characters[3].kind") — here `cursor` (after the walk)
+      // IS the modifier object itself. If its CURRENT kind is locked, reject
+      // any field write into it outright (there is no legitimate Phase 2
+      // edit to an emitter-owned modifier's internals).
+      if (cursor && typeof cursor === 'object' && !Array.isArray(cursor) && 'kind' in cursor && 'value' in cursor && isLockedKind((cursor as any).kind)) {
+        skipped++
+        reasons.push(
+          `[locked-identity] REJECT ${p.module}.${p.path}: patch writes to field "${last.key}" of an existing ` +
+          `locked-kind modifier (kind="${(cursor as any).kind}" value="${(cursor as any).value}") — Phase 2 may not ` +
+          `mutate a deterministic-emitter-owned identity/spec modifier. (${p.reason})`
+        )
+        continue
+      }
       // Defensive: when the patch writes to a known array-shaped field
       // (modifier_characters, words, grammar_links, sub_modules), the repair
       // LLM occasionally emits a single object where an array is required.
