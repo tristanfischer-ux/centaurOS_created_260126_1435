@@ -64,6 +64,8 @@ Run the guard:  python3 scripts/blender-universal/deterministic_layout.py --self
 """
 from __future__ import annotations
 
+import re
+
 GRID_MM = 100          # all coordinates snap to this integer grid → no sub-grid float residue
 
 # A "small standard item" (instrument/junction/small device) is consolidated into a cabinet rather
@@ -159,6 +161,201 @@ HEAVY_MASS_KG = 1000.0
 
 def _clearance(w: float, d: float) -> int:
     return int(min(CLEAR_MAX_MM, max(CLEAR_MIN_MM, min(w, d) * CLEAR_FRAC)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FUNCTION-SEGREGATED PLANT ROOMS (RULE 6 — Sam Green SME review of the real
+# Codema Fischer Farms WTR layout, 2026-07-08): "the real system partitions
+# electrical/control into a walled Elec Plant Rm and mechanical/wet-process
+# into a walled Mech Plant Rm — separate ROOMS, not loose adjacency zones on
+# one open floor." This module already zone-orders same-role parts contiguous
+# (_zone_rank, above) and the caller (build_universal_scene.py's periphery-hug)
+# already spatially GROUPS electrical/control away from the process train for
+# a process-plant archetype — but neither ever drew a wall. compute_function_
+# rooms() is the pure geometry step that turns "these two groups already sit
+# apart" into an actual walled-room pair the GA can draw.
+#
+# UNIVERSAL / keyed on GENERIC signals, never a class/product name: cabinet /
+# cabinet_small / transformer_box are UNAMBIGUOUS electrical enclosures regardless
+# of module; tank/vessel/pump/skid is the wet-process/rotating family. A plain
+# "instrument" or "box" shape needs its MODULE to disambiguate: build_universal_
+# scene.py's classify_shape tags EVERY part in safety_protection / sensing_
+# instrumentation shape="instrument" purely by MODULE MEMBERSHIP, regardless of
+# whether it's actually an electrical device — a real plant's safety_protection
+# module routinely holds FIELD-MOUNTED mechanical kit (an ATEX extract fan, an
+# inlet louvre, ductwork, a nitrogen-blanketing skid) that a real GA would never
+# wall into the Elec Plant Rm (found on the real CO2-mineralisation archetype,
+# 2026-07-08 — the broad module regex pulled fans/louvres/ductwork into the
+# "electrical" group and the resulting bbox no longer separated from wet-process
+# at all, suppressing the room split entirely). So only the genuinely CENTRALISED
+# electrical/control-room modules count for the ambiguous shapes: power
+# distribution, energy storage/distribution gear, and the control/SCADA room
+# (control_compute_communication) — safety_protection / sensing_instrumentation
+# are deliberately excluded here (their field devices stay field-located, exactly
+# as a real plant leaves them).
+_ELEC_ENCLOSURE_SHAPES = {"cabinet", "cabinet_small", "transformer_box"}
+_WET_ROOM_SHAPES = _VESSEL_ZONE_SHAPES | _MACHINE_ZONE_SHAPES | {"skid_box"}
+_ELEC_ROOM_MODULE_RE = re.compile(
+    r"electrical|power[_ ]?distribution|energy[_ ]?storage[_ ]?source|"
+    r"control[_ ]?(?:compute|communication)", re.I)
+
+ROOM_WALL_CLEAR_MM = 900   # walk-round clearance from a room's OWN equipment to its wall
+ROOM_DOOR_MM = 1000        # a standard single-leaf access door width
+
+
+def _room_group(shape: str | None, module: str | None) -> str | None:
+    """Generic function-family classifier: 'electrical' | 'wet' | None (neither
+    family — this part does not force a room split)."""
+    sh = shape or ""
+    if sh in _ELEC_ENCLOSURE_SHAPES:
+        return "electrical"
+    if sh in _WET_ROOM_SHAPES:
+        return "wet"
+    if sh in ("instrument", "box") and _ELEC_ROOM_MODULE_RE.search(module or ""):
+        return "electrical"
+    return None
+
+
+def _bbox_of(rows: list[dict]) -> tuple[float, float, float, float]:
+    """Plain (x0,y0,x1,y1) bbox over a list of {x0,y0,x1,y1} rects — shared by
+    compute_function_rooms and its _selftest proveCatch checks."""
+    return (min(r["x0"] for r in rows), min(r["y0"] for r in rows),
+            max(r["x1"] for r in rows), max(r["y1"] for r in rows))
+
+
+def _iqr_core(rows: list[dict]) -> list[dict]:
+    """Drop axis-outliers from a function-group's rects using the standard Tukey
+    1.5×IQR fence over each item's CENTRE (independently on X and Y), so the
+    room's WALL is sized to the coherent MAJORITY of its group and a small
+    number of genuinely dispersed items (e.g. a field-mounted local E-stop
+    installed beside the specific equipment it protects, rather than
+    centralised with the rest of its module — a real, legitimate placement, not
+    a defect) don't blow the room's bbox out to overlap the other group. Those
+    outliers are NOT dropped from the design — they simply render at their real
+    position, outside the wall, exactly as a genuinely field-mounted device
+    would on a real GA. No-op below 4 items (too few for a reliable quartile
+    split — the whole group is its own bbox)."""
+    if len(rows) < 4:
+        return rows
+
+    def _fence(vals):
+        s = sorted(vals)
+        n = len(s)
+        q1 = s[(n - 1) // 4]
+        q3 = s[(3 * (n - 1)) // 4]
+        iqr = q3 - q1
+        return q1 - 1.5 * iqr, q3 + 1.5 * iqr
+
+    cxs = [(r["x0"] + r["x1"]) / 2.0 for r in rows]
+    cys = [(r["y0"] + r["y1"]) / 2.0 for r in rows]
+    xlo, xhi = _fence(cxs)
+    ylo, yhi = _fence(cys)
+    core = [r for r, cx, cy in zip(rows, cxs, cys) if xlo <= cx <= xhi and ylo <= cy <= yhi]
+    return core if core else rows
+
+
+def _door_span(a0: float, a1: float, b0: float, b1: float, width: float) -> tuple[float, float]:
+    """Centre a `width`-wide door gap in the overlap of ranges (a0,a1) and (b0,b1)
+    (both already sorted lo<hi); falls back to the centre of (a0,a1) alone when the
+    two ranges don't overlap by at least `width`."""
+    lo, hi = max(a0, b0), min(a1, b1)
+    if hi - lo < width:
+        lo, hi = a0, a1
+    c = (lo + hi) / 2.0
+    if hi - lo >= width:
+        c = min(max(c, lo + width / 2.0), hi - width / 2.0)
+    return c - width / 2.0, c + width / 2.0
+
+
+def compute_function_rooms(rows: list[dict]) -> list[dict]:
+    """rows: [{x0,y0,x1,y1,shape,module}] — FINAL placed plan-view footprints
+    (mm) of every DRAWN part, for ANY archetype. Pure geometry; no re-packing,
+    no ordering dependence.
+
+    Returns [] (no partition — proveNoFalsePositive) unless BOTH an
+    ELECTRICAL/CONTROL group and a WET-PROCESS/rotating group are present among
+    the placed parts: a homogeneous / containerised archetype (only one family,
+    or neither) gets ONE open space, never a phantom wall.
+
+    When both are present AND their bounding boxes are separated on at least one
+    axis (the normal case — the packer already zone-groups electrical/control
+    away from the process train), returns exactly 2 room dicts:
+      {"name", "x0","y0","x1","y1" (wall line, mm), "door":{"x0","y0","x1","y1"}}
+    Each room's wall on the side FACING the other room sits on the MIDLINE of the
+    real gap between the two groups (so the two walls can never overlap by
+    construction); the other 3 sides are inflated ROOM_WALL_CLEAR_MM beyond that
+    group's own equipment for a walk-round aisle. The door is a ROOM_DOOR_MM gap
+    centred in the shared wall — each room's own access door onto the corridor
+    between them.
+
+    If the two groups' CORE clusters are not even approximately separated on
+    either axis (an upstream placement that never zone-split them at all — well
+    beyond ROOM_ADJACENCY_TOLERANCE_MM of overlap) no safe wall can be drawn
+    without slicing through equipment, so this returns [] rather than a garbled
+    overlap."""
+    elec = [r for r in rows if _room_group(r.get("shape"), r.get("module")) == "electrical"]
+    wet = [r for r in rows if _room_group(r.get("shape"), r.get("module")) == "wet"]
+    if not elec or not wet:
+        return []
+
+    ex0, ey0, ex1, ey1 = _bbox_of(_iqr_core(elec))
+    wx0, wy0, wx1, wy1 = _bbox_of(_iqr_core(wet))
+    gap_y = max(ey0 - wy1, wy0 - ey1)   # positive ⇒ separated along Y
+    gap_x = max(ex0 - wx1, wx0 - ex1)   # positive ⇒ separated along X
+    # ROOM_ADJACENCY_TOLERANCE_MM: real placements are rarely a clean gap — a couple
+    # of each group's own border items commonly sit close enough that their footprint
+    # RANGES overlap by a small band even though the two clusters are clearly on
+    # opposite sides of a natural line (found on the real Codema render: a fertigation
+    # dosing pump's top edge and the electrical bus incomer's bottom edge overlapped by
+    # 465 mm out of a ~15 m cluster depth). Tolerate up to this much before declining —
+    # a border item may then sit a little proud of the wall line (an inevitable, minor
+    # simplification of a schematic partition), never a request to slice deep into a
+    # cluster that was genuinely never zone-split (proveNoFalsePositive #17 above stays
+    # well beyond this tolerance on both axes).
+    ROOM_ADJACENCY_TOLERANCE_MM = 1500.0
+    if max(gap_y, gap_x) <= -ROOM_ADJACENCY_TOLERANCE_MM:
+        return []
+
+    m = ROOM_WALL_CLEAR_MM
+    if gap_y >= gap_x:
+        # direction by CENTROID (not the raw edge test) so a small tolerated overlap
+        # band still resolves to the correct north/south side.
+        if (ey0 + ey1) >= (wy0 + wy1):     # elec room is NORTH of the wet room
+            mid = (ey0 + wy1) / 2.0
+            e_y0, e_y1 = mid, ey1 + m
+            w_y0, w_y1 = wy0 - m, mid
+        else:                              # wet room is NORTH of the elec room
+            mid = (wy0 + ey1) / 2.0
+            w_y0, w_y1 = mid, wy1 + m
+            e_y0, e_y1 = ey0 - m, mid
+        e_x0, e_x1 = ex0 - m, ex1 + m
+        w_x0, w_x1 = wx0 - m, wx1 + m
+        d0, d1 = _door_span(ex0, ex1, wx0, wx1, ROOM_DOOR_MM)
+        rooms = [
+            {"name": "Elec Plant Rm", "x0": e_x0, "y0": e_y0, "x1": e_x1, "y1": e_y1,
+             "door": {"x0": d0, "y0": mid, "x1": d1, "y1": mid}},
+            {"name": "Mech Plant Rm", "x0": w_x0, "y0": w_y0, "x1": w_x1, "y1": w_y1,
+             "door": {"x0": d0, "y0": mid, "x1": d1, "y1": mid}},
+        ]
+    else:
+        if (ex0 + ex1) >= (wx0 + wx1):      # elec room is EAST of the wet room
+            mid = (ex0 + wx1) / 2.0
+            e_x0, e_x1 = mid, ex1 + m
+            w_x0, w_x1 = wx0 - m, mid
+        else:                               # wet room is EAST of the elec room
+            mid = (wx0 + ex1) / 2.0
+            w_x0, w_x1 = mid, wx1 + m
+            e_x0, e_x1 = ex0 - m, mid
+        e_y0, e_y1 = ey0 - m, ey1 + m
+        w_y0, w_y1 = wy0 - m, wy1 + m
+        d0, d1 = _door_span(ey0, ey1, wy0, wy1, ROOM_DOOR_MM)
+        rooms = [
+            {"name": "Elec Plant Rm", "x0": e_x0, "y0": e_y0, "x1": e_x1, "y1": e_y1,
+             "door": {"x0": mid, "y0": d0, "x1": mid, "y1": d1}},
+            {"name": "Mech Plant Rm", "x0": w_x0, "y0": w_y0, "x1": w_x1, "y1": w_y1,
+             "door": {"x0": mid, "y0": d0, "x1": mid, "y1": d1}},
+        ]
+    return rooms
 
 
 def _is_heavy(w: float, d: float, shape: str | None = None, mass_kg: float | None = None) -> bool:
@@ -601,6 +798,108 @@ def _selftest() -> int:
     if hld > resv_pd + CLEAR_MAX_MM:          # contiguous pack should not exceed (no aisle band
         print(f"  FAIL: heavy+light bounding depth {hld:.0f} mm blew past the reservoir's own "
               f"{resv_pd:.0f} mm padded depth — a dead band remains between the two blocks"); bad += 1
+
+    # (15) FUNCTION-SEGREGATED PLANT ROOMS proveCatch (RULE 6, Sam Green SME review,
+    #      2026-07-08) — a design with a SEPARATED electrical/control block (cabinets)
+    #      and a wet-process block (tanks/pumps) — the real-world Codema shape — must
+    #      get exactly 2 walled rooms, each fully containing its own group's footprint
+    #      (not slicing through equipment), with a door on the wall each faces the other.
+    elec_rows = [{"x0": 0, "y0": 6000, "x1": 3000, "y1": 8000, "shape": "cabinet"},
+                 {"x0": 3200, "y0": 6000, "x1": 4200, "y1": 7000, "shape": "transformer_box"}]
+    wet_rows = [{"x0": 0, "y0": 0, "x1": 5000, "y1": 5000, "shape": "tank"},
+                {"x0": 5200, "y0": 0, "x1": 6200, "y1": 1000, "shape": "pump"}]
+    rooms = compute_function_rooms(elec_rows + wet_rows)
+    if len(rooms) != 2:
+        print(f"  FAIL: separated electrical+wet-process groups did not yield exactly 2 "
+              f"rooms (got {len(rooms)})"); bad += 1
+    else:
+        by_name = {r["name"]: r for r in rooms}
+        if "Elec Plant Rm" not in by_name or "Mech Plant Rm" not in by_name:
+            print(f"  FAIL: rooms not labelled Elec Plant Rm / Mech Plant Rm — got "
+                  f"{[r['name'] for r in rooms]}"); bad += 1
+        else:
+            er, wr = by_name["Elec Plant Rm"], by_name["Mech Plant Rm"]
+            eb = _bbox_of(elec_rows)
+            wb = _bbox_of(wet_rows)
+            if not (er["x0"] <= eb[0] and er["y0"] <= eb[1] and er["x1"] >= eb[2] and er["y1"] >= eb[3]):
+                print(f"  FAIL: Elec Plant Rm {er} does not fully contain its own equipment "
+                      f"bbox {eb} — a wall would slice through kit"); bad += 1
+            if not (wr["x0"] <= wb[0] and wr["y0"] <= wb[1] and wr["x1"] >= wb[2] and wr["y1"] >= wb[3]):
+                print(f"  FAIL: Mech Plant Rm {wr} does not fully contain its own equipment "
+                      f"bbox {wb} — a wall would slice through kit"); bad += 1
+            # the two rooms must never overlap (they're separate walled spaces).
+            if not (er["x1"] <= wr["x0"] or wr["x1"] <= er["x0"]
+                    or er["y1"] <= wr["y0"] or wr["y1"] <= er["y0"]):
+                print(f"  FAIL: Elec Plant Rm {er} and Mech Plant Rm {wr} overlap"); bad += 1
+            for rm in (er, wr):
+                d = rm["door"]
+                dw = abs(d["x1"] - d["x0"]) + abs(d["y1"] - d["y0"])
+                if abs(dw - ROOM_DOOR_MM) > 1.0:
+                    print(f"  FAIL: {rm['name']} door span {dw:.0f} mm ≠ ROOM_DOOR_MM "
+                          f"({ROOM_DOOR_MM} mm)"); bad += 1
+
+    # (16) proveNoFalsePositive — a HOMOGENEOUS design (wet-process shapes only, no
+    #      electrical/control group at all — e.g. a compact/containerised archetype)
+    #      must get NO partition wall: only one function is present, nothing to
+    #      segregate FROM.
+    if compute_function_rooms(wet_rows):
+        print("  FAIL: a wet-process-only (homogeneous) design was given a phantom room "
+              "partition"); bad += 1
+
+    # (17) proveNoFalsePositive — electrical + wet-process groups whose footprints
+    #      OVERLAP (never zone-separated by the upstream packer) must NOT produce a
+    #      garbled overlapping room pair — no safe wall exists, so the function must
+    #      decline (return []) rather than draw a wall through equipment.
+    overlapping = [{"x0": 0, "y0": 0, "x1": 3000, "y1": 3000, "shape": "cabinet"},
+                   {"x0": 1000, "y0": 1000, "x1": 5000, "y1": 5000, "shape": "tank"}]
+    if compute_function_rooms(overlapping):
+        print("  FAIL: overlapping (never zone-separated) electrical+wet groups were "
+              "given rooms anyway — a wall would slice through equipment"); bad += 1
+
+    # (18) proveCatch — REAL-WORLD outlier robustness (found on the actual re-rendered
+    #      Codema plant, 2026-07-08): a majority electrical cluster with ONE genuinely
+    #      dispersed item (a field-mounted device sitting deep in the wet-process zone)
+    #      must still yield 2 rooms sized to the COHERENT majority, not collapse to []
+    #      just because one outlier's raw bbox would overlap the other group.
+    elec_with_outlier = [
+        {"x0": -8000, "y0": 6000, "x1": -6900, "y1": 7000, "shape": "transformer_box"},
+        {"x0": -6000, "y0": 6000, "x1": -4400, "y1": 6900, "shape": "cabinet"},
+        {"x0": -4200, "y0": 6000, "x1": -2600, "y1": 6900, "shape": "cabinet"},
+        {"x0": -2000, "y0": 6100, "x1": -1600, "y1": 6700, "shape": "instrument",
+         "module": "control_compute_communication"},
+        {"x0": 2100, "y0": 1000, "x1": 2500, "y1": 1600, "shape": "instrument",  # outlier
+         "module": "control_compute_communication"},
+    ]
+    rooms18 = compute_function_rooms(elec_with_outlier + wet_rows)
+    if len(rooms18) != 2:
+        print(f"  FAIL: a majority-electrical cluster with 1 dispersed outlier item did "
+              f"not yield 2 rooms (got {len(rooms18)}) — a single stray item should never "
+              f"suppress the whole room partition"); bad += 1
+    else:
+        er18 = next(r for r in rooms18 if r["name"] == "Elec Plant Rm")
+        if not (er18["y1"] - er18["y0"] < 3000):
+            print(f"  FAIL: Elec Plant Rm depth {er18['y1']-er18['y0']:.0f} mm was dragged "
+                  f"open by the outlier instead of sizing to the coherent majority cluster"); bad += 1
+
+    # (19) proveNoFalsePositive — MODULE-SCOPING for the ambiguous 'instrument'/'box'
+    #      shapes (found on the real CO2-mineralisation archetype, 2026-07-08): a
+    #      FIELD-MOUNTED item classify_shape tags shape="instrument" purely because
+    #      its module is safety_protection / sensing_instrumentation (an ATEX extract
+    #      fan, an inlet louvre) must NOT be classified 'electrical' — only the
+    #      genuinely centralised power/control-room modules count for that shape.
+    if _room_group("instrument", "safety_protection") is not None:
+        print("  FAIL: a safety_protection instrument (field-mounted device) was "
+              "classified into a function-room group — it should stay unclassified "
+              "(field-located, not walled into the Elec Plant Rm)"); bad += 1
+    if _room_group("instrument", "sensing_instrumentation") is not None:
+        print("  FAIL: a sensing_instrumentation instrument (field-mounted device) was "
+              "classified into a function-room group"); bad += 1
+    if _room_group("instrument", "control_compute_communication") != "electrical":
+        print("  FAIL: a control_compute_communication instrument (genuine SCADA/PLC/"
+              "marshalling kit) was NOT classified electrical"); bad += 1
+    if _room_group("cabinet", "safety_protection") != "electrical":
+        print("  FAIL: an unambiguous cabinet-shaped enclosure lost its electrical "
+              "classification just because its module is safety_protection"); bad += 1
 
     print("deterministic_layout selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

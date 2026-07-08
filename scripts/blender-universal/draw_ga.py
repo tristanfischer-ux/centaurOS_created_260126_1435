@@ -148,7 +148,12 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
             "y_min_mm": min(p.y0 for p in parts), "y_max_mm": max(p.y1 for p in parts),
             "z_min_mm": min(p.z0 for p in parts), "z_max_mm": max(p.z1 for p in parts),
         }
-    meta = {"count": man.get("count", len(parts)), "schema": man.get("schema", "")}
+    # FUNCTION-SEGREGATED PLANT ROOMS (RULE 6, Sam Green SME review 2026-07-08) — the
+    # walled electrical/control vs wet-process partition build_universal_scene.py
+    # computed over the FINAL placed geometry (deterministic_layout.compute_function_
+    # rooms). [] on a homogeneous / compact archetype — no rooms to draw.
+    meta = {"count": man.get("count", len(parts)), "schema": man.get("schema", ""),
+            "rooms": man.get("rooms") or []}
     return parts, bbox, meta
 
 
@@ -637,12 +642,78 @@ def _elevation_tag_groups(items):
 # MAIN LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _wall_edge(svg: SVG, ax, ay, bx, by, gap=None, w=3.2):
+    """Draw one wall EDGE (ax,ay)-(bx,by) — horizontal (ay==by) or vertical
+    (ax==bx) only. `gap` (a0,a1) leaves a DOOR opening along the edge (a0<a1, in
+    the same px space) with a short leaf-tick at its start — the standard
+    architectural door symbol, simplified to a single leaf line (legible at GA
+    scale without a full swing-arc). No gap ⇒ a plain wall line."""
+    if gap is None:
+        svg.line(ax, ay, bx, by, stroke=INK, width=w)
+        return
+    g0, g1 = gap
+    if ay == by:      # horizontal edge — the gap splits it along X
+        svg.line(ax, ay, g0, ay, stroke=INK, width=w)
+        svg.line(g1, ay, bx, by, stroke=INK, width=w)
+        svg.line(g0, ay, g0, ay + 12.0, stroke=INK, width=1.3)
+    else:             # vertical edge — the gap splits it along Y
+        svg.line(ax, ay, ax, g0, stroke=INK, width=w)
+        svg.line(ax, g1, bx, by, stroke=INK, width=w)
+        svg.line(ax, g0, ax + 12.0, g0, stroke=INK, width=1.3)
+
+
+def _draw_function_room(svg: SVG, x0, y0, x1, y1, door, name, label_y_min=None):
+    """Draw one function-segregated PLANT ROOM (RULE 6, Sam Green SME review
+    2026-07-08) on the plan: a heavier-stroke wall outline (x0,y0)-(x1,y1) (px,
+    y0<y1) with a DOOR GAP cut into whichever wall face `door` names, and a
+    room-name label inside the top-left corner. `door` is (edge, a, b) with
+    edge in {'top','bottom','left','right'} and (a,b) the gap's px range along
+    that edge, or None for no door (should not happen in practice — every room
+    compute_function_rooms returns carries one). `label_y_min` clamps the label
+    baseline so a room whose wall sits hard against the plant's own edge (a
+    dense archetype with almost no clearance to the building envelope) never
+    prints its name up into the PLAN title / north-arrow band above the content."""
+    edge, a, b = door if door else (None, None, None)
+    _wall_edge(svg, x0, y0, x1, y0, (a, b) if edge == "top" else None)
+    _wall_edge(svg, x0, y1, x1, y1, (a, b) if edge == "bottom" else None)
+    _wall_edge(svg, x0, y0, x0, y1, (a, b) if edge == "left" else None)
+    _wall_edge(svg, x1, y0, x1, y1, (a, b) if edge == "right" else None)
+    label_y = y0 + 14
+    if label_y_min is not None:
+        label_y = max(label_y, label_y_min)
+    svg.text(x0 + 6, label_y, name, size=10.2, weight="bold", fill=INK)
+
+
+def _draw_function_rooms(svg: SVG, rooms, plan_x, plan_y, mx, my):
+    """Project every RULE-6 room (mm, plan coords) into plan px via mx()/my() and
+    draw its walls + door + label. No-op for an empty `rooms` list (a
+    homogeneous / compact archetype — proveNoFalsePositive: no phantom wall)."""
+    for rm in (rooms or []):
+        rx0, ry0, rx1, ry1 = rm["x0"], rm["y0"], rm["x1"], rm["y1"]
+        x0p, x1p = plan_x + mx(rx0), plan_x + mx(rx1)
+        y0p, y1p = plan_y + my(ry1), plan_y + my(ry0)   # my() inverts (north = up)
+        door = rm.get("door")
+        d = None
+        if door:
+            if abs(door["y0"] - door["y1"]) < 1.0:      # horizontal wall-face door
+                da, db = sorted((plan_x + mx(door["x0"]), plan_x + mx(door["x1"])))
+                edge = "top" if abs(door["y0"] - ry1) <= abs(door["y0"] - ry0) else "bottom"
+                d = (edge, da, db)
+            else:                                        # vertical wall-face door
+                da, db = sorted((plan_y + my(door["y1"]), plan_y + my(door["y0"])))
+                edge = "left" if abs(door["x0"] - rx0) <= abs(door["x0"] - rx1) else "right"
+                d = (edge, da, db)
+        _draw_function_room(svg, x0p, y0p, x1p, y1p, d, rm.get("name", "Plant Rm"),
+                            label_y_min=plan_y + 12)
+
+
 def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
-                 meta: dict) -> str:
+                 meta: dict, rooms: Optional[list] = None) -> str:
     """Render the projected equipment as a GENERAL ARRANGEMENT: PLAN (top-left),
     FRONT elevation (below the plan, shared X), SIDE elevation (right of plan,
     shared Y), with overall + key dimensions, a scale bar, north arrow, grid,
-    title block + key."""
+    title block + key. `rooms` (RULE 6, optional): function-segregated plant
+    rooms drawn as walled partitions on the PLAN only."""
     # ----- model extents (mm), padded a touch so outlines aren't on the frame -----
     x_min = bbox.get("x_min_mm", min((p.x0 for p in parts), default=0.0))
     x_max = bbox.get("x_max_mm", max((p.x1 for p in parts), default=1000.0))
@@ -772,6 +843,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     for p, kx, ky in keynotes:
         plan_tags.add(kx, ky + 2.7, p.tag, 7.5, anchor_pt=(kx, ky))
     plan_tags.flush()
+    # FUNCTION-SEGREGATED PLANT ROOMS (RULE 6, Sam Green SME review 2026-07-08) —
+    # walled partitions between function-incompatible equipment groups (today:
+    # electrical/control vs wet-process), drawn OVER the equipment so the heavier
+    # wall stroke reads clearly. No-op when `rooms` is empty (a homogeneous /
+    # compact archetype gets no phantom partition — proveNoFalsePositive).
+    _draw_function_rooms(svg, rooms, plan_x, plan_y, mx, my)
     # north arrow (top-right corner of the plan)
     north_arrow(svg, plan_x + plan_w - 16, plan_y + 22)
 
@@ -1225,13 +1302,18 @@ def _load_state(out_dir: str, state_path: Optional[str]) -> dict:
     return {}
 
 
-def _apply_building_envelope(parts: list, bbox: dict, state: dict):
+def _apply_building_envelope(parts: list, bbox: dict, state: dict,
+                             rooms: Optional[list] = None):
     """Make the DRAWN building footprint match the LEDGER slab area (the #122 one-source
     rule): when the ledger carries a floor-slab / building-footprint area, draw the building
     at THAT area (not the equipment-placement bbox, which can be a long ribbon) and uniformly
     scale every part INTO that envelope so the kit sits within walls that match the slab the
     BoM costs. No-op (returns the inputs unchanged) for a design with no building slab — a
-    skid / turbine / satellite is untouched. Deterministic; universal."""
+    skid / turbine / satellite is untouched. Deterministic; universal.
+
+    `rooms` (optional, mutated in place): the function-segregated plant ROOM rects
+    (RULE 6) must scale/translate with the SAME transform as the equipment they wall
+    in, or the drawn walls would drift off the parts they're meant to enclose."""
     build_bb, tf = _be.building_bbox(state, bbox)
     if build_bb is None:
         return parts, bbox
@@ -1243,6 +1325,17 @@ def _apply_building_envelope(parts: list, bbox: dict, state: dict):
             p.x0, p.x1 = p.x1, p.x0
         if p.y1 < p.y0:
             p.y0, p.y1 = p.y1, p.y0
+    for rm in (rooms or []):
+        rm["x0"], rm["y0"] = tf(rm["x0"], rm["y0"])
+        rm["x1"], rm["y1"] = tf(rm["x1"], rm["y1"])
+        if rm["x1"] < rm["x0"]:
+            rm["x0"], rm["x1"] = rm["x1"], rm["x0"]
+        if rm["y1"] < rm["y0"]:
+            rm["y0"], rm["y1"] = rm["y1"], rm["y0"]
+        d = rm.get("door")
+        if d:
+            d["x0"], d["y0"] = tf(d["x0"], d["y0"])
+            d["x1"], d["y1"] = tf(d["x1"], d["y1"])
     return parts, build_bb
 
 
@@ -1253,11 +1346,12 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     # deterministic title-block issue date from the run's own artifacts (set before draw).
     _ISSUE_DATE = _tb.issue_date(out_dir)
     parts, bbox, meta = load_manifest(out_dir, manifest_path)
+    rooms = meta.get("rooms") or []
     # the building rectangle is derived from the LEDGER slab area, with equipment fitted
     # inside it — so the GA envelope matches the slab the BoM costs (not the placement spread).
-    parts, bbox = _apply_building_envelope(parts, bbox, _load_state(out_dir, state_path))
+    parts, bbox = _apply_building_envelope(parts, bbox, _load_state(out_dir, state_path), rooms)
     archetype = _archetype_name(out_dir, state_path)
-    svg_text = build_ga_svg(parts, bbox, archetype, meta)
+    svg_text = build_ga_svg(parts, bbox, archetype, meta, rooms)
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)

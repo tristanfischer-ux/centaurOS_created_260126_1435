@@ -6138,8 +6138,33 @@ def write_parts_manifest(out_dir, parts, state=None):
     if site:
         print(f"[parts-manifest] site utilisation: hull {site['hull_m2']} m² / "
               f"deck {site['deck_m2']} m² = {site['utilisation']}")
+    # FUNCTION-SEGREGATED PLANT ROOMS (RULE 6, Sam Green SME review 2026-07-08): a
+    # pure post-hoc geometry pass over the FINAL placed rows — universal across every
+    # archetype/placer (rack_farm, tower_machine, process-plant…) since it reads only
+    # the manifest's own pos_mm/dims_mm/shape/module, not how those positions were
+    # computed. See deterministic_layout.compute_function_rooms for the rule + guard.
+    rooms = []
+    try:
+        room_rows = []
+        for r in rows:
+            x, y, _z = r["pos_mm"]
+            d = r["dims_mm"]
+            if "dia" in d:
+                half = float(d.get("dia") or 0.0) / 2.0
+                rx0, rx1, ry0, ry1 = x - half, x + half, y - half, y + half
+            else:
+                hw, hd = float(d.get("w") or 0.0) / 2.0, float(d.get("d") or 0.0) / 2.0
+                rx0, rx1, ry0, ry1 = x - hw, x + hw, y - hd, y + hd
+            room_rows.append({"x0": rx0, "y0": ry0, "x1": rx1, "y1": ry1,
+                              "shape": r.get("shape"), "module": r.get("module")})
+        rooms = dl.compute_function_rooms(room_rows)
+        if rooms:
+            print(f"[parts-manifest] function-segregated plant rooms: "
+                  f"{[rm['name'] for rm in rooms]}")
+    except Exception as _rme:   # pure diagnostics — never fail the export
+        print(f"[parts-manifest] function-rooms skipped: {_rme}")
     manifest = {"schema": "parts-manifest/1", "count": len(rows),
-                "bbox_mm": bbox, "site": site, "parts": rows}
+                "bbox_mm": bbox, "site": site, "rooms": rooms, "parts": rows}
     with open(os.path.join(out_dir, "parts-manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
     print(f"[parts-manifest] wrote {len(rows)} placed parts → "
