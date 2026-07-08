@@ -3177,6 +3177,31 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
     proc = reconstruct_process(schedule, state, out_dir=out_dir)
     # populate the title-block issue date deterministically from the run's artifacts.
     proc.date = _run_issue_date(out_dir)
+
+    # INSTRUMENT-CLUSTERING INVARIANT (Sam Green SME review, 2026-07-07 — "Seems all
+    # sensors on left are plugged into a softener vessel?"). The evaluator existed but
+    # nothing in the render path called it — only this module's own --selftest did, on
+    # synthetic fixtures. Wired here, on the FINAL placed nodes (after every instrument-
+    # attachment path — the synthesised-instrument projection + the conventional
+    # symbol-based fallback in `_attach_instruments` — has already run), so the verdict
+    # reflects exactly what the drawing is about to render. Non-fatal: records the
+    # verdict on the summary + writes a punchlist on a HIGH finding; never blocks the
+    # drawing (an actual re-attach fix belongs in `_attach_instruments` /
+    # `_project_synth_instruments`, not this detector).
+    _node_dict = {nd.key: nd for nd in proc.nodes}
+    instrument_clustering = evaluate_instrument_clustering_invariant(_node_dict)
+    if instrument_clustering["verdict"] == "high":
+        print(f"[pid] INSTRUMENT-CLUSTERING invariant: HIGH — {instrument_clustering['reason']}")
+        try:
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+            (Path(out_dir) / "instrument-clustering-punchlist.md").write_text(
+                "# Instrument-clustering punchlist\n\n"
+                f"- {instrument_clustering['reason']}\n")
+        except OSError:
+            pass
+    else:
+        print(f"[pid] instrument-clustering invariant: {instrument_clustering['verdict']}")
+
     svg_text = build_pid_svg(proc)
 
     draw_dir = Path(out_dir) / "drawings"
@@ -3212,6 +3237,7 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
                   + sum(len(l.valves) for l in proc.lines),
         "schedule_present": proc.schedule_present,
         "symbols": _symbol_breakdown(proc),
+        "instrument_clustering": instrument_clustering,
     }
     return summary, proc, svg_text
 
