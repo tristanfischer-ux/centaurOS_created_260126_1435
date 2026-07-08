@@ -64,7 +64,8 @@ import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
 // 2026-05-19: was `import { runTrainingDataDump, extractStageContext } from "@/lib/forge-v2/parallel-llm"` —
 // archived during chain unification. cad-lab.ts is consumed by /the-forge/cad-lab
 // (legacy workbench). Stubs keep the file compiling; runtime callers see clear errors.
-async function runTrainingDataDump(..._args: unknown[]): Promise<null> { return null }
+import type { TrainingDataDumpResult, ParallelLLMResult } from "@/lib/forge-v2/parallel-llm"
+async function runTrainingDataDump(..._args: unknown[]): Promise<TrainingDataDumpResult | null> { return null }
 function extractStageContext(..._args: unknown[]): unknown { return null }
 import {
   getMashupPlanningSystemPrompt,
@@ -293,6 +294,7 @@ export async function runCadLabResearch(
     designBrief?: CadLabDesignBrief
     assumptionNotes?: string
     documentContext?: string
+    existingProjectId?: string
   },
   trusted?: TrustedContext,
 ): Promise<CadLabResearchResult> {
@@ -351,7 +353,7 @@ export async function runCadLabResearch(
         console.info(`[THE-FORGE] Stage 0 skipped: Found ${fullTrainingDossier.length} chars of existing training data on project.`);
       } else {
         const trainingDump = await runTrainingDataDump(description, formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes))
-        if (trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
+        if (trainingDump && trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
           fullTrainingDossier = trainingDump.dossier
           console.info(`[THE-FORGE] Stage 0 complete: ${trainingDump.modelsResponded}/10 models, ${trainingDump.dossier.length} chars, ${trainingDump.elapsedMs}ms`)
         }
@@ -419,7 +421,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.\
       console.warn("[THE-FORGE] Step 1: Gemini grounding returned 0 sources (or failed), attempting Brave Search fallback")
       const braveResults = await searchBraveFallback(description, { maxResults: 10 })
       if (braveResults.length > 0) {
-        webSources = braveResults
+        webSources = braveResults.map((r) => ({ uri: r.url, title: r.title }))
         console.info(`[THE-FORGE] Step 1: Brave Search fallback injected ${braveResults.length} sources`)
       }
     }
@@ -2311,7 +2313,7 @@ export async function skeletonDecompose(
     try {
       // 2026-05-19: dynamic import retired. Legacy /the-forge/cad-lab path.
       const { runParallelAndCompare } = await Promise.resolve({
-          runParallelAndCompare: async (..._args: unknown[]) => {
+          runParallelAndCompare: async (..._args: unknown[]): Promise<ParallelLLMResult> => {
               throw new Error("runParallelAndCompare retired 2026-05-19 (chain unification)")
           },
       })

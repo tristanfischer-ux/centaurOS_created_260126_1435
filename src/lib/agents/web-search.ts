@@ -19,6 +19,7 @@
 
 // ─── Constants ──────────────────────────────────────────────────────
 
+const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09" as const
 const PRE_SEARCH_MODEL = "gpt-4.1-mini"
 const PRE_SEARCH_MAX_TOKENS = 4096
 const PRE_SEARCH_MAX_USES = 2

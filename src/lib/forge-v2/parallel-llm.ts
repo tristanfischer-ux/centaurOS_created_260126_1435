@@ -26,15 +26,41 @@ function retired(name: string): never {
     )
 }
 
-export async function runParallelAndCompare(..._args: unknown[]): Promise<never> {
+// Return shapes match the archived implementation
+// (_archive/2026-05-19-pre-chain-unification/lib/forge-v2/parallel-llm.ts) so
+// legacy callers in cad-lab.ts / bom.ts / cad-lab-cost.ts still type-check
+// correctly even though every call throws at runtime via retired().
+
+export interface ParallelLLMResult {
+    bestOutput: string
+    winnerModel: string
+    selectionReason: string
+    allOutputs: Array<{ model: string; output: string; error?: string }>
+    judgeUsed: boolean
+}
+
+export interface TrainingDataDumpResult {
+    /** Merged dossier text combining all model outputs, organised by pipeline stage */
+    dossier: string
+    /** Per-model outputs for transparency and debugging */
+    modelOutputs: Array<{ model: string; lineage: string; output: string }>
+    /** Number of models that responded successfully */
+    modelsResponded: number
+    /** Total elapsed wall-clock time in ms */
+    elapsedMs: number
+}
+
+export async function runParallelAndCompare(..._args: unknown[]): Promise<ParallelLLMResult> {
     retired("runParallelAndCompare")
 }
 
-export async function callParallelAndCompare(..._args: unknown[]): Promise<never> {
+export async function callParallelAndCompare(
+    ..._args: unknown[]
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
     retired("callParallelAndCompare")
 }
 
-export async function runChaseMultiLineage(..._args: unknown[]): Promise<never> {
+export async function runChaseMultiLineage(..._args: unknown[]): Promise<ParallelLLMResult> {
     retired("runChaseMultiLineage")
 }
 
@@ -42,7 +68,7 @@ export async function loadGroundingData(..._args: unknown[]): Promise<null> {
     return null
 }
 
-export async function runTrainingDataDump(..._args: unknown[]): Promise<null> {
+export async function runTrainingDataDump(..._args: unknown[]): Promise<TrainingDataDumpResult | null> {
     return null
 }
 
