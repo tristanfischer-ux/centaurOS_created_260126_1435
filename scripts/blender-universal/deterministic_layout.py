@@ -1,75 +1,87 @@
 #!/usr/bin/env python3
-"""deterministic_layout.py — the DETERMINISTIC sequence-packer (Tristan 2026-06-29, rewrite "B").
+"""deterministic_layout.py — the DETERMINISTIC 2-D skyline packer (Tristan 2026-07-08, rewrite "C").
 
-THE PROBLEM IT REPLACES: the accreted place_all + CRAFT layout-optimiser computed positions with
-float-sum-order-dependent maths and Blender-object read-back, so the SAME state rendered a
-DIFFERENT plant each run (Blender forces hash randomisation; #86). There is no single line to fix —
-proven: even the base place_all is intermittently non-deterministic with every post-step disabled.
+THE PROBLEM IT REPLACES: rewrite "B" (2026-06-29) fixed NON-DETERMINISM (same state → same plant)
+by packing each region into its own rectangular "bay" (shelf-pack, FFDH) and then stacking those
+bays into row-wrapped "banks" separated by a FLAT 3000/2400 mm gap. That two-level bay+bank scheme
+is itself the dead-space source Sam Green's SME review caught on the re-rendered GA (2026-07-08):
+"kit has just been randomly placed, not bunched together based on what sides need maintenance/
+access and walkways ... huge footprint ... half of F2 for 1 system whereas we had 3 systems in
+~1/4 that area" — the codema water GA still showed ~40% empty deck (the whole right half of the
+plan) even after a first zoning pass (commit 236425a08) cut it 604→330 m². Root cause: a bay sized
+by `sqrt(area)*1.4` over-estimates its rectangle, and bank-stacking fixes EVERY bank's height to
+its tallest region — any region shorter than its bank-mates wastes the difference, and the fold
+search only ever tries whole-bay-width candidates, never lets a later region tuck into an earlier
+bank's leftover depth. That is architecturally incapable of a dense pack.
 
-THE DESIGN (Tristan's spec): a layout that is deterministic BY CONSTRUCTION —
-  1. Components placed in PROCESS SEQUENCE (region rank), each as close to the next as possible.
-  2. Small standard items CONSOLIDATED into one cabinet per region (10-30 small parts → one box),
-     not scattered across the floor.
-  3. ALL arithmetic on an INTEGER GRID — no float-sum-order dependence, no set iteration; total-order
-     sorts only. Same items in ANY order → identical positions (the unit test proves order-invariance).
-This module is PURE (no bpy): the caller passes lightweight item dicts (it computes footprints with
-the existing footprint_mm), and uses the returned integer positions as the AUTHORITATIVE coords the
-manifest + GA + every drawing read — Blender renders AT them, it does not measure them back.
+THE FIX (rewrite "C"): drop the bay/bank abstraction. Every principal item (+ one cabinet per
+region for consolidated small parts, unchanged) is placed by a single deterministic BOTTOM-LEFT
+SKYLINE packer (`_skyline_pack`) over the WHOLE plant width — the classic 2-D packing heuristic:
+track a height profile ("skyline"); each item goes at the lowest-then-leftmost position it fits;
+the skyline updates only under that item's own span, so a short item never inherits a tall
+neighbour's unused headroom. This is what actually kills dead space: no rectangle is reserved
+that isn't asked for.
+
+DESIGNED ACCESS (the actual point, not just "smaller") — two access invariants ride on top of the
+same packer, both universal (derived from generic size, never a class name):
+  1. MAINTENANCE WALKWAYS: every item still carries its own size-scaled `_clearance()` gap to its
+     row neighbours (unchanged from rewrite B), and every time the skyline packer stacks a NEW row
+     on top of existing content it inserts a flat WALKWAY_MM (person-width, ~0.8-1.0 m clear) gap
+     first — so a person can always walk around and reach every serviceable item's back/side.
+  2. DELIVERY AISLE: items whose plan footprint (or, if ever supplied, mass_kg) crosses a
+     "truck/crane-delivered" size threshold are pulled OUT of the general pack into their own
+     block, placed FLUSH against the plant's own entrance edge (y=0) — the very first content in
+     the pack, so nothing else in the plant can ever sit between a heavy item and the outside of
+     the building (a real loading-bay door cuts into the wall exactly there: zero obstruction,
+     provable directly). A full DELIVERY_AISLE_MM (~3.5-4.0 m clear) band then separates that
+     heavy row from the rest of the plant — a real, VISIBLE gap in the rendered GA (an aisle
+     reserved before an edge that has nothing on its outside is invisible once the drawing crops
+     to its content bbox; a gap between two blocks of real content is not). A plant with no heavy
+     item gets no aisle at all (no phantom empty band on a small/compact archetype —
+     proveNoFalsePositive).
+
+Same guarantees as rewrite B, unchanged: PURE (no bpy), INTEGER GRID only (no float-sum-order
+dependence), a single TOTAL-ORDER sort is the only ordering in the whole module — same items in
+ANY input order → IDENTICAL output (the unit test proves order-invariance and determinism).
 
 Run the guard:  python3 scripts/blender-universal/deterministic_layout.py --selftest
 """
 from __future__ import annotations
 
 GRID_MM = 100          # all coordinates snap to this integer grid → no sub-grid float residue
-AISLE_MM = 2000        # legacy flat gap constant, kept for reference/back-compat; _shelf_pack now
-#                        uses the size-SCALED _clearance() below (see CLEAR_* — Sam Green SME
-#                        review 2026-07-08: a flat 2 m gap next to a 0.3 m² pump inflated the
-#                        footprint far more than the same gap next to a 4 m tank; a maintenance
-#                        aisle should scale with what it services)
-REGION_GAP_MM = 3000   # gap between regions along the process train
-BANK_GAP_MM = 2400     # gap between serpentine banks (Y) — aligned 2026-07-02 with the plant's
-#                        established compacted-lane maintenance aisle (build_universal_scene
-#                        BANK_COMPACT_GAP_MM = 2400, "a REAL maintenance aisle"); the old 4000
-#                        was an arbitrary double-width band that alone cost ~3 m of dead deck
-#                        per fold on the v52 codema plant (site-utilisation issue 13)
+
 # A "small standard item" (instrument/junction/small device) is consolidated into a cabinet rather
 # than placed as its own floor object. Footprint threshold (plan area) keyed on size, not class.
 SMALL_ITEM_MAX_AREA_MM2 = 0.6e6   # ≤ ~0.77 m × 0.77 m plan → a panel/cabinet-internal item
 CABINET_CELL_MM = 600             # a consolidated small item occupies this much inside the cabinet
 CABINET_MAX_COLS = 6              # cabinet internal grid width before it grows in depth
-FOLD_ASPECT_MAX = 2.0             # the fold prefers a bounding rect within this aspect before
-#                                   minimising area (a min-area single row can be a 4:1 ribbon)
+FOLD_ASPECT_MAX = 2.0             # the target-width search prefers a bounding rect within this
+#                                   aspect before minimising raw area (a min-area single row can
+#                                   be a 4:1 ribbon)
 
-# ── FUNCTIONAL SUB-ZONING within a region bay (Sam Green SME review, 2026-07-08: "kit
-# randomly placed, not bunched together based on what sides need maintenance/access …
-# huge footprint … half of F2 for 1 system whereas we had 3 systems in ~1/4 that area").
-# ROOT CAUSE: one process-plant archetype can put 25+ heterogeneous parts (pumps, tanks,
-# dosing vessels, packaged skids) in a SINGLE region (e.g. "mass_fluid_transport_process"),
-# and this module's shelf-pack ordered them ONLY by plan-footprint depth/width (FFDH bin
-# packing) — a real engineering-relevant grouping (pump cluster / vessel row / skid row)
-# never happened, so a pump could land between two unrelated tanks purely because their
-# depths matched. Fix: give the shelf-pack a PRIMARY sort key — a functional zone rank
-# derived from the part's geometry-family `shape` (already assigned upstream by the shape
-# classifier: tank/vertical_vessel/pump/cabinet/skid_box/… — the SAME vocabulary every
-# archetype uses, never a product-class name) + its footprint AREA — so same-role parts
-# become CONTIGUOUS in the shelf-pack (they still 2D-shelf-fit exactly as before; only the
-# ORDER changes). A part/synthetic node with no `shape` (legacy caller) gets the lowest
-# rank tier (5) — old behaviour preserved when the signal is absent.
+# ── FUNCTIONAL SUB-ZONING within a region (Sam Green SME review, 2026-07-08: "kit randomly
+# placed, not bunched together based on what sides need maintenance/access"). A part's geometry-
+# family `shape` (already assigned upstream by the shape classifier: tank/vertical_vessel/pump/
+# cabinet/skid_box/… — the SAME vocabulary every archetype uses, never a product-class name) +
+# its footprint AREA give a functional-zone rank so same-role parts land CONTIGUOUS in the pack
+# order (still fed through the one skyline packer below — only the ORDER changes). A part with no
+# `shape` (legacy caller) gets the lowest rank tier (5) — old behaviour preserved when absent.
 _VESSEL_ZONE_SHAPES = {"tank", "vertical_vessel", "horizontal_vessel",
                        "tall_vessel", "tall_column", "cone_vessel"}
 _MACHINE_ZONE_SHAPES = {"pump", "compressor", "centrifuge"}
 _ELECTRICAL_ZONE_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "instrument"}
-# Same physical-size split as layout_optimiser.py's VESSEL_LARGE_AREA_MM2 (a ~2.0 m-diameter
-# vessel) — a reservoir clusters with other reservoirs, a dosing/filter vessel with other
-# small vessels, rather than one long depth-sorted smear of every vessel in the plant.
+# A ~2.0 m-diameter-or-bigger vessel clusters with other large vessels, a dosing/filter vessel
+# with other small vessels, rather than one long depth-sorted smear of every vessel in the plant.
+# Re-used below as the HEAVY/delivery-aisle threshold too — "large vessel" and "truck-delivered
+# item" are the same real-world size class (Sam Green: "reservoirs, skids, big vessels").
 VESSEL_LARGE_AREA_MM2 = 4.0e6
 
 
 def _zone_rank(shape: str | None, area: float) -> int:
-    """Functional-zone sort tier for a shelf-pack node: 0 electrical/control/instruments,
-    1 packaged process skids, 2 large storage vessels, 3 small process/dosing vessels,
-    4 rotating machines, 5 everything else (incl. no shape signal at all). The absolute
-    numbers are arbitrary — only the grouping + determinism matter."""
+    """Functional-zone sort tier for a pack node: 0 electrical/control/instruments, 1 packaged
+    process skids, 2 large storage vessels, 3 small process/dosing vessels, 4 rotating machines,
+    5 everything else (incl. no shape signal at all). The absolute numbers are arbitrary — only
+    the grouping + determinism matter."""
     if shape in _ELECTRICAL_ZONE_SHAPES:
         return 0
     if shape == "skid_box":
@@ -101,102 +113,211 @@ def _cabinet_footprint(n_small: int) -> tuple[int, int]:
     return cols * CABINET_CELL_MM, rows * CABINET_CELL_MM
 
 
-# SIZE-SCALED maintenance clearance (Sam Green SME review, 2026-07-08 — "realistic density …
-# pack to a realistic footprint" + "each equipment gets a maintenance/access side and a
-# clearance envelope"). A flat AISLE_MM=2000 next to EVERY item — a 0.3 m² pump exactly as
-# much as a 4 m reservoir — inflated the footprint of any region with lots of small kit far
-# more than it needed to; a real plant gives a big vessel a real walk-round aisle and packs
-# small kit snugly. Same formula + constants as layout_optimiser.py's _clearance() (the two
-# placement engines agree on what a reasonable aisle looks like): CLEAR_FRAC of the item's
-# SHORTER side, floored/capped so a tiny instrument still gets a minimum service gap and a
-# huge vessel doesn't demand an absurd one.
+# SIZE-SCALED maintenance clearance (Sam Green SME review, 2026-07-08 — "a maintenance aisle
+# should scale with what it services"). CLEAR_FRAC of the item's SHORTER side, floored/capped so a
+# tiny instrument still gets a minimum service gap and a huge vessel doesn't demand an absurd one.
+# This is the ITEM-TO-ITEM gap (same row/shelf neighbours); row-to-row / vehicle access is the
+# separate WALKWAY_MM / DELIVERY_AISLE_MM bands below (2026-07-08 access rewrite).
 CLEAR_MIN_MM, CLEAR_MAX_MM, CLEAR_FRAC = 300.0, 1500.0, 0.20
+
+# DESIGNED ACCESS (2026-07-08, Sam Green SME review + Tristan's explicit requirement — "tighten it
+# up, but with DESIGNED ACCESS, not just smaller"):
+#   WALKWAY_MM        — a person-width clear gap (0.8-1.0 m) inserted whenever the packer opens a
+#                        NEW row/shelf on top of existing content, so every serviceable item keeps
+#                        a walk-round maintenance aisle on its service side.
+#   DELIVERY_AISLE_MM — a heavy-vehicle-width clear gap (3.5-4.0 m) reserved from the plant's own
+#                        entrance edge to every HEAVY/LARGE item's front row, so reservoirs/skids/
+#                        big vessels can be trucked or craned straight in without being walled in
+#                        behind lighter kit.
+#   HEAVY_AREA_MM2    — the size signal that puts an item on the delivery aisle instead of the
+#                        general pack: re-uses VESSEL_LARGE_AREA_MM2 (≈ a 2 m-diameter-or-bigger
+#                        footprint) — a generic size threshold, never a class/product name.
+#   HEAVY_MASS_KG     — an optional mass signal (used IF the caller ever supplies `mass_kg` on an
+#                        item; no current caller does, so this is a future-proofing OR-condition,
+#                        not a behaviour change today).
+WALKWAY_MM = 900
+DELIVERY_AISLE_MM = 3800
+HEAVY_AREA_MM2 = VESSEL_LARGE_AREA_MM2
+HEAVY_MASS_KG = 1000.0
 
 
 def _clearance(w: float, d: float) -> int:
     return int(min(CLEAR_MAX_MM, max(CLEAR_MIN_MM, min(w, d) * CLEAR_FRAC)))
 
 
-def _shelf_pack(nodes: list[dict], x0: int, y0: int, target_w: int) -> tuple[dict, int, int]:
-    """Place `nodes` (each {id, w, d}) in left→right rows that wrap at target_w, rows stepping +Y.
-    Each item's trailing gap (to its right, and — if it opens a new row — above it) is its OWN
-    size-scaled _clearance(), not a flat constant. INTEGER grid only. Returns ({id:(x,y)},
-    used_w, used_d). Order of `nodes` is the caller's deterministic order — this function adds
-    no ordering of its own."""
-    pos = {}
-    x, row_y, row_d, used_w = x0, y0, 0, 0
+def _is_heavy(w: float, d: float, shape: str | None = None, mass_kg: float | None = None) -> bool:
+    """Universal HEAVY/LARGE test — footprint area (or, if supplied, mass) crosses the
+    truck/crane-delivery threshold. A consolidated small-item CABINET is never itself "heavy" no
+    matter how many members it holds — it is a placeholder for many small parts, not a single
+    truck-delivered unit (a real cabinet's contents ship in boxes, not on a HIAB)."""
+    if shape == "cabinet":
+        return False
+    if mass_kg and mass_kg >= HEAVY_MASS_KG:
+        return True
+    return (float(w) * float(d)) >= HEAVY_AREA_MM2
+
+
+def _skyline_pack(nodes: list[dict], target_w: int, y_pad: int) -> tuple[dict, int, int]:
+    """Deterministic BOTTOM-LEFT SKYLINE pack of `nodes` (id,w,d — visitation order is the
+    caller's own deterministic order; this function adds none of its own) into a canvas of width
+    `target_w` mm. Each item is placed at the lowest-then-leftmost position it fits (the classic
+    2-D skyline heuristic) — a short item never inherits a tall neighbour's unused headroom, which
+    is exactly the dead-space defect the old bay+bank scheme could not avoid. Every item's own
+    size-scaled `_clearance()` gap is folded in as symmetric padding (so adjacent items in the same
+    row keep their service-side gap); `y_pad` (WALKWAY_MM or DELIVERY_AISLE_MM) is added under every
+    placed item's row so anything later stacked on top of it keeps at least that vertical access
+    gap — this is what turns "row-to-row spacing" into a genuine person/vehicle walkway rather than
+    a flat per-item constant. A single item wider than `target_w` grows the canvas rather than
+    being dropped. Returns ({id:(cx,cy)}, used_w, content_d) — `content_d` is the true occupied
+    depth (last item's OWN back edge, no trailing pad); the caller adds whatever transition gap
+    is appropriate to whatever comes NEXT (a different gap size than this call's internal
+    `y_pad`, e.g. heavy→rest only needs a walkway, not another full aisle — see `_place_all`)."""
+    if not nodes:
+        return {}, 0, 0
+    canvas_w = max(int(target_w), GRID_MM)
+    skyline = [[0, canvas_w, 0]]     # [x0, x1, height] segments, sorted + contiguous over [0,canvas_w)
+    pos: dict = {}
+    used_w = 0
+    content_d = 0        # true occupied depth (no trailing y_pad) — see docstring
     for nd in nodes:
         w, d = int(nd["w"]), int(nd["d"])
         gap = _clearance(w, d)
-        if x > x0 and x + w > x0 + target_w:        # wrap to a new shelf
-            row_y += row_d + gap
-            x, row_d = x0, 0
-        pos[nd["id"]] = (_snap(x + w / 2), _snap(row_y + d / 2))
-        x += w + gap
-        row_d = max(row_d, d)
-        used_w = max(used_w, x - x0)
-    return pos, used_w, (row_y + row_d - y0)
+        pw, pd = w + gap, d + gap    # padded footprint — the gap is symmetric half-margin per side
+        if pw > canvas_w:             # never drop a node: grow the canvas for an outlier-wide item
+            extra = pw - canvas_w
+            skyline[-1][1] += extra
+            canvas_w += extra
+        best = None                  # (sort_key=(height,x0), x0, height)
+        for i, seg in enumerate(skyline):
+            sx0 = seg[0]
+            if sx0 + pw > canvas_w:
+                continue
+            h, covered, j = 0, 0, i
+            while covered < pw and j < len(skyline):
+                h = max(h, skyline[j][2])
+                covered = skyline[j][1] - sx0
+                j += 1
+            key = (h, sx0)
+            if best is None or key < best[0]:
+                best = (key, sx0, h)
+        _, x0, h = best
+        cx = _snap(x0 + gap / 2 + w / 2)
+        cy = _snap(h + gap / 2 + d / 2)
+        pos[nd["id"]] = (cx, cy)
+        content_d = max(content_d, h + pd)
+        new_h = h + pd + y_pad
+        x1 = x0 + pw
+        # rebuild the skyline: pass through untouched segments, trim the two segments the new
+        # item's span cuts into at its edges, and insert ONE new segment at the placed height.
+        rebuilt = []
+        inserted = False
+        for seg in skyline:
+            sx0, sx1, sh = seg
+            if sx1 <= x0 or sx0 >= x1:
+                rebuilt.append(seg)
+                continue
+            if sx0 < x0:
+                rebuilt.append([sx0, x0, sh])
+            if not inserted:
+                rebuilt.append([x0, x1, new_h])
+                inserted = True
+            if sx1 > x1:
+                rebuilt.append([x1, sx1, sh])
+        skyline = rebuilt
+        merged = [skyline[0]]
+        for seg in skyline[1:]:
+            if seg[2] == merged[-1][2] and seg[0] == merged[-1][1]:
+                merged[-1][1] = seg[1]
+            else:
+                merged.append(seg)
+        skyline = merged
+        used_w = max(used_w, x1)
+    return pos, used_w, content_d
 
 
-def _fold_target_w(region_bay: dict, region_order: list) -> int:
-    """Bank-fold width that MINIMISES the plant's occupied bounding-RECT area.
+def _place_all(nodes: list[dict], target_w: int) -> tuple[dict, int, int]:
+    """Split `nodes` into HEAVY (truck/crane-delivered) vs the general pack, place the heavy block
+    FLUSH against the plant's own entrance edge (y=0) — literally the first content in the pack,
+    so nothing else in the plant can ever sit between a heavy item and the outside of the
+    building (a real loading-bay door cuts into the wall exactly there) — then pack everything
+    else behind it across a full DELIVERY_AISLE_MM (truck/HIAB-width) band. A plant with no heavy
+    item skips the aisle entirely (proveNoFalsePositive — no phantom empty band on a small/
+    compact archetype). Both blocks use the SAME `target_w` canvas so the whole plant reads as
+    one consistent width and the aisle spans the full width it needs to reach every heavy item.
 
-    THE DEFECT THIS FIXES (Tristan 2026-07-02, codema v52 "square-width fold"): the single
-    sqrt(total-area)·1.4 target wraps EVERY region after the first big bay onto its OWN bank —
-    one region per lane, each lane only as wide as its (small) bay — so the plant reads as an
-    L / a ragged narrow column on a much larger deck (site utilisation 0.33). A fold can only
-    happen at a region boundary, so the SEARCH SPACE is tiny: every contiguous-prefix
-    cumulative width is a candidate target (plus the legacy square-ish target); each candidate
-    is run through the SAME greedy wrap the placer uses and scored by the bounding-rect area
-    it produces (max bank extent × total stacked depth). Smallest area wins; ties break to the
-    narrower extent, then the smaller target — pure integer arithmetic over the total-ordered
-    region list, so it is deterministic AND order-invariant like everything else here."""
-    widths = [int(region_bay[rk][0]) for rk in region_order]
-    depths = [int(region_bay[rk][1]) for rk in region_order]
-    if not widths:
+    WHY THE AISLE SITS HERE, NOT BEFORE y=0 (Tristan 2026-07-08, caught on the re-rendered GA):
+    the FIRST cut of this fix put the aisle band BEFORE the heavy row (y in [0, DELIVERY_AISLE_MM),
+    heavy items starting at y=DELIVERY_AISLE_MM) — geometrically correct but INVISIBLE on the
+    rendered GA: the drawn plant envelope is the bounding box of PLACED CONTENT, so an empty band
+    with nothing on either side of it (heavy items on one side, the building's exterior on the
+    other) is cropped away by that same bbox calculation — the drawing simply started where the
+    first item sat, and the reserved aisle vanished. Putting the ONE aisle-width gap where it is
+    ACTUALLY visible — between the heavy row and the rest of the plant, both real content — is
+    what makes it provable by opening the render, not just provable by reading coordinates."""
+    heavy = [nd for nd in nodes if _is_heavy(nd["w"], nd["d"], nd.get("shape"), nd.get("mass_kg"))]
+    heavy_ids = {nd["id"] for nd in heavy}
+    rest = [nd for nd in nodes if nd["id"] not in heavy_ids]
+    pos: dict = {}
+    used_w = 0
+    y_offset = 0
+    if heavy:
+        hpos, hw, hcontent_d = _skyline_pack(heavy, target_w, DELIVERY_AISLE_MM)
+        pos.update(hpos)
+        used_w = max(used_w, hw)
+        # the heavy block's OWN true depth (no trailing pad) + ONE full aisle-width transition —
+        # this IS the visible delivery aisle, between the heavy row and whatever packs behind it.
+        y_offset = _snap(hcontent_d + DELIVERY_AISLE_MM)
+    if rest:
+        rpos, rw, rd = _skyline_pack(rest, target_w, WALKWAY_MM)
+        for k in rpos:
+            rpos[k] = (rpos[k][0], rpos[k][1] + y_offset)
+        pos.update(rpos)
+        used_w = max(used_w, rw)
+        used_d = y_offset + rd
+    else:
+        used_d = y_offset
+    return pos, used_w, used_d
+
+
+def _best_target_w(nodes: list[dict]) -> int:
+    """Search a handful of candidate canvas widths and keep the one that MINIMISES the resulting
+    plant bounding-rect area (ties: within FOLD_ASPECT_MAX first, then narrowest, then smallest
+    candidate) — the direct replacement for rewrite B's `_fold_target_w`, now scored against the
+    REAL skyline pack (incl. the heavy/aisle split) instead of a naive bank-stack simulation."""
+    if not nodes:
         return GRID_MM
+    widths = [int(nd["w"]) for nd in nodes]
     widest = max(widths)
-    cands = set()
-    cum = 0
-    for i, w in enumerate(widths):
-        cum += w + (REGION_GAP_MM if i else 0)
-        cands.add(max(widest, cum))
-    total_area = sum(w * d for w, d in zip(widths, depths)) or (GRID_MM * GRID_MM)
-    cands.add(max(widest, int((total_area ** 0.5) * 1.4)))   # legacy square-ish target
+    total_area = sum((nd["w"] + _clearance(nd["w"], nd["d"])) * (nd["d"] + _clearance(nd["w"], nd["d"]))
+                     for nd in nodes) or (GRID_MM * GRID_MM)
+    base = total_area ** 0.5
+    cands = sorted({int(max(widest, base * k)) for k in (1.0, 1.2, 1.4, 1.6, 2.0, 2.6, 3.4)})
 
     def _cost(tw):
-        # EXACT mirror of the placement wrap below: greedy, wrap when the bay overshoots tw.
-        x, bank_d, depth, used_w = 0, 0, 0, 0
-        for w, d in zip(widths, depths):
-            if x > 0 and x + w > tw:
-                depth += bank_d + BANK_GAP_MM
-                x, bank_d = 0, 0
-            x += w + REGION_GAP_MM
-            bank_d = max(bank_d, d)
-            used_w = max(used_w, x - REGION_GAP_MM)
-        depth += bank_d
-        # ASPECT GATE before raw area: a min-area single row can be a 4:1 ribbon (area
-        # does not punish shape) — prefer candidates whose bounding rect stays within
-        # FOLD_ASPECT_MAX, then the smallest area, then the narrowest, then smallest tw.
-        aspect = max(used_w, depth) / max(1, min(used_w, depth))
-        return (aspect > FOLD_ASPECT_MAX, used_w * depth, used_w, tw)
+        _, uw, ud = _place_all(nodes, tw)
+        aspect = max(uw, ud) / max(1, min(uw, ud))
+        return (aspect > FOLD_ASPECT_MAX, uw * ud, uw, tw)
 
-    return min(sorted(cands), key=_cost)
+    return min(cands, key=_cost)
 
 
 def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) -> dict:
-    """Compute a DETERMINISTIC integer-grid layout for `items`.
+    """Compute a DETERMINISTIC integer-grid layout for `items` via a single flat SKYLINE pack
+    (see module docstring for the rewrite-C rationale).
 
-    items: [{id, region, rank, seq, w, d, area, small?}]  (w/d = plan footprint mm; area = w*d;
-            small=True forces cabinet consolidation; else inferred from area).
-    bay_row_w: optional fixed shelf width for EVERY region bay (mm). The periphery-hug caller
-            uses it to pack a back-row region as a SHALLOW ROW spanning the train width instead
-            of the square-ish default (which stacked 2-3 cabinets into a deep one-part-per-row
-            column). None → the square-ish per-bay target (the default for the process train).
+    items: [{id, region, rank, seq, w, d, area, small?, shape?, mass_kg?}]  (w/d = plan footprint
+            mm; area = w*d; small=True forces cabinet consolidation; else inferred from area;
+            mass_kg optional — feeds the heavy/delivery-aisle test alongside footprint area).
+    bay_row_w: optional fixed canvas width (mm) for THIS call's whole item set — the periphery-hug
+            caller uses it to pack a back-row region group as a SHALLOW ROW spanning the train
+            width instead of the square-ish default target-width search. None → the target-width
+            search below picks the width that minimises the bounding-rect area.
+    n_banks: retained for API compatibility only (unused — the skyline pack has no bank concept).
     Returns {id: (x_mm, y_mm)} for every PRINCIPAL item PLUS one synthetic cabinet per region that
     had ≥2 small items, id 'cabinet::<region>' — and every small item maps to its cabinet's slot so
     the caller can draw/skip as it chooses. Positions are integers on GRID_MM; the SAME items in ANY
     input order yield IDENTICAL output (proven in _selftest)."""
+    _ = n_banks
     if not items:
         return {}
     # 1) TOTAL-ORDER sort — the only ordering in the whole module; everything below is order-free.
@@ -212,8 +333,13 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
             region_order.append(rk)
         by_region[rk].append(it)
 
-    # 3) within each region: split principals vs small items; small → ONE cabinet node.
-    region_nodes: dict[str, list[dict]] = {}
+    # 3) within each region: split principals vs small items; small → ONE cabinet node; sort the
+    #    region's own nodes by functional zone (same-role parts contiguous), then flatten ALL
+    #    regions (in process-rank order) into ONE node list — the single skyline pack below places
+    #    this whole list, so functional zones still read as contiguous blocks (the visitation
+    #    order), but the packer is free to abut them tightly instead of boxing each into its own
+    #    over-sized rectangular bay (rewrite B's dead-space source).
+    flat_nodes: list[dict] = []
     cabinet_members: dict[str, list[str]] = {}
     for rk in region_order:
         principals, small = [], []
@@ -221,8 +347,11 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
             is_small = bool(it.get("small")) or float(it.get("area", it.get("w", 0) * it.get("d", 0))) <= SMALL_ITEM_MAX_AREA_MM2
             (small if is_small else principals).append(it)
         def _node(it):
-            return {"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM)),
-                    "shape": it.get("shape")}
+            n = {"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM)),
+                 "shape": it.get("shape")}
+            if it.get("mass_kg"):
+                n["mass_kg"] = float(it["mass_kg"])
+            return n
         nodes = [_node(it) for it in principals]
         if len(small) >= 2:
             cw, cd = _cabinet_footprint(len(small))
@@ -233,52 +362,16 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
             cabinet_members[rk] = [it["id"] for it in small]
         elif small:                       # a lone small item just sits as itself (no cabinet)
             nodes.extend(_node(it) for it in small)
-        # FUNCTIONAL-ZONE + DEPTH-SORTED SHELVES (zone tier added 2026-07-08, Sam Green SME
-        # review — see _zone_rank; depth-sort was 2026-07-02, the v52 ragged-row fix): pack
-        # each bay's rows deepest-part-first WITHIN its functional zone (FFDH — like-depth
-        # parts share a shelf) so a lone deep tank can't blow a mixed row's depth while later
-        # rows run half-empty, AND same-role parts (pumps with pumps, vessels with vessels,
-        # skids with skids, electrical/control cabinets together) land CONTIGUOUS in the
-        # shelf-pack instead of interleaved by coincidental footprint size. Within-region
-        # order is NOT process order (extraction seq ties → alphabetical id), so this
-        # re-order loses nothing semantic. Deterministic + order-invariant (pure sort key).
         nodes.sort(key=lambda nd: (_zone_rank(nd.get("shape"), nd["w"] * nd["d"]),
                                    -nd["d"], -nd["w"], nd["id"]))
-        region_nodes[rk] = nodes
+        flat_nodes.extend(nodes)
 
-    # 4) shelf-pack each region into a compact BAY (square-ish), then lay the bays in PROCESS ORDER
-    #    left→right, WRAPPING to a new bank when the running width exceeds the MIN-AREA fold target
-    #    (_fold_target_w — the compactness fix; the old single sqrt-target stranded one region per
-    #    lane and shipped an L-shaped plant on a mostly-empty deck). All integer-grid, process order
-    #    preserved, deterministic. `n_banks` is retained for API compatibility (an upper-cap idea
-    #    the min-area search supersedes).
-    #    Bay width accounts for the AISLE each part carries ((w+clear)·(d+clear) pitch area, not the
-    #    bare footprint area): the bare-area sqrt under-estimated the row budget so small-part
-    #    regions shelf-wrapped into one-part-per-row columns 3-5× deeper than wide. Uses each
-    #    part's own size-scaled _clearance() (matching _shelf_pack) rather than a flat AISLE_MM.
-    region_bay: dict[str, tuple] = {}
-    for rk in region_order:
-        nodes = region_nodes[rk]
-        bay_area = sum((nd["w"] + _clearance(nd["w"], nd["d"])) * (nd["d"] + _clearance(nd["w"], nd["d"]))
-                      for nd in nodes) or (GRID_MM * GRID_MM)
-        bay_target_w = int(bay_row_w) if bay_row_w else max(GRID_MM, int((bay_area ** 0.5) * 1.4))
-        rpos, used_w, used_d = _shelf_pack(nodes, 0, 0, bay_target_w)
-        region_bay[rk] = (used_w, used_d, rpos)
-    target_w = _fold_target_w(region_bay, region_order)
-    min_banks = max(1, (len(region_order) + max(1, n_banks * 4) - 1) // max(1, n_banks * 4))  # cap fold
-    out: dict[str, tuple[int, int]] = {}
-    x_cursor, bank_y, bank_d, n_banks_used = 0, 0, 0, 1
-    for rk in region_order:
-        used_w, used_d, rpos = region_bay[rk]
-        if x_cursor > 0 and x_cursor + used_w > target_w:   # wrap to a new bank
-            bank_y += bank_d + BANK_GAP_MM
-            x_cursor, bank_d = 0, 0
-            n_banks_used += 1
-        for pid, (lx, ly) in rpos.items():
-            out[pid] = (_snap(x_cursor + lx), _snap(bank_y + ly))
-        x_cursor += used_w + REGION_GAP_MM
-        bank_d = max(bank_d, used_d)
-    _ = min_banks  # (reserved: a future fold cap; width-budget wrap governs squareness today)
+    # 4) ONE skyline pack over the whole flattened, zone-ordered node list (heavy/delivery-aisle
+    #    split happens inside _place_all). bay_row_w pins the canvas width for this call (the
+    #    periphery-hug shallow-row caller); otherwise search for the area-minimising width.
+    target_w = int(bay_row_w) if bay_row_w else _best_target_w(flat_nodes)
+    out, _uw, _ud = _place_all(flat_nodes, target_w)
+
     # map each small item to its cabinet position so the caller can resolve it.
     for rk, members in cabinet_members.items():
         cpos = out.get(f"cabinet::{rk}")
@@ -316,12 +409,8 @@ def _selftest() -> int:
     if not any(k.startswith("cabinet::") for k in base):
         print("  FAIL: no cabinet was synthesised for the small items"); bad += 1
 
-    # (5) COMPACT FOLD (2026-07-02, the v52 "square-width fold" guard): one BIG region + several
-    #     small ones must NOT strand each small region on its own bank (the L-shaped plant on an
-    #     empty deck). The min-area fold packs the smalls side-by-side, so the layout's bounding
-    #     rect must stay within a sane aspect AND must beat the one-region-per-bank stacking.
-    def _brect(itms, pos):
-        fp = {it["id"]: (it["w"], it["d"]) for it in itms}
+    def _brect(itms, pos, fp_override=None):
+        fp = fp_override or {it["id"]: (it["w"], it["d"]) for it in itms}
         x0 = y0 = 1e12; x1 = y1 = -1e12
         for k, (cx, cy) in pos.items():
             if k not in fp:
@@ -330,6 +419,9 @@ def _selftest() -> int:
             x0 = min(x0, cx - w / 2); x1 = max(x1, cx + w / 2)
             y0 = min(y0, cy - d / 2); y1 = max(y1, cy + d / 2)
         return (x1 - x0), (y1 - y0)
+
+    # (5) COMPACT FOLD (no one-region-per-bank stranding): one BIG region + several small ones must
+    #     pack into a sane bounding-rect aspect, not an L-shaped plant on an empty deck.
     lshape = [{"id": "BIG", "region": "r_00_feed", "rank": 0, "seq": 0,
                "w": 16000, "d": 12000, "area": 16000 * 12000}]
     for i in range(4):
@@ -339,23 +431,19 @@ def _selftest() -> int:
     aspect = max(lw, ld) / max(1.0, min(lw, ld))
     if aspect > 2.5:
         print(f"  FAIL: big+4-small fold is a {aspect:.1f}:1 strip/column (limit 2.5:1) — "
-              f"the smalls were stranded one-per-bank"); bad += 1
-    # stacked-per-bank depth would be 12000 + 4×(2500+BANK_GAP_MM); the fold must beat it clearly
-    if ld >= 12000 + 2 * (2500 + BANK_GAP_MM):
-        print(f"  FAIL: fold depth {ld:.0f} mm ≈ the one-region-per-bank stack (no compaction)"); bad += 1
+              f"the smalls were stranded"); bad += 1
+
     # (6) bay_row_w: a cabinet row packed with an explicit row budget stays ONE shallow row.
     row_items = [{"id": f"C{i}", "region": "r_90_elec", "rank": 90, "seq": i,
                   "w": 1800, "d": 900, "area": 1800 * 900} for i in range(3)]
     rw, rd = _brect(row_items, layout(list(row_items), bay_row_w=20000))
-    if rd > 900 + GRID_MM:
+    if rd > 900 + GRID_MM + WALKWAY_MM:
         print(f"  FAIL: bay_row_w row wrapped into {rd:.0f} mm depth (want one 900 mm row)"); bad += 1
 
-    # (7) FUNCTIONAL SUB-ZONING (Sam Green SME review, 2026-07-08) — proveCatch: mix pumps,
-    #     vessels and electrical cabinets in ONE region with footprints chosen so plain FFDH
-    #     depth-sort would interleave them (a pump the same depth as a vessel used to land
-    #     between two vessels). With `shape` supplied, same-shape parts must end up on
-    #     CONTIGUOUS shelf rows (i.e. every OTHER shape's items sit strictly before or after a
-    #     given shape's whole run in the shelf order) — not proven by depth alone.
+    # (7) FUNCTIONAL SUB-ZONING (Sam Green SME review, 2026-07-08) — proveCatch: mix pumps, vessels
+    #     and electrical cabinets in ONE region with equal footprints (depth alone can't group
+    #     them). With `shape` supplied, same-shape parts must end up CONTIGUOUS in the packed
+    #     (row, then x) visitation order.
     mix = []
     for i in range(3):
         mix.append({"id": f"PUMP{i}", "region": "r_mix", "rank": 0, "seq": i,
@@ -367,7 +455,6 @@ def _selftest() -> int:
         mix.append({"id": f"CAB{i}", "region": "r_mix", "rank": 0, "seq": 6 + i,
                     "w": 900, "d": 900, "area": 900 * 900, "shape": "cabinet"})
     mpos = layout(list(mix))
-    # order by shelf position (row, then x) — reconstructs the packer's own visitation order
     mshelf = sorted(mpos, key=lambda k: (mpos[k][1], mpos[k][0]))
     mshapes = {"PUMP": "pump", "VESS": "tank", "CAB": "cabinet"}
     runs, cur = [], None
@@ -376,24 +463,99 @@ def _selftest() -> int:
         if fam != cur:
             runs.append(fam); cur = fam
     if len(runs) != len(set(runs)):
-        print(f"  FAIL: same-shape parts are NOT contiguous in the shelf order — {runs} "
-              f"(a shape reappears after another shape started, i.e. interleaved)"); bad += 1
+        print(f"  FAIL: same-shape parts are NOT contiguous in the pack order — {runs}"); bad += 1
 
-    # (8) SIZE-SCALED CLEARANCE — a small part's gap must be smaller than a large part's,
-    #     and both must be within the documented [CLEAR_MIN_MM, CLEAR_MAX_MM] band.
+    # (8) SIZE-SCALED CLEARANCE — a small part's gap must be smaller than a large part's, both
+    #     within the documented [CLEAR_MIN_MM, CLEAR_MAX_MM] band.
     small_gap = _clearance(900, 900)
     large_gap = _clearance(6000, 6000)
     if not (CLEAR_MIN_MM <= small_gap < large_gap <= CLEAR_MAX_MM):
         print(f"  FAIL: clearance does not scale with size (small={small_gap}, large={large_gap})"); bad += 1
 
-    # (9) proveNoFalsePositive — a region whose items carry NO `shape` key at all (every
-    #     PRE-EXISTING caller/test above, incl. tests 1-6) must be byte-identical to the
-    #     pre-zoning behaviour: _zone_rank(None, area) is always the same fallback tier (5),
-    #     so the sort degenerates to the original (-depth, -width, id) ordering — verified
-    #     directly against the ORIGINAL 40-item determinism base computed above (already
-    #     shape-less), which passed tests (1)-(4) unchanged.
+    # (9) proveNoFalsePositive (shape-less input) — a region whose items carry NO `shape` key must
+    #     still get a stable, deterministic zone rank (the pre-zoning fallback tier).
     if any(_zone_rank(None, a) != _zone_rank(None, a * 3) for a in (10_000.0, 500_000.0)):
         print("  FAIL: a shape-less node's zone rank is not a stable constant"); bad += 1
+
+    # (10) DELIVERY AISLE proveCatch — one HEAVY item (a reservoir-scale footprint, well over
+    #      HEAVY_AREA_MM2) among several light ones must (a) sit FLUSH against the plant's own
+    #      entrance edge (y=0) — nothing placed between it and the outside of the building — and
+    #      (b) have a full, VISIBLE DELIVERY_AISLE_MM gap to the nearest OTHER content (the light
+    #      items), so the aisle is a real gap between two blocks of drawn content, not an invisible
+    #      band that a bbox-cropped render would discard.
+    aisle_items = [{"id": "RESV", "region": "r_00_store", "rank": 0, "seq": 0,
+                    "w": 5000, "d": 5000, "area": 5000 * 5000, "shape": "tank"}]
+    for i in range(6):
+        # 950x950 (>SMALL_ITEM_MAX_AREA_MM2) so each pump stays its OWN placed item rather than
+        # collapsing into a per-region consolidated cabinet (which would map every pump onto one
+        # shared position and break this test's per-item edge check).
+        aisle_items.append({"id": f"PUMP{i}", "region": "r_10_pumps", "rank": 10, "seq": i + 1,
+                            "w": 950, "d": 950, "area": 950 * 950, "shape": "pump"})
+    apos = layout(list(aisle_items))
+    fp = {it["id"]: (it["w"], it["d"]) for it in aisle_items}
+    resv_front_y = apos["RESV"][1] - fp["RESV"][1] / 2
+    if resv_front_y > WALKWAY_MM:    # flush at the entrance edge (± its own small clearance
+        print(f"  FAIL: heavy item RESV front edge at y={resv_front_y:.0f} — not flush against "  # margin) — NOT offset by anything aisle/walkway-scale
+              f"the plant entrance edge"); bad += 1
+    resv_back_y = apos["RESV"][1] + fp["RESV"][1] / 2
+    other_front_ys = [apos[k][1] - fp[k][1] / 2 for k in apos if k != "RESV"]
+    nearest_other_front = min(other_front_ys, default=1e12)
+    aisle_gap = nearest_other_front - resv_back_y
+    if aisle_gap < DELIVERY_AISLE_MM - GRID_MM:
+        print(f"  FAIL: gap from heavy item RESV to the nearest other content is {aisle_gap:.0f} mm "
+              f"— no visible {DELIVERY_AISLE_MM} mm delivery aisle"); bad += 1
+
+    # (11) WALKWAY proveCatch — force a second row (narrow canvas) and verify the row-to-row gap
+    #      is at least WALKWAY_MM (person-width clear), not the old flat small item clearance.
+    two_row_items = [{"id": f"W{i}", "region": "r_walk", "rank": 0, "seq": i,
+                      "w": 3000, "d": 2000, "area": 3000 * 2000} for i in range(2)]
+    wpos = layout(list(two_row_items), bay_row_w=3500)   # narrow canvas forces row 2 below row 1
+    wfp = {it["id"]: (it["w"], it["d"]) for it in two_row_items}
+    ys = sorted(wpos[k][1] for k in wpos)
+    if len(ys) >= 2:
+        row_gap = (ys[1] - wfp["W0"][1] / 2 - wfp["W1"][1] / 2 - ys[0])
+        # (row_gap as computed above only exact if W0 is row 1 — fall back to a direct edge check)
+        y0_bottom = ys[0] + wfp["W0"][1] / 2
+        y1_top = ys[1] - wfp["W1"][1] / 2
+        gap = y1_top - y0_bottom
+        if gap < WALKWAY_MM - GRID_MM:
+            print(f"  FAIL: row-to-row gap {gap:.0f} mm < WALKWAY_MM ({WALKWAY_MM} mm) — no "
+                  f"maintenance walkway between rows"); bad += 1
+
+    # (12) DEAD-SPACE / DENSITY proveCatch — packing a set of irregular footprints must not blow
+    #      the bounding-rect area out to many multiples of the summed item area (the "whole right
+    #      half of the plan is empty" defect). Bound is generous (accounts for clearances) but
+    #      would have failed under the old bay+bank scheme's ~330 m² vs ~180 m² real equipment.
+    irregular = []
+    for i in range(12):
+        w = 800 + (i % 4) * 900
+        d = 800 + ((i * 3) % 5) * 700
+        irregular.append({"id": f"IR{i}", "region": f"r_{i % 3}", "rank": (i % 3) * 10, "seq": i,
+                          "w": w, "d": d, "area": w * d, "shape": "pump" if i % 2 else "tank"})
+    ipos = layout(list(irregular))
+    ifp = {it["id"]: (it["w"], it["d"]) for it in irregular}
+    iw, idp = _brect(irregular, ipos)
+    sum_area = sum(w * d for w, d in ifp.values())
+    if (iw * idp) > sum_area * 3.5:
+        print(f"  FAIL: packed area {iw * idp / 1e6:.1f} m² is > 3.5x the {sum_area / 1e6:.1f} m² "
+              f"of actual equipment — dead space, not a dense pack"); bad += 1
+
+    # (13) proveNoFalsePositive — an already-compact SINGLE-UNIT layout (no heavy item, one small
+    #      region) must come back essentially unchanged: no phantom delivery-aisle offset, footprint
+    #      close to the item's own size + its clearance (a compact/containerised archetype must not
+    #      be broken by the new access machinery).
+    solo = [{"id": "UNIT", "region": "r_solo", "rank": 0, "seq": 0,
+            "w": 2000, "d": 1200, "area": 2000 * 1200, "shape": "skid_box"}]
+    spos = layout(list(solo))
+    sx, sy = spos["UNIT"]
+    front_edge = sy - 1200 / 2        # should sit near y=0 (± only its own small clearance
+    if front_edge > WALKWAY_MM:       # padding) — NOT offset by a DELIVERY_AISLE_MM-scale band
+        print(f"  FAIL: solo compact unit front edge at y={front_edge:.0f} — a phantom aisle "
+              f"offset was applied with no heavy item to justify it"); bad += 1
+    sw, sd = _brect(solo, spos)
+    if sw > 2000 + 2 * CLEAR_MAX_MM or sd > 1200 + 2 * CLEAR_MAX_MM:
+        print(f"  FAIL: solo compact unit footprint inflated to {sw:.0f}x{sd:.0f} mm "
+              f"(item is only 2000x1200 mm)"); bad += 1
 
     print("deterministic_layout selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

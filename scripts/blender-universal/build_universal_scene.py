@@ -187,9 +187,15 @@ def _det_layout_key(p):
     return f"{getattr(p, 'name', '')}\x1f{int(getattr(p, '_seq', 0))}"
 
 
-# Clear aisle [mm] between the process-train block and the hugged periphery row —
-# a walkable maintenance gap that still reads as ONE plant, not a detached island.
-PERIPHERY_HUG_GAP_MM = 2500
+# Clear aisle [mm] between the process-train block and the hugged periphery row — a walkable
+# maintenance gap that still reads as ONE plant, not a detached island. Was a flat 2500 mm
+# (Tristan 2026-07-02); re-aligned 2026-07-08 to dl.WALKWAY_MM (900 mm, person-width clear) — the
+# SAME "how wide is a maintenance walkway" constant the new dense skyline packer uses everywhere
+# else in the plant, so this transition isn't an oversized leftover flat gap next to genuinely
+# tight packing (exactly the kind of dead-space Sam Green's SME review flagged): the periphery
+# block here is small electrical/control cabinets, not truck-delivered kit, so it only ever
+# needed a walkway, never a vehicle aisle.
+PERIPHERY_HUG_GAP_MM = dl.WALKWAY_MM
 
 # The connection-ledger topology, published by place_process_plant for the det-layout
 # manifold hug (an inline manifold/header places BESIDE the run it serves, not wherever
