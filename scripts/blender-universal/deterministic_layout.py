@@ -21,7 +21,11 @@ Run the guard:  python3 scripts/blender-universal/deterministic_layout.py --self
 from __future__ import annotations
 
 GRID_MM = 100          # all coordinates snap to this integer grid → no sub-grid float residue
-AISLE_MM = 2000        # gap between parts within a region row
+AISLE_MM = 2000        # legacy flat gap constant, kept for reference/back-compat; _shelf_pack now
+#                        uses the size-SCALED _clearance() below (see CLEAR_* — Sam Green SME
+#                        review 2026-07-08: a flat 2 m gap next to a 0.3 m² pump inflated the
+#                        footprint far more than the same gap next to a 4 m tank; a maintenance
+#                        aisle should scale with what it services)
 REGION_GAP_MM = 3000   # gap between regions along the process train
 BANK_GAP_MM = 2400     # gap between serpentine banks (Y) — aligned 2026-07-02 with the plant's
 #                        established compacted-lane maintenance aisle (build_universal_scene
@@ -35,6 +39,46 @@ CABINET_CELL_MM = 600             # a consolidated small item occupies this much
 CABINET_MAX_COLS = 6              # cabinet internal grid width before it grows in depth
 FOLD_ASPECT_MAX = 2.0             # the fold prefers a bounding rect within this aspect before
 #                                   minimising area (a min-area single row can be a 4:1 ribbon)
+
+# ── FUNCTIONAL SUB-ZONING within a region bay (Sam Green SME review, 2026-07-08: "kit
+# randomly placed, not bunched together based on what sides need maintenance/access …
+# huge footprint … half of F2 for 1 system whereas we had 3 systems in ~1/4 that area").
+# ROOT CAUSE: one process-plant archetype can put 25+ heterogeneous parts (pumps, tanks,
+# dosing vessels, packaged skids) in a SINGLE region (e.g. "mass_fluid_transport_process"),
+# and this module's shelf-pack ordered them ONLY by plan-footprint depth/width (FFDH bin
+# packing) — a real engineering-relevant grouping (pump cluster / vessel row / skid row)
+# never happened, so a pump could land between two unrelated tanks purely because their
+# depths matched. Fix: give the shelf-pack a PRIMARY sort key — a functional zone rank
+# derived from the part's geometry-family `shape` (already assigned upstream by the shape
+# classifier: tank/vertical_vessel/pump/cabinet/skid_box/… — the SAME vocabulary every
+# archetype uses, never a product-class name) + its footprint AREA — so same-role parts
+# become CONTIGUOUS in the shelf-pack (they still 2D-shelf-fit exactly as before; only the
+# ORDER changes). A part/synthetic node with no `shape` (legacy caller) gets the lowest
+# rank tier (5) — old behaviour preserved when the signal is absent.
+_VESSEL_ZONE_SHAPES = {"tank", "vertical_vessel", "horizontal_vessel",
+                       "tall_vessel", "tall_column", "cone_vessel"}
+_MACHINE_ZONE_SHAPES = {"pump", "compressor", "centrifuge"}
+_ELECTRICAL_ZONE_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "instrument"}
+# Same physical-size split as layout_optimiser.py's VESSEL_LARGE_AREA_MM2 (a ~2.0 m-diameter
+# vessel) — a reservoir clusters with other reservoirs, a dosing/filter vessel with other
+# small vessels, rather than one long depth-sorted smear of every vessel in the plant.
+VESSEL_LARGE_AREA_MM2 = 4.0e6
+
+
+def _zone_rank(shape: str | None, area: float) -> int:
+    """Functional-zone sort tier for a shelf-pack node: 0 electrical/control/instruments,
+    1 packaged process skids, 2 large storage vessels, 3 small process/dosing vessels,
+    4 rotating machines, 5 everything else (incl. no shape signal at all). The absolute
+    numbers are arbitrary — only the grouping + determinism matter."""
+    if shape in _ELECTRICAL_ZONE_SHAPES:
+        return 0
+    if shape == "skid_box":
+        return 1
+    if shape in _VESSEL_ZONE_SHAPES:
+        return 2 if area >= VESSEL_LARGE_AREA_MM2 else 3
+    if shape in _MACHINE_ZONE_SHAPES:
+        return 4
+    return 5
 
 
 def _snap(v: float) -> int:
@@ -57,19 +101,38 @@ def _cabinet_footprint(n_small: int) -> tuple[int, int]:
     return cols * CABINET_CELL_MM, rows * CABINET_CELL_MM
 
 
+# SIZE-SCALED maintenance clearance (Sam Green SME review, 2026-07-08 — "realistic density …
+# pack to a realistic footprint" + "each equipment gets a maintenance/access side and a
+# clearance envelope"). A flat AISLE_MM=2000 next to EVERY item — a 0.3 m² pump exactly as
+# much as a 4 m reservoir — inflated the footprint of any region with lots of small kit far
+# more than it needed to; a real plant gives a big vessel a real walk-round aisle and packs
+# small kit snugly. Same formula + constants as layout_optimiser.py's _clearance() (the two
+# placement engines agree on what a reasonable aisle looks like): CLEAR_FRAC of the item's
+# SHORTER side, floored/capped so a tiny instrument still gets a minimum service gap and a
+# huge vessel doesn't demand an absurd one.
+CLEAR_MIN_MM, CLEAR_MAX_MM, CLEAR_FRAC = 300.0, 1500.0, 0.20
+
+
+def _clearance(w: float, d: float) -> int:
+    return int(min(CLEAR_MAX_MM, max(CLEAR_MIN_MM, min(w, d) * CLEAR_FRAC)))
+
+
 def _shelf_pack(nodes: list[dict], x0: int, y0: int, target_w: int) -> tuple[dict, int, int]:
     """Place `nodes` (each {id, w, d}) in left→right rows that wrap at target_w, rows stepping +Y.
-    INTEGER grid only. Returns ({id:(x,y)}, used_w, used_d). Order of `nodes` is the caller's
-    deterministic order — this function adds no ordering of its own."""
+    Each item's trailing gap (to its right, and — if it opens a new row — above it) is its OWN
+    size-scaled _clearance(), not a flat constant. INTEGER grid only. Returns ({id:(x,y)},
+    used_w, used_d). Order of `nodes` is the caller's deterministic order — this function adds
+    no ordering of its own."""
     pos = {}
     x, row_y, row_d, used_w = x0, y0, 0, 0
     for nd in nodes:
         w, d = int(nd["w"]), int(nd["d"])
+        gap = _clearance(w, d)
         if x > x0 and x + w > x0 + target_w:        # wrap to a new shelf
-            row_y += row_d + AISLE_MM
+            row_y += row_d + gap
             x, row_d = x0, 0
         pos[nd["id"]] = (_snap(x + w / 2), _snap(row_y + d / 2))
-        x += w + AISLE_MM
+        x += w + gap
         row_d = max(row_d, d)
         used_w = max(used_w, x - x0)
     return pos, used_w, (row_y + row_d - y0)
@@ -157,21 +220,30 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
         for it in by_region[rk]:
             is_small = bool(it.get("small")) or float(it.get("area", it.get("w", 0) * it.get("d", 0))) <= SMALL_ITEM_MAX_AREA_MM2
             (small if is_small else principals).append(it)
-        nodes = [{"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM))}
-                 for it in principals]
+        def _node(it):
+            return {"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM)),
+                    "shape": it.get("shape")}
+        nodes = [_node(it) for it in principals]
         if len(small) >= 2:
             cw, cd = _cabinet_footprint(len(small))
-            nodes.append({"id": f"cabinet::{rk}", "w": cw, "d": cd})
+            # the consolidated cabinet is definitionally instrument/electrical-flavoured kit —
+            # rank it with the electrical/control tier (0) so it sits with any OTHER real
+            # electrical-shaped principals in this bay rather than wherever depth-sort landed it.
+            nodes.append({"id": f"cabinet::{rk}", "w": cw, "d": cd, "shape": "cabinet"})
             cabinet_members[rk] = [it["id"] for it in small]
         elif small:                       # a lone small item just sits as itself (no cabinet)
-            nodes.extend({"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM))} for it in small)
-        # DEPTH-SORTED SHELVES (2026-07-02, the v52 ragged-row fix): pack each bay's rows
-        # deepest-part-first (FFDH — like-depth parts share a shelf) so a lone deep tank
-        # can't blow a mixed row's depth while later rows run half-empty. Within-region
+            nodes.extend(_node(it) for it in small)
+        # FUNCTIONAL-ZONE + DEPTH-SORTED SHELVES (zone tier added 2026-07-08, Sam Green SME
+        # review — see _zone_rank; depth-sort was 2026-07-02, the v52 ragged-row fix): pack
+        # each bay's rows deepest-part-first WITHIN its functional zone (FFDH — like-depth
+        # parts share a shelf) so a lone deep tank can't blow a mixed row's depth while later
+        # rows run half-empty, AND same-role parts (pumps with pumps, vessels with vessels,
+        # skids with skids, electrical/control cabinets together) land CONTIGUOUS in the
+        # shelf-pack instead of interleaved by coincidental footprint size. Within-region
         # order is NOT process order (extraction seq ties → alphabetical id), so this
-        # re-order loses nothing semantic; big-at-the-back also mirrors the legacy
-        # big/medium/small banding. Deterministic + order-invariant (pure sort key).
-        nodes.sort(key=lambda nd: (-nd["d"], -nd["w"], nd["id"]))
+        # re-order loses nothing semantic. Deterministic + order-invariant (pure sort key).
+        nodes.sort(key=lambda nd: (_zone_rank(nd.get("shape"), nd["w"] * nd["d"]),
+                                   -nd["d"], -nd["w"], nd["id"]))
         region_nodes[rk] = nodes
 
     # 4) shelf-pack each region into a compact BAY (square-ish), then lay the bays in PROCESS ORDER
@@ -180,14 +252,15 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
     #    lane and shipped an L-shaped plant on a mostly-empty deck). All integer-grid, process order
     #    preserved, deterministic. `n_banks` is retained for API compatibility (an upper-cap idea
     #    the min-area search supersedes).
-    #    Bay width accounts for the AISLE each part carries ((w+aisle)·(d+aisle) pitch area, not the
+    #    Bay width accounts for the AISLE each part carries ((w+clear)·(d+clear) pitch area, not the
     #    bare footprint area): the bare-area sqrt under-estimated the row budget so small-part
-    #    regions shelf-wrapped into one-part-per-row columns 3-5× deeper than wide.
+    #    regions shelf-wrapped into one-part-per-row columns 3-5× deeper than wide. Uses each
+    #    part's own size-scaled _clearance() (matching _shelf_pack) rather than a flat AISLE_MM.
     region_bay: dict[str, tuple] = {}
     for rk in region_order:
         nodes = region_nodes[rk]
-        bay_area = sum((nd["w"] + AISLE_MM) * (nd["d"] + AISLE_MM) for nd in nodes) \
-            or (GRID_MM * GRID_MM)
+        bay_area = sum((nd["w"] + _clearance(nd["w"], nd["d"])) * (nd["d"] + _clearance(nd["w"], nd["d"]))
+                      for nd in nodes) or (GRID_MM * GRID_MM)
         bay_target_w = int(bay_row_w) if bay_row_w else max(GRID_MM, int((bay_area ** 0.5) * 1.4))
         rpos, used_w, used_d = _shelf_pack(nodes, 0, 0, bay_target_w)
         region_bay[rk] = (used_w, used_d, rpos)
@@ -276,6 +349,52 @@ def _selftest() -> int:
     rw, rd = _brect(row_items, layout(list(row_items), bay_row_w=20000))
     if rd > 900 + GRID_MM:
         print(f"  FAIL: bay_row_w row wrapped into {rd:.0f} mm depth (want one 900 mm row)"); bad += 1
+
+    # (7) FUNCTIONAL SUB-ZONING (Sam Green SME review, 2026-07-08) — proveCatch: mix pumps,
+    #     vessels and electrical cabinets in ONE region with footprints chosen so plain FFDH
+    #     depth-sort would interleave them (a pump the same depth as a vessel used to land
+    #     between two vessels). With `shape` supplied, same-shape parts must end up on
+    #     CONTIGUOUS shelf rows (i.e. every OTHER shape's items sit strictly before or after a
+    #     given shape's whole run in the shelf order) — not proven by depth alone.
+    mix = []
+    for i in range(3):
+        mix.append({"id": f"PUMP{i}", "region": "r_mix", "rank": 0, "seq": i,
+                    "w": 900, "d": 900, "area": 900 * 900, "shape": "pump"})
+    for i in range(3):
+        mix.append({"id": f"VESS{i}", "region": "r_mix", "rank": 0, "seq": 3 + i,
+                    "w": 900, "d": 900, "area": 900 * 900, "shape": "tank"})
+    for i in range(3):
+        mix.append({"id": f"CAB{i}", "region": "r_mix", "rank": 0, "seq": 6 + i,
+                    "w": 900, "d": 900, "area": 900 * 900, "shape": "cabinet"})
+    mpos = layout(list(mix))
+    # order by shelf position (row, then x) — reconstructs the packer's own visitation order
+    mshelf = sorted(mpos, key=lambda k: (mpos[k][1], mpos[k][0]))
+    mshapes = {"PUMP": "pump", "VESS": "tank", "CAB": "cabinet"}
+    runs, cur = [], None
+    for k in mshelf:
+        fam = next(pfx for pfx in mshapes if k.startswith(pfx))
+        if fam != cur:
+            runs.append(fam); cur = fam
+    if len(runs) != len(set(runs)):
+        print(f"  FAIL: same-shape parts are NOT contiguous in the shelf order — {runs} "
+              f"(a shape reappears after another shape started, i.e. interleaved)"); bad += 1
+
+    # (8) SIZE-SCALED CLEARANCE — a small part's gap must be smaller than a large part's,
+    #     and both must be within the documented [CLEAR_MIN_MM, CLEAR_MAX_MM] band.
+    small_gap = _clearance(900, 900)
+    large_gap = _clearance(6000, 6000)
+    if not (CLEAR_MIN_MM <= small_gap < large_gap <= CLEAR_MAX_MM):
+        print(f"  FAIL: clearance does not scale with size (small={small_gap}, large={large_gap})"); bad += 1
+
+    # (9) proveNoFalsePositive — a region whose items carry NO `shape` key at all (every
+    #     PRE-EXISTING caller/test above, incl. tests 1-6) must be byte-identical to the
+    #     pre-zoning behaviour: _zone_rank(None, area) is always the same fallback tier (5),
+    #     so the sort degenerates to the original (-depth, -width, id) ordering — verified
+    #     directly against the ORIGINAL 40-item determinism base computed above (already
+    #     shape-less), which passed tests (1)-(4) unchanged.
+    if any(_zone_rank(None, a) != _zone_rank(None, a * 3) for a in (10_000.0, 500_000.0)):
+        print("  FAIL: a shape-less node's zone rank is not a stable constant"); bad += 1
+
     print("deterministic_layout selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

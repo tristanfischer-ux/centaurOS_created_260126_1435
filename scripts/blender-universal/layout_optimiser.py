@@ -35,10 +35,17 @@ CLEAR_MIN_MM, CLEAR_MAX_MM, CLEAR_FRAC = 300.0, 1500.0, 0.20
 # against the connection weights — high enough to keep the footprint tight, low enough that
 # it never overrides a real high-flow main.
 COMPACT_W = 1.5
+# The zone-affinity pull (functional zoning, below): tuned to beat a "signal" tie (0.4)
+# and sit near a "power" tie (1.4) — enough to bunch weakly-connected same-role kit —
+# while staying well under a real "water"/"thermal" process MAIN (base 3.0 × a
+# log-scaled flow factor ≥1), so a genuine high-flow connection always wins over the
+# zone pull. Declared up front so _SERVICE_BASE (next) can reference it.
+ZONE_AFFINITY_W = 2.2
 # Service → base objective weight (keep the high-cost services SHORT). Fluid/thermal mains
 # dominate (£/m × bore); power next; signal/assembly are cheap + short by nature.
 _SERVICE_BASE = {"water": 3.0, "thermal": 3.0, "air": 1.6, "power": 1.4,
-                 "signal": 0.4, "assembly": 0.5}
+                 "signal": 0.4, "assembly": 0.5,
+                 "__zone__": ZONE_AFFINITY_W}   # synthetic functional-zoning pull (below)
 # HAZARD SEPARATION — pairs that must sit ≥ the stated metres apart (oxidiser/cryogen away
 # from ignition; the standby genset off the wet process block). Class-agnostic vocabulary.
 _OXIDISER_RE = re.compile(r"\blox\b|liquid[_ -]?oxygen|oxygen[_ -]?(?:supply|cone|generat)|"
@@ -46,6 +53,97 @@ _OXIDISER_RE = re.compile(r"\blox\b|liquid[_ -]?oxygen|oxygen[_ -]?(?:supply|con
 _IGNITION_RE = re.compile(r"generator|genset|\bgas\b|boiler|fired|flame|switchgear|"
                           r"transformer|\bmcc\b|motor[_ -]?control", re.I)
 HAZARD_SEP_MM = 8000    # ≥ 8 m oxidiser ↔ ignition (a typical process safety separation)
+
+# ── FUNCTIONAL ZONING (Sam Green SME review, 2026-07-08: "kit randomly placed, not
+# bunched together based on what sides need maintenance/access … huge footprint for a
+# 45 m³ system … half of F2 for 1 system whereas we had 3 systems in ~1/4 that area").
+# Root cause: the CRAFT objective only pulls parts together when a REAL topology edge
+# connects them + a weak global compactness term. Weakly-connected same-ROLE kit (field
+# instruments, electrical/control cabinets, small dosing vessels) has near-zero incident
+# weight, so it gets placed LAST (the `order` sort is `-incident`) into whatever cell is
+# left over once the heavy process train has claimed the centre — scattering it across
+# the periphery instead of bunching it with its own kind, exactly Sam's complaint.
+#
+# Fix: classify every node into a ZONE from GENERIC, UNIVERSAL signals ONLY — its
+# geometry-family `shape` (already assigned upstream by the shape classifier: tank/
+# vertical_vessel/pump/cabinet/skid_box/… — the same vocabulary every archetype uses,
+# NEVER a product-class name) + its footprint AREA (a physical quantity) +, as a
+# fallback, its `module` (the universal module-decomposition id — energy_storage_source/
+# power_distribution/control_compute_communication/… — again archetype-agnostic). Then
+# add a bounded, deterministic "zone affinity" pseudo-edge from every zone member to its
+# zone's HUB (the largest-footprint member, tie-broken by name) — ONE extra edge per
+# non-hub part, so a big zone's aggregate pull on any single part never exceeds one
+# edge's weight and can never swamp a real process MAIN. This buys BOTH of Sam's asks
+# at once: parts of a kind cluster (functional zoning) AND the cluster is TIGHT (the
+# CRAFT search naturally shelf-fits a hub + its close spokes far more densely than the
+# same parts scattered with no shared attractor — this is the density fix, not a
+# separate packing pass).
+_VESSEL_ZONE_SHAPES = {"tank", "vertical_vessel", "horizontal_vessel",
+                       "tall_vessel", "tall_column", "cone_vessel"}
+_MACHINE_ZONE_SHAPES = {"pump", "compressor", "centrifuge"}
+_ELECTRICAL_ZONE_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "instrument"}
+# Below this plan-view footprint a vessel reads as a small ancillary/dosing tank (a 600 L
+# drum, a CIP tank, a softener/filter housing); at or above it, a principal storage
+# reservoir. 4 m² ≈ a 2.0 m-diameter vessel — the real Codema reservoirs (Ø3.7-5.46 m)
+# clear it comfortably; the real dosing tanks (Ø0.9-1.4 m) and filter/softener housings
+# (Ø0.9-1.83 m) sit well under it. A physical-size threshold, not a class name.
+VESSEL_LARGE_AREA_MM2 = 4.0e6
+
+
+def classify_zone(node):
+    """Return a zone key for `node`, or None if it carries no shape/module signal at all
+    (legacy callers that don't pass those keys get NO zoning — old behaviour, unchanged;
+    this is what keeps a caller/selftest that never mentions shape/module byte-identical).
+    Pure function of shape + footprint area + module — deterministic, class-agnostic."""
+    shape = node.get("shape")
+    module = node.get("module")
+    if shape is None and module is None:
+        return None
+    if shape in _MACHINE_ZONE_SHAPES:
+        return "machines"
+    if shape == "skid_box":
+        return "process_skids"
+    if shape in _VESSEL_ZONE_SHAPES:
+        dm = node.get("dims_mm") or [0, 0]
+        area = (dm[0] or 0) * (dm[1] or 0) if len(dm) >= 2 else 0
+        return "vessels_large" if area >= VESSEL_LARGE_AREA_MM2 else "vessels_small"
+    if shape in _ELECTRICAL_ZONE_SHAPES:
+        return "electrical_control"
+    if module in ("power_distribution", "energy_storage_source",
+                  "control_compute_communication", "safety_protection"):
+        return "electrical_control"
+    return module   # fallback: the universal module id groups whatever shape didn't match
+
+
+def _zone_hub_edges(nodes):
+    """Bounded, deterministic zone-affinity edges: for every zone with ≥2 members, ONE
+    synthetic (hub → member) edge per non-hub member (never all-pairs — an O(n) pull, not
+    O(n²), so a big zone's total attraction on one part is always exactly one edge's
+    weight). Hub = the largest-footprint member, tie-broken by name — stable regardless of
+    input order. Returns a list of edge dicts in the SAME shape as a real ledger row."""
+    by_zone = {}
+    for n in nodes:
+        z = classify_zone(n)
+        if z is None:
+            continue
+        by_zone.setdefault(z, []).append(n)
+
+    def _area(n):
+        dm = n.get("dims_mm") or [0, 0]
+        return (dm[0] or 0) * (dm[1] or 0) if len(dm) >= 2 else 0
+
+    virtual = []
+    for z in sorted(by_zone):               # deterministic zone-iteration order
+        members = by_zone[z]
+        if len(members) < 2:
+            continue
+        hub = max(members, key=lambda n: (_area(n), n["name"]))
+        for m in sorted(members, key=lambda n: n["name"]):
+            if m is hub:
+                continue
+            virtual.append({"from_part": hub["name"], "to_part": m["name"],
+                             "mechanism": "zone_affinity", "service": "__zone__"})
+    return virtual
 
 
 def _service_of(mech):
@@ -136,6 +234,14 @@ def optimise(nodes, edges, name_resolve=None, log=print):
     names = [n["name"] for n in nodes if n.get("name")]
     nameset = set(names)
     fp = {n["name"]: _footprint_mm(n) for n in nodes if n.get("name")}
+    # FUNCTIONAL ZONING (Sam Green SME review, 2026-07-08): merge in the bounded, deterministic
+    # zone-affinity edges (hub→member, one per non-hub zone member) BEFORE the determinism sort
+    # below, so they flow through the exact same canonical-order + wpair/incident accumulation as
+    # a real ledger edge — no separate code path, no separate non-determinism risk. classify_zone()
+    # returns None (no edge) for any node missing both `shape` and `module`, so a caller that never
+    # passes those keys (e.g. the pre-existing selftest below) gets zero zone edges — byte-identical
+    # to the pre-zoning behaviour.
+    edges = list(edges or []) + _zone_hub_edges(nodes)
     # DETERMINISM (#86, Tristan 2026-06-29): canonicalise the edge order BEFORE accumulating incident
     # weights. The caller's `edges` arrive in a non-deterministic order (Blender forces hash
     # randomisation; upstream topology iterates sets), and `incident[a] += w` float-accumulates in that
@@ -337,6 +443,37 @@ def _selftest():
     t, p = pos["Tank"], pos["Recirc Pump"]
     print(f"layout_optimiser selftest: OK (6 placed, no overlap, LOX-genset separated, "
           f"loop compact tank-pump={abs(t[0]-p[0])+abs(t[1]-p[1]):.0f} mm)")
+
+    # ── FUNCTIONAL ZONING regression guard (Sam Green SME review, 2026-07-08) ──────────────
+    # proveCatch: two same-role groups with ZERO edges between their own members (the exact
+    # failure mode — weakly/unconnected same-role kit used to scatter with no attraction to
+    # its own kind) must still end up CLUSTERED: each group's average distance to its OWN
+    # centroid must be less than the separation between the two groups' centroids.
+    zone_nodes = (
+        [{"name": f"CAB{i}", "dims_mm": [800, 800], "shape": "cabinet",
+          "module": "power_distribution"} for i in range(4)]
+        + [{"name": f"TANK{i}", "dims_mm": [1100, 1100], "shape": "tank",
+            "module": "mass_fluid_transport_process"} for i in range(4)])
+    zpos, _zfp = optimise(zone_nodes, [], log=lambda *a: None)
+    def _centroid(names):
+        xs = [zpos[n][0] for n in names]; ys = [zpos[n][1] for n in names]
+        return sum(xs) / len(xs), sum(ys) / len(ys)
+    def _avg_to(names, c):
+        return sum(abs(zpos[n][0] - c[0]) + abs(zpos[n][1] - c[1]) for n in names) / len(names)
+    cabs, tanks = [f"CAB{i}" for i in range(4)], [f"TANK{i}" for i in range(4)]
+    c_cab, c_tank = _centroid(cabs), _centroid(tanks)
+    inter = abs(c_cab[0] - c_tank[0]) + abs(c_cab[1] - c_tank[1])
+    assert _avg_to(cabs, c_cab) < inter, "cabinets clustered tighter than the inter-zone gap"
+    assert _avg_to(tanks, c_tank) < inter, "tanks clustered tighter than the inter-zone gap"
+
+    # proveNoFalsePositive: a caller that never mentions shape/module (every OTHER existing
+    # caller, incl. the hazard-separation case above) gets classify_zone(...) is None for
+    # every node → zero zone-affinity edges → BYTE-IDENTICAL positions to a run with the
+    # zoning code stripped out entirely. Verify directly: the 6-part case re-run must match.
+    pos2, _fp2 = optimise(nodes, edges, log=lambda *a: None)
+    assert pos2 == pos, "no shape/module signal ⇒ zoning is a no-op (unchanged legacy behaviour)"
+    print("layout_optimiser selftest: OK (functional zoning clusters unconnected same-role "
+          "kit; legacy callers with no shape/module signal are untouched)")
 
 
 if __name__ == "__main__":

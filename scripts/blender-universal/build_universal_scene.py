@@ -346,14 +346,48 @@ def _det_layout_with_periphery_hug(items):
     # regions is NOT this: its square-ish width budget stacks the region bays into a
     # deep narrow column — a 20 m tail of cabinets running away from the plant (worse
     # than the defect). Region order + all arithmetic deterministic (rank, then name).
-    def _region_rank(rk):
-        return min(int(it.get("rank", 10_000)) for it in peri_items if it["region"] == rk)
-    peri_regions = sorted({it["region"] for it in peri_items}, key=lambda rk: (_region_rank(rk), rk))
+    # PERIPHERY-REGION MERGE (Sam Green SME review, 2026-07-08: "separate Mech. Plant Rm and
+    # Elec. Plant Rm" — the real reference layout has ONE electrical/control room, not one
+    # scattered micro-bay per module id). A process-plant archetype's non-flow side typically
+    # spreads its electrical/control kit across several SEPARATE regions (switchboard + incomer
+    # in one, MCC + SCADA + generator in another, a safety cabinet in a third, a control panel
+    # in a fourth) — each was getting its OWN bay + a full PERIPHERY_HUG_GAP_MM gap regardless
+    # of how few parts it held, which is exactly the scattered-islands look Sam flagged (a lone
+    # Transformer, a lone switchboard pair, etc. each isolated).
+    #
+    # region_key spelling is NOT one fixed vocabulary — some archetypes use the snake_case
+    # module id (power_distribution, energy_storage_source, control_compute_communication,
+    # safety_protection — the water-treatment case), others use a human-readable module name
+    # (checked against the CO2-mineralisation archetype: "Electrical Distribution", "Process
+    # Control System", "Process Instrumentation", "Safety & Protection"). A keyword regex over
+    # the lower-cased region string catches BOTH spellings, so the merge is universal rather
+    # than tied to one archetype's naming convention. This only ever runs over `peri_items` —
+    # regions the upstream flow-order classifier ALREADY decided carry no process fluid/thermal
+    # connection — so a slightly generous keyword match can't misfile real process equipment;
+    # worst case is a less-than-perfect zone label, never a mis-placed flow part. Merging is a
+    # display grouping for THIS bay-packing step only — the real region_key used by BoM/cost/
+    # topology is untouched (see the shallow per-item copy below).
+    _ELECTRICAL_CONTROL_RE = re.compile(
+        r"electrical|power[_ ]?distribution|energy[_ ]?storage[_ ]?source|"
+        r"control[_ ]?(?:compute|communication|system)|\bcontrol\b|safety|protection|instrumentation",
+        re.I)
+
+    def _peri_group(rk):
+        return "electrical_control_room" if _ELECTRICAL_CONTROL_RE.search(rk) else rk
+
+    def _region_rank(gk):
+        return min(int(it.get("rank", 10_000)) for it in peri_items if _peri_group(it["region"]) == gk)
+    peri_regions = sorted({_peri_group(it["region"]) for it in peri_items},
+                          key=lambda rk: (_region_rank(rk), rk))
     out = dict(tpos)
     train_w = max(tx1 - tx0, dl.GRID_MM)
     row_x, row_y, row_d = tx0, ty1 + PERIPHERY_HUG_GAP_MM, 0.0
     for rk in peri_regions:
-        ritems = [it for it in peri_items if it["region"] == rk]
+        # re-tag each item's `region` to the merged group key so dl.layout()'s OWN internal
+        # region-grouping (and small-item cabinet consolidation) treats the whole group as
+        # ONE region/bay too — a shallow per-item copy, the real `it` (and its true region)
+        # is untouched.
+        ritems = [dict(it, region=rk) for it in peri_items if _peri_group(it["region"]) == rk]
         # bay_row_w: pack the back-row bay as a SHALLOW ROW spanning up to the train width —
         # the square-ish default stacked 2-3 cabinets into a one-part-per-row column 5-11 m
         # deep (codema v52: the periphery read as scattered boxes down the deck, not a row).
@@ -393,7 +427,11 @@ def _populate_det_layout(parts):
             fx = fy = float(dl.GRID_MM)
         items.append({"id": _det_layout_key(p), "region": str(getattr(p, "region_key", "")),
                       "rank": int(getattr(p, "region_rank", 10_000)), "seq": int(getattr(p, "_seq", 0)),
-                      "w": int(fx), "d": int(fy), "area": float(fx * fy)})
+                      "w": int(fx), "d": int(fy), "area": float(fx * fy),
+                      # `shape` (the geometry-family classifier already assigns it, universal
+                      # across archetypes) drives dl.layout()'s within-bay functional-zone
+                      # ordering (Sam Green SME review 2026-07-08) — see deterministic_layout.
+                      "shape": str(getattr(p, "shape", "") or "")})
     # OPT-IN diagnostics (DET_LAYOUT_DUMP=1): serialise the packer's INPUT items + flow plan
     # so the pure dl.layout() can be iterated OFFLINE (no Blender session). Never in production.
     if os.environ.get("DET_LAYOUT_DUMP", "").strip().lower() in ("1", "true", "yes", "on"):
@@ -10563,8 +10601,15 @@ def _apply_layout_optimiser(parts, topology, bbox):
     # different optimised layout. Sort by name + the (already-deterministic, pre-optimiser) base placed
     # coords as a total tiebreak. Pairs with the ledger tie-break fix that made the EDGES deterministic.
     equip.sort(key=lambda p: (str(p.name), int(getattr(p, "_seq", 0))))   # _seq = pure-int extraction index (NO float-coord tiebreak, which carried sub-mm jitter that occasionally re-ordered)
+    # `shape` + `module` are the GENERIC, class-agnostic signals layout_optimiser.classify_zone()
+    # uses for functional zoning (Sam Green SME review 2026-07-08: "kit randomly placed, not
+    # bunched together based on function") — both already exist on every part regardless of
+    # archetype (the shape classifier + the universal module-decomposition id), so this costs
+    # nothing to pass and needs no per-class table.
     nodes = [{"name": p.name,
-              "dims_mm": list(footprint_mm(resolved_dims_mm(p))[:2])} for p in equip]
+              "dims_mm": list(footprint_mm(resolved_dims_mm(p))[:2]),
+              "shape": getattr(p, "shape", None),
+              "module": getattr(p, "module_id", None)} for p in equip]
     nameset = {p.name for p in equip}
 
     def _resolve(s):
