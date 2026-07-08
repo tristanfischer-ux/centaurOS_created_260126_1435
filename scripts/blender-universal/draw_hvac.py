@@ -438,12 +438,41 @@ def _cfm(cms: float) -> int:
 
 def _thermal_rows(schedule: dict):
     """Every thermal / duct / fluid-loop run in the schedule (the cooling distribution),
-    excluding pure electrical rows.  Returns the raw row dicts."""
+    excluding pure electrical rows.  Returns the raw row dicts.
+
+    NOTE: 'fluid_loop' is deliberately included here — this is the DN-sizing fallback
+    used by `_build_liquid_loop` (only reached once a real liquid-coolant hub already
+    exists, e.g. a BESS chiller) and the informational `schedule_present` summary flag.
+    It must NOT be used to DECIDE whether HVAC is applicable at all — 'fluid_loop' is
+    the generic mechanism tag for every process-water pipe on EVERY archetype (see
+    build_universal_scene.py's edge-mechanism comments), so a water-treatment plant's
+    ordinary process piping (RO, softener, UF, drain lines — none of it climate-control)
+    would otherwise satisfy this signal and defeat the no-orphan-subsystem gate below.
+    Use `_hvac_distribution_rows` for the applicability decision."""
     out = []
     for r in (schedule.get("rows") or []):
         mech = (r.get("mechanism") or "").lower()
         if mech in ("thermal", "thermal_return", "fluid_loop") or \
                 (r.get("kind") == "duct"):
+            out.append(r)
+    return out
+
+
+def _hvac_distribution_rows(schedule: dict):
+    """Rows that are UNAMBIGUOUSLY an HVAC/coolant distribution run — 'thermal' /
+    'thermal_return' mechanism (the dedicated coolant-loop tag, e.g. a BESS chiller's
+    flow/return headers) or an explicit duct (`kind == 'duct'`). Deliberately EXCLUDES
+    the generic 'fluid_loop' mechanism, which every archetype's ordinary process-water
+    piping also carries (Sam Green SME review, 2026-07-07: the water-treatment gate
+    false-negative — RO/softener/UF/drain pipes are 'fluid_loop' rows with nothing to
+    do with climate control, and counting them tripped the no-orphan-subsystem gate for
+    ANY plant with pipes at all). Used ONLY by the applicability decision in
+    `derive_air_system`; `_thermal_rows` keeps its broader definition for the DN-sizing
+    fallback and the informational schedule_present flag."""
+    out = []
+    for r in (schedule.get("rows") or []):
+        mech = (r.get("mechanism") or "").lower()
+        if mech in ("thermal", "thermal_return") or r.get("kind") == "duct":
             out.append(r)
     return out
 
@@ -559,13 +588,17 @@ def derive_air_system(manifest: dict, state: dict, schedule: dict,
     # publishes a design airflow or cooling/heating duty quantity (`airflow_cms` /
     # `cooling_kw`, both 0.0 only when NO such quantity exists — see _read_design_airflow
     # / _read_cooling_kw, neither fabricates a value from nothing); (d) the routed
-    # connection schedule carries a thermal/duct distribution run (`_thermal_rows`); (e)
-    # the BoM carries a dehumidification unit. None of these ⇒ no HVAC anywhere in this
-    # design ⇒ return NOT-APPLICABLE and never synthesise a hub. A design that legitimately
-    # needs HVAC (BESS thermal management, a data-hall CRAC, a vertical-farm grow room)
-    # always trips at least one signal — proven both directions in the selftest below.
+    # connection schedule carries a DEDICATED thermal/duct distribution run
+    # (`_hvac_distribution_rows` — 'thermal'/'thermal_return' mechanism or an explicit
+    # duct; deliberately NOT the generic 'fluid_loop' process-water pipe tag every
+    # archetype uses, or EVERY plant with pipes would trip this signal — see that
+    # helper's docstring, Sam Green SME review 2026-07-07); (e) the BoM carries a
+    # dehumidification unit. None of these ⇒ no HVAC anywhere in this design ⇒ return
+    # NOT-APPLICABLE and never synthesise a hub. A design that legitimately needs HVAC
+    # (BESS thermal management, a data-hall CRAC, a vertical-farm grow room) always
+    # trips at least one signal — proven both directions in the selftest below.
     if not (hubs or zones or airflow_cms > 0 or cooling_kw > 0
-            or bool(_thermal_rows(schedule)) or _read_dehumidifier(state) is not None):
+            or bool(_hvac_distribution_rows(schedule)) or _read_dehumidifier(state) is not None):
         return AirSystem(
             archetype=arch, hubs=[], zones=[], ducts=[], diffusers=[], bbox=bbox,
             medium=medium, airflow_cms=0.0, cooling_kw=0.0, zones_derived=False,
@@ -2412,6 +2445,25 @@ def _selftest() -> int:
     chk("water_plant_reason_states_no_requirement",
         "no HVAC" in sysm_water.not_applicable_reason)
 
+    # (a2) proveCatch — the REAL false-negative that shipped the orphan hvac-A1.pdf on
+    # the Codema water-treatment dossier (Sam Green SME review follow-up, 2026-07-08):
+    # the routed connection schedule carries ordinary process-water pipe runs tagged
+    # with the GENERIC 'fluid_loop' mechanism (RO skid → softener → UF → drain — the
+    # same tag every archetype's process piping uses). Counting bare 'fluid_loop' rows
+    # as an HVAC distribution-run signal falsely satisfied the gate on ANY plant with
+    # pipes, regardless of climate-control need. MUST still come back not_applicable.
+    water_schedule_with_process_pipes = {"rows": [
+        {"mechanism": "fluid_loop", "from": "Gac Softener", "to": "Softener Vessel",
+         "size": "DN65"},
+        {"mechanism": "fluid_loop", "from": "Ro High Pressure Pump",
+         "to": "Reverse Osmosis Skid", "size": "DN50"},
+    ]}
+    sysm_water2 = derive_air_system(empty_manifest, water_state,
+                                    water_schedule_with_process_pipes, "/tmp")
+    chk("water_plant_not_fooled_by_generic_fluid_loop_pipes",
+        sysm_water2.not_applicable is True)
+    chk("water_plant_with_pipes_no_hub_synthesised", len(sysm_water2.hubs) == 0)
+
     # (b) proveNoFalsePositive — a design with a real published cooling duty (BESS
     # thermal management) but NO equipment placed yet in the manifest. Must NOT be
     # suppressed — a genuine requirement must still get its hub synthesised.
@@ -2440,6 +2492,14 @@ def _selftest() -> int:
                      "bbox_mm": empty_manifest["bbox_mm"]}
     sysm_rack = derive_air_system(rack_manifest, {}, {}, "/tmp")
     chk("placed_zone_not_suppressed", sysm_rack.not_applicable is False)
+
+    # (d2) proveNoFalsePositive — a design with NO placed equipment/quantity but a real
+    # DEDICATED thermal-loop schedule row (a BESS chiller's coolant flow/return header,
+    # tagged mechanism 'thermal') must also NOT be suppressed.
+    thermal_schedule = {"rows": [{"mechanism": "thermal", "from": "Chiller",
+                                 "to": "Rack Busway", "size": "DN40"}]}
+    sysm_thermal = derive_air_system(empty_manifest, {}, thermal_schedule, "/tmp")
+    chk("dedicated_thermal_row_not_suppressed", sysm_thermal.not_applicable is False)
 
     # (e) the generate_hvac() wrapper writes NO files when not_applicable (checked at
     # the source level: the function must short-circuit before touching draw_dir).
