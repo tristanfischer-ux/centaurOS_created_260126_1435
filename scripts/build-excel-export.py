@@ -6346,6 +6346,13 @@ _LEDGER_SHEET = "Bill of Materials (Ledger)"
 # references and the selftest.
 _LEDGER_DATA_START = 5
 
+# Dedupe-fold statuses (2026-07-08): a row carrying one of these is a DUPLICATE-NAME twin
+# whose price legitimately lives on the parent named in its `sub_of` field — the SAME "cost
+# lives elsewhere" shape as a "↳" sub-component, just reached by name-fold rather than
+# assembly-decomposition. Mirrors `dossier_audit.py::_FOLD_STATUSES` (kept as its own
+# constant here since the ledger's row-render decision needs it inline, not imported).
+_LEDGER_FOLD_STATUSES = {"MERGED·SYNONYM", "IN ASSEMBLY"}
+
 # The LIVE address of the BoM Ledger's Σ-total cell, captured when the ledger is built
 # so the Cost waterfall's "Raw materials" row can LINK to the bill (traceability — Tristan:
 # "the raw-materials number can't be a hard-coded figure with no source") instead of
@@ -6674,15 +6681,38 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         # drive motor" sub-line under a £67.9k pump) and reads to a customer as a wrong
         # number. Show "incl. in parent" instead. Totals are unaffected — the LIVE
         # Σ(line_gbp) ignores the text cell exactly as it ignored the 0.
+        #
+        # A DEDUPE-FOLD row (status MERGED·SYNONYM / IN ASSEMBLY — dossier_audit.py's
+        # _FOLD_STATUSES) is the SAME shape: its own price legitimately lives on the parent
+        # named in `sub_of`, so it must ALSO render "incl. in parent", never a standalone
+        # Unit £ next to a Line £ of 0 (2026-07-08: 'Ultrafiltration Module' Z-102, a
+        # MERGED·SYNONYM twin of 'Uf Membrane Bank', showed Qty=1 / Unit £=£14,825 / Line
+        # £=£0 — a real-looking price beside a zero total, both individually "correct" by
+        # their own field but incoherent together).
         _line_raw = row.get("line_gbp")
         _line_num = _line_raw if isinstance(_line_raw, (int, float)) else 0
         _is_subcomp = str(row.get("requirement", "") or "").strip().startswith("↳")
-        if _is_subcomp and not _line_num:
+        _is_fold = str(row.get("status", "") or "").strip() in _LEDGER_FOLD_STATUSES
+        # Rendered as text ("incl. in parent" / "—") rather than a priced buy-list row — a
+        # sub-component OR a dedupe-fold twin, but ONLY when it actually carries no line total
+        # of its own (a fold/subcomp row that DOES carry a real line_gbp renders normally, as
+        # a priced row, same as any other line). Reused below so the Row-check's arithmetic
+        # terms are gated on the SAME decision the D/E cells were rendered with.
+        _rendered_as_incl_in_parent = (_is_subcomp or _is_fold) and not _line_num
+        if _rendered_as_incl_in_parent:
             ws.cell(r, 4, "incl. in parent").border = BORDER
             ws.cell(r, 5, "—").border = BORDER
         else:
             ws.cell(r, 4, num(row.get("unit_gbp"))).border = BORDER
-            ws.cell(r, 5, num(row.get("line_gbp"))).border = BORDER
+            # Line £ is a LIVE FORMULA (Qty × Unit £) — NEVER a copied literal — so this cell
+            # is arithmetically correct BY CONSTRUCTION, regardless of what the upstream
+            # requirementsBom's own `line_gbp` field said. Root cause of the bug above: the
+            # renderer used to copy `row.get("line_gbp")` verbatim, so a stale/wrong upstream
+            # value (a macro-parent principal whose own line_gbp field read 0 despite a real
+            # Qty=1 × Unit=£14,825) rendered a wrong £0 instead of the true £14,825. A live
+            # =Qty×Unit formula can never disagree with its own inputs.
+            lc = ws.cell(r, 5, f"=C{r}*D{r}")
+            lc.border = BORDER
 
         # ── COST-BASIS group (cols F–J) — from the joined cost line, FALLING BACK to the row's own
         #    `basis` string so Key inputs (G) + Factors (H) are NEVER blank when a derivation exists
@@ -6790,7 +6820,7 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             _evc.font = _FONT_AUDIT
             _evc.alignment = WRAP_TOP
             _terms = [f'LEN(TRIM($B{r}&""))>0']
-            if not _is_subcomp:
+            if not _rendered_as_incl_in_parent:
                 _terms += [f"ISNUMBER($C{r})", f"$C{r}>0",
                            f"ISNUMBER($D{r})", f"$D{r}>0",
                            f"ISNUMBER($E{r})", f"$E{r}>0"]
@@ -7022,6 +7052,33 @@ def _unit_family(unit: str) -> Tuple[str, float]:
     return table.get(u, ("?" + u, 1.0))
 
 
+# Pre-change mempalace search: "sense-check unit family conversion brief compliance matcher
+# UNVERIFIED false FAIL" → 1 relevant drawer (forgeos gotchas, #86 brief-parser non-determinism:
+# dossier_audit._contract_match keys on name tokens + unit FAMILY; confirms token-subset + unit-
+# family — never exact name/unit — is the right shape for this matcher).
+#
+# UNIT-FAMILY VALUE CONVERSION (2026-07-08, Codema false-FAIL): _unit_family already carries the
+# multiplier to each family's CANONICAL unit, but _match_quantity's caller compared the brief's raw
+# Target number against the matched quantity's raw Achieved number WITHOUT ever applying that
+# multiplier — so a brief target of 5000 L compared dead-equal to an achieved 5 m³ read as
+# 5000 vs 5 (a false FAIL) even though the FAMILY MATCH already proved they are the same unit family
+# and 5000 L == 5 m³. Convert both to the family's canonical unit before any comparison; refuse
+# (return None) across a genuine family mismatch so a real unit error still surfaces honestly.
+def _convert_value(value: Any, from_unit: str, to_unit: str) -> Optional[float]:
+    """Convert `value` (stated in `from_unit`) into `to_unit`, via the canonical unit-family
+    table above. Returns None when the two units are not the same family — a cross-family
+    conversion must never silently happen (a genuine mismatch stays a genuine mismatch)."""
+    v = num(value)
+    if v is None:
+        return None
+    f_fam, f_mult = _unit_family(from_unit)
+    t_fam, t_mult = _unit_family(to_unit)
+    if f_fam != t_fam or f_fam.startswith("?") or not t_mult:
+        return None
+    # v (in from_unit) -> the family's canonical unit -> to_unit
+    return v * f_mult / t_mult
+
+
 # brief-ECHO quantity suffixes — these carry the REQUESTED target value, not the ACHIEVED design
 # value, so a compliance match against them is a guaranteed false PASS. Excluded from matching.
 _ECHO_SUFFIXES = ("_requested", "_request", "_target", "_demand", "_brief", "_spec")
@@ -7041,6 +7098,25 @@ _QTY_STOP_TOKENS = {
     # ro/permeate), NOT the generic quantity word. These alone must not bridge two subsystems (the
     # memory rule: gac_softener_throughput must NOT match cloth_filter_throughput on "throughput").
     "capacity", "throughput", "flow", "rate", "demand", "output", "volume", "duty", "load",
+}
+
+# GENERIC EQUIPMENT/MEASURE nouns (2026-07-08, Codema false-UNVERIFIED): a metric's true IDENTITY is
+# its SUBSYSTEM name (nursery, hand_watering, ro/permeate) — a mechanism noun like "pump"/"unit"/
+# "motor" recurs across MANY unrelated subsystems and must never, by itself, satisfy the token-
+# overlap threshold. Without this, `pump_unit_nursery_flow_m3_per_hr` (identity tokens after
+# `_QTY_STOP_TOKENS`: {pump, unit, nursery}) matched `irrigation_pump_flow_m3_h` on the *generic*
+# {pump} overlap alone (1 of 2 needed) while the one DISTINCTIVE token, "nursery", went uncovered —
+# and the real match, `nursery_drain_water_reservoir_tank_line_flow_m3_h` (which the "nursery" token
+# uniquely identifies), was missed → false UNVERIFIED. `_match_quantity`'s token-subset pass uses
+# these to derive a "subject" token set (the brief metric's identity tokens MINUS the generic ones)
+# and requires the match to cover at least one SUBJECT token, not merely satisfy the count threshold
+# on generic tokens. Falls back to the full token set when a metric name is entirely generic (no
+# subject token at all) so today's generic-only matches are unaffected. Mirrors the same principle
+# `scripts/lib/dossier_audit.py::_MEASURE_SCOPE_TOKENS` already applies (there, only in its Pass 4
+# fallback) — kept as its own list here because this matcher's stop-token set already differs.
+_GENERIC_MEASURE_TOKENS = {
+    "pump", "motor", "unit", "power", "valve", "module", "size", "value",
+    "peak", "max", "min", "required", "target", "delivery", "department",
 }
 
 
@@ -7160,7 +7236,15 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
     # audit oracle's token-subset threshold). A single SHARED generic token is NOT enough:
     # gac_softener_throughput must NOT match cloth_filter_throughput on "throughput" alone
     # (a wrong-subsystem false PASS — Codema v5 showed 80 m³/h "PASS" for a 14.5 target).
-    need = max(1, (len(b_tokens) + 1) // 2)
+    #
+    # SUBJECT-token gating (2026-07-08, see _GENERIC_MEASURE_TOKENS above): the "half the tokens"
+    # threshold is computed and satisfied over the metric's SUBJECT tokens (identity tokens minus
+    # generic equipment/measure nouns like pump/unit/motor) — not the raw token set — so a match
+    # covering ONLY generic tokens (pump, unit) while missing the one distinctive subsystem token
+    # (nursery) is rejected. Falls back to the full b_tokens when the metric name carries no
+    # subject token at all (an entirely-generic name), so today's generic-only matches still work.
+    b_subject = b_tokens - _GENERIC_MEASURE_TOKENS or b_tokens
+    need = max(1, (len(b_subject) + 1) // 2)
     for qname, qv in quantities.items():
         if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
             continue
@@ -7171,16 +7255,20 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         if not _fam_ok(a_fam, qname):
             continue
         ql = qname.lower()
-        overlap = len(b_tokens & set(re.findall(r"[a-z]+", _norm_qty_name(ql))))
+        q_tokens = set(re.findall(r"[a-z]+", _norm_qty_name(ql)))
+        overlap = len(b_subject & q_tokens)
         if overlap < need:
             continue
+        # rank ties by the FULL-token overlap too (richer context wins among equally-valid subject
+        # matches), then the existing peak/max/surge penalty.
+        full_overlap = len(b_tokens & q_tokens)
         penalty = (1 if re.search(r"peak|max|surge|inrush", ql) else 0)
-        cand = (-overlap, penalty, qname, a_val, qv.get("unit", ""))
+        cand = (-overlap, -full_overlap, penalty, qname, a_val, qv.get("unit", ""))
         if best is None or cand < best:
             best = cand
     if best is None:
         return None
-    return best[2], best[3], best[4]
+    return best[3], best[4], best[5]
 
 
 def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int) -> Optional[int]:
@@ -7237,7 +7325,16 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
             r += 1
             continue
 
-        qname, ach, qunit_s = matched
+        qname, ach_raw, qunit_s = matched
+        # UNIT-FAMILY VALUE CONVERSION (see _convert_value above): the matched quantity may carry
+        # its OWN native unit (e.g. m³) that differs from the brief metric's stated unit (e.g. L) —
+        # same family (both matched via _fam_ok), different scale. Convert into the metric's own
+        # unit so Target and Achieved compare like-for-like (5000 L target vs a 5 m³ achieved reads
+        # as 5000 vs 5 unless converted first — a false FAIL despite the two being dead-equal).
+        # `_convert_value` refuses (returns None) on a genuine cross-family mismatch, in which case
+        # the raw value is shown unconverted (best-effort display; the family gate already ran).
+        ach_converted = _convert_value(ach_raw, qunit_s, unit)
+        ach = ach_converted if ach_converted is not None else ach_raw
         ws.cell(r, 4, _display_name(clean_cell(qname))).border = BORDER
         ac = ws.cell(r, 5, ach)
         ac.fill = FILL_RESULT
@@ -7285,7 +7382,11 @@ def _render_brief_compliance_section(ws: Worksheet, state: dict, start_row: int)
         # token bare ('family=?trays' / 'family=?%') — machine debris, not a note (fix 4).
         _fam = _unit_family(unit)[0]
         _fam_txt = "" if str(_fam).startswith("?") else f" · unit family: {_fam}"
-        nt = ws.cell(r, 8, f"brief key: {key} → contract: {qname}{_fam_txt}")
+        _conv_txt = (f" (converted from {ach_raw:g} {qunit_s} to {unit})"
+                     if ach_converted is not None and qunit_s
+                     and str(qunit_s).strip().lower().replace(" ", "") != str(unit).strip().lower().replace(" ", "")
+                     else "")
+        nt = ws.cell(r, 8, f"brief key: {key} → contract: {qname}{_fam_txt}{_conv_txt}")
         nt.alignment = WRAP_TOP
         nt.font = FONT_NOTE
         nt.border = BORDER
@@ -22479,6 +22580,52 @@ def _selftest() -> int:
         print(f"  FAIL count-noun: actuated_valves_count (unit 'valves') must match actuated_distribution_valve_count (got {vm})"); bad += 1
     if _match_quantity({"key_metric": "design_pressure_bar", "value": 6, "unit": "bar"}, count_qs) is not None:
         print("  FAIL count-noun: a real physical unit ('bar') must NOT be promoted to count + falsely matched"); bad += 1
+    # (1c-2) UNIT-FAMILY VALUE CONVERSION + SUBJECT-TOKEN MATCHING (2026-07-08, Codema out/codema-final
+    # false-FAIL/UNVERIFIED — fixture below reproduces the exact real key names from that run):
+    # proveCatch (both fixed) + proveNoFalsePositive (a genuine shortfall still FAILs, a genuinely
+    # absent quantity stays UNVERIFIED/None).
+    _codema_qs = {
+        "drain_collection_sump_volume_each_m3": {"value": 5, "unit": "m3"},
+        "irrigation_pump_flow_m3_h": {"value": 90, "unit": "m3/h"},          # the WRONG-subsystem
+        # decoy a naive generic-token overlap (pump+flow) would grab instead of the nursery line
+        "nursery_drain_water_reservoir_tank_line_flow_m3_h": {"value": 45, "unit": "m3/h"},
+    }
+    # (a) proveCatch — unit-family conversion: brief target 5000 L vs achieved 5 m³ (dead-equal,
+    # 5000 L == 5 m³) must MATCH and, once converted into the metric's own unit, PASS.
+    _dm = _match_quantity({"key_metric": "drain_pit_volume_l", "value": 5000, "unit": "L"}, _codema_qs)
+    if not _dm or _dm[0] != "drain_collection_sump_volume_each_m3":
+        print(f"  FAIL unit-family: drain_pit_volume_l (5000 L) must match drain_collection_sump_volume_each_m3 (got {_dm})"); bad += 1
+    else:
+        _dm_conv = _convert_value(_dm[1], _dm[2], "L")
+        if _dm_conv is None or abs(_dm_conv - 5000) > 1e-6:
+            print(f"  FAIL unit-family: 5 m³ achieved must convert to 5000 L (got {_dm_conv})"); bad += 1
+    # (b) proveCatch — synonym/token-subset: pump_unit_nursery_flow_m3_per_hr (45 m³/h) must match
+    # the nursery-tagged quantity, NOT the wrong-subsystem irrigation_pump_flow_m3_h (90) that a
+    # naive generic-token overlap (shared "pump"/"flow", missing the identity token "nursery") would
+    # otherwise grab (Tristan 2026-07-08).
+    _nm = _match_quantity({"key_metric": "pump_unit_nursery_flow_m3_per_hr", "value": 45, "unit": "m3/hr"}, _codema_qs)
+    if not _nm or _nm[0] != "nursery_drain_water_reservoir_tank_line_flow_m3_h":
+        print(f"  FAIL synonym/token-subset: pump_unit_nursery_flow_m3_per_hr (45) must match the "
+              f"nursery-tagged quantity, not the wrong-subsystem irrigation pump (got {_nm})"); bad += 1
+    # (c) proveNoFalsePositive — a GENUINE shortfall (achieved 2 m³ = 2000 L, short of a 5000 L
+    # target) must still match (right quantity) but FAIL the value comparison — the fix must never
+    # turn a real miss green.
+    _short_qs = {"drain_collection_sump_volume_each_m3": {"value": 2, "unit": "m3"}}
+    _sm = _match_quantity({"key_metric": "drain_pit_volume_l", "value": 5000, "unit": "L"}, _short_qs)
+    if not _sm:
+        print("  FAIL proveNoFalsePositive: a genuinely short 2 m³ vs 5000 L target must still MATCH"); bad += 1
+    else:
+        _sm_conv = _convert_value(_sm[1], _sm[2], "L")
+        if _sm_conv is None or _sm_conv >= 5000 * 0.98:
+            print(f"  FAIL proveNoFalsePositive: 2 m³ (2000 L) vs a 5000 L target must FAIL, not PASS (got {_sm_conv})"); bad += 1
+    # (d) proveNoFalsePositive — a genuinely ABSENT quantity (no plausible candidate at all) must
+    # stay UNVERIFIED (None), never manufactured into a match.
+    if _match_quantity({"key_metric": "drain_pit_volume_l", "value": 5000, "unit": "L"},
+                       {"unrelated_pressure_bar": {"value": 3, "unit": "bar"}}) is not None:
+        print("  FAIL proveNoFalsePositive: a genuinely absent quantity must stay UNVERIFIED (None)"); bad += 1
+    # (e) proveCatch — cross-family conversion must refuse (never silently convert kg to L).
+    if _convert_value(100, "kg", "L") is not None:
+        print("  FAIL unit-family: _convert_value must refuse a cross-family conversion (kg -> L)"); bad += 1
     # (1d) SCOPE-QUALIFIED brief target (2026-07-05, battery-only vs full-system): a brief cost
     # anchor scoped to a SUBSET of the design ("battery-energy-storage portion only ... EXCLUDING
     # the ... transformer ... costs approximately £63 per kWh") must render against the
