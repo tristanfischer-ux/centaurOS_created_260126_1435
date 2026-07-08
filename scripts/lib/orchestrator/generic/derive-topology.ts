@@ -29,6 +29,10 @@ type AnyWord = {
   _synthesized?: boolean
   _subcomponent?: boolean
   id?: string
+  // The word's own quantity modifier (`×N`) — written by universal-contract-sizing.ts's
+  // synthWord()/buildGroups from a contract `*_count` key (e.g. drain_collection_sump_count =
+  // departmentCount). Read by wordQtyCount() below for the per-zone recovery-collection pass.
+  modifier_characters?: Array<{ kind?: string; value?: unknown }>
 }
 type AnyModule = { sub_modules?: Array<{ words?: AnyWord[] }> }
 
@@ -112,6 +116,21 @@ export function slugify(name: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
+/** Parse a word's population/quantity count from its `quantity` modifier ('×3' → 3; absent
+ *  or unparseable → 1). Mirrors universal-contract-sizing.ts::_wordPopCount (the SAME format
+ *  synthWord() there writes: `mod('quantity', '×'+count)`) — so a word the physics engine
+ *  already sized to N per-zone instances (drain_collection_sump_count = departmentCount,
+ *  cloth_filter_count, drain_transfer_pump_count, …) is read correctly here without importing
+ *  across the two files (kept independent — this module has no dependency on the sizer). */
+function wordQtyCount(w: AnyWord): number {
+  const mods = w.modifier_characters
+  if (!Array.isArray(mods)) return 1
+  const q = mods.find((m) => m?.kind === 'quantity')
+  if (!q) return 1
+  const n = /(\d+)/.exec(String(q.value ?? ''))
+  return n ? parseInt(n[1], 10) || 1 : 1
+}
+
 /**
  * Derive a feed→product process-flow topology from the synthesised principal
  * equipment in `modules`. Returns [] when there is no process equipment to chain
@@ -120,7 +139,7 @@ export function slugify(name: string): string {
 export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
   const seen = new Set<string>()
-  const items: Array<{ name: string; slug: string; rank: number; sub: number }> = []
+  const items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }> = []
   for (const m of modules || []) {
     for (const sm of m.sub_modules || []) {
       for (const w of sm.words || []) {
@@ -136,7 +155,7 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
         const slug = slugify(name)
         if (!slug || seen.has(slug)) continue
         seen.add(slug)
-        items.push({ name, slug, rank: roleRank(name), sub: subRole(name) })
+        items.push({ name, slug, rank: roleRank(name), sub: subRole(name), qty: wordQtyCount(w) })
       }
     }
   }
@@ -146,6 +165,19 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // mover, the mover discharges into the stage's process units — see subRole), then name as
   // the deterministic final tie-break. Alphabetical-within-rank was the v55 direction scramble.
   items.sort((a, b) => a.rank - b.rank || a.sub - b.sub || a.name.localeCompare(b.name))
+
+  // FILTER-ON-DIRTY-STREAM REORDER (2026-07-08 follow-up — see the function's own header
+  // comment below): relocates a treatment unit-op that landed immediately downstream of an
+  // already-clean source onto the recovery/dirty side, IN THE ACTUAL SPINE, not just an
+  // after-the-fact audit flag. Must run before edges are built so the rendered P&ID reflects
+  // the fix, not merely a shadow verdict.
+  repositionFiltersOntoRecoverySide(items)
+
+  // PER-ZONE RECOVERY-COLLECTION EXPANSION (2026-07-08 — see the function's own header
+  // comment below): splits a recovery COLLECTION node (drainpit/sump) the physics engine has
+  // already sized to N per-zone instances into N distinct spine nodes, instead of the single
+  // collapsed node the plain slug-dedupe above produces.
+  expandRecoveryCollectionPerZone(items)
 
   const edges: TopologyEdge[] = []
   for (let i = 0; i < items.length - 1; i++) {
@@ -160,6 +192,14 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
       constraint_kind: thermal ? 'thermal_rejection' : 'flow_capacity',
     } as TopologyEdge)
   }
+
+  // Fan-out/fan-in correction for any per-zone recovery-collection group the expansion above
+  // created: the naive consecutive-chain loop above would otherwise wire the zone replicas
+  // SERIALLY (zone_1 → zone_2 → zone_3), implying one drainpit feeds the next — physically
+  // wrong (each zone's collection point is independent). reconcileZoneReplicaEdges replaces
+  // that with the correct fan-out (shared upstream → every zone) / fan-in (every zone →
+  // shared downstream conditioning) shape.
+  reconcileZoneReplicaEdges(items, edges)
 
   // ── UNIVERSAL RECIRCULATION-LOOP CLOSURE (2026-07-07, Sam Green SME review of
   // the real Codema Fischer Farms system — "Process is not usually this straight
@@ -356,6 +396,149 @@ export function evaluateFilterOnDirtyStreamInvariant(
   }
   if (!anyTreatmentNode) return { verdict: 'not_applicable', violations: [] }
   return violations.length > 0 ? { verdict: 'high', violations } : { verdict: 'pass', violations: [] }
+}
+
+// ── FILTER-ON-DIRTY-STREAM REORDER (2026-07-08 follow-up to the invariant above) ───────────
+// Sam Green: "RO water feeds into cloth filter which doesn't make sense as it's clean
+// already... filters and disinfection should be after drain pits." The invariant above only
+// FLAGS this (shadow — serial-design-chain-v2.tsx records the verdict and writes a punch-
+// list, never blocks, by design: "the physical reorder this defect calls for is a topology-
+// authoring fix... a deeper change than this detector should make silently"). This function
+// IS that reorder, applied inside deriveProcessTopology itself so the actual rendered P&ID/
+// BFD changes, not just an audit verdict.
+//
+// UNIVERSAL: reuses the EXACT SAME vocabulary the invariant already uses — TREATMENT_UNIT_OP_RE
+// / POLISH_EXEMPT_RE / CLEAN_SOURCE_RE / RECOVERY_BUFFER_RE — never a class name. A non-polish
+// treatment node whose ORIGINAL spine position lands it immediately downstream of an already-
+// clean source is relocated to sit immediately after the (first) recovery buffer on the spine —
+// design-basis §5's "conditioning node" position, downstream of the dirty/recovered stream it
+// exists to treat. proveNoFalsePositive is built in: (a) a filter fed by a genuinely dirty/
+// mid-process stream is untouched (its upstream never matches CLEAN_SOURCE_RE); (b) an
+// explicitly-named final-polish/point-of-use stage is untouched (POLISH_EXEMPT_RE); (c) a
+// once-through archetype with NO recovery buffer anywhere is untouched (nothing to relocate
+// onto — never invents a node).
+//
+// Detection reads the CURRENT adjacency each pass and iterates to a FIXED POINT, not just a
+// single pass (2026-07-08 follow-up — a real fresh chain render, out/topo-verify, exposed a
+// cascade case: RO -> Cloth Filter -> Gac Filter. A single pass over the original snapshot
+// relocates Cloth Filter but leaves Gac Filter's ORIGINAL upstream as Cloth Filter, so it looks
+// untouched at detection time — except removing Cloth Filter closes the gap and Gac Filter is
+// now directly downstream of RO, the SAME defect one relocation later. Re-running detection
+// after each relocation catches this; capped at items.length passes for guaranteed termination
+// (a relocated node's new upstream is the recovery buffer or another already-relocated
+// treatment node — neither ever matches CLEAN_SOURCE_RE by vocabulary construction — so each
+// pass strictly shrinks the misplaced set until none remain).
+function repositionFiltersOntoRecoverySide(
+  items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }>,
+): void {
+  const recoveryItem = items.find((it) => RECOVERY_BUFFER_RE.test(it.name))
+  if (!recoveryItem) return // no recovery buffer on this spine — nothing to relocate onto (once-through, untouched)
+  for (let pass = 0; pass < items.length; pass++) {
+    const misplaced: typeof items = []
+    for (let i = 1; i < items.length; i++) {
+      const it = items[i]
+      if (it === recoveryItem || RECOVERY_BUFFER_RE.test(it.name)) continue // never relocate a recovery buffer itself
+      if (!TREATMENT_UNIT_OP_RE.test(it.name)) continue
+      if (POLISH_EXEMPT_RE.test(it.name)) continue // explicit final-polish/point-of-use stage — legitimate on clean water
+      if (!CLEAN_SOURCE_RE.test(items[i - 1].name)) continue // fed by a genuinely dirty/mid-process stream — untouched
+      misplaced.push(it)
+    }
+    if (misplaced.length === 0) break // fixed point — nothing left misplaced
+    for (const it of misplaced) {
+      const idx = items.indexOf(it)
+      if (idx >= 0) items.splice(idx, 1)
+    }
+    const insertAt = items.indexOf(recoveryItem) + 1
+    items.splice(insertAt, 0, ...misplaced)
+  }
+}
+
+// ── PER-ZONE RECOVERY-COLLECTION EXPANSION (2026-07-08, Sam Green SME review — "the real
+// system has per-zone drainpits + buried recovery pipe" vs the engine's single shared node).
+// deriveProcessTopology's item-collection dedupes by SLUG — one spine node per distinct part
+// name — which is correct for a genuinely singular vessel but wrong for a recovery COLLECTION
+// point (drainpit/sump) the physics engine has already sized to serve N distinct consumer
+// zones/departments (its word's own `quantity` modifier, ×N — see engineering-contract.ts
+// `drain_collection_sump_count = departmentCount`, "N drain pits, one per cultivation room").
+// A P&ID that shows ONE sump for an N-zone recirculating plant is Sam's civils-cost critique
+// in diagram form ("drain pits suggest a lot of underground civils work but previous pages
+// suggest almost no civils cost" — a collapsed node undercounts the real physical/buried scope).
+//
+// UNIVERSAL, keyed on generic stream-role vocabulary: RECOVERY_BUFFER_RE (the SAME test the
+// recirculation-loop-closure and the reorder above use) PLUS a narrower COLLECTION-POINT noun
+// (sump/pit/collection) — deliberately excludes the shared AGGREGATE storage downstream (e.g. a
+// "Drainwater Reservoir" or a plant's 2 fixed-capacity storage tanks): those genuinely are one
+// or a few shared vessels, not a per-zone structure, so they are NEVER split by this rule. The
+// count itself is READ, never fabricated, from the word's own synthesised quantity — a
+// single-zone/non-recirculating design (qty=1) is a strict no-op (proveNoFalsePositive).
+const PER_ZONE_COLLECTION_RE = /\b(sump|pit|collection)\b/i
+
+function expandRecoveryCollectionPerZone(
+  items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }>,
+): void {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]
+    if (!Number.isFinite(it.qty) || it.qty < 2) continue // single-zone / non-counted — untouched
+    if (!RECOVERY_BUFFER_RE.test(it.name) || !PER_ZONE_COLLECTION_RE.test(it.name)) continue
+    const n = Math.round(it.qty)
+    const zoneGroup = it.slug
+    const replicas = Array.from({ length: n }, (_, k) => ({
+      name: `${it.name} ${k + 1}`,
+      slug: `${it.slug}_${k + 1}`,
+      rank: it.rank,
+      sub: it.sub,
+      qty: 1,
+      _zoneGroup: zoneGroup,
+    }))
+    items.splice(i, 1, ...replicas)
+  }
+}
+
+// Corrects the naive consecutive-chain SERIAL wiring a zone-replica group would otherwise get
+// (zone_1 → zone_2 → zone_3, implying one drainpit feeds the next) into the physically-correct
+// fan-out (shared upstream → every zone replica) / fan-in (every zone replica → shared
+// downstream) shape. Reads the upstream/downstream neighbours off the edges the normal
+// consecutive-chain loop already built for the FIRST and LAST replica in the group (which are
+// correct — only the INTER-replica links are wrong), then removes the inter-replica edges and
+// adds the missing fan edges. No-op when no zone-replica group exists (expandRecoveryCollectionPerZone
+// never fired) or a group has only one member.
+function reconcileZoneReplicaEdges(
+  items: Array<{ slug: string; _zoneGroup?: string }>,
+  edges: TopologyEdge[],
+): void {
+  const groups = new Map<string, string[]>()
+  for (const it of items) {
+    if (!it._zoneGroup) continue
+    if (!groups.has(it._zoneGroup)) groups.set(it._zoneGroup, [])
+    groups.get(it._zoneGroup)!.push(it.slug)
+  }
+  for (const slugs of groups.values()) {
+    if (slugs.length < 2) continue
+    const slugSet = new Set(slugs)
+    let upstream: string | null = null
+    let downstream: string | null = null
+    for (const e of edges) {
+      if (slugSet.has(e.to_part) && !slugSet.has(e.from_part)) upstream = e.from_part
+      if (slugSet.has(e.from_part) && !slugSet.has(e.to_part)) downstream = e.to_part
+    }
+    for (let i = edges.length - 1; i >= 0; i--) {
+      if (slugSet.has(edges[i].from_part) && slugSet.has(edges[i].to_part)) edges.splice(i, 1)
+    }
+    for (const slug of slugs) {
+      if (upstream && !edges.some((e) => e.from_part === upstream && e.to_part === slug)) {
+        edges.push({
+          from_part: upstream, to_part: slug, mechanism: 'fluid_loop', constraint_kind: 'flow_capacity',
+          material_context: 'per-zone recovery collection — fan-out from the shared upstream stage to each zone’s own drainpit/sump',
+        } as TopologyEdge)
+      }
+      if (downstream && !edges.some((e) => e.from_part === slug && e.to_part === downstream)) {
+        edges.push({
+          from_part: slug, to_part: downstream, mechanism: 'fluid_loop', constraint_kind: 'flow_capacity',
+          material_context: 'per-zone recovery collection — fan-in from each zone’s drainpit/sump into the shared conditioning stage',
+        } as TopologyEdge)
+      }
+    }
+  }
 }
 
 // A FIELD INSTRUMENT word (sensor / transmitter / transducer / analyser / gauge / probe / level /
@@ -846,8 +1029,136 @@ function _selftest() {
   const noFilterVerdict = evaluateFilterOnDirtyStreamInvariant(noFilterTopo)
   if (noFilterVerdict.verdict !== 'not_applicable') throw new Error(`filter-on-dirty-stream: a topology with no treatment unit-op must be 'not_applicable', got '${noFilterVerdict.verdict}'`)
 
+  // ── FILTER-ON-DIRTY-STREAM REORDER proveCatch + proveNoFalsePositive (2026-07-08) ──────────
+  // These drive deriveProcessTopology ITSELF (not the isolated evaluate* helper above), so they
+  // prove the ACTUAL rendered spine changes — the bar the SME review set ("if the P&ID still
+  // shows the filter after RO, it's NOT fixed regardless of selftest").
+  const mkQ = (name: string, qty?: number): AnyWord => ({
+    name_human: name, _synthesized: true,
+    ...(qty !== undefined ? { modifier_characters: [{ kind: 'quantity', value: `×${qty}` }] } : {}),
+  })
+
+  // (a) proveCatch — the EXACT real shape observed in out/codema-sam-verify/state.json
+  // (reverse_osmosis_skid -> cloth_filter, with the recovery buffer further down the spine):
+  // after derivation, RO must NOT feed the cloth filter directly, and the cloth filter must
+  // sit immediately downstream of the recovery buffer instead.
+  const reorderCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Reverse Osmosis Skid'), mkQ('Cloth Filter'), mkQ('Drain Collection Sump'), mkQ('Fresh Water Tank'),
+    ] }],
+  }])
+  if (reorderCatchTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cloth_filter')) {
+    throw new Error('filter-reorder proveCatch FAILED: reverse_osmosis_skid -> cloth_filter edge still present after derivation')
+  }
+  if (!reorderCatchTopo.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'cloth_filter')) {
+    throw new Error(`filter-reorder proveCatch FAILED: expected the cloth filter relocated immediately after the recovery buffer, got ${JSON.stringify(reorderCatchTopo)}`)
+  }
+
+  // (a2) proveCatch — the CASCADE case a real fresh chain render (out/topo-verify, 2026-07-08)
+  // exposed: TWO treatment nodes in a row downstream of RO (Reverse Osmosis Skid -> Cloth
+  // Filter -> Gac Filter, the exact real ordering — both share rank 4, alphabetical tie-break
+  // puts Cloth before Gac). A single-pass fix relocates Cloth Filter and stops, leaving Gac
+  // Filter newly adjacent to RO — the SAME defect one relocation later. Both must end up
+  // downstream of the recovery buffer.
+  const cascadeCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Reverse Osmosis Skid'), mkQ('Cloth Filter'), mkQ('Gac Filter'), mkQ('Drain Collection Sump'), mkQ('Fresh Water Tank'),
+    ] }],
+  }])
+  if (cascadeCatchTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && (e.to_part === 'cloth_filter' || e.to_part === 'gac_filter'))) {
+    throw new Error(`filter-reorder proveCatch (cascade) FAILED: RO must not feed EITHER treatment node directly, got ${JSON.stringify(cascadeCatchTopo)}`)
+  }
+  if (!cascadeCatchTopo.some((e) => e.from_part === 'drain_collection_sump' && (e.to_part === 'cloth_filter' || e.to_part === 'gac_filter'))) {
+    throw new Error(`filter-reorder proveCatch (cascade) FAILED: expected at least one treatment node relocated immediately after the recovery buffer, got ${JSON.stringify(cascadeCatchTopo)}`)
+  }
+
+  // (b) proveNoFalsePositive #1 — a legitimate MID-PROCESS filter in a DIFFERENT (non-water)
+  // archetype, fed by a genuinely dirty/raw stream (never a clean source), with a recovery
+  // buffer present elsewhere on the spine: must stay exactly where rank places it.
+  const dirtyStreamFilterTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Feed Gas Intake'), mkQ('Particulate Filter'), mkQ('Recycle Gas Buffer Tank'), mkQ('Product Storage Silo'),
+    ] }],
+  }])
+  if (!dirtyStreamFilterTopo.some((e) => e.to_part === 'particulate_filter' && e.from_part === 'feed_gas_intake')) {
+    throw new Error(`filter-reorder proveNoFalsePositive (dirty-stream filter) FAILED: a filter fed by a genuinely dirty/raw stream must stay put, got ${JSON.stringify(dirtyStreamFilterTopo)}`)
+  }
+
+  // (c) proveNoFalsePositive #2 — an explicitly-named FINAL POLISH filter downstream of a clean
+  // source, WITH a recovery buffer present elsewhere: must stay put (polish-exempt).
+  const polishStaysTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Reverse Osmosis Skid'), mkQ('Final Polish Filter'), mkQ('Drain Collection Sump'), mkQ('Storage Tank'),
+    ] }],
+  }])
+  if (!polishStaysTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'final_polish_filter')) {
+    throw new Error(`filter-reorder proveNoFalsePositive (final-polish) FAILED: an explicitly-named polish filter must stay downstream of the clean source, got ${JSON.stringify(polishStaysTopo)}`)
+  }
+
+  // (d) proveNoFalsePositive #3 — a genuinely ONCE-THROUGH archetype (no recovery buffer
+  // anywhere): a filter downstream of a clean source has nowhere legitimate to relocate to, so
+  // it must stay put (never invent a node to relocate onto).
+  const onceThroughFilterTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Reverse Osmosis Skid'), mkQ('Cartridge Filter'), mkQ('Product Storage Tank')] }],
+  }])
+  if (!onceThroughFilterTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cartridge_filter')) {
+    throw new Error(`filter-reorder proveNoFalsePositive (once-through, no recovery buffer) FAILED: got ${JSON.stringify(onceThroughFilterTopo)}`)
+  }
+
+  // ── PER-ZONE RECOVERY-COLLECTION EXPANSION proveCatch + proveNoFalsePositive (2026-07-08) ──
+  // (a) proveCatch — a recovery COLLECTION node (drainpit/sump) the physics engine has sized to
+  // qty=2 (the departmentCount-driven contract quantity) must become TWO distinct spine nodes,
+  // fanned out from the shared upstream and fanned back in to the shared downstream — never a
+  // direct edge between the two zone replicas (that would imply one drainpit feeds the next).
+  const zoneCatchTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Drain Collection Sump', 2), mkQ('Drain Water Tank')] }],
+  }])
+  const zoneSlugs = ['drain_collection_sump_1', 'drain_collection_sump_2']
+  for (const slug of zoneSlugs) {
+    if (!zoneCatchTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === slug)) {
+      throw new Error(`per-zone-recovery proveCatch FAILED: expected fan-out feed_pump -> ${slug}, got ${JSON.stringify(zoneCatchTopo)}`)
+    }
+    if (!zoneCatchTopo.some((e) => e.from_part === slug && e.to_part === 'drain_water_tank')) {
+      throw new Error(`per-zone-recovery proveCatch FAILED: expected fan-in ${slug} -> drain_water_tank, got ${JSON.stringify(zoneCatchTopo)}`)
+    }
+  }
+  if (zoneCatchTopo.some((e) => zoneSlugs.includes(e.from_part) && zoneSlugs.includes(e.to_part))) {
+    throw new Error(`per-zone-recovery proveCatch FAILED: a direct edge between the two zone replicas must never be authored (implies serial flow), got ${JSON.stringify(zoneCatchTopo)}`)
+  }
+  if (zoneCatchTopo.some((e) => e.from_part === 'drain_collection_sump' || e.to_part === 'drain_collection_sump')) {
+    throw new Error('per-zone-recovery proveCatch FAILED: the un-suffixed collapsed node must not survive the expansion')
+  }
+
+  // (b) proveNoFalsePositive #1 — qty=1 (single-zone / non-recirculating): the collection node
+  // stays exactly ONE node, byte-identical to the pre-fix behaviour.
+  const zoneSingleTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Drain Collection Sump', 1), mkQ('Drain Water Tank')] }],
+  }])
+  // (NB: a recirculation-loop-closure edge back to items[0] is ALSO expected here — Drain Water
+  // Tank is itself a recovery-buffer match — so this asserts the plain chain survives untouched,
+  // not an exact edge count.)
+  if (!zoneSingleTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === 'drain_collection_sump')
+    || !zoneSingleTopo.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'drain_water_tank')
+    || zoneSingleTopo.some((e) => /drain_collection_sump_[12]/.test(e.from_part) || /drain_collection_sump_[12]/.test(e.to_part))) {
+    throw new Error(`per-zone-recovery proveNoFalsePositive (qty=1) FAILED: expected the plain chain untouched (no zone-suffixed split), got ${JSON.stringify(zoneSingleTopo)}`)
+  }
+
+  // (b) proveNoFalsePositive #2 — a SHARED aggregate storage buffer (reservoir/tank, not a
+  // collection point) with qty=2 must NEVER be split: it is genuinely one/a-few shared vessels,
+  // not a per-zone structure (e.g. the real Codema "2 drain-water storage tanks", a fixed
+  // aggregate count unrelated to department count).
+  const sharedReservoirTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Drainwater Reservoir', 2), mkQ('Product Storage Tank')] }],
+  }])
+  if (sharedReservoirTopo.some((e) => /drainwater_reservoir_[12]/.test(e.from_part) || /drainwater_reservoir_[12]/.test(e.to_part))) {
+    throw new Error(`per-zone-recovery proveNoFalsePositive (shared reservoir) FAILED: a non-collection-point recovery buffer must never be split, got ${JSON.stringify(sharedReservoirTopo)}`)
+  }
+  if (!sharedReservoirTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === 'drainwater_reservoir')) {
+    throw new Error(`per-zone-recovery proveNoFalsePositive (shared reservoir) FAILED: expected the single collapsed node untouched, got ${JSON.stringify(sharedReservoirTopo)}`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold)`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()
