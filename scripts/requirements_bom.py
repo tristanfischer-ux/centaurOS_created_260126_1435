@@ -2444,6 +2444,41 @@ def _civils_cost_for_underground_vessel(vol_m3: float):
 _ROW_VOL_M3_RE = re.compile(r"(\d+(?:\.\d+)?)\s*m³")
 
 
+def _row_underground_volume_m3(req: str):
+    """Below-grade element volume (m³) from a requirement's size text. Tries an
+    explicit 'N m³' figure first, else derives it from the SAME dimensional
+    conventions the rest of this module already parses elsewhere (`_cyl_from_dim`'s
+    '<d> m dia x <h> m' cylinder, `_box_from_dim`'s '<w>x<d>x<h> mm' box). Returns
+    None (never fabricates) when neither form is present.
+
+    ROOT-CAUSE FIX (2026-07-08, Sam Green SME review follow-up): the bare 'N m³'
+    regex alone silently skipped EVERY fabricated-vessel requirement row (Softener
+    Vessel, Drain Collection Sump, Fresh Water Tank, Reverse Osmosis Skid, ...)
+    because their size is recorded as '<dia> m dia x <h> m' — the standard
+    dimension-line convention this module's own SIZE-line assembly + `_cyl_from_dim`
+    already use — never as an 'm³' figure. On the real Codema water-treatment design
+    this meant `civils_rows_from_underground_scope` emitted ZERO civils lines even
+    though a real underground vessel (Drain Collection Sump · 2.1 m dia x 1.4 m,
+    qty 2) was present: exactly the "drainpits everywhere, ~£0 civils" two-truths
+    contradiction Sam flagged. The gap was a volume-PARSING format mismatch, not an
+    under-instantiation of the design (the sump row itself was already there,
+    correctly quantified qty=2) — the design models the recovery infrastructure the
+    reference topology defines; only the cost derivation was blind to its own size
+    text convention."""
+    m = _ROW_VOL_M3_RE.search(req)
+    if m:
+        return float(m.group(1))
+    cyl = _cyl_from_dim(req)
+    if cyl:
+        dia_m, h_m = cyl
+        return math.pi * (dia_m / 2.0) ** 2 * h_m
+    box = _box_from_dim(req)
+    if box:
+        w_m, d_m, h_m = box
+        return w_m * d_m * h_m
+    return None
+
+
 def civils_rows_from_underground_scope(rows: list) -> list:
     """UNDERGROUND-ELEMENT CIVILS DERIVATION — additive post-pass (called from `assemble`
     after every principal/connection/distribution row exists). For every PRINCIPAL row
@@ -2464,10 +2499,9 @@ def civils_rows_from_underground_scope(rows: list) -> list:
         part = str(row.get("part") or "")
         if not (_is_underground_element(req) or _is_underground_element(part)):
             continue
-        m = _ROW_VOL_M3_RE.search(req)
-        if not m:
+        vol_m3 = _row_underground_volume_m3(req)
+        if vol_m3 is None:
             continue  # no parseable volume on this row — never fabricate a civils quantity
-        vol_m3 = float(m.group(1))
         qy = row.get("qty") or 1
         unit_gbp, basis = _civils_cost_for_underground_vessel(vol_m3)
         out.append({
@@ -4238,6 +4272,28 @@ def _selftest() -> int:
     if civils_rows_from_underground_scope(_once):
         print("  FAIL civils-derivation: a CIVILS row must never be re-scanned as its own "
               "underground signal (would compound the cost on re-entry)"); bad += 1
+
+    # (c) proveCatch — REAL SIZE-TEXT FORMAT (2026-07-08 follow-up): the fixture above
+    # used an explicit 'N m³' figure, but every FABRICATED-VESSEL row this module itself
+    # emits (Softener Vessel, Drain Collection Sump, Fresh Water Tank...) records size as
+    # '<dia> m dia x <h> m' — see `_cyl_from_dim` / the SIZE-line assembly — NEVER as an
+    # 'm³' figure. The real out/codema-sam-verify/state.json reads exactly
+    # "Drain Collection Sump · 2.1 m dia x 1.4 m" (qty 2) and got ZERO civils lines before
+    # `_row_underground_volume_m3` added the cylinder-from-dim fallback. This fixture
+    # proves the fix on the REAL text shape, not just the m³ one.
+    _ug_dim_rows = [
+        {"tag": "T-5", "requirement": "Drain Collection Sump · 2.1 m dia x 1.4 m", "status": "BESPOKE",
+         "part": "made to spec", "qty": 2, "unit_gbp": 3200, "line_gbp": 6400,
+         "basis": "bespoke shell take-off"},
+    ]
+    _ug_dim_civils = civils_rows_from_underground_scope(_ug_dim_rows)
+    if len(_ug_dim_civils) != 1:
+        print(f"  FAIL civils-derivation proveCatch (dia-x-h size text): expected exactly 1 "
+              f"civils line for the real 'N m dia x M m' size format, got {len(_ug_dim_civils)}: "
+              f"{_ug_dim_civils!r}"); bad += 1
+    elif _ug_dim_civils[0]["line_gbp"] <= 0:
+        print(f"  FAIL civils-derivation proveCatch (dia-x-h size text): civils line must be "
+              f"non-trivial, got {_ug_dim_civils[0]!r}"); bad += 1
     # (b) proveNoFalsePositive #4: a matching underground row with NO parseable volume
     # is skipped — never a fabricated civils number.
     _no_vol_rows = [{"tag": "T-5", "requirement": "Drain Collection Sump", "status": "SYSTEM",
