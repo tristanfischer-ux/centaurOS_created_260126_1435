@@ -44,6 +44,22 @@ Same guarantees as rewrite B, unchanged: PURE (no bpy), INTEGER GRID only (no fl
 dependence), a single TOTAL-ORDER sort is the only ordering in the whole module — same items in
 ANY input order → IDENTICAL output (the unit test proves order-invariance and determinism).
 
+REWRITE "C.1" (Tristan 2026-07-08, Sam Green's SECOND SME pass on the re-rendered GA): rewrite C's
+own `_place_all` re-introduced a SMALLER version of the exact defect it replaced — heavy items were
+packed on their own canvas, then the ENTIRE rest-of-plant was translated down by ONE FLAT, FULL-
+CANVAS-WIDTH offset (`heavy_depth + DELIVERY_AISLE_MM`), applied to every rest item regardless of
+its x-column. On the Codema water GA (22.3×13.3 m) that fixed 3.8 m offset read as a blank band
+across the WHOLE middle third of the plan — equipment split into a top block and a bottom block
+with almost nothing between them, exactly what Tristan flagged ("why is there so much spare space
+— tighten it up") even though the packer itself was dense within each block. Fix: heavy and rest
+now share ONE `_skyline_pack` call (heavy items visited first, so they still land flush at y=0);
+each item's OWN column-span gets its OWN pad afterward (DELIVERY_AISLE_MM for a heavy item,
+WALKWAY_MM for everything else) — so a column the heavy block never touched stays at whatever
+height it already was, and light equipment tucks in BESIDE a reservoir instead of being forced
+behind it by a blanket offset. The aisle survives exactly where something is genuinely placed
+directly behind a heavy item; it disappears everywhere else. See `_place_all`'s docstring for the
+mechanics and the CONTIGUOUS-PACK proveCatch in `_selftest` for the regression guard.
+
 Run the guard:  python3 scripts/blender-universal/deterministic_layout.py --selftest
 """
 from __future__ import annotations
@@ -157,28 +173,30 @@ def _is_heavy(w: float, d: float, shape: str | None = None, mass_kg: float | Non
     return (float(w) * float(d)) >= HEAVY_AREA_MM2
 
 
-def _skyline_pack(nodes: list[dict], target_w: int, y_pad: int) -> tuple[dict, int, int]:
+def _skyline_pack(nodes: list[dict], target_w: int, pad_for) -> tuple[dict, int, int]:
     """Deterministic BOTTOM-LEFT SKYLINE pack of `nodes` (id,w,d — visitation order is the
     caller's own deterministic order; this function adds none of its own) into a canvas of width
     `target_w` mm. Each item is placed at the lowest-then-leftmost position it fits (the classic
     2-D skyline heuristic) — a short item never inherits a tall neighbour's unused headroom, which
     is exactly the dead-space defect the old bay+bank scheme could not avoid. Every item's own
     size-scaled `_clearance()` gap is folded in as symmetric padding (so adjacent items in the same
-    row keep their service-side gap); `y_pad` (WALKWAY_MM or DELIVERY_AISLE_MM) is added under every
-    placed item's row so anything later stacked on top of it keeps at least that vertical access
-    gap — this is what turns "row-to-row spacing" into a genuine person/vehicle walkway rather than
-    a flat per-item constant. A single item wider than `target_w` grows the canvas rather than
-    being dropped. Returns ({id:(cx,cy)}, used_w, content_d) — `content_d` is the true occupied
-    depth (last item's OWN back edge, no trailing pad); the caller adds whatever transition gap
-    is appropriate to whatever comes NEXT (a different gap size than this call's internal
-    `y_pad`, e.g. heavy→rest only needs a walkway, not another full aisle — see `_place_all`)."""
+    row keep their service-side gap); `pad_for(node)` (WALKWAY_MM or DELIVERY_AISLE_MM, PER ITEM —
+    see rewrite "C.1" below for why this must be per-node, not one flat value for the whole call) is
+    added under every placed item's OWN occupied column-span so anything later stacked directly on
+    top of THAT item keeps at least that vertical access gap — a column an item never touches stays
+    at whatever height it already was, so unrelated content can tuck in beside it with no phantom
+    gap. `pad_for` may also be passed as a bare int for a flat-pad call (back-compat). A single item
+    wider than `target_w` grows the canvas rather than being dropped. Returns ({id:(cx,cy)}, used_w,
+    content_d) — `content_d` is the true occupied depth (last item's OWN back edge, no trailing
+    pad)."""
     if not nodes:
         return {}, 0, 0
+    _pad = pad_for if callable(pad_for) else (lambda _nd, _v=pad_for: _v)
     canvas_w = max(int(target_w), GRID_MM)
     skyline = [[0, canvas_w, 0]]     # [x0, x1, height] segments, sorted + contiguous over [0,canvas_w)
     pos: dict = {}
     used_w = 0
-    content_d = 0        # true occupied depth (no trailing y_pad) — see docstring
+    content_d = 0        # true occupied depth (no trailing pad) — see docstring
     for nd in nodes:
         w, d = int(nd["w"]), int(nd["d"])
         gap = _clearance(w, d)
@@ -205,7 +223,7 @@ def _skyline_pack(nodes: list[dict], target_w: int, y_pad: int) -> tuple[dict, i
         cy = _snap(h + gap / 2 + d / 2)
         pos[nd["id"]] = (cx, cy)
         content_d = max(content_d, h + pd)
-        new_h = h + pd + y_pad
+        new_h = h + pd + _pad(nd)   # PER-NODE pad — only THIS item's own column span rises
         x1 = x0 + pw
         # rebuild the skyline: pass through untouched segments, trim the two segments the new
         # item's span cuts into at its edges, and insert ONE new segment at the placed height.
@@ -236,47 +254,43 @@ def _skyline_pack(nodes: list[dict], target_w: int, y_pad: int) -> tuple[dict, i
 
 
 def _place_all(nodes: list[dict], target_w: int) -> tuple[dict, int, int]:
-    """Split `nodes` into HEAVY (truck/crane-delivered) vs the general pack, place the heavy block
-    FLUSH against the plant's own entrance edge (y=0) — literally the first content in the pack,
-    so nothing else in the plant can ever sit between a heavy item and the outside of the
-    building (a real loading-bay door cuts into the wall exactly there) — then pack everything
-    else behind it across a full DELIVERY_AISLE_MM (truck/HIAB-width) band. A plant with no heavy
-    item skips the aisle entirely (proveNoFalsePositive — no phantom empty band on a small/
-    compact archetype). Both blocks use the SAME `target_w` canvas so the whole plant reads as
-    one consistent width and the aisle spans the full width it needs to reach every heavy item.
+    """Place HEAVY (truck/crane-delivered) items FLUSH against the plant's own entrance edge
+    (y=0) — visited FIRST, before any other item, into an otherwise-empty skyline, so they land
+    at height 0 (nothing can ever sit between a heavy item and the outside of the building — a
+    real loading-bay door cuts into the wall exactly there) — then pack EVERYTHING ELSE into the
+    SAME skyline behind them, via ONE combined `_skyline_pack` call with a PER-ITEM pad: a heavy
+    item's own column-span rises by a full DELIVERY_AISLE_MM (truck/HIAB-width) after it; every
+    other item's column-span rises by only WALKWAY_MM. A plant with no heavy item never invokes
+    the aisle pad at all (proveNoFalsePositive — no phantom empty band on a small/compact
+    archetype).
 
-    WHY THE AISLE SITS HERE, NOT BEFORE y=0 (Tristan 2026-07-08, caught on the re-rendered GA):
-    the FIRST cut of this fix put the aisle band BEFORE the heavy row (y in [0, DELIVERY_AISLE_MM),
-    heavy items starting at y=DELIVERY_AISLE_MM) — geometrically correct but INVISIBLE on the
-    rendered GA: the drawn plant envelope is the bounding box of PLACED CONTENT, so an empty band
-    with nothing on either side of it (heavy items on one side, the building's exterior on the
-    other) is cropped away by that same bbox calculation — the drawing simply started where the
-    first item sat, and the reserved aisle vanished. Putting the ONE aisle-width gap where it is
-    ACTUALLY visible — between the heavy row and the rest of the plant, both real content — is
-    what makes it provable by opening the render, not just provable by reading coordinates."""
-    heavy = [nd for nd in nodes if _is_heavy(nd["w"], nd["d"], nd.get("shape"), nd.get("mass_kg"))]
-    heavy_ids = {nd["id"] for nd in heavy}
+    REWRITE "C.1" (Tristan 2026-07-08, Sam Green's SECOND SME pass — re-rendered GA still showed
+    a large EMPTY MIDDLE BAND splitting a top equipment block from a bottom reservoir block): the
+    ORIGINAL rewrite "C" ran heavy and rest as TWO SEPARATE `_skyline_pack` calls on two separate
+    canvases, then translated the whole "rest" block down by ONE FLAT, FULL-CANVAS-WIDTH
+    `y_offset = heavy_content_depth + DELIVERY_AISLE_MM` — applied uniformly to EVERY rest item
+    regardless of its x-column, even columns the heavy block never touched. On a plant only a few
+    metres deep, that flat offset (a fixed 3.8 m aisle) reads as a huge blank band across the WHOLE
+    width, and light equipment that could have tucked in BESIDE a reservoir (no aisle needed — it
+    isn't behind anything) was forced behind it instead. The fix: heavy and rest now share ONE
+    skyline, so a rest item's placement height is READ off its own column's true occupied height —
+    0 (flush beside a heavy item, in a column the heavy item never claimed) or
+    heavy_item_depth + DELIVERY_AISLE_MM (directly behind a heavy item's own column-span) — never a
+    blanket offset. Reservoirs now pack UP against whatever equipment sits beside them; the aisle
+    survives ONLY where something is genuinely placed directly behind a heavy item, so it stays a
+    real, visible gap between two blocks of drawn content (never an invisible band beyond the
+    render's content bbox — the reasoning that put the aisle AFTER the heavy row, not before y=0,
+    in the original rewrite still holds and is unchanged here)."""
+    heavy_ids = {nd["id"] for nd in nodes
+                 if _is_heavy(nd["w"], nd["d"], nd.get("shape"), nd.get("mass_kg"))}
+    heavy = [nd for nd in nodes if nd["id"] in heavy_ids]
     rest = [nd for nd in nodes if nd["id"] not in heavy_ids]
-    pos: dict = {}
-    used_w = 0
-    y_offset = 0
-    if heavy:
-        hpos, hw, hcontent_d = _skyline_pack(heavy, target_w, DELIVERY_AISLE_MM)
-        pos.update(hpos)
-        used_w = max(used_w, hw)
-        # the heavy block's OWN true depth (no trailing pad) + ONE full aisle-width transition —
-        # this IS the visible delivery aisle, between the heavy row and whatever packs behind it.
-        y_offset = _snap(hcontent_d + DELIVERY_AISLE_MM)
-    if rest:
-        rpos, rw, rd = _skyline_pack(rest, target_w, WALKWAY_MM)
-        for k in rpos:
-            rpos[k] = (rpos[k][0], rpos[k][1] + y_offset)
-        pos.update(rpos)
-        used_w = max(used_w, rw)
-        used_d = y_offset + rd
-    else:
-        used_d = y_offset
-    return pos, used_w, used_d
+    ordered = heavy + rest      # heavy FIRST — guarantees flush-to-entrance (skyline starts flat)
+
+    def _pad_for(nd):
+        return DELIVERY_AISLE_MM if nd["id"] in heavy_ids else WALKWAY_MM
+
+    return _skyline_pack(ordered, target_w, _pad_for)
 
 
 def _best_target_w(nodes: list[dict]) -> int:
@@ -480,9 +494,13 @@ def _selftest() -> int:
     # (10) DELIVERY AISLE proveCatch — one HEAVY item (a reservoir-scale footprint, well over
     #      HEAVY_AREA_MM2) among several light ones must (a) sit FLUSH against the plant's own
     #      entrance edge (y=0) — nothing placed between it and the outside of the building — and
-    #      (b) have a full, VISIBLE DELIVERY_AISLE_MM gap to the nearest OTHER content (the light
-    #      items), so the aisle is a real gap between two blocks of drawn content, not an invisible
-    #      band that a bbox-cropped render would discard.
+    #      (b) when other content ends up genuinely STACKED BEHIND it (its x-column-span is
+    #      claimed and there is no room left BESIDE it — bay_row_w pins the canvas tight enough
+    #      that all 6 pumps must stack behind, not beside), that content sits a full, VISIBLE
+    #      DELIVERY_AISLE_MM behind it — a real gap between two blocks of drawn content, not an
+    #      invisible band a bbox-cropped render would discard. (Content that instead fits BESIDE
+    #      the heavy item, in columns it never claims, is exempt — that is rewrite "C.1"'s fix,
+    #      proven separately in the CONTIGUOUS-PACK test below.)
     aisle_items = [{"id": "RESV", "region": "r_00_store", "rank": 0, "seq": 0,
                     "w": 5000, "d": 5000, "area": 5000 * 5000, "shape": "tank"}]
     for i in range(6):
@@ -491,7 +509,8 @@ def _selftest() -> int:
         # shared position and break this test's per-item edge check).
         aisle_items.append({"id": f"PUMP{i}", "region": "r_10_pumps", "rank": 10, "seq": i + 1,
                             "w": 950, "d": 950, "area": 950 * 950, "shape": "pump"})
-    apos = layout(list(aisle_items))
+    resv_padded_w = 5000 + _clearance(5000, 5000)
+    apos = layout(list(aisle_items), bay_row_w=resv_padded_w + GRID_MM)  # no room beside RESV
     fp = {it["id"]: (it["w"], it["d"]) for it in aisle_items}
     resv_front_y = apos["RESV"][1] - fp["RESV"][1] / 2
     if resv_front_y > WALKWAY_MM:    # flush at the entrance edge (± its own small clearance
@@ -556,6 +575,32 @@ def _selftest() -> int:
     if sw > 2000 + 2 * CLEAR_MAX_MM or sd > 1200 + 2 * CLEAR_MAX_MM:
         print(f"  FAIL: solo compact unit footprint inflated to {sw:.0f}x{sd:.0f} mm "
               f"(item is only 2000x1200 mm)"); bad += 1
+
+    # (14) CONTIGUOUS-PACK proveCatch (rewrite "C.1", Sam Green's 2nd SME pass, 2026-07-08) — a
+    #      HEAVY reservoir with LIGHT equipment that comfortably fits BESIDE it (in columns the
+    #      reservoir's own footprint never claims) must actually land beside it, at height ~0 —
+    #      NOT be pushed behind a FLAT full-canvas-width `heavy_depth + DELIVERY_AISLE_MM` offset
+    #      (the exact "empty middle band splits the plant into a top block and a bottom block"
+    #      regression Sam's 2nd pass caught on the re-rendered Codema GA). A wide bay_row_w gives
+    #      4 light skids exactly enough side-room (4×1500mm padded = 6000mm) to pack fully beside
+    #      a 5000×5000mm reservoir (padded 6000mm) rather than needing to stack behind it.
+    heavy_light = [{"id": "RESV", "region": "r_00_store", "rank": 0, "seq": 0,
+                    "w": 5000, "d": 5000, "area": 5000 * 5000, "shape": "tank"}]
+    for i in range(4):
+        heavy_light.append({"id": f"SKID{i}", "region": "r_10_skids", "rank": 10, "seq": i + 1,
+                            "w": 1200, "d": 1200, "area": 1200 * 1200, "shape": "skid_box"})
+    hlpos = layout(list(heavy_light), bay_row_w=12000)
+    hlfp = {it["id"]: (it["w"], it["d"]) for it in heavy_light}
+    skid_front_ys = [hlpos[f"SKID{i}"][1] - hlfp[f"SKID{i}"][1] / 2 for i in range(4)]
+    if not any(y <= WALKWAY_MM + GRID_MM for y in skid_front_ys):
+        print(f"  FAIL: no light item packed BESIDE the heavy reservoir (front edges "
+              f"{[f'{y:.0f}' for y in skid_front_ys]} mm) — the whole rest-of-plant was pushed "
+              f"behind a flat full-width aisle offset (the empty-middle-band regression)"); bad += 1
+    hlw, hld = _brect(heavy_light, hlpos)
+    resv_pd = 5000 + _clearance(5000, 5000)   # the reservoir's own padded depth — the bound a
+    if hld > resv_pd + CLEAR_MAX_MM:          # contiguous pack should not exceed (no aisle band
+        print(f"  FAIL: heavy+light bounding depth {hld:.0f} mm blew past the reservoir's own "
+              f"{resv_pd:.0f} mm padded depth — a dead band remains between the two blocks"); bad += 1
 
     print("deterministic_layout selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
