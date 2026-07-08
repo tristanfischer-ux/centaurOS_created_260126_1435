@@ -52,6 +52,7 @@ import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import {
   computeScorecardFloor,
+  dedupeScorecardSections,
   buildBriefComplianceSection,
   buildUnresolvedCriticHighsSection,
   buildPhysicsFidelitySection,
@@ -108,7 +109,7 @@ import { snapshotEmitterIdentity, restoreStrippedPartNumbers } from '../src/lib/
 import { scanEmitterForBriefLiterals, scanContractForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { isRoundingFamily, extractOccurrences as gate18ExtractOccurrences, cluster as gate18Cluster, buildFindings as gate18BuildFindings, currentCalcSignatureOf, constraintRoleOf } from './lib/cross-page-numeric-consistency-audit'
 import { isCatalogueComponent, isBlankOrPlaceholderMpn, dbFirstLookup, dbHitAcceptableForWord, tokenize as emitterTokenize, isNodeAbiMismatchError, describeNodeAbiMismatch, type DbPart } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
-import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, type CorpusPriceRow } from './estimate-missing-prices'
+import { classifyByRules, matchCorpusPrice, resolveEmitterPinPrice, existingPartHasRealPrice, type CorpusPriceRow } from './estimate-missing-prices'
 import { auditCostSanity as _auditCostSanityForCorpus } from './lib/cost-self-assessment'
 import { keywordCeilingGbp, PRICE_CEILING_BY_COMPONENT_CLASS, isConsumable, classCeilingGbp } from '../src/lib/pdf-engine-v2/component-classes'
 import { applyPatches } from '../src/lib/pdf-engine-v2/radical/universal-repair'
@@ -12229,6 +12230,78 @@ print(json.dumps({"identical": rows_a == rows_b, "n": len(rows_a), "uncorroborat
         detail: `probe failed: ${(err as Error).message.slice(0, 160)}`,
       })
     }
+  }
+
+  // QL11 (Tristan 2026-07-08, Codema scorecard-honesty fix) — dedupeScorecardSections
+  // proveCatch: an advisory (LLM self-audit) opinion and a deterministic FACT section
+  // sharing the same name (e.g. 'brief_compliance' pushed once by the self-audit loop,
+  // once by buildBriefComplianceSection) must merge into ONE row, never survive as a
+  // stale-looking duplicate. Tristan caught brief_compliance appearing as [5, 10] and
+  // physics_fidelity as [7, 10] in the same out/pn-verify/quality-scorecard.json.
+  {
+    const deduped = dedupeScorecardSections([
+      { name: 'brief_compliance', score: 5, defects: ['6 unverified constraints'], advisory: true },
+      { name: 'brief_compliance', score: 10, defects: [] },
+      { name: 'connectivity', score: 9, defects: [] },
+    ])
+    out.push({
+      id: 'QL11.dedupe_collapses_duplicate_names_to_one_row',
+      description: 'a name pushed twice (advisory opinion + deterministic fact) collapses to ONE row, deterministic score wins, advisory opinion folded into defects',
+      passed:
+        deduped.length === 2 &&
+        deduped.filter((s) => s.name === 'brief_compliance').length === 1 &&
+        deduped.find((s) => s.name === 'brief_compliance')?.score === 10 &&
+        !!deduped.find((s) => s.name === 'brief_compliance')?.defects.some((d) => d.includes('advisory:') && d.includes('5/10')),
+      detail: JSON.stringify(deduped),
+    })
+  }
+
+  // QL12 (Tristan 2026-07-08) — the reported (honest) floor is the min across EVERY
+  // deduped section, deterministic AND advisory; the deterministic-only floor (used
+  // solely to drive the quality loop's re-iteration decision) must stay separately
+  // available and never be confused with the reported number. Proves the exact
+  // masking Tristan caught: bill_of_materials=8 (advisory) hidden behind a
+  // deterministic-only floor of 9.
+  {
+    const deduped = dedupeScorecardSections([
+      { name: 'headline', score: 9, defects: [], advisory: true },
+      { name: 'bill_of_materials', score: 8, defects: ['4 unpriced lines'], advisory: true },
+      { name: 'connectivity', score: 9, defects: [] },
+      { name: 'drawing_gates', score: 10, defects: [] },
+    ])
+    const honestFloor = Math.min(...deduped.map((s) => s.score))
+    const { floor: deterministicOnlyFloor } = computeScorecardFloor(deduped)
+    out.push({
+      id: 'QL12.honest_floor_never_hides_advisory_sub9_behind_deterministic_floor',
+      description: 'reported floor = min across ALL sections (8, from the advisory bill_of_materials), not just the deterministic-only floor (9)',
+      passed: honestFloor === 8 && deterministicOnlyFloor === 9,
+      detail: `honestFloor=${honestFloor} deterministicOnlyFloor=${deterministicOnlyFloor}`,
+    })
+  }
+
+  // QL13 (Tristan 2026-07-08, Codema BoM coverage fix) — existingPartHasRealPrice
+  // proveCatch: a distributor cascade MISS writes `distributor_price_gbp: 0` explicitly
+  // (never omits the field) — treating that as "already priced" (the old `!= null`
+  // check) permanently skipped Engine B's fallback estimate for a genuinely unpriced
+  // part (Codema water plant: HMS Networks AB7072-B Ethernet/IP module shipped at £0).
+  // `> 0` is the correct "has a real price" test — no physical component is ever
+  // legitimately priced at exactly £0.
+  {
+    const cases: Array<{ name: string; existing: any; expect: boolean }> = [
+      { name: 'zero_distributor_price_needs_estimate', existing: { distributor_price_gbp: 0 }, expect: false },
+      { name: 'zero_both_fields_needs_estimate', existing: { distributor_price_gbp: 0, price_estimate_gbp: 0 }, expect: false },
+      { name: 'missing_fields_needs_estimate', existing: {}, expect: false },
+      { name: 'undefined_row_needs_estimate', existing: undefined, expect: false },
+      { name: 'real_distributor_price_has_price', existing: { distributor_price_gbp: 42.5 }, expect: true },
+      { name: 'real_estimate_price_has_price', existing: { distributor_price_gbp: 0, price_estimate_gbp: 12 }, expect: true },
+    ]
+    const wrong = cases.filter((c) => existingPartHasRealPrice(c.existing) !== c.expect)
+    out.push({
+      id: 'QL13.existing_part_has_real_price_treats_zero_as_unpriced',
+      description: 'distributor_price_gbp: 0 (a cascade miss) is treated as UNPRICED (needs an estimate), never as "already priced"',
+      passed: wrong.length === 0,
+      detail: wrong.length ? `failing cases: ${wrong.map((c) => c.name).join(', ')}` : undefined,
+    })
   }
 
   // QL10 — BOARD-HEADING-IN-SVG (J101, 2026-07-03): the panel/load schedule and the

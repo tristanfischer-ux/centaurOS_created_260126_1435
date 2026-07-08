@@ -212,8 +212,20 @@ export function buildAuditDigest(state: any, productClass: string): AuditDigest 
       .map(([m, s]) => `  ${truncate(m, 32)}: ${gbp(s)}`).join('\n')
     const macroList = [...macros].sort((a, b) => (num(b?.total_gbp) ?? 0) - (num(a?.total_gbp) ?? 0)).slice(0, 8)
       .map((m: any) => `  ${truncate(m?.word_name ?? '?', 34)} = ${gbp(num(m?.total_gbp))}${m?.source_detail ? `  (${truncate(m.source_detail, 48)})` : ''}`).join('\n')
+    // LIVE counts only (Tristan 2026-07-08, Codema BoM honesty fix): `cr.priced_lines`/
+    // `cr.unpriced_lines` are a SNAPSHOT written earlier in the pipeline (the G2
+    // cost-reality gate) and only refreshed later `if (rewritten > 0)` at a specific
+    // writeback checkpoint — a run where later stages (Stage 10.5 cascade lookup,
+    // Engine B price estimation, cost-repair) fix an unpriced line without tripping
+    // that specific refresh leaves `cr.unpriced_lines` STALE and too high, so the judge
+    // was scoring against a defect count that had already been fixed elsewhere (Codema
+    // v-latest: cr.unpriced_lines stuck at 4 while the live partVerifications count was
+    // 1). `pv`/`withPrice` above are read fresh from `state.partVerifications` on every
+    // call, so they can never go stale — always prefer them over the cached gate fields.
+    const livePricedLines = withPrice.length
+    const liveUnpricedLines = pv.length - withPrice.length
     const text =
-      `BoM total (chain estimate): ${gbp(total)} for this ${productClass}.  priced lines ${cr?.priced_lines ?? withPrice.length}, unpriced ${cr?.unpriced_lines ?? (pv.length - withPrice.length)}.\n` +
+      `BoM total (chain estimate): ${gbp(total)} for this ${productClass}.  priced lines ${livePricedLines}, unpriced ${liveUnpricedLines}.\n` +
       (macros.length ? `BIG-TICKET ASSEMBLIES priced by dimension-based MACROS (authoritative for large items; total ${gbp(macroTotal)}):\n${macroList}\nNOTE: per-line prices below are PRE-MACRO component estimates — a line whose name matches a macro above renders at the macro price, so a £0/tiny price on a vessel/skid/motor below is a pre-macro placeholder, NOT the shipped price.\n` : '') +
       (realZeros.length ? `£0 LINES not covered by any macro (${realZeros.length}): ${realZeros.slice(0, 10).map((p: any) => truncate(p.name, 40)).join('; ')}\n` : '') +
       `Dearest component lines:\n${sorted.slice(-6).reverse().map((p: any) => '  ' + line(p)).join('\n')}\n` +

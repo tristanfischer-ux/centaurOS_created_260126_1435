@@ -140,6 +140,23 @@ function isFinishedCommodity(ctx: PartContext): boolean {
   return true
 }
 
+/**
+ * True when an existing partVerification row already carries a REAL price and
+ * therefore needs no estimate. `> 0`, never `!= null` — a distributor cascade
+ * miss (Stage 10.5 / gate 20/21) writes `distributor_price_gbp: 0` explicitly on
+ * a miss, it never omits the field, so `!= null` alone treats a genuine "no price
+ * found" result as "already priced" and permanently skips it (Tristan 2026-07-08,
+ * Codema BoM fix: the Ethernet/IP module HMS Networks AB7072-B shipped at £0
+ * because of exactly this). A real physical component is never legitimately
+ * priced at exactly £0, so `> 0` is the correct, universal "has a price" test —
+ * matches every other consumer of this field (build-cost-basis.ts, the G2
+ * cost-reality gate in serial-design-chain-v2.tsx, audit-parts-catalogue-
+ * distributors.tsx). Exported so the regression harness can proveCatch it.
+ */
+export function existingPartHasRealPrice(existing: { distributor_price_gbp?: unknown; price_estimate_gbp?: unknown } | undefined | null): boolean {
+  return Number(existing?.distributor_price_gbp) > 0 || Number(existing?.price_estimate_gbp) > 0
+}
+
 interface PriceEstimate {
   price_estimate_gbp: number
   estimate_low_gbp: number
@@ -1575,8 +1592,7 @@ async function main() {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
         const existing = verifByCompoundId.get(compoundKey(m.module, sm.id, w.id)) ?? verifByLegacyWordId.get(w.id)
-        if (existing?.distributor_price_gbp != null) continue
-        if (existing?.price_estimate_gbp != null) continue
+        if (existingPartHasRealPrice(existing)) continue
         const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
         let qty = 1
         if (qmod) {

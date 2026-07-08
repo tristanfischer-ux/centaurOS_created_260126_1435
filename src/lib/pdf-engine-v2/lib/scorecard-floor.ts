@@ -44,6 +44,68 @@ export function computeScorecardFloor(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SCORECARD HONESTY — dedup stale duplicate sections (Tristan 2026-07-08)
+// ═══════════════════════════════════════════════════════════════════════════════
+// The chain's computeQualityScorecard() pushes sections from several independent
+// sources (the LLM self-audit's own opinion + the deterministic FACT builders
+// above), and more than one can legitimately push the SAME conceptual name (e.g.
+// the self-audit's 'brief_compliance'/'physics_fidelity' opinion ALONGSIDE
+// buildBriefComplianceSection/buildPhysicsFidelitySection's fact-based sections of
+// the identical name). Left un-merged, `sections[]` reads as a stale-looking
+// duplicate — Tristan caught `brief_compliance` appearing as [5, 10] and
+// `physics_fidelity` as [7, 10] in the same scorecard. Every reader of `sections[]`
+// (a human, an automated "every section ≥N" check, the Excel exporter) must see
+// ONE row per name.
+
+/**
+ * Merge scorecard sections that share a `name` into ONE entry. Universal — keyed
+ * on `name` only, no per-section table:
+ *   - a single entry for a name passes through unchanged.
+ *   - a collision takes the WORST (min) score across the group (never hides a low
+ *     score behind a higher one) and unions the defect lists.
+ *   - `advisory` on the merged entry is true ONLY if every entry in the group was
+ *     advisory; a group containing at least one deterministic (fact) entry merges
+ *     to advisory=false (it is, in part, authoritative) and folds each advisory
+ *     sibling's score + defects in as a visible "advisory: self-audit (LLM) scored
+ *     this section N/10 — ..." annotation, so the LLM's opinion is never silently
+ *     discarded, only demoted to an annotation — both scores stay clearly labelled
+ *     rather than one being erased. Mirrors the identical "duplicate names → the
+ *     MIN (worst) wins" convention `build-excel-export.py::_verdict_sections`
+ *     already applies downstream, so the JSON this writes and the workbook's own
+ *     recomputation can never quietly disagree.
+ */
+export function dedupeScorecardSections(sections: ScorecardSection[]): ScorecardSection[] {
+  const order: string[] = []
+  const groups = new Map<string, ScorecardSection[]>()
+  for (const s of sections) {
+    if (!groups.has(s.name)) { groups.set(s.name, []); order.push(s.name) }
+    groups.get(s.name)!.push(s)
+  }
+  const out: ScorecardSection[] = []
+  for (const name of order) {
+    const group = groups.get(name)!
+    if (group.length === 1) { out.push(group[0]); continue }
+    const deterministic = group.filter((g) => !g.advisory)
+    const advisory = group.filter((g) => g.advisory)
+    if (deterministic.length > 0) {
+      const score = Math.min(...deterministic.map((d) => d.score))
+      const defects = Array.from(new Set(deterministic.flatMap((d) => d.defects ?? [])))
+      for (const a of advisory) {
+        defects.push(
+          `advisory: self-audit (LLM) scored this section ${a.score}/10${(a.defects ?? []).length ? ' — ' + a.defects![0] : ''}`.slice(0, 200),
+        )
+      }
+      out.push({ name, score, defects, advisory: false })
+    } else {
+      const score = Math.min(...advisory.map((a) => a.score))
+      const defects = Array.from(new Set(advisory.flatMap((a) => a.defects ?? [])))
+      out.push({ name, score, defects, advisory: true })
+    }
+  }
+  return out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DETERMINISTIC FACT SECTIONS (Tristan 2026-07-02)
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tristan's catch: the workbook's Scorecard sheet showed brief_compliance 5/10
@@ -576,5 +638,70 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     `score=${overrideAttempt.score}`,
   )
 
-  return { passed: 8 - failed.length, failed }
+  // (9) proveCatch — SCORECARD HONESTY dedup (Tristan 2026-07-08): a self-audit
+  // (advisory) opinion and a deterministic FACT section sharing the same name merge
+  // into ONE row, taking the deterministic score as canonical and folding the LLM's
+  // opinion into defects as a visible annotation — never a second silent row.
+  const dedupedMixed = dedupeScorecardSections([
+    { name: 'brief_compliance', score: 5, defects: ['6 unverified constraints'], advisory: true },
+    { name: 'brief_compliance', score: 10, defects: [] },
+  ])
+  check(
+    'dedupe.mixed_advisory_and_deterministic_merges_to_one_row',
+    dedupedMixed.length === 1 &&
+      dedupedMixed[0].score === 10 &&
+      dedupedMixed[0].advisory === false &&
+      dedupedMixed[0].defects.some((d) => d.includes('advisory:') && d.includes('5/10')),
+    JSON.stringify(dedupedMixed),
+  )
+
+  // (10) proveCatch — a collision between two DETERMINISTIC entries for the same name
+  // (never expected today, but the rule must hold universally) takes the WORST score,
+  // never the best — a real defect can never be hidden by a later better-looking push.
+  const dedupedDeterministic = dedupeScorecardSections([
+    { name: 'physics_gates', score: 7, defects: ['finding A'] },
+    { name: 'physics_gates', score: 10, defects: [] },
+  ])
+  check(
+    'dedupe.two_deterministic_entries_take_the_worst_score',
+    dedupedDeterministic.length === 1 && dedupedDeterministic[0].score === 7,
+    JSON.stringify(dedupedDeterministic),
+  )
+
+  // (11) proveCatch — two ADVISORY entries for the same name (no deterministic
+  // counterpart at all) merge honestly to the worst score, staying advisory.
+  const dedupedAdvisoryOnly = dedupeScorecardSections([
+    { name: 'headline', score: 9, defects: [], advisory: true },
+    { name: 'headline', score: 6, defects: ['blank metric'], advisory: true },
+  ])
+  check(
+    'dedupe.two_advisory_entries_take_the_worst_score_stays_advisory',
+    dedupedAdvisoryOnly.length === 1 && dedupedAdvisoryOnly[0].score === 6 && dedupedAdvisoryOnly[0].advisory === true,
+    JSON.stringify(dedupedAdvisoryOnly),
+  )
+
+  // (12) proveCatch — a unique name (no collision) passes through UNCHANGED, and the
+  // HONEST floor (min across every deduped section, deterministic AND advisory) never
+  // hides an advisory sub-9 behind a higher deterministic floor — the exact masking
+  // Tristan caught (bill_of_materials=8 advisory, reported floor=9 deterministic-only).
+  const mixedScorecard = dedupeScorecardSections([
+    { name: 'headline', score: 9, defects: [], advisory: true },
+    { name: 'bill_of_materials', score: 8, defects: ['4 unpriced lines'], advisory: true },
+    { name: 'connectivity', score: 9, defects: [] },
+    { name: 'drawing_gates', score: 10, defects: [] },
+  ])
+  const honestFloor = Math.min(...mixedScorecard.map((s) => s.score))
+  const { floor: deterministicOnlyFloor } = computeScorecardFloor(mixedScorecard)
+  check(
+    'dedupe.unique_names_pass_through_unchanged',
+    mixedScorecard.length === 4,
+    JSON.stringify(mixedScorecard.map((s) => s.name)),
+  )
+  check(
+    'honest_floor.advisory_sub9_not_masked_by_deterministic_floor',
+    honestFloor === 8 && deterministicOnlyFloor === 9 && honestFloor < deterministicOnlyFloor,
+    `honestFloor=${honestFloor} deterministicOnlyFloor=${deterministicOnlyFloor}`,
+  )
+
+  return { passed: 12 - failed.length, failed }
 }

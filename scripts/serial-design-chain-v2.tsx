@@ -53,6 +53,7 @@ import { generateBenchmarkExpectation, compareToBenchmark, diagnoseFaults, route
 import { reconcile as reconcileSweetSpot, type PrimaryObjective } from './lib/sweet-spot'
 import {
   computeScorecardFloor,
+  dedupeScorecardSections,
   buildBriefComplianceSection,
   buildUnresolvedCriticHighsSection,
   buildPhysicsFidelitySection,
@@ -2406,10 +2407,24 @@ function validateLedgerSchema(ledger: any): string[] {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface QualityScorecard {
+  // HONEST fields (Tristan 2026-07-08 scorecard-honesty fix) — the minimum/mean over
+  // EVERY deduped section, deterministic AND advisory. This is what a human reading
+  // quality-scorecard.json (or an automated "every section ≥N" check) must trust: an
+  // advisory section scoring below the deterministic floor is NEVER hidden behind it.
   floor: number
   mean: number
   sections: Array<{ name: string; score: number; defects: string[]; advisory?: boolean }>
   allPass: boolean
+  // DETERMINISTIC (gating) fields — B3: the arithmetic/ledger-derived sections only,
+  // never dragged by LLM self-audit noise. Used SOLELY to drive the automated
+  // quality-loop's re-iteration decision (extractFixDirectives already ignores
+  // advisory sections, so looping on an advisory-only miss would burn iterations with
+  // no possible fix directive — exactly the endless-loop B3 was built to prevent).
+  // Never use these for reporting/display — that is what `floor`/`mean`/`allPass`
+  // above are for.
+  deterministicFloor: number
+  deterministicMean: number
+  deterministicAllPass: boolean
   iteration: number
 }
 
@@ -2840,14 +2855,44 @@ function computeQualityScorecard(state: any): QualityScorecard {
     )
   }
 
-  // B3: floor + mean from the DETERMINISTIC (non-advisory) sections only — the
-  // deterministic checks ARE the quality bar; advisory LLM sections stay visible in
-  // `sections` but cannot drag the floor down. Logic + the universal only-advisory
-  // fallback live in the importable, harness-tested computeScorecardFloor().
-  const { floor, mean } = computeScorecardFloor(sections)
+  // ── SCORECARD HONESTY (Tristan 2026-07-08) ──────────────────────────────────────
+  // Several sources above can push a section under the SAME conceptual name (e.g. the
+  // LLM self-audit's own 'brief_compliance'/'physics_fidelity' opinion at the top of
+  // this function, ALONGSIDE the deterministic fact builders' 'brief_compliance'/
+  // 'physics_fidelity' sections further down) — a stale-looking duplicate that
+  // silently inflates whichever reader only scans for the first match. Dedup FIRST,
+  // universally, keyed on name only (no per-section special-casing), taking the WORST
+  // (min) score on a collision — mirroring the identical "duplicate names → the MIN
+  // (worst) wins" convention `build-excel-export.py::_verdict_sections` already uses
+  // downstream, so the JSON this function writes and the workbook's own recomputation
+  // can never quietly disagree. A collision between a deterministic and an advisory
+  // entry for the same name keeps BOTH clearly labelled rather than erasing one: the
+  // merged section stays advisory=false (it is, in part, a fact) and the advisory
+  // entry's score + defects are folded in as a visible annotation line — never lost,
+  // never allowed to look like a second independent section.
+  const dedupedSections = dedupeScorecardSections(sections)
+
+  // DETERMINISTIC (gating) floor — non-advisory sections only, B3. Drives the
+  // automated quality-loop's re-iteration decision ONLY (see QualityScorecard
+  // comments); never used for reporting.
+  const { floor: deterministicFloor, mean: deterministicMean } = computeScorecardFloor(dedupedSections)
+  const deterministicAllPass = deterministicFloor >= 8
+
+  // HONEST (reported) floor — the minimum across EVERY deduped section, deterministic
+  // AND advisory. This is the number quality-scorecard.json's top-level `floor`/`mean`/
+  // `allPass` report, and the one any "every section ≥N" check must read: an advisory
+  // section scoring below the deterministic sections is NEVER masked behind them.
+  const allScores = dedupedSections.map((s) => s.score)
+  const floor = allScores.length ? Math.min(...allScores) : 0
+  const mean = allScores.length ? Math.round((allScores.reduce((a, b) => a + b, 0) / allScores.length) * 10) / 10 : 0
   const allPass = floor >= 8
+
   const iteration = parseInt(process.env.QUALITY_LOOP_ITER || '0', 10)
-  return { floor, mean, sections, allPass, iteration }
+  return {
+    floor, mean, sections: dedupedSections, allPass,
+    deterministicFloor, deterministicMean, deterministicAllPass,
+    iteration,
+  }
 }
 
 function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirective[] {
@@ -10520,7 +10565,7 @@ async function main() {
     process.env.QUALITY_LOOP_OUT_DIR = outDir
     const scorecard = computeQualityScorecard(finalStateForScore)
     writeFileSync(resolve(outDir, 'quality-scorecard.json'), JSON.stringify(scorecard, null, 2))
-    console.error(`[chain] quality scorecard (iteration ${iter + 1}/${MAX_QUALITY_LOOPS}): floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass}`)
+    console.error(`[chain] quality scorecard (iteration ${iter + 1}/${MAX_QUALITY_LOOPS}): floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10 allPass=${scorecard.allPass} (honest, all sections)  |  gating floor=${scorecard.deterministicFloor}/10 mean=${scorecard.deterministicMean.toFixed(1)}/10 allPass=${scorecard.deterministicAllPass} (deterministic-only, drives the loop)`)
     for (const s of scorecard.sections) {
       const flag = s.score < 8 ? ' ✗ BELOW 8' : ' ✓'
       console.error(`  ${s.name}: ${s.score}/10${flag}`)
@@ -10547,7 +10592,12 @@ async function main() {
     } catch { /* best-effort */ }
 
     // 5. Loop decision — DATA fix (re-run) or CODE fix (GLM-5.2 patch)
-    if (!scorecard.allPass && iter + 1 < MAX_QUALITY_LOOPS) {
+    // Gates on the DETERMINISTIC-only verdict (never the honest all-sections one):
+    // extractFixDirectives() already ignores advisory sections, so a miss driven
+    // solely by an advisory (LLM) section can never produce a fix directive — looping
+    // on the honest floor here would burn iterations with no possible fix, exactly the
+    // endless-loop B3 was built to prevent.
+    if (!scorecard.deterministicAllPass && iter + 1 < MAX_QUALITY_LOOPS) {
       // Load ledger for classification
       const ledger = existsSync(ledgerPath)
         ? JSON.parse(readFileSync(ledgerPath, 'utf-8'))
@@ -10715,8 +10765,14 @@ async function main() {
       })
       return  // the child run handles the rest (including further loops + FINAL output)
     }
-    if (scorecard.allPass) {
-      console.error(`\n[chain] ✦ quality loop COMPLETE — all sections ≥8/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS})`)
+    if (scorecard.deterministicAllPass) {
+      // Deterministic gates all clear — the loop rightly stops (nothing left it can
+      // fix). Report the HONEST floor too so a sub-8 advisory section is never
+      // silently implied "all sections ≥8" when it isn't.
+      const honestNote = scorecard.allPass
+        ? ''
+        : ` (NOTE: honest floor=${scorecard.floor}/10 — an ADVISORY section is still below 8; not auto-fixable, needs a source-side improvement)`
+      console.error(`\n[chain] ✦ quality loop COMPLETE — all DETERMINISTIC sections ≥8/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS})${honestNote}`)
     } else {
       console.error(`\n[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10`)
       // LESSON→RULE LOOP (#1): the run ended below the ≥8 floor after exhausting the loop —
