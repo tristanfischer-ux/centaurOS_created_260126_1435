@@ -201,6 +201,11 @@ function resolveAnnualVolume(
 
 // Pull the canonical product class slug from state. Tries the three places
 // the slug lives in iter-64 states (varies by pipeline version).
+// Run-scoped design scale (set once in main() from the state's contract) — consumed by
+// curveEstimateFor → referenceUnitCostFor's utility-tail override gate. Undefined when
+// the contract carries no nameplate (gate then defaults to prior behaviour).
+let RUN_SCALE_NAMEPLATE_KWH: number | undefined
+
 function getProductClassSlug(state: any): string {
   return String(
     state?.keyMetrics?.product_class ??
@@ -1291,7 +1296,7 @@ function curveEstimateFor(
   // PRODUCT_CLASS_REFERENCE_OVERRIDES in component-classes.ts for the table
   // and rationale. The curve shape (volume multiplier) is unchanged — only
   // the magnitude anchor shifts.
-  const ref = referenceUnitCostFor(cls, productClassSlug)
+  const ref = referenceUnitCostFor(cls, productClassSlug, { nameplateKwh: RUN_SCALE_NAMEPLATE_KWH })
   const m = interpolateCurve(c.curve, annualVolume)
   const raw = ref * m
   // 2026-05-20 iter-8 council fix A: floor clamp. VF iter-7 BoM showed
@@ -1421,6 +1426,21 @@ async function main() {
   }
   const state = JSON.parse(readFileSync(statePath, 'utf-8'))
   const productClass = getProductClassSlug(state)
+  // Design SCALE for the utility-tail override gate (2026-07-09, Powerwall exit-32):
+  // the bess/energy_storage reference overrides are utility-calibrated (oem_subsystem
+  // £10k, battery_cell £100/280Ah) — they must not anchor a 14 kWh wall unit. Read the
+  // nameplate once per run; referenceUnitCostFor gates the override set on it.
+  RUN_SCALE_NAMEPLATE_KWH = (() => {
+    const q = state?.orchestratorContract?.quantities ?? {}
+    for (const k of ['nameplate_capacity_kwh', 'usable_capacity_kwh']) {
+      const v = Number((q[k] as any)?.value)
+      if (Number.isFinite(v) && v > 0) return v
+    }
+    return undefined
+  })()
+  if (RUN_SCALE_NAMEPLATE_KWH !== undefined) {
+    console.log(`[estimate] design scale: nameplate ≈ ${RUN_SCALE_NAMEPLATE_KWH} kWh (utility-tail overrides ${RUN_SCALE_NAMEPLATE_KWH >= 100 ? 'APPLY' : 'GATED OFF — sub-utility scale'})`)
+  }
   const { volume: annualVolume, source: volumeSource } = resolveAnnualVolume(
     state,
     productClass,

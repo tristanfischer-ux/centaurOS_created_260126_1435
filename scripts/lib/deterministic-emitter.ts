@@ -3633,6 +3633,42 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
     ],
   )
 
+  // ── AIR-COOLED BRANCH (2026-07-09, Powerwall exit-32 family — scale-honest
+  // thermal path). A liquid chiller + glycol loop is the CONTAINERISED answer to
+  // tens of kW of rejection; below ~2 kW required duty (a wall-mount / small
+  // cabinet: inverter losses + pack I²R at residential power), the real product
+  // uses forced-air ventilation + cold-plate conduction — no chiller, no coolant
+  // pump, no expansion tank. UNIVERSAL: keyed only on the computed thermal duty,
+  // never a product name; every containerised design (duty ≥ 2 kW) is untouched.
+  // The mass_fluid coolant loop is excluded at the top-level module assembly on
+  // the same signal. Forced-air capacity stated honestly: 4 axial fans at ~700
+  // m³/h aggregate and ΔT 15 K reject ~3.5 kW sensible — comfortably ≥ the
+  // 1.25× margin the cooling_power invariant requires at this scale.
+  const airCooledOnly = requiredChillerKwAtAmbient < 2
+  if (airCooledOnly) {
+    const airCoolingCapacityKw = Math.max(2, Math.ceil(requiredChillerKwAtAmbient * 1.5 * 10) / 10)
+    return {
+      module: 'environmental_interface',
+      module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(2)} kW of inverter + pack losses by forced-air ventilation and cold-plate conduction (sealed-cabinet fan set, ~${airCoolingCapacityKw.toFixed(1)} kW sensible rejection at ΔT 15 K) — at this duty a packaged liquid chiller and glycol loop are not engineering-justified, so none is fitted.`,
+      overview_paragraph_en: '',
+      derived_parameters: {
+        cooling_capacity_kw: airCoolingCapacityKw,
+        thermal_rejection_required_kw: p.thermalRejectionKw,
+        max_ambient_c: p.ambientDesignTempC,
+        ambient_design_temp_c: p.ambientDesignTempC,
+        system_thermal_dissipation_kw: p.systemThermalDissipationKw,
+      },
+      allowed_radicals: [
+        'thermal_transfer_function',
+        'fluid_flow_state',
+        'aluminium',
+        'polymer_thermoplastic',
+      ],
+      applicability_confidence: 'high',
+      sub_modules: [enclosureClimate],
+    }
+  }
+
   return {
     module: 'environmental_interface',
     module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via ${chillerUnitCount}× Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient each${chillerUnitCount > 1 ? `, ${aggregateDeratedCapacityKw.toFixed(1)} kW aggregate derated` : ''}) glycol/water chiller${chillerUnitCount > 1 ? 's' : ''}, plus a ${containerHvacQty}× Pfannenberg ${selectedContainerHvac.part_number} container interior HVAC pair for the ${containerSensibleLoadKw.toFixed(1)} kW auxiliary-load + solar-gain sensible heat, and four enclosure ventilation fans.`,
@@ -5573,13 +5609,20 @@ export function emitBessDesign(contract: ContractShape, brief: unknown): Determi
   // safety argument).
   _emitterWorked = []
   const p = deriveBessParams(contract)
+  // AIR-COOLED EXCLUSION (2026-07-09, mirrors emitEnvironmentalInterface's branch —
+  // same signal, same threshold): below ~2 kW required thermal duty there is NO
+  // glycol coolant loop, so the mass_fluid_transport_process module (whose only
+  // BESS content IS the coolant loop: SS304 piping, expansion tank, cold-plate
+  // manifold hydraulics) is honestly EXCLUDED rather than emitted-and-mispriced
+  // (a wall unit was billing a walk-on GRP "coolant expansion tank" at £25k).
+  const airCooledOnly = p.systemThermalDissipationKw * 1.2 < 2
   const modules: DesignModule[] = [
     emitEnergyStorageSource(p),
     emitEnergyConversionTransduction(p),
     emitControlComputeCommunication(p),
     emitPowerDistribution(p),
     emitEnvironmentalInterface(p),
-    emitMassFluidTransportProcess(p),
+    ...(airCooledOnly ? [] : [emitMassFluidTransportProcess(p)]),
     emitSafetyProtection(p),
     emitStructureContainment(p),
     emitOperatorInterface(p),
@@ -5590,11 +5633,18 @@ export function emitBessDesign(contract: ContractShape, brief: unknown): Determi
   // the known Sartorius BB-8804062 → BB-8804060. No-op for the BESS template's
   // own correctly-typed pins; guards against a future hand edit + documents the
   // universal invariant the chain's DB-fill path must also enforce.
+  // A grammar link into an excluded module would dangle — filter on the same signal.
+  const grammarLinks = emitCrossModuleGrammarLinks(p).filter(
+    (l: any) => !airCooledOnly ||
+      (l?.from_module !== 'mass_fluid_transport_process' && l?.to_module !== 'mass_fluid_transport_process'),
+  )
   const design: DeterministicDesign = {
     modules,
-    cross_module_grammar_links: emitCrossModuleGrammarLinks(p),
-    excluded_modules: [],
-    rationale_excluded: 'All 10 canonical modules apply to utility-scale containerised BESS.',
+    cross_module_grammar_links: grammarLinks,
+    excluded_modules: airCooledOnly ? ['mass_fluid_transport_process'] : [],
+    rationale_excluded: airCooledOnly
+      ? 'mass_fluid_transport_process excluded: required thermal duty < 2 kW — forced-air cooling, no glycol coolant loop exists to route (see environmental_interface module_brief).'
+      : 'All 10 canonical modules apply to utility-scale containerised BESS.',
     brief_overview_prose: emitBriefOverviewProse(p, brief),
     worked_calculations: _emitterWorked,
   }

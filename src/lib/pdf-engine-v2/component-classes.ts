@@ -1094,11 +1094,31 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
 export function referenceUnitCostFor(
   componentClass: ComponentClass,
   productClassSlug?: string | null,
+  scale?: { nameplateKwh?: number },
 ): number {
   if (productClassSlug) {
-    const overrides = PRODUCT_CLASS_REFERENCE_OVERRIDES[productClassSlug]
-    if (overrides && typeof overrides[componentClass] === 'number') {
-      return overrides[componentClass] as number
+    // UTILITY-TAIL SCALE GATE (2026-07-09, Powerwall exit-32 root): the bess /
+    // energy_storage override sets are CALIBRATED FOR UTILITY SCALE ("3-10 MWh,
+    // containerised" — the table's own comment): oem_subsystem £10k anchors a
+    // BMS-master/EMS-PC-class subsystem, battery_cell £100 anchors a 280 Ah
+    // (~1 kWh) prismatic. A 14 kWh residential wall unit hit the SAME anchors →
+    // £10,000 e-stop buttons and £93,020/kWh (186× the class band, exit 32).
+    // An override encodes "this product uses the class's UPPER-magnitude tail" —
+    // true only at utility scale. Gate: the energy-storage override set applies
+    // only when the design's nameplate says utility (≥ 100 kWh, the containerised
+    // threshold); below it the canonical class anchors hold (oem_subsystem £280,
+    // battery_cell small-cell ref). Backward compatible: callers that pass no
+    // scale (or a non-energy class) are byte-identical.
+    const isEnergyStorageSlug =
+      /^(bess|energy_storage|battery_energy_storage|bess-utility-scale)$/.test(productClassSlug)
+    const nameplateKwh = scale?.nameplateKwh
+    const utilityTailApplies =
+      !isEnergyStorageSlug || !Number.isFinite(nameplateKwh as number) || (nameplateKwh as number) >= 100
+    if (utilityTailApplies) {
+      const overrides = PRODUCT_CLASS_REFERENCE_OVERRIDES[productClassSlug]
+      if (overrides && typeof overrides[componentClass] === 'number') {
+        return overrides[componentClass] as number
+      }
     }
   }
   const c = COMPONENT_CURVES[componentClass]

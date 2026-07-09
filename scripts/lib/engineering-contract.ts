@@ -1034,7 +1034,11 @@ registerArchetype('bess', (brief: any) => {
   // PF≈1 for a grid-tied PCS, so kVA ≈ kW; the 1.1× covers the small reactive +
   // overload headroom. A 2,500 kW system → 2,750 kVA min → next standard 3,000 kVA
   // (3 MVA); a 1,000 kW system → 1,100 kVA min → next standard 1,250 kVA (unchanged).
-  const STANDARD_TRANSFORMER_KVA = [500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
+  // Extended DOWN to the small standard dry-type ratings (2026-07-09, Powerwall
+  // exit-32 family): the ladder began at 500 kVA, so an 11 kW residential unit's
+  // 12.1 kVA minimum snapped to a 500 kVA pad-mount — 41× over. IEC 60076 small
+  // dry-type standard ratings prepended; every utility pick (min ≥ 500) unchanged.
+  const STANDARD_TRANSFORMER_KVA = [16, 25, 50, 100, 160, 250, 315, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000]
   const transformerRatingMinKva = continuousKw * 1.1
   const transformerRatingKva =
     STANDARD_TRANSFORMER_KVA.find((kva) => kva >= transformerRatingMinKva) ??
@@ -1073,13 +1077,20 @@ registerArchetype('bess', (brief: any) => {
   // cells dissipate ~0.8 W/cell → 3750 cells = 3.0 kW I²R.  The 1.5× system
   // overhead factor (wiring + busbar) brings it to ~4.5 kW; round to 5 kW as a
   // conservative pre-pybamm default (pybamm typical: 11–13 kW at 0.5C, 1 MW).
-  const cellHeatGenerationKw = 5  // kW — pybamm overrides via system_thermal_dissipation_kw
+  // SCALE-DERIVED, not a utility constant (2026-07-09, Powerwall exit-32 family):
+  // the old `= 5` was the 3,750-cell utility estimate baked as a literal — a
+  // 175-cell wall unit inherited a 25 kW thermal plant (chillers + coolant tanks)
+  // for a real ~0.2 kW cell heat load. Same ~0.8 W/cell × 1.5 system overhead
+  // physics, now × the ACTUAL cell count (utility 3,750 cells → 4.5 ≈ the old 5).
+  const cellHeatGenerationKw = Math.max(0.1, Math.round(0.0008 * cellCount * 1.5 * 100) / 100)
   // Container auxiliary / sensible heat — BMS electronics, rack fans, lighting,
   // door heaters, solar shell gain.  NOT the chiller load; handled by the
-  // container HVAC pair, NOT the liquid chiller loop.
-  const hvacDesignLoadKw = 4  // kW — BMS + fans + lighting + solar gain (aux only)
+  // container HVAC pair, NOT the liquid chiller loop. Scales with system energy
+  // (≈0.01 kW/kWh, capped at the utility 4 kW figure — utility briefs unchanged).
+  const hvacDesignLoadKw = Math.min(4, Math.max(0.05, Math.round(nameplateKwhRequested * 0.01 * 100) / 100))
   // Standby auxiliary losses — BMS idle, telemetry, lighting when not discharging.
-  const standbyAuxLossKw = 2  // kW — conservative floor
+  // Same energy-scaling (≈0.005 kW/kWh, capped at the utility 2 kW floor).
+  const standbyAuxLossKw = Math.min(2, Math.max(0.02, Math.round(nameplateKwhRequested * 0.005 * 100) / 100))
   // System thermal dissipation = cell I²R + inverter losses.  This is the total
   // heat load the LIQUID CHILLER must reject.  Distinct from hvac_design_load_kw
   // (container HVAC for aux sensible heat) and thermal_rejection_capacity_kw
