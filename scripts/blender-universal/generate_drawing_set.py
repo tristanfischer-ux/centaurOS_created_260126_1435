@@ -64,14 +64,17 @@ SCHEDULE_DRAWINGS = [
      "Process Schedules — line / valve / instrument"),
     ("panel-schedule", "draw_panel_schedule.py", "panel-schedule.png",
      "Panel / Load Schedule"),
-    ("hvac", "draw_hvac.py", "hvac-layout.png", "HVAC Duct Layout"),
     # Isometric drawings REMOVED from the dossier (Tristan 2026-06-28: "get rid of the isometric
     # drawings — I never understood or trusted them"). draw_isometric.py is no longer invoked.
+    # HVAC moved to CONDITIONAL_DRAWINGS (T-10 / Sam Green): water-only plants must not emit
+    # an orphan HVAC sheet — gate via draw_hvac.should_emit(state).
 ]
 
-# CONDITIONAL DETAIL sheets (T-20 / T-25) — emitted only when the contract carries
-# the relevant geometry / zone signals. Each: (key, script, png, title, gate_fn_name).
+# CONDITIONAL DETAIL sheets (T-20 / T-25 / T-10) — emitted only when the contract carries
+# the relevant geometry / zone / HVAC signals. Each: (key, script, png, title, gate_fn_name).
 # gate_fn_name is resolved by importing the script module and calling should_emit(state).
+# When should_emit is False the sheet is skipped with `skipped (should_emit=False)` — never
+# marked ok:false for a missing PNG (that would look like a failed draw on a N/A sheet).
 CONDITIONAL_DRAWINGS = [
     ("distribution-interface", "draw_distribution_interface.py",
      "distribution-interface.png",
@@ -80,6 +83,8 @@ CONDITIONAL_DRAWINGS = [
     ("facility-layout", "draw_facility_layout.py",
      "facility-layout.png",
      "Facility / WTR Layout — plant + cultivation zone blocks",
+     "should_emit"),
+    ("hvac", "draw_hvac.py", "hvac-layout.png", "HVAC Duct Layout",
      "should_emit"),
 ]
 
@@ -538,7 +543,15 @@ def generate_drawing_set(state_path: str | Path,
             assert spec and spec.loader
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
             gate = getattr(mod, gate_name, None)
-            if not callable(gate) or not gate(_state_for_gate):
+            # Prefer should_emit(state, out_dir) when the gate accepts a second arg
+            # (draw_hvac loads parts-manifest for placed hubs/zones); fall back to state-only.
+            emit = False
+            if callable(gate):
+                try:
+                    emit = bool(gate(_state_for_gate, str(out_dir)))
+                except TypeError:
+                    emit = bool(gate(_state_for_gate))
+            if not emit:
                 log.append(f"  {script}: skipped (should_emit=False)")
                 continue
             ok = _run_generator(script, out_dir, state_path, png_name, log)

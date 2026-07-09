@@ -51,6 +51,7 @@ export interface CostBasis {
   confidence: 'low' | 'moderate' | 'high'
   rfq_recommended: boolean
   notes?: string
+  how_to_verify?: string
   /**
    * Human-readable one-line derivation, shown under the BoM table (Section 8 notes) so the
    * BoM price IS the right number with its working visible — e.g.
@@ -71,6 +72,39 @@ export const COST_INDICES = {
 
 /** Escalation 1998→2024 ≈ 2.054. */
 export const ESCALATION = COST_INDICES.cepci.y2024 / COST_INDICES.cepci.y1998
+
+/**
+ * Escalate a purchased-equipment cost from `basisYear` to `targetYear` via CEPCI.
+ *
+ * @description Uses COST_INDICES.cepci (1998→2024 known). Same year returns `cost`
+ * unchanged. For 1998→2024 returns `cost * (800 / 389.5)`. Only those two index years
+ * are tabulated; any other year pair that is not both known returns `cost` unchanged
+ * (no fabricated interpolation beyond the two known points — linear blend is only used
+ * when both endpoints are the known 1998/2024 pair, which is the identity of ESCALATION).
+ *
+ * @param cost - Cost in the basis-year currency units (typically USD).
+ * @param basisYear - Year the cost is quoted in (e.g. 1998 for DOE/NETL curves).
+ * @param targetYear - Year to escalate to (default 2024).
+ * @returns Escalated cost; unchanged when years match or an index year is unknown.
+ */
+export function escalateToBaseYear(
+  cost: number,
+  basisYear: number,
+  targetYear = 2024,
+): number {
+  if (!Number.isFinite(cost) || cost === 0) return cost
+  if (basisYear === targetYear) return cost
+  const idx: Record<number, number> = {
+    1998: COST_INDICES.cepci.y1998,
+    2024: COST_INDICES.cepci.y2024,
+  }
+  const from = idx[basisYear]
+  const to = idx[targetYear]
+  // Only escalate when BOTH years are tabulated. Unknown years: return cost unchanged
+  // (no fabricated index) — documented behaviour for T-16.
+  if (from == null || to == null || from === 0) return cost
+  return cost * (to / from)
+}
 
 /**
  * Alloy-conversion factors on a carbon-steel base — DOE/NETL Table 7 (p45).
@@ -288,6 +322,7 @@ export function costProcessEquipment(spec: EquipmentSpec): { gbp: number; basis:
       confidence,
       rfq_recommended: rfq,
       notes: notes.length ? notes.join('; ') : undefined,
+      how_to_verify: "Recompute: qty × rate from basis formula",
     },
   }
 }
@@ -389,3 +424,29 @@ export function catalogueBasis(gbp: number, source: { vendor?: string; url?: str
 // ───────────────────────────── small utils ─────────────────────────────
 function round(n: number, dp = 0): number { const p = Math.pow(10, dp); return Math.round(n * p) / p }
 function fmt(n: number): string { return Math.round(n).toLocaleString('en-GB') }
+
+// ───────────────────────────── --selftest (T-16) ─────────────────────────────
+function _selftest(): void {
+  const want = 100 * (800 / 389.5)
+  const got = escalateToBaseYear(100, 1998, 2024)
+  if (got !== want) {
+    console.error(`[process-equipment-cost] SELFTEST FAIL: escalateToBaseYear(100,1998,2024)=${got}, want ${want}`)
+    process.exit(1)
+  }
+  if (escalateToBaseYear(100, 2024, 2024) !== 100) {
+    console.error('[process-equipment-cost] SELFTEST FAIL: same-year must return cost unchanged')
+    process.exit(1)
+  }
+  // Unknown year: no fabrication — return cost unchanged.
+  if (escalateToBaseYear(100, 2010, 2024) !== 100) {
+    console.error('[process-equipment-cost] SELFTEST FAIL: unknown basisYear must leave cost unchanged')
+    process.exit(1)
+  }
+  console.log(
+    `[process-equipment-cost] selftest OK (CEPCI escalate 100 USD1998 → ${got} = 100*(800/389.5))`,
+  )
+}
+
+if (typeof process !== 'undefined' && process.argv?.includes('--selftest')) {
+  _selftest()
+}

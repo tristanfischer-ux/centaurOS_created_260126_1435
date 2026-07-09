@@ -391,7 +391,19 @@ check(B._is_below_grade_drain_edge("x", "5000L Concrete Drain Pit", ""),
       "the same noun signal build_part uses to sink the part")
 check(B._is_below_grade_drain_edge("x", "Catch-Pit 3", ""),
       "proveCatch: 'catch-pit' / 'catch pit' spelling variants both match")
+check(B._is_below_grade_drain_edge("drain_water_tank", "nursery_drain_collection_sump", ""),
+      "proveCatch: drain_water_tank -> nursery_drain_collection_sump")
+check(B._is_below_grade_drain_edge("cloth_filter", "drain_water_tank", ""),
+      "proveCatch: cloth_filter -> drain_water_tank (destination is a drain collection vessel — no material_context required)")
+# Sam J3 2026-07-09: dirty-side recovery filter → drain store is buried even when the
+# destination is a galvanised drainwater tank (not only a sump/pit name).
+check(B._is_below_grade_drain_edge("Nursery Cloth Filter", "Drain Water Tank", ""),
+      "proveCatch: human-readable recovery filter → drain store is below-grade")
+check(B._is_below_grade_drain_edge("cloth_filter", "drain_water_reservoir", ""),
+      "proveCatch: cloth_filter → drain_water_reservoir (drain-store noun) is below-grade")
 # proveNoFalsePositive — the excluded/negative cases (mirrors draw_pid_test.py G2c-e).
+check(not B._is_below_grade_drain_edge("dosing_pump", "drain_collection_sump", ""),
+      "proveNoFalsePositive: a dosing pump discharging into a sump stays above-ground")
 check(not B._is_below_grade_drain_edge("drain_transfer_pump", "cip_tank", ""),
       "proveNoFalsePositive: a pump discharging into an ordinary tank stays above-ground")
 check(not B._is_below_grade_drain_edge("submersible_lift_pump", "drain_collection_sump", ""),
@@ -444,8 +456,11 @@ def _rpart(name, region_key, rank):
 # An e-fuel-shaped design: M1 feed → M2 reaction → M3 separation (one chain), and a
 # SEPARATE M4 upgrading → M6 product chain (no explicit M3→M4 edge), plus M5
 # utilities fed by the reactor (thermal), and M7/M8 non-flow (control/instruments).
+# GOTCHA: part names must resolve via token_overlap without a conflicting
+# discriminator (e.g. topo "feed compressor" cannot land on "CO2 feed compressor"
+# because candidate disc {co2} ∉ query → veto score 0). Use matching names.
 flow_parts = [
-    _rpart("CO2 feed compressor", "M1 Feed", 10),
+    _rpart("feed compressor", "M1 Feed", 10),
     _rpart("synthesis reactor", "M2 Reaction", 20),
     _rpart("3-phase separator", "M3 Separation", 30),
     _rpart("fractionation column", "M4 Upgrading", 40),
@@ -583,4 +598,5 @@ if _FAILS:
         print(f"  - {m}")
     sys.exit(1)
 print("ALL CHECKS PASSED")
+print("[derive_flows] selftest OK")
 sys.exit(0)

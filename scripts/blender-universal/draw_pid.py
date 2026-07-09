@@ -884,23 +884,66 @@ def _instr_words(state: dict):
             yield str(parent), instr
 
 
+# Equipment-type tokens used by `_node_for_parent` tie-breaks (T-03). Storage nouns win
+# over softener/media vessels when the parent word is a tank/reservoir/sump instrument.
+_STORAGE_EQ_TOKS = frozenset({
+    "tank", "reservoir", "sump", "buffer", "storage", "cistern", "holding",
+})
+_MEDIA_VESSEL_TOKS = frozenset({"softener", "media", "gac"})
+_EQUIP_TYPE_TOKS = frozenset({
+    "tank", "reservoir", "sump", "buffer", "storage", "cistern", "holding",
+    "reactor", "column", "drum", "vessel", "pump", "filter", "softener",
+    "exchanger", "heater", "cooler", "chiller", "absorber", "stripper",
+})
+
+
 def _node_for_parent(parent_key: str, nodes: dict):
     """Map a synthesised instrument's parent equipment word id (e.g. 'rearing_tank_synth_
     word') onto the P&ID node it belongs to (e.g. the 'rearing_tanks' tank node), by token
     overlap (singularising trailing -s). Returns the Node or None. Universal — no per-class
-    table; the same matcher the array-expansion uses."""
+    table; the same matcher the array-expansion uses.
+
+    T-03 (Sam Green): on equal scores prefer an exact equipment-type token match; NEVER
+    prefer a softener/media vessel when the parent tokens include tank/reservoir/sump and
+    such a storage node exists (the weak matcher was dumping every tank instrument onto
+    the softener because both scored on a shared 'vessel'/'water' token).
+    """
     ptoks = _name_tokens(parent_key)
     # drop generic suffix tokens so 'rearing_tank_synth_word' keys on 'rearing'/'tank'.
     ptoks -= {"synth", "word", "synthesized", "synthesised", "unit", "system"}
     ptoks |= {t[:-1] for t in list(ptoks) if t.endswith("s") and len(t) > 3}
-    best, best_score = None, 0
+    scored: list[tuple[int, object, set]] = []
     for nd in nodes.values():
         ntoks = _name_tokens(nd.key) | _name_tokens(nd.label)
         ntoks |= {t[:-1] for t in list(ntoks) if t.endswith("s") and len(t) > 3}
         score = len(ptoks & ntoks)
-        if score > best_score:
-            best_score, best = score, nd
-    return best if best_score >= 1 else None
+        if score >= 1:
+            scored.append((score, nd, ntoks))
+    if not scored:
+        return None
+    best_score = max(s for s, _, _ in scored)
+    tied = [(nd, ntoks) for s, nd, ntoks in scored if s == best_score]
+
+    # Prefer exact equipment-type token match among equal-score candidates.
+    parent_eq = ptoks & _EQUIP_TYPE_TOKS
+    if parent_eq and len(tied) > 1:
+        exact = [(nd, ntoks) for nd, ntoks in tied if ntoks & parent_eq]
+        if exact:
+            tied = exact
+
+    # Never prefer softener/media when parent is a storage instrument and a storage
+    # node exists (among tied, else among any scored candidate).
+    if ptoks & _STORAGE_EQ_TOKS:
+        storage_tied = [(nd, ntoks) for nd, ntoks in tied if ntoks & _STORAGE_EQ_TOKS]
+        if not storage_tied:
+            storage_tied = [(nd, ntoks) for s, nd, ntoks in scored
+                            if ntoks & _STORAGE_EQ_TOKS]
+        if storage_tied:
+            non_media = [(nd, ntoks) for nd, ntoks in storage_tied
+                         if not (ntoks & _MEDIA_VESSEL_TOKS)]
+            tied = non_media or storage_tied
+
+    return tied[0][0]
 
 
 def _project_synth_instruments(nodes: dict, state: dict):
@@ -1825,6 +1868,13 @@ def reconstruct_process(schedule: dict, state: dict,
     # conductivity — keep up to 6 so the life-safety + water-quality instruments all show).
     for nd in nodes.values():
         nd.instruments = nd.instruments[:6]
+    # T-03 (Sam Green): if every instrument still clusters on ONE vessel while ≥2 other
+    # measurable nodes are bare, redistribute excess onto empty nodes (prefer function
+    # match). Re-evaluate; punchlist at generate_pid still records a residual HIGH.
+    if evaluate_instrument_clustering_invariant(nodes).get("verdict") == "high":
+        _redistribute_clustered_instruments(nodes)
+        for nd in nodes.values():
+            nd.instruments = nd.instruments[:6]
     # ---- attach equipment-mounted valves (relief on pressure vessels) ----
     if valve_has["relief"]:
         for nd in nodes.values():
@@ -1997,33 +2047,133 @@ def reconstruct_process(schedule: dict, state: dict,
                    zone_offpages=_delivery_zone_offpages(state))
 
 
+# Name-role matchers for conventional instrument attach (T-03). LEVEL is NOT applied to
+# every vessel — a softener/media vessel is not a level-instrumented storage tank.
+_LEVEL_NAME_RE = re.compile(
+    r"storage|tank|reservoir|sump|buffer|head\s*tank|holding|day.?tank|cistern",
+    re.I)
+_PRESSURE_NAME_RE = re.compile(
+    r"reactor|pressure|column|drum|separator|absorber|stripper|autoclave|"
+    r"vessel",
+    re.I)
+_TEMP_NAME_RE = re.compile(
+    r"reactor|heat.?exch|\bhx\b|heater|fired|furnace|boiler|cooler|chiller|"
+    r"column|stripper|absorber",
+    re.I)
+
+
 def _attach_instruments(nodes: dict, instr_funcs: set):
-    """Place ISA bubbles on equipment by convention, limited to functions the design has:
-       level    → vessels / columns / separators / drums / tanks (anything that holds a
-                  liquid level)
-       pressure → reactors / columns / separators / drums (pressure-containing vessels)
-       temp     → reactors / heat exchangers / fired heaters / columns
+    """Place ISA bubbles on equipment by convention, limited to functions the design has.
+
+    INTENT (T-03 / Sam Green): LEVEL must NOT blanket-apply to every vessel/column/drum —
+    that + weak parent matching clustered every sensor onto the softener. Attach by role:
+       level    → storage/tank/reservoir/sump/buffer (name match) or SYM_TANK
+       pressure → pressure vessels / reactors / columns / drums (name or pressure sym)
+       temp     → reactors / heat exchangers / fired heaters / columns (name or sym)
        analyse  → reactors / columns (composition control)
+    Cap remains so a vessel is never a pin-cushion.
     """
     for nd in nodes.values():
         s = nd.sym
-        if INSTR_LEVEL in instr_funcs and s in (SYM_COLUMN, SYM_DRUM, SYM_VESSEL,
-                                                SYM_TANK):
-            nd.instruments.append(Instr(*INSTR_LEVEL))
-        if INSTR_PRESSURE in instr_funcs and s in (SYM_COLUMN, SYM_DRUM, SYM_VESSEL,
-                                                   SYM_FIRED):
-            nd.instruments.append(Instr(*INSTR_PRESSURE))
-        if INSTR_TEMP in instr_funcs and s in (SYM_COLUMN, SYM_HX, SYM_FIRED):
-            nd.instruments.append(Instr(*INSTR_TEMP))
+        blob = f"{nd.key} {nd.label}"
+        # LEVEL: storage-like nodes only — never every vessel (softener clustering bug).
+        if INSTR_LEVEL in instr_funcs:
+            if s == SYM_TANK or _LEVEL_NAME_RE.search(blob):
+                nd.instruments.append(Instr(*INSTR_LEVEL))
+        # PRESSURE: pressure-containing process units — not softener media vessels.
+        if INSTR_PRESSURE in instr_funcs:
+            if s in (SYM_COLUMN, SYM_DRUM, SYM_FIRED) or (
+                    s == SYM_VESSEL and _PRESSURE_NAME_RE.search(blob)
+                    and not _MEDIA_VESSEL_TOKS & (_name_tokens(nd.key) | _name_tokens(nd.label))):
+                nd.instruments.append(Instr(*INSTR_PRESSURE))
+        # TEMP: thermal process units.
+        if INSTR_TEMP in instr_funcs:
+            if s in (SYM_COLUMN, SYM_HX, SYM_FIRED) or _TEMP_NAME_RE.search(blob):
+                nd.instruments.append(Instr(*INSTR_TEMP))
         if INSTR_PH in instr_funcs and re.search(r"carbonation|crystallis|reactor|"
-                                                 r"neutralis|amine", nd.key, re.I):
+                                                 r"neutralis|amine", blob, re.I):
             nd.instruments.append(Instr(*INSTR_PH))
-        elif INSTR_ANALYSE in instr_funcs and s == SYM_COLUMN and re.search(
-                r"absorber|stripper|reactor|fractionat", nd.key, re.I):
-            nd.instruments.append(Instr(*INSTR_ANALYSE))
+        elif INSTR_ANALYSE in instr_funcs and (
+                s == SYM_COLUMN or re.search(r"reactor|absorber|stripper|fractionat",
+                                             blob, re.I)):
+            if re.search(r"absorber|stripper|reactor|fractionat|column", blob, re.I):
+                nd.instruments.append(Instr(*INSTR_ANALYSE))
     # cap to a sane number per node so a vessel isn't a pin-cushion
     for nd in nodes.values():
         nd.instruments = nd.instruments[:3]
+
+
+def _instr_prefers_node(func: str, nd) -> bool:
+    """Whether instrument function `func` naturally belongs on node `nd` (T-03 redistribute)."""
+    blob = f"{nd.key} {nd.label}"
+    ntoks = _name_tokens(nd.key) | _name_tokens(nd.label)
+    f = (func or "").lower()
+    if f in ("level", "level-low"):
+        return bool(ntoks & _STORAGE_EQ_TOKS) or nd.sym == SYM_TANK or bool(
+            _LEVEL_NAME_RE.search(blob))
+    if f in ("analyser", "analyzer", "analyse", "analyze", "ph", "pH"):
+        return bool(re.search(
+            r"reactor|column|absorber|stripper|carbonat|neutralis|crystallis|"
+            r"process|osmosis|\bro\b|filter|biofilter", blob, re.I))
+    if f == "pressure":
+        return nd.sym in (SYM_COLUMN, SYM_DRUM, SYM_FIRED) or bool(
+            re.search(r"reactor|pressure|column|drum|separator|absorber|stripper",
+                      blob, re.I))
+    if f == "temperature":
+        return nd.sym in (SYM_HX, SYM_FIRED, SYM_COLUMN) or bool(
+            _TEMP_NAME_RE.search(blob))
+    return False
+
+
+def _redistribute_clustered_instruments(nodes: dict) -> dict:
+    """Move excess instruments off an overloaded node onto empty measurable nodes
+    round-robin, preferring function match (level→tank, analyse→process unit).
+
+    INTENT (T-03 / Sam Green): when `_attach_instruments` + `_project_synth_instruments`
+    still leave every bubble on one vessel, fix the placement before render — don't just
+    punchlist. Returns the post-redistribution clustering verdict (caller may punchlist
+    if still HIGH).
+    """
+    verdict = evaluate_instrument_clustering_invariant(nodes)
+    if verdict.get("verdict") != "high":
+        return verdict
+    culprit_key = (verdict.get("instrumented_nodes") or [None])[0]
+    if not culprit_key or culprit_key not in nodes:
+        return verdict
+    culprit = nodes[culprit_key]
+    empty_nodes = [nodes[k] for k in verdict.get("empty_nodes", []) if k in nodes]
+    if not empty_nodes or not culprit.instruments:
+        return verdict
+
+    keep: list = []
+    move: list = []
+    for instr in list(culprit.instruments):
+        # Keep at most one natural-fit instrument on the culprit; move the rest.
+        if (_instr_prefers_node(instr.func, culprit)
+                and not any(i.func == instr.func for i in keep)):
+            keep.append(instr)
+        else:
+            move.append(instr)
+    # Force-spread when everything "prefers" the culprit (or nothing does) but we still
+    # have a HIGH cluster — leave one, move the rest.
+    if not move and len(culprit.instruments) > 1:
+        keep = [culprit.instruments[0]]
+        move = list(culprit.instruments[1:])
+    culprit.instruments = keep
+
+    for instr in move:
+        preferred = [nd for nd in empty_nodes if _instr_prefers_node(instr.func, nd)]
+        pool = preferred or list(empty_nodes)
+        pool = sorted(pool, key=lambda nd: len(nd.instruments))
+        target = pool[0]
+        if any(i.func == instr.func for i in target.instruments):
+            for cand in pool[1:] + [nd for nd in empty_nodes if nd not in pool]:
+                if not any(i.func == instr.func for i in cand.instruments):
+                    target = cand
+                    break
+        target.instruments.append(instr)
+
+    return evaluate_instrument_clustering_invariant(nodes)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3739,23 +3889,71 @@ def _selftest() -> int:
         "softener": _mk_node("softener", "Softener Vessel",
                               instrs=[Instr("LT", "level"), Instr("PT", "pressure"), Instr("PHT", "ph")]),
         "ro_skid": _mk_node("ro_skid", "Reverse Osmosis Skid"),
-        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank"),
-        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1"),
-        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", sym=SYM_TANK),
+        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1", sym=SYM_TANK),
+        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2", sym=SYM_TANK),
     }
     _clu_verdict = evaluate_instrument_clustering_invariant(_clustered)
     chk("G1a.clustering_proveCatch_flags_high", _clu_verdict["verdict"] == "high")
     chk("G1a.clustering_names_the_culprit", _clu_verdict.get("instrumented_nodes") == ["softener"])
     chk("G1a.clustering_names_the_empties", len(_clu_verdict.get("empty_nodes", [])) == 4)
 
+    # G1a2 proveCatch (T-03): clustered attach path AFTER redistribute → PASS (not just
+    # detector HIGH). Moves level→tank, analyse→process unit; softener must not keep all.
+    _to_fix = {
+        "softener": _mk_node("softener", "Softener Vessel",
+                              instrs=[Instr("LT", "level"), Instr("PT", "pressure"),
+                                      Instr("AT", "analyser"), Instr("TT", "temperature")]),
+        "ro_skid": _mk_node("ro_skid", "Reverse Osmosis Skid"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", sym=SYM_TANK),
+        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1", sym=SYM_TANK),
+        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2", sym=SYM_TANK),
+    }
+    chk("G1a2.pre_redistribute_is_high",
+        evaluate_instrument_clustering_invariant(_to_fix)["verdict"] == "high")
+    _post = _redistribute_clustered_instruments(_to_fix)
+    chk("G1a2.redistribute_proveCatch_passes", _post["verdict"] == "pass")
+    chk("G1a2.level_landed_on_tank",
+        any(i.func == "level" for nd in _to_fix.values()
+            if "tank" in nd.key for i in nd.instruments))
+    chk("G1a2.softener_not_sole_instrumented",
+        len([nd for nd in _to_fix.values() if nd.instruments]) >= 2)
+
+    # G1a3 — `_node_for_parent` prefers tank over softener when parent is a tank word.
+    _parent_nodes = {
+        "softener": _mk_node("softener", "Softener Vessel"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", sym=SYM_TANK),
+        "drain_sump": _mk_node("drain_sump", "Drain Collection Sump", sym=SYM_TANK),
+    }
+    _tank_parent = _node_for_parent("fresh_water_tank_level_synth_word", _parent_nodes)
+    chk("G1a3.node_for_parent_prefers_tank_over_softener",
+        _tank_parent is not None and _tank_parent.key == "fresh_tank")
+    _sump_parent = _node_for_parent("drain_collection_sump_level_word", _parent_nodes)
+    chk("G1a3.node_for_parent_prefers_sump_over_softener",
+        _sump_parent is not None and _sump_parent.key == "drain_sump")
+
+    # G1a4 — conventional attach: LEVEL only on storage names, not every vessel.
+    _attach_nodes = {
+        "softener": _mk_node("softener", "Softener Vessel"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", sym=SYM_TANK),
+        "reactor": _mk_node("reactor", "Carbonation Reactor"),
+    }
+    _attach_instruments(_attach_nodes, {INSTR_LEVEL, INSTR_PRESSURE, INSTR_TEMP})
+    chk("G1a4.level_not_on_softener",
+        not any(i.func == "level" for i in _attach_nodes["softener"].instruments))
+    chk("G1a4.level_on_tank",
+        any(i.func == "level" for i in _attach_nodes["fresh_tank"].instruments))
+
     # G1b proveNoFalsePositive: the SAME instrument set, correctly DISTRIBUTED across the
     # equipment each instrument actually measures.
     _distributed = {
         "softener": _mk_node("softener", "Softener Vessel", instrs=[Instr("PHT", "ph")]),
         "ro_skid": _mk_node("ro_skid", "Reverse Osmosis Skid", instrs=[Instr("PT", "pressure")]),
-        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", instrs=[Instr("LT", "level")]),
-        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1", instrs=[Instr("LT", "level")]),
-        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2"),
+        "fresh_tank": _mk_node("fresh_tank", "Fresh Water Tank", sym=SYM_TANK,
+                               instrs=[Instr("LT", "level")]),
+        "drain_tank_1": _mk_node("drain_tank_1", "Drain Water Tank 1", sym=SYM_TANK,
+                                 instrs=[Instr("LT", "level")]),
+        "drain_tank_2": _mk_node("drain_tank_2", "Drain Water Tank 2", sym=SYM_TANK),
     }
     _dist_verdict = evaluate_instrument_clustering_invariant(_distributed)
     chk("G1b.clustering_proveNoFalsePositive_distributed", _dist_verdict["verdict"] == "pass")

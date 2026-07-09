@@ -361,15 +361,29 @@ _HUB_PATTERNS = [
 _PROCESS_THERMAL_ROLES = {"cooler", "process_air_heater", "manifold"}
 
 # A SERVED-ZONE role (the thing air/coolant goes TO).  Racks / grow zones / aisles.
+# "nursery" alone is NOT a zone — "Nursery Drain Transfer Pump" / "Nursery Cloth Filter"
+# are process-water kit that falsely tripped the HVAC scope gate on a pure water plant
+# (Sam: "What is the HVAC required for?" — codema-ship still emitted hvac-layout because
+# three nursery-* drain parts matched grow|nursery). Require a grow/rack/bench noun with
+# nursery, or an explicit cultivation/propagator context. Universal — noun co-occurrence.
 _ZONE_PATTERNS = [
     re.compile(r"\brack\b|cabinet|\benclosure\b|\baisle\b|server|compute|gpu", re.I),
-    re.compile(r"grow|canopy|cultivation|bench|trolley|tier|nursery|propagat", re.I),
+    re.compile(
+        r"grow|canopy|cultivation|propagat|"
+        r"(?:nursery|bench|trolley|tier).{0,20}(?:rack|bench|tunnel|tray|trolley|canopy|grow)|"
+        r"(?:rack|bench|tunnel|tray|trolley|canopy|grow).{0,20}(?:nursery|bench|tier)",
+        re.I,
+    ),
 ]
 
 # Equipment we never treat as a served air zone or a hub (other BoP skids).
+# Process-water / fertigation / drain-recovery kit is NEVER an air zone — even when
+# the name carries "nursery" (nursery drain pump ≠ nursery grow tunnel).
 _NEUTRAL_RE = re.compile(
     r"control|fire|nutrient|water|dosing|switchgear|transformer|\bbms\b|"
-    r"battery management|\bpdu\b|\bups\b|inverter|\bpcs\b|power conversion", re.I)
+    r"battery management|\bpdu\b|\bups\b|inverter|\bpcs\b|power conversion|"
+    r"\bpump\b|\bsump\b|drain|filter|softener|reservoir|\btank\b|cloth|"
+    r"fertigation|irrigation|osmosis|\bro\b|disinfect|\buv\b", re.I)
 
 
 def _classify_role(name: str, module: str):
@@ -502,6 +516,34 @@ def _row_len_m(r: dict) -> float:
 # ═══════════════════════════════════════════════════════════════════════════
 # DERIVE the role-based air / cooling system
 # ═══════════════════════════════════════════════════════════════════════════
+
+def should_emit(state: dict, out_dir: str | None = None) -> bool:
+    """T-10 / Sam Green: drawing-set gate — True iff this design has an HVAC requirement.
+
+    Reuses `derive_air_system` so the decision matches the generator's `not_applicable`
+    scope gate. Loads parts-manifest + connection-schedule from `out_dir` when present
+    (placed hubs/zones / thermal rows); otherwise uses empty stubs so state-only signals
+    (airflow / cooling duty / dehumidifier) still gate correctly. Water-only plants
+    (Fischer Farms / Codema) return False and must NOT emit hvac-layout.
+    """
+    manifest: dict = {"parts": [], "bbox_mm": {}}
+    schedule: dict = {}
+    if out_dir:
+        mp = Path(out_dir) / "parts-manifest.json"
+        if mp.is_file():
+            try:
+                manifest = json.loads(mp.read_text())
+            except (OSError, json.JSONDecodeError):
+                pass
+        sp = Path(out_dir) / "connection-schedule.json"
+        if sp.is_file():
+            try:
+                schedule = json.loads(sp.read_text())
+            except (OSError, json.JSONDecodeError):
+                pass
+    sysm = derive_air_system(manifest, state or {}, schedule, out_dir or "/tmp")
+    return not sysm.not_applicable
+
 
 def derive_air_system(manifest: dict, state: dict, schedule: dict,
                       out_dir: str) -> AirSystem:
@@ -2444,6 +2486,8 @@ def _selftest() -> int:
     chk("water_plant_no_hub_synthesised", len(sysm_water.hubs) == 0)
     chk("water_plant_reason_states_no_requirement",
         "no HVAC" in sysm_water.not_applicable_reason)
+    # T-10 proveCatch: should_emit mirrors not_applicable for the drawing-set gate.
+    chk("should_emit_false_for_water_only", should_emit(water_state) is False)
 
     # (a2) proveCatch — the REAL false-negative that shipped the orphan hvac-A1.pdf on
     # the Codema water-treatment dossier (Sam Green SME review follow-up, 2026-07-08):
@@ -2474,6 +2518,7 @@ def _selftest() -> int:
     sysm_bess = derive_air_system(empty_manifest, bess_state, {}, "/tmp")
     chk("bess_cooling_duty_not_suppressed", sysm_bess.not_applicable is False)
     chk("bess_hub_synthesised", len(sysm_bess.hubs) == 1)
+    chk("should_emit_true_for_bess_cooling", should_emit(bess_state) is True)
 
     # (c) proveNoFalsePositive — a design with a real airflow quantity (data-hall CRAC)
     # must also NOT be suppressed.
@@ -2511,9 +2556,9 @@ def _selftest() -> int:
     if fails:
         print("[hvac] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[hvac] selftest OK (no-orphan-subsystem scope gate: fires on a water-only "
-          "design with zero HVAC signal; a real cooling-duty/airflow-quantity/placed-"
-          "zone design is never suppressed)")
+    print("[hvac] selftest OK (no-orphan-subsystem scope gate + T-10 should_emit: "
+          "False for water-only; True for cooling-duty; real airflow/placed-zone/"
+          "thermal-row designs never suppressed)")
     return 0
 
 
