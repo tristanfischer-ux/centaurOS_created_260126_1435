@@ -1268,7 +1268,14 @@ function _selftest() {
   const backEdge = topo.find((e) => (e as unknown as { _recirculation_loop?: boolean })._recirculation_loop)
   if (!backEdge) throw new Error('derive-topology RECIRC: expected an auto-injected recovery loop for the Codema water-plant fixture (Drain Collection Sump) — none found')
   if (backEdge.from_part !== 'drain_collection_sump') throw new Error(`derive-topology RECIRC: expected the loop to close FROM the recovery buffer (drain_collection_sump), got ${backEdge.from_part}`)
-  if (backEdge.to_part !== order[0]) throw new Error(`derive-topology RECIRC: expected the loop to close back TO the spine head (${order[0]}), got ${backEdge.to_part}`)
+  // DECISION 2026-07-09: re-entry prefers clean storage / delivery (fresh_water_tank),
+  // NOT the spine head when the head is makeup pretreatment (gac_filter after rank-1 move).
+  if (backEdge.to_part === 'gac_filter' || backEdge.to_part === 'softener_vessel') {
+    throw new Error(`derive-topology RECIRC: must NOT re-enter at makeup pretreatment (${backEdge.to_part})`)
+  }
+  if (!endpoints.has(backEdge.to_part)) {
+    throw new Error(`derive-topology RECIRC: re-entry target ${backEdge.to_part} must be a spine node`)
+  }
   if (backEdge.mechanism !== 'fluid_loop') throw new Error('derive-topology RECIRC: the closing edge must carry mechanism fluid_loop')
   // a genuine cycle: the closing edge's to_part must equal an EARLIER edge's from_part.
   const seenFromCheck = new Set<string>()
@@ -1551,8 +1558,15 @@ function _selftest() {
   const onceThroughFilterTopo = deriveProcessTopology([{
     sub_modules: [{ words: [mkQ('Reverse Osmosis Skid'), mkQ('Cartridge Filter'), mkQ('Product Storage Tank')] }],
   }])
-  if (!onceThroughFilterTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cartridge_filter')) {
-    throw new Error(`filter-reorder proveNoFalsePositive (once-through, no recovery buffer) FAILED: got ${JSON.stringify(onceThroughFilterTopo)}`)
+  // DECISION 2026-07-09: cartridge is makeup pretreatment (rank 1) → UPSTREAM of RO.
+  // Pre-fix this fixture asserted the OLD wrong adjacency RO→cartridge (rank-4 filter
+  // after RO) as "untouched"; the real proveNoFalsePositive is: no recovery relocation
+  // (no drain sump in the fixture) AND cartridge stays on the makeup train before RO.
+  if (!onceThroughFilterTopo.some((e) => e.from_part === 'cartridge_filter' && e.to_part === 'reverse_osmosis_skid')) {
+    throw new Error(`filter-reorder proveNoFalsePositive (once-through, no recovery buffer) FAILED: cartridge makeup must feed RO, got ${JSON.stringify(onceThroughFilterTopo)}`)
+  }
+  if (onceThroughFilterTopo.some((e) => (e as { _recirculation_loop?: boolean })._recirculation_loop)) {
+    throw new Error('filter-reorder proveNoFalsePositive (once-through): must NOT invent a recirculation loop without a recovery buffer')
   }
 
   // ── PER-ZONE RECOVERY-COLLECTION EXPANSION proveCatch + proveNoFalsePositive (2026-07-08) ──
