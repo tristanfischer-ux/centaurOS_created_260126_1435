@@ -12,6 +12,13 @@ Public API
         db_path: Path | None = None,
     ) -> list[dict]
 
+    retrieve_relevant_records_many(
+        queries: list[str],
+        ...
+    ) -> list[list[dict]]
+        Same cosine math as the single-query path, but ONE OpenAI embedding batch
+        + ONE corpus matrix load per table (Engine C speed path, 2026-07-09).
+
 Each returned dict contains:
     {
         'table': str,              # source table name
@@ -45,6 +52,9 @@ from openai import OpenAI
 DEFAULT_DB = Path.home() / ".forge-truth" / "forge-truth.db"
 EMBED_MODEL = "text-embedding-3-small"
 EMBED_DIM = 1536
+# OpenAI embeddings API accepts large batches; keep a conservative chunk so a
+# 500-line BoM is a handful of round-trips, not 500.
+_EMBED_BATCH_SIZE = 64
 
 ALL_TABLES = [
     "pretraining_extracted_parts",
@@ -72,6 +82,10 @@ TABLE_FIELDS: dict[str, list[str]] = {
 
 
 _client: OpenAI | None = None
+# Process-lifetime cache: (db_path, table, classes_key) → (normalised_mat, rows)
+# INTENT: Engine C used to reload ~30k embeddings from SQLite PER BoM line.
+# Same vectors, same cosine — load once per Python process.
+_MATRIX_CACHE: dict[tuple, tuple[np.ndarray, list]] = {}
 
 
 def _get_client() -> OpenAI:
@@ -85,12 +99,41 @@ def _get_client() -> OpenAI:
 
 
 def embed_query(query: str) -> np.ndarray:
-    res = _get_client().embeddings.create(
-        model=EMBED_MODEL,
-        input=[query],
-        dimensions=EMBED_DIM,
-    )
-    return np.asarray(res.data[0].embedding, dtype=np.float32)
+    vecs = embed_queries([query])
+    return vecs[0]
+
+
+def embed_queries(queries: list[str]) -> list[np.ndarray]:
+    """Embed many query strings via batched OpenAI calls (same model/dims as corpus).
+
+    Empty / whitespace queries get a zero vector (caller should skip them).
+    Order of returned vectors matches `queries` exactly.
+    """
+    if not queries:
+        return []
+    out: list[np.ndarray | None] = [None] * len(queries)
+    pending_idx: list[int] = []
+    pending_text: list[str] = []
+    for i, q in enumerate(queries):
+        if not q or not str(q).strip():
+            out[i] = np.zeros(EMBED_DIM, dtype=np.float32)
+        else:
+            pending_idx.append(i)
+            pending_text.append(str(q))
+    client = _get_client()
+    for start in range(0, len(pending_text), _EMBED_BATCH_SIZE):
+        chunk = pending_text[start:start + _EMBED_BATCH_SIZE]
+        idxs = pending_idx[start:start + _EMBED_BATCH_SIZE]
+        res = client.embeddings.create(
+            model=EMBED_MODEL,
+            input=chunk,
+            dimensions=EMBED_DIM,
+        )
+        # API returns data sorted by index within the request
+        by_i = {d.index: d.embedding for d in res.data}
+        for j, orig_i in enumerate(idxs):
+            out[orig_i] = np.asarray(by_i[j], dtype=np.float32)
+    return [v if v is not None else np.zeros(EMBED_DIM, dtype=np.float32) for v in out]
 
 
 def _compose_text_row(table: str, row: sqlite3.Row) -> str:
@@ -115,8 +158,16 @@ def _load_table_matrix(
     con: sqlite3.Connection,
     table: str,
     classes: list[str] | None,
+    *,
+    db_path: Path,
+    use_cache: bool = True,
 ) -> tuple[np.ndarray, list[sqlite3.Row]]:
-    """Load all (embedding, row) pairs for one table into memory."""
+    """Load all (embedding, row) pairs for one table into memory (cached)."""
+    classes_key = tuple(classes) if classes else ()
+    cache_key = (str(db_path), table, classes_key)
+    if use_cache and cache_key in _MATRIX_CACHE:
+        return _MATRIX_CACHE[cache_key]
+
     fields = ", ".join(TABLE_FIELDS[table])
     where = "WHERE embedding IS NOT NULL"
     params: tuple = ()
@@ -127,17 +178,63 @@ def _load_table_matrix(
     cur = con.execute(f"SELECT {fields}, embedding FROM {table} {where}", params)
     rows = cur.fetchall()
     if not rows:
-        return np.empty((0, EMBED_DIM), dtype=np.float32), []
+        empty = (np.empty((0, EMBED_DIM), dtype=np.float32), [])
+        if use_cache:
+            _MATRIX_CACHE[cache_key] = empty
+        return empty
     vecs = np.empty((len(rows), EMBED_DIM), dtype=np.float32)
     for i, r in enumerate(rows):
         vecs[i] = np.frombuffer(r["embedding"], dtype=np.float32)
-    return vecs, rows
+    mat_n = _normalise(vecs)
+    result = (mat_n, rows)
+    if use_cache:
+        _MATRIX_CACHE[cache_key] = result
+    return result
 
 
 def _normalise(mat: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(mat, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return mat / norms
+
+
+def _hits_for_qvec(
+    q_vec: np.ndarray,
+    tables: list[str],
+    classes: list[str] | None,
+    db_path: Path,
+    k: int,
+    con: sqlite3.Connection,
+) -> list[dict]:
+    q_vec = q_vec / (np.linalg.norm(q_vec) or 1.0)
+    all_hits: list[tuple[float, str, sqlite3.Row]] = []
+    for t in tables:
+        if t not in ALL_TABLES:
+            raise ValueError(f"unknown table: {t}")
+        mat_n, rows = _load_table_matrix(con, t, classes, db_path=db_path)
+        if not rows:
+            continue
+        scores = mat_n @ q_vec  # (N,)
+        top_idx = np.argpartition(-scores, kth=min(k, len(scores) - 1))[:k]
+        top_idx = top_idx[np.argsort(-scores[top_idx])]
+        for idx in top_idx:
+            all_hits.append((float(scores[idx]), t, rows[idx]))
+
+    all_hits.sort(key=lambda x: -x[0])
+    all_hits = all_hits[:k]
+
+    results: list[dict] = []
+    for score, t, row in all_hits:
+        fields = {f: row[f] for f in TABLE_FIELDS[t]}
+        results.append({
+            "table": t,
+            "id": row["id"],
+            "document_id": row["document_id"],
+            "score": score,
+            "text": _compose_text_row(t, row),
+            "fields": fields,
+        })
+    return results
 
 
 def retrieve_relevant_records(
@@ -154,43 +251,50 @@ def retrieve_relevant_records(
     db_path = db_path or DEFAULT_DB
 
     q_vec = embed_query(query)
-    q_vec = q_vec / (np.linalg.norm(q_vec) or 1.0)
-
     con = sqlite3.connect(str(db_path))
     con.row_factory = sqlite3.Row
     try:
-        # Heap of top-k across tables.
-        all_hits: list[tuple[float, str, sqlite3.Row]] = []
-        for t in tables:
-            if t not in ALL_TABLES:
-                raise ValueError(f"unknown table: {t}")
-            mat, rows = _load_table_matrix(con, t, classes)
-            if not rows:
-                continue
-            mat_n = _normalise(mat)
-            scores = mat_n @ q_vec  # (N,)
-            top_idx = np.argpartition(-scores, kth=min(k, len(scores) - 1))[:k]
-            top_idx = top_idx[np.argsort(-scores[top_idx])]
-            for idx in top_idx:
-                all_hits.append((float(scores[idx]), t, rows[idx]))
-
-        all_hits.sort(key=lambda x: -x[0])
-        all_hits = all_hits[:k]
-
-        results: list[dict] = []
-        for score, t, row in all_hits:
-            fields = {f: row[f] for f in TABLE_FIELDS[t]}
-            results.append({
-                "table": t,
-                "id": row["id"],
-                "document_id": row["document_id"],
-                "score": score,
-                "text": _compose_text_row(t, row),
-                "fields": fields,
-            })
-        return results
+        return _hits_for_qvec(q_vec, tables, classes, db_path, k, con)
     finally:
         con.close()
+
+
+def retrieve_relevant_records_many(
+    queries: list[str],
+    k: int = 5,
+    tables: list[str] | None = None,
+    classes: list[str] | None = None,
+    db_path: Path | None = None,
+) -> list[list[dict]]:
+    """Batch path: one embed batch + one matrix load, then per-query top-k.
+
+    DECISION: same model + same cosine as retrieve_relevant_records — quality-
+    identical; only wall-clock changes (Engine C was ~4 min of sequential
+    OpenAI RTTs + per-query SQLite reloads).
+    """
+    tables = tables or ALL_TABLES
+    db_path = db_path or DEFAULT_DB
+    if not queries:
+        return []
+    q_vecs = embed_queries(queries)
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    try:
+        # Warm the matrix cache once for every requested table.
+        for t in tables:
+            if t in ALL_TABLES:
+                _load_table_matrix(con, t, classes, db_path=db_path)
+        return [
+            _hits_for_qvec(qv, tables, classes, db_path, k, con)
+            for qv in q_vecs
+        ]
+    finally:
+        con.close()
+
+
+def clear_matrix_cache() -> None:
+    """Test helper — drop the process-lifetime corpus cache."""
+    _MATRIX_CACHE.clear()
 
 
 # ---------- CLI ----------------------------------------------------------

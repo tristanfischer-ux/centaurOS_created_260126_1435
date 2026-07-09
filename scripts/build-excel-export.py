@@ -456,6 +456,29 @@ def _aux_tab_score(title: str, run_dir: str):
         # advisory note — visible, never scoring. clean → the visual dimension is VERIFIED, so no
         # advisory and the render earns on its deterministic checks. absent → keep the 'unverified'
         # advisory (honest-cap → 7).
+        def _apply_side_elevation_gate(entry: Optional[dict]) -> Optional[dict]:
+            # INTENT: Tristan 2026-07-09 — a plant with Blender views but no side elevation
+            # cannot show underground tanks/pipes; never score ≥9 (client floor).
+            if not isinstance(entry, dict):
+                return entry
+            if not _gallery_missing_side_elevation(run_dir):
+                return entry
+            sc = entry.get("score")
+            if isinstance(sc, (int, float)) and sc >= 9:
+                entry["score"] = 8.5
+            entry["status"] = "PASS" if (isinstance(entry.get("score"), (int, float))
+                                         and entry["score"] >= 8) else "FAIL"
+            note = ("MISSING side elevation (inspect-side.png) — underground tanks/pipes "
+                    "not visible from iso/plan alone (Excel gallery requires it)")
+            iss = list(entry.get("issues") or [])
+            if note not in iss:
+                iss.insert(0, note)
+            entry["issues"] = iss[:6]
+            if not entry.get("fix"):
+                entry["fix"] = ("re-run Blender inspect pass so inspect-side.png is written "
+                                "with the ground slab hidden")
+            return entry
+
         _vv = _render_vision_verdict(run_dir)
         _vv_defects = (_vv.get("defects") or []) if isinstance(_vv, dict) else []
         # DETERMINISTIC backstop FIRST: a real electrical-part-drawn-as-a-vessel (the stray-beam defect)
@@ -470,7 +493,7 @@ def _aux_tab_score(title: str, run_dir: str):
                 base["status"] = "FAIL"
                 base["issues"] = ([f"WRONG SHAPE: {_stm['count']} electrical part(s) rendered as a process vessel (the stray-beam defect): {_ex}"] + (base.get("issues") or []))[:6]
                 base["fix"] = "classify_shape must map an electrical/power-connection part to a cabinet/box, not a vessel"
-            return base
+            return _apply_side_elevation_gate(base)
         # VISION VERDICT: a 'broken' flag only ever ENTERS this branch when it NAMES a concrete
         # defect. An LLM 'broken=True' with EMPTY defects is unsubstantiated — a false FAIL is as
         # dishonest as a false PASS (Tristan 2026-06-30) — and falls straight to the deterministic-only
@@ -509,14 +532,14 @@ def _aux_tab_score(title: str, run_dir: str):
                                        f"UNCORROBORATED by any deterministic check (litter/shape/drawing-"
                                        f"gates); informational only, does not score (model: {_vv.get('model', '?')})"]
                                        + (base.get("issues") or []))[:6]
-            return base
+            return _apply_side_elevation_gate(base)
         if isinstance(_vv, dict) and _vv.get("ok") and (_vv.get("broken") is False or not _vv_defects):
             # VERIFIED clean, OR broken-but-unsubstantiated (no named defect) → score on the DETERMINISTIC
             # checks (coverage/litter/shape) only; the vision critic cannot drag a deterministically-clean
             # render to a FAIL on a verdict it could not substantiate.
-            return _cap_litter(_cov("blender", "Render"))
-        return _cap_litter(_cov("blender", "Render",
-                    advisory="ADVISORY: object-level visual quality is UNVERIFIED — no vision critic has looked at this render (run render_vision_critic)"))
+            return _apply_side_elevation_gate(_cap_litter(_cov("blender", "Render")))
+        return _apply_side_elevation_gate(_cap_litter(_cov("blender", "Render",
+                    advisory="ADVISORY: object-level visual quality is UNVERIFIED — no vision critic has looked at this render (run render_vision_critic)")))
     if "checks" in t:  # ⚠ Checks — deterministic-invariant pass rate
         try:
             import deterministic_checks_lib as _dcl
@@ -1285,7 +1308,7 @@ FONT_LINK = Font(name="Calibri", size=11, color="1F3A5F", underline="single", bo
 _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Executive Summary": "The cover — what it is, cost, verdict and next steps.",
     "Overview": "Run provenance, quality scorecard and headline metrics.",
-    "Renders": "Photoreal render gallery — interior hero, plan and exterior views.",
+    "Renders": "Photoreal render gallery — hero, plan, side elevation (underground), exterior.",
     "Quality & Audit": "Sections, per-tab scores and audit findings — one verdict.",
     "Sense-check": "Independent market benchmark versus the engine's numbers.",
     "Brief": "Original client brief and the engine's structured interpretation.",
@@ -17268,33 +17291,64 @@ def _manifest_render_map(run_dir: str) -> Dict[str, Tuple[str, str]]:
     return _rmap
 
 
-# The GALLERY view set (Bundle B fix 1, reviewers 2026-07-02): 8 per-render tabs were
-# 7 too many — near-duplicate corner views + an exterior-top nobody reads. ONE 'Renders'
-# gallery keeps the informative views, each with its manifest caption; the other render
-# FILES stay on disk (drawing-manifest renders[] still lists all of them) — they just
-# don't get tabs. Selection is by view KIND from the canonical filenames (universal):
-#   interior 00-hero  → the hero isometric        interior 01-top → the annotated plan
-#   exterior 00-hero  → building exterior iso     exterior 02-corner-FR → 2nd exterior angle
+# The GALLERY view set (Bundle B fix 1, reviewers 2026-07-02; side elevation 2026-07-09):
+# ONE 'Renders' gallery keeps the informative views Excel actually ships. Selection is by
+# view KIND from canonical filenames (universal):
+#   interior 00-hero       → hero isometric
+#   interior 01-top        → annotated plan
+#   inspect-side / 04-side → SIDE ELEVATION (underground tanks + buried pipes visible)
+#   exterior 00-hero       → building exterior iso
+#   exterior 02-corner-FR  → 2nd exterior angle
+# INTENT (Tristan 2026-07-09): no PDF; only images that land in Excel; the side elevation
+# MUST show below-slab drainage / tanks / pipes — iso/plan alone hide that.
 _GALLERY_VIEWS = (
     ("00-hero.png", "Interior — hero isometric",
      "Blender 3D render — interior plant layout (no walls/roof), three-quarter hero view."),
     ("01-top.png", "Interior — annotated plan",
      "Interior plant layout — top-down plan view (matches the GA orientation)."),
+    ("inspect-side.png", "Interior — side elevation (underground)",
+     "Side elevation with the ground slab hidden so underground tanks, sumps and "
+     "buried drain/pipe runs are visible below grade."),
     (os.path.join("exterior", "00-hero.png"), "Exterior — building isometric",
      "Architectural exterior of the building/enclosure, three-quarter view."),
     (os.path.join("exterior", "02-corner-FR.png"), "Exterior — front-corner",
      "Architectural exterior — front-corner angle."),
 )
+# Canonical aliases for the required side elevation (Blender writes inspect-side.png;
+# drawing-set may also promote 04-side-elevation.png).
+_SIDE_ELEVATION_CANDIDATES = (
+    "inspect-side.png",
+    "04-side-elevation.png",
+    "04-side.png",
+)
+
+
+def _side_elevation_path(run_dir: str) -> Optional[str]:
+    """First existing side-elevation PNG in the run dir, or None."""
+    for rel in _SIDE_ELEVATION_CANDIDATES:
+        p = os.path.join(run_dir, rel)
+        if os.path.exists(p):
+            return p
+    return None
 
 
 def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
     """The gallery's (file_path, view_name, caption) picks — hero iso + annotated interior
-    plan + up to 2 exterior views. Captions/names come from the drawing-manifest renders[]
-    where present (fallbacks otherwise). Near-duplicate corners + the exterior-top are
-    deliberately NOT selected. Missing files are skipped (universal)."""
+    plan + REQUIRED side elevation (underground) + up to 2 exterior views.
+    Captions/names come from the drawing-manifest renders[] where present.
+    Near-duplicate corners + the exterior-top are deliberately NOT selected."""
     _rmap = _manifest_render_map(run_dir)
     specs: List[Tuple[str, str, str]] = []
+    side_added = False
     for rel, fb_title, fb_cap in _GALLERY_VIEWS:
+        if rel == "inspect-side.png":
+            p = _side_elevation_path(run_dir)
+            if not p:
+                continue
+            side_added = True
+            sn, cap = _rmap.get(os.path.normpath(p), ("", ""))
+            specs.append((p, sn or fb_title, cap or fb_cap))
+            continue
         p = os.path.join(run_dir, rel)
         if rel == "00-hero.png" and not os.path.exists(p):
             # the interior hero's legacy alias
@@ -17304,15 +17358,27 @@ def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
             continue
         sn, cap = _rmap.get(os.path.normpath(p), ("", ""))
         specs.append((p, sn or fb_title, cap or fb_cap))
+    # GOTCHA: if the side view was listed but missing, and no alias existed, the
+    # gallery still builds — the Renders scorer then caps below 9 (see
+    # _gallery_missing_side_elevation). Never invent a placeholder image.
+    _ = side_added
     return specs
 
 
+def _gallery_missing_side_elevation(run_dir: str) -> bool:
+    """True when the run has Blender hero/plan renders but NO side elevation —
+    the underground-visibility requirement (Tristan 2026-07-09) is unmet."""
+    has_plant_view = any(
+        os.path.exists(os.path.join(run_dir, n))
+        for n in ("00-hero.png", "blender-cover.png", "01-top.png", "inspect-iso.png")
+    )
+    return bool(has_plant_view and _side_elevation_path(run_dir) is None)
+
+
 def tab_renders(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]]:
-    """ONE 'Renders' gallery tab (Bundle B fix 1) — the 8 per-render tabs collapse to a
-    single sheet: hero isometric + annotated interior plan + 1-2 exterior views, each
-    with its manifest caption. Returns [(sheet_title, source_path), …] for the embedded
-    views (so the Drawings register preview links resolve), or None when the run has no
-    renders at all."""
+    """ONE 'Renders' gallery tab — hero isometric + annotated plan + side elevation
+    (underground tanks/pipes) + 1-2 exterior views. Returns [(sheet_title, source_path), …]
+    for the embedded views, or None when the run has no renders at all."""
     from openpyxl.drawing.image import Image as XLImage
     specs = _gallery_render_specs(run_dir)
     if not specs:
@@ -17320,11 +17386,22 @@ def tab_renders(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]]:
     ws = wb.create_sheet("Renders")
     r = title_row(
         ws, "Renders — photoreal views of the plant", 6,
-        "The informative views from the Blender scene build: interior hero isometric, "
-        "annotated interior plan, and the building exterior. Every rendered view file "
-        "(including the additional corner angles) is listed with its caption on the "
-        "Drawings register tab; the full-resolution files live in the run folder.")
+        "Blender views embedded in this workbook: interior hero, annotated plan, "
+        "side elevation (ground slab hidden so underground tanks and buried pipes "
+        "are visible), and the building exterior. Only these Excel-embedded images "
+        "are generated for the deliverable — there is no separate PDF image set.")
     back_link(ws, 6)
+    if _gallery_missing_side_elevation(run_dir):
+        note = ws.cell(
+            r, 1,
+            "⚠ MISSING: side elevation (inspect-side.png) — underground tanks/pipes "
+            "cannot be verified from iso/plan alone. Re-run Blender inspect pass.",
+        )
+        note.font = FONT_NOTE
+        note.alignment = WRAP_TOP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        ws.row_dimensions[r].height = 36
+        r += 2
     embedded: List[Tuple[str, str]] = []
     for path, name, caption in specs:
         png = ensure_png(path, run_dir)
@@ -23653,15 +23730,16 @@ def _selftest() -> int:
     if _rv3 != 998.0 or "seawater" in _rn3:
         print(f"  FAIL rho: a fresh/potable plant must derive 998, never seawater "
               f"(got {_rv3}, {_rn3!r})"); bad += 1
-    # ═══ (18) RENDERS GALLERY (Bundle B fix 1): the gallery picks hero iso + interior
-    # plan + exterior views (manifest names/captions), KILLS the exterior-top + the
-    # near-duplicate corners, and collect_image_specs no longer mints per-render tabs;
-    # hero embedding still prefers the web-weight hero-embed.png ═══
+    # ═══ (18) RENDERS GALLERY (Bundle B fix 1 + side elevation 2026-07-09): hero iso +
+    # interior plan + REQUIRED side elevation (underground) + exterior views; KILLS the
+    # exterior-top + near-duplicate corners; collect_image_specs no longer mints per-render
+    # tabs; hero embedding still prefers the web-weight hero-embed.png ═══
     with _tf.TemporaryDirectory() as _td5:
         os.makedirs(os.path.join(_td5, "exterior"), exist_ok=True)
         from PIL import Image as _PILImg
-        for _fn in ("00-hero.png", "hero-embed.png", "01-top.png", "02-corner-FR.png",
-                    "03-corner-BL.png", os.path.join("exterior", "00-hero.png"),
+        for _fn in ("00-hero.png", "hero-embed.png", "01-top.png", "inspect-side.png",
+                    "02-corner-FR.png", "03-corner-BL.png",
+                    os.path.join("exterior", "00-hero.png"),
                     os.path.join("exterior", "01-top.png"),
                     os.path.join("exterior", "02-corner-FR.png")):
             _PILImg.new("RGB", (8, 6), (200, 20, 20)).save(os.path.join(_td5, _fn))
@@ -23672,14 +23750,17 @@ def _selftest() -> int:
                                     "caption": "Interior render — hero · envelope 23.6 × 39.2 m"}]}, _fh)
         _gv = _gallery_render_specs(_td5)
         _gnames = [os.path.relpath(p, _td5) for p, _n, _c in _gv]
-        if _gnames != ["00-hero.png", "01-top.png",
+        if _gnames != ["00-hero.png", "01-top.png", "inspect-side.png",
                        os.path.join("exterior", "00-hero.png"),
                        os.path.join("exterior", "02-corner-FR.png")]:
-            print(f"  FAIL gallery: must pick hero iso + interior plan + 2 exterior views, "
+            print(f"  FAIL gallery: must pick hero + plan + side elevation + 2 exterior views, "
                   f"in that order (got {_gnames})"); bad += 1
         if any("corner-BL" in n or n == os.path.join("exterior", "01-top.png") for n in _gnames):
             print("  FAIL gallery: the exterior-top + near-duplicate corner views must be "
                   "KILLED (files stay on disk, no tab)"); bad += 1
+        if _gallery_missing_side_elevation(_td5):
+            print("  FAIL gallery: inspect-side.png present must NOT report missing side elevation")
+            bad += 1
         _hs = next((s for s in _gv if os.path.basename(s[0]) == "00-hero.png"), None)
         if not _hs or _hs[1] != "Render 1 — Interior iso" or "envelope" not in _hs[2]:
             print(f"  FAIL gallery-names: the manifest sheet_name/caption must name the gallery "
@@ -23697,6 +23778,15 @@ def _selftest() -> int:
         elif "Renders" not in _wbg.sheetnames or len(_wbg["Renders"]._images) != len(_gv):
             print(f"  FAIL gallery: expected {len(_gv)} images on the Renders sheet "
                   f"(got {len(_wbg['Renders']._images) if 'Renders' in _wbg.sheetnames else 'no sheet'})"); bad += 1
+        # proveCatch: missing side elevation → gallery omits it + missing detector fires
+        os.remove(os.path.join(_td5, "inspect-side.png"))
+        if not _gallery_missing_side_elevation(_td5):
+            print("  FAIL gallery: missing inspect-side.png must trip the underground side-elevation gate")
+            bad += 1
+        _gv_noside = _gallery_render_specs(_td5)
+        if any(os.path.basename(p) == "inspect-side.png" for p, _n, _c in _gv_noside):
+            print("  FAIL gallery: must not invent a side elevation when the file is absent")
+            bad += 1
         else:
             _gtxt = " ".join(str(c.value) for row_ in _wbg["Renders"].iter_rows()
                              for c in row_ if isinstance(c.value, str))

@@ -60,7 +60,10 @@ from typing import Iterable
 
 # Local import — retrieve.py is in the same folder.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from retrieve import retrieve_relevant_records  # noqa: E402
+from retrieve import (  # noqa: E402
+    retrieve_relevant_records,
+    retrieve_relevant_records_many,
+)
 
 # ---------------------------------------------------------------------------
 # FX rates (point estimates as of 2026-05; close enough for an Engine C
@@ -168,63 +171,23 @@ def _percentile(sorted_vals: list[float], pct: float) -> float:
     return sorted_vals[f] + (sorted_vals[c] - sorted_vals[f]) * (k - f)
 
 
-def find_reference_price(
-    part_query: str,
-    class_filter: str | None = None,
-    k: int = 5,
-) -> dict | None:
-    """
-    Retrieve up to k reference records similar to part_query.
-
-    Returns aggregate stats:
-        {ref_count, priced_count, median_unit_cost_gbp,
-         p25_unit_cost_gbp, p75_unit_cost_gbp,
-         top_excerpts: [str], top_sources: [dict], reason}
-
-    `class_filter` is currently advisory — the corpus's parts table indexes
-    `module_assignment` (module-level) rather than `product_class`, and we
-    don't want to over-restrict the retrieval for a marginal precision gain.
-    The class name is appended to the query string instead so the embedding
-    model can use it for relevance ranking.
-
-    Returns None if the query is empty.
-    """
-    if not part_query or not part_query.strip():
-        return None
-
-    # Compose a richer query — appending the class slug gives the embedding
-    # model more signal without hard-filtering. "LFP prismatic cell" alone
-    # retrieves general battery cells; "LFP prismatic cell bess-utility-scale"
-    # biases toward utility BESS context.
-    composed_query = part_query.strip()
+def _compose_query(part_query: str, class_filter: str | None) -> str:
+    composed = part_query.strip()
     if class_filter:
-        composed_query = f"{composed_query} {class_filter.replace('-', ' ')}"
+        composed = f"{composed} {class_filter.replace('-', ' ')}"
+    return composed
 
-    hits = retrieve_relevant_records(
-        composed_query,
-        k=k,
-        tables=['pretraining_extracted_parts'],
+
+def _parts_have_price(hits: list[dict]) -> bool:
+    return any(
+        (h['fields'].get('unit_price_gbp') or 0) > 0
+        or _parse_price_from_excerpt(h['fields'].get('raw_excerpt') or '')
+        for h in hits
     )
 
-    # Specs fallback — when the parts table yields no priced hits the specs
-    # table often does (the corpus has 37 spec rows with `spec_key` matching
-    # /price|cost|msrp/ vs only 7 priced parts). We still ANCHOR on the parts
-    # retrieval (those are the topical hits), but if parts came back with no
-    # priced rows we also retrieve from specs and treat priced specs as
-    # additional evidence rows so the lookup doesn't degrade to "no_priced_hits"
-    # purely because the corpus lacks structured part-level prices.
-    spec_hits: list[dict] = []
-    if not any((h['fields'].get('unit_price_gbp') or 0) > 0 or
-               _parse_price_from_excerpt(h['fields'].get('raw_excerpt') or '')
-               for h in hits):
-        # Append "price" to the query for the specs leg so we bias toward
-        # price-labelled spec rows (Price | 249 GBP | ...).
-        spec_hits = retrieve_relevant_records(
-            composed_query + ' price',
-            k=k,
-            tables=['pretraining_extracted_specs'],
-        )
 
+def _aggregate_reference_price(hits: list[dict], spec_hits: list[dict]) -> dict:
+    """Turn retrieval hits into Engine C aggregate stats (pure; no I/O)."""
     if not hits and not spec_hits:
         return {
             'ref_count': 0,
@@ -263,19 +226,14 @@ def find_reference_price(
             prices_gbp.append(parsed)
 
     # Spec fallback contributions — only currency-labelled spec rows count.
-    # A spec_key matching /price|cost|msrp/ AND a parseable amount in the
-    # raw_excerpt is the bar for inclusion (raises precision vs catching
-    # "Energy cost savings 70 %").
     for sh in spec_hits:
         sf = sh['fields']
         sk = (sf.get('spec_key') or '').lower()
         if not any(t in sk for t in ('price', 'cost', 'msrp', 'list', 'asp')):
             continue
-        # Reject percentage / ratio rows.
         unit = (sf.get('spec_unit') or '').lower()
         if '%' in unit or 'percent' in unit:
             continue
-        # Try structured value + unit first.
         val = sf.get('spec_value')
         unit_u = (sf.get('spec_unit') or '').upper()
         amount: float | None = None
@@ -285,7 +243,6 @@ def find_reference_price(
             amount = None
         if amount is not None and unit_u in ('GBP', 'USD', 'EUR') and 0.01 <= amount <= 10_000_000:
             prices_gbp.append(_convert_to_gbp(amount, unit_u))
-            # Also surface the spec excerpt as additional evidence.
             ex = sf.get('raw_excerpt') or ''
             if ex and len(top_excerpts) < 6:
                 top_excerpts.append(str(ex)[:280])
@@ -296,7 +253,6 @@ def find_reference_price(
                     'score': round(float(sh['score']), 4),
                 })
             continue
-        # Otherwise regex on the excerpt.
         parsed = _parse_price_from_excerpt(sf.get('raw_excerpt') or '')
         if parsed is not None:
             prices_gbp.append(parsed)
@@ -323,49 +279,165 @@ def find_reference_price(
         }
 
     prices_gbp.sort()
-    median = _percentile(prices_gbp, 0.5)
-    p25 = _percentile(prices_gbp, 0.25)
-    p75 = _percentile(prices_gbp, 0.75)
-
     return {
         'ref_count': len(hits),
         'priced_count': len(prices_gbp),
-        'median_unit_cost_gbp': round(median, 4),
-        'p25_unit_cost_gbp': round(p25, 4),
-        'p75_unit_cost_gbp': round(p75, 4),
+        'median_unit_cost_gbp': round(_percentile(prices_gbp, 0.5), 4),
+        'p25_unit_cost_gbp': round(_percentile(prices_gbp, 0.25), 4),
+        'p75_unit_cost_gbp': round(_percentile(prices_gbp, 0.75), 4),
         'top_excerpts': top_excerpts,
         'top_sources': top_sources,
         'reason': 'priced',
     }
 
 
+def find_reference_price(
+    part_query: str,
+    class_filter: str | None = None,
+    k: int = 5,
+) -> dict | None:
+    """
+    Retrieve up to k reference records similar to part_query.
+
+    Returns aggregate stats:
+        {ref_count, priced_count, median_unit_cost_gbp,
+         p25_unit_cost_gbp, p75_unit_cost_gbp,
+         top_excerpts: [str], top_sources: [dict], reason}
+
+    `class_filter` is currently advisory — the corpus's parts table indexes
+    `module_assignment` (module-level) rather than `product_class`, and we
+    don't want to over-restrict the retrieval for a marginal precision gain.
+    The class name is appended to the query string instead so the embedding
+    model can use it for relevance ranking.
+
+    Returns None if the query is empty.
+    """
+    if not part_query or not part_query.strip():
+        return None
+
+    composed_query = _compose_query(part_query, class_filter)
+    hits = retrieve_relevant_records(
+        composed_query,
+        k=k,
+        tables=['pretraining_extracted_parts'],
+    )
+    # Specs fallback — when the parts table yields no priced hits the specs
+    # table often does. We still ANCHOR on the parts retrieval.
+    spec_hits: list[dict] = []
+    if not _parts_have_price(hits):
+        spec_hits = retrieve_relevant_records(
+            composed_query + ' price',
+            k=k,
+            tables=['pretraining_extracted_specs'],
+        )
+    return _aggregate_reference_price(hits, spec_hits)
+
+
 # ---------------------------------------------------------------------------
-# Batch mode — read NDJSON queries from stdin, emit NDJSON results to stdout.
-# This is the path used by enrich-state-with-reference-anchor.tsx so a single
-# Python process embeds + matrix-loads once and serves many queries.
+# Batch mode — read ALL NDJSON queries from stdin, then ONE embed batch + ONE
+# corpus matrix load (2026-07-09). Same cosine / same model as the single-query
+# path — quality-identical; wall-clock drops from ~N OpenAI RTTs to ~N/64.
 # ---------------------------------------------------------------------------
 
 def _batch_mode(k: int) -> int:
+    # INTENT: drain stdin first so we can batch-embed. The TS driver already
+    # writes every request then closes stdin — no streaming requirement.
+    reqs: list[dict] = []
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         try:
-            req = json.loads(line)
+            reqs.append(json.loads(line))
         except json.JSONDecodeError as e:
-            sys.stdout.write(json.dumps({'error': f'bad json: {e}', 'input': line[:200]}) + '\n')
-            sys.stdout.flush()
+            reqs.append({'_parse_error': f'bad json: {e}', '_raw': line[:200]})
+
+    # Preserve request order for stdout pairing.
+    composed: list[str] = []
+    meta: list[tuple[str | None, int, bool]] = []  # (request_id, k, empty_query)
+    for req in reqs:
+        if '_parse_error' in req:
+            meta.append((None, k, True))
+            composed.append('')
             continue
         query = req.get('query') or ''
         class_filter = req.get('class') or None
         kk = int(req.get('k') or k)
+        empty = not query or not str(query).strip()
+        meta.append((req.get('request_id'), kk, empty))
+        composed.append('' if empty else _compose_query(str(query), class_filter))
+
+    # Parts retrieval for every non-empty query (empty → skip).
+    live_idxs = [i for i, (_rid, _kk, empty) in enumerate(meta) if not empty and composed[i]]
+    live_queries = [composed[i] for i in live_idxs]
+    parts_by_live: list[list[dict]] = []
+    if live_queries:
+        # Use max k among live requests so one matrix pass covers all.
+        k_parts = max(meta[i][1] for i in live_idxs) if live_idxs else k
         try:
-            result = find_reference_price(query, class_filter=class_filter, k=kk)
-        except Exception as e:  # noqa: BLE001 — surface to caller, don't crash batch
-            result = {'error': str(e)}
-        out = {'request_id': req.get('request_id'), 'result': result}
-        sys.stdout.write(json.dumps(out) + '\n')
-        sys.stdout.flush()
+            parts_by_live = retrieve_relevant_records_many(
+                live_queries,
+                k=k_parts,
+                tables=['pretraining_extracted_parts'],
+            )
+        except Exception as e:  # noqa: BLE001
+            # Fail the whole batch with per-row errors rather than silent empty.
+            err = {'error': str(e)}
+            for req, (rid, _kk, _empty) in zip(reqs, meta):
+                if '_parse_error' in req:
+                    sys.stdout.write(json.dumps({
+                        'error': req['_parse_error'], 'input': req.get('_raw', ''),
+                    }) + '\n')
+                else:
+                    sys.stdout.write(json.dumps({'request_id': rid, 'result': err}) + '\n')
+            sys.stdout.flush()
+            return 0
+
+    parts_hits: list[list[dict] | None] = [None] * len(reqs)
+    for j, i in enumerate(live_idxs):
+        # Trim to this request's k (many() used max-k).
+        parts_hits[i] = parts_by_live[j][: meta[i][1]]
+
+    # Specs fallback only for rows with no priced parts hits.
+    spec_need_idxs = [
+        i for i in live_idxs
+        if parts_hits[i] is not None and not _parts_have_price(parts_hits[i] or [])
+    ]
+    spec_hits_map: dict[int, list[dict]] = {}
+    if spec_need_idxs:
+        spec_queries = [composed[i] + ' price' for i in spec_need_idxs]
+        k_spec = max(meta[i][1] for i in spec_need_idxs)
+        try:
+            spec_lists = retrieve_relevant_records_many(
+                spec_queries,
+                k=k_spec,
+                tables=['pretraining_extracted_specs'],
+            )
+            for j, i in enumerate(spec_need_idxs):
+                spec_hits_map[i] = spec_lists[j][: meta[i][1]]
+        except Exception as e:  # noqa: BLE001
+            # Specs are a fallback — leave empty and let aggregate report no_priced_hits.
+            sys.stderr.write(f"[reference_lookup] specs batch failed (non-fatal): {e}\n")
+
+    for i, req in enumerate(reqs):
+        if '_parse_error' in req:
+            sys.stdout.write(json.dumps({
+                'error': req['_parse_error'], 'input': req.get('_raw', ''),
+            }) + '\n')
+            continue
+        rid, _kk, empty = meta[i]
+        if empty:
+            result = None
+        else:
+            try:
+                result = _aggregate_reference_price(
+                    parts_hits[i] or [],
+                    spec_hits_map.get(i, []),
+                )
+            except Exception as e:  # noqa: BLE001
+                result = {'error': str(e)}
+        sys.stdout.write(json.dumps({'request_id': rid, 'result': result}) + '\n')
+    sys.stdout.flush()
     return 0
 
 

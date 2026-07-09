@@ -590,8 +590,14 @@ SHAPE_RULES = [
     # vertical fixed-bed / filtration vessels (flanged ends, short legs)
     (r"dryer|guard[- ]?bed|\bbed\b|adsorber|coalescer|\bfilter\b|"
      r"\bguard\b", "vertical_vessel"),
-    # storage
-    (r"storage tank|\btank\b|\bstorage\b", "tank"),
+    # storage — CLOSED cylinders on a low plinth (not vertical-vessel skirts). Includes
+    # "reservoir": plant cleanwater/day/buffer reservoirs are galvanised storage tanks
+    # (h≈d), never open lagoons and never tall process vessels on skirts. Without this
+    # the generic vessel catch-all below classified "Cleanwater Reservoir" as
+    # vertical_vessel → short body on long legs → centre z ≈ 6 m floating pancake
+    # (2026-07-09). Universal storage-noun signal; open basins already match clarifier/
+    # sump/pond rules above as tank with open-rearing treatment.
+    (r"storage tank|\btank\b|\bstorage\b|reservoir", "tank"),
     # tall stacks (oxidiser/flare/chimney)
     (r"oxidi[sz]er|flare|stack|chimney|incinerat", "stack"),
     # boiler / steam generator / fired preheater (big box-ish package)
@@ -626,11 +632,12 @@ SHAPE_RULES = [
     (r"\bsealers?\b|band sealer|heat sealer", "sealer_machine"),
     (r"\bwrappers?\b|stretch.?wrap|palletiser|palletizer", "wrapper_machine"),
     # GENERIC process vessel catch-all (Tristan 2026-06-24: a part named "…vessel" /
-    # "…pot" / "maturation vessel" / "reservoir" / "accumulator" matched NO earlier rule
+    # "…pot" / "maturation vessel" / "accumulator" matched NO earlier rule
     # and fell to a flat BOX. A closed process vessel is a vertical cylinder with dished
     # ends — give it that shape. Placed AFTER every specific reactor/column/separator/
-    # tank/electrical rule so those still win, and before the instrument/box fallbacks.)
-    (r"\bvessels?\b|\bpot\b|reservoir|accumulator|maturation|\bdigest", "vertical_vessel"),
+    # tank/electrical rule so those still win, and before the instrument/box fallbacks.
+    # "reservoir" removed 2026-07-09 — it is storage (tank rule above), not a process vessel.)
+    (r"\bvessels?\b|\bpot\b|accumulator|maturation|\bdigest", "vertical_vessel"),
     # A pipe MANIFOLD / distribution HEADER is a slim horizontal pipe assembly, NOT a
     # crate — left on the DEFAULT box, four manifolds shared one 1515×900×1100 box and
     # tripped the manifest-sight LITTER signal (Codema 2026-07-02). inline_spool already
@@ -819,28 +826,84 @@ GROUND_SLAB_COLOUR     = (0.52, 0.52, 0.55)
 # only on the SAME generic drain/gravity/sump/pit nouns the 2D fix used, never a
 # class name: fires on any archetype whose topology feeds a gravity collection
 # point, stays silent on an all-pressurised design (no matching name/context at all).
+_COLLECTION_VESSEL_RE = re.compile(
+    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain|"
+    r"drain.?water.?tank|drain.?reservoir|\brecovery\b.*\b(tank|sump|pit|vessel)\b|"
+    r"reclaim.*(tank|sump|pit)|drain.?collection", re.I)
 _BELOW_GRADE_NAME_RE = re.compile(
-    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain", re.I)
+    r"\bsump\b|drain.?pit|catch.?pit|\bmanhole\b|\bgully\b|floor.?drain|"
+    r"drain.?collection", re.I)
 _GRAVITY_CONTEXT_RE = re.compile(r"\bgravity\b", re.I)
+_DRAIN_LIKE_RE = re.compile(r"\b(gravity|drain|return|recovery|reclaim)\b", re.I)
+# Pressurised lift LEAVING a pit — discharge stays on the rack. A bare "pump" alone
+# is too broad: a "drain transfer pump" SUCTION from a sump is still below-grade
+# (the run INTO the pump from the pit). Only the discharge side of a lift pump is
+# elevated — detected when the SOURCE is the lift pump (frm is pump).
 _LIFT_PUMP_RE = re.compile(r"\bpump\b", re.I)
+# Dirty-side recovery treatment (cloth / paperbelt / microscreen) — gravity or
+# low-head runs from these units into a drain/recovery store are buried in real
+# plant rooms (Sam J3: "a lot would have to be underground for drainage"). Universal
+# recovery-train nouns, never a class name.
+_RECOVERY_FILTER_RE = re.compile(
+    r"cloth.?filter|paper.?belt|paperbelt|microscreen|micro.?screen|"
+    r"drum.?filter|band.?screen|rotary.?screen", re.I)
+# Drain/recovery STORAGE (not the open pit — the above-grade galvanised drainwater
+# reservoir that receives buried laterals from pits/filters).
+_DRAIN_STORE_RE = re.compile(
+    r"drain.?water|drainwater|drain.?reservoir|recovery.?tank|reclaim.?tank|"
+    r"dirty.?water|return.?water.?tank", re.I)
 
 
 def _is_below_grade_drain_edge(frm, to, material_context):
-    """True when a routed topology edge is a GRAVITY-FED run into a below-grade
-    collection point (sump / drain-pit / catch-pit / manhole / gully / floor drain)
-    — the identical predicate draw_pid.py::_is_below_grade_drain uses to pick the
-    dash-dot line style in the 2D P&ID, reused here to route the 3D pipe UNDERGROUND
-    instead of onto the elevated rack. Also fires when the edge's own
-    material_context explicitly says 'gravity'. Excludes the RISEN, pumped discharge
-    LEAVING a lift pump (that run is above-ground once lifted out of the pit) —
-    proveCatch/proveNoFalsePositive in build_universal_scene_test.py."""
+    """True when a routed topology edge is a GRAVITY-FED / drain-recovery run that
+    belongs UNDER the slab — the identical predicate draw_pid.py uses for dash-dot
+    drain lines, reused here to route the 3D pipe UNDERGROUND instead of onto the
+    elevated rack.
+
+    Fires when:
+      (1) material_context explicitly says 'gravity';
+      (2) destination is a below-grade collection vessel (sump/pit/gully/…) and the
+          source is NOT a pressurised lift pump discharge;
+      (3) material_context is drain/return/recovery into a collection vessel;
+      (4) source is a dirty-side recovery filter (cloth/microscreen/…) feeding a
+          drain/recovery store or collection vessel — buried filter→store laterals
+          (Sam J3 partial close, 2026-07-09);
+      (5) source is a collection vessel / sump feeding a drain store (inter-pit
+          buried transfer without a pump in the source name).
+
+    Excludes the RISEN, pumped discharge LEAVING a lift pump (frm is a pump) — that
+    run is above-ground once lifted. proveCatch / proveNoFalsePositive in
+    test_derive_flows.py. Universal — noun signals only, no class table."""
     if _GRAVITY_CONTEXT_RE.search(re.sub(r"[_\-]+", " ", material_context or "")):
         return True
+
     to_norm = re.sub(r"[_\-]+", " ", to or "")
-    if not _BELOW_GRADE_NAME_RE.search(to_norm):
-        return False
     frm_norm = re.sub(r"[_\-]+", " ", frm or "")
-    return not _LIFT_PUMP_RE.search(frm_norm)
+    mat_norm = re.sub(r"[_\-]+", " ", material_context or "")
+
+    # destination is a below-grade collection vessel → underground, unless the
+    # source is a pressurised pump (lift/dosing discharge stays on the rack).
+    if _COLLECTION_VESSEL_RE.search(to_norm) and not _LIFT_PUMP_RE.search(frm_norm):
+        return True
+
+    # material_context drain/return/recovery into a collection vessel
+    if _DRAIN_LIKE_RE.search(mat_norm) and _COLLECTION_VESSEL_RE.search(to_norm):
+        if not _LIFT_PUMP_RE.search(frm_norm):
+            return True
+
+    # recovery filter → drain store / collection vessel (buried dirty-side lateral)
+    if _RECOVERY_FILTER_RE.search(frm_norm) and (
+            _COLLECTION_VESSEL_RE.search(to_norm) or _DRAIN_STORE_RE.search(to_norm)):
+        if not _LIFT_PUMP_RE.search(frm_norm):
+            return True
+
+    # collection vessel → drain store (inter-pit / pit-to-reservoir buried run;
+    # excludes pump discharges because frm would be the pump, not the vessel)
+    if _COLLECTION_VESSEL_RE.search(frm_norm) and _DRAIN_STORE_RE.search(to_norm):
+        if not _LIFT_PUMP_RE.search(frm_norm):
+            return True
+
+    return False
 
 
 # Below-grade PART sink (the drain-pit/sump/manhole chamber itself, applied in
@@ -2385,23 +2448,31 @@ def _nozzle_mat(MAT):
 # Universal: keyed only off the anchor point + an outward axis, never e-fuel
 # specifics. Each MAJOR vertical vessel also gets a standard top + bottom nozzle
 # and a manway disc for realism (build_vessel reserves those).
-STUB_LEN_MM       = 360.0    # how far a nozzle stub projects from the shell
-STUB_FLANGE_T_MM  = 70.0     # flange disc thickness at the stub tip
+STUB_LEN_MM       = 280.0    # how far a nozzle stub projects from the shell
 MANWAY_DIA_MM     = 600.0    # standard manway disc diameter on a major vessel
 
 
 def _spawn_nozzle_stub(nm, base_xyz_mm, axis, pipe_dia_mm, MAT, mod, MO,
                        length_mm=STUB_LEN_MM):
-    """Grow a short flanged nozzle stub from `base_xyz_mm` along unit `axis`
+    """Grow a short nozzle NECK from `base_xyz_mm` along unit `axis`
     (a 3-tuple; +Z=up, -Z=down, ±X/±Y=sideways). Returns the stub-TIP point (mm)
-    the routed pipe should connect to, so the pipe meets a flange face, not the
-    shell. The stub bore tracks the pipe diameter (a touch fatter) so the joint
-    reads flush. Deterministic + universal — only geometry, no class logic."""
+    the routed pipe should connect to, so the pipe meets the neck tip, not the
+    shell. The stub bore tracks the pipe diameter so the joint reads flush.
+    Deterministic + universal — only geometry, no class logic.
+
+    INTENT: Neck ONLY — no flange disc. A stub flange (even raised-face) at the
+    tip of every port reads as a free-end T-bar when the camera catches the
+    disc edge-on, and stacked with any pipe-end flange into a double T
+    (Sam/Codema visual, 2026-07-09). The pipe tube itself is the joint.
+    """
     nz_mat = _nozzle_mat(MAT)
     bx, by, bz = (float(c) for c in base_xyz_mm)
     ax, ay, az = axis
     nl = float(length_mm)
-    r = max(0.045, pipe_dia_mm * fl.MM * 0.60)        # stub neck radius
+    # Neck radius ≈ half the pipe OD (a flush continuation), floored so a
+    # DN15 stub stays visible but never balloons into a T-bar.
+    pipe_od_m = max(0.025, float(pipe_dia_mm) * fl.MM)
+    r = max(0.012, pipe_od_m * 0.50)
     # neck centre sits half a stub-length out along the axis
     cx = (bx + ax * nl * 0.5) * fl.MM
     cy = (by + ay * nl * 0.5) * fl.MM
@@ -2415,12 +2486,8 @@ def _spawn_nozzle_stub(nm, base_xyz_mm, axis, pipe_dia_mm, MAT, mod, MO,
         rot = (math.radians(90), 0, 0)
     fl.add_cyl(f"{nm}_neck", (cx, cy, cz), r, nl * fl.MM, nz_mat,
                module=mod, module_objects=MO, rotation=rot)
-    # flange disc at the stub TIP (a short fat cylinder = a raised-face flange)
+    # Tip = end of neck (no flange disc — that was the free-end T residual).
     tx, ty, tz = bx + ax * nl, by + ay * nl, bz + az * nl
-    fl.add_cyl(f"{nm}_flange",
-               (tx * fl.MM, ty * fl.MM, tz * fl.MM), r * 1.55,
-               STUB_FLANGE_T_MM * fl.MM, nz_mat, module=mod, module_objects=MO,
-               rotation=rot)
     return (tx, ty, tz)
 
 
@@ -2657,10 +2724,12 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
             roof = fl.add_sphere(f"{nm}_roof", (x_mm * fl.MM, y_mm * fl.MM, z_bot + body_h),
                                  r * 0.99, mat, module=mod, module_objects=MO)
             roof.scale = (1.0, 1.0, max(0.12, roof_rise / max(r, 1e-6)))
-            # closed tanks legitimately carry tie-in nozzles + a top manway (unlike the
-            # open rearing tank). Anchor top stays at the dome apex for routing.
+            # closed tanks: dome roof only. Do NOT mint decorative side nozzles /
+            # manway stubs here — those orphan neck+flange pairs read as T-pieces
+            # that go nowhere (Sam/Codema visual, 2026-07-09). Real process
+            # connections come from add_connection_ports / wire_ports (Stage 2–3),
+            # which only grow stubs that a routed run actually lands on.
             anchors["top"] = (x_mm, y_mm, (z_bot + body_h + roof_rise) / fl.MM)
-            _add_vessel_nozzles(nm, anchors, dia_mm, "tank", MAT, mod, MO)
         _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, z_bot + body_h, steel, mod, MO)
         return {"root": shell, "name": nm}, anchors
 
@@ -2715,9 +2784,11 @@ def build_vessel(nm, kind, dia_mm, length_mm, x_mm, y_mm, base_z_mm, mat, mod, M
     bot_z = (z_bot) / fl.MM
     anchors = {"top": (x_mm, y_mm, top_z), "bottom": (x_mm, y_mm, bot_z),
                "centre": (x_mm, y_mm, cz / fl.MM)}
-    # Fix 1: standard top/bottom side nozzles + a manway on MAJOR vertical
-    # vessels (skip the small bed/filter legs case — those are minor drums).
-    if kind in ("column", "reactor", "vertical", "cone_vessel"):
+    # Decorative side nozzles/manways ONLY on tall process columns/reactors
+    # (mass-transfer silhouette). Skip vertical/bed/filter drums — same orphan
+    # T-stub defect as storage tanks (neck+flange with no pipe). Real ports
+    # still come from Stage-2 connection wiring when the ledger has edges.
+    if kind in ("column", "reactor", "cone_vessel"):
         _add_vessel_nozzles(nm, anchors, dia_mm, kind, MAT, mod, MO)
     _greeble_ladder(nm, x_mm * fl.MM, y_mm * fl.MM, r, z_bot, cz + body_h / 2, steel, mod, MO)
     return {"root": shell, "name": nm}, anchors
@@ -3152,7 +3223,11 @@ def build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
             # 2026-06-22, "two black wires going nowhere"). dia = the tank diameter in scope.
             _edge = dia / 2.0 + 250.0                      # hug the tank face (0.25 m clearance)
             sup_x, drn_x = cxs[0] - _edge, cxs[-1] + _edge  # mains just outside the columns
-            y_f, y_b = rys[0] - 500.0, rys[-1] + 500.0      # span the rows + a short elbow
+            # Span ONLY the tank-row extent (first→last instance). The old ±500 mm
+            # elbow past the outer row left free-end stubs that read as T-pieces
+            # going nowhere (Sam visual, 2026-07-09). Ends now land on the outer
+            # drops, which terminate into each tank.
+            y_f, y_b = rys[0], rys[-1]
 
             def _vp(n, x, y, z0, z1, rr, mt):     # vertical pipe
                 fl.add_cyl("u_pipe_" + n, (x * MM, y * MM, (z0 + z1) / 2 * MM), rr, abs(z1 - z0) * MM,
@@ -4185,6 +4260,17 @@ def resolve_endpoint(edge_part_name, parts):
         # whose real BoM name in this design is the 'MEA stripper reboil pot'.
         "reboiler_steam_supply": "electric steam generator",
         "rich_amine_preheat": "mea stripper reboil pot",
+        # Storage-pin alias (2026-07-09): contracts emit a compliance SCALAR id
+        # (`cleanwater_reservoir` / `drainwater_reservoir`) AND the equipment family
+        # that delivers it (`Fresh Water Tank` / `Drain Water Tank`). Synthesis keeps
+        # ONE physical vessel; topology edges still name the scalar id. Map the id
+        # onto the equipment noun so finalize_ledger resolves to the authored part
+        # (referential integrity) instead of leaving a dangling snake_case endpoint.
+        # Universal — synonym family, not a class table.
+        "cleanwater_reservoir": "fresh water tank",
+        "clean_water_reservoir": "fresh water tank",
+        "drainwater_reservoir": "drain water tank",
+        "drain_water_reservoir": "drain water tank",
     }
     if edge_part_name in SYN:
         toks = tokenise(SYN[edge_part_name])
@@ -8668,9 +8754,12 @@ def _draw_run(nm, mech, waypoints, a_xyz, b_xyz, MAT, MO, pipe_module,
     if mech == "electrical_bus":
         _draw_cable_tray(nm, waypoints, MAT, MO, dia_mm=dia_mm)
     else:
+        # GOTCHA: flanges=True is fine here — prim_pipe_run suppresses pipe-end
+        # flanges whenever connect partners exist (nozzle stub owns the face).
+        conn_t = tuple(c for c in conn if c is not None)
         fl.prim_pipe_run(nm, waypoints, dia_mm,
                          material=_mech_pipe_mat(mech, MAT),
-                         flanges=True, connect=tuple(c for c in conn if c is not None),
+                         flanges=True, connect=conn_t,
                          module=pipe_module, module_objects=MO)
     if log:
         _route_log_add(nm, mech, waypoints, a_xyz, b_xyz, own_parts=own_parts)
@@ -9314,6 +9403,8 @@ def _emit_routes_on_plan(resolved, rack_plan, rack_base_z, MAT, MO,
                       f"{r['a_nm']}  ->  {r['b_nm']}  "
                       f"(+{len(r.get('b_branch', []))} load drops)")
             else:
+                # GOTCHA: connect partners ⇒ prim_pipe_run skips pipe-end flanges
+                # so the nozzle-stub flange is the only disc at the tip (no T-bar).
                 conn = tuple(c for c in (r.get("a_conn"), r.get("b_conn"))
                              if c is not None)
                 fl.prim_pipe_run(nm, waypoints, dia_mm,
@@ -9508,9 +9599,10 @@ def place_all_linear(parts, MAT, MO):
 # stub clearly stands off the shell rather than buried in it.
 PORT_STANDOFF_MM = 120.0
 # Nominal bore [mm] a fluid port stub is drawn at when the ledger edge carries no size
-# (Stage 3 re-sizes the real run; this is only the geometric stub neck). Deliberately
-# modest so it reads as a tie-in point, not a fat process main.
-PORT_FLUID_DIA_MM = 200.0
+# (Stage 3 re-sizes the real run; this is only the geometric stub neck). Was 200
+# (DN200) which made every stub a fat T against DN32–DN80 runs (Sam/Codema
+# 2026-07-09). DN80 is a visible tie-in without dominating the pipe.
+PORT_FLUID_DIA_MM = 80.0
 # Terminal marker box size [mm] — a SMALL junction/terminal box (≤0.3 m per the brief),
 # clearly a terminal, never a generic equipment cube.
 PORT_TERMINAL_MM = (260.0, 200.0, 240.0)
@@ -16598,6 +16690,19 @@ def render_inspection(out_dir, bbox):
             "ortho_scale": line_scale,
         })
 
+    # INTENT (Tristan 2026-07-09): the side elevation must show underground tanks /
+    # sumps / buried drain runs. The opaque ground slab hides them from every camera
+    # that looks across grade — hide the slab ONLY for the side (+ optional line)
+    # elevation, then restore so iso/top/front stay unchanged.
+    def _set_ground_slab_hidden(hidden: bool) -> int:
+        n = 0
+        for o in bpy.data.objects:
+            if o.name.startswith("u_ground_slab"):
+                o.hide_render = hidden
+                o.hide_viewport = hidden
+                n += 1
+        return n
+
     for cam in cams:
         fl.clear_cameras()
         c = fl.setup_camera(cam["loc"], cam["target"], cam["ortho_scale"], focal=50)
@@ -16608,11 +16713,20 @@ def render_inspection(out_dir, bbox):
         # Generous clip range so a big plant is never near/far-plane clipped.
         c.data.clip_start = max(0.01, radius * 0.001)
         c.data.clip_end = radius * 8.0
-        out_path = os.path.join(out_dir, cam["name"] + ".png")
-        scene.render.filepath = out_path
-        bpy.ops.render.render(write_still=True)
-        print(f"[univ][inspect] wrote {out_path}  "
-              f"(ortho_scale={cam['ortho_scale']:.1f} m)")
+        # Side / line elevations: hide slab so below-grade geometry is visible.
+        # DECISION: only these cameras — iso/top/front keep the deck for context.
+        _hide_slab = cam["name"] in ("inspect-side", "inspect-line")
+        _n_slab = _set_ground_slab_hidden(True) if _hide_slab else 0
+        try:
+            out_path = os.path.join(out_dir, cam["name"] + ".png")
+            scene.render.filepath = out_path
+            bpy.ops.render.render(write_still=True)
+            _extra = (f"  slab_hidden={_n_slab}" if _hide_slab else "")
+            print(f"[univ][inspect] wrote {out_path}  "
+                  f"(ortho_scale={cam['ortho_scale']:.1f} m){_extra}")
+        finally:
+            if _hide_slab:
+                _set_ground_slab_hidden(False)
 
 
 def load_state(path):

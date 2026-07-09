@@ -84,16 +84,21 @@ export function shipGatingScore(section: ScorecardSection): number {
   return raw
 }
 
-/** Honest ship floor/mean/allPass — min/mean of shipGatingScore across every section. */
+/**
+ * Honest ship floor/mean/allPass — min/mean of shipGatingScore across every section.
+ * @param passFloor - minimum score for allPass (default 9 — Tristan 2026-07-09 Excel bar).
+ */
 export function computeHonestShipFloor(
   sections: ScorecardSection[],
+  passFloor: number = 9,
 ): { floor: number; mean: number; allPass: boolean } {
   const scores = sections.map(shipGatingScore)
   const floor = scores.length ? Math.min(...scores) : 0
   const mean = scores.length
     ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
     : 0
-  return { floor, mean, allPass: floor >= 8 }
+  const bar = Number.isFinite(passFloor) ? passFloor : 9
+  return { floor, mean, allPass: floor >= bar }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
