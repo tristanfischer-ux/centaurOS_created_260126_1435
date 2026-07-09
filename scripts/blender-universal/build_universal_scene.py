@@ -1090,6 +1090,32 @@ def _plan_span_mm(a_xyz, b_xyz):
         return 0.0
 
 
+def _points_plan_span_mm(points):
+    """Plan AABB span (max of Δx, Δy) over an iterable of XYZ points. Pure."""
+    xs, ys = [], []
+    for p in points or ():
+        try:
+            xs.append(float(p[0])); ys.append(float(p[1]))
+        except (TypeError, ValueError, IndexError):
+            continue
+    if not xs or not ys:
+        return 0.0
+    return max(max(xs) - min(xs), max(ys) - min(ys))
+
+
+def _should_demote_plant_spanning_cable_fanout(src_xyz, dest_xyzs, trunk_waypoints=None):
+    """INTENT: demote a cable tray whose DRAWN plan reach exceeds WIRE_TRAY_MAX_SPAN_MM.
+    DECISION (Codema 1759): measure src∪dests AABB (not dests alone — an MCC outside a
+    compact load cluster kept dest-span ≤16 m while the trunk polyline spanned 20.2 m).
+    Optional built-trunk waypoints are a backstop for Manhattan dog-legs. Universal."""
+    pts = [src_xyz, *(dest_xyzs or ())]
+    if _points_plan_span_mm(pts) > WIRE_TRAY_MAX_SPAN_MM:
+        return True
+    if trunk_waypoints is not None and _points_plan_span_mm(trunk_waypoints) > WIRE_TRAY_MAX_SPAN_MM:
+        return True
+    return False
+
+
 def _should_demote_plant_spanning_fluid(frm, to, src_xyz, dst_xyz, material_context):
     """INTENT: a fluid edge whose plan span exceeds WIRE_TRAY_MAX_SPAN_MM would draw as a
     plant-crossing beam (overhead OR a long below-grade lateral that surfaces across
@@ -1122,6 +1148,26 @@ def _selftest_plant_spanning_fluid_demote() -> None:
     assert not _should_demote_plant_spanning_fluid(
         "Cloth Filter", "Drain Water Tank", near_a, near_b, "",
     ), "short below-grade drain stays 3-D underground"
+    # 1759: MCC outside a compact load cluster — dest-only AABB ≤16 m, src∪dest >16 m.
+    mcc = (-10000.0, 0.0, 7000.0)
+    loads = [(0.0, 0.0, 500.0), (5000.0, 0.0, 500.0), (8000.0, 2000.0, 500.0)]
+    assert _points_plan_span_mm(loads) <= WIRE_TRAY_MAX_SPAN_MM, "fixture: dests alone compact"
+    assert _should_demote_plant_spanning_cable_fanout(mcc, loads), (
+        "MCC src∪dest fan-out must demote (Codema 1759 u_wire_trunk class)"
+    )
+    assert not _should_demote_plant_spanning_cable_fanout(
+        (0.0, 0.0, 7000.0), [(1000.0, 0.0, 500.0), (2000.0, 500.0, 500.0)],
+    ), "compact marshalled tray must stay 3-D"
+    # Trunk dog-leg backstop: AABB of endpoints OK, built polyline spans > limit.
+    short_src, short_dsts = (0.0, 0.0, 7000.0), [(5000.0, 5000.0, 500.0)]
+    dogleg = [(0.0, 0.0, 7000.0), (20000.0, 0.0, 7000.0), (20000.0, 5000.0, 7000.0),
+              (5000.0, 5000.0, 500.0)]
+    assert not _should_demote_plant_spanning_cable_fanout(short_src, short_dsts), (
+        "fixture: endpoints alone under limit"
+    )
+    assert _should_demote_plant_spanning_cable_fanout(short_src, short_dsts, dogleg), (
+        "Manhattan trunk dog-leg must demote when polyline span > limit"
+    )
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
@@ -10484,25 +10530,22 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             #    P&ID (mirrors the electrical_bus + sub-threshold-cable logical rule below). Demote
             #    the whole fan-out to logical; COMPACT fan-outs (a real marshalled rack) stay 3-D.
             #    The connection is NOT lost — it stays on the ledger / schedule / single-line.
-            if _is_cable(service):
-                _dxs = [r["dst_xyz"][0] for r in grp]
-                _dys = [r["dst_xyz"][1] for r in grp]
-                _tray_span = max(max(_dxs) - min(_dxs), max(_dys) - min(_dys))
-                if _tray_span > WIRE_TRAY_MAX_SPAN_MM:
-                    # Demoted from 3-D (the v44 stray fat beam) but NOT from the maths:
-                    # each circuit still gets its own full board→load routed length so
-                    # the panel schedule's ΔU% computes (a cable in a tray runs the
-                    # whole way from the board — no trunk/N cost-share here).
-                    for r in grp:
-                        _record_logical(r, "plant-spanning cable fan-out → single-line/"
-                                           "P&ID, not a 3-D tray (length still routed)")
-                    print(f"[univ][wire]   PLANT-SPANNING {frm} → {len(grp)}× {service}: dest span "
-                          f"{_tray_span * fl.MM:.1f} m > {WIRE_TRAY_MAX_SPAN_MM * fl.MM:.0f} m "
-                          f"→ single-line/P&ID (no 3-D tray beam; lengths routed logically)")
-                    continue
             # ── SHARED TRAY: one trunk from the (single) source port → spurs to each dest.
             src_xyz = grp[0]["src_xyz"]      # same source port for the whole group
             dests = [r["dst_xyz"] for r in grp]
+            # PLANT-SPANNING CABLE FAN-OUT — src∪dests plan AABB (Codema 1759: dest-only
+            # missed an MCC outside a compact load cluster). Universal geometry.
+            if _is_cable(service) and _should_demote_plant_spanning_cable_fanout(
+                    src_xyz, dests):
+                _tray_span = _points_plan_span_mm([src_xyz, *dests])
+                for r in grp:
+                    _record_logical(r, "plant-spanning cable fan-out → single-line/"
+                                       "P&ID, not a 3-D tray (length still routed)")
+                print(f"[univ][wire]   PLANT-SPANNING {frm} → {len(grp)}× {service}: "
+                      f"src∪dest span {_tray_span * fl.MM:.1f} m > "
+                      f"{WIRE_TRAY_MAX_SPAN_MM * fl.MM:.0f} m "
+                      f"→ single-line/P&ID (no 3-D tray beam; lengths routed logically)")
+                continue
             try:
                 trunk, spurs = _tray_paths(src_xyz, dests, service,
                                            overhead_base_z=overhead_base_z)
@@ -10511,6 +10554,18 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                       f"({ex}); falling back to per-edge runs")
                 grp_fallback = True
             else:
+                # Backstop: Manhattan trunk dog-leg can exceed the limit when AABB is tight.
+                if _is_cable(service) and _should_demote_plant_spanning_cable_fanout(
+                        src_xyz, dests, trunk):
+                    _trunk_span = _points_plan_span_mm(trunk)
+                    for r in grp:
+                        _record_logical(r, "plant-spanning cable trunk → single-line/"
+                                           "P&ID, not a 3-D tray (length still routed)")
+                    print(f"[univ][wire]   PLANT-SPANNING {frm} → {len(grp)}× {service}: "
+                          f"trunk plan span {_trunk_span * fl.MM:.1f} m > "
+                          f"{WIRE_TRAY_MAX_SPAN_MM * fl.MM:.0f} m "
+                          f"→ single-line/P&ID (no 3-D tray beam; lengths routed logically)")
+                    continue
                 grp_fallback = False
                 trunk_len_m = _polyline_len_m(trunk)
                 # LENGTH RULE: each edge is charged its OWN spur + an equal share of the

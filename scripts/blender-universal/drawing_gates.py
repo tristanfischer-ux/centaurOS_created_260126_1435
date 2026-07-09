@@ -796,6 +796,9 @@ def _selftest() -> int:
     chk("beam_surfaced_long_fires",
         max(w[2] for w in _surfaced) >= 0
         and not (_span(_surfaced) <= STRAY_BEAM_MAX_SPAN_MM))
+    # Codema 1759: MCC power trunk polyline 20.2 m (dest AABB alone was ≤16 m).
+    _mcc_trunk = [[-10410, 5416, 7340], [9825, 4866, 7340]]
+    chk("beam_mcc_trunk_fires", not (_span(_mcc_trunk) <= STRAY_BEAM_MAX_SPAN_MM))
     # G7 site utilisation proveCatch: the v52 stranded-corner deck (hull 476 / deck 1466
     # = 0.33, measured) FIRES; a compacted plant (hull 476 / deck 900 = 0.53) passes; the
     # severity mapping marks a sub-0.30 ratio HIGH (the deck is 3×+ the plant).
