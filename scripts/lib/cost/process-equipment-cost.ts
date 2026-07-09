@@ -394,6 +394,8 @@ export function costMaterialTakeoff(spec: TakeoffSpec): { gbp: number; basis: Co
       rfq_recommended: false,
       notes: `Fabricated ${spec.shape.replace('_', ' ')} re-costed from its shell mass: material + fabrication. ±30% (AACE Class 4).`,
       working,
+      // T-14 / G5: every CostBasis must state how to verify the figure.
+      how_to_verify: 'Recompute: qty × rate from the basis formula',
     },
   }
 }
@@ -418,6 +420,8 @@ export function catalogueBasis(gbp: number, source: { vendor?: string; url?: str
     confidence: 'high',
     rfq_recommended: false,
     notes: source.mpn ? `Catalogue price for ${source.vendor ?? ''} ${source.mpn}`.trim() : undefined,
+    // T-14 / G5: catalogue lines verify against the manufacturer / distributor listing.
+    how_to_verify: 'Check MPN on manufacturer datasheet / distributor listing',
   }
 }
 

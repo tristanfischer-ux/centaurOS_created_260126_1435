@@ -1219,6 +1219,65 @@ export interface DemandCoverageOpts {
  *  'demand-coverage' provenance. NEVER overwrites an existing quantity; NEVER fabricates
  *  where no engineering basis exists (the honest-UNVERIFIED path stays red). Returns the
  *  mints (empty = byte-identical no-op). */
+
+/**
+ * T-18 — mint a design-decision row when N+1 backup counts exist.
+ *
+ * @description If any quantity key matching `/_backup_count$/` has value ≥ 1, push
+ *   `RULE_N_PLUS_1_STANDBY` onto `contract.design_decisions` so Excel's design-decisions
+ *   register explains intentional standby redundancy (Sam Green / Exec J28: "why is it
+ *   providing double capacity?"). Idempotent — never duplicates the same id.
+ * @param quantities Flat numeric quantity map (post rule-9 backup mint).
+ * @param contract Optional contract sink; when absent this is a pure no-op.
+ * @returns true when a new decision was pushed (or one already existed).
+ */
+export function mintNPlus1StandbyDesignDecision(
+  quantities: Record<string, number>,
+  contract?: ContractInProgress,
+): boolean {
+  if (!contract) return false
+  const backupKeys = Object.keys(quantities).filter((k) => {
+    if (!/_backup_count$/.test(k)) return false
+    const v = quantities[k]
+    return Number.isFinite(v) && v >= 1
+  })
+  if (backupKeys.length === 0) return false
+  const loose = contract as ContractInProgress & {
+    design_decisions?: Array<Record<string, unknown>>
+    designDecisions?: Array<Record<string, unknown>>
+  }
+  const sink: Array<Record<string, unknown>> =
+    loose.design_decisions ?? loose.designDecisions ?? (loose.design_decisions = [])
+  if (!loose.design_decisions) loose.design_decisions = sink
+  if (sink.some((d) => String(d?.id ?? '') === 'RULE_N_PLUS_1_STANDBY')) return true
+  const stems = backupKeys.map((k) => k.replace(/_backup_count$/, '').replace(/_/g, ' '))
+  const totalBackup = backupKeys.reduce((s, k) => s + Math.round(quantities[k]), 0)
+  sink.push({
+    id: 'RULE_N_PLUS_1_STANDBY',
+    module: 'mass_fluid_transport_process',
+    sub_module_id: 'distribution',
+    word_id: backupKeys[0],
+    word_name: stems[0] || 'backup pump',
+    kind: 'n_plus_1_redundancy',
+    conflicting_values: backupKeys.map((k) => `${k}=${quantities[k]}`),
+    explanation:
+      `N+1 standby redundancy is intentional: ${totalBackup} labelled BACKUP / STANDBY ` +
+      `unit(s) (${stems.join('; ')}) mirror the duty movers so a single zone failure does ` +
+      `not halt continuous process delivery. This is NOT unexplained double capacity.`,
+    why_it_matters:
+      'Without this decision on the register, a reviewer reading duty+backup totals as ' +
+      '"double the required capacity" will reject the design as oversizing. The real ' +
+      'Codema P&ID labels each pump unit with a backup pump for the same reason.',
+    recommendation:
+      'Keep the BACKUP / STANDBY units; treat them as N+1 standby (RULE_N_PLUS_1_STANDBY), ' +
+      'not as additional continuous duty. Confirm fail-over philosophy with the client.',
+    recommended_value: 'N+1 standby (intentional redundancy)',
+    generated_by: 'universal-contract-sizing:mintNPlus1StandbyDesignDecision',
+    generated_at: 'deterministic',
+  })
+  return true
+}
+
 export function mintDemandCoverage(
   quantities: Record<string, number>,
   contract?: ContractInProgress,
@@ -2099,6 +2158,13 @@ export function mintDemandCoverage(
       }
     }
   }
+  // ── T-18: N+1 STANDBY as an explicit DESIGN DECISION (Sam Green / Exec J28) ──────────
+  // INTENT: when any `*_backup_count` ≥ 1 exists (minted above OR hand-authored by a class
+  // builder), surface a design-decision row so the Excel register explains the apparent
+  // "double capacity" as intentional N+1 redundancy — never unexplained oversizing.
+  // DECISION: write onto `contract.design_decisions` (loose array the chain merges into
+  // state.designDecisions). Idempotent — never duplicates RULE_N_PLUS_1_STANDBY.
+  mintNPlus1StandbyDesignDecision(quantities, contract)
   // ── rule 10: PLANT-ROOM CLEAR HEIGHT (Sam J6 — "graphics can't be used for construction —
   // not enough details or dimensions"; plant rooms exist as walled Elec/Mech partitions but
   // the finished ceiling / clear height was never stated). UNIVERSAL: when the design already

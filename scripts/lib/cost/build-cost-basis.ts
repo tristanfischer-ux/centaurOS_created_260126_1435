@@ -151,19 +151,22 @@ function disclosureBasis(pv: any): CostBasis {
   const src = String(pv?.price_estimate_source ?? pv?.engine_b_estimate_source ?? '').toLowerCase()
   const corpus = /corpus|engine_c|rag|library/.test(src) || pv?.engine_c_ref_median_gbp != null
 
-  let method: CostMethod, estimate_class: CostBasis['estimate_class'], confidence: CostBasis['confidence'], note: string
+  let method: CostMethod, estimate_class: CostBasis['estimate_class'], confidence: CostBasis['confidence'], note: string, how_to_verify: string
   if (hasDistributor) {
     method = 'catalogue'; estimate_class = 2; confidence = 'high'
     note = `Live distributor price${pv?.source_url ? '' : ''}.`
+    how_to_verify = "Check MPN on manufacturer datasheet / distributor listing"
   } else if (corpus) {
     method = 'class_reference'; estimate_class = 4; confidence = 'moderate'
     const band = pv?.engine_c_ref_median_gbp != null
       ? ` Engine reference median £${Math.round(Number(pv.engine_c_ref_median_gbp)).toLocaleString('en-GB')} (n=${pv?.engine_c_ref_count ?? '?'}).`
       : ''
     note = `Indicative estimate from the engine's component-class reference curve.${band} Confirm by quote.`
+    how_to_verify = "Recompute: qty × rate from basis formula"
   } else {
     method = 'llm_estimate'; estimate_class = 5; confidence = 'low'
     note = 'Indicative list-price estimate with no sized basis — treat as order-of-magnitude; confirm by quote.'
+    how_to_verify = "Obtain written supplier quote — this line is not catalogue-grounded"
   }
   // the engine's own reference curve flagged this price as an outlier → lower confidence, never "high"
   const ecFlag = String(pv?.engine_c_flag ?? '').toLowerCase()
@@ -173,12 +176,17 @@ function disclosureBasis(pv: any): CostBasis {
     note += ` Engine reference flags this price ${ecFlag}${ratio} — verify.`
     if (estimate_class < 4) estimate_class = 4
   }
+  
+  if (!enginePrice || Math.round(enginePrice) === 0) {
+    how_to_verify = "Obtain quote / pin a real MPN"
+  }
+  
   const inputs: never[] = []
   const correlation = hasDistributor && pv?.source_url ? { ref: pv?.manufacturer ?? 'distributor', url: pv.source_url, locator: pv?.part_number } : undefined
   return {
     method, inputs, factors: [], correlation,
-    result_gbp: Math.round(enginePrice), estimate_class, confidence,
-    rfq_recommended: !hasDistributor, notes: note,
+    result_gbp: Math.round(enginePrice || 0), estimate_class, confidence,
+    rfq_recommended: !hasDistributor, notes: note, how_to_verify
   }
 }
 
@@ -290,6 +298,18 @@ export function buildCostBasis(state: any): CostBasisReport {
   const statement = (takeoff + curve + cat) > 0
     ? `${takeoff} fabricated vessel${takeoff === 1 ? '' : 's'}/column${takeoff === 1 ? '' : 's'} re-costed by material take-off (mass × £/kg + fabrication factor, AACE Class 4 ±30%); ${curve} lines from published equipment cost curves (DOE/NETL-2002/1169); ${cat} catalogue/quote lines; ${disc} indicative engine estimates disclosed with their confidence. ${rfq} lines flagged for vendor RFQ.`
     : `Every line is disclosed with its engine pricing method and confidence (indicative) — no fabricated process equipment was detected to re-cost for class "${klass}".`
+
+  // T-14 / G5: every returned CostBasis MUST carry a non-empty how_to_verify so the
+  // Excel Confidence column can always surface a verification path (Sam Green SME).
+  for (const line of lines) {
+    const how = String(line.basis?.how_to_verify ?? '').trim()
+    if (!how) {
+      line.basis.how_to_verify =
+        line.cost_gbp > 0
+          ? 'Obtain supplier quote / recompute from basis'
+          : 'Obtain quote / pin a real MPN'
+    }
+  }
 
   return {
     class: klass,

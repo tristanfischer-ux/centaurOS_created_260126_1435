@@ -261,17 +261,20 @@ def _run_case(label, state_path, sched_candidates):
     _check(phases <= {"Gas", "Liquid", "Steam", "2-phase", "Slurry", "Condensate"},
            f"{label}: unexpected phase value(s) {phases}")
 
-    # ── (7) document furniture — title block + scope note, light-mode ─────────
-    _check("PROCESS SCHEDULES" in md and "LINE LIST" in md and "VALVE LIST" in md
+    # ── (7) document furniture — working-schematic title + scope note, light-mode ─
+    # T-09: sheet title must read as the canonical working schematic deliverable.
+    _check("Working Schematic" in md and "LINE LIST" in md and "VALVE LIST" in md
            and "INSTRUMENT INDEX" in md,
-           f"{label}: markdown missing one of the three schedule sections")
+           f"{label}: markdown missing Working Schematic title or a schedule section")
+    _check("pipe runs" in md.lower() and "dn" in md.lower(),
+           f"{label}: markdown must mention pipe runs / DN (working-schematic subtitle)")
     _check("not for construction" in md.lower() and "as-modelled" in md.lower(),
            f"{label}: markdown scope note 'not for construction · as-modelled' missing")
     svg = Path(summary["svg"]).read_text()
     _check(svg.lstrip().startswith("<svg"), f"{label}: SVG output malformed")
     _check('fill="#ffffff"' in svg, f"{label}: SVG is not light-mode (white page)")
-    _check("PROCESS SCHEDULES" in svg and "DRAWING No." in svg,
-           f"{label}: SVG title block missing")
+    _check("Working Schematic" in svg and "DRAWING No." in svg,
+           f"{label}: SVG title block missing Working Schematic title")
     _check("not for construction" in svg.lower(),
            f"{label}: SVG scope note missing")
     _check("ISO 2768-mK" in svg and "ISO 2768-mK" in md,
@@ -368,37 +371,190 @@ def _run_pump_duty_and_psv_set():
                         v.set_or_cv),
                f"PSV-set: {v.tag} set string malformed: {v.set_or_cv!r}")
 
-    # proveCatch the OTHER direction: an unrelated valve family (no host-pump cid,
-    # not a PSV) is UNCHANGED — it still falls to the pre-existing honest '—' when
-    # nothing else resolves it. This fix must never touch a different valve family.
-    untouched = [v for v in valve_rows
-                if v.vtype in ("Solenoid shut-off", "Actuated isolation") and v.size == "—"]
-    _check(untouched,
-           "pump-duty: a non-pump-family valve with no resolvable line must still "
-           "show the pre-existing honest '—' (this fix must not touch unrelated "
-           "valve families)")
+    # proveNoFalsePositive the OTHER direction: an unrelated valve family (Solenoid /
+    # Actuated — no host-pump cid) must NEVER carry the pump-duty derivation string.
+    # It may resolve a real line DN (honest) or fall to '—' — either is fine; the
+    # pump-duty fix must not smear "derived from host pump duty" onto them.
+    unrelated = [v for v in valve_rows
+                 if v.vtype in ("Solenoid shut-off", "Actuated isolation")]
+    _check(unrelated,
+           "pump-duty: expected ≥1 Solenoid/Actuated valve in the v74 valve list")
+    smeared = [v for v in unrelated if "derived from host pump duty" in (v.size or "")]
+    _check(not smeared,
+           "pump-duty: a non-pump-family valve must NOT carry 'derived from host "
+           f"pump duty' (got {[v.tag + ':' + v.size for v in smeared]})")
     print(f"  PASS  ({len(derived)} valve size(s) derived from host-pump duty; "
           f"{len(no_flow)} honest no-flow flag(s); {len(derived_set)} PSV set(s) "
-          f"derived from vessel design pressure; {len(untouched)} unrelated "
-          f"valve(s) correctly untouched)")
+          f"derived from vessel design pressure; {len(unrelated)} unrelated "
+          f"valve(s) correctly unsmeared)")
+
+
+def _run_t09_synthetic_dn_and_valve_tags():
+    """T-09 proveCatch — Working Schematic content fidelity (Sam Green 2026-07-09).
+
+    Given a synthetic route-manifest (≥2 lines with DN) + a valve schedule with tags,
+    the generated schedule markdown/SVG MUST include those DN strings and valve tags.
+    Also asserts the Working Schematic title is present (first-class deliverable).
+    Pure stdlib — no out/ corpus dependency.
+    """
+    import json
+    print("\n=== T-09 synthetic DN + valve tags (working schematic) ===")
+    state = {
+        "parsedBrief": {"product_class": "water_treatment"},
+        "moduleDecomposition": {
+            "product_class": "water_treatment",
+            "modules": [{
+                "module": "mass_fluid_transport_process",
+                "sub_modules": [{
+                    "sub_module": "valves",
+                    "words": [
+                        {
+                            "id": "isolation_valve_word",
+                            "name_human": "Suction Isolation Valve",
+                            "content_character": {
+                                "character_id": "isolation_valve",
+                                "name_human": "Suction Isolation Valve",
+                            },
+                            "modifier_characters": [
+                                {"kind": "quantity", "value": "×1"},
+                                {"kind": "form", "value": "manual isolation ball valve"},
+                            ],
+                        },
+                        {
+                            "id": "relief_valve_word",
+                            "name_human": "Pressure Relief Valve",
+                            "content_character": {
+                                "character_id": "pressure_relief_valve",
+                                "name_human": "Pressure Relief Valve",
+                            },
+                            "modifier_characters": [
+                                {"kind": "quantity", "value": "×1"},
+                                {"kind": "form", "value": "spring-loaded PSV"},
+                            ],
+                        },
+                    ],
+                }],
+            }],
+        },
+        "orchestratorContract": {
+            "product_class": "water_treatment",
+            "topology": [
+                {
+                    "from_part": "fresh_water_tank",
+                    "to_part": "fertigation_dosing_pump",
+                    "mechanism": "fluid_loop",
+                    "constraint_kind": "flow_capacity",
+                    "required_value": 90,
+                },
+                {
+                    "from_part": "fertigation_dosing_pump",
+                    "to_part": "distribution_manifold",
+                    "mechanism": "fluid_loop",
+                    "constraint_kind": "flow_capacity",
+                    "required_value": 90,
+                },
+            ],
+        },
+        "engineeringContract": {
+            "product_class": "water_treatment",
+            "topology": [],
+            "quantities": {},
+        },
+    }
+    # connection-schedule.json shape the line list joins on (specs[].from_part/to_part
+    # + size_label; rows[].from/to + size) — same as out/*/connection-schedule.json.
+    schedule = {
+        "specs": [
+            {
+                "from_part": "Fresh Water Tank",
+                "to_part": "Fertigation Dosing Pump",
+                "size_label": "DN150",
+                "mechanism": "fluid_loop",
+                "carried_rating": 90,
+                "carried_unit": "m3/h",
+                "phase": "liquid",
+                "length_m": 12.0,
+            },
+            {
+                "from_part": "Fertigation Dosing Pump",
+                "to_part": "Distribution Manifold",
+                "size_label": "DN100",
+                "mechanism": "fluid_loop",
+                "carried_rating": 90,
+                "carried_unit": "m3/h",
+                "phase": "liquid",
+                "length_m": 8.0,
+            },
+            # Also key by topology slug (some archetypes write raw keys).
+            {
+                "from_part": "fresh_water_tank",
+                "to_part": "fertigation_dosing_pump",
+                "size_label": "DN150",
+                "mechanism": "fluid_loop",
+            },
+            {
+                "from_part": "fertigation_dosing_pump",
+                "to_part": "distribution_manifold",
+                "size_label": "DN100",
+                "mechanism": "fluid_loop",
+            },
+        ],
+        "rows": [
+            {
+                "from": "Fresh Water Tank",
+                "to": "Fertigation Dosing Pump",
+                "size": "DN150",
+                "rating": "90 m3/h",
+                "length_m": 12.0,
+            },
+            {
+                "from": "Fertigation Dosing Pump",
+                "to": "Distribution Manifold",
+                "size": "DN100",
+                "rating": "90 m3/h",
+                "length_m": 8.0,
+            },
+        ],
+    }
+    work = tempfile.mkdtemp(prefix="procsched-t09-")
+    state_path = Path(work) / "state.json"
+    state_path.write_text(json.dumps(state))
+    (Path(work) / "connection-schedule.json").write_text(json.dumps(schedule))
+    summary, sc, md = PS.generate_process_schedules(work, str(state_path), rasterise_png=False)
+    svg = Path(summary["svg"]).read_text()
+    blob = md + "\n" + svg
+    _check("Working Schematic" in blob,
+           "T-09: generated content must carry Working Schematic title")
+    _check("DN150" in blob or "DN150" in "".join(r.dn for r in sc.lines),
+           f"T-09: expected DN150 in schedule content (lines={[r.dn for r in sc.lines]})")
+    _check("DN100" in blob or "DN100" in "".join(r.dn for r in sc.lines),
+           f"T-09: expected DN100 in schedule content (lines={[r.dn for r in sc.lines]})")
+    # Valve tags from the BoM words must appear (HV-/PSV- family).
+    vtags = [v.tag for v in sc.valves]
+    _check(len(vtags) >= 1, f"T-09: expected ≥1 valve tag from synthetic BoM, got {vtags}")
+    for t in vtags:
+        _check(t in blob, f"T-09: valve tag {t!r} missing from generated schedule content")
+    print(f"  PASS  (Working Schematic title; DN150+DN100 present; valve tags {vtags})")
 
 
 def main():
     missing = [str(s) for _l, s, _d in CASES if not Path(s).is_file()]
-    if missing:
-        print("[proc-sched-test] SKIP — state.json not found:\n  " + "\n  ".join(missing))
-        return 0
     try:
-        for label, state_path, sched in CASES:
-            _run_case(label, state_path, sched)
-        _run_schedule_less()
-        _run_pump_duty_and_psv_set()
+        # T-09 synthetic proveCatch always runs (no corpus dependency).
+        _run_t09_synthetic_dn_and_valve_tags()
+        if missing:
+            print("[proc-sched-test] SKIP corpus cases — state.json not found:\n  "
+                  + "\n  ".join(missing))
+        else:
+            for label, state_path, sched in CASES:
+                _run_case(label, state_path, sched)
+            _run_schedule_less()
+            _run_pump_duty_and_psv_set()
     except Fail as ex:
         print(f"\n[proc-sched-test] FAIL: {ex}")
         return 1
-    print("\n[proc-sched-test] ALL PASS — both archetypes project real process schedules "
-          "that cross-reference the P&ID line-for-line (line numbers identical · equipment "
-          "tags identical · valve/instrument counts match the state).")
+    print("\n[proc-sched-test] ALL PASS — Working Schematic (T-09) + process schedules "
+          "cross-reference the P&ID line-for-line where corpus states are present.")
     return 0
 
 

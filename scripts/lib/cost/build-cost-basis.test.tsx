@@ -83,11 +83,19 @@ ok('methodology statement present', typeof r.methodology.statement === 'string' 
 ok('take-off lines counted (absorber + primary gypsum reactor + secondary lime reactor = 3 here; stripper word absent in this fixture)',
   r.methodology.takeoff_lines === 3, `takeoff_lines=${r.methodology.takeoff_lines}`)
 ok('every line carries a basis with a method + estimate_class', r.lines.every(l => l.basis && l.basis.method && l.basis.estimate_class >= 1))
+// T-14 / G5: every CostBasis must carry a non-empty how_to_verify (Sam Green SME).
+ok('T-14: every line has non-empty how_to_verify',
+  r.lines.every(l => typeof l.basis.how_to_verify === 'string' && l.basis.how_to_verify.trim().length > 0),
+  JSON.stringify(r.lines.filter(l => !l.basis.how_to_verify?.trim()).map(l => l.word_id)))
+ok('T-14: catalogue pump keeps datasheet verify path',
+  /datasheet|distributor|MPN/i.test(pump.basis.how_to_verify ?? ''))
 
 // an unmapped class → universal disclosure only (no curve lines), never throws
 const other = buildCostBasis({ parsedBrief: { product_class: 'widget_press' },
   partVerifications: [{ word_id: 'frame_word', word_name: 'frame', price_estimate_gbp: 5000 }] })
 ok('unmapped class → all disclosure, no curve lines', other.methodology.curve_lines === 0 && other.lines.length === 1 && !other.lines[0].defensible)
+ok('T-14: unmapped disclosure line still has how_to_verify',
+  typeof other.lines[0].basis.how_to_verify === 'string' && other.lines[0].basis.how_to_verify.trim().length > 0)
 ok('empty / missing partVerifications → no throw, empty lines', buildCostBasis({}).lines.length === 0)
 
 console.log(`\n${pass} passed, ${fail} failed`)

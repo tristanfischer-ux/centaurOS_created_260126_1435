@@ -596,6 +596,12 @@ export function evaluateFilterOnDirtyStreamInvariant(
 // this; capped at items.length passes for guaranteed termination.
 const RECOVERY_SOLIDS_FILTER_RE =
   /\b(cloth[\s-]?filter|paperbelt|paper[\s-]?belt|drum[\s-]?filter|microscreen)\b/i
+// T-04: Sam also flagged disinfection on the clean side ("filters and disinfection
+// should be after drain pits"). Relocate UV / chlorination / ozonation the same way
+// as recovery solids filters — still NEVER bare "filter" (GAC / particle / cartridge
+// makeup pretreatment must stay on the clean train — proveNoFalsePositive).
+const DIRTY_SIDE_TREATMENT_RE =
+  /\b(cloth[\s-]?filter|paperbelt|paper[\s-]?belt|drum[\s-]?filter|microscreen|disinfect(?:ion|ing)?|\buv\b|chlorinat(?:e|ion|ing)?|ozonat(?:e|ion|ing)?)\b/i
 
 function repositionFiltersOntoRecoverySide(
   items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }>,
@@ -607,7 +613,7 @@ function repositionFiltersOntoRecoverySide(
     for (let i = 1; i < items.length; i++) {
       const it = items[i]
       if (it === recoveryItem || RECOVERY_BUFFER_RE.test(it.name)) continue // never relocate a recovery buffer itself
-      if (!RECOVERY_SOLIDS_FILTER_RE.test(it.name)) continue // makeup GAC/particle/cartridge stay put
+      if (!DIRTY_SIDE_TREATMENT_RE.test(it.name)) continue // makeup GAC/particle/cartridge stay put
       if (POLISH_EXEMPT_RE.test(it.name)) continue // explicit final-polish/point-of-use stage — legitimate on clean water
       if (!CLEAN_SOURCE_RE.test(items[i - 1].name)) continue // fed by a genuinely dirty/mid-process stream — untouched
       misplaced.push(it)
@@ -625,13 +631,14 @@ function repositionFiltersOntoRecoverySide(
 /**
  * INTENT: Hand-authored `contract.topology` arrays skip `deriveProcessTopology`, so the
  * item-spine reorder above never runs — drawings still show RO→cloth. Apply the SAME
- * recovery-solids-filter rule to an already-built edge list (slug or display names).
- * DECISION: Rebuild the fluid spine order from edges, relocate, rewrite fluid edges;
- * signal/electrical edges are preserved untouched.
- * @description Mutates `topology` in place when a recovery solids filter sits immediately
- *   downstream of a clean source and a recovery buffer exists elsewhere on the fluid spine.
+ * dirty-side treatment rule to an already-built edge list (slug or display names).
+ * DECISION: (1) Rebuild the fluid spine order from edges, relocate, rewrite fluid edges;
+ * (2) T-04 harder pass — also catch BRANCHED edges where CLEAN→treatment is a direct
+ * edge even when linear spine adjacency missed it. Signal/electrical edges preserved.
+ * @description Mutates `topology` in place when a recovery solids filter / disinfection
+ *   stage sits immediately downstream of a clean source and a recovery buffer exists.
  * @param topology Process-flow edges (from_part / to_part / mechanism).
- * @returns Number of recovery solids-filter nodes relocated (0 = no-op).
+ * @returns Number of dirty-side treatment nodes relocated (0 = no-op).
  */
 export function repositionFiltersOnTopologyEdges(
   topology: Array<Record<string, unknown>>,
@@ -660,14 +667,26 @@ export function repositionFiltersOnTopologyEdges(
   let relocated = 0
   for (let pass = 0; pass < order.length; pass++) {
     const misplaced: string[] = []
+    // Spine-adjacency pass (original).
     for (let i = 1; i < order.length; i++) {
       const node = order[i]
       const prev = order[i - 1]
       if (node === recoveryKey) continue
-      if (!RECOVERY_SOLIDS_FILTER_RE.test(_normaliseSlugForMatch(node))) continue
+      if (!DIRTY_SIDE_TREATMENT_RE.test(_normaliseSlugForMatch(node))) continue
       if (POLISH_EXEMPT_RE.test(_normaliseSlugForMatch(node))) continue
       if (!CLEAN_SOURCE_RE.test(_normaliseSlugForMatch(prev))) continue
-      misplaced.push(node)
+      if (!misplaced.includes(node)) misplaced.push(node)
+    }
+    // T-04 harder: direct CLEAN→treatment edges (branched graphs where linear order
+    // does not place the treatment immediately after the clean source in `order`).
+    for (const e of fluid) {
+      const from = String(e.from_part ?? '')
+      const to = String(e.to_part ?? '')
+      if (!to || to === recoveryKey) continue
+      if (!DIRTY_SIDE_TREATMENT_RE.test(_normaliseSlugForMatch(to))) continue
+      if (POLISH_EXEMPT_RE.test(_normaliseSlugForMatch(to))) continue
+      if (!CLEAN_SOURCE_RE.test(_normaliseSlugForMatch(from))) continue
+      if (!misplaced.includes(to)) misplaced.push(to)
     }
     if (misplaced.length === 0) break
     for (const node of misplaced) {
@@ -1431,6 +1450,42 @@ function _selftest() {
   }
   if (!handAuthored.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'cloth_filter')) {
     throw new Error(`filter-reorder-on-edges proveCatch FAILED: expected cloth after drain sump, got ${JSON.stringify(handAuthored)}`)
+  }
+
+  // T-04 proveCatch — BRANCHED residual: RO→cloth is a side edge while the linear
+  // spine walks RO→cleanwater→sump. Direct-edge scan must still relocate cloth onto
+  // recovery. (Do NOT put GAC after RO here — makeup GAC is a separate train and the
+  // invariant's broad TREATMENT_UNIT_OP_RE would still flag it; this fixture isolates
+  // the branched-cloth residual.)
+  const branched: Array<Record<string, unknown>> = [
+    { from_part: 'reverse_osmosis_skid', to_part: 'cleanwater_reservoir', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'cleanwater_reservoir', to_part: 'drain_collection_sump', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'reverse_osmosis_skid', to_part: 'cloth_filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'cloth_filter', to_part: 'fresh_water_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const nBranch = repositionFiltersOnTopologyEdges(branched)
+  if (nBranch < 1) throw new Error('T-04 branched proveCatch FAILED: expected ≥1 relocation when RO→cloth is a side branch')
+  if (branched.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cloth_filter')) {
+    throw new Error(`T-04 branched proveCatch FAILED: RO→cloth side-branch still present, got ${JSON.stringify(branched)}`)
+  }
+  if (!branched.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'cloth_filter')) {
+    throw new Error(`T-04 branched proveCatch FAILED: expected cloth after drain sump, got ${JSON.stringify(branched)}`)
+  }
+  const branchVerdict = evaluateFilterOnDirtyStreamInvariant(branched)
+  if (branchVerdict.violations.some((v) => /cloth/i.test(v.filter))) {
+    throw new Error(`T-04 branched proveCatch FAILED: cloth violation must clear after harder reposition, got ${JSON.stringify(branchVerdict.violations)}`)
+  }
+
+  // T-04 proveCatch — UV disinfection on RO permeate relocates to recovery side.
+  const uvOnClean: Array<Record<string, unknown>> = [
+    { from_part: 'reverse_osmosis_skid', to_part: 'uv_disinfection', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'uv_disinfection', to_part: 'drain_collection_sump', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'drain_collection_sump', to_part: 'fresh_water_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const nUv = repositionFiltersOnTopologyEdges(uvOnClean)
+  if (nUv < 1) throw new Error('T-04 UV proveCatch FAILED: expected UV disinfection relocated off RO permeate')
+  if (uvOnClean.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'uv_disinfection')) {
+    throw new Error(`T-04 UV proveCatch FAILED: RO→uv still present, got ${JSON.stringify(uvOnClean)}`)
   }
 
   // (b) proveNoFalsePositive #1 — a legitimate MID-PROCESS filter in a DIFFERENT (non-water)

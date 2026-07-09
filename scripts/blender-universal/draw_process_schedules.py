@@ -1470,8 +1470,11 @@ _SCOPE_NOTE = ("Scope: as-modelled major process lines, valves and instruments, 
 def render_markdown(sc: Schedules) -> str:
     arch = PID._humanise(sc.archetype)
     out = []
-    out.append(f"# PROCESS SCHEDULES — {arch}\n")
-    out.append("> Fractional Forge · ForgeOS — line list · valve list · instrument index. "
+    # T-09 (Sam Green): process schedules ARE the working schematic — pipe runs, DN,
+    # valve locations. Title must say so so the sheet is findable as a first-class deliverable.
+    out.append(f"# Working Schematic — Line / Valve / Instrument Schedules — {arch}\n")
+    out.append("> Fractional Forge · ForgeOS — working schematic (pipe runs, DN, valve "
+               "locations) · line list · valve list · instrument index. "
                "Auto-generated; cross-referenced line-for-line to the P&ID "
                f"(`{sc.pid_sheet}`). Not for construction · as-modelled.\n")
     out.append(f"> {_tb.TOLERANCE_NOTE}\n")
@@ -1757,10 +1760,11 @@ def build_table_svg(sc: Schedules) -> str:
     svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
 
     svg.text(_MARGIN, 46, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
-    svg.text(_MARGIN, 70, f"PROCESS SCHEDULES — {arch}", size=18, weight="bold",
-             fill=HEAD_INK)
+    # T-09: canonical working-schematic title (pipe runs / DN / valve locations).
+    svg.text(_MARGIN, 70, f"Working Schematic — Line / Valve / Instrument Schedules — {arch}",
+             size=16, weight="bold", fill=HEAD_INK)
     svg.text(width - _MARGIN, 70,
-             f"Line list · Valve list · Instrument index  ·  P&ID {sc.pid_sheet}"
+             f"pipe runs · DN · valve locations  ·  P&ID {sc.pid_sheet}"
              + (f"  ·  {n_cols}-column fold" if n_cols > 1 else ""),
              size=9.5, anchor="end", fill=MUTED)
     svg.line(_MARGIN, 80, width - _MARGIN, 80, stroke=GRID_FAINT, width=1.0)
@@ -1800,11 +1804,12 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules):
         svg.text(bx0 + 6, ry + 9, k, size=7.5, fill=MUTED, weight="bold")
         svg.text(bx0 + 108, ry + 9, v, size=7.8)
     svg.text(30, y0 + 16, "FRACTIONAL FORGE · ForgeOS", size=10, weight="bold")
-    svg.text(30, y0 + 32, f"PROCESS SCHEDULES — {archetype}", size=12, weight="bold",
-             fill=HEAD_INK)
+    svg.text(30, y0 + 32,
+             f"Working Schematic — Line / Valve / Instrument Schedules — {archetype}",
+             size=11, weight="bold", fill=HEAD_INK)
     svg.text(30, y0 + 47,
-             "Scope: line list · valve list · instrument index, projected from the process "
-             "topology + connection schedule. Cross-referenced to the P&ID. "
+             "Scope: working schematic — pipe runs, DN, valve locations (line / valve / "
+             "instrument schedules). Cross-referenced to the P&ID. "
              "Not for construction · as-modelled.", size=8.2, fill=MUTED)
     # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
     svg.text(30, y0 + 60, _tb.TOLERANCE_NOTE, size=8.2, fill=MUTED)

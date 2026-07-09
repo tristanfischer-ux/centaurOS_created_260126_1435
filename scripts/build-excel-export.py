@@ -6615,6 +6615,54 @@ def _key_input_disclosure(method: str) -> str:
     return "engineering estimate (no itemised inputs)"
 
 
+def _confidence_with_verify(
+    row: dict,
+    cbasis: Optional[dict] = None,
+    *,
+    method: str = "",
+    conf: str = "",
+    line_gbp: float = 0.0,
+) -> str:
+    """T-14 / G5 (Sam Green): build the Confidence cell with a how_to_verify trail.
+
+    INTENT: every priced BoM line must state HOW TO VERIFY the figure — datasheet,
+    recompute from the basis formula, or obtain a written quote. When how_to_verify
+    is missing on both the cost-basis and the row, inject a method-aware fallback
+    (never leave a priced line without a verify path).
+
+    @param row requirementsBom / costed row (may carry how_to_verify / connection / status).
+    @param cbasis joined cost-basis dict (may carry how_to_verify / confidence / method).
+    @param method cost method string (catalogue / parametric / …).
+    @param conf existing confidence text (may be empty).
+    @param line_gbp rendered line total — priced lines (line_gbp > 0) always get a fallback.
+    @returns Confidence cell text, possibly with " · verify: …" appended.
+    """
+    _cbasis = cbasis or {}
+    _how = (_cbasis.get("how_to_verify") or row.get("how_to_verify") or "").strip()
+    _method = method or _cbasis.get("method") or ""
+    _conf = conf or _cbasis.get("confidence", "") or row.get("confidence", "") or ""
+    _line = float(line_gbp or 0)
+    if not _how:
+        if row.get("connection"):
+            _how = "Recompute: length_m × £/m install rate from the cost basis"
+        elif _method in ("catalogue", "distributor"):
+            _how = "Check MPN on manufacturer datasheet / distributor listing"
+        elif _method in ("parametric", "class_reference", "capacity_factored", "material_takeoff"):
+            _how = "Recompute: qty × rate from the basis formula"
+        elif str(row.get("status", "")).upper() in ("NOT FOUND", "TBD"):
+            _how = "Obtain quote / pin a real MPN"
+        elif _line > 0:
+            # T-14: priced line with no how_to_verify — never leave Confidence blank of verify.
+            _how = "Obtain supplier quote / recompute from basis"
+        else:
+            _how = "Obtain written supplier quote — this line is not catalogue-grounded"
+    if _conf and _how and _how not in str(_conf):
+        return f"{_conf} · verify: {_how}"
+    if not _conf and _how:
+        return f"verify: {_how}"
+    return str(_conf) if _conf else ""
+
+
 def _fmt_cost_items(items) -> str:
     """Render a cost-basis inputs/factors list (each a {name,value,unit} dict) as clean
     'name: value unit; …' text instead of a raw Python dict dump in the Ledger."""
@@ -6914,21 +6962,6 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         # cell (the '39 connection lines missing Est class/Confidence' MED).
         _eclass = _cbasis.get("estimate_class", "") or row.get("estimate_class", "")
         _conf = _cbasis.get("confidence", "") or row.get("confidence", "")
-        # G5 (Sam): every priced line states HOW TO VERIFY the figure — datasheet, recompute
-        # from the basis formula, or obtain a written quote. Surfaced in the Confidence cell
-        # so Est-class / Confidence stay the single verifiability surface (no column shift).
-        _how = (_cbasis.get("how_to_verify") or row.get("how_to_verify") or "").strip()
-        if not _how:
-            if row.get("connection"):
-                _how = "Recompute: length_m × £/m install rate from the cost basis"
-            elif _method in ("catalogue", "distributor"):
-                _how = "Check MPN on manufacturer datasheet / distributor listing"
-            elif _method in ("parametric", "class_reference", "capacity_factored", "material_takeoff"):
-                _how = "Recompute: qty × rate from the basis formula"
-            elif not _line_num or str(row.get("status", "")).upper() in ("NOT FOUND", "TBD"):
-                _how = "Obtain quote / pin a real MPN"
-            else:
-                _how = "Obtain written supplier quote — this line is not catalogue-grounded"
         if row.get("connection"):
             _eclass = _eclass or 3
             _conf = _conf or "moderate — deterministic take-off (routed length × rate)"
@@ -6942,10 +6975,11 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             # a PRINCIPAL with no decomposable input is a direct ESTIMATE — DISCLOSE that honestly
             # (method in F + factor in H carry the rest) rather than leave a mystery-blank cell.
             _g = _key_input_disclosure(_method)
-        if _conf and _how and _how not in str(_conf):
-            _conf = f"{_conf} · verify: {_how}"
-        elif not _conf and _how:
-            _conf = f"verify: {_how}"
+        # G5 / T-14 (Sam): every priced line states HOW TO VERIFY — see _confidence_with_verify.
+        _conf = _confidence_with_verify(
+            row, _cbasis, method=_method or "", conf=_conf or "",
+            line_gbp=float(_line_num or 0),
+        )
         if _method or _g or _h or _eclass or _conf:
             ws.cell(r, 6, clean_cell(_method)).border = BORDER
             ic = ws.cell(r, 7, clean_cell(_g))
@@ -22168,6 +22202,35 @@ def _selftest() -> int:
     if _duty_weighted_load_factor({}) is not None:
         print("  FAIL duty-cycle proveNoFalsePositive: an empty quantities dict must "
               "return None"); bad += 1
+    # ═══ proveCatch T-14 / G5 how_to_verify on Confidence cell (Sam Green) ═══
+    # (a) priced line WITHOUT how_to_verify → fallback injected into Confidence.
+    _t14_row = {
+        "requirement": "Generic circulation pump",
+        "line_gbp": 4200,
+        "status": "OK",
+        "qty": 1,
+    }
+    _t14_conf = _confidence_with_verify(_t14_row, {}, method="", conf="", line_gbp=4200)
+    if "verify:" not in _t14_conf.lower() and "obtain supplier quote" not in _t14_conf.lower():
+        print(f"  FAIL T-14 proveCatch: priced line missing how_to_verify must inject "
+              f"fallback into Confidence, got {_t14_conf!r}"); bad += 1
+    if not re.search(r"obtain supplier quote|recompute from basis", _t14_conf, re.I):
+        print(f"  FAIL T-14 proveCatch: expected 'Obtain supplier quote / recompute from "
+              f"basis' (or equivalent) fallback, got {_t14_conf!r}"); bad += 1
+    # (b) proveNoFalsePositive: catalogue-grounded line WITH how_to_verify keeps its text.
+    _t14_keep = "Check MPN on manufacturer datasheet / distributor listing — Grundfos CRNE"
+    _t14_cat = _confidence_with_verify(
+        {"requirement": "MEA circulation pump", "line_gbp": 4000,
+         "how_to_verify": _t14_keep},
+        {"method": "catalogue", "confidence": "high", "how_to_verify": _t14_keep},
+        method="catalogue", conf="high", line_gbp=4000,
+    )
+    if _t14_keep not in _t14_cat:
+        print(f"  FAIL T-14 proveNoFalsePositive: catalogue how_to_verify must be preserved, "
+              f"got {_t14_cat!r}"); bad += 1
+    if "Obtain supplier quote / recompute from basis" in _t14_cat:
+        print(f"  FAIL T-14 proveNoFalsePositive: must NOT overwrite a specific verify "
+              f"string with the generic fallback, got {_t14_cat!r}"); bad += 1
     # ═══ proveCatch T-11/T-12 recirculation makeup + container=tray notes ═══
     _mk_st = {
         "orchestratorContract": {

@@ -1,12 +1,18 @@
 // proveCatch for T-22 / T-13 — Pump Unit skids + N+1 BACKUP/STANDBY labels.
+// T-18 — N+1 standby as an explicit design-decision row (RULE_N_PLUS_1_STANDBY).
 //
 // THE BUG: rule 9 minted backup_count quantities but synthWord titled them
 // "Fertigation Dosing Pump Backup" without a clear BACKUP/STANDBY label or
 // Pump Unit parent tag — P&ID showed scattered P-xxx, not skid assemblies.
 // THE RULE: when backup is minted, name_human / display name carries BACKUP/STANDBY
 // and fertigation/irrigation movers get a Pump Unit N parent tag.
+// T-18: contract.design_decisions must also carry RULE_N_PLUS_1_STANDBY language so
+// Excel's design-decisions register explains the apparent "double capacity".
 
-import { applyUniversalContractSizing } from './universal-contract-sizing'
+import {
+  applyUniversalContractSizing,
+  mintNPlus1StandbyDesignDecision,
+} from './universal-contract-sizing'
 
 type Word = {
   name_human?: string
@@ -100,9 +106,46 @@ function run(): void {
     )
   }
 
+  // T-18 proveCatch: fertigation_dosing_pump_backup_count=2 → design_decisions carries
+  // RULE_N_PLUS_1_STANDBY / N+1 / standby language (Excel register sink).
+  const t18Contract = {
+    product_class: 'water_treatment',
+    quantities: {
+      fertigation_dosing_pump_backup_count: { value: 2, unit: '' },
+    },
+    design_decisions: [] as Array<Record<string, unknown>>,
+  }
+  const t18Flat: Record<string, number> = { fertigation_dosing_pump_backup_count: 2 }
+  const minted = mintNPlus1StandbyDesignDecision(t18Flat, t18Contract as never)
+  if (!minted) {
+    throw new Error('T-18 proveCatch: mintNPlus1StandbyDesignDecision must return true for backup_count=2')
+  }
+  const decisions = t18Contract.design_decisions
+  const nPlus1 = decisions.find((d) => String(d.id) === 'RULE_N_PLUS_1_STANDBY')
+  if (!nPlus1) {
+    throw new Error(`T-18 proveCatch: expected RULE_N_PLUS_1_STANDBY in design_decisions, got ${JSON.stringify(decisions)}`)
+  }
+  const blob = JSON.stringify(nPlus1)
+  if (!/N\+1|standby|RULE_N_PLUS_1/i.test(blob)) {
+    throw new Error(`T-18 proveCatch: decision must mention N+1 / standby / RULE language, got ${blob}`)
+  }
+  // Idempotent: second call must not duplicate.
+  mintNPlus1StandbyDesignDecision(t18Flat, t18Contract as never)
+  if (t18Contract.design_decisions.filter((d) => d.id === 'RULE_N_PLUS_1_STANDBY').length !== 1) {
+    throw new Error('T-18 proveCatch: RULE_N_PLUS_1_STANDBY must be idempotent (exactly one row)')
+  }
+  // Also via applyUniversalContractSizing (rule 9 mint path → decision).
+  const decisionsFromApply = (contract as { design_decisions?: Array<Record<string, unknown>> })
+    .design_decisions
+  if (!decisionsFromApply?.some((d) => String(d.id) === 'RULE_N_PLUS_1_STANDBY')) {
+    throw new Error(
+      `T-18 proveCatch (apply path): expected RULE_N_PLUS_1_STANDBY after backup mint, got ${JSON.stringify(decisionsFromApply)}`,
+    )
+  }
+
   // eslint-disable-next-line no-console
   console.log(
-    `pump-unit-skid --selftest OK (backup_count=${backupCount}; BACKUP/STANDBY labelled; Pump Unit tag present; single RO untouched)`,
+    `pump-unit-skid --selftest OK (backup_count=${backupCount}; BACKUP/STANDBY labelled; Pump Unit tag present; single RO untouched; T-18 RULE_N_PLUS_1_STANDBY)`,
   )
 }
 

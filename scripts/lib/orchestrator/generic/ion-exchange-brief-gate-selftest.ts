@@ -14,6 +14,7 @@ import {
   reconcilePrincipalEquipment,
   stripUnstatedSoftenerQuantities,
 } from './universal-contract-sizing'
+import { buildContract } from '../../engineering-contract'
 
 function names(modules: any): string[] {
   const out: string[] = []
@@ -212,10 +213,41 @@ function run(): void {
     throw new Error(`ion-exchange-brief-gate Codema reconcile: softener must be kept (got ${JSON.stringify(names(m5))})`)
   }
 
+  // T-19 proveCatch — water_treatment contract builder omits softener_vessel_* when
+  // brief is silent; Codema softener brief still emits them.
+  const roOnlyContract = buildContract('water_treatment', {
+    original_text: roOnlyBrief,
+    product_description: 'RO makeup plant',
+  })
+  if (!roOnlyContract) throw new Error('T-19: buildContract(water_treatment) must return a contract')
+  const roQ = roOnlyContract.quantities as Record<string, unknown>
+  if ('softener_vessel_count' in roQ || 'softener_vessel_volume_each_m3' in roQ) {
+    throw new Error(
+      `T-19 proveCatch: RO-only brief must OMIT softener_vessel_* keys entirely, got keys=${Object.keys(roQ).filter((k) => /softener/i.test(k)).join(',')}`,
+    )
+  }
+  if (!('gac_filter_vessel_volume_m3' in roQ) || !('reverse_osmosis_skid_count' in roQ)) {
+    throw new Error('T-19 proveCatch: GAC + RO quantities must still be emitted on RO-only brief')
+  }
+  const codemaContract = buildContract('water_treatment', {
+    original_text: codemaBrief,
+    product_description: 'Codema fertigation water plant',
+  })
+  if (!codemaContract) throw new Error('T-19: Codema buildContract must return a contract')
+  const cQ = codemaContract.quantities as Record<string, { value?: number }>
+  if (cQ.softener_vessel_count?.value !== 2) {
+    throw new Error(
+      `T-19 proveNoFalsePositive: Codema softener brief must emit softener_vessel_count=2, got ${JSON.stringify(cQ.softener_vessel_count)}`,
+    )
+  }
+  if (cQ.softener_vessel_volume_each_m3?.value == null) {
+    throw new Error('T-19 proveNoFalsePositive: Codema brief must emit softener_vessel_volume_each_m3')
+  }
+
   // eslint-disable-next-line no-console
   console.log(
     'ion-exchange-brief-gate --selftest OK ' +
-      '(RO-only drops softener + strips qty; GAC survives; Codema duplex softener kept; empty brief no-op; reconcile wired)',
+      '(RO-only drops softener + strips qty; GAC survives; Codema duplex softener kept; empty brief no-op; reconcile wired; T-19 builder omits softener_vessel_* when silent)',
   )
 }
 

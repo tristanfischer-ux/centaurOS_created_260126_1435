@@ -7254,6 +7254,28 @@ async function main() {
         building_resynthesised: rec.buildingResynthesised,
         details: rec.details.slice(0, 20),
       })
+      // T-18: merge N+1 standby design decisions minted onto the reconcile contract
+      // into state.designDecisions (Excel register reads state.designDecisions at L16755).
+      try {
+        const mintedDecisions = ((reconcileContract as any).design_decisions
+          ?? (reconcileContract as any).designDecisions
+          ?? []) as DesignDecision[]
+        let nMerged = 0
+        for (const d of mintedDecisions) {
+          if (!d?.id) continue
+          if (designDecisions.some((x) => x.id === d.id)) continue
+          designDecisions.push(d)
+          nMerged++
+        }
+        if (nMerged > 0) {
+          ;(state as any).designDecisions = designDecisions
+          writeFileSync(resolve(outDir, '10-design-decisions.json'), JSON.stringify(designDecisions, null, 2))
+          console.error(`[chain] T-18 N+1 design decisions: merged ${nMerged} rule-minted decision(s) into register`)
+          logAction({ step: 'n_plus_1_design_decisions_merge', merged: nMerged })
+        }
+      } catch (mergeErr) {
+        console.error(`[chain] T-18 design-decision merge failed (non-fatal): ${(mergeErr as Error).message}`)
+      }
     }
   } catch (err) {
     console.error(`[chain] principal-equipment reconcile failed (non-fatal): ${(err as Error).message}`)
@@ -7377,30 +7399,55 @@ async function main() {
     // prior-state topology that skipped re-derive because haveOrchTopo) never enters that
     // path — drawings still show RO→cloth. Apply the same recovery-solids-filter rule to
     // the settled edge list BEFORE the shadow invariant audits it, so P&ID/BFD reshape.
+    // T-04: if the invariant is STILL high after the first pass, run a second harder
+    // reposition pass (residual cascade / branched edges). Shadow unless FILTER_ON_DIRTY_ENFORCING.
     if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
-      const { repositionFiltersOnTopologyEdges } = await import('./lib/orchestrator/generic/derive-topology')
+      const {
+        repositionFiltersOnTopologyEdges,
+        evaluateFilterOnDirtyStreamInvariant,
+      } = await import('./lib/orchestrator/generic/derive-topology')
       const nReloc = repositionFiltersOnTopologyEdges(orch.topology as Array<Record<string, unknown>>)
       if (nReloc > 0) {
         console.error(`[chain] filter-on-dirty-stream REORDER: relocated ${nReloc} recovery solids-filter node(s) onto the dirty/recovered side of the settled topology → P&ID + BFD`)
         logAction({ step: 'filter_on_dirty_stream_reorder', relocated: nReloc })
       }
-    }
-    // FILTER-ON-DIRTY-STREAM INVARIANT (Sam Green SME review, 2026-07-07 — "RO water feeds
-    // into cloth filter which doesn't make sense as it's clean already"). Wired here
-    // (after the topology is fully settled — derived + signal edges + flow-demand join +
-    // edge reorder above) so it runs on EVERY design. SHADOW (flags + records, never
-    // blocks) — the physical reorder now runs above; residual HIGH findings are punchlisted.
-    if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
-      const { evaluateFilterOnDirtyStreamInvariant } = await import('./lib/orchestrator/generic/derive-topology')
-      const filterVerdict = evaluateFilterOnDirtyStreamInvariant(orch.topology)
-      ;(state as any).filterOnDirtyStreamCheck = filterVerdict
+      let filterVerdict = evaluateFilterOnDirtyStreamInvariant(orch.topology)
+      let secondPassReloc = 0
+      // T-04: second harder pass when residual HIGH remains after the first reorder.
+      if (filterVerdict.verdict === 'high') {
+        secondPassReloc = repositionFiltersOnTopologyEdges(orch.topology as Array<Record<string, unknown>>)
+        if (secondPassReloc > 0) {
+          console.error(`[chain] filter-on-dirty-stream REORDER pass-2: relocated ${secondPassReloc} residual recovery solids-filter node(s)`)
+          logAction({ step: 'filter_on_dirty_stream_reorder_pass2', relocated: secondPassReloc })
+        }
+        filterVerdict = evaluateFilterOnDirtyStreamInvariant(orch.topology)
+      }
+      ;(state as any).filterOnDirtyStreamCheck = {
+        ...filterVerdict,
+        reorder_pass1: nReloc,
+        reorder_pass2: secondPassReloc,
+        residual_after_second_pass: filterVerdict.verdict === 'high',
+      }
       if (filterVerdict.verdict === 'high') {
         const lines = filterVerdict.violations.map((v) =>
           `- "${v.filter}" sits immediately downstream of "${v.upstream}" (an already-clean/RO-permeate stream) — move it to the dirty/recovered side, or name it an explicit final-polish stage if that is genuinely intended.`)
-        const punchlist = `# Filter-on-dirty-stream punchlist\n\n${lines.join('\n')}\n`
+        const punchlist = `# Filter-on-dirty-stream punchlist\n\n${lines.join('\n')}\n\n` +
+          `_T-04: second reorder pass ran (relocated ${secondPassReloc}); residual HIGH kept as shadow punchlist ` +
+          `(set FILTER_ON_DIRTY_ENFORCING=1 to hard-block)._\n`
         writeFileSync(resolve(outDir, 'filter-on-dirty-stream-punchlist.md'), punchlist)
-        console.error(`[chain] FILTER-ON-DIRTY-STREAM invariant: HIGH — ${filterVerdict.violations.length} treatment unit-op(s) placed on an already-clean stream. See filter-on-dirty-stream-punchlist.md`)
-        logAction({ step: 'filter_on_dirty_stream_invariant', verdict: filterVerdict.verdict, violations: filterVerdict.violations.length })
+        console.error(`[chain] FILTER-ON-DIRTY-STREAM invariant: HIGH — ${filterVerdict.violations.length} treatment unit-op(s) still on a clean stream after 2 reorder passes. See filter-on-dirty-stream-punchlist.md`)
+        logAction({
+          step: 'filter_on_dirty_stream_invariant',
+          verdict: filterVerdict.verdict,
+          violations: filterVerdict.violations.length,
+          residual_after_second_pass: true,
+        })
+        // Shadow by default; opt-in hard block via FILTER_ON_DIRTY_ENFORCING.
+        const enforce = /^(1|true|on|yes)$/i.test(String(process.env.FILTER_ON_DIRTY_ENFORCING ?? ''))
+        if (enforce) {
+          console.error('[chain] FILTER_ON_DIRTY_ENFORCING=1 — exiting on residual filter-on-dirty HIGH')
+          process.exit(35)
+        }
       } else {
         console.error(`[chain] filter-on-dirty-stream invariant: ${filterVerdict.verdict}`)
         logAction({ step: 'filter_on_dirty_stream_invariant', verdict: filterVerdict.verdict, violations: filterVerdict.violations.length })

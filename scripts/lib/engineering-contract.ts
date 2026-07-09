@@ -13851,6 +13851,10 @@ registerArchetype('aquaculture_ras', (brief: any) => {
 // Defaults = the real Codema reference plant (so a missed regex still yields the right design).
 registerArchetype('water_treatment', (brief: any) => {
   const desc = String(`${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`).trim()
+  // T-19: same vocabulary as dropUnstatedIonExchangeStages — only emit softener_vessel_*
+  // when the brief names softener / ion-exchange / resin. Silent RO-only briefs omit those
+  // keys entirely so reconcile cannot re-mint Softener Vessel. Codema names softener → keep.
+  const briefNamesSoftener = /\bsoften|\bion[\s-]?exchange|\bresin\b|\bdeioni|\bdemineral/i.test(desc)
   // Pull the first plausible number near a keyword; fall back to the Codema reference value.
   const pick = (re: RegExp, def: number): number => {
     const m = desc.match(re)
@@ -14046,8 +14050,11 @@ registerArchetype('water_treatment', (brief: any) => {
     ro_high_pressure_pump_power_kw: q(4.2, 'kW', 'power', 'rated', 'module', 'brief', 'RO high-pressure pump motor (frequency-controlled; 4.2 kW consumption within the RO skid 5.5 kW installed)'),
     ro_high_pressure_pump_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one frequency-controlled RO high-pressure pump'),
     gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)', ['gac_softener_throughput_m3_h']),
-    softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
-    softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
+    // T-19: softener_vessel_* only when brief names softener/ion-exchange/resin (see briefNamesSoftener).
+    ...(briefNamesSoftener ? {
+      softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
+      softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
+    } : {}),
     fresh_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', `fresh-water / cleanwater galvanised reservoir (${storageTankVolEachM3} m³, Codema 5.46 m dia × 3.88 m)`),
     fresh_water_tank_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one fresh-water / cleanwater storage reservoir'),
     drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', `drain-water galvanised storage reservoir (${storageTankVolEachM3} m³) for reuse`),
@@ -14195,17 +14202,25 @@ registerArchetype('water_treatment', (brief: any) => {
     total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'alias of connected_electrical_load_kw (ONE-MINT running load)', ['connected_electrical_load_kw']),
   }
 
+  const pretreatLabel = briefNamesSoftener
+    ? `${treatmentThroughputM3H} m³/h softener/GAC pre-treatment capacity`
+    : `${treatmentThroughputM3H} m³/h GAC pre-treatment capacity`
   const closures: any[] = [{
     invariant_id: 'ro_feed_balance_closes',
     status: 'pass',
     measured: Math.round((roPermeateM3H / (roRecoveryPct / 100)) * 10) / 10,
-    required: `RO feed ≈ permeate ÷ recovery = ${roPermeateM3H} ÷ ${roRecoveryPct / 100} ≈ ${Math.round((roPermeateM3H / (roRecoveryPct / 100)) * 10) / 10} m³/h (within the ${treatmentThroughputM3H} m³/h softener/GAC pre-treatment capacity)`,
-    reason: 'reverse-osmosis mass balance: feed = permeate ÷ recovery; the softener + GAC are sized above this feed rate.',
+    required: `RO feed ≈ permeate ÷ recovery = ${roPermeateM3H} ÷ ${roRecoveryPct / 100} ≈ ${Math.round((roPermeateM3H / (roRecoveryPct / 100)) * 10) / 10} m³/h (within the ${pretreatLabel})`,
+    reason: briefNamesSoftener
+      ? 'reverse-osmosis mass balance: feed = permeate ÷ recovery; the softener + GAC are sized above this feed rate.'
+      : 'reverse-osmosis mass balance: feed = permeate ÷ recovery; the GAC is sized above this feed rate (no softener — brief never named ion-exchange).',
   }]
 
+  const softenerTrainClause = briefNamesSoftener
+    ? ` → 14 m³/h duplex softener`
+    : ''
   return {
     product_class: 'water_treatment',
-    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery (MAKEUP for loop losses — not full circulation), with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation trays/containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L underground drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC, building fabric / polytunnel shell and cultivation rack framework are OUT of scope (supplied by others). Underground drain-pit excavation and buried drain laterals are IN scope.`,
+    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter${softenerTrainClause} → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery (MAKEUP for loop losses — not full circulation), with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation trays/containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L underground drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC, building fabric / polytunnel shell and cultivation rack framework are OUT of scope (supplied by others). Underground drain-pit excavation and buried drain laterals are IN scope.`,
     quantities,
     // Empty: generic deriveProcessTopology fills orch.topology after reconcile (P&ID/BFD).
     topology: [],

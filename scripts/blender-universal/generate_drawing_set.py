@@ -61,7 +61,7 @@ SYSTEM_DRAWINGS = [
 ]
 SCHEDULE_DRAWINGS = [
     ("process-schedules", "draw_process_schedules.py", "process-schedules.png",
-     "Process Schedules — line / valve / instrument"),
+     "Working Schematic — Line / Valve / Instrument Schedules (pipe runs, DN, valve locations)"),
     ("panel-schedule", "draw_panel_schedule.py", "panel-schedule.png",
      "Panel / Load Schedule"),
     # Isometric drawings REMOVED from the dossier (Tristan 2026-06-28: "get rid of the isometric

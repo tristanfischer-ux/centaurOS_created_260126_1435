@@ -59,10 +59,12 @@ run "ooxml_strict_check.py --selftest"       "$PY" scripts/lib/ooxml_strict_chec
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
 run "draw_pid.py --selftest (T-23/T-03)"      "$PY" scripts/blender-universal/draw_pid.py --selftest
+run "draw_process_schedules_test (T-09)"      "$PY" scripts/blender-universal/draw_process_schedules_test.py
 run "draw_single_line.py --selftest"          "$PY" scripts/blender-universal/draw_single_line.py --selftest
 run "draw_hvac.py --selftest (T-10)"          "$PY" scripts/blender-universal/draw_hvac.py --selftest
 run "test_derive_flows.py"                    "$PY" scripts/blender-universal/test_derive_flows.py
 run "process-equipment-cost --selftest (T-16)" npx tsx scripts/lib/cost/process-equipment-cost.ts --selftest
+run "build-cost-basis.test (T-14 how_to_verify)" npx tsx scripts/lib/cost/build-cost-basis.test.tsx
 run "draw_ga.py --selftest (T-27)"            "$PY" scripts/blender-universal/draw_ga.py --selftest
 run "draw_distribution_interface --selftest"  "$PY" scripts/blender-universal/draw_distribution_interface.py --selftest
 run "draw_facility_layout --selftest"         "$PY" scripts/blender-universal/draw_facility_layout.py --selftest
