@@ -80,14 +80,19 @@ const DELIVERY_APPLICATION_RE = /fertigation|irrigation|hand.?watering|\bwaterin
 const ROLE_PATTERNS: Array<[RegExp, number]> = [
   [DELIVERY_APPLICATION_RE, 9], // delivery-application override (see 1)
   [/feed|inlet|supply|make.?up|charge|intake|receiv|raw[ _-]?water/i, 0],
-  [/pre.?heat|preheater|guard.?bed|drier|dryer|conditioning|blend|mixer|saturat|soften|dechlor|antiscal|dosing/i, 1],
+  // INTENT (T-04/T-05, Sam Green): makeup pretreatment (GAC / activated-carbon / particle /
+  // cartridge / softener / dechlor) MUST sit UPSTREAM of RO/UF — never after permeate.
+  // TRIED: leaving `\bgac\b|carbon` in rank-4 with mid-plant separators → spine ordered
+  // RO → gac_filter (punchlist: "gac_filter downstream of ro_membrane_elements").
+  [/pre.?heat|preheater|guard.?bed|drier|dryer|conditioning|blend|mixer|saturat|soften|dechlor|antiscal|dosing|\bgac\b|activated[\s-]?carbon|carbon[\s-]?filter|particle[\s-]?filter|cartridge[\s-]?filter|sediment[\s-]?filter/i, 1],
   [/micro.?filtrat|\bmf\b/i, 2.1],                                      // membrane fineness (see 2)
   [/ultra.?filtrat|\buf\b/i, 2.2],
   [/nano.?filtrat/i, 2.3],
   [/reverse.?osmosis|\bro\b|\bedi\b|deioni/i, 2.4],
   [/reactor|synthesis|absorber|contactor|carbonat|crystallis|crystalliz|converter|reformer|electrolys|membrane/i, 2],
   [/steam.?generator|waste.?heat|boiler|economiser|economizer|reboiler|quench/i, 3],
-  [/separator|flash|knock.?out|ko.?drum|\bdrum\b|decanter|coalesc|demister|filter|stripper|clarifier|\bgac\b|carbon|degass|sediment|cartridge/i, 4],
+  // Mid-plant separators only — makeup GAC/carbon/cartridge moved to rank 1 above.
+  [/separator|flash|knock.?out|ko.?drum|\bdrum\b|decanter|coalesc|demister|filter|stripper|clarifier|degass/i, 4],
   [/recycle|\breturn\b|tail.?gas|\bloop\b|recompress|recirc/i, 5],
   [/oxidis|oxidiz|flare|incinerat|\bvent\b|purge|abatement|effluent|disposal|\bwaste\b|\bdrain\b|\bsump\b|reject|concentrate|\bbrine\b|blowdown|backwash/i, 6],
   [/fractionat|distillat|hydrocrack|hydrotreat|isomeris|isomeriz|refin|upgrad|rectif|\bcolumn\b/i, 7],
@@ -378,27 +383,44 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // condensate) — deliberately NARROWER than rank-6's disposal vocabulary (waste/
   // reject/brine/concentrate/blowdown), which is the PURGE the design-basis memo
   // says must NEVER be looped back (that is what stops salt/pathogen
-  // accumulation). When found, close the loop back to the spine HEAD
-  // (items[0]) — the same universal target the aquaculture_ras hand-authored
-  // loop already uses (`recirc_pumps -> rearing_tanks`, engineering-contract.ts).
-  // Keyed on generic stream vocabulary only — no class name — so it fires for
-  // water (Codema drainwater), condensate, glycol/coolant return, or any future
-  // archetype whose synthesised equipment includes a recovery buffer, and stays
-  // silent (untouched, no regression) for a genuinely once-through archetype
-  // (DAC, single-pass cooling, stoichiometric reactants consumed to completion).
+  // accumulation).
+  // DECISION (2026-07-09): re-entry target is NOT blindly items[0]. After GAC/
+  // particle/softener moved to rank-1 (makeup pretreatment UPSTREAM of RO), the
+  // spine head is often a GAC filter — looping recovered drainwater INTO the GAC
+  // is wrong (proveNoFalsePositive makeupGacStays). Prefer a CLEAN STORAGE /
+  // DELIVERY node (fresh/cleanwater tank, irrigation/fertigation pump); fall back
+  // to items[0] only when no such node exists. Never re-enter at makeup
+  // pretreatment or at the recovery buffer itself.
+  // Keyed on generic stream vocabulary only — no class name.
   const recoveryItem = [...items].reverse().find((it) => RECOVERY_BUFFER_RE.test(it.name))
-  if (recoveryItem && recoveryItem.slug !== items[0].slug) {
-    const recircCtx =
-      'recirculation return loop — recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)'
-    edges.push({
-      from_part: recoveryItem.slug,
-      to_part: items[0].slug,
-      mechanism: 'fluid_loop',
-      constraint_kind: 'flow_capacity',
-      material_context: recircCtx,
-      stream_role: 'recovered', // T-01: recirculation closure is always recovered
-      _recirculation_loop: true,
-    } as TopologyEdge)
+  if (recoveryItem) {
+    const CLEAN_REENTRY_RE =
+      /\b(fresh[\s-]?water|clean[\s-]?water|cleanwater|treated[\s-]?water|product[\s-]?water|potable)\b.{0,40}\b(tank|reservoir|storage|cistern|buffer)\b|\b(tank|reservoir|storage|cistern|buffer)\b.{0,40}\b(fresh[\s-]?water|clean[\s-]?water|cleanwater|treated[\s-]?water|product[\s-]?water|potable)\b|\b(irrigation|fertigation|distribution|delivery|hand[\s-]?water)\b.{0,30}\b(pump|manifold|header)\b/i
+    const reentry =
+      items.find((it) => it.slug !== recoveryItem.slug
+        && !MAKEUP_PRETREATMENT_EXEMPT_RE.test(it.name)
+        && !RECOVERY_BUFFER_RE.test(it.name)
+        && CLEAN_REENTRY_RE.test(it.name))
+      ?? items.find((it) => it.slug !== recoveryItem.slug
+        && !MAKEUP_PRETREATMENT_EXEMPT_RE.test(it.name)
+        && !RECOVERY_BUFFER_RE.test(it.name)
+        && DELIVERY_APPLICATION_RE.test(it.name))
+      ?? items.find((it) => it.slug !== recoveryItem.slug
+        && !MAKEUP_PRETREATMENT_EXEMPT_RE.test(it.name)
+        && !RECOVERY_BUFFER_RE.test(it.name))
+    if (reentry && reentry.slug !== recoveryItem.slug) {
+      const recircCtx =
+        'recirculation return loop — recovered stream re-enters clean storage / delivery (design-basis: recovery closes the cycle; purge/disposal streams are never looped back; makeup pretreatment is not the re-entry)'
+      edges.push({
+        from_part: recoveryItem.slug,
+        to_part: reentry.slug,
+        mechanism: 'fluid_loop',
+        constraint_kind: 'flow_capacity',
+        material_context: recircCtx,
+        stream_role: 'recovered', // T-01: recirculation closure is always recovered
+        _recirculation_loop: true,
+      } as TopologyEdge)
+    }
   }
 
   return edges
@@ -509,6 +531,12 @@ const TREATMENT_UNIT_OP_RE =
   /\b(filter|cloth[\s-]?filter|paperbelt|paper[\s-]?belt|disinfect(?:ion|ing)?|\buv\b|chlorinat(?:e|ion|ing)?|ozonat(?:e|ion|ing)?|strain(?:er)?)\b/i
 const POLISH_EXEMPT_RE =
   /\b(polish(?:ing)?|final[\s-]?(?:stage|treatment|polish)|point[\s-]?of[\s-]?use|\bpou\b|pre[\s-]?(?:use|delivery|distribution|dispatch|bottling))\b/i
+// INTENT: Makeup pretreatment (GAC / activated carbon / particle / cartridge / softener)
+// is NOT a dirty-stream recovery filter — it belongs on the clean makeup train UPSTREAM of
+// RO. Bare `filter` in TREATMENT_UNIT_OP_RE would otherwise flag `gac_filter` after RO as
+// HIGH even when the correct fix is spine order (rank 1), not dirty-side relocation.
+const MAKEUP_PRETREATMENT_EXEMPT_RE =
+  /\b(gac|activated[\s-]?carbon|carbon[\s-]?filter|particle[\s-]?filter|cartridge[\s-]?filter|sediment[\s-]?filter|softener|ion[\s-]?exchange|dechlor|antiscal)\b/i
 const CLEAN_SOURCE_RE =
   /\b(permeate|clean\s?water|cleanwater|treated\s?water|product\s?water|potable|purified|fresh\s?water|reverse[\s-]?osmosis|\bro\b|\buf\b|deioni[sz]ed?|\bedi\b)\b/i
 
@@ -556,6 +584,7 @@ export function evaluateFilterOnDirtyStreamInvariant(
     if (!TREATMENT_UNIT_OP_RE.test(toN)) continue
     anyTreatmentNode = true
     if (POLISH_EXEMPT_RE.test(toN)) continue // an explicit final-polish / point-of-use stage — legitimate on clean water
+    if (MAKEUP_PRETREATMENT_EXEMPT_RE.test(toN)) continue // GAC/particle/softener = makeup train, not recovery filter
     if (RECOVERY_BUFFER_RE.test(fromN)) continue // a genuinely dirty/recovered source — the filter's correct role
     if (CLEAN_SOURCE_RE.test(fromN)) {
       violations.push({
@@ -1132,6 +1161,11 @@ function _selftest() {
   //     RO HP pump discharged backwards into the UF bank via the alphabetical tie-break)
   if (!(idx('uf_membrane_bank') < idx('ro_high_pressure_pump')) || !(idx('uf_module_bank') < idx('ro_high_pressure_pump'))) {
     throw new Error(`derive-topology: UF must be UPSTREAM of the RO HP pump (got order ${order.join(' → ')})`)
+  }
+  // (2b) T-04/T-05: makeup GAC pretreatment MUST sit UPSTREAM of RO (never after permeate).
+  // Pre-fix: rank-4 `\bgac\b` put gac_filter after reverse_osmosis_skid → punchlist HIGH.
+  if (!(idx('gac_filter') < idx('reverse_osmosis_skid'))) {
+    throw new Error(`derive-topology: GAC makeup pretreatment must be UPSTREAM of RO (got order ${order.join(' → ')})`)
   }
   // (3) a stage's MOVER discharges INTO the stage units it drives: the RO HP pump feeds the
   //     RO membranes (role-based sub-order, not alphabetical)

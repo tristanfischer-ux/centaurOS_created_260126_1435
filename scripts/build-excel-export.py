@@ -17798,6 +17798,17 @@ def _drawing_register_rows(run_dir: str) -> List[dict]:
         pdfs = [f"drawings/{p}" for p in (man.get("pdfs") or [])]
         gkey = _GATE_KEY_FOR_BASE.get(base)
         gentry = gates.get(gkey) if gkey else None
+        # Normalise failing_gates to list[str] gate names — drawing_gates.py emits
+        # list[dict] ({gate,severity,stage,detail}); legacy fixtures used list[str].
+        _raw_fail = gentry.get("failing_gates") if isinstance(gentry, dict) else None
+        _fail_names: Optional[List[str]] = None
+        if isinstance(_raw_fail, list):
+            _fail_names = []
+            for _gf in _raw_fail:
+                if isinstance(_gf, dict):
+                    _fail_names.append(str(_gf.get("gate") or _gf.get("name") or "gate"))
+                elif _gf:
+                    _fail_names.append(str(_gf))
         rows.append({
             "base": base,
             "svg": svg_name,
@@ -17814,7 +17825,7 @@ def _drawing_register_rows(run_dir: str) -> List[dict]:
                         if not os.path.exists(os.path.join(run_dir, p))],
             "tab": tab,
             "gates_pass": gentry.get("pass") if isinstance(gentry, dict) else None,
-            "gates_failing": gentry.get("failing_gates") if isinstance(gentry, dict) else None,
+            "gates_failing": _fail_names,
         })
     return rows
 
@@ -17975,6 +17986,7 @@ def tab_drawings_register(wb: Workbook, run_dir: str,
         _gp = rr.get("gates_pass")
         _gsent = ws.cell(r, 15, 1 if _gp is True else (0 if _gp is False else None))
         _gsent.font = _FONT_AUDIT
+        # gates_failing is list[str] (normalised in _drawing_register_rows).
         _gfail = ws.cell(r, 14, ", ".join(rr.get("gates_failing") or []) or None)
         _gfail.font = _FONT_AUDIT; _gfail.alignment = WRAP_TOP
         gc = ws.cell(r, 11,
@@ -24233,6 +24245,30 @@ def _selftest() -> int:
                 or _pid_g.get("gates_failing") != ["tag_legibility"]:
             print(f"  FAIL drg-gates: PID must read its gate FAIL + the failing gate name "
                   f"(got {_pid_g})"); bad += 1
+        # proveCatch: drawing_gates.py emits failing_gates as list[dict] — must normalise
+        # to gate-name strings (codema-full-20260709-1328: TypeError skipped Drawings tab).
+        with open(os.path.join(_tdg, "drawing-gates.json"), "w") as _fh:
+            json.dump({"all_pass": False, "n_gates": 1, "n_failing": 1, "drawings": {
+                "general-arrangement": {"pass": True, "failing_gates": []},
+                "pid": {"pass": False, "failing_gates": [
+                    {"gate": "tag_legibility", "severity": "high",
+                     "stage": "draw_ga", "detail": "pile-up"}]}}}, _fh)
+        _rr_dict = _drawing_register_rows(_tdg)
+        _pid_dict = next((x for x in _rr_dict if x["no"] == "FF-PID-001"), None)
+        if not _pid_dict or _pid_dict.get("gates_failing") != ["tag_legibility"]:
+            print(f"  FAIL drg-gates-dict: failing_gates list[dict] must normalise to "
+                  f"['tag_legibility'] (got {_pid_dict})"); bad += 1
+        _wbg_dict = Workbook(); _wbg_dict.remove(_wbg_dict.active)
+        try:
+            if not tab_drawings_register(_wbg_dict, _tdg):
+                print("  FAIL drg-gates-dict: register must build with dict failing_gates"); bad += 1
+        except TypeError as _te:
+            print(f"  FAIL drg-gates-dict: register must not TypeError on dict gates: {_te}"); bad += 1
+        # restore string-shaped fixture for the rest of the mismatched-rev/date checks
+        with open(os.path.join(_tdg, "drawing-gates.json"), "w") as _fh:
+            json.dump({"all_pass": False, "n_gates": 2, "n_failing": 1, "drawings": {
+                "general-arrangement": {"pass": True, "failing_gates": []},
+                "pid": {"pass": False, "failing_gates": ["tag_legibility"]}}}, _fh)
         _wbg = Workbook(); _wbg.remove(_wbg.active)
         if not tab_drawings_register(_wbg, _tdg):
             print("  FAIL drg-gates: the register must build on the mismatched fixture"); bad += 1
