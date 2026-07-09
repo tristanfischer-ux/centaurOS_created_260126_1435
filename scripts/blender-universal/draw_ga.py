@@ -559,7 +559,13 @@ class _TagPlacer:
         rows of (size + 2.5 px) — first straight above/below, then with a
         deterministic horizontal dodge; every candidate must clear the placed
         labels AND the view bounds. A label that moved (or was pulled inside the
-        bounds) gets a leader back to its part."""
+        bounds) gets a leader back to its part.
+
+        GOTCHA (Codema 1538 / G9): the old extreme-pile-up fallback stamped a
+        clamped (x_in, y−9·step) WITHOUT re-checking `_placed`, so two tags that
+        both exhausted the short ladder could land on the SAME fallback slot and
+        ship a >20% bbox pile-up. The fallback now keeps searching a wider
+        spiral and only accepts a clear slot — never an overlapping one."""
         for x, y, text, size, anchor_pt in self._pending:
             w = self.CHAR_W * size * max(len(str(text)), 1)
             # hard clip-guard: pull the anchor x inside the view bounds up front,
@@ -574,8 +580,15 @@ class _TagPlacer:
                         x_in, clamped = nx, True
             step = size + 2.5
             chosen = None
-            for dx in (0.0, -0.75 * w, 0.75 * w, -1.5 * w, 1.5 * w):
-                for k in (0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8):
+            # Primary ladder, then a wider spiral (same deterministic order) so a
+            # dense nest never falls through to an unchecked stamp.
+            dx_steps = (0.0, -0.75 * w, 0.75 * w, -1.5 * w, 1.5 * w,
+                        -2.25 * w, 2.25 * w, -3.0 * w, 3.0 * w)
+            k_order = [0]
+            for kk in range(1, 17):
+                k_order.extend((-kk, kk))
+            for dx in dx_steps:
+                for k in k_order:
                     cx = x_in + dx
                     cy = y + k * step
                     bb = self._bbox(cx, cy, text, size)
@@ -586,12 +599,71 @@ class _TagPlacer:
                         break
                 if chosen is not None:
                     break
-            if chosen is None:      # extreme pile-up — far ladder end, clamped inside
-                cy = y - 9 * step
+            if chosen is None:
+                # Last resort: scan a dense grid inside the view bounds for ANY
+                # clear slot (still deterministic — row-major from the anchor).
+                # Prefer near the part; never accept an overlapping bbox.
+                search_ys = [y + k * step for k in k_order]
+                search_xs = [x_in + dx for dx in dx_steps]
                 if self.bounds is not None:
-                    cy = min(max(cy, self.bounds[1] + size * 0.78 + 1.0),
-                             self.bounds[3] - size * 0.22 - 1.0)
-                chosen = (x_in, cy, self._bbox(x_in, cy, text, size), True)
+                    bx0, by0, bx1, by1 = self.bounds
+                    # pad so the full text bbox fits
+                    pad_x = w / 2.0 + 1.0
+                    pad_y_lo = size * 0.78 + 1.0
+                    pad_y_hi = size * 0.22 + 1.0
+                    grid_x0 = bx0 + pad_x
+                    grid_x1 = bx1 - pad_x
+                    grid_y0 = by0 + pad_y_lo
+                    grid_y1 = by1 - pad_y_hi
+                    if grid_x0 <= grid_x1 and grid_y0 <= grid_y1:
+                        gx = grid_x0
+                        while gx <= grid_x1 + 0.01:
+                            search_xs.append(gx)
+                            gx += max(step, w * 0.5)
+                        gy = grid_y0
+                        while gy <= grid_y1 + 0.01:
+                            search_ys.append(gy)
+                            gy += step
+                for cy in search_ys:
+                    for cx in search_xs:
+                        bb = self._bbox(cx, cy, text, size)
+                        if not self._inside(bb):
+                            continue
+                        if not any(self._hits(bb, pb) for pb in self._placed):
+                            chosen = (cx, cy, bb, True)
+                            break
+                    if chosen is not None:
+                        break
+            if chosen is None:
+                # Truly full view: place at the farthest in-bounds ladder end that
+                # MINIMISES overlap area with existing labels (never silently stack
+                # on the same slot). Still draws — the sheet stays complete — but
+                # G9 will flag residual IoU >20% so the defect stays visible.
+                best = None
+                best_ov = float("inf")
+                for dx in dx_steps:
+                    for k in k_order:
+                        cx = x_in + dx
+                        cy = y + k * step
+                        bb = self._bbox(cx, cy, text, size)
+                        if not self._inside(bb):
+                            continue
+                        ov = 0.0
+                        for pb in self._placed:
+                            ix = min(bb[2], pb[2]) - max(bb[0], pb[0])
+                            iy = min(bb[3], pb[3]) - max(bb[1], pb[1])
+                            if ix > 0 and iy > 0:
+                                ov += ix * iy
+                        if ov < best_ov:
+                            best_ov = ov
+                            best = (cx, cy, bb, True)
+                if best is None:
+                    cy = y - 9 * step
+                    if self.bounds is not None:
+                        cy = min(max(cy, self.bounds[1] + size * 0.78 + 1.0),
+                                 self.bounds[3] - size * 0.22 - 1.0)
+                    best = (x_in, cy, self._bbox(x_in, cy, text, size), True)
+                chosen = best
             cx, cy, bb, moved = chosen
             self._placed.append(bb)
             if moved and anchor_pt is not None:
@@ -662,7 +734,11 @@ def _elevation_tag_groups(items):
     singles, ranges = [], []
     in_range = set()
     for root, idxs in groups.items():
-        if len(idxs) < 3:
+        # DECISION: collapse from cluster size ≥2 (was ≥3). A pair of same-family
+        # tanks projected edge-on still piles tags (Codema 1538 TK-110∩TK-111);
+        # the schedule already ranges ×2 runs, so the elevation must match.
+        # A singleton cluster is untouched (len < 2).
+        if len(idxs) < 2:
             continue
         # same-NAME + numerically-CONSECUTIVE runs inside the stacked cluster —
         # the schedule's own collapse rule ('Drain Water Tank ×2 → TK-106…TK-107'),
@@ -1707,6 +1783,22 @@ def _selftest() -> int:
     if "TK-113" not in txt1 or "TK-111" not in txt1 or "TK-105" not in txt1:
         print("  FAIL ga-tags: every registered tag must still render")
         bad += 1
+    # 1b — EXTREME pile-up proveCatch (Codema 1538 G9): many tags at the SAME
+    #     anchor must still resolve to pairwise-disjoint bboxes. The old fallback
+    #     stamped every exhausted tag at (x, y−9·step) without re-checking
+    #     `_placed` — two tags landed on one slot → >20% IoU. Universal geometry.
+    dense = [(200.0, 100.0, f"TK-{101 + i}") for i in range(12)]
+    _td, pld = _render(dense)
+    for i in range(len(pld._placed)):
+        for j in range(i + 1, len(pld._placed)):
+            if _TagPlacer._hits(pld._placed[i], pld._placed[j]):
+                print("  FAIL ga-tags-dense: extreme nest still overlaps "
+                      f"({pld._placed[i]} vs {pld._placed[j]})")
+                bad += 1
+                break
+        else:
+            continue
+        break
     # 2 — the OTHER direction: a lone tag must stay exactly in place, no leader.
     txt2, pl2 = _render([(100.0, 60.0, "TK-101")])
     if '<line' in txt2:
@@ -1776,6 +1868,36 @@ def _selftest() -> int:
         print("  FAIL ga-elev-range: an edge-on same-name tank nest must collapse to "
               "ONE range tag (TK-103…TK-110) in the elevations — the v59 B–B pile-up")
         bad += 1
+    # 5b — PAIR range-collapse proveCatch (Codema 1538): two same-NAME tanks whose
+    #     elevation footprints overlap must collapse to ONE 'TK-110…TK-111' range,
+    #     not two singles that G9 scores as a pile-up. Cluster threshold is ≥2
+    #     (was ≥3 — a pair slipped through). Universal — geometry + same-name.
+    pair = [
+        GAPart(tag="TK-110", obj_tag="tk110", name="Drain Collection Sump",
+               module="m", shape="tank", qty=1, is_round=True,
+               x0=2000, x1=3200, y0=2000, y1=3200, z0=0, z1=1400,
+               cx=2600, cy=2600, is_below_grade=True),
+        GAPart(tag="TK-111", obj_tag="tk111", name="Drain Collection Sump",
+               module="m", shape="tank", qty=1, is_round=True,
+               x0=2100, x1=3300, y0=2100, y1=3300, z0=0, z1=1400,
+               cx=2700, cy=2700, is_below_grade=True),
+    ]
+    bbox_pair = {"x_min_mm": 0, "x_max_mm": 10000, "y_min_mm": 0, "y_max_mm": 8000,
+                 "z_min_mm": 0, "z_max_mm": 3000}
+    svg_pair = build_ga_svg(pair, bbox_pair, "generic", {"count": 2})
+    if ">TK-110…TK-111<" not in svg_pair:
+        print("  FAIL ga-elev-pair-range: overlapping same-name pair must collapse "
+              "to ONE range tag (TK-110…TK-111) — the Codema 1538 G9 pile-up")
+        bad += 1
+    try:
+        import drawing_gates as _dg
+        _fp = _dg.tag_legibility_findings(svg_pair)
+        if any("TK-110" in f and "TK-111" in f for f in _fp):
+            print(f"  FAIL ga-elev-pair-legible: G9 must not flag the ranged pair, "
+                  f"got {_fp[:3]}")
+            bad += 1
+    except ImportError:
+        pass
     for vb in ("plan", "elevation-aa", "elevation-bb"):
         if f'data-viewbox="{vb}"' not in svg_nest:
             print(f"  FAIL ga-viewbox: the {vb} bounds marker must be emitted (the "

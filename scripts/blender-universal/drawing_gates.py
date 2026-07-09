@@ -552,35 +552,42 @@ def run_gates(out_dir: str) -> list:
                           "high" if got < n * 0.5 else "med", got >= max(2, int(n * 0.8)),
                           f"{noun}: contract qty {n}, parts-manifest has {got} instance(s) (need ≥{max(2, int(n*0.8))})"))
 
-    # ── G6 NO STRAY BEAM — no CABLE run spans the plant as an overhead beam ──────────
+    # ── G6 NO STRAY BEAM — no DRAWN plant-crossing overhead run ─────────────────────
     #    The v44 render shipped a 'stray red pipe extending off the platform to a floating
-    #    box': an MCC->plant-wide-loads cable tray whose spine ran 33 m. A physical overhead
-    #    cable tray does NOT span the whole plant to a lone load — that power/signal
-    #    distribution belongs on the single-line/P&ID (build_universal_scene demotes it).
-    #    SCOPE: cables ONLY (power/signal/electric/data/control/bus). A FLUID pipe MUST
-    #    physically connect its two parts, so a long routed process pipe is legitimate (it
-    #    hugs equipment via Manhattan waypoints — a large bbox is not a straight beam); only
-    #    cable distribution is demotable. Universal — service-keyed, no class table.
+    #    box': an MCC->plant-wide-loads cable tray whose spine ran 33 m. Codema 1538 shipped
+    #    the SAME visual class as a FLUID overhead Manhattan beam (oxygen dosing → drain
+    #    sump, 31 m) while this gate only audited cables — vision flagged it, G6 passed.
+    #    SCOPE (2026-07-09): EVERY drawn route whose plan span exceeds the limit —
+    #    cable OR fluid. Below-grade / undrawn (demoted) runs are skipped (no 3-D beam).
+    #    Universal — geometry + drawn flag, no class table. Demotion lives in wire_ports
+    #    (`_should_demote_plant_spanning_fluid` + cable tray demotion).
     worst = None
     for r in route:
         if not isinstance(r, dict):
             continue
-        svc = str(r.get("service") or r.get("mechanism") or "").lower()
-        if not any(t in svc for t in ("power", "signal", "electric", "data", "control", "bus")):
+        # Demoted / logical-only runs are not in the 3-D scene — not a visual beam.
+        if r.get("drawn") is False:
             continue
         wps = r.get("waypoints_mm") or r.get("waypoints") or []
         xs = [w[0] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 2]
         ys = [w[1] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 2]
+        zs = [w[2] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 3]
         if not xs or not ys:
+            continue
+        # Below-grade laterals (all waypoints under grade) are buried — not an
+        # overhead stray beam. Noun-free: z-signal only.
+        if zs and max(zs) < 0.0:
             continue
         span = max(max(xs) - min(xs), max(ys) - min(ys))
         if worst is None or span > worst[1]:
-            worst = (str(r.get("run_name") or r.get("name") or "?"), span)
+            svc = str(r.get("service") or r.get("mechanism") or "run")
+            worst = (str(r.get("run_name") or r.get("name") or "?"), span, svc)
     if worst is not None:
         gates.append(Gate("no_stray_beam", ["general-arrangement", "pid", "single-line-diagram"],
                           "high", worst[1] <= STRAY_BEAM_MAX_SPAN_MM,
-                          f"longest CABLE run {worst[0]} spans {worst[1]/1000:.1f} m "
-                          f"(limit {STRAY_BEAM_MAX_SPAN_MM/1000:.0f} m — a plant-crossing beam)"))
+                          f"longest drawn run {worst[0]} ({worst[2]}) spans "
+                          f"{worst[1]/1000:.1f} m (limit {STRAY_BEAM_MAX_SPAN_MM/1000:.0f} m "
+                          f"— a plant-crossing beam)"))
 
     # ── G7 SITE UTILISATION — the deck must hug the plant, not dwarf it ──────────────
     #    v52's top view shipped the plant as a corner/L of a much larger deck (the packer's
@@ -776,6 +783,12 @@ def _selftest() -> int:
     chk("beam_ok", _span([[0, 0, 6000], [8000, 0, 6000], [8000, 2000, 500]]) <= STRAY_BEAM_MAX_SPAN_MM)
     chk("beam_stray", not (_span([[440, 12940, 6270], [440, -16910, 6270], [-5980, -16910, 6270]])
                            <= STRAY_BEAM_MAX_SPAN_MM))   # the 33 m MCC beam is caught
+    # Codema 1538 fluid overhead beam (oxygen dosing → drain sump, ~17 m plan span
+    # at z≈7 m) MUST trip the same limit — G6 now covers drawn fluid, not cables only.
+    _fluid_stray = [[10496, 1500, 7070], [-7100, 0, 7070], [-7100, 0, 500]]
+    chk("beam_fluid_stray", not (_span(_fluid_stray) <= STRAY_BEAM_MAX_SPAN_MM))
+    # Below-grade lateral (all z < 0) is NOT a visual overhead beam — skip in gate.
+    chk("beam_below_grade_exempt", max(w[2] for w in [[0, 0, -800], [20000, 0, -800]]) < 0)
     # G7 site utilisation proveCatch: the v52 stranded-corner deck (hull 476 / deck 1466
     # = 0.33, measured) FIRES; a compacted plant (hull 476 / deck 900 = 0.53) passes; the
     # severity mapping marks a sub-0.30 ratio HIGH (the deck is 3×+ the plant).

@@ -416,6 +416,15 @@ check(not B._is_below_grade_drain_edge("dc_busbar_800v", "rack_block_01", ""),
       "proveNoFalsePositive: an all-pressurised/electrical archetype (BESS-shaped names, "
       "no sump/pit/gravity noun anywhere) never trips below-grade")
 
+# Plant-spanning fluid demotion (Codema 1538 / vision-critic stray-pipe) — wire the
+# dead `_should_demote_plant_spanning_fluid` rule. Universal: plan span + below-grade
+# noun exemption. proveCatch / proveNoFalsePositive.
+try:
+    B._selftest_plant_spanning_fluid_demote()
+    check(True, "plant-spanning fluid demote selftest")
+except AssertionError as _e:
+    check(False, f"plant-spanning fluid demote selftest: {_e}")
+
 # _route_below_grade: the underground leg must stay BELOW the ground-slab underside,
 # never rise to the rack, and must still land exactly on both given endpoints.
 _slab_underside = B.DECK_Z_MM - B.GROUND_SLAB_THICK_MM

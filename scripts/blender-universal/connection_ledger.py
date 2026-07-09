@@ -1514,7 +1514,15 @@ def close_residual_completeness(parts, topology, required_services, log=print):
     so it ties to the abstract battery-limit feed/export node. A missing SIGNAL ties to the
     plant control hub (a PLC / SCADA / DCS part) if present, else a control battery-limit;
     a missing POWER feed comes from the distribution hub, else a utility battery-limit.
-    Pure + position-free; universal (no per-class table). Run AFTER close_boundaries."""
+    Pure + universal (no per-class table). Run AFTER close_boundaries.
+
+    DECISION (Codema 1538): when `placed_xyz_mm` is already on the parts (a
+    re-finalize after placement, or a twin that carries centres), prefer PLAN XY
+    distance over region_rank for the fluid partner pick — rank-only "nearest"
+    minted oxygen-dosing→drain-sump across the plant. When placement is absent
+    (first mint, before the placer runs) fall back to rank (position-free).
+    Plant-spanning edges that still mint are demoted from 3-D by
+    `wire_ports._should_demote_plant_spanning_fluid` (geometry gate)."""
     concerns = audit_completeness(parts, topology, required_services, log=lambda *a: None)
     if not concerns:
         return []
@@ -1528,6 +1536,32 @@ def close_residual_completeness(parts, topology, required_services, log=print):
     def _mod(nm):
         p = by_name.get(nm)
         return (getattr(p, "module_id", "") if p is not None else "") or ""
+
+    def _xy(nm):
+        """Plan centre (x,y) mm when the part is already placed; else None."""
+        p = by_name.get(nm)
+        xyz = getattr(p, "placed_xyz_mm", None) if p is not None else None
+        if not (isinstance(xyz, (list, tuple)) and len(xyz) >= 2):
+            return None
+        try:
+            return (float(xyz[0]), float(xyz[1]))
+        except (TypeError, ValueError):
+            return None
+
+    def _pick_nearest(pool, nm, r):
+        """Prefer plan-XY distance when both ends are placed; else region_rank."""
+        if not pool:
+            return None
+        src_xy = _xy(nm)
+        if src_xy is not None:
+            def _key(s):
+                xy = _xy(s)
+                if xy is None:
+                    return (1e18, abs(_rank(s) - r), s)
+                dx, dy = src_xy[0] - xy[0], src_xy[1] - xy[1]
+                return (dx * dx + dy * dy, abs(_rank(s) - r), s)
+            return min(pool, key=_key)
+        return min(pool, key=lambda s: (abs(_rank(s) - r), s))
 
     sources, consumers = set(), set()
     fwd_fluid = set()          # (from,to) of FLUID edges — for 2-cycle avoidance in fluid
@@ -1596,14 +1630,14 @@ def close_residual_completeness(parts, topology, required_services, log=print):
             if miss == "fluid-input":
                 cands = [s for s in sources if s != nm and (nm, s) not in fwd_fluid]
                 pool = [s for s in cands if _mod(s) == m] or cands
-                pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else _BL_FEED
+                pick = _pick_nearest(pool, nm, r) if pool else _BL_FEED
                 _add(pick, nm, "water",
                      "process input (residual closer: nearest producer)" if pick != _BL_FEED
                      else "plant feed (battery limit)")
             elif miss in ("fluid-output", "fluid-connection"):
                 cands = [s for s in consumers if s != nm and (s, nm) not in fwd_fluid]
                 pool = [s for s in cands if _mod(s) == m] or cands
-                pick = min(pool, key=lambda s: (abs(_rank(s) - r), s)) if pool else _BL_EXPORT
+                pick = _pick_nearest(pool, nm, r) if pool else _BL_EXPORT
                 _add(nm, pick, "water",
                      "process output (residual closer: nearest consumer)" if pick != _BL_EXPORT
                      else "product / recycle export (battery limit)")
@@ -2241,6 +2275,34 @@ def _selftest():
                                        log=lambda *a: None)
     assert any(e["from_part"] == "Motor Control Centre" and e["mechanism"] == "signal" for e in sres), \
         "a signal tie parallels an existing power edge between the same pair (service-aware dedup)"
+
+    # proveCatch — plan-XY nearest partner when placement is present (Codema 1538):
+    # rank-only "nearest" would pick a far same-rank consumer across the plant;
+    # with placed_xyz_mm the closer must pick the geographically nearest consumer.
+    class _Placed:
+        def __init__(self, name, rank, xy, mod="m"):
+            self.name, self.module_id, self.function = name, mod, ""
+            self.region_rank = rank
+            self.placed_xyz_mm = (xy[0], xy[1], 0.0)
+    _pparts = [
+        _Placed("Oxygen Dosing Pump", 5, (10000.0, 1500.0)),
+        _Placed("Nearby Softener", 5, (10500.0, 1600.0)),  # close in XY, same rank
+        _Placed("Far Drain Sump", 5, (-7000.0, 0.0)),       # same rank, far XY
+    ]
+    # Seed consumers via inbound edges; pump has an input so it needs an output.
+    _ptopo_xy = [
+        {"from_part": "A", "to_part": "Nearby Softener", "mechanism": "fluid_loop"},
+        {"from_part": "B", "to_part": "Far Drain Sump", "mechanism": "fluid_loop"},
+        {"from_part": "C", "to_part": "Oxygen Dosing Pump", "mechanism": "fluid_loop"},
+    ]
+    _pres = close_residual_completeness(
+        _pparts, _ptopo_xy, lambda n, m, f: {"water"}, log=lambda *a: None)
+    _p_edge = next((e for e in _pres if e["from_part"] == "Oxygen Dosing Pump"), None)
+    assert _p_edge is not None, "placed residual closer must still terminate the pump output"
+    assert _p_edge["to_part"] == "Nearby Softener", (
+        f"with placed_xyz_mm the residual closer must pick the plan-nearest consumer "
+        f"(Nearby Softener), not the far same-rank Far Drain Sump — got {_p_edge['to_part']!r}"
+    )
 
     # ── FLOW-DEMAND JOIN (the v52 required_value=null fix) ──────────────────────
     q = {"fertigation_dosing_pump_throughput_m3_h": {"value": 45},
