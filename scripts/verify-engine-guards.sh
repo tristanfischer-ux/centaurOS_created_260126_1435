@@ -76,6 +76,8 @@ run "pump-motor --selftest"                   npx tsx scripts/lib/orchestrator/g
 run "drive-duty --selftest"                   npx tsx scripts/lib/orchestrator/generic/drive-duty-selftest.ts
 run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/generic/instrument-sizing-selftest.ts
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
+run "membrane-stage-brief-gate --selftest"    npx tsx scripts/lib/orchestrator/generic/membrane-stage-brief-gate-selftest.ts
+run "nursery-reservoir-volume --selftest"     npx tsx scripts/lib/orchestrator/generic/nursery-reservoir-volume-selftest.ts
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
 run "unit-coercion --selftest (prove-catch)"  npx tsx scripts/lib/orchestrator/generic/unit-coercion.ts --selftest
 run "numeric-drift-matcher --selftest"       npx tsx scripts/lib/numeric-drift-matcher-selftest.ts

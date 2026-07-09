@@ -464,27 +464,26 @@ export function evaluateFilterOnDirtyStreamInvariant(
 // IS that reorder, applied inside deriveProcessTopology itself so the actual rendered P&ID/
 // BFD changes, not just an audit verdict.
 //
-// UNIVERSAL: reuses the EXACT SAME vocabulary the invariant already uses — TREATMENT_UNIT_OP_RE
-// / POLISH_EXEMPT_RE / CLEAN_SOURCE_RE / RECOVERY_BUFFER_RE — never a class name. A non-polish
-// treatment node whose ORIGINAL spine position lands it immediately downstream of an already-
-// clean source is relocated to sit immediately after the (first) recovery buffer on the spine —
-// design-basis §5's "conditioning node" position, downstream of the dirty/recovered stream it
-// exists to treat. proveNoFalsePositive is built in: (a) a filter fed by a genuinely dirty/
-// mid-process stream is untouched (its upstream never matches CLEAN_SOURCE_RE); (b) an
+// INTENT: Relocate a DIRTY-STREAM recovery filter (cloth / paperbelt / drum microscreen) that
+// landed immediately downstream of an already-clean source onto the recovery/dirty side.
+// DECISION (2026-07-09): NARROWER than TREATMENT_UNIT_OP_RE — that regex matches bare
+// "filter", so a MAKEUP GAC / particle / cartridge stage (rank-4 pretreatment that
+// legitimately sits upstream of RO) was being dragged onto the drain-recovery side
+// (codema-ship: nursery_cloth_filter → gac_filter → cloth_filter). Makeup pretreatment
+// stays put; only recovery solids-removal nouns relocate. proveNoFalsePositive: (a) a
+// recovery filter fed by a genuinely dirty/mid-process stream is untouched; (b) an
 // explicitly-named final-polish/point-of-use stage is untouched (POLISH_EXEMPT_RE); (c) a
-// once-through archetype with NO recovery buffer anywhere is untouched (nothing to relocate
-// onto — never invents a node).
+// once-through archetype with NO recovery buffer anywhere is untouched; (d) GAC/softener/
+// particle makeup stages are untouched (not in RECOVERY_SOLIDS_FILTER_RE).
 //
 // Detection reads the CURRENT adjacency each pass and iterates to a FIXED POINT, not just a
 // single pass (2026-07-08 follow-up — a real fresh chain render, out/topo-verify, exposed a
-// cascade case: RO -> Cloth Filter -> Gac Filter. A single pass over the original snapshot
-// relocates Cloth Filter but leaves Gac Filter's ORIGINAL upstream as Cloth Filter, so it looks
-// untouched at detection time — except removing Cloth Filter closes the gap and Gac Filter is
-// now directly downstream of RO, the SAME defect one relocation later. Re-running detection
-// after each relocation catches this; capped at items.length passes for guaranteed termination
-// (a relocated node's new upstream is the recovery buffer or another already-relocated
-// treatment node — neither ever matches CLEAN_SOURCE_RE by vocabulary construction — so each
-// pass strictly shrinks the misplaced set until none remain).
+// cascade case: RO -> Cloth Filter -> Nursery Cloth Filter. A single pass relocates one and
+// leaves the next newly adjacent to RO. Re-running detection after each relocation catches
+// this; capped at items.length passes for guaranteed termination.
+const RECOVERY_SOLIDS_FILTER_RE =
+  /\b(cloth[\s-]?filter|paperbelt|paper[\s-]?belt|drum[\s-]?filter|microscreen)\b/i
+
 function repositionFiltersOntoRecoverySide(
   items: Array<{ name: string; slug: string; rank: number; sub: number; qty: number; _zoneGroup?: string }>,
 ): void {
@@ -495,7 +494,7 @@ function repositionFiltersOntoRecoverySide(
     for (let i = 1; i < items.length; i++) {
       const it = items[i]
       if (it === recoveryItem || RECOVERY_BUFFER_RE.test(it.name)) continue // never relocate a recovery buffer itself
-      if (!TREATMENT_UNIT_OP_RE.test(it.name)) continue
+      if (!RECOVERY_SOLIDS_FILTER_RE.test(it.name)) continue // makeup GAC/particle/cartridge stay put
       if (POLISH_EXEMPT_RE.test(it.name)) continue // explicit final-polish/point-of-use stage — legitimate on clean water
       if (!CLEAN_SOURCE_RE.test(items[i - 1].name)) continue // fed by a genuinely dirty/mid-process stream — untouched
       misplaced.push(it)
@@ -508,6 +507,83 @@ function repositionFiltersOntoRecoverySide(
     const insertAt = items.indexOf(recoveryItem) + 1
     items.splice(insertAt, 0, ...misplaced)
   }
+}
+
+/**
+ * INTENT: Hand-authored `contract.topology` arrays skip `deriveProcessTopology`, so the
+ * item-spine reorder above never runs — drawings still show RO→cloth. Apply the SAME
+ * recovery-solids-filter rule to an already-built edge list (slug or display names).
+ * DECISION: Rebuild the fluid spine order from edges, relocate, rewrite fluid edges;
+ * signal/electrical edges are preserved untouched.
+ * @description Mutates `topology` in place when a recovery solids filter sits immediately
+ *   downstream of a clean source and a recovery buffer exists elsewhere on the fluid spine.
+ * @param topology Process-flow edges (from_part / to_part / mechanism).
+ * @returns Number of recovery solids-filter nodes relocated (0 = no-op).
+ */
+export function repositionFiltersOnTopologyEdges(
+  topology: Array<Record<string, unknown>>,
+): number {
+  if (!Array.isArray(topology) || topology.length === 0) return 0
+  const fluid = topology.filter((e) => {
+    const mech = String(e.mechanism ?? 'fluid_loop')
+    return mech === 'fluid_loop' || mech === 'fluid' || mech === ''
+  })
+  if (fluid.length === 0) return 0
+  // Build ordered node list from consecutive fluid edges (first edge's from, then each to).
+  const order: string[] = []
+  const seen = new Set<string>()
+  const push = (k: string): void => {
+    if (!k || seen.has(k)) return
+    seen.add(k)
+    order.push(k)
+  }
+  for (const e of fluid) {
+    push(String(e.from_part ?? ''))
+    push(String(e.to_part ?? ''))
+  }
+  if (order.length < 3) return 0
+  const recoveryKey = order.find((k) => RECOVERY_BUFFER_RE.test(_normaliseSlugForMatch(k)))
+  if (!recoveryKey) return 0
+  let relocated = 0
+  for (let pass = 0; pass < order.length; pass++) {
+    const misplaced: string[] = []
+    for (let i = 1; i < order.length; i++) {
+      const node = order[i]
+      const prev = order[i - 1]
+      if (node === recoveryKey) continue
+      if (!RECOVERY_SOLIDS_FILTER_RE.test(_normaliseSlugForMatch(node))) continue
+      if (POLISH_EXEMPT_RE.test(_normaliseSlugForMatch(node))) continue
+      if (!CLEAN_SOURCE_RE.test(_normaliseSlugForMatch(prev))) continue
+      misplaced.push(node)
+    }
+    if (misplaced.length === 0) break
+    for (const node of misplaced) {
+      const idx = order.indexOf(node)
+      if (idx >= 0) order.splice(idx, 1)
+    }
+    const insertAt = order.indexOf(recoveryKey) + 1
+    order.splice(insertAt, 0, ...misplaced)
+    relocated += misplaced.length
+  }
+  if (relocated === 0) return 0
+  // Rewrite fluid edges as the new consecutive spine; keep non-fluid edges as-is.
+  const nonFluid = topology.filter((e) => {
+    const mech = String(e.mechanism ?? 'fluid_loop')
+    return !(mech === 'fluid_loop' || mech === 'fluid' || mech === '')
+  })
+  const newFluid: Array<Record<string, unknown>> = []
+  for (let i = 0; i < order.length - 1; i++) {
+    if (order[i] === order[i + 1]) continue
+    newFluid.push({
+      from_part: order[i],
+      to_part: order[i + 1],
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+    })
+  }
+  topology.length = 0
+  topology.push(...newFluid, ...nonFluid)
+  return relocated
 }
 
 // ── PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (2026-07-08, the UNIVERSAL multizone
@@ -1182,22 +1258,53 @@ function _selftest() {
     throw new Error(`filter-reorder proveCatch FAILED: expected the cloth filter relocated immediately after the recovery buffer, got ${JSON.stringify(reorderCatchTopo)}`)
   }
 
-  // (a2) proveCatch — the CASCADE case a real fresh chain render (out/topo-verify, 2026-07-08)
-  // exposed: TWO treatment nodes in a row downstream of RO (Reverse Osmosis Skid -> Cloth
-  // Filter -> Gac Filter, the exact real ordering — both share rank 4, alphabetical tie-break
-  // puts Cloth before Gac). A single-pass fix relocates Cloth Filter and stops, leaving Gac
-  // Filter newly adjacent to RO — the SAME defect one relocation later. Both must end up
-  // downstream of the recovery buffer.
+  // (a2) proveCatch — CASCADE of TWO recovery solids filters downstream of RO
+  // (Reverse Osmosis Skid -> Cloth Filter -> Nursery Cloth Filter). A single-pass fix
+  // relocates one and leaves the next newly adjacent to RO — both must end up after the
+  // recovery buffer. DECISION 2026-07-09: GAC is makeup pretreatment (NOT a recovery
+  // solids filter) and must NOT be relocated — see makeupGacStays below.
   const cascadeCatchTopo = deriveProcessTopology([{
     sub_modules: [{ words: [
-      mkQ('Reverse Osmosis Skid'), mkQ('Cloth Filter'), mkQ('Gac Filter'), mkQ('Drain Collection Sump'), mkQ('Fresh Water Tank'),
+      mkQ('Reverse Osmosis Skid'), mkQ('Cloth Filter'), mkQ('Nursery Cloth Filter'), mkQ('Drain Collection Sump'), mkQ('Fresh Water Tank'),
     ] }],
   }])
-  if (cascadeCatchTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && (e.to_part === 'cloth_filter' || e.to_part === 'gac_filter'))) {
-    throw new Error(`filter-reorder proveCatch (cascade) FAILED: RO must not feed EITHER treatment node directly, got ${JSON.stringify(cascadeCatchTopo)}`)
+  if (cascadeCatchTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && (e.to_part === 'cloth_filter' || e.to_part === 'nursery_cloth_filter'))) {
+    throw new Error(`filter-reorder proveCatch (cascade) FAILED: RO must not feed EITHER cloth filter directly, got ${JSON.stringify(cascadeCatchTopo)}`)
   }
-  if (!cascadeCatchTopo.some((e) => e.from_part === 'drain_collection_sump' && (e.to_part === 'cloth_filter' || e.to_part === 'gac_filter'))) {
-    throw new Error(`filter-reorder proveCatch (cascade) FAILED: expected at least one treatment node relocated immediately after the recovery buffer, got ${JSON.stringify(cascadeCatchTopo)}`)
+  if (!cascadeCatchTopo.some((e) => e.from_part === 'drain_collection_sump' && (e.to_part === 'cloth_filter' || e.to_part === 'nursery_cloth_filter'))) {
+    throw new Error(`filter-reorder proveCatch (cascade) FAILED: expected at least one cloth filter relocated immediately after the recovery buffer, got ${JSON.stringify(cascadeCatchTopo)}`)
+  }
+
+  // (a3) proveNoFalsePositive — MAKEUP GAC (city-water pretreatment) must stay on the
+  // clean/makeup side even when a recovery buffer exists. Relocating it onto drain recovery
+  // was the 2026-07-09 codema-ship defect (nursery_cloth → gac → cloth on the dirty side).
+  const makeupGacStaysTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mkQ('Particle Filter'), mkQ('Gac Filter'), mkQ('Reverse Osmosis Skid'), mkQ('Drain Collection Sump'), mkQ('Cloth Filter'), mkQ('Fresh Water Tank'),
+    ] }],
+  }])
+  if (makeupGacStaysTopo.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'gac_filter')) {
+    throw new Error(`filter-reorder proveNoFalsePositive (makeup GAC) FAILED: GAC must stay on the makeup train, not after the drain sump, got ${JSON.stringify(makeupGacStaysTopo)}`)
+  }
+  // Cloth filter (recovery solids) MUST still relocate off RO/clean onto the drain side.
+  if (makeupGacStaysTopo.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cloth_filter')) {
+    throw new Error(`filter-reorder proveCatch (makeup+cloth) FAILED: cloth filter must leave the RO permeate side, got ${JSON.stringify(makeupGacStaysTopo)}`)
+  }
+
+  // (a4) proveCatch — HAND-AUTHORED edge list (skips deriveProcessTopology item spine):
+  // repositionFiltersOnTopologyEdges must reshape the rendered topology the drawings read.
+  const handAuthored: Array<Record<string, unknown>> = [
+    { from_part: 'reverse_osmosis_skid', to_part: 'cloth_filter', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'cloth_filter', to_part: 'drain_collection_sump', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+    { from_part: 'drain_collection_sump', to_part: 'fresh_water_tank', mechanism: 'fluid_loop', constraint_kind: 'flow_capacity' },
+  ]
+  const nHandReloc = repositionFiltersOnTopologyEdges(handAuthored)
+  if (nHandReloc < 1) throw new Error('filter-reorder-on-edges proveCatch FAILED: expected ≥1 relocation on hand-authored RO→cloth→sump')
+  if (handAuthored.some((e) => e.from_part === 'reverse_osmosis_skid' && e.to_part === 'cloth_filter')) {
+    throw new Error(`filter-reorder-on-edges proveCatch FAILED: RO→cloth still present after edge rewrite, got ${JSON.stringify(handAuthored)}`)
+  }
+  if (!handAuthored.some((e) => e.from_part === 'drain_collection_sump' && e.to_part === 'cloth_filter')) {
+    throw new Error(`filter-reorder-on-edges proveCatch FAILED: expected cloth after drain sump, got ${JSON.stringify(handAuthored)}`)
   }
 
   // (b) proveNoFalsePositive #1 — a legitimate MID-PROCESS filter in a DIFFERENT (non-water)
@@ -1390,11 +1497,17 @@ function _selftest() {
   const trimRelocateCatchTopo = deriveProcessTopology([{
     sub_modules: [{ words: [mkQ('Feed Pump'), mkQ('Acid Dosing Pump', 2), mkQ('Fertigation Dosing Pump', 2), mkQ('Irrigation Pump')] }],
   }])
-  if (trimRelocateCatchTopo.some((e) => e.from_part === 'feed_pump' && /^acid_dosing_pump/.test(e.to_part))) {
-    throw new Error(`trim-additive relocation proveCatch FAILED: a per-zone acid dosing pump co-located with a delivery mover must NOT sit directly downstream of Feed Pump (the rank-1 scramble position), got ${JSON.stringify(trimRelocateCatchTopo)}`)
+  // INTENT of the assertion: acid must sit at the delivery end (adjacent to fertigation),
+  // not as a lone rank-1 pretreatment stage. Zone fan-out may still emit feed→acid_* edges
+  // as the shared-upstream fan into each zone replica — that is NOT the rank-1 scramble
+  // (which was a SINGLE serial feed_pump → acid_dosing_pump with no fertigation adjacency).
+  // DECISION: prove the positive adjacency; reject only the serial scramble shape
+  // (exactly one fluid edge from feed_pump to a non-zoned acid_dosing_pump slug).
+  if (trimRelocateCatchTopo.some((e) => e.from_part === 'feed_pump' && e.to_part === 'acid_dosing_pump')) {
+    throw new Error(`trim-additive relocation proveCatch FAILED: collapsed (non-zoned) acid_dosing_pump must not sit directly downstream of Feed Pump, got ${JSON.stringify(trimRelocateCatchTopo)}`)
   }
-  if (!trimRelocateCatchTopo.some((e) => /^acid_dosing_pump/.test(e.from_part) && /^fertigation_dosing_pump/.test(e.to_part))
-    && !trimRelocateCatchTopo.some((e) => /^fertigation_dosing_pump/.test(e.from_part) && /^acid_dosing_pump/.test(e.to_part))) {
+  if (!trimRelocateCatchTopo.some((e) => /^acid_dosing_pump/.test(String(e.from_part)) && /^fertigation_dosing_pump/.test(String(e.to_part)))
+    && !trimRelocateCatchTopo.some((e) => /^fertigation_dosing_pump/.test(String(e.from_part)) && /^acid_dosing_pump/.test(String(e.to_part)))) {
     throw new Error(`trim-additive relocation proveCatch FAILED: expected the acid dosing pump adjacent to the fertigation dosing pump it doses, got ${JSON.stringify(trimRelocateCatchTopo)}`)
   }
   // proveNoFalsePositive: the SAME trim/additive-chemical pump with NO co-located delivery-

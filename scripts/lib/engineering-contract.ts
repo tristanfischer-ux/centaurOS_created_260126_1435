@@ -13864,12 +13864,23 @@ registerArchetype('water_treatment', (brief: any) => {
     ? pick(/nursery(?:\s+pump\s+unit)?[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 45)
     : 0
   const irrigationDemandTotalM3H = Math.round(irrigationDemandM3HPerDept * departmentCount + nurseryPumpFlowM3H * nurseryZoneCount)
-  // Codema SO21101551: cleanwater + 2× drain reservoirs are ~91 m³ each (5.46 m dia × 3.88 m);
-  // nursery drain reservoir is 40 m³. Prefer the explicit ~91 figure when the brief states it.
+  // INTENT: Main cleanwater + drain reservoirs are one size class; the nursery drain
+  // reservoir is a DISTINCT smaller vessel when the brief states it (e.g. 91 m³ main vs
+  // 40 m³ nursery). Collapsing nursery onto the main volume was the codema-ship defect.
+  // DECISION: Parse main and nursery volumes separately from brief noun+volume signals —
+  // never a class table. Nursery quantity keys mint ONLY when nurseryZoneCount > 0 AND a
+  // distinct nursery volume is stated (or a sane smaller default when the nursery zone
+  // exists but the volume regex misses).
   const storageTankVolEachM3 = pick(
     /cleanwater\s+reservoir[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,40}?cleanwater|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)\s+each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i,
     91,
   )
+  const nurseryDrainReservoirVolM3 = hasNurseryPumpUnit
+    ? pick(
+      /nursery\s+drain[\s-]?water\s+reservoir[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|nursery[^.]{0,40}?reservoir[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,40}?nursery\s+drain/i,
+      Math.min(40, storageTankVolEachM3),
+    )
+    : 0
   // The fertigation dosing PUMP is the same physical unit as "Pump Unit N" — the brief states
   // each pump unit "carries its own on-board nutrient dosing" — so its flow tracks the main
   // per-unit demand, not a separately-guessed "dosing units" figure (that regex coincidentally
@@ -13990,8 +14001,14 @@ registerArchetype('water_treatment', (brief: any) => {
     fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', `fresh-water / cleanwater buffer storage (Codema ~${storageTankVolEachM3} m³ galvanised reservoir); lock-gate HARD slot (exit 22)`),
     // Brief cleanwater_reservoir_volume_m3 = 91 — exact key so compliance matches.
     cleanwater_reservoir_volume_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', `cleanwater reservoir volume = ${storageTankVolEachM3} m³ (brief cleanwater_reservoir_volume; Codema 5.46 m dia × 3.88 m)`),
-    // Plant TOTAL across the main reservoirs (1 cleanwater + 2 drain ≈ 3 × 91 = 273 m³).
-    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', `total main water storage = 3 galvanised reservoirs (1 cleanwater + 2 drain) × ${storageTankVolEachM3} m³ = ${storageTankVolEachM3 * 3} m³`, ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'], 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'),
+    // Plant TOTAL: main reservoirs (1 cleanwater + 2 drain) + optional distinct nursery reservoir.
+    water_storage_capacity_m3: q(
+      storageTankVolEachM3 * 3 + (nurseryZoneCount > 0 ? nurseryDrainReservoirVolM3 * nurseryZoneCount : 0),
+      'm³', 'volume', 'rated', 'system', 'calculator',
+      `total water storage = 3×${storageTankVolEachM3} m³ main reservoirs${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}`,
+      ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'],
+      'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)',
+    ),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
@@ -14093,6 +14110,9 @@ registerArchetype('water_treatment', (brief: any) => {
       nursery_chemical_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery chemical dosing pump`),
       nursery_cloth_filter_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery drain-water cloth filter (${nurseryPumpFlowM3H} m³/h, sized to the nursery zone's own peak recovery flow) on HDPE tank, returns to nursery drain reservoir`),
       nursery_cloth_filter_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery cloth-filter unit`),
+      // Distinct nursery drain reservoir (brief ~40 m³ / Ø3.64 m) — NOT the main 91 m³ class.
+      nursery_drain_water_tank_volume_each_m3: q(nurseryDrainReservoirVolM3, 'm³', 'volume', 'rated', 'module', 'brief', `nursery drain-water galvanised reservoir (${nurseryDrainReservoirVolM3} m³) — distinct from the main ${storageTankVolEachM3} m³ drain reservoirs`),
+      nursery_drain_water_tank_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery drain-water reservoir`),
       nursery_drain_collection_sump_volume_each_m3: q(drainPitVolM3, 'm³', 'volume', 'rated', 'module', 'brief', 'nursery drain-water collection pit (5,000 L)'),
       nursery_drain_collection_sump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery drain pit`),
       nursery_drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery drain-pit submersible transfer pump'),

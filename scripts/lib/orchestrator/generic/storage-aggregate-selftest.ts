@@ -104,8 +104,84 @@ function run() {
   const basinDim = cylinderFromVolumeM3(40, 'Rearing Tank')
   const basinM = /([0-9.]+) m dia x ([0-9.]+) m/.exec(basinDim)
   if (!basinM || Number(basinM[2]) / Number(basinM[1]) > 0.5) throw new Error(`storage-aggregate: an OPEN rearing tank must stay wide+shallow (h/d≤0.5), got ${basinDim}`)
+  // RESERVOIR is CLOSED storage (not open-basin): a 91 m³ cleanwater reservoir must be tall
+  // (h/d≥0.7), never the open-basin pancake ⌀8×1.8 that floated on a vertical-vessel skirt.
+  const resDim = cylinderFromVolumeM3(91, 'Cleanwater Reservoir')
+  const resM = /([0-9.]+) m dia x ([0-9.]+) m/.exec(resDim)
+  if (!resM || Number(resM[2]) / Number(resM[1]) < 0.7) {
+    throw new Error(`storage-aggregate: a 91 m³ RESERVOIR must be TALL closed storage (h/d≥0.7), got ${resDim}`)
+  }
+  // STORAGE-PIN ALIAS: when the contract carries BOTH a compliance scalar
+  // (cleanwater_reservoir_volume_m3) AND the equipment family that delivers it
+  // (fresh_water_tank_volume_each_m3 + count), only ONE clean-side vessel may be synthesised.
+  // A same-volume drain tank must still mint separately (clean ≠ dirty role family).
+  const mPin = emptyModules()
+  applyUniversalContractSizing(
+    mPin as never[],
+    contractOf({
+      cleanwater_reservoir_volume_m3: 91,
+      fresh_water_tank_volume_each_m3: 91,
+      fresh_water_tank_count: 1,
+      drain_water_tank_volume_each_m3: 91,
+      drain_water_tank_count: 2,
+    }) as never,
+    { explode: false, instrument: false, dedupeAndStrip: false },
+  )
+  const nPin = names(mPin)
+  const pinHits = nPin.filter((x) => /cleanwater|reservoir|fresh water/i.test(x))
+  if (pinHits.length !== 1) {
+    throw new Error(
+      `storage-aggregate: storage-pin alias must mint exactly ONE clean-side vessel (got ${JSON.stringify(pinHits)})`,
+    )
+  }
+  if (!nPin.some((x) => /fresh water tank/i.test(x))) {
+    throw new Error(
+      `storage-aggregate: the equipment-family Fresh Water Tank must win over the compliance pin (got ${JSON.stringify(nPin)})`,
+    )
+  }
+  if (!nPin.some((x) => /drain water tank/i.test(x))) {
+    throw new Error(
+      `storage-aggregate: same-volume drain tanks must still mint (clean pin must not collapse onto dirty) (got ${JSON.stringify(nPin)})`,
+    )
+  }
+  // DISTINCT ZONE STORAGE (2026-07-09): when the contract carries BOTH a main drain
+  // reservoir volume AND a smaller nursery drain reservoir volume, BOTH principals mint
+  // at their OWN sizes — never collapse the nursery onto the main class.
+  const mZone = emptyModules()
+  applyUniversalContractSizing(
+    mZone as never[],
+    contractOf({
+      fresh_water_tank_volume_each_m3: 91, fresh_water_tank_count: 1,
+      drain_water_tank_volume_each_m3: 91, drain_water_tank_count: 2,
+      nursery_drain_water_tank_volume_each_m3: 40, nursery_drain_water_tank_count: 1,
+    }) as never,
+    { explode: false, instrument: false, dedupeAndStrip: false },
+  )
+  const nZone = names(mZone)
+  if (!nZone.some((x) => /nursery.*drain|drain.*nursery/i.test(x))) {
+    throw new Error(`storage-aggregate: distinct nursery drain reservoir must synthesise (got ${JSON.stringify(nZone)})`)
+  }
+  if (!nZone.some((x) => /drain water tank/i.test(x))) {
+    throw new Error(`storage-aggregate: main drain water tank must still synthesise beside nursery (got ${JSON.stringify(nZone)})`)
+  }
+  let nurseryCap = 0
+  let mainDrainCap = 0
+  for (const m of mZone) for (const sm of m.sub_modules) for (const w of sm.words ?? []) {
+    const nm = String(w.name_human || '')
+    const cap = (w.modifier_characters || []).find((mc: any) => mc.kind === 'capacity')
+    const v = cap ? parseFloat(String(cap.value)) || 0 : 0
+    if (/nursery/i.test(nm) && /drain|reservoir|tank/i.test(nm)) nurseryCap = v
+    if (/^drain water tank$/i.test(nm)) mainDrainCap = v
+  }
+  if (nurseryCap !== 40) throw new Error(`storage-aggregate: nursery reservoir capacity must be 40 m³ (got ${nurseryCap})`)
+  if (mainDrainCap !== 91) throw new Error(`storage-aggregate: main drain reservoir capacity must be 91 m³ (got ${mainDrainCap})`)
+
   // eslint-disable-next-line no-console
-  console.log(`storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed + reconciled; storage tank TALL ${tankDim}, basin SHALLOW ${basinDim})`)
+  console.log(
+    `storage-aggregate --selftest OK (separate tanks kept; total roll-up suppressed + reconciled; ` +
+      `storage tank TALL ${tankDim}, basin SHALLOW ${basinDim}, reservoir TALL ${resDim}; pin-alias single vessel; ` +
+      `nursery 40 m³ ≠ main drain 91 m³)`,
+  )
 }
 
 run()

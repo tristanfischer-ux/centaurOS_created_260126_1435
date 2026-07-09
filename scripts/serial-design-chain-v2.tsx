@@ -7231,7 +7231,7 @@ async function main() {
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,
         reconcileContract,
-        { briefMetrics: briefMetricsForCoverage },
+        { briefMetrics: briefMetricsForCoverage, briefText: currentBriefText },
       )
       console.error(
         `[chain] principal-equipment reconcile (deterministic, contract-keyed): ` +
@@ -7371,18 +7371,24 @@ async function main() {
         logAction({ step: 'join_flow_demands_onto_topology', edges_joined: nJoined })
       }
     }
+    // FILTER-ON-DIRTY-STREAM REORDER ON SETTLED EDGES (2026-07-09): deriveProcessTopology
+    // already reorders its OWN item spine, but a HAND-AUTHORED contract.topology (or a
+    // prior-state topology that skipped re-derive because haveOrchTopo) never enters that
+    // path — drawings still show RO→cloth. Apply the same recovery-solids-filter rule to
+    // the settled edge list BEFORE the shadow invariant audits it, so P&ID/BFD reshape.
+    if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
+      const { repositionFiltersOnTopologyEdges } = await import('./lib/orchestrator/generic/derive-topology')
+      const nReloc = repositionFiltersOnTopologyEdges(orch.topology as Array<Record<string, unknown>>)
+      if (nReloc > 0) {
+        console.error(`[chain] filter-on-dirty-stream REORDER: relocated ${nReloc} recovery solids-filter node(s) onto the dirty/recovered side of the settled topology → P&ID + BFD`)
+        logAction({ step: 'filter_on_dirty_stream_reorder', relocated: nReloc })
+      }
+    }
     // FILTER-ON-DIRTY-STREAM INVARIANT (Sam Green SME review, 2026-07-07 — "RO water feeds
-    // into cloth filter which doesn't make sense as it's clean already"). The evaluator
-    // existed (derive-topology.ts::evaluateFilterOnDirtyStreamInvariant) but nothing in the
-    // render path CALLED it — it only ever ran inside this file's own --selftest, against
-    // display-name fixtures ('Reverse Osmosis Skid'), never the real SLUGIFIED topology
-    // (`ro_membrane_elements -> cloth_filter`) this deriver actually emits. Wired here
-    // (after the topology is fully settled — derived + signal edges + flow-demand join)
-    // so it runs on EVERY design, whether the topology came from the generic deriver above
-    // or a hand-authored per-class contract.topology. SHADOW (flags + records, never
-    // blocks) — the physical reorder this defect calls for is a topology-authoring fix
-    // (the ROLE_PATTERNS rank table), a deeper change than this detector should make
-    // silently; the routed punchlist is the fix-driver.
+    // into cloth filter which doesn't make sense as it's clean already"). Wired here
+    // (after the topology is fully settled — derived + signal edges + flow-demand join +
+    // edge reorder above) so it runs on EVERY design. SHADOW (flags + records, never
+    // blocks) — the physical reorder now runs above; residual HIGH findings are punchlisted.
     if (orch && Array.isArray(orch.topology) && orch.topology.length > 0) {
       const { evaluateFilterOnDirtyStreamInvariant } = await import('./lib/orchestrator/generic/derive-topology')
       const filterVerdict = evaluateFilterOnDirtyStreamInvariant(orch.topology)

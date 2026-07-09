@@ -5084,10 +5084,90 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
   return { droppedPhantom, droppedDuplicate }
 }
 
+// ── BRIEF-STATED MEMBRANE-STAGE GATE (2026-07-09, Codema ship UF banks) ──────────────────
+// INTENT: A brief that names only RO (city water → particle → GAC → softener → RO) must
+// never ship UF / NF / MF membrane banks the generator invented from library candidates
+// (Toray HFU-2020AN UF Module, Uf Membrane Bank, Uf Module Bank — codema-ship). Those words
+// are NOT `_synthesized` so the invented-principal drop never sees them, and they have no
+// contract group either — they survive as grounded phantoms on the P&ID.
+// DECISION: Key off BRIEF TEXT vocabulary (ultrafiltration / nanofiltration / microfiltration
+// / \buf\b / \bnf\b / \bmf\b), never a class table. When the brief is silent on a membrane
+// stage family, drop every principal word whose name/id claims that family. RO-only briefs
+// keep reverse-osmosis words. A brief that DOES name UF keeps UF words (proveNoFalsePositive).
+// When briefText is empty/absent the pass is a strict no-op (never invent a drop without
+// evidence the brief omitted the stage).
+const MEMBRANE_STAGE_FAMILIES: Array<{ family: string; briefRe: RegExp; wordRe: RegExp }> = [
+  {
+    family: 'ultrafiltration',
+    briefRe: /\bultra[\s-]?filtrat|\buf\b/i,
+    wordRe: /\bultra[\s-]?filtrat|\buf\b/i,
+  },
+  {
+    family: 'nanofiltration',
+    briefRe: /\bnano[\s-]?filtrat|\bnf\b/i,
+    wordRe: /\bnano[\s-]?filtrat|\bnf\b/i,
+  },
+  {
+    family: 'microfiltration',
+    briefRe: /\bmicro[\s-]?filtrat|\bmf\b/i,
+    wordRe: /\bmicro[\s-]?filtrat|\bmf\b/i,
+  },
+]
+
+/**
+ * @description Drop principal membrane-stage words (UF/NF/MF banks/modules) the brief never
+ *   named. Mutates `modules` in place. Strict no-op when `briefText` is empty.
+ * @param modules Module tree (words mutated).
+ * @param briefText Original / revised brief prose used as the stated-unit-op signal.
+ * @returns Count of principal words dropped (children of dropped principals also removed).
+ */
+export function dropUnstatedMembraneStages(
+  modules: ModuleLike[],
+  briefText: string | undefined | null,
+): number {
+  const brief = String(briefText ?? '').trim()
+  if (!brief) return 0
+  const absent = MEMBRANE_STAGE_FAMILIES.filter((f) => !f.briefRe.test(brief))
+  if (absent.length === 0) return 0
+  let dropped = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      if (!Array.isArray(sm.words)) continue
+      const dropIds = new Set<string>()
+      for (const w of sm.words) {
+        if (isSubcomponent(w) || isInstrument(w) || isActuator(w)) continue
+        const blob = `${w.name_human ?? ''} ${w.id ?? ''} ${w.content_character?.character_id ?? ''}`.replace(/[_-]+/g, ' ')
+        // Never drop an RO / reverse-osmosis principal via a short \buf\b false match inside
+        // an unrelated token — family regexes already require word boundaries.
+        if (/\breverse[\s-]?osmos|\bro\b/i.test(blob) && !absent.some((f) => f.wordRe.test(blob))) continue
+        for (const f of absent) {
+          if (f.wordRe.test(blob)) {
+            dropIds.add(String(w.id ?? ''))
+            break
+          }
+        }
+      }
+      if (dropIds.size === 0) continue
+      const before = sm.words.length
+      sm.words = sm.words.filter((w) => {
+        const id = String(w.id ?? '')
+        if (dropIds.has(id)) { dropped += 1; return false }
+        // Drop exploded children of a dropped principal (`<id>__…`).
+        for (const pid of dropIds) {
+          if (pid && id.startsWith(`${pid}__`)) { dropped += 1; return false }
+        }
+        return true
+      })
+      void before
+    }
+  }
+  return dropped
+}
+
 export function reconcilePrincipalEquipment(
   modules: ModuleLike[],
   contract: ContractInProgress,
-  reconcileOpts: { briefMetrics?: BriefTargetMetric[] } = {},
+  reconcileOpts: { briefMetrics?: BriefTargetMetric[]; briefText?: string } = {},
 ): PrincipalReconcileResult {
   const res: PrincipalReconcileResult = {
     groups: 0, repaired: 0, removedDuplicates: 0, removedSynonymDuplicates: 0, removedInvented: 0, removedOrphanChildren: 0, synthesizedMissing: 0, buildingResynthesised: 0, instrumentsResynthesised: 0, rehostedDependents: 0, removedDuplicateDependents: 0, details: [],
@@ -5331,6 +5411,18 @@ export function reconcilePrincipalEquipment(
     })
     res.removedInvented += 1
     res.details.push(`dropped LLM-invented principal '${inv.word.name_human ?? invId}' (no contract group backs it)`)
+  }
+
+  // BRIEF-STATED MEMBRANE-STAGE GATE (see dropUnstatedMembraneStages): a grounded
+  // (non-_synthesized) UF/NF/MF bank the generator invented from library candidates has no
+  // contract group AND is not `_synthesized`, so the invented-principal drop above never
+  // sees it. When the brief never named that membrane family, drop it here.
+  {
+    const nMem = dropUnstatedMembraneStages(modules, reconcileOpts.briefText)
+    if (nMem > 0) {
+      res.removedInvented += nMem
+      res.details.push(`dropped ${nMem} unstated membrane-stage word(s) (brief never named UF/NF/MF)`)
+    }
   }
 
   // Explode the sub-assemblies of any PRINCIPAL we just re-created (a repaired survivor
