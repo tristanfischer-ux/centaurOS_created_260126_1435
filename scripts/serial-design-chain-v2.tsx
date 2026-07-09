@@ -8033,6 +8033,35 @@ async function main() {
             v.cost_repair_excluded_from_subtotal = false
           }
           bomTotalGbp = (pv as any[]).reduce((s, v) => s + (v.cost_repair_excluded_from_subtotal ? 0 : Number(v.cost_repair_corrected_price_gbp ?? v.price_estimate_gbp ?? 0) * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1)), 0)
+          // ── DEMOTED WORDS NEVER PRICE (2026-07-10, Powerwall exit-32 round 5): a word an
+          // upstream pass stamped mis_emission_note (positively determined NOT real equipment
+          // — e.g. a glycol chiller at forced-air scale) must be EXCLUDED from the BoM total
+          // regardless of what Engine B estimated for it. deterministic_finalize demotes it to
+          // a scope note later; this closes the window where the priced total is computed
+          // BEFORE that demotion (the stamped hvac_chiller still billed £7,360 via the
+          // oem_hvac_chiller class anchor). One shared drop mechanism, honoured at pricing.
+          {
+            const demotedIds = new Set<string>()
+            for (const m of (liveState.moduleDecomposition?.modules ?? []))
+              for (const sm of (m.sub_modules ?? []))
+                for (const w of (sm.words ?? []))
+                  if ((w as any).mis_emission_note && w.id) demotedIds.add(String(w.id))
+            if (demotedIds.size > 0) {
+              let excluded = 0
+              for (const v of (pv as any[])) {
+                const wid = String(v.word_id ?? '')
+                if (!demotedIds.has(wid) && !demotedIds.has(wid.split('__')[0])) continue
+                if (v.cost_repair_excluded_from_subtotal) continue
+                v.cost_repair_excluded_from_subtotal = true
+                v.cost_provenance = 'demoted-scope-note (mis_emission_note — not real equipment at this scale)'
+                excluded += 1
+              }
+              if (excluded > 0) {
+                bomTotalGbp = (pv as any[]).reduce((s, v) => s + (v.cost_repair_excluded_from_subtotal ? 0 : Number(v.cost_repair_corrected_price_gbp ?? v.price_estimate_gbp ?? 0) * (qtyByWordId.get(String(v.word_id ?? '')) ?? 1)), 0)
+                console.error(`[chain] demoted-word pricing exclusion: ${excluded} line(s) carried mis_emission_note → excluded from the BoM total; raw BoM £${Math.round(bomTotalGbp).toLocaleString()}`)
+              }
+            }
+          }
           console.error(`[chain] physics-derived bottom-up pricing: ${paramById.size} components priced from parent physics → rolled into ${parentRoll.size} assemblies; raw BoM £${Math.round(bomTotalGbp).toLocaleString()}`)
         }
       }

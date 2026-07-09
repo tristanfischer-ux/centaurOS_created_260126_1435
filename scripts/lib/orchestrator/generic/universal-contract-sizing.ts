@@ -2658,9 +2658,19 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 // (non-thermal archetypes): strict no-op.
 const LIQUID_THERMAL_PLANT_RE =
   /\bchiller\b|coolant\s+pump|cooling\s+pump|coolant\s+\w*\s*(?:tank|reservoir|manifold|distribution)|expansion\s+tank|heat\s+exchanger|\bglycol\b/i
+// Occupancy-scale safety PLANT (gas-detection systems/sensor networks, aspirating smoke
+// plant) exists to protect a space a PERSON can enter. A sealed sub-1 m³ cabinet (wall
+// ESS, EV-charger pillar, drone dock) has no occupancy — cell protection is the BMS's
+// temperature chain + the pack vent path, and the real products carry none of this
+// plant. A single smoke/heat DETECTOR (point device) is not plant and stays.
+const OCCUPANCY_SAFETY_PLANT_RE =
+  /gas[\s_]+detection|aspirating\s+smoke|smoke\s+detection\s+system|fire\s+suppression\s+(?:system|skid|plant)|clean\s+agent|novec|inergen/i
 export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
   const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
-  if (!(dissipation > 0) || dissipation * 1.2 >= 2) return 0
+  const airCooled = dissipation > 0 && dissipation * 1.2 < 2
+  const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
+  const noOccupancy = envM3 > 0 && envM3 < 1
+  if (!airCooled && !noOccupancy) return 0
   let demoted = 0
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
@@ -2668,12 +2678,21 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
         if ((w as { mis_emission_note?: string }).mis_emission_note) continue
         const nm = String(w.name_human ?? w.content_character?.name_human ?? '')
         const nmHead = nm.replace(/\s*\([^)]*\)\s*$/g, '').trim() || nm
-        if (!LIQUID_THERMAL_PLANT_RE.test(nmHead)) continue
-        ;(w as { mis_emission_note?: string }).mis_emission_note =
-          `liquid-thermal-plant at air-cooled scale: required duty ${(dissipation * 1.2).toFixed(2)} kW < 2 kW — ` +
-          `no glycol loop exists on the real product (forced-air cooling per environmental_interface); ` +
-          `demoted to a scope note, never a priced line`
-        demoted += 1
+        if (airCooled && LIQUID_THERMAL_PLANT_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `liquid-thermal-plant at air-cooled scale: required duty ${(dissipation * 1.2).toFixed(2)} kW < 2 kW — ` +
+            `no glycol loop exists on the real product (forced-air cooling per environmental_interface); ` +
+            `demoted to a scope note, never a priced line`
+          demoted += 1
+          continue
+        }
+        if (noOccupancy && OCCUPANCY_SAFETY_PLANT_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `occupancy-scale safety plant in a sealed ${envM3.toFixed(2)} m³ enclosure (< 1 m³, no personnel ` +
+            `access): protection is the BMS temperature chain + the pack vent path — a gas-detection/` +
+            `suppression PLANT does not exist on the real product; demoted to a scope note`
+          demoted += 1
+        }
       }
     }
   }
@@ -2752,6 +2771,22 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         if (physics.kw === 0 && physics.m3 === 0 && physics.diaM === 0) {
           const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
           if (envM3 > 0 && envM3 < 50) physics.m3 = Math.max(0.01, envM3 * 0.25)
+        }
+        // CABINET-FAN DUTY CAP (2026-07-10, exit-32 round 5): an enclosure/ventilation
+        // FAN moves the heat the system actually rejects — its motor can never usefully
+        // exceed ~1.5× the contract's own thermal/aux load. The generic path emitted a
+        // 1.7 kW fan rating on a 0.43 kW-dissipation wall cabinet (30× a real 40 W
+        // cabinet fan), which also defeated the refKw cost scaling. Cap physics.kw at
+        // the contract's declared load; a plant with no thermal quantities (or a fan
+        // genuinely serving a big load) is untouched.
+        if (/\bfan\b/i.test(nmHead)) {
+          const thermalLoadKw = Math.max(
+            Number(quantities['hvac_design_load_kw'] ?? 0),
+            Number(quantities['system_thermal_dissipation_kw'] ?? 0),
+          )
+          if (thermalLoadKw > 0 && physics.kw > thermalLoadKw * 1.5) {
+            physics.kw = Math.round(thermalLoadKw * 1.5 * 1000) / 1000
+          }
         }
         // Cost-capacity scale vs the rule's own declared reference duty (see the
         // SUB_ASSEMBLY refKw comment). f = 1 when at/above reference or when the rule

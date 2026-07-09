@@ -92,6 +92,32 @@ expect(demoteLiquidThermalPlantAtAirCooledScale([utilMod], { system_thermal_diss
 expect(demoteLiquidThermalPlantAtAirCooledScale([utilMod], {}) === 0,
   'an archetype without the dissipation quantity must be untouched')
 
+// ── 8. CATCH: occupancy-scale safety PLANT demoted in a sealed sub-1 m³ cabinet;
+//     a point smoke DETECTOR (not plant) is spared ──
+const occMod: any = { sub_modules: [{ words: [
+  mkWord('gas_detection_system_word', 'Gas Detection System', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('smoke_detectors_word', 'Smoke Detectors', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(demoteLiquidThermalPlantAtAirCooledScale([occMod], { enclosure_volume_m3: 0.13 }) === 1,
+  'a 0.13 m³ sealed cabinet must demote the gas-detection PLANT and spare the point detector')
+// plant-scale enclosure (86 m³ container) keeps its gas detection — no false positive
+const occUtil: any = { sub_modules: [{ words: [
+  mkWord('gas_detection_system_word', 'Gas Detection System', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(demoteLiquidThermalPlantAtAirCooledScale([occUtil], { enclosure_volume_m3: 86, system_thermal_dissipation_kw: 25 }) === 0,
+  'a containerised enclosure must keep its gas-detection plant')
+
+// ── 9. CATCH: a cabinet fan's kW is capped at ~1.5× the contract thermal load ──
+const fanMod: any = { sub_modules: [{ words: [
+  mkWord('active_ventilation_fan_word', 'Active Ventilation Fan',
+    [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '1.7', unit: 'kW' }]),
+] }] }
+explodeEquipmentSubAssemblies([fanMod], { system_thermal_dissipation_kw: 0.43, hvac_design_load_kw: 0.14 })
+const fanCasing = fanMod.sub_modules[0].words.find((w: any) => /fan_word__casing/.test(String(w.id)))
+const fanCasingGbp = Number((fanCasing?.modifier_characters ?? []).find((x: any) => x.kind === 'price_estimate_gbp')?.value ?? 1e9)
+expect(fanCasingGbp < 1000,
+  `a 1.7 kW-rated fan on a 0.43 kW-dissipation cabinet must price capped (casing got £${fanCasingGbp})`)
+
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '
   + 'plant-scale default calibration preserved; air-cooled scale demotes tank/pump/chiller '
