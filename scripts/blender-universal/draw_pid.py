@@ -241,6 +241,10 @@ class Process:
     # on the emergency-O₂ supply line so the life-safety O₂ path carries its real figures.
     emergency_o2_supply_kg_h: float = 0.0
     emergency_o2_buffer_kg: float = 0.0
+    # T-23: off-page connectors to out-of-scope cultivation / delivery zones.
+    # Each entry is (key, label) — drawn as SYM_OFFPAGE at the delivery end of each
+    # fertigation/irrigation pump-unit group. Empty when the plant has no zoned delivery.
+    zone_offpages: list[tuple] = field(default_factory=list)
     rev: str = "P1"              # preliminary revision (deterministic, not a live clock)
     date: str = ""               # issue date derived from the run's own artifact mtime
 
@@ -505,6 +509,55 @@ def _pid_quantity(state: dict, *keys):
                 if item.get("key") in keys:
                     return item.get("value")
     return None
+
+
+def _delivery_zone_offpages(state: dict) -> list[tuple]:
+    """T-23 — UNIVERSAL off-page connectors to cultivation / delivery zones.
+
+    When the contract carries multiple fertigation/irrigation pump units (or an
+    explicit `distribution_delivery_groups` / zone count) serving out-of-scope
+    cultivation zones, emit one (key, label) per delivery group. Labels are
+    generic zone-group names (Delivery group 1/2, Nursery) — never hard-coded
+    tunnel numbers unless the brief already stated them as quantity keys.
+
+    proveCatch: N pump-unit delivery nodes → N off-page connectors.
+    proveNoFalsePositive: a single-unit / no-zone plant → [].
+    """
+    def _n(*keys) -> int:
+        for k in keys:
+            v = _pid_quantity(state, k)
+            try:
+                n = int(round(float(v)))
+            except (TypeError, ValueError):
+                continue
+            if n >= 1:
+                return n
+        return 0
+
+    groups = _n("distribution_delivery_groups")
+    if groups < 1:
+        # fall back to fertigation / irrigation pump-unit counts (main zones)
+        groups = _n("fertigation_dosing_pump_count", "irrigation_pump_count",
+                    "pump_unit_count")
+    nursery = _n("nursery_fertigation_dosing_pump_count", "nursery_zone_count")
+    # also accept cultivation_container_count / zone signals as a soft confirm that
+    # delivery leaves the plant room — but never invent groups from containers alone.
+    has_cultivation = _n("cultivation_container_count", "actuated_distribution_valve_count",
+                         "distribution_branch_runs", "distribution_levels_per_branch") > 0
+    if groups < 1 and nursery < 1:
+        return []
+    if groups < 1 and not has_cultivation and nursery < 1:
+        return []
+    # a lone single pump with no cultivation/zone signal is in-plant delivery → no off-page
+    if groups == 1 and nursery < 1 and not has_cultivation:
+        return []
+
+    out: list[tuple] = []
+    for i in range(max(groups, 0)):
+        out.append((f"zone_delivery_group_{i + 1}", f"Delivery group {i + 1}"))
+    if nursery >= 1:
+        out.append(("zone_delivery_nursery", "Nursery zone"))
+    return out
 
 
 def _iter_words(state: dict):
@@ -1852,7 +1905,8 @@ def reconstruct_process(schedule: dict, state: dict,
                                      "emergency_oxygen_supply_kg_h") or 0.0),
                    emergency_o2_buffer_kg=float(
                        _pid_quantity(state, "emergency_o2_buffer_kg",
-                                     "emergency_oxygen_buffer_kg") or 0.0))
+                                     "emergency_oxygen_buffer_kg") or 0.0),
+                   zone_offpages=_delivery_zone_offpages(state))
 
 
 def _attach_instruments(nodes: dict, instr_funcs: set):
@@ -2574,6 +2628,13 @@ def build_pid_svg(proc: Process) -> str:
     #       solenoid → O₂ diffuser) — the per-tank element the BoM carries on all N tanks. ---
     _draw_emergency_o2_final_element(svg, proc, centre, ports)
 
+    # ----- T-23: OFF-PAGE CONNECTORS to cultivation / delivery zones ─────
+    # One SYM_OFFPAGE per delivery group (and nursery when present), drawn to the
+    # RIGHT of the rightmost fertigation/irrigation pump so the P&ID shows where
+    # pressurised delivery leaves the plant room. Labels are zone-group names
+    # (Delivery group 1/2, Nursery) — never hard-coded tunnel numbers.
+    _draw_zone_offpage_connectors(svg, proc, centre, ports, width, legend_w)
+
     # ----- ANCILLARY / FIELD-DEVICE REGISTER (projected from the BoM) -----
     if reg_h:
         reg_y = height - title_h - reg_h - reg_gap + reg_gap / 2
@@ -2643,6 +2704,45 @@ def _draw_control_loops(svg, proc, centre, ports, band_y):
         if lp.dst_valve_tag:
             svg.text(riser_x + 11, dbot + 10, lp.dst_valve_tag, size=7.5, anchor="start",
                      fill=MUTED)
+
+
+def _draw_zone_offpage_connectors(svg, proc, centre, ports, width, legend_w):
+    """T-23 — draw one SYM_OFFPAGE per delivery / cultivation zone group.
+
+    Anchors to the rightmost fertigation/irrigation pump (or the rightmost node
+    when no pump matches). Each connector is labelled with its zone-group name.
+    No-op when proc.zone_offpages is empty (proveNoFalsePositive).
+    """
+    zones = getattr(proc, "zone_offpages", None) or []
+    if not zones:
+        return
+    # prefer a fertigation / irrigation / dosing pump as the delivery origin
+    pumps = [nd for nd in proc.nodes
+             if nd.sym == SYM_PUMP and re.search(
+                 r"fertigat|irrigat|dosing|pump.?unit|circulat",
+                 f"{nd.key} {nd.label}", re.I)]
+    anchors = pumps or [nd for nd in proc.nodes if nd.key in centre]
+    if not anchors:
+        return
+    # rightmost anchor (max centre-x) — delivery leaves the plant to the right
+    origin = max(anchors, key=lambda nd: centre.get(nd.key, (0, 0))[0])
+    if origin.key not in ports:
+        return
+    ox, oy = ports[origin.key]["right"]
+    # keep clear of the legend strip on the right
+    max_x = width - legend_w - 40
+    base_x = min(ox + 90, max_x - 20)
+    n = len(zones)
+    for i, (_key, label) in enumerate(zones):
+        cy = oy + (i - (n - 1) / 2.0) * 48
+        cx = base_x
+        # stub process line from the pump face to the off-page connector
+        svg.line(ox, oy if n == 1 else oy + (i - (n - 1) / 2.0) * 12,
+                 cx - 18, cy, stroke=PROC_INK, width=1.4)
+        _sym_offpage(svg, cx, cy)
+        svg.text(cx, cy + 22, label, size=8.2, anchor="middle", fill=EQ_INK, weight="bold")
+        svg.text(cx, cy + 34, "(to cultivation — out of scope)", size=6.8,
+                 anchor="middle", fill=MUTED)
 
 
 def _draw_emergency_o2_final_element(svg, proc, centre, ports):
@@ -3611,6 +3711,47 @@ def _selftest() -> int:
         'stroke-dasharray="2,2,8,2"' not in _svg_press)
     chk("G2g.no_legend_row_proveNoFalsePositive",
         "Below-grade / gravity drain" not in _svg_press)
+
+    # G3 — T-23 OFF-PAGE CONNECTORS to cultivation / delivery zones.
+    # proveCatch: N pump-unit delivery groups (+ nursery) → N off-page connectors.
+    # proveNoFalsePositive: a single-unit plant with no cultivation signal → [].
+    _z3 = _delivery_zone_offpages({
+        "orchestratorContract": {"quantities": {
+            "distribution_delivery_groups": {"value": 2},
+            "fertigation_dosing_pump_count": {"value": 2},
+            "nursery_fertigation_dosing_pump_count": {"value": 1},
+            "cultivation_container_count": {"value": 6000},
+        }}})
+    chk("G3a.zone_offpages_count_proveCatch", len(_z3) == 3)
+    chk("G3a.zone_offpages_labels_generic",
+        _z3[0][1] == "Delivery group 1" and _z3[1][1] == "Delivery group 2"
+        and _z3[2][1] == "Nursery zone")
+    _z0 = _delivery_zone_offpages({
+        "orchestratorContract": {"quantities": {
+            "fertigation_dosing_pump_count": {"value": 1},
+        }}})
+    chk("G3b.single_unit_no_cultivation_proveNoFalsePositive", _z0 == [])
+    _z_bess = _delivery_zone_offpages({
+        "orchestratorContract": {"quantities": {
+            "battery_rack_count": {"value": 14},
+            "pcs_inverter_count": {"value": 2},
+        }}})
+    chk("G3c.bess_no_zones_proveNoFalsePositive", _z_bess == [])
+    # end-to-end: zone_offpages on a Process render as SYM_OFFPAGE labels in the SVG
+    _z_nodes = [
+        Node(key="p1", tag="P-101", label="Fertigation Dosing Pump",
+             sym=SYM_PUMP, column=0),
+        Node(key="t1", tag="T-101", label="Fresh Water Tank",
+             sym=SYM_TANK, column=1),
+    ]
+    _z_lines = [Line(from_key="p1", to_key="t1", number="201-PR", dn="DN80")]
+    _z_proc = Process(archetype="water_treatment", nodes=_z_nodes, lines=_z_lines,
+                      zone_offpages=_z3)
+    _z_svg = build_pid_svg(_z_proc)
+    chk("G3d.svg_emits_delivery_group_labels",
+        "Delivery group 1" in _z_svg and "Delivery group 2" in _z_svg
+        and "Nursery zone" in _z_svg)
+    chk("G3d.svg_emits_out_of_scope_note", "to cultivation" in _z_svg.lower())
 
     for f in fails:
         print(f"[pid][selftest] FAIL {f}")

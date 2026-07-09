@@ -58,6 +58,10 @@ run "provenance.py --selftest"               "$PY" scripts/lib/provenance.py --s
 run "ooxml_strict_check.py --selftest"       "$PY" scripts/lib/ooxml_strict_check.py --selftest
 run "deterministic_checks_lib.py --selftest"  "$PY" scripts/deterministic_checks_lib.py --selftest
 run "drawing_gates.py --selftest"             "$PY" scripts/blender-universal/drawing_gates.py --selftest
+run "draw_pid.py --selftest (T-23)"           "$PY" scripts/blender-universal/draw_pid.py --selftest
+run "draw_ga.py --selftest (T-27)"            "$PY" scripts/blender-universal/draw_ga.py --selftest
+run "draw_distribution_interface --selftest"  "$PY" scripts/blender-universal/draw_distribution_interface.py --selftest
+run "draw_facility_layout --selftest"         "$PY" scripts/blender-universal/draw_facility_layout.py --selftest
 # TOOL WRAPPERS — worked[] emission + one-mint kVA alignment + honest-absent cert cost (2026-07-03)
 run "electrical_transformer_sizing --selftest" "$PY" scripts/lib/orchestrator/tools/python/electrical_transformer_sizing.py --selftest
 run "control_systems_run --selftest"          "$PY" scripts/lib/orchestrator/tools/python/control_systems_run.py --selftest
@@ -78,6 +82,7 @@ run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/g
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
 run "membrane-stage-brief-gate --selftest"    npx tsx scripts/lib/orchestrator/generic/membrane-stage-brief-gate-selftest.ts
 run "nursery-reservoir-volume --selftest"     npx tsx scripts/lib/orchestrator/generic/nursery-reservoir-volume-selftest.ts
+run "recovery-oxygen-dosing --selftest"      npx tsx scripts/lib/orchestrator/generic/recovery-oxygen-dosing-selftest.ts
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
 run "unit-coercion --selftest (prove-catch)"  npx tsx scripts/lib/orchestrator/generic/unit-coercion.ts --selftest
 run "numeric-drift-matcher --selftest"       npx tsx scripts/lib/numeric-drift-matcher-selftest.ts

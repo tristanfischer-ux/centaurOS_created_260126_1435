@@ -772,6 +772,95 @@ def _draw_function_rooms(svg: SVG, rooms, plan_x, plan_y, mx, my):
                             label_y_min=plan_y + 12)
 
 
+def _draw_external_drain_points(svg: SVG, parts, plan_x, plan_y, plan_w, plan_h,
+                                mx, my):
+    """T-27 — annotate an EXTERNAL DRAIN / MANHOLE outside the plant envelope for
+    every below-grade collection vessel (sump / drainpit / catch-pit).
+
+    UNIVERSAL: keyed on `is_below_grade` (the same noun signal as the hatch
+    convention) — never a class name. Each sump gets a buried (dash-dot) leader
+    from its plan centre to a manhole symbol just outside the nearest plan edge,
+    labelled 'EXT. DRAIN' + the sump's equipment tag. proveCatch in _selftest.
+    """
+    sumps = [p for p in parts if getattr(p, "is_below_grade", False)]
+    if not sumps:
+        return
+    # plan envelope in paper px
+    env_x0, env_y0 = plan_x, plan_y
+    env_x1, env_y1 = plan_x + plan_w, plan_y + plan_h
+    for i, p in enumerate(sumps):
+        cx = plan_x + mx(p.cx)
+        cy = plan_y + my(p.cy)
+        # place the manhole OUTSIDE the nearest envelope edge (prefer south/bottom
+        # so it doesn't collide with the north arrow / top dim band)
+        dist_bottom = env_y1 - cy
+        dist_top = cy - env_y0
+        dist_left = cx - env_x0
+        dist_right = env_x1 - cx
+        nearest = min(
+            ("bottom", dist_bottom), ("top", dist_top),
+            ("left", dist_left), ("right", dist_right),
+            key=lambda t: t[1],
+        )[0]
+        offset = 28 + (i % 3) * 10  # stagger when several sumps share an edge
+        if nearest == "bottom":
+            mxh, myh = cx, env_y1 + offset
+        elif nearest == "top":
+            mxh, myh = cx, env_y0 - offset
+        elif nearest == "left":
+            mxh, myh = env_x0 - offset, cy
+        else:
+            mxh, myh = env_x1 + offset, cy
+        # buried leader (dash-dot) from sump centre to manhole
+        svg.line(cx, cy, mxh, myh, stroke=DATUM_INK, width=1.1, dash="2,2,6,2")
+        # manhole symbol — double circle (standard civil drain/manhole mark)
+        svg.circle(mxh, myh, 7, stroke=EQ_INK, width=1.4, fill=UG_FILL_BG)
+        svg.circle(mxh, myh, 3.5, stroke=EQ_INK, width=1.0, fill="none")
+        svg.text(mxh + 10, myh - 2, "EXT. DRAIN", size=7.2, fill=EQ_INK, weight="bold")
+        svg.text(mxh + 10, myh + 10, p.tag, size=6.8, fill=MUTED)
+
+
+def _draw_elevation_buried_laterals(svg, parts, elev_x, elev_y, elev_w, elev_h,
+                                    axis: str, mx_fn, mz_fn, ground_y):
+    """T-08 — GA elevation dashed buried drain laterals from zone off-page to sumps.
+
+    INTENT: side elevation already hides the slab so below-grade geometry is visible;
+    the FRONT/SIDE elevations still need dashed leaders showing buried headers running
+    from the zone edge (off-page) into each below-grade sump. UNIVERSAL: keyed on
+    is_below_grade — never a class name. axis='x' → front elev (plant length);
+    axis='y' → side elev (plant width)."""
+    sumps = [p for p in parts if getattr(p, "is_below_grade", False)]
+    if not sumps:
+        return
+    # buried trench depth below FFL (schematic — matches 3D BELOW_GRADE_TRENCH_MM spirit)
+    trench_dy = 18.0  # paper px below the ground datum
+    for i, p in enumerate(sumps):
+        if axis == "x":
+            cx = elev_x + mx_fn(p.cx)
+        else:
+            cx = elev_x + mx_fn(p.cy)
+        # sump top sits at/below ground; draw a short vertical drop into the trench
+        # then a horizontal dashed header to the nearest elev edge (off-page zone).
+        sy = ground_y + trench_dy
+        # prefer the nearer elev edge for the off-page stub
+        to_left = cx - elev_x
+        to_right = (elev_x + elev_w) - cx
+        if to_left <= to_right:
+            edge_x = elev_x - 6
+            label_x = elev_x - 4
+            anchor = "end"
+        else:
+            edge_x = elev_x + elev_w + 6
+            label_x = elev_x + elev_w + 8
+            anchor = "start"
+        # horizontal buried header (dash-dot) + short riser into the sump
+        svg.line(edge_x, sy, cx, sy, stroke=DATUM_INK, width=1.15, dash="2,2,6,2")
+        svg.line(cx, sy, cx, ground_y - 2, stroke=DATUM_INK, width=1.0, dash="2,2,6,2")
+        if i == 0:
+            svg.text(label_x, sy - 4, "buried drain lateral", size=6.5, fill=MUTED,
+                     anchor=anchor)
+
+
 def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                  meta: dict, rooms: Optional[list] = None) -> str:
     """Render the projected equipment as a GENERAL ARRANGEMENT: PLAN (top-left),
@@ -926,6 +1015,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # wall stroke reads clearly. No-op when `rooms` is empty (a homogeneous /
     # compact archetype gets no phantom partition — proveNoFalsePositive).
     _draw_function_rooms(svg, rooms, plan_x, plan_y, mx, my)
+    # T-27 — EXTERNAL DRAIN / MANHOLE annotations outside the plant envelope for
+    # every below-grade collection vessel (sump / drainpit). Buried leader from
+    # the sump centre to a manhole symbol just outside the plan boundary.
+    # Universal: any below-grade collection vessel gets one; no-op otherwise.
+    _draw_external_drain_points(svg, parts, plan_x, plan_y, plan_w, plan_h, mx, my)
     # north arrow (top-right corner of the plan)
     north_arrow(svg, plan_x + plan_w - 16, plan_y + 22)
 
@@ -975,6 +1069,9 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
              fill=MUTED)
     dim_v(svg, front_y + (z_max - z_max) * ppm, ground_y, front_x - 16, H,
           ext_from=front_x, label=_fmt_mm(z_max - max(0.0, z_min)))
+    # T-08: dashed buried drain laterals on the FRONT elevation (zone off-page → sump)
+    _draw_elevation_buried_laterals(
+        svg, parts, front_x, front_y, plan_w, front_h, "x", mx, mz, ground_y)
 
     # ───────────────────────── SIDE elevation ─────────────────────────
     svg.text(side_x, side_y - 30, "ELEVATION B–B", size=13, weight="bold",
@@ -1015,6 +1112,11 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     dim_h(svg, side_x, side_x + plan_h, ground_ys + 30, W, ext_from=ground_ys)
     svg.text(side_x + plan_h / 2.0, ground_ys + 50, "PLANT WIDTH", size=8.6,
              anchor="middle", fill=MUTED, spacing="1.0")
+    # T-08: dashed buried drain laterals on the SIDE elevation too
+    def _my_side(y_mm):
+        return (y_max - y_mm) * ppm
+    _draw_elevation_buried_laterals(
+        svg, parts, side_x, side_y, plan_h, front_h, "y", _my_side, mz, ground_ys)
 
     # ───────────────────────── EQUIPMENT SCHEDULE (right gutter) ──────────────
     # The schedule sits in the right-hand column BELOW the side elevation, where
@@ -1660,6 +1762,28 @@ def _selftest() -> int:
     if "url(#ug-hatch)" in all_pressurised or "below grade" in all_pressurised.lower():
         print("  FAIL ga-below-grade-fp: an all-above-grade design (no sump) must "
               "show NO below-grade signal")
+        bad += 1
+    # 7b — T-27 EXTERNAL DRAIN / MANHOLE proveCatch/proveNoFalsePositive.
+    # A below-grade sump must emit an EXT. DRAIN annotation + manhole outside the
+    # plant envelope; an all-above-grade design must show none.
+    if "EXT. DRAIN" not in svg_ug:
+        print("  FAIL ga-ext-drain: a below-grade sump must annotate an external "
+              "drain/manhole outside the plant envelope (T-27)")
+        bad += 1
+    if "TK-114" not in svg_ug:
+        print("  FAIL ga-ext-drain: the external drain label must carry the sump tag")
+        bad += 1
+    if "EXT. DRAIN" in all_pressurised:
+        print("  FAIL ga-ext-drain-fp: an all-above-grade design must NOT emit "
+              "external drain annotations")
+        bad += 1
+    # 7c — T-08 elevation buried drain laterals
+    if "buried drain lateral" not in svg_ug.lower():
+        print("  FAIL ga-T-08: elevation must draw dashed buried drain laterals "
+              "from zone off-page to sumps")
+        bad += 1
+    if "buried drain lateral" in all_pressurised.lower():
+        print("  FAIL ga-T-08-fp: all-above-grade design must NOT show buried laterals")
         bad += 1
     # 8 — CO-LOCATED STACK proveCatch/proveNoFalsePositive (the real Codema control-
     #     cabinet cluster EP-104/X-104/I-103/U-201, all at plan (x,y)=(-4150,9650) —

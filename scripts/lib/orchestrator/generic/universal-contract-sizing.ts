@@ -1582,6 +1582,58 @@ export function mintDemandCoverage(
       }
     }
   }
+  // ── rule 11: RECOVERY-SIDE OXYGEN / AERATION DOSING (T-24 / Sam Green SME —
+  // fertigation-water-recycling reference graph: cloth/paperbelt filter + oxygen dosing
+  // on the drainwater return). UNIVERSAL: a water plant with (a) a drain / recovery /
+  // reclaim reservoir (volume or count key) AND (b) a recovery-conditioning filter
+  // (cloth / paperbelt / recovery filter) OR an explicit recirculation/recovery loop
+  // signal, but NO oxygen/aeration dosing quantity family yet, gets one metering
+  // injector per recovery zone (count tracks the cloth-filter / drain-sump population).
+  // Once-through plants (fresh storage only, no drain reservoir, no recovery filter) →
+  // strict byte-identical no-op. Never fabricates LOX cones (those are RAS life-support;
+  // this is a small ~40 L/h injector on the filtered return).
+  {
+    const r11Keys = Object.keys(quantities)
+    const hasDrainReservoir = r11Keys.some((k) =>
+      /(drain|recover|reclaim|recycl).*(tank|reservoir|storage).*(volume|count)|(tank|reservoir).*(drain|recover|reclaim|recycl).*(volume|count)/i.test(k)
+      || /^drain_water_tank_/.test(k) || /^drainwater_/.test(k) || /_drain_water_tank_/.test(k))
+    const hasRecoveryFilter = r11Keys.some((k) =>
+      /(cloth|paperbelt|paper_belt|recovery).*(filter)|filter.*(cloth|paperbelt|recovery)/i.test(k))
+    const hasRecircSignal = r11Keys.some((k) =>
+      /(recircul|reclaim|recover|recycl|return_loop)/i.test(k))
+    const hasOxygenDosing = r11Keys.some((k) =>
+      /(oxygen|aeration)_dosing|dosing.*(oxygen|aerat)|oxygenat.*dos/i.test(k))
+    if (hasDrainReservoir && (hasRecoveryFilter || hasRecircSignal) && !hasOxygenDosing) {
+      // zone count: prefer cloth_filter_count → drain_collection_sump_count → drain_water_tank_count → 1
+      let zoneN = 0
+      let zoneFrom = ''
+      for (const cand of [
+        'cloth_filter_count', 'drain_collection_sump_count', 'drain_water_tank_count',
+        'drainwater_reservoir_count',
+      ]) {
+        const v = quantities[cand]
+        if (Number.isFinite(v) && v >= 1) { zoneN = Math.round(v); zoneFrom = cand; break }
+      }
+      if (zoneN < 1) {
+        for (const k of r11Keys) {
+          if (!/(cloth_filter|drain_collection_sump|drain_water_tank).*_count$/.test(k)) continue
+          const v = quantities[k]
+          if (Number.isFinite(v) && v >= 1 && v > zoneN) { zoneN = Math.round(v); zoneFrom = k }
+        }
+      }
+      if (zoneN >= 1) {
+        const detail =
+          `demand-coverage: recovery-side oxygen dosing — drain/recovery reservoir + recovery ` +
+          `conditioning (${zoneFrom || 'recovery signal'}) requires re-oxygenation of returned ` +
+          `drainwater before the reservoir; ${zoneN} metering injector(s) (~40 L/h each), one per ` +
+          `recovery zone. Suppressed when oxygen/aeration dosing already exists; once-through ` +
+          `(no drain reservoir) is a no-op.`
+        mint('oxygen_dosing_pump_throughput_m3_h', 0.04, 'm3/h', 'flow_rate', zoneFrom || 'recovery', detail)
+        mint('oxygen_dosing_pump_power_kw', 0.04, 'kW', 'power', zoneFrom || 'recovery', detail)
+        mint('oxygen_dosing_pump_count', zoneN, '', 'count', zoneFrom || 'recovery', detail)
+      }
+    }
+  }
   // ── rule 6: STORAGE DELIVERY COVERAGE (gate-36 round 2 — the v56b storage 40-vs-120
   // false-RADICAL; see the STORAGE-DELIVERY block comment). Every brief STORAGE pin
   // (volume-family target metric whose name reads storage/tank/buffer) must be DELIVERED:
@@ -2852,23 +2904,64 @@ function titleCase(phrase: string): string {
     .join(' ')
 }
 
-function synthWord(g: EquipGroup): WordLike & { _synthesized?: boolean } {
-  const title = titleCase(g.phrase)
+/**
+ * INTENT (T-22/T-13): N+1 backup movers must read as BACKUP/STANDBY on the BoM/P&ID,
+ * not a bare "Fertigation Dosing Pump Backup" that looks like a second duty train.
+ * UNIVERSAL: keyed on the `_backup` stem token minted by rule 9 — never a class table.
+ */
+function equipmentDisplayName(phrase: string): string {
+  const parts = phrase.split(/[_\s]+/).filter(Boolean)
+  const isBackup = parts.some((p) => /^backup$/i.test(p) || /^standby$/i.test(p))
+  const core = parts.filter((p) => !/^backup$/i.test(p) && !/^standby$/i.test(p))
+  const base = titleCase(core.join('_') || phrase)
+  if (!isBackup) return base
+  return `${base} (BACKUP / STANDBY)`
+}
+
+/**
+ * INTENT (T-22): group fertigation/irrigation duty+backup (+ on-board dosing) under a
+ * shared Pump Unit N parent tag so layout/P&ID can cluster them as one skid bay.
+ * UNIVERSAL: zone-mover vocabulary + optional unit index from the count/phrase — no Codema hardcode.
+ */
+function pumpUnitParentTag(phrase: string, unitIndex?: number): string | undefined {
+  const norm = phrase.replace(/[_-]+/g, ' ')
+  if (!/\b(fertigation|irrigation|hand.?water|watering|sprinkler|distribution)\b/i.test(norm)) return undefined
+  if (!/\bpump\b/i.test(norm)) return undefined
+  // metering/trim pumps ride ON the unit but keep their own identity; still tag them
+  // to the parent skid when they share the fertigation/irrigation zone vocabulary.
+  const idx = unitIndex !== undefined && unitIndex >= 1 ? unitIndex : 1
+  return `Pump Unit ${idx}`
+}
+
+function synthWord(g: EquipGroup): WordLike & { _synthesized?: boolean; _pump_unit_tag?: string } {
+  const title = equipmentDisplayName(g.phrase)
   const mods: ModifierCharacter[] = []
   if (g.count !== undefined && g.count >= 2) mods.push(mod('quantity', `×${Math.round(g.count)}`))
   else mods.push(mod('quantity', '×1'))
   mods.push(...dimAndRatingFor(g))
-  mods.push(mod('form', `${title} — principal equipment sized from the engineering contract`))
+  const isBackup = /_backup(?:_|$)/i.test(g.phrase) || /\bbackup\b/i.test(g.phrase.replace(/_/g, ' '))
+  if (isBackup) {
+    mods.push(mod('form', `${title} — labelled N+1 BACKUP/STANDBY replica of the duty pump unit (same rating); not a second duty train`))
+  } else {
+    mods.push(mod('form', `${title} — principal equipment sized from the engineering contract`))
+  }
+  const unitTag = pumpUnitParentTag(g.phrase)
+  if (unitTag) {
+    mods.push(mod('installation', `Skid assembly: ${unitTag} (duty${isBackup ? '+BACKUP' : ''} clustered as one pump-unit bay)`))
+  } else {
+    mods.push(mod('installation', 'Internal / external placement confirmed at layout / detailed design'))
+  }
   mods.push(mod('part_number', 'TBD (detailed design)'))
   mods.push(mod('lifecycle', 'Concept design — catalogue part + exact MPN confirmed at detailed design'))
-  mods.push(mod('installation', 'Internal / external placement confirmed at layout / detailed design'))
-  return {
+  const word: WordLike & { _synthesized?: boolean; _pump_unit_tag?: string } = {
     id: `${g.phrase}_synth_word`,
     name_human: title,
     content_character: { character_id: `${g.phrase}_synth`, name_human: title },
     modifier_characters: mods,
     _synthesized: true,
   }
+  if (unitTag) word._pump_unit_tag = unitTag
+  return word
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -4090,14 +4183,17 @@ export function synthesizeBuildingStructure(
     if (Array.isArray(sm.words)) sm.words = sm.words.filter((w) => !isBuildingStructure(w))
   }
 
-  // SCOPE FIDELITY (Tristan 2026-06-25): if the brief EXPLICITLY excludes the building / civils
-  // (a process plant supplied INTO an existing building by others — e.g. the Codema Fischer Farms
-  // water/fertigation plant), do NOT synthesise a hall around the equipment. Otherwise the universal
+  // SCOPE FIDELITY (Tristan 2026-06-25): if the brief EXPLICITLY excludes the building FABRIC
+  // / polytunnel / hall / rack framework (a process plant supplied INTO an existing building by
+  // others), do NOT synthesise a hall around the equipment. Otherwise the universal
   // BUILDING_ELEMENTS add a floor slab + portal frame + cladding + foundations regardless of scope
   // — a £1.1M+ scope-creep line on a plant whose building is supplied by others. Keyed on the brief's
   // OWN exclusion words (carried on the contract by any archetype that emits scope_exclusions_desc),
   // universal + opt-in — no per-class table. A class that excludes nothing is unaffected (the
   // building still synthesises as before).
+  // GOTCHA (T-06/E-03): "civils" in exclusions historically meant building fabric — underground
+  // drain-pit excavation is a SEPARATE BoM line (civils_rows_from_underground_scope) and must
+  // NOT be suppressed by this flag. The flag only skips the hall synthesis.
   // PRIMARY signal — a numeric flag on the quantities map (this DOES propagate into the orchestrator
   // contract, unlike the string scope_exclusions_desc on shared_quantities, which is stripped).
   const buildingExcludedFlag = Number(
@@ -4109,7 +4205,7 @@ export function synthesizeBuildingStructure(
       ?.shared_quantities?.scope_exclusions_desc
     ?? (contract as unknown as { scope_exclusions_desc?: unknown })?.scope_exclusions_desc ?? '',
   ).toLowerCase()
-  if (buildingExcludedFlag >= 1 || /\bbuilding\b|\bcivils?\b|\bthe\s+hall\b|process\s+hall|rack\s+framework/.test(scopeExclusions)) {
+  if (buildingExcludedFlag >= 1 || /\bbuilding\b|\bcivils?\b|\bthe\s+hall\b|process\s+hall|rack\s+framework|polytunnel|building\s+fabric/.test(scopeExclusions)) {
     return 0
   }
 
@@ -4495,7 +4591,7 @@ function canonFor(g: EquipGroup): CanonEquip {
     group: g,
     id: `${g.phrase}_synth_word`,
     charId: `${g.phrase}_synth`,
-    name: titleCase(g.phrase),
+    name: equipmentDisplayName(g.phrase),
   }
 }
 

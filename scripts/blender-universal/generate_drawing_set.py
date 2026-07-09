@@ -69,6 +69,20 @@ SCHEDULE_DRAWINGS = [
     # drawings — I never understood or trusted them"). draw_isometric.py is no longer invoked.
 ]
 
+# CONDITIONAL DETAIL sheets (T-20 / T-25) — emitted only when the contract carries
+# the relevant geometry / zone signals. Each: (key, script, png, title, gate_fn_name).
+# gate_fn_name is resolved by importing the script module and calling should_emit(state).
+CONDITIONAL_DRAWINGS = [
+    ("distribution-interface", "draw_distribution_interface.py",
+     "distribution-interface.png",
+     "Distribution Interface Detail — multi-tier supply + drain",
+     "should_emit"),
+    ("facility-layout", "draw_facility_layout.py",
+     "facility-layout.png",
+     "Facility / WTR Layout — plant + cultivation zone blocks",
+     "should_emit"),
+]
+
 
 def _blender_bin() -> str | None:
     return shutil.which("blender") or (
@@ -506,7 +520,44 @@ def generate_drawing_set(state_path: str | Path,
 
     system = _group(SYSTEM_DRAWINGS)
     schedules = _group(SCHEDULE_DRAWINGS)
-    n_ok = sum(1 for d in system + schedules if d["ok"])
+
+    # T-20 / T-25 — conditional detail sheets. Gate on contract signals via each
+    # script's should_emit(state); skip silently when not applicable. These need
+    # ONLY state.json (no CAD artifacts) — same philosophy as the BFD.
+    conditional: list[dict] = []
+    try:
+        _state_for_gate = json.loads(state_path.read_text())
+    except Exception:  # noqa: BLE001
+        _state_for_gate = {}
+    for key, script, png_name, title, gate_name in CONDITIONAL_DRAWINGS:
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                f"_cond_{key}", _THIS / script)
+            mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+            assert spec and spec.loader
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            gate = getattr(mod, gate_name, None)
+            if not callable(gate) or not gate(_state_for_gate):
+                log.append(f"  {script}: skipped (should_emit=False)")
+                continue
+            ok = _run_generator(script, out_dir, state_path, png_name, log)
+            # SVG-only success still counts when the generator wrote its SVG
+            # (rasteriser may be absent) — check the sibling .svg.
+            svg_sib = out_dir / "drawings" / png_name.replace(".png", ".svg")
+            if not ok and svg_sib.exists() and svg_sib.stat().st_size > 200:
+                ok = True
+                log.append(f"  {script}: SVG master present (PNG rasteriser absent)")
+            conditional.append({
+                "key": key, "title": title, "script": script,
+                "png": f"drawings/{png_name}",
+                "png_abs": str(out_dir / "drawings" / png_name),
+                "ok": ok,
+            })
+        except Exception as exc:  # noqa: BLE001
+            log.append(f"  {script}: conditional gate/run failed: {exc}")
+
+    n_ok = sum(1 for d in system + schedules + conditional if d["ok"])
 
     # The Block-Flow Diagram (D1 fix) is the PART-1 process-flow overview — distinct
     # from the Part-2 system/schedule drawings. It needs ONLY state.json (the CAD
@@ -614,6 +665,8 @@ def generate_drawing_set(state_path: str | Path,
         "system_drawings": system,
         # schedules/details WEAVE into the Part-2 manufacturing layer.
         "schedule_drawings": schedules,
+        # T-20 / T-25 conditional detail sheets (multi-tier interface + facility layout).
+        "conditional_drawings": conditional,
         # the universal-CAD hero render → state.cad_hero_image_path (cover + module fallback).
         "hero": hero_abs,
         # web-weight hero (≤ ~800 KB) — the exporter should PREFER this when EMBEDDING;
@@ -651,7 +704,7 @@ def generate_drawing_set(state_path: str | Path,
                                   if (out_dir / "connection-schedule.json").exists()
                                   else None),
         "generated_ok": n_ok,
-        "total": len(system) + len(schedules),
+        "total": len(system) + len(schedules) + len(conditional),
         "log": log,
     }
     (out_dir / "drawing-manifest.json").write_text(json.dumps(manifest, indent=1))
@@ -678,6 +731,8 @@ def main(argv: list[str]) -> int:
         print(f"  [system]   {'✓' if d['ok'] else '✗'} {d['title']}  ({d['png']})")
     for d in m["schedule_drawings"]:
         print(f"  [schedule] {'✓' if d['ok'] else '✗'} {d['title']}  ({d['png']})")
+    for d in m.get("conditional_drawings") or []:
+        print(f"  [detail]   {'✓' if d['ok'] else '✗'} {d['title']}  ({d['png']})")
     if any("SKIP" in l or "failed" in l for l in m["log"]):
         print("  log:")
         for l in m["log"]:

@@ -14093,6 +14093,17 @@ registerArchetype('water_treatment', (brief: any) => {
     drain_transfer_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} submersible drain pumps`),
     cloth_filter_throughput_m3_h: q(clothFilterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `drain-water cloth filter (${clothFilterM3H} m³/h, sized to its own zone's peak recovery flow) on HDPE tank, returns to drain tank`),
     cloth_filter_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} cloth-filter units`),
+    // INTENT (T-24 / Sam Green SME): recovery-side oxygen (or aeration) dosing sits AFTER
+    // the cloth/paperbelt filter on the drainwater return — re-oxygenates recovered water
+    // before it re-enters the drain reservoirs. UNIVERSAL signal: drain reservoirs + recovery
+    // filter train exist → mint one O₂ dosing injector per recovery zone (matches cloth_filter
+    // count). A once-through plant with no drain reservoir fabricates nothing here.
+    // DECISION: small metering duty (~40 L/h) mirrors acid/chemical dosing — an injector /
+    // diffuser skid, not a RAS LOX cone. Count tracks the recovery zones, not fertigation
+    // pump units (nursery gets its own key below when present).
+    oxygen_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'recovery-side oxygen dosing injector (~40 L/h) on the filtered drainwater return — re-oxygenates recovered water before the drain reservoir'),
+    oxygen_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'recovery oxygen dosing injector motor (frequency-controlled metering)'),
+    oxygen_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} recovery oxygen dosing injectors (one per drainwater recovery zone, after the cloth filter)`),
     // ── NURSERY PUMP UNIT — the brief's 3rd, differently-sized parallel pump unit (Codema
     //    physics-fault fix, 2026-07-08). Its own dosing, drain pit and cloth filter, mirroring
     //    the main units above, minted ONLY when the brief names a distinct nursery unit
@@ -14113,6 +14124,9 @@ registerArchetype('water_treatment', (brief: any) => {
       nursery_chemical_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery chemical dosing pump`),
       nursery_cloth_filter_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery drain-water cloth filter (${nurseryPumpFlowM3H} m³/h, sized to the nursery zone's own peak recovery flow) on HDPE tank, returns to nursery drain reservoir`),
       nursery_cloth_filter_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery cloth-filter unit`),
+      nursery_oxygen_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery recovery-side oxygen dosing injector (~40 L/h) on the filtered nursery drainwater return'),
+      nursery_oxygen_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery recovery oxygen dosing injector motor'),
+      nursery_oxygen_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery recovery oxygen dosing injector`),
       // Distinct nursery drain reservoir (brief ~40 m³ / Ø3.64 m) — NOT the main 91 m³ class.
       nursery_drain_water_tank_volume_each_m3: q(nurseryDrainReservoirVolM3, 'm³', 'volume', 'rated', 'module', 'brief', `nursery drain-water galvanised reservoir (${nurseryDrainReservoirVolM3} m³) — distinct from the main ${storageTankVolEachM3} m³ drain reservoirs`),
       nursery_drain_water_tank_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery drain-water reservoir`),
@@ -14153,9 +14167,13 @@ registerArchetype('water_treatment', (brief: any) => {
     ),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
-    // 1 = the building / civils / rack framework are supplied by others → synthesizeBuildingStructure
-    // returns 0 (no £1.1M phantom hall). 'build'/'scope' stems are STOP_STEMS so this never synthesises.
-    building_out_of_scope: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'the building, civils and cultivation rack framework are supplied by others — OUT of scope (no hall is synthesised around the water plant)'),
+    // 1 = building FABRIC / polytunnel / rack framework are supplied by others →
+    // synthesizeBuildingStructure returns 0 (no £1.1M phantom hall). Does NOT exclude
+    // underground drain-pit excavation + buried drain laterals — those are IN scope when
+    // drain_pit_* / drain_collection_sump_* quantities exist (Sam Green T-06/E-03 two-truths).
+    // 'build'/'scope' stems are STOP_STEMS so this never synthesises.
+    building_out_of_scope: q(1, '', 'dimensionless', 'rated', 'system', 'brief',
+      'building fabric / polytunnel shell / cultivation rack framework are supplied by others — OUT of scope (no hall synthesised). Underground drain-pit excavation + buried drain laterals remain IN scope when drain_pit / drain_collection_sump quantities exist'),
     total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'alias of connected_electrical_load_kw (ONE-MINT running load)', ['connected_electrical_load_kw']),
   }
 
@@ -14169,7 +14187,7 @@ registerArchetype('water_treatment', (brief: any) => {
 
   return {
     product_class: 'water_treatment',
-    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
+    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery (MAKEUP for loop losses — not full circulation), with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation trays/containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L underground drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC, building fabric / polytunnel shell and cultivation rack framework are OUT of scope (supplied by others). Underground drain-pit excavation and buried drain laterals are IN scope.`,
     quantities,
     // Empty: generic deriveProcessTopology fills orch.topology after reconcile (P&ID/BFD).
     topology: [],
@@ -14186,7 +14204,11 @@ registerArchetype('water_treatment', (brief: any) => {
       actuated_distribution_valve_count: valveCount,
       connected_electrical_load_kw: connectedLoadKw,
       regulatory_standard_spine: 'Pressure Systems Safety Regulations (RO high-pressure section) + Water Supply (Water Fittings) Regulations / backflow Fluid Category protection + COSHH (acid + concentrated-nutrient dosing) + Machinery Directive (BS EN ISO 12100) + BS EN 60204-1 (electrical safety of machinery) + Legionella / water-hygiene control + UKCA',
-      scope_exclusions_desc: 'grow-lighting and its switchboards; climate / heating-ventilation-cooling hardware and the climate computer; the cultivation rack framework; the building and civils; the main electrical switchboard',
+      // INTENT (T-06/E-03): exclude ONLY building fabric / polytunnel / rack — NEVER blanket
+      // "civils". Underground drain-pit excavation + buried laterals stay IN scope when
+      // drain_pit_* quantities exist (requirements_bom civils_rows_from_underground_scope).
+      scope_exclusions_desc: 'grow-lighting and its switchboards; climate / heating-ventilation-cooling hardware and the climate computer; the cultivation rack framework; the building fabric / polytunnel shell (NOT underground drain-pit excavation or buried drain laterals — those remain in scope); the main electrical switchboard',
+      scope_inclusions_desc: 'underground drain-pit excavation, concrete surrounds, and buried drain laterals serving the drain_collection_sump / drain_pit quantities',
     },
   }
 })

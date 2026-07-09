@@ -2765,9 +2765,11 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         )
         # demand-coverage / calculator lineage that cites its parent rule is a disclosed
         # derivation (e.g. backup pump = duty unit's kW), not a hidden calc.
-        disclosed_lineage = src in ("demand-coverage", "calculator", "derived") and (
-            bool(re.search(r"\bRULE\b|rated identically|from\s+\w+|=\s*", sd, re.I))
-            or len(sd) > 20
+        # DECISION: require an explicit RULE/identity/from/= marker — a long prose
+        # sentence alone (len>20) over-widened the exemption and let mystery_hidden_pct
+        # ("an engineering judgement call, no formula") escape the guarantee.
+        disclosed_lineage = src in ("demand-coverage", "calculator", "derived") and bool(
+            re.search(r"\bRULE\b|rated identically|from\s+\w+|=\s*", sd, re.I)
         )
         is_cited_measurement = src == "route-manifest" and bool(_CITED_MEASURED_RE.search(sd))
         if (str(k).lower() in worked or has_formula or tool_shown
@@ -3795,9 +3797,11 @@ def _selftest() -> int:
             # placeholder NAME (part_names fires): requirement is the placeholder
             {"tag": "X-7", "requirement": "requirement stated", "status": "NOT FOUND",
              "part": "requirement stated", "qty": 1, "unit_gbp": 800, "line_gbp": 800},
-            # undocumented tag-prefix ZZ- (glossary fires)
-            {"tag": "ZZ-3", "requirement": "Main Switchboard", "status": "IDENTIFIED",
-             "part": "Switchboard", "qty": 1, "unit_gbp": 3000, "line_gbp": 3000},
+            # undocumented tag-prefix ZZ- (glossary fires). GOTCHA: generative
+            # self-documentation treats a real requirement name as its own definition —
+            # use blank requirement/part so ZZ has NO derivable name (the residual gap).
+            {"tag": "ZZ-3", "requirement": "", "status": "IDENTIFIED",
+             "part": "", "qty": 1, "unit_gbp": 3000, "line_gbp": 3000},
         ] + [{"tag": f"TK-{i}", "requirement": f"Tank {i}", "status": "IDENTIFIED",
               "part": f"Tank {i}", "qty": 1, "unit_gbp": 1000, "line_gbp": 1000} for i in range(9)]
         k_state = {"orchestratorContract": {"product_class": "water_treatment",
