@@ -244,6 +244,22 @@ _GENERIC_ROLE = {
     "pump", "valve", "tank", "vessel", "skid", "unit", "motor", "filter", "blower", "fan",
     "mixer", "agitator", "sensor", "transmitter", "exchanger", "column", "tower", "compressor",
     "dosing", "metering", "throughput", "transfer", "circulation", "recirc", "feed", "pressure",
+    # location / zone qualifiers (Codema ship 2026-07-08 P2-J): 'nursery' is a WHERE, not a
+    # WHAT — nursery_acid_dosing (0.04 m³/h metering) and nursery_fertigation (45 m³/h
+    # circulation) share only 'nursery' and were false-flagged 1125× same-role. Same for
+    # department/zone/main/backup labels that locate equipment without identifying the role.
+    "nursery", "department", "zone", "main", "primary", "secondary", "backup", "standby",
+    "spare", "duty", "train", "skid",
+    # per-unit / each / count vocabulary (Codema ship 2026-07-08): fresh_water_tank_volume_each_m3
+    # (91 m³ reservoir) and nutrient_tank_volume_each_m3 (1 m³ stock tank) share only 'each'
+    # after tank/volume are stripped — they are different vessels, not a same-role pair.
+    "each", "unit", "count", "qty", "number",
+    # vessel-class nouns (codema-full-20260709-1508 Quantities HIGH): a galvanised STORAGE
+    # RESERVOIR (91–455 m³ delivered) and a concrete DRAIN COLLECTION SUMP / PIT (5 m³ each)
+    # share only 'drain'+'water' after generic strip — they are different vessel classes in
+    # the same recovery train, not a same-role contradiction. 'delivered' is a roll-up
+    # qualifier (mintDemandCoverage `_delivered_m3`), not a role.
+    "reservoir", "sump", "pit", "buffer", "storage", "collection", "delivered",
     # electrical measurement-type nouns (BESS cross-val 2026-07-03): every *_voltage_* /
     # *_current_* quantity of the unit shares these, so they don't discriminate ROLE —
     # a 3.2 V CELL and a 1500 V DC BUS are different roles BY DESIGN (469 in series),
@@ -308,6 +324,25 @@ def _dimension_group(key: str) -> Optional[str]:
     return None
 
 
+# VESSEL-CLASS roles (codema-full-20260709-1508 Quantities HIGH): a STORAGE RESERVOIR
+# and a COLLECTION SUMP/PIT in the same drain train share 'drain' but are different
+# vessel classes — never a same-role contradiction. Same pattern as geometric axes:
+# when EITHER key carries a vessel-class token, only compare if they share the SAME class.
+_VESSEL_CLASS_GROUPS = {
+    "reservoir": {"reservoir", "buffer", "storage"},
+    "sump": {"sump", "pit"},
+    "stock_tank": {"stock", "daytank", "day_tank"},
+}
+
+
+def _vessel_class_group(key: str) -> Optional[str]:
+    toks = set(_NUM_RE.findall(str(key).lower()))
+    for group, members in _VESSEL_CLASS_GROUPS.items():
+        if toks & members:
+            return group
+    return None
+
+
 def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
     out: List[ProvFinding] = []
     by_unit: Dict[str, List[tuple]] = {}
@@ -332,7 +367,9 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         roles = _role_tokens(key) - _GENERIC_ROLE - _unit_tokens(unit)
         if not roles:
             continue
-        by_unit.setdefault(unit, []).append((key, float(v), roles, _dimension_group(key)))
+        by_unit.setdefault(unit, []).append(
+            (key, float(v), roles, _dimension_group(key), _vessel_class_group(key)),
+        )
 
     for unit, items in by_unit.items():
         if len(items) < 2:
@@ -344,15 +381,19 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         flagged: Dict[str, tuple] = {}   # hi_key -> (lo_key, ratio, hi, lo)
         n = len(items)
         for i in range(n):
-            ki, vi, ri, di = items[i]
+            ki, vi, ri, di, vi_cls = items[i]
             for j in range(i + 1, n):
-                kj, vj, rj, dj = items[j]
+                kj, vj, rj, dj, vj_cls = items[j]
                 if di and dj and di != dj:
                     # a HEIGHT-family quantity and a DIAMETER/WIDTH-family quantity are
                     # distinct geometric roles even when they share an equipment-stem token
                     # (absorber_column_height_tt_m vs absorber_diameter_m both carry
                     # 'absorber' but measure orthogonal axes of the same vessel) — never
                     # a same-role contradiction, regardless of stem overlap.
+                    continue
+                if (vi_cls or vj_cls) and vi_cls != vj_cls:
+                    # a STORAGE RESERVOIR and a COLLECTION SUMP/PIT share 'drain' but are
+                    # different vessel classes — never a same-role contradiction.
                     continue
                 if not (ri & rj):           # must DIRECTLY share a domain role token
                     continue
@@ -421,6 +462,44 @@ def _selftest() -> int:
     }}}
     expect(not any(f.kind == "divergence" for f in audit_provenance(pumps).findings),
            "a metering pump and a circulation pump (different devices) must NOT be flagged divergent")
+
+    # LOCATION-QUALIFIER guard (Codema ship 2026-07-08): two different devices that only
+    # share a location token ('nursery') must NOT be flagged — nursery acid metering vs
+    # nursery fertigation circulation legitimately differ ~1000×.
+    nursery = {"orchestratorContract": {"quantities": {
+        "nursery_acid_dosing_pump_throughput_m3_h":        {"value": 0.04, "unit": "m³/h", "source": "brief"},
+        "nursery_fertigation_dosing_pump_throughput_m3_h": {"value": 45.0, "unit": "m³/h", "source": "brief"},
+        "nursery_cloth_filter_throughput_m3_h":            {"value": 45.0, "unit": "m³/h", "source": "brief"},
+        "nursery_pump_flow_m3_per_hr":                     {"value": 45.0, "unit": "m³/h", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(nursery).findings),
+           "nursery location alone must NOT make acid metering and fertigation circulation 'same role'")
+
+    # VESSEL-CLASS guard (codema-full-20260709-1508): a drain STORAGE RESERVOIR (delivered
+    # total) and a drain COLLECTION SUMP (per-pit volume) share 'drain'+'water' but are
+    # different vessel classes — must NOT flag. Two competing reservoir claims still flag.
+    vessels = {"orchestratorContract": {"quantities": {
+        "drain_water_reservoir_delivered_m3": {
+            "value": 455.0, "unit": "m3", "source": "demand-coverage",
+            "source_detail": "Σ drain_water_tank volumes (test fixture)",
+        },
+        "nursery_drain_reservoir_delivered_m3": {
+            "value": 364.0, "unit": "m3", "source": "demand-coverage",
+            "source_detail": "Σ nursery drain reservoir volumes (test fixture)",
+        },
+        "drain_collection_sump_volume_each_m3": {"value": 5.0, "unit": "m3", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(vessels).findings),
+           "drain reservoir (storage) vs drain collection sump (pit) must NOT be same-role")
+    same_reservoir = {"orchestratorContract": {"quantities": {
+        "drain_water_reservoir_delivered_m3": {
+            "value": 455.0, "unit": "m3", "source": "demand-coverage",
+            "source_detail": "Σ drain_water_tank volumes (test fixture)",
+        },
+        "drain_water_reservoir_volume_m3": {"value": 5.0, "unit": "m3", "source": "brief"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_reservoir).findings),
+           "two competing drain_water_reservoir claims that disagree must still flag")
 
     # UNIT-PHRASE TIME-WORD guard (CO2-mineralisation cross-val 2026-07-06, both
     # directions): a GAS flow and a LIQUID circulation flow named '..._per_hour' must

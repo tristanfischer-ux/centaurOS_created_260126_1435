@@ -14011,7 +14011,24 @@ registerArchetype('water_treatment', (brief: any) => {
   const q = (v: number, unit: string, family: string, basis: string, scope: string, source: string, source_detail: string, from?: string[], formula?: string): Quantity =>
     ({ value: v, unit, family, basis, scope, source, source_detail, ...(from && from.length ? { lineage: { from, via: source, ...(formula ? { formula } : {}) } } : {}) } as unknown as Quantity)
 
+  // INTENT (codema-full-20260709-1508 load_reconcile): publish the SAME ONE-MINT consumer
+  // list the CO₂ builder already emits so draw_panel_schedule / draw_single_line build
+  // feeders from electrical_consumer__*_kw instead of fuzzy BoM kW (UV 30 vs 10.1, fertigation
+  // 15 vs 7.5 → panel 122 vs contract 87). Panel total == connected_electrical_load_kw by
+  // construction once these quantities exist.
+  const electricalConsumerQuantities: Record<string, Quantity> = Object.fromEntries(
+    electricalConsumers.map((c) => [
+      `electrical_consumer__${c.key}_kw`,
+      q(
+        c.kw, 'kW', 'power', 'rated', 'module', 'calculator',
+        `ONE-MINT electrical-consumer-list entry: ${c.name} — counted once; Σ every ` +
+          `electrical_consumer__*_kw quantity == connected_electrical_load_kw by construction (same array).`,
+      ),
+    ]),
+  )
+
   const quantities: Record<string, Quantity> = {
+    ...electricalConsumerQuantities,
     // ── HARD lock-gate slots (scalars — no equipment synthesised off these names) ──
     ro_permeate_capacity_m3_h: q(roPermeateM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'reverse-osmosis permeate capacity (Codema HORTI PURE RO 8 m³/h); lock-gate HARD slot (exit 22)'),
     irrigation_demand_m3_h: q(irrigationDemandTotalM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'calculator', `peak irrigation demand = ${irrigationDemandM3HPerDept} m³/h per department × ${departmentCount} departments${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount} nursery pump unit(s) × ${nurseryPumpFlowM3H} m³/h` : ''}; lock-gate HARD slot (exit 22)`),
@@ -14074,6 +14091,16 @@ registerArchetype('water_treatment', (brief: any) => {
     // compliance matcher never false-matches acid_dosing_pump_throughput (0.04 m³/h) on a
     // shared "pump" token (scorecard floor 7 on codema-ship: target 90 achieved 0.04).
     pump_unit_flow_m3_per_hr: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `main fertigation pump-unit flow = ${dosingFlowM3H} m³/h (brief pump_unit_flow; one of the 2×90 units)`),
+    // INTENT (codema-full-20260709-1508 Exec UNVERIFIED): brief metrics are numbered
+    // pump_unit_1_capacity / pump_unit_2_capacity / nursery_pump_unit_capacity — emit the
+    // EXACT keys so compliance verifies by name. Same physical duty as pump_unit_flow /
+    // nursery fertigation throughput (aliases, not a second design).
+    pump_unit_1_capacity_m3_per_hr: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief',
+      `pump unit 1 capacity = ${dosingFlowM3H} m³/h (brief pump_unit_1_capacity; alias of pump_unit_flow_m3_per_hr)`,
+      ['pump_unit_flow_m3_per_hr'], 'pump_unit_flow_m3_per_hr'),
+    pump_unit_2_capacity_m3_per_hr: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief',
+      `pump unit 2 capacity = ${dosingFlowM3H} m³/h (brief pump_unit_2_capacity; same duty as unit 1)`,
+      ['pump_unit_flow_m3_per_hr'], 'pump_unit_flow_m3_per_hr'),
     pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'system', 'brief', 'main fertigation pump-unit discharge pressure (brief-stated 2.9 bar)'),
     hand_watering_flow_m3_per_hr: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `hand-watering ring-main flow = ${handWaterM3H} m³/h (brief hand_watering_flow)`),
     fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
@@ -14138,6 +14165,10 @@ registerArchetype('water_treatment', (brief: any) => {
       nursery_fertigation_dosing_pump_power_kw: q(Math.round(dosingPumpKw * 0.6 * 10) / 10, 'kW', 'power', 'rated', 'module', 'brief', 'nursery fertigation circulation pump motor (smaller duty than the main units)'),
       nursery_fertigation_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery fertigation circulation pump discharge pressure (same 2.9 bar plant delivery duty)'),
       nursery_pump_flow_m3_per_hr: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `nursery pump-unit flow = ${nurseryPumpFlowM3H} m³/h (brief nursery_pump_flow; the 45 m³/h unit)`),
+      // Exact brief metric key (codema-full-20260709-1508 Exec UNVERIFIED) — alias of nursery_pump_flow.
+      nursery_pump_unit_capacity_m3_per_hr: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief',
+        `nursery pump-unit capacity = ${nurseryPumpFlowM3H} m³/h (brief nursery_pump_unit_capacity; alias of nursery_pump_flow_m3_per_hr)`,
+        ['nursery_pump_flow_m3_per_hr'], 'nursery_pump_flow_m3_per_hr'),
       nursery_fertigation_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery A/B fertigation dosing unit`),
       nursery_acid_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery acid metering pump (100 L barrel, ~40 L/h)'),
       nursery_acid_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery acid metering pump motor (frequency-controlled)'),
