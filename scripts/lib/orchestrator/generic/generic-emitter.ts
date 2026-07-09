@@ -79,7 +79,28 @@ export async function emitGenericDesign(
   brief: ParsedConstraints,
   envelope: BriefEnvelope,
 ): Promise<DesignJSON> {
-  const slug = resolveClassGraphSlug(envelope.class)
+  let slug = resolveClassGraphSlug(envelope.class)
+  // SCALE-AWARE GRAPH SELECTION (2026-07-10, Powerwall exit-32 round 4): the alias map
+  // sends every energy-storage slug to the CONTAINERISED utility graph, whose own scope
+  // notes exclude residential ("different module set — residential would use
+  // `residential_ess` graph when seeded"). A sub-utility design (nameplate < 100 kWh —
+  // the same containerised threshold as the pricing override gate) inherited the ISO
+  // container, grid step-up transformer, 25 kW HVAC and glycol chiller loop from that
+  // graph — every one a wrong-product-class part the audits then flagged. Route it to
+  // the residential graph instead. Keyed ONLY on the design's own energy scale; a
+  // utility brief (≥ 100 kWh) or any other class is byte-identical.
+  if (slug === 'bess-utility-scale') {
+    const nameplateKwh = Number(
+      (contract as { quantities?: Record<string, { value?: unknown }> })?.quantities?.nameplate_capacity_kwh?.value,
+    )
+    if (Number.isFinite(nameplateKwh) && nameplateKwh > 0 && nameplateKwh < 100) {
+      slug = 'residential-battery-storage'
+      console.error(
+        `[generic-emitter] scale-aware graph selection: nameplate ${nameplateKwh} kWh < 100 kWh ` +
+          `— using 'residential-battery-storage' (wall-mount all-in-one) instead of the containerised utility graph`,
+      )
+    }
+  }
   let graph = await getClassReferenceGraphDBFirst(slug)
   // G4 provenance of the graph the skeleton derives from.
   let graphProvenance = 'db-first/baked'
