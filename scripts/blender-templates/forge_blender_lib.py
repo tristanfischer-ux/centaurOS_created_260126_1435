@@ -2049,16 +2049,27 @@ def _fillet_waypoints_m(pts_m, radius_m, samples=4):
     return [tuple(p) for p in out]
 
 
+from pipe_flange_rules import should_emit_pipe_end_flanges  # noqa: E402
+
+
 def prim_pipe_run(name, waypoints_mm, diameter_mm, material=None,
-                  bend_radius_mm=None, flanges=True, connect=(),
+                  bend_radius_mm=None, flanges=False, connect=(),
                   module=None, module_objects=None):
     """Routed pipe/cable/duct run along an orthogonal waypoint path (mm),
     with real bend radii at the corners (quarter-arc fillets; default bend
-    radius = 1.5D) and flanges at both ends. Use route_orthogonal() to
-    generate waypoints between two ports, or pass them explicitly.
+    radius = 1.5D). Use route_orthogonal() to generate waypoints between two
+    ports, or pass them explicitly.
     connect=(asm_a, asm_b, ...) declares the run attached_to each — the
     module linkage that makes the connectivity check pass and the geometry
-    read as a connected plant."""
+    read as a connected plant.
+
+    INTENT: Pipe-end flanges are OFF by default. Stage-2 nozzle stubs own the
+    single joint face at a port landing; a pipe-end disc (even alone) reads as
+    a free-end T-bar on risers and unterminated runs (Sam/Codema, 2026-07-09).
+    `flanges=True` is accepted for API compatibility but suppressed by
+    `should_emit_pipe_end_flanges` unless PIPE_END_FLANGES_ENABLED is flipped.
+    """
+
     dia = _mm(diameter_mm)
     r_bend = _mm(bend_radius_mm) if bend_radius_mm is not None else dia * 1.5
     pts_m = [_mm3(p) for p in waypoints_mm]
@@ -2068,16 +2079,28 @@ def prim_pipe_run(name, waypoints_mm, diameter_mm, material=None,
     pipe = add_pipe(f"{name}_tube", path, dia / 2, material,
                     module=module, module_objects=module_objects, bevel_segments=6)
     parts = [pipe]
-    if flanges:
+    # DECISION: connect partners ⇒ nozzle stub already owns the flange face.
+    # Emitting flanges=True on top of that is the double-disc T residual.
+    if should_emit_pipe_end_flanges(flanges, connect):
+        # Raised-face flange proportions (not a fat T-bar): OD ≈ 1.35× pipe OD,
+        # face thickness ≈ 0.12× pipe OD. The old dia*0.85 radius + dia*0.35 length
+        # read as free-end T-pieces on every riser (Sam/Codema visual, 2026-07-09).
+        fl_r = dia * 0.675          # radius → OD = 1.35 × pipe OD
+        fl_t = max(dia * 0.12, 0.012)  # thin face (metres)
         for pt, nbr, side in [(pts_m[0], pts_m[1], "A"), (pts_m[-1], pts_m[-2], "B")]:
             d = (mathutils.Vector(nbr) - mathutils.Vector(pt)).normalized()
+            # Skip flange on a stub tip shorter than ~2 pipe diameters — those free
+            # ends are the T-stubs that go nowhere; a flange only makes them louder.
+            seg_len = (mathutils.Vector(nbr) - mathutils.Vector(pt)).length
+            if seg_len < dia * 2.0:
+                continue
             if abs(d.z) > 0.9:
                 rot = (0, 0, 0)
             elif abs(d.x) > 0.9:
                 rot = (0, math.radians(90), 0)
             else:
                 rot = (math.radians(90), 0, 0)
-            parts.append(add_cyl(f"{name}_flange_{side}", pt, dia * 0.85, dia * 0.35,
+            parts.append(add_cyl(f"{name}_flange_{side}", pt, fl_r, fl_t,
                                  material, module=module, module_objects=module_objects,
                                  rotation=rot))
     pipe["fl_pipe_run"] = True

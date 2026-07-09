@@ -1392,10 +1392,10 @@ function _selftest() {
         ] },
       },
       requirementsBom: [
-        { tag: '—', requirement: 'Zoned distribution — zone laterals (flood-fill lines) · DN75 PVC-U · 8,280 m',
-          qty: 8280, unit_gbp: 13.2, line_gbp: 109296, uom: 'm',
+        { tag: '—', requirement: 'Zoned distribution — zone laterals (flood-fill lines) · DN75 PVC-U · 120 m',
+          qty: 120, unit_gbp: 13.2, line_gbp: 1584, uom: 'm',
           basis: 'parametric estimate — zoned-delivery distribution network (engineered allowance, NOT per-pipe routed): '
-            + '8,280 m × £13.2/m supply-only materials (20% of the uk-2026 supply+install £66/m @ DN75) · length-priced: qty = the run length in metres' },
+            + '120 m × £13.2/m supply-only materials (20% of the uk-2026 supply+install £66/m @ DN75) · length-priced: qty = the run length in metres' },
         { tag: '—', requirement: 'Zoned distribution — delivery inlet stubs, one per served position · 6,000 off',
           qty: 6000, unit_gbp: 6, line_gbp: 36000,
           basis: 'parametric estimate — zoned-delivery distribution network: 6,000 served positions × £6 inlet-stub materials '
@@ -1549,14 +1549,14 @@ function _selftest() {
       orchestratorContract: { quantities: {
         actuated_distribution_valve_count: { value: 200, unit: '', source: 'brief',
           source_detail: '200 electrically-actuated distribution valves' },
-        distribution_zone_lateral_length_m: { value: 8280, unit: 'm', source: 'demand-coverage',
+        distribution_zone_lateral_length_m: { value: 120, unit: 'm', source: 'demand-coverage',
           lineage: { from: ['actuated_distribution_valve_count'] },
-          source_detail: 'parametric — zone laterals = 200 zones × (30 positions/zone ÷ 2 rows × 2.76 m position pitch) = 8,280 m' },
+          source_detail: 'parametric — zone laterals = 200 zones × 0.6 m (multi-tier shared-tray zone-valve stub) = 120 m' },
       } },
       requirementsBom: [
-        { tag: '—', requirement: 'Zoned distribution — zone laterals (flood-fill lines) · DN75 PVC-U · 8,280 m',
-          qty: 8280, unit_gbp: 13.2, line_gbp: 109296, uom: 'm',
-          basis: 'parametric estimate — zoned-delivery distribution network: 8,280 m × £13.2/m supply-only materials' },
+        { tag: '—', requirement: 'Zoned distribution — zone laterals (flood-fill lines) · DN75 PVC-U · 120 m',
+          qty: 120, unit_gbp: 13.2, line_gbp: 1584, uom: 'm',
+          basis: 'parametric estimate — zoned-delivery distribution network: 120 m × £13.2/m supply-only materials' },
         { tag: 'P-201', requirement: 'Irrigation Booster Pump · 90 m³/h', qty: 1, unit_gbp: 9000, line_gbp: 9000, basis: 'catalogue' },
         { tag: 'P-202', requirement: 'Transfer Pump · 90 m³/h', qty: 1, unit_gbp: 9000, line_gbp: 9000, basis: 'catalogue' },
         { tag: 'Z-301', requirement: 'Mystery Skid · 700 m³/h', qty: 1, unit_gbp: 50000, line_gbp: 50000, basis: 'catalogue' },
@@ -1564,7 +1564,7 @@ function _selftest() {
     }
     const r = routeFaults([
       { line: '— (Zoned distribution — zone laterals)', dimension: 'quantity',
-        issue: 'qty 8280 far above realistic lateral length for a 45 m³/h system', magnitude: '~5× too long', suggested: '~1,600 m', likely_cause: 'wrong quantity' },
+        issue: 'qty 120 far above realistic lateral length for a 45 m³/h system', magnitude: '~5× too long', suggested: '~20 m', likely_cause: 'wrong quantity' },
       { line: 'P-201 (Irrigation Booster Pump)', dimension: 'sizing',
         issue: '90 m³/h pump on 45 m³/h benchmark flow', magnitude: '~2× oversized', suggested: '45 m³/h', likely_cause: 'oversize' },
       { line: 'P-202 (Transfer Pump)', dimension: 'sizing',
@@ -1573,7 +1573,7 @@ function _selftest() {
         issue: '700 m³/h skid absurd for this plant', magnitude: '~15× too large', suggested: '45 m³/h', likely_cause: 'volume bug' },
     ] as any, st)
     if (!((r[0] as any)?.brief_anchored === true && r[0]?.dimension === 'note' && /corroborated by the brief/.test(r[0]?.issue || ''))) {
-      console.log(`FAIL: the 8,280 m brief-geometry laterals fault must downgrade to a note (got ${JSON.stringify({ d: r[0]?.dimension, i: (r[0]?.issue || '').slice(0, 80) })})`); bad++
+      console.log(`FAIL: the 120 m brief-geometry laterals fault must downgrade to a note (got ${JSON.stringify({ d: r[0]?.dimension, i: (r[0]?.issue || '').slice(0, 80) })})`); bad++
     }
     if (!((r[1] as any)?.brief_anchored === true && r[1]?.dimension === 'note')) {
       console.log(`FAIL: the 90 m³/h IRRIGATION pump (brief: 45 per department × 2) must downgrade (got ${JSON.stringify({ d: r[1]?.dimension })})`); bad++

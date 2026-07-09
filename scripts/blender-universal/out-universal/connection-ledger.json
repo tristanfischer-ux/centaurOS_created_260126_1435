@@ -1,2017 +1,1221 @@
 {
  "schema": "connection-ledger/1",
- "count": 182,
+ "count": 95,
  "note": "Ledger-authored connections (part\u2192part\u2192service). Blender measures the lengths; the BoM costs these. `adjacency` is the per-part trace (inputs/outputs by name).",
  "rows": [
   {
-   "from_part": "LFP prismatic cell",
-   "to_part": "rack DC isolator",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 1562.5,
-   "required_unit": "A",
+   "from_part": "Gac Softener",
+   "to_part": "Softener Vessel",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 14.5,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (destination demand)",
    "material_context": null,
    "source": "contract"
   },
   {
-   "from_part": "PCS inverter 1.5 MW bidirectional",
-   "to_part": "heat_rejection",
-   "mechanism": "thermal",
-   "service": "thermal",
-   "constraint_kind": "thermal_rejection",
-   "required_value": 30.00000000000003,
-   "required_unit": "kW",
+   "from_part": "Softener Vessel",
+   "to_part": "grp_membrane_housings",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 14.5,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (source delivery)",
    "material_context": null,
    "source": "contract"
   },
   {
-   "from_part": "step-up transformer",
-   "to_part": "rack DC isolator enclosure",
-   "mechanism": "mechanical",
-   "service": "assembly",
-   "constraint_kind": "material_compatibility",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "enclosure_atmosphere=air",
-   "source": "contract"
-  },
-  {
-   "from_part": "module top cover",
-   "to_part": "coolant circulation pump",
+   "from_part": "grp_membrane_housings",
+   "to_part": "Uf Module Bank",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
    "required_value": null,
    "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Uf Module Bank",
+   "to_part": "Ro High Pressure Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 11,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty ro_high_pressure_pump_throughput_m3_h = 11 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Ro High Pressure Pump",
+   "to_part": "Reverse Osmosis Skid",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 11,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty ro_high_pressure_pump_throughput_m3_h = 11 m3/h (source delivery)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Reverse Osmosis Skid",
+   "to_part": "ro_membrane_elements",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "ro_membrane_elements",
+   "to_part": "Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Drain Collection Sump",
+   "to_part": "Uv Disinfection",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 225,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty uv_disinfection_throughput_m3_h = 225 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Uv Disinfection",
+   "to_part": "Nursery Cloth Filter",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_cloth_filter_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Cloth Filter",
+   "to_part": "Gac Filter",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_cloth_filter_throughput_m3_h = 45 m3/h (source delivery)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Gac Filter",
+   "to_part": "Cloth Filter",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 90,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty cloth_filter_throughput_m3_h = 90 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Cloth Filter",
+   "to_part": "Drain Water Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 90,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty cloth_filter_throughput_m3_h = 90 m3/h (source delivery)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Drain Water Tank",
+   "to_part": "Nursery Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Drain Collection Sump",
+   "to_part": "Drain Transfer Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Drain Transfer Pump",
+   "to_part": "Nursery Drain Transfer Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Drain Transfer Pump",
+   "to_part": "Cip Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 4,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty cip_tank_line_flow_m3_h = 4 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Cip Tank",
+   "to_part": "Cleanwater Reservoir Reserve Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 4,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty cip_tank_line_flow_m3_h = 4 m3/h (source delivery)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Cleanwater Reservoir Reserve Tank",
+   "to_part": "Fresh Water Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Fresh Water Tank",
+   "to_part": "Nutrient Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nutrient Tank",
+   "to_part": "Acid Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Acid Dosing Pump",
+   "to_part": "Chemical Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Chemical Dosing Pump",
+   "to_part": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+   "to_part": "Fertigation Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 90.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty fertigation_dosing_pump_throughput_m3_h = 90 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Fertigation Dosing Pump",
+   "to_part": "Fertigation Dosing Pump Backup",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 90.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty fertigation_dosing_pump_backup_throughput_m3_h = 90 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Fertigation Dosing Pump Backup",
+   "to_part": "Hand Watering Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 25,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty hand_watering_pump_throughput_m3_h = 25 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Hand Watering Pump",
+   "to_part": "Irrigation Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 225,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty irrigation_pump_flow_m3_h = 225 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Irrigation Pump",
+   "to_part": "Nursery Acid Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Acid Dosing Pump",
+   "to_part": "Nursery Chemical Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Chemical Dosing Pump",
+   "to_part": "Nursery Fertigation Dosing Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_fertigation_dosing_pump_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Fertigation Dosing Pump",
+   "to_part": "Distribution Manifold",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 25,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty distribution_manifold_throughput_m3_h = 25 m3/h (destination demand)",
+   "material_context": null,
+   "source": "contract"
+  },
+  {
+   "from_part": "Nursery Drain Collection Sump",
+   "to_part": "Gac Softener",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 14.5,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty gac_softener_throughput_m3_h = 14.5 m3/h (destination demand)",
+   "material_context": "recirculation return loop \u2014 recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)",
+   "source": "contract"
+  },
+  {
+   "from_part": "Conductivity Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Flow Meter",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Ph Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Orp Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Level Transmitter",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "pH Analyser",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Pressure Transmitter",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Silica Analyzer",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Chlorine Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Tds Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Leak Detection Sensor",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "signal",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "contract"
+  },
+  {
+   "from_part": "Fresh Water Tank",
+   "to_part": "Permeate Outlet",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 225.0,
+   "required_unit": "m3/h",
+   "required_basis": null,
    "material_context": "process water (inter-module recirculation/service)",
    "source": "completion"
   },
   {
-   "from_part": "grid PCC metering CT",
-   "to_part": "step-up transformer",
+   "from_part": "Mains Incomer",
+   "to_part": "Standby Diesel Generator",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "step-up transformer",
-   "to_part": "AC main breaker",
+   "from_part": "Standby Diesel Generator",
+   "to_part": "Transformer",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "AC main breaker",
-   "to_part": "cell-to-cell busbar",
+   "from_part": "Transformer",
+   "to_part": "Main Switchboard",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "cell-to-cell busbar",
-   "to_part": "DC busbar 800 V",
+   "from_part": "Main Switchboard",
+   "to_part": "Motor Control Center",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "utility incomer / main distribution feeder",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "rack heater fuse",
+   "from_part": "Motor Control Center",
+   "to_part": "Electrical Control Panel",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "PCS DC surge arrester",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "transformer MV surge arrester",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "DC HRC fuse",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "G99 protection relay",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "AC surge protection device",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "PE surge counter",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "rack string fuse",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "fuse holder",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "fuse label",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "fuse mount rail",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "fuse install torque card",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "safety relay",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "busbar protective tap (fuse / surge / relay)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "compression plate",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "compression plate",
-   "to_part": "module top cover",
+   "from_part": "Electrical Control Panel",
+   "to_part": "Digital Control Panel",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "current_rating",
+   "required_value": 0.5,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "completion"
+  },
+  {
+   "from_part": "Motor Control Center",
+   "to_part": "3 Phase Power Input",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 4.3,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Motor Control Center",
+   "to_part": "Control + Instrument UPS",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 4.3,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Control + Instrument UPS",
+   "to_part": "Digital Control Panel",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "current_rating",
+   "required_value": 0.5,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "completion"
+  },
+  {
+   "from_part": "Motor Control Center",
+   "to_part": "SCADA / Plant Control System",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "current_rating",
+   "required_value": 4.3,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "LV power feeder 400/415V 3ph",
+   "source": "completion"
+  },
+  {
+   "from_part": "Motor Control Center",
+   "to_part": "Digital Control Panel",
+   "mechanism": "signal",
+   "service": "signal",
+   "constraint_kind": "current_rating",
+   "required_value": 0.5,
+   "required_unit": "A",
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
+   "source": "completion"
+  },
+  {
+   "from_part": "Ultrafiltration Module",
+   "to_part": "Fresh Water Tank",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
+   "required_value": 3.375,
+   "required_unit": "m3/h",
+   "required_basis": null,
    "material_context": "process-water service tie-in (make-up / fill / drain)",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "compression tie rod set",
+   "from_part": "Motor Control Center",
+   "to_part": "Uv Disinfection",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 16.2,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "compression tie rod set",
-   "to_part": "module top cover",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "insulation monitor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "pack temperature sensor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "pack voltage sensor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "PTC rack heater",
+   "from_part": "Motor Control Center",
+   "to_part": "Fertigation Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 12.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "rack heater thermostat",
+   "from_part": "Motor Control Center",
+   "to_part": "Acid Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 0.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "rack heater cable",
+   "from_part": "Motor Control Center",
+   "to_part": "Chemical Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 0.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "PCS DC-link capacitor bank",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "PCS LCL output filter inductor",
+   "from_part": "Motor Control Center",
+   "to_part": "Hand Watering Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "PCS LCL output filter inductor",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "PCS DC surge arrester",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "PCS cooling fan tray",
+   "from_part": "Motor Control Center",
+   "to_part": "Drain Transfer Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 3.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "PCS cooling fan tray",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "PCS liquid cooling interface",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "step-up transformer",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer neutral grounding",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer MV surge arrester",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer winding temperature detector",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "PCS inverter 1.5 MW bidirectional",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "BMS master controller",
+   "from_part": "Motor Control Center",
+   "to_part": "Cloth Filter",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "CAN transceiver",
+   "from_part": "Motor Control Center",
+   "to_part": "Nursery Fertigation Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 12.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "CAN transceiver",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "digital isolator",
+   "from_part": "Motor Control Center",
+   "to_part": "Nursery Acid Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 0.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "digital isolator",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "BMS master housing",
+   "from_part": "Motor Control Center",
+   "to_part": "Nursery Chemical Dosing Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 0.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "BMS master housing",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "BMS slave module",
+   "from_part": "Motor Control Center",
+   "to_part": "Nursery Cloth Filter",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "BMS slave module",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "EMS industrial PC",
+   "from_part": "Motor Control Center",
+   "to_part": "Nursery Drain Transfer Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 3.1,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "EMS industrial PC",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "Modbus gateway",
+   "from_part": "Motor Control Center",
+   "to_part": "Irrigation Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "Modbus gateway",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "EMS managed Ethernet switch",
+   "from_part": "Motor Control Center",
+   "to_part": "Fertigation Dosing Pump Backup",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 12.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "EMS managed Ethernet switch",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "EMS UPS backup module",
+   "from_part": "Motor Control Center",
+   "to_part": "Ro High Pressure Pump",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 6.7,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "EMS UPS backup module",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "EMS fibre patch panel",
+   "from_part": "Motor Control Center",
+   "to_part": "Gac Filter",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "EMS fibre patch panel",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "watchdog timer relay",
+   "from_part": "Motor Control Center",
+   "to_part": "Permeate Outlet",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "watchdog timer relay",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "watchdog terminal block",
+   "from_part": "Motor Control Center",
+   "to_part": "Concentrate Outlet",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "watchdog terminal block",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "AC energy meter",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "AC voltage transformer",
+   "from_part": "Motor Control Center",
+   "to_part": "Electrical Control Cabinet",
    "mechanism": "electrical_bus",
    "service": "power",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 4.3,
    "required_unit": "A",
+   "required_basis": null,
    "material_context": "LV power feeder 400/415V 3ph",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "EMC ground braid",
-   "mechanism": "electrical_bus",
-   "service": "power",
+   "from_part": "Electrical Control Cabinet",
+   "to_part": "Digital Control Panel",
+   "mechanism": "signal",
+   "service": "signal",
    "constraint_kind": "current_rating",
-   "required_value": 12.0,
+   "required_value": 0.5,
    "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
+   "required_basis": null,
+   "material_context": "instrument signal cable 4-20mA",
    "source": "completion"
   },
   {
-   "from_part": "DC busbar 800 V",
-   "to_part": "earth bar",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "equipotential bonding cable",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "earth rod",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "liquid cooling chiller",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "cooling pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "cold plate manifold",
+   "from_part": "Permeate Outlet",
+   "to_part": "Acid Dosing Pump",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "expansion tank",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "enclosure ventilation fan",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "enclosure ventilation fan",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "air intake filter",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "air intake filter",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "louvre vent panel",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "louvre vent panel",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "thermostat controller",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "thermostat controller",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "humidity sensor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "container AC unit",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HVAC duct",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "HVAC condensate pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HVAC condensate pump",
-   "to_part": "cold plate manifold",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "coolant circulation pump",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "cold plate per rack",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "coolant distribution manifold",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "pressure relief and sight glass",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "pressure relief and sight glass",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "coolant supply pipe",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "coolant return pipe",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "ball valve isolation",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "pressure transducer",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "clean agent cylinder",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "suppression nozzle",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "thermal detector",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke aspirating detector",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "suppression releasing panel",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "deflagration vent panel",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke vent interlock",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke vent interlock mount",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "deflagration vent seal",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "gas sensor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "gas detector controller",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "gas detector controller",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "gas sensor mount",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "gas detection harness",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "gas sensor label",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "rack string fuse",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "fuse holder",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "fuse mount rail",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "fuse install torque card",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke detector head",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke detector base",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke detector loop cable",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke detector sounder",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "smoke detector callpoint",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "off-gas exhaust fan",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "off-gas exhaust fan",
-   "to_part": "fuse install torque card",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "off-gas duct section",
-   "to_part": "fuse install torque card",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "off-gas check valve",
-   "to_part": "fuse install torque card",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "off-gas activation solenoid",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "off-gas duct penetration seal",
-   "to_part": "fuse install torque card",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-water service tie-in (make-up / fill / drain)",
-   "source": "completion"
-  },
-  {
-   "from_part": "arc flash relay",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "arc flash fibre-optic point sensor",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "arc flash relay terminal block",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "arc flash barrier tape",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "arc flash barrier panel",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "emergency stop button",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "emergency stop contact block",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "safety relay",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "HMI panel",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HMI panel",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "local emergency stop",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "local emergency stop",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "HMI panel VESA mount",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HMI panel VESA mount",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "HMI ethernet cable",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HMI ethernet cable",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "DC busbar 800 V",
-   "to_part": "HMI label pin",
-   "mechanism": "electrical_bus",
-   "service": "power",
-   "constraint_kind": "current_rating",
-   "required_value": 12.0,
-   "required_unit": "A",
-   "material_context": "LV power feeder 400/415V 3ph",
-   "source": "completion"
-  },
-  {
-   "from_part": "HMI label pin",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "grid PCC metering CT",
-   "to_part": "BMS master controller",
-   "mechanism": "signal",
-   "service": "signal",
-   "constraint_kind": "current_rating",
-   "required_value": 0.5,
-   "required_unit": "A",
-   "material_context": "instrument signal cable 4-20mA",
-   "source": "completion"
-  },
-  {
-   "from_part": "pressure relief and sight glass",
-   "to_part": "compression plate",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "pressure relief and sight glass",
-   "to_part": "compression tie rod set",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "compression tie rod set",
-   "to_part": "cooling pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "compression tie rod set",
-   "to_part": "expansion tank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "compression tie rod set",
-   "to_part": "louvre vent panel",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "compression tie rod set",
-   "to_part": "HVAC duct",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "compression tie rod set",
-   "to_part": "HVAC condensate pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "cold plate per rack",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "coolant return pipe",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "pressure transducer",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "deflagration vent panel",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "smoke vent interlock",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "smoke vent interlock mount",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "deflagration vent seal",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "deflagration vent label",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "off-gas duct section",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "cooling pump",
-   "to_part": "off-gas duct penetration seal",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow input (direction-closer: nearest upstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "PCS inverter 1.5 MW bidirectional",
-   "to_part": "coolant circulation pump",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (destination demand)",
    "material_context": "process-flow output (direction-closer: nearest downstream)",
    "source": "completion"
   },
   {
-   "from_part": "coolant circulation pump",
-   "to_part": "compression tie rod set",
+   "from_part": "Motor Control Center",
+   "to_part": "Digital Control Panel",
+   "mechanism": "electrical_bus",
+   "service": "power",
+   "constraint_kind": "power_feed",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "power feed (distribution hub -> powered part)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Softener Vessel",
+   "to_part": "Inlet Flow Control Valve",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "final_control_element",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "actuator/valve on the host's process line (actuator-host closer: explicit _actuator_of or sibling-group host)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Softener Vessel",
+   "to_part": "Solenoid Valves",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "final_control_element",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "actuator/valve on the host's process line (actuator-host closer: explicit _actuator_of or sibling-group host)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Softener Vessel",
+   "to_part": "Ultrafiltration Module",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow output (direction-closer: nearest downstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "fuse install torque card",
-   "to_part": "heat_rejection",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process-flow output (direction-closer: nearest downstream)",
-   "source": "completion"
-  },
-  {
-   "from_part": "PTC rack heater",
-   "to_part": "rack wiring carrier",
-   "mechanism": "assembly",
-   "service": "assembly",
-   "constraint_kind": "mechanical_assembly",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "sub-component of parent (assembly: part-of)",
-   "source": "completion"
-  },
-  {
-   "from_part": "pressure transducer",
-   "to_part": "pressure relief and sight glass",
-   "mechanism": "assembly",
-   "service": "assembly",
-   "constraint_kind": "mechanical_assembly",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "sub-component of parent (assembly: part-of)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "PCS DC-link capacitor bank",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
+   "required_value": 14.5,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (source delivery)",
    "material_context": "process input (boundary closer: nearest producer)",
    "source": "completion"
   },
   {
-   "from_part": "transformer cable sealing end",
-   "to_part": "PCS LCL output filter inductor",
+   "from_part": "Fresh Water Tank",
+   "to_part": "Softener Vessel",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 14.5,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty softener_vessel_line_flow_m3_h = 14.5 m3/h (destination demand)",
+   "material_context": "process input (boundary closer: nearest producer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Fresh Water Tank",
+   "to_part": "Drain Collection Sump",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
    "required_value": null,
    "required_unit": null,
+   "required_basis": null,
    "material_context": "process input (boundary closer: nearest producer)",
    "source": "completion"
   },
   {
-   "from_part": "transformer cable sealing end",
-   "to_part": "PCS DC surge arrester",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "PCS liquid cooling interface",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "step-up transformer",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "transformer neutral grounding",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer cable sealing end",
-   "to_part": "transformer MV surge arrester",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "transformer MV surge arrester",
-   "to_part": "transformer cable sealing end",
-   "mechanism": "fluid_loop",
-   "service": "water",
-   "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "process input (boundary closer: nearest producer)",
-   "source": "completion"
-  },
-  {
-   "from_part": "deflagration vent panel",
+   "from_part": "Drain Collection Sump",
    "to_part": "Effluent / disposal \u2014 battery limit",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
    "required_value": null,
    "required_unit": null,
+   "required_basis": null,
    "material_context": "discharge to disposal (battery limit)",
    "source": "completion"
   },
   {
-   "from_part": "smoke vent interlock",
+   "from_part": "Fresh Water Tank",
+   "to_part": "Drain Transfer Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": "process input (boundary closer: nearest producer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Drain Transfer Pump",
+   "to_part": "Effluent / disposal \u2014 battery limit",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty drain_transfer_pump_throughput_m3_h = 45 m3/h (source delivery)",
+   "material_context": "discharge to disposal (battery limit)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Fresh Water Tank",
+   "to_part": "Nursery Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "process input (boundary closer: nearest producer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Nursery Drain Collection Sump",
    "to_part": "Effluent / disposal \u2014 battery limit",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
    "required_value": null,
    "required_unit": null,
+   "required_basis": null,
    "material_context": "discharge to disposal (battery limit)",
    "source": "completion"
   },
   {
-   "from_part": "smoke vent interlock mount",
+   "from_part": "Fresh Water Tank",
+   "to_part": "Nursery Drain Transfer Pump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (destination demand)",
+   "material_context": "process input (boundary closer: nearest producer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Nursery Drain Transfer Pump",
+   "to_part": "Effluent / disposal \u2014 battery limit",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 45.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty nursery_drain_transfer_pump_throughput_m3_h = 45 m3/h (source delivery)",
+   "material_context": "discharge to disposal (battery limit)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Fresh Water Tank",
+   "to_part": "Drain Water Tank",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": null,
+   "required_unit": null,
+   "required_basis": null,
+   "material_context": "process input (boundary closer: nearest producer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Drain Water Tank",
    "to_part": "Effluent / disposal \u2014 battery limit",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
    "required_value": null,
    "required_unit": null,
+   "required_basis": null,
    "material_context": "discharge to disposal (battery limit)",
    "source": "completion"
   },
   {
-   "from_part": "deflagration vent seal",
-   "to_part": "Effluent / disposal \u2014 battery limit",
+   "from_part": "Fertigation Dosing Pump",
+   "to_part": "Drain Collection Sump",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "discharge to disposal (battery limit)",
+   "required_value": 90.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty fertigation_dosing_pump_throughput_m3_h = 90 m3/h (source delivery)",
+   "material_context": "process output (residual closer: nearest consumer)",
    "source": "completion"
   },
   {
-   "from_part": "deflagration vent label",
-   "to_part": "Effluent / disposal \u2014 battery limit",
+   "from_part": "Acid Dosing Pump",
+   "to_part": "Drain Collection Sump",
    "mechanism": "fluid_loop",
    "service": "water",
    "constraint_kind": "flow_capacity",
-   "required_value": null,
-   "required_unit": null,
-   "material_context": "discharge to disposal (battery limit)",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty acid_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
+   "material_context": "process output (residual closer: nearest consumer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Chemical Dosing Pump",
+   "to_part": "Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 0.04,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty chemical_dosing_pump_throughput_m3_h = 0.04 m3/h (source delivery)",
+   "material_context": "process output (residual closer: nearest consumer)",
+   "source": "completion"
+  },
+  {
+   "from_part": "Fertigation Dosing Pump Backup",
+   "to_part": "Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "service": "water",
+   "constraint_kind": "flow_capacity",
+   "required_value": 90.0,
+   "required_unit": "m3/h",
+   "required_basis": "contract qty fertigation_dosing_pump_backup_throughput_m3_h = 90 m3/h (source delivery)",
+   "material_context": "process output (residual closer: nearest consumer)",
    "source": "completion"
   }
  ],
  "dropped": [
   {
-   "from": "Utility Incomer",
-   "to": "grid PCC metering CT",
-   "mechanism": "electrical_bus",
-   "reason": "both-endpoints-unresolved"
+   "from": "Uf Module Bank",
+   "to": "Uf Module Bank",
+   "mechanism": "fluid_loop",
+   "reason": "self-loop"
+  },
+  {
+   "from": "Drain Collection Sump",
+   "to": "Uv Disinfection",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "ro_membrane_elements",
+   "to": "Drain Collection Sump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Acid Dosing Pump",
+   "to": "Chemical Dosing Pump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Nutrient Tank",
+   "to": "Acid Dosing Pump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Chemical Dosing Pump",
+   "to": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Acid Dosing Pump",
+   "to": "Chemical Dosing Pump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Fertigation Dosing Pump",
+   "to": "Fertigation Dosing Pump Backup",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+   "to": "Fertigation Dosing Pump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Fertigation Dosing Pump Backup",
+   "to": "Hand Watering Pump",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Fertigation Dosing Pump",
+   "to": "Fertigation Dosing Pump Backup",
+   "mechanism": "fluid_loop",
+   "reason": "duplicate"
+  },
+  {
+   "from": "Fresh Water Tank",
+   "to": "Mains Incomer",
+   "mechanism": "fluid_loop",
+   "reason": "service-domain mismatch (fluid line on electrical/control gear)"
   }
  ],
  "completeness": {
@@ -2019,2015 +1223,181 @@
   "concerns": []
  },
  "adjacency": {
-  "LFP prismatic cell": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "rack DC isolator",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "rack DC isolator": {
+  "Gac Softener": {
    "inputs": [
     {
-     "from": "LFP prismatic cell",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "PCS inverter 1.5 MW bidirectional": {
-   "inputs": [
-    {
-     "from": "PCS DC-link capacitor bank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "PCS LCL output filter inductor",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "PCS DC surge arrester",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "PCS cooling fan tray",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "PCS liquid cooling interface",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "step-up transformer",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "transformer neutral grounding",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "transformer MV surge arrester",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "transformer cable sealing end",
+     "from": "Nursery Drain Collection Sump",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "heat_rejection",
-     "mechanism": "thermal",
-     "service": "thermal"
-    },
-    {
-     "to": "coolant circulation pump",
+     "to": "Softener Vessel",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "heat_rejection": {
+  "Softener Vessel": {
    "inputs": [
     {
-     "from": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "thermal",
-     "service": "thermal"
-    },
-    {
-     "from": "fuse install torque card",
+     "from": "Gac Softener",
      "mechanism": "fluid_loop",
      "service": "water"
-    }
-   ],
-   "outputs": []
-  },
-  "step-up transformer": {
-   "inputs": [
-    {
-     "from": "grid PCC metering CT",
-     "mechanism": "electrical_bus",
-     "service": "power"
     },
     {
-     "from": "transformer cable sealing end",
+     "from": "Fresh Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "rack DC isolator enclosure",
-     "mechanism": "mechanical",
-     "service": "assembly"
+     "to": "grp_membrane_housings",
+     "mechanism": "fluid_loop",
+     "service": "water"
     },
     {
-     "to": "AC main breaker",
-     "mechanism": "electrical_bus",
-     "service": "power"
+     "to": "Inlet Flow Control Valve",
+     "mechanism": "fluid_loop",
+     "service": "water"
     },
     {
-     "to": "PCS inverter 1.5 MW bidirectional",
+     "to": "Solenoid Valves",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Ultrafiltration Module",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "rack DC isolator enclosure": {
+  "grp_membrane_housings": {
    "inputs": [
     {
-     "from": "step-up transformer",
-     "mechanism": "mechanical",
-     "service": "assembly"
-    }
-   ],
-   "outputs": []
-  },
-  "module top cover": {
-   "inputs": [
-    {
-     "from": "compression plate",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "compression tie rod set",
+     "from": "Softener Vessel",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "coolant circulation pump",
+     "to": "Uf Module Bank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "coolant circulation pump": {
+  "Uf Module Bank": {
    "inputs": [
     {
-     "from": "module top cover",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "cold plate per rack",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "coolant distribution manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "pressure relief and sight glass",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "coolant supply pipe",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "coolant return pipe",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "ball valve isolation",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "pressure transducer",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "PCS inverter 1.5 MW bidirectional",
+     "from": "grp_membrane_housings",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "compression tie rod set",
+     "to": "Ro High Pressure Pump",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "grid PCC metering CT": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "step-up transformer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "AC main breaker": {
+  "Ro High Pressure Pump": {
    "inputs": [
     {
-     "from": "step-up transformer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cell-to-cell busbar",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "cell-to-cell busbar": {
-   "inputs": [
-    {
-     "from": "AC main breaker",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "DC busbar 800 V": {
-   "inputs": [
-    {
-     "from": "cell-to-cell busbar",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "rack heater fuse",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "PCS DC surge arrester",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "transformer MV surge arrester",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "DC HRC fuse",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "G99 protection relay",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "AC surge protection device",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "PE surge counter",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "rack string fuse",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "fuse holder",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "fuse label",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "fuse mount rail",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "fuse install torque card",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "safety relay",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "compression plate",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "compression tie rod set",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "PTC rack heater",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "rack heater thermostat",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "rack heater cable",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "PCS LCL output filter inductor",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "PCS cooling fan tray",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "BMS master controller",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "CAN transceiver",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "digital isolator",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "BMS master housing",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "BMS slave module",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "EMS industrial PC",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "Modbus gateway",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "EMS managed Ethernet switch",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "EMS UPS backup module",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "EMS fibre patch panel",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "watchdog timer relay",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "watchdog terminal block",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "AC voltage transformer",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "EMC ground braid",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "earth bar",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "equipotential bonding cable",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "earth rod",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "liquid cooling chiller",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "cooling pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "enclosure ventilation fan",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "air intake filter",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "louvre vent panel",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "thermostat controller",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "container AC unit",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "HVAC condensate pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "pressure relief and sight glass",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "gas detector controller",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "off-gas exhaust fan",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "HMI panel",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "local emergency stop",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "HMI panel VESA mount",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "HMI ethernet cable",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "to": "HMI label pin",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ]
-  },
-  "rack heater fuse": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "PCS DC surge arrester": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "transformer cable sealing end",
+     "from": "Uf Module Bank",
      "mechanism": "fluid_loop",
      "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
     }
    ],
    "outputs": [
     {
-     "to": "PCS inverter 1.5 MW bidirectional",
+     "to": "Reverse Osmosis Skid",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "transformer MV surge arrester": {
+  "Reverse Osmosis Skid": {
    "inputs": [
     {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "transformer cable sealing end",
+     "from": "Ro High Pressure Pump",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "transformer cable sealing end",
+     "to": "ro_membrane_elements",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "DC HRC fuse": {
+  "ro_membrane_elements": {
    "inputs": [
     {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "G99 protection relay": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "AC surge protection device": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "PE surge counter": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "rack string fuse": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "fuse holder": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "fuse label": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "fuse mount rail": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "fuse install torque card": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "off-gas exhaust fan",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "off-gas duct section",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "off-gas check valve",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "off-gas duct penetration seal",
+     "from": "Reverse Osmosis Skid",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "to": "heat_rejection",
+     "to": "Drain Collection Sump",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ]
   },
-  "safety relay": {
+  "Drain Collection Sump": {
    "inputs": [
     {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "compression plate": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "pressure relief and sight glass",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "module top cover",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "compression tie rod set": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "pressure relief and sight glass",
+     "from": "ro_membrane_elements",
      "mechanism": "fluid_loop",
      "service": "water"
     },
     {
-     "from": "coolant circulation pump",
+     "from": "Fresh Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Fertigation Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Chemical Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Fertigation Dosing Pump Backup",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "module top cover",
+     "to": "Uv Disinfection",
      "mechanism": "fluid_loop",
      "service": "water"
-    },
-    {
-     "to": "cooling pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "expansion tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "louvre vent panel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "HVAC duct",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "HVAC condensate pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "insulation monitor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "BMS master controller": {
-   "inputs": [
-    {
-     "from": "insulation monitor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "pack temperature sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "pack voltage sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "transformer winding temperature detector",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "CAN transceiver",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "digital isolator",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "BMS master housing",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "BMS slave module",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "EMS industrial PC",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "Modbus gateway",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "EMS managed Ethernet switch",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "EMS UPS backup module",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "EMS fibre patch panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "watchdog timer relay",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "watchdog terminal block",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "AC energy meter",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "thermostat controller",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "humidity sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "clean agent cylinder",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "suppression nozzle",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "thermal detector",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke aspirating detector",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "suppression releasing panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "deflagration vent panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke vent interlock",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke vent interlock mount",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "deflagration vent seal",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "gas sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "gas detector controller",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "gas sensor mount",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "gas detection harness",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "gas sensor label",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "rack string fuse",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "fuse holder",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "fuse mount rail",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "fuse install torque card",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke detector head",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke detector base",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke detector loop cable",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke detector sounder",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "smoke detector callpoint",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "off-gas activation solenoid",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "arc flash relay",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "arc flash fibre-optic point sensor",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "arc flash relay terminal block",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "arc flash barrier tape",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "arc flash barrier panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "emergency stop button",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "emergency stop contact block",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "safety relay",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "HMI panel",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "local emergency stop",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "HMI panel VESA mount",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "HMI ethernet cable",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "HMI label pin",
-     "mechanism": "signal",
-     "service": "signal"
-    },
-    {
-     "from": "grid PCC metering CT",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ],
-   "outputs": []
-  },
-  "pack temperature sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "pack voltage sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "PTC rack heater": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "rack wiring carrier",
-     "mechanism": "assembly",
-     "service": "assembly"
-    }
-   ]
-  },
-  "rack heater thermostat": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "rack heater cable": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "PCS DC-link capacitor bank": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "PCS LCL output filter inductor": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "PCS cooling fan tray": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "PCS liquid cooling interface": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "transformer neutral grounding": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "transformer winding temperature detector": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "transformer cable sealing end": {
-   "inputs": [
-    {
-     "from": "transformer MV surge arrester",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "PCS inverter 1.5 MW bidirectional",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "cold plate per rack",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "coolant return pipe",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "pressure transducer",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "PCS DC-link capacitor bank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "PCS LCL output filter inductor",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "PCS DC surge arrester",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "PCS liquid cooling interface",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "step-up transformer",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "transformer neutral grounding",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "transformer MV surge arrester",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "CAN transceiver": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "digital isolator": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "BMS master housing": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "BMS slave module": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "EMS industrial PC": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "Modbus gateway": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "EMS managed Ethernet switch": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "EMS UPS backup module": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "EMS fibre patch panel": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "watchdog timer relay": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "watchdog terminal block": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "AC energy meter": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "AC voltage transformer": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "EMC ground braid": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "earth bar": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "equipotential bonding cable": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "earth rod": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "liquid cooling chiller": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "cooling pump": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "deflagration vent panel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "smoke vent interlock",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "smoke vent interlock mount",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "deflagration vent seal",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "deflagration vent label",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "off-gas duct section",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "off-gas duct penetration seal",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "cold plate manifold": {
-   "inputs": [
-    {
-     "from": "cooling pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "expansion tank",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "enclosure ventilation fan",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "air intake filter",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "louvre vent panel",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "HVAC duct",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "from": "HVAC condensate pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": []
-  },
-  "expansion tank": {
-   "inputs": [
-    {
-     "from": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "enclosure ventilation fan": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "air intake filter": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "louvre vent panel": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "thermostat controller": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "humidity sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "container AC unit": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": []
-  },
-  "HVAC duct": {
-   "inputs": [
-    {
-     "from": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "HVAC condensate pump": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "cold plate manifold",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "cold plate per rack": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "coolant distribution manifold": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "pressure relief and sight glass": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    },
-    {
-     "from": "pressure transducer",
-     "mechanism": "assembly",
-     "service": "assembly"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "compression plate",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "compression tie rod set",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "coolant supply pipe": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "coolant return pipe": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "ball valve isolation": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "pressure transducer": {
-   "inputs": [
-    {
-     "from": "transformer cable sealing end",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "coolant circulation pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    },
-    {
-     "to": "pressure relief and sight glass",
-     "mechanism": "assembly",
-     "service": "assembly"
-    }
-   ]
-  },
-  "clean agent cylinder": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "suppression nozzle": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "thermal detector": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke aspirating detector": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "suppression releasing panel": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "deflagration vent panel": {
-   "inputs": [
-    {
-     "from": "cooling pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
     },
     {
      "to": "Effluent / disposal \u2014 battery limit",
@@ -4036,19 +1406,108 @@
     }
    ]
   },
-  "smoke vent interlock": {
+  "Uv Disinfection": {
    "inputs": [
     {
-     "from": "cooling pump",
+     "from": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Nursery Cloth Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Nursery Cloth Filter": {
+   "inputs": [
+    {
+     "from": "Uv Disinfection",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Gac Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Gac Filter": {
+   "inputs": [
+    {
+     "from": "Nursery Cloth Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Cloth Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Cloth Filter": {
+   "inputs": [
+    {
+     "from": "Gac Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Drain Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Drain Water Tank": {
+   "inputs": [
+    {
+     "from": "Cloth Filter",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Fresh Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
+     "to": "Nursery Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
     },
     {
      "to": "Effluent / disposal \u2014 battery limit",
@@ -4057,19 +1516,29 @@
     }
    ]
   },
-  "smoke vent interlock mount": {
+  "Nursery Drain Collection Sump": {
    "inputs": [
     {
-     "from": "cooling pump",
+     "from": "Drain Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Fresh Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
+     "to": "Drain Transfer Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Gac Softener",
+     "mechanism": "fluid_loop",
+     "service": "water"
     },
     {
      "to": "Effluent / disposal \u2014 battery limit",
@@ -4078,19 +1547,29 @@
     }
    ]
   },
-  "deflagration vent seal": {
+  "Drain Transfer Pump": {
    "inputs": [
     {
-     "from": "cooling pump",
+     "from": "Nursery Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "from": "Fresh Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
+     "to": "Nursery Drain Transfer Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
     },
     {
      "to": "Effluent / disposal \u2014 battery limit",
@@ -4099,339 +1578,30 @@
     }
    ]
   },
-  "gas sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "gas detector controller": {
+  "Nursery Drain Transfer Pump": {
    "inputs": [
     {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "gas sensor mount": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "gas detection harness": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "gas sensor label": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke detector head": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke detector base": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke detector loop cable": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke detector sounder": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "smoke detector callpoint": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "off-gas exhaust fan": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "fuse install torque card",
+     "from": "Drain Transfer Pump",
      "mechanism": "fluid_loop",
      "service": "water"
-    }
-   ]
-  },
-  "off-gas duct section": {
-   "inputs": [
+    },
     {
-     "from": "cooling pump",
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "from": "Fresh Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
    ],
    "outputs": [
     {
-     "to": "fuse install torque card",
+     "to": "Cip Tank",
      "mechanism": "fluid_loop",
      "service": "water"
-    }
-   ]
-  },
-  "off-gas check valve": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "fuse install torque card",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "off-gas activation solenoid": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "off-gas duct penetration seal": {
-   "inputs": [
-    {
-     "from": "cooling pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "fuse install torque card",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ]
-  },
-  "arc flash relay": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "arc flash fibre-optic point sensor": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "arc flash relay terminal block": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "arc flash barrier tape": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "arc flash barrier panel": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "emergency stop button": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "emergency stop contact block": {
-   "inputs": [],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "HMI panel": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "local emergency stop": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "HMI panel VESA mount": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "HMI ethernet cable": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "HMI label pin": {
-   "inputs": [
-    {
-     "from": "DC busbar 800 V",
-     "mechanism": "electrical_bus",
-     "service": "power"
-    }
-   ],
-   "outputs": [
-    {
-     "to": "BMS master controller",
-     "mechanism": "signal",
-     "service": "signal"
-    }
-   ]
-  },
-  "deflagration vent label": {
-   "inputs": [
-    {
-     "from": "cooling pump",
-     "mechanism": "fluid_loop",
-     "service": "water"
-    }
-   ],
-   "outputs": [
+    },
     {
      "to": "Effluent / disposal \u2014 battery limit",
      "mechanism": "fluid_loop",
@@ -4439,12 +1609,870 @@
     }
    ]
   },
-  "rack wiring carrier": {
+  "Cip Tank": {
    "inputs": [
     {
-     "from": "PTC rack heater",
-     "mechanism": "assembly",
-     "service": "assembly"
+     "from": "Nursery Drain Transfer Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Cleanwater Reservoir Reserve Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Cleanwater Reservoir Reserve Tank": {
+   "inputs": [
+    {
+     "from": "Cip Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Fresh Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Fresh Water Tank": {
+   "inputs": [
+    {
+     "from": "Cleanwater Reservoir Reserve Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Ultrafiltration Module",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Nutrient Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Permeate Outlet",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Softener Vessel",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Transfer Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Nursery Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Nursery Drain Transfer Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Nutrient Tank": {
+   "inputs": [
+    {
+     "from": "Fresh Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Acid Dosing Pump": {
+   "inputs": [
+    {
+     "from": "Nutrient Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "from": "Permeate Outlet",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Chemical Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Chemical Dosing Pump": {
+   "inputs": [
+    {
+     "from": "Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5": {
+   "inputs": [
+    {
+     "from": "Chemical Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Fertigation Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Fertigation Dosing Pump": {
+   "inputs": [
+    {
+     "from": "fertigation_dosing_injection_pump_vertical_multistage_30_m3_h_53_1_m_7_5",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Fertigation Dosing Pump Backup",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Fertigation Dosing Pump Backup": {
+   "inputs": [
+    {
+     "from": "Fertigation Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Hand Watering Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "to": "Drain Collection Sump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Hand Watering Pump": {
+   "inputs": [
+    {
+     "from": "Fertigation Dosing Pump Backup",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Irrigation Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Irrigation Pump": {
+   "inputs": [
+    {
+     "from": "Hand Watering Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Nursery Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Nursery Acid Dosing Pump": {
+   "inputs": [
+    {
+     "from": "Irrigation Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Nursery Chemical Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Nursery Chemical Dosing Pump": {
+   "inputs": [
+    {
+     "from": "Nursery Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Nursery Fertigation Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Nursery Fertigation Dosing Pump": {
+   "inputs": [
+    {
+     "from": "Nursery Chemical Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Distribution Manifold",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Distribution Manifold": {
+   "inputs": [
+    {
+     "from": "Nursery Fertigation Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": []
+  },
+  "Conductivity Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "SCADA / Plant Control System": {
+   "inputs": [
+    {
+     "from": "Conductivity Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Flow Meter",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Ph Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Orp Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Level Transmitter",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "pH Analyser",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Pressure Transmitter",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Silica Analyzer",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Chlorine Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Tds Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Leak Detection Sensor",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "Flow Meter": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Ph Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Orp Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Level Transmitter": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "pH Analyser": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Pressure Transmitter": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Silica Analyzer": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Chlorine Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Tds Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Leak Detection Sensor": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Permeate Outlet": {
+   "inputs": [
+    {
+     "from": "Fresh Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Acid Dosing Pump",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Mains Incomer": {
+   "inputs": [],
+   "outputs": [
+    {
+     "to": "Standby Diesel Generator",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ]
+  },
+  "Standby Diesel Generator": {
+   "inputs": [
+    {
+     "from": "Mains Incomer",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Transformer",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ]
+  },
+  "Transformer": {
+   "inputs": [
+    {
+     "from": "Standby Diesel Generator",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Main Switchboard",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ]
+  },
+  "Main Switchboard": {
+   "inputs": [
+    {
+     "from": "Transformer",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ]
+  },
+  "Motor Control Center": {
+   "inputs": [
+    {
+     "from": "Main Switchboard",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Electrical Control Panel",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "3 Phase Power Input",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Control + Instrument UPS",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "SCADA / Plant Control System",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Digital Control Panel",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "to": "Uv Disinfection",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Fertigation Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Acid Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Chemical Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Hand Watering Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Drain Transfer Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Cloth Filter",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Nursery Fertigation Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Nursery Acid Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Nursery Chemical Dosing Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Nursery Cloth Filter",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Nursery Drain Transfer Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Irrigation Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Fertigation Dosing Pump Backup",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Ro High Pressure Pump",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Gac Filter",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Permeate Outlet",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Concentrate Outlet",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Electrical Control Cabinet",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    },
+    {
+     "to": "Digital Control Panel",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ]
+  },
+  "Electrical Control Panel": {
+   "inputs": [
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Digital Control Panel",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Digital Control Panel": {
+   "inputs": [
+    {
+     "from": "Electrical Control Panel",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Control + Instrument UPS",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Electrical Control Cabinet",
+     "mechanism": "signal",
+     "service": "signal"
+    },
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "3 Phase Power Input": {
+   "inputs": [
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "Control + Instrument UPS": {
+   "inputs": [
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Digital Control Panel",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Ultrafiltration Module": {
+   "inputs": [
+    {
+     "from": "Softener Vessel",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Fresh Water Tank",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ]
+  },
+  "Concentrate Outlet": {
+   "inputs": [
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": []
+  },
+  "Electrical Control Cabinet": {
+   "inputs": [
+    {
+     "from": "Motor Control Center",
+     "mechanism": "electrical_bus",
+     "service": "power"
+    }
+   ],
+   "outputs": [
+    {
+     "to": "Digital Control Panel",
+     "mechanism": "signal",
+     "service": "signal"
+    }
+   ]
+  },
+  "Inlet Flow Control Valve": {
+   "inputs": [
+    {
+     "from": "Softener Vessel",
+     "mechanism": "fluid_loop",
+     "service": "water"
+    }
+   ],
+   "outputs": []
+  },
+  "Solenoid Valves": {
+   "inputs": [
+    {
+     "from": "Softener Vessel",
+     "mechanism": "fluid_loop",
+     "service": "water"
     }
    ],
    "outputs": []
@@ -4452,27 +2480,27 @@
   "Effluent / disposal \u2014 battery limit": {
    "inputs": [
     {
-     "from": "deflagration vent panel",
+     "from": "Drain Collection Sump",
      "mechanism": "fluid_loop",
      "service": "water"
     },
     {
-     "from": "smoke vent interlock",
+     "from": "Drain Transfer Pump",
      "mechanism": "fluid_loop",
      "service": "water"
     },
     {
-     "from": "smoke vent interlock mount",
+     "from": "Nursery Drain Collection Sump",
      "mechanism": "fluid_loop",
      "service": "water"
     },
     {
-     "from": "deflagration vent seal",
+     "from": "Nursery Drain Transfer Pump",
      "mechanism": "fluid_loop",
      "service": "water"
     },
     {
-     "from": "deflagration vent label",
+     "from": "Drain Water Tank",
      "mechanism": "fluid_loop",
      "service": "water"
     }
@@ -4481,20 +2509,7 @@
   }
  },
  "referential_integrity": {
-  "n_violations": 2,
-  "violations": [
-   {
-    "edge": "PCS inverter 1.5 MW bidirectional\u2192heat_rejection",
-    "end": "to_part",
-    "name": "heat_rejection",
-    "reason": "endpoint name is not an authored part (broken reference)"
-   },
-   {
-    "edge": "fuse install torque card\u2192heat_rejection",
-    "end": "to_part",
-    "name": "heat_rejection",
-    "reason": "endpoint name is not an authored part (broken reference)"
-   }
-  ]
+  "n_violations": 0,
+  "violations": []
  }
 }

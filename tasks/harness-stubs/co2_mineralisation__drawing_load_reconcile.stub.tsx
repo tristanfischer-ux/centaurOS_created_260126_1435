@@ -1,8 +1,8 @@
-// AUTO-DRAFTED regression-harness invariant stub — 2026-06-24T11:30:15.058Z
+// AUTO-DRAFTED regression-harness invariant stub — 2026-07-06T06:26:23.479Z
 // Origin: gate 'drawing:load_reconcile' FAILED on class 'co2_mineralisation', routed to fix-stage: contract (connected_electrical_load_kw) + panel kW resolution.
-// Loss recurrence in the ledger: 6  ⚠ RECURRING — escalate to a coding-council, do not just stub.
-// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-converged-r0  @ f7039600c
-// Detail: single-line-diagram: panel total 337 kW vs contract 87 kW (ratio 3.86, ±15%)
+// Loss recurrence in the ledger: 80  ⚠ RECURRING — escalate to a coding-council, do not just stub.
+// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/co2-campaign-v9  @ ee5554826
+// Detail: single-line-diagram: panel total 886 kW vs contract 559 kW (ratio 1.59, ±15%)
 //
 // TODO(human/council): implement the DETERMINISTIC assertion that would have CAUGHT this
 // at fix-stage 'contract (connected_electrical_load_kw) + panel kW resolution', then MOVE it into scripts/regression-harness.tsx

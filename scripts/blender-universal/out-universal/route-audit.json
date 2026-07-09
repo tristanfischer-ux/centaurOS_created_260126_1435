@@ -1,10 +1,55 @@
 {
-  "routes": 43,
-  "over_equipment_segments": 0,
-  "over_equipment_routes": [],
-  "max_detour_ratio": 1.834,
-  "max_detour_route": "u_trunk_rf_13_electrical_bus",
-  "same_elevation_crossings": 0,
-  "crossing_detail": [],
+  "routes": 39,
+  "over_equipment_segments": 6,
+  "over_equipment_routes": [
+    "u_wire_011_u_cloth_filter_water",
+    "u_wire_081_u_fresh_water_tank_water",
+    "u_wire_085_u_fresh_water_tank_water"
+  ],
+  "max_detour_ratio": 1.414,
+  "max_detour_route": "u_wire_085_u_fresh_water_tank_water",
+  "same_elevation_crossings": 8,
+  "crossing_detail": [
+    [
+      "u_wire_008_u_uv_disinfection_water",
+      "u_wire_042_u_fresh_water_tank_water",
+      7290.0
+    ],
+    [
+      "u_wire_008_u_uv_disinfection_water",
+      "u_wire_024_u_fertigation_dosing_pump_backup_water",
+      7290.0
+    ],
+    [
+      "u_wire_013_u_nursery_drain_collection_sump_water",
+      "u_wire_018_u_fresh_water_tank_water",
+      7180.0
+    ],
+    [
+      "u_wire_013_u_nursery_drain_collection_sump_water",
+      "u_wire_087_u_fresh_water_tank_water",
+      7180.0
+    ],
+    [
+      "u_wire_015_u_nursery_drain_transfer_pump_water",
+      "u_wire_025_u_hand_watering_pump_water",
+      6850.0
+    ],
+    [
+      "u_wire_016_u_cip_tank_water",
+      "u_wire_079_u_softener_vessel_water",
+      6960.0
+    ],
+    [
+      "u_wire_080_u_fresh_water_tank_water",
+      "u_wire_019_u_nutrient_tank_water",
+      7400.0
+    ],
+    [
+      "u_wire_083_u_fresh_water_tank_water",
+      "u_wire_079_u_softener_vessel_water",
+      6960.0
+    ]
+  ],
   "tiers_used_note": "tiers separate crossings; lanes keep parallels apart"
 }

@@ -264,9 +264,9 @@ export function buildAuditDigest(state: any, productClass: string): AuditDigest 
     const text =
       `(Excerpted by this audit — a trailing "…" is truncation here, NOT a defect in the dossier; do not flag truncation.)\n` +
       `Mission: ${truncate(prose?.mission_statement, 320)}\n` +
-      `Why now: ${truncate(prose?.why_now, 220)}\n` +
+      `Why now (OPTIONAL marketing colour — never ship-blocking even if generic): ${truncate(prose?.why_now, 220)}\n` +
       `Module overviews (sample):\n${sampleMods || '  (none)'}\n` +
-      `Judge: is the prose specific to THIS product/brief and engineering-grounded, or generic boilerplate that could describe any product?`
+      `Judge: is the MISSION and MODULE prose specific to THIS product/brief and engineering-grounded? Ignore Why-now genericity for the score floor — a generic Why now alone is not a fail.`
     sections.push({ name: 'design_narrative', label: 'Design narrative', text, hardSignals: [] })
   }
 
@@ -304,7 +304,9 @@ The bar is 8/10 on EVERY section — that is the FLOOR, not the average. You are
   • a numeric value that is physically impossible — usually a unit confusion making a quantity ~100x too big/small;
   • a part that belongs to a DIFFERENT product class (e.g. a Raspberry-Pi cooling fan listed as a heat-pump compressor driver);
   • a compliance / status claim asserted over an unverified or failing cell;
-  • prose that is generic boilerplate rather than grounded in THIS brief.
+  • prose that invents equipment, invents a product class, or asserts engineering facts not in THIS brief (e.g. a heat pump the brief never asked for).
+
+Do NOT treat the "Why now" marketing-timing paragraph as ship-blocking, even if it is generic boilerplate. Keep Why now visible as optional colour; score design_narrative on engineering-grounded mission/module prose only. A generic Why now alone → score ≥8, blocking=false, and you may still list "Why now paragraph is generic boilerplate" as a non-blocking defect for the author.
 
 HONESTY DISTINCTION (decides blocking vs non-blocking — apply it strictly): the question for blocking is "is the reader DECEIVED?", not "is there a gap?".
   - A brief target MISSED but OPENLY stated as a deliberate trade-off ("accepts a 23% shortfall vs the 3.5 MWh target as a mass-constrained trade-off") is a WEAKNESS (score <=6) but NOT ship-blocking — the reader is not deceived.

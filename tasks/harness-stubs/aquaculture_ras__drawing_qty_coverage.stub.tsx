@@ -1,8 +1,8 @@
-// AUTO-DRAFTED regression-harness invariant stub — 2026-06-24T09:51:47.297Z
+// AUTO-DRAFTED regression-harness invariant stub — 2026-07-08T02:17:20.879Z
 // Origin: gate 'drawing:qty_coverage' FAILED on class 'aquaculture_ras', routed to fix-stage: contract qty-N replication + parts-manifest expansion.
-// Loss recurrence in the ledger: 3  ⚠ RECURRING — escalate to a coding-council, do not just stub.
-// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/ras-scale0.5-verify  @ 320802ccb
-// Detail: pid: tank: contract qty 15, parts-manifest has 2 instance(s) (need ≥12)
+// Loss recurrence in the ledger: 327  ⚠ RECURRING — escalate to a coding-council, do not just stub.
+// Run: /Users/tristanfischer/Developer/CentaurOS-oxccu-efuel/out/b3-replay  @ 6ac59cae7
+// Detail: pid: tank: contract qty 30, parts-manifest has 2 instance(s) (need ≥24)
 //
 // TODO(human/council): implement the DETERMINISTIC assertion that would have CAUGHT this
 // at fix-stage 'contract qty-N replication + parts-manifest expansion', then MOVE it into scripts/regression-harness.tsx

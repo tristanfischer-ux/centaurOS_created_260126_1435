@@ -1,316 +1,2539 @@
 {
   "schema": "route-manifest/1",
-  "count": 4,
+  "count": 39,
   "note": "One entry per routed connection (the drawn orthogonal polyline + an elbow at each bend). line_number mirrors draw_pid; the isometric re-matches via reconstruct_process for the exact P&ID/line-list number.",
   "lines": [
     {
-      "line_number": "201-PR-DN300",
-      "run_name": "u_route_0_fluid_loop",
+      "line_number": "201-PR-DN65",
+      "run_name": "u_wire_000_u_gac_softener_water",
       "mechanism": "fluid_loop",
       "role": null,
-      "from_tag": "rearing_tanks",
-      "to_tag": "rotary_drum_filter",
-      "service": "dual_Cornell_drain_tank_exit_solids_rich_bottom_draw_plus_clean_sidewall_draw_to_40_60um_microscreen",
-      "size_label": "DN300",
-      "outer_dia_mm": 323.9,
-      "length_m": 44.88,
+      "from_tag": "Gac Softener",
+      "to_tag": "Softener Vessel",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN65",
+      "outer_dia_mm": 73.0,
+      "length_m": 28.08,
+      "length_routed_m": null,
       "waypoints_mm": [
         [
-          4748.4,
-          -10100.0,
-          6975.0
+          9280.0,
+          3950.0,
+          975.0
         ],
         [
-          4748.4,
-          -10100.0,
-          6760.0
+          9280.0,
+          3950.0,
+          6850.0
         ],
         [
-          4748.4,
-          -1125.0,
-          6760.0
+          -7230.0,
+          3950.0,
+          6850.0
         ],
         [
-          21248.4,
-          -1125.0,
-          6760.0
+          -7230.0,
+          3150.0,
+          6850.0
         ],
         [
-          21248.4,
-          13050.0,
-          6760.0
-        ],
-        [
-          21248.4,
-          13050.0,
-          1745.0
+          -7230.0,
+          3150.0,
+          1955.0
         ]
       ],
       "fittings": [
         {
           "type": "elbow",
           "at": [
-            4748.4,
-            -10100.0,
-            6760.0
+            9280.0,
+            3950.0,
+            6850.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            4748.4,
-            -1125.0,
-            6760.0
+            -7230.0,
+            3950.0,
+            6850.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            21248.4,
-            -1125.0,
-            6760.0
-          ]
-        },
-        {
-          "type": "elbow",
-          "at": [
-            21248.4,
-            13050.0,
-            6760.0
+            -7230.0,
+            3150.0,
+            6850.0
           ]
         }
       ]
     },
     {
-      "line_number": "202-PR-DN300",
-      "run_name": "u_route_1_fluid_loop",
+      "line_number": "202-PR-DN50",
+      "run_name": "u_wire_003_u_uf_module_bank_water",
       "mechanism": "fluid_loop",
       "role": null,
-      "from_tag": "rotary_drum_filter",
-      "to_tag": "mbbr_biofilter",
-      "service": "solids_removed_to_protect_the_biofilter_from_organic_overload_then_TAN_oxidation_in_the_MBBR",
-      "size_label": "DN300",
-      "outer_dia_mm": 323.9,
-      "length_m": 33.92,
+      "from_tag": "Uf Module Bank",
+      "to_tag": "Ro High Pressure Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN50",
+      "outer_dia_mm": 60.3,
+      "length_m": 5.88,
+      "length_routed_m": null,
       "waypoints_mm": [
         [
-          21248.4,
-          13050.0,
-          1745.0
+          13030.0,
+          1550.0,
+          1100.0
         ],
         [
-          21248.4,
-          13050.0,
-          7720.0
+          13030.0,
+          1550.0,
+          1660.0
         ],
         [
-          21248.4,
-          -765.0,
-          7720.0
+          11070.0,
+          1550.0,
+          1660.0
         ],
         [
-          26795.4,
-          -765.0,
-          7720.0
+          11070.0,
+          -750.0,
+          1660.0
         ],
         [
-          26795.4,
-          1500.0,
-          7720.0
-        ],
-        [
-          26795.4,
-          1500.0,
-          1400.0
+          11070.0,
+          -750.0,
+          600.3
         ]
       ],
       "fittings": [
         {
           "type": "elbow",
           "at": [
-            21248.4,
-            13050.0,
-            7720.0
+            13030.0,
+            1550.0,
+            1660.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            21248.4,
-            -765.0,
-            7720.0
+            11070.0,
+            1550.0,
+            1660.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            26795.4,
-            -765.0,
-            7720.0
-          ]
-        },
-        {
-          "type": "elbow",
-          "at": [
-            26795.4,
-            1500.0,
-            7720.0
+            11070.0,
+            -750.0,
+            1660.0
           ]
         }
       ]
     },
     {
-      "line_number": "203-VT-DN250",
-      "run_name": "u_route_5_thermal",
-      "mechanism": "thermal",
+      "line_number": "203-PR-DN50",
+      "run_name": "u_wire_004_u_ro_high_pressure_pump_water",
+      "mechanism": "fluid_loop",
       "role": null,
-      "from_tag": "heat_pumps",
-      "to_tag": "rearing_tanks",
-      "service": "water_source_heat_pumps_hold_the_recirculating_inventory_at_26.4C_with_heat_recovery_from_the_warm_loop",
+      "from_tag": "Ro High Pressure Pump",
+      "to_tag": "Reverse Osmosis Skid",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN50",
+      "outer_dia_mm": 60.3,
+      "length_m": 9.4,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          12630.0,
+          -750.0,
+          600.3
+        ],
+        [
+          12630.0,
+          -750.0,
+          1770.0
+        ],
+        [
+          7370.0,
+          -750.0,
+          1770.0
+        ],
+        [
+          7370.0,
+          1550.0,
+          1770.0
+        ],
+        [
+          7370.0,
+          1550.0,
+          1100.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            12630.0,
+            -750.0,
+            1770.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7370.0,
+            -750.0,
+            1770.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7370.0,
+            1550.0,
+            1770.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "204-PR-DN250",
+      "run_name": "u_wire_007_u_drain_collection_sump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Drain Collection Sump",
+      "to_tag": "Uv Disinfection",
+      "service": null,
+      "material": "carbon steel (assumed)",
       "size_label": "DN250",
       "outer_dia_mm": 273.0,
-      "length_m": 45.84,
+      "length_m": 23.24,
+      "length_routed_m": null,
       "waypoints_mm": [
         [
-          31848.4,
-          3200.0,
-          1745.0
+          4280.0,
+          50.0,
+          45.0
         ],
         [
-          31848.4,
-          3200.0,
-          7080.0
+          4280.0,
+          50.0,
+          7180.0
         ],
         [
-          31848.4,
-          -405.0,
-          7080.0
+          10570.0,
+          50.0,
+          7180.0
         ],
         [
-          4748.4,
-          -405.0,
-          7080.0
+          10570.0,
+          3850.0,
+          7180.0
         ],
         [
-          4748.4,
-          -10100.0,
-          7080.0
-        ],
-        [
-          4748.4,
-          -10100.0,
-          6975.0
+          10570.0,
+          3850.0,
+          1161.5
         ]
       ],
       "fittings": [
         {
           "type": "elbow",
           "at": [
-            31848.4,
-            3200.0,
-            7080.0
+            4280.0,
+            50.0,
+            7180.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            31848.4,
-            -405.0,
-            7080.0
+            10570.0,
+            50.0,
+            7180.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            4748.4,
-            -405.0,
-            7080.0
-          ]
-        },
-        {
-          "type": "elbow",
-          "at": [
-            4748.4,
-            -10100.0,
-            7080.0
+            10570.0,
+            3850.0,
+            7180.0
           ]
         }
       ]
     },
     {
-      "line_number": "204-PR",
-      "run_name": "u_route_7_electrical_bus",
-      "mechanism": "electrical_bus",
+      "line_number": "205-PR-DN125",
+      "run_name": "u_wire_008_u_uv_disinfection_water",
+      "mechanism": "fluid_loop",
       "role": null,
-      "from_tag": "electrical_supply",
-      "to_tag": "recirc_pumps_and_heat_pumps",
-      "service": "400_415V_three_phase_LV_behind_an_11kV_MV_transformer_planned_5MVA_micro_grid_with_backup_generator",
-      "size_label": "2×300 mm²",
-      "outer_dia_mm": 66.3,
-      "length_m": 94.27,
+      "from_tag": "Uv Disinfection",
+      "to_tag": "Nursery Cloth Filter",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 34.64,
+      "length_routed_m": null,
       "waypoints_mm": [
         [
-          9950.0,
-          62630.0,
-          2160.0
+          12330.0,
+          3850.0,
+          749.0
         ],
         [
-          9950.0,
-          62630.0,
-          7400.0
+          12330.0,
+          3850.0,
+          7290.0
         ],
         [
-          9950.0,
-          -45.0,
-          7400.0
+          -11280.0,
+          3850.0,
+          7290.0
         ],
         [
-          27994.4,
-          -45.0,
-          7400.0
+          -11280.0,
+          3350.0,
+          7290.0
         ],
         [
-          27994.4,
-          3505.0,
-          7400.0
-        ],
-        [
-          27994.4,
-          3505.0,
-          2642.6
+          -11280.0,
+          3350.0,
+          3300.0
         ]
       ],
       "fittings": [
         {
           "type": "elbow",
           "at": [
-            9950.0,
-            62630.0,
+            12330.0,
+            3850.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -11280.0,
+            3850.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -11280.0,
+            3350.0,
+            7290.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "206-PR-DN125",
+      "run_name": "u_wire_009_u_nursery_cloth_filter_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Cloth Filter",
+      "to_tag": "Gac Filter",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 3.31,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -8820.0,
+          3350.0,
+          1425.0
+        ],
+        [
+          -8820.0,
+          3350.0,
+          2970.0
+        ],
+        [
+          -9480.0,
+          3350.0,
+          2970.0
+        ],
+        [
+          -9480.0,
+          3250.0,
+          2970.0
+        ],
+        [
+          -9480.0,
+          3250.0,
+          1970.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -8820.0,
+            3350.0,
+            2970.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9480.0,
+            3350.0,
+            2970.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9480.0,
+            3250.0,
+            2970.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "207-PR-DN150",
+      "run_name": "u_wire_010_u_gac_filter_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Gac Filter",
+      "to_tag": "Cloth Filter",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN150",
+      "outer_dia_mm": 168.3,
+      "length_m": 26.69,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -7220.0,
+          3250.0,
+          1095.0
+        ],
+        [
+          -7220.0,
+          3250.0,
+          6850.0
+        ],
+        [
+          9070.0,
+          3250.0,
+          6850.0
+        ],
+        [
+          9070.0,
+          3850.0,
+          6850.0
+        ],
+        [
+          9070.0,
+          3850.0,
+          2807.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -7220.0,
+            3250.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            9070.0,
+            3250.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            9070.0,
+            3850.0,
+            6850.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "208-WT-DN150",
+      "run_name": "u_wire_011_u_cloth_filter_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Cloth Filter",
+      "to_tag": "Drain Water Tank",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN150",
+      "outer_dia_mm": 168.3,
+      "length_m": 30.46,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          10830.0,
+          3850.0,
+          1385.0
+        ],
+        [
+          10830.0,
+          3850.0,
+          -300.0
+        ],
+        [
+          -1180.0,
+          3850.0,
+          -300.0
+        ],
+        [
+          -1180.0,
+          -7950.0,
+          -300.0
+        ],
+        [
+          -1180.0,
+          -7950.0,
+          4667.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            10830.0,
+            3850.0,
+            -300.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -1180.0,
+            3850.0,
+            -300.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -1180.0,
+            -7950.0,
+            -300.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "209-WT-DN25",
+      "run_name": "u_wire_012_u_drain_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Drain Water Tank",
+      "to_tag": "Nursery Drain Collection Sump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 10.97,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          4680.0,
+          -7950.0,
+          1745.0
+        ],
+        [
+          4680.0,
+          -7950.0,
+          -450.0
+        ],
+        [
+          4920.0,
+          -7950.0,
+          -450.0
+        ],
+        [
+          4920.0,
+          50.0,
+          -450.0
+        ],
+        [
+          4920.0,
+          50.0,
+          90.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            4680.0,
+            -7950.0,
+            -450.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4920.0,
+            -7950.0,
+            -450.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4920.0,
+            50.0,
+            -450.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "210-PR-DN125",
+      "run_name": "u_wire_013_u_nursery_drain_collection_sump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Drain Collection Sump",
+      "to_tag": "Drain Transfer Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 37.96,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          7980.0,
+          50.0,
+          -785.0
+        ],
+        [
+          7980.0,
+          50.0,
+          7180.0
+        ],
+        [
+          -9940.0,
+          50.0,
+          7180.0
+        ],
+        [
+          -9940.0,
+          5550.0,
+          7180.0
+        ],
+        [
+          -9940.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            7980.0,
+            50.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9940.0,
+            50.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9940.0,
+            5550.0,
+            7180.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "211-PG-DN20",
+      "run_name": "u_wire_030_u_nursery_drain_collection_sump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Drain Collection Sump",
+      "to_tag": "Gac Softener",
+      "service": "recirculation return loop — recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)",
+      "material": "HDPE/PE100 (water service)",
+      "size_label": "DN20",
+      "outer_dia_mm": 26.7,
+      "length_m": 9.12,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          7980.0,
+          50.0,
+          -785.0
+        ],
+        [
+          7980.0,
+          50.0,
+          2990.0
+        ],
+        [
+          7420.0,
+          50.0,
+          2990.0
+        ],
+        [
+          7420.0,
+          3950.0,
+          2990.0
+        ],
+        [
+          7420.0,
+          3950.0,
+          2100.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            7980.0,
+            50.0,
+            2990.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            50.0,
+            2990.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            3950.0,
+            2990.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "212-PR-DN125",
+      "run_name": "u_wire_014_u_drain_transfer_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Drain Transfer Pump",
+      "to_tag": "Nursery Drain Transfer Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 11.78,
+      "length_routed_m": 16.41,
+      "waypoints_mm": [
+        [
+          -8380.0,
+          5550.0,
+          600.3
+        ],
+        [
+          -8380.0,
+          5550.0,
+          7400.0
+        ],
+        [
+          -5677.5,
+          5550.0,
+          7400.0
+        ],
+        [
+          -5677.5,
+          5350.0,
+          7400.0
+        ],
+        [
+          -5677.5,
+          5350.0,
+          687.7
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -8380.0,
+            5550.0,
             7400.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            9950.0,
-            -45.0,
+            -5677.5,
+            5550.0,
             7400.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            27994.4,
-            -45.0,
+            -5677.5,
+            5350.0,
+            7400.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "213-PR-DN32",
+      "run_name": "u_wire_015_u_nursery_drain_transfer_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Drain Transfer Pump",
+      "to_tag": "Cip Tank",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN32",
+      "outer_dia_mm": 42.2,
+      "length_m": 24.28,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -3622.5,
+          5350.0,
+          687.7
+        ],
+        [
+          -3622.5,
+          5350.0,
+          6850.0
+        ],
+        [
+          -13830.0,
+          5350.0,
+          6850.0
+        ],
+        [
+          -13830.0,
+          7950.0,
+          6850.0
+        ],
+        [
+          -13830.0,
+          7950.0,
+          1542.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -3622.5,
+            5350.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13830.0,
+            5350.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13830.0,
+            7950.0,
+            6850.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "214-WT-DN32",
+      "run_name": "u_wire_016_u_cip_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Cip Tank",
+      "to_tag": "Cleanwater Reservoir Reserve Tank",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN32",
+      "outer_dia_mm": 42.2,
+      "length_m": 26.69,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -11470.0,
+          7950.0,
+          595.0
+        ],
+        [
+          -11470.0,
+          7950.0,
+          6960.0
+        ],
+        [
+          -13130.0,
+          7950.0,
+          6960.0
+        ],
+        [
+          -13130.0,
+          -6050.0,
+          6960.0
+        ],
+        [
+          -13130.0,
+          -6050.0,
+          2293.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -11470.0,
+            7950.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13130.0,
+            7950.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13130.0,
+            -6050.0,
+            6960.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "215-WT-DN25",
+      "run_name": "u_wire_017_u_cleanwater_reservoir_reserve_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Cleanwater Reservoir Reserve Tank",
+      "to_tag": "Fresh Water Tank",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 21.92,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -4170.0,
+          -6050.0,
+          970.0
+        ],
+        [
+          -4170.0,
+          -6050.0,
+          7070.0
+        ],
+        [
+          7420.0,
+          -6050.0,
+          7070.0
+        ],
+        [
+          7420.0,
+          -7950.0,
+          7070.0
+        ],
+        [
+          7420.0,
+          -7950.0,
+          4736.6
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -4170.0,
+            -6050.0,
+            7070.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            -6050.0,
+            7070.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            -7950.0,
+            7070.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "216-WT-DN25",
+      "run_name": "u_wire_018_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Nutrient Tank",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 36.36,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          7180.0
+        ],
+        [
+          -2880.0,
+          -7950.0,
+          7180.0
+        ],
+        [
+          -2880.0,
+          950.0,
+          7180.0
+        ],
+        [
+          -2880.0,
+          950.0,
+          1800.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -2880.0,
+            -7950.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -2880.0,
+            950.0,
+            7180.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "217-WT-DN250",
+      "run_name": "u_wire_042_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Permeate Outlet",
+      "service": "process water (inter-module recirculation/service)",
+      "material": "HDPE/PE100 (water service)",
+      "size_label": "DN250",
+      "outer_dia_mm": 273.0,
+      "length_m": 43.98,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          7290.0
+        ],
+        [
+          -2630.0,
+          -7950.0,
+          7290.0
+        ],
+        [
+          -2630.0,
+          7650.0,
+          7290.0
+        ],
+        [
+          -2630.0,
+          7650.0,
+          850.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -2630.0,
+            -7950.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -2630.0,
+            7650.0,
+            7290.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "218-WT-DN65",
+      "run_name": "u_wire_080_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Softener Vessel",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN65",
+      "outer_dia_mm": 73.0,
+      "length_m": 43.19,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          7400.0
+        ],
+        [
+          -7230.0,
+          -7950.0,
+          7400.0
+        ],
+        [
+          -7230.0,
+          3150.0,
+          7400.0
+        ],
+        [
+          -7230.0,
+          3150.0,
+          1955.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
             7400.0
           ]
         },
         {
           "type": "elbow",
           "at": [
-            27994.4,
-            3505.0,
+            -7230.0,
+            -7950.0,
             7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -7230.0,
+            3150.0,
+            7400.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "219-WT-DN25",
+      "run_name": "u_wire_081_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Drain Collection Sump",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 23.47,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          -600.0
+        ],
+        [
+          1220.0,
+          -7950.0,
+          -600.0
+        ],
+        [
+          1220.0,
+          50.0,
+          -600.0
+        ],
+        [
+          1220.0,
+          50.0,
+          947.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            -600.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            -7950.0,
+            -600.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            50.0,
+            -600.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "220-WT-DN125",
+      "run_name": "u_wire_083_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Drain Transfer Pump",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 48.77,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          6960.0
+        ],
+        [
+          -9940.0,
+          -7950.0,
+          6960.0
+        ],
+        [
+          -9940.0,
+          5550.0,
+          6960.0
+        ],
+        [
+          -9940.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9940.0,
+            -7950.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -9940.0,
+            5550.0,
+            6960.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "221-WT-DN25",
+      "run_name": "u_wire_085_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Nursery Drain Collection Sump",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 19.21,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          -750.0
+        ],
+        [
+          4920.0,
+          -7950.0,
+          -750.0
+        ],
+        [
+          4920.0,
+          50.0,
+          -750.0
+        ],
+        [
+          4920.0,
+          50.0,
+          90.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            -750.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4920.0,
+            -7950.0,
+            -750.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            4920.0,
+            50.0,
+            -750.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "222-WT-DN125",
+      "run_name": "u_wire_087_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Nursery Drain Transfer Pump",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 44.66,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          7180.0
+        ],
+        [
+          -5677.5,
+          -7950.0,
+          7180.0
+        ],
+        [
+          -5677.5,
+          5350.0,
+          7180.0
+        ],
+        [
+          -5677.5,
+          5350.0,
+          687.7
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -5677.5,
+            -7950.0,
+            7180.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -5677.5,
+            5350.0,
+            7180.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "223-WT-DN25",
+      "run_name": "u_wire_089_u_fresh_water_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fresh Water Tank",
+      "to_tag": "Drain Water Tank",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN25 (nominal — flow unknown)",
+      "outer_dia_mm": 33.4,
+      "length_m": 22.19,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          13280.0,
+          -7950.0,
+          1265.0
+        ],
+        [
+          13280.0,
+          -7950.0,
+          -900.0
+        ],
+        [
+          -1180.0,
+          -7950.0,
+          -900.0
+        ],
+        [
+          -1180.0,
+          -7950.0,
+          4667.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            13280.0,
+            -7950.0,
+            -900.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -1180.0,
+            -7950.0,
+            -900.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "224-PR-DN15",
+      "run_name": "u_wire_019_u_nutrient_tank_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nutrient Tank",
+      "to_tag": "Acid Dosing Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 30.53,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -820.0,
+          950.0,
+          1190.0
+        ],
+        [
+          -820.0,
+          950.0,
+          7400.0
+        ],
+        [
+          -13740.0,
+          950.0,
+          7400.0
+        ],
+        [
+          -13740.0,
+          5550.0,
+          7400.0
+        ],
+        [
+          -13740.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -820.0,
+            950.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13740.0,
+            950.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13740.0,
+            5550.0,
+            7400.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "225-PR-DN15",
+      "run_name": "u_wire_020_u_acid_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Acid Dosing Pump",
+      "to_tag": "Chemical Dosing Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 1.24,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -12180.0,
+          5550.0,
+          600.3
+        ],
+        [
+          -12180.0,
+          5550.0,
+          1050.3
+        ],
+        [
+          -11840.0,
+          5550.0,
+          1050.3
+        ],
+        [
+          -11840.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -12180.0,
+            5550.0,
+            1050.3
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -11840.0,
+            5550.0,
+            1050.3
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "226-PR-DN15",
+      "run_name": "u_wire_092_u_acid_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Acid Dosing Pump",
+      "to_tag": "Drain Collection Sump",
+      "service": "process output (residual closer: nearest consumer)",
+      "material": "carbon steel",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 31.27,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -12180.0,
+          5550.0,
+          600.3
+        ],
+        [
+          -12180.0,
+          5550.0,
+          6960.0
+        ],
+        [
+          1220.0,
+          5550.0,
+          6960.0
+        ],
+        [
+          1220.0,
+          50.0,
+          6960.0
+        ],
+        [
+          1220.0,
+          50.0,
+          947.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -12180.0,
+            5550.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            5550.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            50.0,
+            6960.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "227-PR-DN150",
+      "run_name": "u_wire_023_u_fertigation_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fertigation Dosing Pump",
+      "to_tag": "Fertigation Dosing Pump Backup",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN150",
+      "outer_dia_mm": 168.3,
+      "length_m": 1.78,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          1520.0,
+          5550.0,
+          600.3
+        ],
+        [
+          1520.0,
+          5550.0,
+          1270.3
+        ],
+        [
+          1960.0,
+          5550.0,
+          1270.3
+        ],
+        [
+          1960.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            1520.0,
+            5550.0,
+            1270.3
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1960.0,
+            5550.0,
+            1270.3
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "228-PR-DN150",
+      "run_name": "u_wire_091_u_fertigation_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fertigation Dosing Pump",
+      "to_tag": "Drain Collection Sump",
+      "service": "process output (residual closer: nearest consumer)",
+      "material": "carbon steel",
+      "size_label": "DN150",
+      "outer_dia_mm": 168.3,
+      "length_m": 7.71,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          1520.0,
+          5550.0,
+          600.3
+        ],
+        [
+          1520.0,
+          5550.0,
+          1727.5
+        ],
+        [
+          1220.0,
+          5550.0,
+          1727.5
+        ],
+        [
+          1220.0,
+          50.0,
+          1727.5
+        ],
+        [
+          1220.0,
+          50.0,
+          947.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            1520.0,
+            5550.0,
+            1727.5
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            5550.0,
+            1727.5
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            50.0,
+            1727.5
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "229-WT-DN80",
+      "run_name": "u_wire_024_u_fertigation_dosing_pump_backup_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fertigation Dosing Pump Backup",
+      "to_tag": "Hand Watering Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN80",
+      "outer_dia_mm": 88.9,
+      "length_m": 22.44,
+      "length_routed_m": 22.66,
+      "waypoints_mm": [
+        [
+          3520.0,
+          5550.0,
+          600.3
+        ],
+        [
+          3520.0,
+          5550.0,
+          7290.0
+        ],
+        [
+          6520.0,
+          5550.0,
+          7290.0
+        ],
+        [
+          6520.0,
+          -750.0,
+          7290.0
+        ],
+        [
+          6520.0,
+          -750.0,
+          618.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            3520.0,
+            5550.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            6520.0,
+            5550.0,
+            7290.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            6520.0,
+            -750.0,
+            7290.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "230-PR-DN150",
+      "run_name": "u_wire_094_u_fertigation_dosing_pump_backup_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Fertigation Dosing Pump Backup",
+      "to_tag": "Drain Collection Sump",
+      "service": "process output (residual closer: nearest consumer)",
+      "material": "carbon steel",
+      "size_label": "DN150",
+      "outer_dia_mm": 168.3,
+      "length_m": 10.15,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          3520.0,
+          5550.0,
+          600.3
+        ],
+        [
+          3520.0,
+          5550.0,
+          1947.5
+        ],
+        [
+          1220.0,
+          5550.0,
+          1947.5
+        ],
+        [
+          1220.0,
+          50.0,
+          1947.5
+        ],
+        [
+          1220.0,
+          50.0,
+          947.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            3520.0,
+            5550.0,
+            1947.5
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            5550.0,
+            1947.5
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            50.0,
+            1947.5
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "231-WT-DN250",
+      "run_name": "u_wire_025_u_hand_watering_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Hand Watering Pump",
+      "to_tag": "Irrigation Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN250",
+      "outer_dia_mm": 273.0,
+      "length_m": 34.67,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          8380.0,
+          -750.0,
+          618.5
+        ],
+        [
+          8380.0,
+          -750.0,
+          6850.0
+        ],
+        [
+          -7866.0,
+          -750.0,
+          6850.0
+        ],
+        [
+          -7866.0,
+          5550.0,
+          6850.0
+        ],
+        [
+          -7866.0,
+          5550.0,
+          962.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            8380.0,
+            -750.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -7866.0,
+            -750.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -7866.0,
+            5550.0,
+            6850.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "232-PR-DN15",
+      "run_name": "u_wire_026_u_irrigation_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Irrigation Pump",
+      "to_tag": "Nursery Acid Dosing Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 31.46,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -5034.0,
+          5550.0,
+          962.5
+        ],
+        [
+          -5034.0,
+          5550.0,
+          6960.0
+        ],
+        [
+          7770.0,
+          5550.0,
+          6960.0
+        ],
+        [
+          7770.0,
+          -750.0,
+          6960.0
+        ],
+        [
+          7770.0,
+          -750.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -5034.0,
+            5550.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7770.0,
+            5550.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7770.0,
+            -750.0,
+            6960.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "233-PR-DN15",
+      "run_name": "u_wire_027_u_nursery_acid_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Acid Dosing Pump",
+      "to_tag": "Nursery Chemical Dosing Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 1.8,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          9330.0,
+          -750.0,
+          600.3
+        ],
+        [
+          9330.0,
+          -750.0,
+          1270.3
+        ],
+        [
+          8870.0,
+          -750.0,
+          1270.3
+        ],
+        [
+          8870.0,
+          -750.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            9330.0,
+            -750.0,
+            1270.3
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            8870.0,
+            -750.0,
+            1270.3
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "234-PR-DN125",
+      "run_name": "u_wire_028_u_nursery_chemical_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Chemical Dosing Pump",
+      "to_tag": "Nursery Fertigation Dosing Pump",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN125",
+      "outer_dia_mm": 139.7,
+      "length_m": 2.02,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          10430.0,
+          -750.0,
+          600.3
+        ],
+        [
+          10430.0,
+          -750.0,
+          1380.3
+        ],
+        [
+          9970.0,
+          -750.0,
+          1380.3
+        ],
+        [
+          9970.0,
+          -750.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            10430.0,
+            -750.0,
+            1380.3
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            9970.0,
+            -750.0,
+            1380.3
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "235-PR-DN80",
+      "run_name": "u_wire_029_u_nursery_fertigation_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Nursery Fertigation Dosing Pump",
+      "to_tag": "Distribution Manifold",
+      "service": null,
+      "material": "carbon steel (assumed)",
+      "size_label": "DN80",
+      "outer_dia_mm": 88.9,
+      "length_m": 3.39,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          11530.0,
+          -750.0,
+          600.3
+        ],
+        [
+          11530.0,
+          -750.0,
+          1790.0
+        ],
+        [
+          10220.0,
+          -750.0,
+          1790.0
+        ],
+        [
+          10220.0,
+          -750.0,
+          900.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            11530.0,
+            -750.0,
+            1790.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            10220.0,
+            -750.0,
+            1790.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "236-WT-DN32",
+      "run_name": "u_wire_054_u_ultrafiltration_module_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Ultrafiltration Module",
+      "to_tag": "Fresh Water Tank",
+      "service": "process-water service tie-in (make-up / fill / drain)",
+      "material": "HDPE/PE100 (water service)",
+      "size_label": "DN32",
+      "outer_dia_mm": 42.2,
+      "length_m": 38.35,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -10670.0,
+          3350.0,
+          1100.0
+        ],
+        [
+          -10670.0,
+          3350.0,
+          7400.0
+        ],
+        [
+          7420.0,
+          3350.0,
+          7400.0
+        ],
+        [
+          7420.0,
+          -7950.0,
+          7400.0
+        ],
+        [
+          7420.0,
+          -7950.0,
+          4736.6
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -10670.0,
+            3350.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            3350.0,
+            7400.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            7420.0,
+            -7950.0,
+            7400.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "237-PR-DN15",
+      "run_name": "u_wire_075_u_permeate_outlet_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Permeate Outlet",
+      "to_tag": "Acid Dosing Pump",
+      "service": "process-flow output (direction-closer: nearest downstream)",
+      "material": "carbon steel",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 27.42,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -670.0,
+          7650.0,
+          850.0
+        ],
+        [
+          -670.0,
+          7650.0,
+          6850.0
+        ],
+        [
+          -13740.0,
+          7650.0,
+          6850.0
+        ],
+        [
+          -13740.0,
+          5550.0,
+          6850.0
+        ],
+        [
+          -13740.0,
+          5550.0,
+          600.3
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -670.0,
+            7650.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13740.0,
+            7650.0,
+            6850.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13740.0,
+            5550.0,
+            6850.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "238-PR-DN65",
+      "run_name": "u_wire_079_u_softener_vessel_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Softener Vessel",
+      "to_tag": "Ultrafiltration Module",
+      "service": "process input (boundary closer: nearest producer)",
+      "material": "carbon steel",
+      "size_label": "DN65",
+      "outer_dia_mm": 73.0,
+      "length_m": 20.56,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -5070.0,
+          3150.0,
+          1220.0
+        ],
+        [
+          -5070.0,
+          3150.0,
+          6960.0
+        ],
+        [
+          -13830.0,
+          3150.0,
+          6960.0
+        ],
+        [
+          -13830.0,
+          3350.0,
+          6960.0
+        ],
+        [
+          -13830.0,
+          3350.0,
+          1100.0
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -5070.0,
+            3150.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13830.0,
+            3150.0,
+            6960.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            -13830.0,
+            3350.0,
+            6960.0
+          ]
+        }
+      ]
+    },
+    {
+      "line_number": "239-PR-DN15",
+      "run_name": "u_wire_093_u_chemical_dosing_pump_water",
+      "mechanism": "fluid_loop",
+      "role": null,
+      "from_tag": "Chemical Dosing Pump",
+      "to_tag": "Drain Collection Sump",
+      "service": "process output (residual closer: nearest consumer)",
+      "material": "carbon steel",
+      "size_label": "DN15",
+      "outer_dia_mm": 21.3,
+      "length_m": 29.59,
+      "length_routed_m": null,
+      "waypoints_mm": [
+        [
+          -10280.0,
+          5550.0,
+          600.3
+        ],
+        [
+          -10280.0,
+          5550.0,
+          7070.0
+        ],
+        [
+          1220.0,
+          5550.0,
+          7070.0
+        ],
+        [
+          1220.0,
+          50.0,
+          7070.0
+        ],
+        [
+          1220.0,
+          50.0,
+          947.5
+        ]
+      ],
+      "fittings": [
+        {
+          "type": "elbow",
+          "at": [
+            -10280.0,
+            5550.0,
+            7070.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            5550.0,
+            7070.0
+          ]
+        },
+        {
+          "type": "elbow",
+          "at": [
+            1220.0,
+            50.0,
+            7070.0
           ]
         }
       ]
