@@ -176,6 +176,30 @@ function pureTests(): void {
   r = applyStepOutputs(step, baseContract, { motor_power_kw: NaN })
   check('materialiser treats NaN computed field as missing (no NaN written)',
     r.contract.quantities['recirc_pump_motor_kw'] === undefined && r.skipped.length === 1)
+  // (iv) Codema 1735: calculator-seeded storage aggregate must NOT be clobbered by a
+  // bootstrapped consumptive buffer tool (682 m³ phantom over the brief sum).
+  const seeded: ContractInProgress = {
+    ...baseContract,
+    quantities: {
+      total_water_storage_volume_m3: {
+        value: 313, unit: 'm3', family: 'volume', source: 'calculator',
+      } as any,
+    },
+  }
+  const bufStep: ToolPlanStepSpec = {
+    tool_id: 'water-storage:buffer-sizing',
+    inputs: [],
+    outputs: [{
+      contract_key: 'total_water_storage_volume_m3',
+      tool_output_field: 'total_water_storage_volume_m3',
+      unit: 'm3', family: 'volume',
+    }],
+  }
+  r = applyStepOutputs(bufStep, seeded, { total_water_storage_volume_m3: 682.8 })
+  check('SEED-PROTECTED calculator storage aggregate (Codema 1735 class)',
+    r.contract.quantities['total_water_storage_volume_m3']?.value === 313
+    && (r.protected_keys?.length ?? 0) === 1,
+    `got ${r.contract.quantities['total_water_storage_volume_m3']?.value}; protected=${JSON.stringify(r.protected_keys)}`)
 
   // ── candidate-store boundary (security item 18) ─────────────────────────
   let threw = false
