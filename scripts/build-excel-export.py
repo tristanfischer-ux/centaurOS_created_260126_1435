@@ -1630,10 +1630,32 @@ def _stamp_floor_mirrors(scores: dict, state: dict, run_dir: str = "") -> dict:
         es["basis"] = ("MIRROR of the dossier floor (min of every deterministic section & "
                        "non-mirror tab) — re-stamped from the CURRENT scores, never a stale earlier cap"
                        + (f"; own content check: {es.get('content_basis')}" if es.get("content_basis") else ""))
+        # MIRROR OWN-CONTENT GATES THE VERDICT (2026-07-09 — run-2100 Goodhart: the json
+        # carried verdict {ships: true, floor: 9.4} beside summary {min_score: 2,
+        # fail_tabs: [Executive Summary]} — the Exec cover sat at 2 on its OWN content
+        # check, an UNVERIFIED compliance row, while ships stayed true because
+        # compute_verdict excludes the mirrors). The mirror EXCLUSION is a fixpoint guard
+        # against a STALE mirrored floor; a freshly-stamped mirror score BELOW the
+        # computed floor cannot BE the mirrored floor — it is this build's own content
+        # check, a real defect on a real rendered surface, so it gates floor/ships like
+        # any other tab. Fresh-only by construction (own + content_score are stamped
+        # THIS build), so the pre-2026-07-03 stale-0 fixpoint cannot return.
+        if isinstance(fl, (int, float)) and sc < fl - 1e-9:
+            v["floor"] = sc
+            fl = sc
+            if sc < 8:
+                v["open_issues"] = int(v.get("open_issues") or 0) + 1
+                v["ships"] = False
     _qa_prev = scores.get("Quality & Audit") if isinstance(scores.get("Quality & Audit"), dict) else {}
     _qa_sc = fl
     if isinstance(_qa_prev.get("content_score"), (int, float)) and isinstance(fl, (int, float)):
         _qa_sc = min(fl, _qa_prev["content_score"])
+        # the QA mirror's OWN content check gates the verdict the same way (see above)
+        if _qa_sc < fl - 1e-9:
+            v["floor"] = _qa_sc
+            if _qa_sc < 8:
+                v["open_issues"] = int(v.get("open_issues") or 0) + 1
+                v["ships"] = False
     scores["Quality & Audit"] = {
         "score": _qa_sc, "target": 8,
         "status": "PASS" if v.get("ships") else "FAIL",
@@ -25837,13 +25859,21 @@ def _selftest() -> int:
         "Overview": {"score": 9, "target": 8, "status": "PASS", "issues": []},
         "Quality & Audit": {"score": 9, "target": 8, "status": "PASS", "issues": []},
     }
-    _stamp_floor_mirrors(_fxo, _fx_state, "")
+    _fxov = _stamp_floor_mirrors(_fxo, _fx_state, "")
     if _fxo["Executive Summary"]["score"] != 2:
         print(f"  FAIL floor-fixpoint: the Exec cover's OWN [HIGH]×2 findings must cap it at "
               f"10−8=2 below a floor of 9 (got {_fxo['Executive Summary']['score']})"); bad += 1
-    if _fxo["Quality & Audit"]["score"] != 9:
-        print(f"  FAIL floor-fixpoint: Q&A mirrors the non-mirror floor 9 "
-              f"(got {_fxo['Quality & Audit']['score']})"); bad += 1
+    # (d) MIRROR OWN-CONTENT GATES THE VERDICT (2026-07-09, run-2100 Goodhart proveCatch):
+    # the Exec cover's own content 2 is a REAL defect on a REAL rendered surface — the
+    # verdict must carry floor 2 / ships False (never "ships: true, floor 9.4" beside a
+    # summary min of 2), and the Q&A floor-mirror must render the SAME gated floor.
+    if _fxov.get("floor") != 2 or _fxov.get("ships") is not False:
+        print(f"  FAIL mirror-own-content gate: verdict must be floor 2 / ships False when the "
+              f"Exec cover's own content sits at 2 (got floor {_fxov.get('floor')}, "
+              f"ships {_fxov.get('ships')})"); bad += 1
+    if _fxo["Quality & Audit"]["score"] != 2:
+        print(f"  FAIL mirror-own-content gate: Q&A must render the GATED floor 2 — one truth "
+              f"with the verdict it quotes (got {_fxo['Quality & Audit']['score']})"); bad += 1
 
     # ═══ EVERY-TAB SCORING + PER-CELL CONTRACT proveCatches (Tristan 2026-07-03) ═══
     # (V1) NO SILENT DEFAULT — a rendered tab with no scorer entry / empty basis REFUSES.
