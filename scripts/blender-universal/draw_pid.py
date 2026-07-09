@@ -170,6 +170,9 @@ class Node:
     array_n: int = 1
     array_tags: list[str] = field(default_factory=list)
     tie_ins: list[TieIn] = field(default_factory=list)
+    # T-22: Pump Unit N skid parent tag (from BoM installation / _pump_unit_tag).
+    # When ≥2 nodes share a tag, the P&ID draws a dashed skid boundary around them.
+    pump_unit: str = ""
 
 
 @dataclass
@@ -509,6 +512,87 @@ def _pid_quantity(state: dict, *keys):
                 if item.get("key") in keys:
                     return item.get("value")
     return None
+
+
+def _pump_unit_tag_from_word(w: dict) -> str:
+    """T-22 — extract Pump Unit N parent tag from a BoM word (modifier or field).
+
+    UNIVERSAL: reads installation / _pump_unit_tag modifiers — never a class hardcode.
+    """
+    if not isinstance(w, dict):
+        return ""
+    direct = str(w.get("_pump_unit_tag") or w.get("pump_unit_tag") or "").strip()
+    if re.search(r"Pump Unit\s+\d+", direct, re.I):
+        m = re.search(r"(Pump Unit\s+\d+)", direct, re.I)
+        return m.group(1) if m else direct
+    for mod in (w.get("modifier_characters") or []):
+        if not isinstance(mod, dict):
+            continue
+        val = str(mod.get("value") or "")
+        m = re.search(r"(Pump Unit\s+\d+)", val, re.I)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def _annotate_pump_unit_tags(nodes: dict, state: dict) -> None:
+    """T-22 — stamp Node.pump_unit from matching BoM words (name / character_id)."""
+    words = list(_iter_words(state))
+    if not words or not nodes:
+        return
+    for nd in nodes.values():
+        if nd.pump_unit:
+            continue
+        blob = f"{nd.key} {nd.label}".lower()
+        best = ""
+        for w, name, cid, _mid in words:
+            tag = _pump_unit_tag_from_word(w if isinstance(w, dict) else {})
+            if not tag:
+                continue
+            name_l = (name or "").lower()
+            cid_l = (cid or "").lower()
+            if (name_l and name_l in blob) or (cid_l and cid_l in blob) or (
+                blob and any(tok and tok in name_l for tok in re.findall(r"[a-z]{4,}", blob)[:4])
+            ):
+                # Prefer exact-ish name containment over loose token match
+                if name_l and (name_l in blob or blob in name_l):
+                    best = tag
+                    break
+                if not best:
+                    best = tag
+        if best:
+            nd.pump_unit = best
+
+
+def _draw_pump_unit_skid_boundaries(svg, proc, centre) -> None:
+    """T-22 — dashed skid enclosure + 'Pump Unit N' label around clustered duty+standby.
+
+    Groups nodes that share Node.pump_unit. No-op when fewer than 2 members share a tag
+    (proveNoFalsePositive: scattered single pumps stay unboxed).
+    """
+    groups: dict[str, list] = {}
+    for nd in (proc.nodes or []):
+        tag = str(getattr(nd, "pump_unit", "") or "").strip()
+        if not tag:
+            continue
+        groups.setdefault(tag, []).append(nd)
+    for unit_tag, members in groups.items():
+        if len(members) < 2:
+            continue
+        pts = [centre.get(nd.key) for nd in members if nd.key in centre]
+        if len(pts) < 2:
+            continue
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        pad = 48
+        x0, y0 = min(xs) - pad, min(ys) - pad - 10
+        x1, y1 = max(xs) + pad, max(ys) + pad + 28
+        svg.add(
+            f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" height="{y1 - y0:.1f}" '
+            f'fill="none" stroke="{MUTED}" stroke-width="1.2" stroke-dasharray="6,4" rx="4"/>'
+        )
+        svg.text((x0 + x1) / 2, y0 - 6, f"{unit_tag} (skid)", size=8.5,
+                 anchor="middle", fill=EQ_INK, weight="bold")
 
 
 def _delivery_zone_offpages(state: dict) -> list[tuple]:
@@ -1895,6 +1979,10 @@ def reconstruct_process(schedule: dict, state: dict,
             notes.append("Control loops shown dashed: " + " and ".join(phrases)
                          + life_safety + ".")
 
+    # T-22: stamp Pump Unit N parent tags from BoM words onto matching nodes so
+    # build_pid_svg can draw dashed skid boundaries around duty+BACKUP clusters.
+    _annotate_pump_unit_tags(nodes, state)
+
     return Process(archetype=arch, nodes=list(nodes.values()), lines=lines,
                    power_note=power_note, notes=notes,
                    schedule_present=bool(schedule.get("rows")),
@@ -2627,6 +2715,11 @@ def build_pid_svg(proc: Process) -> str:
     # ----- LIFE-SAFETY EMERGENCY-O₂ FINAL ELEMENT on the culture tank (low-DO → fail-open
     #       solenoid → O₂ diffuser) — the per-tank element the BoM carries on all N tanks. ---
     _draw_emergency_o2_final_element(svg, proc, centre, ports)
+
+    # ----- T-22: Pump Unit N skid boundaries (duty+BACKUP clustered) ─────
+    # Drawn BEFORE off-page connectors so the dashed enclosure sits under
+    # delivery stubs. No-op when <2 nodes share a pump_unit tag.
+    _draw_pump_unit_skid_boundaries(svg, proc, centre)
 
     # ----- T-23: OFF-PAGE CONNECTORS to cultivation / delivery zones ─────
     # One SYM_OFFPAGE per delivery group (and nursery when present), drawn to the
@@ -3752,6 +3845,46 @@ def _selftest() -> int:
         "Delivery group 1" in _z_svg and "Delivery group 2" in _z_svg
         and "Nursery zone" in _z_svg)
     chk("G3d.svg_emits_out_of_scope_note", "to cultivation" in _z_svg.lower())
+
+    # G4 — T-22 Pump Unit skid boundary on P&ID.
+    # proveCatch: ≥2 nodes sharing pump_unit → dashed enclosure + "Pump Unit N (skid)".
+    # proveNoFalsePositive: a lone tagged pump → no skid box.
+    _skid_nodes = [
+        Node(key="p_duty", tag="P-101", label="Fertigation Dosing Pump",
+             sym=SYM_PUMP, column=0, pump_unit="Pump Unit 1"),
+        Node(key="p_backup", tag="P-102",
+             label="Fertigation Dosing Pump (BACKUP / STANDBY)",
+             sym=SYM_PUMP, column=0, pump_unit="Pump Unit 1"),
+        Node(key="tank", tag="T-101", label="Fresh Water Tank",
+             sym=SYM_TANK, column=1),
+    ]
+    _skid_proc = Process(
+        archetype="water_treatment",
+        nodes=_skid_nodes,
+        lines=[Line(from_key="p_duty", to_key="tank", number="201-PR", dn="DN80")],
+    )
+    _skid_svg = build_pid_svg(_skid_proc)
+    chk("G4a.skid_boundary_label_proveCatch", "Pump Unit 1 (skid)" in _skid_svg)
+    chk("G4a.skid_boundary_dash_proveCatch", 'stroke-dasharray="6,4"' in _skid_svg)
+    _lone = Process(
+        archetype="water_treatment",
+        nodes=[Node(key="p1", tag="P-101", label="RO HP Pump",
+                    sym=SYM_PUMP, column=0, pump_unit="Pump Unit 1")],
+        lines=[],
+    )
+    _lone_svg = build_pid_svg(_lone)
+    chk("G4b.lone_pump_no_skid_proveNoFalsePositive",
+        "Pump Unit 1 (skid)" not in _lone_svg)
+    # word→tag extractor
+    chk("G4c.tag_from_installation_mod",
+        _pump_unit_tag_from_word({
+            "modifier_characters": [
+                {"kind": "installation",
+                 "value": "Skid assembly: Pump Unit 2 (duty+BACKUP clustered)"},
+            ],
+        }) == "Pump Unit 2")
+    chk("G4d.tag_from_direct_field",
+        _pump_unit_tag_from_word({"_pump_unit_tag": "Pump Unit 3"}) == "Pump Unit 3")
 
     for f in fails:
         print(f"[pid][selftest] FAIL {f}")

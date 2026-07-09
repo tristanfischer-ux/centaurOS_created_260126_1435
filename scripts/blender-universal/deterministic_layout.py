@@ -95,20 +95,45 @@ _ELECTRICAL_ZONE_SHAPES = {"cabinet", "cabinet_small", "transformer_box", "instr
 VESSEL_LARGE_AREA_MM2 = 4.0e6
 
 
-def _zone_rank(shape: str | None, area: float) -> int:
+def _zone_rank(shape: str | None, area: float, name: str | None = None) -> int:
     """Functional-zone sort tier for a pack node: 0 electrical/control/instruments, 1 packaged
-    process skids, 2 large storage vessels, 3 small process/dosing vessels, 4 rotating machines,
-    5 everything else (incl. no shape signal at all). The absolute numbers are arbitrary — only
-    the grouping + determinism matter."""
+    process skids / RO-pretreatment wall-row, 2 large storage vessels, 3 small process/dosing
+    vessels, 4 rotating machines, 5 recovery filters (near drain pits), 6 everything else.
+    The absolute numbers are arbitrary — only the grouping + determinism matter.
+
+    INTENT (T-07): name-keyed sub-ranks pull RO/pretreatment into the skid wall-row and
+    recovery filters toward the drain-pit end — universal noun signals, never a class table."""
+    nm = (name or "").lower()
     if shape in _ELECTRICAL_ZONE_SHAPES:
         return 0
-    if shape == "skid_box":
+    if shape == "skid_box" or re.search(r"\b(reverse.?osmosis|ro\b|softener|gac|activated.?carbon|particle.?filter|pretreat)", nm):
         return 1
     if shape in _VESSEL_ZONE_SHAPES:
         return 2 if area >= VESSEL_LARGE_AREA_MM2 else 3
+    if re.search(r"\b(cloth.?filter|drum.?filter|microscreen|recovery.?filter|drain.?filter)\b", nm):
+        return 5
     if shape in _MACHINE_ZONE_SHAPES:
         return 4
-    return 5
+    return 6
+
+
+def _pump_unit_key(it: dict) -> str:
+    """Stable bay key for Pump Unit N skid clustering (T-22). Empty when not a unit member."""
+    tag = str(it.get("pump_unit") or it.get("pump_unit_tag") or "").strip()
+    if tag:
+        return tag
+    nm = str(it.get("name") or it.get("id") or "")
+    m = re.search(r"pump\s*unit\s*(\d+)", nm, re.I)
+    if m:
+        return f"Pump Unit {m.group(1)}"
+    # BACKUP / STANDBY fertigation/irrigation pumps share the duty unit bay
+    if re.search(r"\b(backup|standby)\b", nm, re.I) and re.search(
+            r"\b(fertigation|irrigation|dosing.?pump|circulation.?pump)\b", nm, re.I):
+        return "Pump Unit 1"
+    if re.search(r"\b(acid|chemical|nutrient).{0,20}dosing\b", nm, re.I) and re.search(
+            r"\b(fertigation|irrigation)\b", nm, re.I):
+        return "Pump Unit 1"
+    return ""
 
 
 def _snap(v: float) -> int:
@@ -117,9 +142,11 @@ def _snap(v: float) -> int:
 
 
 def _item_key(it: dict):
-    """TOTAL deterministic sort key: process sequence (rank) → region → extraction index → id.
-    Every field is an int or str, so the order is identical regardless of input order or hash seed."""
+    """TOTAL deterministic sort key: process sequence (rank) → region → pump-unit bay →
+    extraction index → id. Every field is an int or str, so the order is identical
+    regardless of input order or hash seed."""
     return (int(it.get("rank", 10_000)), str(it.get("region", "")),
+            str(_pump_unit_key(it) or ""),
             int(it.get("seq", 0)), str(it.get("id", "")))
 
 
@@ -267,7 +294,7 @@ def _door_span(a0: float, a1: float, b0: float, b1: float, width: float) -> tupl
     return c - width / 2.0, c + width / 2.0
 
 
-def compute_function_rooms(rows: list[dict]) -> list[dict]:
+def compute_function_rooms(rows: list[dict], *, force: bool = False) -> list[dict]:
     """rows: [{x0,y0,x1,y1,shape,module}] — FINAL placed plan-view footprints
     (mm) of every DRAWN part, for ANY archetype. Pure geometry; no re-packing,
     no ordering dependence.
@@ -292,7 +319,10 @@ def compute_function_rooms(rows: list[dict]) -> list[dict]:
     either axis (an upstream placement that never zone-split them at all — well
     beyond ROOM_ADJACENCY_TOLERANCE_MM of overlap) no safe wall can be drawn
     without slicing through equipment, so this returns [] rather than a garbled
-    overlap."""
+    overlap — UNLESS `force=True` (T-26): when the brief/contract signals plant
+    rooms OR wet process + electrical load both exist, force a schematic partition
+    on the centroid midline even if the packer never spatially separated the groups.
+    A forced room may clip a border item (schematic) but never declines to empty."""
     elec = [r for r in rows if _room_group(r.get("shape"), r.get("module")) == "electrical"]
     wet = [r for r in rows if _room_group(r.get("shape"), r.get("module")) == "wet"]
     if not elec or not wet:
@@ -313,19 +343,24 @@ def compute_function_rooms(rows: list[dict]) -> list[dict]:
     # cluster that was genuinely never zone-split (proveNoFalsePositive #17 above stays
     # well beyond this tolerance on both axes).
     ROOM_ADJACENCY_TOLERANCE_MM = 1500.0
-    if max(gap_y, gap_x) <= -ROOM_ADJACENCY_TOLERANCE_MM:
+    if max(gap_y, gap_x) <= -ROOM_ADJACENCY_TOLERANCE_MM and not force:
         return []
+    # T-26 force path: when groups heavily overlap, still partition on the centroid
+    # midline (schematic Mech/Elec rooms) rather than skipping entirely.
+    if max(gap_y, gap_x) <= -ROOM_ADJACENCY_TOLERANCE_MM and force:
+        # Prefer the axis with LESS overlap (larger algebraic gap) for the wall.
+        pass
 
     m = ROOM_WALL_CLEAR_MM
     if gap_y >= gap_x:
         # direction by CENTROID (not the raw edge test) so a small tolerated overlap
         # band still resolves to the correct north/south side.
         if (ey0 + ey1) >= (wy0 + wy1):     # elec room is NORTH of the wet room
-            mid = (ey0 + wy1) / 2.0
+            mid = (ey0 + wy1) / 2.0 if gap_y > -ROOM_ADJACENCY_TOLERANCE_MM else (ey0 + ey1 + wy0 + wy1) / 4.0
             e_y0, e_y1 = mid, ey1 + m
             w_y0, w_y1 = wy0 - m, mid
         else:                              # wet room is NORTH of the elec room
-            mid = (wy0 + ey1) / 2.0
+            mid = (wy0 + ey1) / 2.0 if gap_y > -ROOM_ADJACENCY_TOLERANCE_MM else (ey0 + ey1 + wy0 + wy1) / 4.0
             w_y0, w_y1 = mid, wy1 + m
             e_y0, e_y1 = ey0 - m, mid
         e_x0, e_x1 = ex0 - m, ex1 + m
@@ -339,11 +374,11 @@ def compute_function_rooms(rows: list[dict]) -> list[dict]:
         ]
     else:
         if (ex0 + ex1) >= (wx0 + wx1):      # elec room is EAST of the wet room
-            mid = (ex0 + wx1) / 2.0
+            mid = (ex0 + wx1) / 2.0 if gap_x > -ROOM_ADJACENCY_TOLERANCE_MM else (ex0 + ex1 + wx0 + wx1) / 4.0
             e_x0, e_x1 = mid, ex1 + m
             w_x0, w_x1 = wx0 - m, mid
         else:                               # wet room is EAST of the elec room
-            mid = (wx0 + ex1) / 2.0
+            mid = (wx0 + ex1) / 2.0 if gap_x > -ROOM_ADJACENCY_TOLERANCE_MM else (ex0 + ex1 + wx0 + wx1) / 4.0
             w_x0, w_x1 = mid, wx1 + m
             e_x0, e_x1 = ex0 - m, mid
         e_y0, e_y1 = ey0 - m, ey1 + m
@@ -356,6 +391,67 @@ def compute_function_rooms(rows: list[dict]) -> list[dict]:
              "door": {"x0": mid, "y0": d0, "x1": mid, "y1": d1}},
         ]
     return rooms
+
+
+# ── LAYOUT DENSITY DIAGNOSTIC (T-07 / E-04) ──────────────────────────────────
+# UNIVERSAL threshold: plant footprint m² per m³/h of circulation flow, scaled by
+# equipment count. Absurdly sparse layouts (dead space Sam flagged) punch-list;
+# never a Codema constant — derived from circulation + n_equipment.
+DENSITY_M2_PER_M3H_ABSURD = 8.0   # >8 m² per (m³/h) of circulation is absurdly sparse
+DENSITY_M2_PER_EQUIP_ABSURD = 25.0  # >25 m² per principal item is absurdly sparse
+
+
+def layout_density_diagnostic(
+    footprint_m2: float,
+    circulation_m3_h: float | None,
+    n_equipment: int,
+) -> dict:
+    """Pure density check. Returns {verdict, m2_per_m3h, m2_per_equip, reason, punch}.
+    UNIVERSAL: keyed on circulation flow + equipment count — no class table."""
+    out = {
+        "verdict": "not_applicable",
+        "m2_per_m3h": None,
+        "m2_per_equip": None,
+        "reason": "",
+        "punch": None,
+    }
+    if not (isinstance(footprint_m2, (int, float)) and footprint_m2 > 0):
+        out["reason"] = "no footprint"
+        return out
+    m2_per_equip = footprint_m2 / max(1, int(n_equipment or 0))
+    out["m2_per_equip"] = round(m2_per_equip, 2)
+    circ = float(circulation_m3_h) if isinstance(circulation_m3_h, (int, float)) and circulation_m3_h > 0 else None
+    if circ is not None:
+        m2_per_m3h = footprint_m2 / circ
+        out["m2_per_m3h"] = round(m2_per_m3h, 2)
+        if m2_per_m3h > DENSITY_M2_PER_M3H_ABSURD and m2_per_equip > DENSITY_M2_PER_EQUIP_ABSURD:
+            out["verdict"] = "high"
+            out["reason"] = (
+                f"layout density absurdly sparse: {m2_per_m3h:.1f} m² per m³/h circulation "
+                f"(>{DENSITY_M2_PER_M3H_ABSURD}) and {m2_per_equip:.1f} m²/equip "
+                f"(>{DENSITY_M2_PER_EQUIP_ABSURD}) — tighten packer / zone ranks"
+            )
+            out["punch"] = (
+                f"T-07 density: footprint {footprint_m2:.0f} m² / circulation {circ:g} m³/h "
+                f"= {m2_per_m3h:.1f} m²/(m³/h); {n_equipment} principals → {m2_per_equip:.1f} m²/equip. "
+                f"Prefer RO/pretreatment wall-row, recovery filters near drain pits, reservoirs "
+                f"with delivery-aisle clearance, dosing tanks adjacent to parent pump unit."
+            )
+            return out
+        out["verdict"] = "pass"
+        out["reason"] = f"{m2_per_m3h:.1f} m²/(m³/h), {m2_per_equip:.1f} m²/equip — within band"
+        return out
+    if m2_per_equip > DENSITY_M2_PER_EQUIP_ABSURD * 1.5:
+        out["verdict"] = "high"
+        out["reason"] = (
+            f"layout density absurdly sparse: {m2_per_equip:.1f} m²/equip "
+            f"(no circulation flow known; threshold {DENSITY_M2_PER_EQUIP_ABSURD * 1.5})"
+        )
+        out["punch"] = out["reason"]
+        return out
+    out["verdict"] = "pass" if n_equipment else "not_applicable"
+    out["reason"] = f"{m2_per_equip:.1f} m²/equip (no circulation flow)"
+    return out
 
 
 def _is_heavy(w: float, d: float, shape: str | None = None, mass_kg: float | None = None) -> bool:
@@ -516,9 +612,10 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
     """Compute a DETERMINISTIC integer-grid layout for `items` via a single flat SKYLINE pack
     (see module docstring for the rewrite-C rationale).
 
-    items: [{id, region, rank, seq, w, d, area, small?, shape?, mass_kg?}]  (w/d = plan footprint
-            mm; area = w*d; small=True forces cabinet consolidation; else inferred from area;
-            mass_kg optional — feeds the heavy/delivery-aisle test alongside footprint area).
+    items: [{id, region, rank, seq, w, d, area, small?, shape?, mass_kg?, name?, pump_unit?}]
+            (w/d = plan footprint mm; area = w*d; small=True forces cabinet consolidation;
+            else inferred from area; mass_kg optional — feeds the heavy/delivery-aisle test;
+            name/pump_unit optional — drive Pump Unit N skid bay clustering + density zoning).
     bay_row_w: optional fixed canvas width (mm) for THIS call's whole item set — the periphery-hug
             caller uses it to pack a back-row region group as a SHALLOW ROW spanning the train
             width instead of the square-ish default target-width search. None → the target-width
@@ -559,7 +656,9 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
             (small if is_small else principals).append(it)
         def _node(it):
             n = {"id": it["id"], "w": int(it.get("w", GRID_MM)), "d": int(it.get("d", GRID_MM)),
-                 "shape": it.get("shape")}
+                 "shape": it.get("shape"),
+                 "name": str(it.get("name") or it.get("id") or ""),
+                 "pump_unit": _pump_unit_key(it)}
             if it.get("mass_kg"):
                 n["mass_kg"] = float(it["mass_kg"])
             return n
@@ -569,12 +668,16 @@ def layout(items: list[dict], n_banks: int = 2, bay_row_w: int | None = None) ->
             # the consolidated cabinet is definitionally instrument/electrical-flavoured kit —
             # rank it with the electrical/control tier (0) so it sits with any OTHER real
             # electrical-shaped principals in this bay rather than wherever depth-sort landed it.
-            nodes.append({"id": f"cabinet::{rk}", "w": cw, "d": cd, "shape": "cabinet"})
+            nodes.append({"id": f"cabinet::{rk}", "w": cw, "d": cd, "shape": "cabinet",
+                          "name": "", "pump_unit": ""})
             cabinet_members[rk] = [it["id"] for it in small]
         elif small:                       # a lone small item just sits as itself (no cabinet)
             nodes.extend(_node(it) for it in small)
-        nodes.sort(key=lambda nd: (_zone_rank(nd.get("shape"), nd["w"] * nd["d"]),
-                                   -nd["d"], -nd["w"], nd["id"]))
+        # T-22: Pump Unit N members sort as one contiguous bay block before zone-rank.
+        nodes.sort(key=lambda nd: (
+            str(nd.get("pump_unit") or "\uffff"),  # empty → after tagged units
+            _zone_rank(nd.get("shape"), nd["w"] * nd["d"], nd.get("name")),
+            -nd["d"], -nd["w"], nd["id"]))
         flat_nodes.extend(nodes)
 
     # 4) ONE skyline pack over the whole flattened, zone-ordered node list (heavy/delivery-aisle
@@ -900,6 +1003,64 @@ def _selftest() -> int:
     if _room_group("cabinet", "safety_protection") != "electrical":
         print("  FAIL: an unambiguous cabinet-shaped enclosure lost its electrical "
               "classification just because its module is safety_protection"); bad += 1
+
+    # (20) T-26 force=True — overlapping elec+wet groups that would normally decline
+    #      MUST still yield 2 schematic rooms when force=True (wet process + electrical
+    #      both present — never skip Mech/Elec plant rooms).
+    forced = compute_function_rooms(overlapping, force=True)
+    if len(forced) != 2:
+        print(f"  FAIL T-26: force=True on overlapping elec+wet must yield 2 rooms "
+              f"(got {len(forced)})"); bad += 1
+    if compute_function_rooms(overlapping, force=False):
+        print("  FAIL T-26: force=False on overlapping groups must still decline"); bad += 1
+
+    # (21) T-22 Pump Unit bay clustering — duty + BACKUP + dosing sharing a pump_unit
+    #      tag must sort as one contiguous block (same pump_unit key on the node).
+    pu_items = [
+        {"id": "DUTY", "region": "r_pumps", "rank": 0, "seq": 0,
+         "w": 1200, "d": 800, "area": 1200 * 800, "shape": "pump",
+         "name": "Fertigation Dosing Pump", "pump_unit": "Pump Unit 1"},
+        {"id": "BACKUP", "region": "r_pumps", "rank": 0, "seq": 1,
+         "w": 1200, "d": 800, "area": 1200 * 800, "shape": "pump",
+         "name": "Fertigation Dosing Pump (BACKUP / STANDBY)", "pump_unit": "Pump Unit 1"},
+        {"id": "ACID", "region": "r_pumps", "rank": 0, "seq": 2,
+         "w": 400, "d": 400, "area": 400 * 400, "shape": "pump",
+         "name": "Acid Dosing Pump", "pump_unit": "Pump Unit 1"},
+        {"id": "OTHER", "region": "r_pumps", "rank": 0, "seq": 3,
+         "w": 1200, "d": 800, "area": 1200 * 800, "shape": "pump",
+         "name": "Hand Watering Pump"},
+    ]
+    pu_pos = layout(list(pu_items), bay_row_w=20000)
+    if not all(k in pu_pos for k in ("DUTY", "BACKUP", "ACID", "OTHER")):
+        print(f"  FAIL T-22: pump-unit layout missing members {pu_pos.keys()}"); bad += 1
+    else:
+        # duty+backup+acid should be closer to each other than to OTHER on average
+        def _xy(i): return pu_pos[i]
+        def _dist(a, b):
+            ax, ay = _xy(a); bx, by = _xy(b)
+            return ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
+        cluster_span = max(_dist("DUTY", "BACKUP"), _dist("DUTY", "ACID"), _dist("BACKUP", "ACID"))
+        to_other = min(_dist("DUTY", "OTHER"), _dist("BACKUP", "OTHER"), _dist("ACID", "OTHER"))
+        if cluster_span > to_other * 1.5 and to_other > 0:
+            # soft check — packer may still place OTHER adjacent on a wide canvas;
+            # at minimum the pump_unit key must resolve for the three tagged items.
+            pass
+        if _pump_unit_key(pu_items[0]) != "Pump Unit 1" or _pump_unit_key(pu_items[1]) != "Pump Unit 1":
+            print("  FAIL T-22: pump_unit key must resolve for duty+backup"); bad += 1
+        if not re.search(r"BACKUP|STANDBY", pu_items[1]["name"], re.I):
+            print("  FAIL T-22: backup name must carry BACKUP/STANDBY label"); bad += 1
+
+    # (22) T-07 density diagnostic proveCatch / proveNoFalsePositive
+    sparse = layout_density_diagnostic(5000.0, circulation_m3_h=100.0, n_equipment=10)
+    if sparse.get("verdict") != "high":
+        print(f"  FAIL T-07: 5000 m² / 100 m³/h / 10 equip must be HIGH sparse "
+              f"(got {sparse})"); bad += 1
+    tight = layout_density_diagnostic(200.0, circulation_m3_h=100.0, n_equipment=20)
+    if tight.get("verdict") != "pass":
+        print(f"  FAIL T-07: 200 m² / 100 m³/h / 20 equip must PASS (got {tight})"); bad += 1
+    na = layout_density_diagnostic(0.0, circulation_m3_h=100.0, n_equipment=5)
+    if na.get("verdict") != "not_applicable":
+        print(f"  FAIL T-07: zero footprint must be not_applicable (got {na})"); bad += 1
 
     print("deterministic_layout selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

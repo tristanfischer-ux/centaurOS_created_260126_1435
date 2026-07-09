@@ -82,6 +82,8 @@ run "instrument-sizing --selftest"            npx tsx scripts/lib/orchestrator/g
 run "storage-aggregate --selftest"            npx tsx scripts/lib/orchestrator/generic/storage-aggregate-selftest.ts
 run "membrane-stage-brief-gate --selftest"    npx tsx scripts/lib/orchestrator/generic/membrane-stage-brief-gate-selftest.ts
 run "nursery-reservoir-volume --selftest"     npx tsx scripts/lib/orchestrator/generic/nursery-reservoir-volume-selftest.ts
+run "civils-scope --selftest (T-06)"          npx tsx scripts/lib/orchestrator/generic/civils-scope-selftest.ts
+run "pump-unit-skid --selftest (T-22)"        npx tsx scripts/lib/orchestrator/generic/pump-unit-skid-selftest.ts
 run "recovery-oxygen-dosing --selftest"      npx tsx scripts/lib/orchestrator/generic/recovery-oxygen-dosing-selftest.ts
 run "count-match --selftest"                  npx tsx scripts/lib/orchestrator/generic/count-match-selftest.ts
 run "unit-coercion --selftest (prove-catch)"  npx tsx scripts/lib/orchestrator/generic/unit-coercion.ts --selftest

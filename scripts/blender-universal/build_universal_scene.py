@@ -437,7 +437,12 @@ def _populate_det_layout(parts):
                       # `shape` (the geometry-family classifier already assigns it, universal
                       # across archetypes) drives dl.layout()'s within-bay functional-zone
                       # ordering (Sam Green SME review 2026-07-08) — see deterministic_layout.
-                      "shape": str(getattr(p, "shape", "") or "")})
+                      "shape": str(getattr(p, "shape", "") or ""),
+                      # T-22: Pump Unit N skid bay clustering — name + optional parent tag
+                      # from the synthesised word's installation / _pump_unit_tag.
+                      "name": str(getattr(p, "name", "") or getattr(p, "name_human", "") or ""),
+                      "pump_unit": str(getattr(p, "pump_unit_tag", "")
+                                       or getattr(p, "_pump_unit_tag", "") or "")})
     # OPT-IN diagnostics (DET_LAYOUT_DUMP=1): serialise the packer's INPUT items + flow plan
     # so the pure dl.layout() can be iterated OFFLINE (no Blender session). Never in production.
     if os.environ.get("DET_LAYOUT_DUMP", "").strip().lower() in ("1", "true", "yes", "on"):
@@ -6332,7 +6337,11 @@ def write_parts_manifest(out_dir, parts, state=None):
     # archetype/placer (rack_farm, tower_machine, process-plant…) since it reads only
     # the manifest's own pos_mm/dims_mm/shape/module, not how those positions were
     # computed. See deterministic_layout.compute_function_rooms for the rule + guard.
+    # T-26: force rooms when wet-process + electrical load both present (or the
+    # contract already signals plant_room_*) — don't skip just because the packer
+    # never spatially separated the groups.
     rooms = []
+    density_diag = None
     try:
         room_rows = []
         for r in rows:
@@ -6346,14 +6355,52 @@ def write_parts_manifest(out_dir, parts, state=None):
                 rx0, rx1, ry0, ry1 = x - hw, x + hw, y - hd, y + hd
             room_rows.append({"x0": rx0, "y0": ry0, "x1": rx1, "y1": ry1,
                               "shape": r.get("shape"), "module": r.get("module")})
-        rooms = dl.compute_function_rooms(room_rows)
+        # T-26: force rooms when wet+electrical groups exist OR contract signals
+        # plant_room / connected electrical load on a wet process — don't skip just
+        # because the packer never spatially separated the groups.
+        _has_wet = any(dl._room_group(r.get("shape"), r.get("module")) == "wet" for r in room_rows)
+        _has_elec = any(dl._room_group(r.get("shape"), r.get("module")) == "electrical" for r in room_rows)
+        _qs = ((state or {}).get("orchestratorContract") or {}).get("quantities") or {}
+        _has_pr = any(re.search(r"plant_?room|mech(anical)?_?room|elec(trical)?_?room",
+                                str(k), re.I) for k in _qs.keys()) if _qs else False
+        _ekw = (qval(_qs, "connected_electrical_load_kw") or 0.0) if _qs else 0.0
+        _force_rooms = bool(
+            (_has_wet and _has_elec)
+            or _has_pr
+            or (_ekw > 0 and _has_wet and _has_elec)
+        )
+        rooms = dl.compute_function_rooms(room_rows, force=_force_rooms)
         if rooms:
             print(f"[parts-manifest] function-segregated plant rooms: "
-                  f"{[rm['name'] for rm in rooms]}")
+                  f"{[rm['name'] for rm in rooms]}"
+                  + (" (forced)" if _force_rooms else ""))
+        # T-07 density diagnostic — punch-list when m² per m³/h is absurdly high.
+        try:
+            _bb = bbox or {}
+            _fp = 0.0
+            if _bb.get("length_mm") and _bb.get("width_mm"):
+                _fp = (_bb["length_mm"] / 1000.0) * (_bb["width_mm"] / 1000.0)
+            _circ = None
+            for _ck in ("irrigation_demand_m3_h", "peak_circulation_demand_m3_per_hr",
+                        "recirculation_flow_m3_h", "fertigation_dosing_capacity_m3_per_hr"):
+                _cv = qval(_qs, _ck) if _qs else None
+                if isinstance(_cv, (int, float)) and _cv > 0:
+                    _circ = float(_cv)
+                    break
+            density_diag = dl.layout_density_diagnostic(_fp, _circ, len(rows))
+            if density_diag.get("verdict") == "high":
+                print(f"[parts-manifest] DENSITY PUNCH: {density_diag.get('punch')}")
+                _punch_path = os.path.join(out_dir, "layout-density-punchlist.md")
+                with open(_punch_path, "w") as _pf:
+                    _pf.write("# Layout density punch-list (T-07)\n\n")
+                    _pf.write(str(density_diag.get("punch") or density_diag.get("reason")) + "\n")
+        except Exception as _de:
+            print(f"[parts-manifest] density diagnostic skipped: {_de}")
     except Exception as _rme:   # pure diagnostics — never fail the export
         print(f"[parts-manifest] function-rooms skipped: {_rme}")
     manifest = {"schema": "parts-manifest/1", "count": len(rows),
-                "bbox_mm": bbox, "site": site, "rooms": rooms, "parts": rows}
+                "bbox_mm": bbox, "site": site, "rooms": rooms,
+                "density": density_diag, "parts": rows}
     with open(os.path.join(out_dir, "parts-manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
     print(f"[parts-manifest] wrote {len(rows)} placed parts → "

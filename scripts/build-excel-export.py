@@ -2321,6 +2321,109 @@ def _honest_headline_output(state: dict) -> dict:
     }
 
 
+def _qnum(qmap: dict, *keys: str) -> Optional[float]:
+    """Read the first finite numeric value among quantity keys (dict or bare)."""
+    for k in keys:
+        v = qmap.get(k) if isinstance(qmap, dict) else None
+        if isinstance(v, dict):
+            v = v.get("value")
+        if isinstance(v, (int, float)) and float(v) > 0:
+            return float(v)
+    return None
+
+
+def _recirculation_makeup_notes(state: dict) -> List[str]:
+    """T-11/T-12 — universal narrative helpers for Exec / Overview / Brief compliance.
+
+    When a recirculation loop exists (circulation ≫ makeup), surface:
+      • 'RO is MAKEUP (losses), not full circulation'
+      • 'container = cultivation tray' when the brief uses container for trays
+    Reads contract quantities only — never a class hardcode."""
+    notes: List[str] = []
+    orch = state.get("orchestratorContract") or {}
+    q = orch.get("quantities") or {}
+    sq = orch.get("shared_quantities") or {}
+    circ = _qnum(q, "irrigation_demand_m3_h", "peak_circulation_demand_m3_per_hr",
+                 "recirculation_flow_m3_h", "fertigation_dosing_capacity_m3_per_hr")
+    if circ is None and isinstance(sq.get("irrigation_demand_m3_h"), (int, float)):
+        circ = float(sq["irrigation_demand_m3_h"])
+    makeup = _qnum(q, "ro_permeate_capacity_m3_h", "makeup_water_m3_h",
+                   "ro_permeate_m3_h", "make_up_water_m3_h")
+    if makeup is None and isinstance(sq.get("ro_permeate_capacity_m3_h"), (int, float)):
+        makeup = float(sq["ro_permeate_capacity_m3_h"])
+    if circ is not None and makeup is not None and makeup < circ * 0.5:
+        notes.append(
+            f"RO is MAKEUP (losses), not full circulation — permeate/makeup "
+            f"{makeup:g} m³/h vs loop circulation {circ:g} m³/h "
+            f"({100.0 * makeup / circ:.0f}% of circulation)."
+        )
+    elif circ is not None and makeup is not None and makeup >= circ:
+        notes.append(
+            f"NOTE: makeup/RO flow ({makeup:g} m³/h) is NOT smaller than circulation "
+            f"({circ:g} m³/h) — verify the source is sized to losses only."
+        )
+    # container = cultivation tray when brief/contract uses container for trays
+    brief_txt = " ".join(str(x) for x in (
+        (state.get("parsedBrief") or {}).get("original_text"),
+        (state.get("parsedBrief") or {}).get("product_description"),
+        orch.get("brief_summary"),
+    ) if x)
+    container_n = _qnum(q, "cultivation_container_count")
+    # INTENT (T-12): brief often says "containers / trays" or "containers (trays)" —
+    # match singular+plural so the tray note fires on real Codema-style briefs.
+    if container_n and re.search(
+        r"\b(trays?|cultivation\s+containers?|ebb/?flow\s+containers?|"
+        r"containers?\s*[/(]\s*trays?|containers?\s*/\s*trays?)\b",
+        brief_txt, re.I,
+    ):
+        notes.append(
+            f"container = cultivation tray — {int(container_n):,} ebb/flow cultivation "
+            f"trays/containers size the irrigation network (not a shipping container)."
+        )
+    return notes
+
+
+def _underground_civils_note(state: dict) -> Optional[str]:
+    """T-06/E-03 — when drain_pit / underground civils BoM lines exist, never claim £0 civils.
+
+    Returns a waterfall/assembly note string, or None when no underground scope."""
+    q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+    pit_vol = _qnum(q, "drain_pit_volume_l", "drain_collection_sump_volume_each_m3")
+    pit_n = _qnum(q, "drain_collection_sump_count", "drain_pit_count")
+    bom = state.get("requirementsBom") or []
+    civ_lines = [
+        b for b in bom if isinstance(b, dict) and (
+            re.search(r"below-?grade\s+civils|excavation|underground",
+                      str(b.get("part") or "") + " " + str(b.get("requirement") or ""), re.I)
+            or str(b.get("tag") or "").upper().startswith("CIV-")
+        )
+    ]
+    civ_gbp = sum(float(b.get("line_gbp") or 0) for b in civ_lines)
+    bld = num((state.get("costStack") or {}).get("building_civils_gbp")) or 0.0
+    if not pit_vol and not civ_lines:
+        return None
+    bits = []
+    if pit_vol:
+        bits.append(
+            f"underground drain-pit excavation IN scope "
+            f"({pit_n or 1:g}× pit, {pit_vol:g} "
+            f"{'L' if _qnum(q, 'drain_pit_volume_l') else 'm³'} each)"
+        )
+    if civ_lines:
+        bits.append(f"{len(civ_lines)} CIVILS BoM line(s) ≈ £{civ_gbp:,.0f}")
+    if bld <= 0 and civ_gbp > 0:
+        bits.append(
+            "building fabric OUT of scope (£0 building_civils_gbp) — "
+            "underground pit civils are SEPARATE (not £0 total civils)"
+        )
+    elif bld <= 0 and pit_vol:
+        bits.append(
+            "building fabric OUT of scope — underground pit excavation remains IN scope "
+            "(do not read £0 building_civils as £0 civils)"
+        )
+    return " · ".join(bits) if bits else None
+
+
 def _exec_synopsis(state: dict) -> str:
     """A deterministic 1-paragraph synopsis assembled ENTIRELY from state — no LLM prose. Every
     clause is a state value (class, headline output, build cost, benchmark verdict), so the prose
@@ -2361,6 +2464,12 @@ def _exec_synopsis(state: dict) -> str:
         _, vsent = _exec_validation_verdict(state)
         if vsent:
             parts.append(vsent)
+    # T-11/T-12 — RO makeup + container=tray narrative when recirculation loop exists
+    for _n in _recirculation_makeup_notes(state):
+        parts.append(_n)
+    _civ_n = _underground_civils_note(state)
+    if _civ_n:
+        parts.append(_civ_n + ".")
     parts.append("Every figure in this workbook — the bill of materials, the costs, and the "
                  "specifications below — is derived deterministically from the engineering "
                  "contract, computed rather than estimated by hand.")
@@ -2639,6 +2748,22 @@ def tab_overview(wb: Workbook, state: dict, run_dir: str, sha: str) -> None:
                 c.font = FONT_PASS if _all_det else FONT_FAIL
             row += 1
         row += 1
+
+        # T-11/T-12 — recirculation makeup + container=tray notes (when applicable)
+        _mk_notes = _recirculation_makeup_notes(state)
+        _civ_ov = _underground_civils_note(state)
+        if _mk_notes or _civ_ov:
+            sub_banner(ws, row, "Process / scope notes (deterministic)", 4)
+            row += 1
+            for _n in _mk_notes:
+                ws.cell(row, 1, "•  " + _n).font = FONT_NOTE
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+                row += 1
+            if _civ_ov:
+                ws.cell(row, 1, "•  " + _civ_ov).font = FONT_NOTE
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+                row += 1
+            row += 1
 
         # per-section table. A section flagged `advisory` is the LLM SEMANTIC self-audit — it is
         # NON-GATING (the gating floor/allPass already exclude it) and noisy, so a sub-8 advisory
@@ -7708,15 +7833,26 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
                   "installed_asp_gbp (anchor — process plant installed price)"))
     # Building & Civils added at INSTALLED level (not through the OEM manufacturing stack) →
     # the ALL-IN project capex (Tristan 2026-06-22: building in the BoM, capex ~£7M all-in).
+    # T-06/E-03: when underground pit civils exist, NEVER imply £0 total civils just because
+    # building_civils_gbp is 0 (building fabric out of scope ≠ no underground excavation).
     bld = num(cs.get("building_civils_gbp")) or 0.0
+    _ug_note = _underground_civils_note(state)
     if bld:
         steps.append(("+ Building & Civils (installed)", bld, None,
                       f"building_civils_gbp — insulated industrial building, "
                       f"{int(num(cs.get('building_footprint_m2')) or 0):,} m² footprint × UK-2026 "
                       "rates: clad walls, insulated roof, floor slab, drainage, doors (civils — "
-                      "separate from the equipment OEM stack)"))
+                      "separate from the equipment OEM stack)"
+                      + (f". ALSO: {_ug_note}" if _ug_note else "")))
         steps.append(("= ALL-IN PROJECT CAPEX", None, num(cs.get("all_in_capex_gbp")),
                       "all_in_capex_gbp (anchor — equipment + building, total project capex)"))
+    elif _ug_note:
+        # Building fabric £0 / out of scope, but underground pit excavation is IN scope —
+        # surface an explicit note so the waterfall never reads as "£0 civils".
+        steps.append(("+ Underground civils (drain pits — IN scope)", None, None,
+                      f"building_civils_gbp = £0 (building fabric / polytunnel OUT of scope). "
+                      f"{_ug_note}. Pit excavation lines live on the BoM as CIV-* "
+                      f"(civils_rows_from_underground_scope) — not £0 total civils."))
 
     # Pre-compute the DERIVATION TABLE layout (below the ladder) so the B6/B9 step cells
     # can be LIVE =SUM() formulas over it: Σ bars = total stays true by construction and
@@ -13716,24 +13852,33 @@ def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
     # each step: dict(phase, scope, pred, plant, duration, hold, design(bool))
     steps: List[dict] = []
     nm_civ = _ASSEMBLY_NORMS["civils"]
+    _ug_asm = _underground_civils_note(state) if state else None
     if slab_m2:
         _civ_days = slab_m2 / nm_civ[0]
+        _scope = (f"Ground-bearing slab {bb['length_mm']/1000:.1f} × "
+                  f"{bb['width_mm']/1000:.1f} m ({slab_m2:g} m², from the placed-plant "
+                  f"footprint) + plinths, bunds & drainage falls")
+        if _ug_asm:
+            _scope += f". UNDERGROUND: {_ug_asm}"
         steps.append(dict(
             phase="Site set-out & civils",
-            scope=(f"Ground-bearing slab {bb['length_mm']/1000:.1f} × "
-                   f"{bb['width_mm']/1000:.1f} m ({slab_m2:g} m², from the placed-plant "
-                   f"footprint) + plinths, bunds & drainage falls"),
+            scope=_scope,
             pred="Site handover", plant="Excavator, concrete pump",
             duration=_fmt_days(_civ_days), dur_days=round(max(0.5, _civ_days), 2),
             hold="Set-out survey + concrete cube tests signed off", design=True))
     else:
+        _scope = ("Ground slab + plinths & bunds (no placed-plant footprint derived "
+                  "for this run — size on the GA)")
+        if _ug_asm:
+            _scope = (f"Underground drain-pit excavation IN scope ({_ug_asm}). "
+                      f"Building fabric / hall slab may be supplied by others.")
         steps.append(dict(
             phase="Site set-out & civils",
-            scope="Ground slab + plinths & bunds (no placed-plant footprint derived "
-                  "for this run — size on the GA)",
+            scope=_scope,
             pred="Site handover", plant="Excavator, concrete pump",
-            duration="— (no footprint derived)", dur_days=0.0,
-            hold="Set-out survey + concrete cube tests signed off", design=False))
+            duration="— (no footprint derived)" if not _ug_asm else "pit excavation (see BoM CIV-*)",
+            dur_days=0.0,
+            hold="Set-out survey + concrete cube tests signed off", design=bool(_ug_asm)))
 
     # per-REGION erection steps in process order (manifest region_rank, then module)
     if man_rows:
@@ -22023,6 +22168,50 @@ def _selftest() -> int:
     if _duty_weighted_load_factor({}) is not None:
         print("  FAIL duty-cycle proveNoFalsePositive: an empty quantities dict must "
               "return None"); bad += 1
+    # ═══ proveCatch T-11/T-12 recirculation makeup + container=tray notes ═══
+    _mk_st = {
+        "orchestratorContract": {
+            "brief_summary": "ebb/flow cultivation containers / trays",
+            "quantities": {
+                "irrigation_demand_m3_h": {"value": 225},
+                "ro_permeate_capacity_m3_h": {"value": 11},
+                "cultivation_container_count": {"value": 6000},
+            },
+            "shared_quantities": {"irrigation_demand_m3_h": 225, "ro_permeate_capacity_m3_h": 11},
+        },
+        "parsedBrief": {"original_text": "6,000 cultivation containers (trays) on ebb/flow"},
+    }
+    _mk_notes = _recirculation_makeup_notes(_mk_st)
+    if not any(re.search(r"RO is MAKEUP|makeup.*losses", n, re.I) for n in _mk_notes):
+        print(f"  FAIL T-11 makeup notes: expected RO-is-MAKEUP note, got {_mk_notes}"); bad += 1
+    if not any(re.search(r"container\s*=\s*cultivation tray", n, re.I) for n in _mk_notes):
+        print(f"  FAIL T-12 container=tray: expected tray note, got {_mk_notes}"); bad += 1
+    # proveNoFalsePositive: once-through (no circ ≫ makeup) → no makeup note
+    _once = {"orchestratorContract": {"quantities": {
+        "irrigation_demand_m3_h": {"value": 10},
+        "ro_permeate_capacity_m3_h": {"value": 10},
+    }}}
+    if any(re.search(r"RO is MAKEUP", n, re.I) for n in _recirculation_makeup_notes(_once)):
+        print("  FAIL T-11 fp: once-through equal flows must NOT claim RO-is-MAKEUP"); bad += 1
+    # ═══ proveCatch T-06 underground civils note (never £0 civils when pits exist) ═══
+    _civ_st = {
+        "orchestratorContract": {"quantities": {
+            "drain_pit_volume_l": {"value": 5000},
+            "drain_collection_sump_count": {"value": 2},
+        }},
+        "costStack": {"building_civils_gbp": 0},
+        "requirementsBom": [{
+            "tag": "CIV-101", "part": "civils — excavation / backfill",
+            "requirement": "Drain pit · below-grade civils", "line_gbp": 12000,
+        }],
+    }
+    _civ_n = _underground_civils_note(_civ_st)
+    if not _civ_n or not re.search(r"underground|drain-?pit|IN scope", _civ_n, re.I):
+        print(f"  FAIL T-06 civils note: expected underground-IN-scope note, got {_civ_n!r}"); bad += 1
+    if re.search(r"£0\s+total\s+civils|no civils", (_civ_n or ""), re.I) and "not £0" not in (_civ_n or "").lower():
+        print(f"  FAIL T-06 civils note: must not claim £0 total civils — {_civ_n!r}"); bad += 1
+    if _underground_civils_note({"orchestratorContract": {"quantities": {}}, "requirementsBom": []}) is not None:
+        print("  FAIL T-06 fp: no pits / no CIV lines must return None"); bad += 1
     # (b) proveNoFalsePositive #3: an explicit engine load_factor/capacity_factor signal
     # still wins over the duty-cycle derivation (unchanged precedence) — checked at the
     # call site in _econ_generic_drivers, but the role classifier itself must never
