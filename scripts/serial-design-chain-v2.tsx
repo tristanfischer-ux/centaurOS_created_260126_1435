@@ -63,6 +63,7 @@ import {
 } from '../src/lib/pdf-engine-v2/lib/scorecard-floor'
 import { createHash } from 'crypto'
 import { buildCostBasis } from './lib/cost/build-cost-basis'
+import { costBasisInputFingerprint, emitWallclockSplit } from './lib/wallclock-split'
 import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
@@ -7229,6 +7230,7 @@ async function main() {
       const briefMetricsForCoverage: any[] = Array.isArray(_tpForCoverage?.metrics) && _tpForCoverage.metrics.length > 0
         ? _tpForCoverage.metrics
         : (_tpForCoverage && Number.isFinite(Number(_tpForCoverage.value)) ? [_tpForCoverage] : [])
+      const tReconcile = Date.now()
       const rec = reconcilePrincipalEquipment(
         (state.moduleDecomposition?.modules ?? []) as any,
         reconcileContract,
@@ -7253,6 +7255,7 @@ async function main() {
         resynthesised_missing: rec.synthesizedMissing,
         building_resynthesised: rec.buildingResynthesised,
         details: rec.details.slice(0, 20),
+        latency_ms: Date.now() - tReconcile,
       })
       // T-18: merge N+1 standby design decisions minted onto the reconcile contract
       // into state.designDecisions (Excel register reads state.designDecisions at L16755).
@@ -8727,8 +8730,22 @@ async function main() {
     const tCB = Date.now()
     try {
       const cbState = JSON.parse(readFileSync(statePath, 'utf-8'))
+      // INTENT: skip rebuild when BoM prices + contract masses are unchanged
+      // (quality-loop re-entry / twin re-runs). Fingerprint is pure over inputs.
+      const cbFp = costBasisInputFingerprint(cbState)
+      const prevFp = typeof (cbState as any).costBasisInputFingerprint === 'string'
+        ? (cbState as any).costBasisInputFingerprint as string
+        : null
+      if (prevFp && prevFp === cbFp && (cbState as any).costBasis?.lines?.length) {
+        console.error(`[chain] cost-basis: SKIP unchanged inputs (fp=${cbFp})`)
+        logAction({
+          step: 'cost_basis', ok: true, skipped: true, fingerprint: cbFp,
+          latency_ms: Date.now() - tCB,
+        })
+      } else {
       const cb = buildCostBasis(cbState)
       cbState.costBasis = cb
+      ;(cbState as any).costBasisInputFingerprint = cbFp
 
       // 2026-06-05 (founder feedback): the BoM number IS the right number. For every
       // FABRICATED vessel/column re-costed by material take-off (mass × £/kg + fabrication),
@@ -8821,7 +8838,7 @@ async function main() {
       writeFileSync(statePath, JSON.stringify(cbState, null, 2))
       console.error(`[chain] cost-basis: ${cb.methodology.takeoff_lines} take-off + ${cb.methodology.curve_lines} curve + ${cb.methodology.catalogue_lines} catalogue + ${cb.methodology.disclosure_lines} disclosed; ${rewritten} take-off price${rewritten === 1 ? '' : 's'} written into the BoM; purchased £${Math.round(cb.rollup.purchased_gbp).toLocaleString('en-GB')} → installed £${Math.round(cb.rollup.installed_central_gbp).toLocaleString('en-GB')} (central)`)
       logAction({
-        step: 'cost_basis', ok: true, class: cb.class,
+        step: 'cost_basis', ok: true, class: cb.class, skipped: false, fingerprint: cbFp,
         takeoff_lines: cb.methodology.takeoff_lines, curve_lines: cb.methodology.curve_lines,
         catalogue_lines: cb.methodology.catalogue_lines,
         disclosure_lines: cb.methodology.disclosure_lines, rfq_lines: cb.methodology.rfq_lines,
@@ -8829,6 +8846,7 @@ async function main() {
         purchased_gbp: cb.rollup.purchased_gbp, installed_central_gbp: cb.rollup.installed_central_gbp,
         latency_ms: Date.now() - tCB,
       })
+      } // end cost-basis fingerprint skip else
     } catch (err) {
       console.error(`[chain] cost-basis threw: ${(err as Error).message}; continuing (never blocks)`)
       logAction({ step: 'cost_basis', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCB })
@@ -10651,6 +10669,31 @@ async function main() {
     }
   } catch {}
   logAction({ step: 'residual_summary', total: residualIssues.length, flagged: residualIssues.filter((r) => r.severity === 'flagged').length })
+  // Quality-adjusted wall clock: baseline_comparable vs new_stage vs unlogged gaps.
+  // Prefer latency_ms — do not trust gap-attributed step names for speed claims.
+  try {
+    const split = emitWallclockSplit(outDir)
+    if (split) {
+      const fmtM = (ms: number): string => `${(ms / 60_000).toFixed(2)}m`
+      console.error(
+        `[chain] wallclock-split: wall=${fmtM(split.wall_ms)} ` +
+          `baseline_comparable=${fmtM(split.baseline_comparable_ms)} ` +
+          `new_stage=${fmtM(split.new_stage_ms)} ` +
+          `unlogged=${fmtM(split.unlogged_ms)} → wallclock-split.json`,
+      )
+      logAction({
+        step: 'wallclock_split',
+        wall_ms: split.wall_ms,
+        baseline_comparable_ms: split.baseline_comparable_ms,
+        new_stage_ms: split.new_stage_ms,
+        unlogged_ms: split.unlogged_ms,
+        attributed_latency_ms: split.attributed_latency_ms,
+        unlogged_gap_count: split.unlogged_gaps.length,
+      })
+    }
+  } catch (err) {
+    console.error(`[chain] wallclock-split emit failed (non-fatal): ${(err as Error).message}`)
+  }
   if (residualIssues.length) {
     console.error(`[chain] render-and-flag: ${residualIssues.length} gate(s) flagged but the dossier SHIPPED (set CHAIN_GATE_ENFORCE=1 to hard-block instead). See RESIDUAL-ISSUES.md.`)
   }

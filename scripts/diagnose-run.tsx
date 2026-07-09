@@ -22,6 +22,11 @@
 
 import { readFileSync, existsSync } from 'fs'
 import { resolve, join } from 'path'
+import {
+  computeWallclockSplit,
+  type ActionLike,
+  type WallclockSplit,
+} from './lib/wallclock-split'
 
 // ─── Arg parsing ──────────────────────────────────────────────────────────────
 
@@ -595,6 +600,49 @@ function buildAnomalies(): { anomalies: Anomaly[]; text: string } {
 
 // ─── JSON output mode ─────────────────────────────────────────────────────────
 
+function buildStepLatencyRollup(): {
+  wallclock_split: WallclockSplit
+  top_by_latency: Array<{ step: string; latency_ms: number; bucket: string }>
+} {
+  const split = computeWallclockSplit(records as ActionLike[])
+  return {
+    wallclock_split: split,
+    top_by_latency: split.by_step.slice(0, 20).map((r) => ({
+      step: r.step,
+      latency_ms: r.latency_ms,
+      bucket: r.bucket,
+    })),
+  }
+}
+
+function buildStepLatencySection(): string {
+  const { wallclock_split: split, top_by_latency } = buildStepLatencyRollup()
+  const lines: string[] = []
+  lines.push('\n── STEP LATENCY ROLLUP (quality-adjusted) ───────────────────────────────────')
+  lines.push(`  Wall (first→last)     : ${fmtMs(split.wall_ms)}`)
+  lines.push(`  Σ latency_ms          : ${fmtMs(split.attributed_latency_ms)}`)
+  lines.push(`  Baseline-comparable   : ${fmtMs(split.baseline_comparable_ms)}`)
+  lines.push(`  New-stage             : ${fmtMs(split.new_stage_ms)}`)
+  lines.push(`  Unlogged (wall−Σlat)  : ${fmtMs(split.unlogged_ms)}`)
+  lines.push(`  Unlogged gaps (≥5s)   : ${split.unlogged_gaps.length}`)
+  lines.push('')
+  lines.push(`${pad('Step', 40)}  ${pad('Latency', 10)}  Bucket`)
+  lines.push('─'.repeat(70))
+  for (const row of top_by_latency) {
+    lines.push(`${pad(row.step, 40)}  ${pad(fmtMs(row.latency_ms), 10)}  ${row.bucket}`)
+  }
+  if (split.unlogged_gaps.length > 0) {
+    lines.push('')
+    lines.push('  Top unlogged gaps (do NOT attribute to the prior step name):')
+    for (const g of split.unlogged_gaps.slice(0, 8)) {
+      lines.push(
+        `    ${g.after_step} → ${g.before_step}: gap ${fmtMs(g.gap_ms)} (excess ${fmtMs(g.excess_ms)})`,
+      )
+    }
+  }
+  return lines.join('\n')
+}
+
 function buildJson(anomalies: Anomaly[]): object {
   const modelMap = new Map<string, { calls: number; tokensIn: number; tokensOut: number; costUsd: number }>()
   for (const r of records) {
@@ -609,6 +657,8 @@ function buildJson(anomalies: Anomaly[]): object {
     modelMap.set(model, ex)
   }
 
+  const rollup = buildStepLatencyRollup()
+
   return {
     iter_dir: absDir,
     start_timestamp: firstTs,
@@ -619,6 +669,8 @@ function buildJson(anomalies: Anomaly[]): object {
     record_count: records.length,
     anomaly_count: anomalies.length,
     anomalies,
+    wallclock_split: rollup.wallclock_split,
+    top_by_latency: rollup.top_by_latency,
     cost_by_model: Object.fromEntries(
       [...modelMap.entries()]
         .sort((a, b) => b[1].costUsd - a[1].costUsd)
@@ -647,5 +699,6 @@ console.log(buildHeader())
 console.log(buildTimeline())
 console.log(buildCostBreakdown())
 console.log(buildStageDurations())
+console.log(buildStepLatencySection())
 console.log(anomalyText)
 console.log()
