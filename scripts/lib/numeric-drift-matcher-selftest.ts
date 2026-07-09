@@ -86,8 +86,31 @@ function run() {
     throw new Error('numeric-drift-matcher: zone_riser_count=300 vs "Zone Riser" ×200 (qualifier "zone" shared) is a genuine drift and must still be flagged HIGH — "riser" joining GENERIC_HEADS must not over-suppress a qualified match')
   }
 
+  // 7. THE codema-full-20260709-1328 FATAL (2026-07-09): parenthetical "(on Distribution Manifold)"
+  //    on a ×2 suction isolation valve shared the claim token "distribution" and TIED score with
+  //    "Pneumatic Actuated Valves" ×200 (actuated+valve vs distribution+valve). First-wins then
+  //    bound the claim to ×2 → 100× HIGH drift exit 12. Parentheticals must not score; on a residual
+  //    tie the closer quantity must win.
+  const s7 = state(
+    { actuated_distribution_valve_count: 200 },
+    [
+      word(
+        'fertigation_dosing_pump_backup_synth_word__suction_isolation_valve',
+        'Suction Isolation Valve (on Distribution Manifold) (on Distribution Manifold)',
+        2,
+      ),
+      word('pneumatic_actuated_valves_word', 'Pneumatic Actuated Valves', 200),
+    ],
+  )
+  const r7 = detectNumericDrift(s7)
+  if (r7.findings.some((f) => f.severity === 'HIGH')) {
+    throw new Error(
+      `numeric-drift-matcher: parenthetical "(on Distribution Manifold)" must not false-join actuated_distribution_valve_count=200 onto a ×2 suction valve when Pneumatic Actuated Valves ×200 is present: ${JSON.stringify(r7.findings)}`,
+    )
+  }
+
   // eslint-disable-next-line no-console
-  console.log('numeric-drift-matcher --selftest OK (200 actuated valves no false-drift onto a ×2 suction valve; generic-head-only = advisory; real 313→165 drift still HIGH; plural matched; v74 hand-watering/DN125-riser false join fixed; qualified zone-riser drift still HIGH)')
+  console.log('numeric-drift-matcher --selftest OK (200 actuated valves no false-drift onto a ×2 suction valve; generic-head-only = advisory; real 313→165 drift still HIGH; plural matched; v74 hand-watering/DN125-riser false join fixed; qualified zone-riser drift still HIGH; parenthetical distribution-manifold false join fixed)')
 }
 
 run()

@@ -153,20 +153,12 @@ function findMatchingBomWord(claim: NumericClaim, bom: BomWordQty[]): BomWordQty
   // pre-tokenised idTokens / nameTokens arrays.
   const tokeniseId = (s: string): string[] => s.toLowerCase().split(/[\s_/-]+/).filter(Boolean)
   const tokeniseName = (s: string): string[] => s.toLowerCase().split(/[\s_/-]+/).filter(Boolean)
-  const includesAsWhole = (tokens: string[], term: string): boolean => {
-    // Single-token term: exact-token match.
-    if (!/\s/.test(term)) return tokens.includes(term)
-    // Multi-token term: every term-token must appear in order somewhere.
-    const termTokens = term.toLowerCase().split(/\s+/).filter(Boolean)
-    for (let i = 0; i + termTokens.length <= tokens.length; i += 1) {
-      let ok = true
-      for (let j = 0; j < termTokens.length; j += 1) {
-        if (tokens[i + j] !== termTokens[j]) { ok = false; break }
-      }
-      if (ok) return true
-    }
-    return false
-  }
+  // INTENT: Parentheticals on BoM names are PARENT-EQUIPMENT annotations
+  // ("Suction Isolation Valve (on Distribution Manifold)"), not the word's
+  // own identity. Scoring them lets a claim qualifier like "distribution"
+  // false-join a ×2 isolation valve and TIE the real ×200 actuated word —
+  // first-wins then FATAL gate 12 (codema-full-20260709-1328).
+  const stripParentheticals = (s: string): string => s.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
   // Singular/plural-insensitive token (Tristan 2026-06-29): "valves" must match the contract's
   // "valve" — otherwise "Pneumatic Actuated Valves" (the real ×200 word) scores 0 and the 200 count
   // mis-binds to a SINGULAR "Suction Isolation Valve" (×2) → a false 100× drift FATAL (gate 12).
@@ -192,19 +184,40 @@ function findMatchingBomWord(claim: NumericClaim, bom: BomWordQty[]): BomWordQty
   const baseToks = baseTerm.split(/[\s_]+/).map(sing).filter(Boolean)
   // Count how many DISTINCT base tokens a word carries (plural-insensitive). The winner shares the
   // MOST → the more-qualified word beats a generic-head-only collision.
-  const scoreOf = (w: BomWordQty): { score: number; sharedNonGeneric: number } => {
-    const toks = new Set([...tokeniseId(w.word_id), ...tokeniseName(w.word_name_human)].map(sing))
+  const scoreOf = (w: BomWordQty): { score: number; sharedNonGeneric: number; qtyDelta: number } => {
+    // DECISION: score identity from word_id + parenthetical-stripped name only.
+    // Parent equipment tags must not contribute claim-qualifier tokens.
+    const toks = new Set([
+      ...tokeniseId(w.word_id),
+      ...tokeniseName(stripParentheticals(w.word_name_human)),
+    ].map(sing))
     let score = 0
     let nonGeneric = 0
     for (const bt of new Set(baseToks)) {
       if (toks.has(bt)) { score += 1; if (!GENERIC_HEADS.has(bt)) nonGeneric += 1 }
     }
-    return { score, sharedNonGeneric: nonGeneric }
+    return {
+      score,
+      sharedNonGeneric: nonGeneric,
+      qtyDelta: Math.abs(w.quantity - claim.contract_value),
+    }
   }
-  let best: { w: BomWordQty; score: number; sharedNonGeneric: number } | null = null
+  // DECISION: on equal score, prefer more distinguishing-qualifier overlap, then closer quantity.
+  // First-wins on a score tie was the codema-full-20260709-1328 FATAL (suction ×2 beat actuated ×200).
+  const beats = (
+    cand: { score: number; sharedNonGeneric: number; qtyDelta: number },
+    incumbent: { score: number; sharedNonGeneric: number; qtyDelta: number },
+  ): boolean => {
+    if (cand.score !== incumbent.score) return cand.score > incumbent.score
+    if (cand.sharedNonGeneric !== incumbent.sharedNonGeneric) {
+      return cand.sharedNonGeneric > incumbent.sharedNonGeneric
+    }
+    return cand.qtyDelta < incumbent.qtyDelta
+  }
+  let best: { w: BomWordQty; score: number; sharedNonGeneric: number; qtyDelta: number } | null = null
   for (const w of bom) {
     const r = scoreOf(w)
-    if (r.score > 0 && (!best || r.score > best.score)) best = { w, ...r }
+    if (r.score > 0 && (!best || beats(r, best))) best = { w, ...r }
   }
   // AMBIGUITY GUARD: a multi-token claim whose best match shares ONLY a generic head noun (e.g. just
   // "valve") is NOT a confident match — skip it (advisory unmatched), never a HIGH drift. A single-
