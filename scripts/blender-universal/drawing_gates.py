@@ -558,9 +558,10 @@ def run_gates(out_dir: str) -> list:
     #    the SAME visual class as a FLUID overhead Manhattan beam (oxygen dosing → drain
     #    sump, 31 m) while this gate only audited cables — vision flagged it, G6 passed.
     #    SCOPE (2026-07-09): EVERY drawn route whose plan span exceeds the limit —
-    #    cable OR fluid. Below-grade / undrawn (demoted) runs are skipped (no 3-D beam).
-    #    Universal — geometry + drawn flag, no class table. Demotion lives in wire_ports
-    #    (`_should_demote_plant_spanning_fluid` + cable tray demotion).
+    #    cable OR fluid. Undrawn (demoted) runs are skipped. Fully buried runs
+    #    (all waypoints z < 0) are skipped — short drains stay 3-D underground;
+    #    plant-spanning laterals are demoted upstream so they never appear here.
+    #    Universal — geometry + drawn flag, no class table.
     worst = None
     for r in route:
         if not isinstance(r, dict):
@@ -574,8 +575,8 @@ def run_gates(out_dir: str) -> list:
         zs = [w[2] for w in wps if isinstance(w, (list, tuple)) and len(w) >= 3]
         if not xs or not ys:
             continue
-        # Below-grade laterals (all waypoints under grade) are buried — not an
-        # overhead stray beam. Noun-free: z-signal only.
+        # Fully buried short drains (all z < 0) are not a visible stray beam.
+        # Noun-free: z-signal only. Long laterals demote before draw.
         if zs and max(zs) < 0.0:
             continue
         span = max(max(xs) - min(xs), max(ys) - min(ys))
@@ -787,8 +788,14 @@ def _selftest() -> int:
     # at z≈7 m) MUST trip the same limit — G6 now covers drawn fluid, not cables only.
     _fluid_stray = [[10496, 1500, 7070], [-7100, 0, 7070], [-7100, 0, 500]]
     chk("beam_fluid_stray", not (_span(_fluid_stray) <= STRAY_BEAM_MAX_SPAN_MM))
-    # Below-grade lateral (all z < 0) is NOT a visual overhead beam — skip in gate.
-    chk("beam_below_grade_exempt", max(w[2] for w in [[0, 0, -800], [20000, 0, -800]]) < 0)
+    # Fully buried short drain (all z < 0) is NOT a visual beam — gate skips it.
+    chk("beam_fully_buried_skip", max(w[2] for w in [[0, 0, -800], [5000, 0, -800]]) < 0)
+    # Codema 1715: long lateral that SURFACES (z −0.8→+4.3 m) is a visual beam —
+    # max(z) ≥ 0 so G6 must NOT skip; span > limit → fail. Universal z-signal.
+    _surfaced = [[0, 0, -800], [25800, 0, -800], [25800, 0, 4300]]
+    chk("beam_surfaced_long_fires",
+        max(w[2] for w in _surfaced) >= 0
+        and not (_span(_surfaced) <= STRAY_BEAM_MAX_SPAN_MM))
     # G7 site utilisation proveCatch: the v52 stranded-corner deck (hull 476 / deck 1466
     # = 0.33, measured) FIRES; a compacted plant (hull 476 / deck 900 = 0.53) passes; the
     # severity mapping marks a sub-0.30 ratio HIGH (the deck is 3×+ the plant).

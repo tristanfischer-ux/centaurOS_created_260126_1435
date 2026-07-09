@@ -416,9 +416,9 @@ check(not B._is_below_grade_drain_edge("dc_busbar_800v", "rack_block_01", ""),
       "proveNoFalsePositive: an all-pressurised/electrical archetype (BESS-shaped names, "
       "no sump/pit/gravity noun anywhere) never trips below-grade")
 
-# Plant-spanning fluid demotion (Codema 1538 / vision-critic stray-pipe) — wire the
-# dead `_should_demote_plant_spanning_fluid` rule. Universal: plan span + below-grade
-# noun exemption. proveCatch / proveNoFalsePositive.
+# Plant-spanning fluid demotion (Codema 1538 / 1715 / vision-critic stray-pipe).
+# Universal: plan-span geometry only (no below-grade noun exemption — 1715 class).
+# proveCatch / proveNoFalsePositive.
 try:
     B._selftest_plant_spanning_fluid_demote()
     check(True, "plant-spanning fluid demote selftest")

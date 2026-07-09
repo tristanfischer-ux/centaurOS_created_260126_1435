@@ -1073,10 +1073,10 @@ WIRE_LOCAL_DIRECT_MAX_MM = 9000.0
 # cross-module closer can mint a fluid edge between two distant parts (e.g. Oxygen Dosing
 # Pump → Drain Collection Sump, 17.6 m at z≈7 m). Drawn as a Manhattan overhead beam it
 # reads as "stray lines/pipes shooting off platform into empty space" — the same visual
-# defect class as the v44 cable beam. Demote those plant-crossing OVERHEAD fluid runs to
-# P&ID (length still routed); BELOW-GRADE drain laterals stay drawn underground even when
-# long (they are invisible from the hero and physically buried). Universal — geometry +
-# the existing below-grade noun signal, no class table.
+# defect class as the v44 cable beam. Demote ANY fluid edge whose plan span exceeds the
+# limit (overhead OR a long "below-grade" lateral that can surface across empty deck —
+# Codema 1715). Short buried drains still draw via `_route_below_grade`. Universal —
+# plan-span geometry only, no class table / no noun exemption.
 WIRE_TRAY_MAX_SPAN_MM = 16000.0
 
 
@@ -1092,16 +1092,21 @@ def _plan_span_mm(a_xyz, b_xyz):
 
 def _should_demote_plant_spanning_fluid(frm, to, src_xyz, dst_xyz, material_context):
     """INTENT: a fluid edge whose plan span exceeds WIRE_TRAY_MAX_SPAN_MM would draw as a
-    plant-crossing OVERHEAD beam (the Codema 1538 / vision-critic stray-pipe class). Demote
-    it from 3-D; keep below-grade drain laterals drawn (buried, not an overhead beam).
-    Universal — geometry + `_is_below_grade_drain_edge` noun signal, never a class table."""
-    if _is_below_grade_drain_edge(frm, to, material_context):
-        return False
+    plant-crossing beam (overhead OR a long below-grade lateral that surfaces across
+    empty deck — Codema 1715 `u_wire_014` nursery-sump water, 25.8 m, z −0.8→+4.3 m).
+    Demote from 3-D; P&ID / schedule keep the edge; length still routed.
+
+    DECISION: no below-grade exemption. A short buried drain (span ≤ limit) still
+    draws via `_route_below_grade`; a plant-crossing buried lateral is P&ID-only —
+    the 1715 exemption let G6 fire on a "below-grade" run that rose above the slab.
+    Universal — plan-span geometry only; `frm`/`to`/`material_context` unused for the
+    decision (kept in the signature so call sites stay stable)."""
+    del frm, to, material_context  # geometry-only; names reserved for future noun guards
     return _plan_span_mm(src_xyz, dst_xyz) > WIRE_TRAY_MAX_SPAN_MM
 
 
 def _selftest_plant_spanning_fluid_demote() -> None:
-    """proveCatch: long overhead fluid demotes; below-grade drain does not; short run does not."""
+    """proveCatch: long fluid demotes (overhead OR below-grade); short run does not."""
     far_a, far_b = (0.0, 0.0, 500.0), (20000.0, 0.0, 500.0)  # 20 m > 16 m limit
     near_a, near_b = (0.0, 0.0, 500.0), (5000.0, 0.0, 500.0)  # 5 m
     assert _should_demote_plant_spanning_fluid(
@@ -1110,10 +1115,13 @@ def _selftest_plant_spanning_fluid_demote() -> None:
     assert not _should_demote_plant_spanning_fluid(
         "Oxygen Dosing Pump", "Gac Filter", near_a, near_b, "process water"
     ), "short fluid run must stay 3-D"
-    # Below-grade drain noun signal — even a long span stays drawn underground.
+    # 1715: long below-grade-classified lateral MUST demote (was exempt → 25.8 m beam).
+    assert _should_demote_plant_spanning_fluid(
+        "Nursery Drain Collection Sump", "Drain Water Tank", far_a, far_b, "",
+    ), "plant-spanning below-grade lateral must demote (Codema 1715 u_wire_014 class)"
     assert not _should_demote_plant_spanning_fluid(
-        "Cloth Filter", "Drain Water Tank", far_a, far_b, "",
-    ), "below-grade drain lateral must NOT demote (buried, not an overhead beam)"
+        "Cloth Filter", "Drain Water Tank", near_a, near_b, "",
+    ), "short below-grade drain stays 3-D underground"
 
 # ── 6. Pipe palette by mechanism ───────────────────────────────────────────
 # Pipe radius ~1.7× (Tristan 2026-06-10): the runs read as thin wires. 110→190 mm.
@@ -10554,18 +10562,16 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
             _own_bb = [bb for bb in (part_xy_bbox_mm(r["src_part"]), part_xy_bbox_mm(r["dst_part"]))
                       if bb is not None]
             _mat_ctx = (r.get("e") or {}).get("material_context")
-            # PLANT-SPANNING FLUID (Codema 1538 / vision-critic stray-pipe class):
-            # a fluid edge whose plan span exceeds WIRE_TRAY_MAX_SPAN_MM would draw
-            # as an overhead Manhattan beam across empty deck. Demote from 3-D
-            # (P&ID / schedule keep the edge; length still routed). Below-grade
-            # drain laterals stay drawn underground. Universal — geometry + noun
-            # signal via `_should_demote_plant_spanning_fluid` (was defined but
-            # never called — dead rule = silent ship of the defect).
+            # PLANT-SPANNING FLUID (Codema 1538 / 1715 / vision-critic stray-pipe):
+            # plan span > WIRE_TRAY_MAX_SPAN_MM → demote from 3-D (P&ID keeps the
+            # edge; length still routed). No below-grade exemption — a long buried
+            # lateral that surfaces is the same visual class as an overhead beam.
+            # Universal — `_should_demote_plant_spanning_fluid` is plan-span only.
             if _should_demote_plant_spanning_fluid(
                     r["frm"], r["to"], r["src_xyz"], r["dst_xyz"], _mat_ctx):
                 _record_logical(
                     r,
-                    "plant-spanning fluid edge → P&ID, not a 3-D overhead beam "
+                    "plant-spanning fluid edge → P&ID, not a 3-D plant-crossing beam "
                     "(length still routed)",
                 )
                 print(f"[univ][wire]   PLANT-SPANNING FLUID {r['edge_lbl']}: plan span "
