@@ -2131,13 +2131,15 @@ def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
 
     Rescaling (not overwriting) preserves each circuit's relative proportion — the
     totals row still equals Σ the visible per-circuit rows, so the table stays
-    internally honest. Amp/cable/breaker sizing is untouched (already derived from the
-    real motor-nameplate/FLC figures earlier in `_fill_circuits`) — only the displayed
-    kW column + the totals row are corrected. Scoped to `kind == 'main'` (the board
-    load_reconcile's regex reads); a sub-board downstream of its own transformer is a
-    different physical demand and is left alone. No-op — unchanged behaviour — when no
-    archetype has published a breakdown (every OTHER product class today: water/BESS/
-    SAF/etc all return None here and this function does nothing)."""
+    internally honest. After a non-trivial rescale, Design I (+ cable / breaker when
+    those were load-derived) MUST be re-derived from the new kW — leaving the pre-
+    rescale FLC beside a rescaled Conn. load fabricates an impossible pf·η (Codema
+    1820 Electrical 6.7: UV row 18.33 kW vs Design I 56.6 A → implied pf·η 0.47).
+    Scoped to `kind == 'main'` (the board load_reconcile's regex reads); a sub-board
+    downstream of its own transformer is a different physical demand and is left
+    alone. No-op — unchanged behaviour — when no archetype has published a breakdown
+    (every OTHER product class today: water/BESS/SAF/etc all return None here and
+    this function does nothing)."""
     quantities = {}
     for ck in ("orchestratorContract", "engineeringContract"):
         q = (state.get(ck) or {}).get("quantities")
@@ -2161,6 +2163,35 @@ def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
                 c.connected_kw = c.connected_kw * ratio
             if c.connected_kw_total is not None:
                 c.connected_kw_total = c.connected_kw_total * ratio
+            # Re-derive Design I from the rescaled kW so Conn. load ↔ Design I stay
+            # arithmetically honest (workbook column contract: implied pf·η ∈ 0.60–1.05).
+            kw_one = c.connected_kw
+            if kw_one is None or kw_one <= 0 or not p.voltage_v:
+                continue
+            resistive = bool(_RESISTIVE_LOAD_RE.search(c.description or ""))
+            flc, _csa, cable_label, frame = size_circuit_from_kw(
+                kw_one, p.voltage_v, is_dc=p.is_dc, phases=p.phases,
+                resistive=resistive)
+            if flc is None:
+                continue
+            c.design_a = flc
+            if cable_label:
+                # Preserve core-count / type prefix when present ("4C · 16 mm²");
+                # otherwise replace the CSA cell with the re-sized label.
+                prev = c.cable or ""
+                if "·" in prev:
+                    prefix = prev.split("·", 1)[0].strip()
+                    c.cable = f"{prefix} · {cable_label}"
+                else:
+                    c.cable = cable_label
+            if frame is not None:
+                c.device_a = frame
+                # Keep the device family (MCB/MCCB/…) but stamp the new frame amps.
+                if c.device:
+                    c.device = re.sub(
+                        r"\b\d{1,5}\s*A\b", f"{frame:g} A", c.device, count=1)
+                else:
+                    c.device = f"MCB {frame:g} A"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2903,10 +2934,42 @@ def _selftest() -> int:
     rec2 = reconcile(pnl2)
     chk("I14.subsumed_kw_excluded_from_running", abs(rec2["sum_kw"] - 21.5) < 0.01)
 
+    # I15 — ONE-MINT kW rescale MUST re-derive Design I (Codema 1820 Electrical 6.7:
+    # Conn. load rescaled 30→18.33 kW but Design I stayed 56.6 A → implied pf·η 0.47).
+    pnl3 = Panel(board_id="mdb", name="MAIN", kind="main", voltage_v=400.0, phases=3)
+    # Pre-rescale: UV at hydraulic-misapplied ~30 kW → ~56.6 A FLC (motor pf/η).
+    uv_a = flc_from_kw(30.0, 400.0, phases=3)
+    pump_a = flc_from_kw(30.0, 400.0, phases=3)
+    pnl3.circuits = [
+        Circuit(ref="W2", description="UV Disinfection", connected_kw=30.0,
+                connected_kw_total=30.0, design_a=uv_a, coincident=True,
+                cable="4C · 16 mm²", device="MCCB 63 A", device_a=63),
+        Circuit(ref="W3", description="Fertigation Pump", connected_kw=30.0,
+                connected_kw_total=30.0, design_a=pump_a, coincident=True,
+                cable="4C · 16 mm²", device="MCCB 63 A", device_a=63),
+    ]
+    st_recon = {"orchestratorContract": {"quantities": {
+        "electrical_consumer__uv_disinfection_kw": {"value": 10.0},
+        "electrical_consumer__fertigation_kw": {"value": 10.0},
+    }}}
+    _reconcile_panels_to_breakdown([pnl3], st_recon)
+    # target Σ = 20 kW, raw = 60 → ratio 1/3 → each circuit 10 kW
+    chk("I15.kw_rescaled_to_breakdown",
+        abs((pnl3.circuits[0].connected_kw or 0) - 10.0) < 0.05)
+    # Design I must match flc_from_kw(10) — not the stale 56.6 A
+    expect_a = flc_from_kw(10.0, 400.0, phases=3)
+    chk("I15.design_a_rederived_from_kw",
+        expect_a is not None and abs((pnl3.circuits[0].design_a or 0) - expect_a) < 0.5)
+    # implied pf·η from P = √3·V·I·pf·η → pf·η = P·1000/(√3·V·I) must sit in 0.60–1.05
+    kw0 = pnl3.circuits[0].connected_kw or 0
+    a0 = pnl3.circuits[0].design_a or 0
+    implied = (kw0 * 1000.0) / (math.sqrt(3) * 400.0 * a0) if a0 > 0 else 0
+    chk("I15.implied_pf_eta_in_band", 0.60 <= implied <= 1.05)
+
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (14 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (15 connected-load reconciliation invariants)")
     return 0
 
 

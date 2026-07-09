@@ -13964,15 +13964,30 @@ registerArchetype('water_treatment', (brief: any) => {
 
   // Connected electrical load — ONE-MINT consumer list (same discipline as the
   // co2_mineralisation electricalConsumers array, 2026-07-06). Panel schedule +
-  // drawing_gates load_reconcile read this total; omitting the irrigation /
-  // nutrient circulation pump left the contract at 67 kW while the panel summed
-  // ~86 kW (Codema ship, 2026-07-09). Standby / backup pumps are NOT in this sum
-  // (panel marks them coincident=False). Nursery fertigation nested under a
-  // counted parent is also excluded from the running total (panel sub-component).
-  const irrigationPumpKw = pick(
-    /(?:irrigation|nutrient)\s+pump[^.]{0,80}?(\d{1,3}(?:\.\d)?)\s*kW/i,
-    Math.max(15, Math.round(irrigationDemandTotalM3H * 0.13)),
-  )
+  // drawing_gates load_reconcile read this total. Standby / backup pumps are NOT
+  // in this sum (panel marks them coincident=False).
+  //
+  // DECISION (Codema 1820 Risk 7.9 / Electrical double-count): when the brief
+  // states ≥2 parallel pump UNITs whose capacities sum to irrigation_demand
+  // (pump_unit_1/2 + nursery), those fertigation units ARE the irrigation
+  // delivery train — do NOT also mint a plant-total "Irrigation / nutrient
+  // circulation pump" consumer or seed irrigation_pump_motor_kw (that seeded a
+  // phantom 225 m³/h Irrigation Pump + double-counted ~29 kW). Universal signal
+  // inside this builder: unit-count + capacity sum vs demand (±5%), not a class
+  // name. A plant with a genuine SEPARATE irrigation pump (no unit capacities
+  // covering demand) still gets the plant-total consumer via the pick() path.
+  const unitCapacitiesCoverIrrigationDemand =
+    (departmentCount + nurseryZoneCount) >= 2 &&
+    Math.abs(
+      (dosingFlowM3H * departmentCount + nurseryPumpFlowM3H * nurseryZoneCount) -
+        irrigationDemandTotalM3H,
+    ) / Math.max(irrigationDemandTotalM3H, 1e-9) <= 0.05
+  const irrigationPumpKw = unitCapacitiesCoverIrrigationDemand
+    ? 0
+    : pick(
+      /(?:irrigation|nutrient)\s+pump[^.]{0,80}?(\d{1,3}(?:\.\d)?)\s*kW/i,
+      Math.max(15, Math.round(irrigationDemandTotalM3H * 0.13)),
+    )
   const handWaterPumpKw = Math.max(3, handWaterM3H * 0.16)
   const drainTransferKwEach = 5.0
   const clothFilterKwEach = 1.5
@@ -13981,8 +13996,19 @@ registerArchetype('water_treatment', (brief: any) => {
   const electricalConsumers: { key: string; name: string; kw: number }[] = [
     { key: 'fertigation_circulation', name: 'Fertigation circulation pumps (duty)',
       kw: departmentCount * dosingPumpKw },
-    { key: 'irrigation_nutrient_pump', name: 'Irrigation / nutrient circulation pump',
-      kw: irrigationPumpKw },
+    // Nursery fertigation is a distinct running motor when present (was previously
+    // omitted as "nested" while a plant-total irrigation_nutrient_pump double-counted
+    // the same duty — with the plant-total gone, count the nursery unit honestly).
+    ...(nurseryZoneCount > 0 && unitCapacitiesCoverIrrigationDemand
+      ? [{ key: 'nursery_fertigation_circulation',
+          name: 'Nursery fertigation circulation pump (duty)',
+          // same scale as nursery_fertigation_dosing_pump_power_kw below (~0.6 × main unit)
+          kw: nurseryZoneCount * (Math.round(dosingPumpKw * 0.6 * 10) / 10) }]
+      : []),
+    ...(irrigationPumpKw > 0
+      ? [{ key: 'irrigation_nutrient_pump', name: 'Irrigation / nutrient circulation pump',
+          kw: irrigationPumpKw }]
+      : []),
     { key: 'ro_high_pressure_pump', name: 'RO high-pressure pump', kw: roHpPumpKw },
     { key: 'hand_watering_pump', name: 'Hand-watering pump', kw: handWaterPumpKw },
     { key: 'drain_transfer_pumps', name: 'Drain-pit transfer pumps (duty)',
@@ -14242,12 +14268,16 @@ registerArchetype('water_treatment', (brief: any) => {
     // metric gac_softener_throughput matches its DELIVERED capacity — the design treats at
     // 14.5 m³/h ≥ the 14.5 m³/h demand (a genuine PASS, not a matcher work-around).
     gac_softener_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
-    irrigation_pump_motor_kw: q(irrigationPumpKw, 'kW', 'power', 'rated', 'module', 'brief',
-      `irrigation / nutrient circulation pump motor ≈ ${irrigationPumpKw} kW (RUNNING load — counted in connected_electrical_load_kw)`),
+    // Only seed a plant-total irrigation_pump_motor_kw when unit capacities do NOT
+    // already cover demand — otherwise buildGroups synthesises a phantom Irrigation Pump.
+    ...(irrigationPumpKw > 0
+      ? { irrigation_pump_motor_kw: q(irrigationPumpKw, 'kW', 'power', 'rated', 'module', 'brief',
+          `irrigation / nutrient circulation pump motor ≈ ${irrigationPumpKw} kW (RUNNING load — counted in connected_electrical_load_kw)`) }
+      : {}),
     connected_electrical_load_kw: q(
       connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator',
       `Σ ONE-MINT electrical consumers (${electricalConsumers.map(c => `${c.name} ${c.kw.toFixed(1)}`).join(' + ')}) = ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC out of scope; standby pumps excluded)`,
-      ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'irrigation_pump_motor_kw', 'hand_watering_pump_count', 'drain_transfer_pump_count', 'uv_disinfection_power_kw'],
+      ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'hand_watering_pump_count', 'drain_transfer_pump_count', 'uv_disinfection_power_kw'],
     ),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).

@@ -333,6 +333,25 @@ function run() {
   const dcMotor = qVal(dcC1, 'irrigation_pump_motor_kw')
   if (!(typeof dcMotor === 'number' && dcMotor > 5 && dcMotor < 20)) throw new Error(`demand-coverage: irrigation_pump_motor_kw must be minted from the flow-only hydraulics (90 m³/h @ 2.5 bar ≈ 10 kW), got ${dcMotor}`)
   if (String(dcC1.quantities.irrigation_pump_flow_m3_h.source) !== 'demand-coverage') throw new Error('demand-coverage: a minted quantity must carry source="demand-coverage" provenance (CORE FIX PRINCIPLE — route by provenance)')
+
+  // (1b) proveCatch (Codema 1820 Risk): when ≥2 brief-stated pump_unit*_capacity* keys
+  // sum to the demand, do NOT mint/synthesise a plant-total Irrigation Pump twin.
+  const dcModsUnits: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
+  const dcCUnits: any = { quantities: {
+    irrigation_demand_m3_h: { value: 225, unit: 'm³/h' },
+    pump_unit_1_capacity_m3_per_hr: { value: 90, unit: 'm³/h', source: 'brief' },
+    pump_unit_2_capacity_m3_per_hr: { value: 90, unit: 'm³/h', source: 'brief' },
+    nursery_pump_unit_capacity_m3_per_hr: { value: 45, unit: 'm³/h', source: 'brief' },
+    fertigation_dosing_pump_throughput_m3_h: { value: 90, unit: 'm³/h', source: 'brief' },
+    fertigation_dosing_pump_count: { value: 2, unit: '', source: 'brief' },
+  } }
+  applyUniversalContractSizing(dcModsUnits as never[], dcCUnits, { dedupeAndStrip: false, explode: false, instrument: false })
+  if (findWord(dcModsUnits, /^irrigation pump$/i)) {
+    throw new Error('demand-coverage: parallel unit capacities covering demand must NOT synthesise a plant-total Irrigation Pump (Codema 1820 phantom twin)')
+  }
+  if (qVal(dcCUnits, 'irrigation_pump_flow_m3_h') !== undefined) {
+    throw new Error(`demand-coverage: must not mint irrigation_pump_flow when unit capacities cover demand (got ${qVal(dcCUnits, 'irrigation_pump_flow_m3_h')})`)
+  }
   // PATH-2 (reconcile ALONE) must give the same coverage.
   const dcMods1b: any = [{ module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] }]
   const dcC1b = mkDemandContract()

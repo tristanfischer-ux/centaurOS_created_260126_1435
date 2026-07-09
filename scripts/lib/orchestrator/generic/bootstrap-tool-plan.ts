@@ -1295,6 +1295,30 @@ function _siblingQty(c: ContractInProgress, stems: string[], suffixRe: RegExp): 
   }
   return best?.v
 }
+/** True when ≥2 brief-stated `pump_unit*_capacity*` (or `*_pump_unit_capacity*`)
+ *  flow keys sum (±5%) to `flowTotal`. Those units ARE the delivery train — a
+ *  plant-total pump-sizing tool must not mint a mega-pump (or an equal-split
+ *  parallel_pumps fiction) on top. Universal: capacity-key signal only. */
+function _parallelUnitCapacitiesCoverFlow(
+  c: ContractInProgress, flowTotal: number,
+): boolean {
+  if (!(flowTotal > 0)) return false
+  const qs = (c.quantities ?? {}) as Record<string, { value?: unknown }>
+  let sum = 0
+  let n = 0
+  for (const [k, qv] of Object.entries(qs)) {
+    if (!/(^|_)pump_unit(_\d+)?_capacity_(m3_h|m3_hr|m3_per_hr)$|(^|_)[a-z0-9]+_pump_unit_capacity_(m3_h|m3_hr|m3_per_hr)$/i.test(k)) {
+      continue
+    }
+    const v = typeof qv === 'object' && qv ? Number(qv.value) : Number(qv)
+    if (!(Number.isFinite(v) && v > 0)) continue
+    sum += v
+    n += 1
+  }
+  if (n < 2) return false
+  return Math.abs(sum - flowTotal) / flowTotal <= 0.05
+}
+
 /** Inject `parallel_pumps` (from `<device>_count`) + `total_dynamic_head_m` (from
  *  `<device>_head_m`) into a pump-sizing payload, derived from the SAME device the
  *  flow was wired from. Mutates + returns `payload`. Never overwrites a value the plan
@@ -1474,6 +1498,27 @@ export function applyStepOutputs(
     if (seedProtected) {
       protectedKeys.push(`${o.contract_key}(seed=${existing.value} vs tool=${v})`)
       continue
+    }
+    // INTENT: a pump-sizing tool wired to a plant DEMAND total must not mint a
+    // plant-total `<stem>_pump_flow` / motor when the brief already states ≥2
+    // parallel pump-UNIT capacities that sum to that demand (Codema 1820: tool
+    // wrote irrigation_pump_flow=225 + synthesised one Irrigation Pump beside
+    // pump_unit_1/2 + nursery capacities). Refuse the write — the units are the
+    // delivery train. Universal: capacity-key coverage of the tool's own flow
+    // input, no class name. Equal-split parallel_pumps would still be wrong for
+    // heterogeneous units (90+90+45), so skip entirely rather than divide.
+    if (_PUMP_SIZING_TOOL_RE.test(step.tool_id)
+      && /_(flow|throughput)_m3_h$|_motor_kw$|_power_kw$/i.test(o.contract_key)) {
+      const flowInp = step.inputs.find((i) => i.param === 'flow_m3_h' && i.from_contract_key)
+      const flowKey = flowInp?.from_contract_key
+      const flowQ = flowKey ? (c.quantities as Record<string, any>)?.[flowKey] : undefined
+      const flowTotal = Number(flowQ && typeof flowQ === 'object' ? flowQ.value : flowQ)
+      if (Number.isFinite(flowTotal) && _parallelUnitCapacitiesCoverFlow(c, flowTotal)) {
+        protectedKeys.push(
+          `${o.contract_key}(parallel-unit-capacities cover flow=${flowTotal} — refuse plant-total pump mint)`,
+        )
+        continue
+      }
     }
     quantities[o.contract_key] = mkQty(v, o.unit, o.family, p(o.tool_output_field), o.condition ?? 'rated')
   }

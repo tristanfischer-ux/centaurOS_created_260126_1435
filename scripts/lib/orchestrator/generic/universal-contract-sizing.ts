@@ -698,9 +698,31 @@ function phraseLooksLikeDevice(phrase: string): boolean {
 // physical extent: a vessel volume or a footprint area (always), or a throughput /
 // device power whose phrase actually names a device. A load/duty/rate/mass/current,
 // or a system flow with a process-noun phrase, is NOT equipment.
-function isSynthesisable(g: EquipGroup): boolean {
+/** A bare `<demand-stem>_pump` group whose throughput equals a plant demand that is
+ *  already covered by ≥2 brief-stated parallel unit capacities — a phantom plant-total
+ *  twin (Codema 1820: Irrigation Pump 225 m³/h beside pump_unit_1/2 + nursery capacities).
+ *  Universal: demand-echo + unit-capacity signals only. */
+function isPhantomPlantTotalPumpCoveredByUnits(
+  g: EquipGroup,
+  quantities: Record<string, number>,
+): boolean {
+  if (g.throughput === undefined || g.throughput <= 0) return false
+  if (!/\bpump\b/i.test(g.phrase.replace(/_/g, ' '))) return false
+  // only a plant-TOTAL twin: throughput matches a demand echo (±5%)
+  let matchedDemand = 0
+  for (const [k, v] of Object.entries(quantities)) {
+    if (!FLUID_DEMAND_ECHO_RE.test(k) || !Number.isFinite(v) || v <= 0) continue
+    if (Math.abs(g.throughput - v) / v <= 0.05) { matchedDemand = v; break }
+  }
+  if (!(matchedDemand > 0)) return false
+  return parallelUnitCapacityCoverage(quantities, matchedDemand) !== null
+}
+
+function isSynthesisable(g: EquipGroup, quantities?: Record<string, number>): boolean {
   // A sub-aspect of a larger principal (degasser_column ⊂ a degasser) is not a second machine.
   if (g.subAspect) return false
+  // Phantom plant-total pump beside brief-stated parallel units — never mint.
+  if (quantities && isPhantomPlantTotalPumpCoveredByUnits(g, quantities)) return false
   if (g.volume !== undefined && g.volume >= 1) return true
   if (g.area !== undefined && g.area >= 2) {
     // a MEMBRANE / transfer SURFACE area (RO/UF/NF) is a process SPEC, not a plan footprint — the
@@ -1065,6 +1087,53 @@ export function briefPinnedQuantityKeys(contract?: ContractInProgress): Set<stri
 // NO-OP — byte-identical output — for a class with no fluid-delivery demand key and no
 // motorless pump-flow family (BESS / smallsat / edge-ai).
 const FLUID_DEMAND_ECHO_RE = /_(demand|required|requested|target|setpoint)_(m3_h|m3_hr|m3_per_hr)$/
+// INTENT: when a brief states N parallel pump-UNIT capacities (pump_unit_1_capacity,
+// nursery_pump_unit_capacity, …) whose sum ≈ a plant demand, that demand is ALREADY
+// delivered by those units — minting/synthesising a single plant-total `<stem>_pump`
+// (225 m³/h Irrigation Pump beside 2×90 + 1×45 fertigation units) is a phantom twin
+// the physics critic correctly flags. Universal: keyed on `*_unit*_capacity*` flow
+// keys (≥2), no class name. (Codema 1820 Risk 7.9.)
+const PARALLEL_UNIT_CAPACITY_KEY_RE =
+  /(^|_)pump_unit(_\d+)?_capacity_(m3_h|m3_hr|m3_per_hr)$|(^|_)[a-z0-9]+_pump_unit_capacity_(m3_h|m3_hr|m3_per_hr)$|(^|_)[a-z0-9]+_unit_capacity_(m3_h|m3_hr|m3_per_hr)$/i
+function parallelUnitCapacityCoverage(
+  quantities: Record<string, number>,
+  demandM3h: number,
+): { sum: number; count: number } | null {
+  if (!(demandM3h > 0)) return null
+  let sum = 0
+  let count = 0
+  for (const [k, v] of Object.entries(quantities)) {
+    if (!Number.isFinite(v) || v <= 0) continue
+    if (!PARALLEL_UNIT_CAPACITY_KEY_RE.test(k)) continue
+    sum += v
+    count += 1
+  }
+  if (count < 2) return null
+  if (Math.abs(sum - demandM3h) / demandM3h > 0.05) return null
+  return { sum, count }
+}
+/** True when a demand echo is already covered by brief-stated parallel unit capacities
+ *  OR by an existing delivered pump-flow / synonym delivery capacity (±5%). */
+function fluidDemandAlreadyCovered(
+  quantities: Record<string, number>,
+  demandKey: string,
+  demandM3h: number,
+): boolean {
+  if (parallelUnitCapacityCoverage(quantities, demandM3h)) return true
+  return Object.entries(quantities).some(([ok, ov]) => {
+    if (ok === demandKey || !Number.isFinite(ov) || ov <= 0) return false
+    if (FLUID_DEMAND_ECHO_RE.test(ok) || FLOW_ECHO_TOKEN_RE.test(ok)) return false
+    // delivered pump flow OR a dosing/circulation capacity roll-up that is the plant delivery
+    if (
+      !DELIVERED_PUMP_FLOW_RE.test(ok) &&
+      !/(irrigation|recirculation).*(m3_h|m3_hr|m3_per_hr)$/.test(ok) &&
+      !/(fertigation|irrigation).*(capacity|total).*(m3_h|m3_hr|m3_per_hr)$/.test(ok)
+    ) {
+      return false
+    }
+    return Math.abs(ov - demandM3h) / demandM3h <= 0.05
+  })
+}
 const DELIVERED_PUMP_FLOW_RE = /_(flow|throughput)_(m3_h|m3_hr|m3_per_hr)$/
 const PUMP_POWER_KEY_RE = /_(motor_kw|motor_power_kw|power_kw|drive_kw|electrical_kw)$/
 function demandKeyTokens(k: string): Set<string> {
@@ -1356,14 +1425,9 @@ export function mintDemandCoverage(
     const cqDetail = String((cqNow?.[k] as { source_detail?: unknown } | undefined)?.source_detail ?? '')
     if (/exact brief-key alias/.test(cqDetail)) continue
     // same discipline without relying on provenance text: if ANY non-echo delivered
-    // system flow already equals this demand (±5%), the demand is covered — no new pump.
-    const alreadyCovered = Object.entries(quantities).some(([ok, ov]) => {
-      if (ok === k || !Number.isFinite(ov) || ov <= 0) return false
-      if (FLUID_DEMAND_ECHO_RE.test(ok) || FLOW_ECHO_TOKEN_RE.test(ok)) return false
-      if (!DELIVERED_PUMP_FLOW_RE.test(ok) && !/(irrigation|recirculation).*(m3_h|m3_hr|m3_per_hr)$/.test(ok)) return false
-      return Math.abs(ov - v) / v <= 0.05
-    })
-    if (alreadyCovered) continue
+    // system flow already equals this demand (±5%), OR brief-stated parallel unit
+    // capacities sum to the demand, the demand is covered — no new plant-total pump.
+    if (fluidDemandAlreadyCovered(quantities, k, v)) continue
     const stemPhrase = k.slice(0, m.index)
     if (!stemPhrase) continue
     if (isPureAggregatePhrase(stemPhrase)) continue // a total/overall roll-up is not one pumped train
@@ -2348,6 +2412,12 @@ export function reconcilePumpMotorAgainstStatedPressure(
     if (pinnedKeys.has(key)) continue // never re-margin a brief-pinned nameplate
     const famPhrase = key.slice(0, mm.index)
     if (!famPhrase) continue
+    // GOTCHA: `_power_kw` also matches UV / disinfection / heater electrical draws.
+    // Hydraulic P = ρ·g·Q·H is a PUMP duty only — a UV reactor's `_throughput_m3_h` is
+    // the treated flow, not a pumped head. Require an explicit `pump` token in the
+    // family phrase (Codema 1820: uv_disinfection_power_kw 10.1 → 30 kW via 225 m³/h
+    // @ 2.9 bar). Universal — noun signal, no class table.
+    if (!/(^|_)pump(_|$)/i.test(famPhrase)) continue
     const famStems = pumpFamilyIdentity(famPhrase)
     if (famStems.length === 0) continue
     // the family's own BULK-FLOW sibling — a dosing/trim pump (litres/hour, no m³/h
@@ -5496,7 +5566,7 @@ export function reconcilePrincipalEquipment(
   // removes the phantom "Total Water Storage" 262 m³ mega-tank (the physics-critic HIGH): this
   // reconcile re-mints principals from the contract LATER in the chain, and because the aggregate
   // is dropped from `canons`, the reconcile's invented-removal also deletes any pre-existing copy.
-  const allSynth = buildGroups(quantities).filter(isSynthesisable)
+  const allSynth = buildGroups(quantities).filter((g) => isSynthesisable(g, quantities))
   // a GROUNDED disinfection word (v55's generator-emitted UV unit — non-synth, so it can
   // never claim a canon below) owns the disinfection function: drop the disinfection canon
   // so the reconcile never mints a synth twin beside it. A prior pass's SYNTH UV word keeps
@@ -6105,7 +6175,7 @@ export function applyUniversalContractSizing(
   if (synthesizeMissing) {
     for (const g of groups) {
       if (matched.has(g.phrase)) continue
-      if (!isSynthesisable(g)) continue
+      if (!isSynthesisable(g, quantities)) continue
       if (isDisinfectionPhrase(g.phrase) && disinfectionWordExists) continue
       // A `total_*` / overall / combined volume is a REPORTING SUM of the real vessels, not a
       // physical tank. Synthesising it mints a phantom mega-vessel that double-counts the
@@ -6116,7 +6186,7 @@ export function applyUniversalContractSizing(
       if (isPureAggregatePhrase(g.phrase) && g.volume !== undefined) {
         const constituents = groups.filter(
           (o) => o !== g && o.volume !== undefined && o.volume >= 1
-            && !isPureAggregatePhrase(o.phrase) && isSynthesisable(o),
+            && !isPureAggregatePhrase(o.phrase) && isSynthesisable(o, quantities),
         )
         if (constituents.length >= 2) continue
       }

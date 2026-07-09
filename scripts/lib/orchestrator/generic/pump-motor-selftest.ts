@@ -286,8 +286,30 @@ function run() {
     throw new Error(`pump-motor: acid metering motor must stay 0.04 kW (never IEC-frame to 0.75/1); got ${acidMotor}`)
   }
 
+  // proveCatch (Codema 1820): UV / disinfection `_power_kw` must NEVER bind the hydraulic
+  // duty cross-check — `_throughput_m3_h` is treated flow, not pumped head. A UV reactor
+  // at the dose rule (~10 kW) must stay put when a plant-wide pump_pressure_bar exists.
+  const qUv: Record<string, number> = {
+    uv_disinfection_throughput_m3_h: 225,
+    uv_disinfection_power_kw: 10.1,
+    irrigation_pump_flow_m3_h: 90,
+    irrigation_pump_motor_kw: 9.653,
+  }
+  const correctedUv = reconcilePumpMotorAgainstStatedPressure(qUv, undefined, [
+    { key_metric: 'pump_pressure_bar', value: 2.9, unit: 'bar', category: 'performance' },
+  ])
+  if (qUv.uv_disinfection_power_kw !== 10.1) {
+    throw new Error(`pump-motor: UV disinfection power must NEVER lift via hydraulic duty cross-check (got ${qUv.uv_disinfection_power_kw})`)
+  }
+  if (correctedUv.some((c) => c.key === 'uv_disinfection_power_kw')) {
+    throw new Error(`pump-motor: UV key must not appear in pressure corrections (got ${JSON.stringify(correctedUv)})`)
+  }
+  if (qUv.irrigation_pump_motor_kw !== 15) {
+    throw new Error(`pump-motor: irrigation pump must still lift 9.653→15 against plant-wide 2.9 bar (got ${qUv.irrigation_pump_motor_kw})`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent; brief-pressure cross-check: 90m³/h@2.9bar lifts 9.653→15kW, dosing pump + pinned nameplate + already-adequate family + no-pressure-metric archetype all untouched, idempotent; acid metering 0.04 kW preserved)`)
+  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent; brief-pressure cross-check: 90m³/h@2.9bar lifts 9.653→15kW, dosing pump + pinned nameplate + already-adequate family + no-pressure-metric archetype all untouched, idempotent; acid metering 0.04 kW preserved; UV power never hydraulic-lifted)`)
 }
 
 run()
