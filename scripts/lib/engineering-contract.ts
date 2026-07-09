@@ -13900,9 +13900,15 @@ registerArchetype('water_treatment', (brief: any) => {
     /cleanwater\s+reservoir[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,40}?cleanwater|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)\s+each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i,
     91,
   )
+  // GOTCHA: do NOT use `[^.]{0,N}` as a "sentence" window — briefs write tank
+  // geometry as "3.64 metres diameter by 3.88 metres high, approximately 40 cubic
+  // metres", and the decimal point truncates the window so the volume never matches.
+  // The old third alternative then falsely captured "91 cubic metres each) and a
+  // nursery drain" from the MAIN-reservoir sentence (Codema 1735: nursery stamped
+  // 91 m³). Universal: nursery-anchored window + volume not part of a decimal.
   const nurseryDrainReservoirVolM3 = hasNurseryPumpUnit
     ? pick(
-      /nursery\s+drain[\s-]?water\s+reservoir[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|nursery[^.]{0,40}?reservoir[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,40}?nursery\s+drain/i,
+      /nursery\s+drain[\s-]?water\s+reservoir[\s\S]{0,160}?(?<![\d.])(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|nursery[\s\S]{0,60}?reservoir[\s\S]{0,100}?(?<![\d.])(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i,
       Math.min(40, storageTankVolEachM3),
     )
     : 0
@@ -14044,13 +14050,35 @@ registerArchetype('water_treatment', (brief: any) => {
     // Brief cleanwater_reservoir_volume_m3 = 91 — exact key so compliance matches.
     cleanwater_reservoir_volume_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', `cleanwater reservoir volume = ${storageTankVolEachM3} m³ (brief cleanwater_reservoir_volume; Codema 5.46 m dia × 3.88 m)`),
     // Plant TOTAL: main reservoirs (1 cleanwater + 2 drain) + optional distinct nursery reservoir.
-    water_storage_capacity_m3: q(
-      storageTankVolEachM3 * 3 + (nurseryZoneCount > 0 ? nurseryDrainReservoirVolM3 * nurseryZoneCount : 0),
-      'm³', 'volume', 'rated', 'system', 'calculator',
-      `total water storage = 3×${storageTankVolEachM3} m³ main reservoirs${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}`,
-      ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'],
-      'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)',
-    ),
+    // INTENT (Codema 1735 / gate-36): also emit `total_water_storage_volume_m3` under the
+    // SAME calculator sum. The bootstrapped `water-storage:buffer-sizing` tool uses a
+    // consumptive peak-buffer model and was writing a phantom 682 m³ total that stomped
+    // Sense-check RADICAL while the discrete tanks stayed brief-correct. Seed-protection
+    // in applyStepOutputs keeps calculator-sourced keys; without this alias the tool
+    // invented a NEW key the contract never owned. Universal — sum of brief-pinned vessels.
+    ...(() => {
+      const totalM3 = storageTankVolEachM3 * 3
+        + (nurseryZoneCount > 0 ? nurseryDrainReservoirVolM3 * nurseryZoneCount : 0)
+      const detail = `total water storage = 3×${storageTankVolEachM3} m³ main reservoirs`
+        + (nurseryZoneCount > 0
+          ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir`
+          : '')
+      const from = [
+        'fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count',
+        ...(nurseryZoneCount > 0
+          ? ['nursery_drain_water_tank_volume_each_m3', 'nursery_drain_water_tank_count']
+          : []),
+      ]
+      const formula = nurseryZoneCount > 0
+        ? 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'
+          + '+nursery_drain_water_tank_volume_each_m3*nursery_drain_water_tank_count'
+        : 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'
+      const agg = q(totalM3, 'm³', 'volume', 'rated', 'system', 'calculator', detail, from, formula)
+      return {
+        water_storage_capacity_m3: agg,
+        total_water_storage_volume_m3: agg,
+      }
+    })(),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m

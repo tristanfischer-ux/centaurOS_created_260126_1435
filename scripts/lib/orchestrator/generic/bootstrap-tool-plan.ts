@@ -1460,7 +1460,18 @@ export function applyStepOutputs(
     // hand-written class-plans use their own contract_update closures and are
     // unaffected, so their intended tool-refinement of seeded geometry still flows.
     const existing = (c.quantities as Record<string, any>)?.[o.contract_key]
-    if (existing && existing.source === 'calculator' && Number.isFinite(existing.value)) {
+    // Calculator seeds (first-principles) AND brief-pinned storage volumes must not be
+    // clobbered by a bootstrapped stand-in (Codema 1735: water-storage:buffer-sizing
+    // wrote a consumptive 682 m³ total over the calculator plant sum). Brief non-storage
+    // refinements still flow via the executor's holdExact / >3× guards.
+    const seedProtected = existing && Number.isFinite(existing.value) && (
+      existing.source === 'calculator'
+      || (existing.source === 'brief'
+        && (o.family === 'volume' || o.family === 'capacity')
+        && /(tank|storage|buffer|reservoir|cistern|silo)\w*_(volume|capacity)|_(storage|tank)_(volume|capacity)/i
+          .test(o.contract_key))
+    )
+    if (seedProtected) {
       protectedKeys.push(`${o.contract_key}(seed=${existing.value} vs tool=${v})`)
       continue
     }
