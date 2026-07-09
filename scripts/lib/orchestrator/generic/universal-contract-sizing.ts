@@ -2464,7 +2464,16 @@ const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 
 
 // Each entry: parts SIZED + PRICED from the parent's physics. Cost factors are
 // engineering order-of-magnitude (UK, installed-equipment basis), universal by type.
-const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
+// `refKw` (2026-07-09, Powerwall exit-32 round 2): a rule may declare the DUTY its
+// fixed bases are priced at — the thermal-plant templates' £4,000 compressor /
+// £4,200 control panel / £3,000 tube bundle are packaged-industrial (Pfannenberg
+// EB-XT-class, ~40 kW) money. A parent far BELOW that reference gets the standard
+// equipment cost-capacity law (six-tenths rule) applied to the whole derived price:
+// f = (kw/refKw)^0.6 clamped to [0.005^0.6, 1] — a 0.11 kW mini-chiller's compressor
+// prices at ~£117, not £4,010. NEVER scales up (the linear kW terms own upsizing),
+// and a rule WITHOUT refKw is byte-identical (the pump/vessel calibrations that
+// Codema/RAS shipped on are untouched).
+const SUB_ASSEMBLY: { re: RegExp; refKw?: number; parts: SubSpec[] }[] = [
   // OPEN ATMOSPHERIC TANK (#144) — checked FIRST so a rearing tank / basin / MBBR biofilter
   // explodes into OPEN-TANK parts (wall + graded floor + dual-drain + walkway), NOT the
   // pressure-vessel parts below (top head, support skirt, manway, PVRV) that don't exist on
@@ -2560,6 +2569,7 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
       { name: 'Local Control Panel', derive: () => ({ gbp: 3800 }) },
     ] },
   { re: /heat[\s-]?exchang|\bhx\b|condenser|evaporator|\bcooler\b/i,
+    refKw: 40,
     parts: [
       { name: 'Shell', derive: (p) => ({ rating: { v: p.kw || 200, u: 'kW' }, gbp: 2500 + (p.kw || 200) * 9 }) },
       { name: 'Tube Bundle', derive: (p) => ({ gbp: 3000 + (p.kw || 200) * 18 }) },
@@ -2572,6 +2582,7 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
       { name: 'Vent & Drain Valves', derive: () => ({ gbp: 520 }) },
     ] },
   { re: /heat[\s-]?pump|chiller|refrigerat/i,
+    refKw: 40,
     parts: [
       { name: 'Scroll Compressor', derive: (p) => ({ rating: { v: p.kw || 200, u: 'kW' }, gbp: 4000 + (p.kw || 200) * 95 }) },
       { name: 'Evaporator Coil', derive: (p) => ({ gbp: 1800 + (p.kw || 200) * 22 }) },
@@ -2599,7 +2610,7 @@ const SUB_ASSEMBLY: { re: RegExp; parts: SubSpec[] }[] = [
 function sanitizeId(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48) || 'part'
 }
-function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPhysics): WordLike & { _subcomponent?: boolean } {
+function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPhysics, costScale = 1): WordLike & { _subcomponent?: boolean } {
   const d = spec.derive(physics)
   const mods: ModifierCharacter[] = [mod('quantity', `×${qty}`)]
   if (d.size) mods.push(mod('dimension', d.size))
@@ -2610,7 +2621,9 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
     const vStr = /kw/i.test(u) ? formatRatingKw(d.rating.v) : String(R2(d.rating.v))
     mods.push(mod('rating_primary', vStr, d.rating.u))
   }
-  mods.push(mod('price_estimate_gbp', String(Math.max(1, R2(d.gbp)))))   // BOTTOM-UP physics price
+  // costScale: the rule's cost-capacity factor vs its declared reference duty (six-
+  // tenths rule; 1 unless the rule declares refKw and the parent sits below it).
+  mods.push(mod('price_estimate_gbp', String(Math.max(1, R2(d.gbp * costScale)))))   // BOTTOM-UP physics price
   mods.push(mod('form', `${spec.name} (assembly component)`))
   mods.push(mod('part_number', 'TBD (detailed design)'))
   mods.push(mod('lifecycle', 'Concept design — sized from parent physics; exact MPN at detailed design'))
@@ -2682,6 +2695,22 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         const rule = SUB_ASSEMBLY.find((r) => r.re.test(nmHead))
         if (!rule) continue
         const physics = readParentPhysics(w)
+        // UNKNOWN-SIZE VESSEL ENVELOPE CAP (2026-07-09, Powerwall exit-32 round 2): a
+        // size-less vessel word (no kW, no m³, no dims — the generic path's "Coolant
+        // Expansion Tank") used to fall to the templates' 50 m³ default → a 4.0 m GRP
+        // tank with walkway + gelcoat (£13.6k) inside a 0.13 m³ wall cabinet. When the
+        // contract declares a COMPACT enclosure (< 50 m³), no internal vessel can
+        // plausibly exceed a quarter of it — cap the default there. A plant-scale or
+        // envelope-less contract (Codema tanks carry real m³) is byte-identical.
+        if (physics.kw === 0 && physics.m3 === 0 && physics.diaM === 0) {
+          const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
+          if (envM3 > 0 && envM3 < 50) physics.m3 = Math.max(0.01, envM3 * 0.25)
+        }
+        // Cost-capacity scale vs the rule's own declared reference duty (see the
+        // SUB_ASSEMBLY refKw comment). f = 1 when at/above reference or when the rule
+        // declares none — those calibrations are untouched.
+        const capRatio = rule.refKw && physics.kw > 0 ? physics.kw / rule.refKw : 1
+        const costScale = capRatio >= 1 ? 1 : Math.pow(Math.max(capRatio, 0.005), 0.6)
         // CONSUME-THE-CONTRACT: a flow-rated pump has p.kw=0, so the Drive Motor + VSD would
         // collapse to the 1.5 kW floor. Bind the hydraulic motor power the sizing tool already
         // computed (e.g. irrigation_pump_motor_kw=9.653) so the motor reflects the real duty +
@@ -2717,7 +2746,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
           if (physics.kw === 0) physics.kw = drive
         }
         for (const spec of rule.parts) {
-          out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics))
+          out.push(subWord(spec, id || sanitizeId(nm), physics.qty, physics, costScale))
           added += 1
         }
       }
