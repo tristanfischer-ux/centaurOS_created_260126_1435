@@ -664,6 +664,25 @@ def _load(p: Path):
         return None
 
 
+def _ellipsis_prefix_match(nm: str, txt: str) -> bool:
+    """ELLIPSIS-TRUNCATION credit — pure, module-level so it is proveCatch-able (see
+    _selftest). A drawing column legitimately truncates a long name with '…' ("W16
+    Nursery Fertigation Dosing Pu…", "W22–23 Fertigation Dosing Pump (BACK…"), so the
+    full BoM name is never a substring of the SVG text — a matcher FALSE-NEGATIVE on a
+    part that IS drawn (Codema 2100 BoM-Ledger 8/10 root, 2026-07-09; the known
+    parts_ledger false-neg class). Credits when a '…'-terminated PREFIX of THIS name
+    (≥ 12 chars, long enough to be unambiguous) appears in the text. Prefix-of-THIS-name
+    only — a truncated run belonging to a DIFFERENT part can never credit this one
+    (a catch-fix, never a relax)."""
+    if "…" not in txt:
+        return False
+    low_nm, low_txt = (nm or "").lower(), txt.lower()
+    for _L in range(len(low_nm) - 1, 11, -1):
+        if (low_nm[:_L].rstrip() + "…") in low_txt:
+            return True
+    return False
+
+
 def _tag_covered_verdict(t: str, txt: str, ambiguous_tags: set, name_present: bool):
     """Pure decision used by covered()'s tag-matching loop — module-level (no bpy, no
     live drawing) so it is a proveCatch-able regression guard (see _selftest).
@@ -949,6 +968,16 @@ def main() -> int:
             _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
             if nm.lower() in txt.lower() or _sing(nm) in _sing(txt):
                 return True
+            # ELLIPSIS-TRUNCATION credit (Codema 2100 BoM-Ledger 8/10 root, 2026-07-09): a
+            # drawing column legitimately truncates a long name with '…' ("W16 Nursery
+            # Fertigation Dosing Pu…", "W22–23 Fertigation Dosing Pump (BACK…"), so the full
+            # BoM name is never a substring of the SVG text — a matcher FALSE-NEGATIVE on a
+            # part that IS drawn (the known parts_ledger false-neg class). Credit when a
+            # '…'-terminated PREFIX of THIS name (≥ 12 chars, long enough to be unambiguous)
+            # appears in the text. Prefix-of-THIS-name only — a truncated run belonging to a
+            # DIFFERENT part can never credit this one (a catch-fix, never a relax).
+            if _ellipsis_prefix_match(nm, txt):
+                return True
             # SYNONYM STAGE CREDIT (Codema ship 2026-07-09): a 'Gac Filter' BoM line is the
             # SAME GAC treatment stage the P&ID already labels 'Gac Softener' / 'Softener' /
             # 'Carbon' — credit when the drawing carries the shared stage token. Narrow:
@@ -1022,6 +1051,14 @@ def main() -> int:
         # cable glands / terminal blocks / mounting frames, not a per-tag table.
         if ga_massing.is_ga_non_massing(name):
             expected = expected - {"blender", "general-arrangement", "single-line-diagram", "panel-schedule"}
+        # A TRANSFORMER is supply-side power conversion UPSTREAM of the board, not a
+        # consuming LOAD WAY — a panel schedule lists load circuits, so expecting the
+        # transformer there deflates coverage on a correctly-drawn board (Codema 2100:
+        # TX-101 held BoM-Ledger at 8/10 while the single-line — its proper home, which
+        # stays expected — already showed it). Same denominator-honesty discipline as the
+        # accessory strip above; keyed on the generic transformer noun, never a tag table.
+        if re.search(r"\btransformer\b", name, re.I):
+            expected = expected - {"panel-schedule"}
         # A pure document/label/certification-record row (Tristan's Codema-discipline ask,
         # 2026-07-05) has NO engineering-drawing home at all — expected NOWHERE, exactly like
         # a PARAMETRIC materials-allowance row. Never inferred from status; a name-level
@@ -1807,6 +1844,25 @@ def _selftest() -> int:
         if _got != _want:
             print(f"  FAIL _tag_covered_verdict({_t!r}, ambiguous={_amb!r}, "
                   f"name_present={_namep!r}) = {_got!r}, want {_want!r}")
+            bad += 1
+    # _ellipsis_prefix_match (2026-07-09, Codema 2100 BoM-Ledger 8/10 root): a column-
+    # truncated name on the drawing must credit ITS part (proveCatch) and never a
+    # different part or a short/ambiguous prefix (proveNoFalsePositive).
+    _ep_cases = [
+        # (name, txt, want)
+        ("Nursery Fertigation Dosing Pump", "W16 Nursery Fertigation Dosing Pu… 1 (8.60)", True),
+        ("Fertigation Dosing Pump (BACKUP / STANDBY)", "W22–23 Fertigation Dosing Pump (BACK… 2", True),
+        # a DIFFERENT pump: the truncated run is not a prefix of this name → no credit
+        ("Nursery Drain Transfer Pump", "W16 Nursery Fertigation Dosing Pu… 1", False),
+        # no ellipsis in the text at all → helper never fires (substring path owns it)
+        ("Nursery Fertigation Dosing Pump", "W16 Nursery Fertigation Dosing Pump 1", False),
+        # sub-12-char prefix is too ambiguous to credit
+        ("Nursery Pump", "W16 Nursery Pu… 1", False),
+    ]
+    for _nm, _txt, _want in _ep_cases:
+        _got = _ellipsis_prefix_match(_nm, _txt)
+        if _got != _want:
+            print(f"  FAIL _ellipsis_prefix_match({_nm!r}) = {_got!r}, want {_want!r}")
             bad += 1
     cases = [
         ("HMI Touchscreen", "control"),
