@@ -1232,8 +1232,18 @@ def _contract_match(state, metric_name, metric_unit, metric_value=None):
     # Pass 3: token-subset match in the same family, echoes excluded.
     b_tokens = _name_tokens(metric_name)
     if b_tokens:
-        need = max(1, (len(b_tokens) + 1) // 2)  # at least half the brief's tokens covered
-        best = None  # (-overlap, peak_penalty, extra_tokens, key, value)
+        # SUBJECT-token gating (2026-07-09 — mirrors build-excel-export._match_quantity,
+        # the ONE-matcher doctrine): need + overlap are computed over the metric's SUBJECT
+        # tokens (identity minus measure/scope words), so a measure word can neither
+        # INFLATE the threshold (ro_makeup_FLOW → 3 tokens → need 2 → the honest match
+        # ro_high_pressure_pump_throughput, overlap {ro} = 1, was unreachable → a false
+        # UNVERIFIED the renderer disagreed with) nor DECIDE a match on its own
+        # (gac_softener_throughput must still never bind cloth_filter_throughput on
+        # 'throughput' alone — measure words carry no subject identity). Falls back to
+        # the full token set when the name is entirely measure words.
+        b_subject = (b_tokens - _MEASURE_SCOPE_TOKENS) or b_tokens
+        need = max(1, (len(b_subject) + 1) // 2)  # at least half the SUBJECT tokens covered
+        best = None  # (-subject_overlap, -full_overlap, peak_penalty, extra_tokens, key, value)
         for k, v in _quantities(state).items():
             if not isinstance(v, dict):
                 continue
@@ -1243,15 +1253,18 @@ def _contract_match(state, metric_name, metric_unit, metric_value=None):
             if not _fam_compatible(fam, qfam):
                 continue
             q_tokens = _name_tokens(k)
-            overlap = len(b_tokens & q_tokens)
+            overlap = len(b_subject & q_tokens)
             if overlap < need:
                 continue
+            # rank ties by the FULL-token overlap too (richer context wins among equally-
+            # valid subject matches) — mirrors the renderer's ranking exactly.
+            full_overlap = len(b_tokens & q_tokens)
             penalty = 1 if re.search(r"peak|max|surge|inrush", str(k).lower()) else 0
-            cand = (-overlap, penalty, len(q_tokens - b_tokens), k, v.get("value"))
+            cand = (-overlap, -full_overlap, penalty, len(q_tokens - b_tokens), k, v.get("value"))
             if best is None or cand < best:
                 best = cand
         if best is not None:
-            return (best[3], best[4])
+            return (best[4], best[5])
     # Pass 4: SUBJECT-anchored family match. When the brief names a REQUIREMENT by a word the DELIVERED
     # quantity doesn't share (irrigation 'demand' ↔ the delivered irrigation 'pump_flow'), bind by the
     # metric's distinctive SUBJECT noun(s) + same family, preferring the fewest extra tokens. Requires
@@ -3782,6 +3795,38 @@ def _selftest() -> int:
     es_score = es.get("score")
     expect(isinstance(es_score, (int, float)) and es_score < 8 and es.get("status") == "FAIL",
            f"G: Exec Summary must FAIL (<8) when its compliance table is mostly UNVERIFIED, got {es_score}")
+
+    # ---- Fixture M: ONE-matcher doctrine — Pass 3 subject-token gating ------------
+    # (2026-07-09, Codema run 2100 Exec=2 root.) The metric ro_makeup_flow_m3_per_hr
+    # tokenises {ro, makeup, flow}: with need computed over ALL tokens (2), the honest
+    # delivered matches (ro_high_pressure_pump_throughput / ro_permeate_capacity, each
+    # sharing only {ro}) were unreachable → false UNVERIFIED that the RENDERER
+    # (build-excel-export._match_quantity, subject-gated since ffe42c887) disagreed
+    # with — two matchers, two verdicts. Pass 3 now computes need+overlap over SUBJECT
+    # tokens (minus _MEASURE_SCOPE_TOKENS), mirroring the renderer.
+    mk_ro = {"orchestratorContract": {"quantities": {
+        "ro_high_pressure_pump_throughput_m3_h": {"value": 11, "unit": "m³/h"},
+        "ro_permeate_capacity_m3_h": {"value": 11, "unit": "m³/h"},
+        "ro_permeate_production_m3_per_hr": {"value": 8, "unit": "m3/h"},
+        "irrigation_pump_flow_m3_h": {"value": 225, "unit": "m3/h"},
+    }}}
+    mk_k, mk_v = _contract_match(mk_ro, "ro_makeup_flow_m3_per_hr", "m3/hr", 11)
+    expect(mk_k is not None and mk_v == 11 and str(mk_k).startswith("ro_"),
+           f"M: ro_makeup_flow must match a delivered RO flow at 11 (got {mk_k}={mk_v})")
+    # proveNoFalsePositive 1: a measure word alone must never decide a match — the
+    # wrong-subsystem cloth filter shares only 'throughput' with the GAC/softener metric.
+    mk_wrong = {"orchestratorContract": {"quantities": {
+        "cloth_filter_throughput_m3_h": {"value": 80, "unit": "m3/h"},
+    }}}
+    expect(_contract_match(mk_wrong, "gac_softener_throughput_m3_per_hr", "m3/hr", 14.5) == (None, None),
+           "M: generic-measure-only overlap must stay unmatched (no wrong-subsystem PASS)")
+    # proveNoFalsePositive 2: a requirement-echo is still excluded — matching the demand
+    # would manufacture a false PASS over an undersized delivery.
+    mk_echo = {"orchestratorContract": {"quantities": {
+        "irrigation_demand_m3_h": {"value": 90, "unit": "m3/h"},
+    }}}
+    expect(_contract_match(mk_echo, "max_irrigation_flow_m3_per_hr", "m3/hr", 45) == (None, None),
+           "M: requirement-echo quantities must stay excluded from Pass 3")
 
     # ---- Fixture K: the 4 formerly-UNSCORED tab checks PROVE they catch ----------
     # part_names (placeholder name), line_velocity (out-of-spec run), panel_schedule
