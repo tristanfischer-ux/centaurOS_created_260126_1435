@@ -197,7 +197,23 @@ _FABRICATED_BASIS_RX = re.compile(
     r"\d+(?:\.\d+)?\s*kW\s*[×x]\s*£|\d+(?:\.\d+)?\s*kVA\s*[×x]\s*£|"
     # A DB-median / rejected-MPN duty price is the SAME fabricated parametric family —
     # the catalogue candidate was tried and discarded; the line is priced from duty.
-    r"real\s+DB\s+median|named\s+part\s+['\"].*?['\"]\s+rejected",
+    r"real\s+DB\s+median|named\s+part\s+['\"].*?['\"]\s+rejected|"
+    # Flow-parametric cloth/paperbelt/drum filters + distribution headers — priced from
+    # throughput, not a catalogue MPN (Codema ship V-104 Nursery Cloth Filter).
+    r"(?:cloth|paperbelt|drum|sand|media)\s+filter\s+parametric|"
+    r"distribution-manifold\s+parametric|"
+    r"\d+(?:\.\d+)?\s*m[³3]/h\s*[×x]\s*£",
+    re.I)
+# INTENT: electrical control / MCC / distribution panels are SCOPE-DOCUMENTED assemblies
+# (built-to-schedule from the panel schedule), not catalogue-research residuals. Without
+# this, X-106 "Electrical Control Panel" stayed bare NOT FOUND while the GA drew it
+# (Codema ship 2026-07-09). Noun-keyed — never a class slug.
+_CONTROL_PANEL_NAME_RE = re.compile(
+    r"\b(?:electrical\s+)?control\s+panel\b|\bmotor\s+control\s+(?:cent(?:re|er)|cabinet)\b|"
+    r"\bmcc\b|\bmdb\b|\bswitchboard\b|\bdistribution\s+board\b|\bpanel\s+board\b",
+    re.I)
+_CLOTH_FILTER_NAME_RE = re.compile(
+    r"\b(?:cloth|paper[- ]?belt|drum|sand|media)\s+filter\b|\bfilter\s+(?:cloth|media)\b",
     re.I)
 
 # ── ONE-TRUTH NAME FAMILIES (Tristan 2026-07-04, round-4 dissection, fix 2) ────────────
@@ -337,6 +353,13 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
     if _MEMBRANE_MEDIA_RE.search(n):
         return "ARCHITECTURALLY-EXCLUDED"
     if _FABRICATED_BASIS_RX.search(b):
+        return "FABRICATED"
+    # Name-family honest statuses (Codema ship 2026-07-09): a control panel / MCC is a
+    # scope-documented assembly; a cloth/media filter with no catalogue pin is fabricated
+    # from its flow duty — neither is a true residual NOT FOUND.
+    if _CONTROL_PANEL_NAME_RE.search(n):
+        return "SCOPE-DOCUMENTED"
+    if _CLOTH_FILTER_NAME_RE.search(n):
         return "FABRICATED"
     pv = _pv_for_name(n, pv_by_norm)
     if pv:
@@ -1838,6 +1861,25 @@ def _selftest() -> int:
     if _fab_hit != "FABRICATED":
         print(f"  FAIL not-found-substatus: a fabricated manifold must classify FABRICATED "
               f"(got {_fab_hit!r}) — a fabricated manifold must never count not-found")
+        bad += 1
+    # proveCatch: Electrical Control Panel / Cloth Filter must never stay bare NOT FOUND
+    # (Codema ship X-106 / V-104 — both drawn on GA, residual Part-names FAIL).
+    _panel = _not_found_substatus("Electrical Control Panel", "bottom-up parametric")
+    if _panel != "SCOPE-DOCUMENTED":
+        print(f"  FAIL not-found-substatus: an electrical control panel must classify "
+              f"SCOPE-DOCUMENTED (got {_panel!r})")
+        bad += 1
+    _cloth = _not_found_substatus(
+        "Nursery Cloth Filter",
+        "cloth filter parametric: 45 m³/h × £40/(m³·h) + £2k frame")
+    if _cloth != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a cloth-filter parametric must classify "
+              f"FABRICATED (got {_cloth!r})")
+        bad += 1
+    _cloth_name = _not_found_substatus("Nursery Cloth Filter", "bottom-up parametric")
+    if _cloth_name != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a cloth filter by NAME must classify "
+              f"FABRICATED even without a parametric basis (got {_cloth_name!r})")
         bad += 1
     _pump_hit = _not_found_substatus("Ro High Pressure Pump", "bottom-up parametric")
     if _pump_hit != "NOT FOUND":

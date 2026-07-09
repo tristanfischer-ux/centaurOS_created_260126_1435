@@ -589,8 +589,21 @@ function formatCapacityM3(v: number): string {
 // `Math.round` (2.5 → 3, 54.6 → 55) — the audit caught the emitted blower rating (3 kW) diverging
 // from the contract quantity (2.5 kW). Keep 1 dp below 100 kW (where the rounding granularity
 // bites), integer at/above; strip a trailing `.0` so a whole number stays clean. Universal.
+//
+// GOTCHA (Codema ship 2026-07-09): 1-dp rounding collapses metering/dosing pumps
+// (≈0.04 kW) to the literal string "0" → BoM/EA rows read "Acid Dosing Pump · 0 kW"
+// and shaft power joins as 0. Below 1 kW keep 2 dp so a real trim duty never prints as zero.
 function formatRatingKw(kw: number): string {
-  return kw < 100 ? String(Math.round(kw * 10) / 10) : String(Math.round(kw))
+  if (!(kw > 0)) return '0'
+  if (kw < 1) {
+    const s = (Math.round(kw * 100) / 100).toFixed(2)
+    return s.replace(/\.?0+$/, '') || '0'
+  }
+  if (kw < 100) {
+    const v = Math.round(kw * 10) / 10
+    return Number.isInteger(v) ? String(v) : String(v)
+  }
+  return String(Math.round(kw))
 }
 function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   const add: ModifierCharacter[] = []
@@ -931,14 +944,28 @@ function nextMotorFrameKw(kw: number): number {
   for (const f of IEC_MOTOR_FRAMES_KW) if (f >= kw - 1e-9) return f
   return Math.ceil(kw)
 }
-const motorKw = (p: ParentPhysics) =>
-  (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned)
-    ? p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
-    : nextMotorFrameKw(
-      (p.motorKwOverride && p.motorKwOverride > 0)
-        ? p.motorKwOverride
-        : Math.max(1.5, (p.kw / 0.88) || (p.m3h ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 30 / 0.88)),
-    )
+// INTENT: metering/trim dosing pumps (acid/chemical, ~0.04 m³/h) must NOT inherit the
+// 1.5 kW bulk-pump floor — that stamped every small injector as a 1.5 kW process motor.
+// Below METERING_FLOW_M3H_MAX use the hydraulic duty (or a 0.04 kW catalogue floor for
+// diaphragm metering), never the bulk IEC ladder. Universal — keyed on flow magnitude.
+const METERING_FLOW_M3H_MAX = 0.5
+const METERING_POWER_KW_FLOOR = 0.04
+const motorKw = (p: ParentPhysics) => {
+  if (p.motorKwOverride && p.motorKwOverride > 0 && p.motorKwPinned) {
+    return p.motorKwOverride // brief-pinned NAMEPLATE — honoured exactly, never re-margined
+  }
+  if (p.motorKwOverride && p.motorKwOverride > 0) {
+    return nextMotorFrameKw(p.motorKwOverride)
+  }
+  const fromShaft = p.kw > 0 ? p.kw / 0.88 : 0
+  const fromFlow = p.m3h > 0 ? (p.m3h * FLOW_PUMP_DEFAULT_BAR) / (36 * FLOW_PUMP_EFF) : 0
+  const hydraulic = fromShaft || fromFlow
+  if (p.m3h > 0 && p.m3h < METERING_FLOW_M3H_MAX) {
+    // Trim/metering: keep the real small duty (floor at catalogue diaphragm ~40 W).
+    return Math.max(METERING_POWER_KW_FLOOR, hydraulic || METERING_POWER_KW_FLOOR)
+  }
+  return nextMotorFrameKw(Math.max(1.5, hydraulic || 30 / 0.88))
+}
 
 // Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
 // quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The
@@ -2362,7 +2389,13 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
   const d = spec.derive(physics)
   const mods: ModifierCharacter[] = [mod('quantity', `×${qty}`)]
   if (d.size) mods.push(mod('dimension', d.size))
-  if (d.rating) mods.push(mod('rating_primary', String(R2(d.rating.v)), d.rating.u))
+  if (d.rating) {
+    // GOTCHA: R2 (= Math.round) collapses metering motors (0.04 kW) to "0" — use
+    // formatRatingKw for kW so trim duties stay honest (Codema ship 2026-07-09).
+    const u = String(d.rating.u || '')
+    const vStr = /kw/i.test(u) ? formatRatingKw(d.rating.v) : String(R2(d.rating.v))
+    mods.push(mod('rating_primary', vStr, d.rating.u))
+  }
   mods.push(mod('price_estimate_gbp', String(Math.max(1, R2(d.gbp)))))   // BOTTOM-UP physics price
   mods.push(mod('form', `${spec.name} (assembly component)`))
   mods.push(mod('part_number', 'TBD (detailed design)'))
@@ -2445,12 +2478,18 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
           const parentRp = wordPowerKw(w)
           // Mirror reconcileDriveTrainRatings: pin exact; else IEC-frame, but never a
           // full-frame jump above the machine nameplate (4.5→5.5 nursery fertigation).
+          // GOTCHA: metering/trim motors (<1 kW, e.g. acid dosing 0.04 kW) must NEVER
+          // IEC-frame to 0.75/1.1 — that re-inflates the trim duty the contract minted
+          // (Codema ship Acid Dosing Pump · 0 kW / Drive Motor 1 kW, 2026-07-09).
           const IEC_NAMEPLATE_BUMP_TOL = 1.12
-          let drive = pinned ? cmk.kw : nextMotorFrameKw(cmk.kw)
-          if (!pinned && parentRp > 0 && drive / parentRp > IEC_NAMEPLATE_BUMP_TOL + 1e-9) {
+          const isMeteringMotor = cmk.kw < 1
+          let drive = (pinned || isMeteringMotor) ? cmk.kw : nextMotorFrameKw(cmk.kw)
+          if (!pinned && !isMeteringMotor && parentRp > 0
+              && drive / parentRp > IEC_NAMEPLATE_BUMP_TOL + 1e-9) {
             drive = parentRp
           }
-          if (parentRp > 0 && drive / parentRp > RATING_PAIR_SERVICE_TOL + 1e-9) {
+          if (!isMeteringMotor && parentRp > 0
+              && drive / parentRp > RATING_PAIR_SERVICE_TOL + 1e-9) {
             let capped = parentRp
             for (const f of IEC_MOTOR_FRAMES_KW) {
               if (f + 1e-9 >= parentRp && f / parentRp <= RATING_PAIR_SERVICE_TOL + 1e-9) capped = f

@@ -270,8 +270,24 @@ function run() {
   reconcilePumpMotorAgainstStatedPressure(q7, undefined, [{ key_metric: 'reactor_pressure_bar', value: 25, unit: 'bar' }])
   if (q7.recirc_pump_motor_kw !== 4) throw new Error(`pump-motor: a distinctive 'reactor_pressure_bar' must never act as a global pump pressure (got ${q7.recirc_pump_motor_kw})`)
 
+  // proveCatch: metering/trim acid dosing (0.04 kW) must NEVER IEC-frame to 0.75/1 kW
+  // (Codema ship Acid Dosing Pump · 0 kW / Drive Motor 1 kW, 2026-07-09).
+  const acidMods: any = [{
+    module: 'm', sub_modules: [{
+      sub_module: 's', words: [mkPump('Acid Dosing Pump', '0.04')],
+    }],
+  }]
+  explodeEquipmentSubAssemblies(acidMods, {
+    acid_dosing_pump_power_kw: 0.04,
+    acid_dosing_pump_throughput_m3_h: 0.04,
+  })
+  const acidMotor = motorOf(acidMods, 'acid_dosing_pump')
+  if (Math.abs(acidMotor - 0.04) > 1e-9) {
+    throw new Error(`pump-motor: acid metering motor must stay 0.04 kW (never IEC-frame to 0.75/1); got ${acidMotor}`)
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent; brief-pressure cross-check: 90m³/h@2.9bar lifts 9.653→15kW, dosing pump + pinned nameplate + already-adequate family + no-pressure-metric archetype all untouched, idempotent)`)
+  console.log(`pump-motor --selftest OK (irrigation=${irr}kW binds contract; drain=${drn}kW per-pump; hand=${hand}kW heuristic fallback, no decoy leak; drive-train reconcile: pinned 7.5/4.2 honoured exactly, tool 1.923→2.2 single-rounded, all v56d pairs within 1.25×, genuine 20-vs-7.5 conflict still fires, idempotent; brief-pressure cross-check: 90m³/h@2.9bar lifts 9.653→15kW, dosing pump + pinned nameplate + already-adequate family + no-pressure-metric archetype all untouched, idempotent; acid metering 0.04 kW preserved)`)
 }
 
 run()

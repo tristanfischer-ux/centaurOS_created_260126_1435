@@ -1245,6 +1245,16 @@ def _range_from_form(form: str, measured: str) -> str:
         return "0–14 pH"
     if "redox" in ml or "orp" in ml:
         return "−1500 to +1500 mV"
+    # INTENT: pump-skid / filter-skid pressure gauges synthesised as sub-assembly
+    # fittings carry no rating_primary (only a £160 lump). A bare '—' on every PT
+    # row floored Process schedules (Codema ship 2026-07-09). A standard industrial
+    # bourdon / DP gauge span is a physical catalogue class, not a design guess —
+    # same discipline as the pH/ORP defaults above. Prefer an explicit range from
+    # form/rating_primary when present (the regexes above already caught it).
+    if "pressure" in ml or re.search(r"\b(?:gauge|transmitter|pt|dp)\b", f, re.I):
+        if re.search(r"differential|dp\b|coplanar", f, re.I):
+            return "0–2.5 bar (DP)"
+        return "0–10 bar"
     return "—"
 
 

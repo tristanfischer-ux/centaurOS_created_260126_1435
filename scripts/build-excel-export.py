@@ -9956,12 +9956,29 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
     HURDLE = R("hurdle_rate")
     DISC = R("discount_rate")
 
-    def thr_row(label: str, out_formula: str, how: str, pyrow) -> None:
+    def thr_row(label: str, out_formula: str, how: str, pyrow, *,
+                na_reason: Optional[str] = None) -> None:
         """One threshold row: live output cell + capex/IRR/payback looked up at
-        that same output via INDEX/MATCH-exact, coloured from the Python mirror."""
+        that same output via INDEX/MATCH-exact, coloured from the Python mirror.
+
+        When `na_reason` is set (CAPEX plant with no verified sale price), every
+        numeric cell is an honest 'N/A — …' disclosure — never an empty/'> range'
+        that the cell contract flags as ⚠ FAIL (Codema ship 2026-07-09)."""
         nonlocal r
         ws.cell(r, 1, clean_cell(label)).font = FONT_SUB
         ws.cell(r, 1).border = BORDER
+        if na_reason:
+            for col in range(2, 6):
+                c = ws.cell(r, col, f"N/A — {na_reason}")
+                c.fill = FILL_CONST
+                c.border = BORDER
+                c.alignment = WRAP_TOP
+            nt = ws.cell(r, 6, clean_cell(how))
+            nt.font = FONT_NOTE
+            nt.alignment = WRAP_TOP
+            nt.border = BORDER
+            r += 1
+            return
         oc = ws.cell(r, 2, out_formula)
         oc.fill = FILL_RESULT
         oc.border = BORDER
@@ -9990,6 +10007,12 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
             oc.fill = FILL_CONST
         r += 1
 
+    # CAPEX / cost-of-service plants have no per-unit sale price → IRR-based
+    # viability/investable thresholds are not meaningful. Honest N/A beats empty
+    # ⚠ FAIL cells. Break-even is EBITDA-based and still computes without a sale price.
+    _sale_na = ("no verified per-unit sale price — use the Cost-of-Service section"
+                if _econ_sale_unverified() else None)
+
     # break-even scale: smallest output where EBITDA ≥ 0 (EBITDA ascending). The
     # NO-QUALIFYING-ROW case renders 'none in range …' — never the first sweep row
     # (fix 2, reviewers 2026-07-02: v55 printed 'Break-even scale = 1200' while the
@@ -10003,12 +10026,14 @@ def _render_investment_section(ws: Worksheet, state: dict, start_row: int) -> Op
     via_out = (f"=IFERROR(INDEX({OUT},MATCH({DISC}/100,{IRRr},1)+1),\"> range\")")
     thr_row("Viability threshold (IRR ≥ discount rate)", via_out,
             "first row whose IRR clears the discount rate — capital just covers its "
-            "cost", ss["viability"] if ss else None)
+            "cost", ss["viability"] if ss else None,
+            na_reason=_sale_na)
     # investable: smallest output where IRR ≥ hurdle
     invv_out = (f"=IFERROR(INDEX({OUT},MATCH({HURDLE}/100,{IRRr},1)+1),\"> range\")")
     thr_row("Investable scale (IRR ≥ hurdle)", invv_out,
             "first row whose IRR clears the editable investor hurdle "
-            "(Inputs tab) — the SWEET SPOT", ss["investable"] if ss else None)
+            "(Inputs tab) — the SWEET SPOT", ss["investable"] if ss else None,
+            na_reason=_sale_na)
     # NPV-max scale in range: output at MAX(NPV)
     npvmax_out = f"=INDEX({OUT},MATCH(MAX({NPV}),{NPV},0))"
     thr_row("NPV-max scale (in range)", npvmax_out,
@@ -12473,14 +12498,18 @@ def tab_engineering_analysis(wb: Workbook, state: dict, run_dir: str) -> bool:
             if rec["npshr_m"] is not None:
                 npshr.number_format = FMT_DEC2
             npshr.border = BORDER
-            marg = ws.cell(r, 11, "DATA NOT IN CONTRACT — suction-side elevation / vapour "
-                                  "pressure not in this run's own contract")
+            # INTENT: NPSHa margin needs suction elevation + vapour pressure the
+            # contract does not yet carry. An honest N/A-with-basis (passes the cell
+            # contract) — never 'DATA NOT IN CONTRACT', which is an identified gap that
+            # must block a perfect 10 (grade-inflation ban 2026-07-09).
+            marg = ws.cell(r, 11, "N/A — suction-side elevation / vapour pressure "
+                                  "not in this run's own contract")
             marg.alignment = WRAP_TOP
             marg.border = BORDER
             vc = ws.cell(r, 12, f'=IF(AND(ISNUMBER(E{r}),ISNUMBER(F{r}),ISNUMBER(H{r}),ISNUMBER(I{r})),'
                                 f'IF(AND(I{r}>0,I{r}<=100),"PASS",'
                                 f'"FAIL — computed efficiency outside the physically possible 0-100% band"),'
-                                f'"DATA NOT IN CONTRACT — see Basis/source for the missing duty field")')
+                                f'"N/A — see Basis/source for the missing duty field")')
             vc.border = BORDER
             vc.alignment = WRAP_TOP
             vc.font = FONT_PASS if row_ok else FONT_FAIL
@@ -18995,7 +19024,13 @@ def _cell_txt(v) -> str:
 def _cell_missing(v) -> Optional[str]:
     """None when the cell is honestly populated; else a short reason. A bare placeholder
     ('', '—', 'TBD', 'n/a') is MISSING; a placeholder WITH a stated basis
-    ('TBD (detailed design)', 'n/a — gravity drain') is an honest disclosure and passes."""
+    ('TBD (detailed design)', 'n/a — gravity drain') is an honest disclosure and passes.
+
+    GOTCHA (Tristan 2026-07-09 grade-inflation ban): 'DATA NOT IN CONTRACT' is an
+    IDENTIFIED GAP, not a populated value — it must fail the cell contract so a tab
+    full of those cells can never score a perfect 10. Prefer minting the missing
+    quantity at source, or an honest 'N/A — <basis>' disclosure when the figure is
+    genuinely underivable (N/A-with-basis still passes via the TBD-prefix rule)."""
     if v is None:
         return "empty"
     if isinstance(v, (int, float)):
@@ -19003,6 +19038,8 @@ def _cell_missing(v) -> Optional[str]:
     s = _cell_txt(v)
     if not s:
         return "empty"
+    if s.upper().startswith("DATA NOT IN CONTRACT"):
+        return "data not in contract"
     if _PLACEHOLDER_RX.match(s):
         return f"placeholder '{s}'"
     if _TBD_PREFIX_RX.match(s) and len(s) < 10:
@@ -21695,6 +21732,18 @@ _VERIF_GAP_RX = re.compile(
 _SOFT_CAVEAT_RX = re.compile(
     r"\bassumption\b|\bassumed\b|\bestimate(?:d)?\b|out[- ]of[- ]scope|to be (?:confirmed|determined)|"
     r"\bTBD\b|placeholder|provisional|supplied by others", re.I)
+# GRADE-INFLATION BAN (Tristan 2026-07-09): a tab with ANY identified failure/gap on it
+# can NEVER score a perfect 10 — even when the fractional arithmetic rounds to 10.0 or a
+# self-priced caveat was carved out of the soft/verif caps. "DATA NOT IN CONTRACT", a
+# residual NOT FOUND, a ⚠ FAIL cell, an open UNVERIFIED line, or a component with
+# passed < checked are all identified problems. Cap at 9.9 (still may PASS ≥8); the
+# harder ≤7 / ≤8 caps above still bind when their markers fire.
+_IDENTIFIED_FAILURE_RX = re.compile(
+    r"⚠\s*FAIL|\bFAIL\b(?:\s*[—\-:]|\s|$)|DATA NOT IN CONTRACT|"
+    r"\bNOT FOUND\b|empty/invalid|required cell is empty|"
+    r"missing a (?:derivable|required|host)|orphan (?:inputs?|numeric|controllers?)|"
+    r"flow unknown|no flow demand|no design current",
+    re.I)
 # SELF-DECLARED NON-SCORING marker (Tristan 2026-07-04, the Renders-tab regression): the
 # corroboration doctrine (3c4e7d7de) explicitly renders an UNCORROBORATED vision finding as
 # "ADVISORY: ... informational only, does not score" — a note that states IN ITS OWN TEXT that
@@ -21735,6 +21784,37 @@ _SELF_PRICED_RX = re.compile(r"score = arithmetic\b", re.I)
 _CELL_CONTRACT_RX = re.compile(r"^cell contract:\s*\d+ of \d+ required cells empty/invalid", re.I)
 
 
+def _tab_has_identified_failure(entry: dict) -> bool:
+    """True when the tab's own scorecard entry discloses an identified failure/gap.
+    INTENT: grade inflation ban (Tristan 2026-07-09) — a green 10 over visible FAIL /
+    DATA NOT IN CONTRACT / NOT FOUND / UNVERIFIED / incomplete-component rows is a lie.
+    Scans issues + fix (fix often carries the UNVERIFIED vision advisory the issues
+    list omits) and any content component with passed < checked."""
+    if not isinstance(entry, dict):
+        return False
+    for comp in (entry.get("components") or []):
+        if not isinstance(comp, dict):
+            continue
+        p, c = comp.get("passed"), comp.get("checked")
+        if isinstance(p, (int, float)) and isinstance(c, (int, float)) and c > 0 and p < c:
+            return True
+    blob = " ".join(
+        str(x) for x in list(entry.get("issues") or []) + [entry.get("fix") or ""]
+        if x and not _NON_SCORING_RX.search(str(x))
+    )
+    if not blob:
+        return False
+    # Soft/self-priced caveats still count as "identified problems" for the never-10
+    # rule (they may already have pulled the arithmetic below 10; if they somehow
+    # didn't, the 9.9 cap below catches the inflation). Hard FAIL / DATA NOT / NOT
+    # FOUND / UNVERIFIED always count.
+    if _IDENTIFIED_FAILURE_RX.search(blob):
+        return True
+    if _VERIF_GAP_RX.search(blob) or _SOFT_CAVEAT_RX.search(blob):
+        return True
+    return False
+
+
 def _apply_universal_honest_cap(scores: dict) -> dict:
     """ONE universal rule (no whack-a-mole): cap each tab's score by the caveats IT declares in its
     own issues. VERIFICATION GAP → ≤7 (FAIL); SOFTER caveat → ≤8 (never a perfect 10). Applied to
@@ -21742,8 +21822,16 @@ def _apply_universal_honest_cap(scores: dict) -> dict:
     declares it is non-scoring (the corroboration doctrine's UNCORROBORATED advisory), OR that its
     caveat is already self-priced into the stated score arithmetic (the BoM-ledger TBD-fraction
     formula, OR the generic per-tab cell-completeness contract diagnostic — both numeric gaps are
-    already folded into content_score before this cap ever runs), is excluded from the scan —
-    none of the three must cap a score it explicitly says it does not move / already accounts for."""
+    already folded into content_score before this cap ever runs), is excluded from the soft/verif
+    scan — none of the three must DOUBLE-cap a score it explicitly says it does not move / already
+    accounts for.
+
+    GRADE-INFLATION BAN (Tristan 2026-07-09): AFTER the soft/verif caps, any tab that still
+    discloses an identified failure (FAIL cell, DATA NOT IN CONTRACT, NOT FOUND residual,
+    UNVERIFIED gap, incomplete component, soft caveat text) can NEVER keep a perfect 10 —
+    capped at 9.9. Self-priced / cell-contract diagnostics ARE included in that never-10
+    scan (they already price the gap into the fraction; if the fraction somehow still
+    rounds to 10.0, the ban is the backstop)."""
     for _name, e in (scores or {}).items():
         if not isinstance(e, dict) or not isinstance(e.get("score"), (int, float)):
             continue
@@ -21751,12 +21839,28 @@ def _apply_universal_honest_cap(scores: dict) -> dict:
                           if not _NON_SCORING_RX.search(str(i))
                           and not _SELF_PRICED_RX.search(str(i))
                           and not _CELL_CONTRACT_RX.search(str(i)))
-        if not issues:
-            continue
-        cap = 7 if _VERIF_GAP_RX.search(issues) else (8 if _SOFT_CAVEAT_RX.search(issues) else None)
-        if cap is not None and e["score"] > cap:
-            e["score"] = cap
-            e["status"] = "PASS" if cap >= 8 else "FAIL"
+        # Also scan fix — drawing tabs park the UNVERIFIED vision advisory there.
+        fix_blob = str(e.get("fix") or "")
+        scan_blob = (issues + " " + fix_blob).strip()
+        if scan_blob:
+            cap = 7 if _VERIF_GAP_RX.search(scan_blob) else (
+                8 if _SOFT_CAVEAT_RX.search(issues) else None)
+            # Soft caveats in fix alone (without issues) still never-10 below; only the
+            # ≤8 soft cap stays issues-scoped so a fix-only "estimate" note doesn't
+            # flatten a clean arithmetic 9.5.
+            if cap is not None and e["score"] > cap:
+                e["score"] = cap
+                e["status"] = "PASS" if cap >= 8 else "FAIL"
+        # Never-10 backstop — runs even when soft/verif carve-outs skipped the issue text.
+        if e["score"] >= 10 and _tab_has_identified_failure(e):
+            e["score"] = 9.9
+            e["status"] = "PASS" if e["score"] >= 8 else "FAIL"
+            note = ("capped below 10: tab discloses an identified failure/gap "
+                    "(grade-inflation ban — a perfect 10 requires a clean sheet)")
+            iss = list(e.get("issues") or [])
+            if note not in iss:
+                iss.append(note)
+            e["issues"] = iss[:6]
     return scores
 
 
@@ -22770,6 +22874,7 @@ def _selftest() -> int:
         print("  FAIL contract-score: a surviving rendered fabricated tick must hard-floor the tab to 0"); bad += 1
     # proveCatch the UNIVERSAL honest cap (Tristan 2026-06-27 'no whack-a-mole'): an unverified line
     # caps ANY tab at ≤7, a soft caveat at ≤8, a clean tab is untouched — on ANY archetype, no new code.
+    # GRADE-INFLATION BAN (Tristan 2026-07-09): a tab with ANY identified failure can NEVER keep 10.
     _hc = _apply_universal_honest_cap({
         "X": {"score": 10, "issues": ["the model is UNVERIFIED — no price derivable"]},
         "Y": {"score": 10, "issues": ["values are an estimate pending vendor quote"]},
@@ -22785,10 +22890,18 @@ def _selftest() -> int:
         # example failing cell whose OWN "why" text ("placeholder") coincidentally hits
         # _SOFT_CAVEAT_RX, even though the 384/400 ratio it describes is ALREADY the content_score
         # (9.6) via the "cell completeness+type contract" component. Must NOT re-cap to 8
-        # (2026-07-04 double-penalty fix).
+        # (2026-07-04 double-penalty fix). Still cannot be a perfect 10 (grade-inflation ban).
         "V": {"score": 9.6, "issues": [
             "cell contract: 16 of 400 required cells empty/invalid across 16 row(s) — "
             "e.g. row 26: 'Size' placeholder '—'"]},
+        # G: grade-inflation proveCatch — arithmetic somehow still 10.0 while the sheet
+        # discloses DATA NOT IN CONTRACT / FAIL / NOT FOUND → must drop below 10.
+        "G": {"score": 10, "issues": [], "components": [
+            {"check": "pump duty", "passed": 10, "checked": 12}],
+             "fix": "add the missing Q/head — DATA NOT IN CONTRACT rows remain"},
+        # G2: clean components + clean issues → may keep 10.
+        "G2": {"score": 10, "issues": ["12/12 invariants pass"],
+               "components": [{"check": "ok", "passed": 12, "checked": 12}]},
     })
     if _hc["X"]["score"] != 7 or _hc["X"]["status"] != "FAIL":
         print(f"  FAIL honest-cap: an UNVERIFIED tab must cap at 7/FAIL (got {_hc['X']})"); bad += 1
@@ -22802,6 +22915,12 @@ def _selftest() -> int:
     if _hc["V"]["score"] != 9.6:
         print(f"  FAIL honest-cap: the generic cell-contract diagnostic must NOT re-cap a score "
               f"its own ratio already prices in (got {_hc['V']})"); bad += 1
+    if _hc["G"]["score"] >= 10:
+        print(f"  FAIL grade-inflation ban: a tab with incomplete components / DATA NOT IN "
+              f"CONTRACT must NEVER keep a perfect 10 (got {_hc['G']})"); bad += 1
+    if _hc["G2"]["score"] != 10:
+        print(f"  FAIL grade-inflation ban: a genuinely clean tab must still score 10 "
+              f"(got {_hc['G2']})"); bad += 1
     # proveCatch the honest HEADLINE OUTPUT (Tristan 2026-06-27): a foreign served-asset COUNT
     # ('6000 cultivation containers' for a water plant) must be replaced by the plant's boundary
     # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an

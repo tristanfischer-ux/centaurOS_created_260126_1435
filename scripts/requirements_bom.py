@@ -153,6 +153,19 @@ def _set_plant_corrosivity(state):
         # still carry the right MoC — WRAS-appropriate polymer / stainless contact materials.
         _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
             False, "PVC-U / 304 stainless (WRAS)", "potable-water service (WRAS-approved wetted materials)")
+    elif re.search(
+        r"fertigat|nutrient|irrigation|hydropon|\bro\b|reverse\s*osmosis|"
+        r"process\s*water|recirculat|drain\s*water|cultivat",
+        blob,
+    ):
+        # INTENT: fertigation / irrigation / RO process-water plants are not seawater
+        # and not "potable" by name, but every wetted fabricated header/manifold/tank
+        # still needs a MoC. Without this branch `_wetted_moc` returned "" and the
+        # BoM ledger FAILed fabricated Distribution Manifold rows for missing material
+        # (Codema ship 2026-07-09). Noun-keyed on the FLUID context, never a class slug.
+        _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (
+            False, "PVC-U / 304 stainless (WRAS)",
+            "process/irrigation water service (WRAS-appropriate wetted materials)")
     else:
         _PLANT_CORROSIVE, _PLANT_MOC, _PLANT_CORROSION = (False, "", "")
 
@@ -2693,6 +2706,10 @@ def _selftest() -> int:
          False, "", ""),
         ({"brief": "An effluent plant with sodium hypochlorite dosing."},
          True, "316L stainless / PVC-U (chemical)", "PVC-U"),
+        # proveCatch: fertigation / irrigation process-water must stamp a plant MoC
+        # so fabricated Distribution Manifold rows carry material (Codema ship 2026-07-09).
+        (dict(_poison, brief="A fertigation and irrigation water plant with RO make-up."),
+         False, "PVC-U / 304 stainless (WRAS)", "PVC-U"),
     ]
     for _st, _want_corr, _want_pump, _want_pipe in _moc_cases:
         _set_plant_corrosivity(_st)
