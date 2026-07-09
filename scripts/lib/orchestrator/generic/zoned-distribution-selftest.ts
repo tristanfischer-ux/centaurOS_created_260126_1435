@@ -64,21 +64,21 @@ function run(): void {
   const contract = freshContract(q)
   mintDemandCoverage(q, contract, { modules: [{ sub_modules: [{ words: [] }] }] as never, briefMetrics })
   // segment lengths — the exact standard-layout arithmetic (formulas in the source_detail)
-  expectEq('zone lateral total (200 × 30/2 × 2.76 m)', q.distribution_zone_lateral_length_m, 8280)
+  expectEq('zone lateral total (200 × 0.6 m)', q.distribution_zone_lateral_length_m, 120)
   expectEq('zone lateral DN (45 m³/h ≤ 3.0 m/s flood-fill)', q.distribution_zone_lateral_dn_mm, 75)
   expectEq('riser total (200/5 risers × 7 m)', q.distribution_riser_length_m, 280)
   expectEq('main/riser DN (45 m³/h ≤ 1.3 m/s surge-limited)', q.distribution_riser_dn_mm, 125)
   expectEq('mains total (2 × (10 × 7.7 m branch pitch + 30 m stand-off))', q.distribution_main_length_m, 214)
-  expectEq('drain riser total (6000/(2×5) drops × 7 m)', q.distribution_drain_riser_length_m, 4200)
+  expectEq('drain riser total (100 drops × 7 m)', q.distribution_drain_riser_length_m, 700)
   expectEq('drain DN (gravity ≤ 1.4 m/s)', q.distribution_drain_riser_dn_mm, 110)
-  expectEq('drain collection (2 × 41.4 × 20)', q.distribution_drain_collection_length_m, 1656)
+  expectEq('drain collection (2 × 7.7 × 20)', q.distribution_drain_collection_length_m, 308)
   expectEq('drain main total (spine mirror)', q.distribution_drain_main_length_m, 214)
   expectEq('drain main DN (part-full ≤ 0.8 m/s)', q.distribution_drain_main_dn_mm, 160)
-  expectEq('network total (km roll-up — different unit family from the segments so the provenance divergence net never false-fires)', q.distribution_network_length_km, 14.844)
+  expectEq('network total (km roll-up — different unit family from the segments so the provenance divergence net never false-fires)', q.distribution_network_length_km, 1.836)
   // connections + the per-group manifold principal quantities
   expectEq('zone kits', q.distribution_zone_kits, 200)
-  expectEq('position connections', q.distribution_position_connections, 6000)
-  expectEq('drain outlet connections', q.distribution_drain_outlet_connections, 3000)
+  expectEq('position connections', q.distribution_position_connections, 200)
+  expectEq('drain outlet connections', q.distribution_drain_outlet_connections, 100)
   expectEq('manifold count (delivery groups)', q.distribution_manifold_count, 2)
   expectEq('manifold duty (90 ÷ 2 groups)', q.distribution_manifold_throughput_m3_h, 45)
   // rule 8b — HAND-WATERING RING MAIN from the brief's own signals (Tristan 2026-07-03,
@@ -97,8 +97,8 @@ function run(): void {
   if (!lat || lat.source !== 'demand-coverage' || !/parametric — not routed/.test(String(lat.source_detail))) {
     throw new Error(`zoned-distribution: lateral quantity must carry 'parametric — not routed' demand-coverage provenance (got ${JSON.stringify(lat)})`)
   }
-  if (!/200 zones × \(30 positions\/zone ÷ 2 rows × 2.76 m/.test(String(lat.source_detail))) {
-    throw new Error('zoned-distribution: the lateral source_detail must state its derivation formula')
+  if (!/200 zones × 0.6 m \(multi-tier shared-tray zone-valve stub\)/.test(String(lat.source_detail))) {
+    throw new Error(`zoned-distribution: the lateral source_detail must state its derivation formula (got ${String(lat.source_detail)})`)
   }
 
   // ── 2. IDEMPOTENT + DETERMINISTIC: a second pass over its own mints is a no-op ──
@@ -116,6 +116,23 @@ function run(): void {
   if (bessMints.length !== 0 || JSON.stringify(bess) !== bessSnap) {
     throw new Error(`zoned-distribution: BESS-like quantities must be byte-identical (minted ${JSON.stringify(bessMints)})`)
   }
+
+  // ── 3b. SINGLE-LEVEL TEST: old flood-fill arithmetic runs for levels=1 ──
+  const singleLevel = waterQuantities()
+  singleLevel.distribution_levels_per_branch = 1
+  singleLevel.actuated_distribution_valve_count = 8
+  const singleContract = freshContract(singleLevel)
+  mintDemandCoverage(singleLevel, singleContract, { modules: [{ sub_modules: [{ words: [] }] }] as never, briefMetrics })
+  const scq = (singleContract as unknown as { quantities: Record<string, { source_detail?: string }> }).quantities
+  const sLat = scq.distribution_zone_lateral_length_m
+  if (!sLat || !/8 zones × \(30 positions\/zone ÷ 2 rows × 2.76 m/.test(String(sLat.source_detail))) {
+    throw new Error(`zoned-distribution: single-level lateral must use the flood-fill positions/row formula, got: ${String(sLat?.source_detail)}`)
+  }
+  expectEq(
+    'single-level position connections',
+    (scq.distribution_position_connections as { value?: number } | undefined)?.value as number,
+    6000,
+  )
   // a valve count WITHOUT a zoning qualifier must never trigger (coolant_valve_count above);
   // a zoning valve count WITHOUT a delivered-flow basis must never fabricate a network.
   const noFlow: Record<string, number> = { actuated_zone_valve_count: 200 }
@@ -178,7 +195,7 @@ function run(): void {
   }
 
   // eslint-disable-next-line no-console
-  console.log('zoned-distribution --selftest OK (water-brief signals mint the 14,844 m parametric network — laterals 8,280 m DN75, mains/risers DN125, drain mirror DN110/DN160, 200 zone kits, 6,000 inlets — with formula provenance; rule 8b hand-watering ring 428 m DN90 + the brief-stated 44 risers, conserved vs the spine, no-op without either signal; idempotent; BESS-like map byte-identical; no-flow-basis never fabricates; manifold ×2 synthesised and shielded from 1-stem fuzzy matches)')
+  console.log('zoned-distribution --selftest OK (water-brief signals mint the 1,836 m parametric network — laterals 120 m DN75 multi-tier, mains/risers DN125, drain mirror DN110/DN160, 200 zone kits, 200 inlets — with formula provenance; single-level fallback preserved; rule 8b hand-watering ring 428 m DN90 + the brief-stated 44 risers, conserved vs the spine, no-op without either signal; idempotent; BESS-like map byte-identical; no-flow-basis never fabricates; manifold ×2 synthesised and shielded from 1-stem fuzzy matches)')
 }
 
 run()

@@ -247,7 +247,7 @@ describe('BESS WAVE C item 2 — duplicate coolant circulation pump listing (v4 
     expect(findWords('cooling_pump_word')).toHaveLength(1)
     expect(findWords('coolant_circulation_pump_word')).toHaveLength(0)
     const owningModule = design.modules.find((m: any) => m.sub_modules.some((sm: any) => sm.words.some((w: any) => w.id === 'cooling_pump_word')))
-    expect(owningModule.module).toBe('environmental_interface')
+    expect(owningModule?.module).toBe('environmental_interface')
   })
 
   it('no Grundfos pump part number appears more than once across the whole design (the general dedup invariant)', () => {

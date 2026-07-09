@@ -810,9 +810,12 @@ export function deriveSignalTopology(modules: AnyModule[]): TopologyEdge[] {
   for (const inst of instruments) {
     if (inst === hub) continue
     edges.push({
-      from_part: inst, to_part: hub, mechanism: 'signal',
-      constraint_kind: 'signal', material_context: 'instrument signal cable 4-20mA',
-    } as TopologyEdge)
+      from_part: inst,
+      to_part: hub,
+      mechanism: 'signal',
+      constraint_kind: 'signal',
+      material_context: 'instrument signal cable 4-20mA',
+    })
   }
   return edges
 }

@@ -12322,7 +12322,7 @@ print(json.dumps({"identical": rows_a == rows_b, "n": len(rows_a), "uncorroborat
         deduped.length === 2 &&
         deduped.filter((s) => s.name === 'brief_compliance').length === 1 &&
         deduped.find((s) => s.name === 'brief_compliance')?.score === 10 &&
-        !!deduped.find((s) => s.name === 'brief_compliance')?.defects.some((d) => d.includes('advisory:') && d.includes('5/10')),
+        !!deduped.find((s) => s.name === 'brief_compliance')?.defects?.some((d) => d.includes('advisory:') && d.includes('5/10')),
       detail: JSON.stringify(deduped),
     })
   }

@@ -132,10 +132,11 @@ export function q(
 export type TopologyEdge = {
   from_part: string  // e.g. 'lfp_cell_string', 'pcs_inverter'
   to_part: string
-  mechanism: 'electrical_bus' | 'fluid_loop' | 'thermal' | 'mechanical' | 'data' | 'control'
+  // 'signal' = instrument→control-hub wiring (deriveSignalTopology); distinct from 'data'/'control'.
+  mechanism: 'electrical_bus' | 'fluid_loop' | 'thermal' | 'mechanical' | 'data' | 'control' | 'signal'
   // Constraint that the EDGE must satisfy. e.g. for an electrical_bus:
   //   { current_rating_a >= bus_continuous_a × 1.25 }
-  constraint_kind: 'current_rating' | 'voltage_rating' | 'thermal_rejection' | 'flow_capacity' | 'mass_carry' | 'data_bandwidth' | 'material_compatibility'
+  constraint_kind: 'current_rating' | 'voltage_rating' | 'thermal_rejection' | 'flow_capacity' | 'mass_carry' | 'data_bandwidth' | 'material_compatibility' | 'signal'
   // Threshold values inline so the validator can check without parsing prose.
   required_value?: number
   required_unit?: string
@@ -11982,8 +11983,10 @@ registerArchetype('co2_mineralisation', (brief: any) => {
     hot_air_process_heater_kw: q(hotAirProcessHeaterKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `= dryer_heat_duty_kw = ${hotAirProcessHeaterKw.toFixed(2)} kW — ONE centralised electric hot-air duct heater's own rating (matches the emitted BoM part, "×2 ... ${hotAirProcessHeaterKw.toFixed(0)} kW each"); the Thermal Utilities module fits ×2 of these (both drying stages) — the plant-wide total (${(2 * hotAirProcessHeaterKw).toFixed(1)} kW) is carried in connected_electrical_load_kw, not this per-unit figure` }),
     dryer_air_heater_battery_kw: q(dryerAirHeaterBatteryKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `dryer_heat_duty_kw × 0.9 = ${dryerAirHeaterBatteryKw.toFixed(2)} kW — the CaCO3 dryer's own dedicated inlet air-heater battery (its own MCC feeder, distinct from the centralised hot_air_process_heater_kw pair)` }),
     shrink_tunnel_heater_kw: q(shrinkTunnelHeaterKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `24 kW/(t/d) × ${scale.toFixed(2)} scale = ${shrinkTunnelHeaterKw.toFixed(2)} kW bagging-line shrink-wrap tunnel heater` }),
-    crystalliser_heater_duty_kw: q(crystalliserHeaterDutyKw, 'kW', 'power', 'thermal', 'module', 'calculator', { source_detail: `90 kW/(t/d) × ${scale.toFixed(2)} scale = ${crystalliserHeaterDutyKw.toFixed(2)} kW steam-heated crystalliser circulation-heater THERMAL duty (feeds the electric steam boiler's sizing, not a direct electrical draw of its own)` }),
-    mea_stripper_pot_duty_kw: q(meaStripperPotDutyKw, 'kW', 'power', 'thermal', 'module', 'calculator', { source_detail: `30 kW/(t/d) × ${scale.toFixed(2)} scale = ${meaStripperPotDutyKw.toFixed(2)} kW steam-heated MEA stripper reboil-pot THERMAL duty (feeds the electric steam boiler's sizing)` }),
+    // GOTCHA: QuantityBasis has no 'thermal' — use 'rated' for steam-side thermal duties
+    // (the source_detail already says THERMAL; basis is the rating class, not the energy form).
+    crystalliser_heater_duty_kw: q(crystalliserHeaterDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `90 kW/(t/d) × ${scale.toFixed(2)} scale = ${crystalliserHeaterDutyKw.toFixed(2)} kW steam-heated crystalliser circulation-heater THERMAL duty (feeds the electric steam boiler's sizing, not a direct electrical draw of its own)` }),
+    mea_stripper_pot_duty_kw: q(meaStripperPotDutyKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `30 kW/(t/d) × ${scale.toFixed(2)} scale = ${meaStripperPotDutyKw.toFixed(2)} kW steam-heated MEA stripper reboil-pot THERMAL duty (feeds the electric steam boiler's sizing)` }),
     boiler_steam_capacity_kg_h: q(boilerSteamKgPerHour, 'kg/h', 'flow_rate', 'rated', 'module', 'calculator', { source_detail: `Σ steam consumers (reboiler ${reboilerDutyKw.toFixed(1)} + crystalliser heater ${crystalliserHeaterDutyKw.toFixed(1)} + MEA stripper pot ${meaStripperPotDutyKw.toFixed(1)} = ${steamThermalKw.toFixed(1)} kW) × 3600 / 2150 kJ/kg LP-steam latent heat × 1.15 margin, rounded up to the next 50 kg/h frame = ${boilerSteamKgPerHour.toFixed(0)} kg/h` }),
     electric_steam_generator_kw: q(electricSteamGeneratorKw, 'kW', 'power', 'rated', 'module', 'calculator', { source_detail: `element sized from boiler_steam_capacity_kg_h (${boilerSteamKgPerHour.toFixed(0)} kg/h) at (167 + 2150) kJ/kg sensible+latent ÷ 3600 ÷ 0.98 element efficiency, rounded up to the next 10 kW frame = ${electricSteamGeneratorKw.toFixed(0)} kW — the packaged electric steam boiler's OWN electrical input (distinct from its downstream steam THERMAL output)` }),
 
@@ -14143,9 +14146,11 @@ registerArchetype('water_treatment', (brief: any) => {
     gac_softener_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
     irrigation_pump_motor_kw: q(irrigationPumpKw, 'kW', 'power', 'rated', 'module', 'brief',
       `irrigation / nutrient circulation pump motor ≈ ${irrigationPumpKw} kW (RUNNING load — counted in connected_electrical_load_kw)`),
-    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', {
-      source_detail: `Σ ONE-MINT electrical consumers (${electricalConsumers.map(c => `${c.name} ${c.kw.toFixed(1)}`).join(' + ')}) = ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC out of scope; standby pumps excluded)`,
-    }, ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'irrigation_pump_motor_kw', 'hand_watering_pump_count', 'drain_transfer_pump_count', 'uv_disinfection_power_kw']),
+    connected_electrical_load_kw: q(
+      connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator',
+      `Σ ONE-MINT electrical consumers (${electricalConsumers.map(c => `${c.name} ${c.kw.toFixed(1)}`).join(' + ')}) = ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC out of scope; standby pumps excluded)`,
+      ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'irrigation_pump_motor_kw', 'hand_watering_pump_count', 'drain_transfer_pump_count', 'uv_disinfection_power_kw'],
+    ),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
     // 1 = the building / civils / rack framework are supplied by others → synthesizeBuildingStructure
@@ -14164,8 +14169,10 @@ registerArchetype('water_treatment', (brief: any) => {
 
   return {
     product_class: 'water_treatment',
-    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
+    brief_summary: `Water-handling, purification, fertigation and ebb/flow irrigation plant for an indoor multi-layer cultivation facility. Purification train: 80-micron particle filter → ${treatmentThroughputM3H} m³/h granular-activated-carbon filter → 14 m³/h duplex softener → ${roPermeateM3H} m³/h reverse-osmosis skid at ${roRecoveryPct}% recovery, with ±15% raw-water blending. Storage: 1 fresh-water + 2 drain-water galvanised tanks at ${storageTankVolEachM3} m³${nurseryZoneCount > 0 ? ` + ${nurseryZoneCount}×${nurseryDrainReservoirVolM3} m³ nursery drain reservoir` : ''}. Fertigation: ${departmentCount} A/B nutrient-dosing units at ${dosingFlowM3H} m³/h${nurseryZoneCount > 0 ? ` plus ${nurseryZoneCount} nursery unit at ${nurseryPumpFlowM3H} m³/h` : ''} (${dosingPumpKw} kW circulation pumps, closed-loop EC/pH correction, eight 1,000 L stock tanks). Ebb/flow distribution: ${containerCount} cultivation containers across ${departmentCount} departments${nurseryZoneCount > 0 ? ' + nursery' : ''}, ${valveCount} actuated valves, peak ${irrigationDemandTotalM3H} m³/h, with gravity drain collection, ${drainPitVolM3 * 1000} L drain pits and per-zone cloth-filter drain-water reclaim (${clothFilterM3H} m³/h${nurseryZoneCount > 0 ? ` main, ${nurseryPumpFlowM3H} m³/h nursery` : ''}). Hand-watering ring main at ${handWaterM3H} m³/h. Hoogendoorn-class irrigation/fertigation process control. Connected electrical load ≈ ${connectedLoadKw} kW (pumps + dosing + controls). Grow-lighting, climate/HVAC and the building are OUT of scope (supplied by others).`,
     quantities,
+    // Empty: generic deriveProcessTopology fills orch.topology after reconcile (P&ID/BFD).
+    topology: [],
     macro_assembly_prices: [],   // B-3: let the universal sizer mint the equipment lines (no double-count)
     closures,
     shared_quantities: {

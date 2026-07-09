@@ -471,7 +471,8 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 <CardContent>
                   <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
                     {(['thesis', 'stage', 'geo', 'cheque', 'activity', 'data', 'hardware'] as const).map((key) => {
-                      const value = matchResult.pillars[key]
+                      // Pillars schema is a subset of the display keys (geo/activity/data/hardware may be absent).
+                      const value = (matchResult.pillars as Record<string, number | null | undefined>)[key]
                       const isNA = value == null
                       // Tristan 2026-04-28 (design audit cross-cutting fix #2):
                       // brand-orange ramp instead of green/amber/red. Keeps a

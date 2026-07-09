@@ -2932,7 +2932,7 @@ function extractFixDirectives(state: any, scorecard: QualityScorecard): FixDirec
       directives.push({
         section: canonical,
         score: s.score,
-        defects: s.defects,
+        defects: s.defects ?? [],
         fixStage: SECTION_TO_STAGE[canonical] || 'reviewer',
       })
     }
@@ -4433,7 +4433,8 @@ async function main() {
         const trs = Array.from(orchResult.tool_results.entries())
         const attempted = trs.length
         const pyDead = trs.filter(([, r]) => !r.ok && /Python exit (null|-?\d+)/.test(String(r.error ?? ''))).length
-        const workedTotal = (orchResult.tools_used_page?.tools ?? [])
+        const toolsUsedPage = (orchResult as { tools_used_page?: { tools?: Array<{ worked?: unknown[] }> } }).tools_used_page
+        const workedTotal = (toolsUsedPage?.tools ?? [])
           .reduce((n: number, t: { worked?: unknown[] }) => n + (t.worked?.length ?? 0), 0)
         const bridgeDead = attempted >= 3 && pyDead / attempted > 0.5
         const calcsEmpty = attempted >= 3 && workedTotal === 0

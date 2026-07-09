@@ -707,9 +707,9 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
   check(
     'dedupe.mixed_advisory_and_deterministic_merges_to_one_row',
     dedupedMixed.length === 1 &&
-      dedupedMixed[0].score === 10 &&
-      dedupedMixed[0].advisory === false &&
-      dedupedMixed[0].defects.some((d) => d.includes('advisory:') && d.includes('5/10')),
+      dedupedMixed[0]?.score === 10 &&
+      dedupedMixed[0]?.advisory === false &&
+      !!dedupedMixed[0]?.defects?.some((d) => d.includes('advisory:') && d.includes('5/10')),
     JSON.stringify(dedupedMixed),
   )
 
