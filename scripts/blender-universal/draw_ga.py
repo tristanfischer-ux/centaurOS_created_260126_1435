@@ -772,15 +772,69 @@ def _draw_function_rooms(svg: SVG, rooms, plan_x, plan_y, mx, my):
                             label_y_min=plan_y + 12)
 
 
+def _nearest_plan_edge(cx: float, cy: float, env_x0: float, env_y0: float,
+                       env_x1: float, env_y1: float) -> str:
+    """Which plant-envelope edge a plan point is nearest (paper px)."""
+    return min(
+        ("bottom", env_y1 - cy), ("top", cy - env_y0),
+        ("left", cx - env_x0), ("right", env_x1 - cx),
+        key=lambda t: t[1],
+    )[0]
+
+
+def _collapse_ext_drain_runs(edge_members: list) -> list:
+    """INTENT: same rule as elevation/schedule range-collapse — consecutive
+    same-NAME below-grade vessels on ONE shared envelope edge become ONE
+    EXT. DRAIN annotation with a range tag ('TK-110…TK-111'), not N piled-up
+    labels. Codema 2026-07-09: two Drain Collection Sumps at the same plan Y
+    both picked the left edge; outward-only stagger left their tag texts at
+    the same baseline 10 px apart → G9 60% IoU. Different names never merge
+    (Nursery Drain Collection Sump stays its own manhole). Returns a list of
+    (members, label) where members is the run's GAPart list in tag order."""
+    by_name: dict = {}
+    for p, cx, cy in edge_members:
+        by_name.setdefault(p.name, []).append((p, cx, cy))
+    out = []
+    for name in sorted(by_name):
+        run: list = []
+
+        def _emit(run: list) -> None:
+            if not run:
+                return
+            members = [t[0] for t in run]
+            if len(members) == 1:
+                label = members[0].tag
+            else:
+                label = f"{members[0].tag}…{members[-1].tag}"
+            out.append((run, label))
+
+        for item in sorted(by_name[name],
+                           key=lambda t: (_tag_num(t[0].tag), t[0].tag)):
+            if run and _tag_num(item[0].tag) != _tag_num(run[-1][0].tag) + 1:
+                _emit(run)
+                run = []
+            run.append(item)
+        _emit(run)
+    return out
+
+
 def _draw_external_drain_points(svg: SVG, parts, plan_x, plan_y, plan_w, plan_h,
                                 mx, my):
     """T-27 — annotate an EXTERNAL DRAIN / MANHOLE outside the plant envelope for
     every below-grade collection vessel (sump / drainpit / catch-pit).
 
     UNIVERSAL: keyed on `is_below_grade` (the same noun signal as the hatch
-    convention) — never a class name. Each sump gets a buried (dash-dot) leader
-    from its plan centre to a manhole symbol just outside the nearest plan edge,
-    labelled 'EXT. DRAIN' + the sump's equipment tag. proveCatch in _selftest.
+    convention) — never a class name. Each sump (or same-name consecutive run
+    sharing an edge) gets a buried (dash-dot) leader from its plan centre to a
+    manhole symbol just outside the nearest plan edge, labelled 'EXT. DRAIN' +
+    the equipment tag (or range). proveCatch in _selftest.
+
+    DECISION (Codema tag_legibility 5× ESCALATE, 2026-07-09): when several
+    sumps share an edge, (1) range-collapse consecutive same-NAME runs into
+    ONE annotation (mirrors `_elevation_tag_groups` / schedule collapse) and
+    (2) stagger remaining annotations ALONG the edge — not only outward. The
+    old `offset = 28 + (i % 3) * 10` only moved the manhole further off-sheet;
+    two sumps at the same plan Y kept identical label baselines and piled up.
     """
     sumps = [p for p in parts if getattr(p, "is_below_grade", False)]
     if not sumps:
@@ -788,36 +842,69 @@ def _draw_external_drain_points(svg: SVG, parts, plan_x, plan_y, plan_w, plan_h,
     # plan envelope in paper px
     env_x0, env_y0 = plan_x, plan_y
     env_x1, env_y1 = plan_x + plan_w, plan_y + plan_h
-    for i, p in enumerate(sumps):
+    # assign each sump to its nearest edge first, THEN collapse + place — so
+    # two same-Y left-edge sumps share one group (and can range-collapse).
+    by_edge: dict = {"bottom": [], "top": [], "left": [], "right": []}
+    for p in sumps:
         cx = plan_x + mx(p.cx)
         cy = plan_y + my(p.cy)
-        # place the manhole OUTSIDE the nearest envelope edge (prefer south/bottom
-        # so it doesn't collide with the north arrow / top dim band)
-        dist_bottom = env_y1 - cy
-        dist_top = cy - env_y0
-        dist_left = cx - env_x0
-        dist_right = env_x1 - cx
-        nearest = min(
-            ("bottom", dist_bottom), ("top", dist_top),
-            ("left", dist_left), ("right", dist_right),
-            key=lambda t: t[1],
-        )[0]
-        offset = 28 + (i % 3) * 10  # stagger when several sumps share an edge
-        if nearest == "bottom":
-            mxh, myh = cx, env_y1 + offset
-        elif nearest == "top":
-            mxh, myh = cx, env_y0 - offset
-        elif nearest == "left":
-            mxh, myh = env_x0 - offset, cy
-        else:
-            mxh, myh = env_x1 + offset, cy
-        # buried leader (dash-dot) from sump centre to manhole
-        svg.line(cx, cy, mxh, myh, stroke=DATUM_INK, width=1.1, dash="2,2,6,2")
-        # manhole symbol — double circle (standard civil drain/manhole mark)
-        svg.circle(mxh, myh, 7, stroke=EQ_INK, width=1.4, fill=UG_FILL_BG)
-        svg.circle(mxh, myh, 3.5, stroke=EQ_INK, width=1.0, fill="none")
-        svg.text(mxh + 10, myh - 2, "EXT. DRAIN", size=7.2, fill=EQ_INK, weight="bold")
-        svg.text(mxh + 10, myh + 10, p.tag, size=6.8, fill=MUTED)
+        edge = _nearest_plan_edge(cx, cy, env_x0, env_y0, env_x1, env_y1)
+        by_edge[edge].append((p, cx, cy))
+
+    # along-edge pitch must clear a start-anchored tag bbox (~6 chars × 6.8 × 0.62
+    # ≈ 26 px wide) plus the EXT. DRAIN title — 36 px keeps G9 IoU well under 20%.
+    ALONG_PITCH = 36.0
+    for edge, members in by_edge.items():
+        if not members:
+            continue
+        runs = _collapse_ext_drain_runs(members)
+        # stable along-edge order: by the run's mean plan position on the edge axis
+        def _along_key(run_label):
+            run, _label = run_label
+            if edge in ("left", "right"):
+                return sum(t[2] for t in run) / len(run)  # mean cy
+            return sum(t[1] for t in run) / len(run)      # mean cx
+
+        for slot, (run, label) in enumerate(sorted(runs, key=_along_key)):
+            # centroid of the run → one leader / one manhole for the whole range
+            cx = sum(t[1] for t in run) / len(run)
+            cy = sum(t[2] for t in run) / len(run)
+            # outward offset still staggers when many runs share an edge; along-
+            # edge pitch is what stops same-baseline pile-ups. Range labels are
+            # wider ('TK-110…TK-111' ≈ 55 px) — pad outward so the OUTBOARD text
+            # clears the plan viewbox (G9 attributes a tag by its bbox centre;
+            # a label drawn INBOARD of a left-edge manhole landed inside the
+            # plan and piled onto TK-107 at 68% IoU on the Codema regen).
+            n_chars = max(len(label), len("EXT. DRAIN"))
+            label_w = 0.62 * 7.2 * n_chars
+            outward = 28 + (slot % 3) * 10 + max(0.0, label_w - 20.0)
+            along = (slot - (len(runs) - 1) / 2.0) * ALONG_PITCH
+            if edge == "bottom":
+                mxh, myh = cx + along, env_y1 + outward
+                lx, anchor = mxh + 10, "start"
+            elif edge == "top":
+                mxh, myh = cx + along, env_y0 - outward
+                lx, anchor = mxh + 10, "start"
+            elif edge == "left":
+                mxh, myh = env_x0 - outward, cy + along
+                # GOTCHA: label must sit LEFT of the manhole (anchor=end). The
+                # previous mxh+10 drew the tag INTO the plant and onto in-place
+                # equipment tags — the Codema TK-107 ∩ TK-110…TK-111 miss.
+                lx, anchor = mxh - 10, "end"
+            else:
+                mxh, myh = env_x1 + outward, cy + along
+                lx, anchor = mxh + 10, "start"
+            # one leader per member (each sump still shows its buried path) —
+            # the shared manhole + range label is what de-overlaps.
+            for _p, pcx, pcy in run:
+                svg.line(pcx, pcy, mxh, myh, stroke=DATUM_INK, width=1.1,
+                         dash="2,2,6,2")
+            # manhole symbol — double circle (standard civil drain/manhole mark)
+            svg.circle(mxh, myh, 7, stroke=EQ_INK, width=1.4, fill=UG_FILL_BG)
+            svg.circle(mxh, myh, 3.5, stroke=EQ_INK, width=1.0, fill="none")
+            svg.text(lx, myh - 2, "EXT. DRAIN", size=7.2, fill=EQ_INK,
+                     weight="bold", anchor=anchor)
+            svg.text(lx, myh + 10, label, size=6.8, fill=MUTED, anchor=anchor)
 
 
 def _draw_elevation_buried_laterals(svg, parts, elev_x, elev_y, elev_w, elev_h,
@@ -1777,6 +1864,55 @@ def _selftest() -> int:
         print("  FAIL ga-ext-drain-fp: an all-above-grade design must NOT emit "
               "external drain annotations")
         bad += 1
+    # 7b2 — EXT. DRAIN same-edge de-overlap proveCatch (Codema 2026-07-09
+    #     tag_legibility ESCALATE ×5: 'TK-110' ∩ 'TK-111' = 60% of the smaller
+    #     bbox). Adversarial input = TWO same-NAME Drain Collection Sumps at the
+    #     SAME plan Y (both nearest the left envelope edge) + a differently-named
+    #     nursery sump. Must: (a) range-collapse the same-name consecutive pair to
+    #     ONE 'TK-110…TK-111' EXT. DRAIN label (not two piled-up singles); (b) keep
+    #     the differently-named sump as its own annotation; (c) pass drawing_gates
+    #     G9 (no tag IoU >20%). The old outward-only stagger left both labels on
+    #     the same baseline 10 px apart — this is the catch that proves the fix.
+    sump_a = GAPart(tag="TK-110", obj_tag="tk110", name="Drain Collection Sump",
+                    module="m", shape="tank", qty=1, is_round=True,
+                    x0=-6826 - 1050, x1=-6826 + 1050, y0=-1050, y1=1050,
+                    z0=-909, z1=491, cx=-6826, cy=0, is_below_grade=True)
+    sump_b = GAPart(tag="TK-111", obj_tag="tk111", name="Drain Collection Sump",
+                    module="m", shape="tank", qty=1, is_round=True,
+                    x0=-4474 - 1050, x1=-4474 + 1050, y0=-1050, y1=1050,
+                    z0=-909, z1=491, cx=-4474, cy=0, is_below_grade=True)
+    sump_c = GAPart(tag="TK-112", obj_tag="tk112",
+                    name="Nursery Drain Collection Sump", module="m",
+                    shape="tank", qty=1, is_round=True,
+                    x0=-1950 - 1050, x1=-1950 + 1050, y0=-1050, y1=1050,
+                    z0=-915, z1=485, cx=-1950, cy=0, is_below_grade=True)
+    bbox_edge = {"x_min_mm": -9000, "x_max_mm": 5000, "y_min_mm": -4000,
+                 "y_max_mm": 4000, "z_min_mm": -1000, "z_max_mm": 3000}
+    svg_edge = build_ga_svg([sump_a, sump_b, sump_c, tank], bbox_edge,
+                            "water_treatment", {"count": 4})
+    if "TK-110…TK-111" not in svg_edge:
+        print("  FAIL ga-ext-drain-range: two same-name consecutive sumps on one "
+              "envelope edge must collapse to ONE 'TK-110…TK-111' EXT. DRAIN "
+              "label (the Codema TK-110∩TK-111 = 60% pile-up)")
+        bad += 1
+    # the differently-named nursery sump must NOT be swallowed into the range
+    if svg_edge.count("EXT. DRAIN") < 2:
+        print("  FAIL ga-ext-drain-range: a differently-named sump on the same "
+              "edge must keep its own EXT. DRAIN annotation")
+        bad += 1
+    if ">TK-112<" not in svg_edge and "TK-112" not in svg_edge:
+        print("  FAIL ga-ext-drain-range: the nursery sump's own tag must still "
+              "appear (range-collapse is same-NAME only)")
+        bad += 1
+    try:
+        import drawing_gates as _dg
+        _f9e = _dg.tag_legibility_findings(svg_edge)
+        if _f9e:
+            print(f"  FAIL ga-ext-drain-legible: G9 must pass the same-edge sump "
+                  f"GA clean (Codema catch — pile-up OR clip), got: {_f9e[:3]}")
+            bad += 1
+    except ImportError:
+        pass
     # 7c — T-08 elevation buried drain laterals
     if "buried drain lateral" not in svg_ug.lower():
         print("  FAIL ga-T-08: elevation must draw dashed buried drain laterals "
