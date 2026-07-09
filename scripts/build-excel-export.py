@@ -349,8 +349,21 @@ def _aux_tab_score(title: str, run_dir: str):
         st = "PASS" if sc >= 8 else "FAIL"
         iss.append(f"{label} part coverage {c.get('present')}/{c.get('expected')} ({pct:.0f}%)"
                    + ("" if pct >= 80 else " — under-covered: the drawing must render its parts so their tags match the BoM"))
-        return {"score": sc, "target": 8, "status": st, "issues": iss,
-                "fix": "object-level visual quality is UNVERIFIED — run the vision critic on the render so a 5-second human-glance defect is caught before ship (then this advisory clears); also keep coverage ≥ 80%"}
+        # DECISION (2026-07-09, P&ID/BFD=7 over 100% coverage): only park the
+        # UNVERIFIED-visual fix text when an advisory is actually present. Parking
+        # it on every coverage-only tab made `_apply_universal_honest_cap` scan the
+        # fix blob and hard-cap P&ID/BFD at 7 even with perfect tag coverage and
+        # zero visual findings — a false FAIL. Coverage-only tabs score from
+        # coverage; renders that pass an explicit advisory still get the cap.
+        if advisory:
+            fix = ("object-level visual quality is UNVERIFIED — run the vision critic "
+                   "on the render so a 5-second human-glance defect is caught before "
+                   "ship (then this advisory clears); also keep coverage ≥ 80%")
+        elif pct < 80:
+            fix = "raise drawing part coverage above 80% so tags match the BoM"
+        else:
+            fix = ""
+        return {"score": sc, "target": 8, "status": st, "issues": iss, "fix": fix}
 
     if t == "drawings" or "drawing register" in t:
         # DRAWING REGISTER (reviewers 2026-07-02) — deterministic integrity check of the
@@ -23606,6 +23619,26 @@ def _selftest() -> int:
         _rn = _aux_tab_score("Render — Interior layout", _td)
         if not _rn or _rn.get("score", 10) > 7 or _rn.get("status") != "FAIL":
             print(f"  FAIL render-cap: a 100%-coverage render with an UNVERIFIED-visual advisory must be ≤7/FAIL, not a fake 10 (got {_rn})"); bad += 1
+        # proveCatch (2026-07-09): a 100%-coverage P&ID with NO visual advisory must
+        # score ≥8 — the UNVERIFIED fix text must not hard-cap coverage-only tabs.
+        with open(os.path.join(_td, "parts-ledger.json"), "w") as _fh:
+            json.dump({"coverage_by_drawing": {
+                "pid": {"present": 51, "expected": 51, "pct": 100.0},
+                "block-flow-diagram": {"present": 31, "expected": 31, "pct": 100.0},
+            }}, _fh)
+        _COV_CACHE.clear()
+        _pid_ok = _aux_tab_score("P&ID", _td)
+        if not _pid_ok or (_pid_ok.get("score") or 0) < 8 or _pid_ok.get("status") != "PASS":
+            print(f"  FAIL pid-coverage-only: 100% P&ID with no advisory must be ≥8/PASS "
+                  f"(got {_pid_ok})"); bad += 1
+        if "UNVERIFIED" in str((_pid_ok or {}).get("fix") or ""):
+            print(f"  FAIL pid-coverage-only: fix text must not park UNVERIFIED when "
+                  f"no advisory is present (got fix={(_pid_ok or {}).get('fix')!r})")
+            bad += 1
+        _bfd_ok = _aux_tab_score("BFD — Block Flow", _td)
+        if not _bfd_ok or (_bfd_ok.get("score") or 0) < 8:
+            print(f"  FAIL bfd-coverage-only: 100% BFD with no advisory must be ≥8 "
+                  f"(got {_bfd_ok})"); bad += 1
         _COV_CACHE.clear()
     # (4b) CORROBORATION DOCTRINE (Tristan 2026-07-03 — the re-roll defect: GA 9.7 vs 9, Renders
     # 9.7 vs 9 across two otherwise-matched runs because an uncached, non-deterministic vision

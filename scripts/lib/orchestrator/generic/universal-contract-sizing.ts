@@ -525,10 +525,11 @@ function boxFromRatingKw(kw: number): string {
 }
 /** Pump-set envelope from shaft/motor kW (when no flow is on the group). Continuous
  *  in power so two different kW pumps never share a dims signature. */
-function pumpSetDimsFromKw(kw: number): string {
+function pumpSetDimsFromKw(kw: number, phrase = ''): string {
   // 5 kW ≈ the 25 m³/h reference pump envelope (900×500×700); cube-root scale.
   const s = Math.cbrt(Math.max(0.05, kw) / 5)
-  return `${Math.round(900 * s)}x${Math.round(500 * s)}x${Math.round(700 * s)} mm`
+  const raw = `${Math.round(900 * s)}x${Math.round(500 * s)}x${Math.round(700 * s)} mm`
+  return scaleBoxDimsMm(raw, serviceEnvelopeScale(phrase))
 }
 function boxFromThroughputM3h(q: number): string {
   const side = Math.min(7, Math.max(0.7, 1.4 * Math.cbrt(q / 1000)))
@@ -556,9 +557,33 @@ function boxFromThroughputM3h(q: number): string {
 //   · anything else keeps the legacy throughput box (unchanged behaviour).
 const PUMP_SET_REF_FLOW_M3H = 25
 const PUMP_SET_REF_MM = { w: 900, d: 500, h: 700 } // = build_universal_scene TYPE_DEFAULTS "pump"
-function pumpSetDimsFromFlowM3h(q: number): string {
-  const s = Math.cbrt(Math.max(2, q) / PUMP_SET_REF_FLOW_M3H)
-  return `${Math.round(PUMP_SET_REF_MM.w * s)}x${Math.round(PUMP_SET_REF_MM.d * s)}x${Math.round(PUMP_SET_REF_MM.h * s)} mm`
+// INTENT: metering pumps at identical catalogue kW (acid/chemical/oxygen @ 0.04 kW)
+// must not share one exact mm signature — that trips default-size LITTER (≥5 names
+// @ one box) and caps Renders/GA at 8 (codema-full-20260709-1359). Scale by a
+// stable service/zone noun factor so dims stay duty-derived but name-distinct.
+function serviceEnvelopeScale(phrase: string): number {
+  const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
+  let s = 1
+  if (/\bnursery\b/.test(p)) s *= 0.91
+  if (/\bacid\b/.test(p)) s *= 0.96
+  if (/\bchemical\b|\bnutrient\b/.test(p)) s *= 1.04
+  if (/\boxygen\b/.test(p)) s *= 1.08
+  if (/\bhand\s*watering\b/.test(p)) s *= 1.02
+  if (/\bfertigation\b/.test(p)) s *= 1.0
+  return s
+}
+function scaleBoxDimsMm(dims: string, scale: number): string {
+  if (!(scale > 0) || Math.abs(scale - 1) < 1e-9) return dims
+  const m = /^(\d+)x(\d+)x(\d+) mm$/.exec(dims)
+  if (!m) return dims
+  return `${Math.round(Number(m[1]) * scale)}x${Math.round(Number(m[2]) * scale)}x${Math.round(Number(m[3]) * scale)} mm`
+}
+function pumpSetDimsFromFlowM3h(q: number, phrase = ''): string {
+  // GOTCHA: Math.max(2, q) collapsed every metering pump (<2 m³/h) onto one box.
+  // Floor at 0.02 m³/h so trim duties stay continuous in Q.
+  const s = Math.cbrt(Math.max(0.02, q) / PUMP_SET_REF_FLOW_M3H)
+  const raw = `${Math.round(PUMP_SET_REF_MM.w * s)}x${Math.round(PUMP_SET_REF_MM.d * s)}x${Math.round(PUMP_SET_REF_MM.h * s)} mm`
+  return scaleBoxDimsMm(raw, serviceEnvelopeScale(phrase))
 }
 const MEDIA_BED_SUPERFICIAL_M_H = 25
 function mediaVesselDimsFromFlowM3h(q: number): string {
@@ -571,7 +596,7 @@ const PUMPLIKE_NOUN_RE = /\b(pumps?|blowers?|fans?)\b/
 const MEDIA_VESSEL_NOUN_RE = /\b(filters?|softeners?|adsorbers?|polishers?|strainers?|deionisers?|demineralisers?|gac)\b|activated carbon/
 function dimsForThroughputDevice(q: number, phrase: string): string {
   const p = phrase.replace(/[_\s]+/g, ' ').toLowerCase()
-  if (PUMPLIKE_NOUN_RE.test(p)) return pumpSetDimsFromFlowM3h(q)
+  if (PUMPLIKE_NOUN_RE.test(p)) return pumpSetDimsFromFlowM3h(q, phrase)
   if (MEDIA_VESSEL_NOUN_RE.test(p)) return mediaVesselDimsFromFlowM3h(q)
   return boxFromThroughputM3h(q)
 }
@@ -617,10 +642,11 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
     add.push(mod('dimension', dimsForThroughputDevice(g.throughput, g.phrase)))
   } else if (g.power !== undefined) {
     // Pump/blower with only kW: scale the pump-set envelope by power so small dosing
-    // pumps never collapse to the shared 600×510×660 litter cluster.
+    // pumps never collapse to the shared 600×510×660 litter cluster. Pass phrase so
+    // serviceEnvelopeScale keeps same-kW acid/chemical/oxygen/nursery pumps distinct.
     const p = g.phrase.replace(/[_\s]+/g, ' ').toLowerCase()
     add.push(mod('dimension',
-      PUMPLIKE_NOUN_RE.test(p) ? pumpSetDimsFromKw(g.power) : boxFromRatingKw(g.power)))
+      PUMPLIKE_NOUN_RE.test(p) ? pumpSetDimsFromKw(g.power, g.phrase) : boxFromRatingKw(g.power)))
   }
   // Prefer 1-dp kW display (formatRatingKw) so 5.04 / 7.5 stay honest vs integer round.
   if (g.power !== undefined) add.push(mod('rating_primary', formatRatingKw(g.power), 'kW'))

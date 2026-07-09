@@ -1997,6 +1997,32 @@ def _unit_operation_price(name: str, md: dict, q):
                          f"+ supports (supply-only materials; field labour in the cost stack)")
         return 1500.0, "distribution-manifold budget: per-group delivery header station (duty unstated)"
 
+    # Media-bed vessel (GAC / softener / adsorber / polisher) — packaged pressure vessel
+    # + media + underdrain + valve nest. Priced from treated FLOW (m³/h). Without this
+    # family an IDENTIFIED media-bag MPN (General Carbon HP-1000 £105) survived as the
+    # vessel line while partVerifications carried the ~£14.7k physics assembly
+    # (codema-full-20260709-1359 V-101 COST FAIL). Universal: noun + flow duty.
+    if re.search(
+        r"\bgac\b|granular.?activ|activated.?carbon|media.?bed|"
+        r"\bsoftener\b|adsorber|polisher|ion.?exchange|carbon.?filter",
+        nm,
+    ):
+        flow = _qv(
+            "gac_filter_throughput_m3_h", "gac_softener_throughput_m3_h",
+            "softener_throughput_m3_h", "gac_throughput_m3_h",
+            "filter_throughput_m3_h", "makeup_water_flow_m3_h",
+            default=rating,
+        )
+        if flow and flow > 0:
+            # Shell + media + underdrain + valve nest + instruments + skid — mirrors
+            # universal-contract-sizing.ts media-bed subassembly at the same duty.
+            gbp = 8500.0 + flow * 430.0
+            return gbp, (
+                f"media-bed vessel parametric: {flow:.1f} m³/h × £430/(m³·h) + £8.5k "
+                f"shell/underdrain/valve-nest/skid (packaged GAC/softener, UK-2026)"
+            )
+        return 14000.0, "media-bed vessel budget: packaged filter/softener (duty unstated)"
+
     return None
 
 
@@ -3429,6 +3455,18 @@ def _selftest() -> int:
     _uv_floor = _price_floor_for("Uv Disinfection", {})
     if not (_uv_floor and _uv_floor >= 8000):
         print(f"  FAIL UV process-system floor missing/too low (got {_uv_floor})"); bad += 1
+
+    # P1-D MEDIA-BED (2026-07-09, codema V-101): GAC/softener parametric at 14.5 m³/h
+    # must land near the physics subassembly (~£14.7k), never a £105 media-bag stub.
+    _md_gac = _mods({"modifier_characters": [
+        {"kind": "rating_primary", "value": "14.5", "unit": "m³/h"},
+    ]})
+    _gac_param, _gac_basis = _unit_operation_price(
+        "Gac Filter", _md_gac, {"gac_filter_throughput_m3_h": {"value": 14.5}},
+    )
+    if not (_gac_param and 12000 <= _gac_param <= 20000 and "media-bed" in (_gac_basis or "")):
+        print(f"  FAIL media-bed 14.5 m³/h parametric (want £12–20k): £{_gac_param} "
+              f"({str(_gac_basis)[:90]})"); bad += 1
 
     # ── MEMBRANE-AS-STEEL proveCatch (2026-07-02, v55: 'Ro Membrane Elements · 364 m²'
     # = £40,760 'structural steelwork take-off', ×3 lines = £122k / 16% of the bill):
@@ -6508,6 +6546,29 @@ def assemble(out_dir: str):
                                 f"reference £{_pre_uv:,.0f} is "
                                 f"{uop_uv[0] / max(_pre_uv, 1e-9):.0f}× below the "
                                 f"duty-rated UV/ozone skid (undersized for the duty)"
+                            )
+                    # P1-D MEDIA-BED (2026-07-09, codema V-101): an IDENTIFIED GAC /
+                    # softener / adsorber MPN whose catalogue stub (£105 HP-1000 media
+                    # bag) is ≪ the duty-rated vessel parametric (~£14.7k at 14.5 m³/h)
+                    # is the SAME underbill family as Spektron — reject the pin and
+                    # lift to the media-bed parametric. Universal: noun-keyed.
+                    elif re.search(
+                        r"\bgac\b|granular.?activ|activated.?carbon|media.?bed|"
+                        r"\bsoftener\b|adsorber|polisher|ion.?exchange|carbon.?filter",
+                        name or "", re.I,
+                    ):
+                        uop_mb = _unit_operation_price(name, md, qcontract)
+                        if (uop_mb and uop_mb[0] > 0
+                                and (gbp <= 0 or uop_mb[0] >= max(gbp, 1e-9) * COST_BAND_FACTOR)):
+                            _pre_mb = gbp
+                            status = "NOT FOUND"
+                            part = "requirement stated — parametric"
+                            gbp, basis = uop_mb[0], (
+                                uop_mb[1] + f" · named part {pn!r} rejected: catalogue "
+                                f"reference £{_pre_mb:,.0f} is "
+                                f"{uop_mb[0] / max(_pre_mb, 1e-9):.0f}× below the "
+                                f"duty-rated media-bed vessel (media bag / stub pin, "
+                                f"not the packaged filter)"
                             )
                 elif bc == "simple":
                     mt = _materials_takeoff(name, md, g_lookup, svc)

@@ -737,6 +737,8 @@ _ABSTRACT_BOUNDARY_RE = re.compile(
     r"(?:steam|nitrogen|instrument[_ -]?air|compressed[_ -]?air|inert[_ -]?gas|"
     r"cooling[_ -]?water|chilled[_ -]?water)[_ -]?supply\b|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
+    # effluent / disposal / drain-to-waste termini (water plant battery limits)
+    r"\beffluent\b|\bdisposal\b|waste[_ -]?stream|drain[_ -]?to[_ -]?waste|"
     r"\b(?:dc|ac|hv|lv|mv)[_ -]?bus\b|\bheat[_ -]?reject(?:ion)?\b|"
     r"\b(?:heat|thermal|cold)[_ -]?sink\b|"
     r"bus[_ -]?way|(?:^|[_ -])ctrl(?:$|[_ -])|(?:^|[_ -])board(?:$|[_ -])", re.I)

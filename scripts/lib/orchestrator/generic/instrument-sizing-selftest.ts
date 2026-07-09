@@ -418,6 +418,49 @@ function run() {
   if (!(wOf('Hand Watering Pump') < wOf('Drain Transfer Pump') && wOf('Drain Transfer Pump') < wOf('Irrigation Pump')))
     throw new Error(`synth-dims: pump-set envelopes must GROW with flow (25→${wOf('Hand Watering Pump')}, 45→${wOf('Drain Transfer Pump')}, 90→${wOf('Irrigation Pump')} mm) — the flow-derived scaling broke`)
   if (!/m dia x .* m$/.test(dimOf('Gac Softener'))) throw new Error(`synth-dims: "Gac Softener" dims "${dimOf('Gac Softener')}" must be a media-bed CYLINDER (⌀ from superficial velocity), not a box`)
+
+  // ── METERING-PUMP LITTER proveCatch (codema-full-20260709-1359, 2026-07-09) ──
+  // Six acid/chemical/oxygen (+ nursery) dosing pumps at 0.04 kW shared one
+  // 388×215×302 box → default-size LITTER capped Renders/GA at 8. Service-noun
+  // envelope scale must keep same-kW metering pumps on DISTINCT dims signatures.
+  const meterModules: any = [
+    { module: 'mass_fluid_transport_process', sub_modules: [{ id: 'sm', words: [] }] },
+  ]
+  const meterContract: any = { quantities: {
+    acid_dosing_pump_count: { value: 2 }, acid_dosing_pump_power_kw: { value: 0.04 },
+    chemical_dosing_pump_count: { value: 2 }, chemical_dosing_pump_power_kw: { value: 0.04 },
+    oxygen_dosing_pump_count: { value: 2 }, oxygen_dosing_pump_power_kw: { value: 0.04 },
+    nursery_acid_dosing_pump_count: { value: 1 }, nursery_acid_dosing_pump_power_kw: { value: 0.04 },
+    nursery_chemical_dosing_pump_count: { value: 1 }, nursery_chemical_dosing_pump_power_kw: { value: 0.04 },
+    nursery_oxygen_dosing_pump_count: { value: 1 }, nursery_oxygen_dosing_pump_power_kw: { value: 0.04 },
+  } }
+  applyUniversalContractSizing(meterModules as never[], meterContract, { dedupeAndStrip: false, explode: false, instrument: false })
+  const meterNames = [
+    'Acid Dosing Pump', 'Chemical Dosing Pump', 'Oxygen Dosing Pump',
+    'Nursery Acid Dosing Pump', 'Nursery Chemical Dosing Pump', 'Nursery Oxygen Dosing Pump',
+  ]
+  const dimOfMeter = (name: string): string => {
+    for (const m of meterModules) {
+      for (const sm of m.sub_modules || []) {
+        for (const w of sm.words || []) {
+          if ((w.name_human || '') === name) {
+            return String((w.modifier_characters || []).find((x: any) => x.kind === 'dimension' || x.kind === 'dimensions')?.value ?? '')
+          }
+        }
+      }
+    }
+    return ''
+  }
+  const meterSigs = new Set<string>()
+  for (const nm of meterNames) {
+    const d = dimOfMeter(nm)
+    if (!d) throw new Error(`metering-litter: "${nm}" synthesised with NO dimension`)
+    meterSigs.add(d)
+  }
+  if (meterSigs.size < 4) {
+    throw new Error(`metering-litter: expected ≥4 distinct dims among 6 same-kW dosing pumps, got ${meterSigs.size} [${[...meterSigs].join(' | ')}] — the 388×215×302 cluster regressed`)
+  }
+
   // the ELECTRICAL word must have adopted NOTHING from the fluid pump group.
   const txMods = modsOf(litterModules, 'Distribution Transformer')
   if (txMods.some((x) => (x.kind === 'dimension' || x.kind === 'dimensions'))) throw new Error('synth-dims: "Distribution Transformer" was stamped a dimension from a FLUID group — the electrical-role coherence guard regressed (it must stay un-dimensioned → scene TYPE_DEFAULT transformer_box)')

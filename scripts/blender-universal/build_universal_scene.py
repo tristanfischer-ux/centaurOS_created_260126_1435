@@ -2325,7 +2325,13 @@ def flow_order_regions(parts, topology):
 
 
 DISCRIMINATORS = {"h2", "co2", "hot", "cold", "saf", "naphtha", "recycle",
-                  "feed", "product", "tail", "syncrude"}
+                  "feed", "product", "tail", "syncrude",
+                  # Zone / area qualifiers (2026-07-09, codema TK-101): without
+                  # these, `drain_water_tank` token-tied Nursery Drain Water Tank
+                  # (shared {drain,water,tank}, score tie → wrong host) and the
+                  # real Drain Water Tank stayed orphan. A candidate carrying
+                  # nursery/department/zone when the query does not is a RIVAL.
+                  "nursery", "department", "zone", "primary", "secondary"}
 
 
 def _token_match(x, y):
@@ -4281,6 +4287,7 @@ def resolve_endpoint(edge_part_name, parts):
         toks = tokenise(SYN[edge_part_name])
     head = toks[-1] if toks else None
     best = None
+    query_set = set(toks)
     for p in parts:
         score = token_overlap(toks, p.match_tokens)
         if score <= 0:
@@ -4292,9 +4299,13 @@ def resolve_endpoint(edge_part_name, parts):
                 _token_match(head, y) or _plural_fold(head) == _plural_fold(y)
                 for y in p.match_tokens):
             continue
-        if best is None or score > best[0]:
-            best = (score, p)
-    return best[1] if best else None
+        # DECISION: on equal overlap, prefer the candidate with fewer EXTRA tokens
+        # (drain_water_tank → Drain Water Tank beats Nursery Drain Water Tank).
+        extra = len(set(p.match_tokens) - query_set)
+        cand = (score, -extra, p)
+        if best is None or cand[:2] > best[:2]:
+            best = cand
+    return best[2] if best else None
 
 
 # Edge-label / endpoint-name tokens that imply the line LEAVES the source from

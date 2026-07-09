@@ -488,17 +488,23 @@ _CABINET_POWER_RE = re.compile(
     r"busbar|distribution\s*board|switchboard|motor\s*control\s*cent|\bMCC\b|switch[- ]?gear|"
     r"\bLV\s*board\b|\bMV\s*board\b|panelboard|consumer\s*unit|\bPDU\b|distribution\s*panel|"
     r"power\s*distribution\s*panel|drive\s*cabinet|\bVSD\b\s*cabinet", re.I)
+# GOTCHA (codema-full-20260709-1359): bare `\bPLC\b` / `\bHMI\b` made every
+# "PLC Controller" / "HMI Touchscreen" classify as its OWN cabinet (empty
+# contents) AND as an orphan_controller — 8 false concerns. A cabinet is an
+# ENCLOSURE (panel/cabinet/system/rack); a bare PLC/HMI is housed CONTENTS.
 _CABINET_CTRL_RE = re.compile(
-    r"marshalling|control\s*cabinet|control\s*panel|\bDCS\b|\bPLC\b|\bHMI\b|junction\s*box|"
+    r"marshalling|control\s*cabinet|control\s*panel|\bDCS\b|junction\s*box|"
     r"control\s*system|control\s*enclosure|instrument\s*panel|i/?o\s*rack|remote\s*i/?o|"
-    r"control[- ]?network", re.I)
+    r"control[- ]?network|plc\s*(?:cabinet|panel|rack|enclosure)|"
+    r"hmi\s*(?:cabinet|panel|station|enclosure)|scada", re.I)
 _HOUSED_POWER_RE = re.compile(
     r"\bbreaker\b|\bfuse\b|surge|\bSPD\b|\brelay\b|\bMCB\b|\bMCCB\b|\bMPCB\b|\bRCD\b|\bRCBO\b|"
     r"contactor|isolator|motor[- ]?protection|earth[- ]?leakage|\bVFD\b|variable[- ]?frequency|"
     r"frequency\s*drive|soft[- ]?start|blower/centrifuge\s*VSD", re.I)
 _HOUSED_CTRL_RE = re.compile(
-    r"i/?o\s*card|i/?o\s*module|plc\s*module|gateway|network\s*switch|signal\s*conditioner|"
-    r"\bbarrier\b|marshalling\s*terminal|power\s*supply|\bPSU\b|interface\s*station", re.I)
+    r"i/?o\s*card|i/?o\s*module|plc\s*module|\bplc\b|controller|gateway|network\s*switch|"
+    r"signal\s*conditioner|\bbarrier\b|marshalling\s*terminal|power\s*supply|\bPSU\b|"
+    r"interface\s*station|\bhmi\b|touchscreen|monitoring|remote\s*monitor", re.I)
 # a "remote I/O rack" / "remote I/O" is itself a small ENCLOSURE (it houses I/O cards) →
 # treat as a cabinet, not a housed device, so cabinet-match takes precedence below.
 
@@ -591,9 +597,23 @@ _ORIGIN_KEYWORDS = {"grid", "mains", "water supply", "water intake", "make-up wa
                     "feed", "food", "fuel", "air intake", "seawater", "freshwater",
                     "oxygen supply", "chemical supply", "intake",
                     "lox", "liquid oxygen", "bulk storage", "supply tank", "storage tank",
-                    "day tank", "bulk tank", "buffer tank", "dosing tank"}
+                    "day tank", "bulk tank", "buffer tank", "dosing tank",
+                    # Grid electrical origin (codema EP-102, 2026-07-09): "Mains Incomer"
+                    # is the battery-limit feed — it HAS no upstream plant edge by design.
+                    "incomer", "mains incomer", "utility incomer"}
 _SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust",
                   "heat rejection", "mortality", "overflow", "reject"}
+
+
+def _is_grid_electrical_origin(name: str) -> bool:
+    """INTENT: a grid/mains electrical incomer is a TRUE battery-limit origin — it
+    feeds the plant and has no upstream plant edge. Flagging missing_input on it is
+    a false concern (codema EP-102). Universal: noun-keyed, never a tag table."""
+    name_l = (name or "").lower()
+    return bool(re.search(
+        r"\bincomer\b|mains\s+incomer|utility\s+incomer|\bgrid\b.*\b(feed|supply|incomer)\b",
+        name_l,
+    ))
 
 
 def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
@@ -610,6 +630,17 @@ def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
     noun (e.g. 'Structural Support Beam') matches neither list and stays exempt —
     universal, keyed on the same noun signal, never a per-part table."""
     name_l = (name or "").lower()
+    # DECISION: grid electrical incomers are origins that REQUIRE no upstream plant
+    # edge — skip the missing_input raise (they still count as origins for tallies).
+    if _is_grid_electrical_origin(name):
+        return None
+    # DECISION: PARAMETRIC zoned-distribution take-offs name "delivery"/"drain" but
+    # are materials aggregates, not discrete flow-through nodes — the status==PARAMETRIC
+    # skip in the main loop covers PROCESS-typed ones; PASSIVE-typed ones hit this
+    # predicate first. Caller must pass status via name alone here — so also skip
+    # when the name itself declares a zoned-distribution materials take-off.
+    if "zoned distribution" in name_l or name_l.startswith("zoned distribution"):
+        return None
     is_origin = any(kw in name_l for kw in _ORIGIN_KEYWORDS)
     is_sink = any(kw in name_l for kw in _SINK_KEYWORDS)
     if is_origin and not has_in:
@@ -1030,10 +1061,19 @@ def main() -> int:
     def resolve(ikey: str):
         if ikey in eq_by_key:
             return eq_by_key[ikey]
-        for k, e in eq_by_key.items():          # loose contains-match (rotary_drum_filter↔drum filter)
-            if k and (k in ikey or ikey in k):
-                return e
-        return None
+        # DECISION: prefer the SHORTEST contains-match (fewest extra tokens) so
+        # "drain water tank" binds Drain Water Tank, not Nursery Drain Water Tank
+        # (codema TK-101 orphan, 2026-07-09). First-wins on a longer superstring
+        # was the false join.
+        best = None  # (extra_len, row)
+        for k, e in eq_by_key.items():
+            if not k:
+                continue
+            if k in ikey or ikey in k:
+                extra = abs(len(k) - len(ikey))
+                if best is None or extra < best[0]:
+                    best = (extra, e)
+        return best[1] if best else None
 
     # ── 2. CONNECTIONS (pipes / wires / sensor ties) — endpoints + via + coverage ──
     rows = conn.get("rows", []) if isinstance(conn, dict) else []
@@ -1251,13 +1291,33 @@ def main() -> int:
     # legitimately has ONE process connection (not a flow-through in + out). Universal —
     # keyed on the vessel ROLE word, no per-part table.
     BUFFER_KEYWORDS = {"expansion", "surge", "buffer", "accumulator", "balance tank",
-                       "break tank", "header tank", "expansion vessel", "expansion reservoir"}
+                       "break tank", "header tank", "expansion vessel", "expansion reservoir",
+                       # Terminal drain/recovery reservoirs (codema TK-101, 2026-07-09):
+                       # a "Drain Water Tank" is a dead-leg collection buffer — one tie
+                       # (in OR out) is correct, not a flow-through in+out. Universal:
+                       # role noun, never a tag table.
+                       "drain water", "drainwater", "recovery tank", "return tank",
+                       "collection tank", "dirty water"}
 
     PROCESS_TYPES = {"vessel", "rotating", "exchanger", "separator", "valve"}
     ELECTRICAL_TYPES = {"electrical"}
     INSTRUMENT_TYPES = {"instrument"}
     CONTROL_TYPES = {"control"}
     PASSIVE_TYPES = {"structural", "other"}
+    # INTENT: controllers nested inside a SCADA/panel cabinet (EP-105 contents) are
+    # already credited via the cabinet aggregate — auditing them again as top-level
+    # orphans is a false concern (codema X-120..X-135, 2026-07-09). Build the set
+    # once from the same cabinet assignment the ledger already computes.
+    _cabinet_content_tags: set = set()
+    try:
+        _cab_preview = _build_cabinets(equipment, set())
+        for _cab in (_cab_preview.get("cabinets") or []):
+            for _c in (_cab.get("contents") or []):
+                _ct = _c.get("tag") if isinstance(_c, dict) else None
+                if _ct:
+                    _cabinet_content_tags.add(str(_ct))
+    except Exception:
+        _cabinet_content_tags = set()
     # AIR-SERVICE / SUB-COMPONENT parts that get a PROCESS etype ("rotating" blower,
     # "exchanger" HVAC unit, an MBBR media fill) but carry AIR or belong to a PARENT —
     # NOT a process-WATER flow-through node. Their correct tie is an air line / a parent
@@ -1360,6 +1420,14 @@ def main() -> int:
         if is_sink and not has_out:
             sink_parts.append({"tag": tag, "name": e["name"], "type": etype})
 
+        # PARAMETRIC materials/network take-off (2026-07-09): skip BEFORE the
+        # PASSIVE boundary predicate — zoned-distribution rows are typed 'other'
+        # and their names contain "delivery"/"drain", which would otherwise raise
+        # false missing_input/output concerns (codema X-150..X-158). Universal:
+        # status-keyed, same discipline as the orphan-loop exemption below.
+        if e.get("status") == "PARAMETRIC":
+            continue
+
         if etype in PASSIVE_TYPES:
             # X-140 THREAD FIX (Tristan 2026-07-04): a PASSIVE-typed part is normally
             # never a connectivity concern (genuinely structural — frames, cladding).
@@ -1372,6 +1440,10 @@ def main() -> int:
             # (no drawn discharge) escaped the ledger completeness audit entirely.
             # Promote via the shared pure predicate; a truly-structural part with no
             # origin/sink noun match stays exempt (untouched).
+            # Grid electrical incomers (EP-102): true battery-limit origins — no
+            # upstream plant edge by design; _passive_boundary_concern returns None.
+            if _is_grid_electrical_origin(e["name"]):
+                continue
             _pbc = _passive_boundary_concern(e["name"], has_in, has_out)
             if _pbc is not None:
                 connectivity_concerns.append({
@@ -1481,7 +1553,12 @@ def main() -> int:
                 r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
                 r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
                 r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
-                r"cable tray|terminal block|enclosure|junction box|\bgland\b",
+                r"cable tray|terminal block|enclosure|junction box|\bgland\b|"
+                # Terminal HMI / local control panel (codema I-103, 2026-07-09):
+                # receives feeds but is the END of the control circuit — no
+                # downstream load edge is required. Universal: role noun.
+                r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
+                r"\bhmi\b|touchscreen|control\s+panel\b",
                 name_l, re.I))
             needs_in = not is_origin and not (is_terminal_elec and not has_any)
             needs_out = not is_sink and not is_terminal_elec
@@ -1502,6 +1579,11 @@ def main() -> int:
                 n_electrical_connected += 1
 
         elif etype in CONTROL_TYPES:
+            # DECISION: a controller already nested in a cabinet's contents is
+            # credited via the cabinet aggregate — do not re-flag as orphan
+            # (codema X-120..X-135 duplicate top-level rows inside EP-105).
+            if tag in _cabinet_content_tags:
+                continue
             if not has_any:
                 connectivity_concerns.append({
                     "tag": tag, "name": e["name"], "type": etype,
@@ -1849,6 +1931,48 @@ def _selftest() -> int:
     if _structural is not None:
         print(f"  FAIL passive-boundary: a genuinely-structural part (no origin/sink "
               f"noun) must NEVER be flagged (got {_structural!r})")
+        bad += 1
+    # Grid electrical incomer (codema EP-102, 2026-07-09): true battery-limit origin.
+    if _passive_boundary_concern("Mains Incomer", has_in=False, has_out=True) is not None:
+        print("  FAIL passive-boundary: 'Mains Incomer' must NEVER raise missing_input "
+              "(grid origin has no upstream plant edge)")
+        bad += 1
+    if not _is_grid_electrical_origin("Mains Incomer"):
+        print("  FAIL _is_grid_electrical_origin: 'Mains Incomer' must match")
+        bad += 1
+    # Zoned-distribution PARAMETRIC take-off names must not raise via the passive
+    # predicate (status skip is the primary gate; name guard is the backstop).
+    if _passive_boundary_concern(
+            "Zoned distribution — department delivery mains",
+            has_in=False, has_out=False) is not None:
+        print("  FAIL passive-boundary: zoned-distribution take-off must not raise")
+        bad += 1
+    # Cabinet vs housed: a bare PLC/HMI is CONTENTS, not its own empty cabinet.
+    if _CABINET_CTRL_RE.search("PLC Controller"):
+        print("  FAIL cabinet-regex: bare 'PLC Controller' must NOT be a cabinet "
+              "(it is housed contents of SCADA/control system)")
+        bad += 1
+    if not _HOUSED_CTRL_RE.search("PLC Controller"):
+        print("  FAIL housed-regex: 'PLC Controller' must be housed contents")
+        bad += 1
+    if not _CABINET_CTRL_RE.search("SCADA / Plant Control System"):
+        print("  FAIL cabinet-regex: SCADA / Plant Control System must remain a cabinet")
+        bad += 1
+    # Shortest-contains resolve: drain water tank → Drain Water Tank, not Nursery…
+    _eq = {
+        "nursery drain water tank": {"name": "Nursery Drain Water Tank", "tag": "TK-115"},
+        "drain water tank": {"name": "Drain Water Tank", "tag": "TK-101"},
+    }
+    _best = None
+    _ikey = "drain water tank"
+    for k, e in _eq.items():
+        if k in _ikey or _ikey in k:
+            extra = abs(len(k) - len(_ikey))
+            if _best is None or extra < _best[0]:
+                _best = (extra, e)
+    if not _best or _best[1]["tag"] != "TK-101":
+        print(f"  FAIL resolve-shortest: 'drain water tank' must bind TK-101 "
+              f"(got {_best})")
         bad += 1
     # ── NOT-FOUND STATUS SPLIT proveCatch (2026-07-04, round-4 dissection fix 1).
     # Per status, both directions: the positive fires on its own evidence, the
