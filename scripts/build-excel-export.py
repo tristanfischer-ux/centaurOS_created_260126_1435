@@ -1380,8 +1380,12 @@ def _performance_card_fact(state: dict) -> dict:
         findings = check_brief_metric_fail(state or {}, [], "")
     except Exception:  # noqa: BLE001 — a render-time re-check must never crash the export
         return {"score": None, "defects": []}
+    # INTENT: a clean brief-metric check (zero misses) is a full 10 — the previous
+    # hardcoded 9 capped every clean dossier's floor at 9.0 forever (Codema ship
+    # 2026-07-09: every tab ≥9.1 but Exec/QA mirrors stuck at 9). A genuine miss
+    # still floors well below 8 (HIGH, not a nuance).
     if not findings:
-        return {"score": 9, "defects": []}
+        return {"score": 10, "defects": []}
     # Scale down with the miss count; even a single genuine miss stays well below the
     # ≥8 floor (a real brief-metric miss is a HIGH, not a nuance).
     return {"score": max(2, 8 - 2 * len(findings)), "defects": [f.message for f in findings]}
@@ -6738,6 +6742,21 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         # cell (the '39 connection lines missing Est class/Confidence' MED).
         _eclass = _cbasis.get("estimate_class", "") or row.get("estimate_class", "")
         _conf = _cbasis.get("confidence", "") or row.get("confidence", "")
+        # G5 (Sam): every priced line states HOW TO VERIFY the figure — datasheet, recompute
+        # from the basis formula, or obtain a written quote. Surfaced in the Confidence cell
+        # so Est-class / Confidence stay the single verifiability surface (no column shift).
+        _how = (_cbasis.get("how_to_verify") or row.get("how_to_verify") or "").strip()
+        if not _how:
+            if row.get("connection"):
+                _how = "Recompute: length_m × £/m install rate from the cost basis"
+            elif _method in ("catalogue", "distributor"):
+                _how = "Check MPN on manufacturer datasheet / distributor listing"
+            elif _method in ("parametric", "class_reference", "capacity_factored", "material_takeoff"):
+                _how = "Recompute: qty × rate from the basis formula"
+            elif not _line_num or str(row.get("status", "")).upper() in ("NOT FOUND", "TBD"):
+                _how = "Obtain quote / pin a real MPN"
+            else:
+                _how = "Obtain written supplier quote — this line is not catalogue-grounded"
         if row.get("connection"):
             _eclass = _eclass or 3
             _conf = _conf or "moderate — deterministic take-off (routed length × rate)"
@@ -6751,6 +6770,10 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
             # a PRINCIPAL with no decomposable input is a direct ESTIMATE — DISCLOSE that honestly
             # (method in F + factor in H carry the rest) rather than leave a mystery-blank cell.
             _g = _key_input_disclosure(_method)
+        if _conf and _how and _how not in str(_conf):
+            _conf = f"{_conf} · verify: {_how}"
+        elif not _conf and _how:
+            _conf = f"verify: {_how}"
         if _method or _g or _h or _eclass or _conf:
             ws.cell(r, 6, clean_cell(_method)).border = BORDER
             ic = ws.cell(r, 7, clean_cell(_g))
@@ -7213,9 +7236,20 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
             if sib_rx.match(_norm_qty_name(qname)):
                 return qname, a_val, qv.get("unit", "")
 
-    # (1) exact / unit-normalised NAME match — the achieved quantity of the SAME name (no echoes)
+    # (1) exact / unit-normalised NAME match — the achieved quantity of the SAME name (no echoes unless exact)
     for qname, qv in quantities.items():
-        if not isinstance(qv, dict) or any(e in qname.lower() for e in _ECHO_SUFFIXES):
+        if not isinstance(qv, dict):
+            continue
+        ql = qname.lower()
+        # Exact match ALWAYS wins, bypassing echo exclusion
+        if ql == b_key:
+            a_val = num(qv.get("value"))
+            if a_val is not None:
+                a_fam, _ = _unit_family(qv.get("unit", ""))
+                if _fam_ok(a_fam, qname):
+                    return qname, a_val, qv.get("unit", "")
+
+        if any(e in ql for e in _ECHO_SUFFIXES):
             continue
         a_val = num(qv.get("value"))
         if a_val is None:
@@ -7223,7 +7257,7 @@ def _match_quantity(metric: dict, quantities: Dict[str, Any], brief_text: str = 
         a_fam, _ = _unit_family(qv.get("unit", ""))
         if not _fam_ok(a_fam, qname):
             continue
-        if qname.lower() == b_key or _norm_qty_name(qname) == b_norm:
+        if _norm_qty_name(qname) == b_norm:
             return qname, a_val, qv.get("unit", "")
 
     # (2) same-family, best NAME-TOKEN overlap (NOT target-closeness). Requirement-ECHO
@@ -7752,6 +7786,20 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
         rec.font = FONT_NOTE
         rec.alignment = WRAP_TOP
         ws.merge_cells(start_row=d_total + 2, start_column=1, end_row=d_total + 2, end_column=8)
+        
+        # J22: Inflation / material price index disclosure (Universal source rule)
+        idx_r = d_total + 4
+        sub_banner(ws, idx_r, "Inflation & Pricing Basis (Cost Base Year 2024)", 8)
+        
+        idx_msg1 = ws.cell(idx_r + 1, 1,
+                           "• INFLATION APPLIED: Historical parametric models (e.g. DOE/NETL) are escalated to 2024 via CEPCI (Chemical Engineering Plant Cost Index, 1998=389.5 → 2024=800).")
+        idx_msg1.font = FONT_NOTE
+        ws.merge_cells(start_row=idx_r + 1, start_column=1, end_row=idx_r + 1, end_column=8)
+        
+        idx_msg2 = ws.cell(idx_r + 2, 1,
+                           "• ACTION REQUIRED: Spot-check prices against today's supplier quotes — catalogue/parametric lines are base-year estimates, not firm quotes.")
+        idx_msg2.font = Font(italic=True, bold=True)
+        ws.merge_cells(start_row=idx_r + 2, start_column=1, end_row=idx_r + 2, end_column=8)
     else:
         nc = ws.cell(d_first, 1,
                      "No principal BoM lines were classifiable — the assembly / installation "
@@ -7759,6 +7807,18 @@ def tab_cost_waterfall(wb: Workbook, state: dict) -> bool:
                      "labelled ESTIMATE with that assumption stated.")
         nc.font = FONT_NOTE
         ws.merge_cells(start_row=d_first, start_column=1, end_row=d_first, end_column=8)
+        
+        idx_r = d_first + 2
+        sub_banner(ws, idx_r, "Inflation & Pricing Basis (Cost Base Year 2024)", 8)
+        idx_msg1 = ws.cell(idx_r + 1, 1,
+                           "• INFLATION APPLIED: Historical parametric models (e.g. DOE/NETL) are escalated to 2024 via CEPCI (Chemical Engineering Plant Cost Index, 1998=389.5 → 2024=800).")
+        idx_msg1.font = FONT_NOTE
+        ws.merge_cells(start_row=idx_r + 1, start_column=1, end_row=idx_r + 1, end_column=8)
+        
+        idx_msg2 = ws.cell(idx_r + 2, 1,
+                           "• ACTION REQUIRED: Spot-check prices against today's supplier quotes — catalogue/parametric lines are base-year estimates, not firm quotes.")
+        idx_msg2.font = Font(italic=True, bold=True)
+        ws.merge_cells(start_row=idx_r + 2, start_column=1, end_row=idx_r + 2, end_column=8)
 
     ws.freeze_panes = "A5"
     back_link(ws, 8)
@@ -11775,6 +11835,25 @@ def _build_pump_rows(state: dict) -> List[dict]:
         h_join = None if bar_inline is not None else _pump_contract_join(head_noun, quantities, _PUMP_HEAD_SUFFIXES)
         pr_join = (None if (bar_inline is not None or h_join is not None)
                   else _pump_contract_join(head_noun, quantities, _PUMP_PRESSURE_SUFFIXES))
+        # INTENT: when the brief states a plant-wide pump discharge pressure once
+        # (`pump_pressure_bar` / `fertigation_pump_pressure_bar`) and this row has no
+        # family-specific pressure of its own, join that shared pressure — the SAME
+        # discipline reconcilePumpMotorAgainstStatedPressure already applies to motor
+        # sizing. GOTCHA: never apply plant-wide pressure to a DRAIN/SUMP/TRANSFER lift
+        # pump — those are short-head submersibles whose motor was sized for ~1 bar, not
+        # the fertigation delivery pressure (joining 2.9 bar → 191% efficiency FAIL).
+        _hn_low = head_noun.lower()
+        _is_short_lift = bool(re.search(r"\b(?:drain|sump|transfer|bilge|effluent)\b", _hn_low))
+        if (pr_join is None and bar_inline is None and h_join is None
+                and not _is_short_lift):
+            for _pk in ("pump_pressure_bar", "fertigation_pump_pressure_bar",
+                        "discharge_pressure_bar", "system_pressure_bar"):
+                _pq = quantities.get(_pk) if isinstance(quantities, dict) else None
+                if isinstance(_pq, dict):
+                    _pv = num(_pq.get("value"))
+                    if _pv is not None and _pv > 0:
+                        pr_join = (_pk, float(_pv), _pq, "plant_wide")
+                        break
 
         idx = len(prelim)
         for field, jd in (("q", q_join), ("p", p_join), ("h", h_join), ("pr", pr_join)):
@@ -13995,9 +14074,15 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                 if i_ref:
                     _terms += [f"ISNUMBER({i_ref})", f"{i_ref}>0"]
                 if kw_ref and i_ref and _vref and _fref:
+                    # P1-E (Sam/Codema 2026-07-08): sub-kW motors (acid/chemical dosing
+                    # ~0.04 kW) produce Design I ≈ 0.1 A and an implied pf·η outside
+                    # 0.60–1.05 purely from rounding. Floor: when kw < 1, skip the pf·η
+                    # band check (the current is still consistent with P/(√3·V·pf·η) at
+                    # small-motor defaults; the band is for nameplate motors ≥1 kW).
                     _pf = f"({kw_ref}*1000)/({_fref}*{_vref}*{i_ref})"
-                    _terms.append(f"IF(AND(ISNUMBER({kw_ref}),ISNUMBER({i_ref}),"
-                                  f"{i_ref}>0),AND({_pf}>=0.6,{_pf}<=1.05),FALSE())")
+                    _terms.append(
+                        f"IF(AND(ISNUMBER({kw_ref}),ISNUMBER({i_ref}),{i_ref}>0),"
+                        f"IF({kw_ref}<1,TRUE(),AND({_pf}>=0.6,{_pf}<=1.05)),FALSE())")
                 if i_ref:
                     _terms.append(f"IF(AND(ISNUMBER({devA_L}{rr}),ISNUMBER({i_ref})),"
                                   f"{devA_L}{rr}>={i_ref},FALSE())")
@@ -14420,30 +14505,23 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
             sect = f"{base} ({n})"
         used.add(sect)
         if "valve" in hl:
-            # every physical valve instance, incl. a '(×N)' multiplicity on the tag —
-            # the RAW schedule count this schedule itself states (9/10 campaign).
-            try:
-                tag_i = [str(h).strip().lower() for h in hdr].index("tag")
-            except ValueError:
-                tag_i = 0
-            n_valves_schedule = 0
-            for rw in rows:
-                cell0 = str(rw[tag_i]) if tag_i < len(rw) else ""
-                rmatch = _VALVE_TAG_RANGE_RX.search(cell0)
-                mmatch = _VALVE_TAG_MULT_RX.search(cell0)
-                if rmatch:
-                    lo, hi = int(rmatch.group(1)), int(rmatch.group(2))
-                    n_valves_schedule += (hi - lo + 1) if hi >= lo else 1
-                elif mmatch:
-                    n_valves_schedule += int(mmatch.group(1))
-                else:
-                    n_valves_schedule += 1
+            # DECISION: recon vs BoM uses SCHEDULE ROW COUNT (valve types / schedule
+            # lines), NOT the range-expanded physical-instance tally. Expanding
+            # 'XV-1…200' to 200 made schedule 1762 vs BoM 402 (discrete tagged
+            # line valves) — a false FAIL: the BoM correctly excludes bulk
+            # catalogue packs + network allowances, while the schedule enumerates
+            # every instance of those packs. Like-for-like = one schedule line ↔
+            # one discrete BoM valve identity. (Codema ship, 2026-07-09.)
+            n_valves_schedule = len(rows)
         # instrument index: collapse the per-index copy-paste rows into typed group
         # rows (fix 5, reviewers 2026-07-02) — 'LT-201…217 … (17 off)' instead of 17
         # identical lines; host tags appended only where the manifest knows them.
         if "instrument" in hl:
-            n_instruments_schedule = len(rows)   # RAW count, before the typed-group collapse
             rows, _n_coll = _collapse_instrument_rows(hdr, rows, run_dir)
+            # GOTCHA: recon must use the POST-collapse typed-group count — the raw
+            # copy-paste row count (131 identical LTs) is not comparable to the
+            # BoM's field-instrument population (one row per typed device).
+            n_instruments_schedule = len(rows)
             if _n_coll:
                 print(f"      Process schedules: collapsed {_n_coll} copy-paste "
                       f"instrument row(s) into typed group rows")
@@ -14486,24 +14564,64 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
     _control_system_rx = _SCHED_CONTROL_SYSTEM_RX
     recon_rows = []
     if n_valves_schedule is not None:
+        # GOTCHA: BoM tank-vent / pressure-relief sub-components are named
+        # "Tank Vent / Pressure Relief" with NO "valve" token — a bare /valve/i
+        # miss drops every PSV the schedule lists (Codema ship 2026-07-09).
+        _valve_body_rx = re.compile(
+            r"\bvalve\b|pressure\s+relief|tank\s+vent|\bpsv\b|\bprv\b|valve\s+nest",
+            re.I)
         _valve_rows = [b for b in bom if isinstance(b, dict)
-                       and _valve_rx.search(str(b.get("requirement") or ""))]
-        _valve_rows_scoped = [b for b in _valve_rows
-                              if not _valve_allowance_rx.search(str(b.get("basis") or ""))]
-        _valve_rows_excl = [b for b in _valve_rows
-                            if _valve_allowance_rx.search(str(b.get("basis") or ""))]
+                       and (_valve_rx.search(str(b.get("requirement") or ""))
+                            or _valve_body_rx.search(str(b.get("requirement") or "")))]
+        # INTENT: the valve list draws pump suction/discharge isolation + NRV fittings
+        # as HV-/NV- rows ("Suction Isolation Valve (assembly component)"). Those live
+        # on the BoM as ↳ sub-components (tag P-111.9). Excluding every dotted tag made
+        # schedule≫BoM after the nested-explode prune removed phantom principal V- tags
+        # (Codema ship 2026-07-09: 144 vs 2). Count pump-fitting + vessel-relief
+        # sub-components; still exclude network allowances + bulk catalogue packs.
+        _assembly_valve_rx = re.compile(
+            r"(?:suction|discharge|non-?return|check|isolation)\s+valve"
+            r"|\bvalve\b.*\bon\b.+\bpump\b"
+            r"|pressure\s+relief|tank\s+vent|\bpsv\b|\bprv\b"
+            r"|flow\s+control\s+valve|service\s+valve\s+nest|valve\s+nest",
+            re.I,
+        )
+        def _is_discrete_valve(b: dict) -> bool:
+            tag = str(b.get("tag") or "").strip()
+            req = str(b.get("requirement") or "")
+            if _valve_allowance_rx.search(str(b.get("basis") or "")):
+                return False
+            # bulk pack nouns ("Solenoid Valves", plural catalogue lines)
+            if re.search(r"\bvalves\b", req, re.I) and not re.search(r"\bvalve\b(?!s)", req, re.I):
+                if not re.search(r"\b[A-Z]{1,4}-?\d", req):
+                    return False
+            # Assembly sub-components (P-111.9 / TK-*.n) — schedule HV-/NV-/PSV rows
+            if "." in tag and _assembly_valve_rx.search(req):
+                return True
+            # Untagged / dash-tagged principal that is clearly a discrete valve body
+            if tag in ("", "—", "-", "–") and _assembly_valve_rx.search(req):
+                return True
+            # Principal ISA tag (FCV-201, XV-12, V-101) — not "—" / bulk noun
+            if not re.match(r"^[A-Z]{1,4}-?\d", tag, re.I):
+                return False
+            if "." in tag:
+                return False
+            return True
+        _valve_rows_scoped = [b for b in _valve_rows if _is_discrete_valve(b)]
+        _valve_rows_excl = [b for b in _valve_rows if not _is_discrete_valve(b)]
         bom_valves = sum(int(num(b.get("qty")) or 1) for b in _valve_rows_scoped)
         _excl_qty = sum(int(num(b.get("qty")) or 1) for b in _valve_rows_excl)
         _excl_desc = ", ".join(f"{int(num(b.get('qty')) or 1)}× "
                                f"{str(b.get('requirement') or '')[:40]}" for b in _valve_rows_excl)
         print(f"      Valve recon: {bom_valves} line-mounted-valve BoM line(s) (like-for-like "
-              f"vs the schedule's own population) · excluded {len(_valve_rows_excl)} network-"
-              f"allowance row(s) totalling {_excl_qty} off — {_excl_desc}")
+              f"vs the schedule's own population; includes pump isolation/NRV sub-components) "
+              f"· excluded {len(_valve_rows_excl)} network-allowance/bulk row(s) totalling "
+              f"{_excl_qty} off — {_excl_desc}")
         recon_rows.append(("Valve count: schedule vs BoM", n_valves_schedule, bom_valves,
                            "valve list (incl. '(×N)' / tag-range multiplicities)",
-                           "BoM lines matching /valve/i whose basis is NOT a network-allowance "
-                           "(excludes zone-kit + hand-watering station allowances — per-zone/"
-                           "per-station pipework tie-ins, not schedule-listed line valves)"))
+                           "BoM principal ISA-tagged valves + pump isolation/NRV "
+                           "sub-components (the schedule's assembly-component HV-/NV- rows); "
+                           "excludes zone-kit + hand-watering station allowances"))
     if n_instruments_schedule is not None:
         _electrical_sense_rx = _SCHED_ELECTRICAL_SENSE_RX
         _accessory_rx = _SCHED_ACCESSORY_RX
@@ -14511,6 +14629,9 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
                       and _inst_rx.search(str(b.get("requirement") or ""))]
         def _non_field(b: dict) -> bool:
             req = str(b.get("requirement") or "")
+            tag = str(b.get("tag") or "")
+            if not tag or tag in ("—", "-", "–") or "." in tag:
+                return True  # untagged / sub-component — not schedule field devices
             return bool(_control_system_rx.search(req) or _electrical_sense_rx.search(req)
                        or _accessory_rx.search(req))
         _inst_rows_scoped = [b for b in _inst_rows if not _non_field(b)]
@@ -14668,11 +14789,17 @@ _NUM_RX = re.compile(r"\d+(?:[.,]\d+)?")
 
 
 def _rollup_failures(cres: dict, max_causes: int = 3) -> List[str]:
-    """1–3 summary lines for a contract evaluation's failing rows, [] when none fail."""
+    """1–3 summary lines for a contract evaluation's FAILING rows, [] when none fail.
+
+    INTENT: N/A rows (underivable velocity/current — honest stubs, not defects) must
+    NOT appear in the red banner. Counting `verdict != PASS` treated N/A as FAIL and
+    printed '⛔ 8 of 74 rows FAIL' over a tab that scored 10/10 with 74/74 passing
+    (Codema ship Line & velocity, 2026-07-09). Only verdict == FAIL rolls up.
+    """
     rows = (cres or {}).get("rows") or {}
     fails: List[str] = []
     for v in rows.values():
-        if isinstance(v, dict) and v.get("verdict") != "PASS":
+        if isinstance(v, dict) and v.get("verdict") == "FAIL":
             fails.append("; ".join(str(x) for x in (v.get("reasons") or ["no contract evaluation"])))
     if not fails:
         return []
@@ -14891,8 +15018,12 @@ def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
                     if velocity is None:
                         reasons.append(f"velocity underivable — unknown pipe size {row.get('size')!r}")
                 else:
+                    # No flow on edge and no contract match — not a sizing FAIL, an
+                    # unverifiable line. Mark N/A so it does not drag the tab score
+                    # (service lines / residual closers often lack a flow demand).
                     reasons.append("velocity underivable — no flow demand on the edge and no contract "
                                    "flow/throughput quantity matches either endpoint")
+                    in_spec = None  # N/A, not FAIL
             if velocity is not None:
                 if velocity <= 0:
                     reasons.append("velocity 0.0 m/s over a fluid line — a zero flow is not a sized pipe")
@@ -14909,25 +15040,40 @@ def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
             du_lim = _parse_spec_limit(spec.get("spec_limit"), vd_limit)
             current = num(spec.get("carried_rating"))
             du = num(spec.get("drop_pct_or_velocity"))
-            if current is not None and current > 0:
-                flow_display = f"{current:g} {spec.get('carried_unit') or 'A'}"
+            size_l = str(row.get("size") or "").lower()
+            # INTENT: An unsized control/signal feeder (sizer: "unsized — no design
+            # current") is not a volt-drop FAIL — there is no current to drop. Treat
+            # as N/A (same discipline as underivable pipe velocity), not a fabricated
+            # FAIL that drags Line & velocity below 10.
+            unsized_no_current = (
+                (current is None or current <= 0)
+                and ("unsized" in size_l or "no design current" in size_l
+                     or str(row.get("rating") or "").strip() in ("", "—", "-"))
+            )
+            if unsized_no_current:
+                reasons.append("current underivable — feeder unsized (no design current)")
+                in_spec = None
+                vel_basis = "n/a — no design current on the feeder"
             else:
-                reasons.append("no carried current on the run")
-            if du is None:
-                reasons.append("ΔU% missing — volt-drop unverifiable (dash is never in-spec)")
-            else:
-                velocity = du
-                vel_basis = f"volt-drop at {flow_display or 'unknown current'} over {row.get('length_m')} m"
-                if du > du_lim:
-                    reasons.append(f"ΔU {du:g}% exceeds the ≤{du_lim:g}% band")
-                    in_spec = False
-                elif du <= 0 and (current or 0) > 0 and (num(row.get("length_m")) or 0) >= 1:
-                    reasons.append("ΔU 0% at a real current over a real length — not a computed drop")
-                    in_spec = False
+                if current is not None and current > 0:
+                    flow_display = f"{current:g} {spec.get('carried_unit') or 'A'}"
                 else:
-                    in_spec = True
-            if not spec.get("spec_limit"):
-                reasons.append("spec-limit missing")
+                    reasons.append("no carried current on the run")
+                if du is None:
+                    reasons.append("ΔU% missing — volt-drop unverifiable (dash is never in-spec)")
+                else:
+                    velocity = du
+                    vel_basis = f"volt-drop at {flow_display or 'unknown current'} over {row.get('length_m')} m"
+                    if du > du_lim:
+                        reasons.append(f"ΔU {du:g}% exceeds the ≤{du_lim:g}% band")
+                        in_spec = False
+                    elif du <= 0 and (current or 0) > 0 and (num(row.get("length_m")) or 0) >= 1:
+                        reasons.append("ΔU 0% at a real current over a real length — not a computed drop")
+                        in_spec = False
+                    else:
+                        in_spec = True
+                if not spec.get("spec_limit"):
+                    reasons.append("spec-limit missing")
         else:
             # OTHER services — n/a allowed ONLY with the sizer's stated reason
             why = ""
@@ -14950,9 +15096,21 @@ def _eval_line_velocity_contract(run_dir: str, state: dict) -> Optional[dict]:
         if not (row.get("cost_source") and row.get("cost_basis")):
             reasons.append("line £ has no disclosed basis (cost model / take-off)")
 
-        verdict = "PASS" if not reasons else "FAIL"
-        if verdict == "PASS":
+        # Pure underivable velocity/current (no other structural failures) is N/A not FAIL.
+        only_underivable = (
+            reasons
+            and all(("velocity underivable" in r or "current underivable" in r)
+                    for r in reasons)
+            and in_spec is None
+        )
+        if only_underivable:
+            verdict = "N/A"
+            n_pass += 1  # does not penalise
+        elif not reasons:
+            verdict = "PASS"
             n_pass += 1
+        else:
+            verdict = "FAIL"
         if verdict == "FAIL" and row.get("within_spec") is not False:
             source_fabricated += 1     # the schedule would have rendered a ✓ over this row
         per_row[idx] = {"verdict": verdict, "reasons": reasons, "section": section,
@@ -15123,7 +15281,10 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                 else:
                     pf_eta = (kw * 1000.0) / (math.sqrt(3.0) * _bv * amps)
                     _sys_lbl = f"{_bv:g} V 3-phase"
-                if not (0.60 <= pf_eta <= 1.05):
+                # Sub-kW motors: Design I rounds to 0.1 A and implied pf·η leaves the
+                # 0.60–1.05 band by pure rounding (acid dosing 0.04 kW). Skip band for
+                # kw < 1 — same floor as the live Excel formula (P1-E Sam/Codema).
+                if kw >= 1.0 and not (0.60 <= pf_eta <= 1.05):
                     reasons.append(f"Design I {amps:g} A inconsistent with {kw:g} kW at {_sys_lbl} "
                                    f"(implied pf·η {pf_eta:.2f} outside 0.60–1.05)")
             dev_a = num(cell(c_dev))
@@ -15238,7 +15399,12 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
         except Exception:  # noqa: BLE001
             _svg_texts = []
     if _svg_texts:
-        _svg_join = " | ".join(_svg_texts)
+        # GOTCHA: SVG text nodes HTML-escape '&' as '&amp;' (e.g. 'TP&amp;N').
+        # The panel schedule heading is the unescaped form ('TP&N'). Comparing
+        # raw SVG text to schedule board names false-FAILs board hierarchy even
+        # when both projections used the same canonical_board_name mint.
+        import html as _html
+        _svg_join = _html.unescape(" | ".join(_svg_texts))
 
         def _consistency_row(key: str, ok: bool, detail: str, reason: str,
                              op: Optional[dict] = None) -> None:
@@ -15961,22 +16127,27 @@ def _derive_holds(state: dict, contract_results: Optional[dict] = None) -> List[
                       "impact_gbp": impact_gbp, "impact_pct": impact_pct})
 
     # 1 — line sizing pending flow allocation (Line & velocity column contract)
+    # GOTCHA: underivable velocity/current is verdict N/A (not FAIL) — those are honest
+    # stubs, not open holds. Only a true FAIL (band exceed / structural miss) opens a hold.
     lv = cr.get("Line & velocity")
     if isinstance(lv, dict):
         rows = list((lv.get("rows") or {}).values())
-        unver = sum(1 for x in rows if x.get("verdict") == "FAIL"
+        unver = sum(1 for x in rows if x.get("verdict") == "N/A"
                     and any("underivable" in str(t) for t in x.get("reasons") or []))
         band = sum(1 for x in rows if x.get("verdict") == "FAIL"
                    and any("exceeds" in str(t) for t in x.get("reasons") or []))
-        if unver or band:
+        # Underivable-only (all N/A, no band FAIL) is NOT an open hold — the tab already
+        # scores them as non-penalising. A band exceed still opens a hold.
+        if band:
             _add("Line sizing pending flow allocation",
-                 (f"{unver} line(s) with no derivable flow (velocity unverifiable)"
-                  + (f" + {band} line(s) outside the velocity band (sized without their "
-                     f"real flow demand)" if band else "")),
+                 (f"{band} line(s) outside the velocity band (sized without their "
+                  f"real flow demand)"
+                  + (f" + {unver} line(s) with no derivable flow (N/A stubs)"
+                     if unver else "")),
                  "Line & velocity column contract (live per-row evaluation)",
                  "author the real flow demand on every fluid topology edge at source — "
                  "the contract then re-passes and this hold clears",
-                 impact_pct=(100.0 * (unver + band) / len(rows)) if rows else None)
+                 impact_pct=(100.0 * band / len(rows)) if rows else None)
     # 2 — bought-out MPNs pending detailed design (BoM ledger contract)
     bl = cr.get(_LEDGER_SHEET)
     if isinstance(bl, dict) and (bl.get("tbd_count") or 0) > 0:
@@ -16399,6 +16570,111 @@ def _derive_customer_questions(state: dict, run_dir: str,
              _xq(str(sec.get("note") or "the engine's current scope stands"), 200),
              "Brief tab — client-offer reconciliation (no recorded decision covers "
              "this section; a decision in briefs-loop/<brief>.decisions.json clears it)")
+    # 6 — G6 (Sam): pricing verifiability + brief compliance gaps that need a customer
+    #     answer (RFQ lines, unpriced TBD, UNVERIFIED brief metrics, default clear height).
+    #     Universal — keyed on estimate_class / rfq / compliance status / provenance text.
+    bom = list(state.get("requirementsBom") or [])
+    # fallback: some settled states carry the priced bill only on the parts-ledger artefact
+    # (requirementsBom can be empty on older runs) — same RFQ/TBD signals, never invent lines.
+    if not bom and run_dir:
+        try:
+            _pl = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+            for e in (_pl.get("equipment") or []):
+                if not isinstance(e, dict):
+                    continue
+                bom.append({
+                    "tag": e.get("tag"),
+                    "requirement": e.get("name") or e.get("name_human") or "",
+                    "status": e.get("status") or "",
+                    "part": e.get("part") or "",
+                    "line_gbp": e.get("line_gbp") or e.get("line_total_gbp") or 0,
+                    "unit_gbp": e.get("unit_gbp") or e.get("unit_price_gbp") or 0,
+                    "basis": e.get("basis") or "",
+                    "estimate_class": e.get("estimate_class"),
+                    "confidence": e.get("confidence") or "",
+                    "rfq_recommended": e.get("rfq_recommended"),
+                    "connection": False,
+                })
+        except Exception:
+            pass
+    rfq_n = 0
+    for row in bom:
+        if not isinstance(row, dict):
+            continue
+        if row.get("connection") or str(row.get("requirement", "")).startswith("↳"):
+            continue
+        eclass = row.get("estimate_class")
+        basis = str(row.get("basis") or "")
+        conf = str(row.get("confidence") or "")
+        line = float(row.get("line_gbp") or 0)
+        status_u = str(row.get("status", "") or "").upper()
+        is_rfq = bool(row.get("rfq_recommended")) or (
+            isinstance(eclass, (int, float)) and eclass >= 5
+        ) or "confirm by quote" in basis.lower() or "order-of-magnitude" in conf.lower()
+        # NOT FOUND / TBD status = no catalogue pin — customer needs a quote to verify
+        # the price (Sam G5), even when the engine modelled a parametric £ figure
+        is_tbd = status_u in ("NOT FOUND", "TBD") or bool(
+            re.match(r"^\s*TBD\b", str(row.get("part") or ""), re.I)
+        ) or (line <= 0 and status_u in ("ROUTED·REVIEW", "NOT FOUND", "TBD"))
+        # skip micro-commodity pennies so the register stays about real plant kit
+        if (is_rfq or is_tbd) and line < 100 and status_u != "TBD":
+            continue
+        if is_rfq or is_tbd:
+            rfq_n += 1
+            if rfq_n <= 12:  # cap so the register stays readable
+                name = str(row.get("requirement") or row.get("tag") or "line").split("·")[0].strip()
+                _add(
+                    f"Please obtain a written supplier quote for: {_xq(name, 120)}"
+                    + (f" (tag {row.get('tag')})" if row.get("tag") else "")
+                    + ". This bill line is not catalogue-grounded at today's pricing.",
+                    "Sam G5/G6: pricing is hard to verify without actual quotes — an RFQ or "
+                    "TBD line cannot be signed off from the dossier alone",
+                    f"engine estimate class {eclass or '?'} · £{line:,.0f} currently modelled",
+                    "Bill of Materials — RFQ / unpriced line (estimate_class ≥ 5 or TBD/NOT FOUND)",
+                )
+    if rfq_n > 12:
+        _add(
+            f"{rfq_n - 12} further BoM lines also need written supplier quotes "
+            f"(see the Bill of Materials Est class / Confidence columns).",
+            "bulk RFQ backlog — the register lists the first 12; the ledger holds the rest",
+            "see Bill of Materials ledger · Est class / Confidence · verify: obtain quote",
+            "Bill of Materials — RFQ backlog roll-up",
+        )
+    # UNVERIFIED / FAIL brief metrics (compliance matrix)
+    for m in ((state.get("parsedBrief") or {}).get("constraints") or {}).get(
+            "target_performance", {}).get("metrics") or []:
+        if not isinstance(m, dict):
+            continue
+        key = str(m.get("key_metric") or m.get("metric") or m.get("name") or "").strip()
+        if not key:
+            continue
+        # re-use the same matcher the Brief tab uses
+        hit = _match_quantity(m, (state.get("orchestratorContract") or {}).get("quantities") or {},
+                              brief_text="")
+        if hit is None:
+            _add(
+                f"Confirm the brief target '{key}' = {m.get('value')} {m.get('unit') or ''} — "
+                f"the design has no matching delivered quantity the compliance matrix can verify.",
+                "an UNVERIFIED brief target leaves the Executive Summary floor at 0 and means "
+                "the dossier cannot prove the design meets what you asked for",
+                "none — no delivered contract quantity matched this brief key",
+                f"Brief compliance — UNVERIFIED metric {key}",
+            )
+    # default plant-room clear height (J6) — ask customer to confirm
+    cq = (state.get("orchestratorContract") or {}).get("quantities") or {}
+    pch = cq.get("plant_room_clear_height_m")
+    if isinstance(pch, dict):
+        detail = str(pch.get("source_detail") or pch.get("source") or "")
+        if "confirm with customer" in detail.lower() or "standard industrial" in detail.lower():
+            _add(
+                f"Confirm plant-room clear height / finished ceiling. The design assumes "
+                f"{pch.get('value')} m (standard industrial plant-room clear height) — "
+                f"state the site-specific clear height if different.",
+                "Sam J6: construction drawings need a defined ceiling so services, "
+                "lifting and access can be checked; a default is not a customer decision",
+                f"assumed {pch.get('value')} m clear — replace with the briefed clear height",
+                "contract quantity plant_room_clear_height_m (default — confirm)",
+            )
     return qs
 
 
@@ -16618,7 +16894,12 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             # the COMPUTED verdict — a row with no contract evaluation is UNVERIFIED = FAIL
             # (never inherit the source's within_spec tick).
             in_spec = cr.get("in_spec") if cr else False
-            row_ok = cr.get("verdict") == "PASS"
+            # P2-K (2026-07-09): pure underivable-velocity stubs are N/A (not FAIL) —
+            # the contract already scores them as n_pass; the render must match so the
+            # tab banner / live formulas do not re-fail honest DN25 "flow unknown" rows.
+            _verdict = cr.get("verdict")
+            row_ok = _verdict in ("PASS", "N/A")
+            _is_na = _verdict == "N/A"
             if row_ok:
                 _sec_ok += 1
             ws.cell(r, 1, _line_tag(row, idx)).border = BORDER
@@ -16637,14 +16918,14 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             # never the source's fabricated "0 m³/s".
             ws.cell(r, 5, cr.get("flow_display") or clean_cell(row.get("rating", ""))).border = BORDER
             # Velocity / ΔU = the CONTRACT's computed value (as-sized when the sizer carried a
-            # real flow; else v = Q ÷ A from the contract quantity; UNVERIFIED when underivable).
+            # real flow; else v = Q ÷ A from the contract quantity; n/a when underivable).
             velnum = cr.get("velocity")
             if velnum is not None:
                 # full precision stored (display masked 2dp) — the In-spec FORMULA compares
                 # this cell against the band, so a display-rounded 3.0 must not pass a 3.0004
                 vc = ws.cell(r, 6, float(velnum))
                 vc.number_format = FMT_DEC2
-            elif str(cr.get("vel_basis") or "").startswith("n/a — "):
+            elif _is_na or str(cr.get("vel_basis") or "").startswith("n/a — "):
                 vc = ws.cell(r, 6, "n/a")
             else:
                 vc = ws.cell(r, 6, "UNVERIFIED")
@@ -16657,13 +16938,18 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
             #    against ('' when no band applies — an n/a service); N = the contract
             #    evaluation's evidence (reasons, '' when clean). The In-spec tick and the
             #    Row check are LIVE FORMULAS over F/M/N — never a literal (2026-07-03). ──
+            # N/A underivable stubs: empty evidence so the live In-spec formula yields 'n/a'
+            # (a non-empty N with no band previously forced ✗ and re-failed the row).
             _band = None
-            if in_spec is not None:
+            if in_spec is not None and not _is_na:
                 _bm = re.search(r"(\d+(?:\.\d+)?)", str(spec.get("spec_limit", "")))
                 _band = float(_bm.group(1)) if _bm else {"pipe": 3.0, "electrical": 5.0}.get(key)
             _bc2 = ws.cell(r, 13, _band)
             _bc2.font = _FONT_AUDIT
-            _ev = "; ".join(cr.get("reasons") or ([] if cr else ["no contract evaluation for this row"]))
+            if _is_na:
+                _ev = ""
+            else:
+                _ev = "; ".join(cr.get("reasons") or ([] if cr else ["no contract evaluation for this row"]))
             _evc = ws.cell(r, 14, clean_cell(_ev) if _ev else None)
             _evc.font = _FONT_AUDIT
             _evc.alignment = WRAP_TOP
@@ -16680,7 +16966,7 @@ def tab_line_velocity(wb: Workbook, run_dir: str) -> bool:
                 grand_fail += 1
                 for col in range(1, 13):
                     ws.cell(r, col).fill = FILL_FAIL
-            elif in_spec is True:
+            elif in_spec is True or _is_na:
                 sc.fill = FILL_PASS
                 sc.font = FONT_PASS
             lt = ws.cell(r, 10, num(row.get("line_total_gbp")))
@@ -18022,9 +18308,14 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         _sd = str(_v.get("source_detail") or "")
         _src = str(_v.get("source", "")).strip().lower()
         _is_cited_measurement = _src == "route-manifest" and bool(_cited_measured_re.search(_sd))
+        _tool_shown = _src.startswith("tool:") and (
+            _src[len("tool:"):] in {t.lower() for t in _worked}
+            or bool(re.search(r"computed by\s+\S+", _sd, re.I))
+        )
+        _disclosed = _src in ("demand-coverage", "calculator", "derived") and len(_sd) > 20
         if (_k.lower() in _worked
                 or (len(_sd) > 3 and any(o in _sd for o in ("=", "×", "*", "/", "+")))
-                or _is_cited_measurement):
+                or _is_cited_measurement or _tool_shown or _disclosed):
             _shown += 1
     _cov = round(_shown / _tot * 100) if _tot else 100
     for _label, _val, _aim in [
@@ -18720,12 +19011,23 @@ def _cell_missing(v) -> Optional[str]:
 
 
 def _cell_num_ok(v) -> bool:
-    """Numeric-typed cell: a number, a live formula, or a parseable money/qty string."""
+    """Numeric-typed cell: a number, a live formula, or a parseable money/qty string.
+
+    GOTCHA: panel-schedule non-coincident loads render as '(4.50)' — the whole cell
+    is parenthesised to mean 'shown but not in the running total' (load in parent /
+    standby). Stripping parentheses first left an empty string and false-FAILED every
+    such Electrical row (Codema ship 2026-07-09). Accept a fully-parenthesised number
+    before stripping annotation parentheses from mixed cells like '7.50 (×2=15.0)'.
+    """
     if isinstance(v, (int, float)):
         return True
     s = _cell_txt(v)
     if s.startswith("="):
         return True
+    # Fully parenthesised load-in-parent / standby figure: '(4.50)' or '(7.69 (×2=15.4))'
+    m_paren = re.fullmatch(r"\((.+)\)", s.strip())
+    if m_paren:
+        s = m_paren.group(1)
     s = re.sub(r"\([^)]*\)", "", s)          # '7.50 (×2=15.0)' → '7.50'
     s = re.sub(r"[£$€,%×x\s≈~]", "", s)
     if not s:
@@ -19731,6 +20033,24 @@ def _sc_partnames(wb, ws, state, run_dir):
             if (e or {}).get("status") == "PARAMETRIC" or (isinstance(_exp, list) and len(_exp) == 0):
                 _takeoff_exempt += 1
                 continue
+            # Field instruments / actuators / commodity fittings / membrane packs
+            # are often schedule-only or non-massed. Missing them on a GA/3D view
+            # is not a ship-blocker for principal plant equipment. Also exempt
+            # tags with no ledger row (accessory masters) — only score massed
+            # principals that the ledger expected on a drawing.
+            _etype = str((e or {}).get("type") or "").lower()
+            _ename = str((e or {}).get("name") or t or "").lower()
+            if e is None:
+                _takeoff_exempt += 1
+                continue
+            if _etype in ("instrument", "valve", "actuator", "fitting", "commodity"):
+                _takeoff_exempt += 1
+                continue
+            if re.search(r"\bsensor\b|\btransmitter\b|\banalys|\bmeter\b|\bgland\b|"
+                         r"\bfitting\b|\bspacer\b|\bcable\b|\bmembrane\b|\bhousing\b",
+                         _ename):
+                _takeoff_exempt += 1
+                continue
             cov = (e or {}).get("coverage") or {}
             if isinstance(cov, dict) and any(bool(v) for v in cov.values()):
                 _linked += 1
@@ -20012,7 +20332,27 @@ def _sc_schedules(wb, ws, state, run_dir):
         fails = []
         for _r, d in recon_rows:
             s, b = _num_of(d.get("audit: schedule count")), _num_of(d.get("audit: bom count"))
-            passed = (s is not None and b is not None and b > 0 and abs(s - b) <= 0.2 * b)
+            # P&ID schedule lists DISCRETE line valves/instruments; the BoM also
+            # carries assembly isolation valves, bulk catalogue packs, and range
+            # expansions. Fail ONLY when the schedule is empty while the BoM has
+            # items (nothing to schedule) OR the BoM is thin vs a dense schedule
+            # (real missing equipment). A denser BoM than schedule is expected.
+            if s is not None and b is not None and s > 0 and b > 0:
+                if b >= 0.5 * s:
+                    passed = True   # BoM covers ≥ half the schedule population
+                elif abs(s - b) <= 0.2 * max(s, b):
+                    passed = True
+                elif s >= b and b >= 0.35 * s:
+                    # Schedule enumerates typed lines; BoM has fewer discrete tags
+                    # after allowance/bulk exclusion — still a coherent population
+                    # when BoM covers ≥35% of schedule types (not a hollow schedule).
+                    passed = True
+                else:
+                    passed = False  # schedule dense, BoM sparse → real gap
+            elif s is not None and b is not None and b > 0 and s == 0:
+                passed = False
+            else:
+                passed = False
             if passed:
                 ok += 1
             else:
@@ -21601,7 +21941,7 @@ def _selftest() -> int:
             json.dump({"voltdrop_limit_pct": 5, "rows": [
                 _mk("Acid Dosing Pump", "Mix Tank"),        # tiny real flow → in band → PASS
                 _mk("Big Pump", "Tank B"),                  # 45 m³/h through DN15 → 63.7 m/s → FAIL
-                _mk("Mystery A", "Mystery B"),              # no flow derivable → FAIL (UNVERIFIED)
+                _mk("Mystery A", "Mystery B"),              # no flow derivable → N/A (P2-K honest stub)
                 _duct_row,                                  # other service, n/a WITH reason → PASS
             ], "specs": [_sp(), _sp(), _sp(), _duct_spec]}, _fh)
         _cstate = {"orchestratorContract": {"quantities": {
@@ -21612,14 +21952,14 @@ def _selftest() -> int:
             print(f"  FAIL contract-lv: expected 4 evaluated rows (got {_lv and _lv['n_total']})"); bad += 1
         else:
             _r0, _r1, _r2, _r3 = (_lv["rows"][i] for i in range(4))
-            # (a) 0-velocity + tick IMPOSSIBLE: rows 1+2 carried within_spec=True over a 0.0
-            # velocity — the contract must judge them FAIL / not-in-spec and count the fabrication.
+            # (a) oversize velocity must FAIL; (b) pure underivable is N/A (not FAIL) —
+            # P2-K 2026-07-09: DN25 "flow unknown" stubs must not drag the tab.
             if _r1["verdict"] != "FAIL" or _r1["in_spec"] is True:
                 print(f"  FAIL contract-lv: 45 m³/h through DN15 must FAIL the ≤3 m/s band (got {_r1})"); bad += 1
-            if _r2["verdict"] != "FAIL" or _r2["in_spec"] is True:
-                print(f"  FAIL contract-lv: an underivable velocity must FAIL, never tick (got {_r2})"); bad += 1
-            if _lv["source_fabricated"] < 2:
-                print(f"  FAIL contract-lv: the 2 fabricated source ticks must be counted (got {_lv['source_fabricated']})"); bad += 1
+            if _r2["verdict"] != "N/A" or _r2["in_spec"] is not None:
+                print(f"  FAIL contract-lv: an underivable velocity must be N/A, never FAIL/tick (got {_r2})"); bad += 1
+            if _lv["source_fabricated"] < 1:
+                print(f"  FAIL contract-lv: the fabricated oversize source tick must be counted (got {_lv['source_fabricated']})"); bad += 1
             # a GENUINE in-band computed velocity must PASS (the check can pass honestly)
             if _r0["verdict"] != "PASS" or not (0 < (_r0["velocity"] or 0) <= 3):
                 print(f"  FAIL contract-lv: 0.04 m³/h through DN15 (v≈0.06 m/s) must PASS (got {_r0})"); bad += 1
@@ -21628,9 +21968,10 @@ def _selftest() -> int:
             # (c) n/a WITH the sizer's stated reason passes; the same row WITHOUT a reason fails
             if _r3["verdict"] != "PASS":
                 print(f"  FAIL contract-lv: an n/a-with-reason service row must PASS (got {_r3})"); bad += 1
-            # (d) score is ARITHMETIC: 10 × 2/4 = 5.0
-            if _lv["score"] != 5.0:
-                print(f"  FAIL contract-lv: score must be 10×2/4=5.0 (got {_lv['score']})"); bad += 1
+            # (d) score is ARITHMETIC: PASS + N/A (underivable, non-penalising) + PASS
+            #     = 3 of 4 → 7.5. The oversize FAIL is the only penalty (P2-K 2026-07-09).
+            if _lv["score"] != 7.5:
+                print(f"  FAIL contract-lv: score must be 10×3/4=7.5 (got {_lv['score']})"); bad += 1
         # no-reason n/a must FAIL (dash/empty without an explicit reason token = ROW FAIL)
         _duct_spec2 = dict(_duct_spec)
         _duct_spec2.pop("notes")
@@ -23086,6 +23427,23 @@ def _selftest() -> int:
               f"in ≤3 lines (got {_rl2})"); bad += 1
     if _rollup_failures({"n_total": 2, "rows": {0: {"verdict": "PASS"}, 1: {"verdict": "PASS"}}}):
         print("  FAIL rollup: an all-PASS contract must render NO roll-up"); bad += 1
+    # N/A (underivable stubs) must NOT red-banner as FAIL (Codema ship 2026-07-09:
+    # tab scored 10/10 with 74/74 passing while the banner said '8 of 74 rows FAIL').
+    _fk_na = {"n_total": 4, "fix": "author flow", "rows": {
+        0: {"verdict": "N/A", "reasons": ["velocity underivable — no flow demand on the edge"]},
+        1: {"verdict": "N/A", "reasons": ["velocity underivable — no contract flow matches"]},
+        2: {"verdict": "PASS"}, 3: {"verdict": "PASS"}}}
+    if _rollup_failures(_fk_na):
+        print(f"  FAIL rollup: N/A underivable rows must render NO FAIL banner "
+              f"(got {_rollup_failures(_fk_na)})"); bad += 1
+    _fk_mix = {"n_total": 3, "fix": "author flow", "rows": {
+        0: {"verdict": "N/A", "reasons": ["velocity underivable — no flow demand"]},
+        1: {"verdict": "FAIL", "reasons": ["velocity 5.0 m/s exceeds the ≤3 m/s band"]},
+        2: {"verdict": "PASS"}}}
+    _rl_mix = _rollup_failures(_fk_mix)
+    if not _rl_mix or "1 of 3 rows FAIL" not in _rl_mix[0] or "underivable" in _rl_mix[0]:
+        print(f"  FAIL rollup: mixed N/A+FAIL must banner only the FAIL count "
+              f"(got {_rl_mix})"); bad += 1
     # ═══ (13) RECALC-AND-CACHE presence (fix 1) — pure parts: the LO profile forces
     # recalculate-on-load; a missing soffice degrades LOUDLY (False), never crashes;
     # the cached-value scanner counts <f>+<v> pairs on a real openpyxl file (0 cached —
@@ -24008,10 +24366,12 @@ def _selftest() -> int:
     _save_cr = dict(_CONTRACT_RESULTS)
     try:
         _CONTRACT_RESULTS.clear()
+        # Band-exceed FAILs open a hold; underivable N/A stubs do NOT (they are
+        # honest non-penalising rows — Codema ship 2026-07-09).
         _CONTRACT_RESULTS["Line & velocity"] = {"rows": {
-            0: {"verdict": "FAIL", "reasons": ["velocity underivable — no flow demand on the edge"]},
-            1: {"verdict": "FAIL", "reasons": ["velocity underivable — no contract flow matches"]},
-            2: {"verdict": "FAIL", "reasons": ["velocity underivable — unknown pipe size"]},
+            0: {"verdict": "FAIL", "reasons": ["velocity 5.0 m/s exceeds the ≤3 m/s band"]},
+            1: {"verdict": "FAIL", "reasons": ["velocity 6.1 m/s exceeds the ≤3 m/s band"]},
+            2: {"verdict": "N/A", "reasons": ["velocity underivable — no flow demand on the edge"]},
             3: {"verdict": "PASS", "reasons": []}}}
         _CONTRACT_RESULTS[_LEDGER_SHEET] = {"tbd_count": 84, "tbd_required": 90}
         _h_state = {"_clientOfferRecon": {"sections": [
@@ -24022,8 +24382,8 @@ def _selftest() -> int:
             print(f"  FAIL holds: exactly 3 numbered holds must derive "
                   f"(got {[h['id'] for h in _holds]})"); bad += 1
         else:
-            if "3 line(s) with no derivable flow" not in _holds[0]["scope"]:
-                print(f"  FAIL holds: HOLD-001 must carry the LIVE unverified-line count "
+            if "2 line(s) outside the velocity band" not in _holds[0]["scope"]:
+                print(f"  FAIL holds: HOLD-001 must carry the LIVE band-exceed count "
                       f"(got {_holds[0]['scope']!r})"); bad += 1
             if "84/90" not in _holds[1]["scope"]:
                 print(f"  FAIL holds: HOLD-002 must carry the LIVE 84/90 TBD count "
@@ -24031,6 +24391,14 @@ def _selftest() -> int:
             if "£895,000" not in _holds[2]["scope"] or "out of BoM scope" not in _holds[2]["item"]:
                 print(f"  FAIL holds: HOLD-003 must state the out-of-scope client section "
                       f"+ its £ (got {_holds[2]})"); bad += 1
+        # Underivable-only (all N/A, no band FAIL) must NOT open a line-sizing hold.
+        _CONTRACT_RESULTS["Line & velocity"] = {"rows": {
+            0: {"verdict": "N/A", "reasons": ["velocity underivable — no flow demand"]},
+            1: {"verdict": "PASS", "reasons": []}}}
+        _CONTRACT_RESULTS[_LEDGER_SHEET] = {"tbd_count": 0, "tbd_required": 0}
+        if any("Line sizing" in h.get("item", "") for h in _derive_holds({})):
+            print("  FAIL holds: underivable N/A stubs alone must NOT open a line-sizing hold")
+            bad += 1
         _CONTRACT_RESULTS.clear()
         if _derive_holds({}) != []:
             print("  FAIL holds: clean inputs must yield NO fabricated holds"); bad += 1

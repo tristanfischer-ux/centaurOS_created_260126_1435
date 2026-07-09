@@ -44,6 +44,59 @@ export function computeScorecardFloor(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// NON-SHIP-GATING DEFECTS (Tristan 2026-07-09 — "keep Why now, don't fail the system")
+// ═══════════════════════════════════════════════════════════════════════════════
+// Marketing-timing prose ("Why now") is OPTIONAL colour on the cover. An LLM judge
+// may still flag generic boilerplate so a human can improve the paragraph, but that
+// defect class must NEVER drag the honest scorecard floor / allPass / Exec-Summary
+// floor-mirror. Engineering truth (compliance, BoM, drawings, physics, connectivity)
+// remains the ship gate. Universal — keyed on the defect text pattern, no class table.
+//
+// shipGatingScore: the score used for floor / mean / allPass. When EVERY defect on a
+// section matches a non-ship-gating class (or the section has no defects), a sub-10
+// advisory score is lifted to 10 for gating purposes only — the raw section.score and
+// defects[] stay unchanged so the critique remains visible. Lift is to 10 (not 8)
+// so a Why-now-only advisory can never pin Exec/QA floor mirrors below the >9 bar
+// Tristan requires on every tab (2026-07-09).
+const NON_SHIP_GATING_DEFECT_RE =
+  /why\s*now\s+paragraph|why_now|why\s+now\s+(?:is\s+)?generic|generic boilerplate.*why\s*now|why\s*now.*generic boilerplate/i
+
+/** True when a defect string is marketing-timing / Why-now prose only — never a ship gate. */
+export function isNonShipGatingDefect(defect: string): boolean {
+  return NON_SHIP_GATING_DEFECT_RE.test(String(defect ?? ''))
+}
+
+/**
+ * Score used for the honest ship floor / allPass. Preserves raw section.score for
+ * display; only lifts when the section's defects are exclusively non-ship-gating
+ * (or empty) and the raw score is the sole floor-drag. A section with any real
+ * engineering defect keeps its raw score.
+ */
+export function shipGatingScore(section: ScorecardSection): number {
+  const raw = Number(section.score)
+  if (!Number.isFinite(raw)) return 0
+  const defects = section.defects ?? []
+  if (defects.length === 0) return raw
+  if (defects.every((d) => isNonShipGatingDefect(d))) {
+    // Why-now-only (or other non-ship-gating-only) advisory: visible critique, not a fail.
+    return Math.max(raw, 10)
+  }
+  return raw
+}
+
+/** Honest ship floor/mean/allPass — min/mean of shipGatingScore across every section. */
+export function computeHonestShipFloor(
+  sections: ScorecardSection[],
+): { floor: number; mean: number; allPass: boolean } {
+  const scores = sections.map(shipGatingScore)
+  const floor = scores.length ? Math.min(...scores) : 0
+  const mean = scores.length
+    ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+    : 0
+  return { floor, mean, allPass: floor >= 8 }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SCORECARD HONESTY — dedup stale duplicate sections (Tristan 2026-07-08)
 // ═══════════════════════════════════════════════════════════════════════════════
 // The chain's computeQualityScorecard() pushes sections from several independent
@@ -703,5 +756,40 @@ export function scorecardFloorSelfTest(): { passed: number; failed: string[] } {
     `honestFloor=${honestFloor} deterministicOnlyFloor=${deterministicOnlyFloor}`,
   )
 
-  return { passed: 12 - failed.length, failed }
+  // (13) proveCatch — Why-now-only design_narrative must NOT drag the honest ship floor
+  // (Tristan 2026-07-09: keep the paragraph, do not fail the system off it).
+  const withWhyNowOnly = [
+    { name: 'connectivity', score: 9, defects: [] as string[] },
+    { name: 'drawing_gates', score: 10, defects: [] as string[] },
+    {
+      name: 'design_narrative',
+      score: 6,
+      defects: ['Why now paragraph is generic boilerplate'],
+      advisory: true,
+    },
+  ]
+  const ship = computeHonestShipFloor(withWhyNowOnly)
+  check(
+    'ship_floor.why_now_only_does_not_drag_floor_below_8',
+    ship.floor >= 9 && ship.allPass === true && shipGatingScore(withWhyNowOnly[2]) === 10,
+    JSON.stringify(ship),
+  )
+  // A design_narrative with a REAL engineering defect still drags the floor.
+  const withRealDefect = [
+    { name: 'connectivity', score: 9, defects: [] as string[] },
+    {
+      name: 'design_narrative',
+      score: 5,
+      defects: ['Module overview invents a heat pump the brief never asked for'],
+      advisory: true,
+    },
+  ]
+  const shipReal = computeHonestShipFloor(withRealDefect)
+  check(
+    'ship_floor.real_narrative_defect_still_drags_floor',
+    shipReal.floor === 5 && shipReal.allPass === false,
+    JSON.stringify(shipReal),
+  )
+
+  return { passed: 14 - failed.length, failed }
 }

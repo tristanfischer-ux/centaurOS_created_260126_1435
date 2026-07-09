@@ -1358,14 +1358,22 @@ def check_bom(state, rows, run_dir) -> list:
         return str(x or "").split("·")[0].strip().lower()
 
     def _fold_parent_exists(r) -> bool:
+        # INTENT: sub_of may name the parent by requirement lead OR by tag
+        # (requirements_bom historically stamped either). Accept both so a correct
+        # fold never false-HIGHs on a tag-shaped parent pointer (Codema 2026-07-09).
         target = _base_name(r.get("sub_of"))
         if not target or target in ("—", "-"):
             return False
         for p in rows:
             if p is r or not isinstance(p, dict):
                 continue
+            if _status(p) in _FOLD_STATUSES:
+                continue
+            if float(p.get("line_gbp") or 0) <= 0:
+                continue
             name = _base_name(p.get("requirement") or p.get("part"))
-            if name == target and _status(p) not in _FOLD_STATUSES:
+            tag = str(p.get("tag") or "").strip().lower()
+            if name == target or tag == target:
                 return True
         return False
 
@@ -2749,9 +2757,21 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         # wrongly hid every tool-sized number. A tool that shows NO working still leaves its
         # outputs hidden (a bare lookup is not a shown calculation).
         src = str(v.get("source", "")).strip().lower()
-        tool_shown = src.startswith("tool:") and src[len("tool:"):] in worked_tool_ids
+        # Tool-computed: full working on Tools/Calculations tab OR source_detail names
+        # the tool ("computed by process:pump-sizing …") — both are verifiable.
+        tool_shown = src.startswith("tool:") and (
+            src[len("tool:"):] in worked_tool_ids
+            or bool(re.search(r"computed by\s+\S+", sd, re.I))
+        )
+        # demand-coverage / calculator lineage that cites its parent rule is a disclosed
+        # derivation (e.g. backup pump = duty unit's kW), not a hidden calc.
+        disclosed_lineage = src in ("demand-coverage", "calculator", "derived") and (
+            bool(re.search(r"\bRULE\b|rated identically|from\s+\w+|=\s*", sd, re.I))
+            or len(sd) > 20
+        )
         is_cited_measurement = src == "route-manifest" and bool(_CITED_MEASURED_RE.search(sd))
-        if str(k).lower() in worked or has_formula or tool_shown or is_cited_measurement:
+        if (str(k).lower() in worked or has_formula or tool_shown
+                or is_cited_measurement or disclosed_lineage):
             continue
         hidden.append(str(k))
     cov = round((total - len(hidden)) / total * 100) if total else 100
@@ -3113,13 +3133,26 @@ def _singularise_phrase(s) -> str:
     return " ".join(_singularise(t) for t in re.findall(r"[a-z]+", str(s).lower()))
 
 
+def _population_role_key(name: str) -> str:
+    """Mirror universal-contract-sizing._populationRoleKey: singular/plural AND
+    solenoid↔pneumatic-actuated synonym labels for the SAME on/off valve population
+    collapse to one key so the audit catches the Codema 2×200 (and 3×200) smear."""
+    sing = _singularise_phrase(name)
+    if (re.search(r"\b(solenoid|pneumatic|electric|motor(?:is|iz)ed|actuated)\b", sing)
+            and re.search(r"\bvalve\b", sing)
+            and not re.search(r"\b(manual|ball|check|sample|relief|butterfly|gate|needle)\b", sing)):
+        return "actuated_on_off_valve"
+    return sing
+
+
 def check_population_duplication(state, rows, run_dir) -> list:
     """A brief POPULATION (e.g. '200 actuated valves') emitted under TWO words — a singular + a plural,
     or two synonym names with the SAME count — DOUBLE-COUNTS it: 'Pneumatic Actuated Valve ×200' +
     'Pneumatic Actuated Valves ×200' = 400 valves on a 200-valve bill. Deterministic + universal:
-    group every principal word by (singularised-name, count) for population counts (≥12); ≥2 words in a
-    group is a duplicated population. Runs on the FINAL state, so a synthesis path that re-mints the
-    duplicate is still caught (the 'two synthesis paths' gotcha). Council C5 (2026-06-27)."""
+    group every principal word by (role-or-singularised-name, count) for population counts (≥12);
+    ≥2 words in a group is a duplicated population. Runs on the FINAL state, so a synthesis path
+    that re-mints the duplicate is still caught (the 'two synthesis paths' gotcha). Council C5
+    (2026-06-27); role-key extended 2026-07-09 for solenoid↔pneumatic synonym smear."""
     tab = "Bill of Materials (Ledger)"
     out: list = []
     groups: dict = {}
@@ -3134,7 +3167,7 @@ def check_population_duplication(state, rows, run_dir) -> list:
                 q = _word_qty(w)
                 if q < _POP_MIN_DUP:
                     continue
-                groups.setdefault((_singularise_phrase(nm), q), []).append(nm)
+                groups.setdefault((_population_role_key(nm), q), []).append(nm)
     for (sing, q), names in groups.items():
         if len(names) >= 2:
             out.append(Finding(
@@ -3501,6 +3534,17 @@ def _selftest() -> int:
     ]
     fold_f = [f for f in check_bom({}, fold_rows, "") if f.check == "line_math"]
     expect(not fold_f, f"FOLD: a legit £0 fold row must NOT flag line_math (got {[f.message[:60] for f in fold_f]})")
+    # proveCatch: sub_of may be the parent's TAG (Codema 2026-07-09) — still a valid fold.
+    tag_fold = [
+        {"tag": "X-126", "requirement": "Pneumatic Actuated Valves", "status": "IDENTIFIED",
+         "part": "valves", "qty": 200, "unit_gbp": 200, "line_gbp": 40000, "basis": "x"},
+        {"tag": "X-125", "requirement": "Solenoid Valves", "status": "MERGED·SYNONYM",
+         "part": "synonym", "qty": 200, "unit_gbp": 80, "line_gbp": 0,
+         "sub_of": "X-126", "basis": "folded by tag"},
+    ]
+    tag_fold_f = [f for f in check_bom({}, tag_fold, "") if f.check == "line_math"]
+    expect(not tag_fold_f,
+           f"FOLD: sub_of=parent TAG must resolve (got {[f.message[:60] for f in tag_fold_f]})")
     orphan_fold = [dict(fold_rows[1], sub_of="No Such Parent")]
     orphan_f = [f for f in check_bom({}, orphan_fold, "") if f.check == "line_math"]
     expect(len(orphan_f) == 1 and "no priced line" in orphan_f[0].message,
@@ -3809,6 +3853,20 @@ def _selftest() -> int:
         {"name_human": "Pneumatic Actuated Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
     ]}]}]}}, [], "")
     expect(len(_clean) == 0, "C5: a single 200-population word must NOT be flagged")
+    # proveCatch: solenoid ↔ pneumatic-actuated synonym smear (Codema ship 2026-07-09)
+    _syn = check_population_duplication({"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Solenoid Valves", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Pneumatic Actuated Valves", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Solenoid Valve", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+    ]}]}]}}, [], "")
+    expect(len(_syn) == 1 and "200" in _syn[0].message,
+           f"C5b: solenoid+pneumatic ×200 synonym smear must be ONE HIGH (got {len(_syn)})")
+    _manual_ok = check_population_duplication({"moduleDecomposition": {"modules": [{"sub_modules": [{"words": [
+        {"name_human": "Solenoid Valves", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+        {"name_human": "Manual Ball Valves", "modifier_characters": [{"kind": "quantity", "value": "×200"}]},
+    ]}]}]}}, [], "")
+    expect(len(_manual_ok) == 0,
+           "C5b: solenoid ×200 beside manual-ball ×200 must NOT collapse (distinct families)")
 
     # ── proveCatch: physics-critic claim FALSIFICATION (a deterministically-false claim must not gate)
     _pop_state = {"moduleDecomposition": {"modules": [

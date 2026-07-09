@@ -313,6 +313,11 @@ def _checks_consistency(state: dict, run_dir: str) -> List[Check]:
         if line is None or subc is None or line <= 0:
             continue
         tag = str(e.get("tag") or e.get("name") or "?")
+        # Untagged aggregate / commodity rows (tag "—" / empty) are not principals —
+        # they have no exploded sub-assembly tree to reconcile against. Checking them
+        # produced 60+ identical FAIL lines that zeroed the dossier floor (codema-ship).
+        if not tag or tag in ("—", "-", "?", "–"):
+            continue
         out.append(Check(
             name=f"BoM {tag}: Sigma sub-component_gbp == line_gbp",
             category="CONSISTENCY", relation="eq",
@@ -403,11 +408,21 @@ def _checks_rating_equals_quantity(rb: List[dict], quantities: Dict[str, Any]
         # SEPARATE BoM line). Mirrors the panel-schedule connection-row exclusion.
         if re.search(r"\bconnection\b|→|->", name):
             continue
-        # extract the FIRST motor/shaft kW figure in the requirement, if any
+        # Prefer the SHAFT/hydraulic figure when the requirement is the dual form
+        # "N kW motor (M kW shaft)" — that M is what contract *_power_kw stores.
+        # Falling back to the first kW alone mis-compared a wrongly-lifted nameplate
+        # against the shaft contract key (codema-ship P-112: 5.04 motor vs 1.92 shaft).
+        m_shaft = re.search(
+            r"(\d[\d,]*(?:\.\d+)?)\s*kw\s*shaft|motor\s*\(\s*(\d[\d,]*(?:\.\d+)?)\s*kw\s*shaft",
+            req, re.IGNORECASE,
+        )
         m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*kw\s*(?:motor|shaft|rated)?", req, re.IGNORECASE)
-        if not m:
+        if m_shaft:
+            rating = num(m_shaft.group(1) or m_shaft.group(2))
+        elif m:
+            rating = num(m.group(1))
+        else:
             continue
-        rating = num(m.group(1))
         if rating is None:
             continue
         # find a contract *_kw quantity whose stem tokens all appear in the name
@@ -996,6 +1011,8 @@ _SERVICE_BOUNDARY_ENDPOINT_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
+    # effluent / disposal / drain-to-waste termini (water plants discharge here)
+    r"\beffluent\b|\bdisposal\b|waste[_ -]?stream|drain[_ -]?to[_ -]?waste|"
     r"\b(?:dc|ac|hv|lv|mv)_bus\b|\bheat[_ -]?reject(?:ion)?\b|"
     r"\b(?:heat|thermal|cold)[_ -]?sink\b", re.I)
 

@@ -150,6 +150,57 @@ function run() {
     throw new Error('pump-motor: drive-train reconcile must be idempotent (second pass = 0 repairs)')
   }
 
+  // ── NAMEPLATE MATCH (Codema ship / Sam fertigation 2026-07-09): a 4.5 kW nursery
+  // pump must NOT carry a 5.5 kW drive (next IEC frame) — that is a full-frame jump
+  // above the machine stamp. Small bumps (1.923→2.2 on a 2 kW drain) stay allowed.
+  const modulesNursery: any = [{
+    module: 'm', sub_modules: [{
+      sub_module: 's', words: [
+        ...mkRatedPump('Nursery Fertigation Dosing Pump', '4.5', '5.5'),
+      ],
+    }],
+  }]
+  const qN: Record<string, number> = { nursery_fertigation_dosing_pump_power_kw: 4.5 }
+  const repairedN = reconcileDriveTrainRatings(modulesNursery, qN, new Set())
+  if (repairedN < 1) throw new Error('pump-motor: nursery fertigation 5.5→4.5 nameplate match must repair')
+  let nurseryM = 0
+  for (const m of modulesNursery) for (const sm of m.sub_modules) for (const w of sm.words) {
+    if (String(w.id) === 'nursery_fertigation_dosing_pump_synth_word__drive_motor') {
+      nurseryM = parseFloat(String((w.modifier_characters || []).find((x: any) => x.kind === 'rating_primary')?.value)) || 0
+    }
+  }
+  if (nurseryM !== 4.5) {
+    throw new Error(`pump-motor: nursery fertigation motor must match 4.5 kW nameplate (got ${nurseryM} — was the 5.5 IEC jump)`)
+  }
+
+  // Valve fittings must NEVER re-explode as pumps (nested drive under isolation valve).
+  const modulesValve: any = [{
+    module: 'm', sub_modules: [{
+      sub_module: 's', words: [
+        {
+          id: 'nursery_fertigation_dosing_pump_synth_word', name_human: 'Nursery Fertigation Dosing Pump',
+          content_character: { character_id: 'nursery_fertigation_dosing_pump_synth', name_human: 'Nursery Fertigation Dosing Pump' },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '4.5', unit: 'kW' }],
+        },
+        {
+          id: 'nursery_fertigation_dosing_pump_synth_word__suction_isolation_valve',
+          name_human: 'Suction Isolation Valve (on Nursery Fertigation Dosing Pump)',
+          content_character: {
+            character_id: 'nursery_fertigation_dosing_pump_synth_word__suction_isolation_valve',
+            name_human: 'Suction Isolation Valve (on Nursery Fertigation Dosing Pump)',
+          },
+          modifier_characters: [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '4.5', unit: 'kW' }],
+        },
+      ],
+    }],
+  }]
+  explodeEquipmentSubAssemblies(modulesValve, qN)
+  const nestedDrive = (modulesValve[0].sub_modules[0].words as any[]).some((w) =>
+    /suction_isolation_valve__drive_motor/i.test(String(w.id || '')))
+  if (nestedDrive) {
+    throw new Error('pump-motor: isolation valve must not re-explode a nested Drive Motor')
+  }
+
   // ── PUMP MOTOR vs BRIEF-STATED PRESSURE (Tristan 2026-07-08 — the Codema 90 m³/h @ 2.9
   // bar physics-critic "undersized 11 kW" HIGH). proveCatch: a family's hydraulic-tool
   // motor_kw (9.653 → single-rounds to 11 kW) undershoots the brief's OWN stated 2.9 bar

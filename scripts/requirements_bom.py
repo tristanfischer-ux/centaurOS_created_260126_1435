@@ -934,6 +934,19 @@ _MIN_PRICE_FLOORS = [
 _DUTY = "__duty_scaled__"
 _BLOWER_DUTY = "__blower_duty__"
 _PROCESS_SYSTEM_FLOORS = [
+    # P1-D (Sam/Codema 2026-07-08): metering/dosing pumps are ~0.04–0.75 kW chemical
+    # injectors (£300–£800 installed), NOT a £3k process skid. Match metering/acid/
+    # chemical dosing FIRST at a realistic floor; leave bulk fertigation circulation
+    # pumps to the general dosing floor below.
+    # Metering injectors ONLY (… dosing pump / meter / injector / skid) — NOT a
+    # plant-level "Chemical Dosing System" (that hits the £3k system floor below).
+    (re.compile(r"(?:acid|chemical|nutrient|metering|h2o2|peroxide|alkalin|caustic|ph)"
+                r"[_ ]?dos(?:e|ing)?[_ ]?(?:pump|meter|injector|skid)\b|"
+                r"\bdos(?:e|ing)[_ ]?(?:pump|meter|injector|skid)\b", re.I), 400.0),
+    # P1-D UV (2026-07-09): a plant UV/ozone skid is never a £280 residential unit.
+    # Flat floor catches the Spektron-30e-class catalogue miss; duty-scaled parametric
+    # in _unit_operation_price still lifts IDENTIFIED lines further (see assemble).
+    (re.compile(r"\buv\b|ultraviolet|\bozone\b|disinfect|steril", re.I), 8000.0),
     (re.compile(r"chemical[_ ]?dos|\bdosing\b|alkalin|\bph[_ ]?dos|caustic[_ ]?dos|acid[_ ]?dos", re.I), 3000.0),
     (re.compile(r"\bfeed\b[_ ]?(?:stor|system|distribution|silo|hopper|handling)|feed[_ ]?stor|"
                 r"feed[_ ]?distribution|pellet[_ ]?(?:stor|silo|system)", re.I), 5000.0),
@@ -1410,6 +1423,68 @@ def _membrane_distinguishing_tokens(name):
             continue
         out.add(t)
     return frozenset(out)
+
+
+_ACTUATED_ON_OFF_POP_RE = re.compile(
+    r"\b(?:solenoid|pneumatic|electric|motor(?:is|iz)ed|actuated)\b.*\bvalves?\b|"
+    r"\bvalves?\b.*\b(?:solenoid|pneumatic|electric|motor(?:is|iz)ed|actuated)\b",
+    re.I)
+_ACTUATED_ON_OFF_EXCLUDE_RE = re.compile(
+    r"\b(?:manual|ball|check|sample|relief|butterfly|gate|needle)\b", re.I)
+
+
+def _dedupe_actuated_valve_population_rows(rows):
+    """Fold synonym ON/OFF actuated-valve POPULATION lines (same qty ≥12) onto ONE
+    survivor. INTENT: 'Solenoid Valves ×200' + 'Pneumatic Actuated Valves ×200' +
+    'Solenoid Valve ×200' are the SAME 200 valves under synonym labels — leaving all
+    three priced DOUBLE/TRIPLE-COUNTS the bill (Codema ship population_duplication +
+    £72k over-bill). Manual/ball/check/sample families never fold in. Mutates `rows`;
+    returns folded count. Mirrors dropAttributePhantomWords role-key discipline."""
+    groups: dict = {}
+    for r in rows:
+        if r.get("connection") or float(r.get("line_gbp") or 0) <= 0:
+            continue
+        if str(r.get("status")) in ("SUB-COMPONENT", "MERGED·SYNONYM", "IN ASSEMBLY"):
+            continue
+        lead = str(r.get("requirement", "")).split("·")[0].strip()
+        if lead.startswith("↳"):
+            continue
+        if not _ACTUATED_ON_OFF_POP_RE.search(lead) or _ACTUATED_ON_OFF_EXCLUDE_RE.search(lead):
+            continue
+        qy = int(r.get("qty") or 1)
+        if qy < 12:
+            continue
+        groups.setdefault(qy, []).append(r)
+    folded = 0
+    for qy, grp in groups.items():
+        if len(grp) < 2:
+            continue
+        # Prefer the highest-priced survivor (assembly-priced pneumatic line over a
+        # cheap solenoid placeholder) so the bill keeps the credible unit cost.
+        grp.sort(key=lambda r: -float(r.get("unit_gbp") or 0))
+        survivor = grp[0]
+        # GOTCHA: dossier_audit fold-parent check matches sub_of against the parent's
+        # requirement/part NAME (not its tag). Always stamp the survivor's lead name.
+        survivor_name = str(survivor.get("requirement", "")).split("·")[0].strip()
+        merged_names = []
+        for r in grp[1:]:
+            merged_names.append(
+                f"'{str(r.get('requirement', '')).split('·')[0].strip()}' "
+                f"(was £{round(float(r.get('line_gbp') or 0)):,})")
+            r["line_gbp"] = 0
+            r["status"] = "MERGED·SYNONYM"
+            r["sub_of"] = survivor_name
+            r["basis"] = (
+                str(r.get("basis", ""))
+                + f" · de-duplicated: names the SAME {qy}-unit on/off actuated-valve "
+                f"population as '{survivor_name}' "
+                f"— synonym line folded into it (one population, one price)")
+            folded += 1
+        if merged_names:
+            survivor["basis"] = (
+                str(survivor.get("basis", ""))
+                + f" · merged synonym population line(s): {', '.join(merged_names)}")
+    return folded
 
 
 def _dedupe_membrane_synonym_rows(rows):
@@ -2114,6 +2189,11 @@ def _motor_nameplate_kw(name: str, shaft_kw, q):
     # normalise a couple of common synonyms so 'circulation' matches 'recirc'
     if "circulation" in name_toks or "circulating" in name_toks:
         name_toks.add("recirc")
+    # Scope tokens that MUST agree both ways (a 'nursery_*_motor_kw' must never
+    # nameplate a non-nursery pump, and a nursery pump must not take the main-zone
+    # motor). Universal zone/role prefixes — not a class table.
+    _SCOPE_TOKS = {"nursery", "backup", "standby", "duty", "primary", "secondary",
+                   "main", "aux", "auxiliary", "hand", "zone"}
     for mk in motor_keys:
         stem = mk[: -len("_motor_kw")]
         stem_toks = [t for t in re.split(r"[_\d]+", stem) if t]
@@ -2121,8 +2201,17 @@ def _motor_nameplate_kw(name: str, shaft_kw, q):
         type_tok = next((t for t in stem_toks if _MOTOR_DRIVEN_NOUN_RE.search(t)), None)
         if not type_tok or type_tok not in name_toks:
             continue
+        # scope tokens: every scope token on the KEY must appear in the NAME, and
+        # every scope token on the NAME must appear on the KEY (symmetric). Without
+        # this, nursery_drain_transfer_pump_motor_kw=5.04 was pasted onto
+        # "Drain Transfer Pump" (1.9 kW shaft) → BoM "5.04 kW motor" vs contract
+        # drain_transfer_pump_power_kw=1.92 (C4 FAIL).
+        key_scope = {t for t in stem_toks if t in _SCOPE_TOKS}
+        name_scope = {t for t in name_toks if t in _SCOPE_TOKS}
+        if key_scope != name_scope:
+            continue
         # and at least one descriptive stem token present in the line's noun
-        if any(t in name_toks for t in stem_toks if t != type_tok) or len(stem_toks) == 1:
+        if any(t in name_toks for t in stem_toks if t != type_tok and t not in _SCOPE_TOKS) or len(stem_toks) == 1:
             nameplate = _qnum(q, mk)
             if nameplate and nameplate > shaft_kw * 1.01:
                 return (nameplate, shaft_kw)
@@ -2153,6 +2242,9 @@ def _contract_motor_kw(name: str, q):
     dist = toks - _GENERIC_EQUIP_TOKENS
     if not dist:
         return (None, None)
+    _SCOPE_TOKS = {"nursery", "backup", "standby", "duty", "primary", "secondary",
+                   "main", "aux", "auxiliary", "hand", "zone"}
+    name_scope = {t for t in toks if t in _SCOPE_TOKS}
 
     def _hit(t, k):
         return t == k or (min(len(t), len(k)) >= 4 and (t.startswith(k) or k.startswith(t)))
@@ -2165,6 +2257,10 @@ def _contract_motor_kw(name: str, q):
         if _NON_MOTOR_KW_KEY_RE.search(kl):
             continue
         ktoks = set(re.split(r"[^a-z0-9]+", kl))
+        key_scope = {t for t in ktoks if t in _SCOPE_TOKS}
+        # Symmetric scope: nursery key ↔ nursery name only (same rule as nameplate).
+        if key_scope != name_scope:
+            continue
         overlap = sum(1 for t in dist if any(_hit(t, kt) for kt in ktoks))
         if overlap == 0:
             continue
@@ -2504,8 +2600,11 @@ def civils_rows_from_underground_scope(rows: list) -> list:
             continue  # no parseable volume on this row — never fabricate a civils quantity
         qy = row.get("qty") or 1
         unit_gbp, basis = _civils_cost_for_underground_vessel(vol_m3)
+        # Unique tag per vessel so ship-gate tag_validity never sees a reused "CIV"
+        # (two drain pits → CIV-101 + CIV-102). Universal sequential counter.
+        n = len(out) + 1
         out.append({
-            "tag": "CIV", "requirement": f"{row.get('requirement', '')} · below-grade civils",
+            "tag": f"CIV-{100 + n}", "requirement": f"{row.get('requirement', '')} · below-grade civils",
             "status": "CIVILS",
             "part": "civils — excavation / backfill / concrete surround (parametric take-off)",
             "qty": qy, "unit_gbp": unit_gbp, "line_gbp": round(unit_gbp * qy), "basis": basis,
@@ -3144,6 +3243,79 @@ def _selftest() -> int:
             if r.get("service") == "water" and _dn(r) == 300 and "316" in r["basis"] and "3.7111" in r["requirement"]:
                 print(f"  FAIL edge still priced DN300/316L at full recirc: {r['tag']} {r['requirement'][:40]}"); bad += 1
 
+        # ── CLOSER-EDGE SUPPRESSION GUARD (P0-C, 2026-07-08) ──
+        # residual/boundary/direction closer language → drop from costed BoM.
+        # source=="completion" alone (MCC power feeders) must NOT drop — prove both ways.
+        _sched_cls = {"rows": [
+            # real process edge (no closer signal)
+            {"from": "tank_a", "to": "pump_b", "mechanism": "fluid_loop", "rating": "1 m³/s", "length_m": 10.0, "size": "DN100", "line_total_gbp": 1000},
+            # residual closer edge (route-manifest service)
+            {"from": "pump_b", "to": "nearest_consumer", "mechanism": "fluid_loop", "rating": "1 m³/s", "length_m": 2.0, "size": "DN100", "line_total_gbp": 200},
+            # boundary closer edge (ledger material_context)
+            {"from": "nearest_producer", "to": "tank_a", "mechanism": "fluid_loop", "rating": "1 m³/s", "length_m": 3.0, "size": "DN100", "line_total_gbp": 300},
+            # completion-only power feeder — must STAY priced (customer buys MCC feeders)
+            {"from": "Motor Control Center", "to": "Irrigation Pump", "mechanism": "electrical_bus",
+             "rating": "15 kW", "length_m": 8.0, "size": "4 mm²", "line_total_gbp": 120},
+        ]}
+        _rm_cls = {"lines": [
+            {"from_tag": "pump_b", "to_tag": "nearest_consumer",
+             "service": "process output (residual closer: nearest consumer)"},
+            {"from_tag": "Motor Control Center", "to_tag": "Irrigation Pump",
+             "service": "LV power feeder 400/415V 3ph"},
+        ]}
+        _cl_cls = {"rows": [
+            {"from_part": "nearest_producer", "to_part": "tank_a",
+             "material_context": "process input (boundary closer: nearest producer)", "source": "completion"},
+            {"from_part": "Motor Control Center", "to_part": "Irrigation Pump",
+             "material_context": "LV power feeder 400/415V 3ph", "source": "completion"},
+        ]}
+        with _tf.TemporaryDirectory() as _d2:
+            json.dump(_sched_cls, open(os.path.join(_d2, "connection-schedule.json"), "w"))
+            json.dump(_rm_cls, open(os.path.join(_d2, "route-manifest.json"), "w"))
+            json.dump(_cl_cls, open(os.path.join(_d2, "connection-ledger.json"), "w"))
+            _c2 = _connection_rows(_d2, _q)
+            _c2_reqs = [r["requirement"] for r in _c2]
+            # endpoint names are space-normalised in the requirement text
+            if not any("tank a → pump b" in rq for rq in _c2_reqs):
+                print(f"  FAIL real edge suppressed incorrectly (got {_c2_reqs})"); bad += 1
+            if any("nearest consumer" in rq or "nearest_consumer" in rq for rq in _c2_reqs):
+                print("  FAIL residual closer edge not suppressed (route-manifest match)"); bad += 1
+            if any("nearest producer" in rq or "nearest_producer" in rq for rq in _c2_reqs):
+                print("  FAIL boundary closer edge not suppressed (ledger material_context match)"); bad += 1
+            if not any("Motor Control Center → Irrigation Pump" in rq for rq in _c2_reqs):
+                print("  FAIL completion-only MCC feeder suppressed (source=completion alone must NOT drop real feeders)"); bad += 1
+
+        # ── P0-C DISTRIBUTION DOUBLE-COUNT GUARD (2026-07-09) ──
+        # When distribution_network_length_km is present, water Cxx must NOT enter the
+        # costed BoM (parametric X-14x lines already price the pipe take-off). Electrical
+        # feeders must still price. Without the distribution key, water Cxx still price
+        # (RAS/CO₂ byte-identity).
+        _sched_d = {"rows": [
+            {"from": "tank_a", "to": "pump_b", "mechanism": "fluid_loop",
+             "rating": "1 m³/s", "length_m": 10.0, "size": "DN100", "line_total_gbp": 1000},
+            {"from": "Motor Control Center", "to": "Irrigation Pump",
+             "mechanism": "electrical_bus", "rating": "15 kW", "length_m": 8.0,
+             "size": "4 mm²", "line_total_gbp": 120},
+        ]}
+        with _tf.TemporaryDirectory() as _d3:
+            json.dump(_sched_d, open(os.path.join(_d3, "connection-schedule.json"), "w"))
+            json.dump({"lines": []}, open(os.path.join(_d3, "route-manifest.json"), "w"))
+            json.dump({"rows": []}, open(os.path.join(_d3, "connection-ledger.json"), "w"))
+            _q_dist = dict(_q)
+            _q_dist["distribution_network_length_km"] = {"value": 1.8}
+            _c3 = _connection_rows(_d3, _q_dist)
+            _c3_water = [r for r in _c3 if r.get("service") == "water"]
+            _c3_elec = [r for r in _c3 if r.get("service") == "electrical"]
+            if _c3_water:
+                print(f"  FAIL water Cxx still costed under distribution_network_length_km "
+                      f"(got {[r.get('requirement') for r in _c3_water]})"); bad += 1
+            if not _c3_elec:
+                print("  FAIL electrical Cxx suppressed when only water should drop"); bad += 1
+            _c3b = _connection_rows(_d3, _q)  # no distribution key
+            if not any(r.get("service") == "water" for r in _c3b):
+                print("  FAIL water Cxx dropped without distribution_network_length_km "
+                      "(byte-identity break)"); bad += 1
+
     # ── CAPACITY-UNIT SIZE LINE (BESS GA-fit bug, gate 36 2026-06-24) — a `capacity`
     # modifier is a VOLUME only when its unit is m³/L; a non-volume capacity (A/V/W/kW/
     # L/min) must render with its REAL unit, never " m³". The old code hardcoded m³ onto
@@ -3228,6 +3400,18 @@ def _selftest() -> int:
                                  {"uv_disinfection_power_kw": {"value": 4.1}})
     if not (abs(g - (4000.0 + 4.1 * 2200.0)) < 1 and "4.1 kW" in b):
         print(f"  FAIL UV contract lamp-power key not used: £{g} ({str(b)[:90]})"); bad += 1
+    # P1-D: IDENTIFIED Spektron-class catalogue price must lift to the parametric
+    # (proveCatch — a £280 pin on a 10.1 kW duty must not survive assemble pricing).
+    _uv_param, _ = _unit_operation_price(
+        "Uv Disinfection",
+        _mods({"modifier_characters": [{"kind": "rating_primary", "value": "10.1", "unit": "kW"}]}),
+        {"uv_disinfection_power_kw": {"value": 10.1}},
+    )
+    if not (_uv_param and _uv_param >= 20000):
+        print(f"  FAIL UV 10.1 kW parametric below £20k floor (got £{_uv_param})"); bad += 1
+    _uv_floor = _price_floor_for("Uv Disinfection", {})
+    if not (_uv_floor and _uv_floor >= 8000):
+        print(f"  FAIL UV process-system floor missing/too low (got {_uv_floor})"); bad += 1
 
     # ── MEMBRANE-AS-STEEL proveCatch (2026-07-02, v55: 'Ro Membrane Elements · 364 m²'
     # = £40,760 'structural steelwork take-off', ×3 lines = £122k / 16% of the bill):
@@ -3719,6 +3903,27 @@ def _selftest() -> int:
     if not (_dedupe_actuator_assembly_rows(_rows_more) == 0 and _rows_more[1]["line_gbp"] == 7000):
         print("  FAIL 200 actuators folded into only 50 assemblies (population mismatch)"); bad += 1
 
+    # ── ACTUATED ON/OFF VALVE POPULATION SYNONYM DE-DUP proveCatch (Codema 2026-07-09)
+    _pop_rows = [
+        {"tag": "X-1", "requirement": "Solenoid Valves", "qty": 200, "unit_gbp": 80,
+         "line_gbp": 16000, "basis": "b", "status": "IDENTIFIED"},
+        {"tag": "X-2", "requirement": "Pneumatic Actuated Valves", "qty": 200, "unit_gbp": 200,
+         "line_gbp": 40000, "basis": "b", "status": "IDENTIFIED"},
+        {"tag": "V-1", "requirement": "Solenoid Valve", "qty": 200, "unit_gbp": 80,
+         "line_gbp": 16000, "basis": "b", "status": "IDENTIFIED"},
+        {"tag": "V-2", "requirement": "Manual Ball Valves", "qty": 200, "unit_gbp": 50,
+         "line_gbp": 10000, "basis": "b", "status": "IDENTIFIED"},
+    ]
+    _pop_folded = _dedupe_actuated_valve_population_rows(_pop_rows)
+    if not (_pop_folded == 2
+            and _pop_rows[1]["line_gbp"] == 40000  # highest-priced survivor
+            and _pop_rows[0]["line_gbp"] == 0 and _pop_rows[0]["status"] == "MERGED·SYNONYM"
+            and _pop_rows[2]["line_gbp"] == 0 and _pop_rows[2]["status"] == "MERGED·SYNONYM"
+            and _pop_rows[3]["line_gbp"] == 10000):  # manual family untouched
+        print(f"  FAIL actuated-pop de-dup (folded={_pop_folded}; "
+              f"rows={[(r['requirement'][:28], r['line_gbp'], r['status']) for r in _pop_rows]})")
+        bad += 1
+
     # ── MEMBRANE-FAMILY SYNONYM DE-DUP proveCatch (gate-36 round 2, 2026-07-03, v56b:
     # 'Ultrafiltration Module' £14,505 + 'Uf Module Bank' £14,505 + 'Uf Membrane Bank'
     # £9,100 = three lines for ONE UF stage). Both directions: the UF synonym triplet
@@ -3824,14 +4029,14 @@ def _selftest() -> int:
     # 'parametric — not routed' distribution quantities price as supply-only £/m lines;
     # absent quantities → [] (every non-zoned archetype's bill byte-identical).
     _dq = {
-        "distribution_network_length_km": {"value": 14.844, "source": "demand-coverage",
+        "distribution_network_length_km": {"value": 1.836, "source": "demand-coverage",
                                            "source_detail": "parametric — not routed: total"},
-        "distribution_zone_lateral_length_m": {"value": 8280, "source": "demand-coverage",
-                                               "source_detail": "parametric — not routed: 200 zones × 41.4 m"},
+        "distribution_zone_lateral_length_m": {"value": 120, "source": "demand-coverage",
+                                               "source_detail": "parametric — not routed: 200 zones × 0.6 m"},
         "distribution_zone_lateral_dn_mm": {"value": 75},
-        "distribution_drain_riser_length_m": {"value": 4200},
+        "distribution_drain_riser_length_m": {"value": 700},
         "distribution_drain_riser_dn_mm": {"value": 110},
-        "distribution_position_connections": {"value": 6000, "source_detail": "parametric — one inlet per position"},
+        "distribution_position_connections": {"value": 200, "source_detail": "parametric — one shared-tray inlet per zone"},
         "distribution_zone_kits": {"value": 200},
     }
     _drows = _distribution_network_rows(_dq)
@@ -3841,16 +4046,16 @@ def _selftest() -> int:
         print("  FAIL hand-watering rows minted WITHOUT the rule-8b quantities (must be a no-op)"); bad += 1
     if len(_drows) == 4:
         _lat = next((r for r in _drows if "zone laterals" in r["requirement"]), None)
-        _want_lat = round(8280 * _pvc_supply_rate_per_m(75))
+        _want_lat = round(120 * _pvc_supply_rate_per_m(75))
         if not _lat or _lat["line_gbp"] != _want_lat:
             print(f"  FAIL lateral line £{_lat and _lat['line_gbp']} want £{_want_lat} "
-                  f"(8,280 m × £{_pvc_supply_rate_per_m(75)}/m supply share)"); bad += 1
+                  f"(120 m × £{_pvc_supply_rate_per_m(75)}/m supply share)"); bad += 1
         # LENGTH-PRICED shape (gate-36 round 3): qty = run length in metres, unit = the £/m
         # rate, uom = 'm' — never qty 1 × the whole run's cost (the "single DN75 assembly
         # ~200× too high" misread). The line total must be UNCHANGED by the reshape.
-        if _lat and (_lat["qty"] != 8280 or _lat["unit_gbp"] != _pvc_supply_rate_per_m(75)
+        if _lat and (_lat["qty"] != 120 or _lat["unit_gbp"] != _pvc_supply_rate_per_m(75)
                      or _lat.get("uom") != "m"):
-            print(f"  FAIL lateral row must be length-priced (qty 8280 m × £{_pvc_supply_rate_per_m(75)}/m, "
+            print(f"  FAIL lateral row must be length-priced (qty 120 m × £{_pvc_supply_rate_per_m(75)}/m, "
                   f"uom 'm'); got qty {_lat['qty']} × £{_lat['unit_gbp']}, uom {_lat.get('uom')!r}"); bad += 1
         if _lat and abs(_lat["unit_gbp"] * _lat["qty"] - _lat["line_gbp"]) > max(1.0, 0.005 * _lat["line_gbp"]):
             print("  FAIL lateral unit × qty must equal the line total within the C2 tolerance"); bad += 1
@@ -3861,8 +4066,8 @@ def _selftest() -> int:
         if _lat and "supply" not in _lat["basis"].lower():
             print("  FAIL lateral basis must state the supply-only share (no install double-count)"); bad += 1
         _ink = next((r for r in _drows if "inlet stubs" in r["requirement"]), None)
-        if not _ink or _ink["line_gbp"] != 6000 * round(_DIST_INLET_STUB_GBP):
-            print(f"  FAIL inlet-stub allowance £{_ink and _ink['line_gbp']} want £{6000 * round(_DIST_INLET_STUB_GBP)}"); bad += 1
+        if not _ink or _ink["line_gbp"] != 200 * round(_DIST_INLET_STUB_GBP):
+            print(f"  FAIL inlet-stub allowance £{_ink and _ink['line_gbp']} want £{200 * round(_DIST_INLET_STUB_GBP)}"); bad += 1
         if any(r["status"] != "PARAMETRIC" for r in _drows):
             print("  FAIL every distribution row must carry the PARAMETRIC status (not ROUTED — it is NOT per-pipe routed)"); bad += 1
         if any("TBD" in str(r.get("part", "")) for r in _drows):
@@ -4453,6 +4658,9 @@ def _distribution_network_rows(q):
                 "uom": "m",
                 "basis": basis,
                 "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
+                "estimate_class": 4,
+                "confidence": "moderate — parametric engineered allowance",
+                "how_to_verify": "Recompute: length_m × £/m rate from the parametric basis formula",
             }
         else:
             r = {
@@ -4467,6 +4675,9 @@ def _distribution_network_rows(q):
                 "line_gbp": round(unit_gbp) * int(qty),
                 "basis": basis,
                 "material": "PVC-U (thermoplastic pressure pipework, solvent-weld)",
+                "estimate_class": 4,
+                "confidence": "moderate — parametric engineered allowance",
+                "how_to_verify": "Recompute: qty × unit rate from the parametric basis formula",
             }
         if extra:
             r.update(extra)
@@ -5143,6 +5354,34 @@ def _connection_rows(out_dir: str, q=None):
         return []
     q = q or {}
 
+    def _norm_endpoint(s: str) -> str:
+        return str(s or "").replace("_", " ").strip().lower()
+
+    ledger_map = {}
+    p_ledger = os.path.join(out_dir, "connection-ledger.json")
+    if os.path.exists(p_ledger):
+        try:
+            for r in json.load(open(p_ledger)).get("rows", []):
+                # connection-ledger uses from_part/to_part; some writers use from/to
+                f = _norm_endpoint(r.get("from_part") or r.get("from") or "")
+                t = _norm_endpoint(r.get("to_part") or r.get("to") or "")
+                if f and t:
+                    ledger_map[(f, t)] = r
+        except Exception:
+            pass
+
+    route_map = {}
+    p_route = os.path.join(out_dir, "route-manifest.json")
+    if os.path.exists(p_route):
+        try:
+            for r in json.load(open(p_route)).get("lines", []):
+                f = _norm_endpoint(r.get("from_tag") or r.get("from") or "")
+                t = _norm_endpoint(r.get("to_tag") or r.get("to") or "")
+                if f and t:
+                    route_map[(f, t)] = r
+        except Exception:
+            pass
+
     def _qval(*keys, default=None):
         for k in keys:
             v = q.get(k) if isinstance(q, dict) else None
@@ -5190,6 +5429,29 @@ def _connection_rows(out_dir: str, q=None):
         mech = str(r.get("mechanism") or "").lower()
         frm = str(r.get("from") or "").replace("_", " ").strip()
         to = str(r.get("to") or "").replace("_", " ").strip()
+        
+        frm_key = frm.lower()
+        to_key = to.lower()
+        ledger_row = ledger_map.get((frm_key, to_key)) or {}
+        route_row = route_map.get((frm_key, to_key)) or {}
+        
+        # P0-C (2026-07-08): residual/boundary/direction CLOSER edges are topological
+        # completion, not customer-bought plant pipework — suppress them from the costed
+        # BoM (~£25k phantom water-connection lines on Codema). Keyed ONLY on the closer
+        # language in service/material_context/role — NEVER on source=="completion" alone
+        # (that flag also marks real MCC power feeders + utility hierarchy the customer buys).
+        signals = [
+            str(ledger_row.get("material_context") or ""),
+            str(route_row.get("service") or ""),
+            str(ledger_row.get("service") or ""),
+            str(ledger_row.get("role") or ""),
+            str(route_row.get("role") or ""),
+            str(r.get("service") or ""),
+            str(r.get("role") or ""),
+        ]
+        if any("closer" in s.lower() for s in signals):
+            continue
+
         length = r.get("length_m")
         within = bool(r.get("within_spec"))
         rating = str(r.get("rating") or "").strip()
@@ -5204,6 +5466,21 @@ def _connection_rows(out_dir: str, q=None):
             service, kind = "air", "duct"
         else:
             service, kind = "water", "pipe"
+
+        # P0-C (2026-07-09): when the parametric zoned-distribution network already owns
+        # the plant pipe take-off (distribution_network_length_km present →
+        # _distribution_network_rows emits X-14x length-priced lines), per-edge water Cxx
+        # rows DOUBLE-COUNT the same pipework (~£25k phantom "water connection: A → B"
+        # lines). Suppress WATER Cxx from the costed bill; Connection trace still reads
+        # connection-ledger.json. Electrical/air Cxx stay (not covered by the PVC
+        # distribution take-off). Keyed on the distribution_network_length_km signal —
+        # every archetype without zoned delivery is byte-identical.
+        if service == "water":
+            _dnet = q.get("distribution_network_length_km") if isinstance(q, dict) else None
+            if isinstance(_dnet, dict):
+                _dnet = _dnet.get("value")
+            if isinstance(_dnet, (int, float)) and _dnet > 0:
+                continue
 
         # ── MIS-CLASSIFIED SIGNAL/ELECTRICAL TIE wrongly tagged as a fluid edge ──
         # An edge whose BOTH endpoints are pure instruments/sensors/controllers (and
@@ -5349,7 +5626,7 @@ def _connection_rows(out_dir: str, q=None):
         else:
             conn_material = "galvanised steel duct (DW/144)"
         row = {
-            "tag": f"C{i + 1:02d}",
+            "tag": f"C{len(out) + 1:02d}",
             "requirement": req,
             "status": "ROUTED" if within else "ROUTED·REVIEW",
             "part": part,
@@ -5364,6 +5641,8 @@ def _connection_rows(out_dir: str, q=None):
             # SOURCE so the 39 connection rows never render blank estimate-class cells.
             "estimate_class": 3,
             "confidence": "moderate — deterministic take-off (routed length × rate)",
+            # G5 (Sam): how an SME verifies this line without re-running the whole design
+            "how_to_verify": "Recompute: length_m × £/m install rate from the cost basis",
             # extras (length + sizing focus) — consumed by the run dashboard:
             "connection": True, "service": service, "size": size,
             "length_m": round(float(length), 1) if isinstance(length, (int, float)) else None,
@@ -6195,6 +6474,24 @@ def assemble(out_dir: str):
                     dpv = dist_price.get(wid)
                     if dpv and gbp > 0 and (gbp / dpv > 5.0 or dpv / gbp > 5.0):
                         gbp, basis = dpv, "catalogue · cheapest distributor (gate-21 >5× correction)"
+                    # P1-D UV (2026-07-09): an IDENTIFIED UV/ozone MPN whose catalogue
+                    # price is ≪ the duty-rated parametric (Spektron 30e £280 on a
+                    # 225 m³/h / 10.1 kW plant duty → ~£26k) is undersized for the
+                    # duty — same discipline as undersized rotating-equipment MPN
+                    # rejection. Lift to the UV parametric and drop the wrong pin.
+                    if re.search(r"\buv\b|ultraviolet|ozone|disinfect|steril", name or "", re.I):
+                        uop_uv = _unit_operation_price(name, md, qcontract)
+                        if (uop_uv and uop_uv[0] > 0
+                                and (gbp <= 0 or uop_uv[0] >= max(gbp, 1e-9) * COST_BAND_FACTOR)):
+                            _pre_uv = gbp
+                            status = "NOT FOUND"
+                            part = "requirement stated — parametric"
+                            gbp, basis = uop_uv[0], (
+                                uop_uv[1] + f" · named part {pn!r} rejected: catalogue "
+                                f"reference £{_pre_uv:,.0f} is "
+                                f"{uop_uv[0] / max(_pre_uv, 1e-9):.0f}× below the "
+                                f"duty-rated UV/ozone skid (undersized for the duty)"
+                            )
                 elif bc == "simple":
                     mt = _materials_takeoff(name, md, g_lookup, svc)
                     status, part = "BESPOKE", "made to spec"
@@ -6593,6 +6890,13 @@ def assemble(out_dir: str):
     if _mfolded:
         print(f"  [membrane-dedup] folded {_mfolded} membrane-family synonym line(s) onto "
               f"their surviving stage line (same distinguishing tokens — one physical bank)",
+              file=sys.stderr)
+    # ── ACTUATED ON/OFF VALVE POPULATION SYNONYM DE-DUP (Codema ship 2026-07-09):
+    # solenoid ↔ pneumatic-actuated ×N lines are ONE population under synonym labels.
+    _afolded = _dedupe_actuated_valve_population_rows(rows)
+    if _afolded:
+        print(f"  [actuated-pop-dedup] folded {_afolded} on/off actuated-valve synonym "
+              f"population line(s) onto one survivor (one population, one price)",
               file=sys.stderr)
     _lift_n, _lift_gbp = 0, 0.0
     for row in rows:

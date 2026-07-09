@@ -1639,45 +1639,48 @@ _INSTR_COLS = [
 _INSTR_MONO = {0}
 
 
+# INTENT: A single stacked line/valve/instrument table on a large plant is a
+# 13:1 strip that fails drawing_gates G1 (≤4:1). Fold ROW CHUNKS into N
+# side-by-side columns — same discipline as draw_single_line's busbar fold —
+# so the PNG is readable and the gate passes. Universal: keyed only on
+# measured row count / aspect (a 538-row valve list alone forces multi-col).
+_MAX_ASPECT = 3.5          # margin under the 4:1 G1 limit
+_COL_GAP = 28
+_SECTION_GAP = 28
+
+
+def _block_h(n: int) -> float:
+    return 10 + _HEAD_H + max(n, 0) * _ROW_H + 16 + 14   # title + head + rows + gap
+
+
+def _chunk_rows(rows: list, n_cols: int) -> list:
+    """Split rows into n_cols contiguous chunks (balanced; empty cols allowed)."""
+    if n_cols <= 1 or not rows:
+        return [rows]
+    n = len(rows)
+    base, rem = divmod(n, n_cols)
+    chunks, i = [], 0
+    for c in range(n_cols):
+        take = base + (1 if c < rem else 0)
+        chunks.append(rows[i:i + take])
+        i += take
+    return chunks
+
+
 def build_table_svg(sc: Schedules) -> str:
     arch = PID._humanise(sc.archetype)
     line_w = sum(c[1] for c in _LINE_COLS)
     valve_w = sum(c[1] for c in _VALVE_COLS)
     instr_w = sum(c[1] for c in _INSTR_COLS)
     table_w = max(line_w, valve_w, instr_w)
-    width = table_w + 2 * _MARGIN
-
-    # measure height: banner + 3 blocks (title+10 + head + rows + 16 gap) + title block
-    def block_h(n):
-        return 10 + _HEAD_H + n * _ROW_H + 16 + 14   # +14 for title line
-    height = (96
-              + block_h(len(sc.lines))
-              + block_h(len(sc.valves))
-              + block_h(len(sc.instruments))
-              + 98)          # +14: shared general-tolerance note line in the title block
-
-    svg = SVG(width, int(math.ceil(height)))
-    svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
-
-    # banner
-    svg.text(_MARGIN, 46, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
-    svg.text(_MARGIN, 70, f"PROCESS SCHEDULES — {arch}", size=18, weight="bold",
-             fill=HEAD_INK)
-    svg.text(width - _MARGIN, 70,
-             f"Line list · Valve list · Instrument index  ·  P&ID {sc.pid_sheet}",
-             size=9.5, anchor="end", fill=MUTED)
-    svg.line(_MARGIN, 80, width - _MARGIN, 80, stroke=GRID_FAINT, width=1.0)
-    y = 110
+    single_w = table_w + 2 * _MARGIN
 
     # ── LINE LIST ──
     line_cells = []
-    for i, r in enumerate(sc.lines):
+    for r in sc.lines:
         vals = [r.number, r.frm_tag, r.to_tag, _short(r.service, 38), r.fluid, r.phase,
                 r.dn, _short(r.material, 18), r.rating, r.insulation, r.pid_ref]
         line_cells.append([(v, (j in _LINE_MONO)) for j, v in enumerate(vals)])
-    y = _draw_table(svg, _MARGIN, y, _LINE_COLS, line_cells,
-                    "1 · LINE LIST",
-                    f"{len(sc.lines)} process lines · line numbers match the P&ID")
 
     # ── VALVE LIST ──
     # Size/Set/Cv + Fail are `_short()`-truncated for THIS fixed-pixel table ONLY
@@ -1691,9 +1694,6 @@ def build_table_svg(sc: Schedules) -> str:
         vals = [v.tag, v.vtype, _short(v.service, 56), v.location, _short(v.size, 20),
                 _short(v.set_or_cv, 30), _short(v.fail_action, 17), v.pid_ref]
         valve_cells.append([(val, (j in _VALVE_MONO)) for j, val in enumerate(vals)])
-    y = _draw_table(svg, _MARGIN, y, _VALVE_COLS, valve_cells,
-                    "2 · VALVE LIST",
-                    f"{len(sc.valves)} valve types · FC fail-closed / FO fail-open")
 
     # ── INSTRUMENT INDEX ──
     instr_cells = []
@@ -1701,11 +1701,73 @@ def build_table_svg(sc: Schedules) -> str:
         vals = [ins.tag, ins.isa, _short(ins.service, 54), ins.measured, ins.itype,
                 ins.location, ins.rng, ins.signal, ins.loop_ref]
         instr_cells.append([(val, (j in _INSTR_MONO)) for j, val in enumerate(vals)])
-    y = _draw_table(svg, _MARGIN, y, _INSTR_COLS, instr_cells,
-                    "3 · INSTRUMENT INDEX",
-                    f"{len(sc.instruments)} instrument types · ISA LT/PT/TT/FT/AT")
 
-    _draw_title_block(svg, arch, width, int(math.ceil(height)), sc)
+    sections = [
+        ("1 · LINE LIST",
+         f"{len(sc.lines)} process lines · line numbers match the P&ID",
+         _LINE_COLS, line_cells),
+        ("2 · VALVE LIST",
+         f"{len(sc.valves)} valve types · FC fail-closed / FO fail-open",
+         _VALVE_COLS, valve_cells),
+        ("3 · INSTRUMENT INDEX",
+         f"{len(sc.instruments)} instrument types · ISA LT/PT/TT/FT/AT",
+         _INSTR_COLS, instr_cells),
+    ]
+
+    banner_h = 96
+    title_h = 98
+    # Smallest column count that clears G1: each section's rows are chunked
+    # across columns, then sections stack vertically (shared column grid).
+    n_cols = 1
+    for cand in range(1, 7):
+        body = 0.0
+        for _ti, _sub, _cols, cells in sections:
+            chunks = _chunk_rows(cells, cand)
+            body += max((_block_h(len(ch)) for ch in chunks), default=_block_h(0))
+            body += _SECTION_GAP
+        height = banner_h + body + title_h
+        width = single_w * cand + _COL_GAP * (cand - 1)
+        aspect = max(width, height) / max(1.0, min(width, height))
+        n_cols = cand
+        if aspect <= _MAX_ASPECT:
+            break
+
+    width = int(math.ceil(single_w * n_cols + _COL_GAP * (n_cols - 1)))
+    # Exact height from the chosen column count.
+    body = 0.0
+    laid: list = []
+    for title, subtitle, cols, cells in sections:
+        chunks = _chunk_rows(cells, n_cols)
+        sec_h = max((_block_h(len(ch)) for ch in chunks), default=_block_h(0))
+        laid.append((title, subtitle, cols, chunks, sec_h))
+        body += sec_h + _SECTION_GAP
+    height = int(math.ceil(banner_h + body + title_h))
+
+    svg = SVG(width, height)
+    svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
+
+    svg.text(_MARGIN, 46, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
+    svg.text(_MARGIN, 70, f"PROCESS SCHEDULES — {arch}", size=18, weight="bold",
+             fill=HEAD_INK)
+    svg.text(width - _MARGIN, 70,
+             f"Line list · Valve list · Instrument index  ·  P&ID {sc.pid_sheet}"
+             + (f"  ·  {n_cols}-column fold" if n_cols > 1 else ""),
+             size=9.5, anchor="end", fill=MUTED)
+    svg.line(_MARGIN, 80, width - _MARGIN, 80, stroke=GRID_FAINT, width=1.0)
+
+    y = 110.0
+    for title, subtitle, cols, chunks, sec_h in laid:
+        for ci, ch in enumerate(chunks):
+            if not ch and ci > 0:
+                continue
+            x0 = _MARGIN + ci * (table_w + _COL_GAP)
+            # Continuation columns keep the same section title with "(cont.)".
+            t = title if ci == 0 else f"{title} (cont.)"
+            sub = subtitle if ci == 0 else f"rows continued · col {ci + 1}/{n_cols}"
+            _draw_table(svg, x0, y, cols, ch, t, sub)
+        y += sec_h + _SECTION_GAP
+
+    _draw_title_block(svg, arch, width, height, sc)
     return svg.render()
 
 

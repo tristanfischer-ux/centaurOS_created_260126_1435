@@ -13864,7 +13864,12 @@ registerArchetype('water_treatment', (brief: any) => {
     ? pick(/nursery(?:\s+pump\s+unit)?[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 45)
     : 0
   const irrigationDemandTotalM3H = Math.round(irrigationDemandM3HPerDept * departmentCount + nurseryPumpFlowM3H * nurseryZoneCount)
-  const storageTankVolEachM3 = pick(/(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,30}?each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 40)
+  // Codema SO21101551: cleanwater + 2× drain reservoirs are ~91 m³ each (5.46 m dia × 3.88 m);
+  // nursery drain reservoir is 40 m³. Prefer the explicit ~91 figure when the brief states it.
+  const storageTankVolEachM3 = pick(
+    /cleanwater\s+reservoir[^.]{0,80}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)[^.]{0,40}?cleanwater|(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)\s+each|three\s+tanks[^.]{0,40}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i,
+    91,
+  )
   // The fertigation dosing PUMP is the same physical unit as "Pump Unit N" — the brief states
   // each pump unit "carries its own on-board nutrient dosing" — so its flow tracks the main
   // per-unit demand, not a separately-guessed "dosing units" figure (that regex coincidentally
@@ -13915,21 +13920,48 @@ registerArchetype('water_treatment', (brief: any) => {
   const uvDisinfectionFlowM3H = irrigationDemandTotalM3H
   const uvDisinfectionKw = Math.max(1.5, Math.round(uvDisinfectionFlowM3H * 0.045 * 10) / 10)
 
-  // Connected electrical load — the SUM of the pump + dosing + control loads. This is a
-  // ~50 kW plant of pumps and dosing, NOT a megawatt facility (fixes the 124 MW mis-size:
-  // the vertical_farm path put LED+HVAC load on a water plant). Built bottom-up from the kit.
+  // Connected electrical load — ONE-MINT consumer list (same discipline as the
+  // co2_mineralisation electricalConsumers array, 2026-07-06). Panel schedule +
+  // drawing_gates load_reconcile read this total; omitting the irrigation /
+  // nutrient circulation pump left the contract at 67 kW while the panel summed
+  // ~86 kW (Codema ship, 2026-07-09). Standby / backup pumps are NOT in this sum
+  // (panel marks them coincident=False). Nursery fertigation nested under a
+  // counted parent is also excluded from the running total (panel sub-component).
+  const irrigationPumpKw = pick(
+    /(?:irrigation|nutrient)\s+pump[^.]{0,80}?(\d{1,3}(?:\.\d)?)\s*kW/i,
+    Math.max(15, Math.round(irrigationDemandTotalM3H * 0.13)),
+  )
+  const handWaterPumpKw = Math.max(3, handWaterM3H * 0.16)
+  const drainTransferKwEach = 5.0
+  const clothFilterKwEach = 1.5
+  const roHpPumpKw = 5.5
+  const controlsKw = 5.0
+  const electricalConsumers: { key: string; name: string; kw: number }[] = [
+    { key: 'fertigation_circulation', name: 'Fertigation circulation pumps (duty)',
+      kw: departmentCount * dosingPumpKw },
+    { key: 'irrigation_nutrient_pump', name: 'Irrigation / nutrient circulation pump',
+      kw: irrigationPumpKw },
+    { key: 'ro_high_pressure_pump', name: 'RO high-pressure pump', kw: roHpPumpKw },
+    { key: 'hand_watering_pump', name: 'Hand-watering pump', kw: handWaterPumpKw },
+    { key: 'drain_transfer_pumps', name: 'Drain-pit transfer pumps (duty)',
+      kw: departmentCount * drainTransferKwEach },
+    { key: 'cloth_filter_pumps', name: 'Cloth-filter self-priming pumps (duty)',
+      kw: departmentCount * clothFilterKwEach },
+    { key: 'uv_disinfection', name: 'UV-C disinfection', kw: uvDisinfectionKw },
+    { key: 'controls_instrumentation', name: 'Instrumentation + dosing + controls',
+      kw: controlsKw },
+  ]
+  if (nurseryZoneCount > 0) {
+    // Nursery drain transfer is a distinct running load on the panel; nursery
+    // fertigation is nested under a counted parent (panel sub-component) so it
+    // is NOT added here — adding it double-counts against the panel total.
+    electricalConsumers.push({
+      key: 'nursery_drain_transfer', name: 'Nursery drain-pit transfer pump',
+      kw: nurseryZoneCount * drainTransferKwEach,
+    })
+  }
   const connectedLoadKw = Math.round(
-    departmentCount * dosingPumpKw          // fertigation circulation pumps
-    + nurseryZoneCount * dosingPumpKw * 0.6  // nursery circulation pump (smaller duty, ~45 vs 90 m³/h)
-    + 5.5                                    // RO high-pressure pump (installed)
-    + Math.max(3, handWaterM3H * 0.16)       // hand-watering pump (~4 kW at 25 m³/h, 3 bar)
-    + departmentCount * 4                    // drain-pit submersible transfer pumps
-    + nurseryZoneCount * 2                   // nursery drain-pit submersible pump (smaller)
-    + departmentCount * 4                    // cloth-filter self-priming pumps
-    + nurseryZoneCount * 2                   // nursery cloth-filter self-priming pump (smaller)
-    + nutrientTankCount * 0.37               // 8 nutrient mixers (~0.37 kW each)
-    + uvDisinfectionKw                       // UV-C disinfection (Legionella control)
-    + 5,                                     // instrumentation, dosing pumps, controls
+    electricalConsumers.reduce((sum, c) => sum + c.kw, 0),
   )
 
   // `from` = the OTHER contract-quantity keys this value is computed FROM (the machine lineage that lets
@@ -13952,14 +13984,14 @@ registerArchetype('water_treatment', (brief: any) => {
     uv_disinfection_power_kw: q(uvDisinfectionKw, 'kW', 'power', 'derived', 'system', 'calculator', `UV-C lamp electrical draw ≈ 0.045 kW per m³/h at the Legionella dose (${uvDisinfectionFlowM3H} m³/h × 0.045)`, ['uv_disinfection_throughput_m3_h'], 'uv_disinfection_throughput_m3_h*0.045'),
     uv_disinfection_count: q(1, 'off', 'count', 'derived', 'system', 'calculator', 'one duty UV-C reactor on the common recirculation main (all stored/recirculated water passes it before distribution)'),
     // hand-watering ring-main delivery pressure — the ACHIEVED value the Brief Compliance table
-    // shows against the brief's 3-bar hand-watering requirement (was unrecorded → read as a miss).
-    hand_watering_discharge_pressure_bar: q(3, 'bar', 'pressure', 'rated', 'system', 'brief', 'hand-watering ring-main delivery pressure (brief-stated 3 bar; sets the hand-watering pump head)'),
-    fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', 'fresh-water buffer storage (Codema 40 m³ galvanised tank); lock-gate HARD slot (exit 22)'),
-    // The brief's 'water_storage_capacity' is the PLANT TOTAL across the 3 galvanised tanks (1 fresh +
-    // 2 drain, ~40 m³ each = 120 m³) — emit it under the brief's own metric name so the compliance check
-    // compares TOTAL-vs-TOTAL, not the per-tank 40 against the 120 target (v10 Exec Summary miss: a brief
-    // total must be matched by an aggregate, never one unit's capacity).
-    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', 'total water storage = 3 galvanised tanks (1 fresh + 2 drain) × 40 m³ = 120 m³', ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'], 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'),
+    // shows against the brief's hand-watering requirement. Brief (SO21101551 / Sam): 3.3 bar.
+    // Was hardcoded 3 → false FAIL (target 3.3, achieved 3). P2-G 2026-07-08.
+    hand_watering_discharge_pressure_bar: q(3.3, 'bar', 'pressure', 'rated', 'system', 'brief', 'hand-watering ring-main delivery pressure (brief-stated 3.3 bar; sets the hand-watering pump head)'),
+    fresh_water_storage_capacity_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', `fresh-water / cleanwater buffer storage (Codema ~${storageTankVolEachM3} m³ galvanised reservoir); lock-gate HARD slot (exit 22)`),
+    // Brief cleanwater_reservoir_volume_m3 = 91 — exact key so compliance matches.
+    cleanwater_reservoir_volume_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'system', 'brief', `cleanwater reservoir volume = ${storageTankVolEachM3} m³ (brief cleanwater_reservoir_volume; Codema 5.46 m dia × 3.88 m)`),
+    // Plant TOTAL across the main reservoirs (1 cleanwater + 2 drain ≈ 3 × 91 = 273 m³).
+    water_storage_capacity_m3: q(storageTankVolEachM3 * 3, 'm³', 'volume', 'rated', 'system', 'calculator', `total main water storage = 3 galvanised reservoirs (1 cleanwater + 2 drain) × ${storageTankVolEachM3} m³ = ${storageTankVolEachM3 * 3} m³`, ['fresh_water_tank_volume_each_m3', 'fresh_water_tank_count', 'drain_water_tank_count'], 'fresh_water_tank_volume_each_m3*(fresh_water_tank_count+drain_water_tank_count)'),
 
     // ── PRINCIPAL EQUIPMENT (self-describing keys → universal sizer synthesises + prices) ──
     // RO skid — ONE packaged skid sized by its physical envelope volume (3.8 × 1.4 × 2.0 m
@@ -13978,12 +14010,27 @@ registerArchetype('water_treatment', (brief: any) => {
     gac_filter_vessel_volume_m3: q(1.8, 'm³', 'volume', 'rated', 'module', 'calculator', 'granular-activated-carbon filter vessel (1 × 42-inch tank, 14.5 m³/h)', ['gac_softener_throughput_m3_h']),
     softener_vessel_volume_each_m3: q(1.5, 'm³', 'volume', 'rated', 'module', 'calculator', 'glass-fibre softener vessel (350 L resin each, 14 m³/h duplex)'),
     softener_vessel_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two duplex softener vessels'),
-    fresh_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'fresh-water galvanised storage tank (3.64 m dia × 3.88 m, 40 m³)'),
-    fresh_water_tank_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one fresh-water storage tank'),
-    drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', 'drain-water galvanised storage tank (40 m³) for reuse'),
-    drain_water_tank_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two drain-water storage tanks'),
+    fresh_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', `fresh-water / cleanwater galvanised reservoir (${storageTankVolEachM3} m³, Codema 5.46 m dia × 3.88 m)`),
+    fresh_water_tank_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one fresh-water / cleanwater storage reservoir'),
+    drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', `drain-water galvanised storage reservoir (${storageTankVolEachM3} m³) for reuse`),
+    drain_water_tank_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two drain-water storage reservoirs'),
     fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `A/B fertigation circulation pump — main pump unit (${dosingFlowM3H} m³/h @ 2.9 bar, 2×40-200/5.5 duty+standby)`),
     fertigation_dosing_pump_power_kw: q(dosingPumpKw, 'kW', 'power', 'rated', 'module', 'brief', 'fertigation circulation pump motor (7.5 kW)'),
+    // INTENT: Engineering Analysis joins head/pressure by exact snake(name)+_pressure_bar.
+    // Emit the ACHIEVED discharge pressure under EACH pump family's own key (and the plant-
+    // wide aliases) so every duty row that already carries Q+P can derive H — never invent
+    // a different pressure per family; the brief states one shared 2.9 bar delivery duty.
+    fertigation_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'fertigation circulation pump discharge pressure (brief-stated 2.9 bar)'),
+    fertigation_dosing_pump_backup_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'standby fertigation circulation pump discharge pressure (same 2.9 bar duty as the main units)'),
+    // P2-H: brief fertigation_pump_pressure_bar = 2.9; emit the ACHIEVED discharge pressure
+    // so compliance matches pressure-vs-pressure (was matching a wrong 2 bar quantity).
+    fertigation_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'system', 'brief', 'fertigation pump-unit discharge pressure (brief-stated 2.9 bar; shared by the 2×90 + 1×45 units)'),
+    // Brief keys pump_unit_flow / nursery_pump_flow / pump_pressure — exact names so the
+    // compliance matcher never false-matches acid_dosing_pump_throughput (0.04 m³/h) on a
+    // shared "pump" token (scorecard floor 7 on codema-ship: target 90 achieved 0.04).
+    pump_unit_flow_m3_per_hr: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `main fertigation pump-unit flow = ${dosingFlowM3H} m³/h (brief pump_unit_flow; one of the 2×90 units)`),
+    pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'system', 'brief', 'main fertigation pump-unit discharge pressure (brief-stated 2.9 bar)'),
+    hand_watering_flow_m3_per_hr: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `hand-watering ring-main flow = ${handWaterM3H} m³/h (brief hand_watering_flow)`),
     fertigation_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} A/B fertigation dosing units (one per department)`),
     // Brief 'fertigation_dosing_capacity' is the PLANT TOTAL across the MAIN dosing units (2 × 90 =
     // 180 m³/h), not one unit's 90 — emit the aggregate under the brief metric name so compliance
@@ -13996,17 +14043,33 @@ registerArchetype('water_treatment', (brief: any) => {
     // metering duty (~40 L/h) — explicit motor kW so the synth doesn't bump them to the 1.5 kW floor.
     acid_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'acid metering pump (Iwaki EWN-C21VCER, 100 L barrel, ~40 L/h)'),
     acid_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'acid metering pump motor (frequency-controlled)'),
+    // Metering pumps inject into the same 2.9 bar fertigation header — discharge pressure is
+    // the plant delivery pressure (exact-name join for Engineering Analysis pump rows).
+    acid_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'acid metering pump discharge into the fertigation header (plant delivery 2.9 bar)'),
     acid_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} acid dosing pumps (one per A/B fertigation unit)`),
     chemical_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'chemical/nutrient metering pump (Iwaki EWN-C21VHERA, 100 L barrel, ~40 L/h)'),
     chemical_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'chemical metering pump motor (frequency-controlled)'),
+    chemical_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'chemical metering pump discharge into the fertigation header (plant delivery 2.9 bar)'),
     chemical_dosing_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} chemical/nutrient dosing pumps (one per A/B fertigation unit)`),
     nutrient_tank_volume_each_m3: q(1.0, 'm³', 'volume', 'rated', 'module', 'brief', 'nutrient stock tank (1,000 L polyester, 4 × A + 4 × B)'),
     nutrient_tank_count: q(nutrientTankCount, '', 'dimensionless', 'rated', 'system', 'brief', 'eight 1,000 L nutrient stock tanks'),
-    hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3 bar)'),
+    hand_watering_pump_throughput_m3_h: q(handWaterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'hand-watering frequency-controlled pump (25 m³/h @ 3.3 bar)'),
+    hand_watering_pump_pressure_bar: q(3.3, 'bar', 'pressure', 'rated', 'module', 'brief', 'hand-watering pump discharge pressure (brief-stated 3.3 bar)'),
     hand_watering_pump_count: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'one hand-watering pump'),
     drain_collection_sump_volume_each_m3: q(drainPitVolM3, 'm³', 'volume', 'rated', 'module', 'brief', 'drain-water collection pit (5,000 L) per cultivation room'),
+    // brief metric drain_pit_volume_l = 5000 L — emit under the brief's own unit so compliance
+    // matches L-vs-L (5 m³ IS 5000 L, but unit-family conversion was missing → false FAIL:
+    // target 5000 L, achieved 5). Same physical quantity, dual unit for the matcher.
+    drain_pit_volume_l: q(drainPitVolM3 * 1000, 'L', 'volume', 'rated', 'module', 'calculator', `drain pit volume = ${drainPitVolM3} m³ = ${drainPitVolM3 * 1000} L (brief metric drain_pit_volume_l)`, ['drain_collection_sump_volume_each_m3'], 'drain_collection_sump_volume_each_m3*1000'),
     drain_collection_sump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} drain pits (one per cultivation room)`),
     drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'drain-pit submersible transfer pump (45 m³/h)'),
+    // Drain transfer lifts into the same recovery header the fertigation plant runs at —
+    // discharge pressure = plant delivery pressure (exact-name join for Engineering Analysis).
+    // INTENT: drain-pit submersibles lift a short static head into the recovery tank —
+    // NOT the 2.9 bar fertigation delivery pressure. ~1.0 bar (≈10 m) matches the
+    // ~1.9–5 kW motors already minted for 45 m³/h (η≈0.65). Joining plant-wide 2.9 bar
+    // made Engineering Analysis report 191% efficiency (Codema ship 2026-07-09).
+    drain_transfer_pump_pressure_bar: q(1.0, 'bar', 'pressure', 'rated', 'module', 'brief', 'drain-pit submersible transfer pump discharge head (~10 m / 1.0 bar into the recovery reservoir — short lift, not the 2.9 bar fertigation delivery)'),
     drain_transfer_pump_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} submersible drain pumps`),
     cloth_filter_throughput_m3_h: q(clothFilterM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `drain-water cloth filter (${clothFilterM3H} m³/h, sized to its own zone's peak recovery flow) on HDPE tank, returns to drain tank`),
     cloth_filter_count: q(departmentCount, '', 'dimensionless', 'rated', 'system', 'brief', `${departmentCount} cloth-filter units`),
@@ -14017,18 +14080,23 @@ registerArchetype('water_treatment', (brief: any) => {
     ...(nurseryZoneCount > 0 ? {
       nursery_fertigation_dosing_pump_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery A/B fertigation circulation pump (${nurseryPumpFlowM3H} m³/h) — the brief's 3rd, differently-sized parallel pump unit`),
       nursery_fertigation_dosing_pump_power_kw: q(Math.round(dosingPumpKw * 0.6 * 10) / 10, 'kW', 'power', 'rated', 'module', 'brief', 'nursery fertigation circulation pump motor (smaller duty than the main units)'),
+      nursery_fertigation_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery fertigation circulation pump discharge pressure (same 2.9 bar plant delivery duty)'),
+      nursery_pump_flow_m3_per_hr: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `nursery pump-unit flow = ${nurseryPumpFlowM3H} m³/h (brief nursery_pump_flow; the 45 m³/h unit)`),
       nursery_fertigation_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery A/B fertigation dosing unit`),
       nursery_acid_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery acid metering pump (100 L barrel, ~40 L/h)'),
       nursery_acid_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery acid metering pump motor (frequency-controlled)'),
+      nursery_acid_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery acid metering pump discharge into the fertigation header (plant delivery 2.9 bar)'),
       nursery_acid_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery acid dosing pump`),
       nursery_chemical_dosing_pump_throughput_m3_h: q(0.04, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery chemical/nutrient metering pump (100 L barrel, ~40 L/h)'),
       nursery_chemical_dosing_pump_power_kw: q(0.04, 'kW', 'power', 'rated', 'module', 'brief', 'nursery chemical metering pump motor (frequency-controlled)'),
+      nursery_chemical_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery chemical metering pump discharge into the fertigation header (plant delivery 2.9 bar)'),
       nursery_chemical_dosing_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery chemical dosing pump`),
       nursery_cloth_filter_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery drain-water cloth filter (${nurseryPumpFlowM3H} m³/h, sized to the nursery zone's own peak recovery flow) on HDPE tank, returns to nursery drain reservoir`),
       nursery_cloth_filter_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery cloth-filter unit`),
       nursery_drain_collection_sump_volume_each_m3: q(drainPitVolM3, 'm³', 'volume', 'rated', 'module', 'brief', 'nursery drain-water collection pit (5,000 L)'),
       nursery_drain_collection_sump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery drain pit`),
       nursery_drain_transfer_pump_throughput_m3_h: q(45, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', 'nursery drain-pit submersible transfer pump'),
+      nursery_drain_transfer_pump_pressure_bar: q(1.0, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery drain-pit submersible transfer pump discharge head (~10 m / 1.0 bar — short lift, not fertigation delivery pressure)'),
       nursery_drain_transfer_pump_count: q(nurseryZoneCount, '', 'dimensionless', 'rated', 'system', 'brief', `${nurseryZoneCount} nursery submersible drain pump`),
     } : {}),
 
@@ -14053,13 +14121,17 @@ registerArchetype('water_treatment', (brief: any) => {
     // metric gac_softener_throughput matches its DELIVERED capacity — the design treats at
     // 14.5 m³/h ≥ the 14.5 m³/h demand (a genuine PASS, not a matcher work-around).
     gac_softener_throughput_m3_h: q(treatmentThroughputM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', 'GAC / softener treatment throughput (~14.5 m³/h)'),
-    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', `sum of pump + dosing + control loads ≈ ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC are out of scope)`, ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'hand_watering_pump_count', 'drain_transfer_pump_count']),
+    irrigation_pump_motor_kw: q(irrigationPumpKw, 'kW', 'power', 'rated', 'module', 'brief',
+      `irrigation / nutrient circulation pump motor ≈ ${irrigationPumpKw} kW (RUNNING load — counted in connected_electrical_load_kw)`),
+    connected_electrical_load_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', {
+      source_detail: `Σ ONE-MINT electrical consumers (${electricalConsumers.map(c => `${c.name} ${c.kw.toFixed(1)}`).join(' + ')}) = ${connectedLoadKw} kW — a pumping/dosing plant, NOT a megawatt facility (lighting + HVAC out of scope; standby pumps excluded)`,
+    }, ['fertigation_dosing_pump_power_kw', 'fertigation_dosing_pump_count', 'irrigation_pump_motor_kw', 'hand_watering_pump_count', 'drain_transfer_pump_count', 'uv_disinfection_power_kw']),
     // Numeric scope flag (the universal sizer reads the quantities map reliably; the string
     // scope_exclusions_desc on shared_quantities does NOT survive into the orchestrator contract).
     // 1 = the building / civils / rack framework are supplied by others → synthesizeBuildingStructure
     // returns 0 (no £1.1M phantom hall). 'build'/'scope' stems are STOP_STEMS so this never synthesises.
     building_out_of_scope: q(1, '', 'dimensionless', 'rated', 'system', 'brief', 'the building, civils and cultivation rack framework are supplied by others — OUT of scope (no hall is synthesised around the water plant)'),
-    total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'total connected electrical demand of the water plant', ['connected_electrical_load_kw']),
+    total_supply_demand_kw: q(connectedLoadKw, 'kW', 'power', 'rated', 'system', 'calculator', 'alias of connected_electrical_load_kw (ONE-MINT running load)', ['connected_electrical_load_kw']),
   }
 
   const closures: any[] = [{

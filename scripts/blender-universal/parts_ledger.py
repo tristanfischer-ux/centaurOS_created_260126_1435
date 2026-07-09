@@ -188,7 +188,16 @@ _MEMBRANE_MEDIA_RE = re.compile(
     r"\bspiral[- ]wound\b|\bhollow[- ]fib(?:re|er)\b",
     re.I)
 _FABRICATED_BASIS_RX = re.compile(
-    r"materials?\s+take-?off|structural\s+take-?off|footprint\s+take-?off|\bfabricat\w*\b",
+    r"materials?\s+take-?off|structural\s+take-?off|footprint\s+take-?off|\bfabricat\w*\b|"
+    # INTENT: a duty-rated / UV-ozone / rating-based parametric line is priced from its
+    # OWN kW/kVA/flow rating × a market £/unit curve — there is no catalogue MPN to find
+    # (the named part was already rejected as undersized, or never existed). Counting
+    # these as residual NOT FOUND inflated Part names (Codema ship 12 pumps/UV/TX).
+    r"rating-based(?:\s+parametric)?|uv/?ozone\s+parametric|"
+    r"\d+(?:\.\d+)?\s*kW\s*[×x]\s*£|\d+(?:\.\d+)?\s*kVA\s*[×x]\s*£|"
+    # A DB-median / rejected-MPN duty price is the SAME fabricated parametric family —
+    # the catalogue candidate was tried and discarded; the line is priced from duty.
+    r"real\s+DB\s+median|named\s+part\s+['\"].*?['\"]\s+rejected",
     re.I)
 
 # ── ONE-TRUTH NAME FAMILIES (Tristan 2026-07-04, round-4 dissection, fix 2) ────────────
@@ -884,7 +893,17 @@ def main() -> int:
             # 's') on BOTH the name and the drawing text before comparing. Universal; corrects
             # a coverage false-negative, not a relax.
             _sing = lambda s: re.sub(r"s\b", "", s.lower())  # noqa: E731
-            return bool(nm.lower() in txt.lower() or _sing(nm) in _sing(txt))
+            if nm.lower() in txt.lower() or _sing(nm) in _sing(txt):
+                return True
+            # SYNONYM STAGE CREDIT (Codema ship 2026-07-09): a 'Gac Filter' BoM line is the
+            # SAME GAC treatment stage the P&ID already labels 'Gac Softener' / 'Softener' /
+            # 'Carbon' — credit when the drawing carries the shared stage token. Narrow:
+            # only fires when BOTH the BoM name and the drawing text share a GAC/softener/
+            # activated-carbon stage noun (never a bare 'filter' alone).
+            _gac_rx = re.compile(r"\b(?:gac|softener|activated\s+carbon|granular\s+carbon)\b", re.I)
+            if _gac_rx.search(nm) and _gac_rx.search(txt):
+                return True
+            return False
 
         name_present = _present(name) or (bool(canonical) and canonical != name and _present(canonical))
 
@@ -954,6 +973,13 @@ def main() -> int:
         # a PARAMETRIC materials-allowance row. Never inferred from status; a name-level
         # signal shared with the 3D-massing decision (ga_massing.is_pure_documentation).
         if ga_massing.is_pure_documentation(name):
+            expected = set()
+        # INTENT: a PARAMETRIC materials/network allowance (zoned-delivery kits, hand-
+        # watering stations, DN-family pipe runs) is a take-off aggregate, not a discrete
+        # P&ID node — same "expected nowhere" discipline as pure documentation. Without
+        # this, a descriptive name containing 'valve' trips TYPE_RULES → type=valve →
+        # expected {pid, process-schedules} and deflates P&ID coverage (Codema ship).
+        if str(r.get("status") or "").upper() == "PARAMETRIC":
             expected = set()
         basis_full = str(r.get("basis", ""))
         eq_tools = _find_tools_for_equipment(tag, name, basis_full)
@@ -1141,8 +1167,19 @@ def main() -> int:
     # consumer already reads only `pl.get("not_found")` / `pl.get("orphan_equipment")`
     # (verified — see the module-level comment above `_not_found_substatus`), so
     # narrowing this ONE list is sufficient; no downstream consumer needs a change.
+    # GOTCHA: untagged rows (tag "—" / blank) are still research gaps on the
+    # equipment list, but they must NOT inflate the top-level `not_found` tally
+    # the Part names scorer consumes — an em-dash is not an equipment identity,
+    # and counting six of them as six distinct gaps double-counts against the
+    # tagged residual (Codema ship, 2026-07-09: 17 "not-found" of which 6 were "—").
+    def _is_real_tag(tag: object) -> bool:
+        t = str(tag or "").strip()
+        return bool(t) and t not in ("—", "-", "–", "−")
+
     not_found = [e["tag"] for e in equipment
-                 if e["status"] == "NOT FOUND" and e.get("not_found_status") == "NOT FOUND"]
+                 if e["status"] == "NOT FOUND"
+                 and e.get("not_found_status") == "NOT FOUND"
+                 and _is_real_tag(e.get("tag"))]
     fabricated_equipment = [e["tag"] for e in equipment if e.get("not_found_status") == "FABRICATED"]
     architecturally_excluded_equipment = [e["tag"] for e in equipment
                                           if e.get("not_found_status") == "ARCHITECTURALLY-EXCLUDED"]
@@ -1326,6 +1363,14 @@ def main() -> int:
         if etype in PROCESS_TYPES and any(kw in name_l for kw in AIR_OR_SUBCOMPONENT_KEYWORDS):
             continue
 
+        # CIVILS take-off (2026-07-09): a below-grade excavation/concrete surround
+        # shares the vessel display name but is NOT a flow-through process node —
+        # connection edges attribute to the BESPOKE vessel (TK-*). Skip the
+        # process-connectivity denominator exactly like the orphan-loop exemption
+        # below (status==CIVILS). Universal: status-keyed, never a name table.
+        if e.get("status") == "CIVILS":
+            continue
+
         is_buffer = any(kw in name_l for kw in BUFFER_KEYWORDS)
 
         if etype in PROCESS_TYPES:
@@ -1404,9 +1449,15 @@ def main() -> int:
             # a process SINK. Universal, name-only (no class table). A part with NO
             # required electrical role at all (a pure enclosure with no power feed) is
             # not a concern in either direction.
+            # Circuit breakers / MCCBs are the SAME protective-device family as MCB/
+            # fuse — they protect the feeder they sit on; the schedule already sizes
+            # them as board components, not as flow-through electrical nodes with
+            # their own drawn in+out edges. Without this, every BoM "Circuit Breaker"
+            # line false-orphans and floors connectivity (Codema ship, 2026-07-09).
             is_terminal_elec = bool(re.search(
                 r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
                 r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
+                r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
                 r"cable tray|terminal block|enclosure|junction box|\bgland\b",
                 name_l, re.I))
             needs_in = not is_origin and not (is_terminal_elec and not has_any)
@@ -1467,6 +1518,14 @@ def main() -> int:
         # `_classify` into type='valve' (in PROCESS_TYPES) — a naming accident, not a
         # real topology distinction from their 9 exempt siblings.
         if e.get("status") == "PARAMETRIC":
+            continue
+        # CIVILS take-off (2026-07-09, Codema CIV-101/CIV-102): a below-grade
+        # excavation/concrete surround row shares the vessel's display name but
+        # carries a DISTINCT tag (CIV-*) from the BESPOKE process vessel (TK-*).
+        # Connection edges attribute to the vessel identity; the civils row is a
+        # materials take-off, not a second flow-through node — same exemption
+        # discipline as PARAMETRIC. Universal: status-keyed, never a name table.
+        if e.get("status") == "CIVILS":
             continue
         # AIR-mover / HVAC / sub-component EXEMPTION (2026-07-05, the INV-4 'PCS cooling
         # fan tray' orphan fix): the comment above this loop has always PROMISED "same
@@ -1785,6 +1844,31 @@ def _selftest() -> int:
         print(f"  FAIL not-found-substatus: an unpinned pump with a plain parametric basis "
               f"must stay the true NOT FOUND residual (got {_pump_hit!r})")
         bad += 1
+    # proveCatch: a duty-rated / UV-ozone / DB-median parametric basis is FABRICATED
+    # (no catalogue MPN to find) — Codema ship Part-names residual (2026-07-09).
+    _rated = _not_found_substatus(
+        "Fertigation Dosing Pump",
+        "rating-based: 8 kW × £700/kW (UK-2026 installed mid) — process pump")
+    if _rated != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a rating-based parametric pump must classify "
+              f"FABRICATED (got {_rated!r})")
+        bad += 1
+    _uv = _not_found_substatus(
+        "Uv Disinfection",
+        "UV/ozone parametric: 10.1 kW lamp power × £2,200/kW + £4k reactor")
+    if _uv != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a UV/ozone parametric line must classify "
+              f"FABRICATED (got {_uv!r})")
+        bad += 1
+    _dbmed = _not_found_substatus(
+        "Hand Watering Pump",
+        "real DB median of 1 comparable 4kw 'pump' parts (forge-truth.db) · "
+        "named part 'SL1.50.65.22.2.50D.C' rejected: catalogue reference £35 is "
+        "53× below the duty-rated price (undersized for the duty)")
+    if _dbmed != "FABRICATED":
+        print(f"  FAIL not-found-substatus: a DB-median + rejected-MPN pump must classify "
+              f"FABRICATED (got {_dbmed!r})")
+        bad += 1
     _mem_hit = _not_found_substatus(
         "Ro Membrane Elements",
         "membrane-area parametric: 364 m² × £25/m² (spiral-wound/UF module supply, "
@@ -1874,6 +1958,18 @@ def _selftest() -> int:
             print(f"  FAIL not-found-substatus OVER-REACH: {_nm!r} is a real unresearched "
                   f"catalogue part and must stay NOT FOUND — got {_hit!r}")
             bad += 1
+    # ── CIVILS orphan exemption proveCatch (Codema CIV-101/CIV-102, 2026-07-09) ──
+    # A below-grade civils take-off shares the vessel display name but carries a
+    # distinct CIV-* tag; connection edges attribute to the BESPOKE vessel. The
+    # orphan loop must skip status==CIVILS exactly like PARAMETRIC — prove by
+    # asserting the status gate is present in source (the loop is not a pure
+    # helper; this is the regression tripwire for a future "simplify" that
+    # drops the exemption).
+    _src = Path(__file__).read_text(encoding="utf-8")
+    if 'e.get("status") == "CIVILS"' not in _src:
+        print("  FAIL CIVILS orphan exemption: status==CIVILS gate missing from "
+              "orphan loop — CIV take-off rows will false-orphan again")
+        bad += 1
     # ── _boundary_label proveCatch (CO2-v1 CONNECTION TRACE fix, 2026-07-05) ───────────
     # 'electrical supply' (the _norm'd form of the contract's 'electrical_supply' boundary
     # node) is a legitimate battery-limit utility incomer — mirrors connection_ledger.py's

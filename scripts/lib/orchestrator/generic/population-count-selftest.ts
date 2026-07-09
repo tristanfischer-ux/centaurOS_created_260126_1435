@@ -74,9 +74,31 @@ function run() {
   }
   if (dr.droppedDuplicate !== 1) throw new Error(`phantom-drop: expected 1 exact-id duplicate dropped, got ${dr.droppedDuplicate}`)
 
+  // ── dropAttributePhantomWords: solenoid ↔ pneumatic-actuated synonym population collapse ──
+  const syn: any = [{
+    module: 'actuation', sub_modules: [{ sub_module: 's', words: [
+      { ...word('Solenoid Valves', 200), id: 'solenoid_valves_word' },
+      { ...word('Pneumatic Actuated Valves', 200), id: 'pneumatic_actuated_valves_word' },
+      { ...word('Solenoid Valve', 200), id: 'solenoid_valve_word' },
+      { ...word('Manual Ball Valves', 200), id: 'manual_ball_valves_word' }, // distinct family — kept
+    ] }],
+  }]
+  const synDr = dropAttributePhantomWords(syn)
+  const synRemain = syn[0].sub_modules[0].words.map((w: any) => w.name_human)
+  if (synRemain.filter((n: string) => /solenoid|pneumatic actuated/i.test(n)).length !== 1) {
+    throw new Error(`phantom-drop: solenoid+pneumatic ×200 must collapse to ONE word (got ${JSON.stringify(synRemain)})`)
+  }
+  if (!synRemain.includes('Manual Ball Valves')) {
+    throw new Error('phantom-drop: Manual Ball Valves ×200 must NOT collapse into the actuated-on/off family')
+  }
+  if (synDr.droppedDuplicate < 2) {
+    throw new Error(`phantom-drop: expected ≥2 synonym population drops, got ${synDr.droppedDuplicate}`)
+  }
+
   // eslint-disable-next-line no-console
   console.log('population-count --selftest OK (4 valve smears → ×1; genuine actuated stays ×200; ' +
-    `attribute phantoms dropped [${dr.droppedPhantom}], same-id dedup [${dr.droppedDuplicate}], real parts kept)`)
+    `attribute phantoms dropped [${dr.droppedPhantom}], same-id dedup [${dr.droppedDuplicate}], ` +
+    `solenoid↔pneumatic synonym collapse [${synDr.droppedDuplicate}], real parts kept)`)
 }
 
 run()

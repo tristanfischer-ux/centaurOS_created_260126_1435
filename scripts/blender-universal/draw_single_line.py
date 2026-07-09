@@ -1837,8 +1837,15 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # edm.canonical_board_name — the ONE MINT shared with the schedule — so the two projections
     # can never disagree. A DC or MV main board already got its OWN descriptive name above
     # ('MAIN DC BUS' / 'MAIN MV SWITCHBOARD', not in this placeholder set) and is left alone.
-    if main_bus.tag in ("MAIN SWITCHBOARD", "MAIN LV BOARD") and main_hub:
+    # ALWAYS mint the canonical board name when we know the real main_hub — never leave
+    # a placeholder OR a stale 'MAIN LV BOARD' written by _apply_distribution_voltage_model
+    # / _build_source (those paths still assign the generic tag AFTER this historically,
+    # and the Excel Electrical tab FAILs when the schedule says
+    # 'MAIN DISTRIBUTION BOARD (TP&N)' while the SVG still reads 'MAIN LV BOARD').
+    if main_hub:
         main_bus.tag = edm.canonical_board_name(main_hub, "main", humanise=_humanise)
+    elif main_bus.tag in ("MAIN SWITCHBOARD", "MAIN LV BOARD"):
+        pass  # no hub identity — keep placeholder rather than invent a board
     # UNIVERSAL de-duplication: a load can reach the board both as a kW-derived
     # synthesised feeder AND as a per-word skeleton edge — collapse those to one way
     # each (keeps the kW-derived feeder). Done AFTER the voltage model so synthesised
@@ -1910,6 +1917,11 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # UNIVERSAL backstop: every final load feeder, at any tier, shows its own protective
     # device (real BoM-matched or a generically-sized MCB) — never a bare conductor.
     _ensure_load_protective_devices(tree, devices)
+    # FINAL canonical board name (P1-E / Electrical tab, 2026-07-09): re-assert after
+    # every grouping pass so a later helper cannot leave 'MAIN LV BOARD' on the SVG
+    # while the panel schedule correctly reads 'MAIN DISTRIBUTION BOARD (TP&N)'.
+    if main_hub and tree.main_bus is not None:
+        tree.main_bus.tag = edm.canonical_board_name(main_hub, "main", humanise=_humanise)
     return tree
 
 
@@ -2159,7 +2171,10 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
                        f"({plan.board_current_a:,.0f} A board); LV loads via local "
                        f"{plan.transformer_ratio} step-down.")] + list(tree.notes or [])
     else:
-        if not main.tag or main.tag in ("MAIN SWITCHBOARD",):
+        # Placeholder only — the post-voltage-model canonical rename (main_hub →
+        # edm.canonical_board_name) overwrites this when a real hub exists. Do NOT
+        # leave 'MAIN LV BOARD' as a final tag on a plant that has a Motor Control Center.
+        if not main.tag or main.tag in ("MAIN SWITCHBOARD", "MAIN LV BOARD"):
             main.tag = "MAIN LV BOARD"
 
     # --- Replace the lumped feeder(s) with per-EQUIPMENT feeders (preferred) or, if no
@@ -2346,6 +2361,8 @@ def _build_source(state, schedule, devices, main_bus, arch):
             tag="TX1", kva=kva_label,
             ratio="11000/400 V",
             detail=(xfmr_d["detail"] or xfmr_d["name"]) if xfmr_d else "")
+        # Placeholder — overwritten by the post-model canonical_board_name mint when
+        # main_hub is known (Motor Control Center → MAIN DISTRIBUTION BOARD (TP&N)).
         main_bus.tag = "MAIN LV BOARD"
         # The LV board sits on the transformer SECONDARY (400 V), not the internal
         # process-bus default the schedule may carry — set it unconditionally.
