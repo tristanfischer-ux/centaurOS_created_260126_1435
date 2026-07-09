@@ -234,7 +234,7 @@ function run(): void {
     product_description: 'Codema fertigation water plant',
   })
   if (!codemaContract) throw new Error('T-19: Codema buildContract must return a contract')
-  const cQ = codemaContract.quantities as Record<string, { value?: number }>
+  const cQ = codemaContract.quantities as Record<string, { value?: number; source?: string }>
   if (cQ.softener_vessel_count?.value !== 2) {
     throw new Error(
       `T-19 proveNoFalsePositive: Codema softener brief must emit softener_vessel_count=2, got ${JSON.stringify(cQ.softener_vessel_count)}`,
@@ -242,6 +242,33 @@ function run(): void {
   }
   if (cQ.softener_vessel_volume_each_m3?.value == null) {
     throw new Error('T-19 proveNoFalsePositive: Codema brief must emit softener_vessel_volume_each_m3')
+  }
+
+  // proveCatch (Codema 2008 exit 33): brief states 90 m³/h @ 2.9 bar but NO motor kW —
+  // builder must seed calculator IEC frame ≥11 kW (15), NEVER a pinned brief 7.5 default.
+  // Uses a Q+P brief (not the softener-only snippet above, which has no pump duty).
+  const dutyBrief =
+    'Pump Unit 1 — 90 cubic metres per hour at approximately 2.9 bar (2 by 40-200/5.5 pumps). ' +
+    'Pump Unit 2 — 90 cubic metres per hour at approximately 2.9 bar. ' +
+    'Nursery Pump Unit — 45 cubic metres per hour at approximately 2.9 bar. ' +
+    'Particle filter and granular-activated-carbon filter; water softener duplex for make-up.'
+  const dutyContract = buildContract('water_treatment', {
+    original_text: dutyBrief,
+    product_description: 'Fertigation plant with stated Q+P, no motor kW',
+  })
+  if (!dutyContract) throw new Error('duty-seed: buildContract must return a contract')
+  const dQ = dutyContract.quantities as Record<string, { value?: number; source?: string }>
+  const fertKw = dQ.fertigation_dosing_pump_power_kw?.value
+  const fertSrc = dQ.fertigation_dosing_pump_power_kw?.source
+  if (!(typeof fertKw === 'number' && fertKw >= 11)) {
+    throw new Error(
+      `duty-seed proveCatch: fertigation_dosing_pump_power_kw must be ≥11 kW IEC frame for 90 m³/h @ 2.9 bar (got ${fertKw})`,
+    )
+  }
+  if (fertSrc === 'brief') {
+    throw new Error(
+      `duty-seed proveCatch: fallback/duty-derived fertigation motor must be source=calculator, not brief-pinned (got ${fertSrc}) — a false brief pin blocks the pressure reconcile`,
+    )
   }
 
   // eslint-disable-next-line no-console

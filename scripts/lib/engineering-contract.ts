@@ -13917,7 +13917,44 @@ registerArchetype('water_treatment', (brief: any) => {
   // per-unit demand, not a separately-guessed "dosing units" figure (that regex coincidentally
   // shared the OLD 45 m³/h default, which understated the real 90 m³/h main-unit flow).
   const dosingFlowM3H = irrigationDemandM3HPerDept
-  const dosingPumpKw = pick(/(\d(?:\.\d)?)[\s-]?kilowatt\s+(?:circulation\s+)?pump|pump[^.]{0,40}?(\d(?:\.\d)?)\s*kilowatt/i, 7.5)
+  // INTENT (Codema 2008 exit 33): never stamp a FALLBACK motor kW as source:'brief'.
+  // The old pick(..., 7.5) default was pinned as brief → reconcilePumpMotorAgainstStatedPressure
+  // refused to lift it → Physics Critic HIGH (7.5/7.7 kW vs 90 m³/h @ 2.9 bar needs ~15 kW
+  // IEC frame) → gate 33 block. UNIVERSAL: when the brief states Q + discharge pressure but
+  // does NOT state a motor kW for that family, size P = ρ·g·Q·H / η (η=0.65 combined) and
+  // round UP to the next IEC frame; provenance = calculator. Only a REAL brief kW match
+  // stays source:'brief' (nameplate pin). Model suffixes like "40-200/5.5" are NOT kW.
+  const IEC_MOTOR_FRAMES_KW = [
+    0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132,
+  ]
+  const nextIecMotorKw = (kw: number): number => {
+    if (!(kw > 0)) return kw
+    for (const f of IEC_MOTOR_FRAMES_KW) if (f >= kw - 1e-9) return f
+    return Math.ceil(kw)
+  }
+  const motorKwFromDuty = (m3h: number, bar: number): number => {
+    const qM3s = m3h / 3600
+    const headM = bar * 10.2
+    const shaftKw = (1000 * 9.81 * qM3s * headM) / 0.65 / 1000
+    return nextIecMotorKw(shaftKw)
+  }
+  const fertigationDischargeBar = pick(
+    /(?:fertigation|irrigation|pump\s*unit)[^.]{0,80}?(\d(?:\.\d)?)\s*bar|(?:at\s+approximately\s+)(\d(?:\.\d)?)\s*bar/i,
+    2.9,
+  )
+  const dosingPumpKwMatch = desc.match(
+    /(?:fertigation|circulation|nutrient)\s+pump[^.]{0,60}?(\d{1,2}(?:\.\d)?)\s*k(?:ilo)?w|(?:fertigation|circulation)\s+[^.]{0,40}?(\d{1,2}(?:\.\d)?)\s*kilowatt/i,
+  )
+  const dosingPumpKwStated = dosingPumpKwMatch
+    ? parseFloat(String(dosingPumpKwMatch.slice(1).find((x) => x != null) ?? ''))
+    : NaN
+  const dosingPumpKwFromDuty = motorKwFromDuty(dosingFlowM3H, fertigationDischargeBar)
+  const dosingPumpKwStatedOk = Number.isFinite(dosingPumpKwStated) && dosingPumpKwStated > 0
+  const dosingPumpKw = dosingPumpKwStatedOk ? dosingPumpKwStated : dosingPumpKwFromDuty
+  const dosingPumpKwSource: 'brief' | 'calculator' = dosingPumpKwStatedOk ? 'brief' : 'calculator'
+  const nurseryPumpKwFromDuty = nurseryPumpFlowM3H > 0
+    ? motorKwFromDuty(nurseryPumpFlowM3H, fertigationDischargeBar)
+    : 0
   const handWaterM3H = pick(/hand[\s-]?water[^.]{0,150}?(\d{2,3})\s*(?:cubic\s+met|m³|m\^?3)/i, 25)
   const containerCount = Math.round(pick(/(\d{1,2}[,\s]?\d{3})\s*(?:cultivation\s+)?(?:container|tray)/i, 6000))
   const valveCount = Math.round(pick(/(\d{2,4})\s*(?:electrically[\s-]?actuated\s+|actuated\s+)?valves?/i, 200))
@@ -13999,11 +14036,10 @@ registerArchetype('water_treatment', (brief: any) => {
     // Nursery fertigation is a distinct running motor when present (was previously
     // omitted as "nested" while a plant-total irrigation_nutrient_pump double-counted
     // the same duty — with the plant-total gone, count the nursery unit honestly).
-    ...(nurseryZoneCount > 0 && unitCapacitiesCoverIrrigationDemand
+    ...(nurseryZoneCount > 0 && unitCapacitiesCoverIrrigationDemand && nurseryPumpKwFromDuty > 0
       ? [{ key: 'nursery_fertigation_circulation',
           name: 'Nursery fertigation circulation pump (duty)',
-          // same scale as nursery_fertigation_dosing_pump_power_kw below (~0.6 × main unit)
-          kw: nurseryZoneCount * (Math.round(dosingPumpKw * 0.6 * 10) / 10) }]
+          kw: nurseryZoneCount * nurseryPumpKwFromDuty }]
       : []),
     ...(irrigationPumpKw > 0
       ? [{ key: 'irrigation_nutrient_pump', name: 'Irrigation / nutrient circulation pump',
@@ -14131,7 +14167,12 @@ registerArchetype('water_treatment', (brief: any) => {
     drain_water_tank_volume_each_m3: q(storageTankVolEachM3, 'm³', 'volume', 'rated', 'module', 'brief', `drain-water galvanised storage reservoir (${storageTankVolEachM3} m³) for reuse`),
     drain_water_tank_count: q(2, '', 'dimensionless', 'rated', 'system', 'brief', 'two drain-water storage reservoirs'),
     fertigation_dosing_pump_throughput_m3_h: q(dosingFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `A/B fertigation circulation pump — main pump unit (${dosingFlowM3H} m³/h @ 2.9 bar, 2×40-200/5.5 duty+standby)`),
-    fertigation_dosing_pump_power_kw: q(dosingPumpKw, 'kW', 'power', 'rated', 'module', 'brief', 'fertigation circulation pump motor (7.5 kW)'),
+    fertigation_dosing_pump_power_kw: q(
+      dosingPumpKw, 'kW', 'power', 'rated', 'module', dosingPumpKwSource,
+      dosingPumpKwStatedOk
+        ? `fertigation circulation pump motor ${dosingPumpKw} kW (brief-stated nameplate)`
+        : `fertigation circulation pump motor ${dosingPumpKw} kW — IEC frame for ${dosingFlowM3H} m³/h @ ${fertigationDischargeBar} bar (P = ρ·g·Q·H / 0.65); brief stated Q+P but no motor kW`,
+    ),
     // INTENT: Engineering Analysis joins head/pressure by exact snake(name)+_pressure_bar.
     // Emit the ACHIEVED discharge pressure under EACH pump family's own key (and the plant-
     // wide aliases) so every duty row that already carries Q+P can derive H — never invent
@@ -14216,7 +14257,10 @@ registerArchetype('water_treatment', (brief: any) => {
     //    (nurseryZoneCount > 0 — a brief with no such unit fabricates nothing here). ──
     ...(nurseryZoneCount > 0 ? {
       nursery_fertigation_dosing_pump_throughput_m3_h: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'module', 'brief', `nursery A/B fertigation circulation pump (${nurseryPumpFlowM3H} m³/h) — the brief's 3rd, differently-sized parallel pump unit`),
-      nursery_fertigation_dosing_pump_power_kw: q(Math.round(dosingPumpKw * 0.6 * 10) / 10, 'kW', 'power', 'rated', 'module', 'brief', 'nursery fertigation circulation pump motor (smaller duty than the main units)'),
+      nursery_fertigation_dosing_pump_power_kw: q(
+        nurseryPumpKwFromDuty, 'kW', 'power', 'rated', 'module', 'calculator',
+        `nursery fertigation circulation pump motor ${nurseryPumpKwFromDuty} kW — IEC frame for ${nurseryPumpFlowM3H} m³/h @ ${fertigationDischargeBar} bar (P = ρ·g·Q·H / 0.65)`,
+      ),
       nursery_fertigation_dosing_pump_pressure_bar: q(2.9, 'bar', 'pressure', 'rated', 'module', 'brief', 'nursery fertigation circulation pump discharge pressure (same 2.9 bar plant delivery duty)'),
       nursery_pump_flow_m3_per_hr: q(nurseryPumpFlowM3H, 'm³/h', 'flow_rate', 'rated', 'system', 'brief', `nursery pump-unit flow = ${nurseryPumpFlowM3H} m³/h (brief nursery_pump_flow; the 45 m³/h unit)`),
       // Exact brief metric key (codema-full-20260709-1508 Exec UNVERIFIED) — alias of nursery_pump_flow.
