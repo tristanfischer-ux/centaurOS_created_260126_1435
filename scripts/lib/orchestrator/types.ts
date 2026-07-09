@@ -472,6 +472,18 @@ export type PartialContract = Readonly<ContractInProgress>
 // so the orchestrator and legacy chain share data structures.
 // ---------------------------------------------------------------------------
 
+/** Fluid-stream role on a topology edge (T-01). Mirrors engineering-contract.StreamRole. */
+export type StreamRole =
+  | 'makeup'
+  | 'clean'
+  | 'fertigated_supply'
+  | 'dirty_drain'
+  | 'recovered'
+  | 'dose'
+  | 'purge'
+  | 'utility'
+  | 'unknown'
+
 export interface TopologyEdge {
   from_part: string
   to_part: string
@@ -486,6 +498,8 @@ export interface TopologyEdge {
   required_unit?: string
   required_margin_factor?: number
   material_context?: string
+  /** Fluid-stream role (T-01). Classified from endpoint names + material_context. */
+  stream_role?: StreamRole
 }
 
 export interface ContractClosureResult {

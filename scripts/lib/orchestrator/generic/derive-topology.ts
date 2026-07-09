@@ -21,7 +21,9 @@
 // endpoints by fuzzy token-overlap against the part display name (build_universal_scene
 // resolve_endpoint), so a slug == snake_case(name_human) always resolves.
 
-import type { TopologyEdge } from '../../engineering-contract'
+import type { StreamRole, TopologyEdge } from '../../engineering-contract'
+
+export type { StreamRole }
 
 type AnyWord = {
   name_human?: string
@@ -146,6 +148,99 @@ export function slugify(name: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
+/** Reverse of slugify for classifier matching when only a slug endpoint is available. */
+export function unslugify(slug: string): string {
+  return (slug || '').replace(/[_-]+/g, ' ').trim()
+}
+
+// ── T-01 STREAM-ROLE CLASSIFIER (universal, name + material_context only) ─────
+// INTENT: Every fluid TopologyEdge carries a typed stream_role so P&ID/BFD/cost
+// consumers can tell makeup vs dirty-drain vs recovered vs dose without parsing
+// a product-class slug. Keyed on endpoint vocabulary + optional material_context
+// — NEVER a class name. Order is deliberate: recirculation/recovered and purge
+// beat generic clean/makeup so a brine reject never reads as "clean".
+const STREAM_PURGE_RE =
+  /\b(brine|reject|waste|disposal|blowdown|concentrate|effluent|purge|abatement|incinerat|flare|\bvent\b|backwash)\b/i
+const STREAM_DIRTY_DRAIN_RE =
+  /\b(drain(?:ed|age|water|pit)?|\bsump\b|collection|dirty|foul)\b/i
+const STREAM_RECOVERED_RE =
+  /\b(recover(?:ed|y)?|reclaim(?:ed)?|recycl(?:ed|e)?|reus(?:e|ed|able)|condensate|recirculat)\b/i
+const STREAM_DOSE_RE =
+  /\b(dos(?:e|ing|er)|inject(?:ion|or)?|\btrim\b|acid|caustic|peroxide|biocide|antiscalant|scale[\s-]?inhibitor|corrosion[\s-]?inhibitor)\b/i
+const STREAM_FERTIGATED_RE =
+  /\b(fertigat|irrigation|hand.?watering|\bwatering\b|sprinkler)\b/i
+const STREAM_MAKEUP_RE =
+  /\b(make.?up|feed|inlet|raw[\s-]?water|intake|charge|receiv|mains|city[\s-]?water)\b/i
+const STREAM_CLEAN_RE =
+  /\b(reverse.?osmosis|\bro\b|\buf\b|ultra.?filtrat|nano.?filtrat|micro.?filtrat|\bgac\b|carbon|softener|deioni|permeate|clean[\s-]?water|treated[\s-]?water|product[\s-]?water|\bedi\b|polish)\b/i
+const STREAM_UTILITY_RE =
+  /\b(utility|cooling[\s-]?water|glycol|steam|instrument[\s-]?air|compressed[\s-]?air|chilled[\s-]?water)\b/i
+
+/**
+ * @description Classify a fluid edge's stream_role from endpoint names (human or
+ * slug tokens) plus optional material_context. Universal — never keys off a
+ * product-class name.
+ * @param fromName Source endpoint display name or slug
+ * @param toName Destination endpoint display name or slug
+ * @param materialContext Optional edge material_context (recirc / fan-out hints)
+ * @returns One of the StreamRole union members
+ */
+export function classifyStreamRole(
+  fromName: string,
+  toName: string,
+  materialContext?: string,
+): StreamRole {
+  const from = _normaliseSlugForMatch(fromName || '')
+  const to = _normaliseSlugForMatch(toName || '')
+  const ctx = materialContext || ''
+  // DECISION: classify primarily from endpoint NAMES. material_context is only
+  // authoritative for the recirculation-closure stamp — reconcileZoneReplicaEdges
+  // reuses a "per-zone recovery collection" string for BOTH recovery AND
+  // distribution fan edges, so trusting that ctx for dirty_drain/recovered would
+  // mis-label irrigation/fertigation branches as recovered.
+  const names = `${from} ${to}`
+
+  // Recirculation closure / recovered-return material_context wins (explicit).
+  if (/\brecirculation\b|\brecovered stream\b|\breturn loop\b/i.test(ctx)) return 'recovered'
+
+  // Purge / disposal — brine/reject/waste. "Waste Brine Disposal Sump" is purge,
+  // never a recovery dirty_drain (disposal vocabulary beats drain/sump alone).
+  if (STREAM_PURGE_RE.test(names)) return 'purge'
+
+  // Dose / trim additive injection (acid/chemical dosing alongside delivery).
+  if (STREAM_DOSE_RE.test(from) || STREAM_DOSE_RE.test(to)) return 'dose'
+
+  // Dirty drain / recovery collection — endpoint vocabulary only.
+  const endpointsAreRecoveryCollection =
+    STREAM_DIRTY_DRAIN_RE.test(from) || STREAM_DIRTY_DRAIN_RE.test(to)
+  if (endpointsAreRecoveryCollection && !STREAM_CLEAN_RE.test(from)) {
+    // Fan-in into a recovered/reclaim buffer → recovered; otherwise dirty_drain.
+    if (STREAM_RECOVERED_RE.test(to) || (STREAM_RECOVERED_RE.test(from) && !STREAM_DIRTY_DRAIN_RE.test(to))) {
+      return 'recovered'
+    }
+    return 'dirty_drain'
+  }
+
+  // Recovered stream (recovery buffer / reclaim / recycle vocabulary on either end).
+  if (STREAM_RECOVERED_RE.test(names)) return 'recovered'
+
+  // Irrigation / fertigation delivery.
+  if (STREAM_FERTIGATED_RE.test(names)) return 'fertigated_supply'
+
+  // Makeup / raw feed into the train (feed/makeup vocabulary on the source side).
+  if (STREAM_MAKEUP_RE.test(from) || (STREAM_MAKEUP_RE.test(names) && STREAM_CLEAN_RE.test(to))) {
+    return 'makeup'
+  }
+
+  // Clean / treated side — RO / GAC / softener / permeate / cleanwater.
+  if (STREAM_CLEAN_RE.test(names)) return 'clean'
+
+  // Utility services.
+  if (STREAM_UTILITY_RE.test(names)) return 'utility'
+
+  return 'unknown'
+}
+
 /** Parse a word's population/quantity count from its `quantity` modifier ('×3' → 3; absent
  *  or unparseable → 1). Mirrors universal-contract-sizing.ts::_wordPopCount (the SAME format
  *  synthWord() there writes: `mod('quantity', '×'+count)`) — so a word the physics engine
@@ -234,18 +329,33 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // collapsed node the plain slug-dedupe above produces.
   expandRecoveryCollectionPerZone(items)
 
+  // INTENT (T-01): look up human names for classifier input — slug-only edges
+  // still get unslugified tokens so the vocabulary regexes match.
+  const nameBySlug = new Map(items.map((it) => [it.slug, it.name]))
+  const endpointName = (slug: string): string => nameBySlug.get(slug) || unslugify(slug)
+
   const edges: TopologyEdge[] = []
   for (let i = 0; i < items.length - 1; i++) {
     const a = items[i], b = items[i + 1]
     if (a.slug === b.slug) continue // a self-loop is never authored (belt + braces on the dedupe)
     // thermal mechanism for heat-recovery(3)/cooling(8) endpoints, else fluid.
     const thermal = a.rank === 3 || a.rank === 8 || b.rank === 8
-    edges.push({
-      from_part: a.slug,
-      to_part: b.slug,
-      mechanism: thermal ? 'thermal' : 'fluid_loop',
-      constraint_kind: thermal ? 'thermal_rejection' : 'flow_capacity',
-    } as TopologyEdge)
+    if (thermal) {
+      edges.push({
+        from_part: a.slug,
+        to_part: b.slug,
+        mechanism: 'thermal',
+        constraint_kind: 'thermal_rejection',
+      } as TopologyEdge)
+    } else {
+      edges.push({
+        from_part: a.slug,
+        to_part: b.slug,
+        mechanism: 'fluid_loop',
+        constraint_kind: 'flow_capacity',
+        stream_role: classifyStreamRole(a.name, b.name),
+      } as TopologyEdge)
+    }
   }
 
   // Fan-out/fan-in correction for any zone-replica group EITHER expansion above created
@@ -256,7 +366,7 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // zone's distribution branch / collection point is independent, fed from / feeding a
   // SHARED header). reconcileZoneReplicaEdges replaces that with the correct fan-out (shared
   // upstream → every zone) / fan-in (every zone → shared downstream) shape.
-  reconcileZoneReplicaEdges(items, edges)
+  reconcileZoneReplicaEdges(items, edges, endpointName)
 
   // ── UNIVERSAL RECIRCULATION-LOOP CLOSURE (2026-07-07, Sam Green SME review of
   // the real Codema Fischer Farms system — "Process is not usually this straight
@@ -278,12 +388,15 @@ export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // (DAC, single-pass cooling, stoichiometric reactants consumed to completion).
   const recoveryItem = [...items].reverse().find((it) => RECOVERY_BUFFER_RE.test(it.name))
   if (recoveryItem && recoveryItem.slug !== items[0].slug) {
+    const recircCtx =
+      'recirculation return loop — recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)'
     edges.push({
       from_part: recoveryItem.slug,
       to_part: items[0].slug,
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
-      material_context: 'recirculation return loop — recovered stream re-enters the spine head (design-basis: recovery closes the cycle; purge/disposal streams are never looped back)',
+      material_context: recircCtx,
+      stream_role: 'recovered', // T-01: recirculation closure is always recovered
       _recirculation_loop: true,
     } as TopologyEdge)
   }
@@ -574,11 +687,14 @@ export function repositionFiltersOnTopologyEdges(
   const newFluid: Array<Record<string, unknown>> = []
   for (let i = 0; i < order.length - 1; i++) {
     if (order[i] === order[i + 1]) continue
+    const fromPart = order[i]
+    const toPart = order[i + 1]
     newFluid.push({
-      from_part: order[i],
-      to_part: order[i + 1],
+      from_part: fromPart,
+      to_part: toPart,
       mechanism: 'fluid_loop',
       constraint_kind: 'flow_capacity',
+      stream_role: classifyStreamRole(unslugify(fromPart), unslugify(toPart)),
     })
   }
   topology.length = 0
@@ -707,8 +823,9 @@ function expandRecoveryCollectionPerZone(
 // adds the missing fan edges. No-op when no zone-replica group exists (expandRecoveryCollectionPerZone
 // never fired) or a group has only one member.
 function reconcileZoneReplicaEdges(
-  items: Array<{ slug: string; _zoneGroup?: string }>,
+  items: Array<{ slug: string; name?: string; _zoneGroup?: string }>,
   edges: TopologyEdge[],
+  endpointName: (slug: string) => string = unslugify,
 ): void {
   const groups = new Map<string, string[]>()
   for (const it of items) {
@@ -730,15 +847,21 @@ function reconcileZoneReplicaEdges(
     }
     for (const slug of slugs) {
       if (upstream && !edges.some((e) => e.from_part === upstream && e.to_part === slug)) {
+        const fanOutCtx =
+          'per-zone recovery collection — fan-out from the shared upstream stage to each zone’s own drainpit/sump'
         edges.push({
           from_part: upstream, to_part: slug, mechanism: 'fluid_loop', constraint_kind: 'flow_capacity',
-          material_context: 'per-zone recovery collection — fan-out from the shared upstream stage to each zone’s own drainpit/sump',
+          material_context: fanOutCtx,
+          stream_role: classifyStreamRole(endpointName(upstream), endpointName(slug), fanOutCtx),
         } as TopologyEdge)
       }
       if (downstream && !edges.some((e) => e.from_part === slug && e.to_part === downstream)) {
+        const fanInCtx =
+          'per-zone recovery collection — fan-in from each zone’s drainpit/sump into the shared conditioning stage'
         edges.push({
           from_part: slug, to_part: downstream, mechanism: 'fluid_loop', constraint_kind: 'flow_capacity',
-          material_context: 'per-zone recovery collection — fan-in from each zone’s drainpit/sump into the shared conditioning stage',
+          material_context: fanInCtx,
+          stream_role: classifyStreamRole(endpointName(slug), endpointName(downstream), fanInCtx),
         } as TopologyEdge)
       }
     }
@@ -1523,8 +1646,76 @@ function _selftest() {
     throw new Error(`trim-additive relocation proveNoFalsePositive FAILED: with no co-located delivery mover, the acid dosing pump must stay at its natural rank-1 position (feed_pump -> acid_dosing_pump), got ${JSON.stringify(trimRelocateNoFPTopo)}`)
   }
 
+  // ── T-01 STREAM-ROLE CLASSIFIER proveCatch + proveNoFalsePositive (2026-07-09) ──
+  // INTENT: every fluid edge from deriveProcessTopology carries a typed stream_role
+  // classified from endpoint names + material_context — never a class name.
+  // (a) proveCatch: a water plant with drain recovery + recirculation must expose
+  // ≥2 distinct stream_role values among fluid edges, and the recirculation edge
+  // must be stream_role === 'recovered'.
+  const fluidRoles = new Set(
+    topo
+      .filter((e) => e.mechanism === 'fluid_loop')
+      .map((e) => e.stream_role)
+      .filter((r): r is NonNullable<typeof r> => r != null),
+  )
+  if (fluidRoles.size < 2) {
+    throw new Error(
+      `stream-role proveCatch FAILED: expected ≥2 distinct stream_role values on the Codema water-plant fluid edges, got ${fluidRoles.size} (${[...fluidRoles].join(',') || 'none'})`,
+    )
+  }
+  if (!backEdge.stream_role || backEdge.stream_role !== 'recovered') {
+    throw new Error(
+      `stream-role proveCatch FAILED: recirculation edge must have stream_role === 'recovered', got '${backEdge.stream_role}'`,
+    )
+  }
+  // Classifier unit checks (name vocabulary, no class slug):
+  if (classifyStreamRole('Drain Collection Sump', 'Gac Filter') !== 'dirty_drain') {
+    throw new Error(`stream-role classify: drain→conditioning must be dirty_drain, got '${classifyStreamRole('Drain Collection Sump', 'Gac Filter')}'`)
+  }
+  if (classifyStreamRole('Acid Dosing Pump', 'Fertigation Dosing Pump') !== 'dose') {
+    throw new Error(`stream-role classify: acid dosing must be dose, got '${classifyStreamRole('Acid Dosing Pump', 'Fertigation Dosing Pump')}'`)
+  }
+  if (classifyStreamRole('Fresh Water Tank', 'Irrigation Pump') !== 'fertigated_supply') {
+    throw new Error(`stream-role classify: irrigation delivery must be fertigated_supply, got '${classifyStreamRole('Fresh Water Tank', 'Irrigation Pump')}'`)
+  }
+  if (classifyStreamRole('Ro Membrane', 'Fresh Water Tank') !== 'clean') {
+    throw new Error(`stream-role classify: RO→clean tank must be clean, got '${classifyStreamRole('Ro Membrane', 'Fresh Water Tank')}'`)
+  }
+  if (classifyStreamRole('Waste Brine Disposal Sump', 'Concentrate Reject Tank') !== 'purge') {
+    throw new Error(`stream-role classify: brine/reject must be purge, got '${classifyStreamRole('Waste Brine Disposal Sump', 'Concentrate Reject Tank')}'`)
+  }
+  if (
+    classifyStreamRole(
+      'Drain Collection Sump',
+      'Softener Vessel',
+      'recirculation return loop — recovered stream re-enters the spine head',
+    ) !== 'recovered'
+  ) {
+    throw new Error('stream-role classify: recirculation material_context must force recovered')
+  }
+
+  // (b) proveNoFalsePositive: a once-through / BESS-like plant (no recovery buffer)
+  // must NOT invent a recovered role on any fluid edge.
+  const onceThroughRoles = onceThroughTopo
+    .filter((e) => e.mechanism === 'fluid_loop')
+    .map((e) => e.stream_role)
+  if (onceThroughRoles.some((r) => r === 'recovered')) {
+    throw new Error(
+      `stream-role proveNoFalsePositive FAILED: once-through fixture must NOT invent stream_role=recovered, got ${JSON.stringify(onceThroughRoles)}`,
+    )
+  }
+  // BESS-like electrical/thermal-only plant: no fluid spine → no recovered invented.
+  const bessLikeTopo = deriveProcessTopology([{
+    sub_modules: [{ words: [
+      mk('Battery Rack'), mk('Pcs Inverter'), mk('Dc Busbar'), mk('Cooling Chiller'),
+    ] }],
+  }])
+  if (bessLikeTopo.some((e) => e.stream_role === 'recovered')) {
+    throw new Error('stream-role proveNoFalsePositive (BESS-like) FAILED: must stay silent — no recovered role invented')
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold; TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION: catch+no-false-positive hold)`)
+  console.log(`derive-topology --selftest OK (${topo.length} fluid edges; ${endpoints.size} process nodes; ${sig.length} signal edges to the control hub; electrical/instrument/valve excluded from the fluid spine; flow-demand join: ${nJoined} joined, counter-cases hold; recirculation-loop closure: catch+no-false-positive hold; makeup-sizing invariant: catch+3×no-false-positive hold; filter-on-dirty-stream invariant: catch+3×no-false-positive hold; filter-on-dirty-stream REORDER: catch+3×no-false-positive hold; per-zone recovery-collection EXPANSION: catch+2×no-false-positive hold; PARALLEL-PER-ZONE DISTRIBUTION BRANCHES (rules 1+2): catch+5×no-false-positive hold; TRIM/ADDITIVE-CHEMICAL POINT-OF-USE RELOCATION: catch+no-false-positive hold; T-01 stream_role: catch+no-false-positive hold, roles={${[...fluidRoles].join(',')}})`)
 }
 
 if (process.argv.includes('--selftest')) _selftest()

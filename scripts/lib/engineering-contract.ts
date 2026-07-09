@@ -129,6 +129,21 @@ export function q(
 // exists." These are typed edges in the Contract.
 // ---------------------------------------------------------------------------
 
+// INTENT: Typed fluid-stream roles on topology edges (T-01) so P&ID/BFD/cost
+// consumers can distinguish makeup vs dirty-drain vs recovered vs dose without
+// parsing class names. Classified from endpoint names + material_context only
+// (see classifyStreamRole in derive-topology.ts) — never a product-class slug.
+export type StreamRole =
+  | 'makeup'
+  | 'clean'
+  | 'fertigated_supply'
+  | 'dirty_drain'
+  | 'recovered'
+  | 'dose'
+  | 'purge'
+  | 'utility'
+  | 'unknown'
+
 export type TopologyEdge = {
   from_part: string  // e.g. 'lfp_cell_string', 'pcs_inverter'
   to_part: string
@@ -145,6 +160,9 @@ export type TopologyEdge = {
   // atmosphere; downstream Contract validator rejects parts whose
   // material isn't in the compatibility set.
   material_context?: string  // e.g. 'R410A refrigerant', 'mineral-oil-filled tank'
+  // Fluid-stream role (T-01). Set on every fluid_loop edge by deriveProcessTopology
+  // / classifyStreamRole; absent on signal/electrical/thermal edges.
+  stream_role?: StreamRole
 }
 
 // ---------------------------------------------------------------------------

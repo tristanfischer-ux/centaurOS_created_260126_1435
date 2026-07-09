@@ -5260,6 +5260,101 @@ export function dropUnstatedMembraneStages(
   return dropped
 }
 
+// ── BRIEF-STATED ION-EXCHANGE / SOFTENER GATE (2026-07-09, T-19) ─────────────────────────
+// INTENT: Mirror of dropUnstatedMembraneStages for softener / ion-exchange / resin beds.
+// A brief that never names softening (RO-only makeup, or a plant with no hardness treatment)
+// must never ship Softener Vessel / ion-exchange resin beds the generator invented from
+// library candidates. Those words are often grounded (not `_synthesized`) so the invented-
+// principal drop never sees them.
+// DECISION: Key off BRIEF TEXT vocabulary (soften / ion-exchange / resin / deioni /
+// demineral), never a class table. Plain GAC / activated-carbon filters are NOT softeners —
+// wordRe only matches when the word's name/id claims softener/ion-exchange/resin, so a
+// "Gac Filter" survives while "Gac Softener" / "Softener Vessel" drop when the brief is silent.
+// Codema's brief names "water softener duplex" → briefRe matches → KEEP (proveNoFalsePositive).
+// Empty briefText → strict no-op.
+const ION_EXCHANGE_BRIEF_RE = /\bsoften|\bion[\s-]?exchange|\bresin\b|\bdeioni|\bdemineral/i
+const ION_EXCHANGE_WORD_RE = /\bsoften|\bion[\s-]?exchange|\bresin\b|\bdeioni|\bdemineral/i
+const ION_EXCHANGE_STAGE_FAMILIES: Array<{ family: string; briefRe: RegExp; wordRe: RegExp }> = [
+  {
+    family: 'ion_exchange_softener',
+    briefRe: ION_EXCHANGE_BRIEF_RE,
+    wordRe: ION_EXCHANGE_WORD_RE,
+  },
+]
+
+/**
+ * @description Drop principal softener / ion-exchange / resin-bed words the brief never
+ *   named. Mutates `modules` in place. Strict no-op when `briefText` is empty. Does NOT
+ *   drop plain GAC / activated-carbon filters (those lack softener/ion-exchange/resin tokens).
+ * @param modules Module tree (words mutated).
+ * @param briefText Original / revised brief prose used as the stated-unit-op signal.
+ * @returns Count of principal words dropped (children of dropped principals also removed).
+ */
+export function dropUnstatedIonExchangeStages(
+  modules: ModuleLike[],
+  briefText: string | undefined | null,
+): number {
+  const brief = String(briefText ?? '').trim()
+  if (!brief) return 0
+  const absent = ION_EXCHANGE_STAGE_FAMILIES.filter((f) => !f.briefRe.test(brief))
+  if (absent.length === 0) return 0
+  let dropped = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      if (!Array.isArray(sm.words)) continue
+      const dropIds = new Set<string>()
+      for (const w of sm.words) {
+        if (isSubcomponent(w) || isInstrument(w) || isActuator(w)) continue
+        const blob = `${w.name_human ?? ''} ${w.id ?? ''} ${w.content_character?.character_id ?? ''}`.replace(/[_-]+/g, ' ')
+        for (const f of absent) {
+          if (f.wordRe.test(blob)) {
+            dropIds.add(String(w.id ?? ''))
+            break
+          }
+        }
+      }
+      if (dropIds.size === 0) continue
+      sm.words = sm.words.filter((w) => {
+        const id = String(w.id ?? '')
+        if (dropIds.has(id)) { dropped += 1; return false }
+        for (const pid of dropIds) {
+          if (pid && id.startsWith(`${pid}__`)) { dropped += 1; return false }
+        }
+        return true
+      })
+    }
+  }
+  return dropped
+}
+
+/**
+ * @description Strip softener_* (and gac_softener_*) quantity keys from the reconcile
+ *   synthesis map when the brief never named softener/ion-exchange/resin. Prevents
+ *   buildGroups → re-mint of Softener Vessel after the word drop. No-op on empty brief
+ *   or when brief vocabulary matches. Mutates `quantities` in place.
+ * @param quantities Flat numeric quantity map used by buildGroups / reconcile.
+ * @param briefText Brief prose (same signal as dropUnstatedIonExchangeStages).
+ * @returns Number of keys removed.
+ */
+export function stripUnstatedSoftenerQuantities(
+  quantities: Record<string, number>,
+  briefText: string | undefined | null,
+): number {
+  const brief = String(briefText ?? '').trim()
+  if (!brief) return 0
+  if (ION_EXCHANGE_BRIEF_RE.test(brief)) return 0
+  let removed = 0
+  for (const k of Object.keys(quantities)) {
+    // softener_vessel_count / softener_vessel_volume_each_m3 / softener_*_throughput /
+    // gac_softener_throughput_m3_h — any key whose stem claims softener.
+    if (/softener/i.test(k)) {
+      delete quantities[k]
+      removed += 1
+    }
+  }
+  return removed
+}
+
 export function reconcilePrincipalEquipment(
   modules: ModuleLike[],
   contract: ContractInProgress,
@@ -5285,6 +5380,23 @@ export function reconcilePrincipalEquipment(
   // PUMP MOTOR vs BRIEF-STATED PRESSURE (same choke-point, both synthesis paths — see the
   // function doc): a pump's motor_kw must never undershoot the brief's own stated duty.
   reconcilePumpMotorAgainstStatedPressure(quantities, contract, reconcileOpts.briefMetrics)
+
+  // BRIEF-STATED ION-EXCHANGE QUANTITY GATE (T-19): when the brief never named softener /
+  // ion-exchange / resin, strip softener_* keys from the synthesis map BEFORE buildGroups
+  // so reconcile cannot re-mint Softener Vessel from a stale contract quantity. Word drop
+  // (dropUnstatedIonExchangeStages) runs later for grounded library-invented softener words.
+  {
+    const nSoftQ = stripUnstatedSoftenerQuantities(quantities, reconcileOpts.briefText)
+    if (nSoftQ > 0) {
+      res.details.push(`stripped ${nSoftQ} unstated softener quantity key(s) (brief never named softener/ion-exchange)`)
+      // Also clear from contract.quantities so a later pass / compliance read does not
+      // resurrect the softener canon from the persisted map.
+      const cq = (contract?.quantities ?? {}) as Record<string, unknown>
+      for (const k of Object.keys(cq)) {
+        if (/softener/i.test(k) && !(k in quantities)) delete cq[k]
+      }
+    }
+  }
 
   // A `total_*`/overall/combined volume is a reporting SUM, not a vessel — exclude it from the
   // principal-equipment set when its constituent vessels are present (≥2 other non-aggregate
@@ -5518,6 +5630,18 @@ export function reconcilePrincipalEquipment(
     if (nMem > 0) {
       res.removedInvented += nMem
       res.details.push(`dropped ${nMem} unstated membrane-stage word(s) (brief never named UF/NF/MF)`)
+    }
+  }
+
+  // BRIEF-STATED ION-EXCHANGE / SOFTENER GATE (see dropUnstatedIonExchangeStages, T-19):
+  // same shape as the membrane gate — grounded Softener Vessel / resin beds with no
+  // contract group survive the invented-principal drop; when the brief is silent on
+  // softener/ion-exchange/resin, drop them here. Plain GAC filters are untouched.
+  {
+    const nIx = dropUnstatedIonExchangeStages(modules, reconcileOpts.briefText)
+    if (nIx > 0) {
+      res.removedInvented += nIx
+      res.details.push(`dropped ${nIx} unstated ion-exchange/softener word(s) (brief never named softener/ion-exchange/resin)`)
     }
   }
 
