@@ -732,8 +732,30 @@ registerArchetype('bess', (brief: any) => {
     // FIFTH: class default for utility-scale BESS
     return 3500  // kWh = 3.5 MWh, matches brief default
   })()
-  // Default DoD 80% per BESS class convention; nameplate = usable / dod
-  const dodFraction = 0.80
+  // Default DoD 80% per BESS class convention; nameplate = usable / dod.
+  // BRIEF-STATED PAIR WINS (2026-07-09, residential wall-unit closure): when the brief
+  // states BOTH nameplate_capacity_kwh AND the usable target as explicit metrics
+  // (e.g. 14.0 nameplate / 13.5 usable — a modern LFP wall unit runs ~96% usable, not
+  // the utility 80% convention), the DoD DERIVES from that pair and the nameplate
+  // request IS the brief's number — a class convention must never override two
+  // brief-stated values ("read the brief value, never a default literal").
+  const briefNameplateKwh = (() => {
+    const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+    for (const m of mets) {
+      const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+      if (!/^nameplate(_capacity)?(_kwh)?$/.test(key)) continue
+      const v = Number(m?.value)
+      if (!(v > 0)) continue
+      const u = String(m?.unit ?? '').toLowerCase()
+      if (u === 'mwh') return v * 1000
+      if (u === 'wh') return v / 1000
+      return v // kWh (or unitless metric already in kWh)
+    }
+    return 0
+  })()
+  const dodFraction = briefNameplateKwh > 0 && usableKwh > 0 && usableKwh <= briefNameplateKwh
+    ? usableKwh / briefNameplateKwh
+    : 0.80
   // L45 council fix (2026-05-27, 3/4 seats: GLM + DeepSeek + Grok): the brief
   // for utility BESS commonly specifies BOTH a minimum usable energy floor
   // ("≥ 2.5 MWh usable") AND an over-delivery target ("design over-delivers
@@ -758,7 +780,11 @@ registerArchetype('bess', (brief: any) => {
     brief?.constraints?.over_deliver_factor?.value ??
     1.06,
   )
-  const nameplateKwhRequested = (usableKwh * overDeliverFactor) / dodFraction
+  // Brief-stated nameplate wins outright (no over-deliver inflation of an explicit
+  // number); otherwise the usable-derived request with the class over-deliver factor.
+  const nameplateKwhRequested = briefNameplateKwh > 0
+    ? briefNameplateKwh
+    : (usableKwh * overDeliverFactor) / dodFraction
   // BESS WAVE C addendum 9 (2026-07-05, CELL/RACK DENSITY recalibration — Tristan: "our
   // config (6,084 cells, 13 racks, 4,361 kWh usable) reflects an older-generation cell
   // assumption; the market delivers ≥5 MWh in a 20-ft container today"). The prior 280 Ah
@@ -774,9 +800,8 @@ registerArchetype('bess', (brief: any) => {
   // 2025-26 utility BESS market (CATL TENER's first-generation 5 MWh/20-ft containers and
   // Sungrow/BYD/EVE competitor 314 Ah-class products all use cells in this Ah/mass/dimension
   // band before the newer 587 Ah "TENER Stack" generation).
-  const cellAh = 314
+  const cellAhDefault = 314
   const cellVoltageV = 3.2
-  const cellEnergyKwh = (cellAh * cellVoltageV) / 1000  // 1.0048 kWh/cell (314 Ah × 3.2 V)
   // DC bus voltage — READ FROM THE BRIEF (2026-06-25 fix: was hardcoded 800,
   // ignoring a brief that states e.g. "Direct-current bus voltage: approximately
   // 1,500 V nominal" → the dossier shipped 800 V = a brief-compliance FAIL AND a
@@ -788,7 +813,7 @@ registerArchetype('bess', (brief: any) => {
   // re-derives to hold nameplate energy fixed (energy = rackCount × cellsPerRack ×
   // cellEnergy is voltage-independent because cellsPerRack = series_cells), so the
   // total cell count and nameplate kWh are PRESERVED across a voltage change.
-  const dcBusVoltage = (() => {
+  const dcBusFromBrief = (() => {
     const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
     for (const m of mets) {
       const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
@@ -807,8 +832,7 @@ registerArchetype('bess', (brief: any) => {
     // (thousands separators allowed: "approximately 1,500 V nominal").
     const dm = desc.match(/(?:dc[\s-]?bus|direct[\s-]?current\s+bus|dc\s+link)[^.\n]{0,40}?(\d{1,2},\d{3}|\d{3,5})\s*v\b/i)
     if (dm) return parseInt(dm[1].replace(/,/g, ''), 10)
-    // THIRD: class default — integer-clean 1P × 250S at exactly 800 V.
-    return 800
+    return 0  // brief silent — the class default / down-scale closure decides below
   })()
   // FLOOR, never round (BESS cross-val 2026-07-03): the string nominal voltage must
   // never EXCEED the DC-bus voltage class — round(1500/3.2)=469S gave 1500.8 V, a
@@ -816,7 +840,60 @@ registerArchetype('bess', (brief: any) => {
   // then recorded as FAIL. floor() yields the largest integer string WITHIN the
   // class: 468S × 3.2 = 1497.6 V ≤ 1500 V. An exact multiple (800/3.2 = 250S) is
   // unchanged, so the 800 V default topology is byte-identical.
-  const seriesCellsPerString = Math.floor(dcBusVoltage / cellVoltageV)  // e.g. 800/3.2 = 250 ; 1500/3.2 → 468
+  let cellAh = cellAhDefault
+  let cellMassKgSelected = 5.49  // CATL CBC00 314 Ah datasheet mass (see citation above)
+  let dcBusVoltage = dcBusFromBrief > 0 ? dcBusFromBrief : 800  // class default 800 V
+  let seriesCellsPerString = Math.floor(dcBusVoltage / cellVoltageV)  // e.g. 800/3.2 = 250 ; 1500/3.2 → 468
+  // ── DOWN-SCALE PACK CLOSURE (2026-07-09, residential wall-unit G0.5 root) ──────────
+  // The class-default cell (314 Ah) at the default 800 V bus makes the MINIMUM buildable
+  // pack one 1P×250S string = 251.2 kWh — 18× a 14 kWh wall-unit brief, so G0.5 halts
+  // (exit 3) on every small-scale BESS brief: the architecture was geometry-locked, not
+  // energy-driven (known drawer). UNIVERSAL rule, keyed ONLY on the energy target: when
+  // the brief leaves the DC bus to design AND one default string OVERSHOOTS the
+  // requested nameplate (target < 80% of one string), re-derive (cell, series) from the
+  // real LFP-prismatic ladder to CLOSE the target — series = round(target/(Ah×3.2 V))
+  // per candidate cell; keep the bus within [max(96 V, P/63 A), 1500 V] (63 A = common
+  // DC-breaker class, so the pack current at continuous power stays residential); pick
+  // the candidate minimising |pack − target|, tie-break fewest cells. A utility brief
+  // (target ≥ one default string) never enters this block — byte-identical.
+  if (!(dcBusFromBrief > 0) && nameplateKwhRequested > 0
+      && nameplateKwhRequested < 0.8 * seriesCellsPerString * (cellAhDefault * cellVoltageV / 1000)) {
+    // Real LFP prismatic cell classes (Ah, datasheet-class mass kg) — EVE/CALB/CATL
+    // catalogue ladder from small ESS to utility: masses at the ~160-185 Wh/kg band.
+    const CELL_LADDER = [
+      { ah: 20, kg: 0.42 }, { ah: 25, kg: 0.50 }, { ah: 50, kg: 1.05 },
+      { ah: 100, kg: 1.95 }, { ah: 105, kg: 2.05 }, { ah: 173, kg: 3.25 },
+      { ah: 230, kg: 4.10 }, { ah: 280, kg: 5.20 }, { ah: 314, kg: 5.49 },
+    ]
+    const contPowerKwForBus = (() => {
+      const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+      for (const m of mets) {
+        const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+        const v = Number(m?.value)
+        if (v > 0 && /continuous.*power|power.*continuous|continuous_kw/.test(key)) return v
+      }
+      return 0
+    })()
+    const busFloorV = Math.max(96, (contPowerKwForBus * 1000) / 63)
+    let best: { ah: number; kg: number; s: number; dev: number } | null = null
+    for (const c of CELL_LADDER) {
+      const s = Math.max(2, Math.round((nameplateKwhRequested * 1000) / (c.ah * cellVoltageV)))
+      const busV = s * cellVoltageV
+      if (busV < busFloorV || busV > 1500) continue
+      const packKwh = (s * c.ah * cellVoltageV) / 1000
+      const dev = Math.abs(packKwh - nameplateKwhRequested) / nameplateKwhRequested
+      if (!best || dev < best.dev - 1e-9 || (Math.abs(dev - best.dev) <= 1e-9 && s < best.s)) {
+        best = { ah: c.ah, kg: c.kg, s, dev }
+      }
+    }
+    if (best && best.dev <= 0.10) {
+      cellAh = best.ah
+      cellMassKgSelected = best.kg
+      seriesCellsPerString = best.s
+      dcBusVoltage = Math.round(best.s * cellVoltageV * 10) / 10
+    }
+  }
+  const cellEnergyKwh = (cellAh * cellVoltageV) / 1000  // kWh/cell (Ah × 3.2 V)
   // BESS L3 physics-critic fix (2026-05-24, issues #1 + #2): the brief's
   // 3.5 MWh usable + 800 V + 28 t + single-container envelope is genuinely
   // over-constrained at 5.3 kg/cell LFP. Solve the integer-feasible config:
@@ -836,7 +913,7 @@ registerArchetype('bess', (brief: any) => {
   // mass (see cellAh citation above) — 3.6% heavier than the 280 Ah predecessor's 5.3 kg,
   // consistent with +12% capacity in the same footprint (denser active material, not a
   // bigger case).
-  const cellMassKg = 5.49
+  const cellMassKg = cellMassKgSelected
   const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 28_000)
   // Container SIZE from the brief envelope (2026-06-25): the longer horizontal dimension is the
   // container length (a 20-ft ISO ≈ 6.06 m, a 40-ft ≈ 12.03 m). The emitter reads this to emit the
