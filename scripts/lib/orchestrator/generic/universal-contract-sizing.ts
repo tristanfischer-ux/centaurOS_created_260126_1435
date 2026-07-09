@@ -2519,6 +2519,11 @@ const SUB_ASSEMBLY: { re: RegExp; refKw?: number; parts: SubSpec[] }[] = [
       { name: 'Nameplate', derive: () => ({ gbp: 60 }) },
     ] },
   { re: /(?<!heat[\s-])\bpump\b|blower|(?<!scroll\s)compressor|\bfan\b/i,  // NOT 'heat pump' (its own rule below)
+    // refKw 2: the £1,500-casing-class bases are industrial-pump money, honest from
+    // ~2 kW up (every Codema principal — drain 2.2 / hand 3 / fertigation 15 kW — sits
+    // at f=1, byte-identical). A sub-kW metering pump or cabinet fan scales down by
+    // the six-tenths law instead of billing an industrial casing (Powerwall exit-32).
+    refKw: 2,
     parts: [
       { name: 'Casing', derive: (p) => ({ gbp: 1500 + (p.kw || 30) * 14 }) },
       { name: 'Impeller / Rotor', derive: (p) => ({ gbp: 600 + (p.kw || 30) * 5 }) },
@@ -2639,7 +2644,46 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 /** Append each principal equipment's PHYSICS-SIZED sub-components (qty inherited), each
  *  priced bottom-up from the parent's computed physics. Mutates modules in place; returns
  *  the number of sub-component lines added. Universal by equipment type. */
+// ── LIQUID-THERMAL-PLANT DEMOTION AT AIR-COOLED SCALE (2026-07-10, Powerwall exit-32
+// round 3). The generic path consumes a containerised class-reference graph whose
+// liquid-cooling chain the graph ITSELF marks scale-conditional ("Optional only because
+// some <1 MWh systems use forced-air cooling"). Below ~2 kW required duty (dissipation ×
+// 1.2 margin — the SAME threshold as the deterministic emitter's air-cooled branch) a
+// glycol loop does not exist on the real product: no chiller, no coolant pump, no
+// expansion/coolant tank, no heat exchanger, no coolant manifolds. Stamp
+// mis_emission_note (the ONE shared drop mechanism — deterministic_finalize demotes the
+// word to an unpriced scope note) BEFORE the explode, and the explode skips stamped
+// words, so the plant is never decomposed into priced children. Air-path words (fan /
+// vent / filter / louvre / cold plate) stay. Duty ≥ 2 kW or no dissipation quantity
+// (non-thermal archetypes): strict no-op.
+const LIQUID_THERMAL_PLANT_RE =
+  /\bchiller\b|coolant\s+pump|cooling\s+pump|coolant\s+\w*\s*(?:tank|reservoir|manifold|distribution)|expansion\s+tank|heat\s+exchanger|\bglycol\b/i
+export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
+  const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
+  if (!(dissipation > 0) || dissipation * 1.2 >= 2) return 0
+  let demoted = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue
+        const nm = String(w.name_human ?? w.content_character?.name_human ?? '')
+        const nmHead = nm.replace(/\s*\([^)]*\)\s*$/g, '').trim() || nm
+        if (!LIQUID_THERMAL_PLANT_RE.test(nmHead)) continue
+        ;(w as { mis_emission_note?: string }).mis_emission_note =
+          `liquid-thermal-plant at air-cooled scale: required duty ${(dissipation * 1.2).toFixed(2)} kW < 2 kW — ` +
+          `no glycol loop exists on the real product (forced-air cooling per environmental_interface); ` +
+          `demoted to a scope note, never a priced line`
+        demoted += 1
+      }
+    }
+  }
+  return demoted
+}
+
 export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3, briefPinnedKeys?: Set<string>): number {
+  // Air-cooled-scale demotion runs FIRST (both synthesis paths call this explode —
+  // the Codema two-paths lesson), so a demoted plant word is never decomposed below.
+  demoteLiquidThermalPlantAtAirCooledScale(modules, quantities)
   // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
   // part already carrying children is skipped (so re-running never duplicates — the
   // bug that gave a pump 39 children); a sub-component that itself matches a rule (a
@@ -2682,6 +2726,9 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // GOTCHA: their name often embeds "(on … Pump)", which would otherwise match the
         // pump SUB_ASSEMBLY rule and mint a nested drive train under the valve.
         if (isInstrument(w) || isActuator(w) || isValveFitting(w) || isUtility(w) || isProcessSystem(w) || isBuildingStructure(w)) continue
+        // A word the air-cooled-scale pass (above) flagged as not-real-equipment must
+        // never be decomposed into priced children — finalize demotes it whole.
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue
         const id = String(w.id ?? '')
         const depth = (id.match(/__/g) ?? []).length
         if (depth >= maxDepth) continue          // too deep — stop the recursion

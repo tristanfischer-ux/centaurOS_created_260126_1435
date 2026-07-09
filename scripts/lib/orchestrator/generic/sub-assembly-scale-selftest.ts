@@ -63,6 +63,36 @@ const plantTotal = Object.values(plantPrices).reduce((s, v) => s + v, 0)
 expect(plantTotal > 9000,
   `plant-scale size-less tank keeps the 50 m³ default calibration (got £${Math.round(plantTotal)})`)
 
+// ── 5. CATCH: air-cooled scale demotes the liquid thermal plant (never priced) ──
+import { demoteLiquidThermalPlantAtAirCooledScale } from './universal-contract-sizing'
+const airMod: any = { sub_modules: [{ words: [
+  mkWord('coolant_expansion_tank_word', 'Coolant Expansion Tank', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('coolant_pump_word', 'Coolant Pump', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('hvac_chiller_word', 'HVAC Chiller', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('active_ventilation_fan_word', 'Active Ventilation Fan', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+const nDem = demoteLiquidThermalPlantAtAirCooledScale([airMod], { system_thermal_dissipation_kw: 0.43 })
+expect(nDem === 3, `0.43 kW duty must demote tank+pump+chiller and spare the fan (got ${nDem})`)
+const fanWord = airMod.sub_modules[0].words.find((w: any) => w.id === 'active_ventilation_fan_word')
+expect(!fanWord.mis_emission_note, 'the air-path fan must NOT be demoted')
+// the explode must then skip the stamped words (no priced children ever minted)
+explodeEquipmentSubAssemblies([airMod], { system_thermal_dissipation_kw: 0.43 })
+const demChildren = airMod.sub_modules[0].words.filter((w: any) =>
+  w._subcomponent && /coolant|chiller/.test(String(w.id)))
+expect(demChildren.length === 0,
+  `a demoted plant word must never explode into priced children (got ${demChildren.length})`)
+
+// ── 6. NO FALSE POSITIVE: utility duty (25 kW) demotes nothing ──
+const utilMod: any = { sub_modules: [{ words: [
+  mkWord('hvac_chiller_word', 'HVAC Chiller', [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '47', unit: 'kW' }]),
+] }] }
+expect(demoteLiquidThermalPlantAtAirCooledScale([utilMod], { system_thermal_dissipation_kw: 25 }) === 0,
+  'utility duty must demote nothing')
+// ── 7. NO FALSE POSITIVE: no dissipation quantity (non-thermal archetype) → no-op ──
+expect(demoteLiquidThermalPlantAtAirCooledScale([utilMod], {}) === 0,
+  'an archetype without the dissipation quantity must be untouched')
+
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '
-  + 'plant-scale default calibration preserved)')
+  + 'plant-scale default calibration preserved; air-cooled scale demotes tank/pump/chiller '
+  + 'but never the fan, demoted words never explode; utility + non-thermal no-ops hold)')
