@@ -311,7 +311,11 @@ export function scanEmitterForBriefLiterals(
       // coincidence. 2026-06-01 (solar-inverter "S 150" vs batch_size=150 false
       // positive: a BESS-only Roxtec seal part-number flagged against an unrelated
       // brief constraint that shared the value 150).
-      if (/\bmod\(\s*['"](?:part_number|manufacturer|mpn|sku|form|name_human|character_id)['"]/i.test(lineText)) continue
+      // `regulatory` added 2026-07-09 (Powerwall exit-25 false positive): a standards
+      // citation ("NFPA 70E Article 130, IEEE 1584") is ALL numbers — article and
+      // standard designators, never physical brief values (Article 130 collided with
+      // max_mass_kg=130). Same product-code rationale as part_number.
+      if (/\bmod\(\s*['"](?:part_number|manufacturer|mpn|sku|form|name_human|character_id|regulatory)['"]/i.test(lineText)) continue
 
       const match = lineText.match(pattern)
       if (!match) continue
@@ -339,6 +343,16 @@ export function scanEmitterForBriefLiterals(
         const valFamily = keyMatch ? familyFromValueKey(keyMatch[1]) : null
         if (valFamily && valFamily !== expectedFamily) continue
       }
+
+      // Catalogue-price literal vs a COST constraint (2026-07-09, Powerwall exit-25
+      // false positive): mod('list_price_gbp','8500') is the Pfannenberg chiller's UK
+      // trade price — a PART-level catalogue fact — colliding by coincidence with the
+      // brief's £8,500 SYSTEM cost ceiling. A per-part price literal is never a stale
+      // brief mirror of a system-level cost constraint: a WRONG part price is gate 21's
+      // live-distributor check, and ceiling compliance is gate 10 B-7 / gate 32. Same
+      // family, different LEVEL — skip.
+      if (/\bmod\(\s*['"](?:list_price_gbp|price_estimate_gbp|unit_price_gbp)['"]/i.test(lineText)
+          && /cost|price|budget|ceiling/i.test(key)) continue
 
       // Unit-family discrimination (trailing-unit check).
       const trailing = lineText.slice(mIdx + match[1].length).replace(/^[\s)\]}]+/, '')
@@ -1208,6 +1222,27 @@ export function selftestContractStrict(): { passed: boolean; failures: string[] 
     const real = scanContractFileForBriefLiterals(contractPath, { dc_bus_voltage_v: 1500, max_mass_kg: 35000 }, 'bess')
     expect('real contract file: zero false positives (brief dc=1500, mass=35000)', real.passed)
   }
+
+  // (6) EMITTER scan skips (2026-07-09, Powerwall exit-25 false positives):
+  //     a standards-citation number (NFPA 70E Article 130) is never a mass cap;
+  //     a per-part catalogue price (Pfannenberg £8,500) is never a stale mirror of
+  //     the SYSTEM cost ceiling. A genuine bare capacity literal still CATCHES.
+  const emitterSkips = scanEmitterForBriefLiterals(
+    [
+      "  mod('regulatory', 'IEC 60695-11-10 V-0, NFPA 70E Article 130, IEEE 1584'),",
+      "  mod('list_price_gbp', '8500'),",
+    ].join('\n'),
+    { max_mass_kg: 130, unit_cost_ceiling_gbp: 8500 },
+    'energy_storage',
+  )
+  expect('emitter: regulatory-citation 130 + catalogue-price 8500 both skip', emitterSkips.passed)
+  const emitterCatch = scanEmitterForBriefLiterals(
+    "  mod('capacity', '130', 'kg'),",
+    { max_mass_kg: 130 },
+    'energy_storage',
+  )
+  expect('emitter: a genuine bare mass literal 130 kg still catches',
+    emitterCatch.hits.some((h) => h.brief_key === 'max_mass_kg'))
 
   return { passed: failures.length === 0, failures }
 }
