@@ -49,18 +49,19 @@ When working to get a dossier to a genuine ≥8-on-EVERY-tab "wow, I can rely on
 
 **Databases** → [`./DATABASES.md`](./DATABASES.md). 7 SQLite databases + 6 Supabase projects. **The 30k-supplier database is `~/.forge-truth/forge-truth.db` table `companies` (27,953 rows)** with profile filters `bess-supplier-discovery-20260422` (330 BESS rows), `manufacturing` (11,586), `cleantech-uk` (4,224). The investor SQLite is misleadingly named `forge-capital-corrupted.db` but is fully functional. Crawler corpus (99 GB) at `~/Developer/Forge-Capital/nightshift/crawler/corpus.db`.
 
-**PDF Engine v2 corpus tables (added to doc 2026-05-26)** — `~/.forge-truth/forge-truth.db` also holds the **self-building DB** the chain SHOULD read at runtime. Rows + writeback status:
+**PDF Engine v2 corpus tables** — `~/.forge-truth/forge-truth.db` is the **self-building DB** the chain reads at runtime. Canonical paths + jobs: [`DATABASES.md`](./DATABASES.md). Full loop audit: [`FORGE-ENGINE-DB-AUDIT.md`](./FORGE-ENGINE-DB-AUDIT.md) (P1–P3 closed 2026-06-04 for parts/specs/standards hybrid + embed-on-write).
 
-| Table | Rows | Writeback | Runtime read |
-|---|---|---|---|
-| `pretraining_extracted_parts` | 36,805 | ✓ via `lib/distributors/library-writeback.ts` | ✓ Stage 17.6 RAG |
-| `pretraining_extracted_specs` | 15,027 | ❌ NO writeback path | ❌ baked into TS class graphs only |
-| `pretraining_extracted_standards` | 4,094 | ❌ NO writeback path | ❌ baked into TS class graphs only |
-| `pretraining_extracted_suppliers` | 1,698 | ❌ NO writeback path | ❌ |
-| `pretraining_spec_documents` | 1,152 | ⚠ synthetic stubs only | ⚠ |
-| `pretraining_products` | 587 | ❌ NO writeback path | ❌ |
+| Table | Writeback | Runtime read |
+|---|---|---|
+| `pretraining_extracted_parts` | ✓ `library-writeback.ts` + emitter completion + background enrichment | ✓ Stage 17.6 RAG (hybrid dualSearch) + blank-MPN fill |
+| `pretraining_extracted_specs` | ✓ `specs-writeback.ts` (embed-on-write) | ✓ engineering lock gate (exit 22) |
+| `pretraining_extracted_standards` | ✓ `standards-writeback.ts` (embed-on-write) | ✓ lock gate (advisory consume) |
+| `companies` + `supplier_embeddings` | ✓ persist-web-fallback + `enrich-new-suppliers.ts` | ✓ Engine D / dualSearch |
+| `pretraining_spec_documents` | ✓ web_extracted docs from lock-gate path | ✓ specs join |
+| `pretraining_products` | ✓ `products-writeback.ts` (no embedding column yet) | ◐ lock gate records only |
+| `material_prices` | ✓ offline `seed-` / `refresh-material-prices.ts` | ✓ `material-prices.ts` DB-first → curated fallback |
 
-Chain at runtime reads BAKED 2026-05-18 TypeScript snapshots in `src/lib/pdf-engine-v2/class-reference-graphs/*.ts` (20 class graphs). Closing this gap to wire LIVE DB reads + writebacks for specs / standards / suppliers / products is the next major architectural move. Drawer: `forgeos_gotchas_25df555e549213ca`. Principle: `forgeos_decisions_e9cf4b858260f428` (growing-DB: DB-first → web-search-on-miss → write-back → grow over time).
+Class-reference graphs still have a baked-TS fallback in `src/lib/pdf-engine-v2/class-reference-graphs/*.ts` when the DB miss path has no web discovery. Principle: `forgeos_decisions_e9cf4b858260f428` (growing-DB: DB-first → web-search-on-miss → write-back → grow over time). Offline materials refresh + supplier enrich stay **out of the chain hot path** (ingest / background-enrichment); `CHAIN_BLANK_MPN_GENERATE` stays opt-in.
 
 **Cross-references in MemPalace**:
 - `forge_capital_env_paths_two_locations` — secrets in TWO places, check `~/secrets/` FIRST

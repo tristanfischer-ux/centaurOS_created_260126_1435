@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, sta
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { execFileSync, spawn } from 'child_process'
+import { withOpenRouterSlot } from '../src/lib/pdf-engine-v2/lib/openrouter-semaphore'
 
 for (const envPath of [
   resolve(process.cwd(), '.env.local'),
@@ -454,15 +455,19 @@ async function callLlm(opts: {
       // if (opts.groundWithGoogleSearch) body.google_search_grounding = { enabled: true }
     }
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
+      // INTENT (Tristan 2026-07-09): OpenRouter semaphore — N=2 workers share host
+      // rate limits; cap in-flight chat completions per process (OPENROUTER_MAX_INFLIGHT).
+      const response = await withOpenRouterSlot(() =>
+        fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        }),
+      )
       clearTimeout(timeout)
       if (response.status >= 500) {
         lastErr = new Error(`OpenRouter ${response.status} from ${opts.model}`)
@@ -7275,9 +7280,9 @@ async function main() {
   if (process.env.CHAIN_SKIP_BLANK_MPN_FILL !== '1') {
     try {
       const tLateFill = Date.now()
-      // fillBlankWordMpns early-returns when candidates=0 (no blank catalogue words
-      // left after the first pass) — still invoke it so late-minted blanks are caught;
-      // the expensive DB/LLM path only runs when candidates > 0.
+      // INTENT (Tristan 2026-07-09 speed): fillBlankWordMpns early-returns at
+      // candidates=0 BEFORE opening the library DB — still invoke so late-minted
+      // blanks are caught; the expensive DB/LLM path only runs when candidates > 0.
       const lateFill = await fillBlankWordMpns(
         (state.moduleDecomposition?.modules ?? []) as any[],
         currentProductClass ?? 'unknown',
@@ -7287,7 +7292,7 @@ async function main() {
         },
       )
       if (lateFill.candidates === 0) {
-        console.error('[chain] fill-blank-mpn (late sweep): 0 candidates — early exit (first pass covered all blanks)')
+        console.error('[chain] fill-blank-mpn (late sweep): 0 candidates — hard early-exit (first pass covered all blanks; no DB open)')
       }
       if (lateFill.filled.length > 0) {
         const dbN = lateFill.filled.filter((f) => f.source === 'db').length
@@ -7306,6 +7311,7 @@ async function main() {
         step: 'fill_blank_word_mpns_late_sweep', filled_count: lateFill.filled.length, db_first: lateFill.filled.filter((f) => f.source === 'db').length,
         generated: lateFill.filled.filter((f) => f.source === 'generated').length, skipped_structural: lateFill.skipped_structural,
         candidates: lateFill.candidates, modules_mutated: lateFill.modulesMutated, filled: lateFill.filled,
+        early_exit: lateFill.candidates === 0,
         class_name: currentProductClass ?? 'unknown', latency_ms: Date.now() - tLateFill,
       })
     } catch (err) {
@@ -9728,6 +9734,60 @@ async function main() {
     if (!process.env.PDF_ENGINE_WORKER && !process.env.RENDER_NO_OPEN) {
       try { execFileSync('open', [dlPath || xlsxPath]) } catch { /* open is best-effort */ }
     }
+
+    // ── CAD DOWNLOAD (Tristan 2026-07-09) ──────────────────────────────────────
+    // INTENT: STEP + glTF/GLB are a SEPARATE download from Excel — never embedded
+    // in the workbook, never scored by Excel gates. Runs ONLY after dossier.xlsx
+    // is on disk (Blender-in-Excel approved path). Fail-soft: a CAD miss must
+    // never block the Excel deliverable. Skip with CHAIN_SKIP_CAD_EXPORT=1.
+    if (process.env.CHAIN_SKIP_CAD_EXPORT !== '1' && existsSync(resolve(outDir, 'parts-manifest.json'))) {
+      try {
+        const tCad = Date.now()
+        const venvPyCad = resolve(__dirname, '..', '.venv', 'bin', 'python')
+        const pyCad = existsSync(venvPyCad) ? venvPyCad : 'python3'
+        const stepScript = resolve(__dirname, 'blender-universal', 'export_step.py')
+        const gltfScript = resolve(__dirname, 'blender-universal', 'export_gltf.py')
+        const cadDir = resolve(outDir, 'cad')
+        mkdirSync(cadDir, { recursive: true })
+        const runBase = outDir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'run'
+        let stepOk = false
+        let gltfOk = false
+        try {
+          execFileSync(pyCad, [stepScript, outDir], {
+            stdio: 'inherit', cwd: resolve(__dirname, '..'), timeout: 300_000,
+          })
+          stepOk = existsSync(resolve(cadDir, `${runBase}-model.step`))
+        } catch (stepErr) {
+          console.error(`[chain] CAD STEP export miss (non-fatal): ${(stepErr as Error).message.slice(0, 160)}`)
+        }
+        if (existsSync(gltfScript)) {
+          try {
+            execFileSync(pyCad, [gltfScript, outDir], {
+              stdio: 'inherit', cwd: resolve(__dirname, '..'), timeout: 180_000,
+            })
+            gltfOk = existsSync(resolve(cadDir, `${runBase}-model.glb`))
+          } catch (gltfErr) {
+            console.error(`[chain] CAD glTF export miss (non-fatal): ${(gltfErr as Error).message.slice(0, 160)}`)
+          }
+        }
+        // Copy CAD artefacts to Downloads alongside the Excel (separate files).
+        if (home && (stepOk || gltfOk)) {
+          for (const ext of ['step', 'glb']) {
+            const src = resolve(cadDir, `${runBase}-model.${ext}`)
+            if (!existsSync(src)) continue
+            const dest = resolve(home, 'Downloads', `${runName}_model_${ts}.${ext}`)
+            try { writeFileSync(dest, readFileSync(src)); console.error(`[chain] CAD download → ${dest}`) } catch { /* best-effort */ }
+          }
+        }
+        console.error(`[chain] CAD export: step=${stepOk ? 'ok' : 'miss'} glb=${gltfOk ? 'ok' : 'miss'} → ${cadDir}/`)
+        logAction({ step: 'cad_export', ok: stepOk || gltfOk, step_ok: stepOk, gltf_ok: gltfOk, latency_ms: Date.now() - tCad })
+      } catch (cadErr) {
+        console.error(`[chain] CAD export stage failed (non-fatal): ${(cadErr as Error).message.slice(0, 160)}`)
+        logAction({ step: 'cad_export', ok: false, error: String(cadErr).slice(0, 200) })
+      }
+    } else if (process.env.CHAIN_SKIP_CAD_EXPORT === '1') {
+      console.error('[chain] CHAIN_SKIP_CAD_EXPORT=1 — skipping STEP/glTF download (Excel-only)')
+    }
   } catch (xerr) {
     console.error(`[chain] Excel deliverable step failed (non-fatal): ${(xerr as Error).message.slice(0, 120)}`)
     logAction({ step: 'excel_deliverable', ok: false, error: String(xerr).slice(0, 160) })
@@ -10495,6 +10555,29 @@ async function main() {
       console.error(`[chain] background enrichment spawn failed: ${(err as Error).message.slice(0, 120)}; non-fatal`)
       logAction({ step: 'background_enrichment_spawned', ok: false, error: String(err).slice(0, 200) })
     }
+    // INTENT (Tristan 2026-07-09 growing-DB): post-chain supplier enrich for newly
+    // merged / quality=0 rows — offline ingest job, never blocks the Excel deliverable.
+    // Cap small so a chain exit doesn't burn Brave quota; full sweeps stay cron.
+    try {
+      const supplierEnrich = resolve(__dirname, 'ingest/enrich-new-suppliers.ts')
+      if (existsSync(supplierEnrich)) {
+        const slog = resolve(outDir, 'supplier-post-chain-enrich.log')
+        const sOut = openSync(slog, 'a')
+        const sErr = openSync(slog, 'a')
+        const sChild = spawn('npx', ['tsx', supplierEnrich, '--write', '--limit', '25'], {
+          detached: true,
+          stdio: ['ignore', sOut, sErr],
+          cwd: resolve(__dirname, '..'),
+          env: process.env,
+        })
+        sChild.unref()
+        console.error(`[chain] supplier post-chain enrich spawned (PID ${sChild.pid}) → ${slog}`)
+        logAction({ step: 'supplier_post_chain_enrich_spawned', ok: true, pid: sChild.pid })
+      }
+    } catch (err) {
+      console.error(`[chain] supplier post-chain enrich spawn failed (non-fatal): ${(err as Error).message.slice(0, 120)}`)
+      logAction({ step: 'supplier_post_chain_enrich_spawned', ok: false, error: String(err).slice(0, 200) })
+    }
   } else {
     console.error('[chain] CHAIN_SKIP_BACKGROUND_ENRICHMENT=1 — skipping live background enrichment')
   }
@@ -10617,7 +10700,11 @@ async function main() {
     // solely by an advisory (LLM) section can never produce a fix directive — looping
     // on the honest floor here would burn iterations with no possible fix, exactly the
     // endless-loop B3 was built to prevent.
-    if (!scorecard.deterministicAllPass && iter + 1 < MAX_QUALITY_LOOPS) {
+    //
+    // INTENT (Tristan 2026-07-09 speed): when deterministicAllPass already clears the
+    // ship floor (≥9) OR there are zero actionable directives, do NOT re-exec the
+    // chain — a zero-directive re-run burns a full iteration for nothing.
+    if (!scorecard.deterministicAllPass && directives.length > 0 && iter + 1 < MAX_QUALITY_LOOPS) {
       // Load ledger for classification
       const ledger = existsSync(ledgerPath)
         ? JSON.parse(readFileSync(ledgerPath, 'utf-8'))
@@ -10789,10 +10876,13 @@ async function main() {
       // Deterministic gates all clear — the loop rightly stops (nothing left it can
       // fix). Report the HONEST floor too so a sub-8 advisory section is never
       // silently implied "all sections ≥8" when it isn't.
+      const shipFloorDone = Math.max(1, Math.min(10, parseInt(process.env.QUALITY_LOOP_SHIP_FLOOR || '9', 10) || 9))
       const honestNote = scorecard.allPass
         ? ''
-        : ` (NOTE: honest floor=${scorecard.floor}/10 — an ADVISORY section is still below 8; not auto-fixable, needs a source-side improvement)`
-      console.error(`\n[chain] ✦ quality loop COMPLETE — all DETERMINISTIC sections ≥8/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS})${honestNote}`)
+        : ` (NOTE: honest floor=${scorecard.floor}/10 — an ADVISORY section is still below ${shipFloorDone}; not auto-fixable, needs a source-side improvement)`
+      console.error(`\n[chain] ✦ quality loop COMPLETE — all DETERMINISTIC sections ≥${shipFloorDone}/10 (iteration ${iter + 1}/${MAX_QUALITY_LOOPS}; skip re-exec)${honestNote}`)
+    } else if (directives.length === 0) {
+      console.error(`\n[chain] quality loop STOP — floor=${scorecard.deterministicFloor}/10 below ship bar but 0 actionable directives (nothing to re-exec; advisory-only or unmapped defects)`)
     } else {
       console.error(`\n[chain] quality loop: max iterations (${MAX_QUALITY_LOOPS}) reached — floor=${scorecard.floor}/10 mean=${scorecard.mean.toFixed(1)}/10`)
       // LESSON→RULE LOOP (#1): the run ended below the ≥8 floor after exhausting the loop —

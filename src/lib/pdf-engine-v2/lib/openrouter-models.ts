@@ -16,6 +16,7 @@
 // scripts/lib is a sanctioned import target from src/lib/pdf-engine-v2 (precedent: allowlist-
 // builder.ts imports parts-spec-validator; engineering-lock-gate.ts imports engineering-contract).
 import { designStageCacheKey, readDesignStageCache, writeDesignStageCache } from '../../../../scripts/lib/design-stage-cache'
+import { withOpenRouterSlot } from './openrouter-semaphore'
 
 // ─── Frontier models (high intelligence, high cost) ─────────────────────────
 
@@ -195,46 +196,48 @@ export async function callFastExtract(
   messages.push({ role: 'user', content: userContent })
 
   // AbortController + setTimeout — NOT AbortSignal.timeout (Vercel unreliable per MEMORY.md).
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 60_000)
-
-  let response: Response
-  try {
-    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: opts.temperature ?? 0,
-        // Fixed seed alongside temperature:0 — a determinism-supporting provider (OpenAI/
-        // Google) then greedy-decodes identically; the ledger backstops the rest.
-        seed: 42,
-        max_tokens: opts.maxTokens ?? 32_000,
-        // Gemini 3.1 Flash-Lite specific options (no-op on other models).
-        ...(model === GEMINI_3_1_FLASH_LITE
-          ? {
-              // thinking_level — default 'low' for extraction; 'medium' for plausibility
-              // judgement; 'minimal' for pure paraphrase; 'high' for complex schema.
-              thinking_level: opts.thinkingLevel ?? 'low',
-              // Grounding with Google Search — drops effective hallucination near zero
-              // for factual queries by cross-referencing real-time web data. Caller
-              // opts in via groundWithGoogleSearch=true (e.g. plausibility check,
-              // vendor-catalog verification, assembly-partner spot check).
-              ...(opts.groundWithGoogleSearch
-                ? { google_search_grounding: { enabled: true } }
-                : {}),
-            }
-          : {}),
-      }),
-      signal: controller.signal,
-    })
-  } finally {
-    clearTimeout(timeout)
-  }
+  // INTENT (Tristan 2026-07-09): withOpenRouterSlot caps in-flight OpenRouter calls
+  // per process (OPENROUTER_MAX_INFLIGHT, default 4) so N=2 workers don't 429 the API.
+  const response = await withOpenRouterSlot(async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 60_000)
+    try {
+      return await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: opts.temperature ?? 0,
+          // Fixed seed alongside temperature:0 — a determinism-supporting provider (OpenAI/
+          // Google) then greedy-decodes identically; the ledger backstops the rest.
+          seed: 42,
+          max_tokens: opts.maxTokens ?? 32_000,
+          // Gemini 3.1 Flash-Lite specific options (no-op on other models).
+          ...(model === GEMINI_3_1_FLASH_LITE
+            ? {
+                // thinking_level — default 'low' for extraction; 'medium' for plausibility
+                // judgement; 'minimal' for pure paraphrase; 'high' for complex schema.
+                thinking_level: opts.thinkingLevel ?? 'low',
+                // Grounding with Google Search — drops effective hallucination near zero
+                // for factual queries by cross-referencing real-time web data. Caller
+                // opts in via groundWithGoogleSearch=true (e.g. plausibility check,
+                // vendor-catalog verification, assembly-partner spot check).
+                ...(opts.groundWithGoogleSearch
+                  ? { google_search_grounding: { enabled: true } }
+                  : {}),
+              }
+            : {}),
+        }),
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+  })
 
   if (!response.ok) {
     throw new Error(`OpenRouter status ${response.status} from ${model}`)

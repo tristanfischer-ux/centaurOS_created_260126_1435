@@ -69,6 +69,37 @@ npx tsx scripts/ingest/replay-ingest.ts [--dry-run]
 
 ---
 
+### `refresh-material-prices.ts` / `seed-material-prices.ts`
+
+**Frequency:** Every 28 days (or cron); seed once after schema create
+**Quota usage:** None until a live commodity feed is wired (`TRADING_ECONOMICS_KEY`)
+**What it does:** Growing-DB half of raw-commodity £/kg anchors used by
+`material-prices.ts` (gate-10 B-8). Seed writes curated rows; refresh walks
+stale rows and write-backs `origin='web'` when a live fetch is implemented.
+Chain stays DB-consumer — never calls this mid-run.
+
+**Usage:**
+```bash
+npx tsx scripts/ingest/seed-material-prices.ts
+npx tsx scripts/ingest/refresh-material-prices.ts [--dry] [--days=28]
+```
+
+---
+
+### `enrich-new-suppliers.ts`
+
+**Frequency:** After supplier merge; also spawned post-chain (limit 25)
+**Quota usage:** Brave Search + OpenRouter Flash-Lite
+**What it does:** Enriches `companies` rows with `enrichment_quality=0` from
+`pretraining_extracted_suppliers`, then embed-on-write to `supplier_embeddings`.
+
+**Usage:**
+```bash
+npx tsx scripts/ingest/enrich-new-suppliers.ts --write --limit 50
+```
+
+---
+
 ## Quota protection
 
 All jobs use `scripts/lib/quota-semaphore.ts` to track calls per (source, day).

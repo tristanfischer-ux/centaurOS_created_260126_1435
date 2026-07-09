@@ -504,7 +504,13 @@ async function failJob(jobId, message) {
 // ─── Main loop ──────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 30_000
 const STALE_RUNNING_THRESHOLD_MS = 200 * 60 * 1000  // 200 min — anything older is a crashed run
-let running = false
+// INTENT (Tristan 2026-07-09 concurrency): N=2 worker pool — claim up to
+// WORKER_POOL_SIZE pending jobs in parallel (each gets its own out-dir under
+// WORK_DIR/<job.id>). OpenRouter rate limits are gated inside the chain via
+// OPENROUTER_MAX_INFLIGHT. Override with WORKER_POOL_SIZE=1 to restore serial.
+const WORKER_POOL_SIZE = Math.max(1, Math.min(4, parseInt(process.env.WORKER_POOL_SIZE || '2', 10) || 2))
+/** @type {Set<Promise<void>>} */
+const activeJobs = new Set()
 
 // 2026-05-19 fix M6 (audit-found stale-running recovery): two-part.
 //
@@ -572,23 +578,32 @@ async function recoverStaleRunningRows() {
 }
 
 async function tick() {
-    if (running) return
-    running = true
     try {
         // M6 Part B: scan for stale rows every poll. Cheap (1 query).
         await recoverStaleRunningRows()
-        const job = await claimOnePendingRun()
-        if (job) {
-            await processJob(job)
+        // Fill free pool slots — each claimed job runs in its own child process
+        // with a dedicated WORK_DIR/<job.id> out-dir (no shared mutable state).
+        while (activeJobs.size < WORKER_POOL_SIZE) {
+            const job = await claimOnePendingRun()
+            if (!job) break
+            const p = processJob(job)
+                .catch((err) => {
+                    log(`job ${job.id} unhandled: ${err instanceof Error ? err.message : err}`)
+                })
+                .finally(() => {
+                    activeJobs.delete(p)
+                })
+            activeJobs.add(p)
         }
     } catch (err) {
         log(`tick error: ${err instanceof Error ? err.message : err}`)
-    } finally {
-        running = false
     }
 }
 
-log(`starting worker (poll ${POLL_INTERVAL_MS / 1000}s, repo ${REPO_ROOT})`)
+log(`starting worker (pool=${WORKER_POOL_SIZE}, poll ${POLL_INTERVAL_MS / 1000}s, repo ${REPO_ROOT})`)
+// Chain children are read-only consumers of forge-truth.db (CHAIN-AS-DB-CONSUMER);
+// writebacks go through background-enrichment / ingest jobs, not the chain path.
+process.env.OPENROUTER_MAX_INFLIGHT = process.env.OPENROUTER_MAX_INFLIGHT || '4'
 // M6 Part A: at startup, recover any rows that were running when we died.
 void recoverStaleRunningRows().then(() => {
     // fire-and-forget immediately, then on interval
@@ -596,10 +611,17 @@ void recoverStaleRunningRows().then(() => {
     setInterval(tick, POLL_INTERVAL_MS)
 })
 
-// Graceful shutdown — let any in-flight job finish via the running guard.
+// Graceful shutdown — wait for in-flight pool jobs (bounded) then exit.
 function shutdown(signal) {
-    log(`received ${signal}, exiting`)
-    process.exit(0)
+    log(`received ${signal}, waiting for ${activeJobs.size} in-flight job(s)…`)
+    const force = setTimeout(() => {
+        log(`shutdown force-exit after grace`)
+        process.exit(0)
+    }, 30_000)
+    Promise.allSettled([...activeJobs]).finally(() => {
+        clearTimeout(force)
+        process.exit(0)
+    })
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))

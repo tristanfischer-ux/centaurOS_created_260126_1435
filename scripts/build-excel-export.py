@@ -1670,12 +1670,33 @@ def _strip_md_emphasis(s: str) -> str:
     return s
 
 
+def _flatten_cell_text(v: Any) -> str:
+    """Coerce nested dict/list contract fields to a single display string.
+
+    GOTCHA: some contract writers nest source_detail as
+    {'source_detail': 'Σ …'} instead of a bare string. openpyxl rejects dicts;
+    flatten before any cell write (cold Codema 2026-07-09).
+    """
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, dict):
+        return " ".join(_flatten_cell_text(x) for x in v.values())
+    if isinstance(v, (list, tuple)):
+        return " ".join(_flatten_cell_text(x) for x in v)
+    return str(v)
+
+
 def clean_cell(v: Any) -> Any:
     """Make any value safe + tidy for a worksheet DISPLAY cell. Strings get control
     chars stripped, are trimmed, markdown emphasis (**bold** / *italic*) de-marked,
     and any leading formula-trigger is defanged with a zero-width space (CWE-1236).
-    Non-strings pass through untouched (numbers stay numbers). NEVER call this on a
+    Nested dict/list values are flattened to text first (contract source_detail
+    nesting). Numbers/bools pass through untouched. NEVER call this on a
     deliberate "=..." live-formula string."""
+    if isinstance(v, (dict, list, tuple)):
+        v = _flatten_cell_text(v)
     if isinstance(v, str):
         s = _CTRL.sub("", v).strip().replace("`", "")   # strip markdown code-ticks (Tristan: `201-PR` → 201-PR)
         s = _strip_md_emphasis(s).strip()
@@ -4219,9 +4240,12 @@ def tab_quantities(wb: Workbook, state: dict, run_dir: str) -> None:
     # count; building_out_of_scope is a synthesis flag). Build a corpus of all calc/closure text and treat
     # a value whose NOUN appears there as USED — so only a GENUINELY unreferenced input is flagged orphan.
     _orch = state.get("orchestratorContract") or {}
+    # GOTCHA: source_detail may be a nested dict — use module-level _flatten_cell_text
+    # so corpus join and Quantities column G never see a raw dict (cold Codema 2026-07-09).
     _corpus = " ".join(
-        [(qq.get("source_detail") or "") for qq in quantities.values() if isinstance(qq, dict)]
-        + [f"{c.get('required', '')} {c.get('reason', '')} {c.get('measured', '')}" for c in (_orch.get("closures") or [])],
+        [_flatten_cell_text(qq.get("source_detail")) for qq in quantities.values() if isinstance(qq, dict)]
+        + [_flatten_cell_text(f"{c.get('required', '')} {c.get('reason', '')} {c.get('measured', '')}")
+           for c in (_orch.get("closures") or [])],
     ).lower()
     _corpus_toks = set(t for t in re.split(r"[^a-z0-9]+", _corpus) if t)
 
@@ -21945,6 +21969,16 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch nested source_detail (cold Codema 2026-07-09) — contract writers
+    # sometimes nest {'source_detail': 'Σ …'}; openpyxl rejects dicts. clean_cell must
+    # flatten so Quantities column G never raises ValueError: Cannot convert … to Excel.
+    _nested_sd = {"source_detail": "Σ ONE-MINT electrical consumers = 87 kW"}
+    _flat = clean_cell(_nested_sd)
+    if not isinstance(_flat, str) or "87 kW" not in _flat:
+        print(f"  FAIL nested-source_detail: clean_cell must flatten nested dict to str "
+              f"containing the inner text, got {_flat!r}"); bad += 1
+    if isinstance(clean_cell({"a": {"b": "inner"}}), dict):
+        print("  FAIL nested-source_detail: deeply nested dict must not pass through as dict"); bad += 1
     # ═══ proveCatch/proveNoFalsePositive ENERGY-FROM-DUTY-CYCLE (Sam Green SME review
     # 2026-07-07: "£41k energy could be too high — a lot of kit (pumps) may only operate
     # infrequently"). ═══
@@ -24813,18 +24847,34 @@ def _selftest() -> int:
         if _ps_ok_labels.get("cross-schedule item-count reconciliation vs the BoM") != (2, 2):
             print(f"  FAIL proc-sched-recon: a BoM matching both schedule counts must PASS "
                   f"both reconciliation rows (got {_ps_ok_labels})"); bad += 1
+        # DECISION (2026-07-09): denser BoM than schedule is EXPECTED (assembly
+        # isolation valves, bulk packs). Fail only when the schedule is dense and
+        # the BoM is sparse (missing equipment) — or schedule empty while BoM has
+        # items. proveCatch the sparse-BoM direction, not the denser-BoM one.
         _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
-        _ps_state_bad = {"requirementsBom": [
+        _ps_state_dense_bom = {"requirementsBom": [
             {"tag": "XV-201", "requirement": "Ball Valve", "qty": 1},
             {"tag": "LT-201", "requirement": "Level Transmitter", "qty": 9}]}
+        _wbps_dense = Workbook(); _wbps_dense.remove(_wbps_dense.active)
+        tab_process_schedules(_wbps_dense, _tdp, _ps_state_dense_bom)
+        _sc_ps_dense = _sc_schedules(_wbps_dense, _wbps_dense["Process schedules"],
+                                     _ps_state_dense_bom, _tdp)
+        _ps_dense_labels = {l: (p, c) for (l, p, c) in _sc_ps_dense.get("components", [])}
+        if _ps_dense_labels.get("cross-schedule item-count reconciliation vs the BoM") != (2, 2):
+            print(f"  FAIL proc-sched-recon: a denser BoM than the schedule must PASS "
+                  f"both reconciliation rows (got {_ps_dense_labels})"); bad += 1
+        _RENDERED_TABLES.clear(); _CELLCON_DONE.clear()
+        _ps_state_bad = {"requirementsBom": [
+            {"tag": "XV-201", "requirement": "Ball Valve", "qty": 1}]}
+        # No field instrument in the BoM while the schedule lists LT-201 → sparse BoM.
         _wbps3 = Workbook(); _wbps3.remove(_wbps3.active)
         tab_process_schedules(_wbps3, _tdp, _ps_state_bad)
         _sc_ps_bad = _sc_schedules(_wbps3, _wbps3["Process schedules"], _ps_state_bad, _tdp)
         _ps_bad_labels = {l: (p, c) for (l, p, c) in _sc_ps_bad.get("components", [])}
         if _ps_bad_labels.get("cross-schedule item-count reconciliation vs the BoM") != (1, 2):
-            print(f"  FAIL proc-sched-recon: a BoM instrument qty (9) wildly diverging from "
-                  f"the schedule's own count (1) must FAIL exactly ONE of the two "
-                  f"reconciliation rows (got {_ps_bad_labels})"); bad += 1
+            print(f"  FAIL proc-sched-recon: a BoM missing the schedule's instrument "
+                  f"must FAIL exactly ONE of the two reconciliation rows "
+                  f"(got {_ps_bad_labels})"); bad += 1
         if not any("Instrument count" in i for i in _sc_ps_bad.get("issues", [])):
             print(f"  FAIL proc-sched-recon: the diverging Instrument-count row must be "
                   f"NAMED in the issues (got {_sc_ps_bad.get('issues')})"); bad += 1
