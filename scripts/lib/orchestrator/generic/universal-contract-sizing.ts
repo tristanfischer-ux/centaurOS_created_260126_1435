@@ -2768,6 +2768,11 @@ const SINGLETON_CONTROLLER_ROLES: ReadonlyArray<{ role: string; re: RegExp }> = 
   // run-25: 'Insulation Monitoring Device' ×5 (£1.4k) — an IMD monitors THE dc system;
   // one per system at every scale (IEC 61557-8), like every supervisory role here.
   { role: 'insulation-monitor', re: /insulation\s+monitor|\bimd\b|(?:ground|earth)\s+fault\s+monitor/i },
+  // run-33: 'DC AC Inverter Module' + 'Silicon Carbide Inverter' + 'Power Conversion
+  // System PCS' + 'Bidirectional PCS Inverter' = FOUR words for ONE power-conversion
+  // stage. A design carries ONE PCS word (its qty carries any multiplicity; a
+  // contract-backed pcs count survives via contractBacksCount as everywhere here).
+  { role: 'power-conversion', re: /\binvert(?:er)?s?\b|\bpcs\b|power\s+conversion/i },
 ]
 const SLAVE_CONTROLLER_RE =
   /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bslave\b|\bslave\b[\w\s]*\b(?:bms|battery\s+management|controller)\b/i

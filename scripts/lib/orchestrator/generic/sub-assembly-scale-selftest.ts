@@ -187,6 +187,20 @@ const utilCtrl: any = { sub_modules: [{ words: [
 ] }] }
 expect(normaliseSystemSingletonControllers([utilCtrl], { rack_count: 15 }) === 0,
   'a utility design whose controller counts are already physical must be a strict no-op')
+// run-33: FOUR power-conversion words → ONE PCS (keeping the pinned word)
+const pcMod: any = { sub_modules: [{ words: [
+  mkWord('dc_ac_inverter_module_word', 'DC AC Inverter Module', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('silicon_carbide_inverter_word', 'Silicon Carbide Inverter',
+    [{ kind: 'quantity', value: '×1' }, { kind: 'part_number', value: 'CAB450M12XM3' }]),
+  mkWord('power_conversion_system_pcs_word', 'Power Conversion System PCS', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('bidirectional_pcs_inverter_word', 'Bidirectional PCS Inverter', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+normaliseSystemSingletonControllers([pcMod], { rack_count: 1 })
+const pcWords: any[] = pcMod.sub_modules[0].words
+expect(pcWords.filter((w) => !w.mis_emission_note).length === 1
+  && !pcWords.find((w) => w.id === 'silicon_carbide_inverter_word').mis_emission_note,
+  'four power-conversion words must fold to the ONE pinned PCS')
+
 // run-21: Remote Monitoring Module ×5 + Interface ×5 → ONE telemetry device ×1
 const rmMod: any = { sub_modules: [{ words: [
   mkWord('remote_monitoring_module_word', 'Remote Monitoring Module',
