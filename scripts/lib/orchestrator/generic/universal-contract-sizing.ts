@@ -5677,6 +5677,20 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
             const head = toks[hi] ?? ''
             const quals = new Set(toks.filter((_, i) => i !== hi && !GENERIC_TAILS.has(toks[i])))
             const phrase = toks.filter((t) => !GENERIC_TAILS.has(t)).join(' ')
+            // TOKEN-SUBSET fold (run-34: the WIRED 'Audible Alarm' beside the residual
+            // 'Audible Alarm BUZZER' — different heads, so the head-keyed rule missed
+            // it). A x1 word whose full token set STRICTLY CONTAINS another x1 word's
+            // set in the SAME module is a re-description of that part, not a second
+            // one. The shorter name is the canonical identity; the longer folds.
+            const tokSet = new Set(toks.filter((t) => !GENERIC_TAILS.has(t)))
+            const seenSets = moduleFamilies.get('__token_sets__') ?? []
+            const isSuperset = seenSets.some((prior) =>
+              prior.quals.size >= 1 && prior.quals.size < tokSet.size
+              && [...prior.quals].every((t) => tokSet.has(t))
+              && !_synonymSiblingConflict(tokSet, prior.quals))
+            if (isSuperset) { droppedDuplicate += 1; return false }
+            seenSets.push({ quals: tokSet, phrase, id: String((w as { id?: unknown }).id ?? '') })
+            moduleFamilies.set('__token_sets__', seenSets)
             if (head) {
               const fam = moduleFamilies.get(head) ?? []
               for (const prior of fam) {

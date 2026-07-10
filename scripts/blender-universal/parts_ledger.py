@@ -351,6 +351,17 @@ def _pv_for_name(name: str, pv_by_norm: dict | None) -> dict:
 # in-function comment. Deliberately requires the FULL noun phrase (never bare 'door'/
 # 'lighting'): an 'Emergency Lighting Inverter' or a 'Fire Door Assembly' with a real
 # catalogue identity should still research.
+_FABRICATED_PACK_WORK_RE = re.compile(
+    r"busbar\s+(?:interconnects?|assembl(?:y|ies))|"
+    r"thermal\s+management\s+(?:manifolds?|bays?|plenums?)|"
+    r"(?:liquid\s+)?coolant\s+loops?|"
+    r"deflagration\s+vent\s+panels?|"
+    r"(?:auxiliary\s+)?power\s+distribution\s+unit", re.I)
+_SCOPE_FUNCTION_WORD_RE = re.compile(
+    r"\bplatform\b|\bsoftware\b|"
+    r"arc\s+(?:flash|fault)\s+(?:protection|detection)|"
+    # spec-echo tail: a 'part' named after an electrical ATTRIBUTE is documentation
+    r"(?:apparent\s+)?power\s*(?:·|\d|$)|efficiency\s*(?:·|\d|$)", re.I)
 _ENCLOSURE_HARDWARE_RE = re.compile(
     r"warning\s+sign|signage|label\s+plate|"
     r"(?:internal|service|cabinet)\s+lighting|"
@@ -397,6 +408,17 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
         return "BOUNDARY-STUB"
     if _COMMODITY_FITTING_RE.search(n):
         return "COMMODITY-FITTING"
+    # FABRICATED IN-PACK WORK (2026-07-10 run-34): busbar interconnects/assemblies,
+    # thermal manifolds/bays/plenums, coolant loops, vent panels — copper/sheet-metal
+    # work fabricated to the pack drawing, never a catalogue MPN target.
+    if _FABRICATED_PACK_WORK_RE.search(n):
+        return "FABRICATED"
+    # SCOPE/FUNCTION words (run-34): a software platform ('GEMS Digital Energy
+    # Platform'), an arc-flash/arc-fault protection FUNCTION, or a spec-echo whose
+    # name ends in an attribute noun ('Surge Apparent Power') is documentation of
+    # scope — not a discrete purchasable part.
+    if _SCOPE_FUNCTION_WORD_RE.search(n):
+        return "SCOPE-DOCUMENTED"
     # ENCLOSURE HARDWARE (2026-07-10, Powerwall run-29: 'Safety Warning Signage',
     # 'Internal/Service Lighting', 'Service Outlets', 'Grounding Terminals', 'Access
     # Doors And Locks', 'Fireproof/Thermal Insulation (Panels)' each scored as a
