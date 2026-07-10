@@ -7345,7 +7345,7 @@ def assemble(out_dir: str):
     # / DB / table = no-op) and idempotent (never overwrite an already-sized/-stamped
     # row).
     rows = _stamp_engine_refused_valve_specs(rows, out_dir)
-    rows = _stamp_oem_proprietary_findings(rows, _run_class_tag(st))
+    rows = _stamp_oem_proprietary_findings(rows, _run_class_tag(_pv_state))  # _pv_state = the STABLE state handle; `st` is rebound inside the loop above
     rows = _stamp_fabricated_family_materials(rows)
     return rows
 
