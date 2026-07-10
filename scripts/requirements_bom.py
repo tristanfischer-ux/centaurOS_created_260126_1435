@@ -1196,7 +1196,11 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     # a stamped per-module part to a large-component reference), NOT an under-priced principal. The
     # genuine cases stay: Degasser £4,946→£65k is 13× (and orig ≥ £500); junction box £40→£110 is
     # 2.75×. Universal, no noun list.
-    if unit_gbp < 500.0 and target > unit_gbp * 20.0:
+    # (tightened 20× → 10× 2026-07-10: run-23 lifted £21 'Access Doors' / £40 skin
+    # lines to a generic £300 corpus p25 at 14× — 22 such lines ≈ £6.6k of phantom
+    # commodity inflation on a wall cabinet. The genuine sub-£500 case in the corpus
+    # is the junction box £40→£110 at 2.75×; nothing genuine needs >10× on a commodity.)
+    if unit_gbp < 500.0 and target > unit_gbp * 10.0:
         return None
     # UNIVERSAL RATIO CEILING (2026-07-10, Powerwall run-20: 'Battery Module Rack'
     # £8,001 → £210,000, a 26× lift to a UTILITY-rack corpus median on a 14 kWh wall
@@ -2892,6 +2896,8 @@ def _selftest() -> int:
               "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 3000}, None),        # module tray £40→£3,000 (75×) → REJECTED
         (16, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 3000,
               "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 1500}, None),        # heater thermostat £16→£1,500 (94×) → REJECTED
+        (21, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 500,
+              "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 300}, None),         # access door £21→£300 (14×) → REJECTED (10× commodity gate)
     ]
     for u, pv, want in _lift_cases:
         res = _corpus_median_lift(float(u), pv)
