@@ -9664,6 +9664,37 @@ async function main() {
     const stLate = JSON.parse(readFileSync(statePath, 'utf8'))
     const rbAfter = Array.isArray(reqRowsLate) ? reqRowsLate.length : 0
     if (Array.isArray(reqRowsLate)) stLate.requirementsBom = reqRowsLate
+    // RE-RECONCILE the cost cascade to the SETTLED bill (run-22: the mid-loop reconcile
+    // pinned costStack.raw_materials_bom_gbp at an iteration's £94,442 while this late
+    // re-derive settled the bill at £20,241 — cost-sanity + the benchmark net + the cover
+    // then read a 4.7× STALE stack and stayed RADICAL over an in-band design). Same
+    // proportional rescale + display-consistency re-derivation as the primary reconcile;
+    // costSanity is re-computed on the final stack so the recorded verdict is the truth.
+    if (Array.isArray(reqRowsLate) && stLate.costStack
+        && Number(stLate.costStack.raw_materials_bom_gbp) > 0) {
+      const reqTotalLate = reqRowsLate.reduce((a: number, r: any) => a + (Number(r?.line_gbp) || 0), 0)
+      const rawPrev = Number(stLate.costStack.raw_materials_bom_gbp)
+      if (reqTotalLate > 0 && Math.abs(rawPrev - reqTotalLate) > 1) {
+        const scaleLate = reqTotalLate / rawPrev
+        for (const k of Object.keys(stLate.costStack)) {
+          if (typeof stLate.costStack[k] === 'number') stLate.costStack[k] = Math.round(stLate.costStack[k] * scaleLate)
+        }
+        const csL = stLate.costStack as Record<string, number>
+        const sumL = (...ks: string[]) => ks.reduce((a, k) => a + (Number(csL[k]) || 0), 0)
+        if (csL.factory_cogs_gbp != null)
+          csL.factory_cogs_gbp = sumL('raw_materials_bom_gbp', 'assembly_labour_gbp', 'factory_overhead_gbp')
+        if (csL.oem_transfer_price_gbp != null)
+          csL.oem_transfer_price_gbp = sumL('factory_cogs_gbp', 'manufacturer_margin_gbp')
+        if (csL.channel_list_price_gbp != null)
+          csL.channel_list_price_gbp = sumL('oem_transfer_price_gbp', 'channel_markup_gbp')
+        if (csL.installed_asp_gbp != null)
+          csL.installed_asp_gbp = sumL('channel_list_price_gbp', 'installation_cost_gbp')
+        if (stLate.cost_reality && typeof stLate.cost_reality === 'object')
+          stLate.cost_reality.bom_total_gbp = Math.round(reqTotalLate)
+        try { stLate.costSanity = computeCostSanity(stLate) } catch { /* shadow — never fatal */ }
+        console.error(`[chain] ghost-snapshot re-derive: cost cascade RE-reconciled to the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (stack raw materials was £${Math.round(rawPrev).toLocaleString('en-GB')} from an earlier loop iteration)`)
+      }
+    }
     writeFileSync(statePath, JSON.stringify(stLate, null, 2))
     console.error(`[chain] ghost-snapshot re-derive: requirementsBom ${rbBefore} → ${rbAfter} row(s) on the FINAL settled tree (pruned ${pvPruned} stale partVerifications entr${pvPruned === 1 ? 'y' : 'ies'})`)
     logAction({ step: 'ghost_snapshot_prune_and_rederive', ok: true, part_verifications_pruned: pvPruned, part_verifications_before: pvBefore, requirements_bom_before: rbBefore, requirements_bom_after: rbAfter })

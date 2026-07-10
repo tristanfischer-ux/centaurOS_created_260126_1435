@@ -158,6 +158,13 @@ def canonicalise_flow_units(edges, quantities, log=print):
     return (n_fix, n_bad)
 
 
+# air-mover endpoint vocabulary for the medium override in finalize_ledger (2026-07-10):
+# a part that MOVES OR PASSES AIR — its fluid edges are duct/free-air, never water pipe.
+_AIR_MOVER_ENDPOINT_RE = re.compile(
+    r"\bfan\b|\bvent(?:ilation)?\b|louvre|\bduct\b|\bblower\b|deflagration|off[\s-]?gas|"
+    r"air\s+(?:intake|filter|inlet|outlet)|\bhvac\b", re.I)
+
+
 def _service_of(mech):
     """Map an edge mechanism → the SERVICE it carries (power / signal / water / thermal
     / air). Mirrors build_universal_scene._edge_service; kept local so this module has
@@ -507,6 +514,20 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
         to = str(e.get("to_part") or e.get("to") or "").strip()
         mech = str(e.get("mechanism") or "fluid_loop")
         svc = _service_of(mech)
+        # AIR-MOVER MEDIUM OVERRIDE (2026-07-10, Powerwall run-22: fan → thermal-bay →
+        # deflagration-vent edges authored as service 'water' and then SIZED as DN100
+        # process-water pipes at the 40 m³/h default — £389/£344 of phantom pipework +
+        # the vision critic's 'pipes shooting vertically' INSIDE an air-cooled cabinet).
+        # A fluid edge whose OWN declaration says medium air, or whose endpoint is an
+        # air-mover (fan / vent / louvre / duct / blower / deflagration panel), carries
+        # AIR — ducted or free-blown, never a water pipe. Universal noun/medium signal;
+        # a genuine water/coolant edge (pump, tank, manifold-to-chiller) is untouched.
+        if svc in ("water", "thermal"):
+            _fluid = e.get("fluid") if isinstance(e.get("fluid"), dict) else {}
+            _medium = str(_fluid.get("medium") or e.get("medium") or "").lower()
+            if _medium == "air" or _AIR_MOVER_ENDPOINT_RE.search(f"{frm} | {to}"):
+                svc = "air"
+                e["_ledger_service"] = "air"
 
         pa = resolve_endpoint(frm, parts) if frm else None
         pb = resolve_endpoint(to, parts) if to else None
@@ -2076,6 +2097,28 @@ def _selftest():
     assert "both-endpoints-unresolved" in drop_reasons
     assert "dry-ancillary water/thermal tie to tank" in drop_reasons
     assert "duplicate" in drop_reasons
+
+    # ── AIR-MOVER MEDIUM OVERRIDE (2026-07-10, run-22 DN100 water pipes on fan edges) ──
+    # (second endpoint deliberately shares NO 4-gram with the fan — the fixture's loose
+    # resolver would otherwise self-loop 'Vent Panels' onto 'Ventilation Fan')
+    air_parts = parts + [_P("Active Ventilation Fan"), _P("Exhaust Louvre Assembly")]
+    air_topo = [
+        {"from_part": "Active Ventilation Fan", "to_part": "Exhaust Louvre Assembly",
+         "mechanism": "fluid_loop"},                                   # endpoint noun → air
+        {"from_part": "Recirc Pump", "to_part": "Rearing Tank",
+         "mechanism": "fluid_loop", "fluid": {"medium": "air"}},       # declared medium → air
+        {"from_part": "Rearing Tank", "to_part": "Rotary Drum Filter",
+         "mechanism": "fluid_loop"},                                   # genuine water — untouched
+    ]
+    air_final, _ = finalize_ledger(air_topo, air_parts, resolve, log=lambda *a: None)
+    _svc = {(e["from_part"], e["to_part"]): e.get("service") or e.get("_ledger_service")
+            for e in air_final}
+    assert any(v == "air" for k, v in _svc.items() if "Fan" in (k[0] or "")), \
+        f"fan edge must author as AIR service, got {_svc}"
+    assert any(v == "air" for k, v in _svc.items() if "Pump" in (k[0] or "")), \
+        "a declared medium:air edge must author as AIR even between wet-named parts"
+    assert any(v == "water" for k, v in _svc.items() if "Rearing Tank" in (k[0] or "")), \
+        "a genuine water edge must stay WATER (no false positive)"
 
     # audit_completeness: the pump has an output (→ tank) but NO input → flagged.
     class _PP:
