@@ -1391,7 +1391,32 @@ export function dbFirstLookup(
 //   3. the component TYPE (a head-noun token) must appear as a whole word in the
 //      candidate's name/class.
 // (Per-word dedup within a sub_module is enforced by the caller.)
+// RATING-COHERENCE (2026-07-10, run-30: 'Bidirectional PCS Inverter · 11.04 kW' was
+// DB-filled with the Sungrow SC2000UD-MV — a 2 MW MEDIUM-VOLTAGE utility PCS. Type
+// coherence passed (both are PCS), SCALE did not: the pin then drags utility dims +
+// price into the cabinet). When the WORD's own name declares a power rating, a
+// candidate whose name/model declares one >5× larger — or carries an MV/kV class
+// token against a sub-100 kW word — is the wrong-scale product line. Words with no
+// self-declared rating are unchanged (no fabricated inference).
+const _WORD_KW_RE = /(\d+(?:\.\d+)?)\s*(mw|mva|kw|kva)\b/i
+function _declaredKw(text: string): number | null {
+  const m = _WORD_KW_RE.exec(text || '')
+  if (!m) return null
+  const v = parseFloat(m[1])
+  return /^m/i.test(m[2]) ? v * 1000 : v
+}
+export function dbHitScaleAcceptable(dbHit: DbPart, wordName: string): boolean {
+  const wordKw = _declaredKw(wordName)
+  if (wordKw == null || wordKw <= 0) return true
+  const blob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''}`
+  const hitKw = _declaredKw(blob)
+  if (hitKw != null && hitKw > wordKw * 5) return false
+  if (wordKw < 100 && /-mv\b|\bmv\b|medium[\s-]?voltage|\b(?:11|33)\s*kv\b/i.test(blob)) return false
+  return true
+}
+
 export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
+  if (!dbHitScaleAcceptable(dbHit, name)) return false
   const mfr = dbHit.manufacturer.trim().toLowerCase()
   if (MAKER_VENDORS.has(mfr)) return false
   const toks = tokenize(name)
