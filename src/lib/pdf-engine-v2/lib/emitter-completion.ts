@@ -576,7 +576,12 @@ export function tokenize(s: string | undefined | null): string[] {
 // 'RO Membrane', 'pH Analyser') — the blanket ≥3-char filter silently dropped
 // them, so a 'Uv Disinfection' word could never reach the WEDECO UV row on the
 // 2-hit acceptance bar.
-const SHORT_DOMAIN_TOKENS = new Set<string>(['uv', 'ro', 'ph', 'uf', 'nf', 'mf'])  // membrane fineness family (MF<UF<NF) — 'Uf Module Bank' was unreachable by any honest part (round 5)
+const SHORT_DOMAIN_TOKENS = new Set<string>(['uv', 'ro', 'ph', 'uf', 'nf', 'mf',
+  // electrical domain qualifiers (2026-07-10 run 53): dropping 'dc'/'ac' left 'DC Fuses'
+  // querying as just [fuse] — one hit, permanently below the (headHit && >=2) acceptance
+  // bar, so a perfect seeded row was unreachable and the miss was silent. 'lv'/'hv' are
+  // the same voltage-domain family.
+  'dc', 'ac', 'lv', 'hv'])  // membrane fineness family (MF<UF<NF) — 'Uf Module Bank' was unreachable by any honest part (round 5)
 
 // Generic/structural tokens that carry no component-type signal — excluded so a
 // DB match is driven by the DISTINGUISHING noun (blade, gearbox, stator, seal),
@@ -2268,6 +2273,13 @@ export async function fillBlankWordMpns(
         ? [headNoun, aliasHeadNoun].filter((h): h is string => !!h)
         : headNoun
       let dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true })
+      // OBSERVABILITY (2026-07-10 run 53): a null first lookup was SILENT — 'DC Fuses' /
+      // 'Main AC Breaker' missed for ~10 runs with no log line while perfect seeded rows
+      // sat in the DB (tokenize dropped 'dc'; the head noun sat beyond the lead segment).
+      // A miss the log never shows is a miss no fix-loop can see.
+      if (!dbHit) {
+        log(`[fill-blank-mpn]   ⊘ nohit ${cand.moduleId}::${cand.subId} (${cand.name}): no DB row passed the rank bar for tokens [${tokenList.slice(0, 6).join(', ')}] — staying generic`)
+      }
       let pinned = false
       let blocked = false // a guard refused the pin outright — never fall through to generate
       let retriesLeft = 8   // walk-down budget (4→8 2026-07-10: 'Gas Sensors' exhausted 4 walks with the MICS-6814 still below the window)

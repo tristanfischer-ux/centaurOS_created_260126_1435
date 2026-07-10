@@ -71,12 +71,22 @@ def harvest(run_dir: str) -> dict:
     p = os.path.join(run_dir, "tab-scorecard.json")
     if os.path.exists(p):
         sc = json.load(open(p))
+        # TARGET-AWARE HARVEST (Tristan 2026-07-10: "looking at every tab ... and fixing
+        # ALL the errors"): a tab PASSING at 8.3 with issue text was invisible to the
+        # board (harvest gated on status==FAIL), so its errors escaped the batch protocol.
+        # Harvest issues from EVERY tab below the campaign target (LOOP_TARGET_SCORE,
+        # default 9) — the gate then forces a disposition on each of them too.
+        target = float(os.environ.get("LOOP_TARGET_SCORE", "9"))
         for tab, v in (sc.get("tabs") or sc).items():
-            if isinstance(v, dict) and v.get("status") == "FAIL":
+            if not isinstance(v, dict):
+                continue
+            score = v.get("score")
+            below = v.get("status") == "FAIL" or (isinstance(score, (int, float)) and score < target)
+            if below:
                 for iss in (v.get("issues") or [])[:6]:
                     add(f"tab:{tab}", iss)
-                if not v.get("issues"):
-                    add(f"tab:{tab}", f"FAIL at {v.get('score')} with no issue text (scorer must flag AND route)")
+                if not v.get("issues") and v.get("status") == "FAIL":
+                    add(f"tab:{tab}", f"FAIL at {score} with no issue text (scorer must flag AND route)")
 
     p = os.path.join(run_dir, "parts-ledger.json")
     if os.path.exists(p):

@@ -9767,7 +9767,12 @@ async function main() {
               const tagM = l.match(/\bx-\d+\b/)
               if (tagM) return tags.has(tagM[0])
               const toks = l.split(/[^a-z0-9]+/).filter((t) => t.length > 2)
-              return nameToks.some((s) => toks.filter((t) => s.has(t)).length >= 2)
+              // run 53: >=2-token overlap alone let SIBLING names through — 'Liquid
+              // Coolant CHILLER' matched 'Liquid Coolant LOOP', 'Auxiliary Power
+              // TRANSFORMER' matched 'Auxiliary Power DISTRIBUTION UNIT'. The HEAD noun
+              // (the component family, type-coherence principle) must also be present.
+              const head = toks[toks.length - 1]
+              return nameToks.some((s) => head && s.has(head) && toks.filter((t) => s.has(t)).length >= 2)
             }
             const before = stLate.benchmarkFaults.length
             stLate.benchmarkFaults = stLate.benchmarkFaults.filter((f: any) => matchesSettled(String(f?.line ?? '')))

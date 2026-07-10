@@ -32,8 +32,8 @@ const RESIDENTIAL_ESS_CANDIDATES: Candidate[] = [
   { name: 'DC contactor 100 A sealed (ESS pack contactor)', manufacturer: 'TE Connectivity', mpn: 'EVC135-1A2M9', component_class: 'dc_contactor' },
   { name: 'PV/battery dc fuse 20 A 1000 Vdc 10x38', manufacturer: 'Littelfuse', mpn: 'SPF020.T', component_class: 'dc_fuse' },
   { name: 'PV/battery dc fuse 15 A 1000 Vdc', manufacturer: 'Bussmann', mpn: 'PV-15A10F', component_class: 'dc_fuse' },
-  { name: 'MCB 63 A curve C 2-pole (main ac breaker)', manufacturer: 'Schneider Electric', mpn: 'A9F44263', component_class: 'ac_breaker' },
-  { name: 'MCB 63 A curve C 2-pole (main ac breaker)', manufacturer: 'ABB', mpn: '2CDS252001R0634', component_class: 'ac_breaker' },
+  { name: 'AC breaker MCB 63 A curve C 2-pole main', manufacturer: 'Schneider Electric', mpn: 'A9F44263', component_class: 'ac_breaker' },
+  { name: 'AC breaker MCB 63 A curve C 2-pole main', manufacturer: 'ABB', mpn: '2CDS252001R0634', component_class: 'ac_breaker' },
   { name: 'AC contactor 40 A AC-3 (grid interface)', manufacturer: 'Schneider Electric', mpn: 'LC1D40AM7', component_class: 'ac_contactor' },
   { name: 'Surge protective device type 2 (dc side)', manufacturer: 'Phoenix Contact', mpn: '2800642', component_class: 'surge_protection' },
   { name: 'Industrial ethernet switch 5-port unmanaged', manufacturer: 'Phoenix Contact', mpn: '2891005', component_class: 'ethernet_switch' },
@@ -44,7 +44,7 @@ const RESIDENTIAL_ESS_CANDIDATES: Candidate[] = [
   { name: 'Axial cooling fan 119 mm 24 Vdc', manufacturer: 'ebm-papst', mpn: '4414FNH', component_class: 'cooling_fan' },
   { name: 'Axial cooling fan 92 mm 12 Vdc', manufacturer: 'Sanyo Denki', mpn: '9GA0912P4G001', component_class: 'cooling_fan' },
   { name: 'Power relay SPDT 12 A (aux control)', manufacturer: 'Omron', mpn: 'G2R-1-E DC12', component_class: 'relay' },
-  { name: 'Insulation monitoring device (unearthed dc system)', manufacturer: 'Bender', mpn: 'B94012045', component_class: 'insulation_monitor' },
+  { name: 'Insulation monitor IMD monitoring device unearthed dc system', manufacturer: 'Bender', mpn: 'B94012045', component_class: 'insulation_monitor' },
 ]
 
 async function main(): Promise<number> {
