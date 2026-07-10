@@ -3586,7 +3586,7 @@ async function main() {
   // carry a decisions file; absent file = empty list, byte-identical behaviour.
   let decisionHolds: unknown[] = []
   try {
-    const decPath = briefPath.replace(/\.md$/i, '') + '.decisions.json'
+    const decPath = briefPath.replace(/\.md$/i, '') + '.commercial-decisions.json'  // NB: '.decisions.json' is the EXISTING per-section client-offer register with its own schema
     if (existsSync(decPath)) {
       const dec = JSON.parse(readFileSync(decPath, 'utf-8'))
       if (Array.isArray(dec?.decisions)) {
