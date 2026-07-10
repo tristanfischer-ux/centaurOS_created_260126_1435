@@ -6147,6 +6147,36 @@ def _detect_borrowed_identities(modules, pv_pn: dict) -> dict:
     return borrowed
 
 
+# fabricated-name-family MATERIAL stamps (2026-07-10 run-40: the taxonomy bridge
+# classified busbar work / manifolds / insulation as FABRICATED — the column contract
+# then honestly demanded a MATERIAL these parametric rows never carried). The stated
+# material of each fabricated family is its trade default; disclosed, idempotent,
+# never overwrites a stated material. Mirrors the family list in build-excel-export
+# _FABRICATED_NAME_FAMILY_RX + parts_ledger._FABRICATED_PACK_WORK_RE (in sync by hand).
+_FAB_FAMILY_MATERIALS = [
+    (re.compile(r"busbar", re.I), "ETP copper bar, tin-plated (stamped/formed to drawing)"),
+    (re.compile(r"thermal\s+management\s+(?:manifold|bay|plenum)|coolant\s+loop", re.I),
+     "aluminium sheet/extrusion (formed to drawing)"),
+    (re.compile(r"deflagration\s+vent\s+panel", re.I), "scored stainless sheet (burst element to drawing)"),
+    (re.compile(r"(?:fireproof|thermal|acoustic)\s+insulation", re.I), "mineral-wool / ceramic-fibre board"),
+    (re.compile(r"structural\s+(?:base\s+)?frame|compartmentali[sz]ed\s+internal", re.I),
+     "painted structural carbon steel (S275)"),
+    (re.compile(r"power\s+distribution\s+unit", re.I), "powder-coated steel enclosure + copper distribution"),
+]
+
+
+def _stamp_fabricated_family_materials(rows):
+    for r in rows:
+        if not isinstance(r, dict) or str(r.get("material") or "").strip():
+            continue
+        nm = str(r.get("requirement") or "")
+        for rx, mat in _FAB_FAMILY_MATERIALS:
+            if rx.search(nm):
+                r["material"] = mat
+                break
+    return rows
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -7316,6 +7346,7 @@ def assemble(out_dir: str):
     # row).
     rows = _stamp_engine_refused_valve_specs(rows, out_dir)
     rows = _stamp_oem_proprietary_findings(rows, _run_class_tag(st))
+    rows = _stamp_fabricated_family_materials(rows)
     return rows
 
 
