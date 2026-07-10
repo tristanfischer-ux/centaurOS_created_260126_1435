@@ -860,9 +860,15 @@ def audit_completeness(parts, final_topology, required_services, log=print):
                     missing.append("fluid-connection")   # on a line, needs ≥1 tie
             else:
                 # a FLOW-THROUGH unit (vessel / pump / filter / treatment) needs BOTH.
-                if not has_in and not is_origin:
+                # AIR-BREATHING EXEMPTION (2026-07-10, run-28: the air-medium flip left
+                # 'Power Semiconductors' with an AIR tie + one conduction water-out —
+                # the audit then demanded a piped water INLET on an air-cooled part).
+                # A part carrying an AIR-service tie sources/returns its fluid through
+                # the AMBIENT — air satisfies a missing direction. A pure water-loop
+                # part (no air tie) keeps the strict in+out rule byte-identically.
+                if not has_in and not is_origin and "air" not in has:
                     missing.append("fluid-input")
-                if not has_out and not is_sink:
+                if not has_out and not is_sink and "air" not in has:
                     missing.append("fluid-output")
         if missing:
             concerns.append({
@@ -2137,6 +2143,24 @@ def _selftest():
         "a declared medium:air edge must author as AIR even between wet-named parts"
     assert any(v == "water" for k, v in _svc.items() if "Rearing Tank" in (k[0] or "")), \
         "a genuine water edge must stay WATER (no false positive)"
+    # AIR-BREATHING completeness exemption: an air-cooled part with an AIR tie + a
+    # conduction water-out must NOT be flagged for a missing piped water inlet; a
+    # pure water part missing its input is still flagged (strict rule unchanged).
+    _ab_parts = [_P("Power Semiconductors"), _P("Cooling Plate"), _P("Recirc Pump"), _P("Rearing Tank")]
+    _ab_topo = [
+        {"from_part": "Power Semiconductors", "to_part": "Cooling Plate",
+         "mechanism": "fluid_loop", "_ledger_service": "water"},
+        {"from_part": "Power Semiconductors", "to_part": "Cooling Plate",
+         "mechanism": "air_flow", "_ledger_service": "air"},
+        {"from_part": "Recirc Pump", "to_part": "Rearing Tank", "mechanism": "fluid_loop"},
+    ]
+    _ab = audit_completeness(_ab_parts, _ab_topo, lambda nm, mod, fn: {"water"},
+                             log=lambda *a: None)
+    _ab_names = {c["part"] for c in _ab}
+    assert "Power Semiconductors" not in _ab_names, \
+        f"an air-breathing part must not need a piped water inlet (got {_ab})"
+    assert "Recirc Pump" in _ab_names, \
+        "a pure water part missing its input must STILL be flagged"
 
     # audit_completeness: the pump has an output (→ tank) but NO input → flagged.
     class _PP:
