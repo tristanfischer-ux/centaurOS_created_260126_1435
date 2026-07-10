@@ -1240,8 +1240,8 @@ registerArchetype('bess', (brief: any) => {
       }
       if (!(pvKw > 0)) return {}
       return {
-        pv_stc_input_kw: q(pvKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `integrated solar DC input the hybrid inverter front-end is rated to accept (${pvKw} kW STC${mpptN > 0 ? ` across ${mpptN} MPPT channels` : ''}) — a design-adopted inverter spec, priced within the hybrid PCS`, from: ['continuous_power_kw'] }),
-        ...(mpptN > 0 ? { mppt_count: q(mpptN, '', 'dimensionless', 'rated', 'component', 'calculator', { source_detail: `MPPT channel count of the integrated hybrid-inverter front-end (${mpptN}) — a feature count of ONE inverter, never separate equipment`, from: ['pv_stc_input_kw'] }) } : {}),
+        pv_stc_input_kw: q(pvKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: `brief-stated integrated solar DC input the hybrid inverter front-end is rated to accept (= ${pvKw} kW STC, from the brief's own PV metric${mpptN > 0 ? ` across ${mpptN} MPPT channels` : ''}) — a design-adopted inverter spec, priced within the hybrid PCS`, from: ['continuous_power_kw'] }),
+        ...(mpptN > 0 ? { mppt_count: q(mpptN, '', 'dimensionless', 'rated', 'component', 'brief', { source_detail: `brief-stated MPPT channel count of the integrated hybrid-inverter front-end (= ${mpptN}, from the brief's own MPPT metric) — a feature count of ONE inverter, never separate equipment`, from: ['pv_stc_input_kw'] }) } : {}),
       }
     })()),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
@@ -1933,7 +1933,7 @@ registerArchetype('bess', (brief: any) => {
       if (rteKey && rteKey !== 'round_trip_efficiency_percent' && !(rteKey in quantities)) {
         quantities[rteKey] = q(
           Math.round(roundTripEfficiencyPercent * 100) / 100, '%', 'dimensionless', 'rated', 'system', 'calculator',
-          { source_detail: `exact brief-key alias of round_trip_efficiency_percent (the computed delivered efficiency) so the compliance matrix verifies by exact name`, from: ['round_trip_efficiency_percent'] },
+          { source_detail: `= round_trip_efficiency_percent (exact brief-key alias of the computed delivered efficiency — full worked derivation on that quantity) so the compliance matrix verifies by exact name`, from: ['round_trip_efficiency_percent'] },
         )
       }
     }
