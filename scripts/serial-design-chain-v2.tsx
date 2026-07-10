@@ -9774,7 +9774,11 @@ async function main() {
               const l = String(line ?? '').toLowerCase()
               const tagM = l.match(/\bx-\d+\b/)
               if (tagM) return tags.has(tagM[0])
-              const toks = l.split(/[^a-z0-9]+/).filter((t) => t.length > 2)
+              // head noun from the NAME segment only (run 57: 'HVAC Chiller · 0.5 kW
+              // cooling' made 'cooling' the head and matched the VENTILATION row —
+              // the rating suffix after '·' is not part of the component family).
+              const nameSeg = l.split('·')[0]
+              const toks = nameSeg.split(/[^a-z0-9]+/).filter((t) => t.length > 2)
               const head = toks[toks.length - 1]
               return nameToks.some((s) => head && s.has(head) && toks.filter((t) => s.has(t)).length >= 2)
             }

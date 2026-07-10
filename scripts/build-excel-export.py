@@ -13855,9 +13855,13 @@ _CRANE_CLASSES = [
 
 _VESSEL_SHAPE_RX = re.compile(
     r"tank|vessel|column|silo|sump|basin|stack|reactor|clarifier|tall_", re.I)
+# 2026-07-11 run 57: \bsensor\b SINGULAR missed 'Current Sensors' etc. (the recurring
+# plural regex family), and thermistor/shunt/detector/monitoring were absent — the recon
+# counted 3 BoM instruments against the schedule's 14 ISA rows and failed the tab. The
+# pattern is plural-tolerant and mirrors the schedule index's ISA families (one truth).
 _INSTRUMENT_ROW_RX = re.compile(
-    r"transmitter|transducer|\bsensor\b|\bprobe\b|analys|instrument|flow meter|\bgauge\b|"
-    r"level switch|\bplc\b|\bhmi\b|\bscada\b", re.I)
+    r"transmitters?|transducers?|\bsensors?\b|\bprobes?\b|analys|instrument|flow meters?|\bgauges?\b|"
+    r"level switch(?:es)?|\bplc\b|\bhmi\b|\bscada\b|thermistors?|\bshunts?\b|detectors?|monitor(?:ing)?\b", re.I)
 
 # ── SCHEDULES-RECON like-for-like matchers (2026-07-05) — module-level so the
 # _selftest() proveCatch below can exercise them directly. Used ONLY by the

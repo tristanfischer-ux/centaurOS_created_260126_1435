@@ -466,7 +466,15 @@ export function buildToolsUsedPage(
     // numeric-substitution machinery then recomputes it LIVE and cross-checks the
     // engine value. Anything that doesn't clean stays a claim only (never a fake calc).
     try {
-      const fromKeys: string[] = Array.isArray(qa.from) ? qa.from : []
+      // lineage lands as qa.lineage.from (the q() helper's `from` option), and many
+      // calculator quantities carry NO lineage but NAME their input keys in the
+      // source_detail ('continuous_kw × 1000 / dc_bus_voltage_v') — scan for those.
+      let fromKeys: string[] = Array.isArray(qa.from) ? qa.from
+        : (Array.isArray(qa.lineage?.from) ? qa.lineage.from : [])
+      if (!fromKeys.length && typeof qa.source_detail === 'string') {
+        fromKeys = Object.keys(contract.quantities).filter((k) =>
+          k !== field && new RegExp(`\\b${k}\\b`).test(qa.source_detail))
+      }
       if (fromKeys.length && typeof qa.source_detail === 'string' && typeof qa.value === 'number') {
         let expr = String(qa.source_detail).split(/—|;/)[0]
         if (expr.includes('=')) expr = expr.split('=').slice(-1)[0]

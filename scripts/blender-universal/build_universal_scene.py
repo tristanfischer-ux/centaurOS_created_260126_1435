@@ -8504,6 +8504,16 @@ def augment_topology_connect_orphans(state, topology, parts):
     for _a, _b in zip(_conv_stages, _conv_stages[1:]):
         if _add_pwr_edge(_a, _b, 'power-conversion series chain'):
             _n_conv += 1
+    # busbar ACCESSORIES (connectors / interconnects) tie onto the busbar itself —
+    # parallel accessories, not series stages (run 57: X-12 Busbar Connectors
+    # missing_input+output).
+    _bus_stage = next((s for s in _conv_stages if re.search(r"busbar", s, re.I)), None)
+    if _bus_stage:
+        for p in parts:
+            if re.search(r"busbar\s+(?:connectors?|interconnects?)", str(p.name), re.I) \
+                    and str(p.name) != _bus_stage:
+                if _add_pwr_edge(_bus_stage, p.name, 'busbar accessory tie'):
+                    _n_conv += 1
     if _n_conv:
         print(f"[univ][topo] power-conversion series chain: {_n_conv} edge(s) over "
               f"{len(_conv_stages)} stage(s) — {' → '.join(s[:22] for s in _conv_stages)}")
@@ -11996,9 +12006,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         nz = min(max(cz0, lo_z), max(lo_z, hi_z))
         ddx, ddy, ddz = nx - cx0, ny - cy0, nz - cz0
         if abs(ddx) + abs(ddy) + abs(ddz) > 0.5:
-            obj.location = (obj.location[0] + ddx * fl.MM,
-                            obj.location[1] + ddy * fl.MM,
-                            obj.location[2] + ddz * fl.MM)
+            # SHAPE-SAFE (run 57: the draw_* scripts re-run placement HEADLESS, where
+            # fl.add_box returns dict mocks — obj.location crashed every schematic and
+            # the panel schedule vanished from the dossier entirely).
+            _delta = (ddx * fl.MM, ddy * fl.MM, ddz * fl.MM)
+            if hasattr(obj, "location"):
+                obj.location = (obj.location[0] + _delta[0],
+                                obj.location[1] + _delta[1],
+                                obj.location[2] + _delta[2])
+            elif isinstance(obj, dict) and "location" in obj:
+                _l = obj["location"]
+                obj["location"] = (_l[0] + _delta[0], _l[1] + _delta[1], _l[2] + _delta[2])
             zp.placed_xyz_mm = (nx, ny, nz)
             for k, v in list(anch.items()):
                 if isinstance(v, (tuple, list)) and len(v) == 3:
