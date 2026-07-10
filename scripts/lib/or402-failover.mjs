@@ -14,8 +14,11 @@
  */
 
 const SUBSTITUTE_MODEL = 'gemini-3.5-flash'
-// OpenRouter-specific body fields Google/DeepSeek reject or misread
-const OR_ONLY_FIELDS = ['provider', 'transforms', 'models', 'route', 'plugins', 'reasoning', 'usage']
+// OpenRouter-specific body fields Google/DeepSeek reject or misread. Run 49 proved
+// Google's OpenAI-compat endpoint 400s on UNKNOWN names ('seed', 'thinking_level'),
+// so this list carries every OpenRouter extension the chain is known to send.
+const OR_ONLY_FIELDS = ['provider', 'transforms', 'models', 'route', 'plugins', 'reasoning', 'usage',
+  'seed', 'thinking_level', 'top_k', 'min_p', 'top_a', 'repetition_penalty', 'logit_bias', 'prediction']
 
 export function routeFor(model) {
   const m = String(model || '')
@@ -32,6 +35,9 @@ export function routeFor(model) {
 export function translateBody(body) {
   const out = { ...body }
   for (const k of OR_ONLY_FIELDS) delete out[k]
+  // callLlm defaults max_tokens to 150,000 (anti-truncation); Gemini's output cap
+  // is 65,536 and the direct endpoint rejects values above it.
+  if (typeof out.max_tokens === 'number' && out.max_tokens > 65536) out.max_tokens = 65536
   return out
 }
 

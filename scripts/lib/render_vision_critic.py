@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from typing import Optional
 
@@ -112,6 +113,24 @@ def _key() -> str:
     return ""
 
 
+def _google_key() -> str:
+    """Direct Google AI key for the 402 failover — same .env.local walk as _key()."""
+    k = (os.environ.get("GOOGLE_AI_API_KEY") or "").strip()
+    if k:
+        return k
+    here = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("../.env.local", "../.env", "../secrets/.env", "../../.env.local"):
+        p = os.path.join(here, rel)
+        try:
+            for line in open(p, encoding="utf-8"):
+                m = re.match(r"\s*(?:export\s+)?GOOGLE_AI_API_KEY\s*=\s*[\"\']?([^\"\'\n]+)", line)
+                if m:
+                    return m.group(1).strip()
+        except OSError:
+            pass
+    return ""
+
+
 def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
     key = _key()
     if not key:
@@ -133,8 +152,26 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
         "https://openrouter.ai/api/v1/chat/completions", data=body,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as http_exc:
+            # 402 failover (2026-07-10, mirrors or402-failover.mjs): OpenRouter credits
+            # exhausted must not silently blind the drawing-quality net. Gemini is
+            # multimodal, so route the SAME OpenAI-shape request to the direct Google
+            # key; google/* models map 1:1, anything else substitutes gemini-3.5-flash.
+            gkey = _google_key()
+            if http_exc.code != 402 or not gkey or os.environ.get("OPENROUTER_402_FAILOVER") == "0":
+                raise
+            gmodel = model.split("google/", 1)[1] if model.startswith("google/") else "gemini-3.5-flash"
+            gbody = json.loads(body.decode()); gbody["model"] = gmodel
+            greq = urllib.request.Request(
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                data=json.dumps(gbody).encode(),
+                headers={"Authorization": f"Bearer {gkey}", "Content-Type": "application/json"})
+            print(f"[vision-critic] OpenRouter 402 → google:{gmodel}", file=sys.stderr)
+            with urllib.request.urlopen(greq, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
         txt = data["choices"][0]["message"]["content"]
     except Exception as exc:  # noqa: BLE001
         return {"broken": None, "defects": [], "model": model, "ok": False, "error": str(exc)[:160]}
