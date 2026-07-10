@@ -2721,7 +2721,7 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
         // an ISO/shipping-container word inside a sub-1 m³ enclosure is wrong-product-
         // class leakage (run-23: 'Iso Container Shell' billed beside the cabinet macro) —
         // a product smaller than a cubic metre is not containerised, by definition.
-        if (noOccupancy && /iso\s+container|shipping\s+container|container\s+shell/i.test(nmHead)) {
+        if (noOccupancy && /iso\s+container|shipping\s+container|container\s+shell|(?:weatherproof|outdoor|weather[\s-]?tight)\s+enclosure/i.test(nmHead)) {
           ;(w as { mis_emission_note?: string }).mis_emission_note =
             `containerised-scale word in a sealed ${envM3.toFixed(2)} m³ enclosure: the product IS its ` +
             `own cabinet (the enclosure macro carries the skin) — an ISO container does not exist here; ` +

@@ -919,6 +919,11 @@ def _battery_cell_price(name: str, md: dict):
 _MIN_PRICE_FLOORS = [
     (re.compile(r"main[_ ]?breaker|\bmccb\b|moulded[_ ]?case|air[_ ]?circuit", re.I), 180.0),
     (re.compile(r"\bbreaker\b|\bmcb\b|circuit[_ ]?breaker", re.I), 45.0),
+    # the £120 busbar floor is a SWITCHBOARD constant — a small-pack busbar (its own
+    # name carries a sub-100 A continuous rating) is stamped copper at £15-30
+    # (2026-07-10, Powerwall run-35: FOUR busbar family lines each floored £120 on a
+    # 39.2 A pack). Amp-aware: <100 A in the name → £20; else the switchboard £120.
+    (re.compile(r"busbar[\w\s]*·\s*(?:[1-9]?\d(?:\.\d+)?)\s*A\b|bus[_ ]?bar[\w\s]*·\s*(?:[1-9]?\d(?:\.\d+)?)\s*A\b", re.I), 20.0),
     (re.compile(r"busbar|bus[_ ]?bar|distribution[_ ]?bus", re.I), 120.0),
     (re.compile(r"surge[_ ]?protect|\bspd\b|surge[_ ]?arrest", re.I), 90.0),
     (re.compile(r"protective[_ ]?relay|protection[_ ]?relay", re.I), 220.0),
@@ -5687,6 +5692,19 @@ def _connection_rows(out_dir: str, q=None):
                 _dnet = _dnet.get("value")
             if isinstance(_dnet, (int, float)) and _dnet > 0:
                 continue
+
+        # ── AIR ROW AT DEVICE SCALE (2026-07-10 run-35): the Blender schedule prices
+        # every sized run on the PIPE model, so a cabinet's short AIR paths carried
+        # 'pipe £28/m @ DN25 (water service)' labels at £59-69 each. A sub-5 m air
+        # run is a moulded duct/grille: supply-share £6/m + £4 ends. Plant-scale
+        # ducting (long runs) keeps the schedule's own figure.
+        if service == "air":
+            _alen = float(length) if isinstance(length, (int, float)) else 0.0
+            if 0 < _alen < 5.0:
+                line = round(_alen * 6.0 + 4.0, 2)
+                basis = (f"air duct/grille supply-share × {_alen:.1f} m @ £6/m + ends "
+                         f"(re-priced from the pipe-model schedule figure)")
+                within = True
 
         # ── MIS-CLASSIFIED SIGNAL/ELECTRICAL TIE wrongly tagged as a fluid edge ──
         # An edge whose BOTH endpoints are pure instruments/sensors/controllers (and
