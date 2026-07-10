@@ -2218,7 +2218,7 @@ export async function fillBlankWordMpns(
       let dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true })
       let pinned = false
       let blocked = false // a guard refused the pin outright — never fall through to generate
-      let retriesLeft = 4   // walk-down budget: claimed-retry + up to 3 type-coherence walks
+      let retriesLeft = 8   // walk-down budget (4→8 2026-07-10: 'Gas Sensors' exhausted 4 walks with the MICS-6814 still below the window)
       const rejectedRows = new Set<string>()
       while (dbHit && !pinned && !blocked) {
         // CAPACITY VALIDATION (Tristan 2026-06-27): a flow-machine pin must not be grossly
