@@ -302,6 +302,25 @@ function componentsForModule(
  */
 function splitIntoSubModuleGroups(components: string[]): string[][] {
   const n = components.length
+  // DOMAIN-AWARE SPLIT FIRST (2026-07-10, gate-29 catch on the Powerwall loop): a
+  // naive halfway slice can land a dc_* component in a group whose LEAD component —
+  // and therefore the sub_module id — is ac_* (main_dc_contactor under
+  // __ac_switchgear), and the sub-module domain guard HARD-fails the run (exit 29).
+  // Electrical-domain-coded components never share a group across domains; the
+  // domain-neutral pool balances density between the two. A resulting thin group is
+  // only a density WARNING — strictly better than a hard domain violation. Modules
+  // with a single (or no) domain keep the original halfway behaviour byte-identically.
+  const domainOf = (c: string): 'dc' | 'ac' | null =>
+    /(^|_)dc(_|$)/i.test(c) ? 'dc' : /(^|_)ac(_|$)/i.test(c) ? 'ac' : null
+  const dc = components.filter((c) => domainOf(c) === 'dc')
+  const ac = components.filter((c) => domainOf(c) === 'ac')
+  if (dc.length > 0 && ac.length > 0) {
+    const neutral = components.filter((c) => domainOf(c) === null)
+    const g1 = [...dc]
+    const g2 = [...ac]
+    for (const c of neutral) (g1.length <= g2.length ? g1 : g2).push(c)
+    return [g1, g2]
+  }
   if (n < 2 * MIN_WORDS) return [components]
   const mid = Math.ceil(n / 2)
   return [components.slice(0, mid), components.slice(mid)]
