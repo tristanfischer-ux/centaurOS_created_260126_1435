@@ -11743,6 +11743,168 @@ def _ga_module_index_map(parts):
     return {mid: i for i, mid in enumerate(order)}
 
 
+# ── SEALED-ENCLOSURE strategy (2026-07-10, Powerwall Renders/GA 2/10) ────────────────
+# A product whose contract declares a sealed sub-1 m³ enclosure (wall-mounted ESS,
+# EV-charger pillar, drone dock, outdoor telecom cabinet) is ONE CABINET, not a plant
+# room: no aisles, no pipe rack, no site deck. The GA shows the enclosure envelope at
+# its BRIEF dimensions with the internal equipment stacked in engineering zones
+# (energy storage at the bottom for CoG, power conversion above it, distribution then
+# control at the top, skin/panels on the faces). UNIVERSAL — keyed on the SAME
+# enclosure_volume_m3 < 1 signal the demotion pass uses + role-noun vocabulary, never
+# a product name. Any archetype without that contract signal is completely untouched.
+SEALED_ENV_MAX_M3 = 1.0
+_SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → top
+    ("energy", 0.52,
+     re.compile(r"\bcell|\bbattery|\bpack\b|\bmodule|\bstring\b|\brack\b", re.I)),
+    ("power", 0.24,
+     re.compile(r"invert|\bpcs\b|convert|mppt|charger|rectifier|power\s+stage|transformer", re.I)),
+    ("distribution", 0.12,
+     re.compile(r"busbar|contactor|fuse|isolat|breaker|relay|surge|distribution|switch|meter|"
+                r"gland|terminal", re.I)),
+    ("control", 0.12,
+     re.compile(r"\bbms\b|controller|\bems\b|gateway|control|monitor|comm|antenna|hmi|display|"
+                r"\bfan\b|cold\s?plate|heat\s?sink|thermal|vent|duct|louvre|grille|sensor|detector",
+                re.I)),
+]
+_SE_SKIN_RE = re.compile(
+    r"enclosure|cabinet|housing|\bdoor\b|\bpanel\b|panels\b|insulation|liner|gasket|"
+    r"\bseal\b|bracket|mount(?:ing)?\b|cover|lid|skin|chassis|frame", re.I)
+
+
+def _sealed_enclosure_env_mm(state, quantities):
+    """(W, D, H) exterior mm when the contract declares a sealed sub-1 m³ enclosure —
+    brief max_dimensions_mm wins (the customer's own envelope), else a cube of the
+    contract volume. None (→ normal family dispatch) for every other scale."""
+    vol = qval(quantities, "enclosure_volume_m3", 0.0) or 0.0
+    if not (0 < vol < SEALED_ENV_MAX_M3):
+        return None
+    md = ((state.get("parsedBrief") or {}).get("constraints") or {}).get("max_dimensions_mm") or {}
+    w = _num(str(md.get("w") or ""))
+    d = _num(str(md.get("d") or ""))
+    h = _num(str(md.get("h") or ""))
+    if w and d and h:
+        return (float(w), float(d), float(h))
+    s = (float(vol) ** (1.0 / 3.0)) * 1000.0
+    return (s, s, s)
+
+
+def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
+    """SEALED-ENCLOSURE placer: one cabinet at the brief envelope, equipment stacked
+    in role zones inside it, skin parts as face plates, edges wired port-to-port at
+    cabinet scale. Same return tuple as every other strategy:
+    (bbox, region_centres, frame_top_mm, routed, unresolved)."""
+    W, D, H = env_mm
+    margin = max(8.0, min(W, D, H) * 0.05)
+    iw, idep, ih = W - 2 * margin, D - 2 * margin, H - 2 * margin
+    base_z = DECK_Z_MM
+    print(f"[univ][sealed] enclosure {W:.0f}×{D:.0f}×{H:.0f} mm "
+          f"(interior {iw:.0f}×{idep:.0f}×{ih:.0f}); {len(parts)} parts")
+
+    # 1. classify every part into a zone / the skin
+    zone_parts = {z[0]: [] for z in _SE_ZONES}
+    skin = []
+    for p in parts:
+        nm = str(p.name)
+        placed = False
+        for key, _frac, rx in _SE_ZONES:
+            if rx.search(nm):
+                zone_parts[key].append(p)
+                placed = True
+                break
+        if placed:
+            continue
+        if _SE_SKIN_RE.search(nm):
+            skin.append(p)
+        else:
+            zone_parts["distribution"].append(p)   # unmatched hardware → mid-band
+
+    # 2. the cabinet SHELL — thin walls named u_skid_* so the INSPECT recolour renders
+    #    them as the faint wireframe the internal equipment shows through.
+    sid = STRUCTURE_MODULE_ID
+    if sid not in MO:
+        MO[sid] = []
+    shell_mat = fl.make_mat("m_se_shell", (0.55, 0.57, 0.60), metallic=0.6, roughness=0.4)
+    t = max(3.0, min(W, D) * 0.012)
+
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    for snm, loc, size in [
+        ("u_skid_encl_back",   (0.0, D / 2 - t / 2, base_z + H / 2), (W, t, H)),
+        ("u_skid_encl_left",   (-W / 2 + t / 2, 0.0, base_z + H / 2), (t, D, H)),
+        ("u_skid_encl_right",  (W / 2 - t / 2, 0.0, base_z + H / 2), (t, D, H)),
+        ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
+        ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
+    ]:
+        fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
+
+    # 3. stack the zones bottom → top; parts side-by-side along X inside each band
+    z_cursor = base_z + margin
+    for key, frac, _rx in _SE_ZONES:
+        band_h = ih * frac
+        plist = sorted(zone_parts[key], key=lambda p: str(p.name))
+        if plist:
+            n = len(plist)
+            gap = max(4.0, iw * 0.015)
+            slot_w = max(10.0, (iw - gap * (n - 1)) / n)
+            for i, p in enumerate(plist):
+                p.shape = "box"
+                p.dim = parse_dimension(f"{slot_w:.0f}x{idep * 0.78:.0f}x{band_h * 0.82:.0f} mm")
+                cx = -iw / 2 + slot_w / 2 + i * (slot_w + gap)
+                asm, anchors = build_part(p, cx, 0.0, z_cursor, MAT, MO)
+                p.obj_anchor, p.anchors = asm, anchors
+                p.placed_xyz_mm = anchors["centre"]
+            print(f"[univ][sealed] zone {key}: {n} part(s) in a "
+                  f"{band_h:.0f} mm band at z {z_cursor - base_z:.0f}")
+        z_cursor += band_h
+
+    # 4. SKIN parts as thin plates cycled over the faces (front, left, right, top) —
+    #    they stay real placed parts (coverage + connection endpoints resolve).
+    faces = [
+        lambda k: ((0.0, -D / 2 - t * (k + 1)), (iw * 0.9, t), "front"),
+        lambda k: ((-W / 2 - t * (k + 1), 0.0), (t, idep * 0.9), "left"),
+        lambda k: ((W / 2 + t * (k + 1), 0.0), (t, idep * 0.9), "right"),
+    ]
+    for i, p in enumerate(sorted(skin, key=lambda p: str(p.name))):
+        (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
+        p.shape = "box"
+        p.dim = parse_dimension(f"{max(pw, 1.0):.0f}x{max(pd, 1.0):.0f}x{ih * 0.9:.0f} mm")
+        asm, anchors = build_part(p, cx, cy, base_z + margin, MAT, MO)
+        p.obj_anchor, p.anchors = asm, anchors
+        p.placed_xyz_mm = anchors["centre"]
+    if skin:
+        print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
+
+    # 5. route the topology at cabinet scale (the SAME shared router, its geometry
+    #    constants scaled to the enclosure so a 1 m cabinet never grows a 300 mm riser)
+    scale = max(0.05, min(1.0, H / 2400.0))
+    _SE_ROUTE_GLOBALS = ("PIPE_DIA_MM", "RACK_TIER_PITCH_MM", "RACK_LANE_PITCH_MM",
+                         "RACK_LATERAL_MIN_MM", "RACK_LANE_SPAN_MM", "RACK_DIRECT_MAX_MM",
+                         "CONN_FALLBACK_DIA_MM", "CONN_MIN_RENDER_DIA_MM")
+    _SE_ROUTE_FLOORS = {"PIPE_DIA_MM": 8.0, "RACK_TIER_PITCH_MM": 16.0,
+                        "RACK_LANE_PITCH_MM": 20.0, "RACK_LATERAL_MIN_MM": 16.0,
+                        "RACK_LANE_SPAN_MM": 120.0, "RACK_DIRECT_MAX_MM": 150.0,
+                        "CONN_FALLBACK_DIA_MM": 5.0, "CONN_MIN_RENDER_DIA_MM": 2.5}
+    bbox = {"x0": -W / 2 - t * 4, "x1": W / 2 + t * 4,
+            "y0": -D / 2 - t * 4, "y1": D / 2 + t * 4}
+    region_centres = {p.region_key: (0.0, 0.0) for p in parts}
+    frame_top_mm = base_z + H
+    saved = {k: globals()[k] for k in _SE_ROUTE_GLOBALS}
+    try:
+        for k in _SE_ROUTE_GLOBALS:
+            globals()[k] = max(_SE_ROUTE_FLOORS[k], saved[k] * scale)
+        routed, unresolved = route_topology(topology, parts, MAT, MO,
+                                            frame_top_mm=frame_top_mm,
+                                            region_centres=region_centres,
+                                            bbox_mm=bbox)
+    finally:
+        for k in _SE_ROUTE_GLOBALS:
+            globals()[k] = saved[k]
+    print(f"[univ][sealed] topology routed = {routed}/{len(topology)}; "
+          f"unresolved = {len(unresolved)}")
+    return bbox, region_centres, frame_top_mm, routed, unresolved
+
+
 def place_generic_assembly(parts, regions, topology, MAT, MO):
     """GENERIC-ASSEMBLY strategy — the universal default. Lay the parts grouped by
     MODULE region using the SHARED region/banking layout (place_all), each part
@@ -17174,6 +17336,16 @@ def main():
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     product_class = product_class_of(state)
     family = detect_geometry_family(parts, modules, product_class)
+    # SEALED-ENCLOSURE OVERRIDE: a contract-declared sub-1 m³ sealed enclosure is ONE
+    # cabinet — the vocabulary-derived family (rack_farm from 'battery rack' words,
+    # generic_assembly, …) would lay a plant ROOM. Contract authority wins: the same
+    # enclosure_volume_m3 < 1 signal the sizing demotion pass keys on.
+    _se_env_mm = _sealed_enclosure_env_mm(state, quantities)
+    if _se_env_mm and not LINEAR_LAYOUT_ON:
+        print(f"[univ] sealed-enclosure override: contract enclosure_volume_m3 "
+              f"< {SEALED_ENV_MAX_M3} m³ → '{family}' replaced by 'sealed_enclosure' "
+              f"({_se_env_mm[0]:.0f}×{_se_env_mm[1]:.0f}×{_se_env_mm[2]:.0f} mm)")
+        family = "sealed_enclosure"
     _route_log_reset()   # fresh route log so audit_routes() sees only this run
     if LINEAR_LAYOUT_ON:
         # STAGE 1 (BLENDER_LINEAR_LAYOUT=1) — universal DETERMINISTIC linear layout:
@@ -17199,6 +17371,9 @@ def main():
         _PANELARRAY_QUANTITIES = quantities
         bbox, region_centres, frame_h, routed, unresolved = place_panel_array(
             parts, regions, topology, MAT, MO)
+    elif family == "sealed_enclosure":
+        bbox, region_centres, frame_h, routed, unresolved = place_sealed_enclosure(
+            parts, regions, topology, MAT, MO, _se_env_mm)
     elif family == "rack_farm":
         global _RACKFARM_QUANTITIES
         _RACKFARM_QUANTITIES = quantities
