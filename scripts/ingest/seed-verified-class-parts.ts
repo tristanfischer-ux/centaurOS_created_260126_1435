@@ -103,6 +103,34 @@ async function main(): Promise<number> {
         renamed += rename.run(plain, candidates[i].mpn, plain).changes
       }
       console.log(`[seed] design-vocab lead segment prefixed on ${renamed} row(s)`)
+      // REACHABILITY PROOF (2026-07-10, the runs 44-53 lesson): a seeded row that the
+      // fill's retrieval cannot SERVE is worthless — the Powerwall seeds sat unreachable
+      // for ~10 runs across four stacked layers (provenance lane, vocabulary, tokenize,
+      // lead segment), each only found by hand-probing. Prove reachability AT WRITE TIME:
+      // run the SAME dbFirstLookup + acceptance the fill uses, with each candidate's
+      // design-vocab name, and report per candidate. An unreachable seed is a defect of
+      // THIS tool run, not a mystery for run N+10.
+      try {
+        const { dbFirstLookup, dbHitAcceptableForWord, tokenize } = await import('../../src/lib/pdf-engine-v2/lib/emitter-completion')
+        let reach = 0, unreach = 0
+        for (let i = 0; i < outcomes.length; i++) {
+          if (!outcomes[i].matched) continue
+          const nm = candidates[i].name
+          const toks = [...new Set(tokenize(nm))]
+          const head = tokenize(nm).slice(-1)[0] ?? null
+          const hit = dbFirstLookup(dbw as never, toks, head, { excludeMakerVendors: true })
+          const ok = !!hit && dbHitAcceptableForWord(hit, nm)
+          if (ok) { reach++ } else {
+            unreach++
+            console.log(`[seed]   ⚠ UNREACHABLE after write: '${nm}' → ` +
+              (hit ? `ranked ${hit.manufacturer} ${hit.part_number} but acceptance refused` : 'no row passed the rank bar') +
+              ` — fix the candidate NAME (head noun in the first 6 tokens; include the domain qualifiers) and re-run`)
+          }
+        }
+        console.log(`[seed] reachability: ${reach} reachable, ${unreach} UNREACHABLE (probe: npx tsx scripts/probe-fill.ts "<word>")`)
+      } catch (pe) {
+        console.log(`[seed] reachability probe skipped: ${(pe as Error).message.slice(0, 80)}`)
+      }
     }
     dbw.close()
   } catch (e) {
