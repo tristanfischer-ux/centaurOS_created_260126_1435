@@ -117,11 +117,37 @@ function run() {
   if (pinnedRemain.filter((n: string) => /battery module rack/i.test(n)).length !== 1) {
     throw new Error(`phantom-drop: singular+plural SAME-PIN principals must collapse to ONE (got ${JSON.stringify(pinnedRemain)})`)
   }
-  if (!pinnedRemain.includes('BMS Slave') || pinnedRemain.filter((n: string) => /spare/i.test(n)).length !== 2) {
-    throw new Error('phantom-drop: a distinct pinned part + TBD-pinned words must be untouched')
+  // (2026-07-10 sibling-fold update: 'Spare Module' + 'Spare Modules' now ALSO fold —
+  //  they are the same part under singular/plural labels, TBD pin or not)
+  if (!pinnedRemain.includes('BMS Slave') || pinnedRemain.filter((n: string) => /spare/i.test(n)).length !== 1) {
+    throw new Error('phantom-drop: the distinct pinned part stays; the spare singular/plural pair folds to ONE')
   }
-  if (pinnedDr.droppedDuplicate !== 1) {
-    throw new Error(`phantom-drop: expected exactly 1 pinned-name duplicate dropped, got ${pinnedDr.droppedDuplicate}`)
+  if (pinnedDr.droppedDuplicate !== 2) {
+    throw new Error(`phantom-drop: expected 2 duplicates dropped (pinned twin + spare sibling), got ${pinnedDr.droppedDuplicate}`)
+  }
+
+  // ── SAME-FAMILY SYNONYM SIBLINGS (run-28 Part-names: 'Main AC Breaker' beside
+  //    'AC Circuit Breaker'; discriminator pairs like voltage/current stay distinct) ──
+  const sib: any = [{
+    module: 'power', sub_modules: [{ sub_module: 's', words: [
+      { ...word('Main AC Breaker', 1), id: 'main_ac_breaker_word' },
+      { ...word('AC Circuit Breaker', 1), id: 'ac_circuit_breaker_word' },   // shared 'ac' + head 'breaker' → folds
+      { ...word('Voltage Transducer', 1), id: 'voltage_transducer_word' },
+      { ...word('Current Transducer', 1), id: 'current_transducer_word' },   // voltage↔current discriminator → BOTH stay
+      { ...word('DC Fuse', 1), id: 'dc_fuse_word' },
+      { ...word('AC Fuse', 1), id: 'ac_fuse_word' },                         // dc↔ac discriminator → BOTH stay
+    ] }],
+  }]
+  dropAttributePhantomWords(sib)
+  const sibRemain = sib[0].sub_modules[0].words.map((w: any) => w.name_human)
+  if (sibRemain.filter((n: string) => /breaker/i.test(n)).length !== 1) {
+    throw new Error(`phantom-drop: breaker synonym siblings must fold to ONE (got ${JSON.stringify(sibRemain)})`)
+  }
+  if (!(sibRemain.includes('Voltage Transducer') && sibRemain.includes('Current Transducer'))) {
+    throw new Error('phantom-drop: voltage vs current transducers are DISTINCT (discriminator pair)')
+  }
+  if (!(sibRemain.includes('DC Fuse') && sibRemain.includes('AC Fuse'))) {
+    throw new Error('phantom-drop: dc vs ac fuses are DISTINCT (discriminator pair)')
   }
 
   // eslint-disable-next-line no-console

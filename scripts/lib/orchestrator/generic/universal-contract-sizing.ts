@@ -5590,6 +5590,26 @@ function _populationRoleKey(name: string): string {
   return sing
 }
 
+// SAME-FAMILY SYNONYM SIBLINGS (2026-07-10, run-28 Part-names 4.5: the decomposition
+// mints 2-3 words per real part — 'Main AC Breaker · 59 A' beside 'AC Circuit Breaker',
+// 'Cell Monitoring Unit' beside 'Cell Monitoring Units' beside 'Battery Management
+// System Slave' — the fill then pins ONE (exclusive assignment) and every sibling stays
+// an honest-but-scored TBD residual). CONSERVATIVE fold: two ×1 words in the SAME module
+// whose singularised names share the HEAD noun AND ≥1 non-head qualifier AND carry NO
+// CONFLICTING DISCRIMINATOR (voltage vs current, dc vs ac, master vs slave, input vs
+// output, supply vs return, high vs low) are the same part twice. 'Voltage Transducer'
+// vs 'Current Transducer' (discriminator pair) and 'DC Fuses' vs 'AC Fuses' stay distinct.
+const _DISCRIMINATOR_PAIRS: ReadonlyArray<[string, string]> = [
+  ['voltage', 'current'], ['dc', 'ac'], ['master', 'slave'], ['input', 'output'],
+  ['supply', 'return'], ['high', 'low'], ['inlet', 'outlet'], ['primary', 'secondary'],
+]
+function _synonymSiblingConflict(a: Set<string>, b: Set<string>): boolean {
+  for (const [x, y] of _DISCRIMINATOR_PAIRS) {
+    if ((a.has(x) && b.has(y)) || (a.has(y) && b.has(x))) return true
+  }
+  return false
+}
+
 export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhantom: number; droppedDuplicate: number } {
   let droppedPhantom = 0
   let droppedDuplicate = 0
@@ -5602,7 +5622,10 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
   // identical role key AND count (manual vs actuated stay distinct).
   const seenPopKey = new Set<string>()
   const seenPinnedName = new Set<string>()
+  // per-MODULE synonym-sibling registry: head → [(qualifier tokens, word id)]
+  const moduleFamilies = new Map<string, Array<{ quals: Set<string>; id: string }>>()
   for (const m of modules ?? []) {
+    moduleFamilies.clear()
     for (const sm of m.sub_modules ?? []) {
       if (!Array.isArray(sm.words)) continue
       sm.words = sm.words.filter((w) => {
@@ -5633,6 +5656,26 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
             const dupKey = `${_singularisePhrase(name)}|${pn.toLowerCase()}`
             if (seenPinnedName.has(dupKey)) { droppedDuplicate += 1; return false }
             seenPinnedName.add(dupKey)
+          }
+          // SAME-FAMILY SYNONYM SIBLING fold (see _DISCRIMINATOR_PAIRS above): two ×1
+          // words in this MODULE, same head noun, ≥1 shared qualifier, no conflicting
+          // discriminator → the same part minted twice under synonym labels.
+          if (count === 1) {
+            const toks = _singularisePhrase(name).split(' ').filter(Boolean)
+            const head = toks[toks.length - 1] ?? ''
+            const quals = new Set(toks.slice(0, -1))
+            if (head && quals.size > 0) {
+              const fam = moduleFamilies.get(head) ?? []
+              for (const prior of fam) {
+                const shared = [...quals].some((t) => prior.quals.has(t))
+                if (shared && !_synonymSiblingConflict(quals, prior.quals)) {
+                  droppedDuplicate += 1
+                  return false
+                }
+              }
+              fam.push({ quals, id: String((w as { id?: unknown }).id ?? '') })
+              moduleFamilies.set(head, fam)
+            }
           }
         }
         return true
