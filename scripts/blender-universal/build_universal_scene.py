@@ -17643,20 +17643,32 @@ def main():
     # ── CONNECTION SCHEDULE (Phase C) — the BoM feedback. Every run was sized at its
     # REAL diameter from its rating; collect the ConnectionSpecs into the distribution
     # schedule (cable-m by CSA, pipe-m by DN, duct-m by size) + flag out-of-spec runs.
-    conn_schedule = write_connection_schedule(out_dir)
+    # SEALED-PRODUCT HERO OWNS IMAGES ONLY (2026-07-10, run-26: the hero pass runs
+    # LAST and — with its wiring suppressed for the product shot — OVERWROTE the
+    # INSPECT pass's good connection-schedule.json with an EMPTY one, wiping the
+    # Electrical tab's routed lengths + the whole Line & velocity schedule. In this
+    # mode every DATA artefact write is skipped; the INSPECT pass's artefacts stand.)
+    if _SEALED_HERO_PRODUCT:
+        print("[univ][sealed] HERO product-skin: data-artefact writes skipped "
+              "(schedule/manifests owned by the INSPECT pass)")
+        conn_schedule = None
+        _pm_path = os.path.join(out_dir, "parts-manifest.json")
+        parts_manifest = json.load(open(_pm_path)) if os.path.exists(_pm_path) else {"parts": []}
+    else:
+        conn_schedule = write_connection_schedule(out_dir)
 
-    # ── PARTS-POSITION MANIFEST — the data the GA + isometric drawings consume.
-    # Every part is now placed (placed_xyz_mm + anchors set above); project that
-    # into parts-manifest.json. PURE EXPORT — always writes, disturbs nothing on
-    # the render / route / schedule paths.
-    parts_manifest = write_parts_manifest(out_dir, parts, state)
+        # ── PARTS-POSITION MANIFEST — the data the GA + isometric drawings consume.
+        # Every part is now placed (placed_xyz_mm + anchors set above); project that
+        # into parts-manifest.json. PURE EXPORT — always writes, disturbs nothing on
+        # the render / route / schedule paths.
+        parts_manifest = write_parts_manifest(out_dir, parts, state)
 
     # ── ROUTE-WAYPOINT MANIFEST — the data the PIPING ISOMETRIC drawing consumes.
     # Joins the routed polylines (_ROUTE_LOG) to their sized specs (_CONN_SPECS) and
     # writes route-manifest.json (one entry per drawn connection: waypoints + fittings
     # + DN + service + endpoints). PURE EXPORT — gated by ROUTE_SKIP_MANIFEST so a run
     # with vs without proves the renders / route-audit / schedule are unchanged.
-    route_manifest = write_route_manifest(out_dir)
+    route_manifest = None if _SEALED_HERO_PRODUCT else write_route_manifest(out_dir)
 
     # ── RENDER TAG CALLOUTS (Bundle D item 3) — billboard equipment-tag chips at the
     # principal equipment, baked into the hero + plan renders. Runs AFTER every data
@@ -17807,9 +17819,9 @@ def main():
               "route_reconcile": {k: route_reconcile[k] for k in
                                   ("instrument_edges_dropped", "routes_capped",
                                    "length_saved_m", "gbp_saved")},
-              "connection_schedule_totals": conn_schedule.get("totals"),
-              "parts_manifest_count": parts_manifest.get("count"),
-              "route_manifest_count": route_manifest.get("count"),
+              "connection_schedule_totals": (conn_schedule or {}).get("totals"),
+              "parts_manifest_count": (parts_manifest or {}).get("count"),
+              "route_manifest_count": (route_manifest or {}).get("count"),
               "tag_callouts": n_tag_callouts,
               "inspect": _inspect_summary,
           }))
