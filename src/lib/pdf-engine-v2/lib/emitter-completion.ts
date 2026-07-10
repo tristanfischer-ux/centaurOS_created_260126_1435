@@ -185,7 +185,13 @@ export interface CompleteEmitterGapsOpts {
 // MUST stay non-structured (no [A-Z0-9]{3,}[-_/]… pattern) AND ideally contain
 // a gate-20 skip token ("specify"). This guarantees fictional-pn-audit treats
 // it as a commodity/unverifiable descriptor (LOW/MED, never HIGH / exit 20).
-function honestDescriptorMpn(): string {
+// EXPORTED 2026-07-10: serial-design-chain Stage 10.6 named-imports this, but it was
+// module-private — the import silently bound undefined, and the stage's OLD failure
+// (the missing verifyProposedParts) threw first and SHIELDED it (the run-16/17
+// missing-module-shields-worse-latent-failures pattern, third occurrence). The moment
+// verifyProposedParts existed, 10.6 ran far enough to hit "(0, …honestDescriptorMpn)
+// is not a function" (run 21).
+export function honestDescriptorMpn(): string {
   // Short + gate-20-safe (non-structured, contains 'TBD' commodity token so
   // fictional-pn-audit skips it). The `form` modifier carries the full
   // "manufacturer — confirm at detailed design" sentence; the part_number
