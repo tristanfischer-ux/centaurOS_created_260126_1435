@@ -218,7 +218,7 @@ const CATALOGUE_TOKEN_SET = new Set<string>([
   'sensor', 'driver', 'controller', 'computer', 'processor', 'board', 'ic', 'chip',
   'connector', 'cable', 'harness', 'antenna', 'transceiver', 'receiver', 'radio',
   'motor', 'servo', 'actuator', 'esc', 'regulator', 'converter', 'inverter', 'relay',
-  'switch', 'fuse', 'capacitor', 'resistor', 'inductor', 'diode', 'transistor',
+  'switch', 'fuse', 'contactor', 'breaker', 'capacitor', 'resistor', 'inductor', 'diode', 'transistor',
   'mosfet', 'battery', 'cell', 'pump', 'valve', 'fan', 'gps', 'imu', 'gyro',
   'accelerometer', 'magnetometer', 'altimeter', 'camera', 'lidar', 'sonar', 'encoder',
   'amplifier', 'oscillator', 'led', 'display', 'gimbal', 'bearing', 'gearbox',
@@ -466,7 +466,14 @@ const COMPOUND_QUALIFIER_GATED_HEADS: Record<string, string[][]> = {
 export function isCatalogueComponentByEitherName(
   name: string, aliasName: string | null | undefined, subId: string,
 ): boolean {
+  // The word's OWN name decides FIRST (2026-07-10, run-36: 'Active Ventilation Fan'
+  // hosted in sub_module …__thermal_INSULATION_PANELS — the subId concatenation fed
+  // the host's STRUCTURAL tokens into the classifier and vetoed a catalogue fan;
+  // 34 'structural skipped' included real purchasable parts). The subId remains a
+  // RESCUE context for names ambiguous on their own, never a veto.
+  if (isCatalogueComponent(name)) return true
   if (isCatalogueComponent(`${name} ${subId}`)) return true
+  if (aliasName && isCatalogueComponent(aliasName)) return true
   return !!aliasName && isCatalogueComponent(`${aliasName} ${subId}`)
 }
 
@@ -2034,6 +2041,7 @@ export async function fillBlankWordMpns(
       const subId = String(sm?.id ?? 'unknown_sub_module')
       for (const w of Array.isArray(sm?.words) ? sm.words! : []) {
         const pn = (w.modifier_characters ?? []).find((mc) => mc.kind === 'part_number')?.value
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue // demoted scope note — never pin a part on it (run-36: Daikin HX pinned on a demoted liquid-cooling word)
         if (!isBlankOrPlaceholderMpn(pn)) continue // already has a real MPN — leave it
         const name = w.content_character?.name_human || w.name_human || w.content_character?.character_id || subId
         const otherName = w.name_human || w.content_character?.name_human || null
