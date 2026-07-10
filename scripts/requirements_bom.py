@@ -62,8 +62,14 @@ _BESPOKE_RE = re.compile(r"tank|vessel|reservoir|basin|sump|biofilter|degass|"
 # reference, not a buyable SKU). Their cost is dominated by INTERNALS / catalyst /
 # heat-exchange / engineering, NOT the shell steel — so a shell materials take-off would
 # wildly undercount them; the honest basis is the process engineering budget estimate.
+# 'contactor' is a NOUN COLLISION (2026-07-10, Powerwall 'Main DC Contactor · 51 A'
+# priced via the process-vessel budget path and flagged for missing MATERIAL): a
+# gas-liquid CONTACTOR column is strong-bespoke; an ELECTRICAL contactor (dc/ac/main/
+# motor/line/power/pack qualifier, or an A-rating) is a catalogue switching device.
 _STRONG_BESPOKE_RE = re.compile(r"reactor|distillation|fractionation|\bcolumn\b|\btower\b|"
-                                r"absorber|stripper|scrubber|contactor|crystalli|calciner|"
+                                r"absorber|stripper|scrubber|"
+                                r"(?<!dc )(?<!ac )(?<!main )(?<!motor )(?<!line )(?<!power )(?<!pack )contactor|"
+                                r"crystalli|calciner|"
                                 r"\bkiln\b|digester|ferment|bioreactor|electroly", re.I)
 _TBD_RE = re.compile(r"tbd|detailed design|specify|^$", re.I)
 
@@ -2764,6 +2770,8 @@ def _selftest() -> int:
         "rearing tank · 9.5 m dia x 4.7 m": "simple",          # head = tank... but '·' splits
         "CO2 degasser": "simple",
         "process-water transfer pump": "none",
+        "Main DC Contactor · 51 A": "none",      # ELECTRICAL contactor — never a process vessel
+        "CO2 gas-liquid contactor": "strong",    # the PROCESS contactor column stays bespoke
     }
     bad = 0
     for name, want in cases.items():
