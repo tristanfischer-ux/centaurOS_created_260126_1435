@@ -2122,7 +2122,15 @@ def _apply_distribution_voltage_model(tree: Tree, schedule: dict, state: dict):
     # _infer_system_voltage leaks a 1500 V DC-bus default onto AC process edges, which
     # must NOT be taken as the LV reference. Final fallback 415 V.
     lv_v = None
-    for s in (schedule.get("specs") or []):
+    # THE CONTRACT'S OWN AC INTERFACE VOLTAGE IS THE AUTHORITY (2026-07-10, run-44
+    # Electrical 8.2: a 230 V single-phase wall unit's board modelled at the
+    # schedule's stale 400 V + a 25 kVA incomer transformer the contract does not
+    # size — the drawing then disagreed with the schedule it feeds). Only when the
+    # contract is silent do the schedule specs / 415 V fallback apply.
+    _ac_contract = _q(state, "ac_output_voltage_v")
+    if _ac_contract and 100.0 <= float(_ac_contract) <= 1000.0:
+        lv_v = float(_ac_contract)
+    for s in ([] if lv_v is not None else (schedule.get("specs") or [])):
         if "electrical" not in (s.get("mechanism") or ""):
             continue
         mc = (s.get("material_context") or "")
@@ -2372,6 +2380,24 @@ def _build_source(state, schedule, devices, main_bus, arch):
         notes.append("MV ring-main supply stepped to 400 V LV board; process loads on "
                      "Form-4 board via MCC.")
         return source, inc_devices, inc_xfmr, notes
+
+    # LV DIRECT GRID-TIE (2026-07-10, run-44 Electrical: the SLD drew an 11/33 kV
+    # grid + a derived 25 kVA TX1 the contract does not size — a 230 V single-phase
+    # wall unit connects at the consumer unit with NO transformer). When the contract
+    # ties at LV (ac ≤ 1000 V) and sizes NO transformer_* quantity, the source IS the
+    # LV grid connection and NO TX1 is drawn — the SLD then agrees with both the
+    # contract and the schedule.
+    _sizes_xfmr = bool(_q(state, "transformer_kva") or _q(state, "main_transformer_kva")
+                       or _q(state, "transformer_rating_kva")
+                       or _q(state, "external_transformer_mass_kg"))
+    if ac_v and float(ac_v) <= 1000.0 and not _sizes_xfmr and not has_step_up:
+        _ph = "single-phase" if float(ac_v) < 300.0 else "3-phase"
+        source = Source(sym=SYM_UTILITY, tag="LV GRID CONNECTION",
+                        detail=f"{ac_v:,.0f} V {_ph} 50 Hz · G98/G99 at the consumer unit — "
+                               f"no step-up transformer (direct LV tie)",
+                        voltage=f"{ac_v:,.0f} V AC")
+        notes.append(f"Direct LV grid tie at {ac_v:,.0f} V {_ph}; no MV plant on this design.")
+        return source, inc_devices, None, notes
 
     if has_step_up or ac_v:
         # Grid-tie inverter-based plant (BESS): the SOURCE is the GRID (export/import);
