@@ -347,6 +347,20 @@ def _pv_for_name(name: str, pv_by_norm: dict | None) -> dict:
     return hits[0] if hits else {}
 
 
+# enclosure-hardware commodity family for _not_found_substatus (2026-07-10) — see the
+# in-function comment. Deliberately requires the FULL noun phrase (never bare 'door'/
+# 'lighting'): an 'Emergency Lighting Inverter' or a 'Fire Door Assembly' with a real
+# catalogue identity should still research.
+_ENCLOSURE_HARDWARE_RE = re.compile(
+    r"warning\s+sign|signage|label\s+plate|"
+    r"(?:internal|service|cabinet)\s+lighting|"
+    r"service\s+(?:outlets?|sockets?)|"
+    r"(?:grounding|earthing)\s+(?:terminals?|bars?|boss)|"
+    r"access\s+doors?(?:\s+and\s+locks?)?|door\s+locks?|hinges?|latch(?:es)?|"
+    r"(?:fireproof|thermal|acoustic)\s+insulation(?:\s+panels?)?|insulation\s+panels?|"
+    r"gland\s+plates?", re.I)
+
+
 def _not_found_substatus(name: str, basis: str, typ: str = "other",
                           pv_by_norm: dict | None = None) -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
@@ -382,6 +396,14 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
     if _BOUNDARY_STUB_RE.search(n):
         return "BOUNDARY-STUB"
     if _COMMODITY_FITTING_RE.search(n):
+        return "COMMODITY-FITTING"
+    # ENCLOSURE HARDWARE (2026-07-10, Powerwall run-29: 'Safety Warning Signage',
+    # 'Internal/Service Lighting', 'Service Outlets', 'Grounding Terminals', 'Access
+    # Doors And Locks', 'Fireproof/Thermal Insulation (Panels)' each scored as a
+    # catalogue-RESEARCH gap). These are wholesaler/ironmonger commodity hardware —
+    # specified by class + rating at detailed design, never a concept-stage MPN
+    # target. Honest substatus: COMMODITY-FITTING. Universal noun family, no class table.
+    if _ENCLOSURE_HARDWARE_RE.search(n):
         return "COMMODITY-FITTING"
     if _SCOPE_DESIGN_METADATA_RE.search(n):
         return "SCOPE-DOCUMENTED"
