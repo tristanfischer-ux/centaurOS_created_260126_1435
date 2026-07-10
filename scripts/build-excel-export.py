@@ -15918,13 +15918,32 @@ _FAB_BASIS_RE = re.compile(
     r"\bpipe £|\bduct £|\bcable £|/m @", re.I)
 
 
+# fabricated-to-the-drawing NAME families (2026-07-10, Powerwall run-38 Ledger 7.5):
+# busbar work, thermal manifolds/bays, coolant loops, vent panels, structural frames,
+# compartmentalised internals, insulation — copper/sheet-metal specified BY DRAWING,
+# never by MPN; their honest MPN column is the fabrication disclosure, not a TBD
+# penalty. MIRRORS parts_ledger.py _FABRICATED_PACK_WORK_RE (kept in sync by hand,
+# same convention as the compliance matcher pair).
+_FABRICATED_NAME_FAMILY_RX = re.compile(
+    r"busbar\s+(?:interconnects?|connectors?|assembl(?:y|ies))|"
+    r"thermal\s+management\s+(?:manifolds?|bays?|plenums?)|"
+    r"(?:liquid\s+)?coolant\s+loops?|"
+    r"deflagration\s+vent\s+panels?|"
+    r"(?:auxiliary\s+)?power\s+distribution\s+unit|"
+    r"structural\s+(?:base\s+)?frames?|compartmentali[sz]ed\s+internal|"
+    r"(?:fireproof|thermal|acoustic)\s+insulation(?:\s+panels?)?", re.I)
+
+
 def _bom_row_kind(row: dict) -> str:
     """'fabricated' (physical part sized to a geometry — material REQUIRED) or
     'assembly' (bought-out unit/package — material n/a WITH reason). Derived ONLY from
-    data the row already carries (shape fields / basis / connection), never a class table."""
+    data the row already carries (shape fields / basis / connection / fabricated name
+    family), never a class table."""
     if any((num(row.get(f)) or 0) > 0 for f in _FAB_FIELDS):
         return "fabricated"
     if _FAB_BASIS_RE.search(str(row.get("basis") or "")):
+        return "fabricated"
+    if _FABRICATED_NAME_FAMILY_RX.search(str(row.get("requirement") or "")):
         return "fabricated"
     if row.get("connection") or row.get("service"):
         return "fabricated"          # a routed line — a pipe/duct/cable take-off
@@ -16017,6 +16036,10 @@ _COMMODITY_NOUN_RX = re.compile(
     r"\b(?:gasket|o-?ring|ferrule|lug|crimp)s?\b|"
     r"\b(?:cable\s+tie|tie-?wrap|label|marker)s?\b|"
     r"\b(?:spacer|standoff|shim)s?\b|\blevell?ing\s+(?:feet|foot|pads?)\b|"
+    # enclosure hardware (2026-07-10 — mirrors parts_ledger._ENCLOSURE_HARDWARE_RE):
+    r"warning\s+sign|signage|(?:internal|service|cabinet)\s+lighting|"
+    r"service\s+(?:outlets?|sockets?)|(?:grounding|earthing)\s+terminals?|"
+    r"(?:service\s+)?access\s+doors?(?:\s+and\s+locks?)?|"
     r"\bconnectors?\b|\b(?:cabling|wiring|conduit|trunking|cable\s+tray)\b|"
     # pipe-joint CLOSURE hardware + bare pipe-stub CONNECTION POINTS (Codema v63
     # residual, 2026-07-03): a FLANGE + its GASKET are the bolted joint on a pipe
