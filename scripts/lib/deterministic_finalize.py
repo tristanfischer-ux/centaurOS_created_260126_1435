@@ -708,12 +708,22 @@ def scope_word_candidates(state):
                 flagged_upstream = bool(w.get("mis_emission_note"))
                 if not flagged_upstream and not (name and _SCOPE_WORD_RE.search(name)):
                     continue
-                if _has_real_mpn(w):
+                # The three escapes below protect a REAL part that merely matches the
+                # scope-word VOCABULARY. An upstream mis_emission_note is a stronger,
+                # physics-grounded verdict — the part does not exist on the real product
+                # at this scale — so a pinned MPN or a catalogue price cannot rescue it
+                # (the engine pinned an MPN for equipment that shouldn't exist; keeping
+                # it priced is exactly the run-18 'HVAC Chiller with a real MPN survives
+                # its own demotion' defect). Children still protect: the explode pass
+                # skips stamped words, so a flagged word owning children predates the
+                # flag and stays until its children are resolved.
+                if not flagged_upstream and _has_real_mpn(w):
                     continue                       # a genuinely-pinned real part stays
                 if _owns_subcomponents(w, sm):
                     continue                        # a real principal with children stays
                 method = _cost_basis_method(state, w.get("id"))
-                if method is not None and method not in _GENERIC_BASIS_METHODS:
+                if (not flagged_upstream and method is not None
+                        and method not in _GENERIC_BASIS_METHODS):
                     continue                        # a catalogue-priced line stays
                 out.append((m, sm, w))
     return out
@@ -1167,8 +1177,22 @@ def _selftest() -> int:
                               and any(w["id"] == "ro_skid_word"
                                       for w in st_none["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"]))
 
+    # (h) an upstream-FLAGGED word demotes EVEN with a pinned real MPN + catalogue price
+    #     (run-18 Powerwall: 'HVAC Chiller' carried a real Pfannenberg MPN and survived
+    #     its own air-cooled-scale demotion — the escapes protect vocabulary matches,
+    #     never a physics-grounded upstream verdict).
+    st_flag_mpn = _scope_state(
+        _scope_word("Hvac Chiller", "hvac_chiller_word", mfr="Pfannenberg", pn="EB-XT-500-WT",
+                    mis_note="liquid-thermal-plant at air-cooled scale: required duty 0.17 kW < 2 kW"),
+        method="catalogue")
+    n_flag_mpn = demote_scope_words(st_flag_mpn)
+    sub_fm = st_flag_mpn["moduleDecomposition"]["modules"][0]["sub_modules"][0]
+    flagged_mpn_demotes_ok = (n_flag_mpn == 1
+                               and not any(w["id"] == "hvac_chiller_word" for w in sub_fm["words"]))
+
     scope_ok = (scope_fires_ok and other_families_ok and real_part_stays_ok and owns_children_stays_ok
-                and catalogue_priced_stays_ok and mis_emission_flag_ok and no_match_untouched_ok)
+                and catalogue_priced_stays_ok and mis_emission_flag_ok and no_match_untouched_ok
+                and flagged_mpn_demotes_ok)
 
     # ── TRACE-LAYER RECONCILE proveCatch (2026-07-04, the 'Piping Network' ghost) — both
     # directions, end-to-end through reconcile_trace_artifacts (the real main() call path),
@@ -1286,6 +1310,7 @@ def _selftest() -> int:
           f"scope_fires_ok={scope_fires_ok} other_families_ok={other_families_ok} "
           f"real_part_stays_ok={real_part_stays_ok} owns_children_stays_ok={owns_children_stays_ok} "
           f"catalogue_priced_stays_ok={catalogue_priced_stays_ok} mis_emission_flag_ok={mis_emission_flag_ok} "
+          f"flagged_mpn_demotes_ok={flagged_mpn_demotes_ok} "
           f"no_match_untouched_ok={no_match_untouched_ok} "
           f"trace_ok={trace_ok} (names_ok={valid_names_exclude_demoted_ok} catch_ok={trace_catch_ok} "
           f"idem_ok={trace_idem_ok} untouched_ok={trace_untouched_ok}) "

@@ -125,6 +125,25 @@ const fanTotal = fanKids.reduce((s: number, w: any) =>
 expect(fanTotal < 500,
   `a duty-capped cabinet fan set must price at EC-fan money, never pump anatomy £3,971 (got £${Math.round(fanTotal)})`)
 
+// ── 9b. CATCH: grid-interface PLANT (step-up/MV/isolation transformer, switchgear) in a
+//     sealed sub-1 m³ enclosure whose contract sizes NO transformer demotes; a contract
+//     that DOES size one (utility BESS / wind: transformer_rating_kva) keeps every word ──
+const gridMod: any = { sub_modules: [{ words: [
+  mkWord('mv_step_up_transformer_word', 'MV Step Up Transformer', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('ac_switchgear_word', 'AC Switchgear', [{ kind: 'quantity', value: '×1' }]),
+  mkWord('hybrid_inverter_word', 'Hybrid Inverter', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(demoteLiquidThermalPlantAtAirCooledScale([gridMod], { enclosure_volume_m3: 0.13 }) >= 2,
+  'a sealed 0.13 m³ cabinet with no contract transformer must demote MV transformer + switchgear')
+expect(!gridMod.sub_modules[0].words.find((w: any) => w.id === 'hybrid_inverter_word').mis_emission_note,
+  'the hybrid inverter (real product electronics) must never be demoted')
+const gridUtil: any = { sub_modules: [{ words: [
+  mkWord('mv_step_up_transformer_word', 'MV Step Up Transformer', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(demoteLiquidThermalPlantAtAirCooledScale([gridUtil],
+  { enclosure_volume_m3: 86, transformer_rating_kva: 1250 }) === 0,
+  'a contract that sizes a transformer must keep its transformer word untouched')
+
 // ── 10. CATCH: SYSTEM-SINGLETON controller normalisation — an invented bms_master ×10
 //     (rack_count=1, no contract count says 10) collapses to ×1; near-synonym master
 //     duplicates demote to scope notes; slave boards track rack_count; a population the

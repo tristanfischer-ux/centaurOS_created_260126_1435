@@ -1669,6 +1669,16 @@ def extract_parts(state):
                     _wid = str(w.get("id") or "").strip()
                     _deslugged = re.sub(r"_word$", "", _wid).replace("_", " ").strip()
                     name = _deslugged or "part"
+                # A word an upstream sizing pass flagged as NOT-REAL-EQUIPMENT
+                # (mis_emission_note — liquid-thermal plant at air-cooled scale,
+                # grid-interface plant at direct-LV-tie scale, duplicate singleton
+                # controllers) is a scope note, never a physical part: placing it
+                # would draw plant the real product doesn't carry AND author
+                # connection-ledger edges the settled BoM can't resolve (the
+                # Powerwall run-13 'Chiller/Transformer' Connection-trace danglers).
+                if w.get("mis_emission_note"):
+                    dropped.append(name)
+                    continue
                 mods = w.get("modifier_characters", []) or []
                 form = " ".join(mc.get("value", "") for mc in mods
                                 if mc.get("kind") == "form")

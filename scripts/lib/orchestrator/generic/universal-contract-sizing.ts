@@ -2679,11 +2679,21 @@ const LIQUID_THERMAL_PLANT_RE =
 // plant. A single smoke/heat DETECTOR (point device) is not plant and stays.
 const OCCUPANCY_SAFETY_PLANT_RE =
   /gas[\s_]+detection|aspirating\s+smoke|smoke\s+detection\s+system|fire\s+suppression\s+(?:system|skid|plant)|clean\s+agent|novec|inergen/i
+// GRID-INTERFACE PLANT (2026-07-10, Powerwall run-18 connection-trace danglers): a
+// step-up/MV/isolation/auxiliary transformer or a switchgear ASSEMBLY is floor-standing
+// electrical PLANT — it cannot exist inside a sealed sub-1 m³ enclosure, and when the
+// engineering contract itself sizes NO transformer (no `transformer_*` quantity — the
+// contract's containerised-scale gate already decides this), the LLM-minted words are
+// wrong-scale leakage from a utility reference. A product whose contract DOES size a
+// transformer (wind turbine, utility BESS) keeps every one of these words untouched.
+const GRID_INTERFACE_PLANT_RE =
+  /\b(?:mv|hv|step[\s-]?up|pad[\s-]?mount(?:ed)?|isolation|auxiliary\s+power)\s+transformer|transformer\s+(?:skid|bay)|\bswitchgear\b|ring\s+main\s+unit|\brmu\b/i
 export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
   const dissipation = Number(quantities['system_thermal_dissipation_kw'] ?? 0)
   const airCooled = dissipation > 0 && dissipation * 1.2 < 2
   const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
   const noOccupancy = envM3 > 0 && envM3 < 1
+  const contractSizesTransformer = Object.keys(quantities ?? {}).some((k) => /transformer/i.test(k))
   if (!airCooled && !noOccupancy) return 0
   let demoted = 0
   for (const m of modules ?? []) {
@@ -2705,6 +2715,15 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
             `occupancy-scale safety plant in a sealed ${envM3.toFixed(2)} m³ enclosure (< 1 m³, no personnel ` +
             `access): protection is the BMS temperature chain + the pack vent path — a gas-detection/` +
             `suppression PLANT does not exist on the real product; demoted to a scope note`
+          demoted += 1
+          continue
+        }
+        if (noOccupancy && !contractSizesTransformer && GRID_INTERFACE_PLANT_RE.test(nmHead)) {
+          ;(w as { mis_emission_note?: string }).mis_emission_note =
+            `grid-interface PLANT in a sealed ${envM3.toFixed(2)} m³ enclosure whose contract sizes NO ` +
+            `transformer (no transformer_* quantity): a step-up/MV/isolation transformer or switchgear ` +
+            `assembly is floor-standing plant that does not exist on the real product — the unit grid-ties ` +
+            `directly at LV; demoted to a scope note, never a priced line`
           demoted += 1
         }
       }
