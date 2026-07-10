@@ -869,7 +869,11 @@ registerArchetype('bess', (brief: any) => {
     // Real LFP prismatic cell classes (Ah, datasheet-class mass kg) — EVE/CALB/CATL
     // catalogue ladder from small ESS to utility: masses at the ~160-185 Wh/kg band.
     const CELL_LADDER = [
-      { ah: 20, kg: 0.42 }, { ah: 25, kg: 0.50 }, { ah: 50, kg: 1.05 },
+      // 50 Ah = 0.996 kg per the EVE LF50K datasheet (996±30 g, 3.2 V LFP prismatic —
+      // the catalogue cell this class actually ships; the earlier 1.05 kg band estimate
+      // pushed an 88-cell wall unit to 134 kg vs its own 130 kg brief cap, run-32
+      // mass_closure FAIL). Datasheet-grounded, not run-fitted.
+      { ah: 20, kg: 0.42 }, { ah: 25, kg: 0.50 }, { ah: 50, kg: 0.996 },
       { ah: 100, kg: 1.95 }, { ah: 105, kg: 2.05 }, { ah: 173, kg: 3.25 },
       { ah: 230, kg: 4.10 }, { ah: 280, kg: 5.20 }, { ah: 314, kg: 5.49 },
     ]
