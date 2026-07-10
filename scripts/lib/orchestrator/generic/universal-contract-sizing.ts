@@ -4207,8 +4207,22 @@ export function standbyLoadFamilies(q?: Record<string, number>): string {
   return top.join(' + ')
 }
 
+// SELF-POWERED / SEALED-PRODUCT EXCLUSION (2026-07-10 run 56: emitting
+// connected_electrical_load_kw for the panel authority ACTIVATED the standby-genset +
+// control-UPS drivers — a £12,800 diesel genset and a £9,700 UPS appeared inside a wall
+// battery). A product that IS an energy-storage source needs no standby power (it IS the
+// standby power), and a sealed sub-1 m³ product carries no genset/UPS PLANT. Signal-keyed:
+// stored energy present, or no-occupancy enclosure.
+function standbyPowerApplies(q: Record<string, number>): boolean {
+  const stored = pickQ(q, /nameplate_capacity_kwh|usable_energy_kwh|nameplate_capacity_mwh/)
+  if (stored && stored > 0) return false
+  const envM3 = pickQ(q, /enclosure_volume_m3/)
+  if (envM3 && envM3 < 1) return false
+  return true
+}
+
 const UTILITY_SYSTEMS: UtilitySpec[] = [
-  { key: 'standby_generator', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Standby Diesel Generator', module: /power|electric|distribution/,
+  { key: 'standby_generator', driver: (q) => standbyPowerApplies(q) ? pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/) : undefined, label: 'Standby Diesel Generator', module: /power|electric|distribution/,
     size: (load) => { const crit = load * 0.7; return { dim: boxFromRatingKw(crit), rating: [String(stdGenset(crit / 0.8)), 'kVA'], gbp: Math.round(crit * 400 + 30000) } },
     // The covered-load description is DERIVED from the load families the contract actually
     // declares — never a class narrative (the old fixed "(recirculation + oxygenation +
@@ -4237,7 +4251,7 @@ const UTILITY_SYSTEMS: UtilitySpec[] = [
   // dead for the ~10-15 s genset start after a mains failure — the plant is blind exactly when
   // it must alarm. A UPS / DC bus rides the controls + life-safety instrumentation through the
   // changeover. Sized to the CONTROL load (~8 % of the connected load), 30-min autonomy.
-  { key: 'control_ups', driver: (q) => pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/), label: 'Control + Instrument UPS', module: /control|compute|scada|power|electric|distribution/,
+  { key: 'control_ups', driver: (q) => standbyPowerApplies(q) ? pickQ(q, /connected_electrical_load_kw|total_supply_demand_kw/) : undefined, label: 'Control + Instrument UPS', module: /control|compute|scada|power|electric|distribution/,
     size: (kw) => { const ctrlKw = Math.max(5, kw * 0.08); return { dim: boxFromRatingKw(ctrlKw), rating: [String(Math.round(ctrlKw)), 'kW (30 min)'], gbp: Math.round(18000 + ctrlKw * 700) } },
     form: (kw) => `On-line double-conversion UPS + battery (~30 min autonomy) sized to the ~${Math.round(kw * 0.08)} kW control + instrument + alarm load; rides the PLC, dissolved-oxygen analysers and auto-dialler through the genset start so the plant alarms even while mains is lost` },
 ]
@@ -4411,8 +4425,11 @@ const PROCESS_SYSTEMS: UtilitySpec[] = [
   // MPPT front-end is boost converters + PV connectors + string protection inside the
   // hybrid inverter, ~£45/kW at OEM volume with a £300 floor — never a plant constant.
   { key: 'pv_mppt_input', driver: (q) => pickQ(q, /pv_stc_input_kw|pv_dc_input_kw|solar_(?:dc_)?input_kw/), label: 'PV DC Input Stage (MPPT)', module: /energy_conversion|conversion|power/,
-    size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW PV STC'], gbp: Math.round(Math.max(300, kw * 45)) }),
-    basis: (kw) => `integrated PV front-end budget — £45/kW × ${Math.round(kw)} kW STC array input (boost/MPPT stages + PV connectors + string protection, integrated in the hybrid inverter; OEM volume)`,
+    // run 56 benchmark: £45/kW read as a standalone-unit price; the honest figure is the
+    // INCREMENTAL BoM of integrated MPPT channels (boost stages + PV connectors + string
+    // fusing inside the hybrid inverter) ≈ £15/kW at OEM volume, floored £200.
+    size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW PV STC'], gbp: Math.round(Math.max(200, kw * 15)) }),
+    basis: (kw) => `integrated PV front-end INCREMENTAL budget — £15/kW × ${Math.round(kw)} kW STC array input (boost/MPPT stages + PV connectors + string fusing, integrated in the hybrid inverter; OEM volume)`,
     form: (kw, q) => `${Math.max(1, Math.round(Number(pickQ(q ?? {}, /^mppt_count$/) ?? 1)))}× independent MPPT channels — solar DC input front-end of the hybrid inverter; accepts ~${Math.round(kw)} kW STC of PV array DC-side (no separate string inverter)` },
   { key: 'chemical_dosing', driver: (q) => pickQ(q, /_dose_kg_day$|dosing_kg|alkalinity_dose/), label: 'Chemical Dosing System (pH / Alkalinity)', module: /mass_fluid|process|chemical|dosing|water/,
     size: (kgd) => { const store = Math.max(2, (kgd * 7) / 1000); return { dim: cylinderFromVolumeM3(store, 'dosing tank'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(30000 + kgd * 20) } },

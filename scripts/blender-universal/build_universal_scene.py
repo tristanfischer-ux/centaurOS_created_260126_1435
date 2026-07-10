@@ -8480,6 +8480,34 @@ def augment_topology_connect_orphans(state, topology, parts):
             if _add_pwr_edge(bus, prot, 'busbar protective tap (fuse / surge / relay)'):
                 n_chain += 1
 
+    # ── POWER-CONVERSION SERIES CHAIN (2026-07-10 run 56: the connectivity audit
+    # honestly failed 5 conversion-path parts as 'electrical component with no
+    # downstream load' — an AC filter inductor feeds the breaker, DC fuses feed the
+    # contactor/busbar; the spine + taps never chained the CONVERSION path itself).
+    # Role-keyed series order, edges added only between stages that EXIST — universal
+    # (a plant with no PV skips stage 1; a DC-only product ends at the busbar).
+    _CONV_CHAIN = [
+        r"\bmppt\b|pv\s+dc\s+input|solar\s+input",
+        r"\bdc\s+fuses?\b",
+        r"\b(?:main\s+)?dc\s+contactor\b",
+        r"\bdc\s+busbar|busbar\s+assembly\b",
+        r"\bdc[\s/-]*(?:ac|dc)\s+(?:inverter|converter)|\binverter\s+module\b|\bpcs\b",
+        r"\bac\s+filter\s+inductors?\b",
+        r"\b(?:main\s+)?ac\s+breaker\b|\bac\s+switchgear\b",
+    ]
+    _conv_stages = []
+    for _rx in _CONV_CHAIN:
+        _hit = next((p.name for p in parts if re.search(_rx, str(p.name), re.I)), None)
+        if _hit and _hit not in _conv_stages:
+            _conv_stages.append(_hit)
+    _n_conv = 0
+    for _a, _b in zip(_conv_stages, _conv_stages[1:]):
+        if _add_pwr_edge(_a, _b, 'power-conversion series chain'):
+            _n_conv += 1
+    if _n_conv:
+        print(f"[univ][topo] power-conversion series chain: {_n_conv} edge(s) over "
+              f"{len(_conv_stages)} stage(s) — {' → '.join(s[:22] for s in _conv_stages)}")
+
     for p in parts:
         needed = _REQUIRED_SERVICES(p.name, p.module_id or '', getattr(p, 'function', '') or '', plant_is_wet)
         got = have.get(p.name, set())
@@ -11789,6 +11817,7 @@ SEALED_ENV_MAX_M3 = 1.0
 # set by place_sealed_enclosure in the HERO pass (INSPECT=0): the scene is a CLOSED
 # PRODUCT shot — tag callouts, wire draws + boundary-service beams are suppressed.
 _SEALED_HERO_PRODUCT = False
+_SEALED_ENV_MM = None   # (W, D, H) set by place_sealed_enclosure — the hero camera frames THIS
 _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → top
     ("energy", 0.52,
      re.compile(r"\bcell|\bbattery|\bpack\b|\bmodule|\bstring\b|\brack\b", re.I)),
@@ -11830,6 +11859,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     cabinet scale. Same return tuple as every other strategy:
     (bbox, region_centres, frame_top_mm, routed, unresolved)."""
     W, D, H = env_mm
+    global _SEALED_ENV_MM
+    _SEALED_ENV_MM = (W, D, H)
     margin = max(8.0, min(W, D, H) * 0.05)
     iw, idep, ih = W - 2 * margin, D - 2 * margin, H - 2 * margin
     base_z = DECK_Z_MM
@@ -11940,6 +11971,43 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     if skin:
         print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
 
+    # 4c. CONTAINMENT CLAMP (2026-07-10 run 56, verified by manifest + the hero image:
+    # every zone part sat at y=±80 with d=135 in a 193 mm-deep interior — ~60 mm through
+    # the front skin — and three parts at y=+200 floated fully OUTSIDE the back; the
+    # vision critic's 'floating disconnected object' was these). Whatever a placement
+    # path does, a sealed product's parts are INSIDE its skin by definition: translate
+    # every part's centre so its bbox fits the interior (a part deeper than the interior
+    # centres at 0 — the skin still encloses its extent visually).
+    n_clamped = 0
+    for zp in parts:
+        anch = getattr(zp, "anchors", None)
+        obj = getattr(zp, "obj_anchor", None)
+        if not (anch and obj is not None and isinstance(zp.dim, dict)):
+            continue
+        cx0, cy0, cz0 = zp.placed_xyz_mm
+        w0 = float(zp.dim.get("w_mm") or zp.dim.get("dia_mm") or 0)
+        d0 = float(zp.dim.get("d_mm") or zp.dim.get("dia_mm") or 0)
+        h0 = float(zp.dim.get("h_mm") or zp.dim.get("len_mm") or 0)
+        lim_x = max(0.0, (iw - w0) / 2.0)
+        lim_y = max(0.0, (idep - d0) / 2.0)
+        nx = min(max(cx0, -lim_x), lim_x)
+        ny = min(max(cy0, -lim_y), lim_y)
+        lo_z, hi_z = base_z + margin + h0 / 2.0, base_z + margin + ih - h0 / 2.0
+        nz = min(max(cz0, lo_z), max(lo_z, hi_z))
+        ddx, ddy, ddz = nx - cx0, ny - cy0, nz - cz0
+        if abs(ddx) + abs(ddy) + abs(ddz) > 0.5:
+            obj.location = (obj.location[0] + ddx * fl.MM,
+                            obj.location[1] + ddy * fl.MM,
+                            obj.location[2] + ddz * fl.MM)
+            zp.placed_xyz_mm = (nx, ny, nz)
+            for k, v in list(anch.items()):
+                if isinstance(v, (tuple, list)) and len(v) == 3:
+                    anch[k] = (v[0] + ddx, v[1] + ddy, v[2] + ddz)
+            n_clamped += 1
+    if n_clamped:
+        print(f"[univ][sealed] containment clamp: {n_clamped} part(s) translated inside the "
+              f"{iw:.0f}×{idep:.0f}×{ih:.0f} mm interior (nothing may protrude through the skin)")
+
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's
     #     hero shot is the PRODUCT — one sealed body at the brief dims — never an open
@@ -12004,8 +12072,18 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                         and _obj.data is not None:
                     _obj.data.materials.clear()
                     _obj.data.materials.append(_deep_cache[_key])
+        # MOUNTING WALL (2026-07-10, the vision critic's 'floating disconnected object'
+        # + my own look at the hero: a WALL-mounted product hanging in white space with
+        # no wall reads as floating). One large neutral vertical plane directly behind
+        # the unit — the product mounts ON something, the way it exists in the world.
+        wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.80, 0.80, 0.79)),
+                               metallic=0.0, roughness=0.9)
+        _ww, _wh = W * 6.0, H * 2.2
+        _owall = fl.add_box("u_se_mount_wall", _mm3((0.0, D / 2 + 20.0, _wh / 2)),
+                            _mm3((_ww, 8.0, _wh)), wall_mat, module=_skin_mod, module_objects=MO)
+        _owall.dimensions = _mm3((_ww, 8.0, _wh))
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
-              f"{n_vents} vent slot(s); tags + wire draws suppressed for the product shot")
+              f"{n_vents} vent slot(s) + mounting wall; tags + wire draws suppressed for the product shot")
 
     # 5. route the topology at cabinet scale (the SAME shared router, its geometry
     #    constants scaled to the enclosure so a 1 m cabinet never grows a 300 mm riser)
@@ -17834,8 +17912,22 @@ def main():
         # assembled shell + interior visible = the translucent-ghost treatment, the
         # same one every enclosed-container bespoke template used). Keyed on the
         # container SIGNAL, not a class table.
+        # HERO FRAMING (2026-07-10, my own look at run 56's hero: the product filled
+        # ~8% of frame because the camera fits compute_scene_bbox() — the whole world,
+        # floor plane included; the new mounting wall would zoom it out further). At
+        # sealed-product scale, frame the PRODUCT: a 3/4 view fitted to the enclosure
+        # bbox with ~25% margin, eye slightly above centre — the product-catalogue shot.
+        _hero_cam = None
+        if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
+            _sw, _sd, _sh = _SEALED_ENV_MM
+            _pc = (0.0, 0.0, (DECK_Z_MM + _sh / 2.0) * fl.MM)
+            _pmax = max(_sw, _sd, _sh) * fl.MM
+            _pd = _pmax * 1.9 / math.sqrt(2)
+            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.35),
+                         "target": _pc, "ortho_scale": _pmax * 1.25}
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
+                               hero_camera_override=_hero_cam,
                                hero_open_frame=not _CONTAINER_LAYOUT)
         # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
         #     subdir, so the architectural exterior + the interior layout are the IDENTICAL

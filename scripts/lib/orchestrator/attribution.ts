@@ -458,6 +458,40 @@ export function buildToolsUsedPage(
         : 'first-principles engineering calculation',
       output_field: field,
     })
+    // WORKED DERIVATION (2026-07-10 Tristan/Grok review: 'one calculation cannot score
+    // 10 when required duties are absent' — the contract carried 23 calculator
+    // derivations while the Calculations tab rendered ONE, because these synthetic
+    // tools always shipped worked:[]). Where the quantity's own lineage substitutes to
+    // CLEAN arithmetic, emit the derivation as a real worked calc — the renderer's
+    // numeric-substitution machinery then recomputes it LIVE and cross-checks the
+    // engine value. Anything that doesn't clean stays a claim only (never a fake calc).
+    try {
+      const fromKeys: string[] = Array.isArray(qa.from) ? qa.from : []
+      if (fromKeys.length && typeof qa.source_detail === 'string' && typeof qa.value === 'number') {
+        let expr = String(qa.source_detail).split(/—|;/)[0]
+        if (expr.includes('=')) expr = expr.split('=').slice(-1)[0]
+        const inputs: Array<{ symbol: string; value: number; unit: string }> = []
+        let ok = true
+        for (const fk of fromKeys) {
+          const fq: any = (contract.quantities as any)[fk]
+          const fv = fq && typeof fq.value === 'number' ? fq.value : null
+          if (fv == null) { ok = false; break }
+          inputs.push({ symbol: fk, value: fv, unit: typeof fq.unit === 'string' ? fq.unit : '' })
+          expr = expr.split(fk).join(String(fv))
+        }
+        expr = expr.replace(/\(\s*[\d.,]+\s*\)/g, '').replace(/×/g, ' x ').replace(/\s+/g, ' ').trim()
+        if (ok && expr && /^[\d\s+\-*/x().eE,]+$/.test(expr) && /[+\-*/x]/.test(expr)) {
+          ;((entry as any).worked as unknown[]).push({
+            label: field.replace(/_/g, ' '),
+            formula: `${field} = ${String(qa.source_detail).split(/—|;/)[0].trim()}`,
+            substitution: `${field} = ${expr} = ${qa.value} ${typeof qa.unit === 'string' ? qa.unit : ''}`.trim(),
+            inputs,
+            result: { value: qa.value, unit: typeof qa.unit === 'string' ? qa.unit : '' },
+            assumptions: ['contract calculator lineage — recomputed live from the stated inputs'],
+          })
+        }
+      }
+    } catch { /* a derivation that cannot clean is a claim only */ }
   }
   for (const [tid, entry] of firstPrinciplesEntries) byTool.set(tid, entry)
 
