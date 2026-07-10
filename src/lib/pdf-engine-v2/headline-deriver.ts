@@ -293,7 +293,24 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
 
   const out: Record<string, any> = {}
 
-  if (annualThroughputMwh != null) {
+  // SUB-UTILITY HEADLINE = THE PRODUCT'S OWN CAPACITY IN ITS OWN UNITS (2026-07-10,
+  // Powerwall cover: "5 MWh / year" annualised from a 13.5 kWh wall unit — technically
+  // derived, completely misrepresenting the product's scale class; the deriver also
+  // printed "0.01 MWh" usable. Below the containerised threshold (usable < 100 kWh —
+  // the shared sub-utility signal) the headline is the usable energy in kWh, the
+  // number the customer asked for; annual throughput stays available as a note.
+  // Utility-scale output (≥ 100 kWh) is byte-identical.
+  const usableKwhForHeadline = usableMwh != null ? usableMwh * 1000 : null
+  if (usableKwhForHeadline != null && usableKwhForHeadline > 0 && usableKwhForHeadline < 100) {
+    out.headline_output = metric(
+      'usable_energy_kwh',
+      'Usable energy',
+      Math.round(usableKwhForHeadline * 10) / 10,
+      'kWh',
+      `${totalCells} cells × ${cellAh ?? '?'} Ah × ${cellV ?? '?'} V = ${((namePlateMwh ?? 0) * 1000).toFixed(1)} kWh nameplate; usable ${usableKwhForHeadline.toFixed(1)} kWh. (~${Math.round(annualThroughputMwh ?? 0)} MWh/year at daily cycling.) Derived deterministically from cell-string components.`,
+      'derived_deterministic',
+    )
+  } else if (annualThroughputMwh != null) {
     out.headline_output = metric(
       'annual_throughput_mwh',
       'Annual MWh throughput',
