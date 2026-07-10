@@ -104,6 +104,14 @@ def cmd_assemble(run_dir: str, board_path: str) -> int:
     board = _load(board_path)
     defects = board["defects"]
     run = os.path.basename(os.path.normpath(run_dir))
+    # CRASHED-RUN GUARD (2026-07-10, run 48): a run that died upstream produces NO
+    # scorecard — harvesting it yields zero defects and would auto-RESOLVE the whole
+    # board (every open defect "absent from the newest run"). Absence of evidence from
+    # a crashed run is NOT evidence of absence: refuse to update the board.
+    if not os.path.exists(os.path.join(run_dir, "tab-scorecard.json")):
+        print(f"[board] {run}: CRASHED/incomplete (no tab-scorecard.json) — board NOT updated; "
+              f"defects keep their prior state")
+        return 0
     now = harvest(run_dir)
     new = reopened = resolved = 0
     for did, d in now.items():
@@ -207,7 +215,20 @@ def _selftest() -> int:
     json.dump({"not_found": []}, open(os.path.join(run3, "parts-ledger.json"), "w"))
     cmd_assemble(run3, bp)
     assert cmd_gate(bp) == 0, "gate must open when the defects are genuinely gone"
-    print("loop_board selftest: OK (gate closes on undispositioned; false-fixed REOPENS; genuine fixes auto-resolve)")
+    # a CRASHED run (no scorecard) must NOT touch the board — re-seed a defect, then
+    # assemble an empty dir and confirm nothing auto-resolves
+    run4 = os.path.join(tmp, "run-4"); os.makedirs(run4)
+    json.dump({"tabs": {"Ledger": {"status": "FAIL", "score": 5, "issues": ["x missing"]}}},
+              open(os.path.join(run4, "tab-scorecard.json"), "w"))
+    cmd_assemble(run4, bp)
+    assert cmd_gate(bp) == 1
+    run5 = os.path.join(tmp, "run-5"); os.makedirs(run5)  # crashed: no artefacts at all
+    cmd_assemble(run5, bp)
+    b2 = _load(bp)
+    live = [d for d in b2["defects"].values() if not d.get("resolved_by_run") and not d.get("disposition")]
+    assert live, "a crashed run must NOT auto-resolve open defects"
+    assert b2.get("latest_run") != "run-5", "a crashed run must not become latest_run"
+    print("loop_board selftest: OK (gate closes on undispositioned; false-fixed REOPENS; genuine fixes auto-resolve; crashed runs don't wipe the board)")
     return 0
 
 
