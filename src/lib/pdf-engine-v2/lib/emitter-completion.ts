@@ -692,6 +692,19 @@ export function isIndicatorLightMispin(slotName: string, p: { part_name?: string
 // is specified GENERICALLY at design stage (size + rating + material), NOT by a single MPN — so a
 // fill-blank name-token match must not pin an unreliable specific part on it. An ACTUATED / control /
 // solenoid / dosing / metering valve is EXCLUDED (it legitimately carries a real MPN). UNIVERSAL.
+/** Battery pack STRUCTURE (modules / module racks / pack frames / cell stacks) in a design
+ *  that pins its OWN cells is OEM-FABRICATED — assembled from the pinned cells + frames,
+ *  never bought as somebody else's module. A DB name-token fill mis-pins it catastrophically
+ *  (run 51: 'Battery Modules' -> TI BQ28400PW, a GBP5 gas-gauge IC whose catalogue category
+ *  says 'module'; 'Battery Module Racks' -> Sungrow ST2752UX, a 2.75 MWh utility container on
+ *  a 14 kWh wall unit — the scale check cannot fire because the structure word carries no kW).
+ *  Guard fires ONLY when a sibling cell word in the same MODULE carries a real (non-TBD) pin
+ *  — a design that BUYS its modules has no pinned bare-cell word and fills normally. */
+export function isBatteryPackStructure(name: string): boolean {
+  return /\bbattery\s+modules?\b|\b(?:battery\s+)?module\s+racks?\b|\bpack\s+frames?\b|\bcell\s+stacks?\b/i
+    .test(String(name ?? ''))
+}
+
 export function isCommodityProcessValve(name: string): boolean {
   const n = (name || '').toLowerCase()
   if (!/\bvalves?\b|\bnon.?return\b/.test(n)) return false
@@ -2187,6 +2200,20 @@ export async function fillBlankWordMpns(
       // exists — tether it to a real principal-equipment sibling in this
       // sub_module, or suppress the line entirely (see the block above
       // isCommodityProcessValve for the full rationale).
+      if (isBatteryPackStructure(cand.name)) {
+        const cellPinned = (cand.module?.sub_modules ?? []).some((s: any) => (s.words ?? []).some((w2: any) => {
+          const nm2 = String(w2.name_human ?? w2.content_character?.name_human ?? '')
+          if (!/\bcells?\b/i.test(nm2) || isBatteryPackStructure(nm2)) return false
+          const pn = (w2.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
+          return pn && !/^\s*TBD\b/i.test(String(pn.value ?? ''))
+        }))
+        if (cellPinned) {
+          log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): battery pack ` +
+            `structure — OEM-fabricated from the design's own pinned cells (module frames + retention ` +
+            `+ interconnect work), never a bought-out third-party module`)
+          continue
+        }
+      }
       if (isCommodityProcessValve(cand.name)) {
         const tether = tetherOrSuppressAccessoryValve(cand.word, cand.sub)
         if (tether.verdict === 'suppress') {

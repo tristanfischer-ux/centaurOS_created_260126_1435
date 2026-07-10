@@ -2693,7 +2693,13 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
   const airCooled = dissipation > 0 && dissipation * 1.2 < 2
   const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
   const noOccupancy = envM3 > 0 && envM3 < 1
-  const contractSizesTransformer = Object.keys(quantities ?? {}).some((k) => /transformer/i.test(k))
+  // run 51: the 230 V direct-tie contract emits transformer_rating_kva = null ("this
+  // product HAS no transformer") — key PRESENCE alone read that null as "the contract
+  // sizes a transformer" and blocked the grid-interface demotion, so a £3,000
+  // 'Auxiliary Power Transformer' survived inside a 0.14 m³ wall unit. A contract
+  // sizes a transformer only when a transformer_* quantity carries a POSITIVE value.
+  const contractSizesTransformer = Object.entries(quantities ?? {})
+    .some(([k, v]) => /transformer/i.test(k) && Number(v) > 0)
   if (!airCooled && !noOccupancy) return 0
   let demoted = 0
   for (const m of modules ?? []) {
@@ -4380,6 +4386,17 @@ function scadaLoopList(q: Record<string, number>): string {
   return loops.length ? `every measured loop (${loops.join(' / ')})` : 'every measured process loop'
 }
 const PROCESS_SYSTEMS: UtilitySpec[] = [
+  // PV DC INPUT STAGE (2026-07-10, Powerwall run 51 benchmark fault 'no MPPT hardware
+  // present anywhere in bill' — the brief demands on-board solar DC inputs and the
+  // contract carries mppt_count + pv_stc_input_kw, but no emitter consumed them).
+  // Universal: any class whose contract declares a PV STC input synthesises its solar
+  // DC front-end; channel count from mppt_count. Device-scale-honest £: an integrated
+  // MPPT front-end is boost converters + PV connectors + string protection inside the
+  // hybrid inverter, ~£45/kW at OEM volume with a £300 floor — never a plant constant.
+  { key: 'pv_mppt_input', driver: (q) => pickQ(q, /pv_stc_input_kw|pv_dc_input_kw|solar_(?:dc_)?input_kw/), label: 'PV DC Input Stage (MPPT)', module: /energy_conversion|conversion|power/,
+    size: (kw) => ({ dim: '', rating: [String(Math.round(kw)), 'kW PV STC'], gbp: Math.round(Math.max(300, kw * 45)) }),
+    basis: (kw) => `integrated PV front-end budget — £45/kW × ${Math.round(kw)} kW STC array input (boost/MPPT stages + PV connectors + string protection, integrated in the hybrid inverter; OEM volume)`,
+    form: (kw, q) => `${Math.max(1, Math.round(Number(pickQ(q ?? {}, /^mppt_count$/) ?? 1)))}× independent MPPT channels — solar DC input front-end of the hybrid inverter; accepts ~${Math.round(kw)} kW STC of PV array DC-side (no separate string inverter)` },
   { key: 'chemical_dosing', driver: (q) => pickQ(q, /_dose_kg_day$|dosing_kg|alkalinity_dose/), label: 'Chemical Dosing System (pH / Alkalinity)', module: /mass_fluid|process|chemical|dosing|water/,
     size: (kgd) => { const store = Math.max(2, (kgd * 7) / 1000); return { dim: cylinderFromVolumeM3(store, 'dosing tank'), rating: [String(Math.round(kgd)), 'kg/day'], gbp: Math.round(30000 + kgd * 20) } },
     form: (kgd, q) => `Bulk + day storage (~${Math.round((kgd * 7) / 1000)} m³, 7-day) + duty/standby dosing pumps + in-line mixer; doses ~${Math.round(kgd)} kg/day to ${q && hasNitrificationSignal(q) ? 'hold pH / alkalinity against nitrification' : 'hold process pH / chemistry to the declared dose-rate set-point'}` },

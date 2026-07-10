@@ -15933,6 +15933,14 @@ _FABRICATED_NAME_FAMILY_RX = re.compile(
     r"structural\s+(?:base\s+)?frames?|compartmentali[sz]ed\s+internal|"
     r"(?:fireproof|thermal|acoustic)\s+insulation(?:\s+panels?)?", re.I)
 
+# battery pack STRUCTURE — fabricated ONLY while unpinned (a TBD module/rack is the OEM's
+# own cell-to-pack assembly work; a row with a REAL module MPN was genuinely bought and
+# stays an assembly). 2026-07-10 run 51: TI BQ28400PW (a £5 gauge IC) + Sungrow ST2752UX
+# (a 2.75 MWh utility container) were mis-pinned onto these words — the honest state is
+# fabricated pack work, tallied unpenalised like the busbar/manifold families.
+_FABRICATED_PACK_STRUCTURE_RX = re.compile(
+    r"battery\s+modules?\b|(?:battery\s+)?module\s+racks?\b|pack\s+frames?\b|cell\s+stacks?\b", re.I)
+
 
 def _bom_row_kind(row: dict) -> str:
     """'fabricated' (physical part sized to a geometry — material REQUIRED) or
@@ -15944,6 +15952,9 @@ def _bom_row_kind(row: dict) -> str:
     if _FAB_BASIS_RE.search(str(row.get("basis") or "")):
         return "fabricated"
     if _FABRICATED_NAME_FAMILY_RX.search(str(row.get("requirement") or "")):
+        return "fabricated"
+    if _FABRICATED_PACK_STRUCTURE_RX.search(str(row.get("requirement") or "")) \
+            and str(row.get("part") or "").strip().lower() in _MPN_PLACEHOLDER | {"tbd (detailed design)"}:
         return "fabricated"
     if row.get("connection") or row.get("service"):
         return "fabricated"          # a routed line — a pipe/duct/cable take-off

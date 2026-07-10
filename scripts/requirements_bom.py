@@ -1104,6 +1104,14 @@ def _price_floor_for(name: str, md=None):
                 except ValueError:
                     amps = None
                 break
+        # run 51: rating_primary is often a BARE number ('39.2') with the unit in the
+        # SEPARATE rating_primary_unit field ('A continuous') — the inline regex above
+        # never sees it. Same unit-honouring discipline as _rating_kw.
+        if amps is None and re.match(r"^\s*A\b", str(md.get("rating_primary_unit") or ""), re.I):
+            try:
+                amps = float(str(md.get("rating_primary")).strip())
+            except (TypeError, ValueError):
+                amps = None
     for rx, floor in _MIN_PRICE_FLOORS:
         if rx.search(nm):
             if floor == 120.0 and amps is not None and amps < 100.0 and \
@@ -6187,6 +6195,10 @@ _FAB_FAMILY_MATERIALS = [
     (re.compile(r"structural\s+(?:base\s+)?frame|compartmentali[sz]ed\s+internal", re.I),
      "painted structural carbon steel (S275)"),
     (re.compile(r"power\s+distribution\s+unit", re.I), "powder-coated steel enclosure + copper distribution"),
+    # battery pack STRUCTURE (2026-07-10 run 51): OEM-fabricated from the design's own
+    # pinned cells — module frames + retention + interconnect work, never a bought module.
+    (re.compile(r"battery\s+modules?\b|(?:battery\s+)?module\s+racks?\b|pack\s+frames?\b|cell\s+stacks?\b", re.I),
+     "aluminium module frames + retention hardware (cell-to-pack assembly to drawing)"),
 ]
 
 

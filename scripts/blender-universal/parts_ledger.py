@@ -352,6 +352,7 @@ def _pv_for_name(name: str, pv_by_norm: dict | None) -> dict:
 # 'lighting'): an 'Emergency Lighting Inverter' or a 'Fire Door Assembly' with a real
 # catalogue identity should still research.
 _FABRICATED_PACK_WORK_RE = re.compile(
+    r"battery\s+modules?\b|(?:battery\s+)?module\s+racks?\b|pack\s+frames?\b|cell\s+stacks?\b|"
     r"busbar\s+(?:interconnects?|assembl(?:y|ies))|"
     r"thermal\s+management\s+(?:manifolds?|bays?|plenums?)|"
     r"(?:liquid\s+)?coolant\s+loops?|"
