@@ -26,5 +26,8 @@ python3 scripts/lib/loop_board.py gate --board "$BOARD" || {
 npx tsx --no-cache scripts/serial-design-chain-v2.tsx "$BRIEF" "$OUT" > "out-$(basename "$OUT").log" 2>&1
 EXIT=$?
 echo "== $LABEL run exit: $EXIT $(date +%H:%M:%S) — $OUT =="
+# OUTSIDE REVIEWER — a different model family reads the DELIVERED artefacts with fresh
+# eyes before the board assembles, so its findings need dispositions like everything else.
+python3 scripts/lib/ship_red_team.py "$OUT" || true
 python3 scripts/lib/loop_board.py assemble "$OUT" --board "$BOARD"
 exit $EXIT

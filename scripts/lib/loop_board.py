@@ -112,6 +112,14 @@ def harvest(run_dir: str) -> dict:
         for line in open(p):
             if line.lstrip().startswith("- `"):
                 add("benchmark:fault", line.strip()[:220])
+    # OUTSIDE REVIEWER (2026-07-10, the false-ship lesson): the ship red-team's findings
+    # enter the board like every other defect — a fresh-eyes hypothesis can never be
+    # silently ignored; it gets fixed or classified with state evidence.
+    p = os.path.join(run_dir, "red-team-punchlist.md")
+    if os.path.exists(p):
+        for line in open(p):
+            if line.lstrip().startswith("- `"):
+                add("redteam:finding", line.strip()[:220])
     return out
 
 
