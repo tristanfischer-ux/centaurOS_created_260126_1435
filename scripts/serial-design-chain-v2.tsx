@@ -9672,6 +9672,22 @@ async function main() {
     if (pvPruned > 0) {
       console.error(`[chain] ghost-snapshot prune: removed ${pvPruned}/${pvBefore} partVerifications entr${pvPruned === 1 ? 'y' : 'ies'} for word(s) no longer in the final tree`)
     }
+    // FINAL-SETTLE FILL (2026-07-10, runs 43-45: 'Main DC Contactor'/'DC Fuses'/
+    // 'Ethernet Switch' + 9 siblings stayed TBD forever — those words are RE-CREATED
+    // by the reconcile AFTER both fill passes ran, so no fill ever visited them while
+    // their sub-module siblings pinned). One more DB-ONLY fill on the FINAL settled
+    // tree — skipGenerate (no LLM, no writeback churn), the same gate-20-safe path —
+    // so a word that exists at ship time was OFFERED the library exactly once.
+    try {
+      const { fillBlankWordMpns: lateFill3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
+      const f3 = await lateFill3(finalState.moduleDecomposition?.modules ?? [],
+                                 String(finalState.orchestratorContract?.product_class ?? 'unknown'),
+                                 { skipGenerate: true })
+      if (f3.filled.length > 0)
+        console.error(`[chain] final-settle fill: pinned ${f3.filled.length} re-created word(s) from the library (DB-only)`)
+    } catch (f3e) {
+      console.error(`[chain] final-settle fill skipped (non-fatal): ${(f3e as Error).message.slice(0, 120)}`)
+    }
     // Re-derive UNCONDITIONALLY, not only when a partVerifications ghost was pruned — a word
     // can be folded/removed by dossier_repair/reconcile_hollow/deterministic_finalize without
     // ever having carried a partVerifications entry (e.g. a structural word never LLM-verified),
