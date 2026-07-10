@@ -1433,12 +1433,14 @@ export function dbFirstLookup(
 // candidate whose name/model declares one >5× larger — or carries an MV/kV class
 // token against a sub-100 kW word — is the wrong-scale product line. Words with no
 // self-declared rating are unchanged (no fabricated inference).
-const _WORD_KW_RE = /(\d+(?:\.\d+)?)\s*(mw|mva|kw|kva)\b/i
+const _WORD_KW_RE = /(\d+(?:\.\d+)?)\s*(mw|mva|kw|kva|w|va)\b/i
 function _declaredKw(text: string): number | null {
   const m = _WORD_KW_RE.exec(text || '')
   if (!m) return null
   const v = parseFloat(m[1])
-  return /^m/i.test(m[2]) ? v * 1000 : v
+  if (/^m/i.test(m[2])) return v * 1000
+  if (/^(w|va)$/i.test(m[2])) return v / 1000  // bare watts ('960W' PSU) — run 54
+  return v
 }
 export function dbHitScaleAcceptable(dbHit: DbPart, wordName: string): boolean {
   const wordKw = _declaredKw(wordName)
@@ -1446,6 +1448,11 @@ export function dbHitScaleAcceptable(dbHit: DbPart, wordName: string): boolean {
   const blob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''}`
   const hitKw = _declaredKw(blob)
   if (hitKw != null && hitKw > wordKw * 5) return false
+  // UNDERSIZED (2026-07-10 run 54): the check only refused candidates too LARGE — an
+  // 11.04 kW 'DC DC Converters' word pinned a 960 W RECOM PSU (£280 'catalogue' on an
+  // 11 kW duty). A candidate whose own declared rating is under HALF the word's duty is
+  // the wrong product line — same 0.5 factor as the flow-capacity duty refusal.
+  if (hitKw != null && hitKw < wordKw * 0.5) return false
   if (wordKw < 100 && /-mv\b|\bmv\b|medium[\s-]?voltage|\b(?:11|33)\s*kv\b/i.test(blob)) return false
   return true
 }

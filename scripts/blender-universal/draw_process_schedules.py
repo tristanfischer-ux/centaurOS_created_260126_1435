@@ -1179,7 +1179,7 @@ _INSTR_KINDS = [
     (re.compile(r"\borp\b|redox", re.I),
      "AT", "Redox (ORP)", "Pt ORP electrode"),
     (re.compile(r"analy[sz]er|ndir|gas_analys|co2_analys|composition|chromatograph|"
-                r"\bgas_sensor\b", re.I),
+                r"\bgas_sensors?\b", re.I),
      "AT", "Composition", "NDIR analyser"),
     (re.compile(r"instr_level|level_transmitter|level[_\s]?transmitter|radar_level|"
                 r"level_sensor|level_gauge|displacer_level|\bradar\b", re.I),
@@ -1193,9 +1193,29 @@ _INSTR_KINDS = [
                 r"\bpressure_transducer\b", re.I),
      "PT", "Pressure", "Coplanar gauge / DP"),
     (re.compile(r"instr_temperature|temperature_transmitter|temperature[_\s]?transmitter|"
-                r"temp_transmitter|temp_probe|thermowell|thermocouple|itherm|\brtd\b|pt100|"
-                r"temperature_sensor|temperature_profile", re.I),
+                r"temp_transmitter|temp_probe|temperature_probes?|thermowell|thermocouple|itherm|\brtd\b|pt100|"
+                r"temperature_sensor|temperature_thermistor|\bthermistor\b|temperature_profile", re.I),
      "TT", "Temperature", "Pt100 + thermowell"),
+    # ELECTRICAL MEASUREMENTS (2026-07-10 run 54, ISA-5.1 first letters E=voltage, I=current,
+    # M=moisture): the ledger types current/voltage/humidity sensing as INSTRUMENTS expecting a
+    # schedule row, and a real integrated-product instrument index DOES list them (a Hall
+    # current transducer on a 4-20 mA loop to the BMS is instrumentation, not switchgear).
+    # The old stance ("current_transducer belongs on the single-line only") left the index
+    # 1/9-covered on a sealed electronics product whose sensing is mostly electrical.
+    (re.compile(r"current_(?:sensor|transducer|shunt)|current[_\s]shunt|hall[_\s-]?effect", re.I),
+     "IT", "Current", "Hall-effect / shunt"),
+    (re.compile(r"voltage_(?:sensor|transducer|monitor(?:ing)?)|voltage[_\s]monitoring", re.I),
+     "ET", "Voltage", "Resistive divider / Hall"),
+    (re.compile(r"humidity_(?:sensor|probe)|\bhygrometer\b|\brh_sensor\b|relative_humidity", re.I),
+     "MT", "Humidity", "Capacitive RH"),
+    (re.compile(r"smoke_detect|smoke_sensor", re.I),
+     "AT", "Smoke", "Photoelectric"),
+    (re.compile(r"hydrogen_detect|h2_detect|hydrogen_sensor", re.I),
+     "AT", "Hydrogen (off-gas)", "Catalytic / MOS"),
+    (re.compile(r"insulation_monitor|\bimd\b", re.I),
+     "ET", "Insulation resistance", "IMD (IEC 61557-8)"),
+    (re.compile(r"cell_monitoring|bms_slave|cell_voltage_monitor", re.I),
+     "ET", "Cell voltage / temperature", "BMS AFE (multiplexed)"),
 ]
 _INSTR_NOISE = re.compile(
     r"catalyst|barrier|sil_barrier|launder|label|relief_valve|control_valve|"
