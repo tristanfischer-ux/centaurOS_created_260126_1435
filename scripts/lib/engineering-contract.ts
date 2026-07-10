@@ -1349,6 +1349,14 @@ registerArchetype('bess', (brief: any) => {
     // — fell back to the 86 m³ (40-ft) default, over-sizing the agent mass + price
     // ~2.3×. Now scales with the brief box (20-ft ≈ 38 m³, 40-ft ≈ 86 m³).
     enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'brief', { source_detail: `gross internal volume from brief max_dimensions_mm (L×W×H × ${HC_GROSS_FACTOR} HC-gross factor); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class (default 86 m³ only when the brief is silent on envelope)` }),
+    // ENCLOSURE INGRESS RATING (2026-07-10, Powerwall Exec-Summary HIGH: brief metric
+    // 'enclosure_ip_rating' 55 UNVERIFIED — no contract quantity fulfils it, so the
+    // compliance matrix could not confirm the design meets its own brief). This is the
+    // DELIVERED rating of the enclosure the design actually specifies (the outdoor
+    // cabinet macro is a sealed gasketed IP55 enclosure; a containerised BESS ships
+    // IP55-rated container penetrations per IEC 60529 outdoor practice) — a delivered
+    // quantity, never an echo of the brief number.
+    enclosure_ip_rating: q(55, 'IP', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'ingress protection of the specified enclosure: sealed gasketed outdoor enclosure to IP55 (IEC 60529) — dust-protected + water-jet resistant; the standard outdoor ESS/switchgear enclosure class', condition: 'enclosure skin with gasketed covers + glanded penetrations, as specified' }),
     // BESS L26 (2026-05-25, gate-17 HIGH #4): ac_output_voltage_v — UK
     // grid-tie BESS universally uses 400 V / 50 Hz LV AC output via the PCS;
     // brief target_performance has key 'ac_output_voltage_v' → 400 V. METRIC_MAP
