@@ -17,7 +17,7 @@
  *   npx tsx scripts/serial-design-chain-v2.tsx <brief.md> <out-dir>
  */
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, statSync, openSync } from 'fs'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
 import { homedir } from 'os'
 import { execFileSync, spawn } from 'child_process'
 import { withOpenRouterSlot } from '../src/lib/pdf-engine-v2/lib/openrouter-semaphore'
@@ -7665,6 +7665,14 @@ async function main() {
       execFileSync('npx', ['tsx', resolve(__dirname, 'estimate-missing-prices.tsx'), statePath, '--write'], {
         stdio: 'inherit',
         cwd: resolve(__dirname, '..'),
+        // PIN THE CHILD TO THE CHAIN'S OWN NODE (2026-07-10, Powerwall run 14): a bare
+        // `npx` resolution drifted to the system Node 25 whose ABI (MODULE_VERSION 141)
+        // rejects the better-sqlite3 binary compiled for the chain's Node 22 (127) —
+        // Engine B died "fatal: better_sqlite3.node", 59 parts went unpriced, the BoM
+        // reduced to £0 and the whole cost stack (and the Financial tab) vanished.
+        // Prefixing PATH with the running node's own bin dir makes the child's `node`
+        // ALWAYS the chain's node, whatever the shell default is.
+        env: { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}` },
       })
       logAction({ step: 'engine_b_estimate_prices', latency_ms: Date.now() - tEngineB, ok: true })
     } catch (err) {
