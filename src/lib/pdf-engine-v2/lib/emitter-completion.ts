@@ -2212,13 +2212,25 @@ export async function fillBlankWordMpns(
       // exists — tether it to a real principal-equipment sibling in this
       // sub_module, or suppress the line entirely (see the block above
       // isCommodityProcessValve for the full rationale).
+      // DUPLICATE CELL POPULATION (2026-07-10 run 56 live catch: a blank 'Blade Battery
+      // Cells' word walked the DB and pinned a TI protection IC while the design's real
+      // cells sat emitter-pinned two words away). A blank battery-CELL word in a design
+      // whose cells are ALREADY pinned is a duplicate representative by construction —
+      // the fill must fold to the pinned principal, never shop for a second cell.
+      const _pinnedCellSibling = (cand.module?.sub_modules ?? []).some((s: any) => (s.words ?? []).some((w2: any) => {
+        const nm2 = String(w2.name_human ?? w2.content_character?.name_human ?? '')
+        if (w2 === cand.word || !/\bcells?\b/i.test(nm2) || isBatteryPackStructure(nm2)) return false
+        const pn = (w2.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
+        return pn && !/^\s*TBD\b/i.test(String(pn.value ?? ''))
+      }))
+      if (/\b(?:battery|lfp|prismatic|blade|pouch|cylindrical)\b[\w\s·-]*\bcells?\b/i.test(cand.name) && _pinnedCellSibling) {
+        log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): duplicate cell ` +
+          `population — the design's cells are already emitter-pinned; this word represents the same ` +
+          `cells, never a second purchasable line`)
+        continue
+      }
       if (isBatteryPackStructure(cand.name)) {
-        const cellPinned = (cand.module?.sub_modules ?? []).some((s: any) => (s.words ?? []).some((w2: any) => {
-          const nm2 = String(w2.name_human ?? w2.content_character?.name_human ?? '')
-          if (!/\bcells?\b/i.test(nm2) || isBatteryPackStructure(nm2)) return false
-          const pn = (w2.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
-          return pn && !/^\s*TBD\b/i.test(String(pn.value ?? ''))
-        }))
+        const cellPinned = _pinnedCellSibling
         if (cellPinned) {
           log(`[fill-blank-mpn]   ⊘ skip ${cand.moduleId}::${cand.subId} (${cand.name}): battery pack ` +
             `structure — OEM-fabricated from the design's own pinned cells (module frames + retention ` +
