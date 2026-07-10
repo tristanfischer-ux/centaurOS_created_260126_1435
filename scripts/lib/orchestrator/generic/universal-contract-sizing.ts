@@ -2765,6 +2765,9 @@ const SINGLETON_CONTROLLER_ROLES: ReadonlyArray<{ role: string; re: RegExp }> = 
   // run-23: 'Local HMI Display' + 'Local HMI Touchscreen' = £1.8k of screens; a
   // product carries ONE operator display (if any).
   { role: 'local-hmi', re: /\bhmi\b|touch\s?screen|operator\s+(?:display|panel|interface)/i },
+  // run-25: 'Insulation Monitoring Device' ×5 (£1.4k) — an IMD monitors THE dc system;
+  // one per system at every scale (IEC 61557-8), like every supervisory role here.
+  { role: 'insulation-monitor', re: /insulation\s+monitor|\bimd\b|(?:ground|earth)\s+fault\s+monitor/i },
 ]
 const SLAVE_CONTROLLER_RE =
   /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bslave\b|\bslave\b[\w\s]*\b(?:bms|battery\s+management|controller)\b/i
@@ -5574,6 +5577,15 @@ function _populationRoleKey(name: string): string {
       && /\bvalve\b/.test(sing)
       && !/\b(manual|ball|check|sample|relief|butterfly|gate|needle)\b/.test(sing)) {
     return 'actuated_on_off_valve'
+  }
+  // BATTERY-CELL population family (2026-07-10, run-25: 'LFP Prismatic Cells' ×88 AND
+  // 'Blade Battery Cells' ×88 — the SAME 88-cell pack under two chemistry labels,
+  // priced twice). One design has ONE cell population; fold by family + count, exactly
+  // like the actuated-valve synonym family. Fuel/load/solar cells never match.
+  if (/\b(lfp|nmc|nca|lto|lithium|prismatic|pouch|cylindrical|blade|battery)\b/.test(sing)
+      && /\bcell\b/.test(sing)
+      && !/\b(fuel|load|solar|photovoltaic|pv)\b/.test(sing)) {
+    return 'battery_cell_population'
   }
   return sing
 }

@@ -9692,6 +9692,18 @@ async function main() {
         if (stLate.cost_reality && typeof stLate.cost_reality === 'object')
           stLate.cost_reality.bom_total_gbp = Math.round(reqTotalLate)
         try { stLate.costSanity = computeCostSanity(stLate) } catch { /* shadow — never fatal */ }
+        // RE-DIFF THE BENCHMARK NET on the settled stack (run-25: the net judged a
+        // mid-loop £160,815 transfer that later iterations settled to £33k — its RADICAL
+        // verdict + the Sense-check 0 were honest for THEIR iteration but stale for the
+        // final dossier). The LLM top-down EXPECTATION is iteration-independent, so this
+        // is the PURE comparison only — no LLM re-call.
+        try {
+          if (stLate.benchmarkExpectation) {
+            const { compareToBenchmark } = await import('./lib/benchmark-expectation')
+            stLate.benchmarkDivergence = compareToBenchmark(stLate.benchmarkExpectation, stLate)
+            console.error(`[chain] ghost-snapshot re-derive: benchmark net re-diffed on the settled stack — verdict ${stLate.benchmarkDivergence?.worst ?? '?'}`)
+          }
+        } catch { /* shadow — never fatal */ }
         console.error(`[chain] ghost-snapshot re-derive: cost cascade RE-reconciled to the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (stack raw materials was £${Math.round(rawPrev).toLocaleString('en-GB')} from an earlier loop iteration)`)
       }
     }
