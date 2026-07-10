@@ -719,8 +719,12 @@ CELL_GBP_PER_KWH = 57.0   # DB-grounded: median real 280 Ah LFP cell ≈ £52 / 
 _FORGE_TRUTH_DB = os.environ.get("FORGE_TRUTH_DB_PATH_OVERRIDE") or os.path.expanduser("~/.forge-truth/forge-truth.db")
 _CELL_DB_CACHE: dict = {}
 _BATTERY_CELL_RE = re.compile(
-    r"\b(?:lfp|nmc|nca|lto|li[\s_-]?ion|lithium|sodium[\s_-]?ion|prismatic|pouch|cylindrical)\b"
-    r"[\w\s_-]*\bcell\b|\bbattery\b[\w\s_-]*\bcell\b", re.I)
+    # `cells?` — the run-24 miss: every real BoM line is PLURAL ('LFP Prismatic
+    # Cells'), and \bcell\b never matches 'Cells', so neither the energy-grounded
+    # price nor the corpus-lift exemption fired on the exact dominant line they
+    # were built for.
+    r"\b(?:lfp|nmc|nca|lto|li[\s_-]?ion|lithium|sodium[\s_-]?ion|prismatic|pouch|cylindrical|blade)\b"
+    r"[\w\s_-]*\bcells?\b|\bbattery\b[\w\s_-]*\bcells?\b", re.I)
 _NON_BATTERY_CELL_RE = re.compile(r"fuel[\s_-]?cell|load[\s_-]?cell|solar[\s_-]?cell|photovoltaic|pv[\s_-]?cell", re.I)
 
 def _cell_chemistry(nm: str) -> str:
