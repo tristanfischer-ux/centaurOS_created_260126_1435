@@ -17530,7 +17530,11 @@ def main():
     # Runs through _draw_run, so each wired run is sized + scheduled + audited like any
     # routed run (audit_routes / reconcile_route_specs / write_connection_schedule below
     # therefore include the wired runs). Requires Stage-2 ports.
-    _PORT_WIRING_FAMILIES = ("process_plant", "generic_assembly")
+    # sealed_enclosure joined 2026-07-10 (run-20 Electrical 0.9: its placer routes
+    # through the SAME deferring route_topology path as generic_assembly, so without
+    # port wiring 34/35 ledger edges were never drawn or sized — the panel schedule's
+    # 'routed cable length missing' rows and a 1-row connection schedule).
+    _PORT_WIRING_FAMILIES = ("process_plant", "generic_assembly", "sealed_enclosure")
     _wire_flag = _wire_ports_on(LINEAR_LAYOUT_ON)
     _explicit = os.environ.get("BLENDER_WIRE_PORTS", "").strip().lower() in (
         "1", "true", "yes", "on")
