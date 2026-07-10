@@ -633,7 +633,14 @@ function formatRatingKw(kw: number): string {
 function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   const add: ModifierCharacter[] = []
   if (g.volume !== undefined) {
-    add.push(mod('dimension', cylinderFromVolumeM3(g.volume, g.phrase)))
+    // An ENCLOSURE-family noun (cabinet / housing / casing / chassis) is a rectangular
+    // skin, never a process vessel — the cylinder default here put '0.6 m dia x 1.0 m'
+    // on a wall-mount enclosure whose GA renders the true flat envelope (run 52
+    // corroborated physics HIGH: cylinder dims contradict the 1105×609×193 mm product).
+    // The honest stamp is the capacity alone; the envelope's authority is the GA drawing.
+    if (!/enclosur|cabinet|housing|casing|chassis/i.test(g.phrase ?? '')) {
+      add.push(mod('dimension', cylinderFromVolumeM3(g.volume, g.phrase)))
+    }
     add.push(mod('capacity', formatCapacityM3(g.volume), 'm³'))
   } else if (g.area !== undefined) {
     add.push(mod('dimension', `${Math.round(g.area)} m² area`))
@@ -653,7 +660,12 @@ function dimAndRatingFor(g: EquipGroup): ModifierCharacter[] {
   else if (g.throughput !== undefined) add.push(mod('rating_primary', `${Math.round(g.throughput)}`, 'm³/h'))
   else if (g.duty !== undefined) add.push(mod('rating_primary', `${Math.round(g.duty)}`, 'kW'))
   else if (g.rate !== undefined) add.push(mod('rating_primary', `${Math.round(g.rate)}`, g.rateUnit || 'kg/h'))
-  else if (g.current !== undefined) add.push(mod('rating_primary', `${Math.round(g.current)}`, 'A'))
+  // A `*_current_a` contract key is a LOAD (bus/string/ac continuous current), never a
+  // device rating — a conductor/busbar RATED at exactly its continuous load has zero
+  // margin (run 52 corroborated physics HIGH: busbar 39.2 A on a 39.2 A bus). Stamp the
+  // RATING sized from the load at the same 1.25 factor the contract itself uses
+  // (`busContinuousA * 1.25 // 25% margin per UL 9540A`) and gate 6 audits against.
+  else if (g.current !== undefined) add.push(mod('rating_primary', `${Math.ceil(g.current * 1.25)}`, 'A'))
   // Per-unit FLOW as a secondary rating on a counted flow-machine (the recirc pump's 1,670 m³/h
   // beside its 97 kW) — so the machine itself states its duty, not only the inlet valve.
   if (g.perUnitFlow !== undefined && g.throughput === undefined) {

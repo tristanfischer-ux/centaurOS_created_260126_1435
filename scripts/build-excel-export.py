@@ -10830,7 +10830,14 @@ def _storage_revenue_and_dcf(state: dict) -> Optional[Dict[str, Any]]:
                   "total_connected_load_kw", "connected_load_kw")
     energy = conn_kw * float(d["hours"]) * float(d["load_factor"]) * float(d["energy_price"])
     maint = capex * float(d["maint_pct"]) / 100.0
-    opex = energy + maint + float(d["labour"]) + float(d["other_opex"])
+    # FIXED O&M SCALES WITH THE ASSET (2026-07-10 run 52 guard-laundering: the flat
+    # labour GBP300k + other GBP120k _ECON_DEFAULTS are PLANT-scale constants — on an
+    # 11 kW home unit they printed EBITDA GBP-420,120/yr against GBP819/yr revenue).
+    # Storage fixed O&M is quoted per kW: GB/NREL grid-scale BESS ~GBP5-10/kW/yr — the
+    # SAME GBP6/kW rule gives a 1 MW plant ~GBP6k/yr and an 11 kW wall unit ~GBP66/yr,
+    # no class table.
+    fixed_om = 6.0 * float(power_kw or 0.0)
+    opex = energy + maint + fixed_om
     ebitda = srm["total_annual_revenue_gbp"] - opex
     i = float(d["discount_rate"]) / 100.0
     n = float(d["project_life"])

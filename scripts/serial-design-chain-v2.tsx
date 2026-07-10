@@ -9751,6 +9751,39 @@ async function main() {
             stLate.benchmarkDivergence = compareToBenchmark(stLate.benchmarkExpectation, stLate)
             console.error(`[chain] ghost-snapshot re-derive: benchmark net re-diffed on the settled stack — verdict ${stLate.benchmarkDivergence?.worst ?? '?'}`)
           }
+          // GHOST-FAULT FILTER (2026-07-10, run 52): diagnoseFaults ran MID-LOOP on the
+          // 123-row bill whose 33 ghost rows this block just pruned — its fault list then
+          // named '£3 Bidirectional PCS' / '£34k HVAC Chiller' lines the SHIPPED 97-row
+          // bill does not contain (the mid-loop-staleness family, LLM edition). A fault
+          // whose line matches NO settled bill row (tag exact, else ≥2 name-token overlap)
+          // is dropped deterministically; benchmark-punchlist.md is rewritten from the
+          // surviving set so the board never inherits ghost defects.
+          if (Array.isArray(stLate.benchmarkFaults) && stLate.benchmarkFaults.length) {
+            const settled: any[] = Array.isArray(stLate.requirementsBom) ? stLate.requirementsBom : []
+            const tags = new Set(settled.map((r) => String(r?.tag ?? '').trim().toLowerCase()).filter(Boolean))
+            const nameToks = settled.map((r) => new Set(String(r?.requirement ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2)))
+            const matchesSettled = (line: string): boolean => {
+              const l = String(line ?? '').toLowerCase()
+              const tagM = l.match(/\bx-\d+\b/)
+              if (tagM) return tags.has(tagM[0])
+              const toks = l.split(/[^a-z0-9]+/).filter((t) => t.length > 2)
+              return nameToks.some((s) => toks.filter((t) => s.has(t)).length >= 2)
+            }
+            const before = stLate.benchmarkFaults.length
+            stLate.benchmarkFaults = stLate.benchmarkFaults.filter((f: any) => matchesSettled(String(f?.line ?? '')))
+            const dropped = before - stLate.benchmarkFaults.length
+            if (dropped > 0) {
+              try {
+                const { routeFaults } = await import('./lib/benchmark-expectation')
+                const routed = routeFaults(stLate.benchmarkFaults, stLate)
+                ;(stLate as Record<string, any>).benchmarkFaultsRouted = routed
+                const md: string[] = ['# Benchmark sanity-net punch-list — settled bill (ghost faults filtered)', '']
+                for (const f of routed) md.push(`- \`${f.line}\` [${f.dimension}] — ${f.issue} (${f.magnitude}) → suggested ${f.suggested}  ·  basis: \`${String(f.basis ?? '—').slice(0, 60)}\``)
+                writeFileSync(resolve(outDir, 'benchmark-punchlist.md'), md.join('\n'))
+              } catch { /* punchlist rewrite is best-effort */ }
+              console.error(`[chain] ghost-fault filter: dropped ${dropped}/${before} benchmark fault(s) naming lines absent from the settled bill`)
+            }
+          }
         } catch { /* shadow — never fatal */ }
         console.error(`[chain] ghost-snapshot re-derive: cost cascade RE-reconciled to the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (stack raw materials was £${Math.round(rawPrev).toLocaleString('en-GB')} from an earlier loop iteration)`)
       }
