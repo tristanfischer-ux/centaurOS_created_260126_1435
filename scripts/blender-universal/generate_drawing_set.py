@@ -416,7 +416,13 @@ def run_convergence_report(state_path: Path, out_dir: Path, log: list[str]) -> d
         try:
             st = json.loads(state_path.read_text())
             q = (st.get("orchestratorContract") or {}).get("quantities") or {}
-            v = q.get("connected_electrical_load_kw") or q.get("electrical_load_kw")
+            # Fallback cascade extended 2026-07-10 (Powerwall: an energy-storage
+            # contract carries neither connected_ nor electrical_load_kw, so the
+            # loop ran its 1000 kW default on an 11 kW wall unit — "as-routed
+            # supply demand 1000 kW"). continuous_power_kw is the universal
+            # system-power key every powered class carries.
+            v = (q.get("connected_electrical_load_kw") or q.get("electrical_load_kw")
+                 or q.get("continuous_power_kw"))
             if isinstance(v, dict):
                 v = v.get("value")
             if isinstance(v, (int, float)) and v > 0:

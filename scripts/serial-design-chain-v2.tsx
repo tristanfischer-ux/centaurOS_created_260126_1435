@@ -1775,7 +1775,12 @@ async function generateKeyMetrics(opts: {
 CRITICAL — Tristan directive 2026-05-15: do NOT emit financial numbers (capex, opex, revenue, payback). Those require the Bill of Materials and an explicit assumptions ledger, neither of which exists at this stage. Financial metrics will be added LATER in a separate phase that aggregates per-component costs from the BoM and references a documented assumptions ledger for £/MWh, labour rates, etc.
 
 Emit ONLY physical/operational metrics derivable from the brief + research:
-  - headline_output: what the product produces (annual MWh for BESS, kg/year yield for vertical farm, kW thermal output for heat pump, readings/day for CGM, etc.)
+  - headline_output: THE BRIEF'S OWN PRIMARY TARGET metric (target_performance), in the
+    brief's own value + unit family — the number the customer asked for, NEVER a derived
+    annualised/aggregated figure. A 13.5 kWh home battery headlines "13.5 kWh usable",
+    never "5 MWh / year" (annualising a storage capacity misrepresents the product's
+    scale class); a 500 t/yr plant headlines 500 t/yr because THAT is the brief's own
+    unit. Derived throughput figures belong in supporting_metrics.
   - headline_constraint: the hardest brief-stated constraint (mass, volume, area, capacity ceiling, etc.)
   - utilisation: a class-appropriate operational metric (round-trip efficiency, SCOP, yield_per_m2_per_year, uptime_fraction)
   - supporting_metrics: 1-3 additional operational metrics readers care about (continuous power output, cycle life, IP rating, noise level)
@@ -1794,7 +1799,7 @@ Return ONLY JSON matching this exact shape (no preamble, no markdown, no financi
 }
 
 Class-appropriate examples:
-- BESS: headline_output={MWh delivered/year}, utilisation={round_trip_efficiency_pct}, headline_constraint={capacity ceiling MWh or mass kg}
+- BESS: headline_output={the brief's energy target in ITS OWN unit — e.g. usable kWh for a residential unit, MWh nameplate for a utility container}, utilisation={round_trip_efficiency_pct}, headline_constraint={capacity ceiling or mass kg}
 - Vertical farm: headline_output={kg yield/year}, utilisation={yield_per_m2_per_year}, headline_constraint={m² growing area}
 - Heat pump: headline_output={kW thermal output}, utilisation={SCOP seasonal coefficient}, headline_constraint={electricity input kW}
 - CGM: headline_output={readings/day}, utilisation={uptime fraction}, headline_constraint={sensor lifetime days}

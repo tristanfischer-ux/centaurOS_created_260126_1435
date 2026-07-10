@@ -1546,6 +1546,22 @@ registerArchetype('bess', (brief: any) => {
       source_detail: `£75/kW × ${continuousKw} kW (Sungrow SC1000UD bidirectional PCS, bare unit; MV transformation provided by the separate external pad-mount step-up transformer)`,
     },
     ((): MacroAssemblyPrice => {
+      // ENCLOSURE MACRO FOLLOWS SCALE (2026-07-10, Powerwall: the cabinet dossier
+      // billed + rendered an "iso_container_enclosure" — its own audit called it
+      // "wrong product class for wall-mounted residential unit"). Cabinet scale =
+      // a sealed outdoor sheet-metal enclosure (~£320 at programme volume:
+      // powder-coated steel + gasket + bracket — Powerwall/BYD-class enclosure
+      // piece cost). Containerised keeps the ISO-container rule verbatim.
+      if (!isContainerisedScale) {
+        return {
+          word_name: 'outdoor_cabinet_enclosure',
+          unit_price_gbp: 320,
+          dimension_basis: 'each',
+          dimension_value: 1,
+          total_gbp: 320,
+          source_detail: '£320 flat — sealed IP55 outdoor wall/floor cabinet (powder-coated steel, gasketed cover, wall bracket) at programme volume',
+        }
+      }
       // Container price + label FOLLOW the derived size (2026-06-25): mirror the
       // emitter's containerSizeFt rule (containerLengthM ≤ 7.5 m → 20-ft, else
       // 40-ft) so a 20-ft brief is no longer billed the 40-ft £8,000 box with a
@@ -1564,12 +1580,17 @@ registerArchetype('bess', (brief: any) => {
       }
     })(),
     {
+      // BMS master follows scale too: a residential pack BMS board is ~£220 at
+      // programme volume (integrated CAN master, no rack-level slave chain);
+      // the £3,000 unit is the utility rack-farm master.
       word_name: 'bms_master_controller',
-      unit_price_gbp: 3000,
+      unit_price_gbp: isContainerisedScale ? 3000 : 220,
       dimension_basis: 'each',
       dimension_value: 1,
-      total_gbp: 3000,
-      source_detail: `£3,000 flat — STM32F427-based BMS master with watchdog, CAN, isolation (IEC 62619)`,
+      total_gbp: isContainerisedScale ? 3000 : 220,
+      source_detail: isContainerisedScale
+        ? `£3,000 flat — STM32F427-based BMS master with watchdog, CAN, isolation (IEC 62619)`
+        : `£220 flat — integrated residential pack BMS master (CAN, cell-chain interface, IEC 62619) at programme volume`,
     },
     {
       word_name: 'bms_slave_module',
