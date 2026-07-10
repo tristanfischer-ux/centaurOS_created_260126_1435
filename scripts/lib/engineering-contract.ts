@@ -785,6 +785,14 @@ registerArchetype('bess', (brief: any) => {
   const nameplateKwhRequested = briefNameplateKwh > 0
     ? briefNameplateKwh
     : (usableKwh * overDeliverFactor) / dodFraction
+  // CONTAINERISED vs CABINET scale (2026-07-10, Powerwall exit-33: the contract emitted
+  // "single 40-ft ISO container", an external pad-mount GSU transformer and a 7,287 kg
+  // in-container mass budget for a 130 kg WALL CABINET — the physics critic correctly
+  // called the result physically impossible). The SAME sub-utility threshold as the
+  // pricing-override / graph-selection / cost-stack / band gates: below 100 kWh the
+  // enclosure is a sealed cabinet grid-tied DIRECTLY at LV (no step-up transformer,
+  // no ISO container furniture, no pad-mount siting policy).
+  const isContainerisedScale = nameplateKwhRequested >= 100
   // BESS WAVE C addendum 9 (2026-07-05, CELL/RACK DENSITY recalibration — Tristan: "our
   // config (6,084 cells, 13 racks, 4,361 kWh usable) reflects an older-generation cell
   // assumption; the market delivers ≥5 MWh in a 20-ft container today"). The prior 280 Ah
@@ -1147,7 +1155,11 @@ registerArchetype('bess', (brief: any) => {
     // (2026-06-25 fix): next standard dry-type rating ≥ continuous_power_kw × 1.1.
     // The deterministic emitter reads this as the transformer word's nameplate so
     // the unit can never again be sized at half the rated power.
-    transformer_rating_kva: q(transformerRatingKva, 'kVA', 'power', 'rated', 'system', 'calculator', { source_detail: `next standard dry-type rating ≥ continuous_power_kw (${continuousKw} kW) × 1.1 = ${Math.round(transformerRatingMinKva)} kVA min` }),
+    // A step-up transformer exists only at containerised scale (utility LV/MV grid
+    // connection); a cabinet unit's hybrid inverter outputs grid voltage directly.
+    ...(isContainerisedScale ? {
+      transformer_rating_kva: q(transformerRatingKva, 'kVA', 'power', 'rated', 'system', 'calculator', { source_detail: `next standard dry-type rating ≥ continuous_power_kw (${continuousKw} kW) × 1.1 = ${Math.round(transformerRatingMinKva)} kVA min` }),
+    } : {}),
     dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'nominal DC bus voltage from brief target_performance.metrics (dc_bus_voltage_v / dc_voltage / bus_voltage) or product description; default 800 V only when the brief is silent' }),
     bus_continuous_current_a: q(busContinuousA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × 1000 / dc_bus_voltage_v' }),
     bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator', { source_detail: 'peak_power_kw × 1000 / dc_bus_voltage_v', from: ['peak_power_kw', 'dc_bus_voltage_v'] }),
@@ -1208,19 +1220,30 @@ registerArchetype('bess', (brief: any) => {
     // narrator) so the Physics Critic stops re-flagging the 2-container
     // recommendation as a "bug" — it is the explicit trade-off the contract
     // documents in brief_target_feasibility=0.
-    container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'container_count = 1 — single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit', from: ['rack_count', 'brief_mass_cap_kg'] }),
-    // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH):
-    // explicit mass breakdown so the Generator + downstream tools see the
-    // full container audit, not just cells. Transformer is EXTERNAL pad-
-    // mounted (industry standard) and excluded from the in-container budget.
-    in_container_mass_kg: q(inContainerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `cells (${totalCellMassKg.toFixed(0)}) + shell (${containerTareKg}) + racks (${totalRackMassKg}) + PCS (${pcsMassKg}) + BMS/cable (${bmsCablingMassKg}) + cooling (${coolingMassKg}) kg — transformer EXCLUDED (external pad-mount)` }),
-    external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `external_transformer_mass_kg = ${transformerMassKg} kg — ${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
-    system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
-    // transformer_installation is a POLICY constant (industry-standard siting choice), not
-    // derived from another quantity's value — citation-style `from`, same treatment as
-    // dod_fraction above.
-    transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)', from: ['standard:IEC_62933-5-2_section_6.4'] }),
-    mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `mass_feasibility = 1 iff in_container_mass_kg <= brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg`, from: ['in_container_mass_kg', 'brief_mass_cap_kg'] }),
+    ...(isContainerisedScale ? {
+      container_count: q(1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'container_count = 1 — single 40-ft ISO container per brief envelope; rack-count solver caps mass to fit', from: ['rack_count', 'brief_mass_cap_kg'] }),
+      // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH):
+      // explicit mass breakdown so the Generator + downstream tools see the
+      // full container audit, not just cells. Transformer is EXTERNAL pad-
+      // mounted (industry standard) and excluded from the in-container budget.
+      in_container_mass_kg: q(inContainerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `cells (${totalCellMassKg.toFixed(0)}) + shell (${containerTareKg}) + racks (${totalRackMassKg}) + PCS (${pcsMassKg}) + BMS/cable (${bmsCablingMassKg}) + cooling (${coolingMassKg}) kg — transformer EXCLUDED (external pad-mount)` }),
+      external_transformer_mass_kg: q(transformerMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `external_transformer_mass_kg = ${transformerMassKg} kg — ${(transformerRatingKva / 1000).toFixed(2)} MVA (${transformerRatingKva} kVA) dry-type EXTERNAL pad-mounted transformer, NOT in container mass per IEC 62933-5-2 §6.4` }),
+      system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
+      // transformer_installation is a POLICY constant (industry-standard siting choice), not
+      // derived from another quantity's value — citation-style `from`, same treatment as
+      // dod_fraction above.
+      transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)', from: ['standard:IEC_62933-5-2_section_6.4'] }),
+      mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `mass_feasibility = 1 iff in_container_mass_kg <= brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg`, from: ['in_container_mass_kg', 'brief_mass_cap_kg'] }),
+    } : {
+      // CABINET scale (< 100 kWh): a sealed wall/floor unit. Honest unit mass = cells
+      // + pack hardware + integrated hybrid inverter + enclosure (~1.45× cell mass at
+      // this scale — Powerwall-3-class: ~97 kg cells in a ~130 kg unit); no container,
+      // no external transformer, no pad-mount siting policy. Keys the payload gate
+      // (exit 30) and the ISO-container layout trigger key on are ABSENT by design —
+      // both guard on presence.
+      unit_mass_kg: q(Math.round(totalCellMassKg * 1.45), 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `unit_mass_kg = total_cell_mass_kg (${totalCellMassKg.toFixed(0)}) × 1.45 (pack hardware + hybrid inverter + sealed enclosure at wall-unit scale)`, from: ['total_cell_mass_kg'] }),
+      mass_feasibility: q(Math.round(totalCellMassKg * 1.45) <= briefMassCapKg ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `mass_feasibility = 1 iff unit_mass_kg <= brief_mass_cap_kg; achieved ${Math.round(totalCellMassKg * 1.45)} kg vs cap ${briefMassCapKg} kg`, from: ['unit_mass_kg', 'brief_mass_cap_kg'] }),
+    }),
     // FIX 3a — Bespoke enclosure payload rating (council CRITICAL, 2026-05-29):
     // The brief's max_mass_kg is the DESIGN gross-mass cap for the bespoke
     // heavy-duty enclosure, NOT the standard ISO-668 26,580 kg payload for a
@@ -1232,10 +1255,12 @@ registerArchetype('bess', (brief: any) => {
     // Universal: classes without a containerised enclosure do not emit this field;
     // the payload gate (exit 30) and the render-minimal-pdf display both guard
     // with presence checks so omission is safe.
-    container_payload_rating_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: `bespoke heavy-duty enclosure rated to brief gross-mass cap (${briefMassCapKg.toLocaleString('en-GB')} kg); road-transportable with route notification / specialist trailer per brief` }),
-    // container SIZE for the emitter — the longer horizontal envelope dimension (20-ft ≈ 6.06 m,
-    // 40-ft ≈ 12.03 m). emitStructureContainment emits the matching container word + tare + price.
-    container_internal_length_m: q(containerLengthM, 'm', 'length', 'rated', 'system', 'brief', { source_detail: `container length from brief max_dimensions_mm (longer horizontal dim); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class` }),
+    ...(isContainerisedScale ? {
+      container_payload_rating_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: `bespoke heavy-duty enclosure rated to brief gross-mass cap (${briefMassCapKg.toLocaleString('en-GB')} kg); road-transportable with route notification / specialist trailer per brief` }),
+      // container SIZE for the emitter — the longer horizontal envelope dimension (20-ft ≈ 6.06 m,
+      // 40-ft ≈ 12.03 m). emitStructureContainment emits the matching container word + tare + price.
+      container_internal_length_m: q(containerLengthM, 'm', 'length', 'rated', 'system', 'brief', { source_detail: `container length from brief max_dimensions_mm (longer horizontal dim); ${containerLengthM <= 7.5 ? '20-ft ISO' : '40-ft ISO'} class` }),
+    } : {}),
     // Enclosure gross internal volume from the brief envelope (2026-06-25). The
     // deterministic emitter (emitStructureContainment) reads this for Novec 1230
     // fire-suppression agent-mass sizing via q(contract,'enclosure_volume_m3',86);
