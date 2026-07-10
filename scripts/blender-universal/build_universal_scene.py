@@ -11920,10 +11920,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     global _SEALED_HERO_PRODUCT
     _SEALED_HERO_PRODUCT = not _INSPECT_MODE
     if _SEALED_HERO_PRODUCT:
-        body_mat = fl.make_mat("m_se_product", fl._to_linear((0.91, 0.92, 0.93)),
-                               metallic=0.05, roughness=0.35)
+        # GHOSTED shell (Tristan 2026-07-10: "why is the box not translucent so you
+        # can see through it") — the zone-stacked internals read through a glassy skin,
+        # the classic engineering-marketing cutaway. alpha 0.30: solid enough to give
+        # the product its silhouette, open enough to show the pack/inverter/controls.
+        body_mat = fl.make_mat("m_se_product", fl._to_linear((0.85, 0.88, 0.92)),
+                               metallic=0.05, roughness=0.25, alpha=0.16)
         panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear((0.84, 0.86, 0.88)),
-                                metallic=0.05, roughness=0.45)
+                                metallic=0.05, roughness=0.45, alpha=0.16)
         vent_mat = fl.make_mat("m_se_product_vent", fl._to_linear((0.30, 0.32, 0.35)),
                                metallic=0.2, roughness=0.6)
         # the one-piece sealed body (fully opaque — internals stay for geometry truth
@@ -11951,6 +11955,22 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _ov = fl.add_box(f"u_se_product_vent_{vi}", _mm3((0.0, -D / 2 - 5.0, vz)),
                              _mm3((slot_w, 3.0, H * 0.012)), vent_mat, module=_skin_mod, module_objects=MO)
             _ov.dimensions = _mm3((slot_w, 3.0, H * 0.012))
+        # deepen the internal palette — pastel module hues wash out behind the
+        # ghosted shell under the white-world hero light; scale each placed part's
+        # diffuse toward saturation so the pack/inverter/controls zones read.
+        _deep_cache = {}
+        for _p in parts:
+            _hue = _module_hue(_p.module_id)
+            _key = f"m_se_deep_{_p.module_id}"
+            if _key not in _deep_cache:
+                _deep_cache[_key] = fl.make_mat(_key, tuple(c * 0.55 for c in _hue),
+                                                metallic=0.15, roughness=0.5)
+            _pref = "u_" + re.sub(r"[^a-z0-9]+", "_", str(_p.name).lower()).strip("_")[:40]
+            for _obj in bpy.data.objects:
+                if getattr(_obj, "type", None) == "MESH" and _obj.name.startswith(_pref) \
+                        and _obj.data is not None:
+                    _obj.data.materials.clear()
+                    _obj.data.materials.append(_deep_cache[_key])
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
               f"{n_vents} vent slot(s); tags + wire draws suppressed for the product shot")
 
@@ -17789,7 +17809,11 @@ def main():
         #     plant (two separate processes diverge — placement isn't deterministic across
         #     processes; Tristan 2026-06-22 caught the services in different places). Gated by
         #     BLENDER_PLANT_SHELL=1 so the chain's default render stays interior-only.
-        if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on"):
+        if os.environ.get("BLENDER_PLANT_SHELL", "").strip().lower() in ("1", "true", "yes", "on") \
+                and not _SEALED_HERO_PRODUCT:
+            # (a sealed PRODUCT is its own enclosure — wrapping a clad BUILDING with a
+            #  roller door around a wall-mounted unit was the 'random building' Tristan
+            #  flagged 2026-07-10; its exterior shot is the product body itself)
             try:
                 build_plant_shell(parts, MAT, MO)
                 for _k in list(MO.keys()):
