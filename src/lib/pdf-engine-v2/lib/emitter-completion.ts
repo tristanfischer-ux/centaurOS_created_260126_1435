@@ -2055,6 +2055,13 @@ export interface FillBlankWordsOpts extends CompleteEmitterGapsOpts {
  * Run AFTER Phase 2 + the emitter-identity re-assert (so the reviewer has had
  * its chance to fill words and nothing later reverts our writes), BEFORE render.
  */
+// PER-PROCESS KNOWN-MISS MEMO (2026-07-10 speed profile: the two fill sweeps cost ~89 s
+// per run, mostly re-walking words the first pass already proved unmatchable). A word
+// keyed by id+name that MISSED once misses again unless something about it changed —
+// the memo skips those on later sweeps within the same process; a renamed / re-created
+// word gets a fresh key and a full walk. Never memoise SUCCESS (a pin mutates the word).
+const _FILL_MISS_MEMO = new Set<string>()
+
 export async function fillBlankWordMpns(
   modules: DesignModuleLike[],
   className: string,
@@ -2212,6 +2219,10 @@ export async function fillBlankWordMpns(
       // exists — tether it to a real principal-equipment sibling in this
       // sub_module, or suppress the line entirely (see the block above
       // isCommodityProcessValve for the full rationale).
+      const _missKey = `${String(cand.word?.id ?? '')}|${cand.name}`
+      if (_FILL_MISS_MEMO.has(_missKey)) {
+        continue  // proved unmatchable earlier this run; nothing about the word changed
+      }
       // DUPLICATE CELL POPULATION (2026-07-10 run 56 live catch: a blank 'Blade Battery
       // Cells' word walked the DB and pinned a TI protection IC while the design's real
       // cells sat emitter-pinned two words away). A blank battery-CELL word in a design
@@ -2298,6 +2309,7 @@ export async function fillBlankWordMpns(
       // A miss the log never shows is a miss no fix-loop can see.
       if (!dbHit) {
         log(`[fill-blank-mpn]   ⊘ nohit ${cand.moduleId}::${cand.subId} (${cand.name}): no DB row passed the rank bar for tokens [${tokenList.slice(0, 6).join(', ')}] — staying generic`)
+        _FILL_MISS_MEMO.add(_missKey)
       }
       let pinned = false
       let blocked = false // a guard refused the pin outright — never fall through to generate
@@ -2391,6 +2403,7 @@ export async function fillBlankWordMpns(
         // MISS (fall through to generate) — LOGGED (2026-07-03): the silent fall-through
         // hid why a word stayed TBD (the Kratos-shades-Eaton diagnosis took a debugger).
         log(`[fill-blank-mpn]   ⊘ miss ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} ${typeOk ? 'already claimed in this sub_module (no distinct alternative)' : 'fails type-coherence'} — ${opts.skipGenerate ? 'staying generic' : 'falling through to generate'}`)
+        if (opts.skipGenerate) _FILL_MISS_MEMO.add(_missKey)
         break
       }
       if (pinned || blocked) continue
