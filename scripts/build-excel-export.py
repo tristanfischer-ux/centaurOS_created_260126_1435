@@ -2631,6 +2631,27 @@ def tab_executive_summary(wb: Workbook, state: dict, run_dir: str, sha: str) -> 
             ws.cell(cmp_start, _c).value = None
         row = cmp_start
 
+    # ---- DISCLOSED COMMERCIAL DECISIONS (Tristan 2026-07-10, design-to-budget (b)):
+    # every named brief decision record renders ON THE COVER — the reader sees the
+    # commercial finding and who owns it before any number below. Absent records =
+    # no section, byte-identical.
+    _holds = [d for d in (state.get("decisionHolds") or [])
+              if isinstance(d, dict) and d.get("title")]
+    if _holds:
+        sub_banner(ws, row, "Commercial findings — named decisions", 7)
+        row += 1
+        for _d in _holds[:3]:
+            ws.cell(row, 1, f"◆ {_d.get('title')}").font = FONT_SUB
+            _st = ws.cell(row, 5, f"{str(_d.get('status','')).upper()} — {_d.get('owner')} ({_d.get('date')})")
+            _st.font = FONT_NOTE
+            row += 1
+            _note = ws.cell(row, 1, str(_d.get('note', ''))[:500])
+            _note.font = FONT_NOTE
+            _note.alignment = Alignment(wrap_text=True, vertical="top")
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+            ws.row_dimensions[row].height = 44
+            row += 2
+
     # ---- where the money goes (top categories) ----
     cb = cost_breakdown_by_category(state.get("requirementsBom") or [])
     if cb:
@@ -13266,7 +13287,13 @@ CLS_EXTERNAL = "EXTERNAL"
 
 def _classify_risk_row(source: str, text: str) -> str:
     """Deterministic triage of ONE risk row from its own provenance + text (never a class
-    table). A live engine finding OR defect vocabulary → ENGINE-FIXABLE; else EXTERNAL."""
+    table). A live engine finding OR defect vocabulary → ENGINE-FIXABLE; else EXTERNAL.
+    A row minted FROM a named brief decision record (source brief.decisions.json:*) is a
+    DISCLOSED DECISION — documented, owner-named, never an engine-fixable defect (Tristan
+    2026-07-10 design-to-budget option (b)); precedence over the vocabulary net because
+    its text intentionally QUOTES the finding it discloses."""
+    if str(source or "").startswith("brief.decisions.json"):
+        return CLS_EXTERNAL
     if source in _RISK_ENGINE_SOURCES:
         return CLS_ENGINE_FIXABLE
     if _RISK_DEFECT_VOCAB_RE.search(text or ""):
@@ -13414,18 +13441,42 @@ def _build_risk_rows(state: dict) -> List[dict]:
              fix=(f"deterministic gate '{ri.get('gate', 'gate')}' flag — correct the flagged source "
                   "line at its producing rule, re-run the gate; the flag clears and this row disappears"))
 
-    # 3) LIVE cost-sanity (commercial) when outside / borderline the industry band
+    # 3) LIVE cost-sanity (commercial) when outside / borderline the industry band.
+    # DEFERRED-DECISION DISCLOSURE (Tristan 2026-07-10, design-to-budget option (b)):
+    # when the brief carries a NAMED, OWNED, DATED design_to_budget decision record
+    # (state.decisionHolds — loaded from <brief>.decisions.json), the capex gap is a
+    # DISCLOSED COMMERCIAL DECISION, not an engine-fixable open defect: the row renders
+    # as a documented DEFERRED DECISION naming its owner/date, and it does not cap the
+    # tab. HONESTY GUARD: the underlying costSanity verdict is untouched (still MED/HIGH
+    # as computed and rendered everywhere else); only the ROW's classification changes,
+    # and ONLY when a real decision record exists — no record, no reclassification.
     cstat = state.get("costSanity") or {}
     if isinstance(cstat, dict) and cstat.get("ratio_to_nearest_edge"):
         ratio = num(cstat.get("ratio_to_nearest_edge")) or 1.0
         if ratio and ratio > 1.05:
             sev = 4 if ratio > 2 else 3 if ratio > 1.5 else 2
-            _add("Commercial — capex", "Capex per output unit outside the typical industry band",
-                 clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.",
-                 sev, 3, "Value-engineer the high-cost items or confirm the premium is justified.",
-                 "state.costSanity",
-                 fix=("cost model at source — requirements_bom.py pricing rules (corpus lift / "
-                      "principal pricing) or value-engineer the high-cost items; re-run cost sanity"))
+            _dtb = next((d for d in (state.get("decisionHolds") or [])
+                         if isinstance(d, dict) and d.get("kind") == "design_to_budget"
+                         and str(d.get("status", "")).lower() in ("deferred", "accepted")
+                         and d.get("owner") and d.get("date")), None)
+            if _dtb:
+                _add("Commercial — capex",
+                     f"Capex vs target — DEFERRED DECISION ({_dtb.get('owner')}, {_dtb.get('date')})",
+                     (clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.")
+                     + " " + str(_dtb.get("note", ""))[:400],
+                     sev, 3,
+                     "Disclosed commercial decision — see the Executive Summary finding; "
+                     "not an engineering defect of this design.",
+                     "brief.decisions.json:design_to_budget",
+                     fix=(f"decision record '{_dtb.get('id')}' (status {_dtb.get('status')}); "
+                          "revisit the record to re-open"))
+            else:
+                _add("Commercial — capex", "Capex per output unit outside the typical industry band",
+                     clean_cell(cstat.get("message", "")) or "Cost-per-output outside band.",
+                     sev, 3, "Value-engineer the high-cost items or confirm the premium is justified.",
+                     "state.costSanity",
+                     fix=("cost model at source — requirements_bom.py pricing rules (corpus lift / "
+                          "principal pricing) or value-engineer the high-cost items; re-run cost sanity"))
 
     # 4) PROCESS-HAZARD rows from the equipment present (universal hazard library) —
     # inherent hazards of the equipment class, mitigated by design practice + statutory

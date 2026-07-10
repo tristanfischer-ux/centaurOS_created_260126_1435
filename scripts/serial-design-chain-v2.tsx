@@ -3575,6 +3575,28 @@ async function main() {
 
   // ── Save the original brief (Phase 0 refinement loop, Tristan 2026-05-15)
   writeFileSync(resolve(outDir, '0-original-brief.md'), brief)
+  // BRIEF-ADJACENT DECISION RECORDS (Tristan 2026-07-10, option (b) of the
+  // design-to-budget call): <brief>.decisions.json carries NAMED, OWNED, DATED
+  // decisions (e.g. a deferred design-to-budget hold). The chain loads them into
+  // state.decisionHolds; the Exec summary DISCLOSES each and the Risk register
+  // classifies a decision-covered finding as a DEFERRED DECISION row (documented,
+  // owner-named) rather than an engine-fixable open defect. HONESTY GUARD: the
+  // records never alter a quantity, a verdict (cost-sanity/benchmark stay as
+  // computed), or the physical design — disclosure only. Universal: any brief may
+  // carry a decisions file; absent file = empty list, byte-identical behaviour.
+  let decisionHolds: unknown[] = []
+  try {
+    const decPath = briefPath.replace(/\.md$/i, '') + '.decisions.json'
+    if (existsSync(decPath)) {
+      const dec = JSON.parse(readFileSync(decPath, 'utf-8'))
+      if (Array.isArray(dec?.decisions)) {
+        decisionHolds = dec.decisions
+        console.error(`[chain] brief decisions loaded: ${decisionHolds.length} record(s) from ${decPath}`)
+      }
+    }
+  } catch (e) {
+    console.error(`[chain] brief decisions file unreadable (ignored): ${(e as Error).message.slice(0, 120)}`)
+  }
 
   // ── Quality loop: load fix directives from prior iteration (if any) ──────────
   const fixDirectivesPath = process.env.QUALITY_LOOP_FIX_DIRECTIVES
@@ -7010,6 +7032,7 @@ async function main() {
   const state = {
     projectId: 'chain-v2-' + Date.now(),
     parsedBrief: parsedResult.data,
+    decisionHolds,   // brief-adjacent NAMED decisions (disclosure records — see the loader)
     moduleDecomposition: design,
     naturalLanguageLayer: nl,
     // Build #19e (2026-05-22): orchestrator's tools-used page surfaces as

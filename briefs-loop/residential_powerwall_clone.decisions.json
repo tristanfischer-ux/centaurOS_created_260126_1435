@@ -1,0 +1,15 @@
+{
+  "schema": "brief-decisions/1",
+  "decisions": [
+    {
+      "id": "design_to_budget",
+      "kind": "design_to_budget",
+      "status": "deferred",
+      "owner": "Tristan Fischer",
+      "date": "2026-07-10",
+      "title": "Ex-works cost vs target — integration depth deferred",
+      "note": "The engine's honest bottom-up at the brief's 5,000-unit batch with a fully bought-out BoM lands materially above the £8,500 ex-works target (market band £300-700/kWh is achieved by manufacturers through power-electronics INTEGRATION: inverter, converters, BMS and monitoring as one custom manufactured board-set, plus contract-volume cell pricing). Decision (Tristan, 2026-07-10): DISCLOSE the gap as a commercial finding rather than model integration depth now; the integrated-assembly costing capability is deferred to a future engine workstream.",
+      "scope": "commercial/cost — does not alter any engineering quantity, verdict, or physical design"
+    }
+  ]
+}
