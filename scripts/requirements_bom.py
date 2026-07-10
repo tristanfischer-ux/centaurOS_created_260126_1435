@@ -1352,6 +1352,47 @@ def _structural_material_from_name(name: str) -> str:
     return "painted structural carbon steel (S275/S355)"
 
 
+_ENCLOSURE_SKIN_HEAD_RE = re.compile(r"(enclosure|cabinet|housing)s?\s*$", re.I)
+_ENCLOSURE_PANEL_HEAD_RE = re.compile(r"(panel|cover|door|lid)s?\s*$", re.I)
+_SHEET_STEEL_GBP_PER_KG = 4.5      # UK-2026 sheet-metal material, mild steel
+_SHEET_FAB_MULT = 2.8              # forming + welding + powder coat + gaskets
+_SHEET_T_MM = 1.5
+_STEEL_KG_PER_M2_PER_MM = 7.85
+
+
+def _enclosure_skin_takeoff(name, qcontract):
+    """Price a DEVICE-SCALE enclosure/cabinet skin from the contract's OWN
+    enclosure_volume_m3 (2026-07-10, Powerwall ledger: 'Outdoor Cabinet Enclosure'
+    shipped at the £3 commodity floor with NO material — a physical fabricated part).
+    Skin area ≈ 6·V^(2/3) × 1.1 (returns/flanges) for a box of that volume; sheet
+    steel 1.5 mm; fabricated cost = mass × £/kg × forming/coating multiplier. A
+    'panel/cover/door' head prices 25% of the skin (one face family, not the whole
+    box). Fires ONLY when the name head is enclosure-family AND the contract carries
+    a sub-5 m³ enclosure volume — every other archetype/row byte-identical. Returns
+    (gbp, basis, spec) or None."""
+    nm = str(name or "")
+    full = bool(_ENCLOSURE_SKIN_HEAD_RE.search(nm))
+    panel = bool(_ENCLOSURE_PANEL_HEAD_RE.search(nm)) and re.search(r"enclosure|cabinet|housing", nm, re.I)
+    if not (full or panel):
+        return None
+    qv = (qcontract or {}).get("enclosure_volume_m3")
+    vol = _num(qv.get("value") if isinstance(qv, dict) else qv)
+    if not vol or not (0 < vol < 5.0):
+        return None
+    area_m2 = 6.0 * (float(vol) ** (2.0 / 3.0)) * 1.1
+    frac = 1.0 if full else 0.25
+    mass_kg = area_m2 * frac * _SHEET_T_MM * _STEEL_KG_PER_M2_PER_MM
+    gbp = mass_kg * _SHEET_STEEL_GBP_PER_KG * _SHEET_FAB_MULT
+    basis = (f"enclosure sheet-metal take-off: {area_m2 * frac:.2f} m² skin"
+             f"{'' if full else ' (panel family — 25% of the box skin)'} from the contract "
+             f"enclosure_volume_m3 = {float(vol):.2f} × {_SHEET_T_MM:.1f} mm sheet "
+             f"({mass_kg:.1f} kg) × £{_SHEET_STEEL_GBP_PER_KG:.2f}/kg × "
+             f"{_SHEET_FAB_MULT:.1f} forming/welding/powder-coat")
+    spec = {"material": "powder-coated mild steel sheet (IP-rated outdoor enclosure)",
+            "skin_area_m2": round(area_m2 * frac, 2), "mass_kg": round(mass_kg, 1)}
+    return gbp, basis, spec
+
+
 def _dedupe_actuator_assembly_rows(rows):
     """DOUBLE-REPRESENTATION de-dup (benchmark net v56, 2026-07-02): when the bill
     carries BOTH an actuated-valve ASSEMBLY line (N units, actuator included in the
@@ -2695,6 +2736,22 @@ def _selftest() -> int:
             got = _bespoke_class(name.split("·")[0].strip())
         if got != want:
             print(f"  FAIL  '{name}' → {got} (want {want})"); bad += 1
+    # ── ENCLOSURE-SKIN take-off (2026-07-10, run-13 ledger £3 material-less enclosure) ──
+    _q_encl = {"enclosure_volume_m3": {"value": 0.143}}
+    _sk = _enclosure_skin_takeoff("Outdoor Cabinet Enclosure", _q_encl)
+    if not _sk or not (100 <= _sk[0] <= 700) or "material" not in (_sk[2] or {}):
+        print(f"  FAIL enclosure-skin proveCatch: 0.143 m³ cabinet skin must price "
+              f"£100-700 with a material, got {_sk!r}"); bad += 1
+    _pn = _enclosure_skin_takeoff("Enclosure Panel", _q_encl)
+    if not _pn or not (_pn[0] < _sk[0] * 0.5):
+        print(f"  FAIL enclosure-skin: a panel head must price a FRACTION of the box "
+              f"skin, got {_pn and _pn[0]!r} vs full {_sk[0]:.0f}"); bad += 1
+    if _enclosure_skin_takeoff("Outdoor Cabinet Enclosure", {}) is not None:
+        print("  FAIL enclosure-skin proveNoFalsePositive: no enclosure_volume_m3 key "
+              "must be a strict no-op (byte-identity)"); bad += 1
+    if _enclosure_skin_takeoff("Steel Portal Frame", _q_encl) is not None:
+        print("  FAIL enclosure-skin proveNoFalsePositive: a non-enclosure head must "
+              "never take the skin price"); bad += 1
     # OPEN-TANK cost discount (#144): an open atmospheric tank (FRP, no top head, tapered
     # wall, delivered) must cost materially LESS than a closed steel pressure vessel of the
     # same size, and land in a sane FRP fish-tank band — not the old £194k/tank over-count.
@@ -6485,8 +6542,19 @@ def assemble(out_dir: str):
                         # the take-off branch) emitted no mt_spec.
                         mt_spec = {"material": _structural_material_from_name(name)}
                     else:
-                        status, part = "NOT FOUND", "requirement stated — structural"
-                        gbp, basis = 0.0, "structural element — footprint take-off (no footprint driver; confidence low)"
+                        # device-scale enclosure skin — priced from the contract's OWN
+                        # enclosure volume before falling to the £0/commodity floor
+                        # (run-13 ledger: £3 material-less 'Outdoor Cabinet Enclosure').
+                        _skin = _enclosure_skin_takeoff(name, qcontract)
+                        if _skin:
+                            status, part = "BESPOKE", "made to spec (structural)"
+                            gbp, basis, mt_spec = _skin
+                        else:
+                            status, part = "NOT FOUND", "requirement stated — structural"
+                            gbp, basis = 0.0, "structural element — footprint take-off (no footprint driver; confidence low)"
+                            # still a PHYSICAL part — its material column must never
+                            # be blank (BoM Ledger column contract).
+                            mt_spec = {"material": _structural_material_from_name(name)}
                 elif bc == "strong":
                     # complex fabricated process vessel — bespoke regardless of any pinned
                     # PN; cost is the engineering budget estimate, NOT a shell take-off

@@ -20570,8 +20570,22 @@ def _sc_benchmark(wb, ws, state, run_dir):
                        "expectation (gate 36)")
     bd = state.get("benchmarkDivergence") or {}
     if bd:
-        comps.append(("gate-36 verdict is not RADICAL",
-                      0 if bd.get("needs_full_check") else 1, 1))
+        radical = bool(bd.get("needs_full_check"))
+        comps.append(("gate-36 verdict is not RADICAL", 0 if radical else 1, 1))
+        if radical:
+            # a failing check MUST say what diverged (flag AND route — the run-13
+            # Sense-check scored 0 with an EMPTY issues list, leaving the reader
+            # nothing to act on). Name each radical dimension with its numbers.
+            rad = [f for f in (bd.get("findings") or [])
+                   if str(f.get("verdict", "")).lower() == "radical"]
+            for f in rad[:4]:
+                iss.append(f"[HIGH] gate-36 RADICAL — {f.get('dimension')}: engine "
+                           f"{f.get('deterministic')} vs independent expectation "
+                           f"{f.get('expected')} ({f.get('ratio')}×). "
+                           f"{str(f.get('note') or '')[:160]}")
+            if not rad:
+                iss.append("[HIGH] gate-36 verdict RADICAL — see benchmark-punchlist.md "
+                           "for the routed fault list")
     return {"components": comps, "issues": iss,
             "mech": "generative benchmark sanity net (gate 36): independent top-down LLM "
                     "expectation diffed against the bottom-up engine, per-dimension",
