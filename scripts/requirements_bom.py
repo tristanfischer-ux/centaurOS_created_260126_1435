@@ -2583,6 +2583,13 @@ def _bespoke_class(name: str) -> str:
     take-off. Universal — no per-class table."""
     head = re.sub(r"[^a-z0-9]+$", "", (name.strip().split() or [""])[-1].lower())
     if _STRONG_BESPOKE_RE.search(head):
+        # the head is tested BARE, so qualifier lookbehinds in the regex can't see the
+        # context — re-test 'contactor' against the FULL name (run-34: 'Main DC
+        # Contactor' → head 'contactor' → strong, the electrical/process collision
+        # the lookbehinds were built for but never reached).
+        if head == "contactor" and re.search(
+                r"\b(?:dc|ac|main|motor|line|power|pack)\b[\s\w·]*contactor", name, re.I):
+            return "none"
         return "strong"
     if _BESPOKE_RE.search(name or ""):
         return "simple"
