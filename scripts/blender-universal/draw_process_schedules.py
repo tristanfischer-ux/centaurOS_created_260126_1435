@@ -1275,6 +1275,27 @@ def _range_from_form(form: str, measured: str) -> str:
         if re.search(r"differential|dp\b|coplanar", f, re.I):
             return "0–2.5 bar (DP)"
         return "0–10 bar"
+    # ELECTRICAL / ENVIRONMENTAL measurements (2026-07-10 run 55: the ISA-complete index
+    # added IT/ET/MT rows whose '—' Range floored the tab's cell contract). Same
+    # physical-catalogue-class discipline as pH/ORP/bourdon above: a Hall transducer's
+    # span is its nominal rating (from the spec text when stated); a capacitive RH
+    # element is 0–100 %RH by construction; a cell-level AFE reads the LFP cell window.
+    if ml.startswith("current"):
+        mA = re.search(r"(\d+(?:\.\d+)?)\s*A\b", f)
+        return f"0–{mA.group(1)} A (nominal)" if mA else "0–100 A (nominal)"
+    if ml.startswith("voltage") or "cell voltage" in ml:
+        mV = re.search(r"(\d+(?:\.\d+)?)\s*V\b", f)
+        if mV:
+            return f"0–{mV.group(1)} V"
+        return "0–5 V/cell (AFE)" if "cell" in ml else "0–500 V"
+    if "humidity" in ml:
+        return "0–100 %RH"
+    if "insulation" in ml:
+        return "0–10 MΩ (IEC 61557-8)"
+    if "smoke" in ml:
+        return "obscuration %/m (EN 54-7)"
+    if "hydrogen" in ml:
+        return "0–100 %LEL"
     return "—"
 
 

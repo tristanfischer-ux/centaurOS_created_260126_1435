@@ -15007,8 +15007,12 @@ def tab_process_schedules(wb: Workbook, run_dir: str, state: Optional[dict] = No
             tag = str(b.get("tag") or "")
             if not tag or tag in ("—", "-", "–") or "." in tag:
                 return True  # untagged / sub-component — not schedule field devices
-            return bool(_control_system_rx.search(req) or _electrical_sense_rx.search(req)
-                       or _accessory_rx.search(req))
+            # 2026-07-10 run 55 (ISA-5.1 decision, one truth with the schedule index):
+            # electrical voltage/current sensing IS instrumentation (ISA E/I letters) and
+            # the schedule now lists it — so the BoM count must include it too, or the
+            # reconciliation measures the two classifiers' disagreement as a divergence
+            # (schedule 14 vs BoM 3). Control systems + accessories stay excluded.
+            return bool(_control_system_rx.search(req) or _accessory_rx.search(req))
         _inst_rows_scoped = [b for b in _inst_rows if not _non_field(b)]
         _inst_rows_excl = [b for b in _inst_rows if _non_field(b)]
         bom_inst = sum(int(num(b.get("qty")) or 1) for b in _inst_rows_scoped)
