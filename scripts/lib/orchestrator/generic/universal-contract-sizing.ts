@@ -2816,6 +2816,41 @@ export function normaliseSystemSingletonControllers(modules: ModuleLike[], quant
   return touched
 }
 
+// ── OVERSIZE-DIMENSION STRIP (2026-07-10, Powerwall run-22): the LLM decomposition
+// echoed ONE utility-PCS datasheet dimension ('1123x955x1235 mm' — a real Sungrow
+// cabinet from training) onto SEVEN words (power semiconductors, inductor, PCS, aux
+// PSU, SPD…) inside a 0.14 m³ wall cabinet — each 'component' larger than the whole
+// product, tripping the physics critic + the gate-36 envelope check. PHYSICAL LAW,
+// every scale: a component's dimension cannot exceed its product's declared enclosure
+// volume. Strip the impossible DIMENSION modifier (the part stays; physics/slotting
+// re-derive real sizes); a design with no enclosure signal is a strict no-op.
+const _DIM_BOX_RE = /(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m)\b/i
+export function stripOversizeDimensionModifiers(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
+  const envM3 = Number(quantities['enclosure_volume_m3'] ?? 0)
+  if (!(envM3 > 0)) return 0
+  const toM = { mm: 0.001, cm: 0.01, m: 1 } as Record<string, number>
+  let stripped = 0
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const mods = w.modifier_characters
+        if (!Array.isArray(mods)) continue
+        w.modifier_characters = mods.filter((mc) => {
+          if (mc.kind !== 'dimension') return true
+          const mt = _DIM_BOX_RE.exec(String(mc.value ?? ''))
+          if (!mt) return true
+          const f = toM[mt[4].toLowerCase()] ?? 0.001
+          const volM3 = Number(mt[1]) * f * Number(mt[2]) * f * Number(mt[3]) * f
+          if (volM3 <= envM3) return true
+          stripped += 1
+          return false
+        })
+      }
+    }
+  }
+  return stripped
+}
+
 export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3, briefPinnedKeys?: Set<string>): number {
   // Air-cooled-scale demotion runs FIRST (both synthesis paths call this explode —
   // the Codema two-paths lesson), so a demoted plant word is never decomposed below.
@@ -2824,6 +2859,9 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
   // for the same both-paths reason: a demoted duplicate must never explode into
   // priced children, and an invented ×N must never smear into sub-assembly pricing.
   normaliseSystemSingletonControllers(modules, quantities)
+  // Physically-impossible component dimensions (bigger than the whole product's
+  // declared enclosure) strip here for the same both-paths reason.
+  stripOversizeDimensionModifiers(modules, quantities)
   // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
   // part already carrying children is skipped (so re-running never duplicates — the
   // bug that gave a pump 39 children); a sub-component that itself matches a rule (a

@@ -200,6 +200,24 @@ expect(!!rmKept && rmWords.filter((w) => w.mis_emission_note).length === 1
   && String(rmKept.modifier_characters.find((m: any) => m.kind === 'quantity').value) === '×1',
   'remote-monitoring ×5 duo must fold to ONE device ×1 (keeping the pinned word)')
 
+// ── 11. CATCH: oversize dimension strip — a '1123x955x1235 mm' component inside a
+//     0.143 m³ cabinet is physically impossible (run-22 seven-word smear); a dim
+//     that FITS stays; no enclosure signal = strict no-op ──
+import { stripOversizeDimensionModifiers } from './universal-contract-sizing'
+const dimMod: any = { sub_modules: [{ words: [
+  mkWord('pcs_word', 'Power Conversion System', [{ kind: 'dimension', value: '1123x955x1235 mm' }]),
+  mkWord('bms_board_word', 'BMS Board', [{ kind: 'dimension', value: '180x120x40 mm' }]),
+] }] }
+expect(stripOversizeDimensionModifiers([dimMod], { enclosure_volume_m3: 0.143 }) === 1,
+  'a component dimension exceeding the whole enclosure must strip (exactly 1)')
+expect(dimMod.sub_modules[0].words[1].modifier_characters.some((m: any) => m.kind === 'dimension'),
+  'a component dimension that FITS must be untouched')
+const dimNoEnv: any = { sub_modules: [{ words: [
+  mkWord('pcs_word', 'Power Conversion System', [{ kind: 'dimension', value: '1123x955x1235 mm' }]),
+] }] }
+expect(stripOversizeDimensionModifiers([dimNoEnv], {}) === 0,
+  'no enclosure signal must be a strict no-op (utility/open-skid byte-identity)')
+
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '
   + 'plant-scale default calibration preserved; air-cooled scale demotes tank/pump/chiller '
