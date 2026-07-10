@@ -11753,6 +11753,9 @@ def _ga_module_index_map(parts):
 # enclosure_volume_m3 < 1 signal the demotion pass uses + role-noun vocabulary, never
 # a product name. Any archetype without that contract signal is completely untouched.
 SEALED_ENV_MAX_M3 = 1.0
+# set by place_sealed_enclosure in the HERO pass (INSPECT=0): the scene is a CLOSED
+# PRODUCT shot — tag callouts, wire draws + boundary-service beams are suppressed.
+_SEALED_HERO_PRODUCT = False
 _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → top
     ("energy", 0.52,
      re.compile(r"\bcell|\bbattery|\bpack\b|\bmodule|\bstring\b|\brack\b", re.I)),
@@ -11836,7 +11839,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
         ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
     ]:
-        fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
+        _o = fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
+        _o.dimensions = _mm3(size)   # add_box halves; set true size
 
     # 3. stack the zones bottom → top; parts in a WRAPPED GRID inside each band
     #    (run-20 litter fix: 28 parts in ONE row made 13 mm slivers all sharing one
@@ -11885,10 +11889,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
 
     # 4. SKIN parts as thin plates cycled over the faces (front, left, right, top) —
     #    they stay real placed parts (coverage + connection endpoints resolve).
+    # in the HERO pass the skin plates sit just INSIDE the closed product body (drawn
+    # in 4b below) — outside placements would poke through the sealed skin
+    _sk_off = (lambda k: -t * (k + 2)) if not _INSPECT_MODE else (lambda k: t * (k + 1))
     faces = [
-        lambda k: ((0.0, -D / 2 - t * (k + 1)), (iw * 0.9, t), "front"),
-        lambda k: ((-W / 2 - t * (k + 1), 0.0), (t, idep * 0.9), "left"),
-        lambda k: ((W / 2 + t * (k + 1), 0.0), (t, idep * 0.9), "right"),
+        lambda k: ((0.0, -D / 2 - _sk_off(k)), (iw * 0.9, t), "front"),
+        lambda k: ((-W / 2 - _sk_off(k), 0.0), (t, idep * 0.9), "left"),
+        lambda k: ((W / 2 + _sk_off(k), 0.0), (t, idep * 0.9), "right"),
     ]
     for i, p in enumerate(sorted(skin, key=lambda p: str(p.name))):
         (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
@@ -11899,6 +11906,53 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         p.placed_xyz_mm = anchors["centre"]
     if skin:
         print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
+
+    # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
+    #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's
+    #     hero shot is the PRODUCT — one sealed body at the brief dims — never an open
+    #     electronics stack with pipe loops and tag stems (that is the GA/elevations'
+    #     job, and they already carry it). In the HERO pass (INSPECT=0) we close the
+    #     skin: a solid one-piece body over the internals (front face included — the
+    #     inspect pass deliberately leaves the front open so the 2D drawings see
+    #     inside), a subtle inset front panel + vent slots derived from the real
+    #     fan/vent parts, and flags that suppress tag chips + wire draws below.
+    #     The INSPECT pass (drawings, manifest, ledger, schedule) is byte-unchanged.
+    global _SEALED_HERO_PRODUCT
+    _SEALED_HERO_PRODUCT = not _INSPECT_MODE
+    if _SEALED_HERO_PRODUCT:
+        body_mat = fl.make_mat("m_se_product", fl._to_linear((0.91, 0.92, 0.93)),
+                               metallic=0.05, roughness=0.35)
+        panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear((0.84, 0.86, 0.88)),
+                                metallic=0.05, roughness=0.45)
+        vent_mat = fl.make_mat("m_se_product_vent", fl._to_linear((0.30, 0.32, 0.35)),
+                               metallic=0.2, roughness=0.6)
+        # the one-piece sealed body (fully opaque — internals stay for geometry truth
+        # but never show), standing on the floor at its true footprint
+        # NOT the structure module — the shaded hero renders structure faint/glassy
+        # (that is why the thin shell walls never showed); the product skin is the
+        # PRODUCT, so it lives in a real equipment module and renders opaque.
+        _skin_mod = parts[0].module_id if parts else sid
+        if _skin_mod not in MO:
+            MO[_skin_mod] = []
+        _ob = fl.add_box("u_se_product_body", _mm3((0.0, 0.0, base_z + H / 2)),
+                         _mm3((W, D, H)), body_mat, module=_skin_mod, module_objects=MO)
+        _ob.dimensions = _mm3((W, D, H))   # add_box halves; set true size
+        # inset front face panel (the visual parting line every wall unit has)
+        _of = fl.add_box("u_se_product_face", _mm3((0.0, -D / 2 - 2.0, base_z + H / 2)),
+                         _mm3((W * 0.92, 4.0, H * 0.94)), panel_mat, module=_skin_mod, module_objects=MO)
+        _of.dimensions = _mm3((W * 0.92, 4.0, H * 0.94))
+        # vent slots near the top + bottom of the front face — one slot per real
+        # air-mover part (fan / vent / louvre), capped at 4, derived not invented
+        n_vents = min(4, max(1, sum(1 for p in parts
+                                    if re.search(r"\bfan\b|vent|louvre|duct", str(p.name), re.I))))
+        slot_w = W * 0.78
+        for vi in range(n_vents):
+            vz = base_z + H * (0.90 - 0.045 * vi)
+            _ov = fl.add_box(f"u_se_product_vent_{vi}", _mm3((0.0, -D / 2 - 5.0, vz)),
+                             _mm3((slot_w, 3.0, H * 0.012)), vent_mat, module=_skin_mod, module_objects=MO)
+            _ov.dimensions = _mm3((slot_w, 3.0, H * 0.012))
+        print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
+              f"{n_vents} vent slot(s); tags + wire draws suppressed for the product shot")
 
     # 5. route the topology at cabinet scale (the SAME shared router, its geometry
     #    constants scaled to the enclosure so a 1 m cabinet never grows a 300 mm riser)
@@ -11914,6 +11968,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             "y0": -D / 2 - t * 4, "y1": D / 2 + t * 4}
     region_centres = {p.region_key: (0.0, 0.0) for p in parts}
     frame_top_mm = base_z + H
+    if _SEALED_HERO_PRODUCT:
+        # a sealed product shot carries NO visible routing — the lengths/schedule come
+        # from the INSPECT pass; drawing the runs here paints plant pipes on a product.
+        print(f"[univ][sealed] HERO product-skin: {len(topology)} topology edge(s) not drawn")
+        return bbox, region_centres, frame_top_mm, 0, []
     saved = {k: globals()[k] for k in _SE_ROUTE_GLOBALS}
     try:
         for k in _SE_ROUTE_GLOBALS:
@@ -16707,6 +16766,9 @@ def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
             "0", "false", "no", "off"):
         print("[univ][callouts] BLENDER_TAG_CALLOUTS=0 — tag chips suppressed")
         return 0
+    if _SEALED_HERO_PRODUCT:
+        print("[univ][callouts] sealed-product hero — no tag chips on a product shot")
+        return 0
     rows = (manifest or {}).get("parts") or []
     cands = [r for r in rows
              if str(r.get("equipment_tag") or "").strip()
@@ -17461,11 +17523,13 @@ def main():
 
     # EXTERNAL service connections (water-in / effluent-out / power) crossing the plant edge —
     # HERO-ONLY (not _INSPECT_MODE) so the chain's technical render/ledger is unchanged.
-    if not _INSPECT_MODE:
+    if not _INSPECT_MODE and not _SEALED_HERO_PRODUCT:
         try:
             draw_boundary_services(parts, MAT, MO)
         except Exception as _be:
             print(f"[univ][boundary] skipped: {_be}")
+    elif _SEALED_HERO_PRODUCT:
+        print("[univ][boundary] sealed-product hero — no external service beams on a product shot")
     # NOTE: the BUILDING ENVELOPE is NOT built here — it is added as a SECOND render pass in the
     # INSPECT=0 branch (interior first, then shell + exterior) so BOTH drawings come from the
     # SAME scene build. Rendering them as two separate processes gave different layouts (the
@@ -17483,6 +17547,9 @@ def main():
     # Default ON (ports are always wanted); set BLENDER_CONNECTION_PORTS=0 to suppress.
     _ports_on = os.environ.get("BLENDER_CONNECTION_PORTS", "1").strip().lower() \
         not in ("0", "false", "no", "off")
+    if _ports_on and _SEALED_HERO_PRODUCT:
+        _ports_on = False   # a closed product shot shows no port stubs (the INSPECT pass keeps them)
+        print("[univ][ports] sealed-product hero — port stubs suppressed")
     if _ports_on:
         try:
             add_connection_ports(parts, MAT, MO, _ledger_adj)
@@ -17541,6 +17608,8 @@ def main():
     # Family participates in port-to-port wiring when it deferred (process_plant /
     # generic_assembly), under the linear layout, OR the operator forced it explicitly.
     _family_wires = (LINEAR_LAYOUT_ON or family in _PORT_WIRING_FAMILIES or _explicit)
+    if _SEALED_HERO_PRODUCT:
+        _family_wires = False   # a closed product shot draws no wiring (lengths come from the INSPECT pass)
     if _ports_on and _wire_flag and _family_wires:
         try:
             wire_ports(parts, topology, MAT, MO, out_dir=out_dir)
