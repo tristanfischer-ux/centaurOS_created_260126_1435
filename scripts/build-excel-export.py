@@ -8540,11 +8540,38 @@ def _econ_generic_drivers(state: dict, capex: float) -> Dict[str, Any]:
         sale_verified = True
         sale_basis = "from engine · product unit sale price"
     else:
-        sale_price = 0.0  # do NOT ship a degenerate £1/unit stub
-        sale_verified = False
-        sale_basis = ("UNVERIFIED — no per-unit market price is derivable for this "
-                      "class. Enter a real sale price to make the economics tabs "
-                      "meaningful; until then revenue / EBITDA / IRR are not valid.")
+        # ── STORAGE revenue (2026-07-10, Powerwall Financial 4/10 "[MED] no revenue
+        # line"): a product whose headline output is a STORED-ENERGY quantity (kWh/MWh
+        # with NO time dimension) does not sell production — it earns per CYCLE:
+        # annual revenue = usable energy × cycles/yr × charge/discharge price spread.
+        # UNIVERSAL — keyed on the output metric's unit family (energy, not per-year),
+        # never a class name; a per-year producer or a non-energy product falls through
+        # to the existing UNVERIFIED path byte-identically. All three drivers stay
+        # editable live cells; contract signals (cycles_per_year, arbitrage spread)
+        # win over the labelled assumptions.
+        _out_qty, _out_unit, _pu, _noun = _econ_output_metric(state)
+        _u = (_out_unit or "").lower()
+        if (_out_qty and _out_qty > 0 and not _output_is_per_year(_u)
+                and re.search(r"\b(?:k|m|g)?wh\b", _u)):
+            cycles = qval(q, "cycles_per_year")
+            if not cycles:
+                daily = qval(q, "daily_cycles") or qval(q, "cycles_per_day")
+                cycles = float(daily) * 365.0 if daily else 365.0
+            spread = qval(q, "arbitrage_spread_gbp_per_kwh") or 0.15
+            per_kwh = {"gwh": 1_000_000.0, "mwh": 1000.0}.get(
+                re.search(r"\b((?:k|m|g)?wh)\b", _u).group(1), 1.0)
+            sale_price = round(float(cycles) * float(spread) * per_kwh, 2)
+            sale_verified = True
+            sale_basis = (f"storage arbitrage/service model — {int(round(cycles))} "
+                          f"cycles/yr × £{spread:.2f}/kWh charge/discharge spread "
+                          f"(≈ one full cycle per day; edit either driver to your "
+                          f"tariff — revenue = usable energy × this £/{_out_unit}·yr)")
+        else:
+            sale_price = 0.0  # do NOT ship a degenerate £1/unit stub
+            sale_verified = False
+            sale_basis = ("UNVERIFIED — no per-unit market price is derivable for this "
+                          "class. Enter a real sale price to make the economics tabs "
+                          "meaningful; until then revenue / EBITDA / IRR are not valid.")
 
     return {
         "hours": hours, "hours_basis": hours_basis,
@@ -22205,6 +22232,24 @@ def _selftest() -> int:
               f"containing the inner text, got {_flat!r}"); bad += 1
     if isinstance(clean_cell({"a": {"b": "inner"}}), dict):
         print("  FAIL nested-source_detail: deeply nested dict must not pass through as dict"); bad += 1
+    # ═══ proveCatch STORAGE-REVENUE branch (2026-07-10, Powerwall Financial 4/10
+    # "[MED] no revenue line — storage earns arbitrage/service revenue"): an
+    # energy-storage output (kWh, NO time dimension) must derive a per-cycle
+    # arbitrage sale price (365 cycles/yr × £0.15/kWh spread); a per-year producer
+    # must fall through to the honest UNVERIFIED zero byte-identically. ═══
+    _st = {"orchestratorContract": {"quantities": {}, "product_class": "battery_energy_storage"},
+           "parsedBrief": {"constraints": {"target_performance": {"metrics": [{"value": 13.5, "unit": "kWh"}]}}}}
+    _st_drv = _econ_generic_drivers(_st, 8500.0)
+    if not (_st_drv["sale_price_verified"] and abs(_st_drv["sale_price"] - 54.75) < 0.01):
+        print(f"  FAIL storage-revenue proveCatch: a 13.5 kWh storage output must price "
+              f"365 × £0.15 = £54.75/kWh·yr, got {_st_drv['sale_price']!r} "
+              f"verified={_st_drv['sale_price_verified']}"); bad += 1
+    _pp = {"orchestratorContract": {"quantities": {}, "product_class": "water_treatment"},
+           "parsedBrief": {"constraints": {"target_performance": {"metrics": [{"value": 90, "unit": "m3/day"}]}}}}
+    _pp_drv = _econ_generic_drivers(_pp, 1e6)
+    if _pp_drv["sale_price_verified"] or _pp_drv["sale_price"] != 0.0:
+        print(f"  FAIL storage-revenue proveNoFalsePositive: a per-year producer must keep "
+              f"the honest UNVERIFIED zero, got {_pp_drv['sale_price']!r}"); bad += 1
     # ═══ proveCatch/proveNoFalsePositive ENERGY-FROM-DUTY-CYCLE (Sam Green SME review
     # 2026-07-07: "£41k energy could be too high — a lot of kit (pumps) may only operate
     # infrequently"). ═══
