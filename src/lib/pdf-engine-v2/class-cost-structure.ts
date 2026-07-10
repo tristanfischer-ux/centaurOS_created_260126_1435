@@ -796,6 +796,21 @@ function archetypeForUnknownClass(slug: string | undefined): { ratios: CostStack
 
 export function resolveCostStack(state: any, slugHint?: string): { ratios: CostStackRatios; class_key: string } {
   const productClass: string | undefined = state?.keyMetrics?.product_class || state?.moduleDecomposition?.product_class || state?.parsedBrief?.product_class
+  // SCALE-AWARE ENERGY-STORAGE STACK (2026-07-10, Powerwall exit-32 round 6): the
+  // bess/energy_storage entries carry HEAVY-EPC ratios (L=0.20, OH=0.15, I=0.45 —
+  // civils + grid-connect + commissioning), calibrated for containerised utility
+  // plant; on a wall unit they compounded a £38.7k BoM to £87k installed. A
+  // sub-utility unit (nameplate < 100 kWh — the same containerised threshold as
+  // the pricing-override and graph-selection gates) is a FACTORY product sold
+  // through distributor + installer: the existing bess_residential profile
+  // (mid-volume professional) models exactly that. Utility briefs (≥ 100 kWh)
+  // are byte-identical.
+  if (productClass && /^(bess|energy_storage|battery_energy_storage|bess-utility-scale)$/.test(productClass)) {
+    const np = Number(state?.orchestratorContract?.quantities?.nameplate_capacity_kwh?.value)
+    if (Number.isFinite(np) && np > 0 && np < 100 && COST_STACK.bess_residential) {
+      return { ratios: COST_STACK.bess_residential, class_key: 'bess_residential' }
+    }
+  }
   if (productClass && COST_STACK[productClass]) return { ratios: COST_STACK[productClass], class_key: productClass }
   if (slugHint && COST_STACK[slugHint]) return { ratios: COST_STACK[slugHint], class_key: slugHint }
   const projectId: string = state?.projectId || ''

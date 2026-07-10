@@ -737,6 +737,13 @@ const NAME_KEYWORD_RULES: RuleEntry[] = [
   { pattern: /\b(fire|gas|methane|hydrogen|co|oxygen|lel)\b.*\b(detector|detection|panel|alarm|suppression)\b/i, cls: 'oem_fire_safety' },
   { pattern: /\b(fire.panel|alarm.panel|suppression.system|gas.suppression|co2.suppression)\b/i, cls: 'oem_fire_safety' },
   // ── HVAC / chiller (NEVER oem_subsystem) ────────────────────────────────
+  // VENTILATION-ONLY comes FIRST (2026-07-10, Powerwall exit-32 round 6): a
+  // "ventilation system" / extract / exhaust set with NO refrigeration-cycle noun
+  // is FANS + louvres + filters — mechanical_assembly money (duty-priced), never
+  // the £8,000 packaged-chiller anchor ('Hvac Ventilation System' billed £7,360
+  // on a 0.43 kW wall cabinet purely on the 'hvac' keyword). A real chiller/AC
+  // (refrigeration-cycle noun present) still routes to oem_hvac_chiller below.
+  { pattern: /\b(ventilation|extract|exhaust)\b(?![\s\S]*\b(chiller|refrigerant|conditioning|compressor|split.ac|condenser)\b)/i, cls: 'mechanical_assembly' },
   { pattern: /\b(liquid.chiller|chiller.unit|cooling.chiller|industrial.chiller)\b|\b(eb.xt|cc.series)\b.*\b(pfannenberg|stulz)\b/i, cls: 'oem_hvac_chiller' },
   { pattern: /\b(air.conditioning|air.handling|hvac|rooftop.ac|container.ac|cabinet.ac|split.ac)\b/i, cls: 'oem_hvac_chiller' },
   // ── Aerospace / HAPS structural + comms (NEVER oem_subsystem — council 2026-06-01) ──
