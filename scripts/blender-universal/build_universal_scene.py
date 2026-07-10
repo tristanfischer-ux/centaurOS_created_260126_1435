@@ -11838,24 +11838,49 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     ]:
         fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
 
-    # 3. stack the zones bottom → top; parts side-by-side along X inside each band
+    # 3. stack the zones bottom → top; parts in a WRAPPED GRID inside each band
+    #    (run-20 litter fix: 28 parts in ONE row made 13 mm slivers all sharing one
+    #    default box — the GA audit's 92% default-size LITTER + the vision critic's
+    #    corroboration). A crowded band wraps into rows at a legible minimum slot
+    #    width; a part whose word carries its OWN real dims keeps them (clamped to
+    #    the slot) — real per-part sizes wherever the data exists; the rest get a
+    #    deterministic name-keyed size variation so no two read as the same box.
     z_cursor = base_z + margin
+    gap = max(4.0, iw * 0.015)
+    min_slot_w = max(40.0, iw / 8.0)
     for key, frac, _rx in _SE_ZONES:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
         if plist:
             n = len(plist)
-            gap = max(4.0, iw * 0.015)
-            slot_w = max(10.0, (iw - gap * (n - 1)) / n)
+            cols = max(1, min(n, int(iw // (min_slot_w + gap))))
+            rows = int(math.ceil(n / float(cols)))
+            row_h = band_h / rows
+            slot_w = (iw - gap * (cols - 1)) / cols
             for i, p in enumerate(plist):
+                r_i, c_i = divmod(i, cols)
+                fit = None
+                own = p.dim if isinstance(p.dim, dict) else None
+                if own:
+                    w0 = float(own.get("w_mm") or own.get("dia_mm") or 0)
+                    d0 = float(own.get("d_mm") or own.get("dia_mm") or 0)
+                    h0 = float(own.get("h_mm") or own.get("len_mm") or 0)
+                    if 0 < w0 <= slot_w and 0 < d0 <= idep and 0 < h0 <= row_h * 0.95:
+                        fit = (w0, d0, h0)   # the word's OWN dims — real size, kept
+                if fit is None:
+                    hsh = sum(ord(c) for c in str(p.name)) % 97
+                    wf = 0.55 + 0.40 * (hsh / 96.0)
+                    hf = 0.45 + 0.45 * (((hsh * 7) % 97) / 96.0)
+                    fit = (max(20.0, slot_w * wf), idep * 0.78,
+                           max(16.0, row_h * 0.82 * hf))
                 p.shape = "box"
-                p.dim = parse_dimension(f"{slot_w:.0f}x{idep * 0.78:.0f}x{band_h * 0.82:.0f} mm")
-                cx = -iw / 2 + slot_w / 2 + i * (slot_w + gap)
-                asm, anchors = build_part(p, cx, 0.0, z_cursor, MAT, MO)
+                p.dim = parse_dimension(f"{fit[0]:.0f}x{fit[1]:.0f}x{fit[2]:.0f} mm")
+                cx = -iw / 2 + slot_w / 2 + c_i * (slot_w + gap)
+                asm, anchors = build_part(p, cx, 0.0, z_cursor + r_i * row_h, MAT, MO)
                 p.obj_anchor, p.anchors = asm, anchors
                 p.placed_xyz_mm = anchors["centre"]
-            print(f"[univ][sealed] zone {key}: {n} part(s) in a "
-                  f"{band_h:.0f} mm band at z {z_cursor - base_z:.0f}")
+            print(f"[univ][sealed] zone {key}: {n} part(s) in {rows} row(s) × "
+                  f"{cols} col(s), band {band_h:.0f} mm at z {z_cursor - base_z:.0f}")
         z_cursor += band_h
 
     # 4. SKIN parts as thin plates cycled over the faces (front, left, right, top) —
@@ -16706,10 +16731,18 @@ def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
     bb = manifest.get("bbox_mm") or {}
     span_mm = max(float(bb.get("length_mm") or 0.0),
                   float(bb.get("width_mm") or 0.0), 1000.0)
-    text_mm = max(TAG_CALLOUT_TEXT_MIN_MM,
+    # The 260 mm text FLOOR is a PLANT constant — on a sub-metre device scene it
+    # makes each chip WIDER than the whole product (run-20 Powerwall: 1,066 mm
+    # chips over a 609 mm cabinet, laddering 3.5 m). The hero camera frames the
+    # bbox, so RELATIVE size is what reads: floor the text at 5.5% of the span
+    # instead when that is smaller — same on-screen legibility at every scale.
+    _text_floor_mm = min(TAG_CALLOUT_TEXT_MIN_MM, span_mm * 0.055)
+    text_mm = max(_text_floor_mm,
                   min(TAG_CALLOUT_TEXT_MAX_MM, span_mm * TAG_CALLOUT_TEXT_FRAC))
     chip_h_mm = text_mm * 1.7
     chip_t_mm = max(28.0, text_mm * 0.08)          # chip thickness (thin slab)
+    # the fixed 550 mm part-to-chip air gap follows the same relative rule
+    _clear_mm = min(TAG_CALLOUT_CLEAR_MM, span_mm * 0.12)
 
     # TWO hero cameras consume this scene (both az 45°, different elevations —
     # MEASURED from their own camera formulas, run-E finding: modelling only the
@@ -16822,13 +16855,23 @@ def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
 
     placed = []          # (u_mm, x_mm, y_mm, z_mm, chip_w_mm)
     placements = []      # (row, tag, x_mm, y_mm, top_mm, chip_w_mm, chip_z_mm)
+    # LADDER CEILING (2026-07-10, Powerwall hero: a 0.6 m-wide cabinet puts EVERY
+    # chip in the same screen column, so the anti-overlap stagger climbed 12 chips
+    # into a ~4.5 m tower of floating labels on parallel leader stems — the vision
+    # critic's exact finding). A chip lifted beyond ~1.2× the plant span above the
+    # tallest part is unreadable sky furniture: DROP it instead of placing it (the
+    # GA + equipment schedule carry every tag). Plant-scale scenes are unaffected —
+    # a tens-of-metres span puts the ceiling far above the pipe corridor.
+    _tallest_top_mm = max((_tag_callout_top_z_mm(r) for r in picked), default=0.0)
+    _chip_ceiling_mm = _tallest_top_mm + max(1.2 * span_mm, 6.0 * chip_h_mm)
+    _dropped_ceiling = 0
     for r in picked:
         tag = str(r["equipment_tag"]).strip()
         x_mm, y_mm = float(r["pos_mm"][0]), float(r["pos_mm"][1])
         top_mm = _tag_callout_top_z_mm(r)
         chip_w_mm = text_mm * (0.62 * len(tag) + 1.0)
         chip_z_mm = (max(top_mm, corridor_top_mm)
-                     + TAG_CALLOUT_CLEAR_MM + chip_h_mm / 2.0)
+                     + _clear_mm + chip_h_mm / 2.0)
         u_mm = (x_mm + y_mm) / math.sqrt(2.0)
         for _ in range(14):                                  # bounded, monotone up
             if not _sightline_clear(x_mm, y_mm, chip_z_mm, chip_w_mm / 2.0):
@@ -16851,6 +16894,12 @@ def add_tag_callouts(manifest, MAT=None, limit=TAG_CALLOUT_COUNT):
             if need_z is None:
                 break
             chip_z_mm = need_z
+        if chip_z_mm > _chip_ceiling_mm:
+            _dropped_ceiling += 1
+            print(f"[univ][callouts] drop {tag}: resolved z {chip_z_mm:.0f} exceeds the "
+                  f"ladder ceiling {_chip_ceiling_mm:.0f} (span {span_mm:.0f}) — an "
+                  f"unreadable sky chip; the GA/schedule carry the tag")
+            continue
         placed.append((u_mm, x_mm, y_mm, chip_z_mm, chip_w_mm))
         placements.append((r, tag, x_mm, y_mm, top_mm, chip_w_mm, chip_z_mm))
         print(f"[univ][callouts] place {tag}: u={u_mm:.0f} z={chip_z_mm:.0f} "
