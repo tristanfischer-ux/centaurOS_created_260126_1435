@@ -107,16 +107,23 @@ const occUtil: any = { sub_modules: [{ words: [
 expect(demoteLiquidThermalPlantAtAirCooledScale([occUtil], { enclosure_volume_m3: 86, system_thermal_dissipation_kw: 25 }) === 0,
   'a containerised enclosure must keep its gas-detection plant')
 
-// ── 9. CATCH: a cabinet fan's kW is capped at ~1.5× the contract thermal load ──
+// ── 9. CATCH: a fan explodes into FAN anatomy (housing/impeller/EC motor — never a
+//     mechanical seal or isolation valve), duty-capped at ~1.5× the thermal load ──
 const fanMod: any = { sub_modules: [{ words: [
   mkWord('active_ventilation_fan_word', 'Active Ventilation Fan',
     [{ kind: 'quantity', value: '×1' }, { kind: 'rating_primary', value: '1.7', unit: 'kW' }]),
 ] }] }
 explodeEquipmentSubAssemblies([fanMod], { system_thermal_dissipation_kw: 0.43, hvac_design_load_kw: 0.14 })
-const fanCasing = fanMod.sub_modules[0].words.find((w: any) => /fan_word__casing/.test(String(w.id)))
-const fanCasingGbp = Number((fanCasing?.modifier_characters ?? []).find((x: any) => x.kind === 'price_estimate_gbp')?.value ?? 1e9)
-expect(fanCasingGbp < 1000,
-  `a 1.7 kW-rated fan on a 0.43 kW-dissipation cabinet must price capped (casing got £${fanCasingGbp})`)
+const fanKids = fanMod.sub_modules[0].words.filter((w: any) => w._subcomponent)
+const fanKidNames = fanKids.map((w: any) => String(w.name_human))
+expect(fanKidNames.some((n: string) => /EC Motor/.test(n)) && fanKidNames.some((n: string) => /Impeller/.test(n)),
+  `fan must decompose into fan anatomy (got ${fanKidNames.join(', ')})`)
+expect(!fanKidNames.some((n: string) => /Mechanical Seal|Isolation Valve|Baseplate/i.test(n)),
+  'a fan must never mint pump anatomy (seals / isolation valves / baseplate)')
+const fanTotal = fanKids.reduce((s: number, w: any) =>
+  s + Number((w.modifier_characters ?? []).find((x: any) => x.kind === 'price_estimate_gbp')?.value ?? 0), 0)
+expect(fanTotal < 500,
+  `a duty-capped cabinet fan set must price at EC-fan money, never pump anatomy £3,971 (got £${Math.round(fanTotal)})`)
 
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '

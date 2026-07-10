@@ -190,6 +190,19 @@ export const CLASS_OUTPUT_BANDS: Record<string, IndustryCostBand & { aliases?: s
     aliases: ['energy_storage', 'battery_storage'],
     notes: 'Utility BESS LFP, ex-works £/kWh (BNEF 2H-2024 / Aurora / WoodMac £200-500/kWh raw-to-premium). Tighter than the £150-800 family band, which spans residential + solid-state.',
   },
+  bess_residential: {
+    family: 'energy_storage', low: 300, high: 700, per_unit_label: '£/kWh',
+    // No aliases — selected by the SCALE branch in resolveClassOutputBand (nameplate
+    // < 100 kWh), never by slug, so utility briefs can never land here by accident.
+    notes: 'Residential wall-mounted ALL-IN-ONE ESS (10-20 kWh with integrated hybrid ' +
+      'inverter + MPPTs + enclosure + BMS), ex-works £/kWh of usable energy. Market ' +
+      'anchors 2026: Tesla Powerwall 3 13.5 kWh product-only UK retail ~£7.5-9k ' +
+      '(→ ex-works ~£5.2-6.5k ≈ £385-480/kWh); BYD Battery-Box HVS + hybrid inverter ' +
+      'and GivEnergy All-in-One packages £300-600/kWh ex-works. Higher than utility ' +
+      '£/kWh because the unit carries the whole PCS + outdoor enclosure + consumer ' +
+      'packaging at 10-20 kWh scale. The band is calibrated to the MARKET, not to any ' +
+      'run — an inflated design still fails it (honest-scoring precondition).',
+  },
   solar_inverter: {
     family: 'power', low: 80, high: 250, per_unit_label: '£/kW',
     aliases: ['pv_inverter', 'central_inverter'],
@@ -253,6 +266,18 @@ const CLASS_BAND_BY_ALIAS: Record<string, IndustryCostBand> = (() => {
  *  (→ caller uses the universal family band). Tries product_class, then the
  *  projectId / slug prefix, mirroring resolvePriceBand's resolution order. */
 export function resolveClassOutputBand(state: any, family: OutputFamily): IndustryCostBand | null {
+  // SCALE-AWARE energy-storage band (2026-07-10, Powerwall loop): the `bess` band is
+  // UTILITY ex-works £/kWh; a residential all-in-one wall unit carries the whole PCS +
+  // enclosure at 10-20 kWh scale and its honest market band is higher (see
+  // bess_residential.notes). Same sub-utility threshold (nameplate < 100 kWh) as the
+  // pricing-override / graph-selection / cost-stack gates. The residential band is
+  // market-calibrated, NOT run-calibrated — an inflated design still fails it.
+  if (family === 'energy_storage') {
+    const np = Number(state?.orchestratorContract?.quantities?.nameplate_capacity_kwh?.value)
+    if (Number.isFinite(np) && np > 0 && np < 100 && CLASS_OUTPUT_BANDS.bess_residential) {
+      return CLASS_OUTPUT_BANDS.bess_residential
+    }
+  }
   const tryKey = (k: unknown): IndustryCostBand | null => {
     const s = String(k ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
     const b = s ? CLASS_BAND_BY_ALIAS[s] : undefined

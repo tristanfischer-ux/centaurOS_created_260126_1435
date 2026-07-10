@@ -2518,11 +2518,25 @@ const SUB_ASSEMBLY: { re: RegExp; refKw?: number; parts: SubSpec[] }[] = [
       { name: 'Earthing Boss', derive: () => ({ gbp: 120 }) },
       { name: 'Nameplate', derive: () => ({ gbp: 60 }) },
     ] },
-  { re: /(?<!heat[\s-])\bpump\b|blower|(?<!scroll\s)compressor|\bfan\b/i,  // NOT 'heat pump' (its own rule below)
+  // FAN gets its OWN anatomy (2026-07-10, exit-32 round 7): an axial/centrifugal fan
+  // has no mechanical seal, no suction/discharge isolation valves, no baseplate — the
+  // pump template minted all of those (a wall cabinet's ventilation fan billed £3,971
+  // of pump anatomy). Honest fan parts, duty-linear from small EC-fan money. Checked
+  // BEFORE the pump rule so \bfan\b never falls through to pump parts.
+  { re: /\bfan\b/i,
+    parts: [
+      { name: 'Fan Housing / Venturi', derive: (p) => ({ gbp: 25 + (p.kw || 0.1) * 120 }) },
+      { name: 'Impeller', derive: (p) => ({ rating: { v: p.kw || 0.1, u: 'kW' }, gbp: 12 + (p.kw || 0.1) * 60 }) },
+      { name: 'EC Motor', derive: (p) => ({ rating: { v: p.kw || 0.1, u: 'kW' }, gbp: 30 + (p.kw || 0.1) * 180 }) },
+      { name: 'Speed Controller', derive: (p) => ({ gbp: 18 + (p.kw || 0.1) * 40 }) },
+      { name: 'Guard / Grille', derive: () => ({ gbp: 9 }) },
+      { name: 'Mounting Frame & Isolators', derive: () => ({ gbp: 14 }) },
+    ] },
+  { re: /(?<!heat[\s-])\bpump\b|blower|(?<!scroll\s)compressor/i,  // NOT 'heat pump' (its own rule below)
     // refKw 2: the £1,500-casing-class bases are industrial-pump money, honest from
     // ~2 kW up (every Codema principal — drain 2.2 / hand 3 / fertigation 15 kW — sits
-    // at f=1, byte-identical). A sub-kW metering pump or cabinet fan scales down by
-    // the six-tenths law instead of billing an industrial casing (Powerwall exit-32).
+    // at f=1, byte-identical). A sub-kW metering pump scales down by the six-tenths
+    // law instead of billing an industrial casing (Powerwall exit-32).
     refKw: 2,
     parts: [
       { name: 'Casing', derive: (p) => ({ gbp: 1500 + (p.kw || 30) * 14 }) },
