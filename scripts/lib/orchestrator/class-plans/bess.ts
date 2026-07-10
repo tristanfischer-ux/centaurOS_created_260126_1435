@@ -971,3 +971,29 @@ export const BESS_UTILITY_CONTAINERISED_PLAN: ClassToolPlan = {
 }
 
 registerPlan(BESS_UTILITY_CONTAINERISED_PLAN)
+
+// ── RESIDENTIAL tier (2026-07-10, Powerwall loop exit-7): the envelope detector
+// correctly classifies a sub-utility wall unit as bess/residential, but no plan was
+// registered — the bootstrap-on-miss then failed (native-module version mismatch in
+// the candidate cache) and the chain honestly hard-exited. The residential-relevant
+// subset of the utility plan: cell/pack sizing (pybamm), PCS electrical simulation
+// (ngspice), real-part search (octopart), standards (IEC), and the UK LV grid-code
+// check (G99 — exactly the residential connection regime). Deliberately EXCLUDED:
+// coolprop (no refrigeration cycle — forced-air unit), pandapower (no MV network to
+// solve at a 230 V single-phase tie), arc-flash + protection-coordination studies
+// (installer/BS 7671 domain at domestic LV, not product design), and the container
+// mass-aggregator (the cabinet contract emits unit_mass_kg directly).
+export const BESS_RESIDENTIAL_PLAN: ClassToolPlan = {
+  id: 'bess:residential',
+  envelope_predicate: (e) =>
+    e.class === 'bess' &&
+    e.scale_tier === 'residential' &&
+    (e.nameplate_kwh === undefined || e.nameplate_kwh < 100),
+  tools: [stepPybamm, stepNgspice, stepOctopart, stepIecStandards, stepG99Compliance],
+  coupled_pairs: [],
+  max_iterations: 5,
+  convergence_tolerance_pct: 2.0,
+  consistency_rules: rules,
+}
+
+registerPlan(BESS_RESIDENTIAL_PLAN)
