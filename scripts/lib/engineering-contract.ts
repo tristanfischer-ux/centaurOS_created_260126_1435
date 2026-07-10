@@ -1194,6 +1194,46 @@ registerArchetype('bess', (brief: any) => {
         dc_surge_current_a: q(dcSurgeA, 'A', 'dimensionless', 'peak', 'system', 'calculator', { source_detail: `surge_apparent_power_kva × 1000 / dc_bus_voltage_v — the DC-side transient every switching/protection device in the pack path must carry for motor-start duration; contactor/fuse frames size to THIS, not the continuous ${busContinuousA.toFixed(1)} A`, from: ['surge_apparent_power_kva', 'dc_bus_voltage_v'], condition: 'motor-start LRA, short duration' }),
       }
     })()),
+    // DELIVERED CHARGE RATING (2026-07-10): every storage system delivers a continuous
+    // charge power — pack-limited at the LFP 0.5C continuous-charge convention, never
+    // above the PCS continuous rating. A DELIVERED derivation (cell physics), not a
+    // brief echo — a brief asking more than 0.5C reads an honest shortfall.
+    max_continuous_charge_kw: q(
+      Math.round(Math.min(0.5 * nameplateKwhRequested, continuousKw) * 100) / 100,
+      'kW', 'power', 'continuous', 'system', 'calculator',
+      { source_detail: `min(0.5C × nameplate ${nameplateKwhRequested} kWh = ${(0.5 * nameplateKwhRequested).toFixed(1)} kW [LFP continuous-charge convention], PCS continuous ${continuousKw} kW)`, from: ['nameplate_capacity_kwh', 'continuous_power_kw'] },
+    ),
+    // INTEGRATED PV FRONT-END (2026-07-10): when the brief describes integrated solar
+    // MPPT inputs (a pv/mppt metric or description signal — any hybrid all-in-one, not
+    // a product-specific branch), the design ADOPTS the PV input rating + MPPT channel
+    // count as inverter front-end specs — design-delivered ratings the same way the AC
+    // output voltage is, priced within the hybrid inverter. Briefs without a PV signal
+    // emit nothing.
+    ...((() => {
+      const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+      let pvKw = 0
+      let mpptN = 0
+      for (const m of mets) {
+        const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+        const v = Number(m?.value)
+        if (!(v > 0)) continue
+        if (/pv.*(input|stc|kw)|solar.*(input|kw)/.test(key)) pvKw = pvKw || v
+        if (/mppt/.test(key)) mpptN = mpptN || Math.round(v)
+      }
+      if (!(pvKw > 0)) {
+        const dm = desc.match(/up to\s+(\d{1,3})\s*kW\s*(?:STC|of\s+(?:solar|pv))/i)
+        if (dm) pvKw = parseInt(dm[1], 10)
+      }
+      if (!(mpptN > 0)) {
+        const dm = desc.match(/(\d{1,2})\s*(?:×|x)?\s*MPPT/i)
+        if (dm) mpptN = parseInt(dm[1], 10)
+      }
+      if (!(pvKw > 0)) return {}
+      return {
+        pv_stc_input_kw: q(pvKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: `integrated solar DC input the hybrid inverter front-end is rated to accept (${pvKw} kW STC${mpptN > 0 ? ` across ${mpptN} MPPT channels` : ''}) — a design-adopted inverter spec, priced within the hybrid PCS`, from: ['continuous_power_kw'] }),
+        ...(mpptN > 0 ? { mppt_count: q(mpptN, '', 'dimensionless', 'rated', 'component', 'calculator', { source_detail: `MPPT channel count of the integrated hybrid-inverter front-end (${mpptN}) — a feature count of ONE inverter, never separate equipment`, from: ['pv_stc_input_kw'] }) } : {}),
+      }
+    })()),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
     // authoritative values so the deterministic emitter consumes them via
     // q(contract, …) shadowing (drawer: q() helper is contract-wins).
@@ -1368,14 +1408,21 @@ registerArchetype('bess', (brief: any) => {
   //         genuinely over-constrained for 3.5 MWh + 1 MW PCS at LFP density;
   //         further reductions need 314 Ah cells or a 2-container split)
   //   fail: in_container > briefMassCapKg × 1.10 (cannot ship; revise design)
+  // Mass closure audits the SCALE-APPROPRIATE mass budget (2026-07-10): the
+  // containerised budget (cells + shell + racks + PCS + cooling, utility constants)
+  // is meaningless for a cabinet — at 14 kWh it read 7,287 kg vs a 130 kg cap and
+  // fail-flagged every run. The cabinet budget is unit_mass_kg (cells × 1.45).
+  const massClosureMassKg = isContainerisedScale ? inContainerMassKg : Math.round(totalCellMassKg * 1.45)
   closures.push({
     invariant_id: 'mass_closure',
-    status: inContainerMassKg <= briefMassCapKg ? 'pass'
-          : inContainerMassKg <= briefMassCapKg * 1.10 ? 'warn'
+    status: massClosureMassKg <= briefMassCapKg ? 'pass'
+          : massClosureMassKg <= briefMassCapKg * 1.10 ? 'warn'
           : 'fail',
-    measured: quantities.in_container_mass_kg,
-    required: { value: briefMassCapKg, unit: 'kg', basis: 'max', source_detail: 'in-container gross mass (cells + shell + racks + PCS + BMS + cooling); MV step-up transformer EXTERNAL pad-mount per IEC 62933-5-2 §6.4' } as any,
-    reason: `In-container mass ${inContainerMassKg.toFixed(0)} kg vs brief cap ${briefMassCapKg} kg (${((inContainerMassKg / briefMassCapKg) * 100).toFixed(0)}%). Breakdown: cells ${totalCellMassKg.toFixed(0)} + shell ${containerTareKg} + racks ${totalRackMassKg} + PCS ${pcsMassKg} + BMS/cable ${bmsCablingMassKg} + cooling ${coolingMassKg} kg. External pad-mounted ${transformerMassKg} kg transformer NOT counted (industry standard utility-BESS layout — Tesla Megapack, Sungrow PowerStack, Wartsila GridSolv Quantum).`,
+    measured: isContainerisedScale ? quantities.in_container_mass_kg : quantities.unit_mass_kg,
+    required: { value: briefMassCapKg, unit: 'kg', basis: 'max', source_detail: isContainerisedScale ? 'in-container gross mass (cells + shell + racks + PCS + BMS + cooling); MV step-up transformer EXTERNAL pad-mount per IEC 62933-5-2 §6.4' : 'sealed-cabinet unit gross mass (cells + pack hardware + integrated hybrid inverter + enclosure)' } as any,
+    reason: isContainerisedScale
+      ? `In-container mass ${inContainerMassKg.toFixed(0)} kg vs brief cap ${briefMassCapKg} kg (${((inContainerMassKg / briefMassCapKg) * 100).toFixed(0)}%). Breakdown: cells ${totalCellMassKg.toFixed(0)} + shell ${containerTareKg} + racks ${totalRackMassKg} + PCS ${pcsMassKg} + BMS/cable ${bmsCablingMassKg} + cooling ${coolingMassKg} kg. External pad-mounted ${transformerMassKg} kg transformer NOT counted (industry standard utility-BESS layout — Tesla Megapack, Sungrow PowerStack, Wartsila GridSolv Quantum).`
+      : `Unit mass ${massClosureMassKg} kg (cells ${totalCellMassKg.toFixed(0)} kg × 1.45 pack/inverter/enclosure factor) vs brief cap ${briefMassCapKg} kg (${((massClosureMassKg / briefMassCapKg) * 100).toFixed(0)}%).`,
   })
   closures.push({
     invariant_id: 'capacity_closure',
@@ -1696,7 +1743,16 @@ registerArchetype('bess', (brief: any) => {
   const cellRoundTripEfficiency = 0.97
   const pcsRoundTripEfficiency = inverterEfficiency * inverterEfficiency
   const assumedChillerCop = 3.5
-  const chillerElectricalKw = systemThermalDissipationKw / assumedChillerCop
+  // COOLING DRIVE POWER BY THERMAL PATH (2026-07-10): below the 2 kW required-duty
+  // threshold (the SAME signal as the emitter's air-cooled branch) the unit is
+  // forced-air — its cooling electrical input is FAN drive power (~6% of the heat
+  // moved, typical EC-fan forced-air fraction), NOT a chiller compressor at COP 3.5.
+  // Charging a phantom compressor cost the cabinet ~1.5 RTE points (87.5% vs the 89%
+  // floor). Liquid-cooled (duty ≥ 2 kW) briefs unchanged.
+  const isAirCooledThermalPath = systemThermalDissipationKw * 1.2 < 2
+  const chillerElectricalKw = isAirCooledThermalPath
+    ? systemThermalDissipationKw * 0.06
+    : systemThermalDissipationKw / assumedChillerCop
   const cycleDischargeHr = continuousKw > 0 ? usableKwhAchieved / continuousKw : 0
   const cycleDurationHr = cycleDischargeHr * 2  // charge assumed same duration as discharge
   const auxEnergyKwh = (chillerElectricalKw + hvacDesignLoadKw + standbyAuxLossKw) * cycleDurationHr
@@ -1797,7 +1853,7 @@ registerArchetype('bess', (brief: any) => {
           `cell RTE ${(cellRoundTripEfficiency * 100).toFixed(0)}% (LFP prismatic coulombic+voltage efficiency, ` +
           `STATED ASSUMPTION — no per-cell datasheet RTE in corpus) × PCS efficiency² ${(pcsRoundTripEfficiency * 100).toFixed(1)}% ` +
           `(${(inverterEfficiency * 100).toFixed(0)}% single-pass, real contract value, squared for AC-DC charge + DC-AC discharge) × ` +
-          `aux-load factor ${(auxLoadFactor! * 100).toFixed(1)}% (chiller @ COP ${assumedChillerCop} STATED ASSUMPTION on real ` +
+          `aux-load factor ${(auxLoadFactor! * 100).toFixed(1)}% (${isAirCooledThermalPath ? `forced-air fan drive ≈ 6% of` : `chiller @ COP ${assumedChillerCop} STATED ASSUMPTION on`} real ` +
           `systemThermalDissipationKw=${systemThermalDissipationKw.toFixed(1)} kW + real hvacDesignLoadKw=${hvacDesignLoadKw} kW + ` +
           `real standbyAuxLossKw=${standbyAuxLossKw} kW, over a ${cycleDurationHr.toFixed(2)} h charge+discharge cycle, ` +
           `${auxEnergyKwh.toFixed(1)} kWh aux vs ${usableKwhAchieved.toFixed(0)} kWh usable) = ${roundTripEfficiencyPercent.toFixed(1)}%`,
@@ -1812,6 +1868,22 @@ registerArchetype('bess', (brief: any) => {
         ],
       },
     )
+    // EXACT-KEY ALIAS under the brief's OWN RTE metric key when it differs from the
+    // canonical `_percent` spelling (e.g. `round_trip_efficiency_pct`) — the same
+    // delivered-value alias pattern as demand-coverage rule 4b-exact, so the Exec
+    // compliance matrix verifies by exact name. Never an echo: the value IS the
+    // computed delivered efficiency (a genuine shortfall still reads FAIL).
+    {
+      const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+      const rteMet = mets.find((mm: any) => /round.?trip.*efficiency/i.test(String(mm?.key_metric ?? mm?.metric ?? mm?.name ?? '')))
+      const rteKey = String(rteMet?.key_metric ?? rteMet?.metric ?? rteMet?.name ?? '').trim()
+      if (rteKey && rteKey !== 'round_trip_efficiency_percent' && !(rteKey in quantities)) {
+        quantities[rteKey] = q(
+          Math.round(roundTripEfficiencyPercent * 100) / 100, '%', 'dimensionless', 'rated', 'system', 'calculator',
+          { source_detail: `exact brief-key alias of round_trip_efficiency_percent (the computed delivered efficiency) so the compliance matrix verifies by exact name`, from: ['round_trip_efficiency_percent'] },
+        )
+      }
+    }
   }
   if (costPerKwhGbp !== null) {
     quantities.cost_per_kwh_gbp = q(

@@ -103,6 +103,11 @@ TYPE_RULES = [
                    # cabinet-internal component that was never meant to have a discrete flow path).
                    r"\bLCL\b|filter\s+inductor|filter\s+capacitor|filter\s+choke|filter\s+reactor|"
                    r"\bEMI\s+filter\b|\bRFI\s+filter\b|harmonic\s+filter|"
+                   # a bare 'Output Filter' / 'AC Filter' on an inverter/PCS is the AC output
+                   # LCL stage — power electronics, never a process separator (Powerwall v13:
+                   # 'Output Filter' typed separator → false 'fluid in+out' connectivity FAIL
+                   # on a solid-state product; process plants say inlet/outlet/discharge filter).
+                   r"\boutput\s+filter\b|\bac\s+filter\b|"
                    # 'panel' means an ELECTRICAL distribution/control panel — but a bare match also
                    # caught non-electrical HVAC/fire/insulation/data compounds sharing the same head
                    # noun (BESS v3 dissection 2026-07-05): a louvre VENT panel, a suppression
@@ -125,7 +130,11 @@ TYPE_RULES = [
                    r"makeup hex|reboil"),
     # `\bscreen\b` (not bare `screen`) so a filtration screen / drum screen matches but an HMI
     # "touchscreen" does NOT fall to separator (the HMI is caught by the control rule above anyway).
-    ("separator",  r"drum filter|\bscreen\b|filter|clarifi|settl|cyclone|membrane|biofilter|\bMBBR\b"),
+    # `(?<!interface )(?<!cell )membrane` — an 'Interface Membrane' / 'Cell Membrane' is a
+    # component INSIDE an electrochemical device (pack separator film / gasket), not a
+    # process-fluid membrane skid (Powerwall v13 false process-typing; same fixed-width
+    # lookbehind idiom as the panel exclusions above).
+    ("separator",  r"drum filter|\bscreen\b|filter|clarifi|settl|cyclone|(?<!interface )(?<!cell )membrane|biofilter|\bMBBR\b"),
     # 'crystalli[sz]er' (crystalliser/crystallizer/recrystalliser/recrystallizer) is a
     # process VESSEL by shape (same CO2-v1 fix as 'reboil' above) — 'K2SO4 recrystalliser'
     # fell to 'other' despite being drawn on the P&ID + block-flow-diagram already.
@@ -1399,7 +1408,13 @@ def main() -> int:
         # filled by EXTERNAL DELIVERY (drums / IBC / manual top-up), NOT a piped process line — they are
         # a process-fluid SOURCE with an output to the dosing pump and no piped INPUT. Requiring a piped
         # fluid input is a false orphan (the fill is off-system). Universal for any chemical day-tank.
-        "nutrient tank", "stock tank", "day tank", "concentrate tank", "dosing tank", "chemical tank"}
+        "nutrient tank", "stock tank", "day tank", "concentrate tank", "dosing tank", "chemical tank",
+        # ENCLOSURE / CABINET COOLING FANS move UNDUCTED AIR — they are never in a piped
+        # process-fluid path, so requiring a fluid in+out is a false orphan (Powerwall v13:
+        # the EC cooling fan held process connectivity at 50%). Universal: every enclosure
+        # fan (utility container or wall cabinet) has a POWER feed (electrical connectivity
+        # covers it), not process pipework.
+        "cooling fan", "ventilation fan", "enclosure fan", "cabinet fan", "axial fan", "case fan"}
 
     connectivity_concerns = []
     origin_parts = []
