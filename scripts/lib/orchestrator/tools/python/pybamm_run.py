@@ -440,7 +440,19 @@ def compute(payload: dict) -> dict:
         parallel_strings_total = topo["parallel_strings_total"]
         string_voltage_nominal_v = topo["string_voltage_nominal_v"]
 
-    cell_mass_kg = CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
+    # CONTRACT CELL MASS WINS (2026-07-10, Powerwall run-20 mass_closure FAIL): the
+    # contract's cell LADDER picked a 50 Ah / 1.05 kg cell, but this table only knows
+    # the utility 314 Ah / 5.49 kg — total_cell_mass_kg came back 483 kg on a 92 kg
+    # pack, pushed unit mass over the 130 kg brief cap and failed mass_feasibility.
+    # The payload now threads the contract's own cell_mass_kg through (the ONE-MINT
+    # note above always said "until the payload threads it through"); the chemistry
+    # table remains the fallback for contracts that omit the quantity.
+    _cell_mass_payload = payload.get("cell_mass_kg")
+    try:
+        _cmp = float(_cell_mass_payload) if _cell_mass_payload not in (None, "", 0) else 0.0
+    except (TypeError, ValueError):
+        _cmp = 0.0
+    cell_mass_kg = _cmp if _cmp > 0 else CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
     total_cell_mass_kg = round(cell_count_rounded * cell_mass_kg, 1)
 
     # BMS slave board sizing — per-rack boundary (LTC6813-1 is 18-ch; wires

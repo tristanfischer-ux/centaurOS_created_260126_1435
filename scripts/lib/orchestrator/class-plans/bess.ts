@@ -147,6 +147,10 @@ const stepPybamm: ToolStep = {
     // present pybamm uses these literally (skips derive_pack_topology + the
     // EoL cell-count round-up). Contract-built topology already respects
     // mass cap + DC bus voltage class boundary (250S × 3.2V = 800V exactly).
+    // 2026-07-10 (run-20 mass_closure): thread the contract LADDER's own cell mass
+    // through — pybamm's chemistry table only knows the utility 314 Ah / 5.49 kg cell,
+    // which gave a 483 kg cell mass on a 92 kg residential pack. Null → table fallback.
+    cell_mass_kg: c.quantities?.cell_mass_kg?.value ?? null,
     cell_count_authoritative: c.quantities?.cell_count?.value ?? null,
     rack_count_authoritative: c.quantities?.rack_count?.value ?? null,
     cells_per_rack_authoritative: c.quantities?.cells_per_rack?.value ?? null,
