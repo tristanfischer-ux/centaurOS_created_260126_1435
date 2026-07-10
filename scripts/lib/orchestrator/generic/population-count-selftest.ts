@@ -149,6 +149,25 @@ function run() {
   if (!(sibRemain.includes('DC Fuse') && sibRemain.includes('AC Fuse'))) {
     throw new Error('phantom-drop: dc vs ac fuses are DISTINCT (discriminator pair)')
   }
+  // generic-tail collapse: 'Audible Alarm System' folds onto 'Audible Alarm';
+  // 'Fire Suppression System' vs 'Gas Detection System' stay distinct (different
+  // effective heads once the generic tail collapses)
+  const gt: any = [{
+    module: 'safety', sub_modules: [{ sub_module: 's', words: [
+      { ...word('Audible Alarm', 1), id: 'audible_alarm_word' },
+      { ...word('Audible Alarm System', 1), id: 'audible_alarm_system_word' },
+      { ...word('Fire Suppression System', 1), id: 'fire_suppression_system_word' },
+      { ...word('Gas Detection System', 1), id: 'gas_detection_system_word' },
+    ] }],
+  }]
+  dropAttributePhantomWords(gt)
+  const gtRemain = gt[0].sub_modules[0].words.map((w: any) => w.name_human)
+  if (gtRemain.filter((n: string) => /audible alarm/i.test(n)).length !== 1) {
+    throw new Error(`phantom-drop: 'Audible Alarm System' must fold onto 'Audible Alarm' (got ${JSON.stringify(gtRemain)})`)
+  }
+  if (!(gtRemain.includes('Fire Suppression System') && gtRemain.includes('Gas Detection System'))) {
+    throw new Error('phantom-drop: suppression vs detection systems are DISTINCT families')
+  }
 
   // eslint-disable-next-line no-console
   console.log('population-count --selftest OK (4 valve smears → ×1; genuine actuated stays ×200; ' +

@@ -856,7 +856,10 @@ def audit_completeness(parts, final_topology, required_services, log=print):
             is_sink = bool(_FLUID_SINK_RE.search(nm))
             is_inline_tap = bool(_INLINE_TAP_RE.search(nm))
             if is_inline_tap:
-                if not has_in and not has_out:
+                # an AIR tie satisfies the inline-tap ≥1-tie rule too (run-31: the
+                # air-cooled 'Thermal Management Manifold' carries only AIR edges —
+                # the fluid_in/out maps count water/thermal only, so it read as tie-less)
+                if not has_in and not has_out and "air" not in has:
                     missing.append("fluid-connection")   # on a line, needs ≥1 tie
             else:
                 # a FLOW-THROUGH unit (vessel / pump / filter / treatment) needs BOTH.

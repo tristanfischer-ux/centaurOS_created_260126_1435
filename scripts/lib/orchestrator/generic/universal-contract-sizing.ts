@@ -5623,7 +5623,7 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
   const seenPopKey = new Set<string>()
   const seenPinnedName = new Set<string>()
   // per-MODULE synonym-sibling registry: head → [(qualifier tokens, word id)]
-  const moduleFamilies = new Map<string, Array<{ quals: Set<string>; id: string }>>()
+  const moduleFamilies = new Map<string, Array<{ quals: Set<string>; phrase: string; id: string }>>()
   for (const m of modules ?? []) {
     moduleFamilies.clear()
     for (const sm of m.sub_modules ?? []) {
@@ -5662,18 +5662,30 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
           // discriminator → the same part minted twice under synonym labels.
           if (count === 1) {
             const toks = _singularisePhrase(name).split(' ').filter(Boolean)
-            const head = toks[toks.length - 1] ?? ''
-            const quals = new Set(toks.slice(0, -1))
-            if (head && quals.size > 0) {
+            // GENERIC-TAIL collapse (run-31: 'Audible Alarm' wired beside the unwired
+            // sibling 'Audible Alarm SYSTEM' — a container noun as the head defeats the
+            // fold). The effective head is the last NON-generic token; 'system/unit/
+            // assembly/module/device/kit' carry no component identity of their own.
+            const GENERIC_TAILS = new Set(['system', 'unit', 'assembly', 'module', 'device', 'kit', 'package'])
+            let hi = toks.length - 1
+            while (hi > 0 && GENERIC_TAILS.has(toks[hi])) hi -= 1
+            const head = toks[hi] ?? ''
+            const quals = new Set(toks.filter((_, i) => i !== hi && !GENERIC_TAILS.has(toks[i])))
+            const phrase = toks.filter((t) => !GENERIC_TAILS.has(t)).join(' ')
+            if (head) {
               const fam = moduleFamilies.get(head) ?? []
               for (const prior of fam) {
-                const shared = [...quals].some((t) => prior.quals.has(t))
+                // shared qualifier fold, OR (both qualifier-less after the generic-tail
+                // collapse) an identical residual phrase ('Spare Module' + 'Spare Modules')
+                const shared = quals.size > 0
+                  ? [...quals].some((t) => prior.quals.has(t))
+                  : prior.quals.size === 0 && prior.phrase === phrase
                 if (shared && !_synonymSiblingConflict(quals, prior.quals)) {
                   droppedDuplicate += 1
                   return false
                 }
               }
-              fam.push({ quals, id: String((w as { id?: unknown }).id ?? '') })
+              fam.push({ quals, phrase, id: String((w as { id?: unknown }).id ?? '') })
               moduleFamilies.set(head, fam)
             }
           }
