@@ -2682,8 +2682,13 @@ function subWord(spec: SubSpec, parentId: string, qty: number, physics: ParentPh
 // words, so the plant is never decomposed into priced children. Air-path words (fan /
 // vent / filter / louvre / cold plate) stay. Duty ≥ 2 kW or no dissipation quantity
 // (non-thermal archetypes): strict no-op.
+// 2026-07-10 (Tristan/Grok false-ship review): 'Liquid Coolant LOOP' + 'Thermal Management
+// Manifold/Bay' survived air-cooled demotion (the regex knew pumps/tanks but not the loop/
+// manifold/bay STRUCTURE words) — the surviving liquid-loop words then demanded process-WATER
+// service ties, flipped plant_is_wet, and put DN25 process-water lines + a steam-phase
+// thermal boundary on a sealed air-cooled battery's P&ID (the wrong-domain drawings defect).
 const LIQUID_THERMAL_PLANT_RE =
-  /\bchiller\b|coolant\s+pump|cooling\s+pump|coolant\s+\w*\s*(?:tank|reservoir|manifold|distribution)|expansion\s+tank|heat\s+exchanger|\bglycol\b/i
+  /\bchiller\b|coolant\s+pump|cooling\s+pump|coolant\s+\w*\s*(?:tank|reservoir|manifold|distribution)|expansion\s+tank|heat\s+exchanger|\bglycol\b|(?:liquid\s+)?coolant\s+loops?\b|thermal\s+management\s+(?:manifolds?|bays?|plenums?)|liquid\s+cool(?:ing|ant)\b/i
 // Occupancy-scale safety PLANT (gas-detection systems/sensor networks, aspirating smoke
 // plant) exists to protect a space a PERSON can enter. A sealed sub-1 m³ cabinet (wall
 // ESS, EV-charger pillar, drone dock) has no occupancy — cell protection is the BMS's

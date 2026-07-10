@@ -93,9 +93,19 @@ def _required_services(name, module, function, wet_plant=True):
                 r'tie[ -]?rod|compression[ -]?plate|end[ -]?plate|\bbracket\b',
                 f"{name} {function}", _re.I):
             req.discard('water')
-    if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
+    # NAME+FUNCTION only (2026-07-10 Tristan/Grok false-ship review): these two rules
+    # scanned `t`, which INCLUDES the module id — so EVERY word in hmi_ergonomics matched
+    # 'hmi' and drew a power+signal feeder ('Warning Labels' fed at 45.2 A on the panel;
+    # 26 such feeders summed to the 195.5 kW board on an 11 kW product). Same module-name
+    # leak the fluid rule was already fixed for ('transDUCTion' -> 'duct'). The module's
+    # service is rule (3)'s job, for UNCLASSIFIED parts only.
+    if any(k in tn for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
         req.add('signal')
-    if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
+    if (any(k in tn for k in ('control', 'plc', 'scada', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller'))
+            or _words & {'hmi'}):
+        req.update(('signal', 'power'))
+    # an ANNUNCIATOR (alarm sounder / beacon / strobe) is an active device: signal + power
+    if _words & {'alarm', 'sounder', 'beacon', 'strobe', 'annunciator'}:
         req.update(('signal', 'power'))
     # ── (1b) A FIELD INSTRUMENT measures the process; it ties in by signal (+ power if
     # active), NEVER by its own process-water main. The water-keyword list above
@@ -110,7 +120,13 @@ def _required_services(name, module, function, wet_plant=True):
     if _is_sensor and not _is_inline:
         req.discard('water')
     # ── (2) PURE STRUCTURE needs nothing (a frame / enclosure / walkway / label) ──
-    if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
+    # PASSIVE families extended 2026-07-10 (Tristan/Grok false-ship review): insulation
+    # panels, signage/placards and burst/deflagration panels reached the module-primary
+    # fallback and drew a feeder/signal from their MODULE's function ('Thermal Insulation
+    # Panels' fed at 45 A from environmental_interface). A passive part answers to NO
+    # module service. ('insulation monitor' stays active — 'monitor' granted its signal
+    # above and this return keeps explicit roles.)
+    if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding', 'insulation', 'signage', 'placard', 'decal', 'deflagration', 'burstpanel', 'gasket', 'busbar')):
         return req   # usually {}; a mis-named structural item keeps any explicit role above
     # ── (3) MODULE-PRIMARY service — ONLY for a part the name keywords left UNCLASSIFIED
     # (a passive busbar/fuse/manifold). A recognised device (sensor, pump, controller)

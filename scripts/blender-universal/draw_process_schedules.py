@@ -283,8 +283,19 @@ def _phase_from(spec: dict, mechanism: str, service_blob: str) -> str:
         if p == "liquid" and re.search(r"slurry|caco3|gypsum|cake|crystallis", service_blob, re.I):
             return "Slurry"
         return p.capitalize()
-    if mechanism == "thermal" or re.search(r"\bsteam\b|raised_steam", service_blob, re.I):
+    # 2026-07-10 (Tristan/Grok false-ship review): mechanism=="thermal" defaulted to STEAM,
+    # printing a steam line on a sealed air-cooled battery's line list. A thermal edge's
+    # phase follows its own declared MEDIUM (the air-mover override family); steam requires
+    # an explicit steam token — a heat path is not a boiler.
+    if re.search(r"\bsteam\b|raised_steam", service_blob, re.I):
         return "Steam"
+    if mechanism == "thermal":
+        med = str(spec.get("medium") or "").strip().lower()
+        if "air" in med or re.search(r"\bair\b|forced[_\s-]?air|convection", service_blob, re.I):
+            return "Air"
+        if med:
+            return med.capitalize()
+        return "Heat transfer"
     if re.search(r"slurry|caco3|gypsum|cake", service_blob, re.I):
         return "Slurry"
     if re.search(r"3phase|three_phase|2phase|hot_and_cold|effluent", service_blob, re.I):

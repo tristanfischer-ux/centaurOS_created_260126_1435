@@ -521,35 +521,42 @@ def _aux_tab_score(title: str, run_dir: str):
                 # failing drawing_gates G1-G9 verdict for this drawing are the corroborating SIGHT
                 # mechanisms. Coverage/legibility corroboration is handled separately by _cov's own
                 # advisory-cap path (applied regardless of the vision verdict, on the 'absent' branch).
+                # 2026-07-10 (Tristan/Grok false-ship review): the corroboration REQUIREMENT
+                # inverted the critic's purpose — it exists precisely because deterministic
+                # geometry checks are BLIND to the floating-object/stray-connection class, so
+                # demanding a deterministic co-signature meant a NAMED defect persisted across
+                # three consecutive runs while Renders scored 9.7. The council FLAG-ONLY
+                # contract is restored: a named defect ALWAYS caps (<=4); determinism is
+                # supplied by the geometry-hash cache (same design -> same cached verdict,
+                # no re-roll), and corroboration is quoted as colour when present.
                 _lit = _manifest_litter(run_dir)
                 _lit_corroborates = (isinstance(_lit, dict)
                                       and isinstance(_lit.get("score"), (int, float))
                                       and _lit["score"] < 8)
                 _gate_corroborates = _drawing_gate_failing(run_dir, "blender", "general-arrangement") is True
-                if _lit_corroborates or _gate_corroborates:
-                    # CORROBORATED: an independent deterministic check agrees — the vision finding
-                    # SCORES (a deduction), quoted for human colour, but the deduction is driven by
-                    # the deterministic corroborator, never the LLM's own opinion number alone.
-                    _corr = "default-size litter" if _lit_corroborates else "a failing drawing_gates verdict"
-                    base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
-                    base["status"] = "FAIL"
-                    base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — CORROBORATED by "
-                                       f"{_corr} (model: {_vv.get('model', '?')})"] + (base.get("issues") or []))[:6]
-                    base["fix"] = "fix the geometry/routing that produces the flagged (and corroborated) defect"
-                else:
-                    # UNCORROBORATED: no deterministic check agrees. A single non-deterministic LLM
-                    # opinion must never move a number on its own (the re-roll defect this doctrine
-                    # closes) — render as an advisory note only; the score stays on its deterministic
-                    # basis (coverage/litter/shape).
-                    base["issues"] = ([f"ADVISORY: vision critic flagged a possible defect: {_df} — "
-                                       f"UNCORROBORATED by any deterministic check (litter/shape/drawing-"
-                                       f"gates); informational only, does not score (model: {_vv.get('model', '?')})"]
-                                       + (base.get("issues") or []))[:6]
+                _corr = ("default-size litter" if _lit_corroborates
+                         else "a failing drawing_gates verdict" if _gate_corroborates
+                         else "none (the vision critic is the ONLY check that sees this defect class)")
+                base["score"] = min(base.get("score", 10) if isinstance(base.get("score"), (int, float)) else 10, 4)
+                base["status"] = "FAIL"
+                base["issues"] = ([f"VISION CRITIC flagged a visible defect: {_df} — corroboration: "
+                                   f"{_corr} (model: {_vv.get('model', '?')}; geometry-hash cached verdict)"]
+                                  + (base.get("issues") or []))[:6]
+                base["fix"] = "fix the geometry/routing that produces the flagged defect"
             return _apply_side_elevation_gate(base)
-        if isinstance(_vv, dict) and _vv.get("ok") and (_vv.get("broken") is False or not _vv_defects):
-            # VERIFIED clean, OR broken-but-unsubstantiated (no named defect) → score on the DETERMINISTIC
-            # checks (coverage/litter/shape) only; the vision critic cannot drag a deterministically-clean
-            # render to a FAIL on a verdict it could not substantiate.
+        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is True and not _vv_defects:
+            # broken=True with NO named defect: unsubstantiated as a specific FAIL, but a broken
+            # flag can never read as verified-clean either (run 55 shipped Renders 9.0 over
+            # exactly this verdict). Honest state: visual quality UNVERIFIED -> capped at 7.
+            base = _cap_litter(_cov("blender", "Render",
+                advisory="vision critic returned broken=true with no named defect — visual quality is "
+                         "NOT verified clean; capped pending a substantiated verdict or a human look"))
+            if isinstance(base, dict) and isinstance(base.get("score"), (int, float)):
+                base["score"] = min(base["score"], 7)
+                base["status"] = "PASS" if base["score"] >= 8 else "FAIL"
+            return _apply_side_elevation_gate(base)
+        if isinstance(_vv, dict) and _vv.get("ok") and _vv.get("broken") is False:
+            # VERIFIED clean → score on the DETERMINISTIC checks (coverage/litter/shape).
             return _apply_side_elevation_gate(_cap_litter(_cov("blender", "Render")))
         return _apply_side_elevation_gate(_cap_litter(_cov("blender", "Render",
                     advisory="ADVISORY: object-level visual quality is UNVERIFIED — no vision critic has looked at this render (run render_vision_critic)")))
@@ -15850,6 +15857,40 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                         break
                 if _kva_drawing is not None:
                     break
+        # 4 — PANEL vs CONTRACT power authority (2026-07-10 Tristan/Grok false-ship
+        # review: the panel schedule shipped 195.5 kW / 696 A on an 11.04 kW product and
+        # NOTHING failed). The schedule's connected-load total must reconcile with the
+        # contract's own connected_electrical_load_kw (±25% — feeder margins are real);
+        # a contradiction is WRONGNESS and fails the row (and with it the tab's >=8).
+        _q_conn = None
+        for _ck in ("connected_electrical_load_kw", "total_connected_load_kw", "total_electrical_demand_kw"):
+            _cv = _q.get(_ck)
+            if isinstance(_cv, dict) and isinstance(_cv.get("value"), (int, float)):
+                _q_conn = float(_cv["value"]); break
+        _sched_kw = None
+        _ps_md = os.path.join(run_dir, "drawings", "panel-schedule.md")
+        if os.path.exists(_ps_md):
+            try:
+                _mm2 = re.search(r"Total connected load[^\d]*([\d.,]+)\s*kW", open(_ps_md).read(), re.I)
+                if _mm2:
+                    _sched_kw = float(_mm2.group(1).replace(",", ""))
+            except Exception:  # noqa: BLE001
+                _sched_kw = None
+        if _q_conn is not None and _sched_kw is not None:
+            _pw_ok = (_q_conn > 0 and abs(_sched_kw - _q_conn) <= 0.25 * max(_q_conn, 0.001))
+            _consistency_row(
+                "panel schedule ↔ contract · connected load", _pw_ok,
+                f"schedule total {_sched_kw:g} kW vs contract connected_electrical_load_kw {_q_conn:g} kW",
+                f"the panel schedule's {_sched_kw:g} kW connected load contradicts the contract's "
+                f"{_q_conn:g} kW — an invented load table (fix the feeder derivation, not the row)",
+                op={"op": "panel_kw", "sched": _sched_kw, "contract": _q_conn})
+        elif _sched_kw is not None:
+            _consistency_row(
+                "panel schedule ↔ contract · connected load", False,
+                f"schedule total {_sched_kw:g} kW; contract carries NO connected-load quantity",
+                "the contract emits no connected_electrical_load_kw — the panel total is unverifiable "
+                "(emit the quantity in the class contract so this row can reconcile)",
+                op={"op": "panel_kw", "sched": _sched_kw, "contract": None})
         if _kva_contract is not None or _kva_drawing is not None:
             _kva_ok = (_kva_contract is not None and _kva_drawing is not None
                        and abs(_kva_drawing - _kva_contract) <= 0.10 * _kva_contract)
@@ -20192,10 +20233,32 @@ def _sc_calculations(wb, ws, state, run_dir):
     if tf_rows:
         ok = sum(1 for _r, d in tf_rows if "⚠" not in _cell_txt(d.get("status")))
         comps.append(("tool outputs consumed downstream", ok, len(tf_rows)))
+    # DUTY COVERAGE (2026-07-10 Tristan/Grok false-ship review: 'one calculation cannot
+    # score 10 when required duties are absent'). The contract's calculator-sourced
+    # quantities are the duties this tab EXISTS to show worked; a tab with a handful of
+    # resolved calcs over dozens of calculator quantities is thin regardless of how clean
+    # those few are. Coverage floor: >=1 worked calc per 4 calculator quantities (a calc
+    # legitimately covers several related quantities), floored at 3.
+    try:
+        _qq = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+        _n_calc_q = sum(1 for _v in _qq.values()
+                        if isinstance(_v, dict) and str(_v.get("source")) == "calculator"
+                        and _v.get("value") is not None)
+        if _n_calc_q >= 4:
+            _need = max(3, _n_calc_q // 4)
+            comps.append(("worked-calc coverage of the contract's calculator duties "
+                          f"(≥{_need} calcs for {_n_calc_q} calculator quantities)",
+                          min(n_def, _need), _need))
+            if n_def < _need:
+                iss.append(f"only {n_def} worked calc(s) shown for {_n_calc_q} calculator-derived "
+                           f"contract quantities — the duties exist; render their derivations "
+                           f"(need ≥{_need})")
+    except Exception:  # noqa: BLE001
+        pass
     return {"components": comps, "issues": iss,
             "mech": "worked-calc coverage (every definition resolves to a LIVE Excel formula "
                     "or an honestly-disclosed non-arithmetic pick; inputs populated) + "
-                    "tool-flow consumption",
+                    "tool-flow consumption + duty coverage vs the contract's calculator quantities",
             "fix": "bind the RHS's symbols to this block's own input cells at the calc "
                    "renderer source (formula_to_excel), or honestly disclose the pick"}
 
@@ -20342,8 +20405,31 @@ def _sc_connection(wb, ws, state, run_dir):
                 ok += 1
         comps.append(("connection rows carry a computed OK status "
                       "(0 unresolved endpoints, no missing-tie evidence)", ok, len(st_rows)))
+    # LOAD-BEARING CONNECTIVITY EVIDENCE (2026-07-10 Tristan/Grok false-ship review): the
+    # parts-ledger RECORDS connectivity concerns (an electrical part with no downstream
+    # load) + stale topology ties every run, and run 54 shipped 9.1 over 5 concerns + 2
+    # stale ties. Recorded-but-unscored evidence is exactly the false-green mechanism —
+    # each concern/stale tie is now a failing component of this tab's own contract.
+    try:
+        _pl2 = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
+        _cc = (_pl2.get("connectivity") or {}) if isinstance(_pl2, dict) else {}
+        _n_conc = int(_cc.get("n_concerns") or 0)
+        _n_stale = int(_pl2.get("n_stale_ties") or 0)
+        if _n_conc or _n_stale:
+            comps.append(("ledger connectivity clean (no unconnected electrical parts, "
+                          "no stale topology ties)", 0, _n_conc + _n_stale))
+            _ex = "; ".join(f"{c.get('tag')} {c.get('name')}: {c.get('issue')}"
+                            for c in (_cc.get("concerns") or [])[:3])
+            iss.append(f"parts-ledger records {_n_conc} connectivity concern(s) + "
+                       f"{_n_stale} stale topology tie(s) — e.g. {_ex}")
+        else:
+            comps.append(("ledger connectivity clean (no unconnected electrical parts, "
+                          "no stale topology ties)", 1, 1))
+    except Exception:  # noqa: BLE001
+        pass
     return {"components": comps, "issues": iss,
-            "mech": "resolved-endpoint fraction (every ← / → tag must exist) + per-row status",
+            "mech": "resolved-endpoint fraction (every ← / → tag must exist) + per-row status "
+                    "+ ledger connectivity concerns/stale ties (each one fails a component)",
             "fix": "fix the topology edge that names a non-existent tag at the connection emitter"}
 
 
@@ -27054,6 +27140,14 @@ def main() -> None:
     print(f"  path        : {res['out_path']}")
     print(f"  size        : {res['size_mb']:.2f} MB")
     print(f"  tabs ({len(res['tabs'])})  : {res['tabs']}")
+    # ONE TAB REGISTRY (2026-07-10 Tristan/Grok review: '33 scored / 31 verdict / 32
+    # Contents' read as disagreement): the three counts are three DENOMINATORS of the
+    # same registry — state them so a reader never has to reconcile them by hand.
+    _n_sheets = len(res['tabs'])
+    _mirrors = [t for t in ("Executive Summary", "Quality & Audit") if t in res['tabs']]
+    print(f"  tab registry: {_n_sheets} sheets = {_n_sheets - 1} content tabs + Contents; "
+          f"verdict floor spans {_n_sheets - len(_mirrors)} non-mirror tabs "
+          f"(mirrors: {', '.join(_mirrors) or '—'})")
     print(f"  live calcs  : {res['live_calcs']}")
     print(f"  static calcs: {res['static_calcs']}")
     print(f"  image tabs  : {res['image_tabs']}")

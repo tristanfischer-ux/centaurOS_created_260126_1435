@@ -9712,52 +9712,60 @@ async function main() {
     const stLate = JSON.parse(readFileSync(statePath, 'utf8'))
     const rbAfter = Array.isArray(reqRowsLate) ? reqRowsLate.length : 0
     if (Array.isArray(reqRowsLate)) stLate.requirementsBom = reqRowsLate
-    // RE-RECONCILE the cost cascade to the SETTLED bill (run-22: the mid-loop reconcile
-    // pinned costStack.raw_materials_bom_gbp at an iteration's £94,442 while this late
-    // re-derive settled the bill at £20,241 — cost-sanity + the benchmark net + the cover
-    // then read a 4.7× STALE stack and stayed RADICAL over an in-band design). Same
-    // proportional rescale + display-consistency re-derivation as the primary reconcile;
-    // costSanity is re-computed on the final stack so the recorded verdict is the truth.
-    if (Array.isArray(reqRowsLate) && stLate.costStack
-        && Number(stLate.costStack.raw_materials_bom_gbp) > 0) {
+    // ONE COST TRUTH (2026-07-10 Tristan/Grok false-ship review): the settled
+    // requirementsBom drives EVERY cost surface, unconditionally. The old shape nested
+    // the cascade re-derive under `raw_materials_bom_gbp > 0` — run 55 shipped
+    // oem_transfer £17,191 beside a settled £10,003 bill because the stack had a null
+    // raw-materials field and the whole branch (including the benchmark re-diff AND the
+    // ghost-fault filter) silently skipped. Now: rescale when a prior stack exists,
+    // MINT a fresh stack from the settled Σ when it does not, and the re-diff + ghost
+    // filter run whenever the settled bill exists at all.
+    if (Array.isArray(reqRowsLate)) {
       const reqTotalLate = reqRowsLate.reduce((a: number, r: any) => a + (Number(r?.line_gbp) || 0), 0)
-      const rawPrev = Number(stLate.costStack.raw_materials_bom_gbp)
-      if (reqTotalLate > 0 && Math.abs(rawPrev - reqTotalLate) > 1) {
-        const scaleLate = reqTotalLate / rawPrev
-        for (const k of Object.keys(stLate.costStack)) {
-          if (typeof stLate.costStack[k] === 'number') stLate.costStack[k] = Math.round(stLate.costStack[k] * scaleLate)
+      if (reqTotalLate > 0) {
+        const rawPrev = Number(stLate.costStack?.raw_materials_bom_gbp) || 0
+        if (stLate.costStack && rawPrev > 0 && Math.abs(rawPrev - reqTotalLate) > 1) {
+          const scaleLate = reqTotalLate / rawPrev
+          for (const k of Object.keys(stLate.costStack)) {
+            if (typeof stLate.costStack[k] === 'number') stLate.costStack[k] = Math.round(stLate.costStack[k] * scaleLate)
+          }
+          const csL = stLate.costStack as Record<string, number>
+          const sumL = (...ks: string[]) => ks.reduce((a, k) => a + (Number(csL[k]) || 0), 0)
+          if (csL.factory_cogs_gbp != null)
+            csL.factory_cogs_gbp = sumL('raw_materials_bom_gbp', 'assembly_labour_gbp', 'factory_overhead_gbp')
+          if (csL.oem_transfer_price_gbp != null)
+            csL.oem_transfer_price_gbp = sumL('factory_cogs_gbp', 'manufacturer_margin_gbp')
+          if (csL.channel_list_price_gbp != null)
+            csL.channel_list_price_gbp = sumL('oem_transfer_price_gbp', 'channel_markup_gbp')
+          if (csL.installed_asp_gbp != null)
+            csL.installed_asp_gbp = sumL('channel_list_price_gbp', 'installation_cost_gbp')
+          console.error(`[chain] ghost-snapshot re-derive: cost cascade RE-reconciled to the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (stack raw materials was £${Math.round(rawPrev).toLocaleString('en-GB')} from an earlier loop iteration)`)
+        } else if (!rawPrev) {
+          try {
+            const { resolveCostStack, computeCostStack } = await import('../src/lib/pdf-engine-v2/class-cost-structure')
+            const { ratios, class_key } = resolveCostStack(stLate)
+            ;(stLate as Record<string, any>).costStack = computeCostStack(reqTotalLate, ratios, class_key)
+            console.error(`[chain] ghost-snapshot re-derive: cost stack MINTED fresh from the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (no prior raw-materials figure — the old path skipped and shipped a stale transfer price)`)
+          } catch (mintErr) {
+            console.error(`[chain] ghost-snapshot re-derive: fresh stack mint failed (non-fatal): ${(mintErr as Error).message.slice(0, 120)}`)
+          }
         }
-        const csL = stLate.costStack as Record<string, number>
-        const sumL = (...ks: string[]) => ks.reduce((a, k) => a + (Number(csL[k]) || 0), 0)
-        if (csL.factory_cogs_gbp != null)
-          csL.factory_cogs_gbp = sumL('raw_materials_bom_gbp', 'assembly_labour_gbp', 'factory_overhead_gbp')
-        if (csL.oem_transfer_price_gbp != null)
-          csL.oem_transfer_price_gbp = sumL('factory_cogs_gbp', 'manufacturer_margin_gbp')
-        if (csL.channel_list_price_gbp != null)
-          csL.channel_list_price_gbp = sumL('oem_transfer_price_gbp', 'channel_markup_gbp')
-        if (csL.installed_asp_gbp != null)
-          csL.installed_asp_gbp = sumL('channel_list_price_gbp', 'installation_cost_gbp')
         if (stLate.cost_reality && typeof stLate.cost_reality === 'object')
           stLate.cost_reality.bom_total_gbp = Math.round(reqTotalLate)
         try { stLate.costSanity = computeCostSanity(stLate) } catch { /* shadow — never fatal */ }
-        // RE-DIFF THE BENCHMARK NET on the settled stack (run-25: the net judged a
-        // mid-loop £160,815 transfer that later iterations settled to £33k — its RADICAL
-        // verdict + the Sense-check 0 were honest for THEIR iteration but stale for the
-        // final dossier). The LLM top-down EXPECTATION is iteration-independent, so this
-        // is the PURE comparison only — no LLM re-call.
+        // RE-DIFF THE BENCHMARK NET on the settled stack — ALWAYS (un-nested 2026-07-10;
+        // pure comparison, no LLM re-call; the expectation is iteration-independent).
         try {
           if (stLate.benchmarkExpectation) {
             const { compareToBenchmark } = await import('./lib/benchmark-expectation')
             stLate.benchmarkDivergence = compareToBenchmark(stLate.benchmarkExpectation, stLate)
             console.error(`[chain] ghost-snapshot re-derive: benchmark net re-diffed on the settled stack — verdict ${stLate.benchmarkDivergence?.worst ?? '?'}`)
           }
-          // GHOST-FAULT FILTER (2026-07-10, run 52): diagnoseFaults ran MID-LOOP on the
-          // 123-row bill whose 33 ghost rows this block just pruned — its fault list then
-          // named '£3 Bidirectional PCS' / '£34k HVAC Chiller' lines the SHIPPED 97-row
-          // bill does not contain (the mid-loop-staleness family, LLM edition). A fault
-          // whose line matches NO settled bill row (tag exact, else ≥2 name-token overlap)
-          // is dropped deterministically; benchmark-punchlist.md is rewritten from the
-          // surviving set so the board never inherits ghost defects.
+        } catch { /* shadow — never fatal */ }
+        // GHOST-FAULT FILTER — ALWAYS on the settled bill (un-nested 2026-07-10): a fault
+        // whose line matches NO settled row (X-tag exact, else head noun + >=2 token
+        // overlap) is dropped; the punchlist rewrites so the board never inherits ghosts.
+        try {
           if (Array.isArray(stLate.benchmarkFaults) && stLate.benchmarkFaults.length) {
             const settled: any[] = Array.isArray(stLate.requirementsBom) ? stLate.requirementsBom : []
             const tags = new Set(settled.map((r) => String(r?.tag ?? '').trim().toLowerCase()).filter(Boolean))
@@ -9767,10 +9775,6 @@ async function main() {
               const tagM = l.match(/\bx-\d+\b/)
               if (tagM) return tags.has(tagM[0])
               const toks = l.split(/[^a-z0-9]+/).filter((t) => t.length > 2)
-              // run 53: >=2-token overlap alone let SIBLING names through — 'Liquid
-              // Coolant CHILLER' matched 'Liquid Coolant LOOP', 'Auxiliary Power
-              // TRANSFORMER' matched 'Auxiliary Power DISTRIBUTION UNIT'. The HEAD noun
-              // (the component family, type-coherence principle) must also be present.
               const head = toks[toks.length - 1]
               return nameToks.some((s) => head && s.has(head) && toks.filter((t) => s.has(t)).length >= 2)
             }
@@ -9790,7 +9794,6 @@ async function main() {
             }
           }
         } catch { /* shadow — never fatal */ }
-        console.error(`[chain] ghost-snapshot re-derive: cost cascade RE-reconciled to the settled Σ £${Math.round(reqTotalLate).toLocaleString('en-GB')} (stack raw materials was £${Math.round(rawPrev).toLocaleString('en-GB')} from an earlier loop iteration)`)
       }
     }
     writeFileSync(statePath, JSON.stringify(stLate, null, 2))
@@ -9951,6 +9954,14 @@ async function main() {
       } catch { /* non-zero exit = ⚠Checks FAIL surfaced (still saved) OR a pre-save gate fired
                     (NOT saved) — the mtime check below tells the two apart, not this catch */ }
     }
+    // STATE FREEZE (2026-07-10 Tristan/Grok false-ship review): record the hash of the
+    // exact state the workbook is built from. Any later mutation of state.json without a
+    // rebuild would ship a workbook narrating a different design — the end-of-run check
+    // below rebuilds once if the hash moved.
+    const _stateHashAtExcel = createHash('sha256').update(readFileSync(statePath)).digest('hex')
+    ;(globalThis as Record<string, any>).__stateHashAtExcel = _stateHashAtExcel
+    ;(globalThis as Record<string, any>).__rebuildExcel = buildExcelOnce
+    console.error(`[chain] state freeze: workbook built from state sha256 ${_stateHashAtExcel.slice(0, 12)}…`)
     let beforeMtimeMs = xlsxMtimeMs()
     buildExcelOnce()
     if (isExcelArtefactStale(beforeMtimeMs)) {
@@ -11172,6 +11183,25 @@ async function main() {
   } catch (loopErr) {
     console.error(`[chain] quality loop stage miss (non-fatal): ${(loopErr as Error).message.slice(0, 200)}`)
   }
+
+  // STATE-FREEZE CHECK (2026-07-10 Tristan/Grok false-ship review, end of run): if any
+  // step mutated state.json AFTER the workbook was built, the shipped Excel narrates a
+  // design that no longer exists — rebuild once from the final state.
+  try {
+    const _h0 = (globalThis as Record<string, any>).__stateHashAtExcel
+    const _rebuild = (globalThis as Record<string, any>).__rebuildExcel
+    if (_h0 && typeof _rebuild === 'function') {
+      const _h1 = createHash('sha256').update(readFileSync(resolve(outDir, 'state.json'))).digest('hex')
+      if (_h1 !== _h0) {
+        console.error(`[chain] state-freeze: state.json CHANGED after the workbook build (${_h0.slice(0, 12)}… → ${_h1.slice(0, 12)}…) — rebuilding Excel once so the deliverable narrates the shipped state`)
+        _rebuild()
+        logAction({ step: 'state_freeze_rebuild', ok: true, before: _h0.slice(0, 12), after: _h1.slice(0, 12) })
+      } else {
+        console.error(`[chain] state-freeze: verified — no state mutation after the workbook build (sha ${String(_h0).slice(0, 12)}…)`)
+        logAction({ step: 'state_freeze_verified', ok: true })
+      }
+    }
+  } catch { /* freeze check is best-effort */ }
 }
 
 main().catch(err => {

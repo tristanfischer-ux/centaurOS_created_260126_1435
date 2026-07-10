@@ -652,6 +652,22 @@ export async function runPhysicsRepairLoop(opts: {
     result.patches_applied_total += appliedThisIter
 
     // Re-run physics critic on the patched design
+    // 2026-07-10 (Tristan/Grok speed review): zero applied patches means the design is
+    // byte-identical — re-critiquing it is a pure LLM spend (and a non-determinism
+    // source: a re-rolled verdict on the SAME design can flip HIGHs, #86). Bail now.
+    if (appliedThisIter === 0) {
+      result.iter_diagnostics.push({
+        iter,
+        high_in: highInThisIter.length,
+        plausibility_in: plausibilityIn,
+        patches_proposed: allPatchesRaw.length,
+        patches_applied: 0,
+        high_out: highInThisIter.length,
+        plausibility_out: plausibilityIn,
+        unfixable_reason: 'no patch applied — design unchanged; re-critique skipped (would re-roll the same design)',
+      })
+      break
+    }
     let newCritique: CritiqueReport | null = null
     try {
       newCritique = await runPhysicsCritic({

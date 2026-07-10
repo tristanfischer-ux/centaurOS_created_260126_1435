@@ -85,8 +85,13 @@ def harvest(run_dir: str) -> dict:
             if below:
                 for iss in (v.get("issues") or [])[:6]:
                     add(f"tab:{tab}", iss)
-                if not v.get("issues") and v.get("status") == "FAIL":
-                    add(f"tab:{tab}", f"FAIL at {score} with no issue text (scorer must flag AND route)")
+                if not v.get("issues"):
+                    # 2026-07-10 (Tristan/Grok review): a sub-target tab with NO issue text
+                    # previously escaped the board entirely when it PASSed — a synthetic
+                    # defect now forces a disposition either way (the scorer owing an
+                    # explanation is itself the defect).
+                    add(f"tab:{tab}", f"{v.get('status', '?')} at {score} (below target {target:g}) "
+                        f"with NO issue text — the scorer must name what holds this tab down")
 
     p = os.path.join(run_dir, "parts-ledger.json")
     if os.path.exists(p):

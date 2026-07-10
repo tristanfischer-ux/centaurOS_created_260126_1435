@@ -1279,6 +1279,13 @@ registerArchetype('bess', (brief: any) => {
     cell_heat_generation_kw: q(cellHeatGenerationKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'pre-pybamm estimate: ~0.8 W/cell × 3750 cells × 1.5 system overhead ≈ 5 kW; PyBaMM overrides system_thermal_dissipation_kw at runtime' }),
     hvac_design_load_kw: q(hvacDesignLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'container auxiliary sensible heat: BMS idle + rack fans + LED lighting + door heaters + solar shell gain (~4 kW); handled by container HVAC pair (NOT liquid chiller)' }),
     standby_aux_loss_kw: q(standbyAuxLossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'BMS telemetry + protection relays + lighting at zero-discharge standby; ~2 kW conservative floor' }),
+    // AUTHORITATIVE PANEL AUTHORITY (2026-07-10 Tristan/Grok false-ship review): the panel
+    // schedule shipped 195.5 kW / 696 A on an 11.04 kW product because NO connected-load
+    // quantity existed — the G2 load-reconcile gate silently skipped and every un-rated
+    // device took a plant-scale default share. The AUXILIARY consumers (HVAC/fans + BMS/
+    // controls/lighting standby) ARE the panel's connected load — the battery/PCS power
+    // path is DC-side conversion, not a panel feeder.
+    connected_electrical_load_kw: q(hvacDesignLoadKw + standbyAuxLossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `auxiliary panel load = hvac_design_load_kw (${hvacDesignLoadKw.toFixed(2)}) + standby_aux_loss_kw (${standbyAuxLossKw.toFixed(2)}) — the AC aux consumers the distribution board actually feeds; the main power path (battery ↔ PCS ↔ grid) is not a panel feeder`, from: ['hvac_design_load_kw', 'standby_aux_loss_kw'] }),
     system_thermal_dissipation_kw: q(systemThermalDissipationKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'cell_heat_generation_kw + inverter_dissipated_kw = total liquid-chiller heat rejection load; PyBaMM overrides cell component at runtime' }),
     thermal_rejection_capacity_kw: q(thermalRejectionCapacityKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'system_thermal_dissipation_kw × 1.5 engineering margin = minimum chiller output required at design ambient' }),
     thermal_rejection_min_kw: q(thermalRejectionMinKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'LEGACY: inverter_dissipated_kw × 1.5 (inverter-only floor, pre-Phase-B); superseded by thermal_rejection_capacity_kw which includes cell heat; retained for emitter backward compat' }),

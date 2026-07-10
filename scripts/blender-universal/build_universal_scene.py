@@ -8038,9 +8038,16 @@ def _device_current_a(name, quantities, ac_v=None):
             kw = float(val)
             break
     if kw is None:
+        # AUTHORITATIVE LOAD (2026-07-10 Tristan/Grok false-ship review): the old fallback
+        # gave EVERY un-rated device a plant-scale default share (7.5 kW, or total/25 with
+        # a 2 kW floor) — 26 devices × 7.5 kW printed a 195.5 kW / 696 A panel on an
+        # 11.04 kW product. A device with NO contract-traceable kW is a small CONTROL/aux
+        # consumer: it draws a 0.25 kW control tap, honestly labelled by its current.
+        # A real load must trace to a *_kw quantity (matched above) or carry its own
+        # rating — never inherit an invented share.
         tot = quantities.get('connected_electrical_load_kw') if isinstance(quantities, dict) else None
         totv = (tot.get('value') if isinstance(tot, dict) else tot) or 0
-        kw = max(2.0, float(totv) / 25) if totv else 7.5
+        kw = min(0.25, float(totv)) if totv else 0.25
     if ac_v is not None and ac_v <= 250.0:
         return round(kw * 1000.0 / (ac_v * 0.9), 1)
     return round(kw * 1000.0 / (1.732 * 400.0 * 0.9), 1)
@@ -8098,9 +8105,15 @@ def _load_required_services():
                         r'tie[ -]?rod|compression[ -]?plate|end[ -]?plate|\bbracket\b',
                         f"{name} {function}", re.I):
                     req.discard('water')
-            if any(k in t for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
+            # NAME+FUNCTION only (2026-07-10) — byte-mirror of component_engineering:
+            # scanning `t` (which includes the module id) fed 'Warning Labels' at 45.2 A
+            # because everything in hmi_ergonomics matched 'hmi'.
+            if any(k in tn for k in ('sensor', 'probe', 'instrument', 'monitor', 'meter', 'gauge', 'transmit', 'analy', 'detector')):
                 req.add('signal')
-            if any(k in t for k in ('control', 'plc', 'scada', 'hmi', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller')):
+            if (any(k in tn for k in ('control', 'plc', 'scada', 'compute', 'automation', 'gateway', 'network', 'iomodule', 'controller'))
+                    or _words & {'hmi'}):
+                req.update(('signal', 'power'))
+            if _words & {'alarm', 'sounder', 'beacon', 'strobe', 'annunciator'}:
                 req.update(('signal', 'power'))
             # (1b) field instrument → signal only, never its own water main (see
             # component_engineering._required_services — keep in sync).
@@ -8110,7 +8123,7 @@ def _load_required_services():
                 'column', 'tower', 'cone', 'exchanger', 'separator', 'contactor', 'sump', 'reservoir', 'drum'))
             if _is_sensor and not _is_inline:
                 req.discard('water')
-            if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding')):
+            if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding', 'insulation', 'signage', 'placard', 'decal', 'deflagration', 'burstpanel', 'gasket', 'busbar')):
                 return req
             if not req:   # module-primary ONLY for name-unclassified passive kit (see component_engineering)
                 if 'powerdistribution' in m or 'powerconversion' in m:
