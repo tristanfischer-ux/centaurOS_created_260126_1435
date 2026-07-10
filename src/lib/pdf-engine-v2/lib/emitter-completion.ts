@@ -2218,7 +2218,8 @@ export async function fillBlankWordMpns(
       let dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true })
       let pinned = false
       let blocked = false // a guard refused the pin outright — never fall through to generate
-      let retriesLeft = 1
+      let retriesLeft = 4   // walk-down budget: claimed-retry + up to 3 type-coherence walks
+      const rejectedRows = new Set<string>()
       while (dbHit && !pinned && !blocked) {
         // CAPACITY VALIDATION (Tristan 2026-06-27): a flow-machine pin must not be grossly
         // undersized vs the engine's own computed duty. A 'Grundfos CM3-3' (3 m³/h) pinned for a
@@ -2288,6 +2289,19 @@ export async function fillBlankWordMpns(
           retriesLeft -= 1
           log(`[fill-blank-mpn]   ↻ retry ${cand.moduleId}::${cand.subId} (${cand.name}): best DB row ${dbHit.manufacturer} ${dbHit.part_number} already claimed in this sub_module — re-ranking excluding claimed part(s) (exclusive assignment)`)
           dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true, excludeKeys: used })
+          continue
+        }
+        // TYPE-COHERENCE WALK-DOWN (2026-07-10, runs 40-42 plateau: the single best
+        // cosine row failed type-coherence and the fill gave up — while the RIGHT
+        // seeded row sat at rank #2-#K, permanently unreachable: 'Gas Sensors' kept
+        // losing to a heat detector though the MICS-6814 was in the DB). On a type
+        // reject, EXCLUDE the rejected row and re-rank — the coherence bar itself is
+        // unchanged (every candidate must still pass it), only the recall improves.
+        if (!typeOk && retriesLeft > 0) {
+          retriesLeft -= 1
+          rejectedRows.add(key)
+          log(`[fill-blank-mpn]   ↻ walk  ${cand.moduleId}::${cand.subId} (${cand.name}): ${dbHit.manufacturer} ${dbHit.part_number} fails type-coherence — trying the next ranked candidate`)
+          dbHit = dbFirstLookup(db, tokenList, headNounsForRank, { excludeMakerVendors: true, excludeKeys: new Set([...used, ...rejectedRows]) })
           continue
         }
         // type mismatch, or a duplicate with no distinct alternative left → treat as a
