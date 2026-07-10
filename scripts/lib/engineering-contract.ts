@@ -1163,6 +1163,37 @@ registerArchetype('bess', (brief: any) => {
     dc_bus_voltage_v: q(dcBusVoltage, 'V', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'nominal DC bus voltage from brief target_performance.metrics (dc_bus_voltage_v / dc_voltage / bus_voltage) or product description; default 800 V only when the brief is silent' }),
     bus_continuous_current_a: q(busContinuousA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × 1000 / dc_bus_voltage_v' }),
     bus_peak_current_a: q(busPeakA, 'A', 'dimensionless', 'peak', 'system', 'calculator', { source_detail: 'peak_power_kw × 1000 / dc_bus_voltage_v', from: ['peak_power_kw', 'dc_bus_voltage_v'] }),
+    // MOTOR-START / LRA SURGE ENVELOPE (2026-07-10, Powerwall exit-33: the Main DC
+    // Contactor was sized at 26 A off the 19.7 A continuous bus while the brief
+    // explicitly requires "locked-rotor starting ... up to approximately 185 A LRA" —
+    // the physics critic correctly refused the known-failing part. The contract now
+    // CARRIES the surge physics the brief states, so every downstream sizer / critic /
+    // auto-correct reads switching-device duty from the surge, not just continuous.
+    // Universal: parsed from any brief LRA/surge metric or the description; briefs
+    // without a surge statement emit nothing (no fabricated envelope).
+    ...((() => {
+      let lraA = 0
+      const mets = Array.isArray((tp as any).metrics) ? (tp as any).metrics : []
+      for (const m of mets) {
+        const key = String(m?.key_metric ?? m?.metric ?? m?.name ?? '').toLowerCase()
+        const v = Number(m?.value)
+        if (v > 0 && /lra|locked.?rotor|surge.?current/.test(key)) { lraA = v; break }
+      }
+      if (!(lraA > 0)) {
+        const dm = desc.match(/(\d{2,4})\s*A\s*(?:LRA|locked[- ]rotor)/i)
+        if (dm) lraA = parseInt(dm[1], 10)
+      }
+      if (!(lraA > 0)) return {}
+      // UK LV classes: 230 V single-phase (cabinet grid tie) / 400 V three-phase (containerised LV output).
+      const acV = isContainerisedScale ? 400 : 230
+      const surgeKva = Math.round(((lraA * acV) / 1000) * 100) / 100
+      const dcSurgeA = Math.round(((surgeKva * 1000) / dcBusVoltage) * 10) / 10
+      return {
+        ac_surge_current_a: q(lraA, 'A', 'dimensionless', 'peak', 'system', 'brief', { source_detail: `motor-start locked-rotor surge the brief requires the unit to support (${lraA} A LRA at ${acV} V AC, short duration)`, condition: 'motor-start LRA, short duration' }),
+        surge_apparent_power_kva: q(surgeKva, 'kVA', 'power', 'peak', 'system', 'calculator', { source_detail: `ac_surge_current_a × ac output voltage = ${lraA} A × ${acV} V`, from: ['ac_surge_current_a'], condition: 'motor-start LRA, short duration' }),
+        dc_surge_current_a: q(dcSurgeA, 'A', 'dimensionless', 'peak', 'system', 'calculator', { source_detail: `surge_apparent_power_kva × 1000 / dc_bus_voltage_v — the DC-side transient every switching/protection device in the pack path must carry for motor-start duration; contactor/fuse frames size to THIS, not the continuous ${busContinuousA.toFixed(1)} A`, from: ['surge_apparent_power_kva', 'dc_bus_voltage_v'], condition: 'motor-start LRA, short duration' }),
+      }
+    })()),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
     // authoritative values so the deterministic emitter consumes them via
     // q(contract, …) shadowing (drawer: q() helper is contract-wins).
