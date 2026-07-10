@@ -187,6 +187,18 @@ const utilCtrl: any = { sub_modules: [{ words: [
 ] }] }
 expect(normaliseSystemSingletonControllers([utilCtrl], { rack_count: 15 }) === 0,
   'a utility design whose controller counts are already physical must be a strict no-op')
+// run-21: Remote Monitoring Module ×5 + Interface ×5 → ONE telemetry device ×1
+const rmMod: any = { sub_modules: [{ words: [
+  mkWord('remote_monitoring_module_word', 'Remote Monitoring Module',
+    [{ kind: 'quantity', value: '×5' }, { kind: 'part_number', value: 'RUT956' }]),
+  mkWord('remote_monitoring_interface_word', 'Remote Monitoring Interface', [{ kind: 'quantity', value: '×5' }]),
+] }] }
+normaliseSystemSingletonControllers([rmMod], { rack_count: 1 })
+const rmWords: any[] = rmMod.sub_modules[0].words
+const rmKept = rmWords.find((w) => !w.mis_emission_note)
+expect(!!rmKept && rmWords.filter((w) => w.mis_emission_note).length === 1
+  && String(rmKept.modifier_characters.find((m: any) => m.kind === 'quantity').value) === '×1',
+  'remote-monitoring ×5 duo must fold to ONE device ×1 (keeping the pinned word)')
 
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '

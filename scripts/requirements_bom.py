@@ -623,7 +623,13 @@ def _materials_takeoff(name, mods, geom=None, service=None):
         head_note = "2 heads"
     supply = mass * rate                                       # ex-works fabricated shell
     installed = supply * ifac                                  # × site-erection multiplier
-    fittings = 0.20 * installed + 1800                        # nozzles, manway, supports, coating
+    # FITTINGS ALLOWANCE FOLLOWS SCALE (2026-07-10, Powerwall run-21: an 'AC Filter
+    # Inductor' mis-routed through this vessel path priced £1,811 — £11 of shell plus
+    # the FLAT £1,800 nozzles/manway/supports allowance, on a 2 kg part. Same family
+    # as the structural £8k connections adder: a plant-scale flat allowance laundering
+    # a device-scale line into principal money). A real vessel (≥ 100 kg shell) keeps
+    # the £1,800 byte-identically; a sub-100 kg shell gets a proportional allowance.
+    fittings = 0.20 * installed + (1800 if mass >= 100 else max(30.0, mass * 6.0))
     basis = (f"{'tapered ' if is_open else 'hoop '}wall {wall*1000:.0f} mm = P·r/(σ·E)+c · ⌀{d_v:.1f}×{h_v:.1f} m ({head_note}) · "
              f"P={P/1000:.0f} kPa head · σ={sigma_mpa:.0f} MPa → {area:.0f} m² × {mass:.0f} kg "
              f"{matlabel} @ £{rate}/kg supply × {ifac:.2f} erection + fittings")
@@ -2808,6 +2814,17 @@ def _selftest() -> int:
             print(f"  FAIL open-tank cost £{oc:.0f} vs closed £{cc:.0f} (want open < 0.75×closed, £20–150k)"); bad += 1
     else:
         print("  FAIL open-tank cost — no geometry parsed"); bad += 1
+
+    # ── FITTINGS ALLOWANCE FOLLOWS SCALE (2026-07-10, run-21 £1,811 'AC Filter Inductor'
+    # via the vessel path: £11 shell + the FLAT £1,800 nozzles/manway allowance). A tiny
+    # shell gets a proportional allowance; a real vessel keeps £1,800 byte-identically. ──
+    _tiny = _materials_takeoff("Filter Housing", {"dimension": "0.1 m dia x 0.1 m"})
+    if not _tiny or _tiny[0] > 300.0:
+        print(f"  FAIL fittings-scale proveCatch: a ⌀0.1×0.1 m shell must price sub-£300 "
+              f"(no £1,800 manway), got {_tiny and round(_tiny[0])}"); bad += 1
+    if ct and not (ct[0] > 20000):
+        print(f"  FAIL fittings-scale proveNoFalsePositive: the 12.4 m Buffer Vessel must "
+              f"keep vessel-scale money (incl. the £1,800 allowance), got £{ct[0]:.0f}"); bad += 1
 
     # ── WETTED-MoC PROVENANCE (v54 seawater-leak, 2026-07-02): the plant fluid service is
     # read from the DUTY context (brief + contract duty fields) ONLY — a tool registry URL

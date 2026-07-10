@@ -1366,7 +1366,21 @@ registerArchetype('bess', (brief: any) => {
     // LV connection (IEC 60038 / G99 at ≤1 MW); PCS raises to MV via external
     // step-up transformer. If a future brief specifies a different AC voltage,
     // the compliance table will show a FAIL row (brief 690 V vs achieved 400 V).
-    ac_output_voltage_v: q(400, 'V', 'voltage', 'AC', 'system', 'physics_constant', { source_detail: 'UK grid-tie LV AC output at PCS terminals: 400 V / 50 Hz (IEC 60038 standard voltage; G99 connection at ≤ 1 MW). Raises to MV (typically 11 kV or 33 kV) via external step-up transformer.', condition: 'PCS output terminals, 50 Hz, balanced 3-phase' }),
+    // AC INTERFACE FOLLOWS SCALE (2026-07-10, Powerwall run-21 physics critic: 'AC
+    // Switchgear rated 15.9 A / 400 V — a single-phase residential system operates at
+    // 230 V and must support 48 A continuous / 185 A surge'). The static 400 V 3φ
+    // constant is the PLANT interface; a sub-utility unit grid-ties at 230 V 1φ
+    // (G98/G99, BS 7671). Every downstream current sizing (switchgear, contactors,
+    // cable CSA) divides by this voltage, so the wrong phase system undersizes the
+    // whole AC chain 3×. Universal: keyed on the SAME sub-utility scale signal.
+    ac_output_voltage_v: isContainerisedScale
+      ? q(400, 'V', 'voltage', 'AC', 'system', 'physics_constant', { source_detail: 'UK grid-tie LV AC output at PCS terminals: 400 V / 50 Hz (IEC 60038 standard voltage; G99 connection at ≤ 1 MW). Raises to MV (typically 11 kV or 33 kV) via external step-up transformer.', condition: 'PCS output terminals, 50 Hz, balanced 3-phase' })
+      : q(230, 'V', 'voltage', 'AC', 'system', 'physics_constant', { source_detail: 'UK single-phase LV grid-tie at the consumer unit: 230 V / 50 Hz (IEC 60038; G98/G99 ≤ 16-32 A per phase export, BS 7671 wiring). Continuous AC current = continuous_power_kw × 1000 / 230.', condition: 'inverter AC terminals, 50 Hz, single-phase' }),
+    ...(isContainerisedScale ? {} : {
+      // the CONTINUOUS + SURGE AC currents at 230 V 1φ — the numbers the switchgear /
+      // breaker / cable sizing must carry (48 A continuous, 185 A LRA surge for 11 kW)
+      ac_continuous_current_a: q(Math.round((continuousKw * 1000) / 230 * 10) / 10, 'A', 'current', 'continuous', 'system', 'calculator', { source_detail: `ac_continuous_current_a = continuous_power_kw × 1000 / 230 V = ${(continuousKw * 1000 / 230).toFixed(1)} A (single-phase)` }),
+    }),
     // BESS L24 (2026-05-25, gate-17 HIGH #3): cycle_life_cycles — the
     // durability metric the brief states as a hard constraint. The renderer's
     // METRIC_MAP maps brief key `cycle_life` → qtyKey `cycle_life_cycles` but

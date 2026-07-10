@@ -2748,6 +2748,9 @@ const SINGLETON_CONTROLLER_ROLES: ReadonlyArray<{ role: string; re: RegExp }> = 
   { role: 'ems', re: /energy\s+management\s+system|\bems\b/i },
   { role: 'scada-gateway', re: /\bscada\b|\bgateway\b/i },
   { role: 'plant-controller', re: /\b(?:plant|site)\s+controller\b/i },
+  // run-21: 'Remote Monitoring Module' ×5 + 'Remote Monitoring Interface' ×5 = £7.8k
+  // of comms kit on a wall unit that carries ONE telemetry device.
+  { role: 'remote-monitoring', re: /remote\s+monitoring|telemetry\s+(?:module|unit|interface)|cellular\s+(?:modem|router)/i },
 ]
 const SLAVE_CONTROLLER_RE =
   /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bslave\b|\bslave\b[\w\s]*\b(?:bms|battery\s+management|controller)\b/i
