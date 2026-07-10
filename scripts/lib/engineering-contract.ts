@@ -883,6 +883,13 @@ registerArchetype('bess', (brief: any) => {
       return 0
     })()
     const busFloorV = Math.max(96, (contPowerKwForBus * 1000) / 63)
+    // TIE-BREAK: among candidates within a 3% closure tolerance, prefer the FEWEST
+    // CELLS (largest Ah, lowest series count) — run-19 physics critic correctly
+    // flagged a 175S × 25 Ah string as an unusual architecture; real wall packs run
+    // fewer-series × larger-Ah (BYD HVS / Powerwall class ≈ 90-120 series-equivalent
+    // with 50-100 Ah cells). Exact-closure only wins when no larger-cell candidate
+    // sits within tolerance.
+    const DEV_TOL = 0.03
     let best: { ah: number; kg: number; s: number; dev: number } | null = null
     for (const c of CELL_LADDER) {
       const s = Math.max(2, Math.round((nameplateKwhRequested * 1000) / (c.ah * cellVoltageV)))
@@ -890,9 +897,12 @@ registerArchetype('bess', (brief: any) => {
       if (busV < busFloorV || busV > 1500) continue
       const packKwh = (s * c.ah * cellVoltageV) / 1000
       const dev = Math.abs(packKwh - nameplateKwhRequested) / nameplateKwhRequested
-      if (!best || dev < best.dev - 1e-9 || (Math.abs(dev - best.dev) <= 1e-9 && s < best.s)) {
-        best = { ah: c.ah, kg: c.kg, s, dev }
-      }
+      if (!best) { best = { ah: c.ah, kg: c.kg, s, dev }; continue }
+      const bothInTol = dev <= DEV_TOL && best.dev <= DEV_TOL
+      const better = bothInTol
+        ? s < best.s                                   // in-tolerance: fewest cells wins
+        : dev < best.dev - 1e-9 || (Math.abs(dev - best.dev) <= 1e-9 && s < best.s)
+      if (better) best = { ah: c.ah, kg: c.kg, s, dev }
     }
     if (best && best.dev <= 0.10) {
       cellAh = best.ah
