@@ -222,6 +222,13 @@ export function contractCountFor(component: string, contract: ContractInProgress
     // binds to "Pneumatic Actuated Valve" [shares actuated] but NOT to "Solenoid Valve"; a count
     // with no qualifiers — `cell_count` — needs only the head noun, as before).
     const quals = keyToks.slice(0, -1)
+    // UNQUALIFIED-COUNT HEAD DISCIPLINE (2026-07-10, Powerwall: cell_count=175 smeared
+    // onto "Cell Temperature Sensors" ×175 @ £30 = a £5,250 phantom sensor farm — a
+    // temp SENSOR is not a CELL). A count with NO qualifiers is a bare noun count and
+    // may only bind a component that IS that noun (its own HEAD token matches); mere
+    // token CONTAINMENT (compToks.has) stays available only for QUALIFIED counts,
+    // where the half-qualifier gate above already anchors the subsystem identity.
+    if (quals.length === 0 && !(qHead === head || qHead === singular || `${qHead}s` === head)) continue
     const sharedQuals = quals.filter((t) => compToks.has(t)).length
     if (quals.length > 0 && sharedQuals < Math.ceil(quals.length / 2)) continue
     const v = (tq as { value?: unknown })?.value
