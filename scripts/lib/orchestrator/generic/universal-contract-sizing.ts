@@ -2713,10 +2713,95 @@ export function demoteLiquidThermalPlantAtAirCooledScale(modules: ModuleLike[], 
   return demoted
 }
 
+// ── SYSTEM-SINGLETON CONTROLLER NORMALISATION (2026-07-10, Powerwall run-18 BMS ×10 trio).
+// The LLM decomposition mints supervisory-controller words with INVENTED populations
+// (bms_master ×10 against rack_count=1 — no contract count anywhere says 10) and
+// near-synonym duplicates priced as separate lines (bms_master / bms_master_controller /
+// battery_management_system_master = THREE master controllers; two slave variants beside
+// the real one; scada_gateway beside a vendor-OS gateway). Physical truth, at EVERY
+// scale: a system carries ONE of each supervisory role (BMS master, EMS, SCADA/telemetry
+// gateway, plant controller); BMS SLAVE boards track the rack/module population.
+// UNIVERSAL — keyed on control-system role nouns + contract counts, never a product
+// name; a word matching no role is untouched, and a population the contract actually
+// backs (a token-subset `*_count` key carrying the same value) is left alone.
+const SINGLETON_CONTROLLER_ROLES: ReadonlyArray<{ role: string; re: RegExp }> = [
+  { role: 'bms-master', re: /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bmaster\b|\bmaster\b[\w\s]*\b(?:bms|battery\s+management)\b/i },
+  { role: 'ems', re: /energy\s+management\s+system|\bems\b/i },
+  { role: 'scada-gateway', re: /\bscada\b|\bgateway\b/i },
+  { role: 'plant-controller', re: /\b(?:plant|site)\s+controller\b/i },
+]
+const SLAVE_CONTROLLER_RE =
+  /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bslave\b|\bslave\b[\w\s]*\b(?:bms|battery\s+management|controller)\b/i
+/** Does the contract back this word's population? True when some `*_count` quantity has
+ *  the SAME value and every one of its key tokens appears in the word's own tokens
+ *  (so `gateway_count=3` backs a ×3 Gateway, but nothing backs an invented bms ×10). */
+function contractBacksCount(wordText: string, cur: number, quantities: Record<string, number>): boolean {
+  const toks = new Set(wordText.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(singulariseTok))
+  for (const [k, v] of Object.entries(quantities ?? {})) {
+    if (!/_count$/.test(k) || Math.round(Number(v)) !== cur) continue
+    const kToks = k.replace(/_count$/, '').split('_').filter(Boolean).map(singulariseTok)
+    if (kToks.length && kToks.every((t) => toks.has(t))) return true
+  }
+  return false
+}
+export function normaliseSystemSingletonControllers(modules: ModuleLike[], quantities: Record<string, number> = {}): number {
+  const slavePop = ['rack_count', 'battery_module_count', 'module_count', 'string_count']
+    .map((k) => Math.round(Number(quantities[k] ?? 0)))
+    .find((v) => v >= 1)
+  const wordText = (w: WordLike) =>
+    `${w.name_human ?? w.content_character?.name_human ?? ''} ${String(w.id ?? '').replace(/_/g, ' ')}`
+  const byRole = new Map<string, WordLike[]>()
+  for (const m of modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        if ((w as { mis_emission_note?: string }).mis_emission_note) continue
+        const txt = wordText(w)
+        const role = SLAVE_CONTROLLER_RE.test(txt)
+          ? 'bms-slave'
+          : SINGLETON_CONTROLLER_ROLES.find((r) => r.re.test(txt))?.role
+        if (!role) continue
+        if (!byRole.has(role)) byRole.set(role, [])
+        byRole.get(role)!.push(w)
+      }
+    }
+  }
+  let touched = 0
+  for (const [role, words] of byRole) {
+    // ONE word carries the role — prefer the best-specified (a pinned part number wins);
+    // the near-synonym duplicates demote to unpriced scope notes via mis_emission_note.
+    const keep =
+      words.find((w) => (w.modifier_characters ?? []).some((mc) => mc.kind === 'part_number' && String(mc.value ?? '').trim())) ??
+      words[0]
+    for (const w of words) {
+      if (w !== keep) {
+        ;(w as { mis_emission_note?: string }).mis_emission_note =
+          `duplicate system-singleton controller (role: ${role}) — the role is already carried by ` +
+          `"${keep.name_human ?? keep.id}"; a system has one ${role.replace(/-/g, ' ')}, so this ` +
+          `near-synonym line demotes to a scope note, never a priced duplicate`
+        touched += 1
+        continue
+      }
+      const qmod = (w.modifier_characters ?? []).find((mc) => mc.kind === 'quantity')
+      if (!qmod) continue
+      const cur = Math.round(parseFloat(String(qmod.value).replace(/[^0-9.]/g, '')) || 0)
+      const expected = role === 'bms-slave' ? (slavePop ?? cur) : 1
+      if (cur > 0 && cur !== expected && !contractBacksCount(wordText(w), cur, quantities)) {
+        qmod.value = `×${expected}`
+        touched += 1
+      }
+    }
+  }
+  return touched
+}
+
 export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities: Record<string, number> = {}, maxDepth = 3, briefPinnedKeys?: Set<string>): number {
   // Air-cooled-scale demotion runs FIRST (both synthesis paths call this explode —
   // the Codema two-paths lesson), so a demoted plant word is never decomposed below.
   demoteLiquidThermalPlantAtAirCooledScale(modules, quantities)
+  // Supervisory-controller populations + near-synonym duplicates normalise here too,
+  // for the same both-paths reason: a demoted duplicate must never explode into
+  // priced children, and an invented ×N must never smear into sub-assembly pricing.
+  normaliseSystemSingletonControllers(modules, quantities)
   // IDEMPOTENT + RECURSIVE: explode ONE level of the un-exploded frontier per call. A
   // part already carrying children is skipped (so re-running never duplicates — the
   // bug that gave a pump 39 children); a sub-component that itself matches a rule (a

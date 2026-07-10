@@ -125,6 +125,50 @@ const fanTotal = fanKids.reduce((s: number, w: any) =>
 expect(fanTotal < 500,
   `a duty-capped cabinet fan set must price at EC-fan money, never pump anatomy £3,971 (got £${Math.round(fanTotal)})`)
 
+// ── 10. CATCH: SYSTEM-SINGLETON controller normalisation — an invented bms_master ×10
+//     (rack_count=1, no contract count says 10) collapses to ×1; near-synonym master
+//     duplicates demote to scope notes; slave boards track rack_count; a population the
+//     contract BACKS (gateway_count=3) is untouched; non-controller words untouched ──
+import { normaliseSystemSingletonControllers } from './universal-contract-sizing'
+const ctrlMod: any = { sub_modules: [{ words: [
+  mkWord('bms_master_word', 'BMS Master', [{ kind: 'quantity', value: '×10' }]),
+  mkWord('bms_master_controller_word', 'BMS Master Controller',
+    [{ kind: 'quantity', value: '×10' }, { kind: 'part_number', value: 'ORION-BMS-2' }]),
+  mkWord('battery_management_system_slave_word', 'Battery Management System Slave', [{ kind: 'quantity', value: '×10' }]),
+  mkWord('bms_slave_word', 'BMS Slave', [{ kind: 'quantity', value: '×10' }]),
+  mkWord('cell_temperature_sensors_word', 'Cell Temperature Sensors', [{ kind: 'quantity', value: '×88' }]),
+] }] }
+normaliseSystemSingletonControllers([ctrlMod], { rack_count: 1, cell_count: 88 })
+const ctrlWords: any[] = ctrlMod.sub_modules[0].words
+const qtyOf = (id: string) => String(ctrlWords.find((w) => w.id === id)?.modifier_characters
+  .find((m: any) => m.kind === 'quantity')?.value ?? '')
+const noteOf = (id: string) => ctrlWords.find((w) => w.id === id)?.mis_emission_note
+expect(qtyOf('bms_master_controller_word') === '×1' && !noteOf('bms_master_controller_word'),
+  'the pinned-part master must be KEPT at ×1 (an invented ×10 with rack_count=1 collapses)')
+expect(!!noteOf('bms_master_word'),
+  'the near-synonym duplicate master must demote to a scope note')
+expect(!!noteOf('bms_slave_word') !== !!noteOf('battery_management_system_slave_word'),
+  'exactly ONE slave word survives; its synonym demotes')
+const keptSlave = noteOf('bms_slave_word') ? 'battery_management_system_slave_word' : 'bms_slave_word'
+expect(qtyOf(keptSlave) === '×1',
+  `the kept slave board must track rack_count=1 (got ${qtyOf(keptSlave)})`)
+expect(qtyOf('cell_temperature_sensors_word') === '×88' && !noteOf('cell_temperature_sensors_word'),
+  'a non-controller word must be byte-untouched')
+// contract-BACKED population is left alone (gateway_count=3 backs a ×3 Gateway)
+const gwMod: any = { sub_modules: [{ words: [
+  mkWord('telemetry_gateway_word', 'Telemetry Gateway', [{ kind: 'quantity', value: '×3' }]),
+] }] }
+normaliseSystemSingletonControllers([gwMod], { gateway_count: 3 })
+expect(String(gwMod.sub_modules[0].words[0].modifier_characters.find((m: any) => m.kind === 'quantity').value) === '×3',
+  'a contract-backed controller population (gateway_count=3) must be untouched')
+// utility counter-case: slaves already tracking rack_count=15 are a strict no-op
+const utilCtrl: any = { sub_modules: [{ words: [
+  mkWord('bms_slave_boards_word', 'BMS Slave Boards', [{ kind: 'quantity', value: '×15' }]),
+  mkWord('bms_master_word', 'BMS Master', [{ kind: 'quantity', value: '×1' }]),
+] }] }
+expect(normaliseSystemSingletonControllers([utilCtrl], { rack_count: 15 }) === 0,
+  'a utility design whose controller counts are already physical must be a strict no-op')
+
 console.log('sub-assembly-scale --selftest OK (0.11 kW chiller scales to mini-compressor money; '
   + '40 kW reference chiller byte-identical; size-less tank capped by a compact enclosure; '
   + 'plant-scale default calibration preserved; air-cooled scale demotes tank/pump/chiller '
