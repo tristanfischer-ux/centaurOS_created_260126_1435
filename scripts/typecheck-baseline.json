@@ -52,7 +52,6 @@
     "scripts/serial-design-chain-v2.tsx|TS2305|Module '\"./lib/background-enrichment\"' has no exported member 'ProposedPart'.",
     "scripts/serial-design-chain-v2.tsx|TS2307|Cannot find module './lib/mpn-shape' or its corresponding type declarations.",
     "scripts/serial-design-chain-v2.tsx|TS2339|Property 'matched' does not exist on type.",
-    "scripts/serial-design-chain-v2.tsx|TS2339|Property 'verifyProposedParts' does not exist on type.",
     "scripts/serial-design-chain-v2.tsx|TS2345|Argument of type is not assignable to parameter of type.",
     "scripts/serial-design-chain-v2.tsx|TS2459|Module '\"__TYPE__\"' declares 'honestDescriptorMpn' locally, but it is not exported.",
     "scripts/serial-design-chain-v2.tsx|TS7006|Parameter 'o' implicitly has an 'any' type.",

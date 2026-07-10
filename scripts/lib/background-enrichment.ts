@@ -826,6 +826,86 @@ async function processSupplier(supplier: DiscoveredSupplier): Promise<'enriched'
 }
 
 // ---------------------------------------------------------------------------
+// Stage 10.6 — synchronous proposed-part verification (2026-07-10; the export
+// serial-design-chain-v2 Stage 10.6 imports — previously a half-built refactor
+// stub whose absence made 10.6 degrade gracefully every run). THIS file is the
+// chain-as-DB-consumer EXEMPT file, so the live distributor probe lives here:
+// one findSkuForPart() per DISTINCT (manufacturer, mpn), small concurrency.
+// The adapters cache BOTH hits and confirmed misses themselves (cascade-cache
+// setCached), so the chain's next lookupCached() sees this batch's outcomes;
+// a confirmed hit is also written back to pretraining_extracted_parts
+// (recordDistributorHit — the growing-DB principle).
+// ---------------------------------------------------------------------------
+
+export interface ProposedPart {
+  module_id: string
+  sub_module_id: string
+  word_id: string
+  manufacturer: string
+  proposed_mpn: string
+  component_class: string | null
+  source: string
+}
+
+export interface ProposedPartOutcome {
+  word_id: string
+  matched: boolean
+  matched_source?: string
+  qty1_gbp?: number | null
+  note?: string
+}
+
+export async function verifyProposedParts(parts: ProposedPart[]): Promise<ProposedPartOutcome[]> {
+  if (!Array.isArray(parts) || parts.length === 0) return []
+  const { findSkuForPart } = await import('../../src/lib/pdf-engine-v2/lib/distributors')
+  const { recordDistributorHit } = await import('../../src/lib/pdf-engine-v2/lib/distributors/library-writeback')
+
+  const keyOf = (p: ProposedPart) =>
+    `${(p.manufacturer || '').trim().toLowerCase()}|${p.proposed_mpn.trim()}`
+  const distinct = new Map<string, ProposedPart>()
+  for (const p of parts) {
+    if (!p?.proposed_mpn?.trim()) continue
+    if (!distinct.has(keyOf(p))) distinct.set(keyOf(p), p)
+  }
+  const outcomes = new Map<string, { matched: boolean; source?: string; qty1?: number | null; note?: string }>()
+  const keys = [...distinct.keys()]
+  let cursor = 0
+  const worker = async () => {
+    for (;;) {
+      const i = cursor++
+      if (i >= keys.length) return
+      const k = keys[i]
+      const sample = distinct.get(k)!
+      try {
+        const agg = await findSkuForPart(sample.proposed_mpn.trim(), sample.manufacturer || null)
+        if (agg?.best) {
+          await recordDistributorHit(agg.best).catch(() => undefined)
+          outcomes.set(k, { matched: true, source: String(agg.best.source ?? ''), qty1: agg.qty1GBP })
+        } else {
+          outcomes.set(k, { matched: false, note: 'no distributor hit (misses cached by the adapters)' })
+        }
+      } catch (err) {
+        // a probe failure is NOT a confirmed miss — report unmatched but say why,
+        // and the adapters cached nothing, so a later run re-probes.
+        outcomes.set(k, { matched: false, note: `probe failed: ${String(err).slice(0, 120)}` })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(3, keys.length) }, worker))
+
+  return parts.map((p) => {
+    const o = outcomes.get(keyOf(p)) ?? { matched: false, note: 'empty mpn' }
+    return {
+      word_id: p.word_id,
+      matched: o.matched,
+      matched_source: o.source,
+      qty1_gbp: o.qty1 ?? null,
+      note: o.note,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
