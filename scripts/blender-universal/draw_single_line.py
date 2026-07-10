@@ -1842,8 +1842,13 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # / _build_source (those paths still assign the generic tag AFTER this historically,
     # and the Excel Electrical tab FAILs when the schedule says
     # 'MAIN DISTRIBUTION BOARD (TP&N)' while the SVG still reads 'MAIN LV BOARD').
+    # ONE-DATASET is_dc (2026-07-10, Powerwall run 50): the schedule's main board is DC
+    # whenever the contract states dc_bus_voltage_v (draw_panel_schedule._board_voltage) —
+    # minting here WITHOUT that signal produced 'MAIN BOARD — Busbar Assembly' on the SVG
+    # while the schedule read 'MAIN DC BUS', failing the board-hierarchy consistency row.
+    _is_dc_board = bool(_q(state, "dc_bus_voltage_v"))
     if main_hub:
-        main_bus.tag = edm.canonical_board_name(main_hub, "main", humanise=_humanise)
+        main_bus.tag = edm.canonical_board_name(main_hub, "main", is_dc=_is_dc_board, humanise=_humanise)
     elif main_bus.tag in ("MAIN SWITCHBOARD", "MAIN LV BOARD"):
         pass  # no hub identity — keep placeholder rather than invent a board
     # UNIVERSAL de-duplication: a load can reach the board both as a kW-derived
@@ -1921,7 +1926,8 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     # every grouping pass so a later helper cannot leave 'MAIN LV BOARD' on the SVG
     # while the panel schedule correctly reads 'MAIN DISTRIBUTION BOARD (TP&N)'.
     if main_hub and tree.main_bus is not None:
-        tree.main_bus.tag = edm.canonical_board_name(main_hub, "main", humanise=_humanise)
+        tree.main_bus.tag = edm.canonical_board_name(
+            main_hub, "main", is_dc=bool(_q(state, "dc_bus_voltage_v")), humanise=_humanise)
     return tree
 
 

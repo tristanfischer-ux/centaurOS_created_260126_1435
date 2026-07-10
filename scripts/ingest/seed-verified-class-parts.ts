@@ -89,6 +89,20 @@ async function main(): Promise<number> {
       const q = mpns.map(() => '?').join(',')
       const r = dbw.prepare(`UPDATE pretraining_extracted_parts SET discovery_source='web_verified_ingest', confidence=0.95 WHERE part_number IN (${q}) AND discovery_source LIKE 'distributor:%'`).run(...mpns)
       console.log(`[seed] promoted ${r.changes} row(s) to the web_verified_ingest priority lane`)
+      // DESIGN-VOCAB LEAD SEGMENT (2026-07-10, run 50): recordDistributorHit stores the
+      // DISTRIBUTOR's category name ('Thermistors - NTC 10kOhms 1% 0402') whose lead segment
+      // carries none of the design vocabulary the fill's type-coherence bar tests against
+      // ('cell temperature sensor') — so a correctly-seeded part is unreachable: the head-noun
+      // check refuses it. Prefix the row name with the candidate's design-vocab name (both
+      // names honestly describe the part; the distributor name is preserved after the dash).
+      const rename = dbw.prepare(`UPDATE pretraining_extracted_parts SET part_name = ? || ' — ' || part_name WHERE part_number = ? AND part_name NOT LIKE ? || '%'`)
+      let renamed = 0
+      for (let i = 0; i < outcomes.length; i++) {
+        if (!outcomes[i].matched) continue
+        const plain = candidates[i].name.replace(/[()\/]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)
+        renamed += rename.run(plain, candidates[i].mpn, plain).changes
+      }
+      console.log(`[seed] design-vocab lead segment prefixed on ${renamed} row(s)`)
     }
     dbw.close()
   } catch (e) {

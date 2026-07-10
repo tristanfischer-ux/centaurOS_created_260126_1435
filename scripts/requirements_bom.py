@@ -1089,8 +1089,26 @@ def _price_floor_for(name: str, md=None):
                 return max(1500.0, ds) if ds is not None else 1500.0
             return floor
     # ELECTRICAL / control floors (the original council-2026-06-16 set)
+    # AMP-AWARE BUSBAR (2026-07-10, Powerwall run 50): the amp-suffixed name pattern
+    # ("busbar · 39.2 A") never fires because the rating suffix is appended to the DISPLAY
+    # row AFTER floor time — at floor time the name is bare ("DC Busbar Assembly") and the
+    # £120 switchboard constant wins on a 39.2 A stamped-copper pack bar (4 lines, run 50).
+    # Read the current from the word's OWN modifiers instead: a sub-100 A busbar floors £20.
+    amps = None
+    if isinstance(md, dict):
+        for _k in ("rating_primary", "rating", "capacity", "dimension"):
+            _mv = re.search(r"([\d.]+)\s*A(?:\b|mp)", str(md.get(_k) or ""), re.I)
+            if _mv:
+                try:
+                    amps = float(_mv.group(1))
+                except ValueError:
+                    amps = None
+                break
     for rx, floor in _MIN_PRICE_FLOORS:
         if rx.search(nm):
+            if floor == 120.0 and amps is not None and amps < 100.0 and \
+                    re.search(r"busbar|bus[_ ]?bar", nm, re.I):
+                return 20.0
             return floor
     return None
 
@@ -3992,6 +4010,13 @@ def _selftest() -> int:
     for nm in ("DC busbar 800 V", "distribution busbar", "main switchboard busbar"):
         if _price_floor_for(nm, {}) != 120.0:
             print(f"  FAIL distribution busbar {nm!r} lost its £120 floor (got {_price_floor_for(nm, {})})"); bad += 1
+    # amp-aware busbar (2026-07-10 run 50): a sub-100 A pack busbar — rating in the MODIFIERS,
+    # not the name — floors £20 (stamped copper), never the £120 switchboard constant; a ≥100 A
+    # or unrated busbar keeps £120.
+    if _price_floor_for("DC Busbar Assembly", {"rating_primary": "39.2 A continuous"}) != 20.0:
+        print("  FAIL 39.2 A busbar (rating in md) should floor £20"); bad += 1
+    if _price_floor_for("DC Busbar Assembly", {"rating_primary": "400 A continuous"}) != 120.0:
+        print("  FAIL 400 A busbar must keep the £120 switchboard floor"); bad += 1
     # (e) duty-scaled floor tiers
     if not (_duty_scaled_floor(3) == 1500.0 and _duty_scaled_floor(30) == 15000.0
             and _duty_scaled_floor(100) == 300000.0 and _duty_scaled_floor(None) is None):

@@ -8020,10 +8020,12 @@ _POWERED_KW = ('pump', 'heat', 'uv', 'oxygen', 'blower', 'drum', 'chiller', 'ste
 _SENSOR_KW = ('sensor', 'probe', 'transmit', 'gauge', 'meter', 'analy', 'detector')
 
 
-def _device_current_a(name, quantities):
-    """Per-device feeder current (A) at 400/415 V 3-phase. Match the device to a *_kw
-    quantity in the contract by keyword; else a modest default share of the connected
-    load. UNIVERSAL — no class table."""
+def _device_current_a(name, quantities, ac_v=None):
+    """Per-device feeder current (A). Match the device to a *_kw quantity in the
+    contract by keyword; else a modest default share of the connected load.
+    UNIVERSAL — no class table. Voltage-aware (2026-07-10): a device-scale contract
+    (ac_output_voltage_v <= 250) computes single-phase I = kW/(V x pf); otherwise the
+    400/415 V 3-phase constant holds."""
     nm = re.sub(r'[^a-z0-9]', '', str(name).lower())
     kw = None
     for k, v in (quantities or {}).items():
@@ -8039,6 +8041,8 @@ def _device_current_a(name, quantities):
         tot = quantities.get('connected_electrical_load_kw') if isinstance(quantities, dict) else None
         totv = (tot.get('value') if isinstance(tot, dict) else tot) or 0
         kw = max(2.0, float(totv) / 25) if totv else 7.5
+    if ac_v is not None and ac_v <= 250.0:
+        return round(kw * 1000.0 / (ac_v * 0.9), 1)
     return round(kw * 1000.0 / (1.732 * 400.0 * 0.9), 1)
 
 
@@ -8301,6 +8305,22 @@ def augment_topology_connect_orphans(state, topology, parts):
     — no double-wiring. Subsumes the old power/signal pass. Universal + deterministic."""
     contract = state.get('orchestratorContract', {}) or {}
     quantities = contract.get('quantities', {}) or {}
+    # CONTRACT-AWARE LV FEEDER LABEL (2026-07-10, Powerwall run 50 Electrical 8.8): the
+    # feeder material_context was the FLAT constant 'LV power feeder 400/415V 3ph' — a
+    # plant-scale label the panel schedule then parses back as a 400 V system voltage,
+    # contradicting a device-scale contract (230 V 1φ). Read the contract's own AC system
+    # voltage: ≤250 V → single-phase label at that voltage; else the 3-phase constant.
+    _ac_v = None
+    for _k in ('ac_output_voltage_v', 'ac_system_voltage_v', 'lv_system_voltage_v'):
+        _q = quantities.get(_k)
+        _val = _q.get('value') if isinstance(_q, dict) else _q
+        try:
+            if _val is not None and 100.0 <= float(_val) <= 1000.0:
+                _ac_v = float(_val); break
+        except (TypeError, ValueError):
+            pass
+    _lv_feeder_ctx = (f'LV power feeder {_ac_v:.0f}V 1ph' if _ac_v is not None and _ac_v <= 250.0
+                      else 'LV power feeder 400/415V 3ph')
     ctrl_hub = _module_repr_part_name('control_compute_communication', parts)
 
     # ── the electrical distribution hierarchy (role-keyed series spine + load hub) ──
@@ -8389,7 +8409,7 @@ def augment_topology_connect_orphans(state, topology, parts):
         seen.add((a, b))
         e = {'from_part': a, 'to_part': b, 'mechanism': 'electrical_bus',
              'constraint_kind': 'current_rating',
-             'required_value': current if current is not None else _device_current_a(b, quantities),
+             'required_value': current if current is not None else _device_current_a(b, quantities, _ac_v),
              'required_unit': 'A', 'required_margin_factor': 1.25,
              'material_context': ctx, '_augmented': True}
         extra.append(e)
@@ -8468,7 +8488,7 @@ def augment_topology_connect_orphans(state, topology, parts):
                 continue
             if svc == 'power' and pwr_hub and p.name != pwr_hub \
                     and (pwr_hub, p.name) not in existing and (pwr_hub, p.name) not in seen:
-                if _add_pwr_edge(pwr_hub, p.name, 'LV power feeder 400/415V 3ph'):
+                if _add_pwr_edge(pwr_hub, p.name, _lv_feeder_ctx):
                     n_pwr += 1
             elif svc == 'signal' and ctrl_hub and p.name != ctrl_hub \
                     and (p.name, ctrl_hub) not in existing and (p.name, ctrl_hub) not in seen:

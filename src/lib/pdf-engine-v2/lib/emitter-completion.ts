@@ -1139,6 +1139,16 @@ const HEAD_NOUN_SYNONYMS: Record<string, string[]> = {
   genset: ['generator'],
   touchscreen: ['hmi'],   // an industrial 'HMI Touchscreen' word ↔ an 'HMI Displays & Panel PCs …' catalogue family
   hmi: ['touchscreen'],
+  // sensing family (2026-07-10, Powerwall run 50): a 'Cell Temperature Sensors' word must
+  // reach a catalogue row led 'Thermistors - NTC …' and a 'Current Sensors' word a row led
+  // 'current transducer …' — sensor/transducer/thermistor/probe are the SAME sensing family
+  // (a thermistor IS a temperature sensor; LEM sells the same part as both 'sensor' and
+  // 'transducer'). Qualifier coherence still applies ('temperature'/'current' must also hit),
+  // so a pressure transmitter still cannot pin a pressure switch (the proveCatch above).
+  sensor: ['transducer', 'thermistor', 'probe'],
+  transducer: ['sensor'],
+  thermistor: ['sensor'],
+  probe: ['sensor'],
 }
 
 /** Does the candidate hay contain the word's HEAD NOUN (fold- and
@@ -1444,6 +1454,21 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   // e.g. the Grundfos fertigation dosing PUMP) wins. An ACCESSORY row never pins
   // a word that did not ask for an accessory.
   if (isAccessoryRow(dbHit.part_name) && !/\baccessor/i.test(name || '')) return false
+  // SERIES-TYPE OVERRIDE (2026-07-10, run 50 'Current Sensors → LEM LV 25-P' mis-pin):
+  // distributor categories can be COARSER than the part's real type — Mouser files LEM's
+  // VOLTAGE transducers under 'Board Mount Current Sensors', so the row's own name lies about
+  // the discriminating qualifier. Curated series facts (gate-27 MFR_PART_PATTERNS spirit):
+  // LEM LV*/DVL* = voltage transducer; LA*/HASS*/HTB*/CKSR* = current. A word asking for one
+  // side of the voltage/current pair refuses a row whose SERIES is the other side.
+  {
+    const mpnUp = (dbHit.part_number ?? '').toUpperCase().trim()
+    const isLem = /\blem\b/i.test(dbHit.manufacturer ?? '')
+    const seriesVolt = isLem && /^(LV|DVL|DVM)\s?\d/.test(mpnUp)
+    const seriesCurr = isLem && /^(LA|LF|HASS|HTB|CKSR|HO|HLSR)\s?\d/.test(mpnUp)
+    const wantsCurr = /\bcurrent\b/i.test(name) && !/\bvoltage\b/i.test(name)
+    const wantsVolt = /\bvoltage\b/i.test(name) && !/\bcurrent\b/i.test(name)
+    if ((wantsCurr && seriesVolt) || (wantsVolt && seriesCurr)) return false
+  }
   const lead = partNameLeadSegment(dbHit.part_name, 6)
   const headTok = toks[toks.length - 1]
   if (headTok && !headNounHit(lead, headTok)) return false

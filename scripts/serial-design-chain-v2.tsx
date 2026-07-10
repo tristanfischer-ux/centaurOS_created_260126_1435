@@ -9679,6 +9679,15 @@ async function main() {
     // tree — skipGenerate (no LLM, no writeback churn), the same gate-20-safe path —
     // so a word that exists at ship time was OFFERED the library exactly once.
     try {
+      // PHANTOM RE-DROP (2026-07-10, run 50 'Surge Apparent Power → Tripp Lite' pin): the
+      // attribute-phantom pass runs post-Phase-2, but reconcile can RE-MINT a phantom-named
+      // word afterwards (the two-synthesis-paths family) — and the final-settle fill then
+      // pins a real MPN onto a word that is an electrical QUANTITY, not a part. Re-drop on
+      // the settled tree BEFORE offering the library (idempotent; a clean tree is untouched).
+      const { dropAttributePhantomWords: lateDrop } = await import('./lib/orchestrator/generic/universal-contract-sizing')
+      const ph3 = lateDrop((finalState.moduleDecomposition?.modules ?? []) as any)
+      if (ph3.droppedPhantom > 0 || ph3.droppedDuplicate > 0)
+        console.error(`[chain] final-settle phantom re-drop: ${ph3.droppedPhantom} phantom + ${ph3.droppedDuplicate} duplicate word(s) removed from the settled tree`)
       const { fillBlankWordMpns: lateFill3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
       const f3 = await lateFill3(finalState.moduleDecomposition?.modules ?? [],
                                  String(finalState.orchestratorContract?.product_class ?? 'unknown'),
