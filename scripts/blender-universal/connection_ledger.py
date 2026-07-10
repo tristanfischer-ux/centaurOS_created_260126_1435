@@ -525,7 +525,25 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
         if svc in ("water", "thermal"):
             _fluid = e.get("fluid") if isinstance(e.get("fluid"), dict) else {}
             _medium = str(_fluid.get("medium") or e.get("medium") or "").lower()
-            if _medium == "air" or _AIR_MOVER_ENDPOINT_RE.search(f"{frm} | {to}"):
+            # AIR-COOLED DESIGN: when the contract's own thermal duty says forced-air
+            # (dissipation × 1.2 < 2 kW — the SAME threshold as the emitter branch +
+            # the liquid-plant demotion), EVERY thermal-family fluid edge is an air/
+            # conduction path — there is no liquid loop to pipe (run-23: 'Thermal
+            # Management Manifold → Bay' + 'Bay → heat_rejection' still authored as
+            # water because their nouns carry no fan/vent token).
+            _diss = 0.0
+            if isinstance(quantities, dict):
+                _dq = quantities.get("system_thermal_dissipation_kw")
+                try:
+                    _diss = float(_dq.get("value") if isinstance(_dq, dict) else (_dq or 0))
+                except (TypeError, ValueError):
+                    _diss = 0.0
+            _air_cooled = 0 < _diss and _diss * 1.2 < 2.0
+            _thermal_family = bool(re.search(
+                r"thermal|cold[\s_-]?plate|heat[\s_-]?sink|heat[\s_-]?rejection|cooling",
+                f"{frm} | {to}", re.I))
+            if (_medium == "air" or _AIR_MOVER_ENDPOINT_RE.search(f"{frm} | {to}")
+                    or (_air_cooled and _thermal_family)):
                 svc = "air"
                 e["_ledger_service"] = "air"
 

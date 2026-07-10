@@ -2751,6 +2751,9 @@ const SINGLETON_CONTROLLER_ROLES: ReadonlyArray<{ role: string; re: RegExp }> = 
   // run-21: 'Remote Monitoring Module' ×5 + 'Remote Monitoring Interface' ×5 = £7.8k
   // of comms kit on a wall unit that carries ONE telemetry device.
   { role: 'remote-monitoring', re: /remote\s+monitoring|telemetry\s+(?:module|unit|interface)|cellular\s+(?:modem|router)/i },
+  // run-23: 'Local HMI Display' + 'Local HMI Touchscreen' = £1.8k of screens; a
+  // product carries ONE operator display (if any).
+  { role: 'local-hmi', re: /\bhmi\b|touch\s?screen|operator\s+(?:display|panel|interface)/i },
 ]
 const SLAVE_CONTROLLER_RE =
   /\b(?:bms|battery\s+management(?:\s+system)?)\b[\w\s]*\bslave\b|\bslave\b[\w\s]*\b(?:bms|battery\s+management|controller)\b/i

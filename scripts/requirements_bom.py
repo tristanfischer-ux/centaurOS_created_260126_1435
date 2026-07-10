@@ -5633,9 +5633,17 @@ def _connection_rows(out_dir: str, q=None):
         sized_note = None
 
         # ── SERVICE CLASSIFICATION ──
+        # The connection-LEDGER's own service verdict is the AUTHORITY when present
+        # (2026-07-10, Powerwall run-23: the ledger's air-mover override correctly
+        # authored fan/vent edges as service 'air', but this classifier ignored it and
+        # fell to the water default — re-pricing a cabinet's AIR paths as DN100 water
+        # mains at the 40 m³/h thermal floor, £1,061 of phantom pipe + the exact
+        # 'pipes into empty space' geometry the vision critic flags).
+        _ledger_svc = str(ledger_row.get("service") or "").lower()
         if "mm²" in size or "mm2" in size.lower() or any(k in mech for k in ("cable", "power", "electr", "supply", "feeder", "bus")):
             service, kind = "electrical", "cable"
-        elif "duct" in size.lower() or any(k in mech for k in ("hvac", "vent", "exhaust", "air", "aeration")):
+        elif (_ledger_svc == "air" or "duct" in size.lower()
+              or any(k in mech for k in ("hvac", "vent", "exhaust", "air", "aeration"))):
             service, kind = "air", "duct"
         else:
             service, kind = "water", "pipe"
@@ -7156,6 +7164,16 @@ def assemble(out_dir: str):
         # assembly to £2,400 (12×). The DN-scaled family band at the pricing site is the
         # grounded truth for BOTH; never corpus-lift either family.
         if _BARE_PNEUMATIC_ACTUATOR_RE.search(req_lead) or _ACTUATED_VALVE_RE.search(req_lead):
+            continue
+        # BATTERY CELL family (2026-07-10, Powerwall run-23, corpus-mismatch family): a
+        # cell line is ENERGY-GROUNDED (Ah × V × £/kWh_cell, the commoditised truth —
+        # requirements_bom's own dominant-cost doctrine) or real-DB-median priced. The
+        # 'cell' corpus median (£52, n=5) is small-quantity RETAIL single-cell pricing —
+        # the wrong frame for a manufactured product's programme BoM: the lift re-inflated
+        # 88 × £8 → 88 × £52 (£3.9k phantom on a 14 kWh unit, £327/kWh at CELL level vs
+        # the ~£60-100/kWh cell market). The energy grounding is the truth; never
+        # corpus-lift a battery-cell line. (Same discipline as membrane/actuator above.)
+        if _BATTERY_CELL_RE.search(req_lead) and not _NON_BATTERY_CELL_RE.search(req_lead):
             continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
