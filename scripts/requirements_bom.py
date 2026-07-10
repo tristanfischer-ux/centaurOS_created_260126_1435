@@ -441,10 +441,23 @@ def _structural_takeoff(name, md, geom=None):
         area_m2 = math.pi * (d_v / 2.0) ** 2          # PLAN footprint (a circle), not a shell
     if area_m2 is None or area_m2 <= 0:
         return None
-    gbp = area_m2 * _STRUCTURAL_GBP_PER_M2 + 8000.0   # + connections/baseplates/HD bolts
+    # CONNECTIONS ADDER FOLLOWS SCALE (2026-07-10, Powerwall run-20: four cabinet-scale
+    # structural rows — 'Battery Module Rack', 'Structural Rack Frame', 'Weatherproof
+    # Enclosure' — each billed the flat £8,000 BUILDING connections/baseplates/HD-bolts
+    # allowance on a sub-1 m² footprint, £24k+ of phantom civils on a wall unit; two of
+    # them then fed the corpus lift as 'principals'). The £8k allowance is a BUILDING
+    # portal-frame constant — it applies at building scale (≥ 20 m² plan) byte-identically;
+    # a device/skid-scale frame gets a proportional fixture allowance instead.
+    if area_m2 >= 20.0:
+        gbp = area_m2 * _STRUCTURAL_GBP_PER_M2 + 8000.0   # + connections/baseplates/HD bolts
+        adder_txt = "+ £8k connections"
+    else:
+        fixture = max(150.0, area_m2 * 40.0)
+        gbp = area_m2 * _STRUCTURAL_GBP_PER_M2 + fixture   # brackets/fasteners at device scale
+        adder_txt = f"+ £{fixture:,.0f} device-scale fixtures (sub-20 m² frame — no building connections)"
     basis = (f"structural steelwork take-off: {area_m2:,.0f} m² plan × £{_STRUCTURAL_GBP_PER_M2:.0f}/m² "
              f"(UK-2026 fabricated + erected; service=structural, dry, 0 bar — NOT a pressure shell) "
-             f"+ £8k connections")
+             f"{adder_txt}")
     spec = {"material": "structural steel", "footprint_m2": round(area_m2)}
     return gbp, basis, spec
 
@@ -1178,6 +1191,16 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     # genuine cases stay: Degasser £4,946→£65k is 13× (and orig ≥ £500); junction box £40→£110 is
     # 2.75×. Universal, no noun list.
     if unit_gbp < 500.0 and target > unit_gbp * 20.0:
+        return None
+    # UNIVERSAL RATIO CEILING (2026-07-10, Powerwall run-20: 'Battery Module Rack'
+    # £8,001 → £210,000, a 26× lift to a UTILITY-rack corpus median on a 14 kWh wall
+    # cabinet — slipped BETWEEN the two guards above because the line was neither
+    # sub-£1k nor sub-£500). Third occurrence of the corpus CLASS-MISMATCH family
+    # (module tray 75×, fan tray 6×, now rack 26×): a line at < ~7% of its corpus
+    # median is not "under-priced" — the corpus matched a DIFFERENT class of product
+    # sharing the noun. The genuine under-priced principals stay: Degasser £4,946→£65k
+    # is 13×, Drum Filter £6,851→£28k is 4×. No noun list, no class table.
+    if target > unit_gbp * 15.0:
         return None
     edge = "p25" if (p25 not in (None, "") and target < median) else "0.6×median"
     basis = (f" · lifted £{round(unit_gbp):,}→£{round(target):,} to the engine corpus "
@@ -2736,6 +2759,27 @@ def _selftest() -> int:
             got = _bespoke_class(name.split("·")[0].strip())
         if got != want:
             print(f"  FAIL  '{name}' → {got} (want {want})"); bad += 1
+    # ── CORPUS-LIFT ratio ceiling (2026-07-10, run-20 rack £8,001→£210,000 26× lift) ──
+    _pv_rack = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 210000,
+                "engine_c_ref_count": 5}
+    if _corpus_median_lift(8001.0, _pv_rack) is not None:
+        print("  FAIL corpus-lift proveCatch: a 26× lift to a wrong-class corpus median "
+              "must be REJECTED (ratio ceiling 15×)"); bad += 1
+    _pv_degas = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 65000,
+                 "engine_c_ref_count": 5}
+    if _corpus_median_lift(4946.0, _pv_degas) is None:
+        print("  FAIL corpus-lift proveNoFalsePositive: the genuine Degasser "
+              "£4,946→0.6×£65k (7.9×) lift must survive"); bad += 1
+    # ── STRUCTURAL connections adder follows scale (2026-07-10, run-20 £8k on 0 m²) ──
+    _st_dev = _structural_takeoff("Battery Module Rack", {"dimension": "0.3 m² footprint"})
+    if not _st_dev or _st_dev[0] > 1000.0:
+        print(f"  FAIL structural-adder proveCatch: a 0.3 m² device frame must price "
+              f"device-scale fixtures (< £1k), got {_st_dev and round(_st_dev[0])}"); bad += 1
+    _st_bld = _structural_takeoff("Steel Portal Frame", {"dimension": "100 m² area"})
+    if not _st_bld or abs(_st_bld[0] - (100 * 90 + 8000)) > 1.0:
+        print(f"  FAIL structural-adder proveNoFalsePositive: a 100 m² building frame "
+              f"must keep the £8k connections adder byte-identically, got "
+              f"{_st_bld and round(_st_bld[0])}"); bad += 1
     # ── ENCLOSURE-SKIN take-off (2026-07-10, run-13 ledger £3 material-less enclosure) ──
     _q_encl = {"enclosure_volume_m3": {"value": 0.143}}
     _sk = _enclosure_skin_takeoff("Outdoor Cabinet Enclosure", _q_encl)

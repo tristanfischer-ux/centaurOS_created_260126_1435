@@ -5534,6 +5534,7 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
   // (count ≥ POP_MIN), keeping the first. Safe: two genuinely-distinct parts won't share an
   // identical role key AND count (manual vs actuated stay distinct).
   const seenPopKey = new Set<string>()
+  const seenPinnedName = new Set<string>()
   for (const m of modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       if (!Array.isArray(sm.words)) continue
@@ -5552,6 +5553,19 @@ export function dropAttributePhantomWords(modules: ModuleLike[]): { droppedPhant
             const key = `${_populationRoleKey(name)}|${count}`
             if (seenPopKey.has(key)) { droppedDuplicate += 1; return false }
             seenPopKey.add(key)
+          }
+          // SINGULAR/PLURAL PINNED-PRINCIPAL DUPLICATE (2026-07-10, run-20): the same
+          // pinned part under 'Battery Module Rack' AND 'Battery Module Racks'
+          // (identical MPN, both ×1) is ONE part emitted twice — each then took its
+          // own corpus lift (£210k × 2 = £420k on a 14 kWh cabinet). Key = singularised
+          // name + pinned MPN; a TBD/absent MPN never keys, so two unpinned generic
+          // words are untouched. Universal — no noun list.
+          const pnMod = (w.modifier_characters ?? []).find((mc) => mc.kind === 'part_number')
+          const pn = String(pnMod?.value ?? '').trim()
+          if (pn && !/^tbd\b|\btbd\s*\(/i.test(pn)) {
+            const dupKey = `${_singularisePhrase(name)}|${pn.toLowerCase()}`
+            if (seenPinnedName.has(dupKey)) { droppedDuplicate += 1; return false }
+            seenPinnedName.add(dupKey)
           }
         }
         return true

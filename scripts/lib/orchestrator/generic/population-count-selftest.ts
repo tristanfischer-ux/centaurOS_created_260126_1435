@@ -95,6 +95,35 @@ function run() {
     throw new Error(`phantom-drop: expected ≥2 synonym population drops, got ${synDr.droppedDuplicate}`)
   }
 
+  // ── dropAttributePhantomWords: SINGULAR/PLURAL PINNED duplicate (run-20 £210k×2 rack) ──
+  const mkPinned = (id: string, name: string, pn: string) => ({
+    id, name_human: name, content_character: { character_id: id, name_human: name },
+    modifier_characters: [
+      { kind: 'quantity', value: '×1' },
+      { kind: 'part_number', value: pn },
+    ],
+  })
+  const pinned: any = [{
+    module: 'energy', sub_modules: [{ sub_module: 's', words: [
+      mkPinned('battery_module_rack_word', 'Battery Module Rack', 'ST2752UX'),
+      mkPinned('battery_module_racks_word', 'Battery Module Racks', 'ST2752UX'),
+      mkPinned('bms_slave_word', 'BMS Slave', 'ORION-2'),                      // different name — kept
+      mkPinned('spare_module_word', 'Spare Module', 'TBD (detailed design)'),  // TBD never keys
+      mkPinned('spare_modules_word', 'Spare Modules', 'TBD (detailed design)'),
+    ] }],
+  }]
+  const pinnedDr = dropAttributePhantomWords(pinned)
+  const pinnedRemain = pinned[0].sub_modules[0].words.map((w: any) => w.name_human)
+  if (pinnedRemain.filter((n: string) => /battery module rack/i.test(n)).length !== 1) {
+    throw new Error(`phantom-drop: singular+plural SAME-PIN principals must collapse to ONE (got ${JSON.stringify(pinnedRemain)})`)
+  }
+  if (!pinnedRemain.includes('BMS Slave') || pinnedRemain.filter((n: string) => /spare/i.test(n)).length !== 2) {
+    throw new Error('phantom-drop: a distinct pinned part + TBD-pinned words must be untouched')
+  }
+  if (pinnedDr.droppedDuplicate !== 1) {
+    throw new Error(`phantom-drop: expected exactly 1 pinned-name duplicate dropped, got ${pinnedDr.droppedDuplicate}`)
+  }
+
   // eslint-disable-next-line no-console
   console.log('population-count --selftest OK (4 valve smears → ×1; genuine actuated stays ×200; ' +
     `attribute phantoms dropped [${dr.droppedPhantom}], same-id dedup [${dr.droppedDuplicate}], ` +
