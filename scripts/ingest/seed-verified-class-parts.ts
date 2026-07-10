@@ -76,6 +76,24 @@ async function main(): Promise<number> {
     }
   }
   console.log(`[seed] ${confirmed}/${candidates.length} confirmed → written back to pretraining_extracted_parts (embedded)`)
+  // PRIORITY LANE (2026-07-10, the runs 42-47 plateau root): dbFirstLookup's retrieval
+  // window admits discovery_source='web_verified_ingest' rows FIRST — recordDistributorHit
+  // writes 'distributor:<src>', which drowns on common tokens behind the 36k-row sweep.
+  // A LIVE distributor confirmation is a stronger verification than a web ingest, so
+  // promote this batch's confirmed rows into the priority lane.
+  try {
+    const Better = (await import('better-sqlite3')).default
+    const dbw = new Better(`${process.env.HOME}/.forge-truth/forge-truth.db`)
+    const mpns = outcomes.map((o, i) => o.matched ? candidates[i].mpn : null).filter(Boolean) as string[]
+    if (mpns.length) {
+      const q = mpns.map(() => '?').join(',')
+      const r = dbw.prepare(`UPDATE pretraining_extracted_parts SET discovery_source='web_verified_ingest', confidence=0.95 WHERE part_number IN (${q}) AND discovery_source LIKE 'distributor:%'`).run(...mpns)
+      console.log(`[seed] promoted ${r.changes} row(s) to the web_verified_ingest priority lane`)
+    }
+    dbw.close()
+  } catch (e) {
+    console.log(`[seed] priority-lane promotion skipped: ${(e as Error).message.slice(0, 100)}`)
+  }
   return 0
 }
 
