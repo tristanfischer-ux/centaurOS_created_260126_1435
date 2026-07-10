@@ -64,15 +64,25 @@ import { upsertSupplierEmbedding } from '../supplier-enrichment/embed-supplier'
 // CLI args + env loading (mirror chain's pattern so detached child has keys)
 // ---------------------------------------------------------------------------
 
+// ENTRY-POINT DETECTION (2026-07-10, Powerwall runs 16+17 silent exit-1 root): this
+// module is BOTH a CLI (detached post-chain child) AND an import (serial-design-chain
+// Stage 10.6 imports verifyProposedParts). The argv guard AND the main() invocation
+// at the bottom used to run at MODULE level — merely importing the module executed
+// the CLI against the CHAIN'S OWN argv (the brief path passed existsSync, main()
+// then failed JSON-parsing the markdown, and its catch process.exit(1)'d the WHOLE
+// CHAIN with nothing on stdout). Everything CLI-shaped now runs only when this file
+// IS the entry script. (The previously-missing mpn-shape module had been shielding
+// the chain by making Stage 10.6 throw before this import was ever reached.)
+const IS_CLI_ENTRY = /background-enrichment/.test(String(process.argv[1] ?? ''))
 const argv = process.argv.slice(2)
-if (argv.length < 2) {
+if (IS_CLI_ENTRY && argv.length < 2) {
   console.error('Usage: background-enrichment.ts <state.json> <outDir>')
   process.exit(1)
 }
-const STATE_PATH = resolve(argv[0])
-const OUT_DIR = resolve(argv[1])
+const STATE_PATH = IS_CLI_ENTRY && argv[0] ? resolve(argv[0]) : ''
+const OUT_DIR = IS_CLI_ENTRY && argv[1] ? resolve(argv[1]) : ''
 
-if (!existsSync(STATE_PATH)) {
+if (IS_CLI_ENTRY && !existsSync(STATE_PATH)) {
   console.error(`[background-enrichment] state file missing: ${STATE_PATH}`)
   process.exit(1)
 }
@@ -936,16 +946,21 @@ async function main(): Promise<number> {
   return 0
 }
 
-main().catch((err) => {
-  logAction({
-    action_type: 'fatal',
-    target_kind: 'meta',
-    target_key: STATE_PATH,
-    status: 'failed',
-    error: String(err).slice(0, 300),
+// CLI entry only — importing this module (Stage 10.6 verifyProposedParts) must
+// NEVER start the enrichment main() or exit the importing process (see the
+// IS_CLI_ENTRY block at the top for the run-16/17 silent-kill this prevents).
+if (IS_CLI_ENTRY) {
+  main().catch((err) => {
+    logAction({
+      action_type: 'fatal',
+      target_kind: 'meta',
+      target_key: STATE_PATH,
+      status: 'failed',
+      error: String(err).slice(0, 300),
+    })
+    try { db.close() } catch { /* ignore */ }
+    process.exit(1)
+  }).then((code) => {
+    if (typeof code === 'number') process.exit(code)
   })
-  try { db.close() } catch { /* ignore */ }
-  process.exit(1)
-}).then((code) => {
-  if (typeof code === 'number') process.exit(code)
-})
+}
