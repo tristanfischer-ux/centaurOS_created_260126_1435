@@ -4603,8 +4603,8 @@ def _selftest() -> int:
     # manufacturer/part_number) in a DIFFERENT module. Claims: (a) the bare stub emits NO
     # row at all — never a blank-requirement ledger tag the Part-names master can't
     # collect; (b) the authored twin still emits its own correct, unaffected row; (c) a
-    # bare word whose id is NOT authored anywhere else is untouched (stays the honest
-    # 'NOT FOUND — requirement stated' gap, never over-suppressed). ═══
+    # bare word whose id is NOT authored anywhere else is retained with an ID-derived
+    # requirement head (never a blank row, never over-suppressed). ═══
     import tempfile as _tempfile
     with _tempfile.TemporaryDirectory() as _pc_dir:
         _pc_state = {
@@ -4653,6 +4653,11 @@ def _selftest() -> int:
             print(f"  FAIL word-id-collision guard: expected exactly 2 rows (the authored twin "
                   f"+ the genuine orphan; the phantom duplicate excluded), got {len(_pc_rows)}: "
                   f"{_pc_rows!r}"); bad += 1
+        _pc_orphan = next((r for r in _pc_rows
+                           if r.get("requirement") == "Truly Unauthored"), None)
+        if not _pc_orphan:
+            print("  FAIL word-id fallback: a genuine bare word must derive a non-blank "
+                  "requirement head from its id"); bad += 1
 
     # ═══ proveCatch/proveNoFalsePositive the UNDERGROUND-ELEMENT CIVILS DERIVATION
     # (Sam Green SME review 2026-07-07 — "drain pits suggest a lot of underground
@@ -6214,6 +6219,24 @@ def _stamp_fabricated_family_materials(rows):
     return rows
 
 
+def _word_requirement_name(word: dict) -> str:
+    """Return a stable requirement head for a real word, even when name_human is absent.
+
+    Late service/document words can legitimately carry only an id
+    (`service_manual`, `safety_lockout_tagout`). A blank requirement is never
+    auditable and cannot join the Part-names master, so derive a human label from
+    content-character identity then word id. Cross-module phantom duplicates are
+    still suppressed before this fallback is called.
+    """
+    cc = word.get("content_character") or {}
+    explicit = str(word.get("name_human") or cc.get("name_human") or "").strip()
+    if explicit:
+        return explicit
+    raw = str(cc.get("character_id") or word.get("id") or "").strip()
+    raw = re.sub(r"(?:_synth)?_word$", "", raw, flags=re.I)
+    return re.sub(r"[_\s]+", " ", raw).strip().title()
+
+
 def assemble(out_dir: str):
     st = json.load(open(os.path.join(out_dir, "state.json")))
     _pv_state = st          # stable handle to the STATE dict — the loop below rebinds
@@ -6383,9 +6406,15 @@ def assemble(out_dir: str):
                 wid = str(w.get("id") or "")
                 if "__" in wid:                       # sub-component → itemised under its parent below
                     continue
-                name = w.get("name_human") or ""
-                if not name and wid in _phantom_duplicate_ids:
+                authored_name = str(
+                    w.get("name_human")
+                    or (w.get("content_character") or {}).get("name_human")
+                    or "").strip()
+                if not authored_name and wid in _phantom_duplicate_ids:
                     continue                          # phantom cross-module id collision — its authored twin already emits the real row
+                name = _word_requirement_name(w)
+                if not name:
+                    continue                          # no identity at all — cannot emit an auditable requirement
                 if re.search(r"\bfastener|gasket seal|\bbracket\b|wiring harness|labelling|"
                              r"lifting point|nameplate|mounting hardware|earthing boss\b", name, re.I):
                     continue                          # hardware detail — not a requirement line

@@ -15590,6 +15590,64 @@ _METHOD_C_AMPACITY_A: Dict[float, float] = {
 _BOARD_RECON_BAND = (0.8, 1.25)
 
 
+_PANEL_BREAKDOWN_STOP = {
+    "electrical", "consumer", "connected", "load", "power", "kw",
+    "system", "total",
+}
+
+
+def _panel_connected_load_for_contract(panel_md: str, quantities: dict):
+    """Select the panel carrying the contract's electrical-consumer breakdown.
+
+    A sealed energy product has an 11 kW principal transfer board and a separate
+    0.21 kW auxiliary-consumer board. `connected_electrical_load_kw` is summed
+    from `electrical_consumer__*` keys, so compare it to the board whose circuit
+    descriptions semantically match those keys — never the first/"main" total.
+    """
+    sections = re.split(r"(?m)^##\s+", panel_md or "")
+    candidates = []
+    for section in sections[1:]:
+        lines = section.splitlines()
+        board = lines[0].strip() if lines else "?"
+        match = re.search(
+            r"Total connected load[^\d]*([\d.,]+)\s*kW", section, re.I)
+        if not match:
+            continue
+        candidates.append((board, float(match.group(1).replace(",", "")), section))
+    if not candidates:
+        return None, None
+
+    items = []
+    for key, raw in (quantities or {}).items():
+        if not re.match(r"^electrical_consumer__.+_kw$", str(key), re.I):
+            continue
+        value = raw.get("value") if isinstance(raw, dict) else raw
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        stem = re.sub(r"^electrical_consumer__|_kw$", "", str(key).lower())
+        tokens = {
+            token for token in re.split(r"[^a-z0-9]+", stem)
+            if len(token) > 2 and token not in _PANEL_BREAKDOWN_STOP
+        }
+        if tokens and value > 0:
+            items.append((tokens, value))
+
+    if items:
+        ranked = []
+        for board, value, section in candidates:
+            section_tokens = set(re.split(r"[^a-z0-9]+", section.lower()))
+            score = sum(v for tokens, v in items if tokens & section_tokens)
+            ranked.append((score, board, value))
+        ranked.sort(key=lambda row: row[0], reverse=True)
+        if ranked and ranked[0][0] > 0:
+            return ranked[0][2], ranked[0][1]
+
+    # Legacy/single-board path: preserve the previous first-total behaviour.
+    return candidates[0][1], candidates[0][0]
+
+
 def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     """Column-contract evaluation of EVERY Panel schedule circuit row (pure — reads
     drawings/panel-schedule.md + drawings/single-line-diagram.svg; renders nothing).
@@ -15935,22 +15993,26 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
             if isinstance(_cv, dict) and isinstance(_cv.get("value"), (int, float)):
                 _q_conn = float(_cv["value"]); break
         _sched_kw = None
+        _sched_board = None
         _ps_md = os.path.join(run_dir, "drawings", "panel-schedule.md")
         if os.path.exists(_ps_md):
             try:
-                _mm2 = re.search(r"Total connected load[^\d]*([\d.,]+)\s*kW", open(_ps_md).read(), re.I)
-                if _mm2:
-                    _sched_kw = float(_mm2.group(1).replace(",", ""))
+                _sched_kw, _sched_board = _panel_connected_load_for_contract(
+                    open(_ps_md).read(), _q)
             except Exception:  # noqa: BLE001
                 _sched_kw = None
+                _sched_board = None
         if _q_conn is not None and _sched_kw is not None:
             _pw_ok = (_q_conn > 0 and abs(_sched_kw - _q_conn) <= 0.25 * max(_q_conn, 0.001))
             _consistency_row(
                 "panel schedule ↔ contract · connected load", _pw_ok,
-                f"schedule total {_sched_kw:g} kW vs contract connected_electrical_load_kw {_q_conn:g} kW",
-                f"the panel schedule's {_sched_kw:g} kW connected load contradicts the contract's "
+                f"schedule board {_sched_board or '?'} total {_sched_kw:g} kW vs "
+                f"contract connected_electrical_load_kw {_q_conn:g} kW",
+                f"the {_sched_board or 'selected'} schedule board's {_sched_kw:g} kW "
+                f"connected load contradicts the contract's "
                 f"{_q_conn:g} kW — an invented load table (fix the feeder derivation, not the row)",
-                op={"op": "panel_kw", "sched": _sched_kw, "contract": _q_conn})
+                op={"op": "panel_kw", "sched": _sched_kw, "contract": _q_conn,
+                    "board": _sched_board})
         elif _sched_kw is not None:
             _consistency_row(
                 "panel schedule ↔ contract · connected load", False,
@@ -23996,9 +24058,9 @@ def _selftest() -> int:
         _COV_CACHE.clear()
     # (4b) CORROBORATION DOCTRINE (Tristan 2026-07-03 — the re-roll defect: GA 9.7 vs 9, Renders
     # 9.7 vs 9 across two otherwise-matched runs because an uncached, non-deterministic vision
-    # verdict directly capped the score). proveCatch BOTH directions on the render/GA scorer: an
-    # UNCORROBORATED vision 'broken' finding must render advisory-only and NEVER move the score; a
-    # CORROBORATED one (an independent deterministic check agrees) must still deduct.
+    # verdict directly capped the score). Current flag-only doctrine: a NAMED visual defect is
+    # load-bearing even when no deterministic geometry check sees that defect class; deterministic
+    # corroboration is additional evidence, not permission to ignore the critic.
     with _tf.TemporaryDirectory() as _td_corr:
         with open(os.path.join(_td_corr, "parts-ledger.json"), "w") as _fh:
             json.dump({"coverage_by_drawing": {"blender": {"present": 40, "expected": 40, "pct": 100.0}}}, _fh)
@@ -24007,15 +24069,16 @@ def _selftest() -> int:
                        "model": "test-model"}, _fh)
         _COV_CACHE.clear(); _VISION_CACHE.clear(); _LITTER_CACHE.clear()
         _SHAPE_MM_CACHE.clear(); _DG_CACHE.clear()
-        # (4b-i) UNCORROBORATED: no drawing-gates.json, no litter degrade, no shape mismatch — the
-        # vision finding must NOT drag a 100%-coverage render below its deterministic PASS.
+        # (4b-i) NAMED, uncorroborated: the critic is the only check that sees some visual
+        # defects, so a named finding must still cap the render ≤4/FAIL.
         _rn_unc = _aux_tab_score("Render — Interior layout", _td_corr)
-        if not _rn_unc or _rn_unc.get("status") != "PASS" or (_rn_unc.get("score") or 0) < 8:
-            print(f"  FAIL corroboration-doctrine: an UNCORROBORATED vision finding must not cap a "
-                  f"clean-deterministic render below PASS (got {_rn_unc})"); bad += 1
-        if not any("UNCORROBORATED" in str(i) for i in (_rn_unc or {}).get("issues", [])):
-            print(f"  FAIL corroboration-doctrine: the uncorroborated vision finding must still render "
-                  f"as a visible ADVISORY note (got issues={(_rn_unc or {}).get('issues')})"); bad += 1
+        if not _rn_unc or _rn_unc.get("status") != "FAIL" or (_rn_unc.get("score") or 10) > 4:
+            print(f"  FAIL vision-flag doctrine: a NAMED vision finding must cap ≤4/FAIL "
+                  f"even without deterministic corroboration (got {_rn_unc})"); bad += 1
+        if not any("corroboration: none" in str(i).lower()
+                   for i in (_rn_unc or {}).get("issues", [])):
+            print(f"  FAIL vision-flag doctrine: issue text must state the absence of a "
+                  f"corroborator (got issues={(_rn_unc or {}).get('issues')})"); bad += 1
         # (4b-ii) CORROBORATED via a failing drawing_gates verdict on the SAME drawing → the finding
         # must now deduct (score capped, FAIL).
         with open(os.path.join(_td_corr, "drawing-gates.json"), "w") as _fh:
@@ -24027,8 +24090,9 @@ def _selftest() -> int:
         if not _rn_corr or _rn_corr.get("status") != "FAIL" or (_rn_corr.get("score") or 10) > 4:
             print(f"  FAIL corroboration-doctrine: a vision finding CORROBORATED by a failing "
                   f"drawing_gates verdict must deduct (≤4/FAIL), got {_rn_corr}"); bad += 1
-        if not any("CORROBORATED" in str(i) for i in (_rn_corr or {}).get("issues", [])):
-            print(f"  FAIL corroboration-doctrine: a corroborated finding's issue text must say so "
+        if not any("corroboration: a failing" in str(i).lower()
+                   for i in (_rn_corr or {}).get("issues", [])):
+            print(f"  FAIL vision-flag doctrine: a corroborated finding's issue text must say so "
                   f"(got issues={(_rn_corr or {}).get('issues')})"); bad += 1
         _COV_CACHE.clear(); _VISION_CACHE.clear(); _LITTER_CACHE.clear()
         _SHAPE_MM_CACHE.clear(); _DG_CACHE.clear()
@@ -26119,6 +26183,47 @@ def _selftest() -> int:
                    if v.get("verdict") != "PASS"]
             print(f"  FAIL elec-contract: a coherent schedule + drawing must score 10 "
                   f"(got {_pe7b.get('score')}: {_f7})"); bad += 1
+
+        # TWO-BOARD SEMANTIC AUTHORITY: connected_electrical_load_kw is the
+        # auxiliary-consumer breakdown, not the principal 11 kW transfer board.
+        _two_board_state = {"orchestratorContract": {"quantities": {
+            "connected_electrical_load_kw": {"value": 0.21, "unit": "kW"},
+            "electrical_consumer__auxiliary_power_supply_kw": {"value": 0.09},
+            "electrical_consumer__active_ventilation_fan_kw": {"value": 0.06},
+            "electrical_consumer__audible_alarm_kw": {"value": 0.06},
+        }}}
+        with open(os.path.join(_td7e, "drawings", "panel-schedule.md"), "w") as _fh7:
+            _fh7.write(
+                "# PANEL\n\n"
+                "## MAIN DC BUS\n\n"
+                "| Field | Value |\n|---|---|\n"
+                "| **Board reference** | MAIN DC BUS |\n"
+                "| **System** | 282 V DC bus |\n| **Busbar rating** | 40 A |\n"
+                "| **Total connected load** | 11.0 kW |\n\n"
+                "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "| W1 | DC DC Converters | 1 | 11.0 | 39.1 | 40 A MCB | 6 mm² · 2c | 2.0 | 0.2 | ✓ |\n\n"
+                "**Reconciliation:** Σ circuit design current = 39 A vs board busbar demand = 39 A (ratio 1.00) → **OK**.\n\n"
+                "## AUX BOARD\n\n"
+                "| Field | Value |\n|---|---|\n"
+                "| **Board reference** | AUX BOARD |\n"
+                "| **System** | 282 V DC bus |\n| **Busbar rating** | 6 A |\n"
+                "| **Total connected load** | 0.21 kW |\n\n"
+                "| Ckt | Description | Ways | Conn. load (kW) | Design I (A) | Protective device | Cable (CSA · cores) | Length (m) | ΔU (%) | In spec |\n"
+                "|---|---|---:|---:|---:|---|---|---:|---:|:--:|\n"
+                "| W1 | Auxiliary Power Supply | 1 | 0.09 | 0.3 | 6 A MCB | 1.5 mm² · 2c | 1.0 | 0.02 | ✓ |\n"
+                "| W2 | Active Ventilation Fan | 1 | 0.06 | 0.2 | 6 A MCB | 1.5 mm² · 2c | 1.0 | 0.02 | ✓ |\n"
+                "| W3 | Audible Alarm | 1 | 0.06 | 0.2 | 6 A MCB | 1.5 mm² · 2c | 1.0 | 0.02 | ✓ |\n\n"
+                "**Reconciliation:** Σ circuit design current = 1 A vs board busbar demand = 1 A (ratio 1.00) → **OK**.\n")
+        with open(os.path.join(_td7e, "drawings", "single-line-diagram.svg"), "w") as _fh7:
+            _fh7.write('<svg><text>282 V</text><text>MAIN DC BUS</text><text>AUX BOARD</text></svg>')
+        _pe7c = _eval_panel_schedule_contract(_td7e, _two_board_state) or {}
+        _pc7 = next((row for row in (_pe7c.get("recon_rows") or [])
+                     if row.get("check") ==
+                     "panel schedule ↔ contract · connected load"), {})
+        if _pc7.get("verdict") != "PASS" or "AUX BOARD" not in _pc7.get("detail", ""):
+            print("  FAIL elec-contract: two-board connected-load check must select "
+                  f"the semantically matching AUX BOARD, got {_pc7}"); bad += 1
 
     # (F6a) FEED-DRIVER SENSITIVITY LABELS — RAS keeps the grounded rows; an engine
     # feed signal renames them; NO basis at all drops them.
