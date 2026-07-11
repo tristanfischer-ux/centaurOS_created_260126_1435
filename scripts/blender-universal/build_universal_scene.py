@@ -12048,6 +12048,26 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     if n_clamped:
         print(f"[univ][sealed] containment clamp (mesh-level): {n_clamped} part(s) translated "
               f"inside the {iw:.0f}×{idep:.0f}×{ih:.0f} mm interior")
+    # POST-CLAMP VERIFICATION (2026-07-11 run 63: parts STILL protruded a metre above the
+    # skin after two clamp generations — stop patching blind; the clamp now REPORTS every
+    # prefix it could not see and every bbox still outside, so the next log names the
+    # exact escape path.)
+    _misses, _outside = [], []
+    for zp in parts:
+        pref = _prefix_of(zp.name)
+        bb = _prefix_bbox(pref)
+        if not bb:
+            _misses.append(f"{zp.name}→{pref}")
+            continue
+        lo, hi = bb
+        if (lo[0] < _int_lo[0] - 0.002 or hi[0] > _int_hi[0] + 0.002
+                or lo[1] < _int_lo[1] - 0.002 or hi[1] > _int_hi[1] + 0.002
+                or lo[2] < _int_lo[2] - 0.002 or hi[2] > _int_hi[2] + 0.002):
+            _outside.append(f"{zp.name} z_top={hi[2]/fl.MM:.0f} y_max={hi[1]/fl.MM:.0f}")
+    if _misses:
+        print(f"[univ][sealed] CLAMP-MISS: {len(_misses)} part(s) matched NO object by prefix — {_misses[:5]}")
+    if _outside:
+        print(f"[univ][sealed] STILL-OUTSIDE after clamp: {_outside[:6]}")
 
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's

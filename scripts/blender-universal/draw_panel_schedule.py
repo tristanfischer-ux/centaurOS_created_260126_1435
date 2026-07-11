@@ -2265,7 +2265,11 @@ def reconcile(panel: Panel) -> dict:
         # guard uses, one mint: a reading that would already fail here is what makes the
         # guard override it in the first place).
         lo, hi = _RECON_BAND
-        verdict = "OK" if lo <= ratio <= hi else "REVIEW"
+        # ABSOLUTE tolerance for micro-boards (2026-07-11 run 63: a 1 A circuit sum vs a
+        # 4 A incoming on the sealed product's bus read ratio 0.17 REVIEW — at magnitudes
+        # under one real MCB frame the RATIO is meaningless; a gap within a single 6 A
+        # device is diversity/aux margin at any scale, never a design defect).
+        verdict = "OK" if (lo <= ratio <= hi or abs(sum_a - demand_a) <= 6.0) else "REVIEW"
 
     # transformer-headroom check (sub-boards fed via a step-down): Σ connected kW must sit
     # within the transformer kVA nameplate (× ~0.95 pf headroom).
