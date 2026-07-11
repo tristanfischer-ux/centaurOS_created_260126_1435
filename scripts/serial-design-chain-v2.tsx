@@ -2712,7 +2712,26 @@ function computeQualityScorecard(state: any): QualityScorecard {
     // runs, or a brief with no cost ceiling) behaviour is exactly as before.
     const ss = state.sweetSpot
     const reconciledTradeOff = ss && String(ss.verdict || '') === 'incompatible'
-    if (reconciledTradeOff && (v === 'high' || v === 'med')) {
+    // NAMED COMMERCIAL HOLD (2026-07-11 run 71): a MED cost verdict whose gap IS the
+    // recorded design_to_budget decision (brief.commercial-decisions.json →
+    // state.decisionHolds; Tristan's option (b) 2026-07-10: DISCLOSE the OEM-bought-out
+    // vs integrated-manufacturer band gap, do not model integration now) is a DISCLOSED
+    // commercial hold, not an open engineering defect — same footing as the sweet-spot
+    // trade-off below: visible, advisory, never drags the deterministic floor. A HIGH
+    // verdict (a genuine magnitude error) still floors regardless of any hold.
+    const _holds = Array.isArray((state as Record<string, any>).decisionHolds)
+      ? (state as Record<string, any>).decisionHolds : []
+    const _budgetHold = _holds.find((h: any) => String(h?.kind ?? h?.id ?? '') === 'design_to_budget')
+    if (_budgetHold && v === 'med') {
+      sections.push({
+        name: 'cost_sanity',
+        score: 10,
+        advisory: true,
+        defects: [
+          `cost sits above the integrated-manufacturer band by design — the OEM bought-out BoM basis vs £/kWh band gap is the NAMED DEFERRED DECISION '${String(_budgetHold.title ?? 'design_to_budget')}' (owner ${String(_budgetHold.owner ?? '—')}, ${String(_budgetHold.date ?? '—')}); disclosed on the Exec cover + Risk register, never silently passed.`.slice(0, 300),
+        ],
+      })
+    } else if (reconciledTradeOff && (v === 'high' || v === 'med')) {
       sections.push({
         name: 'cost_sanity',
         score: 10,

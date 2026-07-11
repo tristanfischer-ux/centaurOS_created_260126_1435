@@ -525,13 +525,25 @@ def run_gates(out_dir: str) -> list:
                       else f"{len(missing)} principal powered part(s) with NO electrical feeder: {missing[:4]}"))
 
     # ── G4 MATERIAL DIVERSITY — multi-service plant ≠ a uniform material ─────────
-    mats = set()
+    # FLUID ROUTES ONLY (2026-07-11 powerwall run 71): the gate's intent is a fluid
+    # plant modelling every pipe as one default material. An all-electrical sealed
+    # product legitimately routes ONLY cables/busbars (mechanism electrical_*,
+    # material None) — 0 fluid lines is "gate not applicable", never "0 materials
+    # FAIL". Keyed on the route's own mechanism/service signal, not the class.
+    fluid_route = []
     for r in route:
-        if isinstance(r, dict):
-            m = r.get("material") or r.get("material_label") or ""
-            if m:
-                mats.add(re.split(r"\s*\(", str(m))[0].strip().lower())
-    if route:
+        if not isinstance(r, dict):
+            continue
+        mech = str(r.get("mechanism") or r.get("service") or "").lower()
+        if re.search(r"electr|signal|data|comms|network|bus\b", mech):
+            continue
+        fluid_route.append(r)
+    mats = set()
+    for r in fluid_route:
+        m = r.get("material") or r.get("material_label") or ""
+        if m:
+            mats.add(re.split(r"\s*\(", str(m))[0].strip().lower())
+    if fluid_route:
         gates.append(Gate("material_diversity", ["line-velocity-schedule", "process-schedules"],
                           "med", len(mats) >= 2,
                           f"{len(mats)} distinct pipe material(s): {sorted(mats)[:4]}"))
@@ -777,6 +789,18 @@ def _selftest() -> int:
     # material diversity
     chk("mat_ok", len({"hdpe/pe100", "duplex 2205"}) >= 2)
     chk("mat_uniform", not (len({"316l stainless"}) >= 2))
+    # G4 fluid-route filter proveCatch (2026-07-11 powerwall run 71): an all-electrical
+    # route set (cables/busbars, material None) yields ZERO fluid routes → the gate is
+    # not emitted (never "0 materials FAIL"); a real fluid route survives the filter so
+    # a uniform-material fluid plant STILL fires. Same regex as the gate body.
+    _g4_rx = re.compile(r"electr|signal|data|comms|network|bus\b")
+    _g4_elec = [{"mechanism": "electrical_bus"}, {"mechanism": "electrical_cable",
+                "service": "LV power feeder 230V 1ph"}]
+    _g4_fluid = [{"mechanism": "pipe", "service": "process water", "material": "316l stainless"}]
+    chk("g4_all_electrical_skipped",
+        not [r for r in _g4_elec if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
+    chk("g4_fluid_route_survives",
+        [r for r in _g4_fluid if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
     # no stray beam: a compact 8 m run passes; the v44 33 m MCC spine fails (proveCatch)
     def _span(wps):
         xs = [w[0] for w in wps]; ys = [w[1] for w in wps]
