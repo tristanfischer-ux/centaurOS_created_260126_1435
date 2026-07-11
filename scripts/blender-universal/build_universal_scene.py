@@ -12027,14 +12027,20 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 delta[i] = _int_hi[i] - hi[i]
         if sum(abs(d) for d in delta) < 0.0005:
             continue
-        # move TOP-LEVEL objects of ANY type (run 62, seen in the hero: assemblies
-        # rooted on an EMPTY have mesh CHILDREN — moving parentless MESHES only left
-        # those assemblies unmoved, and the distribution-zone cluster sat above the
-        # skin). Children follow their parents.
+        # PART-ROOT objects move via matrix_world.translation (run 64 instrumentation:
+        # the meshes have a FOREIGN parent — a module empty — so 'parentless or
+        # prefix-parented' matched nothing, and obj.location is PARENT-RELATIVE anyway;
+        # a world-space translation is parenting-proof). A part-root = prefix-named
+        # object whose parent is not itself prefix-named (children ride along).
+        import mathutils as _mu2
+        _dvec = _mu2.Vector(delta)
         for _obj in bpy.data.objects:
-            if _obj.name.startswith(pref) and _obj.parent is None:
-                _obj.location = (_obj.location[0] + delta[0], _obj.location[1] + delta[1],
-                                 _obj.location[2] + delta[2])
+            if not _obj.name.startswith(pref):
+                continue
+            _par = _obj.parent
+            if _par is not None and _par.name.startswith(pref):
+                continue   # its own part-root carries it
+            _obj.matrix_world.translation = _obj.matrix_world.translation + _dvec
         _d_mm = tuple(d / fl.MM for d in delta)
         anch = getattr(zp, "anchors", None)
         if isinstance(anch, dict):
@@ -12060,10 +12066,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _misses.append(f"{zp.name}→{pref}")
             continue
         lo, hi = bb
-        if (lo[0] < _int_lo[0] - 0.002 or hi[0] > _int_hi[0] + 0.002
-                or lo[1] < _int_lo[1] - 0.002 or hi[1] > _int_hi[1] + 0.002
-                or lo[2] < _int_lo[2] - 0.002 or hi[2] > _int_hi[2] + 0.002):
-            _outside.append(f"{zp.name} z_top={hi[2]/fl.MM:.0f} y_max={hi[1]/fl.MM:.0f}")
+        _viols = []
+        for _ax, _nm_ax in ((0, 'x'), (1, 'y'), (2, 'z')):
+            if lo[_ax] < _int_lo[_ax] - 0.002:
+                _viols.append(f"{_nm_ax}_lo {lo[_ax]/fl.MM:.0f}<{_int_lo[_ax]/fl.MM:.0f}")
+            if hi[_ax] > _int_hi[_ax] + 0.002:
+                _viols.append(f"{_nm_ax}_hi {hi[_ax]/fl.MM:.0f}>{_int_hi[_ax]/fl.MM:.0f}")
+        if _viols:
+            _outside.append(f"{zp.name}: {', '.join(_viols)}")
     if _misses:
         print(f"[univ][sealed] CLAMP-MISS: {len(_misses)} part(s) matched NO object by prefix — {_misses[:5]}")
     if _outside:
