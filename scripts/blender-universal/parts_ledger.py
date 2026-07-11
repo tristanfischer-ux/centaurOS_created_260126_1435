@@ -966,7 +966,17 @@ def main() -> int:
         if not f.exists():
             return ""
         raw = " ".join(re.findall(r">([^<>]+)<", f.read_text(errors="ignore")))
-        return " " + re.sub(r"\s+", " ", raw).strip() + " "
+        txt = " " + re.sub(r"\s+", " ", raw).strip() + " "
+        # RANGE-TAG EXPANSION (2026-07-11 run 60: the GA keynote density collapse
+        # renders module groups as 'X-102…X-131 (14)' — a legible convention the
+        # elevations already use — but this plain-substring presence scan then read
+        # every member as ABSENT and GA coverage fell 27/28 → 9/28. A range tag
+        # COVERS its members: expand 'A-N…A-M' (or -/–) into each member tag.)
+        for _pref, _a, _b in re.findall(r"\b([A-Z]{1,5})-(\d{1,4})\s*[…\u2013\u2014-]\s*(?:\1-)?(\d{1,4})\b", txt):
+            _lo, _hi = int(_a), int(_b)
+            if 0 < _hi - _lo <= 200:
+                txt += " " + " ".join(f"{_pref}-{n}" for n in range(_lo, _hi + 1)) + " "
+        return txt
 
     rep_text = {"blender": ""}
     for key in REPS:

@@ -1311,6 +1311,11 @@ _NAMED_BOARD_RE = re.compile(
 _BOARD_INFRA_RE = re.compile(
     r"\bbus\s*bar\b|busbar|distribution\s*busbar|\bfuse\s*holder\b|fuse\s*carrier\b|"
     r"\bsurge\s*protect(or|ion)?\b|surge\s*arrest(er|or)?\b|\bspd\b|"
+    # 2026-07-11 run 60: the sealed-product vocabulary defeated every token — 'Main AC
+    # Breaker' has a phase word inside 'main breaker'; bare 'DC Fuses' is a protective
+    # position not a load; 'AC Filter Inductors' are PCS bus internals; 'Surge Apparent
+    # Power' is a QUANTITY phantom. All board-work, never outgoing circuits.
+    r"\bfuses?\b|main\s+\w{0,3}\s*breaker|\bfilter\s+inductors?\b|apparent\s+power|"
     r"main\s*breaker|main\s*incomer|\bincomer\b|main\s*isolator", re.I)
 # A way whose name brushes a board-infra token but is a real consuming load we must keep
 # (e.g. a 'busbar trunking RISER feeding a sub-board' — rare; belt-and-braces).

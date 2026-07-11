@@ -131,6 +131,37 @@ def _google_key() -> str:
     return ""
 
 
+_PRODUCT_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D PRODUCT hero render — a "
+    "sealed consumer/outdoor unit (wall-mounted or floor-standing), shown as a closed body or a "
+    "deliberate translucent cutaway revealing the internal modules. Ghosted/translucent skin and "
+    "simplified block internals are INTENTIONAL for this artefact type — do not flag them.\n"
+    "Flag ONLY these visual defects if present:\n"
+    "  • a part visibly POKING THROUGH the product's skin/outline\n"
+    "  • the product or a part FLOATING disconnected (no wall/floor contact where one is implied)\n"
+    "  • a BLANK/empty render (no product visible)\n"
+    "  • garbled/exploded geometry (parts scattered outside the body)\n"
+    "  • the product cropped/overflowing the frame or absurdly small in it\n"
+    "Reply with STRICT JSON only: {\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+
+def _is_product_mode(image_path: str) -> bool:
+    """Sealed-product runs (enclosure_volume_m3 < 1 in the contract) are judged by the
+    PRODUCT rubric — a ghosted cutaway is intentional there, not 'not a real plant'
+    (2026-07-11 run 60: the plant prompt flagged the product hero as 'abstract
+    semi-transparent blocks'). Signal-keyed on the run's own contract, never a class."""
+    try:
+        run_dir = os.path.dirname(os.path.abspath(image_path))
+        st = json.load(open(os.path.join(run_dir, "state.json")))
+        q = ((st.get("orchestratorContract") or {}).get("quantities") or {})
+        v = q.get("enclosure_volume_m3")
+        val = v.get("value") if isinstance(v, dict) else v
+        return bool(val is not None and 0 < float(val) < 1.0)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
     key = _key()
     if not key:
@@ -144,7 +175,7 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
         "model": model,
         "max_tokens": 600,
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": _PROMPT},
+            {"type": "text", "text": _PRODUCT_PROMPT if _is_product_mode(image_path) else _PROMPT},
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
         ]}],
     }).encode()

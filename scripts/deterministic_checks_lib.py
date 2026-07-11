@@ -497,8 +497,19 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     conn_key, conn_kw = _first_q(q, ["connected_electrical_load_kw", "connected_load_kw",
                                      "total_connected_load_kw", "installed_electrical_load_kw"])
     incomer_kva, kva_key = None, ""
-    for k in ("main_transformer_kva", "main_incomer_kva", "supply_transformer_kva",
-              "total_supply_demand_kva", "main_supply_kva"):
+    # LIKE-WITH-LIKE (2026-07-11 run 60): on a self-powered product the AUX panel's
+    # incomer (main_incomer_breaker_a, sized to the 0.21 kW aux load) and the PRODUCT's
+    # grid connection (total_supply_demand_kva = the PCS path, ~25 kVA) are DIFFERENT
+    # electrical boundaries — joining the grid kVA to the aux load breached the 100x
+    # magnitude ceiling on a correct design. When a specific incomer-breaker authority
+    # exists, the generic supply-demand figure is NOT the aux incomer; skip it here
+    # (the breaker-current form (b) below carries the like-for-like comparison).
+    _has_breaker_authority = (qval(q, "main_incomer_breaker_a") or 0) > 0
+    _kva_keys = ["main_transformer_kva", "main_incomer_kva", "supply_transformer_kva",
+                 "total_supply_demand_kva", "main_supply_kva"]
+    if _has_breaker_authority:
+        _kva_keys = [k for k in _kva_keys if k not in ("total_supply_demand_kva", "main_supply_kva")]
+    for k in _kva_keys:
         v = qval(q, k)
         if v is not None and v > 0:
             incomer_kva, kva_key = v, k
@@ -527,8 +538,8 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     else:
         # (b) current form — only with an explicit PF (else we won't guess one)
         breaker_a, breaker_key = None, ""
-        for k in ("main_breaker_rating_a", "main_incomer_rating_a", "main_breaker_a",
-                  "incomer_breaker_a", "main_incomer_current_a",
+        for k in ("main_incomer_breaker_a", "main_breaker_rating_a", "main_incomer_rating_a",
+                  "main_breaker_a", "incomer_breaker_a", "main_incomer_current_a",
                   "main_transformer_secondary_current_a", "main_feeder_current_a"):
             v = qval(q, k)
             if v is not None and v > 0:
@@ -538,9 +549,16 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
                                   "supply_voltage_v", "lv_voltage_v",
                                   "secondary_voltage_v"]) or 400.0
         pf = _first_qval(q, ["power_factor", "system_power_factor"])
+        # a <=250 V system is SINGLE-phase: I = P/(V·PF); and PF defaults to the same
+        # 0.9 the engine's own incomer mint uses (documented in the detail string) —
+        # refusing to run left the aux incomer entirely unchecked (2026-07-11 run 60).
+        single_phase = voltage <= 250
+        if pf is None and single_phase:
+            pf = 0.9
         if (conn_kw is not None and breaker_a is not None and voltage > 0
                 and pf is not None and 0 < pf <= 1):
-            load_a = (conn_kw * 1000.0) / (math.sqrt(3) * voltage * pf)
+            load_a = ((conn_kw * 1000.0) / (voltage * pf) if single_phase
+                      else (conn_kw * 1000.0) / (math.sqrt(3) * voltage * pf))
             required_a = load_a * 1.25
             ceiling_a = load_a * MAGNITUDE_CEILING_FACTOR
             out.append(Check(
