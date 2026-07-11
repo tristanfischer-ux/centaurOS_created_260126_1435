@@ -183,7 +183,23 @@ def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 
         retry = _critique_once(image_path, model, timeout)
         if isinstance(retry, dict) and retry.get("ok"):
             retry["flake_retry"] = True
-            return retry
+            res = retry
+    # DIFFERENT-FAMILY TIEBREAK (2026-07-11 run 74 — the SECOND nameless-broken on a
+    # render verified clean by eye + by every deterministic gate: run 67, then run 74
+    # straight through the one-retry filter). A broken verdict with NO named defect
+    # violates the rubric's own output contract ('flag ONLY these defects'), twice —
+    # that is a NON-VERDICT, and a false FAIL is as dishonest as a false PASS. Ask a
+    # DIFFERENT model family to arbitrate (perspective diversity, not re-rolling the
+    # same flaky judge): a tiebreak that names defects → broken stands WITH names; a
+    # clean tiebreak → clean, flake overruled + logged. Tiebreak errors change nothing.
+    if isinstance(res, dict) and res.get("ok") and res.get("broken") is True and not res.get("defects"):
+        tb_model = os.environ.get("VISION_TIEBREAK_MODEL", "x-ai/grok-4.3")
+        tb = _critique_once(image_path, tb_model, timeout)
+        if isinstance(tb, dict) and tb.get("ok"):
+            tb["flake_retry"] = True
+            tb["tiebreak_after_nameless"] = {"first_model": model, "verdict": "overruled"
+                                             if tb.get("broken") is False else "upheld"}
+            return tb
     return res
 
 
