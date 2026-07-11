@@ -553,6 +553,46 @@ def _retag_blocks_from_ledger(blocks: list, state: dict) -> None:
             b.tag = ledger_tag
 
 
+def _assign_energy_columns(blocks: list[Block], streams: list[Stream]) -> None:
+    """Assign longest-path columns for a branched acyclic energy topology.
+
+    Battery and PV sources remain parallel at column 0; MPPT and DC bus then
+    converge before the inverter/grid path. A separate air-intake/fan/exhaust
+    chain uses the same columns without being falsely spliced into the power path.
+    """
+    by_key = {block.key: block for block in blocks}
+    col = {key: 0 for key in by_key}
+    edges = [(stream.from_key, stream.to_key) for stream in streams
+             if stream.from_key in by_key and stream.to_key in by_key]
+    # Bounded relaxation: longest path for a DAG; cycles simply stop increasing
+    # at N passes and remain visible rather than hanging the renderer.
+    for _ in range(max(1, len(by_key))):
+        changed = False
+        for source, target in edges:
+            candidate = col[source] + 1
+            if candidate > col[target]:
+                col[target] = candidate
+                changed = True
+        if not changed:
+            break
+    # A direct source feeding a convergence whose other input has a longer
+    # chain should stack above that convergence node, not sit in the far-left
+    # source column where its route can pass through the other source block.
+    predecessors: dict[str, list[str]] = {}
+    indegree = {key: 0 for key in by_key}
+    for source, target in edges:
+        predecessors.setdefault(target, []).append(source)
+        indegree[target] += 1
+    for target, sources in predecessors.items():
+        if len(sources) < 2:
+            continue
+        for source in sources:
+            if indegree.get(source, 0) == 0 and col[source] < col[target] - 1:
+                col[source] = col[target]
+    for key, block in by_key.items():
+        block.col = col[key]
+
+
 def _bfd_missing_principals(svg_text: str, state: dict) -> list[str]:
     """Every parts-ledger PRINCIPAL (vessel / rotating / exchanger / separator — the four
     types `parts_ledger.TYPE_EXPECTED` says must appear on the block-flow-diagram) that does
@@ -642,8 +682,10 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
                 qty=_qty,
                 style=STREAM_THERMAL if mech in ("thermal", "thermal_path") else STREAM_PROCESS))
         if _e_blocks and _e_streams:
-            _retag_blocks_from_ledger(list(_e_blocks.values()), state)
-            bf = BlockFlow(archetype=proc.archetype, blocks=list(_e_blocks.values()),
+            _energy_blocks = list(_e_blocks.values())
+            _retag_blocks_from_ledger(_energy_blocks, state)
+            _assign_energy_columns(_energy_blocks, _e_streams)
+            bf = BlockFlow(archetype=proc.archetype, blocks=_energy_blocks,
                            streams=_e_streams, boundaries=[],
                            notes=[proc.na_reason,
                                   f"{_sig_n} signal/data tie(s) — see instrument index"]
@@ -1848,6 +1890,31 @@ def _selftest() -> int:
     ]}
     chk("B2.present_principal_clears",
         _bfd_missing_principals(svg5, _present_state) == [])
+
+    # E1 — branched energy topology: battery and PV are parallel sources,
+    # MPPT converges onto the DC bus, then inverter→grid; cooling air is a
+    # separate chain. Never render these as one false serial process train.
+    _eb = [Block(key=k, tag="", label=k,
+                 sym=getattr(PID, "SYM_PACKAGE", PID.SYM_OFFPAGE)) for k in (
+        "battery", "pv", "mppt", "dc_bus", "inverter", "grid",
+        "air_in", "fan", "air_out")]
+    _es = [
+        Stream("battery", "dc_bus", service="energy"),
+        Stream("pv", "mppt", service="energy"),
+        Stream("mppt", "dc_bus", service="energy"),
+        Stream("dc_bus", "inverter", service="energy"),
+        Stream("inverter", "grid", service="energy"),
+        Stream("air_in", "fan", service="air", style=STREAM_THERMAL),
+        Stream("fan", "air_out", service="air", style=STREAM_THERMAL),
+    ]
+    _assign_energy_columns(_eb, _es)
+    _ec = {b.key: b.col for b in _eb}
+    chk("E1.direct_battery_stacks_at_bus",
+        _ec["battery"] == _ec["dc_bus"] == 2 and _ec["pv"] == 0)
+    chk("E1.mppt_before_bus", _ec["mppt"] == 1 and _ec["dc_bus"] == 2)
+    chk("E1.inverter_grid_order", _ec["inverter"] == 3 and _ec["grid"] == 4)
+    chk("E1.air_chain_separate", _ec["air_in"] == 0 and _ec["fan"] == 1
+        and _ec["air_out"] == 2)
 
     for f in fails:
         print(f"[bfd][selftest] FAIL {f}")
