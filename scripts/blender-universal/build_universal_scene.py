@@ -11981,50 +11981,69 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     if skin:
         print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
 
-    # 4c. CONTAINMENT CLAMP (2026-07-10 run 56, verified by manifest + the hero image:
-    # every zone part sat at y=±80 with d=135 in a 193 mm-deep interior — ~60 mm through
-    # the front skin — and three parts at y=+200 floated fully OUTSIDE the back; the
-    # vision critic's 'floating disconnected object' was these). Whatever a placement
-    # path does, a sealed product's parts are INSIDE its skin by definition: translate
-    # every part's centre so its bbox fits the interior (a part deeper than the interior
-    # centres at 0 — the skin still encloses its extent visually).
+    # 4c. CONTAINMENT CLAMP — MESH-LEVEL (2026-07-10/11, runs 56-58: the anchor-level
+    # clamp moved 2/36 parts because the manifest + renders read the MESH world bboxes,
+    # and build_part's assemblies extend beyond their anchor points (uniform y=-80 with
+    # d=135 in a 174 mm interior; three parts at y=+200 fully outside). Move the PART'S
+    # OBJECTS so each prefix's union bbox fits the interior; anchors shift with them so
+    # routing + the manifest agree. Runs BEFORE routing.)
+    def _prefix_of(nm):
+        return "u_" + re.sub(r"[^a-z0-9]+", "_", str(nm).lower()).strip("_")[:40]
+
+    def _prefix_bbox(pref):
+        lo = [float("inf")] * 3
+        hi = [float("-inf")] * 3
+        found = False
+        if not hasattr(bpy, "data") or not hasattr(bpy.data, "objects"):
+            return None   # dict-mock / headless — the mesh clamp is a bpy-only pass
+        import mathutils as _mu
+        for _obj in bpy.data.objects:
+            if getattr(_obj, "type", None) != "MESH" or not _obj.name.startswith(pref):
+                continue
+            for corner in _obj.bound_box:
+                wc = _obj.matrix_world @ _mu.Vector(corner)
+                for i in range(3):
+                    lo[i] = min(lo[i], wc[i]); hi[i] = max(hi[i], wc[i])
+            found = True
+        return (lo, hi) if found else None
+
     n_clamped = 0
+    _int_lo = (-iw / 2 * fl.MM, -idep / 2 * fl.MM, (base_z + margin) * fl.MM)
+    _int_hi = (iw / 2 * fl.MM, idep / 2 * fl.MM, (base_z + margin + ih) * fl.MM)
     for zp in parts:
-        anch = getattr(zp, "anchors", None)
-        obj = getattr(zp, "obj_anchor", None)
-        if not (anch and obj is not None and isinstance(zp.dim, dict)):
+        pref = _prefix_of(zp.name)
+        bb = _prefix_bbox(pref)
+        if not bb:
             continue
-        cx0, cy0, cz0 = zp.placed_xyz_mm
-        w0 = float(zp.dim.get("w_mm") or zp.dim.get("dia_mm") or 0)
-        d0 = float(zp.dim.get("d_mm") or zp.dim.get("dia_mm") or 0)
-        h0 = float(zp.dim.get("h_mm") or zp.dim.get("len_mm") or 0)
-        lim_x = max(0.0, (iw - w0) / 2.0)
-        lim_y = max(0.0, (idep - d0) / 2.0)
-        nx = min(max(cx0, -lim_x), lim_x)
-        ny = min(max(cy0, -lim_y), lim_y)
-        lo_z, hi_z = base_z + margin + h0 / 2.0, base_z + margin + ih - h0 / 2.0
-        nz = min(max(cz0, lo_z), max(lo_z, hi_z))
-        ddx, ddy, ddz = nx - cx0, ny - cy0, nz - cz0
-        if abs(ddx) + abs(ddy) + abs(ddz) > 0.5:
-            # SHAPE-SAFE (run 57: the draw_* scripts re-run placement HEADLESS, where
-            # fl.add_box returns dict mocks — obj.location crashed every schematic and
-            # the panel schedule vanished from the dossier entirely).
-            _delta = (ddx * fl.MM, ddy * fl.MM, ddz * fl.MM)
-            if hasattr(obj, "location"):
-                obj.location = (obj.location[0] + _delta[0],
-                                obj.location[1] + _delta[1],
-                                obj.location[2] + _delta[2])
-            elif isinstance(obj, dict) and "location" in obj:
-                _l = obj["location"]
-                obj["location"] = (_l[0] + _delta[0], _l[1] + _delta[1], _l[2] + _delta[2])
-            zp.placed_xyz_mm = (nx, ny, nz)
+        lo, hi = bb
+        delta = [0.0, 0.0, 0.0]
+        for i in range(3):
+            ext = hi[i] - lo[i]
+            if ext > (_int_hi[i] - _int_lo[i]):
+                delta[i] = ((_int_lo[i] + _int_hi[i]) / 2) - ((lo[i] + hi[i]) / 2)  # centre it
+            elif lo[i] < _int_lo[i]:
+                delta[i] = _int_lo[i] - lo[i]
+            elif hi[i] > _int_hi[i]:
+                delta[i] = _int_hi[i] - hi[i]
+        if sum(abs(d) for d in delta) < 0.0005:
+            continue
+        for _obj in bpy.data.objects:
+            if getattr(_obj, "type", None) == "MESH" and _obj.name.startswith(pref) and _obj.parent is None:
+                _obj.location = (_obj.location[0] + delta[0], _obj.location[1] + delta[1],
+                                 _obj.location[2] + delta[2])
+        _d_mm = tuple(d / fl.MM for d in delta)
+        anch = getattr(zp, "anchors", None)
+        if isinstance(anch, dict):
             for k, v in list(anch.items()):
                 if isinstance(v, (tuple, list)) and len(v) == 3:
-                    anch[k] = (v[0] + ddx, v[1] + ddy, v[2] + ddz)
-            n_clamped += 1
+                    anch[k] = (v[0] + _d_mm[0], v[1] + _d_mm[1], v[2] + _d_mm[2])
+        if getattr(zp, "placed_xyz_mm", None):
+            c = zp.placed_xyz_mm
+            zp.placed_xyz_mm = (c[0] + _d_mm[0], c[1] + _d_mm[1], c[2] + _d_mm[2])
+        n_clamped += 1
     if n_clamped:
-        print(f"[univ][sealed] containment clamp: {n_clamped} part(s) translated inside the "
-              f"{iw:.0f}×{idep:.0f}×{ih:.0f} mm interior (nothing may protrude through the skin)")
+        print(f"[univ][sealed] containment clamp (mesh-level): {n_clamped} part(s) translated "
+              f"inside the {iw:.0f}×{idep:.0f}×{ih:.0f} mm interior")
 
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's
@@ -12094,7 +12113,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # + my own look at the hero: a WALL-mounted product hanging in white space with
         # no wall reads as floating). One large neutral vertical plane directly behind
         # the unit — the product mounts ON something, the way it exists in the world.
-        wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.80, 0.80, 0.79)),
+        # darker wall (run 58: a pale wall behind the translucent body washed the whole
+        # shot ghost-on-ghost — internals need a tone to read against)
+        wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.42, 0.43, 0.45)),
                                metallic=0.0, roughness=0.9)
         _ww, _wh = W * 6.0, H * 2.2
         _owall = fl.add_box("u_se_mount_wall", _mm3((0.0, D / 2 + 20.0, _wh / 2)),
@@ -17941,8 +17962,15 @@ def main():
             _pc = (0.0, 0.0, (DECK_Z_MM + _sh / 2.0) * fl.MM)
             _pmax = max(_sw, _sd, _sh) * fl.MM
             _pd = _pmax * 1.9 / math.sqrt(2)
+            # ORTHO covers the HORIZONTAL span; the vertical view = ortho/aspect (3:2
+            # render). Run 58's ortho = 1.25×max_dim overflowed a TALL product vertically
+            # (1.38 m view height vs a 1.105 m unit + margin). Fit BOTH axes explicitly.
+            _aspect = 1.5
+            _horiz = (_sw + _sd) * fl.MM / math.sqrt(2)
+            _vert = _sh * fl.MM
             _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.35),
-                         "target": _pc, "ortho_scale": _pmax * 1.25}
+                         "target": _pc,
+                         "ortho_scale": max(_horiz, _vert * _aspect) * 1.12}
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_camera_override=_hero_cam,

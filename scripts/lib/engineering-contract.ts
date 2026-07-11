@@ -1286,6 +1286,13 @@ registerArchetype('bess', (brief: any) => {
     // controls/lighting standby) ARE the panel's connected load — the battery/PCS power
     // path is DC-side conversion, not a panel feeder.
     connected_electrical_load_kw: q(hvacDesignLoadKw + standbyAuxLossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: `auxiliary panel load = hvac_design_load_kw (${hvacDesignLoadKw.toFixed(2)}) + standby_aux_loss_kw (${standbyAuxLossKw.toFixed(2)}) — the AC aux consumers the distribution board actually feeds; the main power path (battery ↔ PCS ↔ grid) is not a panel feeder`, from: ['hvac_design_load_kw', 'standby_aux_loss_kw'] }),
+    // ONE-MINT CONSUMER BREAKDOWN (2026-07-11 run 58: without it, the panel fell to the
+    // heuristic equipment-feeder synthesis, which listed the 11 kW DC-DC/inverter POWER
+    // PATH as board circuits — a 45 kW aux panel on a 0.21 kW aux load). Publishing the
+    // breakdown makes Σ feeders == connected_electrical_load_kw BY CONSTRUCTION (the
+    // panel + single-line read exactly these; see _electrical_consumer_breakdown_feeders).
+    electrical_consumer__hvac_ventilation_kw: q(hvacDesignLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'enclosure ventilation fans + louvre actuation (the hvac_design_load_kw consumer, one mint)' }),
+    electrical_consumer__bms_controls_standby_kw: q(standbyAuxLossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'BMS telemetry + protection relays + indicator lighting (the standby_aux_loss_kw consumer, one mint)' }),
     system_thermal_dissipation_kw: q(systemThermalDissipationKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'cell_heat_generation_kw + inverter_dissipated_kw = total liquid-chiller heat rejection load; PyBaMM overrides cell component at runtime' }),
     thermal_rejection_capacity_kw: q(thermalRejectionCapacityKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'system_thermal_dissipation_kw × 1.5 engineering margin = minimum chiller output required at design ambient' }),
     thermal_rejection_min_kw: q(thermalRejectionMinKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'LEGACY: inverter_dissipated_kw × 1.5 (inverter-only floor, pre-Phase-B); superseded by thermal_rejection_capacity_kw which includes cell heat; retained for emitter backward compat' }),

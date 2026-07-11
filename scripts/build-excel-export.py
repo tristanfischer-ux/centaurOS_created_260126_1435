@@ -5510,8 +5510,7 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
                 uc = ws.cell(r, 9)
                 uc.alignment = WRAP_TOP
                 _pending_forward_trace.append((uc, label, res_val, res_unit, _ds))
-                r += 1
-                r += 1  # spacer
+                r += 1   # (no blank spacer — see the structured path's registration note)
                 continue
 
             # ---- STRUCTURED: lay each input as a labelled yellow cell ----
@@ -5644,7 +5643,12 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
             out_sym = lhs_symbol(formula)
             if out_sym and isinstance(res_val, (int, float)):
                 produced[out_sym] = (f"$B${r}", float(res_val))
-            r += 2  # spacer between calcs
+            # NO blank row between a tool's calcs (2026-07-11 run 58: _walk_rows reads a
+            # rendered table only to the first fully-blank row, so ONLY the first calc
+            # block per tool registered to the worked-calc family — the scorer counted
+            # 3 definitions while 12 blocks rendered, and the duty-coverage component
+            # under-reported forever. The bold definition row separates blocks visually.)
+            r += 1
 
         # ── resolve the deferred col-I forward trace now every calc's row is known ──
         # (Tristan 2026-07-06: 'lands in' rows hyperlinked but 'feeds this tool's
