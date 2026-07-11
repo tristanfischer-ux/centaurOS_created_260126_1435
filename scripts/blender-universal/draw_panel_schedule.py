@@ -1023,9 +1023,7 @@ def build_schedules(schedule: dict, state: dict,
     board_ids = [s for s, targets in load_targets.items()
                  if len(targets) >= 2 or _is_named_board(s)]
     load_count = {s: len(t) for s, t in load_targets.items()}
-    # the MAIN board = the busiest BOARD node that is NOT a '*_subdist' (raw row amps
-    # are wholesale placeholders at this point — the honest magnitude re-rank happens
-    # POST-FILL below, once _fill_circuits has derived each board's real kW demand).
+    # the MAIN board = the busiest BOARD node that is NOT a '*_subdist'.
     non_sub = {s: load_count[s] for s in board_ids if not s.endswith("_subdist")}
     main_hub = max(non_sub, key=non_sub.get) if non_sub else None
     # everything else that bears load is a sub-board (in the D2 case the load lands on a
@@ -1070,36 +1068,6 @@ def build_schedules(schedule: dict, state: dict,
         _fill_circuits(sub, sd, rows, devices, state, equip_qty)
         _set_sub_incoming(sub, sd, rows, schedule, state)
         panels.append(sub)
-
-    # POST-FILL RE-RANK (2026-07-11 run 74 red-team, three findings = ONE defect: the
-    # 0.2 kW aux micro-board fed MANY small loads so target count crowned it 'MAIN DC
-    # BUS' with a 6 A busbar while the 11 kW / 39 A principal board rendered as a
-    # sub-board — a chartered engineer rejects a 6 A 'main' on an 11 kW system). Now
-    # that _fill_circuits has derived REAL circuit demand, the board with the largest
-    # demand IS the main board: swap roles + names + supply labels when a sub out-draws
-    # the current main by >2x. Placeholder-uniform schedules never trip the 2x bar.
-    if len(panels) >= 2 and panels[0].kind == "main":
-        _cur_main = panels[0]
-        _biggest = max(panels[1:], key=lambda p: _circuit_current_sum(p) or 0.0)
-        _a_main = _circuit_current_sum(_cur_main) or 0.0
-        _a_big = _circuit_current_sum(_biggest) or 0.0
-        if _a_big > 2.0 * max(_a_main, 0.1):
-            _cur_main.kind, _biggest.kind = "sub", "main"
-            _cur_main.name = _board_name(_cur_main.board_id, "sub", is_dc=_cur_main.is_dc)
-            _biggest.name = _board_name(_biggest.board_id, "main", is_dc=_biggest.is_dc)
-            _biggest.supply = _supply_label(state, _biggest.is_dc)
-            _sw_ac = _q(state, "ac_output_voltage_v")
-            if _sw_ac and _sw_ac <= 250:
-                _cur_main.supply = (f"Sub-distribution from main board "
-                                    f"({_cur_main.system or f'{_sw_ac:.0f} V 1-phase'})")
-            # PV/AC interface notes belong to the MAIN board (contract-keyed re-mint)
-            for _attr in ("pv_inputs_note", "ac_interface_note"):
-                if getattr(_cur_main, _attr, None) and not getattr(_biggest, _attr, None):
-                    setattr(_biggest, _attr, getattr(_cur_main, _attr))
-                    setattr(_cur_main, _attr, None)
-            panels.sort(key=lambda p: 0 if p.kind == "main" else 1)
-            print(f"[panel-sched] post-fill re-rank: '{_biggest.name}' ({_a_big:.0f} A) "
-                  f"promoted to MAIN over '{_cur_main.name}' ({_a_main:.0f} A)")
 
     # ---- SYNTHESISED main board (universal fallback) ---------------------------
     # A chemical/process archetype's routed topology has NO board node the fan-out
