@@ -1400,8 +1400,31 @@ def _is_named_board(node: str) -> bool:
 
 def _new_panel(board_id, kind, state, voltage_v, is_dc, phases, system) -> Panel:
     name = _board_name(board_id, kind, is_dc=is_dc)
-    return Panel(board_id=board_id, name=name, kind=kind, system=system,
-                 voltage_v=voltage_v, is_dc=is_dc, phases=phases)
+    pnl = Panel(board_id=board_id, name=name, kind=kind, system=system,
+                voltage_v=voltage_v, is_dc=is_dc, phases=phases)
+    # PV INPUT + AC INTERFACE protection notes (2026-07-11 run 73 red-team + Grok,
+    # agreed genuine: "no protective devices shown for PV MPPT inputs / main AC
+    # output"). Contract-keyed (pv_stc_input_kw + mppt_count / ac<=250V);
+    # render_markdown shows them as Field/Value rows — sources, not load circuits,
+    # so the Σ-vs-demand reconciliation is untouched.
+    if kind == "main":
+        _pv_kw = _q(state, "pv_stc_input_kw")
+        _nmppt = int(float(_q(state, "mppt_count") or 0) or 0)
+        if _pv_kw and _nmppt:
+            _v_dc = float(_q(state, "dc_bus_voltage_v") or 0) or 600.0
+            _i_str = math.ceil((float(_pv_kw) * 1000.0 / _nmppt) / max(_v_dc, 100.0) * 1.25)
+            pnl.pv_inputs_note = (
+                f"{_nmppt}× MPPT string input, each: fused DC isolator "
+                f"{_i_str:g} A / {max(600, int(_v_dc * 1.5))} V DC (IEC 60269-6 gPV), "
+                f"SPD type 2 on the PV side")
+        _ac_v = _q(state, "ac_output_voltage_v")
+        _ac_kw = _q(state, "continuous_power_kw")
+        if _ac_v and _ac_kw and float(_ac_v) <= 250:
+            _i_ac = math.ceil(float(_ac_kw) * 1000.0 / (float(_ac_v) * 0.95) * 1.25 / 5) * 5
+            pnl.ac_interface_note = (
+                f"1× {_i_ac:g} A MCB 2-pole (grid tie, G98/G99 interface protection) "
+                f"+ type 2 SPD")
+    return pnl
 
 
 def _board_name(board_id: str, kind: str, is_mv: bool = False, is_dc: bool = False) -> str:
@@ -2363,6 +2386,10 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
             ("Total connected load", conn_val),
             ("Board demand (busbar)", _fmt(rec["demand_a"], " A", fmt="{:,.0f}")),
         ]
+        if getattr(p, "pv_inputs_note", None):
+            hdr.append(("PV string inputs", p.pv_inputs_note))
+        if getattr(p, "ac_interface_note", None):
+            hdr.append(("AC grid interface", p.ac_interface_note))
         out.append("| Field | Value |\n|---|---|")
         for k, v in hdr:
             out.append(f"| **{k}** | {v} |")
