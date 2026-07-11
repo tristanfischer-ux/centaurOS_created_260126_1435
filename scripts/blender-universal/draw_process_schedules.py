@@ -418,7 +418,9 @@ def build_line_list(proc, schedule: dict, state: dict,
     instrument index). Additive + deterministic; byte-identical to the prior 7-row list
     when out_dir is absent."""
     topo = PID._topology(state)
-    proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
+    # REAL process services only (Grok #1 — shared rule with draw_pid so the line list
+    # and the P&ID can never disagree about what is a process line)
+    proc_topo = [e for e in topo if PID._is_real_process_edge(e)]
     # AIR-PATH THERMAL EDGES ARE NOT PIPES (2026-07-11 run 66, red-team HIGH residue:
     # a 'Heat transfer / CS / insulated' LINE-LIST row on a sealed air-cooled battery —
     # the heat path is the VENT AIR, already carried by the ventilation parts; a thermal

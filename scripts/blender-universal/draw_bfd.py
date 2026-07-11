@@ -609,6 +609,47 @@ def reconstruct_blockflow(out_dir: str, state: dict) -> BlockFlow:
     quantities = _quantities(state)
     route_idx = _route_index(out_dir)
 
+    # ── ENERGY BLOCK FLOW (2026-07-11, Grok #1 + the device-topology override): a dry
+    # electrical product has ZERO process nodes (na_reason set) — its honest BFD is the
+    # ENERGY chain: blocks from the full topology's electrical endpoints, energy streams
+    # for the electrical edges, the dry-air thermal path as thermal streams, signal ties
+    # as a note. Universal: fires only on the na_reason signal; plants unchanged. ──
+    if not proc.nodes and getattr(proc, "na_reason", ""):
+        _topo_all = PID._topology(state)
+        _e_blocks: dict = {}
+        _e_streams: list = []
+        _sig_n = 0
+        for e in _topo_all:
+            mech = str(e.get("mechanism") or "")
+            f, t = str(e.get("from_part") or ""), str(e.get("to_part") or "")
+            if not f or not t:
+                continue
+            if mech in ("signal", "data", "control"):
+                _sig_n += 1
+                continue
+            for k in (f, t):
+                if k not in _e_blocks:
+                    _e_blocks[k] = Block(key=k, tag="", label=PID._humanise(k)
+                                         if hasattr(PID, "_humanise") else k.replace("_", " ").title(),
+                                         sym=PID.SYM_OFFPAGE if re.search(
+                                             r"grid|pv_string|air_intake|air_exhaust", k, re.I)
+                                         else getattr(PID, "SYM_PACKAGE", PID.SYM_OFFPAGE))
+            _qty = ""
+            if e.get("required_value") and e.get("required_unit"):
+                _qty = f"{e['required_value']:g} {e['required_unit']}"
+            _e_streams.append(Stream(from_key=f, to_key=t, service=(
+                "energy" if mech == "electrical_bus" else "cooling air"),
+                qty=_qty,
+                style=STREAM_THERMAL if mech in ("thermal", "thermal_path") else STREAM_PROCESS))
+        if _e_blocks and _e_streams:
+            _retag_blocks_from_ledger(list(_e_blocks.values()), state)
+            bf = BlockFlow(archetype=proc.archetype, blocks=list(_e_blocks.values()),
+                           streams=_e_streams, boundaries=[],
+                           notes=[proc.na_reason,
+                                  f"{_sig_n} signal/data tie(s) — see instrument index"]
+                           + list(proc.notes or []))
+            return bf
+
     # ---- blocks (drop the pure electrical pseudo-nodes; the BFD is a PROCESS diagram) ----
     blocks: list[Block] = []
     for nd in proc.nodes:

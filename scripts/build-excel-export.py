@@ -329,6 +329,30 @@ def _aux_tab_score(title: str, run_dir: str):
     cov = _ledger_coverage(run_dir)
 
     def _cov(key: str, label: str, advisory: str = ""):
+        # NA-BY-DESIGN (2026-07-11, Grok #1): a dry electrical product legitimately has
+        # ZERO process services — its P&ID renders the engineering-standard N/A sheet
+        # (draw_pid marker) instead of a fake process train. Coverage of nothing is not
+        # a defect; the tab PASSES with the declaration. Signal: the drawing's OWN
+        # marker + the contract's sealed sub-1 m³ enclosure.
+        try:
+            _svg_p = os.path.join(run_dir, "drawings", f"{key}.svg")
+            if os.path.exists(_svg_p) and "NA-BY-DESIGN" in open(_svg_p, encoding="utf-8", errors="replace").read():
+                _st = load_json(os.path.join(run_dir, "state.json")) or {}
+                _qs = {}
+                for _ck in ("orchestratorContract", "engineeringContract"):
+                    _q0 = (_st.get(_ck) or {}).get("quantities")
+                    if isinstance(_q0, dict) and _q0:
+                        _qs = _q0
+                        break
+                _encl = qval(_qs, "enclosure_volume_m3")
+                if _encl and 0 < float(_encl) < 1.0:
+                    return {"score": 10, "target": 8, "status": "PASS",
+                            "issues": [f"{label} not applicable BY DESIGN — dry electrical "
+                                       "product (no process services); power on the single-line, "
+                                       "thermal path on the GA/render"],
+                            "fix": ""}
+        except OSError:
+            pass
         c = cov.get(key)
         if not isinstance(c, dict):
             return None

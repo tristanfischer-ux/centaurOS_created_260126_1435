@@ -233,6 +233,10 @@ class Process:
     nodes: list[Node]
     lines: list[Line]
     power_note: str = ""         # the electrical_bus edge, summarised as a note
+    # honest N/A (2026-07-11, Grok #1): the design HAS topology but ZERO real process
+    # services (a dry electrical product) — the sheet declares it instead of rendering
+    # a fake process train or an unexplained blank; scorers key on this reason.
+    na_reason: str = ""
     notes: list[str] = field(default_factory=list)
     schedule_present: bool = False
     control_loops: list[ControlLoop] = field(default_factory=list)
@@ -1778,6 +1782,64 @@ def _infer_return_loops(
 # RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ── REAL-PROCESS EDGE FILTER (2026-07-11, Grok draft #1, adopted): a dry electrical
+# product must not become a P&ID. Electrical conversion chains, signal/control ties and
+# unpiped enclosure-air paths belong on the single-line / thermal drawings — only a
+# physical process-fluid/thermal SERVICE is a P&ID line. Universal: keyed on the edge's
+# own mechanism/medium/pipe-size evidence, never a class. A genuine liquid-cooled
+# electrical subsystem (coolant/glycol/water/oil/refrigerant in the medium) is kept. ──
+_ELECTRICAL_PROCESS_NODE_RE = re.compile(
+    r"battery|cells?|bms|busbar|breaker|contactor|fuses?|"
+    r"inverter|rectifier|converters?|semiconductors?|pcs|"
+    r"transformer|switchgear|controller|gateway|mppt",
+    re.I,
+)
+_PROCESS_MECHANISMS = {
+    "fluid_loop", "process_flow", "liquid_flow", "gas_flow",
+    "thermal", "thermal_path",
+}
+
+
+def _edge_medium(edge: dict) -> str:
+    fluid = edge.get("fluid")
+    if isinstance(fluid, dict):
+        return str(fluid.get("medium") or "").lower()
+    return str(edge.get("medium") or "").lower()
+
+
+def _is_real_process_edge(edge: dict) -> bool:
+    """True only for a physical process-fluid/thermal service."""
+    mechanism = str(edge.get("mechanism") or "").lower()
+    if mechanism not in _PROCESS_MECHANISMS:
+        return False
+    endpoints = f"{edge.get('from_part', '')} {edge.get('to_part', '')}"
+    medium = _edge_medium(edge)
+    context = str(edge.get("material_context") or "").lower()
+    has_pipe_size = bool(
+        edge.get("dn")
+        or edge.get("required_unit") in ("mm", "DN")
+        or re.search(r"\bDN\s*\d+", context, re.I)
+    )
+    if _ELECTRICAL_PROCESS_NODE_RE.search(endpoints):
+        if not re.search(r"coolant|glycol|water|oil|refrigerant", medium + " " + context):
+            return False
+    if "air" in medium and not has_pipe_size:
+        return False
+    if mechanism in ("thermal", "thermal_path"):
+        return bool(re.search(r"steam|coolant|glycol|water|oil|refrigerant|condensate",
+                              medium + " " + context))
+    # a FLUID mechanism between non-electrical endpoints IS the process claim — requiring
+    # medium/DN evidence here emptied every codema P&ID (their fluid_loop edges carry no
+    # medium field; 2026-07-11 sweep: fischer-codema-v16..v79 all dropped to 0 kept).
+    # The evidence tests above only disambiguate the WRONGNESS cases (electrical
+    # endpoints masquerading as process, unpiped enclosure air, dry 'thermal' paths).
+    return True
+
+
+def _process_topology(state: dict) -> list:
+    return [e for e in _topology(state) if _is_real_process_edge(e)]
+
+
 def reconstruct_process(schedule: dict, state: dict,
                         out_dir: Optional[str] = None) -> Process:
     """Reconstruct the process for the P&ID/BFD/iso. When `out_dir` is given, also reads
@@ -1793,9 +1855,18 @@ def reconstruct_process(schedule: dict, state: dict,
     instr_funcs = _discover_instrument_types(state)
     valve_has = _discover_valves(state)
 
-    # ---- partition edges: process/thermal (drawn as pipes) vs electrical (a note) ----
-    proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
+    # ---- partition edges: REAL process/thermal services (drawn as pipes) vs everything
+    # electrical/signal/dry-air (single-line + thermal drawings own those — Grok #1) ----
+    proc_topo = [e for e in topo if _is_real_process_edge(e)]
     elec_topo = [e for e in topo if e.get("mechanism") == "electrical_bus"]
+    _na_reason = ""
+    if topo and not proc_topo:
+        _na_reason = ("NO PROCESS SERVICES BY DESIGN — dry, air-cooled electrical product: "
+                      f"{len(elec_topo)} electrical energy edge(s) (single-line diagram), "
+                      f"{sum(1 for e in topo if str(e.get('mechanism')) in ('thermal', 'thermal_path'))} "
+                      "dry-air thermal path(s) (GA / render), "
+                      f"{sum(1 for e in topo if str(e.get('mechanism')) in ('signal', 'data', 'control'))} "
+                      "signal/data tie(s) (instrument index)")
 
     # ---- ordered, de-duplicated node keys, in first-appearance order ----
     node_keys = []
@@ -2034,6 +2105,7 @@ def reconstruct_process(schedule: dict, state: dict,
     _annotate_pump_unit_tags(nodes, state)
 
     return Process(archetype=arch, nodes=list(nodes.values()), lines=lines,
+                   na_reason=_na_reason,
                    power_note=power_note, notes=notes,
                    schedule_present=bool(schedule.get("rows")),
                    control_loops=control_loops, ancillaries=ancillaries,
@@ -2612,11 +2684,22 @@ def build_pid_svg(proc: Process) -> str:
     """Render the reconstructed process as a standard P&ID."""
     nodes = proc.nodes
     if not nodes:
-        # degenerate: still emit a titled empty sheet so callers get a file.
+        # degenerate: still emit a titled sheet so callers get a file. When the design
+        # legitimately has NO process services (a dry electrical product — Grok #1),
+        # the sheet DECLARES it (the engineering-standard N/A page) instead of an
+        # unexplained blank; the tab scorer keys on the NA-BY-DESIGN marker.
         svg = SVG(1100, 600)
         svg.rect(18, 18, 1100 - 36, 600 - 36, stroke=GRID_FAINT, width=1.2)
-        svg.text(550, 300, "No process topology in state — nothing to draw.",
-                 size=14, anchor="middle", fill=MUTED)
+        if proc.na_reason:
+            svg.text(550, 250, "P&ID — NOT APPLICABLE (NA-BY-DESIGN)",
+                     size=18, anchor="middle", weight="bold")
+            svg.text(550, 285, proc.na_reason, size=11, anchor="middle", fill=MUTED)
+            svg.text(550, 315, "Power distribution: see single-line diagram + panel schedule. "
+                               "Thermal path: see general arrangement / render.",
+                     size=11, anchor="middle", fill=MUTED)
+        else:
+            svg.text(550, 300, "No process topology in state — nothing to draw.",
+                     size=14, anchor="middle", fill=MUTED)
         _draw_title_block(svg, proc, 1100, 600, 150)
         return svg.render()
 

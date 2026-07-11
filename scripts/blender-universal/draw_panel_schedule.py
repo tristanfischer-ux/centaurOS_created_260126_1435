@@ -2193,6 +2193,42 @@ def _electrical_consumer_breakdown_total(quantities: dict) -> Optional[float]:
     return total if found else None
 
 
+# ── BREAKDOWN → CORRECT BOARD (2026-07-11, Grok's draft #2, adopted). The rescale
+# below used to target whichever board is NAMED main — the run-75 data-cross root:
+# after a board-role relabel, the 0.21 kW aux breakdown crushed the genuine 11 kW
+# conversion board's circuits to 0.2 kW. Select the board SEMANTICALLY (breakdown-key
+# tokens vs the board's own circuit descriptions); refusing to rescale when nothing
+# matches is safer than shrinking an unrelated inverter/DC-bus board. ──
+_BREAKDOWN_STOP = {
+    "electrical", "consumer", "connected", "load", "power", "kw",
+    "system", "total",
+}
+
+
+def _breakdown_items(quantities: dict) -> list:
+    items = []
+    for key, raw in (quantities or {}).items():
+        if not _ELEC_CONSUMER_BREAKDOWN_RE.match(key.lower()):
+            continue
+        value = raw.get("value") if isinstance(raw, dict) else raw
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        stem = re.sub(r"^electrical_consumer__|_kw$", "", key.lower())
+        tokens = {t for t in re.split(r"[^a-z0-9]+", stem)
+                  if len(t) > 2 and t not in _BREAKDOWN_STOP}
+        if tokens and value > 0:
+            items.append((tokens, value))
+    return items
+
+
+def _panel_breakdown_score(panel, items) -> float:
+    text = " ".join((c.description or "") for c in panel.circuits).lower()
+    panel_tokens = set(re.split(r"[^a-z0-9]+", text))
+    return sum(value for tokens, value in items if tokens & panel_tokens)
+
+
 def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
     """ONE-MINT reconciliation (load_reconcile fix, 2026-07-06): when the engineering
     contract publishes an electrical_consumer__*_kw breakdown, PIN the MAIN board's
@@ -2234,9 +2270,22 @@ def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
     target = _electrical_consumer_breakdown_total(quantities)
     if target is None or target <= 0:
         return
-    for p in panels:
-        if p.kind != "main":
-            continue
+    # SEMANTIC BOARD SELECTION (Grok draft #2): the breakdown's own key tokens
+    # (hvac/ventilation/bms/controls/standby) must MATCH the board's circuit text —
+    # never "the board named main". No match anywhere → refuse the rescale.
+    items = _breakdown_items(quantities)
+    if not items or not panels:
+        return
+    if len(panels) == 1:
+        _selected = panels[0]
+    else:
+        _ranked = sorted(((_panel_breakdown_score(p, items), i, p)
+                          for i, p in enumerate(panels)),
+                         key=lambda t: (t[0], -t[1]), reverse=True)
+        if not _ranked or _ranked[0][0] <= 0:
+            return
+        _selected = _ranked[0][2]
+    for p in [_selected]:
         raw = sum((c.connected_kw_total or 0) for c in p.circuits if c.coincident)
         if raw <= 0:
             continue
