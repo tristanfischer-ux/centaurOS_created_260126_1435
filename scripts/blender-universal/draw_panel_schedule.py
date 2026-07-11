@@ -2461,17 +2461,35 @@ def _fmt(v, suffix="", dash="—", fmt="{:g}"):
 
 
 def _fmt_amp(v) -> str:
-    """Keep micro-board currents visible; integer rounding turned 0.7 A into 1 A."""
+    """Keep device-scale currents visible; 39.1 A must not silently print as 39 A."""
     if v is None:
         return "—"
-    return _fmt(v, " A", fmt="{:,.1f}" if abs(float(v)) < 10 else "{:,.0f}")
+    return _fmt(v, " A", fmt="{:,.1f}" if abs(float(v)) < 100 else "{:,.0f}")
 
 
 def _fmt_kw_capacity(v) -> str:
     """Keep sub-10 kW bus capacities visible; 0.2 kW must never print as 0 kW."""
     if v is None:
         return "—"
-    return _fmt(v, " kW", fmt="{:,.1f}" if abs(float(v)) < 10 else "{:,.0f}")
+    av = abs(float(v))
+    return _fmt(v, " kW", fmt="{:,.2f}" if av < 1 else "{:,.1f}" if av < 10 else "{:,.0f}")
+
+
+def _fmt_kw_load(v) -> str:
+    """Preserve hundredths for sub-kW auxiliaries whose visible rows sum to 0.21 kW."""
+    if v is None:
+        return "—"
+    return _fmt(v, " kW", fmt="{:,.2f}" if abs(float(v)) < 1 else "{:,.1f}")
+
+
+def _display_bus_capacity_kw(rec: dict):
+    """Collapse harmless sub-display rounding so one physical value prints once."""
+    capacity = rec.get("demand_kw")
+    load = rec.get("sum_kw")
+    if capacity is None or load is None:
+        return capacity
+    tolerance = max(0.02, 0.05 * abs(float(load)))
+    return load if abs(float(capacity) - float(load)) <= tolerance else capacity
 
 
 def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
@@ -2502,7 +2520,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
         if p.transformer:
             hdr.append(("Step-down transformer", p.transformer))
         nc = rec.get("noncoincident_kw") or 0
-        conn_val = _fmt(rec["sum_kw"], " kW", fmt="{:,.1f}")
+        conn_val = _fmt_kw_load(rec["sum_kw"])
         if nc > 0:
             conn_val += f"  (running; + {nc:,.0f} kW standby/duplicate not summed)"
         hdr += [
@@ -2537,7 +2555,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
                 f"{_fmt(c.voltdrop_pct, fmt='{:g}')} | {spec} |")
         # totals row
         out.append(
-            f"| | **TOTALS** | | **{rec['sum_kw']:,.1f} kW** | "
+            f"| | **TOTALS** | | **{_fmt_kw_load(rec['sum_kw'])}** | "
             f"**{_fmt_amp(rec['sum_a'])}** | | | | | |")
         out.append("")
         # reconciliation line
@@ -2546,8 +2564,9 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
                 f"**Reconciliation:** Σ circuit design current = {_fmt_amp(rec['sum_a'])} "
                 f"vs board busbar demand = {_fmt_amp(rec['demand_a'])} "
                 f"(ratio {rec['ratio']:.2f}) → **{rec['verdict']}**. "
-                f"Σ connected load ≈ {rec['sum_kw']:,.1f} kW"
-                + (f" vs board busbar capacity ≈ {_fmt_kw_capacity(rec['demand_kw'])}."
+                f"Σ connected load ≈ {_fmt_kw_load(rec['sum_kw'])}"
+                + (f" vs board busbar capacity ≈ "
+                   f"{_fmt_kw_capacity(_display_bus_capacity_kw(rec))}."
                    if rec['demand_kw'] else "."))
             if rec.get("tx_headroom") is not None:
                 tv = "within" if rec["tx_headroom"] <= 1.0 else "OVER"
@@ -3220,7 +3239,11 @@ def _selftest() -> int:
     chk("I17.inband_reading_retained",
         not _demand_needs_circuit_override(4.2, 4.0, 1.2))
     chk("I18.micro_current_not_rounded_to_integer", _fmt_amp(0.7) == "0.7 A")
-    chk("I18.micro_capacity_not_rounded_to_zero", _fmt_kw_capacity(0.2) == "0.2 kW")
+    chk("I18.device_current_keeps_tenth", _fmt_amp(39.1) == "39.1 A")
+    chk("I18.micro_capacity_not_rounded_to_zero", _fmt_kw_capacity(0.2) == "0.20 kW")
+    chk("I18.aux_load_keeps_hundredths", _fmt_kw_load(0.21) == "0.21 kW")
+    chk("I18.same_value_rounding_collapses",
+        _display_bus_capacity_kw({"demand_kw": 0.197, "sum_kw": 0.21}) == 0.21)
 
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))

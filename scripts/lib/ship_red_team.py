@@ -83,7 +83,9 @@ def _evidence_semantics(process_schedule: str, parts_ledger: dict) -> str:
     notes.append(
         "LEDGER STATUS SEMANTICS: `not_found` means catalogue/MPN identity is unresolved; "
         "it is NOT an electrical/process connectivity defect. Connectivity is judged only "
-        "by connectivity.concerns, orphan_equipment and stale_ties.")
+        "by connectivity.concerns, orphan_equipment and stale_ties. These identity gaps ARE "
+        "penalised in the BoM/Part-names scores (the honest sub-10 score is the evidence); "
+        "they are not an unscored omission merely because the tab still exceeds 9.")
     notes.append(
         "INSTRUMENT COUNT SEMANTICS: connectivity.n_instrument_total counts BoM instrument "
         "LINE TYPES; the instrument index enumerates physical qty-N instances. The two numbers "
@@ -221,6 +223,7 @@ def _selftest() -> int:
     checks = [
         "Zero process lines/valves is CORRECT" in notes,
         "NOT an electrical/process connectivity defect" in notes,
+        "ARE penalised" in notes,
         "counts BoM instrument LINE TYPES" in notes,
         "principal battery↔PCS transfer board" in notes,
     ]
