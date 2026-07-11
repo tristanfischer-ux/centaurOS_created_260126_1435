@@ -1626,9 +1626,55 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
         return None
 
     drawings = _find_drawings(ledger) or []
+
+    # Applicability / dedicated-gate authority. A sealed dry product's P&ID can
+    # be explicitly NA-BY-DESIGN, and panel/SLD powered-part coverage is checked
+    # by drawing-gates G3 against the correct powered-part denominator. The
+    # generic ledger denominator must not re-fail those proved cases.
+    def _qv(key):
+        for contract_key in ("orchestratorContract", "engineeringContract"):
+            q = (state.get(contract_key) or {}).get("quantities") or {}
+            value = q.get(key) if isinstance(q, dict) else None
+            if isinstance(value, dict):
+                value = value.get("value")
+            if isinstance(value, (int, float)):
+                return float(value)
+        return None
+
+    sealed = bool((_qv("enclosure_volume_m3") or 0) < 1.0
+                  and (_qv("enclosure_volume_m3") or 0) > 0)
+    pid_na = False
+    pid_svg = os.path.join(run_dir or "", "drawings", "pid.svg")
+    if sealed and os.path.isfile(pid_svg):
+        try:
+            pid_na = "NA-BY-DESIGN" in open(pid_svg, encoding="utf-8").read()
+        except OSError:
+            pid_na = False
+
+    drawing_pass = {}
+    dg_path = os.path.join(run_dir or "", "drawing-gates.json")
+    if os.path.isfile(dg_path):
+        try:
+            drawing_pass = {
+                str(name): bool((entry or {}).get("pass"))
+                for name, entry in (json.load(open(dg_path)).get("drawings") or {}).items()
+                if isinstance(entry, dict)
+            }
+        except (OSError, ValueError):
+            drawing_pass = {}
+
+    def _coverage_applicable(name: str) -> bool:
+        norm = str(name).lower().replace("_", "-")
+        if pid_na and norm in ("pid", "p&id"):
+            return False
+        if norm in ("panel-schedule", "single-line-diagram") and drawing_pass.get(norm):
+            return False
+        return True
+
     parsed = [
         (name, _num(d.get("expected")) or 0, _num(d.get("present")) or 0)
-        for name, d in drawings if isinstance(d, dict)
+        for name, d in drawings
+        if isinstance(d, dict) and _coverage_applicable(name)
     ]
     all_zero = bool(parsed) and all(exp == 0 and pres == 0 for _, exp, pres in parsed)
 
@@ -3709,6 +3755,34 @@ def _selftest() -> int:
         checkse = {f.check for f in repe.findings}
         expect("coverage_partial" in checkse, "E: expected coverage_partial HIGH (pid 11/104)")
         expect("coverage_empty" not in checkse, "E: must NOT be coverage_empty (non-zero coverage)")
+
+    # ---- Fixture E2: sealed P&ID N/A + dedicated panel gate -> no false HIGH ----
+    with tempfile.TemporaryDirectory() as te2:
+        os.makedirs(os.path.join(te2, "drawings"), exist_ok=True)
+        with open(os.path.join(te2, "drawings", "pid.svg"), "w") as fh:
+            fh.write("<svg><text>P&ID — NOT APPLICABLE (NA-BY-DESIGN)</text></svg>")
+        with open(os.path.join(te2, "drawing-gates.json"), "w") as fh:
+            json.dump({"drawings": {
+                "panel-schedule": {"pass": True},
+                "single-line-diagram": {"pass": True},
+            }}, fh)
+        with open(os.path.join(te2, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 11000, "coverage_by_drawing": {
+                "pid": {"expected": 8, "present": 0},
+                "panel-schedule": {"expected": 8, "present": 5},
+                "general-arrangement": {"expected": 26, "present": 25},
+            }}, fh)
+        sealed_state = {
+            **clean_state,
+            "orchestratorContract": {"quantities": {
+                "enclosure_volume_m3": {"value": 0.13, "unit": "m3"},
+            }},
+        }
+        repe2 = audit_dossier(sealed_state, clean_rows, run_dir=te2)
+        high_cov = [f for f in repe2.findings
+                    if f.check == "coverage_partial" and f.severity == "HIGH"]
+        expect(not high_cov,
+               "E2: NA P&ID and dedicated-gate-passed panel must not create coverage HIGH")
 
     # ---- Fixture F: phantom reference in connection trace -> HIGH -------------
     with tempfile.TemporaryDirectory() as tf:
