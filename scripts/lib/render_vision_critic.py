@@ -162,7 +162,27 @@ def _is_product_mode(image_path: str) -> bool:
         return False
 
 
+def _critique_once(image_path: str, model: str, timeout: int) -> dict:
+    return _critique_render_impl(image_path, model, timeout)
+
+
 def critique_render(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
+    """FLAKE FILTER (2026-07-11 run 67): broken=true with an EMPTY defects list is the
+    model's known flake mode (#86 — near-identical geometry flips verdicts run-to-run;
+    run 65 clean, run 67 nameless-broken on the same clean product, verified by eye).
+    A nameless flag gets EXACTLY ONE retry to substantiate: a retry that NAMES a defect
+    scores (cap ≤4); a clean retry is clean; nameless twice keeps the honest cap-at-7.
+    A named first verdict is NEVER retried away (flag-only council rule intact)."""
+    res = _critique_once(image_path, model, timeout)
+    if isinstance(res, dict) and res.get("ok") and res.get("broken") is True and not res.get("defects"):
+        retry = _critique_once(image_path, model, timeout)
+        if isinstance(retry, dict) and retry.get("ok"):
+            retry["flake_retry"] = True
+            return retry
+    return res
+
+
+def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: int = 90) -> dict:
     key = _key()
     if not key:
         return {"broken": None, "defects": [], "model": model, "ok": False, "error": "no OPENROUTER_API_KEY"}
