@@ -82,7 +82,10 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     parts.append("CONTRACT HEADLINE (the authority every artefact must agree with):\n" + json.dumps({
         k: qv(k) for k in ("continuous_power_kw", "nameplate_capacity_kwh", "dc_bus_voltage_v",
                            "ac_output_voltage_v", "connected_electrical_load_kw",
-                           "enclosure_volume_m3", "system_thermal_dissipation_kw") if qv(k) is not None}))
+                           "enclosure_volume_m3", "system_thermal_dissipation_kw",
+                           # run-71 false HIGH: the seat flagged the PV/MPPT input stage as
+                           # out-of-scope because the headline hid these contract quantities
+                           "pv_stc_input_kw", "mppt_count") if qv(k) is not None}))
     pb = state.get("parsedBrief") or {}
     parts.append(f"PRODUCT CLASS: {pb.get('product_class') or state.get('productClass') or '?'} — "
                  f"summary: {str(pb.get('summary') or '')[:400]}")
@@ -102,10 +105,16 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     rb = state.get("requirementsBom") or []
     rb_total = round(sum(r.get("line_gbp") or 0 for r in rb))
     cs = state.get("costStack") or {}
-    parts.append("COST SURFACES side by side (must be ONE truth): "
-                 + json.dumps({"requirementsBom_total": rb_total,
-                               "costStack_oem_transfer": cs.get("oem_transfer_price_gbp"),
-                               "costStack_raw_materials": cs.get("raw_materials_bom_gbp"),
+    # run-71 recurring false HIGH ("three mutually inconsistent totals"): these are
+    # LAYERS of one margin stack (raw parts < ex-works < OEM transfer), not rival
+    # claims of the same number — say so, and let the seat attack the LAYER maths.
+    parts.append("COST STACK LAYERS (one margin stack, ascending — raw parts ⊂ ex-works ⊂ "
+                 "OEM transfer; layers legitimately differ, only a layer SMALLER than the "
+                 "one below it is a contradiction): "
+                 + json.dumps({"raw_parts_bom (requirementsBom Σ)": rb_total,
+                               "raw_materials_layer": cs.get("raw_materials_bom_gbp"),
+                               "ex_works_layer": cs.get("ex_works_price_gbp") or cs.get("ex_works"),
+                               "oem_transfer_layer": cs.get("oem_transfer_price_gbp"),
                                "cost_reality_bom_total": (state.get("cost_reality") or {}).get("bom_total_gbp")}))
     sc = _jload(os.path.join(run_dir, "tab-scorecard.json")) or {}
     tabs = sc.get("tabs") or sc

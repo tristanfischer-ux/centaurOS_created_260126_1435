@@ -1049,7 +1049,14 @@ def build_schedules(schedule: dict, state: dict,
                           else (f"{sec_v:,.0f} V 3-phase + N" if sec_v >= 380
                                 else f"{sec_v:,.0f} V 1-phase + N"))
             sub.phases = 3 if (not is_dc and sec_v >= 380) else 1
-        sub.supply = "Local sub-distribution (MV feeder → local step-down transformer)"
+        # contract-aware (2026-07-11 run 71 red-team HIGH: the canned MV-feeder text on a
+        # 230 V single-phase product contradicts the contract's direct LV tie — same
+        # signal as _supply_label: ac_output_voltage_v ≤ 250 means NO MV plane exists)
+        _sub_ac = _q(state, "ac_output_voltage_v")
+        if _sub_ac and _sub_ac <= 250:
+            sub.supply = f"Sub-distribution from main board ({_sub_ac:.0f} V single-phase)"
+        else:
+            sub.supply = "Local sub-distribution (MV feeder → local step-down transformer)"
         _fill_circuits(sub, sd, rows, devices, state, equip_qty)
         _set_sub_incoming(sub, sd, rows, schedule, state)
         panels.append(sub)
