@@ -8099,6 +8099,9 @@ def _load_required_services():
                     f"{name} {function}", re.I):
                 if re.search(
                         r'capacitor|inductor|arrester|\btransformer\b|busbar|breaker|\brelay\b|'
+                # semiconDUCTors/converters (2026-07-11 run 70: 'duct' glued-substring-matched
+                # inside 'semiconductors' — the transDUCTion family, in a part NAME)
+                r'semiconductors?|converters?|'
                         r'\bfuse\b|inverter|rectifier|\bpcs\b|surge|grounding|earthing|'
                         r'sealing[ -]?end|switchgear|isolator|varistor|bushing|'
                         r'\blabel\b|\bcard\b|\btape\b|placard|nameplate|decal|'

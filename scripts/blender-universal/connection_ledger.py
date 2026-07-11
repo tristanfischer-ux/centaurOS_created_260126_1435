@@ -770,6 +770,15 @@ _COOLANT_LOOP_PART_RE = re.compile(
 # "electric steam generator"), resolve_endpoint's SYN table (build_universal_scene.
 # py) resolves the edge to that PART first — a real part beats an abstract boundary
 # every time, and this pattern only fires as the fallback when no such part exists.
+# ELECTRICAL GEAR is never a process-fluid node (2026-07-11, runs 66+70: DN25 water
+# ties plumbed THROUGH power electronics by BOTH the boundary closer and the residual
+# closer — the class graph's thermal-intent fluid_loop edges made them look like fluid
+# nodes). ONE module-level rule, applied by every closer.
+_ELEC_GEAR_CLOSER_RE = re.compile(
+    r"capacitor|inductor|converters?\b|semiconductors?\b|invert(?:er)?s?\b|rectifier|"
+    r"\bpcs\b|busbar|contactor|breaker|\bfuses?\b|switchgear|transformer|\brelay\b|"
+    r"surge|arrester|bms\b|battery|cells?\b", re.I)
+
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
@@ -1380,15 +1389,6 @@ def close_boundaries(parts, topology, log=print):
         if f and t:
             fwd.add((f, t))
 
-    # ELECTRICAL GEAR is never a process-fluid node (2026-07-11 run 66, red-team HIGH:
-    # DN25 process-water make-up/fill/drain ties plumbed THROUGH Power Semiconductors →
-    # DC DC Converters → Inverter — the class graph's thermal-intent fluid_loop edges
-    # made power electronics look like fluid nodes and the closers piped water via them).
-    _ELEC_GEAR_CLOSER_RE = re.compile(
-        r"capacitor|inductor|converters?\b|semiconductors?\b|invert(?:er)?s?\b|rectifier|"
-        r"\bpcs\b|busbar|contactor|breaker|\bfuses?\b|switchgear|transformer|\brelay\b|"
-        r"surge|arrester|bms\b|battery|cells?\b", re.I)
-
     def _exempt(nm):
         return bool(_INJECTOR_RE.search(nm) or _INLINE_TAP_RE.search(nm) or
                     _DRY_ANCILLARY_RE.search(nm) or _SUBCOMPONENT_RE.search(nm) or
@@ -1687,6 +1687,12 @@ def close_residual_completeness(parts, topology, required_services, log=print):
 
     for c in concerns:
         nm = c["part"]
+        # electrical gear is never a process-fluid node — the same exemption the
+        # BOUNDARY closer applies (2026-07-11 run 70: the RESIDUAL closer re-plumbed
+        # DN25 water through Power Semiconductors → DC DC Converters after the boundary
+        # exemption landed; TWO creators, one rule).
+        if _ELEC_GEAR_CLOSER_RE.search(nm):
+            continue
         r, m = _rank(nm), _mod(nm)
         for miss in c["missing"]:
             if miss == "fluid-input":
