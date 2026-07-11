@@ -1058,7 +1058,11 @@ def build_schedules(schedule: dict, state: dict,
         # signal as _supply_label: ac_output_voltage_v ≤ 250 means NO MV plane exists)
         _sub_ac = _q(state, "ac_output_voltage_v")
         if _sub_ac and _sub_ac <= 250:
-            sub.supply = f"Sub-distribution from main board ({_sub_ac:.0f} V single-phase)"
+            # the parenthetical is the SUB board's OWN system (run-73 red-team: a 282 V DC
+            # sub-board captioned "230 V single-phase" — the contract AC voltage is the
+            # wrong domain for a DC board; sub.system already carries the right label)
+            _sys = sub.system or f"{_sub_ac:.0f} V 1-phase"
+            sub.supply = f"Sub-distribution from main board ({_sys})"
         else:
             sub.supply = "Local sub-distribution (MV feeder → local step-down transformer)"
         _fill_circuits(sub, sd, rows, devices, state, equip_qty)
