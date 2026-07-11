@@ -12348,19 +12348,56 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                    module=_dm, module_objects=MO)
         # fan rings behind the vent band
         for _fj in range(2):
+            _fan_x = (-1 if _fj == 0 else 1) * iw * 0.22
+            _fan_z = base_z + H * 0.90
             fl.add_torus(f"u_se_det_fan_{_fj}",
-                         _mm3(((-1 if _fj == 0 else 1) * iw * 0.22, -D / 2 + tt + 16.0,
-                               base_z + H * 0.90)),
+                         _mm3((_fan_x, -D / 2 + tt + 16.0, _fan_z)),
                          H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
                          module=_dm, module_objects=MO)
+            # Four visible blades in the front plane. Rings alone read as
+            # anonymous washers rather than forced-air thermal management.
+            for _bi, _ang in enumerate((0, 45, 90, 135)):
+                _blade = fl.add_box(
+                    f"u_se_det_fan_{_fj}_blade_{_bi}",
+                    _mm3((_fan_x, -D / 2 + tt + 14.0, _fan_z)),
+                    _mm3((H * 0.070, 4.0, H * 0.009)), _fanr_mat,
+                    module=_dm, module_objects=MO)
+                _blade.rotation_euler[1] = math.radians(_ang)
+        # Central fan duct from the fan plenum to the pack/power channel.
+        _duct_mat = fl.make_mat("m_se_duct", fl._to_linear((0.14, 0.15, 0.17)),
+                                metallic=0.15, roughness=0.65)
+        _duct_z0 = _ez + _eh2 * 0.82
+        _duct_z1 = base_z + H * 0.86
+        fl.add_box("u_se_det_duct",
+                   _mm3((0.0, _yF + 8.0, (_duct_z0 + _duct_z1) / 2)),
+                   _mm3((iw * 0.14, 16.0, _duct_z1 - _duct_z0)), _duct_mat,
+                   module=_dm, module_objects=MO)
+        # Horizontal pack seams make the lower mass read as a module stack
+        # rather than two featureless black doors.
+        for _si in range(1, 7):
+            _sz = _ez + _eh2 * (_si / 7.0)
+            fl.add_box(f"u_se_det_pack_seam_{_si}",
+                       _mm3((0.0, _yF - 2.0, _sz)),
+                       _mm3((iw * 0.76, 3.0, 2.0)), _seg_hero,
+                       module=_dm, module_objects=MO)
         # bottom interface terminals (AC / DC / PV entries)
         for _ti in range(3):
             fl.add_box(f"u_se_det_term_{_ti}",
                        _mm3((-iw * 0.25 + _ti * iw * 0.25, _yF, base_z + margin + ih * 0.03)),
                        _mm3((iw * 0.12, 20.0, ih * 0.035)), _term_mat,
                        module=_dm, module_objects=MO)
+            # Exterior gland ring at the bottom face: the electrical interfaces
+            # must remain visible even when the pack occupies the whole lower bay.
+            _gland = fl.add_torus(
+                f"u_se_det_gland_{_ti}",
+                _mm3((-iw * 0.25 + _ti * iw * 0.25, -D / 2 - 4.0,
+                      base_z + margin + ih * 0.025)),
+                H * 0.014 * fl.MM, H * 0.004 * fl.MM, _term_mat,
+                module=_dm, module_objects=MO)
+            _gland.rotation_euler[0] = math.radians(90)
         print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
-              f"PCB + 4 chips, HV busbar strip, 2 fan rings, 3 interface terminals")
+              f"PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, "
+              f"3 interface terminals/glands")
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
               f"{n_vents} vent slot(s) + mounting wall; tags + wire draws suppressed for the product shot")
 
