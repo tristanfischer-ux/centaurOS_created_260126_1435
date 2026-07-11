@@ -12375,9 +12375,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # the classic engineering-marketing cutaway. alpha 0.30: solid enough to give
         # the product its silhouette, open enough to show the pack/inverter/controls.
         body_mat = fl.make_mat("m_se_product", fl._to_linear((0.85, 0.88, 0.92)),
-                               metallic=0.05, roughness=0.25, alpha=0.16)
+                               metallic=0.05, roughness=0.25)
         panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear((0.84, 0.86, 0.88)),
-                                metallic=0.05, roughness=0.45, alpha=0.16)
+                                metallic=0.05, roughness=0.45)
         exterior_mat = fl.make_mat(
             "m_se_product_exterior",
             fl._to_linear((0.82, 0.85, 0.88)),
@@ -18504,6 +18504,14 @@ def main():
         span = max(bbox["x1"] - bbox["x0"], bbox["y1"] - bbox["y0"]) * fl.MM
         fl.add_lights(target_centre=(cx, cy, span * 0.28),
                       fill_energy=240, fill_size=max(14.0, span * 0.6))
+        if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
+            bpy.ops.object.light_add(
+                type="AREA",
+                location=(cx + 2.8, cy - 1.8, span * 0.55))
+            _product_rim = bpy.context.active_object
+            _product_rim.name = "u_product_right_fill"
+            _product_rim.data.energy = 90
+            _product_rim.data.size = 2.2
         fl.make_world_white()
         # ── #2 SKY ENVIRONMENT (Tristan 2026-06-22) — replace the flat grey world with a
         #    procedural Nishita sky so metals/water reflect a real sky + get graduated ambient
