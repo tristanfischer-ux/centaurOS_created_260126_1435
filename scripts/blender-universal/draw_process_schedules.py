@@ -1539,6 +1539,14 @@ def _na_by_design(sc: Schedules) -> bool:
     return not sc.lines and not sc.valves
 
 
+def _instrument_summary(sc: Schedules) -> str:
+    """Physical entry count plus only the ISA families actually present."""
+    isa = sorted({str(item.isa or "").split()[0] for item in sc.instruments
+                  if str(item.isa or "").strip()})
+    return (f"{len(sc.instruments)} physical instrument entries"
+            + (f" · ISA tags: {', '.join(isa)}" if isa else ""))
+
+
 def render_markdown(sc: Schedules) -> str:
     arch = PID._humanise(sc.archetype)
     out = []
@@ -1594,8 +1602,7 @@ def render_markdown(sc: Schedules) -> str:
     for i in sc.instruments:
         out.append(f"| `{i.tag}` | {i.isa} | {_norm(i.service)} | {i.measured} | "
                    f"{i.itype} | {i.location} | {i.rng} | {i.signal} | {i.loop_ref} |")
-    out.append(f"\n*{len(sc.instruments)} instrument types (ISA — LT level · PT pressure · "
-               "TT temperature · FT flow · AT analyser).*\n")
+    out.append(f"\n*{_instrument_summary(sc)}.*\n")
 
     out.append(f"\n> {_SCOPE_NOTE.replace(chr(10),' ')}\n")
     return "\n".join(out) + "\n"
@@ -1799,7 +1806,7 @@ def build_table_svg(sc: Schedules) -> str:
 
     sections = (
         [("1 · INSTRUMENT INDEX",
-          f"{len(sc.instruments)} instrument types · process lines/valves NA-BY-DESIGN",
+          f"{_instrument_summary(sc)} · process lines/valves NA-BY-DESIGN",
           _INSTR_COLS, instr_cells)]
         if dry_na else
         [
@@ -1810,7 +1817,7 @@ def build_table_svg(sc: Schedules) -> str:
              f"{len(sc.valves)} valve types · FC fail-closed / FO fail-open",
              _VALVE_COLS, valve_cells),
             ("3 · INSTRUMENT INDEX",
-             f"{len(sc.instruments)} instrument types · ISA LT/PT/TT/FT/AT",
+             _instrument_summary(sc),
              _INSTR_COLS, instr_cells),
         ]
     )
@@ -1977,6 +1984,8 @@ def _selftest() -> int:
         "dry_marked_na": "NA-BY-DESIGN" in dry_md and "NA-BY-DESIGN" in dry_svg,
         "dry_has_instrument_index": "INSTRUMENT INDEX" in dry_md,
         "dry_omits_empty_process_tables": "LINE LIST" not in dry_md and "VALVE LIST" not in dry_md,
+        "instrument_summary_counts_instances": "1 physical instrument entries" in dry_md,
+        "instrument_summary_no_absent_families": "PT pressure" not in dry_md,
         "wet_keeps_working_schematic": "Working Schematic" in wet_md,
         "wet_keeps_line_list": "LINE LIST" in wet_md and "201-PW-DN25" in wet_md,
     }

@@ -2460,6 +2460,20 @@ def _fmt(v, suffix="", dash="—", fmt="{:g}"):
         return f"{v}{suffix}"
 
 
+def _fmt_amp(v) -> str:
+    """Keep micro-board currents visible; integer rounding turned 0.7 A into 1 A."""
+    if v is None:
+        return "—"
+    return _fmt(v, " A", fmt="{:,.1f}" if abs(float(v)) < 10 else "{:,.0f}")
+
+
+def _fmt_kw_capacity(v) -> str:
+    """Keep sub-10 kW bus capacities visible; 0.2 kW must never print as 0 kW."""
+    if v is None:
+        return "—"
+    return _fmt(v, " kW", fmt="{:,.1f}" if abs(float(v)) < 10 else "{:,.0f}")
+
+
 def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
     out = []
     out.append(f"# PANEL / LOAD SCHEDULE — {_humanise(archetype)}\n")
@@ -2493,7 +2507,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
             conn_val += f"  (running; + {nc:,.0f} kW standby/duplicate not summed)"
         hdr += [
             ("Total connected load", conn_val),
-            ("Board demand (busbar)", _fmt(rec["demand_a"], " A", fmt="{:,.0f}")),
+            ("Board demand (busbar)", _fmt_amp(rec["demand_a"])),
         ]
         if getattr(p, "pv_inputs_note", None):
             hdr.append(("PV string inputs", p.pv_inputs_note))
@@ -2524,16 +2538,16 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
         # totals row
         out.append(
             f"| | **TOTALS** | | **{rec['sum_kw']:,.1f} kW** | "
-            f"**{rec['sum_a']:,.0f} A** | | | | | |")
+            f"**{_fmt_amp(rec['sum_a'])}** | | | | | |")
         out.append("")
         # reconciliation line
         if rec["ratio"] is not None:
             line = (
-                f"**Reconciliation:** Σ circuit design current = {rec['sum_a']:,.0f} A "
-                f"vs board busbar demand = {rec['demand_a']:,.0f} A "
+                f"**Reconciliation:** Σ circuit design current = {_fmt_amp(rec['sum_a'])} "
+                f"vs board busbar demand = {_fmt_amp(rec['demand_a'])} "
                 f"(ratio {rec['ratio']:.2f}) → **{rec['verdict']}**. "
                 f"Σ connected load ≈ {rec['sum_kw']:,.1f} kW"
-                + (f" vs board busbar capacity ≈ {rec['demand_kw']:,.0f} kW."
+                + (f" vs board busbar capacity ≈ {_fmt_kw_capacity(rec['demand_kw'])}."
                    if rec['demand_kw'] else "."))
             if rec.get("tx_headroom") is not None:
                 tv = "within" if rec["tx_headroom"] <= 1.0 else "OVER"
@@ -3205,11 +3219,13 @@ def _selftest() -> int:
         _demand_needs_circuit_override(4.2, 0.7, 1.2))
     chk("I17.inband_reading_retained",
         not _demand_needs_circuit_override(4.2, 4.0, 1.2))
+    chk("I18.micro_current_not_rounded_to_integer", _fmt_amp(0.7) == "0.7 A")
+    chk("I18.micro_capacity_not_rounded_to_zero", _fmt_kw_capacity(0.2) == "0.2 kW")
 
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (17 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (18 connected-load reconciliation invariants)")
     return 0
 
 
