@@ -1285,6 +1285,9 @@ def main() -> int:
         if not (fe or te):
             continue
         unresolved = [k for k, e in ((fr_key, fe), (to_key, te)) if e is None]
+        # a recognised BOUNDARY endpoint (grid / ambient / heat_rejection …) is a
+        # legitimate battery-limit, never a stale reference (2026-07-11 run 61).
+        unresolved = [k for k in unresolved if not _boundary_label(k)]
         if any(not _in_design(k) for k in unresolved):
             stale_ties.append({"from_part": r.get("from_part"), "to_part": r.get("to_part"),
                                "mechanism": mech,

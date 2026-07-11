@@ -215,6 +215,12 @@ function buildGroups(quantities: Record<string, number>): EquipGroup[] {
     // It describes a CONNECTION (a pipe), never equipment — it must not mint or resize
     // an equipment group (same family as the calc_*/building_* skips above).
     if (SERVICE_LINE_FLOW_KEY_RE.test(key)) continue
+    // TRANSIENT CONDITIONS are never equipment RATINGS (2026-07-11 run 61: the
+    // surge_apparent_power_kva system condition became a 'power' group and stem-matched
+    // 'Power Semiconductors' → rating_primary '42.6 kW' — a motor-start kVA transient
+    // stamped as a continuous kW rating, flagged by the register as an open defect.
+    // Protection FRAMES size to transients via their own emitter lineage, never here.)
+    if (/(^|_)(surge|peak|inrush|transient|lra)(_|$)/i.test(key)) continue
     let matched: { phrase: string; measure: Measure; perEach: boolean; volRole?: number } | null = null
     for (const rule of SUFFIX_RULES) {
       if (rule.re.test(key)) {

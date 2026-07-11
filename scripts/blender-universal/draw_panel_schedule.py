@@ -1555,6 +1555,16 @@ def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
         grp = groups[key]
         rep = grp[0]
         base = key[0]
+        # ZERO-LOAD WAYS on a board are BUS-WORK / mis-homed taps, not circuits
+        # (2026-07-11 run 61: 'Active Ventilation Fan'/'Audible Alarm' rendered 0.00 kW
+        # ways on the MAIN DC BUS — the aux consumers belong to the AC aux board's
+        # one-mint breakdown; a 0.00 kW row only fails the panel's own column contract).
+        try:
+            _a0 = float(_row_amps(rep) or 0)
+        except Exception:  # noqa: BLE001
+            _a0 = None
+        if _a0 is not None and 0 <= _a0 < 0.05:
+            continue
         # WAYS = the larger of (a) the schedule's own fan-out rows and (b) the LEDGER qty for
         # this load (parts-manifest). The connection schedule emits one lumped electrical edge
         # per load name, so an 8-off pump set arrives as a single row; the ledger qty enumerates

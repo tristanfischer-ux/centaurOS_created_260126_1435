@@ -775,6 +775,10 @@ _ABSTRACT_BOUNDARY_RE = re.compile(
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
     r"(?:steam|nitrogen|instrument[_ -]?air|compressed[_ -]?air|inert[_ -]?gas|"
     r"cooling[_ -]?water|chilled[_ -]?water)[_ -]?supply\b|"
+    # heat_rejection (2026-07-11 run 61): the class graph's thermal SINK — at air-cooled
+    # scale it IS the ambient (the vent path), a boundary, never a part; two demotion-
+    # surviving edges to it read as stale ties otherwise.
+    r"heat[_ -]?rejection|heat[_ -]?sink\b|"
     r"atmosphere|ambient|to[_ -]?sea|\bsewer\b|public[_ -]?network|off[_ -]?site|"
     # effluent / disposal / drain-to-waste termini (water plant battery limits)
     r"\beffluent\b|\bdisposal\b|waste[_ -]?stream|drain[_ -]?to[_ -]?waste|"
