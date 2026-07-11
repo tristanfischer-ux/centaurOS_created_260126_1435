@@ -57,6 +57,20 @@ def geometry_hash(run_dir: str) -> Optional[str]:
             continue
     if not parts:
         return None
+    # THE PIXELS ARE THE IDENTITY (2026-07-11 run 75: the manifests are blind to
+    # non-part scene geometry — new zone boards + the open-front cutaway changed the
+    # IMAGE while parts/route stayed byte-identical, so the cache replayed run-74's
+    # stale nameless-broken verdict and bypassed the tiebreak). Include the hero
+    # image bytes: a changed render re-judges; a byte-stable render still hits.
+    for name in _HERO_CANDIDATES:
+        hp = os.path.join(run_dir, name)
+        if os.path.exists(hp):
+            try:
+                with open(hp, "rb") as fh:
+                    parts.append(hashlib.sha256(fh.read()).hexdigest())
+            except OSError:
+                pass
+            break
     return hashlib.sha256("||".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -286,6 +300,11 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     geo_hash = geometry_hash(run_dir)
     if geo_hash:
         cached = cache_read(geo_hash)
+        # a NAMELESS broken verdict is a NON-VERDICT (the rubric demands named
+        # defects) — never replay it from cache; re-judge so the tiebreak can run.
+        if (isinstance(cached, dict) and cached.get("broken") is True
+                and not cached.get("defects")):
+            cached = None
         if isinstance(cached, dict) and cached.get("ok") and cached.get("model") == model:
             res = dict(cached)
             res["cache_hit"] = True
