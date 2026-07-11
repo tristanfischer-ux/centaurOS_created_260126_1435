@@ -19,11 +19,14 @@ Usage:
   fl.run_render_pipeline(OUT, MODULE_OBJECTS, MAT, structure_module_id="structure_containment")
 """
 import os
+import sys
 import bpy
 import math
 import mathutils
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+from render_view_contract import presentation_bevel_width_m
 
 # Module-level state — populated by add_box / add_cyl / etc.
 _module_objects_ref = None
@@ -102,8 +105,10 @@ def init_scene_cycles_hero():
         scene.render.engine = "CYCLES"
         cycles = getattr(scene, "cycles", None)
         if cycles is not None:
+            sample_count = int(os.environ.get("BLENDER_CYCLES_SAMPLES", "64"))
             for attr, val in [
-                ("samples", 64), ("preview_samples", 32),
+                ("samples", sample_count),
+                ("preview_samples", max(8, sample_count // 2)),
                 ("use_denoising", True), ("denoiser", "OPENIMAGEDENOISE"),
                 ("device", "CPU"),  # safe default; Metal/CUDA optional later
             ]:
@@ -476,6 +481,15 @@ def add_box(name, location, size, material, module=None, module_objects=None, ro
     obj.name = name
     obj.scale = (size[0] / 2, size[1] / 2, size[2] / 2)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    if os.environ.get("BLENDER_PRESENTATION_BEVEL") == "1":
+        bevel = obj.modifiers.new(name="presentation_bevel", type="BEVEL")
+        bevel.width = presentation_bevel_width_m(
+            (abs(float(size[0])), abs(float(size[1])), abs(float(size[2]))))
+        bevel.segments = 3
+        try:
+            bevel.harden_normals = True
+        except AttributeError:
+            pass
     obj.data.materials.append(material)
     if module and module_objects is not None:
         module_objects[module].append(obj)
@@ -842,11 +856,14 @@ def camera_for_module(mod_centre, mod_dims, scene_bbox, camera_hint="three_quart
     return {"name": name, "loc": loc, "target": (cx, cy, cz), "ortho_scale": ortho_scale}
 
 
-def setup_camera(loc, target, ortho_scale, focal=50):
+def setup_camera(loc, target, ortho_scale=None, focal=50, camera_type="ORTHO"):
     bpy.ops.object.camera_add(location=loc)
     cam = bpy.context.active_object
-    cam.data.type = "ORTHO"
-    cam.data.ortho_scale = ortho_scale
+    cam.data.type = camera_type
+    if camera_type == "ORTHO":
+        if ortho_scale is None:
+            raise ValueError("ortho_scale is required for an orthographic camera")
+        cam.data.ortho_scale = ortho_scale
     cam.data.lens = focal
     direction = (target[0] - loc[0], target[1] - loc[1], target[2] - loc[2])
     cam.rotation_euler = mathutils.Vector(direction).to_track_quat("-Z", "Y").to_euler()
@@ -1038,7 +1055,8 @@ def orient_billboards_to_camera(loc, target):
 def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_containment",
                         flat_form_factor=False, hero_camera_override=None,
                         hero_cycles=False, hero_open_frame=False,
-                        spatial_bbox_override=None):
+                        spatial_bbox_override=None, spatial_cameras_override=None,
+                        view_preparer=None, spatial_cycles=False):
     """Render the standard Forge engineering set:
     - 3 spatial views (top + corner FR + corner BL), no Freestyle
     - 1 Option-2 hero (ghosted structure + saturated modules), no Freestyle
@@ -1073,15 +1091,30 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     # views render a plate on a slab with the product a sliver (powerwall run 73).
     # The caller passes the PRODUCT bbox so the spatial views frame the product.
     bbox = spatial_bbox_override or compute_scene_bbox()
-    cams = nine_shot_cameras(bbox)
+    cams = spatial_cameras_override or nine_shot_cameras(bbox)
     disable_freestyle()
+    cycles_active = bool(spatial_cycles)
+    if cycles_active:
+        init_scene_cycles_hero()
     for cam_spec in cams:
-        clear_cameras()
-        setup_camera(loc=cam_spec["loc"], target=cam_spec["target"], ortho_scale=cam_spec["ortho_scale"])
-        orient_billboards_to_camera(cam_spec["loc"], cam_spec["target"])   # tag chips face THIS view
-        scene.render.filepath = str(out_dir / f"{cam_spec['name']}.png")
-        bpy.ops.render.render(write_still=True)
-        print(f"[forge] {cam_spec['name']}.png")
+        if view_preparer is not None:
+            view_preparer(cam_spec["name"], True)
+        try:
+            clear_cameras()
+            setup_camera(
+                loc=cam_spec["loc"],
+                target=cam_spec["target"],
+                ortho_scale=cam_spec.get("ortho_scale"),
+                focal=cam_spec.get("focal", 50),
+                camera_type=cam_spec.get("camera_type", "ORTHO"),
+            )
+            orient_billboards_to_camera(cam_spec["loc"], cam_spec["target"])   # tag chips face THIS view
+            scene.render.filepath = str(out_dir / f"{cam_spec['name']}.png")
+            bpy.ops.render.render(write_still=True)
+            print(f"[forge] {cam_spec['name']}.png")
+        finally:
+            if view_preparer is not None:
+                view_preparer(cam_spec["name"], False)
 
     # ─── Pass 2: hero with ghosted shell (or solid open frame) ───
     # hero_open_frame=True → paint the structure SOLID steel so an open skid
@@ -1122,8 +1155,8 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     # Phase B item 8 (2026-05-24): opt-in Cycles ray-trace for hero only.
     # Enable via run_render_pipeline(..., hero_cycles=True) or env
     # BLENDER_HERO_CYCLES=1. Adds ~30 s but produces CAD-presentation hero.
-    use_cycles = hero_cycles or os.environ.get("BLENDER_HERO_CYCLES") == "1"
-    if use_cycles:
+    use_cycles = cycles_active or hero_cycles or os.environ.get("BLENDER_HERO_CYCLES") == "1"
+    if use_cycles and not cycles_active:
         init_scene_cycles_hero()
     scene.render.filepath = str(out_dir / "00-hero.png")
     bpy.ops.render.render(write_still=True)

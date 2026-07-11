@@ -255,6 +255,7 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
     env_shaded = os.environ.copy()
     env_shaded["BLENDER_OUT_DIR"] = str(out_dir)
     env_shaded["INSPECT"] = "0"
+    env_shaded["BLENDER_PRESENTATION_BEVEL"] = "1"
     shaded_ok = False
     try:
         subprocess.run(

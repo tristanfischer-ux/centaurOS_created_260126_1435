@@ -43,6 +43,12 @@ from pathlib import Path
 
 _THIS = Path(__file__).resolve().parent
 _REPO = _THIS.parent.parent
+sys.path.insert(0, str(_REPO / "scripts" / "lib"))
+from render_view_contract import (  # noqa: E402
+    is_product_scale,
+    required_views,
+    resolve_design_envelope_mm,
+)
 
 # The routed-CAD artifacts the drawing generators consume (produced by the
 # Blender scene build). All three present ⇒ reuse; any missing ⇒ (re)build.
@@ -226,6 +232,13 @@ _SHEET_NAME_MAX = 31          # Excel hard limit — names are asserted under it
 def _manifest_envelope_dims(out_dir: Path) -> str:
     """'L × W × H m' from parts-manifest.json bbox, or ''."""
     try:
+        state = json.loads((out_dir / "state.json").read_text())
+        envelope = resolve_design_envelope_mm(state)
+        if envelope:
+            return " × ".join(f"{value / 1000.0:.3f}" for value in envelope) + " m"
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         man = json.loads((out_dir / "parts-manifest.json").read_text())
         bb = man.get("bbox_mm") or {}
         L = (bb.get("x_max_mm", 0) - bb.get("x_min_mm", 0)) / 1000.0
@@ -272,6 +285,32 @@ def build_render_manifest(out_dir: Path) -> list[dict]:
     callouts = _principal_callouts(out_dir)
     entries: list[dict] = []
     idx = 0
+    try:
+        state = json.loads((out_dir / "state.json").read_text())
+    except Exception:  # noqa: BLE001
+        state = {}
+    if is_product_scale(state):
+        for view in required_views(state):
+            path = out_dir / view.filename
+            if not (path.exists() and path.stat().st_size > 1000):
+                continue
+            idx += 1
+            short_title = view.title.split(" — ")[-1]
+            sheet = f"Render {idx} — {short_title}"[:_SHEET_NAME_MAX]
+            caption = view.caption
+            if env_dims:
+                caption += f" · product envelope {env_dims}"
+            entries.append({
+                "file": str(path.relative_to(out_dir)),
+                "file_abs": str(path),
+                "area": "product",
+                "bearing": view.view_id,
+                "sheet_name": sheet,
+                "caption": caption,
+                "required": view.required,
+                "view_id": view.view_id,
+            })
+        return entries
     for area, base in (("Interior", out_dir), ("Exterior", out_dir / "exterior")):
         for fname, bearing, short in _RENDER_VIEWS:
             p = base / fname

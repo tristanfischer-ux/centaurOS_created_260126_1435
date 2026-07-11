@@ -52,6 +52,11 @@ import re
 import struct
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+from render_image_quality import evaluate_image
+from render_view_contract import is_product_scale, required_views
 
 
 @dataclass
@@ -753,6 +758,54 @@ def run_gates(out_dir: str) -> list:
         gates.append(Gate("drawing_domain", ["pid", "block-flow-diagram", "single-line-diagram"],
                           "high", True, "no plant-architecture markers on the device drawings"))
 
+    # ── G12 EXCEL-BOUND RENDER VIEW QUALITY ────────────────────────────────────
+    # Filename existence is not evidence: run 79's 02-corner-FR was a nearly
+    # blank backdrop and the forced product top/side views were meaningless.
+    # Evaluate exactly the form-factor views the workbook contract requests.
+    view_failures = []
+    checked_views = 0
+    for view in required_views(state):
+        path = os.path.join(out_dir, view.filename)
+        if not os.path.exists(path):
+            if view.required:
+                view_failures.append(f"{view.view_id}: missing {view.filename}")
+            continue
+        checked_views += 1
+        quality = evaluate_image(path)
+        if not quality.passed:
+            view_failures.append(
+                f"{view.view_id}: " + "; ".join(quality.reasons))
+    gates.append(Gate(
+        "render_view_quality",
+        ["renders"],
+        "high",
+        not view_failures and checked_views > 0,
+        (f"{checked_views} Excel-bound view(s) present, non-blank and correctly framed"
+         if not view_failures and checked_views > 0 else
+         f"{len(view_failures)} invalid/missing Excel-bound view(s): "
+         + " | ".join(view_failures[:5])),
+    ))
+
+    # ── G13 PRODUCT CAD GEOMETRY COVERAGE ─────────────────────────────────────
+    # Small products must not regress to an all-box cutaway. The hero pass writes
+    # a provenance log for every cached exact/family CAD mesh it actually used.
+    if is_product_scale(state):
+        cad_doc = _load("cad-geometry-resolution.json")
+        cad_assets = cad_doc.get("assets") if isinstance(cad_doc, dict) else []
+        families = {
+            str(asset.get("family")) for asset in (cad_assets or [])
+            if isinstance(asset, dict) and asset.get("family")
+        }
+        gates.append(Gate(
+            "cad_geometry_coverage",
+            ["renders"],
+            "high",
+            len(families) >= 4,
+            (f"{len(families)} verified CAD families used: {', '.join(sorted(families))}"
+             if families else
+             "no verified CAD family geometry recorded — product remains primitive-only"),
+        ))
+
     return gates
 
 
@@ -858,6 +911,8 @@ GATE_STAGE = {
     "tag_legibility": "draw_ga _TagPlacer (view-bounds clip + title/dim obstacles + elev same-name range-collapse) + _draw_external_drain_points (same-edge EXT.DRAIN range-collapse + along-edge stagger)",
     "interior_fill": "build_universal_scene place_sealed_enclosure (pack-array expansion + zone-fill sizing)",
     "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
+    "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
+    "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
 }
 
 
@@ -1020,6 +1075,21 @@ def _selftest() -> int:
     # CONTRACT gate (has_transformer / >250 V) suppresses it on plants — decision, not regex
     chk("g11_negated_disclosure_silent",
         not _G11_MV_RE.search("no step-up transformer (direct LV tie)"))
+    # G12 proveCatch: a product with only the legacy hero is NOT complete; all
+    # form-factor-required Excel views must exist and pass image quality.
+    _g12_state = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": {"value": 0.13},
+        "design_envelope_width_mm": {"value": 609},
+        "design_envelope_depth_mm": {"value": 193},
+        "design_envelope_height_mm": {"value": 1105},
+    }}}
+    _g12_required = [view for view in required_views(_g12_state) if view.required]
+    chk("g12_product_requires_five_views", len(_g12_required) == 5)
+    chk("g12_legacy_hero_only_fires",
+        len([view for view in _g12_required if view.filename not in {"00-hero.png"}]) == 4)
+    chk("g13_three_cad_families_still_fires", len({"fan", "pcb", "gland"}) < 4)
+    chk("g13_four_cad_families_pass",
+        len({"fan", "pcb", "gland", "cell"}) >= 4)
     # G7 sealed-product skip proveCatch: the gate must NOT be emitted for a sub-1 m³
     # sealed product (no site to utilise) and MUST keep firing on the v52 plant ratio.
     chk("g7_plant_ratio_still_fires", not (476 / 1466 >= SITE_UTILISATION_MIN))

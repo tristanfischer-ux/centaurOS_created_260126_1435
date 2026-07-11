@@ -514,6 +514,59 @@ def axial_fan(params):
     return fan
 
 
+def lfp_prismatic_cell(params):
+    """Prismatic LFP cell with aluminium can, top terminals and safety vent."""
+    width = params.get("width", 148.0)
+    depth = params.get("depth", 27.0)
+    height = params.get("height", 102.0)
+    corner_r = params.get("corner_r", 3.0)
+    terminal_d = params.get("terminal_d", 12.0)
+    terminal_h = params.get("terminal_h", 6.0)
+
+    can = (
+        cq.Workplane("XY")
+        .sketch()
+        .rect(width, depth)
+        .vertices().fillet(corner_r)
+        .finalize()
+        .extrude(height)
+    )
+    cap = (
+        cq.Workplane("XY")
+        .workplane(offset=height)
+        .sketch()
+        .rect(width - 2.0, depth - 2.0)
+        .vertices().fillet(max(0.5, corner_r - 0.5))
+        .finalize()
+        .extrude(2.0)
+    )
+    cell = can.union(cap)
+    terminal_x = width * 0.34
+    for x in (-terminal_x, terminal_x):
+        insulator = (
+            cq.Workplane("XY")
+            .workplane(offset=height + 2.0)
+            .transformed(offset=(x, 0, 0))
+            .circle(terminal_d * 0.72)
+            .extrude(2.0)
+        )
+        terminal = (
+            cq.Workplane("XY")
+            .workplane(offset=height + 4.0)
+            .transformed(offset=(x, 0, 0))
+            .circle(terminal_d / 2.0)
+            .extrude(terminal_h)
+        )
+        cell = cell.union(insulator).union(terminal)
+    vent = (
+        cq.Workplane("XY")
+        .workplane(offset=height + 2.0)
+        .circle(depth * 0.22)
+        .extrude(1.5)
+    )
+    return cell.union(vent)
+
+
 def centrifugal_pump(params):
     """
     Small centrifugal pump (inline or base-mount).
@@ -704,6 +757,23 @@ TIER2_REGISTRY = {
             "depth": {"type": "number", "default": 10.0, "unit": "mm"},
             "blade_count": {"type": "integer", "default": 7},
         },
+    },
+    "lfp_prismatic_cell": {
+        "function": lfp_prismatic_cell,
+        "name": "Prismatic LFP Cell",
+        "category": "battery",
+        "default_colour": "#A7ADB4",
+        "visual_tags": ["battery", "lfp", "aluminium", "electrical"],
+        "param_schema": {
+            "width": {"type": "number", "default": 148.0, "unit": "mm"},
+            "depth": {"type": "number", "default": 27.0, "unit": "mm"},
+            "height": {"type": "number", "default": 102.0, "unit": "mm"},
+            "terminal_d": {"type": "number", "default": 12.0, "unit": "mm"},
+        },
+        "mounting_interfaces": [
+            {"name": "positive_terminal", "type": "threaded_stud", "position": "top"},
+            {"name": "negative_terminal", "type": "threaded_stud", "position": "top"},
+        ],
     },
     "centrifugal_pump": {
         "function": centrifugal_pump,

@@ -43,7 +43,13 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "blender-templates"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 import forge_blender_lib as fl
+from render_view_contract import (
+    perspective_distance_for_extent,
+    resolve_design_envelope_mm,
+)
+from cad_asset_resolver import CadAssetResolver
 
 # ── FAST PIPE-RUN PATCH (universal router robustness) ─────────────────────────
 # The stock forge_blender_lib.add_pipe calls bpy.ops.object.select_all + convert
@@ -11831,6 +11837,12 @@ SEALED_ENV_MAX_M3 = 1.0
 # PRODUCT shot — tag callouts, wire draws + boundary-service beams are suppressed.
 _SEALED_HERO_PRODUCT = False
 _SEALED_ENV_MM = None   # (W, D, H) set by place_sealed_enclosure — the hero camera frames THIS
+_SEALED_FRONT_COVER = None
+_SEALED_SHELL_OBJECTS = []
+_SEALED_CUTAWAY_MATERIAL = None
+_SEALED_EXTERIOR_MATERIAL = None
+_CAD_RESOLVER = None
+_CAD_RESOLUTION_LOG = []
 _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → top
     ("energy", 0.52,
      re.compile(r"\bcell|\bbattery|\bpack\b|\bmodule|\bstring\b|\brack\b", re.I)),
@@ -11856,14 +11868,173 @@ def _sealed_enclosure_env_mm(state, quantities):
     vol = qval(quantities, "enclosure_volume_m3", 0.0) or 0.0
     if not (0 < vol < SEALED_ENV_MAX_M3):
         return None
-    md = ((state.get("parsedBrief") or {}).get("constraints") or {}).get("max_dimensions_mm") or {}
-    w = _num(str(md.get("w") or ""))
-    d = _num(str(md.get("d") or ""))
-    h = _num(str(md.get("h") or ""))
-    if w and d and h:
-        return (float(w), float(d), float(h))
+    envelope = resolve_design_envelope_mm(state)
+    if envelope:
+        return envelope
     s = (float(vol) ** (1.0 / 3.0)) * 1000.0
     return (s, s, s)
+
+
+def _sealed_product_camera_specs(env_mm):
+    """Perspective camera set for customer-facing wall/cabinet product views."""
+    w, d, h = (float(value) * fl.MM for value in env_mm)
+    centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) / 2.0) * fl.MM)
+    front_distance = perspective_distance_for_extent(
+        h * 1.08, focal_mm=62, frame_fraction=0.84)
+    side_distance = perspective_distance_for_extent(
+        h * 1.08, focal_mm=58, frame_fraction=0.84)
+    service_distance = perspective_distance_for_extent(
+        h * 0.34, focal_mm=72, frame_fraction=0.68)
+    return [
+        {
+            "name": "04-product-exterior",
+            "loc": (centre[0] + front_distance * 0.18,
+                    centre[1] - front_distance,
+                    centre[2] + h * 0.12),
+            "target": centre,
+            "camera_type": "PERSP",
+            "focal": 62,
+        },
+        {
+            "name": "05-product-left",
+            "loc": (centre[0] - side_distance * 0.42,
+                    centre[1] - side_distance * 0.90,
+                    centre[2] + h * 0.10),
+            "target": centre,
+            "camera_type": "PERSP",
+            "focal": 58,
+        },
+        {
+            "name": "06-product-right",
+            "loc": (centre[0] + side_distance * 0.42,
+                    centre[1] - side_distance * 0.90,
+                    centre[2] + h * 0.10),
+            "target": centre,
+            "camera_type": "PERSP",
+            "focal": 58,
+        },
+        {
+            "name": "07-product-service",
+            "loc": (centre[0], centre[1] - service_distance,
+                    DECK_Z_MM * fl.MM + h * 0.25),
+            "target": (centre[0], centre[1], DECK_Z_MM * fl.MM + h * 0.18),
+            "camera_type": "PERSP",
+            "focal": 72,
+        },
+    ]
+
+
+def _prepare_sealed_product_view(view_name, entering):
+    """Toggle closed exterior vs open cutaway without mutating engineering data."""
+    if _SEALED_FRONT_COVER is None:
+        return
+    exterior_views = {
+        "04-product-exterior", "05-product-left", "06-product-right",
+    }
+    # Always restore the cutaway baseline first. This also makes cleanup after
+    # each view deterministic if Blender changes render order.
+    _SEALED_FRONT_COVER.hide_render = True
+    for obj in bpy.data.objects:
+        if obj.name.startswith("u_se_det_") or obj.name.startswith("u_se_cad_"):
+            obj.hide_render = False
+        if obj.name.startswith("u_se_product_vent_"):
+            obj.hide_render = False
+        if obj.name.startswith("u_se_exterior_detail_"):
+            obj.hide_render = True
+    if _SEALED_CUTAWAY_MATERIAL is not None:
+        for obj in _SEALED_SHELL_OBJECTS:
+            if obj and obj.data:
+                obj.data.materials.clear()
+                obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
+    if entering and view_name in exterior_views:
+        _SEALED_FRONT_COVER.hide_render = False
+        for obj in bpy.data.objects:
+            if obj.name.startswith("u_se_det_") or obj.name.startswith("u_se_cad_"):
+                obj.hide_render = True
+            if obj.name.startswith("u_se_product_vent_"):
+                obj.hide_render = True
+            if obj.name.startswith("u_se_exterior_detail_"):
+                obj.hide_render = False
+        if _SEALED_EXTERIOR_MATERIAL is not None:
+            for obj in _SEALED_SHELL_OBJECTS:
+                if obj and obj.data:
+                    obj.data.materials.clear()
+                    obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
+
+
+def _cad_family_asset(family):
+    """Read a published family asset from forge-truth without writing on miss."""
+    global _CAD_RESOLVER
+    db_path = Path(os.environ.get(
+        "FORGE_TRUTH_DB", "~/.forge-truth/forge-truth.db")).expanduser()
+    asset_root = Path(os.environ.get(
+        "FORGE_CAD_ASSET_ROOT", "~/.forge-truth/cad-assets")).expanduser()
+    if not db_path.exists():
+        return None
+    if _CAD_RESOLVER is None:
+        try:
+            _CAD_RESOLVER = CadAssetResolver(
+                db_path=db_path, asset_root=asset_root, read_only=True)
+        except (OSError, RuntimeError):
+            return None
+    try:
+        return _CAD_RESOLVER.resolve(
+            "", "", family, queue_on_miss=False)
+    except (OSError, RuntimeError):
+        return None
+
+
+def _import_family_cad(
+    family,
+    object_name,
+    location_mm,
+    dimensions_mm,
+    rotation,
+    material,
+    module,
+    module_objects,
+):
+    """Import cached family STL with provenance; return None on a clean miss."""
+    asset = _cad_family_asset(family)
+    if asset is None or not asset.local_path.exists():
+        return None
+    before = set(bpy.data.objects)
+    try:
+        try:
+            bpy.ops.wm.stl_import(filepath=str(asset.local_path))
+        except (AttributeError, RuntimeError):
+            bpy.ops.import_mesh.stl(filepath=str(asset.local_path))
+    except (RuntimeError, ValueError) as exc:
+        print(f"[univ][cad] {family} import declined: {exc}")
+        return None
+    imported = [obj for obj in bpy.data.objects if obj not in before]
+    if not imported:
+        return None
+    obj = imported[0]
+    obj.name = object_name
+    obj.location = tuple(float(value) * fl.MM for value in location_mm)
+    obj.rotation_euler = rotation
+    obj.dimensions = tuple(float(value) * fl.MM for value in dimensions_mm)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    if obj.data and material is not None:
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+    obj["geometry_source"] = f"cad_family:{family}"
+    obj["cad_asset_sha256"] = asset.asset_sha256
+    if module and module_objects is not None:
+        module_objects[module].append(obj)
+    _CAD_RESOLUTION_LOG.append({
+        "object": object_name,
+        "family": family,
+        "resolution_tier": asset.resolution_tier,
+        "asset_sha256": asset.asset_sha256,
+        "source_url": asset.source_url,
+        "licence": asset.licence,
+    })
+    print(f"[univ][cad] {object_name} <- {family} {asset.asset_sha256[:12]}")
+    return obj
 
 
 def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
@@ -12195,7 +12366,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     #     inside), a subtle inset front panel + vent slots derived from the real
     #     fan/vent parts, and flags that suppress tag chips + wire draws below.
     #     The INSPECT pass (drawings, manifest, ledger, schedule) is byte-unchanged.
-    global _SEALED_HERO_PRODUCT
+    global _SEALED_HERO_PRODUCT, _SEALED_FRONT_COVER, _SEALED_SHELL_OBJECTS
+    global _SEALED_CUTAWAY_MATERIAL, _SEALED_EXTERIOR_MATERIAL
     _SEALED_HERO_PRODUCT = not _INSPECT_MODE
     if _SEALED_HERO_PRODUCT:
         # GHOSTED shell (Tristan 2026-07-10: "why is the box not translucent so you
@@ -12206,6 +12378,15 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                metallic=0.05, roughness=0.25, alpha=0.16)
         panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear((0.84, 0.86, 0.88)),
                                 metallic=0.05, roughness=0.45, alpha=0.16)
+        exterior_mat = fl.make_mat(
+            "m_se_product_exterior",
+            fl._to_linear((0.82, 0.85, 0.88)),
+            metallic=0.08,
+            roughness=0.32,
+        )
+        _SEALED_CUTAWAY_MATERIAL = body_mat
+        _SEALED_EXTERIOR_MATERIAL = exterior_mat
+        _SEALED_SHELL_OBJECTS = []
         vent_mat = fl.make_mat("m_se_product_vent", fl._to_linear((0.30, 0.32, 0.35)),
                                metallic=0.2, roughness=0.6)
         # the one-piece sealed body (fully opaque — internals stay for geometry truth
@@ -12229,18 +12410,78 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             ("u_se_product_right",  (W / 2 - tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
             ("u_se_product_top",    (0.0, 0.0, base_z + H - tt / 2), (W, D, tt)),
             ("u_se_product_bottom", (0.0, 0.0, base_z + tt / 2), (W, D, tt)),
-            ("u_se_product_band",   (0.0, -D / 2 + tt / 2, base_z + H * 0.90), (W, tt, H * 0.20)),
+            ("u_se_product_band",   (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)),
         ]:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
             _ob.dimensions = _mm3(bsize)
+            _SEALED_SHELL_OBJECTS.append(_ob)
+        # Closed exterior cover is hidden for the cutaway hero and enabled only
+        # for exterior/product-angle renders by the view preparer.
+        _SEALED_FRONT_COVER = fl.add_box(
+            "u_se_product_front_cover",
+            _mm3((0.0, -D / 2 - tt / 2, base_z + H / 2)),
+            _mm3((W, tt, H)),
+            exterior_mat,
+            module=_skin_mod,
+            module_objects=MO,
+        )
+        _SEALED_FRONT_COVER.dimensions = _mm3((W, tt, H))
+        _cover_bevel = _SEALED_FRONT_COVER.modifiers.get("presentation_bevel")
+        if _cover_bevel is None:
+            _cover_bevel = _SEALED_FRONT_COVER.modifiers.new(
+                name="product_cover_bevel", type="BEVEL")
+        _cover_bevel.width = min(W, D) * 0.06 * fl.MM
+        _cover_bevel.segments = 6
+        _SEALED_FRONT_COVER.hide_render = True
+        _exterior_detail_mat = fl.make_mat(
+            "m_se_exterior_detail",
+            fl._to_linear((0.55, 0.58, 0.61)),
+            metallic=0.15,
+            roughness=0.42,
+        )
+        _status_mat = fl.make_mat(
+            "m_se_exterior_status",
+            fl._to_linear((0.10, 0.62, 0.28)),
+            metallic=0.0,
+            roughness=0.28,
+        )
+        _detail_y = -D / 2 - tt - 1.5
+        _door_w, _door_h = W * 0.88, H * 0.78
+        for _name, _loc, _size in [
+            ("top", (0.0, _detail_y, base_z + H * 0.84), (_door_w, 1.5, 1.8)),
+            ("bottom", (0.0, _detail_y, base_z + H * 0.06), (_door_w, 1.5, 1.8)),
+            ("left", (-_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
+            ("right", (_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
+        ]:
+            _detail = fl.add_box(
+                f"u_se_exterior_detail_seam_{_name}",
+                _mm3(_loc),
+                _mm3(_size),
+                _exterior_detail_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _detail.hide_render = True
+        _status = fl.add_cyl(
+            "u_se_exterior_detail_status",
+            _mm3((W * 0.34, _detail_y - 0.5, base_z + H * 0.88)),
+            4.0 * fl.MM,
+            2.0 * fl.MM,
+            _status_mat,
+            module=_skin_mod,
+            module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        )
+        _status.hide_render = True
         # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4
         n_vents = min(4, max(1, sum(1 for p in parts
                                     if re.search(r"\bfan\b|vent|louvre|duct", str(p.name), re.I))))
         slot_w = W * 0.78
         for vi in range(n_vents):
             vz = base_z + H * (0.955 - 0.035 * vi)
-            _ov = fl.add_box(f"u_se_product_vent_{vi}", _mm3((0.0, -D / 2 - 3.0, vz)),
+            _ov = fl.add_box(f"u_se_product_vent_{vi}",
+                             _mm3((0.0, -D / 2 - tt - 2.0, vz)),
                              _mm3((slot_w, 3.0, H * 0.012)), vent_mat, module=_skin_mod, module_objects=MO)
             _ov.dimensions = _mm3((slot_w, 3.0, H * 0.012))
         # deepen the internal palette — pastel module hues wash out behind the
@@ -12301,7 +12542,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                metallic=0.85, roughness=0.35)
         _cap_mat = fl.make_mat("m_se_caps", fl._to_linear((0.12, 0.13, 0.15)),
                                metallic=0.3, roughness=0.45)
-        _pcb_mat = fl.make_mat("m_se_pcb", fl._to_linear((0.10, 0.30, 0.16)),
+        _pcb_mat = fl.make_mat("m_se_pcb", fl._to_linear((0.025, 0.12, 0.055)),
                                metallic=0.1, roughness=0.6)
         _chip_mat = fl.make_mat("m_se_chip", fl._to_linear((0.08, 0.08, 0.09)),
                                 metallic=0.2, roughness=0.5)
@@ -12320,12 +12561,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # power zone: fin bank (left third) + capacitor trio (right third)
         _pz, _ph2 = _zb.get("power", (base_z + margin + ih * 0.52, ih * 0.24))
         _fin_w, _n_fins = iw * 0.30, 9
-        for _fi in range(_n_fins):
-            _fx2 = -iw * 0.42 + _fi * (_fin_w / max(1, _n_fins - 1))
-            fl.add_box(f"u_se_det_fin_{_fi}",
-                       _mm3((_fx2, _yF, _pz + _ph2 * 0.50)),
-                       _mm3((3.0, 26.0, _ph2 * 0.62)), _fin_mat,
-                       module=_dm, module_objects=MO)
+        _heatsink = _import_family_cad(
+            "heatsink_extruded",
+            "u_se_cad_heatsink",
+            (-iw * 0.28, _yF, _pz + _ph2 * 0.50),
+            (_fin_w, _ph2 * 0.62, 26.0),
+            (math.radians(90), 0.0, 0.0),
+            _fin_mat,
+            _dm,
+            MO,
+        )
+        if _heatsink is None:
+            for _fi in range(_n_fins):
+                _fx2 = -iw * 0.42 + _fi * (_fin_w / max(1, _n_fins - 1))
+                fl.add_box(f"u_se_det_fin_{_fi}",
+                           _mm3((_fx2, _yF, _pz + _ph2 * 0.50)),
+                           _mm3((3.0, 26.0, _ph2 * 0.62)), _fin_mat,
+                           module=_dm, module_objects=MO)
         for _ci in range(3):
             fl.add_cyl(f"u_se_det_cap_{_ci}",
                        _mm3((iw * 0.18 + _ci * iw * 0.09, _yF, _pz + _ph2 * 0.42)),
@@ -12333,36 +12585,102 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                        module=_dm, module_objects=MO)
         # control zone: PCB face + chips
         _cz, _ch2 = _zb.get("control", (base_z + margin + ih * 0.88, ih * 0.12))
-        fl.add_box("u_se_det_pcb", _mm3((-iw * 0.18, _yF, _cz + _ch2 * 0.5)),
-                   _mm3((iw * 0.45, 6.0, _ch2 * 0.6)), _pcb_mat,
-                   module=_dm, module_objects=MO)
-        for _hi in range(4):
-            fl.add_box(f"u_se_det_chip_{_hi}",
-                       _mm3((-iw * 0.32 + _hi * iw * 0.10, _yF - 5.0, _cz + _ch2 * 0.5)),
-                       _mm3((iw * 0.05, 4.0, _ch2 * 0.16)), _chip_mat,
+        _pcb = _import_family_cad(
+            "pcb_board",
+            "u_se_cad_pcb",
+            (-iw * 0.18, -D / 2 + tt + 8.0, _cz - _ch2 * 0.65),
+            (iw * 0.45, _ch2 * 0.82, 12.0),
+            (math.radians(90), 0.0, 0.0),
+            _pcb_mat,
+            _dm,
+            MO,
+        )
+        if _pcb is None:
+            fl.add_box("u_se_det_pcb", _mm3((-iw * 0.18, _yF, _cz + _ch2 * 0.5)),
+                       _mm3((iw * 0.45, 6.0, _ch2 * 0.6)), _pcb_mat,
                        module=_dm, module_objects=MO)
+            for _hi in range(4):
+                fl.add_box(f"u_se_det_chip_{_hi}",
+                           _mm3((-iw * 0.32 + _hi * iw * 0.10, _yF - 5.0, _cz + _ch2 * 0.5)),
+                           _mm3((iw * 0.05, 4.0, _ch2 * 0.16)), _chip_mat,
+                           module=_dm, module_objects=MO)
+        else:
+            _pcb_front_y = -D / 2 + tt + 2.0
+            _pcb_z = _cz - _ch2 * 0.65
+            for _hi, (_hx, _hz, _hw, _hh) in enumerate([
+                (-iw * 0.31, -0.20, 0.055, 0.16),
+                (-iw * 0.23, -0.20, 0.045, 0.13),
+                (-iw * 0.15, -0.20, 0.050, 0.14),
+                (-iw * 0.30, 0.12, 0.040, 0.12),
+                (-iw * 0.22, 0.12, 0.040, 0.12),
+                (-iw * 0.14, 0.12, 0.065, 0.10),
+            ]):
+                fl.add_box(
+                    f"u_se_cad_pcb_package_{_hi}",
+                    _mm3((_hx, _pcb_front_y, _pcb_z + _ch2 * _hz)),
+                    _mm3((iw * _hw, 8.0, _ch2 * _hh)),
+                    _chip_mat,
+                    module=_dm,
+                    module_objects=MO,
+                )
         # pack top: orange HV busbar strip
         _ez, _eh2 = _zb.get("energy", (base_z + margin, ih * 0.52))
         fl.add_box("u_se_det_hvbus", _mm3((0.0, _yF, _ez + _eh2 * 0.94)),
                    _mm3((iw * 0.66, 10.0, _eh2 * 0.035)), _bus_mat,
                    module=_dm, module_objects=MO)
+        # Visible row of linked prismatic-cell CAD instances over the dark pack
+        # envelope. The full electrical quantity remains in the BoM/manifest;
+        # this is a presentation LOD showing recognisable cell construction.
+        _visible_cells = 10
+        _cell_span = iw * 0.72
+        _cell_pitch = _cell_span / _visible_cells
+        _first_cell_x = -_cell_span / 2 + _cell_pitch / 2
+        _cell = _import_family_cad(
+            "lfp_prismatic_cell",
+            "u_se_cad_cell_0",
+            (_first_cell_x, -D / 2 + tt + 10.0, _ez + _eh2 * 0.40),
+            (_cell_pitch * 0.88, 24.0, _eh2 * 0.70),
+            (0.0, 0.0, 0.0),
+            _fin_mat,
+            _dm,
+            MO,
+        )
+        if _cell is not None:
+            for _ci in range(1, _visible_cells):
+                _copy = _cell.copy()
+                _copy.data = _cell.data
+                _copy.name = f"u_se_cad_cell_{_ci}"
+                _copy.location.x = (_first_cell_x + _ci * _cell_pitch) * fl.MM
+                bpy.context.collection.objects.link(_copy)
+                MO[_dm].append(_copy)
         # fan rings behind the vent band
         for _fj in range(2):
             _fan_x = (-1 if _fj == 0 else 1) * iw * 0.22
             _fan_z = base_z + H * 0.90
-            fl.add_torus(f"u_se_det_fan_{_fj}",
-                         _mm3((_fan_x, -D / 2 + tt + 16.0, _fan_z)),
-                         H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
-                         module=_dm, module_objects=MO)
-            # Four visible blades in the front plane. Rings alone read as
-            # anonymous washers rather than forced-air thermal management.
-            for _bi, _ang in enumerate((0, 45, 90, 135)):
-                _blade = fl.add_box(
-                    f"u_se_det_fan_{_fj}_blade_{_bi}",
-                    _mm3((_fan_x, -D / 2 + tt + 14.0, _fan_z)),
-                    _mm3((H * 0.070, 4.0, H * 0.009)), _fanr_mat,
-                    module=_dm, module_objects=MO)
-                _blade.rotation_euler[1] = math.radians(_ang)
+            _fan = _import_family_cad(
+                "axial_fan",
+                f"u_se_cad_fan_{_fj}",
+                (_fan_x, -D / 2 + tt + 16.0, _fan_z),
+                (H * 0.11, H * 0.11, 20.0),
+                (math.radians(90), 0.0, 0.0),
+                _fanr_mat,
+                _dm,
+                MO,
+            )
+            if _fan is None:
+                fl.add_torus(f"u_se_det_fan_{_fj}",
+                             _mm3((_fan_x, -D / 2 + tt + 16.0, _fan_z)),
+                             H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
+                             module=_dm, module_objects=MO)
+                # Four visible blades in the front plane. Rings alone read as
+                # anonymous washers rather than forced-air thermal management.
+                for _bi, _ang in enumerate((0, 45, 90, 135)):
+                    _blade = fl.add_box(
+                        f"u_se_det_fan_{_fj}_blade_{_bi}",
+                        _mm3((_fan_x, -D / 2 + tt + 14.0, _fan_z)),
+                        _mm3((H * 0.070, 4.0, H * 0.009)), _fanr_mat,
+                        module=_dm, module_objects=MO)
+                    _blade.rotation_euler[1] = math.radians(_ang)
         # Central fan duct from the fan plenum to the pack/power channel.
         _duct_mat = fl.make_mat("m_se_duct", fl._to_linear((0.14, 0.15, 0.17)),
                                 metallic=0.15, roughness=0.65)
@@ -12388,13 +12706,25 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                        module=_dm, module_objects=MO)
             # Exterior gland ring at the bottom face: the electrical interfaces
             # must remain visible even when the pack occupies the whole lower bay.
-            _gland = fl.add_torus(
-                f"u_se_det_gland_{_ti}",
-                _mm3((-iw * 0.25 + _ti * iw * 0.25, -D / 2 - 4.0,
-                      base_z + margin + ih * 0.025)),
-                H * 0.014 * fl.MM, H * 0.004 * fl.MM, _term_mat,
-                module=_dm, module_objects=MO)
-            _gland.rotation_euler[0] = math.radians(90)
+            _gland = _import_family_cad(
+                "cable_gland",
+                f"u_se_cad_gland_{_ti}",
+                (-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
+                 base_z + margin + ih * 0.025),
+                (H * 0.032, H * 0.032, 28.0),
+                (math.radians(90), 0.0, 0.0),
+                _term_mat,
+                _dm,
+                MO,
+            )
+            if _gland is None:
+                _gland = fl.add_torus(
+                    f"u_se_det_gland_{_ti}",
+                    _mm3((-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
+                          base_z + margin + ih * 0.025)),
+                    H * 0.014 * fl.MM, H * 0.004 * fl.MM, _term_mat,
+                    module=_dm, module_objects=MO)
+                _gland.rotation_euler[0] = math.radians(90)
         print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
               f"PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, "
               f"3 interface terminals/glands")
@@ -18245,16 +18575,13 @@ def main():
             _sw, _sd, _sh = _SEALED_ENV_MM
             _pc = (0.0, 0.0, (DECK_Z_MM + _sh / 2.0) * fl.MM)
             _pmax = max(_sw, _sd, _sh) * fl.MM
-            _pd = _pmax * 1.9 / math.sqrt(2)
-            # ORTHO covers the HORIZONTAL span; the vertical view = ortho/aspect (3:2
-            # render). Run 58's ortho = 1.25×max_dim overflowed a TALL product vertically
-            # (1.38 m view height vs a 1.105 m unit + margin). Fit BOTH axes explicitly.
-            _aspect = 1.5
-            _horiz = (_sw + _sd) * fl.MM / math.sqrt(2)
-            _vert = _sh * fl.MM
-            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.35),
+            _hero_distance = perspective_distance_for_extent(
+                _sh * fl.MM * 1.08, focal_mm=62, frame_fraction=0.84)
+            _pd = _hero_distance / math.sqrt(2)
+            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.12),
                          "target": _pc,
-                         "ortho_scale": max(_horiz, _vert * _aspect) * 1.12}
+                         "camera_type": "PERSP",
+                         "focal": 62}
         _spatial_bb = None
         if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
             # frame the PRODUCT in the corner/top views too — the mounting wall
@@ -18263,11 +18590,29 @@ def main():
             _spatial_bb = ((-_sw / 2 * fl.MM, _sw / 2 * fl.MM),
                            (-_sd / 2 * fl.MM, _sd / 2 * fl.MM),
                            (DECK_Z_MM * fl.MM, (DECK_Z_MM + _sh) * fl.MM))
+        _spatial_cameras = (
+            _sealed_product_camera_specs(_SEALED_ENV_MM)
+            if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM else None
+        )
+        if _SEALED_HERO_PRODUCT:
+            _cad_resolution_path = Path(out_dir) / "cad-geometry-resolution.json"
+            _cad_resolution_path.write_text(json.dumps({
+                "schema": "cad-geometry-resolution/v1",
+                "count": len(_CAD_RESOLUTION_LOG),
+                "assets": _CAD_RESOLUTION_LOG,
+            }, indent=2))
+            print(f"[univ][cad] resolution log -> {_cad_resolution_path}")
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_camera_override=_hero_cam,
                                hero_open_frame=not _CONTAINER_LAYOUT,
-                               spatial_bbox_override=_spatial_bb)
+                               spatial_bbox_override=_spatial_bb,
+                               spatial_cameras_override=_spatial_cameras,
+                               view_preparer=(
+                                   _prepare_sealed_product_view
+                                   if _SEALED_HERO_PRODUCT else None),
+                               spatial_cycles=bool(_SEALED_HERO_PRODUCT),
+                               hero_cycles=bool(_SEALED_HERO_PRODUCT))
         # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
         #     subdir, so the architectural exterior + the interior layout are the IDENTICAL
         #     plant (two separate processes diverge — placement isn't deterministic across

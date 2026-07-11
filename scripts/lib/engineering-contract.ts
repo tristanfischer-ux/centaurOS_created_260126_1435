@@ -571,6 +571,28 @@ export function buildContract(productClass: string, parsedBrief: any): Engineeri
   const builder = ARCHETYPE_REGISTRY[canonical]
   if (!builder) return null
   const contract = builder(parsedBrief)
+  // INTENT: Blender, GA, captions and CAD exports need one authoritative
+  // physical envelope. Preserve the brief's hard W/D/H independently instead
+  // of forcing downstream consumers to reverse-engineer dimensions from volume.
+  const envelope = parsedBrief?.constraints?.max_dimensions_mm ?? {}
+  const envelopeQuantities = [
+    ['design_envelope_width_mm', Number(envelope.w)],
+    ['design_envelope_depth_mm', Number(envelope.d)],
+    ['design_envelope_height_mm', Number(envelope.h)],
+  ] as const
+  for (const [quantityKey, value] of envelopeQuantities) {
+    if (Number.isFinite(value) && value > 0 && !contract.quantities[quantityKey]) {
+      contract.quantities[quantityKey] = q(
+        value,
+        'mm',
+        'length',
+        'max',
+        'system',
+        'brief',
+        { source_detail: `brief.constraints.max_dimensions_mm.${quantityKey.split('_').at(-2)?.[0] ?? '?'}` },
+      )
+    }
+  }
   // Attach market_band from MARKET_BANDS table. Renderer uses this to draw
   // the INDUSTRY BAND COMPARISON BLOCK on the cover. Null when not defined
   // (TBD classes) — renderer skips the block gracefully.

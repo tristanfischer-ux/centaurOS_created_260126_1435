@@ -102,6 +102,33 @@ describe('BESS WAVE C addendum 5 — usableKwh root cause (nameplate/usable conf
   })
 })
 
+describe('universal brief envelope quantities for downstream CAD/render consumers', () => {
+  it('mints the three hard brief dimensions once on every registered contract', () => {
+    const brief = makeBrief()
+    ;(brief.constraints as any).max_dimensions_mm = {
+      w: 609,
+      d: 193,
+      h: 1105,
+      source: 'user',
+    }
+
+    const contract = buildContract('bess', brief)!
+
+    expect(contract.quantities.design_envelope_width_mm.value).toBe(609)
+    expect(contract.quantities.design_envelope_depth_mm.value).toBe(193)
+    expect(contract.quantities.design_envelope_height_mm.value).toBe(1105)
+    expect(contract.quantities.design_envelope_width_mm.source).toBe('brief')
+  })
+
+  it('does not invent envelope dimensions when the brief is silent', () => {
+    const contract = buildContract('bess', makeBrief())!
+
+    expect(contract.quantities.design_envelope_width_mm).toBeUndefined()
+    expect(contract.quantities.design_envelope_depth_mm).toBeUndefined()
+    expect(contract.quantities.design_envelope_height_mm).toBeUndefined()
+  })
+})
+
 describe('BESS WAVE C addendum 6 — round_trip_efficiency_percent (delivered)', () => {
   it('is present, grounded, and clears the brief floor for a well-formed brief', () => {
     const contract = buildContract('bess', makeBrief())!

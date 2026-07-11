@@ -67,7 +67,9 @@ from openpyxl.worksheet.hyperlink import Hyperlink
 # tab and the instant CLI can never diverge. Imported by absolute path so the
 # exporter works regardless of the caller's cwd.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 import deterministic_checks_lib as dcl  # noqa: E402
+from render_view_contract import is_product_scale, required_views  # noqa: E402
 
 # The DETERMINISTIC per-tab self-audit + ship gate (scripts/lib/dossier_audit.py). It is the
 # SHIP GATE: the dossier is not "validated" unless its scorecard is clean. Imported by absolute
@@ -17869,6 +17871,21 @@ def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
     Captions/names come from the drawing-manifest renders[] where present.
     Near-duplicate corners + the exterior-top are deliberately NOT selected."""
     _rmap = _manifest_render_map(run_dir)
+    _state = load_json(os.path.join(run_dir, "state.json")) or {}
+    if is_product_scale(_state):
+        _product_specs: List[Tuple[str, str, str]] = []
+        for _view in required_views(_state):
+            _path = os.path.join(run_dir, _view.filename)
+            if not os.path.exists(_path):
+                continue
+            _sheet_name, _caption = _rmap.get(
+                os.path.normpath(_path), ("", ""))
+            _product_specs.append((
+                _path,
+                _sheet_name or _view.title,
+                _caption or _view.caption,
+            ))
+        return _product_specs
     specs: List[Tuple[str, str, str]] = []
     side_added = False
     for rel, fb_title, fb_cap in _GALLERY_VIEWS:
@@ -17899,6 +17916,9 @@ def _gallery_render_specs(run_dir: str) -> List[Tuple[str, str, str]]:
 def _gallery_missing_side_elevation(run_dir: str) -> bool:
     """True when the run has Blender hero/plan renders but NO side elevation —
     the underground-visibility requirement (Tristan 2026-07-09) is unmet."""
+    _state = load_json(os.path.join(run_dir, "state.json")) or {}
+    if is_product_scale(_state):
+        return False
     has_plant_view = any(
         os.path.exists(os.path.join(run_dir, n))
         for n in ("00-hero.png", "blender-cover.png", "01-top.png", "inspect-iso.png")
@@ -17915,12 +17935,21 @@ def tab_renders(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]]:
     if not specs:
         return None
     ws = wb.create_sheet("Renders")
+    _state = load_json(os.path.join(run_dir, "state.json")) or {}
+    _is_product = is_product_scale(_state)
     r = title_row(
-        ws, "Renders — photoreal views of the plant", 6,
-        "Blender views embedded in this workbook: interior hero, annotated plan, "
-        "side elevation (ground slab hidden so underground tanks and buried pipes "
-        "are visible), and the building exterior. Only these Excel-embedded images "
-        "are generated for the deliverable — there is no separate PDF image set.")
+        ws,
+        ("Renders — product CAD views" if _is_product
+         else "Renders — photoreal views of the plant"),
+        6,
+        ("Form-factor-approved product views: closed exterior, cutaway, opposing "
+         "front-side angles and service interfaces. Only validated, useful views "
+         "are embedded."
+         if _is_product else
+         "Blender views embedded in this workbook: interior hero, annotated plan, "
+         "side elevation (ground slab hidden so underground tanks and buried pipes "
+         "are visible), and the building exterior. Only these Excel-embedded images "
+         "are generated for the deliverable — there is no separate PDF image set."))
     back_link(ws, 6)
     if _gallery_missing_side_elevation(run_dir):
         note = ws.cell(
