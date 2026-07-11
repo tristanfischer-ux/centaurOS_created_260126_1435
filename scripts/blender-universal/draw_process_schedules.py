@@ -419,6 +419,17 @@ def build_line_list(proc, schedule: dict, state: dict,
     when out_dir is absent."""
     topo = PID._topology(state)
     proc_topo = [e for e in topo if e.get("mechanism") != "electrical_bus"]
+    # AIR-PATH THERMAL EDGES ARE NOT PIPES (2026-07-11 run 66, red-team HIGH residue:
+    # a 'Heat transfer / CS / insulated' LINE-LIST row on a sealed air-cooled battery —
+    # the heat path is the VENT AIR, already carried by the ventilation parts; a thermal
+    # edge whose medium is air (or undeclared, with no DN sizing) is not a process line).
+    def _is_air_thermal(e):
+        if e.get("mechanism") != "thermal":
+            return False
+        med = str(e.get("medium") or "").lower()
+        return ("air" in med) or (not med and not e.get("dn"))
+    # NB: proc.lines zips 1:1 with proc_topo — the skip must run INSIDE the pair loop,
+    # never by pre-filtering this list (pairing would silently shift one row).
     tag_of = {n.key: n.tag for n in proc.nodes}
     # topology-key → human LABEL (e.g. 'softener_vessel' → 'Softener Vessel'). The
     # connection-schedule's `specs`/`rows` are keyed by the human name (from_part /
@@ -443,6 +454,8 @@ def build_line_list(proc, schedule: dict, state: dict,
     seen_numbers: set = set()
     # proc.lines is in the SAME order as proc_topo (draw_pid builds it 1:1), so we can pair.
     for ln, edge in zip(proc.lines, proc_topo):
+        if _is_air_thermal(edge):
+            continue   # the vent-air heat path is not a process pipe
         mc = edge.get("material_context") or ""
         # join on the LABEL (the schedule's own key on SOME archetypes — e.g. water_treatment
         # writes 'Gac Softener'), falling back to the raw topology KEY (the convention OTHER

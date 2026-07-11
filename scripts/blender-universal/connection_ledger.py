@@ -1380,10 +1380,20 @@ def close_boundaries(parts, topology, log=print):
         if f and t:
             fwd.add((f, t))
 
+    # ELECTRICAL GEAR is never a process-fluid node (2026-07-11 run 66, red-team HIGH:
+    # DN25 process-water make-up/fill/drain ties plumbed THROUGH Power Semiconductors →
+    # DC DC Converters → Inverter — the class graph's thermal-intent fluid_loop edges
+    # made power electronics look like fluid nodes and the closers piped water via them).
+    _ELEC_GEAR_CLOSER_RE = re.compile(
+        r"capacitor|inductor|converters?\b|semiconductors?\b|invert(?:er)?s?\b|rectifier|"
+        r"\bpcs\b|busbar|contactor|breaker|\bfuses?\b|switchgear|transformer|\brelay\b|"
+        r"surge|arrester|bms\b|battery|cells?\b", re.I)
+
     def _exempt(nm):
         return bool(_INJECTOR_RE.search(nm) or _INLINE_TAP_RE.search(nm) or
                     _DRY_ANCILLARY_RE.search(nm) or _SUBCOMPONENT_RE.search(nm) or
-                    _AIR_MOVER_RE.search(nm) or _FLUID_ORIGIN_RE.search(nm))
+                    _AIR_MOVER_RE.search(nm) or _FLUID_ORIGIN_RE.search(nm) or
+                    _ELEC_GEAR_CLOSER_RE.search(nm))
 
     extra, seen = [], set()
 

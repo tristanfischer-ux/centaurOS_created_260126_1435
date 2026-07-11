@@ -537,6 +537,11 @@ def _board_voltage(state: dict) -> tuple[Optional[float], bool, int, str]:
 def _supply_label(state: dict, is_dc: bool) -> str:
     """A short supply-source line for the main board header."""
     if _q(state, "external_transformer_mass_kg") or _q(state, "continuous_power_kw") and is_dc:
+        # contract-aware (2026-07-11 run 66: the canned 'step-up to MV' contradicted the
+        # 230 V single-phase direct tie the contract states — red-team LOW)
+        _ac = _q(state, "ac_output_voltage_v")
+        if _ac and _ac <= 250:
+            return f"Battery DC bus via hybrid PCS ({_ac:.0f} V single-phase grid tie, G98/G99)"
         return "Battery DC bus via PCS (grid-tie step-up to MV / G99)"
     mv = any(re.search(r"mv_transformer|distribution_transformer|mv_switchgear|ring.?main",
                        f"{n} {c}", re.I) for _w, n, c in _iter_words(state))
