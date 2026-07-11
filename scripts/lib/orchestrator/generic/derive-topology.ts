@@ -328,7 +328,10 @@ export function deriveDeviceEnergyTopology(
     if (!from_part || !to_part || from_part === to_part) return
     edges.push({ from_part, to_part, mechanism, constraint_kind,
                  ...(required_value != null ? { required_value } : {}),
-                 ...(required_unit ? { required_unit } : {}) } as TopologyEdge)
+                 ...(required_unit ? { required_unit } : {}),
+                 // P&ID/BFD reconstruction only — the scene must NOT route these into
+                 // schedule rows (run 77: duplicated feeders tripled the board load)
+                 _drawing_only: true } as unknown as TopologyEdge)
   }
 
   // energy chain

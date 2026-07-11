@@ -12287,6 +12287,80 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         _owall = fl.add_box("u_se_mount_wall", _mm3((0.0, D / 2 + 20.0, _wh / 2)),
                             _mm3((_ww, 8.0, _wh)), wall_mat, module=_skin_mod, module_objects=MO)
         _owall.dimensions = _mm3((_ww, 8.0, _wh))
+        # ── FUNCTIONAL DETAIL (2026-07-11 run 77, the strict architectural rubric:
+        # "no recognisable inverter/power-electronics region … no visible thermal
+        # management elements … generic anonymous blocks"). Deterministic, zone/part-
+        # vocabulary keyed, HERO pass only (INSPECT/drawings byte-unchanged):
+        #   power zone  → heatsink FIN bank + electrolytic capacitor cylinders
+        #   control     → PCB-green board face + chip blocks
+        #   pack        → orange HV busbar strip along the pack top (the PW3 signature)
+        #   thermal     → two circular fan rings behind the top vent band
+        #   interfaces  → gland/terminal blocks along the bottom front
+        _dm = _skin_mod
+        _fin_mat = fl.make_mat("m_se_fins", fl._to_linear((0.42, 0.44, 0.47)),
+                               metallic=0.85, roughness=0.35)
+        _cap_mat = fl.make_mat("m_se_caps", fl._to_linear((0.12, 0.13, 0.15)),
+                               metallic=0.3, roughness=0.45)
+        _pcb_mat = fl.make_mat("m_se_pcb", fl._to_linear((0.10, 0.30, 0.16)),
+                               metallic=0.1, roughness=0.6)
+        _chip_mat = fl.make_mat("m_se_chip", fl._to_linear((0.08, 0.08, 0.09)),
+                                metallic=0.2, roughness=0.5)
+        _bus_mat = fl.make_mat("m_se_hvbus", fl._to_linear((0.72, 0.36, 0.10)),
+                               metallic=0.7, roughness=0.35)
+        _fanr_mat = fl.make_mat("m_se_fanring", fl._to_linear((0.20, 0.21, 0.24)),
+                                metallic=0.5, roughness=0.4)
+        _term_mat = fl.make_mat("m_se_term", fl._to_linear((0.25, 0.26, 0.29)),
+                                metallic=0.4, roughness=0.5)
+        _zb = {}   # zone → (z0, band_h) from the SAME fractions the placer stacked
+        _zc = base_z + margin
+        for _zk, _zfrac, _zrx in _SE_ZONES:
+            _zb[_zk] = (_zc, ih * _zfrac)
+            _zc += ih * _zfrac
+        _yF = -idep * 0.15 - 22.0     # just proud of the zone boards
+        # power zone: fin bank (left third) + capacitor trio (right third)
+        _pz, _ph2 = _zb.get("power", (base_z + margin + ih * 0.52, ih * 0.24))
+        _fin_w, _n_fins = iw * 0.30, 9
+        for _fi in range(_n_fins):
+            _fx2 = -iw * 0.42 + _fi * (_fin_w / max(1, _n_fins - 1))
+            fl.add_box(f"u_se_det_fin_{_fi}",
+                       _mm3((_fx2, _yF, _pz + _ph2 * 0.50)),
+                       _mm3((3.0, 26.0, _ph2 * 0.62)), _fin_mat,
+                       module=_dm, module_objects=MO)
+        for _ci in range(3):
+            fl.add_cyl(f"u_se_det_cap_{_ci}",
+                       _mm3((iw * 0.18 + _ci * iw * 0.09, _yF, _pz + _ph2 * 0.42)),
+                       iw * 0.030 * fl.MM, _ph2 * 0.5 * fl.MM, _cap_mat,
+                       module=_dm, module_objects=MO)
+        # control zone: PCB face + chips
+        _cz, _ch2 = _zb.get("control", (base_z + margin + ih * 0.88, ih * 0.12))
+        fl.add_box("u_se_det_pcb", _mm3((-iw * 0.18, _yF, _cz + _ch2 * 0.5)),
+                   _mm3((iw * 0.45, 6.0, _ch2 * 0.6)), _pcb_mat,
+                   module=_dm, module_objects=MO)
+        for _hi in range(4):
+            fl.add_box(f"u_se_det_chip_{_hi}",
+                       _mm3((-iw * 0.32 + _hi * iw * 0.10, _yF - 5.0, _cz + _ch2 * 0.5)),
+                       _mm3((iw * 0.05, 4.0, _ch2 * 0.16)), _chip_mat,
+                       module=_dm, module_objects=MO)
+        # pack top: orange HV busbar strip
+        _ez, _eh2 = _zb.get("energy", (base_z + margin, ih * 0.52))
+        fl.add_box("u_se_det_hvbus", _mm3((0.0, _yF, _ez + _eh2 * 0.94)),
+                   _mm3((iw * 0.66, 10.0, _eh2 * 0.035)), _bus_mat,
+                   module=_dm, module_objects=MO)
+        # fan rings behind the vent band
+        for _fj in range(2):
+            fl.add_torus(f"u_se_det_fan_{_fj}",
+                         _mm3(((-1 if _fj == 0 else 1) * iw * 0.22, -D / 2 + tt + 16.0,
+                               base_z + H * 0.90)),
+                         H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
+                         module=_dm, module_objects=MO)
+        # bottom interface terminals (AC / DC / PV entries)
+        for _ti in range(3):
+            fl.add_box(f"u_se_det_term_{_ti}",
+                       _mm3((-iw * 0.25 + _ti * iw * 0.25, _yF, base_z + margin + ih * 0.03)),
+                       _mm3((iw * 0.12, 20.0, ih * 0.035)), _term_mat,
+                       module=_dm, module_objects=MO)
+        print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
+              f"PCB + 4 chips, HV busbar strip, 2 fan rings, 3 interface terminals")
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
               f"{n_vents} vent slot(s) + mounting wall; tags + wire draws suppressed for the product shot")
 
@@ -17625,6 +17699,13 @@ def main():
     # 2. order regions in process flow
     contract = state.get("orchestratorContract", {}) or {}
     base_topology = contract.get("topology", []) or []
+    # DRAWING-ONLY edges (2026-07-11 run 77: deriveDeviceEnergyTopology's device energy
+    # chain exists for the P&ID/BFD reconstruction — routing it ALSO minted duplicate
+    # schedule rows, and the panel counted the same 11 kW PCS three ways → a 33.1 kW
+    # board on an 11 kW product). The scene routes/schedules only the physical edges;
+    # the drawings read the full contract topology directly from state.
+    base_topology = [e for e in base_topology
+                     if not (isinstance(e, dict) and e.get("_drawing_only"))]
     quantities = contract.get("quantities", {}) or {}
     # ── LEDGER DRIVES THE CONNECTIONS (Tristan 2026-06-20) ───────────────────────────
     # The contract authors the process topology; the universal completion closes the
