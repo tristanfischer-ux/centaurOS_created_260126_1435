@@ -362,7 +362,13 @@ _SCOPE_FUNCTION_WORD_RE = re.compile(
     r"\bplatform\b|\bsoftware\b|"
     r"arc\s+(?:flash|fault)\s+(?:protection|detection)|"
     # spec-echo tail: a 'part' named after an electrical ATTRIBUTE is documentation
-    r"(?:apparent\s+)?power\s*(?:·|\d|$)|efficiency\s*(?:·|\d|$)", re.I)
+    r"(?:apparent\s+)?power\s*(?:·|\d|$)|efficiency\s*(?:·|\d|$)|"
+    # DOCUMENTATION / SERVICE CONSUMABLES (2026-07-11 run 68: LLM reviewers minted
+    # 'Service Log Book' / 'Safety Vest' / 'Service Manual' / 'Service Tool Kit' and
+    # each counted as NOT-FOUND catalogue equipment — paperwork and PPE are scope
+    # items, never equipment with an MPN research status).
+    r"log\s*books?\b|\bmanuals?\b|safety\s+vests?\b|tool\s*kits?\b|spares?\s+kits?\b|"
+    r"torque\s+cards?\b|commissioning\s+records?\b|documentation\s+pack", re.I)
 _ENCLOSURE_HARDWARE_RE = re.compile(
     r"warning\s+sign|signage|label\s+plate|"
     r"(?:internal|service|cabinet)\s+lighting|"
