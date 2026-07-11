@@ -106,16 +106,20 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     rb_total = round(sum(r.get("line_gbp") or 0 for r in rb))
     cs = state.get("costStack") or {}
     # run-71 recurring false HIGH ("three mutually inconsistent totals"): these are
-    # LAYERS of one margin stack (raw parts < ex-works < OEM transfer), not rival
-    # claims of the same number — say so, and let the seat attack the LAYER maths.
-    parts.append("COST STACK LAYERS (one margin stack, ascending — raw parts ⊂ ex-works ⊂ "
-                 "OEM transfer; layers legitimately differ, only a layer SMALLER than the "
-                 "one below it is a contradiction): "
+    # LAYERS of one margin stack, not rival claims of the same number. Run-72 refinement:
+    # use the stack's REAL keys (there is no ex_works key — factory COGS is that layer)
+    # and state that raw_materials_bom IS the requirementsBom Σ (±rounding), one surface.
+    parts.append("COST STACK LAYERS (one margin stack, ascending — raw parts BoM < factory "
+                 "COGS < OEM transfer < channel list < installed ASP; layers legitimately "
+                 "differ, only a layer SMALLER than the one below it is a contradiction; "
+                 "raw_materials_bom and the requirementsBom Σ are the SAME layer, expect "
+                 "±rounding): "
                  + json.dumps({"raw_parts_bom (requirementsBom Σ)": rb_total,
-                               "raw_materials_layer": cs.get("raw_materials_bom_gbp"),
-                               "ex_works_layer": cs.get("ex_works_price_gbp") or cs.get("ex_works"),
+                               "raw_materials_bom_layer (same layer)": cs.get("raw_materials_bom_gbp"),
+                               "factory_cogs_layer": cs.get("factory_cogs_gbp"),
                                "oem_transfer_layer": cs.get("oem_transfer_price_gbp"),
-                               "cost_reality_bom_total": (state.get("cost_reality") or {}).get("bom_total_gbp")}))
+                               "channel_list_layer": cs.get("channel_list_price_gbp"),
+                               "installed_asp_layer": cs.get("installed_asp_gbp")}))
     sc = _jload(os.path.join(run_dir, "tab-scorecard.json")) or {}
     tabs = sc.get("tabs") or sc
     parts.append("RECORDED TAB SCORES (attack these): " + json.dumps(

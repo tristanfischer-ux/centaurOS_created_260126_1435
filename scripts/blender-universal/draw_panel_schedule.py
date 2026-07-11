@@ -541,7 +541,11 @@ def _supply_label(state: dict, is_dc: bool) -> str:
         # 230 V single-phase direct tie the contract states — red-team LOW)
         _ac = _q(state, "ac_output_voltage_v")
         if _ac and _ac <= 250:
-            return f"Battery DC bus via hybrid PCS ({_ac:.0f} V single-phase grid tie, G98/G99)"
+            # lead with the board's OWN domain (run-72 red-team: "230 V single-phase" on a
+            # DC board read as a contradiction) — the DC feed first, the AC tie downstream.
+            _dc = _q(state, "dc_bus_voltage_v")
+            _dc_txt = f"Battery string ({_dc:g} V DC bus)" if _dc else "Battery string (DC bus)"
+            return f"{_dc_txt} — hybrid PCS grid tie {_ac:.0f} V 1ph downstream (G98/G99)"
         return "Battery DC bus via PCS (grid-tie step-up to MV / G99)"
     mv = any(re.search(r"mv_transformer|distribution_transformer|mv_switchgear|ring.?main",
                        f"{n} {c}", re.I) for _w, n, c in _iter_words(state))
@@ -2124,7 +2128,19 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
                           + (f" @ {mv_a:g} A" if mv_a else "")
                           + (f" → {panel.transformer}" if panel.transformer else ""))
     else:
-        panel.incoming = mv_descr
+        # SAME-DOMAIN feed (no transformer): the incoming cable must carry the board's own
+        # demand. Run 72 red-team caught a 1.5 mm² placeholder label standing next to a
+        # 39 A corrected demand — the main board re-sizes its cable when the feeder row is
+        # a stale wholesale default (docstring above: "relocate the lie to the cable
+        # column"); mirror that rule here with the SAME _demand_needs_circuit_override test.
+        if (_demand_needs_circuit_override(mv_a, downstream_a, schedule_default_a)
+                and downstream_a > 0):
+            _csa_label = size_cable_csa(downstream_a)[1]
+            panel.incoming = (f"{_csa_label or '—'} (re-sized from the board's own "
+                              f"{downstream_a:,.0f} A circuit demand — the schedule's own "
+                              f"reading was a wholesale placeholder)")
+        else:
+            panel.incoming = mv_descr
 
     # busbar RATING (the frame the board is built to) — split from the demand current, same
     # as the MAIN board (see _set_busbar_rating).
