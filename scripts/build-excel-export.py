@@ -20923,6 +20923,30 @@ def _sc_drawing(wb, ws, state, run_dir):
     for rx, key, mtext in _DRAW_KEYS:
         if rx.search(ws.title):
             mech = mtext
+            # NA-BY-DESIGN (2026-07-11 run 77: the P&ID's honest N/A sheet scored 0 —
+            # _cov accepted the marker but THIS content overlay re-derived coverage
+            # 0/8 from the ledger and min()'d the tab to 0). A dry electrical product
+            # (sealed sub-1 m³ contract) whose drawing DECLARES the N/A has nothing
+            # to cover — the expectation, not the drawing, is wrong. ONE rule with
+            # _cov: marker + contract signal → full component, no ledger fraction.
+            _na_p = os.path.join(run_dir or "", "drawings", f"{key}.svg")
+            try:
+                if run_dir and os.path.exists(_na_p) \
+                        and "NA-BY-DESIGN" in open(_na_p, encoding="utf-8", errors="replace").read():
+                    _qs0 = {}
+                    for _ck in ("orchestratorContract", "engineeringContract"):
+                        _q0 = (state.get(_ck) or {}).get("quantities")
+                        if isinstance(_q0, dict) and _q0:
+                            _qs0 = _q0
+                            break
+                    _encl0 = qval(_qs0, "enclosure_volume_m3")
+                    if _encl0 and 0 < float(_encl0) < 1.0:
+                        comps.append((f"{key} not-applicable-by-design declaration", 1, 1))
+                        iss.append(f"{key} N/A BY DESIGN — dry electrical product; "
+                                   "coverage expectation waived")
+                        break
+            except OSError:
+                pass
             c = cov.get(key)
             if isinstance(c, dict) and isinstance(c.get("expected"), (int, float)) \
                     and c.get("expected"):
