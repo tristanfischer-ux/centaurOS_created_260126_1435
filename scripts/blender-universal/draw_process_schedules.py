@@ -1543,7 +1543,8 @@ def _instrument_summary(sc: Schedules) -> str:
     """Physical entry count plus only the ISA families actually present."""
     isa = sorted({str(item.isa or "").split()[0] for item in sc.instruments
                   if str(item.isa or "").strip()})
-    return (f"{len(sc.instruments)} physical instrument entries"
+    return (f"{len(sc.instruments)} physical instrument entries "
+            f"(qty-N instances expanded; BoM counts line types)"
             + (f" · ISA tags: {', '.join(isa)}" if isa else ""))
 
 

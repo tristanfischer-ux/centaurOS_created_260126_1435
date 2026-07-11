@@ -1961,7 +1961,10 @@ def _connected_kw_for(base: str, design_a, panel: Panel, state: dict,
         v = _panel_pump_kw_by_name(base, state)
         if v:
             return v
-    if "pcs" in b or "inverter" in b or "transformer" in b:
+    if ("pcs" in b or "inverter" in b or "transformer" in b
+            or ("converter" in b and (
+                _q(state, "nameplate_capacity_kwh")
+                or _q(state, "usable_energy_kwh")))):
         v = _q(state, "continuous_power_kw")
         if v:
             return v
@@ -2476,10 +2479,10 @@ def _fmt_kw_capacity(v) -> str:
 
 
 def _fmt_kw_load(v) -> str:
-    """Preserve hundredths for sub-kW auxiliaries whose visible rows sum to 0.21 kW."""
+    """Preserve device-scale hundredths (0.21 kW auxiliaries, 11.04 kW PCS)."""
     if v is None:
         return "—"
-    return _fmt(v, " kW", fmt="{:,.2f}" if abs(float(v)) < 1 else "{:,.1f}")
+    return _fmt(v, " kW", fmt="{:,.2f}" if abs(float(v)) < 100 else "{:,.1f}")
 
 
 def _display_bus_capacity_kw(rec: dict):
@@ -2530,7 +2533,10 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
         if getattr(p, "pv_inputs_note", None):
             hdr.append(("PV string inputs", p.pv_inputs_note))
         if getattr(p, "ac_interface_note", None):
-            hdr.append(("AC grid interface", p.ac_interface_note))
+            hdr.append((
+                "System-level downstream AC protection (outside DC board)"
+                if p.is_dc else "AC grid interface",
+                p.ac_interface_note))
         out.append("| Field | Value |\n|---|---|")
         for k, v in hdr:
             out.append(f"| **{k}** | {v} |")
@@ -3242,6 +3248,7 @@ def _selftest() -> int:
     chk("I18.device_current_keeps_tenth", _fmt_amp(39.1) == "39.1 A")
     chk("I18.micro_capacity_not_rounded_to_zero", _fmt_kw_capacity(0.2) == "0.20 kW")
     chk("I18.aux_load_keeps_hundredths", _fmt_kw_load(0.21) == "0.21 kW")
+    chk("I18.device_power_keeps_hundredths", _fmt_kw_load(11.04) == "11.04 kW")
     chk("I18.same_value_rounding_collapses",
         _display_bus_capacity_kw({"demand_kw": 0.197, "sum_kw": 0.21}) == 0.21)
 
