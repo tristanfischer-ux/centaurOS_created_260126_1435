@@ -7404,8 +7404,33 @@ async function main() {
   // drawings read via the engineeringContract→orchestratorContract fallback).
   try {
     const orch: any = state.orchestratorContract
-    const haveOrchTopo = Array.isArray(orch?.topology) && orch.topology.length > 0
-    const haveEngTopo = Array.isArray((engineeringContract as any)?.topology) && (engineeringContract as any).topology.length > 0
+    let haveOrchTopo = Array.isArray(orch?.topology) && orch.topology.length > 0
+    let haveEngTopo = Array.isArray((engineeringContract as any)?.topology) && (engineeringContract as any).topology.length > 0
+    // DEVICE-SCALE ENERGY TOPOLOGY OVERRIDE (2026-07-11, Grok's drawing audit: P&ID/BFD
+    // ~1/10 with "PCS → heat rejection" + "step-up transformer → enclosure atmosphere" on
+    // a 230 V wall unit). A builder's hand-authored topology is PLANT-scale; the part
+    // demotions remove the plant equipment at device scale but the topology EDGES survive.
+    // On the SAME enclosure_volume_m3 < 1 signal as the sealed scene family, REPLACE the
+    // authored edges with the honest device energy chain + air path + supervision signals
+    // (battery→DC bus→PCS→grid; PV→MPPT→DC bus; intake→fan→exhaust; battery→BMS→gateway).
+    // Plants (no sealed signal) are byte-identical.
+    try {
+      const { deriveDeviceEnergyTopology } = await import('./lib/orchestrator/generic/derive-topology')
+      const devEdges = deriveDeviceEnergyTopology(
+        (state.moduleDecomposition?.modules ?? []) as any,
+        (orch?.quantities ?? {}) as Record<string, unknown>)
+      if (devEdges.length >= 3 && orch) {
+        const nOld = Array.isArray(orch.topology) ? orch.topology.length : 0
+        orch.topology = devEdges
+        if ((engineeringContract as any)?.topology) (engineeringContract as any).topology = devEdges
+        haveOrchTopo = true
+        haveEngTopo = false // signal deriver below still appends instrument ties
+        console.error(`[chain] DEVICE-SCALE topology override: ${nOld} plant edge(s) replaced by ${devEdges.length} device energy/air/signal edge(s) (sealed sub-1 m³ product)`)
+        logAction({ step: 'derive_device_energy_topology', edges: devEdges.length, replaced: nOld })
+      }
+    } catch (devErr) {
+      console.error(`[chain] device-topology deriver failed (non-fatal): ${(devErr as Error).message}`)
+    }
     if (orch && !haveOrchTopo && !haveEngTopo) {
       const { deriveProcessTopology } = await import('./lib/orchestrator/generic/derive-topology')
       const derived = deriveProcessTopology((state.moduleDecomposition?.modules ?? []) as any)

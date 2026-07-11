@@ -266,6 +266,95 @@ function wordQtyCount(w: AnyWord): number {
  * equipment in `modules`. Returns [] when there is no process equipment to chain
  * (caller keeps any existing/empty topology).
  */
+// ── DEVICE-SCALE ENERGY TOPOLOGY (2026-07-11, powerwall run 75 / Grok's drawing audit:
+// P&ID ~1/10, BFD ~1/10 — "PCS → heat rejection" + "step-up transformer → enclosure
+// atmosphere" on a 230 V wall unit). An archetype builder's hand-authored topology is
+// written for the PLANT scale; the part DEMOTIONS remove the plant equipment at device
+// scale but the topology EDGES survive, so the P&ID/BFD draw plant architecture for a
+// product that has none. At device scale (the SAME enclosure_volume_m3 < 1 signal as
+// the sealed scene family) the honest graph is the ENERGY CHAIN + the air path:
+//   battery string → DC bus → PCS/inverter → grid interface (G98/G99)
+//   PV array → MPPT input stage → DC bus                (when the contract has PV)
+//   air intake → fan(s) → air exhaust                   (air-cooled thermal path)
+//   battery → BMS → gateway                              (signal/data)
+// Endpoints are slugs of the design's REAL part names (fuzzy token-overlap resolution,
+// same contract as deriveProcessTopology); boundary nodes (grid/pv/air) are abstract.
+// Universal: contract-keyed, no class table — any sealed device gets the same shape.
+export function deriveDeviceEnergyTopology(
+  modules: AnyModule[],
+  quantities: Record<string, unknown>,
+): TopologyEdge[] {
+  const qv = (k: string): number | null => {
+    const v = (quantities as Record<string, any>)[k]
+    const n = Number(v && typeof v === 'object' ? v.value : v)
+    return Number.isFinite(n) ? n : null
+  }
+  const encl = qv('enclosure_volume_m3')
+  if (!(encl != null && encl > 0 && encl < 1)) return []
+
+  const names: string[] = []
+  for (const m of modules || []) {
+    for (const sm of m.sub_modules || []) {
+      for (const w of sm.words || []) {
+        if (!w || w._subcomponent) continue
+        const nm = w.name_human || w.content_character?.name_human || ''
+        if (nm) names.push(nm)
+      }
+    }
+  }
+  const find = (rx: RegExp): string | null => {
+    const hit = names.find((n) => rx.test(n))
+    return hit ? slugify(hit) : null
+  }
+
+  const battery = find(/\b(cell|battery)\b.*\b(string|pack|module|cells)\b|prismatic|\blfp\b/i)
+    ?? find(/\bbattery\b/i)
+  const dcbus = find(/busbar|dc.?bus/i) ?? 'dc_bus'
+  const inverter = find(/inverter|\bpcs\b|power conversion/i)
+  const mppt = find(/mppt|pv.*input/i)
+  const fan = find(/\bfan\b|ventilation/i)
+  const bms = find(/\bbms\b|battery management|cell monitoring/i)
+  const gw = find(/gateway|remote monitoring|\bems\b/i)
+
+  const dcV = qv('dc_bus_voltage_v') ?? undefined
+  const acV = qv('ac_output_voltage_v') ?? undefined
+  const contKw = qv('continuous_power_kw') ?? undefined
+  const thermKw = qv('system_thermal_dissipation_kw') ?? undefined
+  const pvKw = qv('pv_stc_input_kw')
+  const edges: TopologyEdge[] = []
+  const push = (from_part: string | null, to_part: string | null, mechanism: TopologyEdge['mechanism'],
+                constraint_kind: TopologyEdge['constraint_kind'], required_value?: number,
+                required_unit?: string) => {
+    if (!from_part || !to_part || from_part === to_part) return
+    edges.push({ from_part, to_part, mechanism, constraint_kind,
+                 ...(required_value != null ? { required_value } : {}),
+                 ...(required_unit ? { required_unit } : {}) } as TopologyEdge)
+  }
+
+  // energy chain
+  push(battery, dcbus, 'electrical_bus', 'current_rating',
+       dcV && contKw ? Math.ceil((contKw * 1000) / dcV * 1.25) : undefined, 'A')
+  if (pvKw && mppt) {
+    push('pv_string_array', mppt, 'electrical_bus', 'current_rating', undefined, undefined)
+    push(mppt, dcbus, 'electrical_bus', 'current_rating', undefined, undefined)
+  }
+  push(dcbus, inverter, 'electrical_bus', 'current_rating',
+       dcV && contKw ? Math.ceil((contKw * 1000) / dcV * 1.25) : undefined, 'A')
+  push(inverter, 'grid_interface', 'electrical_bus', 'current_rating',
+       acV && contKw ? Math.ceil((contKw * 1000) / (acV * 0.95) * 1.25) : undefined, 'A')
+  // air-cooled thermal path (a sealed device rejects its losses on AIR — the plant
+  // 'heat_rejection' node does not exist at this scale)
+  if (fan) {
+    push('air_intake', fan, 'thermal', 'thermal_rejection', thermKw ?? undefined, 'kW')
+    push(fan, 'air_exhaust', 'thermal', 'thermal_rejection', thermKw ?? undefined, 'kW')
+  }
+  // supervision
+  push(battery, bms, 'signal', 'signal')
+  push(bms, gw, 'data', 'data_bandwidth' as TopologyEdge['constraint_kind'])
+  return edges
+}
+
+
 export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
   const seen = new Set<string>()

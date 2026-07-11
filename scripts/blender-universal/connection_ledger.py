@@ -782,6 +782,10 @@ _ELEC_GEAR_CLOSER_RE = re.compile(
 _ABSTRACT_BOUNDARY_RE = re.compile(
     r"utility[_ -]?incomer|\bgrid\b|\bmains\b|battery[_ -]?limit|electrical[_ -]?supply|"
     r"power[_ -]?supply\b|incoming[_ -]?supply|"
+    # device-scale energy-topology boundary nodes (2026-07-11, deriveDeviceEnergyTopology):
+    # the grid tie, the PV array on the roof, and the ambient-air openings are BOUNDARIES
+    # of a sealed product, never parts — without these the derived edges raise orphans.
+    r"grid[_ -]?interface|pv[_ -]?string[_ -]?array|air[_ -]?intake\b|air[_ -]?exhaust\b|"
     r"(?:steam|nitrogen|instrument[_ -]?air|compressed[_ -]?air|inert[_ -]?gas|"
     r"cooling[_ -]?water|chilled[_ -]?water)[_ -]?supply\b|"
     # heat_rejection (2026-07-11 run 61): the class graph's thermal SINK — at air-cooled

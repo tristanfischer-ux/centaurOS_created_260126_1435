@@ -677,7 +677,68 @@ def run_gates(out_dir: str) -> list:
                               f"enclosure (floor {INTERIOR_FILL_MIN * 100:.0f}% — below it the "
                               f"render is a hollow shell, not a product)"))
 
+    # ── G11 DRAWING DOMAIN COHERENCE (2026-07-11, Grok: "deterministic gates report all
+    # PASS despite semantic defects — they check geometry/coverage, not whether the
+    # drawing represents the right product"). Mirrors gate-34's marker approach on the
+    # DRAWING SVGs: plant-architecture vocabulary on a drawing whose CONTRACT declares a
+    # device that has none is wrong-domain content, whatever the geometry says. Signals:
+    #   • MV/transformer markers fire when the contract sizes NO transformer AND ties at
+    #     ≤250 V (a plant with a real transformer quantity keeps them);
+    #   • plant heat-rejection markers fire on a sealed sub-1 m³ product (its losses go
+    #     to AIR; 'heat rejection / cooling tower / chiller / CDU' is plant equipment).
+    _g11 = drawing_domain_findings(out_dir, state)
+    for dwg, marker in _g11:
+        gates.append(Gate("drawing_domain", [dwg], "high", False,
+                          f"wrong-domain content on {dwg}: '{marker}' — plant architecture "
+                          f"on a device-scale contract (no transformer sized / ≤250 V tie / "
+                          f"air-cooled sealed product)"))
+    if not _g11 and _encl_m3 and 0 < float(_encl_m3) < 1.0:
+        gates.append(Gate("drawing_domain", ["pid", "block-flow-diagram", "single-line-diagram"],
+                          "high", True, "no plant-architecture markers on the device drawings"))
+
     return gates
+
+
+_G11_MV_RE = re.compile(
+    # negative lookbehind: "no step-up transformer (direct LV tie)" is the CORRECT
+    # device-scale disclosure, not plant content (run-75 SLD false hit)
+    r"(?<!no )(?<!without )step[\s-]?up\s+transformer|MV\s+(?:feeder|switchboard|utility)|"
+    r"\b(?:3\.3|6\.6|11|33)\s?kV\b|ring[\s-]?main", re.I)
+_G11_PLANT_THERMAL_RE = re.compile(
+    r"heat\s+rejection|cooling\s+tower|\bchiller\b|coolant\s+distribution|\bCDU\b", re.I)
+
+
+def drawing_domain_findings(out_dir: str, state: dict) -> list:
+    """PURE G11 check — [(drawing, marker), ...] wrong-domain hits on the electrical/
+    process drawing SVGs, keyed on the contract's own signals (never a class)."""
+    q = lambda k: _q(state, k)
+    qkeys = []
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if isinstance(qs, dict):
+            qkeys += list(qs.keys())
+    has_transformer = any("transformer" in k.lower() for k in qkeys)
+    ac_v = q("ac_output_voltage_v")
+    encl = q("enclosure_volume_m3")
+    sealed = bool(encl and 0 < float(encl) < 1.0)
+    lv_tie = bool(ac_v and float(ac_v) <= 250)
+    findings = []
+    for nm in ("pid", "block-flow-diagram", "single-line-diagram", "panel-schedule"):
+        p = os.path.join(out_dir, "drawings", nm + ".svg")
+        try:
+            txt = open(p, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        if lv_tie and not has_transformer:
+            m = _G11_MV_RE.search(txt)
+            if m:
+                findings.append((nm, m.group(0)))
+                continue
+        if sealed:
+            m = _G11_PLANT_THERMAL_RE.search(txt)
+            if m:
+                findings.append((nm, m.group(0)))
+    return findings
 
 
 def interior_fill_fraction(parts, encl_m3: float):
@@ -739,6 +800,7 @@ GATE_STAGE = {
     "connection_sanity": "derive-topology role ranks (spine direction) + connection_ledger finalize (service-domain drop + flow-unit canonicalisation) + design-loop writeback reconcile bound",
     "tag_legibility": "draw_ga _TagPlacer (view-bounds clip + title/dim obstacles + elev same-name range-collapse) + _draw_external_drain_points (same-edge EXT.DRAIN range-collapse + along-edge stagger)",
     "interior_fill": "build_universal_scene place_sealed_enclosure (pack-array expansion + zone-fill sizing)",
+    "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
 }
 
 
@@ -868,6 +930,19 @@ def _selftest() -> int:
     chk("g10_sparse_interior_fires", _f_sparse is not None and _f_sparse < INTERIOR_FILL_MIN)
     chk("g10_dense_interior_passes", _f_dense is not None and _f_dense >= INTERIOR_FILL_MIN)
     chk("g10_no_dims_abstains", interior_fill_fraction([{"name": "X"}], 0.13) is None)
+    # G11 proveCatch (2026-07-11, Grok's audit): run-75's REAL P&ID text ('PCS → Heat
+    # Rejection', 'Step Up Transformer') must FIRE on a sealed no-transformer ≤250 V
+    # contract; the same text on a PLANT contract (transformer sized, 400 V) must NOT;
+    # a clean device drawing must NOT.
+    chk("g11_mv_marker_fires", bool(_G11_MV_RE.search("Step Up Transformer → Enclosure Atmosphere")))
+    chk("g11_thermal_marker_fires", bool(_G11_PLANT_THERMAL_RE.search("PCS Inverter → Heat Rejection")))
+    chk("g11_clean_device_silent",
+        not _G11_MV_RE.search("Battery String → DC Bus → PCS → Grid Interface (230 V, G98/G99)")
+        and not _G11_PLANT_THERMAL_RE.search("Air Intake → Ventilation Fan → Air Exhaust"))
+    chk("g11_plant_kv_legit", bool(_G11_MV_RE.search("11 kV ring-main")))  # marker exists; the
+    # CONTRACT gate (has_transformer / >250 V) suppresses it on plants — decision, not regex
+    chk("g11_negated_disclosure_silent",
+        not _G11_MV_RE.search("no step-up transformer (direct LV tie)"))
     # no stray beam: a compact 8 m run passes; the v44 33 m MCC spine fails (proveCatch)
     def _span(wps):
         xs = [w[0] for w in wps]; ys = [w[1] for w in wps]
