@@ -364,13 +364,19 @@ const stepNgspice: ToolStep = {
   // (series_cells × cell_voltage). ngspice's prior hardcoded 800V meant
   // it always assumed 800V even when pybamm picked 534V nominal — a
   // major cross-tool inconsistency the physics critic flagged.
-  input_from_contract: (c: any) => ({
-    // Build #18r-fix1: all read from Contract (engineering_contract has them)
-    rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
-    dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
-    ac_output_voltage_v: c.quantities?.ac_output_voltage_v?.value ?? 400,
-    topology: 'sic_two_level' as const,  // TODO #18o: engineering judgment
-  }),
+  input_from_contract: (c: any) => {
+    const acOutputV = Number(c.quantities?.ac_output_voltage_v?.value ?? 400)
+    return {
+      // Build #18r-fix1: all read from Contract (engineering_contract has them)
+      rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
+      dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
+      ac_output_voltage_v: acOutputV,
+      // INTENT: Residential 230 V output is single-phase; utility 400 V output
+      // is three-phase. The old tool ignored voltage and always divided by √3×400.
+      ac_phases: acOutputV < 300 ? 1 : 3,
+      topology: 'sic_two_level' as const,  // TODO #18o: engineering judgment
+    }
+  },
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as {
       dissipated_power_kw: number

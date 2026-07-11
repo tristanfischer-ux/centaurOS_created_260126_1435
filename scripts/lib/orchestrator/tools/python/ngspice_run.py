@@ -146,14 +146,27 @@ def smoke_test_rc_lpf() -> dict:
     }
 
 
-def pcs_dc_operating_point(rated_kw: float, dc_bus_v: float, efficiency: float) -> dict:
+def pcs_dc_operating_point(
+    rated_kw: float,
+    dc_bus_v: float,
+    efficiency: float,
+    ac_output_v: float = 400.0,
+    ac_phases: int = 3,
+) -> dict:
     """Real PCS sizing via ngspice DC operating point (simplified equivalent
     circuit). Returns dissipation, currents."""
     dc_continuous_a = (rated_kw * 1000.0) / dc_bus_v
     dissipated_kw = rated_kw * (1.0 - efficiency)
     switching_kw = dissipated_kw * 0.6  # empirical split
     conduction_kw = dissipated_kw * 0.4
-    ac_continuous_a = (rated_kw * 1000.0) / (1.732 * 400.0)  # 400V 3-phase
+    if ac_output_v <= 0:
+        raise ValueError("ac_output_v must be positive")
+    if ac_phases == 1:
+        ac_continuous_a = (rated_kw * 1000.0) / ac_output_v
+    elif ac_phases == 3:
+        ac_continuous_a = (rated_kw * 1000.0) / (1.732 * ac_output_v)
+    else:
+        raise ValueError("ac_phases must be 1 or 3")
     # Verify via ngspice the DC operating point
     netlist = build_pcs_thermal_netlist(rated_kw, dc_bus_v, efficiency)
     output = run_ngspice(netlist)
@@ -197,6 +210,9 @@ def compute(payload: dict) -> dict:
     # Default PCS sizing mode
     rated_kw = float(payload.get("rated_power_kw", 1000))
     dc_bus_v = float(payload.get("dc_bus_voltage_v", 800))
+    ac_output_v = float(payload.get("ac_output_voltage_v", 400))
+    ac_phases = int(payload.get(
+        "ac_phases", 1 if ac_output_v < 300 else 3))
     topology = str(payload.get("topology", "sic_two_level")).lower()
     efficiency_map = {
         "two_level_igbt": 0.965,
@@ -205,7 +221,8 @@ def compute(payload: dict) -> dict:
         "modular_multilevel": 0.99,
     }
     eff = efficiency_map.get(topology, 0.97)
-    return pcs_dc_operating_point(rated_kw, dc_bus_v, eff)
+    return pcs_dc_operating_point(
+        rated_kw, dc_bus_v, eff, ac_output_v, ac_phases)
 
 
 def main() -> int:

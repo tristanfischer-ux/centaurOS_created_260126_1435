@@ -147,6 +147,16 @@ function isHedgeOnly(text: string): boolean {
   return !CONCRETE_FAILURE_PATTERNS.some((p) => p.re.test(t))
 }
 
+function isAdequateContinuousSpeculativeTransient(text: string): boolean {
+  const body = String(text ?? '')
+  const admitsContinuousAdequacy =
+    /\b(?:while|although)\b[^.]{0,80}?\b(?:covers?|meets?|exceeds?)\s+(?:this|the\s+continuous|continuous\s+demand)/i.test(body)
+    || /\bcontinuous\b[^.]{0,60}?\b(?:adequate|covered|within\s+rating)/i.test(body)
+  const transientOnly = /\b(?:transient|surge|inrush|locked[-\s]?rotor|LRA|peak)\b/i.test(body)
+  const speculative = /\b(?:likely|may|might|could|possible|potential)\b/i.test(body)
+  return admitsContinuousAdequacy && transientOnly && speculative
+}
+
 /**
  * Does this single issue describe a CONCRETE failure mode of a named part? PURE.
  * Reads `issue` (+ `suggested_check` as secondary context) for a recognised
@@ -157,6 +167,9 @@ export function issueDescribesConcreteFailure(issue: CritiqueIssue): { matched: 
   // suggested_check is corroborating context only — a concrete pattern must appear
   // in the issue body itself, so a benign issue with an aggressive suggested_check
   // ("replace the …") cannot, on its own, trip the block.
+  if (isAdequateContinuousSpeculativeTransient(body)) {
+    return { matched: false, tag: '' }
+  }
   if (isHedgeOnly(body)) return { matched: false, tag: '' }
   for (const p of CONCRETE_FAILURE_PATTERNS) {
     if (p.re.test(body)) return { matched: true, tag: p.tag }
