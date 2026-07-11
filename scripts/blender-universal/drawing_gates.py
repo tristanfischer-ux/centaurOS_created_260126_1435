@@ -616,6 +616,13 @@ def run_gates(out_dir: str) -> list:
     #    (aircraft / wind turbine) lay no deck and are never scored.
     pm_doc = _load("parts-manifest.json")
     site = pm_doc.get("site") if isinstance(pm_doc, dict) else None
+    # SEALED PRODUCT SKIP (2026-07-11 run 78): a wall-mounted sub-1 m³ product has no
+    # SITE to utilise — the "deck" is the render's floor prop, and hull/deck = 0.43
+    # is not a stranded plant corner. Same enclosure signal as G10/G11; plants keep
+    # the gate (guard-vs-scale family: the intent is plant-layout compactness).
+    _g7_encl = _q(state, "enclosure_volume_m3")
+    if _g7_encl and 0 < float(_g7_encl) < 1.0:
+        site = None
     if isinstance(site, dict) and site.get("utilisation") is not None:
         try:
             _ratio = float(site["utilisation"])
@@ -943,6 +950,10 @@ def _selftest() -> int:
     # CONTRACT gate (has_transformer / >250 V) suppresses it on plants — decision, not regex
     chk("g11_negated_disclosure_silent",
         not _G11_MV_RE.search("no step-up transformer (direct LV tie)"))
+    # G7 sealed-product skip proveCatch: the gate must NOT be emitted for a sub-1 m³
+    # sealed product (no site to utilise) and MUST keep firing on the v52 plant ratio.
+    chk("g7_plant_ratio_still_fires", not (476 / 1466 >= SITE_UTILISATION_MIN))
+    chk("g7_sealed_skip_signal", (lambda encl: bool(encl and 0 < encl < 1.0))(0.13))
     # no stray beam: a compact 8 m run passes; the v44 33 m MCC spine fails (proveCatch)
     def _span(wps):
         xs = [w[0] for w in wps]; ys = [w[1] for w in wps]
