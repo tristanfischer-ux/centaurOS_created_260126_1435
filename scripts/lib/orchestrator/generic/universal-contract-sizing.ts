@@ -2694,8 +2694,15 @@ const LIQUID_THERMAL_PLANT_RE =
 // ESS, EV-charger pillar, drone dock) has no occupancy — cell protection is the BMS's
 // temperature chain + the pack vent path, and the real products carry none of this
 // plant. A single smoke/heat DETECTOR (point device) is not plant and stays.
+// EXTENDED 2026-07-11 (run 60 residue, the utility-vocabulary leak): bare 'Gas Sensors' /
+// 'Hydrogen Detection Sensor' (the BMS's temperature chain + pack vent are the cell
+// protection — Powerwall-class products carry no gas sensor), 'SCADA' (the comms function
+// is the remote-monitoring singleton), 'HVAC … System' (the enclosure's Active Ventilation
+// Fan is the real part), and 'Deflagration Vent Panels' (the skin take-off's burst vent
+// carries the function) — ALL plant vocabulary at no-occupancy scale. A plant with
+// occupancy keeps every one untouched (the noOccupancy gate).
 const OCCUPANCY_SAFETY_PLANT_RE =
-  /gas[\s_]+detection|aspirating\s+smoke|smoke\s+detection\s+system|fire\s+suppression\s+(?:system|skid|plant)|clean\s+agent|novec|inergen/i
+  /gas[\s_]+detection|aspirating\s+smoke|smoke\s+detection\s+system|fire\s+suppression\s+(?:system|skid|plant)|clean\s+agent|novec|inergen|\bgas\s+sensors?\b|hydrogen\s+detection(?:\s+sensors?)?|\bscada\b|hvac\s+(?:ventilation\s+)?system|deflagration\s+vent\s+panels?/i
 // GRID-INTERFACE PLANT (2026-07-10, Powerwall run-18 connection-trace danglers): a
 // step-up/MV/isolation/auxiliary transformer or a switchgear ASSEMBLY is floor-standing
 // electrical PLANT — it cannot exist inside a sealed sub-1 m³ enclosure, and when the

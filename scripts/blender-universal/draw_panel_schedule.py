@@ -1189,6 +1189,17 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
     # connected_electrical_load_kw by construction. Absent for every other archetype
     # today, so this is a no-op fall-through to the existing heuristic synthesis.
     feeders = _electrical_consumer_breakdown_feeders(quantities, plan.board_voltage_v)
+    if feeders:
+        # ONE MINT, WHOLE BOARD (2026-07-11 run 60: the circuits honestly summed 1 A
+        # while the board header still printed 'demand 162 A / rating 200 A / ≈45 kW'
+        # from the legacy lumped derivation — an internal contradiction on one sheet).
+        # When the breakdown drives the circuits, it drives the BOARD figures too:
+        # demand = Σ circuit currents; rating = the next standard frame with margin,
+        # floored at a real 6 A device.
+        _sum_a = sum(float(f.current_a or 0) for f in feeders)
+        _sum_kw = sum(float(f.load_kw or 0) for f in feeders)
+        plan.board_current_a = max(6.0, _sum_a * 1.25)
+        plan.connected_load_kw = _sum_kw
     if not feeders and parts:
         feeders = edm.synthesise_equipment_feeders(
             plan.board_current_a, plan.board_voltage_v, parts,
