@@ -12027,8 +12027,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 delta[i] = _int_hi[i] - hi[i]
         if sum(abs(d) for d in delta) < 0.0005:
             continue
+        # move TOP-LEVEL objects of ANY type (run 62, seen in the hero: assemblies
+        # rooted on an EMPTY have mesh CHILDREN — moving parentless MESHES only left
+        # those assemblies unmoved, and the distribution-zone cluster sat above the
+        # skin). Children follow their parents.
         for _obj in bpy.data.objects:
-            if getattr(_obj, "type", None) == "MESH" and _obj.name.startswith(pref) and _obj.parent is None:
+            if _obj.name.startswith(pref) and _obj.parent is None:
                 _obj.location = (_obj.location[0] + delta[0], _obj.location[1] + delta[1],
                                  _obj.location[2] + delta[2])
         _d_mm = tuple(d / fl.MM for d in delta)

@@ -1198,7 +1198,11 @@ def _synthesise_main_board(schedule: dict, state: dict, rows, devices) -> Option
         # floored at a real 6 A device.
         _sum_a = sum(float(f.current_a or 0) for f in feeders)
         _sum_kw = sum(float(f.load_kw or 0) for f in feeders)
-        plan.board_current_a = max(6.0, _sum_a * 1.25)
+        # DEMAND is the honest Σ (the board's own reconciliation compares Σ circuits to
+        # this — run 62: the 6 A floor printed as 'demand' made ratio 0.17 REVIEW against
+        # the 1 A circuits). The 6 A real-device floor belongs to the BREAKER/busbar
+        # RATING, which the frame ladder applies downstream.
+        plan.board_current_a = max(0.1, _sum_a)
         plan.connected_load_kw = _sum_kw
     if not feeders and parts:
         feeders = edm.synthesise_equipment_feeders(
