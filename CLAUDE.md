@@ -85,6 +85,7 @@ Both reference files were regenerated 2026-05-17 by discovery agents. If they lo
 | Specialist configs, model swaps, benchmarking, live mapping table | `~/.claude/docs/forgeos/forgeos-specialist-protocol.md` |
 | Architecture decisions, schema changes, security review | `~/.claude/docs/forgeos/forgeos-red-team.md` |
 | Building or porting from a static HTML mockup | `~/.claude/docs/mockups.md` |
+| **Physics simulation data / ML surrogates / calibrating thermal-fluid correlation tools (The Well, Polymathic AI)** | `docs/THE-WELL-ANVIL-PLAN.md` — HARD RULE: no ML surrogate on the authoritative sizing path; The Well is a CALIBRATION corpus (Nu-Ra fits into tool constants with provenance) + tool-generator validation fixtures; ML deps quarantined in `.venv-well/`, never the chain `.venv` |
 
 ---
 
