@@ -84,6 +84,56 @@ def _q(state: dict, key: str):
     return None
 
 
+_G2_STOP = {"electrical", "consumer", "connected", "load", "power", "kw",
+            "system", "total"}
+
+
+def _g2_panel_total(panel_md: str, state: dict):
+    """Select the panel whose circuits match electrical_consumer__* contract keys."""
+    candidates = []
+    for section in re.split(r"(?m)^##\s+", panel_md or "")[1:]:
+        lines = section.splitlines()
+        board = lines[0].strip() if lines else "?"
+        match = re.search(
+            r"Total connected load\D*([\d,]+(?:\.\d+)?)\s*kW", section, re.I)
+        if match:
+            candidates.append(
+                (board, float(match.group(1).replace(",", "")), section))
+    if not candidates:
+        return None, None
+
+    quantities = {}
+    for contract_key in ("orchestratorContract", "engineeringContract"):
+        q = (state.get(contract_key) or {}).get("quantities")
+        if isinstance(q, dict) and q:
+            quantities = q
+            break
+    items = []
+    for key, raw in quantities.items():
+        if not re.match(r"^electrical_consumer__.+_kw$", str(key), re.I):
+            continue
+        value = raw.get("value") if isinstance(raw, dict) else raw
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        stem = re.sub(r"^electrical_consumer__|_kw$", "", str(key).lower())
+        tokens = {token for token in re.split(r"[^a-z0-9]+", stem)
+                  if len(token) > 2 and token not in _G2_STOP}
+        if tokens and value > 0:
+            items.append((tokens, value))
+    if items:
+        ranked = []
+        for board, value, section in candidates:
+            section_tokens = set(re.split(r"[^a-z0-9]+", section.lower()))
+            score = sum(weight for tokens, weight in items if tokens & section_tokens)
+            ranked.append((score, board, value))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        if ranked[0][0] > 0:
+            return ranked[0][2], ranked[0][1]
+    return candidates[0][1], candidates[0][0]
+
+
 _PRINCIPAL_POWERED_RE = re.compile(
     r"\bpump\b|blower|compressor|\bfan\b|heat\s*pump|\buv\b|ozone|skimmer|degasser|"
     r"dehumidifier|aerat|oxygenat|centrifuge|mixer|agitator|drive\b", re.I)
@@ -498,15 +548,15 @@ def run_gates(out_dir: str) -> list:
     cload = _q(state, "connected_electrical_load_kw")
     md_path = os.path.join(dd, "panel-schedule.md")
     panel_total = None
+    panel_board = None
     if os.path.exists(md_path):
-        m = re.search(r"Total connected load\D*([\d,]+(?:\.\d+)?)\s*kW", open(md_path).read())
-        if m:
-            panel_total = float(m.group(1).replace(",", ""))
+        panel_total, panel_board = _g2_panel_total(open(md_path).read(), state)
     if cload and panel_total:
         ratio = panel_total / cload
         gates.append(Gate("load_reconcile", ["panel-schedule", "single-line-diagram"],
                           "high", 0.85 <= ratio <= 1.15,
-                          f"panel total {panel_total:.0f} kW vs contract {cload:.0f} kW (ratio {ratio:.2f}, ±15%)"))
+                          f"{panel_board or 'panel'} total {panel_total:g} kW vs "
+                          f"contract {cload:g} kW (ratio {ratio:.2f}, ±15%)"))
 
     # ── G3 PART COVERAGE — every principal powered part has its OWN electrical feeder ─
     # (decision extracted to g3_missing_feeders above; cabinet-housed power gear —
@@ -880,6 +930,26 @@ def _selftest() -> int:
     # load reconcile ratio band
     chk("load_ok", 0.85 <= (1417 / 1417) <= 1.15)
     chk("load_under", not (0.85 <= (1050 / 1417) <= 1.15))   # the pre-fix undercount fails
+    # G2 two-board semantic authority: contract auxiliary-consumer load selects
+    # AUX, never the first/principal transfer board.
+    _g2_md = (
+        "## MAIN DC BUS\n| **Total connected load** | 11.04 kW |\n"
+        "| W1 | DC DC Converters | 11.04 |\n"
+        "## AUX BOARD\n| **Total connected load** | 0.21 kW |\n"
+        "| W1 | Auxiliary Power Supply | 0.09 |\n"
+        "| W2 | Active Ventilation Fan | 0.06 |\n"
+        "| W3 | Audible Alarm | 0.06 |\n")
+    _g2_state = {"orchestratorContract": {"quantities": {
+        "connected_electrical_load_kw": {"value": 0.21},
+        "electrical_consumer__auxiliary_power_supply_kw": {"value": 0.09},
+        "electrical_consumer__active_ventilation_fan_kw": {"value": 0.06},
+        "electrical_consumer__audible_alarm_kw": {"value": 0.06},
+    }}}
+    _g2_total, _g2_board = _g2_panel_total(_g2_md, _g2_state)
+    chk("g2_semantic_aux_board_selected",
+        _g2_total == 0.21 and _g2_board == "AUX BOARD")
+    _g2_legacy_total, _ = _g2_panel_total(_g2_md, {})
+    chk("g2_legacy_first_board_preserved", _g2_legacy_total == 11.04)
     # part coverage: a pump with no feeder is flagged; the subset-match logic
     htoks = set("recirc pump".split())
     chk("part_fed", htoks <= set("standby diesel generator recirc pump".split()))
