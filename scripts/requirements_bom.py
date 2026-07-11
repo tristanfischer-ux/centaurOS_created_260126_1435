@@ -7035,7 +7035,10 @@ def assemble(out_dir: str):
                     # price keeps within ×3 of its truth (still non-zero-rendering at
                     # 2 dp); only a genuinely price-less line takes the full noun floor.
                     if gbp > 0:
-                        _cf = min(_cf, max(round(gbp * 3.0, 2), 0.5))
+                        # £1 minimum — £0.50 dies at integer display (round-half-even → £0,
+                        # the very defect this guard exists to prevent; run 65). The ×5
+                        # invariant exempts disclosed commodity-floor lines ≤ £1.
+                        _cf = min(_cf, max(round(gbp * 3.0, 2), 1.0))
                     _why = "no DB price" if gbp <= 0 else f"estimate £{gbp:.2f} renders £0 at integer display"
                     gbp = _cf
                     basis = (basis + f" · commodity-floor ({_why}; '{_cnoun}' → £{_cf:g})"

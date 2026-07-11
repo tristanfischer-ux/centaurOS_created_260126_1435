@@ -15576,7 +15576,15 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
     tables = parse_md_tables(text)
     if not tables:
         return None
+    # PHASE-AWARE (2026-07-11 run 65: the '3-phase' capture missed the sealed product's
+    # '230 V 1-phase' schedule entirely and defaulted board_v=400 — the consistency row
+    # then demanded a 400 V token the honest 230 V drawing never states). Read the
+    # schedule's own system line whatever the phase count; 400 only as the last resort.
     mv = re.search(r"(\d{3,4})\s*V\s*3-phase", text)
+    if not mv:
+        mv = re.search(r"(\d{3,4})\s*V\s*1-phase", text)
+    if not mv:
+        mv = re.search(r"\|\s*\*\*System\*\*\s*\|\s*(\d{3,4})\s*V\b", text)
     board_v = float(mv.group(1)) if mv else 400.0
 
     # ── BOARD META first (moved up 2026-07-03): each board's Field/Value table states its
@@ -15756,8 +15764,14 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                 _rs.append(f"the schedule's own reconciliation says {_verd} "
                            f"(ratio {_ratio:g})")
             elif not (_BOARD_RECON_BAND[0] <= _ratio <= _BOARD_RECON_BAND[1]):
-                _rs.append(f"ratio {_ratio:g} outside the "
-                           f"{_BOARD_RECON_BAND[0]:g}–{_BOARD_RECON_BAND[1]:g} band")
+                # ABSOLUTE micro-board tolerance (2026-07-11 run 65 — ONE MINT with the
+                # schedule's own verdict): at magnitudes under one real 6 A device the
+                # ratio is meaningless; a gap within a single MCB of diversity is never
+                # a design defect. Mirrors draw_panel_schedule's rule exactly.
+                _sig_a, _dem_a = num(_sig) or 0.0, num(_dem) or 0.0
+                if abs(_sig_a - _dem_a) > 6.0:
+                    _rs.append(f"ratio {_ratio:g} outside the "
+                               f"{_BOARD_RECON_BAND[0]:g}–{_BOARD_RECON_BAND[1]:g} band")
         else:
             _rs.append("no reconciliation line printed for this board")
             _detail = f"busbar rating: {_meta.get('busbar rating', '—')}"

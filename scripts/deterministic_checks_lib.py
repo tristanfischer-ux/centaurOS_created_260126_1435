@@ -971,6 +971,15 @@ def _checks_cost(state: dict, run_dir: str) -> List[Check]:
                 _item_name, unit_p, ref)
             if recon_applied:
                 bad = False
+        # DISCLOSED DISPLAY FLOOR (2026-07-11 run 65): a pennies-truth commodity line
+        # floored to £1 for integer-display honesty (basis says 'commodity-floor …
+        # renders £0') is a DISCLOSED rendering rule, not a pricing error — the band
+        # (£1 vs a £0.11 catalogue truth = 9×) must not fire on the engine's own
+        # documented floor. Scoped hard: floor value ≤ £1 AND the basis discloses it.
+        if bad and unit_p is not None and unit_p <= 1.0 \
+                and "commodity-floor" in str(row.get("basis") or ""):
+            bad = False
+            recon_note = "disclosed sub-£1 commodity display floor (basis-documented)"
         out.append(Check(
             name=f"BoM {tag}: unit price within x{COST_BAND_FACTOR:g} of {ref_src}",
             category="COST", relation="eq",

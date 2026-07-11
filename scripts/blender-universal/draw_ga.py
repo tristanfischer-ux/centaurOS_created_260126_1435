@@ -1178,7 +1178,12 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     if len(keynotes) >= 15:
         _groups: dict = {}
         for p, kx, ky in keynotes:
-            _groups.setdefault(str(getattr(p, "module", "") or "misc"), []).append((p, kx, ky))
+            # group per (module, TAG LETTER) — a mixed-letter range ('D-101…X-154')
+            # cannot expand in the coverage scan (2026-07-11 run 65: Arc Fault/Flash +
+            # Signage fell out of GA coverage because their letters differed from the
+            # module's X-range label).
+            _ltr = str(getattr(p, "tag", "") or "?").split("-")[0]
+            _groups.setdefault(f"{getattr(p, 'module', '') or 'misc'}|{_ltr}", []).append((p, kx, ky))
         for _mod, members in sorted(_groups.items()):
             _tags = sorted({str(m[0].tag) for m in members})
             _lbl = _tags[0] if len(_tags) == 1 else f"{_tags[0]}…{_tags[-1]} ({len(_tags)})"
