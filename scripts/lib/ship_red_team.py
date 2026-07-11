@@ -97,6 +97,14 @@ def _evidence_semantics(process_schedule: str, parts_ledger: dict) -> str:
     return "\n".join(notes)
 
 
+def _same_layer_rounding_ok(left: object, right: object) -> bool:
+    try:
+        a, b = float(left), float(right)
+    except (TypeError, ValueError):
+        return False
+    return abs(a - b) <= max(5.0, 0.001 * max(abs(a), abs(b), 1.0))
+
+
 def collect_evidence(run_dir: str, state: dict) -> str:
     """Excerpts of the DELIVERED artefacts — never a state.json narrative."""
     parts: list[str] = []
@@ -138,6 +146,12 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     rb = state.get("requirementsBom") or []
     rb_total = round(sum(r.get("line_gbp") or 0 for r in rb))
     cs = state.get("costStack") or {}
+    raw_materials_layer = cs.get("raw_materials_bom_gbp")
+    same_layer_check = (
+        "PASS — rounding-equivalent"
+        if _same_layer_rounding_ok(rb_total, raw_materials_layer)
+        else "FAIL — exceeds rounding tolerance"
+    )
     # run-71 recurring false HIGH ("three mutually inconsistent totals"): these are
     # LAYERS of one margin stack, not rival claims of the same number. Run-72 refinement:
     # use the stack's REAL keys (there is no ex_works key — factory COGS is that layer)
@@ -146,9 +160,11 @@ def collect_evidence(run_dir: str, state: dict) -> str:
                  "COGS < OEM transfer < channel list < installed ASP; layers legitimately "
                  "differ, only a layer SMALLER than the one below it is a contradiction; "
                  "raw_materials_bom and the requirementsBom Σ are the SAME layer, expect "
-                 "±rounding): "
+                 "±rounding; a same-layer difference ≤£5 or ≤0.1% is presentation rounding "
+                 "and MUST NOT be reported as a contradiction): "
                  + json.dumps({"raw_parts_bom (requirementsBom Σ)": rb_total,
-                               "raw_materials_bom_layer (same layer)": cs.get("raw_materials_bom_gbp"),
+                               "raw_materials_bom_layer (same layer)": raw_materials_layer,
+                               "same_layer_check": same_layer_check,
                                "factory_cogs_layer": cs.get("factory_cogs_gbp"),
                                "oem_transfer_layer": cs.get("oem_transfer_price_gbp"),
                                "channel_list_layer": cs.get("channel_list_price_gbp"),
@@ -233,6 +249,12 @@ def _selftest() -> int:
     wet = _evidence_semantics("# Process schedules\n*4 process lines.*", {})
     if "Zero process lines/valves is CORRECT" in wet:
         print("[red-team] SELFTEST FAIL: wet process schedule marked N/A")
+        return 1
+    if not _same_layer_rounding_ok(8639, 8637):
+        print("[red-team] SELFTEST FAIL: £2 same-layer rounding must pass")
+        return 1
+    if _same_layer_rounding_ok(8639, 8000):
+        print("[red-team] SELFTEST FAIL: material same-layer divergence must fail")
         return 1
     print("[red-team] selftest OK (dry N/A + not_found/connectivity semantics)")
     return 0
