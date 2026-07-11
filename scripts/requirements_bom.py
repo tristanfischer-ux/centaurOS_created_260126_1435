@@ -7028,7 +7028,15 @@ def assemble(out_dir: str):
                 _renders_zero = (gbp <= 0) if _is_pack_micro else (round(gbp) <= 0)
                 if status not in ("SUB-COMPONENT", "BUILDING") and _renders_zero:
                     _cf, _cnoun = _commodity_zero_floor(name)
-                    _why = "no DB price" if gbp <= 0 else f"estimate £{gbp:.2f} renders £0"
+                    # ×5 SELF-CONSISTENCY (2026-07-11 run 59: a REAL £0.14 catalogue
+                    # estimate floored to the £3 noun floor tripped the engine's own
+                    # per-line ×5 price invariant — the floor manufactured the very
+                    # wrongness the invariant polices). A line with a KNOWN sub-£0.5
+                    # price keeps within ×3 of its truth (still non-zero-rendering at
+                    # 2 dp); only a genuinely price-less line takes the full noun floor.
+                    if gbp > 0:
+                        _cf = min(_cf, max(round(gbp * 3.0, 2), 0.5))
+                    _why = "no DB price" if gbp <= 0 else f"estimate £{gbp:.2f} renders £0 at integer display"
                     gbp = _cf
                     basis = (basis + f" · commodity-floor ({_why}; '{_cnoun}' → £{_cf:g})"
                              if "commodity-floor" not in basis else basis)

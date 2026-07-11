@@ -1655,8 +1655,16 @@ def main() -> int:
                 # receives feeds but is the END of the control circuit — no
                 # downstream load edge is required. Universal: role noun.
                 r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
-                r"\bhmi\b|touchscreen|control\s+panel\b",
+                r"\bhmi\b|touchscreen|control\s+panel\b|"
+                # busbar ACCESSORIES + pack interconnect work (2026-07-11 run 59:
+                # 'Busbar Connectors' false-flagged missing_input+output — a stamped
+                # connector strip is bus HARDWARE, the electrical analogue of a pipe
+                # fitting; the busbar it serves carries the drawn edges).
+                r"busbar\s+(?:connectors?|interconnects?)|bus\s?bar\s+(?:connectors?|interconnects?)",
                 name_l, re.I))
+            # bus hardware needs neither direction drawn
+            if re.search(r"busbar\s+(?:connectors?|interconnects?)", name_l, re.I):
+                needs_in = False
             needs_in = not is_origin and not (is_terminal_elec and not has_any)
             needs_out = not is_sink and not is_terminal_elec
             ok = True
@@ -1681,7 +1689,12 @@ def main() -> int:
             # (codema X-120..X-135 duplicate top-level rows inside EP-105).
             if tag in _cabinet_content_tags:
                 continue
-            if not has_any:
+            # a TELEMETRY/SCADA GATEWAY aggregates other controllers' data upstream —
+            # it is the network EDGE, not a device commander; requiring a drawn
+            # 'controls' edge false-orphans it on every compact product whose comms
+            # ride the control bus (2026-07-11 run 59, X-141 SCADA Gateway).
+            _is_net_edge = bool(re.search(r"gateway|telemetry|remote\s+monitor|router|modem", name_l, re.I))
+            if not has_any and not _is_net_edge:
                 connectivity_concerns.append({
                     "tag": tag, "name": e["name"], "type": etype,
                     "issue": "orphan_controller",

@@ -1169,8 +1169,27 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # principals left every small part UNIDENTIFIABLE on the sheet — v58b GA coverage
     # 24/37: P-101 / P-104 / P-106 / M-101 / I-102 were DRAWN but untagged. A GA must
     # honestly NAME every part it draws. proveCatch in _selftest.
-    for p, kx, ky in keynotes:
-        plan_tags.add(kx, ky + 2.7, p.tag, 7.5, anchor_pt=(kx, ky))
+    # KEYNOTE DENSITY COLLAPSE (2026-07-11 run 59, sealed product: 30+ DISTINCT small
+    # parts in a 0.6×0.2 m cabinet plan piled 26 illegible tags — the G9 gate failed and
+    # corroborated the vision critic's 'garbled' verdict. At keynote densities no ladder
+    # can help, the honest engineering convention is module-ranged group tags on the
+    # plan; the equipment schedule ON THIS SHEET names every member individually.
+    # Signal-keyed on COUNT, never a class: a normal plant (few keynotes) is untouched.)
+    if len(keynotes) >= 15:
+        _groups: dict = {}
+        for p, kx, ky in keynotes:
+            _groups.setdefault(str(getattr(p, "module", "") or "misc"), []).append((p, kx, ky))
+        for _mod, members in sorted(_groups.items()):
+            _tags = sorted({str(m[0].tag) for m in members})
+            _lbl = _tags[0] if len(_tags) == 1 else f"{_tags[0]}…{_tags[-1]} ({len(_tags)})"
+            _cx = sum(m[1] for m in members) / len(members)
+            _cy = sum(m[2] for m in members) / len(members)
+            plan_tags.add(_cx, _cy + 2.7, _lbl, 7.5, anchor_pt=(_cx, _cy))
+        print(f"[ga] keynote density collapse: {len(keynotes)} small-part tags → "
+              f"{len(_groups)} module-range tag(s); every member named in the schedule")
+    else:
+        for p, kx, ky in keynotes:
+            plan_tags.add(kx, ky + 2.7, p.tag, 7.5, anchor_pt=(kx, ky))
     plan_tags.flush()
     # FUNCTION-SEGREGATED PLANT ROOMS (RULE 6, Sam Green SME review 2026-07-08) —
     # walled partitions between function-incompatible equipment groups (today:

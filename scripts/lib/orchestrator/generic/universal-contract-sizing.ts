@@ -4345,7 +4345,16 @@ function sizeMainIncomer(
   }
   const PF = 0.9
   const MARGIN = 1.25
-  const iReq = (connectedKw * 1000) / (Math.sqrt(3) * vLine * PF) * MARGIN
+  // PHASE-AWARE + REAL-DEVICE FLOOR (2026-07-11 run 59: at the honest 0.21 kW aux load
+  // the 3-phase formula on a 230 V SINGLE-phase system minted main_incomer_breaker_a=0
+  // — and the 'incomer kVA >= load x 1.25' invariant then failed on the engine's own
+  // zero. Single-phase below 250 V: I = P/(V·PF); and no real incomer breaker is
+  // smaller than a 6 A MCB.)
+  const singlePhase = vLine <= 250
+  const iReqRaw = singlePhase
+    ? (connectedKw * 1000) / (vLine * PF) * MARGIN
+    : (connectedKw * 1000) / (Math.sqrt(3) * vLine * PF) * MARGIN
+  const iReq = Math.max(6, iReqRaw)
   const frameA = nextBreakerFrameA(iReq)
 
   // Stamp the frame onto every main-incomer word (overwrite a mispinned rating). Mark it
@@ -4368,12 +4377,12 @@ function sizeMainIncomer(
   quantities['main_incomer_breaker_frame_a'] = frameA
   if (contract) {
     const cq = ((contract as { quantities?: Record<string, unknown> }).quantities ??= {}) as Record<string, unknown>
-    const basis = `main incomer sized from the connected electrical load ${Math.round(connectedKw)} kW: I = P·1000/(√3·${vLine}·${PF})·${MARGIN} = ${Math.round(iReq)} A → next standard ${frameA} A ACB frame`
+    const basis = `main incomer sized from the connected electrical load ${connectedKw.toFixed(2)} kW: I = P·1000/(${singlePhase ? '' : '√3·'}${vLine}·${PF})·${MARGIN} = ${iReqRaw.toFixed(2)} A → ${Math.round(iReq)} A (≥6 A real-device floor) → next standard ${frameA} A frame`
     // lineage.from = the load quantity it was sized from, so the breaker rating traces back to the brief.
     // breaker_a is a CLEAN function of the connected load → carry an Excel formula (the constants vLine/PF/
     // margin are embedded as used) so the Excel renders it as a LIVE, provable cell, not a bare number.
     const breakerLineage = { from: ['connected_electrical_load_kw'], via: 'calculator',
-      formula: `ROUND(connected_electrical_load_kw*1000/(SQRT(3)*${vLine}*${PF})*${MARGIN},0)` }
+      formula: singlePhase ? `MAX(6,ROUND(connected_electrical_load_kw*1000/(${vLine}*${PF})*${MARGIN},0))` : `MAX(6,ROUND(connected_electrical_load_kw*1000/(SQRT(3)*${vLine}*${PF})*${MARGIN},0))` }
     // frame_a is the next STANDARD ACB frame (a discrete lookup, not a clean formula) → lineage only.
     const frameLineage = { from: ['main_incomer_breaker_a'], via: 'calculator' }
     cq['main_incomer_breaker_a'] = { value: Math.round(iReq), unit: 'A', family: 'current', scope: 'system', source: 'calculator', source_detail: basis, lineage: breakerLineage }

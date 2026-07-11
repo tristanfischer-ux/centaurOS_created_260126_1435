@@ -598,6 +598,13 @@ def synthesise_equipment_feeders(total_current_a: float,
         lbl, isb = _cable_or_busbar_label(i_a)
         nm = g["name"] + (f" ×{g['n']}" if g["n"] > 1 else "")
         note = "" if key in known_kw else "even split of unallocated load"
+        # ZERO-LOAD DEVICES ARE NOT CIRCUITS (2026-07-11 run 59: bus protection /
+        # filter components synthesised 0.00 kW MCB rows on the DC sub-board — 9/14
+        # rows then failed the panel's own column contract on 'connected load
+        # missing'. A device that draws nothing is bus-work / a component, already
+        # listed in the board-components schedule, never an outgoing circuit.)
+        if kw < 0.01:
+            continue
         feeders.append(Feeder(name=nm, load_kw=round(kw, 1) if kw else None,
                               current_a=round(i_a, 1), size_label=lbl,
                               voltage_v=voltage_v, is_busbar=isb, note=note))
