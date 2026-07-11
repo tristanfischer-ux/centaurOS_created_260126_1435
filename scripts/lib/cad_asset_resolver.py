@@ -144,6 +144,27 @@ class CadAssetResolver:
                 (family,),
             ).fetchone()
             if family_row:
+                # A family mesh is safe for the current render, but a writable
+                # resolver still queues the exact identity so the library grows
+                # toward manufacturer geometry over time.
+                if (queue_on_miss and not self.read_only
+                        and manufacturer_norm and mpn_norm):
+                    identity_key = f"{manufacturer_norm}:{mpn_norm}:{family}"
+                    connection.execute(
+                        """
+                        INSERT OR IGNORE INTO cad_search_attempts
+                            (identity_key, manufacturer_norm, mpn_norm, family,
+                             status, attempted_at)
+                        VALUES (?, ?, ?, ?, 'pending', ?)
+                        """,
+                        (
+                            identity_key,
+                            manufacturer_norm,
+                            mpn_norm,
+                            family,
+                            datetime.now(timezone.utc).isoformat(),
+                        ),
+                    )
                 return self._resolved_from_row(family_row, "family")
 
             if queue_on_miss and not self.read_only:
@@ -257,4 +278,42 @@ class CadAssetResolver:
                 "SELECT * FROM cad_search_attempts ORDER BY attempted_at"
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def pending_search_attempts(self, limit: int = 25) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM cad_search_attempts
+                WHERE status = 'pending'
+                ORDER BY attempted_at
+                LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_search_attempt(
+        self,
+        identity_key: str,
+        status: str,
+        failure_reason: Optional[str] = None,
+    ) -> None:
+        if self.read_only:
+            raise RuntimeError("read-only CAD resolver cannot update search attempts")
+        if status not in {"pending", "resolved", "not_found", "rejected", "failed"}:
+            raise ValueError(f"unsupported CAD search status: {status}")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE cad_search_attempts
+                SET status=?, failure_reason=?, attempted_at=?
+                WHERE identity_key=?
+                """,
+                (
+                    status,
+                    failure_reason,
+                    datetime.now(timezone.utc).isoformat(),
+                    identity_key,
+                ),
+            )
 

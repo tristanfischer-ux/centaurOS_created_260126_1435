@@ -302,7 +302,22 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--state", required=True, help="absolute path to state.json")
     p.add_argument("--out-dir", required=True, help="directory to write images into")
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="rerender even when hero/module outputs already exist",
+    )
+    p.add_argument(
+        "--cycles-samples",
+        type=int,
+        default=None,
+        help="override product Cycles samples (8-512; default 64)",
+    )
     args = p.parse_args()
+    if args.cycles_samples is not None:
+        if not 8 <= args.cycles_samples <= 512:
+            p.error("--cycles-samples must be between 8 and 512")
+        os.environ["BLENDER_CYCLES_SAMPLES"] = str(args.cycles_samples)
 
     state_path = Path(args.state).resolve()
     out_dir = Path(args.out_dir).resolve()
@@ -333,7 +348,8 @@ def main() -> int:
     existing_hero = out_dir / "00-hero.png"
     existing_cover = out_dir / "blender-cover.png"
     existing_modules = list(out_dir.glob("module-*.png"))
-    if existing_hero.exists() and existing_cover.exists() and existing_modules:
+    if (not args.force and existing_hero.exists()
+            and existing_cover.exists() and existing_modules):
         print(
             f"[render-scene] outputs already present "
             f"({len(existing_modules)} modules + hero + blender-cover); "

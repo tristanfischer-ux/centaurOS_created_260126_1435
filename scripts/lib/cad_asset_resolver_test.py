@@ -74,6 +74,7 @@ class CadAssetResolverTest(unittest.TestCase):
 
         self.assertIsNotNone(resolved)
         self.assertEqual(resolved.resolution_tier, "family")
+        self.assertEqual(len(self.resolver.pending_search_attempts()), 1)
 
     def test_read_only_render_consumer_cannot_write(self):
         reader = CadAssetResolver(
