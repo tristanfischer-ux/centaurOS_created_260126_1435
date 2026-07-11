@@ -142,6 +142,11 @@ _PRODUCT_PROMPT = (
     "  • a BLANK/empty render (no product visible)\n"
     "  • garbled/exploded geometry (parts scattered outside the body)\n"
     "  • the product cropped/overflowing the frame or absurdly small in it\n"
+    "  • a HOLLOW INTERIOR: a cutaway/translucent view whose visible internals occupy well "
+    "under half of the enclosure — a real sealed product (battery wall unit, charger, "
+    "converter cabinet) is engineered DENSE: a dominant pack/stack block plus stacked "
+    "electronics filling the body. Mostly empty air inside the shell is broken:true "
+    "('hollow interior'), even when nothing is geometrically damaged.\n"
     "Reply with STRICT JSON only: {\"broken\": true|false, \"defects\": [\"short description\", ...]}."
 )
 

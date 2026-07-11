@@ -1037,7 +1037,8 @@ def orient_billboards_to_camera(loc, target):
 
 def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_containment",
                         flat_form_factor=False, hero_camera_override=None,
-                        hero_cycles=False, hero_open_frame=False):
+                        hero_cycles=False, hero_open_frame=False,
+                        spatial_bbox_override=None):
     """Render the standard Forge engineering set:
     - 3 spatial views (top + corner FR + corner BL), no Freestyle
     - 1 Option-2 hero (ghosted structure + saturated modules), no Freestyle
@@ -1067,7 +1068,11 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     scene = bpy.context.scene
 
     # ─── Pass 1: 3 spatial views ───
-    bbox = compute_scene_bbox()
+    # spatial_bbox_override: a sealed-product scene adds a room-scale mounting wall
+    # for the hero — compute_scene_bbox() then frames the WALL and the corner/top
+    # views render a plate on a slab with the product a sliver (powerwall run 73).
+    # The caller passes the PRODUCT bbox so the spatial views frame the product.
+    bbox = spatial_bbox_override or compute_scene_bbox()
     cams = nine_shot_cameras(bbox)
     disable_freestyle()
     for cam_spec in cams:

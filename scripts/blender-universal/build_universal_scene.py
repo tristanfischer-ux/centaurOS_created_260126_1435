@@ -11933,35 +11933,96 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
         if plist:
-            n = len(plist)
-            cols = max(1, min(n, int(iw // (min_slot_w + gap))))
-            rows = int(math.ceil(n / float(cols)))
-            row_h = band_h / rows
-            slot_w = (iw - gap * (cols - 1)) / cols
-            for i, p in enumerate(plist):
-                r_i, c_i = divmod(i, cols)
-                fit = None
-                own = p.dim if isinstance(p.dim, dict) else None
-                if own:
-                    w0 = float(own.get("w_mm") or own.get("dia_mm") or 0)
-                    d0 = float(own.get("d_mm") or own.get("dia_mm") or 0)
-                    h0 = float(own.get("h_mm") or own.get("len_mm") or 0)
-                    if 0 < w0 <= slot_w and 0 < d0 <= idep and 0 < h0 <= row_h * 0.95:
-                        fit = (w0, d0, h0)   # the word's OWN dims — real size, kept
-                if fit is None:
-                    hsh = sum(ord(c) for c in str(p.name)) % 97
-                    wf = 0.55 + 0.40 * (hsh / 96.0)
-                    hf = 0.45 + 0.45 * (((hsh * 7) % 97) / 96.0)
-                    fit = (max(20.0, slot_w * wf), idep * 0.78,
-                           max(16.0, row_h * 0.82 * hf))
+            # PACK-ARRAY expansion (2026-07-11 run 73, Tristan vs the LTEC PW3 teardown:
+            # "it does not really look like the internals of a powerwall" — 88 LFP cells
+            # rendered as ONE 99 mm box, interior ~3% full). A qty-N part (N ≥ 8) IS a
+            # dense pack/stack physically — it becomes a band-filling envelope with
+            # module-pitch segmentation grooves (the 26-module look), never one small
+            # box. Signal: the part's own qty; no class table.
+            arr = [p for p in plist
+                   if int(float(getattr(p, "qty", 1) or 1)) >= 8]
+            rest = [p for p in plist if p not in arr]
+            arr_w_total = (iw * (0.74 if rest else 1.0)) if arr else 0.0
+            _ax = -iw / 2
+            for p in arr:
+                seg_w = arr_w_total / len(arr) - (gap if rest else 0.0)
+                qn = int(float(getattr(p, "qty", 1) or 1))
+                pk_d, pk_h = idep * 0.90, band_h * 0.92
                 p.shape = "box"
-                p.dim = parse_dimension(f"{fit[0]:.0f}x{fit[1]:.0f}x{fit[2]:.0f} mm")
-                cx = -iw / 2 + slot_w / 2 + c_i * (slot_w + gap)
-                asm, anchors = build_part(p, cx, 0.0, z_cursor + r_i * row_h, MAT, MO)
+                p.dim = parse_dimension(f"{seg_w:.0f}x{pk_d:.0f}x{pk_h:.0f} mm")
+                cx = _ax + seg_w / 2
+                asm, anchors = build_part(p, cx, 0.0, z_cursor, MAT, MO)
                 p.obj_anchor, p.anchors = asm, anchors
                 p.placed_xyz_mm = anchors["centre"]
-            print(f"[univ][sealed] zone {key}: {n} part(s) in {rows} row(s) × "
-                  f"{cols} col(s), band {band_h:.0f} mm at z {z_cursor - base_z:.0f}")
+                # a real pack is DARK (cell cans / module lids) — recolour the envelope
+                # so the cutaway reads as a battery pack through the translucent skin,
+                # not another ghost-white slab (Tristan vs the Tesla reference)
+                _pk_mat = fl.make_mat("m_se_pack", fl._to_linear((0.16, 0.17, 0.20)),
+                                      metallic=0.35, roughness=0.55)
+                _pref = "u_" + re.sub(r"[^a-z0-9]+", "_", str(p.name).lower()).strip("_")[:40]
+                if hasattr(bpy, "data") and hasattr(bpy.data, "objects"):
+                    for _o in bpy.data.objects:
+                        if getattr(_o, "type", None) == "MESH" and _o.name.startswith(_pref):
+                            _o.data.materials.clear()
+                            _o.data.materials.append(_pk_mat)
+                # module-pitch grooves on the front face — one thin divider per module
+                # segment (cap by legible pitch, min 30 mm); light so they contrast the
+                # dark pack body
+                n_seg = max(2, min(qn, int(seg_w // 30.0)))
+                _gm = fl.make_mat("m_se_groove", fl._to_linear((0.55, 0.57, 0.60)),
+                                  metallic=0.5, roughness=0.4)
+                for j in range(1, n_seg):
+                    gx = _ax + j * (seg_w / n_seg)
+                    fl.add_box(f"{_pref}_seg_{j}",
+                               (gx * fl.MM, (-pk_d / 2 + 1.5) * fl.MM,
+                                (z_cursor + pk_h / 2) * fl.MM),
+                               (2.5 * fl.MM, 3.0 * fl.MM, pk_h * 0.96 * fl.MM),
+                               _gm, module=getattr(p, "module", sid), module_objects=MO)
+                _ax += seg_w + gap
+                print(f"[univ][sealed] zone {key}: PACK-ARRAY '{p.name}' qty {qn} → "
+                      f"{seg_w:.0f}×{pk_d:.0f}×{pk_h:.0f} mm, {n_seg} segments")
+            rest_x0 = _ax
+            rest_w = iw / 2 - rest_x0 if arr else iw
+            n = len(rest)
+            if n:
+                cols = max(1, min(n, int(rest_w // (min_slot_w + gap)) or 1))
+                rows = int(math.ceil(n / float(cols)))
+                row_h = band_h / rows
+                slot_w = max(24.0, (rest_w - gap * (cols - 1)) / cols)
+                for i, p in enumerate(rest):
+                    r_i, c_i = divmod(i, cols)
+                    fit = None
+                    own = p.dim if isinstance(p.dim, dict) else None
+                    if own:
+                        w0 = float(own.get("w_mm") or own.get("dia_mm") or 0)
+                        d0 = float(own.get("d_mm") or own.get("dia_mm") or 0)
+                        h0 = float(own.get("h_mm") or own.get("len_mm") or 0)
+                        if 0 < w0 <= slot_w and 0 < d0 <= idep and 0 < h0 <= row_h * 0.95:
+                            fit = (w0, d0, h0)   # the word's OWN dims — real size, kept
+                    if fit is None:
+                        # ZONE-FILL sizing (run 73): a sealed product's interior is
+                        # designed FULL — dead volume is wasted product. Principal
+                        # zones (energy/power) fill their slots; small-gear bands keep
+                        # legible slack. Hash variation stays so no two read identical.
+                        hsh = sum(ord(c) for c in str(p.name)) % 97
+                        if key in ("energy", "power"):
+                            wf = 0.84 + 0.13 * (hsh / 96.0)
+                            hf = 0.78 + 0.17 * (((hsh * 7) % 97) / 96.0)
+                            df = 0.88
+                        else:
+                            wf = 0.62 + 0.33 * (hsh / 96.0)
+                            hf = 0.55 + 0.35 * (((hsh * 7) % 97) / 96.0)
+                            df = 0.82
+                        fit = (max(20.0, slot_w * wf), idep * df,
+                               max(16.0, row_h * 0.82 * hf))
+                    p.shape = "box"
+                    p.dim = parse_dimension(f"{fit[0]:.0f}x{fit[1]:.0f}x{fit[2]:.0f} mm")
+                    cx = rest_x0 + slot_w / 2 + c_i * (slot_w + gap)
+                    asm, anchors = build_part(p, cx, 0.0, z_cursor + r_i * row_h, MAT, MO)
+                    p.obj_anchor, p.anchors = asm, anchors
+                    p.placed_xyz_mm = anchors["centre"]
+                print(f"[univ][sealed] zone {key}: {n} part(s) in {rows} row(s) × "
+                      f"{cols} col(s), band {band_h:.0f} mm at z {z_cursor - base_z:.0f}")
         z_cursor += band_h
 
     # 4. SKIN parts as thin plates cycled over the faces (front, left, right, top) —
@@ -12082,6 +12143,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     if _outside:
         print(f"[univ][sealed] STILL-OUTSIDE after clamp: {_outside[:6]}")
 
+    # INTERIOR-FILL self-check (2026-07-11 run 73, the empty-shell render): re-measure
+    # the property the pack-array + zone-fill sizing claims to enforce — Σ per-part
+    # bbox volume / interior volume. The LTEC PW3 teardown shows a real sealed product
+    # interior is DENSE; ~3% fill was the broken render. Printed here + gated by
+    # drawing_gates G10 off the parts-manifest, so a regression names itself.
+    _fill_num = 0.0
+    for zp in parts:
+        bb = _prefix_bbox(_prefix_of(zp.name))
+        if bb:
+            lo, hi = bb
+            _fill_num += max(0.0, (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2]))
+    _int_vol = ((_int_hi[0] - _int_lo[0]) * (_int_hi[1] - _int_lo[1])
+                * (_int_hi[2] - _int_lo[2]))
+    if _int_vol > 0:
+        print(f"[univ][sealed] INTERIOR-FILL {100.0 * _fill_num / _int_vol:.0f}% "
+              f"(Σ part bboxes / interior volume)")
+
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's
     #     hero shot is the PRODUCT — one sealed body at the brief dims — never an open
@@ -12113,39 +12191,65 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         _skin_mod = parts[0].module_id if parts else sid
         if _skin_mod not in MO:
             MO[_skin_mod] = []
-        _ob = fl.add_box("u_se_product_body", _mm3((0.0, 0.0, base_z + H / 2)),
-                         _mm3((W, D, H)), body_mat, module=_skin_mod, module_objects=MO)
-        _ob.dimensions = _mm3((W, D, H))   # add_box halves; set true size
-        # inset front face panel (the visual parting line every wall unit has)
-        _of = fl.add_box("u_se_product_face", _mm3((0.0, -D / 2 - 2.0, base_z + H / 2)),
-                         _mm3((W * 0.92, 4.0, H * 0.94)), panel_mat, module=_skin_mod, module_objects=MO)
-        _of.dimensions = _mm3((W * 0.92, 4.0, H * 0.94))
-        # vent slots near the top + bottom of the front face — one slot per real
-        # air-mover part (fan / vent / louvre), capped at 4, derived not invented
+        # TRUE CUTAWAY (2026-07-11 run 73, Tristan vs the Tesla/LTEC references: the
+        # closed translucent box + inset face panel stacked 3-4 pale alpha layers in
+        # front of the internals — everything washed to ghost-white). The hero body is
+        # now an OPEN-FRONT shell: back/left/right/top/bottom plates + a front band
+        # across the top fifth (product identity + the vent field), so the pack and
+        # electronics below it are seen DIRECTLY, one translucent side wall at most.
+        tt = max(6.0, min(W, D) * 0.02)
+        for bnm, bloc, bsize in [
+            ("u_se_product_back",   (0.0, D / 2 - tt / 2, base_z + H / 2), (W, tt, H)),
+            ("u_se_product_left",   (-W / 2 + tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
+            ("u_se_product_right",  (W / 2 - tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
+            ("u_se_product_top",    (0.0, 0.0, base_z + H - tt / 2), (W, D, tt)),
+            ("u_se_product_bottom", (0.0, 0.0, base_z + tt / 2), (W, D, tt)),
+            ("u_se_product_band",   (0.0, -D / 2 + tt / 2, base_z + H * 0.90), (W, tt, H * 0.20)),
+        ]:
+            _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
+                             module=_skin_mod, module_objects=MO)
+            _ob.dimensions = _mm3(bsize)
+        # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4
         n_vents = min(4, max(1, sum(1 for p in parts
                                     if re.search(r"\bfan\b|vent|louvre|duct", str(p.name), re.I))))
         slot_w = W * 0.78
         for vi in range(n_vents):
-            vz = base_z + H * (0.90 - 0.045 * vi)
-            _ov = fl.add_box(f"u_se_product_vent_{vi}", _mm3((0.0, -D / 2 - 5.0, vz)),
+            vz = base_z + H * (0.955 - 0.035 * vi)
+            _ov = fl.add_box(f"u_se_product_vent_{vi}", _mm3((0.0, -D / 2 - 3.0, vz)),
                              _mm3((slot_w, 3.0, H * 0.012)), vent_mat, module=_skin_mod, module_objects=MO)
             _ov.dimensions = _mm3((slot_w, 3.0, H * 0.012))
         # deepen the internal palette — pastel module hues wash out behind the
         # ghosted shell under the white-world hero light; scale each placed part's
         # diffuse toward saturation so the pack/inverter/controls zones read.
         _deep_cache = {}
+        # PACK-ARRAY parts keep their dark pack body + light module-pitch grooves — the
+        # deep-hue repaint below was washing the battery pack back to ghost-white
+        # (run 73: the whole cutaway read as one pale slab against the Tesla reference)
+        _pk_hero = fl.make_mat("m_se_pack_hero", fl._to_linear((0.13, 0.14, 0.17)),
+                               metallic=0.35, roughness=0.5)
+        _seg_hero = fl.make_mat("m_se_seg_hero", fl._to_linear((0.60, 0.62, 0.65)),
+                                metallic=0.5, roughness=0.35)
         for _p in parts:
             _hue = _module_hue(_p.module_id)
             _key = f"m_se_deep_{_p.module_id}"
             if _key not in _deep_cache:
-                _deep_cache[_key] = fl.make_mat(_key, tuple(c * 0.55 for c in _hue),
+                # linear-space conversion (run 73: raw 0.55×hue in linear renders pale —
+                # the power/control blocks above the pack washed out even with the
+                # open-front cutaway)
+                _deep_cache[_key] = fl.make_mat(_key, fl._to_linear(tuple(c * 0.55 for c in _hue)),
                                                 metallic=0.15, roughness=0.5)
+            _is_pack = int(float(getattr(_p, "qty", 1) or 1)) >= 8
             _pref = "u_" + re.sub(r"[^a-z0-9]+", "_", str(_p.name).lower()).strip("_")[:40]
             for _obj in bpy.data.objects:
                 if getattr(_obj, "type", None) == "MESH" and _obj.name.startswith(_pref) \
                         and _obj.data is not None:
                     _obj.data.materials.clear()
-                    _obj.data.materials.append(_deep_cache[_key])
+                    if "_seg_" in _obj.name:
+                        _obj.data.materials.append(_seg_hero)
+                    elif _is_pack:
+                        _obj.data.materials.append(_pk_hero)
+                    else:
+                        _obj.data.materials.append(_deep_cache[_key])
         # MOUNTING WALL (2026-07-10, the vision critic's 'floating disconnected object'
         # + my own look at the hero: a WALL-mounted product hanging in white space with
         # no wall reads as floating). One large neutral vertical plane directly behind
@@ -18008,10 +18112,19 @@ def main():
             _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.35),
                          "target": _pc,
                          "ortho_scale": max(_horiz, _vert * _aspect) * 1.12}
+        _spatial_bb = None
+        if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
+            # frame the PRODUCT in the corner/top views too — the mounting wall
+            # dominates compute_scene_bbox() (run 73: corner shot = a plate on a slab)
+            _sw, _sd, _sh = _SEALED_ENV_MM
+            _spatial_bb = ((-_sw / 2 * fl.MM, _sw / 2 * fl.MM),
+                           (-_sd / 2 * fl.MM, _sd / 2 * fl.MM),
+                           (DECK_Z_MM * fl.MM, (DECK_Z_MM + _sh) * fl.MM))
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_camera_override=_hero_cam,
-                               hero_open_frame=not _CONTAINER_LAYOUT)
+                               hero_open_frame=not _CONTAINER_LAYOUT,
+                               spatial_bbox_override=_spatial_bb)
         # 8b. EXTERIOR pass — add the building shell to the SAME scene + render again to a
         #     subdir, so the architectural exterior + the interior layout are the IDENTICAL
         #     plant (two separate processes diverge — placement isn't deterministic across

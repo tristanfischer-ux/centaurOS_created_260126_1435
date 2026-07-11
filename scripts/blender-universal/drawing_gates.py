@@ -661,7 +661,60 @@ def run_gates(out_dir: str) -> list:
                               if not f9 else
                               f"{len(f9)} illegible tag(s): " + " | ".join(f9[:4])))
 
+    # ── G10 INTERIOR FILL (2026-07-11 run 73, the empty-shell render) — a SEALED
+    # sub-1 m³ product's interior must be substantially occupied: Σ part bbox volume /
+    # enclosure interior volume ≥ INTERIOR_FILL_MIN. The 88-cell pack collapsed to one
+    # 99 mm box left the Powerwall render ~3% full — a hollow translucent shell no
+    # buyer would recognise (Tristan vs the LTEC PW3 teardown). Keyed on the SAME
+    # enclosure_volume_m3 < 1 signal as the sealed scene family; plants untouched. ──
+    _encl_m3 = _q(state, "enclosure_volume_m3")
+    if _encl_m3 and 0 < float(_encl_m3) < 1.0 and parts:
+        fill = interior_fill_fraction(parts, float(_encl_m3))
+        if fill is not None:
+            gates.append(Gate("interior_fill", ["renders", "general-arrangement"],
+                              "high", fill >= INTERIOR_FILL_MIN,
+                              f"interior fill {fill * 100:.0f}% of the {float(_encl_m3):.2f} m³ "
+                              f"enclosure (floor {INTERIOR_FILL_MIN * 100:.0f}% — below it the "
+                              f"render is a hollow shell, not a product)"))
+
     return gates
+
+
+def interior_fill_fraction(parts, encl_m3: float):
+    """PURE G10 measure — Σ per-part bbox volume / enclosure volume (0..1), or None
+    when the manifest carries no usable dims. Skin/enclosure/shell parts are excluded
+    (they ARE the boundary, not the contents)."""
+    _skin_rx = re.compile(r"enclosure|cabinet|housing|\bdoor\b|panel|insulation|liner|"
+                          r"gasket|\bseal\b|bracket|mount|cover|lid|skin|chassis|frame", re.I)
+    tot_mm3 = 0.0
+    n_dims = 0
+    for p in parts:
+        if not isinstance(p, dict):
+            continue
+        if _skin_rx.search(str(p.get("name") or "")):
+            continue
+        d = p.get("dims_mm") or p.get("size_mm") or {}
+        if isinstance(d, dict):
+            w, dp, h = (float(d.get("w") or 0), float(d.get("d") or 0),
+                        float(d.get("h") or 0))
+        elif isinstance(d, (list, tuple)) and len(d) == 3:
+            w, dp, h = (float(d[0]), float(d[1]), float(d[2]))
+        else:
+            continue
+        if w > 0 and dp > 0 and h > 0:
+            tot_mm3 += w * dp * h
+            n_dims += 1
+    if n_dims == 0:
+        return None
+    return min(1.0, tot_mm3 / (encl_m3 * 1e9))
+
+
+# G10 floor: a sealed product interior below this fill fraction renders as an empty
+# shell. Run 73's shipped manifest measured 0.27 (toy boxes + the 88-cell pack
+# collapsed to one 99 mm box — visually hollow); the pack-array + zone-fill sizing
+# lands ~0.45-0.65. A future legitimately-sparse sealed archetype (e.g. a dock that
+# HOUSES a vehicle) needs its own regime signal, not a lowered floor.
+INTERIOR_FILL_MIN = 0.35
 
 
 # A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam
@@ -685,6 +738,7 @@ GATE_STAGE = {
     "site_utilisation": "deterministic_layout min-area fold + periphery row + ground-slab 3 m apron (the deck must hug the plant hull)",
     "connection_sanity": "derive-topology role ranks (spine direction) + connection_ledger finalize (service-domain drop + flow-unit canonicalisation) + design-loop writeback reconcile bound",
     "tag_legibility": "draw_ga _TagPlacer (view-bounds clip + title/dim obstacles + elev same-name range-collapse) + _draw_external_drain_points (same-edge EXT.DRAIN range-collapse + along-edge stagger)",
+    "interior_fill": "build_universal_scene place_sealed_enclosure (pack-array expansion + zone-fill sizing)",
 }
 
 
@@ -801,6 +855,19 @@ def _selftest() -> int:
         not [r for r in _g4_elec if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
     chk("g4_fluid_route_survives",
         [r for r in _g4_fluid if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
+    # G10 interior-fill proveCatch (2026-07-11 run 73): the REAL shipped manifest shape —
+    # 33 small boxes ≈ 3% of the 0.13 m³ enclosure — FIRES; a pack-array interior
+    # (~50%) passes; skin parts are excluded from the numerator both ways.
+    _g10_sparse = ([{"name": f"Part {i}", "dims_mm": {"w": 90, "d": 135, "h": 85}}
+                    for i in range(33)]   # ≈ run-73's real 27% — must FIRE
+                   + [{"name": "Enclosure Housing", "dims_mm": {"w": 1105, "d": 193, "h": 609}}])
+    _g10_dense = [{"name": "LFP Prismatic Cells", "dims_mm": {"w": 700, "d": 160, "h": 500}},
+                  {"name": "DC AC Inverter Module", "dims_mm": {"w": 570, "d": 120, "h": 220}}]
+    _f_sparse = interior_fill_fraction(_g10_sparse, 0.13)
+    _f_dense = interior_fill_fraction(_g10_dense, 0.13)
+    chk("g10_sparse_interior_fires", _f_sparse is not None and _f_sparse < INTERIOR_FILL_MIN)
+    chk("g10_dense_interior_passes", _f_dense is not None and _f_dense >= INTERIOR_FILL_MIN)
+    chk("g10_no_dims_abstains", interior_fill_fraction([{"name": "X"}], 0.13) is None)
     # no stray beam: a compact 8 m run passes; the v44 33 m MCC spine fails (proveCatch)
     def _span(wps):
         xs = [w[0] for w in wps]; ys = [w[1] for w in wps]
