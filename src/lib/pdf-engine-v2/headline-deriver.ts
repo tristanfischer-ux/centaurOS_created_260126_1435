@@ -340,14 +340,28 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
       'derived_from_brief',
     )
   } else if (usableMwh != null) {
-    out.headline_constraint = metric(
-      'usable_capacity_mwh',
-      'Usable energy capacity (derived from cells)',
-      usableMwh.toFixed(2),
-      'MWh',
-      `${totalCells} cells × ${cellAh ?? '?'} Ah × ${cellV ?? '?'} V × ${dod} DoD = ${usableMwh.toFixed(2)} MWh usable.`,
-      'derived_deterministic',
-    )
+    // UNIT-SCALE (2026-07-11 powerwall run 72): the SAME sub-containerised threshold as
+    // headline_output above — a 13.6 kWh wall unit must never print "0.01 MWh" (2 dp in
+    // the wrong scale is a 5-second-glance reject). Signal-keyed on magnitude, not class.
+    if (usableMwh * 1000 < 100) {
+      out.headline_constraint = metric(
+        'usable_capacity_kwh',
+        'Usable energy capacity (derived from cells)',
+        (usableMwh * 1000).toFixed(1),
+        'kWh',
+        `${totalCells} cells × ${cellAh ?? '?'} Ah × ${cellV ?? '?'} V × ${dod} DoD = ${(usableMwh * 1000).toFixed(1)} kWh usable.`,
+        'derived_deterministic',
+      )
+    } else {
+      out.headline_constraint = metric(
+        'usable_capacity_mwh',
+        'Usable energy capacity (derived from cells)',
+        usableMwh.toFixed(2),
+        'MWh',
+        `${totalCells} cells × ${cellAh ?? '?'} Ah × ${cellV ?? '?'} V × ${dod} DoD = ${usableMwh.toFixed(2)} MWh usable.`,
+        'derived_deterministic',
+      )
+    }
   }
 
   out.utilisation = metric(
