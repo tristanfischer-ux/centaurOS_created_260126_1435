@@ -14600,10 +14600,25 @@ def _render_panel_schedule_body(ws: Worksheet, run_dir: str, r: int) -> Optional
                                      f"{_ckname} — evidence",
                                      "; ".join(_rr.get("reasons") or []),
                                      "build-computed reconciliation reasons ('' = clean)")
+                # ONE ARITHMETIC (run-73 one-truth breach): the in-cell verdict states the
+                # SAME rule python applies — ratio in band OR the micro-board ABSOLUTE
+                # clause (|Σ−demand| ≤ 6 A, meaningless-ratio magnitudes). Before this the
+                # formula enforced the bare band and recalculated 0.17 → FAIL → workbook
+                # floor 8.9 while python said 9.2 — the mirrors' number was not live-true.
+                _sar = audit_operand("Electrical · reconciliation",
+                                     f"{_ckname} — Σ circuit current (A)",
+                                     _rr.get("sum_a") if _rr.get("sum_a") is not None else "missing",
+                                     "the schedule's own printed reconciliation line")
+                _dar = audit_operand("Electrical · reconciliation",
+                                     f"{_ckname} — busbar demand (A)",
+                                     _rr.get("demand_a") if _rr.get("demand_a") is not None else "missing",
+                                     "the schedule's own printed reconciliation line")
                 _fx = fx_verdict(
                     _base_terms + [f'{_vdr}="OK"', f"ISNUMBER({_rref})",
-                                   f"{_rref}>={_BOARD_RECON_BAND[0]:g}",
-                                   f"{_rref}<={_BOARD_RECON_BAND[1]:g}",
+                                   f"OR(AND({_rref}>={_BOARD_RECON_BAND[0]:g},"
+                                   f"{_rref}<={_BOARD_RECON_BAND[1]:g}),"
+                                   f"AND(ISNUMBER({_sar}),ISNUMBER({_dar}),"
+                                   f"ABS({_sar}-{_dar})<=6))",
                                    f'LEN(TRIM({_bbr}&""))>0', f'TRIM({_bbr}&"")<>"—"',
                                    f'LEN(TRIM({_evr}&""))=0'],
                     _fx_evidence_expr(_evr, "board reconciliation out of band / busbar rating missing"))
@@ -15792,6 +15807,12 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
                            "op": "board-recon",
                            "ratio": (num(_mrec.group(3)) if _mrec else None),
                            "sched_verdict": (_mrec.group(4).upper() if _mrec else None),
+                           # Σ + demand as NUMBERS so the live formula can state the SAME
+                           # micro-board absolute clause python applies above (run-73
+                           # one-truth breach: in-cell ratio band alone FAILed 0.17 while
+                           # python passed |4−1|≤6 → workbook floor 8.9 vs python 9.2)
+                           "sum_a": (num(_mrec.group(1)) if _mrec else None),
+                           "demand_a": (num(_mrec.group(2)) if _mrec else None),
                            "busbar": _meta.get("busbar rating", "")})
 
     # ── DRAWING ↔ SCHEDULE consistency rows (fix 4): the single-line diagram and the
