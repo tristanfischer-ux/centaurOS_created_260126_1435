@@ -961,6 +961,43 @@ def _equipment_dup_sig(name: str, kw: Optional[float], ways: int,
     return f"{best[1]}|{round(kw, 1)}|{ways}"
 
 
+def _estimate_hub_connected_kw(hub: str, rows: list, state: dict,
+                               voltage_v: Optional[float], is_dc: bool,
+                               phases: int, system: str,
+                               equip_qty: dict) -> float:
+    """Estimate a candidate board's real downstream kW before board roles are named.
+
+    INTENT: MAIN means the distribution node carrying the largest real load, not
+    the node with the most tiny auxiliary targets. This consumes the SAME
+    `_connected_kw_for` evidence the circuit builder uses later, so board choice
+    cannot create a fourth load mint. Target count remains only a tiebreak.
+    """
+    probe = Panel(
+        board_id=hub, name=hub, kind="sub", voltage_v=voltage_v,
+        is_dc=is_dc, phases=phases, system=system,
+    )
+    groups: dict[str, list] = {}
+    for row in rows:
+        if row.get("from") != hub or row.get("role") == "transformer":
+            continue
+        if not _is_terminal_load(row):
+            continue
+        to = row.get("to") or ""
+        match = _RACK_TAP_RE.match(to)
+        base = match.group(1) if match else to
+        groups.setdefault(base, []).append(row)
+
+    total = 0.0
+    for base, grouped in groups.items():
+        schedule_ways = len(grouped)
+        ways = max(schedule_ways, _ledger_qty_for(base, equip_qty))
+        per_way = _connected_kw_for(
+            base, _row_amps(grouped[0]), probe, state, schedule_ways)
+        if per_way is not None and per_way > 0:
+            total += per_way * ways
+    return total
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SCHEDULE RECONSTRUCTION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1023,9 +1060,19 @@ def build_schedules(schedule: dict, state: dict,
     board_ids = [s for s, targets in load_targets.items()
                  if len(targets) >= 2 or _is_named_board(s)]
     load_count = {s: len(t) for s, t in load_targets.items()}
-    # the MAIN board = the busiest BOARD node that is NOT a '*_subdist'.
+    # Choose MAIN before any name/kind-keyed downstream pass runs. Rank by the
+    # same connected-kW evidence `_fill_circuits` later consumes; target count
+    # is only a tiebreak. A 0.2 kW aux fanout must never outrank an 11 kW board.
     non_sub = {s: load_count[s] for s in board_ids if not s.endswith("_subdist")}
-    main_hub = max(non_sub, key=non_sub.get) if non_sub else None
+    hub_kw = {
+        s: _estimate_hub_connected_kw(
+            s, rows, state, voltage_v, is_dc, phases, system, equip_qty)
+        for s in non_sub
+    }
+    main_hub = (
+        max(non_sub, key=lambda s: (hub_kw.get(s, 0.0), non_sub[s], s))
+        if non_sub else None
+    )
     # everything else that bears load is a sub-board (in the D2 case the load lands on a
     # '*_subdist'; without D2 there is only the one main board).
     sub_ids = sorted(s for s in board_ids if s != main_hub)
@@ -1528,22 +1575,24 @@ _RECON_BAND = (0.85, 1.25)
 
 def _demand_needs_circuit_override(raw_a: Optional[float], downstream_a: Optional[float],
                                    schedule_default_a: Optional[float]) -> bool:
-    """True when a board's raw demand reading is PROVABLY a stale schedule-wide placeholder:
-    it equals the schedule's own dominant default AND trusting it would fail the identical
-    reconciliation band `reconcile()` renders. This is the ONE test both `_set_incoming`
-    (MAIN board) and `_set_sub_incoming` (SUB/AUX board) call — before this fix only the MAIN
-    board carried the guard, so a SUB board (e.g. a BESS 'BMS ctrl' aux board) whose own
-    busway-trunk row happened to carry the same 15 A schedule-wide placeholder as everywhere
-    else locked onto a 16 A busbar rating while its own circuits (13 rack feeders) demanded
-    1,685 A — a REVIEW ratio of 112× instead of the true reconciled 1.0×. Root cause fixed at
-    the RULE (both callers), not the one BESS instance."""
+    """True when a raw board demand contradicts the board's own derived circuits.
+
+    A dominant schedule default is direct proof of a placeholder. A different raw
+    value is also stale when it sits outside the shared reconciliation band by more
+    than 0.5 A: `incoming_a` is DEMAND, not a protective-device frame, and therefore
+    must equal the same-domain circuit sum. The busbar RATING remains separately
+    rounded up by `_set_busbar_rating`.
+    """
     if raw_a is None or not downstream_a or schedule_default_a is None:
-        return False
-    if round(raw_a, 1) != round(schedule_default_a, 1):
         return False
     lo, hi = _RECON_BAND
     ratio = downstream_a / raw_a
-    return not (lo <= ratio <= hi)
+    outside_band = not (lo <= ratio <= hi)
+    if not outside_band:
+        return False
+    is_default = round(raw_a, 1) == round(schedule_default_a, 1)
+    material_gap = abs(raw_a - downstream_a) > 0.5
+    return is_default or material_gap
 
 
 def _fill_circuits(panel: Panel, board_id: str, rows, devices, state,
@@ -2091,9 +2140,8 @@ def _set_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: dict
     elif stale_default:
         panel.incoming_a = downstream_a                 # (b) stale wholesale default — use own
         _csa_label = size_cable_csa(downstream_a)[1]     #     circuits' derived sum + cable
-        panel.incoming = (f"{_csa_label or '—'} (re-sized from the board's own {downstream_a:,.0f} A "
-                          f"circuit demand — the schedule's own reading was the "
-                          f"{schedule_default_a:g} A wholesale placeholder)")
+        panel.incoming = (
+            f"{_csa_label or '—'} (derived from {downstream_a:,.1f} A board demand)")
     elif inc is not None:
         panel.incoming_a = raw_a
         panel.incoming = _incoming_descr(inc)            # a genuine reading — show its own cable
@@ -2163,9 +2211,8 @@ def _set_sub_incoming(panel: Panel, board_id: str, rows, schedule: dict, state: 
         if (_demand_needs_circuit_override(mv_a, downstream_a, schedule_default_a)
                 and downstream_a > 0):
             _csa_label = size_cable_csa(downstream_a)[1]
-            panel.incoming = (f"{_csa_label or '—'} (re-sized from the board's own "
-                              f"{downstream_a:,.0f} A circuit demand — the schedule's own "
-                              f"reading was a wholesale placeholder)")
+            panel.incoming = (
+                f"{_csa_label or '—'} (derived from {downstream_a:,.1f} A board demand)")
         else:
             panel.incoming = mv_descr
 
@@ -2326,6 +2373,19 @@ def _reconcile_panels_to_breakdown(panels: list, state: dict) -> None:
                         r"\b\d{1,5}\s*A\b", f"{frame:g} A", c.device, count=1)
                 else:
                     c.device = f"MCB {frame:g} A"
+        # The breakdown changed the circuit kW and therefore the board DEMAND.
+        # Re-mint busbar/incoming demand from the same circuit sum now; leaving
+        # the pre-rescale reading produced a 0.7 A circuit total beside 4.2 A
+        # "demand" even though both rows claimed the same electrical domain.
+        new_demand_a = _circuit_current_sum(p)
+        if new_demand_a > 0:
+            p.incoming_a = new_demand_a
+            p.busbar_a = new_demand_a
+            _set_busbar_rating(p)
+            if not p.transformer:
+                csa_label = size_cable_csa(new_demand_a)[1]
+                p.incoming = (
+                    f"{csa_label or '—'} (derived from {new_demand_a:,.1f} A board demand)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3107,11 +3167,49 @@ def _selftest() -> int:
     a0 = pnl3.circuits[0].design_a or 0
     implied = (kw0 * 1000.0) / (math.sqrt(3) * 400.0 * a0) if a0 > 0 else 0
     chk("I15.implied_pf_eta_in_band", 0.60 <= implied <= 1.05)
+    chk("I15.board_demand_rederived_after_breakdown",
+        abs((pnl3.incoming_a or 0) - _circuit_current_sum(pnl3)) < 0.01)
+
+    # I16 — choice-time board authority uses REAL kW, never target count. A
+    # one-way 11 kW conversion board outranks a seven-target 0.21 kW auxiliary
+    # fanout before either is named MAIN/SUB; no post-fill relabel is required.
+    choice_rows = [
+        {"mechanism": "electrical_bus", "from": "DC Busbar Assembly",
+         "to": "DC DC Converters", "rating": "1.2 A", "role": None},
+        {"mechanism": "electrical_bus", "from": "Busbar Assembly",
+         "to": "Auxiliary Power Supply", "rating": "1.2 A", "role": None},
+        {"mechanism": "electrical_bus", "from": "Busbar Assembly",
+         "to": "Active Ventilation Fan", "rating": "1.2 A", "role": None},
+        {"mechanism": "electrical_bus", "from": "Busbar Assembly",
+         "to": "Audible Alarm", "rating": "1.2 A", "role": None},
+    ]
+    choice_state = {"requirementsBom": [
+        {"requirement": "DC DC Converters · 11.04 kW"},
+        {"requirement": "Auxiliary Power Supply · 0.09 kW"},
+        {"requirement": "Active Ventilation Fan · 0.06 kW"},
+        {"requirement": "Audible Alarm · 0.06 kW"},
+    ]}
+    main_kw = _estimate_hub_connected_kw(
+        "DC Busbar Assembly", choice_rows, choice_state,
+        281.6, True, 1, "282 V DC bus", {})
+    aux_kw = _estimate_hub_connected_kw(
+        "Busbar Assembly", choice_rows, choice_state,
+        281.6, True, 1, "282 V DC bus", {})
+    chk("I16.real_kw_beats_aux_target_count",
+        main_kw >= 10.0 and aux_kw < 1.0 and main_kw > aux_kw)
+
+    # I17 — a non-default raw bus reading that materially contradicts the
+    # same-domain circuit sum is still stale demand data (4.2 A vs 0.7 A).
+    # A genuine in-band reading is retained.
+    chk("I17.nondefault_contradiction_overridden",
+        _demand_needs_circuit_override(4.2, 0.7, 1.2))
+    chk("I17.inband_reading_retained",
+        not _demand_needs_circuit_override(4.2, 4.0, 1.2))
 
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (15 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (17 connected-load reconciliation invariants)")
     return 0
 
 

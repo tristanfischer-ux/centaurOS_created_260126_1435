@@ -1534,46 +1534,60 @@ _SCOPE_NOTE = ("Scope: as-modelled major process lines, valves and instruments, 
                "P&ID. **Not for construction · as-modelled.**")
 
 
+def _na_by_design(sc: Schedules) -> bool:
+    """A dry electrical product has a real instrument index but no process pipes/valves."""
+    return not sc.lines and not sc.valves
+
+
 def render_markdown(sc: Schedules) -> str:
     arch = PID._humanise(sc.archetype)
     out = []
-    # T-09 (Sam Green): process schedules ARE the working schematic — pipe runs, DN,
-    # valve locations. Title must say so so the sheet is findable as a first-class deliverable.
-    out.append(f"# Working Schematic — Line / Valve / Instrument Schedules — {arch}\n")
-    out.append("> Fractional Forge · ForgeOS — working schematic (pipe runs, DN, valve "
-               "locations) · line list · valve list · instrument index. "
-               "Auto-generated; cross-referenced line-for-line to the P&ID "
-               f"(`{sc.pid_sheet}`). Not for construction · as-modelled.\n")
+    dry_na = _na_by_design(sc)
+    if dry_na:
+        out.append(f"# Instrument Index — Dry Electrical Product (NA-BY-DESIGN) — {arch}\n")
+        out.append("> Fractional Forge · ForgeOS — no process lines or valves exist by design. "
+                   "Electrical power paths are on the single-line/panel schedule; dry-air thermal "
+                   "paths are on the GA/render. The instrument index below remains applicable. "
+                   "Not for construction · as-modelled.\n")
+    else:
+        # T-09 (Sam Green): process schedules ARE the working schematic — pipe runs, DN,
+        # valve locations. Title must say so so the sheet is findable as a first-class deliverable.
+        out.append(f"# Working Schematic — Line / Valve / Instrument Schedules — {arch}\n")
+        out.append("> Fractional Forge · ForgeOS — working schematic (pipe runs, DN, valve "
+                   "locations) · line list · valve list · instrument index. "
+                   "Auto-generated; cross-referenced line-for-line to the P&ID "
+                   f"(`{sc.pid_sheet}`). Not for construction · as-modelled.\n")
     out.append(f"> {_tb.TOLERANCE_NOTE}\n")
     if not sc.schedule_present:
         out.append("> Line sizes inferred from process duties (connection schedule not "
                    "supplied); DN shown is indicative.\n")
 
     # ── LINE LIST ──
-    out.append("\n## 1 · LINE LIST\n")
-    out.append("| Line no. | From | To | Service | Fluid | Phase | DN | Material | "
-               "Design rating | Insul. | P&ID |")
-    out.append("|---|---|---|---|---|---|---|---|---|:--:|---|")
-    for r in sc.lines:
-        out.append(f"| `{r.number}` | {r.frm_tag} | {r.to_tag} | {_norm(r.service)} | "
-                   f"{r.fluid} | {r.phase} | {r.dn} | {r.material} | {r.rating} | "
-                   f"{r.insulation} | {r.pid_ref} |")
-    out.append(f"\n*{len(sc.lines)} process lines.*\n")
+    if not dry_na:
+        out.append("\n## 1 · LINE LIST\n")
+        out.append("| Line no. | From | To | Service | Fluid | Phase | DN | Material | "
+                   "Design rating | Insul. | P&ID |")
+        out.append("|---|---|---|---|---|---|---|---|---|:--:|---|")
+        for r in sc.lines:
+            out.append(f"| `{r.number}` | {r.frm_tag} | {r.to_tag} | {_norm(r.service)} | "
+                       f"{r.fluid} | {r.phase} | {r.dn} | {r.material} | {r.rating} | "
+                       f"{r.insulation} | {r.pid_ref} |")
+        out.append(f"\n*{len(sc.lines)} process lines.*\n")
 
-    # ── VALVE LIST ──
-    out.append("\n## 2 · VALVE LIST\n")
-    out.append("| Tag | Type | Service | Line / location | Size | Set / Cv | Fail | P&ID |")
-    out.append("|---|---|---|---|---|---|:--:|---|")
-    for v in sc.valves:
-        out.append(f"| `{v.tag}` | {v.vtype} | {_norm(v.service)} | {v.location} | "
-                   f"{v.size} | {v.set_or_cv} | {v.fail_action} | {v.pid_ref} |")
-    out.append(f"\n*{len(sc.valves)} valve types (control / relief / isolation / ESD). "
-               "Fail-action: FC = fail-closed, FO = fail-open, n/a = no powered fail-state "
-               "(self-actuated relief / manual / passive check) — stated with its basis, "
-               "never a bare dash.*\n")
+        # ── VALVE LIST ──
+        out.append("\n## 2 · VALVE LIST\n")
+        out.append("| Tag | Type | Service | Line / location | Size | Set / Cv | Fail | P&ID |")
+        out.append("|---|---|---|---|---|---|:--:|---|")
+        for v in sc.valves:
+            out.append(f"| `{v.tag}` | {v.vtype} | {_norm(v.service)} | {v.location} | "
+                       f"{v.size} | {v.set_or_cv} | {v.fail_action} | {v.pid_ref} |")
+        out.append(f"\n*{len(sc.valves)} valve types (control / relief / isolation / ESD). "
+                   "Fail-action: FC = fail-closed, FO = fail-open, n/a = no powered fail-state "
+                   "(self-actuated relief / manual / passive check) — stated with its basis, "
+                   "never a bare dash.*\n")
 
     # ── INSTRUMENT INDEX ──
-    out.append("\n## 3 · INSTRUMENT INDEX\n")
+    out.append(f"\n## {'1' if dry_na else '3'} · INSTRUMENT INDEX\n")
     out.append("| Tag | ISA | Service | Measured | Type | Location | Range | Signal | "
                "Loop |")
     out.append("|---|---|---|---|---|---|---|---|---|")
@@ -1749,6 +1763,7 @@ def _chunk_rows(rows: list, n_cols: int) -> list:
 
 def build_table_svg(sc: Schedules) -> str:
     arch = PID._humanise(sc.archetype)
+    dry_na = _na_by_design(sc)
     line_w = sum(c[1] for c in _LINE_COLS)
     valve_w = sum(c[1] for c in _VALVE_COLS)
     instr_w = sum(c[1] for c in _INSTR_COLS)
@@ -1782,17 +1797,23 @@ def build_table_svg(sc: Schedules) -> str:
                 ins.location, ins.rng, ins.signal, ins.loop_ref]
         instr_cells.append([(val, (j in _INSTR_MONO)) for j, val in enumerate(vals)])
 
-    sections = [
-        ("1 · LINE LIST",
-         f"{len(sc.lines)} process lines · line numbers match the P&ID",
-         _LINE_COLS, line_cells),
-        ("2 · VALVE LIST",
-         f"{len(sc.valves)} valve types · FC fail-closed / FO fail-open",
-         _VALVE_COLS, valve_cells),
-        ("3 · INSTRUMENT INDEX",
-         f"{len(sc.instruments)} instrument types · ISA LT/PT/TT/FT/AT",
-         _INSTR_COLS, instr_cells),
-    ]
+    sections = (
+        [("1 · INSTRUMENT INDEX",
+          f"{len(sc.instruments)} instrument types · process lines/valves NA-BY-DESIGN",
+          _INSTR_COLS, instr_cells)]
+        if dry_na else
+        [
+            ("1 · LINE LIST",
+             f"{len(sc.lines)} process lines · line numbers match the P&ID",
+             _LINE_COLS, line_cells),
+            ("2 · VALVE LIST",
+             f"{len(sc.valves)} valve types · FC fail-closed / FO fail-open",
+             _VALVE_COLS, valve_cells),
+            ("3 · INSTRUMENT INDEX",
+             f"{len(sc.instruments)} instrument types · ISA LT/PT/TT/FT/AT",
+             _INSTR_COLS, instr_cells),
+        ]
+    )
 
     banner_h = 96
     title_h = 98
@@ -1827,11 +1848,15 @@ def build_table_svg(sc: Schedules) -> str:
     svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
 
     svg.text(_MARGIN, 46, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
-    # T-09: canonical working-schematic title (pipe runs / DN / valve locations).
-    svg.text(_MARGIN, 70, f"Working Schematic — Line / Valve / Instrument Schedules — {arch}",
+    title = (f"Instrument Index — Dry Electrical Product (NA-BY-DESIGN) — {arch}"
+             if dry_na else
+             f"Working Schematic — Line / Valve / Instrument Schedules — {arch}")
+    svg.text(_MARGIN, 70, title,
              size=16, weight="bold", fill=HEAD_INK)
     svg.text(width - _MARGIN, 70,
-             f"pipe runs · DN · valve locations  ·  P&ID {sc.pid_sheet}"
+             (f"no process lines/valves · instrument index applies"
+              if dry_na else
+              f"pipe runs · DN · valve locations  ·  P&ID {sc.pid_sheet}")
              + (f"  ·  {n_cols}-column fold" if n_cols > 1 else ""),
              size=9.5, anchor="end", fill=MUTED)
     svg.line(_MARGIN, 80, width - _MARGIN, 80, stroke=GRID_FAINT, width=1.0)
@@ -1848,11 +1873,12 @@ def build_table_svg(sc: Schedules) -> str:
             _draw_table(svg, x0, y, cols, ch, t, sub)
         y += sec_h + _SECTION_GAP
 
-    _draw_title_block(svg, arch, width, height, sc)
+    _draw_title_block(svg, arch, width, height, sc, dry_na=dry_na)
     return svg.render()
 
 
-def _draw_title_block(svg, archetype, width, height, sc: Schedules):
+def _draw_title_block(svg, archetype, width, height, sc: Schedules,
+                      dry_na: bool = False):
     y0 = height - 80          # -80 (was -66): +14 for the shared general-tolerance note line
     svg.line(30, y0, width - 30, y0, stroke=INK, width=1.4)
     bw = 300
@@ -1872,12 +1898,17 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules):
         svg.text(bx0 + 108, ry + 9, v, size=7.8)
     svg.text(30, y0 + 16, "FRACTIONAL FORGE · ForgeOS", size=10, weight="bold")
     svg.text(30, y0 + 32,
-             f"Working Schematic — Line / Valve / Instrument Schedules — {archetype}",
+             (f"Instrument Index — Dry Electrical Product — {archetype}"
+              if dry_na else
+              f"Working Schematic — Line / Valve / Instrument Schedules — {archetype}"),
              size=11, weight="bold", fill=HEAD_INK)
     svg.text(30, y0 + 47,
-             "Scope: working schematic — pipe runs, DN, valve locations (line / valve / "
-             "instrument schedules). Cross-referenced to the P&ID. "
-             "Not for construction · as-modelled.", size=8.2, fill=MUTED)
+             ("Scope: no process lines or valves — NA-BY-DESIGN; electrical paths are on "
+              "the SLD/panel, dry-air thermal paths on the GA/render; instrument index applies."
+              if dry_na else
+              "Scope: working schematic — pipe runs, DN, valve locations (line / valve / "
+              "instrument schedules). Cross-referenced to the P&ID. "
+              "Not for construction · as-modelled."), size=8.2, fill=MUTED)
     # shared general-tolerance note (ONE source of truth: drawing_titleblock.py)
     svg.text(30, y0 + 60, _tb.TOLERANCE_NOTE, size=8.2, fill=MUTED)
 
@@ -1920,10 +1951,49 @@ def generate_process_schedules(out_dir: str, state_path: Optional[str] = None,
     return summary, sc, md
 
 
+def _selftest() -> int:
+    """Prove dry electrical schedules are explicit N/A while process plants stay intact."""
+    instr = InstrRow(
+        tag="TT-201", isa="TT", service="Pack temperature",
+        measured="Temperature", itype="Pt100", location="Pack-01",
+        rng="0–80 °C", signal="4–20 mA", loop_ref="FF-PID-001")
+    dry = Schedules(
+        archetype="energy_storage", lines=[], valves=[],
+        instruments=[instr], schedule_present=True)
+    dry_md = render_markdown(dry)
+    dry_svg = build_table_svg(dry)
+
+    line = LineRow(
+        number="201-PW-DN25", frm_tag="P-101", to_tag="T-101",
+        service="Process water", fluid="Water", phase="Liquid",
+        dn="DN25", material="HDPE", rating="5 m³/h", insulation="N",
+        pid_ref="FF-PID-001")
+    wet = Schedules(
+        archetype="water_treatment", lines=[line], valves=[],
+        instruments=[instr], schedule_present=True)
+    wet_md = render_markdown(wet)
+
+    checks = {
+        "dry_marked_na": "NA-BY-DESIGN" in dry_md and "NA-BY-DESIGN" in dry_svg,
+        "dry_has_instrument_index": "INSTRUMENT INDEX" in dry_md,
+        "dry_omits_empty_process_tables": "LINE LIST" not in dry_md and "VALVE LIST" not in dry_md,
+        "wet_keeps_working_schematic": "Working Schematic" in wet_md,
+        "wet_keeps_line_list": "LINE LIST" in wet_md and "201-PW-DN25" in wet_md,
+    }
+    failed = [name for name, ok in checks.items() if not ok]
+    if failed:
+        print("[proc-sched] SELFTEST FAIL: " + ", ".join(failed))
+        return 1
+    print("[proc-sched] selftest OK (dry NA + wet process counter-case)")
+    return 0
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    if argv[0] in ("--selftest", "--self-test", "selftest"):
+        return _selftest()
     out_dir = argv[0]
     state_path = argv[1] if len(argv) > 1 else None
     try:

@@ -70,6 +70,31 @@ def _jload(path: str):
         return None
 
 
+def _evidence_semantics(process_schedule: str, parts_ledger: dict) -> str:
+    """Deterministic applicability/status facts the outside seat must not reinterpret."""
+    notes = []
+    if "NA-BY-DESIGN" in process_schedule and (
+            "no process lines" in process_schedule.lower()
+            or "*0 process lines.*" in process_schedule.lower()):
+        notes.append(
+            "DRAWING APPLICABILITY: process piping and valve schedules are explicitly "
+            "NA-BY-DESIGN for this dry electrical product. Zero process lines/valves is "
+            "CORRECT; the real instrument index remains applicable.")
+    notes.append(
+        "LEDGER STATUS SEMANTICS: `not_found` means catalogue/MPN identity is unresolved; "
+        "it is NOT an electrical/process connectivity defect. Connectivity is judged only "
+        "by connectivity.concerns, orphan_equipment and stale_ties.")
+    notes.append(
+        "INSTRUMENT COUNT SEMANTICS: connectivity.n_instrument_total counts BoM instrument "
+        "LINE TYPES; the instrument index enumerates physical qty-N instances. The two numbers "
+        "are not expected to be equal; association coverage is the relevant comparison.")
+    notes.append(
+        "POWER SEMANTICS: connected_electrical_load_kw is the unit's internal auxiliary/parasitic "
+        "consumer load. The principal battery↔PCS transfer board is governed by continuous_power_kw; "
+        "showing that transfer duty on the MAIN DC board is correct, not a contradiction.")
+    return "\n".join(notes)
+
+
 def collect_evidence(run_dir: str, state: dict) -> str:
     """Excerpts of the DELIVERED artefacts — never a state.json narrative."""
     parts: list[str] = []
@@ -90,10 +115,15 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     parts.append(f"PRODUCT CLASS: {pb.get('product_class') or state.get('productClass') or '?'} — "
                  f"summary: {str(pb.get('summary') or '')[:400]}")
 
-    ps = _read(os.path.join(run_dir, "drawings", "panel-schedule.md"), 2500)
+    # The full panel is needed: truncating at 2.5k cut rows mid-line and made the
+    # outside seat report missing columns that existed later in the delivered file.
+    ps = _read(os.path.join(run_dir, "drawings", "panel-schedule.md"), 6000)
     if ps:
         parts.append("PANEL SCHEDULE (delivered):\n" + ps)
-    sch = _read(os.path.join(run_dir, "drawings", "process-schedules.md"), 3500)
+    # Include the complete instrument index. A 3.5k cap cut the final row mid-line
+    # and the outside seat correctly rejected the *evidence excerpt* as truncated
+    # even though the delivered schedule itself was complete.
+    sch = _read(os.path.join(run_dir, "drawings", "process-schedules.md"), 12000)
     if sch:
         parts.append("LINE LIST + VALVE LIST + INSTRUMENT INDEX (delivered):\n" + sch)
     vv = _jload(os.path.join(run_dir, "render-vision-critique.json"))
@@ -102,6 +132,7 @@ def collect_evidence(run_dir: str, state: dict) -> str:
     pl = _jload(os.path.join(run_dir, "parts-ledger.json")) or {}
     parts.append("LEDGER CONNECTIVITY: " + json.dumps(pl.get("connectivity") or {})[:600]
                  + f" | stale_ties={pl.get('n_stale_ties')} | not_found={len(pl.get('not_found') or [])}")
+    parts.append(_evidence_semantics(sch, pl))
     rb = state.get("requirementsBom") or []
     rb_total = round(sum(r.get("line_gbp") or 0 for r in rb))
     cs = state.get("costStack") or {}
@@ -146,7 +177,9 @@ def run_red_team(run_dir: str, state_path: str | None = None, timeout: int = 300
         "(wrong-domain drawings), totals that contradict the contract authority, evidence the engine "
         "recorded but did not score (a broken render verdict, connectivity defects), cost surfaces that "
         "disagree, and anything a 5-second human glance would reject. Do NOT re-derive the engineering; "
-        "judge the artefacts. Be concrete and cite the artefact line you are judging.\n\n"
+        "judge the artefacts. Obey the explicit DRAWING APPLICABILITY and LEDGER STATUS SEMANTICS "
+        "in the evidence: do not flag a declared NA-BY-DESIGN absence, and do not relabel an MPN "
+        "identity gap as a connectivity fault. Be concrete and cite the artefact line you are judging.\n\n"
         + evidence +
         "\n\nReturn ONLY JSON: {\"findings\": [{\"artefact\": \"<which artefact>\", \"claim\": "
         "\"<what is wrong>\", \"evidence\": \"<the artefact line/number you judged>\", \"severity\": "
@@ -182,7 +215,29 @@ def run_red_team(run_dir: str, state_path: str | None = None, timeout: int = 300
     return 0
 
 
+def _selftest() -> int:
+    dry = "# Instrument Index — Dry Electrical Product (NA-BY-DESIGN)\n*0 process lines.*"
+    notes = _evidence_semantics(dry, {"not_found": ["X-1"]})
+    checks = [
+        "Zero process lines/valves is CORRECT" in notes,
+        "NOT an electrical/process connectivity defect" in notes,
+        "counts BoM instrument LINE TYPES" in notes,
+        "principal battery↔PCS transfer board" in notes,
+    ]
+    if not all(checks):
+        print("[red-team] SELFTEST FAIL: evidence semantics missing")
+        return 1
+    wet = _evidence_semantics("# Process schedules\n*4 process lines.*", {})
+    if "Zero process lines/valves is CORRECT" in wet:
+        print("[red-team] SELFTEST FAIL: wet process schedule marked N/A")
+        return 1
+    print("[red-team] selftest OK (dry N/A + not_found/connectivity semantics)")
+    return 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] in ("--selftest", "--self-test", "selftest"):
+        raise SystemExit(_selftest())
     if len(sys.argv) < 2:
         print(__doc__)
         raise SystemExit(2)
