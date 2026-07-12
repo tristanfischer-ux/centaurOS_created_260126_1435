@@ -14976,6 +14976,43 @@ def _pcb_unresolved_disposition(name_human: str, character_id: str) -> str:
     return "Electronic gap (needs footprint/MPN)"
 
 
+def _pcb_render_extra_views(run_dir: str, pipeline: dict) -> List[Tuple[str, str]]:
+    """Render extra board views (top-down component placement + bottom) from the routed
+    .kicad_pcb via kicad-cli, so the PCB tab shows the ACTUAL BOARD LAYOUT — not only the
+    single perspective 3D render (Tristan 2026-07-12: "the PCB needs more illustrations /
+    images … so you could actually see them in the excel sheet"). Cached under pcb/ (never
+    re-rendered if present). Returns [(label, abs_png)]; empty when kicad-cli or the board
+    is absent (best-effort — never blocks the build). Universal — any bespoke-PCB run."""
+    import shutil
+    kicad_pcb = pipeline.get("kicadPcbPath")
+    if not (kicad_pcb and os.path.exists(kicad_pcb)):
+        return []
+    cli = shutil.which("kicad-cli") or "/opt/homebrew/bin/kicad-cli"
+    if not os.path.exists(cli):
+        return []
+    pcb_dir = os.path.join(run_dir, "pcb")
+    os.makedirs(pcb_dir, exist_ok=True)
+    views = [
+        ("Top view — component placement + copper", "board-top.png", ["--side", "top"]),
+        ("Bottom view", "board-bottom.png", ["--side", "bottom"]),
+    ]
+    out: List[Tuple[str, str]] = []
+    for label, fn, side_args in views:
+        png = os.path.join(pcb_dir, fn)
+        if not os.path.exists(png):
+            try:
+                subprocess.run(
+                    [cli, "pcb", "render", kicad_pcb, "-o", png, "--background", "opaque",
+                     "-w", "1600", "-h", "1200", "--quality", "high", *side_args],
+                    check=True, capture_output=True, timeout=90)
+            except Exception as exc:  # noqa: BLE001
+                print(f"    ! could not render PCB {label}: {str(exc)[:80]}")
+                continue
+        if os.path.exists(png):
+            out.append((label, png))
+    return out
+
+
 def _pcb_write_fab_zip(run_dir: str, pipeline: dict) -> Optional[str]:
     """Bundle the fab pack (gerbers/ + drill/ + positions.csv + drc-report.json + the
     routed .kicad_pcb) into out/<run>/pcb/pcb-fab.zip — the ONE artefact a fab house
@@ -15367,6 +15404,30 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     else:
         ws.cell(r, 1, "— no 3D render was generated for this board —").font = FONT_NOTE
         r += 2
+
+    # ── Board layout views — top / bottom (the ACTUAL board, not only one 3D angle) ──
+    try:
+        _extra_views = _pcb_render_extra_views(run_dir, pipeline)
+    except Exception:  # noqa: BLE001
+        _extra_views = []
+    if _extra_views:
+        sub_banner(ws, r, "Board layout — top & bottom views", 8)
+        r += 1
+        for _vlabel, _vpng in _extra_views:
+            ws.cell(r, 1, _vlabel).font = FONT_SUB
+            r += 1
+            try:
+                _vds = downscale_png(_vpng, run_dir)
+                _vim = XLImage(_vds)
+                _vmax = 760
+                if _vim.width and _vim.width > _vmax:
+                    _vratio = _vmax / float(_vim.width)
+                    _vim.width = int(_vim.width * _vratio)
+                    _vim.height = int(_vim.height * _vratio)
+                ws.add_image(_vim, f"A{r}")
+                r += int(-(-(_vim.height or 420) // 20)) + 2
+            except Exception as _vexc:  # noqa: BLE001
+                print(f"    ! could not embed PCB layout view {_vlabel}: {_vexc}")
 
     # ── PCBA BoM — resolved components ─────────────────────────────────────────────
     sub_banner(ws, r, "PCBA BoM — resolved components", 8)
