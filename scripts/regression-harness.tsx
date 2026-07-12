@@ -48,7 +48,8 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
-import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
@@ -13222,11 +13223,11 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     const grounded = add.design
     const findWord = (moduleId: string, wordId: string) =>
       grounded.modules.find((m: any) => m.module === moduleId)?.sub_modules?.[0]?.words?.some((w: any) => w.id === wordId)
-    wantB('(6) photodiode word present', findWord('sensing_instrumentation', 'photodiode_word__tool_grounded'))
-    wantB('(6) TIA word present', findWord('sensing_instrumentation', 'transimpedance_amplifier_word__tool_grounded'))
-    wantB('(6) cuvette word present', findWord('structure_containment', 'cuvette_holder_word__tool_grounded'))
-    wantB('(6) LED driver word present', findWord('energy_conversion_transduction', 'led_driver_word__tool_grounded'))
-    wantB('(6) MCU word present', findWord('control_compute_communication', 'microcontroller_word__tool_grounded'))
+    wantB('(6) photodiode word present', findWord('sensing_instrumentation', 'photodiode_tool_grounded_word'))
+    wantB('(6) TIA word present', findWord('sensing_instrumentation', 'transimpedance_amplifier_tool_grounded_word'))
+    wantB('(6) cuvette word present', findWord('structure_containment', 'cuvette_holder_tool_grounded_word'))
+    wantB('(6) LED driver word present', findWord('energy_conversion_transduction', 'led_driver_tool_grounded_word'))
+    wantB('(6) MCU word present', findWord('control_compute_communication', 'microcontroller_tool_grounded_word'))
     wantB('(6) original design untouched (pure add)', colorimeterState.moduleDecomposition.modules.find((m: any) => m.module === 'sensing_instrumentation').sub_modules[0].words.length === 5)
     // Industrial-power template words are UNCHANGED by the add pass (additive-only,
     // strip is a separate pass) — inverter bridge etc. still present pre-strip.
@@ -13250,6 +13251,145 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     'CORE FIX PRINCIPLE colorimeter benchmark (both directions): (5) INDUSTRIAL_POWER_MARKERS (inverter bridge, dc link capacitor, dc busbar, storage cell, cell module assembly, module rack, gate driver, i/o module, communication gateway, …) on the real out/colorimeter-pcbtest BESS-template cluster flag + strip on a device-scale pcb_assembly design, are suppressed byte-identically on a genuine bess design (reusing isProcessPlantClass — zero new suppression code), and never over-flag legitimate small-device parts (power converter, voltage/current sensor, main controller); (6) TOOL_IMPLIED_COMPONENTS grounds the SAME BESS-template design using the colorimeter\'s real 12 selected tools — photodiode-tia/cuvette/photometry/wearable-battery/control-systems imply photodiode+TIA+cuvette holder+LED source+LED driver+optical baffle+coin-cell battery+charge-management circuit (power_distribution fallback)+MCU+USB, all 10 reported missing and added via addImpliedWords, idempotent on re-run, byte-identical when nothing is missing',
     failedB.length, (n) => n === 0,
     () => `word-domain-coherence extension cases failed: ${failedB.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
+  ))
+
+  // ── EXTENSION 2026-07-12 (A1 — the skeleton FLOOR itself, TRAINING/REFERENCE-AIDED
+  // run): (5)+(6) above proved the STRIP + ADD backstops catch the BESS-template
+  // pollution AFTER the fact; (7) proves the SOURCE floor in derive-skeleton.ts never
+  // emits it in the first place for an optical-instrument contract, while a genuine
+  // BESS contract keeps its historical floor byte-identically (no regression).
+  const failedC: string[] = []
+  const wantC = (label: string, cond: boolean) => { if (!cond) failedC.push(label) }
+  {
+    const opticalFloorGraph: any = {
+      product_class: 'test',
+      nodes: [
+        { class: 'energy_storage_source', display: 'Energy Storage Source', role: 'principal', required: true },
+        { class: 'energy_conversion_transduction', display: 'Energy Conversion Transduction', role: 'principal', required: true },
+        { class: 'sensing_instrumentation', display: 'Sensing Instrumentation', role: 'principal', required: true },
+        { class: 'structure_containment', display: 'Structure Containment', role: 'principal', required: true },
+        { class: 'control_compute_communication', display: 'Control Compute Communication', role: 'principal', required: true },
+      ],
+      edges: [],
+    }
+    // A synthetic photometer contract: optical tool quantities + device-scale +
+    // NO storage-kWh key (only the coin-cell's own housekeeping quantities —
+    // battery_estimated_hours is NOT a plant-scale kWh signal).
+    const photometerContract: any = {
+      quantities: {
+        required_sample_volume_ml: { value: 1.15 },
+        stray_light_error_at_max_au_pct: { value: 2.05 },
+        led_current_ki: { value: 1.63 },
+        enclosure_volume_m3: { value: 0.0013 },
+        battery_estimated_hours: { value: 2016 },
+        battery_voltage_v: { value: 3 },
+      },
+      _tools_run: ['photodiode-tia:gain-sizing', 'cuvette:sample-volume', 'photometry:stray-light-limit', 'wearable-battery:life', 'control-systems:pid-tuning'],
+    }
+    // A genuine BESS contract: hasEnergyStorage true (nameplate kWh + cell count),
+    // NO optical tool signal.
+    const bessFloorContract: any = {
+      quantities: { nameplate_capacity_kwh: { value: 3500 }, cell_count: { value: 5010 } },
+      _tools_run: ['pybamm:cell-sizing', 'ngspice:inverter-efficiency'],
+    }
+    const wordsOf = (contract: any, moduleKey: string): string[] => {
+      const mods = deriveGenericSkeleton(opticalFloorGraph, {} as any, { class: 'test' } as any, contract, new Map()) as any[]
+      const m = mods.find((mm: any) => mm.module === moduleKey)
+      const out2: string[] = []
+      for (const sm of (m?.sub_modules || [])) for (const w of (sm.words || [])) out2.push(String(w.name_human || w.id || ''))
+      return out2
+    }
+    const photoAll = [
+      ...wordsOf(photometerContract, 'energy_storage_source'),
+      ...wordsOf(photometerContract, 'energy_conversion_transduction'),
+      ...wordsOf(photometerContract, 'sensing_instrumentation'),
+      ...wordsOf(photometerContract, 'structure_containment'),
+      ...wordsOf(photometerContract, 'control_compute_communication'),
+    ].join(' | ')
+    wantC('(7) photometer floor emits LED Source', /LED Source/i.test(photoAll))
+    wantC('(7) photometer floor emits Photodiode', /Photodiode/i.test(photoAll))
+    wantC('(7) photometer floor emits Transimpedance Amplifier', /Transimpedance Amplifier/i.test(photoAll))
+    wantC('(7) photometer floor emits Cuvette Holder', /Cuvette.*Holder/i.test(photoAll))
+    wantC('(7) photometer floor emits Microcontroller', /Microcontroller/i.test(photoAll))
+    wantC('(7) photometer floor emits a rechargeable battery (not cell racks)', /Rechargeable Battery Pack/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Inverter Bridge', !/Inverter Bridge/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Gate Driver', !/Gate Driver/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Storage Cell', !/\bStorage Cell\b/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Module Rack', !/Module Rack/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit DC Busbar', !/DC Busbar/i.test(photoAll))
+
+    const bessAll = [
+      ...wordsOf(bessFloorContract, 'energy_storage_source'),
+      ...wordsOf(bessFloorContract, 'energy_conversion_transduction'),
+    ].join(' | ')
+    wantC('(7) genuine BESS floor KEPT: Storage Cell', /Storage Cell/i.test(bessAll))
+    wantC('(7) genuine BESS floor KEPT: Module Rack', /Module Rack/i.test(bessAll))
+    wantC('(7) genuine BESS floor KEPT: DC Busbar', /DC Busbar/i.test(bessAll))
+    wantC('(7) genuine BESS floor KEPT: Inverter Bridge', /Inverter Bridge/i.test(bessAll))
+    wantC('(7) genuine BESS floor KEPT: Gate Driver', /Gate Driver/i.test(bessAll))
+    wantC('(7) genuine BESS floor NOT optical: no LED Source', !/LED Source/i.test(bessAll))
+    wantC('(7) genuine BESS floor NOT optical: no Photodiode', !/Photodiode/i.test(bessAll))
+  }
+  out.push(assertEq(
+    'UNIVERSAL.optical_instrument_skeleton_floor_replaces_bess_floor',
+    'A1 — the SOURCE fix (derive-skeleton.ts energyFloorFor + OPTICAL_MODULE_FLOORS): a synthetic photometer contract (optical tool-identity signal from _tools_run — photodiode-tia/cuvette/photometry — + device-scale + no storage-kWh key) makes the generic skeleton floor emit LED source + LED driver, photodiode + transimpedance amplifier, a cuvette holder, a microcontroller, and a small rechargeable battery + charge management as PRINCIPALS, and NEVER emits inverter_bridge / gate_driver / storage_cell / module_rack / dc_busbar. A genuine BESS contract (hasEnergyStorage true, no optical tool signal) keeps its historical BESS floor byte-identically and never picks up optical words — the two signals are mutually exclusive and additive-only, no per-product table',
+    failedC.length, (n) => n === 0,
+    () => `optical-instrument skeleton-floor cases failed: ${failedC.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts (energyFloorFor / OPTICAL_MODULE_FLOORS / hasOpticalInstrumentSignal).`,
+  ))
+
+  // ── EXTENSION 2026-07-12 (B1/B2 — deriveDeviceEnergyTopology gating, TRAINING/
+  // REFERENCE-AIDED run): a sealed device (enclosure_volume_m3 < 1) with NO genuine
+  // storage/PCS/grid-tie duty must NOT get a fabricated battery→PCS→grid P&ID/BFD
+  // graph just because its word list happens to contain "Battery"/"Inverter"/"BMS"
+  // strings (the SAME word set a genuine BESS legitimately carries) — the same
+  // enclosure-volume signal alone is not enough; a PLANT-SCALE energy signal is
+  // required too.
+  const failedD: string[] = []
+  const wantD = (label: string, cond: boolean) => { if (!cond) failedD.push(label) }
+  {
+    const topoModules: any = [
+      { module: 'energy_storage_source', sub_modules: [{ words: [
+        { name_human: 'Battery String', content_character: {} },
+        { name_human: 'Battery Management System (BMS)', content_character: {} },
+      ] }] },
+      { module: 'energy_conversion_transduction', sub_modules: [{ words: [
+        { name_human: 'DC Busbar', content_character: {} },
+        { name_human: 'Inverter Bridge', content_character: {} },
+      ] }] },
+      { module: 'environmental_interface', sub_modules: [{ words: [
+        { name_human: 'Cooling Fan', content_character: {} },
+      ] }] },
+      { module: 'control_compute_communication', sub_modules: [{ words: [
+        { name_human: 'Remote Monitoring Gateway', content_character: {} },
+      ] }] },
+    ]
+    // Instrument-shaped quantities: sealed (< 1 m³) + the coin-cell's OWN
+    // housekeeping keys (battery_estimated_hours/battery_voltage_v) — NO kWh-scale
+    // capacity, cell/rack/module count, DC bus, AC grid-tie, PV, or PCS rating.
+    const instrumentQuantities = {
+      enclosure_volume_m3: { value: 0.0013 },
+      battery_estimated_hours: { value: 2016 },
+      battery_voltage_v: { value: 3 },
+    }
+    // Genuine BESS-shaped quantities: sealed + a real plant-scale energy signal.
+    const bessQuantities = {
+      enclosure_volume_m3: { value: 0.13 },
+      nameplate_capacity_kwh: { value: 13.5 },
+      dc_bus_voltage_v: { value: 400 },
+      continuous_power_kw: { value: 5 },
+    }
+    wantD('(8) hasEnergyStoragePlantSignal false on instrument quantities', hasEnergyStoragePlantSignal(instrumentQuantities) === false)
+    wantD('(8) hasEnergyStoragePlantSignal true on BESS quantities', hasEnergyStoragePlantSignal(bessQuantities) === true)
+    const instrumentEdges = deriveDeviceEnergyTopology(topoModules, instrumentQuantities)
+    const bessEdges = deriveDeviceEnergyTopology(topoModules, bessQuantities)
+    wantD('(8) NO PCS/battery graph emitted when no storage-kWh keys (instrument)', instrumentEdges.length === 0)
+    wantD('(8) PCS/battery graph STILL emitted for a genuine sealed BESS (no regression)', bessEdges.length >= 3)
+  }
+  out.push(assertEq(
+    'UNIVERSAL.device_energy_topology_gated_on_storage_signal_not_volume_alone',
+    'B1/B2 — deriveDeviceEnergyTopology (derive-topology.ts) no longer fires a battery→DC-bus→PCS→grid-interface graph off enclosure_volume_m3 < 1 ALONE: it also requires a genuine energy-storage/PCS/grid-tie PLANT-SCALE quantity key (hasEnergyStoragePlantSignal — kWh capacity / cell-rack-module count / DC bus / AC grid-tie / PV / PCS rating), deliberately STRICTER than derive-skeleton\'s hasEnergyStorage (whose bare "battery" token legitimately matches an instrument\'s own battery_estimated_hours/battery_voltage_v housekeeping quantities). A sealed instrument with the SAME battery/inverter/BMS WORD VOCABULARY but no plant-scale signal gets zero fabricated edges (NA-by-design); a genuine sealed BESS is unaffected (no regression)',
+    failedD.length, (n) => n === 0,
+    () => `device-energy-topology gating cases failed: ${failedD.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-topology.ts (deriveDeviceEnergyTopology / hasEnergyStoragePlantSignal).`,
   ))
 
   return out

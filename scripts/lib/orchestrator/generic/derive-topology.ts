@@ -280,6 +280,47 @@ function wordQtyCount(w: AnyWord): number {
 // Endpoints are slugs of the design's REAL part names (fuzzy token-overlap resolution,
 // same contract as deriveProcessTopology); boundary nodes (grid/pv/air) are abstract.
 // Universal: contract-keyed, no class table — any sealed device gets the same shape.
+// ── ENERGY-STORAGE / PCS / GRID-TIE PLANT-SCALE GATE (2026-07-12, Open Colorimeter
+// TRAINING/REFERENCE-AIDED run) ─────────────────────────────────────────────────────
+// This deriver assumes a battery→DC-bus→PCS→grid architecture — correct for a sealed
+// device that IS a battery/power-conversion system (a Powerwall, an EV charger's
+// buffer), wrong for a sealed device with NO storage/PCS/grid-tie duty at all (a
+// portable instrument). Gating on enclosure_volume_m3 < 1 ALONE fired this deriver on
+// the Open Colorimeter (a 1.3-litre coin-cell photometer) and, because its module list
+// still carried the BESS-template floor words at the time (derive-skeleton's A1 fix
+// stops that upstream), matched `battery`/`dc bus`/`inverter` and injected a fabricated
+// PCS/MPPT/grid-interface graph into the P&ID/BFD for a device with no such thing.
+//
+// The gate below is a STRICTER, plant-scale-only quantity-key signal than
+// derive-skeleton's `hasEnergyStorage` — that regex's bare `battery` token
+// legitimately matches an INSTRUMENT's own housekeeping quantities (the colorimeter's
+// real contract carries `battery_estimated_hours` / `battery_voltage_v` /
+// `battery_expected_soh_pct` from the wearable-battery tool — a coin cell, not a
+// storage plant) and would falsely gate this deriver back OPEN. This is a DIFFERENT
+// question — "is this a battery-PCS-grid ENERGY SYSTEM?" — and needs PLANT-SCALE
+// markers only: a kWh-scale capacity, a cell/rack/module count, a DC bus voltage, an
+// AC grid-tie output, a PV input, or an explicit PCS/grid-tie rating. UNIVERSAL — any
+// archetype with a genuine storage/PCS/grid duty (BESS, EV charger with a buffer,
+// off-grid inverter, RV solar system) carries at least one of these keys; a small
+// instrument's incidental power-supply telemetry never does.
+const ENERGY_STORAGE_PLANT_RE = /(^|_)(kwh|cell_count|cells_total|cell_module_count|rack_count|module_count|usable_energy_kwh|usable_capacity_kwh|nameplate_capacity_kwh|storage_kwh|pack_energy|dc_bus_voltage_v|ac_output_voltage_v|pv_stc_input_kw|grid_tie|pcs_rating|string_voltage_nominal_v)(_|$)|_kwh($|_)/i
+
+/** True when `quantities` carries a positive value under an ENERGY_STORAGE_PLANT_RE
+ *  key — i.e. the contract describes a genuine battery-storage / power-conversion /
+ *  grid-tie PLANT, not merely a device with its own small battery. PURE. Accepts both
+ *  raw numbers and `{value: N}`-wrapped quantities (the same shape `qv()` below
+ *  unwraps). Exported so callers other than `deriveDeviceEnergyTopology` (e.g. a
+ *  regression fixture) can probe the same signal directly. */
+export function hasEnergyStoragePlantSignal(quantities: Record<string, unknown>): boolean {
+  for (const [key, raw] of Object.entries(quantities ?? {})) {
+    const v = raw && typeof raw === 'object' ? (raw as { value?: unknown }).value : raw
+    const n = Number(v)
+    if (!Number.isFinite(n) || n <= 0) continue
+    if (ENERGY_STORAGE_PLANT_RE.test(key)) return true
+  }
+  return false
+}
+
 export function deriveDeviceEnergyTopology(
   modules: AnyModule[],
   quantities: Record<string, unknown>,
@@ -291,6 +332,12 @@ export function deriveDeviceEnergyTopology(
   }
   const encl = qv('enclosure_volume_m3')
   if (!(encl != null && encl > 0 && encl < 1)) return []
+  // No genuine storage/PCS/grid-tie duty on this sealed device → this is NOT a
+  // battery-PCS-grid energy system (a portable instrument, say) — honestly emit
+  // nothing (NA-BY-DESIGN) rather than repurpose the BESS graph shape. The generic
+  // process/signal topology derivers (deriveProcessTopology + the instrument-tie
+  // sweep at the call site) still run and cover whatever this design actually has.
+  if (!hasEnergyStoragePlantSignal(quantities)) return []
 
   const names: string[] = []
   for (const m of modules || []) {

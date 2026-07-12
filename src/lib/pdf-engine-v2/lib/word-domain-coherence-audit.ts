@@ -543,6 +543,34 @@ export interface ToolImpliedComponentRule {
  * coverage for a new tool family is a one-line addition here, never a
  * per-product branch.
  */
+// OPTICAL/PHOTOMETRIC-INSTRUMENT tool rule ids — the subset of TOOL_IMPLIED_COMPONENTS
+// below that mark a design as a genuine optical/photometric INSTRUMENT (never the
+// generic 'wearable-battery' / 'control-systems' rules, which many non-optical
+// device-scale products also legitimately select — a coin-cell wristband or a plain
+// IoT sensor is not an optical instrument just because it has a battery and an MCU).
+// Exported so derive-skeleton.ts's skeleton FLOOR (A1, the Open Colorimeter training
+// run, 2026-07-12) keys off the EXACT SAME tool-identity signal as this file's own ADD
+// backstop (A2) — one shared signal, never a duplicated list or a product/class check.
+const OPTICAL_INSTRUMENT_TOOL_IDS = new Set(['photodiode-tia', 'cuvette', 'photometry', 'led-par'])
+
+/** True when a single tool identity/id string (e.g. "photodiode-tia:gain-sizing" from
+ *  contract._tools_run, or a lower-cased "<tool_id> <tool_name>" pair) matches an
+ *  OPTICAL_INSTRUMENT_TOOL_IDS rule's own regex. PURE. */
+export function isOpticalInstrumentToolIdentity(identity: string): boolean {
+  const lower = String(identity ?? '').toLowerCase()
+  return TOOL_IMPLIED_COMPONENTS.some((rule) => OPTICAL_INSTRUMENT_TOOL_IDS.has(rule.id) && rule.re.test(lower))
+}
+
+/** True when ANY of the given tool identity/id strings matches an optical-instrument
+ *  tool rule — the UNIVERSAL "is this design a genuine optical/photometric instrument"
+ *  signal, keyed on the SAME tool-identity vocabulary as the ADD backstop (never a
+ *  product/class name). Accepts contract._tools_run (bare tool_id strings) directly, or
+ *  any other list of tool identity strings. PURE, never throws on a malformed input. */
+export function hasOpticalInstrumentToolSignal(identities: string[] | undefined | null): boolean {
+  if (!Array.isArray(identities)) return false
+  return identities.some((idy) => isOpticalInstrumentToolIdentity(idy))
+}
+
 export const TOOL_IMPLIED_COMPONENTS: ToolImpliedComponentRule[] = [
   {
     id: 'photodiode-tia',
@@ -717,7 +745,19 @@ export function addImpliedWords(
     const subs: any[] = Array.isArray(target?.sub_modules) ? target.sub_modules : []
     const sub = subs[0]
     if (!target || !sub) continue
-    const wordId = `${item.component}_word__tool_grounded`
+    // SINGLE underscore throughout (2026-07-12 propagation fix — the Open Colorimeter
+    // training run): build_universal_scene.py::extract_parts treats ANY word id
+    // containing a DOUBLE underscore as a BoM-only sub-component of its parent
+    // assembly (the SAME "parent__slug" convention makeSubModule uses for sub_module
+    // ids) and silently drops it from Blender placement — so it never reaches
+    // parts-manifest.json, the connection-ledger, or requirements_bom.py's rendered
+    // rows. The old id `${component}_word__tool_grounded` collided with that filter
+    // by construction (every added word was silently dropped from the BoM even
+    // though it was correctly present in moduleDecomposition — confirmed on
+    // out/colorimeter-corefix-20260712-1453: 10 tool-grounded words in state.json,
+    // 0 in requirementsBom). A single underscore is never mistaken for the
+    // sub-component convention, so the grounded word places + prices normally.
+    const wordId = `${item.component}_tool_grounded_word`
     if (!Array.isArray(sub.words)) sub.words = []
     if (sub.words.some((w: any) => String(w?.id ?? '') === wordId)) continue // idempotent — never double-adds
     sub.words.push({
