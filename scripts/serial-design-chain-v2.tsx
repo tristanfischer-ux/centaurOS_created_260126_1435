@@ -68,7 +68,7 @@ import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
-import { runWordDomainCoherence, type WordDomainCoherenceResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { runWordDomainCoherence, type WordDomainCoherenceResult, runToolImpliedComponentGrounding, type ToolImpliedComponentResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
 import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
@@ -3700,6 +3700,11 @@ async function main() {
   // the generator emits the module tree, before the skeleton/Stage-7.5 physics
   // critics run. See the call site after GATE 37 below.
   let wordDomainCoherence: WordDomainCoherenceResult | null = null
+  // ADD-side complement to wordDomainCoherence (same call site, same universal
+  // grounding gate): tool-implied components (photodiode/TIA/cuvette/LED
+  // driver/coin-cell battery/MCU, …) that the selected engineering tools
+  // demand but the module generator omitted. See word-domain-coherence-audit.ts.
+  let toolImpliedComponentGrounding: ToolImpliedComponentResult | null = null
   // PCB capability discovery + bespoke/COTS disposition — Phase A SHADOW stage
   // (docs/plans/pcb-capability-integration.md). Computed AFTER state.requirementsBom
   // is settled (the design/parts are final by then); see the call site after the
@@ -4525,17 +4530,30 @@ async function main() {
       // removed before it reaches the critic/BoM/render) — override with
       // WORD_DOMAIN_COHERENCE_ENFORCING=0 to run shadow-only. Additive: never a
       // new chain exit code, never touches gate 33/the physics critic itself.
+      // wdcState is shared by BOTH the strip pass (below) and the ADD pass
+      // (tool-implied-component grounding, right after it) — orchestratorContract
+      // is the TOOL-ENRICHED contract (orchResult.contract, carries every tool's
+      // provenance + _tools_run), NOT the chain's pre-tool `engineeringContract`
+      // (orchEngineeringContract is only assigned further below); toolsUsedPage
+      // is the attribution page the ADD pass reads to know which tools were
+      // actually selected for THIS run.
+      const wdcState = {
+        moduleDecomposition: design,
+        orchestratorContract: orchResult.contract,
+        parsedBrief: parsedResult.data,
+        toolsUsedPage: orchResult.tools_used_page,
+      }
       try {
-        const wdcState = { moduleDecomposition: design, orchestratorContract: engineeringContract, parsedBrief: parsedResult.data }
         const wdcRun = runWordDomainCoherence(wdcState, process.env.WORD_DOMAIN_COHERENCE_ENFORCING ?? '1')
         wordDomainCoherence = wdcRun.result
         if (wdcRun.result.verdict === 'flagged') {
           console.error(`[chain] WORD-DOMAIN-COHERENCE: ${wdcRun.result.message}`)
           for (const f of wdcRun.result.flagged.slice(0, 12)) {
-            console.error(`  ✕ [${f.marker}] ${f.module_id}/${f.sub_module_id}/${f.word_id} "${f.name}"`)
+            console.error(`  ✕ [${f.marker_family ?? 'process_plant_vessel'}:${f.marker}] ${f.module_id}/${f.sub_module_id}/${f.word_id} "${f.name}"`)
           }
           if (wdcRun.strip) {
             design = wdcRun.strip.design
+            wdcState.moduleDecomposition = design
             console.error(`[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped ${wdcRun.strip.stripped} wrong-domain word(s) from the design`)
           } else {
             console.error(`[chain] WORD-DOMAIN-COHERENCE SHADOW: not stripped (set WORD_DOMAIN_COHERENCE_ENFORCING=1 to strip)`)
@@ -4544,6 +4562,35 @@ async function main() {
         logAction({ step: 'word_domain_coherence', verdict: wdcRun.result.verdict, mode: wdcRun.mode, flagged_count: wdcRun.result.flagged.length, stripped: wdcRun.strip?.stripped ?? 0, product_class: wdcRun.result.product_class, is_process_plant_class: wdcRun.result.is_process_plant_class, is_device_scale: wdcRun.result.is_device_scale })
       } catch (err) {
         console.error(`[chain] WORD-DOMAIN-COHERENCE threw: ${(err as Error).message}; continuing without`)
+      }
+      // ── TOOL-IMPLIED-COMPONENT GROUNDING (2026-07-12, ADD-side complement) ──
+      // The engine's tool layer already ran the CORRECT physics for this brief
+      // (cuvette:sample-volume, photodiode-tia:gain-sizing, photometry:stray-
+      // light-limit, wearable-battery:life, …) and their quantities sit right
+      // in orchResult.contract.quantities — but the generic emitter's static
+      // per-module component floor never consulted them, so the Open
+      // Colorimeter design shipped with NOTHING optical in it. Universal,
+      // tool-IDENTITY-keyed (never a product/class table): any future brief
+      // that selects a `photodiode-tia`/`cuvette`/`wearable-battery`/… tool
+      // gets the SAME implied components added when the design omits them.
+      // SHADOW by default; this chain wiring shares the SAME enforcing flag as
+      // the strip pass above (WORD_DOMAIN_COHERENCE_ENFORCING) — one universal
+      // grounding gate, two complementary directions.
+      try {
+        const groundRun = runToolImpliedComponentGrounding(wdcState, process.env.WORD_DOMAIN_COHERENCE_ENFORCING ?? '1')
+        toolImpliedComponentGrounding = groundRun.result
+        if (groundRun.result.verdict === 'missing') {
+          console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING: ${groundRun.result.message}`)
+          if (groundRun.add) {
+            design = groundRun.add.design
+            console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING ENFORCING: added ${groundRun.add.added} tool-grounded word(s)${groundRun.add.skipped > 0 ? ` (${groundRun.add.skipped} skipped — no matching target module in this design)` : ''}`)
+          } else {
+            console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING SHADOW: not added (set WORD_DOMAIN_COHERENCE_ENFORCING=1 to add)`)
+          }
+        }
+        logAction({ step: 'tool_implied_component_grounding', verdict: groundRun.result.verdict, mode: groundRun.mode, missing_count: groundRun.result.missing.length, added: groundRun.add?.added ?? 0, skipped: groundRun.add?.skipped ?? 0, tools_checked: groundRun.result.tools_checked.length })
+      } catch (err) {
+        console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING threw: ${(err as Error).message}; continuing without`)
       }
 
       // Build #19e (2026-05-22): capture the tools-used page + the finalised
@@ -7130,7 +7177,8 @@ async function main() {
       recommendations_total: partRecommendations.length,
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
-    wordDomainCoherence,  // word-level sibling of gate 34: flagged/stripped process-plant-vessel words on a device-scale design (see call site after GATE 37)
+    wordDomainCoherence,  // word-level sibling of gate 34: flagged/stripped process-plant-vessel/industrial-power words on a device-scale design (see call site after GATE 37)
+    toolImpliedComponentGrounding,  // ADD-side complement: tool-implied components (photodiode/TIA/cuvette/LED driver/coin-cell battery/MCU, …) added when the selected tools demand them but the generator omitted them (same call site)
     pcb,  // Phase A PCB shadow stage: capability + bespoke/COTS disposition, recorded post-requirementsBom when PCB_STAGE is set (see call site below)
     physicsCritique: critique,
     physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)

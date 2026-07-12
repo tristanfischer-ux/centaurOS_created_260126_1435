@@ -48,7 +48,7 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
-import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
@@ -13056,6 +13056,200 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     'gate 34 word-sibling: process-plant-vessel words (pressure vessel shell, filter media/membrane element, underdrain/nozzle plate, backwash, air scour, skid frame & pipework, distribution header, valve nest, differential-pressure gauge, sample cock, …) on a device-scale non-process class (the Open Colorimeter pcb_assembly cluster) flag + strip exactly the 9 polluted words, leaving the 5 legitimate HMI words + Nameplate untouched; the SAME words on a legitimate process/plant class (water_treatment, aquaculture_ras, utility bess) are suppressed and the design is byte-identical (same object reference, zero stripped); a physically tiny instance of a process-plant-slugged class is still flagged (scale overrides the class token); a clean device design with no markers is never touched',
     failed.length, (n) => n === 0,
     () => `word-domain-coherence cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
+  ))
+
+  // ── EXTENSION 2026-07-12 (CORE FIX PRINCIPLE — colorimeter BESS-template
+  // benchmark): TWO more proveCatch cases, matching the module generator's
+  // real defect (out/colorimeter-pcbtest/state.json) — a device-scale design
+  // whose generic TIER_C_FLOOR filled energy_storage_source/energy_conversion_
+  // transduction/control_compute_communication with a BESS/industrial-power
+  // template (storage cell, cell module assembly, module rack, dc busbar,
+  // inverter bridge, dc link capacitor, gate driver, i/o module) while the
+  // SELECTED TOOLS (photodiode-tia, cuvette, photometry, wearable-battery,
+  // control-systems) implied an entirely different, optical/embedded BoM.
+  const failedB: string[] = []
+  const wantB = (label: string, cond: boolean) => { if (!cond) failedB.push(label) }
+
+  // The real colorimeter BESS-template words (out/colorimeter-pcbtest/state.json
+  // modules[energy_storage_source|energy_conversion_transduction|
+  // control_compute_communication].sub_modules[0].words, TIER_C_FLOOR verbatim).
+  const bessTemplateWords = {
+    energy_storage_source: [
+      mkWord('storage_cell_word', 'Storage Cell'),
+      mkWord('cell_module_assembly_word', 'Cell Module Assembly'),
+      mkWord('module_rack_word', 'Module Rack'),
+      mkWord('dc_busbar_word', 'DC Busbar'),
+    ],
+    energy_conversion_transduction: [
+      mkWord('power_converter_word', 'Power Converter'),
+      mkWord('inverter_bridge_word', 'Inverter Bridge'),
+      mkWord('dc_link_capacitor_word', 'DC Link Capacitor'),
+      mkWord('gate_driver_word', 'Gate Driver'),
+      mkWord('output_filter_word', 'Output Filter'),
+    ],
+    control_compute_communication: [
+      mkWord('main_controller_word', 'Main Controller'),
+      mkWord('communication_gateway_word', 'Communication Gateway'),
+      mkWord('io_module_word', 'I/O Module'),
+      mkWord('network_switch_word', 'Network Switch'),
+      mkWord('controller_power_supply_word', 'Controller Power Supply'),
+    ],
+    sensing_instrumentation: [
+      mkWord('voltage_sensor_word', 'Voltage Sensor'),
+      mkWord('current_sensor_word', 'Current Sensor'),
+      mkWord('temperature_probe_word', 'Temperature Probe'),
+      mkWord('pressure_sensor_word', 'Pressure Sensor'),
+      mkWord('signal_conditioner_word', 'Signal Conditioner'),
+    ],
+    structure_containment: [
+      mkWord('structural_frame_word', 'Structural Frame'),
+      mkWord('enclosure_panel_word', 'Enclosure Panel'),
+    ],
+  }
+  const mkBessTemplateDesign = () => ({
+    modules: Object.entries(bessTemplateWords).map(([moduleId, words]) => ({
+      module: moduleId,
+      sub_modules: [{ id: `${moduleId}__sub`, words }],
+    })),
+  })
+  // The colorimeter's actual 12 selected tools (out/colorimeter-pcbtest/4-orchestrator-tools-used.json).
+  const colorimeterToolsUsedPage = {
+    tools: [
+      { tool_id: 'control-systems:pid-tuning', tool_name: 'PID Loop Tuning' },
+      { tool_id: 'cuvette:sample-volume', tool_name: 'Cuvette Minimum Sample Volume Calculator' },
+      { tool_id: 'cybersecurity-threat-model:stride', tool_name: 'STRIDE Threat Model' },
+      { tool_id: 'enclosure-emc:margin', tool_name: 'Enclosure EMC Margin' },
+      { tool_id: 'extruder:thermal', tool_name: 'Extruder Thermal Sizing' },
+      { tool_id: 'mass-aggregator:envelope-check', tool_name: 'Mass Aggregator' },
+      { tool_id: 'photodiode-tia:gain-sizing', tool_name: 'Transimpedance Amplifier Gain Sizer' },
+      { tool_id: 'photometry:stray-light-limit', tool_name: 'Photometry Stray-Light Limit' },
+      { tool_id: 'thermal-envelope:ladder', tool_name: 'Thermal Envelope Ladder' },
+      { tool_id: 'thermo:fluid-properties', tool_name: 'Fluid Properties' },
+      { tool_id: 'warranty-reliability:battery', tool_name: 'Battery Warranty Reliability' },
+      { tool_id: 'wearable-battery:life', tool_name: 'Wearable Coin-Cell Battery Life' },
+    ],
+  }
+
+  // (5) INDUSTRIAL-POWER STRIP — the BESS-template cluster on the colorimeter
+  // (pcb_assembly, device-scale) flags + strips; the SAME cluster on a genuine
+  // BESS class is suppressed, byte-identical (zero stripped, same reference) —
+  // reuses the EXACT SAME class+scale signal as the vessel markers (zero new
+  // suppression logic — "reuse the pattern, do not fork").
+  {
+    const colorimeterState = {
+      parsedBrief: { product_class: 'pcb_assembly' },
+      moduleDecomposition: mkBessTemplateDesign(),
+      orchestratorContract: { product_class: 'pcb_assembly', quantities: {} },
+    }
+    const r = computeWordDomainCoherence(colorimeterState)
+    wantB('(5) verdict flagged on pcb_assembly', r.verdict === 'flagged')
+    const flaggedIds = new Set(r.flagged.map((f) => f.word_id))
+    for (const id of ['storage_cell_word', 'cell_module_assembly_word', 'module_rack_word', 'dc_busbar_word', 'inverter_bridge_word', 'dc_link_capacitor_word', 'gate_driver_word', 'io_module_word', 'communication_gateway_word']) {
+      wantB(`(5) flags ${id}`, flaggedIds.has(id))
+    }
+    // power_converter / voltage_sensor / current_sensor / main_controller / network_switch /
+    // controller_power_supply / structural_frame / enclosure_panel are deliberately NOT
+    // industrial-power markers (a small device legitimately has a DC-DC converter, a
+    // current-sense resistor, or a controller) — must stay unflagged.
+    for (const id of ['power_converter_word', 'voltage_sensor_word', 'current_sensor_word', 'main_controller_word', 'network_switch_word', 'controller_power_supply_word', 'structural_frame_word', 'enclosure_panel_word']) {
+      wantB(`(5) does not flag ${id}`, !flaggedIds.has(id))
+    }
+    wantB('(5) marker_family industrial_power', r.flagged.every((f) => f.marker_family === 'industrial_power'))
+    const strip = stripFlaggedWords(colorimeterState.moduleDecomposition, r.flagged)
+    wantB('(5) strip removes exactly the flagged set', strip.stripped === r.flagged.length && strip.stripped >= 9)
+
+    // Genuine BESS design, SAME words: byte-identical (reuses isProcessPlantClass — 'bess' is
+    // already listed there, zero new code for this suppression).
+    const bessState = {
+      parsedBrief: { product_class: 'bess' },
+      moduleDecomposition: mkBessTemplateDesign(),
+      orchestratorContract: { product_class: 'bess', quantities: {} },
+    }
+    const rBess = computeWordDomainCoherence(bessState)
+    wantB('(5) suppressed on genuine bess (flagged empty)', rBess.flagged.length === 0)
+    const stripBess = stripFlaggedWords(bessState.moduleDecomposition, rBess.flagged)
+    wantB('(5) bess design untouched (same reference)', stripBess.design === bessState.moduleDecomposition)
+
+    wantB('(5) scanner catches "Inverter Bridge"', scanWordTextForIndustrialPowerMarkers('Inverter Bridge').includes('inverter bridge'))
+    wantB('(5) scanner catches "Module Rack"', scanWordTextForIndustrialPowerMarkers('Module Rack').includes('module rack'))
+    wantB('(5) scanner does not flag "Power Converter"', scanWordTextForIndustrialPowerMarkers('Power Converter').length === 0)
+    wantB('(5) scanner does not flag "Main Controller"', scanWordTextForIndustrialPowerMarkers('Main Controller').length === 0)
+  }
+
+  // (6) TOOL-IMPLIED-COMPONENT GROUNDING (the ADD side) — the colorimeter's own
+  // selected tools (photodiode-tia, cuvette, photometry, wearable-battery,
+  // control-systems) imply a photodiode + TIA + cuvette holder + LED source +
+  // LED driver + optical baffle + coin-cell battery + charge-management
+  // circuit + MCU + USB interface; NONE of these are present in the BESS-
+  // template design above, so all should be reported missing + addable
+  // (every target module — sensing_instrumentation, structure_containment,
+  // energy_conversion_transduction, energy_storage_source,
+  // control_compute_communication — exists in this fixture; power_distribution
+  // does not, so the charge-management circuit falls back to
+  // energy_conversion_transduction per MODULE_FALLBACKS).
+  {
+    const colorimeterState: any = {
+      parsedBrief: { product_class: 'pcb_assembly' },
+      moduleDecomposition: mkBessTemplateDesign(),
+      orchestratorContract: { product_class: 'pcb_assembly', quantities: {}, _tools_run: [] },
+      toolsUsedPage: colorimeterToolsUsedPage,
+    }
+    wantB('(6) selectedToolIdentities reads 12 tools', selectedToolIdentities(colorimeterState).length === 12)
+    const r = computeToolImpliedComponents(colorimeterState)
+    wantB('(6) verdict missing', r.verdict === 'missing')
+    const byComponent = new Map(r.missing.map((m) => [m.component, m]))
+    const expect: Array<[string, string]> = [
+      ['photodiode', 'sensing_instrumentation'],
+      ['transimpedance_amplifier', 'sensing_instrumentation'],
+      ['cuvette_holder', 'structure_containment'],
+      ['led_source', 'energy_conversion_transduction'],
+      ['led_driver', 'energy_conversion_transduction'],
+      ['optical_path_baffle', 'structure_containment'],
+      ['coin_cell_battery', 'energy_storage_source'],
+      ['battery_charge_management_circuit', 'energy_conversion_transduction'], // power_distribution fallback
+      ['microcontroller', 'control_compute_communication'],
+      ['usb_interface', 'control_compute_communication'],
+    ]
+    for (const [component, mod] of expect) {
+      const m = byComponent.get(component)
+      wantB(`(6) reports ${component} missing`, m !== undefined)
+      if (m) wantB(`(6) ${component} resolves to ${mod}`, m.resolved_module === mod)
+    }
+    wantB('(6) exactly 10 missing (no duplicates)', r.missing.length === 10)
+
+    const add = addImpliedWords(colorimeterState.moduleDecomposition, r.missing)
+    wantB('(6) adds all 10', add.added === 10 && add.skipped === 0)
+    const grounded = add.design
+    const findWord = (moduleId: string, wordId: string) =>
+      grounded.modules.find((m: any) => m.module === moduleId)?.sub_modules?.[0]?.words?.some((w: any) => w.id === wordId)
+    wantB('(6) photodiode word present', findWord('sensing_instrumentation', 'photodiode_word__tool_grounded'))
+    wantB('(6) TIA word present', findWord('sensing_instrumentation', 'transimpedance_amplifier_word__tool_grounded'))
+    wantB('(6) cuvette word present', findWord('structure_containment', 'cuvette_holder_word__tool_grounded'))
+    wantB('(6) LED driver word present', findWord('energy_conversion_transduction', 'led_driver_word__tool_grounded'))
+    wantB('(6) MCU word present', findWord('control_compute_communication', 'microcontroller_word__tool_grounded'))
+    wantB('(6) original design untouched (pure add)', colorimeterState.moduleDecomposition.modules.find((m: any) => m.module === 'sensing_instrumentation').sub_modules[0].words.length === 5)
+    // Industrial-power template words are UNCHANGED by the add pass (additive-only,
+    // strip is a separate pass) — inverter bridge etc. still present pre-strip.
+    wantB('(6) add pass does not touch unrelated industrial words', findWord('energy_conversion_transduction', 'inverter_bridge_word'))
+
+    // Idempotent: re-running compute+add on the GROUNDED design finds nothing missing
+    // and returns the SAME design reference (byte-identity — never double-adds).
+    const groundedState: any = { ...colorimeterState, moduleDecomposition: grounded }
+    const r2 = computeToolImpliedComponents(groundedState)
+    wantB('(6) idempotent — second pass finds nothing missing', r2.missing.length === 0 && r2.verdict === 'pass')
+    const add2 = addImpliedWords(grounded, r2.missing)
+    wantB('(6) idempotent — second add is a no-op (same reference)', add2.design === grounded && add2.added === 0)
+
+    // No selected tools (or no design) → 'unavailable', never throws, never adds.
+    const rNone = computeToolImpliedComponents({ moduleDecomposition: mkBessTemplateDesign(), toolsUsedPage: { tools: [] } })
+    wantB('(6) no selected tools -> unavailable', rNone.verdict === 'unavailable' && rNone.missing.length === 0)
+  }
+
+  out.push(assertEq(
+    'UNIVERSAL.word_domain_coherence_industrial_power_strip_and_tool_implied_component_grounding',
+    'CORE FIX PRINCIPLE colorimeter benchmark (both directions): (5) INDUSTRIAL_POWER_MARKERS (inverter bridge, dc link capacitor, dc busbar, storage cell, cell module assembly, module rack, gate driver, i/o module, communication gateway, …) on the real out/colorimeter-pcbtest BESS-template cluster flag + strip on a device-scale pcb_assembly design, are suppressed byte-identically on a genuine bess design (reusing isProcessPlantClass — zero new suppression code), and never over-flag legitimate small-device parts (power converter, voltage/current sensor, main controller); (6) TOOL_IMPLIED_COMPONENTS grounds the SAME BESS-template design using the colorimeter\'s real 12 selected tools — photodiode-tia/cuvette/photometry/wearable-battery/control-systems imply photodiode+TIA+cuvette holder+LED source+LED driver+optical baffle+coin-cell battery+charge-management circuit (power_distribution fallback)+MCU+USB, all 10 reported missing and added via addImpliedWords, idempotent on re-run, byte-identical when nothing is missing',
+    failedB.length, (n) => n === 0,
+    () => `word-domain-coherence extension cases failed: ${failedB.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
   ))
 
   return out
