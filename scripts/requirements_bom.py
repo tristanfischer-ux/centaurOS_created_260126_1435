@@ -3496,6 +3496,31 @@ def _selftest() -> int:
             if r.get("service") == "water" and _dn(r) == 300 and "316" in r["basis"] and "3.7111" in r["requirement"]:
                 print(f"  FAIL edge still priced DN300/316L at full recirc: {r['tag']} {r['requirement'][:40]}"); bad += 1
 
+    # ── DEVICE-SCALE INSTRUMENT SIGNAL TIE ≠ WATER PIPE (2026-07-12, colorimeter) ──
+    # The exact 1746 shape: a sealed sub-1 m³ optical instrument whose signal/optical
+    # edges were priced as DN80 HDPE water mains (£5,303 phantom pipe). A signal edge
+    # must classify as 'signal' (never 'water'), and a device-scale interconnect must be
+    # a cheap PCB trace / short lead — never a DN≥50 plant run.
+    _q_dev = {"enclosure_volume_m3": {"value": 0.0013}}
+    _sched_dev = {"rows": [
+        {"from": "High-Power Color LED", "to": "Wavelength Selection Module", "mechanism": "signal",
+         "length_m": 2.26, "size": "(unsized)", "line_total_gbp": 0, "within_spec": True},
+        {"from": "Silicon PIN Photodiode", "to": "Transimpedance Amplifier", "mechanism": "signal",
+         "length_m": 2.20, "size": "(unsized)", "line_total_gbp": 0, "within_spec": True},
+        {"from": "DC DC Regulator", "to": "Microcontroller", "mechanism": "electrical_bus",
+         "length_m": 1.5, "size": "(unsized)", "line_total_gbp": 0, "within_spec": True},
+    ]}
+    with _tf.TemporaryDirectory() as _dd:
+        json.dump(_sched_dev, open(os.path.join(_dd, "connection-schedule.json"), "w"))
+        _crd = _connection_rows(_dd, _q_dev)
+        if any("water connection" in r["requirement"] for r in _crd):
+            print(f"  FAIL device-scale signal/optical tie priced as WATER: {[r['requirement'][:40] for r in _crd]}"); bad += 1
+        if any(re.search(r"DN\d{2,}", str(r.get('size') or '') + ' ' + str(r.get('basis') or '')) for r in _crd):
+            print(f"  FAIL device-scale instrument tie carries a DN pipe size: {[r.get('size') for r in _crd]}"); bad += 1
+        _dev_total = sum(r.get("line_gbp", 0) or 0 for r in _crd)
+        if _dev_total > 40:
+            print(f"  FAIL device-scale interconnect total £{_dev_total} > £40 (should be PCB traces / short leads)"); bad += 1
+
         # ── CLOSER-EDGE SUPPRESSION GUARD (P0-C, 2026-07-08) ──
         # residual/boundary/direction closer language → drop from costed BoM.
         # source=="completion" alone (MCC power feeders) must NOT drop — prove both ways.
@@ -5744,13 +5769,60 @@ def _connection_rows(out_dir: str, q=None):
         # mains at the 40 m³/h thermal floor, £1,061 of phantom pipe + the exact
         # 'pipes into empty space' geometry the vision critic flags).
         _ledger_svc = str(ledger_row.get("service") or "").lower()
-        if "mm²" in size or "mm2" in size.lower() or any(k in mech for k in ("cable", "power", "electr", "supply", "feeder", "bus")):
+        # SIGNAL is checked FIRST and honours the ledger's own service verdict (the
+        # AUTHORITY). A 'signal' mechanism (instrument sense wire / optical-path tie /
+        # data lead) matches none of the electrical keywords below, so before this branch
+        # existed it fell straight to the water DEFAULT and was priced as a DN80 HDPE main
+        # (colorimeter run 1746: 16 optical/signal edges → £5,303 of phantom pipe). A
+        # signal tie is NEVER a water pipe (2026-07-12). Universal — mechanism/ledger-keyed.
+        if _ledger_svc == "signal" or any(k in mech for k in ("signal", "data", "sensor_feedback", "fieldbus", "modbus", "profibus", "control_signal")):
+            service, kind = "signal", "cable"
+        elif ("mm²" in size or "mm2" in size.lower() or _ledger_svc == "power"
+              or any(k in mech for k in ("cable", "power", "electr", "supply", "feeder", "bus"))):
             service, kind = "electrical", "cable"
         elif (_ledger_svc == "air" or "duct" in size.lower()
               or any(k in mech for k in ("hvac", "vent", "exhaust", "air", "aeration"))):
             service, kind = "air", "duct"
+        elif _ledger_svc == "water":
+            service, kind = "water", "pipe"
         else:
             service, kind = "water", "pipe"
+
+        # ── DEVICE-SCALE INTERCONNECT (2026-07-12, colorimeter): inside a sealed sub-1 m³
+        # instrument, a signal/electrical tie is a PCB trace or a short internal lead — NOT
+        # a plant supply+install cable RUN. Price it as a nominal internal interconnect so a
+        # handheld photometer's bill stays in its true £-band. Keyed on enclosure_volume_m3
+        # (the device-scale signal every sealed instrument carries); a plant is untouched.
+        _encl_v = q.get("enclosure_volume_m3") if isinstance(q, dict) else None
+        if isinstance(_encl_v, dict):
+            _encl_v = _encl_v.get("value")
+        _device_scale = isinstance(_encl_v, (int, float)) and 0 < _encl_v < 1.0
+        if _device_scale and service in ("signal", "electrical"):
+            # cap the run at the enclosure's characteristic length — a sealed sub-1 m³
+            # instrument physically cannot have a 2 m internal run (the Blender layout
+            # spaces parts for legibility, not real proximity); the true trace/lead is
+            # ≤ the box's own longest edge.
+            _char_len = max(0.05, min(0.35, float(_encl_v) ** (1.0 / 3.0)))
+            _len_raw = float(length) if isinstance(length, (int, float)) else _char_len
+            _len_dev = min(_len_raw, _char_len)
+            # internal PCB trace / short lead: a few pennies of copper + a connector end
+            line = round(max(0.5, _len_dev * 3.0 + 1.5), 2)
+            size = "PCB trace / internal lead"
+            within = True
+            sized_note = "device-scale internal interconnect (PCB trace / short lead — not a plant cable run)"
+            basis = f"internal instrument interconnect ({service}) × {_len_dev:.2f} m — PCB trace / short lead (device-scale, sealed enclosure)"
+            # skip the plant water re-pricing + the supply+install scope statement below
+            _skip_plant_repricing = True
+        else:
+            _skip_plant_repricing = False
+        # NON-device signal tie (a plant instrument→control-hub sense wire) — a screened
+        # signal/data cable, never a water main. Price it if the schedule left it unsized.
+        if service == "signal" and not _skip_plant_repricing and not (line > 0):
+            _len_sig = float(length) if isinstance(length, (int, float)) else 10.0
+            line = round(_len_sig * 6.0 + 35.0, 2)
+            size = "1.5 mm² screened signal pair"
+            within = True
+            basis = f"signal/data cable 1.5 mm² × {_len_sig:.1f} m @ £6/m + terminations (uk-2026 supply+install)"
 
         # P0-C (2026-07-09): when the parametric zoned-distribution network already owns
         # the plant pipe take-off (distribution_network_length_km present →
@@ -5902,7 +5974,7 @@ def _connection_rows(out_dir: str, q=None):
         # runs to £15-£40 TERMINATIONS: two different scopes. State the scope ON the line
         # so no reader can mistake the installed run for a component price (the fault
         # router downgrades an installed-vs-component complaint to a note on this basis).
-        if "install" not in basis.lower():
+        if "install" not in basis.lower() and not _skip_plant_repricing:
             basis += (" · installed cost — supply + installation labour + terminations "
                       "included (uk-2026 supply+install model; not a bare-fittings/component price)")
         # human part description incl. length + as-sized DN/CSA
@@ -5919,6 +5991,10 @@ def _connection_rows(out_dir: str, q=None):
         # service the row itself carries, no class table. ──
         if service == "water":
             conn_material = matlabel
+        elif _skip_plant_repricing:
+            conn_material = "Cu (PCB trace / short internal lead)"
+        elif service == "signal":
+            conn_material = "Cu conductor, signal/data cable (screened, LSZH)"
         elif service == "electrical":
             conn_material = "Cu conductor, LSZH/XLPE insulated (BS 6724/BS 5467 class)"
         else:
