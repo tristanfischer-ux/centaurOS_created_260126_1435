@@ -11,7 +11,7 @@
  */
 
 import { execFileSync, spawnSync } from 'child_process'
-import { existsSync, readdirSync } from 'fs'
+import { existsSync, readdirSync, realpathSync } from 'fs'
 import { delimiter, resolve } from 'path'
 
 export interface ExecutableCapability {
@@ -27,6 +27,22 @@ export interface LibraryCapability {
   itemCount: number
 }
 
+/**
+ * @description The KiCad-bundled Python interpreter + site-packages containing
+ * `pcbnew` — the only way to call `LoadBoard`/`ExportSpecctraDSN`/`ImportSpecctraSES`
+ * (kicad-cli exposes no equivalent subcommands as of KiCad 10.0.4, verified
+ * 2026-07-12). Discovered generically by resolving the `Versions/Current` symlink
+ * under KiCad.app's bundled Python.framework — never a hardcoded version number
+ * (KiCad has shipped 3.9 through several release lines; hardcoding it breaks on
+ * the next KiCad upgrade).
+ */
+export interface PythonBridgeCapability {
+  available: boolean
+  pythonBin?: string
+  sitePackages?: string
+  error?: string
+}
+
 export interface PcbCapabilityManifest {
   kicadCli: ExecutableCapability
   atopile: ExecutableCapability
@@ -34,6 +50,10 @@ export interface PcbCapabilityManifest {
   java: ExecutableCapability
   kicadSymbols: LibraryCapability
   kicadFootprints: LibraryCapability
+  /** Path to the Freerouting autorouter .jar, discovered from the freerouting.app
+   *  bundle's own `Contents/app/*.jar` (or `$FREEROUTING_JAR`) — never `/tmp`. */
+  freeroutingJar: ExecutableCapability
+  kicadPythonBridge: PythonBridgeCapability
   canAuthor: boolean
   canRoute: boolean
   canVerifyAndExport: boolean
@@ -112,6 +132,53 @@ function inspectLibrary(path: string, suffix: string): LibraryCapability {
 }
 
 /**
+ * @description Finds the Freerouting .jar generically: the app bundle's own
+ * `Contents/app/` directory is globbed for any `*.jar` (never a hardcoded
+ * filename — Freerouting's jar name has changed across releases, e.g.
+ * `freerouting-executable.jar`). `$FREEROUTING_JAR` always wins if set.
+ */
+function inspectFreeroutingJar(freeroutingBinPath: string | undefined): ExecutableCapability {
+  const envJar = process.env.FREEROUTING_JAR
+  if (envJar && existsSync(envJar)) return { available: true, path: envJar }
+  if (!freeroutingBinPath) return { available: false, error: 'freerouting_binary_not_found' }
+  // freeroutingBinPath is typically .../Contents/MacOS/freerouting; the jar
+  // ships alongside at .../Contents/app/*.jar in the same bundle.
+  const contentsDir = resolve(freeroutingBinPath, '..', '..')
+  const appDir = resolve(contentsDir, 'app')
+  if (!existsSync(appDir)) return { available: false, error: 'app_dir_not_found' }
+  const jar = readdirSync(appDir).find((entry) => entry.endsWith('.jar'))
+  if (!jar) return { available: false, error: 'no_jar_in_app_dir' }
+  return { available: true, path: resolve(appDir, jar) }
+}
+
+/**
+ * @description Resolves KiCad's bundled Python interpreter + pcbnew site-packages
+ * via the `Python.framework/Versions/Current` symlink (never a hardcoded version).
+ */
+function inspectKicadPythonBridge(kicadRoot: string): PythonBridgeCapability {
+  const versionsDir = resolve(kicadRoot, 'Frameworks/Python.framework/Versions')
+  if (!existsSync(versionsDir)) return { available: false, error: 'python_framework_not_found' }
+  let versionDir: string
+  try {
+    versionDir = realpathSync(resolve(versionsDir, 'Current'))
+  } catch {
+    return { available: false, error: 'current_symlink_unresolvable' }
+  }
+  const pythonBin = resolve(versionDir, 'bin/python3')
+  if (!existsSync(pythonBin)) return { available: false, error: 'python3_binary_not_found' }
+  const libDir = resolve(versionDir, 'lib')
+  const pyVersionDirName = existsSync(libDir)
+    ? readdirSync(libDir).find((entry) => entry.startsWith('python'))
+    : undefined
+  if (!pyVersionDirName) return { available: false, pythonBin, error: 'site_packages_dir_not_found' }
+  const sitePackages = resolve(libDir, pyVersionDirName, 'site-packages')
+  const pcbnewPresent = existsSync(resolve(sitePackages, 'pcbnew.py')) || existsSync(sitePackages)
+  return pcbnewPresent
+    ? { available: true, pythonBin, sitePackages }
+    : { available: false, pythonBin, error: 'site_packages_not_found' }
+}
+
+/**
  * @description Discovers a usable local PCB design toolchain.
  * @returns Paths, versions, libraries, and derived capability flags.
  */
@@ -157,6 +224,8 @@ export function discoverPcbCapability(): PcbCapabilityManifest {
     resolve(kicadRoot, 'SharedSupport/footprints'),
     '.kicad_mod',
   )
+  const freeroutingJar = inspectFreeroutingJar(freerouting.path)
+  const kicadPythonBridge = inspectKicadPythonBridge(kicadRoot)
 
   const canAuthor =
     atopile.available &&
@@ -164,7 +233,7 @@ export function discoverPcbCapability(): PcbCapabilityManifest {
     kicadSymbols.available &&
     kicadFootprints.available
   const canRoute =
-    canAuthor && (freerouting.available || java.available)
+    canAuthor && freeroutingJar.available && java.available && kicadPythonBridge.available
   const canVerifyAndExport = kicadCli.available
   const missingRequired = [
     ...(!kicadCli.available ? ['kicad-cli'] : []),
@@ -180,6 +249,8 @@ export function discoverPcbCapability(): PcbCapabilityManifest {
     java,
     kicadSymbols,
     kicadFootprints,
+    freeroutingJar,
+    kicadPythonBridge,
     canAuthor,
     canRoute,
     canVerifyAndExport,
