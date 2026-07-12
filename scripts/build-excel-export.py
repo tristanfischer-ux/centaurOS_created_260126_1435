@@ -1370,7 +1370,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Inputs & Assumptions": "Editable yellow drivers feeding the economics model.",
     "Financial model": "Economics, scenarios and investment analysis, live off the Inputs tab.",
     "Electrical": "Single-line diagram with the panel/load schedule — one dataset.",
-    "PCB": "Bespoke board disposition + the real atopile/KiCad pipeline result — DRC, Gerbers, PCBA BoM.",
+    "PCB": "Readiness verdict, DRC/layer/PnP tables, PCBA BoM — hygiene x design-fitness scored.",
     "Process schedules": "Valve and instrument schedules; the line list is Line & velocity.",
     "Line & velocity": "THE line list — every sized run versus its limit.",
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
@@ -14759,17 +14759,373 @@ def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]
     return embedded
 
 
+# ── PCB-TAB-UX (2026-07-12): the PCB tab was a pipeline-HYGIENE report (DRC-clean +
+# routed + Gerbers present) with NO design-fitness check — a wrong-domain board (BESS
+# power-electronics parts pinned onto a colorimeter) scored 9.4/10 because every part
+# had a plausible footprint even though almost none had a verified MPN. Fix: TWO
+# independent axes, honestly combined as min(hygiene, fitness) — a hygienically-clean
+# board of unresolved/wrong-domain parts can never score high or read FAB-READY. ──
+
+_PCB_TIER_WEIGHT = {"mpn_package": 1.0, "package_family": 0.65, "function_class": 0.2}
+
+
+def _pcb_fitness_axis(tiers: Dict[str, int]) -> Tuple[float, int, int]:
+    """DESIGN-FITNESS axis (0-10): a weighted fraction of resolved components that carry
+    a REAL catalogue tier (mpn_package = manufacturer+MPN, package_family = a generic
+    catalogue family match) vs a bare function_class role/footprint guess with no
+    verified part. Pure, no I/O — proveCatch in _selftest, both directions. Returns
+    (score_0_10, resolved_n, verified_n)."""
+    resolved_n = sum(int(v or 0) for v in tiers.values())
+    verified_n = int(tiers.get("mpn_package", 0)) + int(tiers.get("package_family", 0))
+    if resolved_n == 0:
+        return 0.0, 0, 0
+    weighted = sum(_PCB_TIER_WEIGHT.get(tier, 0.2) * int(n or 0) for tier, n in tiers.items())
+    return round(10.0 * weighted / resolved_n, 2), resolved_n, verified_n
+
+
+def _pcb_readiness_verdict(pipeline_ok: bool, drc_ok: bool, routed_ok: bool, gerbers_ok: bool,
+                           bespoke_missing: bool, fitness_score: float,
+                           n_electronic_gap: int) -> Tuple[str, str]:
+    """FAB-READY | ENGINEERING DRAFT | FAIL. A DRC-clean, fully-routed, Gerber-complete
+    board whose BoM is function_class-heavy (fitness_score < 7.5) or still carries an
+    unresolved ELECTRONIC gap must read ENGINEERING DRAFT, never FAB-READY — the exact
+    Goodhart trap this tab used to fall into (hygiene-only -> a wrong-domain board read
+    9.4/10). Pure, no I/O — proveCatch in _selftest, both directions."""
+    hygiene_ok = pipeline_ok and drc_ok and routed_ok and gerbers_ok
+    if bespoke_missing or not hygiene_ok:
+        why = ("this design needs a bespoke PCB but no DRC-clean, fully-routed board with "
+               "Gerbers landed" if bespoke_missing else
+               "the pipeline's own hygiene checks (DRC / routed / Gerbers / pipeline.ok) "
+               "did not all pass")
+        return "FAIL", why
+    if fitness_score < 7.5 or n_electronic_gap > 0:
+        why = ("hygiene is clean, but the BoM is not fab-grade — design-fitness score "
+               f"{fitness_score:.1f}/10 (too many resolved parts carry no verified "
+               "MPN/package, function_class only)")
+        if n_electronic_gap:
+            why += f"; {n_electronic_gap} unresolved ELECTRONIC gap(s) remain"
+        return "ENGINEERING DRAFT", why
+    return "FAB-READY", "DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier"
+
+
+def _pcb_rel(path: Optional[str], run_dir: str) -> str:
+    """A run_dir-relative path for display — NEVER the raw absolute machine path (dead
+    in a shared xlsx). Falls back to the basename if relpath can't be computed."""
+    if not path:
+        return "—"
+    try:
+        return os.path.relpath(path, run_dir)
+    except Exception:  # noqa: BLE001
+        return os.path.basename(str(path))
+
+
+def _pcb_parse_positions(pos_path: str) -> List[dict]:
+    """Parse a KiCad `pcb export pos` ASCII file (Ref/Val/Package/PosX/PosY/Rot/Side,
+    whitespace-column format despite the .csv extension; units stated in the
+    '## Unit = …' comment line, converted to mm here for consistency with the rest of
+    the dossier). Returns [] on any parse failure — never a fabricated row."""
+    rows: List[dict] = []
+    try:
+        with open(pos_path, "r") as f:
+            lines = f.readlines()
+    except Exception:  # noqa: BLE001
+        return rows
+    unit_mm = False
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        if s.startswith("#"):
+            if "unit" in s.lower() and re.search(r"=\s*mm\b", s.lower()):
+                unit_mm = True
+            continue
+        parts = s.split()
+        if len(parts) < 7:
+            continue
+        ref, val, pkg, x, y, rot, side = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
+        try:
+            xf, yf, rf = float(x), float(y), float(rot)
+        except ValueError:
+            continue
+        if not unit_mm:
+            xf *= 25.4
+            yf *= 25.4
+        rows.append({"ref": ref, "val": val, "package": pkg, "x_mm": xf, "y_mm": yf,
+                     "rot": rf, "side": side})
+    return rows
+
+
+def _pcb_designator_map(components: List[dict], pos_rows: List[dict]) -> Dict[str, Optional[str]]:
+    """Map each engine component (in generation order) to its REAL KiCad reference
+    designator (U1/C3/J2), by matching FOOTPRINT-GROUP order: the generator instantiates
+    components in a fixed generation order and kicad-cli numbers each footprint type
+    sequentially in that same order, so the Nth engine component of footprint F is the
+    Nth positions.csv row of footprint F. Never a guess — a footprint whose engine-count
+    doesn't match the board-count is left unmatched (None) for every member of that
+    group. Universal across any board (keyed on footprint shape, never a part name)."""
+    from collections import defaultdict
+    gen_groups: Dict[str, List[str]] = defaultdict(list)
+    for c in components:
+        fp = (c.get("footprint") or {}).get("footprint") or ""
+        gen_groups[fp].append(c.get("instanceName") or "")
+    pos_groups: Dict[str, List[str]] = defaultdict(list)
+    for row in pos_rows:
+        pos_groups[row["package"]].append(row["ref"])
+    out: Dict[str, Optional[str]] = {}
+    for fp, names in gen_groups.items():
+        refs = pos_groups.get(fp) or []
+        if len(refs) == len(names) and names:
+            for name, ref in zip(names, refs):
+                out[name] = ref
+        else:
+            for name in names:
+                out[name] = None
+    return out
+
+
+_PCB_CORE_LAYER_KEYS = [
+    ("F_Cu", "Front copper (F.Cu)"),
+    ("B_Cu", "Back copper (B.Cu)"),
+    ("F_Mask", "Front solder mask (F.Mask)"),
+    ("B_Mask", "Back solder mask (B.Mask)"),
+    ("F_Silkscreen", "Front silkscreen (F.Silkscreen)"),
+    ("B_Silkscreen", "Back silkscreen (B.Silkscreen)"),
+    ("F_Paste", "Front paste (F.Paste)"),
+    ("B_Paste", "Back paste (B.Paste)"),
+    ("Edge_Cuts", "Board outline (Edge.Cuts)"),
+]
+_PCB_INNER_RX = re.compile(r"(?<![A-Za-z0-9])(In(\d+)_Cu)(?![A-Za-z0-9])")
+
+
+def _pcb_layer_inventory(gerber_files: List[str], drill_files: List[str]
+                         ) -> List[Tuple[str, str, bool]]:
+    """Layer -> filename -> present?, derived from the REAL gerber/drill filenames —
+    never a hardcoded layer count. Inner layers (In1.Cu, In2.Cu, …) are discovered
+    dynamically and only listed when actually present, so 'Layers' on the Board summary
+    is honest about whether inner layers exist rather than a fixed '2-layer' assumption."""
+    def _find(key: str, files: List[str]) -> Optional[str]:
+        rx = re.compile(r"(?<![A-Za-z0-9])" + re.escape(key) + r"(?![A-Za-z0-9])")
+        for f in files:
+            if rx.search(os.path.basename(f)):
+                return f
+        return None
+
+    rows: List[Tuple[str, str, bool]] = []
+    for key, label in _PCB_CORE_LAYER_KEYS:
+        f = _find(key, gerber_files)
+        rows.append((label, os.path.basename(f) if f else "—", bool(f)))
+    inner_nums = sorted({int(m.group(2)) for f in gerber_files
+                         for m in [_PCB_INNER_RX.search(os.path.basename(f))] if m})
+    for n in inner_nums:
+        f = _find(f"In{n}_Cu", gerber_files)
+        rows.append((f"Inner layer {n} (In{n}.Cu)", os.path.basename(f) if f else "—", bool(f)))
+    job = next((f for f in gerber_files if f.endswith(".gbrjob")), None)
+    rows.append(("Job file (.gbrjob)", os.path.basename(job) if job else "—", bool(job)))
+    drl = next((f for f in drill_files if f.endswith(".drl")), None)
+    rows.append(("Drill file (.drl)", os.path.basename(drl) if drl else "—", bool(drl)))
+    return rows
+
+
+def _pcb_parse_drc_report(report_path: str) -> Tuple[List[Tuple[str, str, str]], Optional[int]]:
+    """Read the real drc-report.json (never state's bare violation COUNT alone) for the
+    top-N violation rows + the unconnected-item count. Returns ([], None) on any read
+    failure — an honest 'could not read' rather than a fabricated clean report."""
+    try:
+        with open(report_path, "r") as f:
+            report = json.load(f)
+    except Exception:  # noqa: BLE001
+        return [], None
+    rows = []
+    for v in (report.get("violations") or [])[:10]:
+        vtype = str(v.get("type") or "—")
+        sev = str(v.get("severity") or "—")
+        desc = str(v.get("description") or "—")
+        rows.append((vtype, sev, desc))
+    unconnected = report.get("unconnected_items")
+    return rows, (len(unconnected) if isinstance(unconnected, list) else None)
+
+
+_PCB_MECH_OFFBOARD_RX = re.compile(
+    r"\b(rack|busbar|chassis|enclosure|frame|bracket|mount(?:ing)?|housing|cabinet|shelf|"
+    r"rail|fastener|gasket|seal|hinge|handle|door|lid|shell|baseplate|standoff)\b", re.I)
+
+
+def _pcb_unresolved_disposition(name_human: str, character_id: str) -> str:
+    """Split an unresolved word into 'correctly excluded' (a mechanical/off-board
+    assembly that was never going to be a PCB footprint — e.g. a module rack or a
+    system-level DC busbar) vs a genuine 'electronic gap' (a part with no footprint/MPN
+    that DOES belong on the board — e.g. a missing photodiode). Universal: keyed on
+    a mechanical-noun vocabulary, never a per-class table — so module_rack/dc_busbar
+    never score the same as a missing sensor."""
+    text = f"{name_human} {character_id}"
+    if _PCB_MECH_OFFBOARD_RX.search(text):
+        return "Correctly excluded (mechanical/off-board)"
+    return "Electronic gap (needs footprint/MPN)"
+
+
+def _pcb_write_fab_zip(run_dir: str, pipeline: dict) -> Optional[str]:
+    """Bundle the fab pack (gerbers/ + drill/ + positions.csv + drc-report.json + the
+    routed .kicad_pcb) into out/<run>/pcb/pcb-fab.zip — the ONE artefact a fab house
+    needs, and the ONE path this tab points at (relative to run_dir; never an absolute
+    home path). Written HERE, at Excel-build time — the single writer (not the PCB
+    pipeline stage), always rebuilt fresh from the run's own pipeline paths so it can
+    never drift stale against the gerbers it packages. Returns the run_dir-relative
+    path, or None when there is nothing to pack."""
+    import zipfile
+    pcb_dir = os.path.join(run_dir, "pcb")
+    if not os.path.isdir(pcb_dir):
+        return None
+    zip_path = os.path.join(pcb_dir, "pcb-fab.zip")
+    members: List[Tuple[str, str]] = []   # (abs_src, arcname)
+    gerbers = pipeline.get("gerbers") or {}
+    for f in (gerbers.get("files") or []):
+        if f and os.path.exists(f):
+            members.append((f, os.path.join("gerbers", os.path.basename(f))))
+    drill = pipeline.get("drill") or {}
+    for f in (drill.get("files") or []):
+        if f and os.path.exists(f):
+            members.append((f, os.path.join("drill", os.path.basename(f))))
+    pos = pipeline.get("pos") or {}
+    if pos.get("path") and os.path.exists(pos["path"]):
+        members.append((pos["path"], os.path.basename(pos["path"])))
+    drc = pipeline.get("drc") or {}
+    if drc.get("reportPath") and os.path.exists(drc["reportPath"]):
+        members.append((drc["reportPath"], os.path.basename(drc["reportPath"])))
+    kicad_pcb = pipeline.get("kicadPcbPath")
+    if kicad_pcb and os.path.exists(kicad_pcb):
+        members.append((kicad_pcb, os.path.basename(kicad_pcb)))
+    if not members:
+        return None
+    try:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for src, arc in members:
+                zf.write(src, arc)
+    except Exception as exc:  # noqa: BLE001
+        print(f"    ! could not write PCB fab pack zip: {exc}")
+        return None
+    return os.path.relpath(zip_path, run_dir)
+
+
+_PCB_ASSESS_CACHE: dict = {}
+
+
+def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
+    """ONE computation shared by tab_pcb() (render) and _sc_pcb() (score) so the tab's
+    banner/tables and its score can never diverge (mirrors the file-wide 'two never
+    disagree' discipline). Cached per run_dir — the file reads + the fab-zip write
+    happen exactly once per build."""
+    if run_dir in _PCB_ASSESS_CACHE:
+        return _PCB_ASSESS_CACHE[run_dir]
+
+    pipeline = pcb.get("pipeline") or {}
+    drc = pipeline.get("drc") or {}
+    gen = pipeline.get("generator") or {}
+    gerbers = pipeline.get("gerbers") or {}
+    drill = pipeline.get("drill") or {}
+    pos = pipeline.get("pos") or {}
+
+    drc_ok = bool(drc.get("ran")) and drc.get("violations") == 0
+    unrouted = pipeline.get("unroutedAfterFreerouting")
+    routed_ok = bool(pipeline.get("routed")) and (unrouted in (0, None))
+    gerbers_ok = bool(gerbers.get("files"))
+    pipeline_ok = bool(pipeline.get("ok"))
+
+    drc_rows: List[Tuple[str, str, str]] = []
+    unconnected_n: Optional[int] = None
+    if drc.get("reportPath") and os.path.exists(drc["reportPath"]):
+        drc_rows, unconnected_n = _pcb_parse_drc_report(drc["reportPath"])
+
+    pos_rows = (_pcb_parse_positions(pos["path"])
+                if pos.get("path") and os.path.exists(pos["path"]) else [])
+    components = gen.get("components") if isinstance(gen.get("components"), list) else []
+    designators = _pcb_designator_map(components, pos_rows)
+    n_matched_designators = sum(1 for v in designators.values() if v)
+
+    layer_rows = _pcb_layer_inventory(gerbers.get("files") or [], drill.get("files") or [])
+    n_core_present = sum(1 for (_l, _f, present) in layer_rows[:len(_PCB_CORE_LAYER_KEYS)]
+                         if present)
+
+    unresolved = gen.get("unresolved") if isinstance(gen.get("unresolved"), list) else []
+    unresolved_split: List[Tuple[str, str, str, str, str]] = []
+    n_electronic_gap = 0
+    for u in unresolved:
+        disp = _pcb_unresolved_disposition(u.get("nameHuman") or "", u.get("characterId") or "")
+        if disp.startswith("Electronic"):
+            n_electronic_gap += 1
+        unresolved_split.append((u.get("wordId") or "—", u.get("nameHuman") or "—",
+                                 u.get("characterId") or "—", disp, u.get("reason") or "—"))
+
+    from collections import Counter
+    tiers = Counter(c.get("resolutionTier") for c in components)
+    fitness_score, resolved_n, verified_n = _pcb_fitness_axis(dict(tiers))
+
+    fab_zip_rel = _pcb_write_fab_zip(run_dir, pipeline)
+
+    bespoke_missing = (bool(pcb.get("isPcbBearing")) and pcb.get("disposition") == "bespoke"
+                       and not pipeline_ok)
+    readiness, readiness_why = _pcb_readiness_verdict(
+        pipeline_ok, drc_ok, routed_ok, gerbers_ok, bespoke_missing, fitness_score,
+        n_electronic_gap)
+
+    hygiene_components: List[Tuple[str, float, float]] = [
+        ("DRC clean (0 violations)", 1 if drc_ok else 0, 1),
+        ("board fully routed (0 unrouted nets)", 1 if routed_ok else 0, 1),
+        ("Gerber set present", 1 if gerbers_ok else 0, 1),
+        ("pipeline's own ok verdict (built + routed + DRC-clean + gerbers)",
+         1 if pipeline_ok else 0, 1),
+        ("manufacturing layer inventory populated (core layers found)",
+         n_core_present, len(_PCB_CORE_LAYER_KEYS)),
+        ("pick-and-place rows extracted",
+         (min(len(pos_rows), resolved_n) if resolved_n else (1 if pos_rows else 0)),
+         (resolved_n if resolved_n else 1)),
+        ("fab pack zip written (relative path)", 1 if fab_zip_rel else 0, 1),
+    ]
+    fitness_components: List[Tuple[str, float, float]] = []
+    if resolved_n:
+        fitness_components.append(
+            ("BoM resolution fitness (mpn_package/package_family weighted vs "
+             "function_class guesses)", fitness_score, 10))
+        fitness_components.append(
+            ("KiCad designator resolved (real U1/C3/J2, not the engine word ID)",
+             n_matched_designators, resolved_n))
+    if unresolved:
+        fitness_components.append(
+            ("unresolved parts correctly triaged (mechanical vs electronic gap)",
+             max(0, len(unresolved) - n_electronic_gap), len(unresolved)))
+
+    result = {
+        "pipeline": pipeline, "drc": drc, "gen": gen,
+        "drc_ok": drc_ok, "routed_ok": routed_ok, "gerbers_ok": gerbers_ok,
+        "pipeline_ok": pipeline_ok,
+        "readiness": readiness, "readiness_why": readiness_why,
+        "drc_violation_rows": drc_rows, "drc_unconnected_n": unconnected_n,
+        "pos_rows": pos_rows, "designators": designators,
+        "layer_rows": layer_rows,
+        "unresolved_split": unresolved_split, "n_electronic_gap": n_electronic_gap,
+        "resolved_n": resolved_n, "verified_n": verified_n, "fitness_score": fitness_score,
+        "tiers": dict(tiers),
+        "fab_zip_rel": fab_zip_rel,
+        "hygiene_components": hygiene_components,
+        "fitness_components": fitness_components,
+    }
+    _PCB_ASSESS_CACHE[run_dir] = result
+    return result
+
+
 def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
-    """PCB Phase D (2026-07-12, docs/plans/pcb-capability-integration.md): renders the REAL
-    artifacts from state.pcb.pipeline — disposition (bespoke/COTS + rationale), the board the
-    pipeline actually built (atopile -> KiCad -> Freerouting -> DRC -> Gerbers), the DRC
-    verdict, routed/unrouted nets, the 3D render, the Gerber/drill/pos artifact paths, and the
-    PCBA BoM (resolved components with MPN/footprint) + the honest unresolved[] gap list.
-    SELF-GUARDS: absent (returns False, no sheet created) whenever state.pcb.pipeline was never
-    recorded — PCB_STAGE off, or the design's own disposition never required a bespoke board —
-    so every existing archetype run stays byte-identical. Every number here is read from
-    state.pcb.pipeline (the REAL pipeline result), never a stated intention — mirrors the
-    'Electrical' tab's one-dataset discipline."""
+    """PCB-TAB-UX (2026-07-12, extends PCB Phase D): renders the REAL artifacts from
+    state.pcb.pipeline as a USABLE fab pack, not a hygiene-only report — a readiness
+    banner driven by BOTH pipeline hygiene (DRC/routed/Gerbers/ok) AND design fitness
+    (resolution-tier of the BoM), real DRC/manufacturing-layer/pick-and-place tables,
+    KiCad reference designators (U1/C3/J2 — cross-matched from positions.csv, never the
+    raw engine word ID), a relative fab-pack zip pointer, and an honest mechanical-vs-
+    electronic split of the unresolved gap list. NEVER an absolute /Users/... path as
+    the primary UX (mirrors the file-wide relative-path discipline). SELF-GUARDS: absent
+    (returns False, no sheet created) whenever state.pcb.pipeline was never recorded —
+    PCB_STAGE off, or the design's own disposition never required a bespoke board — so
+    every existing archetype run stays byte-identical. Every number here is read from
+    state.pcb.pipeline (the REAL pipeline result) via the shared _pcb_two_axis_assessment
+    (the SAME computation _sc_pcb scores from — tab and score can never diverge)."""
     pcb = state.get("pcb")
     if not isinstance(pcb, dict):
         return False
@@ -14779,20 +15135,22 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
 
     from openpyxl.drawing.image import Image as XLImage
 
+    a = _pcb_two_axis_assessment(pcb, run_dir)
+    gen = a["gen"]
+    drc = a["drc"]
+
     ws = wb.create_sheet("PCB")
-    set_widths(ws, {"A": 26, "B": 34, "C": 18, "D": 20, "E": 18, "F": 20, "G": 10})
-    drc = pipeline.get("drc") or {}
-    violations = drc.get("violations")
-    gen = pipeline.get("generator") or {}
+    set_widths(ws, {"A": 22, "B": 22, "C": 22, "D": 16, "E": 22, "F": 20, "G": 16, "H": 10})
     subtitle = (
-        "The bespoke PCB design surface: disposition, the board the pipeline actually built "
-        "(atopile -> KiCad -> Freerouting autoroute -> KiCad DRC -> Gerbers), and the PCBA "
-        "BoM. Every number on this tab is read from state.pcb.pipeline — the REAL pipeline "
-        "result, never a stated intention; a failed/incomplete board renders as a failure "
-        "here, never a fabricated pass. Auto-generated; not for construction."
+        "The bespoke PCB design surface: a readiness verdict, the board the pipeline "
+        "actually built (atopile -> KiCad -> Freerouting autoroute -> KiCad DRC -> "
+        "Gerbers), and the PCBA BoM. Every number on this tab is read from "
+        "state.pcb.pipeline — the REAL pipeline result, never a stated intention; a "
+        "DRC-clean board of the WRONG parts is never presented as fab-ready here. "
+        "Auto-generated; not for construction."
     )
-    r = title_row(ws, "PCB — bespoke board disposition + real pipeline artifacts", 7, subtitle)
-    back_link(ws, 7)
+    r = title_row(ws, "PCB — readiness, real pipeline artifacts, fab pack", 8, subtitle)
+    back_link(ws, 8)
 
     def _kv(rows: List[Tuple[str, Any]]) -> None:
         nonlocal r
@@ -14801,9 +15159,22 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
             ws.cell(r, 2, clean_cell(val))
             r += 1
 
-    # ── Disposition ──────────────────────────────────────────────────────────────────
+    # ── Readiness banner (top) — driven by hygiene AND design-fitness together ───────
     r += 1
-    sub_banner(ws, r, "Disposition", 7)
+    _fill, _txtcolor = {"FAB-READY": (FILL_PASS, "006100"),
+                        "ENGINEERING DRAFT": (FILL_ADVISORY, "9C6500"),
+                        "FAIL": (FILL_FAIL, "9C0006")}[a["readiness"]]
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=8)
+    bc = ws.cell(r, 1, clean_cell(f"{a['readiness']} — {a['readiness_why']}"))
+    bc.fill = _fill
+    bc.font = Font(name="Calibri", size=13, bold=True, color=_txtcolor)
+    bc.alignment = WRAP_TOP
+    ws.row_dimensions[r].height = 20
+    ws.row_dimensions[r + 1].height = 28
+    r += 3
+
+    # ── Disposition ──────────────────────────────────────────────────────────────────
+    sub_banner(ws, r, "Disposition", 8)
     r += 1
     header(ws, r, ["Field", "Value"])
     r += 1
@@ -14821,15 +15192,27 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     r += 1
 
     # ── Board summary — real pipeline result ────────────────────────────────────────
-    sub_banner(ws, r, "Board summary — real pipeline result", 7)
+    sub_banner(ws, r, "Board summary — real pipeline result", 8)
     r += 1
     header(ws, r, ["Field", "Value"])
     r += 1
     size = pipeline.get("boardSizeMm") or {}
     size_txt = f"{size.get('w')} x {size.get('h')} mm" if size.get("w") and size.get("h") else "—"
+    cu_layer_labels = [lbl for (lbl, _f, present) in a["layer_rows"] if present and "Cu)" in lbl]
+    n_cu = len(cu_layer_labels)
+    if n_cu >= 2:
+        n_inner = n_cu - 2
+        layers_txt = (f"{n_cu} (2 outer + {n_inner} inner — see the layer inventory table below)"
+                      if n_inner else f"{n_cu} (2 outer only — no inner layers on this board)")
+    elif n_cu == 1:
+        layers_txt = "1 (single-sided — unusual for this class of board, verify)"
+    elif a["gerbers_ok"]:
+        layers_txt = "unknown — no copper-layer Gerbers found among the exported set"
+    else:
+        layers_txt = "unknown — no Gerbers were exported to confirm from"
     _kv([
         ("Pipeline stage reached", str(pipeline.get("stageReached") or "—")),
-        ("Layers", "2 (atopile default project — no explicit stackup override generated)"),
+        ("Layers (honest — derived from the exported Gerber set)", layers_txt),
         ("Board size", size_txt),
         ("Components on board", pipeline.get("components") if pipeline.get("components") is not None
          else (gen.get("componentCount") or "—")),
@@ -14841,50 +15224,84 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     ])
     r += 1
 
-    # ── DRC verdict ──────────────────────────────────────────────────────────────────
-    sub_banner(ws, r, "DRC verdict", 7)
+    # ── DRC summary ──────────────────────────────────────────────────────────────────
+    sub_banner(ws, r, "DRC summary", 8)
     r += 1
     header(ws, r, ["Field", "Value"])
     r += 1
-    drc_clean = bool(drc.get("ran")) and violations == 0
-    drc_text = ("CLEAN — 0 violations" if drc_clean else
-                (f"{violations} violation(s)" if drc.get("ran") and isinstance(violations, (int, float))
+    drc_text = ("CLEAN — 0 violations" if a["drc_ok"] else
+                (f"{drc.get('violations')} violation(s)"
+                 if drc.get("ran") and isinstance(drc.get("violations"), (int, float))
                  else "DRC did not run"))
     ws.cell(r, 1, "DRC ran").font = FONT_SUB
     ws.cell(r, 2, "Yes" if drc.get("ran") else "No")
     r += 1
     ws.cell(r, 1, "DRC violations").font = FONT_SUB
     dcell = ws.cell(r, 2, clean_cell(drc_text))
-    dcell.font = FONT_PASS if drc_clean else FONT_FAIL
+    dcell.font = FONT_PASS if a["drc_ok"] else FONT_FAIL
     r += 1
-    ws.cell(r, 1, "DRC report").font = FONT_SUB
-    ws.cell(r, 2, clean_cell(drc.get("reportPath") or "—"))
+    _kv([
+        ("Unconnected items", a["drc_unconnected_n"] if a["drc_unconnected_n"] is not None else "—"),
+        ("Full DRC report (relative to run dir)", _pcb_rel(drc.get("reportPath"), run_dir)),
+    ])
     r += 1
+    if a["drc_violation_rows"]:
+        header(ws, r, ["Type", "Severity", "Description"])
+        r += 1
+        for vtype, sev, desc in a["drc_violation_rows"]:
+            ws.cell(r, 1, clean_cell(vtype))
+            sc = ws.cell(r, 2, clean_cell(sev))
+            sc.font = FONT_FAIL if str(sev).lower() in ("error", "high") else FONT_ADVISORY
+            # NOT merged (unlike most wide-text cells on this tab): the walker's live
+            # 'Cell check' flag column lands immediately right of the declared 3-column
+            # contract (col D) — a merge there would swallow it. Text overflows visually
+            # into the empty cells to the right instead (native Excel behaviour).
+            dc = ws.cell(r, 3, clean_cell(desc))
+            dc.alignment = LEFT_TOP
+            r += 1
+        r += 1
+
+    # ── Manufacturing layer inventory ───────────────────────────────────────────────
+    sub_banner(ws, r, "Manufacturing layer inventory", 8)
+    r += 1
+    header(ws, r, ["Layer", "Filename", "Present?"])
+    r += 1
+    for label, fname, present in a["layer_rows"]:
+        ws.cell(r, 1, clean_cell(label))
+        ws.cell(r, 2, clean_cell(fname))
+        pc = ws.cell(r, 3, "Yes" if present else "No")
+        pc.font = FONT_PASS if present else FONT_FAIL
+        r += 1
     r += 1
 
-    # ── Manufacturing artifacts ────────────────────────────────────────────────────
-    sub_banner(ws, r, "Manufacturing artifacts", 7)
+    # ── Pick-and-place ───────────────────────────────────────────────────────────────
+    sub_banner(ws, r, f"Pick-and-place ({len(a['pos_rows'])} placement(s))", 8)
     r += 1
-    header(ws, r, ["Field", "Value"])
+    header(ws, r, ["Ref", "Footprint", "X (mm)", "Y (mm)", "Rotation (deg)", "Side", "Value"])
     r += 1
-    gerbers = pipeline.get("gerbers") or {}
-    drill = pipeline.get("drill") or {}
-    pos = pipeline.get("pos") or {}
-    _kv([
-        ("Gerber set", f"{len(gerbers.get('files') or [])} file(s) — {gerbers.get('dir') or '—'}"
-         if gerbers else "not generated"),
-        ("Drill files", f"{len(drill.get('files') or [])} file(s) — {drill.get('dir') or '—'}"
-         if drill else "not generated"),
-        ("Pick-and-place (.pos)", pos.get("path") or "not generated"),
-        ("Routed board file (.kicad_pcb)", pipeline.get("kicadPcbPath") or "not generated"),
-    ])
+    if a["pos_rows"]:
+        for row in a["pos_rows"]:
+            ws.cell(r, 1, clean_cell(row["ref"]))
+            ws.cell(r, 2, clean_cell(row["package"]))
+            ws.cell(r, 3, round(row["x_mm"], 2)).number_format = FMT_DEC2
+            ws.cell(r, 4, round(row["y_mm"], 2)).number_format = FMT_DEC2
+            ws.cell(r, 5, round(row["rot"], 1)).number_format = FMT_DEC1
+            ws.cell(r, 6, clean_cell(row["side"]))
+            val = row.get("val") or ""
+            vc = ws.cell(r, 7, "Value unset" if val in ("", "?") else clean_cell(val))
+            if val in ("", "?"):
+                vc.font = FONT_NOTE
+            r += 1
+    else:
+        ws.cell(r, 1, "— no pick-and-place data (positions.csv) for this board —").font = FONT_NOTE
+        r += 1
     r += 1
 
     if pipeline.get("errors"):
-        sub_banner(ws, r, "Pipeline errors (honest failure trace)", 7)
+        sub_banner(ws, r, "Pipeline errors (honest failure trace)", 8)
         r += 1
         for e in (pipeline.get("errors") or [])[:8]:
-            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
             c = ws.cell(r, 1, clean_cell(f"⚠ {e}"))
             c.font = FONT_FAIL
             c.alignment = WRAP_TOP
@@ -14894,7 +15311,7 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
     # ── 3D render ───────────────────────────────────────────────────────────────────
     render_png = pipeline.get("renderPng")
     if render_png and os.path.exists(render_png):
-        sub_banner(ws, r, "3D render", 7)
+        sub_banner(ws, r, "3D render", 8)
         r += 1
         try:
             ds = downscale_png(render_png, run_dir)
@@ -14914,48 +15331,102 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         r += 2
 
     # ── PCBA BoM — resolved components ─────────────────────────────────────────────
-    sub_banner(ws, r, "PCBA BoM — resolved components", 7)
+    sub_banner(ws, r, "PCBA BoM — resolved components", 8)
     r += 1
-    header(ws, r, ["Designator", "Component", "Manufacturer", "MPN", "Footprint",
-                   "Resolution tier", "Qty"])
+    leg = ws.cell(r, 1, clean_cell(
+        "Resolution-tier legend: mpn_package = real manufacturer + MPN (verified) > "
+        "package_family = generic catalogue family match, no specific MPN > "
+        "function_class = role/footprint guess only — treat as a DETAILED-DESIGN "
+        "placeholder, not a verified part. Rows flagged ⚠ below are function_class "
+        "with no MPN at all."))
+    leg.font = FONT_NOTE
+    leg.alignment = WRAP_TOP
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+    ws.row_dimensions[r].height = 40
+    r += 1
+    header(ws, r, ["Designator", "Engine word / role", "Component", "Manufacturer", "MPN",
+                   "Footprint", "Resolution tier", "Qty"])
     r += 1
     components = gen.get("components") if isinstance(gen.get("components"), list) else []
     if components:
         for comp in components:
             fp = comp.get("footprint") or {}
             fp_txt = f"{fp.get('library')}:{fp.get('footprint')}" if fp else "—"
-            ws.cell(r, 1, clean_cell(comp.get("instanceName") or "—"))
-            ws.cell(r, 2, clean_cell(comp.get("nameHuman") or comp.get("characterId") or "—"))
-            ws.cell(r, 3, clean_cell(comp.get("manufacturer") or "—"))
-            ws.cell(r, 4, clean_cell(comp.get("partNumber") or "—"))
-            ws.cell(r, 5, clean_cell(fp_txt))
-            ws.cell(r, 6, clean_cell(comp.get("resolutionTier") or "—"))
-            ws.cell(r, 7, comp.get("quantityInDesign") or 1)
+            tier = comp.get("resolutionTier") or "—"
+            weak = (tier == "function_class" and
+                    not (comp.get("partNumber") and
+                         not str(comp.get("partNumber")).upper().startswith("TBD")))
+            designator = a["designators"].get(comp.get("instanceName") or "")
+            ws.cell(r, 1, clean_cell(designator or "—"))
+            ws.cell(r, 2, clean_cell(comp.get("instanceName") or comp.get("characterId") or "—"))
+            ws.cell(r, 3, clean_cell(comp.get("nameHuman") or comp.get("characterId") or "—"))
+            ws.cell(r, 4, clean_cell(comp.get("manufacturer") or "—"))
+            ws.cell(r, 5, clean_cell(comp.get("partNumber") or "—"))
+            ws.cell(r, 6, clean_cell(fp_txt))
+            tc = ws.cell(r, 7, clean_cell(("⚠ " if weak else "") + tier))
+            tc.font = FONT_FAIL if weak else FONT_SUB
+            ws.cell(r, 8, comp.get("quantityInDesign") or 1)
             r += 1
     else:
         ws.cell(r, 1, "— no components resolved —")
-        ws.cell(r, 2, ""); ws.cell(r, 3, ""); ws.cell(r, 4, "")
-        ws.cell(r, 5, ""); ws.cell(r, 6, ""); ws.cell(r, 7, "")
+        for col in range(2, 9):
+            ws.cell(r, col, "")
         r += 1
     r += 1
 
-    # ── Unresolved parts (honest gap list) ─────────────────────────────────────────
-    unresolved = gen.get("unresolved") if isinstance(gen.get("unresolved"), list) else []
-    sub_banner(ws, r, f"Unresolved parts ({len(unresolved)}) — honest gap list", 7)
+    # ── Unresolved parts — mechanical/off-board vs a real electronic gap ────────────
+    sub_banner(ws, r, f"Unresolved parts ({len(a['unresolved_split'])}) — "
+                      f"{a['n_electronic_gap']} electronic gap(s)", 8)
     r += 1
-    header(ws, r, ["Word ID", "Name", "Character", "Reason unresolved"])
+    header(ws, r, ["Word ID", "Name", "Character", "Disposition", "Reason unresolved"])
     r += 1
-    if unresolved:
-        for u in unresolved:
-            ws.cell(r, 1, clean_cell(u.get("wordId") or "—"))
-            ws.cell(r, 2, clean_cell(u.get("nameHuman") or "—"))
-            ws.cell(r, 3, clean_cell(u.get("characterId") or "—"))
-            ws.cell(r, 4, clean_cell(u.get("reason") or "—"))
+    if a["unresolved_split"]:
+        for word_id, name, character, disp, reason in a["unresolved_split"]:
+            ws.cell(r, 1, clean_cell(word_id))
+            ws.cell(r, 2, clean_cell(name))
+            ws.cell(r, 3, clean_cell(character))
+            dcell2 = ws.cell(r, 4, clean_cell(disp))
+            dcell2.font = FONT_FAIL if disp.startswith("Electronic") else FONT_NOTE
+            # NOT merged — the declared 5-column contract's live 'Cell check' flag column
+            # lands at col F, immediately right; text overflows visually instead.
+            ws.cell(r, 5, clean_cell(reason))
             r += 1
     else:
         ws.cell(r, 1, "0 — every electronic word resolved to a footprint")
-        ws.cell(r, 2, ""); ws.cell(r, 3, ""); ws.cell(r, 4, "")
+        for col in range(2, 6):
+            ws.cell(r, col, "")
         r += 1
+    r += 1
+
+    # ── Manufacturing artifacts + fab pack (RELATIVE paths only) ───────────────────
+    sub_banner(ws, r, "Manufacturing artifacts + fab pack", 8)
+    r += 1
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    gerbers = pipeline.get("gerbers") or {}
+    drill = pipeline.get("drill") or {}
+    pos = pipeline.get("pos") or {}
+    _kv([
+        ("Gerber set", f"{len(gerbers.get('files') or [])} file(s) — "
+         f"{_pcb_rel(gerbers.get('dir'), run_dir)}" if gerbers.get("files") else "not generated"),
+        ("Drill files", f"{len(drill.get('files') or [])} file(s) — "
+         f"{_pcb_rel(drill.get('dir'), run_dir)}" if drill.get("files") else "not generated"),
+        ("Pick-and-place (.pos)", _pcb_rel(pos.get("path"), run_dir)
+         if pos.get("path") else "not generated"),
+        ("Routed board file (.kicad_pcb)", _pcb_rel(pipeline.get("kicadPcbPath"), run_dir)
+         if pipeline.get("kicadPcbPath") else "not generated"),
+    ])
+    fzc = ws.cell(r, 1, "Fab package")
+    fzc.font = FONT_SUB
+    fz_val = (f"{a['fab_zip_rel']} (relative to run dir) — gerbers/ + drill/ + positions.csv "
+             f"+ drc-report.json + the routed .kicad_pcb" if a["fab_zip_rel"] else
+             "not generated — no manufacturing outputs to pack")
+    # NOT merged — this row is still a data row of the declared 2-column 'Field/Value'
+    # contract, whose live 'Cell check' flag column lands at col C; text overflows
+    # visually into the empty cells to the right instead.
+    fzv = ws.cell(r, 2, clean_cell(fz_val))
+    fzv.font = FONT_PASS if a["fab_zip_rel"] else FONT_FAIL
+    r += 1
 
     return True
 
@@ -19858,14 +20329,29 @@ _dt(_ISO_RANGE_HDR, "iso2768-range",
 _dt(_ISO_FLAT_HDR, "iso2768-2-range",
     ["Range low (mm)", "Range high (mm)"], numeric=["Range low (mm)", "Range high (mm)"])
 
-# PCB Phase D (2026-07-12): the PCBA BoM (resolved components with footprint/tier) and the
-# honest unresolved-parts list. Manufacturer/MPN/Footprint are NOT required — a component can
-# be honestly resolved via the package_family/function_class tier with no verified MPN yet;
-# only the structural columns (which part, which resolution path, how many) are required.
-_dt(["Designator", "Component", "Manufacturer", "MPN", "Footprint", "Resolution tier", "Qty"],
-    "pcba-bom", ["Designator", "Component", "Resolution tier", "Qty"], numeric=["Qty"])
-_dt(["Word ID", "Name", "Character", "Reason unresolved"], "pcb-unresolved",
-    ["Word ID", "Name", "Character", "Reason unresolved"])
+# PCB-TAB-UX (2026-07-12): the PCBA BoM (KiCad designator + engine word/role, resolved
+# components with footprint/tier) and the honest unresolved-parts SPLIT (mechanical/off-board
+# vs a real electronic gap). Manufacturer/MPN/Footprint are NOT required — a component can be
+# honestly resolved via the package_family/function_class tier with no verified MPN yet; only
+# the structural columns (which part, which resolution path, how many) are required. Designator
+# is also NOT required — a footprint-group count mismatch leaves it honestly unmatched ('—')
+# rather than guessing.
+_dt(["Designator", "Engine word / role", "Component", "Manufacturer", "MPN", "Footprint",
+     "Resolution tier", "Qty"], "pcba-bom",
+    ["Engine word / role", "Component", "Resolution tier", "Qty"], numeric=["Qty"])
+_dt(["Word ID", "Name", "Character", "Disposition", "Reason unresolved"], "pcb-unresolved",
+    ["Word ID", "Name", "Character", "Disposition", "Reason unresolved"])
+# DRC per-violation rows (only rendered when violations>0 — an empty table is a clean board,
+# not a gap).
+_dt(["Type", "Severity", "Description"], "pcb-drc-violations", ["Type", "Severity", "Description"])
+# Manufacturing layer inventory: Filename is NOT required — a layer legitimately absent from a
+# 2-layer board (In1/In2) renders 'Present? No' with a blank filename, an honest disclosure.
+_dt(["Layer", "Filename", "Present?"], "pcb-layers", ["Layer", "Present?"])
+# Pick-and-place: Value is NOT required — many designs leave the KiCad footprint Value field
+# unset ('?'), rendered as the honest 'Value unset' flag rather than required-and-failing.
+_dt(["Ref", "Footprint", "X (mm)", "Y (mm)", "Rotation (deg)", "Side", "Value"], "pcb-pnp",
+    ["Ref", "Footprint", "X (mm)", "Y (mm)", "Rotation (deg)", "Side"],
+    numeric=["X (mm)", "Y (mm)", "Rotation (deg)"])
 
 # Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
 # drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
@@ -21351,74 +21837,71 @@ def _sc_schedules(wb, ws, state, run_dir):
 
 
 def _sc_pcb(wb, ws, state, run_dir):
-    """PCB Phase D (2026-07-12): scores the tab HONESTLY on the pipeline's own real
-    signals — DRC-clean, fully routed, Gerbers present, resolved-part fraction — and
-    HARD-CAPS the score whenever the design needed a bespoke board but the pipeline did
-    not deliver one (mirrors pcb-gate.ts's evaluatePcbGate at the chain level: never a
-    green PCB tab without a real board)."""
-    comps = []
-    iss = []
+    """PCB-TAB-UX (2026-07-12): scores the tab on TWO INDEPENDENT axes — HYGIENE (does the
+    pipeline's own real signals say DRC-clean/routed/Gerbers-present, PLUS the new
+    DRC/layer/PnP tables + the relative fab-pack zip are actually populated) and
+    DESIGN-FITNESS (is the BoM built from real, resolution-verified parts, not a bare
+    function_class guess, with real KiCad designators and an honest mechanical-vs-
+    electronic unresolved triage). Overall = MIN over every check on BOTH axes — the
+    shared _merge_content mechanism already takes the min across every `components`
+    entry, so a hygienically-clean board of unresolved/wrong-domain parts can never
+    score high (the Goodhart fix for the 9.4/10 wrong-domain colorimeter board). Also
+    HARD-CAPS the score whenever the readiness verdict is itself FAIL (mirrors
+    pcb-gate.ts's evaluatePcbGate at the chain level: never a green PCB tab without a
+    real, fit board). Reads the SAME _pcb_two_axis_assessment tab_pcb() rendered from —
+    the tab and its score can never diverge."""
     pcb = state.get("pcb") or {}
-    pipeline = pcb.get("pipeline") or {}
-    drc = pipeline.get("drc") or {}
-    gen = pipeline.get("generator") or {}
-    violations = drc.get("violations")
+    if not isinstance(pcb.get("pipeline"), dict):
+        return {"components": [], "issues": [], "score_cap": None, "mech": "", "fix": ""}
+    a = _pcb_two_axis_assessment(pcb, run_dir)
+    comps = list(a["hygiene_components"]) + list(a["fitness_components"])
+    iss = []
 
-    drc_ok = bool(drc.get("ran")) and violations == 0
-    comps.append(("DRC clean (0 violations)", 1 if drc_ok else 0, 1))
-    if not drc_ok:
-        if drc.get("ran"):
-            iss.append(f"[HIGH] DRC reported {violations} violation(s) — the board is not "
-                       "clean; fix at the routing/placement stage and re-run the pipeline")
+    verdict_sev = {"FAIL": "HIGH", "ENGINEERING DRAFT": "MED", "FAB-READY": "INFO"}[a["readiness"]]
+    iss.append(f"[{verdict_sev}] readiness: {a['readiness']} — {a['readiness_why']}")
+
+    if not a["drc_ok"]:
+        if a["drc"].get("ran"):
+            iss.append(f"[HIGH] DRC reported {a['drc'].get('violations')} violation(s) — the "
+                       "board is not clean; fix at the routing/placement stage and re-run "
+                       "the pipeline")
         else:
             iss.append("[HIGH] DRC never ran — the pipeline stopped before verification "
-                       f"(stage_reached={pipeline.get('stageReached')})")
-
-    unrouted = pipeline.get("unroutedAfterFreerouting")
-    routed_ok = bool(pipeline.get("routed")) and (unrouted in (0, None))
-    comps.append(("board fully routed (0 unrouted nets)", 1 if routed_ok else 0, 1))
-    if not routed_ok:
+                       f"(stage_reached={a['pipeline'].get('stageReached')})")
+    if not a["routed_ok"]:
+        unrouted = a["pipeline"].get("unroutedAfterFreerouting")
         iss.append(f"[HIGH] board not fully routed — "
                    f"{unrouted if unrouted is not None else 'unknown count of'} net(s) left "
                    "unrouted after Freerouting")
-
-    gerbers = pipeline.get("gerbers") or {}
-    gerbers_ok = bool(gerbers.get("files"))
-    comps.append(("Gerber set present", 1 if gerbers_ok else 0, 1))
-    if not gerbers_ok:
+    if not a["gerbers_ok"]:
         iss.append("[HIGH] no Gerber set was exported — the board cannot be manufactured "
                    "from this run")
+    if a["resolved_n"]:
+        weak_n = a["resolved_n"] - a["verified_n"]
+        if weak_n:
+            iss.append(f"[{'HIGH' if a['readiness'] != 'FAB-READY' else 'MED'}] {weak_n} of "
+                       f"{a['resolved_n']} resolved part(s) carry no verified MPN/package "
+                       "(function_class only, design-fitness "
+                       f"{a['fitness_score']:.1f}/10) — see the resolution-tier legend")
+    if a["n_electronic_gap"]:
+        iss.append(f"[HIGH] {a['n_electronic_gap']} unresolved ELECTRONIC gap(s) — part(s) "
+                   "with no footprint/MPN that are NOT mechanical/off-board")
 
-    pipeline_ok = bool(pipeline.get("ok"))
-    comps.append(("pipeline's own ok verdict (built + routed + DRC-clean + gerbers)",
-                  1 if pipeline_ok else 0, 1))
-
-    resolved_n = int(gen.get("componentCount") or 0)
-    unresolved_n = int(gen.get("unresolvedCount") or 0)
-    total_n = resolved_n + unresolved_n
-    if total_n:
-        comps.append(("electronic words resolved to a real footprint", resolved_n, total_n))
-        if unresolved_n:
-            iss.append(f"{unresolved_n} of {total_n} electronic word(s) did not resolve to a "
-                       "footprint — see the Unresolved parts table")
-
-    # Honest-failure hard cap: needs-bespoke-but-no-board is a FAIL regardless of the
-    # component-level fractions above — mirrors evaluatePcbGate()'s bespoke_required_*
-    # verdicts, never a green tab over a missing board.
-    score_cap = None
-    if bool(pcb.get("isPcbBearing")) and pcb.get("disposition") == "bespoke" and not pipeline_ok:
-        score_cap = 2.0
-        iss.insert(0, "[HIGH] this design NEEDS a bespoke PCB but no DRC-clean routed board "
-                      "with Gerbers landed — the PCB surface is an honest FAIL (mirrors the "
-                      "PCB honest-failure gate)")
+    # Honest-failure hard cap: FAIL readiness (needs-bespoke-but-no-board, OR a hygiene
+    # check didn't pass) caps the score regardless of any individual fraction above —
+    # mirrors evaluatePcbGate()'s bespoke_required_* verdicts, never a green tab over a
+    # missing/unverified board.
+    score_cap = 2.0 if a["readiness"] == "FAIL" else None
 
     return {"components": comps, "issues": iss, "score_cap": score_cap,
-            "mech": "PCB pipeline real-artifact scoring: DRC-clean + fully routed + Gerbers "
-                    "present + resolved-part fraction, hard-capped to a FAIL when a required "
-                    "bespoke board did not land",
-            "fix": "route DRC violations / unrouted nets / unresolved parts back to the "
-                   "atopile generator or the pipeline stage that produced them, then re-run "
-                   "the PCB pipeline"}
+            "mech": "PCB two-axis honest scoring: HYGIENE (DRC/routed/Gerbers/pipeline.ok + "
+                    "the DRC/layer/PnP tables populated + a relative fab-pack path) x "
+                    "DESIGN-FITNESS (resolution-tier-weighted BoM + real KiCad designators + "
+                    "honest unresolved triage) — overall = min(hygiene, fitness), hard-capped "
+                    "to a FAIL band whenever the readiness verdict itself is FAIL",
+            "fix": "route DRC violations / unrouted nets / weak-tier or unresolved parts back "
+                   "to the atopile generator or the pipeline stage that produced them, then "
+                   "re-run the PCB pipeline"}
 
 
 _TAB_SCORERS = [
@@ -27632,6 +28115,93 @@ def _selftest() -> int:
     if _worked_calc_result_is_live_or_disclosed("  = result", "not a formula string"):
         print("  FAIL worked-calc-live-or-disclosed: a STRING that isn't an Excel "
               "formula and carries no disclosure marker must still FAIL"); bad += 1
+
+    # ═══ proveCatch PCB-TAB-UX two-axis honesty (2026-07-12) — the Goodhart fix: a
+    # DRC-clean/routed/Gerber-complete board of UNVERIFIED (function_class-only) parts
+    # must be capped LOW and read ENGINEERING DRAFT, never FAB-READY; a genuinely
+    # verified-tier board with the same clean hygiene must score HIGH and read
+    # FAB-READY. Pure decision functions — no file I/O. ═══
+    _wrong_domain_tiers = {"function_class": 28, "mpn_package": 1}
+    _wd_score, _wd_resolved, _wd_verified = _pcb_fitness_axis(_wrong_domain_tiers)
+    if not (_wd_score < 3.0 and _wd_resolved == 29 and _wd_verified == 1):
+        print(f"  FAIL pcb-fitness-axis proveCatch: a 28-of-29 function_class BoM (the "
+              f"real colorimeter-pcbtest wrong-domain shape) must score well below 3/10, "
+              f"got score={_wd_score!r} resolved={_wd_resolved!r} verified={_wd_verified!r}"); bad += 1
+    _wd_readiness, _wd_why = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=_wd_score, n_electronic_gap=0)
+    if _wd_readiness != "ENGINEERING DRAFT":
+        print(f"  FAIL pcb-readiness proveCatch: a DRC-clean/routed/Gerber-complete board "
+              f"whose BoM is function_class-heavy (fitness {_wd_score:.1f}/10) must read "
+              f"ENGINEERING DRAFT, NOT {_wd_readiness!r} — a wrong-domain board must "
+              "never read FAB-READY"); bad += 1
+    # proveNoFalsePositive: the SAME clean hygiene with a verified-tier BoM scores high
+    # and reads FAB-READY — the honesty cap must not punish a genuinely fit board.
+    _clean_tiers = {"mpn_package": 9, "package_family": 1}
+    _cl_score, _cl_resolved, _cl_verified = _pcb_fitness_axis(_clean_tiers)
+    if not (_cl_score >= 9.0 and _cl_resolved == 10 and _cl_verified == 10):
+        print(f"  FAIL pcb-fitness-axis proveNoFalsePositive: a verified-tier BoM (9 "
+              f"mpn_package + 1 package_family) must score >=9/10, got {_cl_score!r}"); bad += 1
+    _cl_readiness, _cl_why = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=_cl_score, n_electronic_gap=0)
+    if _cl_readiness != "FAB-READY":
+        print(f"  FAIL pcb-readiness proveNoFalsePositive: DRC-clean/routed/Gerber-complete "
+              f"+ a verified-tier BoM (fitness {_cl_score:.1f}/10) must read FAB-READY, "
+              f"got {_cl_readiness!r}"); bad += 1
+    # proveCatch: hygiene failure (DRC dirty) hard-FAILs regardless of fitness, and a
+    # bespoke-required-but-undelivered board FAILs even with clean hygiene flags unset.
+    _dirty_readiness, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=False, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=0)
+    if _dirty_readiness != "FAIL":
+        print(f"  FAIL pcb-readiness proveCatch: a DRC-dirty board must read FAIL "
+              f"regardless of BoM fitness, got {_dirty_readiness!r}"); bad += 1
+    _bespoke_readiness, _ = _pcb_readiness_verdict(
+        pipeline_ok=False, drc_ok=False, routed_ok=False, gerbers_ok=False,
+        bespoke_missing=True, fitness_score=0.0, n_electronic_gap=0)
+    if _bespoke_readiness != "FAIL":
+        print(f"  FAIL pcb-readiness proveCatch: a design that NEEDS a bespoke board but "
+              f"the pipeline never delivered one must read FAIL, got {_bespoke_readiness!r}"); bad += 1
+    # proveCatch: an unresolved ELECTRONIC gap blocks FAB-READY even with a perfect
+    # fitness score on the resolved parts (a missing photodiode is not "done").
+    _gap_readiness, _ = _pcb_readiness_verdict(
+        pipeline_ok=True, drc_ok=True, routed_ok=True, gerbers_ok=True,
+        bespoke_missing=False, fitness_score=10.0, n_electronic_gap=1)
+    if _gap_readiness == "FAB-READY":
+        print("  FAIL pcb-readiness proveCatch: an unresolved ELECTRONIC gap must block "
+              "FAB-READY even when every RESOLVED part is verified-tier"); bad += 1
+    # proveNoFalsePositive: correctly-excluded mechanical/off-board unresolved words
+    # (module_rack, dc_busbar) must NOT be classified as an electronic gap.
+    if _pcb_unresolved_disposition("Module Rack", "module_rack") != \
+            "Correctly excluded (mechanical/off-board)":
+        print("  FAIL pcb-unresolved-disposition proveNoFalsePositive: 'Module Rack' must "
+              "be classified mechanical/off-board, not an electronic gap"); bad += 1
+    if _pcb_unresolved_disposition("DC Busbar", "dc_busbar") != \
+            "Correctly excluded (mechanical/off-board)":
+        print("  FAIL pcb-unresolved-disposition proveNoFalsePositive: 'DC Busbar' must "
+              "be classified mechanical/off-board, not an electronic gap"); bad += 1
+    if _pcb_unresolved_disposition("Photodiode", "photodiode") != \
+            "Electronic gap (needs footprint/MPN)":
+        print("  FAIL pcb-unresolved-disposition proveCatch: a genuinely missing "
+              "electronic part (photodiode) must NOT be classified as correctly "
+              "excluded — module_rack/dc_busbar must never score the same as a real gap"); bad += 1
+    # proveCatch: the KiCad designator matcher must NEVER guess when a footprint
+    # group's engine-count and board-count disagree — honestly unmatched, not a wrong ref.
+    _mismatch_map = _pcb_designator_map(
+        [{"instanceName": "a", "footprint": {"footprint": "SOIC-8"}},
+         {"instanceName": "b", "footprint": {"footprint": "SOIC-8"}}],
+        [{"ref": "U1", "package": "SOIC-8", "val": "?", "x_mm": 0, "y_mm": 0, "rot": 0, "side": "top"}])
+    if _mismatch_map.get("a") is not None or _mismatch_map.get("b") is not None:
+        print(f"  FAIL pcb-designator-map proveCatch: a footprint group with 2 engine "
+              f"components but only 1 board placement must leave BOTH unmatched (None), "
+              f"got {_mismatch_map!r} — a guess here would mis-attribute a designator"); bad += 1
+    _match_map = _pcb_designator_map(
+        [{"instanceName": "a", "footprint": {"footprint": "SOIC-8"}}],
+        [{"ref": "U7", "package": "SOIC-8", "val": "?", "x_mm": 0, "y_mm": 0, "rot": 0, "side": "top"}])
+    if _match_map.get("a") != "U7":
+        print(f"  FAIL pcb-designator-map proveNoFalsePositive: a 1:1 footprint-group "
+              f"match must resolve the real KiCad ref, got {_match_map!r}"); bad += 1
 
     print("build-excel-export selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
