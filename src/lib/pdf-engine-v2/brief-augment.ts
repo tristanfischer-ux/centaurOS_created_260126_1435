@@ -334,6 +334,22 @@ function looksLikeProcessPlant(text: string): boolean {
 }
 
 /** Signals that the product is built as a road-transportable skid / container. */
+// A portable/benchtop electronic-or-optical INSTRUMENT (photometer, meter, analyser,
+// data logger, sensor node). Takes PRECEDENCE over looksLikeProcessPlant for the
+// class-agnostic material/design-life defaults: an unmapped 'optical_instrument' brief
+// that mentions "reagent"/"assay"/"sample" would otherwise trip looksLikeProcessPlant's
+// broad tokens and be handed 304/316 stainless process fabrication + a 20-25 yr PED/ASME
+// plant design life (2026-07-12 colorimeter). Requires an instrument NOUN plus either a
+// portable/benchtop POSITIONING token or concrete device electronics — so a real plant
+// that merely mentions a "monitor"/"meter" never trips it. Universal, keyed on device
+// vocabulary, never a class table.
+function looksLikeDeviceInstrument(text: string): boolean {
+  const instrumentNoun = /\b(?:photometer|colou?rimeter|spectrophotometer|spectrometer|fluorimeter|fluorometer|turbidimeter|nephelometer|refractometer|\bmeter\b|analy[sz]er|data[\s-]?logger|sensor\s+node|hand-?held\s+(?:instrument|device|analy[sz]er|meter)|benchtop\s+instrument)\b/i.test(text)
+  const positioning = /\b(?:portable|hand-?held|bench-?top|desktop|tabletop|wearable|pocket|field-portable|wall-?mount(?:ed)?)\b/i.test(text)
+  const deviceElectronics = /\b(?:microcontroller|firmware|\bpcb\b|printed\s+circuit\s+board|cuvette|photodiode|\bled\b\s+(?:source|driver)|rechargeable\s+battery|usb[\s-]?(?:c|powered|port|interface)|3d[\s-]?printed\s+enclosure)\b/i.test(text)
+  return instrumentNoun && (positioning || deviceElectronics)
+}
+
 function looksSkidOrContainerised(text: string): boolean {
   return /\bskid[-\s]?mounted\b|\bskid\s+module\b|\bcontaineris\w*\b|\bcontaineriz\w*\b|\btransportable\b|\bmodular\b|\bISO\s+container\b|\b(20|40)\s?ft\b|\btrailer\b|\bplinth\b/.test(text)
 }
@@ -401,15 +417,20 @@ function inferGenericDefaults(
   missionStatement: string,
 ): Partial<Pick<ClassAugmentDefaults, 'target_process' | 'target_material' | 'design_life' | 'mass_kg'>> & { rationale_basis: string } {
   const text = `${missionStatement} ${productDescription} ${rawBriefText}`
-  const isProcessPlant = looksLikeProcessPlant(text)
-  const isSkid = looksSkidOrContainerised(text)
+  const isDeviceInstrument = looksLikeDeviceInstrument(text)
+  // a device instrument is NEVER a process plant, even if its brief mentions reagents /
+  // assays / samples — the device signal wins so the plant defaults never apply.
+  const isProcessPlant = !isDeviceInstrument && looksLikeProcessPlant(text)
+  const isSkid = !isDeviceInstrument && looksSkidOrContainerised(text)
   const out: Partial<Pick<ClassAugmentDefaults, 'target_process' | 'target_material' | 'design_life' | 'mass_kg'>> & { rationale_basis: string } = {
     rationale_basis: `class-agnostic inference from brief text for unmapped class "${productClass}"`,
   }
 
   // ── target_process ──────────────────────────────────────────────────────
   // Prefer a one-line process summary distilled from the mission/description.
-  if (isProcessPlant) {
+  if (isDeviceInstrument) {
+    out.target_process = 'Small-batch electronic-instrument manufacture: PCB assembly (SMT/THT), optical + enclosure sub-assembly, firmware flash, calibration + functional test, packaging'
+  } else if (isProcessPlant) {
     // Name the principal unit operations the brief mentions, so the process
     // string is grounded rather than generic boilerplate.
     const ops: string[] = []
@@ -427,7 +448,9 @@ function inferGenericDefaults(
 
   // ── target_material ─────────────────────────────────────────────────────
   const mat = inferGenericMaterial(text, isProcessPlant)
-  if (mat) {
+  if (isDeviceInstrument) {
+    out.target_material = 'Injection-moulded / 3D-printed ABS-polycarbonate enclosure, FR-4 printed-circuit-board assembly, COTS optical + electronic components (no process-pressure fabrication)'
+  } else if (mat) {
     out.target_material = mat
   } else if (isProcessPlant) {
     out.target_material = '304/316 stainless-steel process fabrication (vessels, piping, structure)'
@@ -437,7 +460,9 @@ function inferGenericDefaults(
   // Chemical / process plant: 20–25 yr is the industry norm for static process
   // equipment + pressure vessels (PED / ASME VIII design life). Skidded
   // industrial equipment without a process signal: a slightly shorter band.
-  if (isProcessPlant) {
+  if (isDeviceInstrument) {
+    out.design_life = '5–8 yr (portable laboratory/field electronic instrument service life; battery + LED source are user-replaceable consumables; no pressure-vessel re-inspection regime)'
+  } else if (isProcessPlant) {
     out.design_life = '20–25 yr (chemical-process-plant design life; static process equipment + pressure vessels per PED / ASME VIII; periodic re-inspection)'
   } else if (isSkid) {
     out.design_life = '15–20 yr (skid-mounted industrial equipment design life)'
