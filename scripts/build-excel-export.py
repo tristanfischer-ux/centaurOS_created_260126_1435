@@ -22684,7 +22684,70 @@ def build(run_dir: str, out_path: str) -> dict:
     #    The score itself is UNCHANGED (the panel column contract), tightened by the single-
     #    line drawing's own coverage check when that is lower — the merged sheet cannot
     #    outscore its weaker half. (No external consumer reads the old key — grepped.) ──
-    if "Panel schedule" in _TAB_SCORES:
+    # ELECTRICAL NA-BY-DESIGN for a single-board instrument (2026-07-12, Tristan: "is there a
+    # conflict between the PCB and Electrical tabs?"). YES — a handheld/benchtop PCBA device's
+    # ENTIRE electrical system IS its bespoke PCB: the schematic + power nets (USB/battery →
+    # regulator → rails → loads) + board + Gerbers are the PCB tab's deliverable. A plant-style
+    # single-line DISTRIBUTION diagram (incomer → switchboard → feeders) is inapplicable — there
+    # is no switchboard. The Electrical tab defers to the PCB tab, VERIFIED out-of-scope (the
+    # checkable claim — isInstrumentDevice + isPcbBearing + bespoke disposition — proves the
+    # electrical design lives on the PCB, so this is not the unverified-scope dodge). Universal:
+    # a plant / any non-bespoke-PCBA product keeps its panel + single-line scoring byte-identical.
+    # ── PLANT-DELIVERABLE TABS NA-BY-DESIGN for a fluid-less device instrument (2026-07-12,
+    #    Tristan: "are there other tabs that have similar pointlessness in the context of a
+    #    very small device?"). A single-board handheld instrument with NO process fluid has no
+    #    P&ID (piping & instrumentation), no pipe/cable Line & velocity line-list, no Process
+    #    schedule (valve/instrument list), and no HVAC — a vacuous 10/10 on any of these is
+    #    DISHONEST (a chartered engineer seeing a 10/10 P&ID on a device with zero pipes would
+    #    distrust the whole dossier). Mark them VERIFIED out-of-scope (deferring to the device's
+    #    real diagrams: Connection-trace = signal/power graph, PCB = electronics, GA + Renders =
+    #    mechanical). The checkable, non-dodge claim: isInstrumentDevice AND the settled topology
+    #    carries ZERO fluid edges. A plant (any fluid edge) is byte-identical.
+    _topo_e = ((state.get("orchestratorContract") or {}).get("topology")
+               or (state.get("engineeringContract") or {}).get("topology") or [])
+    _has_fluid = any(isinstance(e, dict) and re.search(r"fluid|water|gas|steam|oxygen|air",
+                     str(e.get("mechanism") or "")) for e in _topo_e)
+    if bool(state.get("isInstrumentDevice")) and not _has_fluid:
+        _NA_PLANT_TABS = {
+            "P&ID": "a piping & instrumentation diagram — there is no process piping or fluid "
+                    "instrumentation on a single-board instrument; the functional signal/optical "
+                    "flow is the Connection trace + PCB schematic.",
+            "Line & velocity": "a pipe/cable line list with velocity / volt-drop — there are no "
+                    "sized process/distribution runs on a handheld device (interconnects are PCB "
+                    "traces / short leads, on the PCB tab).",
+            "Process schedules": "valve + process-instrument schedules — there are no process "
+                    "valves or field instruments on a single-board instrument.",
+            "HVAC": "a ventilation / climate-control schematic — a handheld instrument is "
+                    "passively cooled; there is no HVAC plant.",
+        }
+        for _na_tab, _why in _NA_PLANT_TABS.items():
+            if _na_tab in _TAB_SCORES:
+                _TAB_SCORES[_na_tab] = {
+                    "score": 10, "target": 8, "status": "PASS", "scored": False,
+                    "issues": [f"out of scope for this archetype — VERIFIED, not scored: {_why} "
+                               "(this is a fluid-less single-board device — isInstrumentDevice + "
+                               "zero fluid topology edges — so a process/plant deliverable is "
+                               "inapplicable, not a vacuous pass)."],
+                    "fix": "none — inapplicable to a fluid-less single-board instrument",
+                    "basis": "verified out-of-scope: isInstrumentDevice + zero fluid topology edges",
+                }
+    _pcb_e = state.get("pcb") or {}
+    _elec_is_pcb = (bool(state.get("isInstrumentDevice")) and bool(_pcb_e.get("isPcbBearing"))
+                    and str(_pcb_e.get("disposition") or "") == "bespoke")
+    if _elec_is_pcb:
+        _TAB_SCORES.pop("Panel schedule", None)
+        _TAB_SCORES["Electrical"] = {
+            "score": 10, "target": 8, "status": "PASS", "scored": False,
+            "issues": ["out of scope for this archetype — VERIFIED, not scored: this single-board "
+                       "handheld instrument has no plant electrical DISTRIBUTION (no incomer / "
+                       "switchboard / feeders). Its entire electrical design — schematic, power "
+                       "nets (USB/battery → regulator → loads), board + Gerbers — is the bespoke "
+                       "PCB, documented and scored on the PCB tab. A single-line distribution "
+                       "diagram is inapplicable to a one-board device."],
+            "fix": "none — the electrical design is scored on the PCB tab (bespoke PCBA device)",
+            "basis": "verified out-of-scope: isInstrumentDevice + isPcbBearing + bespoke disposition — the electrical design IS the PCB",
+        }
+    elif "Panel schedule" in _TAB_SCORES:
         _elec_sc = _TAB_SCORES.pop("Panel schedule")
         _sl_sc = _aux_tab_score("Single-line", run_dir)
         if (isinstance(_sl_sc, dict) and isinstance(_sl_sc.get("score"), (int, float))
