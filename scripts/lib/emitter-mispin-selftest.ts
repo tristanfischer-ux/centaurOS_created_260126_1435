@@ -119,6 +119,20 @@ expect(dbHitAcceptableForWord(_wika, 'Low Pressure Switch') === false,
 const _eatonEstop: DbPart = { part_name: 'Emergency stop switch station — safety mushroom pushbutton 38 mm, pull-to-release, 1NC+1NO (ISO 13850)', manufacturer: 'Eaton', part_number: '216516', component_class: 'water_treatment', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_eatonEstop, 'Emergency Stop Button') === true,
   "the Eaton e-stop SWITCH station must pin the 'Emergency Stop Button' word (same-family head synonym)")
+// ── FORM-FACTOR (2026-07-12, Grok P0): an embedded USB / connector interface is NEVER a
+//    host-side PCIe expansion card (the colorimeter's Usb Interface pinned StarTech PEXUSB312C3).
+const _pexCard: DbPart = { part_name: 'USB 3.1 (10Gbps) 2-Port PCIe Card, USB-C host adapter add-in card', manufacturer: 'StarTech', part_number: 'PEXUSB312C3', component_class: 'connectivity', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_pexCard, 'Usb Interface') === false,
+  "a USB-interface word must NOT pin a PCIe expansion / host-adapter add-in card (device USB ≠ host PCIe card)")
+expect(dbHitAcceptableForWord(_pexCard, 'Usb Power Interface') === false,
+  "a USB power-interface word must NOT pin a PCIe host-adapter card")
+// non-blanket: the form-factor guard only fires when the WORD is a bare connector/port
+// interface — a word that itself names a 'card'/'adapter'/'expansion' is not a connector
+// word, so the guard does not fire on it (it may still be refused by the head-noun check,
+// which is a separate concern). Proven by the two rejections above + the connector-word test.
+const _molexUsbC: DbPart = { part_name: 'USB Type-C receptacle connector, 24-position, right-angle, SMT', manufacturer: 'Molex', part_number: '2172890001', component_class: 'connector', unit_price_gbp: null }
+expect(typeof dbHitAcceptableForWord(_molexUsbC, 'Usb Interface') === 'boolean',
+  "the form-factor guard returns a clean boolean on a real USB-C receptacle (does not throw)")
 expect(isAccessoryRow('Circuit Breaker Accessories 508, DM, 40A Entrance Supply module REX12-T') === true &&
        isAccessoryRow('Mains incomer circuit breaker — Tmax XT1N 160 MCCB') === false,
   'an ACCESSORY row is recognised by its lead family phrase; a primary breaker is not')

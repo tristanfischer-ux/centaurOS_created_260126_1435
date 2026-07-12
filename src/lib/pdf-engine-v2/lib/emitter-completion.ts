@@ -1494,6 +1494,20 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
     const wantsVolt = /\bvoltage\b/i.test(name) && !/\bcurrent\b/i.test(name)
     if ((wantsCurr && seriesVolt) || (wantsVolt && seriesCurr)) return false
   }
+  // FORM-FACTOR COHERENCE (2026-07-12, Grok P0): an embedded USB / connector / port /
+  // power-inlet interface (a USB-C receptacle, a device-side USB transceiver, a DC jack)
+  // is NEVER a HOST-SIDE PCIe/PCI EXPANSION / ADD-IN / HOST-ADAPTER CARD. The colorimeter's
+  // 'Usb Interface' + 'Usb Power Interface' both DB-pinned StarTech PEXUSB312C3 — a desktop
+  // PCIe USB add-in card. Reject a host-expansion-card form factor for a connector word,
+  // universally (wrong for any embedded product, not just device-scale).
+  {
+    const wl = (name || '').toLowerCase()
+    const hitBlob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''}`.toLowerCase()
+    const wordIsConnectorIface = /\b(?:usb|type[\s-]?c|connector|receptacle|\bport\b|inlet|\bjack\b|header|interface)\b/.test(wl)
+      && !/\b(?:card|adapter|hub|expansion|host\s+bus)\b/.test(wl)
+    const hitIsExpansionCard = /pci[\s-]?e|\bpcie\b|\bpci\b|\bpex\d|expansion\s+card|add[\s-]?in\s+card|host\s+(?:adapter|bus\s+adapter)|\bhba\b|riser\s+card/.test(hitBlob)
+    if (wordIsConnectorIface && hitIsExpansionCard) return false
+  }
   const lead = partNameLeadSegment(dbHit.part_name, 6)
   const headTok = toks[toks.length - 1]
   if (headTok && !headNounHit(lead, headTok)) return false
