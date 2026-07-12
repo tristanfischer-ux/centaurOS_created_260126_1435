@@ -11856,6 +11856,31 @@ _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → to
                 r"\bfan\b|cold\s?plate|heat\s?sink|thermal|vent|duct|louvre|grille|sensor|detector",
                 re.I)),
 ]
+# DEVICE-SCALE OPTICAL/ELECTRONIC INSTRUMENT zones (2026-07-12, Tristan: the colorimeter
+# hero rendered as a BESS cabinet — a 52% battery-pack stack + power/distribution bands —
+# because _SE_ZONES is a hardcoded BESS ontology and EVERY sealed sub-1 m³ product was
+# packed into it. An optical instrument is an OPTICAL BENCH (source→sample→detector) + a
+# small PCB + a small battery + a front interface — the light path is the dominant volume,
+# the battery is a coin-cell, not half the box. Selected when _IS_INSTRUMENT_DEVICE (the
+# authoritative state.isInstrumentDevice flag). Universal — a plant/BESS never carries it.
+_SE_ZONES_INSTRUMENT = [  # bottom → top
+    ("power", 0.16,
+     re.compile(r"\bbattery\b|\bcell\b|rechargeable|coin[\s_-]?cell|\busb\b|charge|charger|"
+                r"regulator|\bldo\b|dc[\s_-]?dc|power\s+(?:supply|inlet|interface|switch)|\bpmic\b", re.I)),
+    ("electronics", 0.24,
+     re.compile(r"\bpcb\b|\bmcu\b|microcontroller|micro[\s_-]?processor|processor|\badc\b|"
+                r"amplifier|transimpedance|\btia\b|op[\s_-]?amp|firmware|storage|\bdriver\b|"
+                r"main[\s_-]?board|logic|control[\s_-]?board|analog|signal", re.I)),
+    ("optical", 0.44,
+     re.compile(r"\bled\b|\blamp\b|light[\s_-]?source|\bsource\b|cuvette|sample|specimen|"
+                r"photodiode|photo[\s_-]?detector|photo[\s_-]?sensor|\bdetector\b|\blens\b|"
+                r"collimat|baffle|wavelength|\boptic|mirror|grating|aperture|monochromat|filter[\s_-]?wheel", re.I)),
+    ("interface", 0.16,
+     re.compile(r"display|screen|\blcd\b|\boled\b|button|keypad|annunciator|indicator|readout|"
+                r"user[\s_-]?input|switch", re.I)),
+]
+# Set from state.isInstrumentDevice in _sealed_enclosure_env_mm (runs before placement).
+_IS_INSTRUMENT_DEVICE = False
 _SE_SKIN_RE = re.compile(
     r"enclosure|cabinet|housing|\bdoor\b|\bpanel\b|panels\b|insulation|liner|gasket|"
     r"\bseal\b|bracket|mount(?:ing)?\b|cover|lid|skin|chassis|frame", re.I)
@@ -11868,6 +11893,11 @@ def _sealed_enclosure_env_mm(state, quantities):
     vol = qval(quantities, "enclosure_volume_m3", 0.0) or 0.0
     if not (0 < vol < SEALED_ENV_MAX_M3):
         return None
+    # Record whether this sealed product is a device-scale INSTRUMENT (authoritative flag
+    # the chain sets when deriveInstrumentTopology fires) — place_sealed_enclosure reads it
+    # to lay the interior out as an optical bench + PCB, not a BESS battery-cabinet stack.
+    global _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
     envelope = resolve_design_envelope_mm(state)
     if envelope:
         return envelope
@@ -12052,12 +12082,18 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
           f"(interior {iw:.0f}×{idep:.0f}×{ih:.0f}); {len(parts)} parts")
 
     # 1. classify every part into a zone / the skin
-    zone_parts = {z[0]: [] for z in _SE_ZONES}
+    # INSTRUMENT vs BESS-cabinet interior layout (2026-07-12): a device-scale optical/
+    # electronic instrument lays out as an optical bench + PCB + small power + interface,
+    # NOT a 52%-battery BESS stack. Universal — keyed on the authoritative device flag.
+    zones = _SE_ZONES_INSTRUMENT if _IS_INSTRUMENT_DEVICE else _SE_ZONES
+    if _IS_INSTRUMENT_DEVICE:
+        print("[univ][sealed] INSTRUMENT interior layout (optical bench + PCB + power + interface) — not a BESS cabinet stack")
+    zone_parts = {z[0]: [] for z in zones}
     skin = []
     for p in parts:
         nm = str(p.name)
         placed = False
-        for key, _frac, rx in _SE_ZONES:
+        for key, _frac, rx in zones:
             if rx.search(nm):
                 zone_parts[key].append(p)
                 placed = True
@@ -12100,7 +12136,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     z_cursor = base_z + margin
     gap = max(4.0, iw * 0.015)
     min_slot_w = max(40.0, iw / 8.0)
-    for key, frac, _rx in _SE_ZONES:
+    for key, frac, _rx in zones:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
         if plist:
@@ -12554,7 +12590,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                 metallic=0.4, roughness=0.5)
         _zb = {}   # zone → (z0, band_h) from the SAME fractions the placer stacked
         _zc = base_z + margin
-        for _zk, _zfrac, _zrx in _SE_ZONES:
+        for _zk, _zfrac, _zrx in zones:
             _zb[_zk] = (_zc, ih * _zfrac)
             _zc += ih * _zfrac
         _yF = -idep * 0.15 - 22.0     # just proud of the zone boards
