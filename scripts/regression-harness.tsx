@@ -13472,9 +13472,15 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       { name_human: 'Analog To Digital Converter' }, { name_human: 'Microcontroller' },
       { name_human: 'Local Display' }, { name_human: 'User Input Buttons' },
       { name_human: 'Rechargeable Battery Pack' }, { name_human: 'USB Power Interface' },
-      { name_human: 'DC DC Regulator' }, { name_human: 'Enclosure Shell' },
+      { name_human: 'DC DC Regulator' }, { name_human: 'Battery Charge Management Circuit' },
+      { name_human: 'Enclosure Shell' },
     ] }] }]
     const iEdges = deriveInstrumentTopology(instr)
+    // a SECOND power-conditioning part (the charge-management circuit) must be wired
+    // in+out, not orphaned (colorimeter: the only 2 connectivity concerns).
+    const bcm = 'Battery Charge Management Circuit'
+    wantI('charge-mgmt has a power INPUT', iEdges.some((e) => e.to_part === bcm && e.mechanism === 'electrical_bus'))
+    wantI('charge-mgmt has a power OUTPUT', iEdges.some((e) => e.from_part === bcm && e.mechanism === 'electrical_bus'))
     wantI('instrument graph built (≥6 edges)', iEdges.length >= 6)
     const sig = iEdges.filter((e) => e.mechanism === 'signal')
     const pwr = iEdges.filter((e) => e.mechanism === 'electrical_bus')

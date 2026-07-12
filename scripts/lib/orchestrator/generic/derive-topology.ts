@@ -550,13 +550,23 @@ export function deriveInstrumentTopology(modules: AnyModule[]): TopologyEdge[] {
 
   // 2) POWER SPINE — inlet/battery → regulator → loads (electrical_bus, so the
   //    single-line / Electrical tab sees real feeders).
-  const reg = rep('power_conditioning')
+  const regs = byRole.get('power_conditioning') ?? []
+  const reg = regs[0] ?? null // the MAIN DC rail
   const sources = [...(byRole.get('power_in') ?? []), ...(byRole.get('power_storage') ?? [])]
   const loadHub = reg ?? rep('compute') ?? rep('display')
   for (const s of sources) pushPwr(s, loadHub)
   const loads = [rep('compute'), rep('driver'), rep('display'), rep('digitiser'), rep('conditioning')]
     .filter((x): x is string => !!x)
   if (reg) for (const l of loads) pushPwr(reg, l)
+  // ADDITIONAL power-conditioning siblings (a battery charge-management / BMS / a second
+  // regulator) sit on the SOURCE side — fed by a source, feeding the main rail — so none
+  // orphans (colorimeter run: the Battery Charge Management Circuit was the only unwired
+  // part, 2 of 2 connectivity concerns). Universal: any instrument with a charger + a
+  // separate rail regulator.
+  for (let i = 1; i < regs.length; i++) {
+    pushPwr(sources[0] ?? reg, regs[i]) // in
+    pushPwr(regs[i], reg) // out → the main rail
+  }
 
   // 3) DRIVER — the LED/source driver drives the emitter (power) and takes a control
   //    tie from compute (the MCU sets the source intensity / blank reference).
