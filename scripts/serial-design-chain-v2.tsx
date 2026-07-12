@@ -69,6 +69,7 @@ import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { runWordDomainCoherence, type WordDomainCoherenceResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { runPcbStage, type PcbStageResult } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -3696,6 +3697,13 @@ async function main() {
   // the generator emits the module tree, before the skeleton/Stage-7.5 physics
   // critics run. See the call site after GATE 37 below.
   let wordDomainCoherence: WordDomainCoherenceResult | null = null
+  // PCB capability discovery + bespoke/COTS disposition — Phase A SHADOW stage
+  // (docs/plans/pcb-capability-integration.md). Computed AFTER state.requirementsBom
+  // is settled (the design/parts are final by then); see the call site after the
+  // requirements-driven BoM block below. Behind PCB_STAGE — off by default, so every
+  // existing run is byte-identical. Declared here (mirrors wordDomainCoherence) so it
+  // has a stable slot in the initial state object even before it's computed.
+  let pcb: PcbStageResult | null = null
 
   // ── Phase 0 — brief refinement loop (Tristan 2026-05-15)
   // Auto-revise non-viable briefs along the lowest-priority relaxation path,
@@ -7120,6 +7128,7 @@ async function main() {
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
     wordDomainCoherence,  // word-level sibling of gate 34: flagged/stripped process-plant-vessel words on a device-scale design (see call site after GATE 37)
+    pcb,  // Phase A PCB shadow stage: capability + bespoke/COTS disposition, recorded post-requirementsBom when PCB_STAGE is set (see call site below)
     physicsCritique: critique,
     physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)
     physicsCriticAutocorrect,  // gate 33 PHASE-2 self-correcting loop (shadow by default; mutates design + post-correction critique when PHYSICS_CRITIC_AUTOCORRECT=1)
@@ -9655,6 +9664,40 @@ async function main() {
   } catch (err) {
     console.error(`[chain] requirements-bom assembly failed (non-fatal): ${(err as Error).message.slice(0, 160)}`)
     logAction({ step: 'requirements_bom', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── PCB STAGE (Phase A, SHADOW, 2026-07-12) — docs/plans/pcb-capability-integration.md ──
+  // Runs AFTER state.requirementsBom is settled (design/parts final) so the electronic-
+  // complexity signals (part count, distinct function categories, production volume from
+  // the brief) are read off the FINISHED design, not a mid-generation draft. Behind
+  // PCB_STAGE — off/0/false/undefined skips entirely, so every existing archetype run is
+  // byte-unaffected (the additive/shadow-by-default guardrail in the plan). SHADOW: emits
+  // NOTHING to the dossier and NEVER fails the chain in Phase A — it only records
+  // state.pcb + logs a one-line summary. Universal: isPcbBearing is derived from the
+  // design's OWN word/brief content (electronic-function category diversity), never a
+  // class-name table — see src/lib/pdf-engine-v2/lib/pcb/pcb-stage.ts.
+  if (process.env.PCB_STAGE && !['0', 'false', 'off', 'no'].includes(String(process.env.PCB_STAGE).toLowerCase())) {
+    try {
+      const stPcb = JSON.parse(readFileSync(statePath, 'utf8'))
+      const pcbResult = runPcbStage(stPcb)
+      pcb = pcbResult
+      stPcb.pcb = pcbResult
+      writeFileSync(statePath, JSON.stringify(stPcb))
+      console.error(
+        `[chain] PCB STAGE (shadow): bearing=${pcbResult.isPcbBearing} disposition=${pcbResult.disposition} ` +
+        `categories=[${pcbResult.distinctElectronicCategories.join(',')}] canAuthor=${pcbResult.canAuthor} ` +
+        `canRoute=${pcbResult.canRoute} canVerifyAndExport=${pcbResult.canVerifyAndExport}`,
+      )
+      logAction({
+        step: 'pcb_stage', ok: true, is_pcb_bearing: pcbResult.isPcbBearing,
+        disposition: pcbResult.disposition, categories: pcbResult.distinctElectronicCategories,
+        can_author: pcbResult.canAuthor, can_route: pcbResult.canRoute,
+        can_verify_and_export: pcbResult.canVerifyAndExport,
+      })
+    } catch (pcbErr) {
+      console.error(`[chain] PCB STAGE threw (non-fatal, shadow): ${(pcbErr as Error).message.slice(0, 200)}`)
+      logAction({ step: 'pcb_stage', ok: false, error: String(pcbErr).slice(0, 200) })
+    }
   }
 
   // ── SELF-CORRECTING REPAIR (Tristan 2026-06-25: "the engine should look at things, see

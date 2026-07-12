@@ -49,6 +49,8 @@ import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/t
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
+import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import {
@@ -12094,6 +12096,11 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // evidence; no snapshot needed.
   for (const a of checkWordDomainCoherenceInvariants()) assertions.push(a)
 
+  // Self-contained PCB shadow-stage invariants (Phase A, 2026-07-12) — synthetic
+  // colorimeter-like electronic state vs a plant (pumps/tanks) state; no snapshot
+  // needed, no toolchain probe (pure decision helpers only).
+  for (const a of checkPcbStageInvariants()) assertions.push(a)
+
   // Self-contained gate-18 brief-infeasibility net-reconciliation invariant
   // (2026-06-10 edge_ai 0.4-vs-3.7 kW cover-banner oscillation fix).
   for (const a of checkBriefInfeasibilityNetInvariant()) assertions.push(a)
@@ -13049,6 +13056,111 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     'gate 34 word-sibling: process-plant-vessel words (pressure vessel shell, filter media/membrane element, underdrain/nozzle plate, backwash, air scour, skid frame & pipework, distribution header, valve nest, differential-pressure gauge, sample cock, …) on a device-scale non-process class (the Open Colorimeter pcb_assembly cluster) flag + strip exactly the 9 polluted words, leaving the 5 legitimate HMI words + Nameplate untouched; the SAME words on a legitimate process/plant class (water_treatment, aquaculture_ras, utility bess) are suppressed and the design is byte-identical (same object reference, zero stripped); a physically tiny instance of a process-plant-slugged class is still flagged (scale overrides the class token); a clean device design with no markers is never touched',
     failed.length, (n) => n === 0,
     () => `word-domain-coherence cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
+  ))
+
+  return out
+}
+
+// ── pcb-stage.ts (Phase A shadow PCB stage, 2026-07-12) ────────────────────────────
+// PROVECATCH, both directions: a colorimeter-like electronic design (MCU + photodiode/
+// TIA analog front-end + LED driver + OLED display + battery/USB, compact + batch-of-20
+// brief) must reach isPcbBearing=true with a non-'none' disposition; a plant design
+// (pumps/tanks/valves, no electronics-cluster) must reach isPcbBearing=false — "a water
+// plant is not a PCB". Pure decision helpers only (no toolchain probe), self-contained.
+function checkPcbStageInvariants(): Assertion[] {
+  const out: Assertion[] = []
+  const failed: string[] = []
+  const want = (label: string, cond: boolean) => { if (!cond) failed.push(label) }
+
+  const mkWord = (id: string, name: string, form: string) => ({
+    id,
+    name_human: name,
+    content_character: { character_id: id, name_human: name },
+    modifier_characters: [
+      { kind: 'quantity', value: '×1' },
+      { kind: 'form', value: form },
+    ],
+  })
+
+  // Mirrors the real colorimeter snapshot's generic-skeleton shape: the vocabulary
+  // that actually names the electronic function lives in the "form" modifier, not
+  // the generic word name — the scanner must read both.
+  const colorimeterWords = [
+    mkWord('main_controller_word', 'Main Controller', 'Main Controller — representative microcontroller & signal processing board component'),
+    mkWord('voltage_sensor_word', 'Voltage Sensor', 'Voltage Sensor — representative optical sensing engine (photodiode + transimpedance amplifier) component'),
+    mkWord('power_converter_word', 'Power Converter', 'Power Converter — representative replaceable led light source assembly component'),
+    mkWord('display_panel_word', 'Display Panel', 'Display Panel — representative oled display & navigation buttons component'),
+    mkWord('storage_cell_word', 'Storage Cell', 'Storage Cell — representative li-po battery & power management system component'),
+  ]
+  const colorimeterState = {
+    parsedBrief: {
+      product_description: 'A portable, single-wavelength photometer (colorimeter) for analytical assays.',
+      mission_statement: 'A compact, battery-and-USB-powered benchtop instrument delivering local absorbance readings.',
+      constraints: {
+        batch_size: { value: 20 },
+        target_material: { value: 'FR4 for PCBs; 3D-printed enclosure' },
+      },
+    },
+    moduleDecomposition: {
+      modules: [{
+        module: 'sensing_instrumentation',
+        sub_modules: [{ id: 'sensing_instrumentation__voltage_sensor', words: colorimeterWords }],
+      }],
+    },
+  }
+
+  const plantWords = [
+    mkWord('pump_casing_word', 'Pump Casing', 'Pump Casing — representative centrifugal pump casing component'),
+    mkWord('tank_shell_word', 'Tank Shell', 'Tank Shell — representative bolted-panel storage tank shell component'),
+    mkWord('isolation_valve_word', 'Isolation Valve', 'Isolation Valve — representative gate valve component'),
+    mkWord('pipe_spool_word', 'Pipe Spool', 'Pipe Spool — representative carbon-steel pipe spool component'),
+    mkWord('structural_frame_word', 'Structural Frame', 'Structural Frame — representative galvanised skid frame component'),
+  ]
+  const plantState = {
+    parsedBrief: {
+      product_description: 'A grid-scale water treatment plant with a sand-filter train and recirculation pumps.',
+      mission_statement: 'Deliver treated process water at rated flow for continuous plant operation.',
+      constraints: { batch_size: { value: 1 } },
+    },
+    moduleDecomposition: {
+      modules: [{
+        module: 'mass_fluid_transport_process',
+        sub_modules: [{ id: 'mass_fluid_transport_process__recirculation_pump', words: plantWords }],
+      }],
+    },
+  }
+
+  const cScan = scanDesignForElectronicSignals(colorimeterState)
+  want('(1) colorimeter isPcbBearing true', cScan.isPcbBearing === true)
+  want('(1) colorimeter >=3 distinct categories', cScan.distinctElectronicCategories.length >= 3)
+  const cSignals = deriveDispositionSignals(colorimeterState, cScan)
+  const cDisposition = decidePcbDisposition({
+    isPcbBearing: cScan.isPcbBearing,
+    electronicPartCount: cScan.electronicPartCount,
+    distinctElectronicCategories: cScan.distinctElectronicCategories,
+    ...cSignals,
+  })
+  want('(1) colorimeter disposition != none', cDisposition.disposition !== 'none')
+  want('(1) colorimeter disposition is bespoke or cots-modules', ['bespoke', 'cots-modules'].includes(cDisposition.disposition))
+  want('(1) colorimeter repeatedApplicationSpecificBoard true (batch 20)', cSignals.repeatedApplicationSpecificBoard === true)
+  want('(1) colorimeter compactProductEnvelope true', cSignals.compactProductEnvelope === true)
+
+  const pScan = scanDesignForElectronicSignals(plantState)
+  want('(2) plant isPcbBearing false', pScan.isPcbBearing === false)
+  const pSignals = deriveDispositionSignals(plantState, pScan)
+  const pDisposition = decidePcbDisposition({
+    isPcbBearing: pScan.isPcbBearing,
+    electronicPartCount: pScan.electronicPartCount,
+    distinctElectronicCategories: pScan.distinctElectronicCategories,
+    ...pSignals,
+  })
+  want('(2) plant disposition none', pDisposition.disposition === 'none')
+
+  out.push(assertEq(
+    'UNIVERSAL.pcb_stage_flags_electronic_cluster_never_a_plant',
+    'PCB Phase A shadow stage: a colorimeter-like electronic design (MCU/microcontroller + photodiode-TIA analog front-end + LED driver + OLED display + li-po battery, compact + batch-of-20 brief) reaches isPcbBearing=true with >=3 distinct electronic-function categories and a bespoke/cots-modules disposition (never none); a plant design (pump casing, tank shell, isolation valve, pipe spool, structural frame — no electronics cluster) reaches isPcbBearing=false and disposition=none — a water plant is not a PCB',
+    failed.length, (n) => n === 0,
+    () => `pcb-stage cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/pcb/pcb-stage.ts + disposition.ts.`,
   ))
 
   return out
