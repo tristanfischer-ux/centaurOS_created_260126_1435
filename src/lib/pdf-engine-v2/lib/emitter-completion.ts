@@ -1502,11 +1502,26 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   // universally (wrong for any embedded product, not just device-scale).
   {
     const wl = (name || '').toLowerCase()
-    const hitBlob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''}`.toLowerCase()
+    const hitBlob = `${dbHit.manufacturer ?? ''} ${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''} ${dbHit.component_class ?? ''}`.toLowerCase()
     const wordIsConnectorIface = /\b(?:usb|type[\s-]?c|connector|receptacle|\bport\b|inlet|\bjack\b|header|interface)\b/.test(wl)
       && !/\b(?:card|adapter|hub|expansion|host\s+bus)\b/.test(wl)
     const hitIsExpansionCard = /pci[\s-]?e|\bpcie\b|\bpci\b|\bpex\d|expansion\s+card|add[\s-]?in\s+card|host\s+(?:adapter|bus\s+adapter)|\bhba\b|riser\s+card/.test(hitBlob)
     if (wordIsConnectorIface && hitIsExpansionCard) return false
+    // DOMAIN COHERENCE (2026-07-12, Grok/Cursor #1): a device's POWER-STORAGE word (a
+    // battery / cell / rechargeable pack) is NEVER a MACHINE-SAFETY product — the colorimeter
+    // 'Rechargeable Battery Pack' pinned Banner Engineering DBRQ (a safety relay, £280).
+    // Banner Engineering / Sick / Pilz / Schmersal make light-curtains / safety-relays /
+    // interlocks, not batteries. Reject a machine-safety part (by vendor OR by safety noun)
+    // for a battery word — absolute (envelope-independent, like USB≠PCIe).
+    const wordIsBattery = /\b(?:battery|batteries|\bcell\b|rechargeable|li[\s-]?ion|lipo|nimh|coin[\s-]?cell|super[\s-]?cap)\b/.test(wl)
+    const hitIsMachineSafety = /banner\s+engineering|\bpilz\b|schmersal|\bsick\s+ag\b|safety\s+relay|light\s+curtain|safety\s+interlock|muting|safety\s+controller|safety\s+laser|e[\s-]?stop|emergency\s+stop/.test(hitBlob)
+    if (wordIsBattery && hitIsMachineSafety) return false
+    // A device POWER / FUSE noun is not a PHOTOVOLTAIC / solar-string part (the colorimeter
+    // 'DC Input Fuse' pinned an Eaton PV-15A10F PV string fuse). A PV/solar form factor on a
+    // battery/fuse/charger/regulator word is a plant-domain mispin.
+    const wordIsDevicePower = /\b(?:fuse|battery|charger|regulator|dc[\s-]?dc|power\s+(?:input|inlet|supply)|ldo)\b/.test(wl)
+    const hitIsPvSolar = /\bpv[\s-]?\d|photovoltaic|\bpv\s+(?:fuse|string|array|module)\b|solar\s+(?:string|panel|array|pv)|\bpv-\b/.test(hitBlob)
+    if (wordIsDevicePower && hitIsPvSolar) return false
   }
   const lead = partNameLeadSegment(dbHit.part_name, 6)
   const headTok = toks[toks.length - 1]

@@ -133,6 +133,16 @@ expect(dbHitAcceptableForWord(_pexCard, 'Usb Power Interface') === false,
 const _molexUsbC: DbPart = { part_name: 'USB Type-C receptacle connector, 24-position, right-angle, SMT', manufacturer: 'Molex', part_number: '2172890001', component_class: 'connector', unit_price_gbp: null }
 expect(typeof dbHitAcceptableForWord(_molexUsbC, 'Usb Interface') === 'boolean',
   "the form-factor guard returns a clean boolean on a real USB-C receptacle (does not throw)")
+// ── DOMAIN COHERENCE for device power/safety (2026-07-12, Grok/Cursor #1): a battery is
+//    never a machine-safety product; a device fuse is never a PV/solar fuse. The colorimeter
+//    pinned Banner Engineering DBRQ (safety relay, £280) to 'Rechargeable Battery Pack' and
+//    Eaton PV-15A10F (PV string fuse) to 'DC Input Fuse'.
+const _bannerSafety: DbPart = { part_name: 'DBRQ dual-channel safety relay module, 24 VDC', manufacturer: 'Banner Engineering', part_number: 'DBRQ', component_class: 'oem_subsystem', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_bannerSafety, 'Rechargeable Battery Pack') === false,
+  "a battery word must NOT pin a Banner-Engineering machine-safety relay (£280 mis-pin) — battery is not machine safety")
+const _pvFuse: DbPart = { part_name: 'PV string fuse 15 A 1000 VDC gPV', manufacturer: 'Eaton - Bussmann', part_number: 'PV-15A10F', component_class: 'fuse', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_pvFuse, 'DC Input Fuse') === false,
+  "a device DC input fuse must NOT pin a photovoltaic string fuse (plant-domain mis-pin)")
 expect(isAccessoryRow('Circuit Breaker Accessories 508, DM, 40A Entrance Supply module REX12-T') === true &&
        isAccessoryRow('Mains incomer circuit breaker — Tmax XT1N 160 MCCB') === false,
   'an ACCESSORY row is recognised by its lead family phrase; a primary breaker is not')
