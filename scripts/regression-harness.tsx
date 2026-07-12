@@ -13354,7 +13354,18 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       ...wordsOf(photometerContract, 'sensing_instrumentation'),
       ...wordsOf(photometerContract, 'structure_containment'),
       ...wordsOf(photometerContract, 'control_compute_communication'),
+      ...wordsOf(photometerContract, 'power_distribution'),
+      ...wordsOf(photometerContract, 'safety_protection'),
     ].join(' | ')
+    // a handheld instrument's power/safety modules must NOT be a plant switchboard +
+    // machinery-safety system (run 1833: ~£1,150 of Main Breaker / Busbar / Emergency
+    // Stop / Interlock / Protective Relay on a £200 photometer).
+    wantC('(7) photometer floor does NOT emit Main Breaker', !/Main Breaker/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Distribution Busbar', !/Distribution Busbar/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Emergency Stop', !/Emergency Stop/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Protective Relay', !/Protective Relay/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit Interlock Switch', !/Interlock Switch/i.test(photoAll))
+    wantC('(7) photometer power/safety IS a device fuse', /Fuse/i.test(photoAll))
     wantC('(7) photometer floor emits LED Source', /LED Source/i.test(photoAll))
     wantC('(7) photometer floor emits Photodiode', /Photodiode/i.test(photoAll))
     wantC('(7) photometer floor emits Transimpedance Amplifier', /Transimpedance Amplifier/i.test(photoAll))
@@ -13370,7 +13381,12 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     const bessAll = [
       ...wordsOf(bessFloorContract, 'energy_storage_source'),
       ...wordsOf(bessFloorContract, 'energy_conversion_transduction'),
+      ...wordsOf(bessFloorContract, 'power_distribution'),
+      ...wordsOf(bessFloorContract, 'safety_protection'),
     ].join(' | ')
+    // a genuine plant/BESS KEEPS its switchboard + machinery-safety floor (no regression).
+    wantC('(7) BESS floor KEEPS Main Breaker', /Main Breaker/i.test(bessAll))
+    wantC('(7) BESS floor KEEPS Emergency Stop', /Emergency Stop/i.test(bessAll))
     wantC('(7) genuine BESS floor KEPT: Storage Cell', /Storage Cell/i.test(bessAll))
     wantC('(7) genuine BESS floor KEPT: Module Rack', /Module Rack/i.test(bessAll))
     wantC('(7) genuine BESS floor KEPT: DC Busbar', /DC Busbar/i.test(bessAll))

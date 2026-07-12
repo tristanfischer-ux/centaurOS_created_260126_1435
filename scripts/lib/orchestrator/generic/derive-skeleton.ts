@@ -198,6 +198,15 @@ const OPTICAL_ENERGY_CONVERSION_FLOOR = ['led_source', 'led_driver', 'wavelength
 const OPTICAL_SENSING_FLOOR = ['photodiode', 'transimpedance_amplifier', 'analog_to_digital_converter', 'reference_photodiode', 'signal_amplifier_stage', 'sensor_interconnect_cable']
 const OPTICAL_STRUCTURE_FLOOR = ['cuvette_holder', 'optical_path_baffle', 'enclosure_shell', 'lid_shroud', 'fastener_set', 'mounting_bracket']
 const OPTICAL_CONTROL_FLOOR = ['microcontroller', 'usb_interface', 'local_display', 'user_input_buttons', 'firmware_storage', 'debug_interface']
+// A handheld/benchtop INSTRUMENT's power_distribution + safety are NOT a plant's mains
+// switchboard (main breaker + busbar + contactor) or a machinery-safety system (e-stop +
+// interlock + protective relay + fire detector + beacon). The TIER_C defaults put ~£1,150
+// of that plant gear into the colorimeter BoM (run 1833: Main Breaker £180, Busbar £120,
+// Emergency Stop £280, Interlock £267, Protective Relay £220, Isolation £95, Surge £90 —
+// absurd on a £200 handheld). A sub-1 m³ battery/USB instrument's power+safety is a DC
+// input fuse, reverse-polarity + ESD + overcurrent protection, a thermal cutoff — pennies.
+const OPTICAL_POWER_DISTRIBUTION_FLOOR = ['dc_input_fuse', 'power_input_connector', 'reverse_polarity_protection', 'power_indicator_led', 'ferrite_emc_bead']
+const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'lid_interlock_switch']
 
 /** Per-module optical-instrument floor overrides. Only the modules the generic Tier-C
  *  floor gets wrong for an instrument (a BESS/industrial-power shape) are listed —
@@ -208,6 +217,8 @@ const OPTICAL_MODULE_FLOORS: Record<string, string[]> = {
   sensing_instrumentation: OPTICAL_SENSING_FLOOR,
   structure_containment: OPTICAL_STRUCTURE_FLOOR,
   control_compute_communication: OPTICAL_CONTROL_FLOOR,
+  power_distribution: OPTICAL_POWER_DISTRIBUTION_FLOOR,
+  safety_protection: OPTICAL_SAFETY_FLOOR,
 }
 
 /** True when the contract's own selected-tool record (`_tools_run`, populated by the
