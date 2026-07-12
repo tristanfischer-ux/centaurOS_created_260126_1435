@@ -200,6 +200,84 @@ export function scanDesignForElectronicSignals(
   }
 }
 
+export interface ElectronicWordRef {
+  moduleId: string
+  subModuleId: string
+  wordId: string
+  nameHuman: string
+  characterId: string
+  /** modifier_characters flattened to {kind: value}; last write wins for duplicate kinds. */
+  modifiers: Record<string, string>
+  /** Which ELECTRONIC_CATEGORY_PATTERNS this word's OWN text matched (not the design aggregate). */
+  categories: string[]
+  quantity: number
+}
+
+interface RawWordShape {
+  id?: string
+  name_human?: string
+  content_character?: { character_id?: string; name_human?: string }
+  modifier_characters?: Array<{ kind?: string; value?: string }>
+}
+
+/**
+ * @description Per-word electronic-component candidates for the Phase B atopile
+ * generator. Reuses the SAME `ELECTRONIC_CATEGORY_PATTERNS` universal detection
+ * signal as `scanDesignForElectronicSignals` (never a product-class table) but
+ * returns full word detail (module/sub-module id + modifiers) instead of the
+ * design-level aggregate, since the generator needs per-word manufacturer/
+ * part_number/form data to resolve a footprint.
+ * @param state - The chain's assembled state (moduleDecomposition at minimum).
+ * @returns One entry per word whose OWN text matched ≥1 electronic-function category.
+ */
+export function collectElectronicWords(
+  state: Record<string, unknown>,
+): ElectronicWordRef[] {
+  const modules = (state.moduleDecomposition as { modules?: unknown[] } | null)?.modules ?? []
+  const out: ElectronicWordRef[] = []
+  for (const mod of Array.isArray(modules) ? modules : []) {
+    const moduleId = (mod as { module?: string })?.module ?? 'unknown_module'
+    const subModules = (mod as { sub_modules?: unknown[] })?.sub_modules ?? []
+    for (const sub of Array.isArray(subModules) ? subModules : []) {
+      const subModuleId = (sub as { id?: string })?.id ?? 'unknown_sub_module'
+      const words = (sub as { words?: unknown[] })?.words ?? []
+      for (const w of Array.isArray(words) ? words : []) {
+        const word = w as RawWordShape
+        const modifiers: Record<string, string> = {}
+        for (const mc of word.modifier_characters ?? []) {
+          if (mc?.kind) modifiers[mc.kind] = mc.value ?? ''
+        }
+        const text = [
+          word.name_human ?? '',
+          word.content_character?.character_id ?? '',
+          word.content_character?.name_human ?? '',
+          ...Object.values(modifiers),
+        ].join(' ')
+        const categories = ELECTRONIC_CATEGORY_PATTERNS
+          .filter(({ pattern }) => pattern.test(text))
+          .map(({ category }) => category)
+        if (categories.length === 0) continue
+        let quantity = 1
+        if (modifiers.quantity) {
+          const n = Number(String(modifiers.quantity).replace(/[^\d.]/g, ''))
+          if (Number.isFinite(n) && n > 0) quantity = n
+        }
+        out.push({
+          moduleId,
+          subModuleId,
+          wordId: word.id ?? 'unknown_word',
+          nameHuman: word.name_human ?? word.id ?? 'unknown',
+          characterId: word.content_character?.character_id ?? '',
+          modifiers,
+          categories,
+          quantity,
+        })
+      }
+    }
+  }
+  return out
+}
+
 export interface DispositionSignals {
   compactProductEnvelope: boolean
   customFormFactor: boolean

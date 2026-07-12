@@ -1,11 +1,10 @@
 /**
- * @file PCB capability contracts — ENGINE-SIDE, Phase A subset (2026-07-12).
+ * @file PCB capability contracts — ENGINE-SIDE, Phase A + B (2026-07-12).
  * @description The evidence + disposition types `disposition.ts` needs, ported from
- * `prototypes/pcb-capability/pcb-contract.ts`. Phase A only ports the disposition-policy
- * slice; the board-geometry types (PcbPoint/PcbContour/PcbBoardGeometry/…) stay in the
- * prototype contract alongside `pcb-outline.ts` — both are Phase B's concern once the
- * atopile project generator needs to emit Edge.Cuts. Do not duplicate geometry types
- * here until Phase B actually ports `pcb-outline.ts`.
+ * `prototypes/pcb-capability/pcb-contract.ts`. Phase B additionally ports the
+ * board-geometry types (PcbPoint/PcbContour/PcbBoardGeometry/…) verbatim, now that
+ * `pcb-outline.ts` has been ported engine-side alongside `atopile-generator.ts`
+ * (which uses them to compute a component-area-derived board outline).
  */
 
 export type PcbDisposition =
@@ -50,4 +49,53 @@ export interface PcbDispositionDecision {
   reasons: string[]
   requiresKiCadDeliverable: boolean
   confidence: 'high' | 'medium' | 'low'
+}
+
+// ── Board geometry (Phase B, ported verbatim from prototypes/pcb-capability/pcb-contract.ts) ──
+
+export interface PcbPoint {
+  xMm: number
+  yMm: number
+}
+
+export interface PcbLineSegment {
+  kind: 'line'
+  start: PcbPoint
+  end: PcbPoint
+}
+
+export interface PcbArcSegment {
+  kind: 'arc'
+  start: PcbPoint
+  mid: PcbPoint
+  end: PcbPoint
+}
+
+export type PcbOutlineSegment = PcbLineSegment | PcbArcSegment
+
+export interface PcbContour {
+  id: string
+  segments: PcbOutlineSegment[]
+}
+
+export interface PcbMountingHole {
+  id: string
+  center: PcbPoint
+  diameterMm: number
+  plated: boolean
+}
+
+export interface PcbBoardGeometry {
+  /** The external closed board perimeter, expressed as ordered lines/arcs. */
+  outline: PcbContour
+  /** Internal routed openings expressed as additional closed Edge.Cuts contours. */
+  cutouts: PcbContour[]
+  /** Mechanical holes emitted as NPTH/PTH footprints rather than Edge.Cuts. */
+  mountingHoles: PcbMountingHole[]
+  source:
+    | 'brief_dimensions'
+    | 'enclosure_interface'
+    | 'mechanical_cad'
+    | 'derived'
+  sourceDetail: string
 }
