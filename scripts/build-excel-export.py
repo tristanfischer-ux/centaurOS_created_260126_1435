@@ -15165,7 +15165,32 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
                         "ENGINEERING DRAFT": (FILL_ADVISORY, "9C6500"),
                         "FAIL": (FILL_FAIL, "9C0006")}[a["readiness"]]
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=8)
-    bc = ws.cell(r, 1, clean_cell(f"{a['readiness']} — {a['readiness_why']}"))
+    # LIVE verdict formula (not a bare 'FAIL —' literal — _enforce_live_check_gate refuses
+    # the whole workbook save on a bare PASS/FAIL literal, which blocked EVERY colorimeter
+    # dossier from shipping). The readiness WORD is computed by the workbook from the same
+    # operands _pcb_readiness_verdict uses, so an honest FAIL is provably backed by the
+    # real DRC/routed/Gerbers/fitness cells and can never be faked.
+    _bespoke_missing = (bool(pcb.get("isPcbBearing")) and pcb.get("disposition") == "bespoke"
+                        and not a.get("pipeline_ok"))
+    _po = audit_operand("PCB", "pipeline ok (built+routed+DRC-clean+gerbers)", bool(a.get("pipeline_ok")), "state.pcb.pipeline.ok")
+    _do = audit_operand("PCB", "DRC clean (0 violations)", bool(a.get("drc_ok")), "state.pcb.pipeline.drc.violations == 0")
+    _ro = audit_operand("PCB", "board routed (0 unrouted nets)", bool(a.get("routed_ok")), "state.pcb.pipeline.routed")
+    _go = audit_operand("PCB", "Gerber set present", bool(a.get("gerbers_ok")), "exported Gerber layer set found")
+    _bm = audit_operand("PCB", "bespoke board required but pipeline not clean", bool(_bespoke_missing), "isPcbBearing & disposition=bespoke & !pipeline_ok")
+    _fs = audit_operand("PCB", "design-fitness score (/10)", round(float(a.get("fitness_score") or 0.0), 2), "BoM MPN/package resolution weighted vs function_class guesses")
+    _gp = audit_operand("PCB", "unresolved ELECTRONIC gap count", int(a.get("n_electronic_gap") or 0), "electronic parts with no resolved MPN/package")
+    readiness_fx = (
+        f'=IF(OR({_bm},NOT(AND({_po},{_do},{_ro},{_go}))),'
+        f'"FAIL — "&IF({_bm},"this design needs a bespoke PCB but no DRC-clean, fully-routed '
+        f'board with Gerbers landed","the pipeline hygiene checks (DRC / routed / Gerbers / '
+        f'pipeline.ok) did not all pass"),'
+        f'IF(OR({_fs}<7.5,{_gp}>0),'
+        f'"ENGINEERING DRAFT — hygiene is clean, but the BoM is not fab-grade (design-fitness "'
+        f'&TEXT({_fs},"0.0")&"/10"&IF({_gp}>0,"; "&TEXT({_gp},"0")&" unresolved electronic '
+        f'gap(s)","")&")",'
+        f'"FAB-READY — DRC-clean, fully routed, Gerbers complete, and the BoM is verified-tier"))'
+    )
+    bc = ws.cell(r, 1, readiness_fx)
     bc.fill = _fill
     bc.font = Font(name="Calibri", size=13, bold=True, color=_txtcolor)
     bc.alignment = WRAP_TOP
