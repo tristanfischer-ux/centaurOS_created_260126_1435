@@ -1370,6 +1370,7 @@ _TAB_DESCRIPTIONS: Dict[str, str] = {
     "Inputs & Assumptions": "Editable yellow drivers feeding the economics model.",
     "Financial model": "Economics, scenarios and investment analysis, live off the Inputs tab.",
     "Electrical": "Single-line diagram with the panel/load schedule — one dataset.",
+    "PCB": "Bespoke board disposition + the real atopile/KiCad pipeline result — DRC, Gerbers, PCBA BoM.",
     "Process schedules": "Valve and instrument schedules; the line list is Line & velocity.",
     "Line & velocity": "THE line list — every sized run versus its limit.",
     "Glossary": "Plain-English meaning of every abbreviation in the workbook.",
@@ -14758,6 +14759,207 @@ def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]
     return embedded
 
 
+def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
+    """PCB Phase D (2026-07-12, docs/plans/pcb-capability-integration.md): renders the REAL
+    artifacts from state.pcb.pipeline — disposition (bespoke/COTS + rationale), the board the
+    pipeline actually built (atopile -> KiCad -> Freerouting -> DRC -> Gerbers), the DRC
+    verdict, routed/unrouted nets, the 3D render, the Gerber/drill/pos artifact paths, and the
+    PCBA BoM (resolved components with MPN/footprint) + the honest unresolved[] gap list.
+    SELF-GUARDS: absent (returns False, no sheet created) whenever state.pcb.pipeline was never
+    recorded — PCB_STAGE off, or the design's own disposition never required a bespoke board —
+    so every existing archetype run stays byte-identical. Every number here is read from
+    state.pcb.pipeline (the REAL pipeline result), never a stated intention — mirrors the
+    'Electrical' tab's one-dataset discipline."""
+    pcb = state.get("pcb")
+    if not isinstance(pcb, dict):
+        return False
+    pipeline = pcb.get("pipeline")
+    if not isinstance(pipeline, dict):
+        return False
+
+    from openpyxl.drawing.image import Image as XLImage
+
+    ws = wb.create_sheet("PCB")
+    set_widths(ws, {"A": 26, "B": 34, "C": 18, "D": 20, "E": 18, "F": 20, "G": 10})
+    drc = pipeline.get("drc") or {}
+    violations = drc.get("violations")
+    gen = pipeline.get("generator") or {}
+    subtitle = (
+        "The bespoke PCB design surface: disposition, the board the pipeline actually built "
+        "(atopile -> KiCad -> Freerouting autoroute -> KiCad DRC -> Gerbers), and the PCBA "
+        "BoM. Every number on this tab is read from state.pcb.pipeline — the REAL pipeline "
+        "result, never a stated intention; a failed/incomplete board renders as a failure "
+        "here, never a fabricated pass. Auto-generated; not for construction."
+    )
+    r = title_row(ws, "PCB — bespoke board disposition + real pipeline artifacts", 7, subtitle)
+    back_link(ws, 7)
+
+    def _kv(rows: List[Tuple[str, Any]]) -> None:
+        nonlocal r
+        for field, val in rows:
+            ws.cell(r, 1, field).font = FONT_SUB
+            ws.cell(r, 2, clean_cell(val))
+            r += 1
+
+    # ── Disposition ──────────────────────────────────────────────────────────────────
+    r += 1
+    sub_banner(ws, r, "Disposition", 7)
+    r += 1
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    disp_detail = pcb.get("dispositionDetail") or {}
+    _kv([
+        ("PCB-bearing design", "Yes" if pcb.get("isPcbBearing") else "No"),
+        ("Disposition", str(pcb.get("disposition") or "—")),
+        ("Rationale", "; ".join(disp_detail.get("reasons") or pcb.get("reasons") or []) or "—"),
+        ("Electronic function categories", ", ".join(pcb.get("distinctElectronicCategories") or []) or "—"),
+        ("Electronic part count (design)", pcb.get("electronicPartCount") or 0),
+        ("Toolchain — can author (atopile)", "Yes" if pcb.get("canAuthor") else "No"),
+        ("Toolchain — can route (Freerouting)", "Yes" if pcb.get("canRoute") else "No"),
+        ("Toolchain — can verify + export (KiCad DRC/Gerbers)", "Yes" if pcb.get("canVerifyAndExport") else "No"),
+    ])
+    r += 1
+
+    # ── Board summary — real pipeline result ────────────────────────────────────────
+    sub_banner(ws, r, "Board summary — real pipeline result", 7)
+    r += 1
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    size = pipeline.get("boardSizeMm") or {}
+    size_txt = f"{size.get('w')} x {size.get('h')} mm" if size.get("w") and size.get("h") else "—"
+    _kv([
+        ("Pipeline stage reached", str(pipeline.get("stageReached") or "—")),
+        ("Layers", "2 (atopile default project — no explicit stackup override generated)"),
+        ("Board size", size_txt),
+        ("Components on board", pipeline.get("components") if pipeline.get("components") is not None
+         else (gen.get("componentCount") or "—")),
+        ("Nets", pipeline.get("nets") if pipeline.get("nets") is not None else (gen.get("netCount") or "—")),
+        ("Routed", "Yes" if pipeline.get("routed") else "No"),
+        ("Unrouted after autoroute", pipeline.get("unroutedAfterFreerouting")
+         if pipeline.get("unroutedAfterFreerouting") is not None else "—"),
+        ("Freerouting iterations run", pipeline.get("iterationsRun") or "—"),
+    ])
+    r += 1
+
+    # ── DRC verdict ──────────────────────────────────────────────────────────────────
+    sub_banner(ws, r, "DRC verdict", 7)
+    r += 1
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    drc_clean = bool(drc.get("ran")) and violations == 0
+    drc_text = ("CLEAN — 0 violations" if drc_clean else
+                (f"{violations} violation(s)" if drc.get("ran") and isinstance(violations, (int, float))
+                 else "DRC did not run"))
+    ws.cell(r, 1, "DRC ran").font = FONT_SUB
+    ws.cell(r, 2, "Yes" if drc.get("ran") else "No")
+    r += 1
+    ws.cell(r, 1, "DRC violations").font = FONT_SUB
+    dcell = ws.cell(r, 2, clean_cell(drc_text))
+    dcell.font = FONT_PASS if drc_clean else FONT_FAIL
+    r += 1
+    ws.cell(r, 1, "DRC report").font = FONT_SUB
+    ws.cell(r, 2, clean_cell(drc.get("reportPath") or "—"))
+    r += 1
+    r += 1
+
+    # ── Manufacturing artifacts ────────────────────────────────────────────────────
+    sub_banner(ws, r, "Manufacturing artifacts", 7)
+    r += 1
+    header(ws, r, ["Field", "Value"])
+    r += 1
+    gerbers = pipeline.get("gerbers") or {}
+    drill = pipeline.get("drill") or {}
+    pos = pipeline.get("pos") or {}
+    _kv([
+        ("Gerber set", f"{len(gerbers.get('files') or [])} file(s) — {gerbers.get('dir') or '—'}"
+         if gerbers else "not generated"),
+        ("Drill files", f"{len(drill.get('files') or [])} file(s) — {drill.get('dir') or '—'}"
+         if drill else "not generated"),
+        ("Pick-and-place (.pos)", pos.get("path") or "not generated"),
+        ("Routed board file (.kicad_pcb)", pipeline.get("kicadPcbPath") or "not generated"),
+    ])
+    r += 1
+
+    if pipeline.get("errors"):
+        sub_banner(ws, r, "Pipeline errors (honest failure trace)", 7)
+        r += 1
+        for e in (pipeline.get("errors") or [])[:8]:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+            c = ws.cell(r, 1, clean_cell(f"⚠ {e}"))
+            c.font = FONT_FAIL
+            c.alignment = WRAP_TOP
+            r += 1
+        r += 1
+
+    # ── 3D render ───────────────────────────────────────────────────────────────────
+    render_png = pipeline.get("renderPng")
+    if render_png and os.path.exists(render_png):
+        sub_banner(ws, r, "3D render", 7)
+        r += 1
+        try:
+            ds = downscale_png(render_png, run_dir)
+            img = XLImage(ds)
+            max_w = 900
+            if img.width and img.width > max_w:
+                ratio = max_w / float(img.width)
+                img.width = int(img.width * ratio)
+                img.height = int(img.height * ratio)
+            ws.add_image(img, f"A{r}")
+            r += int(-(-(img.height or 500) // 20)) + 2
+        except Exception as exc:  # noqa: BLE001
+            print(f"    ! could not embed PCB 3D render: {exc}")
+            r += 1
+    else:
+        ws.cell(r, 1, "— no 3D render was generated for this board —").font = FONT_NOTE
+        r += 2
+
+    # ── PCBA BoM — resolved components ─────────────────────────────────────────────
+    sub_banner(ws, r, "PCBA BoM — resolved components", 7)
+    r += 1
+    header(ws, r, ["Designator", "Component", "Manufacturer", "MPN", "Footprint",
+                   "Resolution tier", "Qty"])
+    r += 1
+    components = gen.get("components") if isinstance(gen.get("components"), list) else []
+    if components:
+        for comp in components:
+            fp = comp.get("footprint") or {}
+            fp_txt = f"{fp.get('library')}:{fp.get('footprint')}" if fp else "—"
+            ws.cell(r, 1, clean_cell(comp.get("instanceName") or "—"))
+            ws.cell(r, 2, clean_cell(comp.get("nameHuman") or comp.get("characterId") or "—"))
+            ws.cell(r, 3, clean_cell(comp.get("manufacturer") or "—"))
+            ws.cell(r, 4, clean_cell(comp.get("partNumber") or "—"))
+            ws.cell(r, 5, clean_cell(fp_txt))
+            ws.cell(r, 6, clean_cell(comp.get("resolutionTier") or "—"))
+            ws.cell(r, 7, comp.get("quantityInDesign") or 1)
+            r += 1
+    else:
+        ws.cell(r, 1, "— no components resolved —")
+        ws.cell(r, 2, ""); ws.cell(r, 3, ""); ws.cell(r, 4, "")
+        ws.cell(r, 5, ""); ws.cell(r, 6, ""); ws.cell(r, 7, "")
+        r += 1
+    r += 1
+
+    # ── Unresolved parts (honest gap list) ─────────────────────────────────────────
+    unresolved = gen.get("unresolved") if isinstance(gen.get("unresolved"), list) else []
+    sub_banner(ws, r, f"Unresolved parts ({len(unresolved)}) — honest gap list", 7)
+    r += 1
+    header(ws, r, ["Word ID", "Name", "Character", "Reason unresolved"])
+    r += 1
+    if unresolved:
+        for u in unresolved:
+            ws.cell(r, 1, clean_cell(u.get("wordId") or "—"))
+            ws.cell(r, 2, clean_cell(u.get("nameHuman") or "—"))
+            ws.cell(r, 3, clean_cell(u.get("characterId") or "—"))
+            ws.cell(r, 4, clean_cell(u.get("reason") or "—"))
+            r += 1
+    else:
+        ws.cell(r, 1, "0 — every electronic word resolved to a footprint")
+        ws.cell(r, 2, ""); ws.cell(r, 3, ""); ws.cell(r, 4, "")
+        r += 1
+
+    return True
+
+
 # ── INSTRUMENT-INDEX COLLAPSE (reviewers 2026-07-02, Bundle C fix 5) ─────────────────
 # The generated instrument index expands a qty-N instrument into N copy-paste rows
 # ('LT-201 … vessels (e.g. V-104) (#1 of 17)' × 17). Collapse identical-but-for-the-
@@ -18626,7 +18828,7 @@ _TAB_RANK = {
     "Drawings": 6,                                      # the drawing REGISTER opens the drawings block
     # drawings in reading order: BFD 7 → P&ID 8 → Process schedules 9 → GA 10 → HVAC 11 →
     # Electrical 12 → Line & velocity 13 (prefix ranks in _tab_rank fill the gaps)
-    "Process schedules": 9, "Electrical": 12, "Line & velocity": 13,
+    "Process schedules": 9, "Electrical": 12, "PCB": 12.2, "Line & velocity": 13,
     "Assembly sequence": 14, "Risk & Regulatory": 15, "Holds & exclusions": 16,
     "Questions for the customer": 16.5,
     "Quality & Audit": 17, "Sense-check": 17.5, "⚠ Checks": 18,
@@ -18647,7 +18849,7 @@ _TAB_GROUPS = {
     "commercial": {"Executive Summary", "Contents", "Overview", "Renders", "Cost waterfall",
                    "Financial model", "Bill of Materials (Ledger)", "Brief", "Design basis",
                    "Engineering Analysis"},
-    "drawings": {"Drawings", "Process schedules", "Electrical", "Line & velocity",
+    "drawings": {"Drawings", "Process schedules", "Electrical", "PCB", "Line & velocity",
                  "Assembly sequence"},
     "verification": {"Risk & Regulatory", "Holds & exclusions", "Quality & Audit",
                      "Questions for the customer", "Sense-check", "⚠ Checks"},
@@ -19655,6 +19857,15 @@ _dt(_ISO_RANGE_HDR, "iso2768-range",
     ["Range low (mm)", "Range high (mm)"], numeric=["Range low (mm)", "Range high (mm)"])
 _dt(_ISO_FLAT_HDR, "iso2768-2-range",
     ["Range low (mm)", "Range high (mm)"], numeric=["Range low (mm)", "Range high (mm)"])
+
+# PCB Phase D (2026-07-12): the PCBA BoM (resolved components with footprint/tier) and the
+# honest unresolved-parts list. Manufacturer/MPN/Footprint are NOT required — a component can
+# be honestly resolved via the package_family/function_class tier with no verified MPN yet;
+# only the structural columns (which part, which resolution path, how many) are required.
+_dt(["Designator", "Component", "Manufacturer", "MPN", "Footprint", "Resolution tier", "Qty"],
+    "pcba-bom", ["Designator", "Component", "Resolution tier", "Qty"], numeric=["Qty"])
+_dt(["Word ID", "Name", "Character", "Reason unresolved"], "pcb-unresolved",
+    ["Word ID", "Name", "Character", "Reason unresolved"])
 
 # Markdown-sourced tables (_render_md_table: process/panel schedules parsed from
 # drawings/*.md) have CLASS-DEPENDENT columns — they carry a declared GENERIC contract:
@@ -21139,6 +21350,77 @@ def _sc_schedules(wb, ws, state, run_dir):
                    "resolve any diverging item-count reconciliation at its source"}
 
 
+def _sc_pcb(wb, ws, state, run_dir):
+    """PCB Phase D (2026-07-12): scores the tab HONESTLY on the pipeline's own real
+    signals — DRC-clean, fully routed, Gerbers present, resolved-part fraction — and
+    HARD-CAPS the score whenever the design needed a bespoke board but the pipeline did
+    not deliver one (mirrors pcb-gate.ts's evaluatePcbGate at the chain level: never a
+    green PCB tab without a real board)."""
+    comps = []
+    iss = []
+    pcb = state.get("pcb") or {}
+    pipeline = pcb.get("pipeline") or {}
+    drc = pipeline.get("drc") or {}
+    gen = pipeline.get("generator") or {}
+    violations = drc.get("violations")
+
+    drc_ok = bool(drc.get("ran")) and violations == 0
+    comps.append(("DRC clean (0 violations)", 1 if drc_ok else 0, 1))
+    if not drc_ok:
+        if drc.get("ran"):
+            iss.append(f"[HIGH] DRC reported {violations} violation(s) — the board is not "
+                       "clean; fix at the routing/placement stage and re-run the pipeline")
+        else:
+            iss.append("[HIGH] DRC never ran — the pipeline stopped before verification "
+                       f"(stage_reached={pipeline.get('stageReached')})")
+
+    unrouted = pipeline.get("unroutedAfterFreerouting")
+    routed_ok = bool(pipeline.get("routed")) and (unrouted in (0, None))
+    comps.append(("board fully routed (0 unrouted nets)", 1 if routed_ok else 0, 1))
+    if not routed_ok:
+        iss.append(f"[HIGH] board not fully routed — "
+                   f"{unrouted if unrouted is not None else 'unknown count of'} net(s) left "
+                   "unrouted after Freerouting")
+
+    gerbers = pipeline.get("gerbers") or {}
+    gerbers_ok = bool(gerbers.get("files"))
+    comps.append(("Gerber set present", 1 if gerbers_ok else 0, 1))
+    if not gerbers_ok:
+        iss.append("[HIGH] no Gerber set was exported — the board cannot be manufactured "
+                   "from this run")
+
+    pipeline_ok = bool(pipeline.get("ok"))
+    comps.append(("pipeline's own ok verdict (built + routed + DRC-clean + gerbers)",
+                  1 if pipeline_ok else 0, 1))
+
+    resolved_n = int(gen.get("componentCount") or 0)
+    unresolved_n = int(gen.get("unresolvedCount") or 0)
+    total_n = resolved_n + unresolved_n
+    if total_n:
+        comps.append(("electronic words resolved to a real footprint", resolved_n, total_n))
+        if unresolved_n:
+            iss.append(f"{unresolved_n} of {total_n} electronic word(s) did not resolve to a "
+                       "footprint — see the Unresolved parts table")
+
+    # Honest-failure hard cap: needs-bespoke-but-no-board is a FAIL regardless of the
+    # component-level fractions above — mirrors evaluatePcbGate()'s bespoke_required_*
+    # verdicts, never a green tab over a missing board.
+    score_cap = None
+    if bool(pcb.get("isPcbBearing")) and pcb.get("disposition") == "bespoke" and not pipeline_ok:
+        score_cap = 2.0
+        iss.insert(0, "[HIGH] this design NEEDS a bespoke PCB but no DRC-clean routed board "
+                      "with Gerbers landed — the PCB surface is an honest FAIL (mirrors the "
+                      "PCB honest-failure gate)")
+
+    return {"components": comps, "issues": iss, "score_cap": score_cap,
+            "mech": "PCB pipeline real-artifact scoring: DRC-clean + fully routed + Gerbers "
+                    "present + resolved-part fraction, hard-capped to a FAIL when a required "
+                    "bespoke board did not land",
+            "fix": "route DRC violations / unrouted nets / unresolved parts back to the "
+                   "atopile generator or the pipeline stage that produced them, then re-run "
+                   "the PCB pipeline"}
+
+
 _TAB_SCORERS = [
     ("Executive Summary", _sc_exec),
     ("Contents", _sc_contents),
@@ -21154,6 +21436,7 @@ _TAB_SCORERS = [
     ("Glossary", _sc_glossary),
     ("Holds & exclusions", _sc_holds),
     (QUESTIONS_SHEET, _sc_questions),
+    ("PCB", _sc_pcb),
     ("Sense-check", _sc_benchmark),
     ("⚠ Checks", _sc_checks),
     ("Quality & Audit", _sc_quality_audit),
@@ -22097,6 +22380,9 @@ def build(run_dir: str, out_path: str) -> dict:
         embedded.extend(_elec)
         used_titles.add("electrical")
         print("  · Electrical (single-line + panel schedule)")
+    # PCB Phase D (2026-07-12): self-guards on state.pcb.pipeline being present — absent
+    # exactly as today whenever PCB_STAGE was off or the design never needed a bespoke board.
+    add_tab("PCB", lambda: tab_pcb(wb, state, run_dir))
     for path, ttl, cap in specs:
         png = ensure_png(path, run_dir)
         sheet = add_image_tab(wb, run_dir, png, ttl, cap, used_titles) if png else None

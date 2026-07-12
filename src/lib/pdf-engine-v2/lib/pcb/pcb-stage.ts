@@ -31,6 +31,7 @@ import {
   type PcbStageDisposition,
   type PcbStageDispositionResult,
 } from './disposition'
+import type { PcbPipelineResult } from './pcb-pipeline'
 
 interface CategoryPattern {
   category: string
@@ -331,6 +332,34 @@ export function deriveDispositionSignals(
   }
 }
 
+/**
+ * @description Phase D pipeline record attached to `state.pcb.pipeline` — the REAL
+ * `runPcbPipeline()` result (board/route/DRC/Gerbers, honest failure) plus the
+ * Phase-B generator's own summary (component/net counts + the honest unresolved
+ * list), so the dossier tab + gate can read one place for "did a real board land".
+ */
+export interface PcbPipelineRecord extends PcbPipelineResult {
+  generator?: {
+    componentCount: number
+    netCount: number
+    unresolvedCount: number
+    unresolved: Array<{ wordId: string; nameHuman: string; characterId: string; reason: string }>
+    /** The PCBA BoM the dossier tab renders — resolved components with MPN/footprint.
+     *  Slim, serializable projection of AtopileComponentRecord[] (no functionClass enum
+     *  object identity, footprint reduced to {library,footprint}). */
+    components: Array<{
+      instanceName: string
+      nameHuman: string
+      characterId: string
+      manufacturer: string | null
+      partNumber: string | null
+      footprint: { library: string; footprint: string } | null
+      resolutionTier: string
+      quantityInDesign: number
+    }>
+  }
+}
+
 export interface PcbStageResult {
   isPcbBearing: boolean
   electronicPartCount: number
@@ -343,6 +372,9 @@ export interface PcbStageResult {
   canAuthor: boolean
   canRoute: boolean
   canVerifyAndExport: boolean
+  /** Phase D (2026-07-12): set only when disposition==='bespoke' AND PCB_STAGE actually
+   *  attempted the build/route/DRC pipeline (or honestly recorded why it couldn't). */
+  pipeline?: PcbPipelineRecord
 }
 
 /**

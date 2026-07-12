@@ -69,7 +69,10 @@ import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { runWordDomainCoherence, type WordDomainCoherenceResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
-import { runPcbStage, type PcbStageResult } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
+import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
+import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
+import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
+import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -9679,10 +9682,9 @@ async function main() {
   if (process.env.PCB_STAGE && !['0', 'false', 'off', 'no'].includes(String(process.env.PCB_STAGE).toLowerCase())) {
     try {
       const stPcb = JSON.parse(readFileSync(statePath, 'utf8'))
-      const pcbResult = runPcbStage(stPcb)
+      const pcbResult: PcbStageResult = runPcbStage(stPcb)
       pcb = pcbResult
       stPcb.pcb = pcbResult
-      writeFileSync(statePath, JSON.stringify(stPcb))
       console.error(
         `[chain] PCB STAGE (shadow): bearing=${pcbResult.isPcbBearing} disposition=${pcbResult.disposition} ` +
         `categories=[${pcbResult.distinctElectronicCategories.join(',')}] canAuthor=${pcbResult.canAuthor} ` +
@@ -9694,6 +9696,107 @@ async function main() {
         can_author: pcbResult.canAuthor, can_route: pcbResult.canRoute,
         can_verify_and_export: pcbResult.canVerifyAndExport,
       })
+
+      // ── PHASE D (2026-07-12): for a design the disposition says NEEDS a bespoke
+      // board, actually RUN the pipeline (atopile project -> build -> route -> DRC ->
+      // Gerbers). Non-fatal at the stage level — the honest-failure GATE below decides
+      // pass/fail. Robust: a missing toolchain (canAuthor=false) is recorded honestly
+      // and skipped, never crashes the chain; a pipeline exception is caught and
+      // recorded as an honest failure record (same shape as a real ok:false result) so
+      // the gate + dossier tab see ONE consistent contract either way.
+      if (pcbResult.disposition === 'bespoke') {
+        if (pcbResult.canAuthor) {
+          try {
+            const pcbProjectDir = resolve(outDir, 'pcb-project')
+            const genResult = generateAtopileProject(stPcb, pcbProjectDir)
+            console.error(
+              `[chain] PCB atopile project: ${genResult.components.length} component(s), ` +
+              `${genResult.unresolved.length} unresolved, ${genResult.nets.length} net(s) -> ${pcbProjectDir}`,
+            )
+            const pipelineResult = runPcbPipeline(pcbProjectDir, outDir)
+            const record: PcbPipelineRecord = {
+              ...pipelineResult,
+              generator: {
+                componentCount: genResult.components.length,
+                netCount: genResult.nets.length,
+                unresolvedCount: genResult.unresolved.length,
+                unresolved: genResult.unresolved,
+                components: genResult.components.map((c) => ({
+                  instanceName: c.instanceName,
+                  nameHuman: c.nameHuman,
+                  characterId: c.characterId,
+                  manufacturer: c.manufacturer,
+                  partNumber: c.partNumber,
+                  footprint: c.footprint ? { library: c.footprint.library, footprint: c.footprint.footprint } : null,
+                  resolutionTier: c.resolutionTier,
+                  quantityInDesign: c.quantityInDesign,
+                })),
+              },
+            }
+            stPcb.pcb.pipeline = record
+            pcb.pipeline = record
+            console.error(
+              `[chain] PCB pipeline: ok=${pipelineResult.ok} stage_reached=${pipelineResult.stageReached} ` +
+              `routed=${pipelineResult.routed} drc_violations=${pipelineResult.drc.violations}`,
+            )
+            logAction({
+              step: 'pcb_pipeline', ok: pipelineResult.ok, stage_reached: pipelineResult.stageReached,
+              routed: pipelineResult.routed, drc_violations: pipelineResult.drc.violations,
+              unresolved: genResult.unresolved.length,
+            })
+          } catch (pipeErr) {
+            const record: PcbPipelineRecord = {
+              ok: false,
+              stageReached: 'pipeline_exception',
+              routed: false,
+              drc: { ran: false, violations: null },
+              errors: [`pcb pipeline threw: ${(pipeErr as Error).message ?? String(pipeErr)}`.slice(0, 300)],
+            }
+            stPcb.pcb.pipeline = record
+            pcb.pipeline = record
+            console.error(`[chain] PCB pipeline threw (non-fatal, honest failure recorded): ${(pipeErr as Error).message?.slice(0, 200)}`)
+            logAction({ step: 'pcb_pipeline', ok: false, error: String(pipeErr).slice(0, 200) })
+          }
+        } else {
+          // Toolchain missing on this host — record honestly, never fabricate a board.
+          const record: PcbPipelineRecord = {
+            ok: false,
+            stageReached: 'toolchain_discovery',
+            routed: false,
+            drc: { ran: false, violations: null },
+            errors: ['PCB toolchain unavailable on this host (canAuthor=false) — bespoke board required but not generated'],
+          }
+          stPcb.pcb.pipeline = record
+          pcb.pipeline = record
+          console.error('[chain] PCB pipeline SKIPPED (canAuthor=false) — recorded honest toolchain-missing failure')
+          logAction({ step: 'pcb_pipeline', ok: false, error: 'toolchain_discovery: canAuthor=false' })
+        }
+      }
+
+      writeFileSync(statePath, JSON.stringify(stPcb))
+
+      // ── PHASE D STEP 3 — honest-failure GATE (2026-07-12): fires ONLY when the
+      // design's own disposition required a bespoke board but the pipeline did not
+      // come out DRC-clean/routed/Gerber-complete. Mirrors gates 31-37: pure decision
+      // in pcb-gate.ts, SHADOW by default (records state.pcbGate, never blocks),
+      // enforcing opt-in via PCB_GATE_ENFORCING (exit 38). Entirely inert unless
+      // PCB_STAGE is on (this whole block is behind that flag).
+      const gateResult = evaluatePcbGate(pcbResult)
+      const gateMode = pcbGateEnforceModeFromEnv(process.env.PCB_GATE_ENFORCING)
+      const onDiskForGate = JSON.parse(readFileSync(statePath, 'utf8'))
+      onDiskForGate.pcbGate = { ...gateResult, mode: gateMode }
+      writeFileSync(statePath, JSON.stringify(onDiskForGate))
+      if (gateResult.applicable) {
+        console.error(
+          `[chain] PCB GATE (${gateMode}): applicable=true fires=${gateResult.fires} reason=${gateResult.reason}` +
+          (gateResult.details.length ? ` — ${gateResult.details.join('; ')}` : ''),
+        )
+        logAction({ step: 'pcb_gate', ok: !gateResult.fires, mode: gateMode, fires: gateResult.fires, reason: gateResult.reason })
+        if (gateResult.fires && gateMode === 'enforcing') {
+          console.error('[chain] === PCB_GATE_ENFORCING: bespoke PCB required but no DRC-clean routed board with Gerbers landed — exit 38 ===')
+          process.exit(38)
+        }
+      }
     } catch (pcbErr) {
       console.error(`[chain] PCB STAGE threw (non-fatal, shadow): ${(pcbErr as Error).message.slice(0, 200)}`)
       logAction({ step: 'pcb_stage', ok: false, error: String(pcbErr).slice(0, 200) })
