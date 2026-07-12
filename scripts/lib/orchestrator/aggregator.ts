@@ -352,15 +352,22 @@ export function deriveDeviceScaleEnclosure(
 
   // Synthesise a max_dimensions_mm-equivalent box so the sealed-enclosure
   // render + GA have real dimensions rather than falling back to a cube.
-  // Aspect: a slightly-tall square-base box (typical benchtop-instrument
-  // profile) — height = 1.3x the base side.
+  // Aspect: a portable/benchtop instrument is WIDE and FLAT — a landscape
+  // footprint (a display face + optical port on the wide top), NEVER a tall
+  // square box. A slightly-tall square box reads as a floor-standing cabinet
+  // in the hero (the 2026-07-12 Open Colorimeter regression: a 115×115×150 box
+  // rendered as a BESS cabinet; the real IO Rodeo unit is ~140W×110D×55H). Use
+  // W:D:H = 1.45:1.15:0.60 (volume-preserving, 1.45·1.15·0.60 ≈ 1.00). Universal
+  // — only device-scale portable/benchtop products reach this branch.
   if (!q.design_envelope_width_mm && !q.design_envelope_depth_mm && !q.design_envelope_height_mm) {
-    const baseSideMm = Math.cbrt(volM3 / 1.3) * 1000
-    const heightMm = baseSideMm * 1.3
+    const baseSideMm = Math.cbrt(volM3) * 1000
+    const widthMm = baseSideMm * 1.45
+    const depthMm = baseSideMm * 1.15
+    const heightMm = baseSideMm * 0.60
     const boxCondition =
-      'derived_device_scale — synthesised box from estimated enclosure_volume_m3 (brief gave no envelope dimensions)'
-    q.design_envelope_width_mm = deviceScaleQuantity(baseSideMm, 'mm', 'length', 'max', 'design_envelope_width_mm', boxCondition)
-    q.design_envelope_depth_mm = deviceScaleQuantity(baseSideMm, 'mm', 'length', 'max', 'design_envelope_depth_mm', boxCondition)
+      'derived_device_scale — synthesised landscape benchtop box from estimated enclosure_volume_m3 (brief gave no envelope dimensions)'
+    q.design_envelope_width_mm = deviceScaleQuantity(widthMm, 'mm', 'length', 'max', 'design_envelope_width_mm', boxCondition)
+    q.design_envelope_depth_mm = deviceScaleQuantity(depthMm, 'mm', 'length', 'max', 'design_envelope_depth_mm', boxCondition)
     q.design_envelope_height_mm = deviceScaleQuantity(heightMm, 'mm', 'length', 'max', 'design_envelope_height_mm', boxCondition)
   }
 

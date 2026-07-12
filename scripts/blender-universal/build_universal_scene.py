@@ -11908,13 +11908,26 @@ def _sealed_enclosure_env_mm(state, quantities):
 def _sealed_product_camera_specs(env_mm):
     """Perspective camera set for customer-facing wall/cabinet product views."""
     w, d, h = (float(value) * fl.MM for value in env_mm)
-    centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) / 2.0) * fl.MM)
+    # raise the look-at centre for an instrument so the body + the protruding cuvette
+    # port both sit inside the frame (port top ≈ 1.4·H); a plain cabinet stays at mid-H.
+    _centre_frac = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
+    centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) * _centre_frac) * fl.MM)
+    # Frame on the CONTROLLING extent, not height alone: a WIDE-and-FLAT instrument
+    # (W >> H) overflowed the frame and rendered a zoomed-in white patch when the
+    # distance was computed from h only (2026-07-12). perspective_distance_for_extent
+    # fits an extent VERTICALLY; the render frame is ~1.5:1, so a horizontal extent
+    # fits 1.5× more — the vertical-equivalent controlling extent is max(h, w/1.5, d/1.5).
+    _fa = 1.5  # render frame aspect (3000×2000)
+    # instrument devices carry a cuvette/optical port that protrudes ~0.4·H above the
+    # top — inflate the vertical extent so the port is not cropped out of frame.
+    _h_eff = h * (1.42 if _IS_INSTRUMENT_DEVICE else 1.0)
+    _ctrl = max(_h_eff, w / _fa, d / _fa)
     front_distance = perspective_distance_for_extent(
-        h * 1.08, focal_mm=62, frame_fraction=0.84)
+        _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
     side_distance = perspective_distance_for_extent(
-        h * 1.08, focal_mm=58, frame_fraction=0.84)
+        _ctrl * 1.16, focal_mm=58, frame_fraction=0.84)
     service_distance = perspective_distance_for_extent(
-        h * 0.34, focal_mm=72, frame_fraction=0.68)
+        max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
     return [
         {
             "name": "04-product-exterior",
@@ -12517,9 +12530,61 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             rotation=(math.radians(90), 0.0, 0.0),
         )
         _status.hide_render = True
-        # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4
-        n_vents = min(4, max(1, sum(1 for p in parts
-                                    if re.search(r"\bfan\b|vent|louvre|duct", str(p.name), re.I))))
+        # INSTRUMENT FACE (2026-07-12): a device-scale optical instrument's closed
+        # product face must READ as the instrument — a display window + a button
+        # cluster on the front, and a cuvette/optical port on the wide top — not a
+        # featureless cabinet box. Keyed on the authoritative device flag; a plant
+        # enclosure never carries it (the gold Open Colorimeter face: TFT + 5 buttons
+        # left, a light-tight cuvette cube on the right). All as u_se_exterior_detail_*
+        # so they render on the closed product views and hide on the cutaway hero.
+        if _IS_INSTRUMENT_DEVICE:
+            _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear((0.02, 0.03, 0.05)),
+                                    metallic=0.0, roughness=0.14)
+            _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear((0.18, 0.19, 0.22)),
+                                   metallic=0.2, roughness=0.5)
+            _port_mat = fl.make_mat("m_se_face_port", fl._to_linear((0.28, 0.30, 0.33)),
+                                    metallic=0.25, roughness=0.45)
+            _bore_mat = fl.make_mat("m_se_face_bore", fl._to_linear((0.01, 0.01, 0.01)),
+                                    metallic=0.0, roughness=0.9)
+            _face_y = -D / 2 - tt - 1.2
+            # display window — left ~55% of the face (PyBadge TFT sits left)
+            _disp = fl.add_box("u_se_exterior_detail_display",
+                               _mm3((-W * 0.17, _face_y, base_z + H * 0.55)),
+                               _mm3((W * 0.48, 2.4, H * 0.58)), _disp_mat,
+                               module=_skin_mod, module_objects=MO)
+            _disp.dimensions = _mm3((W * 0.48, 2.4, H * 0.58))
+            _disp.hide_render = True
+            # button cluster — right of the display (d-pad + tactile buttons)
+            for _bi, (_bx, _bz) in enumerate([
+                (0.30, 0.72), (0.30, 0.34),          # up / down
+                (0.20, 0.53), (0.40, 0.53),          # left / right
+                (0.30, 0.53),                         # centre / select
+            ]):
+                _btn = fl.add_cyl(f"u_se_exterior_detail_button_{_bi}",
+                                  _mm3((W * _bx, _face_y - 0.4, base_z + H * _bz)),
+                                  3.4 * fl.MM, 2.4 * fl.MM, _btn_mat,
+                                  module=_skin_mod, module_objects=MO,
+                                  rotation=(math.radians(90), 0.0, 0.0))
+                _btn.hide_render = True
+            # cuvette / optical port — a light-tight cube raised off the wide TOP,
+            # on the right (the gold unit's optical block sits to the right of the display)
+            _port = fl.add_box("u_se_exterior_detail_port",
+                               _mm3((W * 0.30, 0.0, base_z + H + H * 0.19)),
+                               _mm3((W * 0.30, D * 0.60, H * 0.40)), _port_mat,
+                               module=_skin_mod, module_objects=MO)
+            _port.dimensions = _mm3((W * 0.30, D * 0.60, H * 0.40))
+            _port.hide_render = True
+            # the cuvette bore — a dark 10 mm well down into the port top
+            _bore = fl.add_cyl("u_se_exterior_detail_port_bore",
+                               _mm3((W * 0.30, 0.0, base_z + H + H * 0.33)),
+                               6.0 * fl.MM, H * 0.22 * fl.MM, _bore_mat,
+                               module=_skin_mod, module_objects=MO)
+            _bore.hide_render = True
+        # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4.
+        # A sealed instrument with no air-movers gets NONE (a benchtop photometer is
+        # not louvred) — only add a slot when a fan/vent/duct part actually exists.
+        n_vents = min(4, sum(1 for p in parts
+                             if re.search(r"\bfan\b|vent|louvre|duct", str(p.name), re.I)))
         slot_w = W * 0.78
         for vi in range(n_vents):
             vz = base_z + H * (0.955 - 0.035 * vi)
@@ -18624,10 +18689,19 @@ def main():
         _hero_cam = None
         if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
             _sw, _sd, _sh = _SEALED_ENV_MM
-            _pc = (0.0, 0.0, (DECK_Z_MM + _sh / 2.0) * fl.MM)
+            # frame on the CONTROLLING extent, not height alone — a WIDE-and-FLAT
+            # instrument (W >> H) was cropped to a zoomed patch when framed on _sh
+            # (2026-07-12). Match _sealed_product_camera_specs: fit max(h_eff, w/1.5,
+            # d/1.5) with the render's 1.5:1 aspect; raise the look-at for the device
+            # so the protruding cuvette port stays in frame.
+            _fa = 1.5
+            _h_eff = _sh * (1.42 if _IS_INSTRUMENT_DEVICE else 1.0)
+            _cf = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
+            _pc = (0.0, 0.0, (DECK_Z_MM + _sh * _cf) * fl.MM)
             _pmax = max(_sw, _sd, _sh) * fl.MM
+            _ctrl = max(_h_eff, _sw / _fa, _sd / _fa) * fl.MM
             _hero_distance = perspective_distance_for_extent(
-                _sh * fl.MM * 1.08, focal_mm=62, frame_fraction=0.84)
+                _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
             _pd = _hero_distance / math.sqrt(2)
             _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.12),
                          "target": _pc,

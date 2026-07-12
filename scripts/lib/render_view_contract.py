@@ -70,6 +70,15 @@ def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, floa
     volume = _quantity_value(state, "enclosure_volume_m3")
     if volume is not None and 0 < volume < 1:
         side_mm = (volume ** (1.0 / 3.0)) * 1000.0
+        # A device-scale optical/electronic INSTRUMENT is a benchtop/handheld unit —
+        # WIDE and FLAT (a display face + optical port on top), never a tall cube.
+        # A cube-of-volume reads as a floor-standing cabinet in the hero (the exact
+        # 2026-07-12 Open Colorimeter regression: a 126 mm cube rendered as a BESS
+        # cabinet). Reshape the same volume to a landscape aspect (W > D > H) keyed on
+        # the authoritative device flag; volume is preserved (1.40·1.15·0.62 ≈ 1.00).
+        # Universal — a plant/cabinet product never carries isInstrumentDevice.
+        if state.get("isInstrumentDevice"):
+            return side_mm * 1.40, side_mm * 1.15, side_mm * 0.62
         return side_mm, side_mm, side_mm
     return None
 
@@ -159,4 +168,34 @@ _PLANT_VIEWS = (
 def required_views(state: dict) -> list[ViewSpec]:
     """Return the ordered Excel-bound view set for the physical form factor."""
     return list(_PRODUCT_VIEWS if is_product_scale(state) else _PLANT_VIEWS)
+
+
+def _selftest() -> None:
+    """proveCatch for the instrument landscape-envelope reshape (2026-07-12).
+
+    A device-scale optical instrument with only a volume (no explicit dims) MUST
+    resolve to a WIDE-and-FLAT benchtop envelope (W > D > H), never a tall cube —
+    a cube rendered as a floor-standing cabinet (the Open Colorimeter regression).
+    A non-instrument sealed product keeps the cube fallback.
+    """
+    vol_state = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 0.002}}}
+    # instrument → landscape
+    inst = dict(vol_state, isInstrumentDevice=True)
+    w, d, h = resolve_design_envelope_mm(inst)
+    assert w > d > h, f"instrument envelope must be landscape W>D>H, got {(w, d, h)}"
+    assert abs(w * d * h / 1e9 - 0.002) < 2e-4, "landscape reshape must preserve volume"
+    # non-instrument → cube (unchanged)
+    cube = resolve_design_envelope_mm(dict(vol_state))
+    assert cube and abs(cube[0] - cube[2]) < 1e-6, f"non-instrument stays a cube, got {cube}"
+    # explicit contract dims always win (never overridden by the reshape)
+    pinned = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": 0.002,
+        "design_envelope_width_mm": 140, "design_envelope_depth_mm": 110,
+        "design_envelope_height_mm": 55}}, "isInstrumentDevice": True}
+    assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), "explicit dims must win"
+    print("render_view_contract _selftest: OK (instrument landscape envelope proven)")
+
+
+if __name__ == "__main__":
+    _selftest()
 
