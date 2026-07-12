@@ -68,6 +68,7 @@ import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { runWordDomainCoherence, type WordDomainCoherenceResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -3691,6 +3692,10 @@ async function main() {
   // Build #19a (2026-05-22): engineering_contract moved AFTER brief refinement
   // — it now uses the FINAL stable brief, not the pre-revision draft.
   let engineeringContract: EngineeringContract | null = null
+  // WORD-level domain coherence (the word sibling of gate 34) — set right after
+  // the generator emits the module tree, before the skeleton/Stage-7.5 physics
+  // critics run. See the call site after GATE 37 below.
+  let wordDomainCoherence: WordDomainCoherenceResult | null = null
 
   // ── Phase 0 — brief refinement loop (Tristan 2026-05-15)
   // Auto-revise non-viable briefs along the lowest-priority relaxation path,
@@ -4494,6 +4499,42 @@ async function main() {
           process.exit(37)
         }
       }
+      // ── WORD-DOMAIN-COHERENCE GATE (2026-07-12, the WORD sibling of gate 34) ──
+      // The Open Colorimeter benchmark: the generator (this block, above) appended
+      // a whole water-treatment pressure-sand-filter vessel (Pressure Vessel Shell,
+      // Filter Media / Membrane Elements, Upper Distribution Header, Lower
+      // Underdrain / Nozzle Plate, Backwash / Service Valve Nest, Differential-
+      // Pressure Gauges, Air Scour / Vent, Sample Cock, Skid Frame & Pipework) into
+      // the hmi_ergonomics module of a hand-held photometer — a wrong-DOMAIN word
+      // cluster the generic (no class-reference-graph) path hallucinated as a
+      // stand-in. Runs immediately after the generator emits `design`, BEFORE the
+      // PHASE 4 skeleton critic + STEP 7.5 physics critic (gate 33) below, so a
+      // clean design reaches both. SHADOW by default (records + logs, never
+      // strips); this chain wiring defaults it ENFORCING (the pollution MUST be
+      // removed before it reaches the critic/BoM/render) — override with
+      // WORD_DOMAIN_COHERENCE_ENFORCING=0 to run shadow-only. Additive: never a
+      // new chain exit code, never touches gate 33/the physics critic itself.
+      try {
+        const wdcState = { moduleDecomposition: design, orchestratorContract: engineeringContract, parsedBrief: parsedResult.data }
+        const wdcRun = runWordDomainCoherence(wdcState, process.env.WORD_DOMAIN_COHERENCE_ENFORCING ?? '1')
+        wordDomainCoherence = wdcRun.result
+        if (wdcRun.result.verdict === 'flagged') {
+          console.error(`[chain] WORD-DOMAIN-COHERENCE: ${wdcRun.result.message}`)
+          for (const f of wdcRun.result.flagged.slice(0, 12)) {
+            console.error(`  ✕ [${f.marker}] ${f.module_id}/${f.sub_module_id}/${f.word_id} "${f.name}"`)
+          }
+          if (wdcRun.strip) {
+            design = wdcRun.strip.design
+            console.error(`[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped ${wdcRun.strip.stripped} wrong-domain word(s) from the design`)
+          } else {
+            console.error(`[chain] WORD-DOMAIN-COHERENCE SHADOW: not stripped (set WORD_DOMAIN_COHERENCE_ENFORCING=1 to strip)`)
+          }
+        }
+        logAction({ step: 'word_domain_coherence', verdict: wdcRun.result.verdict, mode: wdcRun.mode, flagged_count: wdcRun.result.flagged.length, stripped: wdcRun.strip?.stripped ?? 0, product_class: wdcRun.result.product_class, is_process_plant_class: wdcRun.result.is_process_plant_class, is_device_scale: wdcRun.result.is_device_scale })
+      } catch (err) {
+        console.error(`[chain] WORD-DOMAIN-COHERENCE threw: ${(err as Error).message}; continuing without`)
+      }
+
       // Build #19e (2026-05-22): capture the tools-used page + the finalised
       // engineering contract so they can be attached to chain state below.
       // The renderer reads state.toolsUsedPage (Build #19e end-page) and
@@ -7078,6 +7119,7 @@ async function main() {
       recommendations_total: partRecommendations.length,
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
+    wordDomainCoherence,  // word-level sibling of gate 34: flagged/stripped process-plant-vessel words on a device-scale design (see call site after GATE 37)
     physicsCritique: critique,
     physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)
     physicsCriticAutocorrect,  // gate 33 PHASE-2 self-correcting loop (shadow by default; mutates design + post-correction critique when PHYSICS_CRITIC_AUTOCORRECT=1)

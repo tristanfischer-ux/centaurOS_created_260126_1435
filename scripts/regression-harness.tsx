@@ -48,6 +48,7 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
 import { compareToBenchmark, type BenchmarkExpectation } from './lib/benchmark-expectation'
 import {
@@ -11961,6 +11962,11 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // .venv python (gate 3 of these) spawns once across the whole harness run.
   for (const a of checkCo2FixInvariants()) assertions.push(a)
 
+  // Self-contained word-domain-coherence-audit invariants (2026-07-12, gate 34
+  // word sibling) — synthetic states built from the Open Colorimeter benchmark
+  // evidence; no snapshot needed.
+  for (const a of checkWordDomainCoherenceInvariants()) assertions.push(a)
+
   // Self-contained gate-18 brief-infeasibility net-reconciliation invariant
   // (2026-06-10 edge_ai 0.4-vs-3.7 kW cover-banner oscillation fix).
   for (const a of checkBriefInfeasibilityNetInvariant()) assertions.push(a)
@@ -12763,6 +12769,159 @@ print(json.dumps({"lv": r_lv, "dc": r_dc}))
       () => `addRejected=${addRejected} addLogged=${addLogged} changeRejected=${changeRejected} changeLogged=${changeLogged} proseApplied=${proseApplied}`,
     ))
   }
+
+  return out
+}
+
+// ── word-domain-coherence-audit.ts (the WORD sibling of gate 34, 2026-07-12) ──
+// PROVECATCH for the Open Colorimeter benchmark: a whole water-treatment
+// pressure-sand-filter vessel cluster (Pressure Vessel Shell, Filter Media /
+// Membrane Elements, Upper Distribution Header, Lower Underdrain / Nozzle
+// Plate, Backwash / Service Valve Nest, Differential-Pressure Gauges, Air
+// Scour / Vent, Sample Cock, Skid Frame & Pipework — 9 words) leaked into the
+// hmi_ergonomics module of a hand-held photometer
+// (out/colorimeter-20260712-0925/4-generator.json modules[5].sub_modules[0]).
+// Self-contained, synthetic states — no snapshot needed.
+function checkWordDomainCoherenceInvariants(): Assertion[] {
+  const out: Assertion[] = []
+  const failed: string[] = []
+  const want = (label: string, cond: boolean) => { if (!cond) failed.push(label) }
+
+  const mkWord = (id: string, name: string) => ({
+    id,
+    name_human: name,
+    content_character: { character_id: id, name_human: name },
+    modifier_characters: [{ kind: 'form', value: `${name} (assembly component)` }],
+  })
+
+  // The exact colorimeter cluster: words 0-4 legitimate HMI, 5-13 wrong-domain
+  // process-plant-vessel pollution, 14 legitimate Nameplate.
+  const legitimateWords = [
+    mkWord('display_panel_word', 'Display Panel'),
+    mkWord('status_indicator_word', 'Status Indicator'),
+    mkWord('control_switch_word', 'Control Switch'),
+    mkWord('annunciator_word', 'Annunciator'),
+    mkWord('interface_membrane_word', 'Interface Membrane'),
+  ]
+  const nameplateWord = mkWord('interface_membrane_word__nameplate', 'Nameplate')
+  const pollutionWords = [
+    mkWord('interface_membrane_word__pressure_vessel_shell', 'Pressure Vessel Shell'),
+    mkWord('interface_membrane_word__filter_media_membrane_elements', 'Filter Media / Membrane Elements'),
+    mkWord('interface_membrane_word__upper_distribution_header', 'Upper Distribution Header'),
+    mkWord('interface_membrane_word__lower_underdrain_nozzle_plate', 'Lower Underdrain / Nozzle Plate'),
+    mkWord('interface_membrane_word__backwash_service_valve_nest', 'Backwash / Service Valve Nest'),
+    mkWord('interface_membrane_word__differential_pressure_gauges', 'Differential-Pressure Gauges'),
+    mkWord('interface_membrane_word__air_scour_vent', 'Air Scour / Vent'),
+    mkWord('interface_membrane_word__sample_cock', 'Sample Cock'),
+    mkWord('interface_membrane_word__skid_frame_pipework', 'Skid Frame & Pipework'),
+  ]
+
+  const mkState = (productClass: string, enclosureVolumeM3?: number) => ({
+    parsedBrief: { product_class: productClass },
+    moduleDecomposition: {
+      modules: [{
+        module: 'hmi_ergonomics',
+        sub_modules: [{
+          id: 'hmi_ergonomics__display_panel',
+          words: [...legitimateWords, ...pollutionWords, nameplateWord],
+        }],
+      }],
+    },
+    orchestratorContract: {
+      product_class: productClass,
+      quantities: enclosureVolumeM3 !== undefined ? { enclosure_volume_m3: { value: enclosureVolumeM3 } } : {},
+    },
+  })
+
+  // (1) FIRES — colorimeter cluster on a device-scale non-process class (pcb_assembly):
+  // flags exactly those 9 words, strips them, keeps words 0-4 + Nameplate.
+  {
+    const state = mkState('pcb_assembly')
+    const r = computeWordDomainCoherence(state)
+    want('(1) verdict flagged', r.verdict === 'flagged')
+    want('(1) is_device_scale true', r.is_device_scale === true)
+    want('(1) exactly 9 flagged', r.flagged.length === 9)
+    const flaggedIds = new Set(r.flagged.map((f) => f.word_id))
+    for (const w of pollutionWords) want(`(1) flags ${w.id}`, flaggedIds.has(w.id))
+    for (const w of legitimateWords) want(`(1) keeps ${w.id} unflagged`, !flaggedIds.has(w.id))
+    want('(1) keeps Nameplate unflagged', !flaggedIds.has(nameplateWord.id))
+    const strip = stripFlaggedWords(state.moduleDecomposition, r.flagged)
+    want('(1) strips exactly 9', strip.stripped === 9)
+    const remaining = (strip.design as any).modules[0].sub_modules[0].words
+    want('(1) 6 words remain', remaining.length === 6)
+    want('(1) remaining words exclude all pollution', remaining.every((w: any) => !pollutionWords.some((p) => p.id === w.id)))
+    want('(1) remaining words include Nameplate', remaining.some((w: any) => w.id === nameplateWord.id))
+    want('(1) original design untouched (pure strip)', state.moduleDecomposition.modules[0].sub_modules[0].words.length === 15)
+  }
+
+  // (2) SUPPRESSED — the SAME marker words on a legitimate water_treatment /
+  // aquaculture_ras class → flagged EMPTY, design untouched (same reference).
+  {
+    const state = mkState('water_treatment')
+    const r = computeWordDomainCoherence(state)
+    want('(2) verdict pass on water_treatment', r.verdict === 'pass')
+    want('(2) is_process_plant_class true', r.is_process_plant_class === true)
+    want('(2) flagged empty on water_treatment', r.flagged.length === 0)
+    const strip = stripFlaggedWords(state.moduleDecomposition, r.flagged)
+    want('(2) design untouched (same reference)', strip.design === state.moduleDecomposition)
+    want('(2) stripped count 0', strip.stripped === 0)
+  }
+  {
+    const r = computeWordDomainCoherence(mkState('aquaculture_ras'))
+    want('(2b) flagged empty on aquaculture_ras', r.flagged.length === 0)
+  }
+  // (2c) SCALE OVERRIDE: even a process-plant class token is stripped when the
+  // instance is physically tiny (enclosure_volume_m3 < 1 — never shield a
+  // genuinely small unit just because its class slug reads as a process plant).
+  {
+    const r = computeWordDomainCoherence(mkState('water_treatment', 0.2))
+    want('(2c) tiny water_treatment instance still flags', r.flagged.length === 9)
+    want('(2c) is_device_scale true from volume override', r.is_device_scale === true)
+  }
+  // (2d) utility BESS (no volume signal, process-plant class token) suppressed —
+  // "bess-utility-container" legitimately carries skid/frame vocabulary.
+  {
+    const r = computeWordDomainCoherence(mkState('bess'))
+    want('(2d) utility bess (no volume) suppressed', r.flagged.length === 0)
+  }
+
+  // (3) BYTE-IDENTITY — a clean device design (no markers) → flagged empty,
+  // untouched (the CO2/SAF byte-identity guarantee).
+  {
+    const state = {
+      parsedBrief: { product_class: 'pcb_assembly' },
+      moduleDecomposition: {
+        modules: [{ module: 'hmi_ergonomics', sub_modules: [{ id: 'sub', words: [...legitimateWords, nameplateWord] }] }],
+      },
+      orchestratorContract: { product_class: 'pcb_assembly', quantities: {} },
+    }
+    const r = computeWordDomainCoherence(state)
+    want('(3) clean design flagged empty', r.flagged.length === 0)
+    want('(3) verdict pass', r.verdict === 'pass')
+    const strip = stripFlaggedWords(state.moduleDecomposition, r.flagged)
+    want('(3) untouched (same reference)', strip.design === state.moduleDecomposition)
+  }
+
+  // (4) class-predicate + scanner coverage
+  {
+    want('(4) isProcessPlantClass water_treatment true', isProcessPlantClass('water_treatment') === true)
+    want('(4) isProcessPlantClass aquaculture_ras true', isProcessPlantClass('aquaculture_ras') === true)
+    want('(4) isProcessPlantClass pcb_assembly false', isProcessPlantClass('pcb_assembly') === false)
+    want('(4) isDeviceScaleDesign true for pcb_assembly, no volume', isDeviceScaleDesign(mkState('pcb_assembly')) === true)
+    want('(4) isDeviceScaleDesign false for bess, no volume', isDeviceScaleDesign(mkState('bess')) === false)
+    want('(4) isDeviceScaleDesign true for bess, small volume', isDeviceScaleDesign(mkState('bess', 0.16)) === true)
+    want('(4) scanner catches "Pressure Vessel Shell"', scanWordTextForVesselMarkers('Pressure Vessel Shell').includes('pressure vessel shell'))
+    want('(4) scanner catches "Sample Cock"', scanWordTextForVesselMarkers('Sample Cock').includes('sample cock'))
+    want('(4) scanner does not flag "Display Panel"', scanWordTextForVesselMarkers('Display Panel').length === 0)
+    want('(4) scanner does not flag "Nameplate"', scanWordTextForVesselMarkers('Nameplate').length === 0)
+  }
+
+  out.push(assertEq(
+    'UNIVERSAL.word_domain_coherence_flags_process_plant_vessel_words_on_device_scale',
+    'gate 34 word-sibling: process-plant-vessel words (pressure vessel shell, filter media/membrane element, underdrain/nozzle plate, backwash, air scour, skid frame & pipework, distribution header, valve nest, differential-pressure gauge, sample cock, …) on a device-scale non-process class (the Open Colorimeter pcb_assembly cluster) flag + strip exactly the 9 polluted words, leaving the 5 legitimate HMI words + Nameplate untouched; the SAME words on a legitimate process/plant class (water_treatment, aquaculture_ras, utility bess) are suppressed and the design is byte-identical (same object reference, zero stripped); a physically tiny instance of a process-plant-slugged class is still flagged (scale overrides the class token); a clean device design with no markers is never touched',
+    failed.length, (n) => n === 0,
+    () => `word-domain-coherence cases failed: ${failed.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
+  ))
 
   return out
 }

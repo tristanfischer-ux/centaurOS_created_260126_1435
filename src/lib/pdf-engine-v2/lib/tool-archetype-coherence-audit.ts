@@ -240,8 +240,11 @@ const COOLING_CLASS_TOKENS = [
 ]
 
 /** Shared word-boundaried token matcher over a class slug. Normalises separators
- *  (_-/:) to spaces so a token can word-boundary-match a slug part. PURE. */
-function classMatchesTokens(productClass: string, tokens: ReadonlyArray<string>): boolean {
+ *  (_-/:) to spaces so a token can word-boundary-match a slug part. PURE.
+ *  Exported (2026-07-12) so the word-domain-coherence-audit gate (the WORD-level
+ *  sibling of this TOOL-level gate) can build its own isProcessPlantClass()
+ *  predicate on the SAME matcher instead of forking a divergent copy. */
+export function classMatchesTokens(productClass: string, tokens: ReadonlyArray<string>): boolean {
   const slug = String(productClass ?? '').trim().toLowerCase()
   if (!slug) return false
   const normalised = ` ${slug.replace(/[_\-/:]+/g, ' ')} `
