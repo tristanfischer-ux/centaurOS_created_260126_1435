@@ -14947,7 +14947,20 @@ def _pcb_parse_drc_report(report_path: str) -> Tuple[List[Tuple[str, str, str]],
 
 _PCB_MECH_OFFBOARD_RX = re.compile(
     r"\b(rack|busbar|chassis|enclosure|frame|bracket|mount(?:ing)?|housing|cabinet|shelf|"
-    r"rail|fastener|gasket|seal|hinge|handle|door|lid|shell|baseplate|standoff)\b", re.I)
+    r"rail|fastener|gasket|seal|hinge|handle|door|lid|shell|baseplate|standoff|"
+    # OFF-BOARD ELECTRONIC MODULES + INTERCONNECTS (2026-07-12, Cursor PCB-4): a purchased
+    # display / keypad / battery pack connects to the board via an FFC / connector / holder —
+    # the MODULE itself never gets an on-board footprint (only its connector does), so it is a
+    # 'purchased assembly / interconnect', NOT an on-board electronic gap. Same for the OPTICAL
+    # parts (cuvette / lens / baffle / LED source module / wavelength selector) — they mount on
+    # the optical bench, not the PCB. Only true on-board ICs (ADC / MCU / TIA / op-amp /
+    # regulator / connector / fuse / photodiode) stay 'electronic gap' until they resolve.
+    r"display|screen|\blcd\b|\boled\b|\btft\b|readout|annunciator|"
+    r"keypad|membrane\s*switch|tactile\s*switch|user\s*input|push\s*button|button\b|"
+    r"battery\s*pack|rechargeable\s*battery|coin\s*cell|battery\s*holder|"
+    r"cuvette|optical\s*path|\blens\b|collimat\w*|baffle|wavelength\s*select\w*|"
+    r"light\s*source|led\s*source|sample\s*(?:holder|chamber)|filter\s*wheel|"
+    r"optical\s*window|shroud|monochromat\w*)\b", re.I)
 
 
 def _pcb_unresolved_disposition(name_human: str, character_id: str) -> str:
