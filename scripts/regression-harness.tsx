@@ -765,6 +765,55 @@ function checkPrincipalEquipmentFromContract(): Assertion[] {
     (v) => `result=${v}`,
   ))
 
+  // ── COLORIMETER mm-AS-kWh FALSE-BLOCK (2026-07-12, CLAUDE.md unit-family bug #12) ──
+  // targetPerformanceValueAs (class-price-bands.ts) had NO length family and no cross-
+  // family guard: a photometer brief whose target_performance is optical_path_length_mm=10
+  // (LENGTH, mm) answered a `targetPerformanceValueAs(state,'kwh')` query with the bare 10.
+  // deriveOutputDenominator's last-resort loop then read a 10 mm path length as 10 kWh,
+  // computeCostSanity applied the BESS £150-800/kWh band to a £429 photometer, judged it
+  // "3.5× undercounted" and HARD-BLOCKED the run (exit 32) — AND the sweet-spot reconciler
+  // (same deriveOutputDenominator) printed "the brief asks for 10.0 kWh". A length metric
+  // must NEVER resolve as an energy denominator: the colorimeter falls to £/unit (no BESS
+  // band), verdict is NOT a false HIGH. A genuine BESS (kWh unit) is unaffected.
+  const colorimeterState: any = {
+    keyMetrics: { product_class: 'pcb_assembly' },
+    parsedBrief: { constraints: { target_performance: {
+      key_metric: 'optical_path_length_mm', value: 10, unit: 'mm',
+      metrics: [
+        { key_metric: 'optical_path_length_mm', value: 10, unit: 'mm', category: 'scale' },
+        { key_metric: 'wavelength_min_nm', value: 430, unit: 'nm', category: 'performance' },
+      ],
+    } } },
+    costStack: { oem_transfer_price_gbp: 429 },
+  }
+  const colorimeterCS = computeCostSanity(colorimeterState)
+  // A genuine BESS must STILL resolve to the energy_storage band (no regression).
+  const bessEnergyState: any = {
+    keyMetrics: { product_class: 'bess' },
+    parsedBrief: { constraints: { target_performance: {
+      key_metric: 'nameplate_capacity_kwh', value: 100, unit: 'kwh',
+      metrics: [{ key_metric: 'nameplate_capacity_kwh', value: 100, unit: 'kwh', category: 'scale' }],
+    } } },
+    costStack: { oem_transfer_price_gbp: 30_000 }, // £300/kWh — mid-band
+  }
+  const bessEnergyCS = computeCostSanity(bessEnergyState)
+  out.push(assertEq(
+    'UNIVERSAL.target_performance_length_never_reads_as_energy',
+    'targetPerformanceValueAs rejects a cross-family request (a 10 mm optical_path_length asked as kWh returns null, not the bare 10), so computeCostSanity resolves a photometer to £/unit — NOT the BESS energy_storage band — and does not false-HIGH block the run (the colorimeter exit-32 regression). A real 100 kWh BESS still resolves to the energy_storage band with £/kWh (no regression).',
+    JSON.stringify({
+      colorimeterUnitLabel: colorimeterCS.output_unit_label,
+      colorimeterVerdict: colorimeterCS.verdict,
+      bessUnitLabel: bessEnergyCS.output_unit_label,
+      bessOutputValue: bessEnergyCS.output_value,
+    }),
+    (v) => {
+      const o = JSON.parse(v as unknown as string)
+      return o.colorimeterUnitLabel === 'unit' && o.colorimeterVerdict !== 'high' &&
+        o.bessUnitLabel === 'kWh' && o.bessOutputValue === 100
+    },
+    (v) => `result=${v}`,
+  ))
+
   // ── UNIT-FAMILY COMPARISON DETECTOR (2026-07-06) — the reusable, cross-archetype
   // GENERALISATION of the gate-32 kg-vs-tonne false-block guarded immediately above
   // (item-12 in CLAUDE.md's recurring-bug list: hit BESS cell-Ah, then CO2 TWICE in one
