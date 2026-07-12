@@ -206,6 +206,36 @@ function resolveAnnualVolume(
 // the contract carries no nameplate (gate then defaults to prior behaviour).
 let RUN_SCALE_NAMEPLATE_KWH: number | undefined
 
+// Run-scoped device-scale flag (2026-07-12): true when the chain marked this a
+// device-scale optical/electronic INSTRUMENT (state.isInstrumentDevice). On such a
+// product every ESTIMATED (non-catalogue) part is a COTS commodity — a mislabelled
+// oem_subsystem battery must not render at £218. Consumed by deviceScaleCeilingGbp
+// in the curve-estimate clamp chain. Universal — a plant/cabinet never carries it.
+let RUN_IS_INSTRUMENT_DEVICE = false
+
+// Device-scale price ceiling for an ESTIMATED instrument part (only reached when no
+// catalogue/curated/cascade/emitter price exists — those all run BEFORE the curve).
+// Returns undefined off an instrument device (no-op). Name-keyed first (a nameplate
+// is £3 whatever the LLM guessed), then class-keyed. A handheld benchtop instrument
+// has NO single COTS part above ~£55 (an integrated MCU+display board like a PyBadge).
+function deviceScaleCeilingGbp(cls: string, name: string): number | undefined {
+  if (!RUN_IS_INSTRUMENT_DEVICE) return undefined
+  const n = (name || '').toLowerCase()
+  if (/nameplate|placard|\blabel\b|marking|legend.plate/.test(n)) return 4
+  if (/\bled\b|indicator|annunciat|pilot.light/.test(n)) return 5
+  if (/membrane|keypad|overlay|fascia|graphic.overlay/.test(n)) return 12
+  if (/\bswitch\b|\bbutton\b|push.?button|rocker|tactile/.test(n)) return 8
+  if (/\bfuse\b|polyfuse|\bptc\b|resettable|tvs|esd.protect/.test(n)) return 6
+  if (/batter|\bcell\b|\blipo\b|li.?ion|rechargeable/.test(n)) return 25
+  if (/connector|header|\bcable\b|jumper|ribbon|jst|qwiic|stemma/.test(n)) return 8
+  // class-keyed fallback
+  if (cls === 'oem_subsystem' || cls === 'electronic_pcb') return 55
+  if (cls === 'optical') return 40
+  if (cls === 'sensor') return 25
+  if (cls === 'electronic_passive') return 6
+  return 30 // generic estimated device part
+}
+
 function getProductClassSlug(state: any): string {
   return String(
     state?.keyMetrics?.product_class ??
@@ -1374,6 +1404,20 @@ function curveEstimateFor(
     class_ceiling_clamped = true
     class_ceiling_note = `U1 class ceiling: class=${cls}, ceiling=£${classCeil}, clamped from £${round2(ceiled ? kwCeil!.ceiling_gbp : floored ? floor : raw)} to £${round2(central)}`
   }
+  // DEVICE-SCALE ceiling (2026-07-12): on a benchtop/handheld INSTRUMENT, an estimated
+  // part is a COTS commodity. This is AUTHORITATIVE over the per-class floor — the whole
+  // bug is a device battery MISCLASSIFIED as a £280 oem_subsystem whose class FLOOR then
+  // blocks the clamp; on a device the small-part reality overrides the plant-class floor.
+  // Only estimated parts reach here (catalogue/curated/cascade/emitter all run earlier),
+  // so this never clips a real price. Open Colorimeter: battery £218→£25, nameplate £60→£4,
+  // membrane £60→£12, indicator LED £37→£5, switch £30→£8.
+  const devCeil = deviceScaleCeilingGbp(cls, keywordCtx?.name ?? '')
+  if (devCeil !== undefined && central > devCeil) {
+    const _before = central
+    central = devCeil
+    class_ceiling_clamped = true
+    class_ceiling_note = `device-scale instrument ceiling: '${keywordCtx?.name ?? cls}' class=${cls} clamped from £${round2(_before)} to £${devCeil} (COTS commodity on a handheld/benchtop device)`
+  }
   // C5 — Universal per-class sanity bounds backstop (2026-05-28, BLOCKER per
   // council GLM/Kimi). Runs AFTER keyword floor + ceiling + class ceiling so it
   // catches any residual implausible price regardless of which rule missed it.
@@ -1447,6 +1491,10 @@ async function main() {
   })()
   if (RUN_SCALE_NAMEPLATE_KWH !== undefined) {
     console.log(`[estimate] design scale: nameplate ≈ ${RUN_SCALE_NAMEPLATE_KWH} kWh (utility-tail overrides ${RUN_SCALE_NAMEPLATE_KWH >= 100 ? 'APPLY' : 'GATED OFF — sub-utility scale'})`)
+  }
+  RUN_IS_INSTRUMENT_DEVICE = Boolean((state as any)?.isInstrumentDevice)
+  if (RUN_IS_INSTRUMENT_DEVICE) {
+    console.log('[estimate] device-scale INSTRUMENT: estimated parts capped to COTS commodity ceilings (deviceScaleCeilingGbp)')
   }
   const { volume: annualVolume, source: volumeSource } = resolveAnnualVolume(
     state,
