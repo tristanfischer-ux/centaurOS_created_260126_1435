@@ -354,6 +354,29 @@ _MEMBRANE_GBP_PER_M2 = 25.0        # spiral-wound RO / UF module supply ≈ £15
 _HOUSING_M2_PER_UNIT = 37.0        # one 8040 element ≈ 37 m² membrane area
 _HOUSING_GBP_PER_UNIT = 1100.0     # 8-in GRP pressure housing, 300 psi class, supplied
 
+# HMI MEMBRANE ≠ FILTRATION MEMBRANE (2026-07-12, colorimeter benchmark). The bare
+# `\bmembranes?\b` token in _MEMBRANE_MEDIA_RE also matches a MEMBRANE KEYPAD / graphic-
+# overlay / membrane switch — the printed tactile front panel of an instrument's HMI (a
+# few £, priced as a small electronic part), NOT a spiral-wound RO/UF filtration element
+# (£15-30/m² process consumable). On the colorimeter the hmi_ergonomics word 'Interface
+# Membrane' (char_id interface_membrane) was routed to the membrane-AREA parametric and
+# vendor-quote-TBD filtration class → an implausible £60 line + a £0 'Nameplate' sub-part.
+# Universal: keyed on the HMI/keypad/overlay/switch noun family, never a product class.
+_HMI_MEMBRANE_RE = re.compile(
+    r"\b(?:membrane\s+(?:keypad|keyboard|switch|overlay|panel|key)|"
+    r"(?:keypad|keyboard|graphic|interface|hmi|tactile|dome|overlay|control[\s_-]?panel|"
+    r"front[\s_-]?panel|user[\s_-]?interface)\s+membrane|"
+    r"membrane\s+key(?:pad|board))\b", re.I)
+
+
+def _is_filtration_membrane(name) -> bool:
+    """True when a name is a genuine FILTRATION/PROCESS membrane-media line (RO/UF element,
+    filter media) — and NOT an HMI membrane keypad/overlay. The single oracle every membrane
+    pricing/take-off branch reads, so the filtration-area parametric and the structural-
+    take-off exclusion can never disagree on what 'membrane' means."""
+    s = name or ""
+    return bool(_MEMBRANE_MEDIA_RE.search(s)) and not _HMI_MEMBRANE_RE.search(s)
+
 # ── INTERNAL ACCESSORY FAN TRAY (2026-07-04, corpus-mismatch family, BESS
 # out/bess-campaign-v2) ── a "fan tray" is an internal cooling accessory bolted
 # INSIDE its parent assembly (a PCS, VSD, telecoms rack) and rated in TENS of watts
@@ -428,7 +451,7 @@ def _structural_takeoff(name, md, geom=None):
     table."""
     # a MEMBRANE/media line's m² is MEMBRANE area, not a steel plan footprint —
     # it may never take a structural take-off (2026-07-02 membrane-as-steel fix).
-    if _MEMBRANE_MEDIA_RE.search(name or ""):
+    if _is_filtration_membrane(name):
         return None
     area_m2 = None
     dim = str(md.get("dimension") or md.get("dimensions") or "")
@@ -509,7 +532,7 @@ def _materials_takeoff(name, mods, geom=None, service=None):
     """
     # a MEMBRANE/media line is a process consumable/package priced from membrane
     # area — never a shell/steel take-off (2026-07-02 membrane-as-steel fix).
-    if _MEMBRANE_MEDIA_RE.search(name or ""):
+    if _is_filtration_membrane(name):
         mem = _membrane_area_price(name, mods if isinstance(mods, dict) else {})
         if mem:
             g_m, b_m = mem
@@ -2819,6 +2842,19 @@ def _selftest() -> int:
             got = _bespoke_class(name.split("·")[0].strip())
         if got != want:
             print(f"  FAIL  '{name}' → {got} (want {want})"); bad += 1
+    # ── HMI membrane keypad ≠ filtration membrane (2026-07-12, colorimeter) ──
+    # A membrane KEYPAD / graphic overlay / membrane switch (an instrument HMI front
+    # panel, a few £) must NOT route to the RO/UF filtration-media area-parametric +
+    # vendor-quote-TBD class; a genuine RO/UF element MUST still route there.
+    _memb_cases = [
+        ("Interface Membrane", False), ("Membrane Keypad", False),
+        ("Graphic Overlay Membrane", False), ("Membrane Switch", False),
+        ("RO Membrane", True), ("UF Membrane Bank", True),
+        ("Spiral-Wound Membrane Element", True), ("Filter Media", True),
+    ]
+    for _n, _want in _memb_cases:
+        if _is_filtration_membrane(_n) != _want:
+            print(f"  FAIL  _is_filtration_membrane('{_n}') = {_is_filtration_membrane(_n)} (want {_want})"); bad += 1
     # ── CORPUS-LIFT ratio ceiling (2026-07-10, run-20 rack £8,001→£210,000 26× lift) ──
     _pv_rack = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 210000,
                 "engine_c_ref_count": 5}
@@ -6699,7 +6735,7 @@ def assemble(out_dir: str):
                 # (or an honest class-basis TBD) — NEVER the structural-steel or
                 # shell take-off the typed service / noun would otherwise route it
                 # to (the v55 £122k membrane-as-steel bill, 16% of the total). ──
-                if _MEMBRANE_MEDIA_RE.search(name):
+                if _is_filtration_membrane(name):
                     mem = _membrane_area_price(name, md)
                     if _membrane_pin_is_real(pn, wid, curve_only):
                         # a REAL pin keeps its IDENTITY; the PRICE still comes from the
@@ -7304,7 +7340,7 @@ def assemble(out_dir: str):
         # re-inflates the consumable back toward the steel-take-off error the membrane
         # fix just removed (Uf Membrane Bank £9,100→£47,855). The area rate is the
         # grounded truth; never corpus-lift a membrane/media line. (corpus-mismatch family)
-        if _MEMBRANE_MEDIA_RE.search(req_lead):
+        if _is_filtration_membrane(req_lead):
             continue
         # ACTUATED-VALVE / BARE-ACTUATOR FAMILIES (benchmark net v56, 2026-07-02,
         # corpus-mismatch family): the "actuator"/"actuated valve" corpus medians (£548 /
