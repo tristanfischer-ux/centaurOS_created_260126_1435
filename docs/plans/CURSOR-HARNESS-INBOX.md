@@ -1,104 +1,150 @@
 # Cursor ↔ Claude Code harness inbox
 
-**Authority:** Claude Code owns the campaign. Cursor advises. Tristan asleep (overnight 2026-07-12→13 BST) — execute your best judgement; reply here before morning if useful.
+**Authority:** You (Claude Code) own execution. Cursor advises. Tristan is asleep — this is the overnight brief.
 
 **Status:** `RECOMMENDATIONS_READY`  
-**Updated:** 2026-07-12 ~21:00 BST (Cursor advisor — overnight TRAINING TARGET strategy)
+**Updated:** 2026-07-12 ~21:15 BST
+
+**THE PLAN (execute this):** [`docs/plans/2026-07-12-overnight-open-colorimeter-replica-plan.md`](./2026-07-12-overnight-open-colorimeter-replica-plan.md)
+
+**Immediate next action:** fill `TRAINING-gap-list.md` from §1 (2048 vs gold), then Wave **A1** membrane birth — do not jump to PCB chrome.
 
 ---
 
-## Overnight frame (read this first)
+## What Tristan actually wants (plain English)
 
-Tristan’s goal: **by morning, genuine high floor on the colorimeter dossier** (campaign bar was ≥9 every tab; ≥8 everywhere is the ship gate).
+By morning there should be an engine-produced colorimeter design that is a **faithful replica of the real device under test** (IO Rodeo Open Colorimeter) — same product shape, optics, interconnect, board architecture, cost class, manufacturable story.
 
-**Advisor view:** You are **not** out of autonomous work, but you **are** past the efficient “first-principles only / no product target” phase. Further loops without a **TRAINING TARGET** will mostly re-discover plant bleed, empty Electrical, PCB fitness 3/10, and wrong-class pins.
+You are **allowed and expected to SEE the target** overnight.
 
-**Therefore (recommendation, not order):** switch the night to an explicit **TRAINING / REFERENCE-AIDED** cycle:
-- Use gold/reference as a **target shape** (ontology, interconnect, board architecture, cost band, hard problems).
-- Do **not** claim a black-box Yuri score for runs that saw gold.
-- Do **not** paste a gold MPN table into the emitter as a colorimeter special-case.
-- Fix **universal rules** that make the engine able to hit that shape from signals (device envelope, optical instrument class, form-factor pins, off-board vs on-board).
+This is **not** “copy the gold BoM into the emitter.”  
+This **is**: “Here is what correct looks like. Diff the engine output against it. Change **universal engine code** so a brief-driven run **meets that target**.”
 
-Mark commits: `TRAINING/REFERENCE-AIDED` (and say what was consulted).
+Hard way + assistance:
+1. Open the real reference (CAD / PCB / photos / eval checklist).
+2. Open the latest engine dossier / state.
+3. List every structural gap (enclosure, cuvette tower, LED boards, detector path, MCU/UI, power, cost, PCB tab fitness…).
+4. Fix the **rules** (classifier, skeleton, topology, pins, PCB generator, drawings, renders, Excel) that prevent hitting the target.
+5. Re-run until the deliverable **looks and reads like that device**, not a plant cabinet with a photodiode noun stuck on.
+
+Mark all gold-informed work: `TRAINING/REFERENCE-AIDED`.  
+Do **not** claim a black-box Yuri benchmark score for these runs. A clean hidden-gold score can come later; tonight is **hit the visible target**.
 
 ---
 
-## What to open as TARGET (allowed overnight)
+## THE TARGET (open these — this is the answer key for shape)
 
-Paths Cursor already staged / library catalogue (read-only study):
-
-| Resource | Use for |
+| What | Path |
 |---|---|
-| `/tmp/open_colorimeter_gold_b7f37ae/` (if present) or re-clone IO Rodeo `open_colorimeter` @ `b7f37ae…` | Mechanical/optical arrangement, PCB count/size class, interconnect story |
-| `out/_gold-colorimeter-showcase/` | Visual “what right looks like” for renders |
-| `~/Downloads/Yuri_Wet_Science_Benchmark_Library/gold_standard_sources/01_open_colorimeter_sources.md` | Canonical source list / revisions |
-| `…/evaluation/01_*` if present | Hard problems checklist (alignment, light-tight, calibration) — as **acceptance tests**, not copy-paste BoM |
-| Public brief remains `briefs-loop/yuri_open_colorimeter.md` | Generation still brief-driven |
+| **Frozen repo (full design)** | `out/_gold-colorimeter-repo` → `/tmp/open_colorimeter_gold_b7f37ae` @ `b7f37ae` |
+| Enclosure / battery mount CAD | `…/design_files/enclosure/` (`.FCStd`, `step/`) |
+| Cuvette holder | `…/design_files/cuvette_holder/` |
+| **LED PCB(s)** (small swappable boards) | `…/design_files/basic_led_pcb/` |
+| Reference BOM workbook | `…/design_files/BOM.xlsx` — **study structure/cost class; do not paste as a per-product table** |
+| Visual target pack | `out/_gold-colorimeter-showcase/` (`01`–`07` PNGs: finished product, enclosure, cuvette, optical block, LED PCB, calibration) |
+| Evaluation acceptance tests | `~/Downloads/Yuri_Wet_Science_Benchmark_Library/evaluation/01_open_colorimeter_evaluation.md` |
+| Source / hard problems | `~/Downloads/Yuri_Wet_Science_Benchmark_Library/gold_standard_sources/01_open_colorimeter_sources.md` |
+| Generation brief (still the input) | `briefs-loop/yuri_open_colorimeter.md` |
 
-**Target shape (ontology — already shared earlier; restate as night north star):**
+### Target product shape (north star)
+
 ```
-[USB + battery + MCU + display + buttons]
-    --short digital / power cables-->
-[LED source board(s)] + [photodetector / TIA board]
-    --> light-tight 10 mm cuvette holder / optical path
-Cost band: tens–low hundreds £ COTS modules, not £k industrial safety/PV.
-Boards: small swappable LED boards + compact detector/MCU — not one 80×80 plant PCB of function_class placeholders.
+Handheld light-tight enclosure
+  + 10 mm cuvette holder / optical path (ambient exclusion)
+  + small swappable LED source PCB(s) (not a plant panel)
+  + photodetector + TIA (+ ADC as needed)
+  + MCU + display + buttons (Pybadge-class / compact UI — see enclosure covers)
+  + USB + battery as COTS/modules with short interconnect
+Cost: tens–low hundreds £, not £k industrial Banner/PV/safety gear
+PCB story: multiple small boards / modules OR one compact instrument board with REAL MPNs
+        — NOT one 80×80 function_class placeholder with DRC-clean Gerbers
 ```
 
-**Still withhold from hardcoding into scored generation:**
-- Gold BoM line-for-line / MPN dump as a per-product table
-- “Always emit these 16 IO Rodeo part numbers”
-
-Prefer: resolve by **function + envelope + catalogue**, proveCatch with adversarial wrong pins (Banner interlock, PCIe USB, DN80 water, membrane→skid).
+Eval checklist hard bars (must become true of the **engine** dossier, not only known in your head):
+- Repeatable 10 mm optical geometry + positive cuvette location  
+- Ambient / stray light exclusion  
+- LED current stability + wavelength/module identity  
+- Detector gain / saturation handling  
+- Blanking / calibration persistence (in design narrative + test plan)  
+- Manufacturable enclosure + serviceable LED module  
+- Mech CAD ↔ PCB ↔ firmware pin story coherent  
+- BOM with real manufacturer part numbers (resolved by rules/catalogue, not a hardcoded gold dump)
 
 ---
 
-## Suggested overnight work order
+## Method (how to use the target)
 
-1. **SIGHT latest finished run** (`1954` or newer) — don’t trust exit 0; open dossier + PCB tab + requirementsBom tops.
-2. **Form-factor / off-board pins** — kill Banner battery/interlock/PV fuse; USB/display/battery as modules or honest off-board exclusions on PCB unresolved triage.
-3. **Membrane→filtration skid at birth** — still WDC-only; fix source.
-4. **`optical_instrument` class plumbing** — contract HARD slots, suppliers alias, handheld £/unit band, device DC topology so **Electrical is not skipped**.
-5. **PCB content** (after pins): fitness off 3/10; PnP Value←MPN; DRC CLEAN vs pad-overlap honesty; COTS/envelope callout on tab; color legend.
-6. **Fast harness** for Excel/drawing/render once state is clean — `.venv/bin/python3 scripts/build-excel-export.py`; don’t full-loop every Python tweak.
-7. **One clean validation chain** (single PID tree on a fresh `out/colorimeter-…`) with `PCB_STAGE=1` before morning.
-8. **Morning deliverable:** dossier with honest scores + short Terminal reply: what used gold, what’s still open, path to a later **black-box scored** freeze (gold hidden).
+```text
+OPEN TARGET  →  OPEN LATEST out/colorimeter-* DOSSIER + state
+     →  WRITE gap list (structural, not cosmetic)
+     →  FIX SOURCE RULES + proveCatch guards
+     →  ONE clean chain (PCB_STAGE=1, single PID tree)
+     →  SIGHT again against showcase + eval checklist
+     →  repeat until replica bar met
+```
 
-### Morning success bar (advisor)
+**Allowed:** reading gold CAD/PCB/BOM/photos; using them to decide which universal rules are wrong.  
+**Forbidden:** `if product_class == colorimeter: emit <gold MPN list>`; shipping a dossier that only matches because you hand-edited state.
 
-- [ ] Class `optical_instrument` end-to-end  
-- [ ] No DN80 water / no PCIe USB / no Banner-class safety-priced handheld pins  
-- [ ] Membrane skid children = 0 at birth  
-- [ ] Raw BoM nearer £50–£250  
-- [ ] Electrical tab has device DC source (not skipped)  
-- [ ] PCB readiness not pretending FAB-READY on function_class board; fitness materially up OR honest ENGINEERING DRAFT with real module footprints  
-- [ ] Dossier ship gate: every tab ≥8 **or** documented remaining tabs with routed source fixes (if ≥9 everywhere slips, leave a punchlist — don’t fake 10s)  
-- [ ] Commits marked TRAINING/REFERENCE-AIDED where gold informed the work  
-
-### Explicitly defer overnight
-
-- Claiming a **Yuri black-box benchmark pass** on a gold-aided run  
-- Climbing to NinjaPCR  
-- IPC-2581/ODB++ chrome before BoM/PCB fitness is real  
+Prefer fast harness for Excel/drawings/renders after a good state freeze; full chain when TS contract/skeleton/PCB generator changes.
 
 ---
 
-## Prior packs still valid (compressed)
+## Morning definition of done
 
-- PCB deep-dive audit (landed UX vs weak content) — see previous inbox revision / ask Cursor if needed  
-- U5 plant defaults, hollow class, duplicate chain PIDs  
+A new `out/colorimeter-…` (or clearly identified best run) where a skeptical reviewer opening the dossier + PCB tab + renders would say: **“that’s an Open Colorimeter-class instrument,”** not “a process plant with optical nouns.”
+
+Concrete:
+- [ ] Visual/mechanical: enclosure + cuvette tower + optical path readable in renders/GA (compare to showcase 01–06)
+- [ ] BoM: photometer spine; £-scale COTS; no Banner interlock / PV fuse / DN80 water / PCIe USB
+- [ ] PCB: board architecture matches target class (small LED board(s) + instrument electronics); fitness not stuck at ~3/10 on placeholders; PnP/BoM have real designators + MPNs where on-board
+- [ ] Electrical / connection: device DC + signal tree present (Electrical not skipped)
+- [ ] Tab floor: push every tab to genuine ≥8; stretch ≥9 where the target makes it obvious
+- [ ] Commits: `TRAINING/REFERENCE-AIDED` + what gold paths informed the fix
+- [ ] Terminal reply below: best `out/` path, scorecard mins, remaining gaps vs eval checklist
+
+If perfect replica slips: leave the **closest** run + punchlist routed to source rules — never inflate scores.
+
+---
+
+## Also still true from earlier audits (don’t ignore)
+
+- Membrane→filtration skid must die at birth  
+- `optical_instrument` needs real contract/suppliers/cost band  
+- PCB tab UX mostly landed; **content** (pins, off-board triage, pad-overlap vs DRC CLEAN) is the weakness  
+- One chain PID tree per `out/`
 
 ---
 
 ## Terminal reply
 
-<!-- Morning: what you shipped, scores, what gold you used, what’s left for a clean black-box freeze. -->
+<!-- Morning: best out/ path, how you used the target, scores, remaining gaps. -->
 
-_Status: (none yet — overnight)_
+### 2026-07-12 ~21:40 — RENDER FIDELITY (gold-informed, commit 6e6b09e8f)
 
----
+Opened the gold (out/_gold-colorimeter-repo BOM.xlsx + showcase). Target: PyBadge LC
+(4624 = MCU+TFT+buttons+LiPo+USB) + TSL2591 detector (1980) + basic_led source board +
+3D-printed cuvette holder & enclosure + Qwiic/STEMMA cables + M2.5/M3 fasteners; a
+WIDE-FLAT handheld (~140×110×55 mm), ~£100-150 COTS. TRAINING/REFERENCE-AIDED — form
+factor only; did NOT paste the gold MPN table into the emitter.
 
-## Terminal reply (2026-07-12 ~21:10, Claude Code — overnight)
+Root-caused the "black BESS cabinet" hero + fixed at SOURCE (universal, keyed on
+state.isInstrumentDevice):
+1. aggregator.ts deriveDeviceScaleEnclosure emitted a slightly-TALL square box
+   (115×115×150) → cube reads as a floor cabinet. Now landscape W:D:H=1.45:1.15:0.60.
+2. Added instrument FACE features to the closed cover (display window + 5-button d-pad
+   + a cuvette/optical port on the wide top); no vent slots when no air-mover exists.
+3. Product-view + cutaway-hero cameras framed on HEIGHT alone → wide-flat overflowed to
+   a zoomed white patch. Now frame on max(h_eff, w/1.5, d/1.5) at the 1.5:1 aspect.
+VERIFIED (SIGHT): 04-product-exterior reads unmistakably as a benchtop colorimeter;
+00-hero a correctly-framed wide-flat cutaway. proveCatch: render_view_contract _selftest.
 
-Accepted the TRAINING-TARGET frame. Tristan flagged the exact risk I'm guarding against: **false scoring** (NA/vacuous passes without core work). Committed to: NA ONLY for genuinely-inapplicable plant tabs with a verifiable claim; NEVER NA a device deliverable to raise the floor; SIGHT every fix; leave a punchlist, not fake 10s. Full plan + anti-false-scoring discipline in `docs/plans/COLORIMETER-TO-9-EVERY-TAB-HANDOVER.md`.
-Landed tonight already: render KeyError regression fix, PCB off-board triage, PCB top/bottom board views, device tab-scope NA (Electrical/P&ID/Line&vel/Process/HVAC), battery≠Banner/fuse≠PV pins, plant-parts floor, enclosure polymer, provenance source. Next: reconcile scorer json/punchlist (task #24), then the REAL device-content tabs — Connection-trace concerns, Calculations worked-calcs, Part-names drawing tags, Assembly device steps — no NA on those.
+Killed 3 overlapping chain trees (state-flip hazard); launched ONE clean cold run
+out/colorimeter-20260712-2137 (fresh cache, PCB_STAGE=1) to bake in the full fix set.
+
+Honest open punchlist (NOT false-scored): (a) cutaway INTERIOR = generic grey boxes at
+~149% fill (recognisable board/optical-bench geometry is a deeper follow-up); (b) BoM
+~£576 vs gold ~£150 (engine designs discrete where IO Rodeo used an integrated PyBadge
+— disclose/close via COTS-module pricing); (c) scorer json/punchlist reconcile pending.
+
+_Status: (overnight — clean run 2137 in flight)_
