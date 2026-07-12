@@ -35,6 +35,14 @@ from typing import Any, Dict, List, Optional
 ROOT_SOURCES = {
     "brief", "physics_constant", "constant", "standard", "standards",
     "anchor", "class_anchor", "datasheet", "spec", "specification",
+    # Deterministic ENGINE-computed roots — kept in sync with the engine's own
+    # accept-list, scripts/lib/orchestrator/aggregator.ts::isValidProvenanceSource
+    # (2026-07-12). A device-scale geometry derivation (enclosure_volume_m3 +
+    # design_envelope_* from the brief's max_dimensions_mm / mass envelope), an
+    # aggregator-delivered capability metric (optical_path_length_mm etc.), an
+    # envelope-detector read, or a closure-validator value are legitimate self-
+    # documenting origins (their `basis` states the derivation) — NOT sourceless.
+    "derived_device_scale", "aggregator", "envelope_detector", "closure_validator",
 }
 
 # Source tags that are DERIVED — they MUST record how they were produced (source_detail or
@@ -87,8 +95,24 @@ class ProvenanceReport:
 # --------------------------------------------------------------------------- #
 # Predicates
 # --------------------------------------------------------------------------- #
+def _quantity_source(q: dict) -> str:
+    """The origin tag — top-level `source` first, else the structured `provenance.source`
+    (the engine's TypedQuantity carries its origin under `provenance`, e.g. the aggregator/
+    device-scale/tool derivations). 2026-07-12: without the provenance fallback every
+    provenance-tagged quantity read as sourceless (device enclosure geometry, aggregator
+    capability metrics, tool outputs)."""
+    src = str(q.get("source", "") or "").strip().lower()
+    if not src:
+        prov = q.get("provenance")
+        if isinstance(prov, dict):
+            src = str(prov.get("source", "") or "").strip().lower()
+    return src
+
+
 def _is_root(q: dict) -> bool:
-    return str(q.get("source", "")).strip().lower() in ROOT_SOURCES
+    src = _quantity_source(q)
+    # a tool:<id> source IS a recorded origin — the tool run is the lineage.
+    return src in ROOT_SOURCES or src.startswith("tool:")
 
 
 def _has_detail(q: dict) -> bool:
@@ -450,6 +474,21 @@ def _selftest() -> int:
            "total_supply_demand_kw must be flagged sourceless")
     expect(sc["roots"] == 2 and sc["structured"] == 1,
            f"expected 2 roots (brief + physics_constant) + 1 structured, got roots={sc['roots']} structured={sc['structured']}")
+
+    # PROVENANCE-SUB-OBJECT ORIGIN guard (2026-07-12, colorimeter): the engine's TypedQuantity
+    # records its origin under `provenance.source` (NOT a top-level `source`) — a device-scale
+    # geometry derivation, an aggregator capability metric, a tool output. Each must read as a
+    # recorded ROOT/traced origin, never sourceless (before the fix all 4+ read sourceless).
+    provq = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3":       {"value": 0.0013, "unit": "m³", "provenance": {"source": "derived_device_scale"}},
+        "optical_path_length_mm":    {"value": 10.0, "unit": "mm", "provenance": {"source": "aggregator"}},
+        "led_current_kp":            {"value": 2.6, "unit": "", "provenance": {"source": "tool:control-systems:pid-tuning"}},
+        "still_sourceless_kg":       {"value": 5.0, "unit": "kg", "source": ""},  # genuinely sourceless — MUST still flag
+    }}}
+    _pr = audit_provenance(provq)
+    expect(_pr.sourceless == 1, f"only the genuinely-sourceless quantity should flag; got sourceless={_pr.sourceless}")
+    expect(any(f.kind == "sourceless" and f.key == "still_sourceless_kg" for f in _pr.findings),
+           "the genuinely sourceless quantity MUST still be flagged (fix is not a blanket pass)")
 
     # DEVICE-ROLE guard (Tristan 2026-06-30): two DIFFERENT devices that merely share a generic device/
     # flow noun (a 0.04 m³/h acid METERING pump vs a 45 m³/h CIRCULATION pump — both "dosing pumps") must
