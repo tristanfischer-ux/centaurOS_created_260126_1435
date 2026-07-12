@@ -101,4 +101,18 @@ describe('classifyProduct — edge cases', () => {
     const result = classifyProduct('A drone with brushless motors, flight controller, gimbal, 4K camera, ESC, propellers.')
     expect(result.confidence).toBe('HIGH')
   })
+
+  // Grok P0 (2026-07-12): an optical/photometric instrument must NOT land on pcb_assembly.
+  it('classifies a photometer/colorimeter brief as optical_instrument (beats the pcb_assembly catch)', () => {
+    const brief = 'A portable single-wavelength photometer (colorimeter): an LED source through a 10 mm cuvette, '
+      + 'photodiode detector, reports absorbance and transmittance. Deliver a schematic, PCB or module interconnect '
+      + 'design, enclosure CAD, an exact bill of materials, firmware, and assembly instructions.'
+    expect(classifyProduct(brief).productClass).toBe('optical_instrument')
+  })
+  it('a cuvette-based absorbance instrument classifies as optical_instrument', () => {
+    expect(classifyProduct('Benchtop instrument: a cuvette holder, absorbance measurement across the 430–940 nm wavelength range, Beer-Lambert.').productClass).toBe('optical_instrument')
+  })
+  it('a genuine PCBA contract-manufacturing brief still classifies as pcb_assembly (no regression)', () => {
+    expect(classifyProduct('PCBA contract line: SMT assembly, BGA reflow, solder paste stencil, 6-layer pcb assembly, pick and place.').productClass).toBe('pcb_assembly')
+  })
 })
