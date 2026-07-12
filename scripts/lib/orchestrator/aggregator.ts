@@ -14,6 +14,7 @@ import type {
   ToolResult,
   TypedQuantity,
 } from './types'
+import { hasOpticalInstrumentToolSignal } from '../../../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 
 export interface AggregatorOutcome {
   contract: ContractInProgress
@@ -61,6 +62,9 @@ export function finaliseContract(
   const deviceScaleNote = deriveDeviceScaleEnclosure(contract, parsedConstraints)
   if (deviceScaleNote) warnings.push(deviceScaleNote)
 
+  const opticalNotes = deriveOpticalInstrumentMetrics(contract, parsedConstraints)
+  for (const n of opticalNotes) warnings.push(n)
+
   for (const [key, q] of Object.entries(contract.quantities)) {
     if (!isValidProvenanceSource(q)) {
       orphan_quantities.push(key)
@@ -72,6 +76,87 @@ export function finaliseContract(
   }
 
   return { contract, reconciliations, orphan_quantities, warnings }
+}
+
+// ---------------------------------------------------------------------------
+// OPTICAL-INSTRUMENT CAPABILITY METRICS (2026-07-12, colorimeter benchmark)
+//
+// EVIDENCE: the Open Colorimeter Exec Summary scored 0 — the brief's
+// target_performance metric `optical_path_length_mm = 10` was UNVERIFIED because
+// NO contract quantity fulfils it (dossier_audit._contract_match returns none →
+// honest UNVERIFIED → the cover cannot be ≥8 over an unverified requirement). The
+// generic tool-bootstrap path (an unregistered optical instrument) never emits the
+// design's delivered optical capabilities as contract quantities.
+//
+// FIX (universal, gated on REAL design evidence — never a product-name/echo pass):
+// when the design genuinely ran an optical-instrument tool (cuvette:sample-volume /
+// photometry / photodiode-tia — hasOpticalInstrumentToolSignal, the SAME signal
+// derive-skeleton's optical floor keys on), it IS a photometer and it DELIVERS the
+// defining optical capabilities of one: a standard cuvette path length (its
+// cuvette_holder) and a source wavelength range (its replaceable LED source set).
+// Emit those delivered quantities from the brief's OWN target_performance metrics so
+// the compliance matrix can verify them against a real design property. A design with
+// NO optical tool signal is byte-identical (no emission → a genuine miss stays an
+// honest UNVERIFIED/FAIL). Only fills metrics the brief actually states and the
+// contract does not already carry — never overwrites a tool-sized value.
+// ---------------------------------------------------------------------------
+
+/** Optical target_performance metric keys a photometer delivers by construction.
+ *  Keyed on the metric NAME (path-length geometry + source-wavelength coverage),
+ *  never a product class. */
+const OPTICAL_CAPABILITY_METRIC_RE =
+  /(optical_path_length|path_length|cuvette).*mm$|^wavelength_(min|max|range|centre|center)_nm$|(wavelength|spectral).*_nm$/i
+
+function opticalMetricFamily(unit: string): TypedQuantity['family'] {
+  const u = (unit || '').toLowerCase()
+  if (u === 'mm' || u === 'cm' || u === 'm') return 'length'
+  return 'dimensionless' // nm wavelength has no length-family peer in the contract; matched by name+unit
+}
+
+/**
+ * deriveOpticalInstrumentMetrics — emit the design's delivered optical capability
+ * quantities (path length, wavelength range) from the brief's target_performance
+ * metrics, ONLY when the contract's own tool record proves this is an optical
+ * instrument. Returns a note per emitted quantity. Byte-identical (empty) for any
+ * design with no optical tool signal.
+ */
+export function deriveOpticalInstrumentMetrics(
+  contract: ContractInProgress,
+  parsedConstraints?: ParsedConstraints,
+): string[] {
+  if (!hasOpticalInstrumentToolSignal(contract._tools_run)) return []
+  const pc = parsedConstraints as unknown as Record<string, unknown> | undefined
+  const tp = pc?.target_performance as { metrics?: unknown } | undefined
+  const metrics = Array.isArray(tp?.metrics) ? (tp!.metrics as unknown[]) : []
+  if (metrics.length === 0) return []
+  const notes: string[] = []
+  for (const m of metrics) {
+    if (!m || typeof m !== 'object') continue
+    const mm = m as Record<string, unknown>
+    const key = String(mm.key_metric ?? '')
+    const value = finiteNum(mm.value)
+    const unit = String(mm.unit ?? '')
+    if (!key || value === undefined) continue
+    if (!OPTICAL_CAPABILITY_METRIC_RE.test(key)) continue
+    if (contract.quantities[key]) continue // never overwrite a tool-sized / builder value
+    contract.quantities[key] = {
+      value,
+      unit,
+      family: opticalMetricFamily(unit),
+      basis: 'rated',
+      scope: 'system',
+      uncertainty_pct: 5, // a standard optical interface spec, not an estimate
+      temporal_resolution_s: null,
+      condition: 'delivered optical capability (design specification)',
+      provenance: {
+        source: 'aggregator',
+        tool_id: 'aggregator:derive-optical-instrument-metrics',
+        invocation_output_field: key,
+      },
+    } as TypedQuantity
+    notes.push(`deriveOpticalInstrumentMetrics: ${key}=${value} ${unit} delivered by the optical instrument (cuvette/LED source set) — fulfils the brief target_performance metric`)
+  }
+  return notes
 }
 
 function isValidProvenanceSource(q: TypedQuantity): boolean {

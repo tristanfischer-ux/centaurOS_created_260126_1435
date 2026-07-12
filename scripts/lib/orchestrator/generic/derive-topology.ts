@@ -507,17 +507,24 @@ export function deriveInstrumentTopology(modules: AnyModule[]): TopologyEdge[] {
   if (distinctRoles < 2 || nCore < 2) return []
 
   const edges: TopologyEdge[] = []
+  // NOT _drawing_only: unlike deriveDeviceEnergyTopology (whose plant power chain
+  // DUPLICATED already-scheduled feeders, so routing it triple-counted an 11 kW PCS —
+  // run 77), an instrument's signal + DC-rail edges are its ONLY connections. They must
+  // reach the connection-LEDGER (→ parts_ledger connectivity, Connection-trace) and the
+  // single-line (→ Electrical), not just the drawings. Signal + electrical_bus edges are
+  // never drawn as 3-D pipes (build_universal_scene "the 3-D deliberately does NOT draw;
+  // they live on the single-line / P&ID"), so they add ledger/schedule rows without 3-D
+  // clutter and there is nothing to double-count at instrument scale.
   const pushSig = (from: string | null, to: string | null, ctx: string) => {
     if (!from || !to || from === to) return
     edges.push({ from_part: from, to_part: to, mechanism: 'signal',
-      constraint_kind: 'signal', material_context: ctx,
-      _drawing_only: true } as unknown as TopologyEdge)
+      constraint_kind: 'signal', material_context: ctx } as unknown as TopologyEdge)
   }
   const pushPwr = (from: string | null, to: string | null) => {
     if (!from || !to || from === to) return
     edges.push({ from_part: from, to_part: to, mechanism: 'electrical_bus',
-      constraint_kind: 'current_rating', material_context: 'DC power rail (instrument-internal)',
-      _drawing_only: true } as unknown as TopologyEdge)
+      constraint_kind: 'current_rating',
+      material_context: 'DC power rail (instrument-internal)' } as unknown as TopologyEdge)
   }
 
   // 1) SIGNAL SPINE — chain the present stages in order (the optical/analogue path
