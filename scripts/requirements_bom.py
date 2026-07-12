@@ -335,6 +335,13 @@ def _read_service(md: dict):
 # area, UK 2026 — Costain / SCI / CECA.) Plus a modest fixed allowance for connections /
 # baseplates / holding-down bolts.
 _STRUCTURAL_GBP_PER_M2 = 90.0
+# Set once per build from state (see the main builder). A device-scale instrument's
+# enclosure is moulded/3D-printed polymer, never fabricated structural steel.
+_IS_INSTRUMENT_DEVICE = False
+# An ENCLOSURE / HOUSING / CASE / LID / SHROUD family part (the skin of the box).
+_ENCLOSURE_FAMILY_RE = re.compile(
+    r"\benclosure\b|\bhousing\b|\bcase\b|\bcasing\b|\bchassis\b|\blid\b|\bshroud\b|"
+    r"\bcover\b|\bshell\b|\bbezel\b|face\s*plate|front\s*panel", re.I)
 
 
 # ── MEMBRANE / FILTRATION-MEDIA family (2026-07-02, the membrane-as-steel fix) ──
@@ -453,6 +460,28 @@ def _structural_takeoff(name, md, geom=None):
     # it may never take a structural take-off (2026-07-02 membrane-as-steel fix).
     if _is_filtration_membrane(name):
         return None
+    # DEVICE-SCALE INSTRUMENT ENCLOSURE (2026-07-12, colorimeter run 1833: 'Enclosure Shell'
+    # billed £742 as "fabricated + erected structural steelwork"). A sub-1 m³ instrument's
+    # enclosure/housing/lid is a MOULDED or 3D-PRINTED POLYMER part (ABS/PC/PETG), small-
+    # batch — tens of £, not structural steel. Price it from its footprint at a polymer
+    # moulding rate with a small-batch tooling-amortised floor; NEVER the £90/m² steel rate.
+    if _IS_INSTRUMENT_DEVICE and _ENCLOSURE_FAMILY_RE.search(name or ""):
+        _pa = None
+        _dim = str(md.get("dimension") or md.get("dimensions") or "")
+        _pm = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", _dim, re.I)
+        if _pm:
+            _pa = float(_pm.group(1).replace(",", ""))
+        if _pa is None and geom:
+            _dv, _hv = geom
+            _pa = math.pi * (_dv / 2.0) ** 2
+        _pa = _pa if (isinstance(_pa, (int, float)) and _pa > 0) else 0.05
+        # moulded/3D-printed ABS-PC enclosure: material+process ~£300/m² of shell surface
+        # (small-batch of 20), floored to a credible minimum handheld-enclosure price.
+        _gbp = max(18.0, _pa * 300.0)
+        return (round(_gbp, 2),
+                f"moulded / 3D-printed polymer enclosure (ABS/PC, small-batch ×20; "
+                f"~{_pa:.2f} m² shell) — device-scale instrument, NOT structural steel",
+                {"material": "moulded/3D-printed ABS-PC polymer"})
     area_m2 = None
     dim = str(md.get("dimension") or md.get("dimensions") or "")
     m = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", dim, re.I)
@@ -2855,6 +2884,19 @@ def _selftest() -> int:
     for _n, _want in _memb_cases:
         if _is_filtration_membrane(_n) != _want:
             print(f"  FAIL  _is_filtration_membrane('{_n}') = {_is_filtration_membrane(_n)} (want {_want})"); bad += 1
+    # ── DEVICE ENCLOSURE ≠ STRUCTURAL STEEL (2026-07-12, colorimeter run 1833: £742) ──
+    global _IS_INSTRUMENT_DEVICE
+    _saved_dev = _IS_INSTRUMENT_DEVICE
+    _md_encl = {"dimension": "0.05 m² area"}
+    _IS_INSTRUMENT_DEVICE = True
+    _enc_dev = _structural_takeoff("Enclosure Shell", _md_encl)
+    _IS_INSTRUMENT_DEVICE = False
+    _enc_plant = _structural_takeoff("Weatherproof Enclosure", {"dimension": "30 m² area"})
+    _IS_INSTRUMENT_DEVICE = _saved_dev
+    if not (_enc_dev and _enc_dev[0] <= 60 and "polymer" in _enc_dev[1]):
+        print(f"  FAIL device enclosure must be a cheap moulded POLYMER, not steel: {_enc_dev}"); bad += 1
+    if not (_enc_plant and _enc_plant[0] > 1000 and "steel" in str(_enc_plant[2])):
+        print(f"  FAIL a genuine 30 m² plant enclosure must STILL take the structural-steel take-off: {_enc_plant}"); bad += 1
     # ── CORPUS-LIFT ratio ceiling (2026-07-10, run-20 rack £8,001→£210,000 26× lift) ──
     _pv_rack = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 210000,
                 "engine_c_ref_count": 5}
@@ -6382,6 +6424,15 @@ def assemble(out_dir: str):
     # and the per-unit-operation parametrics read (recirc flow, make-up flow, O₂
     # supply, UV lamp power, HX duty …). Universal: a dict keyed by quantity name.
     qcontract = ((st.get("orchestratorContract") or {}).get("quantities") or {})
+    # DEVICE-SCALE INSTRUMENT flag for the whole BoM build — set once from state so the
+    # structural-steel take-off can refuse a moulded-polymer instrument enclosure (a
+    # handheld's ABS/3D-printed case is NOT £742 of fabricated + erected structural steel).
+    global _IS_INSTRUMENT_DEVICE
+    _encl_vol = qcontract.get("enclosure_volume_m3")
+    if isinstance(_encl_vol, dict):
+        _encl_vol = _encl_vol.get("value")
+    _IS_INSTRUMENT_DEVICE = bool(st.get("isInstrumentDevice")) or bool(
+        isinstance(_encl_vol, (int, float)) and 0 < _encl_vol < 1.0)
 
     # tag + as-built geometry from the Blender layout (ONE geometry source for the BoM cost,
     # the drawings and the 3D — not the word's re-derived working volume; kills the 9.5-vs-10.26 split)
