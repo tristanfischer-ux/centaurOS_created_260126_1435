@@ -12103,7 +12103,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if _SE_SKIN_RE.search(nm):
             skin.append(p)
         else:
-            zone_parts["distribution"].append(p)   # unmatched hardware → mid-band
+            # fall to a mid-band zone that EXISTS in the CURRENT zone set — the instrument
+            # zones have no 'distribution' band (only plant zones do), so a hardcoded
+            # 'distribution' key crashed the sealed-INSTRUMENT render with KeyError and
+            # produced NO hero/product images (2026-07-12 regression).
+            _fallback = ("distribution" if "distribution" in zone_parts
+                         else "electronics" if "electronics" in zone_parts
+                         else next(iter(zone_parts)))
+            zone_parts[_fallback].append(p)   # unmatched hardware → mid-band
 
     # 2. the cabinet SHELL — thin walls named u_skid_* so the INSPECT recolour renders
     #    them as the faint wireframe the internal equipment shows through.
