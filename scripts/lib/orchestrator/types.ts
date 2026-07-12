@@ -115,6 +115,14 @@ export type ProvenanceSource =
   | `tool:${string}`         // computed by a registered tool (id format)
   | 'aggregator'             // computed by Contract aggregator (e.g. ratios)
   | 'closure_validator'      // computed by a closure invariant
+  | 'derived_device_scale'   // 2026-07-12: aggregator ESTIMATE for a device-
+                             // scale product whose class builder never emits
+                             // enclosure_volume_m3 / envelope dims (e.g. an
+                             // unregistered generic-path class). Distinct from
+                             // 'aggregator' so a reader can tell "computed from
+                             // other frozen quantities" apart from "estimated
+                             // because the brief gave no real envelope data" —
+                             // see aggregator.ts::deriveDeviceScaleEnclosure.
   | 'narrator'               // EMITTED BY NARRATOR — should not appear in
                              // structural fields; prose-number validator
                              // rejects designs where narrator-source

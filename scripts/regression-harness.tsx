@@ -88,6 +88,8 @@ import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
+import { deriveDeviceScaleEnclosure } from './lib/orchestrator/aggregator'
+import type { ContractInProgress } from './lib/orchestrator/types'
 import { emitBessDesign } from './lib/deterministic-emitter'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
@@ -4948,6 +4950,131 @@ function checkBessEnclosureVolumeFollowsBriefInvariant(): Assertion[] {
     failures.length, (n) => n === 0,
     () => `BESS enclosure-volume-follows-brief wrong: ${failures.join(' ; ')}. Check enclosureVolumeM3 + the iso_container_enclosure macro in registerArchetype('bess', …) in scripts/lib/engineering-contract.ts (both derive from max_dimensions_mm / containerLengthM; default 86 m³ + £8k only when the brief is silent).`,
   ))
+  return out
+}
+
+// ── Device-scale enclosure_volume_m3 derivation invariant (2026-07-12, CORE FIX
+// PRINCIPLE fix for the Open Colorimeter floor-0 evidence) ──────────────────────
+// The colorimeter benchmark (out/colorimeter-20260712-1010, product_class=
+// 'pcb_assembly' — no registered archetype builder, generic tool-bootstrap path)
+// scored FLOOR 0 on P&ID / energy BFD / Connection-trace / Sense-check because
+// those scorers, deriveDeviceEnergyTopology, and the Blender sealed-enclosure
+// scene family ALL key on ONE contract signal (enclosure_volume_m3 < 1) that the
+// generic path never emitted — total_system_mass_kg=0.2 kg sat right there in
+// contract.quantities and nothing read it. deriveDeviceScaleEnclosure() (aggregator.ts)
+// closes that gap UNIVERSALLY, in the aggregator (downstream of both the class
+// builder AND the tool-bootstrap path, so it sees whatever either produced).
+// Three cases, both directions:
+//   1. FIRES — a device-scale fixture (small mass + portable positioning, no
+//      brief dims) derives a plausible 0<v<1 enclosure_volume_m3 AND a
+//      synthesised design_envelope_{width,depth,height}_mm box with positive
+//      dims, both stamped provenance.source='derived_device_scale' (honest —
+//      not brief-stated).
+//   2. UNTOUCHED — a fixture that ALREADY carries enclosure_volume_m3 (e.g. the
+//      Powerwall's 0.13) is byte-identical after the pass (same value, same
+//      object reference for that key never even inspected past the presence
+//      check) — a registered archetype's own derivation always wins.
+//   3. PLANT SUPPRESSED — a plant-scale fixture (12,000 kg, no portable tokens,
+//      no dims) gets NOTHING: enclosure_volume_m3 stays absent, exactly as
+//      today. A multi-tonne plant must never receive a fake small enclosure.
+function checkDeviceScaleEnclosureDerivationInvariants(): Assertion[] {
+  const out: Assertion[] = []
+  const failed: string[] = []
+  const want = (label: string, cond: boolean) => { if (!cond) failed.push(label) }
+
+  const massQ = (value: number): any => ({
+    value, unit: 'kg', family: 'mass', basis: 'rated', scope: 'system',
+    uncertainty_pct: 8, temporal_resolution_s: null, condition: 'rated',
+    provenance: { source: 'tool:mass-aggregator:envelope-check', tool_id: 'mass-aggregator:envelope-check' },
+  })
+  const volQ = (value: number): any => ({
+    value, unit: 'm³', family: 'volume', basis: 'rated', scope: 'system',
+    uncertainty_pct: 8, temporal_resolution_s: null, condition: 'rated',
+    provenance: { source: 'brief' },
+  })
+  const mkContract = (quantities: Record<string, any>, productClass = 'pcb_assembly'): ContractInProgress => ({
+    product_class: productClass,
+    brief_summary: 'test fixture',
+    envelope: {} as any,
+    quantities,
+    topology: [],
+    closures: [],
+    macro_assembly_prices: [],
+    _tools_run: [],
+  }) as unknown as ContractInProgress
+
+  // (1) FIRES — the exact colorimeter shape: total_system_mass_kg=0.2, portable
+  // brief positioning, no max_dimensions_mm.
+  {
+    const contract = mkContract({ total_system_mass_kg: massQ(0.2) })
+    const parsedConstraints: any = {
+      product_class: 'pcb_assembly',
+      product_description: 'A portable, single-wavelength photometer (colorimeter) for analytical and biological assays: a compact, battery-and-USB-powered benchtop instrument.',
+    }
+    const note = deriveDeviceScaleEnclosure(contract, parsedConstraints)
+    const vol = contract.quantities.enclosure_volume_m3
+    want('(1) note returned', typeof note === 'string' && note.length > 0)
+    want('(1) enclosure_volume_m3 present', !!vol)
+    want('(1) 0 < volume < 1', typeof vol?.value === 'number' && vol.value > 0 && vol.value < 1)
+    want('(1) volume in plausible 0.5-3 L handheld-instrument range', typeof vol?.value === 'number' && vol.value >= 0.0005 && vol.value <= 0.003)
+    want('(1) provenance.source = derived_device_scale', vol?.provenance?.source === 'derived_device_scale')
+    for (const k of ['design_envelope_width_mm', 'design_envelope_depth_mm', 'design_envelope_height_mm']) {
+      const dq = (contract.quantities as any)[k]
+      want(`(1) ${k} present + positive`, typeof dq?.value === 'number' && dq.value > 0)
+      want(`(1) ${k} provenance.source = derived_device_scale`, dq?.provenance?.source === 'derived_device_scale')
+    }
+  }
+
+  // (1b) FIRES — small mass ALONE (no positioning text) is sufficient; the mass
+  // gate and the positioning gate are independent triggers (an OR, not an AND).
+  {
+    const contract = mkContract({ total_system_mass_kg: massQ(3.5) })
+    deriveDeviceScaleEnclosure(contract, { product_class: 'pcb_assembly', product_description: 'A sensor module.' } as any)
+    const vol = contract.quantities.enclosure_volume_m3
+    want('(1b) small-mass-only fixture derives enclosure_volume_m3', typeof vol?.value === 'number' && vol.value > 0 && vol.value < 1)
+  }
+
+  // (2) UNTOUCHED — a fixture that already carries enclosure_volume_m3 (the
+  // Powerwall's 0.13-ish value) is byte-identical: value AND reference unchanged.
+  {
+    const existing = volQ(0.13)
+    const contract = mkContract({ total_system_mass_kg: massQ(0.2), enclosure_volume_m3: existing })
+    const note = deriveDeviceScaleEnclosure(contract, { product_class: 'bess', product_description: 'residential wall-mounted battery' } as any)
+    want('(2) no note (no-op)', note === undefined)
+    want('(2) enclosure_volume_m3 value unchanged', contract.quantities.enclosure_volume_m3.value === 0.13)
+    want('(2) enclosure_volume_m3 same object reference (untouched)', contract.quantities.enclosure_volume_m3 === existing)
+    want('(2) no envelope box synthesised (already had a value, nothing to unlock)', !contract.quantities.design_envelope_width_mm)
+  }
+
+  // (3) PLANT SUPPRESSED — large mass, no portable tokens, no dims → NOTHING
+  // derived; enclosure_volume_m3 stays absent (no fake small enclosure on a plant).
+  {
+    const contract = mkContract({ total_system_mass_kg: massQ(12000) }, 'co2_mineralisation')
+    const parsedConstraints: any = {
+      product_class: 'co2_mineralisation',
+      product_description: 'A field-erected CO2 mineralisation plant processing flue gas at industrial scale.',
+    }
+    const note = deriveDeviceScaleEnclosure(contract, parsedConstraints)
+    want('(3) no note (nothing derived)', note === undefined)
+    want('(3) enclosure_volume_m3 stays absent', contract.quantities.enclosure_volume_m3 === undefined)
+    want('(3) no envelope box synthesised either', !contract.quantities.design_envelope_width_mm)
+  }
+
+  // (3b) PLANT SUPPRESSED even with no mass signal at all (nothing to estimate from).
+  {
+    const contract = mkContract({})
+    const note = deriveDeviceScaleEnclosure(contract, { product_class: 'water_treatment', product_description: 'A municipal water treatment plant.' } as any)
+    want('(3b) no mass, no note', note === undefined)
+    want('(3b) no mass, enclosure_volume_m3 absent', contract.quantities.enclosure_volume_m3 === undefined)
+  }
+
+  out.push(assertEq(
+    'UNIVERSAL.device_scale_enclosure_volume_derivation',
+    'deriveDeviceScaleEnclosure (aggregator.ts) fires for a device-scale generic-path contract (small total_system_mass_kg and/or portable/benchtop/handheld brief positioning, no brief dims) — derives a plausible 0<enclosure_volume_m3<1 PLUS a positive design_envelope_{width,depth,height}_mm box, both honestly stamped provenance.source="derived_device_scale"; is a strict byte-identical no-op when enclosure_volume_m3 is already present (any registered archetype — BESS/sealed/containerised — wins untouched); and is HARD-SUPPRESSED on a plant-scale fixture (large mass, no portable tokens, no dims, or no mass signal at all) so a multi-tonne plant never receives a fake small enclosure',
+    failed.length, (n) => n === 0,
+    () => `device-scale enclosure derivation cases failed: ${failed.join(' ; ')}. Check deriveDeviceScaleEnclosure() in scripts/lib/orchestrator/aggregator.ts.`,
+  ))
+
   return out
 }
 
@@ -11983,6 +12110,7 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   for (const a of checkWaterTreatmentArchetypeInvariant()) assertions.push(a)
   for (const a of checkBessBusbarLabelAndAmpacityInvariant()) assertions.push(a)
   for (const a of checkBessEnclosureVolumeFollowsBriefInvariant()) assertions.push(a)
+  for (const a of checkDeviceScaleEnclosureDerivationInvariants()) assertions.push(a)
 
   // Self-contained sub-module density-splitter (bin-pack rewrite) invariants —
   // load the CO₂ v12 fixture themselves + a synthetic ac/dc design; memoised so

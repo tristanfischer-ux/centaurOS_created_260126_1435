@@ -446,7 +446,7 @@ export async function orchestrateDesign(
   }
 
   // ── Step 5: Finalise + aggregator ────────────────────────────────────
-  const aggregatorOutcome = finaliseContract(executorOutcome.contract, executorOutcome.tool_results)
+  const aggregatorOutcome = finaliseContract(executorOutcome.contract, executorOutcome.tool_results, parsedConstraints)
 
   // ── Step 6: Assemble DesignJSON ──────────────────────────────────────
   const assemblerOutcome = await assembleDesign(aggregatorOutcome.contract, envelope, parsedConstraints)
