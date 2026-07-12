@@ -49,7 +49,7 @@ import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/t
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
 import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
-import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal } from './lib/orchestrator/generic/derive-topology'
+import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal, deriveInstrumentTopology, instrumentRole } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
 import { computeCostSanity, resolveClassOutputBand } from '../src/lib/pdf-engine-v2/lib/independent-cost-sanity-audit'
@@ -13390,6 +13390,65 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     'B1/B2 — deriveDeviceEnergyTopology (derive-topology.ts) no longer fires a battery→DC-bus→PCS→grid-interface graph off enclosure_volume_m3 < 1 ALONE: it also requires a genuine energy-storage/PCS/grid-tie PLANT-SCALE quantity key (hasEnergyStoragePlantSignal — kWh capacity / cell-rack-module count / DC bus / AC grid-tie / PV / PCS rating), deliberately STRICTER than derive-skeleton\'s hasEnergyStorage (whose bare "battery" token legitimately matches an instrument\'s own battery_estimated_hours/battery_voltage_v housekeeping quantities). A sealed instrument with the SAME battery/inverter/BMS WORD VOCABULARY but no plant-scale signal gets zero fabricated edges (NA-by-design); a genuine sealed BESS is unaffected (no regression)',
     failedD.length, (n) => n === 0,
     () => `device-energy-topology gating cases failed: ${failedD.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-topology.ts (deriveDeviceEnergyTopology / hasEnergyStoragePlantSignal).`,
+  ))
+
+  // ── EXTENSION 2026-07-12 (INSTRUMENT signal-chain topology, colorimeter benchmark):
+  // a device-scale electronic/optical INSTRUMENT (photodiode → TIA → ADC → MCU →
+  // display, LED source through a cuvette, powered by USB/battery → regulator) has
+  // neither a fluid process spine nor an energy-storage plant, so the process + device-
+  // energy derivers both emit nothing and BFD/P&ID/Connection/Electrical scored 0.
+  // deriveInstrumentTopology builds the honest signal + power graph from the design's
+  // own FUNCTION nouns. proveCatch both directions: a real instrument gets a chained
+  // graph; a lone non-instrument part set (and a PLANT's vocabulary) gets nothing.
+  const failedI: string[] = []
+  const wantI = (label: string, cond: boolean) => { if (!cond) failedI.push(label) }
+  {
+    // role classifier — the exact colorimeter vocabulary + the two ex-misclassifications.
+    wantI('role: photodiode → detector', instrumentRole('Photodiode') === 'detector')
+    wantI('role: TIA → conditioning', instrumentRole('Transimpedance Amplifier') === 'conditioning')
+    wantI('role: ADC → digitiser', instrumentRole('Analog To Digital Converter') === 'digitiser')
+    wantI('role: LED source → optical_source', instrumentRole('LED Source') === 'optical_source')
+    wantI('role: LED driver → driver (before optical_source)', instrumentRole('LED Driver') === 'driver')
+    wantI('role: cuvette → optical_sample', instrumentRole('Cuvette Holder') === 'optical_sample')
+    wantI('role: MCU → compute', instrumentRole('Microcontroller') === 'compute')
+    wantI('role: firmware storage → compute (NOT a fluid vessel)', instrumentRole('Firmware Storage') === 'compute')
+    wantI('role: charge mgmt → power_conditioning (before power_storage)', instrumentRole('Battery Charge Management Circuit') === 'power_conditioning')
+    wantI('role: battery pack → power_storage', instrumentRole('Rechargeable Battery Pack') === 'power_storage')
+    wantI('role: USB → power_in', instrumentRole('USB Power Interface') === 'power_in')
+    wantI('role: structural enclosure → null (not a signal part)', instrumentRole('Enclosure Shell') === null)
+    // a genuine colorimeter word tree → a chained signal + power graph.
+    const instr: any = [{ sub_modules: [{ words: [
+      { name_human: 'LED Source' }, { name_human: 'LED Driver' }, { name_human: 'Cuvette Holder' },
+      { name_human: 'Photodiode' }, { name_human: 'Transimpedance Amplifier' },
+      { name_human: 'Analog To Digital Converter' }, { name_human: 'Microcontroller' },
+      { name_human: 'Local Display' }, { name_human: 'User Input Buttons' },
+      { name_human: 'Rechargeable Battery Pack' }, { name_human: 'USB Power Interface' },
+      { name_human: 'DC DC Regulator' }, { name_human: 'Enclosure Shell' },
+    ] }] }]
+    const iEdges = deriveInstrumentTopology(instr)
+    wantI('instrument graph built (≥6 edges)', iEdges.length >= 6)
+    const sig = iEdges.filter((e) => e.mechanism === 'signal')
+    const pwr = iEdges.filter((e) => e.mechanism === 'electrical_bus')
+    wantI('has signal-spine edges', sig.length >= 3)
+    wantI('has power-rail edges', pwr.length >= 2)
+    // the optical spine must chain source → detector (via sample) and end at the display.
+    const has = (f: string, t: string) => iEdges.some((e) => e.from_part === f && e.to_part === t)
+    wantI('LED Source → Cuvette Holder (optical)', has('LED Source', 'Cuvette Holder'))
+    wantI('Photodiode → Transimpedance Amplifier (detector→conditioning)', has('Photodiode', 'Transimpedance Amplifier'))
+    wantI('Microcontroller → Local Display (compute→display)', has('Microcontroller', 'Local Display'))
+    wantI('Enclosure Shell never a graph node', !iEdges.some((e) => e.from_part === 'Enclosure Shell' || e.to_part === 'Enclosure Shell'))
+    // NO false graph on a PLANT vocabulary (RO skid + tank + pump — no ≥2 core signal roles).
+    const plant: any = [{ sub_modules: [{ words: [
+      { name_human: 'Reverse Osmosis Skid' }, { name_human: 'Storage Tank' },
+      { name_human: 'Irrigation Pump' }, { name_human: 'Main Switchboard' },
+    ] }] }]
+    wantI('NO instrument graph on a plant vocabulary', deriveInstrumentTopology(plant).length === 0)
+  }
+  out.push(assertEq(
+    'UNIVERSAL.instrument_signal_chain_topology_built_for_device_scale_instrument',
+    'INSTRUMENT topology — deriveInstrumentTopology (derive-topology.ts) builds the honest signal + power graph (source→element→sample→detector→conditioning→digitiser→compute→display + inlet/battery→regulator→loads) for a device-scale optical/electronic instrument from its OWN function nouns, so BFD/P&ID/Connection/Electrical no longer score 0 on the 25-part "other" bucket. instrumentRole types the colorimeter vocabulary correctly (incl. Firmware Storage→compute NOT a fluid vessel, LED Driver→driver before LED Source→optical_source, charge-mgmt→power_conditioning before battery→power_storage). UNIVERSAL: a plant vocabulary (no ≥2 core signal roles) gets zero edges; structural enclosure parts are never graph nodes.',
+    failedI.length, (n) => n === 0,
+    () => `instrument-topology cases failed: ${failedI.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-topology.ts (deriveInstrumentTopology / instrumentRole).`,
   ))
 
   return out

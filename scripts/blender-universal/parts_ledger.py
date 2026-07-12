@@ -640,7 +640,60 @@ def _build_cabinets(equipment: list, concern_tags: set) -> dict:
         "cabinets": cabinets}
 
 
-def _classify(name: str, tag: str) -> str:
+# ── INSTRUMENT / SIGNAL-CHAIN ROLES (2026-07-12, colorimeter benchmark) ────────────
+# The Python mirror of derive-topology.ts::INSTRUMENT_ROLE_PATTERNS. Applied ONLY on a
+# device-scale instrument (state.isInstrumentDevice — the SAME authoritative flag the
+# chain sets when deriveInstrumentTopology fires, so classification and topology can
+# never disagree, and NO plant / BESS / Powerwall part is ever re-typed). Signal-chain
+# parts (photodiode, TIA, ADC, LED source, cuvette, display, MCU …) fell to 'other' —
+# no role, no topology, counted in no connectivity denominator — so BFD/P&ID/Connection
+# scored 0; the power parts (USB, battery, regulator) also fell through so Electrical
+# scored 0. Order MOST-SPECIFIC-FIRST, matching the TS list exactly.
+_INSTRUMENT_ROLE_PATTERNS = [
+    ("driver",             r"(?:led|laser|lamp|source|display|backlight)[_ -]?driver\b|\bdriver[_ -]?(?:board|circuit|stage|ic)\b|\bconstant[_ -]?current[_ -]?driver\b"),
+    ("power_conditioning", r"\b(?:regulator|ldo|buck|boost|dc[_ -]?dc|pmic|power[_ -]?management|charge[_ -]?(?:management|controller|circuit|ic)|charger|bms|battery[_ -]?management|power[_ -]?supply|psu|voltage[_ -]?reference|voltage[_ -]?regulat\w*)\b"),
+    ("power_storage",      r"\b(?:battery|rechargeable|li[_ -]?ion|lipo|nimh|coin[_ -]?cell|cell[_ -]?pack|supercap\w*|super[_ -]?capacitor|energy[_ -]?cell)\b"),
+    ("power_in",           r"\b(?:usb|power[_ -]?(?:inlet|input|interface|jack|connector|entry)|dc[_ -]?jack|barrel[_ -]?jack|mains[_ -]?adapter|wall[_ -]?adapter|type[_ -]?c)\b"),
+    ("optical_sample",     r"\b(?:cuvette|sample[_ -]?(?:holder|chamber|cell|compartment)|flow[_ -]?cell|optical[_ -]?cell|specimen[_ -]?holder|test[_ -]?cell)\b"),
+    ("optical_element",    r"\b(?:collimat\w*|lens|monochromat\w*|wavelength[_ -]?select\w*|filter[_ -]?wheel|optical[_ -]?filter|interference[_ -]?filter|aperture|baffle|beam[_ -]?split\w*|mirror|grating|diffuser|slit|shutter|reflector|light[_ -]?guide|fibre[_ -]?optic|fiber[_ -]?optic)\b"),
+    ("optical_source",     r"\b(?:led[_ -]?source|light[_ -]?source|laser[_ -]?(?:diode|source)?|lamp|emitter|illuminat\w*|excitation[_ -]?source|led)\b"),
+    ("detector",           r"\b(?:photodiode|photo[_ -]?detector|photo[_ -]?sensor|photomultiplier|pmt|photo[_ -]?transistor|thermopile|pyroelectric|image[_ -]?sensor|ccd|light[_ -]?sensor|photo[_ -]?receiver|optical[_ -]?detector|detector)\b"),
+    ("conditioning",       r"\b(?:transimpedance|tia|amplifier|op[_ -]?amp|afe|analog[_ -]?front[_ -]?end|signal[_ -]?condition\w*|gain[_ -]?stage|instrumentation[_ -]?amp\w*|pre[_ -]?amp\w*|buffer[_ -]?amp\w*)\b"),
+    ("digitiser",          r"\b(?:analog[_ -]?to[_ -]?digital|adc|dac|delta[_ -]?sigma|successive[_ -]?approx\w*|digiti[sz]er|sigma[_ -]?delta)\b"),
+    ("compute",            r"\b(?:microcontroller|mcu|micro[_ -]?processor|processor|fpga|dsp|soc|firmware|main[_ -]?board|logic[_ -]?board|compute[_ -]?module|system[_ -]?on[_ -]?chip|control[_ -]?board)\b"),
+    ("display",            r"\b(?:display|screen|lcd|oled|tft|e[_ -]?ink|readout|seven[_ -]?segment|annunciator|graphic[_ -]?display|numeric[_ -]?display|vfd)\b"),
+    ("input",              r"\b(?:button|keypad|keyswitch|user[_ -]?input|membrane[_ -]?switch|tactile[_ -]?switch|rotary[_ -]?encoder|touch[_ -]?(?:pad|key)|power[_ -]?switch|on[_ -]?off[_ -]?switch|control[_ -]?switch)\b"),
+]
+_INSTRUMENT_POWER_ROLES = {"power_in", "power_storage", "power_conditioning"}
+
+
+def _instrument_role(name: str):
+    """The instrument signal-chain role of a part name, or None. Mirrors TS
+    derive-topology.ts::instrumentRole. PURE."""
+    n = (name or "")
+    for role, rx in _INSTRUMENT_ROLE_PATTERNS:
+        if re.search(rx, n, re.I):
+            return role
+    return None
+
+
+def _is_instrument_power_origin(name: str) -> bool:
+    """A device instrument's own power SOURCE (battery / USB inlet / DC jack) is a
+    battery-limit ORIGIN — no upstream plant edge, exactly like a mains incomer — so a
+    'missing_input' concern on it is false. Gated by the caller on isInstrumentDevice."""
+    r = _instrument_role(name)
+    return r in ("power_in", "power_storage")
+
+
+def _classify(name: str, tag: str, instrument_device: bool = False) -> str:
+    # On a device-scale instrument, the signal-chain role classifier runs FIRST so the
+    # signal parts type 'instrument' (association-scored) and the power parts type
+    # 'electrical' (single-line) — pre-empting the process-plant TYPE_RULES that would
+    # otherwise mis-type 'Firmware Storage'→vessel and 'Display Panel'→electrical-panel.
+    if instrument_device:
+        role = _instrument_role(name)
+        if role is not None:
+            return "electrical" if role in _INSTRUMENT_POWER_ROLES else "instrument"
     blob = f"{name} {tag}".lower()
     for typ, rx in TYPE_RULES:
         if re.search(rx, blob, re.I):
@@ -799,6 +852,12 @@ def main() -> int:
     cledger = _load(out_dir / "connection-ledger.json") or {}
     route = _load(out_dir / "route-manifest.json") or {}
     rb = state.get("requirementsBom") or []
+
+    # Device-scale INSTRUMENT flag — the authoritative signal the chain sets when
+    # deriveInstrumentTopology fires (a sealed sub-1 m³ optical/electronic instrument
+    # with no fluid/plant). Gates the signal-chain role classification below; a plant /
+    # BESS / Powerwall never carries it, so those runs are byte-identical.
+    instrument_device = bool(state.get("isInstrumentDevice"))
 
     # partVerifications lookup, keyed by NORMALISED word_name (2026-07-05, the
     # VERIFIED_NO_PUBLIC_MPN + evidence-based FABRICATED not-found-substatus fix — see
@@ -1089,7 +1148,7 @@ def main() -> int:
         tag = str(r.get("tag", ""))
         req = str(r.get("requirement", ""))
         name = (req.split("·")[0].strip() or str(placed.get(tag, {}).get("name", "")) or tag)
-        typ = _classify(name, tag)
+        typ = _classify(name, tag, instrument_device)
         # pm resolution: direct TAG lookup first; NAME fallback second (2026-07-05 — a
         # synthetic aggregated block's own tag never equals the BoM tag; see
         # placed_by_name's docstring above).
@@ -1529,6 +1588,11 @@ def main() -> int:
         tag = e["tag"] or "—"
         etype = e.get("type", "other")
         is_origin = any(kw in name_l for kw in ORIGIN_KEYWORDS)
+        # A device instrument's own power SOURCE (battery / USB inlet / DC jack) is a
+        # battery-limit ORIGIN — no upstream plant edge, like a mains incomer. Gated on
+        # the instrument flag so a BESS 'battery' is never treated as an origin.
+        if instrument_device and not is_origin and _is_instrument_power_origin(name_l):
+            is_origin = True
         is_sink = any(kw in name_l for kw in SINK_KEYWORDS)
 
         if is_origin and not has_in:

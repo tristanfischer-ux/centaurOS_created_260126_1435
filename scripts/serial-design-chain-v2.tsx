@@ -7533,6 +7533,45 @@ async function main() {
     } catch (devErr) {
       console.error(`[chain] device-topology deriver failed (non-fatal): ${(devErr as Error).message}`)
     }
+    // INSTRUMENT / SIGNAL-CHAIN TOPOLOGY (2026-07-12, colorimeter benchmark): a
+    // device-scale electronic/optical INSTRUMENT (colorimeter, pH meter, data logger,
+    // sensor node) has neither a fluid process spine nor an energy-storage/PCS plant —
+    // its working medium is LIGHT + electrons through source→sample→detector→
+    // conditioning→digitiser→compute→display, powered by inlet/battery→regulator→loads.
+    // Neither the process deriver nor the device-ENERGY deriver builds that graph, so
+    // BFD/P&ID/Connection/Electrical rendered empty (score 0). Fires on the SAME
+    // device-scale signal as the sealed scene family (enclosure_volume_m3 < 1) when the
+    // device-energy deriver found no plant chain; a plant has none of the signal-chain
+    // vocabulary so it can never trip this (deriveInstrumentTopology also requires ≥2
+    // core signal roles). Takes precedence over the naive process+signal derivers below
+    // (haveEngTopo=true suppresses deriveSignalTopology's 4-20mA instrument→hub star).
+    if (orch && !haveOrchTopo) {
+      try {
+        const enclV = Number((orch?.quantities?.enclosure_volume_m3 as any)?.value
+          ?? orch?.quantities?.enclosure_volume_m3)
+        if (Number.isFinite(enclV) && enclV > 0 && enclV < 1) {
+          const { deriveInstrumentTopology } = await import('./lib/orchestrator/generic/derive-topology')
+          const instEdges = deriveInstrumentTopology((state.moduleDecomposition?.modules ?? []) as any)
+          if (instEdges.length >= 3) {
+            orch.topology = instEdges
+            if ((engineeringContract as any)?.topology) (engineeringContract as any).topology = instEdges
+            haveOrchTopo = true
+            haveEngTopo = true // the instrument graph already carries the signal ties
+            // AUTHORITATIVE instrument-device flag — the ONE decision point. parts_ledger.py
+            // reads this to apply its instrument-role classification (signal-chain parts →
+            // 'instrument', association-scored, not fluid-process), so the connectivity
+            // model and the topology can never disagree. A plant / BESS / Powerwall never
+            // reaches here (energy-storage-plant signal routes them to the device-energy
+            // deriver instead), so they stay byte-identical.
+            ;(state as any).isInstrumentDevice = true
+            console.error(`[chain] INSTRUMENT signal-chain topology: ${instEdges.length} edge(s) (source→sample→detector→conditioning→digitiser→compute→display + power rails) — sealed sub-1 m³ instrument, no fluid/plant`)
+            logAction({ step: 'derive_instrument_topology', edges: instEdges.length })
+          }
+        }
+      } catch (instErr) {
+        console.error(`[chain] instrument-topology deriver failed (non-fatal): ${(instErr as Error).message}`)
+      }
+    }
     if (orch && !haveOrchTopo && !haveEngTopo) {
       const { deriveProcessTopology } = await import('./lib/orchestrator/generic/derive-topology')
       const derived = deriveProcessTopology((state.moduleDecomposition?.modules ?? []) as any)

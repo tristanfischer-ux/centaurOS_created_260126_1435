@@ -405,6 +405,168 @@ export function deriveDeviceEnergyTopology(
 }
 
 
+// ── INSTRUMENT / SIGNAL-CHAIN TOPOLOGY (2026-07-12) ────────────────────────────
+// WHY: the engine has a PROCESS-PLANT ontology (fluid spine — deriveProcessTopology)
+// and an ELECTRICAL-DISTRIBUTION ontology (deriveDeviceEnergyTopology / the single-
+// line), but NO ontology for a device-scale electronic/optical INSTRUMENT whose
+// working "medium" is LIGHT + electrons through a SIGNAL chain
+// (source → optical element → sample → detector → conditioning → digitiser →
+// compute → display), powered by inlet/battery → regulation → loads. On the
+// colorimeter benchmark every one of the 25 signal-chain parts (photodiode, TIA,
+// ADC, LED source, cuvette holder, battery, USB, display …) fell to the classifier's
+// 'other' bucket: no role, no topology edge, counted in no connectivity denominator —
+// so BFD / P&ID / Connection-trace / Electrical all rendered empty and scored 0, and
+// the only parts that DID type were two misclassifications (Firmware Storage → vessel,
+// Display Panel → electrical) whose fluid/single-line expectations then FAILED.
+// This deriver builds the honest instrument graph from the design's OWN function
+// nouns. UNIVERSAL — keyed on FUNCTION vocabulary (source/detector/amplifier/adc/
+// compute/display/battery/regulator/…), never a product-class table; fires only on
+// the device-scale path (the call site gates on enclosure_volume_m3 < 1 + no fluid /
+// plant signal), so the 35 plant/electrical classes are byte-identical.
+
+export type InstrumentRole =
+  | 'power_in' | 'power_storage' | 'power_conditioning' | 'driver'
+  | 'optical_source' | 'optical_element' | 'optical_sample' | 'detector'
+  | 'conditioning' | 'digitiser' | 'compute' | 'display' | 'input'
+
+// The SIGNAL spine order (feed → readout): a part's role gives its slot on the chain.
+const SIGNAL_CHAIN_ORDER: InstrumentRole[] = [
+  'optical_source', 'optical_element', 'optical_sample', 'detector',
+  'conditioning', 'digitiser', 'compute', 'display',
+]
+
+// Role patterns — MOST-SPECIFIC FIRST (first match wins). power_conditioning precedes
+// power_storage so 'Battery Charge Management Circuit' types as the CHARGER (not the
+// pack); 'driver' precedes optical_source so 'LED Driver' is the driver stage while
+// 'LED Source' is the emitter.
+const INSTRUMENT_ROLE_PATTERNS: Array<[InstrumentRole, RegExp]> = [
+  ['driver',            /\b(?:led|laser|lamp|source|display|backlight)[_ -]?driver\b|\bdriver[_ -]?(?:board|circuit|stage|ic)\b|\bconstant[_ -]?current[_ -]?driver\b/i],
+  ['power_conditioning',/\b(?:regulator|\bldo\b|buck|boost|dc[_ -]?dc|\bpmic\b|power[_ -]?management|charge[_ -]?(?:management|controller|circuit|ic)|charger|\bbms\b|battery[_ -]?management|power[_ -]?supply|\bpsu\b|voltage[_ -]?reference|voltage[_ -]?regulat\w*)\b/i],
+  ['power_storage',     /\b(?:battery|rechargeable|\bli[_ -]?ion\b|\blipo\b|\bnimh\b|coin[_ -]?cell|cell[_ -]?pack|supercap\w*|super[_ -]?capacitor|energy[_ -]?cell)\b/i],
+  ['power_in',          /\b(?:usb|power[_ -]?(?:inlet|input|interface|jack|connector|entry)|dc[_ -]?jack|barrel[_ -]?jack|mains[_ -]?adapter|wall[_ -]?adapter|type[_ -]?c)\b/i],
+  ['optical_sample',    /\b(?:cuvette|sample[_ -]?(?:holder|chamber|cell|compartment)|flow[_ -]?cell|optical[_ -]?cell|specimen[_ -]?holder|test[_ -]?cell)\b/i],
+  ['optical_element',   /\b(?:collimat\w*|\blens\b|monochromat\w*|wavelength[_ -]?select\w*|filter[_ -]?wheel|optical[_ -]?filter|interference[_ -]?filter|aperture|baffle|beam[_ -]?split\w*|\bmirror\b|grating|diffuser|\bslit\b|shutter|reflector|light[_ -]?guide|fibre[_ -]?optic|fiber[_ -]?optic)\b/i],
+  ['optical_source',    /\b(?:led[_ -]?source|light[_ -]?source|laser[_ -]?(?:diode|source)?|\blamp\b|emitter|illuminat\w*|excitation[_ -]?source|\bled\b)\b/i],
+  ['detector',          /\b(?:photodiode|photo[_ -]?detector|photo[_ -]?sensor|photomultiplier|\bpmt\b|photo[_ -]?transistor|thermopile|pyroelectric|image[_ -]?sensor|\bccd\b|light[_ -]?sensor|photo[_ -]?receiver|optical[_ -]?detector|\bdetector\b)\b/i],
+  ['conditioning',      /\b(?:transimpedance|\btia\b|amplifier|op[_ -]?amp|\bafe\b|analog[_ -]?front[_ -]?end|signal[_ -]?condition\w*|gain[_ -]?stage|instrumentation[_ -]?amp\w*|pre[_ -]?amp\w*|buffer[_ -]?amp\w*)\b/i],
+  ['digitiser',         /\b(?:analog[_ -]?to[_ -]?digital|\badc\b|\bdac\b|delta[_ -]?sigma|successive[_ -]?approx\w*|digiti[sz]er|sigma[_ -]?delta)\b/i],
+  ['compute',           /\b(?:microcontroller|\bmcu\b|micro[_ -]?processor|\bprocessor\b|\bfpga\b|\bdsp\b|\bsoc\b|firmware|main[_ -]?board|logic[_ -]?board|compute[_ -]?module|system[_ -]?on[_ -]?chip|control[_ -]?board)\b/i],
+  ['display',           /\b(?:display|screen|\blcd\b|\boled\b|\btft\b|e[_ -]?ink|readout|seven[_ -]?segment|annunciator|graphic[_ -]?display|numeric[_ -]?display|\bvfd\b)\b/i],
+  ['input',             /\b(?:button|keypad|keyswitch|user[_ -]?input|membrane[_ -]?switch|tactile[_ -]?switch|rotary[_ -]?encoder|touch[_ -]?(?:pad|key)|power[_ -]?switch|on[_ -]?off[_ -]?switch|control[_ -]?switch)\b/i],
+]
+
+/** The instrument role of a part NAME, or null if it is not a signal-chain part
+ *  (structural enclosure, fastener, etc.). PURE. Exported so parts_ledger's sibling
+ *  classifier and the regression harness can probe the SAME rule. */
+export function instrumentRole(name: string): InstrumentRole | null {
+  const n = String(name ?? '')
+  if (!n.trim()) return null
+  for (const [role, rx] of INSTRUMENT_ROLE_PATTERNS) {
+    if (rx.test(n)) return role
+  }
+  return null
+}
+
+/**
+ * Derive the SIGNAL + POWER topology for a device-scale electronic/optical instrument.
+ * Signal spine: consecutive present stages of SIGNAL_CHAIN_ORDER are chained
+ * (source → element → sample → detector → conditioning → digitiser → compute → display);
+ * a role's non-representative siblings tie to that role's representative so none orphans.
+ * Power spine (electrical_bus): {power_in, power_storage} → regulator → {compute, driver,
+ * display}; the driver (if any) drives the optical_source and takes a control tie from
+ * compute; user inputs signal-tie to compute. Endpoints are the part NAME (name_human) —
+ * these parts are PCB-level, not 3-D-placed, so a slug endpoint would read as a broken
+ * reference (the SAME reason deriveSignalTopology uses names). Returns [] when the design
+ * has no coherent instrument chain (< 2 distinct signal/power roles). PURE.
+ */
+export function deriveInstrumentTopology(modules: AnyModule[]): TopologyEdge[] {
+  // Collect the first-seen part name per role (deterministic: input order), plus every
+  // sibling, walking the SAME module→sub_module→word tree as the other derivers.
+  const byRole = new Map<InstrumentRole, string[]>()
+  for (const m of modules || []) {
+    for (const sm of m.sub_modules || []) {
+      for (const w of sm.words || []) {
+        if (!w || (w as AnyWord)._subcomponent) continue
+        const name = w.name_human || w.content_character?.name_human || ''
+        if (!name) continue
+        const role = instrumentRole(name)
+        if (!role) continue
+        const list = byRole.get(role) ?? []
+        if (!list.includes(name)) list.push(name)
+        byRole.set(role, list)
+      }
+    }
+  }
+  const distinctRoles = byRole.size
+  const rep = (r: InstrumentRole): string | null => byRole.get(r)?.[0] ?? null
+  // Need a genuine chain — at least two of the CORE stages, else there is no instrument
+  // to draw (a lone battery is not an instrument).
+  const coreRoles: InstrumentRole[] = ['optical_source', 'detector', 'conditioning',
+    'digitiser', 'compute', 'display', 'optical_sample']
+  const nCore = coreRoles.filter((r) => byRole.has(r)).length
+  if (distinctRoles < 2 || nCore < 2) return []
+
+  const edges: TopologyEdge[] = []
+  const pushSig = (from: string | null, to: string | null, ctx: string) => {
+    if (!from || !to || from === to) return
+    edges.push({ from_part: from, to_part: to, mechanism: 'signal',
+      constraint_kind: 'signal', material_context: ctx,
+      _drawing_only: true } as unknown as TopologyEdge)
+  }
+  const pushPwr = (from: string | null, to: string | null) => {
+    if (!from || !to || from === to) return
+    edges.push({ from_part: from, to_part: to, mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating', material_context: 'DC power rail (instrument-internal)',
+      _drawing_only: true } as unknown as TopologyEdge)
+  }
+
+  // 1) SIGNAL SPINE — chain the present stages in order (the optical/analogue path
+  //    becomes a digital path after the detector; the material_context labels which).
+  const present = SIGNAL_CHAIN_ORDER.filter((r) => byRole.has(r))
+  const ctxFor = (a: InstrumentRole, b: InstrumentRole): string => {
+    // upstream of the detector = an OPTICAL path; downstream = an electrical signal.
+    const optical = new Set<InstrumentRole>(['optical_source', 'optical_element', 'optical_sample', 'detector'])
+    if (optical.has(a) && optical.has(b)) return 'optical path (free-space / guided light)'
+    if (a === 'detector') return 'analogue detector signal'
+    if (b === 'display') return 'display data bus'
+    return 'analogue/digital signal'
+  }
+  for (let i = 0; i < present.length - 1; i++) {
+    pushSig(rep(present[i]), rep(present[i + 1]), ctxFor(present[i], present[i + 1]))
+  }
+  // sibling ties — every non-representative signal-chain part joins its role rep so it
+  // is not an orphan (e.g. a second amplifier stage, a second optical element).
+  for (const [role, names] of byRole) {
+    if (!SIGNAL_CHAIN_ORDER.includes(role)) continue
+    for (let i = 1; i < names.length; i++) pushSig(names[i], names[0], 'signal (parallel stage)')
+  }
+
+  // 2) POWER SPINE — inlet/battery → regulator → loads (electrical_bus, so the
+  //    single-line / Electrical tab sees real feeders).
+  const reg = rep('power_conditioning')
+  const sources = [...(byRole.get('power_in') ?? []), ...(byRole.get('power_storage') ?? [])]
+  const loadHub = reg ?? rep('compute') ?? rep('display')
+  for (const s of sources) pushPwr(s, loadHub)
+  const loads = [rep('compute'), rep('driver'), rep('display'), rep('digitiser'), rep('conditioning')]
+    .filter((x): x is string => !!x)
+  if (reg) for (const l of loads) pushPwr(reg, l)
+
+  // 3) DRIVER — the LED/source driver drives the emitter (power) and takes a control
+  //    tie from compute (the MCU sets the source intensity / blank reference).
+  const driver = rep('driver')
+  if (driver) {
+    pushPwr(driver, rep('optical_source'))
+    pushSig(rep('compute'), driver, 'source control (intensity / blank)')
+  }
+
+  // 4) USER INPUT → compute (signal). Buttons/switches command the measurement.
+  const compute = rep('compute')
+  for (const inp of byRole.get('input') ?? []) pushSig(inp, compute, 'user command signal')
+
+  return edges
+}
+
+
 export function deriveProcessTopology(modules: AnyModule[]): TopologyEdge[] {
   // Collect distinct principal PROCESS equipment (physics-synthesised, fluid-side).
   const seen = new Set<string>()
