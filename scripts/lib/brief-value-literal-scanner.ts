@@ -162,6 +162,14 @@ const UNIT_FAMILY_TRAILING: Record<string, RegExp> = {
   flow:          /^(lpm|gpm|cmh|cms|l\/|m³\/|m3\/)\b/i,
   pressure:      /^(pa|kpa|mpa|bar|psi)\b/i,
   concentration: /^(ppm|ppb|µmol|mg\/)\b/i,
+  // 'volume' (gate-25 false-positive fix, 2026-07-12): a bare litre/millilitre/
+  // gallon unit trailing a literal — e.g. mod('capacity', '200', 'L') (a coolant
+  // drum charge) or "...and 200 L coolant charge." in module_brief prose. Without
+  // this family, a coincidental £200 cost-ceiling collision with a 200 L capacity
+  // literal had NO family to disambiguate against (colorimeter false positive:
+  // unit_cost_ceiling_gbp=200 vs a 200 L glycol charge). Distinct from 'flow'
+  // (litres/MINUTE, a rate) — this is a bare volume unit with no /time.
+  volume:        /^(l|litres?|liters?|ml|cl|dl|m³|m3|gal|gallons?)\b/i,
 }
 const CONSTRAINT_EXPECTED_FAMILY: Record<string, string> = {
   max_mass_kg: 'mass',
@@ -317,6 +325,22 @@ export function scanEmitterForBriefLiterals(
       // max_mass_kg=130). Same product-code rationale as part_number.
       if (/\bmod\(\s*['"](?:part_number|manufacturer|mpn|sku|form|name_human|character_id|regulatory)['"]/i.test(lineText)) continue
 
+      // Part-catalogue object-literal skip (gate-25 false-positive fix,
+      // 2026-07-12): the mod()-kind skip above only covers the mod('part_number',
+      // ...) CALL shape. A plain TS object-literal catalogue row — e.g.
+      // `{ part_number: 'PV-200A-1XL-B-15', rated_current_a: 200 }` inside a
+      // BUSSMANN_PV_*_RANGE lookup array — carries the SAME part-identity
+      // signal via an unquoted `part_number:`/`mpn:`/`sku:` KEY, not a mod()
+      // call, so the kind-skip above never sees it. A sibling field on the same
+      // row (rated_current_a, voltage_v, …) can coincidentally collide with a
+      // brief scalar even though the row is pure part-catalogue data. Colorimeter
+      // false positive: unit_cost_ceiling_gbp=200 collided with `rated_current_a:
+      // 200` on a row that ALSO carries `part_number: 'PV-200A-1XL-B-15'` — an
+      // unrelated 200 A fuse rating, not a £200 mirror. Skip the WHOLE line: a
+      // catalogue-part-identity row never encodes a system-level brief constraint
+      // (same rationale as the mod()-kind skip, extended to object-literal rows).
+      if (/\b(?:part_number|mpn|sku)\s*:\s*['"]/i.test(lineText)) continue
+
       const match = lineText.match(pattern)
       if (!match) continue
 
@@ -338,9 +362,25 @@ export function scanEmitterForBriefLiterals(
       // If that differs from the constraint's family it's a coincidental collision
       // — e.g. mod('list_price_gbp','300') vs max_mass_kg=300,
       // q(c,'dc_bus_voltage_v',800) vs batch_size=800.
+      //
+      // UNQUOTED key fallback (2026-07-12): the check above only recognises the
+      // mod()/q() QUOTED-key shape (`'key', value`). A plain TS object-literal
+      // field — `rated_current_a: 200` — names its value just as unambiguously
+      // but with an unquoted key + colon (or `=` for a const assignment), which
+      // the quoted-key regex never matches. Colorimeter false positive:
+      // unit_cost_ceiling_gbp=200 vs `{ part_number: '…', rated_current_a: 200 }`
+      // — `rated_current_a` maps to the 'current' family via familyFromValueKey,
+      // differs from the constraint's 'money' family, so it is a coincidental
+      // collision, not a stale cost mirror. Tried only when the quoted-key form
+      // doesn't match (keeps the existing mod()/q() precedence unchanged).
       if (expectedFamily) {
         const keyMatch = lineText.slice(0, mIdx).match(/['"]([a-z_][a-z_0-9]{2,})['"]\s*,\s*['"]?\s*$/i)
-        const valFamily = keyMatch ? familyFromValueKey(keyMatch[1]) : null
+        const unquotedKeyMatch = keyMatch ? null : beforeNum.match(/([A-Za-z_][A-Za-z0-9_]{2,})\s*[:=]\s*$/)
+        const valFamily = keyMatch
+          ? familyFromValueKey(keyMatch[1])
+          : unquotedKeyMatch
+            ? familyFromValueKey(unquotedKeyMatch[1])
+            : null
         if (valFamily && valFamily !== expectedFamily) continue
       }
 
@@ -1244,13 +1284,60 @@ export function selftestContractStrict(): { passed: boolean; failures: string[] 
   expect('emitter: a genuine bare mass literal 130 kg still catches',
     emitterCatch.hits.some((h) => h.brief_key === 'max_mass_kg'))
 
+  // (7) SUPPRESSED (2026-07-12, colorimeter false positive, the bug this fix
+  //     targets): brief `unit_cost_ceiling_gbp=200` must NOT collide with a
+  //     PV fuse part-catalogue row's `rated_current_a: 200` (200 AMPS + a
+  //     part number containing "200"), a `mod('capacity', '200', 'L')` coolant
+  //     charge (200 LITRES), or a `module_brief` prose template quoting
+  //     "200 L coolant charge" — all real lines from deterministic-emitter.ts
+  //     that coincidentally match the £200 brief value in a DIFFERENT
+  //     dimension (current, volume, part-number substring, prose).
+  const colorimeterSuppressed = scanEmitterForBriefLiterals(
+    [
+      "  { part_number: 'PV-200A-1XL-B-15', rated_current_a: 200 },",
+      "  { part_number: 'PV-200ANH1', rated_current_a: 200 },",
+      "  mod('capacity', '200', 'L'),",
+      "  module_brief: `Routes coolant between manifolds and the chiller, and 200 L coolant charge.`,",
+    ].join('\n'),
+    { unit_cost_ceiling_gbp: 200 },
+    'pcb_assembly',
+  )
+  expect('emitter: £200 cost ceiling does not collide with 200A part-number rows / 200L capacity / prose',
+    colorimeterSuppressed.passed)
+
+  // (8) STILL FIRES (genuine catch preserved): a real mass-cap stale literal
+  //     ("35,000 kg" frozen in a mod() call) in a MASS context still flags
+  //     against brief.max_mass_kg=35000 — the classic gate-25 case this gate
+  //     exists for (L38 AUDIT-CONSISTENCY: "28,000 kg" stale vs "35,000 kg"
+  //     current brief) must not be swallowed by the new dimension guards.
+  const massStillFires = scanEmitterForBriefLiterals(
+    "  mod('performance', 'Structural floor reinforced to 35,000 kg capacity'),",
+    { max_mass_kg: 35000 },
+    'energy_storage',
+  )
+  expect('emitter: a genuine mass stale-literal "35,000 kg" still catches',
+    massStillFires.hits.some((h) => h.brief_key === 'max_mass_kg'))
+
+  // (9) SAME-DIMENSION cost literal still flags (no over-suppression): a
+  //     genuine hardcoded cost-family literal (a key that IS money, just not
+  //     one of the deliberately-exempted per-part catalogue price keys —
+  //     list_price_gbp/price_estimate_gbp/unit_price_gbp, see the 2026-07-09
+  //     skip above) must still be caught against a cost-ceiling constraint.
+  const sameDimensionCostStillFires = scanEmitterForBriefLiterals(
+    "  mod('project_cost_gbp', '200'),",
+    { unit_cost_ceiling_gbp: 200 },
+    'pcb_assembly',
+  )
+  expect('emitter: a genuine same-dimension cost literal still catches',
+    sameDimensionCostStillFires.hits.some((h) => h.brief_key === 'unit_cost_ceiling_gbp'))
+
   return { passed: failures.length === 0, failures }
 }
 
 if (require.main === module && process.argv.includes('--selftest')) {
   const { passed, failures } = selftestContractStrict()
   if (passed) {
-    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (5 cases)')
+    console.log('[brief-value-literal-scanner] contract-strict selftest: PASS (9 cases)')
     process.exit(0)
   } else {
     console.error('[brief-value-literal-scanner] contract-strict selftest: FAIL')
