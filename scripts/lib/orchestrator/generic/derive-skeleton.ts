@@ -206,7 +206,9 @@ const OPTICAL_CONTROL_FLOOR = ['microcontroller', 'usb_interface', 'local_displa
 // absurd on a £200 handheld). A sub-1 m³ battery/USB instrument's power+safety is a DC
 // input fuse, reverse-polarity + ESD + overcurrent protection, a thermal cutoff — pennies.
 const OPTICAL_POWER_DISTRIBUTION_FLOOR = ['dc_input_fuse', 'power_input_connector', 'reverse_polarity_protection', 'power_indicator_led', 'ferrite_emc_bead']
-const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'lid_interlock_switch']
+// NB: no lid interlock — a benchtop photometer's lid is a light shroud, not a machinery
+// guard; the token matched a plant interlock switch and priced £267 (run 1954 own-goal).
+const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'polyfuse_resettable']
 
 /** Per-module optical-instrument floor overrides. Only the modules the generic Tier-C
  *  floor gets wrong for an instrument (a BESS/industrial-power shape) are listed —
