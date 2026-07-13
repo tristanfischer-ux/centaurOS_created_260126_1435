@@ -12387,31 +12387,6 @@ def _instrument_pcb_png_path() -> str | None:
     return None
 
 
-def _make_pcb_board_material(name: str, png_path: str | None):
-    """FR4 board material — textured from the pipeline PNG when present.
-
-    INTENT: the product render must show a BOARD, not a solid green face-plate.
-    When pcb/board-top.png exists, that is the same board the PCB tab scored —
-    Blender and Excel stay one artefact. Fallback is matte FR4 green.
-    """
-    if png_path and os.path.isfile(png_path) and hasattr(bpy, "data"):
-        mat = bpy.data.materials.new(name)
-        mat.use_nodes = True
-        nt = mat.node_tree
-        bsdf = nt.nodes["Principled BSDF"]
-        tex = nt.nodes.new("ShaderNodeTexImage")
-        try:
-            tex.image = bpy.data.images.load(png_path, check_existing=True)
-            nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
-            bsdf.inputs["Roughness"].default_value = 0.38
-            bsdf.inputs["Metallic"].default_value = 0.05
-            return mat
-        except (RuntimeError, OSError) as exc:
-            print(f"[univ][sealed] PCB texture load failed ({png_path}): {exc}")
-    return fl.make_mat(
-        name, fl._to_linear((0.06, 0.45, 0.22)), metallic=0.05, roughness=0.40)
-
-
 def _place_instrument_source_pcb(
     name: str,
     form: dict,
@@ -12423,24 +12398,46 @@ def _place_instrument_source_pcb(
 
     INTENT: a transmittance instrument's emitter sits on the optical axis as a
     small replaceable board (not a painted green square that reads as a screen,
-    and not a motherboard spanning the body). Thickness is FR4 (~1.6 mm). Face
-    texture prefers the run's KiCad board-top.png so the Blender shape is the
-    PCB tab's board, not a decoration.
+    and not a motherboard spanning the body). Built as FR4 + pads + mount holes
+    so the product render carries a BOARD SHAPE. When pcb/board-top.png exists we
+    still prefer its FR4 green as the substrate colour cue; we do NOT plaster the
+    full PNG (it includes a studio background that washed the face white).
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     w, _old_d, h = form["led_pcb_size"]
-    # FR4 thickness on the face-normal (Y) axis — was 2–2.4 mm decorative slab.
-    size = (float(w), 1.6, float(h))
+    size = (float(w), 1.6, float(h))  # FR4 thickness on face-normal (Y)
     loc = form["led_pcb_loc"]
-    mat = _make_pcb_board_material(f"m_{name}", _instrument_pcb_png_path())
-    obj = fl.add_box(
-        name, _mm3(loc), _mm3(size), mat, module=module, module_objects=MO)
-    obj.dimensions = _mm3(size)
-    obj.hide_render = hide_render
-    obj["geometry_source"] = "instrument_source_pcb"
-    return obj
+    fr4 = fl.make_mat(
+        f"m_{name}_fr4", fl._to_linear((0.05, 0.42, 0.20)), metallic=0.04, roughness=0.42)
+    pad = fl.make_mat(
+        f"m_{name}_pad", fl._to_linear((0.72, 0.62, 0.18)), metallic=0.85, roughness=0.28)
+    hole = fl.make_mat(
+        f"m_{name}_hole", fl._to_linear((0.12, 0.12, 0.14)), metallic=0.3, roughness=0.55)
+    body = fl.add_box(name, _mm3(loc), _mm3(size), fr4, module=module, module_objects=MO)
+    body.dimensions = _mm3(size)
+    body.hide_render = hide_render
+    body["geometry_source"] = "instrument_source_pcb"
+    # Face-normal is −Y (board on chamber front). Pads sit slightly proud of the face.
+    face_y = loc[1] - size[1] / 2 - 0.15
+    for i, (px, pz) in enumerate(((-0.28, 0.22), (0.28, 0.22), (-0.28, -0.18), (0.28, -0.18), (0.0, 0.0))):
+        p = fl.add_box(
+            f"{name}_pad_{i}",
+            _mm3((loc[0] + w * px, face_y, loc[2] + h * pz)),
+            _mm3((max(2.2, w * 0.16), 0.35, max(1.6, h * 0.12))),
+            pad, module=module, module_objects=MO)
+        p.hide_render = hide_render
+    for i, (px, pz) in enumerate(((-0.38, 0.38), (0.38, 0.38), (-0.38, -0.38), (0.38, -0.38))):
+        fl.add_cyl(
+            f"{name}_mnt_{i}",
+            _mm3((loc[0] + w * px, loc[1], loc[2] + h * pz)),
+            max(0.6, min(w, h) * 0.04) * fl.MM,
+            size[1] * 1.15 * fl.MM,
+            hole, module=module, module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        ).hide_render = hide_render
+    return body
 
 
 def _place_instrument_ui_pcb(
@@ -12452,21 +12449,19 @@ def _place_instrument_ui_pcb(
 ):
     """Thin compute/UI board under the top-deck display (HMI lives on a PCB).
 
-    INTENT: the display is not a painted lid patch — it sits on a board-shaped
-    module on the top operating plane. Uses the same KiCad face texture when
-    present so the product render carries a real PCB silhouette.
+    INTENT: the display sits on a board-shaped module on the top operating plane —
+    a FR4 silhouette, not a grey lid patch.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     dw, dd, _dh = form["top_display_size"]
     dx, dy, dz = form["top_display_loc"]
-    # Board slightly larger than the display glass; FR4 thickness in Z.
     size = (dw * 1.12, dd * 1.18, 1.6)
-    loc = (dx, dy, dz - 0.2)
-    mat = _make_pcb_board_material(f"m_{name}", _instrument_pcb_png_path())
-    obj = fl.add_box(
-        name, _mm3(loc), _mm3(size), mat, module=module, module_objects=MO)
+    loc = (dx, dy, dz - 0.4)
+    fr4 = fl.make_mat(
+        f"m_{name}_fr4", fl._to_linear((0.05, 0.42, 0.20)), metallic=0.04, roughness=0.42)
+    obj = fl.add_box(name, _mm3(loc), _mm3(size), fr4, module=module, module_objects=MO)
     obj.dimensions = _mm3(size)
     obj.hide_render = hide_render
     obj["geometry_source"] = "instrument_ui_pcb"
