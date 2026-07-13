@@ -249,12 +249,18 @@ def required_views(state: dict) -> list[ViewSpec]:
 def sealed_exterior_view_names(is_instrument_device: bool) -> frozenset[str]:
     """Blender view names that render the CLOSED product shell (not cutaway internals).
 
-    A device-scale instrument's 07-product-service must NOT show zone-stacked grey
-    slabs — it is the same closed handheld face as 04–06 (USB/service details on
-    the exterior), not an open cabinet interior."""
+    INTENT: a sealed handheld/benchtop INSTRUMENT is operated and sold as a closed
+    product — the customer-facing artefact is the exterior (top deck + sample port),
+    not an open electronics bay. Cabinets/wall products still use a cutaway 00-hero
+    so internals read; instruments close 00-hero too. 07-product-service follows the
+    same rule (USB/service on the exterior, never zone-stacked grey slabs).
+    """
     views = {"04-product-exterior", "05-product-left", "06-product-right"}
     if is_instrument_device:
-        views = views | {"07-product-service"}
+        # DECISION: instrument 00-hero is the CLOSED product. A cutaway hero is the
+        # wrong deliverable language for a handheld optical instrument — it invents
+        # a "cabinet with the door off" story the product does not have.
+        views = views | {"00-hero", "07-product-service"}
     return frozenset(views)
 
 
@@ -303,6 +309,10 @@ def _selftest() -> None:
         "brief dimensions must win over derived non-handheld instrument hints")
     assert "07-product-service" in sealed_exterior_view_names(True), (
         "instrument service view must use closed exterior, not cutaway slabs")
+    assert "00-hero" in sealed_exterior_view_names(True), (
+        "instrument 00-hero must be the closed product (not a cabinet cutaway)")
+    assert "00-hero" not in sealed_exterior_view_names(False), (
+        "cabinet/plant 00-hero stays cutaway")
     assert "07-product-service" not in sealed_exterior_view_names(False), (
         "plant/cabinet service view stays cutaway")
     print("render_view_contract _selftest: OK (instrument landscape envelope proven)")

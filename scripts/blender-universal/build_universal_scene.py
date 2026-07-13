@@ -11956,6 +11956,8 @@ _SE_ZONES_INSTRUMENT = [  # bottom → top
 ]
 # Set from state.isInstrumentDevice in _sealed_enclosure_env_mm (runs before placement).
 _IS_INSTRUMENT_DEVICE = False
+# Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
+_INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
     r"enclosure|cabinet|housing|\bdoor\b|\bpanel\b|panels\b|insulation|liner|gasket|"
     r"\bseal\b|bracket|mount(?:ing)?\b|cover|lid|skin|chassis|frame", re.I)
@@ -11971,8 +11973,15 @@ def _sealed_enclosure_env_mm(state, quantities):
     # Record whether this sealed product is a device-scale INSTRUMENT (authoritative flag
     # the chain sets when deriveInstrumentTopology fires) — place_sealed_enclosure reads it
     # to lay the interior out as an optical bench + PCB, not a BESS battery-cabinet stack.
-    global _IS_INSTRUMENT_DEVICE
+    global _IS_INSTRUMENT_DEVICE, _INSTRUMENT_OPTICAL_PATH_MM
     _IS_INSTRUMENT_DEVICE = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
+    # Sample-chamber plan/height track the brief/contract optical path when present
+    # (transmittance instruments size the cuvette well from path length — universal).
+    _path = qval(quantities, "optical_path_length_mm", None)
+    if _path is not None and float(_path) > 0:
+        _INSTRUMENT_OPTICAL_PATH_MM = float(_path)
+    else:
+        _INSTRUMENT_OPTICAL_PATH_MM = 10.0
     envelope = resolve_design_envelope_mm(state)
     if envelope:
         return envelope
@@ -12173,35 +12182,74 @@ def _import_family_cad(
     return obj
 
 
-def _instrument_form_rule_mm(W: float, D: float, H: float, base_z: float, tt: float) -> dict:
-    """Pure Open-Colorimeter-class form rule for sealed optical instruments.
+def _instrument_form_rule_mm(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    optical_path_mm: float | None = None,
+) -> dict:
+    """Function-driven exterior features for sealed optical/electronic instruments.
 
-    INTENT: instrument devices are wide, flat handhelds with a raised cuvette tower,
-    top-deck UI, and a small external LED module on the tower face. They must never
-    inherit the sealed-cabinet front-door / interior-board visual language.
+    INTENT — shape from PHYSICS OF USE, never from a commercial silhouette:
+    1. Top operating plane: a handheld/benchtop instrument is used looking down, so
+       the HMI (display + tactile buttons) lives on the TOP deck beside the sample
+       access — not on a vertical front face (that is appliance/cabinet language).
+    2. Sample chamber rises through the top: a transmittance measurement needs a
+       light-tight well the cuvette drops into from above (gravity seat + ambient
+       baffle). Chamber plan size tracks a square cuvette for `optical_path_mm`
+       (path + cuvette wall + baffle allowance). Chamber height is set by a
+       standard cuvette body (~45 mm) scaled gently with path — NOT by copying
+       any particular product's tower proportions.
+    3. Optical SOURCE module on the chamber's optical-axis face: the LED (or other
+       emitter) must sit on the axis that goes through the sample. It is a SMALL
+       replaceable module (wavelength / assay swaps), not the instrument
+       motherboard — so the board is window-scale, not body-spanning.
+    Envelope W/D/H already come from design_envelope_* (landscape for top-operated
+    devices). This rule only places the functional features on that envelope.
     """
-    tower_w = W * 0.28
-    tower_d = D * 0.44
-    tower_h = H * 0.86
-    tower_loc = (W * 0.27, D * 0.06, base_z + H + tower_h / 2)
-    tower_front_y = tower_loc[1] - tower_d / 2 - max(1.2, tt * 0.25)
+    path = float(optical_path_mm if optical_path_mm is not None else _INSTRUMENT_OPTICAL_PATH_MM)
+    path = max(5.0, path)
+    # Square cuvette outer ≈ path + ~2.5 mm walls; chamber adds baffle each side.
+    cuvette_outer = path + 2.5
+    chamber_plan = min(max(cuvette_outer + 8.0, 18.0), min(W, D) * 0.42)
+    # Standard spectrophotometry cuvette body ~45 mm tall; scale gently with path.
+    chamber_h = max(H * 0.50, min(H * 0.95, 28.0 + path * 1.6))
+    # Chamber on the RIGHT of the top deck — leaves a contiguous LEFT operating
+    # plane for display + buttons (operator hand + eyes share that plane).
+    tower_loc = (W * 0.28, D * 0.02, base_z + H + chamber_h / 2)
+    tower_size = (chamber_plan, chamber_plan * 0.92, chamber_h)
+    tower_front_y = tower_loc[1] - tower_size[1] / 2 - max(1.0, tt * 0.2)
+    # Source module ≈ optical window + mount/connector margin — NOT a full face plate.
+    window = max(path * 1.2, 8.0)
+    led_w = min(tower_size[0] * 0.72, window * 2.4)
+    led_h = min(tower_size[2] * 0.38, window * 2.0)
+    led_d = 2.0
+    # Top-deck HMI: dark display rectangle + diamond/cluster of tactile buttons to
+    # its left (thumb reach while looking at the sample chamber).
+    display_size = (W * 0.38, D * 0.30, 2.4)
+    display_loc = (-W * 0.16, -D * 0.06, base_z + H + 1.2)
+    btn_z = base_z + H + 2.4
+    button_locs = [
+        (-W * 0.42, -D * 0.22, btn_z),  # up
+        (-W * 0.42, -D * 0.08, btn_z),  # down
+        (-W * 0.48, -D * 0.15, btn_z),  # left
+        (-W * 0.36, -D * 0.15, btn_z),  # right
+        (-W * 0.05, -D * 0.22, btn_z),  # select
+        (W * 0.02, -D * 0.14, btn_z),   # aux
+    ]
     return {
+        "optical_path_mm": path,
         "tower_loc": tower_loc,
-        "tower_size": (tower_w, tower_d, tower_h),
-        "well_loc": (tower_loc[0], tower_loc[1], base_z + H + tower_h + 1.6),
-        "well_size": (tower_w * 0.44, tower_d * 0.34, 3.2),
-        "led_pcb_loc": (tower_loc[0], tower_front_y, base_z + H + tower_h * 0.42),
-        "led_pcb_size": (tower_w * 0.78, 2.4, tower_h * 0.36),
-        "top_display_loc": (-W * 0.18, -D * 0.08, base_z + H + 1.4),
-        "top_display_size": (W * 0.44, D * 0.34, 2.8),
-        "button_locs": [
-            (W * -0.42, -D * 0.25, base_z + H + 2.6),
-            (W * -0.37, -D * 0.18, base_z + H + 2.6),
-            (W * -0.47, -D * 0.18, base_z + H + 2.6),
-            (W * 0.08, -D * 0.24, base_z + H + 2.6),
-            (W * 0.15, -D * 0.18, base_z + H + 2.6),
-            (W * 0.22, -D * 0.24, base_z + H + 2.6),
-        ],
+        "tower_size": tower_size,
+        "well_loc": (tower_loc[0], tower_loc[1], base_z + H + chamber_h + 1.4),
+        "well_size": (cuvette_outer * 0.95, cuvette_outer * 0.95, 3.0),
+        "led_pcb_loc": (tower_loc[0], tower_front_y, base_z + H + chamber_h * 0.40),
+        "led_pcb_size": (led_w, led_d, led_h),
+        "top_display_loc": display_loc,
+        "top_display_size": display_size,
+        "button_locs": button_locs,
     }
 
 
@@ -12389,8 +12437,8 @@ def _place_instrument_handheld_cues(
     )
     _well.dimensions = _mm3(form["well_size"])
 
-    # SMALL external LED PCB mounted on the tower face. This is deliberately not the
-    # internal electronics story board, so it cannot read as a cabinet-wide cutaway PCB.
+    # SMALL optical SOURCE module on the chamber's optical-axis face (wavelength-
+    # swappable emitter) — window-scale, never a motherboard spanning the body.
     _led_pcb_mat = fl.make_mat(
         "m_se_cue_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
     _led_pcb = fl.add_box(
@@ -12403,8 +12451,8 @@ def _place_instrument_handheld_cues(
     )
     _led_pcb.dimensions = _mm3(form["led_pcb_size"])
 
-    # top deck display + tactile buttons (PyBadge-class layout). Avoid front-face UI:
-    # that is what made the closed render read as a gamepad/appliance.
+    # Top-deck HMI (operator looks down) — display + tactile cluster beside the
+    # sample chamber. Avoid front-face UI: that is appliance/cabinet language.
     _display = fl.add_box(
         "u_se_cutaway_cue_top_display",
         _mm3(form["top_display_loc"]),
@@ -12580,9 +12628,9 @@ def _selftest_instrument_proxy_geometry() -> None:
 
 
 def _selftest_instrument_colorimeter_form_rule() -> None:
-    """proveCatch for the Open-Colorimeter-class sealed instrument form."""
+    """proveCatch: instrument exterior features follow USE PHYSICS, not a product clone."""
     W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
-    form = _instrument_form_rule_mm(W, D, H, base_z, tt)
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
     tower_w, tower_d, tower_h = form["tower_size"]
     tower_x, tower_y, tower_z = form["tower_loc"]
     led_w, led_d, led_h = form["led_pcb_size"]
@@ -12590,23 +12638,33 @@ def _selftest_instrument_colorimeter_form_rule() -> None:
     display_w, display_d, display_h = form["top_display_size"]
     _pcb_w, _pcb_d, _pcb_h = _instrument_electronics_story_size(150.0, 110.0, 18.0)
 
-    assert W > D > H, "fixture must be a wide-flat handheld envelope"
-    assert tower_h >= H * 0.75, (
-        f"cuvette feature must be a vertical tower, not a shallow top lump ({tower_h})")
-    assert abs((tower_z - tower_h / 2) - (base_z + H)) < 1e-6, (
-        "cuvette tower must sit on top of the body")
-    assert form["well_size"][0] < tower_w * 0.55 and form["well_size"][1] < tower_d * 0.45, (
-        "cuvette well must read as a square inset in the tower")
-    assert led_w <= tower_w * 0.85 and led_h <= tower_h * 0.45 and led_d <= 3.0, (
-        "external LED PCB must be a small board, not a cabinet-spanning cutaway PCB")
+    assert W > D > H, "fixture must be a wide-flat top-operated envelope"
+    assert form["optical_path_mm"] == 10.0
+    # Sample chamber must rise above the body (cuvette inserts from above).
+    assert (tower_z - tower_h / 2) >= base_z + H - 1e-6, (
+        "sample chamber must sit on top of the body for top-loading cuvettes")
+    assert tower_h >= 28.0 + 10.0 * 1.0, (
+        "chamber height must clear a standard cuvette body for the optical path")
+    # Well tracks the cuvette for this path (≈12.5 mm outer → well ~path-scale).
+    assert form["well_size"][0] <= 16.0 and form["well_size"][1] <= 16.0, (
+        "cuvette well must track the optical-path cuvette, not a decorative hole")
+    # Source module is window-scale on the optical-axis face — not a face-filling plate.
+    assert led_w <= tower_w * 0.80 and led_h <= tower_h * 0.45 and led_d <= 2.5, (
+        "LED/source module must be optical-window scale, not a cabinet-spanning board")
     assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
-        "external LED PCB must mount on the tower's outside face")
+        "source module must mount on the chamber's optical-axis face")
+    # Path change must resize the chamber/well (function, not a fixed decorative tower).
+    form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
+    assert form20["well_size"][0] > form["well_size"][0], (
+        "longer optical path must widen the cuvette well")
     assert display_w > display_d > display_h, (
-        "display must be a thin top-deck rectangle, not a vertical front screen")
+        "display must be a thin top-deck rectangle (top operating plane)")
     assert len(form["button_locs"]) >= 5 and all(loc[2] > base_z + H for loc in form["button_locs"]), (
-        "tactile buttons must live on the top deck")
+        "tactile buttons must live on the top deck with the display")
     assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30, (
         "instrument electronics story PCB must not span the cutaway interior")
+    # Closed-product hero for instruments (not cabinet cutaway).
+    assert "00-hero" in sealed_exterior_view_names(True)
 
 
 def _place_instrument_manifest_proxies(
@@ -13099,13 +13157,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # can see through it") — the zone-stacked internals read through a glassy skin,
         # the classic engineering-marketing cutaway. alpha 0.30: solid enough to give
         # the product its silhouette, open enough to show the pack/inverter/controls.
-        # SHELL ALBEDO (2026-07-13): a device-scale optical INSTRUMENT is a MATTE DARK
-        # 3D-printed enclosure (the gold Open Colorimeter is charcoal), NOT the white
-        # injection-moulded look of a wall appliance. Keyed on the instrument flag so a
-        # Powerwall / wall product keeps its white body (Tesla-white, run 79 = 9.3).
+        # SHELL ALBEDO: a device-scale optical INSTRUMENT uses a MATTE DARK polymer
+        # shell so stray light does not wash the sample chamber (light-tight product
+        # family). Wall appliances keep a lighter body. Keyed on isInstrumentDevice —
+        # never on a named commercial product.
         if _IS_INSTRUMENT_DEVICE:
             _body_rgb, _panel_rgb, _ext_rgb = (0.11, 0.115, 0.13), (0.09, 0.095, 0.11), (0.10, 0.105, 0.12)
-            _body_rough, _ext_rough = 0.62, 0.66  # matte 3D-printed polymer
+            _body_rough, _ext_rough = 0.62, 0.66  # matte light-tight polymer
         else:
             _body_rgb, _panel_rgb, _ext_rgb = (0.85, 0.88, 0.92), (0.84, 0.86, 0.88), (0.82, 0.85, 0.88)
             _body_rough, _ext_rough = 0.25, 0.32
@@ -13151,18 +13209,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if not _IS_INSTRUMENT_DEVICE:
             _shell_panels.append(
                 ("u_se_product_band", (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)))
-        else:
-            # Instrument hero is a mostly closed handheld with a narrow service/cutaway
-            # reveal. Leaving the entire front open recreates the "grey cabinet cutaway"
-            # failure; this fascia preserves the optical story without exposing a box bay.
-            _shell_panels.extend([
-                ("u_se_product_front_lower_fascia",
-                 (0.0, -D / 2 + tt / 2, base_z + H * 0.24),
-                 (W * 0.96, tt, H * 0.42)),
-                ("u_se_product_front_upper_lip",
-                 (-W * 0.08, -D / 2 + tt / 2, base_z + H * 0.78),
-                 (W * 0.72, tt, H * 0.10)),
-            ])
+        # GOTCHA: instruments do NOT add a partial front fascia here. Closing the
+        # product is done by putting 00-hero in sealed_exterior_view_names so the
+        # front_cover renders — a half-open fascia still reads as a cabinet bay.
         for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
@@ -13250,13 +13299,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 rotation=(math.radians(90), 0.0, 0.0),
             )
             _status.hide_render = True
-        # INSTRUMENT FACE (2026-07-12): a device-scale optical instrument's closed
-        # product face must READ as the instrument — a display window + a button
-        # cluster on the front, and a cuvette/optical port on the wide top — not a
-        # featureless cabinet box. Keyed on the authoritative device flag; a plant
-        # enclosure never carries it (the gold Open Colorimeter face: TFT + 5 buttons
-        # left, a light-tight cuvette cube on the right). All as u_se_exterior_detail_*
-        # so they render on the closed product views and hide on the cutaway hero.
+        # INSTRUMENT FACE: top operating plane + sample chamber + optical-axis
+        # source module — see _instrument_form_rule_mm. All as u_se_exterior_detail_*
+        # so they render on closed product views and hide on any cutaway pass.
         if _IS_INSTRUMENT_DEVICE:
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear((0.02, 0.03, 0.05)),
@@ -13296,8 +13341,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                module=_skin_mod, module_objects=MO)
             _bore.dimensions = _mm3(form["well_size"])
             _bore.hide_render = True
-            # external LED driver PCB — a small green module mounted on the tower
-            # face, not a board spanning the product cutaway.
+            # Optical SOURCE module on the chamber's optical-axis face (window-scale).
             _led_pcb_mat = fl.make_mat(
                 "m_se_face_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
             _led_pcb = fl.add_box(

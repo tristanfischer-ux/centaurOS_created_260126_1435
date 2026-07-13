@@ -446,12 +446,11 @@ export function deriveDeviceScaleEnclosure(
   // Synthesise a max_dimensions_mm-equivalent box so the sealed-enclosure
   // render + GA have real dimensions rather than falling back to a cube.
   // Aspect: a portable/benchtop instrument is WIDE and FLAT — a landscape
-  // footprint (a display face + optical port on the wide top), NEVER a tall
-  // square box. A slightly-tall square box reads as a floor-standing cabinet
-  // in the hero (the 2026-07-12 Open Colorimeter regression: a 115×115×150 box
-  // rendered as a BESS cabinet; the real IO Rodeo unit is ~140W×110D×55H). Use
-  // W:D:H = 1.45:1.15:0.60 (volume-preserving, 1.45·1.15·0.60 ≈ 1.00). Universal
-  // — only device-scale portable/benchtop products reach this branch.
+  // footprint because it is operated from ABOVE (display + sample access share
+  // the top plane). NEVER a tall square box: that reads as a floor-standing
+  // cabinet in the hero (2026-07-12 regression: a ~cube rendered as a BESS
+  // cabinet). Use W:D:H = 1.45:1.15:0.60 (volume-preserving, 1.45·1.15·0.60 ≈ 1.00).
+  // Universal — only device-scale portable/benchtop products reach this branch.
   if (!q.design_envelope_width_mm && !q.design_envelope_depth_mm && !q.design_envelope_height_mm) {
     const baseSideMm = Math.cbrt(volM3) * 1000
     const widthMm = baseSideMm * 1.45
