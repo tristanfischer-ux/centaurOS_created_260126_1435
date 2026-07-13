@@ -273,18 +273,19 @@ def required_views(state: dict) -> list[ViewSpec]:
 def sealed_exterior_view_names(is_instrument_device: bool) -> frozenset[str]:
     """Blender view names that render the CLOSED product shell (not cutaway internals).
 
-    INTENT: a sealed handheld/benchtop INSTRUMENT is operated and sold as a closed
-    product — the customer-facing artefact is the exterior (top deck + sample port),
-    not an open electronics bay. Cabinets/wall products still use a cutaway 00-hero
-    so internals read; instruments close 00-hero too. 07-product-service follows the
-    same rule (USB/service on the exterior, never zone-stacked grey slabs).
+    INTENT: product exterior shots (04–07) show the closed handheld — top deck,
+    sample well, source board, loom. Excel's "Interior — cutaway" is `00-hero.png`
+    (_PRODUCT_VIEWS.product_cutaway) and MUST stay a true cutaway so the optical
+    bench + PCB story is delivered. Closing 00-hero hid that story and contradicted
+    the Excel label (instrument-form-beauty rule, 2026-07-13).
+
+    DECISION: instruments close 04/05/06/07 only; 00-hero remains open cutaway.
+    Cabinets keep the same exterior trio; their 00-hero was already cutaway.
     """
     views = {"04-product-exterior", "05-product-left", "06-product-right"}
     if is_instrument_device:
-        # DECISION: instrument 00-hero is the CLOSED product. A cutaway hero is the
-        # wrong deliverable language for a handheld optical instrument — it invents
-        # a "cabinet with the door off" story the product does not have.
-        views = views | {"00-hero", "07-product-service"}
+        # Service face is still the closed product (USB / cable entries), not zone slabs.
+        views = views | {"07-product-service"}
     return frozenset(views)
 
 
@@ -346,8 +347,10 @@ def _selftest() -> None:
         "brief dimensions must win over derived non-handheld instrument hints")
     assert "07-product-service" in sealed_exterior_view_names(True), (
         "instrument service view must use closed exterior, not cutaway slabs")
-    assert "00-hero" in sealed_exterior_view_names(True), (
-        "instrument 00-hero must be the closed product (not a cabinet cutaway)")
+    assert "00-hero" not in sealed_exterior_view_names(True), (
+        "instrument 00-hero must stay the Excel Interior cutaway (structured optical bench)")
+    assert "04-product-exterior" in sealed_exterior_view_names(True), (
+        "instrument product exterior stays closed")
     assert "00-hero" not in sealed_exterior_view_names(False), (
         "cabinet/plant 00-hero stays cutaway")
     assert "07-product-service" not in sealed_exterior_view_names(False), (

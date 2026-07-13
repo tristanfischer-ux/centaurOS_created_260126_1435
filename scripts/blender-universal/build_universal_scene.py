@@ -52,6 +52,7 @@ from render_view_contract import (
 )
 from cad_asset_resolver import CadAssetResolver
 import human_factors_instrument as hfi
+import instrument_form_grammar as ifg
 
 # ── FAST PIPE-RUN PATCH (universal router robustness) ─────────────────────────
 # The stock forge_blender_lib.add_pipe calls bpy.ops.object.select_all + convert
@@ -12241,16 +12242,17 @@ def _instrument_form_rule_mm(
     led_d = 1.8
     # Recessed display — Apple HIG readability floor (11 pt @ ~350 mm) → mm area.
     ui_span_x = max(40.0, (tx - tw / 2) - (-W / 2))
-    disp_w = max(hfi.DISPLAY_ACTIVE_PREF_W_MM, min(W * 0.40, ui_span_x * 0.70))
-    disp_h = max(hfi.DISPLAY_ACTIVE_PREF_H_MM, min(D * 0.32, disp_w * 0.70))
+    disp_w = max(ifg.DISPLAY_ACTIVE_PREF_W_MM, min(W * 0.40, ui_span_x * 0.70))
+    disp_h = max(ifg.DISPLAY_ACTIVE_PREF_H_MM, min(D * 0.32, disp_w * 0.70))
     # If the deck is tight, never drop below the absolute readability floor.
-    disp_w = max(disp_w, hfi.DISPLAY_ACTIVE_MIN_W_MM)
-    disp_h = max(disp_h, hfi.DISPLAY_ACTIVE_MIN_H_MM)
-    display_size = (disp_w, disp_h, 1.8)
+    disp_w = max(disp_w, ifg.DISPLAY_ACTIVE_MIN_W_MM)
+    disp_h = max(disp_h, ifg.DISPLAY_ACTIVE_MIN_H_MM)
+    display_size = (disp_w, disp_h, ifg.DISPLAY_GLASS_THICKNESS_MM)
     display_loc = (-W * 0.18, -D * 0.04, base_z + H + 0.9)
-    # D-pad + A/B: Apple 44 pt → ≥7 mm tactile; prefer 9 mm; pitch includes gap.
-    btn_d = min(hfi.BUTTON_PREF_DIAMETER_MM, max(hfi.BUTTON_MIN_DIAMETER_MM, min(W, D) * 0.06))
-    btn_pitch = btn_d + hfi.BUTTON_PREF_GAP_MM
+    bezel_size = ifg.display_bezel_size_mm(display_size)
+    # D-pad + A/B: Apple 44 pt → ≥7 mm tactile; prefer 9 mm; Fitts — navigate left, commit right.
+    btn_d = max(ifg.BUTTON_MIN_DIAMETER_MM, min(ifg.BUTTON_PREF_DIAMETER_MM, min(W, D) * 0.075))
+    btn_pitch = btn_d + ifg.BUTTON_PREF_GAP_MM
     btn_z = base_z + H + 2.2
     dx, dy, _dz = display_loc
     dpad_x = dx - display_size[0] * 0.55 - btn_pitch
@@ -12301,12 +12303,16 @@ def _instrument_form_rule_mm(
         "led_pcb_size": (led_w, led_d, led_h),
         "top_display_loc": display_loc,
         "top_display_size": display_size,
+        "display_bezel_size": bezel_size,
         "button_locs": button_locs,
         "button_diameter_mm": btn_d,
+        "button_shape": ifg.BUTTON_SHAPE,
         "screw_locs": screw_locs,
+        "screw_head_diameter_mm": ifg.SCREW_HEAD_DIAMETER_MM,
+        "screw_head_height_mm": ifg.SCREW_HEAD_HEIGHT_MM,
         "step_shelf_loc": (tx, ty, base_z + H + 2.0),
         "step_shelf_size": (tw * 1.12, td * 1.10, 4.0),
-        "viewing_distance_mm": hfi.VIEWING_DISTANCE_MM_DESIGN,
+        "viewing_distance_mm": ifg.VIEWING_DISTANCE_MM_DESIGN,
     }
 
 
@@ -12323,114 +12329,148 @@ def _place_instrument_zone_story(
     idep: float,
     story_mod: str,
     MO: dict,
+    *,
+    envelope: tuple[float, float, float, float, float] | None = None,
 ) -> None:
-    """Stylized optical-bench interior for a handheld instrument cutaway.
+    """DEPRECATED path — zone bands. Prefer `_place_instrument_interior_layout` once."""
+    # Kept as a no-op shim so any residual callers do not rebuild vertical slabs.
+    return
 
-    Zone-stacked grey slabs read as a BESS cabinet, not an Open Colorimeter.
-    The cutaway hero tells a source → cuvette → detector story with a PCB +
-    coin-cell — keyed on _IS_INSTRUMENT_DEVICE only.
+
+def _place_instrument_interior_layout(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    story_mod: str,
+    MO: dict,
+) -> dict:
+    """Structured, beautiful instrument interior aligned to the exterior form rule.
+
+    INTENT: cutaway must read as one composition — UI volume (PCB + cell under the
+    display) beside an optical volume (source → beam → cuvette → detector on the
+    transmittance axis). Anchors come from `_instrument_form_rule_mm` so exterior
+    and interior cannot drift. Never a vertical BESS-style zone stack.
 
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
-    run_render_pipeline's hero pass repaints every structure object with ghost/steel."""
-    mid_z = z_cursor + band_h * 0.5
-
+    """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
-    if key == "optical":
-        led_mat = fl.make_mat(
-            "m_se_story_led", fl._to_linear((1.0, 0.62, 0.08)),
-            metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=2.5)
-        cuv_mat = fl.make_mat(
-            "m_se_story_cuvette", fl._to_linear((0.04, 0.05, 0.08)), metallic=0.35, roughness=0.18)
-        det_mat = fl.make_mat(
-            "m_se_story_detector", fl._to_linear((0.12, 0.13, 0.18)), metallic=0.45, roughness=0.35)
-        bench_mat = fl.make_mat(
-            "m_se_story_bench", fl._to_linear((0.20, 0.21, 0.24)), metallic=0.2, roughness=0.55)
-        beam_mat = fl.make_mat(
-            "m_se_story_beam", fl._to_linear((1.0, 0.72, 0.12)),
-            metallic=0.0, roughness=0.15, kind="led_emissive", emission_strength=1.2)
-        # optical bench rail — the dominant horizontal read in the cutaway
-        _bench = fl.add_box(
-            "u_se_instrument_story_bench",
-            _mm3((0.0, idep * 0.02, z_cursor + band_h * 0.18)),
-            _mm3((iw * 0.88, idep * 0.62, max(5.0, band_h * 0.12))),
-            bench_mat, module=story_mod, module_objects=MO)
-        _bench.dimensions = _mm3((iw * 0.88, idep * 0.62, max(5.0, band_h * 0.12)))
-        _led = fl.add_box(
-            "u_se_instrument_story_led",
-            _mm3((-iw * 0.30, idep * 0.12, mid_z)),
-            _mm3((iw * 0.22, 12.0, band_h * 0.32)),
-            led_mat, module=story_mod, module_objects=MO)
-        _led.dimensions = _mm3((iw * 0.22, 12.0, band_h * 0.32))
-        _cuv = fl.add_box(
-            "u_se_instrument_story_cuvette",
-            _mm3((0.0, idep * 0.04, mid_z + band_h * 0.04)),
-            _mm3((iw * 0.20, idep * 0.42, band_h * 0.62)),
-            cuv_mat, module=story_mod, module_objects=MO)
-        _cuv.dimensions = _mm3((iw * 0.20, idep * 0.42, band_h * 0.62))
-        _det = fl.add_box(
-            "u_se_instrument_story_detector",
-            _mm3((iw * 0.30, idep * 0.08, mid_z)),
-            _mm3((iw * 0.16, idep * 0.30, band_h * 0.30)),
-            det_mat, module=story_mod, module_objects=MO)
-        _det.dimensions = _mm3((iw * 0.16, idep * 0.30, band_h * 0.30))
-        # emissive light path — makes the optical axis legible at thumbnail scale
-        _beam = fl.add_box(
-            "u_se_instrument_story_beam",
-            _mm3((0.0, idep * 0.10, mid_z)),
-            _mm3((iw * 0.62, 4.0, band_h * 0.10)),
-            beam_mat, module=story_mod, module_objects=MO)
-        _beam.dimensions = _mm3((iw * 0.62, 4.0, band_h * 0.10))
-        print(f"[univ][sealed] instrument story: optical bench + LED + cuvette + detector + beam")
-    elif key == "electronics":
-        pcb_mat = fl.make_mat(
-            "m_se_story_pcb", fl._to_linear((0.06, 0.48, 0.24)), metallic=0.1, roughness=0.38)
-        chip_mat = fl.make_mat(
-            "m_se_story_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
-        pcb_size = _instrument_electronics_story_size(iw, idep, band_h)
-        _pcb = fl.add_box(
-            "u_se_instrument_story_pcb",
-            _mm3((-iw * 0.34, idep * 0.12, mid_z)),
-            _mm3(pcb_size),
-            pcb_mat, module=story_mod, module_objects=MO)
-        _pcb.dimensions = _mm3(pcb_size)
-        for _ci, (_cx, _cz) in enumerate([(-0.42, 0.55), (-0.34, 0.45), (-0.26, 0.55)]):
-            fl.add_box(
-                f"u_se_instrument_story_chip_{_ci}",
-                _mm3((iw * _cx, idep * 0.22, z_cursor + band_h * _cz)),
-                _mm3((iw * 0.10, 3.0, band_h * 0.14)),
-                chip_mat, module=story_mod, module_objects=MO)
-        print(f"[univ][sealed] instrument story: small side PCB + MCU packages")
-    elif key == "power":
-        bat_mat = fl.make_mat(
-            "m_se_story_cell", fl._to_linear((0.62, 0.63, 0.66)), metallic=0.55, roughness=0.32)
-        fl.add_cyl(
-            "u_se_instrument_story_cell",
-            _mm3((-iw * 0.34, idep * 0.14, mid_z)),
-            12.0 * fl.MM, 4.0 * fl.MM, bat_mat,
-            module=story_mod, module_objects=MO,
-            rotation=(math.radians(90), 0.0, 0.0))
-        print(f"[univ][sealed] instrument story: coin cell")
-    elif key == "interface":
-        _disp_mat = fl.make_mat(
-            "m_se_story_iface_disp", fl._to_linear((0.02, 0.04, 0.08)), metallic=0.0, roughness=0.12)
-        _btn_mat = fl.make_mat(
-            "m_se_story_iface_btn", fl._to_linear((0.22, 0.23, 0.26)), metallic=0.15, roughness=0.5)
-        fl.add_box(
-            "u_se_instrument_story_display",
-            _mm3((-iw * 0.20, idep * 0.38, mid_z)),
-            _mm3((iw * 0.46, 4.0, band_h * 0.72)),
-            _disp_mat, module=story_mod, module_objects=MO)
-        for _bi, (_bx, _bz) in enumerate([(0.30, 0.68), (0.30, 0.28), (0.18, 0.48), (0.42, 0.48)]):
-            fl.add_cyl(
-                f"u_se_instrument_story_button_{_bi}",
-                _mm3((iw * _bx, idep * 0.42, z_cursor + band_h * _bz)),
-                3.6 * fl.MM, 2.6 * fl.MM, _btn_mat,
-                module=story_mod, module_objects=MO,
-                rotation=(math.radians(90), 0.0, 0.0))
-        print(f"[univ][sealed] instrument story: display + buttons")
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt)
+    tw, td, th = form["tower_size"]
+    tx, ty, tz = form["tower_loc"]
+    dx, dy, dz = form["top_display_loc"]
+    dw, dh, _dt = form["top_display_size"]
+    path = float(form["optical_path_mm"])
+    cuvette_plan = max(8.0, path + 1.0)
 
+    led_mat = fl.make_mat(
+        "m_se_story_led", fl._to_linear(ifg.MAT_LED_EMIT),
+        metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=2.5)
+    cuv_mat = fl.make_mat(
+        "m_se_story_cuvette", fl._to_linear((0.55, 0.72, 0.85)), metallic=0.05, roughness=0.12)
+    det_mat = fl.make_mat(
+        "m_se_story_detector", fl._to_linear(ifg.MAT_DETECTOR), metallic=0.45, roughness=0.35)
+    bench_mat = fl.make_mat(
+        "m_se_story_bench", fl._to_linear(ifg.MAT_OPTICAL_BENCH), metallic=0.2, roughness=0.55)
+    beam_mat = fl.make_mat(
+        "m_se_story_beam", fl._to_linear(ifg.MAT_BEAM),
+        metallic=0.0, roughness=0.15, kind="led_emissive", emission_strength=1.4)
+    pcb_mat = fl.make_mat(
+        "m_se_story_pcb", fl._to_linear(ifg.MAT_FR4), metallic=0.1, roughness=0.38)
+    chip_mat = fl.make_mat(
+        "m_se_story_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
+    bat_mat = fl.make_mat(
+        "m_se_story_cell", fl._to_linear(ifg.MAT_COIN_CELL), metallic=0.55, roughness=0.32)
+    glass_mat = fl.make_mat(
+        "m_se_story_glass", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
+
+    # Optical bench floor inside the cube volume — horizontal read.
+    bench_z = base_z + H * 0.22
+    _bench = fl.add_box(
+        "u_se_instrument_story_bench",
+        _mm3((tx, ty, bench_z)),
+        _mm3((tw * 0.92, td * 0.92, 4.0)),
+        bench_mat, module=story_mod, module_objects=MO)
+    _bench.dimensions = _mm3((tw * 0.92, td * 0.92, 4.0))
+
+    # Transmittance axis along −Y (matches exterior source PCB on tower front).
+    optic_z = base_z + H + th * 0.38
+    src_y = ty - td * 0.28
+    det_y = ty + td * 0.28
+    _led = fl.add_box(
+        "u_se_instrument_story_led",
+        _mm3((tx, src_y, optic_z)),
+        _mm3((max(10.0, path * 1.1), 3.0, max(10.0, path * 1.1))),
+        led_mat, module=story_mod, module_objects=MO)
+    _led.dimensions = _mm3((max(10.0, path * 1.1), 3.0, max(10.0, path * 1.1)))
+    _cuv = fl.add_box(
+        "u_se_instrument_story_cuvette",
+        _mm3((tx, ty, optic_z + 2.0)),
+        _mm3((cuvette_plan, cuvette_plan, min(th * 0.55, 28.0))),
+        cuv_mat, module=story_mod, module_objects=MO)
+    _cuv.dimensions = _mm3((cuvette_plan, cuvette_plan, min(th * 0.55, 28.0)))
+    _det = fl.add_box(
+        "u_se_instrument_story_detector",
+        _mm3((tx, det_y, optic_z)),
+        _mm3((max(8.0, path * 0.9), 4.0, max(8.0, path * 0.9))),
+        det_mat, module=story_mod, module_objects=MO)
+    _det.dimensions = _mm3((max(8.0, path * 0.9), 4.0, max(8.0, path * 0.9)))
+    beam_len = abs(det_y - src_y)
+    _beam = fl.add_box(
+        "u_se_instrument_story_beam",
+        _mm3((tx, (src_y + det_y) / 2.0, optic_z)),
+        _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM)),
+        beam_mat, module=story_mod, module_objects=MO)
+    _beam.dimensions = _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM))
+
+    # UI volume — main PCB under the display locus (left of cube).
+    pcb_w = max(48.0, dw * 1.05)
+    pcb_d = max(36.0, dh * 1.15)
+    pcb_z = base_z + H * 0.42
+    _pcb = fl.add_box(
+        "u_se_instrument_story_pcb",
+        _mm3((dx, dy + 4.0, pcb_z)),
+        _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM)),
+        pcb_mat, module=story_mod, module_objects=MO)
+    _pcb.dimensions = _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM))
+    for _ci, (_ox, _oy) in enumerate([(-0.28, 0.22), (0.18, -0.15), (0.30, 0.28)]):
+        fl.add_box(
+            f"u_se_instrument_story_chip_{_ci}",
+            _mm3((dx + pcb_w * _ox, dy + 4.0 + pcb_d * _oy, pcb_z + 2.2)),
+            _mm3((max(6.0, pcb_w * 0.16), max(5.0, pcb_d * 0.14), 2.0)),
+            chip_mat, module=story_mod, module_objects=MO)
+
+    # Coin cell under the left UI deck (power for handheld instruments).
+    fl.add_cyl(
+        "u_se_instrument_story_cell",
+        _mm3((dx - pcb_w * 0.35, dy - pcb_d * 0.15, base_z + H * 0.28)),
+        ifg.INTERIOR_COIN_CELL_R_MM * fl.MM,
+        3.2 * fl.MM,
+        bat_mat,
+        module=story_mod, module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+
+    # Underside of the recessed display — dark glass reads from the cutaway.
+    _glass = fl.add_box(
+        "u_se_instrument_story_display",
+        _mm3((dx, dy, base_z + H - 1.2)),
+        _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM)),
+        glass_mat, module=story_mod, module_objects=MO)
+    _glass.dimensions = _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM))
+
+    print(
+        "[univ][sealed] instrument interior: optical axis (source→cuvette→detector) "
+        "+ UI PCB + coin cell under display (form-aligned)"
+    )
+    return form
+
+
+# Back-compat: older call sites may still pass zone keys.
+_place_instrument_zone_story_legacy = _place_instrument_zone_story
 
 def _instrument_pcb_png_path() -> str | None:
     """Run-dir KiCad board render — same artefact the Excel PCB tab embeds."""
@@ -12786,9 +12826,14 @@ def _selftest_instrument_form_rule() -> None:
     assert hfi.button_diameter_ok(form["button_diameter_mm"])
     assert len(form["button_locs"]) >= 6, "D-pad + A/B on the top UI deck"
     assert len(form["screw_locs"]) >= 4, "AM enclosure needs visible top-plate fasteners"
-    assert form["viewing_distance_mm"] == hfi.VIEWING_DISTANCE_MM_DESIGN
+    assert form["viewing_distance_mm"] == ifg.VIEWING_DISTANCE_MM_DESIGN
+    assert form["button_shape"] == "square"
+    assert form["display_bezel_size"][0] > display_w
+    assert form["screw_head_diameter_mm"] >= 2.5
     assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30
-    assert "00-hero" in sealed_exterior_view_names(True)
+    assert "00-hero" not in sealed_exterior_view_names(True), (
+        "instrument cutaway hero must remain open so the interior story ships")
+    assert "04-product-exterior" in sealed_exterior_view_names(True)
     _assert_instrument_source_harness_coherent(form, W, D, H, base_z, tt)
     _assert_instrument_source_harness_coherent(form20, W, D, H, base_z, tt)
 
@@ -12894,29 +12939,31 @@ def _place_instrument_handheld_cues(
     _place_instrument_ui_pcb(
         "u_se_cutaway_cue_ui_pcb", form, skin_mod, MO, hide_render=False)
 
-    # Top-deck HMI (operator looks down) — display + tactile cluster beside the
-    # sample chamber. Avoid front-face UI: that is appliance/cabinet language.
+    # Top-deck HMI (operator looks down) — dark glass + square tactile keys.
+    _glass_mat = fl.make_mat(
+        "m_se_cue_glass", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.05, roughness=0.12)
     _display = fl.add_box(
         "u_se_cutaway_cue_top_display",
         _mm3(form["top_display_loc"]),
         _mm3(form["top_display_size"]),
-        bezel_mat,
+        _glass_mat,
         module=skin_mod,
         module_objects=MO,
     )
     _display.dimensions = _mm3(form["top_display_size"])
     _pad_mat = fl.make_mat(
-        "m_se_cue_pad", fl._to_linear((0.18, 0.19, 0.22)), metallic=0.2, roughness=0.5)
+        "m_se_cue_pad", fl._to_linear(ifg.MAT_BUTTON_KEY), metallic=0.12, roughness=0.48)
+    _btn_size = ifg.button_plan_size_mm(float(form.get("button_diameter_mm", ifg.BUTTON_PREF_DIAMETER_MM)))
     for _pi, _loc in enumerate(form["button_locs"]):
-        fl.add_cyl(
+        _b = fl.add_box(
             f"u_se_cutaway_cue_top_button_{_pi}",
             _mm3(_loc),
-            3.0 * fl.MM,
-            2.2 * fl.MM,
+            _mm3(_btn_size),
             _pad_mat,
             module=skin_mod,
             module_objects=MO,
         )
+        _b.dimensions = _mm3(_btn_size)
 
     # chin lip — angled shelf at the bottom front (handheld ergonomics, not a flat cube base)
     _lip_y = -D / 2 + tt * 0.4
@@ -13268,11 +13315,13 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     z_cursor = base_z + margin
     gap = max(4.0, iw * 0.015)
     min_slot_w = max(40.0, iw / 8.0)
+    if _IS_INSTRUMENT_DEVICE:
+        # Single form-aligned interior composition (not vertical zone slabs).
+        _place_instrument_interior_layout(W, D, H, base_z, t, _story_mod, MO)
     for key, frac, _rx in zones:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
         if _IS_INSTRUMENT_DEVICE:
-            _place_instrument_zone_story(key, z_cursor, band_h, iw, idep, _story_mod, MO)
             z_cursor += band_h
             continue
         if plist:
@@ -13613,8 +13662,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _shell_panels.append(
                 ("u_se_product_band", (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)))
         # GOTCHA: instruments do NOT add a partial front fascia here. Closing the
-        # product is done by putting 00-hero in sealed_exterior_view_names so the
-        # front_cover renders — a half-open fascia still reads as a cabinet bay.
+        # product exterior is done by front_cover on sealed_exterior_view_names
+        # (04–07). 00-hero stays open so the structured interior cutaway ships.
         for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
@@ -13707,33 +13756,46 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # so they render on closed product views and hide on any cutaway pass.
         if _IS_INSTRUMENT_DEVICE:
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
-            _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear((0.02, 0.03, 0.05)),
-                                    metallic=0.0, roughness=0.14)
-            _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear((0.12, 0.12, 0.14)),
-                                   metallic=0.15, roughness=0.45)
+            _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS),
+                                    metallic=0.05, roughness=0.10)
+            _bezel_mat = fl.make_mat("m_se_face_bezel", fl._to_linear(ifg.MAT_DISPLAY_BEZEL),
+                                     metallic=0.12, roughness=0.42)
+            _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear(ifg.MAT_BUTTON_KEY),
+                                   metallic=0.12, roughness=0.48)
             # Optical cube matches the charcoal body — same AM polymer, not a grey appliance tower.
-            _port_mat = fl.make_mat("m_se_face_port", fl._to_linear((0.10, 0.105, 0.115)),
+            _port_mat = fl.make_mat("m_se_face_port", fl._to_linear(ifg.MAT_BODY_POLYMER),
                                     metallic=0.05, roughness=0.62)
-            _bore_mat = fl.make_mat("m_se_face_bore", fl._to_linear((0.01, 0.01, 0.01)),
+            _bore_mat = fl.make_mat("m_se_face_bore", fl._to_linear(ifg.MAT_WELL_BORE),
                                     metallic=0.0, roughness=0.9)
             _rim_mat = fl.make_mat("m_se_face_rim", fl._to_linear((0.08, 0.085, 0.09)),
                                    metallic=0.05, roughness=0.55)
-            _screw_mat = fl.make_mat("m_se_face_screw", fl._to_linear((0.05, 0.05, 0.06)),
+            _screw_mat = fl.make_mat("m_se_face_screw", fl._to_linear(ifg.MAT_SCREW),
                                      metallic=0.55, roughness=0.35)
-            # Recessed display on the TOP UI deck (closed product — no FR4 under the glass).
+            _cap_mat = fl.make_mat("m_se_face_cap", fl._to_linear(ifg.MAT_CAP),
+                                   metallic=0.05, roughness=0.58)
+            # Bezel frames the glass (Rams) — slightly larger, sits under the active glass.
+            _bezel = fl.add_box("u_se_exterior_detail_display_bezel",
+                                _mm3((form["top_display_loc"][0], form["top_display_loc"][1],
+                                      form["top_display_loc"][2] - 0.4)),
+                                _mm3(form["display_bezel_size"]), _bezel_mat,
+                                module=_skin_mod, module_objects=MO)
+            _bezel.dimensions = _mm3(form["display_bezel_size"])
+            _bezel.hide_render = True
+            # Recessed dark glass on the TOP UI deck (closed product — no FR4 under the glass).
             _disp = fl.add_box("u_se_exterior_detail_display",
                                _mm3(form["top_display_loc"]),
                                _mm3(form["top_display_size"]), _disp_mat,
                                module=_skin_mod, module_objects=MO)
             _disp.dimensions = _mm3(form["top_display_size"])
             _disp.hide_render = True
-            # D-pad + A/B on the top deck — Apple 44 pt → ≥7 mm tactile floor.
-            _btn_r = max(hfi.BUTTON_MIN_DIAMETER_MM, float(form.get("button_diameter_mm", hfi.BUTTON_PREF_DIAMETER_MM))) / 2.0
+            # D-pad + A/B — square tactile keys at Apple/Fitts floors (not cylindrical pegs).
+            _btn_size = ifg.button_plan_size_mm(float(form.get("button_diameter_mm", ifg.BUTTON_PREF_DIAMETER_MM)))
             for _bi, _loc in enumerate(form["button_locs"]):
-                _btn = fl.add_cyl(f"u_se_exterior_detail_button_{_bi}",
+                _btn = fl.add_box(f"u_se_exterior_detail_button_{_bi}",
                                   _mm3(_loc),
-                                  _btn_r * fl.MM, 2.4 * fl.MM, _btn_mat,
+                                  _mm3(_btn_size), _btn_mat,
                                   module=_skin_mod, module_objects=MO)
+                _btn.dimensions = _mm3(_btn_size)
                 _btn.hide_render = True
             # Step shelf under the optical cube — the L-body joint (UI deck vs optical volume).
             _shelf = fl.add_box(
@@ -13769,28 +13831,29 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 module=_skin_mod, module_objects=MO,
             )
             _rim.hide_render = True
-            # Removable ambient-light cap parked on the UI deck (Beer–Lambert I₀).
+            # Cap parks on the UI deck (product hero keeps the well readable).
             _cap = fl.add_cyl(
                 "u_se_exterior_detail_ambient_cap",
                 _mm3(form["cap_loc"]),
                 (form["cap_od_mm"] / 2.0) * fl.MM,
                 form["cap_h_mm"] * fl.MM,
-                _rim_mat,
+                _cap_mat,
                 module=_skin_mod, module_objects=MO,
             )
             _cap.hide_render = True
-            # AM top-plate fasteners.
+            # AM top-plate fasteners — readable at product scale.
+            _scr = float(form.get("screw_head_diameter_mm", ifg.SCREW_HEAD_DIAMETER_MM)) / 2.0
+            _sch = float(form.get("screw_head_height_mm", ifg.SCREW_HEAD_HEIGHT_MM))
             for _si, _sloc in enumerate(form["screw_locs"]):
-                _sc = fl.add_cyl(
+                fl.add_cyl(
                     f"u_se_exterior_detail_screw_{_si}",
                     _mm3(_sloc),
-                    1.6 * fl.MM,
-                    2.2 * fl.MM,
+                    _scr * fl.MM,
+                    _sch * fl.MM,
                     _screw_mat,
                     module=_skin_mod, module_objects=MO,
-                )
-                _sc.hide_render = True
-            # Optical-axis SOURCE PCB — exposed replaceable module on the cube face.
+                ).hide_render = True
+            # Source PCB + harness on the optical-axis face (closed exterior).
             _place_instrument_source_pcb(
                 "u_se_exterior_detail_led_pcb", form, _skin_mod, MO, hide_render=True)
             _place_instrument_source_harness(
@@ -20030,6 +20093,7 @@ if __name__ == "__main__":
         _selftest_instrument_form_rule()
         _selftest_instrument_source_harness()
         hfi._selftest()
-        print("build_universal_scene _selftest: OK (instrument form + harness + Apple HIG human floors)")
+        ifg._selftest()
+        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials)")
     else:
         main()

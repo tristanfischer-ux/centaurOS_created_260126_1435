@@ -1,0 +1,107 @@
+---
+description: Instrument form beauty grammar — use-physics, materials, Fitts, Rams, loom, manufacturing, structured interior
+alwaysApply: true
+---
+
+# Instrument Form Beauty Grammar
+
+**CRITICAL:** Sealed optical/electronic instruments must look **inevitable and well-designed** — form forced by function, hand/eye, materials, and manufacturing — never by pasting a gold product silhouette.
+
+Hand/eye floors live in `human-factors-instrument-form.mdc` (Apple HIG). This rule is the rest of the stack.
+
+## The stack (encode all of these)
+
+```
+optics / sample / power / HMI / service
+  → volumes + joints          (use-physics)
+  → mm floors for eye/hand    (Apple HIG via human_factors_instrument)
+  → materials per role        (honesty table)
+  → control taxonomy          (Fitts)
+  → dress + fasteners         (loom + AM language)
+  → structured interior       (optical bench composition)
+  → SIGHT proveCatch          (vision / geometry guards)
+```
+
+Gold open-photometer photos are the **TRAINING check**, not a paste target.
+
+## 1. Use-physics → exterior features
+
+| Function | Forced form |
+|---|---|
+| Light-tight optical path | Chunky near-cubic chamber (not a chimney) |
+| Top-loading cuvette | Square well + circular rim for ambient-light cap |
+| Beer–Lambert I₀ | Cap exists; parks on UI deck in product hero (well stays readable) |
+| Wavelength swap | Source PCB on optical-axis face + cable channel at cube↔body joint |
+| Operate looking down | Recessed dark glass + controls on the **top** deck |
+| AM enclosure | Visible top-plate fasteners on a quiet grid |
+
+## 2. Material honesty
+
+| Role | Material language | Forbidden |
+|---|---|---|
+| Body / cube | Charcoal matte polymer | Appliance light-grey slabs |
+| Display | Dark glass (LCD at rest) + subtle bezel | Green FR4 under glass on closed hero; pale “patch” as screen |
+| Keys | Hard dark tactile keys (prefer **square**) | 2–3 mm cosmetic pegs / rivets |
+| Source / compute boards | Green FR4 + gold pads | FR4 painted as the exterior screen |
+| Screws | Dark metallic heads that read at product scale | Invisible or missing fasteners |
+
+Constants: `scripts/lib/instrument_form_grammar.py`.
+
+## 3. Fitts + control taxonomy
+
+- **D-pad** left of glass (navigate)
+- **A/B** right of glass (commit)
+- Pitch ≥ finger gap from Apple floors
+- Keys sized to HIG diameter (≥7 mm, prefer 9 mm), **square** plan when the grammar says square
+
+## 4. Rams / quiet industrial design
+
+- As few exterior features as the functions above require — no decorative vents, fake knobs, or sticker clutter
+- Align display, keys, well, and screws to one top-deck grid
+- One primary composition: buttons → glass → optical cube
+
+## 5. Loom grammar
+
+Connector on source board → strain-relief boot → multi-colour dressed loom → **molded cable channel** at the cube↔body joint → interior. Never mid-air stubs into a lid.
+
+## 6. Interior cutaway (must be beautiful and structured)
+
+The Excel “Interior — cutaway” view (`00-hero.png` for instruments) MUST show a **readable optical/electronics story**, not zone-stacked grey slabs:
+
+```
+LEFT (UI volume)          RIGHT (optical volume)
+  coin cell + main PCB      source → beam → cuvette → detector
+  under the display locus   aligned to the exterior cube / well axis
+```
+
+- One horizontal optical axis through the sample
+- PCB and power live under the UI deck, not as a vertical BESS stack
+- Interior anchors come from `_instrument_form_rule_mm` — exterior and interior share the same geometry truth
+- Translucent shell is intentional; story colours must stay (equipment module, not `structure_containment`)
+
+## 7. View contract
+
+| View | Instrument meaning |
+|---|---|
+| `04` / `05` / `06` / `07` | Closed product exterior |
+| `00-hero` | **Open cutaway** — structured interior (Excel “Interior — cutaway”) |
+
+Do not close `00-hero` for instruments — that hides the interior and defeats the Excel label.
+
+## 8. Code hooks
+
+| Concern | Where |
+|---|---|
+| Hand/eye floors | `scripts/lib/human_factors_instrument.py` |
+| Beauty / materials / Fitts / optics | `scripts/lib/instrument_form_grammar.py` |
+| Form + interior placement | `scripts/blender-universal/build_universal_scene.py` |
+| Closed vs cutaway views | `scripts/lib/render_view_contract.py` → `sealed_exterior_view_names` |
+| Vision rubric | `scripts/lib/render_vision_critic.py` → `_INSTRUMENT_PROMPT` |
+
+## Checklist before shipping an instrument hero set
+
+- [ ] Exterior: L-body, chunky cube, open well + rim, deck-parked cap, cable-channel loom
+- [ ] Exterior: dark glass + bezel, square finger-sized keys, visible screws
+- [ ] Interior cutaway (`00-hero`): source → cuvette → detector + PCB + cell, one composition
+- [ ] Materials honest (no FR4-as-screen on closed views)
+- [ ] Would a competent designer call this quiet and inevitable? If no → fix the rule, not the one render
