@@ -5653,7 +5653,15 @@ async function main() {
     // Device-scale context for dbHitAcceptableForWord: on an instrument, reject industrial
     // DB hits (a plant breaker as device overcurrent, a Banner tower as a status LED, a flow
     // TDC as an ADC) so the slot stays honest-TBD instead of a wrong-family "verified" MPN.
-    setInstrumentDeviceContext(Boolean((state as any)?.isInstrumentDevice))
+    // `state` is not yet declared at this stage, so derive the device signal from the
+    // contract that IS in scope: a sealed sub-1 m³ enclosure whose product class is NOT an
+    // energy-storage / plant archetype (a Powerwall is sub-1 m³ but must NOT be flagged).
+    {
+      const _encVol = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
+      const _pc = String(currentProductClass ?? '').toLowerCase()
+      const _isPlantish = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pc)
+      setInstrumentDeviceContext(Number.isFinite(_encVol) && _encVol > 0 && _encVol < 1 && !_isPlantish)
+    }
     try {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
