@@ -170,6 +170,18 @@ def required_views(state: dict) -> list[ViewSpec]:
     return list(_PRODUCT_VIEWS if is_product_scale(state) else _PLANT_VIEWS)
 
 
+def sealed_exterior_view_names(is_instrument_device: bool) -> frozenset[str]:
+    """Blender view names that render the CLOSED product shell (not cutaway internals).
+
+    A device-scale instrument's 07-product-service must NOT show zone-stacked grey
+    slabs — it is the same closed handheld face as 04–06 (USB/service details on
+    the exterior), not an open cabinet interior."""
+    views = {"04-product-exterior", "05-product-left", "06-product-right"}
+    if is_instrument_device:
+        views = views | {"07-product-service"}
+    return frozenset(views)
+
+
 def _selftest() -> None:
     """proveCatch for the instrument landscape-envelope reshape (2026-07-12).
 
@@ -193,6 +205,10 @@ def _selftest() -> None:
         "design_envelope_width_mm": 140, "design_envelope_depth_mm": 110,
         "design_envelope_height_mm": 55}}, "isInstrumentDevice": True}
     assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), "explicit dims must win"
+    assert "07-product-service" in sealed_exterior_view_names(True), (
+        "instrument service view must use closed exterior, not cutaway slabs")
+    assert "07-product-service" not in sealed_exterior_view_names(False), (
+        "plant/cabinet service view stays cutaway")
     print("render_view_contract _selftest: OK (instrument landscape envelope proven)")
 
 

@@ -48,6 +48,7 @@ import forge_blender_lib as fl
 from render_view_contract import (
     perspective_distance_for_extent,
     resolve_design_envelope_mm,
+    sealed_exterior_view_names,
 )
 from cad_asset_resolver import CadAssetResolver
 
@@ -11971,9 +11972,7 @@ def _prepare_sealed_product_view(view_name, entering):
     """Toggle closed exterior vs open cutaway without mutating engineering data."""
     if _SEALED_FRONT_COVER is None:
         return
-    exterior_views = {
-        "04-product-exterior", "05-product-left", "06-product-right",
-    }
+    exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
     # Always restore the cutaway baseline first. This also makes cleanup after
     # each view deterministic if Blender changes render order.
     _SEALED_FRONT_COVER.hide_render = True
@@ -11984,6 +11983,8 @@ def _prepare_sealed_product_view(view_name, entering):
             obj.hide_render = False
         if obj.name.startswith("u_se_exterior_detail_"):
             obj.hide_render = True
+        if obj.name.startswith("u_se_instrument_story_"):
+            obj.hide_render = False
     if _SEALED_CUTAWAY_MATERIAL is not None:
         for obj in _SEALED_SHELL_OBJECTS:
             if obj and obj.data:
@@ -11998,6 +11999,8 @@ def _prepare_sealed_product_view(view_name, entering):
                 obj.hide_render = True
             if obj.name.startswith("u_se_exterior_detail_"):
                 obj.hide_render = False
+            if obj.name.startswith("u_se_instrument_story_"):
+                obj.hide_render = True
         if _SEALED_EXTERIOR_MATERIAL is not None:
             for obj in _SEALED_SHELL_OBJECTS:
                 if obj and obj.data:
@@ -12080,6 +12083,125 @@ def _import_family_cad(
     return obj
 
 
+def _place_instrument_zone_story(
+    key: str,
+    z_cursor: float,
+    band_h: float,
+    iw: float,
+    idep: float,
+    skin_mod: str,
+    MO: dict,
+) -> None:
+    """Stylized optical-bench interior for a handheld instrument cutaway.
+
+    Zone-stacked grey slabs read as a BESS cabinet, not an Open Colorimeter.
+    The cutaway hero tells a source → cuvette → detector story with a PCB +
+    coin-cell — keyed on _IS_INSTRUMENT_DEVICE only."""
+    mid_z = z_cursor + band_h * 0.5
+
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    if key == "optical":
+        led_mat = fl.make_mat(
+            "m_se_story_led", fl._to_linear((0.95, 0.55, 0.12)), metallic=0.1, roughness=0.35)
+        cuv_mat = fl.make_mat(
+            "m_se_story_cuvette", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.2, roughness=0.55)
+        det_mat = fl.make_mat(
+            "m_se_story_detector", fl._to_linear((0.15, 0.16, 0.20)), metallic=0.3, roughness=0.45)
+        _led = fl.add_box(
+            "u_se_instrument_story_led",
+            _mm3((-iw * 0.22, idep * 0.08, mid_z)),
+            _mm3((iw * 0.28, 8.0, band_h * 0.18)),
+            led_mat, module=skin_mod, module_objects=MO)
+        _led.dimensions = _mm3((iw * 0.28, 8.0, band_h * 0.18))
+        _cuv = fl.add_box(
+            "u_se_instrument_story_cuvette",
+            _mm3((0.0, 0.0, mid_z)),
+            _mm3((iw * 0.22, idep * 0.35, band_h * 0.55)),
+            cuv_mat, module=skin_mod, module_objects=MO)
+        _cuv.dimensions = _mm3((iw * 0.22, idep * 0.35, band_h * 0.55))
+        _det = fl.add_box(
+            "u_se_instrument_story_detector",
+            _mm3((iw * 0.26, -idep * 0.06, mid_z)),
+            _mm3((iw * 0.18, idep * 0.25, band_h * 0.28)),
+            det_mat, module=skin_mod, module_objects=MO)
+        _det.dimensions = _mm3((iw * 0.18, idep * 0.25, band_h * 0.28))
+        print(f"[univ][sealed] instrument story: optical LED + cuvette + detector")
+    elif key == "electronics":
+        pcb_mat = fl.make_mat(
+            "m_se_story_pcb", fl._to_linear((0.08, 0.42, 0.22)), metallic=0.15, roughness=0.4)
+        _pcb = fl.add_box(
+            "u_se_instrument_story_pcb",
+            _mm3((0.0, idep * 0.05, mid_z)),
+            _mm3((iw * 0.72, idep * 0.55, max(4.0, band_h * 0.25))),
+            pcb_mat, module=skin_mod, module_objects=MO)
+        _pcb.dimensions = _mm3((iw * 0.72, idep * 0.55, max(4.0, band_h * 0.25)))
+        print(f"[univ][sealed] instrument story: main PCB")
+    elif key == "power":
+        bat_mat = fl.make_mat(
+            "m_se_story_cell", fl._to_linear((0.55, 0.56, 0.58)), metallic=0.5, roughness=0.35)
+        fl.add_cyl(
+            "u_se_instrument_story_cell",
+            _mm3((-iw * 0.30, idep * 0.10, mid_z)),
+            10.0 * fl.MM, 3.2 * fl.MM, bat_mat,
+            module=skin_mod, module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0))
+        print(f"[univ][sealed] instrument story: coin cell")
+    elif key == "interface":
+        _disp_mat = fl.make_mat(
+            "m_se_story_iface_disp", fl._to_linear((0.02, 0.03, 0.05)), metallic=0.0, roughness=0.2)
+        _btn_mat = fl.make_mat(
+            "m_se_story_iface_btn", fl._to_linear((0.20, 0.21, 0.24)), metallic=0.15, roughness=0.5)
+        fl.add_box(
+            "u_se_instrument_story_display",
+            _mm3((-iw * 0.18, idep * 0.32, mid_z)),
+            _mm3((iw * 0.42, 3.0, band_h * 0.62)),
+            _disp_mat, module=skin_mod, module_objects=MO)
+        for _bi, (_bx, _bz) in enumerate([(0.28, 0.55), (0.28, 0.25), (0.20, 0.40), (0.36, 0.40)]):
+            fl.add_cyl(
+                f"u_se_instrument_story_button_{_bi}",
+                _mm3((iw * _bx, idep * 0.36, z_cursor + band_h * _bz)),
+                2.8 * fl.MM, 2.0 * fl.MM, _btn_mat,
+                module=skin_mod, module_objects=MO,
+                rotation=(math.radians(90), 0.0, 0.0))
+        print(f"[univ][sealed] instrument story: display + buttons")
+
+
+_INSTRUMENT_MESH_KEEP_PREFIXES = (
+    "u_se_instrument_story_",
+    "u_se_product_",
+    "u_se_exterior_detail_",
+    "u_skid_encl_",
+)
+
+
+def _suppress_instrument_boilerplate_meshes() -> int:
+    """Hide per-part BESS slabs and skin plates on instrument cutaways.
+
+    Zone-stacked build_part boxes read as a cabinet interior, not a handheld
+    colorimeter. Story meshes + the product shell are the only visible internals."""
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return 0
+    hidden = 0
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        name = obj.name
+        if any(name.startswith(prefix) for prefix in _INSTRUMENT_MESH_KEEP_PREFIXES):
+            continue
+        if name.startswith("u_se_backplane_") or name.startswith("u_se_det_"):
+            obj.hide_render = True
+            hidden += 1
+            continue
+        if name.startswith("u_") and not name.startswith("u_se_cad_"):
+            obj.hide_render = True
+            hidden += 1
+    if hidden:
+        print(f"[univ][sealed] instrument clutter suppress: {hidden} mesh(es) hidden")
+    return hidden
+
+
 def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     """SEALED-ENCLOSURE placer: one cabinet at the brief envelope, equipment stacked
     in role zones inside it, skin parts as face plates, edges wired port-to-port at
@@ -12159,6 +12281,10 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     for key, frac, _rx in zones:
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
+        if _IS_INSTRUMENT_DEVICE:
+            _place_instrument_zone_story(key, z_cursor, band_h, iw, idep, sid, MO)
+            z_cursor += band_h
+            continue
         if plist:
             # ZONE BACKPLANE (2026-07-11 run 74 — the critic honestly named 'hollow
             # interior': the power/distribution/control parts keep their REAL small
@@ -12287,15 +12413,18 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         lambda k: ((-W / 2 - _sk_off(k), 0.0), (t, idep * 0.9), "left"),
         lambda k: ((W / 2 + _sk_off(k), 0.0), (t, idep * 0.9), "right"),
     ]
-    for i, p in enumerate(sorted(skin, key=lambda p: str(p.name))):
-        (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
-        p.shape = "box"
-        p.dim = parse_dimension(f"{max(pw, 1.0):.0f}x{max(pd, 1.0):.0f}x{ih * 0.9:.0f} mm")
-        asm, anchors = build_part(p, cx, cy, base_z + margin, MAT, MO)
-        p.obj_anchor, p.anchors = asm, anchors
-        p.placed_xyz_mm = anchors["centre"]
-    if skin:
-        print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
+    if not _IS_INSTRUMENT_DEVICE:
+        for i, p in enumerate(sorted(skin, key=lambda p: str(p.name))):
+            (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
+            p.shape = "box"
+            p.dim = parse_dimension(f"{max(pw, 1.0):.0f}x{max(pd, 1.0):.0f}x{ih * 0.9:.0f} mm")
+            asm, anchors = build_part(p, cx, cy, base_z + margin, MAT, MO)
+            p.obj_anchor, p.anchors = asm, anchors
+            p.placed_xyz_mm = anchors["centre"]
+        if skin:
+            print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
+    elif skin:
+        print(f"[univ][sealed] instrument: {len(skin)} skin part(s) skipped (exterior details on closed views)")
 
     # 4c. CONTAINMENT CLAMP — MESH-LEVEL (2026-07-10/11, runs 56-58: the anchor-level
     # clamp moved 2/36 parts because the manifest + renders read the MESH world bboxes,
@@ -12412,6 +12541,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         print(f"[univ][sealed] INTERIOR-FILL {100.0 * _fill_num / _int_vol:.0f}% "
               f"(Σ part bboxes / interior volume)")
 
+    if _IS_INSTRUMENT_DEVICE:
+        _suppress_instrument_boilerplate_meshes()
+
     # 4b. HERO = THE CLOSED PRODUCT (Tristan 2026-07-10: "the blender overview looks
     #     terrible … compare vs the Tesla Powerwall"). A sealed consumer/outdoor unit's
     #     hero shot is the PRODUCT — one sealed body at the brief dims — never an open
@@ -12497,9 +12629,29 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if _cover_bevel is None:
             _cover_bevel = _SEALED_FRONT_COVER.modifiers.new(
                 name="product_cover_bevel", type="BEVEL")
-        _cover_bevel.width = min(W, D) * 0.06 * fl.MM
+        _cover_bevel.width = min(W, D) * (0.10 if _IS_INSTRUMENT_DEVICE else 0.06) * fl.MM
         _cover_bevel.segments = 6
         _SEALED_FRONT_COVER.hide_render = True
+        if _IS_INSTRUMENT_DEVICE:
+            # stepped upper deck — narrower control/optical top (handheld read, not a cube)
+            _deck_h = H * 0.20
+            _deck = fl.add_box(
+                "u_se_product_deck",
+                _mm3((0.0, 0.0, base_z + H - _deck_h / 2)),
+                _mm3((W * 0.90, D * 0.86, _deck_h)),
+                panel_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _deck.dimensions = _mm3((W * 0.90, D * 0.86, _deck_h))
+            _SEALED_SHELL_OBJECTS.append(_deck)
+            for _ob in list(_SEALED_SHELL_OBJECTS):
+                if _ob and getattr(_ob, "type", None) == "MESH":
+                    _bv = _ob.modifiers.get("instrument_bevel")
+                    if _bv is None:
+                        _bv = _ob.modifiers.new(name="instrument_bevel", type="BEVEL")
+                    _bv.width = min(W, D) * 0.08 * fl.MM
+                    _bv.segments = 4
         _exterior_detail_mat = fl.make_mat(
             "m_se_exterior_detail",
             fl._to_linear((0.55, 0.58, 0.61)),
@@ -12579,17 +12731,43 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # cuvette / optical port — a light-tight cube raised off the wide TOP,
             # on the right (the gold unit's optical block sits to the right of the display)
             _port = fl.add_box("u_se_exterior_detail_port",
-                               _mm3((W * 0.30, 0.0, base_z + H + H * 0.19)),
-                               _mm3((W * 0.30, D * 0.60, H * 0.40)), _port_mat,
+                               _mm3((W * 0.28, D * 0.05, base_z + H + H * 0.10)),
+                               _mm3((W * 0.22, D * 0.42, H * 0.22)), _port_mat,
                                module=_skin_mod, module_objects=MO)
-            _port.dimensions = _mm3((W * 0.30, D * 0.60, H * 0.40))
+            _port.dimensions = _mm3((W * 0.22, D * 0.42, H * 0.22))
             _port.hide_render = True
             # the cuvette bore — a dark 10 mm well down into the port top
             _bore = fl.add_cyl("u_se_exterior_detail_port_bore",
-                               _mm3((W * 0.30, 0.0, base_z + H + H * 0.33)),
-                               6.0 * fl.MM, H * 0.22 * fl.MM, _bore_mat,
+                               _mm3((W * 0.28, D * 0.05, base_z + H + H * 0.16)),
+                               5.0 * fl.MM, H * 0.12 * fl.MM, _bore_mat,
                                module=_skin_mod, module_objects=MO)
             _bore.hide_render = True
+            # external LED driver PCB — green board on the left face (gold unit)
+            _led_pcb_mat = fl.make_mat(
+                "m_se_face_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
+            _led_pcb = fl.add_box(
+                "u_se_exterior_detail_led_pcb",
+                _mm3((-W * 0.42, _face_y, base_z + H * 0.52)),
+                _mm3((W * 0.22, 2.2, H * 0.22)),
+                _led_pcb_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _led_pcb.dimensions = _mm3((W * 0.22, 2.2, H * 0.22))
+            _led_pcb.hide_render = True
+            # USB / service port on the bottom edge (visible in 07-product-service)
+            _usb_mat = fl.make_mat(
+                "m_se_face_usb", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.35, roughness=0.4)
+            _usb = fl.add_box(
+                "u_se_exterior_detail_usb",
+                _mm3((0.0, _face_y, base_z + H * 0.06)),
+                _mm3((14.0, 3.0, 6.5)),
+                _usb_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _usb.dimensions = _mm3((14.0, 3.0, 6.5))
+            _usb.hide_render = True
         # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4.
         # A sealed instrument with no air-movers gets NONE (a benchtop photometer is
         # not louvred) — only add a slot when a fan/vent/duct part actually exists.
