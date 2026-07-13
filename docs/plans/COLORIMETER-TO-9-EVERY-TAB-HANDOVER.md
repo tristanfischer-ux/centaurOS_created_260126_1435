@@ -168,3 +168,27 @@ Instrument ontology keystone (`eef5928ef`), ledger-wiring + optical metrics (`6f
 **POWER-LOAD** (commit 21007d36c) — lands NEXT run (0358 used the old aggregator). 
 
 Commits this round: `496765a22` (topology), `21007d36c` (power-load), + docs. Prior: `6e6b09e8f` render, `3473e877b` cost.
+
+### §8d — 2026-07-13 CONNECTION-TRACE CLEARED 0→10 (fast harness, no chain — Grok's A1)
+
+Root was NOT the topology (both contract.topology fields are correct, 47 edges) — the SCENE
+declutters the small I&C parts (Power Indicator LED, Status Indicator, Battery Charge Mgmt)
+out of the placed set, so their edges vanish from connection-schedule.json (the 3-D routing
+artifact the scorer's parts_ledger reads). Fixed at the CONSUMER (parts_ledger.py, commit
+640aec74a), fast-harness-validated on frozen 0358:
+1. `2c` device-instrument pass (gated on instrument_device): attach every contract.topology
+   edge the 3-D-declutter dropped — the topology is the authoritative connectivity source.
+2. `is_terminal_elec` extended: indicator / pilot light / status lamp / annunciator / buzzer
+   are TERMINAL loads (no downstream required) — universal, correct on any panel.
+Result: connectivity concerns 6→0, instruments 18/18, **Connection trace 0 → 10**.
+
+**METHOD WIN (Grok):** iterate on a frozen good state — `parts_ledger.py <dir> <state>` (0.05s)
++ `build-excel-export.py <dir> out.xlsx` (~27s) — NO 1h chain. Use for every Python-side tab.
+
+**FLOOR NOW (0358, non-mirror):** Sense-check 0 (cost gate-36 £805 vs £150 — needs tighter
+ceiling THEN a gate-36 re-eval, which is an LLM call so needs a chain OR a standalone
+benchmark re-run), PCB 2.5, Part names 3.5, Renders 4, then BoM/Calc 7, Assembly/Quantities
+7.7. The 2 mirrors (Exec Summary, Quality & Audit) auto-lift when these clear.
+
+**5 universal fixes tonight:** render `6e6b09e8f`, cost `3473e877b`, topology `496765a22`,
+power-load `21007d36c`, connectivity `640aec74a`. All device-gated, plant byte-identical.
