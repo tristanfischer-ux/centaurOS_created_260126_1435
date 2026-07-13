@@ -179,7 +179,7 @@ function hasEnergyStorage(contract: ContractInProgress): boolean {
 //
 // The fix: a THIRD contract shape — an optical/photometric INSTRUMENT — detected from
 // the SAME tool-identity signal the word-domain-coherence-audit's ADD backstop
-// (TOOL_IMPLIED_COMPONENTS) already uses to ground photodiode/TIA/LED/cuvette words
+// (TOOL_IMPLIED_COMPONENTS) already uses to ground detector-module/LED/cuvette words
 // onto an under-filled design. `hasOpticalInstrumentToolSignal` is SHARED (imported),
 // never a duplicated table: a photodiode-tia / cuvette / photometry / led-par tool
 // selection is unambiguous evidence the design is an optical instrument, on ANY future
@@ -188,14 +188,18 @@ function hasEnergyStorage(contract: ContractInProgress): boolean {
 // energy_conversion_transduction / sensing_instrumentation / structure_containment /
 // control_compute_communication switches to the instrument-shaped set below — a small
 // rechargeable battery (not cell racks), an LED source + driver (not an inverter
-// bridge), a photodetector + transimpedance front-end (not V/I/temp sensors), a
-// cuvette/optical-path interface, and an MCU + display + USB stack. A genuine BESS
+// bridge), a detector-module/breakout (not V/I/temp sensors), a cuvette/optical-path
+// interface, and an MCU + display + USB stack. A genuine BESS
 // (hasEnergyStorage true, no optical tool signal) is completely untouched — the optical
 // check is evaluated FIRST but only routes when the signal fires, so the existing
 // battery-plant/mains-supply dispatch is byte-identical for every other class.
 const OPTICAL_ENERGY_STORAGE_FLOOR = ['rechargeable_battery_pack', 'battery_charge_management_circuit', 'usb_power_interface', 'battery_protection_circuit', 'power_switch', 'low_battery_indicator']
 const OPTICAL_ENERGY_CONVERSION_FLOOR = ['led_source', 'led_driver', 'wavelength_selection_module', 'collimating_optic', 'dc_dc_regulator', 'power_on_indicator']
-const OPTICAL_SENSING_FLOOR = ['photodiode', 'transimpedance_amplifier', 'analog_to_digital_converter', 'reference_photodiode', 'signal_amplifier_stage', 'sensor_interconnect_cable']
+// DECISION (2026-07-13, colorimeter Wave B): commercially-available electronics
+// means the detector side should floor as a purchased detector/breakout module at
+// concept stage. The bespoke board is the LED source/driver/power PCB; the detector
+// module connects by a short sensor cable and is dispositioned off-board by PCB stage.
+const OPTICAL_SENSING_FLOOR = ['optical_detector_module', 'sensor_interconnect_cable']
 const OPTICAL_STRUCTURE_FLOOR = ['cuvette_holder', 'optical_path_baffle', 'enclosure_shell', 'lid_shroud', 'fastener_set', 'mounting_bracket']
 const OPTICAL_CONTROL_FLOOR = ['microcontroller', 'usb_interface', 'local_display', 'user_input_buttons', 'firmware_storage', 'debug_interface']
 // A handheld/benchtop INSTRUMENT's power_distribution + safety are NOT a plant's mains
@@ -209,6 +213,11 @@ const OPTICAL_POWER_DISTRIBUTION_FLOOR = ['dc_input_fuse', 'power_input_connecto
 // NB: no lid interlock — a benchtop photometer's lid is a light shroud, not a machinery
 // guard; the token matched a plant interlock switch and priced £267 (run 1954 own-goal).
 const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'polyfuse_resettable']
+// DECISION (2026-07-13, colorimeter 0819): optical instruments already carry
+// local_display + user_input_buttons on the control floor (PyBadge-class UI).
+// TIER_C hmi_ergonomics still emitted interface_membrane which then classified as
+// Filtration & membranes on the Exec Summary. Optical HMI = buttons+display only.
+const OPTICAL_HMI_FLOOR = ['local_display', 'user_input_buttons', 'status_indicator', 'control_switch', 'mounting_bezel']
 
 /** Per-module optical-instrument floor overrides. Only the modules the generic Tier-C
  *  floor gets wrong for an instrument (a BESS/industrial-power shape) are listed —
@@ -221,6 +230,8 @@ const OPTICAL_MODULE_FLOORS: Record<string, string[]> = {
   control_compute_communication: OPTICAL_CONTROL_FLOOR,
   power_distribution: OPTICAL_POWER_DISTRIBUTION_FLOOR,
   safety_protection: OPTICAL_SAFETY_FLOOR,
+  hmi_ergonomics: OPTICAL_HMI_FLOOR,
+  human_machine_interface: OPTICAL_HMI_FLOOR,
 }
 
 /** True when the contract's own selected-tool record (`_tools_run`, populated by the

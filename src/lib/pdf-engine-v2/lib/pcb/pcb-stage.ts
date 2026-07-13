@@ -44,19 +44,19 @@ interface CategoryPattern {
 const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   {
     category: 'processor',
-    pattern: /\b(mcu|micro-?controller|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing)\b/i,
+    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing)\b/i,
   },
   {
     category: 'analog_frontend',
-    pattern: /\b(photodiode|phototransistor|transimpedance|\btia\b|operational amplifier|op-?amp|\badc\b|analog[- ]to[- ]digital|\bdac\b|analog front-?end|\bafe\b|current sense(?:or)?)\b/i,
+    pattern: /\b(photodiode|phototransistor|detector|light[- ]sensor|spectral[- ]sensor|colou?r[- ]sensor|transimpedance|\btia\b|operational amplifier|op-?amp|\badc\b|analog[- ]to[- ]digital|\bdac\b|analog front-?end|\bafe\b|current sense(?:or)?)\b/i,
   },
   {
     category: 'power_electronics',
-    pattern: /\b(led driver|gate driver|battery charger|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power management (?:ic|system)|\bpmic\b)\b/i,
+    pattern: /\b(status[-_ ]?(?:led|indicator)|led[-_ ]?source|\bled\b|led driver|gate driver|battery charger|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power management (?:ic|system)|\bpmic\b)\b/i,
   },
   {
     category: 'display',
-    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display driver|display module|display panel|segment display)\b/i,
+    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display|readout|keypad|user[- ]input|buttons?|membrane[- ]switch|display driver|display module|display panel|segment display)\b/i,
   },
   {
     category: 'connectivity',
@@ -342,6 +342,15 @@ export interface PcbPipelineRecord extends PcbPipelineResult {
   generator?: {
     componentCount: number
     netCount: number
+    offBoardCount?: number
+    offBoard?: Array<{
+      wordId: string
+      nameHuman: string
+      characterId: string
+      quantityInDesign: number
+      disposition: string
+      reason: string
+    }>
     unresolvedCount: number
     unresolved: Array<{ wordId: string; nameHuman: string; characterId: string; reason: string }>
     /** The PCBA BoM the dossier tab renders — resolved components with MPN/footprint.

@@ -40,9 +40,9 @@
 //
 //   (A/B-add) `TOOL_IMPLIED_COMPONENTS` — a tool-IDENTITY-keyed (never
 //   product-keyed) map from a selected tool's own id/name to the physical
-//   component(s) it implies (a `photodiode-tia` tool always implies a
-//   photodiode + transimpedance amplifier, on ANY future archetype that ever
-//   selects it; a `cuvette` tool always implies a sample-cell holder; a
+//   component(s) it implies (a `photodiode-tia` tool always implies an optical
+//   detector module / breakout, on ANY future archetype that ever selects it;
+//   a `cuvette` tool always implies a sample-cell holder; a
 //   `wearable-battery` tool always implies a small battery + charge-
 //   management circuit). `computeToolImpliedComponents` reads the run's own
 //   selected-tool list (`state.toolsUsedPage.tools`) and, for every implied
@@ -576,8 +576,11 @@ export const TOOL_IMPLIED_COMPONENTS: ToolImpliedComponentRule[] = [
     id: 'photodiode-tia',
     re: /\bphotodiode[-\s]?tia\b|\btransimpedance\b/,
     implies: [
-      { module: 'sensing_instrumentation', component: 'photodiode', name_human: 'Photodiode detector', presence_re: /\bphotodiode/i },
-      { module: 'sensing_instrumentation', component: 'transimpedance_amplifier', name_human: 'Transimpedance amplifier (TIA)', presence_re: /\btransimpedance\b|\btia\b/i },
+      // INTENT: photodiode/TIA sizing tools prove an optical detector channel is
+      // needed, but a small catalogue instrument should buy that channel as a
+      // detector module/breakout unless a later schematic stage deliberately
+      // decomposes it. This keeps COTS detector modules off the bespoke LED PCB.
+      { module: 'sensing_instrumentation', component: 'optical_detector_module', name_human: 'Optical detector module / breakout', presence_re: /\b(?:optical\s+)?detector\s+(?:module|breakout|board|assembly)\b|\b(?:module|breakout|board|assembly)\b.{0,40}\b(?:optical\s+)?detector\b/i },
     ],
   },
   {

@@ -62,6 +62,9 @@ export function finaliseContract(
   const deviceScaleNote = deriveDeviceScaleEnclosure(contract, parsedConstraints)
   if (deviceScaleNote) warnings.push(deviceScaleNote)
 
+  const deviceLoadNote = deriveDeviceScaleElectricalLoad(contract, parsedConstraints)
+  if (deviceLoadNote) warnings.push(deviceLoadNote)
+
   const opticalNotes = deriveOpticalInstrumentMetrics(contract, parsedConstraints)
   for (const n of opticalNotes) warnings.push(n)
 
@@ -148,6 +151,8 @@ export function deriveOpticalInstrumentMetrics(
       uncertainty_pct: 5, // a standard optical interface spec, not an estimate
       temporal_resolution_s: null,
       condition: 'delivered optical capability (design specification)',
+      source_detail:
+        `${key} = ${value} ${unit} (brief target_performance → delivered by optical bench)`,
       provenance: {
         source: 'aggregator',
         tool_id: 'aggregator:derive-optical-instrument-metrics',
@@ -220,6 +225,12 @@ const DEVICE_SCALE_MASS_CEILING_KG = 50
 const DEVICE_SCALE_POSITIONING_RE =
   /\b(portable|benchtop|bench-top|handheld|hand-held|desktop|wall[- ]mount(?:ed)?|tabletop|table-top)\b/i
 
+const ELECTRONIC_INSTRUMENT_RE =
+  /\b(optical[_ -]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance|portable\s+instrument|benchtop\s+instrument)\b/i
+
+const DEVICE_SCALE_INSTRUMENT_LOAD_KW = 0.005
+const DEVICE_SCALE_PLAUSIBLE_LOAD_CEILING_KW = 0.1
+
 /**
  * Effective device density (kg/m³) used to back out a plausible enclosure
  * volume from total system mass — an electronics instrument enclosure
@@ -253,6 +264,70 @@ function deviceScalePositioningPresent(parsedConstraints: ParsedConstraints | un
   return DEVICE_SCALE_POSITIONING_RE.test(text)
 }
 
+function electronicInstrumentSignal(
+  contract: ContractInProgress,
+  parsedConstraints: ParsedConstraints | undefined,
+): boolean {
+  if (hasOpticalInstrumentToolSignal(contract._tools_run)) return true
+  const pc = (parsedConstraints as unknown as Record<string, unknown> | undefined) ?? {}
+  const text = [
+    contract.product_class,
+    contract.brief_summary,
+    pc.product_class,
+    pc.product_description,
+    pc.original_text,
+    pc.application_context,
+  ]
+    .filter((v): v is string => typeof v === 'string')
+    .join(' \n ')
+  return ELECTRONIC_INSTRUMENT_RE.test(text)
+}
+
+/**
+ * deriveDeviceScaleElectricalLoad — emit a watt-scale load anchor for portable
+ * electronic instruments independently of the envelope rule.
+ *
+ * INTENT: a handheld photometer should size USB/battery DC rails from watts, not
+ * inherit a plant convergence artefact. This runs after any envelope derivation
+ * and is still suppressed unless the contract has both device scale and an
+ * electronic-instrument signal.
+ */
+export function deriveDeviceScaleElectricalLoad(
+  contract: ContractInProgress,
+  parsedConstraints?: ParsedConstraints,
+): string | undefined {
+  const q = contract.quantities
+  const massKg = quantityValue(contract, 'total_system_mass_kg')
+  const smallMass = massKg !== undefined && massKg > 0 && massKg < DEVICE_SCALE_MASS_CEILING_KG
+  const portable = deviceScalePositioningPresent(parsedConstraints)
+  const enclosureM3 = quantityValue(contract, 'enclosure_volume_m3')
+  const sealedDevice = enclosureM3 !== undefined && enclosureM3 > 0 && enclosureM3 < 1
+  if (!(smallMass || portable || sealedDevice)) return undefined
+  if (!electronicInstrumentSignal(contract, parsedConstraints)) return undefined
+
+  const existingConnectedLoadKw = quantityValue(contract, 'connected_electrical_load_kw')
+  if (
+    existingConnectedLoadKw !== undefined &&
+    existingConnectedLoadKw > 0 &&
+    existingConnectedLoadKw < DEVICE_SCALE_PLAUSIBLE_LOAD_CEILING_KW
+  ) {
+    return undefined
+  }
+
+  const existingDemandKw = existingConnectedLoadKw ?? quantityValue(contract, 'total_electrical_demand_kw')
+  const overrideNote = existingDemandKw !== undefined
+    ? `; replaced implausible ${existingDemandKw} kW device-load artefact`
+    : ''
+  const deviceLoadKw = DEVICE_SCALE_INSTRUMENT_LOAD_KW
+  q.connected_electrical_load_kw = deviceScaleQuantity(
+    deviceLoadKw, 'kW', 'power', 'rated', 'connected_electrical_load_kw',
+    `device-scale portable/benchtop instrument continuous draw ≈ ${deviceLoadKw * 1000} W (USB/battery-powered ` +
+    `LED source + MCU + display + detector AFE + regulator quiescent) — envelope estimate; NOT the ~1000 kW ` +
+    `plant convergence phantom. Anchors total_supply_demand_kw so the panel schedule reads device-scale`,
+  )
+  return `deriveDeviceScaleElectricalLoad: connected_electrical_load_kw=${deviceLoadKw} kW for portable/benchtop electronic instrument${overrideNote}`
+}
+
 function deviceScaleQuantity(
   value: number,
   unit: string,
@@ -272,6 +347,12 @@ function deviceScaleQuantity(
     uncertainty_pct: 40, // wide — an ESTIMATE, not a measured/brief value
     temporal_resolution_s: null,
     condition,
+    // GOTCHA: calc-coverage (Quality & Audit + dossier_audit) needs a formula-bearing
+    // source_detail — empty detail on derived_device_scale left 8/27 quantities
+    // "no calculation shown" on colorimeter 0819 (Calculations floored at 7).
+    source_detail: condition.includes('=') || /[×*/+]/.test(condition)
+      ? condition
+      : `${outputField} = ${value} ${unit} (${condition})`,
     source: 'derived_device_scale',
     provenance: {
       source: 'derived_device_scale',
@@ -381,27 +462,6 @@ export function deriveDeviceScaleEnclosure(
     q.design_envelope_width_mm = deviceScaleQuantity(widthMm, 'mm', 'length', 'max', 'design_envelope_width_mm', boxCondition)
     q.design_envelope_depth_mm = deviceScaleQuantity(depthMm, 'mm', 'length', 'max', 'design_envelope_depth_mm', boxCondition)
     q.design_envelope_height_mm = deviceScaleQuantity(heightMm, 'mm', 'length', 'max', 'design_envelope_height_mm', boxCondition)
-  }
-
-  // DEVICE-SCALE ELECTRICAL LOAD ANCHOR (2026-07-13): a portable/benchtop electronic
-  // instrument draws a few WATTS (USB/battery), not the ~1000 kW plant phantom the
-  // design-loop convergence writes into total_supply_demand_kw when NO connected-load
-  // ANCHOR exists (the colorimeter's universal contract path mints none, so
-  // writeback-bridge's aliasAnchor is null → it takes conv.trajectory[last].total_demand_kw
-  // ≈ 1001 kW). Minting a device-scale anchor here makes the writeback ALIAS-RECONCILE to
-  // it and REFUSE the phantom (dev ≫ tolerance → UNVERIFIED-ARTEFACT), so the panel
-  // schedule / breakers / Electrical read device-scale. Envelope estimate (like the
-  // enclosure-volume estimate above): a handheld LED-photometer with MCU + display + USB
-  // charge ≈ 5 W continuous. Only when absent (a class builder that mints its own load is
-  // never overridden) AND the device gate already fired. Universal — plant never reaches here.
-  if (q.connected_electrical_load_kw === undefined && q.total_electrical_demand_kw === undefined) {
-    const deviceLoadKw = 0.005
-    q.connected_electrical_load_kw = deviceScaleQuantity(
-      deviceLoadKw, 'kW', 'power', 'rated', 'connected_electrical_load_kw',
-      `device-scale portable/benchtop instrument continuous draw ≈ ${deviceLoadKw * 1000} W (USB/battery-powered ` +
-      `LED source + MCU + display + detector AFE + regulator quiescent) — envelope estimate; NOT the ~1000 kW ` +
-      `plant convergence phantom. Anchors total_supply_demand_kw so the panel schedule reads device-scale`,
-    )
   }
 
   return `deriveDeviceScaleEnclosure: enclosure_volume_m3=${volM3.toFixed(4)} m³ estimated from total_system_mass_kg=${massKg} kg (device-scale gate: ${smallMass ? 'small mass' : 'portable positioning'})`

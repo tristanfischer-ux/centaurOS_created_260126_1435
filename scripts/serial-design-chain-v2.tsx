@@ -7478,6 +7478,10 @@ async function main() {
       // INTENT (Tristan 2026-07-09 speed): fillBlankWordMpns early-returns at
       // candidates=0 BEFORE opening the library DB — still invoke so late-minted
       // blanks are caught; the expensive DB/LLM path only runs when candidates > 0.
+      // GOTCHA (2026-07-13, colorimeter 0819): the late sweep previously ran WITHOUT
+      // re-setting RUN_IS_INSTRUMENT_DEVICE, so Banner/S22 industrial tower lights
+      // could re-pin onto Power Indicator LED after scrubInstrumentIndustrialMisPins.
+      setInstrumentDeviceContext(isInstrumentDevice)
       const lateFill = await fillBlankWordMpns(
         (state.moduleDecomposition?.modules ?? []) as any[],
         currentProductClass ?? 'unknown',
@@ -9817,7 +9821,8 @@ async function main() {
             const genResult = generateAtopileProject(stPcb, pcbProjectDir)
             console.error(
               `[chain] PCB atopile project: ${genResult.components.length} component(s), ` +
-              `${genResult.unresolved.length} unresolved, ${genResult.nets.length} net(s) -> ${pcbProjectDir}`,
+              `${genResult.offBoard.length} off-board COTS, ${genResult.unresolved.length} unresolved, ` +
+              `${genResult.nets.length} net(s) -> ${pcbProjectDir}`,
             )
             const pipelineResult = runPcbPipeline(pcbProjectDir, outDir)
             const record: PcbPipelineRecord = {
@@ -9825,6 +9830,8 @@ async function main() {
               generator: {
                 componentCount: genResult.components.length,
                 netCount: genResult.nets.length,
+                offBoardCount: genResult.offBoard.length,
+                offBoard: genResult.offBoard,
                 unresolvedCount: genResult.unresolved.length,
                 unresolved: genResult.unresolved,
                 components: genResult.components.map((c) => ({
@@ -9848,7 +9855,7 @@ async function main() {
             logAction({
               step: 'pcb_pipeline', ok: pipelineResult.ok, stage_reached: pipelineResult.stageReached,
               routed: pipelineResult.routed, drc_violations: pipelineResult.drc.violations,
-              unresolved: genResult.unresolved.length,
+              off_board_cots: genResult.offBoard.length, unresolved: genResult.unresolved.length,
             })
           } catch (pipeErr) {
             const record: PcbPipelineRecord = {
@@ -10027,7 +10034,10 @@ async function main() {
       const ph3 = lateDrop((finalState.moduleDecomposition?.modules ?? []) as any)
       if (ph3.droppedPhantom > 0 || ph3.droppedDuplicate > 0)
         console.error(`[chain] final-settle phantom re-drop: ${ph3.droppedPhantom} phantom + ${ph3.droppedDuplicate} duplicate word(s) removed from the settled tree`)
-      const { fillBlankWordMpns: lateFill3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
+      const { fillBlankWordMpns: lateFill3, setInstrumentDeviceContext: setDevCtx3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
+      // Same GOTCHA as the post-reconcile late sweep — final-settle fill must keep
+      // RUN_IS_INSTRUMENT_DEVICE so industrial Banner/S22 hits stay rejected.
+      setDevCtx3(Boolean(finalState.isInstrumentDevice))
       const f3 = await lateFill3(finalState.moduleDecomposition?.modules ?? [],
                                  String(finalState.orchestratorContract?.product_class ?? 'unknown'),
                                  { skipGenerate: true })

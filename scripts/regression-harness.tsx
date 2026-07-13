@@ -91,7 +91,7 @@ import { buildPerformanceCard } from '../src/lib/pdf-engine-v2/performance-card'
 import { getMaterialPrice, MATERIAL_PRICES } from '../src/lib/pdf-engine-v2/lib/material-prices'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
-import { deriveDeviceScaleEnclosure } from './lib/orchestrator/aggregator'
+import { deriveDeviceScaleElectricalLoad, deriveDeviceScaleEnclosure } from './lib/orchestrator/aggregator'
 import type { ContractInProgress } from './lib/orchestrator/types'
 import { emitBessDesign } from './lib/deterministic-emitter'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
@@ -5064,17 +5064,32 @@ function checkDeviceScaleEnclosureDerivationInvariants(): Assertion[] {
       product_description: 'A portable, single-wavelength photometer (colorimeter) for analytical and biological assays: a compact, battery-and-USB-powered benchtop instrument.',
     }
     const note = deriveDeviceScaleEnclosure(contract, parsedConstraints)
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, parsedConstraints)
     const vol = contract.quantities.enclosure_volume_m3
+    const load = contract.quantities.connected_electrical_load_kw
     want('(1) note returned', typeof note === 'string' && note.length > 0)
     want('(1) enclosure_volume_m3 present', !!vol)
     want('(1) 0 < volume < 1', typeof vol?.value === 'number' && vol.value > 0 && vol.value < 1)
     want('(1) volume in plausible 0.5-3 L handheld-instrument range', typeof vol?.value === 'number' && vol.value >= 0.0005 && vol.value <= 0.003)
     want('(1) provenance.source = derived_device_scale', vol?.provenance?.source === 'derived_device_scale')
+    want('(1) load note returned', typeof loadNote === 'string' && loadNote.length > 0)
+    want('(1) connected_electrical_load_kw present + <0.1 kW', typeof load?.value === 'number' && load.value > 0 && load.value < 0.1)
+    want('(1) load provenance.source = derived_device_scale', load?.provenance?.source === 'derived_device_scale')
     for (const k of ['design_envelope_width_mm', 'design_envelope_depth_mm', 'design_envelope_height_mm']) {
       const dq = (contract.quantities as any)[k]
       want(`(1) ${k} present + positive`, typeof dq?.value === 'number' && dq.value > 0)
       want(`(1) ${k} provenance.source = derived_device_scale`, dq?.provenance?.source === 'derived_device_scale')
     }
+
+    const updates = computeQuantityUpdates(
+      { trajectory: [{ total_demand_kw: 1000.995 }] } as any,
+      null,
+      contract.quantities,
+    )
+    const supply = updates.find(u => u.key === 'total_supply_demand_kw')
+    const applied = applyUpdates(contract.quantities, updates)
+    want('(1) 1000 kW phantom is refused by load alias', supply?.unverified_artefact === true)
+    want('(1) total_supply_demand_kw phantom not applied', applied.total_supply_demand_kw === undefined)
   }
 
   // (1b) FIRES — small mass ALONE (no positioning text) is sufficient; the mass
@@ -5084,6 +5099,33 @@ function checkDeviceScaleEnclosureDerivationInvariants(): Assertion[] {
     deriveDeviceScaleEnclosure(contract, { product_class: 'pcb_assembly', product_description: 'A sensor module.' } as any)
     const vol = contract.quantities.enclosure_volume_m3
     want('(1b) small-mass-only fixture derives enclosure_volume_m3', typeof vol?.value === 'number' && vol.value > 0 && vol.value < 1)
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, { product_class: 'pcb_assembly', product_description: 'A sensor module.' } as any)
+    want('(1b) generic small sensor is not enough to mint an instrument load', loadNote === undefined && !contract.quantities.connected_electrical_load_kw)
+  }
+
+  // (1c) CORRECTS — if a device-scale instrument already carries the known
+  // plant-convergence phantom as connected_electrical_load_kw, replace it at the
+  // source with the watt-scale instrument anchor instead of preserving the lie.
+  {
+    const contract = mkContract({
+      total_system_mass_kg: massQ(0.2),
+      connected_electrical_load_kw: {
+        value: 1000.995,
+        unit: 'kW',
+        family: 'power',
+        basis: 'estimated',
+        scope: 'system',
+        provenance: { source: 'tool:connection-sizing' },
+      },
+    })
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, {
+      product_class: 'pcb_assembly',
+      product_description: 'A portable, single-wavelength photometer (colorimeter).',
+    } as any)
+    const load = contract.quantities.connected_electrical_load_kw
+    want('(1c) phantom load note returned', typeof loadNote === 'string' && loadNote.includes('replaced implausible'))
+    want('(1c) 1000 kW connected-load phantom corrected to <0.1 kW', typeof load?.value === 'number' && load.value > 0 && load.value < 0.1)
+    want('(1c) corrected load provenance.source = derived_device_scale', load?.provenance?.source === 'derived_device_scale')
   }
 
   // (2) UNTOUCHED — a fixture that already carries enclosure_volume_m3 (the
@@ -5092,10 +5134,13 @@ function checkDeviceScaleEnclosureDerivationInvariants(): Assertion[] {
     const existing = volQ(0.13)
     const contract = mkContract({ total_system_mass_kg: massQ(0.2), enclosure_volume_m3: existing })
     const note = deriveDeviceScaleEnclosure(contract, { product_class: 'bess', product_description: 'residential wall-mounted battery' } as any)
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, { product_class: 'bess', product_description: 'residential wall-mounted battery' } as any)
     want('(2) no note (no-op)', note === undefined)
+    want('(2) no load note (non-instrument sealed product)', loadNote === undefined)
     want('(2) enclosure_volume_m3 value unchanged', contract.quantities.enclosure_volume_m3.value === 0.13)
     want('(2) enclosure_volume_m3 same object reference (untouched)', contract.quantities.enclosure_volume_m3 === existing)
     want('(2) no envelope box synthesised (already had a value, nothing to unlock)', !contract.quantities.design_envelope_width_mm)
+    want('(2) no connected_electrical_load_kw minted for non-instrument sealed product', !contract.quantities.connected_electrical_load_kw)
   }
 
   // (3) PLANT SUPPRESSED — large mass, no portable tokens, no dims → NOTHING
@@ -5107,22 +5152,27 @@ function checkDeviceScaleEnclosureDerivationInvariants(): Assertion[] {
       product_description: 'A field-erected CO2 mineralisation plant processing flue gas at industrial scale.',
     }
     const note = deriveDeviceScaleEnclosure(contract, parsedConstraints)
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, parsedConstraints)
     want('(3) no note (nothing derived)', note === undefined)
+    want('(3) no load note (plant suppressed)', loadNote === undefined)
     want('(3) enclosure_volume_m3 stays absent', contract.quantities.enclosure_volume_m3 === undefined)
     want('(3) no envelope box synthesised either', !contract.quantities.design_envelope_width_mm)
+    want('(3) no connected_electrical_load_kw minted for plant', !contract.quantities.connected_electrical_load_kw)
   }
 
   // (3b) PLANT SUPPRESSED even with no mass signal at all (nothing to estimate from).
   {
     const contract = mkContract({})
     const note = deriveDeviceScaleEnclosure(contract, { product_class: 'water_treatment', product_description: 'A municipal water treatment plant.' } as any)
+    const loadNote = deriveDeviceScaleElectricalLoad(contract, { product_class: 'water_treatment', product_description: 'A municipal water treatment plant.' } as any)
     want('(3b) no mass, no note', note === undefined)
+    want('(3b) no mass, no load note', loadNote === undefined)
     want('(3b) no mass, enclosure_volume_m3 absent', contract.quantities.enclosure_volume_m3 === undefined)
   }
 
   out.push(assertEq(
     'UNIVERSAL.device_scale_enclosure_volume_derivation',
-    'deriveDeviceScaleEnclosure (aggregator.ts) fires for a device-scale generic-path contract (small total_system_mass_kg and/or portable/benchtop/handheld brief positioning, no brief dims) — derives a plausible 0<enclosure_volume_m3<1 PLUS a positive design_envelope_{width,depth,height}_mm box, both honestly stamped provenance.source="derived_device_scale"; is a strict byte-identical no-op when enclosure_volume_m3 is already present (any registered archetype — BESS/sealed/containerised — wins untouched); and is HARD-SUPPRESSED on a plant-scale fixture (large mass, no portable tokens, no dims, or no mass signal at all) so a multi-tonne plant never receives a fake small enclosure',
+    'deriveDeviceScaleEnclosure + deriveDeviceScaleElectricalLoad (aggregator.ts) fire for a device-scale electronic instrument — deriving a plausible 0<enclosure_volume_m3<1, positive design_envelope_{width,depth,height}_mm, and connected_electrical_load_kw <0.1 kW that refuses a 1000 kW convergence phantom; registered/non-instrument sealed products stay load-untouched; plants are HARD-SUPPRESSED',
     failed.length, (n) => n === 0,
     () => `device-scale enclosure derivation cases failed: ${failed.join(' ; ')}. Check deriveDeviceScaleEnclosure() in scripts/lib/orchestrator/aggregator.ts.`,
   ))
@@ -6265,6 +6315,30 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       costStackOk,
       (ok) => ok,
       () => `cost stack mis-resolved: co2 channel=${co2cs.ratios.channel_markup_factor} (want 0); unmappedPlant=${unmappedPlant.class_key}/${unmappedPlant.ratios.channel_markup_factor} (want bespoke_plant_default/0); consumer=${consumerGadget.class_key}/${consumerGadget.ratios.channel_markup_factor} (want DEFAULT/>0). A bespoke plant getting a channel markup is the CO2 "Channel list price" bug.`,
+    ))
+  }
+
+  // ── UNIVERSAL.cost_stack_optical_instrument_no_site_install ──────────────
+  // INTENT (2026-07-13, colorimeter 0819): optical_instrument fell to DEFAULT
+  // (mid-volume professional, installation_cost_factor 0.20) and turned a £317
+  // materials BoM into an £818 "all-in installed" headline. Handheld/benchtop
+  // instruments have ZERO site install. Guard: optical_instrument + isInstrumentDevice
+  // flag both resolve to installation_cost_factor === 0; a plant class still has install.
+  {
+    const opt = resolveCostStack({ keyMetrics: { product_class: 'optical_instrument' } })
+    const flagged = resolveCostStack({ keyMetrics: { product_class: 'unmapped_gadget_xyz' }, isInstrumentDevice: true })
+    const plant = resolveCostStack({ keyMetrics: { product_class: 'bess' } })
+    const optOk =
+      opt.ratios.installation_cost_factor === 0 &&
+      opt.class_key === 'optical_instrument' &&
+      flagged.ratios.installation_cost_factor === 0 &&
+      (plant.ratios.installation_cost_factor ?? 0) > 0
+    assertions.push(assertEq(
+      'UNIVERSAL.cost_stack_optical_instrument_no_site_install',
+      'resolveCostStack: optical_instrument + isInstrumentDevice → install 0; plant still has install',
+      optOk,
+      (ok) => ok,
+      () => `optical install=${opt.ratios.installation_cost_factor} key=${opt.class_key}; flagged install=${flagged.ratios.installation_cost_factor}; plant install=${plant.ratios.installation_cost_factor}`,
     ))
   }
 
@@ -13228,7 +13302,7 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
 
   // (6) TOOL-IMPLIED-COMPONENT GROUNDING (the ADD side) — the colorimeter's own
   // selected tools (photodiode-tia, cuvette, photometry, wearable-battery,
-  // control-systems) imply a photodiode + TIA + cuvette holder + LED source +
+  // control-systems) imply a detector module + cuvette holder + LED source +
   // LED driver + optical baffle + coin-cell battery + charge-management
   // circuit + MCU + USB interface; NONE of these are present in the BESS-
   // template design above, so all should be reported missing + addable
@@ -13249,8 +13323,7 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantB('(6) verdict missing', r.verdict === 'missing')
     const byComponent = new Map(r.missing.map((m) => [m.component, m]))
     const expect: Array<[string, string]> = [
-      ['photodiode', 'sensing_instrumentation'],
-      ['transimpedance_amplifier', 'sensing_instrumentation'],
+      ['optical_detector_module', 'sensing_instrumentation'],
       ['cuvette_holder', 'structure_containment'],
       ['led_source', 'energy_conversion_transduction'],
       ['led_driver', 'energy_conversion_transduction'],
@@ -13265,15 +13338,14 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       wantB(`(6) reports ${component} missing`, m !== undefined)
       if (m) wantB(`(6) ${component} resolves to ${mod}`, m.resolved_module === mod)
     }
-    wantB('(6) exactly 10 missing (no duplicates)', r.missing.length === 10)
+    wantB('(6) exactly 9 missing (no duplicates)', r.missing.length === 9)
 
     const add = addImpliedWords(colorimeterState.moduleDecomposition, r.missing)
-    wantB('(6) adds all 10', add.added === 10 && add.skipped === 0)
+    wantB('(6) adds all 9', add.added === 9 && add.skipped === 0)
     const grounded = add.design
     const findWord = (moduleId: string, wordId: string) =>
       grounded.modules.find((m: any) => m.module === moduleId)?.sub_modules?.[0]?.words?.some((w: any) => w.id === wordId)
-    wantB('(6) photodiode word present', findWord('sensing_instrumentation', 'photodiode_tool_grounded_word'))
-    wantB('(6) TIA word present', findWord('sensing_instrumentation', 'transimpedance_amplifier_tool_grounded_word'))
+    wantB('(6) detector module word present', findWord('sensing_instrumentation', 'optical_detector_module_tool_grounded_word'))
     wantB('(6) cuvette word present', findWord('structure_containment', 'cuvette_holder_tool_grounded_word'))
     wantB('(6) LED driver word present', findWord('energy_conversion_transduction', 'led_driver_tool_grounded_word'))
     wantB('(6) MCU word present', findWord('control_compute_communication', 'microcontroller_tool_grounded_word'))
@@ -13297,7 +13369,7 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
 
   out.push(assertEq(
     'UNIVERSAL.word_domain_coherence_industrial_power_strip_and_tool_implied_component_grounding',
-    'CORE FIX PRINCIPLE colorimeter benchmark (both directions): (5) INDUSTRIAL_POWER_MARKERS (inverter bridge, dc link capacitor, dc busbar, storage cell, cell module assembly, module rack, gate driver, i/o module, communication gateway, …) on the real out/colorimeter-pcbtest BESS-template cluster flag + strip on a device-scale pcb_assembly design, are suppressed byte-identically on a genuine bess design (reusing isProcessPlantClass — zero new suppression code), and never over-flag legitimate small-device parts (power converter, voltage/current sensor, main controller); (6) TOOL_IMPLIED_COMPONENTS grounds the SAME BESS-template design using the colorimeter\'s real 12 selected tools — photodiode-tia/cuvette/photometry/wearable-battery/control-systems imply photodiode+TIA+cuvette holder+LED source+LED driver+optical baffle+coin-cell battery+charge-management circuit (power_distribution fallback)+MCU+USB, all 10 reported missing and added via addImpliedWords, idempotent on re-run, byte-identical when nothing is missing',
+    'CORE FIX PRINCIPLE colorimeter benchmark (both directions): (5) INDUSTRIAL_POWER_MARKERS (inverter bridge, dc link capacitor, dc busbar, storage cell, cell module assembly, module rack, gate driver, i/o module, communication gateway, …) on the real out/colorimeter-pcbtest BESS-template cluster flag + strip on a device-scale pcb_assembly design, are suppressed byte-identically on a genuine bess design (reusing isProcessPlantClass — zero new suppression code), and never over-flag legitimate small-device parts (power converter, voltage/current sensor, main controller); (6) TOOL_IMPLIED_COMPONENTS grounds the SAME BESS-template design using the colorimeter\'s real 12 selected tools — photodiode-tia/cuvette/photometry/wearable-battery/control-systems imply detector module+cuvette holder+LED source+LED driver+optical baffle+coin-cell battery+charge-management circuit (power_distribution fallback)+MCU+USB, all 9 reported missing and added via addImpliedWords, idempotent on re-run, byte-identical when nothing is missing',
     failedB.length, (n) => n === 0,
     () => `word-domain-coherence extension cases failed: ${failedB.join(' ; ')}. Check src/lib/pdf-engine-v2/lib/word-domain-coherence-audit.ts.`,
   ))
@@ -13367,8 +13439,9 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantC('(7) photometer floor does NOT emit Interlock Switch', !/Interlock Switch/i.test(photoAll))
     wantC('(7) photometer power/safety IS a device fuse', /Fuse/i.test(photoAll))
     wantC('(7) photometer floor emits LED Source', /LED Source/i.test(photoAll))
-    wantC('(7) photometer floor emits Photodiode', /Photodiode/i.test(photoAll))
-    wantC('(7) photometer floor emits Transimpedance Amplifier', /Transimpedance Amplifier/i.test(photoAll))
+    wantC('(7) photometer floor emits an optical detector module', /Optical Detector Module/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit bare Photodiode', !/Photodiode/i.test(photoAll))
+    wantC('(7) photometer floor does NOT emit bare TIA', !/Transimpedance Amplifier|\bTIA\b/i.test(photoAll))
     wantC('(7) photometer floor emits Cuvette Holder', /Cuvette.*Holder/i.test(photoAll))
     wantC('(7) photometer floor emits Microcontroller', /Microcontroller/i.test(photoAll))
     wantC('(7) photometer floor emits a rechargeable battery (not cell racks)', /Rechargeable Battery Pack/i.test(photoAll))
@@ -13397,7 +13470,7 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
   }
   out.push(assertEq(
     'UNIVERSAL.optical_instrument_skeleton_floor_replaces_bess_floor',
-    'A1 — the SOURCE fix (derive-skeleton.ts energyFloorFor + OPTICAL_MODULE_FLOORS): a synthetic photometer contract (optical tool-identity signal from _tools_run — photodiode-tia/cuvette/photometry — + device-scale + no storage-kWh key) makes the generic skeleton floor emit LED source + LED driver, photodiode + transimpedance amplifier, a cuvette holder, a microcontroller, and a small rechargeable battery + charge management as PRINCIPALS, and NEVER emits inverter_bridge / gate_driver / storage_cell / module_rack / dc_busbar. A genuine BESS contract (hasEnergyStorage true, no optical tool signal) keeps its historical BESS floor byte-identically and never picks up optical words — the two signals are mutually exclusive and additive-only, no per-product table',
+    'A1 — the SOURCE fix (derive-skeleton.ts energyFloorFor + OPTICAL_MODULE_FLOORS): a synthetic photometer contract (optical tool-identity signal from _tools_run — photodiode-tia/cuvette/photometry — + device-scale + no storage-kWh key) makes the generic skeleton floor emit LED source + LED driver, an off-board optical detector module, a cuvette holder, a microcontroller, and a small rechargeable battery + charge management as PRINCIPALS, and NEVER emits inverter_bridge / gate_driver / storage_cell / module_rack / dc_busbar or a bare photodiode/TIA detector chain. A genuine BESS contract (hasEnergyStorage true, no optical tool signal) keeps its historical floor byte-identically and never picks up optical words — the two signals are mutually exclusive and additive-only, no per-product table',
     failedC.length, (n) => n === 0,
     () => `optical-instrument skeleton-floor cases failed: ${failedC.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts (energyFloorFor / OPTICAL_MODULE_FLOORS / hasOpticalInstrumentSignal).`,
   ))

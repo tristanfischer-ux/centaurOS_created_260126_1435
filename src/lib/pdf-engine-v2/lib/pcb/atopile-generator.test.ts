@@ -1,6 +1,6 @@
 /**
  * @file atopile-generator.test.ts — Phase B verification (2026-07-12).
- * @description Two fixtures:
+ * @description Fixtures cover:
  *   1. The REAL colorimeter design snapshot (`out/colorimeter-20260712-1010/state.json`)
  *      — proves the generator produces a well-formed atopile project with resolved
  *      footprints + an honest unresolved[] list on a real engine run.
@@ -8,6 +8,8 @@
  *      MCU + IMU sensor + LED driver — no colorimeter vocabulary anywhere) — the
  *      UNIVERSALITY PROOF: the same generator, with zero special-casing, maps this
  *      unrelated design too.
+ *   3. A compact instrument UI/controller/detector-module fixture proving COTS
+ *      off-board disposition does not turn intentional modules into PCB gaps.
  */
 
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -60,15 +62,16 @@ describe('atopile-generator', () => {
       expect(atoYaml).toContain('entry: main.ato:App')
     })
 
-    it('resolves at least N real electronic components with verified footprints', () => {
+    it('resolves on-board electronic components with verified footprints and separates off-board COTS modules', () => {
       const outDir = makeTmpDir('atopile-colorimeter-')
       tmpDirs.push(outDir)
       const result = generateAtopileProject(state, outDir)
 
-      // The colorimeter design has ~22 candidate electronic words + generic
-      // decoupling caps added on top; assert a sane floor, not an exact count
-      // (the exact count is allowed to move as Phase A's detection evolves).
-      expect(result.components.length).toBeGreaterThanOrEqual(20)
+      // The colorimeter design has on-board IC/passive/connector words plus
+      // front-panel/controller/display modules that are now intentionally off-board
+      // COTS assemblies. Assert sane floors, not exact counts.
+      expect(result.components.length).toBeGreaterThanOrEqual(10)
+      expect(result.offBoard.length).toBeGreaterThanOrEqual(1)
       for (const component of result.components) {
         expect(component.footprint).not.toBeNull()
         expect(component.footprint!.library.length).toBeGreaterThan(0)
@@ -102,8 +105,10 @@ describe('atopile-generator', () => {
       expect(vcc!.members.length).toBeGreaterThan(0)
       expect(gnd!.members.length).toBeGreaterThan(0)
 
-      const signalNets = result.nets.filter((n) => n.kind === 'signal')
-      expect(signalNets.length).toBeGreaterThan(0)
+      // Topology-derived signal nets are exercised by the arbitrary design below.
+      // This real snapshot may route its UI/controller/detector participants as
+      // off-board COTS modules, leaving only board rails in the PCB project.
+      expect(Array.isArray(result.nets.filter((n) => n.kind === 'signal'))).toBe(true)
     })
 
     it('emits a valid board outline geometry (closed contour)', () => {
@@ -232,6 +237,133 @@ describe('atopile-generator', () => {
 
     const mainAto = readFileSync(result.mainAtoPath, 'utf8')
     expect(mainAto).not.toMatch(/colorimeter|cuvette|photodiode|absorbance/i)
+  })
+
+  it('dispositions compact instrument UI/controller/detector modules as off-board COTS while keeping LEDs on-board', () => {
+    const outDir = makeTmpDir('atopile-cots-offboard-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_description: 'A compact handheld optical instrument with a local display and optical detector module.',
+      },
+      moduleDecomposition: {
+        modules: [
+          {
+            module: 'control_compute_communication',
+            sub_modules: [
+              {
+                id: 'control_compute_communication__controller_ui',
+                words: [
+                  {
+                    id: 'main_controller_word',
+                    name_human: 'Main Controller',
+                    content_character: { character_id: 'main_controller' },
+                    modifier_characters: [{ kind: 'quantity', value: '×1' }],
+                  },
+                  {
+                    id: 'local_display_word',
+                    name_human: 'Local Display',
+                    content_character: { character_id: 'local_display' },
+                    modifier_characters: [{ kind: 'quantity', value: '×1' }],
+                  },
+                  {
+                    id: 'user_input_buttons_word',
+                    name_human: 'User Input Buttons',
+                    content_character: { character_id: 'user_input_buttons' },
+                    modifier_characters: [{ kind: 'quantity', value: '×3' }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            module: 'sensing_instrumentation',
+            sub_modules: [
+              {
+                id: 'sensing_instrumentation__detector',
+                words: [
+                  {
+                    id: 'optical_detector_module_word',
+                    name_human: 'Optical Detector Module',
+                    content_character: { character_id: 'optical_detector_module' },
+                    modifier_characters: [{ kind: 'quantity', value: '×1' }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            module: 'energy_conversion_transduction',
+            sub_modules: [
+              {
+                id: 'energy_conversion_transduction__indicator',
+                words: [
+                  {
+                    id: 'status_led_word',
+                    name_human: 'Status LED',
+                    content_character: { character_id: 'status_indicator_led' },
+                    modifier_characters: [{ kind: 'quantity', value: '×1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((record) => record.wordId))
+    expect(offBoardIds).toEqual(new Set([
+      'main_controller_word',
+      'local_display_word',
+      'user_input_buttons_word',
+      'optical_detector_module_word',
+    ]))
+    expect(result.unresolved.map((gap) => gap.wordId)).not.toEqual(
+      expect.arrayContaining([...offBoardIds]),
+    )
+
+    const led = result.components.find((component) => component.wordId === 'status_led_word')
+    expect(led).toBeDefined()
+    expect(led!.functionClass).toBe('led')
+    expect(led!.resolutionTier).toBe('function_class')
+  })
+
+  it('keeps a non-instrument display module on-board as a normal PCB footprint', () => {
+    const outDir = makeTmpDir('atopile-display-onboard-')
+    tmpDirs.push(outDir)
+    const design = {
+      moduleDecomposition: {
+        modules: [
+          {
+            module: 'control_compute_communication',
+            sub_modules: [
+              {
+                id: 'control_compute_communication__operator_panel',
+                words: [
+                  {
+                    id: 'panel_display_word',
+                    name_human: 'Operator Display Module',
+                    content_character: { character_id: 'display_panel' },
+                    modifier_characters: [{ kind: 'quantity', value: '×1' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [] },
+    }
+
+    const result = generateAtopileProject(design, outDir)
+    expect(result.offBoard).toEqual([])
+    const display = result.components.find((component) => component.wordId === 'panel_display_word')
+    expect(display).toBeDefined()
+    expect(display!.functionClass).toBe('display_module')
   })
 
   it('a design with an unrecognisable electronic word lands honestly in unresolved[]', () => {

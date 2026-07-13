@@ -16,7 +16,10 @@
  * (function-class role names like `voltage_sensor`/`main_controller`/
  * `storage_cell`, and package-family tokens like `SOT-23`/`0603`/`QFP-32`).
  *
- * RESOLUTION TIERS (all three universal, checked in priority order):
+ * RESOLUTION TIERS (all universal, checked in priority order):
+ *   (0) off_board_cots — compact instrument UI/controller and detector-module shapes
+ *                        are purchased modules connected by headers/FFC, not board
+ *                        footprints. This is a shape rule, not a gold-MPN table.
  *   (a) mpn_package   — real manufacturer + part_number → DB-first verification via
  *                        `lookupCached()` (CHAIN-AS-DB-CONSUMER PRINCIPLE: this file
  *                        never touches a live distributor API), then derive package
@@ -102,7 +105,7 @@ export type FunctionClass =
  * as a `main_controller` in a drone or a BMS). First match wins.
  */
 const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> = [
-  { id: 'sensor_ic', test: /photodiode|phototransistor|imu\b|accelerometer|gyroscope|sensor|probe|monitor_ic|cell_monitor/i },
+  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog_to_digital|\badc\b|imu\b|accelerometer|gyroscope|sensor|probe|monitor_ic|cell_monitor/i },
   { id: 'op_amp', test: /signal_conditioner|amplifier|\btia\b|op_?amp/i },
   { id: 'microcontroller', test: /main_controller|\bmcu\b|microcontroller|processor|\bcpu\b|control_unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless/i },
@@ -113,7 +116,7 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'passive_r', test: /resistor/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
   { id: 'display_module', test: /display_panel|\block?d\b|\boled\b|\btft\b|screen/i },
-  { id: 'led', test: /status_indicator|annunciator|^led\b|_led\b/i },
+  { id: 'led', test: /status_indicator|annunciator|led_source|^led\b|_led\b/i },
   { id: 'switch', test: /control_switch|pushbutton|\bswitch\b/i },
   { id: 'connector', test: /interface_membrane|connector|receptacle|header|terminal/i },
 ]
@@ -466,6 +469,15 @@ export interface AtopileUnresolvedRecord {
   reason: string
 }
 
+export interface AtopileOffBoardCotsRecord {
+  wordId: string
+  nameHuman: string
+  characterId: string
+  quantityInDesign: number
+  disposition: 'off_board_cots_module'
+  reason: string
+}
+
 export interface GenerateAtopileProjectResult {
   projectDir: string
   mainAtoPath: string
@@ -473,6 +485,7 @@ export interface GenerateAtopileProjectResult {
   boardOutlinePath: string
   components: AtopileComponentRecord[]
   nets: AtopileNetRecord[]
+  offBoard: AtopileOffBoardCotsRecord[]
   unresolved: AtopileUnresolvedRecord[]
   boardOutline: PcbBoardGeometry
 }
@@ -484,6 +497,79 @@ function sanitizeIdentifier(id: string): string {
 
 function toTypeName(instanceName: string): string {
   return `Part_${instanceName}`
+}
+
+function wordText(word: ElectronicWordRef): string {
+  return [
+    word.wordId,
+    word.nameHuman,
+    word.characterId,
+    ...Object.values(word.modifiers),
+  ].join(' ')
+}
+
+function wordRoleText(word: ElectronicWordRef): string {
+  return [word.wordId, word.nameHuman, word.characterId].join(' ')
+}
+
+const INSTRUMENT_DEVICE_TEXT_RE =
+  /\b(optical[_ -]?instrument|photometer|colou?rimeter|spectrophotometer|absorbance|portable|handheld|hand-held|benchtop|bench-top)\b/i
+
+const COTS_UI_WORD_RE =
+  /\b(local[_ -]?display|display(?:[_ -]?(?:module|panel|screen))?|oled|lcd|tft|readout|user[_ -]?input|buttons?|keypad|membrane[_ -]?(?:switch|keypad)|front[_ -]?panel|hmi)\b/i
+
+const COTS_DETECTOR_MODULE_RE =
+  /\b(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array).*\b(module|breakout|board|assembly)\b|\b(module|breakout|board|assembly).*(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array)\b/i
+
+const CONTROLLER_WORD_RE =
+  /\b(main[_ -]?controller|microcontroller|mcu|processor|control[_ -]?unit)\b/i
+
+const ON_BOARD_PCB_WORD_RE =
+  /\b(status[_ -]?(?:led|indicator)|led[_ -]?source|\bled\b|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b)\b/i
+
+function stateText(state: Record<string, unknown>): string {
+  const parsed = (state.parsedBrief as Record<string, unknown> | undefined) ?? {}
+  return [
+    state.isInstrumentDevice ? 'isInstrumentDevice' : '',
+    parsed.product_class,
+    parsed.product_description,
+    parsed.original_text,
+    parsed.application_context,
+  ].filter((v): v is string => typeof v === 'string').join(' ')
+}
+
+function instrumentDeviceContext(
+  state: Record<string, unknown>,
+  words: ElectronicWordRef[],
+): boolean {
+  if (state.isInstrumentDevice === true) return true
+  const combined = `${stateText(state)} ${words.map(wordText).join(' ')}`
+  return INSTRUMENT_DEVICE_TEXT_RE.test(combined)
+}
+
+function offBoardCotsReason(
+  word: ElectronicWordRef,
+  words: ElectronicWordRef[],
+  state: Record<string, unknown>,
+): string | null {
+  const text = wordText(word)
+  const roleText = wordRoleText(word)
+  if (ON_BOARD_PCB_WORD_RE.test(roleText)) return null
+  const isInstrument = instrumentDeviceContext(state, words)
+  // DECISION: off-board COTS UI/controller/detector disposition is an instrument-
+  // context rule. A display word in a generic embedded product can still be a PCB
+  // footprint; a compact optical instrument buys that front-panel module off-board.
+  if (isInstrument && COTS_UI_WORD_RE.test(roleText)) {
+    return 'front-panel/UI module shape (display/keypad/buttons) — purchased off-board COTS assembly connected to the PCB by header/FFC, not an on-board footprint'
+  }
+  if (isInstrument && COTS_DETECTOR_MODULE_RE.test(text)) {
+    return 'detector-module/breakout shape — purchased optical sensor module connected to the PCB, not a bare on-board IC footprint'
+  }
+  const hasUiModule = words.some((candidate) => candidate.wordId !== word.wordId && COTS_UI_WORD_RE.test(wordRoleText(candidate)))
+  if (isInstrument && hasUiModule && CONTROLLER_WORD_RE.test(roleText)) {
+    return 'compact instrument controller paired with UI/display module — prefer a purchased controller/UI module at concept stage, while LEDs/regulators remain on-board'
+  }
+  return null
 }
 
 /**
@@ -806,8 +892,21 @@ export function generateAtopileProject(
   const electronicWords = collectElectronicWords(state)
 
   const components: AtopileComponentRecord[] = []
+  const offBoard: AtopileOffBoardCotsRecord[] = []
   const unresolved: AtopileUnresolvedRecord[] = []
   for (const word of electronicWords) {
+    const cotsReason = offBoardCotsReason(word, electronicWords, state)
+    if (cotsReason) {
+      offBoard.push({
+        wordId: word.wordId,
+        nameHuman: word.nameHuman,
+        characterId: word.characterId,
+        quantityInDesign: word.quantity,
+        disposition: 'off_board_cots_module',
+        reason: cotsReason,
+      })
+      continue
+    }
     const result = resolveComponent(word, footprintsRoot)
     if ('component' in result) components.push(result.component)
     else unresolved.push(result.unresolved)
@@ -844,6 +943,7 @@ export function generateAtopileProject(
     boardOutlinePath,
     components: allComponents,
     nets,
+    offBoard,
     unresolved,
     boardOutline,
   }
@@ -860,8 +960,12 @@ if (require.main === module) {
   const result = generateAtopileProject(state, outDirArg)
   console.log(
     `[atopile-generator] ${result.components.length} components resolved, ` +
-    `${result.unresolved.length} unresolved, ${result.nets.length} nets → ${result.projectDir}`,
+    `${result.offBoard.length} off-board COTS, ${result.unresolved.length} unresolved, ` +
+    `${result.nets.length} nets → ${result.projectDir}`,
   )
+  if (result.offBoard.length) {
+    console.log('Off-board COTS:', JSON.stringify(result.offBoard, null, 2))
+  }
   if (result.unresolved.length) {
     console.log('Unresolved:', JSON.stringify(result.unresolved, null, 2))
   }
