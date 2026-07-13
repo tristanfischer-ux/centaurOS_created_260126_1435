@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -113,6 +113,25 @@ expect(dbHitAcceptableForWord(_iSii, 'SCADA / Plant Control System') === true,
 const _panelPc: DbPart = { part_name: 'HMI Displays & Panel PCs 12.1" XGA fanless touch panel computer with Intel Celeron processor N3060, 5-wire resistive touch screen and 24 VDC power input (terminal block connector)', manufacturer: 'Axiomtek', part_number: 'GOT5120T-845', component_class: 'oem_subsystem', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_panelPc, 'Terminal Blocks') === false,
   "a panel PC whose spec TAIL says '(terminal block connector)' must never pin 'Terminal Blocks' (lead-segment discipline)")
+// ── DEVICE-SCALE INSTRUMENT rejection (2026-07-13, Grok MPN-help): an industrial part
+//    that passes head-noun coherence but is the wrong SCALE for a handheld must be refused
+//    on a device instrument, and ACCEPTED off-device (a plant breaker IS overcurrent) — so
+//    no plant regression. The colorimeter's three real wrong-family "verified" pins.
+const _max35104: DbPart = { part_name: 'MAX35104 ultrasonic time-to-digital / flow converter AFE', manufacturer: 'Maxim Integrated', part_number: 'MAX35104ETL+T', component_class: 'electronic_pcb', unit_price_gbp: null }
+const _bannerS22: DbPart = { part_name: 'S22 Pro indicator / pick-to-light tower', manufacturer: 'Banner Engineering', part_number: 'S22LBRWPQ', component_class: 'electronic_pcb', unit_price_gbp: null }
+const _nsx: DbPart = { part_name: 'ComPact NSX moulded-case circuit breaker 630 A', manufacturer: 'Schneider Electric', part_number: 'LV430630', component_class: 'circuit_breaker', unit_price_gbp: null }
+setInstrumentDeviceContext(true)
+expect(dbHitAcceptableForWord(_max35104, 'Analog To Digital Converter') === false,
+  'DEVICE: an ultrasonic flow TDC (MAX35104) must be refused on a generic ADC slot')
+expect(dbHitAcceptableForWord(_bannerS22, 'Power Indicator LED') === false,
+  'DEVICE: a Banner industrial indicator tower must be refused on a device status-LED slot')
+expect(dbHitAcceptableForWord(_nsx, 'Overcurrent Protection') === false,
+  'DEVICE: a Schneider NSX 630 A MCCB must be refused on a device overcurrent slot')
+expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === false,
+  'DEVICE: the NSX MCCB is refused even on a coherent Circuit Breaker word (a handheld has no MCCB)')
+setInstrumentDeviceContext(false)
+expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === true,
+  'PLANT: the SAME NSX breaker IS accepted off a device (guard is flag-gated → no plant regression)')
 const _wika: DbPart = { part_name: 'Pressure transmitter — 0-7 bar (0-100 psi), 4-20 mA, G1/4', manufacturer: 'WIKA', part_number: '50372475', component_class: 'water_treatment', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_wika, 'Low Pressure Switch') === false,
   'a pressure TRANSMITTER must never pin a pressure SWITCH word (head-noun families never cross)')

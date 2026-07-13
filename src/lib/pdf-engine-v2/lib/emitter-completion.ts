@@ -1078,6 +1078,33 @@ export function describeNodeAbiMismatch(err: unknown, nodeVersion: string = proc
 let _abiWarned = false
 let _openWarned = false
 
+// Run-scoped device-scale flag (2026-07-13, Grok MPN-help): true when the design is a
+// device-scale optical/electronic INSTRUMENT (state.isInstrumentDevice). On such a run a
+// DB hit that is an INDUSTRIAL-scale part (a plant switchgear breaker, a safety-tower
+// indicator, an ultrasonic flow TDC) is WRONG for a handheld even when it passes head-noun
+// coherence — the colorimeter "verified" MAX35104 (flow TDC) as an ADC, Banner S22 (£40
+// industrial indicator tower) as a status LED, Schneider LV430630 (NSX MCCB) as device
+// overcurrent, while leaving the real board parts NOT-FOUND. Set by the chain via
+// setInstrumentDeviceContext before emitter completion. Universal — a plant never sets it.
+let RUN_IS_INSTRUMENT_DEVICE = false
+export function setInstrumentDeviceContext(isDevice: boolean): void {
+  RUN_IS_INSTRUMENT_DEVICE = Boolean(isDevice)
+}
+
+// Industrial part signatures that must NEVER pin a device-scale instrument slot. Keyed on
+// vendor + MPN-series/class — the parts pass head-noun coherence (a breaker IS protection,
+// a tower light IS an indicator) but are the WRONG SCALE (plant £100s vs device pennies).
+const _DEVICE_REJECT_INDUSTRIAL_VENDORS = new Set([
+  'banner engineering', 'banner', 'schmersal', 'pilz', 'sick', 'sick ag',
+  'schneider electric', 'schneider', 'eaton', 'abb', 'rockwell', 'allen-bradley',
+  'wago', 'phoenix contact', 'pepperl+fuchs', 'pepperl fuchs', 'turck', 'ifm',
+])
+// component_class families that are plant switchgear / industrial safety — never a device part.
+const _DEVICE_REJECT_CLASS_RE =
+  /switchgear|circuit[_ -]?breaker|contactor|\bmccb\b|\bmcb\b|safety[_ -]?relay|light[_ -]?curtain|motor[_ -]?protect|oem_subsystem/i
+// ultrasonic-flow / time-to-digital metering ICs — a FLOW converter, never a generic ADC.
+const _FLOW_TDC_MPN_RE = /\bMAX3510\d|\bMAX35104|\bTDC[_ -]?GP|\bGP22\b|\bGP30\b|flow.*converter/i
+
 function openLibraryDb(dbPath: string): Database.Database | null {
   try {
     if (!existsSync(dbPath)) return null
@@ -1461,6 +1488,22 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   if (!dbHitScaleAcceptable(dbHit, name)) return false
   const mfr = dbHit.manufacturer.trim().toLowerCase()
   if (MAKER_VENDORS.has(mfr)) return false
+  // DEVICE-SCALE INSTRUMENT rejection (2026-07-13, Grok MPN-help): on a handheld/benchtop
+  // instrument, an INDUSTRIAL part is wrong even when it passes head-noun coherence — a
+  // plant breaker IS "overcurrent protection", a safety tower-light IS an "indicator", an
+  // ultrasonic flow TDC IS an "analog-to-digital converter", but none belongs in a £100
+  // colorimeter. Reject the industrial vendor / switchgear class / flow-TDC series so the
+  // slot falls back to an honest TBD (or the correct board part once the DB carries it),
+  // instead of shipping a wrong-family "verified" MPN. Gated on the device flag → plants
+  // (whose breakers/safety-relays/flow-meters ARE correct) are untouched.
+  if (RUN_IS_INSTRUMENT_DEVICE) {
+    const _mpn = (dbHit.part_number ?? '').toUpperCase()
+    const _cls = (dbHit.component_class ?? '')
+    if (_DEVICE_REJECT_INDUSTRIAL_VENDORS.has(mfr)) return false
+    if (_DEVICE_REJECT_CLASS_RE.test(_cls)) return false
+    // a generic ADC / converter slot must not accept a flow/ultrasonic metering TDC
+    if (/\b(adc|converter|analog[_ -]?to[_ -]?digital)\b/i.test(name) && _FLOW_TDC_MPN_RE.test(_mpn)) return false
+  }
   const toks = tokenize(name)
   const cls = (dbHit.component_class ?? '').toLowerCase()
   const MOTION = new Set(['motor', 'servo', 'actuator', 'drive', 'esc', 'speed', 'propeller', 'propulsion', 'thruster'])

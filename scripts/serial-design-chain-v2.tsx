@@ -106,7 +106,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -5650,6 +5650,10 @@ async function main() {
     const macroWordNamesForGate23 = new Set<string>(
       (engineeringContract?.macro_assembly_prices ?? []).map((m) => String(m.word_name)),
     )
+    // Device-scale context for dbHitAcceptableForWord: on an instrument, reject industrial
+    // DB hits (a plant breaker as device overcurrent, a Banner tower as a status LED, a flow
+    // TDC as an ADC) so the slot stays honest-TBD instead of a wrong-family "verified" MPN.
+    setInstrumentDeviceContext(Boolean((state as any)?.isInstrumentDevice))
     try {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
