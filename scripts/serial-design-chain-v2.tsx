@@ -106,7 +106,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -5620,6 +5620,11 @@ async function main() {
   //
   // Universal: runs for ALL classes. BESS arc_flash_protection + hmi_panel
   // are now covered by deterministic-emitter.ts (commit accompanying this gate).
+  const _encVolForDevice = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
+  const _pcForDevice = String(currentProductClass ?? '').toLowerCase()
+  const _isPlantishForDevice = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pcForDevice)
+  const isInstrumentDevice = Number.isFinite(_encVolForDevice) && _encVolForDevice > 0 && _encVolForDevice < 1 && !_isPlantishForDevice
+  setInstrumentDeviceContext(isInstrumentDevice)
   {
     const tGate23 = Date.now()
 
@@ -5656,12 +5661,6 @@ async function main() {
     // `state` is not yet declared at this stage, so derive the device signal from the
     // contract that IS in scope: a sealed sub-1 m³ enclosure whose product class is NOT an
     // energy-storage / plant archetype (a Powerwall is sub-1 m³ but must NOT be flagged).
-    {
-      const _encVol = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
-      const _pc = String(currentProductClass ?? '').toLowerCase()
-      const _isPlantish = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pc)
-      setInstrumentDeviceContext(Number.isFinite(_encVol) && _encVol > 0 && _encVol < 1 && !_isPlantish)
-    }
     try {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
@@ -5939,6 +5938,7 @@ async function main() {
   if (process.env.CHAIN_SKIP_BLANK_MPN_FILL !== '1') {
     try {
       const tFill = Date.now()
+      setInstrumentDeviceContext(isInstrumentDevice)
       const fill = await fillBlankWordMpns(
         design.modules ?? [],
         currentProductClass ?? 'unknown',
@@ -6804,7 +6804,7 @@ async function main() {
         try {
           libCandidates = JSON.parse(require('fs').readFileSync(libCandidatesPath, 'utf-8'))
         } catch { /* continue with empty candidates */ }
-        const realityResult = await runPartRealityCheck(design, libCandidates)
+        const realityResult = await runPartRealityCheck(design, libCandidates, { isInstrumentDevice })
         console.error(
           `[chain] Stage 10.5 Part Reality Check: ${realityResult.words_checked} checked, ` +
           `${realityResult.words_real} real, ${realityResult.words_substituted} substituted, ` +
@@ -6847,6 +6847,13 @@ async function main() {
     }
   } else {
     console.error('[chain] CHAIN_SKIP_PART_REALITY_CHECK=1 — skipping Stage 10.5 Part Reality Check')
+  }
+
+  setInstrumentDeviceContext(isInstrumentDevice)
+  const scrubbedIndustrial = scrubInstrumentIndustrialMisPins(design.modules ?? [])
+  if (scrubbedIndustrial > 0) {
+    console.error(`[chain] scrubbed ${scrubbedIndustrial} industrial-scale MPN(s) from device-instrument words (post Stage 10.5)`)
+    logAction({ step: 'scrub_instrument_industrial_mis_pins', cleared: scrubbedIndustrial })
   }
 
   // ── Stage 10.6: Synchronous Part Verification (the engine's "P1", 2026-06-04).

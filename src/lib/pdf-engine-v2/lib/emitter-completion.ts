@@ -1204,6 +1204,25 @@ export function headNounHit(hay: string, headNoun: string): boolean {
   return (HEAD_NOUN_SYNONYMS[head] ?? []).some((syn) => hasWholeWordFolded(hay, syn))
 }
 
+/** True when the head noun (fold/synonym-tolerant) is among the FIRST two tokens of the
+ *  catalogue part name — "Microcontroller — ATSAMD21" leads with the family; "16-bit
+ *  Microcontrollers - MCU" does not (a qualifier leads). Used in pickBestDbCandidate so a
+ *  web_verified_ingest seed whose name LEADS with the design vocabulary outranks a
+ *  distributor row whose head noun only appears mid-name (colorimeter MCU/photodiode gap). */
+export function headNounLeadsPartName(partName: string | null | undefined, headNoun: string): boolean {
+  const toks = String(partName ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .slice(0, 3)
+  const head = foldPluralToken(headNoun)
+  const family = new Set<string>([head, ...(HEAD_NOUN_SYNONYMS[head] ?? []).map(foldPluralToken)])
+  for (let i = 0; i < Math.min(2, toks.length); i++) {
+    if (family.has(foldPluralToken(toks[i]!))) return true
+  }
+  return false
+}
+
 /**
  * The LEADING FAMILY SEGMENT of a catalogue part name — its first few tokens.
  * Distributor + ingest rows both LEAD with the component family ('Board Mount
@@ -1320,7 +1339,7 @@ export function pickBestDbCandidate(
     (h): h is string => !!h,
   )
   const isHeavy = specificTokens.some((t) => HEAVY_INDUSTRIAL_TOKENS.has(t))
-  const seen = new Map<string, { row: DbPart; nameHits: Set<string>; headHit: boolean }>()
+  const seen = new Map<string, { row: DbPart; nameHits: Set<string>; headHit: boolean; headLeads: boolean }>()
 
   for (const r of rows) {
     const key = `${r.manufacturer}|${r.part_number}`
@@ -1341,19 +1360,20 @@ export function pickBestDbCandidate(
     // mention ('…terminal block connector' on a panel PC) is NOT a family match.
     const lead = partNameLeadSegment(r.part_name)
     const headHit = headNouns.some((h) => headNounHit(lead, h))
+    const headLeads = headNouns.some((h) => headNounLeadsPartName(r.part_name, h))
     const prev = seen.get(key)
     if (!prev || nameHits.size > prev.nameHits.size) {
-      seen.set(key, { row: r, nameHits, headHit })
+      seen.set(key, { row: r, nameHits, headHit, headLeads })
     }
   }
 
   if (seen.size === 0) return null
 
-  // Rank: head-noun (family) hits first, then non-accessory over accessory, then
-  // total distinct hits; on a FULL tie a class-tagged verified-ingest row
-  // outranks a distributor-sweep row (the saturation fix's in-memory leg — same
-  // signal as the SQL window ordering).
-  const rankOf = (v: { row: DbPart; nameHits: Set<string>; headHit: boolean }): number[] => [
+  // Rank: head noun LEADING the part name first (design-vocab seeds beat distributor
+  // category tails), then head-noun anywhere in the lead segment, then non-accessory,
+  // total distinct hits; on a FULL tie a class-tagged verified-ingest row outranks sweep.
+  const rankOf = (v: { row: DbPart; nameHits: Set<string>; headHit: boolean; headLeads: boolean }): number[] => [
+    v.headLeads ? 1 : 0,
     v.headHit ? 1 : 0,
     isAccessoryRow(v.row.part_name) ? 0 : 1,
     v.nameHits.size,
@@ -1364,7 +1384,7 @@ export function pickBestDbCandidate(
     MAKER_VENDORS.has(v.row.manufacturer.trim().toLowerCase()) ? 0 : 1,
     isVerifiedIngestRow(v.row) ? 1 : 0,
   ]
-  let best: { row: DbPart; nameHits: Set<string>; headHit: boolean } | null = null
+  let best: { row: DbPart; nameHits: Set<string>; headHit: boolean; headLeads: boolean } | null = null
   for (const v of seen.values()) {
     if (!best) { best = v; continue }
     const a = rankOf(v)
@@ -1381,8 +1401,14 @@ export function pickBestDbCandidate(
     return null
   }
 
-  // Acceptance: (head-noun hit AND ≥2 total hits) OR (≥3 total hits).
-  const accept = (best.headHit && best.nameHits.size >= 2) || best.nameHits.size >= 3
+  // Acceptance: (head-noun hit AND ≥2 total hits) OR (≥3 total hits). A
+  // web_verified_ingest row whose part name LEADS with the head noun may accept
+  // on a single token — it was deliberately seeded for that design vocabulary
+  // (colorimeter MCU/photodiode gap; probe-fill "Microcontroller").
+  const accept =
+    (best.headLeads && isVerifiedIngestRow(best.row) && best.nameHits.size >= 1) ||
+    (best.headHit && best.nameHits.size >= 2) ||
+    best.nameHits.size >= 3
   return accept ? best.row : null
 }
 
@@ -1939,7 +1965,8 @@ export async function completeEmitterGaps(
 
       // 2. DB-FIRST.
       const dbHit = dbFirstLookup(db, tokenList, headNoun)
-      if (dbHit) {
+      const gapLabel = gap.sub_module_id.replace(/_/g, ' ')
+      if (dbHit && dbHitAcceptableForWord(dbHit, gapLabel)) {
         const word = buildCompletionWord(
           gap.sub_module_id,
           dbHit.manufacturer,
@@ -1977,6 +2004,12 @@ export async function completeEmitterGaps(
           name: word.name_human ?? '',
         })
         continue
+      }
+      if (dbHit) {
+        log(
+          `[emitter-completion]   ⊘ skip ${key}: DB ${dbHit.manufacturer} ${dbHit.part_number} ` +
+          `fails type/device acceptance for gap "${gapLabel}"`,
+        )
       }
 
       // 3. ON MISS → generate on the fly (honest, gate-20-safe MPN).
@@ -2506,5 +2539,48 @@ export async function fillBlankWordMpns(
   const genCount = filled.filter((f) => f.source === 'generated').length
   log(`[fill-blank-mpn] filled ${filled.length}/${candidates.length} blank word(s): ${dbCount} DB-first (real MPN), ${genCount} generated (real OEM, MPN deferred); ${skippedStructural} structural skipped.`)
 
+  const scrubbed = scrubInstrumentIndustrialMisPins(safeModules, log)
+  if (scrubbed > 0) {
+    mutated = true
+    log(`[fill-blank-mpn] scrubbed ${scrubbed} industrial-scale MPN(s) from device-instrument words`)
+  }
+
   return { filled, modulesMutated: mutated, skipped_structural: skippedStructural, candidates: candidates.length }
+}
+
+/** On a device-scale instrument run, clear any pinned MPN that fails
+ *  dbHitAcceptableForWord (Banner tower on status LED, NSX breaker on device fuse, etc.).
+ *  Catches pins from paths that skipped the fill loop's acceptance bar (restore, Stage 10.5). */
+export function scrubInstrumentIndustrialMisPins(
+  modules: DesignModuleLike[],
+  log: (line: string) => void = () => {},
+): number {
+  if (!RUN_IS_INSTRUMENT_DEVICE) return 0
+  let cleared = 0
+  for (const m of Array.isArray(modules) ? modules : []) {
+    const mid = String(m?.module ?? 'unknown_module')
+    for (const sm of Array.isArray(m?.sub_modules) ? m.sub_modules! : []) {
+      const sid = String(sm?.id ?? 'unknown_sub_module')
+      for (const w of Array.isArray(sm?.words) ? sm.words : []) {
+        const mods = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
+        const mpn = mods.find((x) => x.kind === 'part_number')?.value?.trim() ?? ''
+        const mfr = mods.find((x) => x.kind === 'manufacturer')?.value?.trim() ?? ''
+        if (!mpn || isBlankOrPlaceholderMpn(mpn)) continue
+        const nm = String(w.name_human ?? w.content_character?.character_id ?? '')
+        const hit: DbPart = {
+          part_name: nm,
+          manufacturer: mfr,
+          part_number: mpn,
+          component_class: String(w.content_character?.function_radical_primary ?? ''),
+          unit_price_gbp: null,
+        }
+        if (dbHitAcceptableForWord(hit, nm)) continue
+        w.modifier_characters = mods.filter((x) => x.kind !== 'part_number' && x.kind !== 'manufacturer')
+        w.source_detail = 'Device instrument: industrial-scale MPN cleared (wrong scale for handheld slot)'
+        cleared++
+        log(`[fill-blank-mpn]   ⊘ scrub ${mid}::${sid} (${nm}): cleared ${mfr} ${mpn} — industrial mis-pin on device instrument`)
+      }
+    }
+  }
+  return cleared
 }

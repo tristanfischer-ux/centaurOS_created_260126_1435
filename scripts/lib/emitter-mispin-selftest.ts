@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, headNounLeadsPartName, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -132,6 +132,20 @@ expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === false,
 setInstrumentDeviceContext(false)
 expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === true,
   'PLANT: the SAME NSX breaker IS accepted off a device (guard is flag-gated → no plant regression)')
+// ── HEAD-NOUN-LEADS ranking (2026-07-13, colorimeter seed gap): a web_verified_ingest row
+//    whose part_name LEADS with the design vocabulary must outrank a distributor row whose
+//    head noun only appears mid-name ("16-bit Microcontrollers - MCU" vs "Microcontroller — ATSAMD21").
+const _mcuRows: DbPart[] = [
+  { part_name: '16-bit Microcontrollers - MCU, mixed signal, 16 MHz', manufacturer: 'Texas Instruments', part_number: 'MSP430F5529IPNR', component_class: 'electronic_ic', unit_price_gbp: 5, confidence: 0.95, discovery_source: 'distributor_sweep' },
+  { part_name: 'Microcontroller — ATSAMD21G18A-MU', manufacturer: 'Microchip', part_number: 'ATSAMD21G18A-MU', component_class: 'electronic_ic', unit_price_gbp: 3, confidence: 0.95, discovery_source: 'web_verified_ingest' },
+]
+const _mcuPick = pickBestDbCandidate(_mcuRows, ['microcontroller'], 'microcontroller', {})
+expect(_mcuPick?.part_number === 'ATSAMD21G18A-MU',
+  'verified-ingest row whose NAME LEADS with the head noun must outrank a distributor row whose head noun is mid-name')
+expect(headNounLeadsPartName('Microcontroller — ATSAMD21G18A-MU', 'microcontroller') === true,
+  'headNounLeadsPartName: family token in first position')
+expect(headNounLeadsPartName('16-bit Microcontrollers - MCU', 'microcontroller') === false,
+  'headNounLeadsPartName: head noun mid-name (16-bit leads) does not count as leading')
 const _wika: DbPart = { part_name: 'Pressure transmitter — 0-7 bar (0-100 psi), 4-20 mA, G1/4', manufacturer: 'WIKA', part_number: '50372475', component_class: 'water_treatment', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_wika, 'Low Pressure Switch') === false,
   'a pressure TRANSMITTER must never pin a pressure SWITCH word (head-noun families never cross)')
