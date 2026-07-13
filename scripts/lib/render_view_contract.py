@@ -62,6 +62,7 @@ def _instrument_landscape_from_volume(volume_m3: float) -> tuple[float, float, f
 # photometer. A top-operated optical instrument's long edge is dominated by
 # (display/MCU module ≈ 90 mm) + (optical cube ≈ 40 mm) side-by-side — typically
 # ≤155 mm. Clamp DERIVED envelopes only; brief-pinned max_dimensions_mm still win.
+# Kept in sync with human_factors_instrument.HANDHELD_MAX_EDGE_MM (Apple/hand floor).
 _HANDHELD_INSTRUMENT_MAX_EDGE_MM = 155.0
 
 

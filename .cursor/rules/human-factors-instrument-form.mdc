@@ -1,0 +1,114 @@
+---
+description: Human factors for physical instrument form — Apple HIG hand/eye floors translated to mm for Blender/CAD
+alwaysApply: true
+---
+
+# Human Factors for Instrument Form (Form Follows Function + Hand/Eye)
+
+**CRITICAL:** Sealed optical/electronic instruments (colorimeters, meters, handheld lab tools) must look the way they do because of **use-physics** and **human factors** — not because a gold product was copied, and not as a random box with features glued on.
+
+Apple's [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) and [UI Design Dos and Don’ts](https://developer.apple.com/design/tips/) are the **rule-book floor** for hand/eye interaction on these devices. Translate HIG *logical* units into **physical millimetres** for enclosure CAD / Blender form rules.
+
+## Sources (canonical)
+
+| Source | What we take |
+|---|---|
+| [Apple HIG — Typography](https://developer.apple.com/design/human-interface-guidelines/typography) | Text must stay legible at typical viewing distances; platform minimums |
+| [Apple Design Tips](https://developer.apple.com/design/tips/) | Text ≥ **11 pt**; hit targets ≥ **44×44 pt**; contrast; no overlapping text; primary content visible without zoom |
+| Apple HIG — Buttons / Games UI | Interactive controls sized for the interaction method (touch → 44×44 pt floor) |
+| Anthropometry (design practice) | Adult fingertip pad ~16–20 mm; comfortable touch ~7–10 mm physical; handheld viewing ~300–400 mm |
+
+## Core principle
+
+```
+Form follows function AND the human body.
+  optics / sample / power  →  why the volumes exist
+  hand + eye               →  why sizes and layout are what they are
+```
+
+A display that is too small to read at arm's length is a **failed instrument**, even if the optical path is correct.
+
+## Apple → physical engineering floors
+
+### 1. Eye — readable display
+
+| HIG rule | Physical translation for benchtop/handheld instruments |
+|---|---|
+| Text ≥ **11 pt** at typical viewing distance | Active display area must render primary readout (absorbance, %T, status) at ≥11 pt-equivalent without zoom |
+| Body / primary content often **17 pt** default (iOS) | Prefer primary numeric result at ~17 pt-equivalent comfort size |
+| Typical handheld viewing | Design for **300–400 mm** eye-to-display (held or sitting on bench) |
+| Primary content without zoom / horizontal scroll | One glance shows result + mode; no microscopic glass rectangle |
+
+**Minimum active display area (universal floor):**
+
+| Role | Min W×H (mm) | Why |
+|---|---|---|
+| Primary numeric / status readout | **≥ 28 × 18** | Fits several characters of ≥11 pt-equivalent at 300–400 mm |
+| Comfortable lab readout (preferred) | **≥ 36 × 24** | Closer to a readable handheld UI block (~1.5–2" class) |
+
+Display is **recessed in the top plate** on the closed product (operated looking down). Do not fake a green FR4 under the glass on the exterior hero.
+
+### 2. Hand — touch / tactile targets
+
+| HIG rule | Physical translation |
+|---|---|
+| Hit targets ≥ **44×44 pt** | Finger-operable controls **≥ 7 mm** across (≈44 pt on classic ~163 ppi phone); prefer **≥ 9 mm** where space allows |
+| Controls near the content they modify | D-pad / blank / measure buttons live on the **same top deck** as the display and within thumb reach of the sample chamber |
+| Spacing so targets don't fight | ≥ **2 mm** clear gap between adjacent button centres' rims (prefer ≥ 3 mm) |
+
+### 3. Hand — envelope and grip
+
+| Need | Rule |
+|---|---|
+| Landscape operation | W > D > H; top plane is the operating plane (eyes + thumbs share it) |
+| Derived envelope (no brief pin) | Long edge **≤ 155 mm** — display/MCU block + optical cube side-by-side, not an airy appliance |
+| Optical cube | Chunky near-cubic chamber sized for cuvette + baffles — not a skinny chimney |
+| Sample access | Top-loading well + rim for ambient-light cap (Beer–Lambert needs I₀ without room light) |
+| Module interconnect | Source board harness enters a **cable channel** at the cube↔body joint (swappable LED), not mid-air |
+
+## Layout that a human can use (one composition)
+
+Top deck, left→right (or mirror for handedness):
+
+1. **D-pad / primary buttons** — thumb cluster, ≥7 mm each
+2. **Display** — readable block, ≥28×18 mm active
+3. **Optical cube** — sample well + source face + cable channel
+
+If removing the display leaves the device "still looking finished," the HMI is decoration — **fail**.
+
+## Forbidden
+
+| Anti-pattern | Why it fails humans |
+|---|---|
+| Appliance-sized sealed box with tiny lid icons | Screen unreadable at 300–400 mm |
+| Buttons as 2–3 mm cosmetic pegs | Below Apple 44 pt / fingertip floor |
+| Display as a green PCB plate on the closed hero | Wrong material language; hides the actual glass size |
+| Optical "tower" thinner than a cuvette block | Form stopped following optical function |
+| Floating wires with no hand-serviceable plug path | Not how a human swaps a wavelength module |
+
+## Code hooks
+
+| Concern | Where |
+|---|---|
+| Form geometry + human floors | `scripts/blender-universal/build_universal_scene.py` → `_instrument_form_rule_mm` |
+| Constants / proveCatch | `scripts/lib/human_factors_instrument.py` |
+| Derived envelope clamp | `scripts/lib/render_view_contract.py` → `_HANDHELD_INSTRUMENT_MAX_EDGE_MM` |
+
+When you change display/button sizes, **update the constants module and its selftest** — do not hardcode one product's silhouette.
+
+## Quick checklist (before shipping an instrument hero)
+
+- [ ] Display active area ≥ 28×18 mm (prefer ≥ 36×24 mm)
+- [ ] Primary controls ≥ 7 mm across, spaced so a finger can hit one without its neighbour
+- [ ] Operated looking down: HMI + sample on the top plane
+- [ ] Envelope long edge ≤ 155 mm when dimensions are derived (brief pin still wins)
+- [ ] Optical cube chunky; well + rim + deck-parked ambient cap
+- [ ] Source harness enters cube↔body cable channel
+- [ ] Closed product: recessed display glass, not exterior FR4 under the screen
+- [ ] Would a competent engineer hold this and read a result at ~350 mm? If no → fix the rule
+
+## Relationship to other rules
+
+- **Universal, not product-named** — still `isInstrumentDevice` + use-physics (see CORE FIX PRINCIPLE). Gold is the TRAINING check that the reasons produce a real-looking object.
+- **Delight** — a device that fits the hand and can be read without squinting is the floor of "show a friend."
+- **Color / UI tokens** — software screens inside ForgeOS still use semantic tokens; this rule governs **physical instrument CAD / Blender form**.

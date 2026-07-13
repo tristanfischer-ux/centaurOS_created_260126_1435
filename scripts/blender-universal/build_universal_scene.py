@@ -51,6 +51,7 @@ from render_view_contract import (
     sealed_exterior_view_names,
 )
 from cad_asset_resolver import CadAssetResolver
+import human_factors_instrument as hfi
 
 # ── FAST PIPE-RUN PATCH (universal router robustness) ─────────────────────────
 # The stock forge_blender_lib.add_pipe calls bpy.ops.object.select_all + convert
@@ -12210,7 +12211,9 @@ def _instrument_form_rule_mm(
     5. Cable CHANNEL at the cube↔body joint — swappable LED module plugs from
        outside; harness enters a molded slot, never floats mid-deck.
     6. Recessed display + D-pad on the UI deck — operated looking down; closed
-       product hides the compute board (FR4 is cutaway-only).
+       product hides the compute board (FR4 is cutaway-only). Display active
+       area and button diameters follow Apple HIG → mm floors (see
+       human_factors_instrument.py): readable at ~350 mm, finger targets ≥7 mm.
     7. Visible top-plate fasteners — additive-manufactured enclosure language.
 
     Envelope W/D/H already come from design_envelope_* (landscape). This rule
@@ -12221,14 +12224,11 @@ def _instrument_form_rule_mm(
     # Square cuvette outer ≈ path + ~2.5 mm walls; chamber adds baffle each side.
     cuvette_outer = path + 2.5
     # Chunky cube: must dominate the right side of a handheld, not a thin spike.
-    # Floor ~32 mm so a 10 mm path still reads as a real cuvette block at product scale.
     chamber_plan = min(max(cuvette_outer + 18.0, 36.0), min(W, D) * 0.52)
     # Standard spectrophotometry cuvette body ~45 mm tall; keep the cube CHUNKY
     # (h/w ≲ 1.35) so it reads as an optical block, not a chimney.
     chamber_h = max(38.0, min(48.0, 32.0 + path * 1.2))
     # Optical cube on the RIGHT — leaves a contiguous LEFT UI deck (eyes + hands).
-    # Sit the cube slightly forward so the source face and cable channel read in
-    # three-quarter hero views (same reason the real object does).
     tower_loc = (W * 0.30, D * 0.08, base_z + H + chamber_h / 2)
     tower_size = (chamber_plan, chamber_plan * 0.96, chamber_h)
     tw, td, th = tower_size
@@ -12239,20 +12239,28 @@ def _instrument_form_rule_mm(
     led_w = min(tw * 0.70, max(window * 2.2, 14.0))
     led_h = min(th * 0.42, max(window * 2.0, 14.0))
     led_d = 1.8
-    # Recessed display on the LEFT UI deck (dark glass in the top plate).
-    ui_span_x = (tx - tw / 2) - (-W / 2)  # clear deck left of the cube
-    display_size = (min(W * 0.36, ui_span_x * 0.72), D * 0.28, 1.8)
+    # Recessed display — Apple HIG readability floor (11 pt @ ~350 mm) → mm area.
+    ui_span_x = max(40.0, (tx - tw / 2) - (-W / 2))
+    disp_w = max(hfi.DISPLAY_ACTIVE_PREF_W_MM, min(W * 0.40, ui_span_x * 0.70))
+    disp_h = max(hfi.DISPLAY_ACTIVE_PREF_H_MM, min(D * 0.32, disp_w * 0.70))
+    # If the deck is tight, never drop below the absolute readability floor.
+    disp_w = max(disp_w, hfi.DISPLAY_ACTIVE_MIN_W_MM)
+    disp_h = max(disp_h, hfi.DISPLAY_ACTIVE_MIN_H_MM)
+    display_size = (disp_w, disp_h, 1.8)
     display_loc = (-W * 0.18, -D * 0.04, base_z + H + 0.9)
-    # D-pad diamond left of display + A/B along the top edge (thumb while looking down).
+    # D-pad + A/B: Apple 44 pt → ≥7 mm tactile; prefer 9 mm; pitch includes gap.
+    btn_d = min(hfi.BUTTON_PREF_DIAMETER_MM, max(hfi.BUTTON_MIN_DIAMETER_MM, min(W, D) * 0.06))
+    btn_pitch = btn_d + hfi.BUTTON_PREF_GAP_MM
     btn_z = base_z + H + 2.2
     dx, dy, _dz = display_loc
+    dpad_x = dx - display_size[0] * 0.55 - btn_pitch
     button_locs = [
-        (dx - display_size[0] * 0.72, dy + 8.0, btn_z),   # up
-        (dx - display_size[0] * 0.72, dy - 8.0, btn_z),   # down
-        (dx - display_size[0] * 0.72 - 8.0, dy, btn_z),   # left
-        (dx - display_size[0] * 0.72 + 8.0, dy, btn_z),   # right
-        (dx + display_size[0] * 0.55, dy + display_size[1] * 0.55, btn_z),  # A
-        (dx + display_size[0] * 0.55, dy - display_size[1] * 0.15, btn_z),  # B
+        (dpad_x, dy + btn_pitch, btn_z),                 # up
+        (dpad_x, dy - btn_pitch, btn_z),                 # down
+        (dpad_x - btn_pitch, dy, btn_z),                 # left
+        (dpad_x + btn_pitch, dy, btn_z),                 # right
+        (dx + display_size[0] * 0.55, dy + display_size[1] * 0.45, btn_z),  # A
+        (dx + display_size[0] * 0.55, dy - display_size[1] * 0.20, btn_z),  # B
     ]
     # Square well + circular rim that seats the ambient-light cap.
     well_loc = (tx, ty, base_z + H + chamber_h + 1.2)
@@ -12262,17 +12270,13 @@ def _instrument_form_rule_mm(
     # Cap parks ON THE UI DECK beside the cube — never seated on the well in the
     # product hero (a seated cap hides the square well that makes the object read).
     cap_loc = (-W * 0.02, -D * 0.34, base_z + H + 5.5)
-    cap_size = (rim_od * 0.92, rim_od * 0.92, 10.0)  # cylinder via (r inferred in place)
-    # Cable channel: molded slot at the cube↔body joint on the operator-facing
-    # flank (swappable source plugs in from outside — same path real open
-    # photometers use between the LED board and the UI body).
+    # Cable channel: molded slot at the cube↔body joint on the operator-facing flank.
     cable_slot_loc = (
         tx - tw / 2 - 2.0,
         tower_front_y + 2.5,
         base_z + H + min(12.0, chamber_h * 0.22),
     )
     cable_slot_size = (5.0, 8.0, 12.0)
-    # Top-plate assembly screws — AM enclosure language (4 corners of UI deck).
     screw_locs = [
         (-W * 0.40, -D * 0.32, base_z + H + 1.0),
         (-W * 0.40, D * 0.28, base_z + H + 1.0),
@@ -12287,7 +12291,7 @@ def _instrument_form_rule_mm(
         "well_size": well_size,
         "rim_loc": rim_loc,
         "rim_od_mm": rim_od,
-        "rim_h_mm": 2.0,  # flat seating ring — not a lid that hides the well
+        "rim_h_mm": 2.0,
         "cap_loc": cap_loc,
         "cap_od_mm": rim_od * 0.92,
         "cap_h_mm": 11.0,
@@ -12298,9 +12302,11 @@ def _instrument_form_rule_mm(
         "top_display_loc": display_loc,
         "top_display_size": display_size,
         "button_locs": button_locs,
+        "button_diameter_mm": btn_d,
         "screw_locs": screw_locs,
         "step_shelf_loc": (tx, ty, base_z + H + 2.0),
         "step_shelf_size": (tw * 1.12, td * 1.10, 4.0),
+        "viewing_distance_mm": hfi.VIEWING_DISTANCE_MM_DESIGN,
     }
 
 
@@ -12738,7 +12744,9 @@ def _selftest_instrument_form_rule() -> None:
     tower_x, tower_y, tower_z = form["tower_loc"]
     led_w, led_d, led_h = form["led_pcb_size"]
     led_x, led_y, led_z = form["led_pcb_loc"]
-    display_w, display_d, display_h = form["top_display_size"]
+    # GOTCHA: top_display_size is (active_W, active_H_in_plan_Y, glass_thickness_Z)
+    # — not a 3D box W×D×H. Active area for Apple HIG is the first two axes.
+    display_w, display_h, display_t = form["top_display_size"]
     _pcb_w, _pcb_d, _pcb_h = _instrument_electronics_story_size(150.0, 110.0, 18.0)
 
     assert W > D > H, "fixture must be a wide-flat top-operated envelope"
@@ -12768,9 +12776,17 @@ def _selftest_instrument_form_rule() -> None:
     form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
     assert form20["well_size"][0] > form["well_size"][0]
     assert form20["tower_size"][0] >= form["tower_size"][0]
-    assert display_w > display_d > display_h
+    assert display_w >= hfi.DISPLAY_ACTIVE_MIN_W_MM and display_h >= hfi.DISPLAY_ACTIVE_MIN_H_MM, (
+        f"display must meet Apple-HIG readability floor (≥{hfi.DISPLAY_ACTIVE_MIN_W_MM}×"
+        f"{hfi.DISPLAY_ACTIVE_MIN_H_MM} mm), got {display_w:.1f}×{display_h:.1f}")
+    assert hfi.display_active_area_ok(display_w, display_h)
+    assert display_t <= 3.0, "recessed glass is a thin insert, not a slab"
+    assert float(form["button_diameter_mm"]) >= hfi.BUTTON_MIN_DIAMETER_MM, (
+        f"buttons must meet Apple 44 pt → ≥{hfi.BUTTON_MIN_DIAMETER_MM} mm tactile floor")
+    assert hfi.button_diameter_ok(form["button_diameter_mm"])
     assert len(form["button_locs"]) >= 6, "D-pad + A/B on the top UI deck"
     assert len(form["screw_locs"]) >= 4, "AM enclosure needs visible top-plate fasteners"
+    assert form["viewing_distance_mm"] == hfi.VIEWING_DISTANCE_MM_DESIGN
     assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30
     assert "00-hero" in sealed_exterior_view_names(True)
     _assert_instrument_source_harness_coherent(form, W, D, H, base_z, tt)
@@ -13711,11 +13727,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                module=_skin_mod, module_objects=MO)
             _disp.dimensions = _mm3(form["top_display_size"])
             _disp.hide_render = True
-            # D-pad + A/B on the top deck.
+            # D-pad + A/B on the top deck — Apple 44 pt → ≥7 mm tactile floor.
+            _btn_r = max(hfi.BUTTON_MIN_DIAMETER_MM, float(form.get("button_diameter_mm", hfi.BUTTON_PREF_DIAMETER_MM))) / 2.0
             for _bi, _loc in enumerate(form["button_locs"]):
                 _btn = fl.add_cyl(f"u_se_exterior_detail_button_{_bi}",
                                   _mm3(_loc),
-                                  3.0 * fl.MM, 2.0 * fl.MM, _btn_mat,
+                                  _btn_r * fl.MM, 2.4 * fl.MM, _btn_mat,
                                   module=_skin_mod, module_objects=MO)
                 _btn.hide_render = True
             # Step shelf under the optical cube — the L-body joint (UI deck vs optical volume).
@@ -20012,6 +20029,7 @@ if __name__ == "__main__":
         _selftest_instrument_proxy_geometry()
         _selftest_instrument_form_rule()
         _selftest_instrument_source_harness()
-        print("build_universal_scene _selftest: OK (instrument form rule + source harness, multi-envelope)")
+        hfi._selftest()
+        print("build_universal_scene _selftest: OK (instrument form + harness + Apple HIG human floors)")
     else:
         main()
