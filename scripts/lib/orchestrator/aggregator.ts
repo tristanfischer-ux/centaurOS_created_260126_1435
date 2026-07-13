@@ -153,6 +153,11 @@ export function deriveOpticalInstrumentMetrics(
         tool_id: 'aggregator:derive-optical-instrument-metrics',
         invocation_output_field: key,
       },
+      source: 'aggregator',
+      lineage: {
+        from: ['brief.target_performance'],
+        used_by: ['brief_compliance', 'optical_bench', 'calculations'],
+      },
     } as TypedQuantity
     notes.push(`deriveOpticalInstrumentMetrics: ${key}=${value} ${unit} delivered by the optical instrument (cuvette/LED source set) — fulfils the brief target_performance metric`)
   }
@@ -256,6 +261,8 @@ function deviceScaleQuantity(
   outputField: string,
   condition: string,
 ): TypedQuantity {
+  // GOTCHA: tab_quantities reads the FLAT `source` field for column E; provenance.source
+  // alone leaves Source empty → Quantities tab fails provenance (colorimeter 0819: 8 gaps).
   return {
     value,
     unit,
@@ -265,10 +272,15 @@ function deviceScaleQuantity(
     uncertainty_pct: 40, // wide — an ESTIMATE, not a measured/brief value
     temporal_resolution_s: null,
     condition,
+    source: 'derived_device_scale',
     provenance: {
       source: 'derived_device_scale',
       tool_id: 'aggregator:derive-device-scale-enclosure',
       invocation_output_field: outputField,
+    },
+    lineage: {
+      from: ['total_system_mass_kg'],
+      used_by: ['design_envelope', 'sealed_enclosure_placer', 'cost_stack'],
     },
   }
 }

@@ -104,6 +104,41 @@ def _round_extent(centre, half):
     return centre - half, centre + half
 
 
+def _instrument_envelope_bbox(ww: float, dd: float, hh: float) -> dict:
+    return {
+        "x_min_mm": -ww / 2.0, "x_max_mm": ww / 2.0,
+        "y_min_mm": -dd / 2.0, "y_max_mm": dd / 2.0,
+        "z_min_mm": 0.0, "z_max_mm": hh,
+        "length_mm": ww, "width_mm": dd, "height_mm": hh,
+    }
+
+
+def _clamp_instrument_parts_to_envelope(
+    parts: list[GAPart],
+    ww: float,
+    dd: float,
+    hh: float,
+) -> None:
+    """Keep instrument GA proxy outlines inside the product envelope.
+
+    INTENT: handheld instruments export hidden coverage proxies so Part names / GA
+    can identify real parts. If an old proxy is product-sized or tall, the GA must
+    still show a compact product envelope instead of reverting to plant-scale massing.
+    """
+    max_half = (max(3.0, ww * 0.10), max(3.0, dd * 0.10), max(2.5, hh * 0.14))
+    for p in parts:
+        cx = min(max(float(p.cx), -ww / 2.0 + max_half[0]), ww / 2.0 - max_half[0])
+        cy = min(max(float(p.cy), -dd / 2.0 + max_half[1]), dd / 2.0 - max_half[1])
+        zc = min(max((float(p.z0) + float(p.z1)) / 2.0, max_half[2]), hh - max_half[2])
+        hx = min(max((float(p.x1) - float(p.x0)) / 2.0, 2.0), max_half[0])
+        hy = min(max((float(p.y1) - float(p.y0)) / 2.0, 2.0), max_half[1])
+        hz = min(max((float(p.z1) - float(p.z0)) / 2.0, 2.0), max_half[2])
+        p.cx, p.cy = cx, cy
+        p.x0, p.x1 = cx - hx, cx + hx
+        p.y0, p.y1 = cy - hy, cy + hy
+        p.z0, p.z1 = max(0.0, zc - hz), min(hh, zc + hz)
+
+
 # BELOW-GRADE / gravity-drain collection point — the same generic noun signal
 # draw_pid.py keys its underground-drainage line style on (_BELOW_GRADE_NODE_RE).
 # UNIVERSAL: no class name, just the noun a real drainpit/sump/manhole is called.
@@ -169,6 +204,45 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
     # rooms). [] on a homogeneous / compact archetype — no rooms to draw.
     meta = {"count": man.get("count", len(parts)), "schema": man.get("schema", ""),
             "rooms": man.get("rooms") or []}
+    # INTENT (2026-07-13, colorimeter 0819): sealed instruments often leave the GA
+    # massing list empty (PCB-level parts filtered). Without a bbox, build_ga_svg
+    # defaulted to 1000×1000×3000 mm ("1×1×3 m plant"). Prefer the design envelope
+    # from state when isInstrumentDevice — never invent a plant floor.
+    try:
+        st_path = Path(out_dir) / "state.json"
+        if st_path.is_file():
+            with open(st_path) as fh:
+                _st = json.load(fh)
+            meta["is_instrument_device"] = bool(_st.get("isInstrumentDevice"))
+            if meta["is_instrument_device"]:
+                env = (
+                    ((_st.get("orchestratorContract") or {}).get("quantities") or {})
+                    or ((_st.get("engineeringContract") or {}).get("quantities") or {})
+                )
+                # enclosure dims may live as shared quantities or derived mm
+                def _q(key: str):
+                    v = env.get(key)
+                    if isinstance(v, dict):
+                        return v.get("value")
+                    return v
+                w = (_q("enclosure_width_mm") or _q("device_width_mm")
+                     or _q("design_envelope_width_mm"))
+                d = (_q("enclosure_depth_mm") or _q("device_depth_mm")
+                     or _q("design_envelope_depth_mm"))
+                h = (_q("enclosure_height_mm") or _q("device_height_mm")
+                     or _q("design_envelope_height_mm"))
+                # fallback: compact handheld envelope (matches render_view_contract spirit)
+                try:
+                    ww = float(w) if w is not None else 180.0
+                    dd = float(d) if d is not None else 140.0
+                    hh = float(h) if h is not None else 80.0
+                except (TypeError, ValueError):
+                    ww, dd, hh = 180.0, 140.0, 80.0
+                bbox = _instrument_envelope_bbox(ww, dd, hh)
+                meta["envelope_source"] = "instrument_state_or_default"
+                _clamp_instrument_parts_to_envelope(parts, ww, dd, hh)
+    except Exception:
+        pass
     return parts, bbox, meta
 
 
@@ -1580,8 +1654,9 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
     svg.text(x0, y0 + 24, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
     svg.text(x0, y0 + 43, f"GENERAL ARRANGEMENT — {_humanise(archetype)}",
              size=15, weight="bold", fill=EQ_INK)
+    _env_noun = "product envelope" if meta.get("is_instrument_device") else "Overall plant envelope"
     svg.text(x0, y0 + 61,
-             f"Overall plant envelope {L/1000:.1f} m (L) × {W/1000:.1f} m (W) × "
+             f"{_env_noun} {L/1000:.1f} m (L) × {W/1000:.1f} m (W) × "
              f"{H/1000:.1f} m (H) · {meta.get('count', 0)} equipment items.",
              size=9.5, fill=MUTED)
     svg.text(x0, y0 + 79,
@@ -1861,6 +1936,43 @@ def _selftest() -> int:
         bad += 1
     if build_ga_svg([big, small], bbox, "water_treatment", {"count": 2}) != svg_txt:
         print("  FAIL ga-small-tag: the GA render must stay deterministic")
+        bad += 1
+    # 4b — INSTRUMENT empty-massing envelope (colorimeter 0819): 0 GA parts must
+    #     NOT invent a 1×1×3 m plant floor. load_manifest + build_ga_svg with an
+    #     instrument meta + device bbox must say "product envelope" and stay
+    #     under 0.5 m on every axis.
+    inst_bbox = {"x_min_mm": 0, "x_max_mm": 180, "y_min_mm": 0, "y_max_mm": 140,
+                 "z_min_mm": 0, "z_max_mm": 80}
+    svg_inst = build_ga_svg([], inst_bbox, "optical_instrument",
+                            {"count": 0, "is_instrument_device": True})
+    if "product envelope" not in svg_inst:
+        print("  FAIL ga-instrument-envelope: instrument GA must say 'product envelope'")
+        bad += 1
+    if "Overall plant envelope" in svg_inst:
+        print("  FAIL ga-instrument-envelope: must not say 'Overall plant envelope'")
+        bad += 1
+    if "1.0 m (L) × 1.0 m (W) × 3.0 m (H)" in svg_inst:
+        print("  FAIL ga-instrument-envelope: must not invent the 1×1×3 m plant default")
+        bad += 1
+    if "0.2 m (L)" not in svg_inst and "0.18 m (L)" not in svg_inst:
+        # 180 mm → 0.2 m when rounded to 1 decimal, or 0.2/0.18 depending on format
+        if "0.2 m (L)" not in svg_inst and "0.18 m" not in svg_inst:
+            # f"{L/1000:.1f}" for 180 → "0.2"
+            if "0.2 m (L)" not in svg_inst:
+                print("  FAIL ga-instrument-envelope: expected ~0.2 m L from 180 mm bbox; "
+                      f"snippet: {[ln for ln in svg_inst.splitlines() if 'envelope' in ln.lower()][:2]}")
+                bad += 1
+    # 4c — INSTRUMENT stale proxy clamp: if proxy parts exist but carry product-sized
+    #     or tall legacy bboxes, the GA must still draw the compact product envelope.
+    proxy = GAPart(tag="X-101", obj_tag="u_proxy", name="Wavelength Selection Module",
+                   module="m", shape="box", qty=1, is_round=False,
+                   x0=-130, x1=130, y0=-100, y1=100, z0=-120, z1=352,
+                   cx=0, cy=0)
+    _clamp_instrument_parts_to_envelope([proxy], 180.0, 140.0, 80.0)
+    if (proxy.x1 - proxy.x0) > 40 or (proxy.y1 - proxy.y0) > 32 or proxy.z1 > 80:
+        print("  FAIL ga-instrument-proxy-clamp: oversized proxy must be clamped "
+              f"inside handheld envelope, got x={proxy.x1 - proxy.x0:.1f} "
+              f"y={proxy.y1 - proxy.y0:.1f} z1={proxy.z1:.1f}")
         bad += 1
     # 5 — ELEVATION proveCatch (the v59 GA: BOTH elevations failed a 5-second glance —
     #     a ~6-tag pile-up over the tank nest projected edge-on, tags over the view

@@ -19,20 +19,92 @@ class ViewSpec:
     required: bool = True
 
 
-def _quantity_value(state: dict, key: str) -> Optional[float]:
+def _quantity_raw(state: dict, key: str) -> object:
     for contract_key in ("orchestratorContract", "engineeringContract"):
         quantities = (state.get(contract_key) or {}).get("quantities")
         if not isinstance(quantities, dict):
             continue
         raw = quantities.get(key)
-        value = raw.get("value") if isinstance(raw, dict) else raw
-        try:
-            parsed = float(value)
-        except (TypeError, ValueError):
-            continue
-        if isfinite(parsed):
-            return parsed
+        if raw is not None:
+            return raw
     return None
+
+
+def _quantity_value(state: dict, key: str) -> Optional[float]:
+    raw = _quantity_raw(state, key)
+    if raw is None:
+        return None
+    value = raw.get("value") if isinstance(raw, dict) else raw
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if isfinite(parsed):
+        return parsed
+    return None
+
+
+def _quantity_source(state: dict, key: str) -> str:
+    raw = _quantity_raw(state, key)
+    if not isinstance(raw, dict):
+        return ""
+    provenance = raw.get("provenance") if isinstance(raw.get("provenance"), dict) else {}
+    return str(raw.get("source") or provenance.get("source") or raw.get("condition") or "")
+
+
+def _instrument_landscape_from_volume(volume_m3: float) -> tuple[float, float, float]:
+    side_mm = (volume_m3 ** (1.0 / 3.0)) * 1000.0
+    return side_mm * 1.40, side_mm * 1.15, side_mm * 0.62
+
+
+def _is_handheld_landscape(dims: tuple[float, float, float]) -> bool:
+    w, d, h = dims
+    return w > d > h and h <= d * 0.72
+
+
+def _is_derived_device_envelope(state: dict) -> bool:
+    sources = " ".join(
+        _quantity_source(state, key)
+        for key in (
+            "design_envelope_width_mm",
+            "design_envelope_depth_mm",
+            "design_envelope_height_mm",
+        )
+    ).lower()
+    return "derived_device_scale" in sources or "synthesised" in sources
+
+
+def _quantity_triplet(state: dict, *keys: str) -> Optional[tuple[float, float, float]]:
+    parsed = tuple(_quantity_value(state, key) for key in keys)
+    if any(value is None for value in parsed):
+        return None
+    return _positive_triplet(parsed)
+
+
+def _brief_envelope_triplet(state: dict) -> Optional[tuple[float, float, float]]:
+    brief_dims = (
+        ((state.get("parsedBrief") or {}).get("constraints") or {})
+        .get("max_dimensions_mm") or {}
+    )
+    return _positive_triplet(
+        (brief_dims.get("w"), brief_dims.get("d"), brief_dims.get("h")))
+
+
+def _resolve_instrument_contract_dims(
+    state: dict,
+    contract_dims: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    if not state.get("isInstrumentDevice"):
+        return contract_dims
+    if _is_handheld_landscape(contract_dims):
+        return contract_dims
+    volume = _quantity_value(state, "enclosure_volume_m3")
+    if volume is not None and 0 < volume < 1 and _is_derived_device_envelope(state):
+        # DECISION: derived device-scale dimensions are a sizing hint, not a brief pin.
+        # If they drift tall/boxy, keep the same volume but restore the handheld
+        # instrument aspect. Brief max_dimensions_mm still wins below.
+        return _instrument_landscape_from_volume(volume)
+    return contract_dims
 
 
 def _positive_triplet(values: tuple[object, object, object]) -> Optional[tuple[float, float, float]]:
@@ -50,26 +122,29 @@ def _positive_triplet(values: tuple[object, object, object]) -> Optional[tuple[f
 
 def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, float]]:
     """Resolve W/D/H from one authoritative precedence chain."""
-    contract_dims = _positive_triplet((
-        _quantity_value(state, "design_envelope_width_mm"),
-        _quantity_value(state, "design_envelope_depth_mm"),
-        _quantity_value(state, "design_envelope_height_mm"),
-    ))
-    if contract_dims:
-        return contract_dims
-
-    brief_dims = (
-        ((state.get("parsedBrief") or {}).get("constraints") or {})
-        .get("max_dimensions_mm") or {}
+    contract_dims = _quantity_triplet(
+        state,
+        "design_envelope_width_mm",
+        "design_envelope_depth_mm",
+        "design_envelope_height_mm",
     )
-    brief_triplet = _positive_triplet(
-        (brief_dims.get("w"), brief_dims.get("d"), brief_dims.get("h")))
+    if contract_dims:
+        if (
+            state.get("isInstrumentDevice")
+            and _is_derived_device_envelope(state)
+            and not _is_handheld_landscape(contract_dims)
+        ):
+            brief_triplet = _brief_envelope_triplet(state)
+            if brief_triplet:
+                return brief_triplet
+        return _resolve_instrument_contract_dims(state, contract_dims)
+
+    brief_triplet = _brief_envelope_triplet(state)
     if brief_triplet:
         return brief_triplet
 
     volume = _quantity_value(state, "enclosure_volume_m3")
     if volume is not None and 0 < volume < 1:
-        side_mm = (volume ** (1.0 / 3.0)) * 1000.0
         # A device-scale optical/electronic INSTRUMENT is a benchtop/handheld unit —
         # WIDE and FLAT (a display face + optical port on top), never a tall cube.
         # A cube-of-volume reads as a floor-standing cabinet in the hero (the exact
@@ -78,7 +153,8 @@ def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, floa
         # the authoritative device flag; volume is preserved (1.40·1.15·0.62 ≈ 1.00).
         # Universal — a plant/cabinet product never carries isInstrumentDevice.
         if state.get("isInstrumentDevice"):
-            return side_mm * 1.40, side_mm * 1.15, side_mm * 0.62
+            return _instrument_landscape_from_volume(volume)
+        side_mm = (volume ** (1.0 / 3.0)) * 1000.0
         return side_mm, side_mm, side_mm
     return None
 
@@ -199,12 +275,32 @@ def _selftest() -> None:
     # non-instrument → cube (unchanged)
     cube = resolve_design_envelope_mm(dict(vol_state))
     assert cube and abs(cube[0] - cube[2]) < 1e-6, f"non-instrument stays a cube, got {cube}"
-    # explicit contract dims always win (never overridden by the reshape)
+    # explicit contract dims still win when they are already handheld-like.
     pinned = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 0.002,
         "design_envelope_width_mm": 140, "design_envelope_depth_mm": 110,
         "design_envelope_height_mm": 55}}, "isInstrumentDevice": True}
-    assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), "explicit dims must win"
+    assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), (
+        "explicit handheld dims must win")
+    # derived non-handheld dims are not a pin: keep volume, restore handheld aspect.
+    derived_tall = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": 0.002,
+        "design_envelope_width_mm": {
+            "value": 140, "source": "derived_device_scale"},
+        "design_envelope_depth_mm": {
+            "value": 110, "source": "derived_device_scale"},
+        "design_envelope_height_mm": {
+            "value": 180, "source": "derived_device_scale"}}}, "isInstrumentDevice": True}
+    dt = resolve_design_envelope_mm(derived_tall)
+    assert dt and dt[0] > dt[1] > dt[2], f"derived instrument dims must reshape, got {dt}"
+    assert abs(dt[0] * dt[1] * dt[2] / 1e9 - 0.002) < 2e-4, (
+        "derived reshape must preserve volume")
+    derived_brief = dict(
+        derived_tall,
+        parsedBrief={"constraints": {"max_dimensions_mm": {"w": 140, "d": 110, "h": 55}}},
+    )
+    assert resolve_design_envelope_mm(derived_brief) == (140.0, 110.0, 55.0), (
+        "brief dimensions must win over derived non-handheld instrument hints")
     assert "07-product-service" in sealed_exterior_view_names(True), (
         "instrument service view must use closed exterior, not cutaway slabs")
     assert "07-product-service" not in sealed_exterior_view_names(False), (

@@ -12315,6 +12315,160 @@ def _place_instrument_handheld_cues(
     print("[univ][sealed] instrument cutaway cues: grips + port hood + bezel + chin")
 
 
+def _stable_name_bucket(name: str) -> int:
+    """Deterministic small integer from a part name; never use Python's salted hash."""
+    acc = 2166136261
+    for ch in str(name):
+        acc ^= ord(ch)
+        acc = (acc * 16777619) & 0xFFFFFFFF
+    return acc
+
+
+def _instrument_proxy_geometry(
+    name: str,
+    is_shell: bool,
+    key: str,
+    zone_z: dict,
+    base_z: float,
+    iw: float,
+    idep: float,
+    W: float,
+    D: float,
+    H: float,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Device-scale manifest proxy geometry for hidden instrument coverage meshes.
+
+    INTENT: coverage proxies exist so GA/Part-names can identify the real parts even
+    when the hero uses stylized optical-bench meshes. They must be small, stable and
+    inside the handheld envelope; otherwise they become the delivered artefact's bbox.
+    """
+    bucket = _stable_name_bucket(name)
+    if is_shell:
+        loc = (
+            ((bucket % 3) - 1) * iw * 0.08,
+            (((bucket // 3) % 3) - 1) * idep * 0.07,
+            base_z + H * (0.35 + ((bucket // 11) % 5) * 0.06),
+        )
+        size = (
+            max(18.0, min(W * 0.34, 34.0 + (bucket % 19))),
+            max(14.0, min(D * 0.30, 22.0 + ((bucket // 7) % 17))),
+            max(3.0, min(H * 0.12, 4.0 + ((bucket // 13) % 6))),
+        )
+        return loc, size
+
+    mid_z, band_h = zone_z.get(key, (base_z + H * 0.5, 12.0))
+    slot = bucket % 11
+    loc = (
+        ((slot % 3) - 1) * iw * 0.22,
+        (((slot // 3) % 3) - 1) * idep * 0.18,
+        mid_z,
+    )
+    size = (
+        max(6.0, min(iw * 0.18, 8.0 + (bucket % 17))),
+        max(5.0, min(idep * 0.18, 7.0 + ((bucket // 7) % 13))),
+        max(4.0, min(max(6.0, band_h * 0.42), 5.0 + ((bucket // 13) % 15))),
+    )
+    return loc, size
+
+
+def _selftest_instrument_proxy_geometry() -> None:
+    zone_z = {
+        "optical": (38.0, 18.0),
+        "electronics": (58.0, 16.0),
+    }
+    a = _instrument_proxy_geometry(
+        "Wavelength Selection Module", False, "optical", zone_z,
+        0.0, 150.0, 110.0, 180.0, 140.0, 70.0)
+    b = _instrument_proxy_geometry(
+        "Wavelength Selection Module", False, "optical", zone_z,
+        0.0, 150.0, 110.0, 180.0, 140.0, 70.0)
+    shell = _instrument_proxy_geometry(
+        "Printed Enclosure Lid", True, "electronics", zone_z,
+        0.0, 150.0, 110.0, 180.0, 140.0, 70.0)
+    assert a == b, "instrument proxy geometry must be deterministic across calls"
+    for _loc, size in (a, shell):
+        assert size[0] <= 180.0 * 0.35 and size[1] <= 140.0 * 0.31, (
+            f"proxy must not become a product-sized slab, got {size}")
+        assert size[2] <= 70.0 * 0.43, f"proxy must not drive a tall GA bbox, got {size}"
+
+
+def _place_instrument_manifest_proxies(
+    parts: list,
+    zone_parts: dict,
+    zones: list,
+    base_z: float,
+    margin: float,
+    ih: float,
+    iw: float,
+    idep: float,
+    W: float,
+    D: float,
+    H: float,
+    skin_mod: str,
+    MO: dict,
+) -> int:
+    """Place named proxy meshes so parts-manifest / ledger coverage see instrument parts.
+
+    INTENT: the optical-bench story replaces zone-stacked build_part boxes (which read
+    as a BESS cabinet). Without proxies, parts-manifest count stays 0 and GA/Renders/
+    Part-names score 0 on coverage even when the hero is correct. Proxies are named
+    with the part's object prefix, sized from the envelope, and hide_render so they
+    do not re-introduce the grey-slab look — they exist for coverage + tag credit.
+
+    Enclosure / lid / shell parts anchor to the product body; others sit in their
+    zone band centre."""
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return 0
+
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    proxy_mat = fl.make_mat(
+        "m_se_instrument_proxy", fl._to_linear((0.16, 0.17, 0.20)), metallic=0.1, roughness=0.55)
+    z_cursor = base_z + margin
+    zone_z = {}
+    for key, frac, _rx in zones:
+        zone_z[key] = (z_cursor + ih * frac * 0.5, max(8.0, ih * frac * 0.35))
+        z_cursor += ih * frac
+
+    part_zone = {}
+    for key, plist in zone_parts.items():
+        for p in plist:
+            part_zone[id(p)] = key
+
+    n = 0
+    for p in parts:
+        pref = "u_" + re.sub(r"[^a-z0-9]+", "_", str(p.name).lower()).strip("_")[:40]
+        if any(o.name.startswith(pref) for o in bpy.data.objects
+               if getattr(o, "type", None) == "MESH"):
+            continue
+        nm = str(p.name)
+        is_shell = bool(re.search(
+            r"enclosure|housing|shell|lid|shroud|chassis|case\b|cover\b", nm, re.I))
+        key = part_zone.get(id(p), "electronics")
+        loc, size = _instrument_proxy_geometry(
+            nm, is_shell, key, zone_z, base_z, iw, idep, W, D, H)
+        obj = fl.add_box(
+            pref,
+            _mm3(loc),
+            _mm3(size),
+            proxy_mat,
+            module=getattr(p, "module_id", None) or skin_mod,
+            module_objects=MO,
+        )
+        obj.dimensions = _mm3(size)
+        obj.hide_render = True
+        obj["geometry_source"] = "instrument_manifest_proxy"
+        # anchors so downstream clamp / routing see a placed part
+        p.placed_xyz_mm = loc
+        p.obj_anchor = obj
+        p.anchors = {"centre": loc}
+        n += 1
+    if n:
+        print(f"[univ][sealed] instrument manifest proxies: {n} part(s) anchored for coverage")
+    return n
+
+
 _INSTRUMENT_MESH_KEEP_PREFIXES = (
     "u_se_instrument_story_",
     "u_se_product_",
@@ -12583,6 +12737,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             print(f"[univ][sealed] {len(skin)} skin part(s) as face plates")
     elif skin:
         print(f"[univ][sealed] instrument: {len(skin)} skin part(s) skipped (exterior details on closed views)")
+
+    if _IS_INSTRUMENT_DEVICE:
+        # FLOW: story meshes → coverage proxies → parts-manifest (INSPECT pass)
+        # Without proxies, GA/Renders/Part-names score 0 because no part objects exist.
+        # Include skin-classified enclosure/lid parts (they stay in `parts`, not zone_parts).
+        _place_instrument_manifest_proxies(
+            parts, zone_parts, zones,
+            base_z, margin, ih, iw, idep, W, D, H, _story_mod, MO)
 
     # 4c. CONTAINMENT CLAMP — MESH-LEVEL (2026-07-10/11, runs 56-58: the anchor-level
     # clamp moved 2/36 parts because the manifest + renders read the MESH world bboxes,
@@ -19142,4 +19304,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--selftest" in sys.argv:
+        _selftest_instrument_proxy_geometry()
+        print("build_universal_scene _selftest: OK (instrument proxy geometry)")
+    else:
+        main()

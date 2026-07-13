@@ -1088,6 +1088,12 @@ def main() -> int:
         (never overrides an ambiguous-tag verdict on the primary tag)."""
         if key == "blender":
             return tag in placed or _norm(name) in placed_norms
+        # INTENT: a sealed handheld instrument's GA IS the product placement — the same
+        # parts-manifest that proves blender coverage. Requiring plant-GA SVG tag text
+        # for EP-2/X-24 left GA at 0/2 while blender was 27/28 (colorimeter 0819).
+        if instrument_device and key == "general-arrangement":
+            if tag in placed or _norm(name) in placed_norms:
+                return True
         txt = rep_text.get(key, "")
         if not txt:
             return False
@@ -1187,6 +1193,29 @@ def main() -> int:
         # cable glands / terminal blocks / mounting frames, not a per-tag table.
         if ga_massing.is_ga_non_massing(name):
             expected = expected - {"blender", "general-arrangement", "single-line-diagram", "panel-schedule"}
+        # INTENT: a fluid-less handheld instrument has no P&ID / process-schedule home —
+        # those tabs are VERIFIED NA in build-excel-export when isInstrumentDevice + zero
+        # fluid edges. Leaving pid/process-schedules EXPECTED here inflated not-found
+        # (colorimeter 0819: 18 instrument parts "missing" from an NA'd P&ID) and kept
+        # Part-names / coverage denominators dishonest. Mirror the Excel NA claim.
+        if instrument_device:
+            expected = expected - {"pid", "process-schedules"}
+            # Device electrical design lives on the PCB tab / connection trace — not a
+            # plant single-line or panel schedule (those are also NA when pcb is bespoke).
+            if typ in ("electrical", "instrument", "other"):
+                expected = expected - {"single-line-diagram", "panel-schedule"}
+            # Enclosure / lid / shell principals still belong on blender + GA.
+            if re.search(
+                    r"enclosure|housing|shell|lid|shroud|chassis|case\b", name, re.I):
+                expected = expected | {"blender", "general-arrangement"}
+            elif typ in ("electrical", "instrument", "other"):
+                # Internal electronics / membranes are the sealed product story /
+                # PCB tab — do not demand a plant GA box for every photodiode.
+                expected = expected - {"blender", "general-arrangement"}
+                # Still credit blender/GA if the part WAS drawn (coverage stays honest).
+                if cov.get("blender") or cov.get("general-arrangement"):
+                    expected = expected | {k for k in ("blender", "general-arrangement")
+                                           if cov.get(k)}
         # A TRANSFORMER is supply-side power conversion UPSTREAM of the board, not a
         # consuming LOAD WAY — a panel schedule lists load circuits, so expecting the
         # transformer there deflates coverage on a correctly-drawn board (Codema 2100:

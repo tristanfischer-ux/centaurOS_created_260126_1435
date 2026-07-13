@@ -13999,6 +13999,83 @@ def _assembly_groups(rows: List[dict]) -> List[str]:
     return out
 
 
+def _instrument_assembly_steps(principals: list, state: dict) -> List[dict]:
+    """Bench assembly steps for a handheld / single-board instrument (all design=True)."""
+    q = ((state.get("orchestratorContract") or {}).get("quantities") or {})
+
+    def _qval(key: str):
+        v = q.get(key)
+        if isinstance(v, dict):
+            return v.get("value")
+        return v
+
+    w, d, h = (_qval("design_envelope_width_mm"),
+               _qval("design_envelope_depth_mm"),
+               _qval("design_envelope_height_mm"))
+    envelope = (
+        f"{float(w):.0f}×{float(d):.0f}×{float(h):.0f} mm"
+        if all(isinstance(x, (int, float)) for x in (w, d, h))
+        else "brief device envelope"
+    )
+
+    def _names_matching(rx: re.Pattern) -> list:
+        hits = []
+        for b in principals:
+            req = str(b.get("requirement") or "")
+            if rx.search(req):
+                hits.append(str(b.get("tag") or req.split("·")[0].strip()))
+        return hits
+
+    optical = _names_matching(re.compile(
+        r"photodiode|led|cuvette|collimat|wavelength|optic|detector|baffle|path", re.I))
+    electronics = _names_matching(re.compile(
+        r"pcb|mcu|microcontroller|adc|amplifier|tia|regulator|firmware|board", re.I))
+    power = _names_matching(re.compile(
+        r"battery|usb|fuse|polyfuse|charge|power|esd|thermal.?cut", re.I))
+    hmi = _names_matching(re.compile(
+        r"display|button|keypad|switch|annunciator|indicator", re.I))
+    shell = _names_matching(re.compile(
+        r"enclosure|lid|shroud|housing|shell|chassis", re.I))
+
+    return [
+        dict(
+            phase="1 · PCB populate & firmware",
+            scope=(f"Populate main PCB and flash firmware"
+                   + (f" — {', '.join(electronics[:6])}" if electronics else "")),
+            pred="Board fab inbound", plant="SMT / bench soldering iron",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="ICT / continuity + firmware CRC pass", design=True),
+        dict(
+            phase="2 · Optical bench",
+            scope=(f"Align LED → cuvette → detector on the optical path "
+                   f"({envelope})"
+                   + (f" — {', '.join(optical[:6])}" if optical else "")),
+            pred="PCB populate & firmware", plant="Optical alignment jig",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="Blank / dark-current check within cal limit", design=True),
+        dict(
+            phase="3 · Power & protection",
+            scope=(f"Fit battery / USB inlet, series protection, charge path"
+                   + (f" — {', '.join(power[:6])}" if power else "")),
+            pred="Optical bench", plant="Hand tools",
+            duration="~0.25 crew-day", dur_days=0.25,
+            hold="Power-on LED + rail voltages in band", design=True),
+        dict(
+            phase="4 · HMI & enclosure close",
+            scope=(f"Fit display / controls, close {envelope} enclosure"
+                   + (f" — {', '.join((hmi + shell)[:6])}" if (hmi or shell) else "")),
+            pred="Power & protection", plant="Torque driver",
+            duration="~0.25 crew-day", dur_days=0.25,
+            hold="Button map + lid seal visual", design=True),
+        dict(
+            phase="5 · Calibration & ship",
+            scope="Blanking, reference cal, stray-light check; label + pack",
+            pred="HMI & enclosure close", plant="Cal standards / dark box",
+            duration="~0.5 crew-day", dur_days=0.5,
+            hold="Cal certificate filed; Beer–Lambert check within band", design=True),
+    ]
+
+
 def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
     """Z — DESIGN-SPECIFIC assembly & erection sequence (Bundle D item 4). Steps come
     from the design itself: (1) civils/set-out FIRST, sized from the placed-plant
@@ -14018,162 +14095,172 @@ def tab_assembly_sequence(wb: Workbook, state: dict, run_dir: str = "") -> bool:
     if not principals and not man_rows:
         return False
 
+    # INTENT: handheld instruments use a bench build-order (all design=True), not
+    # plant civils/region-erection norms (those score ~2/10 on a device).
+    if bool(state.get("isInstrumentDevice")):
+        steps = _instrument_assembly_steps(principals, state)
+        heaviest = None
+        _heavy = []
+    else:
+        steps = None  # filled below
+
     # ---- the design numbers every step derives from --------------------------
-    bb = (manifest or {}).get("bbox_mm") or {}
-    slab_m2 = None
-    if bb.get("length_mm") and bb.get("width_mm"):
-        slab_m2 = round((bb["length_mm"] / 1000.0) * (bb["width_mm"] / 1000.0), 1)
-    sched = load_json(os.path.join(run_dir, "connection-schedule.json")) if run_dir else None
-    tot = (sched or {}).get("totals") or {}
-    pipe_m = round(sum(v for v in (tot.get("pipe_m_by_dn") or {}).values()
-                       if isinstance(v, (int, float))), 1)
-    cable_m = round(sum(v for v in (tot.get("cable_m_by_csa") or {}).values()
-                        if isinstance(v, (int, float))), 1)
-    n_runs = tot.get("runs_sized")
-    # instruments: BoM principal rows that read as instruments/loops
-    n_loops = sum(int(num(b.get("qty")) or 1) for b in principals
-                  if _INSTRUMENT_ROW_RX.search(str(b.get("requirement") or "")))
-    # heaviest single lift from the BoM (mass_kg rows are per-unit vessel masses)
-    heaviest = None
-    for b in bom:
-        if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float)) and b["mass_kg"] > 0:
-            if heaviest is None or b["mass_kg"] > heaviest["mass_kg"]:
-                heaviest = b
-    # mass by tag for the per-step lifting-plant pick
-    mass_by_tag = {str(b.get("tag")): float(b["mass_kg"]) for b in bom
-                   if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float))
-                   and b.get("tag")}
+    if steps is None:
+        bb = (manifest or {}).get("bbox_mm") or {}
+        slab_m2 = None
+        if bb.get("length_mm") and bb.get("width_mm"):
+            slab_m2 = round((bb["length_mm"] / 1000.0) * (bb["width_mm"] / 1000.0), 1)
+        sched = load_json(os.path.join(run_dir, "connection-schedule.json")) if run_dir else None
+        tot = (sched or {}).get("totals") or {}
+        pipe_m = round(sum(v for v in (tot.get("pipe_m_by_dn") or {}).values()
+                           if isinstance(v, (int, float))), 1)
+        cable_m = round(sum(v for v in (tot.get("cable_m_by_csa") or {}).values()
+                            if isinstance(v, (int, float))), 1)
+        n_runs = tot.get("runs_sized")
+        # instruments: BoM principal rows that read as instruments/loops
+        n_loops = sum(int(num(b.get("qty")) or 1) for b in principals
+                      if _INSTRUMENT_ROW_RX.search(str(b.get("requirement") or "")))
+        # heaviest single lift from the BoM (mass_kg rows are per-unit vessel masses)
+        heaviest = None
+        for b in bom:
+            if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float)) and b["mass_kg"] > 0:
+                if heaviest is None or b["mass_kg"] > heaviest["mass_kg"]:
+                    heaviest = b
+        # mass by tag for the per-step lifting-plant pick
+        mass_by_tag = {str(b.get("tag")): float(b["mass_kg"]) for b in bom
+                       if isinstance(b, dict) and isinstance(b.get("mass_kg"), (int, float))
+                       and b.get("tag")}
 
-    # ---- build the STEP list --------------------------------------------------
-    # each step: dict(phase, scope, pred, plant, duration, hold, design(bool))
-    steps: List[dict] = []
-    nm_civ = _ASSEMBLY_NORMS["civils"]
-    _ug_asm = _underground_civils_note(state) if state else None
-    if slab_m2:
-        _civ_days = slab_m2 / nm_civ[0]
-        _scope = (f"Ground-bearing slab {bb['length_mm']/1000:.1f} × "
-                  f"{bb['width_mm']/1000:.1f} m ({slab_m2:g} m², from the placed-plant "
-                  f"footprint) + plinths, bunds & drainage falls")
-        if _ug_asm:
-            _scope += f". UNDERGROUND: {_ug_asm}"
-        steps.append(dict(
-            phase="Site set-out & civils",
-            scope=_scope,
-            pred="Site handover", plant="Excavator, concrete pump",
-            duration=_fmt_days(_civ_days), dur_days=round(max(0.5, _civ_days), 2),
-            hold="Set-out survey + concrete cube tests signed off", design=True))
-    else:
-        _scope = ("Ground slab + plinths & bunds (no placed-plant footprint derived "
-                  "for this run — size on the GA)")
-        if _ug_asm:
-            _scope = (f"Underground drain-pit excavation IN scope ({_ug_asm}). "
-                      f"Building fabric / hall slab may be supplied by others.")
-        steps.append(dict(
-            phase="Site set-out & civils",
-            scope=_scope,
-            pred="Site handover", plant="Excavator, concrete pump",
-            duration="— (no footprint derived)" if not _ug_asm else "pit excavation (see BoM CIV-*)",
-            dur_days=0.0,
-            hold="Set-out survey + concrete cube tests signed off", design=bool(_ug_asm)))
-
-    # per-REGION erection steps in process order (manifest region_rank, then module)
-    if man_rows:
-        region_mods: Dict[Tuple[int, str], List[dict]] = {}
-        for r in man_rows:
-            key = (int(r.get("region_rank", 999)), str(r.get("module") or ""))
-            region_mods.setdefault(key, []).append(r)
-        nm_v, nm_m = _ASSEMBLY_NORMS["vessel"], _ASSEMBLY_NORMS["machine"]
-        for (rank, mod), rows in sorted(region_mods.items()):
-            vessels = [r for r in rows if _VESSEL_SHAPE_RX.search(str(r.get("shape") or "")
-                                                                  + " " + str(r.get("name") or ""))]
-            machines = [r for r in rows if r not in vessels]
-            dur_days = len(vessels) / nm_v[0] + len(machines) / nm_m[0]
-            step_mass = max((mass_by_tag.get(str(r.get("equipment_tag")), 0.0) for r in rows),
-                            default=0.0)
-            plant = (_crane_class(step_mass) if step_mass > 0
-                     else ("Mobile crane" if vessels else "Forklift / pallet truck"))
-            hold = ("Vessel hydrostatic (leak) test witnessed; machines: alignment + "
-                    "rotation (bump) test" if vessels
-                    else "Alignment + rotation (bump) test recorded")
+        # ---- build the STEP list --------------------------------------------------
+        # each step: dict(phase, scope, pred, plant, duration, hold, design(bool))
+        steps: List[dict] = []
+        nm_civ = _ASSEMBLY_NORMS["civils"]
+        _ug_asm = _underground_civils_note(state) if state else None
+        if slab_m2:
+            _civ_days = slab_m2 / nm_civ[0]
+            _scope = (f"Ground-bearing slab {bb['length_mm']/1000:.1f} × "
+                      f"{bb['width_mm']/1000:.1f} m ({slab_m2:g} m², from the placed-plant "
+                      f"footprint) + plinths, bunds & drainage falls")
+            if _ug_asm:
+                _scope += f". UNDERGROUND: {_ug_asm}"
             steps.append(dict(
-                phase=f"Erect & set — {_humanize_class(mod)}",
-                scope="; ".join(_assembly_groups(rows)),
-                pred="Civils complete & cured" if len(steps) == 1
-                     else steps[-1]["phase"] + " set",
-                plant=plant, duration=_fmt_days(dur_days),
-                dur_days=round(max(0.5, dur_days), 2), hold=hold, design=True))
+                phase="Site set-out & civils",
+                scope=_scope,
+                pred="Site handover", plant="Excavator, concrete pump",
+                duration=_fmt_days(_civ_days), dur_days=round(max(0.5, _civ_days), 2),
+                hold="Set-out survey + concrete cube tests signed off", design=True))
+        else:
+            _scope = ("Ground slab + plinths & bunds (no placed-plant footprint derived "
+                      "for this run — size on the GA)")
+            if _ug_asm:
+                _scope = (f"Underground drain-pit excavation IN scope ({_ug_asm}). "
+                          f"Building fabric / hall slab may be supplied by others.")
+            steps.append(dict(
+                phase="Site set-out & civils",
+                scope=_scope,
+                pred="Site handover", plant="Excavator, concrete pump",
+                duration="— (no footprint derived)" if not _ug_asm else "pit excavation (see BoM CIV-*)",
+                dur_days=0.0,
+                hold="Set-out survey + concrete cube tests signed off", design=bool(_ug_asm)))
 
-    # pipework — quantified from the connection schedule the sizer wrote
-    nm_p = _ASSEMBLY_NORMS["pipe"]
-    if pipe_m > 0:
-        dn_bits = ", ".join(f"{k} {v:g} m" for k, v in sorted(
-            (tot.get("pipe_m_by_dn") or {}).items())[:6])
-        _pipe_days = pipe_m / nm_p[0]
+        # per-REGION erection steps in process order (manifest region_rank, then module)
+        if man_rows:
+            region_mods: Dict[Tuple[int, str], List[dict]] = {}
+            for r in man_rows:
+                key = (int(r.get("region_rank", 999)), str(r.get("module") or ""))
+                region_mods.setdefault(key, []).append(r)
+            nm_v, nm_m = _ASSEMBLY_NORMS["vessel"], _ASSEMBLY_NORMS["machine"]
+            for (rank, mod), rows in sorted(region_mods.items()):
+                vessels = [r for r in rows if _VESSEL_SHAPE_RX.search(str(r.get("shape") or "")
+                                                                      + " " + str(r.get("name") or ""))]
+                machines = [r for r in rows if r not in vessels]
+                dur_days = len(vessels) / nm_v[0] + len(machines) / nm_m[0]
+                step_mass = max((mass_by_tag.get(str(r.get("equipment_tag")), 0.0) for r in rows),
+                                default=0.0)
+                plant = (_crane_class(step_mass) if step_mass > 0
+                         else ("Mobile crane" if vessels else "Forklift / pallet truck"))
+                hold = ("Vessel hydrostatic (leak) test witnessed; machines: alignment + "
+                        "rotation (bump) test" if vessels
+                        else "Alignment + rotation (bump) test recorded")
+                steps.append(dict(
+                    phase=f"Erect & set — {_humanize_class(mod)}",
+                    scope="; ".join(_assembly_groups(rows)),
+                    pred="Civils complete & cured" if len(steps) == 1
+                         else steps[-1]["phase"] + " set",
+                    plant=plant, duration=_fmt_days(dur_days),
+                    dur_days=round(max(0.5, dur_days), 2), hold=hold, design=True))
+
+        # pipework — quantified from the connection schedule the sizer wrote
+        nm_p = _ASSEMBLY_NORMS["pipe"]
+        if pipe_m > 0:
+            dn_bits = ", ".join(f"{k} {v:g} m" for k, v in sorted(
+                (tot.get("pipe_m_by_dn") or {}).items())[:6])
+            _pipe_days = pipe_m / nm_p[0]
+            steps.append(dict(
+                phase="Pipework & interconnections",
+                scope=(f"{pipe_m:g} m of sized pipe across {n_runs or '—'} runs "
+                       f"({dn_bits}) — per the connection schedule / Line & velocity tab"),
+                pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
+                duration=_fmt_days(_pipe_days), dur_days=round(max(0.5, _pipe_days), 2),
+                hold="Pressure / leak test certificate per line", design=True))
+        else:
+            steps.append(dict(
+                phase="Pipework & interconnections",
+                scope="Process pipework per the P&ID (no sized connection schedule "
+                      "for this run)",
+                pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
+                duration="— (no schedule derived)", dur_days=0.0,
+                hold="Pressure / leak test certificate per line", design=False))
+
+        nm_c = _ASSEMBLY_NORMS["cable"]
+        if cable_m > 0:
+            _cable_days = cable_m / nm_c[0]
+            steps.append(dict(
+                phase="Electrical installation",
+                scope=(f"{cable_m:g} m of LV cable per the connection schedule; boards & "
+                       f"distribution per the Electrical tab (single-line + panel schedule)"),
+                pred="Cable routes / trays installed", plant="Cable drum jacks",
+                duration=_fmt_days(_cable_days), dur_days=round(max(0.5, _cable_days), 2),
+                hold="Insulation-resistance + earth-continuity tests", design=True))
+        else:
+            steps.append(dict(
+                phase="Electrical installation",
+                scope="LV distribution per the Electrical tab (no sized cable schedule "
+                      "for this run)",
+                pred="Cable routes / trays installed", plant="Cable drum jacks",
+                duration="— (no schedule derived)", dur_days=0.0,
+                hold="Insulation-resistance + earth-continuity tests", design=False))
+
+        nm_l = _ASSEMBLY_NORMS["loop"]
+        _loop_days = (n_loops / nm_l[0]) if n_loops else 0.0
         steps.append(dict(
-            phase="Pipework & interconnections",
-            scope=(f"{pipe_m:g} m of sized pipe across {n_runs or '—'} runs "
-                   f"({dn_bits}) — per the connection schedule / Line & velocity tab"),
-            pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
-            duration=_fmt_days(_pipe_days), dur_days=round(max(0.5, _pipe_days), 2),
-            hold="Pressure / leak test certificate per line", design=True))
-    else:
+            phase="Instrumentation, controls & SCADA",
+            scope=(f"{n_loops} instrument loop(s) from the bill of materials — mount, "
+                   f"hook-up, loop-check" if n_loops else
+                   "Instrument loops per the process schedules"),
+            pred="Electrical energised (LV)", plant="Hand tools",
+            duration=_fmt_days(_loop_days) if n_loops else "— (no loop count derived)",
+            dur_days=round(max(0.5, _loop_days), 2) if n_loops else 0.0,
+            hold="Loop checks + calibration certificates", design=bool(n_loops)))
+
+        nm_x = _ASSEMBLY_NORMS["commission"]
+        n_prin = len(man_rows) or len(principals)
+        _comm_days = (5.0 + n_prin / nm_x[0]) if n_prin else 0.0
         steps.append(dict(
-            phase="Pipework & interconnections",
-            scope="Process pipework per the P&ID (no sized connection schedule "
-                  "for this run)",
-            pred="Equipment set & grouted", plant="Pipe trolleys, chain hoists",
-            duration="— (no schedule derived)", dur_days=0.0,
-            hold="Pressure / leak test certificate per line", design=False))
+            phase="Pre-commissioning & commissioning",
+            scope=(f"Whole plant — flush, fill, leak-check, energise, wet-commission, "
+                   f"performance test ({n_prin} principal items)"),
+            pred="All systems installed & tested", plant="—",
+            duration=_fmt_days(_comm_days) if n_prin else "—",
+            dur_days=round(max(0.5, _comm_days), 2) if n_prin else 0.0,
+            hold="Water-on, functional + performance test; client witness",
+            design=bool(n_prin)))
 
-    nm_c = _ASSEMBLY_NORMS["cable"]
-    if cable_m > 0:
-        _cable_days = cable_m / nm_c[0]
-        steps.append(dict(
-            phase="Electrical installation",
-            scope=(f"{cable_m:g} m of LV cable per the connection schedule; boards & "
-                   f"distribution per the Electrical tab (single-line + panel schedule)"),
-            pred="Cable routes / trays installed", plant="Cable drum jacks",
-            duration=_fmt_days(_cable_days), dur_days=round(max(0.5, _cable_days), 2),
-            hold="Insulation-resistance + earth-continuity tests", design=True))
-    else:
-        steps.append(dict(
-            phase="Electrical installation",
-            scope="LV distribution per the Electrical tab (no sized cable schedule "
-                  "for this run)",
-            pred="Cable routes / trays installed", plant="Cable drum jacks",
-            duration="— (no schedule derived)", dur_days=0.0,
-            hold="Insulation-resistance + earth-continuity tests", design=False))
-
-    nm_l = _ASSEMBLY_NORMS["loop"]
-    _loop_days = (n_loops / nm_l[0]) if n_loops else 0.0
-    steps.append(dict(
-        phase="Instrumentation, controls & SCADA",
-        scope=(f"{n_loops} instrument loop(s) from the bill of materials — mount, "
-               f"hook-up, loop-check" if n_loops else
-               "Instrument loops per the process schedules"),
-        pred="Electrical energised (LV)", plant="Hand tools",
-        duration=_fmt_days(_loop_days) if n_loops else "— (no loop count derived)",
-        dur_days=round(max(0.5, _loop_days), 2) if n_loops else 0.0,
-        hold="Loop checks + calibration certificates", design=bool(n_loops)))
-
-    nm_x = _ASSEMBLY_NORMS["commission"]
-    n_prin = len(man_rows) or len(principals)
-    _comm_days = (5.0 + n_prin / nm_x[0]) if n_prin else 0.0
-    steps.append(dict(
-        phase="Pre-commissioning & commissioning",
-        scope=(f"Whole plant — flush, fill, leak-check, energise, wet-commission, "
-               f"performance test ({n_prin} principal items)"),
-        pred="All systems installed & tested", plant="—",
-        duration=_fmt_days(_comm_days) if n_prin else "—",
-        dur_days=round(max(0.5, _comm_days), 2) if n_prin else 0.0,
-        hold="Water-on, functional + performance test; client witness",
-        design=bool(n_prin)))
-
-    # heavy items (>1t) from the BoM — EVERY one gets its own lift callout below (not
-    # just the single heaviest), so a multi-vessel plant's lift plan is complete.
-    _heavy = sorted((b for b in bom if isinstance(b, dict)
-                     and isinstance(b.get("mass_kg"), (int, float)) and b["mass_kg"] > 1000.0),
-                    key=lambda b: -b["mass_kg"])
+        # heavy items (>1t) from the BoM — EVERY one gets its own lift callout below (not
+        # just the single heaviest), so a multi-vessel plant's lift plan is complete.
+        _heavy = sorted((b for b in bom if isinstance(b, dict)
+                         and isinstance(b.get("mass_kg"), (int, float)) and b["mass_kg"] > 1000.0),
+                        key=lambda b: -b["mass_kg"])
 
     # ---- render ----------------------------------------------------------------
     ws = wb.create_sheet("Assembly sequence")
