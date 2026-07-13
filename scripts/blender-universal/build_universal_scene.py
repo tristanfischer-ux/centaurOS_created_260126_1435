@@ -12375,6 +12375,104 @@ def _place_instrument_zone_story(
         print(f"[univ][sealed] instrument story: display + buttons")
 
 
+def _instrument_pcb_png_path() -> str | None:
+    """Run-dir KiCad board render — same artefact the Excel PCB tab embeds."""
+    out = os.environ.get("BLENDER_OUT_DIR") or ""
+    if not out:
+        return None
+    for rel in ("pcb/board-top.png", "pcb/board-3d.png"):
+        path = os.path.join(out, rel)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _make_pcb_board_material(name: str, png_path: str | None):
+    """FR4 board material — textured from the pipeline PNG when present.
+
+    INTENT: the product render must show a BOARD, not a solid green face-plate.
+    When pcb/board-top.png exists, that is the same board the PCB tab scored —
+    Blender and Excel stay one artefact. Fallback is matte FR4 green.
+    """
+    if png_path and os.path.isfile(png_path) and hasattr(bpy, "data"):
+        mat = bpy.data.materials.new(name)
+        mat.use_nodes = True
+        nt = mat.node_tree
+        bsdf = nt.nodes["Principled BSDF"]
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        try:
+            tex.image = bpy.data.images.load(png_path, check_existing=True)
+            nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+            bsdf.inputs["Roughness"].default_value = 0.38
+            bsdf.inputs["Metallic"].default_value = 0.05
+            return mat
+        except (RuntimeError, OSError) as exc:
+            print(f"[univ][sealed] PCB texture load failed ({png_path}): {exc}")
+    return fl.make_mat(
+        name, fl._to_linear((0.06, 0.45, 0.22)), metallic=0.05, roughness=0.40)
+
+
+def _place_instrument_source_pcb(
+    name: str,
+    form: dict,
+    module: str,
+    MO: dict,
+    hide_render: bool = False,
+):
+    """Optical-axis SOURCE PCB as a thin board mesh on the sample-chamber face.
+
+    INTENT: a transmittance instrument's emitter sits on the optical axis as a
+    small replaceable board (not a painted green square that reads as a screen,
+    and not a motherboard spanning the body). Thickness is FR4 (~1.6 mm). Face
+    texture prefers the run's KiCad board-top.png so the Blender shape is the
+    PCB tab's board, not a decoration.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    w, _old_d, h = form["led_pcb_size"]
+    # FR4 thickness on the face-normal (Y) axis — was 2–2.4 mm decorative slab.
+    size = (float(w), 1.6, float(h))
+    loc = form["led_pcb_loc"]
+    mat = _make_pcb_board_material(f"m_{name}", _instrument_pcb_png_path())
+    obj = fl.add_box(
+        name, _mm3(loc), _mm3(size), mat, module=module, module_objects=MO)
+    obj.dimensions = _mm3(size)
+    obj.hide_render = hide_render
+    obj["geometry_source"] = "instrument_source_pcb"
+    return obj
+
+
+def _place_instrument_ui_pcb(
+    name: str,
+    form: dict,
+    module: str,
+    MO: dict,
+    hide_render: bool = False,
+):
+    """Thin compute/UI board under the top-deck display (HMI lives on a PCB).
+
+    INTENT: the display is not a painted lid patch — it sits on a board-shaped
+    module on the top operating plane. Uses the same KiCad face texture when
+    present so the product render carries a real PCB silhouette.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    dw, dd, _dh = form["top_display_size"]
+    dx, dy, dz = form["top_display_loc"]
+    # Board slightly larger than the display glass; FR4 thickness in Z.
+    size = (dw * 1.12, dd * 1.18, 1.6)
+    loc = (dx, dy, dz - 0.2)
+    mat = _make_pcb_board_material(f"m_{name}", _instrument_pcb_png_path())
+    obj = fl.add_box(
+        name, _mm3(loc), _mm3(size), mat, module=module, module_objects=MO)
+    obj.dimensions = _mm3(size)
+    obj.hide_render = hide_render
+    obj["geometry_source"] = "instrument_ui_pcb"
+    return obj
+
+
 def _place_instrument_handheld_cues(
     W: float,
     D: float,
@@ -12437,19 +12535,12 @@ def _place_instrument_handheld_cues(
     )
     _well.dimensions = _mm3(form["well_size"])
 
-    # SMALL optical SOURCE module on the chamber's optical-axis face (wavelength-
-    # swappable emitter) — window-scale, never a motherboard spanning the body.
-    _led_pcb_mat = fl.make_mat(
-        "m_se_cue_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
-    _led_pcb = fl.add_box(
-        "u_se_cutaway_cue_led_pcb",
-        _mm3(form["led_pcb_loc"]),
-        _mm3(form["led_pcb_size"]),
-        _led_pcb_mat,
-        module=skin_mod,
-        module_objects=MO,
-    )
-    _led_pcb.dimensions = _mm3(form["led_pcb_size"])
+    # Optical-axis SOURCE PCB — thin FR4 board (textured from pcb/board-top.png
+    # when the pipeline wrote one), not a solid green face-plate / "screen".
+    _place_instrument_source_pcb(
+        "u_se_cutaway_cue_led_pcb", form, skin_mod, MO, hide_render=False)
+    _place_instrument_ui_pcb(
+        "u_se_cutaway_cue_ui_pcb", form, skin_mod, MO, hide_render=False)
 
     # Top-deck HMI (operator looks down) — display + tactile cluster beside the
     # sample chamber. Avoid front-face UI: that is appliance/cabinet language.
@@ -12653,6 +12744,8 @@ def _selftest_instrument_colorimeter_form_rule() -> None:
         "LED/source module must be optical-window scale, not a cabinet-spanning board")
     assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
         "source module must mount on the chamber's optical-axis face")
+    _png = _instrument_pcb_png_path()
+    assert _png is None or str(_png).endswith(".png")
     # Path change must resize the chamber/well (function, not a fixed decorative tower).
     form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
     assert form20["well_size"][0] > form["well_size"][0], (
@@ -13341,19 +13434,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                module=_skin_mod, module_objects=MO)
             _bore.dimensions = _mm3(form["well_size"])
             _bore.hide_render = True
-            # Optical SOURCE module on the chamber's optical-axis face (window-scale).
-            _led_pcb_mat = fl.make_mat(
-                "m_se_face_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
-            _led_pcb = fl.add_box(
-                "u_se_exterior_detail_led_pcb",
-                _mm3(form["led_pcb_loc"]),
-                _mm3(form["led_pcb_size"]),
-                _led_pcb_mat,
-                module=_skin_mod,
-                module_objects=MO,
-            )
-            _led_pcb.dimensions = _mm3(form["led_pcb_size"])
-            _led_pcb.hide_render = True
+            # Optical-axis SOURCE PCB — same board artefact as the PCB tab
+            # (thin FR4 + board-top.png), visible on the closed product.
+            _place_instrument_source_pcb(
+                "u_se_exterior_detail_led_pcb", form, _skin_mod, MO, hide_render=True)
+            _place_instrument_ui_pcb(
+                "u_se_exterior_detail_ui_pcb", form, _skin_mod, MO, hide_render=True)
             # USB / service port on the bottom edge (visible in 07-product-service)
             _usb_mat = fl.make_mat(
                 "m_se_face_usb", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.35, roughness=0.4)
