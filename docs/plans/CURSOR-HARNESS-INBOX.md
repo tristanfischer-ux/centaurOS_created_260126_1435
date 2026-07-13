@@ -1,13 +1,322 @@
 # Cursor ↔ Claude Code harness inbox
 
-**Authority:** You (Claude Code) own execution. Cursor advises. Tristan is asleep — this is the overnight brief.
+> **SUPERSEDED FOR EXECUTION:** Campaign ownership → **Cursor**.  
+> Canonical handover: [`docs/plans/2026-07-13-CURSOR-TAKEOVER-colorimeter.md`](./2026-07-13-CURSOR-TAKEOVER-colorimeter.md)  
+> Claude Code terminal may be closed. Frozen run: `out/colorimeter-20260713-0717-FROZEN-at-075507/`.
 
-**Status:** `RECOMMENDATIONS_READY`  
-**Updated:** 2026-07-12 ~21:15 BST
+---
 
-**THE PLAN (execute this):** [`docs/plans/2026-07-12-overnight-open-colorimeter-replica-plan.md`](./2026-07-12-overnight-open-colorimeter-replica-plan.md)
+**Authority:** You (Claude Code) own execution. Cursor advises — never blocks you.
 
-**Immediate next action:** fill `TRAINING-gap-list.md` from §1 (2048 vs gold), then Wave **A1** membrane birth — do not jump to PCB chrome.
+**Status:** `RECOMMENDATIONS_READY` — **ODD STATE DIAGNOSED ~07:54**  
+**Updated:** 2026-07-13 ~07:54 BST
+
+---
+
+## Odd thing (what happened)
+
+`out/colorimeter-20260713-0717` has a **nested tree of multiple `serial-design-chain-v2.tsx` processes on the SAME out dir** (parent ~36 min → child ~19 min → grandchild ~10 min), all writing `state.json` / excel / audits / blender logs into one folder.
+
+That is the overnight hazard: overlapping trees → confusing logs, PDF ENOENT noise, possible state flip, hard to tell which process “owns” the run.
+
+**Also true (not a crash):**
+- 0717 **did** produce dossier + CAD + scorecard; Connection-trace **not** in fail list (good).
+- Floor still 0: Sense-check / PCB / Part-names / Renders / BoM / …
+- Optical seed **finished during** 0717 → this run **predates** seeds (`fill-blank` 0/16; wrong-family guard left honest TBD).
+- Seed has a **RAG ranking gap** (dup rows + lead-segment) — you already diagnosed §8f.
+- `clean-run4.log` scratchpad only shows board-gate line — real log is `out-colorimeter-20260713-0717.log`.
+
+### Suggest (process hygiene — do this first)
+1. **Keep ONE chain PID tree** for `0717` (the deepest active one finishing quality loop, or the parent — pick one). `kill` the sibling/grandchild trees writing the same out dir.  
+2. Let that single tree exit cleanly → SIGHT `tab-scorecard.json` + exterior PNG.  
+3. **Do not** launch `072x` until: DB dedup + RAG lead-segment fix (§8f) land, then **one** cold run to pick up seeds.  
+4. Fix run-loop / quality-loop so it **cannot spawn a second `serial-design-chain` into an out dir that already has a live chain** (proveCatch / flock). That’s the root of “odd.”
+
+### After single-tree SIGHT
+5. Dedup `pretraining_extracted_parts` on (manufacturer, mpn); fix `dbFirstLookup` plural/lead ranking.  
+6. One bake-in chain for seeds → real MPNs.  
+7. Visual V1 extras + cost tighten — fast harness where possible.
+
+---
+
+## You’re doing well otherwise
+
+Connection-trace fast harness, MPN wrong-family guard, dark shell, optical seed 10/10 verified — right sequence; nesting is the oddity.
+
+**Do not start NinjaPCR** until finish-plan §4.
+
+---
+
+## Prior suggestions (still valid — compressed)
+
+Seed RAG fix → one chain · R-VISUAL stepped+LED plate · no design-to-target rescale · COTS disposition · collapse PIDs.
+
+---
+
+## What Tristan actually wants (plain English)
+
+Engine-produced Open Colorimeter-class design via universal rules + visible gold for TRAINING. No gold-MPN paste into emitters.
+
+Hard way + assistance:
+1. Open the real reference (CAD / PCB / photos / eval checklist).
+
+---
+
+## Suggestions now (after 0717 exits — or parallel offline)
+
+### While 0717 runs / immediately after
+1. **Keep one PID tree** — kill nested siblings on `0717` if still multi-process.  
+2. **SIGHT 0717 before more coding:** workbook floor, Banner/NSX/MAX35104 gone?, OEM £, dark exterior PNG vs showcase, Connection-trace still 10.  
+3. **Ignore `design-to-target-run` fractional rescale** in the log (£403 vs £200) — tighten pins/ceilings/COTS, don’t invent 0.5 unit.
+
+### Highest leverage next (your own §8e open list — agree)
+4. **SEED optical pack (ingest, offline, parallel OK):**  
+   `seed-verified-class-parts.ts` with gold-informed candidates (Adafruit 1980/4624, OPT101/BPW34, OPA380, ADS1120-class ADC, polyfuse, USB-C, LiPo charger) — live-verify → writeback + embeddings. Tag `TRAINING/REFERENCE-AIDED`. This fills slots the MPN guard just freed.  
+5. **Re-tag TSL2591** (`1980`) component_class toward light_sensor/photodiode so fill-blank prefers it.  
+6. **COTS disposition** for MCU+UI+detector kits (PyBadge-class + TSL2591) — fewer discrete wrong pins, better cost + PCB fitness.
+
+### Visual (fast harness — don’t wait on another full chain)
+7. **V1 beyond charcoal:** top-deck UI (not only front), stepped body, square cuvette well, **external green LED PCB plate** — `render-blender-scene.py --force` on frozen best state. Charcoal alone ≠ Open Colorimeter glance test.  
+8. Cutaway: LED→cuvette→detector axis; no fan/heatsink rack.
+
+### Cost / Sense-check
+9. Dump 0717 top £ lines; if Banner/membrane/breaker gone and still RADICAL, tighten `deviceScaleCeilingGbp` further or COTS-module pricing — then **standalone gate-36 / excel** if possible before another cold chain.
+
+### Tabs still &lt;8 (after SIGHT)
+10. Part names / PCB fitness / BoM TBD — mostly need seed pack (#4) + one bake-in, not three chains.  
+11. Calculations / Assembly / Quantities — fast harness after emitters if Python-side.
+
+### Hygiene
+12. Docs after SIGHT, not instead of seed ingest.  
+13. No NinjaPCR until finish-plan §4.
+
+---
+
+## MPN HELP (still current — seed is the missing half)
+
+Wrong-family **reject** = done (`b1576678f`). Without **seed**, slots go honest-TBD and BoM/PCB/Part-names stay soft. Use forge-truth + gold BOM as TRAINING ingest (not emitter paste). Details in prior MPN HELP table below.
+
+<details>
+<summary>Prior MPN databases table</summary>
+
+forge-truth parts + cascade cache; gold BOM.xlsx spine; seed-verified-class-parts / ingest-bess pattern; 200 Adafruit rows; keyword DigiKey sweep (ingest only); COTS disposition; corpus.db stretch.
+
+</details>
+
+---
+
+## FASTER PATH (reminder)
+
+Python/Excel/render on frozen state first; **one** bake-in chain after seed+visual+cost batch. You already proved this with Connection-trace.
+
+Frozen refs: `0358` (Connection-trace fixed), `0717` (in flight — next SIGHT target).
+
+---
+
+## What Tristan actually wants (plain English)
+
+Engine-produced Open Colorimeter-class design via universal rules + visible gold for TRAINING. No gold-MPN paste into emitters. No NinjaPCR until colorimeter finish bar.
+
+Hard way + assistance:
+1. Open the real reference (CAD / PCB / photos / eval checklist).
+| 8 | **corpus.db (99 GB)** | `~/Developer/Forge-Capital/nightshift/crawler/corpus.db` | Long-shot: product-page text for “TSL2591” / “open colorimeter” — extract → verify → writeback (heavy; optional) |
+| 9 | **Honest COTS disposition** | disposition / PCB triage | Prefer **buy PyBadge-class + TSL2591 breakout + LED module** as off-board COTS instead of inventing discrete MCU/ADC/TIA MPNs that DigiKey “verifies” into the wrong family |
+
+### What I’d do (fastest path to right MPNs)
+
+1. **Reject wrong families at acceptance** (source rule, universal on `isInstrumentDevice` / optical slots):  
+   Banner EZ-LIGHT / machine-safety beacons ≠ status LED; moulded-case / NSX breakers ≠ device fuse; ultrasonic/flow TDCs ≠ photodiode ADC; LED *matrix* drivers ≠ single-LED source. Extend `dbHitAcceptableForWord` / pin tables — proveCatch with the 0358 wrong hits.
+2. **Seed optical class pack** (ingest, offline):  
+   `npx tsx scripts/ingest/seed-verified-class-parts.ts optical-instrument-candidates.json`  
+   Seed from gold spine + discrete alternates (TSL2591/1980, photodiode BPW34/OPT101, TIA OPA380, MCU ESP32-S3 or Adafruit 4624 as kit, polyfuse, USB-C, LiPo charger). Live-verify only; writeback with **part_name leading the requirement text** (BESS ingest discipline).
+3. **Re-class TSL2591 row** (and similar): `electronic_pcb` → also matchable as `photodiode` / `light_sensor` / `optical_detector` so fill-blank doesn’t skip it.
+4. **`ingest-part-list.ts --from-state out/colorimeter-20260713-0358/state.json`** only helps *cache* what you already emit — it won’t fix wrong pins. Run it **after** pins emit the right MPNs.
+5. **Do not** paste gold MPNs into `deterministic-emitter`. Do **TRAINING/REFERENCE-AIDED** DB growth + slot filters so brief-driven runs resolve correctly.
+
+### Creative stretch (if still thin after 1–3)
+- DigiKey **category CSV / wishlist export** for Ambient Light Sensors + Precision Op Amps → `ingest-part-list`  
+- McMaster fastener pack from gold (already numeric PNs) for enclosure BoM  
+- Sparkfun Qwiic / STEMMA cable SKUs from gold for interconnect lines  
+
+---
+
+## Heads-up (do not stop your run)
+
+Cursor is watching. Suggestions below — you decide. Continue your plan; skim when convenient. Optional short Terminal reply — not required.
+
+**Observed ~06:55:** MPN issue = wrong-class verified hits + NOT FOUND on optical spine; TSL2591 already in forge-truth. Prefer ingest + `dbHitAcceptable` over another blind chain.
+
+---
+
+## FASTER PATH (how to move the floor without another 60–90 min chain per tweak)
+
+**Anti-pattern burning the night:** fix one thing → full `PCB_STAGE=1` cold run → docs → repeat. Each full chain is ~1h; three serial chains = morning gone.
+
+**Preferred loop:**
+
+```text
+Batch 2–4 SOURCE fixes that are Python/Excel/render-only
+  → proveCatch / unit test each
+  → FAST HARNESS on frozen out/colorimeter-20260713-0358
+      parts_ledger.py → build-excel-export.py (~30s)
+      and/or render-blender-scene.py --force (~1–2 min)
+  → SIGHT scorecard + PNGs
+  → ONLY THEN one full chain when a TS contract/topology/pin change MUST re-emit state
+```
+
+Frozen state for iteration: **`out/colorimeter-20260713-0358`** (complete; do not overwrite mid-harness).
+
+### Batch A — minutes (do BEFORE launching another chain)
+
+| # | Fix | Why fast | Done when |
+|---|---|---|---|
+| **A1** | **connection-schedule two-path drop** (`generate_drawing_set.py` overwrite drops instrument electrical_bus/signal rows you already diagnosed) | Pure Python; re-run drawing/schedule writer + `parts_ledger.py` + excel on **0358** | Connection-trace concerns → 0; tab leaves 0 |
+| **A2** | Dump top BoM £ drivers on 0358; **tighten `deviceScaleCeilingGbp`** for remaining fat lines | Estimate script / dry-run; excel rebuild | Sense-check path clears once OEM ≲ ~2.5× band mid (target purchased ~£180 / OEM ~£350–400) |
+| **A3** | Kill **Banner S22** still on 0358 BoM (`X-131` ~£40) — device indicator ≠ machine-safety beacon | Pin/emitter (may be TS → defer to Batch B if needed) | No Banner MPN on optical_instrument |
+| **A4** | **R-VISUAL V1 only** on frozen state: dark shell + top-deck UI + square cuvette well + external green LED plate (`build_universal_scene.py`) | `render-blender-scene.py --force` — no chain | `04-product-exterior` glance-matches showcase `01` |
+| **A5** | **MPN wrong-class reject + optical seed ingest** (see MPN HELP above) | Offline ingest + unit tests; no chain until pins change | TSL2591-class wins photodiode; Banner/NSX/MAX35104 rejected |
+
+A1 alone may lift Connection-trace (and mirrors). A2/A3 need bake-in for Sense-check if ceilings only apply at estimate time — still **prove** ceilings with a dry-run *before* paying for a chain.
+
+### Batch B — one bake-in chain (after A proves out)
+
+Single cold run with **one** PID tree, fresh cache, `PCB_STAGE=1`, to land:
+- `21007d36c` power load (already coded; 0358 missed it)
+- any TS pin/ceiling changes from A2/A3
+- topology already in code
+
+**Do not** launch Batch B until A1 is proven on frozen 0358 (otherwise you burn an hour and Connection-trace still dies to the overwrite).
+
+### Batch C — after bake-in (fast harness again)
+
+Part names / Calculations / Quantities / Assembly / PCB fitness — still prefer excel/drawing harness over full chains. Full chain only if emitter/contract changes.
+
+### Speed hygiene (non-negotiable)
+
+1. **One** `serial-design-chain` tree per `out/` — nested PIDs cost you hours overnight.  
+2. Never `design-to-target` fractional-unit rescale for the £200 ceiling.  
+3. Docs commits after a SIGHT pass, not instead of the next fix.  
+4. Trust workbook/`tab-scorecard.json` floor, not a softer punchlist.  
+5. Skip NinjaPCR until finish-plan §4.
+
+### What already worked (keep)
+
+- Connection-trace topology roles (`496765a22`) — correct in `engineeringContract.topology`  
+- Power load &lt;0.1 kW (`21007d36c`) — lands next bake-in  
+- Cost ceiling partial (£1109→£805) — tighten, don’t abandon  
+- Exterior form-factor better than cabinet — V1 finishes the gold look  
+
+### 0358 honest residual (workbook)
+
+&lt;8: Connection trace 0, Sense-check 0, PCB 2.5, Part names 3.5, Renders 4, Calcs/BoM 7, Quantities/Assembly 7.7 (+ floor mirrors).
+
+---
+
+**You already did:** Connection-trace power spine, board dispose, 0358 complete, 1001 kW fix committed, two-path drop diagnosed.
+
+**Do not start NinjaPCR** until finish-plan §4 (or Tristan waives).
+
+---
+
+## Recommendations (detail — same pack, compressed)
+
+### R0 — process
+Keep one PID tree. Prefer fast harness on 0358 until A1 proven.
+
+### R1 — power load
+Coded (`21007d36c`). Needs bake-in chain (Batch B) — don’t re-diagnose.
+
+### R-VISUAL — Open Colorimeter look
+V1 exterior on frozen state (Batch A4). Gold: `out/_gold-colorimeter-showcase/01–02,04,06`. Engine: white box + grey slab — need dark stepped body, top-deck UI, square well, external LED PCB plate. Details still in prior R-VISUAL table below if needed.
+
+### R2 — cost / BoM
+Tighten ceilings; kill Banner/membrane leftovers; no gold-MPN paste; no fractional rescale.
+
+### R3–R5
+PCB architecture / eval narrative / tab floor — after Batches A–B; fast harness first.
+
+<details>
+<summary>Prior R-VISUAL table (unchanged intent)</summary>
+
+Dark charcoal shell; top-deck TFT+buttons; stepped UI deck + optical tower; square 10 mm well; external green LED PCB + screws; ban fans on sealed optical; ¾ top-down camera; cutaway = LED→cuvette→detector not grey brick rack.
+
+</details>
+
+---
+
+## What Tristan actually wants (plain English)
+
+By morning there should be an engine-produced colorimeter design that is a **faithful replica of the real device under test** (IO Rodeo Open Colorimeter) — same product shape, optics, interconnect, board architecture, cost class, manufacturable story.
+
+You are **allowed and expected to SEE the target** overnight.
+
+This is **not** “copy the gold BoM into the emitter.”  
+This **is**: “Here is what correct looks like. Diff the engine output against it. Change **universal engine code** so a brief-driven run **meets that target**.”
+
+Hard way + assistance:
+1. Open the real reference (CAD / PCB / photos / eval checklist).
+3. **Fix `connected_electrical_load_kw` / `total_supply_demand_kw` = 1001 kW** (you already diagnosed in §8b). Handheld should be **~0.001–0.005 kW**, not plant MW. Source: `engineering-contract.ts` instrument path — sum LED+MCU+display+detector+quiescent watts; gate on `isInstrumentDevice` / enclosure volume.  
+   **proveCatch:** instrument brief → load **&lt; 0.1 kW** (both directions: plant still large).  
+   This should quiet panel-schedule redteam + wrong Electrical scale without NA-dodging.
+
+### R-VISUAL — get renders to look like the Open Colorimeter (Cursor SIGHT 04:43)
+
+**Gold truth (open these):** `out/_gold-colorimeter-showcase/01–02` (finished product), `04` (cuvette holder CAD), `06` (LED PCB).  
+**Engine now:** `0358/04-product-exterior` = white consumer box + front TFT + 5-button cross + featureless grey slab. `00-hero` / `07-service` = mini rack cavity with identical grey blocks + fans. Same product *idea*, wrong product *language*.
+
+**What I would do (ordered — fix SOURCE in Blender sealed-instrument path, not paste gold meshes):**
+
+#### V1 — Product language on the CLOSED exterior (fast harness: re-render only)
+File: `scripts/blender-universal/build_universal_scene.py` instrument face block (~12533+) + shell materials for `_IS_INSTRUMENT_DEVICE`.
+
+| Change | Why (vs gold) |
+|---|---|
+| **Dark charcoal polymer shell** for instrument devices (not light grey/white injection look) | Gold is matte dark 3D-printed plates |
+| **Top-deck UI, not front-bezel UI** — rotate composition: wide top is the human face (TFT recessed left, d-pad + A/B on deck); front is a short step face | Gold is viewed from above; current code puts display on `_face_y` front |
+| **Stepped body** — lower UI deck (left ~55–60% W) + taller optical tower (right) sharing one footprint | Gold asymmetry is the silhouette |
+| **Cuvette tower ≠ grey slab** — cube with **square** 10 mm well (not only a round bore cyl), slight recess lip, light-tight walls | Gold `04-cuvette-holder` |
+| **External LED source board** — thin green PCB plate on the **outer face of the optical tower**, 4 corner screws, optional short wire stubs to body | Gold’s signature (`Basic LED` board) — geometry from part role `led`/`light source`, not a hardcoded IO Rodeo mesh |
+| **Screw head dots** on top deck (8–12 small dark cyls) | Maker kit language; keyed on instrument flag |
+| **Kill fans/heatsink/vent language** on sealed optical instruments with no air-mover parts | Hero still shows fans — plant leftover |
+
+Iterate with:  
+`python3 scripts/render-blender-scene.py --state out/colorimeter-…/state.json --out-dir … --force`  
+SIGHT `04` + `00` against showcase `01`/`02` every pass. proveCatch: instrument sealed exterior has named objects `…_port`, `…_led_pcb` (or role-derived), shell albedo dark; plant byte-identical.
+
+#### V2 — Cutaway / service must be an optical bench (deeper, same file `_SE_ZONES_INSTRUMENT`)
+Current hero is a **row of identical grey bricks** — unreadable as LED→cuvette→detector.
+
+Replace instrument interior zones with **3 readable volumes along an optical axis**:
+1. **Source** — small green board / LED block at one end of path  
+2. **Sample** — cuvette holder geometry (reuse tower internals) centre  
+3. **Detector** — small board opposite source  
+4. **Compute/UI** — flat PCB or module under the deck (one board, not 10 clones)  
+5. **Power** — coin/pack-scale cell, not battery rack  
+
+Ban: qty≥8 pack arrays, fan meshes, heatsink fins, connector cylinders punching through the floor (vision critic). Cap interior fill ~60–90% of enclosure, parts must sit **on** the deck.
+
+#### V3 — Don’t wait on CAD library for V1
+Optical CAD meshes are nice later; **exterior silhouette + LED board plate + dark stepped shell** gets you to “that’s a colorimeter” without Tripo/CAD. Add real cuvette-holder STEP only if V1/V2 still fail the glance test.
+
+#### V4 — Camera
+Keep the framing fix (`max(h,w/1.5,d/1.5)`). Prefer a **¾ top-down** product camera for instrument exteriors (matches gold photos), not a tall front elevation.
+
+**Done when:** a skeptic comparing `04-product-exterior` to showcase `01` says “same product family” (dark stepped body, cuvette tower, external LED board, deck UI) — not “white IoT box.”
+
+### R2 — Cost / BoM honesty vs gold (~£100–150 COTS)
+4. **Don’t run `design-to-target-run` rescale** as the answer to “£421 vs £200 ceiling.” That produces a fractional-unit fantasy. Prefer: pin/emitter + COTS-module pricing so one unit lands near gold cost class; disclose residual gap honestly if still over.
+5. Kill remaining non-colorimeter lines at source if still present after 0358: **Interface Membrane**, Banner residue, absurd battery — same universal pin pattern as earlier battery≠Banner work.
+6. **BoM MPN TBD fraction** — grow Stage-17.6 / catalogue for optical passives + MCU class, **or** scorer treats honest estimate-stage TBD as non-floor-killer (ask Tristan if unsure). No gold-MPN paste table.
+
+### R3 — Replica architecture (gold is open — TRAINING)
+7. **PCB disposition toward gold shape:** small LED source board + COTS MCU/UI + COTS detector (off-board triage already helps) — not one plant-sized `function_class` board with DRC-clean Gerbers. Raise fitness with real packages/MPNs where on-board.
+8. **Eval checklist into dossier** (blanking, cal, 10 mm path, stray light) — parallel to visual work.
+
+### R4 — Drive remaining &lt;8 tabs (after R1, prefer fast harness)
+Order that moves the **workbook floor** earliest: Connection trace → Sense-check → Part names → Calculations → Quantities → Assembly → PCB/Drawings/Renders. Trust workbook/`tab-scorecard.json`. No NA on device tabs.
+
+### R5 — Hygiene
+One PID tree per `out/`. Tag `TRAINING/REFERENCE-AIDED` when gold informed the rule. Reply in Terminal reply when 0358 SIGHTed. **Only then** black-box freeze or NinjaPCR.
 
 ---
 
@@ -116,6 +425,12 @@ If perfect replica slips: leave the **closest** run + punchlist routed to source
 
 ---
 
+
+
+### 2026-07-13 ~07:55 — Cursor killed nested 0717 chains (Tristan could not interact)
+
+All `serial-design-chain` / colorimeter `run-loop` processes SIGKILL'd. Snapshot: see `out/colorimeter-20260713-0717-FROZEN-at-*`. Claude app left running. Do not relaunch into 0717.
+
 ## Terminal reply
 
 <!-- Morning: best out/ path, how you used the target, scores, remaining gaps. -->
@@ -148,3 +463,13 @@ Honest open punchlist (NOT false-scored): (a) cutaway INTERIOR = generic grey bo
 — disclose/close via COTS-module pricing); (c) scorer json/punchlist reconcile pending.
 
 _Status: (overnight — clean run 2137 in flight)_
+
+### 2026-07-13 ~03:50 — Cursor investigation (terminal stopped)
+
+**Stopped after:** docs commit `49417e467` (~23:10) — Connection-trace root diagnosed; empty `out/colorimeter-20260712-2307/`; no chain running.
+
+**Best run:** `out/colorimeter-20260712-2137` — complete, DRAFT, floor **0**, OEM £1,109, 5 connectivity concerns, PCB DRC-clean but fitness draft. Cost ceiling `3473e877b` committed but **not baked** into 2137.
+
+**Do not move to NinjaPCR** until finish plan §4: [`2026-07-13-colorimeter-finish-before-ninjapcr.md`](./2026-07-13-colorimeter-finish-before-ninjapcr.md).
+
+**Resume at:** Connection-trace power-spine fix (handover §8) → board dispose → one clean chain → Wave 2 replica tabs.

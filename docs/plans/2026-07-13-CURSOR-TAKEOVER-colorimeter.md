@@ -1,5 +1,3 @@
-> **Canonical colorimeter takeover:** `docs/plans/2026-07-13-CURSOR-TAKEOVER-colorimeter.md` (this file is a copy for root discoverability).
-
 # Cursor takeover — Open Colorimeter campaign
 
 **Date:** 2026-07-13 ~08:00 BST  
