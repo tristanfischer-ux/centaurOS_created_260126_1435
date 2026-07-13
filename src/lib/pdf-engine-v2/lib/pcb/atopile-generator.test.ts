@@ -119,6 +119,28 @@ describe('atopile-generator', () => {
       expect(result.boardOutline.outline.segments.length).toBeGreaterThan(0)
       expect(result.boardOutline.source).toBe('derived')
     })
+
+    it('uses a window-scale source board outline for compact optical instruments', () => {
+      const outDir = makeTmpDir('atopile-colorimeter-')
+      tmpDirs.push(outDir)
+      const result = generateAtopileProject(state, outDir)
+
+      const points = result.boardOutline.outline.segments.flatMap((segment) => [
+        segment.start,
+        segment.end,
+        ...(segment.kind === 'arc' ? [segment.mid] : []),
+      ])
+      const xs = points.map((point) => point.xMm)
+      const ys = points.map((point) => point.yMm)
+      const widthMm = Math.max(...xs) - Math.min(...xs)
+      const heightMm = Math.max(...ys) - Math.min(...ys)
+
+      expect(widthMm).toBeGreaterThanOrEqual(25)
+      expect(heightMm).toBeGreaterThanOrEqual(25)
+      expect(widthMm).toBeLessThanOrEqual(40)
+      expect(heightMm).toBeLessThanOrEqual(40)
+      expect(result.boardOutline.sourceDetail).toContain('instrument optical source board')
+    })
   })
 
   // ── UNIVERSALITY PROOF ──────────────────────────────────────────────────────

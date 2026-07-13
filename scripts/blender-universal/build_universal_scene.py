@@ -12440,6 +12440,94 @@ def _place_instrument_source_pcb(
     return body
 
 
+def _instrument_source_harness_spec(
+    form: dict,
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+) -> dict:
+    """Short source-board harness geometry for sealed optical instruments.
+
+    INTENT: an optical source PCB on the sample-chamber face is not decorative;
+    it needs power/control conductors back into the enclosure. Keep the run
+    device-scale and tied to the source board/enclosure anchors, not plant wiring.
+    """
+    led_x, led_y, led_z = form["led_pcb_loc"]
+    led_w, led_d, led_h = form["led_pcb_size"]
+    start_y = led_y + led_d / 2 + 0.35
+    end_x = min(W / 2 - tt * 0.75, led_x + 28.0)
+    end_y = led_y + min(8.0, max(4.0, D * 0.035))
+    offsets = (-0.26, -0.08, 0.10, 0.28)
+    strands = []
+    for i, z_frac in enumerate(offsets):
+        z_offset = led_h * z_frac
+        strands.append({
+            "name": f"u_se_exterior_detail_source_harness_{i}",
+            "start": (led_x + led_w * (-0.24 + i * 0.16), start_y, led_z + z_offset),
+            "mid": (led_x + (end_x - led_x) * 0.55, start_y + 3.0, led_z + z_offset * 0.72),
+            "end": (end_x, end_y, led_z + z_offset * 0.52),
+        })
+    return {
+        "source_anchor": "u_se_exterior_detail_led_pcb",
+        "enclosure_anchor": "u_se_product_right",
+        "port_name": "u_se_exterior_detail_source_harness_port",
+        "port_loc": (end_x + tt * 0.18, end_y, led_z),
+        "port_size": (max(4.0, tt * 0.75), 2.8, min(max(7.0, led_h * 0.42), H * 0.18)),
+        "strands": strands,
+    }
+
+
+def _place_instrument_source_harness(
+    form: dict,
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    module: str,
+    MO: dict,
+    hide_render: bool = True,
+) -> dict:
+    """Draw a visible short cable/ribbon from the exterior source PCB into the body."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    spec = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
+    cable_mat = fl.make_mat(
+        "m_se_source_harness", fl._to_linear((0.025, 0.025, 0.03)), metallic=0.0, roughness=0.66)
+    port_mat = fl.make_mat(
+        "m_se_source_harness_port", fl._to_linear((0.045, 0.048, 0.055)), metallic=0.25, roughness=0.42)
+    port = fl.add_box(
+        spec["port_name"],
+        _mm3(spec["port_loc"]),
+        _mm3(spec["port_size"]),
+        port_mat,
+        module=module,
+        module_objects=MO,
+    )
+    port.dimensions = _mm3(spec["port_size"])
+    port.hide_render = hide_render
+    port["geometry_source"] = "instrument_source_harness_port"
+    for strand in spec["strands"]:
+        obj = fl.add_pipe(
+            strand["name"],
+            [_mm3(strand["start"]), _mm3(strand["mid"]), _mm3(strand["end"])],
+            radius=0.75 * fl.MM,
+            material=cable_mat,
+            module=module,
+            module_objects=MO,
+            bevel_segments=5,
+        )
+        if obj is not None:
+            obj.hide_render = hide_render
+            obj["geometry_source"] = "instrument_source_harness"
+            obj["source_anchor"] = spec["source_anchor"]
+            obj["enclosure_anchor"] = spec["enclosure_anchor"]
+    return spec
+
+
 def _place_instrument_ui_pcb(
     name: str,
     form: dict,
@@ -12753,6 +12841,22 @@ def _selftest_instrument_colorimeter_form_rule() -> None:
         "instrument electronics story PCB must not span the cutaway interior")
     # Closed-product hero for instruments (not cabinet cutaway).
     assert "00-hero" in sealed_exterior_view_names(True)
+    harness = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
+    assert harness["source_anchor"] == "u_se_exterior_detail_led_pcb", (
+        "harness must explicitly originate at the exterior LED/source PCB")
+    assert harness["enclosure_anchor"] == "u_se_product_right", (
+        "harness must explicitly terminate at the enclosure side port/cutout")
+    assert 3 <= len(harness["strands"]) <= 5, (
+        "instrument source harness must render as a short multi-strand cable/ribbon")
+    for strand in harness["strands"]:
+        sx, sy, sz = strand["start"]
+        ex, ey, ez = strand["end"]
+        length = math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2 + (ez - sz) ** 2)
+        assert 20.0 <= length <= 40.0, (
+            f"source PCB harness must be device-scale (20–40 mm), got {length:.1f} mm")
+        assert abs(sx - led_x) <= led_w * 0.42 and abs(sz - led_z) <= led_h * 0.42, (
+            "harness strand must start on the LED/source PCB back face")
+        assert ex > W * 0.36, "harness strand must disappear into the enclosure side port"
 
 
 def _place_instrument_manifest_proxies(
@@ -13433,6 +13537,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # (thin FR4 + board-top.png), visible on the closed product.
             _place_instrument_source_pcb(
                 "u_se_exterior_detail_led_pcb", form, _skin_mod, MO, hide_render=True)
+            _place_instrument_source_harness(
+                form, W, D, H, base_z, tt, _skin_mod, MO, hide_render=True)
             _place_instrument_ui_pcb(
                 "u_se_exterior_detail_ui_pcb", form, _skin_mod, MO, hide_render=True)
             # USB / service port on the bottom edge (visible in 07-product-service)

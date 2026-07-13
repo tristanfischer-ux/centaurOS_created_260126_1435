@@ -605,6 +605,9 @@ const CONTROLLER_WORD_RE =
 const ON_BOARD_PCB_WORD_RE =
   /\b(status[_ -]?(?:led|indicator)|led[_ -]?source|\bled\b|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b)\b/i
 
+const OPTICAL_SOURCE_BOARD_WORD_RE =
+  /\b(?:led[_ -]?source|light[_ -]?source|optical[_ -]?source|source[_ -]?(?:pcb|board|module)|illumination|emitter|led[_ -]?driver)\b/i
+
 function stateText(state: Record<string, unknown>): string {
   const parsed = (state.parsedBrief as Record<string, unknown> | undefined) ?? {}
   return [
@@ -883,24 +886,46 @@ function buildNets(
 
 // ── Board outline — reuses the ported pcb-outline.ts geometry helpers ──────────
 
-function computeBoardOutline(components: AtopileComponentRecord[]): PcbBoardGeometry {
+function hasInstrumentOpticalSourceBoard(
+  state: Record<string, unknown>,
+  words: ElectronicWordRef[],
+  components: AtopileComponentRecord[],
+): boolean {
+  const designText = `${stateText(state)} ${words.map(wordText).join(' ')}`
+  if (OPTICAL_SOURCE_BOARD_WORD_RE.test(designText)) return true
+  return components.some((component) => {
+    const roleText = [component.wordId, component.nameHuman, component.characterId].join(' ')
+    return OPTICAL_SOURCE_BOARD_WORD_RE.test(roleText)
+  })
+}
+
+function computeBoardOutline(
+  components: AtopileComponentRecord[],
+  opts: { isInstrumentSourceBoard?: boolean } = {},
+): PcbBoardGeometry {
   const AREA_MULTIPLIER = 5.0 // matches prior-art pcb_chain.py's validated constant
   const totalAreaMm2 = components.reduce(
     (sum, c) => sum + (c.functionClass ? AREA_MM2_BY_CLASS[c.functionClass] ?? DEFAULT_AREA_MM2 : DEFAULT_AREA_MM2),
     0,
   )
   const rawSide = Math.sqrt(Math.max(totalAreaMm2, 1) * AREA_MULTIPLIER)
-  const side = Math.max(50, Math.min(250, Math.ceil(rawSide / 10) * 10))
+  const minSide = opts.isInstrumentSourceBoard ? 25 : 50
+  const maxSide = opts.isInstrumentSourceBoard ? 40 : 250
+  const roundTo = opts.isInstrumentSourceBoard ? 5 : 10
+  const side = Math.max(minSide, Math.min(maxSide, Math.ceil(rawSide / roundTo) * roundTo))
   const outline = createRoundedRectangleContour('board_outline', side, side, 3)
   const geometry: PcbBoardGeometry = {
     outline,
     cutouts: [],
     mountingHoles: [],
     source: 'derived',
-    sourceDetail:
-      `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
-      `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
-      'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
+    sourceDetail: opts.isInstrumentSourceBoard
+      ? `Phase B instrument optical source board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+        `over ${components.length} on-board components after COTS off-board filtering, clamped [25,40]mm, rounded to 5mm. ` +
+        'UI/controller/detector modules stay off-board COTS, so this outline represents the window-scale source board.'
+      : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+        `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
+        'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
   }
   const findings = validateBoardGeometry(geometry)
   if (findings.length) {
@@ -1004,7 +1029,11 @@ export function generateAtopileProject(
   const { nets, decouplingCaps } = buildNets(components, topology, footprintsRoot)
   const allComponents = [...components, ...decouplingCaps]
 
-  const boardOutline = computeBoardOutline(allComponents)
+  const boardOutline = computeBoardOutline(allComponents, {
+    isInstrumentSourceBoard:
+      instrumentDeviceContext(state, electronicWords) &&
+      hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents),
+  })
 
   mkdirSync(outDir, { recursive: true })
 

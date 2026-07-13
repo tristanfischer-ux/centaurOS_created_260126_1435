@@ -378,15 +378,38 @@ def scale_outline_segments(outline: dict, scale_x: float, scale_y: float) -> dic
                 seg[key] = scale_pt(seg[key])
     return scaled
 
+def _looks_like_compact_source_board(components: List[Component]) -> bool:
+    """Return true for source/driver-only board netlists, not controller motherboards."""
+    text = " ".join(f"{c.ref} {c.value} {c.footprint}" for c in components).lower()
+    has_source = bool(re.search(r"\b(led source|light source|optical source|source board|emitter|illumination|led driver)\b", text))
+    has_motherboard_roles = bool(re.search(r"\b(mcu|microcontroller|processor|controller|display|screen|detector|photodiode|sensor)\b", text))
+    return has_source and not has_motherboard_roles and len(components) <= 32
+
 def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path) -> Tuple[float, float]:
     total_area = 0.0
     for c in components:
         fp = parse_footprint(c.footprint, cfg, fp_root)
         total_area += fp.bbox_w * fp.bbox_h
     side = math.sqrt(max(total_area, 1.0) * cfg.component_area_multiplier)
-    side = max(cfg.board_min_size, min(cfg.board_max_size, side))
-    side = math.ceil(side / 10) * 10
+    if _looks_like_compact_source_board(components):
+        side = max(25.0, min(40.0, side))
+        side = math.ceil(side / 5) * 5
+    else:
+        side = max(cfg.board_min_size, min(cfg.board_max_size, side))
+        side = math.ceil(side / 10) * 10
     return side, side
+
+def selftest() -> None:
+    """proveCatch: compact optical/source boards are not forced to the old 50 mm floor."""
+    cfg = ChainConfig(project_dir=Path("/tmp/pcb-selftest"), run_dir=Path("/tmp/pcb-selftest"))
+    components = [Component("D1", "LED source", "LED_SMD:LED_0603_1608Metric")]
+    _footprint_cache.clear()
+    _footprint_cache[components[0].footprint] = FootprintData(bbox_w=1.6, bbox_h=0.8, resolved_from="fixture")
+    board_w, board_h = auto_board_size(components, cfg, Path("/tmp/unused"))
+    if not (25.0 <= board_w <= 40.0 and 25.0 <= board_h <= 40.0):
+        raise AssertionError(
+            f"compact source PCB should stay 25–40 mm, got {board_w:g}×{board_h:g} mm"
+        )
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
 #     autoplacer. Bounded to the board's own outline bbox with a margin >= the
@@ -936,6 +959,10 @@ def run(args) -> dict:
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        selftest()
+        print("pcb_pipeline_runner selftest: OK")
+        raise SystemExit(0)
     args = parse_args()
     r = run(args)
     sys.exit(0 if r["ok"] else 1)
