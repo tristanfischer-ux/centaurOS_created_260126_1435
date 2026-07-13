@@ -12264,14 +12264,19 @@ def _instrument_form_rule_mm(
         (dx + display_size[0] * 0.55, dy + display_size[1] * 0.45, btn_z),  # A
         (dx + display_size[0] * 0.55, dy - display_size[1] * 0.20, btn_z),  # B
     ]
-    # Square well + circular rim that seats the ambient-light cap.
+    # Cap parks at the FRONT-LEFT deck edge in a nest — accessory lid, not a centre knob.
+    # Flange+grip geometry comes from ifg.ambient_cap_parts_mm (desirability grammar).
     well_loc = (tx, ty, base_z + H + chamber_h + 1.2)
     well_size = (cuvette_outer * 0.95, cuvette_outer * 0.95, 4.0)
     rim_od = min(tw * 0.72, max(well_size[0] + 10.0, 20.0))
     rim_loc = (tx, ty, base_z + H + chamber_h + 0.8)
-    # Cap parks ON THE UI DECK beside the cube — never seated on the well in the
-    # product hero (a seated cap hides the square well that makes the object read).
-    cap_loc = (-W * 0.02, -D * 0.34, base_z + H + 5.5)
+    cap_parts = ifg.ambient_cap_parts_mm(rim_od)
+    cap_nest_loc = (-W * 0.28, -D * 0.36, base_z + H + 0.6)
+    cap_loc = (
+        cap_nest_loc[0],
+        cap_nest_loc[1],
+        base_z + H + ifg.CAP_NEST_DEPTH_MM + cap_parts["flange_h_mm"] / 2,
+    )
     # Cable channel: molded slot at the cube↔body joint on the operator-facing flank.
     cable_slot_loc = (
         tx - tw / 2 - 2.0,
@@ -12285,6 +12290,11 @@ def _instrument_form_rule_mm(
         (W * 0.08, -D * 0.32, base_z + H + 1.0),
         (W * 0.08, D * 0.28, base_z + H + 1.0),
     ]
+    status_led_loc = (
+        dx + display_size[0] * 0.42,
+        dy + display_size[1] * 0.55,
+        base_z + H + 1.4,
+    )
     return {
         "optical_path_mm": path,
         "tower_loc": tower_loc,
@@ -12295,8 +12305,16 @@ def _instrument_form_rule_mm(
         "rim_od_mm": rim_od,
         "rim_h_mm": 2.0,
         "cap_loc": cap_loc,
-        "cap_od_mm": rim_od * 0.92,
-        "cap_h_mm": 11.0,
+        "cap_nest_loc": cap_nest_loc,
+        "cap_nest_od_mm": cap_parts["flange_od_mm"] + ifg.CAP_NEST_CLEARANCE_MM,
+        "cap_nest_depth_mm": ifg.CAP_NEST_DEPTH_MM,
+        "cap_flange_od_mm": cap_parts["flange_od_mm"],
+        "cap_flange_h_mm": cap_parts["flange_h_mm"],
+        "cap_grip_od_mm": cap_parts["grip_od_mm"],
+        "cap_grip_h_mm": cap_parts["grip_h_mm"],
+        # Back-compat aggregate for older callers
+        "cap_od_mm": cap_parts["flange_od_mm"],
+        "cap_h_mm": cap_parts["total_h_mm"],
         "cable_slot_loc": cable_slot_loc,
         "cable_slot_size": cable_slot_size,
         "led_pcb_loc": (tx, tower_front_y, base_z + H + chamber_h * 0.42),
@@ -12310,8 +12328,10 @@ def _instrument_form_rule_mm(
         "screw_locs": screw_locs,
         "screw_head_diameter_mm": ifg.SCREW_HEAD_DIAMETER_MM,
         "screw_head_height_mm": ifg.SCREW_HEAD_HEIGHT_MM,
-        "step_shelf_loc": (tx, ty, base_z + H + 2.0),
-        "step_shelf_size": (tw * 1.12, td * 1.10, 4.0),
+        "step_shelf_loc": (tx, ty, base_z + H + ifg.STEP_SHELF_HEIGHT_MM / 2),
+        "step_shelf_size": (tw * 1.12, td * 1.10, ifg.STEP_SHELF_HEIGHT_MM),
+        "status_led_loc": status_led_loc,
+        "foot_locs": ifg.foot_locs_mm(W, D, base_z),
         "viewing_distance_mm": ifg.VIEWING_DISTANCE_MM_DESIGN,
     }
 
@@ -12368,16 +12388,22 @@ def _place_instrument_interior_layout(
 
     led_mat = fl.make_mat(
         "m_se_story_led", fl._to_linear(ifg.MAT_LED_EMIT),
-        metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=2.5)
+        metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=4.0)
     cuv_mat = fl.make_mat(
-        "m_se_story_cuvette", fl._to_linear((0.55, 0.72, 0.85)), metallic=0.05, roughness=0.12)
+        "m_se_story_cuvette", fl._to_linear(ifg.MAT_CUVETTE_WALL), metallic=0.05,
+        roughness=0.08, alpha=0.45)
+    fluid_mat = fl.make_mat(
+        "m_se_story_fluid", fl._to_linear(ifg.MAT_CUVETTE_FLUID), metallic=0.0,
+        roughness=0.2, kind="led_emissive", emission_strength=0.35)
     det_mat = fl.make_mat(
         "m_se_story_detector", fl._to_linear(ifg.MAT_DETECTOR), metallic=0.45, roughness=0.35)
     bench_mat = fl.make_mat(
         "m_se_story_bench", fl._to_linear(ifg.MAT_OPTICAL_BENCH), metallic=0.2, roughness=0.55)
+    baffle_mat = fl.make_mat(
+        "m_se_story_baffle", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.1, roughness=0.65)
     beam_mat = fl.make_mat(
         "m_se_story_beam", fl._to_linear(ifg.MAT_BEAM),
-        metallic=0.0, roughness=0.15, kind="led_emissive", emission_strength=1.4)
+        metallic=0.0, roughness=0.12, kind="led_emissive", emission_strength=3.2)
     pcb_mat = fl.make_mat(
         "m_se_story_pcb", fl._to_linear(ifg.MAT_FR4), metallic=0.1, roughness=0.38)
     chip_mat = fl.make_mat(
@@ -12386,6 +12412,10 @@ def _place_instrument_interior_layout(
         "m_se_story_cell", fl._to_linear(ifg.MAT_COIN_CELL), metallic=0.55, roughness=0.32)
     glass_mat = fl.make_mat(
         "m_se_story_glass", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
+    ribbon_mat = fl.make_mat(
+        "m_se_story_ribbon", fl._to_linear((0.55, 0.42, 0.12)), metallic=0.05, roughness=0.55)
+
+    n_story = 0
 
     # Optical bench floor inside the cube volume — horizontal read.
     bench_z = base_z + H * 0.22
@@ -12395,29 +12425,50 @@ def _place_instrument_interior_layout(
         _mm3((tw * 0.92, td * 0.92, 4.0)),
         bench_mat, module=story_mod, module_objects=MO)
     _bench.dimensions = _mm3((tw * 0.92, td * 0.92, 4.0))
+    n_story += 1
 
     # Transmittance axis along −Y (matches exterior source PCB on tower front).
-    optic_z = base_z + H + th * 0.38
-    src_y = ty - td * 0.28
-    det_y = ty + td * 0.28
+    optic_z = base_z + H + th * 0.42
+    src_y = ty - td * 0.32
+    det_y = ty + td * 0.32
     _led = fl.add_box(
         "u_se_instrument_story_led",
         _mm3((tx, src_y, optic_z)),
-        _mm3((max(10.0, path * 1.1), 3.0, max(10.0, path * 1.1))),
+        _mm3((max(12.0, path * 1.3), 4.0, max(12.0, path * 1.3))),
         led_mat, module=story_mod, module_objects=MO)
-    _led.dimensions = _mm3((max(10.0, path * 1.1), 3.0, max(10.0, path * 1.1)))
+    _led.dimensions = _mm3((max(12.0, path * 1.3), 4.0, max(12.0, path * 1.3)))
+    n_story += 1
+    cuv_h = min(th * 0.58, 30.0)
     _cuv = fl.add_box(
         "u_se_instrument_story_cuvette",
         _mm3((tx, ty, optic_z + 2.0)),
-        _mm3((cuvette_plan, cuvette_plan, min(th * 0.55, 28.0))),
+        _mm3((cuvette_plan, cuvette_plan, cuv_h)),
         cuv_mat, module=story_mod, module_objects=MO)
-    _cuv.dimensions = _mm3((cuvette_plan, cuvette_plan, min(th * 0.55, 28.0)))
+    _cuv.dimensions = _mm3((cuvette_plan, cuvette_plan, cuv_h))
+    n_story += 1
+    # Sample fluid — desirable cutaway shows the instrument *in use*.
+    _fluid = fl.add_box(
+        "u_se_instrument_story_fluid",
+        _mm3((tx, ty, optic_z + 1.0)),
+        _mm3((cuvette_plan * 0.72, cuvette_plan * 0.72, cuv_h * 0.55)),
+        fluid_mat, module=story_mod, module_objects=MO)
+    _fluid.dimensions = _mm3((cuvette_plan * 0.72, cuvette_plan * 0.72, cuv_h * 0.55))
+    n_story += 1
     _det = fl.add_box(
         "u_se_instrument_story_detector",
         _mm3((tx, det_y, optic_z)),
-        _mm3((max(8.0, path * 0.9), 4.0, max(8.0, path * 0.9))),
+        _mm3((max(10.0, path * 1.0), 3.2, max(10.0, path * 1.0))),
         det_mat, module=story_mod, module_objects=MO)
-    _det.dimensions = _mm3((max(8.0, path * 0.9), 4.0, max(8.0, path * 0.9)))
+    _det.dimensions = _mm3((max(10.0, path * 1.0), 3.2, max(10.0, path * 1.0)))
+    n_story += 1
+    # Detector carrier board (FR4) — density + honesty.
+    _det_pcb = fl.add_box(
+        "u_se_instrument_story_detector_pcb",
+        _mm3((tx, det_y + 2.2, optic_z)),
+        _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4))),
+        pcb_mat, module=story_mod, module_objects=MO)
+    _det_pcb.dimensions = _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4)))
+    n_story += 1
     beam_len = abs(det_y - src_y)
     _beam = fl.add_box(
         "u_se_instrument_story_beam",
@@ -12425,6 +12476,16 @@ def _place_instrument_interior_layout(
         _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM)),
         beam_mat, module=story_mod, module_objects=MO)
     _beam.dimensions = _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM))
+    n_story += 1
+    # Light baffles either side of the cuvette — real photometer interior language.
+    for _bi, _by in enumerate((ty - cuvette_plan * 0.55, ty + cuvette_plan * 0.55)):
+        _bf = fl.add_box(
+            f"u_se_instrument_story_baffle_{_bi}",
+            _mm3((tx, _by, optic_z)),
+            _mm3((tw * 0.55, 1.2, th * 0.35)),
+            baffle_mat, module=story_mod, module_objects=MO)
+        _bf.dimensions = _mm3((tw * 0.55, 1.2, th * 0.35))
+        n_story += 1
 
     # UI volume — main PCB under the display locus (left of cube).
     pcb_w = max(48.0, dw * 1.05)
@@ -12436,12 +12497,23 @@ def _place_instrument_interior_layout(
         _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM)),
         pcb_mat, module=story_mod, module_objects=MO)
     _pcb.dimensions = _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM))
+    n_story += 1
     for _ci, (_ox, _oy) in enumerate([(-0.28, 0.22), (0.18, -0.15), (0.30, 0.28)]):
         fl.add_box(
             f"u_se_instrument_story_chip_{_ci}",
             _mm3((dx + pcb_w * _ox, dy + 4.0 + pcb_d * _oy, pcb_z + 2.2)),
             _mm3((max(6.0, pcb_w * 0.16), max(5.0, pcb_d * 0.14), 2.0)),
             chip_mat, module=story_mod, module_objects=MO)
+        n_story += 1
+
+    # Flex ribbon PCB → display underside (structured interconnect, not empty air).
+    _rib = fl.add_box(
+        "u_se_instrument_story_ribbon",
+        _mm3((dx, dy + pcb_d * 0.15, (pcb_z + base_z + H - 1.2) / 2.0)),
+        _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z))),
+        ribbon_mat, module=story_mod, module_objects=MO)
+    _rib.dimensions = _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z)))
+    n_story += 1
 
     # Coin cell under the left UI deck (power for handheld instruments).
     fl.add_cyl(
@@ -12453,6 +12525,7 @@ def _place_instrument_interior_layout(
         module=story_mod, module_objects=MO,
         rotation=(math.radians(90), 0.0, 0.0),
     )
+    n_story += 1
 
     # Underside of the recessed display — dark glass reads from the cutaway.
     _glass = fl.add_box(
@@ -12461,11 +12534,17 @@ def _place_instrument_interior_layout(
         _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM)),
         glass_mat, module=story_mod, module_objects=MO)
     _glass.dimensions = _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM))
+    n_story += 1
 
     print(
-        "[univ][sealed] instrument interior: optical axis (source→cuvette→detector) "
-        "+ UI PCB + coin cell under display (form-aligned)"
+        f"[univ][sealed] instrument interior: optical axis + fluid + baffles + ribbon "
+        f"({n_story} story meshes, form-aligned)"
     )
+    if n_story < ifg.INTERIOR_MIN_STORY_MESHES:
+        print(
+            f"[univ][sealed] WARN interior density below desirability floor "
+            f"({n_story} < {ifg.INTERIOR_MIN_STORY_MESHES})"
+        )
     return form
 
 
@@ -12830,6 +12909,11 @@ def _selftest_instrument_form_rule() -> None:
     assert form["button_shape"] == "square"
     assert form["display_bezel_size"][0] > display_w
     assert form["screw_head_diameter_mm"] >= 2.5
+    assert form["cap_flange_od_mm"] > form["cap_grip_od_mm"], (
+        "ambient cap must be a lid (flange > grip), not a knob")
+    assert form["step_shelf_size"][2] >= ifg.STEP_SHELF_HEIGHT_MM * 0.85
+    assert ifg.desirability_silhouette_ok(H, tower_h, form["step_shelf_size"][2])
+    assert len(form["foot_locs"]) == 4
     assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30
     assert "00-hero" not in sealed_exterior_view_names(True), (
         "instrument cutaway hero must remain open so the interior story ships")
@@ -12912,12 +12996,15 @@ def _place_instrument_handheld_cues(
         _grip.dimensions = _mm3((tt * 0.55, D * 0.52, H * 0.38))
 
     form = _instrument_form_rule_mm(W, D, H, base_z, tt)
-    # vertical cuvette tower — the signature optical block, not a shallow top lump
+    # vertical cuvette tower — translucent on cutaway so the optical axis reads through
+    _tower_mat = fl.make_mat(
+        "m_se_cue_port", fl._to_linear(ifg.MAT_CUTAWAY_SHELL),
+        metallic=0.08, roughness=0.45, alpha=ifg.CUTAWAY_CUBE_ALPHA)
     _tower = fl.add_box(
         "u_se_cutaway_cue_cuvette_tower",
         _mm3(form["tower_loc"]),
         _mm3(form["tower_size"]),
-        port_mat,
+        _tower_mat,
         module=skin_mod,
         module_objects=MO,
     )
@@ -13771,8 +13858,6 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                    metallic=0.05, roughness=0.55)
             _screw_mat = fl.make_mat("m_se_face_screw", fl._to_linear(ifg.MAT_SCREW),
                                      metallic=0.55, roughness=0.35)
-            _cap_mat = fl.make_mat("m_se_face_cap", fl._to_linear(ifg.MAT_CAP),
-                                   metallic=0.05, roughness=0.58)
             # Bezel frames the glass (Rams) — slightly larger, sits under the active glass.
             _bezel = fl.add_box("u_se_exterior_detail_display_bezel",
                                 _mm3((form["top_display_loc"][0], form["top_display_loc"][1],
@@ -13831,16 +13916,38 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 module=_skin_mod, module_objects=MO,
             )
             _rim.hide_render = True
-            # Cap parks on the UI deck (product hero keeps the well readable).
-            _cap = fl.add_cyl(
-                "u_se_exterior_detail_ambient_cap",
+            # Cap nest + ambient lid (flange + grip) — accessory, not a centre knob.
+            _nest = fl.add_cyl(
+                "u_se_exterior_detail_cap_nest",
+                _mm3(form["cap_nest_loc"]),
+                (form["cap_nest_od_mm"] / 2.0) * fl.MM,
+                form["cap_nest_depth_mm"] * fl.MM,
+                fl.make_mat("m_se_face_nest", fl._to_linear((0.06, 0.062, 0.07)),
+                            metallic=0.05, roughness=0.7),
+                module=_skin_mod, module_objects=MO,
+            )
+            _nest.hide_render = True
+            _cap_mat = fl.make_mat("m_se_face_cap", fl._to_linear(ifg.MAT_CAP),
+                                   metallic=0.05, roughness=0.55)
+            _flange = fl.add_cyl(
+                "u_se_exterior_detail_ambient_cap_flange",
                 _mm3(form["cap_loc"]),
-                (form["cap_od_mm"] / 2.0) * fl.MM,
-                form["cap_h_mm"] * fl.MM,
+                (form["cap_flange_od_mm"] / 2.0) * fl.MM,
+                form["cap_flange_h_mm"] * fl.MM,
                 _cap_mat,
                 module=_skin_mod, module_objects=MO,
             )
-            _cap.hide_render = True
+            _flange.hide_render = True
+            _grip_z = form["cap_loc"][2] + form["cap_flange_h_mm"] / 2 + form["cap_grip_h_mm"] / 2
+            _grip = fl.add_cyl(
+                "u_se_exterior_detail_ambient_cap_grip",
+                _mm3((form["cap_loc"][0], form["cap_loc"][1], _grip_z)),
+                (form["cap_grip_od_mm"] / 2.0) * fl.MM,
+                form["cap_grip_h_mm"] * fl.MM,
+                _cap_mat,
+                module=_skin_mod, module_objects=MO,
+            )
+            _grip.hide_render = True
             # AM top-plate fasteners — readable at product scale.
             _scr = float(form.get("screw_head_diameter_mm", ifg.SCREW_HEAD_DIAMETER_MM)) / 2.0
             _sch = float(form.get("screw_head_height_mm", ifg.SCREW_HEAD_HEIGHT_MM))
@@ -13851,6 +13958,30 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     _scr * fl.MM,
                     _sch * fl.MM,
                     _screw_mat,
+                    module=_skin_mod, module_objects=MO,
+                ).hide_render = True
+            # Status LED — tiny "alive" cue beside the glass.
+            _led_st = fl.make_mat(
+                "m_se_face_status", fl._to_linear(ifg.MAT_STATUS_LED),
+                metallic=0.0, roughness=0.25, kind="led_emissive", emission_strength=1.5)
+            fl.add_cyl(
+                "u_se_exterior_detail_status_led",
+                _mm3(form["status_led_loc"]),
+                (ifg.STATUS_LED_DIAMETER_MM / 2.0) * fl.MM,
+                1.2 * fl.MM,
+                _led_st,
+                module=_skin_mod, module_objects=MO,
+            ).hide_render = True
+            # Rubber feet — desirable handhelds sit, they don't float.
+            _foot_mat = fl.make_mat(
+                "m_se_face_foot", fl._to_linear(ifg.MAT_RUBBER_FOOT), metallic=0.0, roughness=0.85)
+            for _fi, _floc in enumerate(form["foot_locs"]):
+                fl.add_cyl(
+                    f"u_se_exterior_detail_foot_{_fi}",
+                    _mm3(_floc),
+                    (ifg.FOOT_DIAMETER_MM / 2.0) * fl.MM,
+                    ifg.FOOT_HEIGHT_MM * fl.MM,
+                    _foot_mat,
                     module=_skin_mod, module_objects=MO,
                 ).hide_render = True
             # Source PCB + harness on the optical-axis face (closed exterior).

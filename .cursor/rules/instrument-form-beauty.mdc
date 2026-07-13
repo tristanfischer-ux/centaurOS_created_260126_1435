@@ -98,10 +98,28 @@ Do not close `00-hero` for instruments — that hides the interior and defeats t
 | Closed vs cutaway views | `scripts/lib/render_view_contract.py` → `sealed_exterior_view_names` |
 | Vision rubric | `scripts/lib/render_vision_critic.py` → `_INSTRUMENT_PROMPT` |
 
+## 9. Desirability grammar (what makes it a *wanted* object)
+
+These are universal — every `isInstrumentDevice` product, not colorimeter-named:
+
+| Rule | Forced form |
+|---|---|
+| **Silhouette hierarchy** | Optical cube height ≥ 55% of body H; L-step shelf ≥ 8 mm under the cube |
+| **Accessory ≠ control** | Ambient cap = flange lid + narrower grip (never a single knob cylinder) |
+| **Cap nest** | Shallow deck recess so the parked lid belongs; park at deck edge, not HMI centre |
+| **A-surface deck** | Top operating plane slightly lighter than body polymer |
+| **Rubber feet** | Four inset soft feet — product sits, not floats |
+| **Alive cue** | Tiny status LED beside the glass |
+| **Cutaway density** | ≥8 distinct story meshes; thick emissive beam; cuvette shows sample fluid |
+| **Cutaway transparency** | Optical-cube cue is translucent so the beam reads through |
+| **Thumbnail test** | At Excel-gallery size: cube, glass, keys, and optical axis still parse |
+
+Gold photos remain the TRAINING check for these reasons — never a silhouette paste.
+
 ## Checklist before shipping an instrument hero set
 
-- [ ] Exterior: L-body, chunky cube, open well + rim, deck-parked cap, cable-channel loom
-- [ ] Exterior: dark glass + bezel, square finger-sized keys, visible screws
-- [ ] Interior cutaway (`00-hero`): source → cuvette → detector + PCB + cell, one composition
-- [ ] Materials honest (no FR4-as-screen on closed views)
-- [ ] Would a competent designer call this quiet and inevitable? If no → fix the rule, not the one render
+- [ ] Exterior: L-body + readable step, chunky cube, open well + rim, **lid-shaped** parked cap in nest
+- [ ] Exterior: dark glass + bezel, square finger-sized keys, visible screws, rubber feet, status LED
+- [ ] Interior cutaway (`00-hero`): source → bright beam → cuvette(+fluid) → detector + PCB + cell
+- [ ] Materials honest (no FR4-as-screen on closed views; cap darker than deck)
+- [ ] Would someone want this on their bench? If no → fix the **rule**, not one render
