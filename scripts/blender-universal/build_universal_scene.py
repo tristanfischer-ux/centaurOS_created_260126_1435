@@ -12450,32 +12450,54 @@ def _instrument_source_harness_spec(
 ) -> dict:
     """Short source-board harness geometry for sealed optical instruments.
 
-    INTENT: an optical source PCB on the sample-chamber face is not decorative;
-    it needs power/control conductors back into the enclosure. Keep the run
-    device-scale and tied to the source board/enclosure anchors, not plant wiring.
+    INTENT: the optical SOURCE PCB on the chamber face is powered/controlled from
+    inside the enclosure — conductors must leave the board and ENTER the body
+    (through a top-deck grommet at the chamber base). Not a decorative stub into
+    empty air, and not a plant tray run.
     """
     led_x, led_y, led_z = form["led_pcb_loc"]
     led_w, led_d, led_h = form["led_pcb_size"]
-    start_y = led_y + led_d / 2 + 0.35
-    end_x = min(W / 2 - tt * 0.75, led_x + 28.0)
-    end_y = led_y + min(8.0, max(4.0, D * 0.035))
-    offsets = (-0.26, -0.08, 0.10, 0.28)
+    tw, td, th = form["tower_size"]
+    tx, ty, tz = form["tower_loc"]
+    # Leave the board at its enclosure-facing edge (board sits on chamber FRONT;
+    # +Y is toward the tower body / product centre).
+    board_back_y = led_y + led_d / 2 + 0.25
+    # Enter the main enclosure through the TOP DECK beside the chamber base —
+    # that is the physical path a handheld optical module actually uses.
+    port_x = tx - tw * 0.55
+    port_y = ty - td * 0.10
+    port_z = base_z + H + 1.2
+    offsets = (-0.22, -0.07, 0.08, 0.23)
+    # Distinct conductor colours (power/gnd/signal) — universal harness language.
+    colours = (
+        (0.72, 0.08, 0.08),  # power
+        (0.06, 0.06, 0.07),  # gnd
+        (0.85, 0.70, 0.12),  # signal A
+        (0.12, 0.28, 0.72),  # signal B
+    )
     strands = []
     for i, z_frac in enumerate(offsets):
-        z_offset = led_h * z_frac
+        z0 = led_z + led_h * z_frac
+        start = (led_x + led_w * 0.42, board_back_y, z0)
+        mid = (port_x + (led_x - port_x) * 0.35, board_back_y + 2.0, (z0 + port_z) * 0.55)
+        end = (port_x, port_y, port_z + (i - 1.5) * 0.9)
         strands.append({
             "name": f"u_se_exterior_detail_source_harness_{i}",
-            "start": (led_x + led_w * (-0.24 + i * 0.16), start_y, led_z + z_offset),
-            "mid": (led_x + (end_x - led_x) * 0.55, start_y + 3.0, led_z + z_offset * 0.72),
-            "end": (end_x, end_y, led_z + z_offset * 0.52),
+            "start": start,
+            "mid": mid,
+            "end": end,
+            "rgb": colours[i],
         })
     return {
         "source_anchor": "u_se_exterior_detail_led_pcb",
-        "enclosure_anchor": "u_se_product_right",
+        "enclosure_anchor": "u_se_product_top",
         "port_name": "u_se_exterior_detail_source_harness_port",
-        "port_loc": (end_x + tt * 0.18, end_y, led_z),
-        "port_size": (max(4.0, tt * 0.75), 2.8, min(max(7.0, led_h * 0.42), H * 0.18)),
+        "port_loc": (port_x, port_y, port_z),
+        "port_size": (5.5, 5.5, 2.4),
         "strands": strands,
+        # proveCatch anchors: harness starts on the source board and ends at the deck.
+        "board_back_y": board_back_y,
+        "deck_z": base_z + H,
     }
 
 
@@ -12490,13 +12512,11 @@ def _place_instrument_source_harness(
     MO: dict,
     hide_render: bool = True,
 ) -> dict:
-    """Draw a visible short cable/ribbon from the exterior source PCB into the body."""
+    """Draw a visible short cable from the exterior source PCB into the body."""
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     spec = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
-    cable_mat = fl.make_mat(
-        "m_se_source_harness", fl._to_linear((0.025, 0.025, 0.03)), metallic=0.0, roughness=0.66)
     port_mat = fl.make_mat(
         "m_se_source_harness_port", fl._to_linear((0.045, 0.048, 0.055)), metallic=0.25, roughness=0.42)
     port = fl.add_box(
@@ -12511,10 +12531,16 @@ def _place_instrument_source_harness(
     port.hide_render = hide_render
     port["geometry_source"] = "instrument_source_harness_port"
     for strand in spec["strands"]:
+        cable_mat = fl.make_mat(
+            f"m_{strand['name']}",
+            fl._to_linear(strand["rgb"]),
+            metallic=0.0,
+            roughness=0.62,
+        )
         obj = fl.add_pipe(
             strand["name"],
             [_mm3(strand["start"]), _mm3(strand["mid"]), _mm3(strand["end"])],
-            radius=0.75 * fl.MM,
+            radius=0.7 * fl.MM,
             material=cable_mat,
             module=module,
             module_objects=MO,
@@ -12526,6 +12552,25 @@ def _place_instrument_source_harness(
             obj["source_anchor"] = spec["source_anchor"]
             obj["enclosure_anchor"] = spec["enclosure_anchor"]
     return spec
+
+
+def _selftest_instrument_source_harness() -> None:
+    """proveCatch: source harness leaves the LED board and enters the top deck."""
+    W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
+    spec = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
+    assert len(spec["strands"]) >= 3, "source board must show a multi-conductor harness"
+    led_x, led_y, led_z = form["led_pcb_loc"]
+    led_w, led_d, led_h = form["led_pcb_size"]
+    for strand in spec["strands"]:
+        sx, sy, sz = strand["start"]
+        ex, ey, ez = strand["end"]
+        assert abs(sx - led_x) <= led_w * 0.6 + 1e-6, "harness must start on the source board"
+        assert sy >= led_y + led_d / 2 - 1e-6, "harness must leave the enclosure-facing board edge"
+        assert ez <= base_z + H + 8.0, "harness must enter near the top deck, not float in air"
+        assert ex < led_x, "harness must run toward the enclosure (away from outer chamber face)"
+    assert spec["deck_z"] == base_z + H
+    assert spec["source_anchor"].endswith("led_pcb")
 
 
 def _place_instrument_ui_pcb(
@@ -12844,19 +12889,20 @@ def _selftest_instrument_colorimeter_form_rule() -> None:
     harness = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
     assert harness["source_anchor"] == "u_se_exterior_detail_led_pcb", (
         "harness must explicitly originate at the exterior LED/source PCB")
-    assert harness["enclosure_anchor"] == "u_se_product_right", (
-        "harness must explicitly terminate at the enclosure side port/cutout")
+    assert harness["enclosure_anchor"] == "u_se_product_top", (
+        "harness must enter the enclosure through the top deck at the chamber base")
     assert 3 <= len(harness["strands"]) <= 5, (
-        "instrument source harness must render as a short multi-strand cable/ribbon")
+        "instrument source harness must render as a short multi-strand cable")
     for strand in harness["strands"]:
         sx, sy, sz = strand["start"]
         ex, ey, ez = strand["end"]
         length = math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2 + (ez - sz) ** 2)
-        assert 20.0 <= length <= 40.0, (
-            f"source PCB harness must be device-scale (20–40 mm), got {length:.1f} mm")
-        assert abs(sx - led_x) <= led_w * 0.42 and abs(sz - led_z) <= led_h * 0.42, (
-            "harness strand must start on the LED/source PCB back face")
-        assert ex > W * 0.36, "harness strand must disappear into the enclosure side port"
+        assert 8.0 <= length <= 55.0, (
+            f"source PCB harness must be device-scale, got {length:.1f} mm")
+        assert abs(sx - led_x) <= led_w * 0.6 + 1e-6, (
+            "harness strand must start on the LED/source PCB")
+        assert ez <= base_z + H + 8.0 and ex < led_x, (
+            "harness must run into the enclosure top deck, not float outward")
 
 
 def _place_instrument_manifest_proxies(
@@ -19771,6 +19817,7 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
         _selftest_instrument_colorimeter_form_rule()
+        _selftest_instrument_source_harness()
         print("build_universal_scene _selftest: OK (instrument proxy geometry + colorimeter form rule)")
     else:
         main()
