@@ -1129,6 +1129,7 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     # featureless grey box (2026-07-13).
     _HERO_MAT_EXEMPT_PREFIXES = (
         "u_se_instrument_story_", "u_se_product_", "u_se_exterior_detail_",
+        "u_se_cutaway_cue_",
     )
     hero_snap = {}
     for obj in structure_objs:

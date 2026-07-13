@@ -11983,6 +11983,8 @@ def _prepare_sealed_product_view(view_name, entering):
             obj.hide_render = False
         if obj.name.startswith("u_se_exterior_detail_"):
             obj.hide_render = True
+        if obj.name.startswith("u_se_cutaway_cue_"):
+            obj.hide_render = False
         if obj.name.startswith("u_se_instrument_story_"):
             obj.hide_render = False
     if _SEALED_CUTAWAY_MATERIAL is not None:
@@ -11999,6 +12001,8 @@ def _prepare_sealed_product_view(view_name, entering):
                 obj.hide_render = True
             if obj.name.startswith("u_se_exterior_detail_"):
                 obj.hide_render = False
+            if obj.name.startswith("u_se_cutaway_cue_"):
+                obj.hide_render = True
             if obj.name.startswith("u_se_instrument_story_"):
                 obj.hide_render = True
         if _SEALED_EXTERIOR_MATERIAL is not None:
@@ -12199,10 +12203,123 @@ def _place_instrument_zone_story(
         print(f"[univ][sealed] instrument story: display + buttons")
 
 
+def _place_instrument_handheld_cues(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    body_mat,
+    panel_mat,
+    skin_mod: str,
+    MO: dict,
+) -> None:
+    """Exterior silhouette cues visible on the CUTAWAY hero — grip, port hood, bezel.
+
+    u_se_exterior_detail_* hides on cutaway (closed views only). These read at
+    thumbnail scale so a landscape instrument does not look like a bare box."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    grip_mat = fl.make_mat(
+        "m_se_cue_grip", fl._to_linear((0.07, 0.075, 0.09)), metallic=0.05, roughness=0.72)
+    port_mat = fl.make_mat(
+        "m_se_cue_port", fl._to_linear((0.22, 0.24, 0.27)), metallic=0.3, roughness=0.42)
+    bore_mat = fl.make_mat(
+        "m_se_cue_bore", fl._to_linear((0.01, 0.01, 0.02)), metallic=0.0, roughness=0.9)
+    bezel_mat = fl.make_mat(
+        "m_se_cue_bezel", fl._to_linear((0.14, 0.15, 0.17)), metallic=0.12, roughness=0.48)
+    lip_mat = fl.make_mat(
+        "m_se_cue_lip", fl._to_linear((0.10, 0.105, 0.12)), metallic=0.08, roughness=0.58)
+
+    # palm grips — inset channels on the long sides (landscape W > D)
+    for _side, _sx in (("left", -1.0), ("right", 1.0)):
+        _grip = fl.add_box(
+            f"u_se_cutaway_cue_grip_{_side}",
+            _mm3((_sx * (W / 2 - tt * 0.82), 0.0, base_z + H * 0.48)),
+            _mm3((tt * 0.55, D * 0.52, H * 0.38)),
+            grip_mat,
+            module=skin_mod,
+            module_objects=MO,
+        )
+        _grip.dimensions = _mm3((tt * 0.55, D * 0.52, H * 0.38))
+
+    # cuvette / optical port hood — raised block on the top-right (gold unit signature)
+    _hood = fl.add_box(
+        "u_se_cutaway_cue_port_hood",
+        _mm3((W * 0.26, D * 0.06, base_z + H + H * 0.09)),
+        _mm3((W * 0.26, D * 0.40, H * 0.20)),
+        port_mat,
+        module=skin_mod,
+        module_objects=MO,
+    )
+    _hood.dimensions = _mm3((W * 0.26, D * 0.40, H * 0.20))
+    _bore = fl.add_cyl(
+        "u_se_cutaway_cue_port_bore",
+        _mm3((W * 0.26, D * 0.06, base_z + H + H * 0.15)),
+        6.0 * fl.MM,
+        H * 0.11 * fl.MM,
+        bore_mat,
+        module=skin_mod,
+        module_objects=MO,
+    )
+
+    # front bezel — display window frame on the open cutaway lip (reads as an instrument face)
+    _lip_y = -D / 2 + tt * 0.4
+    _bezel = fl.add_box(
+        "u_se_cutaway_cue_bezel",
+        _mm3((-W * 0.14, _lip_y, base_z + H * 0.54)),
+        _mm3((W * 0.52, tt * 1.4, H * 0.56)),
+        bezel_mat,
+        module=skin_mod,
+        module_objects=MO,
+    )
+    _bezel.dimensions = _mm3((W * 0.52, tt * 1.4, H * 0.56))
+    # button cluster pads on the bezel (right of the display cutout)
+    _pad_mat = fl.make_mat(
+        "m_se_cue_pad", fl._to_linear((0.18, 0.19, 0.22)), metallic=0.2, roughness=0.5)
+    for _pi, (_px, _pz) in enumerate([(0.28, 0.70), (0.28, 0.38), (0.20, 0.54), (0.36, 0.54)]):
+        fl.add_cyl(
+            f"u_se_cutaway_cue_pad_{_pi}",
+            _mm3((W * _px, _lip_y - tt * 0.3, base_z + H * _pz)),
+            3.2 * fl.MM,
+            2.0 * fl.MM,
+            _pad_mat,
+            module=skin_mod,
+            module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        )
+
+    # chin lip — angled shelf at the bottom front (handheld ergonomics, not a flat cube base)
+    _chin = fl.add_box(
+        "u_se_cutaway_cue_chin",
+        _mm3((0.0, _lip_y, base_z + H * 0.10)),
+        _mm3((W * 0.78, tt * 2.0, H * 0.14)),
+        lip_mat,
+        module=skin_mod,
+        module_objects=MO,
+    )
+    _chin.dimensions = _mm3((W * 0.78, tt * 2.0, H * 0.14))
+
+    # top-front corner fillets — break the rectangular prism silhouette
+    for _ci, (_cx, _cy) in enumerate([(-W * 0.44, -D * 0.42), (W * 0.44, -D * 0.42)]):
+        fl.add_box(
+            f"u_se_cutaway_cue_corner_{_ci}",
+            _mm3((_cx, _cy, base_z + H - H * 0.08)),
+            _mm3((W * 0.10, D * 0.10, H * 0.14)),
+            panel_mat,
+            module=skin_mod,
+            module_objects=MO,
+        )
+
+    print("[univ][sealed] instrument cutaway cues: grips + port hood + bezel + chin")
+
+
 _INSTRUMENT_MESH_KEEP_PREFIXES = (
     "u_se_instrument_story_",
     "u_se_product_",
     "u_se_exterior_detail_",
+    "u_se_cutaway_cue_",
     "u_skid_encl_",
 )
 
@@ -12643,14 +12760,19 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # across the top fifth (product identity + the vent field), so the pack and
         # electronics below it are seen DIRECTLY, one translucent side wall at most.
         tt = max(6.0, min(W, D) * 0.02)
-        for bnm, bloc, bsize in [
+        _top_w = W * (0.93 if _IS_INSTRUMENT_DEVICE else 1.0)
+        _top_d = D * (0.88 if _IS_INSTRUMENT_DEVICE else 1.0)
+        _shell_panels = [
             ("u_se_product_back",   (0.0, D / 2 - tt / 2, base_z + H / 2), (W, tt, H)),
             ("u_se_product_left",   (-W / 2 + tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
             ("u_se_product_right",  (W / 2 - tt / 2, 0.0, base_z + H / 2), (tt, D, H)),
-            ("u_se_product_top",    (0.0, 0.0, base_z + H - tt / 2), (W, D, tt)),
+            ("u_se_product_top",    (0.0, 0.0, base_z + H - tt / 2), (_top_w, _top_d, tt)),
             ("u_se_product_bottom", (0.0, 0.0, base_z + tt / 2), (W, D, tt)),
-            ("u_se_product_band",   (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)),
-        ]:
+        ]
+        if not _IS_INSTRUMENT_DEVICE:
+            _shell_panels.append(
+                ("u_se_product_band", (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)))
+        for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
             _ob.dimensions = _mm3(bsize)
@@ -12675,24 +12797,27 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         _SEALED_FRONT_COVER.hide_render = True
         if _IS_INSTRUMENT_DEVICE:
             # stepped upper deck — narrower control/optical top (handheld read, not a cube)
-            _deck_h = H * 0.20
+            _deck_h = H * 0.22
             _deck = fl.add_box(
                 "u_se_product_deck",
-                _mm3((0.0, 0.0, base_z + H - _deck_h / 2)),
-                _mm3((W * 0.90, D * 0.86, _deck_h)),
+                _mm3((0.0, D * 0.02, base_z + H - _deck_h / 2)),
+                _mm3((W * 0.86, D * 0.82, _deck_h)),
                 panel_mat,
                 module=_skin_mod,
                 module_objects=MO,
             )
-            _deck.dimensions = _mm3((W * 0.90, D * 0.86, _deck_h))
+            _deck.dimensions = _mm3((W * 0.86, D * 0.82, _deck_h))
             _SEALED_SHELL_OBJECTS.append(_deck)
+            _bevel_frac = 0.12
             for _ob in list(_SEALED_SHELL_OBJECTS):
                 if _ob and getattr(_ob, "type", None) == "MESH":
                     _bv = _ob.modifiers.get("instrument_bevel")
                     if _bv is None:
                         _bv = _ob.modifiers.new(name="instrument_bevel", type="BEVEL")
-                    _bv.width = min(W, D) * 0.08 * fl.MM
-                    _bv.segments = 4
+                    _bv.width = min(W, D) * _bevel_frac * fl.MM
+                    _bv.segments = 5
+            _place_instrument_handheld_cues(
+                W, D, H, base_z, tt, body_mat, panel_mat, _skin_mod, MO)
         _exterior_detail_mat = fl.make_mat(
             "m_se_exterior_detail",
             fl._to_linear((0.55, 0.58, 0.61)),
