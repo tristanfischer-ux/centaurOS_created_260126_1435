@@ -146,3 +146,13 @@ Instrument ontology keystone (`eef5928ef`), ledger-wiring + optical metrics (`6f
 **BOARD GATE:** run 2137 harvested these into `out/colorimeter-board.json`; the loop gate now BLOCKS re-launch until each is dispositioned (`python3 scripts/lib/loop_board.py dispose <id> ...`). Disposition the fixed ones (render, cost) + route the open ones before the next full run.
 
 **ANTI-FALSE-SCORING held:** every 0 is a REAL routed defect (or an honest floor-mirror), never NA-dodged. The out-of-scope NAs (Electrical/Line&velocity/Process schedules) each carry a VERIFIED checkable claim ("single-board handheld — no plant electrical distribution").
+
+### §8b — 2026-07-13 continuation: topology FIXED + device-power-load bug found
+
+**Connection-trace — FIXED** (commit `496765a22`): added `power_protection` + `indicator` roles to derive-topology.ts (mirrored in parts_ledger.py). DC Input Fuse et al. now wired source→protection→rail; Power Indicator LED is a rail LOAD (not an orphan optical source). Unit-validated (standalone deriveInstrumentTopology on run-2137 modules: fuse+LED no longer orphaned, edges 30→47) + regression-harness proveCatch (5 new cases pass, plant still 0 edges). End-to-end validated by the running chain `out/colorimeter-20260713-0358` (regenerates connection-schedule.json).
+
+**All 36 board defects dispositioned** (6 `fixed`: cost×4 + topology×2; 30 `classified`: NA-verified×3, floor-mirrors×2, pass-notes×6, open-routed×19). Board gate re-opened → validation run `0358` launched with render+cost+topology baked in.
+
+**NEXT DEVICE-SCALE BUG (found, not yet fixed): power load = 1001 kW.** `total_supply_demand_kw = 1000.995` (alias of `connected_electrical_load_kw`) — a handheld colorimeter draws ~1-5 W, not 1001 kW. Drives the redteam "PANEL SCHEDULE 63.40 kW total connected load" + "DC-DC 0.00 kW" findings + a wrong Electrical panel. SOURCE: `engineering-contract.ts` connected_electrical_load_kw derivation (line ~1310 is the BESS aux-panel path; the optical_instrument path lands 1001 kW — likely a plant default/fallback). FIX: on isInstrumentDevice, connected_electrical_load_kw = Σ actual device consumer watts (LED source, MCU, display, detector AFE, regulator quiescent) = a few W, so the panel schedule + Electrical read device-scale. proveCatch: assert load < 0.1 kW for a device-scale instrument.
+
+**Committed this continuation:** `496765a22` (topology). Prior tonight: `6e6b09e8f` (render), `3473e877b` (cost), + docs.
