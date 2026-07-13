@@ -192,3 +192,31 @@ benchmark re-run), PCB 2.5, Part names 3.5, Renders 4, then BoM/Calc 7, Assembly
 
 **5 universal fixes tonight:** render `6e6b09e8f`, cost `3473e877b`, topology `496765a22`,
 power-load `21007d36c`, connectivity `640aec74a`. All device-gated, plant byte-identical.
+
+### §8e — 2026-07-13 MPN wrong-family guard (Grok help) + chain 0717 baking all 9 fixes
+
+**Grok's key reframe:** the MPN gap was NOT mainly "empty DB" — the emitter VERIFIED WRONG-FAMILY
+parts (MAX35104 flow-TDC as ADC, Banner S22 industrial tower as status-LED, Schneider NSX MCCB
+as device overcurrent) while the right parts (TSL2591=Adafruit 1980, ~200 Adafruit rows) sat
+unused. **Fixed (b1576678f + 3d46bd4b9):** dbHitAcceptableForWord rejects industrial vendors /
+switchgear classes / flow-TDC-on-ADC on a device instrument → slot falls to honest-TBD or the
+correct board part. proveCatch in emitter-mispin-selftest.ts (PASSES; flag-gated, no plant
+regression). ORDERING TRAP recorded: isInstrumentDevice is set AFTER emitter completion, so the
+guard derives the device signal from enclosure_volume<1 + non-plant class at emitter time.
+
+**Chain `out/colorimeter-20260713-0717` launched** (fresh cache, PCB_STAGE=1) — bakes ALL 9
+committed fixes into one dossier: render (landscape+face+DARK charcoal shell) · device cost
+ceiling · topology roles · power-load anchor · connectivity-from-topology · MPN wrong-family
+guard. Re-runs gate-36 (cost). 15 prior board defects AUTO-RESOLVED on re-assemble (fixes
+confirmed genuine).
+
+**9 UNIVERSAL COMMITS this session:** 6e6b09e8f render · 3473e877b cost · 496765a22 topology ·
+21007d36c power · 640aec74a connectivity · 223def03b dark-shell · b1576678f + 3d46bd4b9 MPN-guard.
+All device-gated, plants byte-identical.
+
+**STILL OPEN after 0717 (routed):** (1) Grok #2 — SEED the live-verified optical pack via ingest
+(OPT101/BPW34 photodiode, OPA380 TIA, ADS1120 ADC, ATSAMD51 MCU) so freed slots resolve to REAL
+board MPNs → BoM/PCB/Part-names clear. (2) Grok #3 — prefer COTS disposition (PyBadge+TSL2591+LED
+module). (3) Interior render optical-bench geometry (Renders). (4) Cost tighten if gate-36 still
+radical. (5) Near-miss tabs: Calculations device-calc leak ("container count"/"Junction temp"),
+Quantities provenance, Assembly steps.
