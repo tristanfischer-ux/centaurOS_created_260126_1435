@@ -12430,15 +12430,25 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # can see through it") — the zone-stacked internals read through a glassy skin,
         # the classic engineering-marketing cutaway. alpha 0.30: solid enough to give
         # the product its silhouette, open enough to show the pack/inverter/controls.
-        body_mat = fl.make_mat("m_se_product", fl._to_linear((0.85, 0.88, 0.92)),
-                               metallic=0.05, roughness=0.25)
-        panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear((0.84, 0.86, 0.88)),
+        # SHELL ALBEDO (2026-07-13): a device-scale optical INSTRUMENT is a MATTE DARK
+        # 3D-printed enclosure (the gold Open Colorimeter is charcoal), NOT the white
+        # injection-moulded look of a wall appliance. Keyed on the instrument flag so a
+        # Powerwall / wall product keeps its white body (Tesla-white, run 79 = 9.3).
+        if _IS_INSTRUMENT_DEVICE:
+            _body_rgb, _panel_rgb, _ext_rgb = (0.11, 0.115, 0.13), (0.09, 0.095, 0.11), (0.10, 0.105, 0.12)
+            _body_rough, _ext_rough = 0.62, 0.66  # matte 3D-printed polymer
+        else:
+            _body_rgb, _panel_rgb, _ext_rgb = (0.85, 0.88, 0.92), (0.84, 0.86, 0.88), (0.82, 0.85, 0.88)
+            _body_rough, _ext_rough = 0.25, 0.32
+        body_mat = fl.make_mat("m_se_product", fl._to_linear(_body_rgb),
+                               metallic=0.05, roughness=_body_rough)
+        panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear(_panel_rgb),
                                 metallic=0.05, roughness=0.45)
         exterior_mat = fl.make_mat(
             "m_se_product_exterior",
-            fl._to_linear((0.82, 0.85, 0.88)),
+            fl._to_linear(_ext_rgb),
             metallic=0.08,
-            roughness=0.32,
+            roughness=_ext_rough,
         )
         _SEALED_CUTAWAY_MATERIAL = body_mat
         _SEALED_EXTERIOR_MATERIAL = exterior_mat
