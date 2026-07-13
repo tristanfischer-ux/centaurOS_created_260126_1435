@@ -11995,7 +11995,7 @@ def _sealed_product_camera_specs(env_mm):
     _fa = 1.5  # render frame aspect (3000×2000)
     # instrument devices carry a cuvette/optical port that protrudes ~0.4·H above the
     # top — inflate the vertical extent so the port is not cropped out of frame.
-    _h_eff = h * (1.42 if _IS_INSTRUMENT_DEVICE else 1.0)
+    _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
     _ctrl = max(_h_eff, w / _fa, d / _fa)
     front_distance = perspective_distance_for_extent(
         _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
@@ -12008,8 +12008,12 @@ def _sealed_product_camera_specs(env_mm):
             "name": "04-product-exterior",
             "loc": (centre[0] + front_distance * 0.18,
                     centre[1] - front_distance,
-                    centre[2] + h * 0.12),
-            "target": centre,
+                    centre[2] + h * (1.40 if _IS_INSTRUMENT_DEVICE else 0.12)),
+            "target": (
+                centre[0],
+                centre[1],
+                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+            ),
             "camera_type": "PERSP",
             "focal": 62,
         },
@@ -12017,8 +12021,12 @@ def _sealed_product_camera_specs(env_mm):
             "name": "05-product-left",
             "loc": (centre[0] - side_distance * 0.42,
                     centre[1] - side_distance * 0.90,
-                    centre[2] + h * 0.10),
-            "target": centre,
+                    centre[2] + h * (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)),
+            "target": (
+                centre[0],
+                centre[1],
+                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+            ),
             "camera_type": "PERSP",
             "focal": 58,
         },
@@ -12026,8 +12034,12 @@ def _sealed_product_camera_specs(env_mm):
             "name": "06-product-right",
             "loc": (centre[0] + side_distance * 0.42,
                     centre[1] - side_distance * 0.90,
-                    centre[2] + h * 0.10),
-            "target": centre,
+                    centre[2] + h * (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)),
+            "target": (
+                centre[0],
+                centre[1],
+                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+            ),
             "camera_type": "PERSP",
             "focal": 58,
         },
@@ -12161,6 +12173,43 @@ def _import_family_cad(
     return obj
 
 
+def _instrument_form_rule_mm(W: float, D: float, H: float, base_z: float, tt: float) -> dict:
+    """Pure Open-Colorimeter-class form rule for sealed optical instruments.
+
+    INTENT: instrument devices are wide, flat handhelds with a raised cuvette tower,
+    top-deck UI, and a small external LED module on the tower face. They must never
+    inherit the sealed-cabinet front-door / interior-board visual language.
+    """
+    tower_w = W * 0.28
+    tower_d = D * 0.44
+    tower_h = H * 0.86
+    tower_loc = (W * 0.27, D * 0.06, base_z + H + tower_h / 2)
+    tower_front_y = tower_loc[1] - tower_d / 2 - max(1.2, tt * 0.25)
+    return {
+        "tower_loc": tower_loc,
+        "tower_size": (tower_w, tower_d, tower_h),
+        "well_loc": (tower_loc[0], tower_loc[1], base_z + H + tower_h + 1.6),
+        "well_size": (tower_w * 0.44, tower_d * 0.34, 3.2),
+        "led_pcb_loc": (tower_loc[0], tower_front_y, base_z + H + tower_h * 0.42),
+        "led_pcb_size": (tower_w * 0.78, 2.4, tower_h * 0.36),
+        "top_display_loc": (-W * 0.18, -D * 0.08, base_z + H + 1.4),
+        "top_display_size": (W * 0.44, D * 0.34, 2.8),
+        "button_locs": [
+            (W * -0.42, -D * 0.25, base_z + H + 2.6),
+            (W * -0.37, -D * 0.18, base_z + H + 2.6),
+            (W * -0.47, -D * 0.18, base_z + H + 2.6),
+            (W * 0.08, -D * 0.24, base_z + H + 2.6),
+            (W * 0.15, -D * 0.18, base_z + H + 2.6),
+            (W * 0.22, -D * 0.24, base_z + H + 2.6),
+        ],
+    }
+
+
+def _instrument_electronics_story_size(iw: float, idep: float, band_h: float) -> tuple[float, float, float]:
+    """Small board size for instrument cutaways; never a cabinet-spanning PCB."""
+    return (iw * 0.30, idep * 0.24, max(5.0, band_h * 0.30))
+
+
 def _place_instrument_zone_story(
     key: str,
     z_cursor: float,
@@ -12234,19 +12283,20 @@ def _place_instrument_zone_story(
             "m_se_story_pcb", fl._to_linear((0.06, 0.48, 0.24)), metallic=0.1, roughness=0.38)
         chip_mat = fl.make_mat(
             "m_se_story_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
+        pcb_size = _instrument_electronics_story_size(iw, idep, band_h)
         _pcb = fl.add_box(
             "u_se_instrument_story_pcb",
-            _mm3((0.0, idep * 0.08, mid_z)),
-            _mm3((iw * 0.82, idep * 0.58, max(5.0, band_h * 0.42))),
+            _mm3((-iw * 0.34, idep * 0.12, mid_z)),
+            _mm3(pcb_size),
             pcb_mat, module=story_mod, module_objects=MO)
-        _pcb.dimensions = _mm3((iw * 0.82, idep * 0.58, max(5.0, band_h * 0.42)))
-        for _ci, (_cx, _cz) in enumerate([(-0.22, 0.55), (0.0, 0.45), (0.20, 0.55)]):
+        _pcb.dimensions = _mm3(pcb_size)
+        for _ci, (_cx, _cz) in enumerate([(-0.42, 0.55), (-0.34, 0.45), (-0.26, 0.55)]):
             fl.add_box(
                 f"u_se_instrument_story_chip_{_ci}",
                 _mm3((iw * _cx, idep * 0.22, z_cursor + band_h * _cz)),
                 _mm3((iw * 0.10, 3.0, band_h * 0.14)),
                 chip_mat, module=story_mod, module_objects=MO)
-        print(f"[univ][sealed] instrument story: main PCB + MCU packages")
+        print(f"[univ][sealed] instrument story: small side PCB + MCU packages")
     elif key == "power":
         bat_mat = fl.make_mat(
             "m_se_story_cell", fl._to_linear((0.62, 0.63, 0.66)), metallic=0.55, roughness=0.32)
@@ -12318,53 +12368,67 @@ def _place_instrument_handheld_cues(
         )
         _grip.dimensions = _mm3((tt * 0.55, D * 0.52, H * 0.38))
 
-    # cuvette / optical port hood — raised block on the top-right (gold unit signature)
-    _hood = fl.add_box(
-        "u_se_cutaway_cue_port_hood",
-        _mm3((W * 0.26, D * 0.06, base_z + H + H * 0.09)),
-        _mm3((W * 0.26, D * 0.40, H * 0.20)),
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt)
+    # vertical cuvette tower — the signature optical block, not a shallow top lump
+    _tower = fl.add_box(
+        "u_se_cutaway_cue_cuvette_tower",
+        _mm3(form["tower_loc"]),
+        _mm3(form["tower_size"]),
         port_mat,
         module=skin_mod,
         module_objects=MO,
     )
-    _hood.dimensions = _mm3((W * 0.26, D * 0.40, H * 0.20))
-    _bore = fl.add_cyl(
-        "u_se_cutaway_cue_port_bore",
-        _mm3((W * 0.26, D * 0.06, base_z + H + H * 0.15)),
-        6.0 * fl.MM,
-        H * 0.11 * fl.MM,
+    _tower.dimensions = _mm3(form["tower_size"])
+    _well = fl.add_box(
+        "u_se_cutaway_cue_cuvette_well",
+        _mm3(form["well_loc"]),
+        _mm3(form["well_size"]),
         bore_mat,
         module=skin_mod,
         module_objects=MO,
     )
+    _well.dimensions = _mm3(form["well_size"])
 
-    # front bezel — display window frame on the open cutaway lip (reads as an instrument face)
-    _lip_y = -D / 2 + tt * 0.4
-    _bezel = fl.add_box(
-        "u_se_cutaway_cue_bezel",
-        _mm3((-W * 0.14, _lip_y, base_z + H * 0.54)),
-        _mm3((W * 0.52, tt * 1.4, H * 0.56)),
+    # SMALL external LED PCB mounted on the tower face. This is deliberately not the
+    # internal electronics story board, so it cannot read as a cabinet-wide cutaway PCB.
+    _led_pcb_mat = fl.make_mat(
+        "m_se_cue_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
+    _led_pcb = fl.add_box(
+        "u_se_cutaway_cue_led_pcb",
+        _mm3(form["led_pcb_loc"]),
+        _mm3(form["led_pcb_size"]),
+        _led_pcb_mat,
+        module=skin_mod,
+        module_objects=MO,
+    )
+    _led_pcb.dimensions = _mm3(form["led_pcb_size"])
+
+    # top deck display + tactile buttons (PyBadge-class layout). Avoid front-face UI:
+    # that is what made the closed render read as a gamepad/appliance.
+    _display = fl.add_box(
+        "u_se_cutaway_cue_top_display",
+        _mm3(form["top_display_loc"]),
+        _mm3(form["top_display_size"]),
         bezel_mat,
         module=skin_mod,
         module_objects=MO,
     )
-    _bezel.dimensions = _mm3((W * 0.52, tt * 1.4, H * 0.56))
-    # button cluster pads on the bezel (right of the display cutout)
+    _display.dimensions = _mm3(form["top_display_size"])
     _pad_mat = fl.make_mat(
         "m_se_cue_pad", fl._to_linear((0.18, 0.19, 0.22)), metallic=0.2, roughness=0.5)
-    for _pi, (_px, _pz) in enumerate([(0.28, 0.70), (0.28, 0.38), (0.20, 0.54), (0.36, 0.54)]):
+    for _pi, _loc in enumerate(form["button_locs"]):
         fl.add_cyl(
-            f"u_se_cutaway_cue_pad_{_pi}",
-            _mm3((W * _px, _lip_y - tt * 0.3, base_z + H * _pz)),
-            3.2 * fl.MM,
-            2.0 * fl.MM,
+            f"u_se_cutaway_cue_top_button_{_pi}",
+            _mm3(_loc),
+            3.0 * fl.MM,
+            2.2 * fl.MM,
             _pad_mat,
             module=skin_mod,
             module_objects=MO,
-            rotation=(math.radians(90), 0.0, 0.0),
         )
 
     # chin lip — angled shelf at the bottom front (handheld ergonomics, not a flat cube base)
+    _lip_y = -D / 2 + tt * 0.4
     _chin = fl.add_box(
         "u_se_cutaway_cue_chin",
         _mm3((0.0, _lip_y, base_z + H * 0.10)),
@@ -12386,7 +12450,7 @@ def _place_instrument_handheld_cues(
             module_objects=MO,
         )
 
-    print("[univ][sealed] instrument cutaway cues: grips + port hood + bezel + chin")
+    print("[univ][sealed] instrument cutaway cues: grips + cuvette tower + external LED PCB + top deck")
 
 
 def _stable_name_bucket(name: str) -> int:
@@ -12513,6 +12577,36 @@ def _selftest_instrument_proxy_geometry() -> None:
         assert size[0] <= 180.0 * 0.35 and size[1] <= 140.0 * 0.31, (
             f"proxy must not become a product-sized slab, got {size}")
         assert size[2] <= 70.0 * 0.43, f"proxy must not drive a tall GA bbox, got {size}"
+
+
+def _selftest_instrument_colorimeter_form_rule() -> None:
+    """proveCatch for the Open-Colorimeter-class sealed instrument form."""
+    W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt)
+    tower_w, tower_d, tower_h = form["tower_size"]
+    tower_x, tower_y, tower_z = form["tower_loc"]
+    led_w, led_d, led_h = form["led_pcb_size"]
+    led_x, led_y, led_z = form["led_pcb_loc"]
+    display_w, display_d, display_h = form["top_display_size"]
+    _pcb_w, _pcb_d, _pcb_h = _instrument_electronics_story_size(150.0, 110.0, 18.0)
+
+    assert W > D > H, "fixture must be a wide-flat handheld envelope"
+    assert tower_h >= H * 0.75, (
+        f"cuvette feature must be a vertical tower, not a shallow top lump ({tower_h})")
+    assert abs((tower_z - tower_h / 2) - (base_z + H)) < 1e-6, (
+        "cuvette tower must sit on top of the body")
+    assert form["well_size"][0] < tower_w * 0.55 and form["well_size"][1] < tower_d * 0.45, (
+        "cuvette well must read as a square inset in the tower")
+    assert led_w <= tower_w * 0.85 and led_h <= tower_h * 0.45 and led_d <= 3.0, (
+        "external LED PCB must be a small board, not a cabinet-spanning cutaway PCB")
+    assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
+        "external LED PCB must mount on the tower's outside face")
+    assert display_w > display_d > display_h, (
+        "display must be a thin top-deck rectangle, not a vertical front screen")
+    assert len(form["button_locs"]) >= 5 and all(loc[2] > base_z + H for loc in form["button_locs"]), (
+        "tactile buttons must live on the top deck")
+    assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30, (
+        "instrument electronics story PCB must not span the cutaway interior")
 
 
 def _place_instrument_manifest_proxies(
@@ -13057,6 +13151,18 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         if not _IS_INSTRUMENT_DEVICE:
             _shell_panels.append(
                 ("u_se_product_band", (0.0, -D / 2 + tt / 2, base_z + H * 0.95), (W, tt, H * 0.10)))
+        else:
+            # Instrument hero is a mostly closed handheld with a narrow service/cutaway
+            # reveal. Leaving the entire front open recreates the "grey cabinet cutaway"
+            # failure; this fascia preserves the optical story without exposing a box bay.
+            _shell_panels.extend([
+                ("u_se_product_front_lower_fascia",
+                 (0.0, -D / 2 + tt / 2, base_z + H * 0.24),
+                 (W * 0.96, tt, H * 0.42)),
+                ("u_se_product_front_upper_lip",
+                 (-W * 0.08, -D / 2 + tt / 2, base_z + H * 0.78),
+                 (W * 0.72, tt, H * 0.10)),
+            ])
         for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
@@ -13117,32 +13223,33 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         )
         _detail_y = -D / 2 - tt - 1.5
         _door_w, _door_h = W * 0.88, H * 0.78
-        for _name, _loc, _size in [
-            ("top", (0.0, _detail_y, base_z + H * 0.84), (_door_w, 1.5, 1.8)),
-            ("bottom", (0.0, _detail_y, base_z + H * 0.06), (_door_w, 1.5, 1.8)),
-            ("left", (-_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
-            ("right", (_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
-        ]:
-            _detail = fl.add_box(
-                f"u_se_exterior_detail_seam_{_name}",
-                _mm3(_loc),
-                _mm3(_size),
-                _exterior_detail_mat,
+        if not _IS_INSTRUMENT_DEVICE:
+            for _name, _loc, _size in [
+                ("top", (0.0, _detail_y, base_z + H * 0.84), (_door_w, 1.5, 1.8)),
+                ("bottom", (0.0, _detail_y, base_z + H * 0.06), (_door_w, 1.5, 1.8)),
+                ("left", (-_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
+                ("right", (_door_w / 2, _detail_y, base_z + H * 0.45), (1.8, 1.5, _door_h)),
+            ]:
+                _detail = fl.add_box(
+                    f"u_se_exterior_detail_seam_{_name}",
+                    _mm3(_loc),
+                    _mm3(_size),
+                    _exterior_detail_mat,
+                    module=_skin_mod,
+                    module_objects=MO,
+                )
+                _detail.hide_render = True
+            _status = fl.add_cyl(
+                "u_se_exterior_detail_status",
+                _mm3((W * 0.34, _detail_y - 0.5, base_z + H * 0.88)),
+                4.0 * fl.MM,
+                2.0 * fl.MM,
+                _status_mat,
                 module=_skin_mod,
                 module_objects=MO,
+                rotation=(math.radians(90), 0.0, 0.0),
             )
-            _detail.hide_render = True
-        _status = fl.add_cyl(
-            "u_se_exterior_detail_status",
-            _mm3((W * 0.34, _detail_y - 0.5, base_z + H * 0.88)),
-            4.0 * fl.MM,
-            2.0 * fl.MM,
-            _status_mat,
-            module=_skin_mod,
-            module_objects=MO,
-            rotation=(math.radians(90), 0.0, 0.0),
-        )
-        _status.hide_render = True
+            _status.hide_render = True
         # INSTRUMENT FACE (2026-07-12): a device-scale optical instrument's closed
         # product face must READ as the instrument — a display window + a button
         # cluster on the front, and a cuvette/optical port on the wide top — not a
@@ -13151,6 +13258,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # left, a light-tight cuvette cube on the right). All as u_se_exterior_detail_*
         # so they render on the closed product views and hide on the cutaway hero.
         if _IS_INSTRUMENT_DEVICE:
+            form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear((0.02, 0.03, 0.05)),
                                     metallic=0.0, roughness=0.14)
             _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear((0.18, 0.19, 0.22)),
@@ -13159,59 +13267,55 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                     metallic=0.25, roughness=0.45)
             _bore_mat = fl.make_mat("m_se_face_bore", fl._to_linear((0.01, 0.01, 0.01)),
                                     metallic=0.0, roughness=0.9)
-            _face_y = -D / 2 - tt - 1.2
-            # display window — left ~55% of the face (PyBadge TFT sits left)
+            # display window on the TOP deck (PyBadge-style), not the front face.
             _disp = fl.add_box("u_se_exterior_detail_display",
-                               _mm3((-W * 0.17, _face_y, base_z + H * 0.55)),
-                               _mm3((W * 0.48, 2.4, H * 0.58)), _disp_mat,
+                               _mm3(form["top_display_loc"]),
+                               _mm3(form["top_display_size"]), _disp_mat,
                                module=_skin_mod, module_objects=MO)
-            _disp.dimensions = _mm3((W * 0.48, 2.4, H * 0.58))
+            _disp.dimensions = _mm3(form["top_display_size"])
             _disp.hide_render = True
-            # button cluster — right of the display (d-pad + tactile buttons)
-            for _bi, (_bx, _bz) in enumerate([
-                (0.30, 0.72), (0.30, 0.34),          # up / down
-                (0.20, 0.53), (0.40, 0.53),          # left / right
-                (0.30, 0.53),                         # centre / select
-            ]):
+            # tactile buttons on the top deck around the display.
+            for _bi, _loc in enumerate(form["button_locs"]):
                 _btn = fl.add_cyl(f"u_se_exterior_detail_button_{_bi}",
-                                  _mm3((W * _bx, _face_y - 0.4, base_z + H * _bz)),
-                                  3.4 * fl.MM, 2.4 * fl.MM, _btn_mat,
-                                  module=_skin_mod, module_objects=MO,
-                                  rotation=(math.radians(90), 0.0, 0.0))
+                                  _mm3(_loc),
+                                  3.2 * fl.MM, 2.2 * fl.MM, _btn_mat,
+                                  module=_skin_mod, module_objects=MO)
                 _btn.hide_render = True
-            # cuvette / optical port — a light-tight cube raised off the wide TOP,
-            # on the right (the gold unit's optical block sits to the right of the display)
+            # cuvette / optical tower — a light-tight vertical block raised off the
+            # wide top, on one side of the display.
             _port = fl.add_box("u_se_exterior_detail_port",
-                               _mm3((W * 0.28, D * 0.05, base_z + H + H * 0.10)),
-                               _mm3((W * 0.22, D * 0.42, H * 0.22)), _port_mat,
+                               _mm3(form["tower_loc"]),
+                               _mm3(form["tower_size"]), _port_mat,
                                module=_skin_mod, module_objects=MO)
-            _port.dimensions = _mm3((W * 0.22, D * 0.42, H * 0.22))
+            _port.dimensions = _mm3(form["tower_size"])
             _port.hide_render = True
-            # the cuvette bore — a dark 10 mm well down into the port top
-            _bore = fl.add_cyl("u_se_exterior_detail_port_bore",
-                               _mm3((W * 0.28, D * 0.05, base_z + H + H * 0.16)),
-                               5.0 * fl.MM, H * 0.12 * fl.MM, _bore_mat,
+            # the cuvette well — square, dark, and on top of the tower.
+            _bore = fl.add_box("u_se_exterior_detail_port_bore",
+                               _mm3(form["well_loc"]),
+                               _mm3(form["well_size"]), _bore_mat,
                                module=_skin_mod, module_objects=MO)
+            _bore.dimensions = _mm3(form["well_size"])
             _bore.hide_render = True
-            # external LED driver PCB — green board on the left face (gold unit)
+            # external LED driver PCB — a small green module mounted on the tower
+            # face, not a board spanning the product cutaway.
             _led_pcb_mat = fl.make_mat(
                 "m_se_face_led_pcb", fl._to_linear((0.10, 0.62, 0.28)), metallic=0.0, roughness=0.32)
             _led_pcb = fl.add_box(
                 "u_se_exterior_detail_led_pcb",
-                _mm3((-W * 0.42, _face_y, base_z + H * 0.52)),
-                _mm3((W * 0.22, 2.2, H * 0.22)),
+                _mm3(form["led_pcb_loc"]),
+                _mm3(form["led_pcb_size"]),
                 _led_pcb_mat,
                 module=_skin_mod,
                 module_objects=MO,
             )
-            _led_pcb.dimensions = _mm3((W * 0.22, 2.2, H * 0.22))
+            _led_pcb.dimensions = _mm3(form["led_pcb_size"])
             _led_pcb.hide_render = True
             # USB / service port on the bottom edge (visible in 07-product-service)
             _usb_mat = fl.make_mat(
                 "m_se_face_usb", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.35, roughness=0.4)
             _usb = fl.add_box(
                 "u_se_exterior_detail_usb",
-                _mm3((0.0, _face_y, base_z + H * 0.06)),
+                _mm3((0.0, _detail_y, base_z + H * 0.06)),
                 _mm3((14.0, 3.0, 6.5)),
                 _usb_mat,
                 module=_skin_mod,
@@ -19335,7 +19439,7 @@ def main():
             # d/1.5) with the render's 1.5:1 aspect; raise the look-at for the device
             # so the protruding cuvette port stays in frame.
             _fa = 1.5
-            _h_eff = _sh * (1.42 if _IS_INSTRUMENT_DEVICE else 1.0)
+            _h_eff = _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
             _cf = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
             _pc = (0.0, 0.0, (DECK_Z_MM + _sh * _cf) * fl.MM)
             _pmax = max(_sw, _sd, _sh) * fl.MM
@@ -19343,8 +19447,13 @@ def main():
             _hero_distance = perspective_distance_for_extent(
                 _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
             _pd = _hero_distance / math.sqrt(2)
-            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd, _pc[2] + _pmax * 0.12),
-                         "target": _pc,
+            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd,
+                                  _pc[2] + _pmax * (0.96 if _IS_INSTRUMENT_DEVICE else 0.12)),
+                         "target": (
+                             _pc[0],
+                             _pc[1],
+                             _pc[2] + _pmax * (0.02 if _IS_INSTRUMENT_DEVICE else 0.0),
+                         ),
                          "camera_type": "PERSP",
                          "focal": 62}
         _spatial_bb = None
@@ -19352,9 +19461,10 @@ def main():
             # frame the PRODUCT in the corner/top views too — the mounting wall
             # dominates compute_scene_bbox() (run 73: corner shot = a plate on a slab)
             _sw, _sd, _sh = _SEALED_ENV_MM
+            _spatial_z_top = DECK_Z_MM + _sh * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
             _spatial_bb = ((-_sw / 2 * fl.MM, _sw / 2 * fl.MM),
                            (-_sd / 2 * fl.MM, _sd / 2 * fl.MM),
-                           (DECK_Z_MM * fl.MM, (DECK_Z_MM + _sh) * fl.MM))
+                           (DECK_Z_MM * fl.MM, _spatial_z_top * fl.MM))
         _spatial_cameras = (
             _sealed_product_camera_specs(_SEALED_ENV_MM)
             if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM else None
@@ -19429,6 +19539,7 @@ def main():
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
-        print("build_universal_scene _selftest: OK (instrument proxy geometry)")
+        _selftest_instrument_colorimeter_form_rule()
+        print("build_universal_scene _selftest: OK (instrument proxy geometry + colorimeter form rule)")
     else:
         main()
