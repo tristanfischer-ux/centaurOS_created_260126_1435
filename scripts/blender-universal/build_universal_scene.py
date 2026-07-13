@@ -12812,218 +12812,219 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                         _obj.data.materials.append(_pk_hero)
                     else:
                         _obj.data.materials.append(_deep_cache[_key])
-        # MOUNTING WALL (2026-07-10, the vision critic's 'floating disconnected object'
-        # + my own look at the hero: a WALL-mounted product hanging in white space with
-        # no wall reads as floating). One large neutral vertical plane directly behind
-        # the unit — the product mounts ON something, the way it exists in the world.
-        # darker wall (run 58: a pale wall behind the translucent body washed the whole
-        # shot ghost-on-ghost — internals need a tone to read against)
-        wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.42, 0.43, 0.45)),
-                               metallic=0.0, roughness=0.9)
-        _ww, _wh = W * 6.0, H * 2.2
-        _owall = fl.add_box("u_se_mount_wall", _mm3((0.0, D / 2 + 20.0, _wh / 2)),
-                            _mm3((_ww, 8.0, _wh)), wall_mat, module=_skin_mod, module_objects=MO)
-        _owall.dimensions = _mm3((_ww, 8.0, _wh))
-        # ── FUNCTIONAL DETAIL (2026-07-11 run 77, the strict architectural rubric:
-        # "no recognisable inverter/power-electronics region … no visible thermal
-        # management elements … generic anonymous blocks"). Deterministic, zone/part-
-        # vocabulary keyed, HERO pass only (INSPECT/drawings byte-unchanged):
-        #   power zone  → heatsink FIN bank + electrolytic capacitor cylinders
-        #   control     → PCB-green board face + chip blocks
-        #   pack        → orange HV busbar strip along the pack top (the PW3 signature)
-        #   thermal     → two circular fan rings behind the top vent band
-        #   interfaces  → gland/terminal blocks along the bottom front
-        _dm = _skin_mod
-        _fin_mat = fl.make_mat("m_se_fins", fl._to_linear((0.42, 0.44, 0.47)),
-                               metallic=0.85, roughness=0.35)
-        _cap_mat = fl.make_mat("m_se_caps", fl._to_linear((0.12, 0.13, 0.15)),
-                               metallic=0.3, roughness=0.45)
-        _pcb_mat = fl.make_mat("m_se_pcb", fl._to_linear((0.025, 0.12, 0.055)),
-                               metallic=0.1, roughness=0.6)
-        _chip_mat = fl.make_mat("m_se_chip", fl._to_linear((0.08, 0.08, 0.09)),
-                                metallic=0.2, roughness=0.5)
-        _bus_mat = fl.make_mat("m_se_hvbus", fl._to_linear((0.72, 0.36, 0.10)),
-                               metallic=0.7, roughness=0.35)
-        _fanr_mat = fl.make_mat("m_se_fanring", fl._to_linear((0.20, 0.21, 0.24)),
-                                metallic=0.5, roughness=0.4)
-        _term_mat = fl.make_mat("m_se_term", fl._to_linear((0.25, 0.26, 0.29)),
-                                metallic=0.4, roughness=0.5)
-        _zb = {}   # zone → (z0, band_h) from the SAME fractions the placer stacked
-        _zc = base_z + margin
-        for _zk, _zfrac, _zrx in zones:
-            _zb[_zk] = (_zc, ih * _zfrac)
-            _zc += ih * _zfrac
-        _yF = -idep * 0.15 - 22.0     # just proud of the zone boards
-        # power zone: fin bank (left third) + capacitor trio (right third)
-        _pz, _ph2 = _zb.get("power", (base_z + margin + ih * 0.52, ih * 0.24))
-        _fin_w, _n_fins = iw * 0.30, 9
-        _heatsink = _import_family_cad(
-            "heatsink_extruded",
-            "u_se_cad_heatsink",
-            (-iw * 0.28, _yF, _pz + _ph2 * 0.50),
-            (_fin_w, _ph2 * 0.62, 26.0),
-            (math.radians(90), 0.0, 0.0),
-            _fin_mat,
-            _dm,
-            MO,
-        )
-        if _heatsink is None:
-            for _fi in range(_n_fins):
-                _fx2 = -iw * 0.42 + _fi * (_fin_w / max(1, _n_fins - 1))
-                fl.add_box(f"u_se_det_fin_{_fi}",
-                           _mm3((_fx2, _yF, _pz + _ph2 * 0.50)),
-                           _mm3((3.0, 26.0, _ph2 * 0.62)), _fin_mat,
+        # MOUNTING WALL + FUNCTIONAL DETAIL — BESS/cabinet products only. A device-scale
+        # optical instrument uses the stylized interior story (_place_instrument_zone_story);
+        # dropping LFP cell rows + fan ducts here is what made the colorimeter hero read
+        # as a Powerwall cabinet (2026-07-13).
+        if not _IS_INSTRUMENT_DEVICE:
+            wall_mat = fl.make_mat("m_se_wall", fl._to_linear((0.42, 0.43, 0.45)),
+                                   metallic=0.0, roughness=0.9)
+            _ww, _wh = W * 6.0, H * 2.2
+            _owall = fl.add_box("u_se_mount_wall", _mm3((0.0, D / 2 + 20.0, _wh / 2)),
+                                _mm3((_ww, 8.0, _wh)), wall_mat, module=_skin_mod, module_objects=MO)
+            _owall.dimensions = _mm3((_ww, 8.0, _wh))
+            # ── FUNCTIONAL DETAIL (2026-07-11 run 77, the strict architectural rubric:
+            # "no recognisable inverter/power-electronics region … no visible thermal
+            # management elements … generic anonymous blocks"). Deterministic, zone/part-
+            # vocabulary keyed, HERO pass only (INSPECT/drawings byte-unchanged):
+            #   power zone  → heatsink FIN bank + electrolytic capacitor cylinders
+            #   control     → PCB-green board face + chip blocks
+            #   pack        → orange HV busbar strip along the pack top (the PW3 signature)
+            #   thermal     → two circular fan rings behind the top vent band
+            #   interfaces  → gland/terminal blocks along the bottom front
+            _dm = _skin_mod
+            _fin_mat = fl.make_mat("m_se_fins", fl._to_linear((0.42, 0.44, 0.47)),
+                                   metallic=0.85, roughness=0.35)
+            _cap_mat = fl.make_mat("m_se_caps", fl._to_linear((0.12, 0.13, 0.15)),
+                                   metallic=0.3, roughness=0.45)
+            _pcb_mat = fl.make_mat("m_se_pcb", fl._to_linear((0.025, 0.12, 0.055)),
+                                   metallic=0.1, roughness=0.6)
+            _chip_mat = fl.make_mat("m_se_chip", fl._to_linear((0.08, 0.08, 0.09)),
+                                    metallic=0.2, roughness=0.5)
+            _bus_mat = fl.make_mat("m_se_hvbus", fl._to_linear((0.72, 0.36, 0.10)),
+                                   metallic=0.7, roughness=0.35)
+            _fanr_mat = fl.make_mat("m_se_fanring", fl._to_linear((0.20, 0.21, 0.24)),
+                                    metallic=0.5, roughness=0.4)
+            _term_mat = fl.make_mat("m_se_term", fl._to_linear((0.25, 0.26, 0.29)),
+                                    metallic=0.4, roughness=0.5)
+            _zb = {}   # zone → (z0, band_h) from the SAME fractions the placer stacked
+            _zc = base_z + margin
+            for _zk, _zfrac, _zrx in zones:
+                _zb[_zk] = (_zc, ih * _zfrac)
+                _zc += ih * _zfrac
+            _yF = -idep * 0.15 - 22.0     # just proud of the zone boards
+            # power zone: fin bank (left third) + capacitor trio (right third)
+            _pz, _ph2 = _zb.get("power", (base_z + margin + ih * 0.52, ih * 0.24))
+            _fin_w, _n_fins = iw * 0.30, 9
+            _heatsink = _import_family_cad(
+                "heatsink_extruded",
+                "u_se_cad_heatsink",
+                (-iw * 0.28, _yF, _pz + _ph2 * 0.50),
+                (_fin_w, _ph2 * 0.62, 26.0),
+                (math.radians(90), 0.0, 0.0),
+                _fin_mat,
+                _dm,
+                MO,
+            )
+            if _heatsink is None:
+                for _fi in range(_n_fins):
+                    _fx2 = -iw * 0.42 + _fi * (_fin_w / max(1, _n_fins - 1))
+                    fl.add_box(f"u_se_det_fin_{_fi}",
+                               _mm3((_fx2, _yF, _pz + _ph2 * 0.50)),
+                               _mm3((3.0, 26.0, _ph2 * 0.62)), _fin_mat,
+                               module=_dm, module_objects=MO)
+            for _ci in range(3):
+                fl.add_cyl(f"u_se_det_cap_{_ci}",
+                           _mm3((iw * 0.18 + _ci * iw * 0.09, _yF, _pz + _ph2 * 0.42)),
+                           iw * 0.030 * fl.MM, _ph2 * 0.5 * fl.MM, _cap_mat,
                            module=_dm, module_objects=MO)
-        for _ci in range(3):
-            fl.add_cyl(f"u_se_det_cap_{_ci}",
-                       _mm3((iw * 0.18 + _ci * iw * 0.09, _yF, _pz + _ph2 * 0.42)),
-                       iw * 0.030 * fl.MM, _ph2 * 0.5 * fl.MM, _cap_mat,
-                       module=_dm, module_objects=MO)
-        # control zone: PCB face + chips
-        _cz, _ch2 = _zb.get("control", (base_z + margin + ih * 0.88, ih * 0.12))
-        _pcb = _import_family_cad(
-            "pcb_board",
-            "u_se_cad_pcb",
-            (-iw * 0.18, -D / 2 + tt + 8.0, _cz - _ch2 * 0.65),
-            (iw * 0.45, _ch2 * 0.82, 12.0),
-            (math.radians(90), 0.0, 0.0),
-            _pcb_mat,
-            _dm,
-            MO,
-        )
-        if _pcb is None:
-            fl.add_box("u_se_det_pcb", _mm3((-iw * 0.18, _yF, _cz + _ch2 * 0.5)),
-                       _mm3((iw * 0.45, 6.0, _ch2 * 0.6)), _pcb_mat,
-                       module=_dm, module_objects=MO)
-            for _hi in range(4):
-                fl.add_box(f"u_se_det_chip_{_hi}",
-                           _mm3((-iw * 0.32 + _hi * iw * 0.10, _yF - 5.0, _cz + _ch2 * 0.5)),
-                           _mm3((iw * 0.05, 4.0, _ch2 * 0.16)), _chip_mat,
+            # control zone: PCB face + chips
+            _cz, _ch2 = _zb.get("control", (base_z + margin + ih * 0.88, ih * 0.12))
+            _pcb = _import_family_cad(
+                "pcb_board",
+                "u_se_cad_pcb",
+                (-iw * 0.18, -D / 2 + tt + 8.0, _cz - _ch2 * 0.65),
+                (iw * 0.45, _ch2 * 0.82, 12.0),
+                (math.radians(90), 0.0, 0.0),
+                _pcb_mat,
+                _dm,
+                MO,
+            )
+            if _pcb is None:
+                fl.add_box("u_se_det_pcb", _mm3((-iw * 0.18, _yF, _cz + _ch2 * 0.5)),
+                           _mm3((iw * 0.45, 6.0, _ch2 * 0.6)), _pcb_mat,
                            module=_dm, module_objects=MO)
-        else:
-            _pcb_front_y = -D / 2 + tt + 2.0
-            _pcb_z = _cz - _ch2 * 0.65
-            for _hi, (_hx, _hz, _hw, _hh) in enumerate([
-                (-iw * 0.31, -0.20, 0.055, 0.16),
-                (-iw * 0.23, -0.20, 0.045, 0.13),
-                (-iw * 0.15, -0.20, 0.050, 0.14),
-                (-iw * 0.30, 0.12, 0.040, 0.12),
-                (-iw * 0.22, 0.12, 0.040, 0.12),
-                (-iw * 0.14, 0.12, 0.065, 0.10),
-            ]):
-                fl.add_box(
-                    f"u_se_cad_pcb_package_{_hi}",
-                    _mm3((_hx, _pcb_front_y, _pcb_z + _ch2 * _hz)),
-                    _mm3((iw * _hw, 8.0, _ch2 * _hh)),
-                    _chip_mat,
-                    module=_dm,
-                    module_objects=MO,
+                for _hi in range(4):
+                    fl.add_box(f"u_se_det_chip_{_hi}",
+                               _mm3((-iw * 0.32 + _hi * iw * 0.10, _yF - 5.0, _cz + _ch2 * 0.5)),
+                               _mm3((iw * 0.05, 4.0, _ch2 * 0.16)), _chip_mat,
+                               module=_dm, module_objects=MO)
+            else:
+                _pcb_front_y = -D / 2 + tt + 2.0
+                _pcb_z = _cz - _ch2 * 0.65
+                for _hi, (_hx, _hz, _hw, _hh) in enumerate([
+                    (-iw * 0.31, -0.20, 0.055, 0.16),
+                    (-iw * 0.23, -0.20, 0.045, 0.13),
+                    (-iw * 0.15, -0.20, 0.050, 0.14),
+                    (-iw * 0.30, 0.12, 0.040, 0.12),
+                    (-iw * 0.22, 0.12, 0.040, 0.12),
+                    (-iw * 0.14, 0.12, 0.065, 0.10),
+                ]):
+                    fl.add_box(
+                        f"u_se_cad_pcb_package_{_hi}",
+                        _mm3((_hx, _pcb_front_y, _pcb_z + _ch2 * _hz)),
+                        _mm3((iw * _hw, 8.0, _ch2 * _hh)),
+                        _chip_mat,
+                        module=_dm,
+                        module_objects=MO,
+                    )
+            # pack top: orange HV busbar strip
+            _ez, _eh2 = _zb.get("energy", (base_z + margin, ih * 0.52))
+            fl.add_box("u_se_det_hvbus", _mm3((0.0, _yF, _ez + _eh2 * 0.94)),
+                       _mm3((iw * 0.66, 10.0, _eh2 * 0.035)), _bus_mat,
+                       module=_dm, module_objects=MO)
+            # Visible row of linked prismatic-cell CAD instances over the dark pack
+            # envelope. The full electrical quantity remains in the BoM/manifest;
+            # this is a presentation LOD showing recognisable cell construction.
+            _visible_cells = 10
+            _cell_span = iw * 0.72
+            _cell_pitch = _cell_span / _visible_cells
+            _first_cell_x = -_cell_span / 2 + _cell_pitch / 2
+            _cell = _import_family_cad(
+                "lfp_prismatic_cell",
+                "u_se_cad_cell_0",
+                (_first_cell_x, -D / 2 + tt + 10.0, _ez + _eh2 * 0.40),
+                (_cell_pitch * 0.88, 24.0, _eh2 * 0.70),
+                (0.0, 0.0, 0.0),
+                _fin_mat,
+                _dm,
+                MO,
+            )
+            if _cell is not None:
+                for _ci in range(1, _visible_cells):
+                    _copy = _cell.copy()
+                    _copy.data = _cell.data
+                    _copy.name = f"u_se_cad_cell_{_ci}"
+                    _copy.location.x = (_first_cell_x + _ci * _cell_pitch) * fl.MM
+                    bpy.context.collection.objects.link(_copy)
+                    MO[_dm].append(_copy)
+            # fan rings behind the vent band
+            for _fj in range(2):
+                _fan_x = (-1 if _fj == 0 else 1) * iw * 0.22
+                _fan_z = base_z + H * 0.90
+                _fan = _import_family_cad(
+                    "axial_fan",
+                    f"u_se_cad_fan_{_fj}",
+                    (_fan_x, -D / 2 + tt + 16.0, _fan_z),
+                    (H * 0.11, H * 0.11, 20.0),
+                    (math.radians(90), 0.0, 0.0),
+                    _fanr_mat,
+                    _dm,
+                    MO,
                 )
-        # pack top: orange HV busbar strip
-        _ez, _eh2 = _zb.get("energy", (base_z + margin, ih * 0.52))
-        fl.add_box("u_se_det_hvbus", _mm3((0.0, _yF, _ez + _eh2 * 0.94)),
-                   _mm3((iw * 0.66, 10.0, _eh2 * 0.035)), _bus_mat,
-                   module=_dm, module_objects=MO)
-        # Visible row of linked prismatic-cell CAD instances over the dark pack
-        # envelope. The full electrical quantity remains in the BoM/manifest;
-        # this is a presentation LOD showing recognisable cell construction.
-        _visible_cells = 10
-        _cell_span = iw * 0.72
-        _cell_pitch = _cell_span / _visible_cells
-        _first_cell_x = -_cell_span / 2 + _cell_pitch / 2
-        _cell = _import_family_cad(
-            "lfp_prismatic_cell",
-            "u_se_cad_cell_0",
-            (_first_cell_x, -D / 2 + tt + 10.0, _ez + _eh2 * 0.40),
-            (_cell_pitch * 0.88, 24.0, _eh2 * 0.70),
-            (0.0, 0.0, 0.0),
-            _fin_mat,
-            _dm,
-            MO,
-        )
-        if _cell is not None:
-            for _ci in range(1, _visible_cells):
-                _copy = _cell.copy()
-                _copy.data = _cell.data
-                _copy.name = f"u_se_cad_cell_{_ci}"
-                _copy.location.x = (_first_cell_x + _ci * _cell_pitch) * fl.MM
-                bpy.context.collection.objects.link(_copy)
-                MO[_dm].append(_copy)
-        # fan rings behind the vent band
-        for _fj in range(2):
-            _fan_x = (-1 if _fj == 0 else 1) * iw * 0.22
-            _fan_z = base_z + H * 0.90
-            _fan = _import_family_cad(
-                "axial_fan",
-                f"u_se_cad_fan_{_fj}",
-                (_fan_x, -D / 2 + tt + 16.0, _fan_z),
-                (H * 0.11, H * 0.11, 20.0),
-                (math.radians(90), 0.0, 0.0),
-                _fanr_mat,
-                _dm,
-                MO,
-            )
-            if _fan is None:
-                fl.add_torus(f"u_se_det_fan_{_fj}",
-                             _mm3((_fan_x, -D / 2 + tt + 16.0, _fan_z)),
-                             H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
-                             module=_dm, module_objects=MO)
-                # Four visible blades in the front plane. Rings alone read as
-                # anonymous washers rather than forced-air thermal management.
-                for _bi, _ang in enumerate((0, 45, 90, 135)):
-                    _blade = fl.add_box(
-                        f"u_se_det_fan_{_fj}_blade_{_bi}",
-                        _mm3((_fan_x, -D / 2 + tt + 14.0, _fan_z)),
-                        _mm3((H * 0.070, 4.0, H * 0.009)), _fanr_mat,
+                if _fan is None:
+                    fl.add_torus(f"u_se_det_fan_{_fj}",
+                                 _mm3((_fan_x, -D / 2 + tt + 16.0, _fan_z)),
+                                 H * 0.055 * fl.MM, H * 0.012 * fl.MM, _fanr_mat,
+                                 module=_dm, module_objects=MO)
+                    # Four visible blades in the front plane. Rings alone read as
+                    # anonymous washers rather than forced-air thermal management.
+                    for _bi, _ang in enumerate((0, 45, 90, 135)):
+                        _blade = fl.add_box(
+                            f"u_se_det_fan_{_fj}_blade_{_bi}",
+                            _mm3((_fan_x, -D / 2 + tt + 14.0, _fan_z)),
+                            _mm3((H * 0.070, 4.0, H * 0.009)), _fanr_mat,
+                            module=_dm, module_objects=MO)
+                        _blade.rotation_euler[1] = math.radians(_ang)
+            # Central fan duct from the fan plenum to the pack/power channel.
+            _duct_mat = fl.make_mat("m_se_duct", fl._to_linear((0.14, 0.15, 0.17)),
+                                    metallic=0.15, roughness=0.65)
+            _duct_z0 = _ez + _eh2 * 0.82
+            _duct_z1 = base_z + H * 0.86
+            fl.add_box("u_se_det_duct",
+                       _mm3((0.0, _yF + 8.0, (_duct_z0 + _duct_z1) / 2)),
+                       _mm3((iw * 0.14, 16.0, _duct_z1 - _duct_z0)), _duct_mat,
+                       module=_dm, module_objects=MO)
+            # Horizontal pack seams make the lower mass read as a module stack
+            # rather than two featureless black doors.
+            for _si in range(1, 7):
+                _sz = _ez + _eh2 * (_si / 7.0)
+                fl.add_box(f"u_se_det_pack_seam_{_si}",
+                           _mm3((0.0, _yF - 2.0, _sz)),
+                           _mm3((iw * 0.76, 3.0, 2.0)), _seg_hero,
+                           module=_dm, module_objects=MO)
+            # bottom interface terminals (AC / DC / PV entries)
+            for _ti in range(3):
+                fl.add_box(f"u_se_det_term_{_ti}",
+                           _mm3((-iw * 0.25 + _ti * iw * 0.25, _yF, base_z + margin + ih * 0.03)),
+                           _mm3((iw * 0.12, 20.0, ih * 0.035)), _term_mat,
+                           module=_dm, module_objects=MO)
+                # Exterior gland ring at the bottom face: the electrical interfaces
+                # must remain visible even when the pack occupies the whole lower bay.
+                _gland = _import_family_cad(
+                    "cable_gland",
+                    f"u_se_cad_gland_{_ti}",
+                    (-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
+                     base_z + margin + ih * 0.025),
+                    (H * 0.032, H * 0.032, 28.0),
+                    (math.radians(90), 0.0, 0.0),
+                    _term_mat,
+                    _dm,
+                    MO,
+                )
+                if _gland is None:
+                    _gland = fl.add_torus(
+                        f"u_se_det_gland_{_ti}",
+                        _mm3((-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
+                              base_z + margin + ih * 0.025)),
+                        H * 0.014 * fl.MM, H * 0.004 * fl.MM, _term_mat,
                         module=_dm, module_objects=MO)
-                    _blade.rotation_euler[1] = math.radians(_ang)
-        # Central fan duct from the fan plenum to the pack/power channel.
-        _duct_mat = fl.make_mat("m_se_duct", fl._to_linear((0.14, 0.15, 0.17)),
-                                metallic=0.15, roughness=0.65)
-        _duct_z0 = _ez + _eh2 * 0.82
-        _duct_z1 = base_z + H * 0.86
-        fl.add_box("u_se_det_duct",
-                   _mm3((0.0, _yF + 8.0, (_duct_z0 + _duct_z1) / 2)),
-                   _mm3((iw * 0.14, 16.0, _duct_z1 - _duct_z0)), _duct_mat,
-                   module=_dm, module_objects=MO)
-        # Horizontal pack seams make the lower mass read as a module stack
-        # rather than two featureless black doors.
-        for _si in range(1, 7):
-            _sz = _ez + _eh2 * (_si / 7.0)
-            fl.add_box(f"u_se_det_pack_seam_{_si}",
-                       _mm3((0.0, _yF - 2.0, _sz)),
-                       _mm3((iw * 0.76, 3.0, 2.0)), _seg_hero,
-                       module=_dm, module_objects=MO)
-        # bottom interface terminals (AC / DC / PV entries)
-        for _ti in range(3):
-            fl.add_box(f"u_se_det_term_{_ti}",
-                       _mm3((-iw * 0.25 + _ti * iw * 0.25, _yF, base_z + margin + ih * 0.03)),
-                       _mm3((iw * 0.12, 20.0, ih * 0.035)), _term_mat,
-                       module=_dm, module_objects=MO)
-            # Exterior gland ring at the bottom face: the electrical interfaces
-            # must remain visible even when the pack occupies the whole lower bay.
-            _gland = _import_family_cad(
-                "cable_gland",
-                f"u_se_cad_gland_{_ti}",
-                (-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
-                 base_z + margin + ih * 0.025),
-                (H * 0.032, H * 0.032, 28.0),
-                (math.radians(90), 0.0, 0.0),
-                _term_mat,
-                _dm,
-                MO,
-            )
-            if _gland is None:
-                _gland = fl.add_torus(
-                    f"u_se_det_gland_{_ti}",
-                    _mm3((-iw * 0.25 + _ti * iw * 0.25, -D / 2 - tt - 8.0,
-                          base_z + margin + ih * 0.025)),
-                    H * 0.014 * fl.MM, H * 0.004 * fl.MM, _term_mat,
-                    module=_dm, module_objects=MO)
-                _gland.rotation_euler[0] = math.radians(90)
-        print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
-              f"PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, "
-              f"3 interface terminals/glands")
+                    _gland.rotation_euler[0] = math.radians(90)
+            print(f"[univ][sealed] HERO functional detail: fin bank ×{_n_fins}, 3 capacitors, "
+                  f"PCB + 4 chips, HV busbar, 2 bladed fans + duct, 6 pack seams, "
+                  f"3 interface terminals/glands")
+        else:
+            print("[univ][sealed] instrument hero: optical-bench story only (no BESS functional detail)")
         print(f"[univ][sealed] HERO product-skin mode: closed body {W:.0f}×{D:.0f}×{H:.0f} mm, "
               f"{n_vents} vent slot(s) + mounting wall; tags + wire draws suppressed for the product shot")
 
