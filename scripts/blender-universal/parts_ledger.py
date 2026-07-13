@@ -1546,6 +1546,46 @@ def main() -> int:
         # covers it), not process pipework.
         "cooling fan", "ventilation fan", "enclosure fan", "cabinet fan", "axial fan", "case fan"}
 
+    # ── 2c. DEVICE-INSTRUMENT AUTHORITATIVE-TOPOLOGY TIES (2026-07-13) ────────────────
+    # A device instrument's signal + DC-rail edges are PCB-level: they are NEVER drawn as
+    # 3-D pipes, and the scene DECLUTTERS the small I&C parts (Power Indicator LED, Status
+    # Indicator, Battery Charge Management Circuit) OUT of the placed set — so their real
+    # electrical edges vanish from connection-schedule.json even though the AUTHORITATIVE
+    # graph (contract.topology from deriveInstrumentTopology) carries them. That made a
+    # correctly-connected part read as missing_input/orphan_instrument (Connection-trace 0).
+    # The contract topology is the truth for connectivity (the 3-D routing is a drawing
+    # artifact); attach every contract edge not already carried by a sized/ledger run.
+    # Gated on instrument_device so NO plant/BESS/Powerwall connectivity is touched.
+    if instrument_device:
+        _oc = (state.get("orchestratorContract") or {}).get("topology") or []
+        _ec = (state.get("engineeringContract") or {}).get("topology") or []
+        _seen_topo = set()
+        _n_topo_attached = 0
+        for _e in (list(_oc) + list(_ec)):
+            if not isinstance(_e, dict):
+                continue
+            _fp, _tp = _e.get("from_part"), _e.get("to_part")
+            _mech = _e.get("mechanism") or "signal"
+            if not _fp or not _tp:
+                continue
+            _fk, _tk = _norm(str(_fp)), _norm(str(_tp))
+            if (_fk, _tk, _mech) in attached_pairs or (_fk, _tk, _mech) in _seen_topo:
+                continue
+            _seen_topo.add((_fk, _tk, _mech))
+            _fe, _te = resolve(_fk), resolve(_tk)
+            if not (_fe or _te):
+                continue  # neither endpoint is a real placed/ledger part — skip (no phantom)
+            _fn = _fe["name"] if _fe else str(_fp)
+            _tn = _te["name"] if _te else str(_tp)
+            if _te:
+                _te["inputs"].append(f"{_fn} ({(_fe or {}).get('tag') or '?'}) via {_mech} [contract-topology]")
+            if _fe:
+                _fe["outputs"].append(f"{_tn} ({(_te or {}).get('tag') or '?'}) via {_mech} [contract-topology]")
+            _n_topo_attached += 1
+        if _n_topo_attached:
+            print(f"[ledger] device-instrument: attached {_n_topo_attached} authoritative-topology tie(s) "
+                  f"the 3-D-declutter dropped from the connection schedule")
+
     connectivity_concerns = []
     origin_parts = []
     sink_parts = []
@@ -1746,6 +1786,14 @@ def main() -> int:
                 # downstream load edge is required. Universal: role noun.
                 r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
                 r"\bhmi\b|touchscreen|control\s+panel\b|"
+                # TERMINAL indication / annunciation (2026-07-13): an indicator LED /
+                # pilot light / status lamp / annunciator / buzzer CONSUMES power and
+                # TERMINATES — it is the end of the branch, so a downstream-load edge is
+                # never required (colorimeter X-131 Power Indicator LED / X-134 Status
+                # Indicator false missing_output). Universal — a pilot light on ANY panel
+                # (BESS/plant included) is equally a terminal load.
+                r"\bindicator\b|pilot\s*(?:light|lamp)|status\s+(?:light|lamp|led)|"
+                r"annunciator|\bbeacon\b|buzzer|\bsounder\b|signal\s+(?:lamp|light)|"
                 # busbar ACCESSORIES + pack interconnect work (2026-07-11 run 59:
                 # 'Busbar Connectors' false-flagged missing_input+output — a stamped
                 # connector strip is bus HARDWARE, the electrical analogue of a pipe
