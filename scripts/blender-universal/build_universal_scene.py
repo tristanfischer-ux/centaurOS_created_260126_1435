@@ -12459,15 +12459,21 @@ def _instrument_source_harness_spec(
     base_z: float,
     tt: float,
 ) -> dict:
-    """Short source-board harness: edge connector → front dress → top-deck grommet.
+    """Short source-module harness for ANY sealed instrument device.
 
-    INTENT: power/control leave the optical-source board at an edge connector,
-    dress along the FRONT of the sample chamber (always visible on the product
-    hero — never routed into/through the chamber body), and enter the enclosure
-    through a grommet in the top deck at the chamber base. One combined product.
+    UNIVERSAL RULE (keyed on `isInstrumentDevice` form geometry — never a product
+    silhouette / never a colorimeter-only branch):
+      any exterior SOURCE module on a raised sample chamber must leave the board
+      at an edge connector, dress on the OPERATOR-FACING chamber front (−Y), and
+      enter the enclosure through a grommet in the top deck at the chamber base.
+
+    INTENT: Blender + PCB read as one product. A floating stub, a tower-lid exit,
+    or a plant-scale cable tray are all class bugs for every handheld/benchtop
+    optical/electronic instrument — not a per-brief cosmetic.
 
     DECISION: dress on −Y (operator-facing) rather than +Y (into the chamber).
-    A +Y flank made Bezier segments read as stubs poking out of the tower lid.
+    A +Y flank made Bezier segments read as stubs poking out of the chamber lid
+    on every instrument envelope that uses this form rule.
     """
     led_x, led_y, led_z = form["led_pcb_loc"]
     led_w, led_d, led_h = form["led_pcb_size"]
@@ -12508,7 +12514,8 @@ def _instrument_source_harness_spec(
             "rgb": colours[i],
         })
     return {
-        "kind": "led_module_to_chamber",
+        # Kind names the UNIVERSAL topology (source module → enclosure), not a product.
+        "kind": "source_module_to_enclosure",
         "entry": "chamber_top_deck_grommet",
         # ~2.7 mm OD — thick enough to read at product-hero scale (not hairline CAD).
         "diameter_mm": 2.7,
@@ -12541,7 +12548,7 @@ def _place_instrument_source_harness(
     MO: dict,
     hide_render: bool = True,
 ) -> dict:
-    """Draw a visible short cable from the source-PCB connector into the body."""
+    """Draw the UNIVERSAL source-module→enclosure loom (any isInstrumentDevice)."""
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
@@ -12610,30 +12617,41 @@ def _place_instrument_source_harness(
     return spec
 
 
-def _selftest_instrument_source_harness() -> None:
-    """proveCatch: harness leaves the board connector and enters the top deck."""
-    W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
-    form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
+def _assert_instrument_source_harness_coherent(
+    form: dict,
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+) -> dict:
+    """Shared proveCatch for the UNIVERSAL source→enclosure harness rule.
+
+    Must hold for every instrument envelope that uses `_instrument_form_rule_mm`
+    — not only one brief's dimensions.
+    """
     spec = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
-    assert spec["kind"] == "led_module_to_chamber"
+    led_x, led_y, led_z = form["led_pcb_loc"]
+    led_w, _led_d, _led_h = form["led_pcb_size"]
+    assert spec["kind"] == "source_module_to_enclosure", (
+        f"harness kind must name the universal topology, got {spec['kind']!r}")
     assert spec["entry"] == "chamber_top_deck_grommet"
     assert float(spec["diameter_mm"]) >= 2.4
     assert float(spec["diameter_m"]) >= 0.0024
     assert int(spec["strand_count"]) >= 4
     assert spec.get("connector") is not None
     assert spec.get("strain_relief") is not None
-    assert len(spec["strands"]) >= 3, "source board must show a multi-conductor harness"
-    led_x, led_y, led_z = form["led_pcb_loc"]
-    led_w, led_d, led_h = form["led_pcb_size"]
+    assert spec["source_anchor"].endswith("led_pcb")
+    assert spec["enclosure_anchor"] == "u_se_product_top"
     assert spec["connector_x"] < led_x - led_w / 2, (
         "harness must originate at an edge connector on the enclosure-facing board side")
+    assert 3 <= len(spec["strands"]) <= 5
     for strand in spec["strands"]:
         pts = strand["pts"]
         assert len(pts) >= 4
         sx, sy, sz = pts[0]
         ex, ey, ez = pts[-1]
         assert sx <= led_x - led_w / 2 + 1e-6, "harness must start at/board-side of the connector"
-        # Dress stays in front of the chamber face (−Y), never into the tower body.
         assert all(p[1] <= led_y + 0.5 for p in pts), (
             "harness must dress on the operator-facing side, not into the chamber")
         assert ez <= base_z + H + 6.0, "harness must enter near the top deck"
@@ -12642,8 +12660,90 @@ def _selftest_instrument_source_harness() -> None:
         length = 0.0
         for a, b in zip(pts, pts[1:]):
             length += math.sqrt(sum((b[i] - a[i]) ** 2 for i in range(3)))
-        assert 12.0 <= length <= 70.0, f"device-scale harness length, got {length:.1f} mm"
-    assert spec["source_anchor"].endswith("led_pcb")
+        assert 12.0 <= length <= 90.0, (
+            f"device-scale harness length for ANY instrument envelope, got {length:.1f} mm")
+    return spec
+
+
+def _selftest_instrument_source_harness() -> None:
+    """proveCatch: UNIVERSAL harness rule holds across distinct instrument envelopes.
+
+    Two envelopes (compact 10 mm path + wider 20 mm path on a larger body) must
+    both dress connector → front → deck grommet. A colorimeter-only path would
+    pass one fixture and miss the class bug on the next instrument brief.
+    """
+    fixtures = (
+        (180.0, 140.0, 70.0, 300.0, 6.0, 10.0),
+        (220.0, 160.0, 80.0, 300.0, 6.0, 20.0),
+    )
+    lengths = []
+    for W, D, H, base_z, tt, path_mm in fixtures:
+        form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=path_mm)
+        spec = _assert_instrument_source_harness_coherent(form, W, D, H, base_z, tt)
+        strand0 = spec["strands"][0]["pts"]
+        length = 0.0
+        for a, b in zip(strand0, strand0[1:]):
+            length += math.sqrt(sum((b[i] - a[i]) ** 2 for i in range(3)))
+        lengths.append(length)
+    # Longer optical path / larger chamber must not collapse to a zero harness,
+    # and both remain device-scale (not plant drops).
+    assert all(12.0 <= L <= 90.0 for L in lengths), lengths
+    assert lengths[1] >= lengths[0] * 0.85, (
+        "larger instrument envelope must still emit a coherent device-scale harness")
+
+
+def _selftest_instrument_form_rule() -> None:
+    """proveCatch: instrument exterior features follow USE PHYSICS, not a product clone.
+
+    UNIVERSAL for every `isInstrumentDevice` sealed enclosure — chamber height,
+    well size, source-module scale, top-deck HMI, and source→enclosure harness
+    all derive from envelope + optical_path_mm. Named without a product noun so
+    the next instrument brief cannot regress behind a colorimeter-only test.
+    """
+    W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
+    form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
+    tower_w, tower_d, tower_h = form["tower_size"]
+    tower_x, tower_y, tower_z = form["tower_loc"]
+    led_w, led_d, led_h = form["led_pcb_size"]
+    led_x, led_y, led_z = form["led_pcb_loc"]
+    display_w, display_d, display_h = form["top_display_size"]
+    _pcb_w, _pcb_d, _pcb_h = _instrument_electronics_story_size(150.0, 110.0, 18.0)
+
+    assert W > D > H, "fixture must be a wide-flat top-operated envelope"
+    assert form["optical_path_mm"] == 10.0
+    # Sample chamber must rise above the body (cuvette inserts from above).
+    assert (tower_z - tower_h / 2) >= base_z + H - 1e-6, (
+        "sample chamber must sit on top of the body for top-loading cuvettes")
+    assert tower_h >= 28.0 + 10.0 * 1.0, (
+        "chamber height must clear a standard cuvette body for the optical path")
+    # Well tracks the cuvette for this path (≈12.5 mm outer → well ~path-scale).
+    assert form["well_size"][0] <= 16.0 and form["well_size"][1] <= 16.0, (
+        "cuvette well must track the optical-path cuvette, not a decorative hole")
+    # Source module is window-scale on the optical-axis face — not a face-filling plate.
+    assert led_w <= tower_w * 0.80 and led_h <= tower_h * 0.45 and led_d <= 2.5, (
+        "source module must be optical-window scale, not a cabinet-spanning board")
+    assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
+        "source module must mount on the chamber's optical-axis face")
+    _png = _instrument_pcb_png_path()
+    assert _png is None or str(_png).endswith(".png")
+    # Path change must resize the chamber/well (function, not a fixed decorative tower).
+    form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
+    assert form20["well_size"][0] > form["well_size"][0], (
+        "longer optical path must widen the cuvette well")
+    assert display_w > display_d > display_h, (
+        "display must be a thin top-deck rectangle (top operating plane)")
+    assert len(form["button_locs"]) >= 5 and all(loc[2] > base_z + H for loc in form["button_locs"]), (
+        "tactile buttons must live on the top deck with the display")
+    assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30, (
+        "instrument electronics story PCB must not span the cutaway interior")
+    # Closed-product hero for instruments (not cabinet cutaway).
+    assert "00-hero" in sealed_exterior_view_names(True)
+    _assert_instrument_source_harness_coherent(form, W, D, H, base_z, tt)
+    _assert_instrument_source_harness_coherent(form20, W, D, H, base_z, tt)
+
+
+# Back-compat alias — older docs/scripts may still call the colorimeter-named entry.
+_selftest_instrument_colorimeter_form_rule = _selftest_instrument_form_rule
 
 
 def _place_instrument_ui_pcb(
@@ -12917,78 +13017,6 @@ def _selftest_instrument_proxy_geometry() -> None:
         assert size[0] <= 180.0 * 0.35 and size[1] <= 140.0 * 0.31, (
             f"proxy must not become a product-sized slab, got {size}")
         assert size[2] <= 70.0 * 0.43, f"proxy must not drive a tall GA bbox, got {size}"
-
-
-def _selftest_instrument_colorimeter_form_rule() -> None:
-    """proveCatch: instrument exterior features follow USE PHYSICS, not a product clone."""
-    W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
-    form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
-    tower_w, tower_d, tower_h = form["tower_size"]
-    tower_x, tower_y, tower_z = form["tower_loc"]
-    led_w, led_d, led_h = form["led_pcb_size"]
-    led_x, led_y, led_z = form["led_pcb_loc"]
-    display_w, display_d, display_h = form["top_display_size"]
-    _pcb_w, _pcb_d, _pcb_h = _instrument_electronics_story_size(150.0, 110.0, 18.0)
-
-    assert W > D > H, "fixture must be a wide-flat top-operated envelope"
-    assert form["optical_path_mm"] == 10.0
-    # Sample chamber must rise above the body (cuvette inserts from above).
-    assert (tower_z - tower_h / 2) >= base_z + H - 1e-6, (
-        "sample chamber must sit on top of the body for top-loading cuvettes")
-    assert tower_h >= 28.0 + 10.0 * 1.0, (
-        "chamber height must clear a standard cuvette body for the optical path")
-    # Well tracks the cuvette for this path (≈12.5 mm outer → well ~path-scale).
-    assert form["well_size"][0] <= 16.0 and form["well_size"][1] <= 16.0, (
-        "cuvette well must track the optical-path cuvette, not a decorative hole")
-    # Source module is window-scale on the optical-axis face — not a face-filling plate.
-    assert led_w <= tower_w * 0.80 and led_h <= tower_h * 0.45 and led_d <= 2.5, (
-        "LED/source module must be optical-window scale, not a cabinet-spanning board")
-    assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
-        "source module must mount on the chamber's optical-axis face")
-    _png = _instrument_pcb_png_path()
-    assert _png is None or str(_png).endswith(".png")
-    # Path change must resize the chamber/well (function, not a fixed decorative tower).
-    form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
-    assert form20["well_size"][0] > form["well_size"][0], (
-        "longer optical path must widen the cuvette well")
-    assert display_w > display_d > display_h, (
-        "display must be a thin top-deck rectangle (top operating plane)")
-    assert len(form["button_locs"]) >= 5 and all(loc[2] > base_z + H for loc in form["button_locs"]), (
-        "tactile buttons must live on the top deck with the display")
-    assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30, (
-        "instrument electronics story PCB must not span the cutaway interior")
-    # Closed-product hero for instruments (not cabinet cutaway).
-    assert "00-hero" in sealed_exterior_view_names(True)
-    harness = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
-    assert harness["kind"] == "led_module_to_chamber"
-    assert harness["entry"] == "chamber_top_deck_grommet"
-    assert float(harness["diameter_mm"]) >= 2.4
-    assert float(harness["diameter_m"]) >= 0.0024
-    assert int(harness["strand_count"]) >= 4
-    assert harness.get("connector") is not None
-    assert harness.get("strain_relief") is not None
-    assert harness["source_anchor"] == "u_se_exterior_detail_led_pcb", (
-        "harness must explicitly originate at the exterior LED/source PCB")
-    assert harness["enclosure_anchor"] == "u_se_product_top", (
-        "harness must enter the enclosure through the top deck at the chamber base")
-    assert 3 <= len(harness["strands"]) <= 5, (
-        "instrument source harness must render as a short multi-strand cable")
-    for strand in harness["strands"]:
-        pts = strand["pts"]
-        assert len(pts) >= 4
-        sx, sy, sz = pts[0]
-        ex, ey, ez = pts[-1]
-        length = 0.0
-        for a, b in zip(pts, pts[1:]):
-            length += math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
-        assert 12.0 <= length <= 70.0, (
-            f"source PCB harness must be device-scale, got {length:.1f} mm")
-        assert sx <= led_x - led_w / 2 + 1e-6, (
-            "harness strand must start at the LED/source PCB edge connector")
-        assert all(p[1] <= led_y + 0.5 for p in pts), (
-            "harness must dress on the operator-facing chamber front, not into the tower")
-        assert ez <= base_z + H + 8.0 and ex < led_x, (
-            "harness must run into the enclosure top deck, not float outward")
 
 
 def _place_instrument_manifest_proxies(
@@ -19902,8 +19930,8 @@ def main():
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
-        _selftest_instrument_colorimeter_form_rule()
+        _selftest_instrument_form_rule()
         _selftest_instrument_source_harness()
-        print("build_universal_scene _selftest: OK (instrument proxy geometry + colorimeter form rule)")
+        print("build_universal_scene _selftest: OK (instrument form rule + source harness, multi-envelope)")
     else:
         main()
