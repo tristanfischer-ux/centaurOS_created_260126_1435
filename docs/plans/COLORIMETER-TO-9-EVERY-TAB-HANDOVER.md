@@ -248,3 +248,29 @@ universal DB growth (generic commodity parts for the class, live-verified — NO
 the seeded parts (its MPN cluster = honest-TBD after the wrong-family guard). The seed benefits
 the NEXT chain. So the ≥9 sequence is: 0717 lands (9 fixes) → dedup DB + RAG lead-segment fix →
 one more chain (picks up seeds → real MPNs on BoM/PCB/Part-names) → interior render + near-miss tabs.
+
+### §8g — 2026-07-13 chain 0717 SIGHT (OOM'd but dossier survived) + 2 findings
+
+Chain 0717 was KILLED (exit 137, OOM — 10 node+Blender procs) at 07:55 but had WRITTEN
+dossier.xlsx (19MB) + state.json at 07:53. SIGHT of that dossier:
+- **Connection-trace CLEARED end-to-end** (no longer in the <8 list) — the parts_ledger
+  device-topology-tie + terminal-indicator fix (640aec74a) works in a full chain, not just
+  the fast-harness rescore. ✓
+- **MAX35104 flow-TDC removed from the ADC** — the wrong-family guard (b1576678f) fired. ✓
+- Cost £366 purchased / £1098 OEM (OEM still radical → Sense-check 0). Part-names 3.5→4.1.
+- Floor still 0. <8: Sense-check 0, PCB 2.2, Renders 4, Part-names 4.1, Calc 7, Quantities
+  7.1, BoM 7.3, Assembly 7.7 (+ the 2 mirrors).
+
+**FINDING 1 — Banner S22 + Schneider LV430630 pins PERSIST** despite the device guard. Since
+MAX35104 WAS rejected (so RUN_IS_INSTRUMENT_DEVICE is set), these two are pinned by a path that
+does NOT call dbHitAcceptableForWord — trace the deterministic-emitter's own pin / curated
+lookup / Stage-10.5 part-reality-check for Power Indicator LED + Overcurrent Protection and
+add the same device-industrial rejection there. (grep the pinning of 'S22LBRWPQ' / 'LV430630'.)
+
+**FINDING 2 — OOM.** run-loop launched a chain that spawned ~10-19 serial-design-chain procs
+(design-loop iterations + PCB stage + Blender) → macOS SIGKILL. Cap concurrency or run PCB/
+Blender stages with lower parallelism; the nested-PID growth (Cursor R0) is the culprit.
+
+**Net: Connection-trace + ADC now genuinely fixed in-chain. Remaining floor-setters unchanged
+(Sense-check cost, PCB, Renders, Part-names) — all need the next chain (seeds + Banner/Schneider
+path fix + interior render).**
