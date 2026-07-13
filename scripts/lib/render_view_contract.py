@@ -57,6 +57,25 @@ def _instrument_landscape_from_volume(volume_m3: float) -> tuple[float, float, f
     return side_mm * 1.40, side_mm * 1.15, side_mm * 0.62
 
 
+# INTENT: mass→volume device estimates often inflate internal air and produce an
+# appliance-sized box (~180 mm) that no longer looks like a real handheld
+# photometer. A top-operated optical instrument's long edge is dominated by
+# (display/MCU module ≈ 90 mm) + (optical cube ≈ 40 mm) side-by-side — typically
+# ≤155 mm. Clamp DERIVED envelopes only; brief-pinned max_dimensions_mm still win.
+_HANDHELD_INSTRUMENT_MAX_EDGE_MM = 155.0
+
+
+def _clamp_derived_handheld_envelope(
+    dims: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    w, d, h = dims
+    longest = max(w, d, h)
+    if longest <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM:
+        return dims
+    scale = _HANDHELD_INSTRUMENT_MAX_EDGE_MM / longest
+    return w * scale, d * scale, h * scale
+
+
 def _is_handheld_landscape(dims: tuple[float, float, float]) -> bool:
     w, d, h = dims
     return w > d > h and h <= d * 0.72
@@ -97,13 +116,16 @@ def _resolve_instrument_contract_dims(
     if not state.get("isInstrumentDevice"):
         return contract_dims
     if _is_handheld_landscape(contract_dims):
+        if _is_derived_device_envelope(state):
+            return _clamp_derived_handheld_envelope(contract_dims)
         return contract_dims
     volume = _quantity_value(state, "enclosure_volume_m3")
     if volume is not None and 0 < volume < 1 and _is_derived_device_envelope(state):
         # DECISION: derived device-scale dimensions are a sizing hint, not a brief pin.
         # If they drift tall/boxy, keep the same volume but restore the handheld
         # instrument aspect. Brief max_dimensions_mm still wins below.
-        return _instrument_landscape_from_volume(volume)
+        return _clamp_derived_handheld_envelope(
+            _instrument_landscape_from_volume(volume))
     return contract_dims
 
 
@@ -153,7 +175,8 @@ def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, floa
         # the authoritative device flag; volume is preserved (1.40·1.15·0.62 ≈ 1.00).
         # Universal — a plant/cabinet product never carries isInstrumentDevice.
         if state.get("isInstrumentDevice"):
-            return _instrument_landscape_from_volume(volume)
+            return _clamp_derived_handheld_envelope(
+                _instrument_landscape_from_volume(volume))
         side_mm = (volume ** (1.0 / 3.0)) * 1000.0
         return side_mm, side_mm, side_mm
     return None
@@ -273,11 +296,12 @@ def _selftest() -> None:
     A non-instrument sealed product keeps the cube fallback.
     """
     vol_state = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 0.002}}}
-    # instrument → landscape
+    # instrument → landscape (and clamped to handheld max edge when derived volume is airy)
     inst = dict(vol_state, isInstrumentDevice=True)
     w, d, h = resolve_design_envelope_mm(inst)
     assert w > d > h, f"instrument envelope must be landscape W>D>H, got {(w, d, h)}"
-    assert abs(w * d * h / 1e9 - 0.002) < 2e-4, "landscape reshape must preserve volume"
+    assert max(w, d, h) <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM + 1e-6, (
+        f"derived instrument envelope must clamp to handheld scale, got {(w, d, h)}")
     # non-instrument → cube (unchanged)
     cube = resolve_design_envelope_mm(dict(vol_state))
     assert cube and abs(cube[0] - cube[2]) < 1e-6, f"non-instrument stays a cube, got {cube}"
@@ -288,7 +312,7 @@ def _selftest() -> None:
         "design_envelope_height_mm": 55}}, "isInstrumentDevice": True}
     assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), (
         "explicit handheld dims must win")
-    # derived non-handheld dims are not a pin: keep volume, restore handheld aspect.
+    # derived non-handheld dims are not a pin: restore handheld aspect + clamp max edge.
     derived_tall = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 0.002,
         "design_envelope_width_mm": {
@@ -299,8 +323,20 @@ def _selftest() -> None:
             "value": 180, "source": "derived_device_scale"}}}, "isInstrumentDevice": True}
     dt = resolve_design_envelope_mm(derived_tall)
     assert dt and dt[0] > dt[1] > dt[2], f"derived instrument dims must reshape, got {dt}"
-    assert abs(dt[0] * dt[1] * dt[2] / 1e9 - 0.002) < 2e-4, (
-        "derived reshape must preserve volume")
+    assert max(dt) <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM + 1e-6, (
+        f"derived reshape must clamp to handheld scale, got {dt}")
+    # Oversized but already-landscape derived dims also clamp (mass→air inflation).
+    derived_wide = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": 0.002,
+        "design_envelope_width_mm": {
+            "value": 183, "source": "derived_device_scale"},
+        "design_envelope_depth_mm": {
+            "value": 145, "source": "derived_device_scale"},
+        "design_envelope_height_mm": {
+            "value": 76, "source": "derived_device_scale"}}}, "isInstrumentDevice": True}
+    dw = resolve_design_envelope_mm(derived_wide)
+    assert dw and max(dw) <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM + 1e-6, (
+        f"airy derived landscape must clamp, got {dw}")
     derived_brief = dict(
         derived_tall,
         parsedBrief={"constraints": {"max_dimensions_mm": {"w": 140, "d": 110, "h": 55}}},

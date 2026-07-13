@@ -12190,66 +12190,117 @@ def _instrument_form_rule_mm(
     tt: float,
     optical_path_mm: float | None = None,
 ) -> dict:
-    """Function-driven exterior features for sealed optical/electronic instruments.
+    """Function-driven exterior for sealed optical/electronic instruments.
 
-    INTENT — shape from PHYSICS OF USE, never from a commercial silhouette:
-    1. Top operating plane: a handheld/benchtop instrument is used looking down, so
-       the HMI (display + tactile buttons) lives on the TOP deck beside the sample
-       access — not on a vertical front face (that is appliance/cabinet language).
-    2. Sample chamber rises through the top: a transmittance measurement needs a
-       light-tight well the cuvette drops into from above (gravity seat + ambient
-       baffle). Chamber plan size tracks a square cuvette for `optical_path_mm`
-       (path + cuvette wall + baffle allowance). Chamber height is set by a
-       standard cuvette body (~45 mm) scaled gently with path — NOT by copying
-       any particular product's tower proportions.
-    3. Optical SOURCE module on the chamber's optical-axis face: the LED (or other
-       emitter) must sit on the axis that goes through the sample. It is a SMALL
-       replaceable module (wavelength / assay swaps), not the instrument
-       motherboard — so the board is window-scale, not body-spanning.
-    Envelope W/D/H already come from design_envelope_* (landscape for top-operated
-    devices). This rule only places the functional features on that envelope.
+    UNIVERSAL — keyed on isInstrumentDevice + optical_path_mm / envelope, never a
+    product noun. The silhouette is NOT arbitrary: each feature is a use-physics
+    consequence that real open photometers share (IO Rodeo Open Colorimeter is
+    the TRAINING check that those reasons produce a real-looking object):
+
+    1. STEPPED L-body — MCU/display/battery live under a low UI deck; the optical
+       path needs a separate light-tight CUBE. The step is the joint between those
+       two volumes (serviceability + stray-light isolation), not decoration.
+    2. CHUNKY optical cube — plan tracks cuvette outer + baffle walls; height
+       clears a standard cuvette body (~45 mm). Aspect is near-cubic so the
+       chamber reads as the optical heart, not a skinny appliance chimney.
+    3. Square well + circular rim — seats the cuvette and a removable ambient-light
+       CAP (Beer–Lambert I₀ needs room light blocked).
+    4. Source module on the optical-axis face — horizontal beam through the sample;
+       window-scale replaceable board with corner fasteners (wavelength swap).
+    5. Cable CHANNEL at the cube↔body joint — swappable LED module plugs from
+       outside; harness enters a molded slot, never floats mid-deck.
+    6. Recessed display + D-pad on the UI deck — operated looking down; closed
+       product hides the compute board (FR4 is cutaway-only).
+    7. Visible top-plate fasteners — additive-manufactured enclosure language.
+
+    Envelope W/D/H already come from design_envelope_* (landscape). This rule
+    only places the functional features on that envelope.
     """
     path = float(optical_path_mm if optical_path_mm is not None else _INSTRUMENT_OPTICAL_PATH_MM)
     path = max(5.0, path)
     # Square cuvette outer ≈ path + ~2.5 mm walls; chamber adds baffle each side.
     cuvette_outer = path + 2.5
-    chamber_plan = min(max(cuvette_outer + 8.0, 18.0), min(W, D) * 0.42)
-    # Standard spectrophotometry cuvette body ~45 mm tall; scale gently with path.
-    chamber_h = max(H * 0.50, min(H * 0.95, 28.0 + path * 1.6))
-    # Chamber on the RIGHT of the top deck — leaves a contiguous LEFT operating
-    # plane for display + buttons (operator hand + eyes share that plane).
-    tower_loc = (W * 0.28, D * 0.02, base_z + H + chamber_h / 2)
-    tower_size = (chamber_plan, chamber_plan * 0.92, chamber_h)
-    tower_front_y = tower_loc[1] - tower_size[1] / 2 - max(1.0, tt * 0.2)
-    # Source module ≈ optical window + mount/connector margin — NOT a full face plate.
+    # Chunky cube: must dominate the right side of a handheld, not a thin spike.
+    # Floor ~32 mm so a 10 mm path still reads as a real cuvette block at product scale.
+    chamber_plan = min(max(cuvette_outer + 18.0, 36.0), min(W, D) * 0.52)
+    # Standard spectrophotometry cuvette body ~45 mm tall; keep the cube CHUNKY
+    # (h/w ≲ 1.35) so it reads as an optical block, not a chimney.
+    chamber_h = max(38.0, min(48.0, 32.0 + path * 1.2))
+    # Optical cube on the RIGHT — leaves a contiguous LEFT UI deck (eyes + hands).
+    # Sit the cube slightly forward so the source face and cable channel read in
+    # three-quarter hero views (same reason the real object does).
+    tower_loc = (W * 0.30, D * 0.08, base_z + H + chamber_h / 2)
+    tower_size = (chamber_plan, chamber_plan * 0.96, chamber_h)
+    tw, td, th = tower_size
+    tx, ty, tz = tower_loc
+    tower_front_y = ty - td / 2 - max(1.0, tt * 0.15)
+    # Source module ≈ optical window + mount/connector margin — NOT a face plate.
     window = max(path * 1.2, 8.0)
-    led_w = min(tower_size[0] * 0.72, window * 2.4)
-    led_h = min(tower_size[2] * 0.38, window * 2.0)
-    led_d = 2.0
-    # Top-deck HMI: dark display rectangle + diamond/cluster of tactile buttons to
-    # its left (thumb reach while looking at the sample chamber).
-    display_size = (W * 0.38, D * 0.30, 2.4)
-    display_loc = (-W * 0.16, -D * 0.06, base_z + H + 1.2)
-    btn_z = base_z + H + 2.4
+    led_w = min(tw * 0.70, max(window * 2.2, 14.0))
+    led_h = min(th * 0.42, max(window * 2.0, 14.0))
+    led_d = 1.8
+    # Recessed display on the LEFT UI deck (dark glass in the top plate).
+    ui_span_x = (tx - tw / 2) - (-W / 2)  # clear deck left of the cube
+    display_size = (min(W * 0.36, ui_span_x * 0.72), D * 0.28, 1.8)
+    display_loc = (-W * 0.18, -D * 0.04, base_z + H + 0.9)
+    # D-pad diamond left of display + A/B along the top edge (thumb while looking down).
+    btn_z = base_z + H + 2.2
+    dx, dy, _dz = display_loc
     button_locs = [
-        (-W * 0.42, -D * 0.22, btn_z),  # up
-        (-W * 0.42, -D * 0.08, btn_z),  # down
-        (-W * 0.48, -D * 0.15, btn_z),  # left
-        (-W * 0.36, -D * 0.15, btn_z),  # right
-        (-W * 0.05, -D * 0.22, btn_z),  # select
-        (W * 0.02, -D * 0.14, btn_z),   # aux
+        (dx - display_size[0] * 0.72, dy + 8.0, btn_z),   # up
+        (dx - display_size[0] * 0.72, dy - 8.0, btn_z),   # down
+        (dx - display_size[0] * 0.72 - 8.0, dy, btn_z),   # left
+        (dx - display_size[0] * 0.72 + 8.0, dy, btn_z),   # right
+        (dx + display_size[0] * 0.55, dy + display_size[1] * 0.55, btn_z),  # A
+        (dx + display_size[0] * 0.55, dy - display_size[1] * 0.15, btn_z),  # B
+    ]
+    # Square well + circular rim that seats the ambient-light cap.
+    well_loc = (tx, ty, base_z + H + chamber_h + 1.2)
+    well_size = (cuvette_outer * 0.95, cuvette_outer * 0.95, 4.0)
+    rim_od = min(tw * 0.72, max(well_size[0] + 10.0, 20.0))
+    rim_loc = (tx, ty, base_z + H + chamber_h + 0.8)
+    # Cap parks ON THE UI DECK beside the cube — never seated on the well in the
+    # product hero (a seated cap hides the square well that makes the object read).
+    cap_loc = (-W * 0.02, -D * 0.34, base_z + H + 5.5)
+    cap_size = (rim_od * 0.92, rim_od * 0.92, 10.0)  # cylinder via (r inferred in place)
+    # Cable channel: molded slot at the cube↔body joint on the operator-facing
+    # flank (swappable source plugs in from outside — same path real open
+    # photometers use between the LED board and the UI body).
+    cable_slot_loc = (
+        tx - tw / 2 - 2.0,
+        tower_front_y + 2.5,
+        base_z + H + min(12.0, chamber_h * 0.22),
+    )
+    cable_slot_size = (5.0, 8.0, 12.0)
+    # Top-plate assembly screws — AM enclosure language (4 corners of UI deck).
+    screw_locs = [
+        (-W * 0.40, -D * 0.32, base_z + H + 1.0),
+        (-W * 0.40, D * 0.28, base_z + H + 1.0),
+        (W * 0.08, -D * 0.32, base_z + H + 1.0),
+        (W * 0.08, D * 0.28, base_z + H + 1.0),
     ]
     return {
         "optical_path_mm": path,
         "tower_loc": tower_loc,
         "tower_size": tower_size,
-        "well_loc": (tower_loc[0], tower_loc[1], base_z + H + chamber_h + 1.4),
-        "well_size": (cuvette_outer * 0.95, cuvette_outer * 0.95, 3.0),
-        "led_pcb_loc": (tower_loc[0], tower_front_y, base_z + H + chamber_h * 0.40),
+        "well_loc": well_loc,
+        "well_size": well_size,
+        "rim_loc": rim_loc,
+        "rim_od_mm": rim_od,
+        "rim_h_mm": 2.0,  # flat seating ring — not a lid that hides the well
+        "cap_loc": cap_loc,
+        "cap_od_mm": rim_od * 0.92,
+        "cap_h_mm": 11.0,
+        "cable_slot_loc": cable_slot_loc,
+        "cable_slot_size": cable_slot_size,
+        "led_pcb_loc": (tx, tower_front_y, base_z + H + chamber_h * 0.42),
         "led_pcb_size": (led_w, led_d, led_h),
         "top_display_loc": display_loc,
         "top_display_size": display_size,
         "button_locs": button_locs,
+        "screw_locs": screw_locs,
+        "step_shelf_loc": (tx, ty, base_z + H + 2.0),
+        "step_shelf_size": (tw * 1.12, td * 1.10, 4.0),
     }
 
 
@@ -12465,28 +12516,24 @@ def _instrument_source_harness_spec(
     silhouette / never a colorimeter-only branch):
       any exterior SOURCE module on a raised sample chamber must leave the board
       at an edge connector, dress on the OPERATOR-FACING chamber front (−Y), and
-      enter the enclosure through a grommet in the top deck at the chamber base.
+      enter the enclosure through the molded CABLE CHANNEL at the cube↔body joint.
 
     INTENT: Blender + PCB read as one product. A floating stub, a tower-lid exit,
     or a plant-scale cable tray are all class bugs for every handheld/benchtop
     optical/electronic instrument — not a per-brief cosmetic.
 
-    DECISION: dress on −Y (operator-facing) rather than +Y (into the chamber).
-    A +Y flank made Bezier segments read as stubs poking out of the chamber lid
-    on every instrument envelope that uses this form rule.
+    DECISION: terminate in form['cable_slot_*'] (the swappable-module plug path),
+    not a mid-deck grommet. Real open photometers route the LED loom into a slot
+    between the optical cube and the UI body so the module can be swapped without
+    opening the enclosure.
     """
     led_x, led_y, led_z = form["led_pcb_loc"]
     led_w, led_d, led_h = form["led_pcb_size"]
-    tw, td, _th = form["tower_size"]
-    tx, ty, _tz = form["tower_loc"]
+    slot_x, slot_y, slot_z = form["cable_slot_loc"]
     # Connector sits on the −X edge of the board (toward the enclosure centre).
     conn_x = led_x - led_w / 2 - 1.4
     # Stand-off in front of the chamber face so the loom clears the board/pads.
-    clear_y = led_y - max(5.0, td * 0.22)
-    # Grommet: top deck, left-front corner of the chamber base (inboard of tower).
-    port_x = tx - tw * 0.58
-    port_y = min(ty - td * 0.42, clear_y + 1.5)
-    port_z = base_z + H + 1.1
+    clear_y = led_y - max(4.0, form["tower_size"][1] * 0.18)
     colours = (
         (0.78, 0.10, 0.10),  # power
         (0.05, 0.05, 0.06),  # gnd
@@ -12496,43 +12543,37 @@ def _instrument_source_harness_spec(
     strands = []
     for i, z_frac in enumerate((-0.28, -0.10, 0.10, 0.28)):
         z0 = led_z + led_h * z_frac * 0.42
-        # Ribbon fan so four colours read as a loom, not a single blob.
-        y_fan = (i - 1.5) * 0.65
-        # 1) leave connector  2) clear face forward  3) dress left+down  4) into grommet
+        y_fan = (i - 1.5) * 0.55
         start = (conn_x - 0.4, led_y - 0.9, z0)
-        clear = (conn_x - 2.5, clear_y + y_fan, z0 - 1.5)
-        # Midway toward the grommet in X — never overshoot back onto the chamber face.
+        clear = (conn_x - 2.0, clear_y + y_fan, z0 - 1.0)
         dress = (
-            (conn_x + port_x) * 0.5,
-            clear_y + y_fan * 0.35,
-            port_z + (z0 - port_z) * 0.40,
+            (conn_x + slot_x) * 0.5,
+            clear_y + y_fan * 0.3,
+            (z0 + slot_z) * 0.55,
         )
-        end = (port_x + (i - 1.5) * 0.55, port_y, port_z)
+        end = (slot_x + 1.0, slot_y + (i - 1.5) * 0.7, slot_z)
         strands.append({
             "name": f"u_se_exterior_detail_source_harness_{i}",
             "pts": [start, clear, dress, end],
             "rgb": colours[i],
         })
     return {
-        # Kind names the UNIVERSAL topology (source module → enclosure), not a product.
         "kind": "source_module_to_enclosure",
-        "entry": "chamber_top_deck_grommet",
-        # ~2.7 mm OD — thick enough to read at product-hero scale (not hairline CAD).
-        "diameter_mm": 2.7,
-        "diameter_m": 0.0027,
+        "entry": "cube_body_cable_channel",
+        "diameter_mm": 2.4,
+        "diameter_m": 0.0024,
         "strand_count": len(strands),
         "source_anchor": "u_se_exterior_detail_led_pcb",
-        "enclosure_anchor": "u_se_product_top",
-        "port_name": "u_se_exterior_detail_source_harness_port",
-        "port_loc": (port_x, port_y, port_z),
-        "port_size": (8.0, 8.0, 3.6),
+        "enclosure_anchor": "u_se_exterior_detail_cable_slot",
+        "port_name": "u_se_exterior_detail_cable_slot",
+        "port_loc": form["cable_slot_loc"],
+        "port_size": form["cable_slot_size"],
         "strands": strands,
         "board_back_y": led_y + led_d / 2,
         "deck_z": base_z + H,
         "connector_x": conn_x,
         "connector": {"x": conn_x, "y": led_y, "z": led_z},
-        "strain_relief": {"at": "connector_and_grommet"},
-        # Convenience anchors for proveCatch (first strand endpoints).
+        "strain_relief": {"at": "connector_and_cable_channel"},
         "pts": strands[0]["pts"] if strands else [],
     }
 
@@ -12548,16 +12589,16 @@ def _place_instrument_source_harness(
     MO: dict,
     hide_render: bool = True,
 ) -> dict:
-    """Draw the UNIVERSAL source-module→enclosure loom (any isInstrumentDevice)."""
+    """Draw the UNIVERSAL source-module→enclosure loom into the cable channel."""
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     spec = _instrument_source_harness_spec(form, W, D, H, base_z, tt)
     port_mat = fl.make_mat(
-        "m_se_source_harness_port", fl._to_linear((0.04, 0.042, 0.05)), metallic=0.2, roughness=0.45)
+        "m_se_source_harness_port", fl._to_linear((0.04, 0.042, 0.05)), metallic=0.15, roughness=0.55)
     boot_mat = fl.make_mat(
         "m_se_source_harness_boot", fl._to_linear((0.03, 0.03, 0.035)), metallic=0.0, roughness=0.7)
-    # Raised grommet boss on the top deck — the visual "wires enter here" cue.
+    # Molded cable channel at the cube↔body joint (the visual "wires enter here").
     port = fl.add_box(
         spec["port_name"],
         _mm3(spec["port_loc"]),
@@ -12568,8 +12609,7 @@ def _place_instrument_source_harness(
     )
     port.dimensions = _mm3(spec["port_size"])
     port.hide_render = hide_render
-    port["geometry_source"] = "instrument_source_harness_port"
-    # Strain-relief boot at the connector — makes the board→cable junction obvious.
+    port["geometry_source"] = "instrument_cable_channel"
     boot = fl.add_box(
         "u_se_exterior_detail_source_harness_boot",
         _mm3((spec["connector_x"] - 1.0, form["led_pcb_loc"][1] - 0.6, form["led_pcb_loc"][2])),
@@ -12580,17 +12620,6 @@ def _place_instrument_source_harness(
     )
     boot.dimensions = _mm3((3.8, 4.2, form["led_pcb_size"][2] * 0.58))
     boot.hide_render = hide_render
-    # Second boot at the grommet — cable disappears into the enclosure, not air.
-    entry_boot = fl.add_box(
-        "u_se_exterior_detail_source_harness_entry",
-        _mm3((spec["port_loc"][0], spec["port_loc"][1], spec["port_loc"][2] + 1.2)),
-        _mm3((5.5, 5.5, 3.0)),
-        boot_mat,
-        module=module,
-        module_objects=MO,
-    )
-    entry_boot.dimensions = _mm3((5.5, 5.5, 3.0))
-    entry_boot.hide_render = hide_render
     radius = (float(spec["diameter_mm"]) / 2.0) * fl.MM
     for strand in spec["strands"]:
         cable_mat = fl.make_mat(
@@ -12635,32 +12664,36 @@ def _assert_instrument_source_harness_coherent(
     led_w, _led_d, _led_h = form["led_pcb_size"]
     assert spec["kind"] == "source_module_to_enclosure", (
         f"harness kind must name the universal topology, got {spec['kind']!r}")
-    assert spec["entry"] == "chamber_top_deck_grommet"
-    assert float(spec["diameter_mm"]) >= 2.4
-    assert float(spec["diameter_m"]) >= 0.0024
+    assert spec["entry"] == "cube_body_cable_channel"
+    assert float(spec["diameter_mm"]) >= 2.0
+    assert float(spec["diameter_m"]) >= 0.0020
     assert int(spec["strand_count"]) >= 4
     assert spec.get("connector") is not None
     assert spec.get("strain_relief") is not None
     assert spec["source_anchor"].endswith("led_pcb")
-    assert spec["enclosure_anchor"] == "u_se_product_top"
+    assert spec["enclosure_anchor"] == "u_se_exterior_detail_cable_slot"
     assert spec["connector_x"] < led_x - led_w / 2, (
         "harness must originate at an edge connector on the enclosure-facing board side")
     assert 3 <= len(spec["strands"]) <= 5
+    slot_x, slot_y, slot_z = form["cable_slot_loc"]
     for strand in spec["strands"]:
         pts = strand["pts"]
         assert len(pts) >= 4
         sx, sy, sz = pts[0]
         ex, ey, ez = pts[-1]
         assert sx <= led_x - led_w / 2 + 1e-6, "harness must start at/board-side of the connector"
-        assert all(p[1] <= led_y + 0.5 for p in pts), (
+        # Dress/clear stay in front of the chamber; the last point may enter the
+        # cable channel a few mm into the cube↔body joint (real plug path).
+        assert all(p[1] <= led_y + 0.5 for p in pts[:-1]), (
             "harness must dress on the operator-facing side, not into the chamber")
-        assert ez <= base_z + H + 6.0, "harness must enter near the top deck"
-        assert ex < led_x, "harness must run toward the enclosure centre"
-        assert ez < sz - 2.0, "harness must descend from the board to the deck"
+        assert pts[-1][1] <= led_y + 4.0, (
+            "cable-channel entry must stay near the source-face joint, not deep in the cube")
+        assert abs(ex - slot_x) <= 4.0 and abs(ez - slot_z) <= 6.0, (
+            "harness must terminate in the cube↔body cable channel")
         length = 0.0
         for a, b in zip(pts, pts[1:]):
             length += math.sqrt(sum((b[i] - a[i]) ** 2 for i in range(3)))
-        assert 12.0 <= length <= 90.0, (
+        assert 8.0 <= length <= 90.0, (
             f"device-scale harness length for ANY instrument envelope, got {length:.1f} mm")
     return spec
 
@@ -12693,12 +12726,11 @@ def _selftest_instrument_source_harness() -> None:
 
 
 def _selftest_instrument_form_rule() -> None:
-    """proveCatch: instrument exterior features follow USE PHYSICS, not a product clone.
+    """proveCatch: instrument exterior follows USE PHYSICS that produce a real object.
 
-    UNIVERSAL for every `isInstrumentDevice` sealed enclosure — chamber height,
-    well size, source-module scale, top-deck HMI, and source→enclosure harness
-    all derive from envelope + optical_path_mm. Named without a product noun so
-    the next instrument brief cannot regress behind a colorimeter-only test.
+    Gold open-photometer shape is the TRAINING check — not a silhouette to copy.
+    Each assert names the reason; multi-envelope so the next instrument brief
+    cannot regress behind a one-fixture patch.
     """
     W, D, H, base_z, tt = 180.0, 140.0, 70.0, 300.0, 6.0
     form = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=10.0)
@@ -12711,32 +12743,35 @@ def _selftest_instrument_form_rule() -> None:
 
     assert W > D > H, "fixture must be a wide-flat top-operated envelope"
     assert form["optical_path_mm"] == 10.0
-    # Sample chamber must rise above the body (cuvette inserts from above).
+    # Optical cube rises above the body (cuvette inserts from above).
     assert (tower_z - tower_h / 2) >= base_z + H - 1e-6, (
         "sample chamber must sit on top of the body for top-loading cuvettes")
-    assert tower_h >= 28.0 + 10.0 * 1.0, (
-        "chamber height must clear a standard cuvette body for the optical path")
-    # Well tracks the cuvette for this path (≈12.5 mm outer → well ~path-scale).
-    assert form["well_size"][0] <= 16.0 and form["well_size"][1] <= 16.0, (
-        "cuvette well must track the optical-path cuvette, not a decorative hole")
-    # Source module is window-scale on the optical-axis face — not a face-filling plate.
-    assert led_w <= tower_w * 0.80 and led_h <= tower_h * 0.45 and led_d <= 2.5, (
-        "source module must be optical-window scale, not a cabinet-spanning board")
-    assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2, (
-        "source module must mount on the chamber's optical-axis face")
-    _png = _instrument_pcb_png_path()
-    assert _png is None or str(_png).endswith(".png")
-    # Path change must resize the chamber/well (function, not a fixed decorative tower).
+    assert tower_h >= 38.0, (
+        "chamber height must clear a standard cuvette body (~45 mm class)")
+    # Chunky cube — not a skinny chimney (real photometers are blocky optical hearts).
+    assert tower_w >= 36.0 and tower_d >= 34.0, (
+        f"optical cube must be chunky, got plan {tower_w:.1f}×{tower_d:.1f} mm")
+    assert abs(tower_w - tower_d) / max(tower_w, tower_d) <= 0.15, (
+        "optical cube plan should be near-square (cuvette + baffle)")
+    assert tower_h / tower_w <= 1.45, (
+        f"optical cube must not read as a thin tower, aspect h/w={tower_h / tower_w:.2f}")
+    # Well + rim + cap — ambient-light rejection is a hard brief physics need.
+    assert form["well_size"][0] <= 16.0 and form["well_size"][1] <= 16.0
+    assert form["rim_od_mm"] > form["well_size"][0] + 4.0, (
+        "circular rim must oversize the well to seat the ambient-light cap")
+    assert form["cap_od_mm"] > 10.0 and form["cap_h_mm"] >= 8.0
+    assert form["cable_slot_size"][0] >= 4.0, (
+        "cube↔body cable channel must exist for the swappable source module")
+    # Source module is window-scale on the optical-axis face.
+    assert led_w <= tower_w * 0.80 and led_h <= tower_h * 0.50 and led_d <= 2.5
+    assert abs(led_x - tower_x) < 1e-6 and led_y < tower_y - tower_d / 2
     form20 = _instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=20.0)
-    assert form20["well_size"][0] > form["well_size"][0], (
-        "longer optical path must widen the cuvette well")
-    assert display_w > display_d > display_h, (
-        "display must be a thin top-deck rectangle (top operating plane)")
-    assert len(form["button_locs"]) >= 5 and all(loc[2] > base_z + H for loc in form["button_locs"]), (
-        "tactile buttons must live on the top deck with the display")
-    assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30, (
-        "instrument electronics story PCB must not span the cutaway interior")
-    # Closed-product hero for instruments (not cabinet cutaway).
+    assert form20["well_size"][0] > form["well_size"][0]
+    assert form20["tower_size"][0] >= form["tower_size"][0]
+    assert display_w > display_d > display_h
+    assert len(form["button_locs"]) >= 6, "D-pad + A/B on the top UI deck"
+    assert len(form["screw_locs"]) >= 4, "AM enclosure needs visible top-plate fasteners"
+    assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30
     assert "00-hero" in sealed_exterior_view_names(True)
     _assert_instrument_source_harness_coherent(form, W, D, H, base_z, tt)
     _assert_instrument_source_harness_coherent(form20, W, D, H, base_z, tt)
@@ -13658,49 +13693,94 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear((0.02, 0.03, 0.05)),
                                     metallic=0.0, roughness=0.14)
-            _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear((0.18, 0.19, 0.22)),
-                                   metallic=0.2, roughness=0.5)
-            _port_mat = fl.make_mat("m_se_face_port", fl._to_linear((0.28, 0.30, 0.33)),
-                                    metallic=0.25, roughness=0.45)
+            _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear((0.12, 0.12, 0.14)),
+                                   metallic=0.15, roughness=0.45)
+            # Optical cube matches the charcoal body — same AM polymer, not a grey appliance tower.
+            _port_mat = fl.make_mat("m_se_face_port", fl._to_linear((0.10, 0.105, 0.115)),
+                                    metallic=0.05, roughness=0.62)
             _bore_mat = fl.make_mat("m_se_face_bore", fl._to_linear((0.01, 0.01, 0.01)),
                                     metallic=0.0, roughness=0.9)
-            # display window on the TOP deck (PyBadge-style), not the front face.
+            _rim_mat = fl.make_mat("m_se_face_rim", fl._to_linear((0.08, 0.085, 0.09)),
+                                   metallic=0.05, roughness=0.55)
+            _screw_mat = fl.make_mat("m_se_face_screw", fl._to_linear((0.05, 0.05, 0.06)),
+                                     metallic=0.55, roughness=0.35)
+            # Recessed display on the TOP UI deck (closed product — no FR4 under the glass).
             _disp = fl.add_box("u_se_exterior_detail_display",
                                _mm3(form["top_display_loc"]),
                                _mm3(form["top_display_size"]), _disp_mat,
                                module=_skin_mod, module_objects=MO)
             _disp.dimensions = _mm3(form["top_display_size"])
             _disp.hide_render = True
-            # tactile buttons on the top deck around the display.
+            # D-pad + A/B on the top deck.
             for _bi, _loc in enumerate(form["button_locs"]):
                 _btn = fl.add_cyl(f"u_se_exterior_detail_button_{_bi}",
                                   _mm3(_loc),
-                                  3.2 * fl.MM, 2.2 * fl.MM, _btn_mat,
+                                  3.0 * fl.MM, 2.0 * fl.MM, _btn_mat,
                                   module=_skin_mod, module_objects=MO)
                 _btn.hide_render = True
-            # cuvette / optical tower — a light-tight vertical block raised off the
-            # wide top, on one side of the display.
+            # Step shelf under the optical cube — the L-body joint (UI deck vs optical volume).
+            _shelf = fl.add_box(
+                "u_se_exterior_detail_step_shelf",
+                _mm3(form["step_shelf_loc"]),
+                _mm3(form["step_shelf_size"]),
+                _port_mat,
+                module=_skin_mod, module_objects=MO,
+            )
+            _shelf.dimensions = _mm3(form["step_shelf_size"])
+            _shelf.hide_render = True
+            # Chunky light-tight optical cube (cuvette chamber).
             _port = fl.add_box("u_se_exterior_detail_port",
                                _mm3(form["tower_loc"]),
                                _mm3(form["tower_size"]), _port_mat,
                                module=_skin_mod, module_objects=MO)
             _port.dimensions = _mm3(form["tower_size"])
             _port.hide_render = True
-            # the cuvette well — square, dark, and on top of the tower.
+            # Square cuvette well.
             _bore = fl.add_box("u_se_exterior_detail_port_bore",
                                _mm3(form["well_loc"]),
                                _mm3(form["well_size"]), _bore_mat,
                                module=_skin_mod, module_objects=MO)
             _bore.dimensions = _mm3(form["well_size"])
             _bore.hide_render = True
-            # Optical-axis SOURCE PCB — same board artefact as the PCB tab
-            # (thin FR4 + board-top.png), visible on the closed product.
+            # Circular rim that seats the ambient-light cap.
+            _rim = fl.add_cyl(
+                "u_se_exterior_detail_well_rim",
+                _mm3(form["rim_loc"]),
+                (form["rim_od_mm"] / 2.0) * fl.MM,
+                form["rim_h_mm"] * fl.MM,
+                _rim_mat,
+                module=_skin_mod, module_objects=MO,
+            )
+            _rim.hide_render = True
+            # Removable ambient-light cap parked on the UI deck (Beer–Lambert I₀).
+            _cap = fl.add_cyl(
+                "u_se_exterior_detail_ambient_cap",
+                _mm3(form["cap_loc"]),
+                (form["cap_od_mm"] / 2.0) * fl.MM,
+                form["cap_h_mm"] * fl.MM,
+                _rim_mat,
+                module=_skin_mod, module_objects=MO,
+            )
+            _cap.hide_render = True
+            # AM top-plate fasteners.
+            for _si, _sloc in enumerate(form["screw_locs"]):
+                _sc = fl.add_cyl(
+                    f"u_se_exterior_detail_screw_{_si}",
+                    _mm3(_sloc),
+                    1.6 * fl.MM,
+                    2.2 * fl.MM,
+                    _screw_mat,
+                    module=_skin_mod, module_objects=MO,
+                )
+                _sc.hide_render = True
+            # Optical-axis SOURCE PCB — exposed replaceable module on the cube face.
             _place_instrument_source_pcb(
                 "u_se_exterior_detail_led_pcb", form, _skin_mod, MO, hide_render=True)
             _place_instrument_source_harness(
                 form, W, D, H, base_z, tt, _skin_mod, MO, hide_render=True)
-            _place_instrument_ui_pcb(
-                "u_se_exterior_detail_ui_pcb", form, _skin_mod, MO, hide_render=True)
+            # GOTCHA: do NOT place a green UI PCB under the display on the closed
+            # product — real open photometers recess the glass in the top plate;
+            # FR4 under the display is cutaway-only (_place_instrument_ui_pcb cues).
             # USB / service port on the bottom edge (visible in 07-product-service)
             _usb_mat = fl.make_mat(
                 "m_se_face_usb", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.35, roughness=0.4)
