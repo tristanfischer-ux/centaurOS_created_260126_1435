@@ -650,6 +650,12 @@ def _build_cabinets(equipment: list, concern_tags: set) -> dict:
 # scored 0; the power parts (USB, battery, regulator) also fell through so Electrical
 # scored 0. Order MOST-SPECIFIC-FIRST, matching the TS list exactly.
 _INSTRUMENT_ROLE_PATTERNS = [
+    # indicator + power_protection added 2026-07-13 (mirror TS): a Power Indicator LED is a
+    # power LOAD (not an optical source); a DC input fuse / polyfuse / TVS / reverse-polarity
+    # / thermal cutoff / EMC bead is a series-PROTECTION element on the DC path — both were
+    # role-less → unwired → Connection-trace concerns. Order matches derive-topology.ts.
+    ("indicator",          r"\b(?:power|status|fault|alarm|charge|standby|ready)[_ -]?indicator\b|\bindicator[_ -]?(?:led|lamp|light)\b|\bpilot[_ -]?(?:light|lamp)\b|\bpower[_ -]?(?:on[_ -]?)?led\b"),
+    ("power_protection",   r"\b(?:fuse|polyfuse|poly[_ -]?fuse|ptc|resettable|circuit[_ -]?breaker|mcb|mov|varistor|tvs|esd[_ -]?protect\w*|surge[_ -]?protect\w*|over[_ -]?current[_ -]?protect\w*|over[_ -]?voltage[_ -]?protect\w*|reverse[_ -]?polarity[_ -]?protect\w*|thermal[_ -]?(?:cut[_ -]?off|fuse|protect\w*)|ferrite[_ -]?(?:bead|emc)|emc[_ -]?(?:bead|filter)|inrush[_ -]?limit\w*)\b"),
     ("driver",             r"(?:led|laser|lamp|source|display|backlight)[_ -]?driver\b|\bdriver[_ -]?(?:board|circuit|stage|ic)\b|\bconstant[_ -]?current[_ -]?driver\b"),
     ("power_conditioning", r"\b(?:regulator|ldo|buck|boost|dc[_ -]?dc|pmic|power[_ -]?management|charge[_ -]?(?:management|controller|circuit|ic)|charger|bms|battery[_ -]?management|power[_ -]?supply|psu|voltage[_ -]?reference|voltage[_ -]?regulat\w*)\b"),
     ("power_storage",      r"\b(?:battery|rechargeable|li[_ -]?ion|lipo|nimh|coin[_ -]?cell|cell[_ -]?pack|supercap\w*|super[_ -]?capacitor|energy[_ -]?cell)\b"),
@@ -664,7 +670,8 @@ _INSTRUMENT_ROLE_PATTERNS = [
     ("display",            r"\b(?:display|screen|lcd|oled|tft|e[_ -]?ink|readout|seven[_ -]?segment|annunciator|graphic[_ -]?display|numeric[_ -]?display|vfd)\b"),
     ("input",              r"\b(?:button|keypad|keyswitch|user[_ -]?input|membrane[_ -]?switch|tactile[_ -]?switch|rotary[_ -]?encoder|touch[_ -]?(?:pad|key)|power[_ -]?switch|on[_ -]?off[_ -]?switch|control[_ -]?switch)\b"),
 ]
-_INSTRUMENT_POWER_ROLES = {"power_in", "power_storage", "power_conditioning"}
+_INSTRUMENT_POWER_ROLES = {"power_in", "power_storage", "power_conditioning",
+                           "power_protection", "indicator"}
 
 
 def _instrument_role(name: str):

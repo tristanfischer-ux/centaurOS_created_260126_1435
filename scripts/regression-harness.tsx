@@ -13481,6 +13481,12 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantI('role: battery pack → power_storage', instrumentRole('Rechargeable Battery Pack') === 'power_storage')
     wantI('role: USB → power_in', instrumentRole('USB Power Interface') === 'power_in')
     wantI('role: structural enclosure → null (not a signal part)', instrumentRole('Enclosure Shell') === null)
+    // 2026-07-13 — Connection-trace orphan fixes: series protection + power indicators.
+    wantI('role: DC input fuse → power_protection', instrumentRole('DC Input Fuse') === 'power_protection')
+    wantI('role: polyfuse → power_protection', instrumentRole('Polyfuse Resettable') === 'power_protection')
+    wantI('role: reverse-polarity → power_protection', instrumentRole('Reverse Polarity Protection') === 'power_protection')
+    wantI('role: power indicator LED → indicator (NOT optical_source)', instrumentRole('Power Indicator LED') === 'indicator')
+    wantI('role: LED source still optical_source (indicator does not steal it)', instrumentRole('LED Source') === 'optical_source')
     // a genuine colorimeter word tree → a chained signal + power graph.
     const instr: any = [{ sub_modules: [{ words: [
       { name_human: 'LED Source' }, { name_human: 'LED Driver' }, { name_human: 'Cuvette Holder' },
@@ -13489,9 +13495,17 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       { name_human: 'Local Display' }, { name_human: 'User Input Buttons' },
       { name_human: 'Rechargeable Battery Pack' }, { name_human: 'USB Power Interface' },
       { name_human: 'DC DC Regulator' }, { name_human: 'Battery Charge Management Circuit' },
+      { name_human: 'DC Input Fuse' }, { name_human: 'Power Indicator LED' },
       { name_human: 'Enclosure Shell' },
     ] }] }]
     const iEdges = deriveInstrumentTopology(instr)
+    // series PROTECTION (DC input fuse) is wired IN + OUT on the power path (was orphan
+    // missing_input); a POWER INDICATOR LED is a rail LOAD with an INPUT (was orphan optical).
+    const fuse = 'DC Input Fuse', pind = 'Power Indicator LED'
+    wantI('DC input fuse has a power INPUT (series, was missing_input)', iEdges.some((e) => e.to_part === fuse && e.mechanism === 'electrical_bus'))
+    wantI('DC input fuse has a power OUTPUT (feeds the rail)', iEdges.some((e) => e.from_part === fuse && e.mechanism === 'electrical_bus'))
+    wantI('power indicator LED has a power INPUT (rail load, was orphan)', iEdges.some((e) => e.to_part === pind && e.mechanism === 'electrical_bus'))
+    wantI('power indicator LED is NOT a signal-chain source', !iEdges.some((e) => e.from_part === pind && e.mechanism === 'signal'))
     // a SECOND power-conditioning part (the charge-management circuit) must be wired
     // in+out, not orphaned (colorimeter: the only 2 connectivity concerns).
     const bcm = 'Battery Charge Management Circuit'

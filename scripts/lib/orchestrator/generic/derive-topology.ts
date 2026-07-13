@@ -425,9 +425,9 @@ export function deriveDeviceEnergyTopology(
 // plant signal), so the 35 plant/electrical classes are byte-identical.
 
 export type InstrumentRole =
-  | 'power_in' | 'power_storage' | 'power_conditioning' | 'driver'
+  | 'power_in' | 'power_storage' | 'power_conditioning' | 'power_protection' | 'driver'
   | 'optical_source' | 'optical_element' | 'optical_sample' | 'detector'
-  | 'conditioning' | 'digitiser' | 'compute' | 'display' | 'input'
+  | 'conditioning' | 'digitiser' | 'compute' | 'display' | 'input' | 'indicator'
 
 // The SIGNAL spine order (feed → readout): a part's role gives its slot on the chain.
 const SIGNAL_CHAIN_ORDER: InstrumentRole[] = [
@@ -440,6 +440,15 @@ const SIGNAL_CHAIN_ORDER: InstrumentRole[] = [
 // pack); 'driver' precedes optical_source so 'LED Driver' is the driver stage while
 // 'LED Source' is the emitter.
 const INSTRUMENT_ROLE_PATTERNS: Array<[InstrumentRole, RegExp]> = [
+  // indicator BEFORE optical_source — a 'Power Indicator LED' / 'Status Indicator' /
+  // pilot light is a POWER LOAD on the rail, NOT a light source in the optical chain
+  // (else it types as optical_source via \bled\b and reads as an orphan_instrument with
+  // an out-edge but no in-edge — colorimeter X-131). Universal for any instrument.
+  ['indicator',         /\b(?:power|status|fault|alarm|charge|standby|ready)[_ -]?indicator\b|\bindicator[_ -]?(?:led|lamp|light)\b|\bpilot[_ -]?(?:light|lamp)\b|\bpower[_ -]?(?:on[_ -]?)?led\b/i],
+  // power_protection BEFORE power_in — a DC input fuse / polyfuse / TVS / reverse-polarity /
+  // thermal cutoff / EMC bead is a SERIES element on the DC path; without a role it collects
+  // no edges and reads as missing_input (colorimeter X-114 DC Input Fuse). Universal.
+  ['power_protection',  /\b(?:fuse|polyfuse|poly[_ -]?fuse|\bptc\b|resettable|circuit[_ -]?breaker|\bmcb\b|\bmov\b|varistor|\btvs\b|esd[_ -]?protect\w*|surge[_ -]?protect\w*|over[_ -]?current[_ -]?protect\w*|over[_ -]?voltage[_ -]?protect\w*|reverse[_ -]?polarity[_ -]?protect\w*|thermal[_ -]?(?:cut[_ -]?off|fuse|protect\w*)|ferrite[_ -]?(?:bead|emc)|emc[_ -]?(?:bead|filter)|inrush[_ -]?limit\w*)\b/i],
   ['driver',            /\b(?:led|laser|lamp|source|display|backlight)[_ -]?driver\b|\bdriver[_ -]?(?:board|circuit|stage|ic)\b|\bconstant[_ -]?current[_ -]?driver\b/i],
   ['power_conditioning',/\b(?:regulator|\bldo\b|buck|boost|dc[_ -]?dc|\bpmic\b|power[_ -]?management|charge[_ -]?(?:management|controller|circuit|ic)|charger|\bbms\b|battery[_ -]?management|power[_ -]?supply|\bpsu\b|voltage[_ -]?reference|voltage[_ -]?regulat\w*)\b/i],
   ['power_storage',     /\b(?:battery|rechargeable|\bli[_ -]?ion\b|\blipo\b|\bnimh\b|coin[_ -]?cell|cell[_ -]?pack|supercap\w*|super[_ -]?capacitor|energy[_ -]?cell)\b/i],
@@ -567,6 +576,20 @@ export function deriveInstrumentTopology(modules: AnyModule[]): TopologyEdge[] {
     pushPwr(sources[0] ?? reg, regs[i]) // in
     pushPwr(regs[i], reg) // out → the main rail
   }
+  // 2b) SERIES PROTECTION — a DC input fuse / polyfuse / TVS / reverse-polarity / thermal
+  //     cutoff / EMC bead sits IN SERIES on the supply path: the supply side feeds it, it
+  //     feeds the rail. So none reads as missing_input (colorimeter: DC Input Fuse et al.
+  //     were unwired). Universal — any instrument with input protection on its DC entry.
+  const railNode = reg ?? loadHub
+  const supply0 = sources[0] ?? railNode
+  for (const p of byRole.get('power_protection') ?? []) {
+    pushPwr(supply0, p) // in — from the supply side
+    pushPwr(p, railNode) // out — into the DC rail
+  }
+  // 2c) POWER INDICATORS / pilot lights are LOADS on the rail (they illuminate when the
+  //     instrument is powered): rail → indicator. So each carries a real input and never
+  //     reads as an orphan optical source. Universal.
+  for (const p of byRole.get('indicator') ?? []) pushPwr(railNode, p)
 
   // 3) DRIVER — the LED/source driver drives the emitter (power) and takes a control
   //    tie from compute (the MCU sets the source intensity / blank reference).
