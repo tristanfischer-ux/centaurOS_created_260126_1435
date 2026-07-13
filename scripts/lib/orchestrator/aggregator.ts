@@ -371,5 +371,26 @@ export function deriveDeviceScaleEnclosure(
     q.design_envelope_height_mm = deviceScaleQuantity(heightMm, 'mm', 'length', 'max', 'design_envelope_height_mm', boxCondition)
   }
 
+  // DEVICE-SCALE ELECTRICAL LOAD ANCHOR (2026-07-13): a portable/benchtop electronic
+  // instrument draws a few WATTS (USB/battery), not the ~1000 kW plant phantom the
+  // design-loop convergence writes into total_supply_demand_kw when NO connected-load
+  // ANCHOR exists (the colorimeter's universal contract path mints none, so
+  // writeback-bridge's aliasAnchor is null → it takes conv.trajectory[last].total_demand_kw
+  // ≈ 1001 kW). Minting a device-scale anchor here makes the writeback ALIAS-RECONCILE to
+  // it and REFUSE the phantom (dev ≫ tolerance → UNVERIFIED-ARTEFACT), so the panel
+  // schedule / breakers / Electrical read device-scale. Envelope estimate (like the
+  // enclosure-volume estimate above): a handheld LED-photometer with MCU + display + USB
+  // charge ≈ 5 W continuous. Only when absent (a class builder that mints its own load is
+  // never overridden) AND the device gate already fired. Universal — plant never reaches here.
+  if (q.connected_electrical_load_kw === undefined && q.total_electrical_demand_kw === undefined) {
+    const deviceLoadKw = 0.005
+    q.connected_electrical_load_kw = deviceScaleQuantity(
+      deviceLoadKw, 'kW', 'power', 'rated', 'connected_electrical_load_kw',
+      `device-scale portable/benchtop instrument continuous draw ≈ ${deviceLoadKw * 1000} W (USB/battery-powered ` +
+      `LED source + MCU + display + detector AFE + regulator quiescent) — envelope estimate; NOT the ~1000 kW ` +
+      `plant convergence phantom. Anchors total_supply_demand_kw so the panel schedule reads device-scale`,
+    )
+  }
+
   return `deriveDeviceScaleEnclosure: enclosure_volume_m3=${volM3.toFixed(4)} m³ estimated from total_system_mass_kg=${massKg} kg (device-scale gate: ${smallMass ? 'small mass' : 'portable positioning'})`
 }
