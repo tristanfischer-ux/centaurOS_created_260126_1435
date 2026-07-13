@@ -12089,14 +12089,17 @@ def _place_instrument_zone_story(
     band_h: float,
     iw: float,
     idep: float,
-    skin_mod: str,
+    story_mod: str,
     MO: dict,
 ) -> None:
     """Stylized optical-bench interior for a handheld instrument cutaway.
 
     Zone-stacked grey slabs read as a BESS cabinet, not an Open Colorimeter.
     The cutaway hero tells a source → cuvette → detector story with a PCB +
-    coin-cell — keyed on _IS_INSTRUMENT_DEVICE only."""
+    coin-cell — keyed on _IS_INSTRUMENT_DEVICE only.
+
+    GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
+    run_render_pipeline's hero pass repaints every structure object with ghost/steel."""
     mid_z = z_cursor + band_h * 0.5
 
     def _mm3(tpl):
@@ -12104,66 +12107,94 @@ def _place_instrument_zone_story(
 
     if key == "optical":
         led_mat = fl.make_mat(
-            "m_se_story_led", fl._to_linear((0.95, 0.55, 0.12)), metallic=0.1, roughness=0.35)
+            "m_se_story_led", fl._to_linear((1.0, 0.62, 0.08)),
+            metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=2.5)
         cuv_mat = fl.make_mat(
-            "m_se_story_cuvette", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.2, roughness=0.55)
+            "m_se_story_cuvette", fl._to_linear((0.04, 0.05, 0.08)), metallic=0.35, roughness=0.18)
         det_mat = fl.make_mat(
-            "m_se_story_detector", fl._to_linear((0.15, 0.16, 0.20)), metallic=0.3, roughness=0.45)
+            "m_se_story_detector", fl._to_linear((0.12, 0.13, 0.18)), metallic=0.45, roughness=0.35)
+        bench_mat = fl.make_mat(
+            "m_se_story_bench", fl._to_linear((0.20, 0.21, 0.24)), metallic=0.2, roughness=0.55)
+        beam_mat = fl.make_mat(
+            "m_se_story_beam", fl._to_linear((1.0, 0.72, 0.12)),
+            metallic=0.0, roughness=0.15, kind="led_emissive", emission_strength=1.2)
+        # optical bench rail — the dominant horizontal read in the cutaway
+        _bench = fl.add_box(
+            "u_se_instrument_story_bench",
+            _mm3((0.0, idep * 0.02, z_cursor + band_h * 0.18)),
+            _mm3((iw * 0.88, idep * 0.62, max(5.0, band_h * 0.12))),
+            bench_mat, module=story_mod, module_objects=MO)
+        _bench.dimensions = _mm3((iw * 0.88, idep * 0.62, max(5.0, band_h * 0.12)))
         _led = fl.add_box(
             "u_se_instrument_story_led",
-            _mm3((-iw * 0.22, idep * 0.08, mid_z)),
-            _mm3((iw * 0.28, 8.0, band_h * 0.18)),
-            led_mat, module=skin_mod, module_objects=MO)
-        _led.dimensions = _mm3((iw * 0.28, 8.0, band_h * 0.18))
+            _mm3((-iw * 0.30, idep * 0.12, mid_z)),
+            _mm3((iw * 0.22, 12.0, band_h * 0.32)),
+            led_mat, module=story_mod, module_objects=MO)
+        _led.dimensions = _mm3((iw * 0.22, 12.0, band_h * 0.32))
         _cuv = fl.add_box(
             "u_se_instrument_story_cuvette",
-            _mm3((0.0, 0.0, mid_z)),
-            _mm3((iw * 0.22, idep * 0.35, band_h * 0.55)),
-            cuv_mat, module=skin_mod, module_objects=MO)
-        _cuv.dimensions = _mm3((iw * 0.22, idep * 0.35, band_h * 0.55))
+            _mm3((0.0, idep * 0.04, mid_z + band_h * 0.04)),
+            _mm3((iw * 0.20, idep * 0.42, band_h * 0.62)),
+            cuv_mat, module=story_mod, module_objects=MO)
+        _cuv.dimensions = _mm3((iw * 0.20, idep * 0.42, band_h * 0.62))
         _det = fl.add_box(
             "u_se_instrument_story_detector",
-            _mm3((iw * 0.26, -idep * 0.06, mid_z)),
-            _mm3((iw * 0.18, idep * 0.25, band_h * 0.28)),
-            det_mat, module=skin_mod, module_objects=MO)
-        _det.dimensions = _mm3((iw * 0.18, idep * 0.25, band_h * 0.28))
-        print(f"[univ][sealed] instrument story: optical LED + cuvette + detector")
+            _mm3((iw * 0.30, idep * 0.08, mid_z)),
+            _mm3((iw * 0.16, idep * 0.30, band_h * 0.30)),
+            det_mat, module=story_mod, module_objects=MO)
+        _det.dimensions = _mm3((iw * 0.16, idep * 0.30, band_h * 0.30))
+        # emissive light path — makes the optical axis legible at thumbnail scale
+        _beam = fl.add_box(
+            "u_se_instrument_story_beam",
+            _mm3((0.0, idep * 0.10, mid_z)),
+            _mm3((iw * 0.62, 4.0, band_h * 0.10)),
+            beam_mat, module=story_mod, module_objects=MO)
+        _beam.dimensions = _mm3((iw * 0.62, 4.0, band_h * 0.10))
+        print(f"[univ][sealed] instrument story: optical bench + LED + cuvette + detector + beam")
     elif key == "electronics":
         pcb_mat = fl.make_mat(
-            "m_se_story_pcb", fl._to_linear((0.08, 0.42, 0.22)), metallic=0.15, roughness=0.4)
+            "m_se_story_pcb", fl._to_linear((0.06, 0.48, 0.24)), metallic=0.1, roughness=0.38)
+        chip_mat = fl.make_mat(
+            "m_se_story_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
         _pcb = fl.add_box(
             "u_se_instrument_story_pcb",
-            _mm3((0.0, idep * 0.05, mid_z)),
-            _mm3((iw * 0.72, idep * 0.55, max(4.0, band_h * 0.25))),
-            pcb_mat, module=skin_mod, module_objects=MO)
-        _pcb.dimensions = _mm3((iw * 0.72, idep * 0.55, max(4.0, band_h * 0.25)))
-        print(f"[univ][sealed] instrument story: main PCB")
+            _mm3((0.0, idep * 0.08, mid_z)),
+            _mm3((iw * 0.82, idep * 0.58, max(5.0, band_h * 0.42))),
+            pcb_mat, module=story_mod, module_objects=MO)
+        _pcb.dimensions = _mm3((iw * 0.82, idep * 0.58, max(5.0, band_h * 0.42)))
+        for _ci, (_cx, _cz) in enumerate([(-0.22, 0.55), (0.0, 0.45), (0.20, 0.55)]):
+            fl.add_box(
+                f"u_se_instrument_story_chip_{_ci}",
+                _mm3((iw * _cx, idep * 0.22, z_cursor + band_h * _cz)),
+                _mm3((iw * 0.10, 3.0, band_h * 0.14)),
+                chip_mat, module=story_mod, module_objects=MO)
+        print(f"[univ][sealed] instrument story: main PCB + MCU packages")
     elif key == "power":
         bat_mat = fl.make_mat(
-            "m_se_story_cell", fl._to_linear((0.55, 0.56, 0.58)), metallic=0.5, roughness=0.35)
+            "m_se_story_cell", fl._to_linear((0.62, 0.63, 0.66)), metallic=0.55, roughness=0.32)
         fl.add_cyl(
             "u_se_instrument_story_cell",
-            _mm3((-iw * 0.30, idep * 0.10, mid_z)),
-            10.0 * fl.MM, 3.2 * fl.MM, bat_mat,
-            module=skin_mod, module_objects=MO,
+            _mm3((-iw * 0.34, idep * 0.14, mid_z)),
+            12.0 * fl.MM, 4.0 * fl.MM, bat_mat,
+            module=story_mod, module_objects=MO,
             rotation=(math.radians(90), 0.0, 0.0))
         print(f"[univ][sealed] instrument story: coin cell")
     elif key == "interface":
         _disp_mat = fl.make_mat(
-            "m_se_story_iface_disp", fl._to_linear((0.02, 0.03, 0.05)), metallic=0.0, roughness=0.2)
+            "m_se_story_iface_disp", fl._to_linear((0.02, 0.04, 0.08)), metallic=0.0, roughness=0.12)
         _btn_mat = fl.make_mat(
-            "m_se_story_iface_btn", fl._to_linear((0.20, 0.21, 0.24)), metallic=0.15, roughness=0.5)
+            "m_se_story_iface_btn", fl._to_linear((0.22, 0.23, 0.26)), metallic=0.15, roughness=0.5)
         fl.add_box(
             "u_se_instrument_story_display",
-            _mm3((-iw * 0.18, idep * 0.32, mid_z)),
-            _mm3((iw * 0.42, 3.0, band_h * 0.62)),
-            _disp_mat, module=skin_mod, module_objects=MO)
-        for _bi, (_bx, _bz) in enumerate([(0.28, 0.55), (0.28, 0.25), (0.20, 0.40), (0.36, 0.40)]):
+            _mm3((-iw * 0.20, idep * 0.38, mid_z)),
+            _mm3((iw * 0.46, 4.0, band_h * 0.72)),
+            _disp_mat, module=story_mod, module_objects=MO)
+        for _bi, (_bx, _bz) in enumerate([(0.30, 0.68), (0.30, 0.28), (0.18, 0.48), (0.42, 0.48)]):
             fl.add_cyl(
                 f"u_se_instrument_story_button_{_bi}",
-                _mm3((iw * _bx, idep * 0.36, z_cursor + band_h * _bz)),
-                2.8 * fl.MM, 2.0 * fl.MM, _btn_mat,
-                module=skin_mod, module_objects=MO,
+                _mm3((iw * _bx, idep * 0.42, z_cursor + band_h * _bz)),
+                3.6 * fl.MM, 2.6 * fl.MM, _btn_mat,
+                module=story_mod, module_objects=MO,
                 rotation=(math.radians(90), 0.0, 0.0))
         print(f"[univ][sealed] instrument story: display + buttons")
 
@@ -12258,15 +12289,25 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
-    for snm, loc, size in [
-        ("u_skid_encl_back",   (0.0, D / 2 - t / 2, base_z + H / 2), (W, t, H)),
-        ("u_skid_encl_left",   (-W / 2 + t / 2, 0.0, base_z + H / 2), (t, D, H)),
-        ("u_skid_encl_right",  (W / 2 - t / 2, 0.0, base_z + H / 2), (t, D, H)),
-        ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
-        ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
-    ]:
-        _o = fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
-        _o.dimensions = _mm3(size)   # add_box halves; set true size
+    # Instrument devices skip the wireframe u_skid shell — the u_se_product cutaway body
+    # is the only enclosure read in the hero; a duplicate structure shell painted steel-grey
+    # by run_render_pipeline drowned the coloured optical-bench story (2026-07-13).
+    if not _IS_INSTRUMENT_DEVICE:
+        for snm, loc, size in [
+            ("u_skid_encl_back",   (0.0, D / 2 - t / 2, base_z + H / 2), (W, t, H)),
+            ("u_skid_encl_left",   (-W / 2 + t / 2, 0.0, base_z + H / 2), (t, D, H)),
+            ("u_skid_encl_right",  (W / 2 - t / 2, 0.0, base_z + H / 2), (t, D, H)),
+            ("u_skid_encl_top",    (0.0, 0.0, base_z + H - t / 2), (W, D, t)),
+            ("u_skid_encl_bottom", (0.0, 0.0, base_z + t / 2), (W, D, t)),
+        ]:
+            _o = fl.add_box(snm, _mm3(loc), _mm3(size), shell_mat, module=sid, module_objects=MO)
+            _o.dimensions = _mm3(size)   # add_box halves; set true size
+
+    # Equipment module for the stylized interior — MUST NOT be structure_containment
+    # (hero pass repaints structure objects ghost/steel and erases story colours).
+    _story_mod = parts[0].module_id if parts else sid
+    if _story_mod not in MO:
+        MO[_story_mod] = []
 
     # 3. stack the zones bottom → top; parts in a WRAPPED GRID inside each band
     #    (run-20 litter fix: 28 parts in ONE row made 13 mm slivers all sharing one
@@ -12282,7 +12323,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         band_h = ih * frac
         plist = sorted(zone_parts[key], key=lambda p: str(p.name))
         if _IS_INSTRUMENT_DEVICE:
-            _place_instrument_zone_story(key, z_cursor, band_h, iw, idep, sid, MO)
+            _place_instrument_zone_story(key, z_cursor, band_h, iw, idep, _story_mod, MO)
             z_cursor += band_h
             continue
         if plist:
@@ -18919,7 +18960,8 @@ def main():
         fl.run_render_pipeline(out_dir, MO,
                                structure_module_id=STRUCTURE_MODULE_ID,
                                hero_camera_override=_hero_cam,
-                               hero_open_frame=not _CONTAINER_LAYOUT,
+                               hero_open_frame=(
+                                   not _CONTAINER_LAYOUT and not _IS_INSTRUMENT_DEVICE),
                                spatial_bbox_override=_spatial_bb,
                                spatial_cameras_override=_spatial_cameras,
                                view_preparer=(

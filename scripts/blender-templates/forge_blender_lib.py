@@ -1124,8 +1124,16 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     # identical — only the structure material differs.
     HERO_STRUCTURE_MAT = make_hero_open_frame_steel() if hero_open_frame else make_hero_ghost()
     structure_objs = module_objects.get(structure_module_id, []) if structure_module_id else []
+    # Product/interior story meshes must keep their authored materials on the hero —
+    # painting them steel/ghost was the root cause of the colorimeter reading as a
+    # featureless grey box (2026-07-13).
+    _HERO_MAT_EXEMPT_PREFIXES = (
+        "u_se_instrument_story_", "u_se_product_", "u_se_exterior_detail_",
+    )
     hero_snap = {}
     for obj in structure_objs:
+        if any(obj.name.startswith(p) for p in _HERO_MAT_EXEMPT_PREFIXES):
+            continue
         if obj.data and obj.data.materials:
             hero_snap[obj.name] = list(obj.data.materials)
             obj.data.materials.clear()
