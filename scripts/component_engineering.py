@@ -8,6 +8,8 @@ import os, json
 import re as _re
 def _norm(s): return _re.sub(r'[^a-z0-9]', '', str(s or '').lower())
 
+_GENERIC_PLACEHOLDER_RE = _re.compile(r'\b(?:sub[- ]?component|component)\s*\d+\b', _re.I)
+
 def _svc(service, size, mech):
     s = f"{service} {mech}".lower(); sz = str(size or '').lower()
     if 'mm²' in sz or 'mm2' in sz or any(k in s for k in ('cable', 'power', 'electr', 'feeder')): return 'electrical'
@@ -48,6 +50,8 @@ def _required_services(name, module, function, wet_plant=True):
     # (a 'Centre Standpipe' must keep matching 'pipe' mid-word).
     _words = set(_re.findall(r'[a-z0-9]+', f"{name} {function}".lower()))
     tn = _norm(f"{name} {function}")   # name+function ONLY — the module's service is rule (3)
+    if _GENERIC_PLACEHOLDER_RE.search(str(name or '')):
+        return req
     # ── (1) NAME-keyword roles (cross-module: a pump / sensor / valve anywhere) ──
     if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
             or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
@@ -137,6 +141,12 @@ def _required_services(name, module, function, wet_plant=True):
     # temperature SENSOR in the environmental module wrongly gets a power feeder. Keyed
     # on the module's FUNCTION, never a per-part table. This is what gets orphans → 0. ──
     if not req:
+        # INTENT: "Sensing Instrumentation Subcomponent 2" is an anonymous coverage
+        # proxy emitted when the design lacks a named child part. It is not itself a
+        # detector/controller, so inheriting the module's signal service creates a
+        # false strict-ledger failure. Real named sensors/controllers returned above.
+        if _GENERIC_PLACEHOLDER_RE.search(str(name or '')):
+            return req
         if 'powerdistribution' in m or 'powerconversion' in m:
             req.add('power')
         if 'safetyprotection' in m:

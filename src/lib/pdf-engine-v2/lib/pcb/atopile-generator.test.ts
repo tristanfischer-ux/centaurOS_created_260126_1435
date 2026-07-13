@@ -226,9 +226,9 @@ describe('atopile-generator', () => {
     expect(ledDriver!.resolutionTier).toBe('package_family')
     expect(ledDriver!.footprint!.library).toBe('Package_TO_SOT_SMD')
 
-    // Function-class tier fires when no MPN and no recognisable package text
-    // ("LGA-14" isn't in the package-family table) — the generic sensor_ic default.
-    expect(imu!.resolutionTier).toBe('function_class')
+    // A generic sensor package default is still weaker than an MPN, but once it
+    // resolves a real KiCad package family it is no longer a bare function guess.
+    expect(imu!.resolutionTier).toBe('package_family')
     expect(imu!.functionClass).toBe('sensor_ic')
 
     // Topology-derived signal nets connect the design's OWN nets, not a fixed pair.
@@ -289,6 +289,88 @@ describe('atopile-generator', () => {
                     content_character: { character_id: 'optical_detector_module' },
                     modifier_characters: [{ kind: 'quantity', value: '×1' }],
                   },
+                  {
+                    id: 'sensor_interconnect_cable_word',
+                    name_human: 'Sensor Interconnect Cable',
+                    content_character: { character_id: 'sensor_interconnect_cable' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'analog detector signal cable for PCBA connection' },
+                    ],
+                  },
+                  {
+                    id: 'collimating_optic_word',
+                    name_human: 'Collimating Optic',
+                    content_character: { character_id: 'collimating_optic' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'optical sensor path part in compact PCBA instrument' },
+                    ],
+                  },
+                  {
+                    id: 'sensing_instrumentation_subcomponent_1_word',
+                    name_human: 'Sensing Instrumentation Subcomponent 1',
+                    content_character: { character_id: 'sensing_instrumentation_subcomponent_1' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'anonymous coverage proxy inheriting photodiode, cuvette, and LED module prose' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            module: 'power_distribution',
+            sub_modules: [
+              {
+                id: 'power_distribution__protection',
+                words: [
+                  {
+                    id: 'dc_input_fuse_word',
+                    name_human: 'DC Input Fuse',
+                    content_character: { character_id: 'dc_input_fuse' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'low-voltage PCBA power management protection part' },
+                    ],
+                  },
+                  {
+                    id: 'reverse_polarity_protection_word',
+                    name_human: 'Reverse Polarity Protection',
+                    content_character: { character_id: 'reverse_polarity_protection' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'low-voltage PCBA power management protection diode' },
+                    ],
+                  },
+                  {
+                    id: 'usb_power_interface_word',
+                    name_human: 'USB Power Interface',
+                    content_character: { character_id: 'usb_power_interface' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'USB-C PCBA power connector' },
+                    ],
+                  },
+                  {
+                    id: 'firmware_storage_word',
+                    name_human: 'Firmware Storage',
+                    content_character: { character_id: 'firmware_storage' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'PCBA nonvolatile memory for firmware' },
+                    ],
+                  },
+                  {
+                    id: 'power_switch_word',
+                    name_human: 'Power Switch',
+                    content_character: { character_id: 'power_switch' },
+                    modifier_characters: [
+                      { kind: 'quantity', value: '×1' },
+                      { kind: 'form', value: 'PCBA user power switch' },
+                    ],
+                  },
                 ],
               },
             ],
@@ -321,15 +403,35 @@ describe('atopile-generator', () => {
       'local_display_word',
       'user_input_buttons_word',
       'optical_detector_module_word',
+      'sensor_interconnect_cable_word',
+      'collimating_optic_word',
     ]))
     expect(result.unresolved.map((gap) => gap.wordId)).not.toEqual(
       expect.arrayContaining([...offBoardIds]),
     )
+    const allPcbIds = new Set([
+      ...result.components.map((record) => record.wordId),
+      ...result.offBoard.map((record) => record.wordId),
+      ...result.unresolved.map((record) => record.wordId),
+    ])
+    expect(allPcbIds.has('sensing_instrumentation_subcomponent_1_word')).toBe(false)
 
     const led = result.components.find((component) => component.wordId === 'status_led_word')
     expect(led).toBeDefined()
     expect(led!.functionClass).toBe('led')
-    expect(led!.resolutionTier).toBe('function_class')
+    expect(led!.resolutionTier).toBe('package_family')
+
+    const byWordId = new Map(result.components.map((component) => [component.wordId, component]))
+    expect(byWordId.get('dc_input_fuse_word')?.functionClass).toBe('fuse_protection')
+    expect(byWordId.get('dc_input_fuse_word')?.resolutionTier).toBe('package_family')
+    expect(byWordId.get('reverse_polarity_protection_word')?.functionClass).toBe('diode_protection')
+    expect(byWordId.get('reverse_polarity_protection_word')?.resolutionTier).toBe('package_family')
+    expect(byWordId.get('usb_power_interface_word')?.functionClass).toBe('usb_connector')
+    expect(byWordId.get('usb_power_interface_word')?.resolutionTier).toBe('package_family')
+    expect(byWordId.get('firmware_storage_word')?.functionClass).toBe('memory_ic')
+    expect(byWordId.get('firmware_storage_word')?.resolutionTier).toBe('package_family')
+    expect(byWordId.get('power_switch_word')?.functionClass).toBe('switch')
+    expect(byWordId.get('power_switch_word')?.resolutionTier).toBe('package_family')
   })
 
   it('keeps a non-instrument display module on-board as a normal PCB footprint', () => {

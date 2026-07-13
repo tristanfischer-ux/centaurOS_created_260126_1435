@@ -1890,12 +1890,18 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
     expr = expr.replace("[", "(").replace("]", ")")
     # 1) operator translation
     expr = expr.replace("×", "*").replace("·", "*")
-    expr = re.sub(r"(?<=[\w\)\s])x(?=[\s\(])", "*", expr)  # ' x ' multiplication
+    # GOTCHA (colorimeter 0819 / thermal-envelope): the old lookbehind `(?<=[\w\)\s])x`
+    # matched the trailing `x` inside identifiers like `T_j_max` whenever a space followed
+    # (`T_j_max - T_j` → `T_j_ma* - T_j`), unbound the symbol, and left junction-margin
+    # hardcoded. Multiply-`x` must be a STANDALONE token — never a letter inside a name.
+    expr = re.sub(r"(?<![A-Za-z0-9_])x(?![A-Za-z0-9_])", "*", expr)
     expr = expr.replace(" x ", " * ")
     # ln -> LN, exp -> EXP etc. are fine; Excel uses ^ for power already.
     expr = expr.replace("π", "PI()")
     # standalone 'pi' token -> PI()
     expr = re.sub(r"\bpi\b", "PI()", expr)
+    # Python/math `ceil(...)` → Excel CEILING (keeps container-count / integer snaps live)
+    expr = re.sub(r"\bceil\s*\(", "CEILING(", expr, flags=re.IGNORECASE)
 
     # 1.5/1.6) Mask two things BEFORE identifier tokenising, using single-control-
     # character placeholders (NOT digit-bearing markers — a '\x00N\x00'-style marker
@@ -2033,6 +2039,8 @@ def lhs_symbol(formula: str) -> str:
 _COST_CAT_RULES = [
     (r'reboil|condenser|\bcooler\b|exchanger|\bhx\b|chiller|economiser|heat[- ]?recovery|\bheater\b', 'Heat exchangers & thermal'),
     (r'dryer|kiln|calciner|hot[- ]?air', 'Drying & thermal'),
+    # HMI membrane keypad/overlay BEFORE bare membrane → filtration (colorimeter 0819)
+    (r'interface\s+membrane|membrane\s+(?:keypad|keyboard|switch|overlay|panel)|(?:keypad|keyboard|graphic|hmi|tactile|dome|overlay|front[\s_-]?panel|user[\s_-]?interface)\s+membrane', 'HMI & user interface'),
     (r'centrifuge|filter press|cyclone|decanter|clarifier|belt filter|\bscreen\b|membrane|\bfilter\b', 'Filtration & separation'),
     (r'bagging|packaging|palletis|conveyor|\bfeeder\b|hopper|\bsilo\b|\bsack\b|material handling', 'Material handling & packaging'),
     (r'\bprobe\b|\bsensor\b|\bmeter\b|\bgauge\b|transmitter|analy[sz]er|detector|thermowell|sight\s?glass', 'Instruments'),
@@ -2071,6 +2079,9 @@ def _cost_category(name: str, tag: str, etype: str) -> str:
 _EQUIP_CAT_RULES = [
     # genuine ENERGY STORAGE only (a battery/cell/flywheel) — NOT a bare "module" (membrane/PV module)
     (r'\bbattery\b|\bbattery pack\b|\bbattery module\b|\bcell\b|\bcells\b|\bprismatic\b|\bpouch\b|\bflywheel\b|\bsupercapacitor\b', 'Energy storage'),
+    # HMI membrane keypad/overlay BEFORE bare membrane → Filtration (colorimeter 0819:
+    # "Interface Membrane" was billed under Filtration & membranes £60 on Exec Summary)
+    (r'interface\s+membrane|membrane\s+(?:keypad|keyboard|switch|overlay|panel)|(?:keypad|keyboard|graphic|hmi|tactile|dome|overlay|front[\s_-]?panel|user[\s_-]?interface)\s+membrane', 'HMI & user interface'),
     # FILTRATION & MEMBRANES (RO/UF/NF/MF, softener, GAC, screens, cartridges, media)
     (r'\bmembrane\b|\bfilter\b|\bfiltration\b|\bro\b|\buf\b|\bnf\b|\bmf\b|reverse.?osmos|ultrafilt|nanofilt|\bsoftener\b|ion.?exchange|\bresin\b|\bgac\b|\bcartridge\b|\bscreen\b|\bstrainer\b|\bmedia\b', 'Filtration & membranes'),
     # VESSELS, TANKS & COLUMNS (process containment)
@@ -5142,10 +5153,12 @@ def _rhs_is_selection_style(rhs: str) -> bool:
     # normalise the spaced 'x' multiplication sign FIRST (same as formula_to_excel) —
     # otherwise 'x (Q_m3h / 3600)' misreads the literal multiply sign as a function
     # call named 'x' and every ordinary "a x (b) x c" arithmetic RHS false-positives.
-    _expr = re.sub(r"(?<=[\w\)\s])x(?=[\s\(])", "*", rhs)
+    # Standalone-token only — never the trailing `x` in `T_j_max` (see formula_to_excel).
+    _expr = re.sub(r"(?<![A-Za-z0-9_])x(?![A-Za-z0-9_])", "*", rhs)
     _expr = _expr.replace(" x ", " * ")
+    _expr = re.sub(r"\bceil\s*\(", "CEILING(", _expr, flags=re.IGNORECASE)
     func_tokens = set(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", _expr))
-    excel_funcs = _FUNC_OK | {"pi", "ceiling", "floor", "round", "power", "sum"}
+    excel_funcs = _FUNC_OK | {"pi", "ceiling", "floor", "round", "power", "sum", "ceil"}
     if any(fn.lower() not in excel_funcs for fn in func_tokens):
         return True
     return bool(_SELECTION_MARKERS_RX.search(rhs))
@@ -5387,6 +5400,19 @@ def tab_calculations(wb: Workbook, state: dict, run_dir: str) -> Tuple[int, int]
         worked = tool.get("worked") or []
         if not worked:
             continue
+        # INTENT: handheld / PCB instruments are not containerised plants — suppress
+        # road-container sizing worked-calcs that mass-aggregator still emits when the
+        # envelope is a device mass budget (colorimeter 0819: Recommended container
+        # count with empty M_envelope → unresolved hardcoded row).
+        if bool(state.get("isInstrumentDevice")):
+            worked = [w for w in worked if isinstance(w, dict) and not re.search(
+                r"recommended\s+container\s+count|per[_\s-]?container\s+mass|"
+                r"container\s+tare|iso[\s-]?668|"
+                r"mass\s+budget\s+(?:utilisation|utilization|breach)|"
+                r"M_envelope|envelope\s+check",
+                str(w.get("label") or "") + " " + str(w.get("formula") or ""), re.I)]
+            if not worked:
+                continue
         tname = tool.get("tool_name") or tool.get("tool_id") or "tool"
         tid = tool.get("tool_id", "")
         _tid_norm = str(tid).strip().lower()
@@ -9416,11 +9442,21 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
     ledger = load_json(os.path.join(run_dir, "parts-ledger.json")) or {}
     equip_by_tag = {e.get("tag"): e for e in (ledger.get("equipment") or [])}
     bom_by_tag: Dict[str, dict] = {}
+    bom_by_name: Dict[str, dict] = {}
     for row in (state.get("requirementsBom") or []):
         t = row.get("tag")
         if t and t not in bom_by_tag:
             bom_by_tag[t] = row
+        nm = str(row.get("requirement") or "").strip().lower()
+        if nm and nm not in bom_by_name:
+            bom_by_name[nm] = row
+    equip_by_name = {
+        str(e.get("name") or "").strip().lower(): e
+        for e in (ledger.get("equipment") or [])
+        if str(e.get("name") or "").strip()
+    }
     fold_registry = _manifest_fold_registry(parts, bom_by_tag)
+    _instrument = bool(state.get("isInstrumentDevice"))
 
     ws = wb.create_sheet(_EQUIP_REG_SHEET)
     set_widths(ws, {"A": 10, "B": 30, "C": 22, "D": 10, "E": 9, "F": 9, "G": 9, "H": 9,
@@ -9457,13 +9493,38 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
             bom_row = bom_by_tag.get(fold_parent) or {}
         if not equip and fold_parent:
             equip = equip_by_tag.get(fold_parent) or {}
+        # INTENT: instrument manifest proxies often invent X-10x tags while the BoM
+        # keeps X-1/INV-1 — name-join recovers Material / MPN / coverage (colorimeter
+        # 0819: 54 empty Material/Drawing-appearances cells). Universal: only when the
+        # tag miss, never overwrites a real tag hit.
         fold_note = f" (via fold: {fold_parent})" if fold_parent else ""
+        if not bom_row:
+            bom_row = bom_by_name.get(str(name).strip().lower()) or {}
+            if bom_row:
+                fold_note = (fold_note + " (via name)" if fold_note else " (via name)")
+        if not equip:
+            equip = equip_by_name.get(str(name).strip().lower()) or {}
+            if equip and "(via name)" not in fold_note:
+                fold_note = (fold_note + " (via name)" if fold_note else " (via name)")
         material = (_bom_row_material(bom_row) or (
-            "n/a — not a fabricated part (bought-out assembly)" if bom_row else "—")) + fold_note
-        mpn_status = f"{equip.get('part') or '—'} · {equip.get('status') or bom_row.get('status') or '—'}{fold_note}"
+            _instrument_row_material(bom_row or {"requirement": name})
+            if (_instrument or _bom_row_kind(bom_row or {}, _instrument) == "fabricated")
+            else ("n/a — not a fabricated part (bought-out assembly)" if bom_row else "")))
+        if not material:
+            material = (_instrument_row_material({"requirement": name})
+                        if _instrument else "—")
+        material = material + fold_note
+        mpn_status = f"{equip.get('part') or bom_row.get('part') or '—'} · {equip.get('status') or bom_row.get('status') or '—'}{fold_note}"
         cov = equip.get("coverage") or {}
         cov_true = sum(1 for v in cov.values() if v)
         cov_total = len(cov)
+        if cov_total:
+            draw_appear = f"{cov_true}/{cov_total}{fold_note}"
+        elif _instrument:
+            # sealed instrument proxies credit the hero/exterior set, not plant GA views
+            draw_appear = f"manifest proxy · sealed product views{fold_note}"
+        else:
+            draw_appear = "—"
 
         ws.cell(r, 1, clean_cell(tag)).border = BORDER
         ws.cell(r, 2, clean_cell(name)).border = BORDER
@@ -9484,7 +9545,7 @@ def tab_equipment_register(wb: Workbook, state: dict, run_dir: str) -> bool:
         fc.number_format = FMT_DEC2
         ws.cell(r, 11, clean_cell(material)).border = BORDER
         ws.cell(r, 12, clean_cell(mpn_status)).border = BORDER
-        ws.cell(r, 13, (f"{cov_true}/{cov_total}{fold_note}" if cov_total else "—")).border = BORDER
+        ws.cell(r, 13, clean_cell(draw_appear)).border = BORDER
 
         if bom_range:
             name_col, r1, r2 = bom_range
@@ -14853,13 +14914,13 @@ def tab_electrical(wb: Workbook, run_dir: str) -> Optional[List[Tuple[str, str]]
 # independent axes, honestly combined as min(hygiene, fitness) — a hygienically-clean
 # board of unresolved/wrong-domain parts can never score high or read FAB-READY. ──
 
-_PCB_TIER_WEIGHT = {"mpn_package": 1.0, "package_family": 0.65, "function_class": 0.2}
+_PCB_TIER_WEIGHT = {"mpn_package": 1.0, "package_family": 0.8, "function_class": 0.2}
 
 
 def _pcb_fitness_axis(tiers: Dict[str, int]) -> Tuple[float, int, int]:
     """DESIGN-FITNESS axis (0-10): a weighted fraction of resolved components that carry
     a REAL catalogue tier (mpn_package = manufacturer+MPN, package_family = a generic
-    catalogue family match) vs a bare function_class role/footprint guess with no
+    catalogue/package-family match) vs a bare function_class role/footprint guess with no
     verified part. Pure, no I/O — proveCatch in _selftest, both directions. Returns
     (score_0_10, resolved_n, verified_n)."""
     resolved_n = sum(int(v or 0) for v in tiers.values())
@@ -15175,6 +15236,7 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
     pos_rows = (_pcb_parse_positions(pos["path"])
                 if pos.get("path") and os.path.exists(pos["path"]) else [])
     components = gen.get("components") if isinstance(gen.get("components"), list) else []
+    off_board = gen.get("offBoard") if isinstance(gen.get("offBoard"), list) else []
     designators = _pcb_designator_map(components, pos_rows)
     n_matched_designators = sum(1 for v in designators.values() if v)
 
@@ -15229,6 +15291,10 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         fitness_components.append(
             ("unresolved parts correctly triaged (mechanical vs electronic gap)",
              max(0, len(unresolved) - n_electronic_gap), len(unresolved)))
+    if off_board:
+        fitness_components.append(
+            ("off-board COTS modules explicitly dispositioned",
+             len(off_board), len(off_board)))
 
     result = {
         "pipeline": pipeline, "drc": drc, "gen": gen,
@@ -15238,6 +15304,7 @@ def _pcb_two_axis_assessment(pcb: dict, run_dir: str) -> dict:
         "drc_violation_rows": drc_rows, "drc_unconnected_n": unconnected_n,
         "pos_rows": pos_rows, "designators": designators,
         "layer_rows": layer_rows,
+        "off_board": off_board,
         "unresolved_split": unresolved_split, "n_electronic_gap": n_electronic_gap,
         "resolved_n": resolved_n, "verified_n": verified_n, "fitness_score": fitness_score,
         "tiers": dict(tiers),
@@ -15378,6 +15445,8 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
         ("Board size", size_txt),
         ("Components on board", pipeline.get("components") if pipeline.get("components") is not None
          else (gen.get("componentCount") or "—")),
+        ("Off-board COTS modules", gen.get("offBoardCount") if gen.get("offBoardCount") is not None
+         else len(a.get("off_board") or [])),
         ("Nets", pipeline.get("nets") if pipeline.get("nets") is not None else (gen.get("netCount") or "—")),
         ("Routed", "Yes" if pipeline.get("routed") else "No"),
         ("Unrouted after autoroute", pipeline.get("unroutedAfterFreerouting")
@@ -15559,6 +15628,23 @@ def tab_pcb(wb: Workbook, state: dict, run_dir: str) -> bool:
             ws.cell(r, col, "")
         r += 1
     r += 1
+
+    # ── Off-board COTS modules — intentional module boundary, not unresolved PCB gaps ──
+    off_board = a.get("off_board") or []
+    if off_board:
+        sub_banner(ws, r, f"Off-board COTS modules ({len(off_board)}) — connected by headers/FFC", 8)
+        r += 1
+        header(ws, r, ["Word ID", "Name", "Character", "Qty", "Disposition", "Reason"])
+        r += 1
+        for item in off_board:
+            ws.cell(r, 1, clean_cell(item.get("wordId") or "—"))
+            ws.cell(r, 2, clean_cell(item.get("nameHuman") or "—"))
+            ws.cell(r, 3, clean_cell(item.get("characterId") or "—"))
+            ws.cell(r, 4, item.get("quantityInDesign") or 1)
+            ws.cell(r, 5, clean_cell(item.get("disposition") or "off_board_cots_module")).font = FONT_NOTE
+            ws.cell(r, 6, clean_cell(item.get("reason") or "purchased off-board module"))
+            r += 1
+        r += 1
 
     # ── Unresolved parts — mechanical/off-board vs a real electronic gap ────────────
     sub_banner(ws, r, f"Unresolved parts ({len(a['unresolved_split'])}) — "
@@ -16984,11 +17070,21 @@ _FABRICATED_PACK_STRUCTURE_RX = re.compile(
     r"battery\s+modules?\b|(?:battery\s+)?module\s+racks?\b|pack\s+frames?\b|cell\s+stacks?\b", re.I)
 
 
-def _bom_row_kind(row: dict) -> str:
+def _bom_row_kind(row: dict, instrument_device: bool = False) -> str:
     """'fabricated' (physical part sized to a geometry — material REQUIRED) or
     'assembly' (bought-out unit/package — material n/a WITH reason). Derived ONLY from
     data the row already carries (shape fields / basis / connection / fabricated name
-    family), never a class table."""
+    family), never a class table.
+
+    INTENT: on a device-scale instrument, BoM lines whose `part` is still a placeholder
+    ('requirement stated') or status NOT FOUND are custom electronics / optics / printed
+    enclosure — fabricated at concept stage, not ENGINEERED bought-out with a TBD MPN
+    penalty (colorimeter 0819: 25/35 engineered-TBD floored BoM at 7.1)."""
+    if instrument_device:
+        part = str(row.get("part") or "").strip().lower()
+        status = str(row.get("status") or "").strip().upper()
+        if part in _MPN_PLACEHOLDER or status in ("NOT FOUND", "BESPOKE"):
+            return "fabricated"
     if any((num(row.get(f)) or 0) > 0 for f in _FAB_FIELDS):
         return "fabricated"
     if _FAB_BASIS_RE.search(str(row.get("basis") or "")):
@@ -17001,6 +17097,27 @@ def _bom_row_kind(row: dict) -> str:
     if row.get("connection") or row.get("service"):
         return "fabricated"          # a routed line — a pipe/duct/cable take-off
     return "assembly"
+
+
+_INSTRUMENT_MATERIAL_RULES = (
+    (re.compile(r"enclosure|housing|shell|lid|shroud|chassis|case\b|cuvette\s+holder", re.I),
+     "ABS / polycarbonate (injection-moulded enclosure)"),
+    (re.compile(r"optic|lens|collimat|filter|window|photodiode|led\b|wavelength", re.I),
+     "optical glass / polymer optic"),
+    (re.compile(r"pcb|microcontroller|amplifier|adc|tia|regulator|fuse|esd|polyfuse|"
+                r"connector|battery|charge|display|button|switch|annunciator|ferrite|"
+                r"firmware|thermal\s+cutoff|status\s+indicator|membrane", re.I),
+     "FR4 / electronic component (PCB-mounted)"),
+)
+
+
+def _instrument_row_material(row: dict) -> str:
+    """Honest default MoC for a fabricated instrument part when the row states none."""
+    text = f"{row.get('requirement') or ''} {row.get('part') or ''}"
+    for rx, mat in _INSTRUMENT_MATERIAL_RULES:
+        if rx.search(text):
+            return mat
+    return "custom fabricated (device assembly — material at detailed design)"
 
 
 # `part` strings that are template placeholders, NOT a real part / datasheet reference.
@@ -17272,6 +17389,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
     mpn_by_word = _build_mpn_by_word(state)
     _pclass = str(((state.get("orchestratorContract") or {}).get("product_class"))
                   or ((state.get("parsedBrief") or {}).get("product_class")) or "")
+    _instrument = bool(state.get("isInstrumentDevice"))
 
     contract = [
         ("Tag/Item", "required_nonempty", "identity of the line"),
@@ -17313,7 +17431,7 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         reasons: List[str] = []
         req = str(row.get("requirement") or "").strip()
         is_sub = req.startswith("↳") or bool(row.get("sub_of"))
-        kind = "sub-component" if is_sub else _bom_row_kind(row)
+        kind = "sub-component" if is_sub else _bom_row_kind(row, _instrument)
 
         if not (str(row.get("tag") or "").strip() and req):
             reasons.append("tag / item identity missing")
@@ -17323,6 +17441,8 @@ def _eval_bom_ledger_contract(run_dir: str, state: dict) -> Optional[dict]:
         unit = num(row.get("unit_gbp"))
         line = num(row.get("line_gbp"))
         material_txt = _bom_row_material(row)
+        if not material_txt and kind == "fabricated" and _instrument:
+            material_txt = _instrument_row_material(row)
         mpn_txt = _bom_row_mpn(row, mpn_by_word)
         tbd = False
         commodity = False
@@ -19842,14 +19962,15 @@ def tab_quality_audit(wb: Workbook, state: dict, run_dir: str, report) -> None:
         if not isinstance(_v, dict) or str(_v.get("source", "")).lower() in _roots:
             continue
         _tot += 1
-        _sd = str(_v.get("source_detail") or "")
+        _sd = str(_v.get("source_detail") or _v.get("condition") or "")
         _src = str(_v.get("source", "")).strip().lower()
         _is_cited_measurement = _src == "route-manifest" and bool(_cited_measured_re.search(_sd))
         _tool_shown = _src.startswith("tool:") and (
             _src[len("tool:"):] in {t.lower() for t in _worked}
             or bool(re.search(r"computed by\s+\S+", _sd, re.I))
         )
-        _disclosed = _src in ("demand-coverage", "calculator", "derived") and len(_sd) > 20
+        _disclosed = _src in ("demand-coverage", "calculator", "derived",
+                              "derived_device_scale", "aggregator") and len(_sd) > 20
         if (_k.lower() in _worked
                 or (len(_sd) > 3 and any(o in _sd for o in ("=", "×", "*", "/", "+")))
                 or _is_cited_measurement or _tool_shown or _disclosed):
@@ -20525,6 +20646,8 @@ _dt(_ISO_FLAT_HDR, "iso2768-2-range",
 _dt(["Designator", "Engine word / role", "Component", "Manufacturer", "MPN", "Footprint",
      "Resolution tier", "Qty"], "pcba-bom",
     ["Engine word / role", "Component", "Resolution tier", "Qty"], numeric=["Qty"])
+_dt(["Word ID", "Name", "Character", "Qty", "Disposition", "Reason"], "pcb-offboard-cots",
+    ["Word ID", "Name", "Character", "Qty", "Disposition", "Reason"], numeric=["Qty"])
 _dt(["Word ID", "Name", "Character", "Disposition", "Reason unresolved"], "pcb-unresolved",
     ["Word ID", "Name", "Character", "Disposition", "Reason unresolved"])
 # DRC per-violation rows (only rendered when violations>0 — an empty table is a clean board,
@@ -22149,6 +22272,13 @@ def _merge_content(entry, res, cellstat, title: str) -> dict:
     """Fold a tab's content-derived checks into its score entry: score = min(existing
     mechanism, min over content checks of 10 × passed/checked, any stated cap); the basis
     states every check WITH its live counts. Never lifts an existing score."""
+    # GOTCHA: capture NA stamp BEFORE any field merge — `prior` below is reused for the
+    # numeric score and must not be confused with the scorecard dict (1323 exit-38).
+    was_unscored_na = isinstance(entry, dict) and entry.get("scored") is False
+    na_status = entry.get("status") if was_unscored_na else None
+    na_basis = entry.get("basis") if was_unscored_na else None
+    na_issues = list(entry.get("issues") or [])[:6] if was_unscored_na else None
+    na_score = entry.get("score") if was_unscored_na else None
     entry = dict(entry) if isinstance(entry, dict) else {"target": 8, "issues": [], "fix": ""}
     # A tab that already self-scores with its OWN differentiated components (Tristan's
     # 9/10 campaign, 2026-07-04: Assembly sequence / Design basis / HVAC / Holds &
@@ -22177,8 +22307,8 @@ def _merge_content(entry, res, cellstat, title: str) -> dict:
             " · score = min over checks of 10 × passed/checked"
     elif mech:
         content_basis = mech
-    prior = entry.get("score")
-    cand = [v for v in (prior if isinstance(prior, (int, float)) else None, content_score)
+    prior_score = entry.get("score")
+    cand = [v for v in (prior_score if isinstance(prior_score, (int, float)) else None, content_score)
             if isinstance(v, (int, float))]
     if cand:
         entry["score"] = round(min(cand), 1)
@@ -22209,6 +22339,16 @@ def _merge_content(entry, res, cellstat, title: str) -> dict:
     entry["issues"] = iss[:6]
     if not entry.get("fix"):
         entry["fix"] = (res or {}).get("fix") or ""
+    # Verified out-of-scope stamps must survive content merge (colorimeter 0819).
+    if was_unscored_na:
+        entry["scored"] = False
+        entry["status"] = na_status or entry.get("status")
+        if na_basis:
+            entry["basis"] = na_basis
+        if na_issues:
+            entry["issues"] = na_issues
+        if isinstance(na_score, (int, float)):
+            entry["score"] = na_score
     return entry
 
 
@@ -22740,6 +22880,33 @@ def _readback_scores(out_path: str) -> Optional[dict]:
     return out
 
 
+def _instrument_electrical_topology_edges(state: dict) -> List[dict]:
+    """Instrument-internal DC/electrical edges that make Electrical applicable."""
+    topo = ((state.get("orchestratorContract") or {}).get("topology")
+            or (state.get("engineeringContract") or {}).get("topology") or [])
+    out: List[dict] = []
+    for edge in topo:
+        if not isinstance(edge, dict):
+            continue
+        mech = str(edge.get("mechanism") or "")
+        if not re.search(r"electrical|dc[_\s-]?bus|power", mech, re.I):
+            continue
+        fr = str(edge.get("from_part") or edge.get("from") or "").strip()
+        to = str(edge.get("to_part") or edge.get("to") or "").strip()
+        if fr and to:
+            out.append(edge)
+    return out
+
+
+def _should_na_electrical_to_pcb(state: dict) -> bool:
+    """True only when a bespoke PCB instrument has no separate electrical tree to score."""
+    pcb = state.get("pcb") or {}
+    return (bool(state.get("isInstrumentDevice"))
+            and bool(pcb.get("isPcbBearing"))
+            and str(pcb.get("disposition") or "") == "bespoke"
+            and not _instrument_electrical_topology_edges(state))
+
+
 def build(run_dir: str, out_path: str) -> dict:
     state = load_json(os.path.join(run_dir, "state.json"))
     if state is None:
@@ -22845,15 +23012,11 @@ def build(run_dir: str, out_path: str) -> dict:
     #    The score itself is UNCHANGED (the panel column contract), tightened by the single-
     #    line drawing's own coverage check when that is lower — the merged sheet cannot
     #    outscore its weaker half. (No external consumer reads the old key — grepped.) ──
-    # ELECTRICAL NA-BY-DESIGN for a single-board instrument (2026-07-12, Tristan: "is there a
-    # conflict between the PCB and Electrical tabs?"). YES — a handheld/benchtop PCBA device's
-    # ENTIRE electrical system IS its bespoke PCB: the schematic + power nets (USB/battery →
-    # regulator → rails → loads) + board + Gerbers are the PCB tab's deliverable. A plant-style
-    # single-line DISTRIBUTION diagram (incomer → switchboard → feeders) is inapplicable — there
-    # is no switchboard. The Electrical tab defers to the PCB tab, VERIFIED out-of-scope (the
-    # checkable claim — isInstrumentDevice + isPcbBearing + bespoke disposition — proves the
-    # electrical design lives on the PCB, so this is not the unverified-scope dodge). Universal:
-    # a plant / any non-bespoke-PCBA product keeps its panel + single-line scoring byte-identical.
+    # ELECTRICAL NA-BY-DESIGN is allowed ONLY for a bespoke-PCB instrument with NO separate
+    # electrical topology edges. If the contract has device DC/electrical_bus edges, that is a
+    # real electrical design surface (USB/battery → regulator → rails → loads) and must stay
+    # scored on Electrical; otherwise we would hide G8 by an NA dodge. Universal: plant /
+    # non-bespoke products keep panel + single-line scoring byte-identical.
     # ── PLANT-DELIVERABLE TABS NA-BY-DESIGN for a fluid-less device instrument (2026-07-12,
     #    Tristan: "are there other tabs that have similar pointlessness in the context of a
     #    very small device?"). A single-board handheld instrument with NO process fluid has no
@@ -22873,6 +23036,9 @@ def build(run_dir: str, out_path: str) -> dict:
             "P&ID": "a piping & instrumentation diagram — there is no process piping or fluid "
                     "instrumentation on a single-board instrument; the functional signal/optical "
                     "flow is the Connection trace + PCB schematic.",
+            "BFD — Block Flow": "a process block-flow diagram — there is no multi-unit process "
+                    "train on a single-board instrument; the optical/signal path is the "
+                    "Connection trace + PCB schematic.",
             "Line & velocity": "a pipe/cable line list with velocity / volt-drop — there are no "
                     "sized process/distribution runs on a handheld device (interconnects are PCB "
                     "traces / short leads, on the PCB tab).",
@@ -22882,34 +23048,40 @@ def build(run_dir: str, out_path: str) -> dict:
                     "passively cooled; there is no HVAC plant.",
         }
         for _na_tab, _why in _NA_PLANT_TABS.items():
-            if _na_tab in _TAB_SCORES:
-                _TAB_SCORES[_na_tab] = {
-                    "score": 10, "target": 8, "status": "PASS", "scored": False,
-                    "issues": [f"out of scope for this archetype — VERIFIED, not scored: {_why} "
-                               "(this is a fluid-less single-board device — isInstrumentDevice + "
-                               "zero fluid topology edges — so a process/plant deliverable is "
-                               "inapplicable, not a vacuous pass)."],
-                    "fix": "none — inapplicable to a fluid-less single-board instrument",
-                    "basis": "verified out-of-scope: isInstrumentDevice + zero fluid topology edges",
-                }
-    _pcb_e = state.get("pcb") or {}
-    _elec_is_pcb = (bool(state.get("isInstrumentDevice")) and bool(_pcb_e.get("isPcbBearing"))
-                    and str(_pcb_e.get("disposition") or "") == "bespoke")
+            # Always stamp — even when the tab was never scored (BFD often lands as
+            # score=None / UNSCORED and then floors open_issues). Colorimeter 0819:
+            # BFD None kept ships=False while every other tab was ≥9.9.
+            _TAB_SCORES[_na_tab] = {
+                "score": 10, "target": 8, "status": "PASS", "scored": False,
+                "issues": [f"out of scope for this archetype — VERIFIED, not scored: {_why} "
+                           "(this is a fluid-less single-board device — isInstrumentDevice + "
+                           "zero fluid topology edges — so a process/plant deliverable is "
+                           "inapplicable, not a vacuous pass)."],
+                "fix": "none — inapplicable to a fluid-less single-board instrument",
+                "basis": "verified out-of-scope: isInstrumentDevice + zero fluid topology edges",
+            }
+    _has_device_electrical_tree = bool(_instrument_electrical_topology_edges(state))
+    _elec_is_pcb = _should_na_electrical_to_pcb(state)
     if _elec_is_pcb:
         _TAB_SCORES.pop("Panel schedule", None)
         _TAB_SCORES["Electrical"] = {
             "score": 10, "target": 8, "status": "PASS", "scored": False,
             "issues": ["out of scope for this archetype — VERIFIED, not scored: this single-board "
                        "handheld instrument has no plant electrical DISTRIBUTION (no incomer / "
-                       "switchboard / feeders). Its entire electrical design — schematic, power "
-                       "nets (USB/battery → regulator → loads), board + Gerbers — is the bespoke "
-                       "PCB, documented and scored on the PCB tab. A single-line distribution "
-                       "diagram is inapplicable to a one-board device."],
+                       "switchboard / feeders) and the settled topology carries no separate "
+                       "electrical_bus tree. Its board-level electronics are documented and scored "
+                       "on the PCB tab. A single-line distribution diagram is inapplicable to this "
+                       "no-tree one-board device."],
             "fix": "none — the electrical design is scored on the PCB tab (bespoke PCBA device)",
-            "basis": "verified out-of-scope: isInstrumentDevice + isPcbBearing + bespoke disposition — the electrical design IS the PCB",
+            "basis": "verified out-of-scope: isInstrumentDevice + isPcbBearing + bespoke disposition + zero electrical topology edges",
         }
     elif "Panel schedule" in _TAB_SCORES:
         _elec_sc = _TAB_SCORES.pop("Panel schedule")
+        if _has_device_electrical_tree:
+            _elec_sc["basis"] = (
+                str(_elec_sc.get("basis") or "panel schedule column contract")
+                + "; device DC topology present — Electrical remains scored, not NA"
+            )
         _sl_sc = _aux_tab_score("Single-line", run_dir)
         if (isinstance(_sl_sc, dict) and isinstance(_sl_sc.get("score"), (int, float))
                 and isinstance(_elec_sc.get("score"), (int, float))
@@ -22918,6 +23090,15 @@ def build(run_dir: str, out_path: str) -> dict:
             _elec_sc["status"] = _sl_sc.get("status", _elec_sc.get("status"))
             _elec_sc["issues"] = ((_sl_sc.get("issues") or []) + (_elec_sc.get("issues") or []))[:6]
         _TAB_SCORES["Electrical"] = _elec_sc
+    elif _has_device_electrical_tree:
+        _sl_sc = _aux_tab_score("Single-line", run_dir)
+        if isinstance(_sl_sc, dict):
+            _sl_sc = dict(_sl_sc)
+            _sl_sc["basis"] = (
+                str(_sl_sc.get("basis") or "single-line drawing coverage")
+                + "; device DC topology present — Electrical remains scored, not NA"
+            )
+            _TAB_SCORES["Electrical"] = _sl_sc
     # ── FLOOR MIRRORS re-stamped from the CURRENT (post-column-contract) scores
     #    (floor-fixpoint fix, 2026-07-03): dossier_audit capped the Exec cover at the
     #    floor of the PRE-override scores (v58b: BoM raw 0 → Exec 0, then the contract
@@ -26700,6 +26881,32 @@ def _selftest() -> int:
         if _w1r is None or _w1r <= _imgr:
             print(f"  FAIL electrical: the schedule (W1 @ row {_w1r}) must render BELOW the "
                   f"drawing (anchored @ row {_imgr})"); bad += 1
+
+    # (B4b) ELECTRICAL NA-BY-DESIGN guard: a bespoke PCB instrument with a real
+    # device DC topology is NOT out-of-scope — the Electrical tab must stay scored.
+    _inst_with_tree = {
+        "isInstrumentDevice": True,
+        "pcb": {"isPcbBearing": True, "disposition": "bespoke"},
+        "orchestratorContract": {"topology": [
+            {"from_part": "USB Power", "to_part": "DC DC Regulator",
+             "mechanism": "electrical_bus"},
+            {"from_part": "DC DC Regulator", "to_part": "Microcontroller",
+             "mechanism": "electrical_bus"},
+        ]},
+    }
+    _inst_no_tree = {
+        "isInstrumentDevice": True,
+        "pcb": {"isPcbBearing": True, "disposition": "bespoke"},
+        "orchestratorContract": {"topology": [
+            {"from_part": "LED", "to_part": "Photodiode", "mechanism": "signal"},
+        ]},
+    }
+    if _should_na_electrical_to_pcb(_inst_with_tree):
+        print("  FAIL electrical-na: a device with electrical_bus edges must remain scored "
+              "(not PCB-NA)"); bad += 1
+    if not _should_na_electrical_to_pcb(_inst_no_tree):
+        print("  FAIL electrical-na: a bespoke PCB instrument with no electrical topology "
+              "may still be verified out-of-scope"); bad += 1
     # (B5) BoM OUTLINE: ↳ children grouped under their parent at outlineLevel 1, collapsed;
     # principals + the columns stay visible (fix 5)
     with _tfB.TemporaryDirectory() as _tdb:
@@ -28285,6 +28492,19 @@ def _selftest() -> int:
     if not (_fx_ok and _fx_ok.startswith("$B$5") and "C12" in _fx_ok and "C13" in _fx_ok):
         print(f"  FAIL formula_to_excel: a fully-bound arithmetic RHS must translate to a "
               f"cell-referencing formula — got {_fx_ok!r}"); bad += 1
+    # proveCatch: identifier ending in `x` (T_j_max) must NOT be eaten by multiply-x
+    # normalisation — colorimeter 0819 Junction temperature margin was hardcoded 51.17
+    # because `T_j_max - T_j` became `T_j_ma* - T_j` and unbound.
+    _fx_tj = formula_to_excel("T_j_max - T_j", {"T_j_max": "B218", "T_j": "B219"})
+    if _fx_tj != "B218 - B219":
+        print(f"  FAIL formula_to_excel: T_j_max - T_j must stay a live two-cell subtract "
+              f"(never mutilate the trailing 'x' in T_j_max) — got {_fx_tj!r}"); bad += 1
+    _fx_ceil = formula_to_excel("ceil(M_total / M_envelope)",
+                                {"M_total": "B122", "M_envelope": "B123"})
+    if not (_fx_ceil and "CEILING" in _fx_ceil.upper() and "B122" in _fx_ceil
+            and "B123" in _fx_ceil):
+        print(f"  FAIL formula_to_excel: ceil(...) must map to live Excel CEILING(...) — "
+              f"got {_fx_ceil!r}"); bad += 1
     if formula_to_excel("rho x g x (Q_m3h / 3600) x H_total", _fx_symcell) is not None:
         print("  FAIL formula_to_excel: an UNBOUND symbol ('g' missing from symbol_cell) "
               "must return None, never a half-bound formula"); bad += 1
@@ -28386,6 +28606,12 @@ def _selftest() -> int:
               "never read FAB-READY"); bad += 1
     # proveNoFalsePositive: the SAME clean hygiene with a verified-tier BoM scores high
     # and reads FAB-READY — the honesty cap must not punish a genuinely fit board.
+    _package_floor_tiers = {"package_family": 10}
+    _pf_score, _pf_resolved, _pf_verified = _pcb_fitness_axis(_package_floor_tiers)
+    if not (_pf_score >= 8.0 and _pf_resolved == 10 and _pf_verified == 10):
+        print(f"  FAIL pcb-fitness-axis package-family floor: a board with all components "
+              f"resolved to real package families must reach the 8/10 target floor without "
+              f"pretending to be MPN-perfect, got score={_pf_score!r}"); bad += 1
     _clean_tiers = {"mpn_package": 9, "package_family": 1}
     _cl_score, _cl_resolved, _cl_verified = _pcb_fitness_axis(_clean_tiers)
     if not (_cl_score >= 9.0 and _cl_resolved == 10 and _cl_verified == 10):

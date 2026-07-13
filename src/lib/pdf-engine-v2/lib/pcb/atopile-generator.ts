@@ -92,6 +92,10 @@ export type FunctionClass =
   | 'power_module'
   | 'passive_c'
   | 'passive_r'
+  | 'fuse_protection'
+  | 'diode_protection'
+  | 'memory_ic'
+  | 'usb_connector'
   | 'battery_connector'
   | 'display_module'
   | 'led'
@@ -105,19 +109,23 @@ export type FunctionClass =
  * as a `main_controller` in a drone or a BMS). First match wins.
  */
 const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> = [
-  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog_to_digital|\badc\b|imu\b|accelerometer|gyroscope|sensor|probe|monitor_ic|cell_monitor/i },
-  { id: 'op_amp', test: /signal_conditioner|amplifier|\btia\b|op_?amp/i },
-  { id: 'microcontroller', test: /main_controller|\bmcu\b|microcontroller|processor|\bcpu\b|control_unit/i },
+  { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|monitor[_-]?ic|cell[_-]?monitor/i },
+  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp/i },
+  { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
-  { id: 'gate_driver_ic', test: /gate_driver|led_driver|inverter_bridge|driver_ic/i },
-  { id: 'regulator', test: /controller_power_supply|power_converter|regulator|\bldo\b|dc_?dc/i },
+  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic/i },
+  { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
+  { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
+  { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
+  { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?memory|eeprom|nonvolatile[_-]?memory/i },
+  { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port)|type[_-]?c/i },
   { id: 'passive_c', test: /capacitor/i },
   { id: 'passive_r', test: /resistor/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
-  { id: 'display_module', test: /display_panel|\block?d\b|\boled\b|\btft\b|screen/i },
-  { id: 'led', test: /status_indicator|annunciator|led_source|^led\b|_led\b/i },
-  { id: 'switch', test: /control_switch|pushbutton|\bswitch\b/i },
+  { id: 'display_module', test: /display[_-]?panel|\block?d\b|\boled\b|\btft\b|screen/i },
+  { id: 'led', test: /status[_-]?indicator|annunciator|led[_-]?source|^led\b|[_-]led\b/i },
+  { id: 'switch', test: /control[_-]?switch|power[_-]?switch|pushbutton|(^|[_-])switch($|[_-])/i },
   { id: 'connector', test: /interface_membrane|connector|receptacle|header|terminal/i },
 ]
 
@@ -187,6 +195,8 @@ interface FunctionClassDefault {
   /** Pin name (case-insensitive) that carries ground, if any. */
   groundPin: string | null
   decouple: boolean
+  /** Resolution confidence for the default footprint family, never an MPN claim. */
+  resolutionTier: 'package_family' | 'function_class'
 }
 
 const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
@@ -198,6 +208,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VDD',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   sensor_ic: {
     library: 'Package_SO',
@@ -207,6 +218,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VCC',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   op_amp: {
     library: 'Package_SO',
@@ -216,6 +228,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VCC',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   connectivity_ic: {
     library: 'Package_DFN_QFN',
@@ -225,6 +238,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VCC',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   io_connector: {
     library: 'Connector_PinHeader_2.54mm',
@@ -234,6 +248,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: null,
     groundPin: null,
     decouple: false,
+    resolutionTier: 'package_family',
   },
   regulator: {
     library: 'Package_TO_SOT_SMD',
@@ -243,6 +258,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VIN',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   gate_driver_ic: {
     library: 'Package_SO',
@@ -252,6 +268,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VCC',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   power_module: {
     library: 'Connector_PinHeader_2.54mm',
@@ -261,6 +278,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VIN',
     groundPin: 'GND',
     decouple: false,
+    resolutionTier: 'package_family',
   },
   passive_c: {
     library: 'Capacitor_SMD',
@@ -270,6 +288,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: null,
     groundPin: null,
     decouple: false,
+    resolutionTier: 'package_family',
   },
   passive_r: {
     library: 'Resistor_SMD',
@@ -279,6 +298,47 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: null,
     groundPin: null,
     decouple: false,
+    resolutionTier: 'package_family',
+  },
+  fuse_protection: {
+    library: 'Fuse',
+    filenameTest: /^Fuse_1206_3216Metric\.kicad_mod$/,
+    designatorPrefix: 'F',
+    pins: ['P1', 'P2'],
+    powerPin: null,
+    groundPin: null,
+    decouple: false,
+    resolutionTier: 'package_family',
+  },
+  diode_protection: {
+    library: 'Diode_SMD',
+    filenameTest: /^D_SOD-323\.kicad_mod$/,
+    designatorPrefix: 'D',
+    pins: ['A', 'K'],
+    powerPin: 'A',
+    groundPin: 'K',
+    decouple: false,
+    resolutionTier: 'package_family',
+  },
+  memory_ic: {
+    library: 'Package_SO',
+    filenameTest: /^SOIC-8_3\.9x4\.9mm_P1\.27mm\.kicad_mod$/,
+    designatorPrefix: 'U',
+    pins: ['VCC', 'GND', 'SCL', 'SDA'],
+    powerPin: 'VCC',
+    groundPin: 'GND',
+    decouple: true,
+    resolutionTier: 'package_family',
+  },
+  usb_connector: {
+    library: 'Connector_PinHeader_2.54mm',
+    filenameTest: /^PinHeader_1x04_P2\.54mm_Vertical\.kicad_mod$/,
+    designatorPrefix: 'J',
+    pins: ['VBUS', 'GND', 'D+', 'D-'],
+    powerPin: 'VBUS',
+    groundPin: 'GND',
+    decouple: false,
+    resolutionTier: 'package_family',
   },
   battery_connector: {
     library: 'Connector_JST',
@@ -288,6 +348,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VBAT',
     groundPin: 'GND',
     decouple: false,
+    resolutionTier: 'package_family',
   },
   display_module: {
     library: 'Connector_PinHeader_2.54mm',
@@ -297,6 +358,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'VCC',
     groundPin: 'GND',
     decouple: true,
+    resolutionTier: 'package_family',
   },
   led: {
     library: 'LED_SMD',
@@ -306,6 +368,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: 'ANODE',
     groundPin: 'CATHODE',
     decouple: false,
+    resolutionTier: 'package_family',
   },
   switch: {
     library: 'Button_Switch_SMD',
@@ -315,6 +378,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: null,
     groundPin: 'P2',
     decouple: false,
+    resolutionTier: 'package_family',
   },
   connector: {
     library: 'Connector_JST',
@@ -324,6 +388,7 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
     powerPin: null,
     groundPin: null,
     decouple: false,
+    resolutionTier: 'package_family',
   },
 }
 
@@ -332,7 +397,8 @@ const FUNCTION_CLASS_DEFAULTS: Record<FunctionClass, FunctionClassDefault> = {
 const AREA_MM2_BY_CLASS: Partial<Record<FunctionClass, number>> = {
   microcontroller: 64, sensor_ic: 20, op_amp: 20, connectivity_ic: 25,
   io_connector: 60, regulator: 15, gate_driver_ic: 20, power_module: 80,
-  passive_c: 1.3, passive_r: 1.3, battery_connector: 32, display_module: 600,
+  passive_c: 1.3, passive_r: 1.3, fuse_protection: 4, diode_protection: 2,
+  memory_ic: 20, usb_connector: 32, battery_connector: 32, display_module: 600,
   led: 1.3, switch: 12, connector: 40,
 }
 const DEFAULT_AREA_MM2 = 25
@@ -495,6 +561,12 @@ function sanitizeIdentifier(id: string): string {
   return cleaned || 'part'
 }
 
+function sanitizePinName(pin: string | null): string | null {
+  if (!pin) return null
+  const cleaned = pin.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1')
+  return cleaned || 'PIN'
+}
+
 function toTypeName(instanceName: string): string {
   return `Part_${instanceName}`
 }
@@ -520,6 +592,12 @@ const COTS_UI_WORD_RE =
 
 const COTS_DETECTOR_MODULE_RE =
   /\b(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array).*\b(module|breakout|board|assembly)\b|\b(module|breakout|board|assembly).*(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array)\b/i
+
+const INSTRUMENT_OPTOMECH_WORD_RE =
+  /\b(collimat\w*|lens|optic(?:al)?|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?bezel|face[_ -]?plate|front[_ -]?panel)\b/i
+
+const INSTRUMENT_INTERCONNECT_WORD_RE =
+  /\b(?:sensor|detector|photodiode|signal|analog|adc|afe).{0,48}(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon).{0,48}(?:sensor|detector|photodiode|signal|analog|adc|afe)\b/i
 
 const CONTROLLER_WORD_RE =
   /\b(main[_ -]?controller|microcontroller|mcu|processor|control[_ -]?unit)\b/i
@@ -564,6 +642,12 @@ function offBoardCotsReason(
   }
   if (isInstrument && COTS_DETECTOR_MODULE_RE.test(text)) {
     return 'detector-module/breakout shape — purchased optical sensor module connected to the PCB, not a bare on-board IC footprint'
+  }
+  if (isInstrument && INSTRUMENT_OPTOMECH_WORD_RE.test(roleText)) {
+    return 'optical/mechanical instrument part — mounted in the optical bench or front panel, not a PCB footprint'
+  }
+  if (isInstrument && INSTRUMENT_INTERCONNECT_WORD_RE.test(roleText)) {
+    return 'instrument interconnect harness/FFC — cable assembly between modules, represented on the connection trace rather than as a PCB footprint'
   }
   const hasUiModule = words.some((candidate) => candidate.wordId !== word.wordId && COTS_UI_WORD_RE.test(wordRoleText(candidate)))
   if (isInstrument && hasUiModule && CONTROLLER_WORD_RE.test(roleText)) {
@@ -621,7 +705,9 @@ function resolveComponent(
     const resolved = resolveFootprintByGlob(footprintsRoot, fallback.library, fallback.filenameTest)
     if (resolved) {
       footprint = resolved
-      tier = 'function_class'
+      // DECISION: a resolved KiCad package family is stronger than a bare role
+      // guess even when no MPN is known. It remains below mpn_package in scoring.
+      tier = fallback.resolutionTier
     }
   }
 
@@ -653,9 +739,9 @@ function resolveComponent(
       resolutionTier: tier,
       footprint,
       designatorPrefix: fallback?.designatorPrefix ?? 'U',
-      pins: fallback ? [...fallback.pins] : ['P1', 'P2'],
-      powerPin: fallback?.powerPin ?? null,
-      groundPin: fallback?.groundPin ?? null,
+      pins: fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2'],
+      powerPin: sanitizePinName(fallback?.powerPin ?? null),
+      groundPin: sanitizePinName(fallback?.groundPin ?? null),
       decouple: fallback?.decouple ?? false,
       quantityInDesign: word.quantity,
     },
@@ -778,7 +864,7 @@ function buildNets(
       manufacturer: null,
       partNumber: null,
       mpnVerified: false,
-      resolutionTier: 'function_class',
+      resolutionTier: 'package_family',
       footprint: capFootprint,
       designatorPrefix: 'C',
       pins: ['P1', 'P2'],

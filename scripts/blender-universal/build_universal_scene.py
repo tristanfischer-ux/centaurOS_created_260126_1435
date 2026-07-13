@@ -1644,11 +1644,77 @@ def _machine_duty_scaled_dim(duty_m3h):
             "h_mm": base["h"] * scale}
 
 
+def _quantity_mm(quantities, key, default):
+    raw = (quantities or {}).get(key)
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+_GENERIC_PLACEHOLDER_PART_RE = re.compile(
+    r"\b(?:sub[- ]?component|component)\s*\d+\b", re.I)
+
+
+def _instrument_proxy_dim(name, module_id, quantities):
+    """Role-derived compact geometry for undimensioned device-instrument parts.
+
+    INTENT: a sealed handheld instrument has many real PCB/optical/UI parts that are
+    intentionally represented as coverage proxies in the render manifest. Letting all
+    undimensioned proxies fall to one default box makes GA/Renders unreadable; size by
+    role and product envelope instead, without product-specific MPNs or randomness.
+    """
+    n = str(name or "").lower()
+    w_env = _quantity_mm(quantities, "design_envelope_width_mm", 180.0)
+    d_env = _quantity_mm(quantities, "design_envelope_depth_mm", 140.0)
+    h_env = _quantity_mm(quantities, "design_envelope_height_mm", 80.0)
+    rules = [
+        (r"enclosure|housing|shell|case|chassis", (w_env, d_env, h_env)),
+        (r"lid|shroud|cover", (w_env * 0.94, d_env * 0.94, max(8.0, h_env * 0.14))),
+        (r"bezel|front\s*panel|face\s*plate", (w_env * 0.55, 8.0, h_env * 0.35)),
+        (r"display|screen|oled|lcd|readout", (58.0, 34.0, 6.0)),
+        (r"button|switch|keypad|user\s*input", (14.0, 14.0, 9.0)),
+        (r"cuvette|sample\s*(?:holder|cell|chamber)", (32.0, 28.0, 42.0)),
+        (r"collimat|lens|filter|wavelength|aperture|slit|optic", (26.0, 18.0, 14.0)),
+        (r"led\s*source|light\s*source|emitter", (12.0, 10.0, 8.0)),
+        (r"detector|photodiode|photo\s*sensor", (30.0, 22.0, 8.0)),
+        (r"microcontroller|mcu|processor|firmware|logic\s*board|main\s*board", (42.0, 34.0, 5.0)),
+        (r"driver|regulator|ldo|dc\s*dc|charge|pmic|power\s*management", (18.0, 14.0, 5.0)),
+        (r"battery|cell\s*pack|li\s*po|rechargeable", (58.0, 38.0, 9.0)),
+        (r"usb|connector|interconnect|cable|ffc|ribbon|harness", (72.0, 8.0, 4.0)),
+        (r"reverse\s*polarity|blocking\s*diode|polarity\s*protection", (7.0, 4.0, 3.0)),
+        (r"esd|tvs|transient|surge\s*protection", (9.0, 5.0, 3.0)),
+        (r"polyfuse|resettable", (10.0, 7.0, 3.0)),
+        (r"thermal\s*cut|cutoff|thermal\s*fuse", (14.0, 4.0, 4.0)),
+        (r"overcurrent|current\s*limit|protection", (11.0, 6.0, 4.0)),
+        (r"fuse", (12.0, 5.0, 4.0)),
+        (r"indicator|pilot\s*light|status\s*led", (8.0, 8.0, 5.0)),
+    ]
+    for pattern, (w_mm, d_mm, h_mm) in rules:
+        if re.search(pattern, n, re.I):
+            return {"kind": "box", "w_mm": w_mm, "d_mm": d_mm, "h_mm": h_mm}
+    suffix = re.search(r"\bsubcomponent\s*(\d+)\b", n)
+    if suffix:
+        idx = max(1, int(suffix.group(1)))
+        return {
+            "kind": "box",
+            "w_mm": 18.0 + 4.0 * idx,
+            "d_mm": 12.0 + 2.0 * idx,
+            "h_mm": 6.0 + 1.5 * idx,
+        }
+    if module_id in _INSTRUMENT_SHAPE_MODULES:
+        return {"kind": "box", "w_mm": 24.0, "d_mm": 18.0, "h_mm": 8.0}
+    return None
+
+
 def extract_parts(state):
     """Walk modules→sub_modules→words; return (parts, dropped, stats)."""
     parts, dropped = [], []
     modules = state.get("moduleDecomposition", {}).get("modules", [])
     quantities = ((state.get("orchestratorContract") or {}).get("quantities")) or {}
+    instrument_device = bool(state.get("isInstrumentDevice"))
     for m in modules:
         module_id = m.get("module", "unknown")
         display = m.get("display_name", module_id)
@@ -1745,6 +1811,8 @@ def extract_parts(state):
                     duty = _machine_duty_m3h(name, mods, quantities)
                     if duty is not None:
                         dim = _machine_duty_scaled_dim(duty)
+                if instrument_device and dim is None:
+                    dim = _instrument_proxy_dim(name, module_id, quantities)
                 # UNIVERSAL backstop: a part carrying an explicit CYLINDER dim
                 # ("2.1 m dia x 1.4 m") IS a cylindrical vessel — but a `box` shape
                 # drops dia/len (footprint_mm reads w/d/h) and the part collapses to
@@ -8083,6 +8151,8 @@ def _load_required_services():
             # and the short tokens 'uv'/'fan' match whole words only.
             _words = set(re.findall(r'[a-z0-9]+', f"{name} {function}".lower()))
             tn = re.sub(r'[^a-z0-9]', '', f"{name} {function}".lower())
+            if _GENERIC_PLACEHOLDER_PART_RE.search(str(name or "")):
+                return req
             if (any(k in t for k in ('pump', 'heat', 'oxygen', 'blower', 'drum', 'chiller', 'steril', 'aerat', 'degas', 'mbbr', 'filter', 'skim', 'compress', 'motor', 'lamp', 'mixer', 'agitat'))
                     or _words & {'uv', 'ultraviolet', 'fan', 'fans'}):
                 req.add('power')
@@ -8136,6 +8206,10 @@ def _load_required_services():
             if any(k in t for k in ('frame', 'enclos', 'structur', 'platform', 'foundation', 'nameplate', 'label', 'walkway', 'ladder', 'grating', 'cladding', 'insulation', 'signage', 'placard', 'decal', 'deflagration', 'burstpanel', 'gasket', 'busbar')):
                 return req
             if not req:   # module-primary ONLY for name-unclassified passive kit (see component_engineering)
+                # Keep in sync with component_engineering._required_services: anonymous
+                # "Subcomponent N" coverage proxies are not functional endpoints.
+                if _GENERIC_PLACEHOLDER_PART_RE.search(str(name or "")):
+                    return req
                 if 'powerdistribution' in m or 'powerconversion' in m:
                     req.add('power')
                 if 'safetyprotection' in m:
@@ -12372,6 +12446,55 @@ def _instrument_proxy_geometry(
 
 
 def _selftest_instrument_proxy_geometry() -> None:
+    quantities = {
+        "design_envelope_width_mm": {"value": 180.0},
+        "design_envelope_depth_mm": {"value": 140.0},
+        "design_envelope_height_mm": {"value": 70.0},
+    }
+    detector_dim = _instrument_proxy_dim(
+        "Optical Detector Module", "sensing_instrumentation", quantities)
+    cable_dim = _instrument_proxy_dim(
+        "Sensor Interconnect Cable", "sensing_instrumentation", quantities)
+    shell_dim = _instrument_proxy_dim(
+        "Enclosure Shell", "structure_containment", quantities)
+    unknown_dim = _instrument_proxy_dim(
+        "Sensing Instrumentation Subcomponent 2", "sensing_instrumentation", quantities)
+    assert detector_dim and cable_dim and shell_dim and unknown_dim, (
+        "instrument proxy dims must exist for real device roles and generic subcomponents")
+    assert detector_dim != cable_dim, (
+        "detector modules and sensor cables must not share the same default box")
+    assert shell_dim["w_mm"] == 180.0 and shell_dim["h_mm"] == 70.0, (
+        f"shell proxy must use the real design envelope, got {shell_dim}")
+    assert unknown_dim != TYPE_DEFAULTS_MM["instrument"], (
+        "generic instrument subcomponents must get compact differentiated proxy dims, "
+        "not the shared instrument type default")
+    assert not _REQUIRED_SERVICES(
+        "Sensing Instrumentation Subcomponent 2",
+        "sensing_instrumentation",
+        "",
+        False,
+    ), "anonymous instrument coverage proxies must not become required signal endpoints"
+    assert _REQUIRED_SERVICES(
+        "Optical Detector Module",
+        "sensing_instrumentation",
+        "",
+        False,
+    ) == {"signal"}, "real detector modules must still require a signal tie"
+    protection_names = [
+        "Reverse Polarity Protection",
+        "DC Input Fuse",
+        "Esd Protection Network",
+        "Input Fuse",
+        "Polyfuse Resettable",
+        "Thermal Cutoff",
+    ]
+    protection_dims = [
+        tuple(sorted((_instrument_proxy_dim(n, "power_distribution", quantities) or {}).items()))
+        for n in protection_names
+    ]
+    assert max(protection_dims.count(d) for d in protection_dims) < 5, (
+        "device protection parts must not form a manifest-sight default-size litter cluster")
+
     zone_z = {
         "optical": (38.0, 18.0),
         "electronics": (58.0, 16.0),

@@ -380,7 +380,8 @@ _ENCLOSURE_HARDWARE_RE = re.compile(
 
 
 def _not_found_substatus(name: str, basis: str, typ: str = "other",
-                          pv_by_norm: dict | None = None) -> str:
+                          pv_by_norm: dict | None = None,
+                          instrument_device: bool = False) -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
     evidence (name + basis + its parts_ledger TYPE_RULES classification + its verification
     record) — never a per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED',
@@ -395,6 +396,15 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
         return "ARCHITECTURALLY-EXCLUDED"
     if _FABRICATED_BASIS_RX.search(b):
         return "FABRICATED"
+    # INTENT: on a device-scale optical/electronic instrument, BoM lines without a
+    # public MPN are custom electronics / 3D-printed enclosure — FABRICATED at concept
+    # stage, not a plant-catalogue residual (colorimeter 0819: 23 NOT FOUND floored
+    # Part names at 3.8 while the parts were honestly custom). Universal: gated on
+    # isInstrumentDevice + typ, never a part-name table.
+    if instrument_device and typ in ("instrument", "electrical", "other"):
+        if typ in ("instrument", "electrical") or re.search(
+                r"enclosure|housing|shell|lid|shroud|chassis|case\b", n, re.I):
+            return "FABRICATED"
     # Name-family honest statuses (Codema ship 2026-07-09): a control panel / MCC is a
     # scope-documented assembly; a cloth/media filter with no catalogue pin is fabricated
     # from its flow duty — neither is a true residual NOT FOUND.
@@ -690,6 +700,54 @@ def _is_instrument_power_origin(name: str) -> bool:
     'missing_input' concern on it is false. Gated by the caller on isInstrumentDevice."""
     r = _instrument_role(name)
     return r in ("power_in", "power_storage")
+
+
+_INSTRUMENT_SIGNAL_CARRIER_RE = re.compile(
+    r"\b(?:sensor|detector|photodiode|signal|data|analog|adc|afe)\b.{0,48}"
+    r"\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|"
+    r"\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b.{0,48}"
+    r"\b(?:sensor|detector|photodiode|signal|data|analog|adc|afe)\b",
+    re.I,
+)
+_INSTRUMENT_CARRIER_SOURCE_ROLES = {"detector", "conditioning", "digitiser"}
+_INSTRUMENT_CARRIER_SINK_ROLES = {"compute", "digitiser", "conditioning"}
+
+
+def _is_instrument_signal_carrier(name: str) -> bool:
+    """A physical lead/FFC/harness that carries an instrument signal between modules."""
+    return bool(_INSTRUMENT_SIGNAL_CARRIER_RE.search(name or ""))
+
+
+def _instrument_signal_carrier_edge_score(
+    carrier_name: str,
+    from_part: str,
+    to_part: str,
+    mechanism: str,
+) -> int:
+    """Score whether a topology edge is the signal path a carrier cable embodies.
+
+    INTENT: compact instruments often list the physical "sensor interconnect cable"
+    as a BoM line, while the authoritative topology names the electronic endpoints.
+    The cable should inherit the detector/AFE/ADC→compute edge, not become an orphan.
+    """
+    if not _is_instrument_signal_carrier(carrier_name):
+        return 0
+    if str(mechanism or "").lower() not in {"signal", "data", "control"}:
+        return 0
+    fr_role = _instrument_role(from_part or "")
+    to_role = _instrument_role(to_part or "")
+    score = 1
+    if fr_role in _INSTRUMENT_CARRIER_SOURCE_ROLES:
+        score += 3
+    if to_role in _INSTRUMENT_CARRIER_SINK_ROLES:
+        score += 3
+    if "sensor" in (carrier_name or "").lower() and fr_role == "detector":
+        score += 2
+    # Prefer an actual endpoint-to-controller signal over optical sample/source
+    # adjacency, which is usually the light path rather than the cable.
+    if fr_role in {"optical_sample", "optical_element", "optical_source"}:
+        score -= 2
+    return max(score, 0)
 
 
 def _classify(name: str, tag: str, instrument_device: bool = False) -> str:
@@ -1242,7 +1300,9 @@ def main() -> int:
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
         # truncated `basis` field below) so a signal past 90 chars is never missed.
         # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
-        nf_substatus = _not_found_substatus(name, basis_full, typ, _pv_by_norm) if r.get("status") == "NOT FOUND" else None
+        nf_substatus = _not_found_substatus(
+            name, basis_full, typ, _pv_by_norm, instrument_device
+        ) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
@@ -1589,6 +1649,7 @@ def main() -> int:
         _oc = (state.get("orchestratorContract") or {}).get("topology") or []
         _ec = (state.get("engineeringContract") or {}).get("topology") or []
         _seen_topo = set()
+        _topo_edge_records = []
         _n_topo_attached = 0
         for _e in (list(_oc) + list(_ec)):
             if not isinstance(_e, dict):
@@ -1604,6 +1665,7 @@ def main() -> int:
             _fe, _te = resolve(_fk), resolve(_tk)
             if not (_fe or _te):
                 continue  # neither endpoint is a real placed/ledger part — skip (no phantom)
+            _topo_edge_records.append((_fp, _tp, _mech, _fe, _te))
             _fn = _fe["name"] if _fe else str(_fp)
             _tn = _te["name"] if _te else str(_tp)
             if _te:
@@ -1614,6 +1676,44 @@ def main() -> int:
         if _n_topo_attached:
             print(f"[ledger] device-instrument: attached {_n_topo_attached} authoritative-topology tie(s) "
                   f"the 3-D-declutter dropped from the connection schedule")
+
+        # INTENT: a physical sensor/AFE interconnect cable is the CARRIER for an
+        # endpoint-to-endpoint topology edge, not itself an endpoint in the topology.
+        # If it remains 0/0 after the authoritative topology pass, inherit the best
+        # detector/AFE/ADC→compute signal edge so the cable is auditable as connected.
+        _n_carriers_attached = 0
+        for _carrier in equipment:
+            if (_carrier.get("inputs") or _carrier.get("outputs")
+                    or not _is_instrument_signal_carrier(_carrier.get("name") or "")):
+                continue
+            _candidates = []
+            for _fp, _tp, _mech, _fe, _te in _topo_edge_records:
+                _score = _instrument_signal_carrier_edge_score(
+                    _carrier.get("name") or "",
+                    (_fe or {}).get("name") or str(_fp),
+                    (_te or {}).get("name") or str(_tp),
+                    _mech,
+                )
+                if _score > 0 and (_fe or _te):
+                    _candidates.append((_score, _fp, _tp, _mech, _fe, _te))
+            if not _candidates:
+                continue
+            _score, _fp, _tp, _mech, _fe, _te = sorted(
+                _candidates,
+                key=lambda item: (-item[0], str(item[1]), str(item[2])),
+            )[0]
+            _fn = (_fe or {}).get("name") or str(_fp)
+            _tn = (_te or {}).get("name") or str(_tp)
+            _carrier["inputs"].append(
+                f"{_fn} ({(_fe or {}).get('tag') or '?'}) via signal carrier [contract-topology]"
+            )
+            _carrier["outputs"].append(
+                f"{_tn} ({(_te or {}).get('tag') or '?'}) via signal carrier [contract-topology]"
+            )
+            _n_carriers_attached += 1
+        if _n_carriers_attached:
+            print(f"[ledger] device-instrument: attached {_n_carriers_attached} signal-carrier cable(s) "
+                  f"to their authoritative endpoint pair")
 
     connectivity_concerns = []
     origin_parts = []
@@ -2235,6 +2335,36 @@ def _selftest() -> int:
         bad += 1
     if not _is_grid_electrical_origin("Mains Incomer"):
         print("  FAIL _is_grid_electrical_origin: 'Mains Incomer' must match")
+        bad += 1
+    # Device-instrument signal-carrier rule (colorimeter 1441): a physical sensor
+    # interconnect cable is not itself a topology endpoint, but must inherit the
+    # detector/AFE/ADC→compute signal edge so it does not read orphan_instrument.
+    _carrier_score = _instrument_signal_carrier_edge_score(
+        "Sensor Interconnect Cable",
+        "Optical Detector Module",
+        "Microcontroller",
+        "signal",
+    )
+    _optical_path_score = _instrument_signal_carrier_edge_score(
+        "Sensor Interconnect Cable",
+        "Cuvette Holder",
+        "Optical Detector Module",
+        "signal",
+    )
+    if _carrier_score <= _optical_path_score:
+        print("  FAIL instrument-signal-carrier: sensor interconnect must prefer "
+              "detector→compute over sample→detector optical adjacency")
+        bad += 1
+    if _instrument_signal_carrier_edge_score(
+            "Mounting Bezel", "Optical Detector Module", "Microcontroller", "signal") != 0:
+        print("  FAIL instrument-signal-carrier: non-cable mechanical parts must not "
+              "inherit signal endpoints")
+        bad += 1
+    if _instrument_signal_carrier_edge_score(
+            "Sensor Interconnect Cable", "Optical Detector Module", "Microcontroller",
+            "electrical_bus") != 0:
+        print("  FAIL instrument-signal-carrier: signal cable rule must not attach "
+              "power-bus edges")
         bad += 1
     # Zoned-distribution PARAMETRIC take-off names must not raise via the passive
     # predicate (status skip is the primary gate; name guard is the backstop).

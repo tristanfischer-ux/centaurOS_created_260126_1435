@@ -79,6 +79,18 @@ const SAFETY_PATTERN = /\b(medical|iec ?60601|life-?support|explosion|hazardous 
 const RF_TERM_PATTERN = /\b(bluetooth|wi-?fi|\brf\b|antenna|zigbee|lora|beamforming)\b/i
 const EXPLICIT_CUSTOM_PATTERN = /\b(custom pcb|bespoke (?:pcb|board|circuit)|custom-designed board)\b/i
 const EXPLICIT_COTS_PATTERN = /\b(off-the-shelf module|cots module|purchased module|third-party module)\b/i
+const GENERIC_PLACEHOLDER_WORD_RE =
+  /\b(?:[a-z][a-z0-9_ -]+[_ -])?sub[-_ ]?component[_ -]?\d+\b/i
+
+function isGenericPlaceholderWord(word: RawWordShape): boolean {
+  const identityText = [
+    word.id ?? '',
+    word.name_human ?? '',
+    word.content_character?.character_id ?? '',
+    word.content_character?.name_human ?? '',
+  ].join(' ')
+  return GENERIC_PLACEHOLDER_WORD_RE.test(identityText)
+}
 
 export interface ElectronicSignalScan {
   isPcbBearing: boolean
@@ -108,6 +120,10 @@ function walkDesignWords(
           content_character?: { character_id?: string; name_human?: string }
           modifier_characters?: Array<{ kind?: string; value?: string }>
         }
+        // GOTCHA: anonymous coverage placeholders often inherit rich module prose
+        // ("photodiode, cuvette, LED...") in their form text. They are not physical
+        // PCB candidates; counting them creates false electronic gaps.
+        if (isGenericPlaceholderWord(word)) continue
         const parts: string[] = [
           word.name_human ?? '',
           word.content_character?.character_id ?? '',
@@ -244,6 +260,7 @@ export function collectElectronicWords(
       const words = (sub as { words?: unknown[] })?.words ?? []
       for (const w of Array.isArray(words) ? words : []) {
         const word = w as RawWordShape
+        if (isGenericPlaceholderWord(word)) continue
         const modifiers: Record<string, string> = {}
         for (const mc of word.modifier_characters ?? []) {
           if (mc?.kind) modifiers[mc.kind] = mc.value ?? ''

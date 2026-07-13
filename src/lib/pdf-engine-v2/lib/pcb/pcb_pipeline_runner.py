@@ -488,7 +488,10 @@ def footprint_to_sexp(fp_data: FootprintData, fp_name: str, ref: str, value: str
                        x: float, y: float, pad_nets: Dict) -> str:
     short_name = fp_name.split(":")[-1]
     lines = [f'(footprint "{short_name}" (layer "F.Cu") (at {x} {y})']
-    lines.append(f'  (fp_text reference "{ref}" (at 0 -{max(fp_data.bbox_h/2 + 1, 2)}) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))')
+    # INTENT: generated footprints come from many packages with no courtyard model.
+    # Keeping refs on F.SilkS clipped header pads (silk_over_copper DRC warnings);
+    # F.Fab preserves manufacturing/PnP identity without claiming printable silk.
+    lines.append(f'  (fp_text reference "{ref}" (at 0 -{max(fp_data.bbox_h/2 + 1, 2)}) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))')
     lines.append(f'  (fp_text value "{value or short_name}" (at 0 {max(fp_data.bbox_h/2 + 1, 2)}) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))')
 
     for sl in fp_data.lines[:6]:
