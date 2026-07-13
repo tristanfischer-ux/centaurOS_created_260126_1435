@@ -220,3 +220,31 @@ board MPNs → BoM/PCB/Part-names clear. (2) Grok #3 — prefer COTS disposition
 module). (3) Interior render optical-bench geometry (Renders). (4) Cost tighten if gate-36 still
 radical. (5) Near-miss tabs: Calculations device-calc leak ("container count"/"Junction temp"),
 Quantities provenance, Assembly steps.
+
+### §8f — 2026-07-13 optical-pack SEED done (Grok #2) + RAG-ranking gap found
+
+**Seed executed** (`seed-verified-class-parts.ts` with the scratchpad optical candidates):
+10/10 LIVE-VERIFIED commodity parts written to forge-truth.db `pretraining_extracted_parts`
+(embedded, promoted to web_verified_ingest lane): Vishay BPW34 photodiode · ams-OSRAM
+TCS34725 colour sensor · TI OPA333/OPA334 amps · TI ADS1220 ADC · TI TLC5916 LED driver ·
+Microchip ATSAMD21G18A MCU · MCP1700 LDO · MCP73831 charge-mgmt · TI REF3025 ref. Legitimate
+universal DB growth (generic commodity parts for the class, live-verified — NOT a gold paste).
+
+**BUT the seeds don't reliably RESOLVE yet — a RAG-ranking gap (probe-fill.ts):**
+1. `seed-verified-class-parts.ts` WRITES A DUPLICATE ROW each run (5-6× per part now in the
+   DB) — pollutes ranking. Dedup pretraining_extracted_parts on (manufacturer, mpn) before
+   re-seeding.
+2. Seeded rows COMPETE with existing rows that also carry the head noun: "Microcontroller" →
+   a distributor MSP430 row ("16-bit Microcontrollers - MCU…", plural, lead="16-bit") outranks
+   ATSAMD21; "Photodiode" → TCS34725 (desc contains "photodiode") + a MPN-less "Measurement
+   photodiode" row outrank BPW34. dbFirstLookup's rank-bar/lead-segment then returns nothing
+   for the bare word. 6/10 probe-reachable; 4 (Photodiode/TIA/MCU/DC-DC) not.
+   FIX (deep, SHARED across all classes — needs a proveCatch on plant words too): dbFirstLookup
+   lead-segment must fold plurals ("microcontrollers"→"microcontroller") and a web_verified_ingest
+   priority-lane row with the head noun leading must outrank a distributor row whose head noun is
+   mid-name. Probe: `npx tsx scripts/probe-fill.ts "Microcontroller"`.
+
+**TIMING:** chain 0717 (running) already PASSED Stage 17.6 before the seed → 0717 does NOT use
+the seeded parts (its MPN cluster = honest-TBD after the wrong-family guard). The seed benefits
+the NEXT chain. So the ≥9 sequence is: 0717 lands (9 fixes) → dedup DB + RAG lead-segment fix →
+one more chain (picks up seeds → real MPNs on BoM/PCB/Part-names) → interior render + near-miss tabs.
