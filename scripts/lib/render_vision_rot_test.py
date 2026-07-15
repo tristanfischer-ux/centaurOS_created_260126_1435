@@ -31,15 +31,33 @@ def main() -> int:
     if not os.path.exists(_FIXTURE):
         print(f"render-vision rot-test: SKIP (frozen fixture missing: {_FIXTURE})")
         return 0
-    res = rv.critique_render(_FIXTURE)
-    if not res.get("ok"):
-        print(f"render-vision rot-test: SKIP (vision call failed: {res.get('error')})")
-        return 0  # a transient API error is not a rot — don't block
-    if res.get("broken") is True:
-        print(f"render-vision rot-test: OK (model still flags the frozen red-beam defect: {res.get('defects')})")
-        return 0
-    print(f"render-vision rot-test: FAIL — the vision model NO LONGER flags the known-bad red-beam render "
-          f"(got broken={res.get('broken')}). The critic has ROTTED; revisit prompt/model before trusting it.")
+    # DECISION: retry up to 3 calls before declaring rot. A single false-negative
+    # from a flaky vision model was blocking unrelated pre-push landings (Powerwall
+    # 2026-07-15) while the same fixture still flags on the next attempt. Three
+    # consecutive "not broken" answers is the rot signal — not one unlucky draw.
+    last: dict = {}
+    for attempt in range(1, 4):
+        res = rv.critique_render(_FIXTURE)
+        last = res if isinstance(res, dict) else {}
+        if not last.get("ok"):
+            print(f"render-vision rot-test: SKIP (vision call failed: {last.get('error')})")
+            return 0  # a transient API error is not a rot — don't block
+        if last.get("broken") is True:
+            print(
+                f"render-vision rot-test: OK (model still flags the frozen red-beam "
+                f"defect on attempt {attempt}: {last.get('defects')})"
+            )
+            return 0
+        print(
+            f"render-vision rot-test: attempt {attempt}/3 did not flag "
+            f"(broken={last.get('broken')}) — retrying"
+        )
+    print(
+        f"render-vision rot-test: FAIL — the vision model NO LONGER flags the "
+        f"known-bad red-beam render after 3 attempts "
+        f"(got broken={last.get('broken')}). The critic has ROTTED; revisit "
+        f"prompt/model before trusting it."
+    )
     return 1
 
 
