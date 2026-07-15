@@ -261,6 +261,16 @@ const CLASS_ALIASES: Record<string, string> = {
   irrigation_system: 'water_treatment',
   water_purification: 'water_treatment',
   reverse_osmosis_plant: 'water_treatment',
+  // syringe_pump — benchtop multi-channel dosing (2026-07-15 Poseidon).
+  // Mirrors engineering-contract ARCHETYPE_ALIASES; device-scale, not plant.
+  syringe_pump: 'syringe_pump',
+  syringe_pump_platform: 'syringe_pump',
+  multi_channel_syringe_pump: 'syringe_pump',
+  programmable_syringe_pump: 'syringe_pump',
+  poseidon: 'syringe_pump',
+  thermocycler: 'thermocycler',
+  pcr_thermocycler: 'thermocycler',
+  optical_instrument: 'optical_instrument',
 }
 
 function normaliseClass(raw: string): string | null {

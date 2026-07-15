@@ -74,6 +74,13 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   // sizing anchors every downstream stage reads; all derived by the engineering-contract builder
   // (registerArchetype 'water_treatment'), so they pass the lock gate. EXACT names (else exit 22).
   water_treatment: ['ro_permeate_capacity_m3_h', 'irrigation_demand_m3_h', 'fresh_water_storage_capacity_m3'],
+  // thermocycler (benchtop PCR / DNA amplification, 2026-07-15 NinjaPCR) —
+  // four sizing anchors every thermal + electrical stage reads; derived by
+  // registerArchetype('thermocycler'). EXACT names (else exit 22).
+  thermocycler: ['tube_count', 'sample_temp_min_c', 'sample_temp_max_c', 'connected_electrical_load_kw'],
+  // syringe_pump (multi-channel benchtop syringe dosing, 2026-07-15 Poseidon) —
+  // channel count + panel load; derived by registerArchetype('syringe_pump').
+  syringe_pump: ['channel_count', 'connected_electrical_load_kw'],
   // Default: no HARD required slots for classes without explicit entries.
   // The gate runs a soft fill pass for all classes regardless.
 }

@@ -755,6 +755,9 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   // (no site install). Alias pcr_thermocycler for LLM display-name drift.
   thermocycler: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   pcr_thermocycler: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  // INTENT (2026-07-15 Poseidon): benchtop multi-channel syringe pump — not plant.
+  syringe_pump: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  syringe_pump_platform: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
 }
 
 // ---------------------------------------------------------------------------

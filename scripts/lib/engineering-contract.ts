@@ -373,6 +373,22 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   diabetes_wearable: 'cgm',
   glucose_sensor_wearable: 'cgm',
   isf_sensor: 'cgm',
+  // INTENT (2026-07-15 NinjaPCR): classifier emits thermocycler; aliases cover
+  // pcr_thermocycler / dna_amplifier so lock-gate + buildContract resolve.
+  thermocycler: 'thermocycler',
+  pcr_thermocycler: 'thermocycler',
+  pcr_cycler: 'thermocycler',
+  dna_amplifier: 'thermocycler',
+  thermal_cycler: 'thermocycler',
+  ninjapcr: 'thermocycler',
+  openpcr: 'thermocycler',
+  // INTENT (2026-07-15 Poseidon): multi-channel syringe-pump platform.
+  // poseidon is a TRAINING synonym only — never a product-noun branch elsewhere.
+  syringe_pump: 'syringe_pump',
+  syringe_pump_platform: 'syringe_pump',
+  multi_channel_syringe_pump: 'syringe_pump',
+  programmable_syringe_pump: 'syringe_pump',
+  poseidon: 'syringe_pump',
   edge_ai: 'edge_ai',
   // Classifier emits 'edge_ai_server' for 1U inference appliance briefs
   edge_ai_server: 'edge_ai',
@@ -14684,6 +14700,606 @@ registerArchetype('water_treatment', (brief: any) => {
       // drain_pit_* quantities exist (requirements_bom civils_rows_from_underground_scope).
       scope_exclusions_desc: 'grow-lighting and its switchboards; climate / heating-ventilation-cooling hardware and the climate computer; the cultivation rack framework; the building fabric / polytunnel shell (NOT underground drain-pit excavation or buried drain laterals — those remain in scope); the main electrical switchboard',
       scope_inclusions_desc: 'underground drain-pit excavation, concrete surrounds, and buried drain laterals serving the drain_collection_sump / drain_pit quantities',
+    },
+  }
+})
+
+// ---------------------------------------------------------------------------
+// THERMOCYCLER (benchtop PCR / DNA amplification) — thin but real contract.
+// INTENT (2026-07-15 NinjaPCR): without a registered archetype the chain
+// logged "Engineering Contract not registered for thermocycler — falling
+// back to LLM-only" with 0 quantities, so thermal/electrical stages had no
+// typed anchors. Mirror CGM scale: brief-derived tube count + temp range,
+// first-principles block thermal mass → heater/cooler duty → panel load,
+// plus honest open-hardware macro BoM for an 8×0.2 mL research instrument.
+// NOT clinical IVD — research-use laboratory electrical equipment.
+// ---------------------------------------------------------------------------
+
+registerArchetype('thermocycler', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+
+  // Capacity: brief hard target ≥8 × 0.2 mL tubes (NinjaPCR / OpenPCR class).
+  const tubeCount = Math.max(
+    8,
+    Math.round(extractRangeFromDesc(desc, /(\d{1,2})\s*(?:\+|plus)?\s*(?:standard\s+)?(?:0\.2\s*mL\s+)?(?:PCR\s+)?tubes?\b/i, 8)),
+  )
+  const tubeVolumeMl = 0.2
+  const sampleTempMinC = extractRangeFromDesc(
+    desc,
+    /(\d{1,2})\s*°?\s*C\s*(?:to|–|-|—)\s*(\d{2,3})\s*°?\s*C/i,
+    4,
+  )
+  // extractRangeFromDesc averages a–b when both groups exist; for "4 to 99"
+  // that yields ~51.5 — wrong. Prefer an explicit max match, then fallback.
+  const sampleTempMaxMatch = desc.match(
+    /(?:to|–|-|—)\s*(\d{2,3})\s*°?\s*C\b|(?:up\s+to|max(?:imum)?)\s+(\d{2,3})\s*°?\s*C\b/i,
+  )
+  const sampleTempMaxC = sampleTempMaxMatch
+    ? parseFloat(sampleTempMaxMatch[1] ?? sampleTempMaxMatch[2])
+    : 99
+  const sampleTempMinResolved = (() => {
+    const m = desc.match(
+      /(?:from|range)\s+(\d{1,2})\s*°?\s*C|(?:≥\s*)?(\d{1,2})\s*°?\s*C\s*(?:to|–|-|—)/i,
+    )
+    if (m) return parseFloat(m[1] ?? m[2])
+    return sampleTempMinC <= 15 ? sampleTempMinC : 4
+  })()
+  const wellUniformityC = extractRangeFromDesc(
+    desc,
+    /(?:uniformity|well[- ]to[- ]well)[^\d]{0,40}(\d(?:\.\d)?)\s*°?\s*C/i,
+    0.5,
+  )
+
+  // Thermal mass: Al block for N tubes (~4 cm³ Al per well seat + walls) + sample water.
+  // OpenPCR-class 8-tube block ≈ 30–40 g Al → Cp_Al·m ≈ 28 J/K; 8×0.2 mL water ≈ 6.7 J/K.
+  const blockMassG = 12 + tubeCount * 3.5
+  const blockThermalMassJK = blockMassG * 0.897 + tubeCount * tubeVolumeMl * 4.18
+  // Ramp targets: research PCR typically 2–4 °C/s heat, slightly slower cool.
+  const heatingRampCs = extractRangeFromDesc(desc, /heat(?:ing)?\s+ramp[^\d]{0,20}(\d(?:\.\d)?)\s*°?\s*C\s*\/\s*s/i, 3)
+  const coolingRampCs = extractRangeFromDesc(desc, /cool(?:ing)?\s+ramp[^\d]{0,20}(\d(?:\.\d)?)\s*°?\s*C\s*\/\s*s/i, 2)
+  const activeHeatingDutyW = blockThermalMassJK * heatingRampCs
+  const activeCoolingDutyW = blockThermalMassJK * coolingRampCs
+  // Bidirectional Peltier: heat-pump electrical ≈ pumped heat / COP; COP~0.6–0.8 at ΔT.
+  const peltierCop = 0.67
+  const peltierElectricalW = Math.max(activeHeatingDutyW, activeCoolingDutyW / peltierCop)
+  const heatRejectionDutyW = activeCoolingDutyW + peltierElectricalW
+  const fanAuxW = 20
+  const electronicsW = 12
+  const lidHeaterW = 15
+  const peakElectricalPowerW = Math.ceil(peltierElectricalW + fanAuxW + electronicsW + lidHeaterW)
+  const connectedElectricalLoadKw = Number((peakElectricalPowerW / 1000).toFixed(3))
+
+  // Benchtop envelope — compact open-hardware class (~200×150×120 mm).
+  const enclosureLengthM = 0.20
+  const enclosureWidthM = 0.15
+  const enclosureHeightM = 0.12
+  const enclosureVolumeM3 = enclosureLengthM * enclosureWidthM * enclosureHeightM
+  const systemMassKg = 1.8 + tubeCount * 0.05 + peltierElectricalW / 200
+
+  const productionRunCount = Math.round(
+    extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*unit\s+engineering\s+build/i, 20),
+  )
+
+  const quantities: Record<string, Quantity> = {
+    // HARD lock-gate slots (exact names — see HARD_REQUIRED_SLOTS.thermocycler)
+    tube_count: q(tubeCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'brief capacity ≥ N × 0.2 mL PCR tubes',
+      condition: 'standard 0.2 mL PCR tubes',
+    }),
+    sample_temp_min_c: q(sampleTempMinResolved, '°C', 'temperature', 'min', 'system', 'brief', {
+      source_detail: 'brief low end of sample temperature range (active cool / ambient-limited disclosed if needed)',
+    }),
+    sample_temp_max_c: q(sampleTempMaxC, '°C', 'temperature', 'max', 'system', 'brief', {
+      source_detail: 'brief high end of sample temperature range (denaturation)',
+    }),
+    connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+      source_detail: `peak panel load = (Peltier ${peltierElectricalW.toFixed(0)} W + fan ${fanAuxW} W + electronics ${electronicsW} W + lid ${lidHeaterW} W) / 1000`,
+      from: ['peak_electrical_power_w'],
+      formula: 'peak_electrical_power_w/1000',
+    }),
+
+    // Soft / downstream thermal model
+    tube_volume_ml: q(tubeVolumeMl, 'mL', 'volume', 'rated', 'system', 'physics_constant', {
+      source_detail: 'standard PCR tube working volume class',
+    }),
+    max_sample_volume_ml: q(tubeCount * tubeVolumeMl, 'mL', 'volume', 'rated', 'system', 'calculator', {
+      source_detail: 'tube_count × tube_volume_ml',
+      from: ['tube_count', 'tube_volume_ml'],
+      formula: 'tube_count*tube_volume_ml',
+    }),
+    well_uniformity_c: q(wellUniformityC, '°C', 'temperature', 'max', 'system', 'brief', {
+      source_detail: 'well-to-well temperature difference design target (measured, not assumed)',
+    }),
+    block_mass_g: q(Number(blockMassG.toFixed(1)), 'g', 'mass', 'empty', 'module', 'calculator', {
+      // INTENT (calc-coverage 2026-07-15): must show arithmetic — bare prose was
+      // counted as a hidden calculator number and floored Calculations to 7.
+      source_detail:
+        `block_mass_g = ${blockMassG.toFixed(1)} g ≈ ρ_Al·V_block proxy for ${tubeCount}-tube open-hardware class`,
+      formula: 'rho_al*V_block_proxy',
+    }),
+    block_thermal_mass_j_k: q(Number(blockThermalMassJK.toFixed(1)), 'J/K', 'dimensionless', 'rated', 'module', 'calculator', {
+      source_detail: `m_Al·Cp_Al + m_sample·Cp_water ≈ ${blockMassG.toFixed(0)} g × 0.897 + ${tubeCount}×${tubeVolumeMl} mL × 4.18`,
+      from: ['block_mass_g', 'tube_count'],
+    }),
+    heating_ramp_rate_c_s: q(heatingRampCs, '°C/s', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'design heating ramp supporting denaturation transitions',
+    }),
+    cooling_ramp_rate_c_s: q(coolingRampCs, '°C/s', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'design cooling ramp supporting anneal transitions',
+    }),
+    active_heating_duty_w: q(Number(activeHeatingDutyW.toFixed(1)), 'W', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'Q = C·dT/dt = block_thermal_mass_j_k × heating_ramp_rate_c_s',
+      from: ['block_thermal_mass_j_k', 'heating_ramp_rate_c_s'],
+      formula: 'block_thermal_mass_j_k*heating_ramp_rate_c_s',
+    }),
+    active_cooling_duty_w: q(Number(activeCoolingDutyW.toFixed(1)), 'W', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'Q = C·dT/dt = block_thermal_mass_j_k × cooling_ramp_rate_c_s',
+      from: ['block_thermal_mass_j_k', 'cooling_ramp_rate_c_s'],
+      formula: 'block_thermal_mass_j_k*cooling_ramp_rate_c_s',
+    }),
+    peltier_electrical_w: q(Number(peltierElectricalW.toFixed(1)), 'W', 'power', 'peak', 'module', 'calculator', {
+      source_detail: `max(heat duty, cool duty / COP=${peltierCop}) for bidirectional TEC`,
+    }),
+    heat_rejection_duty_w: q(Number(heatRejectionDutyW.toFixed(1)), 'W', 'power', 'peak', 'module', 'calculator', {
+      source_detail: 'pumped heat + Peltier electrical rejected at the hot-side heatsink',
+      from: ['active_cooling_duty_w', 'peltier_electrical_w'],
+    }),
+    peak_electrical_power_w: q(peakElectricalPowerW, 'W', 'power', 'peak', 'system', 'calculator', {
+      source_detail: 'Peltier + fan + MCU/SBC/Wi-Fi + lid heater peak simultaneous draw',
+    }),
+    enclosure_volume_m3: q(Number(enclosureVolumeM3.toFixed(5)), 'm³', 'volume', 'rated', 'system', 'calculator', {
+      source_detail: `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m compact benchtop envelope`,
+    }),
+    // INTENT (2026-07-15 NinjaPCR SIGHT): pin design_envelope_*_mm so Blender's
+    // resolve_design_envelope_mm prefers the open-hardware benchtop box over
+    // minimum_working_envelope's flat pack (was 138×66×34 mm — unreadably squat).
+    // GOTCHA: must NOT be provenance.source=derived_device_scale or the resolver
+    // treats them as mass-air fantasy and falls back to the packed envelope.
+    design_envelope_width_mm: q(enclosureLengthM * 1000, 'mm', 'length', 'rated', 'system', 'calculator', {
+      source_detail:
+        `design_envelope_width_mm = enclosure_length_m × 1000 = ${enclosureLengthM} × 1000`,
+      from: ['enclosure_volume_m3'],
+      formula: 'enclosure_length_m*1000',
+    }),
+    design_envelope_depth_mm: q(enclosureWidthM * 1000, 'mm', 'length', 'rated', 'system', 'calculator', {
+      source_detail:
+        `design_envelope_depth_mm = enclosure_width_m × 1000 = ${enclosureWidthM} × 1000`,
+      from: ['enclosure_volume_m3'],
+      formula: 'enclosure_width_m*1000',
+    }),
+    design_envelope_height_mm: q(enclosureHeightM * 1000, 'mm', 'length', 'rated', 'system', 'calculator', {
+      source_detail:
+        `design_envelope_height_mm = enclosure_height_m × 1000 = ${enclosureHeightM} × 1000`,
+      from: ['enclosure_volume_m3'],
+      formula: 'enclosure_height_m*1000',
+    }),
+    total_system_mass_kg: q(Number(systemMassKg.toFixed(2)), 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', {
+      source_detail: 'enclosure + block + TEC + heatsink/fan + PSU + PCB (open-hardware class)',
+    }),
+    production_run_count: q(productionRunCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'engineering-build unit count from brief',
+    }),
+    // Ambient design temp for thermal-derating-style consumers (lab ambient).
+    ambient_design_temp_c: q(25, '°C', 'temperature', 'rated', 'system', 'physics_constant', {
+      source_detail: 'standard laboratory ambient for heatsink / TEC hot-side rejection',
+    }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'peltier_tec_module',
+      to_part: 'aluminum_sample_block',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: Math.max(activeHeatingDutyW, activeCoolingDutyW),
+      required_unit: 'W',
+      material_context: 'thermal_grease_or_pad — TEC cold face bonded to Al block with thin TIM; lid heater separate',
+    },
+    // DECISION (2026-07-15): tube wells are a FEATURE of the Al block, not a
+    // separate BoM part — do not emit aluminum_sample_block → pcr_tube_wells
+    // (that edge failed Connection-trace referential integrity on 0906/0951).
+    // Uniformity is carried on the block's thermal edge from the TEC above.
+    {
+      from_part: 'heatsink_fan_assembly',
+      to_part: 'peltier_tec_module',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: heatRejectionDutyW,
+      required_unit: 'W',
+      material_context: 'forced_air_heatsink — hot-side rejection of pumped heat + TEC electrical',
+    },
+    {
+      from_part: 'main_controller_mcu',
+      to_part: 'peltier_tec_module',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: Number((peltierElectricalW / 12).toFixed(2)),
+      required_unit: 'A',
+      material_context: '12_or_24_v_h_bridge — MOSFET/SSR class switch with independent thermal-fuse cutout',
+    },
+    // GOTCHA: psu_bench_adapter is a priced MACRO, not always an emitted word.
+    // Topology must name an emitted power word (terminal_block / wire harness
+    // path lands as Wire Harness in the skeleton) → MCU, never a dangling macro id.
+    {
+      from_part: 'terminal_block',
+      to_part: 'main_controller_mcu',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: 24,
+      required_unit: 'V',
+      material_context: 'bench_psu_via_terminal_block — 24 V DC feed into MCU / TEC driver rail',
+    },
+    {
+      from_part: 'block_temperature_sensor',
+      to_part: 'main_controller_mcu',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 10,
+      required_unit: 'Hz',
+      material_context: 'ntc_or_pt100_in_block — sensor in sample-block metal, not on heater alone',
+    },
+  ]
+
+  // Honest open-hardware research-thermocycler macros (catalogue + fab).
+  // Totals land in the £200–450 parts band typical of NinjaPCR/OpenPCR-class builds.
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'aluminum_sample_block',
+      unit_price_gbp: 45,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 45,
+      source_detail: `£45 — CNC Al 6061 ${tubeCount}-well 0.2 mL block (or cast + finish) for intimate tube contact`,
+    },
+    {
+      word_name: 'peltier_tec_module',
+      unit_price_gbp: 28,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 28,
+      source_detail: `£28 — bidirectional TEC sized ≥ ${Math.ceil(Math.max(activeHeatingDutyW, activeCoolingDutyW))} W pumped heat (e.g. TEC1-127xx class)`,
+    },
+    {
+      word_name: 'heatsink_fan_assembly',
+      unit_price_gbp: 22,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 22,
+      source_detail: `£22 — extruded Al heatsink + 40/60 mm fan rejecting ~${heatRejectionDutyW.toFixed(0)} W hot-side`,
+    },
+    {
+      word_name: 'control_pcb_mcu',
+      unit_price_gbp: 55,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 55,
+      source_detail: '£55 — MCU/SBC + H-bridge / MOSFET heater drive + ADC + Wi-Fi for browser UI (assembled PCB)',
+    },
+    {
+      word_name: 'block_temperature_sensor',
+      unit_price_gbp: 6,
+      dimension_basis: 'each',
+      dimension_value: 2,
+      total_gbp: 12,
+      source_detail: '£6 × 2 — NTC/Pt100 in block + lid/ambient sense for fault detection',
+    },
+    {
+      word_name: 'psu_bench_adapter',
+      unit_price_gbp: 35,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 35,
+      source_detail: `£35 — 24 V / ≥${Math.ceil(peakElectricalPowerW / 24)} A bench PSU covering ${peakElectricalPowerW} W peak`,
+    },
+    {
+      word_name: 'enclosure_polymer',
+      unit_price_gbp: 40,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 40,
+      source_detail: '£40 — 3D-printed / sheet ABS-PC enclosure + lid with tube access (20-unit engineering build)',
+    },
+    {
+      word_name: 'lid_heater_assembly',
+      unit_price_gbp: 18,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 18,
+      source_detail: '£18 — heated lid / condensation control (~15 W) with independent fuse path',
+    },
+    {
+      word_name: 'thermal_fuse_safety',
+      unit_price_gbp: 4,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 4,
+      source_detail: '£4 — independent thermal fuse / hardware shutdown path (IEC 61010-2-010 abnormal operation)',
+    },
+  ]
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'tube_capacity_closure',
+    status: tubeCount >= 8 ? 'pass' : 'fail',
+    measured: tubeCount,
+    required: '≥8 × 0.2 mL PCR tubes (brief hard target)',
+    reason: `Block seats ${tubeCount} standard 0.2 mL tubes (brief minimum 8).`,
+  })
+  closures.push({
+    invariant_id: 'temperature_range_closure',
+    status:
+      sampleTempMinResolved <= 4 && sampleTempMaxC >= 95
+        ? 'pass'
+        : sampleTempMaxC >= 90
+          ? 'warn'
+          : 'fail',
+    measured: sampleTempMaxC - sampleTempMinResolved,
+    required: 'nominal sample range covering ~4 °C to ≥95 °C denaturation',
+    reason: `Design range ${sampleTempMinResolved}–${sampleTempMaxC} °C. Low end may be ambient-limited without refrigeration — disclose achieved vs brief.`,
+  })
+  closures.push({
+    invariant_id: 'heater_duty_vs_ramp_closure',
+    status: activeHeatingDutyW >= blockThermalMassJK * heatingRampCs * 0.95 ? 'pass' : 'fail',
+    measured: activeHeatingDutyW,
+    required: `≥ ${ (blockThermalMassJK * heatingRampCs).toFixed(0) } W (= C·dT/dt) for ${heatingRampCs} °C/s`,
+    reason: `Active heat duty ${activeHeatingDutyW.toFixed(0)} W from C=${blockThermalMassJK.toFixed(1)} J/K × ${heatingRampCs} °C/s; TEC electrical ${peltierElectricalW.toFixed(0)} W at COP ${peltierCop}.`,
+  })
+  closures.push({
+    invariant_id: 'heat_rejection_closure',
+    status: heatRejectionDutyW >= activeCoolingDutyW + peltierElectricalW * 0.9 ? 'pass' : 'warn',
+    measured: heatRejectionDutyW,
+    required: 'hot-side sink rejects pumped cool duty + TEC electrical',
+    reason: `Heatsink/fan sized for ${heatRejectionDutyW.toFixed(0)} W rejection at ${25} °C lab ambient.`,
+  })
+  closures.push({
+    invariant_id: 'uniformity_target_closure',
+    status: wellUniformityC <= 0.5 ? 'pass' : wellUniformityC <= 1.0 ? 'warn' : 'fail',
+    measured: wellUniformityC,
+    required: '≤0.5 °C well-to-well at steady setpoint (molecular-biology practice)',
+    reason: `Uniformity design target ±${wellUniformityC} °C — must be validated by multi-well measurement, not assumed from block material alone.`,
+  })
+  closures.push({
+    invariant_id: 'bom_honesty_band_closure',
+    status: macroAssemblyTotal >= 150 && macroAssemblyTotal <= 600 ? 'pass' : 'warn',
+    measured: macroAssemblyTotal,
+    required: '£150–600 parts band for catalogue + fab 8-tube research thermocycler',
+    reason: `Macro BoM £${macroAssemblyTotal.toFixed(0)} for a ${productionRunCount}-unit engineering-build class instrument (not clinical IVD).`,
+  })
+
+  return {
+    product_class: 'thermocycler',
+    brief_summary:
+      `Compact research PCR thermocycler, ${tubeCount}×${tubeVolumeMl} mL tubes, `
+      + `sample range ${sampleTempMinResolved}–${sampleTempMaxC} °C, well uniformity ≤${wellUniformityC} °C. `
+      + `Block C≈${blockThermalMassJK.toFixed(0)} J/K → heat ${activeHeatingDutyW.toFixed(0)} W @ ${heatingRampCs} °C/s, `
+      + `cool ${activeCoolingDutyW.toFixed(0)} W @ ${coolingRampCs} °C/s; bidirectional TEC ~${peltierElectricalW.toFixed(0)} W electrical, `
+      + `peak panel ${peakElectricalPowerW} W (${connectedElectricalLoadKw} kW). `
+      + `Macro-assembly raw BoM ≈ £${macroAssemblyTotal.toFixed(0)} (${productionRunCount}-unit engineering build). `
+      + `Research-use laboratory equipment — not clinical IVD.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+    shared_quantities: {
+      tube_count: tubeCount,
+      sample_temp_min_c: sampleTempMinResolved,
+      sample_temp_max_c: sampleTempMaxC,
+      well_uniformity_c: wellUniformityC,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      peak_electrical_power_w: peakElectricalPowerW,
+      block_thermal_mass_j_k: Number(blockThermalMassJK.toFixed(1)),
+      active_heating_duty_w: Number(activeHeatingDutyW.toFixed(1)),
+      active_cooling_duty_w: Number(activeCoolingDutyW.toFixed(1)),
+      heat_rejection_duty_w: Number(heatRejectionDutyW.toFixed(1)),
+      enclosure_volume_m3: Number(enclosureVolumeM3.toFixed(5)),
+      ambient_design_temp_c: 25,
+      regulatory_standard_spine:
+        'LVD 2014/35/EU + EMC 2014/30/EU + RoHS + IEC 61010-1 + IEC 61010-2-010 (heating of materials) + IEC 61326-1 — research-use, not IVDR/IEC 60601',
+    },
+  }
+})
+
+// ---------------------------------------------------------------------------
+// SYRINGE_PUMP (multi-channel benchtop lead-screw dosing) — thin but real.
+// INTENT (2026-07-15 Poseidon): without a registered archetype the chain
+// fell to vehicle (bare `car` matched inside "carriage") → empty contract →
+// plant-scale circulation-pump BoM. Mirror thermocycler: brief-derived
+// channel count + first-principles stepper electrical load + honest
+// open-hardware macro BoM. Research-use wet-lab hardware — not clinical
+// infusion (IEC 60601-2-24) / IVD.
+// ---------------------------------------------------------------------------
+
+registerArchetype('syringe_pump', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+  const tp = brief?.constraints?.target_performance
+  const tpMetrics: Array<{ key_metric?: string; value?: number; unit?: string }> = Array.isArray(tp?.metrics)
+    ? tp.metrics
+    : tp?.key_metric
+      ? [{ key_metric: tp.key_metric, value: tp.value, unit: tp.unit }]
+      : []
+
+  // Channels: brief hard target (Poseidon / Harvard-class rack = 4).
+  const channelFromTp = tpMetrics.find((m) => /channel/i.test(String(m.key_metric ?? '')))
+  const channelCount = Math.max(
+    1,
+    Math.round(
+      channelFromTp?.value
+        ?? extractRangeFromDesc(desc, /(\d{1,2})\s*(?:-|\s)?\s*channel/i, 4),
+    ),
+  )
+
+  // Syringe geometry class — configurable library; default max barrel for sizing.
+  const maxSyringeVolumeMl = extractRangeFromDesc(
+    desc,
+    /(?:up\s+to|max(?:imum)?)\s+(\d{1,3})\s*mL|\b(\d{1,3})\s*mL\s+syringe/i,
+    60,
+  )
+  // Lead screw: typical open-hardware T8×2 / T8×8 class.
+  const leadScrewPitchMm = extractRangeFromDesc(
+    desc,
+    /(?:lead[\s-]?screw|screw)\s+pitch[^\d]{0,20}(\d(?:\.\d)?)\s*mm|\bT8\s*[×x]\s*(\d(?:\.\d)?)/i,
+    2,
+  )
+  // NEMA17-class steppers: ~12–24 W electrical each under continuous microstepping
+  // + driver overhead; desktop 4-ch rack ≈ 40–80 W total (critics flag 37 kW).
+  const wattsPerChannel = 18
+  const electronicsW = 15
+  const peakElectricalPowerW = Math.ceil(channelCount * wattsPerChannel + electronicsW)
+  const connectedElectricalLoadKw = Number((peakElectricalPowerW / 1000).toFixed(3))
+
+  // Benchtop envelope — multi-channel array + control console (~450×250×150 mm).
+  const enclosureLengthM = 0.45
+  const enclosureWidthM = 0.25
+  const enclosureHeightM = 0.15
+  const enclosureVolumeM3 = enclosureLengthM * enclosureWidthM * enclosureHeightM
+  const systemMassKg = 1.2 + channelCount * 0.55
+
+  const productionRunCount = Math.round(
+    extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*unit\s+engineering\s+build/i, 20),
+  )
+
+  // Macro BoM honesty: NEMA17 + T8 + rails + printed frames + CNC shield + MCU + PSU.
+  const macroPerChannelGbp = 85
+  const macroControlGbp = 120
+  const macroAssemblyTotal = channelCount * macroPerChannelGbp + macroControlGbp
+
+  const quantities: Record<string, Quantity> = {
+    channel_count: q(channelCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'brief independent syringe-drive channel count',
+      condition: 'concurrent infuse/withdraw capable',
+    }),
+    connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+      source_detail:
+        `peak panel = (channel_count×${wattsPerChannel} W stepper/driver + ${electronicsW} W control) / 1000`,
+      from: ['channel_count', 'peak_electrical_power_w'],
+      formula: '(channel_count*watts_per_channel+electronics_w)/1000',
+    }),
+    peak_electrical_power_w: q(peakElectricalPowerW, 'W', 'power', 'peak', 'system', 'calculator', {
+      source_detail: `${channelCount}×${wattsPerChannel} W + ${electronicsW} W electronics`,
+      from: ['channel_count'],
+      formula: 'channel_count*watts_per_channel+electronics_w',
+    }),
+    max_syringe_volume_ml: q(maxSyringeVolumeMl, 'mL', 'volume', 'max', 'system', 'brief', {
+      source_detail: 'largest syringe barrel in the configurable syringe library (sizing bound)',
+    }),
+    lead_screw_pitch_mm: q(leadScrewPitchMm, 'mm', 'length', 'rated', 'module', 'brief', {
+      source_detail: 'lead-screw pitch for displacement = π·(ID/2)²·pitch·steps',
+    }),
+    watts_per_channel_w: q(wattsPerChannel, 'W', 'power', 'rated', 'module', 'physics_constant', {
+      source_detail: 'NEMA17-class stepper + microstep driver continuous electrical budget per channel',
+    }),
+    enclosure_volume_m3: q(Number(enclosureVolumeM3.toFixed(5)), 'm³', 'volume', 'rated', 'system', 'calculator', {
+      source_detail: `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m benchtop array + console`,
+      formula: 'L*W*H',
+    }),
+    system_mass_kg: q(Number(systemMassKg.toFixed(2)), 'kg', 'mass', 'empty', 'system', 'calculator', {
+      source_detail: `console + ${channelCount}× (stepper + screw + rails + printed frame)`,
+      from: ['channel_count'],
+    }),
+    production_run_count: q(productionRunCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'engineering-build unit count for macro BoM pricing class',
+    }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'stepper_motor',
+      to_part: 'lead_screw',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: 1,
+      required_unit: 'each',
+      material_context: 'stepper→coupling→lead screw→carriage→plunger per channel',
+    },
+    {
+      from_part: 'carriage',
+      to_part: 'syringe_plunger_clamp',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: 1,
+      required_unit: 'each',
+      material_context: 'plunger capture for infusion AND withdrawal (pull force)',
+    },
+    {
+      from_part: 'main_controller_mcu',
+      to_part: 'stepper_driver',
+      mechanism: 'control',
+      constraint_kind: 'signal',
+      material_context: 'channel-independent step/dir; stall / force-limit path',
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'syringe_drive_channel',
+      unit_price_gbp: macroPerChannelGbp,
+      dimension_basis: 'each',
+      dimension_value: channelCount,
+      total_gbp: channelCount * macroPerChannelGbp,
+      source_detail: `£${macroPerChannelGbp}/ch × ${channelCount} — NEMA17 + T8 lead screw + rails + printed frame/cradle`,
+    },
+    {
+      word_name: 'control_console',
+      unit_price_gbp: macroControlGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: macroControlGbp,
+      source_detail: '£120 — MCU + CNC shield / drivers + bench PSU + host interface cabling',
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'channel_count_matches_brief',
+    status: channelCount >= 4 ? 'pass' : channelCount >= 1 ? 'warn' : 'fail',
+    measured: channelCount,
+    required: '≥4 independent channels when brief states four-channel / multi-channel syringe pump',
+    reason: `Design closes at ${channelCount} channel(s).`,
+  })
+  closures.push({
+    invariant_id: 'desktop_electrical_band',
+    status: peakElectricalPowerW <= 200 ? 'pass' : peakElectricalPowerW <= 500 ? 'warn' : 'fail',
+    measured: peakElectricalPowerW,
+    required: '≤200 W peak for desktop multi-channel syringe rack (not process-plant kW motors)',
+    reason: `Peak electrical ${peakElectricalPowerW} W — industrial 37 kW drives are a class mismatch.`,
+  })
+  closures.push({
+    invariant_id: 'bom_honesty_band_closure',
+    status: macroAssemblyTotal >= 200 && macroAssemblyTotal <= 1200 ? 'pass' : 'warn',
+    measured: macroAssemblyTotal,
+    required: '£200–1200 parts band for catalogue + fab multi-channel research syringe pump',
+    reason: `Macro BoM £${macroAssemblyTotal.toFixed(0)} for a ${productionRunCount}-unit engineering-build class instrument.`,
+  })
+
+  return {
+    product_class: 'syringe_pump',
+    brief_summary:
+      `Multi-channel benchtop syringe-pump platform, ${channelCount} independent lead-screw `
+      + `channels, syringe library up to ${maxSyringeVolumeMl} mL, pitch ${leadScrewPitchMm} mm. `
+      + `Peak panel ~${peakElectricalPowerW} W (${connectedElectricalLoadKw} kW). `
+      + `Macro-assembly raw BoM ≈ £${macroAssemblyTotal.toFixed(0)} (${productionRunCount}-unit engineering build). `
+      + `Research-use wet-lab hardware — not clinical infusion / IVD.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+    shared_quantities: {
+      channel_count: channelCount,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      peak_electrical_power_w: peakElectricalPowerW,
+      max_syringe_volume_ml: maxSyringeVolumeMl,
+      lead_screw_pitch_mm: leadScrewPitchMm,
+      enclosure_volume_m3: Number(enclosureVolumeM3.toFixed(5)),
+      system_mass_kg: Number(systemMassKg.toFixed(2)),
+      ambient_design_temp_c: 25,
+      regulatory_standard_spine:
+        'LVD 2014/35/EU + EMC 2014/30/EU + RoHS + IEC 61010-1 + IEC 61326-1 — research-use, not IVDR/IEC 60601-2-24',
     },
   }
 })

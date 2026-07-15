@@ -522,6 +522,25 @@ const CLASS_SLUG_TO_ENVELOPE_ID: Record<string, string | null> = {
   'consumer-smartphone': null,
   'consumer_smartphone': null,
 
+  // Benchtop / handheld lab instruments — the enclosure IS the product.
+  // INTENT (2026-07-15 NinjaPCR): without this, device-scale volume (<1 m³)
+  // fell through resolveDeploymentEnvelopeForProduct's wall-ESS override and
+  // stamped cabinet-wall-ess-residential onto a PCR thermocycler (vision critic
+  // then scored battery-pack / inverter checklist against a lab instrument).
+  'thermocycler': null,
+  'pcr_thermocycler': null,
+  'pcr-thermocycler': null,
+  'optical_instrument': null,
+  'optical-instrument': null,
+  'colorimeter': null,
+  'photometer': null,
+  // INTENT (2026-07-15 Poseidon): benchtop syringe-pump array — enclosure IS
+  // the product; never inherit wall-ESS / plant skid envelopes.
+  'syringe_pump': null,
+  'syringe-pump': null,
+  'syringe_pump_platform': null,
+  'poseidon': null,
+
   // Drones — custom airframe; ships on a foam-lined case, not a standard
   // envelope. Return null.
   'drone': null,
@@ -654,8 +673,19 @@ export function resolveDeploymentEnvelopeForProduct(
     (mass !== null && mass > 0 && mass < 500) ||
     RESIDENTIAL_WALL_ESS_RE.test(text)
 
+  // GOTCHA (2026-07-15): this override exists to pull utility-BESS class
+  // defaults (40-ft container) down to a wall cabinet for residential ESS.
+  // It must NOT fire for benchtop instruments (thermocycler / colorimeter)
+  // that merely share "device-scale volume" — those classes declare null
+  // envelopes above (device IS the product). Gate on energy-storage class
+  // OR explicit wall-ESS prose.
+  const slug = String(productClass ?? '').toLowerCase()
+  const isEnergyStorageClass =
+    /\b(bess|energy[_-]?storage|battery)\b/.test(slug) || RESIDENTIAL_WALL_ESS_RE.test(text)
+
   if (
     isDeviceScaleEss &&
+    isEnergyStorageClass &&
     (classDefault == null || classDefault.category === 'shipping_container')
   ) {
     // DECISION: when prose/scale says residential wall ESS, return the wall
@@ -700,6 +730,31 @@ export function _selftestResolveDeploymentEnvelope(): void {
     throw new Error(
       `proveCatch FAIL: utility BESS resolved to ${utility?.id ?? 'null'} ` +
         `(category=${utility?.category ?? 'n/a'}) — must stay shipping_container`,
+    )
+  }
+  // Benchtop thermocycler must NEVER inherit the Powerwall wall-cabinet envelope
+  // just because enclosure_volume_m3 < 1.
+  const pcr = resolveDeploymentEnvelopeForProduct('thermocycler', {
+    enclosureVolumeM3: 0.0036,
+    massKg: 2.8,
+    briefText: 'compact PCR thermocycler for eight 0.2 mL tubes, benchtop research instrument',
+  })
+  if (pcr !== null) {
+    throw new Error(
+      `proveCatch FAIL: thermocycler resolved to ${pcr.id} — must be null ` +
+        `(device IS the envelope; not cabinet-wall-ess-residential)`,
+    )
+  }
+  // Benchtop syringe-pump array — same null-envelope contract as thermocycler.
+  const syringe = resolveDeploymentEnvelopeForProduct('syringe_pump', {
+    enclosureVolumeM3: 0.012,
+    massKg: 4.5,
+    briefText: 'four-channel programmable syringe-pump platform, benchtop microfluidic dosing',
+  })
+  if (syringe !== null) {
+    throw new Error(
+      `proveCatch FAIL: syringe_pump resolved to ${syringe.id} — must be null ` +
+        `(device IS the envelope; not plant skid / wall-ESS)`,
     )
   }
 }

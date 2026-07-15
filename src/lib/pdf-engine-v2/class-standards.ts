@@ -325,6 +325,30 @@ const THERMOCYCLER: ClassStandards = {
   ],
 }
 
+// INTENT (2026-07-15 Poseidon): syringe_pump had ZERO registry → Risk WARN
+// forever when classed as vehicle. Same LVD/EMC/61010 floor as other benchtop
+// lab instruments; no heating-of-materials particular (unlike thermocycler).
+const SYRINGE_PUMP: ClassStandards = {
+  product_class: 'syringe_pump',
+  display_name: 'Multi-Channel Benchtop Syringe Pump Platform',
+  compliance_summary:
+    'Research-use benchtop syringe-pump platforms are CE-marked laboratory electrical '
+    + 'equipment: Low Voltage + EMC + RoHS as the market-access floor, IEC 61010-1 for '
+    + 'lab electrical safety, and IEC 61326-1 for lab EMC. Clinical / IVD / infusion-pump '
+    + 'medical-device routes (IVDR, IEC 60601-2-24) are OUT OF SCOPE unless the brief '
+    + 'explicitly requires them — this class is wet-lab / microfluidic research hardware.',
+  standards: [
+    { code: 'LVD 2014/35/EU', title: 'Low Voltage Directive', jurisdiction: 'EU', category: 'electrical', mandatory: true, typical_compliance_cost_gbp: 4_000, typical_lead_time_weeks: 6, applies_because: 'Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on the EU/UK market.' },
+    { code: 'EMC 2014/30/EU', title: 'Electromagnetic Compatibility Directive', jurisdiction: 'EU', category: 'emc', mandatory: true, typical_compliance_cost_gbp: 5_000, typical_lead_time_weeks: 6, applies_because: 'Stepper drivers, MCU clocks and USB/serial interfaces must not emit or succumb to interference in a lab environment.' },
+    { code: 'RoHS 2011/65/EU', title: 'Restriction of Hazardous Substances Directive', jurisdiction: 'EU', category: 'environmental', mandatory: true, typical_compliance_cost_gbp: 2_500, typical_lead_time_weeks: 4, applies_because: 'Restricts Pb/Hg/Cd etc. in electrical equipment; applies to control PCB, motor drivers and enclosure finishes.' },
+    { code: 'IEC 61010-1', title: 'Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements', jurisdiction: 'IEC', category: 'system_safety', mandatory: true, typical_compliance_cost_gbp: 8_000, typical_lead_time_weeks: 10, applies_because: 'Governing electrical-safety standard for benchtop laboratory instruments (creepage, insulation, protective earthing, abnormal operation including stall / blocked-line force limits).' },
+    { code: 'IEC 61326-1', title: 'Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements', jurisdiction: 'IEC', category: 'emc', mandatory: true, typical_compliance_cost_gbp: 6_000, typical_lead_time_weeks: 8, applies_because: 'EMC test levels specific to laboratory equipment; complements the generic EMC Directive with instrument-class immunity.' },
+    { code: 'UKCA / CE DoC', title: 'UKCA / CE Declaration of Conformity (electrical equipment)', jurisdiction: 'UK', category: 'electrical', mandatory: true, typical_compliance_cost_gbp: 1_500, typical_lead_time_weeks: 3, applies_because: 'Market-access paperwork for UK/EU placement — technical file + Declaration of Conformity referencing LVD/EMC/RoHS + 61010.' },
+    { code: 'WEEE 2012/19/EU', title: 'Waste Electrical and Electronic Equipment Directive', jurisdiction: 'EU', category: 'lifecycle', mandatory: true, typical_compliance_cost_gbp: 1_000, typical_lead_time_weeks: 2, applies_because: 'Producer-responsibility registration for electrical equipment placed on the EU market.' },
+    { code: 'FCC Part 15', title: 'Radio Frequency Devices (unintentional radiators)', jurisdiction: 'US', category: 'emc', mandatory: false, typical_compliance_cost_gbp: 4_500, typical_lead_time_weeks: 6, applies_because: 'US market access for digital devices as unintentional radiators; required if the brief targets US laboratory sales.' },
+  ],
+}
+
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   energy_storage: ENERGY_STORAGE,
   e_fuel_synthesis:     E_FUEL_SYNTHESIS,
@@ -339,6 +363,7 @@ export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   haps:           HAPS,
   optical_instrument: OPTICAL_INSTRUMENT,
   thermocycler: THERMOCYCLER,
+  syringe_pump: SYRINGE_PUMP,
 }
 
 // Map common display-name variants and synonyms to canonical class keys. The
@@ -367,6 +392,7 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(e[-\s]?fuel|power[-\s]?to[-\s]?liquid|fischer[-\s]?tropsch|\bptl\b|sustainable\s+aviation\s+fuel|\bsaf\b|e[-\s]?kerosene)\b/, 'e_fuel_synthesis'],
     [/\b(optical[_\s-]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance\s+meter)\b/, 'optical_instrument'],
     [/\b(thermo[\s_-]?cycler|pcr[\s_-]?thermo[\s_-]?cycler|pcr[\s_-]?cycler|dna[\s_-]?amplifier|ninjapcr|openpcr)\b/, 'thermocycler'],
+    [/\b(syringe[\s_-]?pump|multi[\s_-]?channel\s+syringe|poseidon)\b/, 'syringe_pump'],
   ]
   for (const [rx, key] of aliases) {
     if (rx.test(lower)) return key

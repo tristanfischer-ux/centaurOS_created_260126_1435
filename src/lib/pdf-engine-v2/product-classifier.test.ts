@@ -128,4 +128,21 @@ describe('classifyProduct — edge cases', () => {
     expect(classifyProduct('NinjaPCR-class DNA amplifier with sample block and denature/anneal cycling.').productClass)
       .toBe('thermocycler')
   })
+
+  // INTENT (2026-07-15 Poseidon): "carriage" must NOT trip vehicle via bare `car`;
+  // syringe-pump nouns must beat fluid_processing / pcb_assembly.
+  it('classifies a multi-channel syringe-pump brief as syringe_pump (beats vehicle via carriage)', () => {
+    const brief = 'Four-channel programmable syringe-pump platform with lead-screw '
+      + 'linear motion, stepper drives, CAD (carriage guidance, syringe retention), '
+      + 'schematic, PCB, firmware, desktop GUI, exact BOM and assembly plan.'
+    expect(classifyProduct(brief).productClass).toBe('syringe_pump')
+  })
+  it('poseidon + syringe/pump nouns classify as syringe_pump', () => {
+    expect(classifyProduct('Poseidon-class four-channel syringe pump for microfluidic dosing.').productClass)
+      .toBe('syringe_pump')
+  })
+  it('bare carriage alone does not classify as vehicle after word-boundary fix', () => {
+    expect(classifyProduct('A benchtop linear stage with carriage guidance on dual rails.').productClass)
+      .not.toBe('vehicle')
+  })
 })

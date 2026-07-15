@@ -137,6 +137,18 @@ export function classifyProduct(briefText: string): ProductClassification {
       || (lower.match(/\bpcr\b/) && lower.match(/\b(?:0\.2\s*ml|tube\s+block|sample\s+block|denatur|anneal|extension\s+hold|peltier|well[- ]to[- ]well)\b/))
     ) {
       productClass = 'thermocycler'
+    } else if (
+      // INTENT (2026-07-15 Poseidon): multi-channel syringe-pump / lead-screw
+      // dosing instruments. Must beat (a) fallthrough `car`→vehicle via
+      // "carriage", (b) `pump`→fluid_processing (plant), (c) pcb_assembly when
+      // the brief asks for schematic + PCB + assembly of the WHOLE instrument.
+      // Noun-first: syringe pump / syringe-pump platform / multi-channel
+      // infusion+withdrawal. Brand aliases (poseidon) are TRAINING synonyms only.
+      lower.match(/\bsyringe[\s-]?pump|\bmulti[\s-]?channel\s+syringe|\binfusion\s+(?:and\s+|\/\s*)?withdrawal\b/)
+      || (lower.match(/\bsyringe\b/) && lower.match(/\b(?:lead[\s-]?screw|stepper|infus(?:e|ion)|withdraw|microfluidic\s+dos)/))
+      || lower.match(/\bposeidon\b/) && lower.match(/\b(?:syringe|pump|channel)\b/)
+    ) {
+      productClass = 'syringe_pump'
     } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
       productClass = 'pcb_assembly'
     }
@@ -231,7 +243,10 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'bioreactor'
     } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
       productClass = 'robotics'
-    } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
+    } else if (lower.match(/\bvehicle\b|\bcar\b|\bdrivetrain\b|\bcrash\b|\bhomologation\b/)) {
+      // GOTCHA (2026-07-15 Poseidon): bare `car` matched "carriage" on a
+      // syringe-pump brief → vehicle → empty contract → plant BoM. Word
+      // boundaries only. Carriage/cartridge/cartesian must never trip vehicle.
       productClass = 'vehicle'
     } else if (lower.match(/phone|tablet|display|pcb/)) {
       productClass = 'consumer_electronics'
@@ -357,8 +372,11 @@ const SPECIFIC_FIELDS: Record<string, string[]> = {
   pcb_assembly: ['board_count', 'layer_count', 'component_count', 'assembly_type'],
   wearable_medical: ['device_class', 'battery_life_days', 'sensor_type', 'skin_contact_area'],
   bioreactor: ['volume_litres', 'vessel_type', 'sterilisation_method', 'cell_type'],
-  // Soft checklist only — no HARD_REQUIRED_SLOTS yet (thin optical_instrument pattern).
+  // Soft checklist — HARD slots are enforced via engineering-lock-gate
+  // (tube_count, sample_temp_min/max_c, connected_electrical_load_kw).
   thermocycler: ['tube_count', 'sample_temp_min_c', 'sample_temp_max_c', 'well_uniformity_c'],
+  // Soft checklist — HARD: channel_count + connected_electrical_load_kw.
+  syringe_pump: ['channel_count', 'connected_electrical_load_kw', 'max_syringe_volume_ml', 'lead_screw_pitch_mm'],
 }
 
 const RECOMMENDED_UNKNOWN = ['target_cost', 'production_volume', 'jurisdiction', 'max_mass']
