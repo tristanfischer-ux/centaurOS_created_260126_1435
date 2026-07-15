@@ -1,0 +1,73 @@
+---
+description: Photoreal instrument renders from real CAD only — never LLM images; universal form-follows-function
+alwaysApply: true
+---
+
+# Photoreal CAD Instrument Render Bar
+
+**STANDING DIRECTIVE (Tristan 2026-07-13):** Blender heroes, cutaways, and engineering drawing views must look **as photorealistic as possible from realistic CAD geometry**. They must **never** be LLM-generated images (no Gemini/i2i “polish”, no generative fill of product shots). Every choice goes in that direction. Fully **universal**. **Form follows function** (and hand/eye).
+
+## The bar (pass/fail)
+
+Ask of every shaded image and every plan/drawing that shows the product:
+
+> Could a chartered engineer believe this is a Cycles render of real parametric CAD parts — not an AI picture and not a box of Lego?
+
+| Must be TRUE | Must be FALSE |
+|---|---|
+| Geometry from CadQuery / forge-truth CAD families / honest engineering primitives | Cuboid proxies for recognisable parts (LED, TO-can, coin cell, cuvette, PCB) |
+| PBR materials match role (FR4, metal can, glass IOR, matte polymer) | Flat clay grey on everything |
+| Softbox / product studio for instruments; plant sky for plants | Fake “beauty” from an image model |
+| Features forced by use-physics + HIG + beauty grammar | Named-product silhouette paste (Open Colorimeter as paste target) |
+| Universal `isInstrumentDevice` (and class-agnostic plant paths) | Per-product branches |
+
+Gold open-photometer photos remain the **TRAINING check** for whether the rules produce a real-looking object — never a texture or mesh to copy.
+
+## Decision tree (every change)
+
+1. Does this make the **CAD→Cycles** path more photoreal? → do it.
+2. Does this add or rely on an **LLM image** of the product? → reject.
+3. Is the shape forced by **function / hand / eye / manufacturing**? → keep.
+4. Is it universal (`isInstrumentDevice` or geometry-family keyed)? → keep; else reject.
+
+## Geometry sources (priority order)
+
+1. **forge-truth CAD family STL** via `_import_family_cad` (seeded CadQuery)
+2. **Compound engineering primitives** (cyl + dome LED, TO-can, hollow cuvette, coin-cell disk, ribbon pipe)
+3. **Plain box** only for true planar parts (bench plate, baffle sheet, glass pane) — never for named components
+
+Seed / extend families in `scripts/ingest/seed_internal_cad_assets.py` + CadQuery builders under `tier 1 and 2 parts for cad /`. proveCatch: `interior_authenticity_ok`.
+
+## Materials (photoreal, not clay)
+
+When a CAD mesh is imported, assign a **role material**, do not leave default grey:
+
+| Role | Material language |
+|---|---|
+| PCB | FR4 green, slight roughness, packages darker |
+| Coin cell | Brushed metal disk |
+| Cuvette | Glass / clear polymer — low roughness, alpha, IOR |
+| LED | Emissive body + clear dome |
+| Photodiode | Dark metal TO-can + glass window |
+| Enclosure | Charcoal matte polymer (see beauty grammar) |
+
+## Forbidden
+
+- LLM image generators as the hero / exterior / cutaway / drawing product image
+- “Looks better in Midjourney/Gemini” as acceptance
+- Cuboid LED / cuboid battery / solid-block cuvette / flat green slab as PCB when a family or compound exists
+- Product-named special cases that bypass form-follows-function
+
+## Related rules
+
+- Hand/eye floors: `human-factors-instrument-form.mdc`
+- Beauty + desirability + studio: `instrument-form-beauty.mdc`
+- Core FFF stack: use-physics → HIG → materials → Fitts/Rams → CAD authenticity → product studio → SIGHT
+
+## Checklist before shipping instrument views
+
+- [ ] No LLM image polish on product shots
+- [ ] Cutaway authenticity proveCatch passes (`interior_authenticity_ok`)
+- [ ] Recognisable parts are CAD or compound primitives
+- [ ] Materials are role-honest under Cycles softboxes
+- [ ] Features explainable by function / hand / eye — gold is training check only

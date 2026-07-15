@@ -278,7 +278,12 @@ GA_NON_MASSING_RE = re.compile(
 GA_PURE_DOCUMENTATION_RE = re.compile(
     r"\blabels?\s*\d*\s*$|\blabel\s*mounts?\b|"
     r"\bbarrier\s*tapes?\b|\bcertification\s*records?\b|\btorque\s*cards?\b|"
-    r"\bquality\s*records?\b",
+    r"\bquality\s*records?\b|"
+    # Powerwall X-142 (2026-07-14): 'Safety Warning Signage' / 'Warning Sign' is the
+    # same paperwork class as a compliance label — expected on NO engineering drawing
+    # (the enclosure already carries the decal in the massing). `\blabel\b` alone
+    # missed the 'signage' head noun.
+    r"\bsignage\b|\bwarning\s+signs?\b|\bsafety\s+warning\b",
     re.I)
 
 
@@ -407,6 +412,8 @@ def _selftest():
         "arc flash boundary label", "arc flash barrier tape",
         "deflagration vent label", "fuse install torque card",
         "lifting certification record",
+        # Powerwall X-142 Part-names 7.2 (2026-07-14): signage head noun
+        "Safety Warning Signage", "Warning Sign", "safety warning placard",
     ]
     # counter-cases: PRINCIPAL equipment that a GA MUST show — none may be dropped.
     must_keep = [

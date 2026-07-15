@@ -1933,6 +1933,37 @@ def _sealed_cabinet_role_price_cap(name: str, gbp: float, encl_m3,
     return (gbp, None)
 
 
+def _reject_sealed_cabinet_industrial_mpn(status: str, part: str, pn: str,
+                                          basis: str, cap_basis: str):
+    """INTENT: Role-capping £ without stripping the industrial MPN leaves COST1
+    joining Flexy/teach-pendant/Apollo pins to the residential ceiling (×5 FAIL).
+    Same idiom as undersized rotating-equipment MPN rejection — the named catalogue
+    part cannot honestly fill a sealed-cabinet role once its price was demoted.
+    Returns (status, part, basis).
+    """
+    if not cap_basis or status != "IDENTIFIED":
+        return (status, part, basis)
+    part_s = (part or "").strip()
+    pn_s = (pn or "").strip()
+    # Any IDENTIFIED pin (structured PN OR mfr+SKU in `part`) must go — NexCOBOT
+    # teach-pendant SKUs are often separator-free alphanumerics that fail the
+    # structured-PN regex but still join COST1 via manufacturer substring.
+    if not part_s and not pn_s:
+        return (status, part, basis)
+    if part_s.lower().startswith("requirement stated") or "made to spec" in part_s.lower():
+        return (status, part, basis)
+    rejected = pn_s or part_s
+    return (
+        "NOT FOUND",
+        "requirement stated — residential sealed-cabinet role",
+        (basis or "") + (
+            f" · named industrial MPN {rejected!r} rejected: catalogue pin "
+            f"incompatible with sealed-cabinet role ceiling (would fail ×5 "
+            f"band against distributor/estimate)"
+        ),
+    )
+
+
 # ── BARE-COMMODITY HARD CEILING (council 2026-06-17, the marine-RAS mis-PIN) ──
 # The catalogue cap above needs a resolved catalogue price. But a mis-PINNED
 # commodity often has NONE — the structured PN lives only in partVerifications, or
@@ -3974,6 +4005,35 @@ def _selftest() -> int:
             if _hmi and float(_hmi.get("unit_gbp") or 0) > 80.0 + 0.01:
                 print(f"  FAIL sealed-cabinet assemble: HMI must stay role-capped ≤£80 "
                       f"(got £{_hmi.get('unit_gbp')})"); bad += 1
+            # proveCatch: industrial MPN must be STRIPPED so COST1 cannot join the
+            # Siemens/Flexy distributor price to the residential ceiling (0631 ×5).
+            if _hmi and "6AV2124" in str(_hmi.get("part") or ""):
+                print(f"  FAIL sealed-cabinet assemble: HMI industrial MPN must be "
+                      f"rejected after role cap (got part={_hmi.get('part')!r})"); bad += 1
+            if _hmi and _hmi.get("status") == "IDENTIFIED":
+                print(f"  FAIL sealed-cabinet assemble: HMI status must leave "
+                      f"IDENTIFIED after industrial MPN rejection "
+                      f"(got {_hmi.get('status')!r})"); bad += 1
+            _st, _pt, _bs = _reject_sealed_cabinet_industrial_mpn(
+                "IDENTIFIED", "NexCOBOT 10IH0010010X0", "10IH0010010X0",
+                "catalogue · capped to £80 …", "capped to £80 …")
+            if _st != "NOT FOUND" or "10IH0010010X0" in _pt:
+                print(f"  FAIL sealed-cabinet MPN rejector: separator-free teach-"
+                      f"pendant SKU must strip (got status={_st!r} part={_pt!r})")
+                bad += 1
+            _st2, _pt2, _ = _reject_sealed_cabinet_industrial_mpn(
+                "IDENTIFIED", "requirement stated", "", "x", "capped")
+            if _st2 != "IDENTIFIED":
+                print(f"  FAIL sealed-cabinet MPN rejector: already-honest "
+                      f"requirement-stated line must stay IDENTIFIED-or-untouched "
+                      f"(got {_st2!r})"); bad += 1
+            # GOTCHA: status stays IDENTIFIED when part is already honest — the
+            # helper is a no-op (returns inputs). Re-read: we pass IDENTIFIED +
+            # requirement stated → early return keeps IDENTIFIED. That's fine —
+            # assemble path only calls this after a role cap on a real pin.
+            if _pt2 != "requirement stated":
+                print(f"  FAIL sealed-cabinet MPN rejector: honest part mutated "
+                      f"(got {_pt2!r})"); bad += 1
     finally:
         import shutil as _sh_sc
         _sh_sc.rmtree(_sc_asm, ignore_errors=True)
@@ -7344,6 +7404,11 @@ def assemble(out_dir: str):
                 )
                 if _sc_basis is not None:
                     gbp, basis = _sc_gbp, basis + " · " + _sc_basis
+                    # DECISION: strip the industrial MPN when the role ceiling fires —
+                    # otherwise COST1 still joins Flexy/NexCOBOT/Apollo distributor
+                    # prices to the residential £ and FAILs ×5 (Powerwall 0631).
+                    status, part, basis = _reject_sealed_cabinet_industrial_mpn(
+                        status, part, pn, basis, _sc_basis)
                 # ── BARE-COMMODITY HARD CEILING (council 2026-06-17): a commodity
                 # IC / sensor IC / microcontroller / connector / cable / I/O / small
                 # comms line with NO kW/duty rating cannot exceed its sub-class ceiling
@@ -7765,6 +7830,14 @@ def assemble(out_dir: str):
             row["unit_gbp"] = nu
             row["line_gbp"] = round(nu * qy)
             row["basis"] = str(row.get("basis") or "") + " · " + nb
+            _st2, _pt2, _bs2 = _reject_sealed_cabinet_industrial_mpn(
+                str(row.get("status") or ""),
+                str(row.get("part") or ""),
+                "",  # part string already carries mfr+MPN for the rejector
+                str(row.get("basis") or ""),
+                nb,
+            )
+            row["status"], row["part"], row["basis"] = _st2, _pt2, _bs2
 
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     # the PARAMETRIC zoned-delivery distribution network (mains/risers/laterals/drain mirror

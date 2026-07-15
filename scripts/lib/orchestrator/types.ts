@@ -96,6 +96,15 @@ export interface TypedQuantity {
   /** Free-text qualifier (e.g. '25°C ambient, BoL', 'A2/W35'). */
   condition: string | null
 
+  /** Legacy flat source label consumed by Excel/audit tabs. */
+  source?: string
+
+  /** Human-readable derivation/citation detail consumed by calculations coverage. */
+  source_detail?: string
+
+  /** Lightweight input lineage used by attribution and coverage audit surfaces. */
+  lineage?: { from?: string[]; via?: string; used_by?: string[] }
+
   /** Field-level provenance: where this value came from. The cross-tool
    *  consistency verifier reads this to detect orphan quantities. */
   provenance: Provenance

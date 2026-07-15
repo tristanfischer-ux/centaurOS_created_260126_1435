@@ -654,6 +654,49 @@ def _rule_circular_references(z: zipfile.ZipFile) -> List[Finding]:
     return findings
 
 
+def _rule_formula_ceiling_floor_arity(z: zipfile.ZipFile) -> List[Finding]:
+    """Excel CEILING/FLOOR require (number, significance). A 1-arg form is legal in
+    LibreOffice and illegal in real Excel — Excel then strips EVERY formula on the
+    sheet ("Removed Records: Formula from sheetNN.xml"). Codema 0332 Calculations
+    2026-07-14: ``CEILING(B239 / B240)`` from Python ``ceil(...)``. proveCatch: a
+    sheet with 1-arg CEILING must HIGH; ``CEILING(A1,1)`` must pass."""
+    findings: List[Finding] = []
+    fn_rx = re.compile(r"\b(CEILING|FLOOR)\s*\(", re.I)
+    for name in z.namelist():
+        if not (name.startswith("xl/worksheets/sheet") and name.endswith(".xml")):
+            continue
+        data = z.read(name)
+        for m in _FORMULA_TAG_RX.finditer(data):
+            formula = html.unescape(m.group(1).decode("utf-8", "replace"))
+            body = _strip_string_literals(formula)
+            for fm in fn_rx.finditer(body):
+                start_paren = fm.end() - 1
+                depth = 0
+                top_commas = 0
+                j = start_paren
+                while j < len(body):
+                    ch = body[j]
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    elif ch == "," and depth == 1:
+                        top_commas += 1
+                    j += 1
+                else:
+                    continue
+                inner = body[start_paren + 1:j].strip()
+                if top_commas == 0 and inner:
+                    findings.append(Finding(
+                        "formula_ceiling_floor_arity", "HIGH", name,
+                        f"{fm.group(1).upper()}() needs a significance argument "
+                        f"(Excel rejects 1-arg form and strips the sheet's formulas): "
+                        f"{formula[:200]}"))
+    return findings
+
+
 RULES = (
     _rule_well_formed_xml,
     _rule_content_types_completeness,
@@ -664,6 +707,7 @@ RULES = (
     _rule_hyperlink_integrity,
     _rule_relationship_integrity,
     _rule_formula_illegal_tilde_operator,
+    _rule_formula_ceiling_floor_arity,
     _rule_circular_references,
 )
 
@@ -842,6 +886,11 @@ def _fixture_bad(rule: str) -> bytes:
         parts["xl/worksheets/sheet1.xml"] = _GOOD_SHEET1.replace(
             b'<c r="B1" t="str"><f>IF(A1&gt;0,"ok ~ non-zero","~bad")</f><v>ok ~ non-zero</v></c>',
             b'<c r="B1" t="n"><f>COUNT(A1:A1,($A$1~$A$1))</f><v>1</v></c>')
+    elif rule == "formula_ceiling_floor_arity":
+        # Codema 0332: Python ceil(...) → CEILING(x) — Excel needs CEILING(x,1).
+        parts["xl/worksheets/sheet1.xml"] = _GOOD_SHEET1.replace(
+            b'<c r="B1" t="str"><f>IF(A1&gt;0,"ok ~ non-zero","~bad")</f><v>ok ~ non-zero</v></c>',
+            b'<c r="B1" t="n"><f>CEILING(A1)</f><v>1</v></c>')
     elif rule == "circular_reference":
         # two cells that each read the other -- the exact shape of the real defect
         # (a display formula written into the same cell as the sentinel it reads).
@@ -870,6 +919,7 @@ def _selftest() -> int:
                  "cf_sqref_validity", "hyperlink_integrity",
                  "content_types_completeness", "relationship_integrity",
                  "well_formed_xml", "formula_illegal_tilde_operator",
+                 "formula_ceiling_floor_arity",
                  "circular_reference"):
         data = _fixture_bad(rule)
         findings = check_workbook_bytes(data)

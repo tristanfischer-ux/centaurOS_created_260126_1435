@@ -400,7 +400,11 @@ def auto_board_size(components: List[Component], cfg: ChainConfig, fp_root: Path
     return side, side
 
 def selftest() -> None:
-    """proveCatch: compact optical/source boards are not forced to the old 50 mm floor."""
+    """proveCatch: compact optical/source boards stay in the 25–40 mm window.
+
+    Catches both (a) the old 50 mm auto_board_size floor and (b) placement
+    board_extra growth that inflated colorimeter-1441 from 40→80 mm.
+    """
     cfg = ChainConfig(project_dir=Path("/tmp/pcb-selftest"), run_dir=Path("/tmp/pcb-selftest"))
     components = [Component("D1", "LED source", "LED_SMD:LED_0603_1608Metric")]
     _footprint_cache.clear()
@@ -410,6 +414,68 @@ def selftest() -> None:
         raise AssertionError(
             f"compact source PCB should stay 25–40 mm, got {board_w:g}×{board_h:g} mm"
         )
+    # proveCatch: a 40 mm outline + would-be +20/+40 board_extra must clamp ≤40.
+    assert _looks_like_compact_source_board(components), "LED-source-only netlist must classify compact"
+    base_w = base_h = 40.0
+    board_extra = 40.0  # two failed iterations of the old +20 path
+    capped_w = min(base_w + board_extra, 40.0)
+    capped_h = min(base_h + board_extra, 40.0)
+    if capped_w > 40.0 or capped_h > 40.0:
+        raise AssertionError(f"compact-source placement growth must clamp at 40 mm, got {capped_w}×{capped_h}")
+    # Counter-case: motherboard-shaped netlist is NOT compact (may grow past 40).
+    motherboard = [
+        Component("U1", "MCU microcontroller", "Package_QFP:LQFP-64_10x10mm_P0.5mm"),
+        Component("D2", "LED source", "LED_SMD:LED_0603_1608Metric"),
+    ]
+    if _looks_like_compact_source_board(motherboard):
+        raise AssertionError("MCU+LED netlist must NOT classify as compact source board")
+    # proveCatch: IC grid is board-centred (old cy-20 shoved pads off a 40 mm board).
+    _footprint_cache["Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"] = FootprintData(
+        bbox_w=6.0, bbox_h=5.0, resolved_from="fixture",
+        pads=[{"num": "1", "x": -2.7, "y": -1.9, "w": 0.6, "h": 1.5, "rot": 0, "type": "smd", "shape": "rect"}],
+    )
+    _footprint_cache["LED_SMD:LED_0603_1608Metric"] = FootprintData(
+        bbox_w=1.6, bbox_h=0.8, resolved_from="fixture",
+        pads=[{"num": "1", "x": -0.75, "y": 0, "w": 0.8, "h": 0.8, "rot": 0, "type": "smd", "shape": "rect"}],
+    )
+    tiny = [
+        Component("U1", "LED driver", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"),
+        Component("D1", "LED source", "LED_SMD:LED_0603_1608Metric"),
+    ]
+    place = place_components(tiny, cfg, Path("/tmp/unused"), 40.0, 40.0, 10.0, 3.0)
+    uy = place["U1"][1]
+    if not (5.0 <= uy <= 35.0):
+        raise AssertionError(f"compact-board IC must sit near centre, got y={uy:.1f}")
+    # proveCatch (2026-07-15): SOT-23 IC + several 0603 caps must NOT collide.
+    # Old smd_cy = cy + 0.55*ic_spacing kept U1 vs C* at ~0.5 mm (powerwall-2214).
+    _footprint_cache["Package_TO_SOT_SMD:SOT-23-5"] = FootprintData(
+        bbox_w=3.0, bbox_h=3.0, resolved_from="fixture",
+        pads=[
+            {"num": "1", "x": -0.95, "y": -0.95, "w": 0.6, "h": 0.5, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "2", "x": 0.0, "y": -0.95, "w": 0.6, "h": 0.5, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "3", "x": 0.95, "y": -0.95, "w": 0.6, "h": 0.5, "rot": 0, "type": "smd", "shape": "rect"},
+        ],
+    )
+    _footprint_cache["Capacitor_SMD:C_0603_1608Metric"] = FootprintData(
+        bbox_w=1.6, bbox_h=0.8, resolved_from="fixture",
+        pads=[
+            {"num": "1", "x": -0.75, "y": 0, "w": 0.8, "h": 0.8, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "2", "x": 0.75, "y": 0, "w": 0.8, "h": 0.8, "rot": 0, "type": "smd", "shape": "rect"},
+        ],
+    )
+    multi = [
+        Component("U1", "DC-DC regulator", "Package_TO_SOT_SMD:SOT-23-5"),
+        Component("C1", "decouple", "Capacitor_SMD:C_0603_1608Metric"),
+        Component("C2", "decouple", "Capacitor_SMD:C_0603_1608Metric"),
+        Component("C3", "decouple", "Capacitor_SMD:C_0603_1608Metric"),
+        Component("D1", "status LED", "LED_SMD:LED_0603_1608Metric"),
+    ]
+    place2 = place_components(multi, cfg, Path("/tmp/unused"), 70.0, 70.0, 12.0, 5.0,
+                              ic_spacing=15.0, smd_spacing=4.0)
+    ok, reason = validate_placement(place2, multi, cfg, Path("/tmp/unused"), 70.0, 70.0)
+    if not ok:
+        raise AssertionError(f"IC+SMD band separation must place without overlap, got: {reason}")
+    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band)")
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
 #     autoplacer. Bounded to the board's own outline bbox with a margin >= the
@@ -486,21 +552,42 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
 
     cx, cy = board_w / 2, board_h / 2
     ics.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
-    cols = max(2, int(math.sqrt(len(ics)) + 1)) if ics else 2
+    cols = max(1, int(math.sqrt(len(ics)) + 0.999)) if ics else 1
+    rows = max(1, math.ceil(len(ics) / cols)) if ics else 1
+    # DECISION (2026-07-14): centre the IC grid on the board. The old
+    # `cy - 20` / `cy + 10` offsets assumed ≥50 mm motherboards and shoved
+    # SOIC pads off a 25–40 mm optical source daughterboard (colorimeter-1441).
     for i, (c, fp) in enumerate(ics):
         col = i % cols
         row = i // cols
         x = cx - (cols - 1) * ic_spacing / 2 + col * ic_spacing
-        y = cy - 20 + row * ic_spacing
+        y = cy - (rows - 1) * ic_spacing / 2 + row * ic_spacing
+        half_h = max(fp.bbox_h / 2, 1.0)
+        half_w = max(fp.bbox_w / 2, 1.0)
+        x = min(max(x, margin + half_w), board_w - margin - half_w)
+        y = min(max(y, margin + half_h), board_h - margin - half_h)
         placements[c.ref] = (x, y)
 
     smd.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
-    smd_cols = max(3, int(math.sqrt(len(smd)) + 1)) if smd else 3
+    smd_cols = max(1, int(math.sqrt(len(smd)) + 0.999)) if smd else 1
+    smd_rows = max(1, math.ceil(len(smd) / smd_cols)) if smd else 1
+    # DECISION (2026-07-15): separate SMD band by footprint half-extents + gap,
+    # NOT `ic_spacing * 0.55`. Fractional spacing kept U1 (SOT-23-5) and C*
+    # (0603) colliding at ~0.5–0.7 mm while board growth moved BOTH clusters
+    # with `cy` — placement never converged (powerwall-2214/0447).
+    max_ic_half_h = max((max(fp.bbox_h / 2, 1.0) for _, fp in ics), default=0.0)
+    max_smd_half_h = max((max(fp.bbox_h / 2, 0.5) for _, fp in smd), default=0.0)
+    band_gap = max(2.5, ic_spacing * 0.2)
+    smd_cy = cy + max_ic_half_h + band_gap + max_smd_half_h if ics else cy
     for i, (c, fp) in enumerate(smd):
         col = i % smd_cols
         row = i // smd_cols
         x = cx - (smd_cols - 1) * smd_spacing / 2 + col * smd_spacing
-        y = cy + 10 + row * smd_spacing
+        y = smd_cy - (smd_rows - 1) * smd_spacing / 2 + row * smd_spacing
+        half_h = max(fp.bbox_h / 2, 0.5)
+        half_w = max(fp.bbox_w / 2, 0.5)
+        x = min(max(x, margin + half_w), board_w - margin - half_w)
+        y = min(max(y, margin + half_h), board_h - margin - half_h)
         placements[c.ref] = (x, y)
 
     return placements
@@ -835,6 +922,18 @@ def run(args) -> dict:
     placements: Dict[str, Tuple[float, float]] = {}
     board_w = board_h = 0.0
     cur_outline = outline
+    # DECISION (2026-07-14, gold delta G3): compact optical source boards are
+    # clamped [25,40] mm at outline/auto-size. Placement retries used to grow
+    # board_extra by +10/+20 mm per failure and inflate a 40 mm LED daughterboard
+    # to 80×80 — the exact colorimeter-1441 artefact bug. Cap growth so a
+    # window-scale source board cannot become a motherboard via retry.
+    compact_source = _looks_like_compact_source_board(components) or (
+        outline is not None and max(base_w, base_h) <= 40.0 + 1e-6
+    )
+    max_board_side = 40.0 if compact_source else None
+    # 5 mm edge margin eats 40% of a 25 mm board; keep ≥2.5 mm but scale down.
+    if compact_source:
+        edge_margin = min(edge_margin, max(2.5, min(base_w, base_h) * 0.12))
 
     result["stage_reached"] = "placement"
     placed_ok = False
@@ -842,12 +941,19 @@ def run(args) -> dict:
         result["iterations_run"] = iteration + 1
         board_w = base_w + board_extra
         board_h = base_h + board_extra
+        if max_board_side is not None:
+            board_w = min(board_w, max_board_side)
+            board_h = min(board_h, max_board_side)
+            board_extra = min(board_extra, max(0.0, max_board_side - min(base_w, base_h)))
         cur_th_spacing = th_spacing + th_spacing_extra
         cur_ic_spacing = cfg.ic_spacing + ic_spacing_extra
         cur_smd_spacing = cfg.smd_spacing + smd_spacing_extra
 
         if outline is not None and board_extra > 0:
-            scale = board_w / base_w
+            scale = board_w / base_w if base_w > 0 else 1.0
+            # Never scale a compact source outline past the 40 mm ceiling.
+            if max_board_side is not None:
+                scale = min(scale, max_board_side / base_w) if base_w > 0 else 1.0
             cur_outline = scale_outline_segments(outline, scale, scale)
 
         placements = place_components(components, cfg, fp_root, board_w, board_h, cur_th_spacing, edge_margin,
@@ -866,12 +972,33 @@ def run(args) -> dict:
             th_spacing_extra += 2.0
             ic_spacing_extra += 2.0
             smd_spacing_extra += 1.0
-            board_extra += 10
+            step = 10.0
         else:
-            board_extra += 20
-        result["errors"].append(f"placement iteration {iteration + 1} invalid: {reason}")
+            step = 20.0
+        # GOTCHA: under the 40 mm compact-source cap, a +20 step from a 25 mm
+        # outline would overshoot and the old all-or-nothing `continue` left
+        # board_extra at 0 forever (U1 pad off-board on every iteration). Grow
+        # by the remaining headroom instead so 25→35→40 still happens.
+        if max_board_side is not None:
+            headroom = max(0.0, max_board_side - base_w - board_extra)
+            if headroom <= 1e-6:
+                result["errors"].append(
+                    f"placement iteration {iteration + 1} invalid under {max_board_side:g} mm "
+                    f"compact-source cap: {reason}"
+                )
+                continue
+            board_extra += min(step, headroom)
+            result["errors"].append(
+                f"placement iteration {iteration + 1} invalid (grew to "
+                f"{base_w + board_extra:g} mm under cap): {reason}"
+            )
+        else:
+            board_extra += step
+            result["errors"].append(f"placement iteration {iteration + 1} invalid: {reason}")
 
     result["board_size_mm"] = {"w": board_w, "h": board_h}
+    if compact_source:
+        result["compact_source_board_cap_mm"] = 40.0
     if not placed_ok:
         result["errors"].append(f"placement did not converge within {args.max_iterations} iterations")
         emit(result)

@@ -510,6 +510,15 @@ def _board_voltage(state: dict) -> tuple[Optional[float], bool, int, str]:
     DC bus (BESS) → the dc_bus_voltage; AC plant board → ac_output_voltage 3-phase; if
     neither is stated, INFER from the BoM main-breaker (a TP&N / 3-phase main → 400 V
     3-phase + N; a single-phase consumer unit → 230 V 1-phase)."""
+    # INTENT (2026-07-14): a handheld / single-board instrument is a DEVICE DC rail
+    # tree (USB/battery → regulator → loads), never a 400 V TP&N plant board. Falling
+    # through to the BoM TP&N inference painted "Utility LV incomer / 400 V 3-phase"
+    # onto colorimeter schedules and left Busbar/Incoming as '—' (Electrical 8.2).
+    # Universal: keyed on isInstrumentDevice, never a product name.
+    if bool(state.get("isInstrumentDevice")):
+        dc = (_q(state, "dc_bus_voltage_v") or _q(state, "logic_rail_voltage_v")
+              or _q(state, "usb_vbus_voltage_v") or 5.0)
+        return dc, True, 1, f"{dc:g} V DC device rails (USB/battery → regulator)"
     dc = _q(state, "dc_bus_voltage_v")
     if dc:
         return dc, True, 1, f"{dc:,.0f} V DC bus"
@@ -536,6 +545,8 @@ def _board_voltage(state: dict) -> tuple[Optional[float], bool, int, str]:
 
 def _supply_label(state: dict, is_dc: bool) -> str:
     """A short supply-source line for the main board header."""
+    if bool(state.get("isInstrumentDevice")):
+        return "Device DC supply (USB / battery pack → onboard regulator)"
     if _q(state, "external_transformer_mass_kg") or _q(state, "continuous_power_kw") and is_dc:
         # contract-aware (2026-07-11 run 66: the canned 'step-up to MV' contradicted the
         # 230 V single-phase direct tie the contract states — red-team LOW)
@@ -1104,7 +1115,9 @@ def build_schedules(schedule: dict, state: dict,
         # 230 V single-phase product contradicts the contract's direct LV tie — same
         # signal as _supply_label: ac_output_voltage_v ≤ 250 means NO MV plane exists)
         _sub_ac = _q(state, "ac_output_voltage_v")
-        if _sub_ac and _sub_ac <= 250:
+        if bool(state.get("isInstrumentDevice")):
+            sub.supply = "On-board DC rail / sub-circuit from main regulator (no MV plane)"
+        elif _sub_ac and _sub_ac <= 250:
             # the parenthetical is the SUB board's OWN system (run-73 red-team: a 282 V DC
             # sub-board captioned "230 V single-phase" — the contract AC voltage is the
             # wrong domain for a DC board; sub.system already carries the right label)
@@ -2495,7 +2508,9 @@ def _display_bus_capacity_kw(rec: dict):
     return load if abs(float(capacity) - float(load)) <= tolerance else capacity
 
 
-def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
+def render_markdown(archetype: str, panels: list[Panel], schedule: dict,
+                    state: Optional[dict] = None) -> str:
+    state = state or {}
     out = []
     out.append(f"# PANEL / LOAD SCHEDULE — {_humanise(archetype)}\n")
     out.append("> Fractional Forge · ForgeOS — projected from the converged connection "
@@ -2511,14 +2526,30 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
         rec = reconcile(p)
         out.append(f"\n## {p.name}\n")
         # header block
+        _instr = bool(state.get("isInstrumentDevice"))
+        _bb = _fmt(p.busbar_rating_a or p.busbar_a, " A", fmt="{:,.0f}")
+        _inc = p.incoming or "—"
+        _dem = _fmt_amp(rec["demand_a"])
+        # INTENT (2026-07-14): instrument schedules with no plant bus demand must NOT
+        # emit bare '—' in Busbar / Incoming / Board-demand — those fail the Excel cell
+        # contract. Honest N/A-with-basis passes the contract and points at the PCB tab.
+        if _instr:
+            if not _bb or _bb in ("—", "-", ""):
+                _bb = "n/a — device DC distribution (no plant busbar; see PCB / single-line)"
+            if not _inc or str(_inc).strip() in ("—", "-") or str(_inc).startswith("—"):
+                _inc = "n/a — USB/battery infeed on the PCBA (no plant incomer)"
+            if not _dem or _dem in ("—", "-", ""):
+                _dem = "n/a — watt-scale PCB rails (no plant busbar demand model)"
         hdr = [
             ("Board reference", p.board_id),
-            ("Board type", "Main distribution board" if p.kind == "main"
-             else "Sub-distribution board"),
+            ("Board type", ("Main DC distribution (device)" if _instr and p.kind == "main"
+                            else ("Sub-rail / protection (device)" if _instr
+                                  else ("Main distribution board" if p.kind == "main"
+                                        else "Sub-distribution board")))),
             ("Supply source", p.supply or "—"),
             ("System", p.system or "—"),
-            ("Busbar rating", _fmt(p.busbar_rating_a or p.busbar_a, " A", fmt="{:,.0f}")),
-            ("Incoming feeder", p.incoming or "—"),
+            ("Busbar rating", _bb),
+            ("Incoming feeder", _inc),
         ]
         if p.transformer:
             hdr.append(("Step-down transformer", p.transformer))
@@ -2528,7 +2559,7 @@ def render_markdown(archetype: str, panels: list[Panel], schedule: dict) -> str:
             conn_val += f"  (running; + {nc:,.0f} kW standby/duplicate not summed)"
         hdr += [
             ("Total connected load", conn_val),
-            ("Board demand (busbar)", _fmt_amp(rec["demand_a"])),
+            ("Board demand (busbar)", _dem),
         ]
         if getattr(p, "pv_inputs_note", None):
             hdr.append(("PV string inputs", p.pv_inputs_note))
@@ -3009,7 +3040,7 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     panels = build_schedules(schedule, state, out_dir)
     _reconcile_panels_to_breakdown(panels, state)
 
-    md = render_markdown(archetype, panels, schedule)
+    md = render_markdown(archetype, panels, schedule, state)
     # Always render the schedule sheet — even with zero recognised distribution boards
     # (e.g. a chemical/process archetype whose routed topology has no board node) the SVG
     # is a valid header-only sheet, matching draw_process_schedules.py which writes its PNG
@@ -3023,6 +3054,14 @@ def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
     svg_path = draw_dir / "panel-schedule.svg"
     png_path = draw_dir / "panel-schedule.png"
     md_path.write_text(md)
+    # Stamp settled parts-manifest fingerprint (G16 — all drawings one generation).
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(out_dir if isinstance(out_dir, str) else str(out_dir))
+        if _fp:
+            svg_text = embed_svg_placement_fp(svg_text, _fp)
+    except Exception as _fpe:  # noqa: BLE001
+        print(f"[draw] placement_fp stamp skipped: {_fpe}")
     svg_path.write_text(svg_text)
     png_ok = rasterise(svg_path, png_path) if rasterise_png else False
 

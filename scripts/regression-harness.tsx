@@ -7330,17 +7330,12 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     () => `none of the fresh-chain markers present — state predates Sprints 1B/3A/0v2: ${JSON.stringify(freshMarkers)}`,
   ))
 
-  // I9c. Hero image is the Gemini i2i output, NOT the Blender wireframe
-  // (2026-05-21 regression added after Tristan caught hero overwrite bug
-  // where Blender was clobbering the gpt-image-1 cover.png — and then
-  // after the council switch to Gemini i2i which produces photorealistic
-  // output via Blender-as-reference, NOT Blender as the cover itself).
-  // Invariant: if a hero exists, its file should be >= 200 KB (typical
-  // Gemini i2i output is 500-1000 KB; raw Blender renders are also
-  // ~1000 KB so size alone doesn't disambiguate — also check that the
-  // blender_cover_image_path is a DIFFERENT file from brief_hero_image
-  // _path so we know the two writers stopped colliding).
-  if (state?.brief_hero_image_path) {
+  // I9c. Hero vs Blender cover path collision check (2026-05-21).
+  // Historical: Gemini i2i cover must not share a path with blender-cover.
+  // Instruments (2026-07-13 photoreal CAD bar): Gemini product images are
+  // FORBIDDEN — Excel embeds Blender only; skip this collision check when
+  // isInstrumentDevice (brief_hero may be absent or unused).
+  if (state?.brief_hero_image_path && !Boolean(state?.isInstrumentDevice)) {
     const heroPath = String(state.brief_hero_image_path)
     const blenderPath = String(state?.blender_cover_image_path ?? '')
     const samePath = blenderPath && blenderPath === heroPath
@@ -13437,14 +13432,18 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantC('(7) photometer floor does NOT emit Emergency Stop', !/Emergency Stop/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit Protective Relay', !/Protective Relay/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit Interlock Switch', !/Interlock Switch/i.test(photoAll))
-    wantC('(7) photometer power/safety IS a device fuse', /Fuse/i.test(photoAll))
+    wantC('(7) photometer power/safety IS a device fuse/polyfuse', /Fuse|Polyfuse/i.test(photoAll))
     wantC('(7) photometer floor emits LED Source', /LED Source/i.test(photoAll))
     wantC('(7) photometer floor emits an optical detector module', /Optical Detector Module/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit bare Photodiode', !/Photodiode/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit bare TIA', !/Transimpedance Amplifier|\bTIA\b/i.test(photoAll))
     wantC('(7) photometer floor emits Cuvette Holder', /Cuvette.*Holder/i.test(photoAll))
-    wantC('(7) photometer floor emits Microcontroller', /Microcontroller/i.test(photoAll))
-    wantC('(7) photometer floor emits a rechargeable battery (not cell racks)', /Rechargeable Battery Pack/i.test(photoAll))
+    // INTENT (2026-07-14, gold WHY): one COTS compute/UI kit — not an exploded MCU motherboard.
+    wantC('(7) photometer floor emits Compute UI Module (COTS host)', /Compute Ui Module/i.test(photoAll))
+    wantC('(7) photometer floor does NOT explode a discrete Microcontroller host', !/\bMicrocontroller\b/i.test(photoAll))
+    wantC('(7) photometer floor emits battery-as-included-on-compute-UI (not cell racks)', /Battery Included In Compute Ui/i.test(photoAll))
+    wantC('(7) photometer floor emits short maker interconnect cables', /Sensor Interconnect Cable|Qwiic Interconnect Cable/i.test(photoAll))
+    wantC('(7) photometer floor emits Ambient Light Cap', /Ambient Light Cap/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit Inverter Bridge', !/Inverter Bridge/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit Gate Driver', !/Gate Driver/i.test(photoAll))
     wantC('(7) photometer floor does NOT emit Storage Cell', !/\bStorage Cell\b/i.test(photoAll))
@@ -13470,7 +13469,7 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
   }
   out.push(assertEq(
     'UNIVERSAL.optical_instrument_skeleton_floor_replaces_bess_floor',
-    'A1 — the SOURCE fix (derive-skeleton.ts energyFloorFor + OPTICAL_MODULE_FLOORS): a synthetic photometer contract (optical tool-identity signal from _tools_run — photodiode-tia/cuvette/photometry — + device-scale + no storage-kWh key) makes the generic skeleton floor emit LED source + LED driver, an off-board optical detector module, a cuvette holder, a microcontroller, and a small rechargeable battery + charge management as PRINCIPALS, and NEVER emits inverter_bridge / gate_driver / storage_cell / module_rack / dc_busbar or a bare photodiode/TIA detector chain. A genuine BESS contract (hasEnergyStorage true, no optical tool signal) keeps its historical floor byte-identically and never picks up optical words — the two signals are mutually exclusive and additive-only, no per-product table',
+    'A1 — the SOURCE fix (derive-skeleton.ts energyFloorFor + OPTICAL_MODULE_FLOORS): a synthetic photometer contract (optical tool-identity signal from _tools_run — photodiode-tia/cuvette/photometry — + device-scale + no storage-kWh key) makes the generic skeleton floor emit the gold COTS spine (compute_ui_module + battery-included-on-kit + LED source/driver + optical detector module + short maker cables + cuvette holder + ambient light cap) as PRINCIPALS, and NEVER emits an exploded discrete microcontroller host, inverter_bridge / gate_driver / storage_cell / module_rack / dc_busbar, or a bare photodiode/TIA detector chain. A genuine BESS contract (hasEnergyStorage true, no optical tool signal) keeps its historical floor byte-identically and never picks up optical words — the two signals are mutually exclusive and additive-only, no per-product table',
     failedC.length, (n) => n === 0,
     () => `optical-instrument skeleton-floor cases failed: ${failedC.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts (energyFloorFor / OPTICAL_MODULE_FLOORS / hasOpticalInstrumentSignal).`,
   ))

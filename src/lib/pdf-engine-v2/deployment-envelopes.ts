@@ -403,6 +403,27 @@ export const DEPLOYMENT_ENVELOPES: Record<string, DeploymentEnvelope> = {
       'BESS (5–30 kWh), 350 kW DCFC power-cabinet half, electrical distribution / ' +
       'feeder pillar deployments.',
   },
+
+  // INTENT (2026-07-14): residential wall-mounted ESS (Powerwall-class). The
+  // `bess` / `energy_storage` class default is 40-ft Hi-Cube — correct for
+  // Megapack, FATAL for a ~1105×609×193 mm / ~130 kg wall cabinet. Public UK
+  // Powerwall 3 datasheet envelope (H×W×D incl. glass cover).
+  'cabinet-wall-ess-residential': {
+    id: 'cabinet-wall-ess-residential',
+    category: 'outdoor_cabinet',
+    standard: 'Residential Wall-Mounted ESS Cabinet (Powerwall-class)',
+    // length=width (wall face), width=depth (projection), height=height —
+    // same axis convention as other outdoor_cabinet rows (L×W×H mm).
+    internal_dimensions_mm: { length: 580, width: 160, height: 1050 },
+    external_dimensions_mm: { length: 609, width: 193, height: 1105 },
+    max_payload_kg: 150,
+    reference_standard:
+      'Manufacturer-typical residential wall ESS (public Tesla Powerwall 3 UK ' +
+      'datasheet envelope 1105×609×193 mm / ~130 kg; Enphase IQ / Sungrow SBR class)',
+    notes:
+      'Sealed outdoor wall- or plinth-mounted all-in-one residential ESS. NOT a ' +
+      'shipping container — utility-scale BESS stays on container-40ft-hicube.',
+  },
 }
 
 // ============================================================================
@@ -436,11 +457,15 @@ const CLASS_SLUG_TO_ENVELOPE_ID: Record<string, string | null> = {
   'energy-storage': 'container-40ft-hicube',
   'energy_storage': 'container-40ft-hicube',
 
-  // Residential ESS — small floor-standing IP-rated cabinet (Tesla Powerwall 3,
-  // Enphase IQ Battery 5P, Sungrow SBR class). NOT a pallet — these are
-  // wall- or floor-mounted installed units, not palletised crates.
-  'residential-ess': 'cabinet-outdoor-ip54-medium',
-  'residential_ess': 'cabinet-outdoor-ip54-medium',
+  // Residential ESS — wall/plinth IP-rated cabinet (Tesla Powerwall 3,
+  // Enphase IQ Battery 5P, Sungrow SBR class). NOT a pallet and NOT a 40-ft
+  // container — these are installed wall units.
+  'residential-ess': 'cabinet-wall-ess-residential',
+  'residential_ess': 'cabinet-wall-ess-residential',
+  'bess_residential': 'cabinet-wall-ess-residential',
+  'bess-residential': 'cabinet-wall-ess-residential',
+  'residential-battery-storage': 'cabinet-wall-ess-residential',
+  'residential_battery_storage': 'cabinet-wall-ess-residential',
 
   // Heat pumps — residential outdoor unit ships on a Euro pallet. Per Tristan's
   // dispatch brief: heat-pump-residential → pallet (Euro), no container.
@@ -588,4 +613,93 @@ export function suggestEnvelope(
   // Sort by ascending internal volume — smallest envelope that fits first.
   fits.sort((a, b) => envelopeVolumeLiters(a) - envelopeVolumeLiters(b))
   return fits
+}
+
+const RESIDENTIAL_WALL_ESS_RE =
+  /\b(wall[- ]?mount(?:ed)?|residential|powerwall|home[- ]?battery|all[- ]?in[- ]?one\s+(?:battery|ess)|household\s+ess)\b/i
+
+export interface DeploymentEnvelopeHints {
+  /** Brief / contract enclosure volume in m³ (device-scale wall ESS ≈ 0.1–0.2). */
+  enclosureVolumeM3?: number | null
+  /** Brief mass cap / unit mass in kg (Powerwall-class ≈ 130). */
+  massKg?: number | null
+  /** Concatenated brief / product_description / product_class prose. */
+  briefText?: string | null
+}
+
+/**
+ * INTENT: pick the deployment envelope from class defaults AND scale signals.
+ * A residential wall ESS often classifies as `energy_storage` / `bess` (same
+ * slug family as Megapack) — the class table alone would stamp a 40-ft
+ * container onto a 130 kg wall cabinet (powerwall-20260714-0332). When the
+ * brief declares device-scale volume/mass or wall-mount/residential prose,
+ * force the outdoor-cabinet family instead.
+ *
+ * Universal: keyed on volume/mass/prose nouns, never a product-name table.
+ */
+export function resolveDeploymentEnvelopeForProduct(
+  productClass: string,
+  hints: DeploymentEnvelopeHints = {},
+): DeploymentEnvelope | null {
+  const classDefault = defaultEnvelopeForClass(productClass)
+  const vol = typeof hints.enclosureVolumeM3 === 'number' && Number.isFinite(hints.enclosureVolumeM3)
+    ? hints.enclosureVolumeM3
+    : null
+  const mass = typeof hints.massKg === 'number' && Number.isFinite(hints.massKg)
+    ? hints.massKg
+    : null
+  const text = String(hints.briefText ?? '')
+  const isDeviceScaleEss =
+    (vol !== null && vol > 0 && vol < 1.0) ||
+    (mass !== null && mass > 0 && mass < 500) ||
+    RESIDENTIAL_WALL_ESS_RE.test(text)
+
+  if (
+    isDeviceScaleEss &&
+    (classDefault == null || classDefault.category === 'shipping_container')
+  ) {
+    // DECISION: when prose/scale says residential wall ESS, return the wall
+    // cabinet DIRECTLY. suggestEnvelope ranks by internal litres and would
+    // pick cabinet-dcfc-pedestal (EV charger) as the "smallest fit" for a
+    // 0.14 m³ / 130 kg Powerwall-class payload — wrong product family.
+    if (RESIDENTIAL_WALL_ESS_RE.test(text)) {
+      return DEPLOYMENT_ENVELOPES['cabinet-wall-ess-residential'] ?? null
+    }
+    const volL = vol !== null && vol > 0 ? vol * 1000 : 150
+    const massKg = mass !== null && mass > 0 ? mass : 130
+    const cabinetFits = suggestEnvelope(volL, massKg, 'outdoor_cabinet').filter(
+      (env) => !env.id.includes('dcfc'),
+    )
+    if (cabinetFits.length > 0) return cabinetFits[0]
+    return DEPLOYMENT_ENVELOPES['cabinet-wall-ess-residential'] ?? null
+  }
+
+  return classDefault
+}
+
+/** proveCatch — residential wall ESS must never resolve to a shipping container. */
+export function _selftestResolveDeploymentEnvelope(): void {
+  const wall = resolveDeploymentEnvelopeForProduct('energy_storage', {
+    enclosureVolumeM3: 0.143,
+    massKg: 130,
+    briefText: 'residential wall-mounted all-in-one battery energy storage',
+  })
+  if (!wall || wall.id !== 'cabinet-wall-ess-residential') {
+    throw new Error(
+      `proveCatch FAIL: residential wall ESS resolved to ${wall?.id ?? 'null'} ` +
+        `(category=${wall?.category ?? 'n/a'}) — must be cabinet-wall-ess-residential ` +
+        `(not a shipping container or DCFC pedestal)`,
+    )
+  }
+  const utility = resolveDeploymentEnvelopeForProduct('bess', {
+    enclosureVolumeM3: 60,
+    massKg: 20000,
+    briefText: 'utility-scale containerised battery energy storage system',
+  })
+  if (!utility || utility.category !== 'shipping_container') {
+    throw new Error(
+      `proveCatch FAIL: utility BESS resolved to ${utility?.id ?? 'null'} ` +
+        `(category=${utility?.category ?? 'n/a'}) — must stay shipping_container`,
+    )
+  }
 }

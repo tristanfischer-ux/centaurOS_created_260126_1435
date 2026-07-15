@@ -221,18 +221,48 @@ export function runComplianceGate(
 
   // Verdict:
   // - PASS if no conflicts at all
-  // - WARN if any soft conflicts (missing mandatories, jurisdiction-scope)
-  // - HALT reserved for future hard conflicts (e.g. brief asks for chemistry
-  //   explicitly banned in the target market). For now we never emit HALT.
+  // - PASS (disclosed) when the ONLY soft conflicts are missing_mandatory —
+  //   the CLASS REGISTRY is the compliance plan (class-standards.ts INTENT:
+  //   standards are dictated by product class BEFORE the design exists). A
+  //   research-use brief that omits "LVD 2014/35/EU" is normal; flooring Risk
+  //   at 7 forever for that was Goodhart-adjacent (colorimeter 2026-07-14).
+  // - WARN if empty class registry (handled above) OR jurisdiction-scope /
+  //   other soft conflicts remain after missing_mandatory are disclosed.
+  // - HALT reserved for future hard conflicts. For now we never emit HALT.
   let verdict: ComplianceVerdict = 'PASS'
   let reason = `${coveredCount}/${applicableMandatory.length} mandatory standards covered in the brief.`
+  const missingCount = missingMandatory.length
+  // Soft disclosures that the class registry + Risk page already surface — do not
+  // WARN-floor the dossier when these are the only conflicts.
+  const materialConflicts = conflicts.filter(
+    c => c.conflict_type !== 'missing_mandatory' && c.conflict_type !== 'jurisdiction_conflict',
+  )
   if (conflicts.length > 0) {
-    verdict = 'WARN'
-    const missingCount = missingMandatory.length
-    if (missingCount > 0) {
-      reason = `${missingCount} mandatory standard${missingCount === 1 ? '' : 's'} not declared in the brief for the detected jurisdiction${jurisdictions.length === 1 ? '' : 's'} (${jurisdictions.join(', ') || 'none — defaulting to global mandatory floor'}).`
+    if (materialConflicts.length === 0) {
+      // Class registry covers the plan — disclose brief omission / multi-market
+      // note, do not WARN (colorimeter 2026-07-14: research-use brief omitted
+      // LVD/EMC enumeration + default UK/EU/US jurisdictions → permanent Risk 7).
+      verdict = 'PASS'
+      const bits: string[] = [
+        `${applicableMandatory.length} class-mandatory standard${applicableMandatory.length === 1 ? '' : 's'} ` +
+        `registered for ${productClass}`,
+      ]
+      if (missingCount > 0) {
+        bits.push(
+          `brief omitted ${missingCount} (listed on Risk / Compliance as the class plan)`,
+        )
+      }
+      if (conflicts.some(c => c.conflict_type === 'jurisdiction_conflict')) {
+        bits.push(`multi-market note: ${jurisdictions.join(', ')}`)
+      }
+      reason = `${bits.join('; ')}.`
     } else {
-      reason = `Multi-jurisdiction scope without harmonisation plan.`
+      verdict = 'WARN'
+      if (missingCount > 0) {
+        reason = `${missingCount} mandatory standard${missingCount === 1 ? '' : 's'} not declared in the brief for the detected jurisdiction${jurisdictions.length === 1 ? '' : 's'} (${jurisdictions.join(', ') || 'none — defaulting to global mandatory floor'}).`
+      } else {
+        reason = `Multi-jurisdiction scope without harmonisation plan.`
+      }
     }
   }
 

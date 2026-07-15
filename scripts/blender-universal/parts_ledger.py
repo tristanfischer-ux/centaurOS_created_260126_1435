@@ -1507,6 +1507,14 @@ def main() -> int:
             _gac_rx = re.compile(r"\b(?:gac|softener|activated\s+carbon|granular\s+carbon)\b", re.I)
             if _gac_rx.search(nm) and _gac_rx.search(txt):
                 return True
+            # BUSBAR ↔ MAIN DC BUS (Powerwall 2026-07-15): canonical_board_name stamps
+            # the SLD main bus as 'MAIN DC BUS' while the BoM keeps part names
+            # 'Busbar Assembly' / 'DC Busbar Assembly' / 'Busbar Interconnects'.
+            # Those parts ARE the drawn DC bus — credit when both sides carry a
+            # bus/busbar token (never a bare 'assembly' alone).
+            _bus_rx = re.compile(r"\bbus(?:bar)?\b", re.I)
+            if _bus_rx.search(nm) and _bus_rx.search(txt):
+                return True
             return False
 
         name_present = _present(name) or (bool(canonical) and canonical != name and _present(canonical))
@@ -3082,6 +3090,38 @@ def _selftest() -> int:
         print(f"  FAIL product-scale equipment spine: sealed cabinet with 3 BoM "
               f"lines must populate n_equipment≥3 "
               f"(got {_cov_doc.get('n_equipment')})")
+        bad += 1
+
+    # proveCatch (Powerwall 2026-07-15): Busbar Assembly BoM ↔ MAIN DC BUS SLD
+    # synonym — SLD coverage must credit the busbar parts that ARE the drawn bus.
+    _bus_td = Path(_tf_cov.mkdtemp(prefix="pl-bus-syn-"))
+    (_bus_td / "drawings").mkdir()
+    json.dump({"schema": "parts-manifest/1", "count": 1, "parts": [
+        {"equipment_tag": "X-122", "name": "Busbar Assembly",
+         "pos_mm": [0.0, 0.0, 500.0], "dims_mm": {"w": 80, "d": 40, "h": 20}},
+    ], "placement_fp": "busbusbusbusbusbus"},
+              open(_bus_td / "parts-manifest.json", "w"))
+    (_bus_td / "drawings" / "single-line-diagram.svg").write_text(
+        '<svg><text>MAIN DC BUS</text><text>DC Fuses</text></svg>')
+    (_bus_td / "drawings" / "general-arrangement.svg").write_text(
+        '<svg data-placement-fp="busbusbusbusbusbus"><text>FRONT</text></svg>')
+    json.dump({
+        "orchestratorContract": {"quantities": {
+            "enclosure_volume_m3": {"value": 0.14},
+        }},
+        "requirementsBom": [
+            {"tag": "X-122", "requirement": "Busbar Assembly",
+             "status": "IDENTIFIED", "qty": 1, "unit_cost_gbp": 10, "line_gbp": 10},
+        ],
+    }, open(_bus_td / "state.json", "w"))
+    _rc_bus = os.system(f"{sys.executable} {Path(__file__).resolve()} {_bus_td} "
+                        f"{_bus_td / 'state.json'} >/dev/null 2>&1")
+    _bus_doc = _load(_bus_td / "parts-ledger.json") or {}
+    _bus_eq = next((e for e in (_bus_doc.get("equipment") or [])
+                    if e.get("tag") == "X-122"), None)
+    if not _bus_eq or not (_bus_eq.get("coverage") or {}).get("single-line-diagram"):
+        print(f"  FAIL busbar↔MAIN DC BUS synonym: Busbar Assembly must credit "
+              f"SLD when MAIN DC BUS is drawn (eq={_bus_eq}, rc={_rc_bus})")
         bad += 1
 
     # proveCatch (Powerwall 2026-07-15): empty requirementsBom + non-empty

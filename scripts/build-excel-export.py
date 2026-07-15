@@ -18663,8 +18663,23 @@ def _eval_panel_schedule_contract(run_dir: str, state: dict) -> Optional[dict]:
         # 2 — board hierarchy strings: every schedule board reference must appear on
         #     the drawing (same dataset → same names; 'MAIN LV BOARD' vs 'Motor
         #     Control Center' means the two were generated from different data).
-        _missing_boards = [b for b in _board_meta
-                           if b and b.lower() not in _svg_join.lower()]
+        # GOTCHA (Powerwall 2026-07-15): canonical_board_name stamps the SLD main
+        # as 'MAIN DC BUS' while the panel schedule may still echo a BoM hub id
+        # ('Busbar Assembly' / 'DC Busbar Assembly') as a sub-board heading — the
+        # SAME physical DC bus. When MAIN DC BUS is on the drawing, those busbar-
+        # named board refs are satisfied (alias), not a real divergence.
+        _svg_has_main_dc = "main dc bus" in _svg_join.lower()
+
+        def _board_ref_on_sld(b: str) -> bool:
+            if not b:
+                return True
+            if b.lower() in _svg_join.lower():
+                return True
+            if _svg_has_main_dc and re.search(r"\bbus(?:bar)?\b", b, re.I):
+                return True
+            return False
+
+        _missing_boards = [b for b in _board_meta if not _board_ref_on_sld(b)]
         _consistency_row(
             "single-line ↔ schedule · board hierarchy", not _missing_boards,
             f"schedule boards: {', '.join(_board_meta) or '—'}",

@@ -377,14 +377,11 @@ function deviceScaleQuantity(
  *   1. brief `max_dimensions_mm` (all three dims positive) → w×d×h.
  *   2. an equipment/parts bounding-envelope volume quantity, if one exists
  *      (none is wired today — forward-compatible no-op).
- *   3. a DEVICE-SCALE ESTIMATE from `total_system_mass_kg`, HARD-GATED to
- *      small mass (< DEVICE_SCALE_MASS_CEILING_KG) or explicit portable/
- *      benchtop/handheld/desktop/wall-mount/tabletop brief positioning — a
- *      plant-scale design with neither signal is left untouched (no fake
- *      small enclosure). A `design_envelope_{width,depth,height}_mm` box is
- *      synthesised alongside the estimate (a slightly-tall benchtop-
- *      instrument aspect ratio) so the sealed-enclosure render + GA have
- *      real dimensions instead of the volume-only cube fallback.
+ *   3. DEVICE-SCALE GATE from `total_system_mass_kg` (small mass OR portable
+ *      brief positioning) unlocks a MINIMUM WORKING ENVELOPE — the smallest
+ *      box that packs display + optical chamber + electronics (mirrors
+ *      `minimum_working_envelope.py`). Mass÷density is ONLY the gate, never
+ *      the size rule (Tristan 2026-07-14: no more 0.3 kg → 183 mm air boxes).
  *
  * Returns a human-readable note when it derives something (for the caller's
  * warnings[] log), or undefined when it does nothing.
@@ -443,25 +440,45 @@ export function deriveDeviceScaleEnclosure(
     `${smallMass ? `mass < ${DEVICE_SCALE_MASS_CEILING_KG} kg` : 'portable/benchtop brief positioning'} triggered the estimate`,
   )
 
-  // Synthesise a max_dimensions_mm-equivalent box so the sealed-enclosure
-  // render + GA have real dimensions rather than falling back to a cube.
-  // Aspect: a portable/benchtop instrument is WIDE and FLAT — a landscape
-  // footprint because it is operated from ABOVE (display + sample access share
-  // the top plane). NEVER a tall square box: that reads as a floor-standing
-  // cabinet in the hero (2026-07-12 regression: a ~cube rendered as a BESS
-  // cabinet). Use W:D:H = 1.45:1.15:0.60 (volume-preserving, 1.45·1.15·0.60 ≈ 1.00).
-  // Universal — only device-scale portable/benchtop products reach this branch.
+  // INTENT (2026-07-14 Tristan): envelope = as small as possible while still
+  // packing the functional work (display + optical chamber + electronics),
+  // NEVER mass÷density fantasy air (0.3 kg÷150 → 183×145 mm appliance).
+  // Mirrors scripts/lib/minimum_working_envelope.py (Python is authoritative
+  // at render/GA via resolve_design_envelope_mm; this emits matching contract
+  // dims so new chains don't write the airy box in the first place).
+  // Universal — role floors (Apple HIG display + path-driven chamber), never
+  // a product-noun table. Brief max_dimensions already handled in Priority 1.
   if (!q.design_envelope_width_mm && !q.design_envelope_depth_mm && !q.design_envelope_height_mm) {
-    const baseSideMm = Math.cbrt(volM3) * 1000
-    const widthMm = baseSideMm * 1.45
-    const depthMm = baseSideMm * 1.15
-    const heightMm = baseSideMm * 0.60
+    const pathMm = (() => {
+      const p = quantityValue(contract, 'optical_path_length_mm')
+        ?? quantityValue(contract, 'optical_path_mm')
+      return (p !== undefined && p > 0) ? Math.max(5, p) : 10
+    })()
+    // Optical chamber floors (same physics as instrument_form_rule).
+    const chamberPlan = Math.max(36, pathMm + 2.5 + 18)
+    // UI: preferred display 36×24 + D-pad cluster ≈ 40 + gaps.
+    const uiW = 36 + 40 + 16
+    const uiD = Math.max(24 + 9 * 2.2 + 10, (9 + 3) * 3 + 12)
+    const clearance = 6
+    const widthMm = Math.min(155, uiW + chamberPlan + clearance * 2)
+    const depthMm = Math.min(155, Math.max(uiD, chamberPlan * 0.96) + clearance * 2)
+    const heightMm = 28 + clearance // thin electronics body; cube rides on top
     const boxCondition =
-      'derived_device_scale — synthesised landscape benchtop box from estimated enclosure_volume_m3 (brief gave no envelope dimensions)'
+      'minimum_working_envelope — as small as possible while packing display + ' +
+      `optical chamber (path=${pathMm} mm) + electronics; not mass÷density air ` +
+      `(enclosure_volume_m3=${volM3.toFixed(4)} m³ is mass-estimate only)`
     q.design_envelope_width_mm = deviceScaleQuantity(widthMm, 'mm', 'length', 'max', 'design_envelope_width_mm', boxCondition)
     q.design_envelope_depth_mm = deviceScaleQuantity(depthMm, 'mm', 'length', 'max', 'design_envelope_depth_mm', boxCondition)
     q.design_envelope_height_mm = deviceScaleQuantity(heightMm, 'mm', 'length', 'max', 'design_envelope_height_mm', boxCondition)
+    // Prefer packed volume for enclosure_volume when we have a working box.
+    const packedVol = (widthMm * depthMm * heightMm) / 1e9
+    q.enclosure_volume_m3 = deviceScaleQuantity(
+      packedVol, 'm³', 'volume', 'rated', 'enclosure_volume_m3',
+      `minimum_working_envelope body ${widthMm.toFixed(0)}×${depthMm.toFixed(0)}×${heightMm.toFixed(0)} mm — ` +
+      `supersedes mass÷density estimate ${volM3.toFixed(4)} m³`,
+    )
   }
 
-  return `deriveDeviceScaleEnclosure: enclosure_volume_m3=${volM3.toFixed(4)} m³ estimated from total_system_mass_kg=${massKg} kg (device-scale gate: ${smallMass ? 'small mass' : 'portable positioning'})`
+  return `deriveDeviceScaleEnclosure: minimum_working_envelope from functional pack ` +
+    `(mass=${massKg} kg was device-scale gate only; not the size rule)`
 }

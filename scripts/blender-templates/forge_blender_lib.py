@@ -146,6 +146,153 @@ def make_world_white():
     bg.inputs["Strength"].default_value = 1.0
 
 
+def make_instrument_studio_world(strength: float = 0.22):
+    """Soft product-photography backdrop for handheld instruments.
+
+    INTENT: Nishita sky is correct for plant skids (metals reflect sky) but
+    washes a 150 mm charcoal instrument and never puts a specular kiss on dark
+    glass. Soft warm-grey studio world = Apple-product-shot language.
+    UNIVERSAL — call only when isInstrumentDevice.
+
+    GOTCHA: world strength ≥0.5 + softboxes lifted body crop median to ~150
+    (clay) vs gold ~103. Keep ambient low so polymer stays charcoal.
+    """
+    world = bpy.data.worlds.new("world_instrument_studio")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    bg = world.node_tree.nodes["Background"]
+    # Slightly cool mid-grey — backdrop reads darker than the product silhouette.
+    bg.inputs["Color"].default_value = (*_to_linear((0.38, 0.39, 0.42)), 1.0)
+    bg.inputs["Strength"].default_value = float(strength)
+    return world
+
+
+def apply_instrument_color_management(exposure_bias: float = 0.0):
+    """AgX high-contrast for charcoal polymer product shots.
+
+    INTENT: AgX Medium High + softboxes can lift mid-greys. High Contrast
+    restores silhouette. Exposure bias stays ≤0 — positive lift washes charcoal
+    to clay (2026-07-13); heavy negative crush makes polymer featureless black.
+    """
+    scene = bpy.context.scene
+    try:
+        scene.view_settings.view_transform = "AgX"
+    except (TypeError, ValueError):
+        pass
+    for look in ("AgX - High Contrast", "AgX - Medium High Contrast", "None"):
+        try:
+            scene.view_settings.look = look
+            break
+        except (TypeError, ValueError):
+            continue
+    try:
+        scene.view_settings.exposure = float(exposure_bias)
+    except (AttributeError, TypeError):
+        pass
+
+
+def finish_matte_polymer(mat, specular: float = 0.22):
+    """Drop Principled specular so softboxes do not glaze charcoal to clay."""
+    if mat is None or not getattr(mat, "use_nodes", False):
+        return mat
+    try:
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf is None:
+            return mat
+        for sp in ("Specular IOR Level", "Specular"):
+            if sp in bsdf.inputs:
+                bsdf.inputs[sp].default_value = float(specular)
+                break
+    except (AttributeError, TypeError, KeyError):
+        pass
+    return mat
+
+
+def add_instrument_studio_lights(centre_m, extent_m, product_half_height_m=None,
+                                 key_energy: float = 18.0,
+                                 fill_energy: float = 7.0,
+                                 rim_energy: float = 32.0,
+                                 bounce_energy: float = 2.5,
+                                 ground_srgb=(0.52, 0.53, 0.55)):
+    """Softbox product-studio rig for sealed handheld / benchtop instruments.
+
+    INTENT: plant sun+Nishita muddies dark polymer and leaves LCD glass dead.
+    Three large soft AREA lights (key / fill / rim) + a seamless soft ground
+    give charcoal bodies form and put an edge highlight on dark glass.
+    UNIVERSAL — call only for isInstrumentDevice on the shaded pass.
+
+    @param centre_m (cx, cy, cz) product centre in metres.
+    @param extent_m Characteristic product extent in metres (max plan edge).
+    @param product_half_height_m Half enclosure height in metres — grounds the
+        seamless plane under the feet (contact shadow). Falls back to 0.45×extent.
+    """
+    cx, cy, cz = centre_m
+    e = max(0.08, float(extent_m))
+    # Soft KEY — large area from front-upper-right (defines form, soft shadow).
+    # GOTCHA: energies must stay LOW for a ~0.15 m product — plant-scale softbox
+    # wattage washes charcoal polymer to clay-white (2026-07-13 studio first cut;
+    # second cut at 28/12/35 still median ~150 — gold body ≈103). Tuned to
+    # body-face mean ≈80–110 with charcoal albedo ≤0.07 display.
+    bpy.ops.object.light_add(type="AREA", location=(cx + e * 2.2, cy - e * 3.0, cz + e * 3.5))
+    key = bpy.context.active_object
+    key.name = "u_instrument_studio_key"
+    key.data.energy = float(key_energy)
+    key.data.size = e * 4.5
+    key.rotation_euler = (math.radians(50), math.radians(15), math.radians(35))
+    try:
+        key.data.use_shadow = True
+        key.data.spread = math.radians(75)
+    except AttributeError:
+        pass
+    # Soft FILL — camera-side, lifts shadow side without flattening.
+    bpy.ops.object.light_add(type="AREA", location=(cx - e * 2.8, cy - e * 1.2, cz + e * 2.0))
+    fill = bpy.context.active_object
+    fill.name = "u_instrument_studio_fill"
+    fill.data.energy = float(fill_energy)
+    fill.data.size = e * 5.0
+    fill.rotation_euler = (math.radians(35), math.radians(-25), math.radians(-20))
+    # RIM / kicker — behind-right, the specular kiss on dark glass + polymer edges.
+    # Kept relatively hot vs key so dark glass still catches an edge ping.
+    bpy.ops.object.light_add(type="AREA", location=(cx + e * 1.5, cy + e * 2.8, cz + e * 2.2))
+    rim = bpy.context.active_object
+    rim.name = "u_instrument_studio_rim"
+    rim.data.energy = float(rim_energy)
+    rim.data.size = e * 2.4
+    rim.rotation_euler = (math.radians(40), math.radians(10), math.radians(160))
+    try:
+        rim.data.use_shadow = False
+    except AttributeError:
+        pass
+    # Soft bounce from below (very subtle — contact lift only).
+    half_h = float(product_half_height_m) if product_half_height_m is not None else e * 0.45
+    ground_z = cz - half_h - 0.0004
+    bpy.ops.object.light_add(type="AREA", location=(cx, cy - e * 0.3, ground_z - e * 0.15))
+    bounce = bpy.context.active_object
+    bounce.name = "u_instrument_studio_bounce"
+    bounce.data.energy = float(bounce_energy)
+    bounce.data.size = e * 5.0
+    bounce.rotation_euler = (math.radians(-90), 0.0, 0.0)
+    try:
+        bounce.data.use_shadow = False
+    except AttributeError:
+        pass
+    # Seamless soft ground — just under the feet for a real contact shadow.
+    ground_size = e * 8.0
+    bpy.ops.mesh.primitive_plane_add(
+        size=ground_size,
+        location=(cx, cy, ground_z))
+    ground = bpy.context.active_object
+    ground.name = "fl_ground_instrument_studio"
+    mat = bpy.data.materials.new("m_instrument_studio_ground")
+    mat.use_nodes = True
+    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (*_to_linear(tuple(ground_srgb)), 1.0)
+    bsdf.inputs["Roughness"].default_value = 0.95
+    bsdf.inputs["Metallic"].default_value = 0.0
+    ground.data.materials.append(mat)
+    return {"key": key, "fill": fill, "rim": rim, "bounce": bounce, "ground": ground}
+
+
 def add_lights(target_centre=(0, 0, 0), sun_energy=3.0, fill_energy=60, fill_size=2.5):
     """Phase A 2026-05-24: 4-light rig for grounded components + soft side fill.
       - KEY SUN at upper-front-right with shadows ON (defines the form)
@@ -221,19 +368,22 @@ def make_mat(name, rgb, metallic=0.0, roughness=0.55, alpha=1.0, kind=None,
     preset = _MAT_KIND_PRESETS.get(kind, {}) if kind else {}
     metallic = preset.get("metallic", metallic) if kind and "metallic" not in {} else (preset.get("metallic", metallic))
     roughness = preset.get("roughness", roughness)
-    if kind == "glass" and alpha == 1.0:
-        alpha = preset.get("alpha", 0.25)
+    # DECISION: kind=glass + alpha=1.0 → Cycles Transmission (photoreal CAD).
+    # Legacy EEVEE alpha-fade glass must pass alpha < 1.0 explicitly — do NOT
+    # force the preset alpha=0.25 onto the CAD path (that fights Transmission).
     if kind and clearcoat == 0.0:
         clearcoat = preset.get("clearcoat", 0.0)
     if kind == "led_emissive" and emission_strength == 0.0:
         emission_strength = preset.get("emission_strength", 0.0)
     if kind == "glass":
         ior = preset.get("ior", ior)
+        if alpha >= 0.999:
+            roughness = min(roughness, float(preset.get("roughness", 0.05)))
 
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*rgb, alpha)
+    bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Roughness"].default_value = roughness
     if "IOR" in bsdf.inputs:
@@ -255,10 +405,94 @@ def make_mat(name, rgb, metallic=0.0, roughness=0.55, alpha=1.0, kind=None,
         if "Emission Strength" in bsdf.inputs:
             try: bsdf.inputs["Emission Strength"].default_value = emission_strength
             except (AttributeError, TypeError): pass
-    if alpha < 1.0:
+    # Photoreal glass — Cycles Transmission (Blender 4+: "Transmission Weight").
+    use_transmission = kind == "glass" or (alpha < 0.95 and roughness <= 0.12)
+    if use_transmission:
+        for tr_name in ("Transmission Weight", "Transmission"):
+            if tr_name in bsdf.inputs:
+                try:
+                    bsdf.inputs[tr_name].default_value = (
+                        0.92 if kind == "glass" else max(0.0, 1.0 - alpha)
+                    )
+                except (AttributeError, TypeError):
+                    pass
+                break
+    if kind == "glass" and alpha >= 0.999:
+        # Opaque + Transmission — correct Cycles glass path (not alpha-fade).
+        try:
+            mat.blend_method = "OPAQUE"
+        except (AttributeError, TypeError):
+            pass
+    elif alpha < 1.0:
         bsdf.inputs["Alpha"].default_value = alpha
-        mat.blend_method = "BLEND"
+        try:
+            mat.blend_method = "BLEND"
+        except (AttributeError, TypeError):
+            pass
     return mat
+
+
+def shade_smooth_object(obj) -> None:
+    """Smooth STL/CAD imports so facets do not read as low-poly clay."""
+    if obj is None or getattr(obj, "type", None) != "MESH" or obj.data is None:
+        return
+    try:
+        for poly in obj.data.polygons:
+            poly.use_smooth = True
+    except (AttributeError, TypeError):
+        pass
+    try:
+        # Blender 3.x / early 4.x — enough for photoreal CAD under Cycles.
+        obj.data.use_auto_smooth = True
+        obj.data.auto_smooth_angle = math.radians(35.0)
+    except (AttributeError, TypeError):
+        # Blender 4.1+ dropped use_auto_smooth; poly.use_smooth alone is fine.
+        pass
+
+
+def make_instrument_cad_mat(family: str, name: str | None = None):
+    """Role-honest PBR for forge-truth CAD families (photoreal Cycles bar).
+
+    INTENT: imported STLs must not stay default grey. Family → material role
+    is universal for sealed instruments (and reusable for plant CAD).
+    """
+    fam = str(family or "").strip().lower()
+    nm = name or f"m_cad_{fam[:24] or 'part'}"
+    if fam in ("square_cuvette", "cuvette"):
+        # alpha=1.0 → Cycles Transmission + IOR (photoreal CAD bar).
+        return make_mat(
+            nm, _to_linear((0.78, 0.86, 0.90)), metallic=0.0, roughness=0.04,
+            alpha=1.0, kind="glass", clearcoat=0.55, ior=1.52)
+    if fam in ("led_emitter", "led"):
+        return make_mat(
+            nm, _to_linear((1.0, 0.55, 0.08)), metallic=0.0, roughness=0.22,
+            kind="led_emissive", emission_strength=5.0, clearcoat=0.4)
+    if fam in ("photodiode_to_can", "photodiode"):
+        return make_mat(
+            nm, _to_linear((0.14, 0.15, 0.18)), metallic=0.82, roughness=0.28,
+            kind="brushed_alu")
+    if fam in ("coin_cell",):
+        # Brushed steel — too-light albedo under softboxes reads as white plastic.
+        return make_mat(
+            nm, _to_linear((0.42, 0.43, 0.46)), metallic=0.92, roughness=0.28,
+            kind="brushed_alu")
+    if fam in ("instrument_pcb", "pcb_board", "pcb"):
+        return make_mat(
+            nm, _to_linear((0.05, 0.42, 0.20)), metallic=0.05, roughness=0.48,
+            kind="pcb")
+    if fam in ("axial_fan",):
+        return make_mat(
+            nm, _to_linear((0.12, 0.12, 0.14)), metallic=0.15, roughness=0.55,
+            kind="polymer")
+    if fam in ("heatsink_extruded", "terminal_block", "cable_gland"):
+        return make_mat(
+            nm, _to_linear((0.55, 0.57, 0.60)), metallic=0.75, roughness=0.35,
+            kind="brushed_alu")
+    if fam in ("lfp_prismatic_cell",):
+        return make_mat(
+            nm, _to_linear((0.62, 0.64, 0.68)), metallic=0.7, roughness=0.38,
+            kind="brushed_alu")
+    return make_mat(nm, _to_linear((0.45, 0.46, 0.48)), metallic=0.2, roughness=0.5)
 
 
 class _Palette(dict):
@@ -496,11 +730,13 @@ def add_box(name, location, size, material, module=None, module_objects=None, ro
     return obj
 
 
-def add_cyl(name, location, radius, height, material, module=None, module_objects=None, rotation=(0, 0, 0)):
-    bpy.ops.mesh.primitive_cylinder_add(location=location, radius=radius, depth=height, rotation=rotation)
+def add_cyl(name, location, radius, height, material, module=None, module_objects=None, rotation=(0, 0, 0), vertices=48):
+    bpy.ops.mesh.primitive_cylinder_add(
+        location=location, radius=radius, depth=height, rotation=rotation, vertices=vertices)
     obj = bpy.context.active_object
     obj.name = name
     obj.data.materials.append(material)
+    shade_smooth_object(obj)
     if module and module_objects is not None:
         module_objects[module].append(obj)
     return obj

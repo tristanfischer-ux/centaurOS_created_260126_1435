@@ -27,16 +27,14 @@
 // mechanisms close this, both keyed on the SELECTED TOOLS' own identity
 // (never a product name):
 //
-//   (B-strip) `INDUSTRIAL_POWER_MARKERS` — the SAME suppress-on-device-scale
-//   pattern as `PROCESS_PLANT_VESSEL_MARKERS` above, extended with the
-//   unmistakable BESS/industrial-power vocabulary (inverter bridge, dc link
-//   capacitor, dc busbar, storage cell, cell module assembly, module rack,
-//   cell monitoring unit, gate driver, i/o module, plc, contactor,
-//   switchgear, communication gateway). `isProcessPlantClass` already lists
-//   `bess` / `battery_storage` / `energy_storage` / `utility_bess`, so a
-//   genuine BESS design is suppressed via the EXACT SAME class+scale signal,
-//   zero new code — a colorimeter (`pcb_assembly`, not a process-plant class)
-//   is device-scale and gets flagged + stripped.
+//   (B-strip) `INDUSTRIAL_POWER_MARKERS` — suppress on device-scale designs
+//   that are NOT a BESS/energy-storage class. Colorimeter (`pcb_assembly`)
+//   device-scale → strip BESS template words. Residential wall ESS is ALSO
+//   device-scale by volume (<1 m³) but IS a process-plant class (`bess` /
+//   `energy_storage`) — industrial_power vocabulary (contactor, busbar,
+//   module rack) MUST stay; only process-plant VESSEL markers still strip.
+//   (2026-07-15: powerwall-0446 enforcing stripped 19 legitimate pack/PCS
+//   words because volume<1 treated wall ESS like a colorimeter.)
 //
 //   (A/B-add) `TOOL_IMPLIED_COMPONENTS` — a tool-IDENTITY-keyed (never
 //   product-keyed) map from a selected tool's own id/name to the physical
@@ -396,7 +394,15 @@ export function computeWordDomainCoherence(state: any): WordDomainCoherenceResul
         if (!deviceScale) continue // suppressed — a genuine plant-scale process class
         const text = wordText(w)
         const vesselHits = scanWordTextForVesselMarkers(text)
-        const industrialHits = scanWordTextForIndustrialPowerMarkers(text)
+        // GOTCHA (2026-07-15 powerwall-0446): residential wall ESS is device-scale
+        // (enclosure_volume_m3 ≈ 0.14 < 1) AND class `energy_storage` / `bess`.
+        // INDUSTRIAL_POWER markers (contactor, dc busbar, module rack, CMU) are
+        // LEGITIMATE on every BESS — only strip them from non-BESS devices
+        // (colorimeter / pcb_assembly). Process-plant VESSEL markers still strip
+        // on wall ESS (no sand-filter underdrain on a Powerwall).
+        const industrialHits = isProcessPlant
+          ? []
+          : scanWordTextForIndustrialPowerMarkers(text)
         if (vesselHits.length === 0 && industrialHits.length === 0) continue
         const [marker, marker_family]: [string, 'process_plant_vessel' | 'industrial_power'] =
           vesselHits.length > 0 ? [vesselHits[0], 'process_plant_vessel'] : [industrialHits[0], 'industrial_power']

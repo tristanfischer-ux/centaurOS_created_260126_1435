@@ -1576,6 +1576,15 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
       && !/\b(?:card|adapter|hub|expansion|host\s+bus)\b/.test(wl)
     const hitIsExpansionCard = /pci[\s-]?e|\bpcie\b|\bpci\b|\bpex\d|expansion\s+card|add[\s-]?in\s+card|host\s+(?:adapter|bus\s+adapter)|\bhba\b|riser\s+card/.test(hitBlob)
     if (wordIsConnectorIface && hitIsExpansionCard) return false
+    // USB-SERIAL CABLE ASSEMBLY (2026-07-14, gold delta G14): an embedded USB
+    // interface / USB power inlet is a receptacle or on-board transceiver — never a
+    // host-side USB-to-TTL serial cable (FTDI TTL-232RG*, CP2102 cable kits). The
+    // colorimeter 1441 pinned FTDI TTL-232RG-VSW3V3-P to both Usb Interface and
+    // Usb Power Interface (£13×2). Refuse the cable-assembly form factor.
+    const wordIsUsbIface = /\busb\b/.test(wl) && /\b(?:interface|power|connector|port|inlet|receptacle)\b/.test(wl)
+    const hitIsUsbSerialCable = /ttl[\s-]?232|usb[\s-]?to[\s-]?(?:ttl|serial)|serial\s+cable|\bft232\b|cp210[29].*cable|vsw3v3[\s-]?p(?:cb)?\b/.test(hitBlob)
+      || (/\bftdi\b/.test(hitBlob) && /ttl|cable|rs232|serial/.test(hitBlob) && !/receptacle|connector|type[\s-]?c|usb[\s-]?c/.test(hitBlob))
+    if (wordIsUsbIface && hitIsUsbSerialCable) return false
     // DOMAIN COHERENCE (2026-07-12, Grok/Cursor #1): a device's POWER-STORAGE word (a
     // battery / cell / rechargeable pack) is NEVER a MACHINE-SAFETY product — the colorimeter
     // 'Rechargeable Battery Pack' pinned Banner Engineering DBRQ (a safety relay, £280).
@@ -2581,6 +2590,47 @@ export function scrubInstrumentIndustrialMisPins(
         log(`[fill-blank-mpn]   ⊘ scrub ${mid}::${sid} (${nm}): cleared ${mfr} ${mpn} — industrial mis-pin on device instrument`)
       }
     }
+  }
+  return cleared
+}
+
+/**
+ * INTENT: Word-level scrub alone is not enough — verifyAllParts freezes industrial
+ * MPNs into `partVerifications` BEFORE scrubInstrumentIndustrialMisPins runs, and
+ * Excel/cost stack read PV. Colorimeter 1441 shipped Banner S22 + Schneider NSX in
+ * the BoM ledger while the words were already scrubbed to TBD.
+ * FLOW: chain calls this immediately after scrubInstrumentIndustrialMisPins.
+ */
+export function scrubInstrumentIndustrialPartVerifications(
+  partVerifications: Array<Record<string, unknown>>,
+  log: (line: string) => void = () => {},
+): number {
+  if (!RUN_IS_INSTRUMENT_DEVICE) return 0
+  if (!Array.isArray(partVerifications)) return 0
+  let cleared = 0
+  for (const pv of partVerifications) {
+    const mpn = String(pv.part_number ?? '').trim()
+    const mfr = String(pv.manufacturer ?? '').trim()
+    if (!mpn || isBlankOrPlaceholderMpn(mpn)) continue
+    const nm = String(pv.word_name ?? '')
+    const hit: DbPart = {
+      part_name: String(pv.source_title ?? pv.word_name ?? mpn),
+      manufacturer: mfr,
+      part_number: mpn,
+      component_class: String(pv.component_class ?? ''),
+      unit_price_gbp: typeof pv.distributor_price_gbp === 'number' ? pv.distributor_price_gbp : null,
+    }
+    if (dbHitAcceptableForWord(hit, nm)) continue
+    const clearedMfr = mfr
+    const clearedMpn = mpn
+    pv.manufacturer = null
+    pv.part_number = null
+    pv.status = 'uncertain'
+    pv.reasoning = `Device instrument: industrial-scale MPN cleared from partVerifications (${clearedMfr} ${clearedMpn})`
+    pv.distributor_price_gbp = null
+    pv.cost_grounding_price_gbp = null
+    cleared++
+    log(`[fill-blank-mpn]   ⊘ scrub-pv (${nm}): cleared ${clearedMfr} ${clearedMpn} — industrial mis-pin still in partVerifications`)
   }
   return cleared
 }

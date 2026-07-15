@@ -106,7 +106,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins, scrubInstrumentIndustrialPartVerifications } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -139,7 +139,11 @@ import { buildVerifiedPartsAllowlist } from '../src/lib/pdf-engine-v2/radical/al
 import { parseJsonFromLlm } from '../src/lib/pdf-engine-v2/lib/llm-json'
 import type { KeyMetrics, BriefRevisionEntry } from '../src/lib/pdf-engine-v2/types/module-decomposition'
 import { formatFloorsForPrompt, getClassFloors } from '../src/lib/pdf-engine-v2/class-floors'
-import { defaultEnvelopeForClass, suggestEnvelope } from '../src/lib/pdf-engine-v2/deployment-envelopes'
+import {
+  defaultEnvelopeForClass,
+  resolveDeploymentEnvelopeForProduct,
+  suggestEnvelope,
+} from '../src/lib/pdf-engine-v2/deployment-envelopes'
 import {
   ensureGraphsRegistered,
   getClassReferenceGraph,
@@ -6855,6 +6859,14 @@ async function main() {
     console.error(`[chain] scrubbed ${scrubbedIndustrial} industrial-scale MPN(s) from device-instrument words (post Stage 10.5)`)
     logAction({ step: 'scrub_instrument_industrial_mis_pins', cleared: scrubbedIndustrial })
   }
+  // GOTCHA: verifyAllParts freezes industrial MPNs into partVerifications BEFORE the
+  // word scrub above. Excel + cost stack read PV — scrub words alone left Banner S22 /
+  // Schneider NSX "verified" in the colorimeter 1441 BoM. Clear the same scale bar on PV.
+  const scrubbedIndustrialPv = scrubInstrumentIndustrialPartVerifications(partVerifications as unknown as Array<Record<string, unknown>>)
+  if (scrubbedIndustrialPv > 0) {
+    console.error(`[chain] scrubbed ${scrubbedIndustrialPv} industrial-scale MPN(s) from partVerifications (post Stage 10.5)`)
+    logAction({ step: 'scrub_instrument_industrial_part_verifications', cleared: scrubbedIndustrialPv })
+  }
 
   // ── Stage 10.6: Synchronous Part Verification (the engine's "P1", 2026-06-04).
   //
@@ -8047,12 +8059,35 @@ async function main() {
   // quality gain. Opt back in with CHAIN_WANT_GEMINI_I2I=1 (legacy alias:
   // CHAIN_SKIP_IMAGE_GEN=0 alone is no longer enough — must set WANT).
   //
+  // HARD FORBID for instruments (2026-07-13 photoreal CAD bar): even with
+  // CHAIN_WANT_GEMINI_I2I=1, sealed instruments must NEVER use LLM product
+  // images — heroes/cutaways/exteriors are Cycles renders of CAD parts only.
+  // See .cursor/rules/photoreal-cad-instrument-render.mdc.
+  //
   // Historical note: 2026-05-21 bake-off preferred Blender→Gemini i2i for PDF
   // covers; PDF path is itself off by default (CHAIN_WANT_PDF).
+  const isInstrumentNoGemini = Boolean((state as any).isInstrumentDevice)
   const wantGeminiI2i =
     process.env.CHAIN_WANT_GEMINI_I2I === '1' &&
-    process.env.CHAIN_SKIP_IMAGE_GEN !== '1'
-  if (wantGeminiI2i) {
+    process.env.CHAIN_SKIP_IMAGE_GEN !== '1' &&
+    !isInstrumentNoGemini
+  if (isInstrumentNoGemini) {
+    // ALWAYS skip — even if CHAIN_WANT_GEMINI_I2I=1 (photoreal CAD bar).
+    if (process.env.CHAIN_WANT_GEMINI_I2I === '1') {
+      console.error(
+        '[chain] Gemini i2i FORBIDDEN for isInstrumentDevice — photoreal CAD/Cycles only (CHAIN_WANT_GEMINI_I2I ignored)',
+      )
+    } else {
+      console.error(
+        '[chain] Gemini i2i OFF for isInstrumentDevice — Excel embeds Blender CAD/Cycles views only',
+      )
+    }
+    logAction({
+      step: 'gemini_i2i_skipped',
+      ok: true,
+      reason: 'instrument_photoreal_cad_only',
+    })
+  } else if (wantGeminiI2i) {
     // STEP 1: hero (Blender ref → Gemini i2i)
     const tHero = Date.now()
     let heroSucceeded = false
@@ -8121,18 +8156,56 @@ async function main() {
       // its own CLASS_SLUG_TO_ENVELOPE_ID table.
       const lower = productClass.toLowerCase()
       const aliased = resolveClassGraphSlug(lower)
-      let envelope = (aliased !== lower ? defaultEnvelopeForClass(aliased) : null)
-        ?? defaultEnvelopeForClass(productClass)
-        ?? null
-      // For container/cabinet/rack-categorised classes, prefer the size-aware
-      // selector if we have allocated mass + volume aggregates from Engine B
-      // or the brief's derived parameters. Categories per
-      // deployment-envelopes.ts: 'shipping_container' | 'electrical_rack' |
-      // 'pallet' | 'pv_module_form_factor' | 'outdoor_cabinet' | 'din_rail'.
-      // Only the size-variable categories benefit from suggestEnvelope.
-      if (envelope && (envelope.category === 'shipping_container' || envelope.category === 'outdoor_cabinet' || envelope.category === 'electrical_rack')) {
-        const totMassKg = Number(liveState.parsedBrief?.derived_parameters?.max_mass_kg) || 0
-        const totVolM3 = Number(liveState.parsedBrief?.derived_parameters?.envelope_volume_m3) || 0
+      // Scale-aware resolve FIRST (2026-07-14): residential wall ESS that
+      // classifies as energy_storage/bess must NOT inherit 40-ft Hi-Cube.
+      const dims = liveState.parsedBrief?.constraints?.max_dimensions_mm
+      const briefVolM3 = (() => {
+        const fromContract = Number(
+          liveState.orchestratorContract?.quantities?.enclosure_volume_m3?.value ??
+            liveState.parsedBrief?.derived_parameters?.envelope_volume_m3,
+        )
+        if (Number.isFinite(fromContract) && fromContract > 0) return fromContract
+        const w = Number(dims?.w), d = Number(dims?.d), h = Number(dims?.h)
+        if ([w, d, h].every((n) => Number.isFinite(n) && n > 0)) return (w * d * h) / 1e9
+        return null
+      })()
+      const briefMassKg = Number(
+        liveState.orchestratorContract?.quantities?.enclosure_mass_kg?.value ??
+          liveState.orchestratorContract?.quantities?.unit_mass_kg?.value ??
+          liveState.orchestratorContract?.quantities?.brief_mass_cap_kg?.value ??
+          liveState.parsedBrief?.constraints?.max_mass_kg ??
+          liveState.parsedBrief?.derived_parameters?.max_mass_kg,
+      )
+      const briefText = [
+        productClass,
+        liveState.parsedBrief?.product_description,
+        liveState.parsedBrief?.product_class,
+        liveState.parsedBrief?.original_text,
+        liveState.parsedBrief?.application_context,
+      ].filter((v: unknown) => typeof v === 'string').join(' ')
+      let envelope =
+        resolveDeploymentEnvelopeForProduct(aliased !== lower ? aliased : productClass, {
+          enclosureVolumeM3: briefVolM3,
+          massKg: Number.isFinite(briefMassKg) && briefMassKg > 0 ? briefMassKg : null,
+          briefText,
+        }) ??
+        (aliased !== lower ? defaultEnvelopeForClass(aliased) : null) ??
+        defaultEnvelopeForClass(productClass) ??
+        null
+      // Size-aware refine ONLY inside shipping_container / electrical_rack.
+      // GOTCHA (2026-07-15 powerwall-2214): after resolveDeploymentEnvelopeForProduct
+      // correctly picked cabinet-wall-ess-residential, a second suggestEnvelope()
+      // over outdoor_cabinet re-ranked by internal litres and stamped
+      // cabinet-dcfc-pedestal (EV charger) — wrong family. Wall/residential
+      // outdoor_cabinet picks from resolve are FINAL.
+      if (
+        envelope &&
+        (envelope.category === 'shipping_container' || envelope.category === 'electrical_rack')
+      ) {
+        const totMassKg = Number(liveState.parsedBrief?.derived_parameters?.max_mass_kg) ||
+          (Number.isFinite(briefMassKg) ? briefMassKg : 0) || 0
+        const totVolM3 = Number(liveState.parsedBrief?.derived_parameters?.envelope_volume_m3) ||
+          (briefVolM3 ?? 0) || 0
         if (totMassKg > 0 && totVolM3 > 0) {
           const payloadVolLiters = totVolM3 * 1000
           const candidates = suggestEnvelope(payloadVolLiters, totMassKg, envelope.category)

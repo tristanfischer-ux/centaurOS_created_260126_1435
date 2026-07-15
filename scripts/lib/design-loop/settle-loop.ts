@@ -487,6 +487,19 @@ export function runEarlyDesignLoop(
         if (existsSync(src)) writeFileSync(join(opts.resizeOutDir, a), readFileSync(src))
       } catch { /* ignore — late pass rebuilds if absent */ }
     }
+    // INTENT: settled parts-manifest is the GA/data placement truth. Pre-settle
+    // Phase-5 bg renders (00-hero / 01-top) MUST NOT survive — generate_drawing_set
+    // used to skip "00-hero.png already present" and ship a Blender plan from a
+    // different generation than the GA (Codema 2026-07-14: GA≠01-top).
+    // FLOW: settle copies manifest → wipe stale production views → late pass
+    // re-renders hero OR promotes inspect-top as the plan (same placement as GA).
+    const STALE_PRODUCTION_RENDERS = [
+      '00-hero.png', '01-top.png', '02-corner-FR.png', '03-corner-BL.png',
+      'blender-cover.png', 'hero-embed.png',
+    ]
+    for (const r of STALE_PRODUCTION_RENDERS) {
+      try { rmSync(join(opts.resizeOutDir, r), { force: true }) } catch { /* absent is fine */ }
+    }
   }
 
   return { ...settle, basePreLoopKw, converged, parasiticKw, resizedTransformerKva }

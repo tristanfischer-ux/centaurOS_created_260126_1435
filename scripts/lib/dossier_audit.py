@@ -2716,8 +2716,13 @@ def check_scope_fidelity(state, rows, run_dir) -> list:
     # breach (e.g. a "concrete foundation pad" or "site groundworks" BoM line built despite an
     # excluded civil scope) still fails — proveCatch in _selftest, both directions.
     SUBSYS = [
+        # GOTCHA: bare 'horticultural' is a MARKET adjective (horticultural process
+        # computer / fertigation) — NOT lighting. Only match when collocated with a
+        # light noun (Codema 2026-07-14: rename to 'Horticultural … Process Computer'
+        # false-fired scope_fidelity against the brief's lighting exclusion).
         ("lighting", ("lighting", "light", "led", "luminaire"),
-         ("led", "luminaire", "grow light", "horticultural", "photoperiod fixture")),
+         ("led", "luminaire", "grow light", "horticultural light", "horticultural lighting",
+          "photoperiod fixture")),
         ("climate / HVAC", ("climate", "hvac", "ventilation", "heating", "air-condition", "heating-ventilation"),
          ("hvac", "chiller", "dehumidif", " ahu", "air handling", "condenser", "cooling unit", "heat pump", "refrigerant")),
         ("building / structure", ("building", "rack framework", "cultivation rack", "structure"),
@@ -2806,7 +2811,7 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         if str(v.get("source", "")).strip().lower() in _ROOTS:
             continue   # an input/constant, not a calculation
         total += 1
-        sd = str(v.get("source_detail") or "")
+        sd = str(v.get("source_detail") or v.get("condition") or "")
         has_formula = len(sd) > 3 and any(op in sd for op in _OPS)
         # A quantity COMPUTED BY A TOOL whose full working (inputs → formula → substituted
         # numbers → result) is rendered on the Tools-Used / Calculations tab IS shown — the
@@ -2827,7 +2832,10 @@ def check_calc_coverage(state, rows, run_dir) -> list:
         # DECISION: require an explicit RULE/identity/from/= marker — a long prose
         # sentence alone (len>20) over-widened the exemption and let mystery_hidden_pct
         # ("an engineering judgement call, no formula") escape the guarantee.
-        disclosed_lineage = src in ("demand-coverage", "calculator", "derived") and bool(
+        # derived_device_scale / aggregator optical metrics: condition/source_detail carrying
+        # an '=' identity IS the shown derivation (colorimeter 0819 calc-coverage 70%).
+        disclosed_lineage = src in ("demand-coverage", "calculator", "derived",
+                                    "derived_device_scale", "aggregator") and bool(
             re.search(r"\bRULE\b|rated identically|from\s+\w+|=\s*", sd, re.I)
         )
         is_cited_measurement = src == "route-manifest" and bool(_CITED_MEASURED_RE.search(sd))
@@ -2929,8 +2937,10 @@ def check_provenance(state, rows, run_dir) -> list:
         examples = [f.key for f in rep.findings if f.kind == "sourceless"][:6]
         frac = round(sc["traceable_fraction"] * 100)
         sev = "HIGH" if sc["sourceless"] > sc["total"] * 0.25 else "MED"
+        # INTENT (2026-07-14): Quantities sheet folded into Calculations — provenance
+        # findings route to the live home of contract quantities.
         out.append(Finding(
-            tab="Quantities", check="provenance_sourceless", severity=sev,
+            tab="Calculations", check="provenance_sourceless", severity=sev,
             message=(f"{sc['sourceless']} of {sc['total']} quantities have no recorded origin "
                      f"(only {frac}% trace to the brief via a tool/formula) — numbers appear from nowhere"),
             actual=", ".join(examples) + ("…" if sc["sourceless"] > 6 else ""),
@@ -2940,7 +2950,7 @@ def check_provenance(state, rows, run_dir) -> list:
     for f in rep.findings:
         if f.kind == "divergence":
             out.append(Finding(
-                tab="Quantities", check="provenance_divergence", severity="HIGH",
+                tab="Calculations", check="provenance_divergence", severity="HIGH",
                 message=f.message, actual=str(f.value),
                 expected="two quantities of the same physical role must agree",
                 source_rule="provenance.py — one is a wrong roll-up / unit error; fix at source",
@@ -3046,6 +3056,15 @@ def check_panel_schedule(state, rows, run_dir) -> list:
     load schedule with real circuit rows. Absent or empty = a missing deliverable, not a pass."""
     tab = "Panel schedule"
     out: list = []
+    # Fluid-less handheld pack has no plant panel schedule — board electronics live on PCB
+    # (2026-07-14). Do not open Verification HARD on a deliberately omitted plant deliverable.
+    try:
+        from render_view_contract import is_fluid_less_instrument
+        if is_fluid_less_instrument(state or {}):
+            return out
+    except Exception:  # noqa: BLE001
+        if bool((state or {}).get("isInstrumentDevice")):
+            return out
     # Only a design that HAS electrical load owes a panel schedule.
     q = _quantities(state)
     has_elec = any(re.search(r"electrical_load|connected_load|supply_demand|switchboard|incomer", k, re.I)
@@ -3320,7 +3339,7 @@ def audit_dossier(state: dict, rows: list, run_dir: str) -> AuditReport:
 # Canonical Excel tabs that MUST carry a deterministic quality score (the data/engineering tabs).
 # Meta tabs (⭐ Scorecard, Sense-check) and pure-narrative tabs are excluded from the floor.
 SCORED_TABS = [
-    "Executive Summary", "Overview", "Brief", "Quantities", "Calculations",
+    "Executive Summary", "Overview", "Brief", "Calculations",
     "Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
     "Connection trace", "Part names", "Risk & Regulatory", "Assembly sequence",
     "Panel schedule", "Process schedules", "Line & velocity", "Glossary",
@@ -3329,7 +3348,7 @@ SCORED_TABS = [
 # A deterministic check EXAMINES these canonical tabs (so a clean one scores 10; the rest are
 # UNSCORED = a coverage gap to close, never a silent pass). Derived from the _CHECKS tab tags.
 COVERED_TABS = {
-    "Executive Summary", "Overview", "Quantities", "Calculations",
+    "Executive Summary", "Overview", "Calculations",
     "Bill of Materials (Ledger)", "Cost waterfall", "Financial model",
     "Connection trace", "Risk & Regulatory", "Process schedules",
     "Assembly sequence", "Brief",
@@ -3350,7 +3369,8 @@ _TAB_ROUTE = [
     ("capex", "Cost waterfall"), ("cost", "Cost waterfall"),
     ("financial", "Financial model"), ("inputs", "Financial model"), ("revenue", "Financial model"),
     ("econom", "Financial model"),
-    ("quantit", "Quantities"), ("calculation", "Calculations"),
+    # Quantities sheet removed 2026-07-14 — route quantity findings to Calculations.
+    ("quantit", "Calculations"), ("calculation", "Calculations"),
     ("connectiv", "Connection trace"), ("connection", "Connection trace"), ("drawing", "Connection trace"),
     ("part name", "Part names"), ("glossar", "Glossary"),
     ("risk", "Risk & Regulatory"), ("regulator", "Risk & Regulatory"), ("physics", "Risk & Regulatory"),
@@ -4455,6 +4475,33 @@ def _selftest() -> int:
            "a genuine civil-scope BoM line (concrete foundation pad) built despite an excluded "
            "civil-works scope must still surface as a scope_fidelity HIGH — got: "
            f"{[f.message for f in _civil_bad_findings]!r}")
+    # proveCatch: bare 'horticultural' on a process-control word must NOT trip lighting
+    # scope-fidelity; a real 'horticultural light' / grow-light line still must.
+    _hort_state = {
+        "parsedBrief": {
+            "original_text": (
+                "Water treatment plant. Explicitly EXCLUDING grow-lighting and the climate / "
+                "heating-ventilation-cooling hardware."
+            ),
+        },
+    }
+    _hort_ctrl = check_scope_fidelity(
+        _hort_state,
+        [{"requirement": "Irrigation/Fertigation Process Computer Remote Monitoring",
+          "status": "OK", "line_gbp": 985}],
+        "",
+    )
+    expect(not any(f.check == "scope_fidelity" for f in _hort_ctrl),
+           "a horticultural PROCESS COMPUTER must not trip lighting scope_fidelity — got: "
+           f"{[f.message for f in _hort_ctrl]!r}")
+    _hort_light = check_scope_fidelity(
+        _hort_state,
+        [{"requirement": "Horticultural lighting LED bar", "status": "OK", "line_gbp": 12000}],
+        "",
+    )
+    expect(any(f.check == "scope_fidelity" and "lighting" in f.message for f in _hort_light),
+           "a real horticultural lighting BoM line must still trip lighting scope_fidelity — got: "
+           f"{[f.message for f in _hort_light]!r}")
 
     # ---- calc-coverage 'class_anchor' ROOT guard (CO2-mineralisation v2 cross-val
     # 2026-07-05, both directions): a class_anchor value (a cited engineering-estimate

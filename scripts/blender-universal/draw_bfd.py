@@ -1735,6 +1735,14 @@ def generate_bfd(out_dir: str, state_path: Optional[str] = None,
     _schedule, state = PID.load_inputs(out_dir, state_path)
     bf = reconstruct_blockflow(out_dir, state)
     svg_text = build_bfd_svg(bf)
+    # Stamp the settled parts-manifest fingerprint (G16 drawing-set coherence).
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(out_dir)
+        if _fp:
+            svg_text = embed_svg_placement_fp(svg_text, _fp)
+    except Exception as _fpe:  # noqa: BLE001
+        print(f"[bfd] placement_fp stamp skipped: {_fpe}")
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)

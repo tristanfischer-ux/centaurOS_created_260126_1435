@@ -241,16 +241,17 @@ describe('atopile-generator', () => {
     expect(imu).toBeDefined()
     expect(ledDriver).toBeDefined()
 
-    // Package-family tier fires from the design's OWN "LQFP-32"/"SOT-23-6" text —
-    // not a hardcoded per-product table.
-    expect(mcu!.resolutionTier).toBe('package_family')
+    // Package-family OR MPN-package tier fires from the design's OWN package /
+    // MPN text — never a hardcoded per-product table. mpn_package is the stronger
+    // tier when a real MPN is present; either must land a real KiCad library.
+    expect(['package_family', 'mpn_package']).toContain(mcu!.resolutionTier)
     expect(mcu!.footprint!.library).toBe('Package_QFP')
-    expect(ledDriver!.resolutionTier).toBe('package_family')
+    expect(['package_family', 'mpn_package']).toContain(ledDriver!.resolutionTier)
     expect(ledDriver!.footprint!.library).toBe('Package_TO_SOT_SMD')
 
     // A generic sensor package default is still weaker than an MPN, but once it
     // resolves a real KiCad package family it is no longer a bare function guess.
-    expect(imu!.resolutionTier).toBe('package_family')
+    expect(['package_family', 'mpn_package']).toContain(imu!.resolutionTier)
     expect(imu!.functionClass).toBe('sensor_ic')
 
     // Topology-derived signal nets connect the design's OWN nets, not a fixed pair.
@@ -456,6 +457,196 @@ describe('atopile-generator', () => {
     expect(byWordId.get('power_switch_word')?.resolutionTier).toBe('package_family')
   })
 
+  it('keeps host power/USB off the optical source board when COTS UI+controller are present', () => {
+    // proveCatch (2026-07-14 gold delta G3/G15): LED daughterboard ≠ motherboard.
+    const outDir = makeTmpDir('atopile-led-daughterboard-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_description: 'A compact handheld optical instrument with replaceable LED source module and local display.',
+      },
+      moduleDecomposition: {
+        modules: [
+          {
+            module: 'control_compute_communication',
+            sub_modules: [{
+              id: 'control_compute_communication__controller_ui',
+              words: [
+                { id: 'microcontroller_word', name_human: 'Microcontroller', content_character: { character_id: 'microcontroller' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'local_display_word', name_human: 'Local Display', content_character: { character_id: 'local_display' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'usb_interface_word', name_human: 'Usb Interface', content_character: { character_id: 'usb_interface' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+          {
+            module: 'energy_conversion_transduction',
+            sub_modules: [{
+              id: 'energy_conversion_transduction__led_source',
+              words: [
+                { id: 'led_source_word', name_human: 'LED Source', content_character: { character_id: 'led_source' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'led_driver_word', name_human: 'LED Driver', content_character: { character_id: 'led_driver' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+          {
+            module: 'energy_storage_source',
+            sub_modules: [{
+              id: 'energy_storage_source__battery',
+              words: [
+                { id: 'rechargeable_battery_pack_word', name_human: 'Rechargeable Battery Pack', content_character: { character_id: 'rechargeable_battery_pack' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'usb_power_interface_word', name_human: 'Usb Power Interface', content_character: { character_id: 'usb_power_interface' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'dc_input_fuse_word', name_human: 'DC Input Fuse', content_character: { character_id: 'dc_input_fuse' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    expect(offBoardIds.has('microcontroller_word')).toBe(true)
+    expect(offBoardIds.has('local_display_word')).toBe(true)
+    expect(offBoardIds.has('usb_interface_word')).toBe(true)
+    expect(offBoardIds.has('rechargeable_battery_pack_word')).toBe(true)
+    expect(offBoardIds.has('usb_power_interface_word')).toBe(true)
+    expect(offBoardIds.has('dc_input_fuse_word')).toBe(true)
+    const onBoardIds = new Set(result.components.map((c) => c.wordId))
+    expect(onBoardIds.has('led_source_word')).toBe(true)
+    expect(onBoardIds.has('led_driver_word')).toBe(true)
+    expect(result.boardOutline.sourceDetail).toContain('instrument optical source board')
+    const points = result.boardOutline.outline.segments.flatMap((segment) => [
+      segment.start, segment.end, ...(segment.kind === 'arc' ? [segment.mid] : []),
+    ])
+    const widthMm = Math.max(...points.map((p) => p.xMm)) - Math.min(...points.map((p) => p.xMm))
+    expect(widthMm).toBeLessThanOrEqual(40)
+  })
+
+  it('keeps mount-plate / STEMMA / charge-status off the optical source board', () => {
+    // proveCatch (2026-07-14): colorimeter-2130 put detector_mount_plate (SOIC-8!),
+    // stemma_header, charge_status_led, low_battery_indicator on the LED PCBA → 9 parts
+    // + DRC edge violation. Gold is LED + driver (+ decouple); host/UI/optomech off-board.
+    const outDir = makeTmpDir('atopile-instrument-scrub-2130-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_class: 'optical_instrument',
+        product_description: 'A compact handheld optical instrument with LED source and local display.',
+      },
+      moduleDecomposition: {
+        modules: [
+          {
+            module: 'control_compute_communication',
+            sub_modules: [{
+              id: 'control_compute_communication__host',
+              words: [
+                { id: 'compute_ui_module_word', name_human: 'Compute UI Module', content_character: { character_id: 'compute_ui_module' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'charge_status_led_word', name_human: 'Charge Status LED', content_character: { character_id: 'charge_status_led' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'low_battery_indicator_word', name_human: 'Low Battery Indicator', content_character: { character_id: 'low_battery_indicator' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                {
+                  id: 'stemma_header_word',
+                  name_human: 'Stemma Header',
+                  content_character: { character_id: 'stemma_header' },
+                  // GOTCHA: collector only sees electronic-category words — bare
+                  // "stemma_header" is invisible; real runs carry I²C/connector form.
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'form', value: 'STEMMA QT I2C header, JST-PH' },
+                  ],
+                },
+              ],
+            }],
+          },
+          {
+            module: 'sensing_instrumentation',
+            sub_modules: [{
+              id: 'sensing_instrumentation__detector',
+              words: [
+                { id: 'detector_mount_plate_word', name_human: 'Detector Mount Plate', content_character: { character_id: 'detector_mount_plate' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+          {
+            module: 'energy_conversion_transduction',
+            sub_modules: [{
+              id: 'energy_conversion_transduction__source',
+              words: [
+                { id: 'led_source_word', name_human: 'LED Source', content_character: { character_id: 'led_source' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'led_driver_word', name_human: 'LED Driver', content_character: { character_id: 'led_driver' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    const onBoardIds = new Set(result.components.map((c) => c.wordId))
+    expect(offBoardIds.has('detector_mount_plate_word')).toBe(true)
+    expect(offBoardIds.has('stemma_header_word')).toBe(true)
+    expect(offBoardIds.has('charge_status_led_word')).toBe(true)
+    expect(offBoardIds.has('low_battery_indicator_word')).toBe(true)
+    expect(onBoardIds.has('led_source_word')).toBe(true)
+    expect(onBoardIds.has('led_driver_word')).toBe(true)
+    expect(onBoardIds.has('detector_mount_plate_word')).toBe(false)
+    expect(result.components.length).toBeLessThanOrEqual(4)
+  })
+
+  it('keeps a host dc_dc_regulator off the optical source board (not a motherboard rail)', () => {
+    // proveCatch: colorimeter-1441 had dc_dc_regulator survive ON_BOARD_PCB_WORD_RE
+    // (`regulator`) and inflate the LED daughterboard. Host rails ride with COTS MCU.
+    const outDir = makeTmpDir('atopile-host-regulator-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_class: 'optical_instrument',
+        product_description: 'A compact handheld optical instrument with LED source and local display.',
+      },
+      moduleDecomposition: {
+        modules: [
+          {
+            module: 'control_compute_communication',
+            sub_modules: [{
+              id: 'control_compute_communication__host',
+              words: [
+                { id: 'compute_ui_module_word', name_human: 'Compute UI Module', content_character: { character_id: 'compute_ui_module' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'microcontroller_word', name_human: 'Microcontroller', content_character: { character_id: 'microcontroller' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+          {
+            module: 'energy_conversion_transduction',
+            sub_modules: [{
+              id: 'energy_conversion_transduction__source',
+              words: [
+                { id: 'led_source_word', name_human: 'LED Source', content_character: { character_id: 'led_source' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'dc_dc_regulator_word', name_human: 'DC-DC Regulator', content_character: { character_id: 'dc_dc_regulator' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'power_input_connector_word', name_human: 'Power Input Connector', content_character: { character_id: 'power_input_connector' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+              ],
+            }],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    const onBoardIds = new Set(result.components.map((c) => c.wordId))
+    expect(offBoardIds.has('dc_dc_regulator_word')).toBe(true)
+    expect(offBoardIds.has('power_input_connector_word')).toBe(true)
+    expect(onBoardIds.has('led_source_word')).toBe(true)
+    expect(onBoardIds.has('dc_dc_regulator_word')).toBe(false)
+    const points = result.boardOutline.outline.segments.flatMap((segment) => [
+      segment.start, segment.end, ...(segment.kind === 'arc' ? [segment.mid] : []),
+    ])
+    const widthMm = Math.max(...points.map((p) => p.xMm)) - Math.min(...points.map((p) => p.xMm))
+    expect(widthMm).toBeLessThanOrEqual(40)
+  })
+
   it('keeps a non-instrument display module on-board as a normal PCB footprint', () => {
     const outDir = makeTmpDir('atopile-display-onboard-')
     tmpDirs.push(outDir)
@@ -488,6 +679,205 @@ describe('atopile-generator', () => {
     const display = result.components.find((component) => component.wordId === 'panel_display_word')
     expect(display).toBeDefined()
     expect(display!.functionClass).toBe('display_module')
+  })
+
+  // proveCatch (2026-07-15): wall ESS / plantish energy_storage is NOT
+  // isInstrumentDevice, so instrument-only COTS filters used to leave battery
+  // racks + smoke/gas detectors + DIN eth + HMI as on-board SOIC/JST → placement
+  // death (powerwall-2214/0447). Plant purchased assemblies must go off-board
+  // universally; status LEDs / board DC-DC may stay on-board.
+  it('dispositions wall-ESS plant assemblies as off-board COTS without instrument flag', () => {
+    const outDir = makeTmpDir('atopile-wall-ess-plant-')
+    tmpDirs.push(outDir)
+    // GOTCHA: collector only sees words whose text matches ELECTRONIC_CATEGORY_PATTERNS.
+    // Real wall-ESS form modifiers carry fuse/wi-fi/display/battery prose (0447) —
+    // fixtures must include that prose or the word never reaches offBoardCotsReason.
+    const design = {
+      isInstrumentDevice: false,
+      parsedBrief: {
+        product_class: 'energy_storage',
+        product_description: 'Residential wall-mounted battery energy storage system.',
+      },
+      moduleDecomposition: {
+        product_class: 'energy_storage',
+        modules: [
+          {
+            module: 'energy_storage_source',
+            sub_modules: [{
+              id: 'energy_storage_source__cells',
+              words: [
+                {
+                  id: 'battery_module_racks_word',
+                  name_human: 'Battery Module Racks',
+                  content_character: { character_id: 'battery_module_racks' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×2' },
+                    { kind: 'form', value: 'Battery Module Racks — lfp prismatic cell pack + module frames + integrated bms' },
+                  ],
+                },
+                {
+                  id: 'battery_modules_word',
+                  name_human: 'Battery Modules',
+                  content_character: { character_id: 'battery_modules' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×8' },
+                    { kind: 'form', value: 'Battery Modules — lfp prismatic cell pack + integrated bms component' },
+                  ],
+                },
+              ],
+            }],
+          },
+          {
+            module: 'safety_protection',
+            sub_modules: [{
+              id: 'safety_protection__detection',
+              words: [
+                {
+                  id: 'smoke_detectors_word',
+                  name_human: 'Smoke Detectors',
+                  content_character: { character_id: 'smoke_detectors' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×2' },
+                    { kind: 'manufacturer', value: 'Apollo' },
+                    { kind: 'part_number', value: '55000-392' },
+                    { kind: 'form', value: 'Smoke Detectors — pack fuse + over-temperature cutoff + pack vent path' },
+                  ],
+                },
+                {
+                  id: 'gas_sensors_word',
+                  name_human: 'Gas Sensors',
+                  content_character: { character_id: 'gas_sensors' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'form', value: 'Gas Sensors — combustible gas detector with fuse-backed supply' },
+                  ],
+                },
+                {
+                  id: 'hydrogen_detection_sensor_word',
+                  name_human: 'Hydrogen Detection Sensor',
+                  content_character: { character_id: 'hydrogen_detection_sensor' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'form', value: 'Hydrogen Detection Sensor — H2 detector module with fuse-backed supply' },
+                  ],
+                },
+              ],
+            }],
+          },
+          {
+            module: 'control_compute_communication',
+            sub_modules: [{
+              id: 'control_compute_communication__hmi',
+              words: [
+                {
+                  id: 'ethernet_switch_word',
+                  name_human: 'Ethernet Switch',
+                  content_character: { character_id: 'ethernet_switch' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'manufacturer', value: 'Phoenix Contact' },
+                    { kind: 'part_number', value: '2891005' },
+                    { kind: 'form', value: 'Ethernet Switch — energy management controller + wi-fi/ethernet gateway' },
+                  ],
+                },
+                {
+                  id: 'local_hmi_display_word',
+                  name_human: 'Local HMI Display',
+                  content_character: { character_id: 'local_hmi_display' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'form', value: 'Local HMI Display — status led + app-based hmi display panel' },
+                  ],
+                },
+                {
+                  id: 'status_indicator_leds_word',
+                  name_human: 'Status Indicator LEDs',
+                  content_character: { character_id: 'status_indicator_leds' },
+                  modifier_characters: [{ kind: 'quantity', value: '×4' }],
+                },
+                {
+                  id: 'dc_dc_converters_word',
+                  name_human: 'DC DC Converters',
+                  content_character: { character_id: 'dc_dc_converters' },
+                  modifier_characters: [
+                    { kind: 'quantity', value: '×1' },
+                    { kind: 'manufacturer', value: 'XP Power' },
+                    { kind: 'part_number', value: 'DDC3024S09' },
+                    { kind: 'form', value: 'DC DC Converters — board power rail regulator component' },
+                  ],
+                },
+              ],
+            }],
+          },
+        ],
+      },
+      orchestratorContract: { topology: [], quantities: { enclosure_volume_m3: { value: 0.14 } } },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    const onBoardIds = new Set(result.components.map((c) => c.wordId))
+    for (const id of [
+      'battery_module_racks_word',
+      'battery_modules_word',
+      'smoke_detectors_word',
+      'gas_sensors_word',
+      'hydrogen_detection_sensor_word',
+      'ethernet_switch_word',
+      'local_hmi_display_word',
+    ]) {
+      expect(offBoardIds.has(id)).toBe(true)
+      expect(onBoardIds.has(id)).toBe(false)
+    }
+    expect(onBoardIds.has('status_indicator_leds_word')).toBe(true)
+    expect(onBoardIds.has('dc_dc_converters_word')).toBe(true)
+    // No SOIC sensor_ic / battery JST litter on the control board.
+    const mainAto = readFileSync(result.mainAtoPath, 'utf8')
+    expect(mainAto).not.toMatch(/smoke_detectors_word/)
+    expect(mainAto).not.toMatch(/battery_module/)
+
+    // proveCatch: the nine plant assemblies that capped 0447 PCB as ELECTRONIC
+    // gaps must also disposition off-board when the collector sees them.
+    const plantGapDesign = {
+      isInstrumentDevice: false,
+      parsedBrief: { product_class: 'energy_storage', product_description: 'Wall ESS' },
+      moduleDecomposition: {
+        modules: [{
+          module: 'safety_protection',
+          sub_modules: [{
+            id: 'safety_protection__plant',
+            words: [
+              { id: 'power_semiconductors_word', name_human: 'Power Semiconductors', content_character: { character_id: 'power_semiconductors' }, modifier_characters: [{ kind: 'form', value: 'IGBT power semiconductors in PCS' }] },
+              { id: 'power_conversion_system_pcs_word', name_human: 'Power Conversion System PCS', content_character: { character_id: 'power_conversion_system_pcs' }, modifier_characters: [{ kind: 'form', value: 'PCS inverter with wi-fi gateway' }] },
+              { id: 'auxiliary_power_supply_word', name_human: 'Auxiliary Power Supply', content_character: { character_id: 'auxiliary_power_supply' }, modifier_characters: [{ kind: 'form', value: 'Auxiliary power supply with fuse' }] },
+              { id: 'fire_suppression_system_word', name_human: 'Fire Suppression System', content_character: { character_id: 'fire_suppression_system' }, modifier_characters: [{ kind: 'form', value: 'Fire suppression system with fuse-backed release' }] },
+              { id: 'arc_fault_detection_word', name_human: 'Arc Fault Detection', content_character: { character_id: 'arc_fault_detection' }, modifier_characters: [{ kind: 'form', value: 'Arc fault detection module with fuse' }] },
+              { id: 'gas_detection_system_word', name_human: 'Gas Detection System', content_character: { character_id: 'gas_detection_system' }, modifier_characters: [{ kind: 'form', value: 'Gas detection system with fuse' }] },
+              { id: 'status_indicator_leds_word', name_human: 'Status Indicator LEDs', content_character: { character_id: 'status_indicator_leds' }, modifier_characters: [{ kind: 'quantity', value: '×2' }] },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const gapOut = makeTmpDir('atopile-wall-ess-gaps-')
+    tmpDirs.push(gapOut)
+    const gapResult = generateAtopileProject(plantGapDesign, gapOut)
+    const gapOff = new Set(gapResult.offBoard.map((r) => r.wordId))
+    for (const id of [
+      'power_semiconductors_word',
+      'power_conversion_system_pcs_word',
+      'auxiliary_power_supply_word',
+      'fire_suppression_system_word',
+      'arc_fault_detection_word',
+      'gas_detection_system_word',
+    ]) {
+      expect(gapOff.has(id)).toBe(true)
+    }
+    expect(gapResult.unresolved.filter((u) => [
+      'power_semiconductors_word',
+      'fire_suppression_system_word',
+      'arc_fault_detection_word',
+    ].includes(u.wordId))).toEqual([])
   })
 
   it('a design with an unrecognisable electronic word lands honestly in unresolved[]', () => {

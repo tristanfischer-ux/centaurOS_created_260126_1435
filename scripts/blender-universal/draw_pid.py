@@ -3781,6 +3781,15 @@ def generate_pid(out_dir: str, state_path: Optional[str] = None,
         print(f"[pid] instrument-clustering invariant: {instrument_clustering['verdict']}")
 
     svg_text = build_pid_svg(proc)
+    # Stamp the settled parts-manifest fingerprint so G16 can prove P&ID shares
+    # the same generation as the GA / Blender views (2026-07-14 drawing-set QC).
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(out_dir)
+        if _fp:
+            svg_text = embed_svg_placement_fp(svg_text, _fp)
+    except Exception as _fpe:  # noqa: BLE001
+        print(f"[pid] placement_fp stamp skipped: {_fpe}")
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)

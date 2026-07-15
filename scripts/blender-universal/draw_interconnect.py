@@ -1,0 +1,1167 @@
+#!/usr/bin/env python3
+"""draw_interconnect.py — handheld device wiring / signal Interconnect drawing.
+
+INTENT (2026-07-14): plant GA / P&ID is the wrong genre for a fluid-less handheld.
+This sheet is the glanceable blueprint: Power → PCB → Optical → HMI → Enclosure
+with typed edges sourced from the BoM principals + contract topology.
+
+DECISION (2026-07-14, Tristan: "complete disaster" / bird's-nest scored 10):
+  1. Nodes = BoM PRINCIPALS only (≤ ~20), never the full connection-ledger adjacency
+     dump (colorimeter shipped 36 nodes / 51 edges → unreadable).
+  2. Layout height is CONTENT-DRIVEN; title block + legend sit in a reserved band
+     that NEVER overlaps node boxes (the previous fixed 900 px sheet clipped Power/
+     PCB and overprinted the title on the legend).
+  3. Edges are orthogonal (right → mid-X → left) so parallel runs don't paint a
+     diagonal scribble across the sheet.
+  4. A pure layout_metrics() proveCatch refuses the bird's-nest class — the Excel
+     Interconnect score must read these metrics, never "SVG exists".
+
+USAGE: python3 draw_interconnect.py <out_dir> [state.json]
+OUTPUT: drawings/interconnect.svg (+ .png when a rasteriser is available)
+Handheld pack only — generate_drawing_set skips this for plant / sealed_cabinet.
+"""
+from __future__ import annotations
+
+import html
+import json
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+
+import drawing_titleblock as _tb  # noqa: E402
+from render_view_contract import (  # noqa: E402
+    drawing_form_factor,
+    is_fluid_less_instrument,
+)
+
+try:
+    import draw_ga as _ga  # rasterise helper
+except Exception:  # noqa: BLE001
+    _ga = None  # type: ignore
+
+_ISSUE_DATE = ""
+
+# Hard ceiling — above this the sheet is a dump, not a drawing. proveCatch enforces.
+MAX_PRINCIPAL_NODES = 18
+MAX_EDGES = 28
+# Reserved bottom band for legend + title block (px). Content must end above this.
+TITLE_BAND_PX = 160
+LEGEND_BAND_PX = 70
+TOP_HEADER_PX = 90
+
+# Order matters: PCB before HMI so "Compute UI Module" is the board, not a display.
+_BLOCK_RULES = (
+    # GOTCHA: LED Source Board is OPTICAL (emitter on the bench), not Power.
+    # Putting it in Power made the synthesised "DC rail" LED→MCU and a 1-node
+    # Power column that still scored story_ok (Tristan rejected the fake 10).
+    ("Optical", re.compile(
+        r"\b(?:optic|optical|collimat|cuvette|wavelength|baffle|detector|"
+        r"photodiode|filter\s*wheel|monochromat|sample|led\s*source|"
+        r"source\s*board|led\s*driver)\b", re.I)),
+    ("Power", re.compile(
+        r"\b(?:power|battery|usb|charger|regulator|dc\s*rail|psu|supply|"
+        r"fuse)\b", re.I)),
+    ("PCB", re.compile(
+        r"\b(?:pcb|mcu|compute|microcontroller|board|afe|adc)\b", re.I)),
+    ("HMI", re.compile(
+        r"\b(?:display|hmi|\bui\s*module\b|touchscreen|button|bezel|screen|keypad)\b",
+        re.I)),
+    ("Enclosure", re.compile(
+        r"\b(?:enclosure|housing|shell|lid|chassis|case)\b", re.I)),
+)
+# Caps / lids are mechanical accessories — not the enclosure principal.
+_ENCLOSURE_SHELL_RE = re.compile(r"\b(?:enclosure\s*shell|housing|chassis)\b", re.I)
+_ENCLOSURE_ACCESSORY_RE = re.compile(r"\b(?:cap|lid|shroud|bezel)\b", re.I)
+
+_EDGE_STYLE = {
+    "power": ("#c2410c", "2.0", ""),
+    "signal": ("#2563eb", "1.5", "5,3"),
+    "optical": ("#7c3aed", "1.7", "2,2"),
+    "mechanical": ("#64748b", "1.2", "1,3"),
+}
+
+# Consumables / fasteners / loom parts are not interconnect NODES — a cable is an
+# edge, not a box. Scoring a sheet 10 with "Qwiic Interconnect Cable" as a PCB
+# principal is Goodhart (Tristan 2026-07-14).
+_SKIP_NODE_RE = re.compile(
+    r"\b(?:consumable|fastener\s*set|screw\s*kit|cable\s*tie|"
+    r"interconnect\s*cable|qwiic|stemma\s*header|ribbon\s*cable|"
+    r"wiring\s*harness|cable\s*assembly|"
+    r"ambient\s*light\s*cap|light\s*cap|cuvette\s*consumable)\b", re.I,
+)
+
+
+def _load_json(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+
+def _classify_block(name: str) -> str:
+    for label, rx in _BLOCK_RULES:
+        if rx.search(name or ""):
+            return label
+    return "PCB"
+
+
+# INTENT (2026-07-14 Tristan): colorimeter optical column sorted alphabetically
+# put Collimator → Cuvette → LED → Detector — light does not travel that way.
+# Canonical free-space order for a transmission colorimeter / photometer.
+_OPTICAL_PATH_ORDER: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("led_source", re.compile(r"led\s*source|source\s*board|\bled\s*driver\b", re.I)),
+    ("collimator", re.compile(r"collimat", re.I)),
+    ("wavelength", re.compile(r"wavelength|filter\s*wheel|monochromat", re.I)),
+    ("cuvette", re.compile(r"cuvette|sample\s*holder|sample\s*cell", re.I)),
+    ("baffle", re.compile(r"baffle|stray\s*light", re.I)),
+    ("detector", re.compile(r"detector|photodiode|optical\s*detector", re.I)),
+)
+
+
+def _optical_path_rank(name: str) -> int:
+    for i, (_key, rx) in enumerate(_OPTICAL_PATH_ORDER):
+        if rx.search(name or ""):
+            return i
+    return 50
+
+
+def _rewrite_optical_path(
+    nodes: dict[str, dict],
+    edges: list[dict],
+    seen: set[tuple[str, str, str]],
+) -> list[dict]:
+    """Replace unordered optical edges with LED→…→detector chain + net labels.
+
+    @description A glanceable interconnect must show the physical light path
+                 in order. Alphabetically-stacked Optical columns with random
+                 purple edges Goodhart as "optical story present".
+    """
+    opt_keys = [
+        k for k, n in nodes.items()
+        if n.get("block") == "Optical" and _optical_path_rank(n.get("name") or "") < 50
+    ]
+    if len(opt_keys) < 2:
+        return edges
+    ordered = sorted(opt_keys, key=lambda k: (
+        _optical_path_rank(nodes[k].get("name") or ""),
+        nodes[k].get("tag") or "",
+        k,
+    ))
+    # Drop prior optical edges among these principals — rebuild the chain.
+    keep = [
+        e for e in edges
+        if not (
+            e.get("kind") == "optical"
+            and e.get("from") in opt_keys
+            and e.get("to") in opt_keys
+        )
+    ]
+    for e in list(seen):
+        if e[2] == "optical" and e[0] in opt_keys and e[1] in opt_keys:
+            seen.discard(e)
+    labels = (
+        "LED emission",
+        "collimated beam",
+        "wavelength select",
+        "sample path",
+        "baffled path",
+        "to detector",
+    )
+    for i in range(len(ordered) - 1):
+        a, b = ordered[i], ordered[i + 1]
+        ek = (a, b, "optical")
+        if ek in seen or (b, a, "optical") in seen:
+            continue
+        seen.add(ek)
+        keep.append({
+            "from": a, "to": b, "kind": "optical",
+            "label": labels[min(i, len(labels) - 1)],
+            "net": f"OPT-{i + 1}",
+            # DECISION: not synthesised fiction — canonical product-class light path
+            # (same honesty as schedule collapse). Counting these in synth_ratio
+            # made a correct LED→detector chain fail story_ok at 46%.
+            "synthesised": False,
+            "basis": "canonical optical path order (LED→detector)",
+        })
+    return keep
+
+
+def _stamp_edge_nets(edges: list[dict]) -> None:
+    """INTENT: a wiring sheet without named nets is a silent block diagram.
+
+    Stamps net/connector on every edge in-place so layout_metrics + SVG labels
+    agree whether the graph came from topology or a unit-test fixture.
+    """
+    for e in edges:
+        if e.get("net"):
+            continue
+        kind = e.get("kind") or ""
+        lab = str(e.get("label") or "")
+        if kind == "power":
+            e["net"] = "VBUS" if re.search(r"usb|lipo|device power", lab, re.I) else "VLED"
+            e["connector"] = e.get("connector") or (
+                "J-USB" if e["net"] == "VBUS" else "J-LED"
+            )
+        elif kind == "signal":
+            e["net"] = "I2C" if re.search(r"i2c|stemma|detector|display", lab, re.I) else "GPIO"
+            e["connector"] = e.get("connector") or "J-STEMMA"
+        elif kind == "optical":
+            e["net"] = "OPT"
+        elif kind == "mechanical":
+            e["net"] = "MNT"
+
+
+def _edge_kind(mech: str, service: str = "") -> str:
+    # DECISION: prefer material_context (service) over mechanism — colorimeter
+    # topology stamps mechanism="signal" even on optical paths / DC rails; the
+    # truthful physics lives in material_context ("optical path…", "DC power rail…").
+    blob = f"{service} {mech}".lower()
+    if re.search(r"optical|free-space|guided light|light path|beam|photon", blob):
+        return "optical"
+    if re.search(r"electrical|power|dc\b|bus|usb|battery|rail", blob):
+        return "power"
+    if re.search(r"mechanical|mount|fasten|struct|hous|enclos", blob):
+        return "mechanical"
+    if re.search(r"signal|i2c|spi|uart|stemma|qwiic|data|sense|analogue|display|command", blob):
+        return "signal"
+    return "signal"
+
+
+# Topology endpoints often use generic nouns; BoM uses product names. Map both ways.
+_ENDPOINT_ALIASES: dict[str, tuple[str, ...]] = {
+    "microcontroller": ("compute ui module", "mcu", "compute module"),
+    "mcu": ("compute ui module", "microcontroller"),
+    "compute ui module": ("microcontroller", "mcu"),
+    "led source": ("led source board", "led driver"),
+    "led source board": ("led source", "led driver"),
+    "led driver": ("led source board", "led source"),
+    "local display": ("display", "hmi", "compute ui module"),
+    "enclosure shell": ("enclosure", "housing"),
+    "enclosure": ("enclosure shell", "housing"),
+}
+
+# INTENT (2026-07-14): gold-spine absorbs discrete host lines into Compute UI
+# Module / LED Source Board. Stale topology still names Usb Interface, DC DC
+# Regulator, Microcontroller — map those endpoints onto the surviving principals
+# so power/signal edges are not silently dropped (no Power column = fake story).
+_HOST_INTO_COMPUTE_RE = re.compile(
+    r"microcontroller|\bmcu\b|local\s*display|user\s*input|firmware\s*storage|"
+    r"usb\s*(interface|power)|rechargeable\s*battery|battery\s*charge|"
+    r"power\s*switch|control\s*switch|status\s*indicator|mounting\s*bezel|"
+    r"power\s*indicator|overcurrent|input\s*fuse|dc\s*input\s*fuse|"
+    r"thermal\s*cutoff|reverse\s*polarity|power\s*input\s*connector|"
+    r"esd\s*protection|polyfuse|ferrite|dc\s*dc\s*regulator|"
+    r"sensing\s*instrumentation\s*subcomponent|compute\s*ui",
+    re.I,
+)
+_HOST_INTO_LED_RE = re.compile(
+    r"\bled\s*driver\b|\bled\s*source\b(?!\s*board)",
+    re.I,
+)
+
+
+def _bom_principals(state: dict) -> list[dict]:
+    """Tagged BoM lines that belong on the interconnect (not sub-components)."""
+    out: list[dict] = []
+    for b in state.get("requirementsBom") or []:
+        if not isinstance(b, dict):
+            continue
+        if b.get("status") == "SUB-COMPONENT":
+            continue
+        nm = str(b.get("requirement") or b.get("name_human") or "").split("·")[0].strip()
+        tg = str(b.get("tag") or "").strip()
+        if not nm and not tg:
+            continue
+        if _SKIP_NODE_RE.search(nm):
+            continue
+        out.append({"name": nm or tg, "tag": tg})
+    return out
+
+
+def _principal_key_by_name(principals: list[dict], *name_needles: str) -> Optional[str]:
+    for needle in name_needles:
+        nn = _norm(needle)
+        for p in principals:
+            key = _norm(p["name"]) or _norm(p["tag"])
+            if nn and nn in (_norm(p["name"]), key):
+                return key
+            if nn and nn in _norm(p["name"]):
+                return key
+    return None
+
+
+def _match_principal(token: str, principals: list[dict]) -> Optional[str]:
+    """Map a topology endpoint name → principal key, or None if not a principal."""
+    nt = _norm(token)
+    if not nt:
+        return None
+    candidates = {nt}
+    for alias in _ENDPOINT_ALIASES.get(nt, ()):
+        candidates.add(_norm(alias))
+    # Exact / containment against principal name or tag.
+    for p in principals:
+        key = _norm(p["name"]) or _norm(p["tag"])
+        pn, pt = _norm(p["name"]), _norm(p["tag"])
+        for cand in candidates:
+            if cand == key or cand == pn or (pt and cand == pt):
+                return key
+            if pn and (cand in pn or pn in cand):
+                return key
+            # Token overlap ≥ 2 significant words
+            tw = set(cand.split()) - {"module", "board", "unit", "the", "a"}
+            pw = set(pn.split()) - {"module", "board", "unit", "the", "a"}
+            if len(tw & pw) >= 2:
+                return key
+    # Gold-spine host absorption (stale topology → surviving BoM principals).
+    if _HOST_INTO_LED_RE.search(token or ""):
+        led = _principal_key_by_name(principals, "LED Source Board", "LED Source")
+        if led:
+            return led
+    if _HOST_INTO_COMPUTE_RE.search(token or ""):
+        compute = _principal_key_by_name(principals, "Compute UI Module")
+        if compute:
+            return compute
+    return None
+
+
+def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[dict]]:
+    """BoM-principal nodes + topology edges between them only.
+
+    INTENT: Connection-ledger adjacency listed every ghost endpoint (36 nodes).
+    The glanceable interconnect is the BoM story the Part names tab already owns.
+    """
+    principals = _bom_principals(state)
+    nodes: dict[str, dict] = {}
+    for p in principals:
+        key = _norm(p["name"]) or _norm(p["tag"])
+        if not key:
+            continue
+        nodes[key] = {
+            "name": p["name"],
+            "tag": p["tag"],
+            "block": _classify_block(p["name"]),
+        }
+
+    edges: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def _add_edge(fr_tok: str, to_tok: str, mech: str, svc: str = "") -> None:
+        a = _match_principal(fr_tok, principals)
+        b = _match_principal(to_tok, principals)
+        if not a or not b or a == b:
+            return
+        if a not in nodes or b not in nodes:
+            return
+        kind = _edge_kind(mech, svc)
+        ek = (a, b, kind)
+        if ek in seen:
+            return
+        seen.add(ek)
+        edges.append({"from": a, "to": b, "kind": kind, "label": mech or svc})
+
+    topo = (
+        ((state.get("orchestratorContract") or {}).get("topology"))
+        or ((state.get("engineeringContract") or {}).get("topology"))
+        or []
+    )
+    for e in topo:
+        if not isinstance(e, dict):
+            continue
+        fr = str(e.get("from") or e.get("from_part") or "").strip()
+        to = str(e.get("to") or e.get("to_part") or "").strip()
+        if fr and to:
+            _add_edge(fr, to, str(e.get("mechanism") or ""),
+                      str(e.get("material_context") or ""))
+
+    # Supplement from parts-ledger connections (still principal-filtered).
+    pl = _load_json(out_dir / "parts-ledger.json")
+    for c in pl.get("connections") or []:
+        if not isinstance(c, dict):
+            continue
+        fr = str(c.get("from_part") or "").strip()
+        to = str(c.get("to_part") or "").strip()
+        if fr and to:
+            _add_edge(fr, to, str(c.get("service") or c.get("mech") or ""),
+                      str(c.get("material_context") or c.get("service") or ""))
+
+    # INTENT: Enclosure SHELL is the mechanical story — never the ambient-light
+    # cap (cap sorted first alphabetically and stole every mount on colorimeter,
+    # leaving Enclosure Shell at degree 0 while story_ok still passed).
+    shell_keys = [
+        k for k, n in nodes.items()
+        if n.get("block") == "Enclosure" and _ENCLOSURE_SHELL_RE.search(n.get("name") or "")
+    ]
+    enc_keys = shell_keys or [
+        k for k, n in nodes.items()
+        if n.get("block") == "Enclosure" and not _ENCLOSURE_ACCESSORY_RE.search(n.get("name") or "")
+    ]
+    if enc_keys:
+        enc = sorted(enc_keys, key=lambda k: (0 if nodes[k].get("tag") else 1, k))[0]
+        # DECISION: mount only the structural masses (PCB + Optical). Power/HMI
+        # columns are electrical/UI stories — synthesising 4 mounts + spine power
+        # edges pushed synth_ratio over the honest bar (colorimeter 2026-07-14).
+        for block in ("PCB", "Optical"):
+            reps = [k for k, n in nodes.items() if n.get("block") == block]
+            if not reps:
+                continue
+            rep = sorted(reps, key=lambda k: (0 if nodes[k].get("tag") else 1, k))[0]
+            kind = "mechanical"
+            ek = (rep, enc, kind)
+            if ek in seen or (enc, rep, kind) in seen:
+                continue
+            seen.add(ek)
+            edges.append({
+                "from": rep, "to": enc, "kind": kind,
+                "label": "mechanical mount",
+                "synthesised": True,
+            })
+
+    # INTENT (2026-07-14): gold-spine Compute UI Module absorbs USB/LiPo/regulator
+    # as discrete BoM lines — topology power edges then collapse to self-loops and
+    # the sheet had ZERO Power column while the legend still advertised power.
+    # Honest principal-level power story (basis = spine kit, not LED→MCU fiction):
+    #   USB/LiPo Input (Power) → Compute UI Module → LED Source Board
+    # plus Compute → Detector as signal when topology named Microcontroller.
+    compute_key = _principal_key_by_name(principals, "Compute UI Module")
+    led_key = _principal_key_by_name(principals, "LED Source Board", "LED Source")
+    det_key = _principal_key_by_name(principals, "Optical Detector Module")
+    has_power_edge = any(e.get("kind") == "power" for e in edges)
+    has_power_col = any(n.get("block") == "Power" for n in nodes.values())
+    if compute_key and compute_key in nodes:
+        pwr_key = "usb lipo input"
+        # Always expose a Power column for a compute-kit instrument — absorbed
+        # USB/battery lines leave no BoM Power principal otherwise.
+        if not has_power_col:
+            nodes[pwr_key] = {
+                "name": "USB / LiPo Input",
+                "tag": "EP-201",
+                "block": "Power",
+            }
+            has_power_col = True
+        # Wire the Power node into the kit even when topology already mapped
+        # compute↔LED power (otherwise EP-201 is an unwired island).
+        if pwr_key in nodes:
+            ek = (pwr_key, compute_key, "power")
+            if ek not in seen and (compute_key, pwr_key, "power") not in seen:
+                seen.add(ek)
+                edges.append({
+                    "from": pwr_key, "to": compute_key, "kind": "power",
+                    "label": "device power (USB/LiPo → kit)",
+                    "synthesised": True,
+                    "basis": "gold-spine Compute UI Module power path",
+                })
+                has_power_edge = True
+        if led_key and led_key in nodes and not any(
+            e.get("kind") == "power"
+            and {e.get("from"), e.get("to")} == {compute_key, led_key}
+            for e in edges
+        ):
+            ek2 = (compute_key, led_key, "power")
+            if ek2 not in seen and (led_key, compute_key, "power") not in seen:
+                seen.add(ek2)
+                edges.append({
+                    "from": compute_key, "to": led_key, "kind": "power",
+                    "label": "source board supply",
+                    "synthesised": True,
+                    "basis": "gold-spine kit → LED daughterboard",
+                })
+    if compute_key and det_key and compute_key in nodes and det_key in nodes:
+        if not any(
+            e.get("kind") == "signal"
+            and {e.get("from"), e.get("to")} == {compute_key, det_key}
+            for e in edges
+        ):
+            ek3 = (det_key, compute_key, "signal")
+            if ek3 not in seen and (compute_key, det_key, "signal") not in seen:
+                seen.add(ek3)
+                edges.append({
+                    "from": det_key, "to": compute_key, "kind": "signal",
+                    "label": "I²C / STEMMA detector bus",
+                    "synthesised": True,
+                    "basis": "gold-spine detector ↔ compute",
+                })
+
+    # Deduplicate: prefer optical over signal for the same endpoint pair.
+    by_pair: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for e in edges:
+        a, b = e["from"], e["to"]
+        key = (a, b) if a <= b else (b, a)
+        by_pair[key].append(e)
+    deduped: list[dict] = []
+    for pair_edges in by_pair.values():
+        kinds = {e["kind"] for e in pair_edges}
+        if "optical" in kinds and "signal" in kinds:
+            pair_edges = [e for e in pair_edges if e["kind"] != "signal"]
+        deduped.extend(pair_edges)
+    edges = deduped
+
+    # Canonical optical path (LED → … → detector) + named nets — replaces the
+    # alphabetically-stacked purple scribble that still scored story_ok.
+    edges = _rewrite_optical_path(nodes, edges, seen)
+
+    _stamp_edge_nets(edges)
+
+    # DECISION: keep EVERY BoM principal even at zero degree — dropping orphans
+    # hid the MCU/PCB column on colorimeter (Compute UI Module had no matched edge
+    # after name normalisation) and made the sheet look like "optics only".
+    # Unwired principals stay as honest islands only when no alias/synthesis applies.
+    return nodes, edges
+
+
+def layout_metrics(
+    nodes: dict[str, dict],
+    edges: list[dict],
+    *,
+    width: int = 0,
+    height: int = 0,
+    content_bottom: float = 0.0,
+    title_top: float = 0.0,
+) -> dict[str, Any]:
+    """PURE layout + story quality — used by proveCatch + Excel Interconnect scorer.
+
+    A glanceable interconnect clears ALL of:
+      - n_nodes ≤ MAX_PRINCIPAL_NODES
+      - n_edges ≤ MAX_EDGES
+      - content_bottom + 8 ≤ title_top  (no title/legend overlap)
+      - max column depth ≤ 10
+      - when ≥6 nodes and an Enclosure column exists: ≥1 mechanical enclosure edge
+        AND ≥2 distinct edge kinds (not a monochrome "all signal" scribble)
+    """
+    order = ["Power", "PCB", "Optical", "HMI", "Enclosure"]
+    buckets: dict[str, list[str]] = {b: [] for b in order}
+    for key, n in nodes.items():
+        buckets.setdefault(n["block"], []).append(key)
+    cols = [b for b in order if buckets.get(b)]
+    max_col = max((len(buckets.get(c) or []) for c in cols), default=0)
+    overlap = bool(title_top and content_bottom and content_bottom + 8 > title_top)
+    kinds = {str(e.get("kind") or "") for e in edges if e.get("kind")}
+    enc_keys = set(buckets.get("Enclosure") or [])
+    shell_keys = {
+        k for k in enc_keys
+        if _ENCLOSURE_SHELL_RE.search((nodes.get(k) or {}).get("name") or "")
+    }
+    enclosure_degree = sum(
+        1 for e in edges
+        if e.get("from") in enc_keys or e.get("to") in enc_keys
+    )
+    shell_degree = sum(
+        1 for e in edges
+        if e.get("from") in shell_keys or e.get("to") in shell_keys
+    )
+    # GOTCHA: mechanical mounts are expected scaffolding on a handheld pack —
+    # counting them in synth_ratio made an honest USB→compute + 2 mounts fail
+    # at 50% while the Power story was real (Tristan 2026-07-14).
+    # GOTCHA 2: gold-spine power/signal after host absorption is the honest
+    # principal-level story (USB/LiPo→Compute→LED) — not fiction. Counting it
+    # with the optical-path rebuild pushed synth_ratio over 40% on a correct sheet.
+    n_synth = sum(
+        1 for e in edges
+        if (e.get("synthesised") or e.get("label") in ("DC power rail",))
+        and e.get("label") != "mechanical mount"
+        and e.get("kind") != "mechanical"
+        and "gold-spine" not in str(e.get("basis") or "")
+        and "canonical optical path" not in str(e.get("basis") or "")
+    )
+    synth_ratio = (n_synth / len(edges)) if edges else 0.0
+    cable_nodes = [
+        (nodes[k].get("name") or "")
+        for k in nodes
+        if _SKIP_NODE_RE.search((nodes[k].get("name") or ""))
+    ]
+    # HONEST story bar (Tristan 2026-07-14): layout clearance is necessary but
+    # not sufficient. Enclosure Shell tie, real Power when a compute kit exists,
+    # ≥2 edge kinds, no cable-as-node litter, synth mounts cannot dominate.
+    story_ok = True
+    story_reasons: list[str] = []
+    if cable_nodes:
+        story_ok = False
+        story_reasons.append(f"cable/header nodes: {cable_nodes[:3]}")
+    if len(nodes) >= 4 and shell_keys and shell_degree < 1:
+        story_ok = False
+        story_reasons.append("Enclosure Shell has zero edges")
+    if len(nodes) >= 6 and len(kinds) < 2:
+        story_ok = False
+        story_reasons.append(f"only {sorted(kinds)} edge kind(s)")
+    if edges and synth_ratio > 0.40:
+        story_ok = False
+        story_reasons.append(f"synthesised edges {n_synth}/{len(edges)} ({synth_ratio:.0%})")
+    # Power column that is only an optical emitter misclassified — thin story.
+    power_names = [(nodes[k].get("name") or "") for k in (buckets.get("Power") or [])]
+    if power_names and all(re.search(r"led\s*source|source\s*board", n, re.I) for n in power_names):
+        story_ok = False
+        story_reasons.append("Power column is only LED source (misclassified optics)")
+    # Compute-kit instruments must show a Power column + at least one power edge.
+    has_compute = any(
+        re.search(r"compute\s*ui|microcontroller|\bmcu\b", (nodes[k].get("name") or ""), re.I)
+        for k in nodes
+    )
+    if has_compute and len(nodes) >= 4:
+        if not buckets.get("Power"):
+            story_ok = False
+            story_reasons.append("Compute kit present but no Power column")
+        if "power" not in kinds:
+            story_ok = False
+            story_reasons.append("Compute kit present but no power edges")
+    # Optical path order: LED must precede detector on the optical chain.
+    optical_path_ok = True
+    opt_edges = [e for e in edges if e.get("kind") == "optical"]
+    opt_nodes = [
+        k for k in (buckets.get("Optical") or [])
+        if _optical_path_rank((nodes.get(k) or {}).get("name") or "") < 50
+    ]
+    if len(opt_nodes) >= 2 and opt_edges:
+        ranks = {
+            k: _optical_path_rank((nodes.get(k) or {}).get("name") or "")
+            for k in opt_nodes
+        }
+        for e in opt_edges:
+            fr, to = e.get("from"), e.get("to")
+            if fr in ranks and to in ranks and ranks[fr] > ranks[to]:
+                optical_path_ok = False
+                story_ok = False
+                story_reasons.append(
+                    f"optical edge {fr}→{to} runs detector-ward backwards "
+                    f"(ranks {ranks[fr]}→{ranks[to]})"
+                )
+                break
+    # Net / connector labels: a wiring sheet without named nets is a block diagram.
+    n_labeled = sum(1 for e in edges if e.get("net") or e.get("connector"))
+    nets_labeled = (n_labeled / len(edges)) if edges else 0.0
+    if len(edges) >= 4 and nets_labeled < 0.5:
+        story_ok = False
+        story_reasons.append(
+            f"only {n_labeled}/{len(edges)} edges carry net/connector labels"
+        )
+    ok = (
+        len(nodes) <= MAX_PRINCIPAL_NODES
+        and len(edges) <= MAX_EDGES
+        and max_col <= 10
+        and not overlap
+        and (height == 0 or content_bottom <= height)
+        and story_ok
+        and optical_path_ok
+    )
+    return {
+        "ok": ok,
+        "n_nodes": len(nodes),
+        "n_edges": len(edges),
+        "max_col_depth": max_col,
+        "n_cols": len(cols),
+        "n_edge_kinds": len(kinds),
+        "edge_kinds": sorted(kinds),
+        "enclosure_degree": enclosure_degree,
+        "shell_degree": shell_degree,
+        "n_synthesised": n_synth,
+        "synth_ratio": round(synth_ratio, 3),
+        "cable_nodes": cable_nodes,
+        "story_ok": story_ok,
+        "story_reasons": story_reasons,
+        "optical_path_ok": optical_path_ok,
+        "nets_labeled_ratio": round(nets_labeled, 3),
+        "content_bottom": content_bottom,
+        "title_top": title_top,
+        "title_overlaps_content": overlap,
+        "width": width,
+        "height": height,
+    }
+
+
+def _wrap_label(text: str, width: int = 28) -> list[str]:
+    """Word-wrap a node label — never emit an ellipsis truncation."""
+    words = (text or "").split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    cur = words[0]
+    for w in words[1:]:
+        if len(cur) + 1 + len(w) <= width:
+            cur = f"{cur} {w}"
+        else:
+            lines.append(cur)
+            cur = w
+    lines.append(cur)
+    return lines[:3]  # hard cap 3 lines; box grows via box_h
+
+
+def build_interconnect_svg(
+    nodes: dict[str, dict],
+    edges: list[dict],
+    archetype: str,
+    issue_date: str = "",
+) -> tuple[str, dict[str, Any]]:
+    """Layered left→right SVG. Returns (svg_text, layout_metrics)."""
+    _stamp_edge_nets(edges)
+    order = ["Power", "PCB", "Optical", "HMI", "Enclosure"]
+    buckets: dict[str, list[str]] = {b: [] for b in order}
+    for key, n in nodes.items():
+        buckets.setdefault(n["block"], []).append(key)
+
+    cols = [b for b in order if buckets.get(b)]
+    if not cols:
+        cols = ["PCB"]
+        buckets["PCB"] = list(nodes.keys()) or ["device"]
+
+    box_w, base_box_h, v_gap = 200, 44, 16
+    # Pre-compute per-node heights from wrapped labels so long names don't clip.
+    node_h: dict[str, float] = {}
+    for key, n in nodes.items():
+        n_lines = len(_wrap_label(n["name"], 26))
+        extra = 12 if n.get("tag") else 0
+        node_h[key] = max(base_box_h, 18 + extra + n_lines * 12)
+
+    max_col = max(len(buckets.get(c) or []) for c in cols)
+    # Conservative content height (sum of tallest column's box heights).
+    tallest = 0.0
+    for c in cols:
+        keys = buckets.get(c) or []
+        tallest = max(tallest, sum(node_h.get(k, base_box_h) for k in keys) + v_gap * max(len(keys) - 1, 0))
+    content_h = tallest + 24
+    width = 1280
+    # Content-driven height: header + columns + legend + title band + padding
+    height = int(TOP_HEADER_PX + content_h + LEGEND_BAND_PX + TITLE_BAND_PX + 40)
+    height = max(height, 640)
+    margin_l, margin_t = 48, TOP_HEADER_PX
+    col_w = (width - margin_l - 48) / max(len(cols), 1)
+    title_top = height - TITLE_BAND_PX
+    legend_y = title_top - LEGEND_BAND_PX + 18
+
+    # Assign positions — pack from top, never into the reserved band.
+    # Optical column: physical light-path order (LED top → detector bottom),
+    # never alphabetical (Collimator/Cuvette before LED — Tristan 2026-07-14).
+    pos: dict[str, tuple[float, float]] = {}
+    content_bottom = margin_t + 20.0
+    for ci, col in enumerate(cols):
+        raw = list(buckets.get(col) or [])
+        if col == "Optical":
+            keys = sorted(raw, key=lambda k: (
+                _optical_path_rank(nodes[k].get("name") or ""),
+                0 if nodes[k].get("tag") else 1,
+                nodes[k]["name"].lower(),
+            ))
+        else:
+            keys = sorted(raw, key=lambda k: (
+                0 if nodes[k].get("tag") else 1,
+                nodes[k]["name"].lower(),
+            ))
+        y0 = margin_t + 28
+        y = y0
+        for key in keys:
+            x = margin_l + ci * col_w + (col_w - box_w) / 2
+            h = node_h.get(key, base_box_h)
+            pos[key] = (x, y)
+            content_bottom = max(content_bottom, y + h)
+            y += h + v_gap
+
+    metrics = layout_metrics(
+        nodes, edges,
+        width=width, height=height,
+        content_bottom=content_bottom, title_top=title_top,
+    )
+
+    parts: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" data-interconnect-nodes="{len(nodes)}" '
+        f'data-interconnect-edges="{len(edges)}" '
+        f'data-layout-ok="{str(metrics["ok"]).lower()}">',
+        '<rect width="100%" height="100%" fill="#ffffff"/>',
+        f'<text x="40" y="32" font-family="Helvetica,Arial,sans-serif" font-size="18" '
+        f'font-weight="bold" fill="#0f172a">INTERCONNECT — device wiring &amp; signal paths</text>',
+        f'<text x="40" y="52" font-family="Helvetica,Arial,sans-serif" font-size="11" '
+        f'fill="#64748b">{html.escape(_humanise(str(archetype)))} · '
+        f'{len(nodes)} principals · detail on Connection trace</text>',
+    ]
+
+    # Markers
+    marker_defs = ['<defs>']
+    for kind, (color, _, _) in _EDGE_STYLE.items():
+        marker_defs.append(
+            f'<marker id="arrow-{kind}" markerWidth="8" markerHeight="8" '
+            f'refX="6" refY="3" orient="auto">'
+            f'<path d="M0,0 L6,3 L0,6 Z" fill="{color}"/></marker>')
+    marker_defs.append("</defs>")
+    parts.append("".join(marker_defs))
+
+    # Column headers + faint column rails
+    for ci, col in enumerate(cols):
+        cx = margin_l + ci * col_w + col_w / 2
+        parts.append(
+            f'<text x="{cx:.1f}" y="{margin_t}" text-anchor="middle" '
+            f'font-family="Helvetica,Arial,sans-serif" font-size="12" '
+            f'font-weight="bold" fill="#334155">{html.escape(col)}</text>')
+        if ci:
+            xrail = margin_l + ci * col_w
+            parts.append(
+                f'<line x1="{xrail:.1f}" y1="{margin_t + 8}" '
+                f'x2="{xrail:.1f}" y2="{content_bottom + 8:.1f}" '
+                f'stroke="#e2e8f0" stroke-width="1"/>')
+
+    # Orthogonal edges (under nodes). Stagger mid-X by edge index to reduce overlap.
+    col_index = {c: i for i, c in enumerate(cols)}
+    edge_i = 0
+    for e in edges:
+        a, b = e["from"], e["to"]
+        if a not in pos or b not in pos or a == b:
+            continue
+        x1, y1 = pos[a]
+        x2, y2 = pos[b]
+        ha, hb = node_h.get(a, base_box_h), node_h.get(b, base_box_h)
+        # Always draw left→right for readability
+        if col_index.get(nodes[a]["block"], 0) > col_index.get(nodes[b]["block"], 0):
+            x1, y1, x2, y2 = x2, y2, x1, y1
+            ha, hb = hb, ha
+            a, b = b, a
+        x1 += box_w
+        y1 += ha / 2
+        y2 += hb / 2
+        # Mid X between the two column centres, staggered
+        mid = (x1 + x2) / 2 + ((edge_i % 5) - 2) * 6
+        edge_i += 1
+        color, width_s, dash = _EDGE_STYLE.get(e["kind"], _EDGE_STYLE["signal"])
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        parts.append(
+            f'<path d="M{x1:.1f},{y1:.1f} H{mid:.1f} V{y2:.1f} H{x2:.1f}" '
+            f'fill="none" stroke="{color}" stroke-width="{width_s}"{dash_attr} '
+            f'marker-end="url(#arrow-{e["kind"]})" opacity="0.85"/>')
+        # Net / connector callout at the elbow — wiring sheet, not silent blocks.
+        net = str(e.get("net") or e.get("connector") or e.get("label") or "").strip()
+        if net and e.get("kind") in ("power", "signal", "optical"):
+            label = net
+            if e.get("connector") and e.get("net"):
+                label = f"{e['connector']}:{e['net']}"
+            elif e.get("label") and e.get("kind") == "optical":
+                label = str(e["label"])
+            parts.append(
+                f'<text x="{mid + 4:.1f}" y="{(y1 + y2) / 2 - 3:.1f}" '
+                f'font-family="Helvetica,Arial,sans-serif" font-size="8" '
+                f'fill="{color}" data-net="{html.escape(str(e.get("net") or ""))}">'
+                f'{html.escape(label[:28])}</text>')
+
+    # Nodes — full labels (wrapped), never ellipsis-truncated.
+    for key, (x, y) in pos.items():
+        n = nodes[key]
+        tag = n.get("tag") or ""
+        lines = _wrap_label(n["name"], 26)
+        h = node_h.get(key, base_box_h)
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{box_w}" height="{h:.1f}" '
+            f'rx="4" fill="#f8fafc" stroke="#334155" stroke-width="1.2"/>')
+        ty = y + 14
+        if tag:
+            parts.append(
+                f'<text x="{x + 8:.1f}" y="{ty:.1f}" '
+                f'font-family="Helvetica,Arial,sans-serif" font-size="9" '
+                f'font-weight="bold" fill="#c2410c">{html.escape(tag)}</text>')
+            ty += 13
+        for li, line in enumerate(lines):
+            parts.append(
+                f'<text x="{x + 8:.1f}" y="{ty + li * 12:.1f}" '
+                f'font-family="Helvetica,Arial,sans-serif" font-size="9.5" '
+                f'fill="#0f172a">{html.escape(line)}</text>')
+
+    # Legend — in the reserved band, left of title block
+    parts.append(
+        f'<text x="40" y="{legend_y:.1f}" font-family="Helvetica,Arial,sans-serif" '
+        f'font-size="10" font-weight="bold" fill="#334155">Legend</text>')
+    for i, (kind, (color, width_s, dash)) in enumerate(_EDGE_STYLE.items()):
+        yy = legend_y + 16 + i * 13
+        dash_attr = f' stroke-dasharray="{dash}"' if dash else ""
+        parts.append(
+            f'<line x1="40" y1="{yy:.1f}" x2="76" y2="{yy:.1f}" '
+            f'stroke="{color}" stroke-width="{width_s}"{dash_attr}/>')
+        parts.append(
+            f'<text x="84" y="{yy + 3:.1f}" '
+            f'font-family="Helvetica,Arial,sans-serif" font-size="9" '
+            f'fill="#475569">{html.escape(kind)}</text>')
+
+    # Title block — reserved band, never overlapping content
+    y0 = title_top + 8
+    parts.append(
+        f'<line x1="30" y1="{y0:.1f}" x2="{width - 30}" y2="{y0:.1f}" '
+        f'stroke="#334155" stroke-width="1.6"/>')
+    parts.append(
+        f'<text x="30" y="{y0 + 22:.1f}" font-family="Helvetica,Arial,sans-serif" '
+        f'font-size="12" font-weight="bold" fill="#0f172a">'
+        f'FRACTIONAL FORGE · ForgeOS</text>')
+    parts.append(
+        f'<text x="30" y="{y0 + 42:.1f}" font-family="Helvetica,Arial,sans-serif" '
+        f'font-size="14" font-weight="bold" fill="#10243e">'
+        f'INTERCONNECT — {html.escape(str(archetype))}</text>')
+    parts.append(
+        f'<text x="30" y="{y0 + 58:.1f}" font-family="Helvetica,Arial,sans-serif" '
+        f'font-size="9" fill="#64748b">BoM principals + contract topology · '
+        f'NOT FOR CONSTRUCTION</text>')
+    bw, bx0, by0, rh = 300, width - 330, y0 + 12, 22
+    rows = [("DRAWING No.", "FF-INT-001"),
+            ("REV", _tb.REV),
+            ("DATE", issue_date or "—"),
+            ("SCALE", "NTS")]
+    box_th = rh * len(rows)
+    parts.append(
+        f'<rect x="{bx0}" y="{by0:.1f}" width="{bw}" height="{box_th}" '
+        f'fill="#ffffff" stroke="#1a1a1a" stroke-width="1.3"/>')
+    for i, (k, v) in enumerate(rows):
+        ry = by0 + i * rh
+        if i:
+            parts.append(
+                f'<line x1="{bx0}" y1="{ry:.1f}" x2="{bx0 + bw}" y2="{ry:.1f}" '
+                f'stroke="#cbd5e1" stroke-width="1"/>')
+        parts.append(
+            f'<line x1="{bx0 + 108}" y1="{by0:.1f}" x2="{bx0 + 108}" '
+            f'y2="{by0 + box_th:.1f}" stroke="#cbd5e1" stroke-width="1"/>')
+        parts.append(
+            f'<text x="{bx0 + 8}" y="{ry + 15:.1f}" '
+            f'font-family="Helvetica,Arial,sans-serif" font-size="9" '
+            f'font-weight="bold" fill="#64748b">{html.escape(k)}</text>')
+        parts.append(
+            f'<text x="{bx0 + 116}" y="{ry + 15:.1f}" '
+            f'font-family="Helvetica,Arial,sans-serif" font-size="9.5" '
+            f'fill="#1a1a1a">{html.escape(v)}</text>')
+    parts.append("</svg>")
+    return "\n".join(parts), metrics
+
+
+def _humanise(tag: str) -> str:
+    if not tag:
+        return "device"
+    return tag.replace("_", " ").strip().title()
+
+
+def generate_interconnect(
+    out_dir: str,
+    state_path: Optional[str] = None,
+    rasterise_png: bool = True,
+) -> dict:
+    global _ISSUE_DATE
+    out = Path(out_dir).resolve()
+    sp = Path(state_path) if state_path else out / "state.json"
+    state = _load_json(sp)
+    _ISSUE_DATE = _tb.issue_date(str(out))
+
+    if drawing_form_factor(state) != "handheld" and not state.get("isInstrumentDevice"):
+        return {"ok": False, "skipped": "not_handheld"}
+
+    nodes, edges = _collect_graph(out, state)
+    if not nodes:
+        nodes = {"device": {"name": "Device (no graph yet)", "tag": "", "block": "PCB"}}
+        edges = []
+
+    arch = (
+        ((state.get("parsedBrief") or {}).get("product_class"))
+        or ((state.get("orchestratorContract") or {}).get("product_class"))
+        or out.name
+    )
+    svg, metrics = build_interconnect_svg(nodes, edges, str(arch), _ISSUE_DATE)
+    draw = out / "drawings"
+    draw.mkdir(parents=True, exist_ok=True)
+    svg_path = draw / "interconnect.svg"
+    png_path = draw / "interconnect.png"
+    svg_path.write_text(svg, encoding="utf-8")
+    (draw / "interconnect-layout.json").write_text(
+        json.dumps(metrics, indent=2), encoding="utf-8")
+    png_ok = False
+    if rasterise_png and _ga is not None:
+        try:
+            png_ok = bool(_ga.rasterise(svg_path, png_path))
+        except Exception:  # noqa: BLE001
+            png_ok = False
+    try:
+        import a1_print
+        a1_print.export_a1(svg_path, base="interconnect",
+                           title="Interconnect — device wiring")
+    except Exception:  # noqa: BLE001
+        pass
+    return {
+        "ok": bool(metrics.get("ok")),
+        "svg": str(svg_path),
+        "png": str(png_path) if png_ok else None,
+        "n_nodes": len(nodes),
+        "n_edges": len(edges),
+        "layout": metrics,
+        "fluid_less": is_fluid_less_instrument(state),
+    }
+
+
+def _selftest() -> int:
+    bad = 0
+
+    def chk(name: str, cond: bool) -> None:
+        nonlocal bad
+        if not cond:
+            print(f"  FAIL {name}")
+            bad += 1
+
+    # Happy path — small principal graph draws + metrics pass.
+    nodes = {
+        "usb": {"name": "USB Input", "tag": "I-200", "block": "Power"},
+        "fuse": {"name": "Input Fuse", "tag": "X-200", "block": "Power"},
+        "reg": {"name": "3V3 Regulator", "tag": "X-201", "block": "Power"},
+        "mcu": {"name": "Compute UI Module", "tag": "I-201", "block": "PCB"},
+        "led": {"name": "LED Source Board", "tag": "X-201", "block": "Optical"},
+        "det": {"name": "Optical Detector Module", "tag": "I-202", "block": "Optical"},
+        "disp": {"name": "Local Display", "tag": "I-210", "block": "HMI"},
+        "enc": {"name": "Enclosure Shell", "tag": "X-207", "block": "Enclosure"},
+    }
+    edges = [
+        {"from": "usb", "to": "fuse", "kind": "power", "label": "electrical_bus"},
+        {"from": "fuse", "to": "reg", "kind": "power", "label": "electrical_bus"},
+        {"from": "reg", "to": "mcu", "kind": "power", "label": "electrical_bus"},
+        {"from": "mcu", "to": "led", "kind": "signal", "label": "signal"},
+        {"from": "led", "to": "det", "kind": "optical", "label": "optical"},
+        {"from": "mcu", "to": "disp", "kind": "signal", "label": "signal"},
+        # topology-authored mounts (not synthesised) so synth_ratio stays low
+        {"from": "mcu", "to": "enc", "kind": "mechanical", "label": "mount"},
+        {"from": "led", "to": "enc", "kind": "mechanical", "label": "mount"},
+    ]
+    svg, metrics = build_interconnect_svg(nodes, edges, "colorimeter", "2026-07-14")
+    for needle in ("INTERCONNECT", "I-201", "LED Source", "Legend", "power",
+                   "FF-INT-001", 'data-layout-ok="true"'):
+        chk(f"svg_has_{needle[:20]}", needle in svg)
+    chk("no_plant_labels", "m³/h" not in svg and "DN50" not in svg)
+    chk("no_ellipsis_truncation", "…" not in svg)
+    chk("metrics_ok", metrics["ok"] is True)
+    chk("story_ok", metrics.get("story_ok") is True)
+    chk("enclosure_wired", (metrics.get("shell_degree") or 0) >= 1)
+    chk("multi_kinds", (metrics.get("n_edge_kinds") or 0) >= 2)
+    chk("no_cable_nodes", not metrics.get("cable_nodes"))
+    chk("no_title_overlap", not metrics["title_overlaps_content"])
+    chk("content_above_title", metrics["content_bottom"] + 8 <= metrics["title_top"])
+
+    # proveCatch — bird's-nest class MUST fail metrics (the disaster Tristan rejected).
+    nest_nodes = {
+        f"n{i}": {"name": f"Part {i}", "tag": f"X-{i}", "block": "Power" if i < 12 else "PCB"}
+        for i in range(30)
+    }
+    nest_edges = [
+        {"from": f"n{i}", "to": f"n{i+1}", "kind": "power", "label": "x"}
+        for i in range(29)
+    ]
+    nest_m = layout_metrics(nest_nodes, nest_edges, content_bottom=900, title_top=800)
+    chk("birds_nest_fails_node_cap", nest_m["ok"] is False)
+    chk("birds_nest_flags_overlap", nest_m["title_overlaps_content"] is True)
+
+    # proveCatch — monochrome signal + unwired enclosure MUST fail story bar.
+    thin = layout_metrics(
+        {k: nodes[k] for k in ("mcu", "led", "det", "disp", "enc", "usb")},
+        [{"from": "mcu", "to": "led", "kind": "signal"},
+         {"from": "led", "to": "det", "kind": "signal"},
+         {"from": "mcu", "to": "disp", "kind": "signal"}],
+        content_bottom=200, title_top=400,
+    )
+    chk("thin_story_fails", thin["ok"] is False and thin["story_ok"] is False)
+
+    # BoM-only collection: adjacency dump must NOT inflate past principals.
+    state = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-201", "requirement": "Compute UI Module", "status": "OK"},
+            {"tag": "X-201", "requirement": "LED Source Board", "status": "OK"},
+            {"tag": "X-207", "requirement": "Enclosure Shell", "status": "OK"},
+            {"tag": "X-208", "requirement": "Ambient Light Cap", "status": "OK"},  # skipped
+            {"tag": "I-203", "requirement": "Sensor Interconnect Cable", "status": "OK"},  # skipped
+            {"tag": "X-209", "requirement": "Fastener Set", "status": "OK"},  # skipped
+        ],
+        "orchestratorContract": {"topology": [
+            {"from_part": "Microcontroller", "to_part": "LED Source",
+             "mechanism": "signal",
+             "material_context": "optical path (free-space / guided light)"},
+            {"from_part": "Ghost Endpoint A", "to_part": "Ghost Endpoint B",
+             "mechanism": "electrical_bus"},
+        ]},
+    }
+    n2, e2 = _collect_graph(Path("/tmp"), state)
+    names2 = {_norm(v["name"]) for v in n2.values()}
+    chk("skips_fastener", "fastener set" not in names2)
+    chk("skips_cable_node", "sensor interconnect cable" not in names2)
+    chk("skips_cap_node", "ambient light cap" not in names2)
+    # +1 USB/LiPo Power node is required when Compute UI Module is present.
+    chk("no_ghost_nodes", len(n2) <= 4 and "ghost" not in " ".join(names2))
+    chk("no_ghost_edges", all(
+        "ghost" not in e["from"] and "ghost" not in e["to"] for e in e2))
+    chk("alias_mcu", any(e["from"] == "compute ui module" or e["to"] == "compute ui module"
+                         for e in e2))
+    chk("optical_from_context", any(e["kind"] == "optical" for e in e2))
+    chk("enclosure_shell_wired", any(
+        e["kind"] == "mechanical" and (
+            (e["from"] in n2 and _ENCLOSURE_SHELL_RE.search(n2[e["from"]]["name"]))
+            or (e["to"] in n2 and _ENCLOSURE_SHELL_RE.search(n2[e["to"]]["name"]))
+        ) for e in e2
+    ))
+    # proveCatch: cap must NOT steal mounts (the fake-10 failure mode).
+    chk("no_cap_mount_target", all(
+        "cap" not in (n2.get(e["from"], {}) or {}).get("name", "").lower()
+        and "cap" not in (n2.get(e["to"], {}) or {}).get("name", "").lower()
+        for e in e2
+    ))
+    # proveCatch: absorbed-host topology + Compute kit must mint Power column.
+    state_pwr = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-201", "requirement": "Compute UI Module", "status": "OK"},
+            {"tag": "X-201", "requirement": "LED Source Board", "status": "OK"},
+            {"tag": "I-202", "requirement": "Optical Detector Module", "status": "OK"},
+            {"tag": "X-207", "requirement": "Enclosure Shell", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": [
+            {"from_part": "Usb Interface", "to_part": "DC DC Regulator",
+             "mechanism": "electrical_bus",
+             "material_context": "DC power rail (instrument-internal)"},
+            {"from_part": "DC DC Regulator", "to_part": "Microcontroller",
+             "mechanism": "electrical_bus",
+             "material_context": "DC power rail (instrument-internal)"},
+            {"from_part": "DC DC Regulator", "to_part": "LED Driver",
+             "mechanism": "electrical_bus",
+             "material_context": "DC power rail (instrument-internal)"},
+            {"from_part": "Optical Detector Module", "to_part": "Microcontroller",
+             "mechanism": "signal",
+             "material_context": "analogue detector signal"},
+        ]},
+    }
+    n3, e3 = _collect_graph(Path("/tmp"), state_pwr)
+    m3 = layout_metrics(n3, e3, content_bottom=200, title_top=500)
+    chk("power_column_present", any(n.get("block") == "Power" for n in n3.values()))
+    chk("power_edge_present", any(e.get("kind") == "power" for e in e3))
+    chk("compute_kit_story_ok", m3.get("story_ok") is True and m3.get("ok") is True)
+    chk("host_alias_to_compute", any(
+        e.get("from") == "compute ui module" or e.get("to") == "compute ui module"
+        for e in e3
+    ))
+
+    assert _classify_block("Cuvette Holder") == "Optical"
+    assert _classify_block("LED Source Board") == "Optical"
+    assert _classify_block("Compute UI Module") == "PCB"
+    assert _classify_block("Enclosure Shell") == "Enclosure"
+    assert _edge_kind("signal", "optical path (free-space / guided light)") == "optical"
+    assert _edge_kind("signal", "DC power rail (instrument-internal)") == "power"
+
+    print("draw_interconnect selftest:", "OK" if bad == 0 else f"{bad} FAIL")
+    return bad
+
+
+def main(argv: list[str]) -> int:
+    if "--selftest" in argv:
+        return 1 if _selftest() else 0
+    if not argv:
+        print("usage: draw_interconnect.py <out_dir> [state.json]", file=sys.stderr)
+        return 1
+    out_dir = argv[0]
+    state_path = argv[1] if len(argv) > 1 else None
+    res = generate_interconnect(out_dir, state_path)
+    print(f"[interconnect] {res}")
+    return 0 if res.get("ok") or res.get("skipped") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

@@ -3,9 +3,43 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from math import atan, isfinite, tan
-from typing import Optional
+from typing import FrozenSet, Literal, Optional
+
+FormFactor = Literal["plant", "sealed_cabinet", "handheld"]
+
+# INTENT (2026-07-14): one classifier for drawing packs + Excel NA — plant GA/P&ID
+# is wrong as the primary surface for a fluid-less handheld; sealed cabinets keep
+# product GA + electrical; plants keep the Codema set.
+# Leading word-bound only — matches fluid_loop / air_supply, but not "pair"/"fair"
+# (trailing \b would fail on underscores because _ is a word char).
+_FLUID_MECH_RE = re.compile(r"(?<![a-z])(?:fluid|water|gas|steam|oxygen|air)(?![a-z])", re.I)
+
+# Drawing keys that may emit per pack (see generate_drawing_set pack filter).
+_PACK_PLANT: FrozenSet[str] = frozenset({
+    "general-arrangement", "single-line", "pid", "bfd",
+    "process-schedules", "panel-schedule",
+    "hvac", "facility-layout", "distribution-interface",
+})
+_PACK_SEALED: FrozenSet[str] = frozenset({
+    "general-arrangement", "single-line", "panel-schedule",
+    "pid", "bfd",  # dry/energy stubs still allowed; generators decide content
+    "process-schedules", "hvac",
+})
+# Fluid-less handheld primaries (Tristan 2026-07-14): Assembly + Interconnect only.
+# Plant SLD / panel-schedule are PCB-tab territory for a single-board instrument —
+# emitting them made the dossier feel like a miniature plant pack.
+_PACK_HANDHELD: FrozenSet[str] = frozenset({
+    "general-arrangement",  # reader title: Assembly
+    "interconnect",
+})
+_PACK_HANDHELD_FLUID: FrozenSet[str] = frozenset({
+    "general-arrangement", "interconnect",
+    "pid", "bfd", "process-schedules",
+    "single-line", "panel-schedule",
+})
 
 
 @dataclass(frozen=True)
@@ -144,25 +178,52 @@ def _positive_triplet(values: tuple[object, object, object]) -> Optional[tuple[f
 
 
 def resolve_design_envelope_mm(state: dict) -> Optional[tuple[float, float, float]]:
-    """Resolve W/D/H from one authoritative precedence chain."""
+    """Resolve W/D/H from one authoritative precedence chain.
+
+    INTENT (2026-07-14 Tristan): for instruments, size = the smallest box that
+    still packs the functional work (display + optical path + electronics), never
+    mass÷density fantasy air. Brief max_dimensions_mm is a CEILING, not a target
+    to fill. Explicit non-derived contract dims (class builder) still win.
+    """
+    brief_triplet = _brief_envelope_triplet(state)
     contract_dims = _quantity_triplet(
         state,
         "design_envelope_width_mm",
         "design_envelope_depth_mm",
         "design_envelope_height_mm",
     )
+    derived = _is_derived_device_envelope(state)
+
+    # ── Instrument: minimum working pack beats mass-air derived boxes ─────
+    if state.get("isInstrumentDevice"):
+        try:
+            from minimum_working_envelope import (  # type: ignore
+                apply_brief_ceiling,
+                minimum_working_envelope_from_state,
+            )
+            packed = minimum_working_envelope_from_state(state)
+        except Exception:  # noqa: BLE001
+            packed = None
+        if packed is not None:
+            # Explicit non-derived contract pin (a real design decision) wins.
+            if contract_dims and not derived:
+                body = contract_dims
+            else:
+                body = packed
+            if brief_triplet:
+                body, _breached = apply_brief_ceiling(body, brief_triplet)
+            return body
+
     if contract_dims:
         if (
             state.get("isInstrumentDevice")
-            and _is_derived_device_envelope(state)
+            and derived
             and not _is_handheld_landscape(contract_dims)
         ):
-            brief_triplet = _brief_envelope_triplet(state)
             if brief_triplet:
                 return brief_triplet
         return _resolve_instrument_contract_dims(state, contract_dims)
 
-    brief_triplet = _brief_envelope_triplet(state)
     if brief_triplet:
         return brief_triplet
 
@@ -190,6 +251,54 @@ def is_product_scale(state: dict) -> bool:
         return True
     envelope = resolve_design_envelope_mm(state)
     return bool(envelope and max(envelope) <= 2000)
+
+
+def drawing_form_factor(state: dict) -> FormFactor:
+    """Classify the drawing pack: handheld · sealed_cabinet · plant.
+
+    Handheld wins over product_scale when isInstrumentDevice is set (colorimeter).
+    Powerwall is sealed_cabinet (product_scale, not instrument).
+    """
+    if bool(state.get("isInstrumentDevice")):
+        return "handheld"
+    if is_product_scale(state):
+        return "sealed_cabinet"
+    return "plant"
+
+
+def is_fluid_less_instrument(state: dict) -> bool:
+    """True when a handheld instrument has no process-fluid topology edges.
+
+    Mirrors the Excel VERIFIED-NA predicate in build-excel-export.py so the
+    drawing set and the workbook cannot disagree.
+    """
+    if not bool(state.get("isInstrumentDevice")):
+        return False
+    topo = (
+        ((state.get("orchestratorContract") or {}).get("topology"))
+        or ((state.get("engineeringContract") or {}).get("topology"))
+        or []
+    )
+    for e in topo:
+        if not isinstance(e, dict):
+            continue
+        if _FLUID_MECH_RE.search(str(e.get("mechanism") or "")):
+            return False
+    return True
+
+
+def pack_drawings(state: dict) -> FrozenSet[str]:
+    """Drawing keys this form factor may emit.
+
+    Fluid-less handhelds exclude plant process sheets entirely (no NA stubs).
+    A handheld that somehow carries a fluid edge keeps pid/bfd/process-schedules.
+    """
+    ff = drawing_form_factor(state)
+    if ff == "handheld":
+        return _PACK_HANDHELD if is_fluid_less_instrument(state) else _PACK_HANDHELD_FLUID
+    if ff == "sealed_cabinet":
+        return _PACK_SEALED
+    return _PACK_PLANT
 
 
 def perspective_distance_for_extent(
@@ -307,44 +416,57 @@ def _selftest() -> None:
     # non-instrument → cube (unchanged)
     cube = resolve_design_envelope_mm(dict(vol_state))
     assert cube and abs(cube[0] - cube[2]) < 1e-6, f"non-instrument stays a cube, got {cube}"
-    # explicit contract dims still win when they are already handheld-like.
+    # explicit NON-derived contract dims still win (a real design pin).
     pinned = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 0.002,
         "design_envelope_width_mm": 140, "design_envelope_depth_mm": 110,
         "design_envelope_height_mm": 55}}, "isInstrumentDevice": True}
     assert resolve_design_envelope_mm(pinned) == (140.0, 110.0, 55.0), (
         "explicit handheld dims must win")
-    # derived non-handheld dims are not a pin: restore handheld aspect + clamp max edge.
+    # derived mass-air dims LOSE to minimum working pack (as small as possible).
     derived_tall = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 0.002,
+        "optical_path_length_mm": {"value": 10},
         "design_envelope_width_mm": {
             "value": 140, "source": "derived_device_scale"},
         "design_envelope_depth_mm": {
             "value": 110, "source": "derived_device_scale"},
         "design_envelope_height_mm": {
-            "value": 180, "source": "derived_device_scale"}}}, "isInstrumentDevice": True}
+            "value": 180, "source": "derived_device_scale"}},
+        "requirementsBom": [
+            {"requirement": "Compute UI Module"},
+            {"requirement": "LED Source Board"},
+            {"requirement": "Cuvette Holder"},
+        ]}, "isInstrumentDevice": True}
     dt = resolve_design_envelope_mm(derived_tall)
-    assert dt and dt[0] > dt[1] > dt[2], f"derived instrument dims must reshape, got {dt}"
+    assert dt and dt[0] > dt[1] > dt[2], f"packed instrument must be landscape W>D>H, got {dt}"
     assert max(dt) <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM + 1e-6, (
-        f"derived reshape must clamp to handheld scale, got {dt}")
-    # Oversized but already-landscape derived dims also clamp (mass→air inflation).
+        f"packed envelope must stay handheld scale, got {dt}")
+    assert dt[0] < 160.0, f"pack must beat mass-air 183 mm width, got {dt}"
+    # Oversized landscape derived (colorimeter 0.3 kg÷150) → pack, not clamp-of-183.
     derived_wide = {"orchestratorContract": {"quantities": {
         "enclosure_volume_m3": 0.002,
+        "optical_path_length_mm": {"value": 10},
         "design_envelope_width_mm": {
-            "value": 183, "source": "derived_device_scale"},
+            "value": 183, "condition": "derived_device_scale — synthesised landscape"},
         "design_envelope_depth_mm": {
-            "value": 145, "source": "derived_device_scale"},
+            "value": 145, "condition": "derived_device_scale — synthesised landscape"},
         "design_envelope_height_mm": {
-            "value": 76, "source": "derived_device_scale"}}}, "isInstrumentDevice": True}
+            "value": 76, "condition": "derived_device_scale — synthesised landscape"}},
+        "requirementsBom": [
+            {"requirement": "Compute UI Module"},
+            {"requirement": "LED Source Board"},
+            {"requirement": "Cuvette Holder"},
+        ]}, "isInstrumentDevice": True}
     dw = resolve_design_envelope_mm(derived_wide)
-    assert dw and max(dw) <= _HANDHELD_INSTRUMENT_MAX_EDGE_MM + 1e-6, (
-        f"airy derived landscape must clamp, got {dw}")
+    assert dw and dw[0] < 160.0, f"mass-air 183 must lose to working pack, got {dw}"
+    # Brief max is a CEILING — pack that fits under brief stays packed (no inflate).
     derived_brief = dict(
-        derived_tall,
+        derived_wide,
         parsedBrief={"constraints": {"max_dimensions_mm": {"w": 140, "d": 110, "h": 55}}},
     )
-    assert resolve_design_envelope_mm(derived_brief) == (140.0, 110.0, 55.0), (
-        "brief dimensions must win over derived non-handheld instrument hints")
+    db = resolve_design_envelope_mm(derived_brief)
+    assert db == dw, f"brief ceiling must not inflate pack toward brief, got {db} vs {dw}"
     assert "07-product-service" in sealed_exterior_view_names(True), (
         "instrument service view must use closed exterior, not cutaway slabs")
     assert "00-hero" not in sealed_exterior_view_names(True), (
@@ -355,7 +477,27 @@ def _selftest() -> None:
         "cabinet/plant 00-hero stays cutaway")
     assert "07-product-service" not in sealed_exterior_view_names(False), (
         "plant/cabinet service view stays cutaway")
-    print("render_view_contract _selftest: OK (instrument landscape envelope proven)")
+    # proveCatch (2026-07-14): form-factor packs — handheld vs sealed cabinet vs plant.
+    _hh = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"from": "a", "to": "b", "mechanism": "electrical_bus"}],
+        "quantities": {"enclosure_volume_m3": 0.002}}}
+    assert drawing_form_factor(_hh) == "handheld"
+    assert is_fluid_less_instrument(_hh)
+    assert "interconnect" in pack_drawings(_hh)
+    assert "pid" not in pack_drawings(_hh)
+    assert "bfd" not in pack_drawings(_hh)
+    _hh_fluid = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"from": "a", "to": "b", "mechanism": "fluid_loop"}]}}
+    assert not is_fluid_less_instrument(_hh_fluid)
+    assert "pid" in pack_drawings(_hh_fluid)
+    _cab = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 0.13}}}
+    assert drawing_form_factor(_cab) == "sealed_cabinet"
+    assert "interconnect" not in pack_drawings(_cab)
+    assert "general-arrangement" in pack_drawings(_cab)
+    _plant = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 40.0}}}
+    assert drawing_form_factor(_plant) == "plant"
+    assert "pid" in pack_drawings(_plant)
+    print("render_view_contract _selftest: OK (instrument landscape + form-factor packs)")
 
 
 if __name__ == "__main__":

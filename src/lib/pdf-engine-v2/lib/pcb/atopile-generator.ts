@@ -588,25 +588,65 @@ const INSTRUMENT_DEVICE_TEXT_RE =
   /\b(optical[_ -]?instrument|photometer|colou?rimeter|spectrophotometer|absorbance|portable|handheld|hand-held|benchtop|bench-top)\b/i
 
 const COTS_UI_WORD_RE =
-  /\b(local[_ -]?display|display(?:[_ -]?(?:module|panel|screen))?|oled|lcd|tft|readout|user[_ -]?input|buttons?|keypad|membrane[_ -]?(?:switch|keypad)|front[_ -]?panel|hmi)\b/i
+  /\b(local[_ -]?display|display(?:[_ -]?(?:module|panel|screen))?|oled|lcd|tft|readout|user[_ -]?input|buttons?|keypad|membrane[_ -]?(?:switch|keypad)|front[_ -]?panel|hmi|compute[_ -]?ui[_ -]?module)\b/i
 
 const COTS_DETECTOR_MODULE_RE =
   /\b(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array).*\b(module|breakout|board|assembly)\b|\b(module|breakout|board|assembly).*(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array)\b/i
 
+// Gold WHY: one purchased compute/UI kit absorbs MCU+display+buttons+USB+battery.
+const COTS_COMPUTE_UI_MODULE_RE =
+  /\bcompute[_ -]?ui[_ -]?module\b|\b(?:controller|mcu).{0,24}(?:ui|display|badge).{0,16}module\b/i
+
 const INSTRUMENT_OPTOMECH_WORD_RE =
-  /\b(collimat\w*|lens|optic(?:al)?|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?bezel|face[_ -]?plate|front[_ -]?panel)\b/i
+  /\b(collimat\w*|lens|optic(?:al)?|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?(?:bezel|plate)|detector[_ -]?mount|face[_ -]?plate|front[_ -]?panel)\b/i
 
 const INSTRUMENT_INTERCONNECT_WORD_RE =
   /\b(?:sensor|detector|photodiode|signal|analog|adc|afe).{0,48}(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon).{0,48}(?:sensor|detector|photodiode|signal|analog|adc|afe)\b/i
 
-const CONTROLLER_WORD_RE =
-  /\b(main[_ -]?controller|microcontroller|mcu|processor|control[_ -]?unit)\b/i
+// INTENT (2026-07-14): STEMMA/Qwiic/Grove headers mate to purchased COTS modules —
+// they are not optical-source-board footprints (colorimeter-2130 put stemma_header on
+// the LED PCBA and bloated hygiene).
+const INSTRUMENT_COTS_BUS_HEADER_RE =
+  /\b(stemma|qwiic|grove(?:[_ -]?connector)?|i2c[_ -]?header)\b/i
 
+const CONTROLLER_WORD_RE =
+  /\b(main[_ -]?controller|microcontroller|mcu|processor|control[_ -]?unit|compute[_ -]?ui[_ -]?module)\b/i
+
+const INCLUDED_ON_COMPUTE_UI_RE =
+  /\b(?:battery_included_in_compute_ui|usb_charge_path_on_compute_ui|power_switch_on_compute_ui|host_power_rail_on_compute_ui|usb_5v_input_on_compute_ui|input_protection_on_compute_ui|thermal_protection_on_compute_ui|reverse_polarity_on_compute_ui|charge_status_led|low_battery_indicator|board_level_decoupling)\b/i
+
+// GOTCHA: do NOT match bare `status led` / `indicator` here — host charge-status and
+// battery indicators must stay off the optical source board (see INCLUDED_ON_COMPUTE_UI
+// + INSTRUMENT_HOST_SIDE). Keep optical LED source / driver / board-level protection.
 const ON_BOARD_PCB_WORD_RE =
-  /\b(status[_ -]?(?:led|indicator)|led[_ -]?source|\bled\b|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b)\b/i
+  /\b(led[_ -]?source|\bled\b|led[_ -]?driver|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b)\b/i
 
 const OPTICAL_SOURCE_BOARD_WORD_RE =
-  /\b(?:led[_ -]?source|light[_ -]?source|optical[_ -]?source|source[_ -]?(?:pcb|board|module)|illumination|emitter|led[_ -]?driver)\b/i
+  /\b(?:led[_ -]?source|light[_ -]?source|optical[_ -]?source|source[_ -]?(?:pcb|board|module|connector)|illumination|emitter|led[_ -]?driver)\b/i
+
+// Host-side power / USB / protection that belongs on the purchased controller/UI
+// COTS assembly (PyBadge-class), NOT on the window-scale LED daughterboard.
+// Gold Open Colorimeter: LED PCB = LED + R + JST only; battery/USB/rail live on the MCU.
+// INTENT (2026-07-14): also keep generic rail regulators / host connectors off the
+// optical source board — `dc_dc_regulator` used to survive via ON_BOARD_PCB_WORD_RE
+// (`regulator`) and inflate the LED board into a 14-part / 80 mm motherboard.
+const INSTRUMENT_HOST_SIDE_ON_COTS_CONTROLLER_RE =
+  /\b(?:rechargeable[_ -]?battery|battery[_ -]?(?:pack|charge|management|indicator)|low[_ -]?battery|charge[_ -]?status|usb[_ -]?(?:interface|power)|firmware[_ -]?storage|power[_ -]?(?:switch|input|indicator|rail)|dc[_ -]?dc[_ -]?regulator|buck[_ -]?regulator|ldo|host[_ -]?power|dc[_ -]?input[_ -]?fuse|input[_ -]?fuse|overcurrent|esd[_ -]?protection|thermal[_ -]?cutoff|polyfuse|reverse[_ -]?polarity|ferrite|status[_ -]?indicator|control[_ -]?switch|debug[_ -]?interface|\bswd\b|\bjtag\b|i2c[_ -]?level[_ -]?shifter|level[_ -]?shifter)\b/i
+
+// Labels / silkscreen legends are not PCB footprints (2130 left user_facing_legend
+// in unresolved[] and the Excel electronic-gap axis capped PCB at FAIL/DRAFT).
+const INSTRUMENT_NON_FOOTPRINT_WORD_RE =
+  /\b(?:user[_ -]?facing[_ -]?legend|front[_ -]?panel[_ -]?legend|silkscreen[_ -]?legend|nameplate|label[_ -]?plate)\b/i
+
+// INTENT (2026-07-15): residential wall-ESS / plant BoMs name purchased field
+// assemblies (battery racks, Apollo smoke heads, DIN ethernet switches, HMI
+// panels). Those are NOT PCB footprints. Instrument-only COTS filters skipped
+// them because isInstrumentDevice is false for plantish classes even at
+// device-scale volume — powerwall-2214/0447 then pinned smoke detectors as
+// SOIC-8 + battery racks as JST and died at placement (U1 vs C* overlap).
+// UNIVERSAL: keyed off assembly nouns, not a class table.
+const PLANT_PURCHASED_ASSEMBLY_RE =
+  /\b(?:battery[_ -]?(?:module|rack|pack|string)s?|module[_ -]?rack|cell[_ -]?module(?:[_ -]?assembly)?|smoke[_ -]?detectors?|gas[_ -]?(?:sensors?|detection(?:[_ -]?system)?)|hydrogen[_ -]?(?:detection[_ -]?)?sensors?|fire[_ -]?(?:detectors?|suppression(?:[_ -]?system)?)|ethernet[_ -]?switch(?:es)?|din[_ -]?rail[_ -]?(?:switch|eth)|local[_ -]?hmi(?:[_ -]?(?:display|touchscreen|panel)s?)?|hmi[_ -]?(?:display|touchscreen|panel)s?|touchscreen[_ -]?(?:module|panel)s?|power[_ -]?semiconductors?|power[_ -]?conversion[_ -]?system|pcs(?:[_ -]?(?:inverter|unit))?|auxiliary[_ -]?power(?:[_ -]?(?:supply|distribution|transformer|pdu|unit))?|arc[_ -]?(?:fault|flash)(?:[_ -]?(?:detection|protection))?)\b/i
 
 function stateText(state: Record<string, unknown>): string {
   const parsed = (state.parsedBrief as Record<string, unknown> | undefined) ?? {}
@@ -635,11 +675,37 @@ function offBoardCotsReason(
 ): string | null {
   const text = wordText(word)
   const roleText = wordRoleText(word)
-  if (ON_BOARD_PCB_WORD_RE.test(roleText)) return null
   const isInstrument = instrumentDeviceContext(state, words)
-  // DECISION: off-board COTS UI/controller/detector disposition is an instrument-
-  // context rule. A display word in a generic embedded product can still be a PCB
-  // footprint; a compact optical instrument buys that front-panel module off-board.
+  const hasUiModule = words.some((candidate) => candidate.wordId !== word.wordId && COTS_UI_WORD_RE.test(wordRoleText(candidate)))
+  const hasOpticalSource = words.some((candidate) => OPTICAL_SOURCE_BOARD_WORD_RE.test(wordRoleText(candidate)))
+  const hasCotsControllerOrUi = hasUiModule || words.some((candidate) =>
+    candidate.wordId !== word.wordId && CONTROLLER_WORD_RE.test(wordRoleText(candidate)))
+  // DECISION (2026-07-14, gold delta G3/G15): when a compact instrument already has
+  // COTS UI + controller AND an optical LED/source word, host-side battery/USB/
+  // fuse/protection ride with the COTS MCU — NOT the LED daughterboard. Must run
+  // BEFORE the ON_BOARD_PCB_WORD_RE early-keep (that regex used to force fuses/
+  // USB/battery onto the source board → 80×80 mm / 24 parts vs gold ~25 mm).
+  if (
+    isInstrument &&
+    hasOpticalSource &&
+    hasCotsControllerOrUi &&
+    INSTRUMENT_HOST_SIDE_ON_COTS_CONTROLLER_RE.test(roleText) &&
+    !OPTICAL_SOURCE_BOARD_WORD_RE.test(roleText)
+  ) {
+    return 'instrument host power/USB/protection — rides with the purchased controller/UI COTS module, not the optical source daughterboard'
+  }
+  // DECISION: off-board COTS / optomech / bus-header rules MUST run before the
+  // ON_BOARD_PCB early-keep. Otherwise `charge_status_led` / `status indicator`
+  // match `\bled\b` and never reach the host-side disposition (2130: 9-part board).
+  //
+  // DECISION (2026-07-15): plant purchased assemblies are class-agnostic — they
+  // must fire even when isInstrumentDevice is false (wall ESS / BESS / plant).
+  if (PLANT_PURCHASED_ASSEMBLY_RE.test(roleText) || PLANT_PURCHASED_ASSEMBLY_RE.test(text)) {
+    return 'purchased plant/field assembly (battery rack, safety detector, DIN eth switch, HMI panel) — off-board COTS connected to the control PCB, not an on-board footprint'
+  }
+  if (isInstrument && (COTS_COMPUTE_UI_MODULE_RE.test(roleText) || INCLUDED_ON_COMPUTE_UI_RE.test(roleText))) {
+    return 'purchased compute/UI COTS kit (MCU+display+buttons+USB+battery path) — off-board host assembly; optical source board stays separate'
+  }
   if (isInstrument && COTS_UI_WORD_RE.test(roleText)) {
     return 'front-panel/UI module shape (display/keypad/buttons) — purchased off-board COTS assembly connected to the PCB by header/FFC, not an on-board footprint'
   }
@@ -652,10 +718,16 @@ function offBoardCotsReason(
   if (isInstrument && INSTRUMENT_INTERCONNECT_WORD_RE.test(roleText)) {
     return 'instrument interconnect harness/FFC — cable assembly between modules, represented on the connection trace rather than as a PCB footprint'
   }
-  const hasUiModule = words.some((candidate) => candidate.wordId !== word.wordId && COTS_UI_WORD_RE.test(wordRoleText(candidate)))
+  if (isInstrument && INSTRUMENT_COTS_BUS_HEADER_RE.test(roleText)) {
+    return 'COTS I²C bus header (STEMMA/Qwiic/Grove) — mates to a purchased module, not an optical-source-board footprint'
+  }
+  if (isInstrument && INSTRUMENT_NON_FOOTPRINT_WORD_RE.test(roleText)) {
+    return 'front-panel legend / nameplate — marking on the enclosure, not a soldered PCB footprint'
+  }
   if (isInstrument && hasUiModule && CONTROLLER_WORD_RE.test(roleText)) {
     return 'compact instrument controller paired with UI/display module — prefer a purchased controller/UI module at concept stage, while LEDs/regulators remain on-board'
   }
+  if (ON_BOARD_PCB_WORD_RE.test(roleText)) return null
   return null
 }
 
@@ -725,6 +797,14 @@ function resolveComponent(
           : 'no MPN, no matching package-family text, and no recognised function-class role for this word',
       },
     }
+  }
+
+  // INTENT (2026-07-14): scoring's mpn_package axis means "word carries a real MPN",
+  // not "footprint came from DigiKey package text". A real part_number whose footprint
+  // resolved via function-class default was previously left at package_family — so
+  // TLC5916IDR / MCP1700 boards scored 8.1 forever. Promote whenever partNumber is real.
+  if (partNumber && tier !== 'unresolved') {
+    tier = 'mpn_package'
   }
 
   return {

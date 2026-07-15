@@ -501,6 +501,25 @@ def main() -> int:
     check("316L stainless pipe £/m > carbon-steel pipe £/m (material factor)",
           cost_ss["unit_cost_gbp"] > cost_cs["unit_cost_gbp"])
 
+    # 10e. INSTRUMENT SIGNAL edges must NOT price on the LV CSA ladder
+    # (2026-07-13, colorimeter 0819: mechanism='signal' fell through → ~£130/m
+    # 185 mm² cable → ~£855 of fake plant interconnect on a handheld).
+    c_sig = {
+        "kind": "cable", "mechanism": "signal", "length_m": 2.5,
+        "size_label": "1x185", "csa_mm2": 185, "n_parallel": 1,
+    }
+    cost_sig = cs.connection_cost(c_sig)
+    check("instrument signal mechanism uses SIGNAL_BUNDLE £/m (not CSA ladder)",
+          abs(cost_sig["unit_cost_gbp"] - cs.SIGNAL_BUNDLE_GBP_PER_M) < 0.01)
+    check("instrument signal 2.5 m line_total stays device-scale (< £100)",
+          cost_sig["line_total_gbp"] < 100.0)
+    # electrical_bus stays on the CSA ladder (plant DC feeders) — only 'signal'
+    # is the instrument interconnect mechanism.
+    c_bus = dict(c_sig); c_bus["mechanism"] = "electrical_bus"
+    cost_bus = cs.connection_cost(c_bus)
+    check("electrical_bus mechanism still uses CSA ladder (not signal bundle)",
+          cost_bus["unit_cost_gbp"] > cs.SIGNAL_BUNDLE_GBP_PER_M * 5)
+
     # ---- DEFECT-2 (BESS liquid-cooling loop, 2026-07-06): a COOLANT/GLYCOL service must
     # NOT default to a uniform carbon-steel pipe — a real BESS/CO2/SAF coolant loop is
     # STAINLESS on the hard header/riser run (glycol corrodes carbon steel) and a FLEXIBLE

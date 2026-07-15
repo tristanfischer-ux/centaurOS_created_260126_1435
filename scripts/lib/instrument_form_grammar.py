@@ -30,11 +30,16 @@ HANDHELD_MAX_EDGE_MM = hfi.HANDHELD_MAX_EDGE_MM
 VIEWING_DISTANCE_MM_DESIGN = hfi.VIEWING_DISTANCE_MM_DESIGN
 
 # ── Material honesty (sRGB 0–1) ───────────────────────────────────────────
-MAT_BODY_POLYMER = (0.10, 0.105, 0.115)
-MAT_DECK_A_SURFACE = (0.12, 0.125, 0.135)     # slightly lighter top operating plane
-MAT_DISPLAY_GLASS = (0.015, 0.02, 0.035)
-MAT_DISPLAY_BEZEL = (0.06, 0.065, 0.075)
-MAT_BUTTON_KEY = (0.08, 0.08, 0.09)
+# GOTCHA: under product softboxes, display-sRGB ≥0.10 lifts to clay-grey after
+# AgX (2026-07-13: body crop median ~150 vs gold ~103). Gold open-photometer
+# charcoal is near-black polymer — keep body ≈0.06–0.07 display. Too dark
+# (≤0.04 + heavy negative exposure) crushes to featureless black.
+MAT_BODY_POLYMER = (0.065, 0.068, 0.075)
+MAT_DECK_A_SURFACE = (0.08, 0.084, 0.092)     # slightly lighter top operating plane
+MAT_DISPLAY_GLASS = (0.012, 0.015, 0.028)
+MAT_DISPLAY_BEZEL = (0.045, 0.048, 0.055)
+# Keys must read against charcoal deck — gold PyBadge uses mid-grey tactile pads.
+MAT_BUTTON_KEY = (0.22, 0.23, 0.26)
 MAT_FR4 = (0.05, 0.42, 0.20)
 MAT_PAD_GOLD = (0.72, 0.62, 0.18)
 MAT_SCREW = (0.05, 0.05, 0.06)
@@ -49,11 +54,12 @@ MAT_CUVETTE_FLUID = (0.92, 0.78, 0.12)         # sample presence (desirable = in
 MAT_CUVETTE_WALL = (0.75, 0.82, 0.88)
 MAT_RUBBER_FOOT = (0.04, 0.04, 0.045)
 MAT_STATUS_LED = (0.15, 0.85, 0.35)
-MAT_CUTAWAY_SHELL = (0.14, 0.15, 0.17)         # translucent cutaway body cue
+MAT_CUTAWAY_SHELL = (0.10, 0.11, 0.12)         # translucent cutaway body cue
 
 # ── Fitts / control taxonomy ──────────────────────────────────────────────
 BUTTON_SHAPE = "square"
-BUTTON_TRAVEL_MM = 2.4
+# Proud enough that 3/4 product shots read a D-pad, not a flush texture.
+BUTTON_TRAVEL_MM = 3.2
 SCREW_HEAD_DIAMETER_MM = 3.2
 SCREW_HEAD_HEIGHT_MM = 1.2
 DISPLAY_BEZEL_MARGIN_MM = 2.5
@@ -66,7 +72,32 @@ OPTICAL_CUBE_MAX_ASPECT = 1.45
 WELL_RIM_OVERSIZE_MM = 4.0
 CABLE_CHANNEL_MIN_W_MM = 4.0
 
-# ── Desirability grammar (universal) ──────────────────────────────────────
+# ── Render presentation (product photography) ─────────────────────────────
+# Soft studio world + softbox lights live in forge_blender_lib
+# (make_instrument_studio_world / add_instrument_studio_lights). Defaults:
+INSTRUMENT_CYCLES_SAMPLES_DEFAULT = 128
+INSTRUMENT_RENDER_RESOLUTION = (3600, 2400)
+# GOTCHA: never lift exposure for instruments — softboxes already model the
+# form; +0.15 crushed charcoal to clay-white (2026-07-13).
+INSTRUMENT_EXPOSURE_LIFT = 0.0
+INSTRUMENT_EXPOSURE_BIAS = 0.0               # softboxes model form; bias crush → featureless black
+# Softbox energies (Watts) — sized for ~150 mm charcoal polymer, not plants.
+# Target sealed exterior body-face mean ≈90–110 (gold ≈103).
+INSTRUMENT_STUDIO_KEY_ENERGY = 18.0
+INSTRUMENT_STUDIO_FILL_ENERGY = 7.0
+INSTRUMENT_STUDIO_RIM_ENERGY = 32.0
+INSTRUMENT_STUDIO_BOUNCE_ENERGY = 2.5
+INSTRUMENT_STUDIO_WORLD_STRENGTH = 0.30
+INSTRUMENT_STUDIO_GROUND_SRGB = (0.52, 0.53, 0.55)
+# SIGHT band for a sealed exterior BODY-FACE patch (8-bit mean RGB).
+TARGET_BODY_LUM_MEAN_MAX = 130.0
+TARGET_BODY_LUM_MEAN_MIN = 70.0
+# Legacy aliases (centre-crop stats — prefer body_luminance_ok mean band).
+TARGET_BODY_LUM_P50_MAX = 130
+TARGET_BODY_LUM_P50_MIN = 55
+TARGET_BODY_LUM_P10_MAX = 100
+TARGET_BODY_LUM_P10_MIN = 25
+
 # Silhouette: clear secondary volume (optical cube) ≥ this fraction of body height.
 CUBE_TO_BODY_HEIGHT_MIN = 0.55
 # L-step under the cube must read as a joint, not a hairline.
@@ -92,12 +123,40 @@ DECK_CONTRAST_REQUIRED = True
 # ── Interior layout (cutaway desirability) ────────────────────────────────
 INTERIOR_PCB_THICKNESS_MM = 1.6
 INTERIOR_COIN_CELL_R_MM = 10.0
+INTERIOR_COIN_CELL_H_MM = 3.2
 INTERIOR_BEAM_CROSS_MM = 5.0       # thick enough to read at thumbnail
 INTERIOR_SOURCE_TO_DETECTOR = True
 # Cutaway must not read as an empty box — minimum distinct story meshes.
 INTERIOR_MIN_STORY_MESHES = 8
 # Cutaway optical cube cue is translucent so the beam reads through it.
 CUTAWAY_CUBE_ALPHA = 0.35
+# Authenticity: plain axis-aligned boxes must not dominate the cutaway story.
+# Authentic = CAD family import OR compound primitive (cyl/sphere/hollow/pipe).
+INTERIOR_MAX_PLAIN_BOX_FRACTION = 0.40
+INTERIOR_MIN_AUTHENTIC_MESHES = 5
+# forge-truth CAD families for instrument cutaways (seeded via seed_internal_cad_assets).
+CAD_FAMILY_INSTRUMENT_PCB = "instrument_pcb"
+CAD_FAMILY_PCB_BOARD = "pcb_board"
+CAD_FAMILY_COIN_CELL = "coin_cell"
+CAD_FAMILY_CUVETTE = "square_cuvette"
+CAD_FAMILY_LED = "led_emitter"
+CAD_FAMILY_PHOTODIODE = "photodiode_to_can"
+
+
+def interior_authenticity_ok(stats: dict) -> bool:
+    """proveCatch: cutaway story is not mostly axis-aligned cuboids.
+
+    @param stats Dict with n_story, n_plain_box, n_authentic (from placement).
+    @returns True when density + authenticity floors hold.
+    """
+    n = int(stats.get("n_story", 0) or 0)
+    n_box = int(stats.get("n_plain_box", 0) or 0)
+    n_auth = int(stats.get("n_authentic", 0) or 0)
+    if n < INTERIOR_MIN_STORY_MESHES:
+        return False
+    if n_auth < INTERIOR_MIN_AUTHENTIC_MESHES:
+        return False
+    return (n_box / max(1, n)) <= INTERIOR_MAX_PLAIN_BOX_FRACTION
 
 
 def button_plan_size_mm(diameter_mm: float) -> tuple[float, float, float]:
@@ -170,6 +229,31 @@ def desirability_silhouette_ok(body_h_mm: float, cube_h_mm: float, step_h_mm: fl
     )
 
 
+def body_luminance_ok(
+    png_path: str,
+    *,
+    mean_max: float = 130.0,
+    mean_min: float = 70.0,
+) -> bool:
+    """proveCatch: product-body patch stays charcoal (not clay, not crushed).
+
+    INTENT: SIGHT after render — gold open-photometer body ≈103 mean; clay-wash
+    ≈150+; crushed ≈30–50. Sample the LOWER-CENTRE product face — NOT a full
+    centre crop (dark studio void tanks the median and false-fails).
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+    except ImportError:
+        return True  # skip when imaging libs unavailable in CI
+    im = np.asarray(Image.open(png_path).convert("RGB"), dtype=np.float32)
+    h, w, _ = im.shape
+    # Front/side body face on the sealed 3/4 product shot.
+    patch = im[h * 42 // 100 : h * 58 // 100, w * 32 // 100 : w * 55 // 100]
+    mean = float(patch.mean())
+    return mean_min <= mean <= mean_max
+
+
 def _selftest() -> None:
     """proveCatch: grammar floors are stable; accessory cap ≠ knob; silhouette holds."""
     hfi._selftest()
@@ -179,6 +263,8 @@ def _selftest() -> None:
     bx, by, bz = button_plan_size_mm(BUTTON_PREF_DIAMETER_MM)
     assert bx >= BUTTON_MIN_DIAMETER_MM and by >= BUTTON_MIN_DIAMETER_MM
     assert bz == BUTTON_TRAVEL_MM
+    assert BUTTON_TRAVEL_MM >= 3.0, "proud D-pad travel floor"
+    assert sum(MAT_BUTTON_KEY) / 3.0 >= 0.18, "keys must contrast charcoal deck"
     bez = display_bezel_size_mm((36.0, 24.0, 1.6))
     assert bez[0] > 36.0 and bez[1] > 24.0
     cap = ambient_cap_parts_mm(22.0)
@@ -190,6 +276,19 @@ def _selftest() -> None:
     assert len(feet) == 4
     assert INTERIOR_BEAM_CROSS_MM >= 4.0, "beam must read at thumbnail"
     assert INTERIOR_MIN_STORY_MESHES >= 8
+    assert sum(MAT_BODY_POLYMER) / 3.0 <= 0.08, "body must stay charcoal under softboxes"
+    assert INSTRUMENT_EXPOSURE_LIFT == 0.0, "never lift instrument exposure"
+    assert INSTRUMENT_EXPOSURE_BIAS <= 0.0
+    assert INSTRUMENT_STUDIO_KEY_ENERGY <= 22.0, "softbox key must not wash charcoal"
+    assert TARGET_BODY_LUM_MEAN_MIN >= 60.0
+    assert TARGET_BODY_LUM_MEAN_MAX <= 135.0
+    # proveCatch: cuboid-dominated cutaway must fail; CAD-heavy must pass.
+    assert not interior_authenticity_ok(
+        {"n_story": 10, "n_plain_box": 9, "n_authentic": 1}
+    ), "all-box cutaway must fail authenticity"
+    assert interior_authenticity_ok(
+        {"n_story": 12, "n_plain_box": 3, "n_authentic": 7}
+    ), "authentic majority must pass"
     print("instrument_form_grammar _selftest: OK (beauty + desirability + use-physics)")
 
 

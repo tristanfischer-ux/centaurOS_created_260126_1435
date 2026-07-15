@@ -3589,6 +3589,14 @@ def generate_sld(out_dir: str, state_path: Optional[str] = None,
     # populate the title-block issue date deterministically from the run's artifacts.
     tree.date = _run_issue_date(out_dir)
     svg_text = build_sld_svg(tree, _sld_state)
+    # Stamp the settled parts-manifest fingerprint (G16 drawing-set coherence).
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(out_dir)
+        if _fp:
+            svg_text = embed_svg_placement_fp(svg_text, _fp)
+    except Exception as _fpe:  # noqa: BLE001
+        print(f"[sld] placement_fp stamp skipped: {_fpe}")
 
     draw_dir = Path(out_dir) / "drawings"
     draw_dir.mkdir(parents=True, exist_ok=True)

@@ -193,31 +193,56 @@ function hasEnergyStorage(contract: ContractInProgress): boolean {
 // (hasEnergyStorage true, no optical tool signal) is completely untouched — the optical
 // check is evaluated FIRST but only routes when the signal fires, so the existing
 // battery-plant/mains-supply dispatch is byte-identical for every other class.
-const OPTICAL_ENERGY_STORAGE_FLOOR = ['rechargeable_battery_pack', 'battery_charge_management_circuit', 'usb_power_interface', 'battery_protection_circuit', 'power_switch', 'low_battery_indicator']
-const OPTICAL_ENERGY_CONVERSION_FLOOR = ['led_source', 'led_driver', 'wavelength_selection_module', 'collimating_optic', 'dc_dc_regulator', 'power_on_indicator']
-// DECISION (2026-07-13, colorimeter Wave B): commercially-available electronics
-// means the detector side should floor as a purchased detector/breakout module at
-// concept stage. The bespoke board is the LED source/driver/power PCB; the detector
-// module connects by a short sensor cable and is dispositioned off-board by PCB stage.
-const OPTICAL_SENSING_FLOOR = ['optical_detector_module', 'sensor_interconnect_cable']
-const OPTICAL_STRUCTURE_FLOOR = ['cuvette_holder', 'optical_path_baffle', 'enclosure_shell', 'lid_shroud', 'fastener_set', 'mounting_bracket']
-const OPTICAL_CONTROL_FLOOR = ['microcontroller', 'usb_interface', 'local_display', 'user_input_buttons', 'firmware_storage', 'debug_interface']
-// A handheld/benchtop INSTRUMENT's power_distribution + safety are NOT a plant's mains
-// switchboard (main breaker + busbar + contactor) or a machinery-safety system (e-stop +
-// interlock + protective relay + fire detector + beacon). The TIER_C defaults put ~£1,150
-// of that plant gear into the colorimeter BoM (run 1833: Main Breaker £180, Busbar £120,
-// Emergency Stop £280, Interlock £267, Protective Relay £220, Isolation £95, Surge £90 —
-// absurd on a £200 handheld). A sub-1 m³ battery/USB instrument's power+safety is a DC
-// input fuse, reverse-polarity + ESD + overcurrent protection, a thermal cutoff — pennies.
-const OPTICAL_POWER_DISTRIBUTION_FLOOR = ['dc_input_fuse', 'power_input_connector', 'reverse_polarity_protection', 'power_indicator_led', 'ferrite_emc_bead']
-// NB: no lid interlock — a benchtop photometer's lid is a light shroud, not a machinery
-// guard; the token matched a plant interlock switch and priced £267 (run 1954 own-goal).
-const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'polyfuse_resettable']
-// DECISION (2026-07-13, colorimeter 0819): optical instruments already carry
-// local_display + user_input_buttons on the control floor (PyBadge-class UI).
-// TIER_C hmi_ergonomics still emitted interface_membrane which then classified as
-// Filtration & membranes on the Exec Summary. Optical HMI = buttons+display only.
-const OPTICAL_HMI_FLOOR = ['local_display', 'user_input_buttons', 'status_indicator', 'control_switch', 'mounting_bezel']
+// INTENT (2026-07-14, gold WHY): a handheld optical kit buys ONE compute/UI
+// module (dev-board class: MCU + display + buttons + USB + battery path). Gold
+// Open Colorimeter = PyBadge LC starter kit — exploding that into discrete
+// MCU/display/buttons/USB/battery motherboard lines invents a bespoke host PCB
+// and 2–3× the materials cost. Battery + USB ride inside the kit, not as a
+// separate energy_storage plant floor.
+// Battery/USB/charge live ON the compute/UI kit (gold: PyBadge starter w/ battery).
+// Name them as included-host parts so grammar ≥5 is met WITHOUT inventing a
+// separate battery-plant BoM (and without anonymous energy_storage_subcomponent_N).
+const OPTICAL_ENERGY_STORAGE_FLOOR = [
+  'battery_included_in_compute_ui_module',
+  'usb_charge_path_on_compute_ui',
+  'power_switch_on_compute_ui',
+  'charge_status_led',
+  'low_battery_indicator',
+]
+const OPTICAL_ENERGY_CONVERSION_FLOOR = [
+  'led_source', 'led_driver', 'wavelength_selection_module',
+  'dc_dc_regulator', 'source_board_connector',
+]
+// Detector = purchased breakout; two short maker cables (STEMMA/Qwiic-class).
+const OPTICAL_SENSING_FLOOR = [
+  'optical_detector_module', 'sensor_interconnect_cable', 'qwiic_interconnect_cable',
+  'detector_mount_plate', 'optical_window_seal',
+]
+const OPTICAL_STRUCTURE_FLOOR = [
+  'cuvette_holder', 'optical_path_baffle', 'enclosure_shell',
+  'ambient_light_cap', 'fastener_set', 'cuvette_consumable',
+]
+// One COTS compute/UI module + the interconnect/firmware the kit needs for I²C.
+const OPTICAL_CONTROL_FLOOR = [
+  'compute_ui_module', 'stemma_header', 'debug_interface',
+  'i2c_level_shifter', 'firmware_storage',
+]
+// Host rails live on the COTS module — discrete lines are pennies only.
+const OPTICAL_POWER_DISTRIBUTION_FLOOR = [
+  'ferrite_emc_bead', 'power_indicator_led',
+  'host_power_rail_on_compute_ui', 'usb_5v_input_on_compute_ui',
+  'board_level_decoupling',
+]
+const OPTICAL_SAFETY_FLOOR = [
+  'esd_protection_network', 'polyfuse_resettable',
+  'input_protection_on_compute_ui', 'thermal_protection_on_compute_ui',
+  'reverse_polarity_on_compute_ui',
+]
+// HMI absorbed into compute_ui_module — keep bezel/status words (never membrane).
+const OPTICAL_HMI_FLOOR = [
+  'status_indicator', 'mounting_bezel', 'control_switch',
+  'display_bezel', 'user_facing_legend',
+]
 
 /** Per-module optical-instrument floor overrides. Only the modules the generic Tier-C
  *  floor gets wrong for an instrument (a BESS/industrial-power shape) are listed —

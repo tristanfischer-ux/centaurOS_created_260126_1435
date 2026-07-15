@@ -76,23 +76,74 @@ def default_size_litter(manifest: Any) -> dict:
     }
 
 
+def _delivered_manifest_paths(run_dir: str) -> list[str]:
+    """Every parts-manifest.json a delivered drawing might read.
+
+    EXCLUDE internal isolated-pass sub-dirs (a '_'-prefixed dir by convention, e.g. the early
+    settle loop's outDir/_loop/parts-manifest.json). That manifest is written at an EARLIER,
+    pre-final-layout state and NO delivered drawing reads it — GA, the render AND parts_ledger
+    all consume the ROOT canonical parts-manifest (generate_drawing_set snapshots/restores it).
+    Comparing the delivered manifest against this throwaway is a FALSE divergence.
+    """
+    import glob
+    paths = sorted(glob.glob(os.path.join(run_dir, "**", "parts-manifest.json"), recursive=True))
+    return [p for p in paths
+            if not any(seg.startswith("_") for seg in os.path.relpath(p, run_dir).split(os.sep)[:-1])]
+
+
+def publish_canonical_manifests(run_dir: str) -> dict:
+    """SOURCE FIX for LAYOUT DIVERGENCE (Tristan 2026-07-14 / CORE FIX PRINCIPLE).
+
+    INTENT: shaded-hero / early Blender passes write a SECOND parts-manifest under
+    e.g. blender/renders/ with a pre-settle placement. Excel floors Renders + Assembly
+    at 0 when those disagree with the root canon. ONE placement must be the only story —
+    after the root canon is settled (or restored), overwrite every non-'_' mirror copy
+    with the root bytes so GA / render / ledger cannot disagree by path.
+
+    Returns {ok, published, skipped, detail}. Idempotent.
+    """
+    import shutil
+    root = os.path.join(run_dir, "parts-manifest.json")
+    if not os.path.isfile(root):
+        return {"ok": False, "published": [], "skipped": [],
+                "detail": "no root parts-manifest.json"}
+    published: list[str] = []
+    skipped: list[str] = []
+    # Placement-coupled siblings — keep mirrors coherent with the same restore rule.
+    siblings = ("parts-manifest.json", "route-manifest.json",
+                "connection-schedule.json", "edge-manifest.json")
+    for path in _delivered_manifest_paths(run_dir):
+        if os.path.abspath(path) == os.path.abspath(root):
+            continue
+        mirror_dir = os.path.dirname(path)
+        for name in siblings:
+            src = os.path.join(run_dir, name)
+            dst = os.path.join(mirror_dir, name)
+            if not os.path.isfile(src):
+                skipped.append(dst)
+                continue
+            try:
+                shutil.copy2(src, dst)
+                published.append(dst)
+            except OSError as exc:
+                skipped.append(f"{dst}:{exc}")
+    return {
+        "ok": True,
+        "published": published,
+        "skipped": skipped,
+        "detail": (f"published {len(published)} mirror file(s) from root canon"
+                   if published else "no non-root delivered manifests to sync"),
+    }
+
+
 def manifest_divergence(run_dir: str) -> dict:
     """SIGHT: if a run holds ≥2 parts-manifest.json that DISAGREE on where the parts ARE, the drawings
     can disagree — GA reads one manifest, the render the other → "GA-top ≠ render-top" (Tristan's GA2).
     Deterministic, UNIVERSAL: compares part CENTRES (pos_mm) across every manifest in the run; >10% of
     common parts at different positions = divergence. The fix is ONE canonical placement → ONE manifest
-    that GA + render + parts_ledger all consume (no re-place after the render)."""
-    import glob
-    paths = sorted(glob.glob(os.path.join(run_dir, "**", "parts-manifest.json"), recursive=True))
-    # EXCLUDE internal isolated-pass sub-dirs (a '_'-prefixed dir by convention, e.g. the early
-    # settle loop's outDir/_loop/parts-manifest.json). That manifest is written at an EARLIER,
-    # pre-final-layout state and NO delivered drawing reads it — GA, the render AND parts_ledger
-    # all consume the ROOT canonical parts-manifest (generate_drawing_set snapshots/restores it).
-    # Comparing the delivered manifest against this throwaway is a FALSE divergence. The detector's
-    # intent is "do the DELIVERED drawings disagree?" — so only compare manifests a delivered
-    # drawing actually consumes (root + any non-'_' sub-dir).
-    paths = [p for p in paths
-             if not any(seg.startswith("_") for seg in os.path.relpath(p, run_dir).split(os.sep)[:-1])]
+    that GA + render + parts_ledger all consume (no re-place after the render) — see
+    publish_canonical_manifests()."""
+    paths = _delivered_manifest_paths(run_dir)
     if len(paths) < 2:
         return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
     layouts = []
@@ -127,7 +178,8 @@ def manifest_divergence(run_dir: str) -> dict:
                 "detail": (f"{worst[1]}/{worst[2]} parts at DIFFERENT positions between "
                            f"{_d(base_p)}/parts-manifest and {_d(worst[3])}/parts-manifest — GA and the "
                            f"render can show different layouts depending which they read"),
-                "fix": "ONE canonical placement → ONE parts-manifest that GA + render + parts_ledger all consume"}
+                "fix": "ONE canonical placement → ONE parts-manifest that GA + render + parts_ledger all consume "
+                       "(publish_canonical_manifests after settle/restore)"}
     return {"manifests": len(paths), "diverged": False, "score": 10, "status": "PASS", "detail": ""}
 
 
@@ -160,6 +212,41 @@ def shape_type_mismatches(manifest) -> dict:
         if _ELEC_TYPE_RX.search(nm) and shp in _VESSEL_BODY_SHAPES:
             out.append({"name": nm, "shape": shp, "fix": "an electrical/power-connection part must be a cabinet/box, not a process vessel"})
     return {"count": len(out), "parts": out, "status": "FAIL" if out else "PASS"}
+
+
+_MICRO_COMPONENT_NAME_RX = _re.compile(
+    r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
+    r"esd[_ -]?protect|varistor|\bmov\b|input[_ -]?fuse|dc[_ -]?input[_ -]?fuse|"
+    r"thermal[_ -]?cutoff)\b", _re.I,
+)
+
+
+def absurd_micro_component_dims(manifest: Any, max_axis_mm: float = 80.0) -> dict:
+    """SIGHT: a discrete electronic (ferrite bead, fuse, …) whose dims rival the
+    product envelope is a BAD DIM echo — not a principal. Colorimeter shipped
+    Ferrite Emc Bead at 260×200×434 mm (= site bbox) into the GA top-10 while
+    Assembly still scored 10 on coverage alone (Tristan 2026-07-14).
+
+    Returns {count, parts, status}. FAIL when count>0.
+    """
+    bad = []
+    for p in _parts(manifest):
+        if not isinstance(p, dict):
+            continue
+        nm = str(p.get("name") or p.get("tag") or "")
+        if not _MICRO_COMPONENT_NAME_RX.search(nm):
+            continue
+        dm = p.get("dims_mm") or p.get("dims") or {}
+        if isinstance(dm, dict) and dm:
+            axes = [float(dm[k]) for k in ("w", "d", "h", "dia", "len")
+                    if isinstance(dm.get(k), (int, float))]
+        else:
+            pos = p.get("pos_mm") or []
+            axes = []
+        if axes and max(axes) > max_axis_mm:
+            bad.append({"name": nm, "dims_mm": dm, "max_axis_mm": max(axes)})
+    return {"count": len(bad), "parts": bad,
+            "status": "FAIL" if bad else "PASS"}
 
 
 def litter_from_path(manifest_path: str) -> dict:
@@ -239,6 +326,40 @@ def _selftest() -> int:
         r = manifest_divergence(_td)
         if r["diverged"]:
             print(f"  FAIL _loop-exclusion: an internal _loop manifest must NOT count as divergence (got {r})"); bad += 1
+    # proveCatch (2026-07-14): ferrite bead stamped at product-bbox size MUST FAIL.
+    _ab = absurd_micro_component_dims({"parts": [
+        {"name": "Ferrite Emc Bead", "dims_mm": {"w": 260, "d": 200, "h": 434}},
+        {"name": "Cuvette Holder", "dims_mm": {"w": 32, "d": 28, "h": 42}},
+        {"name": "Input Fuse", "dims_mm": {"w": 12, "d": 5, "h": 4}},
+    ]})
+    if _ab["count"] != 1 or _ab["status"] != "FAIL" or "Ferrite" not in _ab["parts"][0]["name"]:
+        print(f"  FAIL absurd-micro proveCatch: bbox-sized ferrite must be the ONLY flag (got {_ab})"); bad += 1
+
+    # proveCatch (2026-07-14): a stale blender/renders mirror that disagrees MUST FAIL, and
+    # publish_canonical_manifests MUST overwrite it so divergence clears (colorimeter floor killer).
+    with _tf.TemporaryDirectory() as _td:
+        os.makedirs(os.path.join(_td, "blender", "renders"), exist_ok=True)
+        _a = {"parts": [{"tag": f"t{i}", "name": f"p{i}", "pos_mm": [i * 100.0, 10.0, 20.0]}
+                        for i in range(10)], "placement_fp": "canon"}
+        _b = {"parts": [{"tag": f"t{i}", "name": f"p{i}", "pos_mm": [0.0, 0.0, 97.0]}
+                        for i in range(10)]}
+        with open(os.path.join(_td, "parts-manifest.json"), "w") as fh:
+            json.dump(_a, fh)
+        with open(os.path.join(_td, "blender", "renders", "parts-manifest.json"), "w") as fh:
+            json.dump(_b, fh)
+        r = manifest_divergence(_td)
+        if not r["diverged"] or r["status"] != "FAIL":
+            print(f"  FAIL renders-mirror proveCatch: disagreeing blender/renders must FAIL (got {r})"); bad += 1
+        pub = publish_canonical_manifests(_td)
+        if not pub.get("ok") or not pub.get("published"):
+            print(f"  FAIL publish_canonical: must overwrite mirror (got {pub})"); bad += 1
+        r2 = manifest_divergence(_td)
+        if r2["diverged"]:
+            print(f"  FAIL publish clears divergence: after publish must PASS (got {r2})"); bad += 1
+        with open(os.path.join(_td, "blender", "renders", "parts-manifest.json")) as fh:
+            mirrored = json.load(fh)
+        if mirrored.get("placement_fp") != "canon":
+            print(f"  FAIL publish bytes: mirror must carry root placement_fp (got {mirrored.get('placement_fp')})"); bad += 1
     print("manifest_sight selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 

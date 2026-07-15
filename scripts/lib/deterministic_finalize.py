@@ -127,6 +127,16 @@ _BRAND_MODEL_RE = re.compile(
     # for "this named system or equivalent".
     r"\b([A-Z][a-zA-Z]{2,})\s+([A-Za-z][\w.\-]*\w)(?:[- ]?class\b)?")
 
+# ROLE phrase fall-back (Codema 2026-07-14): briefs often name the control system by
+# ROLE ("a horticultural irrigation/fertigation process computer") without a Brand+
+# Model token. That is still a NAMED replacement — enough to retire a class-alien
+# SCADA brand — and never matches bare "modern control system" prose.
+_ROLE_CTRL_RE = re.compile(
+    r"\b((?:horticultural|irrigation|fertigation|plant)"
+    r"[\w\s/-]{0,48}?process\s+computer)\b",
+    re.I,
+)
+
 
 def _product_class(state) -> str:
     for ck in ("orchestratorContract", "parsedBrief", "engineeringContract"):
@@ -147,12 +157,15 @@ def _brief_text(state) -> str:
 
 
 def brief_named_control_system(state) -> str | None:
-    """The control system the BRIEF names ('Hoogendoorn iSii'), or None. Deterministic:
-    the FIRST Brand+Model pair found in a sentence that also carries control-system
-    vocabulary. A generic phrase without a branded name returns None."""
+    """The control system the BRIEF names ('Hoogendoorn iSii' or a role phrase like
+    'horticultural … process computer'), or None. Deterministic: prefer the FIRST
+    Brand+Model pair in a control-system sentence; else a ROLE phrase in the same
+    sentence. Bare 'modern control system' prose (no brand, no role noun) returns None
+    so the exporter keeps flagging the alien name honestly."""
     text = _brief_text(state)
     if not text:
         return None
+    role_fallback: str | None = None
     for sentence in re.split(r"(?<=[.;])\s+|\n", text):
         if not _CTRL_CONTEXT_RE.search(sentence):
             continue
@@ -166,7 +179,16 @@ def brief_named_control_system(state) -> str | None:
             if not (re.search(r"\d", model) or re.search(r"[a-z][A-Z]|^[a-z].*[A-Z]", model)):
                 continue
             return f"{brand} {model}"
-    return None
+        if role_fallback is None:
+            rm = _ROLE_CTRL_RE.search(sentence)
+            if rm:
+                # Collapse whitespace; drop a leading 'horticultural' market adjective
+                # so the renamed control word cannot trip lighting scope-fidelity
+                # (bare 'horticultural' used to match the lighting bom_kw).
+                role = re.sub(r"\s+", " ", rm.group(1)).strip()
+                role = re.sub(r"^horticultural\s+", "", role, flags=re.I)
+                role_fallback = role.title()
+    return role_fallback
 
 
 def _alien_hit(name: str, product_class: str):
@@ -1099,6 +1121,22 @@ def _selftest() -> int:
                   == "Hoogendoorn iSii"
                   and brief_named_control_system({"parsedBrief": {"original_text":
                       "A robust control system shall manage the plant."}}) is None)
+    # (e2) ROLE-phrase fall-back (Codema 2026-07-14): no Brand+Model, but the brief
+    # states a horticultural process computer → rename fires to that role phrase.
+    _brief_role = ("PROCESS-CONTROL COMPUTER — a horticultural irrigation/fertigation "
+                   "process computer managing per-zone irrigation scheduling.")
+    st_e2 = _alien_state(_brief_role)
+    n_e2 = rename_class_alien_control(st_e2)
+    w_e2 = st_e2["moduleDecomposition"]["modules"][0]["sub_modules"][0]["words"][0]
+    _role_name = brief_named_control_system({"parsedBrief": {"original_text": _brief_role}}) or ""
+    role_ok = (
+        "Irrigation" in _role_name
+        and "Process Computer" in _role_name
+        and "Horticultural" not in _role_name   # market adjective stripped (lighting scope)
+        and n_e2 == 1
+        and "Aquavista" not in w_e2["name_human"]
+        and "Irrigation" in w_e2["name_human"]
+        and "Aquavista" not in json.dumps(st_e2["requirementsBom"]))
 
     # ── fix 4: scope_word_demotion — proveCatch BOTH directions ─────────────────
     def _scope_word(name, wid, mfr=None, pn="TBD (detailed design)", mis_note=None):
@@ -1298,7 +1336,7 @@ def _selftest() -> int:
 
     if (ok and idem and named and one_dim and merge_ok and loop_ok and exempt_ok and partition_ok
             and domain_ok and rename_ok and rename_none_ok and home_ok and non_telemetry_ok
-            and extract_ok and scope_ok and trace_ok):
+            and extract_ok and role_ok and scope_ok and trace_ok):
         print("deterministic_finalize selftest OK (class-alien-rename / scope-word-demotion / "
               "density-merge / modifier / prose / overview / trace-layer-reconcile / idempotent)")
         return 0
@@ -1307,6 +1345,7 @@ def _selftest() -> int:
           f"partition_ok={partition_ok} domain_ok={domain_ok} rename_ok={rename_ok} "
           f"rename_none_ok={rename_none_ok} home_ok={home_ok} "
           f"non_telemetry_ok={non_telemetry_ok} extract_ok={extract_ok} "
+          f"role_ok={role_ok} "
           f"scope_fires_ok={scope_fires_ok} other_families_ok={other_families_ok} "
           f"real_part_stays_ok={real_part_stays_ok} owns_children_stays_ok={owns_children_stays_ok} "
           f"catalogue_priced_stays_ok={catalogue_priced_stays_ok} mis_emission_flag_ok={mis_emission_flag_ok} "

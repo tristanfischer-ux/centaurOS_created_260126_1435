@@ -668,6 +668,108 @@ def centrifugal_pump(params):
     return pump
 
 
+def coin_cell(params):
+    """CR2032-class coin cell — flat disk with a slight top lip.
+
+    INTENT: handheld instrument cutaways show a recognisable button cell, not a
+    grey cuboid. Universal for any coin-cell-powered sealed instrument.
+    """
+    diameter = float(params.get("diameter", 20.0))
+    height = float(params.get("height", 3.2))
+    lip_h = min(0.4, height * 0.15)
+    can = (
+        cq.Workplane("XY")
+        .circle(diameter / 2.0)
+        .extrude(height - lip_h)
+    )
+    lip = (
+        cq.Workplane("XY")
+        .workplane(offset=height - lip_h)
+        .circle(diameter / 2.0 * 0.92)
+        .extrude(lip_h)
+    )
+    return can.union(lip)
+
+
+def square_cuvette(params):
+    """Open square spectrophotometry cuvette — hollow tube, not a solid block.
+
+    INTENT: Beer–Lambert sample vessel. Wall thickness reads as glass/plastic;
+    the bore is empty so the optical beam / fluid can live inside.
+    """
+    outer = float(params.get("outer", 12.5))
+    wall = float(params.get("wall", 1.25))
+    height = float(params.get("height", 45.0))
+    inner = max(4.0, outer - 2.0 * wall)
+    body = cq.Workplane("XY").box(outer, outer, height)
+    bore = (
+        cq.Workplane("XY")
+        .workplane(offset=-0.5)
+        .box(inner, inner, height + 1.0)
+    )
+    return body.cut(bore)
+
+
+def led_emitter(params):
+    """Through-hole LED — cylindrical body + dome lens.
+
+    INTENT: optical-axis source must read as an emitter, not a glowing cuboid.
+    """
+    body_d = float(params.get("body_d", 5.0))
+    body_h = float(params.get("body_h", 7.0))
+    lens_r = float(params.get("lens_r", body_d * 0.48))
+    body = (
+        cq.Workplane("XY")
+        .circle(body_d / 2.0)
+        .extrude(body_h)
+    )
+    # Dome lens on the emitting face (+Z).
+    lens = (
+        cq.Workplane("XY")
+        .workplane(offset=body_h)
+        .sphere(lens_r)
+    )
+    # Keep only the upper hemisphere of the sphere by cutting below the rim.
+    undercut = (
+        cq.Workplane("XY")
+        .workplane(offset=body_h - lens_r - 0.1)
+        .box(lens_r * 3.0, lens_r * 3.0, lens_r + 0.2)
+    )
+    lens = lens.cut(undercut)
+    return body.union(lens)
+
+
+def photodiode_to_can(params):
+    """TO-can photodiode / detector — flange + can + window.
+
+    INTENT: detector on the optical axis reads as a real TO package, not a slab.
+    """
+    can_d = float(params.get("can_d", 8.0))
+    can_h = float(params.get("can_h", 5.5))
+    flange_od = float(params.get("flange_od", can_d * 1.35))
+    flange_h = float(params.get("flange_h", 0.8))
+    window_d = float(params.get("window_d", can_d * 0.55))
+    flange = (
+        cq.Workplane("XY")
+        .circle(flange_od / 2.0)
+        .extrude(flange_h)
+    )
+    can = (
+        cq.Workplane("XY")
+        .workplane(offset=flange_h)
+        .circle(can_d / 2.0)
+        .extrude(can_h)
+    )
+    window = (
+        cq.Workplane("XY")
+        .workplane(offset=flange_h + can_h)
+        .circle(window_d / 2.0)
+        .extrude(0.6)
+    )
+    return flange.union(can).union(window)
+
+
+
 # ============================================================
 # REGISTRY
 # ============================================================
@@ -786,6 +888,51 @@ TIER2_REGISTRY = {
             "volute_h": {"type": "number", "default": 30.0, "unit": "mm"},
             "motor_od": {"type": "number", "default": 45.0, "unit": "mm"},
             "motor_l": {"type": "number", "default": 80.0, "unit": "mm"},
+        },
+    },
+    "coin_cell": {
+        "function": coin_cell,
+        "name": "Coin Cell (CR2032-class)",
+        "category": "battery",
+        "default_colour": "#9AA0A6",
+        "visual_tags": ["battery", "coin_cell", "metal"],
+        "param_schema": {
+            "diameter": {"type": "number", "default": 20.0, "unit": "mm"},
+            "height": {"type": "number", "default": 3.2, "unit": "mm"},
+        },
+    },
+    "square_cuvette": {
+        "function": square_cuvette,
+        "name": "Square Spectrophotometry Cuvette",
+        "category": "optics",
+        "default_colour": "#C8D4DC",
+        "visual_tags": ["optics", "glass", "sample"],
+        "param_schema": {
+            "outer": {"type": "number", "default": 12.5, "unit": "mm"},
+            "wall": {"type": "number", "default": 1.25, "unit": "mm"},
+            "height": {"type": "number", "default": 45.0, "unit": "mm"},
+        },
+    },
+    "led_emitter": {
+        "function": led_emitter,
+        "name": "Through-hole LED Emitter",
+        "category": "optics",
+        "default_colour": "#FFAA33",
+        "visual_tags": ["optics", "led", "emissive"],
+        "param_schema": {
+            "body_d": {"type": "number", "default": 5.0, "unit": "mm"},
+            "body_h": {"type": "number", "default": 7.0, "unit": "mm"},
+        },
+    },
+    "photodiode_to_can": {
+        "function": photodiode_to_can,
+        "name": "TO-can Photodiode",
+        "category": "optics",
+        "default_colour": "#2A2E36",
+        "visual_tags": ["optics", "sensor", "metal"],
+        "param_schema": {
+            "can_d": {"type": "number", "default": 8.0, "unit": "mm"},
+            "can_h": {"type": "number", "default": 5.5, "unit": "mm"},
         },
     },
 }

@@ -2773,10 +2773,17 @@ def connection_cost(spec: dict,
             "cost_source": COST_SOURCE_MODEL, "cost_basis": basis,
         }
 
-    # ---- DATA / CONTROL / FIBRE bundle (thin, fixed) — by MECHANISM first, so a
-    #      signal lead that the sizer labelled kind='cable' still gets the flat
-    #      bundle rate (NOT the power-cable CSA ladder).
-    if kind == "fibre" or mech in ("data", "control", "optical"):
+    # ---- DATA / CONTROL / FIBRE / INSTRUMENT SIGNAL bundle (thin, fixed) — by
+    #      MECHANISM first, so a signal lead that the sizer labelled kind='cable'
+    #      still gets the flat bundle rate (NOT the power-cable CSA ladder).
+    # DECISION (2026-07-13, colorimeter 0819): deriveInstrumentTopology emits
+    # mechanism='signal' for USB/battery handheld interconnect. That was missing
+    # from this set → fell through to the LV CSA ladder (~£130/m) and priced
+    # ~£855 of fake plant interconnect. Universal: mechanism='signal' uses the
+    # bundle rate. GOTCHA: do NOT include electrical_bus here — plant DC bus
+    # feeders legitimately use that mechanism and must stay on the CSA ladder
+    # (proveCatch: connection_sizing_test "1562 A DC-bus >> drip").
+    if kind == "fibre" or mech in ("data", "control", "optical", "signal"):
         unit_rate = SIGNAL_BUNDLE_GBP_PER_M
         install = unit_rate * L
         term = SIGNAL_TERMINATION_GBP * ends

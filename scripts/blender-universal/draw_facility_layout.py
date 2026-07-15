@@ -277,6 +277,14 @@ def generate(out_dir: str, state_path: Optional[str] = None,
     envelope = _plant_envelope_from_manifest(out)
     arch = _archetype(state)
     svg_text = build_facility_svg(zones, envelope, arch)
+    # Stamp settled parts-manifest fingerprint (G16 — all drawings one generation).
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(str(out_dir))
+        if _fp:
+            svg_text = embed_svg_placement_fp(svg_text, _fp)
+    except Exception as _fpe:  # noqa: BLE001
+        print(f"[draw] placement_fp stamp skipped: {_fpe}")
     svg_path.write_text(svg_text)
     png_ok = False
     if rasterise_png:

@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, headNounLeadsPartName, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, scrubInstrumentIndustrialPartVerifications, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, headNounLeadsPartName, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -159,6 +159,12 @@ expect(dbHitAcceptableForWord(_pexCard, 'Usb Interface') === false,
   "a USB-interface word must NOT pin a PCIe expansion / host-adapter add-in card (device USB ≠ host PCIe card)")
 expect(dbHitAcceptableForWord(_pexCard, 'Usb Power Interface') === false,
   "a USB power-interface word must NOT pin a PCIe host-adapter card")
+// USB-SERIAL CABLE (2026-07-14, gold delta G14): FTDI TTL-232RG is a host cable, not a device USB inlet.
+const _ftdiCable: DbPart = { part_name: 'TTL-232RG-VSW3V3-P USB to TTL serial cable', manufacturer: 'FTDI', part_number: 'TTL-232RG-VSW3V3-P', component_class: 'connectivity', unit_price_gbp: 13 }
+expect(dbHitAcceptableForWord(_ftdiCable, 'Usb Interface') === false,
+  'DEVICE USB interface must NOT pin an FTDI USB-to-TTL serial cable assembly')
+expect(dbHitAcceptableForWord(_ftdiCable, 'Usb Power Interface') === false,
+  'DEVICE USB power interface must NOT pin an FTDI USB-to-TTL serial cable assembly')
 // non-blanket: the form-factor guard only fires when the WORD is a bare connector/port
 // interface — a word that itself names a 'card'/'adapter'/'expansion' is not a connector
 // word, so the guard does not fire on it (it may still be refused by the head-noun check,
@@ -166,6 +172,18 @@ expect(dbHitAcceptableForWord(_pexCard, 'Usb Power Interface') === false,
 const _molexUsbC: DbPart = { part_name: 'USB Type-C receptacle connector, 24-position, right-angle, SMT', manufacturer: 'Molex', part_number: '2172890001', component_class: 'connector', unit_price_gbp: null }
 expect(typeof dbHitAcceptableForWord(_molexUsbC, 'Usb Interface') === 'boolean',
   "the form-factor guard returns a clean boolean on a real USB-C receptacle (does not throw)")
+// PV scrub (2026-07-14): industrial MPNs frozen in partVerifications must clear when words did.
+setInstrumentDeviceContext(true)
+const _pvRows: Array<Record<string, unknown>> = [
+  { word_name: 'Power Indicator LED', manufacturer: 'Banner Engineering', part_number: 'S22LBRWPQ', status: 'verified', distributor_price_gbp: 36.79 },
+  { word_name: 'Overcurrent Protection', manufacturer: 'Schneider Electric', part_number: 'LV430630', status: 'uncertain', distributor_price_gbp: 6.5 },
+  { word_name: 'LED Driver', manufacturer: 'Texas Instruments', part_number: 'TLC5916IDR', status: 'verified', distributor_price_gbp: 1 },
+]
+const _pvCleared = scrubInstrumentIndustrialPartVerifications(_pvRows)
+expect(_pvCleared === 2, 'scrubInstrumentIndustrialPartVerifications clears Banner + Schneider, keeps TI LED driver')
+expect(_pvRows[0].part_number == null && _pvRows[1].part_number == null && _pvRows[2].part_number === 'TLC5916IDR',
+  'PV scrub nulls industrial MPNs but leaves a board-scale IC pin intact')
+setInstrumentDeviceContext(false)
 // ── DOMAIN COHERENCE for device power/safety (2026-07-12, Grok/Cursor #1): a battery is
 //    never a machine-safety product; a device fuse is never a PV/solar fuse. The colorimeter
 //    pinned Banner Engineering DBRQ (safety relay, £280) to 'Rechargeable Battery Pack' and

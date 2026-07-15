@@ -274,6 +274,32 @@ const E_FUEL_SYNTHESIS: ClassStandards = {
   ],
 }
 
+// INTENT (2026-07-14 colorimeter Risk tab): optical_instrument had ZERO registry
+// rows → compliance-gate WARN ("No class-standards registered") floored Risk at 7
+// forever. Lab benchtop photometers are LVD/EMC/RoHS + IEC 61010-1 electrical-
+// safety for measurement equipment — not BESS / process-plant standards.
+const OPTICAL_INSTRUMENT: ClassStandards = {
+  product_class: 'optical_instrument',
+  display_name: 'Portable / Benchtop Optical Instrument (Colorimeter / Photometer)',
+  compliance_summary:
+    'Research-use benchtop optical instruments are CE-marked electrical equipment: ' +
+    'Low Voltage + EMC + RoHS as the market-access floor, IEC 61010-1 for measurement / ' +
+    'control / laboratory use, IEC 61326-1 for EMC of lab equipment, and UN 38.3 when a ' +
+    'lithium pack is shipped. Clinical IVD / medical-device routes (IVDR, IEC 60601) are ' +
+    'OUT OF SCOPE unless the brief explicitly requires them.',
+  standards: [
+    { code: 'LVD 2014/35/EU', title: 'Low Voltage Directive', jurisdiction: 'EU', category: 'electrical', mandatory: true, typical_compliance_cost_gbp: 4_000, typical_lead_time_weeks: 6, applies_because: 'Mandatory CE-marking route for mains/USB-powered laboratory electrical equipment placed on the EU/UK market.' },
+    { code: 'EMC 2014/30/EU', title: 'Electromagnetic Compatibility Directive', jurisdiction: 'EU', category: 'emc', mandatory: true, typical_compliance_cost_gbp: 5_000, typical_lead_time_weeks: 6, applies_because: 'LED drivers, MCU clocks and USB interfaces must not emit or succumb to interference in a lab environment.' },
+    { code: 'RoHS 2011/65/EU', title: 'Restriction of Hazardous Substances Directive', jurisdiction: 'EU', category: 'environmental', mandatory: true, typical_compliance_cost_gbp: 2_500, typical_lead_time_weeks: 4, applies_because: 'Restricts Pb/Hg/Cd etc. in electrical equipment placed on the EU market; applies to the PCB assembly and enclosure finishes.' },
+    { code: 'IEC 61010-1', title: 'Safety requirements for electrical equipment for measurement, control, and laboratory use — Part 1: General requirements', jurisdiction: 'IEC', category: 'system_safety', mandatory: true, typical_compliance_cost_gbp: 8_000, typical_lead_time_weeks: 10, applies_because: 'The governing electrical-safety standard for benchtop measurement instruments (creepage, insulation, protective earthing, abnormal operation).' },
+    { code: 'IEC 61326-1', title: 'Electrical equipment for measurement, control and laboratory use — EMC requirements — Part 1: General requirements', jurisdiction: 'IEC', category: 'emc', mandatory: true, typical_compliance_cost_gbp: 6_000, typical_lead_time_weeks: 8, applies_because: 'EMC test levels specific to laboratory / measurement equipment; complements the generic EMC Directive with instrument-class immunity.' },
+    { code: 'UKCA / CE DoC', title: 'UKCA / CE Declaration of Conformity (electrical equipment)', jurisdiction: 'UK', category: 'electrical', mandatory: true, typical_compliance_cost_gbp: 1_500, typical_lead_time_weeks: 3, applies_because: 'Market-access paperwork for UK/EU placement — technical file + Declaration of Conformity referencing LVD/EMC/RoHS.' },
+    { code: 'UN 38.3', title: 'Recommendations on the Transport of Dangerous Goods — Section 38.3 (Lithium Batteries)', jurisdiction: 'global', category: 'transport', mandatory: true, typical_compliance_cost_gbp: 4_000, typical_lead_time_weeks: 4, applies_because: 'Internal rechargeable lithium pack must be UN 38.3 tested (or use a pre-certified cell/pack) for air/road shipment of the instrument.' },
+    { code: 'WEEE 2012/19/EU', title: 'Waste Electrical and Electronic Equipment Directive', jurisdiction: 'EU', category: 'lifecycle', mandatory: true, typical_compliance_cost_gbp: 1_000, typical_lead_time_weeks: 2, applies_because: 'Producer-responsibility registration for electrical equipment placed on the EU market; marking and take-back obligations.' },
+    { code: 'FCC Part 15', title: 'Radio Frequency Devices (unintentional radiators)', jurisdiction: 'US', category: 'emc', mandatory: false, typical_compliance_cost_gbp: 4_500, typical_lead_time_weeks: 6, applies_because: 'US market access for digital devices as unintentional radiators; required if the brief targets US laboratory sales.' },
+  ],
+}
+
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   energy_storage: ENERGY_STORAGE,
   e_fuel_synthesis:     E_FUEL_SYNTHESIS,
@@ -286,6 +312,7 @@ export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   bioreactor:     BIOREACTOR,
   auv:            AUV,
   haps:           HAPS,
+  optical_instrument: OPTICAL_INSTRUMENT,
 }
 
 // Map common display-name variants and synonyms to canonical class keys. The
@@ -312,6 +339,7 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(auv|underwater\s+vehicle|subsea)\b/, 'auv'],
     [/\b(haps|stratospheric|high[-\s]?altitude\s+platform)\b/, 'haps'],
     [/\b(e[-\s]?fuel|power[-\s]?to[-\s]?liquid|fischer[-\s]?tropsch|\bptl\b|sustainable\s+aviation\s+fuel|\bsaf\b|e[-\s]?kerosene)\b/, 'e_fuel_synthesis'],
+    [/\b(optical[_\s-]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance\s+meter)\b/, 'optical_instrument'],
   ]
   for (const [rx, key] of aliases) {
     if (rx.test(lower)) return key

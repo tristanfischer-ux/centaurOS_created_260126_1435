@@ -431,10 +431,11 @@ def main() -> int:
         )
         return 6
 
-    # Mirror 00-hero.png to blender-cover.png so the existing Gemini i2i
-    # cover step uses the engineering-correct geometry as input rather than
-    # the legacy cube-grid blender-cover.png. Renderer/chain reads
-    # state.blender_cover_image_path which points to <out>/blender-cover.png.
+    # Mirror 00-hero.png to blender-cover.png. For instruments (photoreal CAD
+    # bar), this Cycles CAD render IS the product image — Gemini i2i must never
+    # replace it. For plant/legacy PDF paths, blender-cover may still feed an
+    # optional Gemini i2i step when CHAIN_WANT_GEMINI_I2I=1 (non-instruments only).
+    # Renderer/chain reads state.blender_cover_image_path → <out>/blender-cover.png.
     blender_cover = out_dir / "blender-cover.png"
     blender_cover.write_bytes(hero.read_bytes())
 

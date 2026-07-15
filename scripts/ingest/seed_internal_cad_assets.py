@@ -104,6 +104,43 @@ def seed_assets(resolver: CadAssetResolver) -> list[str]:
                 "cable_d": 10.0,
             },
         ),
+        # Instrument-scale families (sealed optical/electronic cutaways).
+        (
+            "instrument_pcb",
+            electromechanical.pcb_board,
+            {
+                "width": 55.0,
+                "height": 40.0,
+                "thickness": 1.6,
+                "corner_r": 1.5,
+                "components": [
+                    {"x": -12, "y": 8, "w": 10, "d": 10, "h": 2.2},
+                    {"x": 8, "y": 6, "w": 14, "d": 8, "h": 1.8},
+                    {"x": -8, "y": -10, "w": 8, "d": 6, "h": 3.5},
+                    {"x": 12, "y": -8, "w": 6, "d": 6, "h": 2.0},
+                ],
+            },
+        ),
+        (
+            "coin_cell",
+            electromechanical.coin_cell,
+            {"diameter": 20.0, "height": 3.2},
+        ),
+        (
+            "square_cuvette",
+            electromechanical.square_cuvette,
+            {"outer": 12.5, "wall": 1.25, "height": 45.0},
+        ),
+        (
+            "led_emitter",
+            electromechanical.led_emitter,
+            {"body_d": 5.0, "body_h": 7.0, "lens_r": 2.4},
+        ),
+        (
+            "photodiode_to_can",
+            electromechanical.photodiode_to_can,
+            {"can_d": 8.0, "can_h": 5.5, "flange_od": 10.8, "flange_h": 0.8},
+        ),
     ]
 
     published = []

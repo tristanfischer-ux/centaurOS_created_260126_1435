@@ -44,7 +44,9 @@ interface CategoryPattern {
 const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   {
     category: 'processor',
-    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing)\b/i,
+    // compute_ui_module = purchased MCU+UI kit (gold PyBadge-class host) — still a
+    // processor-category electronic assembly for PCB disposition, just off-board.
+    pattern: /\b(main[-_ ]controller|mcu|micro-?controller|compute[_ -]?ui[_ -]?module|\bsoc\b|system[- ]on[- ]chip|fpga|\bprocessor\b|\bcpu\b|signal processing)\b/i,
   },
   {
     category: 'analog_frontend',
@@ -52,11 +54,15 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
   },
   {
     category: 'power_electronics',
-    pattern: /\b(status[-_ ]?(?:led|indicator)|led[-_ ]?source|\bled\b|led driver|gate driver|battery charger|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power management (?:ic|system)|\bpmic\b)\b/i,
+    // INTENT (2026-07-14): match character_ids alone (dc_dc_regulator,
+    // rechargeable_battery_pack, dc_input_fuse) — not only form-modifier prose
+    // that happens to contain "li-po" / "battery charger". Host-side off-board
+    // disposition cannot fire on words the collector never sees.
+    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove)\b/i,
   },
   {
     category: 'display',
-    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display|readout|keypad|user[- ]input|buttons?|membrane[- ]switch|display driver|display module|display panel|segment display)\b/i,
+    pattern: /\b(oled|\block?d\b|\btft\b|e-?ink|display|readout|keypad|user[- ]input|buttons?|membrane[- ]switch|display driver|display module|display panel|segment display|compute[_ -]?ui[_ -]?module)\b/i,
   },
   {
     category: 'connectivity',
@@ -78,7 +84,10 @@ const COMPACT_ENVELOPE_PATTERN = /\b(handheld|hand-held|portable|compact|wearabl
 const SAFETY_PATTERN = /\b(medical|iec ?60601|life-?support|explosion|hazardous area|\batex\b|safety-?critical|implantable)\b/i
 const RF_TERM_PATTERN = /\b(bluetooth|wi-?fi|\brf\b|antenna|zigbee|lora|beamforming)\b/i
 const EXPLICIT_CUSTOM_PATTERN = /\b(custom pcb|bespoke (?:pcb|board|circuit)|custom-designed board)\b/i
-const EXPLICIT_COTS_PATTERN = /\b(off-the-shelf module|cots module|purchased module|third-party module)\b/i
+// INTENT (2026-07-14, gold WHY): handheld optical briefs say "commercially
+// available electronics" — that IS explicit COTS-module intent for the host
+// compute/UI + detector. Keep "custom pcb" as the opposite signal elsewhere.
+const EXPLICIT_COTS_PATTERN = /\b(off-the-shelf module|cots module|purchased module|third-party module|commercially available electronics|catalogue electronics|off[\s-]the[\s-]shelf electronics)\b/i
 const GENERIC_PLACEHOLDER_WORD_RE =
   /\b(?:[a-z][a-z0-9_ -]+[_ -])?sub[-_ ]?component[_ -]?\d+\b/i
 

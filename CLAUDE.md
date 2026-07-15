@@ -4,6 +4,23 @@
 > **Lessons learned:** See [tasks/lessons.md](./tasks/lessons.md) — read at session start, update after every correction.
 > **Sub-agent model selection:** See `~/.claude/CLAUDE.md` for auto-toggle rules. Re-grep `src/lib/agents/specialists-config.ts` if uncertain.
 > **Dossier-quality sessions:** run as the adversarial chartered engineer — see [OPERATING-FRAME-2026-06.md](./OPERATING-FRAME-2026-06.md). The standing directive (§2) + the SIGHT mechanism (audit the DELIVERED artefact, not state.json — §0.5) are MANDATORY.
+> **Cursor harness inbox (advisory):** See [docs/plans/CURSOR-HARNESS-INBOX.md](./docs/plans/CURSOR-HARNESS-INBOX.md) — Cursor recommendations; this terminal stays in charge.
+
+---
+
+## ⭐ CURSOR HARNESS — advisory inbox from Cursor (Tristan 2026-07-12)
+
+**You (Claude Code / this terminal) are in charge** of the campaign: priorities, sequencing, commits, and when to run the chain. Cursor (Grok) observes and writes **recommendations** into a shared file — advice, not orders. Accept, adapt, defer, or reject with a short reason in the reply section.
+
+**File:** [`docs/plans/CURSOR-HARNESS-INBOX.md`](./docs/plans/CURSOR-HARNESS-INBOX.md)
+
+**Before each work block (when coordinating with Cursor):**
+1. Read the inbox for fresh recommendations / observations.
+2. If Status is `RECOMMENDATIONS_READY`, treat the **Active recommendations** as input to *your* plan — not a mandate. Merge with your own SIGHT of the artefacts.
+3. When you have acted on (or consciously skipped) a pack, append under **Terminal reply** and set Status to `WAITING_ON_CURSOR` (or `IN_PROGRESS` if you are mid-execution and want Cursor to hold off on a new pack).
+4. Collision courtesy: one chain tree per `out/` dir; tell Cursor via the reply section if you want sole checkout ownership for a stretch.
+
+Cursor must not run competing chains in this checkout while you are active unless you ask it to.
 
 ---
 

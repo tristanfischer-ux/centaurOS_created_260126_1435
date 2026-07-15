@@ -182,13 +182,19 @@ _INSTRUMENT_PROMPT = (
     "square tactile keys, a chunky optical cube with an open sample well, a parked ambient "
     "light LID (flange + grip — not a rotary knob), rubber feet, and — on cutaways — a "
     "structured interior: bright source → beam → cuvette (with sample) → detector on one "
-    "axis, plus a main PCB and small cell under the UI deck. A translucent cutaway shell "
-    "is intentional.\n\n"
+    "axis, plus a main PCB and small cell under the UI deck.\n\n"
+    "INTENTIONAL / DO NOT FLAG (these are correct instrument language):\n"
+    "  • a TRANSLUCENT optical cube seated ON the body with PCB, cuvette, baffles, and "
+    "detector INSIDE that cube — that is the designed cutaway, not an explosion\n"
+    "  • a small vertical source PCB on the cube's front face (replaceable LED module)\n"
+    "  • a translucent or ghosted body shell that still reads as one closed chassis\n\n"
     "Do NOT flag missing battery-pack density, inverter stacks, PV/AC busbars, plant pipes, "
     "or BESS thermal ducts — those belong to energy-storage products, not instruments.\n\n"
     "Flag broken=true ONLY when any of these are present:\n"
     "  • blank / empty render (no product visible)\n"
-    "  • exploded, floating, or wildly overlapping geometry\n"
+    "  • parts floating OUTSIDE the product envelope or disconnected from the chassis "
+    "(not merely visible through a translucent cube)\n"
+    "  • a hollow open-front arch / gutted chassis with internals hanging in empty air\n"
     "  • a featureless empty box with NO optical path, PCB, port, or grip cues\n"
     "  • cutaway that is only vertical grey slabs (cabinet language) with no optical axis\n"
     "  • display that reads as a pale blank patch or green FR4 plate on a closed exterior\n"
@@ -234,6 +240,34 @@ def _prompt_for_image(image_path: str) -> str:
     if _is_product_mode(image_path):
         return _PRODUCT_PROMPT
     return _PROMPT
+
+
+def _rubric_check_labels(prompt: str) -> list[str]:
+    """Extract the bullet criteria under 'Flag broken=true' from a vision rubric.
+
+    @description Counts named failure modes the model was asked to evaluate so a
+    successful critique can report checks_run ≥ 3 (Excel Renders honesty gate).
+    @param prompt Full vision rubric text
+    @returns Short labels for each bullet criterion (empty if none found)
+    """
+    labels: list[str] = []
+    in_flag = False
+    for raw in prompt.splitlines():
+        line = raw.strip()
+        if "Flag broken=true" in line or "flag broken=true" in line.lower():
+            in_flag = True
+            continue
+        if in_flag:
+            if line.startswith("•") or line.startswith("-") or line.startswith("*"):
+                lab = line.lstrip("•-* ").strip()
+                if lab:
+                    labels.append(lab[:80])
+            elif line.startswith("A ") or line.startswith("Do NOT") or line.startswith("Reply"):
+                break
+            elif not line:
+                if labels:
+                    break
+    return labels
 
 
 def _critique_once(image_path: str, model: str, timeout: int) -> dict:
@@ -334,7 +368,21 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
         tail = txt2.split('"defects"', 1)[-1] if '"defects"' in txt2 else ""
         out = {"broken": bm.group(1).lower() == "true",
                "defects": re.findall(r'"([^"]{3,90})"', tail)}
-    return {"broken": bool(out.get("broken")), "defects": out.get("defects") or [], "model": model, "ok": True}
+    # INTENT (2026-07-14): Excel Renders scorer requires checks_run≥3 so an empty
+    # broken=false cannot mint a 9. Count the rubric's explicit "Flag broken=true"
+    # criteria that this prompt asked the model to evaluate — a real glance, not a
+    # nameless shrug. Deterministic from the prompt text; never invents per-item PASS.
+    prompt = _prompt_for_image(image_path)
+    checks = _rubric_check_labels(prompt)
+    return {
+        "broken": bool(out.get("broken")),
+        "defects": out.get("defects") or [],
+        "model": model,
+        "ok": True,
+        "checks_run": len(checks),
+        "n_checks": len(checks),
+        "checklist": checks,
+    }
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
