@@ -27,6 +27,7 @@ if str(_LIB) not in sys.path:
     sys.path.insert(0, str(_LIB))
 
 import render_vision_critic as rvc  # noqa: E402
+import instrument_form_grammar as ifg  # noqa: E402
 
 _GA_INSTRUMENT_PROMPT = (
     "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
@@ -63,12 +64,12 @@ _EXTERIOR_INSTRUMENT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
 )
 
-# INTENT (NinjaPCR 2026-07-15): optical GA/exterior prompts false-fail a correct
-# PCR thermocycler (wood box + lid + sample-block wells, no cuvette tower).
+# INTENT: optical GA/exterior prompts false-fail tip-back-lid PCR form.
+# Form gate: ifg.is_thermocycler_form — never a product-noun branch.
 _GA_THERMOCYCLER_PROMPT = (
     "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
-    "drawing of a BENCHTOP PCR THERMOCYCLER / thermal cycler (NinjaPCR / OpenPCR "
-    "class — NOT a colorimeter).\n\n"
+    "drawing of a BENCHTOP PCR THERMOCYCLER / thermal cycler (maker-box tip-back "
+    "lid form — NOT a colorimeter).\n\n"
     "Expect orthographic views of a compact wood / plate box with lid, sample-block "
     "wells, and controller PCB cues. Title-block envelope in millimetres.\n\n"
     "Flag broken=true ONLY when any of these are clearly visible:\n"
@@ -105,23 +106,30 @@ _EXTERIOR_THERMOCYCLER_PROMPT = (
 
 
 def _is_thermocycler_out_dir(out_dir: str) -> bool:
-    """True when state.json declares PCR / thermocycler class."""
+    """True when state selects tip-back-lid PCR form (ifg.is_thermocycler_form)."""
     try:
         st = json.loads((Path(out_dir) / "state.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return False
+    pc = ""
     for src in (
         (st.get("orchestratorContract") or {}).get("product_class"),
         (st.get("moduleDecomposition") or {}).get("product_class"),
         (st.get("parsedBrief") or {}).get("product_class"),
     ):
-        if src and re.search(
-            r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr",
-            str(src),
-            re.I,
-        ):
-            return True
-    return False
+        if src:
+            pc = str(src)
+            break
+    part_blob = ""
+    for m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                part_blob += " " + str(w.get("name_human") or "")
+    return ifg.is_thermocycler_form(
+        product_class=pc,
+        part_blob=part_blob,
+        is_instrument=bool(st.get("isInstrumentDevice", True)),
+    )
 
 _FIXTURE_BAD_GA = (
     _HERE.parent.parent / "tests" / "fixtures" / "render-vision" / "known-bad-red-beam.png"
@@ -261,6 +269,9 @@ def _selftest() -> None:
     assert "thermocycler" in _GA_THERMOCYCLER_PROMPT.lower()
     assert "sample block" in _EXTERIOR_THERMOCYCLER_PROMPT.lower()
     assert "cuvette" in _GA_THERMOCYCLER_PROMPT.lower()  # must explicitly NOT-flag
+    assert ifg.is_thermocycler_form(product_class="thermocycler")
+    assert not ifg.is_thermocycler_form(product_class="colorimeter")
+    assert ifg.tipback_lid_vision_image_candidates()[0].startswith("04-")
     # Without a key, critique_drawing_set must SKIP (never pretend PASS).
     old = os.environ.pop("OPENROUTER_API_KEY", None)
     try:

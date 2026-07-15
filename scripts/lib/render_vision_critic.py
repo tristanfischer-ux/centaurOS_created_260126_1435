@@ -29,6 +29,8 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
+import instrument_form_grammar as ifg
+
 DEFAULT_MODEL = "google/gemini-3.1-pro-preview"  # multimodal; strongest reasoner seat
 
 # CORROBORATION DOCTRINE — geometry-hash cache (Tristan re-roll defect, 2026-07-03; same shape as
@@ -204,14 +206,15 @@ _INSTRUMENT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
-# INTENT (NinjaPCR 2026-07-15): the optical-instrument rubric false-fails a correct
-# PCR thermocycler cutaway (wood box + hinged lid + sample-block wells + PCB) because
-# it demands cuvette/optical-path language. Thermocyclers are a DIFFERENT instrument
-# family — judge them on maker-box PCR cues, never colorimeter cues.
+# INTENT: optical-instrument rubric false-fails a correct PCR thermocycler cutaway
+# (wood box + hinged lid + sample-block wells + PCB) because it demands
+# cuvette/optical-path language. Tip-back-lid PCR form is a DIFFERENT family —
+# judge maker-box thermal cues, never colorimeter cues. Form gate:
+# ifg.is_thermocycler_form (class / part vocab — not a product-noun branch).
 _THERMOCYCLER_PROMPT = (
     "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
-    "BENCHTOP PCR THERMOCYCLER / thermal cycler (e.g. open-source NinjaPCR / OpenPCR "
-    "class — NOT a colorimeter, NOT a wall battery, NOT a plant skid).\n\n"
+    "BENCHTOP PCR THERMOCYCLER / thermal cycler (maker-box tip-back lid form — "
+    "NOT a colorimeter, NOT a wall battery, NOT a plant skid).\n\n"
     "Expect a laser-cut wood (or wood-tone plate) box with finger-joint / tab cues, a "
     "hinged lid open tip-back, a dark FIVE-LOBE star pressure knob ON the outer lid "
     "face (low-poly joined hub+lobes count — not a featureless blank lid, not on the "
@@ -269,9 +272,19 @@ def _product_class(image_path: str) -> str:
 
 
 def _is_thermocycler_mode(image_path: str) -> bool:
-    """True for PCR / thermocycler class — uses _THERMOCYCLER_PROMPT, not optical rubric."""
+    """True for tip-back-lid PCR form — uses _THERMOCYCLER_PROMPT, not optical rubric."""
+    st = _load_run_state(image_path)
     pc = _product_class(image_path)
-    return bool(re.search(r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr", pc, re.I))
+    part_blob = ""
+    for m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                part_blob += " " + str(w.get("name_human") or "")
+    return ifg.is_thermocycler_form(
+        product_class=pc,
+        part_blob=part_blob,
+        is_instrument=bool(st.get("isInstrumentDevice", True)),
+    )
 
 
 def _is_instrument_mode(image_path: str) -> bool:
@@ -453,15 +466,6 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
-# INTENT (1808): thermocycler star lives on the tip-back outer lid — clearest on the
-# high product exterior 3/4. Prefer that over the cutaway hero so the critic judges
-# the same face a human SIGHT check uses (00-hero can foreshorten the star).
-_THERMOCYCLER_HERO_CANDIDATES = (
-    "04-product-exterior.png",
-    "00-hero.png",
-    "blender-cover.png",
-    "07-product-service.png",
-)
 
 
 def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
@@ -474,18 +478,22 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     no LLM call, no re-roll. Only an 'ok' prior verdict from the SAME model is reused (a failed/no-key
     prior attempt is not cached as a verdict). Absence of either manifest (geo_hash is None) disables
     caching for that run — correctness over speed when there is nothing stable to key on."""
-    # Probe class from any candidate that exists (state.json lives beside the PNGs).
-    _probe = next(
-        (os.path.join(run_dir, f) for f in (_THERMOCYCLER_HERO_CANDIDATES + _HERO_CANDIDATES)
-         if os.path.exists(os.path.join(run_dir, f))),
-        os.path.join(run_dir, "state.json"),
-    )
+    # RULE: tip-back lid outer-face controls → prefer sealed product exterior
+    # (ifg.tipback_lid_vision_image_candidates) over cutaway hero.
+    _probe = os.path.join(run_dir, "state.json")
     _cands = (
-        _THERMOCYCLER_HERO_CANDIDATES
+        ifg.tipback_lid_vision_image_candidates() + _HERO_CANDIDATES
         if _is_thermocycler_mode(_probe)
         else _HERO_CANDIDATES
     )
-    hero = next((os.path.join(run_dir, f) for f in _cands
+    # Dedupe while preserving preference order.
+    _seen: set[str] = set()
+    _ordered: list[str] = []
+    for _f in _cands:
+        if _f not in _seen:
+            _seen.add(_f)
+            _ordered.append(_f)
+    hero = next((os.path.join(run_dir, f) for f in _ordered
                  if os.path.exists(os.path.join(run_dir, f))), None)
     geo_hash = geometry_hash(run_dir)
     if geo_hash:

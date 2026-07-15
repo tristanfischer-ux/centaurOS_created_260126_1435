@@ -12315,13 +12315,6 @@ _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
     r"enclosure|cabinet|housing|\bdoor\b|\bpanel\b|panels\b|insulation|liner|gasket|"
     r"\bseal\b|bracket|mount(?:ing)?\b|cover|lid|skin|chassis|frame", re.I)
-_THERMOCYCLER_CLASS_RE = re.compile(
-    r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr", re.I)
-_THERMOCYCLER_PART_RE = re.compile(
-    r"peltier|tec[_ -]?module|sample[_ -]?block|thermal[_ -]?block|pcr[_ -]?tube|"
-    r"tube[_ -]?well|heatsink[_ -]?fan", re.I)
-
-
 def _sealed_enclosure_env_mm(state, quantities):
     """(W, D, H) exterior mm when the contract declares a sealed sub-1 m³ enclosure —
     brief max_dimensions_mm wins (the customer's own envelope), else a cube of the
@@ -12335,11 +12328,10 @@ def _sealed_enclosure_env_mm(state, quantities):
     global _IS_INSTRUMENT_DEVICE, _INSTRUMENT_OPTICAL_PATH_MM
     global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
     pc = product_class_of(state) if isinstance(state, dict) else ""
-    # INTENT (2026-07-15 NinjaPCR): prefer the chain's authoritative flag, but ALSO
-    # derive from the same enclosure+not-plantish gate. Intermediate chain rewrites
-    # (liveState/auditState/onDisk) have historically dropped `isInstrumentDevice`
-    # from state.json while still carrying enclosure_volume_m3 < 1 — Blender then
-    # rendered a BESS sealed stack for a thermocycler.
+    # INTENT: prefer the chain's authoritative flag, but ALSO derive from the
+    # same enclosure+not-plantish gate. Intermediate chain rewrites have
+    # historically dropped `isInstrumentDevice` from state.json while still
+    # carrying enclosure_volume_m3 < 1 — Blender then rendered a BESS stack.
     _plantish = bool(re.search(
         r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
         r"switchgear|plant|reactor|boiler|pump|hvac|chiller", pc or ""))
@@ -12355,9 +12347,12 @@ def _sealed_enclosure_env_mm(state, quantities):
             for sm in (m.get("sub_modules") or []):
                 for w in (sm.get("words") or []):
                     part_blob += " " + str(w.get("name_human") or "")
-    _IS_THERMOCYCLER_FORM = bool(
-        _IS_INSTRUMENT_DEVICE
-        and (_THERMOCYCLER_CLASS_RE.search(pc) or _THERMOCYCLER_PART_RE.search(part_blob))
+    # FLOW: form gate lives in instrument_form_grammar — class + part vocab,
+    # never a product-noun branch (see ifg.is_thermocycler_form proveCatch).
+    _IS_THERMOCYCLER_FORM = ifg.is_thermocycler_form(
+        product_class=pc or "",
+        part_blob=part_blob,
+        is_instrument=_IS_INSTRUMENT_DEVICE,
     )
     _tc = qval(quantities, "tube_count", None)
     if _tc is not None and float(_tc) > 0:
@@ -12406,20 +12401,21 @@ def _sealed_product_camera_specs(env_mm):
         _ctrl * _dist_k, focal_mm=58, frame_fraction=_frame)
     service_distance = perspective_distance_for_extent(
         max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
-    # INTENT (1755 SIGHT): thermocycler lid opens tip-back (−Rx); the star lives on
-    # the OUTER face (normal → +Y/rear). Low front cams aimed at the deck only saw
-    # the underside platen — star occluded behind the lid slab. Raise cams + aim at
-    # the open-lid / star region so the lobed knob silhouettes like gold OpenPCR.
+    # RULE (tip-back hinged lid): outer-face controls sit on a lid whose normal
+    # tips toward +Y/rear — low deck-aimed cams only see the underside. Fractions
+    # from ifg.tipback_lid_product_cam_fractions() (form-keyed, not a product noun).
     _tc = bool(_IS_THERMOCYCLER_FORM)
-    _ext_z = 2.10 if _tc else (1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
-    _side_z = 1.85 if _tc else (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
-    _tgt_z = 0.95 if _tc else (0.04 if _IS_INSTRUMENT_DEVICE else 0.0)
-    _tgt_y = (d * 0.12) if _tc else 0.0  # bias look-at toward rear hinge / star
+    _tl = ifg.tipback_lid_product_cam_fractions() if _tc else {}
+    _ext_z = _tl.get("ext_z", 1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
+    _side_z = _tl.get("side_z", 1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
+    _tgt_z = _tl.get("tgt_z", 0.04 if _IS_INSTRUMENT_DEVICE else 0.0)
+    _tgt_y = (d * float(_tl.get("tgt_y_frac", 0.0))) if _tc else 0.0
+    _front_ds = float(_tl.get("front_dist_scale", 1.0)) if _tc else 1.0
     return [
         {
             "name": "04-product-exterior",
             "loc": (centre[0] + front_distance * 0.18,
-                    centre[1] - front_distance * (0.92 if _tc else 1.0),
+                    centre[1] - front_distance * _front_ds,
                     centre[2] + h * _ext_z),
             "target": (
                 centre[0],
@@ -12457,20 +12453,18 @@ def _sealed_product_camera_specs(env_mm):
         },
         {
             "name": "07-product-service",
-            # INTENT (NinjaPCR 2026-07-15): head-on front for a thermocycler is a
-            # blank fascia (edge density 0.0017 < 0.002). Service face = high
-            # 3/4 looking DOWN into the open lid so sample-block wells + star knob
-            # read (1656 07 looked into an empty cavity above the deck).
+            # RULE: tip-back lid + sample deck — head-on fascia is blank; service
+            # cam is a high 3/4 looking into the aperture (wells + outer-face knob).
             "loc": (
                 centre[0] + service_distance * (0.55 if _tc else 0.0),
                 centre[1] - service_distance * (0.55 if _tc else 1.0),
-                (centre[2] + h * 1.55) if _tc
+                (centre[2] + h * float(_tl.get("hero_z", 1.55))) if _tc
                 else (DECK_Z_MM * fl.MM + h * 0.25),
             ),
             "target": (
                 centre[0],
-                centre[1] + (d * 0.10 if _tc else 0.0),
-                (centre[2] + h * 0.85) if _tc
+                centre[1] + (d * float(_tl.get("hero_tgt_y_frac", 0.10)) if _tc else 0.0),
+                (centre[2] + h * float(_tl.get("hero_tgt_z", 0.85))) if _tc
                 else (DECK_Z_MM * fl.MM + h * 0.18),
             ),
             "camera_type": "PERSP",
@@ -15149,10 +15143,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     (0.0, (-_lid_d * 0.5) * fl.MM, (_lid_h * 0.5) * fl.MM))
             except Exception as _lid_par_err:
                 print(f"[univ][sealed] tc_lid parent FAILED: {_lid_par_err}")
-            # Open ~45° from closed (−Rx: front edge rises; knob tips toward +Y/rear).
-            # DECISION (1755): −55° hid too much outer face from front cams; −45°
-            # matches gold kit photos and leaves the star in the high 3/4 silhouette.
-            _HINGE_OPEN_RX_DEG = -45.0
+            # RULE: tip-back open = ifg.tipback_lid_open_rx_deg() (−Rx; Blender +Y=rear).
+            _HINGE_OPEN_RX_DEG = ifg.tipback_lid_open_rx_deg()
             try:
                 _hinge.rotation_euler[0] = math.radians(_HINGE_OPEN_RX_DEG)
             except Exception:
@@ -21813,14 +21805,16 @@ def main():
             _hero_distance = perspective_distance_for_extent(
                 _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
             _pd = _hero_distance / math.sqrt(2)
-            # Thermocycler: raise hero + aim at open lid / star (same as 04 cams).
-            _hz = (1.55 if _IS_THERMOCYCLER_FORM
-                   else (0.96 if _IS_INSTRUMENT_DEVICE else 0.12))
-            _htz = (0.85 if _IS_THERMOCYCLER_FORM
-                    else (0.02 if _IS_INSTRUMENT_DEVICE else 0.0))
-            _hty = (_sd * 0.10 * fl.MM) if _IS_THERMOCYCLER_FORM else 0.0
-            _hero_cam = {"loc": (_pc[0] + _pd * (0.85 if _IS_THERMOCYCLER_FORM else 1.0),
-                                  _pc[1] - _pd * (0.92 if _IS_THERMOCYCLER_FORM else 1.0),
+            # Tip-back lid form: same look-down rule as product cams (ifg fractions).
+            _tlh = ifg.tipback_lid_product_cam_fractions() if _IS_THERMOCYCLER_FORM else {}
+            _hz = float(_tlh.get("hero_z", 0.96 if _IS_INSTRUMENT_DEVICE else 0.12))
+            _htz = float(_tlh.get("hero_tgt_z", 0.02 if _IS_INSTRUMENT_DEVICE else 0.0))
+            _hty = (_sd * float(_tlh.get("hero_tgt_y_frac", 0.0)) * fl.MM
+                    if _IS_THERMOCYCLER_FORM else 0.0)
+            _hds = float(_tlh.get("hero_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
+            _fds = float(_tlh.get("front_dist_scale", 1.0)) if _IS_THERMOCYCLER_FORM else 1.0
+            _hero_cam = {"loc": (_pc[0] + _pd * _hds,
+                                  _pc[1] - _pd * _fds,
                                   _pc[2] + _pmax * _hz),
                          "target": (
                              _pc[0],

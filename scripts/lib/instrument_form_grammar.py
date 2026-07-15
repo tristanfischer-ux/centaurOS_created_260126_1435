@@ -15,6 +15,8 @@ FLOW: constants here + hfi → `_instrument_form_rule_mm` + interior layout
 
 from __future__ import annotations
 
+import re
+
 import human_factors_instrument as hfi
 
 # Re-export hand/eye floors so callers can `import instrument_form_grammar as ifg`
@@ -254,9 +256,133 @@ def body_luminance_ok(
     return mean_min <= mean <= mean_max
 
 
+# ── Thermocycler / PCR benchtop form (tip-back hinged lid) ────────────────
+# INTENT: a SECOND instrument form family beside the optical handheld.
+# Keyed on class slug + thermal/sample-block part vocabulary — never
+# `if product == "ninjapcr"`. Brand nouns below are TRAINING synonyms only
+# (briefs that say "NinjaPCR class" still mean this form).
+#
+# Physical rule: hinged lid opens tip-back (−Rx in Blender: +Y = rear) so the
+# outer-face pressure knob faces up/rear; product cams must look DOWN onto that
+# face or the knob is occluded behind the lid slab.
+
+THERMOCYCLER_CLASS_RE = re.compile(
+    r"thermocycler|thermal[_ -]?cycler|\bpcr\b", re.I)
+# TRAINING synonyms → same form (not product-specific branches).
+THERMOCYCLER_CLASS_ALIAS_RE = re.compile(r"ninjapcr|openpcr", re.I)
+THERMOCYCLER_PART_RE = re.compile(
+    r"peltier|tec[_ -]?module|sample[_ -]?block|thermal[_ -]?block|pcr[_ -]?tube|"
+    r"tube[_ -]?well|heatsink[_ -]?fan", re.I)
+
+# Blender hinge: −Rx raises the lid front edge (y<0); +Rx dumps it into the cavity.
+TIPBACK_LID_OPEN_RX_DEG = -45.0
+
+# Product-camera framing for tip-back lids (fractions of envelope height / depth).
+# RULE: elevate eye + bias look-at toward the rear hinge so outer-face controls read.
+TIPBACK_LID_CAM_EXT_Z = 2.10
+TIPBACK_LID_CAM_SIDE_Z = 1.85
+TIPBACK_LID_CAM_TGT_Z = 0.95
+TIPBACK_LID_CAM_TGT_Y_FRAC = 0.12
+TIPBACK_LID_CAM_HERO_Z = 1.55
+TIPBACK_LID_CAM_HERO_TGT_Z = 0.85
+TIPBACK_LID_CAM_HERO_TGT_Y_FRAC = 0.10
+TIPBACK_LID_CAM_FRONT_DIST_SCALE = 0.92
+TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.85
+
+# Vision: outer-face lid controls are clearest on the sealed product exterior,
+# not the cutaway hero (foreshortens the tip-back knob).
+TIPBACK_LID_VISION_IMAGE_CANDIDATES = (
+    "04-product-exterior.png",
+    "00-hero.png",
+    "blender-cover.png",
+    "07-product-service.png",
+)
+
+
+def is_thermocycler_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for benchtop PCR / thermocycler form — class or part vocabulary.
+
+    @description Form gate for tip-back lid skin, thermal interior, and PCR
+                 vision rubrics. RULE: class/alias slug is authoritative (even if
+                 `isInstrumentDevice` was dropped from state). Part-vocabulary
+                 match only applies on device-scale instruments — avoids a plant
+                 BoM word containing "peltier" flipping a process plant into PCR
+                 skin. Brand aliases are TRAINING synonyms for the form only.
+    @param product_class Chain product_class slug / brief class token
+    @param part_blob Concatenated part name_human text (peltier / sample block…)
+    @param is_instrument Device-scale instrument flag (gates part-vocab path only)
+    @returns True when this form family's rules should apply
+    """
+    pc = product_class or ""
+    blob = part_blob or ""
+    if THERMOCYCLER_CLASS_RE.search(pc) or THERMOCYCLER_CLASS_ALIAS_RE.search(pc):
+        return True
+    if not is_instrument:
+        return False
+    return bool(THERMOCYCLER_PART_RE.search(blob))
+
+
+def tipback_lid_open_rx_deg() -> float:
+    """Hinge open angle (deg) for tip-back PCR lids — always negative in Blender."""
+    return float(TIPBACK_LID_OPEN_RX_DEG)
+
+
+def tipback_lid_product_cam_fractions() -> dict:
+    """Named camera fractions for tip-back hinged-lid product shots.
+
+    @returns Dict of elevation / look-at fractions keyed for Blender product cams.
+    """
+    return {
+        "ext_z": TIPBACK_LID_CAM_EXT_Z,
+        "side_z": TIPBACK_LID_CAM_SIDE_Z,
+        "tgt_z": TIPBACK_LID_CAM_TGT_Z,
+        "tgt_y_frac": TIPBACK_LID_CAM_TGT_Y_FRAC,
+        "hero_z": TIPBACK_LID_CAM_HERO_Z,
+        "hero_tgt_z": TIPBACK_LID_CAM_HERO_TGT_Z,
+        "hero_tgt_y_frac": TIPBACK_LID_CAM_HERO_TGT_Y_FRAC,
+        "front_dist_scale": TIPBACK_LID_CAM_FRONT_DIST_SCALE,
+        "hero_dist_scale": TIPBACK_LID_CAM_HERO_DIST_SCALE,
+    }
+
+
+def tipback_lid_vision_image_candidates() -> tuple[str, ...]:
+    """Image preference order when outer-face lid controls must be judged."""
+    return TIPBACK_LID_VISION_IMAGE_CANDIDATES
+
+
 def _selftest() -> None:
     """proveCatch: grammar floors are stable; accessory cap ≠ knob; silhouette holds."""
     hfi._selftest()
+    # Thermocycler form: class alone (no brand), part vocab, aliases, negatives.
+    assert is_thermocycler_form(product_class="thermocycler"), (
+        "class slug thermocycler must select tip-back lid form without brand nouns")
+    assert is_thermocycler_form(product_class="thermal_cycler")
+    assert is_thermocycler_form(
+        product_class="",
+        part_blob="Peltier TEC module and aluminum sample block with tube wells",
+    ), "part vocabulary alone must select the form when class is thin"
+    assert is_thermocycler_form(product_class="ninjapcr"), (
+        "TRAINING synonym must map to the same form — not a product branch")
+    assert not is_thermocycler_form(product_class="colorimeter")
+    assert is_thermocycler_form(product_class="thermocycler", is_instrument=False), (
+        "class slug remains authoritative when isInstrumentDevice was dropped")
+    assert not is_thermocycler_form(
+        product_class="bess",
+        part_blob="random peltier mention",
+        is_instrument=False,
+    ), "plant + part vocab must NOT select PCR form"
+    assert tipback_lid_open_rx_deg() < 0.0, (
+        "Blender +Y=rear tip-back open must be −Rx (front edge rises)")
+    _cam = tipback_lid_product_cam_fractions()
+    assert _cam["ext_z"] > _cam["tgt_z"] > 0.5, (
+        "tip-back product cam must look down onto the open lid, not the deck")
+    assert tipback_lid_vision_image_candidates()[0] == "04-product-exterior.png", (
+        "outer-face lid controls: prefer sealed product exterior over cutaway hero")
     assert BUTTON_SHAPE == "square"
     assert CAP_STYLE == "ambient_lid"
     assert material_roles_ok(), "material honesty table inverted"
