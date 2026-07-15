@@ -12406,16 +12406,25 @@ def _sealed_product_camera_specs(env_mm):
         _ctrl * _dist_k, focal_mm=58, frame_fraction=_frame)
     service_distance = perspective_distance_for_extent(
         max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
+    # INTENT (1755 SIGHT): thermocycler lid opens tip-back (−Rx); the star lives on
+    # the OUTER face (normal → +Y/rear). Low front cams aimed at the deck only saw
+    # the underside platen — star occluded behind the lid slab. Raise cams + aim at
+    # the open-lid / star region so the lobed knob silhouettes like gold OpenPCR.
+    _tc = bool(_IS_THERMOCYCLER_FORM)
+    _ext_z = 2.10 if _tc else (1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
+    _side_z = 1.85 if _tc else (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
+    _tgt_z = 0.95 if _tc else (0.04 if _IS_INSTRUMENT_DEVICE else 0.0)
+    _tgt_y = (d * 0.12) if _tc else 0.0  # bias look-at toward rear hinge / star
     return [
         {
             "name": "04-product-exterior",
             "loc": (centre[0] + front_distance * 0.18,
-                    centre[1] - front_distance,
-                    centre[2] + h * (1.40 if _IS_INSTRUMENT_DEVICE else 0.12)),
+                    centre[1] - front_distance * (0.92 if _tc else 1.0),
+                    centre[2] + h * _ext_z),
             "target": (
                 centre[0],
-                centre[1],
-                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+                centre[1] + _tgt_y,
+                centre[2] + h * _tgt_z,
             ),
             "camera_type": "PERSP",
             "focal": 62,
@@ -12424,11 +12433,11 @@ def _sealed_product_camera_specs(env_mm):
             "name": "05-product-left",
             "loc": (centre[0] - side_distance * 0.42,
                     centre[1] - side_distance * 0.90,
-                    centre[2] + h * (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)),
+                    centre[2] + h * _side_z),
             "target": (
                 centre[0],
-                centre[1],
-                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+                centre[1] + _tgt_y,
+                centre[2] + h * _tgt_z,
             ),
             "camera_type": "PERSP",
             "focal": 58,
@@ -12437,11 +12446,11 @@ def _sealed_product_camera_specs(env_mm):
             "name": "06-product-right",
             "loc": (centre[0] + side_distance * 0.42,
                     centre[1] - side_distance * 0.90,
-                    centre[2] + h * (1.16 if _IS_INSTRUMENT_DEVICE else 0.10)),
+                    centre[2] + h * _side_z),
             "target": (
                 centre[0],
-                centre[1],
-                centre[2] + h * (0.04 if _IS_INSTRUMENT_DEVICE else 0.0),
+                centre[1] + _tgt_y,
+                centre[2] + h * _tgt_z,
             ),
             "camera_type": "PERSP",
             "focal": 58,
@@ -12453,15 +12462,15 @@ def _sealed_product_camera_specs(env_mm):
             # 3/4 looking DOWN into the open lid so sample-block wells + star knob
             # read (1656 07 looked into an empty cavity above the deck).
             "loc": (
-                centre[0] + service_distance * (0.62 if _IS_THERMOCYCLER_FORM else 0.0),
-                centre[1] - service_distance * (0.70 if _IS_THERMOCYCLER_FORM else 1.0),
-                (centre[2] + h * 0.95) if _IS_THERMOCYCLER_FORM
+                centre[0] + service_distance * (0.55 if _tc else 0.0),
+                centre[1] - service_distance * (0.55 if _tc else 1.0),
+                (centre[2] + h * 1.55) if _tc
                 else (DECK_Z_MM * fl.MM + h * 0.25),
             ),
             "target": (
                 centre[0],
-                centre[1] - (d * 0.05 if _IS_THERMOCYCLER_FORM else 0.0),
-                (centre[2] + h * 0.55) if _IS_THERMOCYCLER_FORM
+                centre[1] + (d * 0.10 if _tc else 0.0),
+                (centre[2] + h * 0.85) if _tc
                 else (DECK_Z_MM * fl.MM + h * 0.18),
             ),
             "camera_type": "PERSP",
@@ -15140,8 +15149,10 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     (0.0, (-_lid_d * 0.5) * fl.MM, (_lid_h * 0.5) * fl.MM))
             except Exception as _lid_par_err:
                 print(f"[univ][sealed] tc_lid parent FAILED: {_lid_par_err}")
-            # Open ~55° from closed (−Rx: front edge rises; knob tips toward +Y/rear).
-            _HINGE_OPEN_RX_DEG = -55.0
+            # Open ~45° from closed (−Rx: front edge rises; knob tips toward +Y/rear).
+            # DECISION (1755): −55° hid too much outer face from front cams; −45°
+            # matches gold kit photos and leaves the star in the high 3/4 silhouette.
+            _HINGE_OPEN_RX_DEG = -45.0
             try:
                 _hinge.rotation_euler[0] = math.radians(_HINGE_OPEN_RX_DEG)
             except Exception:
@@ -15168,14 +15179,16 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 metallic=0.35, roughness=0.42)
             # Small hub + five long lobes — hub ≪ tip radius so the star reads
             # from the high front 3/4 (gold OpenPCR: large black star on outer lid).
-            _knob_r = max(40.0, min(W, D) * 0.30)
-            _hub_r = _knob_r * 0.32
-            _knob_h = 22.0
-            _lobe_len = _knob_r * 1.15
-            _lobe_w = _knob_r * 0.28
+            # Height is load-bearing: even tip-back, a tall star silhouettes above
+            # the lid edge from the front (1755: short knob stayed occluded).
+            _knob_r = max(42.0, min(W, D) * 0.32)
+            _hub_r = _knob_r * 0.30
+            _knob_h = 36.0
+            _lobe_len = _knob_r * 1.20
+            _lobe_w = _knob_r * 0.26
             # Centre of outer lid face — gold star sits mid-lid, not at the lip.
-            _local_y = -_lid_d * 0.28
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 6.0
+            _local_y = -_lid_d * 0.30
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 8.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
