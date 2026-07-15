@@ -60,6 +60,12 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
 import drawing_building_envelope as _be  # noqa: E402  (ledger-slab building footprint)
+from placement_fp import (  # noqa: E402  (GA↔Blender QC token)
+    embed_svg_placement_fp,
+    extract_svg_placement_fp,
+    load_manifest_placement_fp,
+    placement_fingerprint,
+)
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_ga() from the run's own artifacts so the title block is not a live
@@ -124,19 +130,217 @@ def _clamp_instrument_parts_to_envelope(
     INTENT: handheld instruments export hidden coverage proxies so Part names / GA
     can identify real parts. If an old proxy is product-sized or tall, the GA must
     still show a compact product envelope instead of reverting to plant-scale massing.
+
+    GOTCHA: world-Z (~600 mm wall-mount) must NOT be clamped into hh — that piles
+    every part at the top of a 120 mm envelope. XY/size clamp only; Z seating is
+    `_seat_instrument_parts_in_form` (form-rule bands) before draw.
     """
-    max_half = (max(3.0, ww * 0.10), max(3.0, dd * 0.10), max(2.5, hh * 0.14))
+    max_half = (max(3.0, ww * 0.22), max(3.0, dd * 0.22), max(2.5, hh * 0.35))
     for p in parts:
-        cx = min(max(float(p.cx), -ww / 2.0 + max_half[0]), ww / 2.0 - max_half[0])
-        cy = min(max(float(p.cy), -dd / 2.0 + max_half[1]), dd / 2.0 - max_half[1])
-        zc = min(max((float(p.z0) + float(p.z1)) / 2.0, max_half[2]), hh - max_half[2])
+        if _is_instrument_shell(p):
+            # Shells keep full envelope footprint — drawn as dashed outline only.
+            p.cx, p.cy = 0.0, 0.0
+            p.x0, p.x1 = -ww / 2.0, ww / 2.0
+            p.y0, p.y1 = -dd / 2.0, dd / 2.0
+            p.z0, p.z1 = 0.0, min(hh, max(hh * 0.65, 20.0))
+            continue
+        cx = min(max(float(p.cx), -ww / 2.0 + 2.0), ww / 2.0 - 2.0)
+        cy = min(max(float(p.cy), -dd / 2.0 + 2.0), dd / 2.0 - 2.0)
         hx = min(max((float(p.x1) - float(p.x0)) / 2.0, 2.0), max_half[0])
         hy = min(max((float(p.y1) - float(p.y0)) / 2.0, 2.0), max_half[1])
-        hz = min(max((float(p.z1) - float(p.z0)) / 2.0, 2.0), max_half[2])
+        hz = min(max((float(p.z1) - float(p.z0)) / 2.0, 1.5), max_half[2])
+        # Preserve relative Z centre for now; seating rewrites bands later.
+        zc = (float(p.z0) + float(p.z1)) / 2.0
         p.cx, p.cy = cx, cy
         p.x0, p.x1 = cx - hx, cx + hx
         p.y0, p.y1 = cy - hy, cy + hy
-        p.z0, p.z1 = max(0.0, zc - hz), min(hh, zc + hz)
+        p.z0, p.z1 = zc - hz, zc + hz
+
+
+_INSTRUMENT_SHELL_RE = re.compile(
+    r"enclosure|housing|shell|lid|shroud|chassis|\bcase\b|\bcover\b", re.I)
+_INSTRUMENT_CLUTTER_RE = re.compile(
+    r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|tvs\b|esd[_ -]?protect|"
+    r"varistor|mov\b|input[_ -]?fuse|dc[_ -]?input[_ -]?fuse|"
+    r"thermal[_ -]?cutoff|overcurrent\s*protection|"
+    r"subcomponent\s*\d+|sensing\s+instrumentation\s+subcomponent|"
+    r"interconnect\s*cable|sensor\s*cable)\b",
+    re.I,
+)
+_INSTRUMENT_OPTICAL_RE = re.compile(
+    r"\bled\b|emitter|light\s*source|source\s*(?:board|module)|collimat|"
+    r"cuvette|sample\s*cell|detector|photodiode|wavelength|filter|baffle|"
+    r"optic|monochrom|grating|lens",
+    re.I,
+)
+_INSTRUMENT_PCB_RE = re.compile(
+    r"\bpcb\b|board|mcu|microcontroller|processor|compute|driver|regulator|"
+    r"dc[\s_-]?dc|battery|cell\b|pack\b|usb|fuse|esd|ferrite",
+    re.I,
+)
+_INSTRUMENT_HMI_RE = re.compile(
+    r"display|screen|lcd|oled|hmi|bezel|button|keypad|switch|indicator",
+    re.I,
+)
+
+
+def _is_instrument_shell(p: GAPart) -> bool:
+    return bool(_INSTRUMENT_SHELL_RE.search(str(getattr(p, "name", "") or "")))
+
+
+def _is_instrument_clutter(p: GAPart) -> bool:
+    return bool(_INSTRUMENT_CLUTTER_RE.search(str(getattr(p, "name", "") or "")))
+
+
+def _retag_instrument_parts_to_spine(parts: list[GAPart], state: dict) -> int:
+    """Rewrite GA tags to gold-spine BoM principals (I-201 / X-201…), not X-101 proxies.
+
+    INTENT: Assembly must name the same principals as Part names / Interconnect —
+    a sheet of X-108/X-102 boxes while the BoM says I-201 is not a real drawing.
+    """
+    spine: list[tuple[str, str]] = []
+    for b in state.get("requirementsBom") or []:
+        if not isinstance(b, dict) or b.get("status") == "SUB-COMPONENT":
+            continue
+        nm = str(b.get("requirement") or b.get("name_human") or "").split("·")[0].strip()
+        tg = str(b.get("tag") or "").strip()
+        if nm and tg:
+            spine.append((nm.lower(), tg))
+    if not spine:
+        return 0
+    host_to_compute = re.compile(
+        r"microcontroller|\bmcu\b|local\s*display|usb\s*(interface|power)|"
+        r"rechargeable\s*battery|dc\s*dc\s*regulator|power\s*switch|"
+        r"user\s*input|status\s*indicator|mounting\s*bezel",
+        re.I,
+    )
+    compute_tag = next((tg for nm, tg in spine if "compute ui" in nm), "I-201")
+    led_tag = next((tg for nm, tg in spine if "led source" in nm), "X-201")
+    n = 0
+    for p in parts:
+        nm = str(p.name or "").lower()
+        matched = None
+        for sn, tg in spine:
+            if sn in nm or nm in sn or (
+                len(set(sn.split()) & set(nm.split()) - {"module", "board"}) >= 2
+            ):
+                matched = tg
+                break
+        if not matched:
+            if re.search(r"\bled\s*driver\b|\bled\s*source\b", nm):
+                matched = led_tag
+            elif host_to_compute.search(nm):
+                matched = compute_tag
+        if matched and p.tag != matched:
+            p.tag = matched
+            n += 1
+    return n
+
+
+def _seat_instrument_parts_in_form(
+    parts: list[GAPart],
+    form: dict,
+    ww: float,
+    dd: float,
+    hh_body: float,
+) -> int:
+    """Place BoM parts into form-rule Z bands so Assembly shows a real stack-up.
+
+    INTENT (Tristan 2026-07-14): Assembly must show the PCB + optics + how they
+    fit — not an empty exterior silhouette. Optical parts sit in the cube;
+    compute/power on the body PCB plane; HMI on the deck.
+
+    @returns Number of non-shell parts reseated.
+    """
+    if not form or not parts:
+        return 0
+    body_h = float(form.get("body_size", (ww, dd, hh_body))[2] or hh_body)
+    tw, td, th = form["tower_size"]
+    tx, ty, _tz = form["tower_loc"]
+    total_h = float(form.get("total_height_mm") or (body_h + th))
+    # PCB plane ~ mid-body under the UI deck (matches Blender cutaway green board).
+    pcb_z = max(8.0, body_h * 0.42)
+    pcb_half_h = 2.5
+    n = 0
+    for p in parts:
+        nm = str(p.name or "")
+        if _is_instrument_shell(p):
+            p.z0, p.z1 = 0.0, body_h
+            continue
+        hx = max((p.x1 - p.x0) / 2.0, 2.0)
+        hy = max((p.y1 - p.y0) / 2.0, 2.0)
+        if _INSTRUMENT_OPTICAL_RE.search(nm):
+            zc = body_h + th * 0.48
+            hz = min(max((p.z1 - p.z0) / 2.0, 3.0), th * 0.40)
+            # Keep optical parts inside the tower plan.
+            p.cx = min(max(float(p.cx), tx - tw / 2 + hx), tx + tw / 2 - hx)
+            p.cy = min(max(float(p.cy), ty - td / 2 + hy), ty + td / 2 - hy)
+        elif _INSTRUMENT_HMI_RE.search(nm):
+            zc = body_h + 4.0
+            hz = min(max((p.z1 - p.z0) / 2.0, 2.0), 6.0)
+        elif _INSTRUMENT_PCB_RE.search(nm):
+            zc = pcb_z
+            hz = pcb_half_h
+            # Microcontroller / compute board: enlarge plan so the PCB reads as a
+            # real board the optics/HMI mount above — not a 5 mm chip speck.
+            if re.search(r"microcontroller|mcu|\bpcb\b|compute|processor", nm, re.I):
+                hx = max(hx, min(ww * 0.22, 48.0))
+                hy = max(hy, min(dd * 0.20, 38.0))
+        else:
+            zc = body_h * 0.55
+            hz = min(max((p.z1 - p.z0) / 2.0, 2.0), body_h * 0.20)
+        p.x0, p.x1 = p.cx - hx, p.cx + hx
+        p.y0, p.y1 = p.cy - hy, p.cy + hy
+        p.z0 = max(0.0, zc - hz)
+        p.z1 = min(total_h, zc + hz)
+        n += 1
+    return n
+
+
+def _fit_product_parts_to_envelope(
+    parts: list[GAPart],
+    ww: float,
+    dd: float,
+    hh: float,
+) -> dict:
+    """Sit a sealed-cabinet assembly on FFL and fit it inside the design envelope.
+
+    INTENT (Powerwall 0332): parts-manifest carries plant/world Z (z_min≈825 mm —
+    deck + wall-mount offset) while the product envelope is 1.105 m tall. GA drew
+    FFL at 0 and z_max from the floating top (2.08 m), leaving an empty lower half
+    that does not match the Blender hero. Universal: rebase onto the product base,
+    uniformly scale Z if the stack is taller than the design height, soft-clip XY.
+    Never crush part sizes to a handheld proxy fraction (that is the instrument clamp).
+    """
+    if not parts:
+        return {"z_shift_mm": 0.0, "z_scale": 1.0}
+    z_lo = min(float(p.z0) for p in parts)
+    z_hi = max(float(p.z1) for p in parts)
+    span = max(z_hi - z_lo, 1.0)
+    for p in parts:
+        p.z0 = float(p.z0) - z_lo
+        p.z1 = float(p.z1) - z_lo
+    z_scale = 1.0
+    if span > hh + 0.5:
+        z_scale = hh / span
+        for p in parts:
+            p.z0 *= z_scale
+            p.z1 *= z_scale
+    half_w = ww / 2.0
+    half_d = dd / 2.0
+    for p in parts:
+        cx = min(max(float(p.cx), -half_w), half_w)
+        cy = min(max(float(p.cy), -half_d), half_d)
+        hx = max((float(p.x1) - float(p.x0)) / 2.0, 1.0)
+        hy = max((float(p.y1) - float(p.y0)) / 2.0, 1.0)
+        hx = min(hx, max(1.0, half_w - abs(cx)))
+        hy = min(hy, max(1.0, half_d - abs(cy)))
+        p.cx, p.cy = cx, cy
+        p.x0, p.x1 = cx - hx, cx + hx
+        p.y0, p.y1 = cy - hy, cy + hy
+        p.z0 = max(0.0, min(float(p.z0), hh))
+        p.z1 = max(p.z0 + 1.0, min(float(p.z1), hh))
+    return {"z_shift_mm": z_lo, "z_scale": z_scale}
 
 
 # BELOW-GRADE / gravity-drain collection point — the same generic noun signal
@@ -204,43 +408,152 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
     # rooms). [] on a homogeneous / compact archetype — no rooms to draw.
     meta = {"count": man.get("count", len(parts)), "schema": man.get("schema", ""),
             "rooms": man.get("rooms") or []}
+    # INTENT (Powerwall 2026-07-15): G15/G16 compare SVG data-placement-fp to the
+    # settled parts-manifest fingerprint. Capture it HERE from the written rows —
+    # BEFORE any display-only transform (product FFL rebase, instrument clamp)
+    # mutates GAPart coordinates. Hashing rebased z would ship a divergent fp
+    # (GA 176a… ≠ manifest 76fc…) while every other sheet stamps the manifest.
+    try:
+        _settle_fp = man.get("placement_fp") or placement_fingerprint(
+            man.get("parts") or [])
+        if _settle_fp:
+            meta["placement_fp"] = str(_settle_fp).lower()
+    except Exception:  # noqa: BLE001
+        pass
     # INTENT (2026-07-13, colorimeter 0819): sealed instruments often leave the GA
     # massing list empty (PCB-level parts filtered). Without a bbox, build_ga_svg
     # defaulted to 1000×1000×3000 mm ("1×1×3 m plant"). Prefer the design envelope
     # from state when isInstrumentDevice — never invent a plant floor.
+    # EXTENDED 2026-07-14: any product-scale sealed cabinet (Powerwall etc.) must
+    # also say "product envelope", not "Overall plant envelope" — same signal as
+    # render_view_contract.is_product_scale (enclosure_volume_m3 < 1).
     try:
         st_path = Path(out_dir) / "state.json"
         if st_path.is_file():
             with open(st_path) as fh:
                 _st = json.load(fh)
             meta["is_instrument_device"] = bool(_st.get("isInstrumentDevice"))
-            if meta["is_instrument_device"]:
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+            from render_view_contract import is_product_scale as _is_product_scale
+            meta["is_product_scale"] = bool(_is_product_scale(_st))
+            if meta["is_instrument_device"] or meta["is_product_scale"]:
+                # Prefer the SAME envelope the Renders captions publish
+                # (design_envelope_* mm) so GA L×W×H cannot disagree with the hero.
                 env = (
                     ((_st.get("orchestratorContract") or {}).get("quantities") or {})
                     or ((_st.get("engineeringContract") or {}).get("quantities") or {})
                 )
-                # enclosure dims may live as shared quantities or derived mm
+
                 def _q(key: str):
                     v = env.get(key)
                     if isinstance(v, dict):
                         return v.get("value")
                     return v
-                w = (_q("enclosure_width_mm") or _q("device_width_mm")
-                     or _q("design_envelope_width_mm"))
-                d = (_q("enclosure_depth_mm") or _q("device_depth_mm")
-                     or _q("design_envelope_depth_mm"))
-                h = (_q("enclosure_height_mm") or _q("device_height_mm")
-                     or _q("design_envelope_height_mm"))
-                # fallback: compact handheld envelope (matches render_view_contract spirit)
+
+                w = (_q("design_envelope_width_mm") or _q("enclosure_width_mm")
+                     or _q("device_width_mm"))
+                d = (_q("design_envelope_depth_mm") or _q("enclosure_depth_mm")
+                     or _q("device_depth_mm"))
+                h = (_q("design_envelope_height_mm") or _q("enclosure_height_mm")
+                     or _q("device_height_mm"))
                 try:
                     ww = float(w) if w is not None else 180.0
                     dd = float(d) if d is not None else 140.0
                     hh = float(h) if h is not None else 80.0
                 except (TypeError, ValueError):
                     ww, dd, hh = 180.0, 140.0, 80.0
+                # INTENT (2026-07-14): ALWAYS prefer resolve_design_envelope_mm for
+                # instruments — it applies minimum_working_envelope (as small as
+                # possible, still does the work) over mass÷density air written into
+                # design_envelope_* quantities. Raw quantities alone re-inflated
+                # colorimeter to 183×145 mm after the pack rule landed.
+                try:
+                    from render_view_contract import resolve_design_envelope_mm
+                    _resolved = resolve_design_envelope_mm(_st)
+                    if _resolved:
+                        ww, dd, hh = (float(_resolved[0]), float(_resolved[1]),
+                                      float(_resolved[2]))
+                except Exception:  # noqa: BLE001
+                    pass
                 bbox = _instrument_envelope_bbox(ww, dd, hh)
-                meta["envelope_source"] = "instrument_state_or_default"
-                _clamp_instrument_parts_to_envelope(parts, ww, dd, hh)
+                meta["envelope_source"] = "resolve_design_envelope_mm"
+                try:
+                    _op = _q("optical_path_mm") or _q("optical_path_length_mm")
+                    if _op is not None:
+                        meta["optical_path_mm"] = float(_op)
+                except Exception:  # noqa: BLE001
+                    pass
+                if meta["is_instrument_device"]:
+                    # INTENT (colorimeter 2026-07-14): legacy manifests pile every
+                    # BoM proxy at (0,0). Spread via the same role-XY rule Blender
+                    # now uses BEFORE clamp, so FRONT/PLAN match the product shot
+                    # without requiring a full re-render. Persist the rewrite so
+                    # placement_fp / G14 / G15 share one generation.
+                    try:
+                        from instrument_role_xy import spread_instrument_manifest_rows
+                        rows = man.get("parts") or []
+                        n_rew = spread_instrument_manifest_rows(rows, ww, dd)
+                        if n_rew:
+                            man["placement_fp"] = placement_fingerprint(rows)
+                            with open(p, "w") as fh:
+                                json.dump(man, fh, indent=2)
+                        # Stamp the SAME fp into meta so the SVG cannot hash a
+                        # different tag alphabet (u_slug vs X-101) and fail G15/G16.
+                        if man.get("placement_fp"):
+                            meta["placement_fp"] = str(man["placement_fp"]).lower()
+                            # Re-project from the rewritten rows (keep dims, new xy).
+                            parts.clear()
+                            for r in rows:
+                                pos = r.get("pos_mm") or [0, 0, 0]
+                                x, y, z = (float(pos[0]), float(pos[1]), float(pos[2]))
+                                d = r.get("dims_mm") or {}
+                                if "dia" in d:
+                                    dia = float(d.get("dia") or 0.0)
+                                    length = float(d.get("len") or 0.0)
+                                    is_round = True
+                                    x0, x1 = _round_extent(x, dia / 2.0)
+                                    y0, y1 = _round_extent(y, dia / 2.0)
+                                    z0, z1 = z - length / 2.0, z + length / 2.0
+                                else:
+                                    w_ = float(d.get("w") or 0.0)
+                                    dep = float(d.get("d") or 0.0)
+                                    h_ = float(d.get("h") or 0.0)
+                                    is_round = False
+                                    x0, x1 = _round_extent(x, w_ / 2.0)
+                                    y0, y1 = _round_extent(y, dep / 2.0)
+                                    z0, z1 = z - h_ / 2.0, z + h_ / 2.0
+                                _name = r.get("name") or ""
+                                parts.append(GAPart(
+                                    tag=r.get("equipment_tag") or "?",
+                                    obj_tag=r.get("tag") or "",
+                                    name=_name,
+                                    module=r.get("module") or "",
+                                    shape=r.get("shape") or "",
+                                    qty=int(r.get("qty") or 1),
+                                    is_round=is_round,
+                                    x0=x0, x1=x1, y0=y0, y1=y1, z0=z0, z1=z1,
+                                    cx=x, cy=y,
+                                    rank=int(r.get("region_rank") or 10**9),
+                                    is_below_grade=bool(
+                                        _BELOW_GRADE_NAME_RE.search(_name))))
+                            print(f"[ga] instrument role-XY spread: {n_rew} part(s) "
+                                  f"un-collapsed + parts-manifest rewritten")
+                            meta["instrument_role_xy_spread"] = n_rew
+                    except Exception as _exc:  # noqa: BLE001
+                        print(f"[ga] instrument role-XY spread skipped: {_exc}")
+                    _clamp_instrument_parts_to_envelope(parts, ww, dd, hh)
+                elif meta["is_product_scale"] and parts:
+                    # INTENT (Powerwall 0332): envelope bbox alone is not enough —
+                    # floating world-Z parts still paint in the upper half of a
+                    # 0…H frame. Rebase onto FFL + fit into design L×W×H.
+                    _fit = _fit_product_parts_to_envelope(parts, ww, dd, hh)
+                    meta["product_ffl_rebase"] = _fit
+                    if (_fit.get("z_shift_mm") or 0) > 50 or abs(
+                            (_fit.get("z_scale") or 1.0) - 1.0) > 0.02:
+                        print(f"[ga] product FFL rebase: shift="
+                              f"{_fit.get('z_shift_mm'):.0f} mm  z_scale="
+                              f"{_fit.get('z_scale'):.3f}  → envelope "
+                              f"{ww:.0f}×{dd:.0f}×{hh:.0f} mm")
     except Exception:
         pass
     return parts, bbox, meta
@@ -363,10 +676,12 @@ class SVG:
         self.add(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
                  f'stroke="{stroke}" stroke-width="{width}" stroke-linecap="{cap}"{d}/>')
 
-    def rect(self, x, y, w, h, stroke=INK, width=1.3, fill="none", rx=0, dash=None):
+    def rect(self, x, y, w, h, stroke=INK, width=1.3, fill="none", rx=0, dash=None,
+             extra: str = ""):
         d = f' stroke-dasharray="{dash}"' if dash else ""
+        ex = f" {extra}" if extra else ""
         self.add(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
-                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"{d}/>')
+                 f'rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{width}"{d}{ex}/>')
 
     def circle(self, cx, cy, r, stroke=INK, width=1.4, fill="none", dash=None):
         d = f' stroke-dasharray="{dash}"' if dash else ""
@@ -379,13 +694,14 @@ class SVG:
 
     def text(self, x, y, s, size=11, anchor="start", fill=INK, weight="normal",
              family="Helvetica, Arial, sans-serif", mono=False, spacing=None,
-             rotate=None):
+             rotate=None, extra: str = ""):
         fam = "'DejaVu Sans Mono', 'Menlo', monospace" if mono else family
         sp = f' letter-spacing="{spacing}"' if spacing else ""
         tr = f' transform="rotate({rotate} {x:.1f} {y:.1f})"' if rotate is not None else ""
+        ex = f" {extra}" if extra else ""
         self.add(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{fam}" '
                  f'font-size="{size}" text-anchor="{anchor}" fill="{fill}" '
-                 f'font-weight="{weight}"{sp}{tr}>{_esc(s)}</text>')
+                 f'font-weight="{weight}"{sp}{tr}{ex}>{_esc(s)}</text>')
 
     def render(self) -> str:
         body = "\n".join(self.parts)
@@ -761,6 +1077,60 @@ def _view_box(svg: SVG, name: str, x0, y0, x1, y1):
     return (float(x0), float(y0), float(x1), float(y1))
 
 
+def _instrument_zone_tag_items(items: list) -> list:
+    """INTENT (2026-07-14 Tristan): instrument FRONT/SIDE must not ladder 6+
+    optical tags at 12 px pitch (G9 IoU=0 while the human glance fails). Keep
+    ONE tag per zone — PCB (Compute UI), Optical (LED Source Board preferred),
+    HMI (Display) — so the sheet names the stack-up without a tag bullseye.
+
+    @param items [(GAPart, px, py, pw, ph), ...] as drawn in one elevation
+    @returns Filtered items (≤3) for `_elevation_tag_groups`
+    """
+    if not items:
+        return items
+    zones: dict[str, tuple] = {}
+    zone_rank = {"pcb": 0, "optical": 1, "hmi": 2, "other": 9}
+
+    def _zone(name: str) -> str:
+        if re.search(
+            r"compute\s*ui|microcontroller|\bmcu\b|dc\s*dc|usb|battery|"
+            r"power\s*(switch|input)|regulator",
+            name, re.I,
+        ):
+            return "pcb"
+        if re.search(
+            r"led\s*source|collimat|cuvette|detector|wavelength|optical\s*path|"
+            r"baffle|\bled\b",
+            name, re.I,
+        ):
+            return "optical"
+        if re.search(r"display|button|hmi|status\s*indicator", name, re.I):
+            return "hmi"
+        return "other"
+
+    # Prefer spine nouns when several parts share a zone.
+    prefer = {
+        "pcb": re.compile(r"compute\s*ui\s*module", re.I),
+        "optical": re.compile(r"led\s*source\s*board", re.I),
+        "hmi": re.compile(r"local\s*display|compute\s*ui", re.I),
+    }
+    for item in items:
+        p = item[0]
+        nm = str(getattr(p, "name", "") or "")
+        z = _zone(nm)
+        if z == "other":
+            continue
+        prev = zones.get(z)
+        if prev is None:
+            zones[z] = item
+            continue
+        pref = prefer.get(z)
+        if pref and pref.search(nm) and not pref.search(str(prev[0].name or "")):
+            zones[z] = item
+    out = [zones[z] for z in sorted(zones, key=lambda k: zone_rank.get(k, 9))]
+    return out or items[:3]
+
+
 def _elevation_tag_groups(items):
     """Collapse an elevation's stacked same-family tags into RANGE tags (v59 B–B:
     six colliding TK labels over the tank nest projected edge-on). `items` =
@@ -1098,13 +1468,146 @@ def _draw_elevation_buried_laterals(svg, parts, elev_x, elev_y, elev_w, elev_h,
                      anchor=anchor)
 
 
+
+def _draw_instrument_form_silhouettes(
+    svg, form: dict, *,
+    plan_x, plan_y, plan_w, plan_h, L, W, ppm, mx, my,
+    front_x, front_y, z_max, mz,
+    assembly_cutaway: bool = False,
+) -> None:
+    """Envelope + zone context for the instrument Assembly / product sheet.
+
+    INTENT (updated 2026-07-14): when ``assembly_cutaway`` is True the BoM parts
+    carry the story (PCB, optics, stack-up) — this layer is a light dashed
+    envelope + zone labels so the reader still sees OPTICAL / UI DECK / PCB
+    planes. When False (legacy empty-massing), keep the heavier exterior form.
+    """
+    if not form:
+        return
+    tw, td, th = form["tower_size"]
+    tx, ty, tz = form["tower_loc"]
+    body_h = float(form["body_size"][2])
+    # ----- TOP: optical chamber + UI deck zones -----
+    tpx = plan_x + mx(tx - tw / 2)
+    tpy = plan_y + my(ty + td / 2)
+    svg.rect(tpx, tpy, tw * ppm, td * ppm, stroke=EQ_INK, width=1.4,
+             fill="#eef2f6" if assembly_cutaway else "#dde3ea",
+             dash="4,3" if assembly_cutaway else None)
+    svg.text(tpx + tw * ppm / 2, tpy + 11, "OPTICAL",
+             size=7.5, anchor="middle", fill=MUTED)
+    dw, dd, dh = form["deck_size"]
+    dcx, dcy, _ = form["deck_loc"]
+    dpx = plan_x + mx(dcx - dw / 2)
+    dpy = plan_y + my(dcy + dd / 2)
+    svg.rect(dpx, dpy, dw * ppm, dd * ppm, stroke=DATUM_INK, width=1.0,
+             fill="none" if assembly_cutaway else "#f0f3f6", dash="3,2")
+    svg.text(dpx + dw * ppm * 0.28, dpy + 10, "UI DECK",
+             size=7.0, anchor="middle", fill=MUTED)
+    # Display + buttons stay as HMI cues (even under cutaway — reader orientation).
+    dx, dy, _ = form["top_display_loc"]
+    dsw, dsd, _ = form["top_display_size"]
+    svg.rect(plan_x + mx(dx - dsw / 2), plan_y + my(dy + dsd / 2),
+             dsw * ppm, dsd * ppm, stroke=EQ_INK, width=1.1, fill="#c8e6d8")
+    bd = float(form["button_diameter_mm"])
+    for bx, by, _bz in form["button_locs"]:
+        svg.rect(plan_x + mx(bx - bd / 2), plan_y + my(by + bd / 2),
+                 bd * ppm, bd * ppm, stroke=MUTED, width=0.8, fill="none")
+    if assembly_cutaway:
+        # PCB plane cue on TOP (left body) — green FR4 strip under HMI.
+        pcb_w = min(W * 0.42, 90.0)
+        pcb_d = min(dd * 0.55, 55.0)
+        pcb_cx = -W * 0.16
+        pcb_cy = dcy
+        svg.rect(plan_x + mx(pcb_cx - pcb_w / 2), plan_y + my(pcb_cy + pcb_d / 2),
+                 pcb_w * ppm, pcb_d * ppm, stroke="#2e7d32", width=1.2,
+                 fill="#c5e1a5", dash="2,2",
+                 extra='data-glance="top-pcb-plane"')
+        svg.text(plan_x + mx(pcb_cx), plan_y + my(pcb_cy) + 3, "PCB",
+                 size=7.5, anchor="middle", fill="#1b5e20",
+                 extra='data-glance="top-pcb-label"')
+
+    # ----- FRONT: body + optical cube (cutaway = open shell; else closed form) -----
+    svg.rect(front_x, front_y + (z_max - body_h) * ppm, plan_w, body_h * ppm,
+             stroke=EQ_INK, width=1.5,
+             fill="none" if assembly_cutaway else "#f4f6f8",
+             dash="5,3" if assembly_cutaway else None)
+    tower_x0 = tx - tw / 2
+    tower_z0 = body_h
+    ftx = front_x + mx(tower_x0)
+    fty = front_y + (z_max - (tower_z0 + th)) * ppm
+    svg.rect(ftx, fty, tw * ppm, th * ppm, stroke=EQ_INK, width=1.5,
+             fill="none" if assembly_cutaway else "#eef1f4",
+             dash="4,3" if assembly_cutaway else None)
+    svg.text(ftx + tw * ppm / 2, fty + 10, "OPTICAL",
+             size=7.0, anchor="middle", fill=MUTED)
+    dw, _dd, _dh = form["deck_size"]
+    dcx, _dcy, _ = form["deck_loc"]
+    deck_band_h_mm = max(body_h * 0.18, 12.0)
+    f_deck_x = front_x + mx(dcx - dw / 2)
+    f_deck_y = front_y + (z_max - body_h) * ppm
+    svg.rect(f_deck_x, f_deck_y, dw * ppm, deck_band_h_mm * ppm,
+             stroke=DATUM_INK, width=1.0, fill="#e8eef5", dash="2,2",
+             extra='data-glance="front-ui-deck"')
+    svg.text(f_deck_x + dw * ppm * 0.22, f_deck_y + deck_band_h_mm * ppm * 0.55 + 2,
+             "UI", size=6.5, anchor="middle", fill=MUTED,
+             extra='data-glance="front-ui-label"')
+    dx, _dy, _dz = form["top_display_loc"]
+    dsw, _dsd, dst = form["top_display_size"]
+    disp_h_mm = max(float(dst) * 3.5, 8.0)
+    f_disp_x = front_x + mx(dx - dsw / 2)
+    f_disp_y = front_y + (z_max - (body_h + disp_h_mm * 0.15)) * ppm
+    svg.rect(f_disp_x, f_disp_y, dsw * ppm, disp_h_mm * ppm,
+             stroke=EQ_INK, width=1.1, fill="#c8e6d8",
+             extra='data-glance="front-display"')
+    svg.text(f_disp_x + dsw * ppm / 2, f_disp_y + disp_h_mm * ppm * 0.65 + 2,
+             "DISPLAY", size=6.5, anchor="middle", fill=EQ_INK,
+             extra='data-glance="front-display-label"')
+    bd = float(form["button_diameter_mm"])
+    for bx, _by, _bz in form["button_locs"]:
+        nub_h = max(bd * 0.55, 3.5) * ppm
+        svg.rect(front_x + mx(bx - bd / 2),
+                 front_y + (z_max - body_h) * ppm - nub_h * 0.35,
+                 bd * ppm, nub_h,
+                 stroke=MUTED, width=0.7, fill="#d7dce3",
+                 extra='data-glance="front-button"')
+    if assembly_cutaway:
+        # FRONT PCB plane (FR4) — the board the MCU / power parts sit on.
+        pcb_w = min(W * 0.42, 90.0)
+        pcb_h = max(body_h * 0.12, 8.0)
+        pcb_cx = -W * 0.16
+        pcb_zc = body_h * 0.42
+        svg.rect(front_x + mx(pcb_cx - pcb_w / 2),
+                 front_y + (z_max - (pcb_zc + pcb_h / 2)) * ppm,
+                 pcb_w * ppm, pcb_h * ppm,
+                 stroke="#2e7d32", width=1.3, fill="#c5e1a5",
+                 extra='data-glance="front-pcb"')
+        svg.text(front_x + mx(pcb_cx),
+                 front_y + (z_max - pcb_zc) * ppm + 3, "PCB",
+                 size=7.0, anchor="middle", fill="#1b5e20",
+                 extra='data-glance="front-pcb-label"')
+    else:
+        lx, _ly, lz = form["led_pcb_loc"]
+        lw, _ld, lh = form["led_pcb_size"]
+        win_w = lw * 0.45
+        win_h = lh * 0.45
+        svg.rect(front_x + mx(lx - win_w / 2),
+                 front_y + (z_max - (lz + win_h / 2)) * ppm,
+                 win_w * ppm, win_h * ppm,
+                 stroke=MUTED, width=1.0, fill="#1a1f28",
+                 extra='data-glance="front-source-window"')
+
+
 def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
                  meta: dict, rooms: Optional[list] = None) -> str:
-    """Render the projected equipment as a GENERAL ARRANGEMENT: PLAN (top-left),
-    FRONT elevation (below the plan, shared X), SIDE elevation (right of plan,
-    shared Y), with overall + key dimensions, a scale bar, north arrow, grid,
-    title block + key. `rooms` (RULE 6, optional): function-segregated plant
-    rooms drawn as walled partitions on the PLAN only."""
+    """Render the projected equipment as a GENERAL ARRANGEMENT.
+
+    Plant (default): PLAN top-left, FRONT below, SIDE right of plan.
+    Product / sealed cabinet (`is_product_scale`): FRONT (door removed · looking
+    in) is the PRIMARY view — same orientation as the Blender cutaway hero — with
+    TOP and SIDE as secondary. A thin wall-cabinet top plan cannot carry tags.
+
+    `rooms` (RULE 6, optional): function-segregated plant rooms on the PLAN only.
+    """
     # ----- model extents (mm), padded a touch so outlines aren't on the frame -----
     x_min = bbox.get("x_min_mm", min((p.x0 for p in parts), default=0.0))
     x_max = bbox.get("x_max_mm", max((p.x1 for p in parts), default=1000.0))
@@ -1115,21 +1618,74 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     L = max(x_max - x_min, 1.0)     # plant length (x)
     W = max(y_max - y_min, 1.0)     # plant width  (y)
     H = max(z_max - z_min, 1.0)     # plant height (z)
+    # Instrument optical cube sits ON the body (form-rule) — extend the sheet
+    # so FRONT shows the same L-body silhouette as the Blender product shot.
+    _form = None
+    if meta.get("is_instrument_device"):
+        try:
+            from instrument_form_rule import instrument_form_rule_mm
+            _opath = float(meta.get("optical_path_mm") or 10.0)
+            _form = instrument_form_rule_mm(L, W, H, 0.0, 2.0, optical_path_mm=_opath)
+            z_max = max(z_max, float(_form["total_height_mm"]))
+            H = max(z_max - z_min, 1.0)
+            # DECISION (2026-07-14 Tristan): Assembly must show PCB + parts stack-up.
+            # Seat BoM proxies into form-rule Z bands BEFORE drawing — the old
+            # exterior-only silhouette + "see FRONT" TOP failed a real assembly glance.
+            if parts:
+                n_seat = _seat_instrument_parts_in_form(
+                    parts, _form, L, W, float(_form["body_size"][2]))
+                print(f"[ga] instrument assembly seat: {n_seat} part(s) in form bands")
+                meta["instrument_assembly_cutaway"] = True
+                # Retag proxies → spine BoM tags (I-201…) so the sheet matches Part names.
+                try:
+                    _st_path = Path(str(meta.get("out_dir") or "")) / "state.json"
+                    _st = {}
+                    if meta.get("state"):
+                        _st = meta["state"] if isinstance(meta["state"], dict) else {}
+                    elif _st_path.is_file():
+                        with open(_st_path) as _fh:
+                            _st = json.load(_fh)
+                    if _st:
+                        n_tag = _retag_instrument_parts_to_spine(parts, _st)
+                        if n_tag:
+                            print(f"[ga] instrument spine retag: {n_tag} part(s) → BoM tags")
+                except Exception as _te:  # noqa: BLE001
+                    print(f"[ga] instrument spine retag skipped: {_te}")
+        except Exception as _fe:  # noqa: BLE001
+            print(f"[ga] instrument form-rule unavailable: {_fe}")
+            _form = None
 
-    # ----- pick ONE scale shared across all views so they read together. The
-    #       binding span is whichever of (L, W) and (L) , (H) dominates the sheet.
-    #       Target a ~A3-landscape working area; choose scale from the widest view.
-    # Larger plan budgets (2026-07-02): the in-drawing schedule now shows only the top
-    # principals (full list → Part names tab), freeing sheet area — spend it on a bigger,
-    # more legible plan (typically one standard scale finer).
-    PLAN_MAX_W = 1000.0    # px budget for the plan width (x)
-    PLAN_MAX_H = 600.0     # px budget for the plan depth (y)
-    sx, ppm_x = choose_scale(L, PLAN_MAX_W)
-    sy, ppm_y = choose_scale(W, PLAN_MAX_H)
-    sz, ppm_z = choose_scale(H, 300.0)
-    scale_S = max(sx, sy, sz)              # the coarsest fits everything
-    # re-derive the matching px-per-mm for that single scale (K from choose_scale).
+    # INTENT (2026-07-14 Powerwall): sealed product GA must lead with the FRONT
+    # cutaway view — the plant-style top plan of a 618×182 mm wall cabinet is a
+    # tag pile-up that cannot match the Blender hero a reader compares against.
+    product_mode = bool(meta.get("is_product_scale") or meta.get("is_instrument_device"))
+    # Instruments with seated parts: TOP carries tags (real assembly plan).
+    # Thin wall cabinets still defer TOP tags to FRONT.
+    thin_top = (
+        (product_mode and not meta.get("is_instrument_device")
+         and (W / max(L, 1.0)) < 0.45)
+    )
+
+    # ----- pick ONE scale shared across all views so they read together. -----
     K = 3.78
+    if product_mode:
+        # Handheld instruments need a close scale (≤1:5) so the L-body reads;
+        # wall cabinets still use the wide FRONT budget.
+        if meta.get("is_instrument_device"):
+            # GOTCHA: choose_scale() bottoms out at 1:20 for sub-metre envelopes
+            # (its series is plant-oriented). Handhelds need 1:2 so the L-body
+            # + optical cube fill the sheet the way the Blender product shot does.
+            sx = sy = sz = 2.0
+        else:
+            sx, _ = choose_scale(L, 720.0)
+            sy, _ = choose_scale(W, 160.0)
+            sz, _ = choose_scale(H, 820.0)
+    else:
+        # Larger plan budgets (2026-07-02): spend sheet area on a bigger plan.
+        sx, _ = choose_scale(L, 1000.0)
+        sy, _ = choose_scale(W, 600.0)
+        sz, _ = choose_scale(H, 300.0)
+    scale_S = max(sx, sy, sz)              # the coarsest fits everything
     ppm = K / scale_S
 
     def mx(x_mm):   # model-x (mm) → paper px offset
@@ -1151,42 +1707,40 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     title_h = 166             # +16 for the shared general-tolerance note line (_tb.TOLERANCE_NOTE)
     if has_below_grade:
         title_h += 16         # +16 for the below-grade hatch-symbol note (conditional)
-    gap = 96                 # gap between plan and the side elevation / dim gutters
-    v_gap = 92               # gap between plan and front elevation (dim band)
-    label_gutter = 30        # left gutter for the vertical (plant-width) dimension
+    gap = 96                 # gap between primary view and the side elevation
+    v_gap = 92               # gap between stacked views (dim band)
+    label_gutter = 30        # left gutter for the vertical dimension
 
-    # PLAN block origin
-    plan_x = margin + label_gutter + 34
-    plan_y = margin + 54
-
-    # SIDE elevation sits to the RIGHT of the plan, sharing the Y axis (plant width).
-    side_x = plan_x + plan_w + gap
-    side_y = plan_y
-    # the side elevation's PAPER width = the plant WIDTH (y), the axis it is drawn
-    # along — v59 sized the sheet from elev_h (plant HEIGHT, tiny for a low plant)
-    # so the B–B view ran PAST the sheet edge and its right-edge tags rasterised
-    # clipped mid-word ('X-1…' / 'TK-10…'). Source fix: the sheet budget uses the
-    # drawn width, and the +46 keeps the level labels ('+4m') on-sheet.
-    side_w = plan_h + 46
-
-    # FRONT elevation sits BELOW the plan, sharing the X axis (plant length).
-    front_x = plan_x
-    front_y = plan_y + plan_h + v_gap + 26
-    front_h = elev_h
+    if product_mode:
+        # FRONT primary top-left (matches Blender cutaway); SIDE right; TOP below.
+        front_x = margin + label_gutter + 34
+        front_y = margin + 54
+        front_h = elev_h
+        side_x = front_x + plan_w + gap
+        side_y = front_y
+        side_w = plan_h + 46
+        plan_x = front_x
+        plan_y = front_y + front_h + v_gap + 26
+        sched_top = plan_y + plan_h + 56
+    else:
+        # PLAN top-left; SIDE right of plan; FRONT below plan (plant convention).
+        plan_x = margin + label_gutter + 34
+        plan_y = margin + 54
+        side_x = plan_x + plan_w + gap
+        side_y = plan_y
+        side_w = plan_h + 46
+        front_x = plan_x
+        front_y = plan_y + plan_h + v_gap + 26
+        front_h = elev_h
+        sched_top = front_y + front_h + 56
 
     width = max(side_x + side_w + margin + 30,
                 plan_x + plan_w + margin + 30, 1080)
-    # height covers the taller of (a) the front elevation below the plan and (b) the
-    # equipment-schedule panel in the right gutter below the side elevation, so the
-    # schedule never gets clipped or driven into the title block.
-    # the schedule sits BELOW the front elevation (which is below the plan) — NOT just below
-    # the plan TOP, or it covers the plan + front elevation (Tristan 2026-06-22: "the equipment
-    # schedule is hiding most of the plans and elevations"). Its height is the EXACT panel
-    # height _draw_key will draw (shared helper), plus a hard clearance band so the scale
-    # bar + 'SCALE 1:N' text can never overprint the schedule (v54, 2026-07-02).
-    sched_top = front_y + front_h + 56
+    # schedule sits below the lowest orthographic view — never over the drawings
+    # (Tristan 2026-06-22). Clearance band keeps the scale bar off the schedule.
     sched_bottom = sched_top + _key_panel_height(parts)
-    height = max(front_y + front_h + 64, sched_bottom + 60) + title_h
+    lowest_view = max(front_y + front_h, plan_y + plan_h)
+    height = max(lowest_view + 64, sched_bottom + 60) + title_h
     width = int(math.ceil(width))
     height = int(math.ceil(height))
 
@@ -1194,11 +1748,21 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # faint sheet border
     svg.rect(16, 16, width - 32, height - 32, stroke=GRID_FAINT, width=1.2)
 
-    # ───────────────────────── PLAN (top view) ─────────────────────────
-    svg.text(plan_x, plan_y - 30, "PLAN", size=13, weight="bold", fill=EQ_INK,
-             spacing="1.5")
-    svg.text(plan_x + 52, plan_y - 30, "(roof removed · looking down)", size=9.5,
-             fill=MUTED)
+    # ───────────────────────── PLAN / TOP (looking down) ─────────────────────────
+    if product_mode:
+        svg.text(plan_x, plan_y - 30, "TOP", size=13, weight="bold", fill=EQ_INK,
+                 spacing="1.5")
+        _top_sub = (
+            "(looking down · internal arrangement)"
+            if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway")
+            else "(looking down · secondary)"
+        )
+        svg.text(plan_x + 42, plan_y - 30, _top_sub, size=9.5, fill=MUTED)
+    else:
+        svg.text(plan_x, plan_y - 30, "PLAN", size=13, weight="bold", fill=EQ_INK,
+                 spacing="1.5")
+        svg.text(plan_x + 52, plan_y - 30, "(roof removed · looking down)", size=9.5,
+                 fill=MUTED)
     # setting-out grid + plant boundary
     _draw_setout_grid(svg, plan_x, plan_y, plan_w, plan_h, L, W, ppm, axis="plan")
     svg.rect(plan_x, plan_y, plan_w, plan_h, stroke=DATUM_INK, width=1.2,
@@ -1227,16 +1791,66 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # is what breaks legibility). Fix: draw only the LARGEST member's outline; every
     # member keeps its own tag + leader (nothing is silently hidden from the sheet).
     _plan_box_skip = _colocated_box_skip(parts)
+    # INTENT (2026-07-14 sealed GA): skip ultra-thin face-plate skins (w or d ≤ 8 mm)
+    # from PLAN art + tags. They are real BoM lines (schedule still lists them) but
+    # their edge-strip footprints collide with interior tags (K-101 ∩ X-120 G9).
+    def _is_face_skin(q: GAPart) -> bool:
+        return min(max(q.x1 - q.x0, 0.0), max(q.y1 - q.y0, 0.0)) <= 8.0
+
+    # INTENT (2026-07-14 Tristan): gold-spine retag maps many discrete hosts onto
+    # I-201/X-201 — plan then stamped I-201 ×8 (dense ladder). Draw every outline,
+    # but only zone-representative tags (PCB / Optical / HMI) on instrument TOP.
+    _instrument_plan_tag_ids: set[int] = set()
+    if meta.get("is_instrument_device"):
+        _plan_zone_src = []
+        for p in parts:
+            if _is_instrument_shell(p) or _is_instrument_clutter(p) or _is_face_skin(p):
+                continue
+            pw = (p.x1 - p.x0) * ppm
+            ph = (p.y1 - p.y0) * ppm
+            px = plan_x + mx(p.x0)
+            py = plan_y + my(p.y1)
+            _plan_zone_src.append((p, px, py, pw, ph))
+        for item in _instrument_zone_tag_items(_plan_zone_src):
+            _instrument_plan_tag_ids.add(id(item[0]))
+
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.y1 - q.y0, 1))):
+        # Instrument shells = envelope outline (already drawn); clutter = schedule-only.
+        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+            continue
+        if _is_face_skin(p):
+            continue
         pw = (p.x1 - p.x0) * ppm
         ph = (p.y1 - p.y0) * ppm
         px = plan_x + mx(p.x0)
         py = plan_y + my(p.y1)        # my inverts → top edge is the larger y
+        # DECISION (2026-07-14): thin product TOP views draw outlines only — tags
+        # live on FRONT (the cutaway-matched primary). Labelling a 182 mm-deep strip
+        # is what made Powerwall GA look unrelated to the Blender hero.
+        _inst_skip_tag = (
+            meta.get("is_instrument_device")
+            and id(p) not in _instrument_plan_tag_ids
+        )
+        if thin_top or _inst_skip_tag:
+            _draw_equipment_rect(svg, px, py, pw, ph, p.is_round, p.tag,
+                                 show_tag=False, placer=None,
+                                 below_grade=p.is_below_grade,
+                                 draw_box=(id(p) not in _plan_box_skip))
+            if thin_top:
+                continue
+            # Instrument: outline drawn, no tag — skip keynote pile-up too.
+            continue
         labelled = _draw_equipment_rect(svg, px, py, pw, ph, p.is_round, p.tag,
                                         placer=plan_tags, below_grade=p.is_below_grade,
                                         draw_box=(id(p) not in _plan_box_skip))
         if not labelled:
             keynotes.append((p, px + pw / 2.0, py + ph / 2.0))
+    if thin_top:
+        svg.text(plan_x + plan_w / 2.0, plan_y + plan_h / 2.0 + 3,
+                 "Internal arrangement — see FRONT", size=8.5, anchor="middle",
+                 fill=MUTED)
+        print(f"[ga] product thin-TOP: {len(parts)} outlines, tags deferred to FRONT "
+              f"(W/L={W / max(L, 1.0):.2f})")
     # items too small for an IN-PLACE tag get their FULL equipment tag through the same
     # de-overlap ladder (a leader line back to the part when displaced). The old numeric-
     # suffix balloon ('6' for P-106) keyed to a schedule that now shows only the top-10
@@ -1249,7 +1863,7 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # can help, the honest engineering convention is module-ranged group tags on the
     # plan; the equipment schedule ON THIS SHEET names every member individually.
     # Signal-keyed on COUNT, never a class: a normal plant (few keynotes) is untouched.)
-    if len(keynotes) >= 15:
+    elif len(keynotes) >= 15:
         _groups: dict = {}
         for p, kx, ky in keynotes:
             # group per (module, TAG LETTER) — a mixed-letter range ('D-101…X-154')
@@ -1269,7 +1883,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     else:
         for p, kx, ky in keynotes:
             plan_tags.add(kx, ky + 2.7, p.tag, 7.5, anchor_pt=(kx, ky))
-    plan_tags.flush()
+    if not thin_top:
+        plan_tags.flush()
     # FUNCTION-SEGREGATED PLANT ROOMS (RULE 6, Sam Green SME review 2026-07-08) —
     # walled partitions between function-incompatible equipment groups (today:
     # electrical/control vs wet-process), drawn OVER the equipment so the heavier
@@ -1289,9 +1904,23 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     dim_v(svg, plan_y, plan_y + plan_h, plan_x - 16, W, ext_from=plan_x)
 
     # ───────────────────────── FRONT elevation ─────────────────────────
-    svg.text(front_x, front_y - 14, "ELEVATION A–A", size=13, weight="bold",
-             fill=EQ_INK, spacing="1.0")
-    svg.text(front_x + 118, front_y - 14, "(looking north)", size=9.5, fill=MUTED)
+    if product_mode:
+        # INTENT (2026-07-14 Tristan): instrument Assembly FRONT is a cover-removed
+        # cutaway with seated BoM parts (PCB + optics). Empty exterior silhouette
+        # claiming "product form" was the Goodhart glance that hid the stack-up.
+        svg.text(front_x, front_y - 14, "FRONT", size=13, weight="bold",
+                 fill=EQ_INK, spacing="1.0")
+        if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"):
+            _front_sub = "(cover removed · assembly internals)"
+        elif meta.get("is_instrument_device"):
+            _front_sub = "(product form · matches Blender exterior)"
+        else:
+            _front_sub = "(door removed · looking in)"
+        svg.text(front_x + 68, front_y - 14, _front_sub, size=9.5, fill=MUTED)
+    else:
+        svg.text(front_x, front_y - 14, "ELEVATION A–A", size=13, weight="bold",
+                 fill=EQ_INK, spacing="1.0")
+        svg.text(front_x + 118, front_y - 14, "(looking north)", size=9.5, fill=MUTED)
     _draw_elev_frame(svg, front_x, front_y, plan_w, front_h, L, H, ppm,
                      z_min, z_max, mz_base=front_y)
     # SAME _TagPlacer discipline as the plan, with the view's own BOUNDS box (the
@@ -1301,20 +1930,39 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         svg, "elevation-aa", front_x - 2, front_y - 40, front_x + plan_w + 2,
         _gy_f + 0.5))
     # the view TITLE + subtitle are OBSTACLES (they sit inside the bounds headroom)
-    front_tags.block(front_x - 4, front_y - 26, front_x + 212, front_y - 4)
+    front_tags.block(front_x - 4, front_y - 26, front_x + 280, front_y - 4)
     # reserve the ground/FFL row, the left height dimension and the schedule-panel
     # top edge so displaced tags never overprint them.
     front_tags.block(front_x - 30, _gy_f + 0.5, front_x + plan_w + 95, _gy_f + 13)
     front_tags.block(front_x - 30, front_y - 2, front_x - 2, _gy_f)
     front_tags.block(margin, sched_top - 2, width - margin, sched_top + 20)
+    _assembly_cutaway = bool(
+        meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"))
+    if _form is not None:
+        _draw_instrument_form_silhouettes(
+            svg, _form,
+            plan_x=plan_x, plan_y=plan_y, plan_w=plan_w, plan_h=plan_h,
+            L=L, W=W, ppm=ppm, mx=mx, my=my,
+            front_x=front_x, front_y=front_y, z_max=z_max, mz=mz,
+            assembly_cutaway=_assembly_cutaway,
+        )
+        print("[ga] instrument form context drawn "
+              f"(assembly_cutaway={_assembly_cutaway})")
     front_items = []
     for p in sorted(parts, key=lambda q: -(max(q.x1 - q.x0, 1) * max(q.z1 - q.z0, 1))):
+        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+            continue
         pw = (p.x1 - p.x0) * ppm
         ph = (p.z1 - p.z0) * ppm
         px = front_x + mx(p.x0)
         py = front_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
         front_items.append((p, px, py, pw, ph))
+    # INTENT (2026-07-14 Tristan): instrument FRONT must not ladder every optical
+    # tag at ~12 px pitch (G9 IoU=0 while the human glance fails). One tag per
+    # zone (PCB / Optical / HMI) — schedule still lists every principal.
+    if meta.get("is_instrument_device"):
+        front_items = _instrument_zone_tag_items(front_items)
     # stacked same-family tags (the tank nest seen edge-on) collapse to ONE range
     # tag with a single leader — like the schedule's 'TK-106…TK-113' rows.
     _singles_f, _ranges_f = _elevation_tag_groups(front_items)
@@ -1354,7 +2002,23 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     # the v55 regen showed a displaced tag overprinting the dim label without this.
     side_tags.block(side_x - 30, _gy_s + 0.5, side_x + plan_h + 40, _gy_s + 58)
     side_items = []
+    if _form is not None:
+        # Side envelope: dashed when assembly cutaway (parts carry the massing).
+        body_h = float(_form["body_size"][2])
+        svg.rect(side_x, side_y + (z_max - body_h) * ppm, plan_h, body_h * ppm,
+                 stroke=EQ_INK, width=1.5,
+                 fill="none" if _assembly_cutaway else "#f4f6f8",
+                 dash="5,3" if _assembly_cutaway else None)
+        tw, td, th = _form["tower_size"]
+        _tx, ty, _tz = _form["tower_loc"]
+        stx = side_x + (y_max - (ty + td / 2)) * ppm
+        sty = side_y + (z_max - (body_h + th)) * ppm
+        svg.rect(stx, sty, td * ppm, th * ppm, stroke=EQ_INK, width=1.5,
+                 fill="none" if _assembly_cutaway else "#eef1f4",
+                 dash="4,3" if _assembly_cutaway else None)
     for p in sorted(parts, key=lambda q: -(max(q.y1 - q.y0, 1) * max(q.z1 - q.z0, 1))):
+        if _form is not None and (_is_instrument_shell(p) or _is_instrument_clutter(p)):
+            continue
         pw = (p.y1 - p.y0) * ppm
         ph = (p.z1 - p.z0) * ppm
         # plan rows run north(top)→south; keep the same handedness as the plan.
@@ -1362,6 +2026,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
         py = side_y + (z_max - p.z1) * ppm
         _draw_elevation_item(svg, px, py, pw, ph, p)
         side_items.append((p, px, py, pw, ph))
+    if meta.get("is_instrument_device"):
+        side_items = _instrument_zone_tag_items(side_items)
     _singles_s, _ranges_s = _elevation_tag_groups(side_items)
     for label, cx, cy, size, anchor in _ranges_s + _singles_s:
         side_tags.add(cx, cy, label, size, anchor_pt=anchor)
@@ -1371,7 +2037,8 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
              stroke=INK, width=1.4)
     _hatch_ground(svg, side_x - 8, side_x + plan_h + 8, ground_ys)
     dim_h(svg, side_x, side_x + plan_h, ground_ys + 30, W, ext_from=ground_ys)
-    svg.text(side_x + plan_h / 2.0, ground_ys + 50, "PLANT WIDTH", size=8.6,
+    svg.text(side_x + plan_h / 2.0, ground_ys + 50,
+             "PRODUCT WIDTH" if product_mode else "PLANT WIDTH", size=8.6,
              anchor="middle", fill=MUTED, spacing="1.0")
     # T-08: dashed buried drain laterals on the SIDE elevation too
     def _my_side(y_mm):
@@ -1397,9 +2064,27 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     bar_total = _nice_bar_mm(scale_S)
     bar_y = height - title_h - 26
     scale_bar(svg, margin + 6, bar_y, scale_S, ppm, bar_total)
+    # Title count must match the equipment schedule (not raw principal len).
+    # Instrument gold-spine runs otherwise claim "36 equipment items" while the
+    # schedule shows ~8 — Goodhart title vs content (Tristan 2026-07-14).
+    try:
+        _sched_rows, _sched_total, _ = _principal_schedule_rows(parts)
+        _title_n = len(_sched_rows) if _sched_rows else int(_sched_total or 0)
+        if _title_n > 0:
+            meta = {**meta, "count": _title_n}
+    except Exception:  # noqa: BLE001
+        pass
     _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, W, H,
                       has_below_grade=has_below_grade)
-    return svg.render()
+    # QC token: G15/G16 compare this to parts-manifest placement_fp.
+    # GOTCHA: never hash display-mutated GAParts (product FFL rebase / clamp) —
+    # that is the Powerwall 2026-07-15 GA≠manifest fingerprint bug. Prefer the
+    # settled manifest fp captured in load_manifest (or rewritten with the rows).
+    fp = meta.get("placement_fp")
+    if not fp:
+        # Last resort only when the caller built GAParts without a manifest.
+        fp = placement_fingerprint(parts)
+    return embed_svg_placement_fp(svg.render(), fp)
 
 
 def _draw_setout_grid(svg, ox, oy, pw, ph, L_mm, W_mm, ppm, axis="plan"):
@@ -1549,6 +2234,53 @@ def _tag_num(tag):
 _GA_SCHED_MAX_ROWS = 10
 
 
+def _absurd_schedule_part(p) -> bool:
+    """True when a part must not appear as PRINCIPAL equipment on the GA.
+
+    INTENT (colorimeter 2026-07-14): Ferrite Emc Bead stamped at 260×200×434 mm
+    (= whole product bbox) won 'top 10 by footprint' and a GA scored 10 while
+    listing a bead as principal equipment. Discrete electronics are never
+    GA principals — exclude by noun even after dims are clamped (a 24 mm bead
+    can still outrank tiny sensors on a handheld and re-enter the top-10).
+
+    EXTENDED (2026-07-14): gold-spine absorbed hosts (Microcontroller, USB
+    Interface, …) are retagged to I-201 for callout credit, but must NOT fill
+    the PRINCIPAL EQUIPMENT table as ten identical I-201 rows — only the
+    spine noun itself (Compute UI Module / LED Source Board / …) schedules.
+    """
+    name = str(getattr(p, "name", "") or "")
+    if re.search(
+        r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|tvs\b|esd[_ -]?protect|"
+        r"varistor|mov\b|input[_ -]?fuse|dc[_ -]?input[_ -]?fuse|"
+        r"thermal[_ -]?cutoff|overcurrent\s*protection|"
+        r"subcomponent\s*\d+|sensing\s+instrumentation\s+subcomponent|"
+        r"enclosure\s+shell|lid\s+shroud|mounting\s+bezel|"
+        r"ambient\s+light\s+cap|sensor\s+interconnect\s+cable|"
+        r"qwiic|stemma\s*header|fastener\s*set|cuvette\s*consumable)\b",
+        name, re.I,
+    ):
+        return True
+    # Spine principal nouns stay; absorbed host motherboard lines drop.
+    if re.search(
+        r"compute\s*ui\s*module|led\s*source\s*board|"
+        r"optical\s*detector\s*module|cuvette\s*holder|"
+        r"collimating\s*optic|wavelength\s*selection|"
+        r"optical\s*path\s*baffle",
+        name, re.I,
+    ):
+        return False
+    if re.search(
+        r"microcontroller|\bmcu\b|local\s*display|user\s*input|"
+        r"usb\s*(interface|power)|rechargeable\s*battery|"
+        r"dc\s*dc\s*regulator|power\s*switch|control\s*switch|"
+        r"status\s*indicator|power\s*indicator|reverse\s*polarity|"
+        r"power\s*input\s*connector|\bled\s*driver\b|\bled\s*source\b(?!\s*board)",
+        name, re.I,
+    ):
+        return True
+    return False
+
+
 def _principal_schedule_rows(parts):
     """(rows, total_rows, total_items): the collapsed schedule rows for the largest-
     footprint principals (≤ _GA_SCHED_MAX_ROWS rows), plus the FULL collapsed-row and
@@ -1569,6 +2301,8 @@ def _principal_schedule_rows(parts):
     row now competes fairly against a standalone principal on genuine size, not on how
     many raw un-collapsed instances happened to occupy the pre-collapse top-N slice.
     Deterministic (area then tag)."""
+    # Drop absurd micro-component bbox echoes before ranking by footprint.
+    parts = [p for p in parts if not _absurd_schedule_part(p)]
     all_rows = _collapse_schedule(parts)
     if len(all_rows) <= _GA_SCHED_MAX_ROWS:
         return all_rows, len(all_rows), len(parts)
@@ -1652,16 +2386,56 @@ def _draw_title_block(svg, archetype, meta, scale_S, width, height, title_h, L, 
         svg.text(bx0 + 120, ry + 15, v, size=9.5)
 
     svg.text(x0, y0 + 24, "FRACTIONAL FORGE · ForgeOS", size=12, weight="bold")
-    svg.text(x0, y0 + 43, f"GENERAL ARRANGEMENT — {_humanise(archetype)}",
+    # INTENT (2026-07-14): handheld instruments — reader-facing title is Assembly
+    # (plant "General Arrangement" is the wrong genre). Disk stem stays
+    # general-arrangement.* for gate/manifest keys.
+    _sheet_title = (
+        "ASSEMBLY"
+        if meta.get("is_instrument_device")
+        else "GENERAL ARRANGEMENT"
+    )
+    svg.text(x0, y0 + 43, f"{_sheet_title} — {_humanise(archetype)}",
              size=15, weight="bold", fill=EQ_INK)
-    _env_noun = "product envelope" if meta.get("is_instrument_device") else "Overall plant envelope"
-    svg.text(x0, y0 + 61,
-             f"{_env_noun} {L/1000:.1f} m (L) × {W/1000:.1f} m (W) × "
-             f"{H/1000:.1f} m (H) · {meta.get('count', 0)} equipment items.",
-             size=9.5, fill=MUTED)
-    svg.text(x0, y0 + 79,
-             "Plan + two elevations · dimensions in millimetres unless noted · "
-             "datum ± 0.000 = finished floor level.", size=9.0, fill=MUTED)
+    _env_noun = (
+        "product envelope"
+        if meta.get("is_instrument_device") or meta.get("is_product_scale")
+        else "Overall plant envelope"
+    )
+    # GOTCHA: {:.1f} m rounds a 183×145×120 mm handheld to "0.2×0.1×0.1 m" —
+    # the title block then fails a glance against the mm dimensions on the views
+    # (ga_glance_audit envelope_vs_dimension_mismatch). Products under 1 m print mm.
+    if (meta.get("is_instrument_device") or meta.get("is_product_scale")) and max(L, W, H) < 1000.0:
+        _env_line = (
+            f"{_env_noun} {L:.0f} × {W:.0f} × {H:.0f} mm (L×W×H) · "
+            f"{meta.get('count', 0)} equipment items."
+        )
+    else:
+        _env_line = (
+            f"{_env_noun} {L/1000:.1f} m (L) × {W/1000:.1f} m (W) × "
+            f"{H/1000:.1f} m (H) · {meta.get('count', 0)} equipment items."
+        )
+    svg.text(x0, y0 + 61, _env_line, size=9.5, fill=MUTED)
+    if meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"):
+        _view_note = (
+            "Front (cover removed) + top + side · PCB / optics / HMI stack-up · "
+            "dimensions in millimetres unless noted."
+        )
+    elif meta.get("is_instrument_device"):
+        _view_note = (
+            "Front (product form) + top + side · matches Blender exterior composition · "
+            "dimensions in millimetres unless noted."
+        )
+    elif meta.get("is_product_scale"):
+        _view_note = (
+            "Front (door removed) + top + side · matches Blender cutaway orientation · "
+            "dimensions in millimetres unless noted."
+        )
+    else:
+        _view_note = (
+            "Plan + two elevations · dimensions in millimetres unless noted · "
+            "datum ± 0.000 = finished floor level."
+        )
+    svg.text(x0, y0 + 79, _view_note, size=9.0, fill=MUTED)
     svg.text(x0, y0 + 96,
              "Projected from the as-placed equipment manifest (ForgeOS universal "
              "CAD). Equipment outlines + setting-out only.", size=9.0, fill=MUTED)
@@ -1807,8 +2581,13 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     rooms = meta.get("rooms") or []
     # the building rectangle is derived from the LEDGER slab area, with equipment fitted
     # inside it — so the GA envelope matches the slab the BoM costs (not the placement spread).
-    parts, bbox = _apply_building_envelope(parts, bbox, _load_state(out_dir, state_path), rooms)
+    _state = _load_state(out_dir, state_path)
+    parts, bbox = _apply_building_envelope(parts, bbox, _state, rooms)
     archetype = _archetype_name(out_dir, state_path)
+    # FLOW: spine retag in build_ga_svg reads meta["state"] + meta["out_dir"].
+    meta["out_dir"] = out_dir
+    if isinstance(_state, dict):
+        meta["state"] = _state
     svg_text = build_ga_svg(parts, bbox, archetype, meta, rooms)
 
     draw_dir = Path(out_dir) / "drawings"
@@ -1826,7 +2605,10 @@ def generate_ga(out_dir: str, state_path: Optional[str] = None,
     a1 = None
     try:
         import a1_print
-        a1 = a1_print.export_a1(svg_path, base="ga", title="General Arrangement")
+        _a1_title = (
+            "Assembly" if meta.get("is_instrument_device") else "General Arrangement"
+        )
+        a1 = a1_print.export_a1(svg_path, base="ga", title=_a1_title)
     except Exception as ex:  # noqa: BLE001 — the A1 print set never blocks the drawing
         print(f"[ga] A1 PDF export skipped: {type(ex).__name__}: {ex}")
 
@@ -1951,28 +2733,222 @@ def _selftest() -> int:
     if "Overall plant envelope" in svg_inst:
         print("  FAIL ga-instrument-envelope: must not say 'Overall plant envelope'")
         bad += 1
+    # Glance honesty (2026-07-14): mm envelope; empty-massing keeps exterior form.
+    if "mm (L×W×H)" not in svg_inst and "×" not in svg_inst:
+        print("  FAIL ga-instrument-envelope: product <1 m must print envelope in mm")
+        bad += 1
+    if "cover removed" in svg_inst.lower() or "assembly internals" in svg_inst.lower():
+        print("  FAIL ga-instrument-glance: empty-massing instrument must not claim "
+              "cover-removed assembly (no parts to show)")
+        bad += 1
+    if "product form" not in svg_inst.lower():
+        print("  FAIL ga-instrument-glance: empty instrument FRONT must say product form")
+        bad += 1
+    if 'data-glance="front-display"' not in svg_inst:
+        print("  FAIL ga-instrument-glance: FRONT must stamp data-glance=front-display "
+              "(G17 FRONT-scoped HMI)")
+        bad += 1
+    if 'data-glance="front-ui-deck"' not in svg_inst:
+        print("  FAIL ga-instrument-glance: FRONT must stamp data-glance=front-ui-deck")
+        bad += 1
+    # proveCatch: with BoM parts, Assembly must seat + draw stack-up (PCB + tags).
+    _mcu = GAPart(tag="I-113", obj_tag="mcu", name="Microcontroller",
+                  module="m", shape="box", qty=1, is_round=False,
+                  x0=-40, x1=-10, y0=-20, y1=10, z0=600, z1=605, cx=-25, cy=-5)
+    _cuv = GAPart(tag="X-112", obj_tag="cuv", name="Cuvette Holder",
+                  module="m", shape="box", qty=1, is_round=False,
+                  x0=30, x1=55, y0=-10, y1=15, z0=640, z1=680, cx=42, cy=2)
+    _det = GAPart(tag="I-114", obj_tag="det", name="Optical Detector Module",
+                  module="m", shape="box", qty=1, is_round=False,
+                  x0=30, x1=50, y0=20, y1=40, z0=640, z1=655, cx=40, cy=30)
+    _shell = GAPart(tag="X-110", obj_tag="shell", name="Enclosure Shell",
+                    module="m", shape="box", qty=1, is_round=False,
+                    x0=-90, x1=90, y0=-70, y1=70, z0=580, z1=660, cx=0, cy=0)
+    svg_asm_parts = build_ga_svg(
+        [_mcu, _cuv, _det, _shell],
+        {"x_min_mm": -90, "x_max_mm": 90, "y_min_mm": -70, "y_max_mm": 70,
+         "z_min_mm": 0, "z_max_mm": 80},
+        "colorimeter",
+        {"count": 4, "is_instrument_device": True, "optical_path_mm": 10.0},
+    )
+    if "cover removed" not in svg_asm_parts.lower():
+        print("  FAIL ga-instrument-assembly: with parts, FRONT must say cover removed")
+        bad += 1
+    if 'data-glance="front-pcb"' not in svg_asm_parts:
+        print("  FAIL ga-instrument-assembly: cutaway must stamp front-pcb plane")
+        bad += 1
+    if ">I-113<" not in svg_asm_parts and "I-113" not in svg_asm_parts:
+        print("  FAIL ga-instrument-assembly: MCU tag must appear on the sheet")
+        bad += 1
+    if ">X-112<" not in svg_asm_parts and "X-112" not in svg_asm_parts:
+        print("  FAIL ga-instrument-assembly: cuvette tag must appear on the sheet")
+        bad += 1
+    if "Internal arrangement — see FRONT" in svg_asm_parts:
+        print("  FAIL ga-instrument-assembly: TOP must not defer internals to FRONT")
+        bad += 1
+    # Sealed cabinet (Powerwall-scale): product envelope noun, not plant floor;
+    # FRONT is the primary view (matches Blender cutaway); fingerprint embedded.
+    pw_bbox = {"x_min_mm": -265, "x_max_mm": 266, "y_min_mm": -78, "y_max_mm": 78,
+               "z_min_mm": 0, "z_max_mm": 1070}
+    svg_pw = build_ga_svg([], pw_bbox, "energy_storage",
+                          {"count": 26, "is_product_scale": True})
+    if "product envelope" not in svg_pw:
+        print("  FAIL ga-product-envelope: sealed cabinet must say 'product envelope'")
+        bad += 1
+    if "Overall plant envelope" in svg_pw:
+        print("  FAIL ga-product-envelope: sealed cabinet must not say 'Overall plant envelope'")
+        bad += 1
+    if ">FRONT<" not in svg_pw and "FRONT" not in svg_pw:
+        print("  FAIL ga-product-front-primary: sealed cabinet must lead with FRONT view")
+        bad += 1
+    if "door removed" not in svg_pw:
+        print("  FAIL ga-product-front-primary: FRONT caption must say door removed")
+        bad += 1
+    if 'data-placement-fp="' not in svg_pw:
+        print("  FAIL ga-placement-fp: GA SVG must embed data-placement-fp for G15")
+        bad += 1
+    # proveCatch: handheld reader title is ASSEMBLY; plant/cabinet stays GA.
+    svg_asm = build_ga_svg([], {"x_min_mm": -90, "x_max_mm": 90, "y_min_mm": -70,
+                                "y_max_mm": 70, "z_min_mm": 0, "z_max_mm": 80},
+                           "colorimeter",
+                           {"count": 14, "is_instrument_device": True})
+    if "ASSEMBLY" not in svg_asm:
+        print("  FAIL ga-assembly-title: instrument GA must say ASSEMBLY")
+        bad += 1
+    if "GENERAL ARRANGEMENT" in svg_asm:
+        print("  FAIL ga-assembly-title: instrument must not say GENERAL ARRANGEMENT")
+        bad += 1
+    if "GENERAL ARRANGEMENT" not in svg_pw:
+        print("  FAIL ga-assembly-title: sealed cabinet must keep GENERAL ARRANGEMENT")
+        bad += 1
+    # proveCatch (Powerwall 0332): floating world-Z stack (z_min≈825) must sit on
+    # FFL inside the 1.105 m design envelope — never leave an empty lower half on
+    # a 2.08 m sheet that disagrees with the Blender hero.
+    _float_batt = GAPart(tag="X-118", obj_tag="x118", name="Battery Modules",
+                         module="m", shape="box", qty=1, is_round=False,
+                         x0=-200, x1=200, y0=-70, y1=70, z0=825, z1=1240,
+                         cx=0, cy=0)
+    _float_door = GAPart(tag="X-112", obj_tag="x112", name="Service Access Door",
+                         module="m", shape="box", qty=1, is_round=False,
+                         x0=-300, x1=-297, y0=-78, y1=78, z0=1108, z1=2085,
+                         cx=-298.5, cy=0)
+    _fit = _fit_product_parts_to_envelope(
+        [_float_batt, _float_door], 609.0, 193.0, 1105.0)
+    if _fit["z_shift_mm"] < 800:
+        print(f"  FAIL ga-product-ffl-rebase: expected ~825 mm world-Z shift, "
+              f"got {_fit['z_shift_mm']:.1f}")
+        bad += 1
+    if _float_batt.z0 > 5.0:
+        print(f"  FAIL ga-product-ffl-rebase: battery must sit on FFL after rebase, "
+              f"got z0={_float_batt.z0:.1f}")
+        bad += 1
+    if _float_door.z1 > 1105.0 + 0.5:
+        print(f"  FAIL ga-product-ffl-rebase: door top must fit envelope 1105 mm, "
+              f"got z1={_float_door.z1:.1f}")
+        bad += 1
+    if _fit["z_scale"] >= 1.0:
+        print(f"  FAIL ga-product-ffl-rebase: stack taller than envelope must scale "
+              f"(got z_scale={_fit['z_scale']:.3f})")
+        bad += 1
+    # proveCatch (Powerwall 2026-07-15): product FFL rebase MUST NOT change the
+    # SVG placement_fp — G15 compares it to parts-manifest generation. A GA that
+    # hashes rebased z ships fp≠manifest while P&ID/SLD stamp the settled token.
+    import tempfile as _tf_fp
+    _fp_td = _tf_fp.mkdtemp(prefix="ga-fp-")
+    _fp_parts = [
+        {"equipment_tag": "X-118", "name": "Battery Modules",
+         "pos_mm": [0.0, 10.0, 1000.0], "dims_mm": {"w": 400, "d": 140, "h": 400},
+         "module": "m", "shape": "box", "qty": 1},
+        {"equipment_tag": "X-101", "name": "DC DC Converters",
+         "pos_mm": [-100.0, -10.0, 1400.0], "dims_mm": {"w": 80, "d": 60, "h": 80},
+         "module": "m", "shape": "box", "qty": 1},
+        {"equipment_tag": "K-101", "name": "Active Ventilation Fan",
+         "pos_mm": [80.0, -20.0, 1600.0], "dims_mm": {"w": 60, "d": 50, "h": 40},
+         "module": "m", "shape": "box", "qty": 1},
+    ]
+    _fp_man = placement_fingerprint(_fp_parts)
+    json.dump({
+        "schema": "parts-manifest/1", "count": 3, "parts": _fp_parts,
+        "placement_fp": _fp_man,
+        "bbox_mm": {"length_mm": 609, "width_mm": 193, "height_mm": 1105},
+    }, open(os.path.join(_fp_td, "parts-manifest.json"), "w"))
+    json.dump({"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": {"value": 0.14},
+        "design_envelope_width_mm": {"value": 609},
+        "design_envelope_depth_mm": {"value": 193},
+        "design_envelope_height_mm": {"value": 1105},
+    }}}, open(os.path.join(_fp_td, "state.json"), "w"))
+    _lp, _lb, _lm = load_manifest(_fp_td)
+    if not _lm.get("is_product_scale"):
+        print("  FAIL ga-product-fp-settle: fixture must classify as product_scale")
+        bad += 1
+    if (_lm.get("product_ffl_rebase") or {}).get("z_shift_mm", 0) < 100:
+        print("  FAIL ga-product-fp-settle: fixture must exercise FFL rebase "
+              f"(got {_lm.get('product_ffl_rebase')})")
+        bad += 1
+    _fp_mut = placement_fingerprint(_lp)
+    if _fp_mut == _fp_man:
+        print("  FAIL ga-product-fp-settle: rebased GAParts must DIVERGE from "
+              "manifest fp (proveCatch setup — otherwise the trap is inert)")
+        bad += 1
+    _svg_fp = build_ga_svg(_lp, _lb, "energy_storage", _lm)
+    _got_fp = extract_svg_placement_fp(_svg_fp)
+    if _got_fp != _fp_man:
+        print(f"  FAIL ga-product-fp-settle: GA SVG fp {_got_fp} must equal "
+              f"settled manifest {_fp_man} (not rebased {_fp_mut})")
+        bad += 1
+    # Thin TOP must not pile tags — a part on a thin envelope + note instead.
+    pw_part = GAPart(tag="X-119", obj_tag="x119", name="LFP Prismatic Cells",
+                     module="m", shape="box", qty=1, is_round=False,
+                     x0=-200, x1=200, y0=-70, y1=70, z0=100, z1=600,
+                     cx=0, cy=0)
+    svg_pw2 = build_ga_svg([pw_part], pw_bbox, "energy_storage",
+                           {"count": 1, "is_product_scale": True})
+    if "Internal arrangement — see FRONT" not in svg_pw2:
+        print("  FAIL ga-product-thin-top: thin TOP must defer tags to FRONT")
+        bad += 1
     if "1.0 m (L) × 1.0 m (W) × 3.0 m (H)" in svg_inst:
         print("  FAIL ga-instrument-envelope: must not invent the 1×1×3 m plant default")
         bad += 1
-    if "0.2 m (L)" not in svg_inst and "0.18 m (L)" not in svg_inst:
-        # 180 mm → 0.2 m when rounded to 1 decimal, or 0.2/0.18 depending on format
-        if "0.2 m (L)" not in svg_inst and "0.18 m" not in svg_inst:
-            # f"{L/1000:.1f}" for 180 → "0.2"
-            if "0.2 m (L)" not in svg_inst:
-                print("  FAIL ga-instrument-envelope: expected ~0.2 m L from 180 mm bbox; "
-                      f"snippet: {[ln for ln in svg_inst.splitlines() if 'envelope' in ln.lower()][:2]}")
-                bad += 1
-    # 4c — INSTRUMENT stale proxy clamp: if proxy parts exist but carry product-sized
-    #     or tall legacy bboxes, the GA must still draw the compact product envelope.
+    # DECISION (2026-07-14): handheld envelope prints millimetres — metres
+    # (0.2×0.1×0.1 m) failed the glance against 180 mm dims (G17).
+    if "0.2 m (L)" in svg_inst or "0.18 m (L)" in svg_inst:
+        print("  FAIL ga-instrument-envelope: handheld must NOT print metres "
+              "(use mm — see ga_glance_audit envelope_vs_dimension_mismatch)")
+        bad += 1
+    if "180" not in svg_inst or "mm (L×W×H)" not in svg_inst:
+        print("  FAIL ga-instrument-envelope: expected mm envelope from 180 mm bbox; "
+              f"snippet: {[ln for ln in svg_inst.splitlines() if 'envelope' in ln.lower()][:2]}")
+        bad += 1
+    # 4c — INSTRUMENT stale proxy clamp: product-bbox XY must shrink into the
+    #     envelope (≤ ~22% half-span). Z is NOT crushed here — seating assigns
+    #     form bands (clamping world-Z into hh piled every part at the roof).
     proxy = GAPart(tag="X-101", obj_tag="u_proxy", name="Wavelength Selection Module",
                    module="m", shape="box", qty=1, is_round=False,
                    x0=-130, x1=130, y0=-100, y1=100, z0=-120, z1=352,
                    cx=0, cy=0)
     _clamp_instrument_parts_to_envelope([proxy], 180.0, 140.0, 80.0)
-    if (proxy.x1 - proxy.x0) > 40 or (proxy.y1 - proxy.y0) > 32 or proxy.z1 > 80:
-        print("  FAIL ga-instrument-proxy-clamp: oversized proxy must be clamped "
+    if (proxy.x1 - proxy.x0) > 90 or (proxy.y1 - proxy.y0) > 70:
+        print("  FAIL ga-instrument-proxy-clamp: oversized proxy XY must shrink "
               f"inside handheld envelope, got x={proxy.x1 - proxy.x0:.1f} "
-              f"y={proxy.y1 - proxy.y0:.1f} z1={proxy.z1:.1f}")
+              f"y={proxy.y1 - proxy.y0:.1f}")
+        bad += 1
+    if abs(proxy.cx) > 90 or abs(proxy.cy) > 70:
+        print("  FAIL ga-instrument-proxy-clamp: proxy centre outside envelope "
+              f"cx={proxy.cx:.1f} cy={proxy.cy:.1f}")
+        bad += 1
+    # Seating proveCatch: world-Z stack → form bands (optics above body PCB).
+    _seat_instrument_parts_in_form(
+        [proxy],
+        {"body_size": (180.0, 140.0, 80.0),
+         "tower_size": (40.0, 38.0, 42.0),
+         "tower_loc": (54.0, 11.0, 101.0),
+         "total_height_mm": 122.0},
+        180.0, 140.0, 80.0,
+    )
+    if proxy.z0 < 80.0:
+        print("  FAIL ga-instrument-seat: optical part must sit in the tower band "
+              f"(z0≥80), got z0={proxy.z0:.1f}")
         bad += 1
     # 5 — ELEVATION proveCatch (the v59 GA: BOTH elevations failed a 5-second glance —
     #     a ~6-tag pile-up over the tank nest projected edge-on, tags over the view

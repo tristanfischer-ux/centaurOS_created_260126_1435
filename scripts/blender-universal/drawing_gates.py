@@ -53,10 +53,73 @@ import struct
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 from render_image_quality import evaluate_image
-from render_view_contract import is_product_scale, required_views
+from render_view_contract import (
+    is_product_scale,
+    pack_drawings,
+    required_views,
+)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from placement_fp import (  # noqa: E402
+    embed_svg_placement_fp,
+    extract_svg_placement_fp,
+    is_na_by_design,
+    load_manifest_placement_fp,
+    manifest_equipment_tags,
+    phantom_equipment_tags,
+    placement_fingerprint,
+)
+from ga_glance_audit import ga_glance_coherent  # noqa: E402
+from drawing_vision_glance import drawing_vision_coherent  # noqa: E402
+
+# EVERY system drawing that can ship in the dossier — all must share one
+# parts-manifest generation (G16). Tabular sheets (panel / process schedules)
+# are included: Tristan 2026-07-14 "check on all of the drawings that they are
+# consistent with each other" — a matching fingerprint + no phantom tags is the
+# universal proof, whether the sheet is spatial or tabular.
+_DRAWING_SET_SVG = (
+    ("general-arrangement", "general-arrangement.svg"),
+    ("interconnect", "interconnect.svg"),
+    ("pid", "pid.svg"),
+    ("block-flow-diagram", "block-flow-diagram.svg"),
+    ("single-line-diagram", "single-line-diagram.svg"),
+    ("panel-schedule", "panel-schedule.svg"),
+    ("process-schedules", "process-schedules.svg"),
+    ("facility-layout", "facility-layout.svg"),
+    ("distribution-interface", "distribution-interface.svg"),
+)
+DRAWING_COVERAGE_MIN_PCT = 80.0
+# Coverage floor applies to the process/spatial core. Panel / process-schedules /
+# facility sheets are still fingerprint-checked (same generation) but their
+# ledger denominators differ (circuits vs equipment) and are scored on the Excel
+# Drawing tabs — not double-gated here.
+_DRAWING_COVERAGE_KEYS = frozenset({
+    "general-arrangement", "pid", "block-flow-diagram", "single-line-diagram",
+})
+
+# Map drawing-file stem → pack_drawings() key (render_view_contract).
+_STEM_TO_PACK_KEY = {
+    "general-arrangement": "general-arrangement",
+    "interconnect": "interconnect",
+    "pid": "pid",
+    "block-flow-diagram": "bfd",
+    "single-line-diagram": "single-line",
+    "panel-schedule": "panel-schedule",
+    "process-schedules": "process-schedules",
+    "hvac-layout": "hvac",
+    "facility-layout": "facility-layout",
+    "distribution-interface": "distribution-interface",
+}
+
+
+def _in_drawing_pack(state: dict, stem: str) -> bool:
+    """True when this stem belongs in the form-factor pack (else abstain)."""
+    pk = _STEM_TO_PACK_KEY.get(stem, stem)
+    return pk in pack_drawings(state or {})
 
 
 @dataclass
@@ -519,11 +582,21 @@ def run_gates(out_dir: str) -> list:
     parts = _rows(_load("parts-manifest.json"))
     bom = state.get("requirementsBom") or []
     gates: list = []
+    # INTENT: handheld / PCB instruments have no process-fluid schedules — the Excel
+    # exporter already VERIFIED-NA's Process schedules. Scoring a 26:1 empty strip
+    # as a legibility HIGH floors the dossier (colorimeter 0819 drawing_gates=6).
+    _instrument = bool(state.get("isInstrumentDevice"))
 
     # ── G1 LEGIBILITY — each 2D drawing within a sane aspect ratio ───────────────
+    # INTENT (2026-07-14): abstain when the form-factor pack excludes the stem —
+    # a fluid-less handheld must not be scored on a stale/missing P&ID PNG.
     dd = os.path.join(out_dir, "drawings")
     for nm in ("single-line-diagram", "pid", "panel-schedule", "general-arrangement",
-               "block-flow-diagram", "hvac-layout", "process-schedules"):
+               "block-flow-diagram", "hvac-layout", "process-schedules", "interconnect"):
+        if not _in_drawing_pack(state, nm):
+            continue
+        if _instrument and nm in ("process-schedules", "hvac-layout"):
+            continue
         wh = _png_wh(os.path.join(dd, nm + ".png"))
         if not wh:
             continue
@@ -540,6 +613,8 @@ def run_gates(out_dir: str) -> list:
     #    with no delivered A1 set the drawing is scored at ONE-A1-sheet fit scale, so a
     #    generator that skips pagination fails honestly. Fix = MORE SHEETS, never smaller.
     for nm, base in _A1_PRINT_BASES.items():
+        if not _in_drawing_pack(state, nm):
+            continue
         verdict = _min_text_on_a1(dd, nm, base)
         if verdict is None:
             continue
@@ -574,10 +649,14 @@ def run_gates(out_dir: str) -> list:
         if "electr" in med.lower():
             elec_dests.add(str(e.get("to_part") or e.get("to") or "").strip().lower())
     missing = g3_missing_feeders(bom, elec_dests)
-    gates.append(Gate("part_coverage", ["single-line-diagram", "panel-schedule", "pid"],
-                      "high", len(missing) == 0,
-                      "all principal powered parts fed" if not missing
-                      else f"{len(missing)} principal powered part(s) with NO electrical feeder: {missing[:4]}"))
+    # Abstain when the pack has no plant electrical / P&ID home (handheld PCB story).
+    if (_in_drawing_pack(state, "single-line-diagram")
+            or _in_drawing_pack(state, "panel-schedule")
+            or _in_drawing_pack(state, "pid")):
+        gates.append(Gate("part_coverage", ["single-line-diagram", "panel-schedule", "pid"],
+                          "high", len(missing) == 0,
+                          "all principal powered parts fed" if not missing
+                          else f"{len(missing)} principal powered part(s) with NO electrical feeder: {missing[:4]}"))
 
     # ── G4 MATERIAL DIVERSITY — multi-service plant ≠ a uniform material ─────────
     # FLUID ROUTES ONLY (2026-07-11 powerwall run 71): the gate's intent is a fluid
@@ -730,7 +809,12 @@ def run_gates(out_dir: str) -> list:
     # buyer would recognise (Tristan vs the LTEC PW3 teardown). Keyed on the SAME
     # enclosure_volume_m3 < 1 signal as the sealed scene family; plants untouched. ──
     _encl_m3 = _q(state, "enclosure_volume_m3")
-    if _encl_m3 and 0 < float(_encl_m3) < 1.0 and parts:
+    # GOTCHA (colorimeter 2026-07-14): optical/electronic instruments are mostly
+    # air path + PCB — BoM proxy bbox fill legitimately sits well below the
+    # Powerwall 35% floor. G10 targets sealed energy cabinets whose hero looked
+    # like a hollow shell; skip when isInstrumentDevice.
+    if (_encl_m3 and 0 < float(_encl_m3) < 1.0 and parts
+            and not state.get("isInstrumentDevice")):
         fill = interior_fill_fraction(parts, float(_encl_m3))
         if fill is not None:
             gates.append(Gate("interior_fill", ["renders", "general-arrangement"],
@@ -738,6 +822,22 @@ def run_gates(out_dir: str) -> list:
                               f"interior fill {fill * 100:.0f}% of the {float(_encl_m3):.2f} m³ "
                               f"enclosure (floor {INTERIOR_FILL_MIN * 100:.0f}% — below it the "
                               f"render is a hollow shell, not a product)"))
+    # ── G14 PLAN LATERAL SPREAD (2026-07-14 Powerwall GA≠hero) — sealed parts
+    # must not all share one plan cell. A centreline Z-stack makes every GA tag
+    # land at (0,0) while the hero CAD pass paints heatsink/fans/caps off-axis.
+    # EXTENDED (colorimeter 2026-07-14): instruments use the same floor —
+    # role-XY / form-rule slots make pile-up a defect again (not "expected").
+    if _encl_m3 and 0 < float(_encl_m3) < 1.0 and parts:
+        _nxy = plan_lateral_unique_xy(parts)
+        if _nxy is not None:
+            gates.append(Gate(
+                "plan_lateral_spread", ["general-arrangement", "renders"],
+                "high", _nxy >= PLAN_LATERAL_MIN_UNIQUE,
+                (f"plan has {_nxy} distinct (x,y) cell(s) among placed internals "
+                 f"(floor {PLAN_LATERAL_MIN_UNIQUE} — centreline pile-up makes GA≠cutaway)"
+                 if _nxy < PLAN_LATERAL_MIN_UNIQUE else
+                 f"plan has {_nxy} distinct (x,y) cell(s) (≥{PLAN_LATERAL_MIN_UNIQUE})"),
+            ))
 
     # ── G11 DRAWING DOMAIN COHERENCE (2026-07-11, Grok: "deterministic gates report all
     # PASS despite semantic defects — they check geometry/coverage, not whether the
@@ -786,25 +886,130 @@ def run_gates(out_dir: str) -> list:
          + " | ".join(view_failures[:5])),
     ))
 
+    # ── G15 GA↔BLENDER COHERENCE (Codema plant + Powerwall product 2026-07-14) ─
+    # Plant: Excel annotated plan (01-top) + GA share the settled manifest.
+    # Product: Excel cutaway hero (00-hero) + GA share the settled manifest
+    # (fingerprint) — never require a plant top-plan of a wall cabinet.
+    _g15 = ga_render_manifest_coherent(out_dir)
+    if _g15 is not None:
+        ok, detail = _g15
+        gates.append(Gate(
+            "plan_render_coherence", ["general-arrangement", "renders"],
+            "high", ok, detail,
+        ))
+
+    # ── G16 DRAWING-SET COHERENCE (2026-07-14 Tristan: "I now doubt all of the
+    # drawings — they need to be consistent") — every system SVG that is NOT
+    # honestly NA-BY-DESIGN must carry the same placement_fp as the manifest,
+    # and parts_ledger coverage for that drawing must clear 80%. ───────────────
+    _g16 = drawing_set_coherent(out_dir)
+    if _g16 is not None:
+        ok, detail = _g16
+        gates.append(Gate(
+            "drawing_set_coherence",
+            ["general-arrangement", "pid", "block-flow-diagram",
+             "single-line-diagram"],
+            "high", ok, detail,
+        ))
+
+    # ── G17 GA GLANCE COHERENCE (2026-07-14 Tristan: "look at the GA visually")
+    # Fingerprints can ALL-PASS while the sheet fails a 5-second glance (empty
+    # "door removed" FRONT, title 0.1 m vs 183 mm dims). Audits the DELIVERED
+    # SVG — OPERATING-FRAME SIGHT — not state.json intent. ────────────────────
+    _ga_svg_path = os.path.join(out_dir, "drawings", "general-arrangement.svg")
+    if os.path.exists(_ga_svg_path) and os.path.getsize(_ga_svg_path) > 80:
+        try:
+            _ga_svg_txt = open(_ga_svg_path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            _ga_svg_txt = ""
+        if _ga_svg_txt:
+            _g17_ok, _g17_detail = ga_glance_coherent(
+                _ga_svg_txt,
+                is_instrument_device=bool(_instrument),
+                is_product_scale=bool(is_product_scale(state) or _instrument),
+            )
+            gates.append(Gate(
+                "ga_glance_coherence",
+                ["general-arrangement"],
+                "high",
+                _g17_ok,
+                _g17_detail,
+            ))
+
+    # ── G18 DRAWING VISION GLANCE (2026-07-14 Tristan: "look at the GA visually")
+    # Irreducible PNG residue after G17's SVG markers. FLAG-ONLY; shadow unless
+    # DRAWING_VISION_ENFORCING=1. Abstains (no gate) when offline / no key. ─────
+    _g18 = drawing_vision_coherent(out_dir, is_instrument=bool(_instrument))
+    if _g18 is not None:
+        _g18_ok, _g18_detail = _g18
+        _g18_enforce = os.environ.get("DRAWING_VISION_ENFORCING", "").strip().lower() not in (
+            "", "0", "false", "no", "off", "shadow",
+        )
+        # Shadow: record as passed with advisory detail; enforcing: real fail.
+        gates.append(Gate(
+            "drawing_vision_glance",
+            ["general-arrangement", "renders"],
+            "high",
+            True if not _g18_enforce else _g18_ok,
+            (_g18_detail if _g18_ok else f"SHADOW would-fail: {_g18_detail}")
+            if not _g18_enforce and not _g18_ok
+            else _g18_detail,
+        ))
+
     # ── G13 PRODUCT CAD GEOMETRY COVERAGE ─────────────────────────────────────
     # Small products must not regress to an all-box cutaway. The hero pass writes
     # a provenance log for every cached exact/family CAD mesh it actually used.
+    # INTENT: handheld instruments use curated optical-bench STORY meshes +
+    # hide_render manifest proxies (build_universal_scene) — not the Powerwall
+    # CAD-family library. Requiring ≥4 resolved families false-fails a correct
+    # instrument cutaway (colorimeter 0819). Pass when instrument story/proxy
+    # geometry is recorded; keep the ≥4-family bar for non-instrument products.
     if is_product_scale(state):
-        cad_doc = _load("cad-geometry-resolution.json")
-        cad_assets = cad_doc.get("assets") if isinstance(cad_doc, dict) else []
-        families = {
-            str(asset.get("family")) for asset in (cad_assets or [])
-            if isinstance(asset, dict) and asset.get("family")
-        }
-        gates.append(Gate(
-            "cad_geometry_coverage",
-            ["renders"],
-            "high",
-            len(families) >= 4,
-            (f"{len(families)} verified CAD families used: {', '.join(sorted(families))}"
-             if families else
-             "no verified CAD family geometry recorded — product remains primitive-only"),
-        ))
+        if _instrument:
+            n_proxy = sum(
+                1 for p in parts
+                if isinstance(p, dict) and (
+                    str(p.get("geometry_source") or "").startswith("instrument_")
+                    or str(p.get("source") or "").startswith("instrument_")
+                )
+            )
+            # parts-manifest proxies may not carry geometry_source — count placed
+            # instrument parts + any cad-geometry-resolution instrument families
+            cad_doc = _load("cad-geometry-resolution.json")
+            cad_assets = cad_doc.get("assets") if isinstance(cad_doc, dict) else []
+            n_cad = len([
+                a for a in (cad_assets or [])
+                if isinstance(a, dict) and a.get("family")
+            ])
+            n_parts = len([p for p in parts if isinstance(p, dict)])
+            ok = n_proxy >= 1 or n_cad >= 1 or n_parts >= 8
+            gates.append(Gate(
+                "cad_geometry_coverage",
+                ["renders"],
+                "high",
+                ok,
+                (f"instrument geometry present — {n_parts} manifest part(s), "
+                 f"{n_proxy} instrument-proxy source(s), {n_cad} CAD family(ies)"
+                 if ok else
+                 "instrument product has no manifest parts / story proxies — "
+                 "cutaway would be an empty shell"),
+            ))
+        else:
+            cad_doc = _load("cad-geometry-resolution.json")
+            cad_assets = cad_doc.get("assets") if isinstance(cad_doc, dict) else []
+            families = {
+                str(asset.get("family")) for asset in (cad_assets or [])
+                if isinstance(asset, dict) and asset.get("family")
+            }
+            gates.append(Gate(
+                "cad_geometry_coverage",
+                ["renders"],
+                "high",
+                len(families) >= 4,
+                (f"{len(families)} verified CAD families used: {', '.join(sorted(families))}"
+                 if families else
+                 "no verified CAD family geometry recorded — product remains primitive-only"),
+            ))
 
     return gates
 
@@ -834,6 +1039,8 @@ def drawing_domain_findings(out_dir: str, state: dict) -> list:
     lv_tie = bool(ac_v and float(ac_v) <= 250)
     findings = []
     for nm in ("pid", "block-flow-diagram", "single-line-diagram", "panel-schedule"):
+        if not _in_drawing_pack(state, nm):
+            continue
         p = os.path.join(out_dir, "drawings", nm + ".svg")
         try:
             txt = open(p, encoding="utf-8", errors="replace").read()
@@ -880,12 +1087,329 @@ def interior_fill_fraction(parts, encl_m3: float):
     return min(1.0, tot_mm3 / (encl_m3 * 1e9))
 
 
+def plan_lateral_unique_xy(parts, tol_mm: float = 5.0) -> Optional[int]:
+    """PURE G14 measure — count of distinct plan (x,y) anchors among non-skin parts.
+
+    INTENT: sealed centreline Z-stacks put every tag at (0,0) while the hero CAD
+    pass paints heatsink/fans/caps off-axis — GA≠render. Returns None when the
+    manifest has fewer than 3 placeable non-skin parts (abstain).
+    """
+    _skin_rx = re.compile(r"enclosure|cabinet|housing|\bdoor\b|panel|insulation|liner|"
+                          r"gasket|\bseal\b|bracket|mount|cover|lid|skin|chassis|frame|"
+                          r"warning\s+label|signage|label", re.I)
+    cells = set()
+    n = 0
+    for p in parts:
+        if not isinstance(p, dict):
+            continue
+        if _skin_rx.search(str(p.get("name") or "")):
+            continue
+        pos = p.get("pos_mm")
+        if not (isinstance(pos, (list, tuple)) and len(pos) >= 2):
+            continue
+        try:
+            x, y = float(pos[0]), float(pos[1])
+        except (TypeError, ValueError):
+            continue
+        n += 1
+        cells.add((round(x / tol_mm), round(y / tol_mm)))
+    if n < 3:
+        return None
+    return len(cells)
+
+
 # G10 floor: a sealed product interior below this fill fraction renders as an empty
 # shell. Run 73's shipped manifest measured 0.27 (toy boxes + the 88-cell pack
 # collapsed to one 99 mm box — visually hollow); the pack-array + zone-fill sizing
 # lands ~0.45-0.65. A future legitimately-sparse sealed archetype (e.g. a dock that
 # HOUSES a vehicle) needs its own regime signal, not a lowered floor.
 INTERIOR_FILL_MIN = 0.35
+
+# G14 floor: a sealed cabinet with ≥3 placed internals must occupy ≥3 distinct plan
+# cells (5 mm grid). Powerwall 0332 shipped 1 unique XY for 26 parts — centreline pile-up.
+PLAN_LATERAL_MIN_UNIQUE = 3
+
+
+def _load_state(out_dir: str) -> dict:
+    try:
+        return json.load(open(os.path.join(out_dir, "state.json")))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def ga_render_manifest_coherent(out_dir: str):
+    """PURE G15 measure — GA + the Excel-bound Blender view must share the settled
+    parts-manifest generation (mtime freshness + placement fingerprint).
+
+    INTENT (Codema 2026-07-14 + Powerwall 2026-07-14): plant runs compare GA to
+    `01-top.png`; sealed products compare GA to the cutaway hero (`00-hero.png`) —
+    never require a plant top-plan of a wall cabinet. Returns (ok, detail) or None
+    when abstaining (no manifest / nothing to score).
+    """
+    manifest = os.path.join(out_dir, "parts-manifest.json")
+    ga_png = os.path.join(out_dir, "drawings", "general-arrangement.png")
+    ga_svg = os.path.join(out_dir, "drawings", "general-arrangement.svg")
+    if not os.path.exists(manifest):
+        return None
+    try:
+        doc = json.load(open(manifest))
+    except Exception:  # noqa: BLE001
+        return None
+    parts = [p for p in (doc.get("parts") or []) if isinstance(p, dict)]
+    n = int(doc.get("count") or len(parts) or 0)
+    if n < 3:
+        return None
+    state = _load_state(out_dir)
+    product = bool(state and is_product_scale(state))
+    if not product:
+        # Fallback when state is missing: rooms ⇒ plant; sub-2 m envelope ⇒ product.
+        rooms = doc.get("rooms") or []
+        bbox = doc.get("bbox_mm") or {}
+        max_edge = max(
+            float(bbox.get("length_mm") or 0),
+            float(bbox.get("width_mm") or 0),
+            float(bbox.get("height_mm") or 0),
+        )
+        product = (not rooms) and 0 < max_edge <= 2000.0
+
+    # Primary Blender artefact the Excel Renders tab binds for this form factor.
+    if product:
+        render_cands = (
+            os.path.join(out_dir, "00-hero.png"),
+            os.path.join(out_dir, "inspect-hero.png"),
+        )
+        render_label = "00-hero.png (product cutaway)"
+    else:
+        render_cands = (
+            os.path.join(out_dir, "01-top.png"),
+            os.path.join(out_dir, "inspect-top.png"),
+        )
+        render_label = "01-top.png (plant plan)"
+    render = next((p for p in render_cands if os.path.exists(p) and os.path.getsize(p) > 1000), None)
+    if render is None:
+        return (False, f"{render_label} missing — Excel Blender view cannot match the GA")
+
+    # Placement fingerprint — proves the GA was drawn from THIS manifest.
+    fp_man = doc.get("placement_fp") or placement_fingerprint(parts)
+    fp_ga = None
+    if os.path.exists(ga_svg) and os.path.getsize(ga_svg) > 40:
+        try:
+            svg_txt = open(ga_svg, encoding="utf-8", errors="replace").read()
+        except OSError:
+            svg_txt = ""
+        fp_ga = extract_svg_placement_fp(svg_txt)
+        if not fp_ga:
+            return (False,
+                    "general-arrangement.svg missing data-placement-fp — "
+                    "redraw GA so the sheet carries the manifest fingerprint")
+        if fp_ga != str(fp_man).lower():
+            return (False,
+                    f"GA placement fingerprint {fp_ga} ≠ manifest {fp_man} — "
+                    f"GA and Blender do not share the same parts-manifest generation")
+
+    # Freshness vs parts-manifest mtime.
+    # DECISION (colorimeter 2026-07-14): when GA↔manifest fingerprints already
+    # match, skip the render-vs-manifest mtime check on PRODUCT runs — role-XY
+    # rewrites and placement_fp stamps update the JSON without invalidating the
+    # story-mesh hero. PLANT runs still require a fresh 01-top (settled layout).
+    m_mtime = os.path.getmtime(manifest)
+    r_mtime = os.path.getmtime(render)
+    fp_matched = bool(fp_ga and fp_ga == str(fp_man).lower())
+    if not (product and fp_matched):
+        if r_mtime + 2.0 < m_mtime:
+            return (False,
+                    f"{os.path.basename(render)} older than parts-manifest.json by "
+                    f"{m_mtime - r_mtime:.0f}s — Blender view is a stale generation "
+                    f"(GA follows the settled manifest; re-render)")
+        if os.path.exists(ga_png) and os.path.getsize(ga_png) > 1000:
+            g_mtime = os.path.getmtime(ga_png)
+            if g_mtime + 2.0 < m_mtime:
+                return (False,
+                        f"general-arrangement.png older than parts-manifest.json by "
+                        f"{m_mtime - g_mtime:.0f}s — redraw GA from the settled manifest")
+    kind = "product cutaway" if product else "plant plan"
+    # Product/instrument: hero-embed used on the Exec cover must not be older than
+    # the gallery lead view / cutaway (colorimeter 2026-07-14: cover ≠ Renders).
+    if product:
+        embed = os.path.join(out_dir, "hero-embed.png")
+        primary = os.path.join(out_dir, "04-product-exterior.png")
+        if os.path.exists(embed) and os.path.getsize(embed) > 1000:
+            e_m = os.path.getmtime(embed)
+            for src, label in ((render, os.path.basename(render)),
+                               (primary, "04-product-exterior.png")):
+                if os.path.exists(src) and os.path.getsize(src) > 1000:
+                    if e_m + 2.0 < os.path.getmtime(src):
+                        return (False,
+                                f"hero-embed.png older than {label} by "
+                                f"{os.path.getmtime(src) - e_m:.0f}s — Exec cover "
+                                f"would show a stale generation vs the Renders gallery")
+    # Instrument/product GA must lead with FRONT (not a plant PLAN pile-up).
+    # DECISION: sealed cabinets claim "door removed"; handheld instruments claim
+    # "product form" (exterior silhouette matching Blender). Requiring door-removed
+    # on instruments fights G17 (cutaway-claim honesty) and redraws forever.
+    if product and os.path.exists(ga_svg):
+        try:
+            ga_txt = open(ga_svg, encoding="utf-8", errors="replace").read()
+        except OSError:
+            ga_txt = ""
+        if ga_txt:
+            has_front = bool(re.search(r">\s*FRONT\s*\(", ga_txt, re.I))
+            has_cabinet_cutaway = "door removed" in ga_txt.lower()
+            has_instrument_form = "product form" in ga_txt.lower()
+            if not (has_front and (has_cabinet_cutaway or has_instrument_form)):
+                return (False,
+                        "general-arrangement.svg is still plant-style PLAN — "
+                        "product/instrument GA must lead with FRONT "
+                        "(door removed · looking in OR product form · Blender exterior)")
+    return (True,
+            f"{os.path.basename(render)} + GA fresh vs parts-manifest "
+            f"(fp={fp_man}, {kind}) — same placement generation")
+
+
+# Back-compat alias (Codema-era name) — callers / punch-lists may still reference it.
+plan_render_manifest_coherent = ga_render_manifest_coherent
+
+
+def drawing_set_coherent(out_dir: str):
+    """PURE G16 measure — every shipped drawing is the SAME generation.
+
+    INTENT (Tristan 2026-07-14): "you need a check on all of the drawings that
+    they are consistent with each other." G15 seals GA↔Blender; this gate seals
+    the whole set. Proofs (all required when applicable):
+
+      1. Fingerprint — every non-NA system SVG embeds the same
+         ``data-placement-fp`` as parts-manifest (and therefore as each other).
+      2. Content — no phantom equipment tags (letter-prefix in the manifest but
+         tag absent from it) — catches a fingerprint stamped onto a stale SVG.
+      3. Coverage — parts_ledger coverage ≥ DRAWING_COVERAGE_MIN_PCT when the
+         sheet expects tags (NA-BY-DESIGN sheets are stripped from the
+         denominator by parts_ledger).
+      4. Raster freshness — each drawing's PNG is not older than its SVG
+         (stale raster of a previous generation).
+
+    Returns (ok, detail) or None when abstaining (<3 parts / no manifest / no SVGs).
+    """
+    fp = load_manifest_placement_fp(out_dir)
+    if not fp:
+        return None
+    draw = os.path.join(out_dir, "drawings")
+    if not os.path.isdir(draw):
+        return None
+
+    man_path = os.path.join(out_dir, "parts-manifest.json")
+    try:
+        man_doc = json.load(open(man_path))
+    except Exception:  # noqa: BLE001
+        man_doc = {}
+    man_tags = manifest_equipment_tags(man_doc.get("parts") or [])
+
+    fp_fails: list[str] = []
+    tag_fails: list[str] = []
+    png_fails: list[str] = []
+    na_ok: list[str] = []
+    stamped: list[str] = []
+    fps_seen: dict[str, str] = {}
+
+    # Pack-aware: missing SVG for a stem outside the pack is ABSENT-BY-DESIGN, not a fail.
+    try:
+        _st = json.load(open(os.path.join(out_dir, "state.json")))
+        _pack = pack_drawings(_st)
+    except Exception:  # noqa: BLE001
+        _pack = frozenset()
+
+    for key, fname in _DRAWING_SET_SVG:
+        pk = _STEM_TO_PACK_KEY.get(key, key)
+        if _pack and pk not in _pack:
+            continue
+        path = os.path.join(draw, fname)
+        if not os.path.exists(path) or os.path.getsize(path) < 40:
+            continue
+        try:
+            txt = open(path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        if is_na_by_design(txt):
+            na_ok.append(key)
+            continue
+        got = extract_svg_placement_fp(txt)
+        if not got:
+            fp_fails.append(f"{key}: missing data-placement-fp")
+        elif got != fp:
+            fp_fails.append(f"{key}: fp {got} ≠ manifest {fp}")
+        else:
+            stamped.append(key)
+            fps_seen[key] = got
+
+        # Phantom tags on PLACEMENT-projected sheets only (GA / facility-layout).
+        # DECISION: P&ID / panel / SLD / BFD also cite topology & instrument tags
+        # that are intentionally absent from parts-manifest — scoring those as
+        # phantoms false-fires on every real plant. The fingerprint already proves
+        # those sheets share the settled generation; GA is the sheet whose tags
+        # MUST be a projection of the manifest.
+        if key in ("general-arrangement", "facility-layout"):
+            phantoms = sorted(phantom_equipment_tags(txt, man_tags))
+            if phantoms:
+                tag_fails.append(
+                    f"{key}: phantom tag(s) {', '.join(phantoms[:4])} "
+                    f"not in parts-manifest")
+
+        # PNG must not lag its SVG (stale raster).
+        png = os.path.join(draw, fname.replace(".svg", ".png"))
+        if os.path.exists(png) and os.path.getsize(png) > 1000:
+            try:
+                if os.path.getmtime(png) + 2.0 < os.path.getmtime(path):
+                    png_fails.append(
+                        f"{key}: png older than svg by "
+                        f"{os.path.getmtime(path) - os.path.getmtime(png):.0f}s")
+            except OSError:
+                pass
+
+    # Pairwise: every stamped sheet must agree with every other (belt + braces
+    # on top of "each == manifest").
+    uniq_fps = sorted(set(fps_seen.values()))
+    if len(uniq_fps) > 1:
+        fp_fails.append(
+            f"drawings disagree with each other: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(fps_seen.items())[:6]))
+
+    # Coverage floor from parts-ledger (same matrix the Excel Drawing tabs score).
+    cov_fails: list[str] = []
+    ledger_path = os.path.join(out_dir, "parts-ledger.json")
+    if os.path.exists(ledger_path):
+        try:
+            ledger = json.load(open(ledger_path))
+        except Exception:  # noqa: BLE001
+            ledger = {}
+        by_dwg = ledger.get("coverage_by_drawing") or {}
+        for key, _fname in _DRAWING_SET_SVG:
+            pk = _STEM_TO_PACK_KEY.get(key, key)
+            if _pack and pk not in _pack:
+                continue
+            if key in na_ok or key not in _DRAWING_COVERAGE_KEYS:
+                continue
+            row = by_dwg.get(key) or {}
+            exp = row.get("expected")
+            pct = row.get("pct")
+            if exp is None or int(exp or 0) <= 0:
+                continue
+            if pct is None or float(pct) < DRAWING_COVERAGE_MIN_PCT:
+                cov_fails.append(
+                    f"{key}: coverage {pct}% of {exp} expected "
+                    f"(floor {DRAWING_COVERAGE_MIN_PCT:.0f}%)")
+
+    if not stamped and not fp_fails and not cov_fails and not tag_fails and not png_fails:
+        return None
+    fails = fp_fails + tag_fails + png_fails + cov_fails
+    if fails:
+        return (False,
+                f"{len(fails)} drawing-set coherence defect(s): "
+                + " | ".join(fails[:8]))
+    detail = (f"{len(stamped)} system drawing(s) share placement_fp={fp}"
+              + (f"; NA-BY-DESIGN: {', '.join(na_ok)}" if na_ok else "")
+              + f"; no phantom tags; png≥svg; "
+              + f"coverage ≥{DRAWING_COVERAGE_MIN_PCT:.0f}% on applicable sheets")
+    return (True, detail)
+
 
 
 # A single routed CABLE line whose PLAN span exceeds this is a stray plant-crossing beam
@@ -910,6 +1434,11 @@ GATE_STAGE = {
     "connection_sanity": "derive-topology role ranks (spine direction) + connection_ledger finalize (service-domain drop + flow-unit canonicalisation) + design-loop writeback reconcile bound",
     "tag_legibility": "draw_ga _TagPlacer (view-bounds clip + title/dim obstacles + elev same-name range-collapse) + _draw_external_drain_points (same-edge EXT.DRAIN range-collapse + along-edge stagger)",
     "interior_fill": "build_universal_scene place_sealed_enclosure (pack-array expansion + zone-fill sizing)",
+    "plan_lateral_spread": "build_universal_scene _sealed_role_xy_mm / instrument_role_xy + place_sealed_enclosure (role-XY slots shared with hero CAD)",
+    "plan_render_coherence": "settle-loop stale-render wipe + generate_drawing_set _align_plan_render_to_manifest + draw_ga data-placement-fp (plant: 01-top; product: 00-hero cutaway)",
+    "drawing_set_coherence": "placement_fp on EVERY system SVG (GA/P&ID/BFD/SLD/panel/process/facility/distribution) + pairwise fp agree + phantom-tag content check + png≥svg + parts_ledger coverage ≥80%",
+    "ga_glance_coherence": "ga_glance_audit.audit_ga_svg (cutaway-claim honesty + envelope-vs-dims + instrument form markers + FRONT data-glance HMI) + draw_ga title/FRONT HMI band",
+    "drawing_vision_glance": "drawing_vision_glance.critique_drawing_set (GA PNG + product exterior — flag-only residue; proveCatch on known-bad fixture)",
     "drawing_domain": "deriveDeviceEnergyTopology (device-scale topology override) + draw_single_line/_apply_distribution_voltage_model DC-product branch",
     "render_view_quality": "render_view_contract required_views + build_universal_scene product cameras + render_image_quality",
     "cad_geometry_coverage": "cad_asset_resolver DB-first cache + seed_internal_cad_assets + build_universal_scene family imports",
@@ -1062,6 +1591,372 @@ def _selftest() -> int:
     chk("g10_sparse_interior_fires", _f_sparse is not None and _f_sparse < INTERIOR_FILL_MIN)
     chk("g10_dense_interior_passes", _f_dense is not None and _f_dense >= INTERIOR_FILL_MIN)
     chk("g10_no_dims_abstains", interior_fill_fraction([{"name": "X"}], 0.13) is None)
+    # G14 plan-lateral proveCatch (2026-07-14 Powerwall): ALL parts at (0,0) FIRES;
+    # role-spread slots (fans L/R + heatsink + caps) PASS; skin-only abstains.
+    _g14_pile = [{"name": f"Part {i}", "pos_mm": [0.0, 0.0, 100.0 + i]}
+                 for i in range(8)]
+    _g14_spread = [
+        {"name": "Active Ventilation Fan", "pos_mm": [-110.0, -25.0, 900.0]},
+        {"name": "Active Ventilation Fan B", "pos_mm": [110.0, -25.0, 900.0]},
+        {"name": "Extruded Heatsink", "pos_mm": [-140.0, -7.0, 600.0]},
+        {"name": "DC Link Capacitor", "pos_mm": [90.0, -7.0, 600.0]},
+        {"name": "BMS Controller PCB", "pos_mm": [-90.0, -25.0, 800.0]},
+    ]
+    chk("g14_centreline_pile_fires",
+        plan_lateral_unique_xy(_g14_pile) == 1
+        and plan_lateral_unique_xy(_g14_pile) < PLAN_LATERAL_MIN_UNIQUE)
+    chk("g14_role_spread_passes",
+        plan_lateral_unique_xy(_g14_spread) is not None
+        and plan_lateral_unique_xy(_g14_spread) >= PLAN_LATERAL_MIN_UNIQUE)
+    chk("g14_skin_only_abstains",
+        plan_lateral_unique_xy([{"name": "Enclosure Housing", "pos_mm": [0, 0, 0]}]) is None)
+    # G15 ga-render coherence proveCatch (Codema plant + Powerwall product 2026-07-14):
+    # plant + stale 01-top FIRES; fresh plant + matching fp PASSES; product requires
+    # 00-hero (not 01-top); wrong GA fingerprint FIRES; <3 parts abstains.
+    import tempfile, time as _time
+    _g15_td = tempfile.mkdtemp(prefix="g15-")
+    try:
+        _parts54 = [
+            {"equipment_tag": f"P-{i:03d}", "name": f"Pump {i}",
+             "pos_mm": [i * 100.0, 0.0, 0.0]}
+            for i in range(54)
+        ]
+        _fp54 = placement_fingerprint(_parts54)
+        _mani = {
+            "schema": "parts-manifest/1", "count": 54,
+            "rooms": [{"name": "Mech Plant Rm"}],
+            "parts": _parts54,
+            "placement_fp": _fp54,
+        }
+        _mp = os.path.join(_g15_td, "parts-manifest.json")
+        json.dump(_mani, open(_mp, "w"))
+        _plan = os.path.join(_g15_td, "01-top.png")
+        open(_plan, "wb").write(b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        os.makedirs(os.path.join(_g15_td, "drawings"), exist_ok=True)
+        _ga_svg = os.path.join(_g15_td, "drawings", "general-arrangement.svg")
+        open(_ga_svg, "w").write(
+            f'<svg xmlns="http://www.w3.org/2000/svg" data-placement-fp="{_fp54}" '
+            f'width="100" height="100"></svg>')
+        open(os.path.join(_g15_td, "drawings", "general-arrangement.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        _time.sleep(0.05)
+        os.utime(_mp, None)
+        os.utime(_plan, (os.path.getmtime(_mp) - 60, os.path.getmtime(_mp) - 60))
+        _stale = ga_render_manifest_coherent(_g15_td)
+        chk("g15_stale_plan_fires", _stale is not None and _stale[0] is False)
+        os.utime(_plan, None)
+        os.utime(os.path.join(_g15_td, "drawings", "general-arrangement.png"), None)
+        _ok = ga_render_manifest_coherent(_g15_td)
+        chk("g15_fresh_plan_passes", _ok is not None and _ok[0] is True)
+        # Wrong fingerprint on GA must FIRE even when mtimes are fresh.
+        open(_ga_svg, "w").write(
+            '<svg xmlns="http://www.w3.org/2000/svg" data-placement-fp="deadbeefdeadbeef" '
+            'width="100" height="100"></svg>')
+        _bad_fp = ga_render_manifest_coherent(_g15_td)
+        chk("g15_fingerprint_mismatch_fires",
+            _bad_fp is not None and _bad_fp[0] is False and "fingerprint" in _bad_fp[1])
+        # proveCatch (Powerwall 2026-07-15): GA stamped with a DISPLAY-rebased
+        # fingerprint (FFL z-shift) while the manifest keeps the settled fp MUST
+        # fire — this is the exact defect that shipped on powerwall-20260715-0512.
+        _rebased = [
+            {**p, "pos_mm": [p["pos_mm"][0], p["pos_mm"][1],
+                             p["pos_mm"][2] - 825.0]}
+            for p in _parts54[:8]
+        ]
+        _fp_rebased = placement_fingerprint(_rebased)
+        assert _fp_rebased != _fp54, "proveCatch setup: rebased fp must diverge"
+        open(_ga_svg, "w").write(
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'data-placement-fp="{_fp_rebased}" width="100" height="100"></svg>')
+        os.utime(_plan, None)
+        os.utime(os.path.join(_g15_td, "drawings", "general-arrangement.png"), None)
+        _rebase_fire = ga_render_manifest_coherent(_g15_td)
+        chk("g15_product_ffl_rebase_fp_fires",
+            _rebase_fire is not None and _rebase_fire[0] is False
+            and "fingerprint" in _rebase_fire[1]
+            and _fp_rebased in _rebase_fire[1]
+            and str(_fp54) in _rebase_fire[1])
+        # Restore matching fp for subsequent product-scale checks.
+        open(_ga_svg, "w").write(
+            f'<svg xmlns="http://www.w3.org/2000/svg" data-placement-fp="{_fp54}" '
+            f'width="100" height="100"></svg>')
+        # Product-scale: 01-top alone is NOT enough — needs 00-hero cutaway.
+        _prod = tempfile.mkdtemp(prefix="g15-prod-")
+        _pparts = [
+            {"equipment_tag": "X-101", "name": "Inverter", "pos_mm": [-100.0, -10.0, 900.0]},
+            {"equipment_tag": "X-118", "name": "Battery Modules", "pos_mm": [0.0, 10.0, 400.0]},
+            {"equipment_tag": "K-101", "name": "Active Ventilation Fan",
+             "pos_mm": [80.0, -20.0, 1100.0]},
+        ]
+        _pfp = placement_fingerprint(_pparts)
+        json.dump({
+            "count": 3, "parts": _pparts, "rooms": [], "placement_fp": _pfp,
+            "bbox_mm": {"length_mm": 618, "width_mm": 182, "height_mm": 1260},
+        }, open(os.path.join(_prod, "parts-manifest.json"), "w"))
+        json.dump({"orchestratorContract": {"quantities": {
+            "enclosure_volume_m3": {"value": 0.14},
+        }}}, open(os.path.join(_prod, "state.json"), "w"))
+        open(os.path.join(_prod, "01-top.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        _prod_no_hero = ga_render_manifest_coherent(_prod)
+        chk("g15_product_without_hero_fires",
+            _prod_no_hero is not None and _prod_no_hero[0] is False
+            and "00-hero" in _prod_no_hero[1])
+        open(os.path.join(_prod, "00-hero.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        os.makedirs(os.path.join(_prod, "drawings"), exist_ok=True)
+        open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
+            f'<text>FRONT (door removed · looking in)</text></svg>')
+        open(os.path.join(_prod, "drawings", "general-arrangement.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        _prod_ok = ga_render_manifest_coherent(_prod)
+        chk("g15_product_with_hero_passes",
+            _prod_ok is not None and _prod_ok[0] is True)
+        # Plant-style GA on a product must FIRE.
+        open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
+            f'<text>PLAN (roof removed · looking down)</text></svg>')
+        _prod_plan = ga_render_manifest_coherent(_prod)
+        chk("g15_product_plant_style_ga_fires",
+            _prod_plan is not None and _prod_plan[0] is False
+            and "FRONT" in _prod_plan[1])
+        # Instrument exterior form (not cabinet cutaway) must also PASS G15 —
+        # otherwise G15 fights G17 and forces the cutaway lie forever.
+        open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
+            f'<text>FRONT (product form · matches Blender exterior)</text></svg>')
+        _prod_form = ga_render_manifest_coherent(_prod)
+        chk("g15_instrument_product_form_passes",
+            _prod_form is not None and _prod_form[0] is True)
+        open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
+            f'<text>FRONT (door removed · looking in)</text></svg>')
+        # Stale hero-embed vs fresher exterior must FIRE (colorimeter cover≠Renders).
+        open(os.path.join(_prod, "04-product-exterior.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        open(os.path.join(_prod, "hero-embed.png"), "wb").write(
+            b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        import time as _t2
+        _t2.sleep(0.05)
+        os.utime(os.path.join(_prod, "04-product-exterior.png"), None)
+        os.utime(os.path.join(_prod, "hero-embed.png"),
+                 (os.path.getmtime(os.path.join(_prod, "04-product-exterior.png")) - 120,
+                  os.path.getmtime(os.path.join(_prod, "04-product-exterior.png")) - 120))
+        _stale_embed = ga_render_manifest_coherent(_prod)
+        chk("g15_stale_hero_embed_fires",
+            _stale_embed is not None and _stale_embed[0] is False
+            and "hero-embed" in _stale_embed[1])
+        _tiny = tempfile.mkdtemp(prefix="g15-tiny-")
+        json.dump({"count": 1, "parts": [{"name": "A", "equipment_tag": "A-1",
+                                          "pos_mm": [0, 0, 0]}], "rooms": []},
+                  open(os.path.join(_tiny, "parts-manifest.json"), "w"))
+        chk("g15_too_few_parts_abstains",
+            ga_render_manifest_coherent(_tiny) is None)
+        # G16 drawing-set coherence proveCatch (2026-07-14): matching fp on GA+P&ID
+        # PASSES; missing fp on P&ID FIRES; NA-BY-DESIGN P&ID is exempt; low coverage FIRES.
+        _g16 = tempfile.mkdtemp(prefix="g16-")
+        _g16p = [
+            {"equipment_tag": f"TK-{i:03d}", "name": f"Tank {i}",
+             "pos_mm": [i * 500.0, 0.0, 0.0]}
+            for i in range(8)
+        ]
+        _g16fp = placement_fingerprint(_g16p)
+        json.dump({"count": 8, "parts": _g16p, "placement_fp": _g16fp,
+                   "rooms": [{"name": "Mech"}]},
+                  open(os.path.join(_g16, "parts-manifest.json"), "w"))
+        os.makedirs(os.path.join(_g16, "drawings"), exist_ok=True)
+        open(os.path.join(_g16, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100"></svg>')
+        open(os.path.join(_g16, "drawings", "pid.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100">'
+            f'<text>TK-001</text></svg>')
+        open(os.path.join(_g16, "drawings", "block-flow-diagram.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100"></svg>')
+        open(os.path.join(_g16, "drawings", "single-line-diagram.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100"></svg>')
+        json.dump({"coverage_by_drawing": {
+            "general-arrangement": {"expected": 8, "present": 8, "pct": 100.0},
+            "pid": {"expected": 8, "present": 8, "pct": 100.0},
+            "block-flow-diagram": {"expected": 4, "present": 4, "pct": 100.0},
+            "single-line-diagram": {"expected": 2, "present": 2, "pct": 100.0},
+        }}, open(os.path.join(_g16, "parts-ledger.json"), "w"))
+        _g16_ok = drawing_set_coherent(_g16)
+        chk("g16_matching_fp_passes", _g16_ok is not None and _g16_ok[0] is True)
+        open(os.path.join(_g16, "drawings", "pid.svg"), "w").write(
+            '<svg width="100" height="100"><text>TK-001</text></svg>')
+        _g16_miss = drawing_set_coherent(_g16)
+        chk("g16_missing_pid_fp_fires",
+            _g16_miss is not None and _g16_miss[0] is False
+            and "pid" in _g16_miss[1])
+        open(os.path.join(_g16, "drawings", "pid.svg"), "w").write(
+            '<svg width="100" height="100"><text>P&ID — NOT APPLICABLE '
+            '(NA-BY-DESIGN)</text></svg>')
+        json.dump({"coverage_by_drawing": {
+            "general-arrangement": {"expected": 8, "present": 8, "pct": 100.0},
+            "pid": {"expected": 0, "present": 0, "pct": None},
+            "block-flow-diagram": {"expected": 4, "present": 4, "pct": 100.0},
+            "single-line-diagram": {"expected": 2, "present": 2, "pct": 100.0},
+        }}, open(os.path.join(_g16, "parts-ledger.json"), "w"))
+        _g16_na = drawing_set_coherent(_g16)
+        chk("g16_na_pid_exempt", _g16_na is not None and _g16_na[0] is True)
+        json.dump({"coverage_by_drawing": {
+            "general-arrangement": {"expected": 8, "present": 4, "pct": 50.0},
+            "pid": {"expected": 0, "present": 0, "pct": None},
+            "block-flow-diagram": {"expected": 4, "present": 4, "pct": 100.0},
+            "single-line-diagram": {"expected": 2, "present": 2, "pct": 100.0},
+        }}, open(os.path.join(_g16, "parts-ledger.json"), "w"))
+        _g16_cov = drawing_set_coherent(_g16)
+        chk("g16_low_coverage_fires",
+            _g16_cov is not None and _g16_cov[0] is False
+            and "coverage" in _g16_cov[1])
+        # Restore coverage; prove panel-schedule must carry fp too.
+        json.dump({"coverage_by_drawing": {
+            "general-arrangement": {"expected": 8, "present": 8, "pct": 100.0},
+            "pid": {"expected": 0, "present": 0, "pct": None},
+            "block-flow-diagram": {"expected": 4, "present": 4, "pct": 100.0},
+            "single-line-diagram": {"expected": 2, "present": 2, "pct": 100.0},
+            "panel-schedule": {"expected": 2, "present": 2, "pct": 100.0},
+        }}, open(os.path.join(_g16, "parts-ledger.json"), "w"))
+        open(os.path.join(_g16, "drawings", "pid.svg"), "w").write(
+            '<svg width="100" height="100"><text>P&ID — NOT APPLICABLE '
+            '(NA-BY-DESIGN)</text></svg>')
+        open(os.path.join(_g16, "drawings", "panel-schedule.svg"), "w").write(
+            '<svg width="100" height="100"><text>PANEL</text></svg>')
+        _g16_panel = drawing_set_coherent(_g16)
+        chk("g16_panel_missing_fp_fires",
+            _g16_panel is not None and _g16_panel[0] is False
+            and "panel-schedule" in _g16_panel[1])
+        open(os.path.join(_g16, "drawings", "panel-schedule.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100">'
+            f'<text>PANEL</text></svg>')
+        # Phantom tag on GA (same letter prefix, wrong number) must FIRE.
+        open(os.path.join(_g16, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100">'
+            f'<text>TK-999</text></svg>')
+        _g16_phant = drawing_set_coherent(_g16)
+        chk("g16_phantom_tag_fires",
+            _g16_phant is not None and _g16_phant[0] is False
+            and "phantom" in _g16_phant[1])
+        open(os.path.join(_g16, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100">'
+            f'<text>TK-001</text></svg>')
+        # Topology-only tags on SLD must NOT fire (not a placement-projected sheet).
+        open(os.path.join(_g16, "drawings", "single-line-diagram.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100">'
+            f'<text>X-999</text></svg>')
+        # Keep panel stamped; restore BFD to matching fp for the silent check.
+        open(os.path.join(_g16, "drawings", "block-flow-diagram.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100"></svg>')
+        open(os.path.join(_g16, "drawings", "panel-schedule.svg"), "w").write(
+            f'<svg data-placement-fp="{_g16fp}" width="100" height="100"></svg>')
+        _png_ok = os.path.join(_g16, "drawings", "general-arrangement.png")
+        if os.path.exists(_png_ok):
+            os.utime(_png_ok, None)
+        _g16_topo = drawing_set_coherent(_g16)
+        chk("g16_topology_tag_on_sld_silent",
+            _g16_topo is not None and _g16_topo[0] is True)
+        # Stale PNG vs fresher SVG must FIRE.
+        _png = os.path.join(_g16, "drawings", "general-arrangement.png")
+        open(_png, "wb").write(b"\x89PNG\r\n\x1a\n" + b"\0" * 2000)
+        import time as _t3
+        _t3.sleep(0.05)
+        os.utime(os.path.join(_g16, "drawings", "general-arrangement.svg"), None)
+        os.utime(_png, (os.path.getmtime(
+            os.path.join(_g16, "drawings", "general-arrangement.svg")) - 120,
+            os.path.getmtime(
+            os.path.join(_g16, "drawings", "general-arrangement.svg")) - 120))
+        _g16_png = drawing_set_coherent(_g16)
+        chk("g16_stale_png_fires",
+            _g16_png is not None and _g16_png[0] is False
+            and "png older" in _g16_png[1])
+        os.utime(_png, None)
+        # Pairwise disagree: BFD stamped with a different fp must FIRE.
+        open(os.path.join(_g16, "drawings", "block-flow-diagram.svg"), "w").write(
+            '<svg data-placement-fp="aaaaaaaaaaaaaaaa" width="100" height="100"></svg>')
+        _g16_pair = drawing_set_coherent(_g16)
+        chk("g16_pairwise_fp_disagree_fires",
+            _g16_pair is not None and _g16_pair[0] is False
+            and ("block-flow" in _g16_pair[1] or "disagree" in _g16_pair[1]))
+        # G17 glance audit proveCatch (2026-07-14): empty cover-removed claim
+        # must FIRE; assembly with PCB+tags must PASS; exterior form still PASS.
+        from ga_glance_audit import audit_ga_svg, _selftest as _g17_self
+        _g17_self()
+        _bad_ga = (
+            '<svg><text>FRONT (cover removed · assembly internals)</text>'
+            '<text>product envelope 0.2 m (L) × 0.1 m (W) × 0.1 m (H)</text>'
+            '<text>183</text><text>145</text><text>120</text>'
+            '<text>OPTICAL</text><text>UI DECK</text>'
+            '<rect fill="#c8e6d8"/>'
+            + ''.join(
+                '<rect fill="none" stroke="#5b6470" width="17" height="17"/>'
+                for _ in range(6))
+            + '</svg>'
+        )
+        _bad_codes = {f.code for f in audit_ga_svg(
+            _bad_ga, is_instrument_device=True, is_product_scale=True)}
+        chk("g17_empty_cutaway_lie_fires",
+            "cutaway_claim_without_parts" in _bad_codes)
+        chk("g17_envelope_mismatch_fires", "envelope_vs_dimension_mismatch" in _bad_codes)
+        _good_asm = (
+            '<svg><text>FRONT (cover removed · assembly internals)</text>'
+            '<text>product envelope 183 × 145 × 120 mm (L×W×H)</text>'
+            '<text>183</text><text>145</text><text>120</text>'
+            '<text>OPTICAL</text><text>UI DECK</text>'
+            '<text>I-113</text><text>X-112</text><text>I-114</text><text>I-108</text>'
+            '<rect fill="#c8e6d8" data-glance="front-display"/>'
+            '<rect fill="#e8eef5" data-glance="front-ui-deck"/>'
+            '<rect fill="#c5e1a5" data-glance="front-pcb"/>'
+            + ''.join(
+                '<rect fill="none" stroke="#5b6470" width="17" height="17"/>'
+                for _ in range(6))
+            + '</svg>'
+        )
+        chk("g17_honest_assembly_passes",
+            audit_ga_svg(_good_asm, is_instrument_device=True,
+                         is_product_scale=True) == [])
+        _good_ga = (
+            '<svg><text>FRONT (product form · matches Blender exterior)</text>'
+            '<text>product envelope 183 × 145 × 120 mm (L×W×H)</text>'
+            '<text>183</text><text>145</text><text>120</text>'
+            '<text>OPTICAL</text><text>UI DECK</text>'
+            '<rect fill="#c8e6d8" data-glance="front-display"/>'
+            '<rect fill="#e8eef5" data-glance="front-ui-deck"/>'
+            + ''.join(
+                '<rect fill="none" stroke="#5b6470" width="17" height="17"/>'
+                for _ in range(6))
+            + '</svg>'
+        )
+        chk("g17_honest_form_passes",
+            audit_ga_svg(_good_ga, is_instrument_device=True,
+                         is_product_scale=True) == [])
+        _no_front = _good_ga.replace('data-glance="front-display"', "").replace(
+            'data-glance="front-ui-deck"', "")
+        chk("g17_front_missing_hmi_fires",
+            "instrument_front_missing_hmi" in {
+                f.code for f in audit_ga_svg(
+                    _no_front, is_instrument_device=True, is_product_scale=True)})
+        # G18 drawing-vision glance proveCatch (offline skip + prompt contract).
+        from drawing_vision_glance import _selftest as _g18_self
+        _g18_self()
+        chk("g18_vision_glance_selftest", True)
+    finally:
+        import shutil as _sh
+        _sh.rmtree(_g15_td, ignore_errors=True)
+        for _td in list(locals().get("_prod", None) and [_prod] or []):
+            _sh.rmtree(_td, ignore_errors=True)
+        try:
+            _sh.rmtree(_tiny, ignore_errors=True)
+        except NameError:
+            pass
+        try:
+            _sh.rmtree(_g16, ignore_errors=True)
+        except NameError:
+            pass
+        try:
+            _sh.rmtree(_prod, ignore_errors=True)
+        except NameError:
+            pass
     # G11 proveCatch (2026-07-11, Grok's audit): run-75's REAL P&ID text ('PCS → Heat
     # Rejection', 'Step Up Transformer') must FIRE on a sealed no-transformer ≤250 V
     # contract; the same text on a PLANT contract (transformer sized, 400 V) must NOT;
