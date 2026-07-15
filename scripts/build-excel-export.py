@@ -28132,12 +28132,14 @@ def _selftest() -> int:
     with _tf.TemporaryDirectory() as _td5:
         os.makedirs(os.path.join(_td5, "exterior"), exist_ok=True)
         from PIL import Image as _PILImg
+        # GOTCHA: _hero_embed_png requires size > 1000 bytes (rejects stub empties).
+        # An 8×6 RGB PNG is ~77 B and was falsely failing the preference proveCatch.
         for _fn in ("00-hero.png", "hero-embed.png", "01-top.png", "inspect-side.png",
                     "02-corner-FR.png", "03-corner-BL.png",
                     os.path.join("exterior", "00-hero.png"),
                     os.path.join("exterior", "01-top.png"),
                     os.path.join("exterior", "02-corner-FR.png")):
-            _PILImg.new("RGB", (8, 6), (200, 20, 20)).save(os.path.join(_td5, _fn))
+            _PILImg.new("RGB", (640, 480), (200, 20, 20)).save(os.path.join(_td5, _fn))
         with open(os.path.join(_td5, "drawing-manifest.json"), "w") as _fh:
             json.dump({"hero_embed": os.path.join(_td5, "hero-embed.png"),
                        "renders": [{"file": "00-hero.png",
@@ -28712,7 +28714,10 @@ def _selftest() -> int:
                   f"(got {_cosr.get('output_qty')})"); bad += 1
         _i3, _n3 = 0.10, 20.0
         _crf3 = (_i3 * (1 + _i3) ** _n3) / (((1 + _i3) ** _n3) - 1)
-        _exp_lev = (1148141 * _crf3 + 53 * 8000 * 0.65 * 0.15 + 25000
+        # Labour is unmanned O&M £6/kW·yr × connected_electrical_load_kw (Inputs
+        # driver) — not the legacy £25k flat. Mirror _economics_defaults_from_signals.
+        _lab3 = round(6.0 * 53.0)
+        _exp_lev = (1148141 * _crf3 + 53 * 8000 * 0.65 * 0.15 + _lab3
                     + 1148141 * 0.03 + round(1148141 * 0.02)) / (90 * 8760 * 0.25)
         if abs((_cosr.get("levelised_cost_per_unit") or 0) - _exp_lev) > 0.001:
             print(f"  FAIL cos: levelised £/m³ must recompute over the Inputs drivers "
@@ -29337,15 +29342,27 @@ def _selftest() -> int:
             print(f"  FAIL electrical: the schedule (W1 @ row {_w1r}) must render BELOW the "
                   f"drawing (anchored @ row {_imgr})"); bad += 1
 
-    # (B4b) ELECTRICAL NA-BY-DESIGN guard: a bespoke PCB instrument with a real
-    # device DC topology is NOT out-of-scope — the Electrical tab must stay scored.
-    _inst_with_tree = {
+    # (B4b) ELECTRICAL NA-BY-DESIGN: fluid-less handhelds NA Electrical even when
+    # they carry a few electrical_bus edges (board DC lives on PCB — never force a
+    # plant panel-schedule FAIL). A fluid-bearing instrument with electrical_bus
+    # stays scored. Bespoke PCB with neither fluid nor electrical → NA.
+    _inst_fluidless_elec = {
         "isInstrumentDevice": True,
         "pcb": {"isPcbBearing": True, "disposition": "bespoke"},
         "orchestratorContract": {"topology": [
             {"from_part": "USB Power", "to_part": "DC DC Regulator",
              "mechanism": "electrical_bus"},
             {"from_part": "DC DC Regulator", "to_part": "Microcontroller",
+             "mechanism": "electrical_bus"},
+        ]},
+    }
+    _inst_fluid_elec = {
+        "isInstrumentDevice": True,
+        "pcb": {"isPcbBearing": True, "disposition": "bespoke"},
+        "orchestratorContract": {"topology": [
+            {"from_part": "Sample Inlet", "to_part": "Cuvette",
+             "mechanism": "process_fluid"},
+            {"from_part": "USB Power", "to_part": "DC DC Regulator",
              "mechanism": "electrical_bus"},
         ]},
     }
@@ -29356,9 +29373,12 @@ def _selftest() -> int:
             {"from_part": "LED", "to_part": "Photodiode", "mechanism": "signal"},
         ]},
     }
-    if _should_na_electrical_to_pcb(_inst_with_tree):
-        print("  FAIL electrical-na: a device with electrical_bus edges must remain scored "
-              "(not PCB-NA)"); bad += 1
+    if not _should_na_electrical_to_pcb(_inst_fluidless_elec):
+        print("  FAIL electrical-na: fluid-less handheld with electrical_bus must NA "
+              "to PCB (not plant SLD)"); bad += 1
+    if _should_na_electrical_to_pcb(_inst_fluid_elec):
+        print("  FAIL electrical-na: fluid-bearing instrument with electrical_bus must "
+              "remain scored (not PCB-NA)"); bad += 1
     if not _should_na_electrical_to_pcb(_inst_no_tree):
         print("  FAIL electrical-na: a bespoke PCB instrument with no electrical topology "
               "may still be verified out-of-scope"); bad += 1
