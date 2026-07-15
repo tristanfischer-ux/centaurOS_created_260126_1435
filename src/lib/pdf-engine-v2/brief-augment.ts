@@ -344,7 +344,7 @@ function looksLikeProcessPlant(text: string): boolean {
 // that merely mentions a "monitor"/"meter" never trips it. Universal, keyed on device
 // vocabulary, never a class table.
 function looksLikeDeviceInstrument(text: string): boolean {
-  const instrumentNoun = /\b(?:photometer|colou?rimeter|spectrophotometer|spectrometer|fluorimeter|fluorometer|turbidimeter|nephelometer|refractometer|\bmeter\b|analy[sz]er|data[\s-]?logger|sensor\s+node|hand-?held\s+(?:instrument|device|analy[sz]er|meter)|benchtop\s+instrument)\b/i.test(text)
+  const instrumentNoun = /\b(?:photometer|colou?rimeter|spectrophotometer|spectrometer|fluorimeter|fluorometer|turbidimeter|nephelometer|refractometer|thermo[\s-]?cycler|thermal[\s-]?cycler|pcr[\s-]?cycler|dna[\s-]?amplifier|\bmeter\b|analy[sz]er|data[\s-]?logger|sensor\s+node|hand-?held\s+(?:instrument|device|analy[sz]er|meter)|benchtop\s+instrument)\b/i.test(text)
   const positioning = /\b(?:portable|hand-?held|bench-?top|desktop|tabletop|wearable|pocket|field-portable|wall-?mount(?:ed)?)\b/i.test(text)
   const deviceElectronics = /\b(?:microcontroller|firmware|\bpcb\b|printed\s+circuit\s+board|cuvette|photodiode|\bled\b\s+(?:source|driver)|rechargeable\s+battery|usb[\s-]?(?:c|powered|port|interface)|3d[\s-]?printed\s+enclosure)\b/i.test(text)
   return instrumentNoun && (positioning || deviceElectronics)

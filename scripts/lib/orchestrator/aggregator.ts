@@ -226,10 +226,15 @@ const DEVICE_SCALE_POSITIONING_RE =
   /\b(portable|benchtop|bench-top|handheld|hand-held|desktop|wall[- ]mount(?:ed)?|tabletop|table-top)\b/i
 
 const ELECTRONIC_INSTRUMENT_RE =
-  /\b(optical[_ -]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance|portable\s+instrument|benchtop\s+instrument)\b/i
+  /\b(optical[_ -]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance|thermo[_ -]?cycler|thermal[_ -]?cycler|pcr[_ -]?cycler|thermocycler|portable\s+instrument|benchtop\s+instrument)\b/i
 
+// GOTCHA (2026-07-15 NinjaPCR): a USB photometer is ~5 W; a Peltier thermocycler
+// is ~50–150 W continuous. Cap must admit that band without opening the door to
+// plant-scale kW defaults. deriveDeviceScaleElectricalLoad still prefers a
+// brief/contract-stated load when present.
 const DEVICE_SCALE_INSTRUMENT_LOAD_KW = 0.005
-const DEVICE_SCALE_PLAUSIBLE_LOAD_CEILING_KW = 0.1
+const DEVICE_SCALE_THERMOCYCLER_LOAD_KW = 0.12
+const DEVICE_SCALE_PLAUSIBLE_LOAD_CEILING_KW = 0.25
 
 /**
  * Effective device density (kg/m³) used to back out a plausible enclosure
@@ -318,12 +323,23 @@ export function deriveDeviceScaleElectricalLoad(
   const overrideNote = existingDemandKw !== undefined
     ? `; replaced implausible ${existingDemandKw} kW device-load artefact`
     : ''
-  const deviceLoadKw = DEVICE_SCALE_INSTRUMENT_LOAD_KW
+  // Thermocycler / Peltier instruments draw tens–hundreds of watts, not USB 5 W.
+  const briefBits = [
+    String((parsedConstraints as { product_class?: string } | undefined)?.product_class ?? ''),
+    String((contract as { product_class?: string }).product_class ?? ''),
+    String((parsedConstraints as { product_description?: string } | undefined)?.product_description ?? ''),
+    String((parsedConstraints as { original_text?: string } | undefined)?.original_text ?? ''),
+  ].join(' ')
+  const isThermocycler = /\b(?:thermo[_ -]?cycler|thermal[_ -]?cycler|pcr[_ -]?cycler|thermocycler|ninjapcr|openpcr|peltier)\b/i.test(briefBits)
+  const deviceLoadKw = isThermocycler
+    ? DEVICE_SCALE_THERMOCYCLER_LOAD_KW
+    : DEVICE_SCALE_INSTRUMENT_LOAD_KW
+  const loadStory = isThermocycler
+    ? `device-scale benchtop thermocycler continuous draw ≈ ${deviceLoadKw * 1000} W (Peltier well + lid heater + fan + MCU/Wi-Fi) — envelope estimate; NOT a USB photometer 5 W default and NOT a plant-scale kW phantom`
+    : `device-scale portable/benchtop instrument continuous draw ≈ ${deviceLoadKw * 1000} W (USB/battery-powered LED source + MCU + display + detector AFE + regulator quiescent) — envelope estimate; NOT the ~1000 kW plant convergence phantom`
   q.connected_electrical_load_kw = deviceScaleQuantity(
     deviceLoadKw, 'kW', 'power', 'rated', 'connected_electrical_load_kw',
-    `device-scale portable/benchtop instrument continuous draw ≈ ${deviceLoadKw * 1000} W (USB/battery-powered ` +
-    `LED source + MCU + display + detector AFE + regulator quiescent) — envelope estimate; NOT the ~1000 kW ` +
-    `plant convergence phantom. Anchors total_supply_demand_kw so the panel schedule reads device-scale`,
+    `${loadStory}. Anchors total_supply_demand_kw so the panel schedule reads device-scale`,
   )
   return `deriveDeviceScaleElectricalLoad: connected_electrical_load_kw=${deviceLoadKw} kW for portable/benchtop electronic instrument${overrideNote}`
 }

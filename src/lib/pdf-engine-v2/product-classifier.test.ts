@@ -115,4 +115,17 @@ describe('classifyProduct — edge cases', () => {
   it('a genuine PCBA contract-manufacturing brief still classifies as pcb_assembly (no regression)', () => {
     expect(classifyProduct('PCBA contract line: SMT assembly, BGA reflow, solder paste stencil, 6-layer pcb assembly, pick and place.').productClass).toBe('pcb_assembly')
   })
+
+  // INTENT (2026-07-15 NinjaPCR): thermocycler briefs say "schematic, PCB, … assembly"
+  // and must NOT fall through to pcb_assembly (same trap as optical_instrument).
+  it('classifies a PCR thermocycler brief as thermocycler (beats the pcb_assembly catch)', () => {
+    const brief = 'Compact PCR thermocycler for 8× 0.2 mL tubes, 4–99 °C, Peltier heating and '
+      + 'cooling, closed-loop PID, browser UI. Deliver schematic, PCB, firmware, web interface, '
+      + 'exact BOM, calibration method, safety analysis, assembly plan and validation protocol.'
+    expect(classifyProduct(brief).productClass).toBe('thermocycler')
+  })
+  it('NinjaPCR / thermal-cycling nouns classify as thermocycler', () => {
+    expect(classifyProduct('NinjaPCR-class DNA amplifier with sample block and denature/anneal cycling.').productClass)
+      .toBe('thermocycler')
+  })
 })

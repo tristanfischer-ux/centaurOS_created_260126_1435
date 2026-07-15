@@ -751,6 +751,10 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   instrument_device: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   photometer: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   colorimeter: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  // INTENT (2026-07-15 NinjaPCR): benchtop PCR thermocycler — same archetype
+  // (no site install). Alias pcr_thermocycler for LLM display-name drift.
+  thermocycler: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  pcr_thermocycler: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
 }
 
 // ---------------------------------------------------------------------------

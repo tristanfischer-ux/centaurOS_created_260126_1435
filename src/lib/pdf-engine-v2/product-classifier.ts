@@ -128,6 +128,15 @@ export function classifyProduct(briefText: string): ProductClassification {
       // + optical tool signal) handles topology / pricing / rendering. NOT a registered
       // builder class — deliberately generic so any optical instrument is covered.
       productClass = 'optical_instrument'
+    } else if (
+      // INTENT (2026-07-15 NinjaPCR): a PCR / DNA-amplification thermocycler brief
+      // always asks for schematic + PCB + assembly plan — the same incidental
+      // `pcb.*assembly` phrase that mis-routed colorimeter. Must beat that catch.
+      // Noun-first: thermocycler / thermal cycler / PCR cycler / NinjaPCR / OpenPCR.
+      lower.match(/\b(?:thermo[\s-]?cycler|thermal[\s-]?cycl(?:er|ing)|pcr[\s-]?cycler|dna[\s-]?amplif(?:ier|ication)|ninjapcr|openpcr)\b/)
+      || (lower.match(/\bpcr\b/) && lower.match(/\b(?:0\.2\s*ml|tube\s+block|sample\s+block|denatur|anneal|extension\s+hold|peltier|well[- ]to[- ]well)\b/))
+    ) {
+      productClass = 'thermocycler'
     } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
       productClass = 'pcb_assembly'
     }
@@ -348,6 +357,8 @@ const SPECIFIC_FIELDS: Record<string, string[]> = {
   pcb_assembly: ['board_count', 'layer_count', 'component_count', 'assembly_type'],
   wearable_medical: ['device_class', 'battery_life_days', 'sensor_type', 'skin_contact_area'],
   bioreactor: ['volume_litres', 'vessel_type', 'sterilisation_method', 'cell_type'],
+  // Soft checklist only — no HARD_REQUIRED_SLOTS yet (thin optical_instrument pattern).
+  thermocycler: ['tube_count', 'sample_temp_min_c', 'sample_temp_max_c', 'well_uniformity_c'],
 }
 
 const RECOMMENDED_UNKNOWN = ['target_cost', 'production_volume', 'jurisdiction', 'max_mass']
