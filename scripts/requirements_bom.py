@@ -1874,6 +1874,65 @@ def _commodity_catalogue_cap(name: str, pn: str, gbp: float, cat_price):
     return (gbp, None)
 
 
+# SEALED ENERGY-CABINET ROLE CEILINGS (Powerwall 2026-07-15): industrial panel-PC
+# HMIs (£1.2k NexCOBOT) and cellular Flexy gateways (£977) were catalogue-pinned
+# into a residential wall ESS whose real UI is a status LED / app and whose
+# telemetry is a Wi-Fi SoC. Utility arc-flash kit was corpus-lifted the same way.
+# Universal — keyed on enclosure_volume_m3 < 1 (sealed product) + role nouns;
+# plants and instruments are untouched. Ceilings are generous UK-2026 OEM BOM
+# allowances for high-volume residential wall units, not one-off industrial kit.
+_SEALED_CABINET_ROLE_CAPS = [
+    (re.compile(
+        r"\bhmi\b|touch\s?screen|operator\s+(?:display|panel|interface)|"
+        r"local\s+(?:hmi|display)|panel\s+(?:pc|computer)|industrial\s+display",
+        re.I), 80.0, "sealed-cabinet HMI/status-display role"),
+    (re.compile(
+        r"remote\s+monitoring|cellular\s+(?:modem|router|gateway)|"
+        r"\bflexy\b|\bewon\b|telemetry\s+(?:module|unit|gateway)",
+        re.I), 60.0, "sealed-cabinet Wi-Fi/telemetry role"),
+    (re.compile(r"arc\s*flash\s+protection", re.I), 40.0,
+     "sealed-cabinet (utility arc-flash kit demoted)"),
+    (re.compile(r"smoke\s+detect", re.I), 55.0,
+     "sealed-cabinet residential smoke detector"),
+    (re.compile(
+        r"insulation\s+monitor|\bimd\b|(?:ground|earth)\s+fault\s+monitor",
+        re.I), 85.0, "sealed-cabinet IMD (residential DC isolation)"),
+    (re.compile(
+        r"ethernet\s+switch|network\s+switch|industrial\s+switch",
+        re.I), 45.0, "sealed-cabinet onboard Ethernet PHY/switch"),
+    (re.compile(
+        r"digital\s+energy\s+platform|energy\s+management\s+(?:platform|software)|"
+        r"\bgems\b",
+        re.I), 50.0, "sealed-cabinet EMS firmware (not a plant SCADA skid)"),
+]
+
+
+def _sealed_cabinet_role_price_cap(name: str, gbp: float, encl_m3,
+                                   is_instrument: bool = False):
+    """Cap wrong-class industrial catalogue pins on a sealed energy cabinet.
+
+    Returns (gbp, basis_suffix_or_None). No-op for plants (encl ≥ 1), instruments,
+    missing prices, or nouns outside the role list.
+    """
+    if is_instrument or gbp is None or gbp <= 0:
+        return (gbp, None)
+    try:
+        vol = float(encl_m3) if encl_m3 is not None else None
+    except (TypeError, ValueError):
+        vol = None
+    if vol is None or not (0 < vol < 1.0):
+        return (gbp, None)
+    nm = name or ""
+    for rx, ceiling, label in _SEALED_CABINET_ROLE_CAPS:
+        if rx.search(nm) and gbp > ceiling:
+            return (
+                ceiling,
+                f"capped to £{ceiling:,.0f} {label} (was £{gbp:,.0f} — industrial "
+                f"catalogue pin on a sealed {vol:.2f} m³ cabinet)",
+            )
+    return (gbp, None)
+
+
 # ── BARE-COMMODITY HARD CEILING (council 2026-06-17, the marine-RAS mis-PIN) ──
 # The catalogue cap above needs a resolved catalogue price. But a mis-PINNED
 # commodity often has NONE — the structured PN lives only in partVerifications, or
@@ -2897,6 +2956,31 @@ def _selftest() -> int:
         print(f"  FAIL device enclosure must be a cheap moulded POLYMER, not steel: {_enc_dev}"); bad += 1
     if not (_enc_plant and _enc_plant[0] > 1000 and "steel" in str(_enc_plant[2])):
         print(f"  FAIL a genuine 30 m² plant enclosure must STILL take the structural-steel take-off: {_enc_plant}"); bad += 1
+    # ── INSTRUMENT Cxx SUPPRESSION (2026-07-14, gold WHY): handheld topology edges
+    # are NOT costed plant cable runs — maker cables live as equipment principals.
+    import tempfile as _tmp_conn
+    _td_conn = _tmp_conn.mkdtemp(prefix="rbom-instr-conn-")
+    with open(os.path.join(_td_conn, "connection-schedule.json"), "w") as _fh:
+        json.dump({"rows": [
+            {"from": "Optical Detector Module", "to": "Microcontroller",
+             "mechanism": "signal", "length_m": 2.3, "line_total_gbp": 50,
+             "size": "(unsized)", "rating": ""},
+            {"from": "DC DC Regulator", "to": "LED Driver",
+             "mechanism": "electrical_bus", "length_m": 1.5, "line_total_gbp": 40,
+             "size": "1.5 mm²", "rating": "5 V"},
+        ]}, _fh)
+    _saved_dev2 = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _instr_conn = _connection_rows(_td_conn, {"enclosure_volume_m3": {"value": 0.0008}})
+    _IS_INSTRUMENT_DEVICE = False
+    _plant_conn = _connection_rows(_td_conn, {"enclosure_volume_m3": {"value": 40.0}})
+    _IS_INSTRUMENT_DEVICE = _saved_dev2
+    if _instr_conn:
+        print(f"  FAIL instrument Cxx proveCatch: device-scale run must emit ZERO "
+              f"topology connection rows (maker cables are principals), got {len(_instr_conn)}"); bad += 1
+    if not _plant_conn:
+        print("  FAIL instrument Cxx proveNoFalsePositive: a plant enclosure must STILL "
+              "emit costed connection rows from the schedule"); bad += 1
     # ── CORPUS-LIFT ratio ceiling (2026-07-10, run-20 rack £8,001→£210,000 26× lift) ──
     _pv_rack = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 210000,
                 "engine_c_ref_count": 5}
@@ -3801,6 +3885,23 @@ def _selftest() -> int:
     g, b = _commodity_catalogue_cap("Circulation Pump", "GRUNDFOS-NB-100", 65000.0, 1.40)  # not a commodity noun
     if not (abs(g - 65000.0) < 0.01 and b is None):
         print(f"  FAIL rated kit wrongly treated as commodity: £{g} ({b})"); bad += 1
+
+    # ── SEALED ENERGY-CABINET ROLE CAPS (Powerwall 2026-07-15) — both directions.
+    g, b = _sealed_cabinet_role_price_cap("Local HMI Display", 1204.0, 0.13, False)
+    if not (g == 80.0 and b):
+        print(f"  FAIL sealed-cabinet HMI not capped to £80: £{g} ({b})"); bad += 1
+    g, b = _sealed_cabinet_role_price_cap("Remote Monitoring Module", 977.0, 0.13, False)
+    if not (g == 60.0 and b):
+        print(f"  FAIL sealed-cabinet telemetry not capped to £60: £{g} ({b})"); bad += 1
+    g, b = _sealed_cabinet_role_price_cap("Local HMI Display", 1204.0, 40.0, False)
+    if not (abs(g - 1204.0) < 0.01 and b is None):
+        print(f"  FAIL plant HMI wrongly capped: £{g} ({b})"); bad += 1
+    g, b = _sealed_cabinet_role_price_cap("Local HMI Display", 1204.0, 0.001, True)
+    if not (abs(g - 1204.0) < 0.01 and b is None):
+        print(f"  FAIL instrument HMI wrongly capped: £{g} ({b})"); bad += 1
+    g, b = _sealed_cabinet_role_price_cap("DC AC Inverter Module", 838.0, 0.13, False)
+    if not (abs(g - 838.0) < 0.01 and b is None):
+        print(f"  FAIL inverter wrongly role-capped: £{g} ({b})"); bad += 1
 
     # ── MOTOR-NAMEPLATE DISPLAY (council 2026-06-17, marine RAS) — a motor-driven
     # line shows its MOTOR nameplate kW, not the shaft/hydraulic duty. Fires only
@@ -5688,7 +5789,14 @@ def _connection_rows(out_dir: str, q=None):
     per-edge flow from the endpoints + contract quantities (`q`), sizes the DN at
     ~1.75 m/s, defaults to HDPE/PVC-U (reserving 316L for LOX/ozone/seawater/
     effluent), and NEVER prices an instrument-signal or electrical tie as a water
-    main. An out-of-spec run is flagged ROUTED·REVIEW so the loop can re-size it."""
+    main. An out-of-spec run is flagged ROUTED·REVIEW so the loop can re-size it.
+
+    INSTRUMENT / DEVICE-SCALE (2026-07-14, gold WHY): a handheld optical kit's
+    purchased interconnects are explicit BoM principals (STEMMA/Qwiic-class
+    cables on the sensing floor). Topology edges inside the sealed enclosure are
+    PCB traces / short leads — NOT costed Cxx plant runs. Emitting 20–30 × £2
+    "unsized signal edge, 2.3 m" lines invents a plant harness and blows the
+    £200 materials brief. Keyed on isInstrumentDevice / enclosure_volume_m3 < 1."""
     p = os.path.join(out_dir, "connection-schedule.json")
     if not os.path.exists(p):
         return []
@@ -5697,6 +5805,14 @@ def _connection_rows(out_dir: str, q=None):
     except Exception:
         return []
     q = q or {}
+    # INTENT: gold-WHY instrument spine — maker cables are equipment principals;
+    # do not double-count Blender-layout topology edges as plant cable runs.
+    _encl_v0 = q.get("enclosure_volume_m3") if isinstance(q, dict) else None
+    if isinstance(_encl_v0, dict):
+        _encl_v0 = _encl_v0.get("value")
+    _device_scale0 = isinstance(_encl_v0, (int, float)) and 0 < float(_encl_v0) < 1.0
+    if _IS_INSTRUMENT_DEVICE or _device_scale0:
+        return []
 
     def _norm_endpoint(s: str) -> str:
         return str(s or "").replace("_", " ").strip().lower()
@@ -7134,6 +7250,20 @@ def assemble(out_dir: str):
                 capped_gbp, cap_basis = _commodity_catalogue_cap(name, cap_pn, gbp, dist_price.get(wid))
                 if cap_basis is not None:
                     gbp, basis = capped_gbp, basis + " · " + cap_basis
+                # ── SEALED ENERGY-CABINET ROLE CAP (Powerwall 2026-07-15): industrial
+                # panel-PC / Flexy / arc-flash catalogue pins on a sub-1 m³ wall ESS
+                # must not ship at plant prices. Plants (encl ≥ 1) untouched. ──
+                _encl_for_cap = _encl_vol
+                try:
+                    _encl_for_cap = float(_encl_vol) if _encl_vol is not None else None
+                except (TypeError, ValueError):
+                    _encl_for_cap = None
+                _sc_gbp, _sc_basis = _sealed_cabinet_role_price_cap(
+                    name, gbp, _encl_for_cap,
+                    is_instrument=bool(st.get("isInstrumentDevice")),
+                )
+                if _sc_basis is not None:
+                    gbp, basis = _sc_gbp, basis + " · " + _sc_basis
                 # ── BARE-COMMODITY HARD CEILING (council 2026-06-17): a commodity
                 # IC / sensor IC / microcontroller / connector / cable / I/O / small
                 # comms line with NO kW/duty rating cannot exceed its sub-class ceiling
@@ -7488,6 +7618,13 @@ def assemble(out_dir: str):
         # corpus-lift a battery-cell line. (Same discipline as membrane/actuator above.)
         if _BATTERY_CELL_RE.search(req_lead) and not _NON_BATTERY_CELL_RE.search(req_lead):
             continue
+        # SEALED ENERGY-CABINET ROLES (Powerwall 2026-07-15): HMI / telemetry /
+        # arc-flash / smoke nouns on a sub-1 m³ cabinet already have role ceilings;
+        # corpus medians are industrial plant kit and must not re-inflate them.
+        if (isinstance(_encl_vol, (int, float)) and 0 < float(_encl_vol) < 1.0
+                and not st.get("isInstrumentDevice")
+                and any(rx.search(req_lead) for rx, _c, _l in _SEALED_CABINET_ROLE_CAPS)):
+            continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
         res = _corpus_median_lift(u, pv) if (pv and not _is_real_mpn_grounded(pv)) else None
@@ -7531,6 +7668,23 @@ def assemble(out_dir: str):
         # the chain silently falls back to the lower R1 anchor (the £2.08M-not-£5M bug).
         print(f"  [corpus-median-lift] raised {_lift_n} under-priced principal line(s) "
               f"to their engine corpus lower edge (+£{_lift_gbp:,.0f})", file=sys.stderr)
+
+    # Final sealed-cabinet role pass — catches parametric / corpus-lifted lines that
+    # bypassed the per-word catalogue site (e.g. Arc Flash Protection £30→£264).
+    _encl_final = float(_encl_vol) if isinstance(_encl_vol, (int, float)) else None
+    for row in rows:
+        if row.get("status") == "SUB-COMPONENT":
+            continue
+        u0 = float(row.get("unit_gbp") or 0)
+        nu, nb = _sealed_cabinet_role_price_cap(
+            str(row.get("requirement") or ""), u0, _encl_final,
+            is_instrument=bool(st.get("isInstrumentDevice")),
+        )
+        if nb is not None and nu is not None:
+            qy = row.get("qty") or 1
+            row["unit_gbp"] = nu
+            row["line_gbp"] = round(nu * qy)
+            row["basis"] = str(row.get("basis") or "") + " · " + nb
 
     rows += _connection_rows(out_dir, qcontract)   # pipe/cable/duct runs as their own service-classified BoM lines (re-priced from contract duties)
     # the PARAMETRIC zoned-delivery distribution network (mains/risers/laterals/drain mirror

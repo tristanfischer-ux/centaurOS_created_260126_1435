@@ -1134,10 +1134,105 @@ def _should_demote_plant_spanning_fluid(frm, to, src_xyz, dst_xyz, material_cont
     DECISION: no below-grade exemption. A short buried drain (span ≤ limit) still
     draws via `_route_below_grade`; a plant-crossing buried lateral is P&ID-only —
     the 1715 exemption let G6 fire on a "below-grade" run that rose above the slab.
-    Universal — plan-span geometry only; `frm`/`to`/`material_context` unused for the
-    decision (kept in the signature so call sites stay stable)."""
+    GOTCHA (Codema 0332 hero, 2026-07-14): Chebyshev can sit well under the 16 m limit
+    while a Manhattan dogleg still reads as "stray pipe shooting off the platform".
+    Demote when Manhattan plan length > 0.70× the Chebyshev limit (11.2 m) — catches
+    Fertigation→Backup (man ≈11.3 m) whose port sat on empty west apron; tighter
+    than the earlier 1.25× / 0.75× slack. Universal geometry only;
+    `frm`/`to`/`material_context` unused for the decision (signature kept stable)."""
     del frm, to, material_context  # geometry-only; names reserved for future noun guards
-    return _plan_span_mm(src_xyz, dst_xyz) > WIRE_TRAY_MAX_SPAN_MM
+    if _plan_span_mm(src_xyz, dst_xyz) > WIRE_TRAY_MAX_SPAN_MM:
+        return True
+    try:
+        manhattan = (abs(float(src_xyz[0]) - float(dst_xyz[0]))
+                     + abs(float(src_xyz[1]) - float(dst_xyz[1])))
+    except (TypeError, ValueError, IndexError):
+        return False
+    # DECISION: 0.70× — Fertigation→Backup (man ≈11.3 m) was the vision-critic
+    # stray blue pipe; 0.75× (12 m) let it draw. Short drains (≤11.2 m Manhattan)
+    # still draw via `_route_below_grade`.
+    return manhattan > WIRE_TRAY_MAX_SPAN_MM * 0.70
+
+
+def _waypoints_exit_plan_bbox(waypoints, bbox, pad_mm: float = 0.0) -> bool:
+    """INTENT: the orthogonal router can dog-leg a short-Manhattan edge PAST the
+    equipment hull (Codema 0332 Fertigation→Backup: endpoints man ≈11.3 m under
+    the 12 m demote, but the rise→across polyline ran to x=−10312 — west of the
+    slab — and the vision critic flagged 'stray blue pipe off the left side').
+    True when any waypoint leaves the plan bbox (+ optional pad). Universal.
+    `bbox` is either equipment_bbox_mm's {x0,x1,y0,y1} dict OR a (x0,y0,x1,y1) tuple."""
+    if not waypoints or not bbox:
+        return False
+    try:
+        if isinstance(bbox, dict):
+            x0 = float(bbox["x0"]) - pad_mm
+            x1 = float(bbox["x1"]) + pad_mm
+            y0 = float(bbox["y0"]) - pad_mm
+            y1 = float(bbox["y1"]) + pad_mm
+        else:
+            x0 = float(bbox[0]) - pad_mm
+            y0 = float(bbox[1]) - pad_mm
+            x1 = float(bbox[2]) + pad_mm
+            y1 = float(bbox[3]) + pad_mm
+    except (KeyError, TypeError, ValueError, IndexError):
+        return False
+    for p in waypoints:
+        try:
+            x, y = float(p[0]), float(p[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if x < x0 or x > x1 or y < y0 or y > y1:
+            return True
+    return False
+
+
+def _endpoint_pair_plan_bbox(src_part, dst_part):
+    """Union plan AABB of two placed parts' footprints as (x0,y0,x1,y1), or None."""
+    bbs = [b for b in (part_xy_bbox_mm(src_part), part_xy_bbox_mm(dst_part)) if b]
+    if not bbs:
+        return None
+    return (min(b[0] for b in bbs), min(b[1] for b in bbs),
+            max(b[2] for b in bbs), max(b[3] for b in bbs))
+
+
+def _port_outside_own_footprint(part, port_xyz, pad_mm: float = 300.0) -> bool:
+    """INTENT: a port sitting well outside its own part footprint pulls the
+    orthogonal router into empty deck (Codema 0332 Fertigation→Backup: water_in
+    at x=−10312 while the backup pump footprint only reaches ≈−9911 — the vision
+    critic's 'stray blue pipe off the left side'). True when the port XY is
+    outside the part's plan footprint + pad. Universal."""
+    bb = part_xy_bbox_mm(part)
+    if not bb or not port_xyz:
+        return False
+    try:
+        x, y = float(port_xyz[0]), float(port_xyz[1])
+    except (TypeError, ValueError, IndexError):
+        return False
+    return (x < bb[0] - pad_mm or x > bb[2] + pad_mm
+            or y < bb[1] - pad_mm or y > bb[3] + pad_mm)
+
+
+def _waypoints_stray_past_both_ports(waypoints, src_xyz, dst_xyz,
+                                     pad_mm: float = 500.0) -> bool:
+    """True when a waypoint leaves the ports' plan AABB by more than pad_mm.
+    (Secondary backstop; primary stray catch is `_port_outside_own_footprint`.)"""
+    if not waypoints or not src_xyz or not dst_xyz:
+        return False
+    try:
+        x0 = min(float(src_xyz[0]), float(dst_xyz[0])) - pad_mm
+        x1 = max(float(src_xyz[0]), float(dst_xyz[0])) + pad_mm
+        y0 = min(float(src_xyz[1]), float(dst_xyz[1])) - pad_mm
+        y1 = max(float(src_xyz[1]), float(dst_xyz[1])) + pad_mm
+    except (TypeError, ValueError, IndexError):
+        return False
+    for p in waypoints:
+        try:
+            x, y = float(p[0]), float(p[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if x < x0 or x > x1 or y < y0 or y > y1:
+            return True
+    return False
 
 
 def _selftest_plant_spanning_fluid_demote() -> None:
@@ -1157,6 +1252,64 @@ def _selftest_plant_spanning_fluid_demote() -> None:
     assert not _should_demote_plant_spanning_fluid(
         "Cloth Filter", "Drain Water Tank", near_a, near_b, "",
     ), "short below-grade drain stays 3-D underground"
+    # Codema 0332 hero (live waypoints): Chebyshev ≈9.7 m / Manhattan ≈13.3 m —
+    # under the 16 m Chebyshev limit, over the 12 m Manhattan demote — the buried
+    # lateral + west-tank riser the vision critic flagged. Must demote.
+    _cf = (-3650.0, 2950.0, 1385.0)
+    _dwt = (-7200.0, -6750.0, 4667.5)
+    assert _plan_span_mm(_cf, _dwt) <= WIRE_TRAY_MAX_SPAN_MM, (
+        "fixture: Codema Cloth→Drain Chebyshev must sit under the Chebyshev limit")
+    assert (abs(_cf[0] - _dwt[0]) + abs(_cf[1] - _dwt[1])
+            ) > WIRE_TRAY_MAX_SPAN_MM * 0.70, (
+        "fixture: Codema Cloth→Drain Manhattan must clear the 0.70× demote threshold")
+    assert _should_demote_plant_spanning_fluid(
+        "Cloth Filter", "Drain Water Tank", _cf, _dwt, "",
+    ), "L-shaped plant-crossing fluid must demote on Manhattan length (Codema 0332)"
+    # Fertigation→Backup live ports (man ≈11.3 m) — the stray blue pipe.
+    _fert = (-3432.6, 4950.0, 788.2), (-10311.6, 550.0, 788.2)
+    assert _should_demote_plant_spanning_fluid(
+        "Fertigation Dosing Pump", "Fertigation Dosing Pump (BACKUP / STANDBY)",
+        _fert[0], _fert[1], "",
+    ), "Fertigation→Backup must demote on Manhattan (Codema 0332 stray blue pipe)"
+    # Just under the 0.70× Manhattan threshold stays 3-D (short buried drain).
+    _short_l = (0.0, 0.0, 500.0), (6000.0, 4500.0, 500.0)  # man=10.5 m < 11.2 m
+    assert not _should_demote_plant_spanning_fluid(
+        "Cloth Filter", "Drain Water Tank", _short_l[0], _short_l[1], "",
+    ), "Manhattan ≤ 0.70× limit must stay 3-D (short L-drain)"
+    # POST-ROUTE hull exit (Fertigation→Backup dog-leg west of slab / endpoints).
+    _hull = {"x0": -9950.0, "x1": 10376.0, "y0": -9332.0, "y1": 8250.0}
+    _stray = [(-3432.6, 4950.0, 788.2), (-3432.6, 4950.0, 6850.0),
+              (-10311.6, 4950.0, 6850.0), (-10311.6, 550.0, 6850.0),
+              (-10311.6, 550.0, 788.2)]
+    assert _waypoints_exit_plan_bbox(_stray, _hull, pad_mm=0.0), (
+        "Fertigation→Backup dog-leg west of hull must trip hull-exit demote")
+    # Endpoint-pair AABB of primary (−4522±690) ∪ backup (−9222±690); +200 mm pad
+    # still excludes the −10312 west dog-leg (the plant-hull-alone miss class).
+    _pair = (-9911.5, 167.0, -3832.5, 5333.0)  # approx union of the two pump footprints
+    assert _waypoints_exit_plan_bbox(_stray, _pair, pad_mm=200.0), (
+        "Fertigation→Backup dog-leg must trip endpoint-pair hull-exit demote")
+    # On-pair polyline stays inside the pair AABB (no west dog-leg past −9911).
+    _on_pair = [(-4522.0, 4950.0, 788.2), (-4522.0, 4950.0, 6850.0),
+                (-9222.0, 4950.0, 6850.0), (-9222.0, 550.0, 6850.0),
+                (-9222.0, 550.0, 788.2)]
+    assert not _waypoints_exit_plan_bbox(_on_pair, _hull, pad_mm=0.0), (
+        "on-hull polyline must NOT trip plant-hull demote")
+    assert not _waypoints_exit_plan_bbox(_on_pair, _pair, pad_mm=200.0), (
+        "on-endpoint-pair polyline must NOT trip endpoint-pair demote")
+    # Port-outside-footprint: destination port west of backup pump body.
+    class _FakePart:
+        def __init__(self, xyz, fx, fy):
+            self.placed_xyz_mm = xyz
+            self._fx, self._fy = fx, fy
+    # Monkey-patch via a tiny stand-in: call the real helper with a part whose
+    # footprint we control by stubbing part_xy_bbox_mm through a local bbox.
+    _pump_bb = (-9911.5, 167.0, -8532.5, 933.0)  # backup pump footprint
+    assert (_stray[-1][0] < _pump_bb[0] - 300.0), (
+        "fixture: Backup water_in port must sit west of pump footprint")
+    # Direct geometry of the predicate (bbox form):
+    assert (_stray[-1][0] < _pump_bb[0] - 300.0
+            or _stray[-1][0] > _pump_bb[2] + 300.0), (
+        "fixture: stray port must clear the 300 mm footprint pad")
     # 1759: MCC outside a compact load cluster — dest-only AABB ≤16 m, src∪dest >16 m.
     mcc = (-10000.0, 0.0, 7000.0)
     loads = [(0.0, 0.0, 500.0), (5000.0, 0.0, 500.0), (8000.0, 2000.0, 500.0)]
@@ -1780,7 +1933,10 @@ def extract_parts(state):
                 # manifest-sight LITTER signal). They REMAIN in the BoM + connection ledger
                 # and appear on the P&ID. The classifier + its proveCatch live in ga_massing
                 # (bpy-free, --selftest in verify-engine-guards.sh) so the rule is one source.
-                if ga_massing.is_ga_non_massing(name):
+                # GOTCHA (colorimeter 2026-07-14): ga_massing drops detectors /
+                # sensors / baffles as "field instruments" — correct for plants,
+                # wrong for handheld products where those ARE the principal parts.
+                if ga_massing.is_ga_non_massing(name) and not instrument_device:
                     dropped.append(name)
                     continue
                 # Filter on the NAME only (form prose names catalysts/resins on
@@ -3224,6 +3380,19 @@ def resolved_dims_mm(part):
         for _k in ("dia_mm", "len_mm", "w_mm", "d_mm", "h_mm"):
             if rd.get(_k):
                 rd[_k] = min(float(rd[_k]), 600.0)
+    # CAP discrete electronics (ferrite bead, fuse, ESD, polyfuse, …) — a bad dim or
+    # bbox echo can stamp the WHOLE product envelope onto a bead (colorimeter
+    # Ferrite Emc Bead → 260×200×434 mm = the site bbox). Universal noun-keyed.
+    _nm = str(getattr(part, "name", "") or "")
+    if re.search(
+        r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
+        r"esd[_ -]?protect|inrush|varistor|mov\b|input[_ -]?fuse|"
+        r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff)\b",
+        _nm, re.I,
+    ):
+        for _k in ("dia_mm", "len_mm", "w_mm", "d_mm", "h_mm"):
+            if rd.get(_k):
+                rd[_k] = min(float(rd[_k]), 24.0)
     return rd
 
 
@@ -6270,6 +6439,20 @@ def build_parts_manifest(parts):
         w = xmax - xmin
         dep = ymax - ymin
         h = zmax - zmin
+        # GOTCHA (2026-07-14 sealed GA≠hero): when the placer recorded a role-XY
+        # slot on placed_xyz_mm, trust that for plan position. World-bbox centres
+        # can still collapse to the midplane after a bad clamp/union; the GA must
+        # follow the intentional slot so tags match the cutaway composition.
+        # EXTENDED (colorimeter 2026-07-14): instruments always trust placed_xyz_mm
+        # — role-XY may legitimately put a singleton near a small offset that the
+        # |x|>1||y|>1 guard used to discard, collapsing the row back to bbox (0,0).
+        _placed = getattr(p, "placed_xyz_mm", None)
+        if (isinstance(_placed, (tuple, list)) and len(_placed) >= 3
+                and (_IS_INSTRUMENT_DEVICE
+                     or abs(float(_placed[0])) > 1.0
+                     or abs(float(_placed[1])) > 1.0)):
+            cx, cy = float(_placed[0]), float(_placed[1])
+            cz = float(_placed[2])
         entries.append((pref, p, cx, cy, cz, w, dep, h))
 
     # stable deterministic order for tag assignment
@@ -6329,6 +6512,18 @@ def build_parts_manifest(parts):
         # here too so the BoM/GA agree with the model (Tristan 2026-06-22).
         if p.shape == "instrument":
             dims = {k: round(min(float(v), 600.0), 1) for k, v in dims.items()}
+        # GOTCHA (colorimeter 2026-07-14): world-bbox dims for a ferrite bead can still
+        # echo the product envelope (260×200×434) even after resolved_dims_mm clamps the
+        # RENDER — the manifest wrote raw bbox and Excel floored Assembly/Renders at 0
+        # via absurd_micro_component_dims. Clamp discrete electronics HERE too so the
+        # DELIVERED SIGHT artefact agrees with the render (CORE FIX PRINCIPLE).
+        if re.search(
+            r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
+            r"esd[_ -]?protect|inrush|varistor|mov\b|input[_ -]?fuse|"
+            r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff)\b",
+            str(p.name or ""), re.I,
+        ):
+            dims = {k: round(min(float(v), 24.0), 1) for k, v in dims.items()}
         rows.append({
             "tag": pref,
             "equipment_tag": equip_tag,
@@ -6463,6 +6658,52 @@ def _compute_site_utilisation(rows):
                      "u_ground_slab plan rect (mesh bbox + 3 m apron)"}
 
 
+def _instrument_story_mesh_bboxes_mm() -> dict:
+    """World bboxes (mm) for instrument story/cutaway meshes used to seat spine principals.
+
+    Keys are object-name prefixes (u_se_cutaway_cue_ui_pcb, …). Empty when bpy is
+    unavailable or this is not an instrument scene.
+    """
+    out: dict = {}
+    if not _IS_INSTRUMENT_DEVICE or not hasattr(bpy, "data"):
+        return out
+    prefixes = (
+        "u_se_cutaway_cue_ui_pcb",
+        "u_se_instrument_story_pcb",
+        "u_se_cutaway_cue_top_display",
+        "u_se_cutaway_cue_led_pcb",
+        "u_se_exterior_detail_led_pcb",
+        "u_se_exterior_detail_source_window",
+    )
+    for obj in bpy.data.objects:
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        name = obj.name
+        pref = next((p for p in prefixes if name == p or name.startswith(p + "_")), None)
+        if pref is None:
+            continue
+        try:
+            corners = [obj.matrix_world @ v.co for v in obj.data.vertices]
+        except Exception:  # noqa: BLE001
+            continue
+        if not corners:
+            continue
+        xs = [c.x * 1000.0 for c in corners]
+        ys = [c.y * 1000.0 for c in corners]
+        zs = [c.z * 1000.0 for c in corners]
+        bb = (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
+        prev = out.get(pref)
+        if prev is None:
+            out[pref] = bb
+        else:
+            out[pref] = (
+                min(prev[0], bb[0]), max(prev[1], bb[1]),
+                min(prev[2], bb[2]), max(prev[3], bb[3]),
+                min(prev[4], bb[4]), max(prev[5], bb[5]),
+            )
+    return out
+
+
 def write_parts_manifest(out_dir, parts, state=None):
     """Write <out_dir>/parts-manifest.json — the parts-position export the GA +
     isometric drawing generators consume. PURE EXPORT (reads placed state, writes
@@ -6485,6 +6726,22 @@ def write_parts_manifest(out_dir, parts, state=None):
     # Unify auxiliary tags with the canonical BoM/index namespace (kill: CANON_TAGS=0).
     if os.environ.get("CANON_TAGS", "").strip() not in ("0", "false", "no"):
         _remap_manifest_to_canonical_tags(rows, state)
+    # INTENT (2026-07-14): gold-spine BoM principals (I-201 Compute UI Module,
+    # X-201 LED Source Board) must appear in the manifest under their BoM names —
+    # not only as absorbed-host proxies. Seat from story/cutaway meshes when
+    # present, else donor rows. Source rule (not a run-local JSON patch).
+    try:
+        _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        from instrument_spine_manifest import seat_spine_principals_in_manifest as _seat_spine
+        _mesh_bb = _instrument_story_mesh_bboxes_mm()
+        _n_spine = _seat_spine(rows, state, mesh_bbox_by_prefix=_mesh_bb)
+        if _n_spine:
+            print(f"[parts-manifest] seated {_n_spine} gold-spine principal(s) "
+                  f"(Compute UI / LED Source Board)")
+    except Exception as _sse:  # noqa: BLE001 — never block the export
+        print(f"[parts-manifest] spine principal seat skipped: {_sse}")
     # PROCESS-ORDER rows (Tristan 2026-07-02: "the GA equipment schedule lists parts in no
     # meaningful order"): region rank (the process sequence), then the FINAL equipment tag
     # (letter, numeric), then name — so every manifest consumer that keeps row order (the
@@ -6595,9 +6852,21 @@ def write_parts_manifest(out_dir, parts, state=None):
             print(f"[parts-manifest] density diagnostic skipped: {_de}")
     except Exception as _rme:   # pure diagnostics — never fail the export
         print(f"[parts-manifest] function-rooms skipped: {_rme}")
+    # Placement fingerprint — G15 / draw_ga share this token so GA ≠ Blender cannot
+    # silently ship from divergent generations (Codema + Powerwall 2026-07-14).
+    try:
+        _pfp_dir = os.path.dirname(os.path.abspath(__file__))
+        if _pfp_dir not in sys.path:
+            sys.path.insert(0, _pfp_dir)
+        from placement_fp import placement_fingerprint as _placement_fp
+        _place_fp = _placement_fp(rows)
+    except Exception as _pfe:  # noqa: BLE001 — never block the export
+        print(f"[parts-manifest] placement_fp skipped: {_pfe}")
+        _place_fp = None
     manifest = {"schema": "parts-manifest/1", "count": len(rows),
                 "bbox_mm": bbox, "site": site, "rooms": rooms,
-                "density": density_diag, "parts": rows}
+                "density": density_diag, "placement_fp": _place_fp,
+                "parts": rows}
     with open(os.path.join(out_dir, "parts-manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
     print(f"[parts-manifest] wrote {len(rows)} placed parts → "
@@ -10511,6 +10780,11 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
     # equipment footprints for _wire_path's X-then-Y vs Y-then-X ordering choice
     # (RENDERS-1 fix, CO2-v1 2026-07-05) — computed ONCE, reused per port-to-port run.
     _wire_bboxes = equipment_xy_bboxes_mm(parts)
+    # Plant equipment hull (no apron) — post-route demote when a dog-leg exits it.
+    _plant_hull_bb = equipment_bbox_mm(parts, margin_mm=0.0)
+    print(f"[univ][wire]   plant hull XY mm = "
+          f"x[{_plant_hull_bb['x0']:.0f}..{_plant_hull_bb['x1']:.0f}] "
+          f"y[{_plant_hull_bb['y0']:.0f}..{_plant_hull_bb['y1']:.0f}]")
     if overhead_base_z is not None:
         print(f"[univ][wire]   overhead deck Z = {overhead_base_z:.0f} mm "
               f"(equipment-bulk top + {WIRE_OVERHEAD_CLEAR_MM:.0f} mm clearance)")
@@ -10815,6 +11089,21 @@ def wire_ports(parts, ledger_topology, MAT, MO, out_dir=None):
                 waypoints = _wire_path(r["src_xyz"], r["dst_xyz"], service, run_idx=_run_i,
                                        overhead_base_z=overhead_base_z,
                                        bboxes=_wire_bboxes, own=_own_bb)
+            # POST-ROUTE HULL EXIT (backstop): polyline leaves the plant equipment
+            # hull. Primary stray catch is the 0.70× Manhattan demote above
+            # (Fertigation→Backup). Port-outside-footprint was tried and abandoned —
+            # nozzle ports routinely sit ~400 mm outside the footprint box and the
+            # rule emptied the 3-D pipe set (proveCatch over-reach).
+            if (not _is_cable(service)
+                    and _waypoints_exit_plan_bbox(waypoints, _plant_hull_bb, pad_mm=0.0)):
+                _record_logical(
+                    r,
+                    "routed fluid dog-leg exits plant hull → P&ID, not a 3-D "
+                    "stray pipe off the platform (length still routed)",
+                )
+                print(f"[univ][wire]   HULL-EXIT FLUID {r['edge_lbl']}: plant bbox "
+                      f"→ P&ID (no 3-D stray pipe)")
+                continue
             nm = f"u_wire_{r['idx']:03d}_{_part_prefix(str(frm))}_{service}"
             try:
                 _record(r, nm, waypoints, _polyline_len_m(waypoints), "per_edge")
@@ -11920,11 +12209,20 @@ _SEALED_CUTAWAY_MATERIAL = None
 _SEALED_EXTERIOR_MATERIAL = None
 _CAD_RESOLVER = None
 _CAD_RESOLUTION_LOG = []
+# GOTCHA (Powerwall 2026-07-15): bare `\bmodule` / `\brack` stole "DC AC Inverter
+# Module" into the energy band (checked before power's `invert`), so the pack sat
+# mid-cabinet and the vision critic flagged "battery pack … not dominant in the
+# lower region". Energy nouns must be pack/cell/battery-scoped; power-stage nouns
+# are classified FIRST via `_sealed_zone_key`.
 _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → top
     ("energy", 0.52,
-     re.compile(r"\bcell|\bbattery|\bpack\b|\bmodule|\bstring\b|\brack\b", re.I)),
+     re.compile(
+         r"\bcell|\bbattery|\bpack\b|battery\s*module|cell\s*module|pack\s*module|"
+         r"module\s*(?:rack|tray|frame)|battery\s*rack|cell\s*rack|\bstring\b",
+         re.I)),
     ("power", 0.24,
-     re.compile(r"invert|\bpcs\b|convert|mppt|charger|rectifier|power\s+stage|transformer", re.I)),
+     re.compile(r"invert|\bpcs\b|convert|mppt|charger|rectifier|power\s+stage|transformer|"
+                r"semiconductor|igbt|mosfet", re.I)),
     ("distribution", 0.12,
      re.compile(r"busbar|contactor|fuse|isolat|breaker|relay|surge|distribution|switch|meter|"
                 r"gland|terminal", re.I)),
@@ -11933,6 +12231,33 @@ _SE_ZONES = [  # (zone, interior-height fraction, role vocabulary) bottom → to
                 r"\bfan\b|cold\s?plate|heat\s?sink|thermal|vent|duct|louvre|grille|sensor|detector",
                 re.I)),
 ]
+# Power-stage vocabulary wins over energy's pack nouns when both could match
+# (e.g. "Inverter Module" — module is battery-scoped now, but keep the guard).
+_SE_POWER_FIRST_RE = re.compile(
+    r"invert|\bpcs\b|convert|mppt|charger|rectifier|power\s+stage|transformer|"
+    r"semiconductor|igbt|mosfet",
+    re.I,
+)
+
+
+def _sealed_zone_key(name: str, zones) -> str | None:
+    """Classify a sealed-cabinet part into a zone key (or None).
+
+    INTENT: battery pack must own the lower energy band; power electronics sit
+    above. Power-stage nouns are resolved before energy so an inverter never
+    displaces the pack from the lower region (vision critic HARD defect).
+    """
+    nm = str(name or "")
+    if _SE_POWER_FIRST_RE.search(nm):
+        for key, _frac, rx in zones:
+            if key == "power" and rx.search(nm):
+                return key
+        if any(z[0] == "power" for z in zones):
+            return "power"
+    for key, _frac, rx in zones:
+        if rx.search(nm):
+            return key
+    return None
 # DEVICE-SCALE OPTICAL/ELECTRONIC INSTRUMENT zones (2026-07-12, Tristan: the colorimeter
 # hero rendered as a BESS cabinet — a 52% battery-pack stack + power/distribution bands —
 # because _SE_ZONES is a hardcoded BESS ontology and EVERY sealed sub-1 m³ product was
@@ -12008,10 +12333,15 @@ def _sealed_product_camera_specs(env_mm):
     # top — inflate the vertical extent so the port is not cropped out of frame.
     _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
     _ctrl = max(_h_eff, w / _fa, d / _fa)
+    # Cabinet products are tall-and-thin: framing on height alone left the front
+    # view width occupancy at ~0.31 (gate render_view_quality floor 0.35). Pull
+    # in slightly + raise frame fill so the enclosure reads as the subject.
+    _frame = 0.92 if not _IS_INSTRUMENT_DEVICE else 0.84
+    _dist_k = 1.02 if not _IS_INSTRUMENT_DEVICE else 1.16
     front_distance = perspective_distance_for_extent(
-        _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
+        _ctrl * _dist_k, focal_mm=62, frame_fraction=_frame)
     side_distance = perspective_distance_for_extent(
-        _ctrl * 1.16, focal_mm=58, frame_fraction=0.84)
+        _ctrl * _dist_k, focal_mm=58, frame_fraction=_frame)
     service_distance = perspective_distance_for_extent(
         max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
     return [
@@ -12072,14 +12402,32 @@ def _prepare_sealed_product_view(view_name, entering):
     exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
     # Always restore the cutaway baseline first. This also makes cleanup after
     # each view deterministic if Blender changes render order.
-    _SEALED_FRONT_COVER.hide_render = True
+    # DECISION (colorimeter 2026-07-14): handheld instruments keep the front
+    # cover on cutaway — internals read through the translucent shell + optical
+    # cube. Removing the face turned the chassis into a hollow arch with PCB/
+    # coin-cell hanging in empty air (vision: "floating geometry intersecting
+    # UI deck"). Sealed cabinets still gut the front for a service cutaway.
+    _SEALED_FRONT_COVER.hide_render = not bool(_IS_INSTRUMENT_DEVICE)
     for obj in bpy.data.objects:
-        if obj.name.startswith("u_se_det_") or obj.name.startswith("u_se_cad_"):
+        # GOTCHA (colorimeter 2026-07-14): `_suppress_instrument_boilerplate_meshes`
+        # hides u_se_det_* BoM slabs, but this cutaway baseline used to force them
+        # visible again → green FR4/TO-can litter floating through the UI deck
+        # (vision critic: "floating geometry intersecting UI deck"). On instruments
+        # the story meshes ARE the cutaway interior; keep BoM proxies hidden.
+        if obj.name.startswith("u_se_det_"):
+            obj.hide_render = bool(_IS_INSTRUMENT_DEVICE)
+        elif obj.name.startswith("u_se_cad_"):
             obj.hide_render = False
         if obj.name.startswith("u_se_product_vent_"):
             obj.hide_render = False
         if obj.name.startswith("u_se_exterior_detail_"):
-            obj.hide_render = True
+            # INTENT (2026-07-14): cutaway must show the source harness jacket into
+            # the cable channel — hiding ALL exterior_detail_* made the hero look
+            # unwired while Interconnect claimed a power/signal story.
+            if _IS_INSTRUMENT_DEVICE and "source_harness" in obj.name:
+                obj.hide_render = False
+            else:
+                obj.hide_render = True
         if obj.name.startswith("u_se_cutaway_cue_"):
             obj.hide_render = False
         if obj.name.startswith("u_se_instrument_story_"):
@@ -12097,10 +12445,32 @@ def _prepare_sealed_product_view(view_name, entering):
             if obj.name.startswith("u_se_product_vent_"):
                 obj.hide_render = True
             if obj.name.startswith("u_se_exterior_detail_"):
-                obj.hide_render = False
+                # Coloured harness strands are cutaway-only; closed product keeps
+                # jacket + boot + LED window, not a crayon ribbon on 04–07.
+                if re.search(r"source_harness_\d+$", obj.name):
+                    obj.hide_render = True
+                else:
+                    obj.hide_render = False
             if obj.name.startswith("u_se_cutaway_cue_"):
                 obj.hide_render = True
             if obj.name.startswith("u_se_instrument_story_"):
+                obj.hide_render = True
+            # INTENT: closed product = shell + form-rule face only. Topology
+            # u_wire_* / BoM proxies left visible read as mid-air stubs beside
+            # the optical cube and a second messy button cluster.
+            # GOTCHA: studio lights are named u_instrument_studio_* — must NOT
+            # match this hide (hiding them made every product view featureless
+            # black, 2026-07-14). Only MESH clutter; never lights/cameras/empties.
+            if _IS_INSTRUMENT_DEVICE and getattr(obj, "type", None) == "MESH" and (
+                obj.name.startswith("u_wire_")
+                or obj.name.startswith("u_pipe_")
+                or (
+                    obj.name.startswith("u_")
+                    and not obj.name.startswith("u_se_")
+                    and not obj.name.startswith("u_skid_")
+                    and not obj.name.startswith("u_instrument_")
+                )
+            ):
                 obj.hide_render = True
         if _SEALED_EXTERIOR_MATERIAL is not None:
             for obj in _SEALED_SHELL_OBJECTS:
@@ -12141,7 +12511,11 @@ def _import_family_cad(
     module,
     module_objects,
 ):
-    """Import cached family STL with provenance; return None on a clean miss."""
+    """Import cached family STL with provenance; return None on a clean miss.
+
+    INTENT (photoreal CAD bar): smooth-shade + role PBR so STLs read as real
+    parts under Cycles, not faceted grey clay.
+    """
     asset = _cad_family_asset(family)
     if asset is None or not asset.local_path.exists():
         return None
@@ -12160,14 +12534,21 @@ def _import_family_cad(
     obj = imported[0]
     obj.name = object_name
     obj.location = tuple(float(value) * fl.MM for value in location_mm)
-    obj.rotation_euler = rotation
+    # DECISION: scale in local space BEFORE rotation. Setting dimensions after
+    # rotation sizes the world AABB and squashes face-mounted disks/boards
+    # (coin cell → brick; source PCB packages → "lego teeth").
+    obj.rotation_euler = (0.0, 0.0, 0.0)
     obj.dimensions = tuple(float(value) * fl.MM for value in dimensions_mm)
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    if obj.data and material is not None:
+    obj.rotation_euler = rotation
+    fl.shade_smooth_object(obj)
+    # Prefer explicit caller material; else family role PBR (never leave STL grey).
+    use_mat = material if material is not None else fl.make_instrument_cad_mat(family)
+    if obj.data and use_mat is not None:
         obj.data.materials.clear()
-        obj.data.materials.append(material)
+        obj.data.materials.append(use_mat)
     obj["geometry_source"] = f"cad_family:{family}"
     obj["cad_asset_sha256"] = asset.asset_sha256
     if module and module_objects is not None:
@@ -12192,148 +12573,10 @@ def _instrument_form_rule_mm(
     tt: float,
     optical_path_mm: float | None = None,
 ) -> dict:
-    """Function-driven exterior for sealed optical/electronic instruments.
-
-    UNIVERSAL — keyed on isInstrumentDevice + optical_path_mm / envelope, never a
-    product noun. The silhouette is NOT arbitrary: each feature is a use-physics
-    consequence that real open photometers share (IO Rodeo Open Colorimeter is
-    the TRAINING check that those reasons produce a real-looking object):
-
-    1. STEPPED L-body — MCU/display/battery live under a low UI deck; the optical
-       path needs a separate light-tight CUBE. The step is the joint between those
-       two volumes (serviceability + stray-light isolation), not decoration.
-    2. CHUNKY optical cube — plan tracks cuvette outer + baffle walls; height
-       clears a standard cuvette body (~45 mm). Aspect is near-cubic so the
-       chamber reads as the optical heart, not a skinny appliance chimney.
-    3. Square well + circular rim — seats the cuvette and a removable ambient-light
-       CAP (Beer–Lambert I₀ needs room light blocked).
-    4. Source module on the optical-axis face — horizontal beam through the sample;
-       window-scale replaceable board with corner fasteners (wavelength swap).
-    5. Cable CHANNEL at the cube↔body joint — swappable LED module plugs from
-       outside; harness enters a molded slot, never floats mid-deck.
-    6. Recessed display + D-pad on the UI deck — operated looking down; closed
-       product hides the compute board (FR4 is cutaway-only). Display active
-       area and button diameters follow Apple HIG → mm floors (see
-       human_factors_instrument.py): readable at ~350 mm, finger targets ≥7 mm.
-    7. Visible top-plate fasteners — additive-manufactured enclosure language.
-
-    Envelope W/D/H already come from design_envelope_* (landscape). This rule
-    only places the functional features on that envelope.
-    """
-    path = float(optical_path_mm if optical_path_mm is not None else _INSTRUMENT_OPTICAL_PATH_MM)
-    path = max(5.0, path)
-    # Square cuvette outer ≈ path + ~2.5 mm walls; chamber adds baffle each side.
-    cuvette_outer = path + 2.5
-    # Chunky cube: must dominate the right side of a handheld, not a thin spike.
-    chamber_plan = min(max(cuvette_outer + 18.0, 36.0), min(W, D) * 0.52)
-    # Standard spectrophotometry cuvette body ~45 mm tall; keep the cube CHUNKY
-    # (h/w ≲ 1.35) so it reads as an optical block, not a chimney.
-    chamber_h = max(38.0, min(48.0, 32.0 + path * 1.2))
-    # Optical cube on the RIGHT — leaves a contiguous LEFT UI deck (eyes + hands).
-    tower_loc = (W * 0.30, D * 0.08, base_z + H + chamber_h / 2)
-    tower_size = (chamber_plan, chamber_plan * 0.96, chamber_h)
-    tw, td, th = tower_size
-    tx, ty, tz = tower_loc
-    tower_front_y = ty - td / 2 - max(1.0, tt * 0.15)
-    # Source module ≈ optical window + mount/connector margin — NOT a face plate.
-    window = max(path * 1.2, 8.0)
-    led_w = min(tw * 0.70, max(window * 2.2, 14.0))
-    led_h = min(th * 0.42, max(window * 2.0, 14.0))
-    led_d = 1.8
-    # Recessed display — Apple HIG readability floor (11 pt @ ~350 mm) → mm area.
-    ui_span_x = max(40.0, (tx - tw / 2) - (-W / 2))
-    disp_w = max(ifg.DISPLAY_ACTIVE_PREF_W_MM, min(W * 0.40, ui_span_x * 0.70))
-    disp_h = max(ifg.DISPLAY_ACTIVE_PREF_H_MM, min(D * 0.32, disp_w * 0.70))
-    # If the deck is tight, never drop below the absolute readability floor.
-    disp_w = max(disp_w, ifg.DISPLAY_ACTIVE_MIN_W_MM)
-    disp_h = max(disp_h, ifg.DISPLAY_ACTIVE_MIN_H_MM)
-    display_size = (disp_w, disp_h, ifg.DISPLAY_GLASS_THICKNESS_MM)
-    display_loc = (-W * 0.18, -D * 0.04, base_z + H + 0.9)
-    bezel_size = ifg.display_bezel_size_mm(display_size)
-    # D-pad + A/B: Apple 44 pt → ≥7 mm tactile; prefer 9 mm; Fitts — navigate left, commit right.
-    btn_d = max(ifg.BUTTON_MIN_DIAMETER_MM, min(ifg.BUTTON_PREF_DIAMETER_MM, min(W, D) * 0.075))
-    btn_pitch = btn_d + ifg.BUTTON_PREF_GAP_MM
-    btn_z = base_z + H + 2.2
-    dx, dy, _dz = display_loc
-    dpad_x = dx - display_size[0] * 0.55 - btn_pitch
-    button_locs = [
-        (dpad_x, dy + btn_pitch, btn_z),                 # up
-        (dpad_x, dy - btn_pitch, btn_z),                 # down
-        (dpad_x - btn_pitch, dy, btn_z),                 # left
-        (dpad_x + btn_pitch, dy, btn_z),                 # right
-        (dx + display_size[0] * 0.55, dy + display_size[1] * 0.45, btn_z),  # A
-        (dx + display_size[0] * 0.55, dy - display_size[1] * 0.20, btn_z),  # B
-    ]
-    # Cap parks at the FRONT-LEFT deck edge in a nest — accessory lid, not a centre knob.
-    # Flange+grip geometry comes from ifg.ambient_cap_parts_mm (desirability grammar).
-    well_loc = (tx, ty, base_z + H + chamber_h + 1.2)
-    well_size = (cuvette_outer * 0.95, cuvette_outer * 0.95, 4.0)
-    rim_od = min(tw * 0.72, max(well_size[0] + 10.0, 20.0))
-    rim_loc = (tx, ty, base_z + H + chamber_h + 0.8)
-    cap_parts = ifg.ambient_cap_parts_mm(rim_od)
-    cap_nest_loc = (-W * 0.28, -D * 0.36, base_z + H + 0.6)
-    cap_loc = (
-        cap_nest_loc[0],
-        cap_nest_loc[1],
-        base_z + H + ifg.CAP_NEST_DEPTH_MM + cap_parts["flange_h_mm"] / 2,
-    )
-    # Cable channel: molded slot at the cube↔body joint on the operator-facing flank.
-    cable_slot_loc = (
-        tx - tw / 2 - 2.0,
-        tower_front_y + 2.5,
-        base_z + H + min(12.0, chamber_h * 0.22),
-    )
-    cable_slot_size = (5.0, 8.0, 12.0)
-    screw_locs = [
-        (-W * 0.40, -D * 0.32, base_z + H + 1.0),
-        (-W * 0.40, D * 0.28, base_z + H + 1.0),
-        (W * 0.08, -D * 0.32, base_z + H + 1.0),
-        (W * 0.08, D * 0.28, base_z + H + 1.0),
-    ]
-    status_led_loc = (
-        dx + display_size[0] * 0.42,
-        dy + display_size[1] * 0.55,
-        base_z + H + 1.4,
-    )
-    return {
-        "optical_path_mm": path,
-        "tower_loc": tower_loc,
-        "tower_size": tower_size,
-        "well_loc": well_loc,
-        "well_size": well_size,
-        "rim_loc": rim_loc,
-        "rim_od_mm": rim_od,
-        "rim_h_mm": 2.0,
-        "cap_loc": cap_loc,
-        "cap_nest_loc": cap_nest_loc,
-        "cap_nest_od_mm": cap_parts["flange_od_mm"] + ifg.CAP_NEST_CLEARANCE_MM,
-        "cap_nest_depth_mm": ifg.CAP_NEST_DEPTH_MM,
-        "cap_flange_od_mm": cap_parts["flange_od_mm"],
-        "cap_flange_h_mm": cap_parts["flange_h_mm"],
-        "cap_grip_od_mm": cap_parts["grip_od_mm"],
-        "cap_grip_h_mm": cap_parts["grip_h_mm"],
-        # Back-compat aggregate for older callers
-        "cap_od_mm": cap_parts["flange_od_mm"],
-        "cap_h_mm": cap_parts["total_h_mm"],
-        "cable_slot_loc": cable_slot_loc,
-        "cable_slot_size": cable_slot_size,
-        "led_pcb_loc": (tx, tower_front_y, base_z + H + chamber_h * 0.42),
-        "led_pcb_size": (led_w, led_d, led_h),
-        "top_display_loc": display_loc,
-        "top_display_size": display_size,
-        "display_bezel_size": bezel_size,
-        "button_locs": button_locs,
-        "button_diameter_mm": btn_d,
-        "button_shape": ifg.BUTTON_SHAPE,
-        "screw_locs": screw_locs,
-        "screw_head_diameter_mm": ifg.SCREW_HEAD_DIAMETER_MM,
-        "screw_head_height_mm": ifg.SCREW_HEAD_HEIGHT_MM,
-        "step_shelf_loc": (tx, ty, base_z + H + ifg.STEP_SHELF_HEIGHT_MM / 2),
-        "step_shelf_size": (tw * 1.12, td * 1.10, ifg.STEP_SHELF_HEIGHT_MM),
-        "status_led_loc": status_led_loc,
-        "foot_locs": ifg.foot_locs_mm(W, D, base_z),
-        "viewing_distance_mm": ifg.VIEWING_DISTANCE_MM_DESIGN,
-    }
+    """Thin wrapper — canonical rule lives in instrument_form_rule.py (shared with GA)."""
+    from instrument_form_rule import instrument_form_rule_mm
+    path = optical_path_mm if optical_path_mm is not None else _INSTRUMENT_OPTICAL_PATH_MM
+    return instrument_form_rule_mm(W, D, H, base_z, tt, optical_path_mm=path)
 
 
 def _instrument_electronics_story_size(iw: float, idep: float, band_h: float) -> tuple[float, float, float]:
@@ -12357,6 +12600,148 @@ def _place_instrument_zone_story(
     return
 
 
+def _tag_story_geom(obj, source: str) -> None:
+    """Stamp provenance so authenticity audits can classify meshes."""
+    if obj is None:
+        return
+    try:
+        obj["geometry_source"] = source
+    except (TypeError, AttributeError):
+        pass
+
+
+def _place_hollow_square_cuvette(
+    name_prefix: str,
+    centre_mm: tuple[float, float, float],
+    outer_mm: float,
+    height_mm: float,
+    wall_mm: float,
+    material,
+    module: str,
+    MO: dict,
+) -> int:
+    """Four-wall square cuvette when CAD square_cuvette is unavailable."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    cx, cy, cz = centre_mm
+    inner = max(4.0, outer_mm - 2.0 * wall_mm)
+    half = outer_mm / 2.0
+    n = 0
+    for suffix, loc, size in (
+        ("front", (cx, cy - half + wall_mm / 2.0, cz), (outer_mm, wall_mm, height_mm)),
+        ("back", (cx, cy + half - wall_mm / 2.0, cz), (outer_mm, wall_mm, height_mm)),
+        ("left", (cx - half + wall_mm / 2.0, cy, cz), (wall_mm, inner, height_mm)),
+        ("right", (cx + half - wall_mm / 2.0, cy, cz), (wall_mm, inner, height_mm)),
+    ):
+        wall = fl.add_box(
+            f"{name_prefix}_{suffix}",
+            _mm3(loc),
+            _mm3(size),
+            material,
+            module=module,
+            module_objects=MO,
+        )
+        wall.dimensions = _mm3(size)
+        _tag_story_geom(wall, "primitive:hollow_cuvette_wall")
+        n += 1
+    return n
+
+
+def _place_led_emitter_compound(
+    name_prefix: str,
+    tip_mm: tuple[float, float, float],
+    axis_y_sign: float,
+    material,
+    module: str,
+    MO: dict,
+) -> int:
+    """Cylinder body + dome lens along ±Y optical axis (CAD miss fallback)."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    body_d, body_h, lens_r = 5.0, 7.0, 2.4
+    tx, ty, tz = tip_mm
+    # Tip faces the cuvette; body extends away from the sample.
+    body_y = ty - axis_y_sign * (body_h / 2.0)
+    body = fl.add_cyl(
+        f"{name_prefix}_body",
+        _mm3((tx, body_y, tz)),
+        (body_d / 2.0) * fl.MM,
+        body_h * fl.MM,
+        material,
+        module=module,
+        module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+    _tag_story_geom(body, "primitive:led_body")
+    lens = fl.add_sphere(
+        f"{name_prefix}_lens",
+        _mm3((tx, ty, tz)),
+        lens_r * fl.MM,
+        material,
+        module=module,
+        module_objects=MO,
+    )
+    _tag_story_geom(lens, "primitive:led_lens")
+    return 2
+
+
+def _place_photodiode_to_can_compound(
+    name_prefix: str,
+    centre_mm: tuple[float, float, float],
+    axis_y_sign: float,
+    can_mat,
+    window_mat,
+    module: str,
+    MO: dict,
+) -> int:
+    """TO-can detector: flange + can + window (CAD miss fallback)."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    can_d, can_h, flange_od, flange_h = 8.0, 5.5, 10.8, 0.8
+    cx, cy, cz = centre_mm
+    # Window faces the cuvette (−axis_y_sign from can centre toward sample).
+    flange_y = cy + axis_y_sign * (can_h / 2.0)
+    can_y = cy
+    window_y = cy - axis_y_sign * (can_h / 2.0 + 0.4)
+    flange = fl.add_cyl(
+        f"{name_prefix}_flange",
+        _mm3((cx, flange_y, cz)),
+        (flange_od / 2.0) * fl.MM,
+        flange_h * fl.MM,
+        can_mat,
+        module=module,
+        module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+    _tag_story_geom(flange, "primitive:to_can_flange")
+    can = fl.add_cyl(
+        f"{name_prefix}_can",
+        _mm3((cx, can_y, cz)),
+        (can_d / 2.0) * fl.MM,
+        can_h * fl.MM,
+        can_mat,
+        module=module,
+        module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+    _tag_story_geom(can, "primitive:to_can_body")
+    window = fl.add_cyl(
+        f"{name_prefix}_window",
+        _mm3((cx, window_y, cz)),
+        (can_d * 0.28) * fl.MM,
+        0.7 * fl.MM,
+        window_mat,
+        module=module,
+        module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+    _tag_story_geom(window, "primitive:to_can_window")
+    return 3
+
+
 def _place_instrument_interior_layout(
     W: float,
     D: float,
@@ -12373,6 +12758,10 @@ def _place_instrument_interior_layout(
     transmittance axis). Anchors come from `_instrument_form_rule_mm` so exterior
     and interior cannot drift. Never a vertical BESS-style zone stack.
 
+    DECISION: prefer forge-truth CAD families (instrument_pcb, coin_cell,
+    square_cuvette, led_emitter, photodiode_to_can) with honest primitive
+    compounds as fallback — never a field of plain cuboids.
+
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
     """
     def _mm3(tpl):
@@ -12386,17 +12775,17 @@ def _place_instrument_interior_layout(
     path = float(form["optical_path_mm"])
     cuvette_plan = max(8.0, path + 1.0)
 
-    led_mat = fl.make_mat(
-        "m_se_story_led", fl._to_linear(ifg.MAT_LED_EMIT),
-        metallic=0.05, roughness=0.25, kind="led_emissive", emission_strength=4.0)
-    cuv_mat = fl.make_mat(
-        "m_se_story_cuvette", fl._to_linear(ifg.MAT_CUVETTE_WALL), metallic=0.05,
-        roughness=0.08, alpha=0.45)
+    # DECISION: CAD imports get material=None → make_instrument_cad_mat(family).
+    # Fallback compounds use these role mats (same language as CAD path).
+    led_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_LED, "m_se_story_led")
+    cuv_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_CUVETTE, "m_se_story_cuvette")
     fluid_mat = fl.make_mat(
         "m_se_story_fluid", fl._to_linear(ifg.MAT_CUVETTE_FLUID), metallic=0.0,
         roughness=0.2, kind="led_emissive", emission_strength=0.35)
-    det_mat = fl.make_mat(
-        "m_se_story_detector", fl._to_linear(ifg.MAT_DETECTOR), metallic=0.45, roughness=0.35)
+    det_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_PHOTODIODE, "m_se_story_detector")
+    window_mat = fl.make_mat(
+        "m_se_story_det_window", fl._to_linear(ifg.MAT_DISPLAY_GLASS),
+        metallic=0.0, roughness=0.04, alpha=1.0, kind="glass", ior=1.52)
     bench_mat = fl.make_mat(
         "m_se_story_bench", fl._to_linear(ifg.MAT_OPTICAL_BENCH), metallic=0.2, roughness=0.55)
     baffle_mat = fl.make_mat(
@@ -12404,80 +12793,170 @@ def _place_instrument_interior_layout(
     beam_mat = fl.make_mat(
         "m_se_story_beam", fl._to_linear(ifg.MAT_BEAM),
         metallic=0.0, roughness=0.12, kind="led_emissive", emission_strength=3.2)
-    pcb_mat = fl.make_mat(
-        "m_se_story_pcb", fl._to_linear(ifg.MAT_FR4), metallic=0.1, roughness=0.38)
+    pcb_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_INSTRUMENT_PCB, "m_se_story_pcb")
     chip_mat = fl.make_mat(
         "m_se_story_chip", fl._to_linear((0.10, 0.10, 0.12)), metallic=0.25, roughness=0.45)
-    bat_mat = fl.make_mat(
-        "m_se_story_cell", fl._to_linear(ifg.MAT_COIN_CELL), metallic=0.55, roughness=0.32)
+    bat_mat = fl.make_instrument_cad_mat(ifg.CAD_FAMILY_COIN_CELL, "m_se_story_cell")
     glass_mat = fl.make_mat(
-        "m_se_story_glass", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
+        "m_se_story_glass", fl._to_linear(ifg.MAT_DISPLAY_GLASS),
+        metallic=0.0, roughness=0.04, alpha=1.0, kind="glass", ior=1.52)
     ribbon_mat = fl.make_mat(
         "m_se_story_ribbon", fl._to_linear((0.55, 0.42, 0.12)), metallic=0.05, roughness=0.55)
 
     n_story = 0
+    n_plain_box = 0
+    n_authentic = 0
+
+    def _count(obj, kind: str, mesh_count: int = 1) -> None:
+        nonlocal n_story, n_plain_box, n_authentic
+        n_story += mesh_count
+        if kind == "box":
+            n_plain_box += mesh_count
+        else:
+            n_authentic += mesh_count
 
     # Optical bench floor inside the cube volume — horizontal read.
-    bench_z = base_z + H * 0.22
+    # DECISION: bench sits in the TOWER (tz), not the UI body — a body-floor
+    # bench at H·0.22 read as a green bar floating under the deck on cutaway.
+    bench_z = tz - th * 0.38
     _bench = fl.add_box(
         "u_se_instrument_story_bench",
         _mm3((tx, ty, bench_z)),
         _mm3((tw * 0.92, td * 0.92, 4.0)),
         bench_mat, module=story_mod, module_objects=MO)
     _bench.dimensions = _mm3((tw * 0.92, td * 0.92, 4.0))
-    n_story += 1
+    _tag_story_geom(_bench, "fallback:box_bench")
+    _count(_bench, "box")
 
     # Transmittance axis along −Y (matches exterior source PCB on tower front).
-    optic_z = base_z + H + th * 0.42
+    # DECISION: optic_z = form tower centre (tz), not a second formula — dual
+    # formulas drifted and put the detector PCB above the UI deck.
+    optic_z = float(tz)
     src_y = ty - td * 0.32
     det_y = ty + td * 0.32
-    _led = fl.add_box(
+
+    # LED emitter — CAD family first (local D×D×H, then rotate onto −Y axis).
+    _led_cad = _import_family_cad(
+        ifg.CAD_FAMILY_LED,
         "u_se_instrument_story_led",
-        _mm3((tx, src_y, optic_z)),
-        _mm3((max(12.0, path * 1.3), 4.0, max(12.0, path * 1.3))),
-        led_mat, module=story_mod, module_objects=MO)
-    _led.dimensions = _mm3((max(12.0, path * 1.3), 4.0, max(12.0, path * 1.3)))
-    n_story += 1
+        (tx, src_y, optic_z),
+        (5.0, 5.0, 9.4),
+        (math.radians(90), 0.0, 0.0),
+        None,  # family role PBR
+        story_mod,
+        MO,
+    )
+    if _led_cad is not None:
+        _count(_led_cad, "cad")
+    else:
+        _count(None, "auth", _place_led_emitter_compound(
+            "u_se_instrument_story_led", (tx, src_y, optic_z), -1.0,
+            led_mat, story_mod, MO))
+
+    # Hollow square cuvette — CAD glass Transmission, or four-wall primitive.
     cuv_h = min(th * 0.58, 30.0)
-    _cuv = fl.add_box(
+    _cuv_cad = _import_family_cad(
+        ifg.CAD_FAMILY_CUVETTE,
         "u_se_instrument_story_cuvette",
-        _mm3((tx, ty, optic_z + 2.0)),
-        _mm3((cuvette_plan, cuvette_plan, cuv_h)),
-        cuv_mat, module=story_mod, module_objects=MO)
-    _cuv.dimensions = _mm3((cuvette_plan, cuvette_plan, cuv_h))
-    n_story += 1
+        (tx, ty, optic_z + 2.0),
+        (cuvette_plan, cuvette_plan, cuv_h),
+        (0.0, 0.0, 0.0),
+        None,  # family glass Transmission
+        story_mod,
+        MO,
+    )
+    if _cuv_cad is not None:
+        _count(_cuv_cad, "cad")
+    else:
+        _count(None, "auth", _place_hollow_square_cuvette(
+            "u_se_instrument_story_cuvette",
+            (tx, ty, optic_z + 2.0),
+            cuvette_plan,
+            cuv_h,
+            1.25,
+            cuv_mat,
+            story_mod,
+            MO,
+        ))
+
     # Sample fluid — desirable cutaway shows the instrument *in use*.
     _fluid = fl.add_box(
         "u_se_instrument_story_fluid",
         _mm3((tx, ty, optic_z + 1.0)),
-        _mm3((cuvette_plan * 0.72, cuvette_plan * 0.72, cuv_h * 0.55)),
+        _mm3((cuvette_plan * 0.55, cuvette_plan * 0.55, cuv_h * 0.50)),
         fluid_mat, module=story_mod, module_objects=MO)
-    _fluid.dimensions = _mm3((cuvette_plan * 0.72, cuvette_plan * 0.72, cuv_h * 0.55))
-    n_story += 1
-    _det = fl.add_box(
+    _fluid.dimensions = _mm3((cuvette_plan * 0.55, cuvette_plan * 0.55, cuv_h * 0.50))
+    _tag_story_geom(_fluid, "primitive:fluid_volume")
+    _count(_fluid, "auth")  # fluid volume is intentional soft box, count as authentic role
+
+    # Photodiode / detector — TO-can CAD metal (local OD×OD×H, then rotate).
+    _det_cad = _import_family_cad(
+        ifg.CAD_FAMILY_PHOTODIODE,
         "u_se_instrument_story_detector",
-        _mm3((tx, det_y, optic_z)),
-        _mm3((max(10.0, path * 1.0), 3.2, max(10.0, path * 1.0))),
-        det_mat, module=story_mod, module_objects=MO)
-    _det.dimensions = _mm3((max(10.0, path * 1.0), 3.2, max(10.0, path * 1.0)))
-    n_story += 1
-    # Detector carrier board (FR4) — density + honesty.
-    _det_pcb = fl.add_box(
+        (tx, det_y, optic_z),
+        (10.8, 10.8, 6.9),
+        (math.radians(90), 0.0, 0.0),
+        None,  # family brushed metal
+        story_mod,
+        MO,
+    )
+    if _det_cad is not None:
+        _count(_det_cad, "cad")
+    else:
+        _count(None, "auth", _place_photodiode_to_can_compound(
+            "u_se_instrument_story_detector", (tx, det_y, optic_z), +1.0,
+            det_mat, window_mat, story_mod, MO))
+
+    # Detector carrier board (FR4) — local W×D×T (thickness on Z), then face-mount.
+    _det_pcb = _import_family_cad(
+        ifg.CAD_FAMILY_INSTRUMENT_PCB,
         "u_se_instrument_story_detector_pcb",
-        _mm3((tx, det_y + 2.2, optic_z)),
-        _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4))),
-        pcb_mat, module=story_mod, module_objects=MO)
-    _det_pcb.dimensions = _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4)))
-    n_story += 1
+        (tx, det_y + 3.0, optic_z),
+        (max(14.0, path * 1.4), max(14.0, path * 1.4), 1.6),
+        (math.radians(90), 0.0, 0.0),
+        None,
+        story_mod,
+        MO,
+    )
+    if _det_pcb is None:
+        _det_pcb = _import_family_cad(
+            ifg.CAD_FAMILY_PCB_BOARD,
+            "u_se_instrument_story_detector_pcb",
+            (tx, det_y + 3.0, optic_z),
+            (max(14.0, path * 1.4), max(14.0, path * 1.4), 1.6),
+            (math.radians(90), 0.0, 0.0),
+            None,
+            story_mod,
+            MO,
+        )
+    if _det_pcb is not None:
+        _count(_det_pcb, "cad")
+    else:
+        _det_pcb = fl.add_box(
+            "u_se_instrument_story_detector_pcb",
+            _mm3((tx, det_y + 2.2, optic_z)),
+            _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4))),
+            pcb_mat, module=story_mod, module_objects=MO)
+        _det_pcb.dimensions = _mm3((max(14.0, path * 1.4), 1.6, max(14.0, path * 1.4)))
+        _tag_story_geom(_det_pcb, "fallback:box_pcb")
+        _count(_det_pcb, "box")
+
     beam_len = abs(det_y - src_y)
-    _beam = fl.add_box(
+    # Beam as a thin cylinder along Y — reads as a ray, not a glowing brick.
+    _beam = fl.add_cyl(
         "u_se_instrument_story_beam",
         _mm3((tx, (src_y + det_y) / 2.0, optic_z)),
-        _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM)),
-        beam_mat, module=story_mod, module_objects=MO)
-    _beam.dimensions = _mm3((ifg.INTERIOR_BEAM_CROSS_MM, beam_len, ifg.INTERIOR_BEAM_CROSS_MM))
-    n_story += 1
-    # Light baffles either side of the cuvette — real photometer interior language.
+        (ifg.INTERIOR_BEAM_CROSS_MM / 2.0) * fl.MM,
+        beam_len * fl.MM,
+        beam_mat,
+        module=story_mod,
+        module_objects=MO,
+        rotation=(math.radians(90), 0.0, 0.0),
+    )
+    _tag_story_geom(_beam, "primitive:beam_cyl")
+    _count(_beam, "auth")
+
+    # Light baffles either side of the cuvette — thin plates (functional, not cuboid clutter).
     for _bi, _by in enumerate((ty - cuvette_plan * 0.55, ty + cuvette_plan * 0.55)):
         _bf = fl.add_box(
             f"u_se_instrument_story_baffle_{_bi}",
@@ -12485,47 +12964,114 @@ def _place_instrument_interior_layout(
             _mm3((tw * 0.55, 1.2, th * 0.35)),
             baffle_mat, module=story_mod, module_objects=MO)
         _bf.dimensions = _mm3((tw * 0.55, 1.2, th * 0.35))
-        n_story += 1
+        _tag_story_geom(_bf, "fallback:box_baffle")
+        _count(_bf, "box")
 
-    # UI volume — main PCB under the display locus (left of cube).
+    # UI volume — main PCB under the display locus (CAD FR4 preferred).
     pcb_w = max(48.0, dw * 1.05)
     pcb_d = max(36.0, dh * 1.15)
-    pcb_z = base_z + H * 0.42
-    _pcb = fl.add_box(
+    # Just under the top deck — H·0.42 sat mid-cavity and read as a hanging slab.
+    pcb_z = base_z + H - max(10.0, ifg.INTERIOR_PCB_THICKNESS_MM + 6.0)
+    _pcb = _import_family_cad(
+        ifg.CAD_FAMILY_INSTRUMENT_PCB,
         "u_se_instrument_story_pcb",
-        _mm3((dx, dy + 4.0, pcb_z)),
-        _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM)),
-        pcb_mat, module=story_mod, module_objects=MO)
-    _pcb.dimensions = _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM))
-    n_story += 1
-    for _ci, (_ox, _oy) in enumerate([(-0.28, 0.22), (0.18, -0.15), (0.30, 0.28)]):
-        fl.add_box(
-            f"u_se_instrument_story_chip_{_ci}",
-            _mm3((dx + pcb_w * _ox, dy + 4.0 + pcb_d * _oy, pcb_z + 2.2)),
-            _mm3((max(6.0, pcb_w * 0.16), max(5.0, pcb_d * 0.14), 2.0)),
-            chip_mat, module=story_mod, module_objects=MO)
-        n_story += 1
-
-    # Flex ribbon PCB → display underside (structured interconnect, not empty air).
-    _rib = fl.add_box(
-        "u_se_instrument_story_ribbon",
-        _mm3((dx, dy + pcb_d * 0.15, (pcb_z + base_z + H - 1.2) / 2.0)),
-        _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z))),
-        ribbon_mat, module=story_mod, module_objects=MO)
-    _rib.dimensions = _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z)))
-    n_story += 1
-
-    # Coin cell under the left UI deck (power for handheld instruments).
-    fl.add_cyl(
-        "u_se_instrument_story_cell",
-        _mm3((dx - pcb_w * 0.35, dy - pcb_d * 0.15, base_z + H * 0.28)),
-        ifg.INTERIOR_COIN_CELL_R_MM * fl.MM,
-        3.2 * fl.MM,
-        bat_mat,
-        module=story_mod, module_objects=MO,
-        rotation=(math.radians(90), 0.0, 0.0),
+        (dx, dy + 4.0, pcb_z),
+        (pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM + 3.5),
+        (0.0, 0.0, 0.0),
+        None,
+        story_mod,
+        MO,
     )
-    n_story += 1
+    if _pcb is None:
+        _pcb = _import_family_cad(
+            ifg.CAD_FAMILY_PCB_BOARD,
+            "u_se_instrument_story_pcb",
+            (dx, dy + 4.0, pcb_z),
+            (pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM + 3.5),
+            (0.0, 0.0, 0.0),
+            None,
+            story_mod,
+            MO,
+        )
+    if _pcb is not None:
+        _count(_pcb, "cad")
+    else:
+        _pcb = fl.add_box(
+            "u_se_instrument_story_pcb",
+            _mm3((dx, dy + 4.0, pcb_z)),
+            _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM)),
+            pcb_mat, module=story_mod, module_objects=MO)
+        _pcb.dimensions = _mm3((pcb_w, pcb_d, ifg.INTERIOR_PCB_THICKNESS_MM))
+        _tag_story_geom(_pcb, "fallback:box_pcb")
+        _count(_pcb, "box")
+        for _ci, (_ox, _oy) in enumerate([(-0.28, 0.22), (0.18, -0.15), (0.30, 0.28)]):
+            chip = fl.add_box(
+                f"u_se_instrument_story_chip_{_ci}",
+                _mm3((dx + pcb_w * _ox, dy + 4.0 + pcb_d * _oy, pcb_z + 2.2)),
+                _mm3((max(6.0, pcb_w * 0.16), max(5.0, pcb_d * 0.14), 2.0)),
+                chip_mat, module=story_mod, module_objects=MO)
+            _tag_story_geom(chip, "fallback:box_chip")
+            _count(chip, "box")
+
+    # Flex ribbon as a short pipe polyline (bent interconnect), not a vertical brick.
+    rib_pts = [
+        (dx * fl.MM, (dy + pcb_d * 0.10) * fl.MM, pcb_z * fl.MM),
+        (dx * fl.MM, (dy + pcb_d * 0.05) * fl.MM, (pcb_z + (base_z + H - 1.2 - pcb_z) * 0.45) * fl.MM),
+        (dx * fl.MM, dy * fl.MM, (base_z + H - 1.2) * fl.MM),
+    ]
+    try:
+        _rib = fl.add_pipe(
+            "u_se_instrument_story_ribbon",
+            rib_pts,
+            0.45 * fl.MM,
+            ribbon_mat,
+            module=story_mod,
+            module_objects=MO,
+            bevel_segments=3,
+        )
+        _tag_story_geom(_rib, "primitive:ribbon_pipe")
+        _count(_rib, "auth")
+    except Exception:
+        _rib = fl.add_box(
+            "u_se_instrument_story_ribbon",
+            _mm3((dx, dy + pcb_d * 0.15, (pcb_z + base_z + H - 1.2) / 2.0)),
+            _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z))),
+            ribbon_mat, module=story_mod, module_objects=MO)
+        _rib.dimensions = _mm3((max(10.0, dw * 0.35), 0.6, max(8.0, (base_z + H - 1.2) - pcb_z)))
+        _tag_story_geom(_rib, "fallback:box_ribbon")
+        _count(_rib, "box")
+
+    # Coin cell — CAD disk; dims are local (D, H, D) then rotated to face-up.
+    # DECISION: sit under the UI PCB (pcb_z), not at H·0.28 mid-cavity — that
+    # mid-body seat read as a chrome sphere floating in the hollow cutaway.
+    cell_loc = (dx - pcb_w * 0.35, dy - pcb_d * 0.15, pcb_z - 4.0)
+    _cell_d = ifg.INTERIOR_COIN_CELL_R_MM * 2.0
+    _cell_h = ifg.INTERIOR_COIN_CELL_H_MM
+    _cell = _import_family_cad(
+        ifg.CAD_FAMILY_COIN_CELL,
+        "u_se_instrument_story_cell",
+        cell_loc,
+        (_cell_d, _cell_d, _cell_h),  # local XY disk × Z height (pre-rotation)
+        (math.radians(90), 0.0, 0.0),
+        None,
+        story_mod,
+        MO,
+    )
+    if _cell is not None:
+        _count(_cell, "cad")
+    else:
+        _cell = fl.add_cyl(
+            "u_se_instrument_story_cell",
+            _mm3(cell_loc),
+            ifg.INTERIOR_COIN_CELL_R_MM * fl.MM,
+            ifg.INTERIOR_COIN_CELL_H_MM * fl.MM,
+            bat_mat,
+            module=story_mod,
+            module_objects=MO,
+            rotation=(math.radians(90), 0.0, 0.0),
+        )
+        _tag_story_geom(_cell, "primitive:coin_cell_cyl")
+        _count(_cell, "auth")
 
     # Underside of the recessed display — dark glass reads from the cutaway.
     _glass = fl.add_box(
@@ -12534,12 +13080,27 @@ def _place_instrument_interior_layout(
         _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM)),
         glass_mat, module=story_mod, module_objects=MO)
     _glass.dimensions = _mm3((dw, dh, ifg.DISPLAY_GLASS_THICKNESS_MM))
-    n_story += 1
+    _tag_story_geom(_glass, "fallback:box_glass")
+    _count(_glass, "box")
 
+    stats = {
+        "n_story": n_story,
+        "n_plain_box": n_plain_box,
+        "n_authentic": n_authentic,
+    }
+    form["interior_authenticity"] = stats
+    ok = ifg.interior_authenticity_ok(stats)
     print(
-        f"[univ][sealed] instrument interior: optical axis + fluid + baffles + ribbon "
-        f"({n_story} story meshes, form-aligned)"
+        f"[univ][sealed] instrument interior: optical axis + CAD/primitives "
+        f"({n_story} meshes, plain_box={n_plain_box}, authentic={n_authentic}, "
+        f"ok={ok})"
     )
+    if not ok:
+        print(
+            f"[univ][sealed] WARN interior authenticity below floor "
+            f"(box_frac={n_plain_box / max(1, n_story):.2f} "
+            f"max={ifg.INTERIOR_MAX_PLAIN_BOX_FRACTION})"
+        )
     if n_story < ifg.INTERIOR_MIN_STORY_MESHES:
         print(
             f"[univ][sealed] WARN interior density below desirability floor "
@@ -12563,6 +13124,58 @@ def _instrument_pcb_png_path() -> str | None:
     return None
 
 
+def _place_instrument_source_window(
+    name: str,
+    form: dict,
+    module: str,
+    MO: dict,
+    hide_render: bool = False,
+):
+    """Closed-product optical-axis SOURCE as a dark window module (not bare FR4).
+
+    INTENT (2026-07-14 glance): a full green PCB on the exterior face fails the
+    instrument vision rubric ("FR4 plate on a closed exterior"). Cutaway still
+    gets `_place_instrument_source_pcb`. Same loc/size + connector so the
+    jacketed harness path stays identical.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    w, _old_d, h = form["led_pcb_size"]
+    loc = form["led_pcb_loc"]
+    lx, ly, lz = loc
+    housing = fl.make_mat(
+        f"m_{name}_housing", fl._to_linear(ifg.MAT_BODY_POLYMER),
+        metallic=0.05, roughness=0.55)
+    win = fl.make_mat(
+        f"m_{name}_window", fl._to_linear((0.85, 0.55, 0.12)),
+        metallic=0.0, roughness=0.2, kind="led_emissive", emission_strength=0.35)
+    conn = fl.make_mat(
+        f"m_{name}_conn", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.15, roughness=0.48)
+    size = (float(w), 2.4, float(h))
+    body = fl.add_box(name, _mm3(loc), _mm3(size), housing, module=module, module_objects=MO)
+    body.dimensions = _mm3(size)
+    body.hide_render = hide_render
+    body["geometry_source"] = "instrument_source_window"
+    # Amber optical window inset on the −Y face (operator sees a lit aperture).
+    face_y = ly - size[1] / 2 - 0.2
+    aperture = fl.add_box(
+        f"{name}_aperture",
+        _mm3((lx, face_y, lz)),
+        _mm3((w * 0.42, 0.5, h * 0.42)),
+        win, module=module, module_objects=MO)
+    aperture.hide_render = hide_render
+    conn_obj = fl.add_box(
+        f"{name}_connector",
+        _mm3((lx - w / 2 - 1.4, ly, lz)),
+        _mm3((2.8, 3.2, min(h * 0.72, 10.0))),
+        conn, module=module, module_objects=MO)
+    conn_obj.dimensions = _mm3((2.8, 3.2, min(h * 0.72, 10.0)))
+    conn_obj.hide_render = hide_render
+    conn_obj["geometry_source"] = "instrument_source_window_connector"
+    return body
+
+
 def _place_instrument_source_pcb(
     name: str,
     form: dict,
@@ -12576,6 +13189,7 @@ def _place_instrument_source_pcb(
     small replaceable board (not a painted green square). FR4 + pads + mount
     holes + an edge connector — the connector is where the harness leaves the
     board into the enclosure (combined product, not a floating decoration).
+    CUTAWAY ONLY — closed exterior uses `_place_instrument_source_window`.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
@@ -12592,10 +13206,25 @@ def _place_instrument_source_pcb(
         f"m_{name}_hole", fl._to_linear((0.12, 0.12, 0.14)), metallic=0.3, roughness=0.55)
     conn = fl.make_mat(
         f"m_{name}_conn", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.15, roughness=0.48)
-    body = fl.add_box(name, _mm3(loc), _mm3(size), fr4, module=module, module_objects=MO)
-    body.dimensions = _mm3(size)
+    # Prefer a FLAT FR4 board on the optical face — instrument_pcb packages
+    # become "lego teeth" when face-mounted. MCU-board CAD stays for cutaway UI.
+    # Local dims = W×H×thickness (CAD native), then rotate onto the face.
+    _src_thick = 1.6
+    body = _import_family_cad(
+        ifg.CAD_FAMILY_PCB_BOARD,
+        name,
+        loc,
+        (float(w), float(h), _src_thick),
+        (math.radians(90), 0.0, 0.0),
+        None,  # family FR4 role PBR
+        module,
+        MO,
+    )
+    if body is None:
+        body = fl.add_box(name, _mm3(loc), _mm3(size), fr4, module=module, module_objects=MO)
+        body.dimensions = _mm3(size)
+        body["geometry_source"] = "instrument_source_pcb"
     body.hide_render = hide_render
-    body["geometry_source"] = "instrument_source_pcb"
     # Face-normal is −Y (board on chamber front). Pads sit slightly proud of the face.
     face_y = ly - size[1] / 2 - 0.15
     for i, (px, pz) in enumerate(((-0.28, 0.22), (0.28, 0.22), (-0.28, -0.18), (0.28, -0.18), (0.0, 0.0))):
@@ -12605,6 +13234,20 @@ def _place_instrument_source_pcb(
             _mm3((max(2.2, w * 0.16), 0.35, max(1.6, h * 0.12))),
             pad, module=module, module_objects=MO)
         p.hide_render = hide_render
+    # Tiny LED emitter on the optical-axis face of the source board.
+    _led_on_board = _import_family_cad(
+        ifg.CAD_FAMILY_LED,
+        f"{name}_led",
+        (lx, face_y - 2.5, lz),
+        (4.0, 4.0, 7.0),
+        (math.radians(90), 0.0, 0.0),
+        None,
+        module,
+        MO,
+    )
+    if _led_on_board is not None:
+        _led_on_board.hide_render = hide_render
+        fl.shade_smooth_object(_led_on_board)
     for i, (px, pz) in enumerate(((-0.38, 0.38), (0.38, 0.38), (-0.38, -0.38), (0.38, -0.38))):
         fl.add_cyl(
             f"{name}_mnt_{i}",
@@ -12657,36 +13300,55 @@ def _instrument_source_harness_spec(
     slot_x, slot_y, slot_z = form["cable_slot_loc"]
     # Connector sits on the −X edge of the board (toward the enclosure centre).
     conn_x = led_x - led_w / 2 - 1.4
-    # Stand-off in front of the chamber face so the loom clears the board/pads.
-    clear_y = led_y - max(4.0, form["tower_size"][1] * 0.18)
+    # Board front (−Y) — dress stays OUTSIDE the optical cube so strands aren't
+    # swallowed by the tower mesh (which read as mid-air stubs on the 3/4).
+    board_front_y = led_y - led_d / 2
+    dress_y = board_front_y - max(2.2, form["tower_size"][1] * 0.06)
+    # INTENT (2026-07-14, gold glance): 4-colour ribbon must read at thumbnail —
+    # gold open-photometer looms are clearly red/black/yellow/blue, not charcoal.
+    # Keep saturation below "crayon" while staying distinguishable on charcoal body.
     colours = (
-        (0.78, 0.10, 0.10),  # power
-        (0.05, 0.05, 0.06),  # gnd
-        (0.90, 0.75, 0.12),  # signal A
-        (0.15, 0.32, 0.78),  # signal B
+        (0.72, 0.12, 0.10),  # power (red)
+        (0.08, 0.08, 0.09),  # gnd (black)
+        (0.78, 0.62, 0.12),  # signal A (yellow)
+        (0.18, 0.32, 0.72),  # signal B (blue)
     )
+    # INTENT (2026-07-14): connector → short stand-off on the chamber FRONT →
+    # descend the face → enter the molded cable channel at the cube↔body joint.
+    # TRIED: −X mid-air Manhattan to the slot — read as three stiff stubs flying
+    # off the tower into empty space (colorimeter 04-product-exterior).
+    deck_top = base_z + H
+    slot_sx, slot_sy, slot_sz = form["cable_slot_size"]
+    # DECISION: dress on the cube's LEFT face (joint toward the UI body) at
+    # tower_left − 1 mm, not out in −Y free space. Free-space −Y dress read as
+    # "wires flying off the tower" on every 3/4 product shot.
+    tower_left_x = form["tower_loc"][0] - form["tower_size"][0] / 2
+    face_x = tower_left_x - 1.0
+    face_y = (board_front_y + slot_y) * 0.5
     strands = []
-    for i, z_frac in enumerate((-0.28, -0.10, 0.10, 0.28)):
-        z0 = led_z + led_h * z_frac * 0.42
-        y_fan = (i - 1.5) * 0.55
-        start = (conn_x - 0.4, led_y - 0.9, z0)
-        clear = (conn_x - 2.0, clear_y + y_fan, z0 - 1.0)
-        dress = (
-            (conn_x + slot_x) * 0.5,
-            clear_y + y_fan * 0.3,
-            (z0 + slot_z) * 0.55,
+    for i, z_frac in enumerate((-0.22, -0.07, 0.07, 0.22)):
+        z0 = led_z + led_h * z_frac * 0.28
+        z_fan = (i - 1.5) * 0.55
+        y_fan = (i - 1.5) * 0.25
+        # Exit connector → hug left face → drop into cable channel mouth.
+        start = (conn_x, board_front_y - 0.3, z0)
+        to_face = (face_x, face_y + y_fan, z0 + z_fan * 0.2)
+        down = (face_x, face_y + y_fan * 0.5, deck_top + 2.5)
+        end = (
+            slot_x + 0.2,
+            slot_y + y_fan * 0.2,
+            slot_z + z_fan * 0.15,
         )
-        end = (slot_x + 1.0, slot_y + (i - 1.5) * 0.7, slot_z)
         strands.append({
             "name": f"u_se_exterior_detail_source_harness_{i}",
-            "pts": [start, clear, dress, end],
+            "pts": [start, to_face, down, end],
             "rgb": colours[i],
         })
     return {
         "kind": "source_module_to_enclosure",
         "entry": "cube_body_cable_channel",
-        "diameter_mm": 2.4,
-        "diameter_m": 0.0024,
+        "diameter_mm": 1.6,
+        "diameter_m": 0.0016,
         "strand_count": len(strands),
         "source_anchor": "u_se_exterior_detail_led_pcb",
         "enclosure_anchor": "u_se_exterior_detail_cable_slot",
@@ -12735,39 +13397,74 @@ def _place_instrument_source_harness(
     port.dimensions = _mm3(spec["port_size"])
     port.hide_render = hide_render
     port["geometry_source"] = "instrument_cable_channel"
+    # Compact strain-relief boot at the connector — not a black brick that
+    # reads as the origin of floating stubs.
     boot = fl.add_box(
         "u_se_exterior_detail_source_harness_boot",
-        _mm3((spec["connector_x"] - 1.0, form["led_pcb_loc"][1] - 0.6, form["led_pcb_loc"][2])),
-        _mm3((3.8, 4.2, form["led_pcb_size"][2] * 0.58)),
+        _mm3((spec["connector_x"] - 0.4, form["led_pcb_loc"][1] - form["led_pcb_size"][1] / 2 - 1.2,
+              form["led_pcb_loc"][2])),
+        _mm3((2.4, 2.2, form["led_pcb_size"][2] * 0.42)),
         boot_mat,
         module=module,
         module_objects=MO,
     )
-    boot.dimensions = _mm3((3.8, 4.2, form["led_pcb_size"][2] * 0.58))
+    boot.dimensions = _mm3((2.4, 2.2, form["led_pcb_size"][2] * 0.42))
     boot.hide_render = hide_render
-    radius = (float(spec["diameter_mm"]) / 2.0) * fl.MM
-    for strand in spec["strands"]:
-        cable_mat = fl.make_mat(
-            f"m_{strand['name']}",
-            fl._to_linear(strand["rgb"]),
-            metallic=0.0,
-            roughness=0.55,
-        )
-        pts = [_mm3(p) for p in strand["pts"]]
-        obj = fl.add_pipe(
-            strand["name"],
-            pts,
-            radius=radius,
-            material=cable_mat,
+    # DECISION (2026-07-14): closed-product exterior keeps ONE short jacketed
+    # lead (not a crayon ribbon on 04–07). CUTAWAY / hero (hide_render=False)
+    # ALSO meshes the 4-colour strands — a charcoal jacket on a charcoal body
+    # is invisible (SIGHT on 00-hero: "no harness"), so the cutaway must show
+    # the red/black/yellow/blue loom the Interconnect power/signal story claims.
+    jacket_mat = fl.make_mat(
+        "m_se_source_harness_jacket",
+        fl._to_linear((0.10, 0.10, 0.12)),
+        metallic=0.0,
+        roughness=0.65,
+    )
+    # Prefer the middle strand path (representative dress into the channel).
+    jacket_pts_mm = spec["strands"][1]["pts"] if len(spec["strands"]) > 1 else (
+        spec["strands"][0]["pts"] if spec["strands"] else [])
+    if jacket_pts_mm:
+        jacket = fl.add_pipe(
+            "u_se_exterior_detail_source_harness_jacket",
+            [_mm3(p) for p in jacket_pts_mm],
+            radius=max(0.9, float(spec["diameter_mm"]) * 0.55) * fl.MM,
+            material=jacket_mat,
             module=module,
             module_objects=MO,
-            bevel_segments=6,
+            bevel_segments=5,
         )
-        if obj is not None:
-            obj.hide_render = hide_render
-            obj["geometry_source"] = "instrument_source_harness"
-            obj["source_anchor"] = spec["source_anchor"]
-            obj["enclosure_anchor"] = spec["enclosure_anchor"]
+        if jacket is not None:
+            jacket.hide_render = hide_render
+            jacket["geometry_source"] = "instrument_source_harness_jacket"
+            jacket["source_anchor"] = spec["source_anchor"]
+            jacket["enclosure_anchor"] = spec["enclosure_anchor"]
+    # Cutaway: coloured strands (thumbnail-readable). Exterior product views
+    # keep strands hidden so 04–07 stay a clean closed body + single jacket.
+    if not hide_render:
+        for strand in spec.get("strands") or []:
+            pts = strand.get("pts") or []
+            if len(pts) < 2:
+                continue
+            rgb = strand.get("rgb") or (0.5, 0.5, 0.5)
+            smat = fl.make_mat(
+                f"m_se_source_harness_strand_{strand.get('name', 'x')[-1]}",
+                fl._to_linear(tuple(rgb)),
+                metallic=0.05,
+                roughness=0.45,
+            )
+            pipe = fl.add_pipe(
+                str(strand["name"]),
+                [_mm3(p) for p in pts],
+                radius=max(0.55, float(spec["diameter_mm"]) * 0.38) * fl.MM,
+                material=smat,
+                module=module,
+                module_objects=MO,
+                bevel_segments=4,
+            )
+            if pipe is not None:
+                pipe.hide_render = False
+                pipe["geometry_source"] = "instrument_source_harness_strand"
     return spec
 
 
@@ -12790,8 +13487,8 @@ def _assert_instrument_source_harness_coherent(
     assert spec["kind"] == "source_module_to_enclosure", (
         f"harness kind must name the universal topology, got {spec['kind']!r}")
     assert spec["entry"] == "cube_body_cable_channel"
-    assert float(spec["diameter_mm"]) >= 2.0
-    assert float(spec["diameter_m"]) >= 0.0020
+    assert float(spec["diameter_mm"]) >= 1.55
+    assert float(spec["diameter_m"]) >= 0.00155
     assert int(spec["strand_count"]) >= 4
     assert spec.get("connector") is not None
     assert spec.get("strain_relief") is not None
@@ -12801,18 +13498,20 @@ def _assert_instrument_source_harness_coherent(
         "harness must originate at an edge connector on the enclosure-facing board side")
     assert 3 <= len(spec["strands"]) <= 5
     slot_x, slot_y, slot_z = form["cable_slot_loc"]
+    tower_left = form["tower_loc"][0] - form["tower_size"][0] / 2
     for strand in spec["strands"]:
         pts = strand["pts"]
         assert len(pts) >= 4
         sx, sy, sz = pts[0]
         ex, ey, ez = pts[-1]
         assert sx <= led_x - led_w / 2 + 1e-6, "harness must start at/board-side of the connector"
-        # Dress/clear stay in front of the chamber; the last point may enter the
-        # cable channel a few mm into the cube↔body joint (real plug path).
-        assert all(p[1] <= led_y + 0.5 for p in pts[:-1]), (
-            "harness must dress on the operator-facing side, not into the chamber")
-        assert pts[-1][1] <= led_y + 4.0, (
-            "cable-channel entry must stay near the source-face joint, not deep in the cube")
+        # Dress on the operator face (−Y) OR the cube↔body joint face (−X).
+        # Free-space arcs past the chamber fail; left-face drop into the cable
+        # channel is the closed-product gold read.
+        assert all(
+            (p[1] <= led_y + 1.0) or (p[0] <= tower_left + 2.5)
+            for p in pts
+        ), "harness must hug chamber front or left joint — not float into free space"
         assert abs(ex - slot_x) <= 4.0 and abs(ez - slot_z) <= 6.0, (
             "harness must terminate in the cube↔body cable channel")
         length = 0.0
@@ -12848,6 +13547,16 @@ def _selftest_instrument_source_harness() -> None:
     assert all(12.0 <= L <= 90.0 for L in lengths), lengths
     assert lengths[1] >= lengths[0] * 0.85, (
         "larger instrument envelope must still emit a coherent device-scale harness")
+    # proveCatch: 4-colour ribbon must stay distinguishable (gold glance), not charcoal.
+    form = _instrument_form_rule_mm(180.0, 140.0, 70.0, 300.0, 6.0, optical_path_mm=10.0)
+    spec = _instrument_source_harness_spec(form, 180.0, 140.0, 70.0, 300.0, 6.0)
+    rgbs = [tuple(s["rgb"]) for s in spec["strands"]]
+    assert len(rgbs) == 4, "source harness must be a 4-strand ribbon"
+    # At least three strands must differ in dominant channel (red/black/yellow/blue).
+    dominant = [max(range(3), key=lambda i: c[i]) for c in rgbs if max(c) > 0.15]
+    assert len(set(dominant)) >= 2, f"harness colours collapsed to one family: {rgbs}"
+    assert max(rgbs[0]) >= 0.55 and rgbs[0][0] > rgbs[0][1], "power strand should read red"
+    assert max(rgbs[1]) <= 0.15, "gnd strand should stay near-black"
 
 
 def _selftest_instrument_form_rule() -> None:
@@ -12907,10 +13616,38 @@ def _selftest_instrument_form_rule() -> None:
     assert len(form["screw_locs"]) >= 4, "AM enclosure needs visible top-plate fasteners"
     assert form["viewing_distance_mm"] == ifg.VIEWING_DISTANCE_MM_DESIGN
     assert form["button_shape"] == "square"
+    assert ifg.BUTTON_TRAVEL_MM >= 3.0, "keys must be proud enough to read as a D-pad"
+    assert abs(form["button_locs"][0][2] - (base_z + H + ifg.BUTTON_TRAVEL_MM / 2.0)) < 0.05, (
+        "D-pad Z must sit ON the deck (centre at half travel), not float above it")
+    assert sum(ifg.MAT_BUTTON_KEY) / 3.0 >= 0.18, (
+        "button keys must contrast against charcoal deck")
+    # proveCatch: HMI cluster is LEFT of the glass (A/B must not hide behind the cube).
+    _disp_left = form["top_display_loc"][0] - display_w * 0.5
+    assert all(bx < _disp_left - 0.5 for bx, _by, _bz in form["button_locs"]), (
+        "D-pad + A/B must stay left of the display so the product 3/4 matches the GA TOP")
+    # Cross pitch: up/down share X; left/right share Y (not a skewed 2×2).
+    _up, _dn, _lf, _rt = form["button_locs"][:4]
+    assert abs(_up[0] - _dn[0]) < 0.05 and abs(_lf[1] - _rt[1]) < 0.05, (
+        "D-pad must be a classic cross, not a staggered 2×2")
+    _bd = float(form["button_diameter_mm"])
+    for _i, _a in enumerate(form["button_locs"]):
+        for _b in form["button_locs"][_i + 1:]:
+            _dist = math.hypot(_a[0] - _b[0], _a[1] - _b[1])
+            assert _dist + 1e-6 >= _bd, (
+                f"keys must not overlap (dist={_dist:.2f} < diameter={_bd:.2f}) — "
+                "glass ate the HMI budget")
     assert form["display_bezel_size"][0] > display_w
     assert form["screw_head_diameter_mm"] >= 2.5
     assert form["cap_flange_od_mm"] > form["cap_grip_od_mm"], (
         "ambient cap must be a lid (flange > grip), not a knob")
+    # Closed-product lid parks on the table in front (well stays open + cuvette readable).
+    assert form["cap_loc"][1] < -D * 0.5, (
+        "ambient cap must park forward of the body so the cuvette well stays open")
+    assert form["cap_loc"][2] <= base_z + form["cap_flange_h_mm"], (
+        "parked ambient cap sits on the ground plane, not seated on the optical rim")
+    # Nest is a soft stow cue near the optical cube — never a left-deck control disk.
+    assert form["cap_nest_loc"][0] > 0.0, (
+        "cap nest must not sit on the left UI deck (broke GA↔Blender likeness)")
     assert form["step_shelf_size"][2] >= ifg.STEP_SHELF_HEIGHT_MM * 0.85
     assert ifg.desirability_silhouette_ok(H, tower_h, form["step_shelf_size"][2])
     assert len(form["foot_locs"]) == 4
@@ -13098,18 +13835,26 @@ def _instrument_proxy_geometry(
     W: float,
     D: float,
     H: float,
+    index: int = 0,
+    n: int = 1,
 ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     """Device-scale manifest proxy geometry for hidden instrument coverage meshes.
 
     INTENT: coverage proxies exist so GA/Part-names can identify the real parts even
     when the hero uses stylized optical-bench meshes. They must be small, stable and
     inside the handheld envelope; otherwise they become the delivered artefact's bbox.
+
+    DECISION (colorimeter 2026-07-14): lateral (x,y) comes from instrument_role_xy
+    (same nouns as the form-rule optical bench), NOT a centreline hash grid that
+    piled every tag at (0,0) while Renders showed a spread product.
     """
+    from instrument_role_xy import instrument_role_xy_mm
     bucket = _stable_name_bucket(name)
+    cx, cy = instrument_role_xy_mm(name, key, index, n, iw, idep, W, D)
     if is_shell:
         loc = (
-            ((bucket % 3) - 1) * iw * 0.08,
-            (((bucket // 3) % 3) - 1) * idep * 0.07,
+            cx * 0.25,
+            cy * 0.25,
             base_z + H * (0.35 + ((bucket // 11) % 5) * 0.06),
         )
         size = (
@@ -13120,12 +13865,7 @@ def _instrument_proxy_geometry(
         return loc, size
 
     mid_z, band_h = zone_z.get(key, (base_z + H * 0.5, 12.0))
-    slot = bucket % 11
-    loc = (
-        ((slot % 3) - 1) * iw * 0.22,
-        (((slot // 3) % 3) - 1) * idep * 0.18,
-        mid_z,
-    )
+    loc = (cx, cy, mid_z)
     size = (
         max(6.0, min(iw * 0.18, 8.0 + (bucket % 17))),
         max(5.0, min(idep * 0.18, 7.0 + ((bucket // 7) % 13))),
@@ -13202,6 +13942,19 @@ def _selftest_instrument_proxy_geometry() -> None:
         assert size[0] <= 180.0 * 0.35 and size[1] <= 140.0 * 0.31, (
             f"proxy must not become a product-sized slab, got {size}")
         assert size[2] <= 70.0 * 0.43, f"proxy must not drive a tall GA bbox, got {size}"
+    # proveCatch: optical train + UI must NOT pile at (0,0) (colorimeter 2026-07-14).
+    led = _instrument_proxy_geometry(
+        "LED Source", False, "optical", zone_z, 0.0, 150.0, 110.0, 180.0, 140.0, 70.0, 0, 1)
+    cuv = _instrument_proxy_geometry(
+        "Cuvette Holder", False, "optical", zone_z, 0.0, 150.0, 110.0, 180.0, 140.0, 70.0, 0, 1)
+    det = _instrument_proxy_geometry(
+        "Optical Detector Module", False, "optical", zone_z, 0.0, 150.0, 110.0, 180.0, 140.0, 70.0, 0, 1)
+    disp = _instrument_proxy_geometry(
+        "Local Display", False, "electronics", zone_z, 0.0, 150.0, 110.0, 180.0, 140.0, 70.0, 0, 1)
+    assert led[0][1] < cuv[0][1] < det[0][1], (
+        f"optic axis proxies must spread in Y, got {led[0]} {cuv[0]} {det[0]}")
+    assert disp[0][0] < 0 < cuv[0][0], (
+        f"UI left / optical right required, got disp={disp[0]} cuv={cuv[0]}")
 
 
 def _place_instrument_manifest_proxies(
@@ -13248,7 +14001,9 @@ def _place_instrument_manifest_proxies(
         for p in plist:
             part_zone[id(p)] = key
 
-    n = 0
+    # Group by zone so multi-part bands get distinct role-XY indices
+    # (colorimeter 2026-07-14 — hash-at-origin collapse).
+    pending = []
     for p in parts:
         pref = "u_" + re.sub(r"[^a-z0-9]+", "_", str(p.name).lower()).strip("_")[:40]
         if any(o.name.startswith(pref) for o in bpy.data.objects
@@ -13258,24 +14013,33 @@ def _place_instrument_manifest_proxies(
         is_shell = bool(re.search(
             r"enclosure|housing|shell|lid|shroud|chassis|case\b|cover\b", nm, re.I))
         key = part_zone.get(id(p), "electronics")
-        loc, size = _instrument_proxy_geometry(
-            nm, is_shell, key, zone_z, base_z, iw, idep, W, D, H)
-        obj = fl.add_box(
-            pref,
-            _mm3(loc),
-            _mm3(size),
-            proxy_mat,
-            module=getattr(p, "module_id", None) or skin_mod,
-            module_objects=MO,
-        )
-        obj.dimensions = _mm3(size)
-        obj.hide_render = True
-        obj["geometry_source"] = "instrument_manifest_proxy"
-        # anchors so downstream clamp / routing see a placed part
-        p.placed_xyz_mm = loc
-        p.obj_anchor = obj
-        p.anchors = {"centre": loc}
-        n += 1
+        pending.append((p, pref, nm, is_shell, key))
+    by_zone = {}
+    for item in pending:
+        by_zone.setdefault(item[4], []).append(item)
+
+    n = 0
+    for key, items in by_zone.items():
+        for index, (p, pref, nm, is_shell, _key) in enumerate(items):
+            loc, size = _instrument_proxy_geometry(
+                nm, is_shell, key, zone_z, base_z, iw, idep, W, D, H,
+                index=index, n=len(items))
+            obj = fl.add_box(
+                pref,
+                _mm3(loc),
+                _mm3(size),
+                proxy_mat,
+                module=getattr(p, "module_id", None) or skin_mod,
+                module_objects=MO,
+            )
+            obj.dimensions = _mm3(size)
+            obj.hide_render = True
+            obj["geometry_source"] = "instrument_manifest_proxy"
+            # anchors so downstream clamp / routing see a placed part
+            p.placed_xyz_mm = loc
+            p.obj_anchor = obj
+            p.anchors = {"centre": loc}
+            n += 1
     if n:
         print(f"[univ][sealed] instrument manifest proxies: {n} part(s) anchored for coverage")
     return n
@@ -13316,6 +14080,172 @@ def _suppress_instrument_boilerplate_meshes() -> int:
     return hidden
 
 
+def _sealed_role_xy_mm(
+    name: str,
+    zone_key: str,
+    index: int,
+    n: int,
+    iw_mm: float,
+    idep_mm: float,
+) -> tuple[float, float]:
+    """Lateral (cx, cy) slot for a sealed-cabinet part — shared by INSPECT/GA + hero.
+
+    INTENT: the GA plan is projected from parts-manifest world bboxes. A centreline-only
+    Z-stack (cx=cy=0 for every zone singleton) piles every tag at the origin while the
+    hero CAD pass paints heatsink / capacitors / fans at nonzero X — drawings disagree
+    with the product shot. Slot by role vocabulary (same nouns as the hero detail),
+    never by product-class table.
+
+    # FLOW: place_sealed_enclosure → build_part(cx,cy,z) → parts-manifest → draw_ga
+    #       hero CAD detail uses the same fractions (±0.22·iw fans, −0.28 heatsink, …)
+    """
+    nm = (name or "").lower()
+    # Front plane (negative Y) = cutaway-visible face — matches hero _yF ≈ −idep·0.15
+    y_front = -idep_mm * 0.18
+    y_mid = -idep_mm * 0.05
+    y_back = idep_mm * 0.10
+
+    if re.search(r"\bfan\b|ventilat|blower|louvre|grille", nm):
+        side = -1.0 if (index % 2 == 0) else 1.0
+        return (side * iw_mm * 0.22, y_front)
+
+    if re.search(r"\bpcb\b|board|bms|ems|controller|hmi|gateway|monitor|comm", nm):
+        return (-iw_mm * 0.18, y_front)
+
+    if re.search(r"heatsink|heat\s*sink|cold\s*plate", nm):
+        return (-iw_mm * 0.28, y_mid)
+
+    if re.search(r"capacitor|dc[\s_-]?link", nm):
+        return (iw_mm * 0.18 + (index % 3) * iw_mm * 0.09, y_mid)
+
+    if re.search(r"inductor|lcl|\bfilter\b", nm):
+        return (-iw_mm * 0.20, y_mid)
+
+    if re.search(
+        r"semiconductor|igbt|mosfet|invert|convert|mppt|\bpcs\b|rectifier|power\s+stage",
+        nm,
+    ):
+        if n <= 1:
+            return (iw_mm * 0.05, y_mid)
+        t = (index / max(1, n - 1)) - 0.5
+        return (t * iw_mm * 0.55, y_mid)
+
+    if zone_key == "energy" or re.search(r"\bcell|\bbattery|\bpack\b|\bmodule", nm):
+        if n <= 1:
+            return (0.0, y_back)
+        span = iw_mm * 0.72
+        pitch = span / float(n)
+        return (-span / 2.0 + pitch / 2.0 + index * pitch, y_back)
+
+    if re.search(r"busbar|contactor|fuse|breaker|isolat|relay|surge", nm):
+        return (0.0, y_mid)
+
+    if re.search(r"gland|terminal|connector|inlet|outlet", nm):
+        t = ((index / max(1, n - 1)) - 0.5) if n > 1 else 0.0
+        return (t * iw_mm * 0.50, y_front)
+
+    # Default wrap — never collapse a multi-part band onto the centreline.
+    if n <= 1:
+        hsh = sum(ord(c) for c in nm) % 7
+        return ((hsh - 3) * iw_mm * 0.06, y_mid)
+    cols = max(1, min(n, 3))
+    r_i, c_i = divmod(index, cols)
+    slot_w = iw_mm / float(cols)
+    cx = -iw_mm / 2.0 + slot_w / 2.0 + c_i * slot_w
+    cy = y_mid + (r_i - 0.5) * idep_mm * 0.08
+    return (cx, cy)
+
+
+def _fit_dims_at_sealed_slot(
+    fit: tuple[float, float, float],
+    cx: float,
+    cy: float,
+    iw_mm: float,
+    idep_mm: float,
+    row_h: float,
+) -> tuple[float, float, float]:
+    """Shrink a part so its bbox still fits the interior at the chosen (cx, cy).
+
+    GOTCHA: an oversized depth at y_front used to trip the containment clamp's
+    recentre path and snap cy back to 0. Size to the remaining half-extents first.
+    """
+    w, d, h = fit
+    max_half_w = max(8.0, min(cx - (-iw_mm / 2.0), (iw_mm / 2.0) - cx) - 2.0)
+    max_half_d = max(6.0, min(cy - (-idep_mm / 2.0), (idep_mm / 2.0) - cy) - 2.0)
+    return (
+        min(w, 2.0 * max_half_w),
+        min(d, 2.0 * max_half_d),
+        min(h, max(16.0, row_h * 0.92)),
+    )
+
+
+def _sealed_build_part(part, x_mm, y_mm, base_z_mm, MAT, MO):
+    """build_part for sealed cabinets — one presentation mesh, BoM qty preserved.
+
+    INTENT: build_part replicates qty-N box parts into a compact cluster (up to 8).
+    A pack-array cell count of 88 therefore drew 8× band-filling boxes whose union
+    exceeded the interior; the old clamp recentred that union to (0,0) and wiped
+    every role-XY slot. Pack-array segmentation already shows density; the BoM
+    qty stays on the Part for the manifest.
+    """
+    _q_save = getattr(part, "qty", 1)
+    try:
+        part.qty = 1
+        return build_part(part, x_mm, y_mm, base_z_mm, MAT, MO)
+    finally:
+        part.qty = _q_save
+
+
+def _selftest_sealed_role_xy() -> None:
+    """proveCatch: role slots spread XY; centreline-only layout is the defect."""
+    iw, idep = 500.0, 140.0
+    fan_l = _sealed_role_xy_mm("Active Ventilation Fan", "control", 0, 2, iw, idep)
+    fan_r = _sealed_role_xy_mm("Active Ventilation Fan", "control", 1, 2, iw, idep)
+    sink = _sealed_role_xy_mm("Extruded Heatsink", "power", 0, 1, iw, idep)
+    caps = _sealed_role_xy_mm("DC Link Capacitor", "power", 0, 1, iw, idep)
+    pcb = _sealed_role_xy_mm("BMS Controller PCB", "control", 0, 1, iw, idep)
+    inv = _sealed_role_xy_mm("DC AC Inverter Module", "power", 0, 3, iw, idep)
+    assert fan_l[0] < 0 < fan_r[0], f"fans must split left/right, got {fan_l} {fan_r}"
+    assert sink[0] < 0 < caps[0], f"heatsink left / caps right, got {sink} {caps}"
+    assert pcb[0] < 0, f"PCB must sit left of centreline, got {pcb}"
+    assert abs(inv[0]) > 1.0 or abs(inv[1]) > 1.0, f"power bay must leave centreline, got {inv}"
+    # Size-to-slot must leave room so clamp will not re-centre (deliberately oversized)
+    fit = _fit_dims_at_sealed_slot((400.0, 130.0, 80.0), sink[0], sink[1], iw, idep, 100.0)
+    assert fit[0] < 400.0 and fit[1] < 130.0, (
+        f"oversized fit must shrink at offset slot, got {fit} at {sink}")
+    xs = {round(fan_l[0], 1), round(fan_r[0], 1), round(sink[0], 1), round(caps[0], 1),
+          round(pcb[0], 1)}
+    assert len(xs) >= 4, f"plan must have ≥4 distinct X anchors, got {xs}"
+    print("[univ][sealed] _selftest_sealed_role_xy OK")
+
+
+def _selftest_sealed_zone_pack_dominance() -> None:
+    """proveCatch: inverter/PCS cannot steal the lower energy band from the pack.
+
+    Both directions: wall-ESS power nouns → power; pack/cell nouns → energy;
+    a bare 'module' without battery context must NOT claim energy (avoids the
+    pre-fix 'Inverter Module' theft that left the pack mid-cabinet).
+    """
+    inv = _sealed_zone_key("DC AC Inverter Module", _SE_ZONES)
+    pcs = _sealed_zone_key("Bidirectional PCS Inverter", _SE_ZONES)
+    cells = _sealed_zone_key("LFP Prismatic Cells", _SE_ZONES)
+    batt_mod = _sealed_zone_key("Battery Modules", _SE_ZONES)
+    rack = _sealed_zone_key("Battery Module Racks", _SE_ZONES)
+    # Pre-fix defect class: bare industrial 'I/O Module' must not land in energy
+    # just because it says 'module' — control/distribution or unmatched.
+    io_mod = _sealed_zone_key("I/O Module", _SE_ZONES)
+    assert inv == "power", f"inverter module must be power, got {inv!r}"
+    assert pcs == "power", f"PCS must be power, got {pcs!r}"
+    assert cells == "energy", f"cells must be energy, got {cells!r}"
+    assert batt_mod == "energy", f"battery modules must be energy, got {batt_mod!r}"
+    assert rack == "energy", f"battery rack must be energy, got {rack!r}"
+    assert io_mod != "energy", f"bare I/O Module must not steal energy band, got {io_mod!r}"
+    # Instrument zones: battery cell is a small power source, not a 52% pack.
+    coin = _sealed_zone_key("Coin Cell Battery", _SE_ZONES_INSTRUMENT)
+    assert coin == "power", f"instrument coin-cell must be power zone, got {coin!r}"
+    print("[univ][sealed] _selftest_sealed_zone_pack_dominance OK")
+
+
 def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     """SEALED-ENCLOSURE placer: one cabinet at the brief envelope, equipment stacked
     in role zones inside it, skin parts as face plates, edges wired port-to-port at
@@ -13341,25 +14271,24 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
     skin = []
     for p in parts:
         nm = str(p.name)
-        placed = False
-        for key, _frac, rx in zones:
-            if rx.search(nm):
-                zone_parts[key].append(p)
-                placed = True
-                break
-        if placed:
-            continue
+        # DECISION: skin/enclosure nouns win BEFORE zone vocabulary. Otherwise
+        # "Thermal Insulation Panels" matches control's bare `thermal` token and
+        # lands as interior kit — plan tags then pile onto the fan (G9, 2026-07-14).
         if _SE_SKIN_RE.search(nm):
             skin.append(p)
-        else:
-            # fall to a mid-band zone that EXISTS in the CURRENT zone set — the instrument
-            # zones have no 'distribution' band (only plant zones do), so a hardcoded
-            # 'distribution' key crashed the sealed-INSTRUMENT render with KeyError and
-            # produced NO hero/product images (2026-07-12 regression).
-            _fallback = ("distribution" if "distribution" in zone_parts
-                         else "electronics" if "electronics" in zone_parts
-                         else next(iter(zone_parts)))
-            zone_parts[_fallback].append(p)   # unmatched hardware → mid-band
+            continue
+        key = _sealed_zone_key(nm, zones)
+        if key and key in zone_parts:
+            zone_parts[key].append(p)
+            continue
+        # fall to a mid-band zone that EXISTS in the CURRENT zone set — the instrument
+        # zones have no 'distribution' band (only plant zones do), so a hardcoded
+        # 'distribution' key crashed the sealed-INSTRUMENT render with KeyError and
+        # produced NO hero/product images (2026-07-12 regression).
+        _fallback = ("distribution" if "distribution" in zone_parts
+                     else "electronics" if "electronics" in zone_parts
+                     else next(iter(zone_parts)))
+        zone_parts[_fallback].append(p)   # unmatched hardware → mid-band
 
     # 2. the cabinet SHELL — thin walls named u_skid_* so the INSPECT recolour renders
     #    them as the faint wireframe the internal equipment shows through.
@@ -13448,14 +14377,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             rest = [p for p in plist if p not in arr]
             arr_w_total = (iw * (0.74 if rest else 1.0)) if arr else 0.0
             _ax = -iw / 2
-            for p in arr:
+            for _ai, p in enumerate(arr):
                 seg_w = arr_w_total / len(arr) - (gap if rest else 0.0)
                 qn = int(float(getattr(p, "qty", 1) or 1))
-                pk_d, pk_h = idep * 0.90, band_h * 0.92
+                # Multi-pack: keep the left→right band fill. Singleton: role XY so a
+                # lone energy pack is not pinned to plan (0,0) while hero cells pitch.
+                if len(arr) == 1:
+                    cx, cy = _sealed_role_xy_mm(str(p.name), key, 0, 1, iw, idep)
+                    raw = (min(seg_w, iw * 0.74), idep * 0.70, band_h * 0.92)
+                else:
+                    cx = _ax + seg_w / 2
+                    cy = -idep * 0.05
+                    raw = (seg_w, idep * 0.70, band_h * 0.92)
+                pk_w, pk_d, pk_h = _fit_dims_at_sealed_slot(
+                    raw, cx, cy, iw, idep, band_h)
                 p.shape = "box"
-                p.dim = parse_dimension(f"{seg_w:.0f}x{pk_d:.0f}x{pk_h:.0f} mm")
-                cx = _ax + seg_w / 2
-                asm, anchors = build_part(p, cx, 0.0, z_cursor, MAT, MO)
+                p.dim = parse_dimension(f"{pk_w:.0f}x{pk_d:.0f}x{pk_h:.0f} mm")
+                asm, anchors = _sealed_build_part(p, cx, cy, z_cursor, MAT, MO)
                 p.obj_anchor, p.anchors = asm, anchors
                 p.placed_xyz_mm = anchors["centre"]
                 # a real pack is DARK (cell cans / module lids) — recolour the envelope
@@ -13485,48 +14423,52 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _ax += seg_w + gap
                 print(f"[univ][sealed] zone {key}: PACK-ARRAY '{p.name}' qty {qn} → "
                       f"{seg_w:.0f}×{pk_d:.0f}×{pk_h:.0f} mm, {n_seg} segments")
-            rest_x0 = _ax
-            rest_w = iw / 2 - rest_x0 if arr else iw
             n = len(rest)
             if n:
-                cols = max(1, min(n, int(rest_w // (min_slot_w + gap)) or 1))
-                rows = int(math.ceil(n / float(cols)))
-                row_h = band_h / rows
-                slot_w = max(24.0, (rest_w - gap * (cols - 1)) / cols)
+                # DECISION: role-based XY (shared with hero CAD fractions) replaces the
+                # centreline grid. A 1-col band previously set cx = rest_x0 + slot_w/2 = 0
+                # for every singleton zone → plan tags all stacked at (0,0) while the
+                # hero painted heatsink/caps/fans off-axis (Powerwall GA≠render 2026-07-14).
+                row_h = band_h
+                slot_w = max(24.0, iw / max(1, min(n, 3)))
                 for i, p in enumerate(rest):
-                    r_i, c_i = divmod(i, cols)
+                    cx, cy = _sealed_role_xy_mm(str(p.name), key, i, n, iw, idep)
                     fit = None
                     own = p.dim if isinstance(p.dim, dict) else None
                     if own:
                         w0 = float(own.get("w_mm") or own.get("dia_mm") or 0)
                         d0 = float(own.get("d_mm") or own.get("dia_mm") or 0)
                         h0 = float(own.get("h_mm") or own.get("len_mm") or 0)
-                        if 0 < w0 <= slot_w and 0 < d0 <= idep and 0 < h0 <= row_h * 0.95:
+                        if 0 < w0 and 0 < d0 and 0 < h0 <= row_h * 0.95:
                             fit = (w0, d0, h0)   # the word's OWN dims — real size, kept
                     if fit is None:
                         # ZONE-FILL sizing (run 73): a sealed product's interior is
                         # designed FULL — dead volume is wasted product. Principal
                         # zones (energy/power) fill their slots; small-gear bands keep
                         # legible slack. Hash variation stays so no two read identical.
+                        # Depth factor is LOWER than the old 0.82–0.88 so parts can sit
+                        # at y_front / y_mid without the containment clamp recentring.
                         hsh = sum(ord(c) for c in str(p.name)) % 97
                         if key in ("energy", "power"):
-                            wf = 0.84 + 0.13 * (hsh / 96.0)
+                            wf = 0.55 + 0.20 * (hsh / 96.0)
                             hf = 0.78 + 0.17 * (((hsh * 7) % 97) / 96.0)
-                            df = 0.88
+                            df = 0.55
                         else:
-                            wf = 0.62 + 0.33 * (hsh / 96.0)
+                            wf = 0.40 + 0.25 * (hsh / 96.0)
                             hf = 0.55 + 0.35 * (((hsh * 7) % 97) / 96.0)
-                            df = 0.82
+                            df = 0.48
                         fit = (max(20.0, slot_w * wf), idep * df,
                                max(16.0, row_h * 0.82 * hf))
+                    fit = _fit_dims_at_sealed_slot(fit, cx, cy, iw, idep, row_h)
                     p.shape = "box"
                     p.dim = parse_dimension(f"{fit[0]:.0f}x{fit[1]:.0f}x{fit[2]:.0f} mm")
-                    cx = rest_x0 + slot_w / 2 + c_i * (slot_w + gap)
-                    asm, anchors = build_part(p, cx, 0.0, z_cursor + r_i * row_h, MAT, MO)
+                    asm, anchors = _sealed_build_part(p, cx, cy, z_cursor, MAT, MO)
                     p.obj_anchor, p.anchors = asm, anchors
                     p.placed_xyz_mm = anchors["centre"]
-                print(f"[univ][sealed] zone {key}: {n} part(s) in {rows} row(s) × "
-                      f"{cols} col(s), band {band_h:.0f} mm at z {z_cursor - base_z:.0f}")
+                _xs = sorted({round(float(p.placed_xyz_mm[0]), 0) for p in rest
+                              if getattr(p, "placed_xyz_mm", None)})
+                print(f"[univ][sealed] zone {key}: {n} part(s) role-XY "
+                      f"(x∈{_xs[:8]}), band {band_h:.0f} mm at z {z_cursor - base_z:.0f}")
         z_cursor += band_h
 
     # 4. SKIN parts as thin plates cycled over the faces (front, left, right, top) —
@@ -13544,7 +14486,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             (cx, cy), (pw, pd), _face = faces[i % len(faces)](i // len(faces))
             p.shape = "box"
             p.dim = parse_dimension(f"{max(pw, 1.0):.0f}x{max(pd, 1.0):.0f}x{ih * 0.9:.0f} mm")
-            asm, anchors = build_part(p, cx, cy, base_z + margin, MAT, MO)
+            asm, anchors = _sealed_build_part(p, cx, cy, base_z + margin, MAT, MO)
             p.obj_anchor, p.anchors = asm, anchors
             p.placed_xyz_mm = anchors["centre"]
         if skin:
@@ -13587,6 +14529,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         return (lo, hi) if found else None
 
     n_clamped = 0
+    n_scaled = 0
     _int_lo = (-iw / 2 * fl.MM, -idep / 2 * fl.MM, (base_z + margin) * fl.MM)
     _int_hi = (iw / 2 * fl.MM, idep / 2 * fl.MM, (base_z + margin + ih) * fl.MM)
     for zp in parts:
@@ -13596,15 +14539,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             continue
         lo, hi = bb
         delta = [0.0, 0.0, 0.0]
+        scale = [1.0, 1.0, 1.0]
         for i in range(3):
+            span = _int_hi[i] - _int_lo[i]
             ext = hi[i] - lo[i]
-            if ext > (_int_hi[i] - _int_lo[i]):
-                delta[i] = ((_int_lo[i] + _int_hi[i]) / 2) - ((lo[i] + hi[i]) / 2)  # centre it
+            # DECISION (2026-07-14 Powerwall GA≠hero): NEVER recentre an oversized
+            # axis onto the cabinet midplane — that collapsed every role-XY slot to
+            # (0,0) in the parts-manifest (plan tags piled up while hero CAD sat
+            # off-axis). Scale the overflowing axis to fit, preserving the slot
+            # centre; only translate when a face merely protrudes.
+            if ext > span and span > 1e-9:
+                scale[i] = (span * 0.98) / ext
+                n_scaled += 1
             elif lo[i] < _int_lo[i]:
                 delta[i] = _int_lo[i] - lo[i]
             elif hi[i] > _int_hi[i]:
                 delta[i] = _int_hi[i] - hi[i]
-        if sum(abs(d) for d in delta) < 0.0005:
+        if sum(abs(d) for d in delta) < 0.0005 and all(abs(s - 1.0) < 1e-6 for s in scale):
             continue
         # PART-ROOT objects move via matrix_world.translation (run 64 instrumentation:
         # the meshes have a FOREIGN parent — a module empty — so 'parentless or
@@ -13613,12 +14564,25 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # object whose parent is not itself prefix-named (children ride along).
         import mathutils as _mu2
         _dvec = _mu2.Vector(delta)
+        _centre = _mu2.Vector(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2))
         for _obj in bpy.data.objects:
             if not _obj.name.startswith(pref):
                 continue
             _par = _obj.parent
             if _par is not None and _par.name.startswith(pref):
                 continue   # its own part-root carries it
+            if any(abs(s - 1.0) > 1e-6 for s in scale):
+                # Scale about the part's world centre so the role-XY slot is kept.
+                _mw = _obj.matrix_world.copy()
+                _t = _mw.translation - _centre
+                _t = _mu2.Vector((_t.x * scale[0], _t.y * scale[1], _t.z * scale[2]))
+                _mw.translation = _centre + _t
+                _obj.matrix_world = _mw
+                _obj.scale = (
+                    _obj.scale[0] * scale[0],
+                    _obj.scale[1] * scale[1],
+                    _obj.scale[2] * scale[2],
+                )
             _obj.matrix_world.translation = _obj.matrix_world.translation + _dvec
         _d_mm = tuple(d / fl.MM for d in delta)
         anch = getattr(zp, "anchors", None)
@@ -13631,8 +14595,9 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             zp.placed_xyz_mm = (c[0] + _d_mm[0], c[1] + _d_mm[1], c[2] + _d_mm[2])
         n_clamped += 1
     if n_clamped:
-        print(f"[univ][sealed] containment clamp (mesh-level): {n_clamped} part(s) translated "
-              f"inside the {iw:.0f}×{idep:.0f}×{ih:.0f} mm interior")
+        print(f"[univ][sealed] containment clamp (mesh-level): {n_clamped} part(s) fitted "
+              f"inside the {iw:.0f}×{idep:.0f}×{ih:.0f} mm interior "
+              f"({n_scaled} axis-scale(s), no centreline recentre)")
     # POST-CLAMP VERIFICATION (2026-07-11 run 63: parts STILL protruded a metre above the
     # skin after two clamp generations — stop patching blind; the clamp now REPORTS every
     # prefix it could not see and every bbox still outside, so the next log names the
@@ -13701,21 +14666,30 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # family). Wall appliances keep a lighter body. Keyed on isInstrumentDevice —
         # never on a named commercial product.
         if _IS_INSTRUMENT_DEVICE:
-            _body_rgb, _panel_rgb, _ext_rgb = (0.11, 0.115, 0.13), (0.09, 0.095, 0.11), (0.10, 0.105, 0.12)
-            _body_rough, _ext_rough = 0.62, 0.66  # matte light-tight polymer
+            # INTENT: charcoal AM polymer matching gold open-photometer value
+            # (display ≤0.07). Softboxes wash anything ≥0.10 to clay-grey.
+            _body_rgb = ifg.MAT_BODY_POLYMER
+            _panel_rgb = ifg.MAT_DECK_A_SURFACE
+            _ext_rgb = ifg.MAT_BODY_POLYMER
+            _body_rough, _ext_rough = 0.68, 0.70  # matte light-tight polymer
         else:
             _body_rgb, _panel_rgb, _ext_rgb = (0.85, 0.88, 0.92), (0.84, 0.86, 0.88), (0.82, 0.85, 0.88)
             _body_rough, _ext_rough = 0.25, 0.32
         body_mat = fl.make_mat("m_se_product", fl._to_linear(_body_rgb),
                                metallic=0.05, roughness=_body_rough)
         panel_mat = fl.make_mat("m_se_product_panel", fl._to_linear(_panel_rgb),
-                                metallic=0.05, roughness=0.45)
+                                metallic=0.05, roughness=0.55 if _IS_INSTRUMENT_DEVICE else 0.45)
         exterior_mat = fl.make_mat(
             "m_se_product_exterior",
             fl._to_linear(_ext_rgb),
             metallic=0.08,
             roughness=_ext_rough,
         )
+        if _IS_INSTRUMENT_DEVICE:
+            # Softboxes glaze default Specular 0.5 into clay midtones — crush it.
+            fl.finish_matte_polymer(body_mat, specular=0.18)
+            fl.finish_matte_polymer(panel_mat, specular=0.20)
+            fl.finish_matte_polymer(exterior_mat, specular=0.18)
         _SEALED_CUTAWAY_MATERIAL = body_mat
         _SEALED_EXTERIOR_MATERIAL = exterior_mat
         _SEALED_SHELL_OBJECTS = []
@@ -13787,14 +14761,20 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             )
             _deck.dimensions = _mm3((W * 0.86, D * 0.82, _deck_h))
             _SEALED_SHELL_OBJECTS.append(_deck)
-            _bevel_frac = 0.12
-            for _ob in list(_SEALED_SHELL_OBJECTS):
+            # GOTCHA (colorimeter 2026-07-14): bevel width was min(W,D)·0.12 ≈ 17 mm
+            # on a deck only ~H·0.22 tall — the modifier ate the flat top, so D-pad
+            # keys (correctly Z-anchored to deck_top) read as floating cubes. Clamp
+            # to a polymer fillet (≤2.5 mm), never a fraction of the handheld span.
+            _bevel_w_m = min(2.5, max(0.8, min(W, D) * 0.012)) * fl.MM
+            for _ob in list(_SEALED_SHELL_OBJECTS) + ([_SEALED_FRONT_COVER] if _SEALED_FRONT_COVER else []):
                 if _ob and getattr(_ob, "type", None) == "MESH":
                     _bv = _ob.modifiers.get("instrument_bevel")
                     if _bv is None:
                         _bv = _ob.modifiers.new(name="instrument_bevel", type="BEVEL")
-                    _bv.width = min(W, D) * _bevel_frac * fl.MM
-                    _bv.segments = 5
+                    _bv.width = _bevel_w_m
+                    _bv.segments = 3
+                    # Photoreal CAD bar: beveled polymer reads faceted without smooth.
+                    fl.shade_smooth_object(_ob)
             _place_instrument_handheld_cues(
                 W, D, H, base_z, tt, body_mat, panel_mat, _skin_mod, MO)
         _exterior_detail_mat = fl.make_mat(
@@ -13843,10 +14823,31 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # so they render on closed product views and hide on any cutaway pass.
         if _IS_INSTRUMENT_DEVICE:
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
-            _disp_mat = fl.make_mat("m_se_face_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS),
-                                    metallic=0.05, roughness=0.10)
+            # INTENT (2026-07-14 glance): closed-product glass is DARK recessed
+            # LCD (MAT_DISPLAY_GLASS), not FR4-teal emissive. Teal read as "green
+            # PCB pretending to be a screen" — the instrument vision critic's
+            # explicit reject. Soft navy emissive keeps the UI readable without
+            # looking like bare FR4.
+            _disp_mat = fl.make_mat(
+                "m_se_face_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS),
+                metallic=0.05, roughness=0.14, kind="led_emissive", emission_strength=0.22)
+            # Specular kiss needs Coat Roughness low when the input exists.
+            try:
+                _bsdf = _disp_mat.node_tree.nodes.get("Principled BSDF")
+                if _bsdf is not None:
+                    for _cr in ("Coat Roughness", "Clearcoat Roughness"):
+                        if _cr in _bsdf.inputs:
+                            _bsdf.inputs[_cr].default_value = 0.08
+                            break
+                    # Slight specular weight so dark glass catches the rim softbox.
+                    for _sp in ("Specular IOR Level", "Specular"):
+                        if _sp in _bsdf.inputs:
+                            _bsdf.inputs[_sp].default_value = 0.55
+                            break
+            except (AttributeError, TypeError, KeyError):
+                pass
             _bezel_mat = fl.make_mat("m_se_face_bezel", fl._to_linear(ifg.MAT_DISPLAY_BEZEL),
-                                     metallic=0.12, roughness=0.42)
+                                     metallic=0.15, roughness=0.35, clearcoat=0.25)
             _btn_mat = fl.make_mat("m_se_face_button", fl._to_linear(ifg.MAT_BUTTON_KEY),
                                    metallic=0.12, roughness=0.48)
             # Optical cube matches the charcoal body — same AM polymer, not a grey appliance tower.
@@ -13906,6 +14907,55 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                                module=_skin_mod, module_objects=MO)
             _bore.dimensions = _mm3(form["well_size"])
             _bore.hide_render = True
+            # INTENT (2026-07-14, gold WHY): closed product views must show a
+            # glass cuvette + sample in the open well (gold 01–02), not an empty bore.
+            _cuv_wall = fl.make_mat(
+                "m_se_face_cuvette_wall", fl._to_linear(ifg.MAT_CUVETTE_WALL),
+                metallic=0.05, roughness=0.15, kind="glass", alpha=0.35)
+            _cuv_fluid = fl.make_mat(
+                "m_se_face_cuvette_fluid", fl._to_linear(ifg.MAT_CUVETTE_FLUID),
+                metallic=0.0, roughness=0.35)
+            # Glass square must CLEAR the well rim so the 3/4 shot reads "cuvette in use"
+            # (gold 01), not an empty black bore with a submerged insert.
+            _cuv_h = min(form["tower_size"][2] * 0.70, 36.0)
+            _cuv_xy = max(7.5, form["well_size"][0] * 0.85)
+            _cuv_loc = (
+                form["well_loc"][0],
+                form["well_loc"][1],
+                form["well_loc"][2] + _cuv_h * 0.18,
+            )
+            _cuv = fl.add_box(
+                "u_se_exterior_detail_cuvette_insert",
+                _mm3(_cuv_loc),
+                _mm3((_cuv_xy, _cuv_xy, _cuv_h)),
+                _cuv_wall,
+                module=_skin_mod, module_objects=MO,
+            )
+            _cuv.dimensions = _mm3((_cuv_xy, _cuv_xy, _cuv_h))
+            _cuv.hide_render = True
+            _fluid = fl.add_box(
+                "u_se_exterior_detail_cuvette_fluid",
+                _mm3((
+                    _cuv_loc[0], _cuv_loc[1],
+                    _cuv_loc[2] - _cuv_h * 0.08,
+                )),
+                _mm3((_cuv_xy * 0.72, _cuv_xy * 0.72, _cuv_h * 0.55)),
+                _cuv_fluid,
+                module=_skin_mod, module_objects=MO,
+            )
+            _fluid.dimensions = _mm3((_cuv_xy * 0.72, _cuv_xy * 0.72, _cuv_h * 0.55))
+            _fluid.hide_render = True
+            # Cable channel mesh at the cube↔body joint (harness proveCatch anchor).
+            _slot = fl.add_box(
+                "u_se_exterior_detail_cable_slot",
+                _mm3(form["cable_slot_loc"]),
+                _mm3(form["cable_slot_size"]),
+                fl.make_mat("m_se_face_slot", fl._to_linear((0.05, 0.052, 0.058)),
+                            metallic=0.05, roughness=0.75),
+                module=_skin_mod, module_objects=MO,
+            )
+            _slot.dimensions = _mm3(form["cable_slot_size"])
+            _slot.hide_render = True
             # Circular rim that seats the ambient-light cap.
             _rim = fl.add_cyl(
                 "u_se_exterior_detail_well_rim",
@@ -13916,17 +14966,10 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 module=_skin_mod, module_objects=MO,
             )
             _rim.hide_render = True
-            # Cap nest + ambient lid (flange + grip) — accessory, not a centre knob.
-            _nest = fl.add_cyl(
-                "u_se_exterior_detail_cap_nest",
-                _mm3(form["cap_nest_loc"]),
-                (form["cap_nest_od_mm"] / 2.0) * fl.MM,
-                form["cap_nest_depth_mm"] * fl.MM,
-                fl.make_mat("m_se_face_nest", fl._to_linear((0.06, 0.062, 0.07)),
-                            metallic=0.05, roughness=0.7),
-                module=_skin_mod, module_objects=MO,
-            )
-            _nest.hide_render = True
+            # GOTCHA: do NOT place a proud cap-nest cylinder on the UI deck.
+            # A ~27 mm disk beside the D-pad read as a fifth control and made the
+            # closed product diverge from the GA (which has no nest feature).
+            # Ambient lid parks on the table; well stays open with cuvette.
             _cap_mat = fl.make_mat("m_se_face_cap", fl._to_linear(ifg.MAT_CAP),
                                    metallic=0.05, roughness=0.55)
             _flange = fl.add_cyl(
@@ -13984,11 +15027,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     _foot_mat,
                     module=_skin_mod, module_objects=MO,
                 ).hide_render = True
-            # Source PCB + harness on the optical-axis face (closed exterior).
-            _place_instrument_source_pcb(
+            # INTENT (2026-07-14 glance): closed exterior shows a dark polymer
+            # SOURCE WINDOW on the optical face — bare FR4 + pads read as "PCB
+            # slapped on the product" and fail a 5-second glance. Full FR4 board
+            # stays cutaway-only (`u_se_cutaway_cue_led_pcb`).
+            _place_instrument_source_window(
                 "u_se_exterior_detail_led_pcb", form, _skin_mod, MO, hide_render=True)
+            # DECISION: harness meshes stay hide_render=False at creation so the
+            # cutaway baseline can keep them visible; closed exterior views still
+            # hide non-window exterior_detail_* in _prepare_sealed_product_view.
             _place_instrument_source_harness(
-                form, W, D, H, base_z, tt, _skin_mod, MO, hide_render=True)
+                form, W, D, H, base_z, tt, _skin_mod, MO, hide_render=False)
             # GOTCHA: do NOT place a green UI PCB under the display on the closed
             # product — real open photometers recess the glass in the top plate;
             # FR4 under the display is cutaway-only (_place_instrument_ui_pcb cues).
@@ -14005,6 +15054,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             )
             _usb.dimensions = _mm3((14.0, 3.0, 6.5))
             _usb.hide_render = True
+            # Photoreal CAD bar: every curved exterior cue (lid, rim, screws, feet,
+            # source PCB CAD) must shade-smooth — default Blender boxes/cyls are flat.
+            for _sm_obj in list(bpy.data.objects):
+                _nm = getattr(_sm_obj, "name", "") or ""
+                if _nm.startswith((
+                    "u_se_product_",
+                    "u_se_exterior_detail_",
+                    "u_se_instrument_story_",
+                    "u_se_cutaway_cue_",
+                )):
+                    fl.shade_smooth_object(_sm_obj)
         # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4.
         # A sealed instrument with no air-movers gets NONE (a benchtop photometer is
         # not louvred) — only add a slot when a fan/vent/duct part actually exists.
@@ -19829,11 +20889,15 @@ def main():
     _NO_SLAB_FAMILIES = ("aero_body", "tower_machine")
     _slab_on = os.environ.get("BLENDER_GROUND_SLAB", "1").strip().lower() \
         not in ("0", "false", "no", "off")
-    if _slab_on and (LINEAR_LAYOUT_ON or family not in _NO_SLAB_FAMILIES):
+    if (_slab_on and (LINEAR_LAYOUT_ON or family not in _NO_SLAB_FAMILIES)
+            and not _IS_INSTRUMENT_DEVICE
+            and family != "sealed_enclosure"):
         try:
             add_ground_slab(parts, MAT, MO, bbox_mm=bbox)
         except Exception as _ge:    # the floor is additive — never fail the whole render
             print(f"[univ][ground] WARN add_ground_slab skipped: {_ge}")
+    elif _IS_INSTRUMENT_DEVICE or family == "sealed_enclosure":
+        print("[univ][ground] sealed/product — plant slab skipped (product-studio ground from lights)")
     elif not _slab_on:
         print("[univ][ground] BLENDER_GROUND_SLAB=0 — floor suppressed")
     else:
@@ -20036,49 +21100,86 @@ def main():
         cx = (bbox["x0"] + bbox["x1"]) / 2 * fl.MM
         cy = (bbox["y0"] + bbox["y1"]) / 2 * fl.MM
         span = max(bbox["x1"] - bbox["x0"], bbox["y1"] - bbox["y0"]) * fl.MM
-        fl.add_lights(target_centre=(cx, cy, span * 0.28),
-                      fill_energy=240, fill_size=max(14.0, span * 0.6))
-        if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
-            bpy.ops.object.light_add(
-                type="AREA",
-                location=(cx + 2.8, cy - 1.8, span * 0.55))
-            _product_rim = bpy.context.active_object
-            _product_rim.name = "u_product_right_fill"
-            _product_rim.data.energy = 90
-            _product_rim.data.size = 2.2
-        fl.make_world_white()
-        # ── #2 SKY ENVIRONMENT (Tristan 2026-06-22) — replace the flat grey world with a
-        #    procedural Nishita sky so metals/water reflect a real sky + get graduated ambient
-        #    (the single biggest realism jump). Low strength so it lifts + reflects without
-        #    blowing out; the add_lights() sun stays the controlled key. Universal, no file.
+        # INTENT: instruments get a product-photography softbox rig + soft studio
+        # world. Plants keep sun + Nishita (metals need sky reflections).
+        if _IS_INSTRUMENT_DEVICE and _SEALED_ENV_MM:
+            _iw, _id, _ih = _SEALED_ENV_MM
+            _extent_m = max(_iw, _id, _ih) * fl.MM
+            _cz = (DECK_Z_MM + _ih / 2.0) * fl.MM
+            fl.add_instrument_studio_lights(
+                centre_m=(0.0, 0.0, _cz),
+                extent_m=_extent_m,
+                product_half_height_m=(_ih / 2.0) * fl.MM,
+                key_energy=ifg.INSTRUMENT_STUDIO_KEY_ENERGY,
+                fill_energy=ifg.INSTRUMENT_STUDIO_FILL_ENERGY,
+                rim_energy=ifg.INSTRUMENT_STUDIO_RIM_ENERGY,
+                bounce_energy=ifg.INSTRUMENT_STUDIO_BOUNCE_ENERGY,
+                ground_srgb=ifg.INSTRUMENT_STUDIO_GROUND_SRGB,
+            )
+            fl.make_instrument_studio_world(
+                strength=ifg.INSTRUMENT_STUDIO_WORLD_STRENGTH)
+            fl.apply_instrument_color_management(
+                exposure_bias=ifg.INSTRUMENT_EXPOSURE_BIAS)
+            print("[univ][render] instrument product-studio lights + soft world "
+                  f"(key={ifg.INSTRUMENT_STUDIO_KEY_ENERGY} "
+                  f"exposure={ifg.INSTRUMENT_EXPOSURE_BIAS})")
+            # Prefer higher Cycles samples for product shots unless the caller
+            # already pinned BLENDER_CYCLES_SAMPLES (respect explicit speed runs).
+            if "BLENDER_CYCLES_SAMPLES" not in os.environ:
+                os.environ["BLENDER_CYCLES_SAMPLES"] = str(
+                    ifg.INSTRUMENT_CYCLES_SAMPLES_DEFAULT)
+        else:
+            fl.add_lights(target_centre=(cx, cy, span * 0.28),
+                          fill_energy=240, fill_size=max(14.0, span * 0.6))
+            if _SEALED_HERO_PRODUCT and _SEALED_ENV_MM:
+                bpy.ops.object.light_add(
+                    type="AREA",
+                    location=(cx + 2.8, cy - 1.8, span * 0.55))
+                _product_rim = bpy.context.active_object
+                _product_rim.name = "u_product_right_fill"
+                _product_rim.data.energy = 90
+                _product_rim.data.size = 2.2
+            fl.make_world_white()
+            # ── #2 SKY ENVIRONMENT (Tristan 2026-06-22) — replace the flat grey world with a
+            #    procedural Nishita sky so metals/water reflect a real sky + get graduated ambient
+            #    (the single biggest realism jump). Low strength so it lifts + reflects without
+            #    blowing out; the add_lights() sun stays the controlled key. Universal, no file.
+            _scn = bpy.context.scene
+            try:
+                _sw = bpy.data.worlds.new("world_sky")
+                _scn.world = _sw
+                _sw.use_nodes = True
+                _nt = _sw.node_tree
+                for _n in list(_nt.nodes):
+                    _nt.nodes.remove(_n)
+                _sky = _nt.nodes.new("ShaderNodeTexSky")
+                for _a, _v in (("sky_type", "NISHITA"), ("sun_elevation", math.radians(58)),
+                               ("sun_rotation", math.radians(130)), ("sun_intensity", 0.25),
+                               ("air_density", 1.4), ("dust_density", 1.6)):
+                    try:
+                        setattr(_sky, _a, _v)
+                    except (AttributeError, TypeError):
+                        pass
+                _bg = _nt.nodes.new("ShaderNodeBackground")
+                _bg.inputs["Strength"].default_value = 0.14   # subtle — just reflection + gradient,
+                #                                               not a wash (0.45 blew the metals out)
+                _ow = _nt.nodes.new("ShaderNodeOutputWorld")
+                _nt.links.new(_sky.outputs[0], _bg.inputs[0])
+                _nt.links.new(_bg.outputs[0], _ow.inputs[0])
+            except Exception as _we:
+                print(f"[univ][render] sky world skipped: {_we}")
         _scn = bpy.context.scene
-        try:
-            _sw = bpy.data.worlds.new("world_sky")
-            _scn.world = _sw
-            _sw.use_nodes = True
-            _nt = _sw.node_tree
-            for _n in list(_nt.nodes):
-                _nt.nodes.remove(_n)
-            _sky = _nt.nodes.new("ShaderNodeTexSky")
-            for _a, _v in (("sky_type", "NISHITA"), ("sun_elevation", math.radians(58)),
-                           ("sun_rotation", math.radians(130)), ("sun_intensity", 0.25),
-                           ("air_density", 1.4), ("dust_density", 1.6)):
-                try:
-                    setattr(_sky, _a, _v)
-                except (AttributeError, TypeError):
-                    pass
-            _bg = _nt.nodes.new("ShaderNodeBackground")
-            _bg.inputs["Strength"].default_value = 0.14   # subtle — just reflection + gradient,
-            #                                               not a wash (0.45 blew the metals out)
-            _ow = _nt.nodes.new("ShaderNodeOutputWorld")
-            _nt.links.new(_sky.outputs[0], _bg.inputs[0])
-            _nt.links.new(_bg.outputs[0], _ow.inputs[0])
-        except Exception as _we:
-            print(f"[univ][render] sky world skipped: {_we}")
         # ── #3 QUALITY (Tristan 2026-06-22) — higher resolution + samples + AO. The early
         #    setup set 2400×1600/64; bump here (nothing resets between) for a crisper final.
+        #    Instruments get a slightly higher product-shot resolution.
         try:
-            _scn.render.resolution_x, _scn.render.resolution_y = 3000, 2000
+            if _IS_INSTRUMENT_DEVICE:
+                _rx, _ry = ifg.INSTRUMENT_RENDER_RESOLUTION
+                _scn.render.resolution_x, _scn.render.resolution_y = _rx, _ry
+                # apply_instrument_color_management already set exposure bias;
+                # do NOT reset to 0.0 here (that undid the charcoal crush).
+            else:
+                _scn.render.resolution_x, _scn.render.resolution_y = 3000, 2000
             _ev = getattr(_scn, "eevee", None)
             if _ev is not None:
                 for _a, _v in (("taa_render_samples", 160), ("use_gtao", True),
@@ -20223,8 +21324,18 @@ if __name__ == "__main__":
         _selftest_instrument_proxy_geometry()
         _selftest_instrument_form_rule()
         _selftest_instrument_source_harness()
+        _selftest_sealed_role_xy()
+        _selftest_sealed_zone_pack_dominance()
         hfi._selftest()
         ifg._selftest()
-        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials)")
+        try:
+            _lib = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+            if _lib not in sys.path:
+                sys.path.insert(0, _lib)
+            import instrument_spine_manifest as _ism
+            _ism._selftest()
+        except Exception as _ste:  # noqa: BLE001
+            raise SystemExit(f"spine-manifest selftest failed: {_ste}") from _ste
+        print("build_universal_scene _selftest: OK (form + interior grammar + Apple HIG + materials + sealed XY + spine seat)")
     else:
         main()

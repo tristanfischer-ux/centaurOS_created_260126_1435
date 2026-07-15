@@ -317,9 +317,16 @@ const stepCoolProp: ToolStep = {
     // falls back to 20 kW (typical 2% loss at 1 MW). £180/kW installed
     // for an R290 pumped-loop CDU sized to remove 30-40 kW continuous.
     // Build #18r-fix1: read from contract (engineering_contract emits both)
+    // GOTCHA (Powerwall 2026-07-15): after pybamm, system_thermal_dissipation_kw
+    // is ALREADY cell+inverter. Using it as "cell" here double-counted inverter.
+    // Prefer cell_heat_generation_kw; fall back to system only when cell is absent.
     const inverterDissKw = (c.quantities?.inverter_dissipated_kw?.value as number) ?? 20
-    const cellDissipationKw = (c.quantities?.system_thermal_dissipation_kw?.value as number) ?? 4
-    const totalSystemDissKw = inverterDissKw + cellDissipationKw
+    const cellDissipationKw = (typeof c.quantities?.cell_heat_generation_kw?.value === 'number')
+      ? (c.quantities.cell_heat_generation_kw.value as number)
+      : ((c.quantities?.system_thermal_dissipation_kw?.value as number) ?? 4)
+    const totalSystemDissKw = (typeof c.quantities?.cell_heat_generation_kw?.value === 'number')
+      ? (inverterDissKw + cellDissipationKw)
+      : cellDissipationKw  // system already includes inverter when cell_heat absent
     const requiredCoolingKw = totalSystemDissKw * 1.25  // single safety factor (cells already get × 1.25 in pybamm output)
     const coolingPricePerKw = 180
     // Defensive: cp_liquid may be null if the fluid is unsupported.
@@ -415,6 +422,14 @@ const stepNgspice: ToolStep = {
       total_gbp: pcsBasePerKw * ratedKw,
       source_detail: `ngspice-derived: £${pcsBasePerKw}/kW × ${ratedKw} kW = £${(pcsBasePerKw * ratedKw).toLocaleString()} (SiC two-level, η=${out.inverter_efficiency_pct.toFixed(1)}% from SPICE-level simulation)`,
     }
+    // GOTCHA (Powerwall 2026-07-15): pybamm step ENFORCES
+    // system_thermal_dissipation_kw = cell_heat + inverter_dissipated_kw. Writing a
+    // new inverter_dissipated_kw here without recomputing system left Verification
+    // with cell 0.06 + inv 0.17 ≠ system 0.2808 (stale pre-ngspice inverter).
+    const cellHeatKw = (typeof c.quantities?.cell_heat_generation_kw?.value === 'number')
+      ? (c.quantities.cell_heat_generation_kw.value as number)
+      : 0
+    const systemThermalKw = cellHeatKw + out.dissipated_power_kw
     return {
       ...c,
       macro_assembly_prices: [
@@ -424,6 +439,25 @@ const stepNgspice: ToolStep = {
       quantities: backfillToolCitations({
         ...c.quantities,
         inverter_dissipated_kw: { value: out.dissipated_power_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'full load', provenance: prov('dissipated_power_kw') },
+        // Re-close the thermal invariant whenever inverter dissipation changes.
+        system_thermal_dissipation_kw: {
+          value: systemThermalKw, unit: 'kW', family: 'power', basis: 'continuous',
+          scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null,
+          condition: 'ENFORCED: cell_heat_generation_kw + inverter_dissipated_kw (recomputed after ngspice)',
+          provenance: prov('dissipated_power_kw'),
+        },
+        thermal_rejection_capacity_kw: {
+          value: systemThermalKw * 1.5, unit: 'kW', family: 'power', basis: 'min',
+          scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null,
+          condition: 'system_thermal_dissipation_kw × 1.5 after ngspice inverter update',
+          provenance: prov('dissipated_power_kw'),
+        },
+        thermal_rejection_min_kw: {
+          value: systemThermalKw * 1.25, unit: 'kW', family: 'power', basis: 'min',
+          scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null,
+          condition: 'system_thermal_dissipation_kw × 1.25 after ngspice inverter update',
+          provenance: prov('dissipated_power_kw'),
+        },
         inverter_efficiency_pct: { value: out.inverter_efficiency_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0.5, temporal_resolution_s: null, condition: 'A2/W35', provenance: prov('inverter_efficiency_pct') },
         ac_continuous_current_a: { value: out.ac_continuous_current_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'AC PCS output', provenance: prov('ac_continuous_current_a') },
         dc_continuous_current_a: { value: out.dc_continuous_current_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'DC bus to PCS', provenance: prov('dc_continuous_current_a') },

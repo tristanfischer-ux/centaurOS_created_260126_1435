@@ -110,6 +110,20 @@ const ARCH_CONSUMER_HIGH_VOLUME_ELECTRONICS: CostStackRatios = {
   notes: 'Consumer high-volume electronics archetype (SMT-dominated, retail).',
 }
 
+// INTENT: Handheld / benchtop lab instruments (colorimeter, photometer, open-hardware
+// meters) are factory-assembled catalogue products sold direct or via light distribution —
+// NEVER site-installed plant. Without this profile, optical_instrument fell through to
+// DEFAULT (ARCH_MID_VOLUME_PROFESSIONAL) and applied a 20% installation markup, turning a
+// £317 materials BoM into an £818 "all-in installed" headline (colorimeter 0819).
+const ARCH_HANDHELD_BENCHTOP_INSTRUMENT: CostStackRatios = {
+  assembly_labour_factor: 0.18,
+  factory_overhead_factor: 0.12,
+  manufacturer_margin_factor: 0.25,
+  channel_markup_factor: 0.15,
+  installation_cost_factor: 0,
+  notes: 'Handheld/benchtop instrument archetype (lab/USB product — no site install).',
+}
+
 const ARCH_CONSUMER_DISPOSABLE_MEDICAL: CostStackRatios = {
   // CGM, insulin pen needle, lateral-flow. High margin, regulated channel.
   assembly_labour_factor: 0.12,
@@ -519,7 +533,19 @@ export const COST_STACK: Record<string, CostStackRatios> = {
 
   // ===== Additional class taxonomy (archetype-mapped starter ratios) =====
   // Energy + storage
-  bess_residential: { ...ARCH_MID_VOLUME_PROFESSIONAL, installation_cost_factor: 0.40, notes: 'Residential BESS — mid-volume, distributor + installer.' },
+  // Calibrated 2026-07-15 (Powerwall): high-volume wall ESS (5k units/yr class) —
+  // tighter labour/overhead/margin than mid-volume professional so an honest
+  // materials BoM can close under a competitive £8.5k ex-works ceiling. Install
+  // stays 40% of channel list (electrician + commissioning).
+  // Multiplier raw→oem ≈ 1.08×1.08×1.14 = 1.330 (was 1.69 under mid-volume pro).
+  bess_residential: {
+    assembly_labour_factor: 0.08,
+    factory_overhead_factor: 0.08,
+    manufacturer_margin_factor: 0.14,
+    channel_markup_factor: 0.12,
+    installation_cost_factor: 0.40,
+    notes: 'Residential wall ESS — high-volume OEM, distributor + installer (ex-works competitive with UK product-only listings).',
+  },
   bess_commercial: { ...ARCH_INDUSTRIAL_HEAVY_EPC, installation_cost_factor: 0.45, notes: 'Commercial BESS — direct + EPC install.' },
   pv_microinverter: { ...ARCH_PV_STRING_INVERTER, manufacturer_margin_factor: 0.22, notes: 'PV microinverter — commodity inverter.' },
   pv_module: {
@@ -718,6 +744,13 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   // Final fallback when no class matches. Mid-volume professional defaults
   // are the most neutral assumption (avoids over- or under-stating the stack).
   DEFAULT: { ...ARCH_MID_VOLUME_PROFESSIONAL },
+
+  // DECISION: optical_instrument (and aliases) MUST NOT inherit DEFAULT's 20%
+  // installation_cost_factor — a cuvette photometer is not field-erected plant.
+  optical_instrument: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  instrument_device: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  photometer: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  colorimeter: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
 }
 
 // ---------------------------------------------------------------------------
@@ -816,6 +849,11 @@ export function resolveCostStack(state: any, slugHint?: string): { ratios: CostS
   const projectId: string = state?.projectId || ''
   const prefix = projectId.split('-')[0]?.toLowerCase()
   if (prefix && COST_STACK[prefix]) return { ratios: COST_STACK[prefix], class_key: prefix }
+  // GOTCHA: isInstrumentDevice can be true while product_class is an unmapped
+  // slug — still refuse plant install markup. Prefer handheld stack over DEFAULT.
+  if (state?.isInstrumentDevice === true) {
+    return { ratios: ARCH_HANDHELD_BENCHTOP_INSTRUMENT, class_key: 'instrument_device' }
+  }
   // Before the neutral DEFAULT, try an archetype heuristic on the class name so
   // unmapped bespoke PLANTS land on the EPC stack (no distributor channel)
   // rather than the consumer-product mid-volume-professional DEFAULT.
