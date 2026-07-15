@@ -204,15 +204,80 @@ _INSTRUMENT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
+# INTENT (NinjaPCR 2026-07-15): the optical-instrument rubric false-fails a correct
+# PCR thermocycler cutaway (wood box + hinged lid + sample-block wells + PCB) because
+# it demands cuvette/optical-path language. Thermocyclers are a DIFFERENT instrument
+# family — judge them on maker-box PCR cues, never colorimeter cues.
+_THERMOCYCLER_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
+    "BENCHTOP PCR THERMOCYCLER / thermal cycler (e.g. open-source NinjaPCR / OpenPCR "
+    "class — NOT a colorimeter, NOT a wall battery, NOT a plant skid).\n\n"
+    "Expect a laser-cut wood (or wood-tone plate) box with finger-joint / tab cues, a "
+    "hinged lid open tip-back, a dark FIVE-LOBE star pressure knob ON the outer lid "
+    "face (low-poly joined hub+lobes count — not a featureless blank lid, not on the "
+    "floor), an aluminium sample block with PCR-tube wells through the lid opening, "
+    "preferably a metal platen on the lid underside, and on cutaways a PCB + TEC / "
+    "heatsink under the block. Side vent slots showing fins are normal.\n\n"
+    "INTENTIONAL / DO NOT FLAG (correct thermocycler language):\n"
+    "  • open-front cutaway showing PCB + sample block (maker showcase, not a gutted arch)\n"
+    "  • wood / plywood plate aesthetic instead of charcoal polymer\n"
+    "  • green FR4 PCB on the FLOOR of an open cutaway (that is the controller board)\n"
+    "  • a LOW-POLY five-lobe star on the lid made of joined dark boxes/prisms — that IS "
+    "the star knob (do NOT call it floating/exploded debris when it sits on the lid)\n"
+    "  • missing optical cube / cuvette / beam path / parked ambient-light LID — those "
+    "belong to colorimeters, not PCR thermocyclers\n"
+    "  • missing battery pack / inverter / plant pipes\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • open box with EMPTY cavity — no sample block / tube wells visible under the lid\n"
+    "  • closed exterior / product shot that reads as a featureless hollow wood crate "
+    "(no wells through the open lid, no heatsink through side vents, no lid knob)\n"
+    "  • lid knob / star handle sitting on the floor disconnected from the lid\n"
+    "  • open lid with NO dark lobed/star handle on the outer lid face "
+    "(a completely blank lid — a low-poly star of joined lobes is PASS)\n"
+    "  • parts floating OUTSIDE the product envelope (NOT the lid-mounted star)\n"
+    "  • colorimeter optical tower / cuvette well / ambient-light LID wrongly on a PCR box\n"
+    "  • BESS / plant-room language (Mech Plant Rm, rack stacks, industrial EC motors)\n"
+    "  • product cropped so small it is unreadable\n"
+    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
+
+def _load_run_state(image_path: str) -> dict:
+    try:
+        run_dir = os.path.dirname(os.path.abspath(image_path))
+        with open(os.path.join(run_dir, "state.json"), encoding="utf-8") as fh:
+            st = json.load(fh)
+        return st if isinstance(st, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _product_class(image_path: str) -> str:
+    st = _load_run_state(image_path)
+    for src in (
+        (st.get("orchestratorContract") or {}).get("product_class"),
+        (st.get("moduleDecomposition") or {}).get("product_class"),
+        (st.get("parsedBrief") or {}).get("product_class"),
+        (st.get("keyMetrics") or {}).get("product_class"),
+    ):
+        if src:
+            return str(src)
+    return ""
+
+
+def _is_thermocycler_mode(image_path: str) -> bool:
+    """True for PCR / thermocycler class — uses _THERMOCYCLER_PROMPT, not optical rubric."""
+    pc = _product_class(image_path)
+    return bool(re.search(r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr", pc, re.I))
+
 
 def _is_instrument_mode(image_path: str) -> bool:
     """True when the run's state declares a device-scale instrument."""
-    try:
-        run_dir = os.path.dirname(os.path.abspath(image_path))
-        st = json.load(open(os.path.join(run_dir, "state.json")))
-        return bool(st.get("isInstrumentDevice"))
-    except Exception:  # noqa: BLE001
-        return False
+    st = _load_run_state(image_path)
+    return bool(st.get("isInstrumentDevice"))
 
 
 def _is_product_mode(image_path: str) -> bool:
@@ -224,8 +289,7 @@ def _is_product_mode(image_path: str) -> bool:
     if _is_instrument_mode(image_path):
         return False
     try:
-        run_dir = os.path.dirname(os.path.abspath(image_path))
-        st = json.load(open(os.path.join(run_dir, "state.json")))
+        st = _load_run_state(image_path)
         q = ((st.get("orchestratorContract") or {}).get("quantities") or {})
         v = q.get("enclosure_volume_m3")
         val = v.get("value") if isinstance(v, dict) else v
@@ -235,6 +299,9 @@ def _is_product_mode(image_path: str) -> bool:
 
 
 def _prompt_for_image(image_path: str) -> str:
+    # Thermocycler before generic instrument — optical rubric must not judge PCR boxes.
+    if _is_thermocycler_mode(image_path):
+        return _THERMOCYCLER_PROMPT
     if _is_instrument_mode(image_path):
         return _INSTRUMENT_PROMPT
     if _is_product_mode(image_path):
@@ -386,6 +453,15 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
+# INTENT (1808): thermocycler star lives on the tip-back outer lid — clearest on the
+# high product exterior 3/4. Prefer that over the cutaway hero so the critic judges
+# the same face a human SIGHT check uses (00-hero can foreshorten the star).
+_THERMOCYCLER_HERO_CANDIDATES = (
+    "04-product-exterior.png",
+    "00-hero.png",
+    "blender-cover.png",
+    "07-product-service.png",
+)
 
 
 def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
@@ -398,7 +474,18 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     no LLM call, no re-roll. Only an 'ok' prior verdict from the SAME model is reused (a failed/no-key
     prior attempt is not cached as a verdict). Absence of either manifest (geo_hash is None) disables
     caching for that run — correctness over speed when there is nothing stable to key on."""
-    hero = next((os.path.join(run_dir, f) for f in _HERO_CANDIDATES
+    # Probe class from any candidate that exists (state.json lives beside the PNGs).
+    _probe = next(
+        (os.path.join(run_dir, f) for f in (_THERMOCYCLER_HERO_CANDIDATES + _HERO_CANDIDATES)
+         if os.path.exists(os.path.join(run_dir, f))),
+        os.path.join(run_dir, "state.json"),
+    )
+    _cands = (
+        _THERMOCYCLER_HERO_CANDIDATES
+        if _is_thermocycler_mode(_probe)
+        else _HERO_CANDIDATES
+    )
+    hero = next((os.path.join(run_dir, f) for f in _cands
                  if os.path.exists(os.path.join(run_dir, f))), None)
     geo_hash = geometry_hash(run_dir)
     if geo_hash:

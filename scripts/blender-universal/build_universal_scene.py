@@ -15177,18 +15177,19 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _knob_mat = fl.make_mat(
                 "m_se_tc_exterior_knob", fl._to_linear((0.05, 0.05, 0.06)),
                 metallic=0.35, roughness=0.42)
-            # Small hub + five long lobes — hub ≪ tip radius so the star reads
-            # from the high front 3/4 (gold OpenPCR: large black star on outer lid).
-            # Height is load-bearing: even tip-back, a tall star silhouettes above
-            # the lid edge from the front (1755: short knob stayed occluded).
-            _knob_r = max(42.0, min(W, D) * 0.32)
-            _hub_r = _knob_r * 0.30
-            _knob_h = 36.0
-            _lobe_len = _knob_r * 1.20
-            _lobe_w = _knob_r * 0.26
+            # Planar five-lobe star on the outer lid (gold OpenPCR cue).
+            # DECISION (1808): tall prism lobes read to the vision LLM as
+            # "floating/exploded debris" even when parented correctly. Keep the
+            # star FLAT on the lid face (short Z, long XY reach) so it silhouettes
+            # as one joined handle, not a debris cloud.
+            _knob_r = max(44.0, min(W, D) * 0.34)
+            _hub_r = _knob_r * 0.28
+            _knob_h = 14.0
+            _lobe_len = _knob_r * 1.25
+            _lobe_w = _knob_r * 0.22
             # Centre of outer lid face — gold star sits mid-lid, not at the lip.
             _local_y = -_lid_d * 0.30
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 8.0
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 4.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
@@ -21812,12 +21813,19 @@ def main():
             _hero_distance = perspective_distance_for_extent(
                 _ctrl * 1.16, focal_mm=62, frame_fraction=0.84)
             _pd = _hero_distance / math.sqrt(2)
-            _hero_cam = {"loc": (_pc[0] + _pd, _pc[1] - _pd,
-                                  _pc[2] + _pmax * (0.96 if _IS_INSTRUMENT_DEVICE else 0.12)),
+            # Thermocycler: raise hero + aim at open lid / star (same as 04 cams).
+            _hz = (1.55 if _IS_THERMOCYCLER_FORM
+                   else (0.96 if _IS_INSTRUMENT_DEVICE else 0.12))
+            _htz = (0.85 if _IS_THERMOCYCLER_FORM
+                    else (0.02 if _IS_INSTRUMENT_DEVICE else 0.0))
+            _hty = (_sd * 0.10 * fl.MM) if _IS_THERMOCYCLER_FORM else 0.0
+            _hero_cam = {"loc": (_pc[0] + _pd * (0.85 if _IS_THERMOCYCLER_FORM else 1.0),
+                                  _pc[1] - _pd * (0.92 if _IS_THERMOCYCLER_FORM else 1.0),
+                                  _pc[2] + _pmax * _hz),
                          "target": (
                              _pc[0],
-                             _pc[1],
-                             _pc[2] + _pmax * (0.02 if _IS_INSTRUMENT_DEVICE else 0.0),
+                             _pc[1] + _hty,
+                             _pc[2] + _pmax * _htz,
                          ),
                          "camera_type": "PERSP",
                          "focal": 62}

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -62,6 +63,66 @@ _EXTERIOR_INSTRUMENT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
 )
 
+# INTENT (NinjaPCR 2026-07-15): optical GA/exterior prompts false-fail a correct
+# PCR thermocycler (wood box + lid + sample-block wells, no cuvette tower).
+_GA_THERMOCYCLER_PROMPT = (
+    "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
+    "drawing of a BENCHTOP PCR THERMOCYCLER / thermal cycler (NinjaPCR / OpenPCR "
+    "class — NOT a colorimeter).\n\n"
+    "Expect orthographic views of a compact wood / plate box with lid, sample-block "
+    "wells, and controller PCB cues. Title-block envelope in millimetres.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • FRONT/TOP elevations are empty / featureless blank rectangles\n"
+    "  • views are blank / cropped / unreadable\n"
+    "  • title block prints metres for a sub-500 mm benchtop instrument\n\n"
+    "Do NOT flag missing optical cube / cuvette / D-pad / charcoal polymer L-body — "
+    "those belong to colorimeters, not PCR thermocyclers.\n"
+    "Do NOT flag missing plant pipes, battery packs, or inverter stacks.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+_EXTERIOR_THERMOCYCLER_PROMPT = (
+    "You are an adversarial industrial-design reviewer glancing at a product render "
+    "of a BENCHTOP PCR THERMOCYCLER (laser-cut wood box class — NOT a colorimeter).\n\n"
+    "Expect: wood-tone box, hinged lid open tip-back, a dark FIVE-LOBE star knob on "
+    "the outer lid face (low-poly joined hub+lobes count as the star), aluminium "
+    "sample block with tube wells through the lid opening, preferably side vents. "
+    "Green FR4 on a CUTAWAY floor is OK.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • blank / empty / featureless render\n"
+    "  • open lid over a hollow empty cavity with no sample block / wells\n"
+    "  • star knob sitting on the floor disconnected from the lid\n"
+    "  • open lid with a completely blank outer face (no dark lobed/star handle — "
+    "a low-poly joined star on the lid is PASS)\n"
+    "  • exploded geometry OUTSIDE the product envelope (lid-mounted star lobes are NOT this)\n"
+    "  • product cropped unreadably small\n\n"
+    "Do NOT flag missing cuvette tower / ambient-light LID / charcoal polymer D-pad.\n"
+    "Do NOT flag a lid-mounted low-poly star as floating/exploded debris.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+
+def _is_thermocycler_out_dir(out_dir: str) -> bool:
+    """True when state.json declares PCR / thermocycler class."""
+    try:
+        st = json.loads((Path(out_dir) / "state.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return False
+    for src in (
+        (st.get("orchestratorContract") or {}).get("product_class"),
+        (st.get("moduleDecomposition") or {}).get("product_class"),
+        (st.get("parsedBrief") or {}).get("product_class"),
+    ):
+        if src and re.search(
+            r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr",
+            str(src),
+            re.I,
+        ):
+            return True
+    return False
+
 _FIXTURE_BAD_GA = (
     _HERE.parent.parent / "tests" / "fixtures" / "render-vision" / "known-bad-red-beam.png"
 )
@@ -101,20 +162,29 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
             "error": "no OPENROUTER_API_KEY",
         }
     targets: list[tuple[str, str]] = []
+    thermo = bool(is_instrument and _is_thermocycler_out_dir(out_dir))
     ga = out / "drawings" / "general-arrangement.png"
     if ga.is_file() and ga.stat().st_size > 800:
-        prompt = _GA_INSTRUMENT_PROMPT if is_instrument else (
-            "You are an adversarial chartered engineer glancing at a GENERAL "
-            "ARRANGEMENT drawing. Flag broken=true for empty elevations, blank "
-            "sheets, or views that clearly fail a 5-second professional glance. "
-            "Reply STRICT JSON: {\"broken\": true|false, \"defects\": [...]}."
-        )
+        if thermo:
+            prompt = _GA_THERMOCYCLER_PROMPT
+        elif is_instrument:
+            prompt = _GA_INSTRUMENT_PROMPT
+        else:
+            prompt = (
+                "You are an adversarial chartered engineer glancing at a GENERAL "
+                "ARRANGEMENT drawing. Flag broken=true for empty elevations, blank "
+                "sheets, or views that clearly fail a 5-second professional glance. "
+                "Reply STRICT JSON: {\"broken\": true|false, \"defects\": [...]}."
+            )
         targets.append((str(ga), prompt))
     if is_instrument:
+        exterior_prompt = (
+            _EXTERIOR_THERMOCYCLER_PROMPT if thermo else _EXTERIOR_INSTRUMENT_PROMPT
+        )
         for name in ("04-product-exterior.png", "00-hero.png"):
             p = out / name
             if p.is_file() and p.stat().st_size > 800:
-                targets.append((str(p), _EXTERIOR_INSTRUMENT_PROMPT))
+                targets.append((str(p), exterior_prompt))
                 break
     if not targets:
         return {
@@ -156,10 +226,22 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
 def drawing_vision_coherent(
     out_dir: str, *, is_instrument: bool = False,
 ) -> Optional[tuple[bool, str]]:
-    """Gate-shaped wrapper. None = abstain (no key / skip)."""
+    """Gate-shaped wrapper. None = abstain (no key / skip).
+
+    FLOW: also writes drawings/drawing-vision-critique.json so Excel Assembly
+    can lift its honest cap above 6 (build-excel-export Assembly scorer).
+    """
     if os.environ.get("CHAIN_SKIP_DRAWING_VISION", "").strip() in ("1", "true", "yes"):
         return None
     res = critique_drawing_set(out_dir, is_instrument=is_instrument)
+    # Always persist when we have a real verdict — Assembly scorer needs the file.
+    if not res.get("skipped"):
+        try:
+            dest = Path(out_dir) / "drawings" / "drawing-vision-critique.json"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(res, indent=2), encoding="utf-8")
+        except OSError as exc:
+            print(f"[drawing-vision] write failed: {exc}", file=sys.stderr)
     if res.get("skipped"):
         return None
     if not res.get("ok"):
@@ -176,6 +258,9 @@ def _selftest() -> None:
     assert "FRONT" in _GA_INSTRUMENT_PROMPT and "display" in _GA_INSTRUMENT_PROMPT.lower()
     assert "FR4" in _EXTERIOR_INSTRUMENT_PROMPT
     assert "bare PCB" in _EXTERIOR_INSTRUMENT_PROMPT or "PCB" in _EXTERIOR_INSTRUMENT_PROMPT
+    assert "thermocycler" in _GA_THERMOCYCLER_PROMPT.lower()
+    assert "sample block" in _EXTERIOR_THERMOCYCLER_PROMPT.lower()
+    assert "cuvette" in _GA_THERMOCYCLER_PROMPT.lower()  # must explicitly NOT-flag
     # Without a key, critique_drawing_set must SKIP (never pretend PASS).
     old = os.environ.pop("OPENROUTER_API_KEY", None)
     try:
