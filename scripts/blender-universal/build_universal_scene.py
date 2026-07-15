@@ -15092,13 +15092,16 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _ro.dimensions = _mm3(_rim_size)
                 _SEALED_SHELL_OBJECTS.append(_ro)
             # INTENT (2026-07-15 visual parity): gold OpenPCR lids hinge at the
-            # BACK and open toward the camera so the outer-face star knob stays
-            # in the product 3/4. Prior Rx=-35 tilted local +Z toward +Y (away
-            # from the front camera) — knob parented correctly but invisible.
+            # BACK and tip UP-AND-BACK (~55° from closed) so a high front 3/4 sees
+            # wells + underside platen + the outer-face star knob (laptop-lid pose).
             #
-            # DECISION: hinge EMPTY at the back top edge; lid + knob are children
-            # in hinge-local space; open with +Rx so local +Z (knob up) pitches
-            # toward −Y (camera). Never rotate a free-floating centred slab.
+            # TRIED (1746): hinge +Rx=+50°. Blender +Rx drives the lid FRONT edge
+            # DOWN (z' = y·sinθ with y<0 → negative Z) — lid dumped into the cavity /
+            # read as a blank rear slab; star never faced the product cam.
+            #
+            # DECISION: hinge EMPTY at the back top edge; lid + knob children in
+            # hinge-local space; open with −Rx≈55° so the front edge rises (+Z) and
+            # local +Z (knob) tips toward +Y (rear) — gold pose. Never free-float.
             _lid_h = max(6.0, H * 0.10)
             _lid_d = D * 0.92
             _lid_w = W * 0.96
@@ -15137,9 +15140,10 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     (0.0, (-_lid_d * 0.5) * fl.MM, (_lid_h * 0.5) * fl.MM))
             except Exception as _lid_par_err:
                 print(f"[univ][sealed] tc_lid parent FAILED: {_lid_par_err}")
-            # Open ~50° toward camera (+Rx: local +Z tips toward −Y).
+            # Open ~55° from closed (−Rx: front edge rises; knob tips toward +Y/rear).
+            _HINGE_OPEN_RX_DEG = -55.0
             try:
-                _hinge.rotation_euler[0] = math.radians(50.0)
+                _hinge.rotation_euler[0] = math.radians(_HINGE_OPEN_RX_DEG)
             except Exception:
                 pass
             _SEALED_SHELL_OBJECTS.append(_lid)
@@ -15162,15 +15166,16 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _knob_mat = fl.make_mat(
                 "m_se_tc_exterior_knob", fl._to_linear((0.05, 0.05, 0.06)),
                 metallic=0.35, roughness=0.42)
-            # Small hub + five long lobes — hub ≪ tip radius so the star reads.
-            _knob_r = max(32.0, min(W, D) * 0.24)
-            _hub_r = _knob_r * 0.38
-            _knob_h = 18.0
-            _lobe_len = _knob_r * 1.05
-            _lobe_w = _knob_r * 0.32
-            # Sit the star near the lid FRONT (−Y) so it crowns the open aperture.
-            _local_y = -_lid_d * 0.12
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 4.0
+            # Small hub + five long lobes — hub ≪ tip radius so the star reads
+            # from the high front 3/4 (gold OpenPCR: large black star on outer lid).
+            _knob_r = max(40.0, min(W, D) * 0.30)
+            _hub_r = _knob_r * 0.32
+            _knob_h = 22.0
+            _lobe_len = _knob_r * 1.15
+            _lobe_w = _knob_r * 0.28
+            # Centre of outer lid face — gold star sits mid-lid, not at the lip.
+            _local_y = -_lid_d * 0.28
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 6.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
@@ -15225,7 +15230,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 print(f"[univ][sealed] tc_knob parent={getattr(_knob.parent, 'name', None)!r} "
                       f"hinge_rx_deg={math.degrees(_hx):.1f} "
                       f"world_z_mm={_kwz:.1f} lid_z_mm={_lwz:.1f} "
-                      f"delta_z_mm={_kwz - _lwz:.1f}")
+                      f"delta_z_mm={_kwz - _lwz:.1f}",
+                      flush=True)
+                # proveCatch (runtime): open must be −Rx (front edge up / gold pose).
+                if _hx > -math.radians(35.0):
+                    print(f"[univ][sealed] WARN hinge open sign wrong: "
+                          f"expected Rx≲−35° (gold tip-back), got "
+                          f"{math.degrees(_hx):.1f}°",
+                          flush=True)
             except Exception:
                 pass
             # Finger-joint nubs on BOTH side edges (front is covered by fascia on
