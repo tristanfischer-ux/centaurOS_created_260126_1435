@@ -1842,10 +1842,24 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"reverse\s*polarity|blocking\s*diode|polarity\s*protection", (7.0, 4.0, 3.0)),
         (r"esd|tvs|transient|surge\s*protection", (9.0, 5.0, 3.0)),
         (r"polyfuse|resettable", (10.0, 7.0, 3.0)),
-        (r"thermal\s*cut|cutoff|thermal\s*fuse", (14.0, 4.0, 4.0)),
+        (r"thermal\s*cut|cutoff|thermal\s*fuse|overtemp", (14.0, 4.0, 4.0)),
         (r"overcurrent|current\s*limit|protection", (11.0, 6.0, 4.0)),
         (r"fuse", (12.0, 5.0, 4.0)),
         (r"indicator|pilot\s*light|status\s*led", (8.0, 8.0, 5.0)),
+        # INTENT (NinjaPCR 2026-07-15): host peripherals must NOT share one
+        # fallback {24×18×8} — that litter capped Renders/Assembly at 3.
+        (r"wifi|wi[- ]?fi|wireless|bluetooth|\bble\b", (22.0, 16.0, 3.0)),
+        (r"flash\s*(?:storage|memory)|firmware\s*storage|\beeprom\b|\bspi\s*flash\b",
+         (12.0, 8.0, 2.5)),
+        (r"debug\s*uart|uart\s*header|serial\s*debug|\busb\s*uart\b", (20.0, 10.0, 4.0)),
+        (r"fan\s*(?:failure|tach|sense)|tachometer|hall\s*sense", (10.0, 8.0, 6.0)),
+        (r"estop|e[- ]?stop|power\s*kill|kill\s*switch|emergency\s*stop",
+         (16.0, 16.0, 12.0)),
+        (r"protective\s*earth|\bpe\s*terminal\b|earth\s*bond", (10.0, 10.0, 8.0)),
+        (r"peltier|\btec\b|thermoelectric", (40.0, 40.0, 4.0)),
+        (r"heatsink|heat\s*sink", (50.0, 40.0, 20.0)),
+        (r"sample\s*block|thermal\s*block|tube\s*block", (60.0, 40.0, 18.0)),
+        (r"lid\s*heater|heated\s*lid", (55.0, 40.0, 6.0)),
     ]
     for pattern, (w_mm, d_mm, h_mm) in rules:
         if re.search(pattern, n, re.I):
@@ -6818,16 +6832,26 @@ def write_parts_manifest(out_dir, parts, state=None):
         _has_pr = any(re.search(r"plant_?room|mech(anical)?_?room|elec(trical)?_?room",
                                 str(k), re.I) for k in _qs.keys()) if _qs else False
         _ekw = (qval(_qs, "connected_electrical_load_kw") or 0.0) if _qs else 0.0
-        _force_rooms = bool(
+        # INTENT (NinjaPCR 2026-07-15): a benchtop instrument (<1 m³ enclosure /
+        # isInstrumentDevice) must NEVER grow "Mech Plant Rm" / "Elec Plant Rm"
+        # walls — the force path fires whenever MCU (electrical) + fan (wet) both
+        # exist, which is every instrument. Plant rooms are for plant archetypes.
+        _is_instrument = bool((state or {}).get("isInstrumentDevice"))
+        _env_m3 = float(qval(_qs, "enclosure_volume_m3") or 0.0) if _qs else 0.0
+        _skip_plant_rooms = _is_instrument or (0.0 < _env_m3 < 1.0)
+        _force_rooms = (not _skip_plant_rooms) and bool(
             (_has_wet and _has_elec)
             or _has_pr
             or (_ekw > 0 and _has_wet and _has_elec)
         )
-        rooms = dl.compute_function_rooms(room_rows, force=_force_rooms)
+        rooms = ([] if _skip_plant_rooms
+                 else dl.compute_function_rooms(room_rows, force=_force_rooms))
         if rooms:
             print(f"[parts-manifest] function-segregated plant rooms: "
                   f"{[rm['name'] for rm in rooms]}"
                   + (" (forced)" if _force_rooms else ""))
+        elif _skip_plant_rooms:
+            print("[parts-manifest] plant rooms suppressed (device-scale instrument)")
         # T-07 density diagnostic — punch-list when m² per m³/h is absurdly high.
         try:
             _bb = bbox or {}
@@ -12283,11 +12307,19 @@ _SE_ZONES_INSTRUMENT = [  # bottom → top
 ]
 # Set from state.isInstrumentDevice in _sealed_enclosure_env_mm (runs before placement).
 _IS_INSTRUMENT_DEVICE = False
+# Thermocycler / PCR benchtop form (lid + tube block) — distinct from optical-bench instruments.
+_IS_THERMOCYCLER_FORM = False
+_THERMOCYCLER_TUBE_COUNT = 16
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
     r"enclosure|cabinet|housing|\bdoor\b|\bpanel\b|panels\b|insulation|liner|gasket|"
     r"\bseal\b|bracket|mount(?:ing)?\b|cover|lid|skin|chassis|frame", re.I)
+_THERMOCYCLER_CLASS_RE = re.compile(
+    r"thermocycler|thermal[_ -]?cycler|\bpcr\b|ninjapcr|openpcr", re.I)
+_THERMOCYCLER_PART_RE = re.compile(
+    r"peltier|tec[_ -]?module|sample[_ -]?block|thermal[_ -]?block|pcr[_ -]?tube|"
+    r"tube[_ -]?well|heatsink[_ -]?fan", re.I)
 
 
 def _sealed_enclosure_env_mm(state, quantities):
@@ -12298,10 +12330,40 @@ def _sealed_enclosure_env_mm(state, quantities):
     if not (0 < vol < SEALED_ENV_MAX_M3):
         return None
     # Record whether this sealed product is a device-scale INSTRUMENT (authoritative flag
-    # the chain sets when deriveInstrumentTopology fires) — place_sealed_enclosure reads it
-    # to lay the interior out as an optical bench + PCB, not a BESS battery-cabinet stack.
+    # the chain stamps from enclosure_volume_m3 < 1 + not-plantish) — place_sealed_enclosure
+    # reads it to lay the interior as an instrument, not a BESS battery-cabinet stack.
     global _IS_INSTRUMENT_DEVICE, _INSTRUMENT_OPTICAL_PATH_MM
-    _IS_INSTRUMENT_DEVICE = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
+    global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
+    pc = product_class_of(state) if isinstance(state, dict) else ""
+    # INTENT (2026-07-15 NinjaPCR): prefer the chain's authoritative flag, but ALSO
+    # derive from the same enclosure+not-plantish gate. Intermediate chain rewrites
+    # (liveState/auditState/onDisk) have historically dropped `isInstrumentDevice`
+    # from state.json while still carrying enclosure_volume_m3 < 1 — Blender then
+    # rendered a BESS sealed stack for a thermocycler.
+    _plantish = bool(re.search(
+        r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
+        r"switchgear|plant|reactor|boiler|pump|hvac|chiller", pc or ""))
+    _flag = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
+    _IS_INSTRUMENT_DEVICE = _flag or (0 < float(vol) < 1.0 and not _plantish)
+    if _IS_INSTRUMENT_DEVICE and not _flag:
+        print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
+              f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
+    # Part-name evidence when class slug is thin / missing.
+    part_blob = ""
+    if isinstance(state, dict):
+        for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+            for sm in (m.get("sub_modules") or []):
+                for w in (sm.get("words") or []):
+                    part_blob += " " + str(w.get("name_human") or "")
+    _IS_THERMOCYCLER_FORM = bool(
+        _IS_INSTRUMENT_DEVICE
+        and (_THERMOCYCLER_CLASS_RE.search(pc) or _THERMOCYCLER_PART_RE.search(part_blob))
+    )
+    _tc = qval(quantities, "tube_count", None)
+    if _tc is not None and float(_tc) > 0:
+        _THERMOCYCLER_TUBE_COUNT = max(4, min(96, int(round(float(_tc)))))
+    else:
+        _THERMOCYCLER_TUBE_COUNT = 16
     # Sample-chamber plan/height track the brief/contract optical path when present
     # (transmittance instruments size the cuvette well from path length — universal).
     _path = qval(quantities, "optical_path_length_mm", None)
@@ -12386,13 +12448,59 @@ def _sealed_product_camera_specs(env_mm):
         },
         {
             "name": "07-product-service",
-            "loc": (centre[0], centre[1] - service_distance,
-                    DECK_Z_MM * fl.MM + h * 0.25),
-            "target": (centre[0], centre[1], DECK_Z_MM * fl.MM + h * 0.18),
+            # INTENT (NinjaPCR 2026-07-15): head-on front for a thermocycler is a
+            # blank fascia (edge density 0.0017 < 0.002). Service face = high
+            # 3/4 looking DOWN into the open lid so sample-block wells + star knob
+            # read (1656 07 looked into an empty cavity above the deck).
+            "loc": (
+                centre[0] + service_distance * (0.62 if _IS_THERMOCYCLER_FORM else 0.0),
+                centre[1] - service_distance * (0.70 if _IS_THERMOCYCLER_FORM else 1.0),
+                (centre[2] + h * 0.95) if _IS_THERMOCYCLER_FORM
+                else (DECK_Z_MM * fl.MM + h * 0.25),
+            ),
+            "target": (
+                centre[0],
+                centre[1] - (d * 0.05 if _IS_THERMOCYCLER_FORM else 0.0),
+                (centre[2] + h * 0.55) if _IS_THERMOCYCLER_FORM
+                else (DECK_Z_MM * fl.MM + h * 0.18),
+            ),
             "camera_type": "PERSP",
             "focal": 72,
         },
     ]
+
+
+def _thermocycler_exterior_keep_visible(name: str) -> bool:
+    """Pure policy: meshes that must stay visible on thermocycler 04–07 product shots.
+
+    INTENT (2026-07-15 empty-box SIGHT): optical-instrument exterior prep hid
+    story meshes so a closed handheld reads clean. Applied to a PCR wood box with
+    an open lid, that policy shipped a hollow crate. Thermocycler exteriors keep
+    sample-block / heatsink / lid-knob / vent-slat / front-control prefixes.
+    """
+    nm = name or ""
+    return bool(
+        nm.startswith("u_se_tc_")
+        or nm.startswith("u_se_product_tc_")
+        or nm.startswith("u_se_product_vent_")
+        or nm.startswith("u_se_product_back")
+        or nm.startswith("u_se_product_left")
+        or nm.startswith("u_se_product_bottom")
+        or nm.startswith("u_se_product_front_cover")
+    )
+
+
+def _selftest_thermocycler_exterior_keep() -> None:
+    """proveCatch: exterior product shots must not strip the PCR guts / maker skin."""
+    assert _thermocycler_exterior_keep_visible("u_se_tc_sample_block")
+    assert _thermocycler_exterior_keep_visible("u_se_tc_heatsink_fin_2")
+    assert _thermocycler_exterior_keep_visible("u_se_product_tc_knob")
+    assert _thermocycler_exterior_keep_visible("u_se_product_tc_vent_slat_1")
+    assert _thermocycler_exterior_keep_visible("u_se_product_tc_front_btn_reset")
+    assert not _thermocycler_exterior_keep_visible("u_se_instrument_story_optical")
+    assert not _thermocycler_exterior_keep_visible("u_se_cutaway_cue_ui_pcb")
+    assert not _thermocycler_exterior_keep_visible("u_wire_pwr_1")
+    assert "04-product-exterior" in sealed_exterior_view_names(True)
 
 
 def _prepare_sealed_product_view(view_name, entering):
@@ -12402,12 +12510,14 @@ def _prepare_sealed_product_view(view_name, entering):
     exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
     # Always restore the cutaway baseline first. This also makes cleanup after
     # each view deterministic if Blender changes render order.
-    # DECISION (colorimeter 2026-07-14): handheld instruments keep the front
-    # cover on cutaway — internals read through the translucent shell + optical
-    # cube. Removing the face turned the chassis into a hollow arch with PCB/
-    # coin-cell hanging in empty air (vision: "floating geometry intersecting
-    # UI deck"). Sealed cabinets still gut the front for a service cutaway.
-    _SEALED_FRONT_COVER.hide_render = not bool(_IS_INSTRUMENT_DEVICE)
+    # DECISION (colorimeter 2026-07-14): handheld optical instruments keep the
+    # front cover on cutaway — internals read through the translucent shell.
+    # EXCEPTION (NinjaPCR 2026-07-15): thermocycler hero must be an OPEN-FRONT
+    # wood box so the sample-block wells read; a closed fascia hid the aperture.
+    if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
+        _SEALED_FRONT_COVER.hide_render = True
+    else:
+        _SEALED_FRONT_COVER.hide_render = not bool(_IS_INSTRUMENT_DEVICE)
     for obj in bpy.data.objects:
         # GOTCHA (colorimeter 2026-07-14): `_suppress_instrument_boilerplate_meshes`
         # hides u_se_det_* BoM slabs, but this cutaway baseline used to force them
@@ -12438,45 +12548,89 @@ def _prepare_sealed_product_view(view_name, entering):
                 obj.data.materials.clear()
                 obj.data.materials.append(_SEALED_CUTAWAY_MATERIAL)
     if entering and view_name in exterior_views:
-        _SEALED_FRONT_COVER.hide_render = False
-        for obj in bpy.data.objects:
-            if obj.name.startswith("u_se_det_") or obj.name.startswith("u_se_cad_"):
-                obj.hide_render = True
-            if obj.name.startswith("u_se_product_vent_"):
-                obj.hide_render = True
-            if obj.name.startswith("u_se_exterior_detail_"):
-                # Coloured harness strands are cutaway-only; closed product keeps
-                # jacket + boot + LED window, not a crayon ribbon on 04–07.
-                if re.search(r"source_harness_\d+$", obj.name):
+        # DECISION (thermocycler 2026-07-15 SIGHT on 1330 04/07): optical handhelds
+        # want a closed opaque face; a benchtop PCR with an OPEN LID must still show
+        # the sample-block deck + heatsink through side vents. Re-applying the
+        # colorimeter "hide all story meshes + blank fascia" path made 04/07 read as
+        # an empty wood crate even when 00-hero cutaway was populated.
+        if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
+            # Keep front fascia (branding face) but NEVER strip u_se_tc_* / lid cues.
+            _SEALED_FRONT_COVER.hide_render = False
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) != "MESH":
+                    continue
+                nm = obj.name
+                if nm.startswith("u_se_det_") or nm.startswith("u_se_cad_"):
                     obj.hide_render = True
-                else:
+                elif _thermocycler_exterior_keep_visible(nm):
+                    # Sample block / heatsink / lid knob / vent slats / fascia.
                     obj.hide_render = False
-            if obj.name.startswith("u_se_cutaway_cue_"):
-                obj.hide_render = True
-            if obj.name.startswith("u_se_instrument_story_"):
-                obj.hide_render = True
-            # INTENT: closed product = shell + form-rule face only. Topology
-            # u_wire_* / BoM proxies left visible read as mid-air stubs beside
-            # the optical cube and a second messy button cluster.
-            # GOTCHA: studio lights are named u_instrument_studio_* — must NOT
-            # match this hide (hiding them made every product view featureless
-            # black, 2026-07-14). Only MESH clutter; never lights/cameras/empties.
-            if _IS_INSTRUMENT_DEVICE and getattr(obj, "type", None) == "MESH" and (
-                obj.name.startswith("u_wire_")
-                or obj.name.startswith("u_pipe_")
-                or (
-                    obj.name.startswith("u_")
-                    and not obj.name.startswith("u_se_")
-                    and not obj.name.startswith("u_skid_")
-                    and not obj.name.startswith("u_instrument_")
-                )
-            ):
-                obj.hide_render = True
-        if _SEALED_EXTERIOR_MATERIAL is not None:
-            for obj in _SEALED_SHELL_OBJECTS:
-                if obj and obj.data:
+                elif nm.startswith("u_se_cutaway_cue_") or nm.startswith(
+                        "u_se_instrument_story_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_se_exterior_detail_"):
+                    obj.hide_render = bool(re.search(r"source_harness_\d+$", nm))
+                elif nm.startswith("u_wire_") or nm.startswith("u_pipe_"):
+                    obj.hide_render = True
+                elif (
+                    nm.startswith("u_")
+                    and not nm.startswith("u_se_")
+                    and not nm.startswith("u_skid_")
+                    and not nm.startswith("u_instrument_")
+                ):
+                    obj.hide_render = True
+            # GOTCHA: do NOT overwrite lid/knob/finger/vent materials with the flat
+            # exterior shell albedo — that erased the star-knob contrast and made
+            # vent windows look like painted stripes on a solid wall.
+            if _SEALED_EXTERIOR_MATERIAL is not None:
+                for obj in _SEALED_SHELL_OBJECTS:
+                    if not obj or not obj.data:
+                        continue
+                    on = getattr(obj, "name", "") or ""
+                    if on.startswith("u_se_product_tc_"):
+                        continue
                     obj.data.materials.clear()
                     obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
+        else:
+            _SEALED_FRONT_COVER.hide_render = False
+            for obj in bpy.data.objects:
+                if obj.name.startswith("u_se_det_") or obj.name.startswith("u_se_cad_"):
+                    obj.hide_render = True
+                if obj.name.startswith("u_se_product_vent_"):
+                    obj.hide_render = True
+                if obj.name.startswith("u_se_exterior_detail_"):
+                    # Coloured harness strands are cutaway-only; closed product keeps
+                    # jacket + boot + LED window, not a crayon ribbon on 04–07.
+                    if re.search(r"source_harness_\d+$", obj.name):
+                        obj.hide_render = True
+                    else:
+                        obj.hide_render = False
+                if obj.name.startswith("u_se_cutaway_cue_"):
+                    obj.hide_render = True
+                if obj.name.startswith("u_se_instrument_story_"):
+                    obj.hide_render = True
+                # INTENT: closed product = shell + form-rule face only. Topology
+                # u_wire_* / BoM proxies left visible read as mid-air stubs beside
+                # the optical cube and a second messy button cluster.
+                # GOTCHA: studio lights are named u_instrument_studio_* — must NOT
+                # match this hide (hiding them made every product view featureless
+                # black, 2026-07-14). Only MESH clutter; never lights/cameras/empties.
+                if _IS_INSTRUMENT_DEVICE and getattr(obj, "type", None) == "MESH" and (
+                    obj.name.startswith("u_wire_")
+                    or obj.name.startswith("u_pipe_")
+                    or (
+                        obj.name.startswith("u_")
+                        and not obj.name.startswith("u_se_")
+                        and not obj.name.startswith("u_skid_")
+                        and not obj.name.startswith("u_instrument_")
+                    )
+                ):
+                    obj.hide_render = True
+            if _SEALED_EXTERIOR_MATERIAL is not None:
+                for obj in _SEALED_SHELL_OBJECTS:
+                    if obj and obj.data:
+                        obj.data.materials.clear()
+                        obj.data.materials.append(_SEALED_EXTERIOR_MATERIAL)
 
 
 def _cad_family_asset(family):
@@ -12742,6 +12896,143 @@ def _place_photodiode_to_can_compound(
     return 3
 
 
+def _place_thermocycler_interior_layout(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    story_mod: str,
+    MO: dict,
+) -> dict:
+    """Benchtop PCR thermocycler cutaway — lid, metal tube block, TEC, heatsink fan.
+
+    INTENT (2026-07-15 NinjaPCR SIGHT): the hero must read as the real open-source
+    instrument (laser-cut wood box, hinged lid + star knob, aluminium sample block
+    with tube wells) — NOT an optical colorimeter bench and NOT a BESS stack.
+
+    DECISION: keyed on `_IS_THERMOCYCLER_FORM` (class or peltier/sample-block vocab),
+    never a NinjaPCR-named branch. Tube count from contract `tube_count`.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    n_wells = max(4, int(_THERMOCYCLER_TUBE_COUNT or 16))
+    cols = 4 if n_wells >= 16 else (4 if n_wells >= 8 else 2)
+    rows = max(1, int(math.ceil(n_wells / float(cols))))
+
+    wood_mat = fl.make_mat(
+        "m_se_tc_wood", fl._to_linear((0.62, 0.48, 0.28)), metallic=0.0, roughness=0.72)
+    wood_edge_mat = fl.make_mat(
+        "m_se_tc_wood_edge", fl._to_linear((0.22, 0.16, 0.10)), metallic=0.0, roughness=0.85)
+    alu_mat = fl.make_mat(
+        "m_se_tc_block", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.85, roughness=0.28)
+    tec_mat = fl.make_mat(
+        "m_se_tc_tec", fl._to_linear((0.15, 0.16, 0.18)), metallic=0.4, roughness=0.45)
+    knob_mat = fl.make_mat(
+        "m_se_tc_knob", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.15, roughness=0.55)
+    btn_mat = fl.make_mat(
+        "m_se_tc_btn", fl._to_linear((0.05, 0.05, 0.06)), metallic=0.1, roughness=0.5)
+    pcb_mat = fl.make_mat(
+        "m_se_tc_pcb", fl._to_linear((0.12, 0.38, 0.18)), metallic=0.05, roughness=0.55)
+    fan_mat = fl.make_mat(
+        "m_se_tc_fan", fl._to_linear((0.25, 0.26, 0.28)), metallic=0.3, roughness=0.5)
+
+    # Body volume (lower box). Lid + star knob come from the product skin
+    # (`u_se_product_tc_lid`) — do NOT emit a second interior lid that fights
+    # the shell aperture and reads as an empty double-lid.
+    body_h = H * 0.72
+    block_w = W * 0.55
+    block_d = D * 0.48
+    block_h = max(14.0, H * 0.16)
+    # INTENT (NinjaPCR 2026-07-15 SIGHT): 0951 buried the block at ~0.34·H so the
+    # open-lid hero looked empty even when wells were un-suppressed. Sit the
+    # sample block in the top aperture so wells read through the open lid.
+    block_z = base_z + H - block_h * 0.55 - max(6.0, tt)
+
+    # Sample block (aluminium) centred, proud in the top opening.
+    _block = fl.add_box(
+        "u_se_tc_sample_block",
+        _mm3((0.0, -D * 0.02, block_z)),
+        _mm3((block_w, block_d, block_h)),
+        alu_mat, module=story_mod, module_objects=MO)
+    _block.dimensions = _mm3((block_w, block_d, block_h))
+
+    # Tube wells — dark recessed cylinders into the block (visible grid).
+    well_pitch_x = block_w / (cols + 1)
+    well_pitch_y = block_d / (rows + 1)
+    well_r = min(well_pitch_x, well_pitch_y) * 0.32
+    well_depth = block_h * 0.70
+    well_mat = fl.make_mat(
+        "m_se_tc_well", fl._to_linear((0.12, 0.10, 0.08)), metallic=0.35, roughness=0.55)
+    wi = 0
+    for r in range(rows):
+        for c in range(cols):
+            if wi >= n_wells:
+                break
+            wx = -block_w / 2 + well_pitch_x * (c + 1)
+            wy = -D * 0.02 - block_d / 2 + well_pitch_y * (r + 1)
+            wz = block_z + block_h / 2 - well_depth / 2 + 0.5
+            _well = fl.add_cyl(
+                f"u_se_tc_well_{wi + 1}",
+                _mm3((wx, wy, wz)),
+                well_r * fl.MM,
+                well_depth * fl.MM,
+                well_mat, module=story_mod, module_objects=MO)
+            wi += 1
+
+    # TEC under the block + heatsink plate + small axial fan at the rear.
+    _tec = fl.add_box(
+        "u_se_tc_peltier",
+        _mm3((0.0, -D * 0.02, block_z - block_h / 2 - 4.0)),
+        _mm3((block_w * 0.85, block_d * 0.75, 6.0)),
+        tec_mat, module=story_mod, module_objects=MO)
+    _tec.dimensions = _mm3((block_w * 0.85, block_d * 0.75, 6.0))
+    # INTENT (2026-07-15 empty-box): seat heatsink against the RIGHT wall so the
+    # slatted vent gaps show aluminium fins on exterior product shots (gold cue).
+    _hs = fl.add_box(
+        "u_se_tc_heatsink",
+        _mm3((W * 0.22, D * 0.02, base_z + body_h * 0.32)),
+        _mm3((W * 0.28, D * 0.55, body_h * 0.36)),
+        alu_mat, module=story_mod, module_objects=MO)
+    _hs.dimensions = _mm3((W * 0.28, D * 0.55, body_h * 0.36))
+    for _fi in range(4):
+        _fin = fl.add_box(
+            f"u_se_tc_heatsink_fin_{_fi}",
+            _mm3((W * 0.34, -D * 0.18 + _fi * (D * 0.12), base_z + body_h * 0.32)),
+            _mm3((W * 0.04, D * 0.08, body_h * 0.32)),
+            alu_mat, module=story_mod, module_objects=MO)
+        _fin.dimensions = _mm3((W * 0.04, D * 0.08, body_h * 0.32))
+    _fan = fl.add_box(
+        "u_se_tc_heatsink_fan",
+        _mm3((W * 0.10, D * 0.28, base_z + body_h * 0.32)),
+        _mm3((min(W, D) * 0.18, 12.0, min(W, D) * 0.18)),
+        fan_mat, module=story_mod, module_objects=MO)
+    _fan.dimensions = _mm3((min(W, D) * 0.18, 12.0, min(W, D) * 0.18))
+
+    # Control PCB on the floor of the body.
+    _pcb = fl.add_box(
+        "u_se_tc_control_pcb",
+        _mm3((0.0, -D * 0.12, base_z + 8.0)),
+        _mm3((W * 0.70, D * 0.55, 2.0)),
+        pcb_mat, module=story_mod, module_objects=MO)
+    _pcb.dimensions = _mm3((W * 0.70, D * 0.55, 2.0))
+
+    # Front RESET / MODE buttons (maker aesthetic).
+    for i, label in enumerate(("reset", "mode")):
+        bx = -W * 0.28 + i * (W * 0.12)
+        _b = fl.add_cyl(
+            f"u_se_tc_btn_{label}",
+            _mm3((bx, -D / 2 + tt + 3.0, base_z + body_h * 0.22)),
+            3.5 * fl.MM,
+            4.0 * fl.MM,
+            btn_mat, module=story_mod, module_objects=MO)
+
+    print(f"[univ][sealed] THERMOCYCLER interior: {n_wells} tube wells "
+          f"({cols}×{rows}) at top aperture + TEC+heatsink fan (lid from product skin)")
+    return {"wells": n_wells, "form": "thermocycler"}
+
+
 def _place_instrument_interior_layout(
     W: float,
     D: float,
@@ -12763,7 +13054,12 @@ def _place_instrument_interior_layout(
     compounds as fallback — never a field of plain cuboids.
 
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
+    FLOW: thermocycler/PCR classes divert to `_place_thermocycler_interior_layout`
+    (lid + sample block) — optical bench would be the wrong product family.
     """
+    if _IS_THERMOCYCLER_FORM:
+        return _place_thermocycler_interior_layout(W, D, H, base_z, tt, story_mod, MO)
+
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
@@ -14048,6 +14344,10 @@ def _place_instrument_manifest_proxies(
 _INSTRUMENT_MESH_KEEP_PREFIXES = (
     "u_se_instrument_story_",
     "u_se_product_",
+    # INTENT (NinjaPCR 2026-07-15): thermocycler sample block + wells + TEC live
+    # under u_se_tc_* — without this prefix clutter-suppress hide_render'd all 17
+    # story meshes and the hero shipped as an empty wood box with an open lid.
+    "u_se_tc_",
     "u_se_exterior_detail_",
     "u_se_cutaway_cue_",
     "u_skid_encl_",
@@ -14665,7 +14965,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # shell so stray light does not wash the sample chamber (light-tight product
         # family). Wall appliances keep a lighter body. Keyed on isInstrumentDevice —
         # never on a named commercial product.
-        if _IS_INSTRUMENT_DEVICE:
+        if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
+            # INTENT (2026-07-15 NinjaPCR): laser-cut plywood / birch plate tone —
+            # the real instrument is a wood finger-joint box, not charcoal polymer.
+            _body_rgb = (0.62, 0.48, 0.28)
+            _panel_rgb = (0.55, 0.42, 0.24)
+            _ext_rgb = (0.58, 0.45, 0.26)
+            _body_rough, _ext_rough = 0.78, 0.80
+        elif _IS_INSTRUMENT_DEVICE:
             # INTENT: charcoal AM polymer matching gold open-photometer value
             # (display ≤0.07). Softboxes wash anything ≥0.10 to clay-grey.
             _body_rgb = ifg.MAT_BODY_POLYMER
@@ -14748,7 +15055,253 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         _cover_bevel.width = min(W, D) * (0.10 if _IS_INSTRUMENT_DEVICE else 0.06) * fl.MM
         _cover_bevel.segments = 6
         _SEALED_FRONT_COVER.hide_render = True
-        if _IS_INSTRUMENT_DEVICE:
+        if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
+            # INTENT (2026-07-15 NinjaPCR SIGHT): exterior must read as a laser-cut
+            # wood plate box with lid + star knob — NOT the optical handheld tower
+            # cues (colorimeter deck/keypad) that previously won the product shot.
+            #
+            # GOTCHA (0906 SIGHT): a solid top plate hid the sample-block wells
+            # under the open lid, and an unparented knob fell to the floor after
+            # containment clamp. Cut a top aperture + parent the knob to the lid.
+            for _shell_obj in list(_SEALED_SHELL_OBJECTS):
+                if getattr(_shell_obj, "name", "").endswith("u_se_product_top") or \
+                   "u_se_product_top" in getattr(_shell_obj, "name", ""):
+                    try:
+                        _shell_obj.hide_render = True
+                        _shell_obj.hide_viewport = True
+                    except Exception:
+                        pass
+            # Frame-only top (rim) so the tube block reads through the lid opening.
+            _rim = max(8.0, min(W, D) * 0.08)
+            for _rim_name, _rim_loc, _rim_size in (
+                ("u_se_product_tc_top_front",
+                 (0.0, -D / 2 + _rim / 2, base_z + H - tt / 2),
+                 (W * 0.96, _rim, tt)),
+                ("u_se_product_tc_top_back",
+                 (0.0, D / 2 - _rim / 2, base_z + H - tt / 2),
+                 (W * 0.96, _rim, tt)),
+                ("u_se_product_tc_top_left",
+                 (-W / 2 + _rim / 2, 0.0, base_z + H - tt / 2),
+                 (_rim, D * 0.70, tt)),
+                ("u_se_product_tc_top_right",
+                 (W / 2 - _rim / 2, 0.0, base_z + H - tt / 2),
+                 (_rim, D * 0.70, tt)),
+            ):
+                _ro = fl.add_box(_rim_name, _mm3(_rim_loc), _mm3(_rim_size),
+                                 body_mat, module=_skin_mod, module_objects=MO)
+                _ro.dimensions = _mm3(_rim_size)
+                _SEALED_SHELL_OBJECTS.append(_ro)
+            # INTENT (2026-07-15 visual parity): gold OpenPCR lids hinge at the
+            # BACK and open toward the camera so the outer-face star knob stays
+            # in the product 3/4. Prior Rx=-35 tilted local +Z toward +Y (away
+            # from the front camera) — knob parented correctly but invisible.
+            #
+            # DECISION: hinge EMPTY at the back top edge; lid + knob are children
+            # in hinge-local space; open with +Rx so local +Z (knob up) pitches
+            # toward −Y (camera). Never rotate a free-floating centred slab.
+            _lid_h = max(6.0, H * 0.10)
+            _lid_d = D * 0.92
+            _lid_w = W * 0.96
+            _hinge_y = D / 2 - max(4.0, tt)
+            _hinge_z = base_z + H
+            import bpy as _bpy_hinge
+            _hinge = _bpy_hinge.data.objects.new("u_se_product_tc_lid_hinge", None)
+            _bpy_hinge.context.collection.objects.link(_hinge)
+            _hinge.location = _mm3((0.0, _hinge_y, _hinge_z))
+            _hinge.empty_display_size = 0.01
+            # Lid centre is forward of the hinge (−Y) and half a lid thick (+Z).
+            _lid = fl.add_box(
+                "u_se_product_tc_lid",
+                (0.0, 0.0, 0.0),
+                _mm3((_lid_w, _lid_d, _lid_h)),
+                panel_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _lid.dimensions = _mm3((_lid_w, _lid_d, _lid_h))
+            # GOTCHA (1258): clear matrix_parent_inverse so local = true child pose.
+            def _parent_local(child, parent, loc_m, rot_euler=(0.0, 0.0, 0.0)):
+                child.parent = parent
+                try:
+                    child.matrix_parent_inverse.identity()
+                except Exception:
+                    pass
+                child.location = loc_m
+                child.rotation_euler[0] = rot_euler[0]
+                child.rotation_euler[1] = rot_euler[1]
+                child.rotation_euler[2] = rot_euler[2]
+
+            try:
+                _parent_local(
+                    _lid, _hinge,
+                    (0.0, (-_lid_d * 0.5) * fl.MM, (_lid_h * 0.5) * fl.MM))
+            except Exception as _lid_par_err:
+                print(f"[univ][sealed] tc_lid parent FAILED: {_lid_par_err}")
+            # Open ~50° toward camera (+Rx: local +Z tips toward −Y).
+            try:
+                _hinge.rotation_euler[0] = math.radians(50.0)
+            except Exception:
+                pass
+            _SEALED_SHELL_OBJECTS.append(_lid)
+            # Heated platen on the underside of the lid (gold OpenPCR cue).
+            _platen_mat = fl.make_mat(
+                "m_se_tc_lid_platen", fl._to_linear((0.55, 0.56, 0.58)),
+                metallic=0.75, roughness=0.35)
+            _platen = fl.add_box(
+                "u_se_product_tc_lid_platen",
+                (0.0, 0.0, 0.0),
+                _mm3((_lid_w * 0.55, _lid_d * 0.45, 3.0)),
+                _platen_mat, module=_skin_mod, module_objects=MO)
+            _platen.dimensions = _mm3((_lid_w * 0.55, _lid_d * 0.45, 3.0))
+            try:
+                _parent_local(
+                    _platen, _lid,
+                    (0.0, (-_lid_d * 0.05) * fl.MM, (-_lid_h * 0.5 - 1.5) * fl.MM))
+            except Exception:
+                pass
+            _knob_mat = fl.make_mat(
+                "m_se_tc_exterior_knob", fl._to_linear((0.05, 0.05, 0.06)),
+                metallic=0.35, roughness=0.42)
+            # Small hub + five long lobes — hub ≪ tip radius so the star reads.
+            _knob_r = max(32.0, min(W, D) * 0.24)
+            _hub_r = _knob_r * 0.38
+            _knob_h = 18.0
+            _lobe_len = _knob_r * 1.05
+            _lobe_w = _knob_r * 0.32
+            # Sit the star near the lid FRONT (−Y) so it crowns the open aperture.
+            _local_y = -_lid_d * 0.12
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 4.0
+
+            _knob = fl.add_box(
+                "u_se_product_tc_knob",
+                (0.0, 0.0, 0.0),
+                _mm3((_hub_r * 2.0, _hub_r * 2.0, _knob_h)),
+                _knob_mat, module=_skin_mod, module_objects=MO)
+            _knob.dimensions = _mm3((_hub_r * 2.0, _hub_r * 2.0, _knob_h))
+            try:
+                _parent_local(
+                    _knob, _lid,
+                    (0.0, _local_y * fl.MM, _local_z * fl.MM))
+            except Exception as _knob_par_err:
+                print(f"[univ][sealed] tc_knob parent FAILED: {_knob_par_err}")
+            for _si in range(5):
+                _sang = math.radians(_si * 72.0)
+                _reach = _hub_r + _lobe_len * 0.52
+                _sx = math.sin(_sang) * _reach
+                _sy = math.cos(_sang) * _reach
+                _lobe = fl.add_box(
+                    f"u_se_product_tc_knob_lobe_{_si}",
+                    (0.0, 0.0, 0.0),
+                    _mm3((_lobe_w, _lobe_len, _knob_h * 0.88)),
+                    _knob_mat, module=_skin_mod, module_objects=MO)
+                _lobe.dimensions = _mm3((_lobe_w, _lobe_len, _knob_h * 0.88))
+                try:
+                    _parent_local(
+                        _lobe, _lid,
+                        (_sx * fl.MM, (_local_y + _sy) * fl.MM, _local_z * fl.MM),
+                        rot_euler=(0.0, 0.0, _sang))
+                except Exception:
+                    pass
+            # Threaded stud through the lid (gold cue — knob rides a shaft).
+            _stud = fl.add_box(
+                "u_se_product_tc_knob_stud",
+                (0.0, 0.0, 0.0),
+                _mm3((6.0, 6.0, _lid_h + _knob_h * 0.6)),
+                fl.make_mat("m_se_tc_stud", fl._to_linear((0.45, 0.45, 0.48)),
+                            metallic=0.7, roughness=0.35),
+                module=_skin_mod, module_objects=MO)
+            _stud.dimensions = _mm3((6.0, 6.0, _lid_h + _knob_h * 0.6))
+            try:
+                _parent_local(
+                    _stud, _lid,
+                    (0.0, _local_y * fl.MM, (_knob_h * 0.1) * fl.MM))
+            except Exception:
+                pass
+            try:
+                _bpy_hinge.context.view_layer.update()
+                _kwz = float(_knob.matrix_world.translation.z) / fl.MM
+                _lwz = float(_lid.matrix_world.translation.z) / fl.MM
+                _hx = float(_hinge.rotation_euler[0])
+                print(f"[univ][sealed] tc_knob parent={getattr(_knob.parent, 'name', None)!r} "
+                      f"hinge_rx_deg={math.degrees(_hx):.1f} "
+                      f"world_z_mm={_kwz:.1f} lid_z_mm={_lwz:.1f} "
+                      f"delta_z_mm={_kwz - _lwz:.1f}")
+            except Exception:
+                pass
+            # Finger-joint nubs on BOTH side edges (front is covered by fascia on
+            # closed exterior views — sides must carry the maker cue).
+            # Laser-char edge tone (gold OpenPCR finger joints are dark-edged).
+            _fj_mat = fl.make_mat(
+                "m_se_tc_finger", fl._to_linear((0.22, 0.14, 0.08)),
+                metallic=0.0, roughness=0.92)
+            for fi in range(6):
+                _fz = base_z + H * (0.12 + fi * 0.13)
+                for _side, _sx in (("L", -W / 2 - tt * 0.35), ("R", W / 2 + tt * 0.35)):
+                    _fj = fl.add_box(
+                        f"u_se_product_tc_finger_{_side}_{fi}",
+                        _mm3((_sx, -D * 0.05 + (fi % 2) * D * 0.08, _fz)),
+                        _mm3((tt * 1.4, D * 0.14, H * 0.10)),
+                        _fj_mat, module=_skin_mod, module_objects=MO)
+                    _fj.dimensions = _mm3((tt * 1.4, D * 0.14, H * 0.10))
+            # INTENT (2026-07-15 empty-box SIGHT): painted dark stripes on a solid
+            # right wall read as decoration, not vents — heatsink never showed
+            # through. Hide the solid right plate and rebuild as slats with REAL
+            # gaps so the aluminium heatsink reads on 04/05/07 (gold OpenPCR cue).
+            for _shell_obj in list(_SEALED_SHELL_OBJECTS):
+                if "u_se_product_right" in (getattr(_shell_obj, "name", "") or ""):
+                    try:
+                        _shell_obj.hide_render = True
+                        _shell_obj.hide_viewport = True
+                    except Exception:
+                        pass
+            _slat_mat = body_mat
+            _slat_gap = H * 0.055
+            _slat_h = H * 0.07
+            _slat_y0 = -D * 0.28
+            for si in range(5):
+                _sz = base_z + H * 0.22 + si * (_slat_h + _slat_gap)
+                _slat = fl.add_box(
+                    f"u_se_product_tc_vent_slat_{si}",
+                    _mm3((W / 2 - tt / 2, _slat_y0 + D * 0.28, _sz)),
+                    _mm3((tt, D * 0.62, _slat_h)),
+                    _slat_mat, module=_skin_mod, module_objects=MO)
+                _slat.dimensions = _mm3((tt, D * 0.62, _slat_h))
+                _SEALED_SHELL_OBJECTS.append(_slat)
+            # Front face controls ON the fascia (interior buttons sit behind the
+            # cover and vanish on closed exterior — gold shows RESET/MODE outside).
+            _btn_mat = fl.make_mat(
+                "m_se_tc_front_btn", fl._to_linear((0.06, 0.06, 0.07)),
+                metallic=0.15, roughness=0.5)
+            for bi, _blabel in enumerate(("reset", "mode")):
+                _bx = -W * 0.22 + bi * (W * 0.18)
+                # DECISION: data-API box, not add_cyl ops — same floor-dump class as
+                # the star-knob hub failure (1258).
+                _bb = fl.add_box(
+                    f"u_se_product_tc_front_btn_{_blabel}",
+                    _mm3((_bx, -D / 2 - tt * 0.9, base_z + H * 0.28)),
+                    _mm3((9.0, 5.0, 9.0)),
+                    _btn_mat, module=_skin_mod, module_objects=MO)
+                _bb.dimensions = _mm3((9.0, 5.0, 9.0))
+            _pwr = fl.add_box(
+                "u_se_product_tc_front_power",
+                _mm3((W * 0.28, -D / 2 - tt * 0.9, base_z + H * 0.18)),
+                _mm3((W * 0.16, tt * 1.2, H * 0.10)),
+                fl.make_mat("m_se_tc_front_pwr", fl._to_linear((0.85, 0.85, 0.88)),
+                            metallic=0.2, roughness=0.45),
+                module=_skin_mod, module_objects=MO)
+            _pwr.dimensions = _mm3((W * 0.16, tt * 1.2, H * 0.10))
+            # Service port on the rear face (USB / power entry) — 07-product-service edges.
+            _usb = fl.add_box(
+                "u_se_product_tc_usb",
+                _mm3((0.0, D / 2 + tt * 0.2, base_z + H * 0.18)),
+                _mm3((W * 0.18, tt * 1.4, H * 0.08)),
+                fl.make_mat("m_se_tc_usb", fl._to_linear((0.12, 0.12, 0.13)),
+                            metallic=0.25, roughness=0.45),
+                module=_skin_mod, module_objects=MO)
+            _usb.dimensions = _mm3((W * 0.18, tt * 1.4, H * 0.08))
+            print("[univ][sealed] THERMOCYCLER product skin: wood box + hinged lid "
+                  "+ parented star knob + top aperture + slatted vents + front controls")
+        elif _IS_INSTRUMENT_DEVICE:
             # stepped upper deck — narrower control/optical top (handheld read, not a cube)
             _deck_h = H * 0.22
             _deck = fl.add_box(
@@ -14821,7 +15374,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # INSTRUMENT FACE: top operating plane + sample chamber + optical-axis
         # source module — see _instrument_form_rule_mm. All as u_se_exterior_detail_*
         # so they render on closed product views and hide on any cutaway pass.
-        if _IS_INSTRUMENT_DEVICE:
+        # GOTCHA (NinjaPCR 2026-07-15): thermocycler already has its own wood-box
+        # product skin (lid + star knob + top aperture). Re-running the optical
+        # face rule here dumped a parked ambient-light LID + cuvette well onto
+        # the PCR box roof — wrong product language. Skip for thermocycler form.
+        if _IS_INSTRUMENT_DEVICE and not _IS_THERMOCYCLER_FORM:
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             # INTENT (2026-07-14 glance): closed-product glass is DARK recessed
             # LCD (MAT_DISPLAY_GLASS), not FR4-teal emissive. Teal read as "green
@@ -21323,6 +21880,7 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_instrument_proxy_geometry()
         _selftest_instrument_form_rule()
+        _selftest_thermocycler_exterior_keep()
         _selftest_instrument_source_harness()
         _selftest_sealed_role_xy()
         _selftest_sealed_zone_pack_dominance()
