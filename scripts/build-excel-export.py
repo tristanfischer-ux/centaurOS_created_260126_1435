@@ -7796,8 +7796,16 @@ def tab_bom(wb: Workbook, state: dict, run_dir: str) -> None:
         _BOM_COLLAPSED_PARENTS.extend(sorted(_parents_with_children))
 
     # LIVE Σ of line £ (col E)
+    # GOTCHA (Powerwall 2026-07-15): when the bill is empty, first_line_row=5 and
+    # last_line_row=4, so `=SUM(E5:E4)` is written INTO E5. Excel normalises the
+    # inverted range to E4:E5 — which includes the formula cell → circular
+    # reference `'Bill of Materials (Ledger)'!E5 -> E5` and the exporter refused
+    # to ship. Guard: only emit a live SUM over a non-empty, forward range.
     ws.cell(r, 1, "Σ TOTAL").font = FONT_SUB
-    tot = ws.cell(r, 5, f"=SUM(E{first_line_row}:E{last_line_row})")
+    if last_line_row >= first_line_row:
+        tot = ws.cell(r, 5, f"=SUM(E{first_line_row}:E{last_line_row})")
+    else:
+        tot = ws.cell(r, 5, 0)
     tot.font = Font(bold=True)
     tot.fill = FILL_RESULT
     sum_row = r
@@ -28684,6 +28692,25 @@ def _selftest() -> int:
             print(f"  FAIL conn-est-class: a connection row must disclose Est class 3 + "
                   f"a stated take-off confidence, never blanks (got {_ec!r}, {_cf!r})")
             bad += 1
+
+    # proveCatch (Powerwall 2026-07-15): empty requirementsBom must NOT write
+    # `=SUM(E5:E4)` into E5 — Excel expands that to E4:E5 → self-circular E5→E5.
+    with _tfc.TemporaryDirectory() as _tde:
+        _wbe = Workbook(); _wbe.remove(_wbe.active)
+        tab_parts_master(_wbe, {"requirementsBom": []}, _tde)
+        tab_bom(_wbe, {"requirementsBom": []}, _tde)
+        _wse = _wbe[_LEDGER_SHEET]
+        _sum_self = False
+        _e5 = _wse.cell(5, 5).value
+        for _rr in range(5, 12):
+            _v = _wse.cell(_rr, 5).value
+            if isinstance(_v, str) and _v.startswith("=") and re.search(
+                    rf"\bE{_rr}\b", _v, re.I):
+                _sum_self = True
+                break
+        if _sum_self or not (isinstance(_e5, (int, float)) and float(_e5) == 0.0):
+            print(f"  FAIL empty-bom E5 circular: empty bill Σ must be literal 0 "
+                  f"with no self-referencing SUM (got E5={_e5!r})"); bad += 1
 
     # (2+3) COST-OF-SERVICE: the levelised divisor is design flow × 8760 × the WATER
     # utilisation Inputs driver (never the ELECTRICAL load factor — the 512,460 m³ bug),

@@ -3903,6 +3903,81 @@ def _selftest() -> int:
     if not (abs(g - 838.0) < 0.01 and b is None):
         print(f"  FAIL inverter wrongly role-capped: £{g} ({b})"); bad += 1
 
+    # proveCatch (Powerwall 2026-07-15): a sealed cabinet with a STRUCTURAL-family
+    # word MUST still assemble ≥1 BoM row. Pre-fix: `st = _structural_takeoff(...)`
+    # rebound the state dict to a tuple → later `st.get("isInstrumentDevice")`
+    # AttributeError → chain left requirementsBom=[] → parts-ledger n_equipment=0.
+    import tempfile as _tf_sc_asm
+    _sc_asm = _tf_sc_asm.mkdtemp(prefix="rbom-sealed-asm-")
+    try:
+        _sc_words = [
+            {"id": "outdoor_cabinet_enclosure_word",
+             "name_human": "Outdoor Cabinet Enclosure",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "dimension", "value": "0.6 m × 0.25 m × 1.0 m"},
+                 {"kind": "service", "value": json.dumps({
+                     "fluid": "none", "phase": "solid", "pressure_bar": 0,
+                     "fabrication_family": "structural", "criticality": "primary",
+                 })},
+             ]},
+            {"id": "dc_ac_inverter_module_word",
+             "name_human": "DC AC Inverter Module",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Growatt"},
+                 {"kind": "part_number", "value": "MIN-5000TL-X"},
+             ]},
+            {"id": "local_hmi_display_word",
+             "name_human": "Local HMI Display",
+             "modifier_characters": [
+                 {"kind": "quantity", "value": "×1"},
+                 {"kind": "manufacturer", "value": "Siemens"},
+                 {"kind": "part_number", "value": "6AV2124-0MC01-0AX0"},
+             ]},
+        ]
+        json.dump({
+            "orchestratorContract": {"quantities": {
+                "enclosure_volume_m3": {"value": 0.14},
+            }, "product_class": "energy_storage"},
+            "moduleDecomposition": {"product_class": "energy_storage",
+                                    "modules": [{"sub_modules": [{"words": _sc_words}]}]},
+            "partVerifications": [
+                {"word_id": "dc_ac_inverter_module_word", "word_name": "DC AC Inverter Module",
+                 "manufacturer": "Growatt", "part_number": "MIN-5000TL-X",
+                 "price_estimate_gbp": 838},
+                {"word_id": "local_hmi_display_word", "word_name": "Local HMI Display",
+                 "manufacturer": "Siemens", "part_number": "6AV2124-0MC01-0AX0",
+                 "price_estimate_gbp": 1204},
+            ],
+        }, open(os.path.join(_sc_asm, "state.json"), "w"))
+        json.dump({"schema": "parts-manifest/1", "count": 2, "parts": [
+            {"equipment_tag": "X-101", "name": "DC AC Inverter Module",
+             "dims_mm": {"w": 140, "d": 96, "h": 190}},
+            {"equipment_tag": "X-110", "name": "Outdoor Cabinet Enclosure",
+             "dims_mm": {"w": 600, "d": 250, "h": 1000}},
+        ]}, open(os.path.join(_sc_asm, "parts-manifest.json"), "w"))
+        try:
+            _sc_rows = assemble(_sc_asm)
+        except Exception as _sc_exc:  # noqa: BLE001
+            print(f"  FAIL sealed-cabinet assemble proveCatch: assemble crashed "
+                  f"({type(_sc_exc).__name__}: {_sc_exc}) — structural take-off must "
+                  f"not rebind state"); bad += 1
+            _sc_rows = []
+        if not isinstance(_sc_rows, list) or len(_sc_rows) < 2:
+            print(f"  FAIL sealed-cabinet assemble proveCatch: sealed product with "
+                  f"structural + equipment words must emit ≥2 BoM rows "
+                  f"(got {len(_sc_rows) if isinstance(_sc_rows, list) else type(_sc_rows)})"); bad += 1
+        else:
+            _hmi = next((r for r in _sc_rows
+                         if "hmi" in str(r.get("requirement") or "").lower()), None)
+            if _hmi and float(_hmi.get("unit_gbp") or 0) > 80.0 + 0.01:
+                print(f"  FAIL sealed-cabinet assemble: HMI must stay role-capped ≤£80 "
+                      f"(got £{_hmi.get('unit_gbp')})"); bad += 1
+    finally:
+        import shutil as _sh_sc
+        _sh_sc.rmtree(_sc_asm, ignore_errors=True)
+
     # ── MOTOR-NAMEPLATE DISPLAY (council 2026-06-17, marine RAS) — a motor-driven
     # line shows its MOTOR nameplate kW, not the shaft/hydraulic duty. Fires only
     # when the line already shows a shaft rating AND the contract pairs it (by the
@@ -7013,10 +7088,15 @@ def assemble(out_dir: str):
                 elif svc_fam in _STRUCTURAL_FAMILIES:
                     # structural / building frame — price on footprint, not a pressure shell.
                     pv = price.get(wid, 0.0)
-                    st = _structural_takeoff(name, md, g_lookup)
-                    if st:
+                    # GOTCHA: never rebind local `st` (the state dict) — Powerwall
+                    # 2026-07-15: `st = _structural_takeoff(...)` turned `st` into a
+                    # take-off tuple, so later `st.get("isInstrumentDevice")` crashed
+                    # assemble() → chain left requirementsBom=[], parts-ledger
+                    # n_equipment=0, Excel E5 circular SUM. Use `toff` + `_pv_state`.
+                    toff = _structural_takeoff(name, md, g_lookup)
+                    if toff:
                         status, part = "BESPOKE", "made to spec (structural)"
-                        gbp, basis, mt_spec = st[0], st[1], (st[2] if len(st) > 2 else None)
+                        gbp, basis, mt_spec = toff[0], toff[1], (toff[2] if len(toff) > 2 else None)
                     elif pv > 0:
                         status, part = "BESPOKE", "made to spec (structural)"
                         gbp, basis = pv, "made-to-spec · structural budget estimate"
@@ -7260,7 +7340,7 @@ def assemble(out_dir: str):
                     _encl_for_cap = None
                 _sc_gbp, _sc_basis = _sealed_cabinet_role_price_cap(
                     name, gbp, _encl_for_cap,
-                    is_instrument=bool(st.get("isInstrumentDevice")),
+                    is_instrument=bool(_pv_state.get("isInstrumentDevice")),
                 )
                 if _sc_basis is not None:
                     gbp, basis = _sc_gbp, basis + " · " + _sc_basis
@@ -7622,7 +7702,7 @@ def assemble(out_dir: str):
         # arc-flash / smoke nouns on a sub-1 m³ cabinet already have role ceilings;
         # corpus medians are industrial plant kit and must not re-inflate them.
         if (isinstance(_encl_vol, (int, float)) and 0 < float(_encl_vol) < 1.0
-                and not st.get("isInstrumentDevice")
+                and not _pv_state.get("isInstrumentDevice")
                 and any(rx.search(req_lead) for rx, _c, _l in _SEALED_CABINET_ROLE_CAPS)):
             continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
@@ -7678,7 +7758,7 @@ def assemble(out_dir: str):
         u0 = float(row.get("unit_gbp") or 0)
         nu, nb = _sealed_cabinet_role_price_cap(
             str(row.get("requirement") or ""), u0, _encl_final,
-            is_instrument=bool(st.get("isInstrumentDevice")),
+            is_instrument=bool(_pv_state.get("isInstrumentDevice")),
         )
         if nb is not None and nu is not None:
             qy = row.get("qty") or 1

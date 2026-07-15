@@ -1098,6 +1098,90 @@ def _is_connection(r: dict) -> bool:
             or str(r.get("basis", "")).startswith(("pipe ", "cable ", "gas ")))
 
 
+def _seed_rb_from_manifest_and_costs(state: dict, manifest: dict) -> list:
+    """INTENT (Powerwall 2026-07-15): when state.requirementsBom is empty but the
+    run still has a parts-manifest and/or costBasis lines (assembler crashed mid-
+    structural take-off, chain left []), the ledger must NOT emit n_equipment=0.
+    Seed a minimal BoM spine from costBasis.lines joined to manifest tags, falling
+    back to moduleDecomposition words. Universal — sealed cabinets and plants.
+    Never invents prices beyond what costBasis / partVerifications already hold."""
+    cost_lines = ((state.get("costBasis") or {}).get("lines") or [])
+    pv_by_wid = {str(v.get("word_id") or ""): v
+                 for v in (state.get("partVerifications") or []) if isinstance(v, dict)}
+    pm_by_name: dict[str, dict] = {}
+    for p in (manifest.get("parts") or []) if isinstance(manifest, dict) else []:
+        nm = _norm(str(p.get("name") or ""))
+        if nm and nm not in pm_by_name:
+            pm_by_name[nm] = p
+
+    rows: list = []
+    seen: set = set()
+
+    def _append(name: str, tag: str, unit: float, basis: str, status: str,
+                part: str = "requirement stated", qty: float = 1) -> None:
+        key = _norm(name) or tag
+        if not key or key in seen:
+            return
+        seen.add(key)
+        rows.append({
+            "tag": tag or "—",
+            "requirement": name,
+            "status": status,
+            "part": part,
+            "qty": qty,
+            "unit_gbp": unit,
+            "line_gbp": round(float(unit or 0) * float(qty or 1), 2),
+            "basis": basis or "seeded from costBasis/manifest (requirementsBom was empty)",
+        })
+
+    for cl in cost_lines:
+        if not isinstance(cl, dict):
+            continue
+        name = str(cl.get("label") or cl.get("name") or "").strip()
+        if not name:
+            continue
+        pm = pm_by_name.get(_norm(name)) or {}
+        tag = str(pm.get("equipment_tag") or pm.get("tag") or "—")
+        unit = float(cl.get("cost_gbp") or cl.get("engine_price_gbp") or 0) or 0.0
+        basis_obj = cl.get("basis") if isinstance(cl.get("basis"), dict) else {}
+        basis = str((basis_obj or {}).get("notes") or cl.get("method")
+                    or "costBasis line (requirementsBom empty — seeded)")
+        _append(name, tag, unit, basis, "IDENTIFIED" if unit > 0 else "NOT FOUND")
+
+    if not rows:
+        for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+            for sm in (m.get("sub_modules") or []):
+                for w in (sm.get("words") or []):
+                    if not isinstance(w, dict):
+                        continue
+                    cc = w.get("content_character") or {}
+                    name = str(w.get("name_human") or cc.get("name_human") or "").strip()
+                    if not name:
+                        continue
+                    wid = str(w.get("id") or w.get("word_id") or "")
+                    pv = pv_by_wid.get(wid) or {}
+                    pm = pm_by_name.get(_norm(name)) or {}
+                    tag = str(pm.get("equipment_tag") or pm.get("tag") or "—")
+                    unit = float(pv.get("cost_repair_corrected_price_gbp")
+                                 or pv.get("price_estimate_gbp")
+                                 or pv.get("distributor_price_gbp") or 0) or 0.0
+                    part = " ".join(x for x in (pv.get("manufacturer"), pv.get("part_number"))
+                                    if x).strip() or "requirement stated"
+                    _append(name, tag, unit,
+                            "moduleDecomposition word (requirementsBom empty — seeded)",
+                            "IDENTIFIED" if unit > 0 else "NOT FOUND", part=part)
+
+    if not rows:
+        for p in (manifest.get("parts") or []) if isinstance(manifest, dict) else []:
+            name = str(p.get("name") or "").strip()
+            tag = str(p.get("equipment_tag") or p.get("tag") or "—")
+            if name:
+                _append(name, tag, 0.0,
+                        "parts-manifest only (requirementsBom empty — seeded)",
+                        "NOT FOUND", qty=float(p.get("qty") or 1))
+    return rows
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("usage: parts_ledger.py <out_dir> [state.json]", file=sys.stderr)
@@ -1119,7 +1203,24 @@ def main() -> int:
     # Universal — no per-class logic. (Tristan 2026-06-24: audit the graph that is real.)
     cledger = _load(out_dir / "connection-ledger.json") or {}
     route = _load(out_dir / "route-manifest.json") or {}
-    rb = state.get("requirementsBom") or []
+    rb = list(state.get("requirementsBom") or [])
+    # INTENT (Powerwall 2026-07-15): empty requirementsBom + non-empty manifest/cost
+    # must still populate equipment — sealed product cabinets included. Source crash
+    # in requirements_bom.assemble is fixed separately; this seed is the ledger's
+    # universal backstop so GA/Process/Verification floors cannot zero out.
+    if not rb:
+        _n_manifest = len(manifest.get("parts") or []) if isinstance(manifest, dict) else 0
+        _n_cost = len(((state.get("costBasis") or {}).get("lines") or []))
+        _n_words = sum(
+            len(sm.get("words") or [])
+            for m in ((state.get("moduleDecomposition") or {}).get("modules") or [])
+            for sm in (m.get("sub_modules") or []))
+        if _n_manifest or _n_cost or _n_words:
+            rb = _seed_rb_from_manifest_and_costs(state, manifest)
+            print(f"[parts_ledger] requirementsBom empty — seeded {len(rb)} row(s) "
+                  f"from costBasis/manifest/words "
+                  f"(manifest={_n_manifest}, cost_lines={_n_cost}, words={_n_words})",
+                  file=sys.stderr)
 
     # Device-scale INSTRUMENT flag — the authoritative signal the chain sets when
     # deriveInstrumentTopology fires (a sealed sub-1 m³ optical/electronic instrument
@@ -2977,6 +3078,59 @@ def _selftest() -> int:
               f"must credit placed parts without SVG tags (got pct={_ga_pct}, "
               f"rc={_rc})")
         bad += 1
+    if int(_cov_doc.get("n_equipment") or 0) < 3:
+        print(f"  FAIL product-scale equipment spine: sealed cabinet with 3 BoM "
+              f"lines must populate n_equipment≥3 "
+              f"(got {_cov_doc.get('n_equipment')})")
+        bad += 1
+
+    # proveCatch (Powerwall 2026-07-15): empty requirementsBom + non-empty
+    # parts-manifest / costBasis MUST still yield equipment rows (the assembler-
+    # crash backstop). Pre-fix: ledger iterated empty rb → n_equipment=0 while
+    # manifest had 33 parts → GA/Process/Verification floors collapsed.
+    _empty_td = Path(_tf_cov.mkdtemp(prefix="pl-empty-rb-"))
+    (_empty_td / "drawings").mkdir()
+    json.dump({"schema": "parts-manifest/1", "count": 2, "parts": [
+        {"equipment_tag": "X-101", "name": "DC AC Inverter Module",
+         "dims_mm": {"w": 140, "d": 96, "h": 190}},
+        {"equipment_tag": "X-120", "name": "Battery Modules",
+         "dims_mm": {"w": 400, "d": 140, "h": 400}},
+    ]}, open(_empty_td / "parts-manifest.json", "w"))
+    (_empty_td / "drawings" / "general-arrangement.svg").write_text(
+        "<svg><text>X-101 DC AC Inverter Module</text></svg>")
+    json.dump({
+        "orchestratorContract": {"quantities": {
+            "enclosure_volume_m3": {"value": 0.14},
+        }},
+        "requirementsBom": [],
+        "costBasis": {"lines": [
+            {"label": "DC AC Inverter Module", "cost_gbp": 838,
+             "basis": {"notes": "catalogue"}},
+            {"label": "Battery Modules", "cost_gbp": 1200,
+             "basis": {"notes": "catalogue"}},
+        ]},
+    }, open(_empty_td / "state.json", "w"))
+    _rc2 = os.system(f"{sys.executable} {Path(__file__).resolve()} {_empty_td} "
+                     f"{_empty_td / 'state.json'} >/dev/null 2>&1")
+    _empty_doc = _load(_empty_td / "parts-ledger.json") or {}
+    if int(_empty_doc.get("n_equipment") or 0) < 2:
+        print(f"  FAIL empty-rb equipment seed: manifest+costBasis with empty "
+              f"requirementsBom must still populate n_equipment≥2 "
+              f"(got {_empty_doc.get('n_equipment')}, rc={_rc2})")
+        bad += 1
+    # pure helper proveCatch (no I/O): seed function itself
+    _seeded = _seed_rb_from_manifest_and_costs(
+        {"requirementsBom": [], "costBasis": {"lines": [
+            {"label": "Power Semiconductors", "cost_gbp": 10}]}},
+        {"parts": [{"equipment_tag": "X-105", "name": "Power Semiconductors"}]})
+    if len(_seeded) < 1 or float(_seeded[0].get("line_gbp") or 0) != 10:
+        print(f"  FAIL _seed_rb_from_manifest_and_costs: expected 1 priced row "
+              f"(got {_seeded!r})")
+        bad += 1
+    if _seed_rb_from_manifest_and_costs({"requirementsBom": []}, {"parts": []}):
+        print("  FAIL _seed_rb_from_manifest_and_costs: empty inputs must yield []")
+        bad += 1
+
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad
 
