@@ -5629,6 +5629,24 @@ async function main() {
   const _isPlantishForDevice = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pcForDevice)
   const isInstrumentDevice = Number.isFinite(_encVolForDevice) && _encVolForDevice > 0 && _encVolForDevice < 1 && !_isPlantishForDevice
   setInstrumentDeviceContext(isInstrumentDevice)
+  // INTENT (2026-07-15 NinjaPCR): isInstrumentDevice is computed HERE (enclosure < 1
+  // + not plantish) and stamped onto `state` at construction (~line 7199). Do NOT
+  // wait for deriveInstrumentTopology (optical signal-chain) — a thermocycler is
+  // device-scale but has no LED→cuvette→photodiode graph, so that path left the
+  // flag unset and Blender rendered a BESS-style sealed stack.
+  // GOTCHA: `state` is declared later in this function — stamping it here hits TDZ
+  // (ReferenceError on ninjapcr-20260715-0831). Log only; field is set at construction.
+  if (isInstrumentDevice) {
+    console.error(
+      `[chain] isInstrumentDevice=true (enclosure_volume_m3=${_encVolForDevice} < 1, ` +
+      `class=${_pcForDevice || '∅'}, not plantish) — will stamp on state construction`,
+    )
+    logAction({
+      step: 'stamp_is_instrument_device',
+      enclosure_volume_m3: _encVolForDevice,
+      product_class: _pcForDevice,
+    })
+  }
   {
     const tGate23 = Date.now()
 
@@ -7185,6 +7203,10 @@ async function main() {
     decisionHolds,   // brief-adjacent NAMED decisions (disclosure records — see the loader)
     moduleDecomposition: design,
     naturalLanguageLayer: nl,
+    // AUTHORITATIVE instrument-device flag (2026-07-15 NinjaPCR): same gate as
+    // setInstrumentDeviceContext — enclosure_volume_m3 ∈ (0,1) and class not
+    // plantish. Blender/Excel read this; must NOT depend on optical topology.
+    isInstrumentDevice: Boolean(isInstrumentDevice),
     // Build #19e (2026-05-22): orchestrator's tools-used page surfaces as
     // the PDF's end-page (Tools Used in This Report). state.engineeringContract
     // is set further down at line ~3227 (legacy chain field) — the renderer
@@ -7734,6 +7756,22 @@ async function main() {
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
+
+  // INTENT (2026-07-15 NinjaPCR): intermediate liveState/auditState/onDisk rewrites
+  // drop isInstrumentDevice. Re-stamp onto disk before ANY Blender consumer reads it.
+  const ensureInstrumentDeviceOnDisk = (): void => {
+    if (!isInstrumentDevice || !existsSync(statePath)) return
+    try {
+      const disk = JSON.parse(readFileSync(statePath, 'utf-8')) as Record<string, unknown>
+      if (disk.isInstrumentDevice === true) return
+      disk.isInstrumentDevice = true
+      writeFileSync(statePath, JSON.stringify(disk, null, 2))
+      console.error('[chain] re-stamped isInstrumentDevice=true on state.json (survives rewrite drops)')
+    } catch (err) {
+      console.error(`[chain] isInstrumentDevice re-stamp failed (non-fatal): ${(err as Error).message}`)
+    }
+  }
+  ensureInstrumentDeviceOnDisk()
 
   // ══════════════════════════════════════════════════════════════════════════════════════════
   // EARLY DESIGN-LOOP CLOSURE (Increments 2+3 — UNIVERSAL-DESIGN-LOOP-DESIGN.md §3, §7.2/§7.3)
@@ -9481,6 +9519,7 @@ async function main() {
   const venvPyDraw = resolve(__dirname, '..', '.venv', 'bin', 'python')
   const pyBinDraw = existsSync(venvPyDraw) ? venvPyDraw : 'python3'
   const drawScriptMain = resolve(__dirname, 'blender-universal', 'generate_drawing_set.py')
+  ensureInstrumentDeviceOnDisk()
   try {
     const tDraw = Date.now()
     // ── Drawing generation (the settle loop now runs EARLY, before the cost stack). ──
@@ -10278,11 +10317,43 @@ async function main() {
   try {
     const _py = existsSync(resolve(__dirname, '..', '.venv', 'bin', 'python'))
       ? resolve(__dirname, '..', '.venv', 'bin', 'python') : 'python3'
-    for (const _d of ['draw_pid', 'draw_bfd', 'draw_single_line', 'draw_panel_schedule', 'draw_process_schedules']) {
+    // INTENT (NinjaPCR 2026-07-15): draw_interconnect ran BEFORE requirementsBom
+    // and shipped a 1-node stub ("Device (no graph yet)") that floored Interconnect
+    // at 0. Re-draw after BoM settles — same staleness fix as P&ID/BFD.
+    // GOTCHA (NinjaPCR SCORED floor0): this loop used to re-run EVERY schematic
+    // AFTER generate_drawing_set had correctly skipped plant sheets for a fluid-less
+    // handheld — resurrecting panel-schedule (500 A busbar) + process-water DN25.
+    // Respect the SAME pack_drawings() allow-list as generate_drawing_set.
+    const _FRESHEN_PACK_KEY: Record<string, string> = {
+      draw_pid: 'pid',
+      draw_bfd: 'bfd',
+      draw_single_line: 'single-line',
+      draw_panel_schedule: 'panel-schedule',
+      draw_process_schedules: 'process-schedules',
+      draw_interconnect: 'interconnect',
+    }
+    let _freshenAllowed: Set<string> | null = null
+    try {
+      const _packOut = execFileSync(_py, [
+        '-c',
+        'import json,sys; sys.path.insert(0, ' +
+          JSON.stringify(resolve(__dirname, 'lib')) +
+          '); from render_view_contract import pack_drawings; ' +
+          'print(json.dumps(sorted(pack_drawings(json.load(open(sys.argv[1]))))))',
+        statePath,
+      ], { encoding: 'utf8', timeout: 30_000 })
+      _freshenAllowed = new Set(JSON.parse(String(_packOut).trim()) as string[])
+    } catch { /* pack resolve best-effort — generators also self-gate */ }
+    for (const _d of [
+      'draw_pid', 'draw_bfd', 'draw_single_line', 'draw_panel_schedule',
+      'draw_process_schedules', 'draw_interconnect',
+    ]) {
+      const _pk = _FRESHEN_PACK_KEY[_d]
+      if (_freshenAllowed && _pk && !_freshenAllowed.has(_pk)) continue
       try { execFileSync(_py, [resolve(__dirname, 'blender-universal', `${_d}.py`), outDir, statePath], { stdio: 'ignore', timeout: 120_000 }) } catch { /* a schematic that can't render just omits its page */ }
     }
     try { execFileSync(_py, [resolve(__dirname, 'blender-universal', 'parts_ledger.py'), outDir, statePath], { stdio: 'ignore', timeout: 120_000 }) } catch { /* coverage best-effort */ }
-    console.error('[chain] freshen-scorer-inputs: re-rendered schematics + parts_ledger on the FINAL state (post-cleanup, post-BoM)')
+    console.error('[chain] freshen-scorer-inputs: re-rendered schematics + interconnect + parts_ledger on the FINAL state (post-cleanup, post-BoM)')
     logAction({ step: 'freshen_scorer_inputs', ok: true })
   } catch (frErr) {
     logAction({ step: 'freshen_scorer_inputs', ok: false, error: String(frErr).slice(0, 160) })

@@ -58,10 +58,12 @@ from typing import Optional
 
 # ── reuse the P&ID's canonical reconstruction so line numbers + tags are IDENTICAL ──
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 import draw_pid as PID  # noqa: E402  (the P&ID generator — single source of truth)
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
 import canonical_tags  # noqa: E402  (the SHARED auxiliary-tag authority — one tag, BoM + drawings)
 import connection_sizing as CS  # noqa: E402  (pump-duty line-DN + PSV-set derivation, below)
+from render_view_contract import pack_drawings  # noqa: E402
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_process_schedules() from the run's own artifacts; '' until set ('—').
@@ -1936,6 +1938,21 @@ def _draw_title_block(svg, archetype, width, height, sc: Schedules,
 # ENTRY
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _purge_process_schedule_artefacts(out_dir: str) -> None:
+    """Remove stale process-schedule files so a skipped pack cannot resurface them."""
+    draw_dir = Path(out_dir) / "drawings"
+    for name in (
+        "process-schedules.md", "process-schedules.svg", "process-schedules.png",
+        "process-schedules-A1.pdf", "process-schedules-A1.json",
+    ):
+        p = draw_dir / name
+        if p.exists():
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
 def generate_process_schedules(out_dir: str, state_path: Optional[str] = None,
                                rasterise_png: bool = True):
     """Full pipeline: load (via the P&ID's loader) → reconstruct → render MD + SVG (+ PNG)."""
@@ -1943,6 +1960,18 @@ def generate_process_schedules(out_dir: str, state_path: Optional[str] = None,
     # deterministic title-block issue date from the run's own artifacts (set before draw).
     _ISSUE_DATE = _tb.issue_date(out_dir)
     schedule, state = PID.load_inputs(out_dir, state_path)
+    # INTENT (2026-07-15 NinjaPCR red-team): fluid-less handheld must NOT emit a plant
+    # process line list (process-water DN25 tie-in on a dry thermocycler). Same pack gate
+    # as generate_drawing_set — stops freshen-scorer-inputs from resurrecting the sheet.
+    if "process-schedules" not in pack_drawings(state or {}):
+        _purge_process_schedule_artefacts(out_dir)
+        print("[proc-sched] skipped (not in form-factor pack — fluid-less instrument)")
+        return {
+            "archetype": PID._archetype_name(state or {}),
+            "md": None, "svg": None, "png": None,
+            "lines": 0, "valves": 0, "instruments": 0,
+            "schedule_present": False, "skipped": "not_in_pack",
+        }, None, ""
     sc = reconstruct_schedules(schedule, state, out_dir)
 
     md = render_markdown(sc)
@@ -1972,6 +2001,19 @@ def generate_process_schedules(out_dir: str, state_path: Optional[str] = None,
 
 def _selftest() -> int:
     """Prove dry electrical schedules are explicit N/A while process plants stay intact."""
+    # proveCatch (2026-07-15): fluid-less instrument pack excludes process-schedules —
+    # stops process-water DN25 from resurrecting on a dry thermocycler.
+    _hh = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"mechanism": "thermal"}, {"mechanism": "electrical_bus"}],
+        "quantities": {"enclosure_volume_m3": {"value": 0.002}}}}
+    if "process-schedules" in pack_drawings(_hh):
+        print("[proc-sched] SELFTEST FAIL: fluid-less instrument must exclude process-schedules")
+        return 1
+    if "process-schedules" not in pack_drawings({
+            "isInstrumentDevice": True,
+            "orchestratorContract": {"topology": [{"mechanism": "fluid_loop"}]}}):
+        print("[proc-sched] SELFTEST FAIL: fluid-bearing instrument must keep process-schedules")
+        return 1
     instr = InstrRow(
         tag="TT-201", isa="TT", service="Pack temperature",
         measured="Temperature", itype="Pt100", location="Pack-01",

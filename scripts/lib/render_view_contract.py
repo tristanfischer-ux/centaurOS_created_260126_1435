@@ -486,6 +486,14 @@ def _selftest() -> None:
     assert "interconnect" in pack_drawings(_hh)
     assert "pid" not in pack_drawings(_hh)
     assert "bfd" not in pack_drawings(_hh)
+    assert "panel-schedule" not in pack_drawings(_hh)
+    assert "process-schedules" not in pack_drawings(_hh)
+    # thermal / electrical_bus alone must NOT flip fluid-less → plant pack
+    # (NinjaPCR: thermal edges are air-path, not process-water pipes).
+    _hh_thermal = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"mechanism": "thermal"}, {"mechanism": "electrical_bus"}]}}
+    assert is_fluid_less_instrument(_hh_thermal)
+    assert "panel-schedule" not in pack_drawings(_hh_thermal)
     _hh_fluid = {"isInstrumentDevice": True, "orchestratorContract": {
         "topology": [{"from": "a", "to": "b", "mechanism": "fluid_loop"}]}}
     assert not is_fluid_less_instrument(_hh_fluid)

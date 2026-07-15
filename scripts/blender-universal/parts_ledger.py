@@ -415,7 +415,14 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
     # stage, not a plant-catalogue residual (colorimeter 0819: 23 NOT FOUND floored
     # Part names at 3.8 while the parts were honestly custom). Universal: gated on
     # isInstrumentDevice + typ, never a part-name table.
-    if instrument_device and typ in ("instrument", "electrical", "other"):
+    # GOTCHA (NinjaPCR 2026-07-15): plant TYPE_RULES mis-type board nouns
+    # (Flash Storage→vessel, Fan Tachometer→rotating) — fold those into the same
+    # instrument residual path unless the name is a real plant head noun.
+    _inst_typ = typ
+    if instrument_device and typ in ("vessel", "rotating", "exchanger") and not re.search(
+            r"\b(?:tank|pump|blower|compressor|reactor|column|vessel)\b", n, re.I):
+        _inst_typ = "other"
+    if instrument_device and _inst_typ in ("instrument", "electrical", "other"):
         # INTENT (2026-07-14): bezel / "Sensing Instrumentation Subcomponent N" /
         # optical-bench custom parts are concept-stage fabricated work on a handheld
         # instrument — not plant-catalogue NOT FOUND residuals. Universal noun family
@@ -426,7 +433,10 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
         # nouns — Part names floored on 5/14 "not-found" while every row already
         # said "bespoke fabrication". Commodity interconnect/hardware →
         # COMMODITY-FITTING; compute/UI/cap/enclosure → FABRICATED.
-        if typ in ("instrument", "electrical"):
+        # EXTENDED (NinjaPCR 2026-07-15 Part names 5.3): Bulk Capacitor / Peltier TEC /
+        # MOSFET heater switch / sample block fell through both regexes → bare NOT FOUND.
+        # Remaining typ=other on an instrument is concept-stage board/thermal work.
+        if _inst_typ in ("instrument", "electrical"):
             return "FABRICATED"
         if re.search(
                 r"\b(?:fastener|screw|bolt|nut|washer|header|stemma|qwiic|"
@@ -434,10 +444,17 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
             return "COMMODITY-FITTING"
         if re.search(
                 r"enclosure|housing|shell|lid|shroud|chassis|case\b|bezel|\bcap\b|"
+                r"capacitor|peltier|\btec\b|mosfet|h[\s-]?bridge|current\s+sense|\bshunt\b|"
+                r"heater|wifi|wlan|flash\s+storage|debug\s+uart|uart\b|"
+                r"fan\s+tach|fan\s+failure|overtemp|estop|e[\s-]?stop|"
+                r"protective\s+earth|sample\s+block|aluminum\s+sample|"
                 r"subcomponent|sensing|cuvette|collimat|baffle|optic|"
                 r"compute|\bmcu\b|microcontroller|\bui\b|display|\bkit\b",
                 n, re.I):
             return "FABRICATED"
+        # Fallthrough: any remaining typ=other on a device instrument is concept-stage
+        # fabricated work, not a plant-catalogue research residual (proveCatch below).
+        return "FABRICATED"
     # Name-family honest statuses (Codema ship 2026-07-09): a control panel / MCC is a
     # scope-documented assembly; a cloth/media filter with no catalogue pin is fabricated
     # from its flow duty — neither is a true residual NOT FOUND.
@@ -2788,11 +2805,33 @@ def _selftest() -> int:
         print(f"  FAIL not-found-substatus: instrument sensing subcomponent must be "
               f"FABRICATED (got {_subc!r})")
         bad += 1
+    # proveCatch (2026-07-15 NinjaPCR Part names 5.3): Bulk Capacitor / Peltier TEC /
+    # MOSFET heater on a device instrument must NOT stay bare NOT FOUND.
+    for _npcr_name in ("Bulk Capacitor", "Peltier Tec Module", "Mosfet Heater Switch",
+                       "H Bridge Tec Driver", "Current Sense Shunt"):
+        _npcr = _not_found_substatus(_npcr_name, "bottom-up parametric · commodity-floor",
+                                     "other", instrument_device=True)
+        if _npcr == "NOT FOUND":
+            print(f"  FAIL not-found-substatus: instrument {_npcr_name!r} must not stay "
+                  f"bare NOT FOUND (got {_npcr!r})")
+            bad += 1
+    _flash = _not_found_substatus("Flash Storage", "bottom-up parametric", "vessel",
+                                  instrument_device=True)
+    if _flash == "NOT FOUND":
+        print(f"  FAIL not-found-substatus: instrument Flash Storage (mis-typed vessel) "
+              f"must not stay bare NOT FOUND (got {_flash!r})")
+        bad += 1
     _bez_plant = _not_found_substatus("Mounting Bezel", "bottom-up parametric", "other",
                                      instrument_device=False)
     if _bez_plant == "FABRICATED":
         print("  FAIL not-found-substatus proveNoFalsePositive: Mounting Bezel on a "
               "non-instrument plant must NOT auto-classify FABRICATED")
+        bad += 1
+    _cap_plant = _not_found_substatus("Bulk Capacitor", "bottom-up parametric", "other",
+                                     instrument_device=False)
+    if _cap_plant != "NOT FOUND":
+        print("  FAIL not-found-substatus proveNoFalsePositive: Bulk Capacitor on a "
+              f"non-instrument plant must stay NOT FOUND (got {_cap_plant!r})")
         bad += 1
     # proveCatch: Electrical Control Panel / Cloth Filter must never stay bare NOT FOUND
     # (Codema ship X-106 / V-104 — both drawn on GA, residual Part-names FAIL).

@@ -63,8 +63,10 @@ from typing import Optional
 # Universal distribution-voltage + per-module feeder model (shared with the SLD).
 # Keyed on load magnitude + the connection model — never product class.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 import electrical_distribution_model as edm  # noqa: E402
 import drawing_titleblock as _tb  # noqa: E402  (shared REV + deterministic issue date)
+from render_view_contract import pack_drawings  # noqa: E402
 
 # Deterministic title-block issue date for THIS run (YYYY-MM-DD), set by
 # generate_panel_schedule() from the run's own artifacts; '' until set ('—').
@@ -3030,12 +3032,39 @@ def _find_chrome():
 # ENTRY
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _purge_panel_schedule_artefacts(out_dir: str) -> None:
+    """Remove stale panel-schedule files so a skipped pack cannot resurface them."""
+    draw_dir = Path(out_dir) / "drawings"
+    for name in (
+        "panel-schedule.md", "panel-schedule.svg", "panel-schedule.png",
+        "panel-schedule-A1.pdf", "panel-schedule-A1.json",
+    ):
+        p = draw_dir / name
+        if p.exists():
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
 def generate_panel_schedule(out_dir: str, state_path: Optional[str] = None,
                             rasterise_png: bool = True):
     global _ISSUE_DATE
     # deterministic title-block issue date from the run's own artifacts (set before draw).
     _ISSUE_DATE = _tb.issue_date(out_dir)
     schedule, state = load_inputs(out_dir, state_path)
+    # INTENT (2026-07-15 NinjaPCR red-team): fluid-less handheld pack must NOT emit a
+    # plant panel schedule (500 A busbar / 100 A MCBs on a USB thermocycler). generate_drawing_set
+    # already skips via pack_drawings; this guard stops freshen-scorer-inputs / direct CLI
+    # from resurrecting the sheet. Universal — keyed on pack_drawings, never a product name.
+    if "panel-schedule" not in pack_drawings(state or {}):
+        _purge_panel_schedule_artefacts(out_dir)
+        print("[panel-sched] skipped (not in form-factor pack — fluid-less instrument)")
+        return {
+            "archetype": _archetype_name(state),
+            "md": None, "svg": None, "png": None,
+            "panels": [], "skipped": "not_in_pack",
+        }, [], ""
     archetype = _archetype_name(state)
     panels = build_schedules(schedule, state, out_dir)
     _reconcile_panels_to_breakdown(panels, state)
@@ -3291,10 +3320,22 @@ def _selftest() -> int:
     chk("I18.same_value_rounding_collapses",
         _display_bus_capacity_kw({"demand_kw": 0.197, "sum_kw": 0.21}) == 0.21)
 
+    # proveCatch (2026-07-15): fluid-less instrument pack excludes panel-schedule —
+    # the freshen-scorer-inputs bug that resurrected 500 A busbars on NinjaPCR.
+    _hh = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"mechanism": "electrical_bus"}],
+        "quantities": {"enclosure_volume_m3": {"value": 0.002}}}}
+    chk("I19.fluid_less_pack_excludes_panel_schedule",
+        "panel-schedule" not in pack_drawings(_hh))
+    _hh_fluid = {"isInstrumentDevice": True, "orchestratorContract": {
+        "topology": [{"mechanism": "fluid_loop"}]}}
+    chk("I19.fluid_instrument_keeps_panel_schedule",
+        "panel-schedule" in pack_drawings(_hh_fluid))
+
     if fails:
         print("[panel-sched] SELFTEST FAIL: " + ", ".join(fails))
         return 1
-    print("[panel-sched] selftest OK (18 connected-load reconciliation invariants)")
+    print("[panel-sched] selftest OK (19 connected-load reconciliation invariants)")
     return 0
 
 

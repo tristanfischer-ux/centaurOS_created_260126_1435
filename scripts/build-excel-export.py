@@ -2436,10 +2436,20 @@ def formula_to_excel(rhs: str, symbol_cell: Dict[str, str]) -> Optional[str]:
 
 
 def rhs_of(formula: str) -> str:
-    """Return the right-hand side of 'lhs = rhs' (or the whole thing if no '=')."""
-    if formula and "=" in formula:
-        return formula.split("=", 1)[1].strip()
-    return (formula or "").strip()
+    """Return the right-hand side of 'lhs = rhs' (or the whole thing if no '=').
+
+    INTENT (2026-07-15 NinjaPCR Calculations 7): a physics-transcript formula may
+    chain equals — `active_heating_duty_w = Q = C·dT/dt = C * ramp`. The LIVE
+    arithmetic is the LAST segment (quantity symbols × operators), not the prose
+    after the first '=' (which left Q/C/dT unbound → hardcoded result). Single-'='
+    formulas are unchanged (`S_rated = ceil_to_standard(S_req)` → selection RHS).
+    """
+    if not formula or "=" not in formula:
+        return (formula or "").strip()
+    parts = [p.strip() for p in formula.split("=") if p.strip()]
+    if len(parts) >= 2:
+        return parts[-1]
+    return formula.split("=", 1)[1].strip()
 
 
 def lhs_symbol(formula: str) -> str:
@@ -16688,8 +16698,12 @@ _PCB_MECH_OFFBOARD_RX = re.compile(
     r"keypad|membrane\s*switch|tactile\s*switch|user\s*input|push\s*button|button|"
     r"battery\s*pack|rechargeable\s*battery|coin\s*cell|battery\s*holder|"
     r"cuvette|optical\s*path|lens|collimat\w*|baffle|wavelength\s*select\w*|"
-    r"light\s*source|led\s*source|sample\s*(?:holder|chamber)|filter\s*wheel|"
+    r"light\s*source|led\s*source|sample\s*(?:holder|chamber|block)|filter\s*wheel|"
     r"optical\s*window|shroud|monochromat\w*|"
+    # INTENT (NinjaPCR 2026-07-15): TEC / heatsink / tube block are purchased
+    # thermal assemblies — Excel must not re-label them ELECTRONIC gaps.
+    r"peltier|\btec\b|thermoelectric|heatsink|heat\s*sink|thermal\s*block|"
+    r"tube\s*block|lid\s*heater|heated\s*lid|cooling\s*fan|"
     r"audible\s*alarm|alarm|buzzer|sounder|siren|"
     r"warning\s*labels?|safety\s*warning|signage|warning\s*sign|"
     r"battery\s*management|energy\s*management|digital\s*energy\s*platform|"
@@ -31003,6 +31017,20 @@ def _selftest() -> int:
     # ═══ proveCatch the LIVE-FORMULA no-cheating property (Tristan 2026-07-06 — the
     # Calculations tab's banner claimed 'every value recomputed live' while col B was a
     # hardcoded number). Both directions on each pure helper, renderer + scorer share. ═══
+    # proveCatch (2026-07-15 NinjaPCR Calculations 7): physics-transcript multi-'='
+    # formulas must expose the LAST arithmetic segment so formula_to_excel can bind.
+    _rhs_phys = rhs_of(
+        "active_heating_duty_w = Q = C·dT/dt = block_thermal_mass_j_k × heating_ramp_rate_c_s")
+    if _rhs_phys != "block_thermal_mass_j_k × heating_ramp_rate_c_s":
+        print(f"  FAIL rhs_of: multi-equals physics transcript must return the LAST "
+              f"arithmetic segment — got {_rhs_phys!r}"); bad += 1
+    _fx_heat = formula_to_excel(
+        _rhs_phys, {"block_thermal_mass_j_k": "B10", "heating_ramp_rate_c_s": "B11"})
+    if not (_fx_heat and "B10" in _fx_heat and "B11" in _fx_heat):
+        print(f"  FAIL formula_to_excel: heating-duty RHS from rhs_of must bind live — "
+              f"got {_fx_heat!r}"); bad += 1
+    if rhs_of("S_rated = ceil_to_standard(S_req)") != "ceil_to_standard(S_req)":
+        print("  FAIL rhs_of: single-equals selection formula must be unchanged"); bad += 1
     _fx_symcell = {"rho": "$B$5", "Q_m3h": "C12", "H_total": "C13"}
     _fx_ok = formula_to_excel("rho x g x (Q_m3h / 3600) x H_total",
                               {**_fx_symcell, "g": "$B$6"})
