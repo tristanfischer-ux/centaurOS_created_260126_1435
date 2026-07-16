@@ -394,6 +394,16 @@ SP_HARNESS_OD_MM = 4.5
 SP_TUBING_OD_MM = 2.2
 SP_CRADLE_ANGLE_DEG = 18.0       # tip cradle tips forward (gold printed aesthetic)
 SP_DISPLAY_TILT_DEG = 22.0       # console screen tips up toward operator
+# Product cams: OPEN array is wide+low — optical-instrument h×1.92 inflation
+# left height occupancy ~0.39 (drawing_gates floor 0.45). Pull in + lower look.
+SP_CAM_EXT_Z = 0.95
+SP_CAM_SIDE_Z = 0.70
+SP_CAM_TGT_Z = 0.0
+SP_CAM_FRONT_DIST_SCALE = 0.88
+SP_CAM_H_EFF_SCALE = 1.05        # vs optical instrument 1.92 (no cuvette tower)
+SP_CAM_DIST_K = 0.98
+SP_CAM_FRAME = 0.90
+SP_CAM_CENTRE_FRAC = 0.42
 
 # Mesh-name prefixes for deterministic SIGHT (form_converge_loop).
 SP_MESH_PREFIX = "u_se_sp_"
@@ -426,6 +436,23 @@ def is_syringe_pump_form(
     has_linear = bool(re.search(
         r"lead[_ -]?screw|leadscrew|carriage|stepper|nema", blob, re.I))
     return has_syringe and has_linear
+
+
+def syringe_pump_product_cam_fractions() -> dict:
+    """Named camera fractions for OPEN-array product shots (wide+low benchtop).
+
+    @returns Dict of elevation / look-at / framing keys for Blender product cams.
+    """
+    return {
+        "ext_z": SP_CAM_EXT_Z,
+        "side_z": SP_CAM_SIDE_Z,
+        "tgt_z": SP_CAM_TGT_Z,
+        "front_dist_scale": SP_CAM_FRONT_DIST_SCALE,
+        "h_eff_scale": SP_CAM_H_EFF_SCALE,
+        "dist_k": SP_CAM_DIST_K,
+        "frame": SP_CAM_FRAME,
+        "centre_frac": SP_CAM_CENTRE_FRAC,
+    }
 
 
 def syringe_pump_envelope_mm(channel_count: int) -> tuple[float, float, float]:

@@ -505,13 +505,28 @@ def _checks_adequacy(state: dict, run_dir: str) -> List[Check]:
     # exists, the generic supply-demand figure is NOT the aux incomer; skip it here
     # (the breaker-current form (b) below carries the like-for-like comparison).
     _has_breaker_authority = (qval(q, "main_incomer_breaker_a") or 0) > 0
-    _kva_keys = ["main_transformer_kva", "main_incomer_kva", "supply_transformer_kva",
-                 "total_supply_demand_kva", "main_supply_kva"]
+    # GOTCHA (2026-07-16 Poseidon): bench instruments mint psu_transformer_kva≈0.25
+    # AND a leftover plant total_supply_demand_kva=25. Picking the plant 25 kVA against
+    # a 0.087 kW load fails the ×100 magnitude ceiling even though the real bench PSU
+    # is adequate. Device-scale (<1 kW connected) prefers PSU/bench keys and skips
+    # plant supply-demand phantoms that sit above the ceiling.
+    _device_scale_load = conn_kw is not None and 0 < float(conn_kw) < 1.0
+    if _device_scale_load:
+        _kva_keys = [
+            "psu_transformer_kva", "bench_psu_kva", "main_incomer_kva",
+            "supply_transformer_kva", "main_transformer_kva",
+        ]
+    else:
+        _kva_keys = ["main_transformer_kva", "main_incomer_kva", "supply_transformer_kva",
+                     "total_supply_demand_kva", "main_supply_kva"]
     if _has_breaker_authority:
         _kva_keys = [k for k in _kva_keys if k not in ("total_supply_demand_kva", "main_supply_kva")]
     for k in _kva_keys:
         v = qval(q, k)
         if v is not None and v > 0:
+            # Skip plant-scale phantoms that cannot be this device's incomer.
+            if _device_scale_load and conn_kw is not None and v > float(conn_kw) * MAGNITUDE_CEILING_FACTOR:
+                continue
             incomer_kva, kva_key = v, k
             break
     if conn_kw is not None and incomer_kva is not None:
@@ -2186,6 +2201,29 @@ def _selftest() -> int:
               "(an INPUT to the flagged aggregate) must NOT be flagged")
     # a LEGITIMATE margin (1250 kVA on 800 kW = 1.56x) must still PASS under the ceiling —
     # already asserted by the CLEAN run above ("CLEAN incomer kVA should PASS").
+
+    # ---- DEVICE-SCALE INCOMER proveCatch (2026-07-16 Poseidon): a bench instrument
+    #      with psu_transformer_kva=0.25 AND a leftover plant total_supply_demand_kva=25
+    #      must prefer the PSU and PASS — never FAIL the ×100 ceiling on the plant phantom.
+    bench_state = {
+        "orchestratorContract": {
+            "product_class": "syringe_pump",
+            "quantities": {
+                "connected_electrical_load_kw": {"value": 0.087, "unit": "kW"},
+                "psu_transformer_kva": {"value": 0.25, "unit": "kVA"},
+                "total_supply_demand_kva": {"value": 25, "unit": "kVA"},
+            },
+            "closures": [],
+        },
+        "requirementsBom": [], "partVerifications": [],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, bench_state, {}, {})
+        checks = run_all_checks(d)
+        _ck = next((c for c in checks if "incomer kVA" in c.name), None)
+        check(_ck is not None and _ck.status == PASS and _ck.actual == 0.25,
+              f"DEVICE-SCALE INCOMER: must select psu_transformer_kva=0.25 and PASS "
+              f"(got {_ck and (_ck.status, _ck.actual, _ck.producer)}) — plant 25 kVA phantom skipped")
 
     # ---- BESS CROSS-VAL proveCatches (2026-07-03) — the three checks re-keyed for the
     #      electrical-storage archetype must each still CATCH their adversarial input

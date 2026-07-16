@@ -12402,9 +12402,19 @@ def _sealed_enclosure_env_mm(state, quantities):
 def _sealed_product_camera_specs(env_mm):
     """Perspective camera set for customer-facing wall/cabinet product views."""
     w, d, h = (float(value) * fl.MM for value in env_mm)
+    # Form-keyed cam packs (never product nouns): tip-back PCR vs OPEN syringe array
+    # vs generic optical handheld. OPEN arrays are wide+low — optical h×1.92
+    # inflation left height occupancy ~0.39 (drawing_gates floor 0.45).
+    _tc = bool(_IS_THERMOCYCLER_FORM)
+    _sp = bool(_IS_SYRINGE_PUMP_FORM)
+    _tl = ifg.tipback_lid_product_cam_fractions() if _tc else {}
+    _sp_cam = ifg.syringe_pump_product_cam_fractions() if _sp else {}
     # raise the look-at centre for an instrument so the body + the protruding cuvette
     # port both sit inside the frame (port top ≈ 1.4·H); a plain cabinet stays at mid-H.
-    _centre_frac = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
+    if _sp:
+        _centre_frac = float(_sp_cam.get("centre_frac", 0.42))
+    else:
+        _centre_frac = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
     centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) * _centre_frac) * fl.MM)
     # Frame on the CONTROLLING extent, not height alone: a WIDE-and-FLAT instrument
     # (W >> H) overflowed the frame and rendered a zoomed-in white patch when the
@@ -12414,13 +12424,20 @@ def _sealed_product_camera_specs(env_mm):
     _fa = 1.5  # render frame aspect (3000×2000)
     # instrument devices carry a cuvette/optical port that protrudes ~0.4·H above the
     # top — inflate the vertical extent so the port is not cropped out of frame.
-    _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
+    if _sp:
+        _h_eff = h * float(_sp_cam.get("h_eff_scale", 1.05))
+    else:
+        _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
     _ctrl = max(_h_eff, w / _fa, d / _fa)
     # Cabinet products are tall-and-thin: framing on height alone left the front
     # view width occupancy at ~0.31 (gate render_view_quality floor 0.35). Pull
     # in slightly + raise frame fill so the enclosure reads as the subject.
-    _frame = 0.92 if not _IS_INSTRUMENT_DEVICE else 0.84
-    _dist_k = 1.02 if not _IS_INSTRUMENT_DEVICE else 1.16
+    if _sp:
+        _frame = float(_sp_cam.get("frame", 0.90))
+        _dist_k = float(_sp_cam.get("dist_k", 0.98))
+    else:
+        _frame = 0.92 if not _IS_INSTRUMENT_DEVICE else 0.84
+        _dist_k = 1.02 if not _IS_INSTRUMENT_DEVICE else 1.16
     front_distance = perspective_distance_for_extent(
         _ctrl * _dist_k, focal_mm=62, frame_fraction=_frame)
     side_distance = perspective_distance_for_extent(
@@ -12430,13 +12447,18 @@ def _sealed_product_camera_specs(env_mm):
     # RULE (tip-back hinged lid): outer-face controls sit on a lid whose normal
     # tips toward +Y/rear — low deck-aimed cams only see the underside. Fractions
     # from ifg.tipback_lid_product_cam_fractions() (form-keyed, not a product noun).
-    _tc = bool(_IS_THERMOCYCLER_FORM)
-    _tl = ifg.tipback_lid_product_cam_fractions() if _tc else {}
-    _ext_z = _tl.get("ext_z", 1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
-    _side_z = _tl.get("side_z", 1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
-    _tgt_z = _tl.get("tgt_z", 0.04 if _IS_INSTRUMENT_DEVICE else 0.0)
-    _tgt_y = (d * float(_tl.get("tgt_y_frac", 0.0))) if _tc else 0.0
-    _front_ds = float(_tl.get("front_dist_scale", 1.0)) if _tc else 1.0
+    if _sp:
+        _ext_z = float(_sp_cam.get("ext_z", 0.95))
+        _side_z = float(_sp_cam.get("side_z", 0.70))
+        _tgt_z = float(_sp_cam.get("tgt_z", 0.0))
+        _tgt_y = 0.0
+        _front_ds = float(_sp_cam.get("front_dist_scale", 0.88))
+    else:
+        _ext_z = _tl.get("ext_z", 1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
+        _side_z = _tl.get("side_z", 1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
+        _tgt_z = _tl.get("tgt_z", 0.04 if _IS_INSTRUMENT_DEVICE else 0.0)
+        _tgt_y = (d * float(_tl.get("tgt_y_frac", 0.0))) if _tc else 0.0
+        _front_ds = float(_tl.get("front_dist_scale", 1.0)) if _tc else 1.0
     return [
         {
             "name": "04-product-exterior",

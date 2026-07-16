@@ -16704,6 +16704,13 @@ _PCB_MECH_OFFBOARD_RX = re.compile(
     # thermal assemblies — Excel must not re-label them ELECTRONIC gaps.
     r"peltier|\btec\b|thermoelectric|heatsink|heat\s*sink|thermal\s*block|"
     r"tube\s*block|lid\s*heater|heated\s*lid|cooling\s*fan|"
+    # INTENT (2026-07-16 Poseidon): OPEN syringe-pump mechanics + NEMA steppers
+    # are purchased/printed assemblies — only driver/MCU ICs belong on the PCB.
+    r"syringe|plunger|lead[\s_-]?screw|leadscrew|linear\s*carriage|carriage|"
+    r"guide\s*rail|v[\s_-]?cradle|barrel\s*cradle|star\s*clamp|thumb\s*clamp|"
+    r"stepper(?:\s*motor)?|nema\s*17|shaft\s*coupling|base\s*plate|"
+    r"channel\s*frame|console\s*enclosure|wire\s*harness|cable\s*harness|"
+    r"foot\s*pad|printed\s*frame|"
     r"audible\s*alarm|alarm|buzzer|sounder|siren|"
     r"warning\s*labels?|safety\s*warning|signage|warning\s*sign|"
     r"battery\s*management|energy\s*management|digital\s*energy\s*platform|"
