@@ -46,7 +46,10 @@ import { cc, makeSubModule, mod, word, type SubModule, type Word } from './emitt
 // TRAINING/REFERENCE-AIDED run). SHARES the tool-identity signal the word-domain-
 // coherence-audit's ADD backstop (A2) already uses — never a duplicated list, never a
 // product/class check. See the `hasOpticalInstrumentSignal` comment below.
-import { hasOpticalInstrumentToolSignal } from '../../../../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import {
+  hasOpticalInstrumentToolSignal,
+  hasThermocyclerToolSignal,
+} from '../../../../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 
 const MIN_WORDS = 5 // sub_module_word_density gate floor (words PER sub_module)
 const MAX_COMPONENTS = 12 // components per module — split into ≥2 sub_modules of ≥MIN_WORDS
@@ -268,6 +271,142 @@ function hasOpticalInstrumentSignal(contract: ContractInProgress): boolean {
   return hasOpticalInstrumentToolSignal(contract?._tools_run)
 }
 
+/** True when tools_run shows a solid-state PCR / thermocycler tool (Peltier /
+ *  thermal-block / forced-convection heatsink). PURE — shared signal. */
+function hasThermocyclerSignal(contract: ContractInProgress): boolean {
+  return hasThermocyclerToolSignal(contract?._tools_run)
+}
+
+// ── THERMOCYCLER / SOLID-STATE TEC FLOOR (Tristan 2026-07-15 — NinjaPCR) ────────
+// INTENT: with an empty or heating+cooling contract the environmental_interface
+// floor defaults to plant chillers (THERMAL_COOLING / THERMAL_BOTH). A benchtop
+// PCR instrument cools with a Peltier + heatsink fan, not a 200 kW scroll
+// compressor. Same shape as OPTICAL_* floors — tool-identity signal, never a
+// product-class table. Energy path is a bench PSU + IEC inlet, not a
+// distribution transformer / LV switchboard.
+const THERMOCYCLER_THERMAL_FLOOR = [
+  'peltier_tec_module', 'heatsink_fan_assembly', 'aluminum_sample_block',
+  'block_temperature_sensor', 'lid_heater_assembly', 'thermal_interface_pad',
+]
+const THERMOCYCLER_ENERGY_FLOOR = [
+  'bench_psu_adapter', 'iec_mains_inlet', 'input_fuse',
+  'power_switch', 'emc_line_filter', 'protective_earth_bond',
+]
+const THERMOCYCLER_ENERGY_CONVERSION_FLOOR = [
+  'h_bridge_tec_driver', 'mosfet_heater_switch', 'dc_dc_regulator',
+  'current_sense_shunt', 'snubber_network',
+]
+const THERMOCYCLER_POWER_DISTRIBUTION_FLOOR = [
+  'terminal_block', 'wire_harness', 'polyfuse_resettable',
+  'bulk_capacitor', 'status_led',
+]
+const THERMOCYCLER_STRUCTURE_FLOOR = [
+  'enclosure_shell', 'sample_block_mount', 'lid_assembly',
+  'tube_access_aperture', 'fastener_set', 'foot_pad',
+]
+const THERMOCYCLER_CONTROL_FLOOR = [
+  'main_controller_mcu', 'wifi_module', 'flash_storage',
+  'debug_uart', 'firmware_watchdog',
+]
+const THERMOCYCLER_SENSING_FLOOR = [
+  'block_temperature_sensor', 'lid_temperature_sensor', 'ambient_temperature_sensor',
+  'fan_tachometer_sense', 'sensor_cable',
+]
+const THERMOCYCLER_SAFETY_FLOOR = [
+  'thermal_fuse_safety', 'overtemp_hardware_cutout', 'fan_failure_detect',
+  'estop_or_power_kill', 'protective_earth',
+]
+const THERMOCYCLER_HMI_FLOOR = [
+  'status_indicator', 'browser_ui_host', 'run_start_control',
+  'mounting_bezel', 'user_facing_legend',
+]
+const THERMOCYCLER_MODULE_FLOORS: Record<string, string[]> = {
+  environmental_interface: THERMOCYCLER_THERMAL_FLOOR,
+  energy_conversion_transduction: THERMOCYCLER_ENERGY_CONVERSION_FLOOR,
+  sensing_instrumentation: THERMOCYCLER_SENSING_FLOOR,
+  structure_containment: THERMOCYCLER_STRUCTURE_FLOOR,
+  control_compute_communication: THERMOCYCLER_CONTROL_FLOOR,
+  power_distribution: THERMOCYCLER_POWER_DISTRIBUTION_FLOOR,
+  safety_protection: THERMOCYCLER_SAFETY_FLOOR,
+  hmi_ergonomics: THERMOCYCLER_HMI_FLOOR,
+  human_machine_interface: THERMOCYCLER_HMI_FLOOR,
+}
+// Plant-thermal / LV-incomer names that must never pad a thermocycler module
+// even if the class-reference corpus still lists them.
+const THERMOCYCLER_FORBIDDEN_COMPONENT_RE =
+  /chill|scroll\s*compressor|process_water|condensate_drain|air_damper|heat_pump|circulation_pump|expansion_vessel|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|module_rack|storage_cell/i
+
+// ── SYRINGE_PUMP / MULTI-CHANNEL LINEAR DOSING FLOOR (Tristan 2026-07-16 — Poseidon) ──
+// INTENT: Tier-C mass_fluid defaults emit circulation_pump + expansion_reservoir +
+// plant HMI membrane — wrong for an OPEN benchtop lead-screw array. Form signal =
+// product_class syringe_pump OR contract quantities unique to the archetype builder
+// (channel_count + lead_screw_pitch_mm + max_syringe_volume_ml) — never a brand noun.
+const SYRINGE_PUMP_FLUID_FLOOR = [
+  'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
+  'guide_rail_pair', 'linear_carriage', 'stepper_motor',
+]
+const SYRINGE_PUMP_ENERGY_FLOOR = [
+  'bench_psu_adapter', 'iec_mains_inlet', 'input_fuse',
+  'power_switch', 'emc_line_filter', 'protective_earth_bond',
+]
+const SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR = [
+  'stepper_driver_board', 'microstep_driver', 'shaft_coupling',
+  'dc_dc_regulator', 'current_sense_shunt',
+]
+const SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR = [
+  'wire_harness', 'terminal_block', 'polyfuse_resettable',
+  'bulk_capacitor', 'status_led',
+]
+const SYRINGE_PUMP_STRUCTURE_FLOOR = [
+  'channel_frame_printed', 'base_plate', 'console_enclosure',
+  'foot_pad', 'fastener_set', 'cable_tie_mount',
+]
+const SYRINGE_PUMP_CONTROL_FLOOR = [
+  'main_controller_mcu', 'host_interface', 'flash_storage',
+  'debug_uart', 'firmware_watchdog',
+]
+const SYRINGE_PUMP_SENSING_FLOOR = [
+  'endstop_or_stall_sense', 'current_sense_on_driver', 'home_reference',
+  'sensor_cable', 'force_limit_feedback',
+]
+const SYRINGE_PUMP_SAFETY_FLOOR = [
+  'estop_or_power_kill', 'protective_earth', 'overcurrent_polyfuse',
+  'force_limit_firmware', 'mains_fuse',
+]
+const SYRINGE_PUMP_HMI_FLOOR = [
+  'touch_display', 'status_indicator', 'run_start_control',
+  'mounting_bezel', 'user_facing_legend',
+]
+const SYRINGE_PUMP_MODULE_FLOORS: Record<string, string[]> = {
+  mass_fluid_transport_process: SYRINGE_PUMP_FLUID_FLOOR,
+  energy_conversion_transduction: SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR,
+  sensing_instrumentation: SYRINGE_PUMP_SENSING_FLOOR,
+  structure_containment: SYRINGE_PUMP_STRUCTURE_FLOOR,
+  control_compute_communication: SYRINGE_PUMP_CONTROL_FLOOR,
+  power_distribution: SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR,
+  safety_protection: SYRINGE_PUMP_SAFETY_FLOOR,
+  hmi_ergonomics: SYRINGE_PUMP_HMI_FLOOR,
+  human_machine_interface: SYRINGE_PUMP_HMI_FLOOR,
+}
+const SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE =
+  /chill|scroll\s*compressor|process_water|circulation_pump|expansion_vessel|expansion_reservoir|access_ladder|interface_membrane|scada|plc_cabinet|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|module_rack|storage_cell|pipework_run|distribution_manifold|fluid_filter/i
+
+/** True when the contract is a multi-channel benchtop linear syringe-dosing form.
+ *  PURE — class slug OR archetype-builder quantity triad; never a product brand. */
+function hasSyringePumpSignal(contract: ContractInProgress): boolean {
+  const pc = String((contract as { product_class?: unknown })?.product_class ?? '').toLowerCase()
+  if (/syringe[_ -]?pump/.test(pc)) return true
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  const channels = Number(q.channel_count?.value)
+  const pitch = Number(q.lead_screw_pitch_mm?.value)
+  const syringeMl = Number(q.max_syringe_volume_ml?.value)
+  return (
+    Number.isFinite(channels) && channels >= 1
+    && Number.isFinite(pitch) && pitch > 0
+    && Number.isFinite(syringeMl) && syringeMl > 0
+  )
+}
+
 /** The energy_storage_source floor: an optical instrument's own small rechargeable
  *  battery + charge management (checked FIRST — never confused with a BESS even if a
  *  stray quantity key happens to match ENERGY_STORAGE_RE), else a battery kit for a
@@ -275,7 +414,15 @@ function hasOpticalInstrumentSignal(contract: ContractInProgress): boolean {
  *  power (no battery). */
 function energyFloorFor(contract: ContractInProgress): string[] {
   if (hasOpticalInstrumentSignal(contract)) return OPTICAL_ENERGY_STORAGE_FLOOR
+  if (hasThermocyclerSignal(contract)) return THERMOCYCLER_ENERGY_FLOOR
+  if (hasSyringePumpSignal(contract)) return SYRINGE_PUMP_ENERGY_FLOOR
   return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
+}
+
+/** Thermal floor: solid-state TEC kit for thermocycler tools; else duty-sign plant set. */
+function thermalFloorForContract(contract: ContractInProgress): string[] {
+  if (hasThermocyclerSignal(contract)) return THERMOCYCLER_THERMAL_FLOOR
+  return thermalFloorFor(contract)
 }
 
 const ACRONYMS: Record<string, string> = {
@@ -385,6 +532,8 @@ function componentsForModule(
   const isThermal = moduleKey === 'environmental_interface'
   const isEnergyStore = moduleKey === 'energy_storage_source'
   const isOpticalInstrument = hasOpticalInstrumentSignal(contract)
+  const isThermocycler = hasThermocyclerSignal(contract)
+  const isSyringePump = hasSyringePumpSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -392,6 +541,10 @@ function componentsForModule(
   const push = (c: string) => {
     // Heating-only plant: never admit a cooling component (from corpus OR floor).
     if (isThermal && thermalMode === 'heating' && COOLING_COMPONENT_RE.test(c)) return
+    // Thermocycler: never admit plant chillers / LV switchboard vocabulary.
+    if (isThermocycler && THERMOCYCLER_FORBIDDEN_COMPONENT_RE.test(c)) return
+    // Syringe-pump: never admit plant circulation / ladder / membrane vocabulary.
+    if (isSyringePump && SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Never admit a DIMENSION/PROPERTY name as a part (it is an attribute of its parent device).
     if (PROPERTY_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
@@ -403,9 +556,11 @@ function componentsForModule(
   for (const c of fromCorpus) push(c)
   if (out.length < MIN_WORDS) {
     // Duty-aware thermal floor (heating ⇒ heat-pump set, cooling ⇒ chiller set, etc.);
-    // every other module keeps its static Tier-C floor.
-    const floor = isThermal ? thermalFloorFor(contract)
+    // thermocycler / optical / syringe-pump instrument module floors override plant Tier-C.
+    const floor = isThermal ? thermalFloorForContract(contract)
       : isEnergyStore ? energyFloorFor(contract)
+      : (isSyringePump && SYRINGE_PUMP_MODULE_FLOORS[moduleKey]) ? SYRINGE_PUMP_MODULE_FLOORS[moduleKey]
+      : (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey]) ? THERMOCYCLER_MODULE_FLOORS[moduleKey]
       : (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey]) ? OPTICAL_MODULE_FLOORS[moduleKey]
       : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {

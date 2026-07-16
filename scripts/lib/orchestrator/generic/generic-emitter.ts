@@ -204,9 +204,25 @@ export async function emitGenericDesign(
     const briefMetrics = (Array.isArray(tp?.metrics) && tp.metrics.length > 0
       ? tp.metrics
       : tp && Number.isFinite(Number(tp.value)) ? [tp] : []) as never[]
+    // INTENT (2026-07-16 Poseidon): bench instruments must NOT run plant synthesis
+    // (circulation pumps, expansion reservoirs, SCADA, access ladders, building
+    // take-off). Detect form via class + contract quantities unique to the
+    // syringe-pump / thermocycler / optical archetype builders — never a brand noun.
+    const _pc = String((contract as { product_class?: unknown }).product_class ?? '').toLowerCase()
+    const _q = (contract as { quantities?: Record<string, { value?: unknown }> }).quantities ?? {}
+    const _enc = Number(_q.enclosure_volume_m3?.value)
+    const _isBenchInstrument =
+      /syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument/.test(_pc)
+      || (Number.isFinite(_enc) && _enc > 0 && _enc < 1 && (
+        (Number(_q.channel_count?.value) >= 1 && Number(_q.lead_screw_pitch_mm?.value) > 0)
+        || Number(_q.max_syringe_volume_ml?.value) > 0
+      ))
     const r = applyUniversalContractSizing(modules as never[], contract, {
       onlyUnsized: true,
-      synthesizeMissing: true,
+      // Device-scale: keep contract sizing on existing words; do not mint plant equipment.
+      synthesizeMissing: !_isBenchInstrument,
+      instrument: !_isBenchInstrument,
+      explode: !_isBenchInstrument,
       briefMetrics,
     })
     physicsEquipment = { sized: r.sized, synthesized: r.synthesized }

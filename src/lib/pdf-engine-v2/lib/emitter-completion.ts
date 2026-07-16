@@ -1098,10 +1098,15 @@ const _DEVICE_REJECT_INDUSTRIAL_VENDORS = new Set([
   'banner engineering', 'banner', 'schmersal', 'pilz', 'sick', 'sick ag',
   'schneider electric', 'schneider', 'eaton', 'abb', 'rockwell', 'allen-bradley',
   'wago', 'phoenix contact', 'pepperl+fuchs', 'pepperl fuchs', 'turck', 'ifm',
+  // INTENT (NinjaPCR 2026-07-15): industrial motor OEMs must not pin a 5–20 W
+  // heatsink-fan "EC Motor" slot — WEG M4-02FL* shipped on a £259 thermocycler.
+  'weg', 'siemens', 'nord', 'nord drivesystems', 'baldor', 'reliance',
+  'leroy-somer', 'leroy somer', 'sew-eurodrive', 'sew eurodrive', 'teco',
+  'toshiba industrial', 'yaskawa',
 ])
 // component_class families that are plant switchgear / industrial safety — never a device part.
 const _DEVICE_REJECT_CLASS_RE =
-  /switchgear|circuit[_ -]?breaker|contactor|\bmccb\b|\bmcb\b|safety[_ -]?relay|light[_ -]?curtain|motor[_ -]?protect|oem_subsystem/i
+  /switchgear|circuit[_ -]?breaker|contactor|\bmccb\b|\bmcb\b|safety[_ -]?relay|light[_ -]?curtain|motor[_ -]?protect|oem_subsystem|industrial[_ -]?motor|iec[_ -]?frame/i
 // ultrasonic-flow / time-to-digital metering ICs — a FLOW converter, never a generic ADC.
 const _FLOW_TDC_MPN_RE = /\bMAX3510\d|\bMAX35104|\bTDC[_ -]?GP|\bGP22\b|\bGP30\b|flow.*converter/i
 
@@ -1525,10 +1530,17 @@ export function dbHitAcceptableForWord(dbHit: DbPart, name: string): boolean {
   if (RUN_IS_INSTRUMENT_DEVICE) {
     const _mpn = (dbHit.part_number ?? '').toUpperCase()
     const _cls = (dbHit.component_class ?? '')
+    const _hitBlob = `${dbHit.part_name ?? ''} ${dbHit.part_number ?? ''} ${dbHit.component_class ?? ''}`
     if (_DEVICE_REJECT_INDUSTRIAL_VENDORS.has(mfr)) return false
     if (_DEVICE_REJECT_CLASS_RE.test(_cls)) return false
     // a generic ADC / converter slot must not accept a flow/ultrasonic metering TDC
     if (/\b(adc|converter|analog[_ -]?to[_ -]?digital)\b/i.test(name) && _FLOW_TDC_MPN_RE.test(_mpn)) return false
+    // IEC-frame / TEFC industrial motors on a device motor/fan/impeller word
+    // (NinjaPCR: WEG M4-02FL112C3BIE3 on a 10 W heatsink fan EC Motor).
+    if (/\b(motor|fan|impeller|blower)\b/i.test(name)
+      && /\b(?:tefc|ip55|ip65|iec[\s-]?frame|frame\s*size|cast[\s-]?iron\s+motor|industrial\s+motor)\b/i.test(_hitBlob)) {
+      return false
+    }
   }
   const toks = tokenize(name)
   const cls = (dbHit.component_class ?? '').toLowerCase()

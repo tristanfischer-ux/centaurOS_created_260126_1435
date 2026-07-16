@@ -48,7 +48,7 @@ import { normaliseFieldErectedMassConstraint } from './lib/orchestrator/constrai
 import { massAggregator, workedCalc as workedCalcTs } from './lib/orchestrator/tools/mass-aggregator'
 import { buildExecutiveSummary } from '../src/lib/pdf-engine-v2/lib/executive-summary'
 import { computeToolArchetypeCoherence, isMarineClass, isHydroponicClass, isCoolingClass, isSeawaterSourceClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
-import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { computeWordDomainCoherence, stripFlaggedWords, isProcessPlantClass, isDeviceScaleDesign, scanWordTextForVesselMarkers, scanWordTextForIndustrialPowerMarkers, computeToolImpliedComponents, addImpliedWords, selectedToolIdentities, hasOpticalInstrumentToolSignal, hasThermocyclerToolSignal } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 import { deriveDeviceEnergyTopology, hasEnergyStoragePlantSignal, deriveInstrumentTopology, instrumentRole } from './lib/orchestrator/generic/derive-topology'
 import { scanDesignForElectronicSignals, deriveDispositionSignals } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
 import { decidePcbDisposition } from '../src/lib/pdf-engine-v2/lib/pcb/disposition'
@@ -6339,6 +6339,84 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       optOk,
       (ok) => ok,
       () => `optical install=${opt.ratios.installation_cost_factor} key=${opt.class_key}; flagged install=${flagged.ratios.installation_cost_factor}; plant install=${plant.ratios.installation_cost_factor}`,
+    ))
+  }
+
+  // ── UNIVERSAL.thermocycler_contract_emits_hard_slots ─────────────────────
+  // INTENT (2026-07-15 NinjaPCR): new on-the-fly class must not ship an empty
+  // contract (LLM-only fallback). Guard: buildContract('thermocycler') fills
+  // every HARD_REQUIRED_SLOTS.thermocycler key with a positive value, and cost
+  // stack has zero site install (benchtop instrument).
+  {
+    const ninjaBrief = {
+      original_text:
+        'Compact PCR thermocycler for at least eight standard 0.2 mL PCR tubes, '
+        + 'sample temperatures from 4 °C to 99 °C, active heating and cooling, '
+        + '20-unit engineering build.',
+      product_description: 'Benchtop PCR thermocycler, 8×0.2 mL tubes, 4–99 °C.',
+      constraints: { target_performance: { value: 8, unit: 'tubes' } },
+    }
+    let miss: string[] = []
+    let tube = 0
+    let loadKw = 0
+    let threw = ''
+    try {
+      const c = buildContract('thermocycler', ninjaBrief) as {
+        quantities?: Record<string, { value?: number }>
+      } | null
+      if (!c?.quantities) {
+        threw = 'buildContract returned null/empty'
+      } else {
+        const hard = HARD_REQUIRED_SLOTS.thermocycler ?? []
+        for (const slot of hard) {
+          const v = c.quantities[slot]?.value
+          if (v === undefined || v === null || v === 0) miss.push(slot)
+        }
+        tube = Number(c.quantities.tube_count?.value ?? 0)
+        loadKw = Number(c.quantities.connected_electrical_load_kw?.value ?? 0)
+      }
+    } catch (err) {
+      threw = String(err).slice(0, 160)
+    }
+    const stack = resolveCostStack({ keyMetrics: { product_class: 'thermocycler' } })
+    const ok =
+      !threw
+      && miss.length === 0
+      && tube >= 8
+      && loadKw > 0
+      && loadKw < 1
+      && stack.ratios.installation_cost_factor === 0
+    assertions.push(assertEq(
+      'UNIVERSAL.thermocycler_contract_emits_hard_slots',
+      'thermocycler archetype fills HARD slots + instrument cost stack (no site install)',
+      ok,
+      (v) => v,
+      () => `threw=${threw || 'none'}; miss=[${miss.join(',')}]; tube=${tube}; load_kw=${loadKw}; install=${stack.ratios.installation_cost_factor}`,
+    ))
+  }
+
+  // ── UNIVERSAL.thermocycler_tool_signal_not_plant_hvac ───────────────────
+  // INTENT (2026-07-15): Peltier/thermal-block tools mark a benchtop
+  // thermocycler; plant "Chiller Unit" / "Mains Incomer" vocabulary must flag
+  // on device-scale scans (skeleton floor source fix).
+  {
+    const tools = ['peltier:tec-sizing', 'thermal-block:spreading-resistance', 'heatsink:forced-convection']
+    const signal = hasThermocyclerToolSignal(tools)
+    const chillerHits = scanWordTextForIndustrialPowerMarkers('Chiller Unit Scroll Compressor')
+    const incomerHits = scanWordTextForIndustrialPowerMarkers('Mains Incomer distribution transformer')
+    const fanHits = scanWordTextForIndustrialPowerMarkers('Heatsink Fan Assembly')
+    const ok =
+      signal
+      && chillerHits.includes('chiller unit')
+      && incomerHits.includes('mains incomer')
+      && fanHits.length === 0
+      && !hasThermocyclerToolSignal(['photodiode-tia:gain-sizing'])
+    assertions.push(assertEq(
+      'UNIVERSAL.thermocycler_tool_signal_not_plant_hvac',
+      'peltier/thermal-block tools → thermocycler signal; plant chiller/incomer markers fire; heatsink fan clean',
+      ok,
+      (v) => v,
+      () => `signal=${signal}; chiller=${chillerHits.join(',')}; incomer=${incomerHits.join(',')}; fan=${fanHits.join(',')}`,
     ))
   }
 

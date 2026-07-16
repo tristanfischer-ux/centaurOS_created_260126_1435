@@ -5626,8 +5626,22 @@ async function main() {
   // are now covered by deterministic-emitter.ts (commit accompanying this gate).
   const _encVolForDevice = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
   const _pcForDevice = String(currentProductClass ?? '').toLowerCase()
-  const _isPlantishForDevice = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pcForDevice)
-  const isInstrumentDevice = Number.isFinite(_encVolForDevice) && _encVolForDevice > 0 && _encVolForDevice < 1 && !_isPlantishForDevice
+  // GOTCHA (2026-07-16 Poseidon): bare `pump` matched `syringe_pump` → plantish=true
+  // → isInstrumentDevice=false → industrial MPN scrub off + plant BoM vocabulary.
+  // Plant pumps are NAMED (circulation/centrifugal/process); instrument forms win.
+  const _isInstrumentFormForDevice =
+    /syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument/.test(
+      _pcForDevice,
+    )
+  const _isPlantishForDevice =
+    /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump/.test(
+      _pcForDevice,
+    ) && !_isInstrumentFormForDevice
+  const isInstrumentDevice =
+    Number.isFinite(_encVolForDevice) &&
+    _encVolForDevice > 0 &&
+    _encVolForDevice < 1 &&
+    (!_isPlantishForDevice || _isInstrumentFormForDevice)
   setInstrumentDeviceContext(isInstrumentDevice)
   // INTENT (2026-07-15 NinjaPCR): isInstrumentDevice is computed HERE (enclosure < 1
   // + not plantish) and stamped onto `state` at construction (~line 7199). Do NOT

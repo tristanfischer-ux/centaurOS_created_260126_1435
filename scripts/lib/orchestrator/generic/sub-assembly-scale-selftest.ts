@@ -125,6 +125,46 @@ const fanTotal = fanKids.reduce((s: number, w: any) =>
 expect(fanTotal < 500,
   `a duty-capped cabinet fan set must price at EC-fan money, never pump anatomy £3,971 (got £${Math.round(fanTotal)})`)
 
+// ── 9a. CATCH (2026-07-15 NinjaPCR): unrated heatsink/fan parent must NOT invent a
+//     100 W EC Motor (old `p.kw || 0.1` default) — electronics axial fans are ~5 W.
+const tinyFanMod: any = { sub_modules: [{ words: [
+  mkWord('heatsink_fan_assembly_word', 'Heatsink Fan Assembly',
+    [{ kind: 'quantity', value: '×1' }]),
+] }] }
+explodeEquipmentSubAssemblies([tinyFanMod], {
+  connected_electrical_load_kw: 0.175,
+  heat_rejection_duty_w: 213,
+  enclosure_volume_m3: 0.0036,
+})
+const tinyEc = tinyFanMod.sub_modules[0].words.find((w: any) => /EC Motor/i.test(String(w.name_human ?? '')))
+const tinyEcKw = Number((tinyEc?.modifier_characters ?? []).find((x: any) => x.kind === 'rating_primary')?.value ?? 99)
+expect(!!tinyEc && tinyEcKw > 0 && tinyEcKw <= 0.02,
+  `unrated heatsink fan EC Motor must be ≤20 W electronics-class (got ${tinyEcKw} kW)`)
+
+// ── 9a2. CATCH (2026-07-15 NinjaPCR): fan_failure_detect / fan_tachometer_sense must
+//     NOT explode EC Motor / Impeller anatomy — only the real heatsink fan does.
+const senseFanMod: any = { sub_modules: [{ words: [
+  mkWord('fan_failure_detect_word', 'Fan Failure Detect',
+    [{ kind: 'quantity', value: '×1' }]),
+  mkWord('fan_tachometer_sense_word', 'Fan Tachometer Sense',
+    [{ kind: 'quantity', value: '×1' }]),
+  mkWord('heatsink_fan_assembly_word', 'Heatsink Fan Assembly',
+    [{ kind: 'quantity', value: '×1' }]),
+] }] }
+explodeEquipmentSubAssemblies([senseFanMod], {
+  connected_electrical_load_kw: 0.175,
+  enclosure_volume_m3: 0.0036,
+})
+const senseKids = senseFanMod.sub_modules[0].words.filter((w: any) => w._subcomponent)
+const senseEcParents = senseKids
+  .filter((w: any) => /EC Motor/i.test(String(w.name_human ?? '')))
+  .map((w: any) => String((w.content_character || {}).character_id || w.id || ''))
+expect(senseEcParents.length === 1 && /heatsink_fan/i.test(senseEcParents[0] || ''),
+  `only heatsink_fan may explode an EC Motor (got ${senseEcParents.join(', ') || 'none'})`)
+expect(!senseKids.some((w: any) => /fan_failure|fan_tachometer/i.test(
+  String((w.content_character || {}).character_id || w.id || ''))),
+  'fan_failure_detect / fan_tachometer_sense must never mint fan anatomy children')
+
 // ── 9b. CATCH: grid-interface PLANT (step-up/MV/isolation transformer, switchgear) in a
 //     sealed sub-1 m³ enclosure whose contract sizes NO transformer demotes; a contract
 //     that DOES size one (utility BESS / wind: transformer_rating_kva) keeps every word ──

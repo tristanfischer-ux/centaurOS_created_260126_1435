@@ -226,7 +226,7 @@ const DEVICE_SCALE_POSITIONING_RE =
   /\b(portable|benchtop|bench-top|handheld|hand-held|desktop|wall[- ]mount(?:ed)?|tabletop|table-top)\b/i
 
 const ELECTRONIC_INSTRUMENT_RE =
-  /\b(optical[_ -]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance|thermo[_ -]?cycler|thermal[_ -]?cycler|pcr[_ -]?cycler|thermocycler|portable\s+instrument|benchtop\s+instrument)\b/i
+  /\b(optical[_ -]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance|thermo[_ -]?cycler|thermal[_ -]?cycler|pcr[_ -]?cycler|thermocycler|syringe[_ -]?pump|multi[_ -]?channel[_ -]?syringe|portable\s+instrument|benchtop\s+instrument)\b/i
 
 // GOTCHA (2026-07-15 NinjaPCR): a USB photometer is ~5 W; a Peltier thermocycler
 // is ~50–150 W continuous. Cap must admit that band without opening the door to

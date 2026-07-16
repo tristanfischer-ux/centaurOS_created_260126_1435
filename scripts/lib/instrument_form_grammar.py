@@ -387,6 +387,13 @@ SP_CARRIAGE_TRAVEL_FRAC = 0.42    # carriage mid-stroke for readability
 SP_SYRINGE_LENGTH_MM = 100.0
 SP_SYRINGE_DIAMETER_MM = 22.0
 SP_CLAMP_STAR_OD_MM = 22.0
+SP_CLAMP_STAR_LOBES = 5
+SP_COUPLER_LEN_MM = 18.0
+SP_COUPLER_OD_MM = 16.0
+SP_HARNESS_OD_MM = 4.5
+SP_TUBING_OD_MM = 2.2
+SP_CRADLE_ANGLE_DEG = 18.0       # tip cradle tips forward (gold printed aesthetic)
+SP_DISPLAY_TILT_DEG = 22.0       # console screen tips up toward operator
 
 # Mesh-name prefixes for deterministic SIGHT (form_converge_loop).
 SP_MESH_PREFIX = "u_se_sp_"
@@ -482,17 +489,30 @@ def syringe_pump_checklist(channel_count: int) -> list[str]:
                  Blender rounds stay cheap.
     """
     n = max(1, int(channel_count))
-    stems = [f"{SP_MESH_PREFIX}base", f"{SP_MESH_PREFIX}console"]
+    # Global: base + console body/top/display + bundled harness trunk.
+    stems = [
+        f"{SP_MESH_PREFIX}base",
+        f"{SP_MESH_PREFIX}console",
+        f"{SP_MESH_PREFIX}console_top",
+        f"{SP_MESH_PREFIX}console_display",
+        f"{SP_MESH_PREFIX}harness_trunk",
+    ]
     for i in range(1, n + 1):
         p = f"{SP_CHANNEL_PREFIX}{i}_"
         stems.extend([
             f"{p}stepper",
+            f"{p}coupler",
             f"{p}leadscrew",
             f"{p}carriage",
             f"{p}rail_a",
+            f"{p}rail_b",
             f"{p}cradle",
-            f"{p}clamp",
+            f"{p}cradle_v_a",
+            f"{p}clamp_barrel",
+            f"{p}clamp_plunger",
             f"{p}syringe",
+            f"{p}tubing",
+            f"{p}harness",
         ])
     return stems
 
@@ -588,9 +608,12 @@ def _selftest() -> None:
     assert len(_locs) == 4
     assert _locs[1]["x"] > _locs[0]["x"], "channels step in +X"
     _ok, _miss = syringe_pump_checklist_ok(
-        ["u_se_sp_base", "u_se_sp_console"]
+        ["u_se_sp_base", "u_se_sp_console", "u_se_sp_console_top",
+         "u_se_sp_console_display", "u_se_sp_harness_trunk"]
         + [f"u_se_sp_ch{i}_{s}" for i in range(1, 5)
-           for s in ("stepper", "leadscrew", "carriage", "rail_a", "cradle", "clamp", "syringe")],
+           for s in ("stepper", "coupler", "leadscrew", "carriage", "rail_a", "rail_b",
+                     "cradle", "cradle_v_a", "clamp_barrel", "clamp_plunger",
+                     "syringe", "tubing", "harness")],
         4,
     )
     assert _ok and not _miss, f"full mesh set must pass checklist, miss={_miss}"

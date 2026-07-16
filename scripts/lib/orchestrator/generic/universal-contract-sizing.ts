@@ -1033,6 +1033,36 @@ const motorKw = (p: ParentPhysics) => {
   return nextMotorFrameKw(Math.max(1.5, hydraulic || 30 / 0.88))
 }
 
+/** Fan shaft/electrical duty for SUB_ASSEMBLY fan anatomy. INTENT (2026-07-15):
+ *  unrated heatsink/cabinet fan parents must NOT default to 0.1 kW (100 W EC motor
+ *  on a ~175 W peak thermocycler). Catalogue 40–80 mm electronics fans are ~2–8 W. */
+const FAN_DEFAULT_KW = 0.005
+const fanKw = (p: ParentPhysics): number =>
+  (typeof p.kw === 'number' && p.kw > 0) ? p.kw : FAN_DEFAULT_KW
+
+// INTENT (2026-07-15 NinjaPCR): SUB_ASSEMBLY fan anatomy must only attach to a real
+// ventilation/heatsink fan parent. Bare `\bfan\b` also matched `fan_failure_detect` /
+// `fan_tachometer_sense` sense words and exploded THREE industrial EC motors into a
+// 175 W thermocycler. Sense/fail/tachometer parents stay as sensors — no impeller.
+const FAN_SENSE_OR_ALARM_RE =
+  /\b(fan[_\s-]?(failure|tachometer|sense|detect|alarm|speed|rpm|status)|failure[_\s-]?detect|tachometer[_\s-]?sense)\b/i
+const FAN_ASSEMBLY_PARENT_RE =
+  /\b(heatsink[_\s-]?fan|cooling[_\s-]?fan|chassis[_\s-]?fan|exhaust[_\s-]?fan|ventilation[_\s-]?fan|fan[_\s-]?assembly|active[_\s-]?(ventilation[_\s-]?)?fan)\b/i
+
+/**
+ * @description True when a word head is a physical fan assembly that should explode
+ * into housing/impeller/EC-motor anatomy — not a fan-related sensor or alarm.
+ */
+export function isFanAssemblyParent(name: string): boolean {
+  const n = String(name || '')
+  if (!n.trim()) return false
+  if (FAN_SENSE_OR_ALARM_RE.test(n)) return false
+  if (FAN_ASSEMBLY_PARENT_RE.test(n)) return true
+  // Bare "fan" / "fans" still explode (cabinet ventilation), but never when the
+  // same head also names a sensor/fuse/detect role.
+  return /\bfans?\b/i.test(n) && !/\b(sensor|fuse|detect|sense|tachometer|failure|alarm)\b/i.test(n)
+}
+
 // Read a pump/rotating parent's already-computed motor/drive power (kW) from the contract
 // quantities by stem (e.g. parent 'Irrigation Pump' → irrigation_pump_motor_kw=9.653). The
 // hydraulic sizing tool (process:/irrigation:pump-sizing) emits *_motor_kw / *_power_kw for
@@ -2491,7 +2521,13 @@ const vesselArea = (p: ParentPhysics) => { const d = p.diaM || Math.cbrt(((p.m3 
 // prices at ~£117, not £4,010. NEVER scales up (the linear kW terms own upsizing),
 // and a rule WITHOUT refKw is byte-identical (the pump/vessel calibrations that
 // Codema/RAS shipped on are untouched).
-const SUB_ASSEMBLY: { re: RegExp; refKw?: number; parts: SubSpec[] }[] = [
+const SUB_ASSEMBLY: {
+  re: RegExp
+  /** Optional predicate — when set, wins over `re.test` (fan sense-word exclusion). */
+  match?: (name: string) => boolean
+  refKw?: number
+  parts: SubSpec[]
+}[] = [
   // OPEN ATMOSPHERIC TANK (#144) — checked FIRST so a rearing tank / basin / MBBR biofilter
   // explodes into OPEN-TANK parts (wall + graded floor + dual-drain + walkway), NOT the
   // pressure-vessel parts below (top head, support skirt, manway, PVRV) that don't exist on
@@ -2541,12 +2577,19 @@ const SUB_ASSEMBLY: { re: RegExp; refKw?: number; parts: SubSpec[] }[] = [
   // pump template minted all of those (a wall cabinet's ventilation fan billed £3,971
   // of pump anatomy). Honest fan parts, duty-linear from small EC-fan money. Checked
   // BEFORE the pump rule so \bfan\b never falls through to pump parts.
-  { re: /\bfan\b/i,
+  //
+  // GOTCHA (2026-07-15 NinjaPCR): default was `p.kw || 0.1` → a heatsink/assembly
+  // parent with NO rating exploded an EC Motor at 100 W (physics-critic HIGH on a
+  // benchtop thermocycler whose whole peak draw is ~175 W). Missing parent rating
+  // now means a small electronics axial fan (~5 W), not a 100 W industrial EC.
+  // GOTCHA (same day): bare `\bfan\b` also matched fan_failure_detect /
+  // fan_tachometer_sense — match via isFanAssemblyParent (sense/alarm excluded).
+  { re: FAN_ASSEMBLY_PARENT_RE, match: isFanAssemblyParent,
     parts: [
-      { name: 'Fan Housing / Venturi', derive: (p) => ({ gbp: 25 + (p.kw || 0.1) * 120 }) },
-      { name: 'Impeller', derive: (p) => ({ rating: { v: p.kw || 0.1, u: 'kW' }, gbp: 12 + (p.kw || 0.1) * 60 }) },
-      { name: 'EC Motor', derive: (p) => ({ rating: { v: p.kw || 0.1, u: 'kW' }, gbp: 30 + (p.kw || 0.1) * 180 }) },
-      { name: 'Speed Controller', derive: (p) => ({ gbp: 18 + (p.kw || 0.1) * 40 }) },
+      { name: 'Fan Housing / Venturi', derive: (p) => ({ gbp: 25 + fanKw(p) * 120 }) },
+      { name: 'Impeller', derive: (p) => ({ rating: { v: fanKw(p), u: 'kW' }, gbp: 12 + fanKw(p) * 60 }) },
+      { name: 'EC Motor', derive: (p) => ({ rating: { v: fanKw(p), u: 'kW' }, gbp: 30 + fanKw(p) * 180 }) },
+      { name: 'Speed Controller', derive: (p) => ({ gbp: 18 + fanKw(p) * 40 }) },
       { name: 'Guard / Grille', derive: () => ({ gbp: 9 }) },
       { name: 'Mounting Frame & Isolators', derive: () => ({ gbp: 14 }) },
     ] },
@@ -2975,7 +3018,7 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // rule test so a valve fitting that slipped past isValveFitting still cannot
         // inherit the pump parts list from the parenthetical.
         const nmHead = nm.replace(/\s*\([^)]*\)\s*$/g, '').trim() || nm
-        const rule = SUB_ASSEMBLY.find((r) => r.re.test(nmHead))
+        const rule = SUB_ASSEMBLY.find((r) => (r.match ? r.match(nmHead) : r.re.test(nmHead)))
         if (!rule) continue
         const physics = readParentPhysics(w)
         // UNKNOWN-SIZE VESSEL ENVELOPE CAP (2026-07-09, Powerwall exit-32 round 2): a
@@ -2996,11 +3039,19 @@ export function explodeEquipmentSubAssemblies(modules: ModuleLike[], quantities:
         // cabinet fan), which also defeated the refKw cost scaling. Cap physics.kw at
         // the contract's declared load; a plant with no thermal quantities (or a fan
         // genuinely serving a big load) is untouched.
-        if (/\bfan\b/i.test(nmHead)) {
+        if (isFanAssemblyParent(nmHead)) {
           const thermalLoadKw = Math.max(
             Number(quantities['hvac_design_load_kw'] ?? 0),
             Number(quantities['system_thermal_dissipation_kw'] ?? 0),
+            Number(quantities['heat_rejection_duty_w'] ?? 0) / 1000,
+            Number(quantities['connected_electrical_load_kw'] ?? 0),
           )
+          // Unrated parent: seed a small electronics-fan duty (not 0 → not 100 W default).
+          if (physics.kw <= 0) {
+            physics.kw = thermalLoadKw > 0
+              ? Math.min(FAN_DEFAULT_KW * 4, Math.max(FAN_DEFAULT_KW, thermalLoadKw * 0.05))
+              : FAN_DEFAULT_KW
+          }
           if (thermalLoadKw > 0 && physics.kw > thermalLoadKw * 1.5) {
             physics.kw = Math.round(thermalLoadKw * 1.5 * 1000) / 1000
           }

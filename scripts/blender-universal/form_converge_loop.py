@@ -185,22 +185,24 @@ def run(
         if not checklist_ok:
             # SOURCE gap — looping frame scale cannot invent missing form parts.
             break
-        if framing and framing["score"] >= frame_threshold:
-            # Final shaded product pass for SIGHT.
-            _render(state_path, out_dir, samples=max(samples, 64),
-                    frame_scale=frame_scale, inspect=False)
-            converged = True
-            break
         if framing:
+            codes = {f["code"] for f in framing.get("findings") or []}
+            # GOTCHA: score can clear threshold while TOO_SMALL remains — still reframe.
+            needs_reframe = bool(codes & {"TOO_SMALL", "TOO_LARGE", "CLIPPED"})
+            if framing["score"] >= frame_threshold and not needs_reframe:
+                _render(state_path, out_dir, samples=max(samples, 64),
+                        frame_scale=frame_scale, inspect=False)
+                converged = True
+                break
             new_scale, op = _adjust_frame(frame_scale, framing["findings"])
             if op is None or abs(new_scale - frame_scale) < 1e-3:
                 _render(state_path, out_dir, samples=max(samples, 64),
                         frame_scale=frame_scale, inspect=False)
-                converged = checklist_ok
+                converged = checklist_ok and not needs_reframe
                 break
             frame_scale = new_scale
-        else:
-            break
+            continue
+        break
 
     report = {
         "schema": "form-convergence-report/v1",

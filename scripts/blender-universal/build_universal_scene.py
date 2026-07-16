@@ -12953,6 +12953,38 @@ def _place_photodiode_to_can_compound(
     return 3
 
 
+def _sp_add_star_clamp(name, xyz_mm, od_mm, mat, story_mod, MO,
+                       *, lobes=None, hub_h_mm=8.0):
+    """Low-poly star thumb-knob (hub + radial lobes) — gold clamp affordance."""
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+    n_lobes = int(lobes or ifg.SP_CLAMP_STAR_LOBES)
+    x, y, z = xyz_mm
+    hub = fl.add_cyl(
+        f"{name}_hub", _mm3((x, y, z)),
+        (od_mm * 0.28) * fl.MM, hub_h_mm * fl.MM,
+        mat, module=story_mod, module_objects=MO)
+    # Primary named mesh for checklist (stem = name).
+    hub.name = name
+    lobe_w = od_mm * 0.22
+    lobe_l = od_mm * 0.55
+    for k in range(n_lobes):
+        ang = (2.0 * math.pi * k) / n_lobes
+        lx = x + math.cos(ang) * od_mm * 0.28
+        ly = y + math.sin(ang) * od_mm * 0.28
+        lobe = fl.add_box(
+            f"{name}_lobe{k}",
+            _mm3((lx, ly, z)),
+            _mm3((lobe_l, lobe_w, hub_h_mm * 0.85)),
+            mat, module=story_mod, module_objects=MO)
+        lobe.dimensions = _mm3((lobe_l, lobe_w, hub_h_mm * 0.85))
+        try:
+            lobe.rotation_euler = (0.0, 0.0, ang)
+        except Exception:
+            pass
+    return hub
+
+
 def _place_syringe_pump_layout(
     W: float,
     D: float,
@@ -12962,38 +12994,47 @@ def _place_syringe_pump_layout(
     story_mod: str,
     MO: dict,
 ) -> dict:
-    """OPEN multi-channel linear dosing array — stepper→screw→carriage→syringe.
+    """OPEN multi-channel linear dosing array — gold-convergent form rules.
 
     INTENT (2026-07-16 Poseidon SIGHT): gold open syringe pumps expose the
     mechanism as the product face. Function forces N parallel bays (channel_count)
-    with lead-screw carriages and cradles — never a sealed empty cube.
+    with lead-screw carriages, V-cradles, star clamps, harness, and a tipped
+    console display — never a sealed empty cube.
 
     DECISION: keyed on `_IS_SYRINGE_PUMP_FORM` via ifg.is_syringe_pump_form
     (class / part vocab — never a product-noun branch). Geometry from
-    ifg.syringe_pump_channel_locs_mm.
+    ifg.syringe_pump_channel_locs_mm + GOLD-WHY convergent details.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
 
     n = max(1, int(_SYRINGE_PUMP_CHANNEL_COUNT or 4))
+    # Printed-frame aesthetic: cool grey polymer + saturated safety-blue accents.
     frame_mat = fl.make_mat(
-        "m_se_sp_frame", fl._to_linear((0.55, 0.56, 0.58)), metallic=0.15, roughness=0.55)
-    carriage_mat = fl.make_mat(
-        "m_se_sp_carriage", fl._to_linear((0.12, 0.35, 0.78)), metallic=0.05, roughness=0.45)
+        "m_se_sp_frame", fl._to_linear((0.52, 0.54, 0.56)), metallic=0.08, roughness=0.62)
+    accent_mat = fl.make_mat(
+        "m_se_sp_accent", fl._to_linear((0.10, 0.38, 0.82)), metallic=0.02, roughness=0.48)
+    carriage_mat = accent_mat
     motor_mat = fl.make_mat(
         "m_se_sp_motor", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.35, roughness=0.50)
     screw_mat = fl.make_mat(
         "m_se_sp_screw", fl._to_linear((0.70, 0.72, 0.74)), metallic=0.85, roughness=0.25)
     rail_mat = fl.make_mat(
-        "m_se_sp_rail", fl._to_linear((0.65, 0.66, 0.68)), metallic=0.80, roughness=0.30)
-    cradle_mat = fl.make_mat(
-        "m_se_sp_cradle", fl._to_linear((0.50, 0.51, 0.53)), metallic=0.10, roughness=0.55)
+        "m_se_sp_rail", fl._to_linear((0.72, 0.73, 0.75)), metallic=0.90, roughness=0.22)
+    cradle_mat = frame_mat
     clamp_mat = fl.make_mat(
-        "m_se_sp_clamp", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.15, roughness=0.55)
+        "m_se_sp_clamp", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.12, roughness=0.55)
     syringe_mat = fl.make_mat(
-        "m_se_sp_syringe", fl._to_linear((0.85, 0.88, 0.90)), metallic=0.0, roughness=0.35)
-    console_mat = fl.make_mat(
-        "m_se_sp_console", fl._to_linear((0.18, 0.20, 0.24)), metallic=0.05, roughness=0.50)
+        "m_se_sp_syringe", fl._to_linear((0.88, 0.90, 0.92)), metallic=0.0, roughness=0.28)
+    tubing_mat = fl.make_mat(
+        "m_se_sp_tubing", fl._to_linear((0.75, 0.82, 0.85)), metallic=0.0, roughness=0.20)
+    harness_mat = fl.make_mat(
+        "m_se_sp_harness", fl._to_linear((0.12, 0.12, 0.13)), metallic=0.05, roughness=0.70)
+    wire_r_mat = fl.make_mat(
+        "m_se_sp_wire_r", fl._to_linear((0.75, 0.12, 0.10)), metallic=0.0, roughness=0.55)
+    wire_g_mat = fl.make_mat(
+        "m_se_sp_wire_g", fl._to_linear((0.12, 0.55, 0.18)), metallic=0.0, roughness=0.55)
+    console_mat = frame_mat
     glass_mat = fl.make_mat(
         "m_se_sp_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
 
@@ -13008,6 +13049,8 @@ def _place_syringe_pump_layout(
     locs = ifg.syringe_pump_channel_locs_mm(n, base_z=base_z)
     face = ifg.SP_STEPPER_FACE_MM
     screw_r = ifg.SP_SCREW_DIAMETER_MM / 2.0
+    cradle_tilt = math.radians(ifg.SP_CRADLE_ANGLE_DEG)
+    harness_ends = []  # (x, y, z) at motor rear for trunk gather
     for loc in locs:
         i = int(loc["index"])
         p = f"u_se_sp_ch{i}_"
@@ -13016,26 +13059,58 @@ def _place_syringe_pump_layout(
         y_t = float(loc["y_tip"])
         y_c = float(loc["y_carriage"])
         z = float(loc["z_axis"])
-        # Frame uprights (rear motor mount + front cradle mount).
-        for tag, y in (("frame_rear", y_m), ("frame_front", y_t)):
+        # Printed bay side rails (triangular gusset read via tapered uprights).
+        for tag, y, z_off in (
+            ("frame_rear", y_m, 0.0),
+            ("frame_front", y_t, 2.0),
+        ):
             _fr = fl.add_box(
                 f"{p}{tag}",
-                _mm3((x, y, base_z + ifg.SP_BAY_HEIGHT_MM * 0.35)),
-                _mm3((face * 0.95, 12.0, ifg.SP_BAY_HEIGHT_MM * 0.7)),
+                _mm3((x, y, base_z + ifg.SP_BAY_HEIGHT_MM * 0.32 + z_off)),
+                _mm3((face * 0.95, 14.0, ifg.SP_BAY_HEIGHT_MM * 0.65)),
                 frame_mat, module=story_mod, module_objects=MO)
-            _fr.dimensions = _mm3((face * 0.95, 12.0, ifg.SP_BAY_HEIGHT_MM * 0.7))
+            _fr.dimensions = _mm3((face * 0.95, 14.0, ifg.SP_BAY_HEIGHT_MM * 0.65))
+            if tag == "frame_front":
+                try:
+                    _fr.rotation_euler = (cradle_tilt, 0.0, 0.0)
+                except Exception:
+                    pass
+        # Diagonal gusset (printed-frame rigidity cue).
+        _gus = fl.add_box(
+            f"{p}gusset",
+            _mm3((x - face * 0.38, (y_m + y_t) * 0.35, base_z + 18.0)),
+            _mm3((4.0, abs(y_m - y_t) * 0.45, 10.0)),
+            frame_mat, module=story_mod, module_objects=MO)
+        _gus.dimensions = _mm3((4.0, abs(y_m - y_t) * 0.45, 10.0))
+        try:
+            _gus.rotation_euler = (0.0, 0.0, math.radians(12.0))
+        except Exception:
+            pass
         # Stepper (cube = NEMA face class).
+        y_st = y_m + face * 0.35
         _st = fl.add_box(
             f"{p}stepper",
-            _mm3((x, y_m + face * 0.35, z)),
+            _mm3((x, y_st, z)),
             _mm3((face, face, face)),
             motor_mat, module=story_mod, module_objects=MO)
         _st.dimensions = _mm3((face, face, face))
-        # Lead screw along Y between motor and tip.
-        screw_len = abs(y_m - y_t) - face * 0.5
+        # Flexible shaft coupler motor→screw.
+        y_cpl = y_m - ifg.SP_COUPLER_LEN_MM * 0.15
+        _cpl = fl.add_cyl(
+            f"{p}coupler",
+            _mm3((x, y_cpl, z)),
+            (ifg.SP_COUPLER_OD_MM / 2.0) * fl.MM,
+            ifg.SP_COUPLER_LEN_MM * fl.MM,
+            screw_mat, module=story_mod, module_objects=MO)
+        try:
+            _cpl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+        # Lead screw along Y between coupler and tip.
+        screw_len = abs(y_m - y_t) - face * 0.55
         _ls = fl.add_cyl(
             f"{p}leadscrew",
-            _mm3((x, (y_m + y_t) / 2.0, z)),
+            _mm3((x, (y_m + y_t) / 2.0 - 4.0, z)),
             screw_r * fl.MM,
             screw_len * fl.MM,
             screw_mat, module=story_mod, module_objects=MO)
@@ -13048,38 +13123,65 @@ def _place_syringe_pump_layout(
             _rl = fl.add_cyl(
                 f"{p}{tag}",
                 _mm3((x + side * ifg.SP_RAIL_GAP_MM / 2.0, (y_m + y_t) / 2.0, z)),
-                2.0 * fl.MM,
+                2.2 * fl.MM,
                 screw_len * fl.MM,
                 rail_mat, module=story_mod, module_objects=MO)
             try:
                 _rl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
             except Exception:
                 pass
-        # Carriage (contrasting) + plunger clamp nub.
+        # Bright blue carriage + V-notch seat for plunger flange.
         _car = fl.add_box(
             f"{p}carriage",
             _mm3((x, y_c, z)),
-            _mm3((face * 0.85, ifg.SP_CARRIAGE_L_MM, face * 0.70)),
+            _mm3((face * 0.90, ifg.SP_CARRIAGE_L_MM, face * 0.72)),
             carriage_mat, module=story_mod, module_objects=MO)
-        _car.dimensions = _mm3((face * 0.85, ifg.SP_CARRIAGE_L_MM, face * 0.70))
-        # V-cradle at tip end.
+        _car.dimensions = _mm3((face * 0.90, ifg.SP_CARRIAGE_L_MM, face * 0.72))
+        for tag, side in (("carriage_v_a", -1), ("carriage_v_b", 1)):
+            _cv = fl.add_box(
+                f"{p}{tag}",
+                _mm3((x + side * 6.0, y_c - ifg.SP_CARRIAGE_L_MM * 0.15, z + face * 0.28)),
+                _mm3((10.0, 10.0, 8.0)),
+                carriage_mat, module=story_mod, module_objects=MO)
+            _cv.dimensions = _mm3((10.0, 10.0, 8.0))
+            try:
+                _cv.rotation_euler = (0.0, side * math.radians(40.0), 0.0)
+            except Exception:
+                pass
+        # Angled tip cradle block + V jaws (barrel seat).
         _cr = fl.add_box(
             f"{p}cradle",
-            _mm3((x, y_t, z - 4.0)),
-            _mm3((face * 0.90, 18.0, 16.0)),
+            _mm3((x, y_t, z - 2.0)),
+            _mm3((face * 0.95, 22.0, 20.0)),
             cradle_mat, module=story_mod, module_objects=MO)
-        _cr.dimensions = _mm3((face * 0.90, 18.0, 16.0))
-        # Clamp knob (star affordance ≈ low-poly lobe cylinder) above cradle.
-        _cl = fl.add_cyl(
-            f"{p}clamp",
-            _mm3((x, y_t, z + 14.0)),
-            (ifg.SP_CLAMP_STAR_OD_MM / 2.0) * fl.MM,
-            8.0 * fl.MM,
-            clamp_mat, module=story_mod, module_objects=MO)
+        _cr.dimensions = _mm3((face * 0.95, 22.0, 20.0))
+        try:
+            _cr.rotation_euler = (cradle_tilt, 0.0, 0.0)
+        except Exception:
+            pass
+        for tag, side in (("cradle_v_a", -1), ("cradle_v_b", 1)):
+            _vj = fl.add_box(
+                f"{p}{tag}",
+                _mm3((x + side * 7.0, y_t - 2.0, z + 6.0)),
+                _mm3((12.0, 16.0, 10.0)),
+                cradle_mat, module=story_mod, module_objects=MO)
+            _vj.dimensions = _mm3((12.0, 16.0, 10.0))
+            try:
+                _vj.rotation_euler = (cradle_tilt, side * math.radians(42.0), 0.0)
+            except Exception:
+                pass
+        # Star clamps: barrel (tip) + plunger (carriage) — gold has both.
+        _sp_add_star_clamp(
+            f"{p}clamp_barrel", (x, y_t + 2.0, z + 16.0),
+            ifg.SP_CLAMP_STAR_OD_MM, clamp_mat, story_mod, MO, hub_h_mm=9.0)
+        _sp_add_star_clamp(
+            f"{p}clamp_plunger", (x, y_c - ifg.SP_CARRIAGE_L_MM * 0.25, z + face * 0.42),
+            ifg.SP_CLAMP_STAR_OD_MM * 0.85, clamp_mat, story_mod, MO, hub_h_mm=7.0)
         # Syringe barrel toward −Y tip.
+        sy_y = y_t - ifg.SP_SYRINGE_LENGTH_MM * 0.38
         _sy = fl.add_cyl(
             f"{p}syringe",
-            _mm3((x, y_t - ifg.SP_SYRINGE_LENGTH_MM * 0.35, z + 2.0)),
+            _mm3((x, sy_y, z + 3.0)),
             (ifg.SP_SYRINGE_DIAMETER_MM / 2.0) * fl.MM,
             ifg.SP_SYRINGE_LENGTH_MM * fl.MM,
             syringe_mat, module=story_mod, module_objects=MO)
@@ -13087,25 +13189,116 @@ def _place_syringe_pump_layout(
             _sy.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
+        # Plunger flange disc on carriage side of barrel.
+        _pl = fl.add_cyl(
+            f"{p}plunger",
+            _mm3((x, y_c - ifg.SP_CARRIAGE_L_MM * 0.35, z + 3.0)),
+            (ifg.SP_SYRINGE_DIAMETER_MM * 0.55) * fl.MM,
+            4.0 * fl.MM,
+            syringe_mat, module=story_mod, module_objects=MO)
+        try:
+            _pl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+        # Clear tubing from syringe tip toward console (+X).
+        tip_y = sy_y - ifg.SP_SYRINGE_LENGTH_MM * 0.45
+        _tb = fl.add_cyl(
+            f"{p}tubing",
+            _mm3((x + face * 0.55, tip_y, z + 1.0)),
+            (ifg.SP_TUBING_OD_MM / 2.0) * fl.MM,
+            face * 1.8 * fl.MM,
+            tubing_mat, module=story_mod, module_objects=MO)
+        try:
+            _tb.rotation_euler = (0.0, math.pi / 2.0, 0.0)
+        except Exception:
+            pass
+        # Per-channel harness stub from motor rear (+Y).
+        hy = y_st + face * 0.55
+        _hn = fl.add_cyl(
+            f"{p}harness",
+            _mm3((x, hy + 12.0, z + 4.0)),
+            (ifg.SP_HARNESS_OD_MM / 2.0) * fl.MM,
+            28.0 * fl.MM,
+            harness_mat, module=story_mod, module_objects=MO)
+        try:
+            _hn.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+        # Colour wire cues (gold multi-colour bundle).
+        for wi, (wmat, dx) in enumerate(((wire_r_mat, -3.0), (wire_g_mat, 3.0))):
+            _w = fl.add_cyl(
+                f"{p}wire{wi}",
+                _mm3((x + dx, hy + 10.0, z + 6.0 + wi)),
+                0.9 * fl.MM, 22.0 * fl.MM,
+                wmat, module=story_mod, module_objects=MO)
+            try:
+                _w.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+            except Exception:
+                pass
+        harness_ends.append((x, hy + 26.0, z + 4.0))
 
     # Control console to the +X side of the array.
     cx = W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.45
+    cw = ifg.SP_CONSOLE_WIDTH_MM * 0.9
+    cd = ifg.SP_CONSOLE_DEPTH_MM * 0.85
+    ch = ifg.SP_CONSOLE_HEIGHT_MM * 0.9
     _con = fl.add_box(
         "u_se_sp_console",
-        _mm3((cx, 0.0, base_z + ifg.SP_CONSOLE_HEIGHT_MM * 0.45)),
-        _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.9, ifg.SP_CONSOLE_DEPTH_MM * 0.85,
-              ifg.SP_CONSOLE_HEIGHT_MM * 0.9)),
+        _mm3((cx, 0.0, base_z + ch * 0.45)),
+        _mm3((cw, cd, ch)),
         console_mat, module=story_mod, module_objects=MO)
-    _con.dimensions = _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.9, ifg.SP_CONSOLE_DEPTH_MM * 0.85,
-                            ifg.SP_CONSOLE_HEIGHT_MM * 0.9))
+    _con.dimensions = _mm3((cw, cd, ch))
+    # Blue top work surface (gold: microfluidic stage plate).
+    _top = fl.add_box(
+        "u_se_sp_console_top",
+        _mm3((cx, 0.0, base_z + ch + 2.0)),
+        _mm3((cw * 0.98, cd * 0.98, 4.0)),
+        accent_mat, module=story_mod, module_objects=MO)
+    _top.dimensions = _mm3((cw * 0.98, cd * 0.98, 4.0))
+    # Chip backlight stub on top plate.
+    _chip = fl.add_box(
+        "u_se_sp_console_chip",
+        _mm3((cx, cd * 0.05, base_z + ch + 5.0)),
+        _mm3((cw * 0.35, cd * 0.28, 3.0)),
+        glass_mat, module=story_mod, module_objects=MO)
+    _chip.dimensions = _mm3((cw * 0.35, cd * 0.28, 3.0))
+    # Angled landscape display on console front (−Y).
+    disp_tilt = math.radians(ifg.SP_DISPLAY_TILT_DEG)
     _disp = fl.add_box(
         "u_se_sp_console_display",
-        _mm3((cx, -ifg.SP_CONSOLE_DEPTH_MM * 0.28,
-              base_z + ifg.SP_CONSOLE_HEIGHT_MM * 0.55)),
-        _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.70, 4.0, ifg.SP_CONSOLE_HEIGHT_MM * 0.45)),
+        _mm3((cx, -cd * 0.42, base_z + ch * 0.55)),
+        _mm3((cw * 0.78, 5.0, ch * 0.50)),
         glass_mat, module=story_mod, module_objects=MO)
-    _disp.dimensions = _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.70, 4.0,
-                             ifg.SP_CONSOLE_HEIGHT_MM * 0.45))
+    _disp.dimensions = _mm3((cw * 0.78, 5.0, ch * 0.50))
+    try:
+        _disp.rotation_euler = (disp_tilt, 0.0, 0.0)
+    except Exception:
+        pass
+    # Blue corner feet on console.
+    for sx, sy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+        _ft = fl.add_box(
+            f"u_se_sp_console_foot_{sx}_{sy}",
+            _mm3((cx + sx * cw * 0.42, sy * cd * 0.38, base_z + 3.0)),
+            _mm3((12.0, 12.0, 6.0)),
+            accent_mat, module=story_mod, module_objects=MO)
+        _ft.dimensions = _mm3((12.0, 12.0, 6.0))
+
+    # Bundled harness trunk: gather channel stubs → console rear (+Y).
+    if harness_ends:
+        hx = sum(p[0] for p in harness_ends) / len(harness_ends)
+        hy = max(p[1] for p in harness_ends) + 8.0
+        hz = sum(p[2] for p in harness_ends) / len(harness_ends)
+        trunk_len = max(40.0, abs(cx - hx) * 0.85)
+        _tr = fl.add_cyl(
+            "u_se_sp_harness_trunk",
+            _mm3(((hx + cx) / 2.0, hy, hz)),
+            (ifg.SP_HARNESS_OD_MM * 1.4 / 2.0) * fl.MM,
+            trunk_len * fl.MM,
+            harness_mat, module=story_mod, module_objects=MO)
+        try:
+            _tr.rotation_euler = (0.0, math.pi / 2.0, 0.0)
+        except Exception:
+            pass
 
     # Dump mesh names for form_converge_loop deterministic checklist (no LLM).
     try:
@@ -13121,7 +13314,7 @@ def _place_syringe_pump_layout(
     except Exception as _dump_exc:
         print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
     print(f"[univ][sealed] SYRINGE_PUMP OPEN array: {n} channel(s) "
-          f"+ control console (no sealed crate)")
+          f"+ V-cradles + star clamps + harness + tipped console (no sealed crate)")
     return {"channels": n, "form": "syringe_pump"}
 
 

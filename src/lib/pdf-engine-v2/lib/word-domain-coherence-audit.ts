@@ -168,6 +168,14 @@ export const INDUSTRIAL_POWER_MARKERS: DomainMarker[] = [
   { id: 'contactor', re: /\bcontactors?\b/ },
   { id: 'switchgear', re: /\bswitchgears?\b/ },
   { id: 'communication gateway', re: /\bcommunication\s+gateways?\b/ },
+  // INTENT (2026-07-15 NinjaPCR): plant HVAC / LV incomer vocabulary is as
+  // wrong on a benchtop thermocycler as inverter bridges on a photometer.
+  // Skeleton floors used to mint "Chiller Unit" + "Scroll Compressor" +
+  // "Mains Incomer" from the plant thermal/energy defaults — strip them when
+  // the design is device-scale.
+  { id: 'chiller unit', re: /\bchiller\s+units?\b|\bscroll\s+compressors?\b|\bpackaged\s+chillers?\b/ },
+  { id: 'mains incomer', re: /\bmains\s+incomers?\b|\bdistribution\s+transformers?\b|\bmain\s+switchboards?\b/ },
+  { id: 'lv acb incomer', re: /\b(?:lv\s+)?incomers?\b|\bacb\s+frames?\b|\b400\s*v\s+3[-\s]?phase\b/ },
 ]
 
 // ---------------------------------------------------------------------------
@@ -559,6 +567,11 @@ export interface ToolImpliedComponentRule {
 // backstop (A2) — one shared signal, never a duplicated list or a product/class check.
 const OPTICAL_INSTRUMENT_TOOL_IDS = new Set(['photodiode-tia', 'cuvette', 'photometry', 'led-par'])
 
+// INTENT (2026-07-15 NinjaPCR): solid-state PCR / thermocycler tool ids — the
+// subset that marks a benchtop thermal-cycling INSTRUMENT (Peltier + sample
+// block), never a plant chiller plant. Shared with derive-skeleton.ts floors.
+const THERMOCYCLER_TOOL_IDS = new Set(['peltier', 'thermal-block', 'heatsink-forced'])
+
 /** True when a single tool identity/id string (e.g. "photodiode-tia:gain-sizing" from
  *  contract._tools_run, or a lower-cased "<tool_id> <tool_name>" pair) matches an
  *  OPTICAL_INSTRUMENT_TOOL_IDS rule's own regex. PURE. */
@@ -575,6 +588,19 @@ export function isOpticalInstrumentToolIdentity(identity: string): boolean {
 export function hasOpticalInstrumentToolSignal(identities: string[] | undefined | null): boolean {
   if (!Array.isArray(identities)) return false
   return identities.some((idy) => isOpticalInstrumentToolIdentity(idy))
+}
+
+/** True when a tool identity matches a thermocycler / solid-state TEC rule. PURE. */
+export function isThermocyclerToolIdentity(identity: string): boolean {
+  const lower = String(identity ?? '').toLowerCase()
+  return TOOL_IMPLIED_COMPONENTS.some((rule) => THERMOCYCLER_TOOL_IDS.has(rule.id) && rule.re.test(lower))
+}
+
+/** True when ANY tool identity marks a PCR / thermocycler instrument (Peltier +
+ *  sample-block tools). PURE — never a product-class name check. */
+export function hasThermocyclerToolSignal(identities: string[] | undefined | null): boolean {
+  if (!Array.isArray(identities)) return false
+  return identities.some((idy) => isThermocyclerToolIdentity(idy))
 }
 
 export const TOOL_IMPLIED_COMPONENTS: ToolImpliedComponentRule[] = [
@@ -626,6 +652,28 @@ export const TOOL_IMPLIED_COMPONENTS: ToolImpliedComponentRule[] = [
     implies: [
       { module: 'control_compute_communication', component: 'microcontroller', name_human: 'Microcontroller (MCU)', presence_re: /\bmicrocontroller\b|\bmcu\b/i },
       { module: 'control_compute_communication', component: 'usb_interface', name_human: 'USB data / firmware interface', presence_re: /\busb\b/i },
+    ],
+  },
+  {
+    id: 'peltier',
+    re: /\bpeltier\b|\btec[-\s]?sizing\b|\bthermoelectric\b/,
+    implies: [
+      { module: 'environmental_interface', component: 'peltier_tec_module', name_human: 'Peltier TEC module', presence_re: /\bpeltier\b|\btec\b|\bthermoelectric\b/i },
+      { module: 'environmental_interface', component: 'heatsink_fan_assembly', name_human: 'Heatsink + forced-air fan', presence_re: /\bheatsink\b|\bheat\s*sink\b/i },
+    ],
+  },
+  {
+    id: 'thermal-block',
+    re: /\bthermal[-\s]?block\b|\bspreading[-\s]?resistance\b/,
+    implies: [
+      { module: 'structure_containment', component: 'aluminum_sample_block', name_human: 'Aluminum PCR sample block', presence_re: /\bsample\s+block\b|\baluminum\s+block\b|\bthermal\s+block\b/i },
+    ],
+  },
+  {
+    id: 'heatsink-forced',
+    re: /\bheatsink:forced|\bforced[-\s]?convection\b/,
+    implies: [
+      { module: 'environmental_interface', component: 'heatsink_fan_assembly', name_human: 'Forced-convection heatsink assembly', presence_re: /\bheatsink\b|\bheat\s*sink\b|\bcooling\s+fan\b/i },
     ],
   },
 ]
