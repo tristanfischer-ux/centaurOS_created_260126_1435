@@ -77,7 +77,7 @@ import { storeProposalForClass, loadProposalForClass } from './lib/orchestrator/
 import { dutyHash, type DutySpec } from './lib/orchestrator/generic/tool-generator'
 import { computeQuantityUpdates, applyUpdates } from './lib/design-loop/writeback-bridge'
 import { resizeFromConvergedDemand, nextStandardKva } from './lib/design-loop/settle-loop'
-import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure, reconcileComputedTwins } from './lib/orchestrator/generic/universal-contract-sizing'
+import { reconcilePrincipalEquipment, applyUniversalContractSizing, synthesizeBuildingStructure, reconcileComputedTwins, dropAttributePhantomWords } from './lib/orchestrator/generic/universal-contract-sizing'
 import { deriveGenericSkeleton } from './lib/orchestrator/generic/derive-skeleton'
 import { runMassAttributionStage } from './lib/mass-attribution-stage'
 import { buildAuditDigest, evaluateSelfAuditEnforcement } from './lib/semantic-self-audit'
@@ -13611,7 +13611,6 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     const maintSp = byModSp.get('maintenance_serviceability') || ''
     const structSp = byModSp.get('structure_containment') || ''
     // ProveCatch: exclusive ownership survives global word-id dedup.
-    const { dropAttributePhantomWords } = require('./lib/orchestrator/generic/universal-contract-sizing') as typeof import('./lib/orchestrator/generic/universal-contract-sizing')
     const modsAfterDedup = JSON.parse(JSON.stringify(modsSp))
     dropAttributePhantomWords(modsAfterDedup)
     const actAfter = (modsAfterDedup.find((m: any) => m.module === 'actuation_kinematics')?.sub_modules || [])
@@ -13626,7 +13625,15 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     wantSp('actuation survives dropAttributePhantomWords with ≥5 words', (actAfter.match(/\|/g) || []).length + (actAfter ? 1 : 0) >= 5 && /Stepper Motor/i.test(actAfter))
     wantSp('actuation_kinematics never Primary Assembly placeholder', !/Primary Assembly/i.test(actSp))
     wantSp('structure emits Control Console macro noun', /Control Console/i.test(structSp))
-    wantSp('maintenance floor emits Access Panel (not plant Lifting Point)', /Access Panel/i.test(maintSp) && !/Lifting Point/i.test(maintSp))
+    wantSp('maintenance floor emits syringe service nouns (not PADDING_RE plant access_panel)', /Syringe Swap Fixture/i.test(maintSp) && !/Access Panel/i.test(maintSp) && !/Lifting Point/i.test(maintSp))
+    // ProveCatch: PADDING_RE strip must not hollow maintenance after sizing.
+    const modsSized = JSON.parse(JSON.stringify(modsSp))
+    applyUniversalContractSizing(modsSized, syringeContract, {
+      dedupeAndStrip: true, synthesizeMissing: false, explode: false, instrument: false,
+    })
+    const maintSized = (modsSized.find((m: any) => m.module === 'maintenance_serviceability')?.sub_modules || [])
+      .flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))).join(' | ')
+    wantSp('maintenance survives applyUniversalContractSizing with ≥5 words', (maintSized.match(/\|/g) || []).length + (maintSized ? 1 : 0) >= 5)
     wantSp('syringe floor forbids plant Circulation Pump', !/Circulation Pump/i.test(allSp))
     wantSp('syringe floor forbids Expansion Reservoir', !/Expansion Reservoir/i.test(allSp))
     // Fallback: graph WITHOUT actuation still ships drive on fluid.

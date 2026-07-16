@@ -404,9 +404,15 @@ const SYRINGE_PUMP_HMI_FLOOR = [
   'touch_display', 'status_indicator', 'run_start_control',
   'mounting_bezel', 'user_facing_legend',
 ]
+// GOTCHA (Poseidon 2026-07-16 cold 0556): access_panel / service_connector /
+// diagnostic_port / labelling_set match PADDING_RE in universal-contract-sizing
+// and are stripped as skeleton junk when part_number is still TBD — leaving only
+// channel_service_clearance and failing density. Use instrument service nouns
+// that are NOT in that plant-padding list.
 const SYRINGE_PUMP_MAINTENANCE_FLOOR = [
-  'access_panel', 'service_connector', 'diagnostic_port',
-  'labelling_set', 'channel_service_clearance',
+  'channel_service_clearance', 'syringe_swap_fixture',
+  'calibration_reference_port', 'tool_free_carriage_access',
+  'spare_plunger_seal_kit',
 ]
 /** @param hasActuationNode When true, fluid stays wet-path-only (drive lives on actuation). */
 function syringePumpModuleFloors(hasActuationNode: boolean): Record<string, string[]> {
