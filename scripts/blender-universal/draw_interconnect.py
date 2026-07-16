@@ -54,28 +54,51 @@ TITLE_BAND_PX = 160
 LEGEND_BAND_PX = 70
 TOP_HEADER_PX = 90
 
-# Order matters: PCB before HMI so "Compute UI Module" is the board, not a display.
+# Order matters: Thermal before Optical so "sample block" is not mis-filed as
+# optics; Actuation before PCB so "stepper driver board" is not a bare board
+# dump; PCB before HMI so "Compute UI Module" is the board, not a display.
 _BLOCK_RULES = (
+    # INTENT (NinjaPCR 2026-07-15): TEC / sample block / heatsink are THERMAL
+    # principals — not Optical (colorimeter "sample holder" stays Optical via
+    # holder/cell/chamber below).
+    ("Thermal", re.compile(
+        r"\b(?:peltier|\btec\b|thermoelectric|heatsink|heat\s*sink|"
+        r"sample\s*block|thermal\s*block|tube\s*block|lid\s*heater|"
+        r"heated\s*lid|cooling\s*fan)\b", re.I)),
+    # INTENT (Poseidon 2026-07-16): OPEN-array linear dosing — NEMA + screw
+    # train is the Actuation column (not Optical, not a plant pump).
+    # GOTCHA: do NOT match bare "stepper" — "Stepper Driver Board" is PCB.
+    ("Actuation", re.compile(
+        r"\b(?:stepper\s*motor|\bnema\b|lead\s*screw|leadscrew|"
+        r"linear\s*carriage|plunger(?:\s*clamp)?|syringe(?:\s*barrel)?|"
+        r"shaft\s*coupl|guide\s*rail)\b", re.I)),
     # GOTCHA: LED Source Board is OPTICAL (emitter on the bench), not Power.
     # Putting it in Power made the synthesised "DC rail" LED→MCU and a 1-node
     # Power column that still scored story_ok (Tristan rejected the fake 10).
     ("Optical", re.compile(
         r"\b(?:optic|optical|collimat|cuvette|wavelength|baffle|detector|"
-        r"photodiode|filter\s*wheel|monochromat|sample|led\s*source|"
-        r"source\s*board|led\s*driver)\b", re.I)),
+        r"photodiode|filter\s*wheel|monochromat|sample\s*(?:holder|cell|chamber)|"
+        r"led\s*source|source\s*board|led\s*driver)\b", re.I)),
     ("Power", re.compile(
         r"\b(?:power|battery|usb|charger|regulator|dc\s*rail|psu|supply|"
-        r"fuse)\b", re.I)),
+        r"fuse|terminal\s*block|mains|bench\s*adapter)\b", re.I)),
     ("PCB", re.compile(
-        r"\b(?:pcb|mcu|compute|microcontroller|board|afe|adc)\b", re.I)),
+        r"\b(?:pcb|mcu|compute|microcontroller|controller|board|afe|adc|"
+        r"stepper\s*driver)\b", re.I)),
     ("HMI", re.compile(
-        r"\b(?:display|hmi|\bui\s*module\b|touchscreen|button|bezel|screen|keypad)\b",
+        r"\b(?:display|hmi|\bui\s*module\b|touchscreen|touch\s*display|"
+        r"button|bezel|screen|keypad)\b",
         re.I)),
     ("Enclosure", re.compile(
-        r"\b(?:enclosure|housing|shell|lid|chassis|case)\b", re.I)),
+        r"\b(?:enclosure|housing|shell|lid|chassis|case|base\s*plate|"
+        r"channel\s*frame|console\s*enclosure)\b", re.I)),
 )
 # Caps / lids are mechanical accessories — not the enclosure principal.
-_ENCLOSURE_SHELL_RE = re.compile(r"\b(?:enclosure\s*shell|housing|chassis)\b", re.I)
+# Console / base plate ARE the OPEN-array mechanical story (no sealed shell).
+_ENCLOSURE_SHELL_RE = re.compile(
+    r"\b(?:enclosure\s*shell|housing|chassis|console\s*enclosure|base\s*plate)\b",
+    re.I,
+)
 _ENCLOSURE_ACCESSORY_RE = re.compile(r"\b(?:cap|lid|shroud|bezel)\b", re.I)
 
 _EDGE_STYLE = {
@@ -91,8 +114,34 @@ _EDGE_STYLE = {
 _SKIP_NODE_RE = re.compile(
     r"\b(?:consumable|fastener\s*set|screw\s*kit|cable\s*tie|"
     r"interconnect\s*cable|qwiic|stemma\s*header|ribbon\s*cable|"
-    r"wiring\s*harness|cable\s*assembly|"
+    r"wiring\s*harness|wire\s*harness|cable\s*assembly|sensor\s*cable|"
     r"ambient\s*light\s*cap|light\s*cap|cuvette\s*consumable)\b", re.I,
+)
+
+# INTENT (NinjaPCR 1258): host peripherals + protection that gold-spine absorbs
+# into the compute principal — listing them as nodes blew past MAX_PRINCIPAL_NODES
+# (32 > 18) even after the Power story was correct.
+_ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
+    r"wifi|wi[- ]?fi|flash\s*storage|firmware\s*watchdog|debug\s*uart|"
+    r"usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|status\s*led|"
+    r"current\s*sense|snubber|h[- ]?bridge|mosfet|dc\s*dc\s*regulator|"
+    r"fan\s*(?:tach|failure)|overtemp|thermal\s*fuse|estop|e[- ]?stop|"
+    r"power\s*kill|protective\s*earth|\bpe\b|block\s*temperature|"
+    r"temperature\s*sensor|sample\s*block\s*mount|tube\s*access|"
+    r"lid\s*assembly(?!\s*heater)|host\s*interface|force\s*limit|"
+    r"home\s*reference|endstop|mains\s*fuse|overcurrent|"
+    r"status\s*indicator|run\s*start|user\s*facing|foot\s*pad|"
+    r"mounting\s*bezel|actuation\s*kinematics|maintenance\s*service|"
+    r"access\s*panel",
+    re.I,
+)
+# INTENT (Poseidon): cradle/rail/screw are the motor's mechanical train — one
+# Actuation principal (Stepper Motor), not six boxes that blow MAX_PRINCIPAL_NODES.
+_ABSORB_INTO_STEPPER_NODE_RE = re.compile(
+    r"lead\s*screw|leadscrew|linear\s*carriage|guide\s*rail|"
+    r"plunger(?:\s*clamp)?|syringe(?:\s*barrel)?(?:\s*cradle)?|"
+    r"shaft\s*coupl|channel\s*frame",
+    re.I,
 )
 
 
@@ -273,22 +322,210 @@ _HOST_INTO_LED_RE = re.compile(
 )
 
 
+def _bom_rows(state: dict) -> list[dict]:
+    """Normalise requirementsBom whether it is a list or {rows:[…]}."""
+    bom = state.get("requirementsBom")
+    if isinstance(bom, list):
+        rows = [b for b in bom if isinstance(b, dict)]
+        if rows:
+            return rows
+    if isinstance(bom, dict):
+        nested = bom.get("rows") or bom.get("items") or []
+        rows = [b for b in nested if isinstance(b, dict)]
+        if rows:
+            return rows
+    # GOTCHA (Poseidon 2026-07-16): nested chain re-entry can rewrite state.json
+    # mid-flight WITHOUT requirementsBom (estimate/engine-c) while module words
+    # still carry the principals. Fall back so Interconnect is not a 1-node stub.
+    out: list[dict] = []
+    seen: set[str] = set()
+    for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+        if not isinstance(m, dict):
+            continue
+        for sm in (m.get("sub_modules") or []):
+            if not isinstance(sm, dict):
+                continue
+            for w in (sm.get("words") or []):
+                if not isinstance(w, dict):
+                    continue
+                nm = str(w.get("name_human") or w.get("name") or "").split("·")[0].strip()
+                if not nm:
+                    continue
+                key = _norm(nm)
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                out.append({"name": nm, "tag": "", "status": "OK"})
+    return out
+
+
 def _bom_principals(state: dict) -> list[dict]:
     """Tagged BoM lines that belong on the interconnect (not sub-components)."""
     out: list[dict] = []
-    for b in state.get("requirementsBom") or []:
-        if not isinstance(b, dict):
-            continue
+    for b in _bom_rows(state):
         if b.get("status") == "SUB-COMPONENT":
             continue
-        nm = str(b.get("requirement") or b.get("name_human") or "").split("·")[0].strip()
+        # GOTCHA: word-fallback rows (no requirementsBom) carry `name` only —
+        # reading requirement/name_human alone wiped every principal (Poseidon).
+        nm = str(
+            b.get("requirement") or b.get("name_human") or b.get("name") or ""
+        ).split("·")[0].strip()
         tg = str(b.get("tag") or "").strip()
         if not nm and not tg:
             continue
         if _SKIP_NODE_RE.search(nm):
             continue
         out.append({"name": nm or tg, "tag": tg})
+    # Collapse host peripherals into the compute principal so the sheet stays
+    # glanceable (≤ MAX_PRINCIPAL_NODES). Topology aliases still route via
+    # _match_principal → _find_compute_principal.
+    has_compute = any(
+        re.search(
+            r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
+            p.get("name") or "",
+            re.I,
+        )
+        for p in out
+    )
+    has_stepper = any(
+        re.search(r"stepper\s*motor|\bnema\b", p.get("name") or "", re.I)
+        for p in out
+    )
+    # When the motor word is still missing (pad-truncated BoM), keep ONE actuation
+    # anchor (linear carriage / lead screw) and absorb the rest of the train.
+    has_actuation_anchor = has_stepper or any(
+        re.search(r"linear\s*carriage|lead\s*screw", p.get("name") or "", re.I)
+        for p in out
+    )
+    if has_compute or has_actuation_anchor:
+        kept: list[dict] = []
+        kept_actuation_anchor = False
+        for p in out:
+            nm = p.get("name") or ""
+            if re.search(
+                r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
+                nm,
+                re.I,
+            ):
+                kept.append(p)
+                continue
+            if re.search(r"stepper\s*motor|\bnema\b", nm, re.I):
+                kept.append(p)
+                kept_actuation_anchor = True
+                continue
+            if re.search(r"stepper\s*driver", nm, re.I):
+                kept.append(p)
+                continue
+            if has_compute and _ABSORB_INTO_COMPUTE_NODE_RE.search(nm):
+                continue
+            if _ABSORB_INTO_STEPPER_NODE_RE.search(nm):
+                # First carriage/screw becomes the Actuation principal when no motor.
+                if (
+                    not has_stepper
+                    and not kept_actuation_anchor
+                    and re.search(r"linear\s*carriage|lead\s*screw", nm, re.I)
+                ):
+                    kept.append(p)
+                    kept_actuation_anchor = True
+                continue
+            kept.append(p)
+        out = kept
     return out
+
+
+def _find_compute_principal(principals: list[dict]) -> Optional[str]:
+    """Universal compute/MCU principal — not just gold-spine 'Compute UI Module'."""
+    return (
+        _principal_key_by_name(principals, "Compute UI Module")
+        or _principal_key_by_name(
+            principals,
+            "Main Controller MCU",
+            "Main Controller",
+            "Microcontroller",
+            "MCU",
+            "Processor",
+        )
+        or next(
+            (
+                (_norm(p["name"]) or _norm(p["tag"]))
+                for p in principals
+                if re.search(
+                    r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
+                    p.get("name") or "",
+                    re.I,
+                )
+            ),
+            None,
+        )
+    )
+
+
+def _find_thermal_load_principal(principals: list[dict]) -> Optional[str]:
+    """Dominant thermal/electrical load for instrument power story (TEC / heater)."""
+    return (
+        _principal_key_by_name(
+            principals,
+            "Peltier Module",
+            "TEC Module",
+            "Thermoelectric Cooler",
+            "Lid Heater",
+            "Sample Block",
+            "Thermal Block",
+        )
+        or next(
+            (
+                (_norm(p["name"]) or _norm(p["tag"]))
+                for p in principals
+                if re.search(
+                    r"peltier|\btec\b|thermoelectric|lid\s*heater|sample\s*block|"
+                    r"thermal\s*block|h[- ]?bridge",
+                    p.get("name") or "",
+                    re.I,
+                )
+            ),
+            None,
+        )
+    )
+
+
+def _find_stepper_driver_principal(principals: list[dict]) -> Optional[str]:
+    """Stepper / microstep driver board (PCB column) for OPEN-array dosing."""
+    return (
+        _principal_key_by_name(
+            principals,
+            "Stepper Driver Board",
+            "Stepper Driver",
+            "Microstep Driver",
+        )
+        or next(
+            (
+                (_norm(p["name"]) or _norm(p["tag"]))
+                for p in principals
+                if re.search(r"stepper\s*driver|microstep\s*driver", p.get("name") or "", re.I)
+            ),
+            None,
+        )
+    )
+
+
+def _find_stepper_motor_principal(principals: list[dict]) -> Optional[str]:
+    """NEMA / stepper motor — the Actuation column principal."""
+    return (
+        _principal_key_by_name(
+            principals,
+            "Stepper Motor",
+            "NEMA Stepper",
+            "NEMA Motor",
+        )
+        or next(
+            (
+                (_norm(p["name"]) or _norm(p["tag"]))
+                for p in principals
+                if re.search(r"stepper\s*motor|\bnema\b", p.get("name") or "", re.I)
+            ),
+            None,
+        )
+    )
 
 
 def _principal_key_by_name(principals: list[dict], *name_needles: str) -> Optional[str]:
@@ -331,7 +568,7 @@ def _match_principal(token: str, principals: list[dict]) -> Optional[str]:
         if led:
             return led
     if _HOST_INTO_COMPUTE_RE.search(token or ""):
-        compute = _principal_key_by_name(principals, "Compute UI Module")
+        compute = _find_compute_principal(principals)
         if compute:
             return compute
     return None
@@ -410,10 +647,11 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
     ]
     if enc_keys:
         enc = sorted(enc_keys, key=lambda k: (0 if nodes[k].get("tag") else 1, k))[0]
-        # DECISION: mount only the structural masses (PCB + Optical). Power/HMI
-        # columns are electrical/UI stories — synthesising 4 mounts + spine power
-        # edges pushed synth_ratio over the honest bar (colorimeter 2026-07-14).
-        for block in ("PCB", "Optical"):
+        # DECISION: mount only the structural masses (PCB + Optical + Thermal).
+        # Power/HMI columns are electrical/UI stories — synthesising 4 mounts +
+        # spine power edges pushed synth_ratio over the honest bar
+        # (colorimeter 2026-07-14). Thermal = TEC/sample block in the wood box.
+        for block in ("PCB", "Optical", "Thermal", "Actuation"):
             reps = [k for k, n in nodes.items() if n.get("block") == block]
             if not reps:
                 continue
@@ -429,21 +667,30 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
                 "synthesised": True,
             })
 
-    # INTENT (2026-07-14): gold-spine Compute UI Module absorbs USB/LiPo/regulator
-    # as discrete BoM lines — topology power edges then collapse to self-loops and
-    # the sheet had ZERO Power column while the legend still advertised power.
-    # Honest principal-level power story (basis = spine kit, not LED→MCU fiction):
-    #   USB/LiPo Input (Power) → Compute UI Module → LED Source Board
-    # plus Compute → Detector as signal when topology named Microcontroller.
-    compute_key = _principal_key_by_name(principals, "Compute UI Module")
+    # INTENT (2026-07-14 / extended 2026-07-15): gold-spine Compute UI Module
+    # absorbs USB/LiPo/regulator as discrete BoM lines — topology power edges then
+    # collapse to self-loops and the sheet had ZERO Power column while the legend
+    # still advertised power. UNIVERSAL: any instrument compute principal
+    # (Compute UI Module OR Main Controller MCU / …) gets the same Power story:
+    #   USB/LiPo or DC Input (Power) → Compute → (LED Source | TEC / thermal load
+    #   | stepper driver → stepper motor)
+    # plus Compute → Detector as signal when an optical detector exists.
+    compute_key = _find_compute_principal(principals)
     led_key = _principal_key_by_name(principals, "LED Source Board", "LED Source")
     det_key = _principal_key_by_name(principals, "Optical Detector Module")
+    load_key = _find_thermal_load_principal(principals)
+    driver_key = _find_stepper_driver_principal(principals)
+    motor_key = _find_stepper_motor_principal(principals)
     has_power_edge = any(e.get("kind") == "power" for e in edges)
     has_power_col = any(n.get("block") == "Power" for n in nodes.values())
     if compute_key and compute_key in nodes:
-        pwr_key = "usb lipo input"
-        # Always expose a Power column for a compute-kit instrument — absorbed
-        # USB/battery lines leave no BoM Power principal otherwise.
+        # Prefer an existing Power-column principal (terminal block / PSU) over a
+        # synthetic USB/LiPo node when the BoM already names one.
+        existing_pwr = next(
+            (k for k, n in nodes.items() if n.get("block") == "Power"),
+            None,
+        )
+        pwr_key = existing_pwr or "usb lipo input"
         if not has_power_col:
             nodes[pwr_key] = {
                 "name": "USB / LiPo Input",
@@ -451,17 +698,15 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
                 "block": "Power",
             }
             has_power_col = True
-        # Wire the Power node into the kit even when topology already mapped
-        # compute↔LED power (otherwise EP-201 is an unwired island).
         if pwr_key in nodes:
             ek = (pwr_key, compute_key, "power")
             if ek not in seen and (compute_key, pwr_key, "power") not in seen:
                 seen.add(ek)
                 edges.append({
                     "from": pwr_key, "to": compute_key, "kind": "power",
-                    "label": "device power (USB/LiPo → kit)",
+                    "label": "device power → compute",
                     "synthesised": True,
-                    "basis": "gold-spine Compute UI Module power path",
+                    "basis": "gold-spine compute power path",
                 })
                 has_power_edge = True
         if led_key and led_key in nodes and not any(
@@ -478,6 +723,68 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
                     "synthesised": True,
                     "basis": "gold-spine kit → LED daughterboard",
                 })
+        elif load_key and load_key in nodes and load_key != compute_key and not any(
+            e.get("kind") == "power"
+            and {e.get("from"), e.get("to")} == {compute_key, load_key}
+            for e in edges
+        ):
+            ek2b = (compute_key, load_key, "power")
+            if ek2b not in seen and (load_key, compute_key, "power") not in seen:
+                seen.add(ek2b)
+                edges.append({
+                    "from": compute_key, "to": load_key, "kind": "power",
+                    "label": "TEC / thermal load supply",
+                    "synthesised": True,
+                    "basis": "gold-spine kit → thermal load",
+                })
+        # OPEN-array dosing: Power → MCU → Driver (power+step/dir) → Motor.
+        if driver_key and driver_key in nodes and driver_key != compute_key:
+            if pwr_key in nodes:
+                ek_pd = (pwr_key, driver_key, "power")
+                if ek_pd not in seen and (driver_key, pwr_key, "power") not in seen:
+                    seen.add(ek_pd)
+                    edges.append({
+                        "from": pwr_key, "to": driver_key, "kind": "power",
+                        "label": "motor supply rail",
+                        "synthesised": True,
+                        "basis": "gold-spine OPEN-array driver power",
+                    })
+            ek_sd = (compute_key, driver_key, "signal")
+            if ek_sd not in seen and (driver_key, compute_key, "signal") not in seen:
+                seen.add(ek_sd)
+                edges.append({
+                    "from": compute_key, "to": driver_key, "kind": "signal",
+                    "label": "step / dir / enable",
+                    "synthesised": True,
+                    "basis": "gold-spine OPEN-array step/dir",
+                })
+            if motor_key and motor_key in nodes and motor_key != driver_key:
+                ek_dm = (driver_key, motor_key, "power")
+                if ek_dm not in seen and (motor_key, driver_key, "power") not in seen:
+                    seen.add(ek_dm)
+                    edges.append({
+                        "from": driver_key, "to": motor_key, "kind": "power",
+                        "label": "phase coils",
+                        "synthesised": True,
+                        "basis": "gold-spine OPEN-array motor phases",
+                    })
+        else:
+            # No discrete driver — power the Actuation principal (motor, or
+            # carriage/screw stand-in when the motor word was pad-truncated).
+            act_key = motor_key or next(
+                (k for k, n in nodes.items() if n.get("block") == "Actuation"),
+                None,
+            )
+            if act_key and act_key in nodes and act_key != compute_key:
+                ek_cm = (compute_key, act_key, "power")
+                if ek_cm not in seen and (act_key, compute_key, "power") not in seen:
+                    seen.add(ek_cm)
+                    edges.append({
+                        "from": compute_key, "to": act_key, "kind": "power",
+                        "label": "stepper drive",
+                        "synthesised": True,
+                        "basis": "gold-spine OPEN-array MCU→actuation",
+                    })
     if compute_key and det_key and compute_key in nodes and det_key in nodes:
         if not any(
             e.get("kind") == "signal"
@@ -540,7 +847,7 @@ def layout_metrics(
       - when ≥6 nodes and an Enclosure column exists: ≥1 mechanical enclosure edge
         AND ≥2 distinct edge kinds (not a monochrome "all signal" scribble)
     """
-    order = ["Power", "PCB", "Optical", "HMI", "Enclosure"]
+    order = ["Power", "PCB", "Actuation", "Thermal", "Optical", "HMI", "Enclosure"]
     buckets: dict[str, list[str]] = {b: [] for b in order}
     for key, n in nodes.items():
         buckets.setdefault(n["block"], []).append(key)
@@ -586,6 +893,12 @@ def layout_metrics(
     # ≥2 edge kinds, no cable-as-node litter, synth mounts cannot dominate.
     story_ok = True
     story_reasons: list[str] = []
+    # GOTCHA (NinjaPCR 1203): 1-node stub "Device (no graph yet)" scored
+    # story_ok=true while kinds=[] — Goodhart. A real interconnect needs ≥2
+    # nodes and ≥1 edge before the story bar can pass.
+    if len(nodes) < 2 or len(edges) < 1:
+        story_ok = False
+        story_reasons.append(f"thin graph nodes={len(nodes)} edges={len(edges)}")
     if cable_nodes:
         story_ok = False
         story_reasons.append(f"cable/header nodes: {cable_nodes[:3]}")
@@ -605,7 +918,11 @@ def layout_metrics(
         story_reasons.append("Power column is only LED source (misclassified optics)")
     # Compute-kit instruments must show a Power column + at least one power edge.
     has_compute = any(
-        re.search(r"compute\s*ui|microcontroller|\bmcu\b", (nodes[k].get("name") or ""), re.I)
+        re.search(
+            r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
+            (nodes[k].get("name") or ""),
+            re.I,
+        )
         for k in nodes
     )
     if has_compute and len(nodes) >= 4:
@@ -704,7 +1021,7 @@ def build_interconnect_svg(
 ) -> tuple[str, dict[str, Any]]:
     """Layered left→right SVG. Returns (svg_text, layout_metrics)."""
     _stamp_edge_nets(edges)
-    order = ["Power", "PCB", "Optical", "HMI", "Enclosure"]
+    order = ["Power", "PCB", "Actuation", "Thermal", "Optical", "HMI", "Enclosure"]
     buckets: dict[str, list[str]] = {b: [] for b in order}
     for key, n in nodes.items():
         buckets.setdefault(n["block"], []).append(key)
@@ -1143,8 +1460,126 @@ def _selftest() -> int:
     assert _classify_block("LED Source Board") == "Optical"
     assert _classify_block("Compute UI Module") == "PCB"
     assert _classify_block("Enclosure Shell") == "Enclosure"
+    assert _classify_block("Peltier Module") == "Thermal"
+    assert _classify_block("Sample Block") == "Thermal"
+    assert _classify_block("Main Controller MCU") == "PCB"
     assert _edge_kind("signal", "optical path (free-space / guided light)") == "optical"
     assert _edge_kind("signal", "DC power rail (instrument-internal)") == "power"
+
+    # proveCatch (NinjaPCR 1203): thermocycler MCU + TEC must mint Power column
+    # + power edges without a colorimeter-named "Compute UI Module".
+    state_tc = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-101", "requirement": "Main Controller MCU", "status": "OK"},
+            {"tag": "X-110", "requirement": "Peltier Module", "status": "OK"},
+            {"tag": "X-111", "requirement": "Sample Block", "status": "OK"},
+            {"tag": "X-120", "requirement": "Enclosure Shell", "status": "OK"},
+            {"tag": "X-121", "requirement": "Terminal Block", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": []},
+    }
+    n_tc, e_tc = _collect_graph(Path("/tmp"), state_tc)
+    m_tc = layout_metrics(n_tc, e_tc, content_bottom=200, title_top=500)
+    chk("tc_power_column", any(n.get("block") == "Power" for n in n_tc.values()))
+    chk("tc_power_edge", any(e.get("kind") == "power" for e in e_tc))
+    chk("tc_thermal_load_edge", any(
+        e.get("kind") == "power"
+        and ("peltier" in e.get("from", "") or "peltier" in e.get("to", "")
+             or "sample" in e.get("from", "") or "sample" in e.get("to", ""))
+        for e in e_tc
+    ))
+    chk("tc_story_ok", m_tc.get("story_ok") is True)
+    chk("tc_not_thin", len(n_tc) >= 4 and len(e_tc) >= 1)
+    # proveCatch (Poseidon 2026-07-16): OPEN-array MCU + driver + stepper must
+    # mint Power + Actuation columns and a driver→motor power edge — never a
+    # 1-node stub when requirementsBom is missing (word fallback).
+    state_sp = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-101", "requirement": "Main Controller MCU", "status": "OK"},
+            {"tag": "X-201", "requirement": "Stepper Driver Board", "status": "OK"},
+            {"tag": "X-202", "requirement": "Stepper Motor", "status": "OK"},
+            {"tag": "X-203", "requirement": "Lead Screw", "status": "OK"},
+            {"tag": "X-204", "requirement": "Terminal Block", "status": "OK"},
+            {"tag": "X-205", "requirement": "Console Enclosure", "status": "OK"},
+            {"tag": "X-206", "requirement": "Touch Display", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": []},
+    }
+    n_sp, e_sp = _collect_graph(Path("/tmp"), state_sp)
+    m_sp = layout_metrics(n_sp, e_sp, content_bottom=200, title_top=500)
+    chk("sp_actuation_column", any(n.get("block") == "Actuation" for n in n_sp.values()))
+    chk("sp_driver_is_pcb", any(
+        n.get("block") == "PCB" and "driver" in (n.get("name") or "").lower()
+        for n in n_sp.values()
+    ))
+    chk("sp_absorbs_lead_screw", "lead screw" not in {_norm(v["name"]) for v in n_sp.values()})
+    chk("sp_keeps_motor", any("stepper motor" in _norm(v["name"]) for v in n_sp.values()))
+    chk("sp_motor_power_edge", any(
+        e.get("kind") == "power"
+        and ("stepper" in e.get("from", "") or "stepper" in e.get("to", "")
+             or "driver" in e.get("from", "") or "driver" in e.get("to", ""))
+        for e in e_sp
+    ))
+    chk("sp_story_ok", m_sp.get("story_ok") is True and m_sp.get("ok") is True)
+    # Word fallback when requirementsBom was wiped mid-chain.
+    state_sp_words = {
+        "isInstrumentDevice": True,
+        "moduleDecomposition": {
+            "modules": [{
+                "sub_modules": [{
+                    "words": [
+                        {"name_human": "Main Controller Mcu"},
+                        {"name_human": "Stepper Driver Board"},
+                        {"name_human": "Stepper Motor"},
+                        {"name_human": "Terminal Block"},
+                        {"name_human": "Console Enclosure"},
+                    ],
+                }],
+            }],
+        },
+        "orchestratorContract": {"topology": []},
+    }
+    n_wf, e_wf = _collect_graph(Path("/tmp"), state_sp_words)
+    chk("sp_word_fallback_not_thin", len(n_wf) >= 4 and len(e_wf) >= 1)
+    # proveCatch (1258): fat host BoM must absorb into compute — not 32 nodes.
+    state_fat = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-101", "requirement": "Main Controller MCU", "status": "OK"},
+            {"tag": "I-104", "requirement": "Wifi Module", "status": "OK"},
+            {"tag": "I-105", "requirement": "Flash Storage", "status": "OK"},
+            {"tag": "I-106", "requirement": "Debug Uart", "status": "OK"},
+            {"tag": "X-112", "requirement": "Polyfuse Resettable", "status": "OK"},
+            {"tag": "X-113", "requirement": "Bulk Capacitor", "status": "OK"},
+            {"tag": "X-109", "requirement": "Status LED", "status": "OK"},
+            {"tag": "X-101", "requirement": "Current Sense Shunt", "status": "OK"},
+            {"tag": "I-110", "requirement": "Fan Failure Detect", "status": "OK"},
+            {"tag": "I-111", "requirement": "Estop Or Power Kill", "status": "OK"},
+            {"tag": "X-111", "requirement": "Wire Harness", "status": "OK"},
+            {"tag": "X-115", "requirement": "Peltier Tec Module", "status": "OK"},
+            {"tag": "X-114", "requirement": "Aluminum Sample Block", "status": "OK"},
+            {"tag": "K-101", "requirement": "Heatsink Fan Assembly", "status": "OK"},
+            {"tag": "X-106", "requirement": "Enclosure Shell", "status": "OK"},
+            {"tag": "X-110", "requirement": "Terminal Block", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": []},
+    }
+    n_fat, e_fat = _collect_graph(Path("/tmp"), state_fat)
+    m_fat = layout_metrics(n_fat, e_fat, content_bottom=200, title_top=500)
+    chk("fat_under_node_cap", len(n_fat) <= MAX_PRINCIPAL_NODES)
+    chk("fat_absorbs_wifi", "wifi module" not in {_norm(v["name"]) for v in n_fat.values()})
+    chk("fat_keeps_mcu", any("mcu" in _norm(v["name"]) for v in n_fat.values()))
+    chk("fat_power_story", any(e.get("kind") == "power" for e in e_fat))
+    chk("fat_layout_ok", m_fat.get("ok") is True)
+    # proveCatch: 1-node stub must FAIL story (Goodhart net on empty interconnect).
+    thin_stub = layout_metrics(
+        {"device": {"name": "Device (no graph yet)", "tag": "", "block": "PCB"}},
+        [],
+        content_bottom=100, title_top=400,
+    )
+    chk("stub_story_fails", thin_stub.get("story_ok") is False and thin_stub.get("ok") is False)
 
     print("draw_interconnect selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

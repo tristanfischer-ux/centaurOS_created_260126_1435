@@ -13552,6 +13552,64 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     () => `optical-instrument skeleton-floor cases failed: ${failedC.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts (energyFloorFor / OPTICAL_MODULE_FLOORS / hasOpticalInstrumentSignal).`,
   ))
 
+  // ── EXTENSION 2026-07-16 (Poseidon): syringe-pump instrument floors are FULLY
+  // UNIONED (not MIN_WORDS padding). stepper_motor was #6 on the fluid floor and
+  // never shipped while cradle+clamp+screw+rail+carriage already filled density;
+  // stepper_driver_board lived only on energy_conversion which the graph omitted.
+  {
+    const failedSp: string[] = []
+    const wantSp = (label: string, cond: boolean) => { if (!cond) failedSp.push(label) }
+    const syringeGraph: any = {
+      nodes: [
+        { class: 'mass_fluid_transport_process', role: 'principal', required: true, display: 'Mass / Fluid' },
+        { class: 'power_distribution', role: 'support', required: true, display: 'Power' },
+        { class: 'control_compute_communication', role: 'support', required: true, display: 'Control' },
+        { class: 'structure_containment', role: 'support', required: true, display: 'Structure' },
+      ],
+    }
+    // Pre-seed corpus with the FIRST five fluid-floor nouns so a pad-only rule
+    // would stop before stepper_motor — proveCatch that full-union still adds it.
+    const corpusPad = new Map<string, string[]>([
+      ['mass_fluid_transport_process', [
+        'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
+        'guide_rail_pair', 'linear_carriage',
+      ]],
+      ['power_distribution', [
+        'wire_harness', 'terminal_block', 'polyfuse_resettable',
+        'bulk_capacitor', 'status_led',
+      ]],
+    ])
+    const syringeContract: any = {
+      product_class: 'syringe_pump',
+      quantities: {
+        channel_count: { value: 4 },
+        lead_screw_pitch_mm: { value: 2 },
+        max_syringe_volume_ml: { value: 60 },
+        enclosure_volume_m3: { value: 0.013 },
+      },
+    }
+    const modsSp = deriveGenericSkeleton(
+      syringeGraph, {} as any, { class: 'test' } as any, syringeContract, corpusPad,
+    ) as any[]
+    const allSp = modsSp.flatMap((m: any) =>
+      (m.sub_modules || []).flatMap((sm: any) =>
+        (sm.words || []).map((w: any) => String(w.name_human || w.id || '')),
+      ),
+    ).join(' | ')
+    wantSp('syringe floor emits Stepper Motor past MIN_WORDS pad', /Stepper Motor/i.test(allSp))
+    wantSp('syringe floor emits Shaft Coupling on fluid module', /Shaft Coupling/i.test(allSp))
+    wantSp('syringe floor emits Stepper Driver on power (no energy_conversion node)', /Stepper Driver/i.test(allSp))
+    wantSp('syringe floor emits Main Controller Mcu', /Main Controller/i.test(allSp))
+    wantSp('syringe floor forbids plant Circulation Pump', !/Circulation Pump/i.test(allSp))
+    wantSp('syringe floor forbids Expansion Reservoir', !/Expansion Reservoir/i.test(allSp))
+    out.push(assertEq(
+      'UNIVERSAL.syringe_pump_skeleton_floor_unions_full_actuation_inventory',
+      'Poseidon SOURCE fix (derive-skeleton.ts): syringe_pump instrument floors UNION the full inventory (stepper_motor + shaft_coupling + stepper_driver_board) even when corpus already satisfies MIN_WORDS — never density-pad truncation. Drivers land on power_distribution when energy_conversion is absent from the class graph. Plant circulation/reservoir vocabulary stays forbidden.',
+      failedSp.length, (n) => n === 0,
+      () => `syringe-pump skeleton-floor cases failed: ${failedSp.join(' ; ')}. Check SYRINGE_PUMP_*_FLOOR + instrumentFloor full-union in componentsForModule.`,
+    ))
+  }
+
   // ── EXTENSION 2026-07-12 (B1/B2 — deriveDeviceEnergyTopology gating, TRAINING/
   // REFERENCE-AIDED run): a sealed device (enclosure_volume_m3 < 1) with NO genuine
   // storage/PCS/grid-tie duty must NOT get a fabricated battery→PCS→grid P&ID/BFD

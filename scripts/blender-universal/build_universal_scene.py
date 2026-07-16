@@ -12442,8 +12442,15 @@ def _sealed_product_camera_specs(env_mm):
         _ctrl * _dist_k, focal_mm=62, frame_fraction=_frame)
     side_distance = perspective_distance_for_extent(
         _ctrl * _dist_k, focal_mm=58, frame_fraction=_frame)
-    service_distance = perspective_distance_for_extent(
-        max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
+    if _sp:
+        # OPEN array: frame on controlling extent (not width-only) + pull in.
+        _svc_frame = float(_sp_cam.get("service_frame", 0.88))
+        _svc_dist_k = float(_sp_cam.get("service_dist_k", 0.78))
+        service_distance = perspective_distance_for_extent(
+            _ctrl * _svc_dist_k, focal_mm=72, frame_fraction=_svc_frame)
+    else:
+        service_distance = perspective_distance_for_extent(
+            max(w, d) / _fa * 1.05, focal_mm=72, frame_fraction=0.78)
     # RULE (tip-back hinged lid): outer-face controls sit on a lid whose normal
     # tips toward +Y/rear — low deck-aimed cams only see the underside. Fractions
     # from ifg.tipback_lid_product_cam_fractions() (form-keyed, not a product noun).
@@ -12503,17 +12510,30 @@ def _sealed_product_camera_specs(env_mm):
             "name": "07-product-service",
             # RULE: tip-back lid + sample deck — head-on fascia is blank; service
             # cam is a high 3/4 looking into the aperture (wells + outer-face knob).
+            # OPEN array: 3/4 from front-right so harness + console rear are readable.
             "loc": (
-                centre[0] + service_distance * (0.55 if _tc else 0.0),
-                centre[1] - service_distance * (0.55 if _tc else 1.0),
-                (centre[2] + h * float(_tl.get("hero_z", 1.55))) if _tc
-                else (DECK_Z_MM * fl.MM + h * 0.25),
+                centre[0] + service_distance * (
+                    float(_sp_cam.get("service_x_frac", 0.35)) if _sp
+                    else (0.55 if _tc else 0.0)
+                ),
+                centre[1] - service_distance * (
+                    float(_sp_cam.get("service_y_frac", 0.72)) if _sp
+                    else (0.55 if _tc else 1.0)
+                ),
+                (centre[2] + h * float(_sp_cam.get("service_z", 0.95))) if _sp
+                else (
+                    (centre[2] + h * float(_tl.get("hero_z", 1.55))) if _tc
+                    else (DECK_Z_MM * fl.MM + h * 0.25)
+                ),
             ),
             "target": (
                 centre[0],
                 centre[1] + (d * float(_tl.get("hero_tgt_y_frac", 0.10)) if _tc else 0.0),
-                (centre[2] + h * float(_tl.get("hero_tgt_z", 0.85))) if _tc
-                else (DECK_Z_MM * fl.MM + h * 0.18),
+                (centre[2] + h * float(_sp_cam.get("service_tgt_z", 0.28))) if _sp
+                else (
+                    (centre[2] + h * float(_tl.get("hero_tgt_z", 0.85))) if _tc
+                    else (DECK_Z_MM * fl.MM + h * 0.18)
+                ),
             ),
             "camera_type": "PERSP",
             "focal": 72,

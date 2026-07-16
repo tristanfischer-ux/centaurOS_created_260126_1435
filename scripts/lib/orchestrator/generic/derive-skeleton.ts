@@ -341,9 +341,15 @@ const THERMOCYCLER_FORBIDDEN_COMPONENT_RE =
 // plant HMI membrane — wrong for an OPEN benchtop lead-screw array. Form signal =
 // product_class syringe_pump OR contract quantities unique to the archetype builder
 // (channel_count + lead_screw_pitch_mm + max_syringe_volume_ml) — never a brand noun.
+// GOTCHA (Poseidon 2026-07-16): stepper_motor was #6 on this list and never
+// shipped while the first five already satisfied MIN_WORDS — instrument floors
+// are now FULLY UNIONED (see componentsForModule), not density padding.
+// shaft_coupling lives here (not only on energy_conversion) because many
+// syringe-pump graphs omit that module entirely.
 const SYRINGE_PUMP_FLUID_FLOOR = [
   'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
   'guide_rail_pair', 'linear_carriage', 'stepper_motor',
+  'shaft_coupling',
 ]
 const SYRINGE_PUMP_ENERGY_FLOOR = [
   'bench_psu_adapter', 'iec_mains_inlet', 'input_fuse',
@@ -353,9 +359,11 @@ const SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR = [
   'stepper_driver_board', 'microstep_driver', 'shaft_coupling',
   'dc_dc_regulator', 'current_sense_shunt',
 ]
+// Drivers sit with power distribution when energy_conversion is absent from
+// the class graph (Poseidon run: 9 modules, no energy_conversion node).
 const SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR = [
   'wire_harness', 'terminal_block', 'polyfuse_resettable',
-  'bulk_capacitor', 'status_led',
+  'bulk_capacitor', 'status_led', 'stepper_driver_board',
 ]
 const SYRINGE_PUMP_STRUCTURE_FLOOR = [
   'channel_frame_printed', 'base_plate', 'console_enclosure',
@@ -554,14 +562,23 @@ function componentsForModule(
     }
   }
   for (const c of fromCorpus) push(c)
-  if (out.length < MIN_WORDS) {
-    // Duty-aware thermal floor (heating ⇒ heat-pump set, cooling ⇒ chiller set, etc.);
-    // thermocycler / optical / syringe-pump instrument module floors override plant Tier-C.
+  // DECISION (Poseidon 2026-07-16): instrument form floors are AUTHORITATIVE
+  // inventories (every listed part must land), not MIN_WORDS padding. Topping up
+  // to 5 left stepper_motor / stepper_driver_board off the BoM while cradle +
+  // clamp + screw + rail + carriage already satisfied density — Interconnect
+  // then had no actuation principals and Blender lost the NEMA/coupler story.
+  // Optical / thermocycler floors get the same full-union rule (same bug class).
+  const instrumentFloor =
+    (isSyringePump && SYRINGE_PUMP_MODULE_FLOORS[moduleKey])
+    || (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey])
+    || (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey])
+    || null
+  if (instrumentFloor) {
+    for (const c of instrumentFloor) push(c)
+  } else if (out.length < MIN_WORDS) {
+    // Duty-aware thermal / energy / Tier-C plant floors still pad to density.
     const floor = isThermal ? thermalFloorForContract(contract)
       : isEnergyStore ? energyFloorFor(contract)
-      : (isSyringePump && SYRINGE_PUMP_MODULE_FLOORS[moduleKey]) ? SYRINGE_PUMP_MODULE_FLOORS[moduleKey]
-      : (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey]) ? THERMOCYCLER_MODULE_FLOORS[moduleKey]
-      : (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey]) ? OPTICAL_MODULE_FLOORS[moduleKey]
       : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {
       if (out.length >= MIN_WORDS) break

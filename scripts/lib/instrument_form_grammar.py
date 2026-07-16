@@ -404,6 +404,14 @@ SP_CAM_H_EFF_SCALE = 1.05        # vs optical instrument 1.92 (no cuvette tower)
 SP_CAM_DIST_K = 0.98
 SP_CAM_FRAME = 0.90
 SP_CAM_CENTRE_FRAC = 0.42
+# Service cam (07-product-service): default used max(w,d)/aspect which left
+# height occupancy ~0.31 on a wide+low array. Pull in + raise look at console.
+SP_CAM_SERVICE_DIST_K = 0.78
+SP_CAM_SERVICE_FRAME = 0.88
+SP_CAM_SERVICE_Z = 0.95
+SP_CAM_SERVICE_Y_FRAC = 0.72
+SP_CAM_SERVICE_X_FRAC = 0.35
+SP_CAM_SERVICE_TGT_Z = 0.28
 
 # Mesh-name prefixes for deterministic SIGHT (form_converge_loop).
 SP_MESH_PREFIX = "u_se_sp_"
@@ -452,6 +460,12 @@ def syringe_pump_product_cam_fractions() -> dict:
         "dist_k": SP_CAM_DIST_K,
         "frame": SP_CAM_FRAME,
         "centre_frac": SP_CAM_CENTRE_FRAC,
+        "service_dist_k": SP_CAM_SERVICE_DIST_K,
+        "service_frame": SP_CAM_SERVICE_FRAME,
+        "service_z": SP_CAM_SERVICE_Z,
+        "service_y_frac": SP_CAM_SERVICE_Y_FRAC,
+        "service_x_frac": SP_CAM_SERVICE_X_FRAC,
+        "service_tgt_z": SP_CAM_SERVICE_TGT_Z,
     }
 
 
