@@ -355,6 +355,158 @@ def tipback_lid_vision_image_candidates() -> tuple[str, ...]:
     return TIPBACK_LID_VISION_IMAGE_CANDIDATES
 
 
+# ── Multi-channel linear dosing / syringe-pump form (OPEN array) ──────────
+# INTENT: a THIRD instrument form family. Function forces N parallel
+# stepper→leadscrew→carriage→plunger-clamp bays + a control spine.
+# OPEN mechanism is the product face (maker instrument) — never a sealed
+# empty cube. Brand aliases (poseidon) are TRAINING synonyms only.
+#
+# DECISION: keyed on class slug + motion/fluid part vocabulary, same
+# discipline as is_thermocycler_form — never `if product == "poseidon"`.
+
+SYRINGE_PUMP_CLASS_RE = re.compile(
+    r"syringe[_ -]?pump|multi[_ -]?channel[_ -]?syringe|programmable[_ -]?syringe", re.I)
+SYRINGE_PUMP_CLASS_ALIAS_RE = re.compile(r"\bposeidon\b", re.I)
+SYRINGE_PUMP_PART_RE = re.compile(
+    r"syringe|plunger|lead[_ -]?screw|leadscrew|carriage|guide[_ -]?rail|"
+    r"stepper|nema\s*17|microstep|infus(?:e|ion)|withdraw", re.I)
+
+# Parametric bay geometry (mm) — scales with channel_count, not brand.
+SP_BAY_PITCH_MM = 72.0
+SP_BAY_LENGTH_MM = 220.0          # motor → tip cradle (syringe stroke class)
+SP_BAY_HEIGHT_MM = 70.0
+SP_BASE_MARGIN_MM = 18.0
+SP_CONSOLE_WIDTH_MM = 140.0
+SP_CONSOLE_DEPTH_MM = 160.0
+SP_CONSOLE_HEIGHT_MM = 90.0
+SP_STEPPER_FACE_MM = 42.0         # NEMA17 face class
+SP_RAIL_GAP_MM = 28.0
+SP_SCREW_DIAMETER_MM = 8.0
+SP_CARRIAGE_L_MM = 28.0
+SP_CARRIAGE_TRAVEL_FRAC = 0.42    # carriage mid-stroke for readability
+SP_SYRINGE_LENGTH_MM = 100.0
+SP_SYRINGE_DIAMETER_MM = 22.0
+SP_CLAMP_STAR_OD_MM = 22.0
+
+# Mesh-name prefixes for deterministic SIGHT (form_converge_loop).
+SP_MESH_PREFIX = "u_se_sp_"
+SP_CHANNEL_PREFIX = "u_se_sp_ch"
+
+
+def is_syringe_pump_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for multi-channel benchtop linear syringe-dosing form.
+
+    @description Form gate for OPEN parallel actuator array + control spine.
+                 Class/alias is authoritative; part-vocab only on instruments.
+    @param product_class Chain product_class slug
+    @param part_blob Concatenated part name_human text
+    @param is_instrument Device-scale flag (gates part-vocab path only)
+    @returns True when this form family's rules should apply
+    """
+    pc = product_class or ""
+    blob = part_blob or ""
+    if SYRINGE_PUMP_CLASS_RE.search(pc) or SYRINGE_PUMP_CLASS_ALIAS_RE.search(pc):
+        return True
+    if not is_instrument:
+        return False
+    # Need syringe + linear-drive signal together (avoid plant "pump" alone).
+    has_syringe = bool(re.search(r"syringe|plunger", blob, re.I))
+    has_linear = bool(re.search(
+        r"lead[_ -]?screw|leadscrew|carriage|stepper|nema", blob, re.I))
+    return has_syringe and has_linear
+
+
+def syringe_pump_envelope_mm(channel_count: int) -> tuple[float, float, float]:
+    """Benchtop envelope forced by N bays + control console beside the array.
+
+    @param channel_count Independent syringe drives (≥1)
+    @returns (W, D, H) mm — width across channels, depth along stroke, height
+    """
+    n = max(1, int(channel_count))
+    array_w = n * SP_BAY_PITCH_MM + 2.0 * SP_BASE_MARGIN_MM
+    w = array_w + SP_CONSOLE_WIDTH_MM + SP_BASE_MARGIN_MM
+    d = max(SP_BAY_LENGTH_MM, SP_CONSOLE_DEPTH_MM) + 2.0 * SP_BASE_MARGIN_MM
+    h = max(SP_BAY_HEIGHT_MM, SP_CONSOLE_HEIGHT_MM) + SP_BASE_MARGIN_MM
+    return (w, d, h)
+
+
+def syringe_pump_channel_locs_mm(
+    channel_count: int,
+    *,
+    origin_x: float = 0.0,
+    origin_y: float = 0.0,
+    base_z: float = 0.0,
+) -> list[dict]:
+    """Per-channel world anchors for stepper / screw / carriage / cradle.
+
+    INTENT: convergent layout — channels share Y (stroke axis) and step in X.
+    Control console sits at +X beyond the last bay (caller places separately).
+
+    @returns List of dicts with loc keys in mm for one bay each.
+    """
+    n = max(1, int(channel_count))
+    env_w, env_d, _env_h = syringe_pump_envelope_mm(n)
+    array_w = n * SP_BAY_PITCH_MM
+    # Array centred left of console; console occupies right band.
+    array_cx = origin_x - SP_CONSOLE_WIDTH_MM / 2.0
+    x0 = array_cx - array_w / 2.0 + SP_BAY_PITCH_MM / 2.0
+    y_motor = origin_y + env_d * 0.28
+    y_tip = origin_y - env_d * 0.32
+    stroke = abs(y_motor - y_tip) - SP_STEPPER_FACE_MM
+    locs: list[dict] = []
+    for i in range(n):
+        x = x0 + i * SP_BAY_PITCH_MM
+        y_car = y_motor - SP_STEPPER_FACE_MM * 0.6 - stroke * SP_CARRIAGE_TRAVEL_FRAC
+        locs.append({
+            "index": i + 1,
+            "x": x,
+            "y_motor": y_motor,
+            "y_tip": y_tip,
+            "y_carriage": y_car,
+            "z_axis": base_z + SP_BAY_HEIGHT_MM * 0.45,
+            "z_base": base_z,
+            "stroke_mm": stroke,
+        })
+    return locs
+
+
+def syringe_pump_checklist(channel_count: int) -> list[str]:
+    """Deterministic mesh-name stems that must exist after placement.
+
+    @description form_converge_loop scores these without an LLM — hundreds of
+                 Blender rounds stay cheap.
+    """
+    n = max(1, int(channel_count))
+    stems = [f"{SP_MESH_PREFIX}base", f"{SP_MESH_PREFIX}console"]
+    for i in range(1, n + 1):
+        p = f"{SP_CHANNEL_PREFIX}{i}_"
+        stems.extend([
+            f"{p}stepper",
+            f"{p}leadscrew",
+            f"{p}carriage",
+            f"{p}rail_a",
+            f"{p}cradle",
+            f"{p}clamp",
+            f"{p}syringe",
+        ])
+    return stems
+
+
+def syringe_pump_checklist_ok(mesh_names: list[str], channel_count: int) -> tuple[bool, list[str]]:
+    """proveCatch / converge score: every required stem is a prefix of some mesh."""
+    names = list(mesh_names or [])
+    missing: list[str] = []
+    for stem in syringe_pump_checklist(channel_count):
+        if not any(n.startswith(stem) or stem in n for n in names):
+            missing.append(stem)
+    return (len(missing) == 0, missing)
+
+
 def _selftest() -> None:
     """proveCatch: grammar floors are stable; accessory cap ≠ knob; silhouette holds."""
     hfi._selftest()
@@ -415,6 +567,35 @@ def _selftest() -> None:
     assert interior_authenticity_ok(
         {"n_story": 12, "n_plain_box": 3, "n_authentic": 7}
     ), "authentic majority must pass"
+    # Syringe-pump OPEN array form — class, alias, part vocab, negatives.
+    assert is_syringe_pump_form(product_class="syringe_pump"), (
+        "class slug syringe_pump must select OPEN linear-dosing form")
+    assert is_syringe_pump_form(product_class="poseidon"), (
+        "TRAINING synonym must map to the same form — not a product branch")
+    assert is_syringe_pump_form(
+        product_class="",
+        part_blob="lead screw carriage and syringe plunger clamp with NEMA17 stepper",
+    ), "syringe+linear part vocabulary must select the form"
+    assert not is_syringe_pump_form(product_class="thermocycler")
+    assert not is_syringe_pump_form(
+        product_class="water_treatment",
+        part_blob="circulation pump",
+        is_instrument=False,
+    ), "plant pump must NOT select syringe-pump form"
+    _env = syringe_pump_envelope_mm(4)
+    assert _env[0] > _env[1], "4-ch array must be wider than deep (channels across X)"
+    _locs = syringe_pump_channel_locs_mm(4)
+    assert len(_locs) == 4
+    assert _locs[1]["x"] > _locs[0]["x"], "channels step in +X"
+    _ok, _miss = syringe_pump_checklist_ok(
+        ["u_se_sp_base", "u_se_sp_console"]
+        + [f"u_se_sp_ch{i}_{s}" for i in range(1, 5)
+           for s in ("stepper", "leadscrew", "carriage", "rail_a", "cradle", "clamp", "syringe")],
+        4,
+    )
+    assert _ok and not _miss, f"full mesh set must pass checklist, miss={_miss}"
+    _bad, _miss2 = syringe_pump_checklist_ok(["u_se_sp_base"], 4)
+    assert (not _bad) and len(_miss2) > 0, "empty channels must fail checklist"
     print("instrument_form_grammar _selftest: OK (beauty + desirability + use-physics)")
 
 

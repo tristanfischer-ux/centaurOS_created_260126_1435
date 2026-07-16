@@ -12310,6 +12310,9 @@ _IS_INSTRUMENT_DEVICE = False
 # Thermocycler / PCR benchtop form (lid + tube block) — distinct from optical-bench instruments.
 _IS_THERMOCYCLER_FORM = False
 _THERMOCYCLER_TUBE_COUNT = 16
+# OPEN multi-channel linear dosing (syringe-pump form) — not a sealed cube.
+_IS_SYRINGE_PUMP_FORM = False
+_SYRINGE_PUMP_CHANNEL_COUNT = 4
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
@@ -12327,29 +12330,44 @@ def _sealed_enclosure_env_mm(state, quantities):
     # reads it to lay the interior as an instrument, not a BESS battery-cabinet stack.
     global _IS_INSTRUMENT_DEVICE, _INSTRUMENT_OPTICAL_PATH_MM
     global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
+    global _IS_SYRINGE_PUMP_FORM, _SYRINGE_PUMP_CHANNEL_COUNT
     pc = product_class_of(state) if isinstance(state, dict) else ""
-    # INTENT: prefer the chain's authoritative flag, but ALSO derive from the
-    # same enclosure+not-plantish gate. Intermediate chain rewrites have
-    # historically dropped `isInstrumentDevice` from state.json while still
-    # carrying enclosure_volume_m3 < 1 — Blender then rendered a BESS stack.
-    _plantish = bool(re.search(
-        r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
-        r"switchgear|plant|reactor|boiler|pump|hvac|chiller", pc or ""))
-    _flag = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
-    _IS_INSTRUMENT_DEVICE = _flag or (0 < float(vol) < 1.0 and not _plantish)
-    if _IS_INSTRUMENT_DEVICE and not _flag:
-        print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
-              f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
-    # Part-name evidence when class slug is thin / missing.
+    # Part-name evidence when class slug is thin / missing (needed before plantish).
     part_blob = ""
     if isinstance(state, dict):
         for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
             for sm in (m.get("sub_modules") or []):
                 for w in (sm.get("words") or []):
                     part_blob += " " + str(w.get("name_human") or "")
+    # GOTCHA (2026-07-16 Poseidon): bare `pump` in plantish matched `syringe_pump`
+    # and forced a non-instrument path → sealed cube / plant fallback. Instrument
+    # form families win over the plantish keyword table.
+    _form_instrument = (
+        ifg.is_thermocycler_form(product_class=pc or "", part_blob=part_blob, is_instrument=True)
+        or ifg.is_syringe_pump_form(product_class=pc or "", part_blob=part_blob, is_instrument=True)
+        or bool(re.search(r"optical[_ -]?instrument|colorimeter|photometer", pc or "", re.I))
+    )
+    # INTENT: prefer the chain's authoritative flag, but ALSO derive from the
+    # same enclosure+not-plantish gate. Intermediate chain rewrites have
+    # historically dropped `isInstrumentDevice` from state.json while still
+    # carrying enclosure_volume_m3 < 1 — Blender then rendered a BESS stack.
+    _plantish = (not _form_instrument) and bool(re.search(
+        r"battery|storage|bess|powerwall|energy|inverter|pcs|transformer|"
+        r"switchgear|plant|reactor|boiler|hvac|chiller|"
+        r"water[_ -]?treatment|circulation[_ -]?pump|process[_ -]?pump", pc or ""))
+    _flag = bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
+    _IS_INSTRUMENT_DEVICE = _flag or _form_instrument or (0 < float(vol) < 1.0 and not _plantish)
+    if _IS_INSTRUMENT_DEVICE and not _flag:
+        print(f"[univ][sealed] isInstrumentDevice derived from enclosure "
+              f"{vol:.4f} m³ + class={pc or '∅'} (flag missing on state.json)")
     # FLOW: form gate lives in instrument_form_grammar — class + part vocab,
     # never a product-noun branch (see ifg.is_thermocycler_form proveCatch).
     _IS_THERMOCYCLER_FORM = ifg.is_thermocycler_form(
+        product_class=pc or "",
+        part_blob=part_blob,
+        is_instrument=_IS_INSTRUMENT_DEVICE,
+    )
+    _IS_SYRINGE_PUMP_FORM = ifg.is_syringe_pump_form(
         product_class=pc or "",
         part_blob=part_blob,
         is_instrument=_IS_INSTRUMENT_DEVICE,
@@ -12359,6 +12377,11 @@ def _sealed_enclosure_env_mm(state, quantities):
         _THERMOCYCLER_TUBE_COUNT = max(4, min(96, int(round(float(_tc)))))
     else:
         _THERMOCYCLER_TUBE_COUNT = 16
+    _ch = qval(quantities, "channel_count", None)
+    if _ch is not None and float(_ch) > 0:
+        _SYRINGE_PUMP_CHANNEL_COUNT = max(1, min(16, int(round(float(_ch)))))
+    else:
+        _SYRINGE_PUMP_CHANNEL_COUNT = 4
     # Sample-chamber plan/height track the brief/contract optical path when present
     # (transmittance instruments size the cuvette well from path length — universal).
     _path = qval(quantities, "optical_path_length_mm", None)
@@ -12366,6 +12389,9 @@ def _sealed_enclosure_env_mm(state, quantities):
         _INSTRUMENT_OPTICAL_PATH_MM = float(_path)
     else:
         _INSTRUMENT_OPTICAL_PATH_MM = 10.0
+    # OPEN syringe-pump array: envelope from channel physics, not a cube of volume.
+    if _IS_SYRINGE_PUMP_FORM:
+        return ifg.syringe_pump_envelope_mm(_SYRINGE_PUMP_CHANNEL_COUNT)
     envelope = resolve_design_envelope_mm(state)
     if envelope:
         return envelope
@@ -12473,6 +12499,12 @@ def _sealed_product_camera_specs(env_mm):
     ]
 
 
+def _syringe_pump_exterior_keep_visible(name: str) -> bool:
+    """OPEN array story meshes stay visible on product exteriors (mechanism IS the face)."""
+    nm = name or ""
+    return nm.startswith("u_se_sp_")
+
+
 def _thermocycler_exterior_keep_visible(name: str) -> bool:
     """Pure policy: meshes that must stay visible on thermocycler 04–07 product shots.
 
@@ -12508,7 +12540,8 @@ def _selftest_thermocycler_exterior_keep() -> None:
 
 def _prepare_sealed_product_view(view_name, entering):
     """Toggle closed exterior vs open cutaway without mutating engineering data."""
-    if _SEALED_FRONT_COVER is None:
+    # Syringe-pump OPEN form has no front cover — still must toggle mesh visibility.
+    if _SEALED_FRONT_COVER is None and not _IS_SYRINGE_PUMP_FORM:
         return
     exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
     # Always restore the cutaway baseline first. This also makes cleanup after
@@ -12517,10 +12550,12 @@ def _prepare_sealed_product_view(view_name, entering):
     # front cover on cutaway — internals read through the translucent shell.
     # EXCEPTION (NinjaPCR 2026-07-15): thermocycler hero must be an OPEN-FRONT
     # wood box so the sample-block wells read; a closed fascia hid the aperture.
-    if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
-        _SEALED_FRONT_COVER.hide_render = True
-    else:
-        _SEALED_FRONT_COVER.hide_render = not bool(_IS_INSTRUMENT_DEVICE)
+    if _SEALED_FRONT_COVER is not None:
+        if _IS_INSTRUMENT_DEVICE and (_IS_THERMOCYCLER_FORM or _IS_SYRINGE_PUMP_FORM):
+            # OPEN forms: no closed fascia on cutaway / hero.
+            _SEALED_FRONT_COVER.hide_render = True
+        else:
+            _SEALED_FRONT_COVER.hide_render = not bool(_IS_INSTRUMENT_DEVICE)
     for obj in bpy.data.objects:
         # GOTCHA (colorimeter 2026-07-14): `_suppress_instrument_boilerplate_meshes`
         # hides u_se_det_* BoM slabs, but this cutaway baseline used to force them
@@ -12556,7 +12591,26 @@ def _prepare_sealed_product_view(view_name, entering):
         # the sample-block deck + heatsink through side vents. Re-applying the
         # colorimeter "hide all story meshes + blank fascia" path made 04/07 read as
         # an empty wood crate even when 00-hero cutaway was populated.
-        if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
+        if _IS_INSTRUMENT_DEVICE and _IS_SYRINGE_PUMP_FORM:
+            # Mechanism IS the product face — keep u_se_sp_*, hide sealed crate.
+            if _SEALED_FRONT_COVER is not None:
+                _SEALED_FRONT_COVER.hide_render = True
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) != "MESH":
+                    continue
+                nm = obj.name
+                if _syringe_pump_exterior_keep_visible(nm):
+                    obj.hide_render = False
+                elif nm.startswith("u_se_product_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_se_det_") or nm.startswith("u_se_cad_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_se_cutaway_cue_") or nm.startswith(
+                        "u_se_instrument_story_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_wire_") or nm.startswith("u_pipe_"):
+                    obj.hide_render = True
+        elif _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
             # Keep front fascia (branding face) but NEVER strip u_se_tc_* / lid cues.
             _SEALED_FRONT_COVER.hide_render = False
             for obj in bpy.data.objects:
@@ -12899,6 +12953,178 @@ def _place_photodiode_to_can_compound(
     return 3
 
 
+def _place_syringe_pump_layout(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    story_mod: str,
+    MO: dict,
+) -> dict:
+    """OPEN multi-channel linear dosing array — stepper→screw→carriage→syringe.
+
+    INTENT (2026-07-16 Poseidon SIGHT): gold open syringe pumps expose the
+    mechanism as the product face. Function forces N parallel bays (channel_count)
+    with lead-screw carriages and cradles — never a sealed empty cube.
+
+    DECISION: keyed on `_IS_SYRINGE_PUMP_FORM` via ifg.is_syringe_pump_form
+    (class / part vocab — never a product-noun branch). Geometry from
+    ifg.syringe_pump_channel_locs_mm.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    n = max(1, int(_SYRINGE_PUMP_CHANNEL_COUNT or 4))
+    frame_mat = fl.make_mat(
+        "m_se_sp_frame", fl._to_linear((0.55, 0.56, 0.58)), metallic=0.15, roughness=0.55)
+    carriage_mat = fl.make_mat(
+        "m_se_sp_carriage", fl._to_linear((0.12, 0.35, 0.78)), metallic=0.05, roughness=0.45)
+    motor_mat = fl.make_mat(
+        "m_se_sp_motor", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.35, roughness=0.50)
+    screw_mat = fl.make_mat(
+        "m_se_sp_screw", fl._to_linear((0.70, 0.72, 0.74)), metallic=0.85, roughness=0.25)
+    rail_mat = fl.make_mat(
+        "m_se_sp_rail", fl._to_linear((0.65, 0.66, 0.68)), metallic=0.80, roughness=0.30)
+    cradle_mat = fl.make_mat(
+        "m_se_sp_cradle", fl._to_linear((0.50, 0.51, 0.53)), metallic=0.10, roughness=0.55)
+    clamp_mat = fl.make_mat(
+        "m_se_sp_clamp", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.15, roughness=0.55)
+    syringe_mat = fl.make_mat(
+        "m_se_sp_syringe", fl._to_linear((0.85, 0.88, 0.90)), metallic=0.0, roughness=0.35)
+    console_mat = fl.make_mat(
+        "m_se_sp_console", fl._to_linear((0.18, 0.20, 0.24)), metallic=0.05, roughness=0.50)
+    glass_mat = fl.make_mat(
+        "m_se_sp_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
+
+    # Base plate spanning the forced envelope.
+    _base = fl.add_box(
+        "u_se_sp_base",
+        _mm3((0.0, 0.0, base_z + 3.0)),
+        _mm3((W * 0.96, D * 0.92, 6.0)),
+        frame_mat, module=story_mod, module_objects=MO)
+    _base.dimensions = _mm3((W * 0.96, D * 0.92, 6.0))
+
+    locs = ifg.syringe_pump_channel_locs_mm(n, base_z=base_z)
+    face = ifg.SP_STEPPER_FACE_MM
+    screw_r = ifg.SP_SCREW_DIAMETER_MM / 2.0
+    for loc in locs:
+        i = int(loc["index"])
+        p = f"u_se_sp_ch{i}_"
+        x = float(loc["x"])
+        y_m = float(loc["y_motor"])
+        y_t = float(loc["y_tip"])
+        y_c = float(loc["y_carriage"])
+        z = float(loc["z_axis"])
+        # Frame uprights (rear motor mount + front cradle mount).
+        for tag, y in (("frame_rear", y_m), ("frame_front", y_t)):
+            _fr = fl.add_box(
+                f"{p}{tag}",
+                _mm3((x, y, base_z + ifg.SP_BAY_HEIGHT_MM * 0.35)),
+                _mm3((face * 0.95, 12.0, ifg.SP_BAY_HEIGHT_MM * 0.7)),
+                frame_mat, module=story_mod, module_objects=MO)
+            _fr.dimensions = _mm3((face * 0.95, 12.0, ifg.SP_BAY_HEIGHT_MM * 0.7))
+        # Stepper (cube = NEMA face class).
+        _st = fl.add_box(
+            f"{p}stepper",
+            _mm3((x, y_m + face * 0.35, z)),
+            _mm3((face, face, face)),
+            motor_mat, module=story_mod, module_objects=MO)
+        _st.dimensions = _mm3((face, face, face))
+        # Lead screw along Y between motor and tip.
+        screw_len = abs(y_m - y_t) - face * 0.5
+        _ls = fl.add_cyl(
+            f"{p}leadscrew",
+            _mm3((x, (y_m + y_t) / 2.0, z)),
+            screw_r * fl.MM,
+            screw_len * fl.MM,
+            screw_mat, module=story_mod, module_objects=MO)
+        try:
+            _ls.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+        # Dual guide rails.
+        for side, tag in ((-1, "rail_a"), (1, "rail_b")):
+            _rl = fl.add_cyl(
+                f"{p}{tag}",
+                _mm3((x + side * ifg.SP_RAIL_GAP_MM / 2.0, (y_m + y_t) / 2.0, z)),
+                2.0 * fl.MM,
+                screw_len * fl.MM,
+                rail_mat, module=story_mod, module_objects=MO)
+            try:
+                _rl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+            except Exception:
+                pass
+        # Carriage (contrasting) + plunger clamp nub.
+        _car = fl.add_box(
+            f"{p}carriage",
+            _mm3((x, y_c, z)),
+            _mm3((face * 0.85, ifg.SP_CARRIAGE_L_MM, face * 0.70)),
+            carriage_mat, module=story_mod, module_objects=MO)
+        _car.dimensions = _mm3((face * 0.85, ifg.SP_CARRIAGE_L_MM, face * 0.70))
+        # V-cradle at tip end.
+        _cr = fl.add_box(
+            f"{p}cradle",
+            _mm3((x, y_t, z - 4.0)),
+            _mm3((face * 0.90, 18.0, 16.0)),
+            cradle_mat, module=story_mod, module_objects=MO)
+        _cr.dimensions = _mm3((face * 0.90, 18.0, 16.0))
+        # Clamp knob (star affordance ≈ low-poly lobe cylinder) above cradle.
+        _cl = fl.add_cyl(
+            f"{p}clamp",
+            _mm3((x, y_t, z + 14.0)),
+            (ifg.SP_CLAMP_STAR_OD_MM / 2.0) * fl.MM,
+            8.0 * fl.MM,
+            clamp_mat, module=story_mod, module_objects=MO)
+        # Syringe barrel toward −Y tip.
+        _sy = fl.add_cyl(
+            f"{p}syringe",
+            _mm3((x, y_t - ifg.SP_SYRINGE_LENGTH_MM * 0.35, z + 2.0)),
+            (ifg.SP_SYRINGE_DIAMETER_MM / 2.0) * fl.MM,
+            ifg.SP_SYRINGE_LENGTH_MM * fl.MM,
+            syringe_mat, module=story_mod, module_objects=MO)
+        try:
+            _sy.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+
+    # Control console to the +X side of the array.
+    cx = W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.45
+    _con = fl.add_box(
+        "u_se_sp_console",
+        _mm3((cx, 0.0, base_z + ifg.SP_CONSOLE_HEIGHT_MM * 0.45)),
+        _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.9, ifg.SP_CONSOLE_DEPTH_MM * 0.85,
+              ifg.SP_CONSOLE_HEIGHT_MM * 0.9)),
+        console_mat, module=story_mod, module_objects=MO)
+    _con.dimensions = _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.9, ifg.SP_CONSOLE_DEPTH_MM * 0.85,
+                            ifg.SP_CONSOLE_HEIGHT_MM * 0.9))
+    _disp = fl.add_box(
+        "u_se_sp_console_display",
+        _mm3((cx, -ifg.SP_CONSOLE_DEPTH_MM * 0.28,
+              base_z + ifg.SP_CONSOLE_HEIGHT_MM * 0.55)),
+        _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.70, 4.0, ifg.SP_CONSOLE_HEIGHT_MM * 0.45)),
+        glass_mat, module=story_mod, module_objects=MO)
+    _disp.dimensions = _mm3((ifg.SP_CONSOLE_WIDTH_MM * 0.70, 4.0,
+                             ifg.SP_CONSOLE_HEIGHT_MM * 0.45))
+
+    # Dump mesh names for form_converge_loop deterministic checklist (no LLM).
+    try:
+        _out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if _out and hasattr(bpy, "data"):
+            _names = sorted(
+                o.name for o in bpy.data.objects
+                if getattr(o, "type", None) == "MESH" and o.name.startswith("u_se_sp_")
+            )
+            Path(_out).joinpath("form-meshes.json").write_text(
+                json.dumps({"form": "syringe_pump", "channels": n, "meshes": _names}, indent=2)
+            )
+    except Exception as _dump_exc:
+        print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
+    print(f"[univ][sealed] SYRINGE_PUMP OPEN array: {n} channel(s) "
+          f"+ control console (no sealed crate)")
+    return {"channels": n, "form": "syringe_pump"}
+
+
 def _place_thermocycler_interior_layout(
     W: float,
     D: float,
@@ -12914,8 +13140,9 @@ def _place_thermocycler_interior_layout(
     instrument (laser-cut wood box, hinged lid + star knob, aluminium sample block
     with tube wells) — NOT an optical colorimeter bench and NOT a BESS stack.
 
-    DECISION: keyed on `_IS_THERMOCYCLER_FORM` (class or peltier/sample-block vocab),
-    never a NinjaPCR-named branch. Tube count from contract `tube_count`.
+    DECISION: keyed on `_IS_THERMOCYCLER_FORM` via ifg.is_thermocycler_form
+    (class slug / part vocab — never a product-noun branch). Tube count from
+    contract `tube_count`.
     """
     def _mm3(tpl):
         return tuple(c * fl.MM for c in tpl)
@@ -13057,9 +13284,11 @@ def _place_instrument_interior_layout(
     compounds as fallback — never a field of plain cuboids.
 
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
-    FLOW: thermocycler/PCR classes divert to `_place_thermocycler_interior_layout`
-    (lid + sample block) — optical bench would be the wrong product family.
+    FLOW: thermocycler/PCR → tip-back lid layout; syringe_pump → OPEN linear
+    dosing array; else optical bench. Wrong family would be a sealed cube.
     """
+    if _IS_SYRINGE_PUMP_FORM:
+        return _place_syringe_pump_layout(W, D, H, base_z, tt, story_mod, MO)
     if _IS_THERMOCYCLER_FORM:
         return _place_thermocycler_interior_layout(W, D, H, base_z, tt, story_mod, MO)
 
@@ -15035,6 +15264,15 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # GOTCHA: instruments do NOT add a partial front fascia here. Closing the
         # product exterior is done by front_cover on sealed_exterior_view_names
         # (04–07). 00-hero stays open so the structured interior cutaway ships.
+        #
+        # EXCEPTION (syringe_pump 2026-07-16): OPEN array — skip sealed crate
+        # panels entirely; mechanism meshes from `_place_syringe_pump_layout`
+        # ARE the product face (convergent with gold maker pumps).
+        if _IS_SYRINGE_PUMP_FORM:
+            _shell_panels = []
+            _SEALED_FRONT_COVER = None
+            print("[univ][sealed] SYRINGE_PUMP: skipped sealed product crate "
+                  "(OPEN multi-channel array is the exterior)")
         for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
@@ -15042,22 +15280,23 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _SEALED_SHELL_OBJECTS.append(_ob)
         # Closed exterior cover is hidden for the cutaway hero and enabled only
         # for exterior/product-angle renders by the view preparer.
-        _SEALED_FRONT_COVER = fl.add_box(
-            "u_se_product_front_cover",
-            _mm3((0.0, -D / 2 - tt / 2, base_z + H / 2)),
-            _mm3((W, tt, H)),
-            exterior_mat,
-            module=_skin_mod,
-            module_objects=MO,
-        )
-        _SEALED_FRONT_COVER.dimensions = _mm3((W, tt, H))
-        _cover_bevel = _SEALED_FRONT_COVER.modifiers.get("presentation_bevel")
-        if _cover_bevel is None:
-            _cover_bevel = _SEALED_FRONT_COVER.modifiers.new(
-                name="product_cover_bevel", type="BEVEL")
-        _cover_bevel.width = min(W, D) * (0.10 if _IS_INSTRUMENT_DEVICE else 0.06) * fl.MM
-        _cover_bevel.segments = 6
-        _SEALED_FRONT_COVER.hide_render = True
+        if not _IS_SYRINGE_PUMP_FORM:
+            _SEALED_FRONT_COVER = fl.add_box(
+                "u_se_product_front_cover",
+                _mm3((0.0, -D / 2 - tt / 2, base_z + H / 2)),
+                _mm3((W, tt, H)),
+                exterior_mat,
+                module=_skin_mod,
+                module_objects=MO,
+            )
+            _SEALED_FRONT_COVER.dimensions = _mm3((W, tt, H))
+            _cover_bevel = _SEALED_FRONT_COVER.modifiers.get("presentation_bevel")
+            if _cover_bevel is None:
+                _cover_bevel = _SEALED_FRONT_COVER.modifiers.new(
+                    name="product_cover_bevel", type="BEVEL")
+            _cover_bevel.width = min(W, D) * (0.10 if _IS_INSTRUMENT_DEVICE else 0.06) * fl.MM
+            _cover_bevel.segments = 6
+            _SEALED_FRONT_COVER.hide_render = True
         if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
             # INTENT (2026-07-15 NinjaPCR SIGHT): exterior must read as a laser-cut
             # wood plate box with lid + star knob — NOT the optical handheld tower
