@@ -104,13 +104,45 @@ _EXTERIOR_THERMOCYCLER_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
 )
 
+# INTENT: optical GA/exterior prompts false-fail OPEN syringe-pump arrays.
+_GA_SYRINGE_PUMP_PROMPT = (
+    "You are an adversarial chartered engineer glancing at a GENERAL ARRANGEMENT "
+    "drawing of a BENCHTOP MULTI-CHANNEL SYRINGE PUMP (OPEN linear-dosing array — "
+    "NOT a colorimeter).\n\n"
+    "Expect orthographic views of N parallel actuator bays + a control console, "
+    "envelope in millimetres for a sub-500 mm benchtop instrument.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • FRONT/TOP elevations are empty / featureless blank rectangles\n"
+    "  • views are blank / cropped / unreadable\n"
+    "  • title block prints metres for a sub-500 mm benchtop instrument\n\n"
+    "Do NOT flag missing optical cube / cuvette / D-pad / charcoal polymer L-body.\n"
+    "Do NOT flag missing plant pipes, battery packs, or inverter stacks.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
 
-def _is_thermocycler_out_dir(out_dir: str) -> bool:
-    """True when state selects tip-back-lid PCR form (ifg.is_thermocycler_form)."""
+_EXTERIOR_SYRINGE_PUMP_PROMPT = (
+    "You are an adversarial industrial-design reviewer glancing at a product render "
+    "of a BENCHTOP MULTI-CHANNEL SYRINGE PUMP (OPEN array — NOT a colorimeter).\n\n"
+    "Expect: parallel steppers + lead screws + contrasting carriages + V-cradles + "
+    "syringes + a control console beside the array. Open mechanism is intentional.\n\n"
+    "Flag broken=true ONLY when any of these are clearly visible:\n"
+    "  • blank / empty / featureless render\n"
+    "  • sealed empty cube with no actuator bays\n"
+    "  • optical colorimeter tower wrongly on the product\n"
+    "  • product cropped unreadably small\n\n"
+    "Do NOT flag exposed screws/rails/carriages as 'exploded' — that IS the form.\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"short description\", ...]}."
+)
+
+
+def _form_state_signals(out_dir: str) -> tuple[str, str, bool]:
+    """product_class, part_blob, is_instrument from run state.json."""
     try:
         st = json.loads((Path(out_dir) / "state.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
-        return False
+        return "", "", True
     pc = ""
     for src in (
         (st.get("orchestratorContract") or {}).get("product_class"),
@@ -125,10 +157,22 @@ def _is_thermocycler_out_dir(out_dir: str) -> bool:
         for sm in (m.get("sub_modules") or []):
             for w in (sm.get("words") or []):
                 part_blob += " " + str(w.get("name_human") or "")
+    return pc, part_blob, bool(st.get("isInstrumentDevice", True))
+
+
+def _is_thermocycler_out_dir(out_dir: str) -> bool:
+    """True when state selects tip-back-lid PCR form (ifg.is_thermocycler_form)."""
+    pc, part_blob, is_inst = _form_state_signals(out_dir)
     return ifg.is_thermocycler_form(
-        product_class=pc,
-        part_blob=part_blob,
-        is_instrument=bool(st.get("isInstrumentDevice", True)),
+        product_class=pc, part_blob=part_blob, is_instrument=is_inst,
+    )
+
+
+def _is_syringe_pump_out_dir(out_dir: str) -> bool:
+    """True when state selects OPEN multi-channel syringe-pump form."""
+    pc, part_blob, is_inst = _form_state_signals(out_dir)
+    return ifg.is_syringe_pump_form(
+        product_class=pc, part_blob=part_blob, is_instrument=is_inst,
     )
 
 _FIXTURE_BAD_GA = (
@@ -171,9 +215,12 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
         }
     targets: list[tuple[str, str]] = []
     thermo = bool(is_instrument and _is_thermocycler_out_dir(out_dir))
+    syringe = bool(is_instrument and _is_syringe_pump_out_dir(out_dir))
     ga = out / "drawings" / "general-arrangement.png"
     if ga.is_file() and ga.stat().st_size > 800:
-        if thermo:
+        if syringe:
+            prompt = _GA_SYRINGE_PUMP_PROMPT
+        elif thermo:
             prompt = _GA_THERMOCYCLER_PROMPT
         elif is_instrument:
             prompt = _GA_INSTRUMENT_PROMPT
@@ -186,9 +233,12 @@ def critique_drawing_set(out_dir: str, *, is_instrument: bool = False) -> dict:
             )
         targets.append((str(ga), prompt))
     if is_instrument:
-        exterior_prompt = (
-            _EXTERIOR_THERMOCYCLER_PROMPT if thermo else _EXTERIOR_INSTRUMENT_PROMPT
-        )
+        if syringe:
+            exterior_prompt = _EXTERIOR_SYRINGE_PUMP_PROMPT
+        elif thermo:
+            exterior_prompt = _EXTERIOR_THERMOCYCLER_PROMPT
+        else:
+            exterior_prompt = _EXTERIOR_INSTRUMENT_PROMPT
         for name in ("04-product-exterior.png", "00-hero.png"):
             p = out / name
             if p.is_file() and p.stat().st_size > 800:

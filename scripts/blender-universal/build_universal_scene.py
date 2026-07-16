@@ -12580,6 +12580,23 @@ def _prepare_sealed_product_view(view_name, entering):
             obj.hide_render = False
         if obj.name.startswith("u_se_instrument_story_"):
             obj.hide_render = False
+    # GOTCHA (2026-07-16 Poseidon): cutaway baseline above forces optical
+    # instrument_story / cue meshes visible. OPEN syringe-pump form's product
+    # face is ONLY u_se_sp_* — optical PCB/display litter false-fails vision
+    # ("floating outside chassis") and breaks gold twinship. Hide non-sp story.
+    if _IS_SYRINGE_PUMP_FORM:
+        for obj in bpy.data.objects:
+            if getattr(obj, "type", None) != "MESH":
+                continue
+            nm = obj.name
+            if _syringe_pump_exterior_keep_visible(nm):
+                obj.hide_render = False
+            elif nm.startswith((
+                "u_se_instrument_story_", "u_se_cutaway_cue_", "u_se_det_",
+                "u_se_cad_", "u_se_product_", "u_se_tc_", "u_se_exterior_detail_",
+                "u_wire_", "u_pipe_",
+            )):
+                obj.hide_render = True
     if _SEALED_CUTAWAY_MATERIAL is not None:
         for obj in _SEALED_SHELL_OBJECTS:
             if obj and obj.data:

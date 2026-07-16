@@ -206,6 +206,45 @@ _INSTRUMENT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
+# INTENT: optical-instrument rubric false-fails a correct OPEN multi-channel
+# syringe-pump array (exposed steppers/screws/carriages — mechanism IS the
+# product face) because it demands optical-cube / closed-chassis language.
+# Form gate: ifg.is_syringe_pump_form — never a product-noun branch.
+_SYRINGE_PUMP_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
+    "BENCHTOP MULTI-CHANNEL SYRINGE PUMP / linear dosing array (OPEN mechanism form — "
+    "NOT a colorimeter, NOT a PCR box, NOT a wall battery, NOT a plant skid).\n\n"
+    "Expect N parallel open bays on one benchtop base: black NEMA-class stepper at the "
+    "rear of each bay, lead screw + dual guide rails, a CONTRASTING (often bright blue) "
+    "carriage with a star/thumb clamp for the plunger, a V-cradle + star clamp at the "
+    "tip for the syringe barrel, white/translucent syringe barrels, and a SEPARATE "
+    "control console beside the array with a tipped landscape display (and often a blue "
+    "top plate). A bundled wire harness from the motors into the console is normal. "
+    "The open mechanism IS the product face — there is NO sealed optical cube / closed "
+    "charcoal L-body.\n\n"
+    "INTENTIONAL / DO NOT FLAG (correct syringe-pump language):\n"
+    "  • exposed steppers, lead screws, rails, carriages, cradles — OPEN array, not a "
+    "gutted hollow chassis\n"
+    "  • bright blue / contrasting carriage blocks (motion readability)\n"
+    "  • black star / lobed thumb knobs on carriage and tip cradle\n"
+    "  • a control console as a separate volume beside the array\n"
+    "  • thin tubing from syringe tips toward the console / stage\n"
+    "  • missing optical cube / cuvette / ambient-light LID / charcoal D-pad — those "
+    "belong to colorimeters\n"
+    "  • missing battery pack / inverter / plant pipes / Mech Plant Rm\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • a sealed featureless cube / empty crate with NO parallel actuator bays\n"
+    "  • optical colorimeter tower / cuvette well wrongly on a syringe-pump array\n"
+    "  • plant-room language (access ladders, expansion vessels, industrial EC motors "
+    "as the product)\n"
+    "  • carriages/syringes floating with NO shared base / rails / screws connecting them\n"
+    "  • product cropped so small it is unreadable\n"
+    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
 # INTENT: optical-instrument rubric false-fails a correct PCR thermocycler cutaway
 # (wood box + hinged lid + sample-block wells + PCB) because it demands
 # cuvette/optical-path language. Tip-back-lid PCR form is a DIFFERENT family —
@@ -271,18 +310,31 @@ def _product_class(image_path: str) -> str:
     return ""
 
 
-def _is_thermocycler_mode(image_path: str) -> bool:
-    """True for tip-back-lid PCR form — uses _THERMOCYCLER_PROMPT, not optical rubric."""
-    st = _load_run_state(image_path)
-    pc = _product_class(image_path)
+def _part_blob_from_state(st: dict) -> str:
     part_blob = ""
     for m in ((st.get("moduleDecomposition") or {}).get("modules") or []):
         for sm in (m.get("sub_modules") or []):
             for w in (sm.get("words") or []):
                 part_blob += " " + str(w.get("name_human") or "")
+    return part_blob
+
+
+def _is_thermocycler_mode(image_path: str) -> bool:
+    """True for tip-back-lid PCR form — uses _THERMOCYCLER_PROMPT, not optical rubric."""
+    st = _load_run_state(image_path)
     return ifg.is_thermocycler_form(
-        product_class=pc,
-        part_blob=part_blob,
+        product_class=_product_class(image_path),
+        part_blob=_part_blob_from_state(st),
+        is_instrument=bool(st.get("isInstrumentDevice", True)),
+    )
+
+
+def _is_syringe_pump_mode(image_path: str) -> bool:
+    """True for OPEN multi-channel linear dosing — uses _SYRINGE_PUMP_PROMPT."""
+    st = _load_run_state(image_path)
+    return ifg.is_syringe_pump_form(
+        product_class=_product_class(image_path),
+        part_blob=_part_blob_from_state(st),
         is_instrument=bool(st.get("isInstrumentDevice", True)),
     )
 
@@ -312,7 +364,9 @@ def _is_product_mode(image_path: str) -> bool:
 
 
 def _prompt_for_image(image_path: str) -> str:
-    # Thermocycler before generic instrument — optical rubric must not judge PCR boxes.
+    # Form-specific instrument rubrics BEFORE generic optical instrument.
+    if _is_syringe_pump_mode(image_path):
+        return _SYRINGE_PUMP_PROMPT
     if _is_thermocycler_mode(image_path):
         return _THERMOCYCLER_PROMPT
     if _is_instrument_mode(image_path):
