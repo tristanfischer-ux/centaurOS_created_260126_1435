@@ -13562,6 +13562,8 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     const syringeGraph: any = {
       nodes: [
         { class: 'mass_fluid_transport_process', role: 'principal', required: true, display: 'Mass / Fluid' },
+        { class: 'actuation_kinematics', role: 'actuator', required: true, display: 'Actuation' },
+        { class: 'maintenance_serviceability', role: 'support', required: true, display: 'Maintenance' },
         { class: 'power_distribution', role: 'support', required: true, display: 'Power' },
         { class: 'control_compute_communication', role: 'support', required: true, display: 'Control' },
         { class: 'structure_containment', role: 'support', required: true, display: 'Structure' },
@@ -13596,15 +13598,31 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
         (sm.words || []).map((w: any) => String(w.name_human || w.id || '')),
       ),
     ).join(' | ')
+    const byModSp = new Map<string, string>(
+      modsSp.map((m: any) => [
+        String(m.module),
+        (m.sub_modules || []).flatMap((sm: any) =>
+          (sm.words || []).map((w: any) => String(w.name_human || w.id || '')),
+        ).join(' | '),
+      ]),
+    )
+    const actSp = byModSp.get('actuation_kinematics') || ''
+    const maintSp = byModSp.get('maintenance_serviceability') || ''
+    const structSp = byModSp.get('structure_containment') || ''
     wantSp('syringe floor emits Stepper Motor past MIN_WORDS pad', /Stepper Motor/i.test(allSp))
     wantSp('syringe floor emits Shaft Coupling on fluid module', /Shaft Coupling/i.test(allSp))
     wantSp('syringe floor emits Stepper Driver on power (no energy_conversion node)', /Stepper Driver/i.test(allSp))
     wantSp('syringe floor emits Main Controller Mcu', /Main Controller/i.test(allSp))
+    wantSp('actuation_kinematics owns Stepper Motor (not GENERIC primary_assembly)', /Stepper Motor/i.test(actSp))
+    wantSp('actuation_kinematics owns Syringe Drive Channel macro noun', /Syringe Drive Channel/i.test(actSp))
+    wantSp('actuation_kinematics never Primary Assembly placeholder', !/Primary Assembly/i.test(actSp))
+    wantSp('structure emits Control Console macro noun', /Control Console/i.test(structSp))
+    wantSp('maintenance floor emits Access Panel (not plant Lifting Point)', /Access Panel/i.test(maintSp) && !/Lifting Point/i.test(maintSp))
     wantSp('syringe floor forbids plant Circulation Pump', !/Circulation Pump/i.test(allSp))
     wantSp('syringe floor forbids Expansion Reservoir', !/Expansion Reservoir/i.test(allSp))
     out.push(assertEq(
       'UNIVERSAL.syringe_pump_skeleton_floor_unions_full_actuation_inventory',
-      'Poseidon SOURCE fix (derive-skeleton.ts): syringe_pump instrument floors UNION the full inventory (stepper_motor + shaft_coupling + stepper_driver_board) even when corpus already satisfies MIN_WORDS — never density-pad truncation. Drivers land on power_distribution when energy_conversion is absent from the class graph. Plant circulation/reservoir vocabulary stays forbidden.',
+      'Poseidon SOURCE fix (derive-skeleton.ts): syringe_pump instrument floors UNION the full inventory (stepper_motor + shaft_coupling + stepper_driver_board) even when corpus already satisfies MIN_WORDS — never density-pad truncation. Drivers land on power_distribution when energy_conversion is absent from the class graph. actuation_kinematics + maintenance_serviceability get real instrument floors (not GENERIC primary_assembly / plant lifting_point that later hollow-out). Contract macro nouns syringe_drive_channel + control_console land so BoM pricing can attach. Plant circulation/reservoir vocabulary stays forbidden.',
       failedSp.length, (n) => n === 0,
       () => `syringe-pump skeleton-floor cases failed: ${failedSp.join(' ; ')}. Check SYRINGE_PUMP_*_FLOOR + instrumentFloor full-union in componentsForModule.`,
     ))

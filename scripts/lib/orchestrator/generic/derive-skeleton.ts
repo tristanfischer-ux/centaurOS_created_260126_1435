@@ -341,15 +341,25 @@ const THERMOCYCLER_FORBIDDEN_COMPONENT_RE =
 // plant HMI membrane — wrong for an OPEN benchtop lead-screw array. Form signal =
 // product_class syringe_pump OR contract quantities unique to the archetype builder
 // (channel_count + lead_screw_pitch_mm + max_syringe_volume_ml) — never a brand noun.
-// GOTCHA (Poseidon 2026-07-16): stepper_motor was #6 on this list and never
+// GOTCHA (Poseidon 2026-07-16): stepper_motor was #6 on the fluid list and never
 // shipped while the first five already satisfied MIN_WORDS — instrument floors
 // are now FULLY UNIONED (see componentsForModule), not density padding.
-// shaft_coupling lives here (not only on energy_conversion) because many
-// syringe-pump graphs omit that module entirely.
+// GOTCHA (Poseidon 2026-07-16 cold 0539): class graphs often INCLUDE
+// actuation_kinematics + maintenance_serviceability nodes. Without module floors
+// those fell through to GENERIC_FLOOR / TIER_C (primary_assembly, lifting_point)
+// and later hollow/synonym passes emptied them — Physics Critic HIGH "actuation
+// completely empty" while the drive train lived only under mass_fluid.
+// DECISION: actuation owns the rotary→linear train; fluid owns wet-path
+// cradle/clamp/tubing; both keep shaft_coupling / lead_screw nouns so a graph
+// that omits actuation still ships a complete drive (prior proveCatch).
+const SYRINGE_PUMP_ACTUATION_FLOOR = [
+  'stepper_motor', 'shaft_coupling', 'lead_screw',
+  'guide_rail_pair', 'linear_carriage', 'syringe_drive_channel',
+]
 const SYRINGE_PUMP_FLUID_FLOOR = [
   'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
   'guide_rail_pair', 'linear_carriage', 'stepper_motor',
-  'shaft_coupling',
+  'shaft_coupling', 'tip_luer_fitting',
 ]
 const SYRINGE_PUMP_ENERGY_FLOOR = [
   'bench_psu_adapter', 'iec_mains_inlet', 'input_fuse',
@@ -367,7 +377,7 @@ const SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR = [
 ]
 const SYRINGE_PUMP_STRUCTURE_FLOOR = [
   'channel_frame_printed', 'base_plate', 'console_enclosure',
-  'foot_pad', 'fastener_set', 'cable_tie_mount',
+  'control_console', 'foot_pad', 'fastener_set', 'cable_tie_mount',
 ]
 const SYRINGE_PUMP_CONTROL_FLOOR = [
   'main_controller_mcu', 'host_interface', 'flash_storage',
@@ -385,8 +395,13 @@ const SYRINGE_PUMP_HMI_FLOOR = [
   'touch_display', 'status_indicator', 'run_start_control',
   'mounting_bezel', 'user_facing_legend',
 ]
+const SYRINGE_PUMP_MAINTENANCE_FLOOR = [
+  'access_panel', 'service_connector', 'diagnostic_port',
+  'labelling_set', 'channel_service_clearance',
+]
 const SYRINGE_PUMP_MODULE_FLOORS: Record<string, string[]> = {
   mass_fluid_transport_process: SYRINGE_PUMP_FLUID_FLOOR,
+  actuation_kinematics: SYRINGE_PUMP_ACTUATION_FLOOR,
   energy_conversion_transduction: SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR,
   sensing_instrumentation: SYRINGE_PUMP_SENSING_FLOOR,
   structure_containment: SYRINGE_PUMP_STRUCTURE_FLOOR,
@@ -395,9 +410,10 @@ const SYRINGE_PUMP_MODULE_FLOORS: Record<string, string[]> = {
   safety_protection: SYRINGE_PUMP_SAFETY_FLOOR,
   hmi_ergonomics: SYRINGE_PUMP_HMI_FLOOR,
   human_machine_interface: SYRINGE_PUMP_HMI_FLOOR,
+  maintenance_serviceability: SYRINGE_PUMP_MAINTENANCE_FLOOR,
 }
 const SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE =
-  /chill|scroll\s*compressor|process_water|circulation_pump|expansion_vessel|expansion_reservoir|access_ladder|interface_membrane|scada|plc_cabinet|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|module_rack|storage_cell|pipework_run|distribution_manifold|fluid_filter/i
+  /chill|scroll\s*compressor|process_water|circulation_pump|expansion_vessel|expansion_reservoir|access_ladder|lifting_point|interface_membrane|scada|plc_cabinet|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|module_rack|storage_cell|pipework_run|distribution_manifold|fluid_filter|primary_assembly|secondary_assembly/i
 
 /** True when the contract is a multi-channel benchtop linear syringe-dosing form.
  *  PURE — class slug OR archetype-builder quantity triad; never a product brand. */
