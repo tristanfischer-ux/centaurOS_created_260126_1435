@@ -13569,12 +13569,12 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
         { class: 'structure_containment', role: 'support', required: true, display: 'Structure' },
       ],
     }
-    // Pre-seed corpus with the FIRST five fluid-floor nouns so a pad-only rule
-    // would stop before stepper_motor — proveCatch that full-union still adds it.
+    // Pre-seed corpus with wet-path nouns so a pad-only rule would stop early —
+    // proveCatch that exclusive actuation ownership still lands the drive train.
     const corpusPad = new Map<string, string[]>([
       ['mass_fluid_transport_process', [
-        'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
-        'guide_rail_pair', 'linear_carriage',
+        'syringe_barrel_cradle', 'plunger_clamp', 'tip_luer_fitting',
+        'tubing_set', 'barrel_seal_o_ring',
       ]],
       ['power_distribution', [
         'wire_harness', 'terminal_block', 'polyfuse_resettable',
@@ -13607,24 +13607,49 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
       ]),
     )
     const actSp = byModSp.get('actuation_kinematics') || ''
+    const fluidSp = byModSp.get('mass_fluid_transport_process') || ''
     const maintSp = byModSp.get('maintenance_serviceability') || ''
     const structSp = byModSp.get('structure_containment') || ''
+    // ProveCatch: exclusive ownership survives global word-id dedup.
+    const { dropAttributePhantomWords } = require('./lib/orchestrator/generic/universal-contract-sizing') as typeof import('./lib/orchestrator/generic/universal-contract-sizing')
+    const modsAfterDedup = JSON.parse(JSON.stringify(modsSp))
+    dropAttributePhantomWords(modsAfterDedup)
+    const actAfter = (modsAfterDedup.find((m: any) => m.module === 'actuation_kinematics')?.sub_modules || [])
+      .flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || ''))).join(' | ')
     wantSp('syringe floor emits Stepper Motor past MIN_WORDS pad', /Stepper Motor/i.test(allSp))
-    wantSp('syringe floor emits Shaft Coupling on fluid module', /Shaft Coupling/i.test(allSp))
+    wantSp('syringe floor emits Shaft Coupling (on actuation when present)', /Shaft Coupling/i.test(actSp))
+    wantSp('fluid wet-path does NOT duplicate Stepper Motor (id-dedup safe)', !/Stepper Motor/i.test(fluidSp))
     wantSp('syringe floor emits Stepper Driver on power (no energy_conversion node)', /Stepper Driver/i.test(allSp))
     wantSp('syringe floor emits Main Controller Mcu', /Main Controller/i.test(allSp))
     wantSp('actuation_kinematics owns Stepper Motor (not GENERIC primary_assembly)', /Stepper Motor/i.test(actSp))
     wantSp('actuation_kinematics owns Syringe Drive Channel macro noun', /Syringe Drive Channel/i.test(actSp))
+    wantSp('actuation survives dropAttributePhantomWords with ≥5 words', (actAfter.match(/\|/g) || []).length + (actAfter ? 1 : 0) >= 5 && /Stepper Motor/i.test(actAfter))
     wantSp('actuation_kinematics never Primary Assembly placeholder', !/Primary Assembly/i.test(actSp))
     wantSp('structure emits Control Console macro noun', /Control Console/i.test(structSp))
     wantSp('maintenance floor emits Access Panel (not plant Lifting Point)', /Access Panel/i.test(maintSp) && !/Lifting Point/i.test(maintSp))
     wantSp('syringe floor forbids plant Circulation Pump', !/Circulation Pump/i.test(allSp))
     wantSp('syringe floor forbids Expansion Reservoir', !/Expansion Reservoir/i.test(allSp))
+    // Fallback: graph WITHOUT actuation still ships drive on fluid.
+    const fluidOnlyGraph: any = {
+      nodes: [
+        { class: 'mass_fluid_transport_process', role: 'principal', required: true, display: 'Mass / Fluid' },
+        { class: 'power_distribution', role: 'support', required: true, display: 'Power' },
+      ],
+    }
+    const modsFluidOnly = deriveGenericSkeleton(
+      fluidOnlyGraph, {} as any, { class: 'test' } as any, syringeContract, new Map(),
+    ) as any[]
+    const fluidOnlySp = modsFluidOnly.flatMap((m: any) =>
+      (m.sub_modules || []).flatMap((sm: any) =>
+        (sm.words || []).map((w: any) => String(w.name_human || '')),
+      ),
+    ).join(' | ')
+    wantSp('fluid-only graph still emits Stepper Motor (actuation-absent fallback)', /Stepper Motor/i.test(fluidOnlySp))
     out.push(assertEq(
       'UNIVERSAL.syringe_pump_skeleton_floor_unions_full_actuation_inventory',
-      'Poseidon SOURCE fix (derive-skeleton.ts): syringe_pump instrument floors UNION the full inventory (stepper_motor + shaft_coupling + stepper_driver_board) even when corpus already satisfies MIN_WORDS — never density-pad truncation. Drivers land on power_distribution when energy_conversion is absent from the class graph. actuation_kinematics + maintenance_serviceability get real instrument floors (not GENERIC primary_assembly / plant lifting_point that later hollow-out). Contract macro nouns syringe_drive_channel + control_console land so BoM pricing can attach. Plant circulation/reservoir vocabulary stays forbidden.',
+      'Poseidon SOURCE fix (derive-skeleton.ts): syringe_pump floors UNION the full inventory; when actuation_kinematics is in the class graph the drive train lives ONLY there (wet-path on fluid) so dropAttributePhantomWords global word-id dedup cannot hollow actuation. Without an actuation node the drive train falls back onto fluid. Drivers on power_distribution when energy_conversion is absent. Macro nouns syringe_drive_channel + control_console land. Plant circulation/reservoir vocabulary stays forbidden.',
       failedSp.length, (n) => n === 0,
-      () => `syringe-pump skeleton-floor cases failed: ${failedSp.join(' ; ')}. Check SYRINGE_PUMP_*_FLOOR + instrumentFloor full-union in componentsForModule.`,
+      () => `syringe-pump skeleton-floor cases failed: ${failedSp.join(' ; ')}. Check syringePumpModuleFloors + instrumentFloor full-union in componentsForModule.`,
     ))
   }
 

@@ -349,17 +349,26 @@ const THERMOCYCLER_FORBIDDEN_COMPONENT_RE =
 // those fell through to GENERIC_FLOOR / TIER_C (primary_assembly, lifting_point)
 // and later hollow/synonym passes emptied them — Physics Critic HIGH "actuation
 // completely empty" while the drive train lived only under mass_fluid.
-// DECISION: actuation owns the rotary→linear train; fluid owns wet-path
-// cradle/clamp/tubing; both keep shaft_coupling / lead_screw nouns so a graph
-// that omits actuation still ships a complete drive (prior proveCatch).
+// GOTCHA (Poseidon 2026-07-16 cold 0545): duplicating stepper/lead_screw/… on
+// BOTH fluid + actuation mints identical word ids (`stepper_motor_word`).
+// dropAttributePhantomWords keeps the FIRST id globally (fluid is principal /
+// earlier in the graph) and strips the actuation copies → density FAIL with
+// only syringe_drive_channel left. DECISION: exclusive ownership — actuation
+// owns the rotary→linear train when that node exists; fluid owns wet-path only.
+// Graphs that OMIT actuation still get the drive train on fluid (fallback).
 const SYRINGE_PUMP_ACTUATION_FLOOR = [
   'stepper_motor', 'shaft_coupling', 'lead_screw',
   'guide_rail_pair', 'linear_carriage', 'syringe_drive_channel',
 ]
+/** Wet-path only — never re-list actuation nouns (global word-id dedup). */
 const SYRINGE_PUMP_FLUID_FLOOR = [
-  'syringe_barrel_cradle', 'plunger_clamp', 'lead_screw',
-  'guide_rail_pair', 'linear_carriage', 'stepper_motor',
-  'shaft_coupling', 'tip_luer_fitting',
+  'syringe_barrel_cradle', 'plunger_clamp', 'tip_luer_fitting',
+  'tubing_set', 'barrel_seal_o_ring', 'plunger_tip_seal',
+]
+/** Drive train folded onto fluid when the class graph has no actuation node. */
+const SYRINGE_PUMP_FLUID_WITH_DRIVE_FLOOR = [
+  ...SYRINGE_PUMP_FLUID_FLOOR,
+  ...SYRINGE_PUMP_ACTUATION_FLOOR.filter((c) => c !== 'syringe_drive_channel'),
 ]
 const SYRINGE_PUMP_ENERGY_FLOOR = [
   'bench_psu_adapter', 'iec_mains_inlet', 'input_fuse',
@@ -399,18 +408,23 @@ const SYRINGE_PUMP_MAINTENANCE_FLOOR = [
   'access_panel', 'service_connector', 'diagnostic_port',
   'labelling_set', 'channel_service_clearance',
 ]
-const SYRINGE_PUMP_MODULE_FLOORS: Record<string, string[]> = {
-  mass_fluid_transport_process: SYRINGE_PUMP_FLUID_FLOOR,
-  actuation_kinematics: SYRINGE_PUMP_ACTUATION_FLOOR,
-  energy_conversion_transduction: SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR,
-  sensing_instrumentation: SYRINGE_PUMP_SENSING_FLOOR,
-  structure_containment: SYRINGE_PUMP_STRUCTURE_FLOOR,
-  control_compute_communication: SYRINGE_PUMP_CONTROL_FLOOR,
-  power_distribution: SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR,
-  safety_protection: SYRINGE_PUMP_SAFETY_FLOOR,
-  hmi_ergonomics: SYRINGE_PUMP_HMI_FLOOR,
-  human_machine_interface: SYRINGE_PUMP_HMI_FLOOR,
-  maintenance_serviceability: SYRINGE_PUMP_MAINTENANCE_FLOOR,
+/** @param hasActuationNode When true, fluid stays wet-path-only (drive lives on actuation). */
+function syringePumpModuleFloors(hasActuationNode: boolean): Record<string, string[]> {
+  return {
+    mass_fluid_transport_process: hasActuationNode
+      ? SYRINGE_PUMP_FLUID_FLOOR
+      : SYRINGE_PUMP_FLUID_WITH_DRIVE_FLOOR,
+    actuation_kinematics: SYRINGE_PUMP_ACTUATION_FLOOR,
+    energy_conversion_transduction: SYRINGE_PUMP_ENERGY_CONVERSION_FLOOR,
+    sensing_instrumentation: SYRINGE_PUMP_SENSING_FLOOR,
+    structure_containment: SYRINGE_PUMP_STRUCTURE_FLOOR,
+    control_compute_communication: SYRINGE_PUMP_CONTROL_FLOOR,
+    power_distribution: SYRINGE_PUMP_POWER_DISTRIBUTION_FLOOR,
+    safety_protection: SYRINGE_PUMP_SAFETY_FLOOR,
+    hmi_ergonomics: SYRINGE_PUMP_HMI_FLOOR,
+    human_machine_interface: SYRINGE_PUMP_HMI_FLOOR,
+    maintenance_serviceability: SYRINGE_PUMP_MAINTENANCE_FLOOR,
+  }
 }
 const SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE =
   /chill|scroll\s*compressor|process_water|circulation_pump|expansion_vessel|expansion_reservoir|access_ladder|lifting_point|interface_membrane|scada|plc_cabinet|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|module_rack|storage_cell|pipework_run|distribution_manifold|fluid_filter|primary_assembly|secondary_assembly/i
@@ -552,6 +566,7 @@ function componentsForModule(
   moduleKey: string,
   componentsByModule: Map<string, string[]>,
   contract: ContractInProgress,
+  opts: { syringeHasActuationNode?: boolean } = {},
 ): string[] {
   const isThermal = moduleKey === 'environmental_interface'
   const isEnergyStore = moduleKey === 'energy_storage_source'
@@ -584,8 +599,11 @@ function componentsForModule(
   // clamp + screw + rail + carriage already satisfied density — Interconnect
   // then had no actuation principals and Blender lost the NEMA/coupler story.
   // Optical / thermocycler floors get the same full-union rule (same bug class).
+  const syringeFloors = isSyringePump
+    ? syringePumpModuleFloors(Boolean(opts.syringeHasActuationNode))
+    : null
   const instrumentFloor =
-    (isSyringePump && SYRINGE_PUMP_MODULE_FLOORS[moduleKey])
+    (syringeFloors && syringeFloors[moduleKey])
     || (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey])
     || (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey])
     || null
@@ -708,10 +726,17 @@ export function deriveGenericSkeleton(
     principalParams['cells_per_module'] = Math.round(cellCount / moduleCount)
   }
 
+  // INTENT: exclusive fluid/actuation ownership for syringe forms — see
+  // syringePumpModuleFloors. Detect the actuation node once for the whole graph.
+  const syringeHasActuationNode = hasSyringePumpSignal(contract)
+    && graph.nodes.some((n: GraphNode) => String(n.class) === 'actuation_kinematics')
+
   return graph.nodes.map((node: GraphNode): DesignModule => {
     const moduleName = String(node.class)
     const display = node.display ?? humanize(moduleName)
-    const components = componentsForModule(moduleName, componentsByModule, contract)
+    const components = componentsForModule(moduleName, componentsByModule, contract, {
+      syringeHasActuationNode,
+    })
     const groups = splitIntoSubModuleGroups(components)
 
     const sub_modules: SubModule[] = groups.map((group, gi) => {
