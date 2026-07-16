@@ -8355,6 +8355,13 @@ _SOFT_BRIEF_CATEGORIES = frozenset({
     "soft", "preference", "nice_to_have", "aspirational", "nice-to-have",
 })
 _INSTRUMENT_PCB_MAX_MM = 40.0
+# Actuation-drive control boards (MCU + stepper) need the [50,120] plant floor —
+# the 40 mm optical-daughterboard cap must not HARD-fail them (Poseidon 2026-07-16).
+_INSTRUMENT_ACTUATION_PCB_MAX_MM = 120.0
+_ACTUATION_PCB_RE = re.compile(
+    r"\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver)\b",
+    re.I,
+)
 _ABSORBANCE_ERROR_MAX_PCT = 10.0
 _QTY_WORKED_TOL = 0.05
 # GOTCHA: quantity keys end in SI crumbs (…_ma, …_db, …_mw). Those must not
@@ -8932,13 +8939,28 @@ def _assemble_verification_rows(state: dict, run_dir: str = "") -> List[dict]:
             bw = bh = num(bsz)
         side = max(bw or 0, bh or 0) if (bw or bh) else None
         if state.get("isInstrumentDevice") and side is not None:
+            gen = pipe.get("generator") or {}
+            gen_blob = " ".join(
+                f"{(c or {}).get('instanceName', '')} {(c or {}).get('nameHuman', '')} "
+                f"{(c or {}).get('characterId', '')}"
+                for c in (gen.get("components") or gen.get("parts") or [])
+                if isinstance(c, dict)
+            )
+            is_actuation_pcb = bool(_ACTUATION_PCB_RE.search(gen_blob))
+            pcb_max = (
+                _INSTRUMENT_ACTUATION_PCB_MAX_MM if is_actuation_pcb else _INSTRUMENT_PCB_MAX_MM
+            )
             rows.append(_verif_row(
                 "realisation", "Instrument PCB max side",
-                status=_status_from_compare("le", _INSTRUMENT_PCB_MAX_MM, side, 0),
+                status=_status_from_compare("le", pcb_max, side, 0),
                 hardness="HARD",
-                provenance="state.pcb.boardSizeMm (isInstrumentDevice compact board)",
-                target=_INSTRUMENT_PCB_MAX_MM, achieved=side, unit="mm",
-                target_num=_INSTRUMENT_PCB_MAX_MM, achieved_num=side, compare="le", tol_frac=0,
+                provenance=(
+                    "state.pcb.boardSizeMm (actuation-drive control board)"
+                    if is_actuation_pcb
+                    else "state.pcb.boardSizeMm (isInstrumentDevice compact board)"
+                ),
+                target=pcb_max, achieved=side, unit="mm",
+                target_num=pcb_max, achieved_num=side, compare="le", tol_frac=0,
             ))
         ok = pipe.get("ok")
         if ok is not None:

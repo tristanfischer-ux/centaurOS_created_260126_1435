@@ -86,7 +86,11 @@ TYPE_RULES = [
                    # P&ID/schedule-expected, not a phantom single-line feeder (BESS v3 dissection
                    # 2026-07-05: 'door position switch' had NO TYPE_RULES match at all → fell to
                    # 'other' → wrongly blender/GA-expected).
-                   r"position switch|door switch|limit switch"),
+                   r"position switch|door switch|limit switch|"
+                   # INTENT (Poseidon 2026-07-16): force/stall/end-stop feedback is a sensing
+                   # instrument — NOT a battery-limit "feed" origin (substring trap below).
+                   r"force\s+limit|limit\s+feedback|stall\s*(?:sense|detect|feedback)|"
+                   r"end[\s-]?stop|load\s*cell|force\s+feedback"),
     ("valve",      r"\bvalve\b|solenoid|actuator|damper"),
     ("control",    r"controller|gateway|\bI/O\b|network switch|power supply|scada|\bUPS\b|\bPLC\b|"
                    r"\bHMI\b|touch\s?screen|touch\s?panel|\bDCS\b|operator (?:panel|interface|station)"),
@@ -753,13 +757,20 @@ def _is_instrument_power_origin(name: str) -> bool:
 
 
 _HOST_INTO_COMPUTE_RE = re.compile(
-    r"microcontroller|\bmcu\b|local\s*display|user\s*input|firmware\s*storage|"
-    r"usb\s*(interface|power)|rechargeable\s*battery|battery\s*charge|"
-    r"power\s*switch|control\s*switch|status\s*indicator|mounting\s*bezel|"
-    r"power\s*indicator|overcurrent|input\s*fuse|dc\s*input\s*fuse|"
-    r"thermal\s*cutoff|reverse\s*polarity|power\s*input\s*connector|"
-    r"esd\s*protection|polyfuse|ferrite|dc\s*dc\s*regulator|"
+    r"microcontroller|\bmcu\b|main\s*controller|local\s*display|user\s*input|"
+    r"firmware\s*storage|flash\s*storage|wifi|wi[- ]?fi|"
+    r"usb\s*(interface|power|data)|rechargeable\s*battery|battery\s*charge|"
+    r"power\s*switch|control\s*switch|status\s*indicator|status\s*led|"
+    r"mounting\s*bezel|power\s*indicator|overcurrent|input\s*fuse|"
+    r"dc\s*input\s*fuse|thermal\s*(?:cutoff|fuse)|reverse\s*polarity|"
+    r"power\s*input\s*connector|esd\s*protection|polyfuse|ferrite|"
+    r"dc\s*dc\s*regulator|debug\s*uart|current\s*sense|estop|e[- ]?stop|"
+    r"power\s*kill|protective\s*earth|fan\s*(?:tach|failure)|overtemp|"
     r"compute\s*ui",
+    re.I,
+)
+_COMPUTE_PRINCIPAL_RE = re.compile(
+    r"compute\s*ui\s*module|main\s*controller|microcontroller|\bmcu\b|processor",
     re.I,
 )
 _HOST_INTO_LED_RE = re.compile(
@@ -784,9 +795,12 @@ def _prune_instrument_ghost_connections(
     if not connections or not equipment:
         return connections, 0
     by_norm = {_norm(e.get("name") or ""): e for e in equipment if e.get("name")}
+    # GOTCHA (NinjaPCR 1330): gold-spine used "Compute UI Module"; thermocycler
+    # BoM names "Main Controller MCU" — prune must recognise either or host
+    # peripherals stay as ghost electrical orphans and floor Interconnect to 0.
     compute = next(
         (e for e in equipment
-         if re.search(r"compute\s*ui\s*module", e.get("name") or "", re.I)),
+         if _COMPUTE_PRINCIPAL_RE.search(e.get("name") or "")),
         None,
     )
     led = next(
@@ -932,6 +946,28 @@ _SINK_KEYWORDS = {"drain", "effluent", "discharge", "waste", "sludge", "exhaust"
                   "heat rejection", "mortality", "overflow", "reject"}
 
 
+def _name_has_boundary_keyword(name_l: str, keywords: set) -> bool:
+    """INTENT: origin/sink noun match with WORD boundaries.
+
+    GOTCHA (Poseidon 2026-07-16): bare `kw in name_l` matched `feed` inside
+    `feedback` → "Force Limit Feedback" falsely raised missing_input and demoted
+    an otherwise story-OK Interconnect tab to 0. Short tokens that are prefixes
+    of longer words MUST use \\b; multi-word phrases stay substring-safe.
+    """
+    if not name_l:
+        return False
+    for kw in keywords:
+        if not kw:
+            continue
+        if " " in kw:
+            if kw in name_l:
+                return True
+            continue
+        if re.search(rf"\b{re.escape(kw)}\b", name_l):
+            return True
+    return False
+
+
 def _is_grid_electrical_origin(name: str) -> bool:
     """INTENT: a grid/mains electrical incomer is a TRUE battery-limit origin — it
     feeds the plant and has no upstream plant edge. Flagging missing_input on it is
@@ -1039,8 +1075,8 @@ def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
     # when the name itself declares a zoned-distribution materials take-off.
     if "zoned distribution" in name_l or name_l.startswith("zoned distribution"):
         return None
-    is_origin = any(kw in name_l for kw in _ORIGIN_KEYWORDS)
-    is_sink = any(kw in name_l for kw in _SINK_KEYWORDS)
+    is_origin = _name_has_boundary_keyword(name_l, _ORIGIN_KEYWORDS)
+    is_sink = _name_has_boundary_keyword(name_l, _SINK_KEYWORDS)
     if is_origin and not has_in:
         return {"issue": "missing_input",
                 "detail": "Battery-limit origin with no upstream feed drawn — the TYPE "
@@ -2159,13 +2195,13 @@ def main() -> int:
         name_l = (e["name"] or "").lower()
         tag = e["tag"] or "—"
         etype = e.get("type", "other")
-        is_origin = any(kw in name_l for kw in ORIGIN_KEYWORDS)
+        is_origin = _name_has_boundary_keyword(name_l, ORIGIN_KEYWORDS)
         # A device instrument's own power SOURCE (battery / USB inlet / DC jack) is a
         # battery-limit ORIGIN — no upstream plant edge, like a mains incomer. Gated on
         # the instrument flag so a BESS 'battery' is never treated as an origin.
         if instrument_device and not is_origin and _is_instrument_power_origin(name_l):
             is_origin = True
-        is_sink = any(kw in name_l for kw in SINK_KEYWORDS)
+        is_sink = _name_has_boundary_keyword(name_l, SINK_KEYWORDS)
 
         if is_origin and not has_in:
             origin_parts.append({"tag": tag, "name": e["name"], "type": etype})
@@ -2295,6 +2331,20 @@ def main() -> int:
 
         elif etype in ELECTRICAL_TYPES:
             n_electrical_total += 1
+            # INTENT (NinjaPCR 1330): host peripherals absorbed into the compute
+            # principal (polyfuse / DC-DC / USB / thermal fuse / …) do not carry
+            # their own drawn in+out edges — they ride the MCU kit. Flagging them
+            # missing_input/output floored Interconnect content_score to 0 while
+            # layout_metrics already earned the Power story.
+            if (
+                instrument_device
+                and _HOST_INTO_COMPUTE_RE.search(e.get("name") or "")
+                and not _COMPUTE_PRINCIPAL_RE.search(e.get("name") or "")
+                and any(_COMPUTE_PRINCIPAL_RE.search(x.get("name") or "")
+                        for x in equipment)
+            ):
+                n_electrical_connected += 1
+                continue
             # A TERMINAL / PASSIVE electrical device legitimately has no downstream
             # LOAD edge — it is the END of a circuit, not a distributor: a fuse / surge
             # protector (SPD) / protective relay protects the bus it taps; a cable tray
@@ -2750,6 +2800,19 @@ def _selftest() -> int:
             "Zoned distribution — department delivery mains",
             has_in=False, has_out=False) is not None:
         print("  FAIL passive-boundary: zoned-distribution take-off must not raise")
+        bad += 1
+    # proveCatch (Poseidon 2026-07-16): "feed" must NOT match inside "feedback".
+    if _passive_boundary_concern(
+            "Force Limit Feedback", has_in=False, has_out=False) is not None:
+        print("  FAIL passive-boundary: 'Force Limit Feedback' must NEVER raise "
+              "missing_input (feedback ≠ feed origin)")
+        bad += 1
+    if not _name_has_boundary_keyword("chemical feed line", _ORIGIN_KEYWORDS):
+        print("  FAIL boundary-keyword: bare 'feed' as a word must still match origins")
+        bad += 1
+    if _classify("Force Limit Feedback", "I-111") != "instrument":
+        print("  FAIL type: 'Force Limit Feedback' must classify as instrument "
+              f"(got {_classify('Force Limit Feedback', 'I-111')!r})")
         bad += 1
     # Cabinet vs housed: a bare PLC/HMI is CONTENTS, not its own empty cabinet.
     if _CABINET_CTRL_RE.search("PLC Controller"):

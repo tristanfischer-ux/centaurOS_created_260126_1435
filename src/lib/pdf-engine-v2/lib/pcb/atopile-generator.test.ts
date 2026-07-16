@@ -973,10 +973,15 @@ describe('atopile-generator', () => {
           sub_modules: [{
             id: 'control_compute_communication__main',
             words: [
-              { id: 'main_controller_mcu_word', name_human: 'Main Controller MCU', content_character: { character_id: 'main_controller_mcu' }, modifier_characters: [{ kind: 'form', value: 'MCU controller board' }] },
+              { id: 'main_controller_mcu_word', name_human: 'Main Controller MCU', content_character: { character_id: 'main_controller_mcu' }, modifier_characters: [
+                { kind: 'form', value: 'MCU controller board' },
+                { kind: 'dimensions', value: '7×7 mm QFN56' },
+              ] },
               { id: 'stepper_driver_board_word', name_human: 'Stepper Driver Board', content_character: { character_id: 'stepper_driver_board' }, modifier_characters: [{ kind: 'form', value: 'A4988 microstep driver' }] },
+              { id: 'current_sense_on_driver_word', name_human: 'Current Sense On Driver', content_character: { character_id: 'current_sense_on_driver' }, modifier_characters: [{ kind: 'form', value: '0.1 ohm shunt' }] },
               { id: 'touch_display_word', name_human: 'Touch Display', content_character: { character_id: 'touch_display' }, modifier_characters: [{ kind: 'form', value: 'TFT touch panel' }] },
               { id: 'polyfuse_resettable_word', name_human: 'Polyfuse Resettable', content_character: { character_id: 'polyfuse_resettable' }, modifier_characters: [{ kind: 'form', value: '1206 polyfuse' }] },
+              { id: 'mains_fuse_word', name_human: 'Mains Fuse', content_character: { character_id: 'mains_fuse' }, modifier_characters: [{ kind: 'form', value: 'mains inlet fuse' }] },
               { id: 'bulk_capacitor_word', name_human: 'Bulk Capacitor', content_character: { character_id: 'bulk_capacitor' }, modifier_characters: [{ kind: 'form', value: '100uF bulk cap' }] },
               { id: 'flash_storage_word', name_human: 'Flash Storage', content_character: { character_id: 'flash_storage' }, modifier_characters: [{ kind: 'form', value: 'SPI flash' }] },
               { id: 'host_interface_word', name_human: 'Host Interface', content_character: { character_id: 'host_interface' }, modifier_characters: [{ kind: 'form', value: 'USB host link' }] },
@@ -990,12 +995,22 @@ describe('atopile-generator', () => {
     const onBoardIds = new Set(result.components.map((c) => c.instanceName))
     const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
     const unresolvedIds = new Set(result.unresolved.map((u) => u.wordId))
+    const mcu = result.components.find((c) => c.instanceName === 'main_controller_mcu_word')
     expect(offBoardIds.has('touch_display_word')).toBe(true)
     expect(offBoardIds.has('main_controller_mcu_word')).toBe(false)
     expect(offBoardIds.has('polyfuse_resettable_word')).toBe(false)
     expect(offBoardIds.has('bulk_capacitor_word')).toBe(false)
     expect(offBoardIds.has('flash_storage_word')).toBe(true)
+    // Mains/AC inlet fuse stays off the low-voltage control PCB.
+    expect(offBoardIds.has('mains_fuse_word')).toBe(true)
     expect(unresolvedIds.has('host_interface_word')).toBe(false)
+    expect(unresolvedIds.has('stepper_driver_board_word')).toBe(false)
+    expect(unresolvedIds.has('current_sense_on_driver_word')).toBe(false)
+    expect(onBoardIds.has('stepper_driver_board_word')).toBe(true)
+    expect(onBoardIds.has('current_sense_on_driver_word')).toBe(true)
+    // Concept "QFN56" dimensions must NOT pin a 56-pad island for a 4-pin stub.
+    expect(mcu?.footprint.footprint).not.toMatch(/QFN-56/i)
+    expect(mcu?.footprint.footprint).toMatch(/LQFP-32/i)
     // MCU and/or stepper driver must land as on-board components (not a 2-part fuse board).
     expect(
       onBoardIds.has('main_controller_mcu_word')

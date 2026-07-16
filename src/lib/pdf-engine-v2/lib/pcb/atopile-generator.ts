@@ -114,14 +114,19 @@ const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> =
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
-  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic/i },
+  // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
+  // gate-drive ICs (SOIC-8 class default) — without this, `stepper_driver_board`
+  // landed in unresolved[] and floored the PCB readiness gate.
+  { id: 'gate_driver_ic', test: /gate[_-]?driver|led[_-]?driver|inverter[_-]?bridge|driver[_-]?ic|stepper[_-]?driver|microstep[_-]?driver|h[_-]?bridge|motor[_-]?driver/i },
   { id: 'regulator', test: /controller[_-]?power[_-]?supply|power[_-]?converter|regulator|(^|[_-])ldo($|[_-])|dc[_-]?dc/i },
   { id: 'fuse_protection', test: /fuse|poly[_-]?fuse|overcurrent[_-]?protection|thermal[_-]?cut(?:off)?|ptc|resettable/i },
   { id: 'diode_protection', test: /reverse[_-]?polarity|esd[_-]?protection|tvs|surge[_-]?protection|transient/i },
   { id: 'memory_ic', test: /firmware[_-]?storage|flash[_-]?memory|eeprom|nonvolatile[_-]?memory/i },
   { id: 'usb_connector', test: /usb[_-]?(?:interface|power|connector|receptacle|port)|type[_-]?c/i },
   { id: 'passive_c', test: /capacitor/i },
-  { id: 'passive_r', test: /resistor/i },
+  // current_sense_on_driver / sense_shunt → SMD resistor (shunt), not unresolved.
+  // GOTCHA: do not bare-match `current_sense` alone — that can be an amplifier IC.
+  { id: 'passive_r', test: /resistor|current[_-]?sense(?:[_-]?on[_-]?driver|_shunt)|sense[_-]?shunt|shunt[_-]?resistor/i },
   { id: 'battery_connector', test: /storage_cell|cell_module_assembly|battery/i },
   { id: 'display_module', test: /display[_-]?panel|\block?d\b|\boled\b|\btft\b|screen/i },
   { id: 'led', test: /status[_-]?indicator|annunciator|led[_-]?source|^led\b|[_-]led\b/i },
@@ -426,6 +431,16 @@ function resolveFootprintByPackageText(
   if (smdSize) {
     const size = smdSize[1]
     const metric = IMPERIAL_TO_METRIC_MM[size] ?? size
+    // GOTCHA: fuse/polyfuse form text often says "1206 polyfuse" — must land in
+    // Fuse:* not Resistor_SMD (Poseidon polyfuse was mis-resolved to R_1206).
+    if (kindHint === 'fuse_protection' || /\b(?:fuse|polyfuse|ptc)\b/i.test(text)) {
+      const fuseRef = resolveFootprintByGlob(
+        root,
+        'Fuse',
+        new RegExp(`^Fuse_${size}_${metric}Metric\\.kicad_mod$`),
+      )
+      if (fuseRef) return { ref: fuseRef, rule: `smd_fuse_size_${size}` }
+    }
     const prefix = kindHint === 'passive_c' ? 'C' : kindHint === 'led' ? 'LED' : 'R'
     const library = kindHint === 'passive_c' ? 'Capacitor_SMD' : kindHint === 'led' ? 'LED_SMD' : 'Resistor_SMD'
     const ref = resolveFootprintByGlob(root, library, new RegExp(`^${prefix}_${size}_${metric}Metric\\.kicad_mod$`))
@@ -474,6 +489,30 @@ function resolveFootprintByPackageText(
   }
 
   return null
+}
+
+/**
+ * @description Declared pin/pad count from a KiCad footprint name (QFN-56, LQFP-32…),
+ * or null when the name carries no numeric package size.
+ */
+function footprintDeclaredPinCount(footprintName: string): number | null {
+  const m = footprintName.match(/\b(?:QFN|LQFP|TQFP|SOIC|SSOP|TSSOP)-(\d+)\b/i)
+  if (!m) return null
+  const n = Number(m[1])
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/**
+ * @description Concept-stage form/dimensions often claim dense packages
+ * ("7×7 mm QFN56") while the schematic only wires a 4-pin power/GPIO stub.
+ * Freerouting then leaves unconnected nets on a 56-pad island (Poseidon 0602).
+ * Prefer the function-class default when package pads ≫ schematic pins and there
+ * is no verified MPN — universal, never a per-product package table.
+ */
+function packageOversizeForSchematic(footprintName: string, schematicPinCount: number): boolean {
+  const pads = footprintDeclaredPinCount(footprintName)
+  if (pads == null || schematicPinCount <= 0) return false
+  return pads > Math.max(schematicPinCount * 2, schematicPinCount + 8)
 }
 
 // ── Tier (a): MPN-driven — DB-first lookup, never a live distributor call ──────
@@ -795,6 +834,16 @@ function offBoardCotsReason(
   if (isInstrument && INSTRUMENT_NON_FOOTPRINT_WORD_RE.test(roleText)) {
     return 'front-panel legend / nameplate — marking on the enclosure, not a soldered PCB footprint'
   }
+  // INTENT (2026-07-16): instrument control PCBs are low-voltage. A "mains fuse"
+  // / IEC inlet fuse lives at the chassis inlet or external PSU — packing three
+  // 1206 fuses (polyfuse + overcurrent + mains) onto a 35 mm board caused pad
+  // overlap and freerouting leftovers (Poseidon 0602). Keep PCB polyfuses.
+  if (
+    isInstrument
+    && /\b(?:mains|line|ac[_ -]?input)[_ -]?fuse\b|\bfuse[_ -]?holder\b/i.test(roleText)
+  ) {
+    return 'mains/AC inlet protection — lives at the IEC inlet or external PSU, not on the low-voltage control PCB'
+  }
   // OPEN-array / linear dosing: MCU stays on the control PCB even when a
   // Touch Display exists — the display is the off-board HMI, not a license to
   // replace the whole controller with a purchased kit (Poseidon 2026-07-16).
@@ -849,8 +898,15 @@ function resolveComponent(
   if (!footprint && packageText.trim()) {
     const resolved = resolveFootprintByPackageText(packageText, functionClass, footprintsRoot)
     if (resolved) {
-      footprint = resolved.ref
-      tier = 'package_family'
+      const schematicPins = fallback?.pins.length ?? 0
+      // GOTCHA: skip oversize package_text when no real MPN — fall through to (c).
+      if (
+        mpnVerified
+        || !packageOversizeForSchematic(resolved.ref.footprint, schematicPins)
+      ) {
+        footprint = resolved.ref
+        tier = 'package_family'
+      }
     }
   }
 
@@ -1193,8 +1249,12 @@ export function generateAtopileProject(
   // were stuck at the plant [50,250] floor and failed Verification HARD
   // "Instrument PCB max side". Optical source board remains the stricter path
   // when present; any other isInstrumentDevice with ≤12 on-board parts qualifies.
+  // GOTCHA (Poseidon 2026-07-16): actuation-drive boards (MCU + stepper driver +
+  // polyfuses) cannot pack under a 40 mm ceiling — keep them on the [50,250]
+  // plant floor so Freerouting/placement can converge DRC-clean.
   const isCompactInstrumentBoard =
     instrumentDeviceContext(state, electronicWords) &&
+    !hasActuationDriveBoard(state, electronicWords) &&
     (hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents) ||
       allComponents.length <= 12)
   const boardOutline = computeBoardOutline(allComponents, {

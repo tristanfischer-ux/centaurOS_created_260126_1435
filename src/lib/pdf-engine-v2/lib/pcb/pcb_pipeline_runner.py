@@ -475,7 +475,50 @@ def selftest() -> None:
     ok, reason = validate_placement(place2, multi, cfg, Path("/tmp/unused"), 70.0, 70.0)
     if not ok:
         raise AssertionError(f"IC+SMD band separation must place without overlap, got: {reason}")
-    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band)")
+    # proveCatch (2026-07-16): three Fuse_1206 at cfg smd_spacing=4 mm must NOT
+    # collide — spacing floors to bbox_w+1 (≥4.2 for 3.2 mm 1206).
+    _footprint_cache["Fuse:Fuse_1206_3216Metric"] = FootprintData(
+        bbox_w=3.2, bbox_h=1.6, resolved_from="fixture",
+        pads=[
+            {"num": "1", "x": -1.4, "y": 0, "w": 1.0, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "2", "x": 1.4, "y": 0, "w": 1.0, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+        ],
+    )
+    fuses = [
+        Component("F1", "polyfuse", "Fuse:Fuse_1206_3216Metric"),
+        Component("F2", "overcurrent", "Fuse:Fuse_1206_3216Metric"),
+        Component("F3", "mains", "Fuse:Fuse_1206_3216Metric"),
+    ]
+    place_f = place_components(fuses, cfg, Path("/tmp/unused"), 40.0, 40.0, 10.0, 3.0,
+                               smd_spacing=4.0)
+    ok_f, reason_f = validate_placement(place_f, fuses, cfg, Path("/tmp/unused"), 40.0, 40.0)
+    if not ok_f:
+        raise AssertionError(f"1206 fuse SMD pitch floor must prevent pad overlap, got: {reason_f}")
+    # proveCatch (2026-07-16): LQFP + Fuse_1206 band must clear (SMD anchored below IC).
+    _footprint_cache["Package_QFP:LQFP-32_7x7mm_P0.8mm"] = FootprintData(
+        bbox_w=10.8, bbox_h=10.8, resolved_from="fixture",
+        pads=[
+            {"num": "1", "x": -4.2, "y": -4.2, "w": 0.5, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "9", "x": 4.2, "y": -4.2, "w": 0.5, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "17", "x": 4.2, "y": 4.2, "w": 0.5, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+            {"num": "25", "x": -4.2, "y": 4.2, "w": 0.5, "h": 1.2, "rot": 0, "type": "smd", "shape": "rect"},
+        ],
+    )
+    drive = [
+        Component("U1", "MCU microcontroller", "Package_QFP:LQFP-32_7x7mm_P0.8mm"),
+        Component("F1", "polyfuse", "Fuse:Fuse_1206_3216Metric"),
+        Component("F2", "overcurrent", "Fuse:Fuse_1206_3216Metric"),
+    ]
+    place_d = place_components(drive, cfg, Path("/tmp/unused"), 60.0, 60.0, 12.0, 5.0,
+                               ic_spacing=15.0, smd_spacing=4.0)
+    ok_d, reason_d = validate_placement(place_d, drive, cfg, Path("/tmp/unused"), 60.0, 60.0)
+    if not ok_d:
+        raise AssertionError(f"LQFP+fuse SMD band anchor must clear IC pads, got: {reason_d}")
+    if place_d["F1"][1] <= place_d["U1"][1]:
+        raise AssertionError(
+            f"SMD band must sit below IC (F1.y={place_d['F1'][1]:.1f} U1.y={place_d['U1'][1]:.1f})"
+        )
+    print("pcb_pipeline_runner selftest: OK (compact 25-40 + growth cap + centred IC + motherboard counter-case + IC/SMD band + fuse pitch + LQFP band)")
 
 # ─── Placement (unchanged algorithm; NAIVE — grid/edge placement, not a real
 #     autoplacer. Bounded to the board's own outline bbox with a margin >= the
@@ -554,6 +597,21 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
     ics.sort(key=lambda x: max(x[1].bbox_w, x[1].bbox_h), reverse=True)
     cols = max(1, int(math.sqrt(len(ics)) + 0.999)) if ics else 1
     rows = max(1, math.ceil(len(ics) / cols)) if ics else 1
+
+    def _pad_radial_extent(fp: FootprintData) -> float:
+        if fp.pads:
+            return max(
+                max(abs(pad["x"]) + max(pad["w"], pad["h"]) / 2,
+                    abs(pad["y"]) + max(pad["w"], pad["h"]) / 2)
+                for pad in fp.pads
+            )
+        return max(fp.bbox_w / 2, fp.bbox_h / 2, 0.5)
+
+    # Floor IC pitch by pad extents so LQFP-32 + SOIC-8 cannot start at 15 mm
+    # centres with nearest pads < min_gap (Poseidon retest iter-1 U1-vs-U2).
+    if ics:
+        max_ic_extent = max(_pad_radial_extent(fp) for _, fp in ics)
+        ic_spacing = max(ic_spacing, 2 * max_ic_extent + 0.5)
     # DECISION (2026-07-14): centre the IC grid on the board. The old
     # `cy - 20` / `cy + 10` offsets assumed ≥50 mm motherboards and shoved
     # SOIC pads off a 25–40 mm optical source daughterboard (colorimeter-1441).
@@ -575,15 +633,32 @@ def place_components(components: List[Component], cfg: ChainConfig, fp_root: Pat
     # NOT `ic_spacing * 0.55`. Fractional spacing kept U1 (SOT-23-5) and C*
     # (0603) colliding at ~0.5–0.7 mm while board growth moved BOTH clusters
     # with `cy` — placement never converged (powerwall-2214/0447).
-    max_ic_half_h = max((max(fp.bbox_h / 2, 1.0) for _, fp in ics), default=0.0)
-    max_smd_half_h = max((max(fp.bbox_h / 2, 0.5) for _, fp in smd), default=0.0)
-    band_gap = max(2.5, ic_spacing * 0.2)
-    smd_cy = cy + max_ic_half_h + band_gap + max_smd_half_h if ics else cy
+    # INTENT (2026-07-16): floor SMD pitch + IC/SMD band gap from real pad
+    # extents (same r as validate_placement) so Fuse_1206 parts and LQFP pads
+    # cannot collide (Poseidon 0602 / retest U1-vs-F1).
+    max_ic_half_h = max((_pad_radial_extent(fp) for _, fp in ics), default=0.0)
+    max_ic_half_h = max(
+        max_ic_half_h,
+        max((fp.bbox_h / 2 for _, fp in ics), default=0.0),
+        1.0 if ics else 0.0,
+    )
+    max_smd_half_h = max((_pad_radial_extent(fp) for _, fp in smd), default=0.5)
+    max_pad_extent = max_smd_half_h
+    smd_spacing = max(smd_spacing, 2 * max_pad_extent + 0.5)
+    band_gap = max(2.5, ic_spacing * 0.2, 1.0)
+    # DECISION (2026-07-16): anchor the SMD band BELOW the IC pad extent.
+    # Centring the SMD grid on smd_cy pulled row-0 back into the LQFP pads
+    # (Poseidon retest: U1@cy vs F1@cy+5.6 with extents 4.92+2.27 needed ≥7.4).
+    if ics:
+        smd_top = cy + max_ic_half_h + band_gap
+        smd_y0 = smd_top + max_smd_half_h
+    else:
+        smd_y0 = cy - (smd_rows - 1) * smd_spacing / 2
     for i, (c, fp) in enumerate(smd):
         col = i % smd_cols
         row = i // smd_cols
         x = cx - (smd_cols - 1) * smd_spacing / 2 + col * smd_spacing
-        y = smd_cy - (smd_rows - 1) * smd_spacing / 2 + row * smd_spacing
+        y = smd_y0 + row * smd_spacing
         half_h = max(fp.bbox_h / 2, 0.5)
         half_w = max(fp.bbox_w / 2, 0.5)
         x = min(max(x, margin + half_w), board_w - margin - half_w)
@@ -927,9 +1002,10 @@ def run(args) -> dict:
     # board_extra by +10/+20 mm per failure and inflate a 40 mm LED daughterboard
     # to 80×80 — the exact colorimeter-1441 artefact bug. Cap growth so a
     # window-scale source board cannot become a motherboard via retry.
-    compact_source = _looks_like_compact_source_board(components) or (
-        outline is not None and max(base_w, base_h) <= 40.0 + 1e-6
-    )
+    # GOTCHA (Poseidon 2026-07-16): outline≤40 alone must NOT clamp growth — a
+    # Phase-B 30 mm estimate for an MCU+stepper control board is NOT a compact
+    # optical source. Only `_looks_like_compact_source_board` may set the cap.
+    compact_source = _looks_like_compact_source_board(components)
     max_board_side = 40.0 if compact_source else None
     # 5 mm edge margin eats 40% of a 25 mm board; keep ≥2.5 mm but scale down.
     if compact_source:
@@ -1035,9 +1111,12 @@ def run(args) -> dict:
         result["errors"].append(f"Freerouting did not produce a .ses file: {fr_log[-1200:]}")
         emit(result)
         return result
-    if unrouted > 5:
-        fr_ok2, unrouted2, fr_log2 = run_freerouter(cfg.dsn_path, cfg.ses_path, args, "Global")
-        if fr_ok2:
+    # DECISION (2026-07-16): any leftover unrouted net is a manufacturability
+    # failure (Poseidon 0602: Hybrid left 2 VCC/GND stubs). Retry Global whenever
+    # Hybrid leaves ANY nets — not only when unrouted > 5.
+    if unrouted > 0:
+        fr_ok2, unrouted2, _fr_log2 = run_freerouter(cfg.dsn_path, cfg.ses_path, args, "Global")
+        if fr_ok2 and unrouted2 < unrouted:
             unrouted = unrouted2
     result["unrouted_after_freerouting"] = unrouted
 

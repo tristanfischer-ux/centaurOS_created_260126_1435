@@ -77,8 +77,20 @@ function main(): void {
   }
 
   const w = (pipelineResult.boardSizeMm as { w?: number } | undefined)?.w
-  if (typeof w === 'number' && w > 40) {
-    console.error(`[sync-instrument-pcb] FAIL: board ${w} mm exceeds 40 mm instrument cap`)
+  // INTENT (Poseidon 2026-07-16): optical LED daughterboards stay ≤40 mm; actuation
+  // drive boards (MCU + stepper) legitimately need the [50,250] plant floor.
+  const onBoardBlob = genResult.components
+    .map((c) => `${c.instanceName} ${c.nameHuman} ${c.characterId}`)
+    .join(' ')
+  const isActuationDrive = /\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver)\b/i.test(
+    onBoardBlob,
+  )
+  const maxSideMm = isActuationDrive ? 120 : 40
+  if (typeof w === 'number' && w > maxSideMm) {
+    console.error(
+      `[sync-instrument-pcb] FAIL: board ${w} mm exceeds ${maxSideMm} mm ` +
+        `${isActuationDrive ? 'actuation-drive' : 'instrument'} cap`,
+    )
     process.exit(2)
   }
   if (genResult.components.length > 12) {

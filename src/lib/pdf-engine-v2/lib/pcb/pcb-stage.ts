@@ -58,7 +58,10 @@ const ELECTRONIC_CATEGORY_PATTERNS: CategoryPattern[] = [
     // rechargeable_battery_pack, dc_input_fuse) — not only form-modifier prose
     // that happens to contain "li-po" / "battery charger". Host-side off-board
     // disposition cannot fire on words the collector never sees.
-    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove)\b/i,
+    // INTENT (Poseidon 2026-07-16): stepper/microstep/H-bridge driver boards are
+    // power-electronics (collected → atopile) — "Stepper Driver Board" was silently
+    // dropped because only "gate driver" / "led driver" matched.
+    pattern: /\b(status[-_ ]?(?:led|indicator)|charge[_ -]?status|low[_ -]?battery|battery[_ -]?indicator|led[-_ ]?source|\bled\b|led driver|gate driver|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge|motor[_ -]?driver|driver[_ -]?board|driver[_ -]?ic|rechargeable[_ -]?battery|battery(?:[_ -]?(?:pack|charger|charge|management))?|li-?ion|li-?po|lithium[- ]polymer|voltage regulator|dc[_ -]?dc[_ -]?regulator|\bldo\b|dc-?dc converter|boost converter|buck converter|power(?:[_ -]?(?:input|switch|indicator|rail))?|power management (?:ic|system)|\bpmic\b|(?:dc[_ -]?)?(?:input[_ -]?)?fuse|polyfuse|ferrite|esd[_ -]?protection|thermal[_ -]?cutoff|reverse[_ -]?polarity|stemma|qwiic|grove)\b/i,
   },
   {
     category: 'display',
