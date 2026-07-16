@@ -88,7 +88,30 @@ export function computeRenderQuality(
   const hasPerClassTemplate = templateName !== null
   // A brief-specific LLM-generated scene in the out dir is also a real (custom) model.
   const hasLlmScene = existsSync(join(opts.outDir, 'blender-scene.py'))
-  const usedUniversalFallback = !hasPerClassTemplate && !hasLlmScene
+  // INTENT (Poseidon 2026-07-16): build_universal_scene instrument form grammars
+  // (syringe OPEN array / thermocycler / optical) dump form-meshes.json — that IS
+  // the design, not grey-box stock. Treat as a real render so BLENDER_UNIVERSAL_FALLBACK
+  // does not floor Renders on every instrument class that correctly uses the universal
+  // path. A plant class with neither template nor form-meshes still flags HIGH.
+  const hasInstrumentFormRender = (() => {
+    for (const rel of ['form-meshes.json', join('_loop', 'form-meshes.json')]) {
+      const p = join(opts.outDir, rel)
+      if (!existsSync(p)) continue
+      try {
+        const raw = JSON.parse(readFileSync(p, 'utf-8')) as { form?: unknown; meshes?: unknown }
+        const form = String(raw?.form ?? '').toLowerCase()
+        const n = Array.isArray(raw?.meshes) ? raw.meshes.length : 0
+        if (
+          n >= 8
+          && /syringe_pump|thermocycler|optical|photometer|colorimeter|instrument/.test(form)
+        ) {
+          return true
+        }
+      } catch { /* ignore malformed */ }
+    }
+    return false
+  })()
+  const usedUniversalFallback = !hasPerClassTemplate && !hasLlmScene && !hasInstrumentFormRender
 
   // Inventory the rendered images.
   const heroCandidates = ['00-hero.png', 'blender-cover.png']
@@ -115,9 +138,11 @@ export function computeRenderQuality(
       code: 'BLENDER_UNIVERSAL_FALLBACK',
       message:
         `No per-class Blender template for product_class="${productClass}" (and no LLM-generated ` +
-        `blender-scene.py) — the dossier's cover + module images are the GENERIC UNIVERSAL FALLBACK, ` +
-        `NOT this design. Add a hand-coded scripts/blender-templates/<class>-9shot.py (model it on ` +
-        `co2-mineralisation-9shot.py) and register it in scripts/render-blender-scene.py CLASS_TO_TEMPLATE.`,
+        `blender-scene.py, and no instrument form-meshes.json) — the dossier's cover + module ` +
+        `images are the GENERIC UNIVERSAL FALLBACK, NOT this design. Add a hand-coded ` +
+        `scripts/blender-templates/<class>-9shot.py (model it on co2-mineralisation-9shot.py) ` +
+        `and register it in scripts/render-blender-scene.py CLASS_TO_TEMPLATE — or ensure the ` +
+        `universal instrument form grammar wrote form-meshes.json for this class.`,
     })
   }
   if (!heroPresent) {

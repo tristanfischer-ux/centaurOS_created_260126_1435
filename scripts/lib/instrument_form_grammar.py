@@ -393,7 +393,11 @@ SP_COUPLER_OD_MM = 16.0
 SP_HARNESS_OD_MM = 4.5
 SP_TUBING_OD_MM = 2.2
 SP_CRADLE_ANGLE_DEG = 18.0       # tip cradle tips forward (gold printed aesthetic)
-SP_DISPLAY_TILT_DEG = 22.0       # console screen tips up toward operator
+SP_DISPLAY_TILT_DEG = 38.0       # tipped landscape tablet (gold: propped UI in front)
+SP_TABLET_W_MM = 110.0
+SP_TABLET_H_MM = 72.0
+SP_TABLET_T_MM = 8.0
+SP_UI_BEZEL_MM = 4.0
 # Product cams: OPEN array is wide+low — optical-instrument h×1.92 inflation
 # left height occupancy ~0.39 (drawing_gates floor 0.45). Pull in + lower look.
 SP_CAM_EXT_Z = 0.95
@@ -535,6 +539,7 @@ def syringe_pump_checklist(channel_count: int) -> list[str]:
         f"{SP_MESH_PREFIX}base",
         f"{SP_MESH_PREFIX}console",
         f"{SP_MESH_PREFIX}console_top",
+        f"{SP_MESH_PREFIX}console_tablet",
         f"{SP_MESH_PREFIX}console_display",
         f"{SP_MESH_PREFIX}harness_trunk",
     ]

@@ -3867,12 +3867,32 @@ function checkCo2FixInvariants(): Assertion[] {
       const noTpl = computeRenderQuality({ moduleDecomposition: { product_class: '__nonexistent_class_zzz' } }, { outDir: '/tmp/__rq_none_probe', repoRoot })
       if (!noTpl.used_universal_fallback) bad.push('a template-less class was NOT detected as universal-fallback')
       if (!noTpl.findings.some((f) => f.severity === 'high' && f.code === 'BLENDER_UNIVERSAL_FALLBACK')) bad.push('template-less class did not produce a HIGH BLENDER_UNIVERSAL_FALLBACK finding')
+      // Instrument form via build_universal_scene dumps form-meshes.json — NOT grey-box stock.
+      const formDir = '/tmp/__rq_syringe_form_probe'
+      try {
+        mkdirSync(formDir, { recursive: true })
+        writeFileSync(join(formDir, 'form-meshes.json'), JSON.stringify({
+          form: 'syringe_pump',
+          channels: 4,
+          meshes: Array.from({ length: 12 }, (_, i) => `u_se_sp_ch${(i % 4) + 1}_part`),
+        }))
+        writeFileSync(join(formDir, '00-hero.png'), Buffer.alloc(50_000))
+        const formOk = computeRenderQuality(
+          { moduleDecomposition: { product_class: 'syringe_pump' } },
+          { outDir: formDir, repoRoot },
+        )
+        if (formOk.used_universal_fallback) {
+          bad.push('syringe_pump with form-meshes.json was wrongly flagged as universal-fallback')
+        }
+      } catch (err) {
+        bad.push(`instrument-form render-quality proveCatch threw: ${String(err).slice(0, 120)}`)
+      }
     } catch (err) {
       bad.push(`render-quality gate threw: ${String(err).slice(0, 120)}`)
     }
     out.push(assertEq(
       'UNIVERSAL.render_quality_gate_catches_missing_blender_template',
-      'the render-quality gate passes a class WITH a Blender template (e_fuel, co2) and flags a template-less class as a HIGH universal-fallback (so a bad/generic Blender model is auto-caught, not silently shipped)',
+      'the render-quality gate passes a class WITH a Blender template (e_fuel, co2), flags a template-less class as HIGH universal-fallback, and does NOT flag an instrument class that wrote form-meshes.json via build_universal_scene (Poseidon OPEN-array path)',
       bad.length, (n) => n === 0,
       () => `render-quality gate wrong: ${bad.join(' ; ')}.`,
     ))

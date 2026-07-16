@@ -13259,13 +13259,15 @@ def _place_syringe_pump_layout(
             _pl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Clear tubing from syringe tip toward console (+X).
+        # Clear tubing from syringe tip toward console (+X) — long enough to read
+        # as a wet-path gather (gold: tip lines leave the array toward the spine).
         tip_y = sy_y - ifg.SP_SYRINGE_LENGTH_MM * 0.45
+        tube_len = max(face * 2.4, abs((W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.45) - x) * 0.55)
         _tb = fl.add_cyl(
             f"{p}tubing",
-            _mm3((x + face * 0.55, tip_y, z + 1.0)),
+            _mm3((x + tube_len * 0.45, tip_y, z + 1.0)),
             (ifg.SP_TUBING_OD_MM / 2.0) * fl.MM,
-            face * 1.8 * fl.MM,
+            tube_len * fl.MM,
             tubing_mat, module=story_mod, module_objects=MO)
         try:
             _tb.rotation_euler = (0.0, math.pi / 2.0, 0.0)
@@ -13314,25 +13316,61 @@ def _place_syringe_pump_layout(
         _mm3((cw * 0.98, cd * 0.98, 4.0)),
         accent_mat, module=story_mod, module_objects=MO)
     _top.dimensions = _mm3((cw * 0.98, cd * 0.98, 4.0))
-    # Chip backlight stub on top plate.
+    # Chip backlight stub on top plate (gold microfluidic stage window).
     _chip = fl.add_box(
         "u_se_sp_console_chip",
         _mm3((cx, cd * 0.05, base_z + ch + 5.0)),
         _mm3((cw * 0.35, cd * 0.28, 3.0)),
         glass_mat, module=story_mod, module_objects=MO)
     _chip.dimensions = _mm3((cw * 0.35, cd * 0.28, 3.0))
-    # Angled landscape display on console front (−Y).
+    # INTENT (gold convergent): tipped landscape tablet in FRONT of the console —
+    # a separate HMI volume (not a flush fascia glass). UI face uses a bright
+    # "software" material so the shot reads as a live controller, not a blank slab.
+    ui_mat = fl.make_mat(
+        "m_se_sp_ui", fl._to_linear((0.72, 0.78, 0.86)), metallic=0.0, roughness=0.35)
+    ui_chrome = fl.make_mat(
+        "m_se_sp_tablet", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.25, roughness=0.45)
     disp_tilt = math.radians(ifg.SP_DISPLAY_TILT_DEG)
-    _disp = fl.add_box(
-        "u_se_sp_console_display",
-        _mm3((cx, -cd * 0.42, base_z + ch * 0.55)),
-        _mm3((cw * 0.78, 5.0, ch * 0.50)),
-        glass_mat, module=story_mod, module_objects=MO)
-    _disp.dimensions = _mm3((cw * 0.78, 5.0, ch * 0.50))
+    tw = ifg.SP_TABLET_W_MM
+    th = ifg.SP_TABLET_H_MM
+    tt_mm = ifg.SP_TABLET_T_MM
+    # Pivot near the console front lip so the tablet tips toward the operator (−Y).
+    tab_y = -cd * 0.48
+    tab_z = base_z + ch * 0.42
+    _tab = fl.add_box(
+        "u_se_sp_console_tablet",
+        _mm3((cx, tab_y, tab_z)),
+        _mm3((tw, tt_mm, th)),
+        ui_chrome, module=story_mod, module_objects=MO)
+    _tab.dimensions = _mm3((tw, tt_mm, th))
     try:
-        _disp.rotation_euler = (disp_tilt, 0.0, 0.0)
+        _tab.rotation_euler = (disp_tilt, 0.0, 0.0)
     except Exception:
         pass
+    # Screen inset (slightly proud of bezel) — brighter UI face.
+    bezel = ifg.SP_UI_BEZEL_MM
+    _scr = fl.add_box(
+        "u_se_sp_console_display",
+        _mm3((cx, tab_y - tt_mm * 0.35, tab_z)),
+        _mm3((tw - 2.0 * bezel, 1.5, th - 2.0 * bezel)),
+        ui_mat, module=story_mod, module_objects=MO)
+    _scr.dimensions = _mm3((tw - 2.0 * bezel, 1.5, th - 2.0 * bezel))
+    try:
+        _scr.rotation_euler = (disp_tilt, 0.0, 0.0)
+    except Exception:
+        pass
+    # Soft UI chrome rows (table / tabs cue — form grammar, not a brand screenshot).
+    for ri, dy in enumerate((-th * 0.18, 0.0, th * 0.18)):
+        _row = fl.add_box(
+            f"u_se_sp_console_ui_row{ri}",
+            _mm3((cx, tab_y - tt_mm * 0.55, tab_z + dy)),
+            _mm3((tw * 0.72, 0.8, th * 0.10)),
+            glass_mat, module=story_mod, module_objects=MO)
+        _row.dimensions = _mm3((tw * 0.72, 0.8, th * 0.10))
+        try:
+            _row.rotation_euler = (disp_tilt, 0.0, 0.0)
+        except Exception:
+            pass
     # Blue corner feet on console.
     for sx, sy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
         _ft = fl.add_box(
