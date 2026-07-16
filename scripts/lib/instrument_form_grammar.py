@@ -655,7 +655,7 @@ def _selftest() -> None:
     assert _locs[1]["x"] > _locs[0]["x"], "channels step in +X"
     _ok, _miss = syringe_pump_checklist_ok(
         ["u_se_sp_base", "u_se_sp_console", "u_se_sp_console_top",
-         "u_se_sp_console_display", "u_se_sp_harness_trunk"]
+         "u_se_sp_console_tablet", "u_se_sp_console_display", "u_se_sp_harness_trunk"]
         + [f"u_se_sp_ch{i}_{s}" for i in range(1, 5)
            for s in ("stepper", "coupler", "leadscrew", "carriage", "rail_a", "rail_b",
                      "cradle", "cradle_v_a", "clamp_barrel", "clamp_plunger",
