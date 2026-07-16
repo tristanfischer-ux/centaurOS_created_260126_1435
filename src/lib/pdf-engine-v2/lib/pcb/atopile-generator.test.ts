@@ -139,7 +139,7 @@ describe('atopile-generator', () => {
       expect(heightMm).toBeGreaterThanOrEqual(25)
       expect(widthMm).toBeLessThanOrEqual(40)
       expect(heightMm).toBeLessThanOrEqual(40)
-      expect(result.boardOutline.sourceDetail).toContain('instrument optical source board')
+      expect(result.boardOutline.sourceDetail).toContain('compact instrument board')
     })
   })
 
@@ -421,6 +421,8 @@ describe('atopile-generator', () => {
 
     const result = generateAtopileProject(design, outDir)
     const offBoardIds = new Set(result.offBoard.map((record) => record.wordId))
+    // Host-side power/USB/firmware/status ride with the purchased COTS
+    // controller+UI kit (not the optical source daughterboard).
     expect(offBoardIds).toEqual(new Set([
       'main_controller_word',
       'local_display_word',
@@ -428,6 +430,11 @@ describe('atopile-generator', () => {
       'optical_detector_module_word',
       'sensor_interconnect_cable_word',
       'collimating_optic_word',
+      'dc_input_fuse_word',
+      'firmware_storage_word',
+      'power_switch_word',
+      'reverse_polarity_protection_word',
+      'usb_power_interface_word',
     ]))
     expect(result.unresolved.map((gap) => gap.wordId)).not.toEqual(
       expect.arrayContaining([...offBoardIds]),
@@ -444,17 +451,17 @@ describe('atopile-generator', () => {
     expect(led!.functionClass).toBe('led')
     expect(led!.resolutionTier).toBe('package_family')
 
-    const byWordId = new Map(result.components.map((component) => [component.wordId, component]))
-    expect(byWordId.get('dc_input_fuse_word')?.functionClass).toBe('fuse_protection')
-    expect(byWordId.get('dc_input_fuse_word')?.resolutionTier).toBe('package_family')
-    expect(byWordId.get('reverse_polarity_protection_word')?.functionClass).toBe('diode_protection')
-    expect(byWordId.get('reverse_polarity_protection_word')?.resolutionTier).toBe('package_family')
-    expect(byWordId.get('usb_power_interface_word')?.functionClass).toBe('usb_connector')
-    expect(byWordId.get('usb_power_interface_word')?.resolutionTier).toBe('package_family')
-    expect(byWordId.get('firmware_storage_word')?.functionClass).toBe('memory_ic')
-    expect(byWordId.get('firmware_storage_word')?.resolutionTier).toBe('package_family')
-    expect(byWordId.get('power_switch_word')?.functionClass).toBe('switch')
-    expect(byWordId.get('power_switch_word')?.resolutionTier).toBe('package_family')
+    // Host power/USB/firmware ride with the COTS controller kit — not on-board
+    // footprints next to the status LED (gold delta G3/G15).
+    for (const id of [
+      'dc_input_fuse_word',
+      'reverse_polarity_protection_word',
+      'usb_power_interface_word',
+      'firmware_storage_word',
+      'power_switch_word',
+    ]) {
+      expect(offBoardIds.has(id)).toBe(true)
+    }
   })
 
   it('keeps host power/USB off the optical source board when COTS UI+controller are present', () => {
@@ -515,7 +522,7 @@ describe('atopile-generator', () => {
     const onBoardIds = new Set(result.components.map((c) => c.wordId))
     expect(onBoardIds.has('led_source_word')).toBe(true)
     expect(onBoardIds.has('led_driver_word')).toBe(true)
-    expect(result.boardOutline.sourceDetail).toContain('instrument optical source board')
+    expect(result.boardOutline.sourceDetail).toContain('compact instrument board')
     const points = result.boardOutline.outline.segments.flatMap((segment) => [
       segment.start, segment.end, ...(segment.kind === 'arc' ? [segment.mid] : []),
     ])
@@ -878,6 +885,123 @@ describe('atopile-generator', () => {
       'fire_suppression_system_word',
       'arc_fault_detection_word',
     ].includes(u.wordId))).toEqual([])
+  })
+
+  // INTENT (NinjaPCR 2026-07-15): thermocycler has MCU + host peripherals + TEC
+  // and NO optical LED source. Host absorption must not require hasOpticalSource;
+  // TEC/sample block must off-board as thermal assemblies.
+  it('dispositions thermocycler host peripherals + thermal assemblies as off-board COTS without optical source', () => {
+    const outDir = makeTmpDir('atopile-thermocycler-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_class: 'thermocycler',
+        product_description: 'Compact research PCR thermocycler with Peltier sample block',
+      },
+      moduleDecomposition: {
+        modules: [{
+          module: 'control_compute_communication',
+          sub_modules: [{
+            id: 'control_compute_communication__main',
+            words: [
+              { id: 'main_controller_mcu_word', name_human: 'Main Controller MCU', content_character: { character_id: 'main_controller_mcu' }, modifier_characters: [{ kind: 'form', value: 'MCU controller board' }] },
+              { id: 'wifi_module_word', name_human: 'Wifi Module', content_character: { character_id: 'wifi_module' }, modifier_characters: [{ kind: 'form', value: 'WiFi radio module' }] },
+              { id: 'flash_storage_word', name_human: 'Flash Storage', content_character: { character_id: 'flash_storage' }, modifier_characters: [{ kind: 'form', value: 'SPI flash memory' }] },
+              { id: 'debug_uart_word', name_human: 'Debug Uart', content_character: { character_id: 'debug_uart' }, modifier_characters: [{ kind: 'form', value: 'UART debug header' }] },
+              { id: 'fan_failure_detect_word', name_human: 'Fan Failure Detect', content_character: { character_id: 'fan_failure_detect' }, modifier_characters: [{ kind: 'form', value: 'Fan tach sense' }] },
+              { id: 'estop_or_power_kill_word', name_human: 'Estop Or Power Kill', content_character: { character_id: 'estop_or_power_kill' }, modifier_characters: [{ kind: 'form', value: 'E-stop switch' }] },
+              { id: 'peltier_module_word', name_human: 'Peltier Module', content_character: { character_id: 'peltier_module' }, modifier_characters: [{ kind: 'form', value: 'TEC module 40x40' }] },
+              { id: 'sample_block_word', name_human: 'Sample Block', content_character: { character_id: 'sample_block' }, modifier_characters: [{ kind: 'form', value: 'Aluminium tube block' }] },
+              { id: 'heatsink_fan_word', name_human: 'Heatsink Fan', content_character: { character_id: 'heatsink_fan' }, modifier_characters: [{ kind: 'form', value: 'Heatsink with fan' }] },
+            ],
+          }],
+        }],
+      },
+      orchestratorContract: { topology: [] },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    // Host peripherals that the electronic collector flags must ride with the MCU.
+    for (const id of [
+      'wifi_module_word',
+      'flash_storage_word',
+      'debug_uart_word',
+      'estop_or_power_kill_word',
+    ]) {
+      expect(offBoardIds.has(id)).toBe(true)
+    }
+    // Thermal assemblies are either off-board COTS or never collected as
+    // electronic footprints — either way they must not land in unresolved[].
+    const unresolvedIds = new Set(result.unresolved.map((u) => u.wordId))
+    for (const id of [
+      'wifi_module_word',
+      'flash_storage_word',
+      'peltier_module_word',
+      'sample_block_word',
+      'heatsink_fan_word',
+      'fan_failure_detect_word',
+    ]) {
+      expect(unresolvedIds.has(id)).toBe(false)
+    }
+  })
+
+  // INTENT (Poseidon 2026-07-16): OPEN-array linear dosing has Touch Display +
+  // MCU + lead-screw train. Display must stay off-board HMI, but MCU + drive
+  // support (polyfuse/bulk/sense) stay on the control PCB — never the
+  // colorimeter "purchased COTS controller+UI kit" path that left fuse+terminal.
+  it('keeps actuation-drive MCU on-board when Touch Display is present', () => {
+    const outDir = makeTmpDir('atopile-syringe-actuation-')
+    tmpDirs.push(outDir)
+    const design = {
+      isInstrumentDevice: true,
+      parsedBrief: {
+        product_class: 'syringe_pump',
+        product_description: 'Multi-channel benchtop linear syringe dosing array',
+      },
+      orchestratorContract: {
+        quantities: {
+          channel_count: { value: 4 },
+          lead_screw_pitch_mm: { value: 2 },
+          max_syringe_volume_ml: { value: 60 },
+        },
+        topology: [],
+      },
+      moduleDecomposition: {
+        modules: [{
+          module: 'control_compute_communication',
+          sub_modules: [{
+            id: 'control_compute_communication__main',
+            words: [
+              { id: 'main_controller_mcu_word', name_human: 'Main Controller MCU', content_character: { character_id: 'main_controller_mcu' }, modifier_characters: [{ kind: 'form', value: 'MCU controller board' }] },
+              { id: 'stepper_driver_board_word', name_human: 'Stepper Driver Board', content_character: { character_id: 'stepper_driver_board' }, modifier_characters: [{ kind: 'form', value: 'A4988 microstep driver' }] },
+              { id: 'touch_display_word', name_human: 'Touch Display', content_character: { character_id: 'touch_display' }, modifier_characters: [{ kind: 'form', value: 'TFT touch panel' }] },
+              { id: 'polyfuse_resettable_word', name_human: 'Polyfuse Resettable', content_character: { character_id: 'polyfuse_resettable' }, modifier_characters: [{ kind: 'form', value: '1206 polyfuse' }] },
+              { id: 'bulk_capacitor_word', name_human: 'Bulk Capacitor', content_character: { character_id: 'bulk_capacitor' }, modifier_characters: [{ kind: 'form', value: '100uF bulk cap' }] },
+              { id: 'flash_storage_word', name_human: 'Flash Storage', content_character: { character_id: 'flash_storage' }, modifier_characters: [{ kind: 'form', value: 'SPI flash' }] },
+              { id: 'host_interface_word', name_human: 'Host Interface', content_character: { character_id: 'host_interface' }, modifier_characters: [{ kind: 'form', value: 'USB host link' }] },
+              { id: 'lead_screw_word', name_human: 'Lead Screw', content_character: { character_id: 'lead_screw' }, modifier_characters: [{ kind: 'form', value: 'T8 lead screw' }] },
+            ],
+          }],
+        }],
+      },
+    }
+    const result = generateAtopileProject(design, outDir)
+    const onBoardIds = new Set(result.components.map((c) => c.instanceName))
+    const offBoardIds = new Set(result.offBoard.map((r) => r.wordId))
+    const unresolvedIds = new Set(result.unresolved.map((u) => u.wordId))
+    expect(offBoardIds.has('touch_display_word')).toBe(true)
+    expect(offBoardIds.has('main_controller_mcu_word')).toBe(false)
+    expect(offBoardIds.has('polyfuse_resettable_word')).toBe(false)
+    expect(offBoardIds.has('bulk_capacitor_word')).toBe(false)
+    expect(offBoardIds.has('flash_storage_word')).toBe(true)
+    expect(unresolvedIds.has('host_interface_word')).toBe(false)
+    // MCU and/or stepper driver must land as on-board components (not a 2-part fuse board).
+    expect(
+      onBoardIds.has('main_controller_mcu_word')
+      || onBoardIds.has('stepper_driver_board_word')
+      || result.components.length >= 3,
+    ).toBe(true)
   })
 
   it('a design with an unrecognisable electronic word lands honestly in unresolved[]', () => {

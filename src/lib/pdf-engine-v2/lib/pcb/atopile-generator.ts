@@ -601,7 +601,7 @@ const INSTRUMENT_OPTOMECH_WORD_RE =
   /\b(collimat\w*|lens|optic(?:al)?|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?(?:bezel|plate)|detector[_ -]?mount|face[_ -]?plate|front[_ -]?panel)\b/i
 
 const INSTRUMENT_INTERCONNECT_WORD_RE =
-  /\b(?:sensor|detector|photodiode|signal|analog|adc|afe).{0,48}(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon).{0,48}(?:sensor|detector|photodiode|signal|analog|adc|afe)\b/i
+  /\b(?:sensor|detector|photodiode|signal|analog|adc|afe).{0,48}(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon).{0,48}(?:sensor|detector|photodiode|signal|analog|adc|afe)\b|\b(?:wire[_ -]?harness|wiring[_ -]?harness|cable[_ -]?assembly|sensor[_ -]?cable)\b/i
 
 // INTENT (2026-07-14): STEMMA/Qwiic/Grove headers mate to purchased COTS modules —
 // they are not optical-source-board footprints (colorimeter-2130 put stemma_header on
@@ -619,7 +619,18 @@ const INCLUDED_ON_COMPUTE_UI_RE =
 // battery indicators must stay off the optical source board (see INCLUDED_ON_COMPUTE_UI
 // + INSTRUMENT_HOST_SIDE). Keep optical LED source / driver / board-level protection.
 const ON_BOARD_PCB_WORD_RE =
-  /\b(led[_ -]?source|\bled\b|led[_ -]?driver|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b)\b/i
+  /\b(led[_ -]?source|\bled\b|led[_ -]?driver|regulator|fuse|polyfuse|thermal[_ -]?cutoff|polarity|protection|power[_ -]?switch|usb[_ -]?power|analog[_ -]?to[_ -]?digital|\badc\b|stepper[_ -]?driver|microstep[_ -]?driver|h[_ -]?bridge)\b/i
+
+// INTENT (Poseidon 2026-07-16): OPEN-array linear dosing — MCU + stepper
+// drivers ARE the control PCB. A Touch Display must not license the colorimeter
+// "purchased COTS controller+UI kit" path that strips the board to fuse+terminal.
+const INSTRUMENT_ACTUATION_DRIVE_RE =
+  /\b(?:stepper(?:[_ -]?(?:motor|driver|drive))?|microstep(?:[_ -]?driver)?|\bnema\b|lead[_ -]?screw|leadscrew|linear[_ -]?carriage)\b/i
+
+// Drive-rail parts that stay on the actuation control PCB (not absorbed into a
+// purchased UI kit) when INSTRUMENT_ACTUATION_DRIVE_RE is present.
+const ACTUATION_ON_BOARD_SUPPORT_RE =
+  /\b(?:polyfuse|bulk[_ -]?capacitor|status[_ -]?led|current[_ -]?sense(?:[_ -]?shunt|_on_driver)?|sense[_ -]?shunt|dc[_ -]?dc[_ -]?regulator)\b/i
 
 const OPTICAL_SOURCE_BOARD_WORD_RE =
   /\b(?:led[_ -]?source|light[_ -]?source|optical[_ -]?source|source[_ -]?(?:pcb|board|module|connector)|illumination|emitter|led[_ -]?driver)\b/i
@@ -630,8 +641,16 @@ const OPTICAL_SOURCE_BOARD_WORD_RE =
 // INTENT (2026-07-14): also keep generic rail regulators / host connectors off the
 // optical source board — `dc_dc_regulator` used to survive via ON_BOARD_PCB_WORD_RE
 // (`regulator`) and inflate the LED board into a 14-part / 80 mm motherboard.
+// GOTCHA: do NOT include status_led / bare LED here — ON_BOARD_PCB_WORD_RE keeps
+// LEDs on the optical source / actuation drive board (colorimeter proveCatch).
 const INSTRUMENT_HOST_SIDE_ON_COTS_CONTROLLER_RE =
-  /\b(?:rechargeable[_ -]?battery|battery[_ -]?(?:pack|charge|management|indicator)|low[_ -]?battery|charge[_ -]?status|usb[_ -]?(?:interface|power)|firmware[_ -]?storage|power[_ -]?(?:switch|input|indicator|rail)|dc[_ -]?dc[_ -]?regulator|buck[_ -]?regulator|ldo|host[_ -]?power|dc[_ -]?input[_ -]?fuse|input[_ -]?fuse|overcurrent|esd[_ -]?protection|thermal[_ -]?cutoff|polyfuse|reverse[_ -]?polarity|ferrite|status[_ -]?indicator|control[_ -]?switch|debug[_ -]?interface|\bswd\b|\bjtag\b|i2c[_ -]?level[_ -]?shifter|level[_ -]?shifter)\b/i
+  /\b(?:rechargeable[_ -]?battery|battery[_ -]?(?:pack|charge|management|indicator)|low[_ -]?battery|charge[_ -]?status|usb[_ -]?(?:interface|power|data)|firmware[_ -]?(?:storage|watchdog)|flash[_ -]?(?:storage|memory)|wifi|wi[_ -]?fi|wireless|bluetooth|\bble\b|debug[_ -]?uart|uart[_ -]?header|serial[_ -]?debug|fan[_ -]?(?:failure|tach|sense)|tachometer|overtemp|estop|e[_ -]?stop|power[_ -]?kill|protective[_ -]?earth|\bpe\b|power[_ -]?(?:switch|input|indicator|rail)|dc[_ -]?dc[_ -]?regulator|buck[_ -]?regulator|ldo|host[_ -]?(?:power|interface)|dc[_ -]?input[_ -]?fuse|input[_ -]?fuse|overcurrent|esd[_ -]?protection|thermal[_ -]?cutoff|polyfuse|reverse[_ -]?polarity|ferrite|status[_ -]?indicator|control[_ -]?switch|run[_ -]?start|start[_ -]?control|debug[_ -]?interface|\bswd\b|\bjtag\b|i2c[_ -]?level[_ -]?shifter|level[_ -]?shifter|current[_ -]?sense(?:[_ -]?shunt)?|sense[_ -]?shunt|bulk[_ -]?capacitor|thermal[_ -]?fuse)\b/i
+
+// INTENT (NinjaPCR 2026-07-15): TEC / sample block / heatsink fan are purchased
+// thermal assemblies — not PCB footprints. Same off-board pattern as plant
+// purchased assemblies / optical optomech; noun-keyed, not class-tabled.
+const INSTRUMENT_THERMAL_ASSEMBLY_RE =
+  /\b(?:peltier|\btec\b|thermoelectric(?:[_ -]?cooler)?|heatsink(?:[_ -]?fan)?|heat[_ -]?sink|sample[_ -]?block|thermal[_ -]?block|tube[_ -]?block|lid[_ -]?heater|heated[_ -]?lid|cooling[_ -]?fan)\b/i
 
 // Labels / silkscreen legends are not PCB footprints (2130 left user_facing_legend
 // in unresolved[] and the Excel electronic-gap axis capped PCB at FAIL/DRAFT).
@@ -668,6 +687,47 @@ function instrumentDeviceContext(
   return INSTRUMENT_DEVICE_TEXT_RE.test(combined)
 }
 
+/**
+ * @description True when the design is an OPEN-array / linear dosing form whose
+ * control PCB must keep the MCU + stepper drivers on-board.
+ * PURE — electronic words OR mechanical train nouns in moduleDecomposition OR
+ * the archetype quantity triad (channel_count + lead_screw_pitch_mm).
+ */
+function hasActuationDriveBoard(
+  state: Record<string, unknown>,
+  words: ElectronicWordRef[],
+): boolean {
+  if (words.some((w) => INSTRUMENT_ACTUATION_DRIVE_RE.test(wordRoleText(w)))) {
+    return true
+  }
+  const contract =
+    (state.orchestratorContract as { quantities?: Record<string, { value?: unknown }> } | undefined)
+    ?? (state.engineeringContract as { quantities?: Record<string, { value?: unknown }> } | undefined)
+  const q = contract?.quantities ?? {}
+  const channels = Number(q.channel_count?.value)
+  const pitch = Number(q.lead_screw_pitch_mm?.value)
+  if (
+    Number.isFinite(channels) && channels >= 1
+    && Number.isFinite(pitch) && pitch > 0
+  ) {
+    return true
+  }
+  // Mechanical train words (lead screw / carriage) are often non-electronic —
+  // still the form signal for a drive PCB (Poseidon live BoM had no stepper_* word).
+  const names: string[] = []
+  const md = state.moduleDecomposition as {
+    modules?: Array<{ sub_modules?: Array<{ words?: Array<{ name_human?: string; id?: string }> }> }>
+  } | undefined
+  for (const m of md?.modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        names.push(String(w.name_human || w.id || ''))
+      }
+    }
+  }
+  return INSTRUMENT_ACTUATION_DRIVE_RE.test(names.join(' '))
+}
+
 function offBoardCotsReason(
   word: ElectronicWordRef,
   words: ElectronicWordRef[],
@@ -678,21 +738,32 @@ function offBoardCotsReason(
   const isInstrument = instrumentDeviceContext(state, words)
   const hasUiModule = words.some((candidate) => candidate.wordId !== word.wordId && COTS_UI_WORD_RE.test(wordRoleText(candidate)))
   const hasOpticalSource = words.some((candidate) => OPTICAL_SOURCE_BOARD_WORD_RE.test(wordRoleText(candidate)))
+  const hasActuationDrive = hasActuationDriveBoard(state, words)
   const hasCotsControllerOrUi = hasUiModule || words.some((candidate) =>
     candidate.wordId !== word.wordId && CONTROLLER_WORD_RE.test(wordRoleText(candidate)))
-  // DECISION (2026-07-14, gold delta G3/G15): when a compact instrument already has
-  // COTS UI + controller AND an optical LED/source word, host-side battery/USB/
-  // fuse/protection ride with the COTS MCU — NOT the LED daughterboard. Must run
-  // BEFORE the ON_BOARD_PCB_WORD_RE early-keep (that regex used to force fuses/
-  // USB/battery onto the source board → 80×80 mm / 24 parts vs gold ~25 mm).
+  // DECISION (2026-07-14, gold delta G3/G15; extended 2026-07-15 thermocycler):
+  // when a compact instrument already has a COTS controller/UI, host-side
+  // battery/USB/wifi/uart/fan-tach/protection ride with that MCU — NOT as bare
+  // footprints. Optical instruments also keep them off the LED daughterboard.
+  // Must run BEFORE ON_BOARD_PCB_WORD_RE early-keep.
+  // GOTCHA: do NOT require hasOpticalSource — thermocycler has MCU+TEC and no
+  // LED source; requiring optics left wifi/uart/flash as unresolved ELECTRONIC.
+  // GOTCHA (Poseidon): actuation-drive boards KEEP polyfuse/bulk/sense/LED on
+  // the control PCB — absorbing them into a "purchased UI kit" left only
+  // fuse+terminal and routed=false.
   if (
     isInstrument &&
-    hasOpticalSource &&
     hasCotsControllerOrUi &&
     INSTRUMENT_HOST_SIDE_ON_COTS_CONTROLLER_RE.test(roleText) &&
-    !OPTICAL_SOURCE_BOARD_WORD_RE.test(roleText)
+    !OPTICAL_SOURCE_BOARD_WORD_RE.test(roleText) &&
+    !(hasActuationDrive && ACTUATION_ON_BOARD_SUPPORT_RE.test(roleText))
   ) {
-    return 'instrument host power/USB/protection — rides with the purchased controller/UI COTS module, not the optical source daughterboard'
+    return hasOpticalSource
+      ? 'instrument host power/USB/protection — rides with the purchased controller/UI COTS module, not the optical source daughterboard'
+      : 'instrument host peripheral — rides with the purchased controller/UI COTS module, not a bare on-board footprint'
+  }
+  if (isInstrument && INSTRUMENT_THERMAL_ASSEMBLY_RE.test(roleText)) {
+    return 'purchased thermal assembly (TEC / sample block / heatsink fan / lid heater) — off-board module driven by the control PCB, not an on-board footprint'
   }
   // DECISION: off-board COTS / optomech / bus-header rules MUST run before the
   // ON_BOARD_PCB early-keep. Otherwise `charge_status_led` / `status indicator`
@@ -724,7 +795,15 @@ function offBoardCotsReason(
   if (isInstrument && INSTRUMENT_NON_FOOTPRINT_WORD_RE.test(roleText)) {
     return 'front-panel legend / nameplate — marking on the enclosure, not a soldered PCB footprint'
   }
-  if (isInstrument && hasUiModule && CONTROLLER_WORD_RE.test(roleText)) {
+  // OPEN-array / linear dosing: MCU stays on the control PCB even when a
+  // Touch Display exists — the display is the off-board HMI, not a license to
+  // replace the whole controller with a purchased kit (Poseidon 2026-07-16).
+  if (
+    isInstrument &&
+    hasUiModule &&
+    CONTROLLER_WORD_RE.test(roleText) &&
+    !hasActuationDrive
+  ) {
     return 'compact instrument controller paired with UI/display module — prefer a purchased controller/UI module at concept stage, while LEDs/regulators remain on-board'
   }
   if (ON_BOARD_PCB_WORD_RE.test(roleText)) return null
@@ -1000,9 +1079,9 @@ function computeBoardOutline(
     mountingHoles: [],
     source: 'derived',
     sourceDetail: opts.isInstrumentSourceBoard
-      ? `Phase B instrument optical source board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
+      ? `Phase B compact instrument board estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
         `over ${components.length} on-board components after COTS off-board filtering, clamped [25,40]mm, rounded to 5mm. ` +
-        'UI/controller/detector modules stay off-board COTS, so this outline represents the window-scale source board.'
+        'Host peripherals / purchased assemblies stay off-board; this outline is the control/source daughterboard.'
       : `Phase B estimate: sqrt(sum(per-class nominal footprint area mm²) × ${AREA_MULTIPLIER}) ` +
         `over ${components.length} components, clamped [50,250]mm, rounded to 10mm. ` +
         'Phase C recomputes from the real placed footprint bounding boxes once layout runs.',
@@ -1109,10 +1188,17 @@ export function generateAtopileProject(
   const { nets, decouplingCaps } = buildNets(components, topology, footprintsRoot)
   const allComponents = [...components, ...decouplingCaps]
 
+  // DECISION (NinjaPCR 2026-07-15): compact instrument boards use the [25,40] mm
+  // clamp whether or not an optical LED source exists — thermocycler MCU boards
+  // were stuck at the plant [50,250] floor and failed Verification HARD
+  // "Instrument PCB max side". Optical source board remains the stricter path
+  // when present; any other isInstrumentDevice with ≤12 on-board parts qualifies.
+  const isCompactInstrumentBoard =
+    instrumentDeviceContext(state, electronicWords) &&
+    (hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents) ||
+      allComponents.length <= 12)
   const boardOutline = computeBoardOutline(allComponents, {
-    isInstrumentSourceBoard:
-      instrumentDeviceContext(state, electronicWords) &&
-      hasInstrumentOpticalSourceBoard(state, electronicWords, allComponents),
+    isInstrumentSourceBoard: isCompactInstrumentBoard,
   })
 
   mkdirSync(outDir, { recursive: true })
