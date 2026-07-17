@@ -70,6 +70,7 @@ _BLOCK_RULES = (
     # GOTCHA: do NOT match bare "stepper" — "Stepper Driver Board" is PCB.
     ("Actuation", re.compile(
         r"\b(?:stepper\s*motor|\bnema\b|lead\s*screw|leadscrew|"
+        r"flexure\s*stage|sample\s*stage|stage\s*platform|"
         r"linear\s*carriage|plunger(?:\s*clamp)?|syringe(?:\s*barrel)?|"
         r"shaft\s*coupl|guide\s*rail)\b", re.I)),
     # GOTCHA: LED Source Board is OPTICAL (emitter on the bench), not Power.
@@ -78,12 +79,14 @@ _BLOCK_RULES = (
     ("Optical", re.compile(
         r"\b(?:optic|optical|collimat|cuvette|wavelength|baffle|detector|"
         r"photodiode|filter\s*wheel|monochromat|sample\s*(?:holder|cell|chamber)|"
+        r"objective|rms\s*objective|tube\s*assembly|camera|webcam|illumination|"
+        r"focus\s*metric|"
         r"led\s*source|source\s*board|led\s*driver)\b", re.I)),
     ("Power", re.compile(
         r"\b(?:power|battery|usb|charger|regulator|dc\s*rail|psu|supply|"
         r"fuse|terminal\s*block|mains|bench\s*adapter)\b", re.I)),
     ("PCB", re.compile(
-        r"\b(?:pcb|mcu|compute|microcontroller|controller|board|afe|adc|"
+        r"\b(?:pcb|mcu|compute|sbc|single\s*board\s*computer|microcontroller|controller|board|afe|adc|"
         r"stepper\s*driver)\b", re.I)),
     ("HMI", re.compile(
         r"\b(?:display|hmi|\bui\s*module\b|touchscreen|touch\s*display|"
@@ -91,12 +94,14 @@ _BLOCK_RULES = (
         re.I)),
     ("Enclosure", re.compile(
         r"\b(?:enclosure|housing|shell|lid|chassis|case|base\s*plate|"
+        r"printed\s*main\s*body|main\s*body|instrument\s*body|"
         r"channel\s*frame|console\s*enclosure)\b", re.I)),
 )
 # Caps / lids are mechanical accessories — not the enclosure principal.
 # Console / base plate ARE the OPEN-array mechanical story (no sealed shell).
 _ENCLOSURE_SHELL_RE = re.compile(
-    r"\b(?:enclosure\s*shell|housing|chassis|console\s*enclosure|base\s*plate)\b",
+    r"\b(?:enclosure\s*shell|housing|chassis|console\s*enclosure|base\s*plate|"
+    r"printed\s*main\s*body|main\s*body|instrument\s*body)\b",
     re.I,
 )
 _ENCLOSURE_ACCESSORY_RE = re.compile(r"\b(?:cap|lid|shroud|bezel)\b", re.I)
@@ -115,7 +120,11 @@ _SKIP_NODE_RE = re.compile(
     r"\b(?:consumable|fastener\s*set|screw\s*kit|cable\s*tie|"
     r"interconnect\s*cable|qwiic|stemma\s*header|ribbon\s*cable|"
     r"wiring\s*harness|wire\s*harness|cable\s*assembly|sensor\s*cable|"
-    r"ambient\s*light\s*cap|light\s*cap|cuvette\s*consumable)\b", re.I,
+    r"ambient\s*light\s*cap|light\s*cap|cuvette\s*consumable|"
+    r"(?:sensing|structure|control|energy|power(?:\s*distribution)?|"
+    r"actuation|hmi|safety)[\w\s-]*subcomponent\s*\d+|"
+    r"browser\s*ui\s*host\s*software|network\s*api\s*service|"
+    r"source\s*board\s*connector|optical\s*window\s*seal|detector\s*mount\s*plate)\b", re.I,
 )
 
 # INTENT (NinjaPCR 1258): host peripherals + protection that gold-spine absorbs
@@ -123,16 +132,19 @@ _SKIP_NODE_RE = re.compile(
 # (32 > 18) even after the Power story was correct.
 _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
     r"wifi|wi[- ]?fi|flash\s*storage|firmware\s*watchdog|debug\s*uart|"
-    r"usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|status\s*led|"
+    r"debug\s*interface|usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|"
+    r"board\s*level\s*decoupling|decoupling|status\s*led|"
     r"current\s*sense|snubber|h[- ]?bridge|mosfet|dc\s*dc\s*regulator|"
+    r"i2c\s*level\s*shifter|input\s*protection|control\s*switch|"
     r"fan\s*(?:tach|failure)|overtemp|thermal\s*fuse|estop|e[- ]?stop|"
     r"power\s*kill|protective\s*earth|\bpe\b|block\s*temperature|"
     r"temperature\s*sensor|sample\s*block\s*mount|tube\s*access|"
     r"lid\s*assembly(?!\s*heater)|host\s*interface|force\s*limit|"
     r"home\s*reference|endstop|mains\s*fuse|overcurrent|"
-    r"status\s*indicator|run\s*start|user\s*facing|foot\s*pad|"
+    r"status\s*indicator|low\s*battery\s*indicator|power\s*indicator(?:\s*led)?|"
+    r"battery\s*included|host\s*power\s*rail|run\s*start|user\s*facing|foot\s*pad|"
     r"mounting\s*bezel|actuation\s*kinematics|maintenance\s*service|"
-    r"access\s*panel",
+    r"access\s*panel|stage\s*limit|stall\s*sense|motor\s*current\s*limit",
     re.I,
 )
 # INTENT (Poseidon): cradle/rail/screw are the motor's mechanical train — one
@@ -1523,6 +1535,46 @@ def _selftest() -> int:
         for e in e_sp
     ))
     chk("sp_story_ok", m_sp.get("story_ok") is True and m_sp.get("ok") is True)
+    # proveCatch (OpenFlexure 0939): generic Power Distribution Subcomponent N
+    # leaves are plant-template residue. They must not become device principals.
+    state_of = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-102", "requirement": "Microcontroller (MCU)", "status": "OK"},
+            {"tag": "I-105", "requirement": "Motor Controller Board", "status": "OK"},
+            {"tag": "I-108", "requirement": "Sbc Compute Module", "status": "OK"},
+            {"tag": "X-111", "requirement": "Geared Stepper Motor X", "status": "OK"},
+            {"tag": "X-112", "requirement": "Geared Stepper Motor Focus", "status": "OK"},
+            {"tag": "X-113", "requirement": "Flexure Stage Body", "status": "OK"},
+            {"tag": "X-101", "requirement": "Optics Tube Assembly", "status": "OK"},
+            {"tag": "X-102", "requirement": "Rms Objective Mount", "status": "OK"},
+            {"tag": "X-103", "requirement": "Webcam Grade Camera", "status": "OK"},
+            {"tag": "X-105", "requirement": "Printed Main Body", "status": "OK"},
+            {"tag": "X-116", "requirement": "Low Voltage DC Supply", "status": "OK"},
+            {"tag": "EP-101", "requirement": "Usb Or Barrel Power Inlet", "status": "OK"},
+            {"tag": "X-123", "requirement": "Power Distribution Subcomponent 1", "status": "OK"},
+            {"tag": "X-124", "requirement": "Power Distribution Subcomponent 2", "status": "OK"},
+            {"tag": "X-125", "requirement": "Power Distribution Subcomponent 3", "status": "OK"},
+            {"tag": "X-128", "requirement": "HMI Ergonomics Subcomponent 1", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": [
+            {"from_part": "Power Distribution Subcomponent 1", "to_part": "Microcontroller",
+             "mechanism": "electrical_bus"},
+            {"from_part": "Sbc Compute Module", "to_part": "Motor Controller Board",
+             "mechanism": "signal"},
+            {"from_part": "Geared Stepper Motor X", "to_part": "Flexure Stage Body",
+             "mechanism": "mechanical"},
+        ]},
+    }
+    n_of, e_of = _collect_graph(Path("/tmp"), state_of)
+    m_of = layout_metrics(n_of, e_of, content_bottom=200, title_top=500)
+    of_names = {_norm(v["name"]) for v in n_of.values()}
+    chk("of_skips_power_distribution_subcomponents", not any(
+        "power distribution subcomponent" in name for name in of_names))
+    chk("of_skips_hmi_subcomponent", "hmi ergonomics subcomponent 1" not in of_names)
+    chk("of_under_node_cap", len(n_of) <= MAX_PRINCIPAL_NODES)
+    chk("of_shell_wired", (m_of.get("shell_degree") or 0) >= 1)
+    chk("of_layout_ok", m_of.get("ok") is True)
     # Word fallback when requirementsBom was wiped mid-chain.
     state_sp_words = {
         "isInstrumentDevice": True,

@@ -919,6 +919,16 @@ def _classify(name: str, tag: str, instrument_device: bool = False) -> str:
     # 'electrical' (single-line) — pre-empting the process-plant TYPE_RULES that would
     # otherwise mis-type 'Firmware Storage'→vessel and 'Display Panel'→electrical-panel.
     if instrument_device:
+        # INTENT: "HMI Ergonomics Subcomponent 1" / "Power Distribution Subcomponent 2"
+        # are placeholder decomposition leaves, not standalone controllers or feeders.
+        # Let them remain passive so they cannot create orphan_controller floor kills.
+        if re.search(
+            r"\b(?:sensing|structure|control|energy|power(?:\s*distribution)?|"
+            r"actuation|hmi|safety)[\w\s-]*subcomponent\s*\d+\b",
+            name or "",
+            re.I,
+        ):
+            return "other"
         role = _instrument_role(name)
         if role is not None:
             return "electrical" if role in _INSTRUMENT_POWER_ROLES else "instrument"
@@ -1012,7 +1022,15 @@ def _electrical_edge_needs(
     if is_bus_hardware:
         return False, False
     needs_in = not is_origin and not (is_terminal_elec and not has_any)
-    needs_out = not is_sink and not is_terminal_elec and not is_ac_filter_sink
+    # GOTCHA: compact-device topology can reverse a battery-limit origin tie
+    # (e.g. "Power Distribution -> USB inlet"). If any edge touches the origin,
+    # the inlet is auditable; do not require the arrow to point downstream.
+    needs_out = (
+        not is_sink
+        and not (is_origin and has_any)
+        and not is_terminal_elec
+        and not is_ac_filter_sink
+    )
     return needs_in, needs_out
 
 
@@ -3107,6 +3125,8 @@ def _selftest() -> int:
         ("DC Contactor", False, False, False, (True, True)),
         ("DC Contactor", True, False, False, (True, True)),
         ("Status Indicator LED", True, False, False, (True, False)),
+        ("Usb Or Barrel Power Inlet", True, True, False, (False, False)),
+        ("Usb Or Barrel Power Inlet", False, True, False, (False, True)),
     ]
     for _en, _ha, _io, _is, _want in _elec_cases:
         _got = _electrical_edge_needs(_en, has_any=_ha, is_origin=_io, is_sink=_is)
@@ -3125,6 +3145,16 @@ def _selftest() -> int:
         print("  FAIL _control_present: MCU typed other must NOT count on a plant "
               "(non-instrument) run")
         bad += 1
+    # proveCatch (OpenFlexure 0939): generic device subcomponents are placeholder
+    # leaves, not orphan controllers/feeders.
+    for _sub_nm in ("HMI Ergonomics Subcomponent 1",
+                    "Power Distribution Subcomponent 2",
+                    "Actuation Kinematics Subcomponent 1"):
+        _typ = _classify(_sub_nm, "", instrument_device=True)
+        if _typ != "other":
+            print(f"  FAIL _classify: instrument generic subcomponent {_sub_nm!r} "
+                  f"must be passive 'other' (got {_typ!r})")
+            bad += 1
     if not _is_instrument_consumable("Cuvette Consumable"):
         print("  FAIL _is_instrument_consumable: Cuvette Consumable must match")
         bad += 1
