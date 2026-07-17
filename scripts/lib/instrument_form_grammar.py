@@ -167,6 +167,52 @@ def button_plan_size_mm(diameter_mm: float) -> tuple[float, float, float]:
     return (d, d, BUTTON_TRAVEL_MM)
 
 
+# INTENT (2026-07-17 SIGHT colorimeter-2053): closed-product cuvette tip may clear
+# the rim so the shot reads "in use", but MUST NOT free-stand as a yellow column
+# above the optical cube (vision: "floating detached cylinder").
+EXTERIOR_CUVETTE_PROUD_MM = 7.0
+EXTERIOR_CUVETTE_MAX_PROUD_MM = 9.0
+
+
+def exterior_cuvette_seat_mm(
+    well_xy: tuple[float, float],
+    rim_top_z: float,
+    tower_top_z: float,
+    tower_h_mm: float,
+    well_plan_mm: float,
+) -> dict:
+    """Seat the closed-product cuvette insert + fluid inside the optical cube.
+
+    @description Tip clears the rim by EXTERIOR_CUVETTE_PROUD_MM; body nests into
+                 the cube so fluid_bottom stays below tower_top (no floating column).
+    @returns Dict with cuv_h, cuv_xy, cuv_loc (x,y,z), fluid_loc, fluid_size.
+    """
+    cuv_h = min(float(tower_h_mm) * 0.62, 28.0)
+    cuv_xy = max(7.5, float(well_plan_mm) * 0.85)
+    proud = float(EXTERIOR_CUVETTE_PROUD_MM)
+    cuv_z = float(rim_top_z) + proud - cuv_h / 2.0
+    # Fluid fills the lower portion — never a free-standing blob above the cube.
+    fluid_h = cuv_h * 0.48
+    fluid_z = cuv_z - cuv_h * 0.12
+    # Hard seat: if math still puts fluid above the cube, pull both down.
+    fluid_bottom = fluid_z - fluid_h / 2.0
+    if fluid_bottom > float(tower_top_z) - 1.0:
+        shift = fluid_bottom - (float(tower_top_z) - 1.0)
+        cuv_z -= shift
+        fluid_z -= shift
+    wx, wy = well_xy
+    return {
+        "cuv_h": cuv_h,
+        "cuv_xy": cuv_xy,
+        "cuv_loc": (wx, wy, cuv_z),
+        "fluid_loc": (wx, wy, fluid_z),
+        "fluid_size": (cuv_xy * 0.72, cuv_xy * 0.72, fluid_h),
+        "proud_mm": proud,
+        "cuv_top_z": cuv_z + cuv_h / 2.0,
+        "fluid_bottom_z": fluid_z - fluid_h / 2.0,
+    }
+
+
 def display_bezel_size_mm(display_size: tuple[float, float, float]) -> tuple[float, float, float]:
     """Bezel frame slightly larger than the active glass."""
     w, h, _t = display_size
@@ -287,11 +333,14 @@ TIPBACK_LID_CAM_EXT_Z = 2.10
 TIPBACK_LID_CAM_SIDE_Z = 1.85
 TIPBACK_LID_CAM_TGT_Z = 0.95
 TIPBACK_LID_CAM_TGT_Y_FRAC = 0.12
-TIPBACK_LID_CAM_HERO_Z = 1.55
-TIPBACK_LID_CAM_HERO_TGT_Z = 0.85
+TIPBACK_LID_CAM_HERO_Z = 1.45
+TIPBACK_LID_CAM_HERO_TGT_Z = 0.80
 TIPBACK_LID_CAM_HERO_TGT_Y_FRAC = 0.10
-TIPBACK_LID_CAM_FRONT_DIST_SCALE = 0.92
-TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.85
+TIPBACK_LID_CAM_FRONT_DIST_SCALE = 0.88
+# INTENT (2026-07-17 NinjaPCR 1257): cutaway hero height occupancy was 0.43
+# (drawing_gates floor 0.45). Pull the hero in so the wood box + tip-back lid
+# fill the frame without cropping the star knob.
+TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.70
 
 # Vision: outer-face lid controls are clearest on the sealed product exterior,
 # not the cutaway hero (foreshortens the tip-back knob).
@@ -838,6 +887,9 @@ def _selftest() -> None:
     _cam = tipback_lid_product_cam_fractions()
     assert _cam["ext_z"] > _cam["tgt_z"] > 0.5, (
         "tip-back product cam must look down onto the open lid, not the deck")
+    assert float(_cam["hero_dist_scale"]) <= 0.75, (
+        "tip-back hero must pull in enough for cutaway height occupancy ≥0.45 "
+        f"(got hero_dist_scale={_cam['hero_dist_scale']})")
     assert tipback_lid_vision_image_candidates()[0] == "04-product-exterior.png", (
         "outer-face lid controls: prefer sealed product exterior over cutaway hero")
     assert BUTTON_SHAPE == "square"
@@ -848,6 +900,21 @@ def _selftest() -> None:
     assert bz == BUTTON_TRAVEL_MM
     assert BUTTON_TRAVEL_MM >= 3.0, "proud D-pad travel floor"
     assert sum(MAT_BUTTON_KEY) / 3.0 >= 0.18, "keys must contrast charcoal deck"
+    # proveCatch (colorimeter-2053): seated cuvette must NOT free-stand above cube.
+    _seat = exterior_cuvette_seat_mm(
+        well_xy=(0.0, 0.0),
+        rim_top_z=80.0,
+        tower_top_z=78.0,
+        tower_h_mm=44.0,
+        well_plan_mm=12.0,
+    )
+    assert _seat["cuv_top_z"] - 80.0 <= EXTERIOR_CUVETTE_MAX_PROUD_MM + 1e-6, (
+        f"cuvette tip too proud: {_seat['cuv_top_z'] - 80.0:.1f} mm")
+    assert _seat["fluid_bottom_z"] <= 78.0 - 0.5, (
+        f"fluid must nest under tower top, got bottom={_seat['fluid_bottom_z']:.1f}")
+    _bad_old = 84.744 + 30.8 * 0.18  # legacy centre that made fluid float
+    assert _seat["cuv_loc"][2] < _bad_old - 2.0, (
+        "seat helper must sit well below the 2053 floating-column centre")
     bez = display_bezel_size_mm((36.0, 24.0, 1.6))
     assert bez[0] > 36.0 and bez[1] > 24.0
     cap = ambient_cap_parts_mm(22.0)

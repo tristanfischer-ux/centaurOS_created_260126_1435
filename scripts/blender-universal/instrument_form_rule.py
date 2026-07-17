@@ -104,9 +104,11 @@ def instrument_form_rule_mm(
     if display_loc[0] > max_disp_cx:
         display_loc = (max_disp_cx, display_loc[1], display_loc[2])
     bezel_size = ifg.display_bezel_size_mm(display_size)
-    # GOTCHA: centre at half travel ⇒ key bottom = deck top. Any extra +Z reads as
-    # "floating cubes" on the closed product and the cutaway hero.
-    btn_z = deck_top_z + ifg.BUTTON_TRAVEL_MM / 2.0
+    # DECISION (2026-07-17 SIGHT colorimeter-2053): nest keys at 0.35·travel so
+    # ~65% of the key body sits below deck_top. Half-travel centres are
+    # mathematically flush but still cast a soft-shadow "floating keys" gap on
+    # short handheld decks (H≈34 mm) — vision critic broken=true on 04-exterior.
+    btn_z = deck_top_z + ifg.BUTTON_TRAVEL_MM * 0.35
     dx, dy, _dz = display_loc
     # D-pad + A/B column entirely left of the glass (matches GA TOP diamond).
     dpad_x = ui_left + btn_pitch
@@ -137,7 +139,9 @@ def instrument_form_rule_mm(
     well_loc = (tx, ty, base_z + H + chamber_h + 1.2)
     well_size = (cuvette_outer * 0.95, cuvette_outer * 0.95, 4.0)
     rim_od = min(tw * 0.72, max(well_size[0] + 10.0, 20.0))
-    rim_loc = (tx, ty, base_z + H + chamber_h + 0.8)
+    # INTENT: taller collar so the seated cuvette reads "in a socket", not a
+    # free-standing column hovering above the cube (2053 floating-cylinder).
+    rim_loc = (tx, ty, base_z + H + chamber_h + 2.0)
     cap_parts = ifg.ambient_cap_parts_mm(rim_od)
     # DECISION: no proud "cap nest" disk on the UI deck — a 27 mm cylinder next to
     # the D-pad reads as a fifth control and broke GA↔Blender likeness. Nest is a
@@ -178,7 +182,7 @@ def instrument_form_rule_mm(
         "well_size": well_size,
         "rim_loc": rim_loc,
         "rim_od_mm": rim_od,
-        "rim_h_mm": 2.0,
+        "rim_h_mm": 4.0,
         "cap_loc": cap_loc,
         "cap_nest_loc": cap_nest_loc,
         "cap_nest_od_mm": cap_parts["flange_od_mm"] + ifg.CAP_NEST_CLEARANCE_MM,

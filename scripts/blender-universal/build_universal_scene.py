@@ -1832,7 +1832,15 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"display|screen|oled|lcd|readout", (58.0, 34.0, 6.0)),
         (r"button|switch|keypad|user\s*input", (14.0, 14.0, 9.0)),
         (r"cuvette|sample\s*(?:holder|cell|chamber)", (32.0, 28.0, 42.0)),
-        (r"collimat|lens|filter|wavelength|aperture|slit|optic", (26.0, 18.0, 14.0)),
+        # Lab-microscope nouns BEFORE bare `optic` (which matches inside "objective").
+        (r"\brms\b|objective", (30.0, 30.0, 42.0)),
+        (r"webcam|pi\s*camera|camera\s*sensor|grade\s*camera", (25.0, 24.0, 14.0)),
+        (r"flexure\s*stage|stage\s*body|flexure\s*body", (85.0, 85.0, 35.0)),
+        (r"illuminat|condenser|brightfield|transmitted\s*light", (36.0, 36.0, 22.0)),
+        (r"sangaboard|motor\s*controller\s*board", (55.0, 40.0, 8.0)),
+        (r"network\s*api|api\s*service|software\s*service", (18.0, 12.0, 3.0)),
+        (r"optics\s*tube|tube\s*assembly", (28.0, 28.0, 55.0)),
+        (r"collimat|lens|filter|wavelength|aperture|slit|\boptics?\b", (26.0, 18.0, 14.0)),
         (r"led\s*source|light\s*source|emitter|kingbright|\bnm\s*led\b|(?<!status\s)(?<!power\sindicator\s)(?<!indicator\s)\bled\b",
          (12.0, 10.0, 8.0)),
         (r"detector|photodiode|photo\s*sensor", (30.0, 22.0, 8.0)),
@@ -1880,17 +1888,26 @@ def _instrument_proxy_dim(name, module_id, quantities):
     for pattern, (w_mm, d_mm, h_mm) in rules:
         if re.search(pattern, n, re.I):
             return {"kind": "box", "w_mm": w_mm, "d_mm": d_mm, "h_mm": h_mm}
+    # GOTCHA (OpenFlexure 1354): EVERY "… Subcomponent 1" collapsed to 22×14×8
+    # (idx-only formula) → 6-name litter cluster. Diversify by module+name bucket.
     suffix = re.search(r"\bsubcomponent\s*(\d+)\b", n)
     if suffix:
         idx = max(1, int(suffix.group(1)))
+        bucket = _stable_name_bucket(f"{module_id}|{n}")
         return {
             "kind": "box",
-            "w_mm": 18.0 + 4.0 * idx,
-            "d_mm": 12.0 + 2.0 * idx,
-            "h_mm": 6.0 + 1.5 * idx,
+            "w_mm": 12.0 + 3.0 * idx + (bucket % 13),
+            "d_mm": 9.0 + 2.0 * idx + ((bucket // 5) % 11),
+            "h_mm": 4.0 + 1.0 * idx + ((bucket // 11) % 7),
         }
     if module_id in _INSTRUMENT_SHAPE_MODULES:
-        return {"kind": "box", "w_mm": 24.0, "d_mm": 18.0, "h_mm": 8.0}
+        bucket = _stable_name_bucket(f"{module_id}|{n}")
+        return {
+            "kind": "box",
+            "w_mm": 16.0 + (bucket % 15),
+            "d_mm": 12.0 + ((bucket // 3) % 11),
+            "h_mm": 5.0 + ((bucket // 7) % 7),
+        }
     return None
 
 
@@ -6561,7 +6578,9 @@ def build_parts_manifest(parts):
             r"host\s*power\s*rail|power\s*rail|bench\s*psu|psu\s*input|"
             r"user\s*facing\s*legend|legend\s*plate|"
             r"ambient\s*light\s*cap|light\s*cap|"
-            r"kingbright|\bnm\s*led\b)\b",
+            r"kingbright|\bnm\s*led\b|"
+            r"rms|objective|webcam|flexure|illuminat|condenser|"
+            r"sangaboard|network\s*api|optics\s*tube)\b",
             _nm, re.I,
         ):
             proxy = _instrument_proxy_dim(_nm, getattr(p, "module_id", "") or "", {})
@@ -14950,8 +14969,10 @@ def _selftest_instrument_form_rule() -> None:
     assert form["viewing_distance_mm"] == ifg.VIEWING_DISTANCE_MM_DESIGN
     assert form["button_shape"] == "square"
     assert ifg.BUTTON_TRAVEL_MM >= 3.0, "keys must be proud enough to read as a D-pad"
-    assert abs(form["button_locs"][0][2] - (base_z + H + ifg.BUTTON_TRAVEL_MM / 2.0)) < 0.05, (
-        "D-pad Z must sit ON the deck (centre at half travel), not float above it")
+    assert abs(form["button_locs"][0][2] - (base_z + H + ifg.BUTTON_TRAVEL_MM * 0.35)) < 0.05, (
+        "D-pad Z must nest into the deck (centre at 0.35·travel), not hover above it")
+    assert form["button_locs"][0][2] - ifg.BUTTON_TRAVEL_MM / 2.0 < base_z + H + 0.05, (
+        "key bottoms must sit at/below deck top — vision flags floating keys")
     assert sum(ifg.MAT_BUTTON_KEY) / 3.0 >= 0.18, (
         "button keys must contrast against charcoal deck")
     # proveCatch: HMI cluster is LEFT of the glass (A/B must not hide behind the cube).
@@ -14985,6 +15006,20 @@ def _selftest_instrument_form_rule() -> None:
     assert ifg.desirability_silhouette_ok(H, tower_h, form["step_shelf_size"][2])
     assert len(form["foot_locs"]) == 4
     assert _pcb_w <= 150.0 * 0.35 and _pcb_d <= 110.0 * 0.30
+    assert float(form["rim_h_mm"]) >= 3.5, (
+        "well rim collar must seat the cuvette (2053 floating-cylinder class)")
+    # proveCatch: exterior seat helper keeps tip proud but fluid nested (2053).
+    _tower_top = tower_z + tower_h / 2.0
+    _rim_top = form["rim_loc"][2] + float(form["rim_h_mm"]) / 2.0
+    _seat = ifg.exterior_cuvette_seat_mm(
+        well_xy=(form["well_loc"][0], form["well_loc"][1]),
+        rim_top_z=_rim_top,
+        tower_top_z=_tower_top,
+        tower_h_mm=tower_h,
+        well_plan_mm=float(form["well_size"][0]),
+    )
+    assert _seat["cuv_top_z"] - _rim_top <= ifg.EXTERIOR_CUVETTE_MAX_PROUD_MM + 1e-6
+    assert _seat["fluid_bottom_z"] <= _tower_top - 0.5
     assert "00-hero" not in sealed_exterior_view_names(True), (
         "instrument cutaway hero must remain open so the interior story ships")
     assert "04-product-exterior" in sealed_exterior_view_names(True)
@@ -15230,6 +15265,42 @@ def _selftest_instrument_proxy_geometry() -> None:
     assert unknown_dim != TYPE_DEFAULTS_MM["instrument"], (
         "generic instrument subcomponents must get compact differentiated proxy dims, "
         "not the shared instrument type default")
+    # proveCatch (OpenFlexure 1354): Subcomponent-1 across modules must NOT share
+    # one 22×14×8 box (6-name litter floored Renders/Assembly at 1).
+    _sc1 = [
+        _instrument_proxy_dim(f"{mod} Subcomponent 1", mod, quantities)
+        for mod in (
+            "energy_conversion_transduction",
+            "hmi_ergonomics",
+            "structure_containment",
+            "power_distribution",
+            "control_compute_communication",
+            "sensing_instrumentation",
+        )
+    ]
+    assert all(_sc1), "module Subcomponent-1 proxies must resolve"
+    _sc1_keys = {
+        (round(float(d["w_mm"])), round(float(d["d_mm"])), round(float(d["h_mm"])))
+        for d in _sc1
+    }
+    assert len(_sc1_keys) >= 5, (
+        f"Subcomponent-1 proxies must diversify by module, got {_sc1}")
+    # proveCatch: lab-microscope envelope-echo nouns stay device-scale.
+    _lm_echo = [
+        _instrument_proxy_dim(n, "optics_sensing", quantities)
+        for n in (
+            "Rms Objective Mount",
+            "Webcam Grade Camera",
+            "Flexure Stage Body",
+            "Network Api Service",
+            "Optics Tube Assembly",
+        )
+    ]
+    assert all(_lm_echo), "lab-microscope nouns must resolve to role-proxy dims"
+    assert all(
+        max(float(d["w_mm"]), float(d["d_mm"]), float(d["h_mm"])) < 120.0
+        for d in _lm_echo
+    ), f"lab-microscope proxies must stay device-scale, got {_lm_echo}"
     assert not _REQUIRED_SERVICES(
         "Sensing Instrumentation Subcomponent 2",
         "sensing_instrumentation",
@@ -16612,21 +16683,27 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _bore.hide_render = True
             # INTENT (2026-07-14, gold WHY): closed product views must show a
             # glass cuvette + sample in the open well (gold 01–02), not an empty bore.
+            # GOTCHA (2026-07-17 SIGHT colorimeter-2053): the old +0.18·h centre put
+            # yellow fluid ~13 mm above the cube → vision "floating detached cylinder".
+            # Seat via ifg.exterior_cuvette_seat_mm (proud tip, nested fluid).
             _cuv_wall = fl.make_mat(
                 "m_se_face_cuvette_wall", fl._to_linear(ifg.MAT_CUVETTE_WALL),
-                metallic=0.05, roughness=0.15, kind="glass", alpha=0.35)
+                metallic=0.05, roughness=0.18, kind="glass", alpha=0.55)
             _cuv_fluid = fl.make_mat(
                 "m_se_face_cuvette_fluid", fl._to_linear(ifg.MAT_CUVETTE_FLUID),
                 metallic=0.0, roughness=0.35)
-            # Glass square must CLEAR the well rim so the 3/4 shot reads "cuvette in use"
-            # (gold 01), not an empty black bore with a submerged insert.
-            _cuv_h = min(form["tower_size"][2] * 0.70, 36.0)
-            _cuv_xy = max(7.5, form["well_size"][0] * 0.85)
-            _cuv_loc = (
-                form["well_loc"][0],
-                form["well_loc"][1],
-                form["well_loc"][2] + _cuv_h * 0.18,
+            _tower_top = form["tower_loc"][2] + form["tower_size"][2] / 2.0
+            _rim_top = form["rim_loc"][2] + float(form["rim_h_mm"]) / 2.0
+            _seat = ifg.exterior_cuvette_seat_mm(
+                well_xy=(form["well_loc"][0], form["well_loc"][1]),
+                rim_top_z=_rim_top,
+                tower_top_z=_tower_top,
+                tower_h_mm=float(form["tower_size"][2]),
+                well_plan_mm=float(form["well_size"][0]),
             )
+            _cuv_h = float(_seat["cuv_h"])
+            _cuv_xy = float(_seat["cuv_xy"])
+            _cuv_loc = tuple(_seat["cuv_loc"])
             _cuv = fl.add_box(
                 "u_se_exterior_detail_cuvette_insert",
                 _mm3(_cuv_loc),
@@ -16638,15 +16715,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _cuv.hide_render = True
             _fluid = fl.add_box(
                 "u_se_exterior_detail_cuvette_fluid",
-                _mm3((
-                    _cuv_loc[0], _cuv_loc[1],
-                    _cuv_loc[2] - _cuv_h * 0.08,
-                )),
-                _mm3((_cuv_xy * 0.72, _cuv_xy * 0.72, _cuv_h * 0.55)),
+                _mm3(tuple(_seat["fluid_loc"])),
+                _mm3(tuple(_seat["fluid_size"])),
                 _cuv_fluid,
                 module=_skin_mod, module_objects=MO,
             )
-            _fluid.dimensions = _mm3((_cuv_xy * 0.72, _cuv_xy * 0.72, _cuv_h * 0.55))
+            _fluid.dimensions = _mm3(tuple(_seat["fluid_size"]))
             _fluid.hide_render = True
             # Cable channel mesh at the cube↔body joint (harness proveCatch anchor).
             _slot = fl.add_box(
@@ -16744,18 +16818,20 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # GOTCHA: do NOT place a green UI PCB under the display on the closed
             # product — real open photometers recess the glass in the top plate;
             # FR4 under the display is cutaway-only (_place_instrument_ui_pcb cues).
-            # USB / service port on the bottom edge (visible in 07-product-service)
+            # USB / service port on the bottom edge (visible in 07-product-service).
+            # DECISION (2026-07-17): charcoal port flush to the fascia — a bright
+            # silver block at _detail_y read as a detached white foot on 04-exterior.
             _usb_mat = fl.make_mat(
-                "m_se_face_usb", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.35, roughness=0.4)
+                "m_se_face_usb", fl._to_linear((0.12, 0.125, 0.14)), metallic=0.35, roughness=0.45)
             _usb = fl.add_box(
                 "u_se_exterior_detail_usb",
-                _mm3((0.0, _detail_y, base_z + H * 0.06)),
-                _mm3((14.0, 3.0, 6.5)),
+                _mm3((0.0, -D / 2 - tt * 0.35, base_z + H * 0.08)),
+                _mm3((12.0, 2.2, 5.0)),
                 _usb_mat,
                 module=_skin_mod,
                 module_objects=MO,
             )
-            _usb.dimensions = _mm3((14.0, 3.0, 6.5))
+            _usb.dimensions = _mm3((12.0, 2.2, 5.0))
             _usb.hide_render = True
             # Photoreal CAD bar: every curved exterior cue (lid, rim, screws, feet,
             # source PCB CAD) must shade-smooth — default Blender boxes/cyls are flat.
