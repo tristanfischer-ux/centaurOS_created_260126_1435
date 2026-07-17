@@ -71,25 +71,47 @@ function firstExisting(candidates: readonly string[]): string | undefined {
   return candidates.find((candidate) => existsSync(candidate))
 }
 
+function isTransientProbeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  // INTENT (NinjaPCR 2302): kicad-cli --version ETIMEDOUT under concurrent
+  // Blender/chain load flipped canAuthor=false on a host where the binary is
+  // fine (colorimeter 2254 canAuthor=true minutes earlier). Retry transient
+  // spawn failures; permanent missing/crash still fails closed.
+  return /ETIMEDOUT|EAGAIN|EBUSY|timed?\s*out/i.test(message)
+}
+
 function inspectExecutable(
   candidates: readonly string[],
   versionArgs: readonly string[],
 ): ExecutableCapability {
   const executable = firstExisting(candidates)
   if (!executable) return { available: false, error: 'not_found' }
-  try {
-    const version = execFileSync(executable, [...versionArgs], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 10_000,
-    }).trim()
-    return { available: true, path: executable, version }
-  } catch (error) {
-    return {
-      available: false,
-      path: executable,
-      error: error instanceof Error ? error.message : 'version_probe_failed',
+  // DECISION: 25s × 3 beats a false canAuthor=false that skips the whole PCB
+  // pipeline (exit-floor 0). Cold kicad-cli --version is ~0.2s; the long budget
+  // is only for contended hosts.
+  const timeoutsMs = [25_000, 40_000, 60_000] as const
+  let lastError = 'version_probe_failed'
+  for (let attempt = 0; attempt < timeoutsMs.length; attempt += 1) {
+    try {
+      const version = execFileSync(executable, [...versionArgs], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: timeoutsMs[attempt],
+      }).trim()
+      return { available: true, path: executable, version }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'version_probe_failed'
+      if (!isTransientProbeError(error) || attempt === timeoutsMs.length - 1) {
+        break
+      }
+      // No sleep helper needed: each retry widens the exec timeout so a
+      // contended kicad-cli can finish under the next budget.
     }
+  }
+  return {
+    available: false,
+    path: executable,
+    error: lastError,
   }
 }
 

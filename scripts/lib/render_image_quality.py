@@ -48,14 +48,21 @@ def evaluate_image(
         width_occupancy = 0.0
         height_occupancy = 0.0
 
+    # INTENT (NinjaPCR 2302): height_occupancy 0.445 printed as "0.45 below 0.45"
+    # because the message rounded to 2dp while the compare used raw floats.
+    # DECISION: gate on the same 2dp rounding the message shows — a value that
+    # displays as meeting the floor must pass (float dust must not fail a ship).
+    def _below_floor(value: float, floor: float) -> bool:
+        return round(value, 2) < round(floor, 2)
+
     reasons = []
     if edge_density < min_edge_density:
         reasons.append(
             f"edge density {edge_density:.4f} below {min_edge_density:.4f}")
-    if width_occupancy < min_width_occupancy:
+    if _below_floor(width_occupancy, min_width_occupancy):
         reasons.append(
             f"width occupancy {width_occupancy:.2f} below {min_width_occupancy:.2f}")
-    if height_occupancy < min_height_occupancy:
+    if _below_floor(height_occupancy, min_height_occupancy):
         reasons.append(
             f"height occupancy {height_occupancy:.2f} below {min_height_occupancy:.2f}")
     return ImageQualityResult(

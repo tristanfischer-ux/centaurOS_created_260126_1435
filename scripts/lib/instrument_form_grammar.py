@@ -356,10 +356,10 @@ TIPBACK_LID_CAM_HERO_Z = 1.38
 TIPBACK_LID_CAM_HERO_TGT_Z = 0.78
 TIPBACK_LID_CAM_HERO_TGT_Y_FRAC = 0.10
 TIPBACK_LID_CAM_FRONT_DIST_SCALE = 0.88
-# INTENT (NinjaPCR 1257): product_cutaway height occupancy 0.43 < 0.45 on
-# 00-hero — tipback lid needs a closer hero. 0.70→0.62 still short; 0.55 clears
-# the gate with margin without clipping the deck.
-TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.55
+# INTENT (NinjaPCR 1257/2302): product_cutaway height occupancy 0.43→0.445 on
+# 00-hero — tipback lid needs a closer hero. 0.55 still lands 0.445 raw (float
+# dust vs 0.45 floor). 0.50 clears with margin without clipping the deck knob.
+TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.50
 
 # Vision: outer-face lid controls are clearest on the sealed product exterior,
 # not the cutaway hero (foreshortens the tip-back knob).
@@ -906,7 +906,7 @@ def _selftest() -> None:
     _cam = tipback_lid_product_cam_fractions()
     assert _cam["ext_z"] > _cam["tgt_z"] > 0.5, (
         "tip-back product cam must look down onto the open lid, not the deck")
-    assert float(_cam["hero_dist_scale"]) <= 0.58, (
+    assert float(_cam["hero_dist_scale"]) <= 0.52, (
         "tip-back hero must pull in enough for cutaway height occupancy ≥0.45 "
         f"(got hero_dist_scale={_cam['hero_dist_scale']})")
     assert -0.05 <= float(BUTTON_NEST_FRAC) <= 0.15, (

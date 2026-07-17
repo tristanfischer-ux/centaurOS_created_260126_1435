@@ -215,12 +215,20 @@ launch() {
   return 0
 }
 
-# Returns 0 if already at full bar (skip cold burn).
+# Returns 0 if ANY settled out/ for this label is at full bar (skip cold burn).
+# GOTCHA: latest_out prefers newest-then-settled; an empty stamp dir ahead of a
+# floor≥9 run (colorimeter-2301 vs 2254) must not force a re-burn.
 already_at_bar() {
-  local label="$1" form="$2" key="$3"
-  local d
-  d="$(latest_out "$label")"
-  [[ -n "$d" ]] && check_bar "$d" "$form" "$key"
+  local label="$1" form="$2" key="$3" d
+  while IFS= read -r d; do
+    [[ -z "$d" ]] && continue
+    dir_settled "$d" || continue
+    if check_bar "$d" "$form" "$key"; then
+      log "$label at bar via $d"
+      return 0
+    fi
+  done < <(ls -td "$ROOT"/out/${label}-2026[0-9]* 2>/dev/null | grep -v SCORED || true)
+  return 1
 }
 
 run_revisit() {
