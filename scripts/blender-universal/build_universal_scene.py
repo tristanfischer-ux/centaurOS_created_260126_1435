@@ -14974,10 +14974,19 @@ def _selftest_instrument_form_rule() -> None:
     assert form["viewing_distance_mm"] == ifg.VIEWING_DISTANCE_MM_DESIGN
     assert form["button_shape"] == "square"
     assert ifg.BUTTON_TRAVEL_MM >= 3.0, "keys must be proud enough to read as a D-pad"
-    assert abs(form["button_locs"][0][2] - (base_z + H + ifg.BUTTON_TRAVEL_MM * 0.35)) < 0.05, (
-        "D-pad Z must nest into the deck (centre at 0.35·travel), not hover above it")
+    assert abs(
+        form["button_locs"][0][2]
+        - (base_z + H + ifg.BUTTON_TRAVEL_MM * ifg.BUTTON_NEST_FRAC)
+    ) < 0.05, (
+        "D-pad Z must nest into the deck (centre at BUTTON_NEST_FRAC·travel), "
+        "not hover above it")
     assert form["button_locs"][0][2] - ifg.BUTTON_TRAVEL_MM / 2.0 < base_z + H + 0.05, (
         "key bottoms must sit at/below deck top — vision flags floating keys")
+    _key_above = (
+        form["button_locs"][0][2] + ifg.BUTTON_TRAVEL_MM / 2.0 - (base_z + H)
+    )
+    assert _key_above <= ifg.BUTTON_TRAVEL_MM * 0.45 + 0.05, (
+        f"key crown above deck must stay ≤45% of travel (got {_key_above:.2f} mm)")
     assert sum(ifg.MAT_BUTTON_KEY) / 3.0 >= 0.18, (
         "button keys must contrast against charcoal deck")
     # proveCatch: HMI cluster is LEFT of the glass (A/B must not hide behind the cube).

@@ -62,6 +62,10 @@ MAT_CUTAWAY_SHELL = (0.10, 0.11, 0.12)         # translucent cutaway body cue
 BUTTON_SHAPE = "square"
 # Proud enough that 3/4 product shots read a D-pad, not a flush texture.
 BUTTON_TRAVEL_MM = 3.2
+# INTENT (2219 SIGHT): 0.35·travel still cast a soft-shadow gap under keys on
+# short handheld decks. Centre at nest·travel so ≥70% of the key body sits
+# below deck_top while the crown stays tactile.
+BUTTON_NEST_FRAC = 0.12
 SCREW_HEAD_DIAMETER_MM = 3.2
 SCREW_HEAD_HEIGHT_MM = 1.2
 DISPLAY_BEZEL_MARGIN_MM = 2.5
@@ -342,14 +346,15 @@ TIPBACK_LID_CAM_EXT_Z = 2.10
 TIPBACK_LID_CAM_SIDE_Z = 1.85
 TIPBACK_LID_CAM_TGT_Z = 0.95
 TIPBACK_LID_CAM_TGT_Y_FRAC = 0.12
-TIPBACK_LID_CAM_HERO_Z = 1.45
-TIPBACK_LID_CAM_HERO_TGT_Z = 0.80
+# INTENT (2026-07-17 NinjaPCR 1257): cutaway hero height occupancy was 0.43
+# (drawing_gates floor 0.45). Pull hero in + slight look-down so wood box +
+# tip-back lid fill the frame without cropping the star knob.
+# DECISION: 0.70 unproven on cold run; 0.43→0.45 is thin — 0.62 + proveCatch ≤0.65.
+TIPBACK_LID_CAM_HERO_Z = 1.38
+TIPBACK_LID_CAM_HERO_TGT_Z = 0.78
 TIPBACK_LID_CAM_HERO_TGT_Y_FRAC = 0.10
 TIPBACK_LID_CAM_FRONT_DIST_SCALE = 0.88
-# INTENT (2026-07-17 NinjaPCR 1257): cutaway hero height occupancy was 0.43
-# (drawing_gates floor 0.45). Pull the hero in so the wood box + tip-back lid
-# fill the frame without cropping the star knob.
-TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.70
+TIPBACK_LID_CAM_HERO_DIST_SCALE = 0.62
 
 # Vision: outer-face lid controls are clearest on the sealed product exterior,
 # not the cutaway hero (foreshortens the tip-back knob).
@@ -896,9 +901,11 @@ def _selftest() -> None:
     _cam = tipback_lid_product_cam_fractions()
     assert _cam["ext_z"] > _cam["tgt_z"] > 0.5, (
         "tip-back product cam must look down onto the open lid, not the deck")
-    assert float(_cam["hero_dist_scale"]) <= 0.75, (
+    assert float(_cam["hero_dist_scale"]) <= 0.65, (
         "tip-back hero must pull in enough for cutaway height occupancy ≥0.45 "
         f"(got hero_dist_scale={_cam['hero_dist_scale']})")
+    assert 0.08 <= float(BUTTON_NEST_FRAC) <= 0.20, (
+        "D-pad nest frac must bury most of the key body under the deck")
     assert tipback_lid_vision_image_candidates()[0] == "04-product-exterior.png", (
         "outer-face lid controls: prefer sealed product exterior over cutaway hero")
     assert BUTTON_SHAPE == "square"

@@ -104,11 +104,10 @@ def instrument_form_rule_mm(
     if display_loc[0] > max_disp_cx:
         display_loc = (max_disp_cx, display_loc[1], display_loc[2])
     bezel_size = ifg.display_bezel_size_mm(display_size)
-    # DECISION (2026-07-17 SIGHT colorimeter-2053): nest keys at 0.35·travel so
-    # ~65% of the key body sits below deck_top. Half-travel centres are
-    # mathematically flush but still cast a soft-shadow "floating keys" gap on
-    # short handheld decks (H≈34 mm) — vision critic broken=true on 04-exterior.
-    btn_z = deck_top_z + ifg.BUTTON_TRAVEL_MM * 0.35
+    # DECISION (2026-07-17 SIGHT colorimeter-2053/2219): nest keys at
+    # BUTTON_NEST_FRAC·travel. 0.50 floated; 0.35 still cast a soft-shadow gap
+    # on short handheld decks (2219 04-exterior). 0.12 buries ≥70% under deck.
+    btn_z = deck_top_z + ifg.BUTTON_TRAVEL_MM * ifg.BUTTON_NEST_FRAC
     dx, dy, _dz = display_loc
     # D-pad + A/B column entirely left of the glass (matches GA TOP diamond).
     dpad_x = ui_left + btn_pitch
