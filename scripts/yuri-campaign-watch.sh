@@ -50,12 +50,19 @@ dir_settled() {
   local dir="$1"
   [[ -n "$dir" && -d "$dir" ]] || return 1
   [[ -f "$dir/state.json" ]] || return 1
+  # Happy path: scorecard / dossier / PDF present.
   [[ -f "$dir/tab-scorecard.json" \
      || -f "$dir/dossier.xlsx" \
      || -f "$dir/chain-v2.pdf" \
      || -f "$dir/excel-export.xlsx" \
-     || -f "$dir/quality-scorecard.json" ]] || return 1
-  return 0
+     || -f "$dir/quality-scorecard.json" ]] && return 0
+  # GOTCHA: gate exit 31 (HEADLINE_BLANK) writes state.json + chain.log DONE
+  # but never reaches Excel. Treat as settled so the ladder can continue
+  # (check_bar will FAIL score; that is correct).
+  if [[ -f "$dir/chain.log" ]] && grep -qE 'run exit: [1-9]|DONE|self-audit ENFORCING' "$dir/chain.log" 2>/dev/null; then
+    return 0
+  fi
+  return 1
 }
 
 check_bar() {
