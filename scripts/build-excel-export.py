@@ -71,6 +71,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib
 import deterministic_checks_lib as dcl  # noqa: E402
 from render_view_contract import (  # noqa: E402
     drawing_form_factor,
+    form_factor_honesty_ok,
+    form_factor_honesty_findings,
     is_fluid_less_instrument,
     is_product_scale,
     required_views,
@@ -1938,6 +1940,15 @@ def compute_verdict(state: dict, tab_scores: dict, run_dir: str = "",
                 open_n = max(open_n, len(_spine.hard_open()) or 1)
         except Exception as _spine_exc:  # noqa: BLE001 — never let the spine kill the verdict
             print(f"  ! verification spine unavailable in compute_verdict: {_spine_exc}")
+    # INTENT (encode P1-7): container metadata on wall/device products cannot SHIP.
+    if isinstance(state, dict) and not form_factor_honesty_ok(state):
+        ships = False
+        open_n = max(open_n, 1)
+        _ff_findings = form_factor_honesty_findings(state)
+        print(f"  ! form-factor honesty blocked SHIPS: "
+              f"{[f.get('code') for f in _ff_findings]}")
+        if floor is None or floor > 4.0:
+            floor = 4.0
     return {"floor": floor, "open_issues": open_n,
             "ships": ships,
             "n_sections": len(secs), "n_tabs": len(tabs)}
@@ -25866,7 +25877,15 @@ _IDENTIFIED_FAILURE_RX = re.compile(
 # kept it out of. An issue that self-declares it does not score is excluded from the honest-cap
 # scan entirely; a genuine verification-gap advisory (e.g. "no vision critic has looked at this
 # render") carries no such marker and still caps normally.
-_NON_SCORING_RX = re.compile(r"does not score|informational only", re.I)
+# GOTCHA (colorimeter 2008): dossier_audit emits "never scored" / "carry no score
+# penalty" for UNCORROBORATED critic notes; the vision path said "does not score" /
+# "informational only". `_VERIF_GAP_RX`'s bare `advisory[: ]` then capped Risk at 7
+# and blocked floor ≥9 even though corroboration doctrine says these never score.
+_NON_SCORING_RX = re.compile(
+    r"does not score|informational only|never scores?|carry no score penalty|"
+    r"rendered as advisory,\s*never scored",
+    re.I,
+)
 # SELF-PRICED CAVEAT marker (2026-07-05, the BoM-ledger TBD double-penalty bug): the ledger's own
 # column-contract arithmetic (`_eval_bom_ledger_contract`) already prices its TBD caveat
 # PROPORTIONATELY into the score — score = arithmetic − 4 × engineered-TBD-fraction, ranging 6-10
@@ -27412,6 +27431,14 @@ def _selftest() -> int:
         # G4: compliance WARN disclosed → never a perfect 10.
         "G4": {"score": 10, "issues": [
             "compliance-gate verdict: WARN — No class-standards registered for optical_instrument"]},
+        # G5 (colorimeter 2008): dossier_audit UNCORROBORATED critic notes say
+        # "never scored" — must NOT trip _VERIF_GAP_RX's bare `advisory[: ]` to ≤7.
+        "G5": {"score": 10, "issues": [
+            "[INFO] 3 critic note(s) are UNCORROBORATED by any deterministic check over "
+            "the delivered artefacts — rendered as advisory, never scored: The brief "
+            "explicitly mandates a rechargeable internal battery… | ADVISORY (falsified…)"],
+            "components": [{"check": "cell completeness+type contract",
+                            "passed": 28, "checked": 28}]},
     })
     if _hc["X"]["score"] != 7 or _hc["X"]["status"] != "FAIL":
         print(f"  FAIL honest-cap: an UNVERIFIED tab must cap at 7/FAIL (got {_hc['X']})"); bad += 1
@@ -27437,6 +27464,9 @@ def _selftest() -> int:
     if _hc["G4"]["score"] >= 10:
         print(f"  FAIL grade-inflation ban: compliance-gate WARN must NEVER keep a "
               f"perfect 10 (got {_hc['G4']})"); bad += 1
+    if _hc["G5"]["score"] < 9:
+        print(f"  FAIL honest-cap: UNCORROBORATED critic notes (never scored) must NOT "
+              f"floor Risk ≤7 (got {_hc['G5']})"); bad += 1
     # proveCatch the honest HEADLINE OUTPUT (Tristan 2026-06-27): a foreign served-asset COUNT
     # ('6000 cultivation containers' for a water plant) must be replaced by the plant's boundary
     # DELIVERABLE (an output-named flow, internal/storage excluded), NOT a static volume, NOT an
