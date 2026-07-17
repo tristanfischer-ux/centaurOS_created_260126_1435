@@ -603,7 +603,7 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     _probe = os.path.join(run_dir, "state.json")
     _cands: list[str]
     if _is_thermocycler_mode(_probe):
-        _cands = ifg.tipback_lid_vision_image_candidates() + list(_HERO_CANDIDATES)
+        _cands = list(ifg.tipback_lid_vision_image_candidates()) + list(_HERO_CANDIDATES)
     else:
         # Optical handheld / sealed instruments: prefer product exterior when the
         # cutaway hero is still the inspect clone (colorimeter 2254).
