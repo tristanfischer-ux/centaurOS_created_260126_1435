@@ -131,10 +131,12 @@ _SKIP_NODE_RE = re.compile(
 # into the compute principal — listing them as nodes blew past MAX_PRINCIPAL_NODES
 # (32 > 18) even after the Power story was correct.
 _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
-    r"wifi|wi[- ]?fi|flash\s*storage|firmware\s*watchdog|debug\s*uart|"
+    r"wifi|wi[- ]?fi|flash\s*storage|firmware\s*(?:storage|watchdog)|debug\s*uart|"
     r"debug\s*interface|usb\s*(?:data|interface|power)|polyfuse|bulk\s*capacitor|"
     r"board\s*level\s*decoupling|decoupling|status\s*led|"
     r"current\s*sense|snubber|h[- ]?bridge|mosfet|dc\s*dc\s*regulator|"
+    r"low\s*noise\s*regulator|\bldo\b|linear\s*regulator|"
+    r"ferrite|emc\s*bead|esd\s*protection|"
     r"i2c\s*level\s*shifter|input\s*protection|control\s*switch|"
     r"fan\s*(?:tach|failure)|overtemp|thermal\s*fuse|estop|e[- ]?stop|"
     r"power\s*kill|protective\s*earth|\bpe\b|block\s*temperature|"
@@ -145,6 +147,14 @@ _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
     r"battery\s*included|host\s*power\s*rail|run\s*start|user\s*facing|foot\s*pad|"
     r"mounting\s*bezel|actuation\s*kinematics|maintenance\s*service|"
     r"access\s*panel|stage\s*limit|stall\s*sense|motor\s*current\s*limit",
+    re.I,
+)
+# GOTCHA (colorimeter 1236): "Host Power Rail On Compute Ui" / "Input Protection On
+# Compute Ui" contain "Compute Ui" and were KEPT as compute principals — absorb never
+# ran. Match the real MCU/compute host only; absorb-matched names always lose.
+_COMPUTE_PRINCIPAL_NAME_RE = re.compile(
+    r"^(?:compute\s*ui(?:\s*module)?|main\s*controller(?:\s*mcu)?|"
+    r"microcontroller|\bmcu\b|processor(?:\s*board)?)(?:\b|$)",
     re.I,
 )
 # INTENT (Poseidon): cradle/rail/screw are the motor's mechanical train — one
@@ -391,14 +401,7 @@ def _bom_principals(state: dict) -> list[dict]:
     # Collapse host peripherals into the compute principal so the sheet stays
     # glanceable (≤ MAX_PRINCIPAL_NODES). Topology aliases still route via
     # _match_principal → _find_compute_principal.
-    has_compute = any(
-        re.search(
-            r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
-            p.get("name") or "",
-            re.I,
-        )
-        for p in out
-    )
+    has_compute = any(_COMPUTE_PRINCIPAL_NAME_RE.search(p.get("name") or "") for p in out)
     has_stepper = any(
         re.search(r"stepper\s*motor|\bnema\b", p.get("name") or "", re.I)
         for p in out
@@ -414,11 +417,11 @@ def _bom_principals(state: dict) -> list[dict]:
         kept_actuation_anchor = False
         for p in out:
             nm = p.get("name") or ""
-            if re.search(
-                r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
-                nm,
-                re.I,
-            ):
+            # Absorb BEFORE compute-keep — "… On Compute Ui" peripherals must not
+            # be promoted to the MCU column (colorimeter 1236 edge-cap blow-out).
+            if has_compute and _ABSORB_INTO_COMPUTE_NODE_RE.search(nm):
+                continue
+            if _COMPUTE_PRINCIPAL_NAME_RE.search(nm):
                 kept.append(p)
                 continue
             if re.search(r"stepper\s*motor|\bnema\b", nm, re.I):
@@ -427,8 +430,6 @@ def _bom_principals(state: dict) -> list[dict]:
                 continue
             if re.search(r"stepper\s*driver", nm, re.I):
                 kept.append(p)
-                continue
-            if has_compute and _ABSORB_INTO_COMPUTE_NODE_RE.search(nm):
                 continue
             if _ABSORB_INTO_STEPPER_NODE_RE.search(nm):
                 # First carriage/screw becomes the Actuation principal when no motor.
@@ -461,11 +462,7 @@ def _find_compute_principal(principals: list[dict]) -> Optional[str]:
             (
                 (_norm(p["name"]) or _norm(p["tag"]))
                 for p in principals
-                if re.search(
-                    r"compute\s*ui|main\s*controller|microcontroller|\bmcu\b|processor",
-                    p.get("name") or "",
-                    re.I,
-                )
+                if _COMPUTE_PRINCIPAL_NAME_RE.search(p.get("name") or "")
             ),
             None,
         )
@@ -814,16 +811,29 @@ def _collect_graph(out_dir: Path, state: dict) -> tuple[dict[str, dict], list[di
                 })
 
     # Deduplicate: prefer optical over signal for the same endpoint pair.
+    # Also drop anonymous signal clones of electrical_bus power edges — parts-ledger
+    # re-emits the same USB→compute hop as both power + signal and blew MAX_EDGES
+    # (colorimeter 1236: 17 nodes / 37 edges with story_ok still true).
     by_pair: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for e in edges:
         a, b = e["from"], e["to"]
         key = (a, b) if a <= b else (b, a)
         by_pair[key].append(e)
     deduped: list[dict] = []
+    _DATA_BUS_RE = re.compile(
+        r"i2c|spi|uart|stemma|qwiic|usb\s*data|can\b|rs[- ]?485|modbus", re.I,
+    )
     for pair_edges in by_pair.values():
         kinds = {e["kind"] for e in pair_edges}
         if "optical" in kinds and "signal" in kinds:
             pair_edges = [e for e in pair_edges if e["kind"] != "signal"]
+        if "power" in kinds and "signal" in kinds:
+            pair_edges = [
+                e for e in pair_edges
+                if e["kind"] != "signal"
+                or _DATA_BUS_RE.search(str(e.get("label") or ""))
+                or _DATA_BUS_RE.search(str(e.get("net") or ""))
+            ]
         deduped.extend(pair_edges)
     edges = deduped
 
@@ -1625,6 +1635,42 @@ def _selftest() -> int:
     chk("fat_keeps_mcu", any("mcu" in _norm(v["name"]) for v in n_fat.values()))
     chk("fat_power_story", any(e.get("kind") == "power" for e in e_fat))
     chk("fat_layout_ok", m_fat.get("ok") is True)
+    # proveCatch (colorimeter 1236): "… On Compute Ui" peripherals must absorb, not
+    # become extra compute principals that + power/signal clones blow MAX_EDGES.
+    state_on_compute = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-101", "requirement": "Compute Ui Module", "status": "OK"},
+            {"tag": "I-102", "requirement": "Host Power Rail On Compute Ui", "status": "OK"},
+            {"tag": "I-103", "requirement": "Input Protection On Compute Ui", "status": "OK"},
+            {"tag": "I-104", "requirement": "Firmware Storage", "status": "OK"},
+            {"tag": "I-105", "requirement": "Ferrite Emc Bead", "status": "OK"},
+            {"tag": "I-106", "requirement": "Esd Protection Network", "status": "OK"},
+            {"tag": "I-107", "requirement": "Low Noise Regulator", "status": "OK"},
+            {"tag": "X-115", "requirement": "Usb 5v Input", "status": "OK"},
+            {"tag": "X-102", "requirement": "LED Source", "status": "OK"},
+            {"tag": "I-110", "requirement": "Optical Detector Module", "status": "OK"},
+            {"tag": "X-109", "requirement": "Enclosure Shell", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": [
+            {"from_part": "Usb 5v Input", "to_part": "Compute Ui Module",
+             "mechanism": "electrical_bus"},
+            {"from_part": "Usb 5v Input", "to_part": "Compute Ui Module",
+             "mechanism": "signal"},
+            {"from_part": "Compute Ui Module", "to_part": "LED Source",
+             "mechanism": "electrical_bus"},
+            {"from_part": "Optical Detector Module", "to_part": "Compute Ui Module",
+             "mechanism": "signal"},
+        ]},
+    }
+    n_oc, e_oc = _collect_graph(Path("/tmp"), state_on_compute)
+    m_oc = layout_metrics(n_oc, e_oc, content_bottom=200, title_top=500)
+    oc_names = {_norm(v["name"]) for v in n_oc.values()}
+    chk("on_compute_absorbs_host_rail", "host power rail on compute ui" not in oc_names)
+    chk("on_compute_absorbs_input_prot", "input protection on compute ui" not in oc_names)
+    chk("on_compute_absorbs_firmware", "firmware storage" not in oc_names)
+    chk("on_compute_under_edge_cap", len(e_oc) <= MAX_EDGES)
+    chk("on_compute_layout_ok", m_oc.get("ok") is True)
     # proveCatch: 1-node stub must FAIL story (Goodhart net on empty interconnect).
     thin_stub = layout_metrics(
         {"device": {"name": "Device (no graph yet)", "tag": "", "block": "PCB"}},
