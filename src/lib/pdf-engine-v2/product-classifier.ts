@@ -98,6 +98,16 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'drone'
     } else if (lower.match(/ev charger|dc fast.?charger|electric vehicle.*charger|charging station|\bccs2?\b.*charger|\bocpp\b/)) {
       productClass = 'ev_charger'
+    } else if (
+      // INTENT (2026-07-16 Pioreactor): compact benchtop continuous-culture /
+      // turbidostat instruments must BEAT the plant bioreactor catch below
+      // (which trips on "bioreactor|cell culture" and routes to sterilisation /
+      // m³ vessel HARD slots). Noun-first: pioreactor / turbidostat / chemostat
+      // + ml-scale working volume cues.
+      lower.match(/\bpioreactor\b|\bturbidostat\b|\bchemostat\b/)
+      || (lower.match(/\bbioreactor\b/) && lower.match(/\b(?:20\s*ml|working\s+volume|od[\s_-]?sensor|optical\s+density|benchtop\s+continuous)\b/))
+    ) {
+      productClass = 'benchtop_bioreactor'
     } else if (lower.match(/bioreactor|fermenter|fermentation.*(?:vessel|tank|process)|bioprocess|cell culture/)) {
       productClass = 'bioreactor'
     } else if (lower.match(/edge.?ai|gpu server|1u.*server|rack.?mount.*server|datacentre|\btpu\b|\bnpu\b|compute server|inference.*server|inference.*appliance/)) {
@@ -149,6 +159,30 @@ export function classifyProduct(briefText: string): ProductClassification {
       || lower.match(/\bposeidon\b/) && lower.match(/\b(?:syringe|pump|channel)\b/)
     ) {
       productClass = 'syringe_pump'
+    } else if (
+      // INTENT (2026-07-16 OpenFlexure): motorised flexure-stage / inverted
+      // research microscopes. Must beat fallthrough `pcb`→consumer_electronics
+      // (briefs always ask for schematic + PCB + assembly of the WHOLE instrument)
+      // and must NOT collapse into optical_instrument (photometer / cuvette path).
+      // Noun-first: microscope / flexure stage / openflexure / RMS objective.
+      lower.match(/\b(?:openflexure|flexure[\s-]?stage|motorised\s+inverted\s+microscope|motorized\s+inverted\s+microscope)\b/)
+      || (lower.match(/\bmicroscope\b/) && lower.match(/\b(?:objective|rms|autofocus|brightfield|xy[\s-]?stage|focus\s+(?:travel|adjustment)|tiled\s+acquisition)\b/))
+    ) {
+      productClass = 'lab_microscope'
+    } else if (
+      // INTENT (2026-07-16 Rodeostat): USB potentiostat briefs always ask for
+      // schematic + PCB + assembly of the WHOLE instrument — must beat pcb_assembly.
+      lower.match(/\b(?:potentiostat|galvanostat|rodeostat|iowa\s+rodeostat)\b/)
+      || (lower.match(/\bcyclic\s+voltammetr/) && lower.match(/\b(?:three[\s-]?electrode|working\s+electrode|chronoamperometr)\b/))
+    ) {
+      productClass = 'potentiostat'
+    } else if (
+      // INTENT (2026-07-16 OpenDrop): digital microfluidics / EWOD controllers.
+      // Must beat pcb_assembly when the brief asks for array PCB + HV drive assembly.
+      lower.match(/\b(?:opendrop|open[\s-]?drop|electrowetting|ewod|digital\s+microfluidic)/)
+      || (lower.match(/\bmicrofluidic\b/) && lower.match(/\b(?:electrode\s+array|droplet\s+rout|high[\s-]?voltage\s+drive)\b/))
+    ) {
+      productClass = 'digital_microfluidics'
     } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
       productClass = 'pcb_assembly'
     }
@@ -377,6 +411,16 @@ const SPECIFIC_FIELDS: Record<string, string[]> = {
   thermocycler: ['tube_count', 'sample_temp_min_c', 'sample_temp_max_c', 'well_uniformity_c'],
   // Soft checklist — HARD: channel_count + connected_electrical_load_kw.
   syringe_pump: ['channel_count', 'connected_electrical_load_kw', 'max_syringe_volume_ml', 'lead_screw_pitch_mm'],
+  // Soft checklist — HARD: stage axes + optical sampling + panel load.
+  lab_microscope: [
+    'stage_axis_count',
+    'focus_resolution_um',
+    'connected_electrical_load_kw',
+    'objective_na',
+  ],
+  benchtop_bioreactor: ['working_volume_ml', 'connected_electrical_load_kw'],
+  potentiostat: ['compliance_voltage_v', 'connected_electrical_load_kw'],
+  digital_microfluidics: ['electrode_count', 'connected_electrical_load_kw'],
 }
 
 const RECOMMENDED_UNKNOWN = ['target_cost', 'production_volume', 'jurisdiction', 'max_mass']

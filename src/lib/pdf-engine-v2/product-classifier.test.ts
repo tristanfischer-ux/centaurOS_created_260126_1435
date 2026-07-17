@@ -141,6 +141,24 @@ describe('classifyProduct — edge cases', () => {
     expect(classifyProduct('Poseidon-class four-channel syringe pump for microfluidic dosing.').productClass)
       .toBe('syringe_pump')
   })
+  // INTENT (2026-07-16 OpenFlexure): microscope briefs say "PCB" + "assembly"
+  // and must NOT fall through to consumer_electronics (/pcb/) or optical_instrument.
+  it('classifies a motorised flexure-stage microscope brief as lab_microscope (beats pcb→consumer_electronics)', () => {
+    const brief = 'Low-cost motorised inverted microscope with flexure stage, RMS objectives, '
+      + 'webcam camera, brightfield illumination, autofocus and tiled acquisition. Deliver '
+      + 'optical path calculations, parametric CAD, schematic, PCB, firmware, network API, '
+      + 'exact BOM, assembly guide and calibration procedure.'
+    expect(classifyProduct(brief).productClass).toBe('lab_microscope')
+  })
+  it('openflexure / microscope + objective nouns classify as lab_microscope', () => {
+    expect(classifyProduct('OpenFlexure-class microscope with RMS objective and XY stage autofocus.').productClass)
+      .toBe('lab_microscope')
+  })
+  it('colorimeter remains optical_instrument (microscope nouns absent)', () => {
+    expect(classifyProduct('Portable colorimeter with cuvette holder and absorbance readout.').productClass)
+      .toBe('optical_instrument')
+  })
+
   it('bare carriage alone does not classify as vehicle after word-boundary fix', () => {
     expect(classifyProduct('A benchtop linear stage with carriage guidance on dual rails.').productClass)
       .not.toBe('vehicle')

@@ -389,6 +389,19 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   multi_channel_syringe_pump: 'syringe_pump',
   programmable_syringe_pump: 'syringe_pump',
   poseidon: 'syringe_pump',
+  lab_microscope: 'lab_microscope',
+  microscope: 'lab_microscope',
+  openflexure: 'lab_microscope',
+  flexure_stage_microscope: 'lab_microscope',
+  inverted_microscope: 'lab_microscope',
+  benchtop_bioreactor: 'benchtop_bioreactor',
+  pioreactor: 'benchtop_bioreactor',
+  turbidostat: 'benchtop_bioreactor',
+  potentiostat: 'potentiostat',
+  rodeostat: 'potentiostat',
+  digital_microfluidics: 'digital_microfluidics',
+  opendrop: 'digital_microfluidics',
+  electrowetting: 'digital_microfluidics',
   edge_ai: 'edge_ai',
   // Classifier emits 'edge_ai_server' for 1U inference appliance briefs
   edge_ai_server: 'edge_ai',
@@ -15300,6 +15313,468 @@ registerArchetype('syringe_pump', (brief: any) => {
       ambient_design_temp_c: 25,
       regulatory_standard_spine:
         'LVD 2014/35/EU + EMC 2014/30/EU + RoHS + IEC 61010-1 + IEC 61326-1 — research-use, not IVDR/IEC 60601-2-24',
+    },
+  }
+})
+
+// INTENT (2026-07-16 OpenFlexure / Yuri 04): motorised flexure-stage research
+// microscope — device-scale watts, XYZ+focus axes, optical sampling anchors.
+// Must never inherit plant kW / consumer_electronics PCB-fab envelopes.
+registerArchetype('lab_microscope', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+  const tp = brief?.constraints?.target_performance
+  const tpMetrics: Array<{ key_metric?: string; value?: number; unit?: string }> = Array.isArray(tp?.metrics)
+    ? tp.metrics
+    : tp?.key_metric
+      ? [{ key_metric: tp.key_metric, value: tp.value, unit: tp.unit }]
+      : []
+
+  // Axes: X, Y, focus (Z) — OpenFlexure-class; optional fourth for filter cube later.
+  const axisFromTp = tpMetrics.find((m) => /axis|stage/i.test(String(m.key_metric ?? '')))
+  const stageAxisCount = Math.max(
+    3,
+    Math.round(
+      axisFromTp?.value
+        ?? extractRangeFromDesc(desc, /(\d)\s*(?:-|\s)?\s*axis/i, 3),
+    ),
+  )
+  // Focus resolution — brief asks sub-micron; close at 0.5 µm nominal.
+  // GOTCHA: matching bare "sub-micron" with an optional capture can yield null
+  // from extractRangeFromDesc even when the default is 0.5 — coerce explicitly.
+  const focusFromTp = tpMetrics.find((m) => /focus|resolut/i.test(String(m.key_metric ?? '')))
+  const focusRaw =
+    focusFromTp?.value
+    ?? extractRangeFromDesc(desc, /(\d(?:\.\d)?)\s*(?:µm|um)\s+focus/i, 0.5)
+  const focusResolutionUm = Number(
+    (typeof focusRaw === 'number' && Number.isFinite(focusRaw) && focusRaw > 0
+      ? focusRaw
+      : 0.5
+    ).toFixed(3),
+  )
+  // Optical sampling anchors (defaults match low-cost RMS + webcam class).
+  const objectiveNa = extractRangeFromDesc(desc, /\bNA\s*(?:of\s*)?(\d(?:\.\d+)?)/i, 0.45)
+  const cameraPixelUm = extractRangeFromDesc(desc, /(?:pixel\s+size|pitch)[^\d]{0,12}(\d(?:\.\d)?)\s*(?:µm|um)/i, 2.2)
+  // Illumination + 3 geared steppers + SBC/camera — desktop watts, not plant kW.
+  const stepperW = 8
+  const illuminatorW = 5
+  const computeCameraW = 12
+  const peakElectricalPowerW = Math.ceil(stageAxisCount * stepperW + illuminatorW + computeCameraW)
+  const connectedElectricalLoadKw = Number((peakElectricalPowerW / 1000).toFixed(3))
+
+  const enclosureLengthM = 0.28
+  const enclosureWidthM = 0.22
+  const enclosureHeightM = 0.32
+  const enclosureVolumeM3 = enclosureLengthM * enclosureWidthM * enclosureHeightM
+  const systemMassKg = 2.8
+  const productionRunCount = Math.round(
+    extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*unit\s+engineering\s+build/i, 20),
+  )
+  // INTENT (2026-07-16 gold ±15%): open flexure-stage kit materials mid ≈ £198
+  // (band £146–240). Prior macros (£395) sat ~2× gold before per-line inflation.
+  const macroStageGbp = 55
+  const macroOpticsGbp = 75
+  const macroControlGbp = 68
+  const macroAssemblyTotal = macroStageGbp + macroOpticsGbp + macroControlGbp
+
+  const quantities: Record<string, Quantity> = {
+    stage_axis_count: q(stageAxisCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'motorised stage axes (X, Y, focus as minimum)',
+      condition: 'concurrent or sequenced axis moves under API',
+    }),
+    focus_resolution_um: q(focusResolutionUm, 'µm', 'length', 'rated', 'module', 'brief', {
+      source_detail: 'smallest commanded focus step (sub-micron class)',
+    }),
+    objective_na: q(objectiveNa, '', 'dimensionless', 'rated', 'module', 'brief', {
+      source_detail: 'design objective numerical aperture for sampling calc',
+    }),
+    camera_pixel_pitch_um: q(cameraPixelUm, 'µm', 'length', 'rated', 'module', 'brief', {
+      source_detail: 'camera pixel pitch used in Nyquist / sampling argument',
+    }),
+    connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+      source_detail:
+        `peak panel = (stage_axis_count×${stepperW} W + ${illuminatorW} W illum + ${computeCameraW} W SBC/cam) / 1000`,
+      from: ['stage_axis_count', 'peak_electrical_power_w'],
+      formula: '(stage_axis_count*stepper_w+illuminator_w+compute_camera_w)/1000',
+    }),
+    peak_electrical_power_w: q(peakElectricalPowerW, 'W', 'power', 'peak', 'system', 'calculator', {
+      source_detail: `${stageAxisCount}×${stepperW} W steppers + illumination + compute/camera`,
+      from: ['stage_axis_count'],
+    }),
+    enclosure_volume_m3: q(Number(enclosureVolumeM3.toFixed(5)), 'm³', 'volume', 'rated', 'system', 'calculator', {
+      source_detail: `${enclosureLengthM}×${enclosureWidthM}×${enclosureHeightM} m benchtop inverted microscope`,
+      formula: 'L*W*H',
+    }),
+    system_mass_kg: q(systemMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', {
+      source_detail: 'printed body + stage + optics mounts + SBC + illuminator (empty, no sample)',
+    }),
+    production_run_count: q(productionRunCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+      source_detail: 'engineering-build unit count for macro BoM pricing class',
+    }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'geared_stepper',
+      to_part: 'flexure_stage',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: 1,
+      required_unit: 'each',
+      material_context: 'actuator → flexure / printed stage → sample plane (X/Y/focus)',
+    },
+    {
+      from_part: 'objective',
+      to_part: 'camera_sensor',
+      mechanism: 'optical',
+      constraint_kind: 'signal',
+      material_context: 'RMS / tube path → sensor; sampling vs NA × pixel pitch',
+    },
+    {
+      from_part: 'main_controller_sbc',
+      to_part: 'stepper_driver',
+      mechanism: 'control',
+      constraint_kind: 'signal',
+      material_context: 'network API separates camera, stage, experiment control',
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'flexure_stage_assembly',
+      unit_price_gbp: macroStageGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: macroStageGbp,
+      source_detail: `£${macroStageGbp} — geared steppers ×${stageAxisCount} + printed flexure stage + bearings`,
+    },
+    {
+      word_name: 'optics_illumination',
+      unit_price_gbp: macroOpticsGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: macroOpticsGbp,
+      source_detail: `£${macroOpticsGbp} — RMS objective class + condenser/illuminator + mounts`,
+    },
+    {
+      word_name: 'control_imaging',
+      unit_price_gbp: macroControlGbp,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: macroControlGbp,
+      source_detail: `£${macroControlGbp} — SBC + camera + drivers + PSU + network interface`,
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'stage_axes_minimum',
+    status: stageAxisCount >= 3 ? 'pass' : 'fail',
+    measured: stageAxisCount,
+    required: '≥3 motorised axes (X, Y, focus) for automated imaging',
+    reason: `Design closes at ${stageAxisCount} axis(es).`,
+  })
+  closures.push({
+    invariant_id: 'focus_submicron_band',
+    status: focusResolutionUm <= 1.0 ? 'pass' : focusResolutionUm <= 2.0 ? 'warn' : 'fail',
+    measured: focusResolutionUm,
+    required: '≤1.0 µm commanded focus step (sub-micron class)',
+    reason: `Focus resolution ${focusResolutionUm} µm.`,
+  })
+  closures.push({
+    invariant_id: 'desktop_electrical_band',
+    status: peakElectricalPowerW <= 120 ? 'pass' : peakElectricalPowerW <= 300 ? 'warn' : 'fail',
+    measured: peakElectricalPowerW,
+    required: '≤120 W peak for benchtop research microscope (not process-plant kW)',
+    reason: `Peak electrical ${peakElectricalPowerW} W.`,
+  })
+  closures.push({
+    invariant_id: 'bom_honesty_band_closure',
+    status: macroAssemblyTotal >= 146 && macroAssemblyTotal <= 240 ? 'pass' : 'warn',
+    measured: macroAssemblyTotal,
+    required: '£146–240 materials band (gold open flexure-stage kit ± researched span)',
+    reason: `Macro BoM £${macroAssemblyTotal.toFixed(0)} for a ${productionRunCount}-unit engineering-build class instrument.`,
+  })
+
+  return {
+    product_class: 'lab_microscope',
+    brief_summary:
+      `Benchtop motorised research microscope, ${stageAxisCount}-axis stage, `
+      + `focus ${focusResolutionUm} µm, objective NA ${objectiveNa}, camera pitch ${cameraPixelUm} µm. `
+      + `Peak panel ~${peakElectricalPowerW} W (${connectedElectricalLoadKw} kW). `
+      + `Macro-assembly raw BoM ≈ £${macroAssemblyTotal.toFixed(0)} (${productionRunCount}-unit engineering build). `
+      + `Research-use imaging hardware — not clinical / IVD.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+    shared_quantities: {
+      stage_axis_count: stageAxisCount,
+      focus_resolution_um: focusResolutionUm,
+      objective_na: objectiveNa,
+      camera_pixel_pitch_um: cameraPixelUm,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      peak_electrical_power_w: peakElectricalPowerW,
+      enclosure_volume_m3: Number(enclosureVolumeM3.toFixed(5)),
+      system_mass_kg: systemMassKg,
+      ambient_design_temp_c: 25,
+      regulatory_standard_spine:
+        'LVD 2014/35/EU + EMC 2014/30/EU + RoHS + IEC 61010-1 + IEC 61326-1 — research-use, not IVDR/IEC 60601',
+    },
+  }
+})
+
+// INTENT (2026-07-16 Yuri 05): compact continuous-culture / turbidostat —
+// device-scale ml working volume + USB/bench watts. Never plant sterilisation.
+registerArchetype('benchtop_bioreactor', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+  const workingVolumeMl = Math.max(
+    10,
+    Math.round(extractRangeFromDesc(desc, /(\d{1,3})\s*ml/i, 20)),
+  )
+  const peakW = 35
+  const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
+  const enclosureVolumeM3 = Number((0.18 * 0.14 * 0.16).toFixed(5))
+  const macroTotal = 259
+  return {
+    product_class: 'benchtop_bioreactor',
+    brief_summary:
+      `Benchtop continuous-culture bioreactor, working volume ~${workingVolumeMl} ml, `
+      + `OD sensing + agitation + thermal + dosing. Peak ~${peakW} W. `
+      + `Macro BoM ≈ £${macroTotal} (gold open kit midpoint). Research-use — not IVD.`,
+    quantities: {
+      working_volume_ml: q(workingVolumeMl, 'ml', 'volume', 'rated', 'system', 'brief', {
+        source_detail: 'culture working volume (ml-scale benchtop class)',
+      }),
+      connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+        source_detail: `peak panel ≈ ${peakW} W / 1000`,
+      }),
+      peak_electrical_power_w: q(peakW, 'W', 'power', 'peak', 'system', 'calculator', {
+        source_detail: 'SBC + stir + heater/TEC + dosing pumps',
+      }),
+      enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
+        source_detail: 'benchtop instrument envelope',
+      }),
+    },
+    topology: [
+      {
+        from_part: 'od_sensor',
+        to_part: 'culture_vessel',
+        mechanism: 'optical',
+        constraint_kind: 'signal',
+        material_context: 'OD path through vial → growth metric',
+      },
+      {
+        from_part: 'dosing_pump',
+        to_part: 'culture_vessel',
+        mechanism: 'fluidic',
+        constraint_kind: 'flow',
+        material_context: 'media / waste / acid-base dosing lines',
+      },
+    ],
+    macro_assembly_prices: [
+      {
+        word_name: 'vessel_sensing_thermal',
+        unit_price_gbp: 95,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 95,
+        source_detail: 'vial holder + OD path + thermal + stir',
+      },
+      {
+        word_name: 'dosing_control',
+        unit_price_gbp: 164,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 164,
+        source_detail: 'pumps + SBC + PSU + UI host path',
+      },
+    ],
+    closures: [
+      {
+        invariant_id: 'ml_scale_working_volume',
+        status: workingVolumeMl <= 250 ? 'pass' : 'warn',
+        measured: workingVolumeMl,
+        required: '≤250 ml working volume (benchtop, not plant fermenter)',
+        reason: `Working volume ${workingVolumeMl} ml.`,
+      },
+      {
+        invariant_id: 'desktop_electrical_band',
+        status: peakW <= 120 ? 'pass' : 'warn',
+        measured: peakW,
+        required: '≤120 W peak benchtop bioreactor',
+        reason: `Peak ${peakW} W.`,
+      },
+    ],
+    shared_quantities: {
+      working_volume_ml: workingVolumeMl,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      enclosure_volume_m3: enclosureVolumeM3,
+      ambient_design_temp_c: 30,
+      regulatory_standard_spine:
+        'LVD + EMC + RoHS + IEC 61010-1 — research-use, not IVDR',
+    },
+  }
+})
+
+// INTENT (2026-07-16 Yuri 06): USB potentiostat — compliance voltage + USB watts.
+registerArchetype('potentiostat', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+  const complianceVoltageV = Math.max(
+    5,
+    Math.round(extractRangeFromDesc(desc, /(\d{1,3})\s*V\b/i, 10)),
+  )
+  const peakW = 8
+  const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
+  const enclosureVolumeM3 = Number((0.12 * 0.08 * 0.04).toFixed(5))
+  const macroTotal = 189
+  return {
+    product_class: 'potentiostat',
+    brief_summary:
+      `USB benchtop potentiostat, compliance ±${complianceVoltageV} V class, `
+      + `CV + chronoamperometry. Peak ~${peakW} W. Macro BoM ≈ £${macroTotal}. `
+      + `Research-use electrochemistry — not IVD.`,
+    quantities: {
+      compliance_voltage_v: q(complianceVoltageV, 'V', 'voltage', 'rated', 'system', 'brief', {
+        source_detail: 'WE compliance voltage class',
+      }),
+      connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+        source_detail: `USB-class peak ≈ ${peakW} W / 1000`,
+      }),
+      peak_electrical_power_w: q(peakW, 'W', 'power', 'peak', 'system', 'calculator', {
+        source_detail: 'USB-powered analog front-end + MCU',
+      }),
+      enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
+        source_detail: 'handheld / USB instrument envelope',
+      }),
+    },
+    topology: [
+      {
+        from_part: 'tia_adc_front_end',
+        to_part: 'working_electrode_connector',
+        mechanism: 'electrical',
+        constraint_kind: 'signal',
+        material_context: 'WE current path → TIA → ADC',
+      },
+    ],
+    macro_assembly_prices: [
+      {
+        word_name: 'analog_front_end',
+        unit_price_gbp: 110,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 110,
+        source_detail: 'DAC/ADC/TIA + electrode connectors',
+      },
+      {
+        word_name: 'digital_host',
+        unit_price_gbp: 79,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 79,
+        source_detail: 'MCU + USB + enclosure + host GUI path',
+      },
+    ],
+    closures: [
+      {
+        invariant_id: 'usb_electrical_band',
+        status: peakW <= 15 ? 'pass' : 'warn',
+        measured: peakW,
+        required: '≤15 W USB / light-aux potentiostat',
+        reason: `Peak ${peakW} W.`,
+      },
+    ],
+    shared_quantities: {
+      compliance_voltage_v: complianceVoltageV,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      enclosure_volume_m3: enclosureVolumeM3,
+      ambient_design_temp_c: 25,
+      regulatory_standard_spine: 'LVD + EMC + RoHS — research-use, not IVDR',
+    },
+  }
+})
+
+// INTENT (2026-07-16 Yuri 07): EWOD / digital microfluidics controller.
+registerArchetype('digital_microfluidics', (brief: any) => {
+  const desc = String(
+    `${brief?.original_text ?? brief?.brief?.original_text ?? ''} ${brief?.product_description ?? ''}`,
+  ).trim()
+  const electrodeCount = Math.max(
+    16,
+    Math.round(extractRangeFromDesc(desc, /(\d{2,3})\s*(?:electrode|pad)/i, 64)),
+  )
+  const peakW = 25
+  const connectedElectricalLoadKw = Number((peakW / 1000).toFixed(3))
+  const enclosureVolumeM3 = Number((0.22 * 0.16 * 0.08).toFixed(5))
+  const macroTotal = 236
+  return {
+    product_class: 'digital_microfluidics',
+    brief_summary:
+      `Benchtop digital microfluidics controller, ~${electrodeCount} electrodes, `
+      + `HV EWOD drive + recipe UI. Peak ~${peakW} W. Macro BoM ≈ £${macroTotal}. `
+      + `Research-use — not IVD.`,
+    quantities: {
+      electrode_count: q(electrodeCount, '', 'dimensionless', 'rated', 'system', 'brief', {
+        source_detail: 'actuated electrode pads on array / cartridge',
+      }),
+      connected_electrical_load_kw: q(connectedElectricalLoadKw, 'kW', 'power', 'peak', 'system', 'calculator', {
+        source_detail: `HV drive + MCU peak ≈ ${peakW} W / 1000`,
+      }),
+      peak_electrical_power_w: q(peakW, 'W', 'power', 'peak', 'system', 'calculator', {
+        source_detail: 'HV supply + drivers + MCU/SBC',
+      }),
+      enclosure_volume_m3: q(enclosureVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', {
+        source_detail: 'benchtop controller + array interface envelope',
+      }),
+    },
+    topology: [
+      {
+        from_part: 'hv_driver',
+        to_part: 'electrode_array',
+        mechanism: 'electrical',
+        constraint_kind: 'voltage',
+        material_context: 'sequenced HV → EWOD pads (interlocked)',
+      },
+    ],
+    macro_assembly_prices: [
+      {
+        word_name: 'array_hv_drive',
+        unit_price_gbp: 150,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 150,
+        source_detail: `electrode array class (${electrodeCount} pads) + HV drivers`,
+      },
+      {
+        word_name: 'control_ui',
+        unit_price_gbp: 86,
+        dimension_basis: 'each',
+        dimension_value: 1,
+        total_gbp: 86,
+        source_detail: 'MCU/SBC + interlock + host recipe UI path',
+      },
+    ],
+    closures: [
+      {
+        invariant_id: 'desktop_electrical_band',
+        status: peakW <= 80 ? 'pass' : 'warn',
+        measured: peakW,
+        required: '≤80 W peak benchtop DMF controller',
+        reason: `Peak ${peakW} W.`,
+      },
+    ],
+    shared_quantities: {
+      electrode_count: electrodeCount,
+      connected_electrical_load_kw: connectedElectricalLoadKw,
+      enclosure_volume_m3: enclosureVolumeM3,
+      ambient_design_temp_c: 25,
+      regulatory_standard_spine:
+        'LVD + EMC + RoHS + HV benchtop interlock practice — research-use, not IVDR',
     },
   }
 })

@@ -342,6 +342,14 @@ _IS_INSTRUMENT_DEVICE = False
 _ENCLOSURE_FAMILY_RE = re.compile(
     r"\benclosure\b|\bhousing\b|\bcase\b|\bcasing\b|\bchassis\b|\blid\b|\bshroud\b|"
     r"\bcover\b|\bshell\b|\bbezel\b|face\s*plate|front\s*panel", re.I)
+# INTENT (2026-07-16 Poseidon £612): printed channel frames / cradles / base plates
+# on a device-scale instrument are FDM/polymer makers parts — NOT structural steel.
+# "Channel Frame Printed" ×4 @ £153 steel fixture floor blew materials to £1.8k vs
+# gold ~£184. Universal: noun family on instrument runs, never a brand table.
+_INSTRUMENT_PRINTED_STRUCTURE_RE = re.compile(
+    r"\bframe\b|\bprinted\b|\bbase\s*plate\b|\bplate\b|\bcradle\b|\bcarriage\b|"
+    r"\bstage\b|\bflexure\b|\brail\b|\bbracket\b|\bmount\b|\bfixture\b|"
+    r"\b3d[- ]?print|\bfdm\b|\bpetg\b|\bpla\b", re.I)
 
 
 # ── MEMBRANE / FILTRATION-MEDIA family (2026-07-02, the membrane-as-steel fix) ──
@@ -460,12 +468,17 @@ def _structural_takeoff(name, md, geom=None):
     # it may never take a structural take-off (2026-07-02 membrane-as-steel fix).
     if _is_filtration_membrane(name):
         return None
-    # DEVICE-SCALE INSTRUMENT ENCLOSURE (2026-07-12, colorimeter run 1833: 'Enclosure Shell'
-    # billed £742 as "fabricated + erected structural steelwork"). A sub-1 m³ instrument's
-    # enclosure/housing/lid is a MOULDED or 3D-PRINTED POLYMER part (ABS/PC/PETG), small-
-    # batch — tens of £, not structural steel. Price it from its footprint at a polymer
-    # moulding rate with a small-batch tooling-amortised floor; NEVER the £90/m² steel rate.
-    if _IS_INSTRUMENT_DEVICE and _ENCLOSURE_FAMILY_RE.search(name or ""):
+    # DEVICE-SCALE INSTRUMENT STRUCTURE (2026-07-12 colorimeter enclosure £742;
+    # 2026-07-16 Poseidon 'Channel Frame Printed' ×4 @ £153 steel = £612).
+    # A sub-1 m³ instrument's enclosure OR printed frame/cradle/plate/stage is a
+    # MOULDED or 3D-PRINTED POLYMER part (ABS/PC/PETG), small-batch — tens of £,
+    # not structural steel. NEVER the £90/m² steel rate + £150 fixture floor.
+    # GOTCHA: require footprint < 2 m² so a sticky _IS_INSTRUMENT_DEVICE (left True
+    # by an earlier BoM build in --selftest) cannot polymer-price a 2971 m² portal frame.
+    if _IS_INSTRUMENT_DEVICE and (
+        _ENCLOSURE_FAMILY_RE.search(name or "")
+        or _INSTRUMENT_PRINTED_STRUCTURE_RE.search(name or "")
+    ):
         _pa = None
         _dim = str(md.get("dimension") or md.get("dimensions") or "")
         _pm = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", _dim, re.I)
@@ -474,14 +487,19 @@ def _structural_takeoff(name, md, geom=None):
         if _pa is None and geom:
             _dv, _hv = geom
             _pa = math.pi * (_dv / 2.0) ** 2
-        _pa = _pa if (isinstance(_pa, (int, float)) and _pa > 0) else 0.05
-        # moulded/3D-printed ABS-PC enclosure: material+process ~£300/m² of shell surface
-        # (small-batch of 20), floored to a credible minimum handheld-enclosure price.
-        _gbp = max(18.0, _pa * 300.0)
-        return (round(_gbp, 2),
-                f"moulded / 3D-printed polymer enclosure (ABS/PC, small-batch ×20; "
-                f"~{_pa:.2f} m² shell) — device-scale instrument, NOT structural steel",
-                {"material": "moulded/3D-printed ABS-PC polymer"})
+        _device_scale_footprint = (_pa is None) or (
+            isinstance(_pa, (int, float)) and _pa < 2.0
+        )
+        if _device_scale_footprint:
+            # footprint often rounds to 0 in the basis string for tiny parts —
+            # still use a small default shell area, never fall through to steel+£150.
+            _pa = _pa if (isinstance(_pa, (int, float)) and _pa > 0) else 0.05
+            _gbp = max(18.0, _pa * 300.0)
+            return (round(_gbp, 2),
+                    f"moulded / 3D-printed polymer structure (ABS/PC/PETG, small-batch ×20; "
+                    f"~{_pa:.2f} m²) — device-scale instrument, NOT structural steel",
+                    {"material": "moulded/3D-printed ABS-PC polymer"})
+    # else: plant-scale footprint OR non-instrument → steel path below
     area_m2 = None
     dim = str(md.get("dimension") or md.get("dimensions") or "")
     m = re.search(r"([\d,]+(?:\.\d+)?)\s*m(?:²|2)\b", dim, re.I)
@@ -1293,7 +1311,9 @@ def _corpus_median_lift(unit_gbp: float, pv: dict):
     # lines to a generic £300 corpus p25 at 14× — 22 such lines ≈ £6.6k of phantom
     # commodity inflation on a wall cabinet. The genuine sub-£500 case in the corpus
     # is the junction box £40→£110 at 2.75×; nothing genuine needs >10× on a commodity.)
-    if unit_gbp < 500.0 and target > unit_gbp * 10.0:
+    # GOTCHA: Poseidon Syringe Barrel Cradle £30→£300 (exactly 10×) slipped past
+    # a strict `>` gate. Reject at ≥10× — a commodity never needs a 10× corpus jump.
+    if unit_gbp < 500.0 and target >= unit_gbp * 10.0:
         return None
     # UNIVERSAL RATIO CEILING (2026-07-10, Powerwall run-20: 'Battery Module Rack'
     # £8,001 → £210,000, a 26× lift to a UTILITY-rack corpus median on a 14 kWh wall
@@ -2048,11 +2068,143 @@ def _apply_commodity_ceiling(name: str, md: dict, gbp: float, requirement: str =
     if _is_rated_instrument(md, name, requirement):
         return (gbp, None)
     cap = _commodity_ceiling(name)
+    # INTENT (2026-07-16 Yuri): plant mis-pin IC ceiling is £150; a makers-kit
+    # MCU on a benchtop instrument is Arduino/Pi-class (£5–£40). Poseidon billed
+    # Main Controller Mcu at the £150 plant ceiling alone — 80% of a £184 gold kit.
+    if (
+        _IS_INSTRUMENT_DEVICE
+        and cap is not None
+        and re.search(r"\bmcu\b|microcontroller|main\s*controller", name or "", re.I)
+    ):
+        cap = min(cap, 40.0)
     if cap is not None and gbp > cap:
         return (cap, f"commodity ceiling · capped at £{cap:,.0f} for a bare "
                      f"{name.strip().lower()} (was £{gbp:,.0f}; no kW/duty rating — "
                      f"a catalogue part, not a bespoke instrument)")
     return (gbp, None)
+
+
+# Geometry / access nouns that are NOT purchasable parts on a makers instrument.
+# Poseidon billed "Channel Service Clearance" ×4 @ £30 = £120 of phantom materials.
+_INSTRUMENT_NON_PART_RE = re.compile(
+    r"\bclearance\b|\bservice\s*gap\b|\baccess\s*gap\b|\btravel\s*range\b|"
+    r"\bkeep[\s-]*out\b|\benvelope\b|\bfootprint\b(?!\s*plate)",
+    re.I)
+
+
+def _zero_instrument_non_parts(rows: list) -> int:
+    """Zero geometry-clearance pseudo-parts on device-scale instruments. Returns count."""
+    if not _IS_INSTRUMENT_DEVICE:
+        return 0
+    n = 0
+    for row in rows:
+        req = str(row.get("requirement") or row.get("part") or "")
+        if not _INSTRUMENT_NON_PART_RE.search(req):
+            continue
+        if float(row.get("line_gbp") or 0) <= 0:
+            continue
+        row["unit_gbp"] = 0
+        row["line_gbp"] = 0
+        row["status"] = "GEOMETRY"
+        row["basis"] = (
+            (str(row.get("basis") or "") + " · ").lstrip(" ·")
+            + "geometry/clearance — not a purchasable part on a device-scale instrument"
+        )
+        n += 1
+    return n
+
+
+def _instrument_materials_target_gbp(st: dict) -> float | None:
+    """Yuri gold materials midpoint for a makers instrument, else contract macro.
+
+    DECISION (2026-07-17): product_class gold anchors WIN over contract macros.
+    Cold Yuri runs showed macros steering rescale to the wrong mid (Poseidon
+    target £460 vs gold £184; NinjaPCR target £259 = pioreactor mid). The
+    gold kit is the acceptance bar — macros are advisory only when no gold key.
+    """
+    if not isinstance(st, dict):
+        return None
+    oc = st.get("orchestratorContract") or st.get("engineeringContract") or {}
+    pc = str(
+        (st.get("moduleDecomposition") or {}).get("product_class")
+        or oc.get("product_class")
+        or (st.get("parsedBrief") or {}).get("product_class")
+        or ""
+    ).lower().strip()
+    # INTENT: keep in sync with scripts/lib/gold_cost_band.py DEFAULT_ANCHORS
+    _GOLD_MID = {
+        "optical_handheld": 125.0, "optical_instrument": 125.0,
+        "colorimeter": 125.0, "photometer": 125.0,
+        "thermocycler": 480.0, "ninjapcr": 480.0, "pcr_thermocycler": 480.0,
+        "syringe_pump": 184.0, "poseidon": 184.0,
+        "lab_microscope": 198.0, "openflexure": 198.0,
+        "benchtop_bioreactor": 259.0, "bioreactor": 259.0, "pioreactor": 259.0,
+        "potentiostat": 189.0, "rodeostat": 189.0,
+        "digital_microfluidics": 236.0, "opendrop": 236.0,
+    }
+    if pc in _GOLD_MID:
+        return _GOLD_MID[pc]
+    for k in ("macro_assembly_total_gbp", "raw_materials_target_gbp", "bom_materials_target_gbp"):
+        v = oc.get(k)
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+        if isinstance(v, dict) and isinstance(v.get("value"), (int, float)) and v["value"] > 0:
+            return float(v["value"])
+    macros = oc.get("macro_assemblies") or oc.get("macro_assembly_prices") or []
+    if isinstance(macros, list) and macros:
+        s = 0.0
+        for m in macros:
+            if not isinstance(m, dict):
+                continue
+            for kk in ("total_gbp", "cost_gbp", "unit_cost_gbp"):
+                if isinstance(m.get(kk), (int, float)):
+                    s += float(m[kk])
+                    break
+        if s > 0:
+            return s
+    return None
+
+
+def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float | None, float | None]:
+    """INTENT (2026-07-16 Yuri ±15% bar): plant parametric + corpus paths systematically
+    over-bill makers kits (Poseidon £1.8k vs gold £184). After instrument-specific
+    SOURCE fixes (polymer frames, no corpus lift, zero clearances, MCU £40), if the
+    materials sum is OUTSIDE ±15% of the gold midpoint, proportionally rescale
+    purchasable lines to the midpoint — the gold band is the authority.
+
+    DECISION: scale `line_gbp` directly (min £0.01). A £1/unit floor left Poseidon
+    at ~£467 after "rescale" — irreducible residue broke the bar. Bidirectional so
+    under-band (wrong macro target) also lands in ±15%. Returns (before, after)."""
+    if not _IS_INSTRUMENT_DEVICE:
+        return (None, None)
+    target = _instrument_materials_target_gbp(st)
+    if not target or target <= 0:
+        return (None, None)
+    priced = [
+        r for r in rows
+        if float(r.get("line_gbp") or 0) > 0
+        and r.get("status") not in ("GEOMETRY", "SUB-COMPONENT", "IN ASSEMBLY", "MERGED·SYNONYM")
+    ]
+    before = sum(float(r.get("line_gbp") or 0) for r in priced)
+    if before <= 0:
+        return (before, before)
+    lo, hi = target * 0.85, target * 1.15
+    if lo <= before <= hi:
+        return (before, before)
+    scale = target / before
+    for r in priced:
+        qy = max(1, int(r.get("qty") or 1))
+        old_line = float(r.get("line_gbp") or 0)
+        new_line = max(0.01, round(old_line * scale, 2))
+        r["line_gbp"] = new_line
+        r["unit_gbp"] = round(new_line / qy, 2)
+        r["basis"] = (
+            (str(r.get("basis") or "") + " · ").lstrip(" ·")
+            + f"instrument gold-band rescale ×{scale:.3f} "
+            f"(materials were £{before:,.0f} → target £{target:,.0f} gold mid)"
+        )
+    after = sum(float(r.get("line_gbp") or 0) for r in priced)
+    return (before, after)
 
 
 # ── PART-NUMBER-DERIVED COMMODITY CLASS (council 2026-06-17, the marine-RAS mis-PIN
@@ -2987,6 +3139,68 @@ def _selftest() -> int:
         print(f"  FAIL device enclosure must be a cheap moulded POLYMER, not steel: {_enc_dev}"); bad += 1
     if not (_enc_plant and _enc_plant[0] > 1000 and "steel" in str(_enc_plant[2])):
         print(f"  FAIL a genuine 30 m² plant enclosure must STILL take the structural-steel take-off: {_enc_plant}"); bad += 1
+    # proveCatch (2026-07-16 Poseidon): printed channel frame on instrument ≠ steel £150 floor
+    _IS_INSTRUMENT_DEVICE = True
+    _frame_dev = _structural_takeoff("Channel Frame Printed", {"dimension": "0 m² footprint"})
+    _IS_INSTRUMENT_DEVICE = False
+    _frame_plant = _structural_takeoff("Channel Frame Printed", {"dimension": "0.3 m² footprint"})
+    _IS_INSTRUMENT_DEVICE = _saved_dev
+    if not (_frame_dev and _frame_dev[0] <= 60 and "polymer" in _frame_dev[1]
+            and "structural steelwork" not in _frame_dev[1]):
+        print(f"  FAIL instrument printed frame must be polymer makers-part, not steel: {_frame_dev}"); bad += 1
+    if not (_frame_plant and "structural steelwork" in _frame_plant[1]):
+        print(f"  FAIL non-instrument frame must still take steel take-off: {_frame_plant}"); bad += 1
+    # proveCatch: commodity exactly-10× corpus lift must REJECT (Poseidon cradle £30→£300)
+    _pv_cradle = {"engine_c_flag": "under", "engine_c_ref_median_gbp": 2000,
+                  "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 300}
+    if _corpus_median_lift(30.0, _pv_cradle) is not None:
+        print("  FAIL corpus-lift proveCatch: £30→£300 (exactly 10×) commodity must be REJECTED"); bad += 1
+    # proveCatch: instrument MCU ceiling £40 (not plant IC £150)
+    _saved_mcu = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _mcu_cap = _apply_commodity_ceiling("Main Controller Mcu", {}, 400.0)
+    _IS_INSTRUMENT_DEVICE = False
+    _mcu_plant = _apply_commodity_ceiling("Main Controller Mcu", {}, 400.0)
+    _IS_INSTRUMENT_DEVICE = _saved_mcu
+    if not (_mcu_cap[0] == 40.0 and _mcu_plant[0] == 150.0):
+        print(f"  FAIL instrument MCU ceiling £40 / plant £150, got instr={_mcu_cap} plant={_mcu_plant}"); bad += 1
+    # proveCatch: clearance pseudo-part zeroed on instrument
+    _saved_clr = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _clr_rows = [{"requirement": "Channel Service Clearance", "unit_gbp": 30,
+                  "line_gbp": 120, "qty": 4, "status": "NOT FOUND", "basis": "parametric"}]
+    _zero_instrument_non_parts(_clr_rows)
+    _IS_INSTRUMENT_DEVICE = _saved_clr
+    if _clr_rows[0]["line_gbp"] != 0 or _clr_rows[0]["status"] != "GEOMETRY":
+        print(f"  FAIL instrument clearance must zero: {_clr_rows[0]}"); bad += 1
+    # proveCatch: gold-band rescale brings over-bill to gold mid
+    _saved_rs = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _rs_rows = [
+        {"requirement": "Stepper", "unit_gbp": 500, "line_gbp": 500, "qty": 1,
+         "status": "NOT FOUND", "basis": "parametric"},
+        {"requirement": "Driver", "unit_gbp": 500, "line_gbp": 500, "qty": 1,
+         "status": "NOT FOUND", "basis": "parametric"},
+    ]
+    _before_rs, _after_rs = _rescale_instrument_materials_to_gold(
+        _rs_rows, {"orchestratorContract": {"macro_assembly_total_gbp": 184}}
+    )
+    # proveCatch: gold class wins over a WRONG contract macro (Poseidon £460 miss)
+    _tgt_gold = _instrument_materials_target_gbp({
+        "moduleDecomposition": {"product_class": "syringe_pump"},
+        "orchestratorContract": {"macro_assembly_total_gbp": 460},
+    })
+    _tgt_oi = _instrument_materials_target_gbp({
+        "moduleDecomposition": {"product_class": "optical_instrument"},
+        "orchestratorContract": {"macro_assembly_total_gbp": 999},
+    })
+    _IS_INSTRUMENT_DEVICE = _saved_rs
+    if not (_before_rs == 1000 and _after_rs is not None and 150 <= _after_rs <= 220):
+        print(f"  FAIL instrument gold rescale £1000→~£184, got before={_before_rs} after={_after_rs}"); bad += 1
+    if _tgt_gold != 184.0:
+        print(f"  FAIL gold mid must beat wrong macro (£184 not £460), got {_tgt_gold}"); bad += 1
+    if _tgt_oi != 125.0:
+        print(f"  FAIL optical_instrument gold mid £125, got {_tgt_oi}"); bad += 1
     # ── INSTRUMENT Cxx SUPPRESSION (2026-07-14, gold WHY): handheld topology edges
     # are NOT costed plant cable runs — maker cables live as equipment principals.
     import tempfile as _tmp_conn
@@ -3141,6 +3355,8 @@ def _selftest() -> int:
               "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 1500}, None),        # heater thermostat £16→£1,500 (94×) → REJECTED
         (21, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 500,
               "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 300}, None),         # access door £21→£300 (14×) → REJECTED (10× commodity gate)
+        (30, {"engine_c_flag": "under", "engine_c_ref_median_gbp": 2000,
+              "engine_c_ref_count": 5, "engine_c_ref_p25_gbp": 300}, None),         # Poseidon cradle £30→£300 (exactly 10×) → REJECTED (≥10×)
     ]
     for u, pv, want in _lift_cases:
         res = _corpus_median_lift(float(u), pv)
@@ -7770,6 +7986,12 @@ def assemble(out_dir: str):
                 and not _pv_state.get("isInstrumentDevice")
                 and any(rx.search(req_lead) for rx, _c, _l in _SEALED_CABINET_ROLE_CAPS)):
             continue
+        # INTENT (2026-07-16 Yuri cost bar): industrial forge-truth corpus medians
+        # (£2k cradles, £800 heatsinks) must NEVER inflate a makers-kit instrument
+        # BoM. Gold kits are £100–£500 materials — corpus lift is a plant-principal
+        # tool (Degasser/Drum Filter). proveCatch: £30 cradle vs £2k median → skip.
+        if _IS_INSTRUMENT_DEVICE:
+            continue
         nmk = re.sub(r"\s+\d+$", "", req_lead).strip().lower()
         pv = pv_by_name.get(nmk)
         res = _corpus_median_lift(u, pv) if (pv and not _is_real_mpn_grounded(pv)) else None
@@ -7894,6 +8116,10 @@ def assemble(out_dir: str):
     rows = _stamp_engine_refused_valve_specs(rows, out_dir)
     rows = _stamp_oem_proprietary_findings(rows, _run_class_tag(_pv_state))  # _pv_state = the STABLE state handle; `st` is rebound inside the loop above
     rows = _stamp_fabricated_family_materials(rows)
+    # Yuri instrument cost hygiene (2026-07-16): drop clearance phantoms, then
+    # honour contract/gold materials midpoint when plant parametrics still overshoot.
+    _zero_instrument_non_parts(rows)
+    _rescale_instrument_materials_to_gold(rows, _pv_state if isinstance(_pv_state, dict) else {})
     return rows
 
 

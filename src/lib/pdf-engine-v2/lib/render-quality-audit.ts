@@ -101,9 +101,12 @@ export function computeRenderQuality(
         const raw = JSON.parse(readFileSync(p, 'utf-8')) as { form?: unknown; meshes?: unknown }
         const form = String(raw?.form ?? '').toLowerCase()
         const n = Array.isArray(raw?.meshes) ? raw.meshes.length : 0
+        // GOTCHA (2026-07-16 OpenFlexure): lab_microscope form-meshes.json was
+        // written (17 meshes) but this regex omitted it → false FALLBACK + floor Renders.
+        // Include every instrument form family the universal placer emits.
         if (
           n >= 8
-          && /syringe_pump|thermocycler|optical|photometer|colorimeter|instrument/.test(form)
+          && /syringe_pump|thermocycler|optical|photometer|colorimeter|instrument|lab_microscope|microscope|flexure|benchtop_bioreactor|bioreactor|potentiostat|digital_microfluidics|opendrop|pioreactor|rodeostat/.test(form)
         ) {
           return true
         }

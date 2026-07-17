@@ -81,6 +81,16 @@ export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   // syringe_pump (multi-channel benchtop syringe dosing, 2026-07-15 Poseidon) —
   // channel count + panel load; derived by registerArchetype('syringe_pump').
   syringe_pump: ['channel_count', 'connected_electrical_load_kw'],
+  // lab_microscope (motorised flexure-stage research microscope, 2026-07-16 OpenFlexure) —
+  // stage axes + focus resolution + panel load; derived by registerArchetype('lab_microscope').
+  lab_microscope: ['stage_axis_count', 'focus_resolution_um', 'connected_electrical_load_kw'],
+  // benchtop_bioreactor (compact continuous culture / Pioreactor class, 2026-07-16) —
+  // working volume ml + OD path + panel load; NOT plant sterilisation / m³ vessels.
+  benchtop_bioreactor: ['working_volume_ml', 'connected_electrical_load_kw'],
+  // potentiostat (USB electrochemistry, 2026-07-16 Rodeostat) —
+  potentiostat: ['compliance_voltage_v', 'connected_electrical_load_kw'],
+  // digital_microfluidics (EWOD / OpenDrop class, 2026-07-16) —
+  digital_microfluidics: ['electrode_count', 'connected_electrical_load_kw'],
   // Default: no HARD required slots for classes without explicit entries.
   // The gate runs a soft fill pass for all classes regardless.
 }

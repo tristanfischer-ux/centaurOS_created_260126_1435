@@ -758,6 +758,17 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   // INTENT (2026-07-15 Poseidon): benchtop multi-channel syringe pump — not plant.
   syringe_pump: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
   syringe_pump_platform: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  // INTENT (2026-07-16 OpenFlexure): printed flexure-stage lab microscope — not plant.
+  lab_microscope: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  microscope: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  openflexure: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  // INTENT (2026-07-16 Yuri 05–07): remaining benchtop wet-lab instruments — not plant.
+  benchtop_bioreactor: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  pioreactor: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  potentiostat: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  rodeostat: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  digital_microfluidics: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
+  opendrop: { ...ARCH_HANDHELD_BENCHTOP_INSTRUMENT },
 }
 
 // ---------------------------------------------------------------------------

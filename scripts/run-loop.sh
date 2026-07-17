@@ -23,9 +23,15 @@ mkdir -p "$OUT"
 python3 scripts/lib/loop_board.py gate --board "$BOARD" || {
   echo "[run-loop] GATE CLOSED — disposition every board defect before launching (loop_board.py dispose <id> ...)"; exit 3; }
 
-npx tsx --no-cache scripts/serial-design-chain-v2.tsx "$BRIEF" "$OUT" > "out-$(basename "$OUT").log" 2>&1
-EXIT=$?
-echo "== $LABEL run exit: $EXIT $(date +%H:%M:%S) — $OUT =="
+# DECISION: primary log under $OUT (campaign watch + durable nohup). Mirror to
+# repo-root out-*.log for existing greppers. PIPESTATUS[0] = chain exit.
+CHAIN_LOG="$OUT/chain.log"
+ROOT_LOG="out-$(basename "$OUT").log"
+set -o pipefail
+npx tsx --no-cache scripts/serial-design-chain-v2.tsx "$BRIEF" "$OUT" \
+  2>&1 | tee "$CHAIN_LOG" "$ROOT_LOG"
+EXIT=${PIPESTATUS[0]:-$?}
+echo "== $LABEL run exit: $EXIT $(date +%H:%M:%S) — $OUT ==" | tee -a "$CHAIN_LOG"
 # OUTSIDE REVIEWER — a different model family reads the DELIVERED artefacts with fresh
 # eyes before the board assembles, so its findings need dispositions like everything else.
 python3 scripts/lib/ship_red_team.py "$OUT" || true

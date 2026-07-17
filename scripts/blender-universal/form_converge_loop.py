@@ -34,6 +34,9 @@ sys.path.insert(0, str(_ROOT / "scripts" / "lib"))
 import instrument_form_grammar as ifg  # noqa: E402
 import render_quality_score as rqs  # noqa: E402
 
+sys.path.insert(0, str(_ROOT / "scripts" / "lib"))
+import form_render_glance as frg  # noqa: E402
+
 BLENDER = os.environ.get("BLENDER_BIN") or "/Applications/Blender.app/Contents/MacOS/Blender"
 if not Path(BLENDER).exists():
     BLENDER = os.environ.get("BLENDER_BIN") or "/opt/homebrew/bin/blender"
@@ -121,16 +124,45 @@ def _mesh_names_from_out(out_dir: Path) -> list[str]:
     log = out_dir / "form-converge-blender.log"
     if log.exists():
         for line in log.read_text(errors="ignore").splitlines():
-            if "u_se_sp_" in line:
-                for tok in line.replace(",", " ").replace("'", " ").split():
-                    if tok.startswith("u_se_sp_"):
-                        names.append(tok.strip("[]()"))
+            for pfx in ("u_se_sp_", "u_se_lm_", "u_se_tc_"):
+                if pfx in line:
+                    for tok in line.replace(",", " ").replace("'", " ").split():
+                        if tok.startswith(pfx):
+                            names.append(tok.strip("[]()"))
     # Also scrape any .txt object lists
     for p in out_dir.glob("*object*.txt"):
         for line in p.read_text(errors="ignore").splitlines():
-            if "u_se_sp_" in line:
+            if any(x in line for x in ("u_se_sp_", "u_se_lm_", "u_se_tc_")):
                 names.append(line.strip())
     return sorted({n for n in names if n})
+
+
+def _form_from_state(state_path: Path) -> str:
+    """Resolve form family from frozen state — never a product-noun branch."""
+    state = json.loads(state_path.read_text())
+    pc = str(
+        (state.get("keyMetrics") or {}).get("product_class")
+        or (state.get("parsedBrief") or {}).get("product_class")
+        or ""
+    )
+    part_blob = ""
+    for m in ((state.get("moduleDecomposition") or {}).get("modules") or []):
+        for sm in (m.get("sub_modules") or []):
+            for w in (sm.get("words") or []):
+                part_blob += " " + str(w.get("name_human") or "")
+    fam = ifg.resolve_form_family(
+        product_class=pc, part_blob=part_blob, is_instrument=True
+    )
+    return fam or "syringe_pump"
+
+
+def _checklist_for_form(form_id: str, meshes: list[str], channel_count: int) -> tuple[bool, list[str]]:
+    if form_id == "lab_microscope":
+        return ifg.lab_microscope_checklist_ok(meshes)
+    if form_id == "syringe_pump":
+        return ifg.syringe_pump_checklist_ok(meshes, channel_count)
+    # Thermocycler / optical: no mesh checklist in this loop yet — framing+glance only.
+    return (True, [])
 
 
 def _adjust_frame(frame_scale: float, findings: list) -> tuple[float, str | None]:
@@ -150,8 +182,10 @@ def run(
     max_rounds: int = 8,
     samples: int = 24,
     frame_threshold: float = 0.80,
+    form_id: str | None = None,
 ) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
+    form_id = form_id or _form_from_state(state_path)
     frame_scale = 1.05
     trajectory: list[dict] = []
     converged = False
@@ -161,29 +195,71 @@ def run(
         ok = _render(
             state_path, out_dir, samples=samples, frame_scale=frame_scale, inspect=inspect)
         meshes = _mesh_names_from_out(out_dir)
-        checklist_ok, missing = ifg.syringe_pump_checklist_ok(meshes, channel_count)
+        checklist_ok, missing = _checklist_for_form(form_id, meshes, channel_count)
         iso = out_dir / "inspect-iso.png"
         hero = out_dir / "00-hero.png"
+        exterior = out_dir / "04-product-exterior.png"
+        # DECISION: framing uses inspect-iso; form glance uses PRODUCT shots only
+        # (inspect overlays are not twinship — encode checklist §3.4).
         score_img = iso if iso.exists() else hero
         framing = None
         if score_img and score_img.exists():
             framing = rqs.score_image(score_img)
+        glance = None
+        glance_img = hero if hero.exists() else exterior
+        if checklist_ok and glance_img and glance_img.exists() and not str(glance_img).endswith(
+            "inspect-iso.png"
+        ):
+            # Prefer shaded product; if only inspect hero exists mid-loop, still glance.
+            glance = frg.score_form_glance(form_id, glance_img)
+        _pfx = {
+            "syringe_pump": "u_se_sp_",
+            "lab_microscope": "u_se_lm_",
+            "thermocycler": "u_se_tc_",
+        }.get(form_id, "u_se_")
         entry = {
             "round": rnd,
+            "form": form_id,
             "render_ok": ok,
             "frame_scale": round(frame_scale, 3),
             "checklist_ok": checklist_ok,
             "missing_stems": missing,
-            "mesh_count_sp": sum(1 for n in meshes if n.startswith("u_se_sp_")),
+            "mesh_count_form": sum(1 for n in meshes if n.startswith(_pfx)),
             "framing_score": None if not framing else framing.get("score"),
             "framing_findings": [] if not framing else [f["code"] for f in framing["findings"]],
+            "glance_ok": None if glance is None else glance.get("ok"),
+            "glance_score": None if glance is None else glance.get("score"),
+            "glance_findings": [] if not glance else [f["code"] for f in glance.get("findings") or []],
+            "glance_metrics": None if not glance else glance.get("metrics"),
         }
         trajectory.append(entry)
-        print(f"[form-converge] round {rnd}: checklist={'PASS' if checklist_ok else 'FAIL'} "
-              f"missing={len(missing)} meshes_sp={entry['mesh_count_sp']} "
-              f"frame={entry['framing_score']}")
+        print(f"[form-converge] round {rnd} form={form_id}: "
+              f"checklist={'PASS' if checklist_ok else 'FAIL'} "
+              f"missing={len(missing)} meshes={entry['mesh_count_form']} "
+              f"frame={entry['framing_score']} "
+              f"glance={'PASS' if entry['glance_ok'] else ('FAIL' if entry['glance_ok'] is False else 'n/a')}"
+              f"{(' ' + str(entry['glance_findings'])) if entry['glance_findings'] else ''}")
         if not checklist_ok:
             # SOURCE gap — looping frame scale cannot invent missing form parts.
+            break
+        if glance is not None and not glance.get("ok"):
+            # SOURCE gap — glance codes name the constant/placer fix (not reframe).
+            _render(state_path, out_dir, samples=max(samples, 64),
+                    frame_scale=frame_scale, inspect=False)
+            # Re-glance shaded hero; if still bad, stop (do not claim converged).
+            if (out_dir / "00-hero.png").exists():
+                glance2 = frg.score_form_glance(form_id, out_dir / "00-hero.png")
+                entry["glance_ok"] = glance2.get("ok")
+                entry["glance_score"] = glance2.get("score")
+                entry["glance_findings"] = [f["code"] for f in glance2.get("findings") or []]
+                entry["glance_metrics"] = glance2.get("metrics")
+                (out_dir / "form-glance.json").write_text(json.dumps(glance2, indent=2))
+                if glance2.get("ok") and framing:
+                    codes = {f["code"] for f in framing.get("findings") or []}
+                    needs_reframe = bool(codes & {"TOO_SMALL", "TOO_LARGE", "CLIPPED"})
+                    converged = framing["score"] >= frame_threshold and not needs_reframe
+                else:
+                    converged = False
             break
         if framing:
             codes = {f["code"] for f in framing.get("findings") or []}
@@ -192,33 +268,137 @@ def run(
             if framing["score"] >= frame_threshold and not needs_reframe:
                 _render(state_path, out_dir, samples=max(samples, 64),
                         frame_scale=frame_scale, inspect=False)
-                converged = True
+                # Final shaded glance is mandatory for converge (layer 3).
+                if (out_dir / "00-hero.png").exists():
+                    glance_f = frg.score_form_glance(form_id, out_dir / "00-hero.png")
+                    (out_dir / "form-glance.json").write_text(json.dumps(glance_f, indent=2))
+                    entry["glance_ok"] = glance_f.get("ok")
+                    entry["glance_findings"] = [f["code"] for f in glance_f.get("findings") or []]
+                    converged = bool(glance_f.get("ok"))
+                else:
+                    converged = True
                 break
             new_scale, op = _adjust_frame(frame_scale, framing["findings"])
             if op is None or abs(new_scale - frame_scale) < 1e-3:
                 _render(state_path, out_dir, samples=max(samples, 64),
                         frame_scale=frame_scale, inspect=False)
-                converged = checklist_ok and not needs_reframe
+                glance_f = None
+                if (out_dir / "00-hero.png").exists():
+                    glance_f = frg.score_form_glance(form_id, out_dir / "00-hero.png")
+                    (out_dir / "form-glance.json").write_text(json.dumps(glance_f, indent=2))
+                converged = (
+                    checklist_ok and not needs_reframe
+                    and (glance_f is None or bool(glance_f.get("ok")))
+                )
                 break
             frame_scale = new_scale
             continue
         break
 
+    # INTENT (encode §0.3): never exit on inspect-only rounds without a shaded
+    # form glance — framing can churn on TOO_SMALL while twinship is unmeasured.
+    last_ok = bool(trajectory and trajectory[-1].get("checklist_ok"))
+    if last_ok and not (out_dir / "00-hero.png").exists():
+        _render(state_path, out_dir, samples=max(samples, 64),
+                frame_scale=frame_scale, inspect=False)
+    if last_ok and (out_dir / "00-hero.png").exists():
+        glance_hero = frg.score_form_glance(form_id, out_dir / "00-hero.png")
+        glance_ext = None
+        if (out_dir / "04-product-exterior.png").exists():
+            glance_ext = frg.score_form_glance(
+                form_id, out_dir / "04-product-exterior.png")
+        # DECISION: both product shots must pass for converge (gold twinship).
+        # Iso ground residual: hero may clear via iso_crate_residual_ok when
+        # exterior is clean and mechanism/HMI/harness metrics are strong.
+        glance_final = glance_hero
+        hero_ok = bool(glance_hero.get("ok")) or frg.iso_crate_residual_ok(glance_hero)
+        ext_ok = glance_ext is None or bool(glance_ext.get("ok"))
+        both_ok = hero_ok and ext_ok
+        (out_dir / "form-glance.json").write_text(json.dumps({
+            "hero": glance_hero,
+            "exterior": glance_ext,
+            "ok": both_ok,
+        }, indent=2))
+        if trajectory:
+            trajectory[-1]["glance_ok"] = both_ok
+            trajectory[-1]["glance_score"] = glance_hero.get("score")
+            trajectory[-1]["glance_findings"] = [
+                f["code"] for f in glance_hero.get("findings") or []
+            ]
+            if glance_ext and not glance_ext.get("ok"):
+                trajectory[-1]["glance_findings"] += [
+                    f"ext:{f['code']}" for f in glance_ext.get("findings") or []
+                ]
+            trajectory[-1]["glance_metrics"] = glance_hero.get("metrics")
+        if not both_ok:
+            converged = False
+            print(f"[form-converge] final glance FAIL hero="
+                  f"{[f['code'] for f in glance_hero.get('findings') or []]} "
+                  f"ext={[] if not glance_ext else [f['code'] for f in glance_ext.get('findings') or []]}")
+        else:
+            print("[form-converge] final glance PASS (hero + exterior)")
+            converged = True
+
+    drawings = None
+    if converged:
+        drawings = _regen_drawings(state_path, out_dir)
+
+    _gold_why = {
+        "syringe_pump": "docs/plans/GOLD-WHY-syringe-pump-form.md",
+        "lab_microscope": "docs/plans/GOLD-WHY-lab-microscope-form.md",
+        "thermocycler": "docs/plans/GOLD-WHY-instrument-rules.md",
+        "optical_handheld": "docs/plans/GOLD-WHY-instrument-rules.md",
+    }.get(form_id, "docs/plans/GOLD-WHY-instrument-rules.md")
     report = {
         "schema": "form-convergence-report/v1",
-        "form": "syringe_pump",
+        "form": form_id,
         "channel_count": channel_count,
         "converged": converged,
         "rounds": len(trajectory),
         "trajectory": trajectory,
-        "gold_why": "docs/plans/GOLD-WHY-syringe-pump-form.md",
+        "drawings": drawings,
+        "gold_why": _gold_why,
+        "encode_checklist": "docs/plans/UNIVERSAL-ENCODE-CHECKLIST-2026-07-16.md",
         "note": (
-            "Checklist PASS means OPEN N-channel lead-screw grammar is present. "
-            "Compare 00-hero/04-product-exterior to out/_gold-poseidon-showcase/."
+            "Converged = mesh checklist PASS + form_render_glance PASS (+ framing when available). "
+            "Glance FAIL routes to form grammar / placer SOURCE (not reframe). "
+            "On converge, generate_drawing_set regenerates GA/interconnect from new form."
         ),
     }
     (out_dir / "form-convergence-report.json").write_text(json.dumps(report, indent=2))
+    (out_dir / "form-drawings-dirty").unlink(missing_ok=True)
+    if converged:
+        (out_dir / "form-drawings-stamped.json").write_text(
+            json.dumps({"ok": True, "drawings": drawings}, indent=2)
+        )
+    else:
+        (out_dir / "form-drawings-dirty").write_text(
+            "form not converged — drawings stale relative to form SOURCE\n"
+        )
     return report
+
+
+def _regen_drawings(state_path: Path, out_dir: Path) -> dict:
+    """Regenerate GA/interconnect after form converge (encode checklist §3.8 / P1-6)."""
+    gen = _THIS / "generate_drawing_set.py"
+    if not gen.exists():
+        return {"ok": False, "error": "generate_drawing_set.py missing"}
+    # Drop stale CAD manifests so ensure_cad_artifacts rebuilds from this out_dir
+    # (Blender already wrote them in the form loop — keep them; only force drawing PNGs).
+    cmd = [sys.executable, str(gen), str(state_path), str(out_dir)]
+    env = dict(os.environ, BLENDER_OUT_DIR=str(out_dir), STATE_JSON=str(state_path), INSPECT="0")
+    try:
+        r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=900)
+        (out_dir / "form-drawings-regen.log").write_text(
+            (r.stdout or "")[-6000:] + "\n---STDERR---\n" + (r.stderr or "")[-6000:]
+        )
+        return {
+            "ok": r.returncode == 0,
+            "returncode": r.returncode,
+            "log": "form-drawings-regen.log",
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 def main() -> int:
@@ -235,16 +415,24 @@ def main() -> int:
         ifg._selftest()
         ok, miss = ifg.syringe_pump_checklist_ok([], 2)
         assert not ok and miss
-        print("form_converge_loop --selftest OK")
+        lok, lmiss = ifg.lab_microscope_checklist_ok([])
+        assert not lok and lmiss
+        frg._selftest()
+        assert ifg.resolve_form_family(product_class="syringe_pump") == "syringe_pump"
+        assert ifg.resolve_form_family(product_class="ninjapcr") == "thermocycler"
+        assert ifg.resolve_form_family(product_class="lab_microscope") == "lab_microscope"
+        assert "syringe_pump" in ifg.FORM_FAMILIES and "lab_microscope" in ifg.FORM_FAMILIES
+        print("form_converge_loop --selftest OK (incl. form_render_glance + FORM_FAMILIES)")
         return 0
     if not args.state_json or not args.out_dir:
         ap.error("state_json and out_dir required (unless --selftest)")
     state = Path(args.state_json).resolve()
     out = Path(args.out_dir).resolve()
     n = _channel_count_from_state(state, args.channels or None)
+    form_id = _form_from_state(state)
     report = run(
         state, out, channel_count=n, max_rounds=args.max,
-        samples=args.samples, frame_threshold=args.threshold,
+        samples=args.samples, frame_threshold=args.threshold, form_id=form_id,
     )
     print(json.dumps({
         "converged": report["converged"],

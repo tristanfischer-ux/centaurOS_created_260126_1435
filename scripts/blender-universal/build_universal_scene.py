@@ -12313,6 +12313,8 @@ _THERMOCYCLER_TUBE_COUNT = 16
 # OPEN multi-channel linear dosing (syringe-pump form) — not a sealed cube.
 _IS_SYRINGE_PUMP_FORM = False
 _SYRINGE_PUMP_CHANNEL_COUNT = 4
+# OPEN flexure-stage lab microscope — cream FDM body + stage + actuators (not sealed cube).
+_IS_LAB_MICROSCOPE_FORM = False
 # Optical path length (mm) for instrument sample-chamber sizing — from contract when present.
 _INSTRUMENT_OPTICAL_PATH_MM = 10.0
 _SE_SKIN_RE = re.compile(
@@ -12331,6 +12333,7 @@ def _sealed_enclosure_env_mm(state, quantities):
     global _IS_INSTRUMENT_DEVICE, _INSTRUMENT_OPTICAL_PATH_MM
     global _IS_THERMOCYCLER_FORM, _THERMOCYCLER_TUBE_COUNT
     global _IS_SYRINGE_PUMP_FORM, _SYRINGE_PUMP_CHANNEL_COUNT
+    global _IS_LAB_MICROSCOPE_FORM
     pc = product_class_of(state) if isinstance(state, dict) else ""
     # Part-name evidence when class slug is thin / missing (needed before plantish).
     part_blob = ""
@@ -12342,9 +12345,12 @@ def _sealed_enclosure_env_mm(state, quantities):
     # GOTCHA (2026-07-16 Poseidon): bare `pump` in plantish matched `syringe_pump`
     # and forced a non-instrument path → sealed cube / plant fallback. Instrument
     # form families win over the plantish keyword table.
+    _lm_detect = getattr(ifg, "is_lab_microscope_form", None)
     _form_instrument = (
         ifg.is_thermocycler_form(product_class=pc or "", part_blob=part_blob, is_instrument=True)
         or ifg.is_syringe_pump_form(product_class=pc or "", part_blob=part_blob, is_instrument=True)
+        or (bool(_lm_detect(product_class=pc or "", part_blob=part_blob, is_instrument=True))
+            if callable(_lm_detect) else False)
         or bool(re.search(r"optical[_ -]?instrument|colorimeter|photometer", pc or "", re.I))
     )
     # INTENT: prefer the chain's authoritative flag, but ALSO derive from the
@@ -12372,6 +12378,16 @@ def _sealed_enclosure_env_mm(state, quantities):
         part_blob=part_blob,
         is_instrument=_IS_INSTRUMENT_DEVICE,
     )
+    # FLOW: lab_microscope OPEN flexure form — class/part vocab in ifg (never
+    # product-noun). Priority vs envelopes: syringe_pump > lab_microscope >
+    # sealed optical cube.
+    _IS_LAB_MICROSCOPE_FORM = (
+        bool(_lm_detect(
+            product_class=pc or "",
+            part_blob=part_blob,
+            is_instrument=_IS_INSTRUMENT_DEVICE,
+        )) if callable(_lm_detect) else False
+    )
     _tc = qval(quantities, "tube_count", None)
     if _tc is not None and float(_tc) > 0:
         _THERMOCYCLER_TUBE_COUNT = max(4, min(96, int(round(float(_tc)))))
@@ -12392,6 +12408,13 @@ def _sealed_enclosure_env_mm(state, quantities):
     # OPEN syringe-pump array: envelope from channel physics, not a cube of volume.
     if _IS_SYRINGE_PUMP_FORM:
         return ifg.syringe_pump_envelope_mm(_SYRINGE_PUMP_CHANNEL_COUNT)
+    # OPEN flexure-stage microscope: form envelope (before sealed optical cube).
+    if _IS_LAB_MICROSCOPE_FORM:
+        _lm_env = getattr(ifg, "lab_microscope_envelope_mm", None)
+        if callable(_lm_env):
+            return _lm_env()
+        # Fallback while grammar lands in parallel — typical printed-stage envelope.
+        return (200.0, 180.0, 240.0)
     envelope = resolve_design_envelope_mm(state)
     if envelope:
         return envelope
@@ -12403,16 +12426,41 @@ def _sealed_product_camera_specs(env_mm):
     """Perspective camera set for customer-facing wall/cabinet product views."""
     w, d, h = (float(value) * fl.MM for value in env_mm)
     # Form-keyed cam packs (never product nouns): tip-back PCR vs OPEN syringe array
-    # vs generic optical handheld. OPEN arrays are wide+low — optical h×1.92
-    # inflation left height occupancy ~0.39 (drawing_gates floor 0.45).
+    # / lab microscope vs generic optical handheld. OPEN forms skip optical h×1.92
+    # inflation that left height occupancy below drawing_gates floors.
     _tc = bool(_IS_THERMOCYCLER_FORM)
     _sp = bool(_IS_SYRINGE_PUMP_FORM)
+    _lm = bool(_IS_LAB_MICROSCOPE_FORM)
+    _open = _sp or _lm
     _tl = ifg.tipback_lid_product_cam_fractions() if _tc else {}
     _sp_cam = ifg.syringe_pump_product_cam_fractions() if _sp else {}
+    _lm_cam_fn = getattr(ifg, "lab_microscope_product_cam_fractions", None)
+    _lm_cam = (
+        _lm_cam_fn() if (_lm and callable(_lm_cam_fn)) else (
+            {
+                # Wide-ish tall OPEN instrument — softer than optical handheld.
+                "ext_z": 1.05,
+                "side_z": 0.85,
+                "tgt_z": 0.15,
+                "front_dist_scale": 0.90,
+                "h_eff_scale": 1.35,
+                "dist_k": 0.95,
+                "frame": 0.88,
+                "centre_frac": 0.45,
+                "service_dist_k": 0.82,
+                "service_frame": 0.86,
+                "service_z": 1.05,
+                "service_y_frac": 0.70,
+                "service_x_frac": 0.40,
+                "service_tgt_z": 0.35,
+            } if _lm else {}
+        )
+    )
+    _open_cam = _lm_cam if _lm else _sp_cam
     # raise the look-at centre for an instrument so the body + the protruding cuvette
     # port both sit inside the frame (port top ≈ 1.4·H); a plain cabinet stays at mid-H.
-    if _sp:
-        _centre_frac = float(_sp_cam.get("centre_frac", 0.42))
+    if _open:
+        _centre_frac = float(_open_cam.get("centre_frac", 0.42 if _sp else 0.45))
     else:
         _centre_frac = 0.66 if _IS_INSTRUMENT_DEVICE else 0.5
     centre = (0.0, 0.0, (DECK_Z_MM + float(env_mm[2]) * _centre_frac) * fl.MM)
@@ -12424,17 +12472,17 @@ def _sealed_product_camera_specs(env_mm):
     _fa = 1.5  # render frame aspect (3000×2000)
     # instrument devices carry a cuvette/optical port that protrudes ~0.4·H above the
     # top — inflate the vertical extent so the port is not cropped out of frame.
-    if _sp:
-        _h_eff = h * float(_sp_cam.get("h_eff_scale", 1.05))
+    if _open:
+        _h_eff = h * float(_open_cam.get("h_eff_scale", 1.05 if _sp else 1.35))
     else:
         _h_eff = h * (1.92 if _IS_INSTRUMENT_DEVICE else 1.0)
     _ctrl = max(_h_eff, w / _fa, d / _fa)
     # Cabinet products are tall-and-thin: framing on height alone left the front
     # view width occupancy at ~0.31 (gate render_view_quality floor 0.35). Pull
     # in slightly + raise frame fill so the enclosure reads as the subject.
-    if _sp:
-        _frame = float(_sp_cam.get("frame", 0.90))
-        _dist_k = float(_sp_cam.get("dist_k", 0.98))
+    if _open:
+        _frame = float(_open_cam.get("frame", 0.90))
+        _dist_k = float(_open_cam.get("dist_k", 0.98))
     else:
         _frame = 0.92 if not _IS_INSTRUMENT_DEVICE else 0.84
         _dist_k = 1.02 if not _IS_INSTRUMENT_DEVICE else 1.16
@@ -12442,10 +12490,10 @@ def _sealed_product_camera_specs(env_mm):
         _ctrl * _dist_k, focal_mm=62, frame_fraction=_frame)
     side_distance = perspective_distance_for_extent(
         _ctrl * _dist_k, focal_mm=58, frame_fraction=_frame)
-    if _sp:
-        # OPEN array: frame on controlling extent (not width-only) + pull in.
-        _svc_frame = float(_sp_cam.get("service_frame", 0.88))
-        _svc_dist_k = float(_sp_cam.get("service_dist_k", 0.78))
+    if _open:
+        # OPEN form: frame on controlling extent (not width-only) + pull in.
+        _svc_frame = float(_open_cam.get("service_frame", 0.88))
+        _svc_dist_k = float(_open_cam.get("service_dist_k", 0.78))
         service_distance = perspective_distance_for_extent(
             _ctrl * _svc_dist_k, focal_mm=72, frame_fraction=_svc_frame)
     else:
@@ -12454,12 +12502,12 @@ def _sealed_product_camera_specs(env_mm):
     # RULE (tip-back hinged lid): outer-face controls sit on a lid whose normal
     # tips toward +Y/rear — low deck-aimed cams only see the underside. Fractions
     # from ifg.tipback_lid_product_cam_fractions() (form-keyed, not a product noun).
-    if _sp:
-        _ext_z = float(_sp_cam.get("ext_z", 0.95))
-        _side_z = float(_sp_cam.get("side_z", 0.70))
-        _tgt_z = float(_sp_cam.get("tgt_z", 0.0))
+    if _open:
+        _ext_z = float(_open_cam.get("ext_z", 0.95))
+        _side_z = float(_open_cam.get("side_z", 0.70))
+        _tgt_z = float(_open_cam.get("tgt_z", 0.0))
         _tgt_y = 0.0
-        _front_ds = float(_sp_cam.get("front_dist_scale", 0.88))
+        _front_ds = float(_open_cam.get("front_dist_scale", 0.88))
     else:
         _ext_z = _tl.get("ext_z", 1.40 if _IS_INSTRUMENT_DEVICE else 0.12)
         _side_z = _tl.get("side_z", 1.16 if _IS_INSTRUMENT_DEVICE else 0.10)
@@ -12513,14 +12561,14 @@ def _sealed_product_camera_specs(env_mm):
             # OPEN array: 3/4 from front-right so harness + console rear are readable.
             "loc": (
                 centre[0] + service_distance * (
-                    float(_sp_cam.get("service_x_frac", 0.35)) if _sp
+                    float(_open_cam.get("service_x_frac", 0.35)) if _open
                     else (0.55 if _tc else 0.0)
                 ),
                 centre[1] - service_distance * (
-                    float(_sp_cam.get("service_y_frac", 0.72)) if _sp
+                    float(_open_cam.get("service_y_frac", 0.72)) if _open
                     else (0.55 if _tc else 1.0)
                 ),
-                (centre[2] + h * float(_sp_cam.get("service_z", 0.95))) if _sp
+                (centre[2] + h * float(_open_cam.get("service_z", 0.95))) if _open
                 else (
                     (centre[2] + h * float(_tl.get("hero_z", 1.55))) if _tc
                     else (DECK_Z_MM * fl.MM + h * 0.25)
@@ -12529,7 +12577,7 @@ def _sealed_product_camera_specs(env_mm):
             "target": (
                 centre[0],
                 centre[1] + (d * float(_tl.get("hero_tgt_y_frac", 0.10)) if _tc else 0.0),
-                (centre[2] + h * float(_sp_cam.get("service_tgt_z", 0.28))) if _sp
+                (centre[2] + h * float(_open_cam.get("service_tgt_z", 0.28))) if _open
                 else (
                     (centre[2] + h * float(_tl.get("hero_tgt_z", 0.85))) if _tc
                     else (DECK_Z_MM * fl.MM + h * 0.18)
@@ -12545,6 +12593,13 @@ def _syringe_pump_exterior_keep_visible(name: str) -> bool:
     """OPEN array story meshes stay visible on product exteriors (mechanism IS the face)."""
     nm = name or ""
     return nm.startswith("u_se_sp_")
+
+
+def _lab_microscope_exterior_keep_visible(name: str) -> bool:
+    """OPEN flexure-stage meshes stay visible on product exteriors (printable body IS the face)."""
+    nm = name or ""
+    pfx = getattr(ifg, "LM_MESH_PREFIX", "u_se_lm_")
+    return nm.startswith(pfx)
 
 
 def _thermocycler_exterior_keep_visible(name: str) -> bool:
@@ -12582,8 +12637,10 @@ def _selftest_thermocycler_exterior_keep() -> None:
 
 def _prepare_sealed_product_view(view_name, entering):
     """Toggle closed exterior vs open cutaway without mutating engineering data."""
-    # Syringe-pump OPEN form has no front cover — still must toggle mesh visibility.
-    if _SEALED_FRONT_COVER is None and not _IS_SYRINGE_PUMP_FORM:
+    # OPEN mechanism forms (syringe_pump / lab_microscope) have no front cover —
+    # still must toggle mesh visibility.
+    if _SEALED_FRONT_COVER is None and not (
+            _IS_SYRINGE_PUMP_FORM or _IS_LAB_MICROSCOPE_FORM):
         return
     exterior_views = sealed_exterior_view_names(_IS_INSTRUMENT_DEVICE)
     # Always restore the cutaway baseline first. This also makes cleanup after
@@ -12593,7 +12650,9 @@ def _prepare_sealed_product_view(view_name, entering):
     # EXCEPTION (NinjaPCR 2026-07-15): thermocycler hero must be an OPEN-FRONT
     # wood box so the sample-block wells read; a closed fascia hid the aperture.
     if _SEALED_FRONT_COVER is not None:
-        if _IS_INSTRUMENT_DEVICE and (_IS_THERMOCYCLER_FORM or _IS_SYRINGE_PUMP_FORM):
+        if _IS_INSTRUMENT_DEVICE and (
+                _IS_THERMOCYCLER_FORM or _IS_SYRINGE_PUMP_FORM
+                or _IS_LAB_MICROSCOPE_FORM):
             # OPEN forms: no closed fascia on cutaway / hero.
             _SEALED_FRONT_COVER.hide_render = True
         else:
@@ -12635,7 +12694,23 @@ def _prepare_sealed_product_view(view_name, entering):
                 obj.hide_render = False
             elif nm.startswith((
                 "u_se_instrument_story_", "u_se_cutaway_cue_", "u_se_det_",
-                "u_se_cad_", "u_se_product_", "u_se_tc_", "u_se_exterior_detail_",
+                "u_se_cad_", "u_se_product_", "u_se_tc_", "u_se_lm_",
+                "u_se_exterior_detail_",
+                "u_wire_", "u_pipe_",
+            )):
+                obj.hide_render = True
+    # OPEN flexure microscope: only u_se_lm_* is the product face.
+    if _IS_LAB_MICROSCOPE_FORM:
+        for obj in bpy.data.objects:
+            if getattr(obj, "type", None) != "MESH":
+                continue
+            nm = obj.name
+            if _lab_microscope_exterior_keep_visible(nm):
+                obj.hide_render = False
+            elif nm.startswith((
+                "u_se_instrument_story_", "u_se_cutaway_cue_", "u_se_det_",
+                "u_se_cad_", "u_se_product_", "u_se_tc_", "u_se_sp_",
+                "u_se_exterior_detail_",
                 "u_wire_", "u_pipe_",
             )):
                 obj.hide_render = True
@@ -12659,6 +12734,25 @@ def _prepare_sealed_product_view(view_name, entering):
                     continue
                 nm = obj.name
                 if _syringe_pump_exterior_keep_visible(nm):
+                    obj.hide_render = False
+                elif nm.startswith("u_se_product_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_se_det_") or nm.startswith("u_se_cad_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_se_cutaway_cue_") or nm.startswith(
+                        "u_se_instrument_story_"):
+                    obj.hide_render = True
+                elif nm.startswith("u_wire_") or nm.startswith("u_pipe_"):
+                    obj.hide_render = True
+        elif _IS_INSTRUMENT_DEVICE and _IS_LAB_MICROSCOPE_FORM:
+            # Printable flexure body IS the product face — keep u_se_lm_*.
+            if _SEALED_FRONT_COVER is not None:
+                _SEALED_FRONT_COVER.hide_render = True
+            for obj in bpy.data.objects:
+                if getattr(obj, "type", None) != "MESH":
+                    continue
+                nm = obj.name
+                if _lab_microscope_exterior_keep_visible(nm):
                     obj.hide_render = False
                 elif nm.startswith("u_se_product_"):
                     obj.hide_render = True
@@ -13068,48 +13162,82 @@ def _place_syringe_pump_layout(
         return tuple(c * fl.MM for c in tpl)
 
     n = max(1, int(_SYRINGE_PUMP_CHANNEL_COUNT or 4))
-    # Printed-frame aesthetic: cool grey polymer + saturated safety-blue accents.
+    # INTENT (gold twinship 2026-07-16): silk-silver FDM bay bodies + saturated
+    # safety-blue carriages/plates + clear barrels + multi-colour braid + docked
+    # black tablet with cool lit UI. Never sealed black crates / floating white
+    # shard. Glance CRATE_WALLS tax mid-grey fill — OPEN mid-bay + strong blue
+    # keep crate_frac near gold (~0.22) while blue_accent climbs toward ~0.30+.
     frame_mat = fl.make_mat(
-        "m_se_sp_frame", fl._to_linear((0.52, 0.54, 0.56)), metallic=0.08, roughness=0.62)
+        "m_se_sp_frame", fl._to_linear((0.58, 0.60, 0.62)), metallic=0.08, roughness=0.72)
+    deck_mat = fl.make_mat(
+        "m_se_sp_deck", fl._to_linear((0.48, 0.50, 0.52)), metallic=0.04, roughness=0.80)
     accent_mat = fl.make_mat(
-        "m_se_sp_accent", fl._to_linear((0.10, 0.38, 0.82)), metallic=0.02, roughness=0.48)
+        "m_se_sp_accent", fl._to_linear((0.05, 0.30, 0.92)), metallic=0.02, roughness=0.38)
     carriage_mat = accent_mat
     motor_mat = fl.make_mat(
         "m_se_sp_motor", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.35, roughness=0.50)
     screw_mat = fl.make_mat(
-        "m_se_sp_screw", fl._to_linear((0.70, 0.72, 0.74)), metallic=0.85, roughness=0.25)
+        "m_se_sp_screw", fl._to_linear((0.72, 0.74, 0.76)), metallic=0.88, roughness=0.22)
     rail_mat = fl.make_mat(
-        "m_se_sp_rail", fl._to_linear((0.72, 0.73, 0.75)), metallic=0.90, roughness=0.22)
+        "m_se_sp_rail", fl._to_linear((0.74, 0.75, 0.77)), metallic=0.92, roughness=0.18)
     cradle_mat = frame_mat
     clamp_mat = fl.make_mat(
-        "m_se_sp_clamp", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.12, roughness=0.55)
+        "m_se_sp_clamp", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.10, roughness=0.55)
+    tip_mat = fl.make_mat(
+        "m_se_sp_tip", fl._to_linear((0.92, 0.78, 0.12)), metallic=0.0, roughness=0.35)
     syringe_mat = fl.make_mat(
-        "m_se_sp_syringe", fl._to_linear((0.88, 0.90, 0.92)), metallic=0.0, roughness=0.28)
+        "m_se_sp_syringe", fl._to_linear((0.85, 0.90, 0.94)),
+        metallic=0.0, roughness=0.06, alpha=0.38, kind="glass", ior=1.49)
     tubing_mat = fl.make_mat(
-        "m_se_sp_tubing", fl._to_linear((0.75, 0.82, 0.85)), metallic=0.0, roughness=0.20)
+        "m_se_sp_tubing", fl._to_linear((0.80, 0.88, 0.92)),
+        metallic=0.0, roughness=0.10, alpha=0.50, kind="glass", ior=1.45)
     harness_mat = fl.make_mat(
-        "m_se_sp_harness", fl._to_linear((0.12, 0.12, 0.13)), metallic=0.05, roughness=0.70)
-    wire_r_mat = fl.make_mat(
-        "m_se_sp_wire_r", fl._to_linear((0.75, 0.12, 0.10)), metallic=0.0, roughness=0.55)
-    wire_g_mat = fl.make_mat(
-        "m_se_sp_wire_g", fl._to_linear((0.12, 0.55, 0.18)), metallic=0.0, roughness=0.55)
+        "m_se_sp_harness", fl._to_linear((0.12, 0.12, 0.13)), metallic=0.05, roughness=0.78)
+    wire_mats = [
+        fl.make_mat("m_se_sp_wire_r", fl._to_linear((0.88, 0.12, 0.08)), metallic=0.0, roughness=0.45),
+        fl.make_mat("m_se_sp_wire_g", fl._to_linear((0.12, 0.62, 0.16)), metallic=0.0, roughness=0.45),
+        fl.make_mat("m_se_sp_wire_b", fl._to_linear((0.14, 0.32, 0.85)), metallic=0.0, roughness=0.45),
+        fl.make_mat("m_se_sp_wire_k", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.0, roughness=0.45),
+    ]
+    # Open modular console: silk posts + blue plates (gold), not a solid crate.
     console_mat = frame_mat
-    glass_mat = fl.make_mat(
-        "m_se_sp_display", fl._to_linear(ifg.MAT_DISPLAY_GLASS), metallic=0.0, roughness=0.12)
+    chip_mat = fl.make_mat(
+        "m_se_sp_chip", fl._to_linear((0.72, 0.84, 0.90)),
+        metallic=0.0, roughness=0.05, alpha=0.48, kind="glass", ior=1.52)
+    # Cool lit software face — MUST stay cool (b−r>8) for glance HMI_FACE.
+    # GOTCHA: AgX-blown near-white fails the cool mask ((b−r)>8); bias cyan.
+    ui_mat = fl.make_mat(
+        "m_se_sp_ui", fl._to_linear((0.48, 0.68, 0.95)), metallic=0.0, roughness=0.30,
+        emission_strength=2.8)
+    ui_chrome = fl.make_mat(
+        "m_se_sp_tablet", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.40, roughness=0.35)
+    ui_ink = fl.make_mat(
+        "m_se_sp_ui_ink", fl._to_linear((0.20, 0.35, 0.58)), metallic=0.0, roughness=0.38,
+        emission_strength=0.60)
+    ui_header = fl.make_mat(
+        "m_se_sp_ui_hdr", fl._to_linear((0.22, 0.42, 0.82)), metallic=0.0, roughness=0.32,
+        emission_strength=1.1)
 
-    # Base plate spanning the forced envelope.
+    # Invisible checklist stem — discrete bays carry the silhouette (no grey pad).
     _base = fl.add_box(
         "u_se_sp_base",
-        _mm3((0.0, 0.0, base_z + 3.0)),
-        _mm3((W * 0.96, D * 0.92, 6.0)),
-        frame_mat, module=story_mod, module_objects=MO)
-    _base.dimensions = _mm3((W * 0.96, D * 0.92, 6.0))
+        _mm3((0.0, 0.0, base_z + 0.4)),
+        _mm3((W * 0.68, D * 0.55, 0.8)),
+        deck_mat, module=story_mod, module_objects=MO)
+    _base.dimensions = _mm3((W * 0.68, D * 0.55, 0.8))
 
     locs = ifg.syringe_pump_channel_locs_mm(n, base_z=base_z)
     face = ifg.SP_STEPPER_FACE_MM
     screw_r = ifg.SP_SCREW_DIAMETER_MM / 2.0
     cradle_tilt = math.radians(ifg.SP_CRADLE_ANGLE_DEG)
+    nose_tilt = math.radians(ifg.SP_CHASSIS_NOSE_DEG)
+    wall_t = ifg.SP_CHASSIS_WALL_T_MM
+    side_h = ifg.SP_CHASSIS_SIDE_H_MM
+    rear_h = getattr(ifg, "SP_CHASSIS_REAR_H_MM", side_h * 1.35)
+    floor_h = ifg.SP_CHASSIS_FLOOR_H_MM
+    bay_w = face * 1.35
     harness_ends = []  # (x, y, z) at motor rear for trunk gather
+    tip_xy = []  # syringe tip gather → console chip
     for loc in locs:
         i = int(loc["index"])
         p = f"u_se_sp_ch{i}_"
@@ -13118,43 +13246,58 @@ def _place_syringe_pump_layout(
         y_t = float(loc["y_tip"])
         y_c = float(loc["y_carriage"])
         z = float(loc["z_axis"])
-        # Printed bay side rails (triangular gusset read via tapered uprights).
-        for tag, y, z_off in (
-            ("frame_rear", y_m, 0.0),
-            ("frame_front", y_t, 2.0),
-        ):
-            _fr = fl.add_box(
-                f"{p}{tag}",
-                _mm3((x, y, base_z + ifg.SP_BAY_HEIGHT_MM * 0.32 + z_off)),
-                _mm3((face * 0.95, 14.0, ifg.SP_BAY_HEIGHT_MM * 0.65)),
-                frame_mat, module=story_mod, module_objects=MO)
-            _fr.dimensions = _mm3((face * 0.95, 14.0, ifg.SP_BAY_HEIGHT_MM * 0.65))
-            if tag == "frame_front":
-                try:
-                    _fr.rotation_euler = (cradle_tilt, 0.0, 0.0)
-                except Exception:
-                    pass
-        # Diagonal gusset (printed-frame rigidity cue).
-        _gus = fl.add_box(
-            f"{p}gusset",
-            _mm3((x - face * 0.38, (y_m + y_t) * 0.35, base_z + 18.0)),
-            _mm3((4.0, abs(y_m - y_t) * 0.45, 10.0)),
+        bay_len = abs(y_m - y_t) + face * 0.70
+        bay_cy = (y_m + y_t) * 0.5
+        # DECISION: bulky silk-silver U-channel (gold printed bay) — continuous
+        # low sides + tall rear motor shelf + 45° nose. Mid-bay OPEN above floor
+        # so lead screw + blue carriage remain the product face.
+        # Narrower floor + segmented sides — full silk slabs inflated CRATE_WALLS
+        # (final6 hero crate≈0.61 vs gold≈0.22) while hiding the open mid-bay.
+        _flr = fl.add_box(
+            f"{p}chassis_floor",
+            _mm3((x, bay_cy, base_z + floor_h * 0.5)),
+            _mm3((bay_w * 0.72, bay_len * 0.82, floor_h)),
             frame_mat, module=story_mod, module_objects=MO)
-        _gus.dimensions = _mm3((4.0, abs(y_m - y_t) * 0.45, 10.0))
+        _flr.dimensions = _mm3((bay_w * 0.72, bay_len * 0.82, floor_h))
+        for side, tag in ((-1, "chassis_side_l"), (1, "chassis_side_r")):
+            sx = x + side * (bay_w * 0.5 - wall_t * 0.5)
+            for seg, y_seg, len_seg, h_mul in (
+                ("a", y_m - bay_len * 0.06, bay_len * 0.32, 1.15),
+                ("b", y_t + bay_len * 0.04, bay_len * 0.30, 1.05),
+            ):
+                _sw = fl.add_box(
+                    f"{p}{tag}" if seg == "a" else f"{p}{tag}_tip",
+                    _mm3((sx, y_seg, base_z + floor_h + side_h * 0.48 * h_mul)),
+                    _mm3((wall_t, len_seg, side_h * h_mul)),
+                    frame_mat, module=story_mod, module_objects=MO)
+                _sw.dimensions = _mm3((wall_t, len_seg, side_h * h_mul))
+        _nose = fl.add_box(
+            f"{p}chassis_nose",
+            _mm3((x, y_t - 4.0, base_z + floor_h + side_h * 0.62)),
+            _mm3((bay_w * 0.92, 16.0, side_h * 1.20)),
+            frame_mat, module=story_mod, module_objects=MO)
+        _nose.dimensions = _mm3((bay_w * 0.92, 16.0, side_h * 1.20))
         try:
-            _gus.rotation_euler = (0.0, 0.0, math.radians(12.0))
+            _nose.rotation_euler = (nose_tilt, 0.0, 0.0)
         except Exception:
             pass
-        # Stepper (cube = NEMA face class).
-        y_st = y_m + face * 0.35
+        # Tall rear motor shelf (gold: NEMA sits on printed bulk, not a black crate).
+        _fr = fl.add_box(
+            f"{p}frame_rear",
+            _mm3((x, y_m + face * 0.15, base_z + floor_h + rear_h * 0.48)),
+            _mm3((bay_w * 0.88, 14.0, rear_h)),
+            frame_mat, module=story_mod, module_objects=MO)
+        _fr.dimensions = _mm3((bay_w * 0.88, 14.0, rear_h))
+        y_st = y_m + face * 0.22
+        z_mech = base_z + floor_h + rear_h + face * 0.48
         _st = fl.add_box(
             f"{p}stepper",
-            _mm3((x, y_st, z)),
+            _mm3((x, y_st, z_mech)),
             _mm3((face, face, face)),
             motor_mat, module=story_mod, module_objects=MO)
         _st.dimensions = _mm3((face, face, face))
-        # Flexible shaft coupler motor→screw.
-        y_cpl = y_m - ifg.SP_COUPLER_LEN_MM * 0.15
+        z = z_mech - face * 0.15  # drive axis just below motor face centre
+        y_cpl = y_m - ifg.SP_COUPLER_LEN_MM * 0.20
         _cpl = fl.add_cyl(
             f"{p}coupler",
             _mm3((x, y_cpl, z)),
@@ -13165,11 +13308,10 @@ def _place_syringe_pump_layout(
             _cpl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Lead screw along Y between coupler and tip.
-        screw_len = abs(y_m - y_t) - face * 0.55
+        screw_len = abs(y_m - y_t) - face * 0.40
         _ls = fl.add_cyl(
             f"{p}leadscrew",
-            _mm3((x, (y_m + y_t) / 2.0 - 4.0, z)),
+            _mm3((x, (y_m + y_t) / 2.0 - 2.0, z)),
             screw_r * fl.MM,
             screw_len * fl.MM,
             screw_mat, module=story_mod, module_objects=MO)
@@ -13177,43 +13319,48 @@ def _place_syringe_pump_layout(
             _ls.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Dual guide rails.
         for side, tag in ((-1, "rail_a"), (1, "rail_b")):
             _rl = fl.add_cyl(
                 f"{p}{tag}",
                 _mm3((x + side * ifg.SP_RAIL_GAP_MM / 2.0, (y_m + y_t) / 2.0, z)),
-                2.2 * fl.MM,
+                2.4 * fl.MM,
                 screw_len * fl.MM,
                 rail_mat, module=story_mod, module_objects=MO)
             try:
                 _rl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
             except Exception:
                 pass
-        # Bright blue carriage + V-notch seat for plunger flange.
+        # Printed blue carriage block (gold: dominant accent per bay — glance blue≥0.14).
         _car = fl.add_box(
             f"{p}carriage",
-            _mm3((x, y_c, z)),
-            _mm3((face * 0.90, ifg.SP_CARRIAGE_L_MM, face * 0.72)),
+            _mm3((x, y_c, z + 2.0)),
+            _mm3((face * 1.42, ifg.SP_CARRIAGE_L_MM * 1.45, face * 1.18)),
             carriage_mat, module=story_mod, module_objects=MO)
-        _car.dimensions = _mm3((face * 0.90, ifg.SP_CARRIAGE_L_MM, face * 0.72))
+        _car.dimensions = _mm3((face * 1.42, ifg.SP_CARRIAGE_L_MM * 1.45, face * 1.18))
+        # Plunger flange cup (gold carriage captures the flange).
+        _cup = fl.add_box(
+            f"{p}carriage_flange",
+            _mm3((x, y_c - ifg.SP_CARRIAGE_L_MM * 0.42, z + face * 0.20)),
+            _mm3((face * 0.95, 8.0, face * 0.55)),
+            carriage_mat, module=story_mod, module_objects=MO)
+        _cup.dimensions = _mm3((face * 0.95, 8.0, face * 0.55))
         for tag, side in (("carriage_v_a", -1), ("carriage_v_b", 1)):
             _cv = fl.add_box(
                 f"{p}{tag}",
-                _mm3((x + side * 6.0, y_c - ifg.SP_CARRIAGE_L_MM * 0.15, z + face * 0.28)),
-                _mm3((10.0, 10.0, 8.0)),
+                _mm3((x + side * 7.0, y_c - ifg.SP_CARRIAGE_L_MM * 0.10, z + face * 0.38)),
+                _mm3((12.0, 12.0, 10.0)),
                 carriage_mat, module=story_mod, module_objects=MO)
-            _cv.dimensions = _mm3((10.0, 10.0, 8.0))
+            _cv.dimensions = _mm3((12.0, 12.0, 10.0))
             try:
-                _cv.rotation_euler = (0.0, side * math.radians(40.0), 0.0)
+                _cv.rotation_euler = (0.0, side * math.radians(38.0), 0.0)
             except Exception:
                 pass
-        # Angled tip cradle block + V jaws (barrel seat).
         _cr = fl.add_box(
             f"{p}cradle",
-            _mm3((x, y_t, z - 2.0)),
-            _mm3((face * 0.95, 22.0, 20.0)),
+            _mm3((x, y_t, z - 1.0)),
+            _mm3((face * 0.95, 20.0, 18.0)),
             cradle_mat, module=story_mod, module_objects=MO)
-        _cr.dimensions = _mm3((face * 0.95, 22.0, 20.0))
+        _cr.dimensions = _mm3((face * 0.95, 20.0, 18.0))
         try:
             _cr.rotation_euler = (cradle_tilt, 0.0, 0.0)
         except Exception:
@@ -13221,26 +13368,25 @@ def _place_syringe_pump_layout(
         for tag, side in (("cradle_v_a", -1), ("cradle_v_b", 1)):
             _vj = fl.add_box(
                 f"{p}{tag}",
-                _mm3((x + side * 7.0, y_t - 2.0, z + 6.0)),
-                _mm3((12.0, 16.0, 10.0)),
+                _mm3((x + side * 8.0, y_t - 2.0, z + 7.0)),
+                _mm3((14.0, 18.0, 12.0)),
                 cradle_mat, module=story_mod, module_objects=MO)
-            _vj.dimensions = _mm3((12.0, 16.0, 10.0))
+            _vj.dimensions = _mm3((14.0, 18.0, 12.0))
             try:
                 _vj.rotation_euler = (cradle_tilt, side * math.radians(42.0), 0.0)
             except Exception:
                 pass
-        # Star clamps: barrel (tip) + plunger (carriage) — gold has both.
+        # Thumb/star clamps (GOLD-WHY: friction-clamp affordance on barrel + plunger).
         _sp_add_star_clamp(
-            f"{p}clamp_barrel", (x, y_t + 2.0, z + 16.0),
-            ifg.SP_CLAMP_STAR_OD_MM, clamp_mat, story_mod, MO, hub_h_mm=9.0)
+            f"{p}clamp_barrel", (x, y_t + 1.0, z + 20.0),
+            ifg.SP_CLAMP_STAR_OD_MM, clamp_mat, story_mod, MO, hub_h_mm=11.0)
         _sp_add_star_clamp(
-            f"{p}clamp_plunger", (x, y_c - ifg.SP_CARRIAGE_L_MM * 0.25, z + face * 0.42),
-            ifg.SP_CLAMP_STAR_OD_MM * 0.85, clamp_mat, story_mod, MO, hub_h_mm=7.0)
-        # Syringe barrel toward −Y tip.
+            f"{p}clamp_plunger", (x, y_c - ifg.SP_CARRIAGE_L_MM * 0.22, z + face * 0.55),
+            ifg.SP_CLAMP_STAR_OD_MM * 0.78, clamp_mat, story_mod, MO, hub_h_mm=7.0)
         sy_y = y_t - ifg.SP_SYRINGE_LENGTH_MM * 0.38
         _sy = fl.add_cyl(
             f"{p}syringe",
-            _mm3((x, sy_y, z + 3.0)),
+            _mm3((x, sy_y, z + 4.0)),
             (ifg.SP_SYRINGE_DIAMETER_MM / 2.0) * fl.MM,
             ifg.SP_SYRINGE_LENGTH_MM * fl.MM,
             syringe_mat, module=story_mod, module_objects=MO)
@@ -13248,154 +13394,232 @@ def _place_syringe_pump_layout(
             _sy.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Plunger flange disc on carriage side of barrel.
         _pl = fl.add_cyl(
             f"{p}plunger",
-            _mm3((x, y_c - ifg.SP_CARRIAGE_L_MM * 0.35, z + 3.0)),
+            _mm3((x, y_c - ifg.SP_CARRIAGE_L_MM * 0.38, z + 4.0)),
             (ifg.SP_SYRINGE_DIAMETER_MM * 0.55) * fl.MM,
-            4.0 * fl.MM,
-            syringe_mat, module=story_mod, module_objects=MO)
+            5.0 * fl.MM,
+            frame_mat, module=story_mod, module_objects=MO)
         try:
             _pl.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Clear tubing from syringe tip toward console (+X) — long enough to read
-        # as a wet-path gather (gold: tip lines leave the array toward the spine).
-        tip_y = sy_y - ifg.SP_SYRINGE_LENGTH_MM * 0.45
-        tube_len = max(face * 2.4, abs((W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.45) - x) * 0.55)
-        _tb = fl.add_cyl(
-            f"{p}tubing",
-            _mm3((x + tube_len * 0.45, tip_y, z + 1.0)),
-            (ifg.SP_TUBING_OD_MM / 2.0) * fl.MM,
-            tube_len * fl.MM,
-            tubing_mat, module=story_mod, module_objects=MO)
+        tip_y = sy_y - ifg.SP_SYRINGE_LENGTH_MM * 0.48
+        tip_z = z + 4.0
+        tip_xy.append((x, tip_y, tip_z))
+        tip_od = getattr(ifg, "SP_SYRINGE_TIP_OD_MM", 6.5)
+        _tip = fl.add_cyl(
+            f"{p}syringe_tip",
+            _mm3((x, tip_y - 3.0, tip_z)),
+            (tip_od / 2.0) * fl.MM,
+            10.0 * fl.MM,
+            tip_mat, module=story_mod, module_objects=MO)
         try:
-            _tb.rotation_euler = (0.0, math.pi / 2.0, 0.0)
+            _tip.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Per-channel harness stub from motor rear (+Y).
-        hy = y_st + face * 0.55
+        # Temporary stub — retargeted to console chip after console placed.
+        _tb = fl.add_cyl(
+            f"{p}tubing",
+            _mm3((x, tip_y - 12.0, tip_z)),
+            (ifg.SP_TUBING_OD_MM / 2.0) * fl.MM,
+            20.0 * fl.MM,
+            tubing_mat, module=story_mod, module_objects=MO)
+        try:
+            _tb.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
+        except Exception:
+            pass
+        # Per-channel braid from motor rear — thick jacket + 4-colour conductors.
+        hy = y_st + face * 0.58
         _hn = fl.add_cyl(
             f"{p}harness",
-            _mm3((x, hy + 12.0, z + 4.0)),
+            _mm3((x, hy + 22.0, z_mech + 2.0)),
             (ifg.SP_HARNESS_OD_MM / 2.0) * fl.MM,
-            28.0 * fl.MM,
+            48.0 * fl.MM,
             harness_mat, module=story_mod, module_objects=MO)
         try:
             _hn.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
         except Exception:
             pass
-        # Colour wire cues (gold multi-colour bundle).
-        for wi, (wmat, dx) in enumerate(((wire_r_mat, -3.0), (wire_g_mat, 3.0))):
+        for wi, wmat in enumerate(wire_mats):
+            dx = (-5.0 + wi * 3.2)
             _w = fl.add_cyl(
                 f"{p}wire{wi}",
-                _mm3((x + dx, hy + 10.0, z + 6.0 + wi)),
-                0.9 * fl.MM, 22.0 * fl.MM,
+                _mm3((x + dx, hy + 16.0, z_mech + 4.0 + (wi % 2) * 1.8)),
+                1.35 * fl.MM, 40.0 * fl.MM,
                 wmat, module=story_mod, module_objects=MO)
             try:
                 _w.rotation_euler = (math.pi / 2.0, 0.0, 0.0)
             except Exception:
                 pass
-        harness_ends.append((x, hy + 26.0, z + 4.0))
+        harness_ends.append((x, hy + 46.0, z_mech + 2.0))
 
-    # Control console to the +X side of the array.
-    cx = W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.45
-    cw = ifg.SP_CONSOLE_WIDTH_MM * 0.9
-    cd = ifg.SP_CONSOLE_DEPTH_MM * 0.85
-    ch = ifg.SP_CONSOLE_HEIGHT_MM * 0.9
+    # Open control spine (gold: corner posts + blue top/bottom + docked HMI).
+    cx = W * 0.5 - ifg.SP_CONSOLE_WIDTH_MM * 0.42
+    cw = ifg.SP_CONSOLE_WIDTH_MM * 0.95
+    cd = ifg.SP_CONSOLE_DEPTH_MM * 0.92
+    ch = ifg.SP_CONSOLE_HEIGHT_MM * 1.05
+    post_r = getattr(ifg, "SP_CONSOLE_POST_OD_MM", 12.0) / 2.0
+    # Checklist stem `console` = thin rear electronics shelf (not a solid crate).
     _con = fl.add_box(
         "u_se_sp_console",
-        _mm3((cx, 0.0, base_z + ch * 0.45)),
-        _mm3((cw, cd, ch)),
-        console_mat, module=story_mod, module_objects=MO)
-    _con.dimensions = _mm3((cw, cd, ch))
-    # Blue top work surface (gold: microfluidic stage plate).
+        _mm3((cx, cd * 0.18, base_z + ch * 0.42)),
+        _mm3((cw * 0.72, cd * 0.22, ch * 0.55)),
+        motor_mat, module=story_mod, module_objects=MO)
+    _con.dimensions = _mm3((cw * 0.72, cd * 0.22, ch * 0.55))
+    # Four silk corner posts (gold modular frame).
+    for sx, sy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+        _post = fl.add_cyl(
+            f"u_se_sp_console_post_{sx}_{sy}",
+            _mm3((cx + sx * cw * 0.42, sy * cd * 0.38, base_z + ch * 0.5)),
+            post_r * fl.MM,
+            ch * fl.MM,
+            console_mat, module=story_mod, module_objects=MO)
+    # Blue bottom + top plates (gold accent planes — glance blue_accent).
+    _bot = fl.add_box(
+        "u_se_sp_console_bottom",
+        _mm3((cx, 0.0, base_z + 5.0)),
+        _mm3((cw * 1.02, cd * 1.02, 5.5)),
+        accent_mat, module=story_mod, module_objects=MO)
+    _bot.dimensions = _mm3((cw * 1.02, cd * 1.02, 5.5))
     _top = fl.add_box(
         "u_se_sp_console_top",
         _mm3((cx, 0.0, base_z + ch + 2.0)),
-        _mm3((cw * 0.98, cd * 0.98, 4.0)),
+        _mm3((cw * 1.05, cd * 1.05, 6.5)),
         accent_mat, module=story_mod, module_objects=MO)
-    _top.dimensions = _mm3((cw * 0.98, cd * 0.98, 4.0))
-    # Chip backlight stub on top plate (gold microfluidic stage window).
+    _top.dimensions = _mm3((cw * 1.05, cd * 1.05, 6.5))
+    chip_x = cx - cw * 0.05
+    chip_y = -cd * 0.05
+    chip_z = base_z + ch + 5.5 + ifg.SP_CHIP_H_MM * 0.5
     _chip = fl.add_box(
         "u_se_sp_console_chip",
-        _mm3((cx, cd * 0.05, base_z + ch + 5.0)),
-        _mm3((cw * 0.35, cd * 0.28, 3.0)),
-        glass_mat, module=story_mod, module_objects=MO)
-    _chip.dimensions = _mm3((cw * 0.35, cd * 0.28, 3.0))
-    # INTENT (gold convergent): tipped landscape tablet in FRONT of the console —
-    # a separate HMI volume (not a flush fascia glass). UI face uses a bright
-    # "software" material so the shot reads as a live controller, not a blank slab.
-    ui_mat = fl.make_mat(
-        "m_se_sp_ui", fl._to_linear((0.72, 0.78, 0.86)), metallic=0.0, roughness=0.35)
-    ui_chrome = fl.make_mat(
-        "m_se_sp_tablet", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.25, roughness=0.45)
+        _mm3((chip_x, chip_y, chip_z)),
+        _mm3((ifg.SP_CHIP_W_MM, ifg.SP_CHIP_D_MM, ifg.SP_CHIP_H_MM)),
+        chip_mat, module=story_mod, module_objects=MO)
+    _chip.dimensions = _mm3((ifg.SP_CHIP_W_MM, ifg.SP_CHIP_D_MM, ifg.SP_CHIP_H_MM))
+    # Retarget per-channel tubing tip → chip inlet (gold wet-path gather).
+    for ti, (tx, ty, tz) in enumerate(tip_xy):
+        p = f"u_se_sp_ch{ti + 1}_"
+        try:
+            _old = bpy.data.objects.get(f"{p}tubing")
+            if _old is not None:
+                bpy.data.objects.remove(_old, do_unlink=True)
+        except Exception:
+            pass
+        # Port offset on chip edge facing the array.
+        px = chip_x - ifg.SP_CHIP_W_MM * 0.35 + ti * (ifg.SP_CHIP_W_MM * 0.22 / max(1, n - 1))
+        py = chip_y - ifg.SP_CHIP_D_MM * 0.35
+        mid_x = (tx + px) * 0.5
+        mid_y = (ty + py) * 0.5
+        span = max(32.0, math.hypot(px - tx, py - ty))
+        ang = math.atan2(py - ty, px - tx)
+        _tb = fl.add_cyl(
+            f"{p}tubing",
+            _mm3((mid_x, mid_y, (tz + chip_z) * 0.55)),
+            (ifg.SP_TUBING_OD_MM / 2.0) * fl.MM,
+            span * fl.MM,
+            tubing_mat, module=story_mod, module_objects=MO)
+        try:
+            _tb.rotation_euler = (math.pi / 2.0, 0.0, ang)
+        except Exception:
+            pass
     disp_tilt = math.radians(ifg.SP_DISPLAY_TILT_DEG)
+    disp_yaw = math.radians(getattr(ifg, "SP_TABLET_YAW_DEG", -22.0))
     tw = ifg.SP_TABLET_W_MM
     th = ifg.SP_TABLET_H_MM
     tt_mm = ifg.SP_TABLET_T_MM
-    # Pivot near the console front lip so the tablet tips toward the operator (−Y).
-    tab_y = -cd * 0.48
-    tab_z = base_z + ch * 0.42
+    # INTENT (final7→8): dock tablet ON the console front lip (gold), not a
+    # floating foreground shard. Screen faces −Y toward the product cams.
+    tab_y = -cd * 0.50
+    tab_z = base_z + ch * 0.52
+    tab_x = cx - cw * 0.02
+    # Dock shelf under the tablet (ties HMI to the blue bottom plate).
+    _dock = fl.add_box(
+        "u_se_sp_console_tablet_dock",
+        _mm3((tab_x, tab_y + tt_mm * 0.8, base_z + 8.0)),
+        _mm3((tw * 0.92, 18.0, 6.0)),
+        accent_mat, module=story_mod, module_objects=MO)
+    _dock.dimensions = _mm3((tw * 0.92, 18.0, 6.0))
     _tab = fl.add_box(
         "u_se_sp_console_tablet",
-        _mm3((cx, tab_y, tab_z)),
+        _mm3((tab_x, tab_y, tab_z)),
         _mm3((tw, tt_mm, th)),
         ui_chrome, module=story_mod, module_objects=MO)
     _tab.dimensions = _mm3((tw, tt_mm, th))
     try:
-        _tab.rotation_euler = (disp_tilt, 0.0, 0.0)
+        _tab.rotation_euler = (disp_tilt, 0.0, disp_yaw)
     except Exception:
         pass
-    # Screen inset (slightly proud of bezel) — brighter UI face.
     bezel = ifg.SP_UI_BEZEL_MM
+    # Thick cool screen — primary HMI_FACE pixels (cyan bias survives AgX).
     _scr = fl.add_box(
         "u_se_sp_console_display",
-        _mm3((cx, tab_y - tt_mm * 0.35, tab_z)),
-        _mm3((tw - 2.0 * bezel, 1.5, th - 2.0 * bezel)),
+        _mm3((tab_x, tab_y - tt_mm * 1.05, tab_z + th * 0.02)),
+        _mm3((tw - 2.0 * bezel, 8.0, th - 2.0 * bezel)),
         ui_mat, module=story_mod, module_objects=MO)
-    _scr.dimensions = _mm3((tw - 2.0 * bezel, 1.5, th - 2.0 * bezel))
+    _scr.dimensions = _mm3((tw - 2.0 * bezel, 8.0, th - 2.0 * bezel))
     try:
-        _scr.rotation_euler = (disp_tilt, 0.0, 0.0)
+        _scr.rotation_euler = (disp_tilt, 0.0, disp_yaw)
     except Exception:
         pass
-    # Soft UI chrome rows (table / tabs cue — form grammar, not a brand screenshot).
-    for ri, dy in enumerate((-th * 0.18, 0.0, th * 0.18)):
+    # Software chrome: header bar + table rows (form cue, not a brand screenshot).
+    _hdr = fl.add_box(
+        "u_se_sp_console_ui_header",
+        _mm3((tab_x, tab_y - tt_mm * 1.75, tab_z + th * 0.28)),
+        _mm3((tw * 0.90, 2.0, th * 0.16)),
+        ui_header, module=story_mod, module_objects=MO)
+    _hdr.dimensions = _mm3((tw * 0.90, 2.0, th * 0.16))
+    try:
+        _hdr.rotation_euler = (disp_tilt, 0.0, disp_yaw)
+    except Exception:
+        pass
+    for ri, dy in enumerate((-th * 0.18, -th * 0.02, th * 0.14, th * 0.30)):
         _row = fl.add_box(
             f"u_se_sp_console_ui_row{ri}",
-            _mm3((cx, tab_y - tt_mm * 0.55, tab_z + dy)),
-            _mm3((tw * 0.72, 0.8, th * 0.10)),
-            glass_mat, module=story_mod, module_objects=MO)
-        _row.dimensions = _mm3((tw * 0.72, 0.8, th * 0.10))
+            _mm3((tab_x, tab_y - tt_mm * 1.90, tab_z + dy)),
+            _mm3((tw * (0.84 if ri else 0.58), 1.6, th * 0.10)),
+            ui_ink, module=story_mod, module_objects=MO)
+        _row.dimensions = _mm3((tw * (0.84 if ri else 0.58), 1.6, th * 0.10))
         try:
-            _row.rotation_euler = (disp_tilt, 0.0, 0.0)
+            _row.rotation_euler = (disp_tilt, 0.0, disp_yaw)
         except Exception:
             pass
-    # Blue corner feet on console.
+    # Feet only under console corners (gold cube feet — never litter on the floor).
     for sx, sy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
         _ft = fl.add_box(
             f"u_se_sp_console_foot_{sx}_{sy}",
-            _mm3((cx + sx * cw * 0.42, sy * cd * 0.38, base_z + 3.0)),
-            _mm3((12.0, 12.0, 6.0)),
+            _mm3((cx + sx * cw * 0.40, sy * cd * 0.36, base_z + 3.5)),
+            _mm3((16.0, 16.0, 7.0)),
             accent_mat, module=story_mod, module_objects=MO)
-        _ft.dimensions = _mm3((12.0, 12.0, 6.0))
+        _ft.dimensions = _mm3((16.0, 16.0, 7.0))
 
     # Bundled harness trunk: gather channel stubs → console rear (+Y).
     if harness_ends:
         hx = sum(p[0] for p in harness_ends) / len(harness_ends)
         hy = max(p[1] for p in harness_ends) + 8.0
         hz = sum(p[2] for p in harness_ends) / len(harness_ends)
-        trunk_len = max(40.0, abs(cx - hx) * 0.85)
+        trunk_len = max(55.0, abs(cx - hx) * 0.95)
         _tr = fl.add_cyl(
             "u_se_sp_harness_trunk",
             _mm3(((hx + cx) / 2.0, hy, hz)),
-            (ifg.SP_HARNESS_OD_MM * 1.4 / 2.0) * fl.MM,
+            (ifg.SP_HARNESS_OD_MM * 1.75 / 2.0) * fl.MM,
             trunk_len * fl.MM,
             harness_mat, module=story_mod, module_objects=MO)
         try:
             _tr.rotation_euler = (0.0, math.pi / 2.0, 0.0)
         except Exception:
             pass
+        for wi, wmat in enumerate(wire_mats):
+            _tw = fl.add_cyl(
+                f"u_se_sp_harness_trunk_wire{wi}",
+                _mm3(((hx + cx) / 2.0, hy + 4.0 + wi * 1.4, hz + 3.0)),
+                1.25 * fl.MM,
+                trunk_len * 0.94 * fl.MM,
+                wmat, module=story_mod, module_objects=MO)
+            try:
+                _tw.rotation_euler = (0.0, math.pi / 2.0, 0.0)
+            except Exception:
+                pass
 
     # Dump mesh names for form_converge_loop deterministic checklist (no LLM).
     try:
@@ -13411,8 +13635,197 @@ def _place_syringe_pump_layout(
     except Exception as _dump_exc:
         print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
     print(f"[univ][sealed] SYRINGE_PUMP OPEN array: {n} channel(s) "
-          f"+ V-cradles + star clamps + harness + tipped console (no sealed crate)")
+          f"+ silk U-bays + V-cradles + star clamps + braid + docked HMI")
     return {"channels": n, "form": "syringe_pump"}
+
+
+def _place_lab_microscope_layout(
+    W: float,
+    D: float,
+    H: float,
+    base_z: float,
+    tt: float,
+    story_mod: str,
+    MO: dict,
+) -> dict:
+    """OPEN flexure-stage lab microscope — cream FDM body + stage + actuators.
+
+    INTENT (2026-07-16 OpenFlexure SIGHT): gold printed-stage microscopes expose
+    the mechanism as the product face — cream AM pedestal, XY/focus actuators,
+    inverted optics tube under the stage, transmitted illumination above. Never
+    a sealed charcoal handheld cube.
+
+    DECISION: keyed on `_IS_LAB_MICROSCOPE_FORM` via ifg.is_lab_microscope_form
+    (class / part vocab — never a product-noun branch). Mesh stems match
+    ifg.lab_microscope_checklist() under LM_MESH_PREFIX.
+    """
+    def _mm3(tpl):
+        return tuple(c * fl.MM for c in tpl)
+
+    pfx = getattr(ifg, "LM_MESH_PREFIX", "u_se_lm_")
+    body_w = float(getattr(ifg, "LM_BODY_W_MM", W * 0.52))
+    body_d = float(getattr(ifg, "LM_BODY_D_MM", D * 0.52))
+    body_h = float(getattr(ifg, "LM_BODY_H_MM", H * 0.40))
+    stage_w = float(getattr(ifg, "LM_STAGE_W_MM", W * 0.40))
+    stage_d = float(getattr(ifg, "LM_STAGE_D_MM", D * 0.36))
+    stage_t = float(getattr(ifg, "LM_STAGE_T_MM", 8.0))
+    slide_w = float(getattr(ifg, "LM_SLIDE_W_MM", 76.0))
+    slide_d = float(getattr(ifg, "LM_SLIDE_D_MM", 26.0))
+    slide_t = float(getattr(ifg, "LM_SLIDE_T_MM", 1.6))
+    face = float(getattr(ifg, "LM_STEPPER_FACE_MM", 42.0))
+    screw_od = float(getattr(ifg, "LM_LEADSCREW_OD_MM", 8.0))
+    tube_od = float(getattr(ifg, "LM_OPTICS_TUBE_OD_MM", 32.0))
+    tube_h = float(getattr(ifg, "LM_OPTICS_TUBE_H_MM", max(48.0, H * 0.28)))
+    cond_od = float(getattr(ifg, "LM_CONDENSER_OD_MM", 36.0))
+    sbc_w = float(getattr(ifg, "LM_SBC_W_MM", 65.0))
+    sbc_d = float(getattr(ifg, "LM_SBC_D_MM", 30.0))
+
+    # Cream / off-white FDM — OpenFlexure-class printed polymer (not charcoal).
+    cream = fl._to_linear(getattr(ifg, "LM_MAT_BODY_CREAM", (0.90, 0.86, 0.78)))
+    cream_dk = fl._to_linear(getattr(ifg, "LM_MAT_BODY_CREAM_DK", (0.78, 0.74, 0.66)))
+    body_mat = fl.make_mat("m_se_lm_body", cream, metallic=0.0, roughness=0.78)
+    stage_mat = fl.make_mat("m_se_lm_stage", cream_dk, metallic=0.02, roughness=0.72)
+    slide_mat = fl.make_mat(
+        "m_se_lm_slide", fl._to_linear((0.82, 0.88, 0.92)),
+        metallic=0.0, roughness=0.08, alpha=0.55, kind="glass", ior=1.52)
+    motor_mat = fl.make_mat(
+        "m_se_lm_motor", fl._to_linear((0.08, 0.08, 0.09)), metallic=0.35, roughness=0.48)
+    screw_mat = fl.make_mat(
+        "m_se_lm_screw", fl._to_linear((0.70, 0.72, 0.74)), metallic=0.88, roughness=0.22)
+    tube_mat = fl.make_mat(
+        "m_se_lm_optics", fl._to_linear((0.06, 0.06, 0.07)), metallic=0.25, roughness=0.42)
+    arm_mat = body_mat
+    cond_mat = fl.make_mat(
+        "m_se_lm_condenser", fl._to_linear((0.12, 0.12, 0.14)), metallic=0.15, roughness=0.50)
+    led_mat = fl.make_mat(
+        "m_se_lm_led", fl._to_linear((1.0, 0.82, 0.45)),
+        metallic=0.0, roughness=0.25, kind="led_emissive", emission_strength=2.4)
+    pcb_mat = fl.make_mat(
+        "m_se_lm_sbc", fl._to_linear((0.12, 0.42, 0.18)), metallic=0.05, roughness=0.55)
+
+    # Main cream FDM pedestal (printable body — the product silhouette).
+    body_z = base_z + body_h * 0.5
+    _body = fl.add_box(
+        f"{pfx}body",
+        _mm3((0.0, 0.0, body_z)),
+        _mm3((body_w, body_d, body_h)),
+        body_mat, module=story_mod, module_objects=MO)
+    _body.dimensions = _mm3((body_w, body_d, body_h))
+
+    # Stage platform on top of body + thin slide rectangle.
+    stage_z = base_z + body_h + stage_t * 0.5
+    _stage = fl.add_box(
+        f"{pfx}stage",
+        _mm3((0.0, 0.0, stage_z)),
+        _mm3((stage_w, stage_d, stage_t)),
+        stage_mat, module=story_mod, module_objects=MO)
+    _stage.dimensions = _mm3((stage_w, stage_d, stage_t))
+    _slide = fl.add_box(
+        f"{pfx}slide",
+        _mm3((0.0, 0.0, stage_z + stage_t * 0.5 + slide_t * 0.5 + 0.4)),
+        _mm3((slide_w, slide_d, slide_t)),
+        slide_mat, module=story_mod, module_objects=MO)
+    _slide.dimensions = _mm3((slide_w, slide_d, slide_t))
+
+    # Three actuator towers (X/Y/Z) around the body — geared stepper + leadscrew.
+    # Layout: X left, Y right, Z/focus rear — OpenFlexure-class motion WHY.
+    act_specs = (
+        ("x", -body_w * 0.52 - face * 0.55, 0.0, base_z + body_h * 0.55, (0.0, 0.0, 0.0)),
+        ("y", body_w * 0.52 + face * 0.55, 0.0, base_z + body_h * 0.55, (0.0, 0.0, 0.0)),
+        ("z", 0.0, body_d * 0.52 + face * 0.55, base_z + body_h * 0.72, (0.0, 0.0, 0.0)),
+    )
+    for axis, ax, ay, az, _rot in act_specs:
+        tower_h = face * 1.35
+        _tw = fl.add_box(
+            f"{pfx}act_{axis}_tower",
+            _mm3((ax, ay, az - tower_h * 0.15)),
+            _mm3((face * 0.85, face * 0.85, tower_h)),
+            body_mat, module=story_mod, module_objects=MO)
+        _tw.dimensions = _mm3((face * 0.85, face * 0.85, tower_h))
+        _st = fl.add_box(
+            f"{pfx}act_{axis}_stepper",
+            _mm3((ax, ay, az + tower_h * 0.35)),
+            _mm3((face, face, face * 0.72)),
+            motor_mat, module=story_mod, module_objects=MO)
+        _st.dimensions = _mm3((face, face, face * 0.72))
+        # Small leadscrew cylinder — axis toward stage centre.
+        screw_len = max(28.0, min(body_w, body_d) * 0.28)
+        if axis == "x":
+            sc_loc = (ax + (face * 0.55 if ax < 0 else -face * 0.55), ay, az + face * 0.15)
+            sc_rot = (0.0, math.pi / 2.0, 0.0)
+        elif axis == "y":
+            sc_loc = (ax - (face * 0.55 if ax > 0 else -face * 0.55), ay, az + face * 0.15)
+            sc_rot = (0.0, math.pi / 2.0, 0.0)
+        else:
+            sc_loc = (ax, ay - face * 0.55, az + face * 0.10)
+            sc_rot = (math.pi / 2.0, 0.0, 0.0)
+        _sc = fl.add_cyl(
+            f"{pfx}act_{axis}_screw",
+            _mm3(sc_loc),
+            (screw_od / 2.0) * fl.MM,
+            screw_len * fl.MM,
+            screw_mat, module=story_mod, module_objects=MO)
+        try:
+            _sc.rotation_euler = sc_rot
+        except Exception:
+            pass
+
+    # Black optics barrel under stage looking up (inverted optical path cue).
+    tube_z = base_z + body_h * 0.42
+    _tube = fl.add_cyl(
+        f"{pfx}optics_tube",
+        _mm3((0.0, -D * 0.02, tube_z)),
+        (tube_od / 2.0) * fl.MM,
+        tube_h * fl.MM,
+        tube_mat, module=story_mod, module_objects=MO)
+
+    # Illumination arm + condenser disk above stage with warm LED.
+    arm_h = float(getattr(ifg, "LM_ILLUM_ARM_H_MM", max(55.0, H * 0.28)))
+    arm_z = stage_z + stage_t * 0.5 + arm_h * 0.45
+    _arm = fl.add_box(
+        f"{pfx}illum_arm",
+        _mm3((0.0, D * 0.28, arm_z)),
+        _mm3((18.0, D * 0.22, arm_h)),
+        arm_mat, module=story_mod, module_objects=MO)
+    _arm.dimensions = _mm3((18.0, D * 0.22, arm_h))
+    cond_z = stage_z + stage_t * 0.5 + arm_h * 0.78
+    _cond = fl.add_cyl(
+        f"{pfx}condenser",
+        _mm3((0.0, 0.0, cond_z)),
+        (cond_od / 2.0) * fl.MM,
+        6.0 * fl.MM,
+        cond_mat, module=story_mod, module_objects=MO)
+    _led = fl.add_cyl(
+        f"{pfx}led",
+        _mm3((0.0, 0.0, cond_z - 5.0)),
+        (cond_od * 0.28) * fl.MM,
+        4.0 * fl.MM,
+        led_mat, module=story_mod, module_objects=MO)
+
+    # Small green FR4 SBC on the body side.
+    _sbc = fl.add_box(
+        f"{pfx}sbc",
+        _mm3((-body_w * 0.52 - 2.0, -body_d * 0.10, base_z + body_h * 0.35)),
+        _mm3((2.0, sbc_d, sbc_w * 0.55)),
+        pcb_mat, module=story_mod, module_objects=MO)
+    _sbc.dimensions = _mm3((2.0, sbc_d, sbc_w * 0.55))
+
+    # Dump mesh names for form_converge_loop deterministic checklist (no LLM).
+    try:
+        _out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if _out and hasattr(bpy, "data"):
+            _names = sorted(
+                o.name for o in bpy.data.objects
+                if getattr(o, "type", None) == "MESH" and o.name.startswith(pfx)
+            )
+            Path(_out).joinpath("form-meshes.json").write_text(
+                json.dumps({"form": "lab_microscope", "meshes": _names}, indent=2)
+            )
+    except Exception as _dump_exc:
+        print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
+    print("[univ][sealed] LAB_MICROSCOPE OPEN flexure: cream body + stage + "
+          "3 actuators + optics tube + illumination")
+    return {"form": "lab_microscope"}
 
 
 def _place_thermocycler_interior_layout(
@@ -13575,10 +13988,13 @@ def _place_instrument_interior_layout(
 
     GOTCHA: story meshes MUST live in an equipment module, NOT structure_containment.
     FLOW: thermocycler/PCR → tip-back lid layout; syringe_pump → OPEN linear
-    dosing array; else optical bench. Wrong family would be a sealed cube.
+    dosing array; lab_microscope → OPEN flexure stage; else optical bench.
+    Wrong family would be a sealed cube.
     """
     if _IS_SYRINGE_PUMP_FORM:
         return _place_syringe_pump_layout(W, D, H, base_z, tt, story_mod, MO)
+    if _IS_LAB_MICROSCOPE_FORM:
+        return _place_lab_microscope_layout(W, D, H, base_z, tt, story_mod, MO)
     if _IS_THERMOCYCLER_FORM:
         return _place_thermocycler_interior_layout(W, D, H, base_z, tt, story_mod, MO)
 
@@ -15558,11 +15974,14 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # EXCEPTION (syringe_pump 2026-07-16): OPEN array — skip sealed crate
         # panels entirely; mechanism meshes from `_place_syringe_pump_layout`
         # ARE the product face (convergent with gold maker pumps).
-        if _IS_SYRINGE_PUMP_FORM:
+        # EXCEPTION (lab_microscope 2026-07-16): OPEN printable flexure body —
+        # cream FDM + stage + actuators ARE the exterior (no charcoal crate).
+        if _IS_SYRINGE_PUMP_FORM or _IS_LAB_MICROSCOPE_FORM:
             _shell_panels = []
             _SEALED_FRONT_COVER = None
-            print("[univ][sealed] SYRINGE_PUMP: skipped sealed product crate "
-                  "(OPEN multi-channel array is the exterior)")
+            _form_tag = "SYRINGE_PUMP" if _IS_SYRINGE_PUMP_FORM else "LAB_MICROSCOPE"
+            print(f"[univ][sealed] {_form_tag}: skipped sealed product crate "
+                  "(OPEN mechanism form is the exterior)")
         for bnm, bloc, bsize in _shell_panels:
             _ob = fl.add_box(bnm, _mm3(bloc), _mm3(bsize), body_mat,
                              module=_skin_mod, module_objects=MO)
@@ -15570,7 +15989,7 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _SEALED_SHELL_OBJECTS.append(_ob)
         # Closed exterior cover is hidden for the cutaway hero and enabled only
         # for exterior/product-angle renders by the view preparer.
-        if not _IS_SYRINGE_PUMP_FORM:
+        if not (_IS_SYRINGE_PUMP_FORM or _IS_LAB_MICROSCOPE_FORM):
             _SEALED_FRONT_COVER = fl.add_box(
                 "u_se_product_front_cover",
                 _mm3((0.0, -D / 2 - tt / 2, base_z + H / 2)),
@@ -15925,7 +16344,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
         # product skin (lid + star knob + top aperture). Re-running the optical
         # face rule here dumped a parked ambient-light LID + cuvette well onto
         # the PCR box roof — wrong product language. Skip for thermocycler form.
-        if _IS_INSTRUMENT_DEVICE and not _IS_THERMOCYCLER_FORM:
+        # Same for OPEN syringe_pump / lab_microscope — mechanism IS the face.
+        if (_IS_INSTRUMENT_DEVICE
+                and not _IS_THERMOCYCLER_FORM
+                and not _IS_SYRINGE_PUMP_FORM
+                and not _IS_LAB_MICROSCOPE_FORM):
             form = _instrument_form_rule_mm(W, D, H, base_z, tt)
             # INTENT (2026-07-14 glance): closed-product glass is DARK recessed
             # LCD (MAT_DISPLAY_GLASS), not FR4-teal emissive. Teal read as "green

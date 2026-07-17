@@ -26,7 +26,7 @@ Target user: academic and maker wet labs running microfluidic or reagent-dosing 
 - **Concurrency:** channels independently timed; no missed-step regimes left undocumented.
 - **Host:** desktop control + documented serial (or equivalent) protocol; calibration persisted per pump and syringe type.
 - **Manufacturability:** catalogue + printable custom parts; assembly executable by a second engineer.
-- **Cost:** honest prototype BOM for a four-channel research pump platform (state the figure); prefer parts the engine can price.
+- **Cost:** honest prototype **bill of materials within £156–£212** for a four-channel research pump (gold open syringe-pump kit band; midpoint ≈ £184 materials). Prefer parts the engine can price. Do not ship plant-scale industrial assemblies.
 - **Positioning:** research-use engineering hardware. Do **not** present it as a clinical diagnostic or certified medical / IVD device unless a separate regulatory programme is specified.
 
 ## Required outputs

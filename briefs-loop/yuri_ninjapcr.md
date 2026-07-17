@@ -25,7 +25,7 @@ Target user: molecular-biology education labs, maker / open-hardware labs, and s
 - **Safety:** independent thermal fuse or hardware shutdown path in addition to firmware limits; detect sensor failure, fan failure, over-temperature, uncontrolled heating.
 - **UI / logging:** browser-based configuration and run status; log setpoint and measured temperature for the whole run; retain active protocol across a temporary power interruption where safe.
 - **Manufacturability:** reproducible in a **20-unit** engineering build.
-- **Cost:** target a prototype **bill of materials that is honest for a compact 8-tube research thermocycler** (state the figure); prefer catalogue-available heaters, sensors, MOSFETs/SSRs, fans, MCU/SBC, and power supplies the engine can price.
+- **Cost:** target a prototype **bill of materials within £408–£552** for a compact 8-tube research thermocycler (gold open-PCR kit band; midpoint ≈ £480 materials). Prefer catalogue-available heaters, sensors, MOSFETs/SSRs, fans, MCU/SBC, and power supplies the engine can price. Do not ship plant-scale industrial assemblies.
 - **Positioning:** research-use engineering hardware. Do **not** present it as a clinical diagnostic device or certified medical / IVD equipment unless a separate regulatory programme is specified.
 
 ## Required outputs

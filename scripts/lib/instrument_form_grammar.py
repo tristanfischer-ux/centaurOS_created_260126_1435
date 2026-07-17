@@ -372,42 +372,66 @@ SYRINGE_PUMP_PART_RE = re.compile(
     r"stepper|nema\s*17|microstep|infus(?:e|ion)|withdraw", re.I)
 
 # Parametric bay geometry (mm) — scales with channel_count, not brand.
-SP_BAY_PITCH_MM = 72.0
-SP_BAY_LENGTH_MM = 220.0          # motor → tip cradle (syringe stroke class)
-SP_BAY_HEIGHT_MM = 70.0
+SP_BAY_PITCH_MM = 78.0
+SP_BAY_LENGTH_MM = 230.0          # motor → tip cradle (syringe stroke class)
+SP_BAY_HEIGHT_MM = 78.0
 SP_BASE_MARGIN_MM = 18.0
-SP_CONSOLE_WIDTH_MM = 140.0
-SP_CONSOLE_DEPTH_MM = 160.0
-SP_CONSOLE_HEIGHT_MM = 90.0
+SP_CONSOLE_WIDTH_MM = 150.0
+SP_CONSOLE_DEPTH_MM = 170.0
+SP_CONSOLE_HEIGHT_MM = 85.0
 SP_STEPPER_FACE_MM = 42.0         # NEMA17 face class
 SP_RAIL_GAP_MM = 28.0
 SP_SCREW_DIAMETER_MM = 8.0
-SP_CARRIAGE_L_MM = 28.0
+SP_CARRIAGE_L_MM = 36.0
 SP_CARRIAGE_TRAVEL_FRAC = 0.42    # carriage mid-stroke for readability
-SP_SYRINGE_LENGTH_MM = 100.0
-SP_SYRINGE_DIAMETER_MM = 22.0
-SP_CLAMP_STAR_OD_MM = 22.0
+SP_SYRINGE_LENGTH_MM = 105.0
+SP_SYRINGE_DIAMETER_MM = 20.0
+SP_CLAMP_STAR_OD_MM = 24.0
 SP_CLAMP_STAR_LOBES = 5
 SP_COUPLER_LEN_MM = 18.0
 SP_COUPLER_OD_MM = 16.0
-SP_HARNESS_OD_MM = 4.5
-SP_TUBING_OD_MM = 2.2
-SP_CRADLE_ANGLE_DEG = 18.0       # tip cradle tips forward (gold printed aesthetic)
-SP_DISPLAY_TILT_DEG = 38.0       # tipped landscape tablet (gold: propped UI in front)
-SP_TABLET_W_MM = 110.0
-SP_TABLET_H_MM = 72.0
-SP_TABLET_T_MM = 8.0
+# INTENT (gold convergent 2026-07-16): harness must read as a multi-conductor
+# braid into the control spine — thin 4.5 mm stubs vanished in product cams.
+SP_HARNESS_OD_MM = 7.5
+SP_TUBING_OD_MM = 2.8
+SP_CRADLE_ANGLE_DEG = 22.0       # tip cradle tips forward (gold printed aesthetic)
+# Modular bay chassis — LOW side rails + 45° nose (gold open printed frame).
+# GOTCHA (2026-07-16 SIGHT): side_h ≥58 mm closed into white crates and hid the
+# lead-screw / blue carriage — gold keeps the mechanism as the product face.
+SP_CHASSIS_WALL_T_MM = 4.5
+SP_CHASSIS_FLOOR_H_MM = 5.0
+SP_CHASSIS_NOSE_DEG = 45.0
+# INTENT (gold twinship 2026-07-16): bulky printed U-channel ~NEMA height at
+# the rear; mid-bay stays OPEN so lead-screw + blue carriage remain the face.
+# Side height alone ≠ crate — crate is solid mid-grey fill (glance CRATE_WALLS).
+SP_CHASSIS_SIDE_H_MM = 34.0
+SP_CHASSIS_REAR_H_MM = 48.0  # motor shelf / rear bulk (gold printed bay)
+# Tipped landscape tablet docked on console front (gold ~25–30° from vertical).
+# GOTCHA (final6 SIGHT): tilt≥62° + under-top-plate dock hid the face in iso —
+# tip less, park in front of the posts so screen is a cool billboard.
+SP_DISPLAY_TILT_DEG = 58.0
+SP_TABLET_W_MM = 160.0
+SP_TABLET_H_MM = 108.0
+SP_TABLET_T_MM = 10.0
 SP_UI_BEZEL_MM = 4.0
+SP_TABLET_YAW_DEG = -18.0  # yaw into 3/4 hero so screen ≠ edge shard
+# Cam: tip more toward operator so HMI face (not bezel edge) fills the glance crop.
+SP_CAM_EXT_Z = 0.36
+# Microfluidic stage chip on console top (gold wet-path gather target).
+SP_CHIP_W_MM = 78.0
+SP_CHIP_D_MM = 52.0
+SP_CHIP_H_MM = 6.0
+SP_SYRINGE_TIP_OD_MM = 6.5  # yellow luer tip cue (gold wet-path affordance)
+SP_CONSOLE_POST_OD_MM = 12.0  # open frame posts (gold modular console)
 # Product cams: OPEN array is wide+low — optical-instrument h×1.92 inflation
 # left height occupancy ~0.39 (drawing_gates floor 0.45). Pull in + lower look.
-SP_CAM_EXT_Z = 0.95
-SP_CAM_SIDE_Z = 0.70
-SP_CAM_TGT_Z = 0.0
-SP_CAM_FRONT_DIST_SCALE = 0.88
+SP_CAM_SIDE_Z = 0.45
+SP_CAM_TGT_Z = 0.25
+SP_CAM_FRONT_DIST_SCALE = 0.72
 SP_CAM_H_EFF_SCALE = 1.05        # vs optical instrument 1.92 (no cuvette tower)
-SP_CAM_DIST_K = 0.98
-SP_CAM_FRAME = 0.90
-SP_CAM_CENTRE_FRAC = 0.42
+SP_CAM_DIST_K = 0.82
+SP_CAM_FRAME = 0.82
+SP_CAM_CENTRE_FRAC = 0.34
 # Service cam (07-product-service): default used max(w,d)/aspect which left
 # height occupancy ~0.31 on a wide+low array. Pull in + raise look at console.
 SP_CAM_SERVICE_DIST_K = 0.78
@@ -420,6 +444,210 @@ SP_CAM_SERVICE_TGT_Z = 0.28
 # Mesh-name prefixes for deterministic SIGHT (form_converge_loop).
 SP_MESH_PREFIX = "u_se_sp_"
 SP_CHANNEL_PREFIX = "u_se_sp_ch"
+
+# ── Lab microscope / flexure-stage form (OPEN printable) ─────────────────
+# INTENT: a FOURTH instrument form family. Function forces cream AM body +
+# sample stage + ≥3 geared actuators (X/Y/focus) + optics tube + transmitted
+# illumination. OPEN printable structure is the product face — never a sealed
+# charcoal optical handheld. Brand aliases (openflexure) are TRAINING synonyms.
+#
+# DECISION: keyed on class slug + optics/motion part vocabulary — never
+# `if product == "openflexure"`.
+
+LAB_MICROSCOPE_CLASS_RE = re.compile(
+    r"lab[_ -]?microscope|flexure[_ -]?stage[_ -]?microscope|"
+    r"motorised[_ -]?inverted[_ -]?microscope|"
+    r"motorized[_ -]?inverted[_ -]?microscope", re.I)
+LAB_MICROSCOPE_CLASS_ALIAS_RE = re.compile(r"\bopenflexure\b", re.I)
+LAB_MICROSCOPE_PART_RE = re.compile(
+    r"microscope|rms|objective|flexure|brightfield|autofocus|"
+    r"xy[\s_-]?stage|focus[\s_-]?(?:travel|actuator|motor)|condenser|"
+    r"illumination|optics[\s_-]?tube|sangaboard", re.I)
+
+LM_MESH_PREFIX = "u_se_lm_"
+# Envelope (mm) — compact printed-stage research microscope class.
+LM_ENV_W_MM = 200.0
+LM_ENV_D_MM = 180.0
+LM_ENV_H_MM = 240.0
+LM_BODY_W_MM = 110.0
+LM_BODY_D_MM = 110.0
+LM_BODY_H_MM = 95.0
+LM_STAGE_W_MM = 85.0
+LM_STAGE_D_MM = 70.0
+LM_STAGE_T_MM = 8.0
+LM_SLIDE_W_MM = 76.0
+LM_SLIDE_D_MM = 26.0
+LM_SLIDE_T_MM = 1.6
+LM_STEPPER_FACE_MM = 42.0
+LM_LEADSCREW_OD_MM = 8.0
+LM_OPTICS_TUBE_OD_MM = 32.0
+LM_OPTICS_TUBE_H_MM = 70.0
+LM_CONDENSER_OD_MM = 36.0
+LM_ILLUM_ARM_H_MM = 70.0
+LM_SBC_W_MM = 65.0
+LM_SBC_D_MM = 30.0
+# Cream FDM body (gold printed polymer) — not charcoal optical handheld.
+# Slightly lifted cream so product-hero AgX still clears glance cream_frac.
+LM_MAT_BODY_CREAM = (0.94, 0.90, 0.82)
+LM_MAT_BODY_CREAM_DK = (0.82, 0.78, 0.70)
+# Product cams: taller than wide OPEN array — slight pull-in + mid look-at.
+LM_CAM_EXT_Z = 0.95
+LM_CAM_SIDE_Z = 0.85
+LM_CAM_TGT_Z = 0.42
+LM_CAM_FRONT_DIST_SCALE = 0.88
+LM_CAM_H_EFF_SCALE = 1.35
+LM_CAM_DIST_K = 0.90
+LM_CAM_FRAME = 0.88
+LM_CAM_CENTRE_FRAC = 0.45
+
+
+def is_lab_microscope_form(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> bool:
+    """True for benchtop flexure-stage / motorised research microscope form.
+
+    @description Form gate for OPEN printable microscope (stage + actuators +
+                 optics + illumination). Class/alias is authoritative; part-vocab
+                 only on instruments — avoids plant BoM words flipping form.
+    @param product_class Chain product_class slug / brief class token
+    @param part_blob Concatenated part name_human text
+    @param is_instrument Device-scale flag (gates part-vocab path only)
+    @returns True when this form family's rules should apply
+    """
+    pc = product_class or ""
+    blob = part_blob or ""
+    if LAB_MICROSCOPE_CLASS_RE.search(pc) or LAB_MICROSCOPE_CLASS_ALIAS_RE.search(pc):
+        return True
+    if not is_instrument:
+        return False
+    # GOTCHA: bare "optics" matches OD/spectrophotometry on bioreactors
+    # (pioreactor-20260717-0514 emitted form=lab_microscope). Require a
+    # microscope-specific optic noun — not generic optics/LED photometry.
+    has_optics = bool(re.search(
+        r"microscope|objective|\brms\b|brightfield|condenser|flexure", blob, re.I))
+    has_motion = bool(re.search(
+        r"flexure|stage|stepper|autofocus|focus[\s_-]?actuator|\bxy[\s_-]?stage\b",
+        blob, re.I))
+    return has_optics and has_motion
+
+
+def lab_microscope_envelope_mm() -> tuple[float, float, float]:
+    """Benchtop envelope for printed flexure-stage microscope class."""
+    return (LM_ENV_W_MM, LM_ENV_D_MM, LM_ENV_H_MM)
+
+
+def lab_microscope_product_cam_fractions() -> dict:
+    """Named camera fractions for OPEN flexure-microscope product shots."""
+    return {
+        "ext_z": LM_CAM_EXT_Z,
+        "side_z": LM_CAM_SIDE_Z,
+        "tgt_z": LM_CAM_TGT_Z,
+        "front_dist_scale": LM_CAM_FRONT_DIST_SCALE,
+        "h_eff_scale": LM_CAM_H_EFF_SCALE,
+        "dist_k": LM_CAM_DIST_K,
+        "frame": LM_CAM_FRAME,
+        "centre_frac": LM_CAM_CENTRE_FRAC,
+    }
+
+
+def lab_microscope_checklist() -> list[str]:
+    """Deterministic mesh-name stems that must exist after placement."""
+    stems = [
+        f"{LM_MESH_PREFIX}body",
+        f"{LM_MESH_PREFIX}stage",
+        f"{LM_MESH_PREFIX}slide",
+        f"{LM_MESH_PREFIX}optics_tube",
+        f"{LM_MESH_PREFIX}illum_arm",
+        f"{LM_MESH_PREFIX}condenser",
+        f"{LM_MESH_PREFIX}led",
+        f"{LM_MESH_PREFIX}sbc",
+    ]
+    for axis in ("x", "y", "z"):
+        stems.extend([
+            f"{LM_MESH_PREFIX}act_{axis}_tower",
+            f"{LM_MESH_PREFIX}act_{axis}_stepper",
+            f"{LM_MESH_PREFIX}act_{axis}_screw",
+        ])
+    return stems
+
+
+def lab_microscope_checklist_ok(mesh_names: list[str]) -> tuple[bool, list[str]]:
+    """proveCatch / converge score: every required stem is present."""
+    names = list(mesh_names or [])
+    missing: list[str] = []
+    for stem in lab_microscope_checklist():
+        if not any(n.startswith(stem) or stem in n for n in names):
+            missing.append(stem)
+    return (len(missing) == 0, missing)
+
+
+# ── FORM_FAMILIES registry (encode checklist §2.14) ───────────────────────
+# INTENT: one table so a new instrument form registers detect/checklist/cams/
+# glance without copy-pasting product branches across Blender + critics.
+# glance_id → scripts/lib/form_render_glance.GLANCE_BY_FORM
+FORM_FAMILIES: dict[str, dict] = {
+    "optical_handheld": {
+        "detect": "is_optical_via_instrument_device",  # sealed instrument path
+        "glance_id": "optical_handheld",
+        "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
+        "vision_images": ("04-product-exterior.png", "00-hero.png"),
+    },
+    "thermocycler": {
+        "detect": "is_thermocycler_form",
+        "glance_id": "thermocycler",
+        "gold_why": "docs/plans/GOLD-WHY-instrument-rules.md",
+        "vision_images_fn": "tipback_lid_vision_image_candidates",
+        "cam_fractions_fn": "tipback_lid_product_cam_fractions",
+    },
+    "syringe_pump": {
+        "detect": "is_syringe_pump_form",
+        "glance_id": "syringe_pump",
+        "checklist_fn": "syringe_pump_checklist",
+        "cam_fractions_fn": "syringe_pump_product_cam_fractions",
+        "gold_why": "docs/plans/GOLD-WHY-syringe-pump-form.md",
+        "vision_images": ("00-hero.png", "04-product-exterior.png"),
+        "encode_checklist": "docs/plans/UNIVERSAL-ENCODE-CHECKLIST-2026-07-16.md",
+    },
+    "lab_microscope": {
+        "detect": "is_lab_microscope_form",
+        "glance_id": "lab_microscope",
+        "checklist_fn": "lab_microscope_checklist",
+        "cam_fractions_fn": "lab_microscope_product_cam_fractions",
+        "gold_why": "docs/plans/GOLD-WHY-lab-microscope-form.md",
+        "vision_images": ("00-hero.png", "04-product-exterior.png"),
+        "encode_checklist": "docs/plans/UNIVERSAL-ENCODE-CHECKLIST-2026-07-16.md",
+    },
+}
+
+
+def resolve_form_family(
+    *,
+    product_class: str = "",
+    part_blob: str = "",
+    is_instrument: bool = True,
+) -> str | None:
+    """Return form family id for this brief/parts — never a product noun branch.
+
+    @returns 'syringe_pump' | 'lab_microscope' | 'thermocycler' | 'optical_handheld' | None
+    """
+    if is_syringe_pump_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return "syringe_pump"
+    if is_lab_microscope_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return "lab_microscope"
+    if is_thermocycler_form(
+        product_class=product_class, part_blob=part_blob, is_instrument=is_instrument
+    ):
+        return "thermocycler"
+    if is_instrument:
+        return "optical_handheld"
+    return None
 
 
 def is_syringe_pump_form(
@@ -541,11 +769,16 @@ def syringe_pump_checklist(channel_count: int) -> list[str]:
         f"{SP_MESH_PREFIX}console_top",
         f"{SP_MESH_PREFIX}console_tablet",
         f"{SP_MESH_PREFIX}console_display",
+        f"{SP_MESH_PREFIX}console_chip",
         f"{SP_MESH_PREFIX}harness_trunk",
     ]
     for i in range(1, n + 1):
         p = f"{SP_CHANNEL_PREFIX}{i}_"
         stems.extend([
+            f"{p}chassis_floor",
+            f"{p}chassis_side_l",
+            f"{p}chassis_side_r",
+            f"{p}chassis_nose",
             f"{p}stepper",
             f"{p}coupler",
             f"{p}leadscrew",
@@ -559,6 +792,8 @@ def syringe_pump_checklist(channel_count: int) -> list[str]:
             f"{p}syringe",
             f"{p}tubing",
             f"{p}harness",
+            f"{p}wire0",
+            f"{p}wire1",
         ])
     return stems
 
@@ -655,16 +890,73 @@ def _selftest() -> None:
     assert _locs[1]["x"] > _locs[0]["x"], "channels step in +X"
     _ok, _miss = syringe_pump_checklist_ok(
         ["u_se_sp_base", "u_se_sp_console", "u_se_sp_console_top",
-         "u_se_sp_console_tablet", "u_se_sp_console_display", "u_se_sp_harness_trunk"]
+         "u_se_sp_console_tablet", "u_se_sp_console_display",
+         "u_se_sp_console_chip", "u_se_sp_harness_trunk"]
         + [f"u_se_sp_ch{i}_{s}" for i in range(1, 5)
-           for s in ("stepper", "coupler", "leadscrew", "carriage", "rail_a", "rail_b",
+           for s in ("chassis_floor", "chassis_side_l", "chassis_side_r", "chassis_nose",
+                     "stepper", "coupler", "leadscrew", "carriage", "rail_a", "rail_b",
                      "cradle", "cradle_v_a", "clamp_barrel", "clamp_plunger",
-                     "syringe", "tubing", "harness")],
+                     "syringe", "tubing", "harness", "wire0", "wire1")],
         4,
     )
     assert _ok and not _miss, f"full mesh set must pass checklist, miss={_miss}"
     _bad, _miss2 = syringe_pump_checklist_ok(["u_se_sp_base"], 4)
     assert (not _bad) and len(_miss2) > 0, "empty channels must fail checklist"
+    # proveCatch: gold-convergent geometry floors (modular chassis + tipped HMI).
+    assert SP_CHASSIS_NOSE_DEG >= 40.0, "bay nose must read as printed 45° chamfer"
+    assert SP_CHASSIS_SIDE_H_MM <= 40.0, "side rails must not seal into a full crate wall"
+    assert SP_CHASSIS_REAR_H_MM >= SP_STEPPER_FACE_MM, "rear shelf must seat NEMA-class motor"
+    assert 48.0 <= SP_DISPLAY_TILT_DEG <= 70.0, "tablet tip must match gold docked HMI band"
+    assert SP_HARNESS_OD_MM >= 6.0, "harness braid must survive product-cam foreshortening"
+    assert SP_CHIP_W_MM >= 40.0, "console chip must read as microfluidic stage, not a speck"
+    assert SP_CAM_EXT_Z <= 0.75, "exterior cam must not crush tipped tablet into a bar"
+    assert SP_SYRINGE_TIP_OD_MM >= 4.0, "luer tip must read against clear barrel"
+    assert SP_CONSOLE_POST_OD_MM >= 8.0, "console posts must read as open modular frame"
+    assert resolve_form_family(product_class="poseidon") == "syringe_pump"
+    assert resolve_form_family(product_class="ninjapcr") == "thermocycler"
+    assert FORM_FAMILIES["syringe_pump"]["glance_id"] == "syringe_pump"
+    # Lab microscope OPEN flexure form — class, alias, part vocab, negatives.
+    assert is_lab_microscope_form(product_class="lab_microscope"), (
+        "class slug lab_microscope must select OPEN flexure microscope form")
+    assert is_lab_microscope_form(product_class="openflexure"), (
+        "TRAINING synonym must map to the same form — not a product branch")
+    assert is_lab_microscope_form(
+        product_class="",
+        part_blob="RMS objective flexure XY stage stepper autofocus condenser",
+    ), "optics+motion part vocabulary must select the form"
+    assert not is_lab_microscope_form(product_class="colorimeter")
+    assert not is_lab_microscope_form(product_class="thermocycler")
+    assert not is_lab_microscope_form(
+        product_class="bess",
+        part_blob="random objective mention",
+        is_instrument=False,
+    ), "plant + thin optics vocab must NOT select microscope form"
+    # proveCatch: pioreactor OD optics + steppers must NOT flip to microscope
+    assert not is_lab_microscope_form(
+        product_class="benchtop_bioreactor",
+        part_blob="OD optics LED photometer stirring stepper stage vial",
+    ), "bioreactor optics+stepper must NOT select lab_microscope form"
+    assert not is_lab_microscope_form(
+        product_class="pioreactor",
+        part_blob="spectrophotometry optics stepper motor culture vial",
+    ), "pioreactor alias + bare optics must NOT select microscope form"
+    _lm_env = lab_microscope_envelope_mm()
+    assert _lm_env[2] >= _lm_env[0] * 0.9, "microscope envelope is tall benchtop class"
+    _lm_ok, _lm_miss = lab_microscope_checklist_ok([
+        "u_se_lm_body", "u_se_lm_stage", "u_se_lm_slide",
+        "u_se_lm_optics_tube", "u_se_lm_illum_arm", "u_se_lm_condenser",
+        "u_se_lm_led", "u_se_lm_sbc",
+        "u_se_lm_act_x_tower", "u_se_lm_act_x_stepper", "u_se_lm_act_x_screw",
+        "u_se_lm_act_y_tower", "u_se_lm_act_y_stepper", "u_se_lm_act_y_screw",
+        "u_se_lm_act_z_tower", "u_se_lm_act_z_stepper", "u_se_lm_act_z_screw",
+    ])
+    assert _lm_ok and not _lm_miss, f"full lm mesh set must pass, miss={_lm_miss}"
+    _lm_bad, _lm_miss2 = lab_microscope_checklist_ok(["u_se_lm_body"])
+    assert (not _lm_bad) and len(_lm_miss2) > 0, "empty actuators must fail checklist"
+    assert sum(LM_MAT_BODY_CREAM) / 3.0 >= 0.80, "body must stay cream FDM, not charcoal"
+    assert resolve_form_family(product_class="lab_microscope") == "lab_microscope"
+    assert resolve_form_family(product_class="openflexure") == "lab_microscope"
+    assert FORM_FAMILIES["lab_microscope"]["glance_id"] == "lab_microscope"
     print("instrument_form_grammar _selftest: OK (beauty + desirability + use-physics)")
 
 

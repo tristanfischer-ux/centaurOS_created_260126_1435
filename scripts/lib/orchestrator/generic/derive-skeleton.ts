@@ -435,6 +435,63 @@ function syringePumpModuleFloors(hasActuationNode: boolean): Record<string, stri
 const SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE =
   /chill|scroll\s*compressor|process_water|circulation_pump|expansion_vessel|expansion_reservoir|access_ladder|lifting_point|interface_membrane|scada|plc_cabinet|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|module_rack|storage_cell|pipework_run|distribution_manifold|fluid_filter|primary_assembly|secondary_assembly/i
 
+// ── LAB_MICROSCOPE / FLEXURE-STAGE FLOOR (Tristan 2026-07-16 — OpenFlexure) ──
+// INTENT: research printed-stage microscope BoM — motors + optics + illum + SBC.
+// FORBIDDEN: industrial plant / depth-camera robotics / DIN-rail signal conditioning
+// that inflated OpenFlexure 1310 materials to ~£640 vs gold ~£198.
+const LAB_MICROSCOPE_ACTUATION_FLOOR = [
+  'geared_stepper_motor_x',
+  'geared_stepper_motor_y',
+  'geared_stepper_motor_focus',
+  'flexure_stage_body',
+  'leadscrew_nut_assembly',
+]
+const LAB_MICROSCOPE_OPTICS_FLOOR = [
+  'rms_objective_mount',
+  'optics_tube_assembly',
+  'webcam_grade_camera',
+]
+const LAB_MICROSCOPE_ILLUM_FLOOR = [
+  'transmitted_led_illuminator',
+  'condenser_lens_assembly',
+]
+const LAB_MICROSCOPE_CONTROL_FLOOR = [
+  'motor_controller_board',
+  'sbc_compute_module',
+  'stage_limit_or_stall_sense',
+]
+const LAB_MICROSCOPE_STRUCTURE_FLOOR = [
+  'printed_main_body',
+  'sample_stage_platform',
+  'illumination_arm',
+]
+const LAB_MICROSCOPE_ENERGY_FLOOR = [
+  'usb_or_barrel_power_inlet',
+  'low_voltage_dc_supply',
+]
+const LAB_MICROSCOPE_HMI_FLOOR = [
+  'browser_ui_host_software',
+  'network_api_service',
+]
+const LAB_MICROSCOPE_MODULE_FLOORS: Record<string, string[]> = {
+  actuation_kinematics: LAB_MICROSCOPE_ACTUATION_FLOOR,
+  energy_conversion_transduction: LAB_MICROSCOPE_OPTICS_FLOOR,
+  environmental_interface: LAB_MICROSCOPE_ILLUM_FLOOR,
+  sensing_instrumentation: [
+    'focus_metric_sensor_path',
+    'illumination_feedback_photodiode',
+  ],
+  structure_containment: LAB_MICROSCOPE_STRUCTURE_FLOOR,
+  control_compute_communication: LAB_MICROSCOPE_CONTROL_FLOOR,
+  power_distribution: LAB_MICROSCOPE_ENERGY_FLOOR,
+  hmi_ergonomics: LAB_MICROSCOPE_HMI_FLOOR,
+  human_machine_interface: LAB_MICROSCOPE_HMI_FLOOR,
+  safety_protection: ['emergency_stop_or_fault_cutout', 'motor_current_limit'],
+  maintenance_serviceability: ['objective_swap_access', 'stage_calibration_fixture'],
+}
+const LAB_MICROSCOPE_FORBIDDEN_COMPONENT_RE =
+  /realsense|depth\s*camera|lidar|weidmuller|weidmüller|phoenix\s*contact|schneider|nsx\s*mccb|banner\s*ez|scada|plc_cabinet|mains_incomer|distribution_transformer|chill|scroll\s*compressor|circulation_pump|process_water|module_rack|storage_cell|access_ladder|pressure\s*transmitter|signal\s*conditioner/i
+
 /** True when the contract is a multi-channel benchtop linear syringe-dosing form.
  *  PURE — class slug OR archetype-builder quantity triad; never a product brand. */
 function hasSyringePumpSignal(contract: ContractInProgress): boolean {
@@ -451,6 +508,17 @@ function hasSyringePumpSignal(contract: ContractInProgress): boolean {
   )
 }
 
+/** True for printed flexure-stage / motorised research microscope form.
+ *  PURE — class slug OR stage_axis_count + focus_resolution_um; never a brand. */
+function hasLabMicroscopeSignal(contract: ContractInProgress): boolean {
+  const pc = String((contract as { product_class?: unknown })?.product_class ?? '').toLowerCase()
+  if (/lab[_ -]?microscope|flexure[_ -]?stage|openflexure/.test(pc)) return true
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  const axes = Number(q.stage_axis_count?.value)
+  const focusUm = Number(q.focus_resolution_um?.value)
+  return Number.isFinite(axes) && axes >= 2 && Number.isFinite(focusUm) && focusUm > 0
+}
+
 /** The energy_storage_source floor: an optical instrument's own small rechargeable
  *  battery + charge management (checked FIRST — never confused with a BESS even if a
  *  stray quantity key happens to match ENERGY_STORAGE_RE), else a battery kit for a
@@ -460,6 +528,7 @@ function energyFloorFor(contract: ContractInProgress): string[] {
   if (hasOpticalInstrumentSignal(contract)) return OPTICAL_ENERGY_STORAGE_FLOOR
   if (hasThermocyclerSignal(contract)) return THERMOCYCLER_ENERGY_FLOOR
   if (hasSyringePumpSignal(contract)) return SYRINGE_PUMP_ENERGY_FLOOR
+  if (hasLabMicroscopeSignal(contract)) return LAB_MICROSCOPE_ENERGY_FLOOR
   return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
 }
 
@@ -579,6 +648,7 @@ function componentsForModule(
   const isOpticalInstrument = hasOpticalInstrumentSignal(contract)
   const isThermocycler = hasThermocyclerSignal(contract)
   const isSyringePump = hasSyringePumpSignal(contract)
+  const isLabMicroscope = hasLabMicroscopeSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -590,6 +660,8 @@ function componentsForModule(
     if (isThermocycler && THERMOCYCLER_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Syringe-pump: never admit plant circulation / ladder / membrane vocabulary.
     if (isSyringePump && SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE.test(c)) return
+    // Lab microscope: never admit robotics depth cams / DIN-rail industrial I/O.
+    if (isLabMicroscope && LAB_MICROSCOPE_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Never admit a DIMENSION/PROPERTY name as a part (it is an attribute of its parent device).
     if (PROPERTY_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
@@ -604,14 +676,17 @@ function componentsForModule(
   // to 5 left stepper_motor / stepper_driver_board off the BoM while cradle +
   // clamp + screw + rail + carriage already satisfied density — Interconnect
   // then had no actuation principals and Blender lost the NEMA/coupler story.
-  // Optical / thermocycler floors get the same full-union rule (same bug class).
+  // Optical / thermocycler / lab_microscope floors get the same full-union rule.
   const syringeFloors = isSyringePump
     ? syringePumpModuleFloors(Boolean(opts.syringeHasActuationNode))
     : null
   const instrumentFloor =
     (syringeFloors && syringeFloors[moduleKey])
+    || (isLabMicroscope && LAB_MICROSCOPE_MODULE_FLOORS[moduleKey])
     || (isThermocycler && THERMOCYCLER_MODULE_FLOORS[moduleKey])
-    || (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey])
+    // GOTCHA: lab_microscope must NOT fall through to OPTICAL_MODULE_FLOORS
+    // (cuvette/colorimeter vocabulary) — checked before optical.
+    || (isOpticalInstrument && !isLabMicroscope && OPTICAL_MODULE_FLOORS[moduleKey])
     || null
   if (instrumentFloor) {
     for (const c of instrumentFloor) push(c)
