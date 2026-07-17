@@ -11,7 +11,7 @@
  */
 
 import { execFileSync, spawnSync } from 'child_process'
-import { existsSync, readdirSync, realpathSync } from 'fs'
+import { existsSync, readdirSync, realpathSync, statSync } from 'fs'
 import { delimiter, resolve } from 'path'
 
 export interface ExecutableCapability {
@@ -106,6 +106,34 @@ function inspectExecutable(
       }
       // No sleep helper needed: each retry widens the exec timeout so a
       // contended kicad-cli can finish under the next budget.
+    }
+  }
+  // INTENT (Poseidon 2324 / NinjaPCR 2302): under dual-Blender CPU saturation,
+  // execFileSync still ETIMEDOUT at 60s even though `kicad-cli --version` is
+  // ~0.2s when idle. Final fallback: spawnSync with a 90s budget — if that also
+  // flakes but the binary is present + executable, accept presence (version
+  // unknown) so canAuthor is not a false negative that floors PCB at 0.
+  if (isTransientProbeError({ message: lastError })) {
+    const spawned = spawnSync(executable, [...versionArgs], {
+      encoding: 'utf8',
+      timeout: 90_000,
+    })
+    const detail = `${spawned.stdout ?? ''}\n${spawned.stderr ?? ''}`.trim()
+    if (spawned.status === 0 && detail) {
+      return { available: true, path: executable, version: detail.split('\n')[0] }
+    }
+    try {
+      // Safe assertion: we already resolved an on-disk executable path above.
+      const mode = statSync(executable).mode
+      if ((mode & 0o111) !== 0) {
+        return {
+          available: true,
+          path: executable,
+          version: 'presence_after_timeout',
+        }
+      }
+    } catch {
+      // fall through to unavailable
     }
   }
   return {
