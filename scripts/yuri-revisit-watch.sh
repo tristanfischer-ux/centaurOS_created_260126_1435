@@ -13,13 +13,16 @@ LOG="$ROOT/out/logs/yuri-revisit-watch.log"
 mkdir -p "$ROOT/out/logs"
 
 if ! mkdir "$LOCKDIR" 2>/dev/null; then
-  echo "[$(date -Iseconds)] revisit already locked ($LOCKDIR pid=$(cat "$LOCKDIR/pid" 2>/dev/null || echo ?))" | tee -a "$LOG"
+  # stdout only — callers redirect to $LOG; tee-a+$redirect doubled every line.
+  echo "[$(date -Iseconds)] revisit already locked ($LOCKDIR pid=$(cat "$LOCKDIR/pid" 2>/dev/null || echo ?))"
   exit 0
 fi
 echo $$ >"$LOCKDIR/pid"
 trap 'rm -rf "$LOCKDIR"' EXIT
 
-log() { echo "[$(date -Iseconds)] $*" | tee -a "$LOG"; }
+# GOTCHA: do NOT tee -a "$LOG" here — campaign launchers already redirect
+# stdout/stderr to $LOG (nohup >>LOG). tee+redirect wrote every line twice.
+log() { echo "[$(date -Iseconds)] $*"; }
 
 latest_out() {
   local prefix="$1" d best=""
