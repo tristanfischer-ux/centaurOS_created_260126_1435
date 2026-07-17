@@ -44,6 +44,7 @@ from pathlib import Path
 _THIS = Path(__file__).resolve().parent
 _REPO = _THIS.parent.parent
 sys.path.insert(0, str(_REPO / "scripts" / "lib"))
+from blender_out_lock import blender_out_dir_lock  # noqa: E402
 from render_view_contract import (  # noqa: E402
     drawing_form_factor,
     is_product_scale,
@@ -128,15 +129,17 @@ def ensure_cad_artifacts(state_path: Path, out_dir: Path,
     log.append(f"build: running headless Blender to produce CAD artifacts → {out_dir}")
     env = dict(os.environ, BLENDER_OUT_DIR=str(out_dir), STATE_JSON=str(state_path))
     try:
-        proc = subprocess.run(
-            [blender, "--background", "--python",
-             str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
-            # 1500 s: a heavy scene (e.g. a RAS with 8 parallel treatment trains × 24
-            # units + the building take-off + 90+ routed connections) exceeds the old
-            # 600 s here — the build then returns "artifacts=MISSING" and the whole BoM +
-            # drawing set silently vanish. The render step already allows 900 s; the CAD
-            # build (geometry + orthogonal routing + manifest export) is heavier. (2026-06-16)
-            env=env, capture_output=True, text=True, timeout=1500)
+        # INTENT: wait for blender-bg product cams — never race two Blenders on out_dir.
+        with blender_out_dir_lock(out_dir, timeout_s=2400.0):
+            proc = subprocess.run(
+                [blender, "--background", "--python",
+                 str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
+                # 1500 s: a heavy scene (e.g. a RAS with 8 parallel treatment trains × 24
+                # units + the building take-off + 90+ routed connections) exceeds the old
+                # 600 s here — the build then returns "artifacts=MISSING" and the whole BoM +
+                # drawing set silently vanish. The render step already allows 900 s; the CAD
+                # build (geometry + orthogonal routing + manifest export) is heavier. (2026-06-16)
+                env=env, capture_output=True, text=True, timeout=1500)
     except Exception as exc:  # noqa: BLE001
         log.append(f"SKIP: Blender build failed to launch: {type(exc).__name__}: {exc}")
         return False
@@ -275,10 +278,11 @@ def _run_shaded_hero_pass(out_dir: Path, state_path: Path,
                STATE_JSON=str(state_path), INSPECT="0")
     log.append("shaded-hero: running INSPECT=0 Blender pass → 00-hero.png")
     try:
-        proc = subprocess.run(
-            [blender, "--background", "--python",
-             str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
-            env=env, capture_output=True, text=True, timeout=1500)
+        with blender_out_dir_lock(out_dir, timeout_s=2400.0):
+            proc = subprocess.run(
+                [blender, "--background", "--python",
+                 str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
+                env=env, capture_output=True, text=True, timeout=1500)
     except Exception as exc:  # noqa: BLE001
         log.append(f"shaded-hero: Blender launch failed: {exc}")
         return False
@@ -315,10 +319,11 @@ def _run_exterior_pass(out_dir: Path, state_path: Path,
                STATE_JSON=str(state_path), INSPECT="0", BLENDER_PLANT_SHELL="1")
     log.append("exterior: running INSPECT=0 BLENDER_PLANT_SHELL=1 Blender pass → exterior/")
     try:
-        proc = subprocess.run(
-            [blender, "--background", "--python",
-             str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
-            env=env, capture_output=True, text=True, timeout=1500)
+        with blender_out_dir_lock(out_dir, timeout_s=2400.0):
+            proc = subprocess.run(
+                [blender, "--background", "--python",
+                 str(_THIS / "build_universal_scene.py"), "--", str(state_path)],
+                env=env, capture_output=True, text=True, timeout=1500)
     except Exception as exc:  # noqa: BLE001
         log.append(f"exterior: Blender launch failed: {exc}")
         return False

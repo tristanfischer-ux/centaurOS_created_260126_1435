@@ -43,6 +43,8 @@ TEMPLATES_DIR = REPO_ROOT / "scripts" / "blender-templates"
 BLENDER_BIN = os.environ.get(
     "BLENDER_BIN", "/Applications/Blender.app/Contents/MacOS/Blender"
 )
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+from blender_out_lock import blender_out_dir_lock  # noqa: E402
 
 # product_class → template filename. Substring match: any product_class
 # CONTAINING the key uses the matching template. Order doesn't matter for
@@ -230,53 +232,60 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
     env["BLENDER_OUT_DIR"] = str(out_dir)
     env["INSPECT"] = "1"  # produce the inspect-*.png whole-plant renders
     print(f"[render-scene] no per-class template → UNIVERSAL builder {universal.name}", flush=True)
+    shaded_ok = False
+    inspect_hero = out_dir / "inspect-hero.png"
+    # INTENT (Poseidon 2324): hold out_dir lock across BOTH inspect + shaded passes
+    # so generate_drawing_set cannot interleave a third Blender on the same stamp.
     try:
-        subprocess.run(
-            [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
-            env=env,
-            check=True,
-            timeout=900,
-        )
+        with blender_out_dir_lock(out_dir, timeout_s=2400.0):
+            subprocess.run(
+                [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+                env=env,
+                check=True,
+                timeout=900,
+            )
+            # SHADED HERO PASS (council 2026-06-16, render scored 3/10 "blobby"): the INSPECT=1
+            # pass above produced the FLAT even-fill inspect-*.png — the fast input for the 2D
+            # drawings, but a shallow open RAS tank rendered flat reads as a flat green DISC. The
+            # dossier COVER + module pages must be SHADED. Run a SECOND pass with INSPECT=0 → the
+            # studio KEY-SUN + soft-shadow + white-world rig (build_universal_scene's else-branch
+            # + run_render_pipeline) writes a shaded 00-hero.png + module-<id>.png DIRECTLY. In
+            # INSPECT=0 the pipe-diameter legibility FLOOR is also off, so the pipework renders at
+            # its true (thinner) gauge — fixing the "fat tangle" at the same time. ~2× render, correct.
+            env_shaded = os.environ.copy()
+            env_shaded["BLENDER_OUT_DIR"] = str(out_dir)
+            env_shaded["INSPECT"] = "0"
+            env_shaded["BLENDER_PRESENTATION_BEVEL"] = "1"
+            try:
+                subprocess.run(
+                    [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
+                    env=env_shaded, check=True, timeout=900,
+                )
+                hero_path = out_dir / "00-hero.png"
+                # GOTCHA (colorimeter 2254): exists()-only was True when a PRIOR inspect
+                # fallback left 00-hero.png identical to inspect-hero while 04–07 product
+                # cams wrote successfully — vision critic then floored Renders on the
+                # labelled CAD arch. Require a real shaded hero ≠ inspect-hero.
+                if hero_path.exists():
+                    if inspect_hero.exists() and hero_path.read_bytes() == inspect_hero.read_bytes():
+                        print("[render-scene] shaded hero pass: 00-hero is still inspect-hero "
+                              "(byte-identical) — treating as MISSING", flush=True)
+                    else:
+                        shaded_ok = True
+                print(f"[render-scene] shaded hero pass: 00-hero="
+                      f"{'shaded OK' if shaded_ok else 'MISSING'}", flush=True)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                print(f"[render-scene] shaded hero pass failed ({e}) — falling back",
+                      file=sys.stderr)
     except subprocess.CalledProcessError as e:
         print(f"[render-scene] FATAL: universal builder exited {e.returncode}", file=sys.stderr)
         return 6
     except subprocess.TimeoutExpired:
         print("[render-scene] FATAL: universal builder timed out", file=sys.stderr)
         return 6
-
-    # SHADED HERO PASS (council 2026-06-16, render scored 3/10 "blobby"): the INSPECT=1
-    # pass above produced the FLAT even-fill inspect-*.png — the fast input for the 2D
-    # drawings, but a shallow open RAS tank rendered flat reads as a flat green DISC. The
-    # dossier COVER + module pages must be SHADED. Run a SECOND pass with INSPECT=0 → the
-    # studio KEY-SUN + soft-shadow + white-world rig (build_universal_scene's else-branch
-    # + run_render_pipeline) writes a shaded 00-hero.png + module-<id>.png DIRECTLY. In
-    # INSPECT=0 the pipe-diameter legibility FLOOR is also off, so the pipework renders at
-    # its true (thinner) gauge — fixing the "fat tangle" at the same time. ~2× render, correct.
-    env_shaded = os.environ.copy()
-    env_shaded["BLENDER_OUT_DIR"] = str(out_dir)
-    env_shaded["INSPECT"] = "0"
-    env_shaded["BLENDER_PRESENTATION_BEVEL"] = "1"
-    shaded_ok = False
-    inspect_hero = out_dir / "inspect-hero.png"
-    try:
-        subprocess.run(
-            [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
-            env=env_shaded, check=True, timeout=900,
-        )
-        hero_path = out_dir / "00-hero.png"
-        # GOTCHA (colorimeter 2254): exists()-only was True when a PRIOR inspect
-        # fallback left 00-hero.png identical to inspect-hero while 04–07 product
-        # cams wrote successfully — vision critic then floored Renders on the
-        # labelled CAD arch. Require a real shaded hero ≠ inspect-hero.
-        if hero_path.exists():
-            if inspect_hero.exists() and hero_path.read_bytes() == inspect_hero.read_bytes():
-                print("[render-scene] shaded hero pass: 00-hero is still inspect-hero "
-                      "(byte-identical) — treating as MISSING", flush=True)
-            else:
-                shaded_ok = True
-        print(f"[render-scene] shaded hero pass: 00-hero={'shaded OK' if shaded_ok else 'MISSING'}", flush=True)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        print(f"[render-scene] shaded hero pass failed ({e}) — falling back", file=sys.stderr)
+    except TimeoutError as e:
+        print(f"[render-scene] FATAL: {e}", file=sys.stderr)
+        return 6
 
     iso = out_dir / "inspect-iso.png"
     hero = inspect_hero if inspect_hero.exists() else (out_dir / "inspect-hero.png")
