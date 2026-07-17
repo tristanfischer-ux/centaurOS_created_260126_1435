@@ -169,7 +169,14 @@ wait_for_settle() {
       continue
     fi
     idle=$((idle + 60))
-    if [[ $idle -ge 180 && -n "$dir" && "$dir_epoch" -ge "$since_epoch" ]]; then
+    # GOTCHA (2026-07-17 pioreactor): launch failed after board GATE CLOSED →
+    # mkdir'd empty stamp dir OR latest_out still points at an OLD run whose
+    # mtime < since_epoch. Without this branch the watch spun for hours.
+    if [[ $idle -ge 180 ]]; then
+      if [[ -z "$dir" || "$dir_epoch" -lt "$since_epoch" ]]; then
+        log "WARN: $label launch never produced a new out/ dir (latest mtime < launch) — relaunch"
+        return 2
+      fi
       if [[ -f "$dir/0-original-brief.md" && ! -f "$dir/state.json" ]]; then
         log "WARN: $label stalled without state.json — relaunch once"
         return 2
