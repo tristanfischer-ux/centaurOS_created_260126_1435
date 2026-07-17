@@ -36,7 +36,7 @@
  *                                          [--no-rerender]
  */
 
-import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
+import { readFileSync, existsSync, statSync, writeFileSync, mkdtempSync, rmSync, mkdirSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve, dirname, join } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
