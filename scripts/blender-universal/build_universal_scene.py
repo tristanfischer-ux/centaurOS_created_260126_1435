@@ -12906,11 +12906,12 @@ def _prepare_sealed_product_view(view_name, entering):
                 if obj.name.startswith("u_se_exterior_detail_"):
                     # Coloured harness strands are cutaway-only; closed product keeps
                     # jacket + boot + LED window, not a crayon ribbon on 04–07.
-                    # GOTCHA (2219): cuvette_fluid / tall cuvette_insert read as a
-                    # floating pale cylinder on 04-exterior — keep them off.
+                    # GOTCHA (2219): cuvette_fluid / cuvette_insert read as a
+                    # floating pale cylinder on 04-exterior. Closed product shows
+                    # open well + rim + parked cap (gold accessory language).
                     if re.search(r"source_harness_\d+$", obj.name):
                         obj.hide_render = True
-                    elif "cuvette_fluid" in obj.name:
+                    elif "cuvette_fluid" in obj.name or "cuvette_insert" in obj.name:
                         obj.hide_render = True
                     else:
                         obj.hide_render = False
