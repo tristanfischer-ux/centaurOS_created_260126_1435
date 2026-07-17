@@ -1124,45 +1124,64 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
     # identical — only the structure material differs.
     HERO_STRUCTURE_MAT = make_hero_open_frame_steel() if hero_open_frame else make_hero_ghost()
     structure_objs = module_objects.get(structure_module_id, []) if structure_module_id else []
+    # Product/interior story meshes must keep their authored materials on the hero —
+    # painting them steel/ghost was the root cause of the colorimeter reading as a
+    # featureless grey box (2026-07-13).
+    _HERO_MAT_EXEMPT_PREFIXES = (
+        "u_se_instrument_story_", "u_se_product_", "u_se_exterior_detail_",
+        "u_se_cutaway_cue_",
+    )
     hero_snap = {}
     for obj in structure_objs:
+        if any(obj.name.startswith(p) for p in _HERO_MAT_EXEMPT_PREFIXES):
+            continue
         if obj.data and obj.data.materials:
             hero_snap[obj.name] = list(obj.data.materials)
             obj.data.materials.clear()
             obj.data.materials.append(HERO_STRUCTURE_MAT)
 
     clear_cameras()
-    if hero_camera_override:
-        setup_camera(**hero_camera_override)
-        _hero_loc, _hero_target = hero_camera_override["loc"], hero_camera_override["target"]
-    else:
-        (xmin, xmax), (ymin, ymax), (zmin, zmax) = compute_scene_bbox()
-        cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
-        if flat_form_factor:
-            horizontal_max = max(xmax-xmin, ymax-ymin)
-            hero_diag = horizontal_max * 1.6 / math.sqrt(2)
-            _hero_loc = (cx + hero_diag, cy - hero_diag, cz + horizontal_max * 0.20)
-            _hero_target = (cx, cy, cz)
-            setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=horizontal_max * 1.10)
+    # INTENT: sealed products may need a different shell for the hero than for
+    # spatial views (instruments: closed product as 00-hero; cabinets: cutaway).
+    # Spatial cameras already go through view_preparer; the hero pass must too,
+    # otherwise 00-hero silently inherits the last cutaway baseline.
+    if view_preparer is not None:
+        view_preparer("00-hero", True)
+    try:
+        if hero_camera_override:
+            setup_camera(**hero_camera_override)
+            _hero_loc, _hero_target = hero_camera_override["loc"], hero_camera_override["target"]
         else:
-            max_dim = max(xmax-xmin, ymax-ymin, zmax-zmin)
-            hero_diag = max_dim * 2.0 / math.sqrt(2)
-            _hero_loc = (cx + hero_diag, cy - hero_diag, cz + max_dim * 0.45)
-            _hero_target = (cx, cy, cz)
-            setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=max_dim * 1.20)
-    orient_billboards_to_camera(_hero_loc, _hero_target)   # tag chips face the hero camera
-    disable_freestyle()
-    # Phase B item 8 (2026-05-24): opt-in Cycles ray-trace for hero only.
-    # Enable via run_render_pipeline(..., hero_cycles=True) or env
-    # BLENDER_HERO_CYCLES=1. Adds ~30 s but produces CAD-presentation hero.
-    use_cycles = cycles_active or hero_cycles or os.environ.get("BLENDER_HERO_CYCLES") == "1"
-    if use_cycles and not cycles_active:
-        init_scene_cycles_hero()
-    scene.render.filepath = str(out_dir / "00-hero.png")
-    bpy.ops.render.render(write_still=True)
-    print("[forge] 00-hero.png" + (" (Cycles)" if use_cycles else ""))
-    if use_cycles:
-        init_scene_back_to_eevee()
+            (xmin, xmax), (ymin, ymax), (zmin, zmax) = compute_scene_bbox()
+            cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
+            if flat_form_factor:
+                horizontal_max = max(xmax-xmin, ymax-ymin)
+                hero_diag = horizontal_max * 1.6 / math.sqrt(2)
+                _hero_loc = (cx + hero_diag, cy - hero_diag, cz + horizontal_max * 0.20)
+                _hero_target = (cx, cy, cz)
+                setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=horizontal_max * 1.10)
+            else:
+                max_dim = max(xmax-xmin, ymax-ymin, zmax-zmin)
+                hero_diag = max_dim * 2.0 / math.sqrt(2)
+                _hero_loc = (cx + hero_diag, cy - hero_diag, cz + max_dim * 0.45)
+                _hero_target = (cx, cy, cz)
+                setup_camera(loc=_hero_loc, target=_hero_target, ortho_scale=max_dim * 1.20)
+        orient_billboards_to_camera(_hero_loc, _hero_target)   # tag chips face the hero camera
+        disable_freestyle()
+        # Phase B item 8 (2026-05-24): opt-in Cycles ray-trace for hero only.
+        # Enable via run_render_pipeline(..., hero_cycles=True) or env
+        # BLENDER_HERO_CYCLES=1. Adds ~30 s but produces CAD-presentation hero.
+        use_cycles = cycles_active or hero_cycles or os.environ.get("BLENDER_HERO_CYCLES") == "1"
+        if use_cycles and not cycles_active:
+            init_scene_cycles_hero()
+        scene.render.filepath = str(out_dir / "00-hero.png")
+        bpy.ops.render.render(write_still=True)
+        print("[forge] 00-hero.png" + (" (Cycles)" if use_cycles else ""))
+        if use_cycles:
+            init_scene_back_to_eevee()
+    finally:
+        if view_preparer is not None:
+            view_preparer("00-hero", False)
 
     # Restore structure materials
     for name, mats in hero_snap.items():

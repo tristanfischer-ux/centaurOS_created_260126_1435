@@ -68,6 +68,11 @@
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import {
+  dbHitAcceptableForWord,
+  setInstrumentDeviceContext,
+  type DbPart,
+} from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 import { lookupCached } from '../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 // ── CURATED-TABLE SKIP ───────────────────────────────────────────────────────
@@ -282,7 +287,9 @@ export interface PartRealityCheckResult {
 export async function runPartRealityCheck(
   state: any,
   libraryCandidates: any,
+  opts: { isInstrumentDevice?: boolean } = {},
 ): Promise<PartRealityCheckResult> {
+  if (opts.isInstrumentDevice) setInstrumentDeviceContext(true)
   const result: PartRealityCheckResult = {
     words_checked: 0,
     words_real: 0,
@@ -367,6 +374,16 @@ export async function runPartRealityCheck(
       if (candidateCheck.nexar_tried) result.nexar_calls += 1
 
       if (!candidateCheck.real) continue
+
+      const wordName = String(word.name_human ?? word_id)
+      const substHit: DbPart = {
+        part_name: String(candidate.part_name ?? ''),
+        manufacturer: candidateMfr,
+        part_number: candidateMpn,
+        component_class: String(candidate.component_class ?? libraryClass ?? ''),
+        unit_price_gbp: null,
+      }
+      if (!dbHitAcceptableForWord(substHit, wordName)) continue
 
       // Found a real substitute — patch the word in-place
       const mods: Array<{ kind: string; value: string }> = word.modifier_characters ?? []

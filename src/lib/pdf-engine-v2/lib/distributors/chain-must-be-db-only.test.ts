@@ -48,6 +48,10 @@ const CHAIN_SIDE_FILES_UNDER_TEST = [
   'scripts/lib/per-line-price-plausibility-audit.ts',
   'scripts/lib/orchestrator/tools/distributor-cascade-real.ts',
   'scripts/lib/part-reality-check.ts',
+  // PCB Phase B (2026-07-12): the atopile generator's MPN resolution tier uses
+  // lookupCached() only — it must never hit a live distributor for footprint
+  // derivation (it isn't the ingest path; that would burn quota per chain run).
+  'src/lib/pdf-engine-v2/lib/pcb/atopile-generator.ts',
 ]
 
 // Pattern that identifies a forbidden live-adapter import.

@@ -45,7 +45,9 @@ _THIS = Path(__file__).resolve().parent
 _REPO = _THIS.parent.parent
 sys.path.insert(0, str(_REPO / "scripts" / "lib"))
 from render_view_contract import (  # noqa: E402
+    drawing_form_factor,
     is_product_scale,
+    pack_drawings,
     required_views,
     resolve_design_envelope_mm,
 )
@@ -64,6 +66,9 @@ SYSTEM_DRAWINGS = [
      "Single-Line Electrical Diagram"),
     ("pid", "draw_pid.py", "pid.png",
      "Piping & Instrumentation Diagram"),
+    # Handheld pack only (fluid-less instruments) — wiring/signal blueprint.
+    ("interconnect", "draw_interconnect.py", "interconnect.png",
+     "Interconnect — device wiring & signal paths"),
 ]
 SCHEDULE_DRAWINGS = [
     ("process-schedules", "draw_process_schedules.py", "process-schedules.png",
@@ -142,16 +147,117 @@ def ensure_cad_artifacts(state_path: Path, out_dir: Path,
     return ok
 
 
+def _render_fresh_vs_manifest(render: Path, manifest: Path) -> bool:
+    """True when `render` is usable as a view of THIS parts-manifest generation.
+
+    INTENT: a pre-settle Phase-5 01-top/00-hero must never skip the late pass when
+    the settle loop has since rewritten parts-manifest.json (Codema 2026-07-14:
+    GA from settled 54-part layout, Blender plan from stale 61-part bg pass)."""
+    if not render.exists() or render.stat().st_size < 1000:
+        return False
+    if not manifest.exists():
+        return True
+    # Allow 2 s clock skew; manifest newer than the render ⇒ stale.
+    return render.stat().st_mtime + 2.0 >= manifest.stat().st_mtime
+
+
+def _restamp_system_svg_placement_fps(out_dir: Path, log: list[str]) -> None:
+    """After the FINAL parts-manifest is settled, every system SVG must carry its fp.
+
+    INTENT (Powerwall 2026-07-15): display-only GA transforms (product FFL rebase)
+    used to embed a fingerprint of the *mutated* GAParts while P&ID/SLD stamped the
+    settled manifest — G15/G16 then fired. Re-stamp from the settled manifest so a
+    divergent data-placement-fp can never ship, even if a generator forgets.
+    NA-BY-DESIGN sheets are left alone. Content staleness is still caught by G16
+    phantom-tag checks on placement-projected sheets.
+    """
+    try:
+        sys.path.insert(0, str(_THIS))
+        from placement_fp import (  # noqa: E402
+            embed_svg_placement_fp,
+            extract_svg_placement_fp,
+            is_na_by_design,
+            load_manifest_placement_fp,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.append(f"placement-fp restamp: SKIP (import: {exc})")
+        return
+    fp = load_manifest_placement_fp(str(out_dir))
+    if not fp:
+        log.append("placement-fp restamp: SKIP (no settled placement_fp)")
+        return
+    draw = out_dir / "drawings"
+    if not draw.is_dir():
+        return
+    n_fixed = 0
+    for svg_path in sorted(draw.glob("*.svg")):
+        try:
+            txt = svg_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if len(txt) < 40 or is_na_by_design(txt):
+            continue
+        got = extract_svg_placement_fp(txt)
+        if got == fp:
+            continue
+        try:
+            svg_path.write_text(embed_svg_placement_fp(txt, fp), encoding="utf-8")
+            n_fixed += 1
+        except OSError as exc:
+            log.append(f"placement-fp restamp: {svg_path.name} write failed: {exc}")
+    if n_fixed:
+        log.append(f"placement-fp restamp: {n_fixed} SVG(s) → {fp}")
+    else:
+        log.append(f"placement-fp restamp: all system SVGs already match {fp}")
+
+
+def _align_plan_render_to_manifest(out_dir: Path, log: list[str]) -> None:
+    """Promote inspect-top.png → 01-top.png when it shares generation with the
+    canonical parts-manifest (the SAME INSPECT=1 placement the GA was drawn from).
+
+    DECISION: the shaded INSPECT=0 hero pass may RE-PLACE (control-cabinet
+    consolidate etc.); after the canon-manifest restore those PNGs no longer match
+    the GA. The settle-loop inspect-top IS the Blender plan of the GA placement —
+    use it as the Excel-bound annotated plan so GA ≠ Blender-plan cannot ship.
+
+    GOTCHA: settle writes inspect-top a few seconds before the final manifest
+    touch (or a skipped hero leaves a much older shaded 01-top). Allow a 30-min
+    window so a slightly-older inspect-top still wins over a divergent shaded plan."""
+    manifest = out_dir / "parts-manifest.json"
+    inspect_top = out_dir / "inspect-top.png"
+    plan = out_dir / "01-top.png"
+    if not (inspect_top.exists() and inspect_top.stat().st_size > 1000 and manifest.exists()):
+        return
+    age = manifest.stat().st_mtime - inspect_top.stat().st_mtime
+    if age > 1800:  # inspect more than 30 min older than manifest — different run
+        log.append(f"plan-align: inspect-top.png too old vs parts-manifest "
+                   f"({age:.0f}s) — leave 01-top.png")
+        return
+    try:
+        shutil.copy2(inspect_top, plan)
+        # copy2 preserves the older inspect mtime — bump so G15 freshness passes.
+        import os
+        os.utime(plan, None)
+        log.append("plan-align: 01-top.png ← inspect-top.png "
+                   "(same INSPECT=1 placement as GA / parts-manifest)")
+    except OSError as exc:
+        log.append(f"plan-align: copy failed: {exc}")
+
+
 def _run_shaded_hero_pass(out_dir: Path, state_path: Path,
                           log: list[str]) -> bool:
     """Run a second Blender pass with INSPECT=0 to produce the SHADED studio
     hero (00-hero.png + blender-cover.png). The settle loop ran INSPECT=1
     (flat color-coded inspect-*.png); this pass re-renders with studio key-sun
-    + soft shadows. Skipped if 00-hero.png already exists. Non-fatal."""
+    + soft shadows. Skipped only when 00-hero.png is FRESH vs parts-manifest
+    (Codema 2026-07-14 — existence alone is not enough). Non-fatal."""
     hero = out_dir / "00-hero.png"
-    if hero.exists() and hero.stat().st_size > 1000:
-        log.append("shaded-hero: 00-hero.png already present — skip")
+    manifest = out_dir / "parts-manifest.json"
+    if _render_fresh_vs_manifest(hero, manifest):
+        log.append("shaded-hero: 00-hero.png fresh vs parts-manifest — skip")
         return True
+    if hero.exists():
+        log.append("shaded-hero: 00-hero.png STALE vs parts-manifest — re-render")
     blender = _blender_bin()
     if not blender:
         log.append("shaded-hero: SKIP — blender not on PATH")
@@ -186,9 +292,12 @@ def _run_exterior_pass(out_dir: Path, state_path: Path,
     was never produced (Tristan 2026-06-24: "two internal + two external; only one internal
     shows"). Skipped if exterior/00-hero.png already exists. Non-fatal."""
     ext_hero = out_dir / "exterior" / "00-hero.png"
-    if ext_hero.exists() and ext_hero.stat().st_size > 1000:
-        log.append("exterior: exterior/00-hero.png already present — skip")
+    manifest = out_dir / "parts-manifest.json"
+    if _render_fresh_vs_manifest(ext_hero, manifest):
+        log.append("exterior: exterior/00-hero.png fresh vs parts-manifest — skip")
         return True
+    if ext_hero.exists():
+        log.append("exterior: exterior/00-hero.png STALE vs parts-manifest — re-render")
     blender = _blender_bin()
     if not blender:
         log.append("exterior: SKIP — blender not on PATH")
@@ -556,10 +665,66 @@ def generate_drawing_set(state_path: str | Path,
             print(f"[drawing-set] BUDGET={budget} FAILED: {e}", file=sys.stderr)
             log.append(f"budget: FAILED: {e}")
 
+    try:
+        _state_for_gate = json.loads(state_path.read_text())
+    except Exception:  # noqa: BLE001
+        _state_for_gate = {}
+    # INTENT (2026-07-14): form-factor pack — fluid-less handhelds must NOT emit
+    # P&ID/BFD/process/HVAC stubs (NA files still polluted the dossier). Interconnect
+    # is handheld-only. Codema plant + Powerwall sealed_cabinet keep their sets.
+    _form = drawing_form_factor(_state_for_gate)
+    _allowed = pack_drawings(_state_for_gate)
+    log.append(f"form-factor pack: {_form} · allowed={sorted(_allowed)}")
+
+    # INTENT: remove stale plant stubs from a prior pack so the Drawings register
+    # / Excel cannot resurface a fluid-less handheld's NA-BY-DESIGN P&ID.
+    _STEM_BY_KEY = {
+        "pid": "pid", "bfd": "block-flow-diagram",
+        "process-schedules": "process-schedules", "hvac": "hvac-layout",
+        "general-arrangement": "general-arrangement",
+        "single-line": "single-line-diagram",
+        "panel-schedule": "panel-schedule",
+        "interconnect": "interconnect",
+        "facility-layout": "facility-layout",
+        "distribution-interface": "distribution-interface",
+    }
+    _drawings_dir = out_dir / "drawings"
+    for _k, _stem in _STEM_BY_KEY.items():
+        if _k in _allowed:
+            continue
+        # Clear master PNG/SVG AND leftover A1 print-set artefacts so a fluid-less
+        # handheld cannot resurface a prior plant P&ID/BFD from the Drawings folder.
+        _a1_stem = {"block-flow-diagram": "bfd", "single-line-diagram": "single-line",
+                    "general-arrangement": "ga", "hvac-layout": "hvac",
+                    "pid": "pid", "interconnect": "interconnect",
+                    "process-schedules": "process-schedules",
+                    "panel-schedule": "panel-schedule"}.get(_stem, _stem)
+        for _name in (
+            f"{_stem}.png", f"{_stem}.svg", f"{_stem}.md",
+            f"{_a1_stem}-A1.pdf", f"{_a1_stem}-A1.json",
+        ):
+            _p = _drawings_dir / _name
+            if _p.exists():
+                try:
+                    _p.unlink()
+                    log.append(f"  purged stale {_p.name} (not in {_form} pack)")
+                except OSError:
+                    pass
+
     def _group(rows: list[tuple]) -> list[dict]:
         out = []
         for key, script, png_name, title in rows:
-            ok = have_cad and _run_generator(script, out_dir, state_path, png_name, log)
+            if key not in _allowed:
+                log.append(f"  {script}: skipped (not in {_form} pack)")
+                continue
+            # Interconnect needs only state + ledger — run even without full CAD.
+            needs_cad = key not in ("interconnect",)
+            ok = (have_cad or not needs_cad) and _run_generator(
+                script, out_dir, state_path, png_name, log)
+            svg_sib = out_dir / "drawings" / png_name.replace(".png", ".svg")
+            if not ok and svg_sib.exists() and svg_sib.stat().st_size > 200:
+                ok = True
+                log.append(f"  {script}: SVG master present (PNG rasteriser absent)")
             out.append({
                 "key": key, "title": title, "script": script,
                 "png": f"drawings/{png_name}",
@@ -575,11 +740,10 @@ def generate_drawing_set(state_path: str | Path,
     # script's should_emit(state); skip silently when not applicable. These need
     # ONLY state.json (no CAD artifacts) — same philosophy as the BFD.
     conditional: list[dict] = []
-    try:
-        _state_for_gate = json.loads(state_path.read_text())
-    except Exception:  # noqa: BLE001
-        _state_for_gate = {}
     for key, script, png_name, title, gate_name in CONDITIONAL_DRAWINGS:
+        if key not in _allowed:
+            log.append(f"  {script}: skipped (not in {_form} pack)")
+            continue
         try:
             import importlib.util
             spec = importlib.util.spec_from_file_location(
@@ -622,9 +786,16 @@ def generate_drawing_set(state_path: str | Path,
     # artifacts are optional enrichment), so it runs regardless of have_cad (it
     # renders even when Blender is absent). The renderer's EngineeringBasisPage reads
     # block_flow_diagram to replace the degraded process-flow box-list for non-CO2.
-    bfd_ok = _run_generator("draw_bfd.py", out_dir, state_path,
-                            "block-flow-diagram.png", log)
-    bfd_path = str(out_dir / "drawings" / "block-flow-diagram.png") if bfd_ok else None
+    # SKIP for fluid-less handheld pack (no process train to summarise).
+    bfd_ok = False
+    bfd_path = None
+    if "bfd" in _allowed:
+        bfd_ok = _run_generator("draw_bfd.py", out_dir, state_path,
+                                "block-flow-diagram.png", log)
+        bfd_path = (str(out_dir / "drawings" / "block-flow-diagram.png")
+                    if bfd_ok else None)
+    else:
+        log.append("  draw_bfd.py: skipped (not in form-factor pack)")
 
     # ── ONE SOURCE OF TRUTH (Tristan 2026-06-26: "the Blender model sets the connection lengths, so the
     #    GA must follow the Blender model exactly — one source of truth"). The CANONICAL placement is the
@@ -681,6 +852,28 @@ def generate_drawing_set(state_path: str | Path,
         except Exception:  # noqa: BLE001
             pass
 
+    # ── PUBLISH CANON → every non-'_' mirror (blender/renders/, …) ──
+    # INTENT: early/shaded Blender passes leave a second parts-manifest under
+    # blender/renders/ with pre-settle positions. Excel floors Renders+Assembly on
+    # LAYOUT DIVERGENCE when those disagree with the root. After restore, overwrite
+    # every delivered mirror so ONE placement is the only story (CORE FIX PRINCIPLE).
+    try:
+        sys.path.insert(0, str(_THIS.parent / "lib"))
+        from manifest_sight import publish_canonical_manifests as _publish_canon  # noqa: E402
+        _pub = _publish_canon(str(out_dir))
+        log.append(f"canonical-publish: {_pub.get('detail', '')} "
+                   f"(n={len(_pub.get('published') or [])})")
+    except Exception as _pub_exc:  # noqa: BLE001
+        log.append(f"canonical-publish: SKIP ({_pub_exc})")
+
+    # After restore: Excel-bound plan must show the RESTORED placement (GA's), not a
+    # re-placed shaded hero. Promote inspect-top → 01-top when congruent.
+    _align_plan_render_to_manifest(out_dir, log)
+
+    # FINAL settled manifest is now the only story — re-stamp every system SVG so
+    # data-placement-fp cannot diverge from parts-manifest (G15/G16).
+    _restamp_system_svg_placement_fps(out_dir, log)
+
     # ── DETERMINISTIC SELF-EXAMINATION (the loop's drawing feedback signal) ──
     # The LEDGER (parts_ledger.py — BoM + inputs/outputs/transformations + the
     # coverage matrix over the 8 drawings + Blender) and the drawing INSPECTOR
@@ -716,6 +909,8 @@ def generate_drawing_set(state_path: str | Path,
     manifest = {
         "schema": "drawing-set/v1",
         "placement": "lead-and-weave",
+        "form_factor": _form,
+        "pack_drawings": sorted(_allowed),
         "out_dir": str(out_dir),
         "state": str(state_path),
         "cad_artifacts_available": have_cad,

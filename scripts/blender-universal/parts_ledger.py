@@ -376,11 +376,26 @@ _ENCLOSURE_HARDWARE_RE = re.compile(
     r"(?:grounding|earthing)\s+(?:terminals?|bars?|boss)|"
     r"access\s+doors?(?:\s+and\s+locks?)?|door\s+locks?|hinges?|latch(?:es)?|"
     r"(?:fireproof|thermal|acoustic)\s+insulation(?:\s+panels?)?|insulation\s+panels?|"
-    r"gland\s+plates?", re.I)
+    r"gland\s+plates?|"
+    # PANEL INDICATORS / FIELD SENSORS (Powerwall Part-names 7.2, 2026-07-14): concept-
+    # stage ESS dossiers pin shunts / thermistors / E-stops / pilot lights / bypass
+    # switches BY SPEC, not MPN — same commodity discipline as glands on the BoM axis
+    # (`_COMMODITY_NOUN_RX` in build-excel-export.py). Deliberately SPECIFIC noun phrases
+    # (never bare `\bsensors?\b` / `\bmodbus\b`): a Modbus interface, insulation monitor,
+    # or ventilation fan stays a true catalogue-research residual (proveCatch below).
+    r"current\s+shunts?|temperature\s+thermistors?|\bthermistors?\b|"
+    r"(?:current|voltage|humidity|temperature)\s+(?:monitoring\s+)?(?:sensors?|probes?)|"
+    r"temperature\s+probes?|"
+    r"audible\s+alarms?|status\s+indicator\s+(?:lights?|leds?)|indicator\s+lights?|"
+    r"pilot\s+(?:lights?|lamps?)|"
+    r"emergency\s+stop\s+(?:buttons?|switch(?:es)?|push\s*buttons?)|"
+    # GOTCHA: `switches?` matches "switche(s)", not "switch" — use switch(?:es)?.
+    r"(?:maintenance\s+)?bypass\s+switch(?:es)?", re.I)
 
 
 def _not_found_substatus(name: str, basis: str, typ: str = "other",
-                          pv_by_norm: dict | None = None) -> str:
+                          pv_by_norm: dict | None = None,
+                          instrument_device: bool = False) -> str:
     """Classify a status=='NOT FOUND' equipment row's TRUE reason from its own
     evidence (name + basis + its parts_ledger TYPE_RULES classification + its verification
     record) — never a per-part table. One of 'OEM-PROPRIETARY', 'ARCHITECTURALLY-EXCLUDED',
@@ -395,6 +410,34 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
         return "ARCHITECTURALLY-EXCLUDED"
     if _FABRICATED_BASIS_RX.search(b):
         return "FABRICATED"
+    # INTENT: on a device-scale optical/electronic instrument, BoM lines without a
+    # public MPN are custom electronics / 3D-printed enclosure — FABRICATED at concept
+    # stage, not a plant-catalogue residual (colorimeter 0819: 23 NOT FOUND floored
+    # Part names at 3.8 while the parts were honestly custom). Universal: gated on
+    # isInstrumentDevice + typ, never a part-name table.
+    if instrument_device and typ in ("instrument", "electrical", "other"):
+        # INTENT (2026-07-14): bezel / "Sensing Instrumentation Subcomponent N" /
+        # optical-bench custom parts are concept-stage fabricated work on a handheld
+        # instrument — not plant-catalogue NOT FOUND residuals. Universal noun family
+        # (enclosure + optical/sensing custom + generic subcomponent), never a product name.
+        # EXTENDED (colorimeter 1441 Part names 6.4): type=other residuals
+        # (Compute UI Module, Ambient Light Cap, STEMMA/Qwiic cable/header, fastener
+        # kit) were still NOT FOUND because the regex only covered enclosure/optical
+        # nouns — Part names floored on 5/14 "not-found" while every row already
+        # said "bespoke fabrication". Commodity interconnect/hardware →
+        # COMMODITY-FITTING; compute/UI/cap/enclosure → FABRICATED.
+        if typ in ("instrument", "electrical"):
+            return "FABRICATED"
+        if re.search(
+                r"\b(?:fastener|screw|bolt|nut|washer|header|stemma|qwiic|"
+                r"interconnect|cable|harness|ribbon)\b", n, re.I):
+            return "COMMODITY-FITTING"
+        if re.search(
+                r"enclosure|housing|shell|lid|shroud|chassis|case\b|bezel|\bcap\b|"
+                r"subcomponent|sensing|cuvette|collimat|baffle|optic|"
+                r"compute|\bmcu\b|microcontroller|\bui\b|display|\bkit\b",
+                n, re.I):
+            return "FABRICATED"
     # Name-family honest statuses (Codema ship 2026-07-09): a control panel / MCC is a
     # scope-documented assembly; a cloth/media filter with no catalogue pin is fabricated
     # from its flow duty — neither is a true residual NOT FOUND.
@@ -426,12 +469,12 @@ def _not_found_substatus(name: str, basis: str, typ: str = "other",
     # scope — not a discrete purchasable part.
     if _SCOPE_FUNCTION_WORD_RE.search(n):
         return "SCOPE-DOCUMENTED"
-    # ENCLOSURE HARDWARE (2026-07-10, Powerwall run-29: 'Safety Warning Signage',
-    # 'Internal/Service Lighting', 'Service Outlets', 'Grounding Terminals', 'Access
-    # Doors And Locks', 'Fireproof/Thermal Insulation (Panels)' each scored as a
-    # catalogue-RESEARCH gap). These are wholesaler/ironmonger commodity hardware —
-    # specified by class + rating at detailed design, never a concept-stage MPN
-    # target. Honest substatus: COMMODITY-FITTING. Universal noun family, no class table.
+    # ENCLOSURE HARDWARE + PANEL INDICATORS (2026-07-10 / 2026-07-14): signage /
+    # lighting / grounding / doors / insulation AND concept-stage shunts /
+    # thermistors / E-stops / pilot lights / bypass switches each scored as a
+    # catalogue-RESEARCH gap. Wholesaler / by-spec panel hardware — never a
+    # concept-stage MPN target. Honest substatus: COMMODITY-FITTING. Universal
+    # noun family, no class table (Modbus / IMD / fans stay residual — proveCatch).
     if _ENCLOSURE_HARDWARE_RE.search(n):
         return "COMMODITY-FITTING"
     if _SCOPE_DESIGN_METADATA_RE.search(n):
@@ -640,7 +683,214 @@ def _build_cabinets(equipment: list, concern_tags: set) -> dict:
         "cabinets": cabinets}
 
 
-def _classify(name: str, tag: str) -> str:
+# ── INSTRUMENT / SIGNAL-CHAIN ROLES (2026-07-12, colorimeter benchmark) ────────────
+# The Python mirror of derive-topology.ts::INSTRUMENT_ROLE_PATTERNS. Applied ONLY on a
+# device-scale instrument (state.isInstrumentDevice — the SAME authoritative flag the
+# chain sets when deriveInstrumentTopology fires, so classification and topology can
+# never disagree, and NO plant / BESS / Powerwall part is ever re-typed). Signal-chain
+# parts (photodiode, TIA, ADC, LED source, cuvette, display, MCU …) fell to 'other' —
+# no role, no topology, counted in no connectivity denominator — so BFD/P&ID/Connection
+# scored 0; the power parts (USB, battery, regulator) also fell through so Electrical
+# scored 0. Order MOST-SPECIFIC-FIRST, matching the TS list exactly.
+_INSTRUMENT_ROLE_PATTERNS = [
+    # indicator + power_protection added 2026-07-13 (mirror TS): a Power Indicator LED is a
+    # power LOAD (not an optical source); a DC input fuse / polyfuse / TVS / reverse-polarity
+    # / thermal cutoff / EMC bead is a series-PROTECTION element on the DC path — both were
+    # role-less → unwired → Connection-trace concerns. Order matches derive-topology.ts.
+    ("indicator",          r"\b(?:power|status|fault|alarm|charge|standby|ready)[_ -]?indicator\b|\bindicator[_ -]?(?:led|lamp|light)\b|\bpilot[_ -]?(?:light|lamp)\b|\bpower[_ -]?(?:on[_ -]?)?led\b"),
+    ("power_protection",   r"\b(?:fuse|polyfuse|poly[_ -]?fuse|ptc|resettable|circuit[_ -]?breaker|mcb|mov|varistor|tvs|esd[_ -]?protect\w*|surge[_ -]?protect\w*|over[_ -]?current[_ -]?protect\w*|over[_ -]?voltage[_ -]?protect\w*|reverse[_ -]?polarity[_ -]?protect\w*|thermal[_ -]?(?:cut[_ -]?off|fuse|protect\w*)|ferrite[_ -]?(?:bead|emc)|emc[_ -]?(?:bead|filter)|inrush[_ -]?limit\w*)\b"),
+    ("driver",             r"(?:led|laser|lamp|source|display|backlight)[_ -]?driver\b|\bdriver[_ -]?(?:board|circuit|stage|ic)\b|\bconstant[_ -]?current[_ -]?driver\b"),
+    ("power_conditioning", r"\b(?:regulator|ldo|buck|boost|dc[_ -]?dc|pmic|power[_ -]?management|charge[_ -]?(?:management|controller|circuit|ic)|charger|bms|battery[_ -]?management|power[_ -]?supply|psu|voltage[_ -]?reference|voltage[_ -]?regulat\w*)\b"),
+    ("power_storage",      r"\b(?:battery|rechargeable|li[_ -]?ion|lipo|nimh|coin[_ -]?cell|cell[_ -]?pack|supercap\w*|super[_ -]?capacitor|energy[_ -]?cell)\b"),
+    ("power_in",           r"\b(?:usb|power[_ -]?(?:inlet|input|interface|jack|connector|entry)|dc[_ -]?jack|barrel[_ -]?jack|mains[_ -]?adapter|wall[_ -]?adapter|type[_ -]?c)\b"),
+    ("optical_sample",     r"\b(?:cuvette|sample[_ -]?(?:holder|chamber|cell|compartment)|flow[_ -]?cell|optical[_ -]?cell|specimen[_ -]?holder|test[_ -]?cell)\b"),
+    ("optical_element",    r"\b(?:collimat\w*|lens|monochromat\w*|wavelength[_ -]?select\w*|filter[_ -]?wheel|optical[_ -]?filter|interference[_ -]?filter|aperture|baffle|beam[_ -]?split\w*|mirror|grating|diffuser|slit|shutter|reflector|light[_ -]?guide|fibre[_ -]?optic|fiber[_ -]?optic)\b"),
+    ("optical_source",     r"\b(?:led[_ -]?source|light[_ -]?source|laser[_ -]?(?:diode|source)?|lamp|emitter|illuminat\w*|excitation[_ -]?source|led)\b"),
+    ("detector",           r"\b(?:photodiode|photo[_ -]?detector|photo[_ -]?sensor|photomultiplier|pmt|photo[_ -]?transistor|thermopile|pyroelectric|image[_ -]?sensor|ccd|light[_ -]?sensor|photo[_ -]?receiver|optical[_ -]?detector|detector)\b"),
+    ("conditioning",       r"\b(?:transimpedance|tia|amplifier|op[_ -]?amp|afe|analog[_ -]?front[_ -]?end|signal[_ -]?condition\w*|gain[_ -]?stage|instrumentation[_ -]?amp\w*|pre[_ -]?amp\w*|buffer[_ -]?amp\w*)\b"),
+    ("digitiser",          r"\b(?:analog[_ -]?to[_ -]?digital|adc|dac|delta[_ -]?sigma|successive[_ -]?approx\w*|digiti[sz]er|sigma[_ -]?delta)\b"),
+    ("compute",            r"\b(?:microcontroller|mcu|micro[_ -]?processor|processor|fpga|dsp|soc|firmware|main[_ -]?board|logic[_ -]?board|compute[_ -]?module|system[_ -]?on[_ -]?chip|control[_ -]?board)\b"),
+    ("display",            r"\b(?:display|screen|lcd|oled|tft|e[_ -]?ink|readout|seven[_ -]?segment|annunciator|graphic[_ -]?display|numeric[_ -]?display|vfd)\b"),
+    ("input",              r"\b(?:button|keypad|keyswitch|user[_ -]?input|membrane[_ -]?switch|tactile[_ -]?switch|rotary[_ -]?encoder|touch[_ -]?(?:pad|key)|power[_ -]?switch|on[_ -]?off[_ -]?switch|control[_ -]?switch)\b"),
+]
+_INSTRUMENT_POWER_ROLES = {"power_in", "power_storage", "power_conditioning",
+                           "power_protection", "indicator"}
+
+
+def _instrument_role(name: str):
+    """The instrument signal-chain role of a part name, or None. Mirrors TS
+    derive-topology.ts::instrumentRole. PURE."""
+    n = (name or "")
+    for role, rx in _INSTRUMENT_ROLE_PATTERNS:
+        if re.search(rx, n, re.I):
+            return role
+    return None
+
+
+def _is_instrument_power_origin(name: str) -> bool:
+    """A device instrument's own power SOURCE (battery / USB inlet / DC jack) is a
+    battery-limit ORIGIN — no upstream plant edge, exactly like a mains incomer — so a
+    'missing_input' concern on it is false. Gated by the caller on isInstrumentDevice."""
+    r = _instrument_role(name)
+    return r in ("power_in", "power_storage")
+
+
+_HOST_INTO_COMPUTE_RE = re.compile(
+    r"microcontroller|\bmcu\b|local\s*display|user\s*input|firmware\s*storage|"
+    r"usb\s*(interface|power)|rechargeable\s*battery|battery\s*charge|"
+    r"power\s*switch|control\s*switch|status\s*indicator|mounting\s*bezel|"
+    r"power\s*indicator|overcurrent|input\s*fuse|dc\s*input\s*fuse|"
+    r"thermal\s*cutoff|reverse\s*polarity|power\s*input\s*connector|"
+    r"esd\s*protection|polyfuse|ferrite|dc\s*dc\s*regulator|"
+    r"compute\s*ui",
+    re.I,
+)
+_HOST_INTO_LED_RE = re.compile(
+    r"\bled\s*driver\b|\bled\s*source\b(?!\s*board)",
+    re.I,
+)
+
+
+def _prune_instrument_ghost_connections(
+    equipment: list,
+    connections: list,
+) -> tuple:
+    """INTENT: after gold-spine / host absorption, Connection trace must not
+    score against 50+ ghost USB→fuse→regulator ties that are no longer BoM lines.
+
+    Remap absorbed host endpoints onto Compute UI Module / LED Source Board when
+    those principals exist; drop edges that still fail to resolve to two
+    equipment rows; rebuild each principal's inputs/outputs from the survivors.
+
+    @returns (pruned_connections, n_dropped)
+    """
+    if not connections or not equipment:
+        return connections, 0
+    by_norm = {_norm(e.get("name") or ""): e for e in equipment if e.get("name")}
+    compute = next(
+        (e for e in equipment
+         if re.search(r"compute\s*ui\s*module", e.get("name") or "", re.I)),
+        None,
+    )
+    led = next(
+        (e for e in equipment
+         if re.search(r"led\s*source\s*board", e.get("name") or "", re.I)),
+        None,
+    )
+
+    def _map_endpoint(name: str):
+        nn = _norm(name or "")
+        if not nn:
+            return None
+        if nn in by_norm:
+            return by_norm[nn]
+        for k, e in by_norm.items():
+            if nn in k or k in nn:
+                return e
+        if led and _HOST_INTO_LED_RE.search(name or ""):
+            return led
+        if compute and _HOST_INTO_COMPUTE_RE.search(name or ""):
+            return compute
+        return None
+
+    kept = []
+    seen: set = set()
+    dropped = 0
+    for c in connections:
+        fe = _map_endpoint(str(c.get("from_part") or ""))
+        te = _map_endpoint(str(c.get("to_part") or ""))
+        if not fe or not te or fe is te:
+            dropped += 1
+            continue
+        key = (fe["name"], te["name"], c.get("mechanism") or c.get("kind") or "")
+        rkey = (te["name"], fe["name"], key[2])
+        if key in seen or rkey in seen:
+            dropped += 1
+            continue
+        seen.add(key)
+        kept.append({
+            **c,
+            "from_part": fe["name"],
+            "from_tag": fe.get("tag"),
+            "to_part": te["name"],
+            "to_tag": te.get("tag"),
+        })
+
+    # Rebuild I/O lists so Connection trace rows match the pruned graph.
+    for e in equipment:
+        e["inputs"] = []
+        e["outputs"] = []
+    for c in kept:
+        fe = by_norm.get(_norm(c["from_part"]))
+        te = by_norm.get(_norm(c["to_part"]))
+        via = c.get("via") or c.get("kind") or "tie"
+        mech = c.get("mechanism") or ""
+        if te:
+            te["inputs"].append(
+                f"{c['from_part']} ({c.get('from_tag') or '?'}) via {via} [{mech}]")
+        if fe:
+            fe["outputs"].append(
+                f"{c['to_part']} ({c.get('to_tag') or '?'}) via {via} [{mech}]")
+    return kept, dropped
+
+
+_INSTRUMENT_SIGNAL_CARRIER_RE = re.compile(
+    r"\b(?:sensor|detector|photodiode|signal|data|analog|adc|afe)\b.{0,48}"
+    r"\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|"
+    r"\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b.{0,48}"
+    r"\b(?:sensor|detector|photodiode|signal|data|analog|adc|afe)\b",
+    re.I,
+)
+_INSTRUMENT_CARRIER_SOURCE_ROLES = {"detector", "conditioning", "digitiser"}
+_INSTRUMENT_CARRIER_SINK_ROLES = {"compute", "digitiser", "conditioning"}
+
+
+def _is_instrument_signal_carrier(name: str) -> bool:
+    """A physical lead/FFC/harness that carries an instrument signal between modules."""
+    return bool(_INSTRUMENT_SIGNAL_CARRIER_RE.search(name or ""))
+
+
+def _instrument_signal_carrier_edge_score(
+    carrier_name: str,
+    from_part: str,
+    to_part: str,
+    mechanism: str,
+) -> int:
+    """Score whether a topology edge is the signal path a carrier cable embodies.
+
+    INTENT: compact instruments often list the physical "sensor interconnect cable"
+    as a BoM line, while the authoritative topology names the electronic endpoints.
+    The cable should inherit the detector/AFE/ADC→compute edge, not become an orphan.
+    """
+    if not _is_instrument_signal_carrier(carrier_name):
+        return 0
+    if str(mechanism or "").lower() not in {"signal", "data", "control"}:
+        return 0
+    fr_role = _instrument_role(from_part or "")
+    to_role = _instrument_role(to_part or "")
+    score = 1
+    if fr_role in _INSTRUMENT_CARRIER_SOURCE_ROLES:
+        score += 3
+    if to_role in _INSTRUMENT_CARRIER_SINK_ROLES:
+        score += 3
+    if "sensor" in (carrier_name or "").lower() and fr_role == "detector":
+        score += 2
+    # Prefer an actual endpoint-to-controller signal over optical sample/source
+    # adjacency, which is usually the light path rather than the cable.
+    if fr_role in {"optical_sample", "optical_element", "optical_source"}:
+        score -= 2
+    return max(score, 0)
+
+
+def _classify(name: str, tag: str, instrument_device: bool = False) -> str:
+    # On a device-scale instrument, the signal-chain role classifier runs FIRST so the
+    # signal parts type 'instrument' (association-scored) and the power parts type
+    # 'electrical' (single-line) — pre-empting the process-plant TYPE_RULES that would
+    # otherwise mis-type 'Firmware Storage'→vessel and 'Display Panel'→electrical-panel.
+    if instrument_device:
+        role = _instrument_role(name)
+        if role is not None:
+            return "electrical" if role in _INSTRUMENT_POWER_ROLES else "instrument"
     blob = f"{name} {tag}".lower()
     for typ, rx in TYPE_RULES:
         if re.search(rx, blob, re.I):
@@ -674,6 +924,77 @@ def _is_grid_electrical_origin(name: str) -> bool:
         r"\bincomer\b|mains\s+incomer|utility\s+incomer|\bgrid\b.*\b(feed|supply|incomer)\b",
         name_l,
     ))
+
+
+def _electrical_edge_needs(
+    name: str, *, has_any: bool, is_origin: bool, is_sink: bool,
+) -> tuple:
+    """INTENT: which drawn electrical edges a part requires (needs_in, needs_out).
+
+    Pure so proveCatch can pin the Powerwall false-concern class without running the
+    full ledger: busbar interconnect HARDWARE needs neither edge; an AC/LCL output-
+    filter stage is an electrical sink (in only); fuse/SPD/HMI/alarm terminals need
+    no downstream load. Universal — noun-keyed, never a tag/class table.
+    """
+    name_l = (name or "").lower()
+    is_bus_hardware = bool(re.search(
+        r"busbar\s+(?:connectors?|interconnects?)|"
+        r"bus\s?bar\s+(?:connectors?|interconnects?)",
+        name_l, re.I))
+    is_ac_filter_sink = bool(re.search(
+        r"(?:\bac\s+filter\b|\boutput\s+filter\b|\bLCL\b|"
+        r"filter\s+(?:inductor|capacitor|choke|reactor)|"
+        r"\bEMI\s+filter\b|\bRFI\s+filter\b|harmonic\s+filter)",
+        name_l, re.I))
+    is_terminal_elec = is_bus_hardware or bool(re.search(
+        r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
+        r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
+        r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
+        r"cable tray|terminal block|enclosure|junction box|\bgland\b|"
+        r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
+        r"\bhmi\b|touchscreen|control\s+panel\b|"
+        r"\bindicator\b|pilot\s*(?:light|lamp)|status\s+(?:light|lamp|led)|"
+        r"annunciator|\bbeacon\b|buzzer|\bsounder\b|signal\s+(?:lamp|light)",
+        name_l, re.I))
+    if is_bus_hardware:
+        return False, False
+    needs_in = not is_origin and not (is_terminal_elec and not has_any)
+    needs_out = not is_sink and not is_terminal_elec and not is_ac_filter_sink
+    return needs_in, needs_out
+
+
+# INTENT (2026-07-14 colorimeter Connection-trace 0/10): handheld instruments type the
+# MCU / compute / display as `other`/`instrument`, never `control` — so a type-only
+# control check left every unconnected sensor (incl. a cuvette CONSUMABLE) as
+# orphan_instrument and floored the tab via min-score. Pure helpers so proveCatch
+# pins both failure modes without running the full ledger.
+_INSTRUMENT_CONTROL_NAME_RE = re.compile(
+    r"\b(?:mcu|microcontroller|compute|controller|plc|hmi|display|ui\s*module)\b",
+    re.I)
+_INSTRUMENT_CONSUMABLE_RE = re.compile(
+    r"\b(?:consumable|cuvette|sample\s*(?:cell|vial|tube|cuvette)|"
+    r"reagent|ampoule)\b",
+    re.I)
+
+
+def _control_present(equipment: list, *, instrument_device: bool) -> bool:
+    """True when the plant/device has something instruments can report to.
+
+    On a device instrument, an onboard MCU/compute/display counts even when typed
+    `other`/`instrument` (not plant `control`).
+    """
+    for e in equipment:
+        typ = str(e.get("type") or "")
+        if typ == "control":
+            return True
+        if instrument_device and _INSTRUMENT_CONTROL_NAME_RE.search(str(e.get("name") or "")):
+            return True
+    return False
+
+
+def _is_instrument_consumable(name: str) -> bool:
+    """Passive optical/sample path element — not a transmitter that reports to control."""
+    return bool(_INSTRUMENT_CONSUMABLE_RE.search(name or ""))
 
 
 def _passive_boundary_concern(name: str, has_in: bool, has_out: bool):
@@ -799,6 +1120,26 @@ def main() -> int:
     cledger = _load(out_dir / "connection-ledger.json") or {}
     route = _load(out_dir / "route-manifest.json") or {}
     rb = state.get("requirementsBom") or []
+
+    # Device-scale INSTRUMENT flag — the authoritative signal the chain sets when
+    # deriveInstrumentTopology fires (a sealed sub-1 m³ optical/electronic instrument
+    # with no fluid/plant). Gates the signal-chain role classification below; a plant /
+    # BESS / Powerwall never carries it, so those runs are byte-identical.
+    instrument_device = bool(state.get("isInstrumentDevice"))
+    # INTENT (Powerwall 2026-07-15): sealed product cabinets (enclosure_volume_m3 < 1)
+    # share the instrument rule for GA coverage — the GA IS the parts-manifest
+    # projection (thin-TOP outlines + FRONT cutaway). Requiring every sub-16×12 px
+    # cabinet internal to carry a readable tag deflated coverage to 68% while the
+    # parts were honestly drawn. Envelope signal via is_product_scale — never a
+    # class table.
+    try:
+        _lib = str(Path(__file__).resolve().parent.parent / "lib")
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        from render_view_contract import is_product_scale as _is_product_scale
+        product_scale = bool(_is_product_scale(state))
+    except Exception:  # noqa: BLE001
+        product_scale = False
 
     # partVerifications lookup, keyed by NORMALISED word_name (2026-07-05, the
     # VERIFIED_NO_PUBLIC_MPN + evidence-based FABRICATED not-found-substatus fix — see
@@ -1022,6 +1363,15 @@ def main() -> int:
         (never overrides an ambiguous-tag verdict on the primary tag)."""
         if key == "blender":
             return tag in placed or _norm(name) in placed_norms
+        # INTENT: a sealed handheld instrument's GA IS the product placement — the same
+        # parts-manifest that proves blender coverage. Requiring plant-GA SVG tag text
+        # for EP-2/X-24 left GA at 0/2 while blender was 27/28 (colorimeter 0819).
+        # EXTENDED (Powerwall 2026-07-15): product-scale sealed cabinets share this —
+        # thin-TOP defers tags to FRONT, and many honest outlines fall below the
+        # 16×12 px tag floor; coverage must not Goodhart "readable tag text".
+        if (instrument_device or product_scale) and key == "general-arrangement":
+            if tag in placed or _norm(name) in placed_norms:
+                return True
         txt = rep_text.get(key, "")
         if not txt:
             return False
@@ -1089,7 +1439,7 @@ def main() -> int:
         tag = str(r.get("tag", ""))
         req = str(r.get("requirement", ""))
         name = (req.split("·")[0].strip() or str(placed.get(tag, {}).get("name", "")) or tag)
-        typ = _classify(name, tag)
+        typ = _classify(name, tag, instrument_device)
         # pm resolution: direct TAG lookup first; NAME fallback second (2026-07-05 — a
         # synthetic aggregated block's own tag never equals the BoM tag; see
         # placed_by_name's docstring above).
@@ -1121,6 +1471,64 @@ def main() -> int:
         # cable glands / terminal blocks / mounting frames, not a per-tag table.
         if ga_massing.is_ga_non_massing(name):
             expected = expected - {"blender", "general-arrangement", "single-line-diagram", "panel-schedule"}
+        # INTENT: a fluid-less handheld instrument has no P&ID / process-schedule home —
+        # those tabs are VERIFIED NA in build-excel-export when isInstrumentDevice + zero
+        # fluid edges. Leaving pid/process-schedules EXPECTED here inflated not-found
+        # (colorimeter 0819: 18 instrument parts "missing" from an NA'd P&ID) and kept
+        # Part-names / coverage denominators dishonest. Mirror the Excel NA claim.
+        if instrument_device:
+            # Fluid-less handheld pack: no P&ID / BFD / process / HVAC homes (2026-07-14).
+            expected = expected - {
+                "pid", "process-schedules", "block-flow-diagram",
+            }
+            # Device electrical design lives on the PCB tab / connection trace / interconnect
+            # — not a plant single-line or panel schedule (those are also NA when pcb is bespoke).
+            if typ in ("electrical", "instrument", "other"):
+                expected = expected - {"single-line-diagram", "panel-schedule"}
+            # Enclosure / lid / shell principals still belong on blender + GA.
+            if re.search(
+                    r"enclosure|housing|shell|lid|shroud|chassis|case\b", name, re.I):
+                expected = expected | {"blender", "general-arrangement"}
+            elif typ in ("electrical", "instrument", "other"):
+                # INTENT (2026-07-14 Tristan): gold-spine BoM PRINCIPALS (Compute UI
+                # Module, LED Source Board, …) MUST stay expected on blender + GA —
+                # dropping them from the denominator made coverage 7/7 while I-201
+                # was never drawn (Goodhart). Sub-component / absorbed host lines
+                # still do not demand a plant GA box.
+                _is_spine_principal = bool(
+                    re.match(r"^[IXEP]-\d{3}$", str(tag or "").strip())
+                    and int(re.sub(r"\D", "", str(tag) or "0") or "0") >= 200
+                ) or bool(re.search(
+                    r"compute\s*ui\s*module|led\s*source\s*board|"
+                    r"optical\s*detector\s*module|cuvette\s*holder|"
+                    r"collimating\s*optic|wavelength\s*selection|"
+                    r"optical\s*path\s*baffle",
+                    name, re.I,
+                ))
+                _is_cable_consumable = bool(re.search(
+                    r"interconnect\s*cable|qwiic|stemma\s*header|"
+                    r"fastener|consumable|ambient\s*light\s*cap",
+                    name, re.I,
+                ))
+                if _is_spine_principal and not _is_cable_consumable:
+                    expected = expected | {"blender", "general-arrangement", "interconnect"}
+                else:
+                    # Internal electronics / membranes — do not demand a plant GA box.
+                    expected = expected - {"blender", "general-arrangement"}
+                    # Still credit blender/GA if the part WAS drawn.
+                    if cov.get("blender") or cov.get("general-arrangement"):
+                        expected = expected | {k for k in ("blender", "general-arrangement")
+                                               if cov.get(k)}
+        # INTENT (2026-07-14 Powerwall): a dry electrical product's P&ID/BFD honestly
+        # declares NA-BY-DESIGN — those sheets are NOT a home for process vessels /
+        # rotating kit. Leaving them EXPECTED made coverage pid=0/7 while the GA +
+        # SLD + hero agreed. Mirror the SVG's own NA declaration into the denominator.
+        if "NA-BY-DESIGN" in (rep_text.get("pid") or ""):
+            expected = expected - {"pid"}
+        if "NA-BY-DESIGN" in (rep_text.get("block-flow-diagram") or ""):
+            expected = expected - {"block-flow-diagram"}
+        if "NA-BY-DESIGN" in (rep_text.get("process-schedules") or ""):
+            expected = expected - {"process-schedules"}
         # A TRANSFORMER is supply-side power conversion UPSTREAM of the board, not a
         # consuming LOAD WAY — a panel schedule lists load circuits, so expecting the
         # transformer there deflates coverage on a correctly-drawn board (Codema 2100:
@@ -1147,7 +1555,9 @@ def main() -> int:
         # NOT-FOUND STATUS SPLIT — classified from the FULL basis (never the display-
         # truncated `basis` field below) so a signal past 90 chars is never missed.
         # None for every other status (IDENTIFIED/BESPOKE/SYSTEM/… never reach this).
-        nf_substatus = _not_found_substatus(name, basis_full, typ, _pv_by_norm) if r.get("status") == "NOT FOUND" else None
+        nf_substatus = _not_found_substatus(
+            name, basis_full, typ, _pv_by_norm, instrument_device
+        ) if r.get("status") == "NOT FOUND" else None
         equipment.append(dict(
             tag=tag, name=name, type=typ, module=pm.get("module"), ikey=_norm(name),
             requirement=req, part=r.get("part"), status=r.get("status"),
@@ -1313,6 +1723,19 @@ def main() -> int:
               f"absent from the delivered design (wired pre-removal) — disclosed in "
               f"stale_ties, not attached: "
               f"{[t['from_part'] + '→' + t['to_part'] for t in stale_ties[:4]]}")
+
+    # INTENT (2026-07-14 Tristan adversarial): gold-spine / handheld BoM collapses
+    # USB/MCU/fuse hosts into Compute UI Module + LED Source Board, but the
+    # connection-schedule + Blender ledger still emit 50+ ghost host ties.
+    # Connection trace then scores 10 on ~7 rendered rows while the ledger lists
+    # 52 — Goodhart. Prune to principal↔principal edges (remap absorbed hosts).
+    if instrument_device:
+        connections, n_ghost_drop = _prune_instrument_ghost_connections(
+            equipment, connections)
+        if n_ghost_drop:
+            print(f"[parts-ledger] instrument ghost prune: dropped {n_ghost_drop} "
+                  f"absorbed-host / unresolved ties → {len(connections)} principal "
+                  f"connection(s) (Connection trace honesty)")
 
     # ── reconciliations / summaries ──
     by_drawing = {}
@@ -1480,6 +1903,86 @@ def main() -> int:
         # covers it), not process pipework.
         "cooling fan", "ventilation fan", "enclosure fan", "cabinet fan", "axial fan", "case fan"}
 
+    # ── 2c. DEVICE-INSTRUMENT AUTHORITATIVE-TOPOLOGY TIES (2026-07-13) ────────────────
+    # A device instrument's signal + DC-rail edges are PCB-level: they are NEVER drawn as
+    # 3-D pipes, and the scene DECLUTTERS the small I&C parts (Power Indicator LED, Status
+    # Indicator, Battery Charge Management Circuit) OUT of the placed set — so their real
+    # electrical edges vanish from connection-schedule.json even though the AUTHORITATIVE
+    # graph (contract.topology from deriveInstrumentTopology) carries them. That made a
+    # correctly-connected part read as missing_input/orphan_instrument (Connection-trace 0).
+    # The contract topology is the truth for connectivity (the 3-D routing is a drawing
+    # artifact); attach every contract edge not already carried by a sized/ledger run.
+    # Gated on instrument_device so NO plant/BESS/Powerwall connectivity is touched.
+    if instrument_device:
+        _oc = (state.get("orchestratorContract") or {}).get("topology") or []
+        _ec = (state.get("engineeringContract") or {}).get("topology") or []
+        _seen_topo = set()
+        _topo_edge_records = []
+        _n_topo_attached = 0
+        for _e in (list(_oc) + list(_ec)):
+            if not isinstance(_e, dict):
+                continue
+            _fp, _tp = _e.get("from_part"), _e.get("to_part")
+            _mech = _e.get("mechanism") or "signal"
+            if not _fp or not _tp:
+                continue
+            _fk, _tk = _norm(str(_fp)), _norm(str(_tp))
+            if (_fk, _tk, _mech) in attached_pairs or (_fk, _tk, _mech) in _seen_topo:
+                continue
+            _seen_topo.add((_fk, _tk, _mech))
+            _fe, _te = resolve(_fk), resolve(_tk)
+            if not (_fe or _te):
+                continue  # neither endpoint is a real placed/ledger part — skip (no phantom)
+            _topo_edge_records.append((_fp, _tp, _mech, _fe, _te))
+            _fn = _fe["name"] if _fe else str(_fp)
+            _tn = _te["name"] if _te else str(_tp)
+            if _te:
+                _te["inputs"].append(f"{_fn} ({(_fe or {}).get('tag') or '?'}) via {_mech} [contract-topology]")
+            if _fe:
+                _fe["outputs"].append(f"{_tn} ({(_te or {}).get('tag') or '?'}) via {_mech} [contract-topology]")
+            _n_topo_attached += 1
+        if _n_topo_attached:
+            print(f"[ledger] device-instrument: attached {_n_topo_attached} authoritative-topology tie(s) "
+                  f"the 3-D-declutter dropped from the connection schedule")
+
+        # INTENT: a physical sensor/AFE interconnect cable is the CARRIER for an
+        # endpoint-to-endpoint topology edge, not itself an endpoint in the topology.
+        # If it remains 0/0 after the authoritative topology pass, inherit the best
+        # detector/AFE/ADC→compute signal edge so the cable is auditable as connected.
+        _n_carriers_attached = 0
+        for _carrier in equipment:
+            if (_carrier.get("inputs") or _carrier.get("outputs")
+                    or not _is_instrument_signal_carrier(_carrier.get("name") or "")):
+                continue
+            _candidates = []
+            for _fp, _tp, _mech, _fe, _te in _topo_edge_records:
+                _score = _instrument_signal_carrier_edge_score(
+                    _carrier.get("name") or "",
+                    (_fe or {}).get("name") or str(_fp),
+                    (_te or {}).get("name") or str(_tp),
+                    _mech,
+                )
+                if _score > 0 and (_fe or _te):
+                    _candidates.append((_score, _fp, _tp, _mech, _fe, _te))
+            if not _candidates:
+                continue
+            _score, _fp, _tp, _mech, _fe, _te = sorted(
+                _candidates,
+                key=lambda item: (-item[0], str(item[1]), str(item[2])),
+            )[0]
+            _fn = (_fe or {}).get("name") or str(_fp)
+            _tn = (_te or {}).get("name") or str(_tp)
+            _carrier["inputs"].append(
+                f"{_fn} ({(_fe or {}).get('tag') or '?'}) via signal carrier [contract-topology]"
+            )
+            _carrier["outputs"].append(
+                f"{_tn} ({(_te or {}).get('tag') or '?'}) via signal carrier [contract-topology]"
+            )
+            _n_carriers_attached += 1
+        if _n_carriers_attached:
+            print(f"[ledger] device-instrument: attached {_n_carriers_attached} signal-carrier cable(s) "
+                  f"to their authoritative endpoint pair")
+
     connectivity_concerns = []
     origin_parts = []
     sink_parts = []
@@ -1511,7 +2014,9 @@ def main() -> int:
     # A control system is present when ANY equipment is control-typed (SCADA / PLC / DCS /
     # control panel) — every field instrument reports its measurement to it (see the instrument
     # branch below; its signal wiring is on the P&ID, decluttered from the 3-D model).
-    _control_present = any((str(e.get("type") or "")) in CONTROL_TYPES for e in equipment)
+    # On a device instrument, onboard MCU/compute/display also counts — see
+    # `_control_present` (colorimeter 1441 Connection-trace 0/10).
+    has_control = _control_present(equipment, instrument_device=instrument_device)
 
     seen_idents: set = set()
     for e in equipment:
@@ -1529,6 +2034,11 @@ def main() -> int:
         tag = e["tag"] or "—"
         etype = e.get("type", "other")
         is_origin = any(kw in name_l for kw in ORIGIN_KEYWORDS)
+        # A device instrument's own power SOURCE (battery / USB inlet / DC jack) is a
+        # battery-limit ORIGIN — no upstream plant edge, like a mains incomer. Gated on
+        # the instrument flag so a BESS 'battery' is never treated as an origin.
+        if instrument_device and not is_origin and _is_instrument_power_origin(name_l):
+            is_origin = True
         is_sink = any(kw in name_l for kw in SINK_KEYWORDS)
 
         if is_origin and not has_in:
@@ -1641,7 +2151,14 @@ def main() -> int:
             # LLM authors a signal grammar-link for some transmitters and not others. Credit the
             # instrument when a control system exists; only a genuinely CONTROL-LESS plant leaves
             # an instrument orphan. Deterministic — keyed on the presence of a control-typed part.
-            if has_any or _control_present:
+            # GOTCHA (colorimeter 1441): a CUVETTE CONSUMABLE / sample cell is a passive
+            # optical path element, NOT a transmitter that reports to control — flagging it
+            # orphan_instrument floored Connection Trace to 0/10 while every row said ✓ OK
+            # (the concern never appeared as a row status). Universal noun family, not a
+            # product name.
+            if _is_instrument_consumable(e["name"] or ""):
+                n_instrument_associated += 1
+            elif has_any or has_control:
                 n_instrument_associated += 1
             else:
                 connectivity_concerns.append({
@@ -1665,27 +2182,10 @@ def main() -> int:
             # them as board components, not as flow-through electrical nodes with
             # their own drawn in+out edges. Without this, every BoM "Circuit Breaker"
             # line false-orphans and floors connectivity (Codema ship, 2026-07-09).
-            is_terminal_elec = bool(re.search(
-                r"\bfuse\b|surge|\bSPD\b|protective relay|protection relay|safety relay|"
-                r"motor[- ]?protection|\bMPCB\b|earth leakage|\bRCD\b|\bRCBO\b|\bMCB\b|"
-                r"\bMCCB\b|circuit\s+breakers?\b|breaker\b|"
-                r"cable tray|terminal block|enclosure|junction box|\bgland\b|"
-                # Terminal HMI / local control panel (codema I-103, 2026-07-09):
-                # receives feeds but is the END of the control circuit — no
-                # downstream load edge is required. Universal: role noun.
-                r"digital\s+control\s+panel|local\s+control\s+panel|operator\s+panel|"
-                r"\bhmi\b|touchscreen|control\s+panel\b|"
-                # busbar ACCESSORIES + pack interconnect work (2026-07-11 run 59:
-                # 'Busbar Connectors' false-flagged missing_input+output — a stamped
-                # connector strip is bus HARDWARE, the electrical analogue of a pipe
-                # fitting; the busbar it serves carries the drawn edges).
-                r"busbar\s+(?:connectors?|interconnects?)|bus\s?bar\s+(?:connectors?|interconnects?)",
-                name_l, re.I))
-            # bus hardware needs neither direction drawn
-            if re.search(r"busbar\s+(?:connectors?|interconnects?)", name_l, re.I):
-                needs_in = False
-            needs_in = not is_origin and not (is_terminal_elec and not has_any)
-            needs_out = not is_sink and not is_terminal_elec
+            # FLOW: _electrical_edge_needs — busbar interconnect / AC-filter / fuse+HMI
+            # terminal exemptions (Powerwall X-117/X-101 false-concern fix, 2026-07-14).
+            needs_in, needs_out = _electrical_edge_needs(
+                e["name"], has_any=has_any, is_origin=is_origin, is_sink=is_sink)
             ok = True
             if needs_in and not has_in:
                 connectivity_concerns.append({
@@ -2088,6 +2588,36 @@ def _selftest() -> int:
     if not _is_grid_electrical_origin("Mains Incomer"):
         print("  FAIL _is_grid_electrical_origin: 'Mains Incomer' must match")
         bad += 1
+    # Device-instrument signal-carrier rule (colorimeter 1441): a physical sensor
+    # interconnect cable is not itself a topology endpoint, but must inherit the
+    # detector/AFE/ADC→compute signal edge so it does not read orphan_instrument.
+    _carrier_score = _instrument_signal_carrier_edge_score(
+        "Sensor Interconnect Cable",
+        "Optical Detector Module",
+        "Microcontroller",
+        "signal",
+    )
+    _optical_path_score = _instrument_signal_carrier_edge_score(
+        "Sensor Interconnect Cable",
+        "Cuvette Holder",
+        "Optical Detector Module",
+        "signal",
+    )
+    if _carrier_score <= _optical_path_score:
+        print("  FAIL instrument-signal-carrier: sensor interconnect must prefer "
+              "detector→compute over sample→detector optical adjacency")
+        bad += 1
+    if _instrument_signal_carrier_edge_score(
+            "Mounting Bezel", "Optical Detector Module", "Microcontroller", "signal") != 0:
+        print("  FAIL instrument-signal-carrier: non-cable mechanical parts must not "
+              "inherit signal endpoints")
+        bad += 1
+    if _instrument_signal_carrier_edge_score(
+            "Sensor Interconnect Cable", "Optical Detector Module", "Microcontroller",
+            "electrical_bus") != 0:
+        print("  FAIL instrument-signal-carrier: signal cable rule must not attach "
+              "power-bus edges")
+        bad += 1
     # Zoned-distribution PARAMETRIC take-off names must not raise via the passive
     # predicate (status skip is the primary gate; name guard is the backstop).
     if _passive_boundary_concern(
@@ -2133,6 +2663,27 @@ def _selftest() -> int:
     if _fab_hit != "FABRICATED":
         print(f"  FAIL not-found-substatus: a fabricated manifold must classify FABRICATED "
               f"(got {_fab_hit!r}) — a fabricated manifold must never count not-found")
+        bad += 1
+    # proveCatch (2026-07-14): instrument-device custom bezel / sensing subcomponents
+    # must classify FABRICATED — never inflate Part names with plant-catalogue NOT FOUND.
+    _bez = _not_found_substatus("Mounting Bezel", "bottom-up parametric", "other",
+                               instrument_device=True)
+    if _bez != "FABRICATED":
+        print(f"  FAIL not-found-substatus: instrument Mounting Bezel must be FABRICATED "
+              f"(got {_bez!r})")
+        bad += 1
+    _subc = _not_found_substatus(
+        "Sensing Instrumentation Subcomponent 1", "bottom-up parametric", "other",
+        instrument_device=True)
+    if _subc != "FABRICATED":
+        print(f"  FAIL not-found-substatus: instrument sensing subcomponent must be "
+              f"FABRICATED (got {_subc!r})")
+        bad += 1
+    _bez_plant = _not_found_substatus("Mounting Bezel", "bottom-up parametric", "other",
+                                     instrument_device=False)
+    if _bez_plant == "FABRICATED":
+        print("  FAIL not-found-substatus proveNoFalsePositive: Mounting Bezel on a "
+              "non-instrument plant must NOT auto-classify FABRICATED")
         bad += 1
     # proveCatch: Electrical Control Panel / Cloth Filter must never stay bare NOT FOUND
     # (Codema ship X-106 / V-104 — both drawn on GA, residual Part-names FAIL).
@@ -2264,13 +2815,27 @@ def _selftest() -> int:
     # SAME bare 'bottom-up parametric' basis as every family member above must stay the
     # true NOT FOUND residual; none of the three new families may over-reach into them.
     for _nm in ("Motor Starter", "Vfd Drive", "Vfd Controller", "Modbus Interface",
-                "Pneumatic Actuated Valves", "Ro High Pressure Pump", "Gac Filter",
+                "Modbus Tcp Interface", "Pneumatic Actuated Valves",
+                "Ro High Pressure Pump", "Gac Filter",
                 "Gac Softener", "Transformer", "Overcurrent Protection",
-                "Pressure Relief Valve", "Pneumatic Control Valve"):
+                "Pressure Relief Valve", "Pneumatic Control Valve",
+                "Insulation Monitoring Device", "Active Ventilation Fan"):
         _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
         if _hit != "NOT FOUND":
             print(f"  FAIL not-found-substatus OVER-REACH: {_nm!r} is a real unresearched "
                   f"catalogue part and must stay NOT FOUND — got {_hit!r}")
+            bad += 1
+    # PANEL INDICATOR / FIELD SENSOR commodity family (Powerwall Part-names, 2026-07-14)
+    # — mirrors BoM `_COMMODITY_NOUN_RX` for the SAME concept-stage ESS rows so the
+    # Part-names not_found residual and the BoM commodity tally stay one truth.
+    for _nm in ("Current Shunt", "Temperature Thermistor", "Emergency Stop Button",
+                "Audible Alarm", "Status Indicator Lights", "Maintenance Bypass Switch",
+                "Current Sensors", "Temperature Probes", "Voltage Monitoring Sensors",
+                "Humidity Sensors"):
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", "other")
+        if _hit != "COMMODITY-FITTING":
+            print(f"  FAIL not-found-substatus: {_nm!r} must classify COMMODITY-FITTING "
+                  f"(panel indicator / field sensor commodity) — got {_hit!r}")
             bad += 1
     # ── CIVILS orphan exemption proveCatch (Codema CIV-101/CIV-102, 2026-07-09) ──
     # A below-grade civils take-off shares the vessel display name but carries a
@@ -2319,6 +2884,98 @@ def _selftest() -> int:
     if _boundary_label("stray unresolved pump") is not None:
         print("  FAIL _boundary_label: a non-boundary unresolved endpoint must return "
               "None (an honest phantom reference, not laundered as a boundary)")
+        bad += 1
+    # ── Powerwall electrical terminal exemptions (2026-07-14 Connection-trace 0)
+    # Busbar Interconnects → neither edge; AC Filter Inductors → in only; a mid-chain
+    # contactor with edges still present still requires both.
+    _elec_cases = [
+        ("Busbar Interconnects", True, False, False, (False, False)),
+        ("AC Filter Inductors", True, False, False, (True, False)),
+        ("Output Filter", True, False, False, (True, False)),
+        ("PCS LCL filter inductor", True, False, False, (True, False)),
+        ("DC Contactor", False, False, False, (True, True)),
+        ("DC Contactor", True, False, False, (True, True)),
+        ("Status Indicator LED", True, False, False, (True, False)),
+    ]
+    for _en, _ha, _io, _is, _want in _elec_cases:
+        _got = _electrical_edge_needs(_en, has_any=_ha, is_origin=_io, is_sink=_is)
+        if _got != _want:
+            print(f"  FAIL _electrical_edge_needs({_en!r}, has_any={_ha}) = {_got!r}, "
+                  f"want {_want!r}")
+            bad += 1
+    # proveCatch (colorimeter 1441): instrument MCU typed `other` MUST count as control
+    # (plant path still requires typ==control; device path also accepts MCU/UI names).
+    _fake_mcu = {"tag": "I-201", "name": "Compute UI Module", "type": "other"}
+    if not _control_present([_fake_mcu], instrument_device=True):
+        print("  FAIL _control_present: instrument Compute UI Module typed other "
+              "must satisfy control_present")
+        bad += 1
+    if _control_present([_fake_mcu], instrument_device=False):
+        print("  FAIL _control_present: MCU typed other must NOT count on a plant "
+              "(non-instrument) run")
+        bad += 1
+    if not _is_instrument_consumable("Cuvette Consumable"):
+        print("  FAIL _is_instrument_consumable: Cuvette Consumable must match")
+        bad += 1
+    if _is_instrument_consumable("Optical Detector Module"):
+        print("  FAIL _is_instrument_consumable: real detector must NOT match")
+        bad += 1
+    # proveCatch: instrument NOT FOUND substatus — Compute UI + Ambient Light Cap +
+    # STEMMA cable must leave residual NOT FOUND (Part names 6.4 = 9/14 coverage).
+    for _nm, _typ, _want in (
+        ("Compute UI Module", "other", "FABRICATED"),
+        ("Ambient Light Cap", "other", "FABRICATED"),
+        ("STEMMA QT Interconnect Cable", "other", "COMMODITY-FITTING"),
+    ):
+        _hit = _not_found_substatus(_nm, "bottom-up parametric", _typ,
+                                    instrument_device=True)
+        if _hit != _want:
+            print(f"  FAIL not-found-substatus: instrument {_nm!r} must be {_want!r} "
+                  f"(got {_hit!r})")
+            bad += 1
+    # proveCatch (Powerwall 2026-07-15): product-scale sealed cabinet — a part in
+    # parts-manifest but UNTAGGED on the GA SVG must still credit GA coverage
+    # (thin-TOP + sub-threshold FRONT tags). A plant-scale twin must NOT.
+    import tempfile as _tf_cov
+    _cov_td = Path(_tf_cov.mkdtemp(prefix="pl-prod-cov-"))
+    (_cov_td / "drawings").mkdir()
+    _cov_parts = [
+        {"equipment_tag": "X-105", "name": "Power Semiconductors",
+         "pos_mm": [0.0, 0.0, 900.0], "dims_mm": {"w": 80, "d": 60, "h": 40}},
+        {"equipment_tag": "K-101", "name": "Active Ventilation Fan",
+         "pos_mm": [50.0, 0.0, 1000.0], "dims_mm": {"w": 60, "d": 50, "h": 40}},
+        {"equipment_tag": "X-120", "name": "Battery Modules",
+         "pos_mm": [0.0, 10.0, 400.0], "dims_mm": {"w": 400, "d": 140, "h": 400}},
+    ]
+    json.dump({"schema": "parts-manifest/1", "count": 3, "parts": _cov_parts,
+               "placement_fp": "abcdabcdabcdabcd"},
+              open(_cov_td / "parts-manifest.json", "w"))
+    # GA SVG with NO equipment tags — the thin-TOP / sub-threshold case.
+    (_cov_td / "drawings" / "general-arrangement.svg").write_text(
+        '<svg data-placement-fp="abcdabcdabcdabcd"><text>FRONT '
+        '(door removed · looking in)</text></svg>')
+    json.dump({
+        "orchestratorContract": {"quantities": {
+            "enclosure_volume_m3": {"value": 0.14},
+        }},
+        "requirementsBom": [
+            {"tag": "X-105", "requirement": "Power Semiconductors",
+             "status": "IDENTIFIED", "qty": 1, "unit_cost_gbp": 10, "line_gbp": 10},
+            {"tag": "K-101", "requirement": "Active Ventilation Fan",
+             "status": "IDENTIFIED", "qty": 1, "unit_cost_gbp": 20, "line_gbp": 20},
+            {"tag": "X-120", "requirement": "Battery Modules",
+             "status": "IDENTIFIED", "qty": 1, "unit_cost_gbp": 100, "line_gbp": 100},
+        ],
+    }, open(_cov_td / "state.json", "w"))
+    _rc = os.system(f"{sys.executable} {Path(__file__).resolve()} {_cov_td} "
+                    f"{_cov_td / 'state.json'} >/dev/null 2>&1")
+    _cov_doc = _load(_cov_td / "parts-ledger.json") or {}
+    _ga_pct = ((_cov_doc.get("coverage_by_drawing") or {})
+               .get("general-arrangement") or {}).get("pct")
+    if _ga_pct is None or float(_ga_pct) < 80.0:
+        print(f"  FAIL product-scale-ga-credit: sealed cabinet GA coverage "
+              f"must credit placed parts without SVG tags (got pct={_ga_pct}, "
+              f"rc={_rc})")
         bad += 1
     print("parts_ledger selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

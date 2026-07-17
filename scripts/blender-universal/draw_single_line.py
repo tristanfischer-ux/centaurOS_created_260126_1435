@@ -468,6 +468,128 @@ def _clean_cable(val) -> str:
     return s
 
 
+def _device_dc_voltage_label(state: dict) -> str:
+    """Low-voltage DC rail label for an instrument-device SLD.
+
+    INTENT: a handheld instrument's Electrical drawing is a USB/battery DC rail,
+    not a site switchboard. Prefer explicit contract voltages; otherwise label the
+    rail generically instead of inventing a plant LV value.
+    """
+    for key in ("dc_bus_voltage_v", "logic_rail_voltage_v", "battery_voltage_v"):
+        v = _q(state, key)
+        if v and 1.0 <= v <= 60.0:
+            return f"{v:g} V DC"
+    return "low-voltage DC"
+
+
+def _build_instrument_device_tree(schedule: dict, state: dict, arch: str,
+                                  devices: list[dict]) -> Optional[Tree]:
+    """Project a device-scale instrument's electrical_bus rows as a DC/signal rail.
+
+    DECISION: this is keyed on the authoritative `isInstrumentDevice` flag plus the
+    design's own electrical_bus topology. It deliberately bypasses the plant
+    distribution-voltage/grouping model, which otherwise turns a USB/battery device
+    into a hollow MAIN SWITCHBOARD with one arbitrary feeder.
+    """
+    if not bool(state.get("isInstrumentDevice")):
+        return None
+    rows = [r for r in _electrical_rows(schedule)
+            if str(r.get("mechanism") or "").lower() == "electrical_bus"]
+    if not rows:
+        return None
+
+    fanout: dict[str, int] = {}
+    for r in rows:
+        src = str(r.get("from") or "").strip()
+        to = str(r.get("to") or "").strip()
+        if src and to and src != to:
+            fanout[src] = fanout.get(src, 0) + 1
+    if not fanout:
+        return None
+    rail_node = max(fanout, key=fanout.get)
+
+    load_rows = [r for r in rows if str(r.get("from") or "").strip() == rail_node
+                 and str(r.get("to") or "").strip()
+                 and str(r.get("to") or "").strip() != rail_node]
+    if not load_rows:
+        return None
+
+    voltage = _device_dc_voltage_label(state)
+    load_kw = _q(state, "connected_electrical_load_kw")
+    bus = Bus(
+        tag="DEVICE DC RAIL",
+        voltage=voltage,
+        rating=(f"{load_kw * 1000:g} W connected" if load_kw else ""),
+        is_sub=False,
+    )
+
+    seen: set[str] = set()
+    for r in load_rows:
+        target = str(r.get("to") or "").strip()
+        key = _norm_load_name(target)
+        if not target or not key or key in seen:
+            continue
+        seen.add(key)
+        label = _humanise(target)
+        bus.branches.append(Branch(
+            from_node=bus.tag,
+            to_node=label,
+            label=label,
+            rating=_clean_rating(r.get("rating")),
+            cable=_clean_cable(r.get("size")) or "short device harness / PCB trace",
+            voltdrop="",
+            count=1,
+            role="device_load",
+        ))
+
+    if not bus.branches:
+        return None
+
+    inbound = [str(r.get("from") or "").strip() for r in rows
+               if str(r.get("to") or "").strip() == rail_node
+               and str(r.get("from") or "").strip() != rail_node]
+    inbound_clean = []
+    for name in inbound:
+        h = _humanise(name)
+        if h and h not in inbound_clean:
+            inbound_clean.append(h)
+    source = Source(
+        sym=SYM_UTILITY,
+        tag="USB / BATTERY INPUT",
+        detail=", ".join(inbound_clean[:3]) or "device low-voltage input",
+        voltage=voltage,
+    )
+
+    incomer_devices: list[Device] = []
+    for name in inbound_clean:
+        if re.search(r"\bfuse\b|polyfuse|overcurrent|protection|power\s*switch", name, re.I):
+            kind = "fuse" if "fuse" in name.lower() else "isolator"
+            tag = "F" if kind == "fuse" else "Q"
+            incomer_devices.append(Device(kind=kind, tag=tag, detail=name))
+    if not incomer_devices:
+        fuse = _pick_device(devices, kind="fuse")
+        if fuse:
+            incomer_devices.append(_as_device(fuse, "fuse", "F"))
+
+    notes = [
+        "Device-scale instrument: USB/battery input feeds a low-voltage DC rail; "
+        "loads are MCU/UI, LED driver and detector electronics, not plant feeders.",
+        "Signal and optical paths are documented in the connection trace / PCB tabs; "
+        "this Electrical view shows the device DC power tree.",
+    ]
+    tree = Tree(
+        archetype=arch,
+        source=source,
+        incomer_devices=incomer_devices,
+        incomer_transformer=None,
+        main_bus=bus,
+        notes=notes,
+        schedule_totals=schedule.get("totals") or {},
+    )
+    tree._device_instrument_tree = True  # type: ignore[attr-defined]
+    return tree
+
+
 def _bus_voltage_label(state, schedule, default=""):
     """Best DC/system-voltage label for the MAIN bus from state, else a spec."""
     dc = _q(state, "dc_bus_voltage_v")
@@ -1575,6 +1697,10 @@ def reconstruct_tree(schedule: dict, state: dict) -> Tree:
     arch = _archetype_name(state, schedule)
     devices = extract_devices(state)
     rows = _electrical_rows(schedule)
+
+    device_tree = _build_instrument_device_tree(schedule, state, arch, devices)
+    if device_tree is not None:
+        return device_tree
 
     # ---- Identify the bus "hub" node: the from_part that fans out to the most
     #      branch consumers (switchgear / electrical_supply / a board). -----------
@@ -3595,6 +3721,44 @@ def _selftest() -> int:
     chk("S4.proveNoFalsePositive_trivial_board_stays_flat",
         len(small.main_bus.branches) == 2
         and all(br.sub_bus is None for br in small.main_bus.branches))
+
+    # S5 — DEVICE INSTRUMENT ELECTRICAL TREE (Open Colorimeter Wave B G8):
+    # proveCatch: an isInstrumentDevice run whose own topology has electrical_bus
+    # rows renders a USB/battery → DEVICE DC RAIL → MCU/UI/LED tree, not a hollow
+    # MAIN SWITCHBOARD. proveNoFalsePositive is S4 + the isInstrumentDevice gate:
+    # ordinary plant boards still use the plant reconstruction above.
+    inst_schedule = {"rows": [
+        {"mechanism": "signal", "from": "LED Source", "to": "Cuvette Holder"},
+        {"mechanism": "electrical_bus", "from": "Rechargeable Battery Pack", "to": "DC DC Regulator",
+         "rating": "—", "size": "(unsized — no design current)"},
+        {"mechanism": "electrical_bus", "from": "DC Input Fuse", "to": "DC DC Regulator",
+         "rating": "—", "size": "(unsized — no design current)"},
+        {"mechanism": "electrical_bus", "from": "DC DC Regulator", "to": "Microcontroller",
+         "rating": "—", "size": "(unsized — no design current)"},
+        {"mechanism": "electrical_bus", "from": "DC DC Regulator", "to": "Local Display",
+         "rating": "—", "size": "(unsized — no design current)"},
+        {"mechanism": "electrical_bus", "from": "DC DC Regulator", "to": "LED Driver",
+         "rating": "—", "size": "(unsized — no design current)"},
+    ]}
+    inst_state = {
+        "isInstrumentDevice": True,
+        "orchestratorContract": {
+            "product_class": "optical_instrument",
+            "quantities": {"connected_electrical_load_kw": {"value": 0.005}},
+        },
+        "moduleDecomposition": {"modules": []},
+    }
+    inst_tree = reconstruct_tree(inst_schedule, inst_state)
+    inst_svg = build_sld_svg(inst_tree)
+    inst_labels = {br.label for br in inst_tree.main_bus.branches}
+    chk("S5.proveCatch_device_dc_rail",
+        inst_tree.main_bus.tag == "DEVICE DC RAIL"
+        and inst_tree.source.tag == "USB / BATTERY INPUT"
+        and getattr(inst_tree, "_device_instrument_tree", False) is True)
+    chk("S5.proveCatch_device_loads_visible",
+        {"Microcontroller", "Local Display", "LED Driver"}.issubset(inst_labels))
+    chk("S5.proveCatch_not_plant_switchboard",
+        "MAIN SWITCHBOARD" not in inst_svg and "DEVICE DC RAIL" in inst_svg)
 
     for f in fails:
         print(f"[sld][selftest] FAIL {f}")

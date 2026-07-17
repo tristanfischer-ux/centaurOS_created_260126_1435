@@ -554,9 +554,17 @@ def compute(payload: dict) -> dict:
             result=per_cell_thermal_r, result_unit="W",
             assumptions=[f"r_ohm clamped to min {r_ohm_r} ohm (datasheet floor; PyBaMM DFN transient under-estimates)"],
         ),
+        # GOTCHA (Powerwall 2026-07-15): this arithmetic is CELL-PACK heat only.
+        # BESS class-plan remaps the tool field onto cell_heat_generation_kw and
+        # RECOMPUTES quantities.system_thermal_dissipation_kw = cell + inverter.
+        # Labelling this "System thermal…" caused Verification to FAIL a present,
+        # consistent system quantity against the cells-only worked value (0.28 vs 0.06).
         worked_calc(
-            label="System thermal dissipation (all cells + overhead)",
-            formula="system_thermal_kw = cell_count x per_cell_thermal_w x 1.5 / 1000",
+            # Label nouns must cover cell_heat_generation_kw subject tokens
+            # (cell/heat/generation) so Verification can close the cell leg;
+            # system_thermal_dissipation_kw closes via cell+inverter composition.
+            label="Cell heat generation (all cells + pack overhead)",
+            formula="cell_heat_kw = cell_count x per_cell_thermal_w x 1.5 / 1000",
             values={
                 "cell_count": (cell_count_rounded, "cells"),
                 "per_cell_thermal_w": (per_cell_thermal_r, "W"),
@@ -565,6 +573,7 @@ def compute(payload: dict) -> dict:
             assumptions=[
                 "1.5x overhead for busbars, tabs, wiring, contactors",
                 "divide by 1000 to convert W to kW",
+                "system_thermal_dissipation_kw (contract) = this + inverter_dissipated_kw",
             ],
         ),
         # BMS slave board count uses ceil() which is a non-arithmetic function;

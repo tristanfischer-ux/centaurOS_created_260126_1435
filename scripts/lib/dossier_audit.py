@@ -3004,6 +3004,14 @@ def check_line_velocity(state, rows, run_dir) -> list:
     hydraulic/electrical defect (e.g. 25 m/s through an undersized pipe)."""
     tab = "Line & velocity"
     out: list = []
+    # NA-BY-DESIGN for a device-scale INSTRUMENT (2026-07-12, colorimeter): a sealed sub-1 m³
+    # optical/electronic instrument has no fluid pipe schedule and no plant cable line-list —
+    # its interconnects are PCB traces / short internal leads, not sized runs carrying a
+    # velocity or a volt-drop verdict. The Line & velocity line list is not applicable (the
+    # same NA-by-design principle as the P&ID for a solid-state product). Universal — keyed
+    # on the authoritative device flag; a plant with real sized runs is unaffected.
+    if isinstance(state, dict) and state.get("isInstrumentDevice"):
+        return out
     cs = _load_run_json(run_dir, "connection-schedule.json")
     lines = cs.get("rows") if isinstance(cs, dict) else None
     expected = len(_principal_rows(rows)) >= 10  # a real multi-equipment plant has connections

@@ -169,12 +169,54 @@ _PRODUCT_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
+# INTENT: handheld optical / PCB instruments are NOT wall batteries — the product
+# rubric's pack/inverter/BMS checklist false-fails a colorimeter cutaway that correctly
+# shows an optical bench (LED → path → detector) + PCB (colorimeter 0819). Signal-keyed
+# on state.isInstrumentDevice, never a product-name table.
+_INSTRUMENT_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of a "
+    "HANDHELD or BENCHTOP scientific/electronic INSTRUMENT (e.g. colorimeter, photometer, "
+    "sensor probe — NOT a wall battery, NOT a plant skid).\n\n"
+    "Expect a quiet, desirable product: charcoal polymer body with a clear L-step, "
+    "dark recessed display glass (not a green PCB pretending to be a screen), finger-sized "
+    "square tactile keys, a chunky optical cube with an open sample well, a parked ambient "
+    "light LID (flange + grip — not a rotary knob), rubber feet, and — on cutaways — a "
+    "structured interior: bright source → beam → cuvette (with sample) → detector on one "
+    "axis, plus a main PCB and small cell under the UI deck. A translucent cutaway shell "
+    "is intentional.\n\n"
+    "Do NOT flag missing battery-pack density, inverter stacks, PV/AC busbars, plant pipes, "
+    "or BESS thermal ducts — those belong to energy-storage products, not instruments.\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • exploded, floating, or wildly overlapping geometry\n"
+    "  • a featureless empty box with NO optical path, PCB, port, or grip cues\n"
+    "  • cutaway that is only vertical grey slabs (cabinet language) with no optical axis\n"
+    "  • display that reads as a pale blank patch or green FR4 plate on a closed exterior\n"
+    "  • product cropped so small it is unreadable\n"
+    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
+
+def _is_instrument_mode(image_path: str) -> bool:
+    """True when the run's state declares a device-scale instrument."""
+    try:
+        run_dir = os.path.dirname(os.path.abspath(image_path))
+        st = json.load(open(os.path.join(run_dir, "state.json")))
+        return bool(st.get("isInstrumentDevice"))
+    except Exception:  # noqa: BLE001
+        return False
+
 
 def _is_product_mode(image_path: str) -> bool:
     """Sealed-product runs (enclosure_volume_m3 < 1 in the contract) are judged by the
     PRODUCT rubric — a ghosted cutaway is intentional there, not 'not a real plant'
     (2026-07-11 run 60: the plant prompt flagged the product hero as 'abstract
-    semi-transparent blocks'). Signal-keyed on the run's own contract, never a class."""
+    semi-transparent blocks'). Signal-keyed on the run's own contract, never a class.
+    Instruments use _INSTRUMENT_PROMPT instead (not the wall-battery product checklist)."""
+    if _is_instrument_mode(image_path):
+        return False
     try:
         run_dir = os.path.dirname(os.path.abspath(image_path))
         st = json.load(open(os.path.join(run_dir, "state.json")))
@@ -184,6 +226,14 @@ def _is_product_mode(image_path: str) -> bool:
         return bool(val is not None and 0 < float(val) < 1.0)
     except Exception:  # noqa: BLE001
         return False
+
+
+def _prompt_for_image(image_path: str) -> str:
+    if _is_instrument_mode(image_path):
+        return _INSTRUMENT_PROMPT
+    if _is_product_mode(image_path):
+        return _PRODUCT_PROMPT
+    return _PROMPT
 
 
 def _critique_once(image_path: str, model: str, timeout: int) -> dict:
@@ -235,7 +285,7 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
         "model": model,
         "max_tokens": 600,
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": _PRODUCT_PROMPT if _is_product_mode(image_path) else _PROMPT},
+            {"type": "text", "text": _prompt_for_image(image_path)},
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
         ]}],
     }).encode()

@@ -1162,7 +1162,7 @@ registerArchetype('bess', (brief: any) => {
   // class. See drawer pattern: universal-thermal-contract-2026-05-25.
   const ambientDesignTempC = Number(brief?.constraints?.operating_environment?.temp_max_c ?? 35)
 
-  const quantities: Record<string, Quantity> = {
+  const quantities = {
     // BESS L3 (2026-05-24): usable_capacity_kwh now emits ACHIEVED value
     // (integer-rack-feasible), not the brief's requested value. The
     // requested value is preserved separately as usable_capacity_kwh_requested
@@ -1267,7 +1267,7 @@ registerArchetype('bess', (brief: any) => {
       if (!(pvKw > 0)) return {}
       return {
         pv_stc_input_kw: q(pvKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: `brief-stated integrated solar DC input the hybrid inverter front-end is rated to accept (= ${pvKw} kW STC, from the brief's own PV metric${mpptN > 0 ? ` across ${mpptN} MPPT channels` : ''}) — a design-adopted inverter spec, priced within the hybrid PCS`, from: ['continuous_power_kw'] }),
-        ...(mpptN > 0 ? { mppt_count: q(mpptN, '', 'dimensionless', 'rated', 'component', 'brief', { source_detail: `brief-stated MPPT channel count of the integrated hybrid-inverter front-end (= ${mpptN}, from the brief's own MPPT metric) — a feature count of ONE inverter, never separate equipment`, from: ['pv_stc_input_kw'] }) } : {}),
+        ...(mpptN > 0 ? { mppt_count: q(mpptN, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: `brief-stated MPPT channel count of the integrated hybrid-inverter front-end (= ${mpptN}, from the brief's own MPPT metric) — a feature count of ONE inverter, never separate equipment`, from: ['pv_stc_input_kw'] }) } : {}),
       }
     })()),
     // BESS L3 (2026-05-24, issue #2): integer-clean topology — emit the
@@ -1437,7 +1437,7 @@ registerArchetype('bess', (brief: any) => {
     // lookup here or source from parts-spec-validator KNOWN_PART_AUTHORITATIVE
     // once the cell entries carry a cycle_life_at_80pct_dod value.
     cycle_life_cycles: q(6_000, 'cycles', 'dimensionless', 'lifetime', 'cell', 'physics_constant', { source_detail: 'LFP prismatic @ 80% DoD → ≥ 6 000 cycles to 80% SoH (CATL LF280K / BYD Blade published cycling data; conservative floor for utility-grade cells — the 2026 CBC00 314 Ah successor datasheet rates ≥7,000 cycles to a LOWER 70% SOH floor, i.e. more headroom at the stricter 80% SoH threshold used here, so 6,000 stays the honest conservative figure)', condition: '0.5C/0.5C, 25°C, 80% DoD, end-of-life = 80% SoH' }),
-  }
+  } as Record<string, Quantity>
 
   // Topology constraints — typed edges
   const topology: TopologyEdge[] = [

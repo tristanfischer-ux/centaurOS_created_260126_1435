@@ -42,6 +42,11 @@ import type { BriefEnvelope, ContractInProgress, ParsedConstraints } from '../ty
 import type { DesignModule } from '../assembler'
 import type { GraphNode, ProductClassGraph } from '../../../../src/lib/pdf-engine-v2/class-reference-graph'
 import { cc, makeSubModule, mod, word, type SubModule, type Word } from './emitter-primitives'
+// A1 — the optical/instrument skeleton floor (Tristan 2026-07-12, Open Colorimeter
+// TRAINING/REFERENCE-AIDED run). SHARES the tool-identity signal the word-domain-
+// coherence-audit's ADD backstop (A2) already uses — never a duplicated list, never a
+// product/class check. See the `hasOpticalInstrumentSignal` comment below.
+import { hasOpticalInstrumentToolSignal } from '../../../../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
 
 const MIN_WORDS = 5 // sub_module_word_density gate floor (words PER sub_module)
 const MAX_COMPONENTS = 12 // components per module — split into ≥2 sub_modules of ≥MIN_WORDS
@@ -155,9 +160,96 @@ function hasEnergyStorage(contract: ContractInProgress): boolean {
   return false
 }
 
-/** The energy_storage_source floor that matches whether the plant STORES energy: a battery kit for a
- *  storage plant, the mains electrical supply for a plant that only DRAWS power (no battery). */
+// ── OPTICAL/INSTRUMENT FLOOR (Tristan 2026-07-12 — Open Colorimeter TRAINING/
+// REFERENCE-AIDED run, CORE FIX PRINCIPLE) ──────────────────────────────────────────
+// `energyFloorFor`'s duty-aware pattern (above) already proved the fix shape: read a
+// SIGNAL off the contract, pick the matching component set instead of a fixed
+// BESS/industrial-power default. That fix stopped short of the ROOT — it still only
+// chooses between "stores energy" (battery kit) and "doesn't" (mains supply), both
+// GRID-POWER-PLANT shapes. A hand-held photometer running through the generic emitter
+// (no registered class emitter for `pcb_assembly`) never triggers `hasEnergyStorage`
+// (no kWh-scale key) so it fell to ELECTRICAL_SUPPLY_FLOOR (mains incomer, distribution
+// transformer, switchboard) — still wrong, a coin-cell instrument has no mains supply
+// either. The TIER_C_FLOOR defaults for energy_conversion_transduction (inverter
+// bridge, gate driver, dc link capacitor) and control_compute_communication
+// (communication gateway, i/o module) are equally BESS/industrial-shaped. Every one of
+// these floors assumed the generic emitter is always flooring a GRID-CONNECTED PLANT —
+// true for the ~40 registered process-plant/BESS classes the generic path was built
+// against, false for a bench/hand-held INSTRUMENT.
+//
+// The fix: a THIRD contract shape — an optical/photometric INSTRUMENT — detected from
+// the SAME tool-identity signal the word-domain-coherence-audit's ADD backstop
+// (TOOL_IMPLIED_COMPONENTS) already uses to ground detector-module/LED/cuvette words
+// onto an under-filled design. `hasOpticalInstrumentToolSignal` is SHARED (imported),
+// never a duplicated table: a photodiode-tia / cuvette / photometry / led-par tool
+// selection is unambiguous evidence the design is an optical instrument, on ANY future
+// archetype that ever selects one (a spectrophotometer, turbidimeter, fluorimeter —
+// never a product-name check). When present, the floor for energy_storage_source /
+// energy_conversion_transduction / sensing_instrumentation / structure_containment /
+// control_compute_communication switches to the instrument-shaped set below — a small
+// rechargeable battery (not cell racks), an LED source + driver (not an inverter
+// bridge), a detector-module/breakout (not V/I/temp sensors), a cuvette/optical-path
+// interface, and an MCU + display + USB stack. A genuine BESS
+// (hasEnergyStorage true, no optical tool signal) is completely untouched — the optical
+// check is evaluated FIRST but only routes when the signal fires, so the existing
+// battery-plant/mains-supply dispatch is byte-identical for every other class.
+const OPTICAL_ENERGY_STORAGE_FLOOR = ['rechargeable_battery_pack', 'battery_charge_management_circuit', 'usb_power_interface', 'battery_protection_circuit', 'power_switch', 'low_battery_indicator']
+const OPTICAL_ENERGY_CONVERSION_FLOOR = ['led_source', 'led_driver', 'wavelength_selection_module', 'collimating_optic', 'dc_dc_regulator', 'power_on_indicator']
+// DECISION (2026-07-13, colorimeter Wave B): commercially-available electronics
+// means the detector side should floor as a purchased detector/breakout module at
+// concept stage. The bespoke board is the LED source/driver/power PCB; the detector
+// module connects by a short sensor cable and is dispositioned off-board by PCB stage.
+const OPTICAL_SENSING_FLOOR = ['optical_detector_module', 'sensor_interconnect_cable']
+const OPTICAL_STRUCTURE_FLOOR = ['cuvette_holder', 'optical_path_baffle', 'enclosure_shell', 'lid_shroud', 'fastener_set', 'mounting_bracket']
+const OPTICAL_CONTROL_FLOOR = ['microcontroller', 'usb_interface', 'local_display', 'user_input_buttons', 'firmware_storage', 'debug_interface']
+// A handheld/benchtop INSTRUMENT's power_distribution + safety are NOT a plant's mains
+// switchboard (main breaker + busbar + contactor) or a machinery-safety system (e-stop +
+// interlock + protective relay + fire detector + beacon). The TIER_C defaults put ~£1,150
+// of that plant gear into the colorimeter BoM (run 1833: Main Breaker £180, Busbar £120,
+// Emergency Stop £280, Interlock £267, Protective Relay £220, Isolation £95, Surge £90 —
+// absurd on a £200 handheld). A sub-1 m³ battery/USB instrument's power+safety is a DC
+// input fuse, reverse-polarity + ESD + overcurrent protection, a thermal cutoff — pennies.
+const OPTICAL_POWER_DISTRIBUTION_FLOOR = ['dc_input_fuse', 'power_input_connector', 'reverse_polarity_protection', 'power_indicator_led', 'ferrite_emc_bead']
+// NB: no lid interlock — a benchtop photometer's lid is a light shroud, not a machinery
+// guard; the token matched a plant interlock switch and priced £267 (run 1954 own-goal).
+const OPTICAL_SAFETY_FLOOR = ['input_fuse', 'overcurrent_protection', 'esd_protection_network', 'thermal_cutoff', 'polyfuse_resettable']
+// DECISION (2026-07-13, colorimeter 0819): optical instruments already carry
+// local_display + user_input_buttons on the control floor (PyBadge-class UI).
+// TIER_C hmi_ergonomics still emitted interface_membrane which then classified as
+// Filtration & membranes on the Exec Summary. Optical HMI = buttons+display only.
+const OPTICAL_HMI_FLOOR = ['local_display', 'user_input_buttons', 'status_indicator', 'control_switch', 'mounting_bezel']
+
+/** Per-module optical-instrument floor overrides. Only the modules the generic Tier-C
+ *  floor gets wrong for an instrument (a BESS/industrial-power shape) are listed —
+ *  `energy_storage_source` is handled separately inside `energyFloorFor` (it already
+ *  branches on a contract signal, this just adds a third branch). */
+const OPTICAL_MODULE_FLOORS: Record<string, string[]> = {
+  energy_conversion_transduction: OPTICAL_ENERGY_CONVERSION_FLOOR,
+  sensing_instrumentation: OPTICAL_SENSING_FLOOR,
+  structure_containment: OPTICAL_STRUCTURE_FLOOR,
+  control_compute_communication: OPTICAL_CONTROL_FLOOR,
+  power_distribution: OPTICAL_POWER_DISTRIBUTION_FLOOR,
+  safety_protection: OPTICAL_SAFETY_FLOOR,
+  hmi_ergonomics: OPTICAL_HMI_FLOOR,
+  human_machine_interface: OPTICAL_HMI_FLOOR,
+}
+
+/** True when the contract's own selected-tool record (`_tools_run`, populated by the
+ *  executor as tools run — already settled by the time the generic emitter derives the
+ *  skeleton) shows an optical/photometric-instrument tool. PURE — delegates entirely to
+ *  the SHARED signal in word-domain-coherence-audit.ts (never a second copy of the
+ *  tool-identity list). */
+function hasOpticalInstrumentSignal(contract: ContractInProgress): boolean {
+  return hasOpticalInstrumentToolSignal(contract?._tools_run)
+}
+
+/** The energy_storage_source floor: an optical instrument's own small rechargeable
+ *  battery + charge management (checked FIRST — never confused with a BESS even if a
+ *  stray quantity key happens to match ENERGY_STORAGE_RE), else a battery kit for a
+ *  genuine storage plant, else the mains electrical supply for a plant that only DRAWS
+ *  power (no battery). */
 function energyFloorFor(contract: ContractInProgress): string[] {
+  if (hasOpticalInstrumentSignal(contract)) return OPTICAL_ENERGY_STORAGE_FLOOR
   return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
 }
 
@@ -267,6 +359,7 @@ function componentsForModule(
 ): string[] {
   const isThermal = moduleKey === 'environmental_interface'
   const isEnergyStore = moduleKey === 'energy_storage_source'
+  const isOpticalInstrument = hasOpticalInstrumentSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -288,6 +381,7 @@ function componentsForModule(
     // every other module keeps its static Tier-C floor.
     const floor = isThermal ? thermalFloorFor(contract)
       : isEnergyStore ? energyFloorFor(contract)
+      : (isOpticalInstrument && OPTICAL_MODULE_FLOORS[moduleKey]) ? OPTICAL_MODULE_FLOORS[moduleKey]
       : (TIER_C_FLOOR[moduleKey] ?? GENERIC_FLOOR)
     for (const c of floor) {
       if (out.length >= MIN_WORDS) break

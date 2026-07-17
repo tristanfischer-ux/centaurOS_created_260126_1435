@@ -116,6 +116,18 @@ export function classifyProduct(briefText: string): ProductClassification {
     } else if (lower.match(/\bsmr\b|small modular reactor|pressuris(?:ed|er)\s+water\s+reactor|\bpwr\b.*reactor|reactor pressure vessel|nuclear\s+(?:island|reactor|fuel\s+assembl)|fission|control\s+rod\s+drive/)) {
       // 2026-05-24: SMR must beat the generic 'industrial machine' catch.
       productClass = 'smr'
+    } else if (lower.match(/\b(?:photometer|colou?rimeter|spectrophotometer|spectrometer|fluorimeter|fluorometer|turbidimeter|nephelometer|refractometer)\b/)
+      || (lower.match(/\bcuvette\b/) && lower.match(/absorbance|transmittance|photometr|\bwavelength\b|optical\s+path|beer.?lambert/))) {
+      // 2026-07-12 (Grok P0): an optical/photometric benchtop-or-handheld INSTRUMENT
+      // (photometer / colorimeter / spectrophotometer / turbidimeter …) must BEAT the
+      // pcb_assembly catch below — its brief legitimately says "PCB or module interconnect
+      // design … assembly instructions" for the WHOLE instrument, which trips `pcb.*assembly`
+      // and mis-routes a £200 photometer onto a PCB-fab-line class (DEFAULT cost stack,
+      // plant tool bootstrap, worthless £/unit band). Routes to the generic device-scale
+      // path; the instrument-ontology (state.isInstrumentDevice, keyed on enclosure_volume
+      // + optical tool signal) handles topology / pricing / rendering. NOT a registered
+      // builder class — deliberately generic so any optical instrument is covered.
+      productClass = 'optical_instrument'
     } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
       productClass = 'pcb_assembly'
     }

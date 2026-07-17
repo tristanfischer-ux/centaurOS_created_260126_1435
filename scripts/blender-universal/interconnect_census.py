@@ -41,7 +41,7 @@ HEAT_NAME_HINTS = ("exchanger", "cooler", "condenser", "chiller", "reboiler", "h
                    "evaporator", "economiser", "economizer")
 
 
-def _tieins(shape: str, name: str) -> list[dict]:
+def _tieins(shape: str, name: str, *, is_instrument_device: bool = False) -> list[dict]:
     """The standard procurement-meaningful tie-ins a single unit of this equipment needs.
     Each is a connection spec connection_cost can price. UNIVERSAL — keyed on shape + name."""
     nm = (name or "").lower()
@@ -71,13 +71,21 @@ def _tieins(shape: str, name: str) -> list[dict]:
                             size_label="DN50", length_m=20.0, material_context="cooling water"))
     # field instrument — a signal wire each (full density: every transmitter/gauge/probe)
     if shape in INSTRUMENTS:
-        out.append(dict(role="signal", mechanism="electrical_bus", kind="cable",
-                        size_label="1.5 mm²", csa_mm2=1.5, n_parallel=1, length_m=50.0,
-                        material_context="instrument signal 2-core screened"))
+        if is_instrument_device:
+            # INTENT: a handheld/benchtop instrument uses internal device harnesses,
+            # not plant field runs. Keep this keyed on state.isInstrumentDevice so a
+            # refinery transmitter still gets the long screened field cable model.
+            out.append(dict(role="signal", mechanism="signal", kind="cable",
+                            size_label="device harness", csa_mm2=0.22, n_parallel=1, length_m=0.12,
+                            material_context="instrument internal signal harness"))
+        else:
+            out.append(dict(role="signal", mechanism="electrical_bus", kind="cable",
+                            size_label="1.5 mm²", csa_mm2=1.5, n_parallel=1, length_m=50.0,
+                            material_context="instrument signal 2-core screened"))
     return out
 
 
-def build_census(parts: list[dict]) -> dict:
+def build_census(parts: list[dict], *, is_instrument_device: bool = False) -> dict:
     """Enumerate + price the full census from the parts-manifest. qty-expanded (each physical
     unit gets its own tie-ins → e.g. 38 transmitters = 38 signal wires)."""
     rows: list[dict] = []
@@ -85,7 +93,7 @@ def build_census(parts: list[dict]) -> dict:
         shape = str(p.get("shape", ""))
         name = p.get("name", p.get("equipment_tag", "?"))
         qty = max(1, int(p.get("qty", 1) or 1))
-        for t in _tieins(shape, name):
+        for t in _tieins(shape, name, is_instrument_device=is_instrument_device):
             spec = {k: t[k] for k in t if k != "role"}
             cost = cs.connection_cost(spec)
             rows.append({
@@ -100,7 +108,7 @@ def build_census(parts: list[dict]) -> dict:
     # model). These are what take the interconnect from "enumerated runs" to a realistic take-off.
     cable_m = sum(r["length_m"] * r["qty_units"] for r in rows if r["kind"] == "cable")
     pipe_m = sum(r["length_m"] * r["qty_units"] for r in rows if r["kind"] == "pipe")
-    if cable_m > 0:
+    if cable_m > 0 and not is_instrument_device:
         rows.append({"role": "cable tray/ladder", "to_part": "(plant-wide)", "mechanism": "electrical_bus",
                      "kind": "tray", "size": "ladder", "length_m": round(cable_m * 0.45, 1), "qty_units": 1,
                      "line_total_gbp": round(cable_m * 0.45 * 42.0, 2),  # ~45% sharing, £42/m supply+install
@@ -114,7 +122,9 @@ def build_census(parts: list[dict]) -> dict:
     pipe = sum(r["line_total_gbp"] for r in rows if r["kind"] in ("pipe", "support"))
     return {
         "schema": "interconnect-census/v1",
-        "basis": "FULL-DENSITY per-equipment utility/electrical/instrument tie-in census + bulk "
+        "basis": ("DEVICE-SCALE instrument harness census; no plant cable tray; priced " + cs.COST_SOURCE_MODEL)
+                 if is_instrument_device else
+                 "FULL-DENSITY per-equipment utility/electrical/instrument tie-in census + bulk "
                  "(cable tray, pipe supports); estimated standard runs (model, ±range); priced " + cs.COST_SOURCE_MODEL,
         "census_runs": len(rows),
         "total_units": sum(r["qty_units"] for r in rows),
@@ -124,7 +134,39 @@ def build_census(parts: list[dict]) -> dict:
     }
 
 
+def _is_instrument_device_run(out_dir: Path) -> bool:
+    state_path = out_dir / "state.json"
+    if not state_path.exists():
+        return False
+    try:
+        state = json.loads(state_path.read_text())
+    except Exception as exc:
+        print(f"[census] warning: could not read state.json instrument flag: {exc}", file=sys.stderr)
+        return False
+    return bool(isinstance(state, dict) and state.get("isInstrumentDevice"))
+
+
+def selftest() -> None:
+    """proveCatch: handheld instruments use centimetre device harnesses, not plant drops."""
+    census = build_census(
+        [{"shape": "instrument", "name": "Optical Detector Module", "qty": 1}],
+        is_instrument_device=True,
+    )
+    signal_rows = [r for r in census["rows"] if r["role"] == "signal"]
+    assert signal_rows, "instrument fixture must emit a signal/device harness row"
+    assert max(r["length_m"] for r in signal_rows) <= 0.3, (
+        f"instrument signal harness must be <=0.3 m, got {signal_rows}")
+    assert all(r["mechanism"] == "signal" for r in signal_rows), (
+        "instrument harness rows must use the signal mechanism so pricing stays bundle-scale")
+    assert not any(r["kind"] == "tray" for r in census["rows"]), (
+        "handheld device harnesses must not add plant-wide cable tray/ladder bulk rows")
+
+
 def main(argv: list[str]) -> int:
+    if argv and argv[0] == "--selftest":
+        selftest()
+        print("interconnect_census selftest: OK")
+        return 0
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__); return 0
     out_dir = Path(argv[0]).resolve()
@@ -132,7 +174,8 @@ def main(argv: list[str]) -> int:
     if not pm_path.exists():
         print(f"[census] no parts-manifest.json in {out_dir}", file=sys.stderr); return 1
     parts = json.loads(pm_path.read_text()).get("parts", [])
-    census = build_census(parts)
+    is_instrument_device = _is_instrument_device_run(out_dir)
+    census = build_census(parts, is_instrument_device=is_instrument_device)
     (out_dir / "interconnect-census.json").write_text(json.dumps(census, indent=1))
     # report against the routed schedule for context
     routed = 0.0

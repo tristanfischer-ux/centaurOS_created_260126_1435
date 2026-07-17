@@ -116,10 +116,29 @@ export function targetPerformanceValueAs(state: any, targetUnit: string): number
     // and the band is £/m² installed (£600-£1200/m²) instead of a single
     // £15k-£45k flat band that implicitly assumed a 4-8 m² unit.
     { cm2: 0.0001, m2: 1, ha: 10000 },
+    // 2026-07-12 length family (colorimeter benchmark). A photometer's
+    // target_performance is optical_path_length_mm=10 (LENGTH, mm). Before this
+    // family existed, `mm` matched NO family and the cross-family guard below did
+    // not exist, so a `targetPerformanceValueAs(state,'kwh')` request FELL THROUGH
+    // to `return v` and handed back 10 — the cost-sanity gate then read a 10 mm
+    // path length as 10 kWh, applied the BESS £150-800/kWh band, judged the honest
+    // £429 photometer BoM "3.5× undercounted" and HARD-BLOCKED the run (exit 32).
+    { mm: 0.001, cm: 0.01, m: 1, km: 1000 },
   ]
+  // CROSS-FAMILY GUARD (CLAUDE.md unit-family bug #12): only convert WITHIN a family.
+  // If the brief unit and the requested unit are in DIFFERENT dimensional families
+  // (or exactly one is a known dimensional unit), the request is UNFULFILLABLE — return
+  // null so the caller SKIPS (a length metric can never answer a £/kWh question), never
+  // a bare value that silently reads mm as kWh.
   for (const f of families) {
-    if (unit in f && t in f) return (v * f[unit]) / f[t]
+    const unitIn = unit in f
+    const targetIn = t in f
+    if (unitIn && targetIn) return (v * f[unit]) / f[t]
+    if (unitIn !== targetIn) return null // exactly one side dimensional in THIS family → incompatible
   }
+  // Neither unit is a known dimensional unit (two unrecognised unit strings) — preserve
+  // the legacy lenient behaviour (trust the caller's unit); the cross-family guard above
+  // already rejects the dangerous case (a known dimensional unit vs a foreign one).
   return v
 }
 

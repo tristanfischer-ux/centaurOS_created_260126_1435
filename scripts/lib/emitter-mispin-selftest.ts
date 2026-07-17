@@ -6,7 +6,7 @@
  * physics critic flagged (or its legit counter-case) — the guard must FIRE on the bad input and stay
  * SILENT on the good one. Wired into verify-engine-guards.sh.
  */
-import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { isElectronicsIcMispin, isCommodityProcessValve, partFlowCapacityM3h, isIndicatorLightMispin, isMotorDriveSlot, isBoardMountSensorMispin, isCatalogueComponent, isCatalogueComponentByEitherName, foldPluralToken, dbHitAcceptableForWord, setInstrumentDeviceContext, motorDriveRatingAcceptable, partPowerRatingKw, wordMotorDriveDutyKw, partNameLeadSegment, isAccessoryRow, headNounHit, headNounLeadsPartName, pickBestDbCandidate, hostingPrincipalEquipmentName, tetherOrSuppressAccessoryValve, isGenericRepresentativeFiller, representativeDuplicateKey, wordQuantity, type DbPart } from '../../src/lib/pdf-engine-v2/lib/emitter-completion'
 
 let failures = 0
 const expect = (cond: boolean, msg: string) => { if (!cond) { failures++; console.error('  ✗ ' + msg) } }
@@ -113,12 +113,69 @@ expect(dbHitAcceptableForWord(_iSii, 'SCADA / Plant Control System') === true,
 const _panelPc: DbPart = { part_name: 'HMI Displays & Panel PCs 12.1" XGA fanless touch panel computer with Intel Celeron processor N3060, 5-wire resistive touch screen and 24 VDC power input (terminal block connector)', manufacturer: 'Axiomtek', part_number: 'GOT5120T-845', component_class: 'oem_subsystem', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_panelPc, 'Terminal Blocks') === false,
   "a panel PC whose spec TAIL says '(terminal block connector)' must never pin 'Terminal Blocks' (lead-segment discipline)")
+// ── DEVICE-SCALE INSTRUMENT rejection (2026-07-13, Grok MPN-help): an industrial part
+//    that passes head-noun coherence but is the wrong SCALE for a handheld must be refused
+//    on a device instrument, and ACCEPTED off-device (a plant breaker IS overcurrent) — so
+//    no plant regression. The colorimeter's three real wrong-family "verified" pins.
+const _max35104: DbPart = { part_name: 'MAX35104 ultrasonic time-to-digital / flow converter AFE', manufacturer: 'Maxim Integrated', part_number: 'MAX35104ETL+T', component_class: 'electronic_pcb', unit_price_gbp: null }
+const _bannerS22: DbPart = { part_name: 'S22 Pro indicator / pick-to-light tower', manufacturer: 'Banner Engineering', part_number: 'S22LBRWPQ', component_class: 'electronic_pcb', unit_price_gbp: null }
+const _nsx: DbPart = { part_name: 'ComPact NSX moulded-case circuit breaker 630 A', manufacturer: 'Schneider Electric', part_number: 'LV430630', component_class: 'circuit_breaker', unit_price_gbp: null }
+setInstrumentDeviceContext(true)
+expect(dbHitAcceptableForWord(_max35104, 'Analog To Digital Converter') === false,
+  'DEVICE: an ultrasonic flow TDC (MAX35104) must be refused on a generic ADC slot')
+expect(dbHitAcceptableForWord(_bannerS22, 'Power Indicator LED') === false,
+  'DEVICE: a Banner industrial indicator tower must be refused on a device status-LED slot')
+expect(dbHitAcceptableForWord(_nsx, 'Overcurrent Protection') === false,
+  'DEVICE: a Schneider NSX 630 A MCCB must be refused on a device overcurrent slot')
+expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === false,
+  'DEVICE: the NSX MCCB is refused even on a coherent Circuit Breaker word (a handheld has no MCCB)')
+setInstrumentDeviceContext(false)
+expect(dbHitAcceptableForWord(_nsx, 'Circuit Breaker') === true,
+  'PLANT: the SAME NSX breaker IS accepted off a device (guard is flag-gated → no plant regression)')
+// ── HEAD-NOUN-LEADS ranking (2026-07-13, colorimeter seed gap): a web_verified_ingest row
+//    whose part_name LEADS with the design vocabulary must outrank a distributor row whose
+//    head noun only appears mid-name ("16-bit Microcontrollers - MCU" vs "Microcontroller — ATSAMD21").
+const _mcuRows: DbPart[] = [
+  { part_name: '16-bit Microcontrollers - MCU, mixed signal, 16 MHz', manufacturer: 'Texas Instruments', part_number: 'MSP430F5529IPNR', component_class: 'electronic_ic', unit_price_gbp: 5, confidence: 0.95, discovery_source: 'distributor_sweep' },
+  { part_name: 'Microcontroller — ATSAMD21G18A-MU', manufacturer: 'Microchip', part_number: 'ATSAMD21G18A-MU', component_class: 'electronic_ic', unit_price_gbp: 3, confidence: 0.95, discovery_source: 'web_verified_ingest' },
+]
+const _mcuPick = pickBestDbCandidate(_mcuRows, ['microcontroller'], 'microcontroller', {})
+expect(_mcuPick?.part_number === 'ATSAMD21G18A-MU',
+  'verified-ingest row whose NAME LEADS with the head noun must outrank a distributor row whose head noun is mid-name')
+expect(headNounLeadsPartName('Microcontroller — ATSAMD21G18A-MU', 'microcontroller') === true,
+  'headNounLeadsPartName: family token in first position')
+expect(headNounLeadsPartName('16-bit Microcontrollers - MCU', 'microcontroller') === false,
+  'headNounLeadsPartName: head noun mid-name (16-bit leads) does not count as leading')
 const _wika: DbPart = { part_name: 'Pressure transmitter — 0-7 bar (0-100 psi), 4-20 mA, G1/4', manufacturer: 'WIKA', part_number: '50372475', component_class: 'water_treatment', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_wika, 'Low Pressure Switch') === false,
   'a pressure TRANSMITTER must never pin a pressure SWITCH word (head-noun families never cross)')
 const _eatonEstop: DbPart = { part_name: 'Emergency stop switch station — safety mushroom pushbutton 38 mm, pull-to-release, 1NC+1NO (ISO 13850)', manufacturer: 'Eaton', part_number: '216516', component_class: 'water_treatment', unit_price_gbp: null }
 expect(dbHitAcceptableForWord(_eatonEstop, 'Emergency Stop Button') === true,
   "the Eaton e-stop SWITCH station must pin the 'Emergency Stop Button' word (same-family head synonym)")
+// ── FORM-FACTOR (2026-07-12, Grok P0): an embedded USB / connector interface is NEVER a
+//    host-side PCIe expansion card (the colorimeter's Usb Interface pinned StarTech PEXUSB312C3).
+const _pexCard: DbPart = { part_name: 'USB 3.1 (10Gbps) 2-Port PCIe Card, USB-C host adapter add-in card', manufacturer: 'StarTech', part_number: 'PEXUSB312C3', component_class: 'connectivity', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_pexCard, 'Usb Interface') === false,
+  "a USB-interface word must NOT pin a PCIe expansion / host-adapter add-in card (device USB ≠ host PCIe card)")
+expect(dbHitAcceptableForWord(_pexCard, 'Usb Power Interface') === false,
+  "a USB power-interface word must NOT pin a PCIe host-adapter card")
+// non-blanket: the form-factor guard only fires when the WORD is a bare connector/port
+// interface — a word that itself names a 'card'/'adapter'/'expansion' is not a connector
+// word, so the guard does not fire on it (it may still be refused by the head-noun check,
+// which is a separate concern). Proven by the two rejections above + the connector-word test.
+const _molexUsbC: DbPart = { part_name: 'USB Type-C receptacle connector, 24-position, right-angle, SMT', manufacturer: 'Molex', part_number: '2172890001', component_class: 'connector', unit_price_gbp: null }
+expect(typeof dbHitAcceptableForWord(_molexUsbC, 'Usb Interface') === 'boolean',
+  "the form-factor guard returns a clean boolean on a real USB-C receptacle (does not throw)")
+// ── DOMAIN COHERENCE for device power/safety (2026-07-12, Grok/Cursor #1): a battery is
+//    never a machine-safety product; a device fuse is never a PV/solar fuse. The colorimeter
+//    pinned Banner Engineering DBRQ (safety relay, £280) to 'Rechargeable Battery Pack' and
+//    Eaton PV-15A10F (PV string fuse) to 'DC Input Fuse'.
+const _bannerSafety: DbPart = { part_name: 'DBRQ dual-channel safety relay module, 24 VDC', manufacturer: 'Banner Engineering', part_number: 'DBRQ', component_class: 'oem_subsystem', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_bannerSafety, 'Rechargeable Battery Pack') === false,
+  "a battery word must NOT pin a Banner-Engineering machine-safety relay (£280 mis-pin) — battery is not machine safety")
+const _pvFuse: DbPart = { part_name: 'PV string fuse 15 A 1000 VDC gPV', manufacturer: 'Eaton - Bussmann', part_number: 'PV-15A10F', component_class: 'fuse', unit_price_gbp: null }
+expect(dbHitAcceptableForWord(_pvFuse, 'DC Input Fuse') === false,
+  "a device DC input fuse must NOT pin a photovoltaic string fuse (plant-domain mis-pin)")
 expect(isAccessoryRow('Circuit Breaker Accessories 508, DM, 40A Entrance Supply module REX12-T') === true &&
        isAccessoryRow('Mains incomer circuit breaker — Tmax XT1N 160 MCCB') === false,
   'an ACCESSORY row is recognised by its lead family phrase; a primary breaker is not')

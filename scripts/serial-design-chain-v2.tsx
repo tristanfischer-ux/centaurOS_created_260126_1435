@@ -68,6 +68,11 @@ import { adoptCascadePrices } from './lib/cascade-price-adoption'
 import { recordGateFailure } from './lib/lesson-loop'
 import { runChainPreflight } from './lib/chain-preflight'
 import { computeToolArchetypeCoherence, evaluateToolArchetypeEnforcement, toolArchetypeEnforceModeFromEnv, inferProductClass, toolLeaksWrongDomain } from '../src/lib/pdf-engine-v2/lib/tool-archetype-coherence-audit'
+import { runWordDomainCoherence, type WordDomainCoherenceResult, runToolImpliedComponentGrounding, type ToolImpliedComponentResult } from '../src/lib/pdf-engine-v2/lib/word-domain-coherence-audit'
+import { runPcbStage, type PcbStageResult, type PcbPipelineRecord } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-stage'
+import { generateAtopileProject } from '../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
+import { runPcbPipeline } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
+import { evaluatePcbGate, pcbGateEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
 import { computeRenderQuality, evaluateRenderQualityEnforcement, renderQualityEnforceModeFromEnv } from '../src/lib/pdf-engine-v2/lib/render-quality-audit'
 import { buildAdvisorEngagement } from '../src/lib/pdf-engine-v2/lib/advisor-engagement'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -101,7 +106,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
-import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
+import { completeEmitterGaps, fillBlankWordMpns, honestDescriptorMpn, setInstrumentDeviceContext, scrubInstrumentIndustrialMisPins } from '../src/lib/pdf-engine-v2/lib/emitter-completion'
 // Stage 10.6 synchronous part-verification leg. The live call is delegated to
 // background-enrichment.ts (chain-as-DB-consumer exempt file); the chain only
 // needs the type here — verifyProposedParts is dynamically imported in-stage.
@@ -3691,6 +3696,22 @@ async function main() {
   // Build #19a (2026-05-22): engineering_contract moved AFTER brief refinement
   // — it now uses the FINAL stable brief, not the pre-revision draft.
   let engineeringContract: EngineeringContract | null = null
+  // WORD-level domain coherence (the word sibling of gate 34) — set right after
+  // the generator emits the module tree, before the skeleton/Stage-7.5 physics
+  // critics run. See the call site after GATE 37 below.
+  let wordDomainCoherence: WordDomainCoherenceResult | null = null
+  // ADD-side complement to wordDomainCoherence (same call site, same universal
+  // grounding gate): tool-implied components (photodiode/TIA/cuvette/LED
+  // driver/coin-cell battery/MCU, …) that the selected engineering tools
+  // demand but the module generator omitted. See word-domain-coherence-audit.ts.
+  let toolImpliedComponentGrounding: ToolImpliedComponentResult | null = null
+  // PCB capability discovery + bespoke/COTS disposition — Phase A SHADOW stage
+  // (docs/plans/pcb-capability-integration.md). Computed AFTER state.requirementsBom
+  // is settled (the design/parts are final by then); see the call site after the
+  // requirements-driven BoM block below. Behind PCB_STAGE — off by default, so every
+  // existing run is byte-identical. Declared here (mirrors wordDomainCoherence) so it
+  // has a stable slot in the initial state object even before it's computed.
+  let pcb: PcbStageResult | null = null
 
   // ── Phase 0 — brief refinement loop (Tristan 2026-05-15)
   // Auto-revise non-viable briefs along the lowest-priority relaxation path,
@@ -4494,6 +4515,84 @@ async function main() {
           process.exit(37)
         }
       }
+      // ── WORD-DOMAIN-COHERENCE GATE (2026-07-12, the WORD sibling of gate 34) ──
+      // The Open Colorimeter benchmark: the generator (this block, above) appended
+      // a whole water-treatment pressure-sand-filter vessel (Pressure Vessel Shell,
+      // Filter Media / Membrane Elements, Upper Distribution Header, Lower
+      // Underdrain / Nozzle Plate, Backwash / Service Valve Nest, Differential-
+      // Pressure Gauges, Air Scour / Vent, Sample Cock, Skid Frame & Pipework) into
+      // the hmi_ergonomics module of a hand-held photometer — a wrong-DOMAIN word
+      // cluster the generic (no class-reference-graph) path hallucinated as a
+      // stand-in. Runs immediately after the generator emits `design`, BEFORE the
+      // PHASE 4 skeleton critic + STEP 7.5 physics critic (gate 33) below, so a
+      // clean design reaches both. SHADOW by default (records + logs, never
+      // strips); this chain wiring defaults it ENFORCING (the pollution MUST be
+      // removed before it reaches the critic/BoM/render) — override with
+      // WORD_DOMAIN_COHERENCE_ENFORCING=0 to run shadow-only. Additive: never a
+      // new chain exit code, never touches gate 33/the physics critic itself.
+      // wdcState is shared by BOTH the strip pass (below) and the ADD pass
+      // (tool-implied-component grounding, right after it) — orchestratorContract
+      // is the TOOL-ENRICHED contract (orchResult.contract, carries every tool's
+      // provenance + _tools_run), NOT the chain's pre-tool `engineeringContract`
+      // (orchEngineeringContract is only assigned further below); toolsUsedPage
+      // is the attribution page the ADD pass reads to know which tools were
+      // actually selected for THIS run.
+      const wdcState = {
+        moduleDecomposition: design,
+        orchestratorContract: orchResult.contract,
+        parsedBrief: parsedResult.data,
+        toolsUsedPage: orchResult.tools_used_page,
+      }
+      try {
+        const wdcRun = runWordDomainCoherence(wdcState, process.env.WORD_DOMAIN_COHERENCE_ENFORCING ?? '1')
+        wordDomainCoherence = wdcRun.result
+        if (wdcRun.result.verdict === 'flagged') {
+          console.error(`[chain] WORD-DOMAIN-COHERENCE: ${wdcRun.result.message}`)
+          for (const f of wdcRun.result.flagged.slice(0, 12)) {
+            console.error(`  ✕ [${f.marker_family ?? 'process_plant_vessel'}:${f.marker}] ${f.module_id}/${f.sub_module_id}/${f.word_id} "${f.name}"`)
+          }
+          if (wdcRun.strip) {
+            design = wdcRun.strip.design
+            wdcState.moduleDecomposition = design
+            console.error(`[chain] WORD-DOMAIN-COHERENCE ENFORCING: stripped ${wdcRun.strip.stripped} wrong-domain word(s) from the design`)
+          } else {
+            console.error(`[chain] WORD-DOMAIN-COHERENCE SHADOW: not stripped (set WORD_DOMAIN_COHERENCE_ENFORCING=1 to strip)`)
+          }
+        }
+        logAction({ step: 'word_domain_coherence', verdict: wdcRun.result.verdict, mode: wdcRun.mode, flagged_count: wdcRun.result.flagged.length, stripped: wdcRun.strip?.stripped ?? 0, product_class: wdcRun.result.product_class, is_process_plant_class: wdcRun.result.is_process_plant_class, is_device_scale: wdcRun.result.is_device_scale })
+      } catch (err) {
+        console.error(`[chain] WORD-DOMAIN-COHERENCE threw: ${(err as Error).message}; continuing without`)
+      }
+      // ── TOOL-IMPLIED-COMPONENT GROUNDING (2026-07-12, ADD-side complement) ──
+      // The engine's tool layer already ran the CORRECT physics for this brief
+      // (cuvette:sample-volume, photodiode-tia:gain-sizing, photometry:stray-
+      // light-limit, wearable-battery:life, …) and their quantities sit right
+      // in orchResult.contract.quantities — but the generic emitter's static
+      // per-module component floor never consulted them, so the Open
+      // Colorimeter design shipped with NOTHING optical in it. Universal,
+      // tool-IDENTITY-keyed (never a product/class table): any future brief
+      // that selects a `photodiode-tia`/`cuvette`/`wearable-battery`/… tool
+      // gets the SAME implied components added when the design omits them.
+      // SHADOW by default; this chain wiring shares the SAME enforcing flag as
+      // the strip pass above (WORD_DOMAIN_COHERENCE_ENFORCING) — one universal
+      // grounding gate, two complementary directions.
+      try {
+        const groundRun = runToolImpliedComponentGrounding(wdcState, process.env.WORD_DOMAIN_COHERENCE_ENFORCING ?? '1')
+        toolImpliedComponentGrounding = groundRun.result
+        if (groundRun.result.verdict === 'missing') {
+          console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING: ${groundRun.result.message}`)
+          if (groundRun.add) {
+            design = groundRun.add.design
+            console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING ENFORCING: added ${groundRun.add.added} tool-grounded word(s)${groundRun.add.skipped > 0 ? ` (${groundRun.add.skipped} skipped — no matching target module in this design)` : ''}`)
+          } else {
+            console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING SHADOW: not added (set WORD_DOMAIN_COHERENCE_ENFORCING=1 to add)`)
+          }
+        }
+        logAction({ step: 'tool_implied_component_grounding', verdict: groundRun.result.verdict, mode: groundRun.mode, missing_count: groundRun.result.missing.length, added: groundRun.add?.added ?? 0, skipped: groundRun.add?.skipped ?? 0, tools_checked: groundRun.result.tools_checked.length })
+      } catch (err) {
+        console.error(`[chain] TOOL-IMPLIED-COMPONENT GROUNDING threw: ${(err as Error).message}; continuing without`)
+      }
+
       // Build #19e (2026-05-22): capture the tools-used page + the finalised
       // engineering contract so they can be attached to chain state below.
       // The renderer reads state.toolsUsedPage (Build #19e end-page) and
@@ -5521,6 +5620,11 @@ async function main() {
   //
   // Universal: runs for ALL classes. BESS arc_flash_protection + hmi_panel
   // are now covered by deterministic-emitter.ts (commit accompanying this gate).
+  const _encVolForDevice = Number((engineeringContract?.quantities?.enclosure_volume_m3 as any)?.value)
+  const _pcForDevice = String(currentProductClass ?? '').toLowerCase()
+  const _isPlantishForDevice = /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|pump|hvac|chiller/.test(_pcForDevice)
+  const isInstrumentDevice = Number.isFinite(_encVolForDevice) && _encVolForDevice > 0 && _encVolForDevice < 1 && !_isPlantishForDevice
+  setInstrumentDeviceContext(isInstrumentDevice)
   {
     const tGate23 = Date.now()
 
@@ -5551,6 +5655,12 @@ async function main() {
     const macroWordNamesForGate23 = new Set<string>(
       (engineeringContract?.macro_assembly_prices ?? []).map((m) => String(m.word_name)),
     )
+    // Device-scale context for dbHitAcceptableForWord: on an instrument, reject industrial
+    // DB hits (a plant breaker as device overcurrent, a Banner tower as a status LED, a flow
+    // TDC as an ADC) so the slot stays honest-TBD instead of a wrong-family "verified" MPN.
+    // `state` is not yet declared at this stage, so derive the device signal from the
+    // contract that IS in scope: a sealed sub-1 m³ enclosure whose product class is NOT an
+    // energy-storage / plant archetype (a Powerwall is sub-1 m³ but must NOT be flagged).
     try {
       const completion = await completeEmitterGaps(
         design.modules ?? [],
@@ -5828,6 +5938,7 @@ async function main() {
   if (process.env.CHAIN_SKIP_BLANK_MPN_FILL !== '1') {
     try {
       const tFill = Date.now()
+      setInstrumentDeviceContext(isInstrumentDevice)
       const fill = await fillBlankWordMpns(
         design.modules ?? [],
         currentProductClass ?? 'unknown',
@@ -6693,7 +6804,7 @@ async function main() {
         try {
           libCandidates = JSON.parse(require('fs').readFileSync(libCandidatesPath, 'utf-8'))
         } catch { /* continue with empty candidates */ }
-        const realityResult = await runPartRealityCheck(design, libCandidates)
+        const realityResult = await runPartRealityCheck(design, libCandidates, { isInstrumentDevice })
         console.error(
           `[chain] Stage 10.5 Part Reality Check: ${realityResult.words_checked} checked, ` +
           `${realityResult.words_real} real, ${realityResult.words_substituted} substituted, ` +
@@ -6736,6 +6847,13 @@ async function main() {
     }
   } else {
     console.error('[chain] CHAIN_SKIP_PART_REALITY_CHECK=1 — skipping Stage 10.5 Part Reality Check')
+  }
+
+  setInstrumentDeviceContext(isInstrumentDevice)
+  const scrubbedIndustrial = scrubInstrumentIndustrialMisPins(design.modules ?? [])
+  if (scrubbedIndustrial > 0) {
+    console.error(`[chain] scrubbed ${scrubbedIndustrial} industrial-scale MPN(s) from device-instrument words (post Stage 10.5)`)
+    logAction({ step: 'scrub_instrument_industrial_mis_pins', cleared: scrubbedIndustrial })
   }
 
   // ── Stage 10.6: Synchronous Part Verification (the engine's "P1", 2026-06-04).
@@ -7078,6 +7196,9 @@ async function main() {
       recommendations_total: partRecommendations.length,
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
+    wordDomainCoherence,  // word-level sibling of gate 34: flagged/stripped process-plant-vessel/industrial-power words on a device-scale design (see call site after GATE 37)
+    toolImpliedComponentGrounding,  // ADD-side complement: tool-implied components (photodiode/TIA/cuvette/LED driver/coin-cell battery/MCU, …) added when the selected tools demand them but the generator omitted them (same call site)
+    pcb,  // Phase A PCB shadow stage: capability + bespoke/COTS disposition, recorded post-requirementsBom when PCB_STAGE is set (see call site below)
     physicsCritique: critique,
     physicsCriticEnforcement,  // gate 33 corrective-physics decision (shadow by default, exit 33 when PHYSICS_CRITIC_ENFORCING)
     physicsCriticAutocorrect,  // gate 33 PHASE-2 self-correcting loop (shadow by default; mutates design + post-correction critique when PHYSICS_CRITIC_AUTOCORRECT=1)
@@ -7357,6 +7478,10 @@ async function main() {
       // INTENT (Tristan 2026-07-09 speed): fillBlankWordMpns early-returns at
       // candidates=0 BEFORE opening the library DB — still invoke so late-minted
       // blanks are caught; the expensive DB/LLM path only runs when candidates > 0.
+      // GOTCHA (2026-07-13, colorimeter 0819): the late sweep previously ran WITHOUT
+      // re-setting RUN_IS_INSTRUMENT_DEVICE, so Banner/S22 industrial tower lights
+      // could re-pin onto Power Indicator LED after scrubInstrumentIndustrialMisPins.
+      setInstrumentDeviceContext(isInstrumentDevice)
       const lateFill = await fillBlankWordMpns(
         (state.moduleDecomposition?.modules ?? []) as any[],
         currentProductClass ?? 'unknown',
@@ -7430,6 +7555,45 @@ async function main() {
       }
     } catch (devErr) {
       console.error(`[chain] device-topology deriver failed (non-fatal): ${(devErr as Error).message}`)
+    }
+    // INSTRUMENT / SIGNAL-CHAIN TOPOLOGY (2026-07-12, colorimeter benchmark): a
+    // device-scale electronic/optical INSTRUMENT (colorimeter, pH meter, data logger,
+    // sensor node) has neither a fluid process spine nor an energy-storage/PCS plant —
+    // its working medium is LIGHT + electrons through source→sample→detector→
+    // conditioning→digitiser→compute→display, powered by inlet/battery→regulator→loads.
+    // Neither the process deriver nor the device-ENERGY deriver builds that graph, so
+    // BFD/P&ID/Connection/Electrical rendered empty (score 0). Fires on the SAME
+    // device-scale signal as the sealed scene family (enclosure_volume_m3 < 1) when the
+    // device-energy deriver found no plant chain; a plant has none of the signal-chain
+    // vocabulary so it can never trip this (deriveInstrumentTopology also requires ≥2
+    // core signal roles). Takes precedence over the naive process+signal derivers below
+    // (haveEngTopo=true suppresses deriveSignalTopology's 4-20mA instrument→hub star).
+    if (orch && !haveOrchTopo) {
+      try {
+        const enclV = Number((orch?.quantities?.enclosure_volume_m3 as any)?.value
+          ?? orch?.quantities?.enclosure_volume_m3)
+        if (Number.isFinite(enclV) && enclV > 0 && enclV < 1) {
+          const { deriveInstrumentTopology } = await import('./lib/orchestrator/generic/derive-topology')
+          const instEdges = deriveInstrumentTopology((state.moduleDecomposition?.modules ?? []) as any)
+          if (instEdges.length >= 3) {
+            orch.topology = instEdges
+            if ((engineeringContract as any)?.topology) (engineeringContract as any).topology = instEdges
+            haveOrchTopo = true
+            haveEngTopo = true // the instrument graph already carries the signal ties
+            // AUTHORITATIVE instrument-device flag — the ONE decision point. parts_ledger.py
+            // reads this to apply its instrument-role classification (signal-chain parts →
+            // 'instrument', association-scored, not fluid-process), so the connectivity
+            // model and the topology can never disagree. A plant / BESS / Powerwall never
+            // reaches here (energy-storage-plant signal routes them to the device-energy
+            // deriver instead), so they stay byte-identical.
+            ;(state as any).isInstrumentDevice = true
+            console.error(`[chain] INSTRUMENT signal-chain topology: ${instEdges.length} edge(s) (source→sample→detector→conditioning→digitiser→compute→display + power rails) — sealed sub-1 m³ instrument, no fluid/plant`)
+            logAction({ step: 'derive_instrument_topology', edges: instEdges.length })
+          }
+        }
+      } catch (instErr) {
+        console.error(`[chain] instrument-topology deriver failed (non-fatal): ${(instErr as Error).message}`)
+      }
     }
     if (orch && !haveOrchTopo && !haveEngTopo) {
       const { deriveProcessTopology } = await import('./lib/orchestrator/generic/derive-topology')
@@ -9615,6 +9779,143 @@ async function main() {
     logAction({ step: 'requirements_bom', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── PCB STAGE (Phase A, SHADOW, 2026-07-12) — docs/plans/pcb-capability-integration.md ──
+  // Runs AFTER state.requirementsBom is settled (design/parts final) so the electronic-
+  // complexity signals (part count, distinct function categories, production volume from
+  // the brief) are read off the FINISHED design, not a mid-generation draft. Behind
+  // PCB_STAGE — off/0/false/undefined skips entirely, so every existing archetype run is
+  // byte-unaffected (the additive/shadow-by-default guardrail in the plan). SHADOW: emits
+  // NOTHING to the dossier and NEVER fails the chain in Phase A — it only records
+  // state.pcb + logs a one-line summary. Universal: isPcbBearing is derived from the
+  // design's OWN word/brief content (electronic-function category diversity), never a
+  // class-name table — see src/lib/pdf-engine-v2/lib/pcb/pcb-stage.ts.
+  if (process.env.PCB_STAGE && !['0', 'false', 'off', 'no'].includes(String(process.env.PCB_STAGE).toLowerCase())) {
+    try {
+      const stPcb = JSON.parse(readFileSync(statePath, 'utf8'))
+      const pcbResult: PcbStageResult = runPcbStage(stPcb)
+      pcb = pcbResult
+      stPcb.pcb = pcbResult
+      console.error(
+        `[chain] PCB STAGE (shadow): bearing=${pcbResult.isPcbBearing} disposition=${pcbResult.disposition} ` +
+        `categories=[${pcbResult.distinctElectronicCategories.join(',')}] canAuthor=${pcbResult.canAuthor} ` +
+        `canRoute=${pcbResult.canRoute} canVerifyAndExport=${pcbResult.canVerifyAndExport}`,
+      )
+      logAction({
+        step: 'pcb_stage', ok: true, is_pcb_bearing: pcbResult.isPcbBearing,
+        disposition: pcbResult.disposition, categories: pcbResult.distinctElectronicCategories,
+        can_author: pcbResult.canAuthor, can_route: pcbResult.canRoute,
+        can_verify_and_export: pcbResult.canVerifyAndExport,
+      })
+
+      // ── PHASE D (2026-07-12): for a design the disposition says NEEDS a bespoke
+      // board, actually RUN the pipeline (atopile project -> build -> route -> DRC ->
+      // Gerbers). Non-fatal at the stage level — the honest-failure GATE below decides
+      // pass/fail. Robust: a missing toolchain (canAuthor=false) is recorded honestly
+      // and skipped, never crashes the chain; a pipeline exception is caught and
+      // recorded as an honest failure record (same shape as a real ok:false result) so
+      // the gate + dossier tab see ONE consistent contract either way.
+      if (pcbResult.disposition === 'bespoke') {
+        if (pcbResult.canAuthor) {
+          try {
+            const pcbProjectDir = resolve(outDir, 'pcb-project')
+            const genResult = generateAtopileProject(stPcb, pcbProjectDir)
+            console.error(
+              `[chain] PCB atopile project: ${genResult.components.length} component(s), ` +
+              `${genResult.offBoard.length} off-board COTS, ${genResult.unresolved.length} unresolved, ` +
+              `${genResult.nets.length} net(s) -> ${pcbProjectDir}`,
+            )
+            const pipelineResult = runPcbPipeline(pcbProjectDir, outDir)
+            const record: PcbPipelineRecord = {
+              ...pipelineResult,
+              generator: {
+                componentCount: genResult.components.length,
+                netCount: genResult.nets.length,
+                offBoardCount: genResult.offBoard.length,
+                offBoard: genResult.offBoard,
+                unresolvedCount: genResult.unresolved.length,
+                unresolved: genResult.unresolved,
+                components: genResult.components.map((c) => ({
+                  instanceName: c.instanceName,
+                  nameHuman: c.nameHuman,
+                  characterId: c.characterId,
+                  manufacturer: c.manufacturer,
+                  partNumber: c.partNumber,
+                  footprint: c.footprint ? { library: c.footprint.library, footprint: c.footprint.footprint } : null,
+                  resolutionTier: c.resolutionTier,
+                  quantityInDesign: c.quantityInDesign,
+                })),
+              },
+            }
+            stPcb.pcb.pipeline = record
+            pcb.pipeline = record
+            console.error(
+              `[chain] PCB pipeline: ok=${pipelineResult.ok} stage_reached=${pipelineResult.stageReached} ` +
+              `routed=${pipelineResult.routed} drc_violations=${pipelineResult.drc.violations}`,
+            )
+            logAction({
+              step: 'pcb_pipeline', ok: pipelineResult.ok, stage_reached: pipelineResult.stageReached,
+              routed: pipelineResult.routed, drc_violations: pipelineResult.drc.violations,
+              off_board_cots: genResult.offBoard.length, unresolved: genResult.unresolved.length,
+            })
+          } catch (pipeErr) {
+            const record: PcbPipelineRecord = {
+              ok: false,
+              stageReached: 'pipeline_exception',
+              routed: false,
+              drc: { ran: false, violations: null },
+              errors: [`pcb pipeline threw: ${(pipeErr as Error).message ?? String(pipeErr)}`.slice(0, 300)],
+            }
+            stPcb.pcb.pipeline = record
+            pcb.pipeline = record
+            console.error(`[chain] PCB pipeline threw (non-fatal, honest failure recorded): ${(pipeErr as Error).message?.slice(0, 200)}`)
+            logAction({ step: 'pcb_pipeline', ok: false, error: String(pipeErr).slice(0, 200) })
+          }
+        } else {
+          // Toolchain missing on this host — record honestly, never fabricate a board.
+          const record: PcbPipelineRecord = {
+            ok: false,
+            stageReached: 'toolchain_discovery',
+            routed: false,
+            drc: { ran: false, violations: null },
+            errors: ['PCB toolchain unavailable on this host (canAuthor=false) — bespoke board required but not generated'],
+          }
+          stPcb.pcb.pipeline = record
+          pcb.pipeline = record
+          console.error('[chain] PCB pipeline SKIPPED (canAuthor=false) — recorded honest toolchain-missing failure')
+          logAction({ step: 'pcb_pipeline', ok: false, error: 'toolchain_discovery: canAuthor=false' })
+        }
+      }
+
+      writeFileSync(statePath, JSON.stringify(stPcb))
+
+      // ── PHASE D STEP 3 — honest-failure GATE (2026-07-12): fires ONLY when the
+      // design's own disposition required a bespoke board but the pipeline did not
+      // come out DRC-clean/routed/Gerber-complete. Mirrors gates 31-37: pure decision
+      // in pcb-gate.ts, SHADOW by default (records state.pcbGate, never blocks),
+      // enforcing opt-in via PCB_GATE_ENFORCING (exit 38). Entirely inert unless
+      // PCB_STAGE is on (this whole block is behind that flag).
+      const gateResult = evaluatePcbGate(pcbResult)
+      const gateMode = pcbGateEnforceModeFromEnv(process.env.PCB_GATE_ENFORCING)
+      const onDiskForGate = JSON.parse(readFileSync(statePath, 'utf8'))
+      onDiskForGate.pcbGate = { ...gateResult, mode: gateMode }
+      writeFileSync(statePath, JSON.stringify(onDiskForGate))
+      if (gateResult.applicable) {
+        console.error(
+          `[chain] PCB GATE (${gateMode}): applicable=true fires=${gateResult.fires} reason=${gateResult.reason}` +
+          (gateResult.details.length ? ` — ${gateResult.details.join('; ')}` : ''),
+        )
+        logAction({ step: 'pcb_gate', ok: !gateResult.fires, mode: gateMode, fires: gateResult.fires, reason: gateResult.reason })
+        if (gateResult.fires && gateMode === 'enforcing') {
+          console.error('[chain] === PCB_GATE_ENFORCING: bespoke PCB required but no DRC-clean routed board with Gerbers landed — exit 38 ===')
+          process.exit(38)
+        }
+      }
+    } catch (pcbErr) {
+      console.error(`[chain] PCB STAGE threw (non-fatal, shadow): ${(pcbErr as Error).message.slice(0, 200)}`)
+      logAction({ step: 'pcb_stage', ok: false, error: String(pcbErr).slice(0, 200) })
+    }
+  }
+
   // ── SELF-CORRECTING REPAIR (Tristan 2026-06-25: "the engine should look at things, see
   //    that it doesn't work, and FIX it — find all the problems and fix them internally,
   //    without producing a report until it's fixed"). Run the deterministic audit→FIX→
@@ -9733,7 +10034,10 @@ async function main() {
       const ph3 = lateDrop((finalState.moduleDecomposition?.modules ?? []) as any)
       if (ph3.droppedPhantom > 0 || ph3.droppedDuplicate > 0)
         console.error(`[chain] final-settle phantom re-drop: ${ph3.droppedPhantom} phantom + ${ph3.droppedDuplicate} duplicate word(s) removed from the settled tree`)
-      const { fillBlankWordMpns: lateFill3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
+      const { fillBlankWordMpns: lateFill3, setInstrumentDeviceContext: setDevCtx3 } = await import('../src/lib/pdf-engine-v2/lib/emitter-completion')
+      // Same GOTCHA as the post-reconcile late sweep — final-settle fill must keep
+      // RUN_IS_INSTRUMENT_DEVICE so industrial Banner/S22 hits stay rejected.
+      setDevCtx3(Boolean(finalState.isInstrumentDevice))
       const f3 = await lateFill3(finalState.moduleDecomposition?.modules ?? [],
                                  String(finalState.orchestratorContract?.product_class ?? 'unknown'),
                                  { skipGenerate: true })

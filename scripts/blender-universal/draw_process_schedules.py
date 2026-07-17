@@ -425,10 +425,21 @@ def build_line_list(proc, schedule: dict, state: dict,
     # a 'Heat transfer / CS / insulated' LINE-LIST row on a sealed air-cooled battery —
     # the heat path is the VENT AIR, already carried by the ventilation parts; a thermal
     # edge whose medium is air (or undeclared, with no DN sizing) is not a process line).
+    # GOTCHA (e-fuel SAF / oxccu): FT-exotherm → waste-heat steam generator is a real
+    # STEAM process line (P&ID 203-ST-DN200) but carries no medium/dn on the topology
+    # edge — only material_context ("raised_steam"). Undeclared+no-DN must NOT swallow
+    # steam/coolant/HX media named in material_context.
     def _is_air_thermal(e):
         if e.get("mechanism") != "thermal":
             return False
         med = str(e.get("medium") or "").lower()
+        blob = f"{med} {e.get('material_context') or ''} {e.get('from_part') or ''} {e.get('to_part') or ''}".lower()
+        if re.search(
+            r"steam|glycol|coolant|thermal[\s_-]?oil|refrigerant|condensate|"
+            r"waste[\s_-]?heat|boiler|hx\b|heat[\s_-]?exchang",
+            blob,
+        ):
+            return False
         return ("air" in med) or (not med and not e.get("dn"))
     # NB: proc.lines zips 1:1 with proc_topo — the skip must run INSIDE the pair loop,
     # never by pre-filtering this list (pairing would silently shift one row).
