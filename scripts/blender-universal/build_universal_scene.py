@@ -16150,15 +16150,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # jagged spikes on the raised lip — outer face tipped away from cam.
             # DECISION: compact clover on the FRONT half of the outer lid (raised
             # lip in tip-back pose) + short lobes parented to the HUB.
-            _knob_r = max(16.0, min(W, D) * 0.13)
-            _hub_r = _knob_r * 0.38
-            _knob_h = 8.0
-            _lobe_len = _knob_r * 0.55
-            _lobe_w = _knob_r * 0.32
-            _lobe_h = 4.5
+            # Hub-dominant clover: glance needs dark_knob_frac≥0.008 on the
+            # product mask; 1257 mid-lid star scored 0.0025 (NO_LID_KNOB).
+            _knob_r = max(20.0, min(W, D) * 0.15)
+            _hub_r = _knob_r * 0.48
+            _knob_h = 10.0
+            _lobe_len = _knob_r * 0.48
+            _lobe_w = _knob_r * 0.30
+            _lobe_h = 4.0
             # Front half of outer lid — highest / most camera-facing when open.
-            _local_y = -_lid_d * 0.38
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 2.5
+            _local_y = -_lid_d * 0.40
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 3.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
