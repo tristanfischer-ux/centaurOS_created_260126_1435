@@ -2172,16 +2172,35 @@ def _is_catalogue_pinned_bom_row(row: dict) -> bool:
     1206L300SLTHYR £1.41 → £0.22; ×5 distributor check correctly FAILed and
     held ships. Catalogue identity prices are the authority for those lines;
     only parametric / estimate residue absorbs the gold-band scale.
+
+    GOTCHA (colorimeter 2036): cascade stamps `distributor_price_gbp` on nearly
+    every instrument line as a REFERENCE even when `unit_gbp` is still a
+    parametric estimate. Treating any non-null distributor field as a pin left
+    param_sum=0, skipped rescale, and materials stuck at £255 vs gold £125.
+    Hold only when the billed unit IS the catalogue pin (basis says so, or
+    unit ≈ distributor within 25%).
     """
     basis = str(row.get("basis") or "").lower()
     if any(t in basis for t in (
         "catalogue", "distributor", "digi-key", "digikey", "mouser",
         "farnell", "lcsc", "nexar", "rs components",
     )):
+        # Gold-band rescale annotates basis AFTER pin check; a line that was
+        # parametric and then rescaled must stay scalable on re-entry.
+        if "gold-band rescale" in basis and "catalogue pins held" in basis:
+            return False
         return True
-    if row.get("distributor_price_gbp") not in (None, "", 0, 0.0):
-        return True
-    return False
+    dist = row.get("distributor_price_gbp")
+    if dist in (None, "", 0, 0.0):
+        return False
+    try:
+        d = float(dist)
+        u = float(row.get("unit_gbp") or row.get("unit_price_gbp") or 0)
+    except (TypeError, ValueError):
+        return False
+    if d <= 0 or u <= 0:
+        return False
+    return abs(u - d) / d <= 0.25
 
 
 def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float | None, float | None]:
@@ -3255,6 +3274,29 @@ def _selftest() -> int:
         print(f"  FAIL catalogue pin must not gold-rescale (want £1.41, got £{_fuse_u})"); bad += 1
     if not (_b_cat is not None and _a_cat is not None and 150 <= _a_cat <= 220):
         print(f"  FAIL catalogue-hold rescale still lands gold band, got before={_b_cat} after={_a_cat}"); bad += 1
+    # proveCatch (colorimeter 2036): distributor_price_gbp as a cascade REFERENCE on
+    # a parametric unit must NOT freeze gold rescale (materials stuck at £255).
+    _saved_ref = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _ref_rows = [
+        {"requirement": "Wavelength Selection Module", "unit_gbp": 55.0, "line_gbp": 55.0,
+         "qty": 1, "status": "IDENTIFIED", "basis": "bottom-up parametric",
+         "distributor_price_gbp": 4.20},
+        {"requirement": "Enclosure Shell", "unit_gbp": 200.0, "line_gbp": 200.0,
+         "qty": 1, "status": "NOT FOUND", "basis": "parametric polymer take-off",
+         "distributor_price_gbp": 12.0},
+    ]
+    _b_ref, _a_ref = _rescale_instrument_materials_to_gold(
+        _ref_rows, {"moduleDecomposition": {"product_class": "optical_instrument"}})
+    _IS_INSTRUMENT_DEVICE = _saved_ref
+    if not (_b_ref == 255.0 and _a_ref is not None and 95 <= _a_ref <= 160):
+        print(f"  FAIL distributor-ref must still gold-rescale (£255→~£125), "
+              f"got before={_b_ref} after={_a_ref}"); bad += 1
+    if _is_catalogue_pinned_bom_row({
+        "basis": "bottom-up parametric", "unit_gbp": 55.0,
+        "distributor_price_gbp": 4.20,
+    }):
+        print("  FAIL distributor-ref field alone must not catalogue-pin a parametric unit"); bad += 1
     # proveCatch: benchtop_bioreactor class forces instrument path even if flag false
     _saved_pio = _IS_INSTRUMENT_DEVICE
     _IS_INSTRUMENT_DEVICE = False  # simulate chain plantish miss

@@ -1841,8 +1841,16 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"driver|regulator|ldo|dc\s*dc|charge|pmic|power\s*management|"
          r"board\s*level\s*decoupling|decoupling|bulk\s*cap", (18.0, 14.0, 5.0)),
         (r"battery|cell\s*pack|li\s*po|rechargeable", (58.0, 38.0, 9.0)),
-        (r"usb|connector|interconnect|cable|ffc|ribbon|harness|bench\s*psu|psu\s*input|"
-         r"host\s*power\s*rail|power\s*rail", (72.0, 8.0, 4.0)),
+        # INTENT (colorimeter 2036): do NOT collapse USB / PSU / rail / cable /
+        # connector into one 72×8×4 box — that minted a fresh 5-name litter
+        # cluster after the envelope-echo clamp cleared the 260×200×434 set.
+        (r"usb\s*5v|usb\s*input|\busb\b", (18.0, 12.0, 8.0)),
+        (r"bench\s*psu|psu\s*input|bench\s*adapter", (28.0, 16.0, 10.0)),
+        (r"host\s*power\s*rail|power\s*rail", (40.0, 6.0, 3.0)),
+        (r"source\s*board\s*connector|board\s*connector", (14.0, 10.0, 6.0)),
+        (r"sensor\s*interconnect|interconnect\s*cable|ffc|ribbon|harness|"
+         r"wiring\s*harness|cable\s*assembly", (50.0, 5.0, 3.0)),
+        (r"connector|cable", (22.0, 8.0, 5.0)),
         (r"reverse\s*polarity|blocking\s*diode|polarity\s*protection", (7.0, 4.0, 3.0)),
         (r"esd|tvs|transient|surge\s*protection", (9.0, 5.0, 3.0)),
         (r"polyfuse|resettable", (10.0, 7.0, 3.0)),
@@ -15266,6 +15274,19 @@ def _selftest_instrument_proxy_geometry() -> None:
     ), f"envelope-echo proxies must stay device-scale, got {echo_dims}"
     assert len({tuple(sorted(d.items())) for d in echo_dims}) >= 3, (
         "envelope-echo nouns must not all collapse to one shared box")
+    # proveCatch (colorimeter 2036): connector-family nouns must NOT share one
+    # 72×8×4 box (that litter floored Renders after the envelope-echo fix).
+    conn_names = [
+        "Usb 5v Input",
+        "Bench Psu Input",
+        "Host Power Rail On Compute Ui",
+        "Sensor Interconnect Cable",
+        "Source Board Connector",
+    ]
+    conn_dims = [_instrument_proxy_dim(n, "power_distribution", quantities) for n in conn_names]
+    assert all(conn_dims), "connector-family nouns must resolve to role-proxy dims"
+    assert len({tuple(sorted(d.items())) for d in conn_dims}) >= 4, (
+        f"connector-family proxies must diversify, got {conn_dims}")
 
     zone_z = {
         "optical": (38.0, 18.0),
