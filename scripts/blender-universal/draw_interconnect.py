@@ -1319,6 +1319,16 @@ def generate_interconnect(
         or out.name
     )
     svg, metrics = build_interconnect_svg(nodes, edges, str(arch), _ISSUE_DATE)
+    # INTENT (colorimeter 2254): stamp placement_fp at write time. When
+    # generate_drawing_set is raced/killed before `_restamp_system_svg_placement_fps`,
+    # interconnect.svg alone lacked data-placement-fp and floored Drawings via G15.
+    try:
+        from placement_fp import embed_svg_placement_fp, load_manifest_placement_fp
+        _fp = load_manifest_placement_fp(str(out))
+        if _fp:
+            svg = embed_svg_placement_fp(svg, _fp)
+    except Exception:  # noqa: BLE001
+        pass
     draw = out / "drawings"
     draw.mkdir(parents=True, exist_ok=True)
     svg_path = draw / "interconnect.svg"
@@ -1746,6 +1756,14 @@ def _selftest() -> int:
         content_bottom=100, title_top=400,
     )
     chk("stub_story_fails", thin_stub.get("story_ok") is False and thin_stub.get("ok") is False)
+    # proveCatch (colorimeter 2254): write-time placement_fp stamp — restamp alone
+    # is not enough when generate_drawing_set is raced/killed mid-set.
+    from placement_fp import embed_svg_placement_fp, extract_svg_placement_fp
+    _fp_demo = "abcdef0123456789"
+    _svg_raw = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'
+    _svg_stamped = embed_svg_placement_fp(_svg_raw, _fp_demo)
+    chk("write_time_placement_fp",
+        extract_svg_placement_fp(_svg_stamped) == _fp_demo)
 
     print("draw_interconnect selftest:", "OK" if bad == 0 else f"{bad} FAIL")
     return bad

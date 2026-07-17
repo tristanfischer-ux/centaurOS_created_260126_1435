@@ -257,24 +257,46 @@ def run_universal_fallback(state_path: Path, out_dir: Path, state: dict) -> int:
     env_shaded["INSPECT"] = "0"
     env_shaded["BLENDER_PRESENTATION_BEVEL"] = "1"
     shaded_ok = False
+    inspect_hero = out_dir / "inspect-hero.png"
     try:
         subprocess.run(
             [BLENDER_BIN, "--background", "--python", str(universal), "--", str(state_path)],
             env=env_shaded, check=True, timeout=900,
         )
-        shaded_ok = (out_dir / "00-hero.png").exists()
+        hero_path = out_dir / "00-hero.png"
+        # GOTCHA (colorimeter 2254): exists()-only was True when a PRIOR inspect
+        # fallback left 00-hero.png identical to inspect-hero while 04–07 product
+        # cams wrote successfully — vision critic then floored Renders on the
+        # labelled CAD arch. Require a real shaded hero ≠ inspect-hero.
+        if hero_path.exists():
+            if inspect_hero.exists() and hero_path.read_bytes() == inspect_hero.read_bytes():
+                print("[render-scene] shaded hero pass: 00-hero is still inspect-hero "
+                      "(byte-identical) — treating as MISSING", flush=True)
+            else:
+                shaded_ok = True
         print(f"[render-scene] shaded hero pass: 00-hero={'shaded OK' if shaded_ok else 'MISSING'}", flush=True)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        print(f"[render-scene] shaded hero pass failed ({e}) — falling back to the flat inspect hero", file=sys.stderr)
+        print(f"[render-scene] shaded hero pass failed ({e}) — falling back", file=sys.stderr)
 
     iso = out_dir / "inspect-iso.png"
-    hero = out_dir / "inspect-hero.png"
-    cover_src = hero if hero.exists() else iso
-    if not (shaded_ok or cover_src.exists()):
+    hero = inspect_hero if inspect_hero.exists() else (out_dir / "inspect-hero.png")
+    # INTENT (colorimeter 2254): instrument product exterior is the real face —
+    # never promote the flat inspect arch onto the cover when 04-product-exterior
+    # already landed (inspect labels floor Renders via vision critic).
+    product_exterior = out_dir / "04-product-exterior.png"
+    is_instrument = bool(state.get("isInstrumentDevice"))
+    cover_src = None
+    if not shaded_ok:
+        if is_instrument and product_exterior.exists() and product_exterior.stat().st_size > 50_000:
+            cover_src = product_exterior
+            print("[render-scene] cover fallback: 04-product-exterior "
+                  "(instrument — not inspect-hero)", flush=True)
+        else:
+            cover_src = hero if hero.exists() else iso
+    if not (shaded_ok or (cover_src is not None and cover_src.exists())):
         print("[render-scene] FATAL: no hero render produced", file=sys.stderr)
         return 6
     if not shaded_ok:
-        # shaded pass unavailable → map the flat inspect hero onto the cover (old behaviour)
         (out_dir / "00-hero.png").write_bytes(cover_src.read_bytes())
     # blender-cover mirrors whatever 00-hero is (shaded if the pass ran, else flat)
     (out_dir / "blender-cover.png").write_bytes((out_dir / "00-hero.png").read_bytes())

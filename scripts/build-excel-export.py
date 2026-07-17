@@ -1868,6 +1868,20 @@ def _verdict_sections(state: dict, run_dir: str = "") -> Tuple[Dict[str, dict], 
                 facts["performance_card"] = _pc
         else:
             facts["performance_card"] = _pc
+    # SIGHT (colorimeter 2254): quality-scorecard.drawing_gates can freeze a mid-loop
+    # FAIL (score 6) while the DELIVERED drawing-gates.json is ALL-PASS after a heal /
+    # restamp. The floor must re-ingest the on-disk gate verdict — never trust the
+    # stale section alone (OPERATING-FRAME §0.5 RENDER-THEN-REINGEST).
+    if run_dir:
+        _dg = _drawing_gates_verdict(run_dir)
+        if isinstance(_dg, dict) and _dg.get("all_pass") is True:
+            facts["drawing_gates"] = {"score": 10.0, "defects": []}
+        elif isinstance(_dg, dict) and _dg.get("all_pass") is False:
+            _nf = int(_dg.get("n_failing") or 0)
+            facts["drawing_gates"] = {
+                "score": max(0.0, 10.0 - 2.0 * max(1, _nf)),
+                "defects": [f"{_nf} drawing gate(s) failing (live drawing-gates.json)"],
+            }
     return facts, advisory
 
 
@@ -16749,7 +16763,22 @@ _PCB_MECH_OFFBOARD_RX = re.compile(
     r"battery\s*management|energy\s*management|digital\s*energy\s*platform|"
     # GOTCHA: 'Remote Monitoring Module' — `remote\s*monitor\b` fails because
     # 'Monitoring' continues with a word char after 'monitor'. Allow the -ing form.
-    r"energy\s*platform|remote\s*monitor(?:ing)?|telemetry)\b"
+    r"energy\s*platform|remote\s*monitor(?:ing)?|telemetry|"
+    # INTENT (OpenFlexure 2026-07-17): OPEN lab-microscope mechanics + purchased
+    # modules + host software are NOT on-board footprints. 1354 left these as
+    # ELECTRONIC gaps and capped PCB at 1 even after litter/focus SOURCE landed.
+    # Bare MCU / ADC / op-amp / photodiode stay electronic-gap (proveCatch).
+    r"optics?\s*tube|tube\s*assembly|objective(?:\s*mount)?|\brms\b|"
+    r"webcam|pi\s*camera|grade\s*camera|camera\s*module|"
+    r"flexure(?:\s*stage)?|stage\s*body|illuminat\w*|condenser|"
+    r"motor\s*controller\s*board|sangaboard|"
+    r"sbc|compute\s*module|raspberry\s*pi|single\s*board\s*computer|"
+    r"stage\s*limit|stall\s*sense|limit\s*switch|"
+    r"usb\s*or\s*barrel|barrel\s*power|power\s*inlet|dc\s*inlet|"
+    r"low\s*voltage\s*dc\s*supply|bench\s*psu|dc\s*supply|"
+    r"focus\s*metric|sensor\s*path|"
+    r"browser\s*ui|host\s*software|network\s*api|api\s*service|"
+    r"software(?:\s*service)?|firmware\s*image)\b"
     r"|"
     # PANEL / SYSTEM MODULES (Powerwall PCB 1.2 floor, 2026-07-14): purchased BMS/EMS/
     # SCADA/gateway assemblies are NEVER bare footprints. Allow `_` after the acronym so
@@ -31025,6 +31054,21 @@ def _selftest() -> int:
         if _fgot != 7:
             print(f"  FAIL mirror-sync: with NO on-disk file, _verdict_sections must "
                   f"fall back to the embedded state[qualityScorecard] — got {_fgot}"); bad += 1
+        # proveCatch (colorimeter 2254): stale quality-scorecard drawing_gates=6 must
+        # yield to live drawing-gates.json ALL-PASS → FACT score 10 (SIGHT reingest).
+        json.dump({"sections": [
+            {"name": "drawing_gates", "score": 6, "defects": ["stale mid-loop FAIL"]},
+            {"name": "cost_sanity", "score": 10, "defects": []},
+        ]}, open(os.path.join(_mstd, "quality-scorecard.json"), "w"))
+        json.dump({"all_pass": True, "n_failing": 0, "drawings": {}},
+                  open(os.path.join(_mstd, "drawing-gates.json"), "w"))
+        _DG_CACHE.pop(_mstd, None)
+        _dg_facts, _ = _verdict_sections({}, _mstd)
+        _dg_got = (_dg_facts.get("drawing_gates") or {}).get("score")
+        if _dg_got != 10.0:
+            print(f"  FAIL live-drawing-gates SIGHT: stale quality-scorecard "
+                  f"drawing_gates=6 must reingest ALL-PASS drawing-gates.json as 10 "
+                  f"— got {_dg_got!r}"); bad += 1
 
     # (performance-card fact, 2026-07-05) — an overdelivery vs a FLOOR brief target must
     # NOT be demoted to a low score, but a genuine miss still must. This exercises the
@@ -31323,6 +31367,30 @@ def _selftest() -> int:
             "Electronic gap (needs footprint/MPN)":
         print("  FAIL pcb-unresolved-disposition proveCatch: a bare ADC must stay an "
               "electronic gap — system-module nouns must not swallow on-board ICs"); bad += 1
+    # proveNoFalsePositive (OpenFlexure 2026-07-17): lab-microscope purchased
+    # modules + host software must not mint ELECTRONIC gaps on the PCB tab.
+    for _nm, _cid in (
+        ("Optics Tube Assembly", "optics_tube_assembly"),
+        ("Webcam Grade Camera", "webcam_grade_camera"),
+        ("Motor Controller Board", "motor_controller_board"),
+        ("Sbc Compute Module", "sbc_compute_module"),
+        ("Stage Limit Or Stall Sense", "stage_limit_or_stall_sense"),
+        ("Usb Or Barrel Power Inlet", "usb_or_barrel_power_inlet"),
+        ("Low Voltage DC Supply", "low_voltage_dc_supply"),
+        ("Browser Ui Host Software", "browser_ui_host_software"),
+        ("Network Api Service", "network_api_service"),
+        ("Focus Metric Sensor Path", "focus_metric_sensor_path"),
+    ):
+        if _pcb_unresolved_disposition(_nm, _cid) != \
+                "Correctly excluded (mechanical/off-board)":
+            print(f"  FAIL pcb-unresolved-disposition proveNoFalsePositive: {_nm!r}/"
+                  f"{_cid!r} must be off-board (lab-microscope module / software), "
+                  f"not an electronic gap"); bad += 1
+    if _pcb_unresolved_disposition("Photodiode Tia", "photodiode_tia") != \
+            "Electronic gap (needs footprint/MPN)":
+        print("  FAIL pcb-unresolved-disposition proveCatch: photodiode/TIA must stay "
+              "an electronic gap — microscope off-board nouns must not swallow "
+              "on-board optoelectronics"); bad += 1
     # proveCatch: the KiCad designator matcher must NEVER guess when a footprint
     # group's engine-count and board-count disagree — honestly unmatched, not a wrong ref.
     _mismatch_map = _pcb_designator_map(

@@ -1838,8 +1838,18 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"flexure\s*stage|stage\s*body|flexure\s*body", (85.0, 85.0, 35.0)),
         (r"illuminat|condenser|brightfield|transmitted\s*light", (36.0, 36.0, 22.0)),
         (r"sangaboard|motor\s*controller\s*board", (55.0, 40.0, 8.0)),
-        (r"network\s*api|api\s*service|software\s*service", (18.0, 12.0, 3.0)),
+        (r"network\s*api|api\s*service|software\s*service|"
+         r"browser\s*ui|host\s*software", (18.0, 12.0, 3.0)),
         (r"optics\s*tube|tube\s*assembly", (28.0, 28.0, 55.0)),
+        # INTENT (OpenFlexure 1354): LV PSU brick + USB/barrel inlet are COTS
+        # bricks/panel parts — must not inherit the 260×200×437 product bbox.
+        (r"low\s*voltage\s*dc\s*supply|dc\s*supply|power\s*supply\s*brick",
+         (48.0, 32.0, 22.0)),
+        (r"usb\s*or\s*barrel|barrel\s*power|power\s*inlet|dc\s*inlet",
+         (16.0, 14.0, 10.0)),
+        (r"stage\s*limit|stall\s*sense|limit\s*switch", (12.0, 8.0, 6.0)),
+        (r"sbc|compute\s*module|raspberry\s*pi", (65.0, 56.0, 8.0)),
+        (r"focus\s*metric|sensor\s*path", (20.0, 12.0, 8.0)),
         (r"collimat|lens|filter|wavelength|aperture|slit|\boptics?\b", (26.0, 18.0, 14.0)),
         (r"led\s*source|light\s*source|emitter|kingbright|\bnm\s*led\b|(?<!status\s)(?<!power\sindicator\s)(?<!indicator\s)\bled\b",
          (12.0, 10.0, 8.0)),

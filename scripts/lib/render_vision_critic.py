@@ -569,6 +569,23 @@ def _critique_render_impl(image_path: str, model: str = DEFAULT_MODEL, timeout: 
 
 
 _HERO_CANDIDATES = ("00-hero.png", "blender-cover.png", "cover.png", "inspect-hero.png")
+# INTENT (colorimeter 2254): sealed handheld product face — prefer exterior over
+# a cutaway/inspect that can be left as the labelled CAD arch when shaded hero
+# fails mid-race.
+_INSTRUMENT_EXTERIOR_CANDIDATES = ("04-product-exterior.png",)
+
+
+def _hero_is_inspect_clone(run_dir: str, hero_path: str) -> bool:
+    """True when 00-hero.png is byte-identical to inspect-hero (failed shaded pass)."""
+    if os.path.basename(hero_path) not in ("00-hero.png", "blender-cover.png"):
+        return False
+    inspect = os.path.join(run_dir, "inspect-hero.png")
+    if not os.path.isfile(inspect):
+        return False
+    try:
+        return open(hero_path, "rb").read() == open(inspect, "rb").read()
+    except OSError:
+        return False
 
 
 def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
@@ -584,11 +601,13 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
     # RULE: tip-back lid outer-face controls → prefer sealed product exterior
     # (ifg.tipback_lid_vision_image_candidates) over cutaway hero.
     _probe = os.path.join(run_dir, "state.json")
-    _cands = (
-        ifg.tipback_lid_vision_image_candidates() + _HERO_CANDIDATES
-        if _is_thermocycler_mode(_probe)
-        else _HERO_CANDIDATES
-    )
+    _cands: list[str]
+    if _is_thermocycler_mode(_probe):
+        _cands = ifg.tipback_lid_vision_image_candidates() + list(_HERO_CANDIDATES)
+    else:
+        # Optical handheld / sealed instruments: prefer product exterior when the
+        # cutaway hero is still the inspect clone (colorimeter 2254).
+        _cands = list(_INSTRUMENT_EXTERIOR_CANDIDATES) + list(_HERO_CANDIDATES)
     # Dedupe while preserving preference order.
     _seen: set[str] = set()
     _ordered: list[str] = []
@@ -596,8 +615,15 @@ def critique_run(run_dir: str, model: str = DEFAULT_MODEL) -> dict:
         if _f not in _seen:
             _seen.add(_f)
             _ordered.append(_f)
-    hero = next((os.path.join(run_dir, f) for f in _ordered
-                 if os.path.exists(os.path.join(run_dir, f))), None)
+    hero = None
+    for f in _ordered:
+        p = os.path.join(run_dir, f)
+        if not os.path.exists(p):
+            continue
+        if _hero_is_inspect_clone(run_dir, p):
+            continue  # skip inspect-as-hero; prefer 04-product-exterior
+        hero = p
+        break
     geo_hash = geometry_hash(run_dir)
     if geo_hash:
         cached = cache_read(geo_hash)
