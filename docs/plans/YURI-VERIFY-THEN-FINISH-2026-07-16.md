@@ -33,6 +33,24 @@ Anchors: `out/_yuri-gold-cost-anchors.json` · checker: `scripts/lib/gold_cost_b
 
 ## Run order (sequential — one Blender)
 
+### REVISIT FIRST (2026-07-17 standing order)
+
+**Before any new product:** every started Yuri run that is not yet floor ≥9 /
+gold cost / form PASS must be re-run and improved. Watch:
+`scripts/yuri-revisit-watch.sh` (detach: `python3 scripts/detach-yuri-revisit.py`).
+
+Queue (skip only if `check_bar` already PASS):
+
+1. **Colorimeter** — gold mid fix (optical_instrument)  
+2. **NinjaPCR** — gold mid beats wrong macro  
+3. **Poseidon** — gold mid + line_gbp rescale  
+4. **OpenFlexure** — score ≥9 (cost+form already PASS on `2159`)  
+5. **Pioreactor** — form ≠ lab_microscope  
+6. **Rodeostat** — exit-31 HEADLINE_BLANK recovery  
+7. **OpenDrop** — finish first interrupted run last  
+
+### Original campaign order (superseded by revisit until all ≥9)
+
 1. Form-converge OpenFlexure on frozen `1310` state → promote meshes  
 2. Full cold re-run **OpenFlexure** (form + cost + score ≥9)  
 3. Full cold re-run **Colorimeter** (regression)  
