@@ -104,8 +104,16 @@ export function classifyProduct(briefText: string): ProductClassification {
       // (which trips on "bioreactor|cell culture" and routes to sterilisation /
       // m³ vessel HARD slots). Noun-first: pioreactor / turbidostat / chemostat
       // + ml-scale working volume cues.
+      // GOTCHA: bare "working volume" matches plant "Bag working volume: 200 L"
+      // (06-pharma-bioreactor). Require ml-scale / OD / continuous-culture nouns.
       lower.match(/\bpioreactor\b|\bturbidostat\b|\bchemostat\b/)
-      || (lower.match(/\bbioreactor\b/) && lower.match(/\b(?:20\s*ml|working\s+volume|od[\s_-]?sensor|optical\s+density|benchtop\s+continuous)\b/))
+      || (
+        lower.match(/\bbioreactor\b/)
+        && lower.match(
+          /\b(?:\d{1,3}\s*ml\b|working\s+volume[^.\n]{0,24}\bml\b|od[\s_-]?sensor|optical\s+density|benchtop\s+continuous)\b/,
+        )
+        && !lower.match(/\b(?:\d{2,4}\s*l\b|single[- ]?use\s+bag|mammalian\s+cell|cdmo)\b/)
+      )
     ) {
       productClass = 'benchtop_bioreactor'
     } else if (lower.match(/bioreactor|fermenter|fermentation.*(?:vessel|tank|process)|bioprocess|cell culture/)) {

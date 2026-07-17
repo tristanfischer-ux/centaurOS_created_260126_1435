@@ -163,4 +163,16 @@ describe('classifyProduct — edge cases', () => {
     expect(classifyProduct('A benchtop linear stage with carriage guidance on dual rails.').productClass)
       .not.toBe('vehicle')
   })
+
+  // INTENT (2026-07-16 Pioreactor): ml-scale turbidostat ≠ plant single-use bag.
+  it('classifies a 20 ml turbidostat as benchtop_bioreactor', () => {
+    const brief = 'Pioreactor-class continuous culture: 20 ml working volume, OD sensor, '
+      + 'stirring, dosing pumps, turbidostat control. Deliver PCB, firmware, BOM.'
+    expect(classifyProduct(brief).productClass).toBe('benchtop_bioreactor')
+  })
+  it('200 L single-use pharma bag stays plant bioreactor (not benchtop)', () => {
+    const brief = 'A 200 L single-use bioreactor skid, bag working volume 100 L to 200 L, '
+      + 'mammalian cell culture for CDMO Phase I supply.'
+    expect(classifyProduct(brief).productClass).toBe('bioreactor')
+  })
 })
