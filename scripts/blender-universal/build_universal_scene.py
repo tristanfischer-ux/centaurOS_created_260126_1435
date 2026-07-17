@@ -16345,8 +16345,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             except Exception:
                 pass
             _knob_mat = fl.make_mat(
-                "m_se_tc_exterior_knob", fl._to_linear((0.05, 0.05, 0.06)),
-                metallic=0.35, roughness=0.42)
+                "m_se_tc_exterior_knob", fl._to_linear((0.02, 0.02, 0.025)),
+                metallic=0.25, roughness=0.48)
             # Planar five-lobe star on the outer lid (gold OpenPCR cue).
             #
             # TRIED (1808): tall prism lobes → vision "floating/exploded debris".
@@ -16359,15 +16359,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # lip in tip-back pose) + short lobes parented to the HUB.
             # Hub-dominant clover: glance needs dark_knob_frac≥0.008 on the
             # product mask; 1257 mid-lid star scored 0.0025 (NO_LID_KNOB).
-            _knob_r = max(20.0, min(W, D) * 0.15)
-            _hub_r = _knob_r * 0.48
-            _knob_h = 10.0
-            _lobe_len = _knob_r * 0.48
-            _lobe_w = _knob_r * 0.30
-            _lobe_h = 4.0
+            # GOTCHA (2302 tipback 0.55): closer hero grew warm body area so the
+            # same knob fell to dark_frac 0.0063 — enlarge hub + keep charcoal.
+            _knob_r = max(26.0, min(W, D) * 0.19)
+            _hub_r = _knob_r * 0.55
+            _knob_h = 12.0
+            _lobe_len = _knob_r * 0.50
+            _lobe_w = _knob_r * 0.32
+            _lobe_h = 5.0
             # Front half of outer lid — highest / most camera-facing when open.
-            _local_y = -_lid_d * 0.40
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 3.0
+            _local_y = -_lid_d * 0.38
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 4.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",

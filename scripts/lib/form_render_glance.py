@@ -292,7 +292,10 @@ def score_thermocycler_glance(png_path: str | Path) -> dict[str, Any]:
     warm = (r > g) & (r > 90) & (mean > 70) & (mean < 170) & obj
     warm_f = _frac(warm, obj)
     findings: list[dict[str, str]] = []
-    if dark_f < 0.008:
+    # INTENT (NinjaPCR 2302): tipback hero_dist_scale 0.55 fills more warm body
+    # pixels; charcoal hub must still clear this floor. 0.008 was calibrated at
+    # 0.70 distance — keep a tight floor so empty crates still FAIL.
+    if dark_f < 0.0055:
         findings.append({
             "code": "NO_LID_KNOB",
             "fix": "tipback_lid_cam_star",
