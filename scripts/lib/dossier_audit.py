@@ -344,9 +344,19 @@ def _physics_issues(state, run_dir=None) -> list:
     (identical designs → identical rows, however the LLM re-rolled its phrasing); anything the
     deterministic matchers cannot corroborate carries corroboration='uncorroborated' and is an
     ADVISORY note — visible, honest, NEVER scores. Idempotent: a critique the chain already
-    canonicalised (every issue carries a 'corroboration' marker) is returned as-is."""
+    canonicalised (every issue carries a 'corroboration' marker) is returned as-is.
+
+    DEVICE-SCALE MOTOR SWEEP (2026-07-15): always merged so a Goodhart-clean critic
+    (or an already-canonicalised critique) cannot leave physics_fidelity at 10 while
+    the BoM ships 100 W EC motors on a 175 W instrument."""
     raw = _physics_issues_raw(state, run_dir)
-    return _canonicalise_issues(state, raw)
+    issues = _canonicalise_issues(state, raw)
+    motor = _device_scale_motor_sweep(state)
+    if not motor:
+        return issues
+    if any(i.get("shape") == "device_scale_motor" for i in issues):
+        return issues
+    return motor + issues
 
 
 _PHYS_EMPTY_CLAIM_RX = re.compile(r"\bempty\b|no words|words['\"]?\s*[:=]?\s*\[\s*\]|\bhas no (?:words|equipment|parts)\b", re.I)
@@ -801,6 +811,168 @@ def _rating_pair_sweep(state) -> list:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# DEVICE-SCALE MOTOR SWEEP (Tristan 2026-07-15 — NinjaPCR Goodhart net)
+# --------------------------------------------------------------------------- #
+# rating_pair only fires when a motor is lineage-paired to a driven machine with
+# a DIFFERENT kW (Impeller 0.1 + EC Motor 0.1 share the same fanKw → silent).
+# On a sealed instrument the contract already states peak load
+# (connected_electrical_load_kw ≈ 0.175); any single motor > ~20 W electronics
+# class, or a motor fleet summing past the whole connected load, is WRONGNESS
+# and MUST score physics_fidelity — otherwise the critic can flag it while the
+# deterministic section stays at 10 (Goodhart).
+_DEVICE_MOTOR_NAME_RX = re.compile(
+    r"\bec\s*motor\b|\bdrive\s*motor\b|\bmotor\b|\bvsd\b|variable[- ]speed\s*drive", re.I)
+_DEVICE_SCALE_MOTOR_CAP_KW = 0.02  # 20 W electronics axial-fan class
+
+
+def _contract_connected_load_kw(state) -> float | None:
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if not isinstance(qs, dict):
+            continue
+        for key in ("connected_electrical_load_kw", "peak_electrical_power_kw"):
+            v = qs.get(key)
+            val = (v or {}).get("value") if isinstance(v, dict) else v
+            try:
+                fval = float(str(val))
+            except (TypeError, ValueError):
+                continue
+            if fval > 0:
+                return fval
+        # peak_electrical_power_w → kW
+        v = qs.get("peak_electrical_power_w")
+        val = (v or {}).get("value") if isinstance(v, dict) else v
+        try:
+            fval = float(str(val)) / 1000.0
+        except (TypeError, ValueError):
+            fval = 0.0
+        if fval > 0:
+            return fval
+    return None
+
+
+def _is_device_scale_state(state) -> bool:
+    if bool(state.get("isInstrumentDevice")):
+        return True
+    pc = _product_class(state)
+    if re.search(r"thermocycler|optical|colorimeter|photometer|spectrometer|"
+                 r"handheld|benchtop|instrument", pc):
+        return True
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if not isinstance(qs, dict):
+            continue
+        v = qs.get("enclosure_volume_m3")
+        val = (v or {}).get("value") if isinstance(v, dict) else v
+        try:
+            fval = float(str(val))
+        except (TypeError, ValueError):
+            continue
+        if 0 < fval < 1.0:
+            return True
+    return False
+
+
+def _device_scale_motor_sweep(state) -> list:
+    """CANONICAL sweep: on a device-scale instrument, every delivered motor/EC
+    motor kW vs the contract connected load. Scores when a single motor exceeds
+    the electronics-fan cap (20 W) AND half the connected load, or when the
+    fleet sum exceeds 1.5× connected load. Empty on plant-scale designs."""
+    if not _is_device_scale_state(state):
+        return []
+    load_kw = _contract_connected_load_kw(state)
+    if not load_kw or load_kw <= 0:
+        return []
+    motors = []
+    for mid, w in _iter_words_with_module(state):
+        nm = str(w.get("name_human") or "")
+        if not _DEVICE_MOTOR_NAME_RX.search(nm):
+            continue
+        kw = _word_kw(w)
+        if not kw or kw <= 0:
+            continue
+        motors.append((mid, nm, kw))
+    if not motors:
+        return []
+    out = []
+    per_cap = max(_DEVICE_SCALE_MOTOR_CAP_KW, load_kw * 0.5)
+    for mid, nm, kw in sorted(motors, key=lambda t: (-t[2], t[1])):
+        if kw <= per_cap + 1e-9:
+            continue
+        ratio = kw / max(load_kw, 1e-9)
+        sev = "high" if ratio >= 0.5 or kw >= 0.05 else "med"
+        out.append({
+            "dimension": "engineering_plausibility",
+            "severity": sev,
+            "confidence": "high",
+            "where": f"{mid}/{nm}",
+            "issue": (f"{nm} is rated {kw:g} kW on a device-scale instrument whose "
+                      f"connected electrical load is only {load_kw:g} kW "
+                      f"(cap {per_cap:g} kW / electronics-fan class) — both values "
+                      f"are on the delivered artefacts (deterministic device-scale "
+                      f"motor corroboration)"),
+            "suggested_check": ("size the fan/motor at the SOURCE explode rule "
+                                "(isFanAssemblyParent + fanKw), never paste industrial "
+                                "EC motors onto sense words; re-run"),
+            "corroboration": "corroborated",
+            "shape": "device_scale_motor",
+            "parent_name": nm,
+        })
+    fleet = sum(kw for _m, _n, kw in motors)
+    if fleet > load_kw * 1.5 + 1e-9 and not out:
+        # Fleet overshoot with no single offender above per_cap (e.g. 3× 0.02 kW
+        # on a 0.03 kW load) — still score once.
+        out.append({
+            "dimension": "engineering_plausibility",
+            "severity": "high",
+            "confidence": "high",
+            "where": "system/motors",
+            "issue": (f"device-scale motor fleet sums to {fleet:g} kW against "
+                      f"connected load {load_kw:g} kW (>1.5×) — deterministic "
+                      f"device-scale motor corroboration"),
+            "suggested_check": ("collapse duplicate fan anatomy under sense/fail "
+                                "parents; keep one heatsink fan at electronics duty"),
+            "corroboration": "corroborated",
+            "shape": "device_scale_motor",
+            "parent_name": "motor fleet",
+        })
+    # INTENT (2026-07-15): even when each motor is electronics-class (5–10 W),
+    # exploding fan anatomy onto fan_failure_detect / fan_tachometer_sense leaves
+    # ≥2 EC motors on a single-fan benchtop instrument — still WRONGNESS, and the
+    # rating_pair shape stays silent because every child shares the same kW.
+    fan_count = None
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = (state.get(ck) or {}).get("quantities")
+        if not isinstance(qs, dict):
+            continue
+        v = qs.get("fan_count") or qs.get("heatsink_fan_count")
+        val = (v or {}).get("value") if isinstance(v, dict) else v
+        try:
+            fan_count = float(str(val))
+            break
+        except (TypeError, ValueError):
+            pass
+    allowed = max(1, int(fan_count)) if fan_count and fan_count > 0 else 1
+    if len(motors) > allowed and not out:
+        out.append({
+            "dimension": "engineering_plausibility",
+            "severity": "high",
+            "confidence": "high",
+            "where": "system/motors",
+            "issue": (f"device-scale design ships {len(motors)} motor/EC-motor rows "
+                      f"but only {allowed} fan assembly is expected — duplicate fan "
+                      f"anatomy under sense/fail parents (deterministic device-scale "
+                      f"motor corroboration)"),
+            "suggested_check": ("isFanAssemblyParent must exclude fan_failure_detect / "
+                                "fan_tachometer_sense; only heatsink_fan explodes"),
+            "corroboration": "corroborated",
+            "shape": "device_scale_motor",
+            "parent_name": "duplicate motors",
+        })
+    return out
+
+
 def _claim_tokens(issue) -> set:
     txt = f"{issue.get('issue') or ''} {issue.get('title') or ''} {issue.get('where') or ''}".lower()
     return {t for t in re.findall(r"[a-z]{4,}", txt)}
@@ -1031,6 +1203,12 @@ def _canonicalise_issues(state, issues) -> list:
         advisory.append(adv)
     if swept_rating_pairs:
         scoring = _rating_pair_sweep(state) + scoring
+    # Always surface device-scale motor wrongness (even when the critic never
+    # named a rating_pair — Impeller + EC Motor share the same kW so the pair
+    # shape is silent). Deduped by shape in _physics_issues.
+    motor_rows = _device_scale_motor_sweep(state)
+    if motor_rows and not any(r.get("shape") == "device_scale_motor" for r in scoring):
+        scoring = motor_rows + scoring
     return scoring + advisory
 
 
@@ -1058,9 +1236,16 @@ def canonicalise_physics_critique(state, critique) -> dict:
 def _product_class(state) -> str:
     oc = state.get("orchestratorContract") or {}
     pb = state.get("parsedBrief") or {}
+    md = state.get("moduleDecomposition") or {}
+    km = state.get("keyMetrics") or {}
+    # GOTCHA (2026-07-15 NinjaPCR): thermocycler class often lives only on
+    # moduleDecomposition — omitting it left device_scale_motor silent while
+    # physics_fidelity stayed at a Goodhart 10.
     return str(
         pb.get("product_class")
+        or md.get("product_class")
         or oc.get("product_class")
+        or km.get("product_class")
         or ""
     ).strip().lower()
 
@@ -1102,6 +1287,21 @@ def _name_tokens(name) -> set:
     plurals folded. Used for the token-subset compliance match."""
     base = _norm_name(name)
     return {_singularise(t) for t in base.split("_") if t and t not in _MATCH_STOP_TOKENS}
+
+
+def _minmax_polarity_mismatch(metric_name: str, quantity_key: str) -> int:
+    """Return 1 when a brief max_* metric would bind to a *_min quantity (or vice
+    versa), else 0. INTENT (NinjaPCR 2026-07-15): max_sample_temp_c must not bind
+    to sample_temp_min_c just because both share {sample,temp} subject tokens."""
+    m = str(metric_name or "").lower()
+    q = str(quantity_key or "").lower()
+    m_max = bool(re.search(r"(^|_)(max|maximum|peak)(_|$)", m))
+    m_min = bool(re.search(r"(^|_)(min|minimum)(_|$)", m))
+    q_max = bool(re.search(r"(^|_)(max|maximum|peak)(_|$)", q))
+    q_min = bool(re.search(r"(^|_)(min|minimum)(_|$)", q))
+    if (m_max and q_min) or (m_min and q_max):
+        return 1
+    return 0
 
 
 # --------------------------------------------------------------------------- #
@@ -1259,12 +1459,23 @@ def _contract_match(state, metric_name, metric_unit, metric_value=None):
             # rank ties by the FULL-token overlap too (richer context wins among equally-
             # valid subject matches) — mirrors the renderer's ranking exactly.
             full_overlap = len(b_tokens & q_tokens)
-            penalty = 1 if re.search(r"peak|max|surge|inrush", str(k).lower()) else 0
-            cand = (-overlap, -full_overlap, penalty, len(q_tokens - b_tokens), k, v.get("value"))
+            # INTENT (NinjaPCR 2026-07-15): brief max_sample_temp_c was binding to
+            # sample_temp_min_c=4 because the peak|max penalty preferred the *min*
+            # quantity when subject overlap was equal. Prefer polarity agreement
+            # (max↔max, min↔min) and only penalise peak/max on the quantity when the
+            # brief metric itself is NOT asking for a max/peak.
+            polarity_mismatch = _minmax_polarity_mismatch(metric_name, k)
+            penalty = 0
+            if polarity_mismatch == 0 and not re.search(
+                    r"(^|_)(max|maximum|peak)(_|$)", str(metric_name).lower()):
+                if re.search(r"peak|max|surge|inrush", str(k).lower()):
+                    penalty = 1
+            cand = (-overlap, -full_overlap, polarity_mismatch, penalty,
+                    len(q_tokens - b_tokens), k, v.get("value"))
             if best is None or cand < best:
                 best = cand
         if best is not None:
-            return (best[4], best[5])
+            return (best[5], best[6])
     # Pass 4: SUBJECT-anchored family match. When the brief names a REQUIREMENT by a word the DELIVERED
     # quantity doesn't share (irrigation 'demand' ↔ the delivered irrigation 'pump_flow'), bind by the
     # metric's distinctive SUBJECT noun(s) + same family, preferring the fewest extra tokens. Requires
@@ -1282,11 +1493,12 @@ def _contract_match(state, metric_name, metric_unit, metric_value=None):
                 continue
             q_tokens = _name_tokens(k)
             if subj <= q_tokens:                      # every subject noun present in the quantity
-                cand4 = (len(q_tokens - b_tokens), k, v.get("value"))
+                polarity_mismatch = _minmax_polarity_mismatch(metric_name, k)
+                cand4 = (polarity_mismatch, len(q_tokens - b_tokens), k, v.get("value"))
                 if best4 is None or cand4 < best4:
                     best4 = cand4
         if best4 is not None:
-            return (best4[1], best4[2])
+            return (best4[2], best4[3])
     return (None, None)
 
 
@@ -1641,8 +1853,16 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
                 return float(value)
         return None
 
-    sealed = bool((_qv("enclosure_volume_m3") or 0) < 1.0
-                  and (_qv("enclosure_volume_m3") or 0) > 0)
+    # GOTCHA: isInstrumentDevice alone must count — some instrument briefs pin
+    # envelope dims without enclosure_volume_m3; skipping only on volume left
+    # SLD/PNL coverage_partial HARD-open on thermocyclers (NinjaPCR 1330).
+    sealed = bool(
+        bool(state.get("isInstrumentDevice"))
+        or (
+            (_qv("enclosure_volume_m3") or 0) < 1.0
+            and (_qv("enclosure_volume_m3") or 0) > 0
+        )
+    )
     pid_na = False
     pid_svg = os.path.join(run_dir or "", "drawings", "pid.svg")
     if sealed and os.path.isfile(pid_svg):
@@ -1667,8 +1887,18 @@ def check_drawing_coverage(state, rows, run_dir) -> list:
         norm = str(name).lower().replace("_", "-")
         if pid_na and norm in ("pid", "p&id"):
             return False
-        if norm in ("panel-schedule", "single-line-diagram") and drawing_pass.get(norm):
-            return False
+        # GOTCHA (NinjaPCR 1330): fluid-less / sealed instruments do not emit
+        # panel-schedule or SLD (pack_drawings = GA+interconnect only). The
+        # ledger still carries SLD/PNL expected>0 from electrical-typed parts,
+        # and the old guard only skipped when drawing_gates had a PASS entry —
+        # absent drawings left coverage_partial HIGH and floored Verification.
+        # Skip when the gate proved the sheet OR the sheet is not in the pack.
+        if norm in ("panel-schedule", "single-line-diagram", "sld", "pnl",
+                    "process-schedules"):
+            if drawing_pass.get(norm):
+                return False
+            if sealed and norm not in drawing_pass:
+                return False
         return True
 
     parsed = [
@@ -3812,6 +4042,29 @@ def _selftest() -> int:
         expect(not high_cov,
                "E2: NA P&ID and dedicated-gate-passed panel must not create coverage HIGH")
 
+    # ---- Fixture E3 (NinjaPCR 1330): instrument device skips SLD/PNL even when
+    # those sheets are absent from drawing-gates (pack = GA+interconnect only).
+    with tempfile.TemporaryDirectory() as te3:
+        with open(os.path.join(te3, "parts-ledger.json"), "w") as fh:
+            json.dump({"grand_total_gbp": 800, "coverage_by_drawing": {
+                "general-arrangement": {"expected": 30, "present": 30},
+                "blender": {"expected": 30, "present": 30},
+                "single-line-diagram": {"expected": 3, "present": 0},
+                "panel-schedule": {"expected": 3, "present": 0},
+            }}, fh)
+        # No drawing-gates.json — sealed instrument must still skip SLD/PNL.
+        inst_state = {
+            **clean_state,
+            "isInstrumentDevice": True,
+            "orchestratorContract": {
+                "product_class": "thermocycler",
+                "quantities": {"enclosure_volume_m3": {"value": 0.0036, "unit": "m3"}},
+            },
+        }
+        repe3 = audit_dossier(inst_state, clean_rows, run_dir=te3)
+        expect(not any(f.check == "coverage_partial" for f in repe3.findings),
+               "E3: isInstrumentDevice must skip absent SLD/PNL (NinjaPCR coverage_partial)")
+
     # ---- Fixture F: phantom reference in connection trace -> HIGH -------------
     with tempfile.TemporaryDirectory() as tf:
         with open(os.path.join(tf, "parts-ledger.json"), "w") as fh:
@@ -3980,6 +4233,29 @@ def _selftest() -> int:
            f"J: flow metric must match the throughput=45, not the count; got {fk}={fv}")
     expect(not _fam_compatible("volume", ""), "J: a dimensioned family must NOT match a blank/count family")
     expect(_fam_compatible("", "count") and _fam_compatible("", ""), "J: dimensionless families cross-match")
+
+    # proveCatch (NinjaPCR 2026-07-15): max_sample_temp must bind sample_temp_max, never min.
+    _tc_state = {
+        "orchestratorContract": {"product_class": "thermocycler", "quantities": {
+            "sample_temp_min_c": {"value": 4, "unit": "°C"},
+            "sample_temp_max_c": {"value": 99, "unit": "°C"},
+        }},
+        "parsedBrief": {"product_class": "thermocycler", "constraints": {"target_performance": {"metrics": [
+            {"key_metric": "max_sample_temp_c", "value": 99, "unit": "C"},
+            {"key_metric": "min_sample_temp_c", "value": 4, "unit": "C"},
+        ]}}},
+    }
+    _tk, _tv = _contract_match(_tc_state, "max_sample_temp_c", "C", 99)
+    expect(_tk == "sample_temp_max_c" and _tv == 99,
+           f"NinjaPCR: max_sample_temp_c must bind sample_temp_max_c=99, not min; got {_tk}={_tv}")
+    _tk2, _tv2 = _contract_match(_tc_state, "min_sample_temp_c", "C", 4)
+    expect(_tk2 == "sample_temp_min_c" and _tv2 == 4,
+           f"NinjaPCR: min_sample_temp_c must bind sample_temp_min_c=4; got {_tk2}={_tv2}")
+    expect(_minmax_polarity_mismatch("max_sample_temp_c", "sample_temp_min_c") == 1,
+           "polarity helper must flag max↔min")
+    expect(not any(f.check == "brief_metric_fail"
+                   for f in check_brief_metric_fail(_tc_state, [], "")),
+           "NinjaPCR: honest 4–99 °C range must not FAIL brief_metric on polarity mixup")
 
     # ---- Unit checks: synonym + conversion helpers ---------------------------
     expect(_norm_name_syn("usable_energy_mwh") == _norm_name_syn("usable_capacity_kwh"),
@@ -4282,6 +4558,79 @@ def _selftest() -> int:
     expect(v10[0] == "uncorroborated" and v10[1] == "current_rating_pair",
            f"CORR(10): a claim naming a part that matches NO delivered row must stay UNCORROBORABLE, "
            f"never falsified/corroborated by accident (got {v10[:2]})")
+
+    # ── proveCatch: DEVICE-SCALE MOTOR SWEEP (Tristan 2026-07-15 NinjaPCR) ─────
+    # A thermocycler with three 0.1 kW EC motors vs connected_load 0.175 kW must
+    # SCORE (physics_fidelity drag) even when Impeller and EC Motor share the
+    # same kW (rating_pair silent) and the critic finding is shape=other.
+    ninja_bad = {
+        "isInstrumentDevice": True,
+        "parsedBrief": {"product_class": "thermocycler"},
+        "orchestratorContract": {"quantities": {
+            "connected_electrical_load_kw": {"value": 0.175, "unit": "kW"},
+            "enclosure_volume_m3": {"value": 0.0036, "unit": "m³"},
+        }},
+        "moduleDecomposition": {"modules": [{"module": "environmental_interface", "sub_modules": [{"words": [
+            _corr_word("heatsink_fan_assembly_word__ec_motor", "EC Motor", 0.1),
+            _corr_word("fan_failure_detect_word__ec_motor", "EC Motor", 0.1),
+            _corr_word("fan_tachometer_sense_word__ec_motor", "EC Motor", 0.1),
+        ]}]}]},
+    }
+    ninja_rows = _device_scale_motor_sweep(ninja_bad)
+    expect(len(ninja_rows) >= 1 and ninja_rows[0]["shape"] == "device_scale_motor",
+           f"CORR(11): 0.1 kW EC motors on a 0.175 kW thermocycler must fire device_scale_motor "
+           f"(got {len(ninja_rows)} rows)")
+    expect(any(r.get("severity") == "high" for r in ninja_rows),
+           "CORR(11): a motor ≥ half the connected load must be HIGH severity")
+    # Empty critic + bad motors still lands corroborated rows via _physics_issues
+    ninja_phys = _physics_issues(ninja_bad, None)
+    expect(any(i.get("shape") == "device_scale_motor" and i.get("corroboration") == "corroborated"
+               for i in ninja_phys),
+           "CORR(11): _physics_issues must merge the motor sweep even with an empty critique")
+    # Healthy device (5 W fan) must stay silent
+    ninja_ok = {
+        "isInstrumentDevice": True,
+        "orchestratorContract": {"quantities": {
+            "connected_electrical_load_kw": {"value": 0.175, "unit": "kW"},
+            "enclosure_volume_m3": {"value": 0.0036, "unit": "m³"},
+        }},
+        "moduleDecomposition": {"modules": [{"module": "environmental_interface", "sub_modules": [{"words": [
+            _corr_word("heatsink_fan_assembly_word__ec_motor", "EC Motor", 0.005),
+        ]}]}]},
+    }
+    expect(_device_scale_motor_sweep(ninja_ok) == [],
+           "CORR(11): a 5 W electronics EC motor on a 175 W instrument must NOT fire")
+    # Duplicate 10 W motors (the post-fanKw NinjaPCR shape) must still fire
+    ninja_dup = {
+        "parsedBrief": {"product_class": "thermocycler"},
+        "orchestratorContract": {"product_class": "thermocycler", "quantities": {
+            "connected_electrical_load_kw": {"value": 0.175, "unit": "kW"},
+            "enclosure_volume_m3": {"value": 0.0036, "unit": "m³"},
+        }},
+        "moduleDecomposition": {"product_class": "thermocycler", "modules": [
+            {"module": "environmental_interface", "sub_modules": [{"words": [
+                _corr_word("heatsink_fan_assembly_word__ec_motor", "EC Motor", 0.01),
+                _corr_word("fan_failure_detect_word__ec_motor", "EC Motor", 0.01),
+                _corr_word("fan_tachometer_sense_word__ec_motor", "EC Motor", 0.01),
+            ]}]}]},
+    }
+    dup_rows = _device_scale_motor_sweep(ninja_dup)
+    expect(any("duplicate" in str(r.get("issue") or "").lower() or r.get("parent_name") == "duplicate motors"
+               for r in dup_rows),
+           f"CORR(11b): 3× 10 W EC motors on a single-fan thermocycler must fire duplicate-motor "
+           f"(got {dup_rows})")
+    # Plant-scale Codema-like state must never trip the device sweep
+    plant = {
+        "orchestratorContract": {"quantities": {
+            "connected_electrical_load_kw": {"value": 45.0, "unit": "kW"},
+            "enclosure_volume_m3": {"value": 86.0, "unit": "m³"},
+        }},
+        "moduleDecomposition": {"modules": [{"module": "mass_fluid", "sub_modules": [{"words": [
+            _corr_word("pump_word__drive_motor", "Drive Motor", 11),
+        ]}]}]},
+    }
+    expect(_device_scale_motor_sweep(plant) == [],
+           "CORR(11): plant-scale motors must never enter the device-scale sweep")
 
     # ---- VERIFIED OUT-OF-SCOPE (Tristan 2026-07-05, Option A) — tab_scorecard_summary
     #      must exclude a `scored:False` tab from EVERY count (min/fail/unscored), while an

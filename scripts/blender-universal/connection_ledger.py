@@ -64,8 +64,14 @@ SWITCH_CONTROL_GEAR_RE = re.compile(
 # separate powered part). Used by the gate's reverse check (power edge into a tank). A
 # storage name carrying a powered-internals qualifier is exempt.
 PURE_STORAGE_RE = re.compile(r"\b(?:tank|reservoir|storage|silo|cistern)\b", re.I)
+# GOTCHA (NinjaPCR 2026-07-15): "Flash Storage" / "Firmware Storage" match
+# PURE_STORAGE_RE via \bstorage\b but are powered memory ICs on the MCU board —
+# a Wire Harness → Flash Storage power edge is legitimate. Carve out electronic
+# / firmware memory before the pure-tank power check fires.
 POWERED_INTERNALS_RE = re.compile(
-    r"heat|agitat|mix|stir|immersion|trace|chill|refriger|aerat|dosing|pump", re.I)
+    r"heat|agitat|mix|stir|immersion|trace|chill|refriger|aerat|dosing|pump|"
+    r"flash|firmware|eeprom|nvram|ssd|sd[\s_-]?card|memory|sram|dram|\bram\b",
+    re.I)
 
 _FLUID_SERVICES = ("water", "thermal", "air", "oxygen")
 
@@ -554,14 +560,29 @@ def finalize_ledger(topology, parts, resolve_endpoint, log=print, quantities=Non
         if pa is None and pb is None:
             dropped.append((frm or "∅", to or "∅", mech, "both-endpoints-unresolved"))
             continue
-        # canonical endpoint names: a resolved part's name, else the (abstract) tag text.
+        # canonical endpoint names: a resolved part's name, else the authored tag text.
         a_name = pa.name if pa is not None else frm
         b_name = pb.name if pb is not None else to
         # SELF-LOOP — compared on the NORMALISED name (case/punctuation-insensitive), so a
         # 'Cip Tank' → 'cip_tank' slug/alias pair is caught, not only the exact-string match
         # (v55 shipped a 'Cip Tank → Cip Tank' row on the Connection trace).
+        # GOTCHA: must run BEFORE the unresolved-non-boundary drop — otherwise a
+        # name↔slug self-loop is mis-classified as unresolved-non-boundary-endpoint.
         if _norm_name(a_name) == _norm_name(b_name):
             dropped.append((a_name, b_name, mech, "self-loop"))
+            continue
+        # INTENT (NinjaPCR 2026-07-15): a ONE-SIDED unresolved endpoint that is NOT
+        # a recognised battery-limit / service boundary (e.g. contract topology
+        # `pcr_tube_wells`, `psu_bench_adapter` with no BoM word) used to ship as a
+        # kept row and then FAIL referential integrity. Only abstract boundaries may
+        # remain unresolved; everything else must resolve to a real part or drop.
+        if pa is None and not _ABSTRACT_BOUNDARY_RE.search(str(frm or "")):
+            dropped.append((frm or "∅", to or "∅", mech,
+                            "unresolved-non-boundary-endpoint"))
+            continue
+        if pb is None and not _ABSTRACT_BOUNDARY_RE.search(str(to or "")):
+            dropped.append((frm or "∅", to or "∅", mech,
+                            "unresolved-non-boundary-endpoint"))
             continue
 
         # SERVICE-DOMAIN COMPATIBILITY — a fluid edge may not terminate on switching /
@@ -1961,10 +1982,10 @@ def _row_keep_decisions(rows, valid_names):
     that UNIQUELY resolves to a real part (exact name, or the SAME token-subset rule the
     exporter's phantom-reference resolver uses) is kept, canonicalised to the resolved name;
     (3) a bare lowercase/snake_case topology-internal id that does NOT uniquely resolve
-    (_INTERNAL_ID_RE) is kept UNCHANGED — this pass has no visibility into Blender's own
-    topology-id resolution, so the only safe action is a no-op, never a guess or a drop;
-    (4) anything else resolving to NOTHING is a genuinely dangling DISPLAY-name reference —
-    the row is dropped."""
+    is KEPT as-is (Blender's resolve_endpoint may still bind it at render time; dropping
+    would orphan live edges). NinjaPCR dangling ids (`pcr_tube_wells`) are killed at
+    SOURCE in finalize_ledger, not here; (4) anything else resolving to NOTHING is a
+    genuinely dangling DISPLAY-name reference — the row is dropped."""
     index = _build_valid_index(valid_names)
 
     def _canon(name):
@@ -1976,8 +1997,10 @@ def _row_keep_decisions(rows, valid_names):
         resolved = _resolve_to_valid_name(name, index)
         if resolved:
             return resolved
+        # Topology-internal id passthrough — do not drop or guess.
+        # Strip qty-N index suffix so rack[3] / bms_ctrl match the same rule.
         if _INTERNAL_ID_RE.fullmatch(re.sub(r"\[\d+\]$", "", s.strip())):
-            return name   # can't verify a topology-internal id — leave unchanged, never drop
+            return name
         return None
 
     out = []
@@ -2148,6 +2171,23 @@ def _selftest():
     assert "both-endpoints-unresolved" in drop_reasons
     assert "dry-ancillary water/thermal tie to tank" in drop_reasons
     assert "duplicate" in drop_reasons
+
+    # ── UNRESOLVED NON-BOUNDARY ENDPOINT (NinjaPCR 2026-07-15) ──
+    # proveCatch: a contract-topology snake_case id with no BoM word (e.g.
+    # pcr_tube_wells) used to ship as a kept one-sided row and FAIL Connection RI.
+    # Abstract boundaries (Mains Incomer / Atmosphere) may remain unresolved.
+    one_sided = [
+        {"from_part": "Recirc Pump", "to_part": "pcr_tube_wells", "mechanism": "mechanical"},
+        {"from_part": "Recirc Pump", "to_part": "Mains Incomer", "mechanism": "power"},
+    ]
+    os_final, os_dropped = finalize_ledger(one_sided, parts, resolve, log=lambda *a: None)
+    assert not any("pcr_tube_wells" in ((e.get("from_part") or "") + (e.get("to_part") or ""))
+                   for e in os_final), \
+        f"unresolved non-boundary snake_case id must drop; kept {os_final}"
+    assert any(d[3] == "unresolved-non-boundary-endpoint" for d in os_dropped), \
+        f"expected unresolved-non-boundary-endpoint drop; got {os_dropped}"
+    assert any((e.get("to_part") or "") == "Mains Incomer" for e in os_final), \
+        f"abstract boundary endpoint must still be keepable; got {os_final}"
 
     # ── AIR-MOVER MEDIUM OVERRIDE (2026-07-10, run-22 DN100 water pipes on fan edges) ──
     # (second endpoint deliberately shares NO 4-gram with the fan — the fixture's loose

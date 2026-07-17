@@ -266,6 +266,79 @@ def drawing_form_factor(state: dict) -> FormFactor:
     return "plant"
 
 
+def form_factor_honesty_findings(state: dict) -> list[dict]:
+    """Detect container / plant-scale claims on wall or device products.
+
+    INTENT (encode checklist §1.7–1.8 / P1-7): Powerwall false-ship class —
+    container metadata on a sealed_cabinet / handheld must block SHIPS.
+    Keyed on form factor + envelope quantities, never a product noun.
+
+    @returns List of finding dicts with code/message (empty = honest).
+    """
+    findings: list[dict] = []
+    ff = drawing_form_factor(state)
+    if ff == "plant":
+        return findings
+    env = resolve_design_envelope_mm(state)
+    max_edge = max(env) if env else None
+    vol = _quantity_value(state, "enclosure_volume_m3")
+    container_count = _quantity_value(state, "container_count")
+    container_len = _quantity_value(state, "container_internal_length_m")
+    # Shipping-container signals in quantity keys / bases.
+    blob_parts: list[str] = []
+    for ck in ("orchestratorContract", "engineeringContract"):
+        qs = ((state.get(ck) or {}).get("quantities") or {})
+        if not isinstance(qs, dict):
+            continue
+        for k, v in qs.items():
+            blob_parts.append(str(k))
+            if isinstance(v, dict):
+                blob_parts.append(str(v.get("source_detail") or ""))
+                blob_parts.append(str(v.get("basis") or ""))
+    blob = " ".join(blob_parts).lower()
+    iso_claim = bool(re.search(
+        r"\b(?:40|20)[\s-]?ft\b|\biso[\s-]?container\b|\bshipping container\b|"
+        r"\bcontainerised\b|\bcontainerized\b",
+        blob,
+    ))
+    # Device / wall cabinet: small envelope must not carry ISO furniture.
+    small = (
+        (vol is not None and 0 < vol < 2.0)
+        or (max_edge is not None and max_edge <= 2500.0)
+        or ff == "handheld"
+    )
+    if small and container_count is not None and float(container_count) >= 1.0:
+        # Utility BESS legitimately has container_count; wall/device volumes don't.
+        if vol is not None and vol < 2.0:
+            findings.append({
+                "code": "CONTAINER_COUNT_ON_PRODUCT",
+                "message": (
+                    f"form={ff} enclosure_volume_m3={vol} but container_count="
+                    f"{container_count} — shipping-container metadata on a "
+                    "wall/device product (false-ship class)"
+                ),
+            })
+    if small and container_len is not None and float(container_len) >= 5.0:
+        findings.append({
+            "code": "ISO_LENGTH_ON_PRODUCT",
+            "message": (
+                f"form={ff} claims container_internal_length_m={container_len} "
+                "on a product-scale envelope"
+            ),
+        })
+    if small and iso_claim and ff == "handheld":
+        findings.append({
+            "code": "ISO_PROSE_ON_HANDHELD",
+            "message": "ISO/shipping-container prose on a handheld instrument form",
+        })
+    return findings
+
+
+def form_factor_honesty_ok(state: dict) -> bool:
+    """True when form-factor claims are coherent (no container-on-device false-ship)."""
+    return len(form_factor_honesty_findings(state)) == 0
+
+
 def is_fluid_less_instrument(state: dict) -> bool:
     """True when a handheld instrument has no process-fluid topology edges.
 
@@ -505,7 +578,27 @@ def _selftest() -> None:
     _plant = {"orchestratorContract": {"quantities": {"enclosure_volume_m3": 40.0}}}
     assert drawing_form_factor(_plant) == "plant"
     assert "pid" in pack_drawings(_plant)
-    print("render_view_contract _selftest: OK (instrument landscape + form-factor packs)")
+    # proveCatch (encode P1-7): container metadata on wall/device must FAIL honesty.
+    _wall_lie = {
+        "orchestratorContract": {
+            "quantities": {
+                "enclosure_volume_m3": 0.15,
+                "container_count": {"value": 1, "source_detail": "single 40-ft ISO container"},
+                "container_internal_length_m": {"value": 12.03},
+            }
+        }
+    }
+    assert drawing_form_factor(_wall_lie) == "sealed_cabinet"
+    assert not form_factor_honesty_ok(_wall_lie), "container on wall cabinet must fail honesty"
+    _codes = {f["code"] for f in form_factor_honesty_findings(_wall_lie)}
+    assert "CONTAINER_COUNT_ON_PRODUCT" in _codes or "ISO_LENGTH_ON_PRODUCT" in _codes
+    _hh_clean = {"isInstrumentDevice": True, "orchestratorContract": {
+        "quantities": {"enclosure_volume_m3": 0.002}}}
+    assert form_factor_honesty_ok(_hh_clean), "clean handheld must pass honesty"
+    _plant_ok = {"orchestratorContract": {"quantities": {
+        "enclosure_volume_m3": 40.0, "container_count": {"value": 1}}}}
+    assert form_factor_honesty_ok(_plant_ok), "plant may claim containers"
+    print("render_view_contract _selftest: OK (instrument landscape + form-factor packs + honesty)")
 
 
 if __name__ == "__main__":

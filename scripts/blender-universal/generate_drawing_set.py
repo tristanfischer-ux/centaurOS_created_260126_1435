@@ -203,10 +203,19 @@ def _restamp_system_svg_placement_fps(out_dir: Path, log: list[str]) -> None:
         try:
             svg_path.write_text(embed_svg_placement_fp(txt, fp), encoding="utf-8")
             n_fixed += 1
+            # INTENT (NinjaPCR 2026-07-15): restamping SVG after an ~800s settle
+            # left the sibling PNG older → G16 "png older than svg by 840s" on
+            # interconnect. Bump PNG mtime (attribute-only stamp; content unchanged).
+            png_path = svg_path.with_suffix(".png")
+            if png_path.is_file():
+                try:
+                    os.utime(png_path, None)
+                except OSError:
+                    pass
         except OSError as exc:
             log.append(f"placement-fp restamp: {svg_path.name} write failed: {exc}")
     if n_fixed:
-        log.append(f"placement-fp restamp: {n_fixed} SVG(s) → {fp}")
+        log.append(f"placement-fp restamp: {n_fixed} SVG(s) → {fp} (PNG mtimes synced)")
     else:
         log.append(f"placement-fp restamp: all system SVGs already match {fp}")
 

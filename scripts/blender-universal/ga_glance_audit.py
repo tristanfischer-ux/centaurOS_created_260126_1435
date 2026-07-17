@@ -55,6 +55,11 @@ def _count_form_markers(svg: str) -> dict:
         # Button squares from form rule: small none-fill rects ~ button size.
         "small_none_rects": len(re.findall(
             r'<rect[^>]*fill="none"[^>]*stroke="#5b6470"', svg, re.I)),
+        # Thermocycler / PCR form (NinjaPCR 2026-07-15) — not optical.
+        "sample_block": len(re.findall(
+            r'data-glance="(?:front|top)-sample-block"|SAMPLE\s*BLOCK', svg, re.I)),
+        "tec": len(re.findall(r'data-glance="top-tec"|>\s*TEC\s*<', svg, re.I)),
+        "lid": len(re.findall(r'data-glance="front-lid"|>\s*LID\s*<', svg, re.I)),
     }
 
 
@@ -183,26 +188,48 @@ def audit_ga_svg(
     # ── 3. Instrument form / assembly markers ──────────────────────────────
     if is_instrument_device:
         markers = _count_form_markers(svg_text)
-        if markers["optical"] < 1:
-            findings.append(GaGlanceFinding(
-                "instrument_missing_optical_silhouette",
-                "instrument GA has no OPTICAL form-rule marker — sheet cannot "
-                "orient the optical chamber",
-                "draw_ga._draw_instrument_form_silhouettes",
-            ))
-        if markers["ui_deck"] < 1 and markers["display_fill"] < 1:
-            findings.append(GaGlanceFinding(
-                "instrument_missing_ui_silhouette",
-                "instrument GA has neither UI DECK nor display fill — HMI plane absent",
-                "draw_ga._draw_instrument_form_silhouettes",
-            ))
-        if markers["small_none_rects"] < 4:
-            findings.append(GaGlanceFinding(
-                "instrument_missing_dpad",
-                f"instrument GA has {markers['small_none_rects']} button-scale squares "
-                f"(need ≥4 for a D-pad) — TOP fails the Blender HMI glance",
-                "draw_ga._draw_instrument_form_silhouettes button_locs",
-            ))
+        is_thermocycler = (
+            markers.get("sample_block", 0) >= 1
+            or bool(re.search(r"SAMPLE\s*BLOCK|thermocycler|\bpcr\b", svg_text, re.I))
+        )
+        if is_thermocycler:
+            # INTENT (NinjaPCR 2026-07-15): PCR form is sample-block/TEC/lid —
+            # optical/UI-deck/D-pad requirements are colorimeter-family only.
+            if markers.get("sample_block", 0) < 1:
+                findings.append(GaGlanceFinding(
+                    "thermocycler_missing_sample_block",
+                    "thermocycler GA has no SAMPLE BLOCK marker — tube-block "
+                    "orientation is missing",
+                    "draw_ga._draw_thermocycler_form_silhouettes",
+                ))
+            if markers.get("tec", 0) < 1 and markers.get("lid", 0) < 1:
+                findings.append(GaGlanceFinding(
+                    "thermocycler_missing_tec_or_lid",
+                    "thermocycler GA has neither TEC nor LID cue — thermal stack "
+                    "is unreadable",
+                    "draw_ga._draw_thermocycler_form_silhouettes",
+                ))
+        else:
+            if markers["optical"] < 1:
+                findings.append(GaGlanceFinding(
+                    "instrument_missing_optical_silhouette",
+                    "instrument GA has no OPTICAL form-rule marker — sheet cannot "
+                    "orient the optical chamber",
+                    "draw_ga._draw_instrument_form_silhouettes",
+                ))
+            if markers["ui_deck"] < 1 and markers["display_fill"] < 1:
+                findings.append(GaGlanceFinding(
+                    "instrument_missing_ui_silhouette",
+                    "instrument GA has neither UI DECK nor display fill — HMI plane absent",
+                    "draw_ga._draw_instrument_form_silhouettes",
+                ))
+            if markers["small_none_rects"] < 4:
+                findings.append(GaGlanceFinding(
+                    "instrument_missing_dpad",
+                    f"instrument GA has {markers['small_none_rects']} button-scale squares "
+                    f"(need ≥4 for a D-pad) — TOP fails the Blender HMI glance",
+                    "draw_ga._draw_instrument_form_silhouettes button_locs",
+                ))
         # Assembly stack-up: when cover-removed is claimed, PCB plane + tags required.
         if claims_cutaway:
             if markers["pcb"] < 1:
@@ -219,8 +246,8 @@ def audit_ga_svg(
                     "a real assembly drawing names the PCB / optics / HMI parts",
                     "draw_ga FRONT/TOP part draw after _seat_instrument_parts_in_form",
                 ))
-        # Exterior-form path still needs FRONT-scoped HMI stamps.
-        if "product form" in svg_text.lower():
+        # Exterior-form path still needs FRONT-scoped HMI stamps (optical family only).
+        if (not is_thermocycler) and "product form" in svg_text.lower():
             has_front_display = 'data-glance="front-display"' in svg_text
             has_front_ui = (
                 'data-glance="front-ui-deck"' in svg_text

@@ -337,14 +337,30 @@ def _selftest() -> None:
         if old is not None:
             os.environ["OPENROUTER_API_KEY"] = old
     # Optional live rot check against frozen plant fixture (SKIP without key/file).
+    # DECISION: retry 3× — OpenRouter vision flakes occasionally return
+    # broken=false on the known-bad red-beam and blocked unrelated SOURCE pushes
+    # (2026-07-17 oxccu-efuel tipback/kicad commit). Three clean misses = real rot.
     if rvc._key() and _FIXTURE_BAD_GA.is_file():
-        res = critique_image(str(_FIXTURE_BAD_GA), (
+        prompt = (
             "Flag broken=true if you see a stray pipe/beam/cable shooting off a "
             "platform. STRICT JSON: {\"broken\": true|false, \"defects\": [...]}."
-        ))
-        if res.get("ok") and res.get("broken") is not True:
+        )
+        caught = False
+        last_ok = None
+        for _attempt in range(3):
+            res = critique_image(str(_FIXTURE_BAD_GA), prompt)
+            if not res.get("ok"):
+                # Transient API — do not fail the set offline-style.
+                last_ok = res
+                continue
+            if res.get("broken") is True:
+                caught = True
+                break
+            last_ok = res
+        if not caught and last_ok is not None and last_ok.get("ok"):
             raise AssertionError(
-                "drawing_vision_glance rot: known-bad red-beam no longer flagged")
+                "drawing_vision_glance rot: known-bad red-beam no longer flagged "
+                f"after 3 attempts (last={last_ok!r})")
     print("drawing_vision_glance _selftest: OK (prompt + skip + optional rot)")
 
 

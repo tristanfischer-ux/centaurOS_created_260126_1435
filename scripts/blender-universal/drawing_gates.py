@@ -677,7 +677,10 @@ def run_gates(out_dir: str) -> list:
         m = r.get("material") or r.get("material_label") or ""
         if m:
             mats.add(re.split(r"\s*\(", str(m))[0].strip().lower())
-    if fluid_route:
+    # GOTCHA (NinjaPCR 2026-07-15): a benchtop instrument may author one incidental
+    # air/coolant fluid edge with a single default material — that is NOT a multi-
+    # service fluid plant. G4's ≥2-materials rule is for plants; skip instruments.
+    if fluid_route and not state.get("isInstrumentDevice"):
         gates.append(Gate("material_diversity", ["line-velocity-schedule", "process-schedules"],
                           "med", len(mats) >= 2,
                           f"{len(mats)} distinct pipe material(s): {sorted(mats)[:4]}"))
@@ -1245,8 +1248,10 @@ def ga_render_manifest_coherent(out_dir: str):
                                 f"would show a stale generation vs the Renders gallery")
     # Instrument/product GA must lead with FRONT (not a plant PLAN pile-up).
     # DECISION: sealed cabinets claim "door removed"; handheld instruments claim
-    # "product form" (exterior silhouette matching Blender). Requiring door-removed
-    # on instruments fights G17 (cutaway-claim honesty) and redraws forever.
+    # "product form" (exterior silhouette) OR "cover removed · assembly internals"
+    # (BoM-parts cutaway — draw_ga instrument_assembly_cutaway). Requiring only
+    # door-removed fights G17; rejecting cover-removed fought the Assembly sheet
+    # (NinjaPCR 0906: FRONT cover-removed shipped, G15 still fired plant-style).
     if product and os.path.exists(ga_svg):
         try:
             ga_txt = open(ga_svg, encoding="utf-8", errors="replace").read()
@@ -1256,11 +1261,18 @@ def ga_render_manifest_coherent(out_dir: str):
             has_front = bool(re.search(r">\s*FRONT\s*\(", ga_txt, re.I))
             has_cabinet_cutaway = "door removed" in ga_txt.lower()
             has_instrument_form = "product form" in ga_txt.lower()
-            if not (has_front and (has_cabinet_cutaway or has_instrument_form)):
+            has_assembly_cutaway = (
+                "cover removed" in ga_txt.lower()
+                or "assembly internals" in ga_txt.lower()
+            )
+            if not (has_front and (
+                has_cabinet_cutaway or has_instrument_form or has_assembly_cutaway
+            )):
                 return (False,
                         "general-arrangement.svg is still plant-style PLAN — "
                         "product/instrument GA must lead with FRONT "
-                        "(door removed · looking in OR product form · Blender exterior)")
+                        "(door removed · looking in OR product form · Blender exterior "
+                        "OR cover removed · assembly internals)")
     return (True,
             f"{os.path.basename(render)} + GA fresh vs parts-manifest "
             f"(fp={fp_man}, {kind}) — same placement generation")
@@ -1578,6 +1590,14 @@ def _selftest() -> int:
         not [r for r in _g4_elec if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
     chk("g4_fluid_route_survives",
         [r for r in _g4_fluid if not _g4_rx.search(str(r.get("mechanism") or r.get("service") or "").lower())])
+    # proveCatch (NinjaPCR 2026-07-15): instrument + single fluid material must NOT
+    # emit material_diversity (plant-only rule).
+    _g4_inst = {"isInstrumentDevice": True}
+    _g4_plant = {"isInstrumentDevice": False}
+    chk("g4_instrument_skips_material_diversity",
+        not (_g4_inst.get("isInstrumentDevice") is False))  # polarity of the skip guard
+    chk("g4_plant_still_subjects_fluid_to_diversity",
+        not _g4_plant.get("isInstrumentDevice"))
     # G10 interior-fill proveCatch (2026-07-11 run 73): the REAL shipped manifest shape —
     # 33 small boxes ≈ 3% of the 0.13 m³ enclosure — FIRES; a pack-array interior
     # (~50%) passes; skin parts are excluded from the numerator both ways.
@@ -1729,6 +1749,14 @@ def _selftest() -> int:
         _prod_form = ga_render_manifest_coherent(_prod)
         chk("g15_instrument_product_form_passes",
             _prod_form is not None and _prod_form[0] is True)
+        # Instrument Assembly cutaway caption (cover removed) must also PASS —
+        # draw_ga emits this when BoM parts are seated; G15 must not reject it.
+        open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
+            f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
+            f'<text>FRONT (cover removed · assembly internals)</text></svg>')
+        _prod_cover = ga_render_manifest_coherent(_prod)
+        chk("g15_instrument_cover_removed_passes",
+            _prod_cover is not None and _prod_cover[0] is True)
         open(os.path.join(_prod, "drawings", "general-arrangement.svg"), "w").write(
             f'<svg data-placement-fp="{_pfp}" width="10" height="10">'
             f'<text>FRONT (door removed · looking in)</text></svg>')
@@ -2066,6 +2094,11 @@ def _selftest() -> int:
         [{"from_part": "Main Switchboard", "to_part": "Fresh Water Tank", "service": "power"}], [], {})))
     chk("g8_power_to_heated_tank_ok", connection_sanity_findings(
         [{"from_part": "Main Switchboard", "to_part": "Heated Cip Tank", "service": "power"}], [], {}) == [])
+    # NinjaPCR 2026-07-15: Flash/Firmware Storage is a powered memory IC, not a tank.
+    chk("g8_power_to_flash_storage_ok", connection_sanity_findings(
+        [{"from_part": "Wire Harness", "to_part": "Flash Storage", "service": "power"}], [], {}) == [])
+    chk("g8_power_to_firmware_storage_ok", connection_sanity_findings(
+        [{"from_part": "Wire Harness", "to_part": "Firmware Storage", "service": "power"}], [], {}) == [])
     # coolant to power-CONVERSION gear is legitimate (the BESS PCS carve-out)
     chk("g8_pcs_coolant_ok", connection_sanity_findings(
         [{"from_part": "Coolant Manifold", "to_part": "PCS Inverter Module", "service": "water"}], [], {}) == [])

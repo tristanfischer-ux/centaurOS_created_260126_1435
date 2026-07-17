@@ -433,6 +433,16 @@ def load_manifest(out_dir: str, manifest_path: Optional[str] = None):
             with open(st_path) as fh:
                 _st = json.load(fh)
             meta["is_instrument_device"] = bool(_st.get("isInstrumentDevice"))
+            _pc = str(
+                ((_st.get("moduleDecomposition") or {}).get("product_class"))
+                or ((_st.get("orchestratorContract") or {}).get("product_class"))
+                or ((_st.get("parsedBrief") or {}).get("product_class"))
+                or ""
+            ).lower()
+            # INTENT (NinjaPCR 2026-07-15): thermocycler GA must show sample-block /
+            # TEC / lid zones — not the colorimeter OPTICAL / UI DECK silhouettes.
+            meta["is_thermocycler_form"] = bool(
+                re.search(r"thermocycler|thermal[_ -]?cycler|\bpcr\b", _pc))
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
             from render_view_contract import is_product_scale as _is_product_scale
             meta["is_product_scale"] = bool(_is_product_scale(_st))
@@ -1469,6 +1479,81 @@ def _draw_elevation_buried_laterals(svg, parts, elev_x, elev_y, elev_w, elev_h,
 
 
 
+def _draw_thermocycler_form_silhouettes(
+    svg, *,
+    plan_x, plan_y, plan_w, plan_h, L, W, H, ppm, mx, my,
+    front_x, front_y, z_max,
+    assembly_cutaway: bool = False,
+) -> None:
+    """Benchtop PCR thermocycler zone cues — sample block / TEC / lid / PCB.
+
+    INTENT (NinjaPCR 2026-07-15): never stamp OPTICAL / UI DECK (colorimeter
+    family) onto a thermal cycler. Reader must see the tube block + TEC stack.
+    """
+    block_w, block_d = L * 0.48, W * 0.42
+    block_h = max(12.0, H * 0.18)
+    # TOP — sample block with well grid cue
+    bx = plan_x + mx(-block_w / 2)
+    by = plan_y + my(block_d / 2)
+    svg.rect(bx, by, block_w * ppm, block_d * ppm, stroke=EQ_INK, width=1.5,
+             fill="#d8dde3" if assembly_cutaway else "#c5ccd4",
+             dash="3,2" if assembly_cutaway else None,
+             extra='data-glance="top-sample-block"')
+    svg.text(plan_x + mx(0), plan_y + my(0) + 3, "SAMPLE BLOCK",
+             size=7.5, anchor="middle", fill=MUTED,
+             extra='data-glance="top-sample-label"')
+    # 2×4 well dots
+    for r in range(2):
+        for c in range(4):
+            wx = -block_w / 2 + block_w * (c + 0.5) / 4
+            wy = -block_d / 2 + block_d * (r + 0.5) / 2
+            svg.rect(plan_x + mx(wx - 2), plan_y + my(wy + 2),
+                     4 * ppm, 4 * ppm, stroke=MUTED, width=0.7, fill="none")
+    # TEC under / behind block on TOP
+    tec_w, tec_d = block_w * 0.9, block_d * 0.35
+    svg.rect(plan_x + mx(-tec_w / 2), plan_y + my(-block_d / 2 - 2),
+             tec_w * ppm, tec_d * ppm, stroke=DATUM_INK, width=1.0,
+             fill="none", dash="2,2",
+             extra='data-glance="top-tec"')
+    svg.text(plan_x + mx(0), plan_y + my(-block_d / 2 - tec_d / 2) + 3, "TEC",
+             size=6.5, anchor="middle", fill=MUTED)
+    if assembly_cutaway:
+        pcb_w, pcb_d = L * 0.55, W * 0.35
+        svg.rect(plan_x + mx(-pcb_w / 2), plan_y + my(W * 0.35),
+                 pcb_w * ppm, pcb_d * ppm, stroke="#2e7d32", width=1.2,
+                 fill="#c5e1a5", dash="2,2",
+                 extra='data-glance="top-pcb-plane"')
+        svg.text(plan_x + mx(0), plan_y + my(W * 0.35 - pcb_d / 2) + 3, "PCB",
+                 size=7.0, anchor="middle", fill="#1b5e20",
+                 extra='data-glance="top-pcb-label"')
+    # FRONT — body + block + lid band
+    body_h = H * 0.62
+    svg.rect(front_x, front_y + (z_max - body_h) * ppm, plan_w, body_h * ppm,
+             stroke=EQ_INK, width=1.5,
+             fill="none" if assembly_cutaway else "#f4f6f8",
+             dash="5,3" if assembly_cutaway else None)
+    fbx = front_x + mx(-block_w / 2)
+    fby = front_y + (z_max - (body_h * 0.55 + block_h)) * ppm
+    svg.rect(fbx, fby, block_w * ppm, block_h * ppm, stroke=EQ_INK, width=1.4,
+             fill="#c5ccd4",
+             extra='data-glance="front-sample-block"')
+    svg.text(fbx + block_w * ppm / 2, fby + 10, "BLOCK",
+             size=7.0, anchor="middle", fill=MUTED)
+    lid_h = max(6.0, H * 0.08)
+    svg.rect(front_x + mx(-L * 0.45), front_y + (z_max - (body_h + lid_h * 2.2)) * ppm,
+             L * 0.9 * ppm, lid_h * ppm, stroke=DATUM_INK, width=1.1,
+             fill="none", dash="3,2",
+             extra='data-glance="front-lid"')
+    svg.text(front_x + mx(0), front_y + (z_max - (body_h + lid_h * 1.2)) * ppm + 3,
+             "LID", size=6.5, anchor="middle", fill=MUTED,
+             extra='data-glance="front-lid-label"')
+    if assembly_cutaway:
+        svg.rect(front_x + mx(-L * 0.35), front_y + (z_max - 14) * ppm,
+                 L * 0.7 * ppm, 8 * ppm, stroke="#2e7d32", width=1.1,
+                 fill="#c5e1a5", dash="2,2",
+                 extra='data-glance="front-pcb"')
+
+
 def _draw_instrument_form_silhouettes(
     svg, form: dict, *,
     plan_x, plan_y, plan_w, plan_h, L, W, ppm, mx, my,
@@ -1938,7 +2023,17 @@ def build_ga_svg(parts: list[GAPart], bbox: dict, archetype: str,
     front_tags.block(margin, sched_top - 2, width - margin, sched_top + 20)
     _assembly_cutaway = bool(
         meta.get("is_instrument_device") and meta.get("instrument_assembly_cutaway"))
-    if _form is not None:
+    if meta.get("is_thermocycler_form"):
+        _draw_thermocycler_form_silhouettes(
+            svg,
+            plan_x=plan_x, plan_y=plan_y, plan_w=plan_w, plan_h=plan_h,
+            L=L, W=W, H=H, ppm=ppm, mx=mx, my=my,
+            front_x=front_x, front_y=front_y, z_max=z_max,
+            assembly_cutaway=_assembly_cutaway,
+        )
+        print("[ga] thermocycler form context drawn "
+              f"(assembly_cutaway={_assembly_cutaway})")
+    elif _form is not None:
         _draw_instrument_form_silhouettes(
             svg, _form,
             plan_x=plan_x, plan_y=plan_y, plan_w=plan_w, plan_h=plan_h,

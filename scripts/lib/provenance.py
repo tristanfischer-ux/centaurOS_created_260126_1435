@@ -290,6 +290,13 @@ _GENERIC_ROLE = {
     # exactly as 'power'/'mass' above; only the genuine domain token (cell/bus/string)
     # discriminates.
     "voltage", "volt", "current", "amperage", "frequency",
+    # temperature measurement-type nouns (NinjaPCR / thermocycler 2026-07-15): every
+    # *_temp_* / *_temperature_* quantity of the unit shares these, so they don't
+    # discriminate ROLE — heatsink_base_temp_c (109 °C absolute) and
+    # calculated_temp_spread_c (0.5 °C delta) are DIFFERENT physical roles that only
+    # shared the spurious token 'temp' and false-flagged 218×. Domain tokens
+    # (heatsink/base vs spread/delta) discriminate; see _temperature_kind.
+    "temp", "temperature", "celsius", "kelvin",
     # UNIT-PHRASE time words spelled out INSIDE a key name (CO2-mineralisation cross-val
     # 2026-07-06): a key like 'flue_gas_flow_m3_per_hour' encodes its unit as literal
     # tokens ('per', 'hour') rather than in the `unit` field ('m³/h' has no letter run
@@ -367,6 +374,38 @@ def _vessel_class_group(key: str) -> Optional[str]:
     return None
 
 
+# TEMPERATURE kinds (NinjaPCR 2026-07-15): an ABSOLUTE temperature (heatsink base,
+# junction, ambient) and a DELTA / spread / uniformity are NEVER the same physical
+# role — they share only the measurement noun 'temp' after generic strip.
+_TEMP_DELTA_TOKENS = {"spread", "delta", "rise", "drop", "uniformity", "gradient", "diff"}
+_TEMP_ABS_HINT = {"temp", "temperature", "celsius", "kelvin", "degc", "deg"}
+
+
+def _temperature_kind(key: str) -> Optional[str]:
+    toks = set(_NUM_RE.findall(str(key).lower()))
+    if not (toks & _TEMP_ABS_HINT) and not (toks & _TEMP_DELTA_TOKENS):
+        return None
+    if toks & _TEMP_DELTA_TOKENS:
+        return "delta"
+    return "absolute"
+
+
+# RANGE bounds (sample_temp_min vs sample_temp_max): both are absolute °C of the
+# same stem but opposite ends of a stated operating range — never a contradiction.
+_RANGE_BOUND_GROUPS = {
+    "min_bound": {"min", "minimum", "low", "lower"},
+    "max_bound": {"max", "maximum", "high", "upper"},
+}
+
+
+def _range_bound_group(key: str) -> Optional[str]:
+    toks = set(_NUM_RE.findall(str(key).lower()))
+    for group, members in _RANGE_BOUND_GROUPS.items():
+        if toks & members:
+            return group
+    return None
+
+
 def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
     out: List[ProvFinding] = []
     by_unit: Dict[str, List[tuple]] = {}
@@ -392,7 +431,8 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         if not roles:
             continue
         by_unit.setdefault(unit, []).append(
-            (key, float(v), roles, _dimension_group(key), _vessel_class_group(key)),
+            (key, float(v), roles, _dimension_group(key), _vessel_class_group(key),
+             _temperature_kind(key), _range_bound_group(key)),
         )
 
     for unit, items in by_unit.items():
@@ -405,9 +445,9 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
         flagged: Dict[str, tuple] = {}   # hi_key -> (lo_key, ratio, hi, lo)
         n = len(items)
         for i in range(n):
-            ki, vi, ri, di, vi_cls = items[i]
+            ki, vi, ri, di, vi_cls, ti, bi = items[i]
             for j in range(i + 1, n):
-                kj, vj, rj, dj, vj_cls = items[j]
+                kj, vj, rj, dj, vj_cls, tj, bj = items[j]
                 if di and dj and di != dj:
                     # a HEIGHT-family quantity and a DIAMETER/WIDTH-family quantity are
                     # distinct geometric roles even when they share an equipment-stem token
@@ -418,6 +458,12 @@ def _detect_divergences(q: Dict[str, dict]) -> List[ProvFinding]:
                 if (vi_cls or vj_cls) and vi_cls != vj_cls:
                     # a STORAGE RESERVOIR and a COLLECTION SUMP/PIT share 'drain' but are
                     # different vessel classes — never a same-role contradiction.
+                    continue
+                if ti and tj and ti != tj:
+                    # absolute temperature vs delta/spread — never same role.
+                    continue
+                if bi and bj and bi != bj:
+                    # operating-range min vs max of the same stem — never a contradiction.
                     continue
                 if not (ri & rj):           # must DIRECTLY share a domain role token
                     continue
@@ -602,6 +648,27 @@ def _selftest() -> int:
            "two genuinely same-axis (both HEIGHT) absorber claims that disagree 122x must "
            "still flag — the dimension-group guard must not swallow real height-vs-height "
            "divergences")
+
+    # TEMPERATURE absolute-vs-delta guard (NinjaPCR 2026-07-15): heatsink_base_temp
+    # (absolute °C) and calculated_temp_spread (delta °C) must NOT cluster merely
+    # because both carry 'temp'. Two competing absolute heatsink-base claims still flag.
+    # sample_temp_min vs sample_temp_max is an operating-range pair — also not a
+    # same-role contradiction.
+    temps = {"orchestratorContract": {"quantities": {
+        "heatsink_base_temp_c": {"value": 109.0, "unit": "degC", "source": "tool"},
+        "calculated_temp_spread_c": {"value": 0.5, "unit": "degC", "source": "tool"},
+        "sample_temp_min_c": {"value": 4.0, "unit": "degC", "source": "brief"},
+        "sample_temp_max_c": {"value": 99.0, "unit": "degC", "source": "brief"},
+    }}}
+    expect(not any(f.kind == "divergence" for f in audit_provenance(temps).findings),
+           "heatsink absolute temp vs temp-spread delta, and sample min vs max, "
+           "must NOT be flagged as same-role divergences")
+    same_heatsink = {"orchestratorContract": {"quantities": {
+        "heatsink_base_temp_c": {"value": 109.0, "unit": "degC", "source": "tool"},
+        "heatsink_hot_side_base_temp_c": {"value": 0.5, "unit": "degC", "source": "tool"},
+    }}}
+    expect(any(f.kind == "divergence" for f in audit_provenance(same_heatsink).findings),
+           "two competing heatsink-base absolute temperatures that disagree must still flag")
 
     # LIFECYCLE-vs-EMBODIED aggregate guard (CO2-mineralisation v2 cross-val 2026-07-05):
     # a cradle-to-grave lifecycle total (embodied + years of operation) legitimately dwarfs
