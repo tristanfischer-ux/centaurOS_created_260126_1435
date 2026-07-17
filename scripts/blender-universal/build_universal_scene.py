@@ -16141,18 +16141,22 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 "m_se_tc_exterior_knob", fl._to_linear((0.05, 0.05, 0.06)),
                 metallic=0.35, roughness=0.42)
             # Planar five-lobe star on the outer lid (gold OpenPCR cue).
-            # DECISION (1808): tall prism lobes read to the vision LLM as
-            # "floating/exploded debris" even when parented correctly. Keep the
-            # star FLAT on the lid face (short Z, long XY reach) so it silhouettes
-            # as one joined handle, not a debris cloud.
-            _knob_r = max(44.0, min(W, D) * 0.34)
-            _hub_r = _knob_r * 0.28
-            _knob_h = 14.0
-            _lobe_len = _knob_r * 1.25
-            _lobe_w = _knob_r * 0.22
+            #
+            # TRIED (1808): tall prism lobes → vision "floating/exploded debris".
+            # TRIED (1257/0855 SIGHT): oversized flat star
+            #   ``max(44, 0.34·min(W,D))`` still read as THREE black bars behind
+            #   the open lid (lobes edge-on) + "no dark lobed/star knob on lid".
+            # DECISION: compact ~18 mm star, short Z, lobes parented to the HUB
+            # (one rigid assembly) so the handle reads as a single lid cue.
+            _knob_r = max(14.0, min(W, D) * 0.12)
+            _hub_r = _knob_r * 0.32
+            _knob_h = 7.0
+            _lobe_len = _knob_r * 0.90
+            _lobe_w = _knob_r * 0.28
+            _lobe_h = 5.0
             # Centre of outer lid face — gold star sits mid-lid, not at the lip.
             _local_y = -_lid_d * 0.30
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 4.0
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 2.0
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
@@ -16174,13 +16178,15 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _lobe = fl.add_box(
                     f"u_se_product_tc_knob_lobe_{_si}",
                     (0.0, 0.0, 0.0),
-                    _mm3((_lobe_w, _lobe_len, _knob_h * 0.88)),
+                    _mm3((_lobe_w, _lobe_len, _lobe_h)),
                     _knob_mat, module=_skin_mod, module_objects=MO)
-                _lobe.dimensions = _mm3((_lobe_w, _lobe_len, _knob_h * 0.88))
+                _lobe.dimensions = _mm3((_lobe_w, _lobe_len, _lobe_h))
                 try:
+                    # Parent to hub (not lid) so lobes cannot drift into a
+                    # debris cloud when the hinge tips the outer face.
                     _parent_local(
-                        _lobe, _lid,
-                        (_sx * fl.MM, (_local_y + _sy) * fl.MM, _local_z * fl.MM),
+                        _lobe, _knob,
+                        (_sx * fl.MM, _sy * fl.MM, 0.0),
                         rot_euler=(0.0, 0.0, _sang))
                 except Exception:
                     pass
@@ -16188,15 +16194,15 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _stud = fl.add_box(
                 "u_se_product_tc_knob_stud",
                 (0.0, 0.0, 0.0),
-                _mm3((6.0, 6.0, _lid_h + _knob_h * 0.6)),
+                _mm3((5.0, 5.0, _lid_h + _knob_h * 0.5)),
                 fl.make_mat("m_se_tc_stud", fl._to_linear((0.45, 0.45, 0.48)),
                             metallic=0.7, roughness=0.35),
                 module=_skin_mod, module_objects=MO)
-            _stud.dimensions = _mm3((6.0, 6.0, _lid_h + _knob_h * 0.6))
+            _stud.dimensions = _mm3((5.0, 5.0, _lid_h + _knob_h * 0.5))
             try:
                 _parent_local(
-                    _stud, _lid,
-                    (0.0, _local_y * fl.MM, (_knob_h * 0.1) * fl.MM))
+                    _stud, _knob,
+                    (0.0, 0.0, (-_knob_h * 0.35) * fl.MM))
             except Exception:
                 pass
             try:
@@ -16204,10 +16210,17 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                 _kwz = float(_knob.matrix_world.translation.z) / fl.MM
                 _lwz = float(_lid.matrix_world.translation.z) / fl.MM
                 _hx = float(_hinge.rotation_euler[0])
+                _n_lobes = sum(
+                    1 for o in _bpy_hinge.data.objects
+                    if (getattr(o, "name", "") or "").startswith(
+                        "u_se_product_tc_knob_lobe_")
+                    and getattr(o, "parent", None) is _knob
+                )
                 print(f"[univ][sealed] tc_knob parent={getattr(_knob.parent, 'name', None)!r} "
                       f"hinge_rx_deg={math.degrees(_hx):.1f} "
                       f"world_z_mm={_kwz:.1f} lid_z_mm={_lwz:.1f} "
-                      f"delta_z_mm={_kwz - _lwz:.1f}",
+                      f"delta_z_mm={_kwz - _lwz:.1f} "
+                      f"lobes_on_hub={_n_lobes} r_mm={_knob_r:.1f}",
                       flush=True)
                 # proveCatch (runtime): open must be −Rx (front edge up / gold pose).
                 if _hx > -math.radians(35.0):
@@ -16215,6 +16228,12 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                           f"expected Rx≲−35° (gold tip-back), got "
                           f"{math.degrees(_hx):.1f}°",
                           flush=True)
+                if _n_lobes < 5:
+                    print(f"[univ][sealed] WARN tc star lobes not on hub: "
+                          f"{_n_lobes}/5", flush=True)
+                if _knob_r > 28.0:
+                    print(f"[univ][sealed] WARN tc star oversized "
+                          f"r={_knob_r:.1f}mm (debris risk)", flush=True)
             except Exception:
                 pass
             # Finger-joint nubs on BOTH side edges (front is covered by fascia on
@@ -16290,6 +16309,29 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _usb.dimensions = _mm3((W * 0.18, tt * 1.4, H * 0.08))
             print("[univ][sealed] THERMOCYCLER product skin: wood box + hinged lid "
                   "+ parented star knob + top aperture + slatted vents + front controls")
+            # INTENT (2026-07-17): yuri-revisit watch WARN'd "no form-meshes.json"
+            # on every thermocycler settle even when glance PASS. Dump like
+            # syringe_pump / lab_microscope / optical_handheld.
+            try:
+                _out = os.environ.get("BLENDER_OUT_DIR") or ""
+                if _out and hasattr(_bpy_hinge, "data"):
+                    _names = sorted(
+                        o.name for o in _bpy_hinge.data.objects
+                        if getattr(o, "type", None) == "MESH"
+                        and (
+                            o.name.startswith("u_se_tc_")
+                            or o.name.startswith("u_se_product_tc_")
+                        )
+                    )
+                    Path(_out).joinpath("form-meshes.json").write_text(
+                        json.dumps(
+                            {"form": "thermocycler", "form_id": "thermocycler",
+                             "meshes": _names},
+                            indent=2,
+                        )
+                    )
+            except Exception as _dump_exc:
+                print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
         elif _IS_INSTRUMENT_DEVICE:
             # stepped upper deck — narrower control/optical top (handheld read, not a cube)
             _deck_h = H * 0.22

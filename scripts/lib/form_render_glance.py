@@ -59,18 +59,28 @@ def _load_rgb(path: str | Path) -> np.ndarray:
 
 
 def _object_mask(rgb: np.ndarray) -> np.ndarray:
-    """Foreground vs near-uniform studio/inspect background (corner median)."""
+    """Foreground vs studio/inspect backdrop(s).
+
+    INTENT (NinjaPCR 2026-07-17 SIGHT): product cams use a SPLIT studio
+    (black upper void + white floor). A single median of all four corners
+    lands mid-grey, so the black void scores as "object" and thermocycler
+    ``dark_knob_frac`` false-passes at ~0.50. Exclude pixels near ANY corner
+    colour so multi-backdrop studios drop both void and floor.
+    """
     h, w, _ = rgb.shape
     cs = max(4, min(h, w) // 40)
-    corners = np.concatenate([
-        rgb[:cs, :cs].reshape(-1, 3),
-        rgb[:cs, -cs:].reshape(-1, 3),
-        rgb[-cs:, :cs].reshape(-1, 3),
-        rgb[-cs:, -cs:].reshape(-1, 3),
-    ])
-    bg = np.median(corners, axis=0)
-    dist = np.sqrt(((rgb - bg) ** 2).sum(axis=2))
-    return dist > 28.0
+    patches = (
+        rgb[:cs, :cs],
+        rgb[:cs, -cs:],
+        rgb[-cs:, :cs],
+        rgb[-cs:, -cs:],
+    )
+    near_bg = np.zeros((h, w), dtype=bool)
+    for patch in patches:
+        bg = np.median(patch.reshape(-1, 3), axis=0)
+        dist = np.sqrt(((rgb - bg) ** 2).sum(axis=2))
+        near_bg |= dist < 28.0
+    return ~near_bg
 
 
 def _frac(mask: np.ndarray, obj: np.ndarray) -> float:
@@ -525,6 +535,16 @@ def _synth(path: Path, kind: str, size: tuple[int, int] = (640, 400)) -> Path:
         d.ellipse([300, 90, 340, 130], fill=(25, 25, 28))  # star knob
     elif kind == "thermocycler_empty":
         d.rectangle([140, 110, 500, 300], fill=(140, 142, 145))
+    elif kind == "thermocycler_split_studio_good":
+        # proveCatch: live Blender product cams (black void + white floor).
+        d.rectangle([0, 0, w, h // 2], fill=(0, 0, 0))
+        d.rectangle([0, h // 2, w, h], fill=(245, 245, 245))
+        d.rectangle([120, 100, 520, 320], fill=(160, 120, 70))
+        d.ellipse([300, 90, 340, 130], fill=(25, 25, 28))
+    elif kind == "thermocycler_split_studio_noknob":
+        d.rectangle([0, 0, w, h // 2], fill=(0, 0, 0))
+        d.rectangle([0, h // 2, w, h], fill=(245, 245, 245))
+        d.rectangle([120, 100, 520, 320], fill=(160, 120, 70))
     elif kind == "microscope_good":
         # Cream FDM body + dark steppers + dark optics tube
         d.rectangle([220, 140, 420, 300], fill=(230, 220, 200))
@@ -568,6 +588,16 @@ def _selftest() -> None:
     te = score_thermocycler_glance(_synth(tmp / "tc_empty.png", "thermocycler_empty"))
     assert not te["ok"], te
     assert any(f["code"] in ("NO_LID_KNOB", "EMPTY_BOX_BODY") for f in te["findings"])
+
+    # proveCatch (2026-07-17): split black/white studio must NOT inflate dark_knob.
+    tsg = score_thermocycler_glance(
+        _synth(tmp / "tc_split_good.png", "thermocycler_split_studio_good"))
+    assert tsg["ok"], tsg
+    assert float(tsg["metrics"]["dark_knob_frac"]) < 0.20, tsg["metrics"]
+    tsn = score_thermocycler_glance(
+        _synth(tmp / "tc_split_noknob.png", "thermocycler_split_studio_noknob"))
+    assert not tsn["ok"], tsn
+    assert any(f["code"] == "NO_LID_KNOB" for f in tsn["findings"]), tsn
 
     mg = score_lab_microscope_glance(_synth(tmp / "lm_good.png", "microscope_good"))
     assert mg["ok"], f"microscope good synthetic must PASS: {mg}"
