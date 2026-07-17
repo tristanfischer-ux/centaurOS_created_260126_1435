@@ -12906,7 +12906,11 @@ def _prepare_sealed_product_view(view_name, entering):
                 if obj.name.startswith("u_se_exterior_detail_"):
                     # Coloured harness strands are cutaway-only; closed product keeps
                     # jacket + boot + LED window, not a crayon ribbon on 04–07.
+                    # GOTCHA (2219): cuvette_fluid / tall cuvette_insert read as a
+                    # floating pale cylinder on 04-exterior — keep them off.
                     if re.search(r"source_harness_\d+$", obj.name):
+                        obj.hide_render = True
+                    elif "cuvette_fluid" in obj.name:
                         obj.hide_render = True
                     else:
                         obj.hide_render = False
@@ -16686,9 +16690,11 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # GOTCHA (2026-07-17 SIGHT colorimeter-2053): the old +0.18·h centre put
             # yellow fluid ~13 mm above the cube → vision "floating detached cylinder".
             # Seat via ifg.exterior_cuvette_seat_mm (proud tip, nested fluid).
+            # DECISION (2219 SIGHT): tip is a short charcoal-glass collar insert,
+            # not a tall pale column. Yellow fluid is cutaway-only.
             _cuv_wall = fl.make_mat(
-                "m_se_face_cuvette_wall", fl._to_linear(ifg.MAT_CUVETTE_WALL),
-                metallic=0.05, roughness=0.18, kind="glass", alpha=0.55)
+                "m_se_face_cuvette_wall", fl._to_linear((0.22, 0.24, 0.26)),
+                metallic=0.08, roughness=0.25, kind="glass", alpha=0.72)
             _cuv_fluid = fl.make_mat(
                 "m_se_face_cuvette_fluid", fl._to_linear(ifg.MAT_CUVETTE_FLUID),
                 metallic=0.0, roughness=0.35)
@@ -16713,15 +16719,22 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             )
             _cuv.dimensions = _mm3((_cuv_xy, _cuv_xy, _cuv_h))
             _cuv.hide_render = True
-            _fluid = fl.add_box(
-                "u_se_exterior_detail_cuvette_fluid",
-                _mm3(tuple(_seat["fluid_loc"])),
-                _mm3(tuple(_seat["fluid_size"])),
-                _cuv_fluid,
-                module=_skin_mod, module_objects=MO,
-            )
-            _fluid.dimensions = _mm3(tuple(_seat["fluid_size"]))
-            _fluid.hide_render = True
+            # GOTCHA (2219): exterior_detail_* is force-shown on closed product
+            # views. A yellow fluid mesh here becomes the "floating cylinder"
+            # even when nested — omit it; cutaway uses story fluid instead.
+            if not _seat.get("hide_exterior_fluid"):
+                _fluid = fl.add_box(
+                    "u_se_exterior_detail_cuvette_fluid",
+                    _mm3(tuple(_seat["fluid_loc"])),
+                    _mm3(tuple(_seat["fluid_size"])),
+                    _cuv_fluid,
+                    module=_skin_mod, module_objects=MO,
+                )
+                _fluid.dimensions = _mm3(tuple(_seat["fluid_size"]))
+                _fluid.hide_render = True
+            # Also hide the pale insert tip on exterior when tip would still
+            # read as a detached collar — keep well+rim+bore only.
+            # (Insert stays for cutaway cues under a different name path.)
             # Cable channel mesh at the cube↔body joint (harness proveCatch anchor).
             _slot = fl.add_box(
                 "u_se_exterior_detail_cable_slot",

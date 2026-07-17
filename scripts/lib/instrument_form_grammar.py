@@ -167,11 +167,12 @@ def button_plan_size_mm(diameter_mm: float) -> tuple[float, float, float]:
     return (d, d, BUTTON_TRAVEL_MM)
 
 
-# INTENT (2026-07-17 SIGHT colorimeter-2053): closed-product cuvette tip may clear
-# the rim so the shot reads "in use", but MUST NOT free-stand as a yellow column
-# above the optical cube (vision: "floating detached cylinder").
-EXTERIOR_CUVETTE_PROUD_MM = 7.0
-EXTERIOR_CUVETTE_MAX_PROUD_MM = 9.0
+# INTENT (2026-07-17 SIGHT colorimeter-2053/2219): closed-product tip may clear
+# the rim so the shot reads "in use", but MUST NOT free-stand as a pale column
+# above the optical cube (vision: "floating detached cylinder"). 2219 still
+# showed an 11 mm stub above the tower — keep tip ≤4 mm above rim.
+EXTERIOR_CUVETTE_PROUD_MM = 3.5
+EXTERIOR_CUVETTE_MAX_PROUD_MM = 5.0
 
 
 def exterior_cuvette_seat_mm(
@@ -185,31 +186,39 @@ def exterior_cuvette_seat_mm(
 
     @description Tip clears the rim by EXTERIOR_CUVETTE_PROUD_MM; body nests into
                  the cube so fluid_bottom stays below tower_top (no floating column).
-    @returns Dict with cuv_h, cuv_xy, cuv_loc (x,y,z), fluid_loc, fluid_size.
+                 Exterior fluid is optional (hide_exterior_fluid) — yellow sample
+                 above the collar was the 2053 "detached cylinder" cue.
+    @returns Dict with cuv_h, cuv_xy, cuv_loc (x,y,z), fluid_loc, fluid_size,
+             hide_exterior_fluid.
     """
-    cuv_h = min(float(tower_h_mm) * 0.62, 28.0)
+    cuv_h = min(float(tower_h_mm) * 0.55, 24.0)
     cuv_xy = max(7.5, float(well_plan_mm) * 0.85)
     proud = float(EXTERIOR_CUVETTE_PROUD_MM)
     cuv_z = float(rim_top_z) + proud - cuv_h / 2.0
-    # Fluid fills the lower portion — never a free-standing blob above the cube.
-    fluid_h = cuv_h * 0.48
-    fluid_z = cuv_z - cuv_h * 0.12
-    # Hard seat: if math still puts fluid above the cube, pull both down.
+    # Fluid stays deep in the well — never a free-standing blob above the cube.
+    fluid_h = cuv_h * 0.35
+    fluid_z = float(tower_top_z) - float(tower_h_mm) * 0.18
     fluid_bottom = fluid_z - fluid_h / 2.0
-    if fluid_bottom > float(tower_top_z) - 1.0:
-        shift = fluid_bottom - (float(tower_top_z) - 1.0)
-        cuv_z -= shift
+    if fluid_bottom > float(tower_top_z) - 2.0:
+        shift = fluid_bottom - (float(tower_top_z) - 2.0)
         fluid_z -= shift
+    # Tip must clear rim by ≤ MAX; if seat math drifts, pull the glass down.
+    cuv_top = cuv_z + cuv_h / 2.0
+    if cuv_top - float(rim_top_z) > EXTERIOR_CUVETTE_MAX_PROUD_MM:
+        cuv_z -= (cuv_top - float(rim_top_z) - EXTERIOR_CUVETTE_PROUD_MM)
     wx, wy = well_xy
     return {
         "cuv_h": cuv_h,
         "cuv_xy": cuv_xy,
         "cuv_loc": (wx, wy, cuv_z),
         "fluid_loc": (wx, wy, fluid_z),
-        "fluid_size": (cuv_xy * 0.72, cuv_xy * 0.72, fluid_h),
+        "fluid_size": (cuv_xy * 0.65, cuv_xy * 0.65, fluid_h),
         "proud_mm": proud,
         "cuv_top_z": cuv_z + cuv_h / 2.0,
         "fluid_bottom_z": fluid_z - fluid_h / 2.0,
+        # DECISION (2219 SIGHT): hide yellow fluid on closed exterior — glass tip
+        # in the rim is enough "in use"; fluid column was the vision cylinder.
+        "hide_exterior_fluid": True,
     }
 
 
@@ -912,9 +921,10 @@ def _selftest() -> None:
         f"cuvette tip too proud: {_seat['cuv_top_z'] - 80.0:.1f} mm")
     assert _seat["fluid_bottom_z"] <= 78.0 - 0.5, (
         f"fluid must nest under tower top, got bottom={_seat['fluid_bottom_z']:.1f}")
-    _bad_old = 84.744 + 30.8 * 0.18  # legacy centre that made fluid float
-    assert _seat["cuv_loc"][2] < _bad_old - 2.0, (
-        "seat helper must sit well below the 2053 floating-column centre")
+    assert _seat.get("hide_exterior_fluid") is True, (
+        "closed exterior must hide yellow fluid (2219 floating-cylinder class)")
+    assert _seat["cuv_top_z"] - 78.0 <= 8.0, (
+        f"tip above tower must stay ≤8 mm, got {_seat['cuv_top_z'] - 78.0:.1f}")
     bez = display_bezel_size_mm((36.0, 24.0, 1.6))
     assert bez[0] > 36.0 and bez[1] > 24.0
     cap = ambient_cap_parts_mm(22.0)
