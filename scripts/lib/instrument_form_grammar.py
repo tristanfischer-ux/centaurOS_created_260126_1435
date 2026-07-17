@@ -275,7 +275,11 @@ THERMOCYCLER_PART_RE = re.compile(
     r"tube[_ -]?well|heatsink[_ -]?fan", re.I)
 
 # Blender hinge: −Rx raises the lid front edge (y<0); +Rx dumps it into the cavity.
-TIPBACK_LID_OPEN_RX_DEG = -45.0
+# DECISION (2026-07-17 NinjaPCR lid-crop SIGHT): −45° tipped the outer face so
+# far toward +Y/rear that the star only read as jagged spikes on the lid lip.
+# −38° keeps the cavity + platen readable while leaving more outer-face area
+# toward the high product cam (ext_z≈2.1).
+TIPBACK_LID_OPEN_RX_DEG = -38.0
 
 # Product-camera framing for tip-back lids (fractions of envelope height / depth).
 # RULE: elevate eye + bias look-at toward the rear hinge so outer-face controls read.

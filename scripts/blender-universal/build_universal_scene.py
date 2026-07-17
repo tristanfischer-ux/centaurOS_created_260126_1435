@@ -16146,17 +16146,19 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             # TRIED (1257/0855 SIGHT): oversized flat star
             #   ``max(44, 0.34·min(W,D))`` still read as THREE black bars behind
             #   the open lid (lobes edge-on) + "no dark lobed/star knob on lid".
-            # DECISION: compact ~18 mm star, short Z, lobes parented to the HUB
-            # (one rigid assembly) so the handle reads as a single lid cue.
-            _knob_r = max(14.0, min(W, D) * 0.12)
-            _hub_r = _knob_r * 0.32
-            _knob_h = 7.0
-            _lobe_len = _knob_r * 0.90
-            _lobe_w = _knob_r * 0.28
-            _lobe_h = 5.0
-            # Centre of outer lid face — gold star sits mid-lid, not at the lip.
-            _local_y = -_lid_d * 0.30
-            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 2.0
+            # TRIED (1257 lid-crop): compact mid-lid star still only showed as
+            # jagged spikes on the raised lip — outer face tipped away from cam.
+            # DECISION: compact clover on the FRONT half of the outer lid (raised
+            # lip in tip-back pose) + short lobes parented to the HUB.
+            _knob_r = max(16.0, min(W, D) * 0.13)
+            _hub_r = _knob_r * 0.38
+            _knob_h = 8.0
+            _lobe_len = _knob_r * 0.55
+            _lobe_w = _knob_r * 0.32
+            _lobe_h = 4.5
+            # Front half of outer lid — highest / most camera-facing when open.
+            _local_y = -_lid_d * 0.38
+            _local_z = _lid_h * 0.5 + _knob_h * 0.55 + 2.5
 
             _knob = fl.add_box(
                 "u_se_product_tc_knob",
