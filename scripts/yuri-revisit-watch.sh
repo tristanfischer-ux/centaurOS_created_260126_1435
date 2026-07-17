@@ -215,18 +215,47 @@ launch() {
   return 0
 }
 
-# Returns 0 if ANY settled out/ for this label is at full bar (skip cold burn).
-# GOTCHA: latest_out prefers newest-then-settled; an empty stamp dir ahead of a
-# floor≥9 run (colorimeter-2301 vs 2254) must not force a re-burn.
+# Returns 0 if a recent settled out/ is at full bar (skip cold burn).
+# GOTCHA: empty stamp dirs ahead of a floor≥9 run must not force a re-burn.
+# DECISION: only scan the 8 newest settled dirs — walking every historic
+# ninjapcr-20260715-* flooded the log and delayed LAUNCH by minutes.
 already_at_bar() {
-  local label="$1" form="$2" key="$3" d
+  local label="$1" form="$2" key="$3" d n=0 ships floor
   while IFS= read -r d; do
     [[ -z "$d" ]] && continue
     dir_settled "$d" || continue
-    if check_bar "$d" "$form" "$key"; then
-      log "$label at bar via $d"
-      return 0
+    n=$((n + 1))
+    # Cheap pre-filter: only call check_bar (gold/glance/log) when scorecard
+    # already claims ships + floor≥9.
+    ships=""; floor=""
+    eval "$(python3 - "$d" <<'PY'
+import json, sys
+from pathlib import Path
+d = Path(sys.argv[1])
+for name in ("tab-scorecard.json", "quality-scorecard.json"):
+    p = d / name
+    if not p.is_file():
+        continue
+    s = json.loads(p.read_text())
+    v = s.get("verdict") or {}
+    ships = bool(v.get("ships")) if isinstance(v, dict) else bool(s.get("ships"))
+    floor = v.get("floor") if isinstance(v, dict) else s.get("floor")
+    print(f"ships={str(ships)}")
+    print(f"floor={floor if floor is not None else ''}")
+    break
+else:
+    print("ships=False")
+    print("floor=")
+PY
+)"
+    if [[ "$ships" == "True" ]] && [[ -n "$floor" ]] \
+       && python3 -c "import sys; sys.exit(0 if float(sys.argv[1])>=9 else 1)" "$floor"; then
+      if check_bar "$d" "$form" "$key"; then
+        log "$label at bar via $d"
+        return 0
+      fi
     fi
+    (( n >= 8 )) && break
   done < <(ls -td "$ROOT"/out/${label}-2026[0-9]* 2>/dev/null | grep -v SCORED || true)
   return 1
 }
