@@ -245,6 +245,40 @@ _SYRINGE_PUMP_PROMPT = (
     "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
 )
 
+# INTENT (OpenFlexure 2026-07-17): optical-instrument rubric false-fails a correct
+# OPEN lab_microscope (cream FDM + flexure stage + steppers) as "featureless empty
+# box" because it demands charcoal L-body / cuvette / D-pad. Form gate:
+# ifg.is_lab_microscope_form — never a product-noun branch.
+_LAB_MICROSCOPE_PROMPT = (
+    "You are an adversarial industrial-design reviewer inspecting a 3-D render of an "
+    "OPEN FLEXURE / printed-stage LAB MICROSCOPE (benchtop maker instrument — "
+    "NOT a colorimeter, NOT a PCR box, NOT a sealed charcoal handheld, NOT a plant skid).\n\n"
+    "Expect a cream / off-white FDM polymer body as the product face, an XY / focus "
+    "actuator stage with dark stepper motors (often NEMA-class cubes) and leadscrews, "
+    "a stage plate that can hold a glass slide, an optics tube (often under or through "
+    "the stage), and a condenser / illumination cue. The OPEN printed mechanism IS the "
+    "product — there is NO sealed optical colorimeter cube and NO charcoal L-body D-pad.\n\n"
+    "INTENTIONAL / DO NOT FLAG (correct lab-microscope language):\n"
+    "  • cream / ivory FDM body instead of charcoal polymer\n"
+    "  • exposed steppers, leadscrews, flexure arms, stage — OPEN mechanism, not a "
+    "gutted hollow chassis\n"
+    "  • dark optics tube / condenser as separate cylindrical volumes\n"
+    "  • missing cuvette well / ambient-light LID / square tactile D-pad — those belong "
+    "to colorimeters\n"
+    "  • missing battery pack / inverter / plant pipes / Mech Plant Rm\n\n"
+    "Flag broken=true ONLY when any of these are present:\n"
+    "  • blank / empty render (no product visible)\n"
+    "  • a sealed featureless charcoal / grey cube with NO cream body and NO stage / "
+    "actuators / optics tube\n"
+    "  • colorimeter optical tower / cuvette / ambient-light LID wrongly as the product\n"
+    "  • plant-room language (racks, expansion vessels, industrial EC motors as the product)\n"
+    "  • steppers/stage floating with NO shared cream body / pedestal connecting them\n"
+    "  • product cropped so small it is unreadable\n"
+    "  • absurd scale (one part dwarfing the whole device unrealistically)\n\n"
+    "Reply with STRICT JSON only: "
+    "{\"broken\": true|false, \"defects\": [\"specific visible defect\", ...]}."
+)
+
 # INTENT: optical-instrument rubric false-fails a correct PCR thermocycler cutaway
 # (wood box + hinged lid + sample-block wells + PCB) because it demands
 # cuvette/optical-path language. Tip-back-lid PCR form is a DIFFERENT family —
@@ -339,6 +373,19 @@ def _is_syringe_pump_mode(image_path: str) -> bool:
     )
 
 
+def _is_lab_microscope_mode(image_path: str) -> bool:
+    """True for OPEN flexure-stage lab microscope — uses _LAB_MICROSCOPE_PROMPT."""
+    st = _load_run_state(image_path)
+    fn = getattr(ifg, "is_lab_microscope_form", None)
+    if not callable(fn):
+        return False
+    return bool(fn(
+        product_class=_product_class(image_path),
+        part_blob=_part_blob_from_state(st),
+        is_instrument=bool(st.get("isInstrumentDevice", True)),
+    ))
+
+
 def _is_instrument_mode(image_path: str) -> bool:
     """True when the run's state declares a device-scale instrument."""
     st = _load_run_state(image_path)
@@ -369,6 +416,8 @@ def _prompt_for_image(image_path: str) -> str:
         return _SYRINGE_PUMP_PROMPT
     if _is_thermocycler_mode(image_path):
         return _THERMOCYCLER_PROMPT
+    if _is_lab_microscope_mode(image_path):
+        return _LAB_MICROSCOPE_PROMPT
     if _is_instrument_mode(image_path):
         return _INSTRUMENT_PROMPT
     if _is_product_mode(image_path):

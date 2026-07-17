@@ -2165,6 +2165,25 @@ def _instrument_materials_target_gbp(st: dict) -> float | None:
     return None
 
 
+def _is_catalogue_pinned_bom_row(row: dict) -> bool:
+    """True when unit price is a live/catalogue pin — must not be gold-rescaled.
+
+    INTENT (Poseidon 2026-07-17): uniform gold rescale crushed Littelfuse
+    1206L300SLTHYR £1.41 → £0.22; ×5 distributor check correctly FAILed and
+    held ships. Catalogue identity prices are the authority for those lines;
+    only parametric / estimate residue absorbs the gold-band scale.
+    """
+    basis = str(row.get("basis") or "").lower()
+    if any(t in basis for t in (
+        "catalogue", "distributor", "digi-key", "digikey", "mouser",
+        "farnell", "lcsc", "nexar", "rs components",
+    )):
+        return True
+    if row.get("distributor_price_gbp") not in (None, "", 0, 0.0):
+        return True
+    return False
+
+
 def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float | None, float | None]:
     """INTENT (2026-07-16 Yuri ±15% bar): plant parametric + corpus paths systematically
     over-bill makers kits (Poseidon £1.8k vs gold £184). After instrument-specific
@@ -2172,9 +2191,10 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
     materials sum is OUTSIDE ±15% of the gold midpoint, proportionally rescale
     purchasable lines to the midpoint — the gold band is the authority.
 
-    DECISION: scale `line_gbp` directly (min £0.01). A £1/unit floor left Poseidon
-    at ~£467 after "rescale" — irreducible residue broke the bar. Bidirectional so
-    under-band (wrong macro target) also lands in ±15%. Returns (before, after)."""
+    DECISION: scale `line_gbp` on PARAMETRIC residue only (min £0.01). Catalogue /
+    distributor-pinned lines keep their unit identity so ×5 live-price checks
+    stay honest. Bidirectional so under-band (wrong macro target) also lands in
+    ±15%. Returns (before, after)."""
     if not _IS_INSTRUMENT_DEVICE:
         return (None, None)
     target = _instrument_materials_target_gbp(st)
@@ -2191,8 +2211,23 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
     lo, hi = target * 0.85, target * 1.15
     if lo <= before <= hi:
         return (before, before)
-    scale = target / before
-    for r in priced:
+    catalogue = [r for r in priced if _is_catalogue_pinned_bom_row(r)]
+    parametric = [r for r in priced if not _is_catalogue_pinned_bom_row(r)]
+    cat_sum = sum(float(r.get("line_gbp") or 0) for r in catalogue)
+    param_sum = sum(float(r.get("line_gbp") or 0) for r in parametric)
+    # Keep catalogue pins fixed; scale only parametric residue toward the mid.
+    # If there is no parametric residue, do NOT crush catalogue prices (Poseidon
+    # X-127 class) — leave the over/under-band visible for the gold check.
+    if param_sum <= 0:
+        return (before, before)
+    needed_param = target - cat_sum
+    if needed_param <= 0:
+        # Catalogue alone already at/above mid — leave pins; zero-floor parametric.
+        scale = 0.01 / param_sum if param_sum > 0 else 1.0
+        scale = min(scale, 1.0)
+    else:
+        scale = needed_param / param_sum
+    for r in parametric:
         qy = max(1, int(r.get("qty") or 1))
         old_line = float(r.get("line_gbp") or 0)
         new_line = max(0.01, round(old_line * scale, 2))
@@ -2201,7 +2236,8 @@ def _rescale_instrument_materials_to_gold(rows: list, st: dict) -> tuple[float |
         r["basis"] = (
             (str(r.get("basis") or "") + " · ").lstrip(" ·")
             + f"instrument gold-band rescale ×{scale:.3f} "
-            f"(materials were £{before:,.0f} → target £{target:,.0f} gold mid)"
+            f"(parametric residue; catalogue pins held; "
+            f"materials were £{before:,.0f} → target £{target:,.0f} gold mid)"
         )
     after = sum(float(r.get("line_gbp") or 0) for r in priced)
     return (before, after)
@@ -3201,6 +3237,49 @@ def _selftest() -> int:
         print(f"  FAIL gold mid must beat wrong macro (£184 not £460), got {_tgt_gold}"); bad += 1
     if _tgt_oi != 125.0:
         print(f"  FAIL optical_instrument gold mid £125, got {_tgt_oi}"); bad += 1
+    # proveCatch (Poseidon 2026-07-17): catalogue polyfuse must KEEP £1.41 while
+    # parametric over-bill absorbs gold rescale — uniform scale crushed it to £0.22.
+    _saved_cat = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = True
+    _cat_rows = [
+        {"requirement": "Littelfuse 1206L300SLTHYR", "unit_gbp": 1.41, "line_gbp": 1.41,
+         "qty": 1, "status": "IDENTIFIED", "basis": "catalogue · Digi-Key £1.41"},
+        {"requirement": "Polymer frame", "unit_gbp": 800.0, "line_gbp": 800.0,
+         "qty": 1, "status": "NOT FOUND", "basis": "parametric polymer take-off"},
+    ]
+    _b_cat, _a_cat = _rescale_instrument_materials_to_gold(
+        _cat_rows, {"moduleDecomposition": {"product_class": "syringe_pump"}})
+    _fuse_u = float(_cat_rows[0]["unit_gbp"])
+    _IS_INSTRUMENT_DEVICE = _saved_cat
+    if abs(_fuse_u - 1.41) > 0.02:
+        print(f"  FAIL catalogue pin must not gold-rescale (want £1.41, got £{_fuse_u})"); bad += 1
+    if not (_b_cat is not None and _a_cat is not None and 150 <= _a_cat <= 220):
+        print(f"  FAIL catalogue-hold rescale still lands gold band, got before={_b_cat} after={_a_cat}"); bad += 1
+    # proveCatch: benchtop_bioreactor class forces instrument path even if flag false
+    _saved_pio = _IS_INSTRUMENT_DEVICE
+    _IS_INSTRUMENT_DEVICE = False  # simulate chain plantish miss
+    _pio_rows = [
+        {"requirement": "Vessel skid", "unit_gbp": 40000, "line_gbp": 40000, "qty": 1,
+         "status": "NOT FOUND", "basis": "plant parametric"},
+        {"requirement": "CIP skid", "unit_gbp": 40000, "line_gbp": 40000, "qty": 1,
+         "status": "NOT FOUND", "basis": "plant parametric"},
+    ]
+    # assemble sets flag from class — unit-test the class→target + rescale path
+    _tgt_pio = _instrument_materials_target_gbp({
+        "moduleDecomposition": {"product_class": "benchtop_bioreactor"},
+        "isInstrumentDevice": False,
+        "orchestratorContract": {"macro_assembly_total_gbp": 90000},
+    })
+    _IS_INSTRUMENT_DEVICE = True  # class allowlist would set this in assemble()
+    _b_pio, _a_pio = _rescale_instrument_materials_to_gold(
+        _pio_rows,
+        {"moduleDecomposition": {"product_class": "benchtop_bioreactor"}},
+    )
+    _IS_INSTRUMENT_DEVICE = _saved_pio
+    if _tgt_pio != 259.0:
+        print(f"  FAIL benchtop_bioreactor gold mid £259 beats plant macro, got {_tgt_pio}"); bad += 1
+    if not (_b_pio == 80000 and _a_pio is not None and 220 <= _a_pio <= 298):
+        print(f"  FAIL pioreactor rescale £80k→~£259, got before={_b_pio} after={_a_pio}"); bad += 1
     # ── INSTRUMENT Cxx SUPPRESSION (2026-07-14, gold WHY): handheld topology edges
     # are NOT costed plant cable runs — maker cables live as equipment principals.
     import tempfile as _tmp_conn

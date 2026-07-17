@@ -1593,6 +1593,8 @@ _BRIEF_UNIT_FAM = {
     "minutes": "time2", "%": "frac", "percent": "frac", "pct": "frac", "t/yr": "tpy",
     "tpy": "tpy", "tonne/yr": "tpy", "tonnes/yr": "tpy", "ratio": "ratio", "c": "temp",
     "degc": "temp", "ppt": "sal", "kw": "power", "mw": "power", "kwh": "energy",
+    # INTENT (OpenFlexure 2026-07-17): brief `1 um` vs contract `1 µm` must share a family.
+    "um": "len_um", "µm": "len_um", "μm": "len_um",
 }
 
 
@@ -1602,13 +1604,17 @@ def _ufam(u: Any) -> str:
     # the CORRECT flow quantity was excluded because 'm3/hr' != 'm3/h'). ³→3, ²→2, caret dropped, and
     # every hour spelling (/hr, /hour, per hour, perhr) → /h.
     s = re.sub(r"\s+", "", str(u or "").lower()).replace("³", "3").replace("²", "2").replace("°", "").replace("^", "")
+    s = s.replace("µ", "u").replace("μ", "u")
     s = s.replace("perhour", "/h").replace("/hour", "/h").replace("perhr", "/h").replace("/hr", "/h")
     return _BRIEF_UNIT_FAM.get(s, s)
 
 
 def _btoks(s: Any) -> set:
     s = re.sub(r"[^a-z0-9]+", " ", str(s or "").lower())
-    _drop = {"kg", "m3", "mm", "days", "day", "mins", "min", "minute", "minutes", "hr",
+    # GOTCHA (OpenFlexure 2026-07-17): `um` as a concept token made
+    # focus_resolution_um fuzzy-bind abbe_resolution_um ({resolution, um}) and
+    # HARD-FAIL a met 1 µm focus step against Abbe 0.611 µm. Drop unit tokens.
+    _drop = {"kg", "m3", "mm", "um", "nm", "days", "day", "mins", "min", "minute", "minutes", "hr",
              "h", "s", "percent", "pct", "tpy", "yr", "year", "per", "c", "ppt", "kw",
              "mw", "kwh", "ml", "l", "w", "ratio", "the", "of", "value", "target", "a", "an"}
     return {t for t in s.split() if t and t not in _drop and not t.isdigit()}
@@ -1643,6 +1649,22 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
         mt, mu = _btoks(km), _ufam(unit)
         if not km or not mt or tvf == 0:
             continue
+        tol = abs(tvf) * 0.05
+        # DECISION (OpenFlexure 2026-07-17): exact key_metric match FIRST.
+        # Fuzzy token overlap wrongly bound focus_resolution_um → abbe_resolution_um.
+        if km in q:
+            dvc = qval(q, km)
+            if dvc is not None:
+                out.append(Check(
+                    name=f"Brief target met: {km}",
+                    category="BRIEF", relation="ge",
+                    status=PASS if dvc >= tvf - tol else FAIL,
+                    actual=round(dvc, 4), expected=tvf, tol=round(tol, 4), unit=unit,
+                    producer=f"brief:{km}",
+                    detail=(f"Brief target {km} = {tvf:g} {unit}; design ({km}) = {dvc:g} {unit} — "
+                            f"the design must realise the brief target within ±5%."),
+                ))
+                continue
         # candidate designed quantities: unit-family agrees AND a concept-token overlap (>=2,
         # or a full subset for a single-token metric). Among the candidates pick the value
         # CLOSEST to the brief target — this resolves a per-unit-vs-total name clash (the brief's
@@ -1666,7 +1688,6 @@ def _checks_brief_compliance(state: dict, run_dir: str) -> List[Check]:
                     cands.append((abs(dvc - tvf), dvc, k))
         if not cands:
             continue
-        tol = abs(tvf) * 0.05
         # A performance target is MET by MEETING-OR-EXCEEDING it — the design delivering MORE than the
         # brief demand is success, not a failure (v14: irrigation 'per_department' target 45 m³/h with a
         # design that delivers the 90 m³/h TOTAL the plant needs — 90 ≥ 45 is MET, not an equality miss).
@@ -2631,6 +2652,37 @@ def _selftest() -> int:
               "exact match), not the plainer 'CB30' key's £3,000/£2,400 UNRELATED "
               "siblings merely because that shorter key was indexed first (would read "
               "x7.2 and FAIL as a checker mis-join, not a real mispriced part)")
+
+    # ---- OpenFlexure 2026-07-17: exact key + um/µm fold — must NOT bind Abbe ----
+    focus_state = {
+        "orchestratorContract": {
+            "product_class": "lab_microscope",
+            "quantities": {
+                "focus_resolution_um": {"value": 1.0, "unit": "µm"},
+                "abbe_resolution_um": {"value": 0.611, "unit": "µm"},
+            },
+        },
+        "parsedBrief": {
+            "constraints": {
+                "target_performance": {
+                    "metrics": [
+                        {"key_metric": "focus_resolution_um", "value": 1.0, "unit": "um"},
+                    ],
+                },
+            },
+        },
+        "requirementsBom": [],
+        "partVerifications": [],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        d = _write_run(tmp, focus_state, {}, {})
+        # Write brief so _checks_brief_compliance can load metrics if needed
+        with open(os.path.join(d, "1-parsed-brief.json"), "w") as fh:
+            json.dump(focus_state["parsedBrief"], fh)
+        checks = run_all_checks(d)
+        check(_has(checks, "Brief target met: focus_resolution_um", PASS),
+              "FOCUS um/µm: brief 1 um must PASS against contract focus_resolution_um=1 µm "
+              "(exact key), NOT fail via fuzzy bind to abbe_resolution_um=0.611")
 
     # ---- UNIVERSALITY: a minimal class with none of these inputs -> all N/A,
     #      zero FAIL (the suite must never invent a failure on a sparse class) ----
