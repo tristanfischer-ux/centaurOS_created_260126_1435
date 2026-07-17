@@ -250,4 +250,15 @@ run_revisit briefs-loop/yuri_pioreactor.md out/pioreactor-board.json pioreactor 
 run_revisit briefs-loop/yuri_rodeostat.md out/rodeostat-board.json rodeostat "" potentiostat
 run_revisit briefs-loop/yuri_opendrop.md out/opendrop-board.json opendrop "" digital_microfluidics
 
+# INTENT: after interconnect + class-standards SOURCE landed mid-queue, burn a
+# second cold pass on anything still below score bar (cost/form may already PASS).
+log "===== SCORE SECOND PASS (interconnect + standards SOURCE) ====="
+run_revisit briefs-loop/yuri_open_colorimeter.md out/colorimeter-board.json colorimeter optical_handheld colorimeter
+run_revisit briefs-loop/yuri_ninjapcr.md out/ninjapcr-board.json ninjapcr thermocycler ninjapcr
+run_revisit briefs-loop/yuri_poseidon.md out/poseidon-board.json poseidon syringe_pump poseidon
+run_revisit briefs-loop/yuri_openflexure.md out/openflexure-board.json openflexure lab_microscope lab_microscope
+run_revisit briefs-loop/yuri_pioreactor.md out/pioreactor-board.json pioreactor "" benchtop_bioreactor
+run_revisit briefs-loop/yuri_rodeostat.md out/rodeostat-board.json rodeostat "" potentiostat
+run_revisit briefs-loop/yuri_opendrop.md out/opendrop-board.json opendrop "" digital_microfluidics
+
 log "===== Yuri REVISIT queue complete ====="

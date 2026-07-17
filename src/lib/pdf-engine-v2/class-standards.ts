@@ -349,6 +349,72 @@ const SYRINGE_PUMP: ClassStandards = {
   ],
 }
 
+// INTENT (2026-07-17 OpenFlexure): lab_microscope had ZERO registry rows →
+// Risk WARN floored at 7 (same lesson as optical_instrument / thermocycler).
+// Research flexure-stage microscopes share the LVD/EMC/61010 lab-instrument floor.
+const LAB_MICROSCOPE: ClassStandards = {
+  product_class: 'lab_microscope',
+  display_name: 'Benchtop Motorised / Flexure-Stage Research Microscope',
+  compliance_summary:
+    'Research-use benchtop microscopes are CE-marked laboratory electrical equipment: '
+    + 'Low Voltage + EMC + RoHS as the market-access floor, IEC 61010-1 for lab electrical '
+    + 'safety, and IEC 61326-1 for lab EMC. Clinical IVD / medical-device routes (IVDR, '
+    + 'IEC 60601) are OUT OF SCOPE unless the brief explicitly requires them.',
+  standards: OPTICAL_INSTRUMENT.standards.map((s) => ({
+    ...s,
+    applies_because: s.applies_because.replace(/photometer|colorimeter|optical/gi, (m) =>
+      m.toLowerCase().includes('optical') ? 'microscope / optical-path' : 'microscope'),
+  })),
+}
+
+// INTENT (2026-07-17 Pioreactor): ml-scale turbidostat ≠ plant BIOREACTOR
+// (sterilisation / COMAH). Same LVD/EMC/61010 floor as other benchtop instruments.
+const BENCHTOP_BIOREACTOR: ClassStandards = {
+  product_class: 'benchtop_bioreactor',
+  display_name: 'Benchtop Continuous-Culture / Turbidostat Bioreactor',
+  compliance_summary:
+    'Research-use ml-scale continuous-culture instruments are CE-marked laboratory '
+    + 'electrical equipment: Low Voltage + EMC + RoHS, IEC 61010-1, IEC 61326-1. '
+    + 'Plant fermenter / sterilisation / COMAH standards do NOT apply. Clinical IVD '
+    + 'routes are OUT OF SCOPE unless the brief explicitly requires them.',
+  standards: SYRINGE_PUMP.standards.map((s) => ({ ...s })),
+}
+
+// INTENT (2026-07-17 Rodeostat): USB potentiostat — lab instrument floor, not plant.
+const POTENTIOSTAT: ClassStandards = {
+  product_class: 'potentiostat',
+  display_name: 'USB Benchtop Potentiostat',
+  compliance_summary:
+    'Research-use USB potentiostats are CE-marked laboratory electrical equipment: '
+    + 'Low Voltage + EMC + RoHS, IEC 61010-1, IEC 61326-1. Clinical IVD / medical-device '
+    + 'routes are OUT OF SCOPE unless the brief explicitly requires them.',
+  standards: SYRINGE_PUMP.standards.map((s) => ({ ...s })),
+}
+
+// INTENT (2026-07-17 OpenDrop): EWOD controller — lab HV instrument floor.
+const DIGITAL_MICROFLUIDICS: ClassStandards = {
+  product_class: 'digital_microfluidics',
+  display_name: 'Benchtop Digital Microfluidics / EWOD Controller',
+  compliance_summary:
+    'Research-use EWOD / digital-microfluidics controllers are CE-marked laboratory '
+    + 'electrical equipment with an additional HV drive path: Low Voltage + EMC + RoHS, '
+    + 'IEC 61010-1, IEC 61326-1. Clinical IVD routes are OUT OF SCOPE unless the brief '
+    + 'explicitly requires them.',
+  standards: [
+    ...SYRINGE_PUMP.standards.map((s) => ({ ...s })),
+    {
+      code: 'IEC 61010-2-201',
+      title: 'Safety requirements for electrical equipment for measurement, control and laboratory use — Part 2-201: Particular requirements for control equipment',
+      jurisdiction: 'IEC',
+      category: 'system_safety',
+      mandatory: false,
+      typical_compliance_cost_gbp: 5_000,
+      typical_lead_time_weeks: 8,
+      applies_because: 'Control equipment particular requirements when the HV electrode drive is treated as laboratory control apparatus.',
+    },
+  ],
+}
+
 export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   energy_storage: ENERGY_STORAGE,
   e_fuel_synthesis:     E_FUEL_SYNTHESIS,
@@ -364,6 +430,10 @@ export const CLASS_STANDARDS: Record<string, ClassStandards> = {
   optical_instrument: OPTICAL_INSTRUMENT,
   thermocycler: THERMOCYCLER,
   syringe_pump: SYRINGE_PUMP,
+  lab_microscope: LAB_MICROSCOPE,
+  benchtop_bioreactor: BENCHTOP_BIOREACTOR,
+  potentiostat: POTENTIOSTAT,
+  digital_microfluidics: DIGITAL_MICROFLUIDICS,
 }
 
 // Map common display-name variants and synonyms to canonical class keys. The
@@ -393,6 +463,10 @@ function resolveClassKey(productClass: string): string | null {
     [/\b(optical[_\s-]?instrument|photometer|colorimeter|colourimeter|spectrophotometer|absorbance\s+meter)\b/, 'optical_instrument'],
     [/\b(thermo[\s_-]?cycler|pcr[\s_-]?thermo[\s_-]?cycler|pcr[\s_-]?cycler|dna[\s_-]?amplifier|ninjapcr|openpcr)\b/, 'thermocycler'],
     [/\b(syringe[\s_-]?pump|multi[\s_-]?channel\s+syringe|poseidon)\b/, 'syringe_pump'],
+    [/\b(lab[\s_-]?microscope|flexure[\s_-]?stage|openflexure|inverted\s+microscope)\b/, 'lab_microscope'],
+    [/\b(benchtop[\s_-]?bioreactor|pioreactor|turbidostat|chemostat)\b/, 'benchtop_bioreactor'],
+    [/\b(potentiostat|rodeostat|electrochemical\s+workstation)\b/, 'potentiostat'],
+    [/\b(digital[\s_-]?microfluidics|opendrop|ewod)\b/, 'digital_microfluidics'],
   ]
   for (const [rx, key] of aliases) {
     if (rx.test(lower)) return key
