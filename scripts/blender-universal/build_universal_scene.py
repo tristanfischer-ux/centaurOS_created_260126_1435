@@ -1833,12 +1833,16 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"button|switch|keypad|user\s*input", (14.0, 14.0, 9.0)),
         (r"cuvette|sample\s*(?:holder|cell|chamber)", (32.0, 28.0, 42.0)),
         (r"collimat|lens|filter|wavelength|aperture|slit|optic", (26.0, 18.0, 14.0)),
-        (r"led\s*source|light\s*source|emitter", (12.0, 10.0, 8.0)),
+        (r"led\s*source|light\s*source|emitter|kingbright|\bnm\s*led\b|(?<!status\s)(?<!power\sindicator\s)(?<!indicator\s)\bled\b",
+         (12.0, 10.0, 8.0)),
         (r"detector|photodiode|photo\s*sensor", (30.0, 22.0, 8.0)),
-        (r"microcontroller|mcu|processor|firmware|logic\s*board|main\s*board", (42.0, 34.0, 5.0)),
-        (r"driver|regulator|ldo|dc\s*dc|charge|pmic|power\s*management", (18.0, 14.0, 5.0)),
+        (r"microcontroller|mcu|processor|firmware|logic\s*board|main\s*board|"
+         r"feather|arduino|pico|esp32|teensy|rp2040", (42.0, 34.0, 5.0)),
+        (r"driver|regulator|ldo|dc\s*dc|charge|pmic|power\s*management|"
+         r"board\s*level\s*decoupling|decoupling|bulk\s*cap", (18.0, 14.0, 5.0)),
         (r"battery|cell\s*pack|li\s*po|rechargeable", (58.0, 38.0, 9.0)),
-        (r"usb|connector|interconnect|cable|ffc|ribbon|harness", (72.0, 8.0, 4.0)),
+        (r"usb|connector|interconnect|cable|ffc|ribbon|harness|bench\s*psu|psu\s*input|"
+         r"host\s*power\s*rail|power\s*rail", (72.0, 8.0, 4.0)),
         (r"reverse\s*polarity|blocking\s*diode|polarity\s*protection", (7.0, 4.0, 3.0)),
         (r"esd|tvs|transient|surge\s*protection", (9.0, 5.0, 3.0)),
         (r"polyfuse|resettable", (10.0, 7.0, 3.0)),
@@ -1846,6 +1850,10 @@ def _instrument_proxy_dim(name, module_id, quantities):
         (r"overcurrent|current\s*limit|protection", (11.0, 6.0, 4.0)),
         (r"fuse", (12.0, 5.0, 4.0)),
         (r"indicator|pilot\s*light|status\s*led", (8.0, 8.0, 5.0)),
+        # INTENT (colorimeter 2008): label / stray-light cap must not inherit the
+        # product envelope bbox (260×200×434) — that litter floored Renders at 6.
+        (r"user\s*facing\s*legend|legend\s*plate|silk\s*screen|\blabel\b", (40.0, 2.0, 12.0)),
+        (r"ambient\s*light\s*cap|light\s*cap|stray\s*light\s*cap", (28.0, 28.0, 10.0)),
         # INTENT (NinjaPCR 2026-07-15): host peripherals must NOT share one
         # fallback {24×18×8} — that litter capped Renders/Assembly at 3.
         (r"wifi|wi[- ]?fi|wireless|bluetooth|\bble\b", (22.0, 16.0, 3.0)),
@@ -3401,7 +3409,12 @@ def resolved_dims_mm(part):
     if re.search(
         r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
         r"esd[_ -]?protect|inrush|varistor|mov\b|input[_ -]?fuse|"
-        r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff)\b",
+        r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff|"
+        r"board\s*level\s*decoupling|decoupling|bulk\s*cap|"
+        r"host\s*power\s*rail|power\s*rail|bench\s*psu|psu\s*input|"
+        r"user\s*facing\s*legend|legend\s*plate|"
+        r"ambient\s*light\s*cap|light\s*cap|"
+        r"kingbright|\bnm\s*led\b)\b",
         _nm, re.I,
     ):
         for _k in ("dia_mm", "len_mm", "w_mm", "d_mm", "h_mm"):
@@ -6526,18 +6539,32 @@ def build_parts_manifest(parts):
         # here too so the BoM/GA agree with the model (Tristan 2026-06-22).
         if p.shape == "instrument":
             dims = {k: round(min(float(v), 600.0), 1) for k, v in dims.items()}
-        # GOTCHA (colorimeter 2026-07-14): world-bbox dims for a ferrite bead can still
-        # echo the product envelope (260×200×434) even after resolved_dims_mm clamps the
-        # RENDER — the manifest wrote raw bbox and Excel floored Assembly/Renders at 0
-        # via absurd_micro_component_dims. Clamp discrete electronics HERE too so the
-        # DELIVERED SIGHT artefact agrees with the render (CORE FIX PRINCIPLE).
+        # GOTCHA (colorimeter 2026-07-14 / 2008): world-bbox dims for discrete
+        # electronics / labels / caps can still echo the product envelope
+        # (260×200×434) even after resolved_dims_mm clamps the RENDER — the
+        # manifest wrote raw bbox and Excel floored Assembly/Renders via
+        # default-size litter. Prefer role-proxy dims, else hard cap.
+        _nm = str(p.name or "")
         if re.search(
             r"\b(?:ferrite|emc[_ -]?bead|bead\b|polyfuse|poly[_ -]?fuse|tvs\b|"
             r"esd[_ -]?protect|inrush|varistor|mov\b|input[_ -]?fuse|"
-            r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff)\b",
-            str(p.name or ""), re.I,
+            r"dc[_ -]?input[_ -]?fuse|thermal[_ -]?cutoff|"
+            r"board\s*level\s*decoupling|decoupling|bulk\s*cap|"
+            r"host\s*power\s*rail|power\s*rail|bench\s*psu|psu\s*input|"
+            r"user\s*facing\s*legend|legend\s*plate|"
+            r"ambient\s*light\s*cap|light\s*cap|"
+            r"kingbright|\bnm\s*led\b)\b",
+            _nm, re.I,
         ):
-            dims = {k: round(min(float(v), 24.0), 1) for k, v in dims.items()}
+            proxy = _instrument_proxy_dim(_nm, getattr(p, "module_id", "") or "", {})
+            if isinstance(proxy, dict) and proxy.get("kind") == "box":
+                dims = {
+                    "w": round(float(proxy["w_mm"]), 1),
+                    "d": round(float(proxy["d_mm"]), 1),
+                    "h": round(float(proxy["h_mm"]), 1),
+                }
+            else:
+                dims = {k: round(min(float(v), 24.0), 1) for k, v in dims.items()}
         rows.append({
             "tag": pref,
             "equipment_tag": equip_tag,
@@ -6551,6 +6578,47 @@ def build_parts_manifest(parts):
             "pos_mm": [round(cx, 1), round(cy, 1), round(cz, 1)],
             "dims_mm": dims,
         })
+
+    # INTENT (colorimeter 2008): UNIVERSAL envelope-echo backstop — if ≥5 distinct
+    # non-shell names share one large (≥80 mm) dims signature, they inherited the
+    # product bbox. Re-proxy each from role nouns so Renders/Assembly cannot floor
+    # on default-size litter when a new noun slips the clamp list.
+    _shell_re = re.compile(
+        r"enclosure\s*shell|housing|chassis|main\s*body|instrument\s*body|"
+        r"printed\s*main\s*body|console\s*enclosure",
+        re.I,
+    )
+    _large_sig: dict[tuple, list[dict]] = {}
+    for r in rows:
+        d = r.get("dims_mm") or {}
+        if not all(k in d for k in ("w", "d", "h")):
+            continue
+        key = (round(float(d["w"])), round(float(d["d"])), round(float(d["h"])))
+        if min(key) < 80:
+            continue
+        if _shell_re.search(str(r.get("name") or "")):
+            continue
+        _large_sig.setdefault(key, []).append(r)
+    for _key, cluster in _large_sig.items():
+        names = {str(r.get("name") or "") for r in cluster}
+        if len(names) < 5:
+            continue
+        for r in cluster:
+            proxy = _instrument_proxy_dim(
+                str(r.get("name") or ""), str(r.get("module") or ""), {},
+            )
+            if isinstance(proxy, dict) and proxy.get("kind") == "box":
+                r["dims_mm"] = {
+                    "w": round(float(proxy["w_mm"]), 1),
+                    "d": round(float(proxy["d_mm"]), 1),
+                    "h": round(float(proxy["h_mm"]), 1),
+                }
+            else:
+                r["dims_mm"] = {
+                    "w": round(min(float((r.get("dims_mm") or {}).get("w", 24)), 24.0), 1),
+                    "d": round(min(float((r.get("dims_mm") or {}).get("d", 18)), 18.0), 1),
+                    "h": round(min(float((r.get("dims_mm") or {}).get("h", 8)), 8.0), 1),
+                }
 
     # AGGREGATE FAMILIES (rack-farm / panel-array / tower-machine / aero-body) draw
     # their kit under a synthetic naming scheme, so per-word matching above finds
@@ -15180,6 +15248,24 @@ def _selftest_instrument_proxy_geometry() -> None:
     ]
     assert max(protection_dims.count(d) for d in protection_dims) < 5, (
         "device protection parts must not form a manifest-sight default-size litter cluster")
+    # proveCatch (colorimeter 2008): envelope-echo nouns must get compact role
+    # dims — not the product bbox that floored Renders at 6 (17% litter).
+    echo_names = [
+        "Kingbright 470 nm LED",
+        "Host Power Rail On Compute Ui",
+        "Board Level Decoupling",
+        "Bench Psu Input",
+        "User Facing Legend",
+        "Ambient Light Cap",
+    ]
+    echo_dims = [_instrument_proxy_dim(n, "power_distribution", quantities) for n in echo_names]
+    assert all(echo_dims), "envelope-echo nouns must resolve to role-proxy dims"
+    assert all(
+        max(float(d["w_mm"]), float(d["d_mm"]), float(d["h_mm"])) < 100.0
+        for d in echo_dims
+    ), f"envelope-echo proxies must stay device-scale, got {echo_dims}"
+    assert len({tuple(sorted(d.items())) for d in echo_dims}) >= 3, (
+        "envelope-echo nouns must not all collapse to one shared box")
 
     zone_z = {
         "optical": (38.0, 18.0),

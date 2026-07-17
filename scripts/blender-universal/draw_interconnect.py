@@ -145,16 +145,30 @@ _ABSORB_INTO_COMPUTE_NODE_RE = re.compile(
     r"home\s*reference|endstop|mains\s*fuse|overcurrent|"
     r"status\s*indicator|low\s*battery\s*indicator|power\s*indicator(?:\s*led)?|"
     r"battery\s*included|host\s*power\s*rail|run\s*start|user\s*facing|foot\s*pad|"
+    r"user\s*facing\s*legend|legend\s*plate|silk\s*screen|"
     r"mounting\s*bezel|actuation\s*kinematics|maintenance\s*service|"
-    r"access\s*panel|stage\s*limit|stall\s*sense|motor\s*current\s*limit",
+    r"access\s*panel|stage\s*limit|stall\s*sense|motor\s*current\s*limit|"
+    r"debug\s*interface|level\s*shifter|i2c\s*level|"
+    r"blm\d+|ferrite\s*bead",
     re.I,
 )
 # GOTCHA (colorimeter 1236): "Host Power Rail On Compute Ui" / "Input Protection On
 # Compute Ui" contain "Compute Ui" and were KEPT as compute principals — absorb never
 # ran. Match the real MCU/compute host only; absorb-matched names always lose.
+# GOTCHA (colorimeter 2008): BoM pinned "Adafruit Feather M0" instead of
+# "Compute UI Module" — has_compute was False, absorb skipped, 27 nodes / 39 edges.
+# Named MCU boards ARE the compute principal (catalogue pin, not a generic noun).
 _COMPUTE_PRINCIPAL_NAME_RE = re.compile(
     r"^(?:compute\s*ui(?:\s*module)?|main\s*controller(?:\s*mcu)?|"
-    r"microcontroller|\bmcu\b|processor(?:\s*board)?)(?:\b|$)",
+    r"microcontroller|\bmcu\b|processor(?:\s*board)?|"
+    r"(?:adafruit\s+)?feather(?:\s+\w+)*|"
+    r"arduino(?:\s+\w+)*|"
+    r"(?:raspberry\s*pi\s+)?pico(?:\s+\w+)*|"
+    r"esp32(?:\s*[- ]?\w+)*|teensy(?:\s+\w+)*|"
+    r"rp2040(?:\s+\w+)*|samd(?:21|51)?(?:\s+\w+)*|"
+    r"nrf52(?:\s+\w+)*|stm32(?:\s+\w+)*|"
+    r"itsybitsy(?:\s+\w+)*|metro\s+m\d+(?:\s+\w+)*)"
+    r"(?:\b|$)",
     re.I,
 )
 # INTENT (Poseidon): cradle/rail/screw are the motor's mechanical train — one
@@ -457,6 +471,8 @@ def _find_compute_principal(principals: list[dict]) -> Optional[str]:
             "Microcontroller",
             "MCU",
             "Processor",
+            "Adafruit Feather M0",
+            "Feather M0",
         )
         or next(
             (
@@ -1671,6 +1687,58 @@ def _selftest() -> int:
     chk("on_compute_absorbs_firmware", "firmware storage" not in oc_names)
     chk("on_compute_under_edge_cap", len(e_oc) <= MAX_EDGES)
     chk("on_compute_layout_ok", m_oc.get("ok") is True)
+    # proveCatch (colorimeter 2008): catalogue MCU pin ("Adafruit Feather M0") must
+    # still trigger host absorb — otherwise 27 nodes / 39 edges blows MAX_EDGES.
+    state_feather = {
+        "isInstrumentDevice": True,
+        "requirementsBom": [
+            {"tag": "I-104", "requirement": "Adafruit Feather M0", "status": "OK"},
+            {"tag": "I-106", "requirement": "Debug Interface", "status": "OK"},
+            {"tag": "I-107", "requirement": "I2c Level Shifter", "status": "OK"},
+            {"tag": "X-121", "requirement": "Firmware Storage", "status": "OK"},
+            {"tag": "X-119", "requirement": "BLM21PG221SN1D Ferrite Bead", "status": "OK"},
+            {"tag": "X-118", "requirement": "Power Indicator LED", "status": "OK"},
+            {"tag": "X-120", "requirement": "Host Power Rail On Compute Ui", "status": "OK"},
+            {"tag": "EP-102", "requirement": "Board Level Decoupling", "status": "OK"},
+            {"tag": "X-115", "requirement": "Usb 5v Input", "status": "OK"},
+            {"tag": "X-117", "requirement": "Bench Psu Input", "status": "OK"},
+            {"tag": "X-114", "requirement": "Polyfuse Resettable", "status": "OK"},
+            {"tag": "X-116", "requirement": "Low Noise Regulator", "status": "OK"},
+            {"tag": "X-103", "requirement": "DC DC Regulator", "status": "OK"},
+            {"tag": "I-102", "requirement": "Esd Protection Network", "status": "OK"},
+            {"tag": "I-101", "requirement": "Input Protection On Compute Ui", "status": "OK"},
+            {"tag": "X-105", "requirement": "Control Switch", "status": "OK"},
+            {"tag": "X-106", "requirement": "Mounting Bezel", "status": "OK"},
+            {"tag": "X-112", "requirement": "User Facing Legend", "status": "OK"},
+            {"tag": "X-108", "requirement": "SSD1306 0.96 inch OLED", "status": "OK"},
+            {"tag": "X-101", "requirement": "LED Driver", "status": "OK"},
+            {"tag": "X-102", "requirement": "Kingbright 470 nm LED", "status": "OK"},
+            {"tag": "X-104", "requirement": "Wavelength Selection Module", "status": "OK"},
+            {"tag": "I-110", "requirement": "Optical Detector Module", "status": "OK"},
+            {"tag": "X-111", "requirement": "Cuvette Holder", "status": "OK"},
+            {"tag": "X-110", "requirement": "Optical Path Baffle", "status": "OK"},
+            {"tag": "X-109", "requirement": "Enclosure Shell", "status": "OK"},
+            {"tag": "X-107", "requirement": "Display Bezel", "status": "OK"},
+        ],
+        "orchestratorContract": {"topology": [
+            {"from_part": "Usb 5v Input", "to_part": "Adafruit Feather M0",
+             "mechanism": "electrical_bus"},
+            {"from_part": "Adafruit Feather M0", "to_part": "LED Driver",
+             "mechanism": "electrical_bus"},
+            {"from_part": "Optical Detector Module", "to_part": "Adafruit Feather M0",
+             "mechanism": "signal"},
+        ]},
+    }
+    n_fe, e_fe = _collect_graph(Path("/tmp"), state_feather)
+    m_fe = layout_metrics(n_fe, e_fe, content_bottom=200, title_top=500)
+    fe_names = {_norm(v["name"]) for v in n_fe.values()}
+    chk("feather_is_compute", any("feather" in n for n in fe_names))
+    chk("feather_absorbs_host_rail", "host power rail on compute ui" not in fe_names)
+    chk("feather_absorbs_decoupling", "board level decoupling" not in fe_names)
+    chk("feather_absorbs_ferrite_mpn", not any("blm21" in n or "ferrite" in n for n in fe_names))
+    chk("feather_under_node_cap", len(n_fe) <= MAX_PRINCIPAL_NODES)
+    chk("feather_under_edge_cap", len(e_fe) <= MAX_EDGES)
+    chk("feather_layout_ok", m_fe.get("ok") is True)
     # proveCatch: 1-node stub must FAIL story (Goodhart net on empty interconnect).
     thin_stub = layout_metrics(
         {"device": {"name": "Device (no graph yet)", "tag": "", "block": "PCB"}},
