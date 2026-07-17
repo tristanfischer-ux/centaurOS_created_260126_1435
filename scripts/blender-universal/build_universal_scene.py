@@ -12906,12 +12906,16 @@ def _prepare_sealed_product_view(view_name, entering):
                 if obj.name.startswith("u_se_exterior_detail_"):
                     # Coloured harness strands are cutaway-only; closed product keeps
                     # jacket + boot + LED window, not a crayon ribbon on 04–07.
-                    # GOTCHA (2219): cuvette_fluid / cuvette_insert read as a
-                    # floating pale cylinder on 04-exterior. Closed product shows
-                    # open well + rim + parked cap (gold accessory language).
+                    # GOTCHA (2219/2237): cuvette_fluid/insert + parked ambient
+                    # cap grip read as a "detached floating cylinder". Closed
+                    # product keeps open well + rim only (cap is cutaway/accessory).
                     if re.search(r"source_harness_\d+$", obj.name):
                         obj.hide_render = True
-                    elif "cuvette_fluid" in obj.name or "cuvette_insert" in obj.name:
+                    elif (
+                        "cuvette_fluid" in obj.name
+                        or "cuvette_insert" in obj.name
+                        or "ambient_cap" in obj.name
+                    ):
                         obj.hide_render = True
                     else:
                         obj.hide_render = False
@@ -14985,8 +14989,9 @@ def _selftest_instrument_form_rule() -> None:
     _key_above = (
         form["button_locs"][0][2] + ifg.BUTTON_TRAVEL_MM / 2.0 - (base_z + H)
     )
-    assert _key_above <= ifg.BUTTON_TRAVEL_MM * 0.45 + 0.05, (
-        f"key crown above deck must stay ≤45% of travel (got {_key_above:.2f} mm)")
+    # nest≈0 → crown ≈ travel/2; wells (not crown height alone) kill the hover gap.
+    assert _key_above <= ifg.BUTTON_TRAVEL_MM * 0.55 + 0.05, (
+        f"key crown above deck must stay ≤55% of travel (got {_key_above:.2f} mm)")
     assert sum(ifg.MAT_BUTTON_KEY) / 3.0 >= 0.18, (
         "button keys must contrast against charcoal deck")
     # proveCatch: HMI cluster is LEFT of the glass (A/B must not hide behind the cube).
@@ -16663,8 +16668,26 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _disp.dimensions = _mm3(form["top_display_size"])
             _disp.hide_render = True
             # D-pad + A/B — square tactile keys at Apple/Fitts floors (not cylindrical pegs).
+            # GOTCHA (2237 SIGHT): without a deck well, nested keys still cast a
+            # soft-shadow "floating" gap on short handheld decks. Cut a dark well
+            # under each key first, then seat the key crown in the pocket.
             _btn_size = ifg.button_plan_size_mm(float(form.get("button_diameter_mm", ifg.BUTTON_PREF_DIAMETER_MM)))
+            _well_mat = fl.make_mat(
+                "m_se_face_button_well", fl._to_linear((0.06, 0.065, 0.07)),
+                metallic=0.02, roughness=0.85)
+            _deck_top_z = float(form["button_locs"][0][2]) - ifg.BUTTON_TRAVEL_MM * ifg.BUTTON_NEST_FRAC
+            _well_h = float(ifg.BUTTON_WELL_DEPTH_MM)
+            _well_xy = float(_btn_size[0]) * float(ifg.BUTTON_WELL_OVERSIZE)
             for _bi, _loc in enumerate(form["button_locs"]):
+                _well = fl.add_box(
+                    f"u_se_exterior_detail_button_well_{_bi}",
+                    _mm3((_loc[0], _loc[1], _deck_top_z - _well_h / 2.0)),
+                    _mm3((_well_xy, _well_xy, _well_h)),
+                    _well_mat,
+                    module=_skin_mod, module_objects=MO,
+                )
+                _well.dimensions = _mm3((_well_xy, _well_xy, _well_h))
+                _well.hide_render = True
                 _btn = fl.add_box(f"u_se_exterior_detail_button_{_bi}",
                                   _mm3(_loc),
                                   _mm3(_btn_size), _btn_mat,
@@ -16858,6 +16881,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _usb.hide_render = True
             # Photoreal CAD bar: every curved exterior cue (lid, rim, screws, feet,
             # source PCB CAD) must shade-smooth — default Blender boxes/cyls are flat.
+            # GOTCHA (2237 vision): shade-smooth on square D-pad boxes reads as
+            # "round illuminated buttons". Keep button meshes + wells FLAT.
             for _sm_obj in list(bpy.data.objects):
                 _nm = getattr(_sm_obj, "name", "") or ""
                 if _nm.startswith((
@@ -16866,6 +16891,8 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     "u_se_instrument_story_",
                     "u_se_cutaway_cue_",
                 )):
+                    if "button_" in _nm:
+                        continue
                     fl.shade_smooth_object(_sm_obj)
         # vent slots on the FRONT BAND — one slot per real air-mover part, capped at 4.
         # A sealed instrument with no air-movers gets NONE (a benchtop photometer is

@@ -104,9 +104,9 @@ def instrument_form_rule_mm(
     if display_loc[0] > max_disp_cx:
         display_loc = (max_disp_cx, display_loc[1], display_loc[2])
     bezel_size = ifg.display_bezel_size_mm(display_size)
-    # DECISION (2026-07-17 SIGHT colorimeter-2053/2219): nest keys at
-    # BUTTON_NEST_FRAC·travel. 0.50 floated; 0.35 still cast a soft-shadow gap
-    # on short handheld decks (2219 04-exterior). 0.12 buries ≥70% under deck.
+    # DECISION (2026-07-17 SIGHT 2053/2219/2237): nest keys at BUTTON_NEST_FRAC
+    # ·travel AND cut a deck well under each key (see place_sealed_enclosure).
+    # Without the well, even 0.12 nest still reads as a soft-shadow hover gap.
     btn_z = deck_top_z + ifg.BUTTON_TRAVEL_MM * ifg.BUTTON_NEST_FRAC
     dx, dy, _dz = display_loc
     # D-pad + A/B column entirely left of the glass (matches GA TOP diamond).

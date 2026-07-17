@@ -62,10 +62,12 @@ MAT_CUTAWAY_SHELL = (0.10, 0.11, 0.12)         # translucent cutaway body cue
 BUTTON_SHAPE = "square"
 # Proud enough that 3/4 product shots read a D-pad, not a flush texture.
 BUTTON_TRAVEL_MM = 3.2
-# INTENT (2219 SIGHT): 0.35·travel still cast a soft-shadow gap under keys on
-# short handheld decks. Centre at nest·travel so ≥70% of the key body sits
-# below deck_top while the crown stays tactile.
-BUTTON_NEST_FRAC = 0.12
+# INTENT (2219/2237 SIGHT): keys without a deck recess cast a soft-shadow gap
+# even when nested. Centre near deck_top (nest≈0) + cut a well under each key
+# so the crown reads seated, not hovering. Crown ≈ travel/2 above deck.
+BUTTON_NEST_FRAC = 0.05
+BUTTON_WELL_DEPTH_MM = 1.4
+BUTTON_WELL_OVERSIZE = 1.18
 SCREW_HEAD_DIAMETER_MM = 3.2
 SCREW_HEAD_HEIGHT_MM = 1.2
 DISPLAY_BEZEL_MARGIN_MM = 2.5
@@ -904,8 +906,10 @@ def _selftest() -> None:
     assert float(_cam["hero_dist_scale"]) <= 0.65, (
         "tip-back hero must pull in enough for cutaway height occupancy ≥0.45 "
         f"(got hero_dist_scale={_cam['hero_dist_scale']})")
-    assert 0.08 <= float(BUTTON_NEST_FRAC) <= 0.20, (
-        "D-pad nest frac must bury most of the key body under the deck")
+    assert -0.05 <= float(BUTTON_NEST_FRAC) <= 0.15, (
+        "D-pad nest frac must keep the key crown tactile without a hover gap")
+    assert float(BUTTON_WELL_DEPTH_MM) >= 1.0, (
+        "deck must cut a ≥1 mm well under each key (2237 soft-shadow float)")
     assert tipback_lid_vision_image_candidates()[0] == "04-product-exterior.png", (
         "outer-face lid controls: prefer sealed product exterior over cutaway hero")
     assert BUTTON_SHAPE == "square"
