@@ -10796,6 +10796,54 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     assertions.push({ id: 'UNIVERSAL.headline_output_never_blank', description: 'headline never blank', passed: false, detail: `deriveHeadlineFromModules threw: ${String(err).slice(0, 160)}` })
   }
 
+  // ── UNIVERSAL: sparse lab-instrument briefs headline from contract quantities ──
+  //
+  // Rodeostat 20260717: parsedBrief.target_performance was empty, but U6 +
+  // engineering-contract had real capability targets (compliance voltage,
+  // electrode count, ml working volume, stage axes). The cover rendered a
+  // blank headline despite those source quantities. Guard the contract fallback
+  // across the instrument classes that hit this parser shape.
+  try {
+    const parsedNoTarget = {
+      constraints: {
+        target_performance: { key_metric: null, value: null, unit: null, metrics: [] },
+        unit_cost_ceiling: { value: 217, currency: 'GBP' },
+      },
+    }
+    const cases: Array<{ cls: string; key: string; value: number; unit: string }> = [
+      { cls: 'potentiostat', key: 'compliance_voltage_v', value: 10, unit: 'V' },
+      { cls: 'digital_microfluidics', key: 'electrode_count', value: 64, unit: '' },
+      { cls: 'benchtop_bioreactor', key: 'working_volume_ml', value: 50, unit: 'ml' },
+      { cls: 'lab_microscope', key: 'stage_axis_count', value: 3, unit: '' },
+      { cls: 'optical_instrument', key: 'peak_electrical_power_w', value: 2.5, unit: 'W' },
+    ]
+    const failedInstrumentHeadlines: string[] = []
+    for (const c of cases) {
+      const h = deriveHeadlineFromModules([], parsedNoTarget, c.cls, null, {
+        product_class: c.cls,
+        quantities: {
+          [c.key]: { value: c.value, unit: c.unit, source_detail: 'fixture capability quantity' },
+          enclosure_volume_m3: { value: 0.01, unit: 'm³', source_detail: 'device-scale fixture' },
+        },
+      })
+      const hv = h?.headline_output?.value
+      const hid = h?.headline_output?.id
+      if (hv == null || String(hv).trim() === '' || String(hv).trim() === '—') {
+        failedInstrumentHeadlines.push(`${c.cls}: blank headline`)
+      }
+      if (hid !== c.key) failedInstrumentHeadlines.push(`${c.cls}: headline id ${hid} !== ${c.key}`)
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.instrument_headline_uses_contract_quantities_when_brief_target_missing',
+      'instrument-class headline fallback reads engineering-contract quantities when parsedBrief.target_performance is empty (potentiostat compliance voltage, digital_microfluidics electrode count, benchtop_bioreactor working volume, lab_microscope stage axes, optical_instrument peak watts) — the cover never renders HEADLINE_BLANK just because the parser missed prose targets',
+      failedInstrumentHeadlines.length,
+      (n) => n === 0,
+      () => `instrument headline contract-fallback cases failed: ${failedInstrumentHeadlines.join(' ; ')}. Check src/lib/pdf-engine-v2/headline-deriver.ts contractHeadlineQuantities().`,
+    ))
+  } catch (err) {
+    assertions.push({ id: 'UNIVERSAL.instrument_headline_uses_contract_quantities_when_brief_target_missing', description: 'instrument headline uses contract quantities when brief target missing', passed: false, detail: `fixture threw: ${String(err).slice(0, 200)}` })
+  }
+
   // ── UNIVERSAL: compliance banner never claims "All PASS" over unverified rows (2026-06-01) ──
   //
   // UNIVERSAL.compliance_banner_not_false_pass — the Brief Compliance headline must
@@ -13571,6 +13619,60 @@ function checkWordDomainCoherenceInvariants(): Assertion[] {
     failedC.length, (n) => n === 0,
     () => `optical-instrument skeleton-floor cases failed: ${failedC.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts (energyFloorFor / OPTICAL_MODULE_FLOORS / hasOpticalInstrumentSignal).`,
   ))
+
+  // ── EXTENSION 2026-07-17 (Rodeostat): non-optical USB lab instruments also
+  // need a device-scale electronics floor. Tool signals are mixed-signal /
+  // potentiostat / USB power, not optical, so the optical floor correctly does
+  // not fire; the source rule must still prevent plant Main Breaker / Network
+  // Switch / Pressure Sensor / Emergency Stop pollution.
+  {
+    const failedPot: string[] = []
+    const wantPot = (label: string, cond: boolean) => { if (!cond) failedPot.push(label) }
+    const potentiostatGraph: any = {
+      product_class: 'potentiostat',
+      nodes: [
+        { class: 'energy_conversion_transduction', display: 'AFE / Conversion', role: 'principal', required: true },
+        { class: 'power_distribution', display: 'Power', role: 'support', required: true },
+        { class: 'control_compute_communication', display: 'Control', role: 'support', required: true },
+        { class: 'sensing_instrumentation', display: 'Electrode Sensing', role: 'principal', required: true },
+        { class: 'safety_protection', display: 'Safety', role: 'support', required: true },
+        { class: 'hmi_ergonomics', display: 'HMI', role: 'support', required: true },
+      ],
+      edges: [],
+    }
+    const potentiostatContract: any = {
+      product_class: 'potentiostat',
+      quantities: {
+        compliance_voltage_v: { value: 10 },
+        connected_electrical_load_kw: { value: 0.008 },
+        peak_electrical_power_w: { value: 8 },
+        enclosure_volume_m3: { value: 0.00038 },
+      },
+      _tools_run: [
+        'potentiostat:tia-sizing',
+        'mixed-signal:quantization-limits',
+        'power-supply:usb-boost-budget',
+        'pcb-design:creepage-clearance',
+      ],
+    }
+    const mods = deriveGenericSkeleton(potentiostatGraph, {} as any, { class: 'potentiostat' } as any, potentiostatContract, new Map()) as any[]
+    const potAll = mods
+      .flatMap((m: any) => (m.sub_modules || []).flatMap((sm: any) => (sm.words || []).map((w: any) => String(w.name_human || w.id || ''))))
+      .join(' | ')
+    for (const bad of ['Main Breaker', 'Distribution Busbar', 'Network Switch', 'Pressure Sensor', 'Emergency Stop', 'Protective Relay', 'Fire Detector', 'Interlock Switch']) {
+      wantPot(`potentiostat floor does NOT emit ${bad}`, !new RegExp(bad, 'i').test(potAll))
+    }
+    for (const good of ['Analog Front End', 'DAC Output Stage', 'USB Interface', 'Electrode Interface Connector', 'Galvanic Isolator', 'Polyfuse']) {
+      wantPot(`potentiostat floor emits ${good}`, new RegExp(good, 'i').test(potAll))
+    }
+    out.push(assertEq(
+      'UNIVERSAL.low_power_lab_instrument_skeleton_floor_replaces_plant_floor',
+      'Rodeostat proveCatch: a device-scale low-power lab-electronics contract (compliance_voltage_v + 8 W USB load + small enclosure + mixed-signal/potentiostat tools) makes derive-skeleton emit an AFE/USB/electrode/isolation floor and NEVER plant power-distribution or safety parts (Main Breaker, Network Switch, Pressure Sensor, Emergency Stop, Protective Relay, Fire Detector, Interlock Switch). Genuine BESS coverage remains guarded by the optical-floor BESS case above.',
+      failedPot.length,
+      (n) => n === 0,
+      () => `low-power lab-instrument skeleton cases failed: ${failedPot.join(' ; ')}. Check scripts/lib/orchestrator/generic/derive-skeleton.ts LAB_ELECTRONICS_* floors and signal.`,
+    ))
+  }
 
   // ── EXTENSION 2026-07-16 (Poseidon): syringe-pump instrument floors are FULLY
   // UNIONED (not MIN_WORDS padding). stepper_motor was #6 on the fluid floor and

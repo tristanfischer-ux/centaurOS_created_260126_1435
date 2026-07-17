@@ -492,6 +492,59 @@ const LAB_MICROSCOPE_MODULE_FLOORS: Record<string, string[]> = {
 const LAB_MICROSCOPE_FORBIDDEN_COMPONENT_RE =
   /realsense|depth\s*camera|lidar|weidmuller|weidmüller|phoenix\s*contact|schneider|nsx\s*mccb|banner\s*ez|scada|plc_cabinet|mains_incomer|distribution_transformer|chill|scroll\s*compressor|circulation_pump|process_water|module_rack|storage_cell|access_ladder|pressure\s*transmitter|signal\s*conditioner/i
 
+// ── LOW-POWER LAB ELECTRONICS FLOOR (2026-07-17 Rodeostat / Yuri 06) ─────────
+// INTENT: sparse USB/bench instruments with mixed-signal or small-volume lab
+// quantities are not industrial plants. Without an optical/thermocycler/syringe
+// signal they fell through to Tier-C plant floors: Main Breaker, Network Switch,
+// Pressure Sensor, Emergency Stop. The signal below is contract/quantity based
+// (compliance voltage, electrode count, ml working volume, watt-scale load,
+// small enclosure), never a Rodeostat brand branch.
+const LAB_ELECTRONICS_ENERGY_FLOOR = [
+  'usb_5v_input', 'bench_psu_input', 'polyfuse_resettable',
+  'low_noise_regulator', 'board_level_decoupling',
+]
+const LAB_ELECTRONICS_ENERGY_CONVERSION_FLOOR = [
+  'analog_front_end', 'precision_voltage_reference', 'dac_output_stage',
+  'adc_input_stage', 'low_noise_op_amp',
+]
+const LAB_ELECTRONICS_POWER_DISTRIBUTION_FLOOR = [
+  'usb_power_entry', 'esd_protection_network', 'ferrite_emc_bead',
+  'reverse_polarity_protection', 'power_indicator_led',
+]
+const LAB_ELECTRONICS_CONTROL_FLOOR = [
+  'microcontroller_mcu', 'usb_interface', 'firmware_storage',
+  'debug_header', 'host_protocol_bridge',
+]
+const LAB_ELECTRONICS_SENSING_FLOOR = [
+  'electrode_interface_connector', 'current_measurement_tia', 'reference_input_buffer',
+  'voltage_sense_path', 'calibration_reference',
+]
+const LAB_ELECTRONICS_STRUCTURE_FLOOR = [
+  'enclosure_shell', 'pcb_mounting_standoff', 'front_panel_connector_ports',
+  'cable_strain_relief', 'fastener_set',
+]
+const LAB_ELECTRONICS_SAFETY_FLOOR = [
+  'galvanic_isolator', 'input_protection_network', 'wet_bench_creepage_slot',
+  'current_limit_polyfuse', 'safety_label_set',
+]
+const LAB_ELECTRONICS_HMI_FLOOR = [
+  'status_indicator', 'run_start_control', 'host_gui_software',
+  'calibration_prompt_ui', 'user_facing_legend',
+]
+const LAB_ELECTRONICS_MODULE_FLOORS: Record<string, string[]> = {
+  energy_storage_source: LAB_ELECTRONICS_ENERGY_FLOOR,
+  energy_conversion_transduction: LAB_ELECTRONICS_ENERGY_CONVERSION_FLOOR,
+  power_distribution: LAB_ELECTRONICS_POWER_DISTRIBUTION_FLOOR,
+  control_compute_communication: LAB_ELECTRONICS_CONTROL_FLOOR,
+  sensing_instrumentation: LAB_ELECTRONICS_SENSING_FLOOR,
+  structure_containment: LAB_ELECTRONICS_STRUCTURE_FLOOR,
+  safety_protection: LAB_ELECTRONICS_SAFETY_FLOOR,
+  hmi_ergonomics: LAB_ELECTRONICS_HMI_FLOOR,
+  human_machine_interface: LAB_ELECTRONICS_HMI_FLOOR,
+}
+const LAB_ELECTRONICS_FORBIDDEN_COMPONENT_RE =
+  /main_breaker|distribution_busbar|power_contactor|protective_relay|emergency_stop|fire_detector|interlock_switch|warning_beacon|network_switch|communication_gateway|(?:io_module|i\/o\s*module)|scada|plc|pressure_sensor|mains_incomer|distribution_transformer|main_switchboard|inverter_bridge|dc_link_capacitor|gate_driver|chiller|scroll\s*compressor|circulation_pump|pipework_run|skid_frame|access_ladder|lifting_point|walkway_grating/i
+
 /** True when the contract is a multi-channel benchtop linear syringe-dosing form.
  *  PURE — class slug OR archetype-builder quantity triad; never a product brand. */
 function hasSyringePumpSignal(contract: ContractInProgress): boolean {
@@ -519,6 +572,34 @@ function hasLabMicroscopeSignal(contract: ContractInProgress): boolean {
   return Number.isFinite(axes) && axes >= 2 && Number.isFinite(focusUm) && focusUm > 0
 }
 
+/** True for USB/bench lab electronics whose contract carries watt-scale load
+ *  plus instrument quantities (electrochemical compliance voltage, EWOD
+ *  electrode count, ml-scale working volume, etc.). */
+function hasLowPowerLabElectronicsSignal(contract: ContractInProgress): boolean {
+  const pc = String((contract as { product_class?: unknown })?.product_class ?? '').toLowerCase()
+  const q = (contract?.quantities ?? {}) as Record<string, { value?: unknown } | undefined>
+  const peakW = Number(q.peak_electrical_power_w?.value)
+  const loadKw = Number(q.connected_electrical_load_kw?.value)
+  const enclosureM3 = Number(q.enclosure_volume_m3?.value)
+  const isSmallPower =
+    (Number.isFinite(peakW) && peakW > 0 && peakW <= 100)
+    || (Number.isFinite(loadKw) && loadKw > 0 && loadKw <= 0.1)
+  const isSmallEnclosure = !Number.isFinite(enclosureM3) || enclosureM3 < 1
+  const hasInstrumentQuantity = [
+    'compliance_voltage_v',
+    'electrode_count',
+    'working_volume_ml',
+    'working_volume_l',
+    'peak_electrical_power_w',
+  ].some((key) => {
+    const v = Number(q[key]?.value)
+    return Number.isFinite(v) && v > 0
+  })
+  const classHintsLabElectronics =
+    /potentiostat|digital[_ -]?microfluidics|benchtop[_ -]?bioreactor|optical[_ -]?instrument/.test(pc)
+  return isSmallPower && isSmallEnclosure && (hasInstrumentQuantity || classHintsLabElectronics)
+}
+
 /** The energy_storage_source floor: an optical instrument's own small rechargeable
  *  battery + charge management (checked FIRST — never confused with a BESS even if a
  *  stray quantity key happens to match ENERGY_STORAGE_RE), else a battery kit for a
@@ -529,6 +610,7 @@ function energyFloorFor(contract: ContractInProgress): string[] {
   if (hasThermocyclerSignal(contract)) return THERMOCYCLER_ENERGY_FLOOR
   if (hasSyringePumpSignal(contract)) return SYRINGE_PUMP_ENERGY_FLOOR
   if (hasLabMicroscopeSignal(contract)) return LAB_MICROSCOPE_ENERGY_FLOOR
+  if (hasLowPowerLabElectronicsSignal(contract)) return LAB_ELECTRONICS_ENERGY_FLOOR
   return hasEnergyStorage(contract) ? ENERGY_STORAGE_FLOOR : ELECTRICAL_SUPPLY_FLOOR
 }
 
@@ -649,6 +731,7 @@ function componentsForModule(
   const isThermocycler = hasThermocyclerSignal(contract)
   const isSyringePump = hasSyringePumpSignal(contract)
   const isLabMicroscope = hasLabMicroscopeSignal(contract)
+  const isLowPowerLabElectronics = hasLowPowerLabElectronicsSignal(contract)
   const thermalMode = isThermal ? thermalModeFromContract(contract) : 'unknown'
   const fromCorpus = componentsByModule.get(moduleKey) ?? []
   const out: string[] = []
@@ -662,6 +745,8 @@ function componentsForModule(
     if (isSyringePump && SYRINGE_PUMP_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Lab microscope: never admit robotics depth cams / DIN-rail industrial I/O.
     if (isLabMicroscope && LAB_MICROSCOPE_FORBIDDEN_COMPONENT_RE.test(c)) return
+    // Low-power lab electronics: never admit plant power/safety/process sensors.
+    if (isLowPowerLabElectronics && LAB_ELECTRONICS_FORBIDDEN_COMPONENT_RE.test(c)) return
     // Never admit a DIMENSION/PROPERTY name as a part (it is an attribute of its parent device).
     if (PROPERTY_COMPONENT_RE.test(c)) return
     const id = sanitizeId(c)
@@ -687,6 +772,7 @@ function componentsForModule(
     // GOTCHA: lab_microscope must NOT fall through to OPTICAL_MODULE_FLOORS
     // (cuvette/colorimeter vocabulary) — checked before optical.
     || (isOpticalInstrument && !isLabMicroscope && OPTICAL_MODULE_FLOORS[moduleKey])
+    || (isLowPowerLabElectronics && LAB_ELECTRONICS_MODULE_FLOORS[moduleKey])
     || null
   if (instrumentFloor) {
     for (const c of instrumentFloor) push(c)

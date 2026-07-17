@@ -847,7 +847,53 @@ function briefNum(v: any): number | null {
   return null
 }
 
-function deriveUniversalHeadlineFromBrief(modules: ModuleSpec[], parsedBrief: any, productClass: string, briefText?: string | null): Record<string, any> {
+type ContractQuantityCandidate = {
+  key: string
+  value: number | string
+  unit: string
+  note: string
+  priority: number
+}
+
+const CONTRACT_HEADLINE_QUANTITY_PRIORITIES: Array<{ re: RegExp; priority: number }> = [
+  { re: /\bcompliance_voltage_v\b/i, priority: 10 },
+  { re: /\bworking_volume_(?:ml|l)\b/i, priority: 10 },
+  { re: /\belectrode_count\b/i, priority: 10 },
+  { re: /\bstage_axis_count\b/i, priority: 10 },
+  { re: /\bobjective_na\b/i, priority: 9 },
+  { re: /\bfocus_resolution_um\b/i, priority: 9 },
+  { re: /\bmax_sample_volume_ml\b/i, priority: 9 },
+  { re: /\bdrive_voltage_v\b|\bhv_(?:drive_)?voltage_v\b/i, priority: 8 },
+  { re: /\bsampling_rate_hz\b/i, priority: 8 },
+  { re: /\bdac_resolution_bits\b/i, priority: 8 },
+  { re: /\bmax_measurable_current_a\b|\bmin_current_resolution_a\b/i, priority: 8 },
+  { re: /\bpeak_electrical_power_w\b|\bconnected_electrical_load_kw\b/i, priority: 6 },
+  { re: /\benclosure_volume_m3\b/i, priority: 5 },
+]
+
+function quantityPriority(key: string): number {
+  for (const rule of CONTRACT_HEADLINE_QUANTITY_PRIORITIES) {
+    if (rule.re.test(key)) return rule.priority
+  }
+  return 0
+}
+
+function contractHeadlineQuantities(orchestratorContract?: any): ContractQuantityCandidate[] {
+  const quantities = orchestratorContract?.quantities ?? {}
+  const out: ContractQuantityCandidate[] = []
+  for (const [key, raw] of Object.entries(quantities)) {
+    const value = (raw as any)?.value
+    if (value == null || String(value).trim() === '') continue
+    const priority = quantityPriority(key)
+    if (priority <= 0) continue
+    const unit = String((raw as any)?.unit ?? '')
+    const note = String((raw as any)?.source_detail ?? (raw as any)?.basis ?? 'Engineering contract quantity.')
+    out.push({ key, value: value as number | string, unit, note, priority })
+  }
+  return out.sort((a, b) => b.priority - a.priority || a.key.localeCompare(b.key))
+}
+
+function deriveUniversalHeadlineFromBrief(modules: ModuleSpec[], parsedBrief: any, productClass: string, briefText?: string | null, orchestratorContract?: any): Record<string, any> {
   const out: Record<string, any> = {}
   const c = parsedBrief?.constraints ?? {}
   const tp = c.target_performance
@@ -879,6 +925,35 @@ function deriveUniversalHeadlineFromBrief(modules: ModuleSpec[], parsedBrief: an
   // target_performance absent but metrics[] present → promote the first metric.
   if (!out.headline_output && supporting.length > 0) {
     out.headline_output = supporting.shift()
+  }
+  // INTENT: Sparse instrument briefs often state capability in prose ("±10 V
+  // compliance", "64 electrodes", "50 ml working volume") that U6 promotes into
+  // the engineering contract, while the brief parser leaves target_performance
+  // empty. The cover headline must read the contract truth before falling back
+  // to a blank — this is universal over quantity keys, not a product/brand case.
+  const contractQuantities = contractHeadlineQuantities(orchestratorContract)
+  if (!out.headline_output && contractQuantities.length > 0) {
+    const primary = contractQuantities[0]
+    out.headline_output = metric(
+      primary.key,
+      prettyKey(primary.key),
+      fmt(primary.value),
+      primary.unit,
+      `Engineering contract quantity surfaced because parsedBrief.constraints.target_performance was empty. ${primary.note}`,
+      'derived_deterministic',
+    )
+  }
+  if (contractQuantities.length > 0) {
+    const existingIds = new Set<string>([
+      out.headline_output?.id,
+      ...supporting.map((m) => String(m?.id ?? '')),
+    ].filter(Boolean) as string[])
+    for (const q of contractQuantities) {
+      if (existingIds.has(q.key)) continue
+      supporting.push(metric(q.key, prettyKey(q.key), fmt(q.value), q.unit, `Engineering contract quantity. ${q.note}`, 'derived_deterministic'))
+      existingIds.add(q.key)
+      if (supporting.length >= 5) break
+    }
   }
   out.supporting_metrics = supporting
 
@@ -943,7 +1018,7 @@ export function deriveHeadlineFromModules(modules: ModuleSpec[], parsedBrief: an
     const ho = out.headline_output
     const needsOutput = !ho || ho.value == null || String(ho.value).trim() === '' || String(ho.value).trim() === '—'
     if (needsOutput || !out.headline_constraint || !(out.supporting_metrics?.length)) {
-      const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText)
+      const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText, orchestratorContract)
       if (needsOutput && uni.headline_output) out.headline_output = uni.headline_output
       if (!out.headline_constraint && uni.headline_constraint) out.headline_constraint = uni.headline_constraint
       if (!(out.supporting_metrics?.length) && uni.supporting_metrics?.length) out.supporting_metrics = uni.supporting_metrics
@@ -960,7 +1035,7 @@ export function deriveHeadlineFromModules(modules: ModuleSpec[], parsedBrief: an
   // headline is NEVER a bare "—" (THE AIM: the engine must work on unknown /
   // novel classes). Surfaces the brief's target_performance + supporting metrics
   // + a binding constraint straight from parsedBrief.
-  const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText)
+  const uni = deriveUniversalHeadlineFromBrief(modules, parsedBrief, productClass, briefText, orchestratorContract)
   return {
     ...uni,
     generated_by: 'universal_brief_fallback',
