@@ -15427,7 +15427,7 @@ registerArchetype('lab_microscope', (brief: any) => {
     {
       from_part: 'objective',
       to_part: 'camera_sensor',
-      mechanism: 'optical',
+      mechanism: 'signal',
       constraint_kind: 'signal',
       material_context: 'RMS / tube path → sensor; sampling vs NA × pixel pitch',
     },
@@ -15563,15 +15563,15 @@ registerArchetype('benchtop_bioreactor', (brief: any) => {
       {
         from_part: 'od_sensor',
         to_part: 'culture_vessel',
-        mechanism: 'optical',
+        mechanism: 'signal',
         constraint_kind: 'signal',
         material_context: 'OD path through vial → growth metric',
       },
       {
         from_part: 'dosing_pump',
         to_part: 'culture_vessel',
-        mechanism: 'fluidic',
-        constraint_kind: 'flow',
+        mechanism: 'fluid_loop',
+        constraint_kind: 'flow_capacity',
         material_context: 'media / waste / acid-base dosing lines',
       },
     ],
@@ -15657,7 +15657,7 @@ registerArchetype('potentiostat', (brief: any) => {
       {
         from_part: 'tia_adc_front_end',
         to_part: 'working_electrode_connector',
-        mechanism: 'electrical',
+        mechanism: 'signal',
         constraint_kind: 'signal',
         material_context: 'WE current path → TIA → ADC',
       },
@@ -15736,8 +15736,8 @@ registerArchetype('digital_microfluidics', (brief: any) => {
       {
         from_part: 'hv_driver',
         to_part: 'electrode_array',
-        mechanism: 'electrical',
-        constraint_kind: 'voltage',
+        mechanism: 'electrical_bus',
+        constraint_kind: 'voltage_rating',
         material_context: 'sequenced HV → EWOD pads (interlocked)',
       },
     ],

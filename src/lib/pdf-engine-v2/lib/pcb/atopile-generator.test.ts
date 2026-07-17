@@ -1009,8 +1009,8 @@ describe('atopile-generator', () => {
     expect(onBoardIds.has('stepper_driver_board_word')).toBe(true)
     expect(onBoardIds.has('current_sense_on_driver_word')).toBe(true)
     // Concept "QFN56" dimensions must NOT pin a 56-pad island for a 4-pin stub.
-    expect(mcu?.footprint.footprint).not.toMatch(/QFN-56/i)
-    expect(mcu?.footprint.footprint).toMatch(/LQFP-32/i)
+    expect(mcu?.footprint?.footprint).not.toMatch(/QFN-56/i)
+    expect(mcu?.footprint?.footprint).toMatch(/LQFP-32/i)
     // MCU and/or stepper driver must land as on-board components (not a 2-part fuse board).
     expect(
       onBoardIds.has('main_controller_mcu_word')
