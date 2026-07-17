@@ -5629,12 +5629,15 @@ async function main() {
   // GOTCHA (2026-07-16 Poseidon): bare `pump` matched `syringe_pump` → plantish=true
   // → isInstrumentDevice=false → industrial MPN scrub off + plant BoM vocabulary.
   // Plant pumps are NAMED (circulation/centrifugal/process); instrument forms win.
+  // GOTCHA (2026-07-17 Pioreactor): bare `reactor` matched `benchtop_bioreactor`
+  // → plantish=true → isInstrumentDevice=false → £81k plant BoM vs gold £259.
+  // Use `\breactor\b` (not substring) + explicit instrument-form allowlist.
   const _isInstrumentFormForDevice =
-    /syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument/.test(
+    /syringe[_ -]?pump|thermo[_ -]?cycler|thermal[_ -]?cycler|\bpcr\b|colorimeter|colourimeter|spectrophotometer|optical[_ -]?instrument|optical[_ -]?handheld|lab[_ -]?microscope|openflexure|flexure[_ -]?stage|benchtop[_ -]?bioreactor|pioreactor|turbidostat|chemostat|potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop/.test(
       _pcForDevice,
     )
   const _isPlantishForDevice =
-    /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|reactor|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump/.test(
+    /battery|storage|bess|powerwall|energy|inverter|pcs|transformer|switchgear|plant|\breactor\b|boiler|hvac|chiller|circulation[_ -]?pump|centrifugal[_ -]?pump|process[_ -]?pump/.test(
       _pcForDevice,
     ) && !_isInstrumentFormForDevice
   const isInstrumentDevice =

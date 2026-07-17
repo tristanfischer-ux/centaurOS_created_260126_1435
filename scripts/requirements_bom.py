@@ -6898,8 +6898,24 @@ def assemble(out_dir: str):
     _encl_vol = qcontract.get("enclosure_volume_m3")
     if isinstance(_encl_vol, dict):
         _encl_vol = _encl_vol.get("value")
+    # GOTCHA (2026-07-17): chain plantish regex used bare `reactor` which matched
+    # `benchtop_bioreactor` and left isInstrumentDevice=false → £81k plant BoM.
+    # Class allowlist is a belt-and-suspenders so gold rescale still runs.
+    _pc_bom = str(
+        (st.get("moduleDecomposition") or {}).get("product_class")
+        or ((st.get("orchestratorContract") or {}).get("product_class"))
+        or (st.get("parsedBrief") or {}).get("product_class")
+        or ""
+    ).lower().strip()
+    _INSTRUMENT_CLASS_RE = re.compile(
+        r"syringe[_ -]?pump|thermo[_ -]?cycler|optical[_ -]?instrument|optical[_ -]?handheld|"
+        r"colorimeter|lab[_ -]?microscope|openflexure|benchtop[_ -]?bioreactor|pioreactor|"
+        r"potentiostat|rodeostat|digital[_ -]?microfluidics|opendrop",
+        re.I,
+    )
     _IS_INSTRUMENT_DEVICE = bool(st.get("isInstrumentDevice")) or bool(
-        isinstance(_encl_vol, (int, float)) and 0 < _encl_vol < 1.0)
+        isinstance(_encl_vol, (int, float)) and 0 < _encl_vol < 1.0
+    ) or bool(_INSTRUMENT_CLASS_RE.search(_pc_bom))
 
     # tag + as-built geometry from the Blender layout (ONE geometry source for the BoM cost,
     # the drawings and the 3D — not the word's re-derived working volume; kills the 9.5-vs-10.26 split)
