@@ -14340,6 +14340,29 @@ def _place_instrument_interior_layout(
             f"[univ][sealed] WARN interior density below desirability floor "
             f"({n_story} < {ifg.INTERIOR_MIN_STORY_MESHES})"
         )
+    # INTENT (2026-07-17): syringe_pump + lab_microscope already dump form-meshes.json
+    # for the converge checklist / yuri-revisit bar. Optical handhelds were silent →
+    # watch WARN "no form-meshes.json" even when glance PASS. Dump the story meshes.
+    try:
+        _out = os.environ.get("BLENDER_OUT_DIR") or ""
+        if _out and hasattr(bpy, "data"):
+            _names = sorted(
+                o.name for o in bpy.data.objects
+                if getattr(o, "type", None) == "MESH"
+                and (
+                    o.name.startswith("u_se_instrument_")
+                    or o.name.startswith("u_se_exterior_")
+                )
+            )
+            Path(_out).joinpath("form-meshes.json").write_text(
+                json.dumps(
+                    {"form": "optical_handheld", "form_id": "optical_handheld",
+                     "meshes": _names},
+                    indent=2,
+                )
+            )
+    except Exception as _dump_exc:
+        print(f"[univ][sealed] form-meshes dump skipped: {_dump_exc}")
     return form
 
 
