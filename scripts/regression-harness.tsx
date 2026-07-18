@@ -12308,7 +12308,6 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // worked[] arithmetic, exercised directly on the real CO2 reactions. Memoised so the
   // .venv python spawns once across the whole run, not per snapshot.
   for (const a of checkReactionToolsWorkedSound()) assertions.push(a)
-  for (const a of checkCapacityDisplayNeverZero()) assertions.push(a)
   for (const a of checkDesignLoopWritebackAdditive()) assertions.push(a)
   for (const a of checkDesignLoopClosesEarly()) assertions.push(a)
   for (const a of checkPrincipalEquipmentFromContract()) assertions.push(a)
@@ -12449,6 +12448,10 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
 
 function checkQualityLoopInvariants(): Assertion[] {
   const out: Assertion[] = []
+
+  // Snapshot-independent display-formatter guard — runs UNCONDITIONALLY here (moved out of
+  // the per-snapshot block, which never fires when the default snapshot fixture is absent).
+  for (const a of checkCapacityDisplayNeverZero()) out.push(a)
 
   // QL1: canonicalSectionName normalises all known aliases
   const aliases: Record<string, string> = {
