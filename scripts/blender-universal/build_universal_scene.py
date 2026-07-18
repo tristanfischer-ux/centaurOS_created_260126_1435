@@ -13046,7 +13046,18 @@ def _prepare_sealed_product_view(view_name, entering):
             if os.environ.get("DEBUG_LE"):
                 _vis = sorted(f"{o.name}:{o.type}" for o in bpy.data.objects
                               if getattr(o, "type", None) in _geo_types and not o.hide_render)
-                print(f"[DEBUG_LE] view={view_name} LE_branch RAN; visible geo ({len(_vis)}): {_vis}")
+                print(f"[DEBUG_LE] view={view_name} LE_branch RAN sig={_LE_SIGNATURE}; visible geo ({len(_vis)}): {_vis}")
+                # world-space bbox of the visible SHELL so signature geometry lands on the real face
+                import mathutils as _mu  # noqa
+                _xs = []; _ys = []; _zs = []
+                for o in bpy.data.objects:
+                    if o.name.startswith("u_se_product_") and not o.hide_render:
+                        for _c in o.bound_box:
+                            _w = o.matrix_world @ _mu.Vector(_c)
+                            _xs.append(_w.x); _ys.append(_w.y); _zs.append(_w.z)
+                if _xs:
+                    print(f"[DEBUG_LE] shell world bbox X[{min(_xs):.3f},{max(_xs):.3f}] "
+                          f"Y[{min(_ys):.3f},{max(_ys):.3f}] Z[{min(_zs):.3f},{max(_zs):.3f}]")
             if _SEALED_EXTERIOR_MATERIAL is not None:
                 for obj in _SEALED_SHELL_OBJECTS:
                     if obj and obj.data:
@@ -16552,6 +16563,58 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
             _cover_bevel.width = min(W, D) * (0.10 if _IS_INSTRUMENT_DEVICE else 0.06) * fl.MM
             _cover_bevel.segments = 6
             _SEALED_FRONT_COVER.hide_render = True
+        # ── LAB-ELECTRONICS SIGNATURE GEOMETRY (Tristan 2026-07-18) ──
+        # The generic sealed shell is a featureless box that fails form_signature_gate
+        # (R1 generic-skeleton) and does not read as any specific product. Give each
+        # sub-type (set from contract signals in _LE_SIGNATURE) its RECOGNISABLE exterior
+        # signature, mounted on the REAL shell face (front y=-D/2, top base_z+H) so it
+        # never floats. Named u_se_le_lead/electrode/grid/vial/… → the exterior view
+        # keep-list shows them and they enter form-meshes.json (re-dumped below).
+        if _IS_INSTRUMENT_DEVICE and _IS_LAB_ELECTRONICS_FORM:
+            _fy = -D / 2                     # product front face (mm, pre-_mm3 frame)
+            _sig_new = []
+            if _LE_SIGNATURE == "potentiostat":
+                # Three colour-coded banana jacks = the WE / RE / CE electrode interface,
+                # the single most recognisable potentiostat feature (IO Rodeostat gold).
+                _lead_cols = (("we", (0.10, 0.55, 0.20)),   # working = green
+                              ("re", (0.86, 0.86, 0.88)),   # reference = white/silver
+                              ("ce", (0.78, 0.12, 0.12)))    # counter = red
+                for _li, (_lbl, _rgb) in enumerate(_lead_cols):
+                    _lx = (_li - 1) * W * 0.20
+                    _lmat = fl.make_mat(f"m_se_le_lead_{_lbl}", fl._to_linear(_rgb),
+                                        metallic=0.15, roughness=0.4)
+                    _jack = fl.add_cyl(
+                        f"u_se_le_lead_{_lbl}",
+                        _mm3((_lx, _fy - tt - 6.0, base_z + H * 0.5)),
+                        4.0 * fl.MM, 14.0 * fl.MM, _lmat,
+                        module=_skin_mod, module_objects=MO,
+                        rotation=(math.radians(90), 0.0, 0.0))
+                    _sig_new.append(_jack)
+                # USB / host port on the front face beside the electrode row.
+                _umat = fl.make_mat("m_se_le_face_usb", fl._to_linear((0.10, 0.10, 0.12)),
+                                    metallic=0.4, roughness=0.4)
+                _uport = fl.add_box(
+                    "u_se_le_face_usb",
+                    _mm3((W * 0.34, _fy - tt - 2.0, base_z + H * 0.5)),
+                    _mm3((12.0, 8.0, 6.0)), _umat,
+                    module=_skin_mod, module_objects=MO)
+                _uport.dimensions = _mm3((12.0, 8.0, 6.0))
+                _sig_new.append(_uport)
+            # Re-dump form-meshes.json to include the signature parts (the interior
+            # builder dumped earlier, before these existed) so form_signature_gate sees them.
+            try:
+                _out = os.environ.get("BLENDER_OUT_DIR") or ""
+                if _out and _sig_new:
+                    _names = sorted(o.name for o in bpy.data.objects
+                                    if getattr(o, "type", None) == "MESH"
+                                    and o.name.startswith(("u_se_le_", "u_se_product_")))
+                    Path(_out).joinpath("form-meshes.json").write_text(json.dumps(
+                        {"form": "lab_electronics", "form_id": "lab_electronics",
+                         "le_signature": _LE_SIGNATURE, "meshes": _names}, indent=2))
+                    print(f"[univ][sealed] LAB_ELECTRONICS signature={_LE_SIGNATURE}: "
+                          f"placed {len(_sig_new)} exterior signature part(s)")
+            except Exception as _sigexc:
+                print(f"[univ][sealed] signature form-meshes re-dump skipped: {_sigexc}")
         if _IS_INSTRUMENT_DEVICE and _IS_THERMOCYCLER_FORM:
             # INTENT (2026-07-15 NinjaPCR SIGHT): exterior must read as a laser-cut
             # wood plate box with lid + star knob — NOT the optical handheld tower
