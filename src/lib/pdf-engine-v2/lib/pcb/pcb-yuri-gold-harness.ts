@@ -1,21 +1,26 @@
 import {
   existsSync,
   mkdtempSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs'
 import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 import { generateAtopileProject } from './atopile-generator'
 import { derivePcbArchitecture } from './pcb-architecture'
+import { runPcbPipeline } from './pcb-pipeline'
 
 import type {
   PcbArchitecturePlan,
   PcbBoardPlan,
   PcbSystemDisposition,
 } from './pcb-architecture'
+import type { ResolutionTier } from './atopile-generator'
+import type { PcbPipelineOptions, PcbPipelineResult } from './pcb-pipeline'
 
 interface ExpectedChannelRequirement {
   role: string
@@ -82,6 +87,64 @@ export interface YuriGoldVerificationReport {
 export interface VerifyYuriGoldStatesOptions {
   fixturePath: string
   sourceOutRoot: string
+}
+
+export interface VerifyYuriGoldPipelinesOptions extends VerifyYuriGoldStatesOptions {
+  outputRoot?: string
+  pipelineOptions?: PcbPipelineOptions
+  runPipeline?: (
+    atoProjectDir: string,
+    runDir: string,
+    options?: PcbPipelineOptions,
+  ) => PcbPipelineResult
+}
+
+export interface YuriPipelineBoardResult {
+  boardId: string
+  role: string
+  requiredWordCount: number
+  requiredFunctionCount: number
+  generatedComponentCount: number
+  unresolvedComponentCount: number
+  offBoardComponentCount: number
+  unverifiedMpnCount: number
+  resolutionTierCounts: Partial<Record<ResolutionTier, number>>
+  engineeringFindings: string[]
+  projectDir: string
+  runDir: string
+  pipelineOk: boolean
+  stageReached: string
+  routed: boolean
+  drcRan: boolean
+  drcViolations: number | null
+  unroutedAfterFreerouting: number | null
+  boardSizeMm: { w: number; h: number } | null
+  pipelineComponentCount: number | null
+  netCount: number | null
+  errors: string[]
+}
+
+export interface YuriPipelineProductResult {
+  product: string
+  statePath: string
+  disposition: PcbSystemDisposition
+  requiredBoardCount: number
+  unassignedWordIds: string[]
+  architectureFailureCodes: YuriGoldFailureCode[]
+  architectureFailureDetails: string[]
+  boards: YuriPipelineBoardResult[]
+}
+
+export interface YuriPipelineVerificationReport {
+  schema: 'pcb-yuri-pipeline-verification/v1'
+  outputRoot: string
+  products: YuriPipelineProductResult[]
+  summary: {
+    products: number
+    requiredBoards: number
+    pipelineOkBoards: number
+    failedBoards: number
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -353,4 +416,172 @@ export function verifyYuriGoldStates(
     schema: 'pcb-yuri-gold-verification/v1',
     products,
   }
+}
+
+function safePathSegment(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function pipelineBoardResult(
+  boardPlan: PcbBoardPlan,
+  projectDir: string,
+  runDir: string,
+  generated: ReturnType<typeof generateAtopileProject>,
+  pipeline: PcbPipelineResult,
+): YuriPipelineBoardResult {
+  const unverifiedMpnCount = generated.components.filter(
+    (component) => !component.mpnVerified,
+  ).length
+  const resolutionTierCounts = generated.components.reduce<
+    Partial<Record<ResolutionTier, number>>
+  >((counts, component) => {
+    counts[component.resolutionTier] = (counts[component.resolutionTier] ?? 0) + 1
+    return counts
+  }, {})
+  const engineeringFindings: string[] = []
+  if (unverifiedMpnCount > 0) {
+    engineeringFindings.push(
+      `${unverifiedMpnCount} generated component(s) lack verified MPN identity`,
+    )
+  }
+  if (generated.unresolved.length > 0) {
+    engineeringFindings.push(
+      `${generated.unresolved.length} required component role(s) remain unresolved`,
+    )
+  }
+  if (!pipeline.ok) {
+    engineeringFindings.push(`pipeline failed at ${pipeline.stageReached}`)
+  }
+  return {
+    boardId: boardPlan.boardId,
+    role: boardPlan.role,
+    requiredWordCount: boardPlan.requiredWordIds.length,
+    requiredFunctionCount: boardPlan.channelRequirements.reduce(
+      (total, requirement) => total + requirement.count,
+      0,
+    ),
+    generatedComponentCount: generated.components.length,
+    unresolvedComponentCount: generated.unresolved.length,
+    offBoardComponentCount: generated.offBoard.length,
+    unverifiedMpnCount,
+    resolutionTierCounts,
+    engineeringFindings,
+    projectDir,
+    runDir,
+    pipelineOk: pipeline.ok,
+    stageReached: pipeline.stageReached,
+    routed: pipeline.routed,
+    drcRan: pipeline.drc.ran,
+    drcViolations: pipeline.drc.violations,
+    unroutedAfterFreerouting: pipeline.unroutedAfterFreerouting ?? null,
+    boardSizeMm: pipeline.boardSizeMm ?? null,
+    pipelineComponentCount: pipeline.components ?? null,
+    netCount: pipeline.nets ?? null,
+    errors: pipeline.errors,
+  }
+}
+
+/**
+ * @description Runs the existing Atopile-to-fabrication pipeline independently
+ * for every board required by each of the seven accepted Yuri architecture
+ * plans. All generated projects and pipeline artifacts remain under one
+ * isolated `/tmp` root for direct inspection.
+ * @param options - Accepted-state fixture paths, optional `/tmp` output root,
+ * pipeline options, and an injectable runner used by unit tests.
+ * @returns A per-product/per-board matrix of architecture scope, generator
+ * scope, routing, DRC, dimensions, counts, and honest failure details.
+ * @throws When fixture/state input is malformed or outputRoot is outside `/tmp`.
+ */
+export function verifyYuriGoldPipelines(
+  options: VerifyYuriGoldPipelinesOptions,
+): YuriPipelineVerificationReport {
+  const outputRoot = options.outputRoot ?? mkdtempSync('/tmp/pcb-yuri-pipeline-')
+  if (outputRoot !== '/tmp' && !outputRoot.startsWith('/tmp/')) {
+    throw new Error(`[PcbYuriGoldHarness] Pipeline output must be isolated under /tmp: ${outputRoot}`)
+  }
+  mkdirSync(outputRoot, { recursive: true })
+
+  const expectations = readExpectations(options.fixturePath)
+  const pipelineRunner = options.runPipeline ?? runPcbPipeline
+  const products = expectations.map((expectation): YuriPipelineProductResult => {
+    const statePath = join(options.sourceOutRoot, expectation.runDirectory, 'state.json')
+    const state = readState(statePath)
+    const plan = derivePcbArchitecture(state)
+    const architectureCodes = new Set<YuriGoldFailureCode>()
+    const architectureDetails: string[] = []
+    comparePlanToGold(
+      expectation,
+      plan,
+      architectureCodes,
+      architectureDetails,
+    )
+
+    const boards = plan.boards
+      .filter((boardPlan) => boardPlan.requiresKiCadDeliverable)
+      .map((boardPlan): YuriPipelineBoardResult => {
+        const boardRoot = join(
+          outputRoot,
+          safePathSegment(expectation.product),
+          safePathSegment(boardPlan.boardId),
+        )
+        const projectDir = join(boardRoot, 'atopile-project')
+        const runDir = join(boardRoot, 'pipeline-run')
+        mkdirSync(projectDir, { recursive: true })
+        mkdirSync(runDir, { recursive: true })
+        const generated = generateAtopileProject(state, projectDir, {
+          requiredWordIds: boardPlan.requiredWordIds,
+          requiredFunctionRoles: boardPlan.channelRequirements.map(
+            (requirement) => requirement.role,
+          ),
+          boardShape: boardPlan.shape,
+        })
+        const pipeline = pipelineRunner(projectDir, runDir, options.pipelineOptions)
+        return pipelineBoardResult(boardPlan, projectDir, runDir, generated, pipeline)
+      })
+
+    return {
+      product: expectation.product,
+      statePath,
+      disposition: plan.systemDisposition,
+      requiredBoardCount: plan.boards.filter((board) => board.requiresKiCadDeliverable).length,
+      unassignedWordIds: plan.unassignedWordIds,
+      architectureFailureCodes: [...architectureCodes],
+      architectureFailureDetails: architectureDetails,
+      boards,
+    }
+  })
+  const boardResults = products.flatMap((product) => product.boards)
+  const report: YuriPipelineVerificationReport = {
+    schema: 'pcb-yuri-pipeline-verification/v1',
+    outputRoot,
+    products,
+    summary: {
+      products: products.length,
+      requiredBoards: boardResults.length,
+      pipelineOkBoards: boardResults.filter((board) => board.pipelineOk).length,
+      failedBoards: boardResults.filter((board) => !board.pipelineOk).length,
+    },
+  }
+  writeFileSync(
+    join(outputRoot, 'verification-report.json'),
+    `${JSON.stringify(report, null, 2)}\n`,
+  )
+  return report
+}
+
+if (require.main === module) {
+  const [, , fixturePath, sourceOutRoot, requestedOutputRoot] = process.argv
+  if (!fixturePath || !sourceOutRoot) {
+    console.error(
+      'usage: pcb-yuri-gold-harness.ts <gold-expectations.json> <accepted-out-root> [/tmp/output-root]',
+    )
+    process.exit(1)
+  }
+  const report = verifyYuriGoldPipelines({
+    fixturePath,
+    sourceOutRoot,
+    outputRoot: requestedOutputRoot,
+  })
+  console.log(JSON.stringify(report, null, 2))
+  process.exit(report.summary.failedBoards === 0 ? 0 : 1)
 }
