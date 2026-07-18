@@ -82,4 +82,15 @@ describe('derivePcbArchitecture', () => {
     const plan = derivePcbArchitecture(stateWithQuantities({ channel_count: 4 }))
     expect(plan.boards[0].channelRequirements).toEqual([{ role: 'motion_channel', count: 4 }])
   })
+
+  it('derives board shape and work from function rather than a generic square', () => {
+    const optical = derivePcbArchitecture(stateWithQuantities({ optical_path_length_mm: 10 })).boards[0]
+    expect(optical.workPerformed).toContain('drive_optical_source')
+    expect(optical.shape.shapeFamily).toBe('optical_registration_plate')
+    expect(optical.shape.mountingHoles).toBe(4)
+
+    const ewod = derivePcbArchitecture(stateWithQuantities({ electrode_count: 64 }))
+    expect(ewod.boards.find((item) => item.role === 'electrode_cartridge')?.shape.shapeFamily).toBe('electrode_cartridge')
+    expect(ewod.boards.find((item) => item.role === 'high_voltage_controller')?.workPerformed).toContain('isolate_high_voltage')
+  })
 })

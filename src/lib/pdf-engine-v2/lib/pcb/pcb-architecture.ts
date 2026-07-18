@@ -21,6 +21,13 @@ export interface PcbBoardPlan {
   requiredWordIds: string[]
   domains: Array<'logic' | 'analog' | 'power' | 'high_voltage' | 'wet_interface' | 'thermal_actuation' | 'motion_actuation'>
   channelRequirements: Array<{ role: string; count: number }>
+  workPerformed: string[]
+  shape: {
+    shapeFamily: string
+    outlineBasis: string
+    mountingHoles: number
+    rationale: string
+  }
   requiresKiCadDeliverable: boolean
 }
 
@@ -62,7 +69,24 @@ function wordBlob(state: Record<string, unknown>): string {
 }
 
 function board(boardId: string, role: string, domains: PcbBoardPlan['domains']): PcbBoardPlan {
-  return { boardId, role, requiredWordIds: [], domains, channelRequirements: [], requiresKiCadDeliverable: true }
+  const phenotype: Record<string, { work: string[]; shape: string; basis: string; holes: number }> = {
+    optical_source_daughterboard: { work: ['drive_optical_source', 'mate_source_harness'], shape: 'optical_registration_plate', basis: 'optical_axis_and_cube_face', holes: 4 },
+    thermal_power_controller: { work: ['sense_sample_temperature', 'drive_heater_peltier_fan', 'enforce_thermal_cutoff'], shape: 'thermal_power_base', basis: 'thermal_connectors_and_heatsink', holes: 4 },
+    motion_driver_board: { work: ['drive_repeated_motion_channels', 'sense_channel_current'], shape: 'linear_channel_spine', basis: 'channel_count_and_connector_pitch', holes: 4 },
+    analog_front_end_shield: { work: ['drive_cell_voltage', 'measure_cell_current', 'switch_measurement_range'], shape: 'precision_analog_shield', basis: 'host_header_and_guarded_input_edge', holes: 4 },
+    wet_lab_hat: { work: ['interface_host_compute', 'isolate_wet_peripherals'], shape: 'wet_lab_hat', basis: 'host_header_standard', holes: 4 },
+    od_optics_board: { work: ['drive_od_source', 'measure_od_detector'], shape: 'optical_registration_plate', basis: 'vial_optical_axis', holes: 2 },
+    heater_stir_actuation_board: { work: ['drive_heater_stir_pumps', 'sense_wet_actuation_faults'], shape: 'wet_actuation_base', basis: 'wet_connector_edge_and_power_dissipation', holes: 4 },
+    high_voltage_controller: { work: ['generate_high_voltage', 'isolate_high_voltage', 'switch_electrode_channels'], shape: 'high_voltage_controller', basis: 'hv_lv_boundary_and_creepage', holes: 4 },
+    electrode_cartridge: { work: ['present_electrode_array', 'route_droplet_channels'], shape: 'electrode_cartridge', basis: 'electrode_pitch_and_cartridge_connector', holes: 2 },
+  }
+  const p = phenotype[role] ?? { work: ['implement_board_functions'], shape: 'generic_rectangular', basis: 'component_and_connector_envelope', holes: 4 }
+  return {
+    boardId, role, requiredWordIds: [], domains, channelRequirements: [],
+    workPerformed: p.work,
+    shape: { shapeFamily: p.shape, outlineBasis: p.basis, mountingHoles: p.holes, rationale: `form_follows_${role}` },
+    requiresKiCadDeliverable: true,
+  }
 }
 
 function assignmentBoard(wordText: string, boards: PcbBoardPlan[]): PcbBoardPlan | undefined {
