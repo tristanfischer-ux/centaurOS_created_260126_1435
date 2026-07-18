@@ -71,6 +71,21 @@ CLASS_SIGNATURE_PATTERNS: dict[str, str] = {
     "optical_handheld": r"cuvette|sample_cell",
 }
 
+# R4 FOREIGN_SAMPLE_INTERFACE — the "colorimeter deck applied to everything" bug (Cursor
+# 2026-07-18). A NON-optical instrument must not wear an optical-bench sample interface
+# (cuvette / optical cube / beam / the instrument_story optical cutaway). Classes whose
+# sample interface is genuinely optical are exempt.
+_OPTICAL_STORY_RE = re.compile(r"instrument_story|cuvette|optical_cube|_beam(_|$)|baffle|led_source")
+_OPTICAL_CLASSES = {"optical_instrument", "optical_handheld", "colorimeter",
+                    "spectrophotometer", "photometer", "fluorometer", "turbidity_meter",
+                    "lab_microscope"}  # microscope legitimately has an optical path
+
+# R5 WRONG_TRANSPORT_PHYSICS — a digital-microfluidics / EWOD device actuates droplets
+# ELECTRICALLY on a plane; continuous-flow plant morphology (manifold / valve / pipe /
+# pump-head) is the wrong physics leaking in (Cursor: OpenDrop "Distribution Manifold").
+_FLOW_PLANT_RE = re.compile(r"manifold|(^|_)valve(_|$)|(^|_)pipe(_|$)|pump_head|impeller|nozzle|flow_control")
+_EWOD_CLASSES = {"digital_microfluidics", "opendrop", "electrowetting", "ewod"}
+
 _STORY_RE = re.compile(r"_story(_|$)")
 _INDEX_SUFFIX_RE = re.compile(r"_\d+$")
 
@@ -155,6 +170,40 @@ def evaluate_form_signature(meshes: list[str], product_class: str | None) -> dic
                        f"geometry (mesh name matching /{pat}/)",
             })
 
+    cls = (product_class or "").strip().lower()
+
+    # R4 — foreign (optical) sample interface on a non-optical instrument.
+    if cls and cls not in _OPTICAL_CLASSES:
+        offby = [m for m in meshes if _OPTICAL_STORY_RE.search(m)]
+        if offby:
+            findings.append({
+                "code": "FOREIGN_SAMPLE_INTERFACE",
+                "severity": "high",
+                "message": (
+                    f"non-optical class {product_class!r} wears an OPTICAL sample interface "
+                    f"({offby[:3]}) — the colorimeter optical-bench deck leaked onto a device "
+                    f"whose sample interface is not optical"
+                ),
+                "fix": "build_universal_scene.py: give this class its OWN sample interface "
+                       "(electrodes / vial / cartridge), never the optical cuvette story",
+            })
+
+    # R5 — continuous-flow transport morphology on an electrical droplet device.
+    if cls in _EWOD_CLASSES:
+        flow = [m for m in meshes if _FLOW_PLANT_RE.search(m)]
+        if flow:
+            findings.append({
+                "code": "WRONG_TRANSPORT_PHYSICS",
+                "severity": "high",
+                "message": (
+                    f"EWOD/digital-microfluidics class {product_class!r} has continuous-flow "
+                    f"plant geometry ({flow[:3]}) — droplets are actuated ELECTRICALLY on a "
+                    f"plane; manifolds/valves/pipes are the wrong transport physics"
+                ),
+                "fix": "build_universal_scene.py: remove flow/manifold/valve morphology; "
+                       "model the planar electrode grid + cartridge instead",
+            })
+
     return {
         "schema": "form-signature-gate/v1",
         "product_class": product_class,
@@ -229,6 +278,30 @@ def _selftest() -> int:
         else:
             tag = "PASS" if got else "FAIL(caught " + ",".join(codes) + ")"
             print(f"  ok  {name}: {tag}")
+    # R4 proveCatch — a potentiostat wearing the optical cuvette story (colorimeter deck
+    # leak) must fire FOREIGN_SAMPLE_INTERFACE; an actual optical instrument must NOT.
+    r4 = evaluate_form_signature(
+        ["u_se_le_pcb", "u_se_le_bnc", "u_se_instrument_story_cuvette",
+         "u_se_instrument_story_beam"], "potentiostat")
+    if "FOREIGN_SAMPLE_INTERFACE" not in [f["code"] for f in r4["findings"]]:
+        print("  FAIL R4: optical story on a potentiostat must fire FOREIGN_SAMPLE_INTERFACE"); bad += 1
+    r4ok = evaluate_form_signature(
+        ["u_se_instrument_story_cuvette", "u_se_product_body"], "optical_instrument")
+    if "FOREIGN_SAMPLE_INTERFACE" in [f["code"] for f in r4ok["findings"]]:
+        print("  FAIL R4: an optical instrument's cuvette must NOT fire FOREIGN_SAMPLE_INTERFACE"); bad += 1
+    # R5 proveCatch — an EWOD device with a flow manifold must fire WRONG_TRANSPORT_PHYSICS.
+    r5 = evaluate_form_signature(
+        ["u_se_ewod_electrode_grid", "u_se_dmf_cartridge", "u_se_distribution_manifold"],
+        "digital_microfluidics")
+    if "WRONG_TRANSPORT_PHYSICS" not in [f["code"] for f in r5["findings"]]:
+        print("  FAIL R5: a manifold on an EWOD device must fire WRONG_TRANSPORT_PHYSICS"); bad += 1
+    # A clean EWOD device (grid + cartridge, no flow parts) must NOT fire R5 (and passes R3).
+    r5ok = evaluate_form_signature(
+        ["u_se_ewod_electrode_grid", "u_se_dmf_cartridge", "u_se_hv_driver"],
+        "digital_microfluidics")
+    if not r5ok["ok"]:
+        print(f"  FAIL R5: a clean EWOD grid+cartridge must PASS, got {[f['code'] for f in r5ok['findings']]}"); bad += 1
+
     # A generic-skeleton design must NEVER be rescued by a class with no R3 pattern.
     res = evaluate_form_signature(["u_se_le_pcb", "u_se_le_cell"], "some_new_gadget")
     if res["ok"]:
