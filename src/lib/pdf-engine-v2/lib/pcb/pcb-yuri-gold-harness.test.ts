@@ -147,9 +147,20 @@ describe('Yuri PCB gold architecture harness', () => {
         unroutedAfterFreerouting: 0,
         boardSizeMm: { w: 41, h: 31 },
         pipelineComponentCount: 11,
+        verifiedIdentityCount: 0,
+        unresolvedIdentityCount: 8,
         unverifiedMpnCount: 8,
         resolutionTierCounts: { package_family: 8 },
-        engineeringFindings: ['8 generated component(s) lack verified MPN identity'],
+        identitySources: [],
+        identityBlockers: expect.arrayContaining([
+          expect.objectContaining({
+            wordId: expect.any(String),
+            reason: expect.stringContaining('curated role-compatible candidate'),
+          }),
+        ]),
+        engineeringFindings: [
+          '8 generated component(s) lack verified MPN/symbol/pinout identity',
+        ],
         errors: [],
       })
       expect(boards[1]).toMatchObject({

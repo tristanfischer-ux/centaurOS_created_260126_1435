@@ -107,8 +107,16 @@ export interface YuriPipelineBoardResult {
   generatedComponentCount: number
   unresolvedComponentCount: number
   offBoardComponentCount: number
+  verifiedIdentityCount: number
+  unresolvedIdentityCount: number
   unverifiedMpnCount: number
   resolutionTierCounts: Partial<Record<ResolutionTier, number>>
+  identitySources: string[]
+  identityBlockers: Array<{
+    wordId: string
+    characterId: string
+    reason: string
+  }>
   engineeringFindings: string[]
   projectDir: string
   runDir: string
@@ -429,6 +437,10 @@ function pipelineBoardResult(
   generated: ReturnType<typeof generateAtopileProject>,
   pipeline: PcbPipelineResult,
 ): YuriPipelineBoardResult {
+  const verifiedIdentityCount = generated.components.filter(
+    (component) => component.identityVerified,
+  ).length
+  const unresolvedIdentityCount = generated.components.length - verifiedIdentityCount
   const unverifiedMpnCount = generated.components.filter(
     (component) => !component.mpnVerified,
   ).length
@@ -438,10 +450,25 @@ function pipelineBoardResult(
     counts[component.resolutionTier] = (counts[component.resolutionTier] ?? 0) + 1
     return counts
   }, {})
+  const identitySources = [...new Set(
+    generated.components.flatMap((component) =>
+      component.identityVerified && component.identityProvenance
+        ? [component.identityProvenance]
+        : []),
+  )].sort()
+  const identityBlockers = generated.components.flatMap((component) =>
+    component.identityVerified
+      ? []
+      : [{
+        wordId: component.wordId,
+        characterId: component.characterId,
+        reason: component.identityBlocker ??
+          `no verified manufacturer/MPN identity for ${component.characterId}`,
+      }])
   const engineeringFindings: string[] = []
-  if (unverifiedMpnCount > 0) {
+  if (unresolvedIdentityCount > 0) {
     engineeringFindings.push(
-      `${unverifiedMpnCount} generated component(s) lack verified MPN identity`,
+      `${unresolvedIdentityCount} generated component(s) lack verified MPN/symbol/pinout identity`,
     )
   }
   if (generated.unresolved.length > 0) {
@@ -463,8 +490,12 @@ function pipelineBoardResult(
     generatedComponentCount: generated.components.length,
     unresolvedComponentCount: generated.unresolved.length,
     offBoardComponentCount: generated.offBoard.length,
+    verifiedIdentityCount,
+    unresolvedIdentityCount,
     unverifiedMpnCount,
     resolutionTierCounts,
+    identitySources,
+    identityBlockers,
     engineeringFindings,
     projectDir,
     runDir,

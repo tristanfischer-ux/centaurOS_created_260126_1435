@@ -20,10 +20,12 @@
  *   (0) off_board_cots — compact instrument UI/controller and detector-module shapes
  *                        are purchased modules connected by headers/FFC, not board
  *                        footprints. This is a shape rule, not a gold-MPN table.
- *   (a) mpn_package   — real manufacturer + part_number → DB-first verification via
- *                        `lookupCached()` (CHAIN-AS-DB-CONSUMER PRINCIPLE: this file
- *                        never touches a live distributor API), then derive package
- *                        from the distributor description text if present.
+ *   (a) mpn_symbol_footprint — DB-verified manufacturer/MPN + role/rating-compatible
+ *                        curated candidate + exact local KiCad symbol/full pinout +
+ *                        exact footprint with pin/pad parity. This is the only tier
+ *                        that counts as a resolved fabrication identity.
+ *   (a.5) mpn_package_only — DB-verified manufacturer/MPN whose local symbol/pinout
+ *                        mapping is still absent; retained as an explicit draft.
  *   (b) package_family — the word's own `form`/`dimensions` modifier text is
  *                        regex-matched against a PACKAGE_TEXT_RULES table (SMD
  *                        passive sizes, SOT-23-N, SOIC-N, QFN-N, QFP-N, USB-C
@@ -40,9 +42,10 @@
  *
  * ATOPILE 0.2.69 SYNTAX NOTES (verified live 2026-07-12 via real `ato build` runs —
  * see `docs/plans/pcb-capability-integration.md` Phase B study notes):
- *   - `component X:` blocks with `signal <name> ~ pin <N>` declare pins; no real
- *     KiCad symbol is required — atopile auto-generates a generic schematic part
- *     for the netlist, so `footprint` is the only KiCad-library reference needed.
+ *   - `component X:` blocks still emit generic Atopile schematic syntax, but the
+ *     fabrication-verified tier derives those declarations from a real local
+ *     KiCad symbol and exact inherited pin numbers. Synthetic function pins remain
+ *     draft-only evidence and never count as resolved identity.
  *   - `footprint = "<Library>:<FootprintName>"` (the classic KiCad
  *     `LibraryNickname:FootprintName` reference) resolves DIRECTLY against a real
  *     installed KiCad global footprint library — CONFIRMED: `ato build` embeds this
@@ -68,17 +71,23 @@ import { join } from 'path'
 import { collectElectronicWords, type ElectronicWordRef } from './pcb-stage'
 import { lookupCached } from '../distributors/db-only-cascade'
 import {
+  resolveVerifiedComponentIdentity,
+} from './pcb-verified-candidates'
+import {
   createBoardGeometryFromShapeContract,
   createRoundedRectangleContour,
   validateBoardGeometry,
 } from './pcb-outline'
 import type { PcbBoardGeometry } from './pcb-contract'
 import type { PcbBoardShapeContract } from './pcb-architecture'
+import type { PcbPinSpec } from './pcb-component-resolution'
+import type { VerifiedCandidateRequest } from './pcb-verified-candidates'
 
 // ── Real local KiCad footprint library root (the "15,435-footprint library" the
 // task's universal resolution target) — same install `discover-capability.ts` probes. ──
 
 const KICAD_ROOT = '/Applications/KiCad/KiCad.app/Contents'
+const DEFAULT_SYMBOLS_ROOT = join(KICAD_ROOT, 'SharedSupport/symbols')
 const DEFAULT_FOOTPRINTS_ROOT = join(KICAD_ROOT, 'SharedSupport/footprints')
 
 // ── Function classes — GENERIC electronic roles, never a product name ──────────
@@ -554,7 +563,13 @@ function isRealPartNumber(pn: string | undefined): pn is string {
 
 // ── Component + net records ─────────────────────────────────────────────────────
 
-export type ResolutionTier = 'mpn_package' | 'package_family' | 'function_class' | 'unresolved'
+export type ResolutionTier =
+  | 'mpn_symbol_footprint'
+  | 'mpn_package_only'
+  | 'mpn_package'
+  | 'package_family'
+  | 'function_class'
+  | 'unresolved'
 
 export interface AtopileComponentRecord {
   instanceName: string
@@ -567,6 +582,14 @@ export interface AtopileComponentRecord {
   manufacturer: string | null
   partNumber: string | null
   mpnVerified: boolean
+  identityVerified: boolean
+  symbolId: string | null
+  pinSpecs: PcbPinSpec[]
+  pinPadMap: Record<string, string>
+  identityProvenance: string | null
+  roleCompatibility: string | null
+  packageCompatibility: string | null
+  identityBlocker: string | null
   resolutionTier: ResolutionTier
   footprint: ResolvedFootprintRef | null
   designatorPrefix: string
@@ -613,6 +636,7 @@ export interface GenerateAtopileProjectResult {
 
 export interface GenerateAtopileProjectOptions {
   footprintsRoot?: string
+  symbolsRoot?: string
   requiredWordIds?: string[]
   requiredFunctionRoles?: string[]
   boardShape?: PcbBoardShapeContract
@@ -646,6 +670,24 @@ function sanitizePinName(pin: string | null): string | null {
   if (!pin) return null
   const cleaned = pin.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1')
   return cleaned || 'PIN'
+}
+
+function pinIdentifier(pin: PcbPinSpec): string {
+  return `${sanitizePinName(pin.name) ?? 'PIN'}_${sanitizeIdentifier(pin.number)}`
+}
+
+function requiredRatings(word: ElectronicWordRef): VerifiedCandidateRequest['requiredRatings'] {
+  const text = Object.values(word.modifiers).join(' ')
+  const voltageValues = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:v|volt(?:s)?)\b/gi)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite)
+  const currentValues = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:a|amp(?:s|ere|eres)?)\b/gi)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite)
+  return {
+    ...(voltageValues.length > 0 ? { voltageV: Math.max(...voltageValues) } : {}),
+    ...(currentValues.length > 0 ? { currentA: Math.max(...currentValues) } : {}),
+  }
 }
 
 function toTypeName(instanceName: string): string {
@@ -923,6 +965,7 @@ function offBoardCotsReason(
 function resolveComponent(
   word: ElectronicWordRef,
   footprintsRoot: string,
+  symbolsRoot: string,
 ): { component: AtopileComponentRecord } | { unresolved: AtopileUnresolvedRecord } {
   const functionClass = classifyFunction(word.characterId)
   const manufacturer = word.modifiers.manufacturer?.trim() || null
@@ -936,6 +979,16 @@ function resolveComponent(
   let footprint: ResolvedFootprintRef | null = null
   let tier: ResolutionTier = 'unresolved'
   let mpnVerified = false
+  let identityVerified = false
+  let symbolId: string | null = null
+  let pinSpecs: PcbPinSpec[] = []
+  let pinPadMap: Record<string, string> = {}
+  let identityProvenance: string | null = null
+  let roleCompatibility: string | null = null
+  let packageCompatibility: string | null = null
+  let identityBlocker: string | null = null
+  let resolvedManufacturer = manufacturer
+  let resolvedPartNumber = partNumber
 
   // Tier (a): MPN-driven
   if (partNumber) {
@@ -948,6 +1001,39 @@ function resolveComponent(
         tier = 'mpn_package'
       }
     }
+  }
+
+  // Tier (a.5): curated generic candidate, promoted only when its DB identity,
+  // role, ratings, full local symbol pinout and exact local footprint all agree.
+  if (!mpnVerified) {
+    const identity = resolveVerifiedComponentIdentity({
+      wordId: word.wordId,
+      nameHuman: word.nameHuman,
+      characterId: word.characterId,
+      functionClass,
+      requiredRatings: requiredRatings(word),
+    }, lookupCached, { symbolsRoot, footprintsRoot })
+    if (!('status' in identity)) {
+      footprint = identity.footprint
+      tier = 'mpn_symbol_footprint'
+      mpnVerified = true
+      identityVerified = true
+      symbolId = identity.symbolId
+      pinSpecs = identity.pins
+      pinPadMap = Object.fromEntries(identity.pins.map((pin) => [
+        pinIdentifier(pin),
+        pin.number,
+      ]))
+      identityProvenance = identity.provenance
+      roleCompatibility = identity.roleCompatibility
+      packageCompatibility = identity.packageCompatibility
+      resolvedManufacturer = identity.manufacturer
+      resolvedPartNumber = identity.partNumber
+    } else {
+      identityBlocker = identity.reason
+    }
+  } else {
+    identityBlocker = `DB-verified MPN ${partNumber} has no curated local KiCad symbol/pinout mapping`
   }
 
   // Tier (b): the word's own package/form text
@@ -993,9 +1079,19 @@ function resolveComponent(
   // INTENT: The MPN confidence axis means catalogue-verified identity, not merely
   // a plausible-looking string in an upstream word. Unverified candidates retain
   // their evidence but may only claim package/function-class resolution.
-  if (partNumber && mpnVerified && tier !== 'unresolved') {
-    tier = 'mpn_package'
+  if (partNumber && mpnVerified && !identityVerified && tier !== 'unresolved') {
+    tier = 'mpn_package_only'
   }
+
+  const fallbackPins = fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2']
+  const resolvedPins = identityVerified ? pinSpecs.map(pinIdentifier) : fallbackPins
+  const resolvedPowerPin = identityVerified
+    ? pinSpecs.find((pin) =>
+      pin.kind === 'power_in' && !/(?:gnd|vss)/i.test(pin.name)) ?? null
+    : null
+  const resolvedGroundPin = identityVerified
+    ? pinSpecs.find((pin) => /(?:gnd|vss)/i.test(pin.name)) ?? null
+    : null
 
   return {
     component: {
@@ -1006,15 +1102,29 @@ function resolveComponent(
       nameHuman: word.nameHuman,
       characterId: word.characterId,
       functionClass,
-      manufacturer,
-      partNumber,
+      manufacturer: resolvedManufacturer,
+      partNumber: resolvedPartNumber,
       mpnVerified,
+      identityVerified,
+      symbolId,
+      pinSpecs,
+      pinPadMap,
+      identityProvenance: identityProvenance ?? (
+        partNumber && mpnVerified ? `forge-truth:cached upstream MPN ${partNumber}` : null
+      ),
+      roleCompatibility,
+      packageCompatibility,
+      identityBlocker: identityVerified ? null : identityBlocker,
       resolutionTier: tier,
       footprint,
       designatorPrefix: fallback?.designatorPrefix ?? 'U',
-      pins: fallback ? fallback.pins.map((pin) => sanitizePinName(pin)!) : ['P1', 'P2'],
-      powerPin: sanitizePinName(fallback?.powerPin ?? null),
-      groundPin: sanitizePinName(fallback?.groundPin ?? null),
+      pins: resolvedPins,
+      powerPin: identityVerified
+        ? (resolvedPowerPin ? pinIdentifier(resolvedPowerPin) : null)
+        : sanitizePinName(fallback?.powerPin ?? null),
+      groundPin: identityVerified
+        ? (resolvedGroundPin ? pinIdentifier(resolvedGroundPin) : null)
+        : sanitizePinName(fallback?.groundPin ?? null),
       decouple: fallback?.decouple ?? false,
       quantityInDesign: word.quantity,
     },
@@ -1054,6 +1164,7 @@ function buildNets(
   components: AtopileComponentRecord[],
   topology: TopologyEdge[],
   footprintsRoot: string,
+  symbolsRoot: string,
 ): { nets: AtopileNetRecord[]; decouplingCaps: AtopileComponentRecord[] } {
   const nets = new Map<string, AtopileNetRecord>()
   const ensureNet = (name: string, kind: AtopileNetRecord['kind']): AtopileNetRecord => {
@@ -1126,29 +1237,50 @@ function buildNets(
     if (!component.decouple || !component.powerPin || !component.groundPin) continue
     const capFootprint = resolveFootprintByGlob(footprintsRoot, 'Capacitor_SMD', /^C_0603_1608Metric\.kicad_mod$/)
     if (!capFootprint) continue
+    const capWordId = `${component.wordId}__decouple`
+    const verifiedCap = resolveVerifiedComponentIdentity({
+      wordId: capWordId,
+      nameHuman: `Decoupling capacitor (${component.nameHuman})`,
+      characterId: 'decoupling_capacitor',
+      functionClass: 'passive_c',
+      requiredRatings: {},
+    }, lookupCached, { symbolsRoot, footprintsRoot })
+    const hasVerifiedCap = !('status' in verifiedCap)
+    const capPinSpecs = hasVerifiedCap ? verifiedCap.pins : []
+    const capPins = hasVerifiedCap ? capPinSpecs.map(pinIdentifier) : ['P1', 'P2']
     const cap: AtopileComponentRecord = {
       instanceName: `decouple_${component.instanceName}`,
-      wordId: `${component.wordId}__decouple`,
+      wordId: capWordId,
       moduleId: component.moduleId,
       subModuleId: component.subModuleId,
       nameHuman: `Decoupling capacitor (${component.nameHuman})`,
       characterId: 'decoupling_capacitor',
       functionClass: 'passive_c',
-      manufacturer: null,
-      partNumber: null,
-      mpnVerified: false,
-      resolutionTier: 'package_family',
+      manufacturer: hasVerifiedCap ? verifiedCap.manufacturer : null,
+      partNumber: hasVerifiedCap ? verifiedCap.partNumber : null,
+      mpnVerified: hasVerifiedCap,
+      identityVerified: hasVerifiedCap,
+      symbolId: hasVerifiedCap ? verifiedCap.symbolId : null,
+      pinSpecs: capPinSpecs,
+      pinPadMap: hasVerifiedCap
+        ? Object.fromEntries(capPinSpecs.map((pin) => [pinIdentifier(pin), pin.number]))
+        : {},
+      identityProvenance: hasVerifiedCap ? verifiedCap.provenance : null,
+      roleCompatibility: hasVerifiedCap ? verifiedCap.roleCompatibility : null,
+      packageCompatibility: hasVerifiedCap ? verifiedCap.packageCompatibility : null,
+      identityBlocker: hasVerifiedCap ? null : verifiedCap.reason,
+      resolutionTier: hasVerifiedCap ? 'mpn_symbol_footprint' : 'package_family',
       footprint: capFootprint,
       designatorPrefix: 'C',
-      pins: ['P1', 'P2'],
-      powerPin: 'P1',
-      groundPin: 'P2',
+      pins: capPins,
+      powerPin: capPins[0],
+      groundPin: capPins[1],
       decouple: false,
       quantityInDesign: 1,
     }
     decouplingCaps.push(cap)
-    addMember(vcc, cap.instanceName, 'P1')
-    addMember(gnd, cap.instanceName, 'P2')
+    addMember(vcc, cap.instanceName, capPins[0])
+    addMember(gnd, cap.instanceName, capPins[1])
   }
 
   return { nets: [...nets.values()], decouplingCaps }
@@ -1226,7 +1358,8 @@ function emitComponentBlock(component: AtopileComponentRecord): string {
     : `TBD (detailed design) - ${component.functionClass ?? 'part'}`
   lines.push(`    mpn = "${mpnComment.replace(/"/g, "'")}"`)
   component.pins.forEach((pin, index) => {
-    lines.push(`    signal ${pin} ~ pin ${index + 1}`)
+    const padNumber = component.pinPadMap[pin] ?? String(index + 1)
+    lines.push(`    signal ${pin} ~ pin ${padNumber}`)
   })
   return lines.join('\n')
 }
@@ -1270,6 +1403,7 @@ export function generateAtopileProject(
   opts: GenerateAtopileProjectOptions = {},
 ): GenerateAtopileProjectResult {
   const footprintsRoot = opts.footprintsRoot ?? DEFAULT_FOOTPRINTS_ROOT
+  const symbolsRoot = opts.symbolsRoot ?? DEFAULT_SYMBOLS_ROOT
   footprintDirCache.clear()
 
   const allElectronicWords = collectElectronicWords(state)
@@ -1305,7 +1439,7 @@ export function generateAtopileProject(
       })
       continue
     }
-    const result = resolveComponent(word, footprintsRoot)
+    const result = resolveComponent(word, footprintsRoot, symbolsRoot)
     if ('component' in result) components.push(result.component)
     else unresolved.push(result.unresolved)
   }
@@ -1313,7 +1447,12 @@ export function generateAtopileProject(
   const topology = (
     (state.orchestratorContract as { topology?: TopologyEdge[] } | undefined)?.topology ?? []
   )
-  const { nets, decouplingCaps } = buildNets(components, topology, footprintsRoot)
+  const { nets, decouplingCaps } = buildNets(
+    components,
+    topology,
+    footprintsRoot,
+    symbolsRoot,
+  )
   const allComponents = [...components, ...decouplingCaps]
 
   // DECISION (NinjaPCR 2026-07-15): compact instrument boards use the [25,40] mm
