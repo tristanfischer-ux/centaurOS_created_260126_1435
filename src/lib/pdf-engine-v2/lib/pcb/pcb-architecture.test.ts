@@ -53,4 +53,33 @@ describe('derivePcbArchitecture', () => {
     expect(plan.systemDisposition).toBe('unresolved')
     expect(plan.requiresAnyKiCadDeliverable).toBe(false)
   })
+
+  it('assigns multi-board wet-lab roles to the correct boards', () => {
+    const state = stateWithQuantities({ working_volume_ml: 20 })
+    state.moduleDecomposition = {
+      modules: [{
+        module: 'control',
+        sub_modules: [{
+          id: 'electronics',
+          words: [
+            { id: 'host_mcu', name_human: 'Microcontroller HAT', content_character: { character_id: 'microcontroller_mcu' }, modifier_characters: [] },
+            { id: 'od_adc', name_human: 'Optical density ADC sensor', content_character: { character_id: 'adc_input_stage' }, modifier_characters: [] },
+            { id: 'heater_driver', name_human: 'Heater motor driver pump', content_character: { character_id: 'motor_driver' }, modifier_characters: [] },
+          ],
+        }],
+      }],
+    }
+    const plan = derivePcbArchitecture(state)
+    expect(plan.assignments.map((item) => [item.wordId, item.boardId])).toEqual([
+      ['host_mcu', 'wet_lab_hat'],
+      ['od_adc', 'od_optics'],
+      ['heater_driver', 'wet_actuation'],
+    ])
+    expect(plan.unassignedWordIds).toEqual([])
+  })
+
+  it('records required repeated channel capacity on board plans', () => {
+    const plan = derivePcbArchitecture(stateWithQuantities({ channel_count: 4 }))
+    expect(plan.boards[0].channelRequirements).toEqual([{ role: 'motion_channel', count: 4 }])
+  })
 })

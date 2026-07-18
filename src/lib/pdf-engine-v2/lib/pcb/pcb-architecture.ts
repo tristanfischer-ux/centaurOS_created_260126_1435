@@ -20,6 +20,7 @@ export interface PcbBoardPlan {
   role: string
   requiredWordIds: string[]
   domains: Array<'logic' | 'analog' | 'power' | 'high_voltage' | 'wet_interface' | 'thermal_actuation' | 'motion_actuation'>
+  channelRequirements: Array<{ role: string; count: number }>
   requiresKiCadDeliverable: boolean
 }
 
@@ -61,7 +62,20 @@ function wordBlob(state: Record<string, unknown>): string {
 }
 
 function board(boardId: string, role: string, domains: PcbBoardPlan['domains']): PcbBoardPlan {
-  return { boardId, role, requiredWordIds: [], domains, requiresKiCadDeliverable: true }
+  return { boardId, role, requiredWordIds: [], domains, channelRequirements: [], requiresKiCadDeliverable: true }
+}
+
+function assignmentBoard(wordText: string, boards: PcbBoardPlan[]): PcbBoardPlan | undefined {
+  if (boards.length <= 1) return boards[0]
+  const text = wordText.toLowerCase()
+  return boards.find((candidate) => {
+    if (candidate.role === 'electrode_cartridge') return /electrode|cartridge|array|reservoir/.test(text)
+    if (candidate.role === 'high_voltage_controller') return /hv|high.?voltage|switch|boost|isolat|controller|microcontroller/.test(text)
+    if (candidate.role === 'od_optics_board') return /optical|density|photodiode|adc|sensor|led/.test(text)
+    if (candidate.role === 'heater_stir_actuation_board') return /heat|stir|motor|pump|driver|peltier|power/.test(text)
+    if (candidate.role === 'wet_lab_hat') return /hat|host|microcontroller|compute|raspberry|interface/.test(text)
+    return false
+  })
 }
 
 /**
@@ -108,6 +122,7 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     } else {
       systemDisposition = 'single_custom'
       boards = [board('motion_controller', 'motion_driver_board', ['logic', 'power', 'motion_actuation'])]
+      boards[0].channelRequirements.push({ role: 'motion_channel', count: Math.max(1, Math.floor(quantity(state, 'channel_count') ?? 1)) })
       rationale.push('motion_channels_require_integrated_driver_board')
     }
   } else if ((quantity(state, 'stage_axis_count') ?? 0) >= 2) {
@@ -124,14 +139,17 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
   }
 
   const words = collectElectronicWords(state)
-  const defaultBoard = boards[0]
   const assignments: PcbWordAssignment[] = words.map((word) => {
     if (systemDisposition === 'cots_only') {
       return { wordId: word.wordId, placement: 'off_board_module', reasons: ['cots_only_system'] }
     }
-    if (defaultBoard) {
-      defaultBoard.requiredWordIds.push(word.wordId)
-      return { wordId: word.wordId, placement: 'on_board', boardId: defaultBoard.boardId, reasons: ['shadow_default_board_assignment'] }
+    const selectedBoard = assignmentBoard(
+      `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`,
+      boards,
+    )
+    if (selectedBoard) {
+      selectedBoard.requiredWordIds.push(word.wordId)
+      return { wordId: word.wordId, placement: 'on_board', boardId: selectedBoard.boardId, reasons: ['function_role_board_assignment'] }
     }
     return { wordId: word.wordId, placement: 'unassigned', reasons: ['no_board_plan'] }
   })
