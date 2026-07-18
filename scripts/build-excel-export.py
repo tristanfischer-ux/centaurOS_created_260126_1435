@@ -1489,10 +1489,29 @@ def _write_defect_join_cell(ws: Worksheet, row: int, col: int, items: List[str])
     return ws.cell(row, col, "=" + '&"; "&'.join(parts))
 
 
+def _cf_range_is_empty(rng: str) -> bool:
+    """True when a cell-range string is BACKWARDS/empty (end row < start row) — e.g.
+    'O10:O9', produced when a section header renders at row1 but ZERO data rows follow
+    (r stays == row1, so 'O{row1}:O{r-1}' inverts). openpyxl's conditional-formatting /
+    merge machinery raises 'N must be greater than M' → 'expected MultiCellRange' on such
+    a range, which the add_tab guard swallows as a whole-tab SKIP (the Engineering Analysis
+    tab vanished on the OpenDrop instrument, whose EA sections can be empty). Universal:
+    any tab that builds a verdict range over a possibly-empty section is protected."""
+    import re as _re
+    m = _re.match(r"^\$?[A-Z]+\$?(\d+)(?::\$?[A-Z]+\$?(\d+))?$", rng.strip())
+    if not m:
+        return False                       # unrecognised shape — let openpyxl judge it
+    r1 = int(m.group(1))
+    r2 = int(m.group(2)) if m.group(2) else r1
+    return r2 < r1
+
+
 def _cf_verdict(ws: Worksheet, rng: str) -> None:
     """Conditional formatting for a live verdict column: green on PASS, red on FAIL —
     so a formula that FLIPS on recalc recolours itself (the static build-time fill only
     reflects the build-time evaluation)."""
+    if _cf_range_is_empty(rng):
+        return                             # empty section — nothing to colour, skip cleanly
     from openpyxl.formatting.rule import CellIsRule
     ws.conditional_formatting.add(rng, CellIsRule(
         operator="beginsWith", formula=['"FAIL"'], fill=FILL_FAIL, font=FONT_FAIL))
@@ -26102,6 +26121,14 @@ def _selftest() -> int:
     """Pure guards for the compliance MATCHER + direction + class display — the false-PASS class of
     bug (2026-06-25). Exits non-zero on any failure; wired into verify-engine-guards.sh."""
     bad = 0
+    # ═══ proveCatch _cf_range_is_empty (OpenDrop 2026-07-18): a backwards/empty verdict
+    # range (O10:O9, an empty EA section) must be recognised so _cf_verdict skips it instead
+    # of raising 'expected MultiCellRange' → whole-tab SKIP. Valid ranges + single cells
+    # must NOT be flagged empty. ═══
+    for _rng, _want in [("O10:O9", True), ("$O$10:$O$9", True), ("O10:O25", False),
+                        ("O10", False), ("AA5:AA5", False), ("B2:B1", True)]:
+        if _cf_range_is_empty(_rng) != _want:
+            print(f"  FAIL _cf_range_is_empty({_rng!r}) = {_cf_range_is_empty(_rng)} (want {_want})"); bad += 1
     # ═══ proveCatch Verification spine (Tristan 2026-07-14) — silent HARD omission and
     # green-over-HARD-hold must both block SHIPS; vacuous spine must not stamp. ═══
     try:
