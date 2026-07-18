@@ -1226,12 +1226,16 @@ function emitModule(components: AtopileComponentRecord[], nets: AtopileNetRecord
 export function generateAtopileProject(
   state: Record<string, unknown>,
   outDir: string,
-  opts: { footprintsRoot?: string } = {},
+  opts: { footprintsRoot?: string; requiredWordIds?: string[] } = {},
 ): GenerateAtopileProjectResult {
   const footprintsRoot = opts.footprintsRoot ?? DEFAULT_FOOTPRINTS_ROOT
   footprintDirCache.clear()
 
-  const electronicWords = collectElectronicWords(state)
+  const allElectronicWords = collectElectronicWords(state)
+  const requiredWordIds = opts.requiredWordIds ? new Set(opts.requiredWordIds) : null
+  const electronicWords = requiredWordIds
+    ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
+    : allElectronicWords
 
   const components: AtopileComponentRecord[] = []
   const offBoard: AtopileOffBoardCotsRecord[] = []
