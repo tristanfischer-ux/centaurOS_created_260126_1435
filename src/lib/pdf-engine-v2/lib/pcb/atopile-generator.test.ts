@@ -483,6 +483,7 @@ describe('atopile-generator', () => {
                 { id: 'microcontroller_word', name_human: 'Microcontroller', content_character: { character_id: 'microcontroller' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
                 { id: 'local_display_word', name_human: 'Local Display', content_character: { character_id: 'local_display' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
                 { id: 'usb_interface_word', name_human: 'Usb Interface', content_character: { character_id: 'usb_interface' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
+                { id: 'host_protocol_bridge_word', name_human: 'Host Protocol Bridge', content_character: { character_id: 'host_protocol_bridge' }, modifier_characters: [{ kind: 'quantity', value: '×1' }] },
               ],
             }],
           },
@@ -516,6 +517,7 @@ describe('atopile-generator', () => {
     expect(offBoardIds.has('microcontroller_word')).toBe(true)
     expect(offBoardIds.has('local_display_word')).toBe(true)
     expect(offBoardIds.has('usb_interface_word')).toBe(true)
+    expect(offBoardIds.has('host_protocol_bridge_word')).toBe(true)
     expect(offBoardIds.has('rechargeable_battery_pack_word')).toBe(true)
     expect(offBoardIds.has('usb_power_interface_word')).toBe(true)
     expect(offBoardIds.has('dc_input_fuse_word')).toBe(true)

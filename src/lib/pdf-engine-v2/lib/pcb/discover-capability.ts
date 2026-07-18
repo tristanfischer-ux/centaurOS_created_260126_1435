@@ -77,7 +77,24 @@ function isTransientProbeError(error: unknown): boolean {
   // Blender/chain load flipped canAuthor=false on a host where the binary is
   // fine (colorimeter 2254 canAuthor=true minutes earlier). Retry transient
   // spawn failures; permanent missing/crash still fails closed.
-  return /ETIMEDOUT|EAGAIN|EBUSY|timed?\s*out/i.test(message)
+  // GOTCHA (OpenFlexure 0101): a hung probe killed with SIGTERM/SIGKILL reports
+  // "Command failed" / "killed" — not ETIMEDOUT — and the old gate skipped the
+  // presence fallback → canAuthor=false with KiCad installed.
+  return /ETIMEDOUT|EAGAIN|EBUSY|timed?\s*out|SIGTERM|SIGKILL|signal\s*9|killed|EPIPE|spawn\s*ENOENT/i.test(
+    message,
+  )
+}
+
+function isExecutableOnDisk(executable: string): boolean {
+  try {
+    const mode = statSync(executable).mode
+    if ((mode & 0o111) !== 0) return true
+    // Symlink mode bits can omit +x on some hosts — check the real path.
+    const real = realpathSync(executable)
+    return (statSync(real).mode & 0o111) !== 0
+  } catch {
+    return false
+  }
 }
 
 function inspectExecutable(
@@ -86,10 +103,10 @@ function inspectExecutable(
 ): ExecutableCapability {
   const executable = firstExisting(candidates)
   if (!executable) return { available: false, error: 'not_found' }
-  // DECISION: 25s × 3 beats a false canAuthor=false that skips the whole PCB
-  // pipeline (exit-floor 0). Cold kicad-cli --version is ~0.2s; the long budget
-  // is only for contended hosts.
-  const timeoutsMs = [25_000, 40_000, 60_000] as const
+  // DECISION: short first probe (5s) — cold kicad-cli --version is ~0.2s. Long
+  // budgets only on retry. SIGKILL so a wedged KiCad GUI lock cannot outlive
+  // the timeout (SIGTERM was leaving zombies that held the chain for minutes).
+  const timeoutsMs = [5_000, 15_000, 30_000] as const
   let lastError = 'version_probe_failed'
   for (let attempt = 0; attempt < timeoutsMs.length; attempt += 1) {
     try {
@@ -97,6 +114,7 @@ function inspectExecutable(
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: timeoutsMs[attempt],
+        killSignal: 'SIGKILL',
       }).trim()
       return { available: true, path: executable, version }
     } catch (error) {
@@ -104,36 +122,25 @@ function inspectExecutable(
       if (!isTransientProbeError(error) || attempt === timeoutsMs.length - 1) {
         break
       }
-      // No sleep helper needed: each retry widens the exec timeout so a
-      // contended kicad-cli can finish under the next budget.
     }
   }
-  // INTENT (Poseidon 2324 / NinjaPCR 2302): under dual-Blender CPU saturation,
-  // execFileSync still ETIMEDOUT at 60s even though `kicad-cli --version` is
-  // ~0.2s when idle. Final fallback: spawnSync with a 90s budget — if that also
-  // flakes but the binary is present + executable, accept presence (version
-  // unknown) so canAuthor is not a false negative that floors PCB at 0.
-  if (isTransientProbeError({ message: lastError })) {
-    const spawned = spawnSync(executable, [...versionArgs], {
-      encoding: 'utf8',
-      timeout: 90_000,
-    })
-    const detail = `${spawned.stdout ?? ''}\n${spawned.stderr ?? ''}`.trim()
-    if (spawned.status === 0 && detail) {
-      return { available: true, path: executable, version: detail.split('\n')[0] }
-    }
-    try {
-      // Safe assertion: we already resolved an on-disk executable path above.
-      const mode = statSync(executable).mode
-      if ((mode & 0o111) !== 0) {
-        return {
-          available: true,
-          path: executable,
-          version: 'presence_after_timeout',
-        }
-      }
-    } catch {
-      // fall through to unavailable
+  // INTENT (Poseidon 2324 / OpenFlexure 0101): version probe flakes must not
+  // floor PCB. One last short spawnSync, then presence if the binary is on disk
+  // and executable — ALWAYS (not only when lastError matched ETIMEDOUT).
+  const spawned = spawnSync(executable, [...versionArgs], {
+    encoding: 'utf8',
+    timeout: 10_000,
+    killSignal: 'SIGKILL',
+  })
+  const detail = `${spawned.stdout ?? ''}\n${spawned.stderr ?? ''}`.trim()
+  if (spawned.status === 0 && detail) {
+    return { available: true, path: executable, version: detail.split('\n')[0] }
+  }
+  if (isExecutableOnDisk(executable)) {
+    return {
+      available: true,
+      path: executable,
+      version: 'presence_after_probe_fail',
     }
   }
   return {

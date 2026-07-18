@@ -759,14 +759,22 @@ def _is_instrument_power_origin(name: str) -> bool:
 _HOST_INTO_COMPUTE_RE = re.compile(
     r"microcontroller|\bmcu\b|main\s*controller|local\s*display|user\s*input|"
     r"firmware\s*storage|flash\s*storage|wifi|wi[- ]?fi|"
-    r"usb\s*(interface|power|data)|rechargeable\s*battery|battery\s*charge|"
+    r"usb\s*(interface|power|data)|host\s*protocol\s*bridge|protocol\s*bridge|"
+    r"usb[- ]?uart|\bftdi\b|rechargeable\s*battery|battery\s*charge|"
     r"power\s*switch|control\s*switch|status\s*indicator|status\s*led|"
     r"mounting\s*bezel|power\s*indicator|overcurrent|input\s*fuse|"
     r"dc\s*input\s*fuse|thermal\s*(?:cutoff|fuse)|reverse\s*polarity|"
     r"power\s*input\s*connector|esd\s*protection|polyfuse|ferrite|"
     r"dc\s*dc\s*regulator|debug\s*uart|current\s*sense|estop|e[- ]?stop|"
     r"power\s*kill|protective\s*earth|fan\s*(?:tach|failure)|overtemp|"
-    r"compute\s*ui",
+    # INTENT (Rodeostat 0201): AFE / voltage-ref / front-panel ports ride the
+    # MCU kit — flagging missing_input/output floored Connection Trace to 6.
+    r"compute\s*ui|voltage\s*reference|precision\s*voltage|"
+    r"analog\s*front\s*end|\bafe\b|current\s*measurement|\btia\b|"
+    r"galvanic\s*isolat|front\s*panel\s*connector|electrode\s*interface|"
+    r"adc\s*input|dac\s*output|calibration\s*prompt|"
+    # INTENT (Pioreactor 0250): fan anatomy Speed Controller orphaned as control.
+    r"speed\s*controller|ec\s*motor|fan\s*housing|stir\s*tachometer",
     re.I,
 )
 _COMPUTE_PRINCIPAL_RE = re.compile(
@@ -2005,12 +2013,24 @@ def main() -> int:
     # keyed on the vessel ROLE word, no per-part table.
     BUFFER_KEYWORDS = {"expansion", "surge", "buffer", "accumulator", "balance tank",
                        "break tank", "header tank", "expansion vessel", "expansion reservoir",
+                       # INTENT (Pioreactor 0327): a batch culture vessel / vial is a
+                       # dead-leg working volume — media doses IN; the broth stays put.
+                       # Requiring fluid OUT floored Interconnect (missing_output V-101).
+                       "culture vessel", "culture vial", "working volume",
                        # Terminal drain/recovery reservoirs (codema TK-101, 2026-07-09):
                        # a "Drain Water Tank" is a dead-leg collection buffer — one tie
                        # (in OR out) is correct, not a flow-through in+out. Universal:
                        # role noun, never a tag table.
                        "drain water", "drainwater", "recovery tank", "return tank",
                        "collection tank", "dirty water"}
+    # INTENT (OpenDrop 0410): lab cartridge / syringe / EWOD fluid filters on a
+    # device-scale instrument are consumable dead-legs (dose → trap), NOT plant
+    # separators that need fluid OUT. Gated on instrument_device below so a plant
+    # water-treatment "Fluid Filter" still requires in+out.
+    _INSTRUMENT_LAB_FILTER_BUFFER = (
+        "fluid filter", "syringe filter", "cartridge filter", "inline filter",
+        "sample filter", "media filter",
+    )
 
     PROCESS_TYPES = {"vessel", "rotating", "exchanger", "separator", "valve"}
     ELECTRICAL_TYPES = {"electrical"}
@@ -2273,6 +2293,8 @@ def main() -> int:
             continue
 
         is_buffer = any(kw in name_l for kw in BUFFER_KEYWORDS)
+        if instrument_device and any(kw in name_l for kw in _INSTRUMENT_LAB_FILTER_BUFFER):
+            is_buffer = True
 
         if etype in PROCESS_TYPES:
             # An INLINE VALVE is a FINAL ELEMENT mounted ON a pipe run — the connection

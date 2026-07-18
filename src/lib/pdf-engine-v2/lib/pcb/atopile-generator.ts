@@ -110,7 +110,9 @@ export type FunctionClass =
  */
 const FUNCTION_CLASS_RULES: ReadonlyArray<{ id: FunctionClass; test: RegExp }> = [
   { id: 'sensor_ic', test: /photodiode|phototransistor|detector|analog[_-]?to[_-]?digital|(^|[_-])adc($|[_-])|imu\b|accelerometer|gyroscope|sensor|probe|monitor[_-]?ic|cell[_-]?monitor/i },
-  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp/i },
+  // INTENT (Rodeostat 0201): dac_output_stage is a real SOIC DAC IC — without
+  // this it landed in unresolved[] ELECTRONIC gap and capped PCB at DRAFT/5.
+  { id: 'op_amp', test: /signal[_-]?conditioner|amplifier|(^|[_-])tia($|[_-])|op[_-]?amp|dac[_-]?output|(^|[_-])dac($|[_-])|digital[_-]?to[_-]?analog/i },
   { id: 'microcontroller', test: /main[_-]?controller|(^|[_-])mcu($|[_-])|microcontroller|processor|(^|[_-])cpu($|[_-])|control[_-]?unit/i },
   { id: 'connectivity_ic', test: /communication_gateway|network_switch|transceiver|\bmodem\b|wireless/i },
   { id: 'io_connector', test: /io_module|\bi_?o_?module\b/i },
@@ -633,11 +635,14 @@ const COTS_DETECTOR_MODULE_RE =
   /\b(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array).*\b(module|breakout|board|assembly)\b|\b(module|breakout|board|assembly).*(?:detector|spectral[_ -]?sensor|light[_ -]?sensor|colour[_ -]?sensor|color[_ -]?sensor|photodiode[_ -]?array)\b/i
 
 // Gold WHY: one purchased compute/UI kit absorbs MCU+display+buttons+USB+battery.
+// INTENT (OpenFlexure 0101): SBC / Pi compute + motor-controller board + webcam
+// are purchased host modules for OPEN lab microscopes — same off-board path as
+// PyBadge-class compute/UI kits. Noun-keyed (never product==openflexure).
 const COTS_COMPUTE_UI_MODULE_RE =
-  /\bcompute[_ -]?ui[_ -]?module\b|\b(?:controller|mcu).{0,24}(?:ui|display|badge).{0,16}module\b/i
+  /\bcompute[_ -]?ui[_ -]?module\b|\b(?:controller|mcu).{0,24}(?:ui|display|badge).{0,16}module\b|\b(?:sbc|compute[_ -]?module|raspberry[_ -]?pi|single[_ -]?board[_ -]?computer|motor[_ -]?controller[_ -]?board|sangaboard)\b/i
 
 const INSTRUMENT_OPTOMECH_WORD_RE =
-  /\b(collimat\w*|lens|optic(?:al)?|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?(?:bezel|plate)|detector[_ -]?mount|face[_ -]?plate|front[_ -]?panel)\b/i
+  /\b(collimat\w*|lens|optic(?:al)?|optics?[_ -]?tube|tube[_ -]?assembly|objective(?:[_ -]?mount)?|\brms\b|webcam|pi[_ -]?camera|grade[_ -]?camera|camera[_ -]?module|flexure(?:[_ -]?stage)?|condenser|wavelength[_ -]?selection|filter[_ -]?(?:wheel|optic)|cuvette|sample[_ -]?(?:holder|cell|chamber)|bezel|mount(?:ing)?[_ -]?(?:bezel|plate|standoff)|pcb[_ -]?mounting[_ -]?standoff|standoff|detector[_ -]?mount|face[_ -]?plate|front[_ -]?panel)\b/i
 
 const INSTRUMENT_INTERCONNECT_WORD_RE =
   /\b(?:sensor|detector|photodiode|signal|analog|adc|afe).{0,48}(?:interconnect|cable|lead|wire|harness|ffc|ribbon)\b|\b(?:interconnect|cable|lead|wire|harness|ffc|ribbon).{0,48}(?:sensor|detector|photodiode|signal|analog|adc|afe)\b|\b(?:wire[_ -]?harness|wiring[_ -]?harness|cable[_ -]?assembly|sensor[_ -]?cable)\b/i
@@ -682,8 +687,11 @@ const OPTICAL_SOURCE_BOARD_WORD_RE =
 // (`regulator`) and inflate the LED board into a 14-part / 80 mm motherboard.
 // GOTCHA: do NOT include status_led / bare LED here — ON_BOARD_PCB_WORD_RE keeps
 // LEDs on the optical source / actuation drive board (colorimeter proveCatch).
+// INTENT (Pioreactor 0327): host_protocol_bridge is a purchased USB↔UART/FTDI
+// dongle that rides with the MCU COTS kit — leaving it unresolved floored PCB
+// to DRAFT (1 electronic gap) despite a clean DRC board.
 const INSTRUMENT_HOST_SIDE_ON_COTS_CONTROLLER_RE =
-  /\b(?:rechargeable[_ -]?battery|battery[_ -]?(?:pack|charge|management|indicator)|low[_ -]?battery|charge[_ -]?status|usb[_ -]?(?:interface|power|data)|firmware[_ -]?(?:storage|watchdog)|flash[_ -]?(?:storage|memory)|wifi|wi[_ -]?fi|wireless|bluetooth|\bble\b|debug[_ -]?uart|uart[_ -]?header|serial[_ -]?debug|fan[_ -]?(?:failure|tach|sense)|tachometer|overtemp|estop|e[_ -]?stop|power[_ -]?kill|protective[_ -]?earth|\bpe\b|power[_ -]?(?:switch|input|indicator|rail)|dc[_ -]?dc[_ -]?regulator|buck[_ -]?regulator|ldo|host[_ -]?(?:power|interface)|dc[_ -]?input[_ -]?fuse|input[_ -]?fuse|overcurrent|esd[_ -]?protection|thermal[_ -]?cutoff|polyfuse|reverse[_ -]?polarity|ferrite|status[_ -]?indicator|control[_ -]?switch|run[_ -]?start|start[_ -]?control|debug[_ -]?interface|\bswd\b|\bjtag\b|i2c[_ -]?level[_ -]?shifter|level[_ -]?shifter|current[_ -]?sense(?:[_ -]?shunt)?|sense[_ -]?shunt|bulk[_ -]?capacitor|thermal[_ -]?fuse)\b/i
+  /\b(?:rechargeable[_ -]?battery|battery[_ -]?(?:pack|charge|management|indicator)|low[_ -]?battery|charge[_ -]?status|usb[_ -]?(?:interface|power|data)|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge|usb[_ -]?uart|\bftdi\b|firmware[_ -]?(?:storage|watchdog)|flash[_ -]?(?:storage|memory)|wifi|wi[_ -]?fi|wireless|bluetooth|\bble\b|debug[_ -]?uart|uart[_ -]?header|serial[_ -]?debug|fan[_ -]?(?:failure|tach|sense)|tachometer|overtemp|estop|e[_ -]?stop|power[_ -]?kill|protective[_ -]?earth|\bpe\b|power[_ -]?(?:switch|input|indicator|rail)|dc[_ -]?dc[_ -]?regulator|buck[_ -]?regulator|ldo|host[_ -]?(?:power|interface)|dc[_ -]?input[_ -]?fuse|input[_ -]?fuse|overcurrent|esd[_ -]?protection|thermal[_ -]?cutoff|polyfuse|reverse[_ -]?polarity|ferrite|status[_ -]?indicator|control[_ -]?switch|run[_ -]?start|start[_ -]?control|debug[_ -]?interface|\bswd\b|\bjtag\b|i2c[_ -]?level[_ -]?shifter|level[_ -]?shifter|current[_ -]?sense(?:[_ -]?shunt)?|sense[_ -]?shunt|bulk[_ -]?capacitor|thermal[_ -]?fuse)\b/i
 
 // INTENT (NinjaPCR 2026-07-15): TEC / sample block / heatsink fan are purchased
 // thermal assemblies — not PCB footprints. Same off-board pattern as plant
@@ -694,7 +702,12 @@ const INSTRUMENT_THERMAL_ASSEMBLY_RE =
 // Labels / silkscreen legends are not PCB footprints (2130 left user_facing_legend
 // in unresolved[] and the Excel electronic-gap axis capped PCB at FAIL/DRAFT).
 const INSTRUMENT_NON_FOOTPRINT_WORD_RE =
-  /\b(?:user[_ -]?facing[_ -]?legend|front[_ -]?panel[_ -]?legend|silkscreen[_ -]?legend|nameplate|label[_ -]?plate)\b/i
+  /\b(?:user[_ -]?facing[_ -]?legend|front[_ -]?panel[_ -]?legend|silkscreen[_ -]?legend|nameplate|label[_ -]?plate|browser[_ -]?ui|host[_ -]?software|network[_ -]?api|api[_ -]?service|firmware[_ -]?image)\b/i
+
+// INTENT (OpenFlexure 0101): purchased PSU / barrel inlet / stall-sense switches
+// ride off the control PCB (daughterboard keeps MCU + photodiode only).
+const INSTRUMENT_PURCHASED_POWER_SENSE_RE =
+  /\b(?:usb[_ -]?or[_ -]?barrel|barrel[_ -]?power|power[_ -]?inlet|dc[_ -]?inlet|low[_ -]?voltage[_ -]?dc[_ -]?supply|bench[_ -]?psu|dc[_ -]?supply|stage[_ -]?limit|stall[_ -]?sense|limit[_ -]?switch)\b/i
 
 // INTENT (2026-07-15): residential wall-ESS / plant BoMs name purchased field
 // assemblies (battery racks, Apollo smoke heads, DIN ethernet switches, HMI
@@ -832,7 +845,10 @@ function offBoardCotsReason(
     return 'COTS I²C bus header (STEMMA/Qwiic/Grove) — mates to a purchased module, not an optical-source-board footprint'
   }
   if (isInstrument && INSTRUMENT_NON_FOOTPRINT_WORD_RE.test(roleText)) {
-    return 'front-panel legend / nameplate — marking on the enclosure, not a soldered PCB footprint'
+    return 'front-panel legend / nameplate / host software — not a soldered PCB footprint'
+  }
+  if (isInstrument && INSTRUMENT_PURCHASED_POWER_SENSE_RE.test(roleText)) {
+    return 'purchased PSU / inlet / limit-sense assembly — off-board module connected to the control PCB, not an on-board footprint'
   }
   // INTENT (2026-07-16): instrument control PCBs are low-voltage. A "mains fuse"
   // / IEC inlet fuse lives at the chassis inlet or external PSU — packing three

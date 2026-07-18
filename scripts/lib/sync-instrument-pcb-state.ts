@@ -12,6 +12,7 @@ import { cpSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 
 import { generateAtopileProject } from '../../src/lib/pdf-engine-v2/lib/pcb/atopile-generator'
+import { evaluatePcbGate } from '../../src/lib/pdf-engine-v2/lib/pcb/pcb-gate'
 import { runPcbPipeline } from '../../src/lib/pdf-engine-v2/lib/pcb/pcb-pipeline'
 
 function main(): void {
@@ -39,9 +40,37 @@ function main(): void {
       `stage=${pipelineResult.stageReached}`,
   )
 
+  const w = (pipelineResult.boardSizeMm as { w?: number } | undefined)?.w
+  // INTENT (Poseidon 2026-07-16): optical LED daughterboards stay ≤40 mm; actuation
+  // drive boards (MCU + stepper) legitimately need the [50,250] plant floor.
+  // GOTCHA (OpenFlexure 0101): MCU + photodiode control board is 50 mm and has
+  // no "stepper" token on-board (motors are off-board COTS) — still not a 40 mm
+  // LED daughterboard. MCU / LQFP / motor-controller → 120 mm cap.
+  const onBoardBlob = genResult.components
+    .map((c) => `${c.instanceName} ${c.nameHuman} ${c.characterId} ${c.footprint?.footprint ?? ''}`)
+    .join(' ')
+  const productClass = String(
+    ((state.moduleDecomposition as { product_class?: string } | undefined)?.product_class)
+      || ((state.orchestratorContract as { product_class?: string } | undefined)?.product_class)
+      || '',
+  ).toLowerCase()
+  const isActuationOrControl = /\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver|microcontroller|mcu|lqfp|motor[_ -]?controller)\b/i.test(
+    onBoardBlob,
+  ) || /lab[_ -]?microscope|openflexure|thermocycler|ninjapcr|syringe[_ -]?pump|poseidon|potentiostat|rodeostat|benchtop[_ -]?bioreactor|pioreactor|opendrop|digital[_ -]?microfluid/.test(
+    productClass,
+  )
+  const maxSideMm = isActuationOrControl ? 120 : 40
+  if (typeof w === 'number' && w > maxSideMm) {
+    console.error(
+      `[sync-instrument-pcb] FAIL: board ${w} mm exceeds ${maxSideMm} mm ` +
+        `${isActuationOrControl ? 'actuation/control' : 'instrument'} cap`,
+    )
+    process.exit(2)
+  }
+
   const record = {
     ...pipelineResult,
-    compactSourceBoardCapMm: 40,
+    compactSourceBoardCapMm: maxSideMm,
     generator: {
       componentCount: genResult.components.length,
       netCount: genResult.nets.length,
@@ -67,7 +96,23 @@ function main(): void {
 
   const pcb = (state.pcb as Record<string, unknown> | undefined) ?? {}
   pcb.pipeline = record
+  // INTENT (OpenFlexure 0101): heal path must flip canAuthor after a real
+  // pipeline complete — Excel PCB tab was still reading toolchain_discovery
+  // from the failed chain probe even though disk had Gerbers + DRC=0.
+  if (pipelineResult.ok && pipelineResult.stageReached === 'complete') {
+    pcb.canAuthor = true
+    pcb.canRoute = true
+    pcb.canVerifyAndExport = true
+  }
   state.pcb = pcb
+  // INTENT (OpenFlexure 0101): chain-time pcbGate stays stale after a heal sync
+  // (still fires on toolchain_discovery). Re-evaluate from the patched pcb so
+  // Verification / Quality sheets read the post-heal clean_board verdict.
+  const gate = evaluatePcbGate(pcb as Parameters<typeof evaluatePcbGate>[0])
+  state.pcbGate = {
+    ...gate,
+    mode: 'shadow',
+  }
   writeFileSync(statePath, JSON.stringify(state, null, 2))
 
   const srcPcb = join(tmpOut, 'pcb')
@@ -76,23 +121,6 @@ function main(): void {
     cpSync(srcPcb, dstPcb, { recursive: true })
   }
 
-  const w = (pipelineResult.boardSizeMm as { w?: number } | undefined)?.w
-  // INTENT (Poseidon 2026-07-16): optical LED daughterboards stay ≤40 mm; actuation
-  // drive boards (MCU + stepper) legitimately need the [50,250] plant floor.
-  const onBoardBlob = genResult.components
-    .map((c) => `${c.instanceName} ${c.nameHuman} ${c.characterId}`)
-    .join(' ')
-  const isActuationDrive = /\b(?:stepper|microstep|h[_ -]?bridge|lead[_ -]?screw|motor[_ -]?driver)\b/i.test(
-    onBoardBlob,
-  )
-  const maxSideMm = isActuationDrive ? 120 : 40
-  if (typeof w === 'number' && w > maxSideMm) {
-    console.error(
-      `[sync-instrument-pcb] FAIL: board ${w} mm exceeds ${maxSideMm} mm ` +
-        `${isActuationDrive ? 'actuation-drive' : 'instrument'} cap`,
-    )
-    process.exit(2)
-  }
   if (genResult.components.length > 12) {
     console.warn(
       `[sync-instrument-pcb] WARN: ${genResult.components.length} on-board parts — ` +
@@ -101,7 +129,7 @@ function main(): void {
   }
   console.log(
     `[sync-instrument-pcb] OK — board ${JSON.stringify(pipelineResult.boardSizeMm)} · ` +
-      `generator.components=${genResult.components.length}`,
+      `cap=${maxSideMm}mm · generator.components=${genResult.components.length}`,
   )
 }
 

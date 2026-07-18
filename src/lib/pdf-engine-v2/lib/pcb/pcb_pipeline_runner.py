@@ -884,7 +884,12 @@ def run_drc(board_path: Path, drc_json_path: Path, kicad_cli: str) -> Tuple[bool
     result = subprocess.run(
         [kicad_cli, "pcb", "drc", str(board_path),
          "--output", str(drc_json_path), "--format", "json", "--severity-all"],
-        capture_output=True, text=True, timeout=90,
+        # GOTCHA (Rodeostat 0201): 90s timed out under concurrent Blender/chain
+        # load even though a quiet DRC finishes in ~2s — pipeline stopped at
+        # runner_output_parse with a routed board and no Gerbers.
+        # GOTCHA (OpenDrop 0410): 300s still timed out under revisit-watch load
+        # (Freerouting + excel + Blender concurrent) — raise to 900s.
+        capture_output=True, text=True, timeout=900,
     )
     if not drc_json_path.exists():
         return False, -1, {"stdout": result.stdout, "stderr": result.stderr}
