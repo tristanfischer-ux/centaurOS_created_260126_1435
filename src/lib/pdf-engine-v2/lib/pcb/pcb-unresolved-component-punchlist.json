@@ -9,10 +9,10 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 5,
+    "resolvedIdentityCount": 7,
     "reclassifiedNonComponentCount": 16,
-    "remainingUnresolvedFittedComponents": 29,
-    "remainingMissingMpn": 29,
+    "remainingUnresolvedFittedComponents": 27,
+    "remainingMissingMpn": 27,
     "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
@@ -22,7 +22,9 @@
     "pioreactor-od_optics-esd_protection_network_word",
     "rodeostat-analog_afe-dac_output_stage_word",
     "rodeostat-analog_afe-current_measurement_tia_word",
-    "opendrop-hv_controller_main-usb_power_entry_word"
+    "opendrop-hv_controller_main-usb_power_entry_word",
+    "colorimeter-optical_source-led_source_word",
+    "colorimeter-optical_source-source_board_connector_word"
   ],
   "scopeReclassifications": [
     {
@@ -190,16 +192,16 @@
           "wordId": "led_source_word",
           "characterId": "led_source",
           "requiredRatings": {
-            "status": "partially_verified",
-            "requirements": ["470 nm optical wavelength from generated topology"],
-            "missing": ["forward voltage", "operating current", "radiant intensity/bin", "package and optical-axis tolerance"],
-            "evidence": ["Generated net names the source kingbright_470_nm_led; gold requires a wavelength-specific LED MPN."]
+            "status": "source_verified",
+            "requirements": ["470 nm-class optical source", "3.1 V nominal forward voltage", "15 mA operating point", "0603 SMD package"],
+            "missing": ["instrument-level intensity-bin and ageing-calibration acceptance remain system calibration requirements"],
+            "evidence": ["Frozen Open Colorimeter 470 nm board specifies one 0603 LED at 3.1 V and 15 mA; Yongyu SZYY0603B manufacturer data gives 469 nm peak, 460-475 nm dominant wavelength, 3.1 V, 30 mA and 0603 package."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No wavelength-specific manufacturer ordering code is present." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Yongyu SZYY0603B manufacturer ordering code after off-chain ingest and pin/package parity." },
           "sourceCandidate": {
-            "identity": "wavelength-specific LED used by the frozen Open Colorimeter source board",
-            "evidenceLevel": "gold_role_family",
-            "source": "https://github.com/iorodeo/open_colorimeter/tree/b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7/design_files/basic_led_pcb",
+            "identity": "Yongyu Photoelectric SZYY0603B",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "https://www.lcsc.com/datasheet/C434421.pdf",
             "disposition": "candidate_only"
           },
           "exactAction": {
@@ -1280,16 +1282,16 @@
           "wordId": "source_board_connector_word",
           "characterId": "source_board_connector",
           "requiredRatings": {
-            "status": "partially_verified",
-            "requirements": ["two four-position JST-SH connectors", "daisy-chain source-board interface"],
-            "missing": ["exact ordering code", "pin contract", "current", "mating cable/retention", "orientation"],
-            "evidence": ["Gold-gap audit records dual 4-pin JST-SH connectors; generated board has one 2-pin JST-XH."]
+            "status": "source_verified",
+            "requirements": ["two four-position 1.00 mm right-angle SMD connectors", "pins 1 GND, 2 3V3, 3 SDA, 4 SCL", "50 V and 1 A connector ratings"],
+            "missing": ["assembly BOM must still freeze the mating cable and service-cycle requirement"],
+            "evidence": ["Frozen Open Colorimeter J1/J2 use BOOMELE_SMD_SH_4PIN_RT and identify LCSC C145956; BOOMELE manufacturer data maps C145956 to exact MPN 1.0T-4P."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "Gold proves connector family/count but not an exact manufacturer ordering code in the current evidence bundle." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact BOOMELE 1.0T-4P ordering code, four-pin contract and frozen Forge_Manufacturer:BOOMELE_1.0T-4P land pattern." },
           "sourceCandidate": {
-            "identity": "dual four-position JST-SH source-board connectors",
-            "evidenceLevel": "gold_role_family",
-            "source": "https://github.com/iorodeo/open_colorimeter/tree/b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7/design_files/basic_led_pcb",
+            "identity": "BOOMELE (Boom Precision Elec) 1.0T-4P",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "https://www.lcsc.com/product-detail/C145956.html",
             "disposition": "candidate_only"
           },
           "exactAction": {

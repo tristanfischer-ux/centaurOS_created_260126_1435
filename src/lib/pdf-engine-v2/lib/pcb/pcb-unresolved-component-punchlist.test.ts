@@ -75,6 +75,40 @@ interface Punchlist {
   roleGroups: PunchlistRoleGroup[]
 }
 
+interface ProcurementRequirement {
+  punchlistId: string
+  function: string
+  electrical: {
+    voltage: string
+    current: string
+    power: string
+  }
+  signalIntegrity: {
+    precision: string
+    bandwidth: string
+    noise: string
+  }
+  channelCount: string
+  interface: string
+  packageConstraints: string
+  environmentLifecycle: string
+  evidence: string[]
+  disposition: {
+    status: 'resolved_exact_mpn' | 'procurement_required'
+    manufacturer: string | null
+    partNumber: string | null
+    blocker: string | null
+  }
+}
+
+interface ProcurementMatrix {
+  schema: 'pcb-residual-procurement-requirements/v1'
+  baselineCount: number
+  resolvedExactMpnCount: number
+  residualProcurementCount: number
+  requirements: ProcurementRequirement[]
+}
+
 const PUNCHLIST_PATH = resolve(
   __dirname,
   'pcb-unresolved-component-punchlist.json',
@@ -82,6 +116,10 @@ const PUNCHLIST_PATH = resolve(
 const MARKDOWN_PATH = resolve(
   __dirname,
   '../../../../../docs/plans/CURSOR-YURI-PCB-UNRESOLVED-COMPONENT-PUNCHLIST-2026-07-18.md',
+)
+const PROCUREMENT_MATRIX_PATH = resolve(
+  __dirname,
+  'pcb-residual-procurement-requirements.json',
 )
 
 const EXPECTED_BLOCKERS = [
@@ -188,14 +226,12 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     }, {})
 
     expect(productCounts).toEqual({
-      Colorimeter: 2,
       NinjaPCR: 9,
       Pioreactor: 3,
       Rodeostat: 5,
       OpenDrop: 10,
     })
     expect(boardCounts).toEqual({
-      optical_source: 2,
       thermal_controller: 9,
       wet_lab_hat: 1,
       od_optics: 2,
@@ -203,14 +239,14 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       hv_controller_main: 10,
     })
     expect(gapCounts).toEqual({
-      mpn: 29,
+      mpn: 27,
     })
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
-      resolvedIdentityCount: 5,
+      resolvedIdentityCount: 7,
       reclassifiedNonComponentCount: 16,
-      remainingUnresolvedFittedComponents: 29,
-      remainingMissingMpn: 29,
+      remainingUnresolvedFittedComponents: 27,
+      remainingMissingMpn: 27,
       remainingMissingSymbolPinout: 0,
       targetBoards: 8,
       productsWithFittedBoards: 5,
@@ -221,7 +257,7 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const reclassifications = punchlist.scopeReclassifications
 
-    expect(punchlist.resolvedIdentityIds).toHaveLength(5)
+    expect(punchlist.resolvedIdentityIds).toHaveLength(7)
     expect(reclassifications).toHaveLength(16)
     expect(new Set(reclassifications.map((item) => item.id)).size).toBe(16)
     expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
@@ -268,8 +304,8 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('29 unresolved fitted components')
-    expect(markdown).toContain('29 missing MPN')
+    expect(markdown).toContain('27 unresolved fitted components')
+    expect(markdown).toContain('27 missing MPN')
     expect(markdown).toContain('0 missing symbol/pinout')
     expect(markdown).toContain('16 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
@@ -277,6 +313,63 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     }
     for (const entry of entries) {
       expect(markdown).toContain(`<a id="${entry.id}"></a>`)
+    }
+  })
+
+  it('publishes complete procurement requirements for all 29 residual roles', () => {
+    const punchlist = readPunchlist()
+    const matrix = JSON.parse(
+      readFileSync(PROCUREMENT_MATRIX_PATH, 'utf8'),
+    ) as ProcurementMatrix
+    const closedBeforeThisPass = new Set([
+      ...punchlist.resolvedIdentityIds.filter((id) =>
+        ![
+          'colorimeter-optical_source-led_source_word',
+          'colorimeter-optical_source-source_board_connector_word',
+        ].includes(id)),
+      ...punchlist.scopeReclassifications.map((item) => item.id),
+    ])
+    const baselineResidualIds = punchlist.roleGroups
+      .flatMap((group) => group.entries)
+      .filter((entry) => !closedBeforeThisPass.has(entry.id))
+      .map((entry) => entry.id)
+      .sort()
+
+    expect(matrix.schema).toBe('pcb-residual-procurement-requirements/v1')
+    expect(matrix.baselineCount).toBe(29)
+    expect(matrix.resolvedExactMpnCount).toBe(2)
+    expect(matrix.residualProcurementCount).toBe(27)
+    expect(matrix.requirements).toHaveLength(29)
+    expect(matrix.requirements.map((item) => item.punchlistId).sort())
+      .toEqual(baselineResidualIds)
+    expect(matrix.requirements.filter((item) =>
+      item.disposition.status === 'resolved_exact_mpn').map((item) =>
+      item.punchlistId).sort()).toEqual([
+      'colorimeter-optical_source-led_source_word',
+      'colorimeter-optical_source-source_board_connector_word',
+    ])
+    for (const item of matrix.requirements) {
+      expect(item.function.trim()).not.toBe('')
+      expect(item.electrical.voltage.trim()).not.toBe('')
+      expect(item.electrical.current.trim()).not.toBe('')
+      expect(item.electrical.power.trim()).not.toBe('')
+      expect(item.signalIntegrity.precision.trim()).not.toBe('')
+      expect(item.signalIntegrity.bandwidth.trim()).not.toBe('')
+      expect(item.signalIntegrity.noise.trim()).not.toBe('')
+      expect(item.channelCount.trim()).not.toBe('')
+      expect(item.interface.trim()).not.toBe('')
+      expect(item.packageConstraints.trim()).not.toBe('')
+      expect(item.environmentLifecycle.trim()).not.toBe('')
+      expect(item.evidence.length).toBeGreaterThan(0)
+      if (item.disposition.status === 'resolved_exact_mpn') {
+        expect(item.disposition.manufacturer?.trim()).not.toBe('')
+        expect(item.disposition.partNumber?.trim()).not.toBe('')
+        expect(item.disposition.blocker).toBeNull()
+      } else {
+        expect(item.disposition.manufacturer).toBeNull()
+        expect(item.disposition.partNumber).toBeNull()
+        expect(item.disposition.blocker?.trim()).not.toBe('')
+      }
     }
   })
 })

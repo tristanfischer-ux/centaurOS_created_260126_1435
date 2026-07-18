@@ -94,7 +94,7 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(5)
+    expect(report.acceptedMappings).toHaveLength(7)
     expect(report.pendingExactMappings).toHaveLength(0)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
@@ -209,11 +209,11 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 5,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 5 - 16,
-      resolvedDelta: 5,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 7,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 7 - 16,
+      resolvedDelta: 7,
       reclassifiedNonComponentCount: 16,
-      missingMpn: 29,
+      missingMpn: 27,
       missingSymbolPinout: 0,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([

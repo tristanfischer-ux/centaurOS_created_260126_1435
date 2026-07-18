@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Five identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **29 unresolved fitted components**: **29 missing MPN** and **0 missing symbol/pinout**. The seven former symbol gaps were closed by three authoritative manufacturer mappings and one explicit unsupported-part rejection; none was falsely promoted into an incompatible role.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Seven identities were subsequently resolved and 16 roles were proven to be non-components. The active residual is therefore **27 unresolved fitted components**: **27 missing MPN** and **0 missing symbol/pinout**. The full 29-role input to this sourcing pass, including explicit electrical and package requirements for every miss, is preserved in `pcb-residual-procurement-requirements.json`.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -19,18 +19,18 @@ The detailed sections preserve all 50 baseline entries for traceability. Items l
 
 `Unknown` is intentional where neither the offline report nor frozen source proves a rating. Placeholder footprints and synthetic pins are not rating evidence.
 
-The latest identities were promoted only after the off-chain ingest wrote manufacturer-backed forge-truth rows and the DB-only resolver passed exact MPN, local symbol, full pinout, footprint, and electrical-pad parity. The former Colorimeter regulator and BM04 connector closures were withdrawn after direct source inspection disproved them. No chain-side database write was made.
+The latest identities were promoted only after the off-chain ingest wrote manufacturer-backed forge-truth rows and the DB-only resolver passed exact MPN, local symbol, full pinout, footprint, and electrical-pad parity. The former Colorimeter regulator closure remains withdrawn. Direct source inspection replaced the incorrect JST BM04 assumption with source-identified BOOMELE `1.0T-4P`; the wavelength role is closed by Yongyu `SZYY0603B`.
 
 ## Counts
 
 | Product | Board(s) | Residual unresolved fitted components |
 |---|---|---:|
-| Colorimeter | `optical_source` | 2 |
+| Colorimeter | `optical_source` | 0 |
 | NinjaPCR | `thermal_controller` | 9 |
 | Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
 | Rodeostat | `analog_afe` | 5 |
 | OpenDrop | `hv_controller_main` | 10 |
-| **Total** | **6 boards with residual fitted-component gaps** | **29** |
+| **Total** | **5 boards with residual fitted-component gaps** | **27** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
@@ -65,7 +65,7 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 ## optical_source_and_visual_indication
 
 <a id="colorimeter-optical_source-led_source_word"></a>
-- **Colorimeter · `optical_source` · `led_source_word`** — Ratings: 470 nm is topology-backed; forward voltage/current, intensity/bin and axis tolerance unknown. Gap: **MPN**. Gold candidate: wavelength-specific LED in frozen `basic_led_pcb` (family only). Action: extract exact BOM code, verify manufacturer optical/electrical data, ingest, then map symbol/footprint.
+- **Colorimeter · `optical_source` · `led_source_word`** — **Resolved:** Yongyu `SZYY0603B`, 469 nm peak / 460–475 nm dominant wavelength, 3.1 V, 30 mA-rated 0603 LED. The frozen board's 15 mA operating point, manufacturer polarity, exact local symbol and 0603 footprint are mapped.
 
 <a id="colorimeter-optical_source-led_driver_word"></a>
 - **Colorimeter · `optical_source` · `led_driver_word`** — **Reclassified:** every frozen source board uses one wavelength-specific LED and one calculated ballast resistor. No driver IC is fitted; the current-limiting function remains mandatory as passive topology.
@@ -216,7 +216,7 @@ These **16 evidence-backed non-components** are removed from fitted BOM scope wi
 ## board_to_board_and_cartridge_interconnect
 
 <a id="colorimeter-optical_source-source_board_connector_word"></a>
-- **Colorimeter · `optical_source` · `source_board_connector_word`** — Ratings: two four-position daisy-chain connectors are source-backed, but the frozen footprint is generic `BOOMELE_SMD_SH_4PIN_RT`, not JST `BM04B-SRSS-TB`. Gap: **MPN**. Action: identify the exact connector and mating cable before mapping pinout/footprint.
+- **Colorimeter · `optical_source` · `source_board_connector_word`** — **Resolved:** frozen J1/J2 identify LCSC C145956, which manufacturer data maps to BOOMELE `1.0T-4P`: 4 contacts, 1.00 mm pitch, right-angle SMD, 50 V, 1 A. Pins are GND/3V3/SDA/SCL; the frozen BOOMELE land pattern is vendored as `Forge_Manufacturer:BOOMELE_1.0T-4P` and passes electrical-pad parity. The assembly BOM must still freeze the mating cable.
 
 <a id="opendrop-electrode_cartridge-required_electrode_channel_word"></a>
 - **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — Ratings: 64 channels and cartridge mating known; connector count/code, voltage, creepage, contact rating and cycles unknown. Gap: **MPN**. Gold candidate: Mini-DIMM/cartridge interconnect family. Action: extract 64-channel pin/domain map, resolve exact connector or custom edge geometry, prove creepage/alignment and complete pads.

@@ -1,0 +1,55 @@
+(footprint "BOOMELE_1.0T-4P"
+  (version 20240108)
+  (generator "forgeos-frozen-gold")
+  (layer "F.Cu")
+  (descr "BOOMELE 1.0T-4P, frozen Open Colorimeter land pattern, source revision b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7")
+  (tags "BOOMELE 1.0T-4P 1.00mm right-angle")
+  (property "Reference" "REF**"
+    (at 0 4.055 0)
+    (layer "F.SilkS")
+    (effects (font (size 1.016 1.016) (thickness 0.2032)))
+  )
+  (property "Value" "BOOMELE_1.0T-4P"
+    (at 0.025 -4.47 0)
+    (layer "F.Fab")
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (attr smd)
+  (fp_rect
+    (start -3 -2.655)
+    (end 3 1.695)
+    (stroke (width 0.15) (type solid))
+    (fill none)
+    (layer "F.SilkS")
+  )
+  (pad "1" smd rect
+    (at 1.5 1.845 180)
+    (size 0.4 1.6)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+  (pad "2" smd rect
+    (at 0.5 1.845 180)
+    (size 0.4 1.6)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+  (pad "3" smd rect
+    (at -0.5 1.845 180)
+    (size 0.4 1.6)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+  (pad "4" smd rect
+    (at -1.5 1.845 180)
+    (size 0.4 1.6)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+  (pad "" smd rect
+    (at 2.65 -0.48 180)
+    (size 0.8 3)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+  (pad "" smd rect
+    (at -2.65 -0.48 180)
+    (size 0.8 3)
+    (layers "F.Cu" "F.Paste" "F.Mask")
+  )
+)

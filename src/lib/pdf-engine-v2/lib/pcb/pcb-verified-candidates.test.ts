@@ -118,6 +118,40 @@ describe('verified function-keyed PCB candidates', () => {
     })
   })
 
+  it('does not assign source-specific parts to underspecified generic roles', () => {
+    const lookup = (manufacturer: string | null, mpn: string): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        manufacturer: manufacturer ?? '',
+        mpn,
+        description: 'Exact requested candidate',
+      },
+    })
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'led_source_word',
+        nameHuman: 'Optical source LED',
+        characterId: 'led_source',
+        functionClass: 'led',
+        requiredRatings: { voltageV: 3.3, currentA: 0.015 },
+      },
+      lookup,
+    )).toBeNull()
+
+    expect(resolveVerifiedFunctionCandidate(
+      {
+        wordId: 'board_to_board_connector_word',
+        nameHuman: 'Four-position board-to-board connector',
+        characterId: 'board_to_board_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 3.3, currentA: 0.1 },
+      },
+      lookup,
+    )).toBeNull()
+  })
+
   it('resolves the fixed 100 nF decoupling role but not an unspecified bulk capacitor', () => {
     const lookup = (): DbCascadeResult => ({
       ...CACHE_HIT,
@@ -173,19 +207,6 @@ describe('verified function-keyed PCB candidates', () => {
     },
     {
       request: {
-        wordId: 'source_board_connector_word',
-        nameHuman: 'Four-position source board connector',
-        characterId: 'source_board_connector',
-        functionClass: 'connector',
-      },
-      manufacturer: 'JST Sales America Inc.',
-      partNumber: 'BM04B-SRSS-TB',
-      description: 'CONN HEADER SMD 4POS 1MM',
-      expectedFootprint: 'JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical',
-      expectedSource: 'Pioreactor Eye-Spy frozen BOM',
-    },
-    {
-      request: {
         wordId: 'esd_protection_network_word',
         nameHuman: '5 V interface TVS protection',
         characterId: 'esd_protection_network',
@@ -197,6 +218,34 @@ describe('verified function-keyed PCB candidates', () => {
       description: 'TVS DIODE 5V 15V SOD923',
       expectedFootprint: 'D_SOD-923',
       expectedSource: 'Pioreactor Eye-Spy frozen BOM',
+    },
+    {
+      request: {
+        wordId: 'led_source_word',
+        nameHuman: '470 nm optical source LED',
+        characterId: 'led_source',
+        functionClass: 'led',
+        requiredRatings: { voltageV: 3.3, currentA: 0.015 },
+      },
+      manufacturer: 'Yongyu Photoelectric',
+      partNumber: 'SZYY0603B',
+      description: 'LED BLUE 469NM 0603',
+      expectedFootprint: 'LED_0603_1608Metric',
+      expectedSource: 'Open Colorimeter frozen 470 nm source board',
+    },
+    {
+      request: {
+        wordId: 'source_board_connector_word',
+        nameHuman: 'Four-position right-angle source board connector',
+        characterId: 'source_board_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 3.3, currentA: 0.1 },
+      },
+      manufacturer: 'BOOMELE (Boom Precision Elec)',
+      partNumber: '1.0T-4P',
+      description: 'CONN HEADER SMD R/A 4POS 1MM',
+      expectedFootprint: 'BOOMELE_1.0T-4P',
+      expectedSource: 'Open Colorimeter frozen source-board J1/J2',
     },
   ] as const)(
     'resolves $partNumber only for its source-backed universal role and package',
@@ -360,6 +409,32 @@ describe('verified function-keyed PCB candidates', () => {
       expectedSymbol: 'Forge_Manufacturer:OPA334AIDBVR',
       expectedFootprint: 'SOT-23-6',
     },
+    {
+      request: {
+        wordId: 'led_source_word',
+        nameHuman: '470 nm optical source LED',
+        characterId: 'led_source',
+        functionClass: 'led',
+        requiredRatings: { voltageV: 3.3, currentA: 0.015 },
+      },
+      manufacturer: 'Yongyu Photoelectric',
+      partNumber: 'SZYY0603B',
+      expectedSymbol: 'Device:LED',
+      expectedFootprint: 'LED_0603_1608Metric',
+    },
+    {
+      request: {
+        wordId: 'source_board_connector_word',
+        nameHuman: 'Four-position right-angle source board connector',
+        characterId: 'source_board_connector',
+        functionClass: 'connector',
+        requiredRatings: { voltageV: 3.3, currentA: 0.1 },
+      },
+      manufacturer: 'BOOMELE (Boom Precision Elec)',
+      partNumber: '1.0T-4P',
+      expectedSymbol: 'Connector_Generic:Conn_01x04',
+      expectedFootprint: 'BOOMELE_1.0T-4P',
+    },
   ] as const)(
     'promotes frozen-gold $partNumber through exact local symbol and footprint parity',
     ({
@@ -437,6 +512,25 @@ describe('verified function-keyed PCB candidates', () => {
       nameHuman: 'USB power entry',
       characterId: 'usb_power_entry',
       functionClass: 'usb_connector',
+    }, lookup)).toBeNull()
+  })
+
+  it('does not retain the disproven vertical JST identity for the Colorimeter source connector', () => {
+    const lookup = (): DbCascadeResult => ({
+      ...CACHE_HIT,
+      result: {
+        ...CACHE_HIT.result!,
+        mpn: 'BM04B-SRSS-TB',
+        manufacturer: 'JST Sales America Inc.',
+        description: 'CONN HEADER SMD 4POS 1MM VERTICAL',
+      },
+    })
+
+    expect(resolveVerifiedFunctionCandidate({
+      wordId: 'source_board_connector_word',
+      nameHuman: 'Four-position right-angle source board connector',
+      characterId: 'source_board_connector',
+      functionClass: 'connector',
     }, lookup)).toBeNull()
   })
 

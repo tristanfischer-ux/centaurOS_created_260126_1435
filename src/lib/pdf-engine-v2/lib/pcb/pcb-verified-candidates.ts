@@ -5,6 +5,8 @@
  * Product names never participate in runtime selection.
  */
 
+import { resolve } from 'node:path'
+
 import type {
   DbCascadeResult,
   DbCascadeSource,
@@ -91,7 +93,21 @@ interface CandidateRule {
   pinoutEvidence?: string
 }
 
+const CURATED_FOOTPRINTS_ROOT = resolve(__dirname, 'footprints')
+
 const CANDIDATE_RULES: readonly CandidateRule[] = [
+  {
+    roleTest: /(?=.*470\s*nm)(?=.*(?:led|optical[_ -]?source))/i,
+    functionClass: 'led',
+    manufacturer: 'Yongyu Photoelectric',
+    partNumber: 'SZYY0603B',
+    footprint: { library: 'LED_SMD', footprint: 'LED_0603_1608Metric' },
+    symbol: { library: 'Device', symbol: 'LED' },
+    ratings: { voltageV: 3.3, currentA: 0.03 },
+    packageEvidence: 'Yongyu SZYY0603B: blue water-clear LED in 0603 (1.6 x 0.8 x 0.6 mm), 469 nm peak, 460-475 nm dominant wavelength',
+    referenceEvidence: 'Open Colorimeter frozen 470 nm source board specifies one 0603 LED at 3.1 V / 15 mA, revision b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7; Yongyu SZYY0603B manufacturer data distributed as LCSC C434421',
+    pinoutEvidence: 'Yongyu 0603 polarity drawing; local KiCad Device:LED with LED_SMD:LED_0603_1608Metric',
+  },
   {
     roleTest: /wi[_ -]?fi[_ -]?module|esp8266[_ -]?module/i,
     functionClass: 'connectivity_ic',
@@ -278,19 +294,19 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     pinoutEvidence: 'Molex three through-hole contacts; local KiCad Connector_Generic:Conn_01x03 with exact 6410-03A footprint',
   },
   {
-    roleTest: /source[_ -]?board[_ -]?connector|four[_ -]?(?:position|pin)[_ -]?(?:board[_ -]?to[_ -]?board[_ -]?)?connector/i,
+    roleTest: /source[_ -]?board[_ -]?connector/i,
     functionClass: 'connector',
-    manufacturer: 'JST Sales America Inc.',
-    partNumber: 'BM04B-SRSS-TB',
+    manufacturer: 'BOOMELE (Boom Precision Elec)',
+    partNumber: '1.0T-4P',
     footprint: {
-      library: 'Connector_JST',
-      footprint: 'JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical',
+      library: 'Forge_Manufacturer',
+      footprint: 'BOOMELE_1.0T-4P',
     },
     symbol: { library: 'Connector_Generic', symbol: 'Conn_01x04' },
     ratings: { voltageV: 50, currentA: 1 },
-    packageEvidence: 'JST SH BM04B-SRSS-TB: four SMD contacts, 1.00 mm pitch, vertical header',
-    referenceEvidence: 'JST SH manufacturer data sheet https://www.jst-mfg.com/product/pdf/eng/eSH.pdf; Pioreactor Eye-Spy frozen BOM and schematic, revision ca40a91e728801b139b1086853f7cf74ce76def9; Digi-Key 455-BM04B-SRSS-TBTR-ND',
-    pinoutEvidence: 'frozen Eye-Spy schematic J1/J2 pins 1-4; local KiCad Connector_Generic:Conn_01x04 and exact JST footprint',
+    packageEvidence: 'BOOMELE 1.0T-4P: four-contact, 1.00 mm-pitch, right-angle SMD SH-compatible header',
+    referenceEvidence: 'Open Colorimeter frozen source-board J1/J2 use BOOMELE_SH_SMD:BOOMELE_SMD_SH_4PIN_RT and identify LCSC C145956, revision b7f37ae1d1f6d254e37b1a89ee1e2aac75eb5fb7; BOOMELE 1.0T-4P manufacturer data distributed as LCSC C145956',
+    pinoutEvidence: 'frozen source-board J1/J2 pins 1=GND, 2=3V3, 3=SDA, 4=SCL; local KiCad Connector_Generic:Conn_01x04 with the frozen BOOMELE 1.0T-4P land pattern',
   },
   {
     roleTest: /esd[_ -]?protection|(?:^|[_ -])tvs(?:$|[_ -])|transient[_ -]?protection/i,
@@ -441,6 +457,7 @@ export function resolveVerifiedComponentIdentity(
     : resolveKicadSymbol(roots.symbolsRoot, rule.symbol)
   const footprint = curated?.footprint
     ?? resolveKicadFootprint(roots.footprintsRoot, rule.footprint)
+    ?? resolveKicadFootprint(CURATED_FOOTPRINTS_ROOT, rule.footprint)
   if (!footprint) {
     return {
       status: 'unresolved',

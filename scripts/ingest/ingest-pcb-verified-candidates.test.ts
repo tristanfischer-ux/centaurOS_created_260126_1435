@@ -54,7 +54,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     return databasePath
   }
 
-  it('writes only the ten exact candidates with complete evidence metadata', async () => {
+  it('writes only the twelve exact candidates with complete evidence metadata', async () => {
     const databasePath = createTemporaryDatabase()
     const embedding = Buffer.alloc(1536 * 4, 7)
 
@@ -66,10 +66,10 @@ describe('off-chain verified PCB candidate ingest', () => {
     })
 
     expect(result).toEqual({
-      inserted: 10,
+      inserted: 12,
       updated: 0,
       unchanged: 0,
-      embedded: 10,
+      embedded: 12,
       dryRun: false,
     })
 
@@ -82,7 +82,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     `).all() as Array<Record<string, unknown>>
     database.close()
 
-    expect(rows).toHaveLength(10)
+    expect(rows).toHaveLength(12)
     expect(rows.map((row) => row.part_number).sort()).toEqual(
       PCB_VERIFIED_CANDIDATES.map((candidate) => candidate.partNumber).sort(),
     )
@@ -108,6 +108,8 @@ describe('off-chain verified PCB candidate ingest', () => {
       'MCP1700T-3302E/TT',
       'NAU7802SGI',
       'OPA334AIDBVR',
+      'SZYY0603B',
+      '1.0T-4P',
     ]))
   })
 
@@ -126,7 +128,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     expect(second).toEqual({
       inserted: 0,
       updated: 0,
-      unchanged: 10,
+      unchanged: 12,
       embedded: 0,
       dryRun: false,
     })
@@ -140,8 +142,8 @@ describe('off-chain verified PCB candidate ingest', () => {
     ).get() as { count: number }
     database.close()
 
-    expect(documentCount.count).toBe(10)
-    expect(partCount.count).toBe(10)
+    expect(documentCount.count).toBe(12)
+    expect(partCount.count).toBe(12)
   })
 
   it('preserves an existing embedding when an update cannot generate a replacement', async () => {
