@@ -435,6 +435,45 @@ describe('verified function-keyed PCB candidates', () => {
       expectedSymbol: 'Connector_Generic:Conn_01x04',
       expectedFootprint: 'BOOMELE_1.0T-4P',
     },
+    {
+      request: {
+        wordId: 'dac_output_stage_word',
+        nameHuman: '50 kohm SPI high-voltage setpoint potentiometer',
+        characterId: 'programmable_hv_setpoint',
+        functionClass: 'programmable_resistor',
+        requiredRatings: { voltageV: 3.3 },
+      },
+      manufacturer: 'Microchip Technology',
+      partNumber: 'MCP41050-I/SN',
+      expectedSymbol: 'Potentiometer_Digital:MCP41050',
+      expectedFootprint: 'SOIC-8_3.9x4.9mm_P1.27mm',
+    },
+    {
+      request: {
+        wordId: 'esd_protection_network_word',
+        nameHuman: 'Five-line 5 V ESD protection array',
+        characterId: 'five_line_esd_protection',
+        functionClass: 'diode_protection',
+        requiredRatings: { voltageV: 5 },
+      },
+      manufacturer: 'Nexperia',
+      partNumber: 'PESD5V0L5UY',
+      expectedSymbol: 'Power_Protection:PESD5V0L5UY',
+      expectedFootprint: 'SOT-363_SC-70-6',
+    },
+    {
+      request: {
+        wordId: 'current_measurement_tia_word',
+        nameHuman: 'Droplet feedback amplifier',
+        characterId: 'droplet_feedback_amplifier',
+        functionClass: 'op_amp',
+        requiredRatings: { voltageV: 5 },
+      },
+      manufacturer: 'Microchip Technology',
+      partNumber: 'MCP6002-I/SN',
+      expectedSymbol: 'Amplifier_Operational:MCP6002-xSN',
+      expectedFootprint: 'SOIC-8_3.9x4.9mm_P1.27mm',
+    },
   ] as const)(
     'promotes frozen-gold $partNumber through exact local symbol and footprint parity',
     ({

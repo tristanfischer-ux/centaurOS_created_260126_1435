@@ -54,7 +54,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     return databasePath
   }
 
-  it('writes only the fourteen exact candidates with complete evidence metadata', async () => {
+  it('writes only the declared exact candidates with complete evidence metadata', async () => {
     const databasePath = createTemporaryDatabase()
     const embedding = Buffer.alloc(1536 * 4, 7)
 
@@ -66,10 +66,10 @@ describe('off-chain verified PCB candidate ingest', () => {
     })
 
     expect(result).toEqual({
-      inserted: 14,
+      inserted: PCB_VERIFIED_CANDIDATES.length,
       updated: 0,
       unchanged: 0,
-      embedded: 14,
+      embedded: PCB_VERIFIED_CANDIDATES.length,
       dryRun: false,
     })
 
@@ -82,7 +82,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     `).all() as Array<Record<string, unknown>>
     database.close()
 
-    expect(rows).toHaveLength(14)
+    expect(rows).toHaveLength(PCB_VERIFIED_CANDIDATES.length)
     expect(rows.map((row) => row.part_number).sort()).toEqual(
       PCB_VERIFIED_CANDIDATES.map((candidate) => candidate.partNumber).sort(),
     )
@@ -112,7 +112,15 @@ describe('off-chain verified PCB candidate ingest', () => {
       '1.0T-4P',
       'BAS70-04',
       '3800',
+      'MCP41050-I/SN',
+      'PESD5V0L5UY',
+      'MCP6002-I/SN',
     ]))
+    for (const partNumber of ['MCP41050-I/SN', 'PESD5V0L5UY', 'MCP6002-I/SN']) {
+      const row = rows.find((candidate) => candidate.part_number === partNumber)
+      const metadata = JSON.parse(String(row?.raw_excerpt)) as Record<string, unknown>
+      expect(metadata.pinout).toEqual(expect.any(String))
+    }
   })
 
   it('is idempotent and does not duplicate documents or part rows', async () => {
@@ -130,7 +138,7 @@ describe('off-chain verified PCB candidate ingest', () => {
     expect(second).toEqual({
       inserted: 0,
       updated: 0,
-      unchanged: 14,
+      unchanged: PCB_VERIFIED_CANDIDATES.length,
       embedded: 0,
       dryRun: false,
     })
@@ -144,8 +152,8 @@ describe('off-chain verified PCB candidate ingest', () => {
     ).get() as { count: number }
     database.close()
 
-    expect(documentCount.count).toBe(14)
-    expect(partCount.count).toBe(14)
+    expect(documentCount.count).toBe(PCB_VERIFIED_CANDIDATES.length)
+    expect(partCount.count).toBe(PCB_VERIFIED_CANDIDATES.length)
   })
 
   it('preserves an existing embedding when an update cannot generate a replacement', async () => {

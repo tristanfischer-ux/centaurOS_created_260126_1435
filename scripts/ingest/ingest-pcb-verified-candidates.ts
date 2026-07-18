@@ -23,6 +23,7 @@ interface PcbVerifiedCandidate {
   componentClass: string
   function: string
   package: string
+  pinout?: string
   ratings: Record<string, string | number | boolean>
   sourceUrl: string
   sourceCommit: string
@@ -292,6 +293,62 @@ export const PCB_VERIFIED_CANDIDATES: readonly PcbVerifiedCandidate[] = [
     sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
     evidence: 'Amphenol product data identifies 12401610E4#2A as a 24-contact right-angle top-mount USB Type-C receptacle; frozen OpenDrop J1 uses its exact footprint.',
   },
+  {
+    partName: '50 kohm SPI high-voltage setpoint potentiometer',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP41050-I/SN',
+    componentClass: 'programmable_resistor',
+    function: '256-position SPI adjustment of the MAX1771 high-voltage feedback setpoint',
+    package: '8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch (SN)',
+    pinout: 'pins 1=CS, 2=SCK, 3=SI, 4=VSS, 5=PA0, 6=PW0, 7=PB0, 8=VDD',
+    ratings: {
+      supplyVoltageV: '2.7 to 5.5',
+      nominalResistanceOhm: 50000,
+      resolutionBits: 8,
+      wiperCurrentA: 0.001,
+      operatingTemperatureC: '-40 to 85',
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/11195c.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Microchip DS11195C identifies MCP41050-I/SN as the industrial-temperature 50 kohm, 256-position SPI potentiometer in eight-lead SOIC; frozen OpenDrop U15 has value MCP41050 and SO08 footprint on the MAX1771 VSENS setpoint path.',
+  },
+  {
+    partName: 'Five-line 5 V ESD protection diode array',
+    manufacturer: 'Nexperia',
+    partNumber: 'PESD5V0L5UY',
+    componentClass: 'diode_protection',
+    function: 'five-channel unidirectional ESD and transient protection for exposed low-voltage lines',
+    package: 'six-lead SOT363 (SC-88)',
+    pinout: 'pins 1/3/4/5/6=cathodes 1-5; pin 2=common anode',
+    ratings: {
+      reverseStandoffVoltageV: 5,
+      clampingVoltageV: 12,
+      peakPulseCurrentA: 2.5,
+      diodeCapacitancePf: 19,
+      contactDischargeKv: 8,
+    },
+    sourceUrl: 'https://assets.nexperia.com/documents/data-sheet/PESDXL5UF_V_Y.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Nexperia PESDxL5UF/V/Y Rev. 02 identifies PESD5V0L5UY as a fivefold 5 V array in SOT363; frozen OpenDrop D4 names the exact MPN and SOT-363_SC-70-6 footprint.',
+  },
+  {
+    partName: 'Dual rail-to-rail droplet feedback amplifier',
+    manufacturer: 'Microchip Technology',
+    partNumber: 'MCP6002-I/SN',
+    componentClass: 'op_amp',
+    function: 'dual low-power feedback amplifier for droplet-presence sensing',
+    package: '8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch (SN)',
+    pinout: 'pins 1=VOUTA, 2=VINA-, 3=VINA+, 4=VSS, 5=VINB+, 6=VINB-, 7=VOUTB, 8=VDD',
+    ratings: {
+      supplyVoltageV: '1.8 to 6.0',
+      gainBandwidthMhz: 1,
+      quiescentCurrentUaPerAmplifier: 100,
+      operatingTemperatureC: '-40 to 85',
+    },
+    sourceUrl: 'https://ww1.microchip.com/downloads/en/DeviceDoc/MCP6001-1R-1U-2-4-1-MHz-Low-Power-Op-Amp-DS20001733L.pdf',
+    sourceCommit: '934a44db3ed41c24ae4dddb5b805a22e4166284b',
+    evidence: 'Microchip DS20001733L identifies MCP6002-I/SN as the industrial-temperature dual 1 MHz rail-to-rail op amp in eight-lead SOIC; frozen OpenDrop U6 has value MCP6002 and SO08 footprint in the named FEEDBACK AMPLIFIER.',
+  },
 ] as const
 
 interface ExistingPartRow {
@@ -317,6 +374,7 @@ function metadataFor(candidate: PcbVerifiedCandidate): string {
     evidence: candidate.evidence,
     function: candidate.function,
     package: candidate.package,
+    pinout: candidate.pinout,
     ratings: candidate.ratings,
     sourceCommit: candidate.sourceCommit,
     sourceUrl: candidate.sourceUrl,

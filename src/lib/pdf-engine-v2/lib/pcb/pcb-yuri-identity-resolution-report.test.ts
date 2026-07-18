@@ -36,6 +36,12 @@ interface ResolutionReport {
   }
   acceptedMappings: AcceptedMapping[]
   pendingExactMappings: AcceptedMapping[]
+  rejectedMappings: Array<{
+    punchlistId: string
+    rejectedIdentity: string
+    reason: string
+    evidence: string
+  }>
   sevenProductSummary: ProductSummary[]
   updatedSummary: {
     products: number
@@ -94,11 +100,11 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(7)
+    expect(report.acceptedMappings).toHaveLength(11)
     expect(report.pendingExactMappings).toHaveLength(0)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
-    expect(punchlist.scopeReclassifications).toHaveLength(16)
+    expect(punchlist.scopeReclassifications).toHaveLength(20)
     expect(report.sevenProductSummary).toHaveLength(7)
     expect(report.sevenProductSummary.reduce(
       (total, product) => total + product.requiredBoards,
@@ -149,6 +155,10 @@ describe('offline seven-product PCB identity resolution report', () => {
       'rodeostat-analog_afe-usb_power_entry_word': 'off_board_module',
       'rodeostat-analog_afe-usb_interface_word': 'off_board_module',
       'rodeostat-analog_afe-host_protocol_bridge_word': 'interconnect_only',
+      'rodeostat-analog_afe-adc_input_stage_word': 'off_board_module',
+      'rodeostat-analog_afe-ferrite_emc_bead_word': 'passive_topology',
+      'rodeostat-analog_afe-power_indicator_led_word': 'off_board_module',
+      'rodeostat-analog_afe-status_indicator_word': 'off_board_module',
       'opendrop-hv_controller_main-usb_interface_word': 'interconnect_only',
       'opendrop-electrode_cartridge-required_electrode_channel_word': 'passive_geometry',
     })
@@ -203,17 +213,55 @@ describe('offline seven-product PCB identity resolution report', () => {
       mapping.databaseEvidence.includes('manufacturer_verified_pcb_ingest'))).toBe(true)
   })
 
+  it('rejects all seven OpenDrop roles without exact fitted-part evidence', () => {
+    const report = readJson<ResolutionReport>(REPORT_PATH)
+    const rejectedOpenDrop = report.rejectedMappings.filter((mapping) =>
+      mapping.punchlistId.startsWith('opendrop-'))
+
+    expect(rejectedOpenDrop.map((mapping) => mapping.punchlistId).sort()).toEqual([
+      'opendrop-hv_controller_main-adc_input_stage_word',
+      'opendrop-hv_controller_main-debug_header_word',
+      'opendrop-hv_controller_main-ferrite_emc_bead_word',
+      'opendrop-hv_controller_main-firmware_storage_word',
+      'opendrop-hv_controller_main-host_protocol_bridge_word',
+      'opendrop-hv_controller_main-power_indicator_led_word',
+      'opendrop-hv_controller_main-status_indicator_word',
+    ])
+    for (const rejection of rejectedOpenDrop) {
+      expect(rejection.rejectedIdentity.trim()).not.toBe('')
+      expect(rejection.reason).toMatch(/exact|ordering code|not fitted/i)
+      expect(rejection.evidence).toContain('934a44db3ed41c24ae4dddb5b805a22e4166284b')
+    }
+  })
+
+  it('accepts the three exact OpenDrop residual identities', () => {
+    const report = readJson<ResolutionReport>(REPORT_PATH)
+    const acceptedOpenDropResiduals = report.acceptedMappings
+      .filter((mapping) => [
+        'opendrop-hv_controller_main-dac_output_stage_word',
+        'opendrop-hv_controller_main-esd_protection_network_word',
+        'opendrop-hv_controller_main-current_measurement_tia_word',
+      ].includes(mapping.punchlistId))
+      .map((mapping) => [mapping.punchlistId, mapping.partNumber])
+
+    expect(acceptedOpenDropResiduals).toEqual([
+      ['opendrop-hv_controller_main-dac_output_stage_word', 'MCP41050-I/SN'],
+      ['opendrop-hv_controller_main-esd_protection_network_word', 'PESD5V0L5UY'],
+      ['opendrop-hv_controller_main-current_measurement_tia_word', 'MCP6002-I/SN'],
+    ])
+  })
+
   it('reports the exact honest delta without claiming a pipeline rerun', () => {
     const report = readJson<ResolutionReport>(REPORT_PATH)
 
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 7,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 7 - 16,
-      resolvedDelta: 7,
-      reclassifiedNonComponentCount: 16,
-      missingMpn: 27,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 11,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 11 - 20,
+      resolvedDelta: 11,
+      reclassifiedNonComponentCount: 20,
+      missingMpn: 19,
       missingSymbolPinout: 0,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([

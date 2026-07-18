@@ -9,10 +9,10 @@
   },
   "summary": {
     "baselineUnresolvedFittedComponents": 50,
-    "resolvedIdentityCount": 8,
+    "resolvedIdentityCount": 11,
     "reclassifiedNonComponentCount": 20,
-    "remainingUnresolvedFittedComponents": 22,
-    "remainingMissingMpn": 22,
+    "remainingUnresolvedFittedComponents": 19,
+    "remainingMissingMpn": 19,
     "remainingMissingSymbolPinout": 0,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
@@ -23,6 +23,9 @@
     "rodeostat-analog_afe-dac_output_stage_word",
     "rodeostat-analog_afe-current_measurement_tia_word",
     "opendrop-hv_controller_main-usb_power_entry_word",
+    "opendrop-hv_controller_main-dac_output_stage_word",
+    "opendrop-hv_controller_main-esd_protection_network_word",
+    "opendrop-hv_controller_main-current_measurement_tia_word",
     "colorimeter-optical_source-led_source_word",
     "colorimeter-optical_source-source_board_connector_word",
     "rodeostat-analog_afe-esd_protection_network_word"
@@ -793,19 +796,24 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "esd_protection_network_word",
-          "characterId": "esd_protection_network",
+          "characterId": "five_line_esd_protection",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["protected USB/LV/HV interfaces", "working/clamp voltage", "capacitance", "channel count", "surge standard"],
-            "evidence": ["Offline report supplies only a generic two-pin diode placeholder."]
+            "status": "source_verified",
+            "requirements": ["five unidirectional 5 V protection channels", "12 V maximum clamp at 2.5 A", "19 pF maximum capacitance", "IEC 61000-4-2 level 4", "six-lead SOT363"],
+            "missing": ["closed by exact PESD5V0L5UY mapping"],
+            "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and SOT-363_SC-70-6; Nexperia Rev. 02 closes ratings and pinout."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No manufacturer protection-array MPN or interface-specific ratings." },
-          "sourceCandidate": null,
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Nexperia PESD5V0L5UY identity, package, pinout and ratings." },
+          "sourceCandidate": {
+            "identity": "Nexperia PESD5V0L5UY",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; Nexperia PESDxL5UF/V/Y Rev. 02; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
+            "disposition": "accepted"
+          },
           "exactAction": {
-            "action": "derive_and_source",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Partition USB/LV/HV interfaces and derive protection per interface.", "Source manufacturer devices with leakage/capacitance/clamp evidence.", "Ingest and map every channel/pin."]
+            "action": "resolved_exact_mpn",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
+            "acceptance": ["Resolve Nexperia PESD5V0L5UY.", "Map pins 1/3/4/5/6 as cathodes and pin 2 as common anode.", "Require exact SOT-363_SC-70-6 pad parity."]
           }
         },
         {
@@ -1188,19 +1196,24 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "dac_output_stage_word",
-          "characterId": "dac_output_stage",
+          "characterId": "programmable_hv_setpoint",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["whether DAC exists", "electrowetting HV setpoint range", "isolation", "drive/load", "noise/settling"],
-            "evidence": ["Gold-gap audit identifies this analog-front-end template as wrong for OpenDrop's HV matrix architecture."]
+            "status": "source_verified",
+            "requirements": ["50 kohm, 256-position SPI high-voltage setpoint adjustment", "2.7-5.5 V supply", "8-lead SOIC"],
+            "missing": ["closed by exact MCP41050-I/SN mapping"],
+            "evidence": ["Frozen OpenDrop U15 is MCP41050 in SO08 on the MAX1771 VSENS path; Microchip DS11195C identifies exact industrial SOIC ordering code MCP41050-I/SN."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "No source-backed DAC/output-stage MPN; role may be a foreign potentiostat template." },
-          "sourceCandidate": null,
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Microchip MCP41050-I/SN identity, package, pinout and ratings." },
+          "sourceCandidate": {
+            "identity": "Microchip Technology MCP41050-I/SN",
+            "evidenceLevel": "manufacturer_ordering_code",
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS11195C; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
+            "disposition": "accepted"
+          },
           "exactAction": {
-            "action": "reclassify",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the generic DAC role unless the frozen HV converter/control path proves it.", "Derive the real MAX1771/HV feedback/control chain from source."]
+            "action": "resolved_exact_mpn",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
+            "acceptance": ["Resolve Microchip MCP41050-I/SN.", "Map SOIC-8 SPI and PA0/PW0/PB0 pinout.", "Retain only the frozen MAX1771 VSENS setpoint function."]
           }
         },
         {
@@ -1233,24 +1246,24 @@
           "product": "OpenDrop",
           "targetBoard": { "boardId": "hv_controller_main", "boardRole": "high_voltage_controller" },
           "wordId": "current_measurement_tia_word",
-          "characterId": "current_measurement_tia",
+          "characterId": "droplet_feedback_amplifier",
           "requiredRatings": {
-            "status": "unproven",
-            "requirements": [],
-            "missing": ["whether TIA exists", "measured current range", "bias/noise/bandwidth", "HV isolation"],
-            "evidence": ["Gold-gap audit identifies the generated potentiostat analog template as wrong for OpenDrop."]
+            "status": "source_verified",
+            "requirements": ["dual rail-to-rail droplet feedback amplifier", "1.8-6.0 V supply", "1 MHz gain bandwidth", "8-lead SOIC"],
+            "missing": ["closed by exact MCP6002-I/SN mapping"],
+            "evidence": ["Frozen OpenDrop U6 is MCP6002 in SO08 in the named FEEDBACK AMPLIFIER; Microchip DS20001733L closes package, pinout and ratings."]
           },
-          "missingEvidence": { "kind": "mpn", "details": "OPA334AIDBVR now has the correct manufacturer-backed 6-pin SOT-23 DBV mapping, but is rejected because OpenDrop has no source-backed potentiostat TIA role. The actual HV feedback component identity remains missing." },
+          "missingEvidence": { "kind": "mpn", "details": "Closed by exact Microchip MCP6002-I/SN identity, package, pinout and ratings; OPA334 remains rejected." },
           "sourceCandidate": {
-            "identity": "Texas Instruments OPA334AIDBVR",
+            "identity": "Microchip Technology MCP6002-I/SN",
             "evidenceLevel": "manufacturer_ordering_code",
-            "source": "forge-truth:DB-verified row recorded by /tmp/pcb-yuri-identity-final/verification-report.json",
-            "disposition": "reject_for_target_role"
+            "source": "forge-truth:manufacturer_verified_pcb_ingest; Microchip DS20001733L; frozen OpenDrop 934a44db3ed41c24ae4dddb5b805a22e4166284b",
+            "disposition": "accepted"
           },
           "exactAction": {
-            "action": "reclassify",
-            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-architecture.ts",
-            "acceptance": ["Remove the potentiostat TIA role.", "Derive OpenDrop's actual HV feedback/sense circuitry from the frozen source.", "Source/map only proven components."]
+            "action": "resolved_exact_mpn",
+            "targetSource": "src/lib/pdf-engine-v2/lib/pcb/pcb-verified-candidates.ts",
+            "acceptance": ["Resolve Microchip MCP6002-I/SN.", "Map the exact dual-op-amp SOIC-8 pinout.", "Name the role droplet feedback amplifier rather than an unevidenced HV TIA."]
           }
         }
       ]

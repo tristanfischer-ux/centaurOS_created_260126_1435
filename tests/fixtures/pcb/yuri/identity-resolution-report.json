@@ -134,6 +134,24 @@
       "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact ST row; source URL and frozen source commit embedded in row metadata"
     },
     {
+      "punchlistId": "rodeostat-analog_afe-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "Low-leakage electrochemical rail clamp",
+        "characterId": "low_leakage_rail_clamp",
+        "functionClass": "diode_protection",
+        "requiredRatings": { "voltageV": 70, "currentA": 0.07 }
+      },
+      "manufacturer": "Slkor",
+      "partNumber": "BAS70-04",
+      "roleCompatibility": "Frozen Rodeostat D1/D2 use the exact dual-series low-leakage Schottky clamp on the precision analogue path.",
+      "package": "SOT-23, three terminals, dual Schottky diodes in series",
+      "ratings": "70 V reverse; 70 mA forward; 100 nA maximum leakage at 50 V; 2 pF maximum capacitance",
+      "symbolPinout": "Forge_Manufacturer:BAS70-04; pins 1 A1, 2 K2, 3 K1/A2; Package_TO_SOT_SMD:SOT-23",
+      "manufacturerEvidence": "Slkor BAS70-04 manufacturer data distributed as LCSC C609810; frozen Rodeostat D1/D2 exact BOM and schematic identity",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Slkor row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
       "punchlistId": "opendrop-hv_controller_main-usb_power_entry_word",
       "resolverRequest": {
         "wordId": "usb_power_entry_word",
@@ -153,9 +171,107 @@
       "symbolPinout": "Connector:USB_C_Receptacle; contacts A1-A12/B1-B12 plus SH; Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A",
       "manufacturerEvidence": "Amphenol 12401610E4#2A manufacturer data; frozen OpenDrop J1 exact footprint identity",
       "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Amphenol row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-dac_output_stage_word",
+      "resolverRequest": {
+        "wordId": "dac_output_stage_word",
+        "nameHuman": "50 kohm SPI high-voltage setpoint potentiometer",
+        "characterId": "programmable_hv_setpoint",
+        "functionClass": "programmable_resistor",
+        "requiredRatings": { "voltageV": 3.3 }
+      },
+      "manufacturer": "Microchip Technology",
+      "partNumber": "MCP41050-I/SN",
+      "roleCompatibility": "Frozen OpenDrop U15 is the 50 kohm SPI device on the MAX1771 VSENS high-voltage setpoint path.",
+      "package": "8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch",
+      "ratings": "2.7-5.5 V supply; 50 kohm nominal; 256 positions; 1 mA maximum wiper current; -40 to +85 C",
+      "symbolPinout": "Potentiometer_Digital:MCP41050; pins 1 CS, 2 SCK, 3 SI, 4 VSS, 5 PA0, 6 PW0, 7 PB0, 8 VDD; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "Microchip MCP41XXX/42XXX data sheet DS11195C; frozen OpenDrop U15 value, SO08 footprint and VSENS net",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Microchip row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-esd_protection_network_word",
+      "resolverRequest": {
+        "wordId": "esd_protection_network_word",
+        "nameHuman": "Five-line 5 V ESD protection array",
+        "characterId": "five_line_esd_protection",
+        "functionClass": "diode_protection",
+        "requiredRatings": { "voltageV": 5 }
+      },
+      "manufacturer": "Nexperia",
+      "partNumber": "PESD5V0L5UY",
+      "roleCompatibility": "Frozen OpenDrop D4 uses this five-line common-anode array on exposed low-voltage channels.",
+      "package": "six-lead SOT363 (SC-88)",
+      "ratings": "5 V reverse standoff; 12 V maximum clamp at 2.5 A; 19 pF maximum per line; IEC 61000-4-2 level 4",
+      "symbolPinout": "Power_Protection:PESD5V0L5UY; pins 1/3/4/5/6 cathodes 1-5, pin 2 common anode; Package_TO_SOT_SMD:SOT-363_SC-70-6",
+      "manufacturerEvidence": "Nexperia PESDxL5UF/V/Y Rev. 02; frozen OpenDrop D4 exact value and footprint",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Nexperia row; source URL and frozen source commit embedded in row metadata"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-current_measurement_tia_word",
+      "resolverRequest": {
+        "wordId": "current_measurement_tia_word",
+        "nameHuman": "Droplet feedback amplifier",
+        "characterId": "droplet_feedback_amplifier",
+        "functionClass": "op_amp",
+        "requiredRatings": { "voltageV": 5 }
+      },
+      "manufacturer": "Microchip Technology",
+      "partNumber": "MCP6002-I/SN",
+      "roleCompatibility": "Frozen OpenDrop U6 is the dual rail-to-rail FEEDBACK AMPLIFIER used for droplet-presence sensing.",
+      "package": "8-lead SOIC, 3.9 x 4.9 mm body, 1.27 mm pitch",
+      "ratings": "1.8-6.0 V supply; 1 MHz gain bandwidth; 100 uA typical quiescent current per amplifier; -40 to +85 C",
+      "symbolPinout": "Amplifier_Operational:MCP6002-xSN; pins 1 VOUTA, 2 VINA-, 3 VINA+, 4 VSS, 5 VINB+, 6 VINB-, 7 VOUTB, 8 VDD; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "Microchip MCP6001/2/4 data sheet DS20001733L; frozen OpenDrop U6 value, SO08 footprint and FEEDBACK net",
+      "databaseEvidence": "forge-truth manufacturer_verified_pcb_ingest exact Microchip row; source URL and frozen source commit embedded in row metadata"
     }
   ],
   "pendingExactMappings": [],
+  "rejectedMappings": [
+    {
+      "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
+      "rejectedIdentity": "Nuvoton NAU7802SGI",
+      "reason": "Rejected: bridge-sensor ADC is not fitted in OpenDrop; the frozen SAMD21 owns ADC conversion and no exact discrete ADC ordering code exists.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b contains no NAU7802 or other discrete ADC."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
+      "rejectedIdentity": "Unspecified 0603 ferrite bead",
+      "reason": "Rejected for exact closure: FB1-FB8 have only generic values and no manufacturer ordering code or impedance/current/DCR rating.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies only Ferrite_Bead_Small in L_0603_1608Metric."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-power_indicator_led_word",
+      "rejectedIdentity": "TE Connectivity 4-2489541-7",
+      "reason": "Rejected: the 110 V panel indicator is not fitted and the frozen 0603 LED positions have no exact ordering code or power-state assignment.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies LED1-LED3 only as generic LED values."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-firmware_storage_word",
+      "rejectedIdentity": "Unspecified discrete firmware memory",
+      "reason": "Rejected as not fitted: firmware resides in SAMD21 internal flash and no exact external-memory ordering code exists.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b contains the SAMD21 and no discrete SPI/I2C memory."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-debug_header_word",
+      "rejectedIdentity": "Generic 2x5 1.27 mm SMD header",
+      "reason": "Rejected for exact closure: J2 proves geometry and SWD nets but supplies no manufacturer ordering code.",
+      "evidence": "Frozen OpenDrop J2 revision 934a44db3ed41c24ae4dddb5b805a22e4166284b is Conn_02x05_Odd_Even with a generic Pin_Header_Straight_2x05_Pitch1.27mm_SMD footprint."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-host_protocol_bridge_word",
+      "rejectedIdentity": "Unspecified host protocol bridge",
+      "reason": "Rejected as not fitted: SAMD21 native USB connects directly to USB D+/D- and no exact bridge ordering code exists.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b routes USB directly to SAMD21 PA24/PA25 and contains no bridge IC."
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
+      "rejectedIdentity": "Generic LED1/LED2/LED3 0603 positions",
+      "reason": "Rejected for exact closure: the source proves RX_LED and D13 roles but no LED manufacturer ordering code, colour or optical rating.",
+      "evidence": "Frozen OpenDrop schematic revision 934a44db3ed41c24ae4dddb5b805a22e4166284b identifies generic 0603 LEDs with 390 ohm resistors only."
+    }
+  ],
   "sevenProductSummary": [
     {
       "product": "Colorimeter",
@@ -190,32 +306,32 @@
     {
       "product": "Rodeostat",
       "requiredBoards": 1,
-      "resolvedDelta": 2,
-      "remainingUnresolved": 5
+      "resolvedDelta": 3,
+      "remainingUnresolved": 0
     },
     {
       "product": "OpenDrop",
       "requiredBoards": 2,
-      "resolvedDelta": 1,
-      "remainingUnresolved": 10
+      "resolvedDelta": 4,
+      "remainingUnresolved": 7
     }
   ],
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 42,
-    "unresolvedIdentityCount": 27,
-    "resolvedDelta": 7,
-    "reclassifiedNonComponentCount": 16,
-    "missingMpn": 27,
+    "verifiedIdentityCount": 46,
+    "unresolvedIdentityCount": 19,
+    "resolvedDelta": 11,
+    "reclassifiedNonComponentCount": 20,
+    "missingMpn": 19,
     "missingSymbolPinout": 0
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
-    "optical_source_and_visual_indication": 6,
-    "power_entry_conversion_and_protection": 12,
+    "optical_source_and_visual_indication": 4,
+    "power_entry_conversion_and_protection": 9,
     "digital_compute_communications_and_storage": 5,
-    "precision_analog_measurement_and_control": 4,
+    "precision_analog_measurement_and_control": 1,
     "wet_actuation_drive": 0,
     "board_to_board_and_cartridge_interconnect": 0
   },

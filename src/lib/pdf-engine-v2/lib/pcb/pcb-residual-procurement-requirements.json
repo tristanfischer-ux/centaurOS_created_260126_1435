@@ -1,8 +1,8 @@
 {
   "schema": "pcb-residual-procurement-requirements/v1",
   "baselineCount": 29,
-  "resolvedExactMpnCount": 3,
-  "residualProcurementCount": 22,
+  "resolvedExactMpnCount": 6,
+  "residualProcurementCount": 19,
   "requirements": [
     {
       "punchlistId": "colorimeter-optical_source-led_source_word",
@@ -241,8 +241,8 @@
       "interface": "SAMD21 DAC/PWM or discrete DAC into isolated/attenuated feedback path.",
       "packageConstraints": "Remain entirely on LV side with creepage to 65-260 V domain.",
       "environmentLifecycle": "-40 to +85 C minimum; monotonic output and reference drift specified.",
-      "evidence": ["Frozen OpenDrop uses MAX1771ESA feedback control.", "No separate DAC output-stage ordering code is evidenced; generated role came from a potentiostat template."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Trace the frozen MAX1771 setpoint path and prove a discrete DAC is needed before sourcing." }
+      "evidence": ["Frozen OpenDrop U15 is MCP41050 in an SO08 footprint on the MAX1771 VSENS setpoint path.", "Microchip DS11195C identifies MCP41050-I/SN as the industrial 50 kohm, 256-position SPI potentiometer in 8-lead SOIC."],
+      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Microchip Technology", "partNumber": "MCP41050-I/SN", "blocker": null }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-adc_input_stage_word",
@@ -265,8 +265,8 @@
       "interface": "USB-C receptacle-side TVS array and VBUS protection placed at entry.",
       "packageConstraints": "Flow-through USB array preferred; maintain creepage from HV copper.",
       "environmentLifecycle": "-40 to +85 C minimum; IEC 61000-4-2 contact/air rating and active lifecycle.",
-      "evidence": ["Frozen OpenDrop has a 24-contact USB-C entry and 65-260 V HV domain.", "Generated two-pin diode does not identify protected nets or standard."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Partition USB, LV and HV interfaces and declare ESD/surge levels before selecting devices." }
+      "evidence": ["Frozen OpenDrop D4 names PESD5V0L5UY and Package_TO_SOT_SMD:SOT-363_SC-70-6.", "Nexperia PESDxL5UF/V/Y Rev. 02 defines the five-line common-anode pinout, 5 V standoff, 12 V clamp, 2.5 A pulse and IEC 61000-4-2 level 4 rating."],
+      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Nexperia", "partNumber": "PESD5V0L5UY", "blocker": null }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-ferrite_emc_bead_word",
@@ -337,8 +337,8 @@
       "interface": "Creepage-compliant shunt/isolator or high-side monitor to SAMD21 ADC.",
       "packageConstraints": "No generic LV op-amp may cross the HV boundary; package voltage and creepage are topology constraints.",
       "environmentLifecycle": "-40 to +85 C minimum; isolation lifetime and surge rating required.",
-      "evidence": ["Gold-gap audit identifies the generated potentiostat TIA as foreign to OpenDrop.", "OPA334 has no source-backed role in the HV architecture."],
-      "disposition": { "status": "procurement_required", "manufacturer": null, "partNumber": null, "blocker": "Prove a current-monitor net exists and derive range/isolation; otherwise remove the false TIA role." }
+      "evidence": ["Frozen OpenDrop U6 names MCP6002 in SO08 within the FEEDBACK AMPLIFIER and routes its output to the FEEDBACK net for droplet sensing.", "Microchip DS20001733L identifies MCP6002-I/SN as the industrial dual rail-to-rail 1 MHz op amp in 8-lead SOIC."],
+      "disposition": { "status": "resolved_exact_mpn", "manufacturer": "Microchip Technology", "partNumber": "MCP6002-I/SN", "blocker": null }
     },
     {
       "punchlistId": "opendrop-hv_controller_main-status_indicator_word",
