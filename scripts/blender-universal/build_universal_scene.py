@@ -16600,6 +16600,67 @@ def place_sealed_enclosure(parts, regions, topology, MAT, MO, env_mm):
                     module=_skin_mod, module_objects=MO)
                 _uport.dimensions = _mm3((12.0, 8.0, 6.0))
                 _sig_new.append(_uport)
+            elif _LE_SIGNATURE == "ewod":
+                # OpenDrop: OPEN PCBA deck with a planar ELECTRODE GRID on top — the
+                # signature of digital microfluidics (droplets actuated on the pad matrix).
+                _z_top = base_z + H
+                _grid_mat = fl.make_mat("m_se_le_grid", fl._to_linear((0.72, 0.58, 0.22)),
+                                        metallic=0.85, roughness=0.35)   # gold electrode pads
+                _ncol, _nrow = 8, 5
+                _gw, _gd = W * 0.66, D * 0.62
+                _cw, _cd = _gw / _ncol, _gd / _nrow
+                _cell = min(_cw, _cd) * 0.82
+                for _r in range(_nrow):
+                    for _c in range(_ncol):
+                        _gx = (_c - (_ncol - 1) / 2.0) * _cw
+                        _gy = (_r - (_nrow - 1) / 2.0) * _cd
+                        _pad = fl.add_box(
+                            f"u_se_le_electrode_{_r}_{_c}",
+                            _mm3((_gx, _gy, _z_top + 0.8)),
+                            _mm3((_cell, _cell, 1.4)), _grid_mat,
+                            module=_skin_mod, module_objects=MO)
+                        _pad.dimensions = _mm3((_cell, _cell, 1.4))
+                        _sig_new.append(_pad)
+                # An edge cartridge connector + a small OLED on the deck (open-board cues).
+                _oledm = fl.make_mat("m_se_le_oled", fl._to_linear((0.05, 0.05, 0.08)),
+                                     metallic=0.2, roughness=0.3)
+                _oled = fl.add_box("u_se_le_cartridge_oled",
+                                   _mm3((-W * 0.34, 0.0, _z_top + 1.2)),
+                                   _mm3((W * 0.16, D * 0.28, 2.4)), _oledm,
+                                   module=_skin_mod, module_objects=MO)
+                _oled.dimensions = _mm3((W * 0.16, D * 0.28, 2.4))
+                _sig_new.append(_oled)
+            elif _LE_SIGNATURE == "vial_bioreactor":
+                # Pioreactor: a transparent culture VIAL standing on top is the dominant
+                # silhouette, with paired OD source/detector housings hugging it.
+                _z_top = base_z + H
+                # Slender vial that clears the sealed base but stays within the product
+                # camera's h_eff≈1.92·H frame (a taller vial crops on 04). ~0.8·H tall.
+                _vial_r = min(W, D) * 0.11
+                _vial_h = max(H * 0.8, 30.0)
+                _glass = fl.make_mat("m_se_le_vial", fl._to_linear((0.78, 0.86, 0.90)),
+                                     metallic=0.0, roughness=0.06)
+                _vial = fl.add_cyl("u_se_le_vial",
+                                   _mm3((0.0, 0.0, _z_top + _vial_h * 0.5)),
+                                   _vial_r * fl.MM, _vial_h * fl.MM, _glass,
+                                   module=_skin_mod, module_objects=MO)
+                _sig_new.append(_vial)
+                _fluidm = fl.make_mat("m_se_le_vial_fluid", fl._to_linear((0.80, 0.68, 0.30)),
+                                      metallic=0.0, roughness=0.3)
+                _fluid = fl.add_cyl("u_se_le_vial_fluid",
+                                    _mm3((0.0, 0.0, _z_top + _vial_h * 0.28)),
+                                    _vial_r * 0.85 * fl.MM, _vial_h * 0.52 * fl.MM, _fluidm,
+                                    module=_skin_mod, module_objects=MO)
+                _sig_new.append(_fluid)
+                for _sx, _lbl in ((-(_vial_r + 6.0), "src"), (_vial_r + 6.0, "det")):
+                    _odm = fl.make_mat(f"m_se_le_od_{_lbl}", fl._to_linear((0.09, 0.09, 0.11)),
+                                       metallic=0.3, roughness=0.5)
+                    _od = fl.add_box(f"u_se_le_od_{_lbl}",
+                                     _mm3((_sx, 0.0, _z_top + _vial_h * 0.4)),
+                                     _mm3((8.0, 11.0, 12.0)), _odm,
+                                     module=_skin_mod, module_objects=MO)
+                    _od.dimensions = _mm3((8.0, 11.0, 12.0))
+                    _sig_new.append(_od)
             # Re-dump form-meshes.json to include the signature parts (the interior
             # builder dumped earlier, before these existed) so form_signature_gate sees them.
             try:
