@@ -18,8 +18,12 @@ import type {
   PcbArchitecturePlan,
   PcbBoardPlan,
   PcbSystemDisposition,
+  PcbWordAssignment,
 } from './pcb-architecture'
-import type { ResolutionTier } from './atopile-generator'
+import type {
+  AtopileFunctionRequirementRecord,
+  ResolutionTier,
+} from './atopile-generator'
 import type { PcbPipelineOptions, PcbPipelineResult } from './pcb-pipeline'
 
 interface ExpectedChannelRequirement {
@@ -58,6 +62,7 @@ export interface YuriGeneratedBoardResult {
   componentCount: number
   unresolvedWordIds: string[]
   offBoardWordIds: string[]
+  functionRequirements: AtopileFunctionRequirementRecord[]
   usedTemporaryDirectory: boolean
 }
 
@@ -71,6 +76,7 @@ export interface YuriGoldProductResult {
   observedShapes: Record<string, string>
   observedChannelRequirements: Record<string, ExpectedChannelRequirement[]>
   observedBoardScopes: Record<string, string[]>
+  observedAssignments: Record<string, PcbWordAssignment['placement']>
   generatedProjectCount: number
   generatedBoards: YuriGeneratedBoardResult[]
   routingArtifactsFound: string[]
@@ -117,6 +123,7 @@ export interface YuriPipelineBoardResult {
     characterId: string
     reason: string
   }>
+  functionRequirements: AtopileFunctionRequirementRecord[]
   engineeringFindings: string[]
   projectDir: string
   runDir: string
@@ -355,6 +362,7 @@ function generateExpectedBoardProjects(
         componentCount: generated.components.length,
         unresolvedWordIds,
         offBoardWordIds,
+        functionRequirements: generated.functionRequirements,
         usedTemporaryDirectory: projectDir.startsWith(tmpdir()) &&
           basename(projectDir).startsWith('pcb-yuri-'),
       })
@@ -410,6 +418,12 @@ export function verifyYuriGoldStates(
       ),
       observedBoardScopes: Object.fromEntries(
         plan.boards.map((board) => [board.role, board.requiredWordIds]),
+      ),
+      observedAssignments: Object.fromEntries(
+        plan.assignments.map((assignment) => [
+          assignment.wordId,
+          assignment.placement,
+        ]),
       ),
       generatedProjectCount: generated.boards.length,
       generatedBoards: generated.boards,
@@ -476,6 +490,14 @@ function pipelineBoardResult(
       `${generated.unresolved.length} required component role(s) remain unresolved`,
     )
   }
+  const unresolvedFunctions = generated.functionRequirements.filter(
+    (requirement) => requirement.implementation === 'unresolved_board_function',
+  )
+  if (unresolvedFunctions.length > 0) {
+    engineeringFindings.push(
+      `${unresolvedFunctions.length} architecture function requirement(s) need real component topology`,
+    )
+  }
   if (!pipeline.ok) {
     engineeringFindings.push(`pipeline failed at ${pipeline.stageReached}`)
   }
@@ -496,6 +518,7 @@ function pipelineBoardResult(
     resolutionTierCounts,
     identitySources,
     identityBlockers,
+    functionRequirements: generated.functionRequirements,
     engineeringFindings,
     projectDir,
     runDir,

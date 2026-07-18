@@ -622,6 +622,12 @@ export interface AtopileOffBoardCotsRecord {
   reason: string
 }
 
+export interface AtopileFunctionRequirementRecord {
+  role: string
+  implementation: 'unresolved_board_function' | 'passive_board_geometry'
+  reason: string
+}
+
 export interface GenerateAtopileProjectResult {
   projectDir: string
   mainAtoPath: string
@@ -631,6 +637,7 @@ export interface GenerateAtopileProjectResult {
   nets: AtopileNetRecord[]
   offBoard: AtopileOffBoardCotsRecord[]
   unresolved: AtopileUnresolvedRecord[]
+  functionRequirements: AtopileFunctionRequirementRecord[]
   boardOutline: PcbBoardGeometry
 }
 
@@ -645,25 +652,6 @@ export interface GenerateAtopileProjectOptions {
 function sanitizeIdentifier(id: string): string {
   const cleaned = id.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1')
   return cleaned || 'part'
-}
-
-function requiredFunctionWord(role: string): ElectronicWordRef {
-  const normalizedRole = sanitizeIdentifier(role).toLowerCase()
-  const characterId = /electrode.*channel/i.test(normalizedRole)
-    ? `${normalizedRole}_connector`
-    : `${normalizedRole}_driver`
-  return {
-    moduleId: 'pcb_architecture',
-    subModuleId: 'board_function_requirements',
-    wordId: `required_${normalizedRole}_word`,
-    nameHuman: role.replace(/_/g, ' '),
-    characterId,
-    modifiers: {},
-    categories: [
-      /electrode.*channel/i.test(normalizedRole) ? 'board_role' : 'power_electronics',
-    ],
-    quantity: 1,
-  }
 }
 
 function sanitizePinName(pin: string | null): string | null {
@@ -1411,12 +1399,24 @@ export function generateAtopileProject(
   const scopedElectronicWords = requiredWordIds
     ? allElectronicWords.filter((word) => requiredWordIds.has(word.wordId))
     : allElectronicWords
-  // INTENT: A board architecture may be forced by channel/function contracts
-  // even when the upstream BoM has no component-level electronic word yet.
-  // Emit an honest function-class requirement (null MPN), never an empty board.
-  const electronicWords = scopedElectronicWords.length > 0
-    ? scopedElectronicWords
-    : (opts.requiredFunctionRoles ?? []).map(requiredFunctionWord)
+  const electronicWords = scopedElectronicWords
+  // INTENT: Channel contracts describe work the board must implement; they are
+  // not manufacturer-orderable packages. Keep the obligation explicit until a
+  // real topology assigns components or passive copper geometry to the role.
+  const functionRequirements: AtopileFunctionRequirementRecord[] =
+    (scopedElectronicWords.length === 0 ? opts.requiredFunctionRoles ?? [] : []).map((role) => (
+      /electrode.*channel/i.test(role)
+        ? {
+            role,
+            implementation: 'passive_board_geometry',
+            reason: 'electrode channel is patterned board geometry, not a fitted package',
+          }
+        : {
+            role,
+            implementation: 'unresolved_board_function',
+            reason: 'architecture function requires a real component topology',
+          }
+    ))
 
   const components: AtopileComponentRecord[] = []
   const offBoard: AtopileOffBoardCotsRecord[] = []
@@ -1504,6 +1504,7 @@ export function generateAtopileProject(
     nets,
     offBoard,
     unresolved,
+    functionRequirements,
     boardOutline,
   }
 }

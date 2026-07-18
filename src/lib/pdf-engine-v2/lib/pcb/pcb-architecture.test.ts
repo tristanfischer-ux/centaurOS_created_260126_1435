@@ -12,6 +12,47 @@ function stateWithQuantities(quantities: Record<string, number>): Record<string,
   }
 }
 
+function withElectronicWords(
+  state: Record<string, unknown>,
+  words: Array<{
+    id: string
+    nameHuman: string
+    characterId: string
+    modifiers?: Array<{ kind: string; value: string }>
+  }>,
+): Record<string, unknown> {
+  return {
+    ...state,
+    moduleDecomposition: {
+      modules: [{
+        module: 'control',
+        sub_modules: [{
+          id: 'electronics',
+          words: words.map((word) => ({
+            id: word.id,
+            name_human: word.nameHuman,
+            content_character: { character_id: word.characterId },
+            modifier_characters: word.modifiers ?? [],
+          })),
+        }],
+      }],
+    },
+  }
+}
+
+interface NonComponentPlacementCase {
+  name: string
+  quantities: Record<string, number>
+  evidence: string
+  words: Array<{
+    id: string
+    nameHuman: string
+    characterId: string
+  }>
+  expectedPlacement: string
+  expectedBoardId?: string
+}
+
 describe('derivePcbArchitecture', () => {
   it.each([
     [{ optical_path_length_mm: 10 }, 'daughterboard', ['optical_source_daughterboard']],
@@ -214,5 +255,133 @@ describe('derivePcbArchitecture', () => {
     const ewod = derivePcbArchitecture(stateWithQuantities({ electrode_count: 64 }))
     expect(ewod.boards.find((item) => item.role === 'electrode_cartridge')?.shape.shapeFamily).toBe('electrode_cartridge')
     expect(ewod.boards.find((item) => item.role === 'high_voltage_controller')?.workPerformed).toContain('isolate_high_voltage')
+  })
+
+  it.each<NonComponentPlacementCase>([
+    {
+      name: 'mechanical detector registration',
+      quantities: { optical_path_length_mm: 10 },
+      evidence: 'COTS detector module and detector mounting plate',
+      words: [{
+        id: 'detector_mount_plate_word',
+        nameHuman: 'Detector mounting plate',
+        characterId: 'detector_mount_plate',
+      }],
+      expectedPlacement: 'mechanical_only',
+      expectedBoardId: 'optical_source',
+    },
+    {
+      name: 'host-owned USB on a COTS compute shield',
+      quantities: { compliance_voltage_v: 10 },
+      evidence: 'ItsyBitsy M4 COTS compute module owns USB power and data',
+      words: [{
+        id: 'usb_interface_word',
+        nameHuman: 'USB interface',
+        characterId: 'usb_interface',
+      }],
+      expectedPlacement: 'off_board_module',
+      expectedBoardId: undefined,
+    },
+    {
+      name: 'direct host bus rather than a bridge IC',
+      quantities: { working_volume_ml: 20 },
+      evidence: 'Raspberry Pi host exposes direct I2C and SPI buses',
+      words: [{
+        id: 'host_protocol_bridge_word',
+        nameHuman: 'Host protocol bridge',
+        characterId: 'host_protocol_bridge',
+      }],
+      expectedPlacement: 'interconnect_only',
+      expectedBoardId: 'wet_lab_hat',
+    },
+  ])('keeps $name in whole-system scope without treating it as a fitted component', ({
+    quantities,
+    evidence,
+    words,
+    expectedPlacement,
+    expectedBoardId,
+  }) => {
+    const state = withElectronicWords(stateWithQuantities(quantities), words)
+    state.parsedBrief = { original_text: evidence }
+
+    const plan = derivePcbArchitecture(state)
+    const assignment = plan.assignments.find((item) => item.wordId === words[0].id)
+
+    expect(assignment).toMatchObject({
+      placement: expectedPlacement,
+      ...(expectedBoardId ? { boardId: expectedBoardId } : {}),
+    })
+    expect(plan.boards.flatMap((item) => item.requiredWordIds)).not.toContain(words[0].id)
+    expect(plan.unassignedWordIds).not.toContain(words[0].id)
+  })
+
+  it('collapses a duplicate USB-interface concept while retaining the physical USB entry', () => {
+    const state = withElectronicWords(stateWithQuantities({ electrode_count: 64 }), [
+      {
+        id: 'usb_power_entry_word',
+        nameHuman: 'USB-C power and data receptacle',
+        characterId: 'usb_power_entry',
+        modifiers: [{ kind: 'part_number', value: '12401610E4-2A' }],
+      },
+      {
+        id: 'usb_interface_word',
+        nameHuman: 'USB interface',
+        characterId: 'usb_interface',
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'usb_power_entry_word',
+        placement: 'on_board',
+        boardId: 'hv_controller_main',
+      }),
+      expect.objectContaining({
+        wordId: 'usb_interface_word',
+        placement: 'interconnect_only',
+        boardId: 'hv_controller_main',
+      }),
+    ]))
+    expect(plan.boards.find((item) => item.boardId === 'hv_controller_main')?.requiredWordIds)
+      .toEqual(['usb_power_entry_word'])
+  })
+
+  it('keeps integrated MCU firmware storage and protocol work as board requirements, not packages', () => {
+    const state = withElectronicWords(stateWithQuantities({ electrode_count: 64 }), [
+      {
+        id: 'microcontroller_word',
+        nameHuman: 'SAMD21 microcontroller',
+        characterId: 'microcontroller_mcu',
+      },
+      {
+        id: 'firmware_storage_word',
+        nameHuman: 'SPI firmware storage',
+        characterId: 'firmware_storage',
+      },
+      {
+        id: 'host_protocol_bridge_word',
+        nameHuman: 'Host protocol bridge',
+        characterId: 'host_protocol_bridge',
+      },
+    ])
+
+    const plan = derivePcbArchitecture(state)
+
+    expect(plan.assignments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wordId: 'firmware_storage_word',
+        placement: 'functional_requirement',
+        boardId: 'hv_controller_main',
+      }),
+      expect.objectContaining({
+        wordId: 'host_protocol_bridge_word',
+        placement: 'functional_requirement',
+        boardId: 'hv_controller_main',
+      }),
+    ]))
+    expect(plan.boards.find((item) => item.boardId === 'hv_controller_main')?.requiredWordIds)
+      .toEqual(['microcontroller_word'])
   })
 })

@@ -44,7 +44,14 @@ export interface PcbBoardPlan {
 
 export interface PcbWordAssignment {
   wordId: string
-  placement: 'on_board' | 'off_board_module' | 'interconnect_only' | 'unassigned'
+  placement:
+    | 'on_board'
+    | 'off_board_module'
+    | 'interconnect_only'
+    | 'mechanical_only'
+    | 'functional_requirement'
+    | 'passive_geometry'
+    | 'unassigned'
   boardId?: string
   reasons: string[]
 }
@@ -242,15 +249,141 @@ function assignmentBoard(word: ElectronicWordRef, boards: PcbBoardPlan[]): PcbBo
 
 function nonBoardPlacement(
   word: ElectronicWordRef,
-): Pick<PcbWordAssignment, 'placement' | 'reasons'> | null {
-  const text = `${word.wordId} ${word.nameHuman} ${word.characterId} ${Object.values(word.modifiers).join(' ')}`.toLowerCase()
-  if (/cable|harness|standoff|bezel|window.?seal|legend|mounting.?plate/.test(text)) {
+  state: Record<string, unknown>,
+  boards: PcbBoardPlan[],
+  allWords: ElectronicWordRef[],
+): Omit<PcbWordAssignment, 'wordId'> | null {
+  const roleText = `${word.wordId} ${word.nameHuman} ${word.characterId}`.toLowerCase()
+  const selectedBoard = assignmentBoard(word, boards) ?? (
+    boards.length === 1 ? boards[0] : undefined
+  )
+  const evidence = architectureEvidenceBlob(state)
+  const hasExplicitPartIdentity = [word.modifiers.part_number, word.modifiers.manufacturer]
+    .some((value) => Boolean(
+      value?.trim() &&
+      !/\b(?:tbd|unknown|generic|detailed design)\b/i.test(value),
+    ))
+  const hasCotsComputeHost =
+    /\b(?:raspberry\s*pi|single.board.computer|itsybitsy|pybadge|compute.ui.module)\b/i
+      .test(evidence)
+  const hasIntegratedFirmwareMcu =
+    /\b(?:samd21|esp8266|esp32|stm32)\b/i.test(evidence)
+  const hasPhysicalUsbEntry = allWords.some((candidate) =>
+    /usb[_ -]?(?:power[_ -]?entry|connector|receptacle|port)/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    ))
+  const hasRadioAndDebugAccess =
+    allWords.some((candidate) => /wi-?fi|wifi[_ -]?module/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    )) &&
+    allWords.some((candidate) => /debug[_ -]?(?:uart|header)|\buart\b/i.test(
+      `${candidate.wordId} ${candidate.nameHuman} ${candidate.characterId}`,
+    ))
+
+  if (/mounting.?plate|detector.?mount|standoff|bezel|window.?seal|legend/.test(roleText)) {
+    return {
+      placement: 'mechanical_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['mechanical_datum_not_fitted_component'],
+    }
+  }
+  if (/cable|harness/.test(roleText)) {
     return { placement: 'interconnect_only', reasons: ['mechanical_or_interconnect_role'] }
   }
   if (
-    /compute.?ui.?module|detector.?module|wavelength.?selection.?module|bench.?psu/.test(text)
+    /compute.?ui.?module|detector.?module|wavelength.?selection.?module|bench.?psu/.test(roleText)
   ) {
     return { placement: 'off_board_module', reasons: ['purchased_or_host_side_module'] }
+  }
+  if (!hasExplicitPartIdentity && selectedBoard?.role === 'wet_lab_hat') {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        boardId: selectedBoard.boardId,
+        reasons: ['host_hat_uses_direct_compute_bus'],
+      }
+    }
+    if (/usb[_ -]?interface|firmware[_ -]?storage/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['host_compute_owns_usb_or_persistence'],
+      }
+    }
+  }
+  if (!hasExplicitPartIdentity && selectedBoard?.role === 'analog_front_end_shield') {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        boardId: selectedBoard.boardId,
+        reasons: ['host_shield_uses_direct_compute_bus'],
+      }
+    }
+    if (/usb[_ -]?(?:interface|power[_ -]?entry)/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['host_compute_module_owns_usb'],
+      }
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    selectedBoard?.role === 'od_optics_board' &&
+    /usb[_ -]?power[_ -]?entry/.test(roleText) &&
+    boards.some((candidate) => candidate.role === 'wet_lab_hat')
+  ) {
+    return {
+      placement: 'interconnect_only',
+      boardId: selectedBoard.boardId,
+      reasons: ['host_hat_interconnect_owns_peripheral_power_entry'],
+    }
+  }
+  if (!hasExplicitPartIdentity && hasCotsComputeHost) {
+    if (/host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)) {
+      return {
+        placement: 'interconnect_only',
+        ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+        reasons: ['direct_host_bus_interconnect_not_bridge_component'],
+      }
+    }
+    if (/usb[_ -]?(?:interface|power[_ -]?entry)|firmware[_ -]?storage/.test(roleText)) {
+      return {
+        placement: 'off_board_module',
+        reasons: ['cots_compute_host_owns_interface_or_storage'],
+      }
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    /usb[_ -]?interface/.test(roleText) &&
+    hasPhysicalUsbEntry
+  ) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['duplicate_usb_interface_contract'],
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    /usb[_ -]?interface/.test(roleText) &&
+    hasRadioAndDebugAccess
+  ) {
+    return {
+      placement: 'interconnect_only',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['radio_and_debug_interfaces_close_host_access'],
+    }
+  }
+  if (
+    !hasExplicitPartIdentity &&
+    hasIntegratedFirmwareMcu &&
+    /firmware[_ -]?storage|host[_ -]?protocol[_ -]?bridge|protocol[_ -]?bridge/.test(roleText)
+  ) {
+    return {
+      placement: 'functional_requirement',
+      ...(selectedBoard ? { boardId: selectedBoard.boardId } : {}),
+      reasons: ['integrated_mcu_owns_firmware_or_protocol_function'],
+    }
   }
   return null
 }
@@ -428,7 +561,7 @@ export function derivePcbArchitecture(state: Record<string, unknown>): PcbArchit
     if (systemDisposition === 'cots_only') {
       return { wordId: word.wordId, placement: 'off_board_module', reasons: ['cots_only_system'] }
     }
-    const nonBoard = nonBoardPlacement(word)
+    const nonBoard = nonBoardPlacement(word, state, boards, words)
     if (nonBoard) {
       return { wordId: word.wordId, ...nonBoard }
     }

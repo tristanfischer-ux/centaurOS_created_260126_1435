@@ -39,7 +39,7 @@ interface PunchlistRoleGroup {
 }
 
 interface Punchlist {
-  schema: 'pcb-unresolved-component-punchlist/v1'
+  schema: 'pcb-unresolved-component-punchlist/v2'
   sourceReport: {
     path: string
     producingCommit: string
@@ -48,12 +48,29 @@ interface Punchlist {
     unresolvedIdentityCount: number
   }
   summary: {
-    unresolvedFittedComponents: number
-    missingMpn: number
-    missingSymbolPinout: number
+    baselineUnresolvedFittedComponents: number
+    resolvedIdentityCount: number
+    reclassifiedNonComponentCount: number
+    remainingUnresolvedFittedComponents: number
+    remainingMissingMpn: number
+    remainingMissingSymbolPinout: number
     targetBoards: number
     productsWithFittedBoards: number
   }
+  resolvedIdentityIds: string[]
+  scopeReclassifications: Array<{
+    id: string
+    product: string
+    placement:
+      | 'off_board_module'
+      | 'interconnect_only'
+      | 'mechanical_only'
+      | 'functional_requirement'
+      | 'passive_geometry'
+    wholeSystemOwner: string
+    evidence: string
+    retainedFunction: string
+  }>
   roleGroups: PunchlistRoleGroup[]
 }
 
@@ -129,7 +146,7 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(punchlist.schema).toBe('pcb-unresolved-component-punchlist/v1')
+    expect(punchlist.schema).toBe('pcb-unresolved-component-punchlist/v2')
     expect(punchlist.sourceReport).toEqual({
       path: '/tmp/pcb-yuri-identity-final/verification-report.json',
       producingCommit: 'd43f46aaf',
@@ -149,49 +166,79 @@ describe('Yuri unresolved fitted-component punchlist', () => {
   it('covers every product/board blocker and reconciles evidence-gap counts', () => {
     const punchlist = readPunchlist()
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
-    const productCounts = entries.reduce<Record<string, number>>((counts, entry) => {
+    const closedIds = new Set([
+      ...punchlist.resolvedIdentityIds,
+      ...punchlist.scopeReclassifications.map((item) => item.id),
+    ])
+    const remainingEntries = entries.filter((entry) => !closedIds.has(entry.id))
+    const productCounts = remainingEntries.reduce<Record<string, number>>((counts, entry) => {
       counts[entry.product] = (counts[entry.product] ?? 0) + 1
       return counts
     }, {})
-    const boardCounts = entries.reduce<Record<string, number>>((counts, entry) => {
+    const boardCounts = remainingEntries.reduce<Record<string, number>>((counts, entry) => {
       counts[entry.targetBoard.boardId] =
         (counts[entry.targetBoard.boardId] ?? 0) + 1
       return counts
     }, {})
-    const gapCounts = entries.reduce<Record<string, number>>((counts, entry) => {
+    const gapCounts = remainingEntries.reduce<Record<string, number>>((counts, entry) => {
       counts[entry.missingEvidence.kind] =
         (counts[entry.missingEvidence.kind] ?? 0) + 1
       return counts
     }, {})
 
     expect(productCounts).toEqual({
-      Colorimeter: 5,
-      NinjaPCR: 11,
-      Pioreactor: 11,
-      Rodeostat: 10,
-      OpenDrop: 13,
+      Colorimeter: 2,
+      NinjaPCR: 10,
+      Pioreactor: 3,
+      Rodeostat: 7,
+      OpenDrop: 11,
     })
     expect(boardCounts).toEqual({
-      optical_source: 5,
-      thermal_controller: 11,
-      wet_lab_hat: 4,
-      od_optics: 4,
-      wet_actuation: 3,
-      analog_afe: 10,
-      hv_controller_main: 12,
-      electrode_cartridge: 1,
+      optical_source: 2,
+      thermal_controller: 10,
+      wet_lab_hat: 1,
+      od_optics: 2,
+      analog_afe: 7,
+      hv_controller_main: 11,
     })
     expect(gapCounts).toEqual({
-      mpn: 38,
-      symbol_pinout: 12,
+      mpn: 24,
+      symbol_pinout: 9,
     })
     expect(punchlist.summary).toEqual({
-      unresolvedFittedComponents: 50,
-      missingMpn: 38,
-      missingSymbolPinout: 12,
+      baselineUnresolvedFittedComponents: 50,
+      resolvedIdentityCount: 3,
+      reclassifiedNonComponentCount: 14,
+      remainingUnresolvedFittedComponents: 33,
+      remainingMissingMpn: 24,
+      remainingMissingSymbolPinout: 9,
       targetBoards: 8,
       productsWithFittedBoards: 5,
     })
+  })
+
+  it('reclassifies only evidence-backed non-components and preserves whole-system ownership', () => {
+    const punchlist = readPunchlist()
+    const reclassifications = punchlist.scopeReclassifications
+
+    expect(punchlist.resolvedIdentityIds).toHaveLength(3)
+    expect(reclassifications).toHaveLength(14)
+    expect(new Set(reclassifications.map((item) => item.id)).size).toBe(14)
+    expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
+      counts[item.placement] = (counts[item.placement] ?? 0) + 1
+      return counts
+    }, {})).toEqual({
+      mechanical_only: 1,
+      off_board_module: 4,
+      interconnect_only: 5,
+      functional_requirement: 3,
+      passive_geometry: 1,
+    })
+    for (const item of reclassifications) {
+      expect(item.wholeSystemOwner.trim()).not.toBe('')
+      expect(item.evidence.trim()).not.toBe('')
+      expect(item.retainedFunction.trim()).not.toBe('')
+    }
   })
 
   it('keeps every candidate unresolved and specifies ratings and a source action', () => {
@@ -220,9 +267,10 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('50 unresolved fitted components')
-    expect(markdown).toContain('38 missing MPN')
-    expect(markdown).toContain('12 missing symbol/pinout')
+    expect(markdown).toContain('33 unresolved fitted components')
+    expect(markdown).toContain('24 missing MPN')
+    expect(markdown).toContain('9 missing symbol/pinout')
+    expect(markdown).toContain('14 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)
     }

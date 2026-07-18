@@ -7,9 +7,9 @@
 
 ## Evidence boundary
 
-The latest seven-product/eight-board offline report has 85 fitted components: 35 identity-verified and **50 unresolved fitted components**. This punchlist reconciles all 50: **38 missing MPN** and **12 missing symbol/pinout**.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Three identities were subsequently resolved and 14 roles were proven to be non-components. The active residual is therefore **33 unresolved fitted components**: **24 missing MPN** and **9 missing symbol/pinout**.
 
-Every named part below remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
+The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
 1. derived target-board ratings;
 2. manufacturer/orderable identity evidence;
@@ -21,14 +21,37 @@ Every named part below remains a candidate. A gold schematic value, repository f
 
 ## Counts
 
-| Product | Board(s) | Unresolved |
+| Product | Board(s) | Residual unresolved fitted components |
 |---|---|---:|
-| Colorimeter | `optical_source` | 5 |
-| NinjaPCR | `thermal_controller` | 11 |
-| Pioreactor | `wet_lab_hat`, `od_optics`, `wet_actuation` | 11 |
-| Rodeostat | `analog_afe` | 10 |
-| OpenDrop | `hv_controller_main`, `electrode_cartridge` | 13 |
-| **Total** | **8 boards** | **50** |
+| Colorimeter | `optical_source` | 2 |
+| NinjaPCR | `thermal_controller` | 10 |
+| Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
+| Rodeostat | `analog_afe` | 7 |
+| OpenDrop | `hv_controller_main` | 11 |
+| **Total** | **6 boards with residual fitted-component gaps** | **33** |
+
+The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
+
+## Evidence-backed reassignment matrix
+
+These **14 evidence-backed non-components** are removed from fitted BOM scope without removing their system obligations.
+
+| Baseline identity | Placement | Whole-system owner retained |
+|---|---|---|
+| `colorimeter-optical_source-detector_mount_plate_word` | `mechanical_only` | Optical-source registration geometry |
+| `ninjapcr-thermal_controller-usb_interface_tool_grounded_word` | `interconnect_only` | Wi-Fi host path plus debug/programming header |
+| `pioreactor-wet_lab_hat-usb_interface_word` | `off_board_module` | Raspberry Pi host USB |
+| `pioreactor-wet_lab_hat-firmware_storage_word` | `off_board_module` | Raspberry Pi host persistence |
+| `pioreactor-wet_lab_hat-host_protocol_bridge_word` | `interconnect_only` | Direct Raspberry Pi HAT bus |
+| `pioreactor-od_optics-usb_power_entry_word` | `interconnect_only` | HAT-to-OD-board JST power/data |
+| `pioreactor-wet_actuation-required_heater_channel_word` | `functional_requirement` | One real heater channel topology |
+| `pioreactor-wet_actuation-required_stir_channel_word` | `functional_requirement` | One real stir channel topology |
+| `pioreactor-wet_actuation-required_pump_channel_word` | `functional_requirement` | One real dosing-pump channel topology |
+| `rodeostat-analog_afe-usb_power_entry_word` | `off_board_module` | ItsyBitsy M4 host power entry |
+| `rodeostat-analog_afe-usb_interface_word` | `off_board_module` | ItsyBitsy M4 host USB data |
+| `rodeostat-analog_afe-host_protocol_bridge_word` | `interconnect_only` | Direct shield-to-host bus |
+| `opendrop-hv_controller_main-usb_interface_word` | `interconnect_only` | Retained source-backed USB-C entry circuit |
+| `opendrop-electrode_cartridge-required_electrode_channel_word` | `passive_geometry` | All 64 cartridge electrodes, routes, creepage, and mating interface |
 
 ## mechanical_or_off_board_scope
 
@@ -196,8 +219,8 @@ Every named part below remains a candidate. A gold schematic value, repository f
 
 ## Ordered next actions
 
-1. **Remove/reclassify unsupported roles first** — mechanical mount, duplicate/off-board USB/bridges/storage, and OpenDrop's foreign analog template. This prevents ingesting parts for circuits that should not exist.
-2. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety, Pioreactor actuation loads, Rodeostat analog performance, and OpenDrop HV/interconnect domains.
-3. **Ingest manufacturer-backed gold candidates** — Pioreactor `DF2S6.8MFS,L3M`, Eye-Spy JSTs, OpenDrop USB-C code, Colorimeter LED/JST identities, and released NinjaPCR/Rodeostat BOM identities.
-4. **Close the 12 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
-5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 50 → 0 unresolved fitted identities; this document itself resolves none.
+1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety, Pioreactor optics, Rodeostat analog performance, and OpenDrop HV/interconnect domains.
+2. **Ingest manufacturer-backed gold candidates** — Eye-Spy JSTs, OpenDrop USB-C code, Colorimeter LED identities, and released NinjaPCR/Rodeostat BOM identities.
+3. **Close the 9 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
+4. **Implement the preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies, and prove all 64 OpenDrop electrode routes and mating contacts.
+5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 33 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.

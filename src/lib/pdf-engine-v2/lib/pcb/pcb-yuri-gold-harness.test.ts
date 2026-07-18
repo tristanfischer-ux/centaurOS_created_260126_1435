@@ -69,7 +69,53 @@ describe('Yuri PCB gold architecture harness', () => {
     })))
   })
 
-  it('closes the downstream generator residuals for all seven products', () => {
+  it('retains evidence-backed non-components in whole-system assignments but outside board BOM scope', () => {
+    const report = verifyYuriGoldStates({
+      fixturePath: FIXTURE_PATH,
+      sourceOutRoot: MAIN_OUT_ROOT,
+    })
+    const expected = {
+      Colorimeter: {
+        detector_mount_plate_word: 'mechanical_only',
+      },
+      NinjaPCR: {
+        usb_interface_tool_grounded_word: 'interconnect_only',
+      },
+      Pioreactor: {
+        usb_interface_word: 'off_board_module',
+        firmware_storage_word: 'off_board_module',
+        host_protocol_bridge_word: 'interconnect_only',
+        usb_power_entry_word: 'interconnect_only',
+      },
+      Rodeostat: {
+        usb_power_entry_word: 'off_board_module',
+        usb_interface_word: 'off_board_module',
+        host_protocol_bridge_word: 'interconnect_only',
+      },
+      OpenDrop: {
+        usb_interface_word: 'interconnect_only',
+      },
+    } as const
+
+    for (const product of report.products) {
+      const expectedAssignments = expected[
+        product.product as keyof typeof expected
+      ]
+      if (!expectedAssignments) continue
+      const assignments = (
+        product as typeof product & {
+          observedAssignments: Record<string, string>
+        }
+      ).observedAssignments
+      expect(assignments).toMatchObject(expectedAssignments)
+      const boardWordIds = Object.values(product.observedBoardScopes).flat()
+      expect(boardWordIds).toEqual(expect.not.arrayContaining(
+        Object.keys(expectedAssignments),
+      ))
+    }
+  })
+
+  it('reports unimplemented board functions without minting package identities', () => {
     const report = verifyYuriGoldStates({
       fixturePath: FIXTURE_PATH,
       sourceOutRoot: MAIN_OUT_ROOT,
@@ -82,10 +128,31 @@ describe('Yuri PCB gold architecture harness', () => {
       NinjaPCR: [],
       Poseidon: [],
       OpenFlexure: [],
-      Pioreactor: [],
+      Pioreactor: ['empty_generated_project'],
       Rodeostat: [],
-      OpenDrop: [],
+      OpenDrop: ['empty_generated_project'],
     })
+    const pioreactor = report.products.find((product) => product.product === 'Pioreactor')
+    const openDrop = report.products.find((product) => product.product === 'OpenDrop')
+    expect(pioreactor?.generatedBoards.find((board) => board.boardId === 'wet_actuation'))
+      .toMatchObject({
+        componentCount: 0,
+        functionRequirements: [
+          expect.objectContaining({ role: 'heater_channel' }),
+          expect.objectContaining({ role: 'stir_channel' }),
+          expect.objectContaining({ role: 'pump_channel' }),
+        ],
+      })
+    expect(openDrop?.generatedBoards.find((board) => board.boardId === 'electrode_cartridge'))
+      .toMatchObject({
+        componentCount: 0,
+        functionRequirements: [
+          expect.objectContaining({
+            role: 'electrode_channel',
+            implementation: 'passive_board_geometry',
+          }),
+        ],
+      })
   })
 
   it('runs every required board through an isolated pipeline and records honest metrics', () => {
@@ -148,9 +215,9 @@ describe('Yuri PCB gold architecture harness', () => {
         boardSizeMm: { w: 41, h: 31 },
         pipelineComponentCount: 11,
         verifiedIdentityCount: 0,
-        unresolvedIdentityCount: 8,
-        unverifiedMpnCount: 8,
-        resolutionTierCounts: { package_family: 8 },
+        unresolvedIdentityCount: 6,
+        unverifiedMpnCount: 6,
+        resolutionTierCounts: { package_family: 6 },
         identitySources: [],
         identityBlockers: expect.arrayContaining([
           expect.objectContaining({
@@ -159,7 +226,7 @@ describe('Yuri PCB gold architecture harness', () => {
           }),
         ]),
         engineeringFindings: [
-          '8 generated component(s) lack verified MPN/symbol/pinout identity',
+          '6 generated component(s) lack verified MPN/symbol/pinout identity',
         ],
         errors: [],
       })

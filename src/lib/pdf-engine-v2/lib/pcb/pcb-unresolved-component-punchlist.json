@@ -1,5 +1,5 @@
 {
-  "schema": "pcb-unresolved-component-punchlist/v1",
+  "schema": "pcb-unresolved-component-punchlist/v2",
   "sourceReport": {
     "path": "/tmp/pcb-yuri-identity-final/verification-report.json",
     "producingCommit": "d43f46aaf",
@@ -8,12 +8,134 @@
     "unresolvedIdentityCount": 50
   },
   "summary": {
-    "unresolvedFittedComponents": 50,
-    "missingMpn": 38,
-    "missingSymbolPinout": 12,
+    "baselineUnresolvedFittedComponents": 50,
+    "resolvedIdentityCount": 3,
+    "reclassifiedNonComponentCount": 14,
+    "remainingUnresolvedFittedComponents": 33,
+    "remainingMissingMpn": 24,
+    "remainingMissingSymbolPinout": 9,
     "targetBoards": 8,
     "productsWithFittedBoards": 5
   },
+  "resolvedIdentityIds": [
+    "colorimeter-optical_source-dc_dc_regulator_word",
+    "colorimeter-optical_source-source_board_connector_word",
+    "pioreactor-od_optics-esd_protection_network_word"
+  ],
+  "scopeReclassifications": [
+    {
+      "id": "colorimeter-optical_source-detector_mount_plate_word",
+      "product": "Colorimeter",
+      "placement": "mechanical_only",
+      "wholeSystemOwner": "optical_source mechanical registration",
+      "evidence": "The role names a detector mounting plate and has no electrical interface, ratings, or orderable component identity.",
+      "retainedFunction": "The optical-source board keeps its four-point registration geometry; only the false SOIC fitted-component identity is removed."
+    },
+    {
+      "id": "ninjapcr-thermal_controller-usb_interface_tool_grounded_word",
+      "product": "NinjaPCR",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "Wi-Fi module plus released debug/programming header",
+      "evidence": "The board already carries radio control and a dedicated debug UART contract; the generic additional USB role has no released connector or circuit.",
+      "retainedFunction": "Programming and service access remain assigned to the debug header, while normal host communication remains assigned to Wi-Fi."
+    },
+    {
+      "id": "pioreactor-wet_lab_hat-usb_interface_word",
+      "product": "Pioreactor",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "Raspberry Pi host compute module",
+      "evidence": "A wet-lab HAT plugs into a host that already owns USB; no independent HAT USB peripheral or connector is evidenced.",
+      "retainedFunction": "USB power/data remain in the whole-system architecture under the host compute module."
+    },
+    {
+      "id": "pioreactor-wet_lab_hat-firmware_storage_word",
+      "product": "Pioreactor",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "Raspberry Pi host persistence",
+      "evidence": "The HAT architecture relies on the Raspberry Pi host and supplies no board-local memory requirement, bus, capacity, or endurance contract.",
+      "retainedFunction": "Firmware and persistent storage remain owned by the host filesystem rather than a fabricated SOIC memory package."
+    },
+    {
+      "id": "pioreactor-wet_lab_hat-host_protocol_bridge_word",
+      "product": "Pioreactor",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "direct Raspberry Pi HAT bus",
+      "evidence": "The host HAT exposes direct compute buses; no two-sided protocol contract or bridge identity is present.",
+      "retainedFunction": "The host-to-HAT communication contract remains required as an interconnect, without inventing a bridge IC."
+    },
+    {
+      "id": "pioreactor-od_optics-usb_power_entry_word",
+      "product": "Pioreactor",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "wet-lab HAT to OD-board JST power/data interconnect",
+      "evidence": "The frozen Eye-Spy board uses two four-pin JST host headers and no local USB power connector.",
+      "retainedFunction": "OD-board power and data entry remain required through the host interconnect."
+    },
+    {
+      "id": "pioreactor-wet_actuation-required_heater_channel_word",
+      "product": "Pioreactor",
+      "placement": "functional_requirement",
+      "wholeSystemOwner": "wet_actuation heater channel contract",
+      "evidence": "The word was synthesized from a channel requirement and is not a manufacturer-orderable package or topology.",
+      "retainedFunction": "One heater channel remains mandatory until real switch, protection, connector, and sensing components implement it."
+    },
+    {
+      "id": "pioreactor-wet_actuation-required_stir_channel_word",
+      "product": "Pioreactor",
+      "placement": "functional_requirement",
+      "wholeSystemOwner": "wet_actuation stir channel contract",
+      "evidence": "The word was synthesized from a channel requirement; mapping the requirement itself to one generic driver package hides the complete motor circuit.",
+      "retainedFunction": "One stir channel remains mandatory pending a ratings-closed driver and connector topology."
+    },
+    {
+      "id": "pioreactor-wet_actuation-required_pump_channel_word",
+      "product": "Pioreactor",
+      "placement": "functional_requirement",
+      "wholeSystemOwner": "wet_actuation dosing-pump channel contract",
+      "evidence": "The word was synthesized from a channel requirement and does not identify the pump switch, protection, connector, or current path.",
+      "retainedFunction": "One dosing-pump channel remains mandatory pending a real component topology."
+    },
+    {
+      "id": "rodeostat-analog_afe-usb_power_entry_word",
+      "product": "Rodeostat",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "ItsyBitsy M4 host module",
+      "evidence": "The custom analog board is a shield around a COTS compute module that owns its USB connector and power entry.",
+      "retainedFunction": "USB power remains present at whole-system level through the host module."
+    },
+    {
+      "id": "rodeostat-analog_afe-usb_interface_word",
+      "product": "Rodeostat",
+      "placement": "off_board_module",
+      "wholeSystemOwner": "ItsyBitsy M4 host module",
+      "evidence": "No released shield-side USB circuit is evidenced; USB data terminates on the COTS host.",
+      "retainedFunction": "USB communication remains assigned to the host module."
+    },
+    {
+      "id": "rodeostat-analog_afe-host_protocol_bridge_word",
+      "product": "Rodeostat",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "direct shield-to-host digital bus",
+      "evidence": "The shield communicates directly with its host; no protocol conversion endpoints or bridge component are evidenced.",
+      "retainedFunction": "The digital host interface remains an explicit shield interconnect."
+    },
+    {
+      "id": "opendrop-hv_controller_main-usb_interface_word",
+      "product": "OpenDrop",
+      "placement": "interconnect_only",
+      "wholeSystemOwner": "source-backed USB-C entry circuit",
+      "evidence": "The same board already has a physical USB-C power/data entry role; the second generic USB-interface word duplicates that circuit rather than naming another fitted component.",
+      "retainedFunction": "USB power/data remain required through the retained USB-C entry and its protection contract."
+    },
+    {
+      "id": "opendrop-electrode_cartridge-required_electrode_channel_word",
+      "product": "OpenDrop",
+      "placement": "passive_geometry",
+      "wholeSystemOwner": "64-channel electrode cartridge copper and mating interface",
+      "evidence": "Electrowetting electrodes are patterned conductive geometry; the channel requirement was incorrectly emitted as one two-pin fitted connector.",
+      "retainedFunction": "All 64 electrode channels remain mandatory in cartridge geometry, routing, creepage, and the controller mating interface."
+    }
+  ],
   "roleGroups": [
     {
       "universalFunctionRole": "mechanical_or_off_board_scope",

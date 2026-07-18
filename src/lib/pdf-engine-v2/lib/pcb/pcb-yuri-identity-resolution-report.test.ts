@@ -42,6 +42,7 @@ interface ResolutionReport {
     verifiedIdentityCount: number
     unresolvedIdentityCount: number
     resolvedDelta: number
+    reclassifiedNonComponentCount: number
     missingMpn: number
     missingSymbolPinout: number
   }
@@ -54,6 +55,14 @@ interface PunchlistEntry {
 }
 
 interface Punchlist {
+  resolvedIdentityIds: string[]
+  scopeReclassifications: Array<{
+    id: string
+    placement: string
+    wholeSystemOwner: string
+    evidence: string
+    retainedFunction: string
+  }>
   roleGroups: Array<{
     universalFunctionRole: string
     entries: PunchlistEntry[]
@@ -86,6 +95,8 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
     expect(report.acceptedMappings).toHaveLength(3)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
+    expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
+    expect(punchlist.scopeReclassifications).toHaveLength(14)
     expect(report.sevenProductSummary).toHaveLength(7)
     expect(report.sevenProductSummary.reduce(
       (total, product) => total + product.requiredBoards,
@@ -103,7 +114,10 @@ describe('offline seven-product PCB identity resolution report', () => {
     const remainingCategoryCounts = Object.fromEntries(
       punchlist.roleGroups.map((group) => [
         group.universalFunctionRole,
-        group.entries.filter((entry) => !acceptedIds.has(entry.id)).length,
+        group.entries.filter((entry) =>
+          !acceptedIds.has(entry.id) &&
+          !punchlist.scopeReclassifications.some((item) => item.id === entry.id))
+          .length,
       ]),
     )
     expect(report.remainingCategoryCounts).toEqual(remainingCategoryCounts)
@@ -111,6 +125,34 @@ describe('offline seven-product PCB identity resolution report', () => {
       (total, count) => total + count,
       0,
     )).toBe(report.updatedSummary.unresolvedIdentityCount)
+  })
+
+  it('publishes the evidence-backed reassignment matrix without dropping system functions', () => {
+    const punchlist = readJson<Punchlist>(PUNCHLIST_PATH)
+
+    expect(Object.fromEntries(
+      punchlist.scopeReclassifications.map((item) => [item.id, item.placement]),
+    )).toEqual({
+      'colorimeter-optical_source-detector_mount_plate_word': 'mechanical_only',
+      'ninjapcr-thermal_controller-usb_interface_tool_grounded_word': 'interconnect_only',
+      'pioreactor-wet_lab_hat-usb_interface_word': 'off_board_module',
+      'pioreactor-wet_lab_hat-firmware_storage_word': 'off_board_module',
+      'pioreactor-wet_lab_hat-host_protocol_bridge_word': 'interconnect_only',
+      'pioreactor-od_optics-usb_power_entry_word': 'interconnect_only',
+      'pioreactor-wet_actuation-required_heater_channel_word': 'functional_requirement',
+      'pioreactor-wet_actuation-required_stir_channel_word': 'functional_requirement',
+      'pioreactor-wet_actuation-required_pump_channel_word': 'functional_requirement',
+      'rodeostat-analog_afe-usb_power_entry_word': 'off_board_module',
+      'rodeostat-analog_afe-usb_interface_word': 'off_board_module',
+      'rodeostat-analog_afe-host_protocol_bridge_word': 'interconnect_only',
+      'opendrop-hv_controller_main-usb_interface_word': 'interconnect_only',
+      'opendrop-electrode_cartridge-required_electrode_channel_word': 'passive_geometry',
+    })
+    for (const item of punchlist.scopeReclassifications) {
+      expect(item.wholeSystemOwner.trim()).not.toBe('')
+      expect(item.evidence.trim()).not.toBe('')
+      expect(item.retainedFunction.trim()).not.toBe('')
+    }
   })
 
   it('links every reported acceptance to the function-keyed resolver and complete evidence', () => {
@@ -156,10 +198,11 @@ describe('offline seven-product PCB identity resolution report', () => {
       products: 7,
       requiredBoards: 8,
       verifiedIdentityCount: report.baseline.verifiedIdentityCount + 3,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 3,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 3 - 14,
       resolvedDelta: 3,
-      missingMpn: report.baseline.missingMpn - 2,
-      missingSymbolPinout: report.baseline.missingSymbolPinout - 1,
+      reclassifiedNonComponentCount: 14,
+      missingMpn: report.baseline.missingMpn - 2 - 12,
+      missingSymbolPinout: report.baseline.missingSymbolPinout - 1 - 2,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([
       expect.stringContaining('no terminal-owned chain'),

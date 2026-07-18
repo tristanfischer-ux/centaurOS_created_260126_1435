@@ -1174,4 +1174,47 @@ describe('atopile-generator', () => {
     expect(mainAto).not.toContain('NOT-A-REAL-MPN-999')
     expect(mainAto).toContain('TBD (detailed design) - passive_c')
   })
+
+  it('records architecture channel requirements without inventing fitted components', () => {
+    const outDir = makeTmpDir('atopile-function-requirements-')
+    tmpDirs.push(outDir)
+    const result = generateAtopileProject({
+      moduleDecomposition: { modules: [] },
+      orchestratorContract: { topology: [] },
+    }, outDir, {
+      requiredWordIds: [],
+      requiredFunctionRoles: [
+        'heater_channel',
+        'stir_channel',
+        'pump_channel',
+        'electrode_channel',
+      ],
+    })
+    const mainAto = readFileSync(result.mainAtoPath, 'utf8')
+
+    expect(result.components).toEqual([])
+    expect(result.functionRequirements).toEqual([
+      {
+        role: 'heater_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'stir_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'pump_channel',
+        implementation: 'unresolved_board_function',
+        reason: 'architecture function requires a real component topology',
+      },
+      {
+        role: 'electrode_channel',
+        implementation: 'passive_board_geometry',
+        reason: 'electrode channel is patterned board geometry, not a fitted package',
+      },
+    ])
+    expect(mainAto).not.toContain('Part_required_')
+  })
 })
