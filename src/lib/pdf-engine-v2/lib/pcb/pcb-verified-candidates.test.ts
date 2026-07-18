@@ -229,6 +229,78 @@ describe('verified function-keyed PCB candidates', () => {
     },
   )
 
+  it.each([
+    {
+      request: {
+        wordId: 'dac_output_stage_word',
+        nameHuman: 'Precision bipolar DAC conditioning stage',
+        characterId: 'dac_output_stage',
+        functionClass: 'op_amp',
+        requiredRatings: { voltageV: 30 },
+      },
+      manufacturer: 'Texas Instruments',
+      partNumber: 'OP07CDR',
+      expectedSymbol: 'Amplifier_Operational:OP07',
+      expectedFootprint: 'SOIC-8_3.9x4.9mm_P1.27mm',
+    },
+    {
+      request: {
+        wordId: 'current_measurement_tia_word',
+        nameHuman: 'Selectable-gain current measurement TIA',
+        characterId: 'current_measurement_tia',
+        functionClass: 'op_amp',
+        requiredRatings: { voltageV: 30 },
+      },
+      manufacturer: 'STMicroelectronics',
+      partNumber: 'TL072CDT',
+      expectedSymbol: 'Amplifier_Operational:TL072',
+      expectedFootprint: 'SOIC-8_3.9x4.9mm_P1.27mm',
+    },
+    {
+      request: {
+        wordId: 'usb_power_entry_word',
+        nameHuman: 'Full-featured USB-C power and data receptacle',
+        characterId: 'usb_power_entry',
+        functionClass: 'usb_connector',
+        requiredRatings: { voltageV: 5, currentA: 5 },
+      },
+      manufacturer: 'Amphenol ICC',
+      partNumber: '12401610E4#2A',
+      expectedSymbol: 'Connector:USB_C_Receptacle',
+      expectedFootprint: 'USB_C_Receptacle_Amphenol_12401610E4-2A',
+    },
+  ] as const)(
+    'promotes frozen-gold $partNumber through exact local symbol and footprint parity',
+    ({
+      request,
+      manufacturer,
+      partNumber,
+      expectedSymbol,
+      expectedFootprint,
+    }) => {
+      const lookup = (): DbCascadeResult => ({
+        ...CACHE_HIT,
+        result: {
+          ...CACHE_HIT.result!,
+          mpn: partNumber,
+          manufacturer,
+          description: expectedFootprint,
+        },
+      })
+
+      expect(resolveVerifiedComponentIdentity(request, lookup, {
+        symbolsRoot: '/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols',
+        footprintsRoot: '/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints',
+      })).toMatchObject({
+        manufacturer,
+        partNumber,
+        symbolId: expectedSymbol,
+        footprint: { footprint: expectedFootprint },
+        resolutionTier: 'mpn_symbol_footprint',
+      })
+    },
+  )
+
   it('does not repurpose the four-pin JST host interconnect as USB power entry', () => {
     const lookup = (): DbCascadeResult => ({
       ...CACHE_HIT,
@@ -323,6 +395,7 @@ describe('verified function-keyed PCB candidates', () => {
         footprint: 'C_0603_1608Metric',
         padCount: 2,
         nonElectricalPadCount: 0,
+        electricalPadCount: 2,
       },
       resolutionTier: 'mpn_symbol_footprint',
     })

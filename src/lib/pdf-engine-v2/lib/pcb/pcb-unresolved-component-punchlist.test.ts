@@ -190,28 +190,28 @@ describe('Yuri unresolved fitted-component punchlist', () => {
       Colorimeter: 2,
       NinjaPCR: 10,
       Pioreactor: 3,
-      Rodeostat: 7,
-      OpenDrop: 11,
+      Rodeostat: 5,
+      OpenDrop: 10,
     })
     expect(boardCounts).toEqual({
       optical_source: 2,
       thermal_controller: 10,
       wet_lab_hat: 1,
       od_optics: 2,
-      analog_afe: 7,
-      hv_controller_main: 11,
+      analog_afe: 5,
+      hv_controller_main: 10,
     })
     expect(gapCounts).toEqual({
-      mpn: 24,
-      symbol_pinout: 9,
+      mpn: 22,
+      symbol_pinout: 8,
     })
     expect(punchlist.summary).toEqual({
       baselineUnresolvedFittedComponents: 50,
-      resolvedIdentityCount: 3,
+      resolvedIdentityCount: 6,
       reclassifiedNonComponentCount: 14,
-      remainingUnresolvedFittedComponents: 33,
-      remainingMissingMpn: 24,
-      remainingMissingSymbolPinout: 9,
+      remainingUnresolvedFittedComponents: 30,
+      remainingMissingMpn: 22,
+      remainingMissingSymbolPinout: 8,
       targetBoards: 8,
       productsWithFittedBoards: 5,
     })
@@ -221,7 +221,7 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const punchlist = readPunchlist()
     const reclassifications = punchlist.scopeReclassifications
 
-    expect(punchlist.resolvedIdentityIds).toHaveLength(3)
+    expect(punchlist.resolvedIdentityIds).toHaveLength(6)
     expect(reclassifications).toHaveLength(14)
     expect(new Set(reclassifications.map((item) => item.id)).size).toBe(14)
     expect(reclassifications.reduce<Record<string, number>>((counts, item) => {
@@ -267,9 +267,9 @@ describe('Yuri unresolved fitted-component punchlist', () => {
     const markdown = readFileSync(MARKDOWN_PATH, 'utf8')
     const entries = punchlist.roleGroups.flatMap((group) => group.entries)
 
-    expect(markdown).toContain('33 unresolved fitted components')
-    expect(markdown).toContain('24 missing MPN')
-    expect(markdown).toContain('9 missing symbol/pinout')
+    expect(markdown).toContain('30 unresolved fitted components')
+    expect(markdown).toContain('22 missing MPN')
+    expect(markdown).toContain('8 missing symbol/pinout')
     expect(markdown).toContain('14 evidence-backed non-components')
     for (const group of punchlist.roleGroups) {
       expect(markdown).toContain(group.universalFunctionRole)

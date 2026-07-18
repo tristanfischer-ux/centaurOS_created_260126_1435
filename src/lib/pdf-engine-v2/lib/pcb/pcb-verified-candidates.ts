@@ -111,6 +111,30 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     referenceEvidence: 'NinjaPCR frozen schematic, revision 181768d6ec068a6dd68593042167699285744768',
   },
   {
+    roleTest: /dac[_ -]?(?:output|conditioning)|bipolar[_ -]?dac/i,
+    functionClass: 'op_amp',
+    manufacturer: 'Texas Instruments',
+    partNumber: 'OP07CDR',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Amplifier_Operational', symbol: 'OP07' },
+    ratings: { voltageV: 36 },
+    packageEvidence: 'TI OP07CDR: single low-offset amplifier in 8-pin SOIC (D)',
+    referenceEvidence: 'Rodeostat frozen high-current schematic U11/U13 DAC shift-and-scale stages and BOM LCSC C7433=OP07CDR, revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; TI OP07x datasheet SLOS099H',
+    pinoutEvidence: 'TI SOIC-8 pinout 1/5=offset null, 2=IN-, 3=IN+, 4=V-, 6=OUT, 7=V+, 8=NC; local KiCad Amplifier_Operational:OP07 with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
+    roleTest: /current[_ -]?measurement[_ -]?tia|selectable[_ -]?gain[_ -]?tia|transimpedance/i,
+    functionClass: 'op_amp',
+    manufacturer: 'STMicroelectronics',
+    partNumber: 'TL072CDT',
+    footprint: { library: 'Package_SO', footprint: 'SOIC-8_3.9x4.9mm_P1.27mm' },
+    symbol: { library: 'Amplifier_Operational', symbol: 'TL072' },
+    ratings: { voltageV: 36 },
+    packageEvidence: 'ST TL072CDT: dual low-noise JFET-input amplifier in SO-8',
+    referenceEvidence: 'Rodeostat frozen high-current schematic U9 directly connects WRK_ELECT to selectable-gain TIA_OUT_BIP and BOM LCSC C6961=TL072CDT, revision 86e4708fea84f8fc33bcbfc9a706b06f4b770efd; ST TL072 datasheet',
+    pinoutEvidence: 'ST SO-8 pinout 1=OUT1, 2=IN1-, 3=IN1+, 4=VCC-, 5=IN2+, 6=IN2-, 7=OUT2, 8=VCC+; local KiCad Amplifier_Operational:TL072 with Package_SO:SOIC-8_3.9x4.9mm_P1.27mm',
+  },
+  {
     roleTest: /current[_ -]?measurement[_ -]?tia|(^|[_ -])tia($|[_ -])|signal[_ -]?conditioner|op[_ -]?amp/i,
     functionClass: 'op_amp',
     manufacturer: 'Texas Instruments',
@@ -180,6 +204,21 @@ const CANDIDATE_RULES: readonly CandidateRule[] = [
     packageEvidence: 'Microchip MCP1700T-3302E/TT: fixed 3.3 V, 250 mA LDO in 3-lead SOT-23',
     referenceEvidence: 'Microchip MCP1700 datasheet DS20001826F and forge-truth distributor/spec-document cache',
     pinoutEvidence: 'Microchip SOT-23 pinout 1=GND, 2=VOUT, 3=VIN; local KiCad Regulator_Linear:MCP1700x-330xxTT with Package_TO_SOT_SMD:SOT-23',
+  },
+  {
+    roleTest: /usb[_ -]?(?:c[_ -]?)?(?:power[_ -]?entry|receptacle)|type[_ -]?c[_ -]?receptacle/i,
+    functionClass: 'usb_connector',
+    manufacturer: 'Amphenol ICC',
+    partNumber: '12401610E4#2A',
+    footprint: {
+      library: 'Connector_USB',
+      footprint: 'USB_C_Receptacle_Amphenol_12401610E4-2A',
+    },
+    symbol: { library: 'Connector', symbol: 'USB_C_Receptacle' },
+    ratings: { voltageV: 5, currentA: 5 },
+    packageEvidence: 'Amphenol 12401610E4#2A: full-featured 24-contact right-angle SMT USB-C receptacle',
+    referenceEvidence: 'OpenDrop V4 frozen schematic J1 exact Amphenol 12401610E4-2A footprint, revision 934a44db3ed41c24ae4dddb5b805a22e4166284b; Amphenol USB Type-C manufacturer data',
+    pinoutEvidence: 'Amphenol contacts A1-A12/B1-B12 plus shield; local KiCad Connector:USB_C_Receptacle and exact Connector_USB footprint',
   },
   {
     roleTest: /source[_ -]?board[_ -]?connector|four[_ -]?(?:position|pin)[_ -]?(?:board[_ -]?to[_ -]?board[_ -]?)?connector/i,
@@ -347,7 +386,7 @@ export function resolveVerifiedComponentIdentity(
       reason: `${rule.partNumber} symbol footprint ${symbol.footprintId} does not match ${expectedFootprintId}`,
     }
   }
-  const electricalPads = footprint.padCount - footprint.nonElectricalPadCount
+  const electricalPads = footprint.electricalPadCount
   if (symbol.pins.length !== electricalPads) {
     return {
       status: 'unresolved',

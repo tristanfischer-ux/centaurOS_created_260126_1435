@@ -28,6 +28,7 @@ export interface PcbFootprintSpec {
   footprint: string
   padCount: number
   nonElectricalPadCount: number
+  electricalPadCount: number
 }
 
 export type PcbComponentResolutionTier =
@@ -188,10 +189,15 @@ export function evaluatePcbComponentResolution(
     const { padCount, nonElectricalPadCount } = candidate.footprint
     const hasValidPadCounts = Number.isInteger(padCount)
       && Number.isInteger(nonElectricalPadCount)
+      && Number.isInteger(candidate.footprint.electricalPadCount)
       && padCount > 0
       && nonElectricalPadCount >= 0
       && nonElectricalPadCount < padCount
-    electricalPadCount = hasValidPadCounts ? padCount - nonElectricalPadCount : null
+      && candidate.footprint.electricalPadCount > 0
+      && candidate.footprint.electricalPadCount <= padCount - nonElectricalPadCount
+    electricalPadCount = hasValidPadCounts
+      ? candidate.footprint.electricalPadCount
+      : null
     if (electricalPadCount === null || uniquePinCount !== electricalPadCount) {
       findings.push(finding(
         candidate,

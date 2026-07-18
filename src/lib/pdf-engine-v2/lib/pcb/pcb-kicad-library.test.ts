@@ -70,6 +70,7 @@ describe('KiCad component identity library', () => {
       footprint: 'PART',
       padCount: 6,
       nonElectricalPadCount: 3,
+      electricalPadCount: 3,
     })
   })
 

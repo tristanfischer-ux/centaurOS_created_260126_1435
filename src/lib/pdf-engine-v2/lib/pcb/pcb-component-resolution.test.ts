@@ -21,6 +21,7 @@ function verifiedCandidate(
       footprint: 'TQFP-48_7x7mm_P0.5mm',
       padCount: 48,
       nonElectricalPadCount: 0,
+      electricalPadCount: 48,
     },
     pins: Array.from({ length: 48 }, (_, index) => ({
       number: String(index + 1),

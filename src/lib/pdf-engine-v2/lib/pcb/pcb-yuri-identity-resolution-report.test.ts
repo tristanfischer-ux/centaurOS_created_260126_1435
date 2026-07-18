@@ -93,7 +93,7 @@ describe('offline seven-product PCB identity resolution report', () => {
     )
 
     expect(report.schema).toBe('pcb-yuri-identity-resolution-report/v1')
-    expect(report.acceptedMappings).toHaveLength(3)
+    expect(report.acceptedMappings).toHaveLength(6)
     expect([...acceptedIds].every((id) => baselineIds.has(id))).toBe(true)
     expect([...acceptedIds].sort()).toEqual([...punchlist.resolvedIdentityIds].sort())
     expect(punchlist.scopeReclassifications).toHaveLength(14)
@@ -197,12 +197,12 @@ describe('offline seven-product PCB identity resolution report', () => {
     expect(report.updatedSummary).toEqual({
       products: 7,
       requiredBoards: 8,
-      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 3,
-      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 3 - 14,
-      resolvedDelta: 3,
+      verifiedIdentityCount: report.baseline.verifiedIdentityCount + 6,
+      unresolvedIdentityCount: report.baseline.unresolvedIdentityCount - 6 - 14,
+      resolvedDelta: 6,
       reclassifiedNonComponentCount: 14,
-      missingMpn: report.baseline.missingMpn - 2 - 12,
-      missingSymbolPinout: report.baseline.missingSymbolPinout - 1 - 2,
+      missingMpn: report.baseline.missingMpn - 4 - 12,
+      missingSymbolPinout: report.baseline.missingSymbolPinout - 2 - 2,
     })
     expect(report.limitations).toEqual(expect.arrayContaining([
       expect.stringContaining('no terminal-owned chain'),

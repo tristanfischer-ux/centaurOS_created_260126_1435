@@ -7,7 +7,7 @@
 
 ## Evidence boundary
 
-The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Three identities were subsequently resolved and 14 roles were proven to be non-components. The active residual is therefore **33 unresolved fitted components**: **24 missing MPN** and **9 missing symbol/pinout**.
+The frozen seven-product/eight-board offline report started with 85 fitted components: 35 identity-verified and 50 unresolved. Six identities were subsequently resolved and 14 roles were proven to be non-components. The active residual is therefore **30 unresolved fitted components**: **22 missing MPN** and **8 missing symbol/pinout**.
 
 The detailed sections preserve all 50 baseline entries for traceability. Items listed in the reassignment matrix are closed only as fitted-component identities; their mechanical, interconnect, host-side, passive-geometry, or functional obligations remain in whole-system architecture. Every other named part remains a candidate. A gold schematic value, repository footprint name, or forge-truth cache row is not resolution by itself. Resolution still requires:
 
@@ -19,6 +19,8 @@ The detailed sections preserve all 50 baseline entries for traceability. Items l
 
 `Unknown` is intentional where neither the offline report nor frozen source proves a rating. Placeholder footprints and synthetic pins are not rating evidence.
 
+The three identities added in this delta have exact gold/manufacturer mappings and pass local symbol/footprint parity. Runtime promotion remains DB-gated until the scheduled ingest path adds those identities to forge-truth; no chain-side database write was made here.
+
 ## Counts
 
 | Product | Board(s) | Residual unresolved fitted components |
@@ -26,9 +28,9 @@ The detailed sections preserve all 50 baseline entries for traceability. Items l
 | Colorimeter | `optical_source` | 2 |
 | NinjaPCR | `thermal_controller` | 10 |
 | Pioreactor | `wet_lab_hat`, `od_optics` | 3 |
-| Rodeostat | `analog_afe` | 7 |
-| OpenDrop | `hv_controller_main` | 11 |
-| **Total** | **6 boards with residual fitted-component gaps** | **33** |
+| Rodeostat | `analog_afe` | 5 |
+| OpenDrop | `hv_controller_main` | 10 |
+| **Total** | **6 boards with residual fitted-component gaps** | **30** |
 
 The architecture still requires eight board deliverables across five products. `wet_actuation` and `electrode_cartridge` remain required boards even though their current gaps are function contracts and passive copper geometry rather than package identities.
 
@@ -87,7 +89,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## power_entry_conversion_and_protection
 
 <a id="colorimeter-optical_source-dc_dc_regulator_word"></a>
-- **Colorimeter · `optical_source` · `dc_dc_regulator_word`** — Ratings: candidate implies 3.3 V output; input, load, dropout and thermal margin unknown. Gap: **symbol/pinout** for DB-backed `MCP1700T-3302E/TT`. Action: verify ratings, map complete manufacturer pinout and exact SOT-23-5 footprint.
+- **Colorimeter · `optical_source` · `dc_dc_regulator_word`** — **Resolved:** Microchip `MCP1700T-3302E/TT`, fixed 3.3 V/250 mA, with complete `MCP1700x-330xxTT` pinout and SOT-23 footprint. The resolver rejects it whenever the required input exceeds 6 V.
 
 <a id="ninjapcr-thermal_controller-terminal_block_word"></a>
 - **NinjaPCR · `thermal_controller` · `terminal_block_word`** — Ratings: 12 V/high-current thermal path known; current, wire gauge and temperature rise unknown. Gap: **MPN**. Gold candidate: `SCREW-TERMINAL-GREEN(2P-3.5)` family. Action: derive load/current and extract or source an exact rated connector.
@@ -114,7 +116,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Pioreactor · `od_optics` · `usb_power_entry_word`** — Ratings: board ownership, current, connector and shield treatment unknown. Gap: **MPN**. Gold candidate: two `BM04B-SRSS-TB` JST host connectors, not USB. Action: reconcile to gold interconnect; remove local USB if host-powered.
 
 <a id="pioreactor-od_optics-esd_protection_network_word"></a>
-- **Pioreactor · `od_optics` · `esd_protection_network_word`** — Ratings: gold proves 5 V TVS, 15 V clamp, SOD-923; net count/capacitance/surge standard unknown. Gap: **MPN** in the current resolver. Gold candidate: Toshiba `DF2S6.8MFS,L3M`. Action: ingest manufacturer datasheet, derive protected nets, map complete symbol/footprint.
+- **Pioreactor · `od_optics` · `esd_protection_network_word`** — **Resolved:** frozen Eye-Spy BOM D2-D5 specifies Toshiba `DF2S6.8MFS,L3M`, 5 V working/15 V clamp, with two-pin TVS symbol and exact SOD-923 footprint.
 
 <a id="pioreactor-od_optics-ferrite_emc_bead_word"></a>
 - **Pioreactor · `od_optics` · `ferrite_emc_bead_word`** — Ratings: need, impedance/frequency, current and DCR unknown. Gap: **MPN**; absent from frozen Eye-Spy BOM. Action: remove unless analysis requires it; otherwise derive and ingest.
@@ -132,7 +134,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 - **Rodeostat · `analog_afe` · `ferrite_emc_bead_word`** — Ratings: rail/noise target, impedance, current and DCR unknown. Gap: **MPN**. Action: derive from analog noise analysis, then ingest exact bead.
 
 <a id="opendrop-hv_controller_main-usb_power_entry_word"></a>
-- **OpenDrop · `hv_controller_main` · `usb_power_entry_word`** — Ratings: USB-C form known; current/data role, shield/ESD and datum unknown. Gap: **MPN** in resolver. Gold candidate: apparent Amphenol `12401610E4-2A`. Action: verify manufacturer datasheet/lifecycle, ingest, map all USB-C pins and footprint.
+- **OpenDrop · `hv_controller_main` · `usb_power_entry_word`** — **Resolved:** frozen J1 and Amphenol evidence identify `12401610E4#2A`, a full-featured 24-contact USB-C receptacle; the resolver maps all A/B contacts plus shield to the exact local footprint.
 
 <a id="opendrop-hv_controller_main-esd_protection_network_word"></a>
 - **OpenDrop · `hv_controller_main` · `esd_protection_network_word`** — Ratings: protected USB/LV/HV interfaces, clamp, capacitance and channels unknown. Gap: **MPN**. Action: partition domains, derive per-interface protection and ingest exact devices.
@@ -184,13 +186,13 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## precision_analog_measurement_and_control
 
 <a id="rodeostat-analog_afe-dac_output_stage_word"></a>
-- **Rodeostat · `analog_afe` · `dac_output_stage_word`** — Ratings: precision output role known; range/current, offset/noise, settling and rails unknown. Gap: **MPN**. Gold candidate: OP07 family positions (value evidence only). Action: trace released setpoint/output chain, derive ratings and ingest exact ordering codes.
+- **Rodeostat · `analog_afe` · `dac_output_stage_word`** — **Resolved:** frozen U11/U13 nets and BOM LCSC C7433 identify TI `OP07CDR` for bipolar DAC shift/scale; complete OP07 SOIC-8 pinout and footprint are mapped.
 
 <a id="rodeostat-analog_afe-adc_input_stage_word"></a>
 - **Rodeostat · `analog_afe` · `adc_input_stage_word`** — Ratings: measurement role known; ADC ownership, resolution/rate, range/noise and reference unknown. Gap: **symbol/pinout** for `NAU7802SGI`, which is NinjaPCR-derived and not Rodeostat-proven. Action: trace real conversion path; remove NAU7802 unless evidence supports it.
 
 <a id="rodeostat-analog_afe-current_measurement_tia_word"></a>
-- **Rodeostat · `analog_afe` · `current_measurement_tia_word`** — Ratings: low-leakage multirange TIA role known; ranges, bias/noise, bandwidth/stability and rails unknown. Gap: **symbol/pinout** for `OPA334AIDBVR`. Gold has OPA129/OPA227/OP07 families. Action: derive requirements, compare manufacturer data, map only the selected exact part.
+- **Rodeostat · `analog_afe` · `current_measurement_tia_word`** — **Resolved:** frozen U9 directly joins `WRK_ELECT` to the selectable-gain TIA network; BOM LCSC C6961 identifies ST `TL072CDT`, with complete TL072 SOIC-8 pinout and footprint.
 
 <a id="opendrop-hv_controller_main-dac_output_stage_word"></a>
 - **OpenDrop · `hv_controller_main` · `dac_output_stage_word`** — Ratings and need unknown. Gap: **MPN**; audit identifies this as foreign potentiostat-template residue. Action: remove unless real MAX1771/HV feedback source proves a DAC stage.
@@ -212,7 +214,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## board_to_board_and_cartridge_interconnect
 
 <a id="colorimeter-optical_source-source_board_connector_word"></a>
-- **Colorimeter · `optical_source` · `source_board_connector_word`** — Ratings: gold requires two four-position JST-SH connectors; exact code, pin contract, current and orientation unknown. Gap: **MPN**. Action: extract exact connector/mating cable codes from frozen BOM/source, ingest and map both connectors.
+- **Colorimeter · `optical_source` · `source_board_connector_word`** — **Resolved:** JST `BM04B-SRSS-TB`, four-position 1.00 mm vertical SH header rated 50 V/1 A, with pins 1-4 and exact JST footprint; mechanical MP pads are excluded from electrical parity.
 
 <a id="opendrop-electrode_cartridge-required_electrode_channel_word"></a>
 - **OpenDrop · `electrode_cartridge` · `required_electrode_channel_word`** — Ratings: 64 channels and cartridge mating known; connector count/code, voltage, creepage, contact rating and cycles unknown. Gap: **MPN**. Gold candidate: Mini-DIMM/cartridge interconnect family. Action: extract 64-channel pin/domain map, resolve exact connector or custom edge geometry, prove creepage/alignment and complete pads.
@@ -220,7 +222,7 @@ These **14 evidence-backed non-components** are removed from fitted BOM scope wi
 ## Ordered next actions
 
 1. **Derive ratings from board contracts** — especially NinjaPCR TEC/heater safety, Pioreactor optics, Rodeostat analog performance, and OpenDrop HV/interconnect domains.
-2. **Ingest manufacturer-backed gold candidates** — Eye-Spy JSTs, OpenDrop USB-C code, Colorimeter LED identities, and released NinjaPCR/Rodeostat BOM identities.
-3. **Close the 9 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
+2. **Ingest manufacturer-backed gold candidates** — Colorimeter LED identities and released NinjaPCR/Rodeostat BOM identities.
+3. **Close the 8 symbol/pinout blockers** — only after role/rating checks; map complete local symbols and exact footprints with pin/pad parity.
 4. **Implement the preserved function contracts** — replace Pioreactor channel requirements with complete switching/protection/connector topologies, and prove all 64 OpenDrop electrode routes and mating contacts.
-5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 33 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.
+5. **Regenerate the offline report** — done only by the terminal owner after source work. The acceptance target is 30 → 0 unresolved fitted identities; this document does not claim a terminal-owned chain rerun.

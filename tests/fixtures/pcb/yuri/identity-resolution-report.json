@@ -71,6 +71,67 @@
       "symbolPinout": "Device:D_TVS pins 1-2; Diode_SMD:D_SOD-923",
       "manufacturerEvidence": "Toshiba DF2S6.8MFS product data and frozen Eye-Spy manufacturer ordering code",
       "databaseEvidence": "forge-truth frozen Eye-Spy BOM/schematic row"
+    },
+    {
+      "punchlistId": "rodeostat-analog_afe-dac_output_stage_word",
+      "resolverRequest": {
+        "wordId": "dac_output_stage_word",
+        "nameHuman": "Precision bipolar DAC conditioning stage",
+        "characterId": "dac_output_stage",
+        "functionClass": "op_amp",
+        "requiredRatings": {
+          "voltageV": 30
+        }
+      },
+      "manufacturer": "Texas Instruments",
+      "partNumber": "OP07CDR",
+      "roleCompatibility": "Frozen U11/U13 OP07 stages shift the host DAC from 0-3.3 V to bipolar and apply selectable gain.",
+      "package": "8-pin SOIC (D), 3.9 x 4.9 mm, 1.27 mm pitch",
+      "ratings": "36 V maximum supply span; low-offset single operational amplifier",
+      "symbolPinout": "Amplifier_Operational:OP07; pins 1/5 offset null, 2 IN-, 3 IN+, 4 V-, 6 OUT, 7 V+, 8 NC; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "TI OP07x data sheet SLOS099H; frozen Rodeostat U11/U13 schematic nets and BOM LCSC C7433",
+      "databaseEvidence": "Exact resolver mapping is DB-gated; the local forge-truth snapshot still requires scheduled ingest of OP07CDR"
+    },
+    {
+      "punchlistId": "rodeostat-analog_afe-current_measurement_tia_word",
+      "resolverRequest": {
+        "wordId": "current_measurement_tia_word",
+        "nameHuman": "Selectable-gain current measurement TIA",
+        "characterId": "current_measurement_tia",
+        "functionClass": "op_amp",
+        "requiredRatings": {
+          "voltageV": 30
+        }
+      },
+      "manufacturer": "STMicroelectronics",
+      "partNumber": "TL072CDT",
+      "roleCompatibility": "Frozen U9 directly connects WRK_ELECT to the Kelvin-switched transimpedance network and TIA_OUT_BIP.",
+      "package": "8-pin SOIC, 3.9 x 4.9 mm, 1.27 mm pitch",
+      "ratings": "6-36 V supply span; dual low-noise JFET-input operational amplifier",
+      "symbolPinout": "Amplifier_Operational:TL072; pins 1 OUT1, 2 IN1-, 3 IN1+, 4 VCC-, 5 IN2+, 6 IN2-, 7 OUT2, 8 VCC+; Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "manufacturerEvidence": "ST TL072 data sheet; frozen Rodeostat U9 schematic TIA nets and BOM LCSC C6961",
+      "databaseEvidence": "Exact resolver mapping is DB-gated; the local forge-truth snapshot still requires scheduled ingest of TL072CDT"
+    },
+    {
+      "punchlistId": "opendrop-hv_controller_main-usb_power_entry_word",
+      "resolverRequest": {
+        "wordId": "usb_power_entry_word",
+        "nameHuman": "Full-featured USB-C power and data receptacle",
+        "characterId": "usb_power_entry",
+        "functionClass": "usb_connector",
+        "requiredRatings": {
+          "voltageV": 5,
+          "currentA": 5
+        }
+      },
+      "manufacturer": "Amphenol ICC",
+      "partNumber": "12401610E4#2A",
+      "roleCompatibility": "Frozen OpenDrop J1 is the board USB-C power/data entry; duplicate interface placeholders remain out of fitted scope.",
+      "package": "24-contact right-angle SMT USB-C receptacle with through-hole shield tabs",
+      "ratings": "USB 3.2 Gen 2 full-featured receptacle; USB Type-C current capability up to 5 A",
+      "symbolPinout": "Connector:USB_C_Receptacle; contacts A1-A12/B1-B12 plus SH; Connector_USB:USB_C_Receptacle_Amphenol_12401610E4-2A",
+      "manufacturerEvidence": "Amphenol 12401610E4#2A manufacturer data; frozen OpenDrop J1 exact footprint identity",
+      "databaseEvidence": "Exact resolver mapping is DB-gated; the local forge-truth snapshot still requires scheduled ingest of 12401610E4#2A"
     }
   ],
   "sevenProductSummary": [
@@ -107,37 +168,38 @@
     {
       "product": "Rodeostat",
       "requiredBoards": 1,
-      "resolvedDelta": 0,
-      "remainingUnresolved": 7
+      "resolvedDelta": 2,
+      "remainingUnresolved": 5
     },
     {
       "product": "OpenDrop",
       "requiredBoards": 2,
-      "resolvedDelta": 0,
-      "remainingUnresolved": 11
+      "resolvedDelta": 1,
+      "remainingUnresolved": 10
     }
   ],
   "updatedSummary": {
     "products": 7,
     "requiredBoards": 8,
-    "verifiedIdentityCount": 38,
-    "unresolvedIdentityCount": 33,
-    "resolvedDelta": 3,
+    "verifiedIdentityCount": 41,
+    "unresolvedIdentityCount": 30,
+    "resolvedDelta": 6,
     "reclassifiedNonComponentCount": 14,
-    "missingMpn": 24,
-    "missingSymbolPinout": 9
+    "missingMpn": 22,
+    "missingSymbolPinout": 8
   },
   "remainingCategoryCounts": {
     "mechanical_or_off_board_scope": 0,
     "optical_source_and_visual_indication": 8,
-    "power_entry_conversion_and_protection": 13,
+    "power_entry_conversion_and_protection": 12,
     "digital_compute_communications_and_storage": 6,
-    "precision_analog_measurement_and_control": 6,
+    "precision_analog_measurement_and_control": 4,
     "wet_actuation_drive": 0,
     "board_to_board_and_cartridge_interconnect": 0
   },
   "limitations": [
     "This is an offline identity delta against the frozen 50-item report; no terminal-owned chain or fabrication pipeline was rerun.",
+    "The three newly mapped identities are exact gold/manufacturer resolutions, but runtime promotion remains DB-gated until scheduled ingest adds them to forge-truth.",
     "NinjaPCR's regulator remains unresolved because a direct 12 V rail exceeds the MCP1700 absolute input range.",
     "No candidate without an exact manufacturer ordering code, compatible ratings, package, and symbol/pinout source was promoted.",
     "Fourteen roles were removed only from fitted-component scope; each retains an explicit whole-system owner or board-function requirement in the architecture record."
